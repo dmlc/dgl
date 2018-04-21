@@ -18,7 +18,6 @@ class mx_Graph(Graph):
             self.set_repr(n, h_init)
 
     def set_repr(self, u, h_u, name='h'):
-        #import ipdb; ipdb.set_trace()
         assert u in self.nodes
         kwarg = {name: h_u}
         self.add_node(u, **kwarg)
