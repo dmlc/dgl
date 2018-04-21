@@ -21,12 +21,6 @@ class mx_Graph(Graph):
         assert u in self.nodes
         kwarg = {name: h_u}
         self.add_node(u, **kwarg)
-        '''
-        if name == None:
-            self.add_node(u, h=h_u)
-        else:
-            self.add_node(u, name=h_u)
-        '''
 
     def get_repr(self, u, name='h'):
         assert u in self.nodes
