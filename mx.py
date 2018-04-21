@@ -17,19 +17,21 @@ class mx_Graph(Graph):
         for n in self.nodes:
             self.set_repr(n, h_init)
 
-    def set_repr(self, u, h_u, name=None):
+    def set_repr(self, u, h_u, name='h'):
+        #import ipdb; ipdb.set_trace()
         assert u in self.nodes
+        kwarg = {name: h_u}
+        self.add_node(u, **kwarg)
+        '''
         if name == None:
             self.add_node(u, h=h_u)
         else:
             self.add_node(u, name=h_u)
+        '''
 
-    def get_repr(self, u, name=None):
+    def get_repr(self, u, name='h'):
         assert u in self.nodes
-        if name == None:
-            return self.nodes[u]['h']
-        else:
-            return self.nodes[u][name]
+        return self.nodes[u][name]
 
     def set_msg_func(self, func=None, u=None):
         """Function that gathers messages from neighbors"""
