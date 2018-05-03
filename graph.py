@@ -128,8 +128,8 @@ class DiGraph(nx.DiGraph, NN.Module):
                 source = T.stack([self.node[u]['state'] for u, _ in ebunch])
                 edge_tag = T.stack([self[u][v]['tag'] for u, v in ebunch])
                 message = f(source, edge_tag)
-                for u, v in ebunch:
-                    self[u][v]['state'] = message
+                for i, (u, v) in enumerate(ebunch):
+                    self[u][v]['state'] = message[i]
             else:
                 for u, v in ebunch:
                     self[u][v]['state'] = f(
