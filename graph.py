@@ -1,6 +1,7 @@
 import networkx as nx
 import torch as T
 import torch.nn as NN
+from util import *
 
 class DiGraph(nx.DiGraph, NN.Module):
     '''
@@ -25,7 +26,7 @@ class DiGraph(nx.DiGraph, NN.Module):
     def add_edge(self, u, v, tag=None, attr_dict=None, **attr):
         nx.DiGraph.add_edge(self, u, v, tag=tag, attr_dict=attr_dict, **attr)
 
-    def add_edges_from(self, ebunch, tag=tag, attr_dict=None, **attr):
+    def add_edges_from(self, ebunch, tag=None, attr_dict=None, **attr):
         nx.DiGraph.add_edges_from(self, ebunch, tag=tag, attr_dict=attr_dict, **attr)
 
     def _nodes_or_all(self, nodes='all'):
@@ -49,20 +50,20 @@ class DiGraph(nx.DiGraph, NN.Module):
         nodes = self._nodes_or_all(nodes)
 
         for v in nodes:
-            self.node[v]['state'] = T.zeros(shape)
+            self.node[v]['state'] = tovar(T.zeros(shape))
 
     def init_node_tag_with(self, shape, init_func, dtype=T.float32, nodes='all', args=()):
         nodes = self._nodes_or_all(nodes)
 
         for v in nodes:
-            self.node[v]['tag'] = init_func(NN.Parameter(T.zeros(shape, dtype=dtype)), *args)
+            self.node[v]['tag'] = init_func(NN.Parameter(tovar(T.zeros(shape, dtype=dtype))), *args)
             self.register_parameter(self._node_tag_name(v), self.node[v]['tag'])
 
     def init_edge_tag_with(self, shape, init_func, dtype=T.float32, edges='all', args=()):
         edges = self._edges_or_all(edges)
 
         for u, v in edges:
-            self[u][v]['tag'] = init_func(NN.Parameter(T.zeros(shape, dtype=dtype)), *args)
+            self[u][v]['tag'] = init_func(NN.Parameter(tovar(T.zeros(shape, dtype=dtype))), *args)
             self.register_parameter(self._edge_tag_name(u, v), self[u][v]['tag'])
 
     def remove_node_tag(self, nodes='all'):
@@ -115,7 +116,7 @@ class DiGraph(nx.DiGraph, NN.Module):
         '''
         batched: whether to do a single batched computation instead of iterating
         update function: accepts a node attribute dictionary (including state and tag),
-        and a dictionary of edge attribute dictionaries
+        and a list of tuples (source node, target node, edge attribute dictionary)
         '''
         self.update_funcs.append((self._nodes_or_all(nodes), update_func, batched))
 
@@ -126,7 +127,11 @@ class DiGraph(nx.DiGraph, NN.Module):
                 # FIXME: need to optimize since we are repeatedly stacking and
                 # unpacking
                 source = T.stack([self.node[u]['state'] for u, _ in ebunch])
-                edge_tag = T.stack([self[u][v]['tag'] for u, v in ebunch])
+                edge_tags = [self[u][v]['tag'] for u, v in ebunch]
+                if all(t is None for t in edge_tags):
+                    edge_tag = None
+                else:
+                    edge_tag = T.stack([self[u][v]['tag'] for u, v in ebunch])
                 message = f(source, edge_tag)
                 for i, (u, v) in enumerate(ebunch):
                     self[u][v]['state'] = message[i]
@@ -139,5 +144,6 @@ class DiGraph(nx.DiGraph, NN.Module):
 
         # update state
         # TODO: does it make sense to batch update the nodes?
-        for v, f in self.update_funcs:
-            self.node[v]['state'] = f(self.node[v], self[v])
+        for vbunch, f, batched in self.update_funcs:
+            for v in vbunch:
+                self.node[v]['state'] = f(self.node[v], self.in_edges(v, data=True))
