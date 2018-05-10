@@ -105,7 +105,7 @@ class TreeGlimpsedClassifier(NN.Module):
         G.add_edges_from(hy_edge_list)
         G.add_edges_from(hb_edge_list)
 
-        self.G = DiGraph(G)
+        self.G = DiGraph(nx.DiGraph(G))
         hh_edge_list = [(u, v)
                         for u, v in self.G.edges()
                         if self.G.node[u]['type'] == self.G.node[v]['type'] == 'h']
@@ -175,6 +175,7 @@ class TreeGlimpsedClassifier(NN.Module):
         n_bh_edges, batch_size, _ = source.shape
         # FIXME: really using self.x is a bad design here
         _, nchan, nrows, ncols = self.x.size()
+        source, _ = self.glimpse.rescale(source, False)
         _source = source.reshape(-1, self.glimpse.att_params)
 
         m_b = T.relu(self.bh_1(_source))
@@ -232,23 +233,19 @@ class TreeGlimpsedClassifier(NN.Module):
 
         self.G.zero_node_state((self.h_dims,), batch_size, nodes=self.h_nodes_list)
         self.G.zero_node_state((self.n_classes,), batch_size, nodes=self.y_nodes_list)
-        full = self.glimpse.full().unsqueeze(0).expand(batch_size, self.glimpse.att_params)
-        for v in self.G.nodes():
-            if self.G.node[v]['type'] == 'b':
-                # Initialize bbox variables to cover the entire canvas
-                self.G.node[v]['state'] = full
+        self.G.zero_node_state((self.glimpse.att_params,), batch_size, nodes=self.b_nodes_list)
 
         for t in range(self.steps):
             self.G.step()
             # We don't change b of the root
-            self.G.node['b0']['state'] = full
+            self.G.node['b0']['state'].zero_()
 
         self.y_pre = T.stack(
                 [self.G.node['y%d' % i]['state'] for i in range(self.n_nodes - 1, self.n_nodes - self.n_leaves - 1, -1)],
                 1
                 )
         self.v_B = T.stack(
-                [self.G.node['b%d' % i]['state'] for i in range(self.n_nodes)],
+                [self.glimpse.rescale(self.G.node['b%d' % i]['state'], False)[0] for i in range(self.n_nodes)],
                 1,
                 )
         self.y_logprob = F.log_softmax(self.y_pre)
