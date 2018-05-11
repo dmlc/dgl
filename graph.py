@@ -116,6 +116,12 @@ class DiGraph(NN.Module):
         '''
         self.update_funcs.append((self._nodes_or_all(nodes), update_func, batched))
 
+    def draw(self):
+        from networkx.drawing.nx_agraph import graphviz_layout
+
+        pos = graphviz_layout(self.G, prog='dot')
+        nx.draw(self.G, pos, with_labels=True)
+
     def step(self):
         # update message
         for ebunch, f, batched in self.message_funcs:
