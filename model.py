@@ -88,7 +88,7 @@ class TreeGlimpsedClassifier(NN.Module):
                          {i: 'h%d' % i for i in range(len(G.nodes()))},
                          False
                          )
-        self.h_nodes_list = h_nodes_list = list(G.nodes)[:]
+        self.h_nodes_list = h_nodes_list = list(G.nodes)
         for h in h_nodes_list:
             G.node[h]['type'] = 'h'
         b_nodes_list = ['b%d' % i for i in range(len(h_nodes_list))]
