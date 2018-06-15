@@ -212,7 +212,7 @@ class DGLGraph(DiGraph):
           Nodes with pre-computed messages to u. Default is all
           the predecessors.
         """
-        u_is_container = type(u) in (list, tuple)
+        u_is_container = isinstance(u, list)
         u_is_tensor = isinstance(u, Tensor)
         # TODO(minjie): tensorize the loop.
         for i, uu in enumerate(utils.node_iter(u)):

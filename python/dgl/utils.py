@@ -2,7 +2,7 @@ import dgl.backend as F
 from dgl.backend import Tensor
 
 def node_iter(n):
-    n_is_container = type(n) in (list, tuple)
+    n_is_container = isinstance(n, list)
     n_is_tensor = isinstance(n, Tensor)
     if n_is_tensor:
         n = F.asnumpy(n)
@@ -15,8 +15,8 @@ def node_iter(n):
         yield n
 
 def edge_iter(u, v):
-    u_is_container = type(u) in (list, tuple)
-    v_is_container = type(v) in (list, tuple)
+    u_is_container = isinstance(u, list)
+    v_is_container = isinstance(v, list)
     u_is_tensor = isinstance(u, Tensor)
     v_is_tensor = isinstance(v, Tensor)
     if u_is_tensor:
