@@ -244,9 +244,14 @@ class DGLGraph(DiGraph):
         preds = defaultdict(list)
         for uu, vv in utils.edge_iter(u, v):
             preds[vv].append(uu)
-        dst = preds.keys()
-        src = [preds[d] for d in dst]
-        self.recvfrom(dst, src)
+        if len(preds) == 1:
+            dst = list(preds.keys())[0]
+            src = preds[dst]
+            self.recvfrom(dst, src)
+        elif len(preds) > 1:
+            dst = list(preds.keys())
+            src = [preds[d] for d in dst]
+            self.recvfrom(dst, src)
 
     def update_to(self, u):
         """Pull messages from the node's predecessors and then update it.
