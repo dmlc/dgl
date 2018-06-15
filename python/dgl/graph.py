@@ -1,6 +1,7 @@
 """Base graph class specialized for neural networks on graphs.
 """
 
+from collections import defaultdict
 import networkx as nx
 from networkx.classes.digraph import DiGraph
 
@@ -170,7 +171,7 @@ class DGLGraph(DiGraph):
         """
         nodes = self._nodes_or_all(nodes)
         edges = self._nodes_or_all(nodes)
-        assert self.readout_func is not None,
+        assert self.readout_func is not None, \
             "Readout function is not registered."
         # TODO(minjie): tensorize following loop.
         nstates = [self.nodes[n] for n in nodes]
@@ -190,7 +191,7 @@ class DGLGraph(DiGraph):
         # TODO(minjie): tensorize the loop.
         for uu, vv in utils.edge_iter(u, v):
             f_msg = self.edges[uu, vv].get(__MFUNC__, self.m_func)
-            assert f_msg is not None,
+            assert f_msg is not None, \
                 "message function not registered for edge (%s->%s)" % (uu, vv)
             m = f_msg(self.nodes[uu], self.nodes[vv], self.edges[uu, vv])
             self.edges[uu, vv][__MSG__] = m
@@ -224,9 +225,9 @@ class DGLGraph(DiGraph):
             # TODO(minjie): tensorize the message batching
             m = [self.edges[vv, uu][__MSG__] for vv in v]
             f_update = self.nodes[uu].get(__UFUNC__, self.u_func)
-            assert f_update is not None,
+            assert f_update is not None, \
                 "Update function not registered for node %s" % uu
-            self.nodes[uu] = f_update(self.nodes[uu], m)
+            self.node[uu].update(f_update(self.nodes[uu], m))
 
     def update_by_edge(self, u, v):
         """Trigger the message function on u->v and update v.
@@ -283,9 +284,9 @@ class DGLGraph(DiGraph):
         u = [uu for uu, _ in self.edges]
         v = [vv for _, vv in self.edges]
         self.sendto(u, v)
-        self.recvfrom(v)
+        self.recvfrom(list(self.nodes()))
 
-    def propagate(self, iterator='bfs'):
+    def propagate(self, iterator='bfs', **kwargs):
         """Propagate messages and update nodes using iterator.
 
         A convenient function for passing messages and updating
@@ -299,6 +300,8 @@ class DGLGraph(DiGraph):
         ----------
         iterator : str or generator of steps.
           The iterator of the graph.
+        kwargs : keyword arguments, optional
+            Arguments for pre-defined iterators.
         """
         if isinstance(iterator, str):
             # TODO Call pre-defined routine to unroll the computation.
