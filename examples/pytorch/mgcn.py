@@ -53,6 +53,7 @@ class EdgeUpdateModule(nn.Module):
         new_he = self.net1(src['hv']) + self.net2(dst['hv']) + self.net3(edge['he'])
         return {'he' : new_he}
 
+# TODO: we don't need this one anymore
 class EdgeModule(nn.Module):
     def __init__(self, he_dims):
         # use a flag to trigger either message module or edge update module.
@@ -70,7 +71,8 @@ class EdgeModule(nn.Module):
 def train(g):
     # TODO(minjie): finish the complete training algorithm.
     g = dgl.DGLGraph(g)
-    g.register_message_func(EdgeModule())
+    g.register_message_func(MessageModule())
+    g.register_edge_func(EdgeUpdateModule())
     g.register_update_func(NodeUpdateModule())
     # TODO(minjie): init hv and he
     num_iter = 10
@@ -78,4 +80,4 @@ def train(g):
         # The first call triggers message function and update all the nodes.
         g.update_all()
         # The second sendall updates all the edge features.
-        g.send_all()
+        # g.send_all()
