@@ -16,9 +16,10 @@ class NodeUpdateModule(nn.Module):
 
     def forward(self, node, msgs):
         h = node['h']
+        # (lingfan): how to write dropout, is the following correct?
         if self.p is not None:
             h = F.dropout(h, p=self.p)
-        # aggregator messages
+        # aggregate messages
         for msg in msgs:
             h += msg
         h = self.linear(h)
@@ -29,7 +30,7 @@ class NodeUpdateModule(nn.Module):
 
 
 class GCN(nn.Module):
-    def __init__(self, input_dim, num_hidden, num_classes, num_layers, activation, dropout):
+    def __init__(self, input_dim, num_hidden, num_classes, num_layers, activation, dropout=None, output_projection=True):
         super(GCN, self).__init__()
         self.layers = nn.ModuleList()
         # hidden layers
@@ -39,7 +40,8 @@ class GCN(nn.Module):
                     NodeUpdateModule(last_dim, num_hidden, act=activation, p=dropout))
             last_dim = num_hidden
         # output layer
-        self.layers.append(NodeUpdateModule(num_hidden, num_classes, p=dropout))
+        if output_projection:
+            self.layers.append(NodeUpdateModule(num_hidden, num_classes, p=dropout))
 
     def forward(self, g):
         g.register_message_func(lambda src, dst, edge: src['h'])
@@ -72,6 +74,7 @@ def main(args):
     # convert labels and masks to tensor
     labels = torch.FloatTensor(y_train)
     mask = torch.FloatTensor(train_mask.astype(np.float32))
+    n_train = torch.sum(mask)
 
     for epoch in range(args.epochs):
         # reset grad
@@ -87,7 +90,7 @@ def main(args):
         # masked cross entropy loss
         # TODO: (lingfan) use gather to speed up
         logp = F.log_softmax(logits, 1)
-        loss = torch.mean(logp * labels * mask.view(-1, 1))
+        loss = -torch.sum(logp * labels * mask.view(-1, 1)) / n_train
         print("epoch {} loss: {}".format(epoch, loss.item()))
 
         loss.backward()

@@ -126,6 +126,7 @@ def main(args):
     # convert labels and masks to tensor
     labels = torch.FloatTensor(y_train)
     mask = torch.FloatTensor(train_mask.astype(np.float32))
+    n_train = torch.sum(mask)
 
     for epoch in range(args.epochs):
         # reset grad
@@ -141,7 +142,7 @@ def main(args):
         # masked cross entropy loss
         # TODO: (lingfan) use gather to speed up
         logp = F.log_softmax(logits, 1)
-        loss = torch.mean(logp * labels * mask.view(-1, 1))
+        loss = -torch.sum(logp * labels * mask.view(-1, 1)) / n_train
         print("epoch {} loss: {}".format(epoch, loss.item()))
 
         loss.backward()
