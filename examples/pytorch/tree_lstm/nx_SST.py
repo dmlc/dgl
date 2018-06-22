@@ -20,9 +20,9 @@ class nx_BCT_Reader(object):
                 node_id = str(self.node_cnt) + '_' + str(depth+1)
                 self.node_cnt += 1
                 if isinstance(child[0], str) or isinstance(child[0], unicode):
-                    self.G.add_node(node_id, word=child[0])
+                    self.G.add_node(node_id, word=child[0], label=None)
                 else:
-                    self.G.add_node(node_id, word=None)
+                    self.G.add_node(node_id, word=None, lable=child.label())
                     if isinstance(child, Tree): #check illegal trees
                         _rec(child, node_id)
                 self.G.add_edge(node_id, nx_node)
@@ -36,5 +36,4 @@ class nx_BCT_Reader(object):
         assert mode in ['train', 'dev', 'test']
         for s in self.__dict__[mode]:
             yield self.create_BCT(s)
-
 
