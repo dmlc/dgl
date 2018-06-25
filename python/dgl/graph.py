@@ -143,7 +143,7 @@ class DGLGraph(DiGraph):
 
         The update function should be compatible with following signature:
 
-        (edge_reprs, node_reprs) -> node_reprs
+        (node_reprs, edge_reprs) -> node_reprs
 
         It computes the new node representations using the representations
         of the in-coming edges (the same concept as messages) and the node
@@ -167,7 +167,7 @@ class DGLGraph(DiGraph):
         >>> g.register_update_func(ufunc)
 
         Register for a specific node.
-        >>> g.register_update_func(ufunc, u)
+        >>> g.register_update_func(ufunc, u) # TODO Not implemented
 
         Register for multiple nodes.
         >>> u = [u1, u2, u3, ...]
