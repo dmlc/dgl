@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+from utils import pad_and_mask
 
 class MLP(nn.Module):
     def __init__(self, num_hidden, num_classes, num_layers):
@@ -26,6 +27,7 @@ class MLP(nn.Module):
 class DGMG(nn.Module):
     def __init__(self, node_num_hidden, graph_num_hidden, T, num_MLP_layers=1, loss_func=None):
         super(DGMG, self).__init__()
+        # hidden size of node and graph
         self.node_num_hidden = node_num_hidden
         self.graph_num_hidden = graph_num_hidden
         # use GCN as a simple propagation model
@@ -35,166 +37,205 @@ class DGMG(nn.Module):
         # add node
         self.fan = MLP(graph_num_hidden, 2, num_MLP_layers)
         # add edge
-        self.fae = MLP(graph_num_hidden + node_num_hidden, 2, num_MLP_layers)
+        self.fae = MLP(graph_num_hidden + node_num_hidden, 1, num_MLP_layers)
         # select node to add edge
         self.fs = MLP(node_num_hidden * 2, 1, num_MLP_layers)
         # init node state
         self.finit = MLP(graph_num_hidden, node_num_hidden, num_MLP_layers)
-
-        self.train = False
+        # (masked) loss function
         self.loss_func = loss_func
 
-    # gcn propagate
-    def propagate(self, g):
-        if len(g) > 0:
-            self.gcn.forward(g)
 
-    def readout(self, g):
-        hidden = self.gcn.readout(g)
-        hG = torch.sum(self.graph_project(hidden), 0, keepdim=True)
-        return hG
+    # waiting for batched version for progagtion and readout
+    def propagate(self, gs):
+        for mask, g in zip(self.masks[self.step], gs):
+            if mask == 1:
+                # only propagate graphs that have new edge added
+                self.gcn.forward(g)
 
-    # peek the correct choice
-    def peek_ground_truth(self):
-        return self.ordering[self.head]
 
-    def set_ground_truth(self, ordering):
-        self.ordering = ordering
-        if ordering is None:
-            # inference
-            self.train = False
-            self.node_count = 0
+    def readout(self, gs):
+        to_concat = []
+        for g in gs:
+            hidden = self.gcn.readout(g)
+            hG = torch.sum(self.graph_project(hidden), 0, keepdim=True)
+            to_concat.append(hG)
+        if len(to_concat) == 1:
+            return to_concat[0]
         else:
-            # training
-            self.ordering += [-1] # add a stop sign
-            self.train = True
-            self.head = 0
-            self.loss = 0
+            return torch.cat(to_concat, dim=0)
 
-    def decide_add_node(self, hG):
+
+    def decide_add_node(self, hG, label=1):
         h = self.fan(hG)
-        if self.train:
-            p = F.softmax(h, dim=1)
-            # get ground truth
-            ground_truth = self.peek_ground_truth()
-            assert(isinstance(ground_truth, int))
-            if ground_truth >= 0:
-                label = 1 # keep adding node
-            else:
-                label = 0 # see stop (-1)
-            # calc loss
-            self.loss += self.loss_func(p, label)
-            return label
+        p = F.softmax(h, dim=1)
+        # calc loss
+        if label == 1:
+            label = self.label1
+            mask = self.masks_tensor[self.step]
         else:
-            _, idx = torch.max(h)
-            return idx
+            label = self.label0
+            mask = None
+        self.loss += self.loss_func(p, label, mask)
 
-    def decide_add_edge(self, hG, hv):
+
+    def decide_add_edge(self, hG, hv, label=1):
         h = self.fae(torch.cat((hG, hv), dim=1))
         p = F.sigmoid(h)
-        if self.train:
-            # get ground truth
-            ground_truth = self.peek_ground_truth()
-            if isinstance(ground_truth, tuple):
-                label = 1 # add edge
-            else:
-                label = 0 # add node
-            # calc loss
-            self.loss += self.loss_func(p, label)
-            return label
-        else:
-            _, idx = torch.max(p)
-            return idx
+        p = torch.cat([1 - p, p], dim=1)
 
-    def select_node_for_edge(self, g, hv):
-        h = [g.node[n]['h'] for n in g.nodes()]
-        hu = h[:-1]
+        # calc loss
+        if label == 1:
+            label = self.label1
+            mask = self.masks_tensor[self.step]
+        else:
+            label = self.label0
+            mask = None
+        self.loss += self.loss_func(p, label, mask)
+
+
+    def select_node_for_edge(self, g, hv, src, dst):
+        hu = [g.node[n]['h'] for n in g.nodes() if n != dst]
         h = torch.cat((torch.cat(hu, dim=0), hv.expand(len(hu), -1)), dim=1)
-        if self.train:
-            s = F.softmax(self.fs(h), dim=0).view(1, -1)
-            # get ground truth (src, dst)
-            ground_truth = self.peek_ground_truth()
-            assert(isinstance(ground_truth, tuple))
-            # assuming new node is src node
-            label = ground_truth[1]
-            # calc loss
-            self.loss += self.loss_func(s, label)
-            # increment head
-            self.head += 1
-            return label
-        else:
-            _, idx = torch.max(self.fs(h).view(1, -1))
-            return indx
+        s = F.softmax(self.fs(h), dim=0).view(1, -1)
+        # calc loss
+        self.loss += self.loss_func(s, src)
 
-    def get_next_node_id(self):
-        if self.train:
-            node_id = self.peek_ground_truth()
-            # increment head
-            self.head += 1
-        else:
-            node_id = self.node_count
-            self.node_count += 1
-        return node_id
 
-    def init_node_state(self, hG):
-        if hG is None:
-            hG = torch.zeros((1, self.graph_num_hidden))
-        return self.finit(hG)
+    def add_node_for_batch(self, gs, new_states):
+        for idx, (g, mask, node) in enumerate(zip(gs,
+                                                 self.masks[self.step],
+                                                 self.selected[self.step])):
+            if mask == 1:
+                g.add_node(node)
+                g.node[node]['h'] = new_states[idx:idx+1] # keep dim
 
-    # g is an empty graph
-    # ordering is a list of node(int) or edge(tuple) added to g (i.e. ground truth)
-    # order set to None for inference
-    def forward(self, g, ordering=None):
-        self.set_ground_truth(ordering)
-        hG = None # start with empty graph
-        while len(g) == 0 or self.decide_add_node(hG):
-            node_id = self.get_next_node_id()
-            # add node
-            g.add_node(node_id)
-            # init node state
-            hv = self.init_node_state(hG)
-            g.node[node_id]['h'] = hv
-            while len(g) > 1 and self.decide_add_edge(hG, hv):
-                # add edges
-                dst = self.select_node_for_edge(g, hv)
-                g.add_edge(node_id, dst)
+
+    def add_edge_for_batch(self, gs, hv):
+        for idx, (g, mask, src, dst) in enumerate(zip(gs,
+                                                      self.masks[self.step],
+                                                      self.selected[self.step],
+                                                      self.selected[self.last_node])):
+            if mask == 1:
+                # select node to add edge
+                self.select_node_for_edge(g, hv[idx: idx + 1], src, dst)
+                # add ground truth edge
+                g.add_edge(src, dst)
+
+
+    def train(self, gs, ground_truths):
+        # init ground truth
+        actions, masks, selected = ground_truths
+        self.selected = selected
+        self.masks = masks
+        self.selected_tensor = map(torch.FloatTensor, selected)
+        self.masks_tensor = map(torch.FloatTensor, masks)
+
+        # init loss
+        self.loss = 0
+
+        self.batch_size = len(gs)
+
+        # create 1-label and 0-label for future use
+        self.label1 = torch.ones(self.batch_size, 1, dtype=torch.long)
+        self.label0 = torch.zeros(self.batch_size, 1, dtype=torch.long)
+
+        # start with empty graph
+        hG = torch.zeros(self.batch_size, self.graph_num_hidden)
+
+        # step count
+        self.step = 0
+
+        nsteps = len(actions)
+
+        while self.step < nsteps:
+            assert(actions[self.step] == 0) # add nodes
+
+            # decide whether to add node
+            self.decide_add_node(hG, 1)
+
+            # batched add node
+            hv = self.finit(hG)
+            self.add_node_for_batch(gs, hv)
+            self.last_node = self.step
+
+            self.step += 1
+
+            # decide whether to add edges (for at least once)
+            while self.step < nsteps and actions[self.step] == 1:
+
+                # decide whether to add edge
+                self.decide_add_edge(hG, hv, 1)
+
+                # batched add edge
+                self.add_edge_for_batch(gs, hv)
+
                 # propagate
-                self.propagate(g)
-            # get new graph repr
-            hG = self.readout(g)
+                self.propagate(gs)
+
+                # get new graph repr
+                hG = self.readout(gs)
+
+                self.step += 1
+
+            # decide to stop add edges
+            self.decide_add_edge(hG, hv, 0)
+
+        # decide to stop add nodes
+        self.decide_add_node(hG, 0)
+
 
 def main():
     epoch = 10
+
     # number of hidden units
-    node_num_hidden = 32
-    graph_num_hidden = 64
+    node_num_hidden = 4
+    graph_num_hidden = 8
+
     # number of rounds of propagation
     T = 2
 
-    # graph
-    # 0   1---3
+    # graph1
+    # 0   1
     #  \ /
     #   2
 
+    # graph2
+    # 0---1   2
+    #  \  |  /
+    #   \ | /
+    #     3
+
     # ground truth
-    ordering = [0, 1, 2, (2, 0), (2, 1), 3, (3, 1)]
+    orderings = [
+                 [0, 1, 2, (0, 2), (1, 2)],
+                 [0, 1, (0, 1), 2, 3, (0, 3), (1, 3), (2, 3)]
+                ]
+
+    batch_size = len(orderings)
+    ground_truths = pad_and_mask(orderings)
 
     # loss function
-    def loss_func(x, label):
-        label = torch.LongTensor([[label]])
+    def masked_loss_func(x, label, mask=None):
+        if isinstance(label, int):
+            label = torch.LongTensor([[label]])
+        # create one-hot code
         y_onehot = torch.FloatTensor(x.shape).zero_()
         y_onehot.scatter_(1, label, 1)
         # return F.mse_loss(x, y_onehot)
-        return -torch.mean(torch.log(x) * y_onehot)
+        if mask is not None:
+            return -torch.sum(torch.log(x) * y_onehot * mask.view(-1, 1)) / torch.sum(mask)
+        else:
+            return -torch.mean(torch.log(x) * y_onehot)
 
-    model = DGMG(node_num_hidden, graph_num_hidden, T, loss_func=loss_func)
-    optimizer = torch.optim.Adam(model.parameters())
+    model = DGMG(node_num_hidden, graph_num_hidden, T, loss_func=masked_loss_func)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
     for ep in range(epoch):
         print("epoch: {}".format(ep))
         optimizer.zero_grad()
-        # create new empty graph
-        g = DGLGraph()
-        model.forward(g, ordering)
+        # create new empty graphs
+        gs = [DGLGraph() for _ in range(batch_size)]
+        model.train(gs, ground_truths)
         print("loss: {}".format(model.loss.item()))
         model.loss.backward()
         optimizer.step()
