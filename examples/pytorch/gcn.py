@@ -1,5 +1,12 @@
+"""
+Semi-Supervised Classification with Graph Convolutional Networks
+Paper: https://arxiv.org/abs/1609.02907
+Code: https://github.com/tkipf/gcn
+"""
+
 import networkx as nx
 from dgl.graph import DGLGraph
+from dgl.utils import reduce_sum
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,24 +21,20 @@ class NodeUpdateModule(nn.Module):
         self.act = act
         self.p = p
 
-    def forward(self, node, msgs):
+    def forward(self, node, msgs_repr):
         h = node['h']
-        # (lingfan): how to write dropout, is the following correct?
-        if self.p is not None:
-            h = F.dropout(h, p=self.p)
         # aggregate messages
-        for msg in msgs:
-            h += msg
+        h = h + msgs_repr
         h = self.linear(h)
         if self.act is not None:
             h = self.act(h)
-        # (lingfan): Can user directly update node instead of using return statement?
         return {'h': h}
 
 
 class GCN(nn.Module):
     def __init__(self, input_dim, num_hidden, num_classes, num_layers, activation, dropout=None, output_projection=True):
         super(GCN, self).__init__()
+        self.dropout = dropout
         self.layers = nn.ModuleList()
         # hidden layers
         last_dim = input_dim
@@ -43,9 +46,17 @@ class GCN(nn.Module):
         if output_projection:
             self.layers.append(NodeUpdateModule(num_hidden, num_classes, p=dropout))
 
+
     def forward(self, g):
         g.register_message_func(lambda src, dst, edge: src['h'])
+        g.register_reduce_func(lambda msgs: reduce_sum(msgs))
         for layer in self.layers:
+            # apply dropout
+            if self.dropout is not None:
+                # TODO (lingfan): use batched dropout once we have better api
+                #                 for global manipulation
+                for n in g.nodes():
+                    g.node[n]['h'] = F.dropout(g.node[n]['h'], p=self.dropout)
             g.register_update_func(layer)
             g.update_all()
         logits = [g.node[n]['h'] for n in g.nodes()]
