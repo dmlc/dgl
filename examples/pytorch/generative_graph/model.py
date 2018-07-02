@@ -122,14 +122,17 @@ class DGMG(nn.Module):
                 # add ground truth edge
                 g.add_edge(src, dst)
 
-
-    def train(self, gs, ground_truths):
+    def set_ground_truths(self, ground_truths):
         # init ground truth
         actions, masks, selected = ground_truths
+        self.actions = actions
         self.selected = selected
         self.masks = masks
-        self.selected_tensor = map(torch.FloatTensor, selected)
-        self.masks_tensor = map(torch.FloatTensor, masks)
+        self.masks_tensor = list(map(torch.FloatTensor, masks))
+
+    def forward(self, gs, training=False):
+        if not training:
+            raise NotImplementedError("batching for inference is not implemented yet")
 
         # init loss
         self.loss = 0
@@ -146,10 +149,10 @@ class DGMG(nn.Module):
         # step count
         self.step = 0
 
-        nsteps = len(actions)
+        nsteps = len(self.actions)
 
         while self.step < nsteps:
-            assert(actions[self.step] == 0) # add nodes
+            assert(self.actions[self.step] == 0) # add nodes
 
             # decide whether to add node
             self.decide_add_node(hG, 1)
@@ -162,7 +165,7 @@ class DGMG(nn.Module):
             self.step += 1
 
             # decide whether to add edges (for at least once)
-            while self.step < nsteps and actions[self.step] == 1:
+            while self.step < nsteps and self.actions[self.step] == 1:
 
                 # decide whether to add edge
                 self.decide_add_edge(hG, hv, 1)
@@ -213,6 +216,8 @@ def main():
                 ]
 
     batch_size = len(orderings)
+
+    # pad and generate mask for samples in the batch for batching
     ground_truths = pad_and_mask(orderings)
 
     # loss function
@@ -230,12 +235,17 @@ def main():
 
     model = DGMG(node_num_hidden, graph_num_hidden, T, loss_func=masked_loss_func)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+
+    # set ground truth for training
+    model.set_ground_truths(ground_truths)
+
+    # training loop
     for ep in range(epoch):
         print("epoch: {}".format(ep))
         optimizer.zero_grad()
         # create new empty graphs
         gs = [DGLGraph() for _ in range(batch_size)]
-        model.train(gs, ground_truths)
+        model.forward(gs, training=True)
         print("loss: {}".format(model.loss.item()))
         model.loss.backward()
         optimizer.step()
