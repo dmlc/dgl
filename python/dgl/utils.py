@@ -1,5 +1,5 @@
 import dgl.backend as F
-from dgl.backend import Tensor, reduce_sum
+from dgl.backend import Tensor
 
 def node_iter(n):
     n_is_container = isinstance(n, list)

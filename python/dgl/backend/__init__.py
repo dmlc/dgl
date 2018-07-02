@@ -1,5 +1,4 @@
 import os
-# __backend__ = 'numpy'
 __backend__ = os.environ.get('DGLBACKEND', 'pytorch').lower()
 if __backend__ == 'numpy':
     from dgl.backend.numpy import *

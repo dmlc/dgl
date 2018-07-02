@@ -6,7 +6,6 @@ Code: https://github.com/tkipf/gcn
 
 import networkx as nx
 from dgl.graph import DGLGraph
-from dgl.utils import reduce_sum
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -49,7 +48,7 @@ class GCN(nn.Module):
 
     def forward(self, g):
         g.register_message_func(lambda src, dst, edge: src['h'])
-        g.register_reduce_func(lambda msgs: reduce_sum(msgs))
+        g.register_reduce_func(sum)
         for layer in self.layers:
             # apply dropout
             if self.dropout is not None:

@@ -6,7 +6,6 @@ Code: https://github.com/PetarV-/GAT
 
 import networkx as nx
 from dgl.graph import DGLGraph
-from dgl.utils import reduce_sum
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -47,7 +46,7 @@ class NodeReduceModule(nn.Module):
                 a = F.dropout(a, self.attention_dropout)
             if self.input_dropout is not None:
                 hvv = F.dropout(hvv, self.input_dropout)
-            h = reduce_sum(a * hvv)
+            h = torch.sum(a * hvv, 0, keepdim=True)
             msgs_repr.append(h)
 
         return msgs_repr
