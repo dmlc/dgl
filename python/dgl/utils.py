@@ -41,3 +41,11 @@ def edge_iter(u, v):
             yield u, vv
     else:
         yield u, v
+
+def batch(x_list):
+    x_dict = x_list[0].copy()
+    for attr in x_dict:
+        # TODO(gaiyu): place guards
+        # TODO(gaiyu): platform-agnostic
+        x_dict[attr] = F.cat([x[attr] for x in x_list], 0)
+    return x_dict
