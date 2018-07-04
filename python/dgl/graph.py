@@ -15,6 +15,7 @@ __N_REPR__ = "__n_repr__"
 __MFUNC__ = "__mfunc__"
 __EFUNC__ = "__efunc__"
 __UFUNC__ = "__ufunc__"
+__RFUNC__ = "__rfunc__"
 
 class DGLGraph(DiGraph):
     """Base graph class specialized for neural networks on graphs.
@@ -138,12 +139,65 @@ class DGLGraph(DiGraph):
             for e in edges:
                 self.edges[e][__EFUNC__] = edge_func
 
+    def register_reduce_func(self, reduce_func, nodes='all', batchable=False):
+        """Register message reduce function on incoming edges.
+
+        The reduce function should be compatible with following signature:
+
+        edge_reprs -> reduced_edge_repr
+
+        It computes the reduced edge representations using the representations
+        of the in-coming edges (the same concept as messages).
+
+        The reduce function can be any of the pre-defined functions ('sum',
+        'max'). If built-in function is used, computation will be performed
+        efficiently (using generic-SPMV kernels).
+
+        Parameters
+        ----------
+        reduce_func : str or callable
+          Reduce function on incoming edges.
+        nodes : str, node, container or tensor
+          The nodes for which the reduce function is registered. Default is
+          registering for all the nodes. Registering for multiple nodes is
+          supported.
+        batchable : bool
+          Whether the provided reduce function allows batch computing.
+
+        Examples
+        --------
+
+        Register for all nodes.
+        >>> g.register_reduce_func(rfunc)
+
+        Register for a specific node.
+        >>> g.register_reduce_func(rfunc, u) # TODO Not implemented
+
+        Register for multiple nodes.
+        >>> u = [u1, u2, u3, ...]
+        >>> g.register_reduce_func(rfunc, u)
+        """
+        if isinstance(reduce_func, str):
+            # built-in reduce func
+            if reduce_func == 'sum':
+                reduce_func = F.reduce_sum
+            elif reduce_func == 'max':
+                reduce_func = F.reduce_max
+            else:
+                raise NotImplementedError(
+                        "Built-in function %s not implemented" % reduce_func)
+        if nodes == 'all':
+            self.r_func = reduce_func
+        else:
+            for n in nodes:
+                self.nodes[n][__RFUNC__] = reduce_func
+
     def register_update_func(self, update_func, nodes='all', batchable=False):
         """Register computation on nodes.
 
         The update function should be compatible with following signature:
 
-        (node_reprs, edge_reprs) -> node_reprs
+        (node_reprs, reduced_edge_repr) -> node_reprs
 
         It computes the new node representations using the representations
         of the in-coming edges (the same concept as messages) and the node
@@ -289,10 +343,14 @@ class DGLGraph(DiGraph):
                 v = preds
             # TODO(minjie): tensorize the message batching
             m = [self.edges[vv, uu][__MSG__] for vv in v]
+            f_reduce = self.nodes[uu].get(__RFUNC__, self.r_func)
+            assert f_reduce is not None, \
+                "Reduce function not registered for node %s" % uu
+            msgs_reduced_repr = f_reduce(m)
             f_update = self.nodes[uu].get(__UFUNC__, self.u_func)
             assert f_update is not None, \
                 "Update function not registered for node %s" % uu
-            self.node[uu].update(f_update(self.nodes[uu], m))
+            self.node[uu].update(f_update(self.nodes[uu], msgs_reduced_repr))
 
     def update_by_edge(self, u, v):
         """Trigger the message function on u->v and update v.
