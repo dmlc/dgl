@@ -142,16 +142,20 @@ class DGLGraph(DiGraph):
     def register_reduce_func(self, reduce_func, nodes='all', batchable=False):
         """Register message reduce function on incoming edges.
 
-        The update function should be compatible with following signature:
+        The reduce function should be compatible with following signature:
 
         edge_reprs -> reduced_edge_repr
 
         It computes the reduced edge representations using the representations
         of the in-coming edges (the same concept as messages).
 
+        The reduce function can be any of the pre-defined functions ('sum',
+        'max'). If built-in function is used, computation will be performed
+        efficiently (using generic-SPMV kernels).
+
         Parameters
         ----------
-        reduce_func : callable
+        reduce_func : str or callable
           Reduce function on incoming edges.
         nodes : str, node, container or tensor
           The nodes for which the reduce function is registered. Default is
@@ -173,6 +177,15 @@ class DGLGraph(DiGraph):
         >>> u = [u1, u2, u3, ...]
         >>> g.register_reduce_func(rfunc, u)
         """
+        if isinstance(reduce_func, str):
+            # built-in reduce func
+            if reduce_func == 'sum':
+                reduce_func = F.reduce_sum
+            elif reduce_func == 'max':
+                reduce_func = F.reduce_max
+            else:
+                raise NotImplementedError(
+                        "Built-in function %s not implemented" % reduce_func)
         if nodes == 'all':
             self.r_func = reduce_func
         else:
