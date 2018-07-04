@@ -8,3 +8,5 @@ SparseTensor = scipy.sparse.spmatrix
 
 def asnumpy(a):
     return a.cpu().numpy()
+
+cat = torch.cat
