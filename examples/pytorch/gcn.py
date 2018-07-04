@@ -48,7 +48,7 @@ class GCN(nn.Module):
 
     def forward(self, g):
         g.register_message_func(lambda src, dst, edge: src['h'])
-        g.register_reduce_func(sum)
+        g.register_reduce_func('sum')
         for layer in self.layers:
             # apply dropout
             if self.dropout is not None:
