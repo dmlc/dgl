@@ -37,12 +37,14 @@ class DGLGraph(DiGraph):
         self.readout_func = None
 
     def init_reprs(self, h_init=None):
+        # TODO(gaiyu): multiple nodes
         print("[DEPRECATED]: please directly set node attrs "
               "(e.g. g.nodes[node]['x'] = val).")
         for n in self.nodes:
             self.set_repr(n, h_init)
 
     def set_repr(self, u, h_u, name=__N_REPR__):
+        # TODO(gaiyu): multiple nodes
         print("[DEPRECATED]: please directly set node attrs "
               "(e.g. g.nodes[node]['x'] = val).")
         assert u in self.nodes
@@ -50,6 +52,7 @@ class DGLGraph(DiGraph):
         self.add_node(u, **kwarg)
 
     def get_repr(self, u, name=__N_REPR__):
+        # TODO(gaiyu): multiple nodes
         print("[DEPRECATED]: please directly get node attrs "
               "(e.g. g.nodes[node]['x']).")
         assert u in self.nodes

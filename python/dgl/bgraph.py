@@ -1,3 +1,7 @@
+from collections import defaultdict
+from itertools import starmap
+from functools import partial
+
 import dgl.graph as G
 import dgl.backend as F
 import dgl.utils as utils
@@ -20,8 +24,7 @@ class DGLBGraph(G.DGLGraph):
           The destination node(s).
         """
         fmsg_set, u_list, v_list, edge_list = set(), [], [], []
-        # TODO(gaiyu): group f_msg
-        # (lambda x: x) != (lambda x: x)
+        # TODO(gaiyu): Group f_msg.
         for uu, vv in utils.edge_iter(u, v):
             f_msg = self.edges[uu, vv].get(G.__MFUNC__, self.m_func)
             assert f_msg is not None, \
@@ -35,7 +38,11 @@ class DGLBGraph(G.DGLGraph):
             raise NotImplementedError()
 
         u_dict, v_dict = utils.batch(u_list), utils.batch(v_list)
-        edge_dict = utils.batch(edge_list)
+        try:
+            edge_dict = utils.batch(edge_list)
+        except TypeError:
+            print('sendto', edge_list[0]['__msg__'])
+            exit()
         msg = f_msg(u_dict, v_dict, edge_dict)
 
         for i, (uu, vv) in enumerate(utils.edge_iter(u, v)):
@@ -86,7 +93,7 @@ class DGLBGraph(G.DGLGraph):
         u_is_container = isinstance(u, list)
         u_is_tensor = isinstance(u, F.Tensor)
 
-        u_list, msgs_list = [], []
+        repr_list, msg_list = [], []
         freduce_set, fupdate_set = set(), set()
         for i, uu in enumerate(utils.node_iter(u)):
             if preds is None:
@@ -106,31 +113,51 @@ class DGLBGraph(G.DGLGraph):
                 "Update function not registered for node %s" % uu
             fupdate_set.add(f_update)
 
-            u_list.append(self.nodes[uu])
-            msgs_list.append([self.edges[vv, uu][G.__MSG__] for vv in v])
+            repr_list.append(self.nodes[uu])
+            msg_list.append([self.edges[vv, uu][G.__MSG__] for vv in v])
+
+        def groupby(iterable, key):
+            d = defaultdict(list)
+            for x in iterable:
+                d[key(x)].append(x)
+            return [d[key] for key in sorted(d.keys())]
 
         if len(freduce_set) > 1:
-            raise NotImplementedError()
+            raise NotImplementedError() # TODO(gaiyu): group f_reduce
         f_reduce, = list(freduce_set)
-        max_deg = max(map(len, msgs_list))
-        has_deg = lambda deg: lambda msgs: len(msgs) == deg
-        msgs_by_deg = [list(filter(has_deg(deg), msgs_list)) for deg in range(max_deg + 1)]
-        to_reduce = [[utils.batch(y) for y in zip(*x)] for x in msgs_by_deg[1:]]
-        reduced = list(map(f_reduce, to_reduce))
+        deg_list = list(map(len, msg_list))
+        min_deg, max_deg = min(deg_list), max(deg_list)
+        msgs = msg_list if min_deg > 0 else filter(bool, msg_list)
+        msgs = groupby(msgs, len) # list of list of list of dict
+        msgs = [list(map(utils.batch, x)) for x in msgs] # list of list of dict
+        msgs = map(partial(utils.batch, method='stack'), msgs) # iter (map) of dict
+        msgs = list(map(f_reduce, msgs)) # list of dict
 
         if len(fupdate_set) > 1:
-            raise NotImplementedError()
+            raise NotImplementedError() # TODO(gaiyu): group f_update
         f_update, = list(fupdate_set)
-        u2msgs = dict(zip(utils.node_iter(u), msgs_list))
-        has_deg = lambda deg: lambda x: len(u2msgs[x]) == deg
-        u_by_deg = [filter(has_deg(deg), utils.node_iter(u)) for deg in range(max_deg + 1)]
-        rearranged = sum(map(list, u_by_deg), [])
-        u2reprs = dict(zip(utils.node_iter(u), u_list))
-        reprs_list = list(map(u2reprs.__getitem__, rearranged))
-        u_dict = utils.batch(reprs_list)
-        msgs = utils.batch(reduced)
-        new = f_update(u_dict, msgs)
 
-        # TODO(gaiyu): place guards
-        for i, uu in enumerate(rearranged):
-            self.node[uu].update({k : v[i : i + 1] for k, v in new.items()})
+        ureprmsg_zip = zip(utils.node_iter(u), repr_list, deg_list)
+        by_deg = groupby(ureprmsg_zip, lambda x: x[2]) # list of list of tuple
+
+        def update(u_tuple, repr_dict):
+            for i, uu in enumerate(u_tuple):
+                self.nodes[uu].update({k : v[i : i + 1] for k, v in repr_dict.items()})
+
+        # nodes without neighbors
+        if min_deg == 0:
+            without_msg = by_deg[0] # list of (u, repr)
+            u_tuple, repr_tuple, _ = zip(*without_msg) # tuple of dict
+            repr_dict = utils.batch(repr_tuple)
+            repr_dict = f_update(repr_dict, None)
+            update(u_tuple, repr_dict)
+
+        # nodes with neighbors
+        if max_deg > 0:
+            by_deg = by_deg if min_deg > 0 else by_deg[1:]
+            with_msg = sum(by_deg, []) # list of (u, repr)
+            u_tuple, repr_tuple, _ = zip(*with_msg) # tuple of dict
+            repr_dict = utils.batch(repr_tuple)
+            msgs = utils.batch(msgs)
+            repr_dict = f_update(repr_dict, msgs)
+            update(u_tuple, repr_dict)
