@@ -42,10 +42,11 @@ def edge_iter(u, v):
     else:
         yield u, v
 
-def batch(x_list):
+def batch(x_list, method='cat'):
     x_dict = x_list[0].copy()
-    for attr in x_dict:
-        # TODO(gaiyu): place guards
-        # TODO(gaiyu): platform-agnostic
-        x_dict[attr] = F.cat([x[attr] for x in x_list], 0)
+    method = getattr(F, method)
+    for key in x_dict:
+        value_list = [x.get(key) for x in x_list]
+        batchable = F.isbatchable(value_list, method)
+        x_dict[key] = method(value_list) if batchable else value_list
     return x_dict
