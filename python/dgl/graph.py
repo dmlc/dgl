@@ -34,6 +34,7 @@ class DGLGraph(DiGraph):
         self._glb_func = {}
 
     def init_reprs(self, h_init=None):
+        # TODO(gaiyu): multiple nodes
         print("[DEPRECATED]: please directly set node attrs "
               "(e.g. g.nodes[node]['x'] = val).")
         for n in self.nodes:
