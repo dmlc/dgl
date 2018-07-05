@@ -35,5 +35,3 @@ def reduce_max(a):
     a = torch.cat(a, 0)
     a, _ = torch.max(a, 0, keepdim=True)
     return a
-
-cat = torch.cat
