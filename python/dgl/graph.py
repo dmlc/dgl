@@ -36,14 +36,12 @@ class DGLGraph(DiGraph):
         self.e_func = None
         self.readout_func = None
 
-    def init_node_reprs(self, h_init=None, name=__N_REPR__, batch=True, expand_dims=False):
+    def init_node_repr(self, h_init=None, name=__N_REPR__, batch=True, expand_dims=False):
         """ Initialize node representations.
 
         Parameters
         ----------
-        u : node, list or tensor
-            (Container of) node(s) to initialize representations for.
-        h_u : list, tensor or any object
+        h_init : list, tensor or any object
             Initial node representations.
         name : str, optional
             Representation name.
@@ -65,13 +63,49 @@ class DGLGraph(DiGraph):
 
         Initialize every node's representation to `0`.
 
-        >>> g.set_node_repr(g.nodes, [0] * len(g.nodes))
+        >>> g.init_node_repr([0] * len(g.nodes))
 
         Initialize every node's representation to `torch.zeros(1, 1)`.
 
-        >>> g.set_node_repr(g.nodes, torch.zeros(len(g.nodes), 1))
+        >>> g.init_node_repr(torch.zeros(len(g.nodes), 1))
         """
-        self.set_node_repr(self.nodes, h_init, name, batch, expand_dims)
+        self.set_node_repr(list(self.nodes), h_init, name, batch, expand_dims)
+
+    def init_edge_repr(self, h_init=None, name=__E_REPR__, batch=True, expand_dims=False):
+        """ Initialize edge representations.
+
+        Parameters
+        ----------
+        h_init : list, tensor or any object
+            Initial edge representations.
+        name : str, optional
+            Representation name.
+        batch : bool, optional
+            Whether `h_u` is a batch (list or tensor) of representations.
+            If `h_u` is a list and `batch` is `True`, `len(h_u)` must be the same as
+            the number of edges in graph.
+            If `h_u` is a tensor and `batch` is `True`, the shape of `h_u` must be
+            `(N, D_1, ...)`, where `N` is the number of edges in graph. The representation 
+            for the `i`-th edge is `h_u[i]` (a tensor with shape `(1, D_1, ...)`).
+            If `h_u` is any other object, `batch` must be `False`, 
+            in which case edges in graph will share `h_u`.
+        expand_dims : bool, optional
+            Whether to prepend a dimension (the batch dimension) to `h_u`.
+            Only valid when `h_u` is a tensor and `batch` is `False`.
+
+        Examples
+        --------
+
+        Initialize every edge's representation to `0`.
+
+        >>> g.init_edge_repr([0] * len(g.edges))
+
+        Initialize every edge's representation to `torch.zeros(1, 1)`.
+
+        >>> g.init_edge_repr(torch.zeros(len(g.edges), 1))
+        """
+        u, v = map(list, zip(*self.edges))
+        self.set_edge_repr(u, v, h_init, name, batch, expand_dims)
 
     def set_node_repr(self, u, h_u, name=__N_REPR__, batch=True, expand_dims=False):
         """ Set node representations.
@@ -102,14 +136,14 @@ class DGLGraph(DiGraph):
 
         Set every node's representation to `0`.
 
-        >>> g.set_node_repr(g.nodes, [0] * len(g.nodes))
+        >>> g.set_node_repr(list(g.nodes), [0] * len(g.nodes))
 
         Set every node's representation to `torch.zeros(1, 1)`.
 
-        >>> g.set_node_repr(g.nodes, torch.zeros(len(g.nodes), 1))
+        >>> g.set_node_repr(list(g.nodes), torch.zeros(len(g.nodes), 1))
         """
 
-        if not isinstance(u, [list, Tensor]):
+        if not isinstance(u, (list, Tensor)):
             print("[DEPRECATED]: please directly set node attrs "
                   "(e.g. g.nodes[node]['x'] = val).")
         node_iter = lambda: utils.node_iter(u)
@@ -144,25 +178,26 @@ class DGLGraph(DiGraph):
 
         Set every edge's representation to `0`.
 
-        >>> g.set_edge_repr(g.edges, [0] * len(g.edges))
+        >>> g.set_edge_repr(list(g.edges), [0] * len(g.edges))
 
         Set every edge's representation to `torch.zeros(1, 1)`.
 
-        >>> g.set_edge_repr(g.edges, torch.zeros(len(g.edges), 1))
+        >>> g.set_edge_repr(list(g.edges), torch.zeros(len(g.edges), 1))
         """
-        if not isinstance(u, [list, Tensor]) and not isinstance(v, [list, Tensor]):
+        if not isinstance(u, (list, Tensor)) and not isinstance(v, (list, Tensor)):
             print("[DEPRECATED]: please directly set edge attrs "
                   "(e.g. g.edges[u, v]['x'] = val).")
-        edge_iter = lambda: utils.edge_iter(u)
+        edge_iter = lambda: utils.edge_iter(u, v)
         self.set_x_repr(self.edges, edge_iter, h_uv, name, batch, expand_dims)
 
     def set_x_repr(self, xs, x_iter, h_x, name, batch, expand_dims):
-        x_str = 'node' if xs is self.nodes else 'edge'
-        hx_str = 'h_u' if xs is self.nodes else 'h_uv'
-        add_x = self.add_node if xs is self.nodes else self.add_edge
+        x_str = 'node' if xs == self.nodes else 'edge'
+        hx_str = 'h_u' if xs == self.nodes else 'h_uv'
+        add_x = self.add_node if xs == self.nodes else \
+                    lambda uv, **kwargs: self.add_edge(uv[0], uv[1], **kwargs)
 
         if batch:
-            assert isinstance(h_x, [list, Tensor]), \
+            assert isinstance(h_x, (list, Tensor)), \
                 "%s must be a list or tensor when batch is True" % hx_str
 
             n = len(list(x_iter()))
@@ -170,8 +205,8 @@ class DGLGraph(DiGraph):
                 assert len(h_x) == n, \
                     "len(%s) must be the same as the number of %ss." % (hx_str, x_str)
             elif isinstance(h_x, Tensor):
-                assert F.shape(h_x) == n, "The first dimension of %s \
-                    must be the same as the number of %ss" % (hx_str, x_str)
+                assert F.shape(h_x)[0] == n, "The first dimension of %s " \
+                    "must be the same as the number of %ss" % (hx_str, x_str)
 
             assert not expand_dims, "expand_dims may be True only when batch is False."
 
@@ -208,7 +243,7 @@ class DGLGraph(DiGraph):
         -------
         repr : a list or tensor of representations.
         """
-        if not isinstance(u, [list, Tensor]):
+        if not isinstance(u, (list, Tensor)):
             print("[DEPRECATED]: please directly get node attrs "
                   "(e.g. g.nodes[node]['x']).")
         node_iter = lambda: utils.node_iter(u)
@@ -231,7 +266,7 @@ class DGLGraph(DiGraph):
         -------
         repr : a list or tensor of representations.
         """
-        if not isinstance(u, [list, Tensor]) and not isinstance(v, [list, Tensor]):
+        if not isinstance(u, (list, Tensor)) and not isinstance(v, (list, Tensor)):
             print("[DEPRECATED]: please directly get edge attrs "
                   "(e.g. g.edges[u, v]['x']).")
         edge_iter = lambda: utils.edge_iter(u, v)
