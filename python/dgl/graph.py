@@ -36,27 +36,220 @@ class DGLGraph(DiGraph):
         self.e_func = None
         self.readout_func = None
 
-    def init_reprs(self, h_init=None):
-        # TODO(gaiyu): multiple nodes
-        print("[DEPRECATED]: please directly set node attrs "
-              "(e.g. g.nodes[node]['x'] = val).")
-        for n in self.nodes:
-            self.set_repr(n, h_init)
+    def init_node_reprs(self, h_init=None, name=__N_REPR__, batch=True, expand_dims=False):
+        """ Initialize node representations.
 
-    def set_repr(self, u, h_u, name=__N_REPR__):
-        # TODO(gaiyu): multiple nodes
-        print("[DEPRECATED]: please directly set node attrs "
-              "(e.g. g.nodes[node]['x'] = val).")
-        assert u in self.nodes
-        kwarg = {name: h_u}
-        self.add_node(u, **kwarg)
+        Parameters
+        ----------
+        u : node, list or tensor
+            (Container of) node(s) to initialize representations for.
+        h_u : list, tensor or any object
+            Initial node representations.
+        name : str, optional
+            Representation name.
+        batch : bool, optional
+            Whether `h_u` is a batch (list or tensor) of representations.
+            If `h_u` is a list and `batch` is `True`, `len(h_u)` must be the same as
+            the number of nodes in graph.
+            If `h_u` is a tensor and `batch` is `True`, the shape of `h_u` must be
+            `(N, D_1, ...)`, where `N` is the number of nodes in graph. The representation 
+            for the `i`-th node is `h_u[i]` (a tensor with shape `(1, D_1, ...)`).
+            If `h_u` is any other object, `batch` must be `False`, 
+            in which case nodes in graph will share `h_u`.
+        expand_dims : bool, optional
+            Whether to prepend a dimension (the batch dimension) to `h_u`.
+            Only valid when `h_u` is a tensor and `batch` is `False`.
 
-    def get_repr(self, u, name=__N_REPR__):
-        # TODO(gaiyu): multiple nodes
-        print("[DEPRECATED]: please directly get node attrs "
-              "(e.g. g.nodes[node]['x']).")
-        assert u in self.nodes
-        return self.nodes[u][name]
+        Examples
+        --------
+
+        Initialize every node's representation to `0`.
+
+        >>> g.set_node_repr(g.nodes, [0] * len(g.nodes))
+
+        Initialize every node's representation to `torch.zeros(1, 1)`.
+
+        >>> g.set_node_repr(g.nodes, torch.zeros(len(g.nodes), 1))
+        """
+        self.set_node_repr(self.nodes, h_init, name, batch, expand_dims)
+
+    def set_node_repr(self, u, h_u, name=__N_REPR__, batch=True, expand_dims=False):
+        """ Set node representations.
+
+        Parameters
+        ----------
+        u : node, list or tensor
+            (Container of) node(s) to set representations to.
+        h_u : list, tensor or any object
+            Node representations.
+        name : str, optional
+            Representation name.
+        batch : bool, optional
+            Whether `h_u` is a batch (list or tensor) of representations.
+            If `h_u` is a list and `batch` is `True`, `len(h_u)` must be the same as
+            the number of nodes in `u`. The representation for the `i`th node is `h_u[i]`. 
+            If `h_u` is a tensor and `batch` is `True`, the shape of `h_u` must be
+            `(N, D_1, ...)`, where `N` is the number of nodes in `u`. The representation 
+            for the `i`th node is `h_u[i]` (a tensor with shape `(1, D_1, ...)`).
+            If `h_u` is any other object, `batch` must be `False`, 
+            in which case nodes in `u` will share `h_u`.
+        expand_dims : bool, optional
+            Whether to prepend a dimension (the batch dimension) to `h_u`.
+            Only valid when `h_u` is a tensor and `batch` is `False`.
+
+        Examples
+        --------
+
+        Set every node's representation to `0`.
+
+        >>> g.set_node_repr(g.nodes, [0] * len(g.nodes))
+
+        Set every node's representation to `torch.zeros(1, 1)`.
+
+        >>> g.set_node_repr(g.nodes, torch.zeros(len(g.nodes), 1))
+        """
+
+        if not isinstance(u, [list, Tensor]):
+            print("[DEPRECATED]: please directly set node attrs "
+                  "(e.g. g.nodes[node]['x'] = val).")
+        node_iter = lambda: utils.node_iter(u)
+        self.set_x_repr(self.nodes, node_iter, h_u, name, batch, expand_dims)
+
+    def set_edge_repr(self, u, v, h_uv, name=__E_REPR__, batch=True, expand_dims=False):
+        """ Set edge representations.
+
+        Parameters
+        ----------
+        u, v : edge, list or tensor
+            (Container of) edge(s) to set representations to.
+        h_uv : list, tensor or any object
+            Node representations.
+        name : str, optional
+            Representation name.
+        batch : bool, optional
+            Whether `h_uv` is a batch (list or tensor) of representations.
+            If `h_uv` is a list and `batch` is `True`, `len(h_uv)` must be the same as
+            the number of edges. The representation for the `i`th edge is `h_uv[i]`. 
+            If `h_uv` is a tensor and `batch` is `True`, the shape of `h_uv` must be
+            `(N, D_1, ...)`, where `N` is the number of edges. The representation 
+            for the `i`th edge is `h_uv[i]` (a tensor with shape `(1, D_1, ...)`).
+            If `h_uv` is any other object, `batch` must be `False`, 
+            in which case edges will share `h_uv`.
+        expand_dims : bool, optional
+            Whether to prepend a dimension (the batch dimension) to `h_uv`.
+            Only valid when `h_uv` is a tensor and `batch` is `False`.
+
+        Examples
+        --------
+
+        Set every edge's representation to `0`.
+
+        >>> g.set_edge_repr(g.edges, [0] * len(g.edges))
+
+        Set every edge's representation to `torch.zeros(1, 1)`.
+
+        >>> g.set_edge_repr(g.edges, torch.zeros(len(g.edges), 1))
+        """
+        if not isinstance(u, [list, Tensor]) and not isinstance(v, [list, Tensor]):
+            print("[DEPRECATED]: please directly set edge attrs "
+                  "(e.g. g.edges[u, v]['x'] = val).")
+        edge_iter = lambda: utils.edge_iter(u)
+        self.set_x_repr(self.edges, edge_iter, h_uv, name, batch, expand_dims)
+
+    def set_x_repr(self, xs, x_iter, h_x, name, batch, expand_dims):
+        x_str = 'node' if xs is self.nodes else 'edge'
+        hx_str = 'h_u' if xs is self.nodes else 'h_uv'
+        add_x = self.add_node if xs is self.nodes else self.add_edge
+
+        if batch:
+            assert isinstance(h_x, [list, Tensor]), \
+                "%s must be a list or tensor when batch is True" % hx_str
+
+            n = len(list(x_iter()))
+            if isinstance(h_x, list):
+                assert len(h_x) == n, \
+                    "len(%s) must be the same as the number of %ss." % (hx_str, x_str)
+            elif isinstance(h_x, Tensor):
+                assert F.shape(h_x) == n, "The first dimension of %s \
+                    must be the same as the number of %ss" % (hx_str, x_str)
+
+            assert not expand_dims, "expand_dims may be True only when batch is False."
+
+            for xx, h_xx in zip(x_iter(), h_x):
+                assert xx in xs, "%s does not exist in graph." % (xx,)
+                kwarg = {name: h_xx}
+                add_x(xx, **kwarg)
+
+        else:
+            if expand_dims:
+                assert isinstance(x, Tensor), \
+                    "expand_dims may be True only when %s is a tensor." % hx_str
+                x = F.expand_dims(x, 0)
+
+            for xx in x_iter():
+                assert xx in xs, "%s does not exist in graph." % (xx,)
+                kwarg = {name: h_x}
+                add_x(xx, **kwarg)
+
+    def get_node_repr(self, u, name=__N_REPR__, batch=True):
+        """ Get node representations.
+
+        Parameters
+        ----------
+        u : node, list or tensor.
+            (Container of) node(s) to get representations from.
+        name : str, optional
+            Representation name.
+        batch : bool, optional
+            Whether to batch representations.
+            `batch` may be `True` only when representations are batchable.
+
+        Returns
+        -------
+        repr : a list or tensor of representations.
+        """
+        if not isinstance(u, [list, Tensor]):
+            print("[DEPRECATED]: please directly get node attrs "
+                  "(e.g. g.nodes[node]['x']).")
+        node_iter = lambda: utils.node_iter(u)
+        return self.get_x_repr(self.nodes, node_iter, name, batch)
+
+    def get_edge_repr(self, u, v, name=__E_REPR__, batch=True):
+        """ Get edge representations.
+
+        Parameters
+        ----------
+        u, v : edge, list or tensor.
+            (Container of) edge(s) to get representations from.
+        name : str, optional
+            Representation name.
+        batch : bool, optional
+            Whether to batch representations.
+            `batch` may be `True` only when representations are batchable.
+
+        Returns
+        -------
+        repr : a list or tensor of representations.
+        """
+        if not isinstance(u, [list, Tensor]) and not isinstance(v, [list, Tensor]):
+            print("[DEPRECATED]: please directly get edge attrs "
+                  "(e.g. g.edges[u, v]['x']).")
+        edge_iter = lambda: utils.edge_iter(u, v)
+        return self.get_x_repr(self.edges, edge_iter, name, batch)
+
+    def get_x_repr(self, xs, x_iter, name, batch):
+        repr_list = []
+        for xx in x_iter():
+            assert xx in xs, "%s does not exist in graph." % (xx,)
+            assert name in xs[xx], \
+                "Representation %s does not exist for %s." % (name, xx)
+            repr_list.append(xs[xx][name])
+
+        if batch:
+            assert F.isbatchable(repr_list, F.cat), "Representations are not batchable."
+            return F.cat(repr_list)
+        else:
+            return repr_list
 
     def register_message_func(self, message_func, edges='all', batchable=False):
         """Register computation on edges.

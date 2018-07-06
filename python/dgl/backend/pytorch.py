@@ -13,6 +13,9 @@ sum = torch.sum
 def asnumpy(a):
     return a.cpu().numpy()
 
+def expand_dims(a, axis):
+    return a.unsqueeze(axis)
+
 def isbatchable(x_list, method):
     device = lambda x: x.device == x_list[0].device
     dtype = lambda x: x.dtype == x_list[0].dtype
@@ -35,3 +38,6 @@ def reduce_max(a):
     a = torch.cat(a, 0)
     a, _ = torch.max(a, 0, keepdim=True)
     return a
+
+def shape(a):
+    return a.size()
