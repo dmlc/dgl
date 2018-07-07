@@ -17,6 +17,8 @@ __UFUNC__ = "__ufunc__"
 __RFUNC__ = "__rfunc__"
 __READOUT__ = "__readout__"
 
+XFunc = namedtuple('XFunc', ['func', 'batchable'])
+
 class DGLGraph(DiGraph):
     """Base graph class specialized for neural networks on graphs.
 
@@ -321,6 +323,8 @@ class DGLGraph(DiGraph):
         u : node, container or tensor
           The node to be updated.
         """
+
+        '''
         u_is_container = isinstance(u, list)
         u_is_tensor = isinstance(u, Tensor)
         rfunc = self._glb_func.get(__RFUNC__)

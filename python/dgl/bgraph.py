@@ -38,11 +38,7 @@ class DGLBGraph(G.DGLGraph):
             raise NotImplementedError()
 
         u_dict, v_dict = utils.batch(u_list), utils.batch(v_list)
-        try:
-            edge_dict = utils.batch(edge_list)
-        except TypeError:
-            print('sendto', edge_list[0]['__msg__'])
-            exit()
+        edge_dict = utils.batch(edge_list)
         msg = f_msg(u_dict, v_dict, edge_dict)
 
         for i, (uu, vv) in enumerate(utils.edge_iter(u, v)):
