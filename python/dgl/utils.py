@@ -41,3 +41,12 @@ def edge_iter(u, v):
             yield u, vv
     else:
         yield u, v
+
+def batch(x_list, method='cat'):
+    x_dict = x_list[0].copy()
+    method = getattr(F, method)
+    for key in x_dict:
+        value_list = [x.get(key) for x in x_list]
+        batchable = F.isbatchable(value_list, method)
+        x_dict[key] = method(value_list) if batchable else value_list
+    return x_dict
