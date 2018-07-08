@@ -16,6 +16,10 @@ __MFUNC__ = "__mfunc__"
 __EFUNC__ = "__efunc__"
 __UFUNC__ = "__ufunc__"
 __RFUNC__ = "__rfunc__"
+__MBATCH__ = "__mbatch__"
+__EBATCH__ = "__ebatch__"
+__UBATCH__ = "__ubatch__"
+__RBATCH__ = "__rbatch__"
 
 class DGLGraph(DiGraph):
     """Base graph class specialized for neural networks on graphs.
@@ -32,28 +36,265 @@ class DGLGraph(DiGraph):
     def __init__(self, graph_data=None, **attr):
         super(DGLGraph, self).__init__(graph_data, **attr)
         self.m_func = None
-        self.u_func = None
         self.e_func = None
+        self.r_func = None
+        self.u_func = None
         self.readout_func = None
 
-    def init_reprs(self, h_init=None):
-        print("[DEPRECATED]: please directly set node attrs "
-              "(e.g. g.nodes[node]['x'] = val).")
-        for n in self.nodes:
-            self.set_repr(n, h_init)
+        self.m_batch = None
+        self.e_batch = None
+        self.r_batch = None
+        self.u_batch = None
 
-    def set_repr(self, u, h_u, name=__N_REPR__):
-        print("[DEPRECATED]: please directly set node attrs "
-              "(e.g. g.nodes[node]['x'] = val).")
-        assert u in self.nodes
-        kwarg = {name: h_u}
-        self.add_node(u, **kwarg)
+    def init_node_repr(self, h_init=None, name=__N_REPR__, batch=True, expand_dims=False):
+        """ Initialize node representations.
 
-    def get_repr(self, u, name=__N_REPR__):
-        print("[DEPRECATED]: please directly get node attrs "
-              "(e.g. g.nodes[node]['x']).")
-        assert u in self.nodes
-        return self.nodes[u][name]
+        Parameters
+        ----------
+        h_init : list, tensor or any object
+            Initial node representations.
+        name : str, optional
+            Representation name.
+        batch : bool, optional
+            Whether `h_u` is a batch (list or tensor) of representations.
+            If `h_u` is a list and `batch` is `True`, `len(h_u)` must be the same as
+            the number of nodes in graph.
+            If `h_u` is a tensor and `batch` is `True`, the shape of `h_u` must be
+            `(N, D_1, ...)`, where `N` is the number of nodes in graph. The representation 
+            for the `i`-th node is `h_u[i]` (a tensor with shape `(1, D_1, ...)`).
+            If `h_u` is any other object, `batch` must be `False`, 
+            in which case nodes in graph will share `h_u`.
+        expand_dims : bool, optional
+            Whether to prepend a dimension (the batch dimension) to `h_u`.
+            Only valid when `h_u` is a tensor and `batch` is `False`.
+
+        Examples
+        --------
+
+        Initialize every node's representation to `0`.
+
+        >>> g.init_node_repr([0] * len(g.nodes))
+
+        Initialize every node's representation to `torch.zeros(1, 1)`.
+
+        >>> g.init_node_repr(torch.zeros(len(g.nodes), 1))
+        """
+        self.set_node_repr(list(self.nodes), h_init, name, batch, expand_dims)
+
+    def init_edge_repr(self, h_init=None, name=__E_REPR__, batch=True, expand_dims=False):
+        """ Initialize edge representations.
+
+        Parameters
+        ----------
+        h_init : list, tensor or any object
+            Initial edge representations.
+        name : str, optional
+            Representation name.
+        batch : bool, optional
+            Whether `h_u` is a batch (list or tensor) of representations.
+            If `h_u` is a list and `batch` is `True`, `len(h_u)` must be the same as
+            the number of edges in graph.
+            If `h_u` is a tensor and `batch` is `True`, the shape of `h_u` must be
+            `(N, D_1, ...)`, where `N` is the number of edges in graph. The representation 
+            for the `i`-th edge is `h_u[i]` (a tensor with shape `(1, D_1, ...)`).
+            If `h_u` is any other object, `batch` must be `False`, 
+            in which case edges in graph will share `h_u`.
+        expand_dims : bool, optional
+            Whether to prepend a dimension (the batch dimension) to `h_u`.
+            Only valid when `h_u` is a tensor and `batch` is `False`.
+
+        Examples
+        --------
+
+        Initialize every edge's representation to `0`.
+
+        >>> g.init_edge_repr([0] * len(g.edges))
+
+        Initialize every edge's representation to `torch.zeros(1, 1)`.
+
+        >>> g.init_edge_repr(torch.zeros(len(g.edges), 1))
+        """
+        u, v = map(list, zip(*self.edges))
+        self.set_edge_repr(u, v, h_init, name, batch, expand_dims)
+
+    def set_node_repr(self, u, h_u, name=__N_REPR__, batch=True, expand_dims=False):
+        """ Set node representations.
+
+        Parameters
+        ----------
+        u : node, list or tensor
+            (Container of) node(s) to set representations to.
+        h_u : list, tensor or any object
+            Node representations.
+        name : str, optional
+            Representation name.
+        batch : bool, optional
+            Whether `h_u` is a batch (list or tensor) of representations.
+            If `h_u` is a list and `batch` is `True`, `len(h_u)` must be the same as
+            the number of nodes in `u`. The representation for the `i`th node is `h_u[i]`. 
+            If `h_u` is a tensor and `batch` is `True`, the shape of `h_u` must be
+            `(N, D_1, ...)`, where `N` is the number of nodes in `u`. The representation 
+            for the `i`th node is `h_u[i]` (a tensor with shape `(1, D_1, ...)`).
+            If `h_u` is any other object, `batch` must be `False`, 
+            in which case nodes in `u` will share `h_u`.
+        expand_dims : bool, optional
+            Whether to prepend a dimension (the batch dimension) to `h_u`.
+            Only valid when `h_u` is a tensor and `batch` is `False`.
+
+        Examples
+        --------
+
+        Set every node's representation to `0`.
+
+        >>> g.set_node_repr(list(g.nodes), [0] * len(g.nodes))
+
+        Set every node's representation to `torch.zeros(1, 1)`.
+
+        >>> g.set_node_repr(list(g.nodes), torch.zeros(len(g.nodes), 1))
+        """
+
+        if not isinstance(u, (list, Tensor)):
+            print("[DEPRECATED]: please directly set node attrs "
+                  "(e.g. g.nodes[node]['x'] = val).")
+        node_iter = lambda: utils.node_iter(u)
+        self.set_x_repr(self.nodes, node_iter, h_u, name, batch, expand_dims)
+
+    def set_edge_repr(self, u, v, h_uv, name=__E_REPR__, batch=True, expand_dims=False):
+        """ Set edge representations.
+
+        Parameters
+        ----------
+        u, v : edge, list or tensor
+            (Container of) edge(s) to set representations to.
+        h_uv : list, tensor or any object
+            Node representations.
+        name : str, optional
+            Representation name.
+        batch : bool, optional
+            Whether `h_uv` is a batch (list or tensor) of representations.
+            If `h_uv` is a list and `batch` is `True`, `len(h_uv)` must be the same as
+            the number of edges. The representation for the `i`th edge is `h_uv[i]`. 
+            If `h_uv` is a tensor and `batch` is `True`, the shape of `h_uv` must be
+            `(N, D_1, ...)`, where `N` is the number of edges. The representation 
+            for the `i`th edge is `h_uv[i]` (a tensor with shape `(1, D_1, ...)`).
+            If `h_uv` is any other object, `batch` must be `False`, 
+            in which case edges will share `h_uv`.
+        expand_dims : bool, optional
+            Whether to prepend a dimension (the batch dimension) to `h_uv`.
+            Only valid when `h_uv` is a tensor and `batch` is `False`.
+
+        Examples
+        --------
+
+        Set every edge's representation to `0`.
+
+        >>> g.set_edge_repr(list(g.edges), [0] * len(g.edges))
+
+        Set every edge's representation to `torch.zeros(1, 1)`.
+
+        >>> g.set_edge_repr(list(g.edges), torch.zeros(len(g.edges), 1))
+        """
+        if not isinstance(u, (list, Tensor)) and not isinstance(v, (list, Tensor)):
+            print("[DEPRECATED]: please directly set edge attrs "
+                  "(e.g. g.edges[u, v]['x'] = val).")
+        edge_iter = lambda: utils.edge_iter(u, v)
+        self.set_x_repr(self.edges, edge_iter, h_uv, name, batch, expand_dims)
+
+    def set_x_repr(self, xs, x_iter, h_x, name, batch, expand_dims):
+        x_str = 'node' if xs == self.nodes else 'edge'
+        hx_str = 'h_u' if xs == self.nodes else 'h_uv'
+        add_x = self.add_node if xs == self.nodes else \
+                    lambda uv, **kwargs: self.add_edge(uv[0], uv[1], **kwargs)
+
+        if batch:
+            assert isinstance(h_x, (list, Tensor)), \
+                "%s must be a list or tensor when batch is True" % hx_str
+
+            n = len(list(x_iter()))
+            if isinstance(h_x, list):
+                assert len(h_x) == n, \
+                    "len(%s) must be the same as the number of %ss." % (hx_str, x_str)
+            elif isinstance(h_x, Tensor):
+                assert F.shape(h_x)[0] == n, "The first dimension of %s " \
+                    "must be the same as the number of %ss" % (hx_str, x_str)
+
+            assert not expand_dims, "expand_dims may be True only when batch is False."
+
+            for xx, h_xx in zip(x_iter(), h_x):
+                assert xx in xs, "%s does not exist in graph." % (xx,)
+                kwarg = {name: h_xx}
+                add_x(xx, **kwarg)
+
+        else:
+            if expand_dims:
+                assert isinstance(x, Tensor), \
+                    "expand_dims may be True only when %s is a tensor." % hx_str
+                x = F.expand_dims(x, 0)
+
+            for xx in x_iter():
+                assert xx in xs, "%s does not exist in graph." % (xx,)
+                kwarg = {name: h_x}
+                add_x(xx, **kwarg)
+
+    def get_node_repr(self, u, name=__N_REPR__, batch=True):
+        """ Get node representations.
+
+        Parameters
+        ----------
+        u : node, list or tensor.
+            (Container of) node(s) to get representations from.
+        name : str, optional
+            Representation name.
+        batch : bool, optional
+            Whether to batch representations.
+            `batch` may be `True` only when representations are batchable.
+
+        Returns
+        -------
+        repr : a list or tensor of representations.
+        """
+        if not isinstance(u, (list, Tensor)):
+            print("[DEPRECATED]: please directly get node attrs "
+                  "(e.g. g.nodes[node]['x']).")
+        node_iter = lambda: utils.node_iter(u)
+        return self.get_x_repr(self.nodes, node_iter, name, batch)
+
+    def get_edge_repr(self, u, v, name=__E_REPR__, batch=True):
+        """ Get edge representations.
+
+        Parameters
+        ----------
+        u, v : edge, list or tensor.
+            (Container of) edge(s) to get representations from.
+        name : str, optional
+            Representation name.
+        batch : bool, optional
+            Whether to batch representations.
+            `batch` may be `True` only when representations are batchable.
+
+        Returns
+        -------
+        repr : a list or tensor of representations.
+        """
+        if not isinstance(u, (list, Tensor)) and not isinstance(v, (list, Tensor)):
+            print("[DEPRECATED]: please directly get edge attrs "
+                  "(e.g. g.edges[u, v]['x']).")
+        edge_iter = lambda: utils.edge_iter(u, v)
+        return self.get_x_repr(self.edges, edge_iter, name, batch)
+
+    def get_x_repr(self, xs, x_iter, name, batch):
+        repr_list = []
+        for xx in x_iter():
+            assert xx in xs, "%s does not exist in graph." % (xx,)
+            assert name in xs[xx], \
+                "Representation %s does not exist for %s." % (name, xx)
+            repr_list.append(xs[xx][name])
+
+        if batch:
+            assert F.isbatchable(repr_list, F.cat), "Representations are not batchable."
+            return F.cat(repr_list)
+        else:
+            return repr_list
 
     def register_message_func(self, message_func, edges='all', batchable=False):
         """Register computation on edges.
@@ -93,9 +334,11 @@ class DGLGraph(DiGraph):
         """
         if edges == 'all':
             self.m_func = message_func
+            self.m_batch = batchable
         else:
             for e in edges:
                 self.edges[e][__MFUNC__] = message_func
+                self.edges[e][__MBATCH__] = batchable
 
     def register_edge_func(self, edge_func, edges='all', batchable=False):
         """Register computation on edges.
@@ -135,9 +378,11 @@ class DGLGraph(DiGraph):
         """
         if edges == 'all':
             self.e_func = edge_func
+            self.e_batch = batchable
         else:
             for e in edges:
                 self.edges[e][__EFUNC__] = edge_func
+                self.edges[e][__EBATCH__] = batchable
 
     def register_reduce_func(self, reduce_func, nodes='all', batchable=False):
         """Register message reduce function on incoming edges.
@@ -188,9 +433,11 @@ class DGLGraph(DiGraph):
                         "Built-in function %s not implemented" % reduce_func)
         if nodes == 'all':
             self.r_func = reduce_func
+            self.r_batch = batchable
         else:
             for n in nodes:
                 self.nodes[n][__RFUNC__] = reduce_func
+                self.nodes[n][__RBATCH__] = batchable
 
     def register_update_func(self, update_func, nodes='all', batchable=False):
         """Register computation on nodes.
@@ -229,9 +476,11 @@ class DGLGraph(DiGraph):
         """
         if nodes == 'all':
             self.u_func = update_func
+            self.u_batch = batchable
         else:
             for n in nodes:
                 self.nodes[n][__UFUNC__] = update_func
+                self.nodes[n][__UBATCH__] = batchable
 
     def register_readout_func(self, readout_func):
         """Register computation on the whole graph.
@@ -289,6 +538,8 @@ class DGLGraph(DiGraph):
         v : node, container or tensor
           The destination node(s).
         """
+
+        '''
         # TODO(minjie): tensorize the loop.
         for uu, vv in utils.edge_iter(u, v):
             f_msg = self.edges[uu, vv].get(__MFUNC__, self.m_func)
@@ -296,6 +547,34 @@ class DGLGraph(DiGraph):
                 "message function not registered for edge (%s->%s)" % (uu, vv)
             m = f_msg(self.nodes[uu], self.nodes[vv], self.edges[uu, vv])
             self.edges[uu, vv][__MSG__] = m
+        '''
+
+        mfunc2args = defaultdict(list)
+        mfunc2edges = defaultdict(list)
+        for uu, vv in utils.edge_iter(u, v):
+            m_func = self.edges[uu, vv].get(__MFUNC__, self.m_func)
+            m_batch = self.edges[uu, vv].get(__MBATCH__, self.m_batch)
+            assert m_func is not None, \
+                "message function not registered for edge (%s->%s)" % (uu, vv)
+
+            args = [self.nodes[uu], self.nodes[vv], self.edges[uu, vv]]
+            if m_batch:
+                mfunc2args[m_func].append(args)
+                mfunc2edges[m_func].append([uu, vv])
+            else:
+                msg = m_func(*args)
+                self.edges[uu, vv][__MSG__] = msg
+
+        for m_func, args_list in mfunc2args.items():
+            uu_tuple, vv_tuple, uv_tuple = zip(*args_tuple)
+            uu_dict = utils.batch(uu_tuple)
+            vv_dict = utils.batch(vv_tuple)
+            uv_dict = utils.batch(uv_tuple)
+            msg_dict = m_func(uu_dict, vv_dict, uv_dict)
+
+            for i, [uu, vv] in enumerate(mfunc2edges[m_func]):
+                msg = {k : v[i : i + 1] for k, v in msg_dict.items()}
+                self.edges[uu, vv][G.__MSG__].update(msg)
 
     def update_edge(self, u, v):
         """Update representation on edge u->v
@@ -307,6 +586,8 @@ class DGLGraph(DiGraph):
         v : node, container or tensor
           The destination node(s).
         """
+
+        '''
         # TODO(minjie): tensorize the loop.
         for uu, vv in utils.edge_iter(u, v):
             f_edge = self.edges[uu, vv].get(__EFUNC__, self.m_func)
@@ -314,6 +595,34 @@ class DGLGraph(DiGraph):
                 "edge function not registered for edge (%s->%s)" % (uu, vv)
             m = f_edge(self.nodes[uu], self.nodes[vv], self.edges[uu, vv])
             self.edges[uu, vv][__E_REPR__] = m
+        '''
+
+        efunc2args = defaultdict(list)
+        efunc2edges = defaultdict(list)
+        for uu, vv in utils.edge_iter(u, v):
+            e_func = self.edges[uu, vv].get(__EFUNC__, self.e_func)
+            e_batch = self.edges[uu, vv].get(__EBATCH__, self.e_batch)
+            assert e_func is not None, \
+                "edge function not registered for edge (%s->%s)" % (uu, vv)
+
+            args = [self.nodes[uu], self.nodes[vv], self.edges[uu, vv]]
+            if e_batch:
+                efunc2args[e_func].append(args)
+                efunc2edges[e_func].append([uu, vv])
+            else:
+                msg = e_func(*args)
+                self.edges[uu, vv][__MSG__] = msg
+
+        for e_func, args_list in efunc2args.items():
+            uu_tuple, vv_tuple, uv_tuple = zip(*args_tuple)
+            uu_dict = utils.batch(uu_tuple)
+            vv_dict = utils.batch(vv_tuple)
+            uv_dict = utils.batch(uv_tuple)
+            ret_dict = e_func(uu_dict, vv_dict, uv_dict)
+
+            for i, [uu, vv] in enumerate(efunc2edges[e_func]):
+                ret = {k : v[i : i + 1] for k, v in ret_dict.items()}
+                self.edges[uu, vv][G.__MSG__].update(ret)
 
     def recvfrom(self, u, preds=None):
         """Trigger the update function on node u.
@@ -331,6 +640,8 @@ class DGLGraph(DiGraph):
           Nodes with pre-computed messages to u. Default is all
           the predecessors.
         """
+
+        '''
         u_is_container = isinstance(u, list)
         u_is_tensor = isinstance(u, Tensor)
         # TODO(minjie): tensorize the loop.
@@ -351,6 +662,86 @@ class DGLGraph(DiGraph):
             assert f_update is not None, \
                 "Update function not registered for node %s" % uu
             self.node[uu].update(f_update(self.nodes[uu], msgs_reduced_repr))
+        '''
+
+        # Two loops for r_func and u_func for correctness.
+
+        u_is_container = isinstance(u, list)
+        u_is_tensor = isinstance(u, Tensor)
+        rfunc2msgs = defaultdict(list)
+        rfunc2nodes = defaultdict(list)
+        rmsg_dict = {}
+        for i, uu in enumerate(utils.node_iter(u)):
+            if preds is None:
+                v = list(self.pred[uu])
+            elif u_is_container or u_is_tensor:
+                v = preds[i]
+            else:
+                v = preds
+
+            msgs = [self.edges[vv, uu][__MSG__] for vv in v]
+            r_func = self.nodes[uu].get(__RFUNC__, self.r_func)
+            r_batch = self.edges[uu, vv].get(__RBATCH__, self.r_batch)
+            assert r_func is not None, \
+                "Reduce function not registered for node %s" % uu
+            if r_batch:
+                rfunc2msgs[r_func].append(msgs)
+                rfunc2nodes[r_func].append(uu)
+            else:
+                rmsg_dict[uu, vv] = r_func(msgs)
+
+        def groupby(iterable, key):
+            d = defaultdict(list)
+            for x in iterable:
+                d[key(x)].append(x)
+            return [d[key] for key in sorted(d.keys())]
+
+        def update(u_tuple, repr_dict):
+            for i, uu in enumerate(u_tuple):
+                self.nodes[uu].update({k : v[i : i + 1] for k, v in repr_dict.items()})
+
+        for r_func, msgs_list in rfunc2msgs.items():
+            deg_list = list(map(len, msgs_list))
+            min_deg, max_deg = min(deg_list), max(deg_list)
+            msgs = msgs_list if min_deg > 0 else filter(bool, msgs_list)
+            msgs = groupby(msgs, len) # list of list of list of dict
+            msgs = [list(map(utils.batch, x)) for x in msgs] # list of list of dict
+            msgs = map(partial(utils.batch, method='stack'), msgs) # iter (map) of dict
+            rmsgs = map(r_func, msgs) # iter (map) of dict
+
+            uumsgs_zip = zip(rfunc2nodes[r_func], msgs_list)
+            by_deg = groupby(uumsgs_zip, lambda x: x[1])
+            for uu_list, rmsg_dict in zip(by_deg, rmsgs):
+                pass # TODO(gaiyu): update
+
+        ufunc2args = defaultdict(list)
+        ufunc2nodes = defaultdict(list)
+        for i, uu in enumerate(utils.node_iter(u)):
+            if preds is None:
+                v = list(self.pred[uu])
+            elif u_is_container or u_is_tensor:
+                v = preds[i]
+            else:
+                v = preds
+
+            u_func = self.nodes[uu].get(__UFUNC__, self.u_func)
+            u_batch = self.edges[uu, vv].get(__UBATCH__, self.u_batch)
+            assert u_func is not None, \
+                "Update function not registered for node %s" % uu
+
+            args = [self.nodes[uu], rmsg_dict[uu]]
+            if u_batch:
+                ufunc2args[u_func].append(args)
+                ufunc2nodes[u_func].append(uu)
+            else:
+                self.node[uu].update(u_func(*args))
+
+        for u_func, args_list in ufunc2rmsgs.items():
+            uu_tuple, rmsg_tuple = zip(*args_list)
+            uu_dict = utils.batch(uu_dict)
+            rmsg_dict = utils.batch(rmsg_dict)
+            ret_dict = u_func(uu_dict, rmsg_dict)
+            update(ufunc2nodes[u_func], ret_dict)
 
     def update_by_edge(self, u, v):
         """Trigger the message function on u->v and update v.
