@@ -10,8 +10,8 @@ K = 10
 def message_func(src, dst, edge):
     return src['pv'] / src['deg']
 
-def update_func(node, msgs):
-    pv = (1 - DAMP) / N + DAMP * sum(msgs)
+def update_func(node, accum):
+    pv = (1 - DAMP) / N + DAMP * accum
     return {'pv' : pv}
 
 def compute_pagerank(g):
@@ -19,6 +19,7 @@ def compute_pagerank(g):
     print(g.number_of_edges(), g.number_of_nodes())
     g.register_message_func(message_func)
     g.register_update_func(update_func)
+    g.register_reduce_func('sum')
     # init pv value
     for n in g.nodes():
         g.node[n]['pv'] = 1 / N

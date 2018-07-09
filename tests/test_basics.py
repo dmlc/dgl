@@ -3,9 +3,8 @@ from dgl.graph import DGLGraph
 def message_func(src, dst, edge):
     return src['h']
 
-def update_func(node, msgs):
-    m = sum(msgs)
-    return {'h' : node['h'] + m}
+def update_func(node, accum):
+    return {'h' : node['h'] + accum}
 
 def generate_graph():
     g = DGLGraph()
@@ -29,6 +28,7 @@ def test_sendrecv():
     check(g, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     g.register_message_func(message_func)
     g.register_update_func(update_func)
+    g.register_reduce_func('sum')
     g.sendto(0, 1)
     g.recvfrom(1, [0])
     check(g, [1, 3, 3, 4, 5, 6, 7, 8, 9, 10])
@@ -42,6 +42,7 @@ def test_multi_sendrecv():
     check(g, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     g.register_message_func(message_func)
     g.register_update_func(update_func)
+    g.register_reduce_func('sum')
     # one-many
     g.sendto(0, [1, 2, 3])
     g.recvfrom([1, 2, 3], [[0], [0], [0]])
@@ -60,6 +61,7 @@ def test_update_routines():
     check(g, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     g.register_message_func(message_func)
     g.register_update_func(update_func)
+    g.register_reduce_func('sum')
     g.update_by_edge(0, 1)
     check(g, [1, 3, 3, 4, 5, 6, 7, 8, 9, 10])
     g.update_to(9)
