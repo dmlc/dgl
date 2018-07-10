@@ -42,11 +42,37 @@ def edge_iter(u, v):
     else:
         yield u, v
 
-def batch(x_list, method='cat'):
-    x_dict = x_list[0].copy()
+def batch_dicts(dicts, method='cat'):
+    # TODO(gaiyu): error message
+    ret = dicts[0].copy()
     method = getattr(F, method)
-    for key in x_dict:
-        value_list = [x.get(key) for x in x_list]
-        batchable = F.isbatchable(value_list, method)
-        x_dict[key] = method(value_list) if batchable else value_list
-    return x_dict
+    for key in ret:
+        values = [x.get(key) for x in ret]
+        assert values == len(dicts)
+        batchable = F.isbatchable(values, method)
+        if not batchable:
+        ret[key] = method(value_list)
+
+    return ret
+
+def batch_tensors(tensors, method='cat'):
+    # TODO(gaiyu): error message
+    method = getattr(F, method)
+    assert F.isbatchable(tensors, method)
+    return method(tensors)
+
+def unbatch_dict(x):
+    # TODO(gaiyu): error message
+    assert all(isinstance(value, Tensor) for value in x.values())
+
+    N = F.shape(next(x.values()))[0]
+    assert all(F.shape(value)[0] == N for value in x.values())
+
+    keys, values = zip(*x.items())
+    split_values = zip(*[F.split(value, N) for value in values])
+    return [dict(zip(key, value)) for key, value in zip(keys, split_values)]
+
+def unbatch_tensor(x):
+    # TODO(gaiyu): error message
+    N = F.shape(x)[0]
+    return F.split(x, N)

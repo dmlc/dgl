@@ -114,7 +114,9 @@ class DGLGraph(DiGraph):
 
         It computes the new edge representations (the same concept as messages)
         using the representations of the source node, target node and the edge
-        itself. All node_reprs and edge_reprs are dictionaries.
+        itself. All node_reprs and edge_reprs are dictionaries. If `update_func`
+        returns a dict, edge attribute dict(s) will be updated with it. Otherwise, 
+        the returned object will become new default edge representation(s).
 
         Parameters
         ----------
@@ -207,7 +209,9 @@ class DGLGraph(DiGraph):
 
         It computes the new node representations using the representations
         of the in-coming edges (the same concept as messages) and the node
-        itself. All node_reprs and edge_reprs are dictionaries.
+        itself. All node_reprs and edge_reprs are dictionaries. If `update_func` 
+        returns a dict, node attribute dict(s) will be updated with it. Otherwise, 
+        the returned object will become new default node representation(s).
 
         Parameters
         ----------
@@ -324,7 +328,6 @@ class DGLGraph(DiGraph):
           The node to be updated.
         """
 
-        '''
         u_is_container = isinstance(u, list)
         u_is_tensor = isinstance(u, Tensor)
         rfunc = self._glb_func.get(__RFUNC__)
@@ -342,6 +345,7 @@ class DGLGraph(DiGraph):
                 msgs_reduced = None
             elif len(msgs_batch) == 1:
                 msgs_reduced = msgs_batch[0]
+
             else:
                 msgs_reduced = f_reduce(msgs_batch)
             # update phase
