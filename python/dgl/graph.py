@@ -175,7 +175,7 @@ class DGLGraph(DiGraph):
         >>> g.register_reduce_func(rfunc)
 
         Register for a specific node.
-        >>> g.register_reduce_func(rfunc, u) # TODO Not implemented
+        >>> g.register_reduce_func(rfunc, u)
 
         Register for multiple nodes.
         >>> u = [u1, u2, u3, ...]
@@ -226,7 +226,7 @@ class DGLGraph(DiGraph):
         >>> g.register_update_func(ufunc)
 
         Register for a specific node.
-        >>> g.register_update_func(ufunc, u) # TODO Not implemented
+        >>> g.register_update_func(ufunc, u)
 
         Register for multiple nodes.
         >>> u = [u1, u2, u3, ...]
