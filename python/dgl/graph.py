@@ -48,6 +48,14 @@ class DGLGraph(DiGraph):
         assert u in self.nodes
         return self.nodes[u][__REPR__]
 
+    def set_e_repr(self, u, v, h_uv):
+        assert (u, v) in self.edges
+        self.edges[u, v][__REPR__] = h_uv
+
+    def get_e_repr(self, u, v):
+        assert (u, v) in self.edges
+        return self.edges[u, v][__REPR__]
+
     def register_message_func(self,
                               message_func,
                               edges='all',
