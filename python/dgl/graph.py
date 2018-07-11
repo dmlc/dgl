@@ -10,8 +10,7 @@ from dgl.backend import Tensor
 import dgl.utils as utils
 
 __MSG__ = "__msg__"
-__E_REPR__ = "__e_repr__"
-__N_REPR__ = "__n_repr__"
+__REPR__ = "__repr__"
 __MFUNC__ = "__mfunc__"
 __EFUNC__ = "__efunc__"
 __UFUNC__ = "__ufunc__"
@@ -40,18 +39,14 @@ class DGLGraph(DiGraph):
         for n in self.nodes:
             self.set_repr(n, h_init)
 
-    def set_repr(self, u, h_u, name=__N_REPR__):
-        print("[DEPRECATED]: please directly set node attrs "
-              "(e.g. g.nodes[node]['x'] = val).")
+    def set_n_repr(self, u, h_u):
         assert u in self.nodes
-        kwarg = {name: h_u}
+        kwarg = {__REPR__: h_u}
         self.add_node(u, **kwarg)
 
-    def get_repr(self, u, name=__N_REPR__):
-        print("[DEPRECATED]: please directly get node attrs "
-              "(e.g. g.nodes[node]['x']).")
+    def get_n_repr(self, u):
         assert u in self.nodes
-        return self.nodes[u][name]
+        return self.nodes[u][__REPR__]
 
     def register_message_func(self,
                               message_func,
@@ -333,15 +328,18 @@ class DGLGraph(DiGraph):
             else:
                 v = preds
             # TODO(minjie): tensorize the message batching
+            # reduce phase
             f_reduce = self.nodes[uu].get(__RFUNC__, rfunc)
             assert f_reduce is not None, \
                 "Reduce function not registered for node %s" % uu
-            m = [self.edges[vv, uu][__MSG__] for vv in v]
-            msgs_reduced_repr = f_reduce(m)
+            msgs_batch = [self.edges[vv, uu][__MSG__] for vv in v]
+            msgs_reduced = f_reduce(msgs_batch)
+            # update phase
             f_update = self.nodes[uu].get(__UFUNC__, ufunc)
             assert f_update is not None, \
                 "Update function not registered for node %s" % uu
-            self.node[uu].update(f_update(self.nodes[uu], msgs_reduced_repr))
+            ret = f_update(self._get_repr(self.nodes[uu]), msgs_reduced)
+            self._set_repr(self.nodes[uu], ret)
 
     def update_by_edge(self, u, v):
         """Trigger the message function on u->v and update v.
@@ -443,6 +441,18 @@ class DGLGraph(DiGraph):
     def _edges_or_all(self, edges='all'):
         return self.edges() if edges == 'all' else edges
 
+    def _get_repr(self, states):
+        if len(states) == 1 and __REPR__ in states:
+            return states[__REPR__]
+        else:
+            return states
+
+    def _set_repr(self, states, val):
+        if isinstance(val, dict):
+            states.update(val)
+        else:
+            states[__REPR__] = val
+
     def _internal_register_node(self, name, func, nodes, batchable):
         # TODO(minjie): handle batchable
         # TODO(minjie): group nodes based on their registered func
@@ -468,5 +478,7 @@ class DGLGraph(DiGraph):
             f_edge = self.edges[uu, vv].get(name, efunc)
             assert f_edge is not None, \
                 "edge function \"%s\" not registered for edge (%s->%s)" % (name, uu, vv)
-            m = f_edge(self.nodes[uu], self.nodes[vv], self.edges[uu, vv])
-            self.edges[uu, vv].update(m)
+            ret = f_edge(self._get_repr(self.nodes[uu]),
+                         self._get_repr(self.nodes[vv]),
+                         self._get_repr(self.edges[uu, vv]))
+            self._set_repr(self.edges[uu, vv], ret)
