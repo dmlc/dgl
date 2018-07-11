@@ -30,11 +30,11 @@ def test_sendrecv():
     g.register_update_func(update_func)
     g.register_reduce_func('sum')
     g.sendto(0, 1)
-    g.recvfrom(1, [0])
+    g.recvfrom(1)
     check(g, [1, 3, 3, 4, 5, 6, 7, 8, 9, 10])
     g.sendto(5, 9)
     g.sendto(6, 9)
-    g.recvfrom(9, [5, 6])
+    g.recvfrom(9)
     check(g, [1, 3, 3, 4, 5, 6, 7, 8, 9, 23])
 
 def test_multi_sendrecv():
@@ -45,15 +45,15 @@ def test_multi_sendrecv():
     g.register_reduce_func('sum')
     # one-many
     g.sendto(0, [1, 2, 3])
-    g.recvfrom([1, 2, 3], [[0], [0], [0]])
+    g.recvfrom([1, 2, 3])
     check(g, [1, 3, 4, 5, 5, 6, 7, 8, 9, 10])
     # many-one
     g.sendto([6, 7, 8], 9)
-    g.recvfrom(9, [6, 7, 8])
+    g.recvfrom(9)
     check(g, [1, 3, 4, 5, 5, 6, 7, 8, 9, 34])
     # many-many
     g.sendto([0, 0, 4, 5], [4, 5, 9, 9])
-    g.recvfrom([4, 5, 9], [[0], [0], [4, 5]])
+    g.recvfrom([4, 5, 9])
     check(g, [1, 3, 4, 5, 6, 7, 7, 8, 9, 45])
 
 def test_update_routines():
