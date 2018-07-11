@@ -1,4 +1,5 @@
 from dgl import DGLGraph
+from dgl.graph import __REPR__
 
 def message_func(hu, hv, e_uv):
     return hu + e_uv
@@ -40,5 +41,27 @@ def test_sendrecv():
     g.recvfrom(9, [5, 6])
     check(g, [1, 4, 3, 4, 5, 6, 7, 8, 9, 25])
 
+def message_func_hybrid(src, dst, edge):
+    return src[__REPR__] + edge
+
+def update_func_hybrid(node, accum):
+    return node[__REPR__] + accum
+
+def test_hybridrepr():
+    g = generate_graph()
+    for i in range(10):
+        g.nodes[i]['id'] = -i
+    g.register_message_func(message_func_hybrid)
+    g.register_update_func(update_func_hybrid)
+    g.register_reduce_func('sum')
+    g.sendto(0, 1)
+    g.recvfrom(1, [0])
+    check(g, [1, 4, 3, 4, 5, 6, 7, 8, 9, 10])
+    g.sendto(5, 9)
+    g.sendto(6, 9)
+    g.recvfrom(9, [5, 6])
+    check(g, [1, 4, 3, 4, 5, 6, 7, 8, 9, 25])
+
 if __name__ == '__main__':
     test_sendrecv()
+    test_hybridrepr()
