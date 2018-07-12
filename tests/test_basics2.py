@@ -45,7 +45,7 @@ def test_no_msg_update():
     g.register_reduce_func(reduce_not_called)
     g.register_update_func(update_no_msg)
     for i in range(10):
-        g.recvfrom(i)
+        g.recv(i)
     check(g, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
 
 def test_double_recv():
@@ -56,11 +56,11 @@ def test_double_recv():
     g.register_update_func(update_func)
     g.sendto(1, 9)
     g.sendto(2, 9)
-    g.recvfrom(9)
+    g.recv(9)
     check(g, [1, 2, 3, 4, 5, 6, 7, 8, 9, 15])
     try:
         # The second recv should have a None message
-        g.recvfrom(9)
+        g.recv(9)
     except:
         return
     assert False
@@ -71,7 +71,7 @@ def test_recv_no_pred():
     g.register_message_func(message_not_called)
     g.register_reduce_func(reduce_not_called)
     g.register_update_func(update_no_msg)
-    g.recvfrom(0)
+    g.recv(0)
 
 def test_skipped_reduce():
     g = generate_graph()
@@ -80,7 +80,7 @@ def test_skipped_reduce():
     g.register_reduce_func(reduce_not_called)
     g.register_update_func(update_func)
     g.sendto(0, 1)
-    g.recvfrom(1)
+    g.recv(1)
     check(g, [1, 3, 3, 4, 5, 6, 7, 8, 9, 10])
 
 if __name__ == '__main__':

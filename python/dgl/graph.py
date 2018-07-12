@@ -307,8 +307,8 @@ class DGLGraph(DiGraph):
         """
         self._internal_trigger_edges(u, v, __EFUNC__)
 
-    def recvfrom(self, u):
-        """Trigger the update function on node u.
+    def recv(self, u):
+        """Receive in-coming messages and update representation on node u.
 
         It computes the new node state using the messages sent from the predecessors
         of node u. If no message is found from the predecessors, reduce function
@@ -361,7 +361,7 @@ class DGLGraph(DiGraph):
         dst = set()
         for uu, vv in utils.edge_iter(u, v):
             dst.add(vv)
-        self.recvfrom(list(dst))
+        self.recv(list(dst))
 
     def update_to(self, u):
         """Pull messages from the node's predecessors and then update it.
@@ -376,7 +376,7 @@ class DGLGraph(DiGraph):
             assert uu in self.nodes
             preds = list(self.pred[uu])
             self.sendto(preds, uu)
-            self.recvfrom(uu)
+            self.recv(uu)
 
     def update_from(self, u):
         """Send message from the node to its successors and update them.
@@ -399,7 +399,7 @@ class DGLGraph(DiGraph):
         u = [uu for uu, _ in self.edges]
         v = [vv for _, vv in self.edges]
         self.sendto(u, v)
-        self.recvfrom(list(self.nodes()))
+        self.recv(list(self.nodes()))
 
     def propagate(self, iterator='bfs', **kwargs):
         """Propagate messages and update nodes using iterator.

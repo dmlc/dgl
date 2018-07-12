@@ -34,11 +34,11 @@ def test_sendrecv():
     g.register_update_func(update_func)
     g.register_reduce_func('sum')
     g.sendto(0, 1)
-    g.recvfrom(1)
+    g.recv(1)
     check(g, [1, 4, 3, 4, 5, 6, 7, 8, 9, 10])
     g.sendto(5, 9)
     g.sendto(6, 9)
-    g.recvfrom(9)
+    g.recv(9)
     check(g, [1, 4, 3, 4, 5, 6, 7, 8, 9, 25])
 
 def message_func_hybrid(src, dst, edge):
@@ -55,11 +55,11 @@ def test_hybridrepr():
     g.register_update_func(update_func_hybrid)
     g.register_reduce_func('sum')
     g.sendto(0, 1)
-    g.recvfrom(1)
+    g.recv(1)
     check(g, [1, 4, 3, 4, 5, 6, 7, 8, 9, 10])
     g.sendto(5, 9)
     g.sendto(6, 9)
-    g.recvfrom(9)
+    g.recv(9)
     check(g, [1, 4, 3, 4, 5, 6, 7, 8, 9, 25])
 
 if __name__ == '__main__':

@@ -80,7 +80,7 @@ class TreeLSTM(nn.Module):
             iterator.append((src, trg))
             frontier = src
 
-        g.recvfrom(leaves)
+        g.recv(leaves)
         g.propagate(reversed(iterator))
 
         return self.readout_func(g, train)
