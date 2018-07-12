@@ -307,21 +307,18 @@ class DGLGraph(DiGraph):
         """
         self._internal_trigger_edges(u, v, __EFUNC__)
 
-    def recvfrom(self, u, preds=None):
-        """Trigger the update function on node u.
+    def recv(self, u):
+        """Receive in-coming messages and update representation on node u.
 
-        It computes the new node state using the messages and edge
-        states from preds->u. If `u` is one node, `preds` is a list
-        of predecessors. If `u` is a container or tensor of nodes,
-        then `preds[i]` should be the predecessors of `u[i]`.
+        It computes the new node state using the messages sent from the predecessors
+        of node u. If no message is found from the predecessors, reduce function
+        will be skipped and a None type will be provided as the reduced messages for
+        the update function.
 
         Parameters
         ----------
         u : node, container or tensor
           The node to be updated.
-        preds : container
-          Nodes with pre-computed messages to u. Default is all
-          the predecessors.
         """
         u_is_container = isinstance(u, list)
         u_is_tensor = isinstance(u, Tensor)
@@ -329,19 +326,19 @@ class DGLGraph(DiGraph):
         ufunc = self._glb_func.get(__UFUNC__)
         # TODO(minjie): tensorize the loop.
         for i, uu in enumerate(utils.node_iter(u)):
-            if preds is None:
-                v = list(self.pred[uu])
-            elif u_is_container or u_is_tensor:
-                v = preds[i]
-            else:
-                v = preds
             # TODO(minjie): tensorize the message batching
             # reduce phase
             f_reduce = self.nodes[uu].get(__RFUNC__, rfunc)
             assert f_reduce is not None, \
                 "Reduce function not registered for node %s" % uu
-            msgs_batch = [self.edges[vv, uu][__MSG__] for vv in v]
-            msgs_reduced = f_reduce(msgs_batch)
+            msgs_batch = [self.edges[vv, uu].pop(__MSG__)
+                          for vv in self.pred[uu] if __MSG__ in self.edges[vv, uu]]
+            if len(msgs_batch) == 0:
+                msgs_reduced = None
+            elif len(msgs_batch) == 1:
+                msgs_reduced = msgs_batch[0]
+            else:
+                msgs_reduced = f_reduce(msgs_batch)
             # update phase
             f_update = self.nodes[uu].get(__UFUNC__, ufunc)
             assert f_update is not None, \
@@ -361,17 +358,10 @@ class DGLGraph(DiGraph):
         """
         self.sendto(u, v)
         # TODO(minjie): tensorize the following loops.
-        preds = defaultdict(list)
+        dst = set()
         for uu, vv in utils.edge_iter(u, v):
-            preds[vv].append(uu)
-        if len(preds) == 1:
-            dst = list(preds.keys())[0]
-            src = preds[dst]
-            self.recvfrom(dst, src)
-        elif len(preds) > 1:
-            dst = list(preds.keys())
-            src = [preds[d] for d in dst]
-            self.recvfrom(dst, src)
+            dst.add(vv)
+        self.recv(list(dst))
 
     def update_to(self, u):
         """Pull messages from the node's predecessors and then update it.
@@ -386,7 +376,7 @@ class DGLGraph(DiGraph):
             assert uu in self.nodes
             preds = list(self.pred[uu])
             self.sendto(preds, uu)
-            self.recvfrom(uu, preds)
+            self.recv(uu)
 
     def update_from(self, u):
         """Send message from the node to its successors and update them.
@@ -409,7 +399,7 @@ class DGLGraph(DiGraph):
         u = [uu for uu, _ in self.edges]
         v = [vv for _, vv in self.edges]
         self.sendto(u, v)
-        self.recvfrom(list(self.nodes()))
+        self.recv(list(self.nodes()))
 
     def propagate(self, iterator='bfs', **kwargs):
         """Propagate messages and update nodes using iterator.
