@@ -8,3 +8,9 @@ SparseTensor = sp.sparse.spmatrix
 
 def asnumpy(a):
     return a
+
+def unpack(a):
+    return np.split(a, a.shape[0], axis=0)
+
+def pack(arrays):
+    return np.concatenate(arrays, axis=0)

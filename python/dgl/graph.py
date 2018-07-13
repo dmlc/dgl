@@ -7,6 +7,7 @@ from networkx.classes.digraph import DiGraph
 
 import dgl.backend as F
 from dgl.backend import Tensor
+import dgl.state as state
 import dgl.utils as utils
 
 __MSG__ = "__msg__"
@@ -16,8 +17,6 @@ __EFUNC__ = "__efunc__"
 __UFUNC__ = "__ufunc__"
 __RFUNC__ = "__rfunc__"
 __READOUT__ = "__readout__"
-
-XFunc = namedtuple('XFunc', ['func', 'batchable'])
 
 class DGLGraph(DiGraph):
     """Base graph class specialized for neural networks on graphs.
@@ -31,6 +30,11 @@ class DGLGraph(DiGraph):
     attr : keyword arguments, optional
         Attributes to add to graph as key=value pairs.
     """
+    node_dict_factory = state.NodeDict
+    adjlist_outer_dict_factory = state.AdjOuterDict
+    adjlist_inner_dict_factory = state.AdjInnerDict
+    edge_attr_dict_factory = state.EdgeAttrDict
+
     def __init__(self, graph_data=None, **attr):
         super(DGLGraph, self).__init__(graph_data, **attr)
         self._glb_func = {}
