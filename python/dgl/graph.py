@@ -102,8 +102,13 @@ class DGLGraph(DiGraph):
         >>> v = [v1, v2, v3, ...]
         >>> g.register_message_func(mfunc, (u, v))
         """
-        def _msg_edge_func(u, v, e_uv):
-            return {__MSG__ : message_func(u, v, e_uv)}
+        def _msg_edge_func(u, v, uv):
+            ret = message_func(u, v, uv) # TODO(gaiyu): u and uv only
+            if isinstance(ret, dict):
+                assert all(isinstance(key, str) for key in ret) # TODO(gaiyu): remove
+                return {__MSG__ + key : value for key, value in ret}
+            else:
+                return {__MSG__ : ret}
         self._internal_register_edge(__MFUNC__, _msg_edge_func, edges, batchable)
 
     def register_edge_func(self,
@@ -318,7 +323,7 @@ class DGLGraph(DiGraph):
         """
         self._internal_trigger_edges(u, v, __EFUNC__)
 
-    def recv(self, u):
+    def recv(self, u, reduce_func, update_func):
         """Receive in-coming messages and update representation on node u.
 
         It computes the new node state using the messages sent from the predecessors
@@ -331,33 +336,7 @@ class DGLGraph(DiGraph):
         u : node, container or tensor
           The node to be updated.
         """
-
-        u_is_container = isinstance(u, list)
-        u_is_tensor = isinstance(u, Tensor)
-        rfunc = self._glb_func.get(__RFUNC__)
-        ufunc = self._glb_func.get(__UFUNC__)
-        # TODO(minjie): tensorize the loop.
-        for i, uu in enumerate(utils.node_iter(u)):
-            # TODO(minjie): tensorize the message batching
-            # reduce phase
-            f_reduce = self.nodes[uu].get(__RFUNC__, rfunc)
-            assert f_reduce is not None, \
-                "Reduce function not registered for node %s" % uu
-            msgs_batch = [self.edges[vv, uu].pop(__MSG__)
-                          for vv in self.pred[uu] if __MSG__ in self.edges[vv, uu]]
-            if len(msgs_batch) == 0:
-                msgs_reduced = None
-            elif len(msgs_batch) == 1:
-                msgs_reduced = msgs_batch[0]
-
-            else:
-                msgs_reduced = f_reduce(msgs_batch)
-            # update phase
-            f_update = self.nodes[uu].get(__UFUNC__, ufunc)
-            assert f_update is not None, \
-                "Update function not registered for node %s" % uu
-            ret = f_update(self._get_repr(self.nodes[uu]), msgs_reduced)
-            self._set_repr(self.nodes[uu], ret)
+        pass
 
     def update_by_edge(self, u, v):
         """Trigger the message function on u->v and update v.
@@ -452,18 +431,6 @@ class DGLGraph(DiGraph):
     def _edges_or_all(self, edges='all'):
         return self.edges() if edges == 'all' else edges
 
-    def _get_repr(self, states):
-        if len(states) == 1 and __REPR__ in states:
-            return states[__REPR__]
-        else:
-            return states
-
-    def _set_repr(self, states, val):
-        if isinstance(val, dict):
-            states.update(val)
-        else:
-            states[__REPR__] = val
-
     def _internal_register_node(self, name, func, nodes, batchable):
         # TODO(minjie): handle batchable
         # TODO(minjie): group nodes based on their registered func
@@ -482,14 +449,46 @@ class DGLGraph(DiGraph):
             for e in edges:
                 self.edges[e][name] = func
 
-    def _internal_trigger_edges(self, u, v, name):
-        # TODO(minjie): tensorize the loop.
-        efunc = self._glb_func.get(name)
-        for uu, vv in utils.edge_iter(u, v):
-            f_edge = self.edges[uu, vv].get(name, efunc)
-            assert f_edge is not None, \
-                "edge function \"%s\" not registered for edge (%s->%s)" % (name, uu, vv)
-            ret = f_edge(self._get_repr(self.nodes[uu]),
-                         self._get_repr(self.nodes[vv]),
-                         self._get_repr(self.edges[uu, vv]))
-            self._set_repr(self.edges[uu, vv], ret)
+    @staticmethod
+    def _get_repr(attr_dict):
+        return attr_dict[__REPR__] if __REPR__ in attr_dict else attr_dict
+
+    @staticmethod
+    def _set_repr(self, attr_dict, attr):
+        if isinstance(attr, dict):
+            attr_dict.update(attr)
+        else:
+            attr_dict[__REPR__] = attr
+
+    def _internal_trigger_edges(self, u, v, func):
+        uu = self._get_repr(self.nodes[u])
+        vv = self._get_repr(self.nodes[v])
+        uv = self._get_repr(self.edges[u, v])
+
+        uu_shape = F.shape(uu)
+        vv_shape = F.shape(vv)
+        if uu_shape != vv_shape:
+            assert uu_shape[0] == 1 or vv_shape[0] == 1 # TODO(gaiyu): remove
+            if uu_shape[0] < vv_shape[0]:
+                uu = F.concatenate([uu] * vv_shape[0])
+            else:
+                vv = F.concatenate([vv] * uu_shape[0])
+
+        self._set_repr(self.edges[u][v], func(uu, vv, uv))
+
+    def expand_by_pred(self, v):
+        if isinstance(v, list):
+            return sum([self.pred[vv] for vv in v], [])
+        elif isinstance(v, Tensor):
+            raise NotImplementedError()
+        else:
+            return list(self.pred[v])
+
+    def expand_by_deg(self, v):
+        """By incoming degree."""
+        if isinstance(v, list):
+            return sum([[vv] * self.in_degree(vv) for vv in v], [])
+        elif isinstance(v, Tensor):
+            raise NotImplementedError()
+        else:
+            return [v] * self.in_degree(v)

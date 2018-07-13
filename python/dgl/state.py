@@ -47,7 +47,7 @@ class NodeDict(MutableMapping):
                 self._row_dict[nn] = {}
             lazy_dict = LazyContainerNodeAttrDict(self, n)
             lazy_dict.update(attr_dict)
-        if n_is_tensor:
+        elif n_is_tensor:
             raise NotImplementedError()
         else:
             self._row_dict[n] = attr_dict
@@ -69,10 +69,7 @@ class LazyContainerNodeAttrDict(MutableMapping):
 
     def __getitem__(self, attr_name):
         attr_list = [self._node_dict._row_dict[nn][attr_name] for nn in self._n]
-        if isinstance(items[0], Tensor):
-            return F.pack(attr_list)
-        else:
-            return attr_list
+        return F.pack(attr_list) if F.packable(attr_list) else attr_list
 
     def __iter__(self):
         return iter(self._keys)
@@ -124,7 +121,7 @@ class AdjOuterDict(MutableMapping):
             raise NotImplementedError()
         else:
             assert u in self._outer_dict
-        return LazyAdjInnerDict(self, u, u_is_container, u_is_tensor)
+        return LazyAdjInnerDict(self._outer_dict, u, u_is_container, u_is_tensor)
 
     def __setitem__(self, u, inner_dict):
         u_is_container = iscontainer(n)
@@ -138,42 +135,69 @@ class AdjOuterDict(MutableMapping):
             self._outer_dict[u] = inner_dict
 
 class LazyAdjInnerDict:
-    def __init__(self, store, u, u_is_container, u_is_tensor):
-        self._store = store
+    def __init__(self, outer_dict, u, u_is_container, u_is_tensor):
+        self._outer_dict = outer_dict
         self._u = u
-        self.u_is_container = u_is_container
-        self.u_is_tensor = u_is_tensor
+        self._u_is_container = u_is_container
+        self._u_is_tensor = u_is_tensor
 
     def __getitem__(self, v):
         v_is_container = iscontainer(v)
         v_is_tensor = isinstance(v, Tensor)
         if v_is_container:
-            assert all(
+            assert not self._u_is_tensor
+            return LazyContainerEdgeAttrDict(self._outer_dict, self._u, v)
         if v_is_tensor:
             raise NotImplementedError()
-        else:
-            return self._store._row_dict[self._n][v]
+        elif not self._u_is_container and not self._u_is_tensor:
+            return self._outer_dict[self._n][v]
 
     def __iter__(self):
+        raise NotImplementedError()
 
     def __len__(self):
+        raise NotImplementedError()
 
-    def __setitem__(self, v, attrs):
+    def __setitem__(self, v, attr_dict):
         v_is_container = iscontainer(v)
         v_is_tensor = isinstance(v, Tensor)
         if v_is_container:
             assert not self.u_is_tensor
             for vv in v:
                 self._store._row_dict[self._n][vv] = {}
-            attr_dict = LazyEdgeAttrDict(self._store, self._n, v)
-            for name, attr in attrs.items():
-                attr_dict[name] = attr
+            lazy_dict = LazyEdgeAttrDict(self._store, self._n, v)
+            for attr_name, attr in attr_dict.items():
+                lazy_dict[attr_name] = attr
         elif v_is_tensor:
-            assert self.u_is_tensor
             raise NotImplementedError()
         else:
-            self._store._row_dict[self._n][v] = attrs
+            self._store._row_dict[self._n][v] = attr_dict
 
 class LazyContainerEdgeAttrDict:
     """dict: attr_name -> attr"""
-    pass
+    def __init__(self, outer_dict, u, v):
+        self._outer_dict = outer_dict
+        self._u = u
+        self._v = v
+
+    def __getitem__(self, attr_name):
+        edge_iter = utils.edge_iter(self._u, self._v)
+        attr_list = [self._outer_dict[uu, vv][attr_name] for uu, vv in edge_iter]
+        return F.pack(attr_list) if F.packable(attr_list) else attr_list
+    
+    def __iter__(self):
+        raise NotImplementedError()
+
+    def __len__(self):
+        raise NotImplementedError()
+
+    def __setitem__(self, attr_name, attr):
+        if F.unpackable(attr):
+            for [uu, vv], a in zip(utils.edge_iter(self._u, self._v), F.unpack(attr)):
+                self._outer_dict[uu][vv][attr_name] = a
+        else:
+            for uu, vv in utils.edge_iter(self._u, self._v):
+                self._outer_dict[uu][vv][attr_name] = attr
+        
+AdjInnerDict = dict
+EdgeAttrDict = dict

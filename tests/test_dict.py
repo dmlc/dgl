@@ -10,8 +10,8 @@ def test_node_dict():
     nodes[1] = {}
     nodes[1]['k1'] = 'n11'
     print(nodes)
-    for k in nodes.items():
-        print(k)
+    for key, value in nodes.items():
+        print(key, value)
     print(nodes.items())
     nodes.clear()
     print(nodes)
@@ -58,4 +58,4 @@ def test_node_dict_tensor_arg():
 test_node_dict()
 test_node_dict_batched()
 test_node_dict_batched_tensor()
-test_node_dict_tensor_arg()
+# test_node_dict_tensor_arg()
