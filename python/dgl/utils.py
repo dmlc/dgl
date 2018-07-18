@@ -1,5 +1,5 @@
 import dgl.backend as F
-from dgl.backend import Tensor
+from dgl.backend import Tensor, SparseTensor
 
 def node_iter(n):
     n_is_container = isinstance(n, list)
@@ -41,3 +41,10 @@ def edge_iter(u, v):
             yield u, vv
     else:
         yield u, v
+
+def homogeneous(x_list, x=None):
+    type_x = x if x else type(x_list[0])
+    return all(type(x) == x_type for x in x_list)
+
+def degree(u, v, n):
+    pass

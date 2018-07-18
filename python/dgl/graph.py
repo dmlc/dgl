@@ -2,8 +2,10 @@
 """
 
 from collections import defaultdict
+from functools import reduce
 import networkx as nx
 from networkx.classes.digraph import DiGraph
+import numpy as np
 
 import dgl.backend as F
 from dgl.backend import Tensor
@@ -309,6 +311,7 @@ class DGLGraph(DiGraph):
         v : node, container or tensor
           The destination node(s).
         """
+        # Cannot store messages separately (graph mutation)
         self._internal_trigger_edges(u, v, __MFUNC__)
 
     def update_edge(self, u, v):
@@ -323,20 +326,63 @@ class DGLGraph(DiGraph):
         """
         self._internal_trigger_edges(u, v, __EFUNC__)
 
-    def recv(self, u, reduce_func, update_func):
-        """Receive in-coming messages and update representation on node u.
+    def recv(self, v, reduce_func, update_func, batchable=False):
+        # TODO(gaiyu): __REPR__
+        if batchable:
+            if isinstance(v, list):
+                assert utils.homogeneous(v, int)
+                v = F.tensor(v)
+            elif isinstance(v, Tensor):
+                assert F.isinteger(u) and len(F.shape(u)) == 1
+            elif isinstance(v, int):
+                v = F.tensor([v])
+            else:
+                raise KeyError()
 
-        It computes the new node state using the messages sent from the predecessors
-        of node u. If no message is found from the predecessors, reduce function
-        will be skipped and a None type will be provided as the reduced messages for
-        the update function.
+            key_list = [key for key in self.edges._attrs if key.startswith(__MSG__)]
+            uv_list = [self.edges.uv(key, v=v) for key in key_list]
+            deg_list = [utils.degree(src, dst) for src, dst in uv_list]
+            deg = deg_list[0]
+            assert all(F.prod(x == deg) for x in deg_list)
+            uniq = map(F.item, F.unique(deg_list[0]))
 
-        Parameters
-        ----------
-        u : node, container or tensor
-          The node to be updated.
-        """
-        pass
+            w_list = []
+            r_list = []
+            for d in uniq:
+                w = v[deg == d]
+                n = F.shape(w)[0]
+                wx = self.nodes[w]
+
+                uvx = {self.edges[src, dst].pop(key, None) \
+                      for key, [src, dst] in zip(key_list, uv_list)}
+                uvx = {k : F.reshape(x, [int(n / d), d, -1]) for k, x in uvx.items() if x}
+
+                rx = reduce_func(wx, uvx)
+                assert all(isinstance(x, Tensor) and \
+                           F.shape(x)[0] == n for x in r.values())
+
+                w_list.append(wx)
+                r_list.append(rx)
+
+            def valid(x_list):
+                key_set = set(x_list[0])
+                return all(set(x) == key_set for x in x_list) and \
+                    all(F.packable([x[key] for x in x_list]) for key in key_set)
+
+            assert valid(w_list)
+            assert valid(r_list)
+
+            wx = {key : F.pack([wx[key] for wx in w_list]) for key in w_list[0]}
+            rx = {key : F.pack([rx[key] for rx in r_list]) for key in r_list[0]}
+            ux = update_func(wx, rx)
+
+            assert all(isinstance(x, Tensor) and \
+                       F.shape(x)[0] == F.shape(v)[0] for x in ux.values())
+
+            for key, value in u.items():
+                self.nodes[v][key] = value
+        else:
+            pass
 
     def update_by_edge(self, u, v):
         """Trigger the message function on u->v and update v.
@@ -475,20 +521,3 @@ class DGLGraph(DiGraph):
                 vv = F.concatenate([vv] * uu_shape[0])
 
         self._set_repr(self.edges[u][v], func(uu, vv, uv))
-
-    def expand_by_pred(self, v):
-        if isinstance(v, list):
-            return sum([self.pred[vv] for vv in v], [])
-        elif isinstance(v, Tensor):
-            raise NotImplementedError()
-        else:
-            return list(self.pred[v])
-
-    def expand_by_deg(self, v):
-        """By incoming degree."""
-        if isinstance(v, list):
-            return sum([[vv] * self.in_degree(vv) for vv in v], [])
-        elif isinstance(v, Tensor):
-            raise NotImplementedError()
-        else:
-            return [v] * self.in_degree(v)

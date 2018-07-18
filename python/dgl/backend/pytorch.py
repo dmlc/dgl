@@ -25,10 +25,9 @@ def reduce_max(a):
     return a
 
 def packable(tensors):
-    return all(isinstance(t, torch.Tensor) and \
-               t.device == tensors[0].device and \
-               t.dtype == tensors[0].dtype and \
-               t.shape[1:] == tensors[0].shape[1:] for t in tensors)
+    return all(isinstance(x, torch.Tensor) and \
+               x.dtype == tensors[0].dtype and \
+               x.shape[1:] == tensors[0].shape[1:] for x in tensors)
 
 def pack(tensors):
     return torch.cat(tensors)
@@ -41,3 +40,10 @@ def unpack(t):
 
 def shape(t):
     return t.shape
+
+def expand_dims(x, axis):
+    return x.unsqueeze(axis)
+
+def prod(x, axis=None, keepdims=None):
+    args = ([axis] if axis else []) + ([keepdims] if keepdims else []) 
+    return th.prod(x, *args)
