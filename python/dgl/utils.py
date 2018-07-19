@@ -42,9 +42,9 @@ def edge_iter(u, v):
     else:
         yield u, v
 
-def homogeneous(x_list, x=None):
-    type_x = x if x else type(x_list[0])
-    return all(type(x) == x_type for x in x_list)
+def homogeneous(x_list, type_x=None):
+    type_x = type_x if type_x else type(x_list[0])
+    return all(type(x) == type_x for x in x_list)
 
 def degree(u, v, n):
     pass

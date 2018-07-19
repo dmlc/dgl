@@ -1,22 +1,23 @@
 import networkx as nx
-import numpy as np
+# import numpy as np
+import torch as F
 from dgl.graph import DGLGraph
 
 def test_node1():
     graph = DGLGraph()
     n0 = 0
     n1 = 1
-    graph.add_node(n0, x=10)
-    graph.add_node(n1, x=11)
+    graph.add_node(n0, x=F.tensor([10]))
+    graph.add_node(n1, x=F.tensor([11]))
     assert len(graph.nodes()) == 2
-    assert graph.node[[n0, n1]]['x'] == [10, 11]
+    assert F.prod(graph.nodes[[n0, n1]]['x'] == F.tensor([10, 11]))
     # tensor state
-    graph.add_node(n0, y=np.zeros((1, 10)))
-    graph.add_node(n1, y=np.zeros((1, 10)))
-    assert graph.node[[n0, n1]]['y'].shape == (2, 10)
+    graph.add_node(n0, y=F.zeros([1, 10]))
+    graph.add_node(n1, y=F.zeros([1, 10]))
+    assert graph.nodes[[n0, n1]]['y'].shape == (2, 10)
     # tensor args
-#   nodes = np.array([n0, n1, n1, n0])
-#   assert graph.node[nodes]['y'].shape == (4, 10)
+    nodes = F.tensor([n0, n1, n1, n0])
+    assert graph.node[nodes]['y'].shape == (4, 10)
 
 def test_node2():
     g = DGLGraph()

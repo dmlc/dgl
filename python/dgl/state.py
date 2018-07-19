@@ -1,8 +1,6 @@
 from collections import defaultdict, MutableMapping
-from functools import reduce
-from itertools import chain
 import dgl.backend as F
-from dgl.backend import Tensor
+import dgl.utils as utils
 
 class DGLNodeTensor:
     def __init__(self, idx, dat):
@@ -25,7 +23,7 @@ class DGLNodeTensor:
         ----------
         u : Tensor
         """
-        assert isinstance(u, Tensor)
+        assert isinstance(u, F.Tensor)
         idx = self._idx[u]
         dat = self._dat[u]
         return DGLNodeTensor(idx, dat)
@@ -83,7 +81,7 @@ class DGLEdgeTensor:
         ----------
         idx : Tensor (N,)
         """
-        assert isinstance(idx, Tensor) and len(F.shape(idx)) == 1
+        assert isinstance(idx, F.Tensor) and len(F.shape(idx)) == 1
         src = self._src[idx]
         dst = self._dst[idx]
         dat = self._dat[idx]
@@ -96,17 +94,17 @@ class DGLEdgeTensor:
         u : Tensor (N,) or slice(None, None, None)
         v : Tensor (N,) or slice(None, None, None)
         """
-        if isinstance(u, Tensor):
+        if isinstance(u, F.Tensor):
             assert len(F.shape(u)) == 1
-        if isinstance(v, Tensor):
+        if isinstance(v, F.Tensor):
             assert len(F.shape(v)) == 1
         if u == slice(None, None, None) and slice(None, None, None):
             return self
-        elif u == slice(None, None, None) and isinstance(v, Tensor):
+        elif u == slice(None, None, None) and isinstance(v, F.Tensor):
             return self._index(self._complete(v=v))
-        elif isinstance(u, Tensor) and v == slice(None, None, None):
+        elif isinstance(u, F.Tensor) and v == slice(None, None, None):
             return self._index(self._complete(u=u))
-        elif isinstance(u, Tensor) and isinstance(v, Tensor):
+        elif isinstance(u, F.Tensor) and isinstance(v, F.Tensor):
             assert F.shape(u)[0] == F.shape(v)[0]
             return self._index((self._src == u) * (self._dst == v))
         else:
@@ -143,30 +141,23 @@ def concatenate(tensors):
         raise RuntimeError()
 
 class NodeDict(MutableMapping):
-    """dict: node -> attr_name -> attr_value
-    Always a column-based storage.
-    By default, a column is dictized, i.e. stored as dict: node -> attr_value. 
-    Users can tensorize a dictized column by calling `NodeDict.tensorize` 
-    and dictize a tensorized column by calling `NodeDict.dictize`.
-
-    dispatch `node_dict[node][attr_name] = attr_value`
-    If `node` is a list/tensor, `attr_value` must be a tensor. 
-    Depending on whether `attr_name` is dictized or tensorized, 
-    `attr_value`.
-
-    `node_dict[node][attr_name]` returns when `node` is a node 
-    and returns when `node` is a tensor.
-    If `node` is a list/tensor and `attr_name` is dictized, 
-    attempt to pack.
-
-    Nodes are maintained in a separate set.
-
-    There is performance discrepancy between batch getitem and 
-    only if the attribute is tensorized.
-    """
     def __init__(self):
         self._node = set()
         self._attrs = defaultdict(dict)
+
+    @staticmethod
+    def _deltensor(attr_value, u):
+        """
+        Parameters
+        ----------
+        u : Tensor
+        """
+        isin = F.isin(attr_value.idx, u)
+        if F.sum(isin):
+            if F.prod(isin):
+                return DGLNodeTensor
+            else:
+                return attr_value[1 - isin]
 
     @staticmethod
     def _delitem(attrs, attr_name, u, uu):
@@ -174,30 +165,33 @@ class NodeDict(MutableMapping):
         Parameters
         ----------
         attrs :
-        u : Tensor
-        uu : list
         """
         attr_value = attrs[attr_name]
+        deltensor = NodeDict._deltensor
         if isinstance(attr_value, dict):
-            if u == slice(None, None, None):
-                assert not uu
-                attrs[attr_name] = {}
-            else:
+            if isinstance(u, list):
+                for x in u:
+                    attr_value.pop(x, None)
+            elif isinstance(u, F.Tensor):
                 uu = uu if uu else map(F.item, u)
                 for x in uu:
                     attr_value.pop(x, None)
+            elif u == slice(None, None, None):
+                assert not uu
+                attrs[attr_name] = {}
+            else:
+                raise RuntimeError()
         elif isinstance(attr_value, DGLNodeTensor):
-            if u == slice(None, None, None):
+            if isinstance(u, list):
+                uu = uu if uu else F.tensor(u) # TODO(gaiyu): device, dtype, shape
+                attrs[attr_name] = deltensor(attr_value, uu)
+            elif isinstance(u, Tensor):
+                attrs[attr_name] = deltensor(attr_value, u)
+            elif u == slice(None, None, None):
                 assert not uu
                 attrs[attr_name] = DGLNodeTensor
             else:
-                u = u if u else F.tensor(uu) # TODO(gaiyu): device, dtype, shape
-                isin = F.isin(attr_value.idx, u)
-                if F.sum(isin):
-                    if F.prod(isin):
-                        attrs[attr_name] = DGLNodeTensor
-                    else:
-                        attrs[attr_name] = attr_value[1 - isin]
+                raise RuntimeError()
         elif attr_value != DGLNodeTensor:
             raise RuntimeError()
 
@@ -211,17 +205,20 @@ class NodeDict(MutableMapping):
             if all(x not in self._adj for x in u):
                 raise KeyError()
             self._node = self._node.difference(set(u))
-            u, uu = None, u
-        elif isinstance(u, Tensor):
-            assert len(F.shape(u)) == 1 and F.isinteger(u) and F.prod(u >= 0)
             uu = None
+        elif isinstance(u, F.Tensor):
+            assert len(F.shape(u)) == 1 \
+                and F.isinteger(u) \
+                and F.prod(u >= 0) \
+                and F.unpackable(u)
+            uu = F.unpackable(u)
             self._node = self._node.difference(set(uu))
         elif u == slice(None, None, None):
             uu = None
         else:
             assert isinstance(u, int) and u >= 0
             self._node.remove(u)
-            u, uu = None, [u]
+            u, uu = [u], None
 
         for attr_name in self._attrs:
             self._delitem(self._attrs, attr_name, u, uu)
@@ -236,8 +233,8 @@ class NodeDict(MutableMapping):
             assert utils.homogeneous(u, int) and all(x >= 0 for x in u)
             if all(x not in self._node for x in u):
                 raise KeyError()
-            u, uu = None, u
-        elif isinstance(u, Tensor):
+            uu = None
+        elif isinstance(u, F.Tensor):
             assert len(F.shape(u)) == 1 and F.unpackable(u)
             uu = list(map(F.item, F.unpack(u)))
             assert utils.homogeneous(uu, int) and all(x >= 0 for x in uu)
@@ -260,25 +257,34 @@ class NodeDict(MutableMapping):
     def __len__(self):
         return len(self._node)
 
+    @staticmethod
     def _settensor(attrs, attr_name, u, uu, attr_value):
         """
         Parameters
         ----------
+        attrs :
         attr_name :
+        u : Tensor or slice(None, None, None) or None
+        uu : list or None
         attr_value : Tensor
         """
         x = attrs[attr_name]
         if isinstance(x, dict):
-            if u == slice(None, None, None):
+            if isinstance(u, list):
+                for y, z in zip(u, F.unpack(attr_value)):
+                    x[y] = z
+            elif isinstance(u, F.Tensor):
+                uu = uu if uu else map(F.item, F.unpack(u))
+                assert F.unpackable(attr_value)
+                for y, z in zip(uu, F.unpack(attr_value)):
+                    x[y] = z
+            elif u == slice(None, None, None):
                 assert not uu
                 attrs[attr_name] = self._dictize(attr_value)
             else:
-                u = u if u else map(F.item, F.unpack(uu))
-                assert F.unpackable(attr_value)
-                for y, z in zip(u, F.unpack(attr_value)):
-                    x[y] = z
+                raise RuntimeError()
         elif isinstance(x, DGLNodeTensor):
-            u = F.tensor(u)
+            u = u if u else F.tensor(uu)
             isin = F.isin(x.idx, u)
             if F.sum(isin):
                 if F.prod(isin):
@@ -290,28 +296,31 @@ class NodeDict(MutableMapping):
         elif x == DGLNodeTensor:
             attrs[attr_name] = DGLEdgeTensor(F.tensor(u), attr_value)
 
+    @staticmethod
     def _setitem(node, attrs, attr_name, u, uu, attr_value):
         def valid(x):
-            return isinstance(attr_value, Tensor) \
+            return isinstance(attr_value, F.Tensor) \
                 and F.shape(attr_value)[0] == x \
                 and F.unpackable(attr_value)
 
+        settensor = NodeDict._settensor
+
         if isinstance(u, list):
             assert valid(len(u))
-            self._settensor(self._attrs, attr_name, u, uu, attr_value)
-        elif isinstance(u, Tensor):
+            settensor(attrs, attr_name, u, None, attr_value)
+        elif isinstance(u, F.Tensor):
             assert valid(F.shape(u)[0])
-            self._settensor(self._attrs, attr_name, None, u, attr_value)
+            settensor(attrs, attr_name, u, uu, attr_value)
         elif u == slice(None, None, None):
             assert valid(len(node))
-            self._settensor(self._attrs, attr_name, u, None, attr_value)
+            settensor(attrs, attr_name, u, None, attr_value)
         elif isinstance(u, int):
             assert u >= 0
-            if isinstance(attr_value, Tensor):
+            if isinstance(attr_value, F.Tensor):
                 assert valid(1)
-                self._tensor(self._attrs, attr_name, [u], None, attr_value)
+                settensor(attrs, attr_name, [u], None, attr_value)
             else:
-                self._attrs[attr_name][u] = attr_value
+                attrs[attr_name][u] = attr_value
         else:
             raise RuntimeError()
 
@@ -325,23 +334,25 @@ class NodeDict(MutableMapping):
         if isinstance(u, list):
             assert utils.homogeneous(u, int) and all(x >= 0 for x in u)
             self._node.update(u)
-            u, uu = None, u
-        elif isinstance(u, Tensor):
+            uu = None
+        elif isinstance(u, F.Tensor):
             assert len(F.shape(u)) == 1 and F.isinteger(u) and F.prod(u >= 0)
             uu = list(map(F.item, F.unpack(u)))
             self._node.update(uu)
         elif u == slice(None, None, None):
-            pass
+            uu = None
         elif isinstance(u, int):
             assert u >= 0
             self._node.add(u)
+            uu = None
         else:
             raise RuntimeError()
 
         for attr_name, attr_value in attrs.items():
-            self._setitem(self._node, self._attrs, attr_name, u, attr_value)
+            self._setitem(self._node, self._attrs, attr_name, u, uu, attr_value)
 
-    def _tensorize(self, attr_value):
+    @staticmethod
+    def _tensorize(attr_value):
         assert isinstance(attr_value, dict)
         if attr_value:
             assert F.packable([x for x in attr_value.values()])
@@ -361,7 +372,8 @@ class NodeDict(MutableMapping):
         attr_value = self._attrs[attr_name]
         return isinstance(attr_value, DGLNodeTensor) or attr_value == DGLNodeTensor
 
-    def _dictize(self, attr_value):
+    @staticmethod
+    def _dictize(attr_value):
         assert isinstance(attr_value, DGLNodeTensor)
         keys = map(F.item, F.unpack(attr_value.idx))
         values = F.unpack(attr_value.dat)
@@ -396,38 +408,49 @@ class LazyNodeAttrDict(MutableMapping):
             if all(x not in self._node for x in self._u):
                 raise KeyError()
             if isinstance(attr_value, dict):
-                y_list = [attr_value[x] for x in self._u]
-                assert F.packable(y_list)
-                return F.pack(y_list)
+                y = [attr_value[x] for x in self._u]
+                assert F.packable(y)
+                return F.pack(y)
             elif isinstance(attr_value, DGLNodeTensor):
-                isin = F.isin(attr_value.idx, F.tensor(self._u))
+                uu = self._uu if self._uu else F.tensor(u)
+                isin = F.isin(attr_value.idx, uu)
                 return attr_value[isin].dat
-        elif isinstance(self._u, Tensor):
-            u = list(map(F.item, F.unpack(self._u)))
-            if all(x not in self._node for x in u):
+            else:
+                raise KeyError()
+        elif isinstance(self._u, F.Tensor):
+            uu = self._uu if self._uu else list(map(F.item, F.unpack(self._u)))
+            if all(x not in self._node for x in uu):
                 raise KeyError()
             if isinstance(attr_value, dict):
-                y_list = [attr_value[x] for x in u]
+                y_list = [attr_value[x] for x in uu]
                 assert F.packable(y_list)
                 return F.pack(y_list)
             elif isinstance(attr_value, DGLNodeTensor):
-                isin = F.isin(attr_value.idx, u)
+                isin = F.isin(attr_value.idx, self._u)
                 return attr_value[isin].dat
-        elif self._u == slice(None, None, None):
-            if isinstance(attr_value, dict):
-                return NodeDict._tensorize(attr_value).dat
             else:
+                raise KeyError()
+        elif self._u == slice(None, None, None):
+            assert not self._uu
+            if isinstance(attr_value, dict) and attr_value:
+                return NodeDict._tensorize(attr_value).dat
+            elif isinstance(attr_value, DGLNodeTensor):
                 return attr_value.dat
+            else:
+                raise KeyError()
         elif isinstance(self._u, int):
+            assert not self._uu
             if isinstance(attr_value, dict):
                 return attr_value[self._u]
             elif isinstance(attr_value, DGLNodeTensor):
-                try:
+                try: # TODO(gaiyu)
                     return attr_value.dat[self._u]
                 except:
                     raise KeyError()
             else:
                 raise KeyError()
+        else:
+            raise KeyError()
 
     def __iter__(self):
         if isinstance(self._u, int):
@@ -439,23 +462,24 @@ class LazyNodeAttrDict(MutableMapping):
             raise RuntimeError()
 
     def __len__(self):
-        return len(list(self))
+        return sum(1 for x in self)
 
     def __setitem__(self, attr_name, attr_value):
         """
         Parameters
         ----------
         """
+        setitem = NodeDict._setitem
         if isinstance(self._u, int):
             assert self._u in self._node
-            if isinstance(attr_value, Tensor):
-                NodeDict._setitem(self._attrs, [self._u], attr_name)
+            if isinstance(attr_value, F.Tensor):
+                setitem(self._node, self._attrs, attr_name, self._u, None, attr_value)
             else:
                 self._attrs[self._u][attr_name] = attr_value
         else:
             if all(x not in self._node for x in self._u):
                 raise KeyError()
-            NodeDict._setitem(self._attrs, self._u, attr_name)
+            setitem(self._node, self._attrs, self._u, self._uu, attr_name)
 
     def materialized(self):
         attrs = {}
@@ -471,8 +495,44 @@ class AdjOuterDict(MutableMapping):
         self._adj = defaultdict(lambda: defaultdict(dict))
         self._attrs = defaultdict(dict)
 
+    @staticmethod
+    def _delitem(attrs, attr_name, u, uu):
+        attr_value = attrs[attr_name]
+        if isinstance(attr_value, dict):
+            if u == slice(None, None, None):
+                assert not uu
+                attrs[attr_name] = {}
+            else:
+                uu = uu if uu else map(F.item, u)
+                for x in uu:
+                    attr_value.pop(x, None)
+        elif isinstance(attr_value, DGLNodeTensor):
+            if u == slice(None, None, None):
+                assert not uu
+                attrs[attr_name] = DGLEdgeTensor
+            else:
+                u = u if u else F.tensor(uu) # TODO(gaiyu): device, dtype, shape
+                isin = F.isin(attr_value.idx, u)
+                if F.sum(isin):
+                    if F.prod(isin):
+                        attrs[attr_name] = DGLEdgeTensor
+                    else:
+                        attrs[attr_name] = attr_value[1 - isin]
+        elif attr_value != DGLEdgeTensor:
+            raise RuntimeError()
+
     def __delitem__(self, u):
-        assert isinstance(u, list) and utils.homogeneous(u, int)
+        if isinstance(u, list):
+            assert utils.homogeneous(u, int) and all(x >= 0 for x in u)
+            if all(x not in self._attrs for x in u):
+                raise KeyError()
+            for x in u:
+                self._attrs.pop(x, None)
+        elif isinstance(u, F.Tensor):
+            pass
+
+        for attr_name in self._attrs:
+            self._delitem(self._attrs, attr_name, u, uu)
 
     def __iter__(self):
         return iter(self._adj)
@@ -498,11 +558,11 @@ class AdjOuterDict(MutableMapping):
         if u:
             assert not v
             assert (isinstance(u, list) and utils.homogeneous(u, int)) or \
-                (isinstance(u, Tensor) and F.isinteger(u) and len(F.shape(u)) == 1)
+                (isinstance(u, F.Tensor) and F.isinteger(u) and len(F.shape(u)) == 1)
         elif v:
             assert not u
             assert (isinstance(v, list) and utils.homogeneous(v, int)) or \
-                (isinstance(v, Tensor) and F.isinteger(v) and len(F.shape(v)) == 1)
+                (isinstance(v, F.Tensor) and F.isinteger(v) and len(F.shape(v)) == 1)
         else:
             raise RuntimeError()
 
@@ -517,7 +577,7 @@ class AdjOuterDict(MutableMapping):
 
         return u, v
 
-class LazyAdjInnerDict:
+class LazyAdjInnerDict(MutableMapping):
     def __init__(self, u, adj, attrs):
         self._u = u
         self._adj = adj
@@ -541,7 +601,7 @@ class LazyAdjInnerDict:
     def __setitem__(self, v, attr_dict):
         pass
 
-class LazyEdgeAttrDict:
+class LazyEdgeAttrDict(MutableMapping):
     """dict: attr_name -> attr"""
     def __init__(self, outer_dict, u, v):
         self._outer_dict = outer_dict

@@ -14,7 +14,7 @@ def asnumpy(a):
     return a.cpu().numpy()
 
 def concatenate(tensors, axis=0):
-    return th.concatenate(tensors, axis)
+    return torch.concatenate(tensors, axis)
 
 def reduce_sum(a):
     return sum(a)
@@ -32,18 +32,24 @@ def packable(tensors):
 def pack(tensors):
     return torch.cat(tensors)
 
-def unpackable(t):
-    return isinstance(t, torch.Tensor) and t.numel() > 0
+def unpackable(x):
+    return isinstance(x, torch.Tensor) and x.numel() > 0
 
-def unpack(t):
-    return th.split(t, 1)
+def unpack(x):
+    return torch.split(x, 1)
 
-def shape(t):
-    return t.shape
+def shape(x):
+    return x.shape
 
 def expand_dims(x, axis):
     return x.unsqueeze(axis)
 
 def prod(x, axis=None, keepdims=None):
     args = ([axis] if axis else []) + ([keepdims] if keepdims else []) 
-    return th.prod(x, *args)
+    return torch.prod(x, *args)
+
+def item(x):
+    return x.item()
+
+def isinteger(x):
+    return x.dtype in [torch.int, torch.int8, torch.int16, torch.int32, torch.int64]
