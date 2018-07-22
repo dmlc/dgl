@@ -8,15 +8,19 @@ pipeline {
         stage('BUILD') {
             steps {
                 dir('python') {
-                    sh 'echo $PWD'
                     sh 'python setup.py install'
                 }
             }
         }
         stage('TEST') {
             steps {
-                sh 'python tests/test_basics.py'
+                sh 'nosetests tests -v --with-xunit'
             }
+        }
+    }
+    post {
+        always {
+            junit '*.xml'
         }
     }
 }
