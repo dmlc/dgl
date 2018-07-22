@@ -5,6 +5,11 @@ pipeline {
         }
     }
     stages {
+        stage('SETUP') {
+            steps {
+                sh 'easy_install nose'
+            }
+        }
         stage('BUILD') {
             steps {
                 dir('python') {
