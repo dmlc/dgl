@@ -3,7 +3,7 @@
 import setuptools
 import os.path
 
-with open(os.path.join(os.path.dirname(__file__), 'VERSION')) as f:
+with open(os.path.join(os.path.dirname(__file__), '../VERSION')) as f:
     version = f.readline().strip()
 
 setuptools.setup(
