@@ -13,8 +13,10 @@ setuptools.setup(
     maintainer='DGL Team',
     maintainer_email='wmjlyjemaine@gmail.com',
     packages=setuptools.find_packages(),
-    install_requires=[
+    setup_requires=[
         'numpy',
+    ]
+    install_requires=[
         'scipy',
     ],
     data_files=[('', ['VERSION'])],
