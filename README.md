@@ -1,4 +1,6 @@
 # Deep Graph Library
+[![Build Status](http://216.165.71.225:8080/buildStatus/icon?job=DGL-fork/master)](http://216.165.71.225:8080/job/DGL-fork/job/master/)
+[![GitHub license](https://dmlc.github.io/img/apache2.svg)](./LICENSE)
 
 ## Architecture
 Show below, there are three sets of APIs for different models.
