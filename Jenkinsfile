@@ -7,8 +7,10 @@ pipeline {
     stages {
         stage('BUILD') {
             steps {
-                sh 'cd python'
-                sh 'python setup.py install'
+                dir('python') {
+                    sh 'echo $PWD'
+                    sh 'python setup.py install'
+                }
             }
         }
         stage('TEST') {
