@@ -578,8 +578,9 @@ class AdjOuterDict(MutableMapping):
         return u, v
 
 class LazyAdjInnerDict(MutableMapping):
-    def __init__(self, u, adj, attrs):
+    def __init__(self, u, uu, adj, attrs):
         self._u = u
+        self._uu = uu
         self._adj = adj
         self._attrs = attrs
 
@@ -587,8 +588,8 @@ class LazyAdjInnerDict(MutableMapping):
         pass
 
     def __iter__(self):
-        if not isinstance(self._u, [list, slice]):
-            yield self._u
+        if isinstance(self._u, int):
+            pass
         else:
             raise RuntimeError()
 
@@ -603,10 +604,13 @@ class LazyAdjInnerDict(MutableMapping):
 
 class LazyEdgeAttrDict(MutableMapping):
     """dict: attr_name -> attr"""
-    def __init__(self, outer_dict, u, v):
-        self._outer_dict = outer_dict
+    def __init__(self, u, v, uu, vv, adj, attrs):
         self._u = u
         self._v = v
+        self._uu = uu
+        self._vv = vv
+        self._adj = adj
+        self._attrs = attrs
 
     def __getitem__(self, attr_name):
         edge_iter = utils.edge_iter(self._u, self._v)

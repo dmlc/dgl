@@ -53,3 +53,20 @@ def item(x):
 
 def isinteger(x):
     return x.dtype in [torch.int, torch.int8, torch.int16, torch.int32, torch.int64]
+
+def isin(x, y):
+    assert x.device == y.device
+    assert x.dtype == y.dtype
+    assert len(x.shape) == 1
+    assert len(y.shape) == 1
+    return (x[None, :] == y[:, None]).any(-1)
+
+def dtype(x):
+    return x.dtype
+
+def astype(x, dtype):
+    return x.type(dtype)
+
+bool = torch.uint8
+ones = torch.ones
+unique = torch.unique

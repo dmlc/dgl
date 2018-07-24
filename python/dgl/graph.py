@@ -339,30 +339,34 @@ class DGLGraph(DiGraph):
             else:
                 raise KeyError()
 
-            key_list = [key for key in self.edges._attrs if key.startswith(__MSG__)]
-            uv_list = [self.edges.uv(key, v=v) for key in key_list]
-            deg_list = [utils.degree(src, dst) for src, dst in uv_list]
-            deg = deg_list[0]
-            assert all(F.prod(x == deg) for x in deg_list)
-            uniq = map(F.item, F.unique(deg_list[0]))
+            # TODO(gaiyu): purge message
 
-            w_list = []
+            keys = [x for x in self._edge_frame.column_names() if x.startswith(__MSG__)]
+            select_columns = self._edge_frame.select_columns(keys)
+            uv_frame = select_columns.filter_by('dst', v)
+            assert uv_frame.dropna().num_rows() == uv_frame.num_rows()
+            groupby = uv_frame.groupby('dst', {'deg' : aggregate.COUNT()})
+            unique = groupby['deg'].unique().to_numpy()
+            uv_frame = uv_frame.join('dst', groupby)
+
+            dst_list = []
             r_list = []
-            for d in uniq:
-                w = v[deg == d]
-                n = F.shape(w)[0]
-                wx = self.nodes[w]
+            for x in unique:
+                frame = uv_frame[uv_frame['deg'] == x]
+                src, dst = frame['src'], frame['dst']
 
-                uvx = {self.edges[src, dst].pop(key, None) \
-                      for key, [src, dst] in zip(key_list, uv_list)}
-                uvx = {k : F.reshape(x, [int(n / d), d, -1]) for k, x in uvx.items() if x}
+                v_dict = self.nodes[dst]
 
-                rx = reduce_func(wx, uvx)
+                uv_dict = self.edges[src, dst]
+                shape = [int(frame.num_rows() / x), x, -1]
+                uv_dict = {k[:len(__MSG__)] : F.reshape(_.pop(k), shape) for k in keys}
+
+                v_dict = reduce_func(v_dict, uv_dict)
                 assert all(isinstance(x, Tensor) and \
                            F.shape(x)[0] == n for x in r.values())
 
-                w_list.append(wx)
-                r_list.append(rx)
+                dst_list.append(dst)
+                r_list.append(r_dict)
 
             def valid(x_list):
                 key_set = set(x_list[0])
@@ -381,6 +385,10 @@ class DGLGraph(DiGraph):
 
             for key, value in u.items():
                 self.nodes[v][key] = value
+
+            for key in keys:
+                if not self._edge_frame[key].shape:
+                    del self._edge_frame[key]
         else:
             pass
 
