@@ -1,20 +1,17 @@
 """Base graph class specialized for neural networks on graphs.
 """
 
-from collections import defaultdict
-from functools import reduce
 import networkx as nx
 from networkx.classes.digraph import DiGraph
-import numpy as np
 
 import dgl.backend as F
 from dgl.backend import Tensor
-import dgl.state as state
+#import dgl.state as state
+import dgl.scheduler as scheduler
 import dgl.utils as utils
 
 __MSG__ = "__msg__"
 __REPR__ = "__repr__"
-__READOUT__ = "__readout__"
 
 class DGLGraph(DiGraph):
     """Base graph class specialized for neural networks on graphs.
@@ -28,14 +25,20 @@ class DGLGraph(DiGraph):
     attr : keyword arguments, optional
         Attributes to add to graph as key=value pairs.
     """
-    node_dict_factory = state.NodeDict
-    adjlist_outer_dict_factory = state.AdjOuterDict
-    adjlist_inner_dict_factory = state.AdjInnerDict
-    edge_attr_dict_factory = state.EdgeAttrDict
+    #node_dict_factory = state.NodeDict
+    #adjlist_outer_dict_factory = state.AdjOuterDict
+    #adjlist_inner_dict_factory = state.AdjInnerDict
+    #edge_attr_dict_factory = state.EdgeAttrDict
 
     def __init__(self, graph_data=None, **attr):
         super(DGLGraph, self).__init__(graph_data, **attr)
-        self._glb_func = {}
+        assert graph_data is None,
+            'provided graph_data is currently not supported.'
+        self._cached_graph = CachedGraph()
+        self._node_frame = Frame()
+        self._edge_frame = Frame()
+        self._msg_frame = Frame()
+        self._msg_graph = CachedGraph()
 
     def init_reprs(self, h_init=None):
         # TODO(gaiyu): multiple nodes
@@ -61,35 +64,10 @@ class DGLGraph(DiGraph):
         assert (u, v) in self.edges
         return self.edges[u, v][__REPR__]
 
-    def register_readout_func(self, readout_func):
-        """Register computation on the whole graph.
-
-        The readout_func should be compatible with following signature:
-
-        (node_reprs, edge_reprs) -> any
-
-        It takes the representations of selected nodes and edges and
-        returns readout values.
-
-        NOTE: readout function can be implemented outside of DGLGraph.
-        One can simple get the node/edge reprs of the graph and perform
-        arbitrary computation.
-
-        Parameters
-        ----------
-        readout_func : callable
-          The readout function.
-
-        See Also
-        --------
-        readout
-        """
-        self._glb_func[__READOUT__] = readout_func
-
     def readout(self,
                 nodes='all',
                 edges='all',
-                **kwargs):
+                readout_func):
         """Trigger the readout function on the specified nodes/edges.
 
         Parameters
@@ -98,17 +76,15 @@ class DGLGraph(DiGraph):
           The nodes to get reprs from.
         edges : str, pair of nodes, pair of containers or pair of tensors
           The edges to get reprs from.
-        kwargs : keyword arguments, optional
-            Arguments for the readout function.
+        readout_func : callable
+          Readout function.
         """
         nodes = self._nodes_or_all(nodes)
         edges = self._edges_or_all(edges)
-        assert __READOUT__ in self._glb_func, \
-            "Readout function has not been registered."
         # TODO(minjie): tensorize following loop.
         nstates = [self.nodes[n] for n in nodes]
         estates = [self.edges[e] for e in edges]
-        return self._glb_func[__READOUT__](nstates, estates, **kwargs)
+        return readout_func(nstates, estates)
 
     def sendto(self, u, v, message_func, batchable=False):
         """Trigger the message function on edge u->v
@@ -291,7 +267,7 @@ class DGLGraph(DiGraph):
             "Update function not registered for node %s" % uu
 
         # TODO: __REPR__
-        degrees, v_buckets = _degree_bucketing(self._msg_graph, v)
+        degrees, v_buckets = scheduler.degree_bucketing(self._msg_graph, v)
         reduced_msgs = []
         for deg, v_bkt in zip(degrees, v_buckets):
             bkt_len = len(v_bkt)
