@@ -1,4 +1,5 @@
 import torch as th
+from torch.autograd import Variable
 import numpy as np
 from dgl.frame import Frame
 
@@ -9,10 +10,10 @@ def check_eq(a, b):
     assert a.shape == b.shape
     assert th.sum(a == b) == int(np.prod(list(a.shape)))
 
-def create_test_data():
-    c1 = th.randn(N, D)
-    c2 = th.randn(N, D)
-    c3 = th.randn(N, D)
+def create_test_data(grad=False):
+    c1 = Variable(th.randn(N, D), requires_grad=grad)
+    c2 = Variable(th.randn(N, D), requires_grad=grad)
+    c3 = Variable(th.randn(N, D), requires_grad=grad)
     return {'a1' : c1, 'a2' : c2, 'a3' : c3}
 
 def test_create():
@@ -67,8 +68,37 @@ def test_row_getter_setter():
         check_eq(v, th.zeros((len(rowid), D)))
 
 def test_row_getter_setter_grad():
-    #TODO
-    pass
+    data = create_test_data(grad=True)
+    f = Frame(data)
+
+    # getter
+    c1 = f['a1']
+    # test non-duplicate keys
+    rowid = th.tensor([0, 2])
+    rows = f[rowid]
+    rows['a1'].backward(th.ones((len(rowid), D)))
+    check_eq(c1.grad[:,0], th.tensor([1., 0., 1., 0., 0., 0., 0., 0., 0., 0.]))
+    c1.grad.data.zero_()
+    # test duplicate keys
+    rowid = th.tensor([8, 2, 2, 1])
+    rows = f[rowid]
+    rows['a1'].backward(th.ones((len(rowid), D)))
+    check_eq(c1.grad[:,0], th.tensor([0., 1., 2., 0., 0., 0., 0., 0., 1., 0.]))
+    c1.grad.data.zero_()
+
+    # setter
+    c1 = f['a1']
+    rowid = th.tensor([0, 2, 4])
+    vals = {'a1' : Variable(th.zeros((len(rowid), D)), requires_grad=True),
+            'a2' : Variable(th.zeros((len(rowid), D)), requires_grad=True),
+            'a3' : Variable(th.zeros((len(rowid), D)), requires_grad=True),
+            }
+    f[rowid] = vals
+    c11 = f['a1']
+    c11.backward(th.ones((N, D)))
+    check_eq(c1.grad[:,0], th.tensor([0., 1., 0., 1., 0., 1., 1., 1., 1., 1.]))
+    check_eq(vals['a1'].grad, th.ones((len(rowid), D)))
+    assert vals['a2'].grad is None
 
 def test_append():
     data = create_test_data()
