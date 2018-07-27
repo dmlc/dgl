@@ -46,5 +46,16 @@ def homogeneous(x_list, type_x=None):
     type_x = type_x if type_x else type(x_list[0])
     return all(type(x) == type_x for x in x_list)
 
-def degree(u, v, n):
-    pass
+def convert_to_id_tensor(x):
+    if isinstance(x, list):
+        assert homogeneous(x, int)
+        return F.tensor(x)
+    elif isinstance(x, Tensor):
+        assert F.isinteger(x) and len(F.shape(x)) == 1
+        return x
+    elif isinstance(x, int):
+        x = F.tensor([x])
+        return x
+    else:
+        raise TypeError('Error recv node: %s' % str(x))
+    return None
