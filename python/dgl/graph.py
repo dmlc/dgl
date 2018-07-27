@@ -32,8 +32,7 @@ class DGLGraph(DiGraph):
 
     def __init__(self, graph_data=None, **attr):
         super(DGLGraph, self).__init__(graph_data, **attr)
-        assert graph_data is None,
-            'provided graph_data is currently not supported.'
+        assert graph_data is None, 'provided graph_data is currently not supported.'
         self._cached_graph = CachedGraph()
         self._node_frame = Frame()
         self._edge_frame = Frame()
@@ -65,19 +64,19 @@ class DGLGraph(DiGraph):
         return self.edges[u, v][__REPR__]
 
     def readout(self,
+                readout_func,
                 nodes='all',
-                edges='all',
-                readout_func):
+                edges='all'):
         """Trigger the readout function on the specified nodes/edges.
 
         Parameters
         ----------
+        readout_func : callable
+          Readout function.
         nodes : str, node, container or tensor
           The nodes to get reprs from.
         edges : str, pair of nodes, pair of containers or pair of tensors
           The edges to get reprs from.
-        readout_func : callable
-          Readout function.
         """
         nodes = self._nodes_or_all(nodes)
         edges = self._edges_or_all(edges)
@@ -290,7 +289,7 @@ class DGLGraph(DiGraph):
         reordered_v = F.pack(v_buckets)
         reordered_ns = self._node_frame.select_rows(reordered_v)
         all_reduced_msgs = LazyDict(
-                lambda key : F.pack([m[key] for m in reduced_msgs])
+                lambda key : F.pack([m[key] for m in reduced_msgs]))
         new_ns = f_update(reordered_ns, all_reduced_msgs)
         self._node_frame.update_rows(reordered_v, new_ns)
 

@@ -59,3 +59,26 @@ def convert_to_id_tensor(x):
     else:
         raise TypeError('Error recv node: %s' % str(x))
     return None
+
+class LazyDict:
+    """A readonly dictionary that does not materialize the storage."""
+    def __init__(self, fn, keys=None):
+        self._fn = fn
+        self._keys = keys
+
+    def keys(self):
+        return self._keys
+
+    def __getitem__(self, key):
+        assert key in self._keys
+        return self._fn(key)
+
+    def __contains__(self, key):
+        return key in self._keys
+
+    def __iter__(self):
+        for key in self._keys:
+            yield key, self._fn(key)
+
+    def __len__(self):
+        return len(self._keys)

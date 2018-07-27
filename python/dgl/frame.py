@@ -2,6 +2,7 @@
 
 import dgl.backend as F
 from dgl.backend import Tensor
+from dgl.utils import LazyDict
 
 class Frame:
     def __init__(self, data=None):
@@ -62,12 +63,12 @@ class Frame:
 
     def select_rows(self, rowids):
         def _lazy_select(key):
-            return F.embedding_lookup(self._columns[key], rowids)
-        return LazyDict(_lazy_select)
+            return F.gather_row(self._columns[key], rowids)
+        return LazyDict(_lazy_select, keys=self._columns.keys())
 
     def update_rows(self, rowids, other):
         if not isinstance(other, Frame):
             other = Frame(data=other)
         for key in other.schemes:
             assert key in self._columns
-            self._columns[key] = F.embedding_update(self[key], rowids, other[key])
+            self._columns[key] = F.scatter_row(self[key], rowids, other[key])

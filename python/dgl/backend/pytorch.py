@@ -70,3 +70,9 @@ def astype(x, dtype):
 bool = torch.uint8
 ones = torch.ones
 unique = torch.unique
+
+def gather_row(data, row_index):
+    return torch.index_select(data, 0, row_index)
+
+def scatter_row(data, row_index, value):
+    return data.index_copy_(0, row_index, value)
