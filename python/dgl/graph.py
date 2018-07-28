@@ -9,7 +9,7 @@ from dgl.backend import Tensor
 import dgl.builtin as builtin
 #import dgl.state as state
 from dgl.frame import Frame
-from dgl.cached_graph import CachedGraph
+from dgl.cached_graph import CachedGraph, create_cached_graph
 import dgl.scheduler as scheduler
 import dgl.utils as utils
 
@@ -40,7 +40,7 @@ class DGLGraph(DiGraph):
         self._node_frame = Frame()
         self._edge_frame = Frame()
         self._msg_frame = Frame()
-        self._msg_graph = CachedGraph()
+        self._msg_graph = None
         self._message_func = None
         self._reduce_func = None
         self._update_func = None
@@ -193,12 +193,12 @@ class DGLGraph(DiGraph):
         v = utils.convert_to_id_tensor(v)
         edge_id = self.cached_graph.get_edge_id(u, v)
         message_func = _get_message_func(message_func)
-        self._msg_graph.add_edges(u, v)
+        self.msg_graph.add_edges(u, v)
         if len(u) != len(v) and len(u) == 1:
             u = F.broadcast_to(u, v)
         src_reprs = self._node_frame.select_rows(u)
         edge_reprs = self._edge_frame.select_rows(edge_id)
-        msgs = message_func(src_reps, edge_reprs)
+        msgs = message_func(src_reprs, edge_reprs)
         self._msg_frame.append(msgs)
 
     def update_edge(self, u, v, edge_func=None, batchable=False):
@@ -332,12 +332,12 @@ class DGLGraph(DiGraph):
         f_reduce = _get_reduce_func(reduce_func)
         f_update = update_func
         # TODO: __REPR__
-        degrees, v_buckets = scheduler.degree_bucketing(self._msg_graph, v)
+        degrees, v_buckets = scheduler.degree_bucketing(self.msg_graph, v)
         reduced_msgs = []
         for deg, v_bkt in zip(degrees, v_buckets):
             bkt_len = len(v_bkt)
-            uu, vv = self._msg_graph.in_edges(v_bkt)
-            in_msg_ids = self._msg_graph.get_edge_id(uu, vv)
+            uu, vv = self.msg_graph.in_edges(v_bkt)
+            in_msg_ids = self.msg_graph.get_edge_id(uu, vv)
             # The in_msgs represents the rows selected. Since our storage
             # is column-based, it will only be materialized when user
             # tries to get the column (e.g. when user called `msgs['h']`)
@@ -578,6 +578,14 @@ class DGLGraph(DiGraph):
         if self._cached_graph is None:
             self._cached_graph = create_cached_graph(self)
         return self._cached_graph
+
+    @property
+    def msg_graph(self):
+        # TODO: dirty flag when mutated
+        if self._msg_graph is None:
+            self._msg_graph = CachedGraph()
+            self._msg_graph.add_nodes(self.number_of_nodes())
+        return self._msg_graph
 
     def _nodes_or_all(self, nodes):
         return self.nodes() if nodes == ALL else nodes

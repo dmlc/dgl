@@ -79,3 +79,6 @@ def gather_row(data, row_index):
 
 def scatter_row(data, row_index, value):
     return data.index_copy(0, row_index, value)
+
+def broadcast_to(x, to_array):
+    return x + th.zeros_like(to_array)

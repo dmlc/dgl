@@ -21,7 +21,7 @@ class CachedGraph:
         # The edge will be assigned ids equal to the order.
         # TODO(minjie): tensorize the loop
         for uu, vv in utils.edge_iter(u, v):
-            self._graph.add_edge(u, v)
+            self._graph.add_edge(uu, vv)
 
     def get_edge_id(self, u, v):
         # TODO(minjie): tensorize the loop

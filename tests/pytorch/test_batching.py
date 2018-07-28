@@ -1,51 +1,37 @@
 import torch as th
 from dgl.graph import DGLGraph
-from dgl.bgraph import DGLBGraph
-import dgl.backend as F
 
-D = 1024
+D = 32
 
-def message_func(src, dst, edge):
-    ret = {'h' : src['h']}
-    # print('message_func', ret)
-    return ret
+def message_func(src, edge):
+    assert len(src['h'].shape) == 2
+    assert src['h'].shape[1] == D
+    return {'m' : src['h']}
 
-def reduce_func(msgs):
-    # TODO(gaiyu): unify
-    ret = {'h' : sum(msg['h'] for msg in msgs)} if isinstance(msgs, list) else \
-            ({'h' : F.sum(msgs['h'], 1)} if isinstance(msgs, dict) else None)
-    # print('reduce_func', ret)
-    return ret
+def reduce_func(node, msgs):
+    msgs = msgs['h']
+    assert len(msgs.shape) == 3
+    assert msgs.shape[1] == D
+    return th.sum(msgs, 1)
 
-def update_func(node, msgs):
-    ret = {'h' : node['h']} if msgs is None else {'h' : node['h'] + msgs['h']}
-    # print('update_func', ret)
-    return ret
+def update_func(node, accum):
+    assert node['h'].shape == accum.shape
+    return node['h'] + accum
 
 def generate_graph():
     g = DGLGraph()
-    bg = DGLBGraph()
     for i in range(10):
-        h = th.rand(1, D)
-        g.add_node(i, h=h) # 10 nodes.
-        bg.add_node(i, h=h)
-
+        g.add_node(i) # 10 nodes.
     # create a graph where 0 is the source and 9 is the sink
     for i in range(1, 9):
-        h = th.rand(1, D)
-        g.add_edge(0, i, h=h)
-        bg.add_edge(0, i, h=h)
-
-        h = th.rand(1, D)
-        g.add_edge(i, 9, h=h)
-        bg.add_edge(i, 9, h=h)
-
+        g.add_edge(0, i)
+        g.add_edge(i, 9)
     # add a back flow from 9 to 0
-    h = th.rand(1, D)
-    g.add_edge(9, 0, h=h)
-    bg.add_edge(9, 0, h=h)
-
-    return g, bg
+    g.add_edge(9, 0)
+    # TODO: use internal interface to set data.
+    col = th.randn(10, D)
+    g._node_frame['h'] = col
+    return g
 
 def check(g, bg, tolerance=1e-5):
     distance = lambda n: th.max(th.abs(g.nodes[n]['h'] - bg.nodes[n]['h']))
@@ -56,37 +42,36 @@ def check(g, bg, tolerance=1e-5):
     delta = max(distance(u, v) for u, v in g.edges)
     assert delta < tolerance, str(delta)
 
-def test_sendrecv():
-    g, bg = generate_graph()
+def test_batch_send():
+    g = generate_graph()
+    def _fmsg(src, edge):
+        assert src['h'].shape == (5, D)
+        return {'m' : src['h']}
+    g.register_message_func(_fmsg, batchable=True)
+    # many-many sendto
+    u = th.tensor([0, 0, 0, 0, 0])
+    v = th.tensor([1, 2, 3, 4, 5])
+    g.sendto(u, v)
+    # one-many sendto
+    u = th.tensor([0])
+    v = th.tensor([1, 2, 3, 4, 5])
+    g.sendto(u, v)
+    # many-one sendto
+    u = th.tensor([1, 2, 3, 4, 5])
+    v = th.tensor([9])
+    g.sendto(u, v)
 
-    check(g, bg)
+def test_batch_recv():
+    g = generate_graph()
+    g.register_message_func(message_func, batchable=True)
+    g.register_reduce_func(reduce_func, batchable=True)
+    g.register_update_func(update_func, batchable=True)
+    u = th.tensor([0, 0, 0, 0, 0])
+    v = th.tensor([1, 2, 3, 4, 5])
+    g.sendto(u, v)
+    g.recv(v)
 
-    g.register_message_func(message_func)
-    g.register_reduce_func(reduce_func)
-    g.register_update_func(update_func)
-
-    bg.register_message_func(message_func)
-    bg.register_reduce_func(reduce_func)
-    bg.register_update_func(update_func)
-
-    g.sendto(0, 1)
-    g.recvfrom(1, [0])
-
-    bg.sendto(0, 1)
-    bg.recvfrom(1, [0])
-
-    check(g, bg)
-
-    g.sendto(5, 9)
-    g.sendto(6, 9)
-    g.recvfrom(9, [5, 6])
-
-    bg.sendto(5, 9)
-    bg.sendto(6, 9)
-    bg.recvfrom(9, [5, 6])
-
-    check(g, bg)
-
+'''
 def test_multi_sendrecv():
     g, bg = generate_graph()
 
@@ -155,8 +140,10 @@ def test_update_routines():
     bg.update_all()
 
     check(g, bg)
+'''
 
 if __name__ == '__main__':
-    test_sendrecv()
-    test_multi_sendrecv()
-    test_update_routines()
+    test_batch_send()
+    test_batch_recv()
+    #test_multi_sendrecv()
+    #test_update_routines()
