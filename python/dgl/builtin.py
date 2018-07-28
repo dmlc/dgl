@@ -1,4 +1,5 @@
 """Built-in functors."""
+from __future__ import absolute_import
 
 import dgl.backend as F
 

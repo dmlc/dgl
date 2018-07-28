@@ -3,6 +3,7 @@
 TODO: Currently implemented by igraph. Should replace with more efficient
 solution later.
 """
+from __future__ import absolute_import
 
 import igraph
 
@@ -56,6 +57,10 @@ class CachedGraph:
     def edges(self):
         # TODO(minjie): return two tensors, src and dst.
         raise NotImplementedError()
+
+    def in_degrees(self, v):
+        degs = self._graph.indegree(list(v))
+        return F.tensor(degs, dtype=F.int64)
 
 def create_cached_graph(dglgraph):
     # TODO: tensorize the loop

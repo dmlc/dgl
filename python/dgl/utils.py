@@ -1,4 +1,5 @@
 """Utility module."""
+from __future__ import absolute_import
 
 import dgl.backend as F
 from dgl.backend import Tensor, SparseTensor
@@ -64,7 +65,7 @@ def convert_to_id_tensor(x):
 
 class LazyDict:
     """A readonly dictionary that does not materialize the storage."""
-    def __init__(self, fn, keys=None):
+    def __init__(self, fn, keys):
         self._fn = fn
         self._keys = keys
 

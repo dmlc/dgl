@@ -1,4 +1,5 @@
 """Columnar storage for graph attributes."""
+from __future__ import absolute_import
 
 import dgl.backend as F
 from dgl.backend import Tensor

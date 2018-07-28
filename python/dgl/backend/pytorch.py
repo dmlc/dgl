@@ -25,9 +25,6 @@ max = th.max
 def asnumpy(a):
     return a.cpu().numpy()
 
-def concatenate(tensors, axis=0):
-    return th.concatenate(tensors, axis)
-
 def packable(tensors):
     return all(isinstance(x, th.Tensor) and \
                x.dtype == tensors[0].dtype and \
@@ -36,42 +33,15 @@ def packable(tensors):
 def pack(tensors):
     return th.cat(tensors)
 
-def unpackable(x):
-    return isinstance(x, th.Tensor) and x.numel() > 0
-
 def unpack(x):
     return th.split(x, 1)
 
 def shape(x):
     return x.shape
 
-def expand_dims(x, axis):
-    return x.unsqueeze(axis)
-
-def prod(x, axis=None, keepdims=None):
-    args = ([axis] if axis else []) + ([keepdims] if keepdims else []) 
-    return th.prod(x, *args)
-
-def item(x):
-    return x.item()
-
 def isinteger(x):
     return x.dtype in [th.int, th.int8, th.int16, th.int32, th.int64]
 
-def isin(x, y):
-    assert x.device == y.device
-    assert x.dtype == y.dtype
-    assert len(x.shape) == 1
-    assert len(y.shape) == 1
-    return (x[None, :] == y[:, None]).any(-1)
-
-def dtype(x):
-    return x.dtype
-
-def astype(x, dtype):
-    return x.type(dtype)
-
-ones = th.ones
 unique = th.unique
 
 def gather_row(data, row_index):
@@ -82,3 +52,9 @@ def scatter_row(data, row_index, value):
 
 def broadcast_to(x, to_array):
     return x + th.zeros_like(to_array)
+
+nonzero = th.nonzero
+def eq_scalar(x, val):
+    return th.eq(x, float(val))
+squeeze = th.squeeze
+reshape = th.reshape

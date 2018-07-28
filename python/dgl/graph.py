@@ -1,5 +1,6 @@
 """Base graph class specialized for neural networks on graphs.
 """
+from __future__ import absolute_import
 
 import networkx as nx
 from networkx.classes.digraph import DiGraph
@@ -342,9 +343,13 @@ class DGLGraph(DiGraph):
             # is column-based, it will only be materialized when user
             # tries to get the column (e.g. when user called `msgs['h']`)
             in_msgs = self._msg_frame.select_rows(in_msg_ids)
-            # Register a hook to reshape the column tensor to (B, Deg, ...).
-            reshaped_in_msgs = LazyDict(
-                    lambda key : F.reshape(in_msgs[key], (bkt_len, deg, -1)))
+            # Reshape the column tensor to (B, Deg, ...).
+            def _reshape_fn(key):
+                msg = in_msgs[key]
+                msg_shape = F.shape(msg)
+                new_shape = (bkt_len, deg) + msg_shape[1:]
+                return F.reshape(msg, new_shape)
+            reshaped_in_msgs = utils.LazyDict(_reshape_fn, self._msg_frame.schemes)
             dst_reprs = self._node_frame.select_rows(v_bkt)
             reduced_msgs.append(f_reduce(dst_reprs, reshaped_in_msgs))
 
@@ -354,8 +359,8 @@ class DGLGraph(DiGraph):
         # Read the node states in the degree-bucketing order.
         reordered_v = F.pack(v_buckets)
         reordered_ns = self._node_frame.select_rows(reordered_v)
-        all_reduced_msgs = LazyDict(
-                lambda key : F.pack([m[key] for m in reduced_msgs]))
+        # TODO(minjie): handle rich-typed reduced msgs
+        all_reduced_msgs = F.pack(reduced_msgs)
         new_ns = f_update(reordered_ns, all_reduced_msgs)
         self._node_frame.update_rows(reordered_v, new_ns)
 
@@ -586,6 +591,12 @@ class DGLGraph(DiGraph):
             self._msg_graph = CachedGraph()
             self._msg_graph.add_nodes(self.number_of_nodes())
         return self._msg_graph
+
+    def clear_messages(self):
+        if self._msg_graph is not None:
+            self._msg_graph = CachedGraph()
+            self._msg_graph.add_nodes(self.number_of_nodes())
+            self._msg_frame.clear()
 
     def _nodes_or_all(self, nodes):
         return self.nodes() if nodes == ALL else nodes
