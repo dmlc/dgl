@@ -15,11 +15,12 @@ import dgl.utils as utils
 
 __MSG__ = "__msg__"
 __REPR__ = "__repr__"
+ALL = "__all__"
 
 class DGLGraph(DiGraph):
     """Base graph class specialized for neural networks on graphs.
 
-    TODO(minjie): document of multi-node and multi-edge syntax.
+    TODO(minjie): document of batching semantics
 
     Parameters
     ----------
@@ -35,8 +36,7 @@ class DGLGraph(DiGraph):
 
     def __init__(self, graph_data=None, **attr):
         super(DGLGraph, self).__init__(graph_data, **attr)
-        assert graph_data is None, 'provided graph_data is currently not supported.'
-        self._cached_graph = CachedGraph()
+        self._cached_graph = None
         self._node_frame = Frame()
         self._edge_frame = Frame()
         self._msg_frame = Frame()
@@ -128,8 +128,8 @@ class DGLGraph(DiGraph):
 
     def readout(self,
                 readout_func,
-                nodes='all',
-                edges='all'):
+                nodes=ALL,
+                edges=ALL):
         """Trigger the readout function on the specified nodes/edges.
 
         Parameters
@@ -191,9 +191,9 @@ class DGLGraph(DiGraph):
         # TODO: __REPR__
         u = utils.convert_to_id_tensor(u)
         v = utils.convert_to_id_tensor(v)
-        edge_id = self._cached_graph.get_edge_id(u, v)
+        edge_id = self.cached_graph.get_edge_id(u, v)
         message_func = _get_message_func(message_func)
-        self._msg_graph.add_edge(u, v)
+        self._msg_graph.add_edges(u, v)
         if len(u) != len(v) and len(u) == 1:
             u = F.broadcast_to(u, v)
         src_reprs = self._node_frame.select_rows(u)
@@ -242,7 +242,7 @@ class DGLGraph(DiGraph):
         # TODO: __REPR__
         u = utils.convert_to_id_tensor(u)
         v = utils.convert_to_id_tensor(v)
-        edge_id = self._cached_graph.get_edge_id(u, v)
+        edge_id = self.cached_graph.get_edge_id(u, v)
         if len(u) != len(v) and len(u) == 1:
             u = F.broadcast_to(u, v)
         elif len(u) != len(v) and len(v) == 1:
@@ -359,57 +359,6 @@ class DGLGraph(DiGraph):
         new_ns = f_update(reordered_ns, all_reduced_msgs)
         self._node_frame.update_rows(reordered_v, new_ns)
 
-        '''
-        keys = [x for x in self._edge_frame.column_names() if x.startswith(__MSG__)]
-        select_columns = self._edge_frame.select_columns(keys)
-        uv_frame = select_columns.filter_by('dst', v)
-        assert uv_frame.dropna().num_rows() == uv_frame.num_rows()
-        groupby = uv_frame.groupby('dst', {'deg' : aggregate.COUNT()})
-        unique = groupby['deg'].unique().to_numpy()
-        uv_frame = uv_frame.join('dst', groupby)
-
-        dst_list = []
-        r_list = []
-        for x in unique:
-            frame = uv_frame[uv_frame['deg'] == x]
-            src, dst = frame['src'], frame['dst']
-
-            v_dict = self.nodes[dst]
-
-            uv_dict = self.edges[src, dst]
-            shape = [int(frame.num_rows() / x), x, -1]
-            uv_dict = {k[:len(__MSG__)] : F.reshape(_.pop(k), shape) for k in keys}
-
-            v_dict = reduce_func(v_dict, uv_dict)
-            assert all(isinstance(x, Tensor) and \
-                       F.shape(x)[0] == n for x in r.values())
-
-            dst_list.append(dst)
-            r_list.append(r_dict)
-
-        def valid(x_list):
-            key_set = set(x_list[0])
-            return all(set(x) == key_set for x in x_list) and \
-                all(F.packable([x[key] for x in x_list]) for key in key_set)
-
-        assert valid(w_list)
-        assert valid(r_list)
-
-        wx = {key : F.pack([wx[key] for wx in w_list]) for key in w_list[0]}
-        rx = {key : F.pack([rx[key] for rx in r_list]) for key in r_list[0]}
-        ux = update_func(wx, rx)
-
-        assert all(isinstance(x, Tensor) and \
-                   F.shape(x)[0] == F.shape(v)[0] for x in ux.values())
-
-        for key, value in u.items():
-            self.nodes[v][key] = value
-
-        for key in keys:
-            if not self._edge_frame[key].shape:
-                del self._edge_frame[key]
-        '''
-
     def update_by_edge(self,
                        u, v,
                        message_func=None,
@@ -488,7 +437,7 @@ class DGLGraph(DiGraph):
         assert reduce_func is not None
         assert update_func is not None
         if batchable:
-            uu, vv = self._cached_graph.in_edges(v)
+            uu, vv = self.cached_graph.in_edges(v)
             self.update_by_edge(uu, vv, message_func,
                     reduce_func, update_func, batchable)
         else:
@@ -529,7 +478,7 @@ class DGLGraph(DiGraph):
         assert reduce_func is not None
         assert update_func is not None
         if batchable:
-            uu, vv = self._cached_graph.out_edges(u)
+            uu, vv = self.cached_graph.out_edges(u)
             self.update_by_edge(uu, vv, message_func,
                     reduce_func, update_func, batchable)
         else:
@@ -567,7 +516,7 @@ class DGLGraph(DiGraph):
         assert reduce_func is not None
         assert update_func is not None
         if batchable:
-            uu, vv = self._cached_graph.edges()
+            uu, vv = self.cached_graph.edges()
             self.update_by_edge(uu, vv,
                     message_func, reduce_func, update_func, batchable)
         else:
@@ -623,11 +572,18 @@ class DGLGraph(DiGraph):
         pos = graphviz_layout(self, prog='dot')
         nx.draw(self, pos, with_labels=True)
 
-    def _nodes_or_all(self, nodes='all'):
-        return self.nodes() if nodes == 'all' else nodes
+    @property
+    def cached_graph(self):
+        # TODO: dirty flag when mutated
+        if self._cached_graph is None:
+            self._cached_graph = create_cached_graph(self)
+        return self._cached_graph
 
-    def _edges_or_all(self, edges='all'):
-        return self.edges() if edges == 'all' else edges
+    def _nodes_or_all(self, nodes):
+        return self.nodes() if nodes == ALL else nodes
+
+    def _edges_or_all(self, edges):
+        return self.edges() if edges == ALL else edges
 
     @staticmethod
     def _get_repr(attr_dict):

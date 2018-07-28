@@ -1,37 +1,66 @@
 """High-performance graph structure query component.
 
-TODO: Currently implemented by networkx. Should replace with more efficient
+TODO: Currently implemented by igraph. Should replace with more efficient
 solution later.
 """
 
-import networkx as nx
+import igraph
+
+import dgl.backend as F
+from dgl.backend import Tensor
+import dgl.utils as utils
 
 class CachedGraph:
     def __init__(self):
-        pass
+        self._graph = igraph.Graph(directed=True)
 
-    def add_node(self, u):
-        # TODO: make sure the node id is equal to row id in storage.
-        pass
+    def add_nodes(self, num_nodes):
+        self._graph.add_vertices(num_nodes)
 
-    def add_edge(self, u, v):
-        # TODO: one-many, many-one, many-many
-        # TODO: make sure the edge id is equal to row id in storage.
-        pass
+    def add_edges(self, u, v):
+        # The edge will be assigned ids equal to the order.
+        # TODO(minjie): tensorize the loop
+        for uu, vv in utils.edge_iter(u, v):
+            self._graph.add_edge(u, v)
 
     def get_edge_id(self, u, v):
-        # TODO: one-many, many-one, many-many
-        # TODO: return a tensor of edge ids.
-        pass
+        # TODO(minjie): tensorize the loop
+        uvs = list(utils.edge_iter(u, v))
+        eids = self._graph.get_eids(uvs)
+        return F.tensor(eids, dtype=F.int64)
 
     def in_edges(self, v):
-        # TODO: return two tensors, src and dst.
-        pass
+        # TODO(minjie): tensorize the loop
+        src = []
+        dst = []
+        for vv in utils.node_iter(v):
+            uu = self._graph.predecessors(vv)
+            src += uu
+            dst += [vv] * len(uu)
+        src = F.tensor(src, dtype=F.int64)
+        dst = F.tensor(dst, dtype=F.int64)
+        return src, dst
 
     def out_edges(self, u):
-        # TODO: return two tensors, src and dst.
-        pass
+        # TODO(minjie): tensorize the loop
+        src = []
+        dst = []
+        for uu in utils.node_iter(u):
+            vv = self._graph.successors(uu)
+            src += [uu] * len(vv)
+            dst += vv
+        src = F.tensor(src, dtype=F.int64)
+        dst = F.tensor(dst, dtype=F.int64)
+        return src, dst
 
     def edges(self):
-        # TODO: return two tensors, src and dst.
-        pass
+        # TODO(minjie): return two tensors, src and dst.
+        raise NotImplementedError()
+
+def create_cached_graph(dglgraph):
+    # TODO: tensorize the loop
+    cg = CachedGraph()
+    cg.add_nodes(dglgraph.number_of_nodes())
+    for u, v in dglgraph.edges():
+        cg.add_edges(u, v)
+    return cg

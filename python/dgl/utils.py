@@ -1,3 +1,5 @@
+"""Utility module."""
+
 import dgl.backend as F
 from dgl.backend import Tensor, SparseTensor
 
