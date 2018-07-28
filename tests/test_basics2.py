@@ -1,10 +1,10 @@
 from dgl import DGLGraph
 from dgl.graph import __REPR__
 
-def message_func(hu, hv, e_uv):
+def message_func(hu, e_uv):
     return hu
 
-def message_not_called(hu, hv, e_uv):
+def message_not_called(hu, e_uv):
     assert False
     return hu
 

@@ -1,7 +1,7 @@
 from dgl import DGLGraph
 from dgl.graph import __REPR__
 
-def message_func(hu, hv, e_uv):
+def message_func(hu, e_uv):
     return hu + e_uv
 
 def update_func(h, accum):
@@ -41,7 +41,7 @@ def test_sendrecv():
     g.recv(9)
     check(g, [1, 4, 3, 4, 5, 6, 7, 8, 9, 25])
 
-def message_func_hybrid(src, dst, edge):
+def message_func_hybrid(src, edge):
     return src[__REPR__] + edge
 
 def update_func_hybrid(node, accum):

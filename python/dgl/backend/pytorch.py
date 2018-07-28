@@ -5,24 +5,14 @@ import scipy.sparse
 
 Tensor = torch.Tensor
 SparseTensor = scipy.sparse.spmatrix
-
-cat = torch.cat
-stack = torch.stack
 sum = torch.sum
+max = torch.max
 
 def asnumpy(a):
     return a.cpu().numpy()
 
 def concatenate(tensors, axis=0):
     return torch.concatenate(tensors, axis)
-
-def reduce_sum(a):
-    return sum(a)
-
-def reduce_max(a):
-    a = torch.cat(a, 0)
-    a, _ = torch.max(a, 0, keepdim=True)
-    return a
 
 def packable(tensors):
     return all(isinstance(x, torch.Tensor) and \
