@@ -67,79 +67,41 @@ def test_batch_recv():
     assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     reduce_msg_shapes.clear()
 
-'''
-def test_multi_sendrecv():
-    g, bg = generate_graph()
-
-    check(g, bg)
-
-    g.register_message_func(message_func)
-    g.register_reduce_func(reduce_func)
-    g.register_update_func(update_func)
-
-    bg.register_message_func(message_func)
-    bg.register_reduce_func(reduce_func)
-    bg.register_update_func(update_func)
-
-    # one-many
-    g.sendto(0, [1, 2, 3])
-    g.recvfrom([1, 2, 3], [[0], [0], [0]])
-
-    bg.sendto(0, [1, 2, 3])
-    bg.recvfrom([1, 2, 3], [[0], [0], [0]])
-
-    check(g, bg)
-
-    # many-one
-    g.sendto([6, 7, 8], 9)
-    g.recvfrom(9, [6, 7, 8])
-
-    bg.sendto([6, 7, 8], 9)
-    bg.recvfrom(9, [6, 7, 8])
-
-    check(g, bg)
-
-    # many-many
-    g.sendto([0, 0, 4, 5], [4, 5, 9, 9])
-    g.recvfrom([4, 5, 9], [[0], [0], [4, 5]])
-
-    bg.sendto([0, 0, 4, 5], [4, 5, 9, 9])
-    bg.recvfrom([4, 5, 9], [[0], [0], [4, 5]])
-
-    check(g, bg)
-
 def test_update_routines():
-    g, bg = generate_graph()
+    g = generate_graph()
+    g.register_message_func(message_func, batchable=True)
+    g.register_reduce_func(reduce_func, batchable=True)
+    g.register_update_func(update_func, batchable=True)
 
-    check(g, bg)
+    # update_by_edge
+    reduce_msg_shapes.clear()
+    u = th.tensor([0, 0, 0, 4, 5, 6])
+    v = th.tensor([1, 2, 3, 9, 9, 9])
+    g.update_by_edge(u, v)
+    assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
+    reduce_msg_shapes.clear()
 
-    g.register_message_func(message_func)
-    g.register_update_func(update_func)
-    g.register_reduce_func(reduce_func)
+    # update_to
+    v = th.tensor([1, 2, 3, 9])
+    reduce_msg_shapes.clear()
+    g.update_to(v)
+    assert(reduce_msg_shapes == {(1, 8, D), (3, 1, D)})
+    reduce_msg_shapes.clear()
 
-    bg.register_message_func(message_func)
-    bg.register_update_func(update_func)
-    bg.register_reduce_func(reduce_func)
+    # update_from
+    v = th.tensor([0, 1, 2, 3])
+    reduce_msg_shapes.clear()
+    g.update_from(v)
+    assert(reduce_msg_shapes == {(1, 3, D), (8, 1, D)})
+    reduce_msg_shapes.clear()
 
-    g.update_by_edge(0, 1)
-    g.update_to(9)
-
-    bg.update_by_edge(0, 1)
-    bg.update_to(9)
-
-    check(g, bg)
-
-    g.update_from(0)
+    # update_all
+    reduce_msg_shapes.clear()
     g.update_all()
-
-    bg.update_from(0)
-    bg.update_all()
-
-    check(g, bg)
-'''
+    assert(reduce_msg_shapes == {(1, 8, D), (9, 1, D)})
+    reduce_msg_shapes.clear()
 
 if __name__ == '__main__':
     test_batch_send()
     test_batch_recv()
-    #test_multi_sendrecv()
-    #test_update_routines()
+    test_update_routines()
