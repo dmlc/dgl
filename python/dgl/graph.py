@@ -193,7 +193,6 @@ class DGLGraph(DiGraph):
         u = utils.convert_to_id_tensor(u)
         v = utils.convert_to_id_tensor(v)
         edge_id = self.cached_graph.get_edge_id(u, v)
-        message_func = _get_message_func(message_func)
         self.msg_graph.add_edges(u, v)
         if len(u) != len(v) and len(u) == 1:
             u = F.broadcast_to(u, v)
@@ -397,19 +396,37 @@ class DGLGraph(DiGraph):
         assert reduce_func is not None
         assert update_func is not None
         if batchable:
-            if message_func == 'from_src' and reduce_func == 'sum':
-                # Specialized to generic-SPMV
-                raise NotImplementedError('SPVM specialization')
-            else:
-                self.sendto(u, v, message_func, batchable)
-                unique_v = F.unique(v)
-                self.recv(unique_v, reduce_func, update_func, batchable)
+            self._batched_update_by_edge(
+                    u, v, message_func, reduce_func, update_func)
         else:
-            self.sendto(u, v, message_func, batchable)
-            dst = set()
-            for uu, vv in utils.edge_iter(u, v):
-                dst.add(vv)
-            self.recv(list(dst), reduce_func, update_func, batchable)
+            self._non_batched_update_by_edge(
+                    u, v, message_func, reduce_func, update_func)
+
+    def _non_batched_update_by_edge(
+            self,
+            u, v,
+            message_func=None,
+            reduce_func=None,
+            update_func=None):
+        self._non_batched_sendto(u, v, message_func)
+        dst = set()
+        for uu, vv in utils.edge_iter(u, v):
+            dst.add(vv)
+        self._non_batched_recv(list(dst), reduce_func, update_func)
+
+    def _batched_update_by_edge(
+            self,
+            u, v,
+            message_func=None,
+            reduce_func=None,
+            update_func=None):
+        if message_func == 'from_src' and reduce_func == 'sum':
+            # Specialized to generic-SPMV
+            raise NotImplementedError('SPVM specialization')
+        else:
+            self._batched_sendto(u, v, message_func)
+            unique_v = F.unique(v)
+            self._batched_recv(unique_v, reduce_func, update_func)
 
     def update_to(self,
                   v,
@@ -521,14 +538,14 @@ class DGLGraph(DiGraph):
         assert reduce_func is not None
         assert update_func is not None
         if batchable:
-            uu, vv = self.cached_graph.edges()
-            self.update_by_edge(uu, vv,
-                    message_func, reduce_func, update_func, batchable)
+            u, v = self.cached_graph.edges()
+            self._batched_update_by_edge(u, v,
+                    message_func, reduce_func, update_func)
         else:
             u = [uu for uu, _ in self.edges]
             v = [vv for _, vv in self.edges]
-            self.sendto(u, v, message_func, batchable)
-            self.recv(list(self.nodes()), reduce_func, update_func, batchable)
+            self._non_batched_sendto(u, v, message_func)
+            self._non_batched_recv(list(self.nodes()), reduce_func, update_func)
 
     def propagate(self,
                   message_func=None,

@@ -60,7 +60,7 @@ def convert_to_id_tensor(x):
         x = F.tensor([x])
         return x
     else:
-        raise TypeError('Error recv node: %s' % str(x))
+        raise TypeError('Error node: %s' % str(x))
     return None
 
 class LazyDict:

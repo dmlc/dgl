@@ -55,8 +55,13 @@ class CachedGraph:
         return src, dst
 
     def edges(self):
-        # TODO(minjie): return two tensors, src and dst.
-        raise NotImplementedError()
+        # TODO(minjie): tensorize
+        elist = self._graph.get_edgelist()
+        src = [u for u, _ in elist]
+        dst = [v for _, v in elist]
+        src = F.tensor(src, dtype=F.int64)
+        dst = F.tensor(dst, dtype=F.int64)
+        return src, dst
 
     def in_degrees(self, v):
         degs = self._graph.indegree(list(v))
