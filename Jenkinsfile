@@ -9,7 +9,7 @@ pipeline {
             steps {
                 sh 'easy_install nose'
                 sh 'uname -a'
-                sh 'apt-get install libxml2-dev'
+                sh 'pacman -S libxml2'
             }
         }
         stage('BUILD') {
