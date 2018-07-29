@@ -8,6 +8,7 @@ pipeline {
         stage('SETUP') {
             steps {
                 sh 'easy_install nose'
+                sh 'uname -a'
                 sh 'apt-get install libxml2-dev'
             }
         }
