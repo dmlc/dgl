@@ -2,6 +2,7 @@
 """
 from __future__ import absolute_import
 
+from collections import MutableMapping
 import networkx as nx
 from networkx.classes.digraph import DiGraph
 
@@ -22,6 +23,7 @@ class DGLGraph(DiGraph):
     """Base graph class specialized for neural networks on graphs.
 
     TODO(minjie): document of batching semantics
+    TODO(minjie): document of __REPR__ semantics
 
     Parameters
     ----------
@@ -36,40 +38,158 @@ class DGLGraph(DiGraph):
     #edge_attr_dict_factory = state.EdgeAttrDict
 
     def __init__(self, graph_data=None, **attr):
+        # call base class init
         super(DGLGraph, self).__init__(graph_data, **attr)
         self._cached_graph = None
         self._node_frame = Frame()
         self._edge_frame = Frame()
-        self._msg_frame = Frame()
+        # other class members
         self._msg_graph = None
+        self._msg_frame = Frame()
         self._message_func = None
         self._reduce_func = None
         self._update_func = None
         self._edge_func = None
 
-    def init_reprs(self, h_init=None):
-        # TODO(gaiyu): multiple nodes
-        print("[DEPRECATED]: please directly set node attrs "
-              "(e.g. g.nodes[node]['x'] = val).")
-        for n in self.nodes:
-            self.set_repr(n, h_init)
+    def set_n_repr(self, hu, u=ALL):
+        """Set node(s) representation.
 
-    def set_n_repr(self, u, h_u):
-        assert u in self.nodes
-        kwarg = {__REPR__: h_u}
-        self.add_node(u, **kwarg)
+        To set multiple node representations at once, pass `u` with a tensor or
+        a supported container of node ids. In this case, `hu` must be a tensor
+        of shape (B, D1, D2, ...), where B is the number of the nodes and
+        (D1, D2, ...) is the shape of the node representation tensor.
 
-    def get_n_repr(self, u):
-        assert u in self.nodes
-        return self.nodes[u][__REPR__]
+        Dictionary type is also supported for `hu`. In this case, each item
+        will be treated as separate attribute of the nodes.
 
-    def set_e_repr(self, u, v, h_uv):
-        assert (u, v) in self.edges
-        self.edges[u, v][__REPR__] = h_uv
+        Parameters
+        ----------
+        hu : any
+          Node representation.
+        u : node, container or tensor
+          The node(s).
+        """
+        # sanity check
+        if isinstance(u, str) and u == ALL:
+            num_nodes = self.number_of_nodes()
+        else:
+            u = utils.convert_to_id_tensor(u)
+            num_nodes = len(u)
+        if isinstance(hu, dict):
+            for key, val in hu.items():
+                assert F.shape(val)[0] == num_nodes
+        else:
+            F.shape(hu)[0] == num_nodes
+        # set
+        if isinstance(u, str) and u == ALL:
+            if isinstance(hu, dict):
+                for key, val in hu.items():
+                    self._node_frame[key] = val
+            else:
+                self._node_frame[__REPR__] = hu
+        else:
+            if isinstance(hu, dict):
+                for key, val in hu.items():
+                    self._node_frame[key][u] = val
+            else:
+                self._node_frame[__REPR__][u] = hu
 
-    def get_e_repr(self, u, v):
-        assert (u, v) in self.edges
-        return self.edges[u, v][__REPR__]
+    def get_n_repr(self, u=ALL):
+        """Get node(s) representation.
+
+        Parameters
+        ----------
+        u : node, container or tensor
+          The node(s).
+        """
+        if isinstance(u, str) and u == ALL:
+            if len(self._node_frame) == 1 and __REPR__ in self._node_frame:
+                return self._node_frame[__REPR__]
+            else:
+                return dict(self._node_frame)
+        else:
+            u = utils.convert_to_id_tensor(u)
+            if len(self._node_frame) == 1 and __REPR__ in self._node_frame:
+                return self._node_frame[__REPR__][u]
+            else:
+                return self._node_frame.select_rows(u)
+
+    def set_e_repr(self, h_uv, u=ALL, v=ALL):
+        """Set edge(s) representation.
+
+        To set multiple edge representations at once, pass `u` and `v` with tensors or
+        supported containers of node ids. In this case, `h_uv` must be a tensor
+        of shape (B, D1, D2, ...), where B is the number of the edges and
+        (D1, D2, ...) is the shape of the edge representation tensor.
+
+        Dictionary type is also supported for `h_uv`. In this case, each item
+        will be treated as separate attribute of the edges.
+
+        Parameters
+        ----------
+        h_uv : any
+          Edge representation.
+        u : node, container or tensor
+          The source node(s).
+        v : node, container or tensor
+          The destination node(s).
+        """
+        # sanity check
+        u_is_all = isinstance(u, str) and u == ALL
+        v_is_all = isinstance(v, str) and v == ALL
+        assert u_is_all == v_is_all
+        if u_is_all:
+            num_edges = self.number_of_edges()
+        else:
+            u = utils.convert_to_id_tensor(u)
+            v = utils.convert_to_id_tensor(v)
+            num_edges = max(len(u), len(v))
+        if isinstance(h_uv, dict):
+            for key, val in h_uv.items():
+                assert F.shape(val)[0] == num_edges
+        else:
+            F.shape(h_uv)[0] == num_edges
+        # set
+        if u_is_all:
+            if isinstance(h_uv, dict):
+                for key, val in h_uv.items():
+                    self._edge_frame[key] = val
+            else:
+                self._edge_frame[__REPR__] = h_uv
+        else:
+            eid = self.cached_graph.get_edge_id(u, v)
+            if isinstance(h_uv, dict):
+                for key, val in h_uv.items():
+                    self._edge_frame[key][eid] = val
+            else:
+                self._edge_frame[__REPR__][eid] = h_uv
+
+    def get_e_repr(self, u=ALL, v=ALL):
+        """Get node(s) representation.
+
+        Parameters
+        ----------
+        u : node, container or tensor
+          The source node(s).
+        v : node, container or tensor
+          The destination node(s).
+        """
+        u_is_all = isinstance(u, str) and u == ALL
+        v_is_all = isinstance(v, str) and v == ALL
+        assert u_is_all == v_is_all
+        if u_is_all:
+            if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
+                return self._edge_frame[__REPR__]
+            else:
+                return dict(self._edge_frame)
+        else:
+            u = utils.convert_to_id_tensor(u)
+            v = utils.convert_to_id_tensor(v)
+            eid = self.cached_graph.get_edge_id(u, v)
+            if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
+                return self._edge_frame[__REPR__][eid]
+            else:
+                return self._edge_frame.select_rows(eid)
 
     def register_message_func(self,
                               message_func,
@@ -306,8 +426,6 @@ class DGLGraph(DiGraph):
             self._nonbatch_recv(u, reduce_func, update_func)
 
     def _nonbatch_recv(self, u, reduce_func, update_func):
-        u_is_container = isinstance(u, list)
-        u_is_tensor = isinstance(u, Tensor)
         f_reduce = _get_reduce_func(reduce_func)
         f_update = update_func
         for i, uu in enumerate(utils.node_iter(u)):

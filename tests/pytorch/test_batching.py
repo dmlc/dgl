@@ -1,7 +1,7 @@
 import torch as th
 from dgl.graph import DGLGraph
 
-D = 32
+D = 5
 reduce_msg_shapes = set()
 
 def message_func(src, edge):
@@ -30,10 +30,57 @@ def generate_graph():
         g.add_edge(i, 9)
     # add a back flow from 9 to 0
     g.add_edge(9, 0)
-    # TODO: use internal interface to set data.
     col = th.randn(10, D)
-    g._node_frame['h'] = col
+    g.set_n_repr({'h' : col})
     return g
+
+def test_batch_setter_getter():
+    def _pfc(x):
+        return list(x.numpy()[:,0])
+    g = generate_graph()
+    # set all nodes
+    g.set_n_repr({'h' : th.zeros((10, D))})
+    assert _pfc(g.get_n_repr()['h']) == [0.] * 10
+    # set partial nodes
+    u = th.tensor([1, 3, 5])
+    g.set_n_repr({'h' : th.ones((3, D))}, u)
+    assert _pfc(g.get_n_repr()['h']) == [0., 1., 0., 1., 0., 1., 0., 0., 0., 0.]
+    # get partial nodes
+    u = th.tensor([1, 2, 3])
+    assert _pfc(g.get_n_repr(u)['h']) == [1., 0., 1.]
+
+    '''
+    s, d, eid
+    0, 1, 0
+    1, 9, 1
+    0, 2, 2
+    2, 9, 3
+    0, 3, 4
+    3, 9, 5
+    0, 4, 6
+    4, 9, 7
+    0, 5, 8
+    5, 9, 9
+    0, 6, 10
+    6, 9, 11
+    0, 7, 12
+    7, 9, 13
+    0, 8, 14
+    8, 9, 15
+    9, 0, 16
+    '''
+    # set all edges
+    g.set_e_repr({'l' : th.zeros((17, D))})
+    assert _pfc(g.get_e_repr()['l']) == [0.] * 17
+    # set partial nodes (many-many)
+    # TODO(minjie): following case will fail at the moment as CachedGraph
+    # does not maintain edge addition order.
+    #u = th.tensor([0, 0, 2, 5, 9])
+    #v = th.tensor([1, 3, 9, 9, 0])
+    #g.set_e_repr({'l' : th.ones((5, D))}, u, v)
+    #truth = [0.] * 17
+    #truth[0] = truth[4] = truth[3] = truth[9] = truth[16] = 1.
+    #assert _pfc(g.get_e_repr()['l']) == truth
 
 def test_batch_send():
     g = generate_graph()
@@ -102,6 +149,7 @@ def test_update_routines():
     reduce_msg_shapes.clear()
 
 if __name__ == '__main__':
+    test_batch_setter_getter()
     test_batch_send()
     test_batch_recv()
     test_update_routines()

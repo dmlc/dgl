@@ -1,27 +1,30 @@
 """Utility module."""
 from __future__ import absolute_import
 
+from collections import Mapping
 import dgl.backend as F
 from dgl.backend import Tensor, SparseTensor
 
+def is_id_tensor(u):
+    return isinstance(u, Tensor) and F.isinteger(u) and len(F.shape(u)) == 1
+
+def is_id_container(u):
+    return isinstance(u, list)
+
 def node_iter(n):
-    n_is_container = isinstance(n, list)
-    n_is_tensor = isinstance(n, Tensor)
-    if n_is_tensor:
-        n = F.asnumpy(n)
-        n_is_tensor = False
-        n_is_container = True
-    if n_is_container:
+    if is_id_tensor(n):
+        n = list(F.asnumpy(n))
+    if is_id_container(n):
         for nn in n:
             yield nn
     else:
         yield n
 
 def edge_iter(u, v):
-    u_is_container = isinstance(u, list)
-    v_is_container = isinstance(v, list)
-    u_is_tensor = isinstance(u, Tensor)
-    v_is_tensor = isinstance(v, Tensor)
+    u_is_container = is_id_container(u)
+    v_is_container = is_id_container(v)
+    u_is_tensor = is_id_tensor(u)
+    v_is_tensor = is_id_tensor(v)
     if u_is_tensor:
         u = F.asnumpy(u)
         u_is_tensor = False
@@ -50,11 +53,10 @@ def homogeneous(x_list, type_x=None):
     return all(type(x) == type_x for x in x_list)
 
 def convert_to_id_tensor(x):
-    if isinstance(x, list):
+    if is_id_container(x):
         assert homogeneous(x, int)
         return F.tensor(x)
-    elif isinstance(x, Tensor):
-        assert F.isinteger(x) and len(F.shape(x)) == 1
+    elif is_id_tensor(x):
         return x
     elif isinstance(x, int):
         x = F.tensor([x])
@@ -63,7 +65,7 @@ def convert_to_id_tensor(x):
         raise TypeError('Error node: %s' % str(x))
     return None
 
-class LazyDict:
+class LazyDict(Mapping):
     """A readonly dictionary that does not materialize the storage."""
     def __init__(self, fn, keys):
         self._fn = fn

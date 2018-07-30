@@ -8,7 +8,7 @@ from dgl.utils import LazyDict
 class Frame:
     def __init__(self, data=None):
         if data is None:
-            self._columns = {}
+            self._columns = dict()
             self._num_rows = 0
         else:
             self._columns = data
@@ -27,6 +27,9 @@ class Frame:
     @property
     def num_rows(self):
         return self._num_rows
+
+    def __contains__(self, key):
+        return key in self._columns
 
     def __getitem__(self, key):
         if isinstance(key, str):
@@ -73,3 +76,10 @@ class Frame:
         for key in other.schemes:
             assert key in self._columns
             self._columns[key] = F.scatter_row(self[key], rowids, other[key])
+
+    def __iter__(self):
+        for key, col in self._columns.items():
+            yield key, col
+
+    def __len__(self):
+        return self.num_columns
