@@ -15,9 +15,9 @@ from dgl.cached_graph import CachedGraph, create_cached_graph
 import dgl.scheduler as scheduler
 import dgl.utils as utils
 
-__MSG__ = "__msg__"
-__REPR__ = "__repr__"
-ALL = "__all__"
+__MSG__ = "__MSG__"
+__REPR__ = "__REPR__"
+ALL = "__ALL__"
 
 class DGLGraph(DiGraph):
     """Base graph class specialized for neural networks on graphs.

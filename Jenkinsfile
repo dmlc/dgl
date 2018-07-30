@@ -21,6 +21,7 @@ pipeline {
         stage('TEST') {
             steps {
                 sh 'nosetests tests -v --with-xunit'
+                sh 'nosetests tests/pytorch -v --with-xunit'
             }
         }
     }

@@ -21,21 +21,18 @@ def update_func(h, accum):
     return h + accum
 
 def check(g, h):
-    nh = [str(g.get_n_repr(i)) for i in range(10)]
+    nh = [str(g.nodes[i][__REPR__]) for i in range(10)]
     h = [str(x) for x in h]
     assert nh == h, "nh=[%s], h=[%s]" % (' '.join(nh), ' '.join(h))
 
 def generate_graph():
     g = DGLGraph()
     for i in range(10):
-        g.add_node(i) # 10 nodes.
-        g.set_n_repr(i, i+1)
+        g.add_node(i, __REPR__=i+1) # 10 nodes.
     # create a graph where 0 is the source and 9 is the sink
     for i in range(1, 9):
         g.add_edge(0, i)
-        g.set_e_repr(0, i, 1)
         g.add_edge(i, 9)
-        g.set_e_repr(i, 9, 1)
     return g
 
 def test_no_msg_update():
