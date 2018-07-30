@@ -1,6 +1,6 @@
 from dgl.graph import DGLGraph
 
-def message_func(src, dst, edge):
+def message_func(src, edge):
     return src['h']
 
 def update_func(node, accum):
