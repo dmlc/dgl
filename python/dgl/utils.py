@@ -12,45 +12,43 @@ def is_id_container(u):
     return isinstance(u, list)
 
 def node_iter(n):
-    if is_id_tensor(n):
-        n = list(F.asnumpy(n))
-    if is_id_container(n):
-        for nn in n:
-            yield nn
-    else:
-        yield n
+    n = convert_to_id_container(n)
+    for nn in n:
+        yield nn
 
 def edge_iter(u, v):
-    u_is_container = is_id_container(u)
-    v_is_container = is_id_container(v)
-    u_is_tensor = is_id_tensor(u)
-    v_is_tensor = is_id_tensor(v)
-    if u_is_tensor:
-        u = F.asnumpy(u)
-        u_is_tensor = False
-        u_is_container = True
-    if v_is_tensor:
-        v = F.asnumpy(v)
-        v_is_tensor = False
-        v_is_container = True
-    if u_is_container and v_is_container:
+    u = convert_to_id_container(u)
+    v = convert_to_id_container(v)
+    if len(u) == len(v):
         # many-many
         for uu, vv in zip(u, v):
             yield uu, vv
-    elif u_is_container and not v_is_container:
+    elif len(v) == 1:
         # many-one
         for uu in u:
-            yield uu, v
-    elif not u_is_container and v_is_container:
+            yield uu, v[0]
+    elif len(u) == 1:
         # one-many
         for vv in v:
-            yield u, vv
+            yield u[0], vv
     else:
-        yield u, v
+        raise ValueError('Error edges:', u, v)
 
 def homogeneous(x_list, type_x=None):
     type_x = type_x if type_x else type(x_list[0])
     return all(type(x) == type_x for x in x_list)
+
+def convert_to_id_container(x):
+    if is_id_container(x):
+        assert homogeneous(x, int)
+        return x
+    elif is_id_tensor(x):
+        return F.asnumpy(x)
+    elif isinstance(x, int):
+        return [x]
+    else:
+        raise TypeError('Error node: %s' % str(x))
+    return None
 
 def convert_to_id_tensor(x):
     if is_id_container(x):

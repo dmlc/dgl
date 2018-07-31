@@ -72,15 +72,37 @@ def test_batch_setter_getter():
     # set all edges
     g.set_e_repr({'l' : th.zeros((17, D))})
     assert _pfc(g.get_e_repr()['l']) == [0.] * 17
-    # set partial nodes (many-many)
-    # TODO(minjie): following case will fail at the moment as CachedGraph
-    # does not maintain edge addition order.
+    # set partial edges (many-many)
     u = th.tensor([0, 0, 2, 5, 9])
     v = th.tensor([1, 3, 9, 9, 0])
     g.set_e_repr({'l' : th.ones((5, D))}, u, v)
     truth = [0.] * 17
     truth[0] = truth[4] = truth[3] = truth[9] = truth[16] = 1.
     assert _pfc(g.get_e_repr()['l']) == truth
+    # set partial edges (many-one)
+    u = th.tensor([3, 4, 6])
+    v = th.tensor([9])
+    g.set_e_repr({'l' : th.ones((3, D))}, u, v)
+    truth[5] = truth[7] = truth[11] = 1.
+    assert _pfc(g.get_e_repr()['l']) == truth
+    # set partial edges (one-many)
+    u = th.tensor([0])
+    v = th.tensor([4, 5, 6])
+    g.set_e_repr({'l' : th.ones((3, D))}, u, v)
+    truth[6] = truth[8] = truth[10] = 1.
+    assert _pfc(g.get_e_repr()['l']) == truth
+    # get partial edges (many-many)
+    u = th.tensor([0, 6, 0])
+    v = th.tensor([6, 9, 7])
+    assert _pfc(g.get_e_repr(u, v)['l']) == [1., 1., 0.]
+    # get partial edges (many-one)
+    u = th.tensor([5, 6, 7])
+    v = th.tensor([9])
+    assert _pfc(g.get_e_repr(u, v)['l']) == [1., 1., 0.]
+    # get partial edges (one-many)
+    u = th.tensor([0])
+    v = th.tensor([3, 4, 5])
+    assert _pfc(g.get_e_repr(u, v)['l']) == [1., 1., 1.]
 
 def test_batch_send():
     g = generate_graph()
