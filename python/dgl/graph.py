@@ -199,7 +199,6 @@ class DGLGraph(DiGraph):
                 self._edge_frame[__REPR__] = h_uv
         else:
             eid = self.cached_graph.get_edge_id(u, v)
-            print(eid)
             if isinstance(h_uv, dict):
                 for key, val in h_uv.items():
                     self._edge_frame[key][eid] = val
