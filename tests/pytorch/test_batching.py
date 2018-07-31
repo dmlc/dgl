@@ -75,12 +75,12 @@ def test_batch_setter_getter():
     # set partial nodes (many-many)
     # TODO(minjie): following case will fail at the moment as CachedGraph
     # does not maintain edge addition order.
-    #u = th.tensor([0, 0, 2, 5, 9])
-    #v = th.tensor([1, 3, 9, 9, 0])
-    #g.set_e_repr({'l' : th.ones((5, D))}, u, v)
-    #truth = [0.] * 17
-    #truth[0] = truth[4] = truth[3] = truth[9] = truth[16] = 1.
-    #assert _pfc(g.get_e_repr()['l']) == truth
+    u = th.tensor([0, 0, 2, 5, 9])
+    v = th.tensor([1, 3, 9, 9, 0])
+    g.set_e_repr({'l' : th.ones((5, D))}, u, v)
+    truth = [0.] * 17
+    truth[0] = truth[4] = truth[3] = truth[9] = truth[16] = 1.
+    assert _pfc(g.get_e_repr()['l']) == truth
 
 def test_batch_send():
     g = generate_graph()

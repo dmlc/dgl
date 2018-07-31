@@ -29,5 +29,8 @@ def test_basics():
     check_eq(s, th.tensor([1, 1, 2, 2]))
     check_eq(d, th.tensor([2, 3, 4, 5]))
 
+    print(cg._graph.get_adjacency())
+    print(cg._graph.get_adjacency(eids=True))
+
 if __name__ == '__main__':
     test_basics()

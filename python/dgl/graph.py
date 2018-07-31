@@ -9,7 +9,6 @@ from networkx.classes.digraph import DiGraph
 import dgl.backend as F
 from dgl.backend import Tensor
 import dgl.builtin as builtin
-#import dgl.state as state
 from dgl.frame import Frame
 from dgl.cached_graph import CachedGraph, create_cached_graph
 import dgl.scheduler as scheduler
@@ -18,6 +17,44 @@ import dgl.utils as utils
 __MSG__ = "__MSG__"
 __REPR__ = "__REPR__"
 ALL = "__ALL__"
+
+class _NodeDict(MutableMapping):
+    def __init__(self, cb):
+        self._dict = {}
+        self._cb = cb
+    def __setitem__(self, key, val):
+        if isinstance(val, _AdjInnerDict):
+            # This node dict is used as adj_outer_list
+            val.src = key
+        elif key not in self._dict:
+            self._cb(key)
+        self._dict[key] = val
+    def __getitem__(self, key):
+        return self._dict[key]
+    def __delitem__(self, key):
+        del self._dict[key]
+    def __len__(self):
+        return len(self._dict)
+    def __iter__(self):
+        return iter(self._dict)
+
+class _AdjInnerDict(MutableMapping):
+    def __init__(self, cb):
+        self._dict = {}
+        self.src = None
+        self._cb = cb
+    def __setitem__(self, key, val):
+        if key not in self._dict:
+            self._cb(self.src, key)
+        self._dict[key] = val
+    def __getitem__(self, key):
+        return self._dict[key]
+    def __delitem__(self, key):
+        del self._dict[key]
+    def __len__(self):
+        return len(self._dict)
+    def __iter__(self):
+        return iter(self._dict)
 
 class DGLGraph(DiGraph):
     """Base graph class specialized for neural networks on graphs.
@@ -32,12 +69,14 @@ class DGLGraph(DiGraph):
     attr : keyword arguments, optional
         Attributes to add to graph as key=value pairs.
     """
-    #node_dict_factory = state.NodeDict
-    #adjlist_outer_dict_factory = state.AdjOuterDict
-    #adjlist_inner_dict_factory = state.AdjInnerDict
-    #edge_attr_dict_factory = state.EdgeAttrDict
-
     def __init__(self, graph_data=None, **attr):
+        # setup dict overlay
+        self.node_dict_factory = lambda : _NodeDict(self._add_node_callback)
+        # In networkx 2.1, DiGraph is not using this factory. Instead, the outer
+        # dict uses the same data structure as the node dict.
+        self.adjlist_outer_dict_factory = None
+        self.adjlist_inner_dict_factory = lambda : _AdjInnerDict(self._add_edge_callback)
+        self.edge_attr_dict_factory = dict
         # call base class init
         super(DGLGraph, self).__init__(graph_data, **attr)
         self._cached_graph = None
@@ -50,6 +89,8 @@ class DGLGraph(DiGraph):
         self._reduce_func = None
         self._update_func = None
         self._edge_func = None
+        self._edge_cb_state = True
+        self._edge_list = []
 
     def set_n_repr(self, hu, u=ALL):
         """Set node(s) representation.
@@ -158,6 +199,7 @@ class DGLGraph(DiGraph):
                 self._edge_frame[__REPR__] = h_uv
         else:
             eid = self.cached_graph.get_edge_id(u, v)
+            print(eid)
             if isinstance(h_uv, dict):
                 for key, val in h_uv.items():
                     self._edge_frame[key][eid] = val
@@ -742,6 +784,23 @@ class DGLGraph(DiGraph):
 
     def _edges_or_all(self, edges):
         return self.edges() if edges == ALL else edges
+
+    def _add_node_callback(self, node):
+        #print('New node:', node)
+        pass
+
+    def _add_edge_callback(self, u, v):
+        # In networkx 2.1, two adjlists are maintained. One for succ, one for pred.
+        # We only record once for the succ addition.
+        if self._edge_cb_state:
+            #print('New edge:', u, v)
+            self._edge_list.append((u, v))
+        self._edge_cb_state = not self._edge_cb_state
+
+    @property
+    def edge_list(self):
+        """Return edges in the addition order."""
+        return self._edge_list
 
 def _get_repr(attr_dict):
     if len(attr_dict) == 1 and __REPR__ in attr_dict:

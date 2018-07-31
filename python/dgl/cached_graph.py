@@ -71,6 +71,6 @@ def create_cached_graph(dglgraph):
     # TODO: tensorize the loop
     cg = CachedGraph()
     cg.add_nodes(dglgraph.number_of_nodes())
-    for u, v in dglgraph.edges():
+    for u, v in dglgraph.edge_list:
         cg.add_edges(u, v)
     return cg
