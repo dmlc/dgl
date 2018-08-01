@@ -6,6 +6,7 @@ from collections import MutableMapping
 import networkx as nx
 from networkx.classes.digraph import DiGraph
 
+from dgl.base import ALL, is_all
 import dgl.backend as F
 from dgl.backend import Tensor
 import dgl.builtin as builtin
@@ -16,7 +17,6 @@ import dgl.utils as utils
 
 __MSG__ = "__MSG__"
 __REPR__ = "__REPR__"
-ALL = "__ALL__"
 
 class _NodeDict(MutableMapping):
     def __init__(self, cb):
@@ -105,7 +105,7 @@ class DGLGraph(DiGraph):
 
         Parameters
         ----------
-        hu : any
+        hu : tensor or dict of tensor
           Node representation.
         u : node, container or tensor
           The node(s).
@@ -120,7 +120,7 @@ class DGLGraph(DiGraph):
             for key, val in hu.items():
                 assert F.shape(val)[0] == num_nodes
         else:
-            F.shape(hu)[0] == num_nodes
+            assert F.shape(hu)[0] == num_nodes
         # set
         if isinstance(u, str) and u == ALL:
             if isinstance(hu, dict):
@@ -168,7 +168,7 @@ class DGLGraph(DiGraph):
 
         Parameters
         ----------
-        h_uv : any
+        h_uv : tensor or dict of tensor
           Edge representation.
         u : node, container or tensor
           The source node(s).
@@ -189,7 +189,7 @@ class DGLGraph(DiGraph):
             for key, val in h_uv.items():
                 assert F.shape(val)[0] == num_edges
         else:
-            F.shape(h_uv)[0] == num_edges
+            assert F.shape(h_uv)[0] == num_edges
         # set
         if u_is_all:
             if isinstance(h_uv, dict):
@@ -199,6 +199,41 @@ class DGLGraph(DiGraph):
                 self._edge_frame[__REPR__] = h_uv
         else:
             eid = self.cached_graph.get_edge_id(u, v)
+            if isinstance(h_uv, dict):
+                for key, val in h_uv.items():
+                    self._edge_frame[key][eid] = val
+            else:
+                self._edge_frame[__REPR__][eid] = h_uv
+
+    def set_e_repr_by_id(self, h_uv, eid=ALL):
+        """Set edge(s) representation by edge id.
+
+        Parameters
+        ----------
+        h_uv : tensor or dict of tensor
+          Edge representation.
+        eid : int, container or tensor
+          The edge id(s).
+        """
+        # sanity check
+        if isinstance(eid, str) and eid == ALL:
+            num_edges = self.number_of_edges()
+        else:
+            eid = utils.convert_to_id_tensor(eid)
+            num_edges = len(eid)
+        if isinstance(h_uv, dict):
+            for key, val in h_uv.items():
+                assert F.shape(val)[0] == num_edges
+        else:
+            assert F.shape(h_uv)[0] == num_edges
+        # set
+        if isinstance(eid, str) and eid == ALL:
+            if isinstance(h_uv, dict):
+                for key, val in h_uv.items():
+                    self._edge_frame[key] = val
+            else:
+                self._edge_frame[__REPR__] = h_uv
+        else:
             if isinstance(h_uv, dict):
                 for key, val in h_uv.items():
                     self._edge_frame[key][eid] = val
@@ -227,6 +262,26 @@ class DGLGraph(DiGraph):
             u = utils.convert_to_id_tensor(u)
             v = utils.convert_to_id_tensor(v)
             eid = self.cached_graph.get_edge_id(u, v)
+            if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
+                return self._edge_frame[__REPR__][eid]
+            else:
+                return self._edge_frame.select_rows(eid)
+
+    def get_e_repr_by_id(self, eid=ALL):
+        """Get edge(s) representation by edge id.
+
+        Parameters
+        ----------
+        eid : int, container or tensor
+          The edge id(s).
+        """
+        if isinstance(eid, str) and eid == ALL:
+            if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
+                return self._edge_frame[__REPR__]
+            else:
+                return dict(self._edge_frame)
+        else:
+            eid = utils.convert_to_id_tensor(eid)
             if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
                 return self._edge_frame[__REPR__][eid]
             else:
@@ -355,8 +410,8 @@ class DGLGraph(DiGraph):
         self.msg_graph.add_edges(u, v)
         if len(u) != len(v) and len(u) == 1:
             u = F.broadcast_to(u, v)
-        src_reprs = _get_repr(self._node_frame.select_rows(u))
-        edge_reprs = _get_repr(self._edge_frame.select_rows(edge_id))
+        src_reprs = self.get_n_repr(u)
+        edge_reprs = self.get_e_repr_by_id(edge_id)
         msgs = message_func(src_reprs, edge_reprs)
         if isinstance(msgs, dict):
             self._msg_frame.append(msgs)
@@ -403,16 +458,16 @@ class DGLGraph(DiGraph):
     def _batch_update_edge(self, u, v, edge_func):
         u = utils.convert_to_id_tensor(u)
         v = utils.convert_to_id_tensor(v)
-        edge_id = self.cached_graph.get_edge_id(u, v)
+        eid = self.cached_graph.get_edge_id(u, v)
         if len(u) != len(v) and len(u) == 1:
             u = F.broadcast_to(u, v)
         elif len(u) != len(v) and len(v) == 1:
             v = F.broadcast_to(v, u)
-        src_reprs = _get_repr(self._node_frame.select_rows(u))
-        dst_reprs = _get_repr(self._node_frame.select_rows(v))
-        edge_reprs = _get_repr(self._edge_frame.select_rows(edge_id))
+        src_reprs = self.get_n_repr(u)
+        dst_reprs = self.get_n_repr(v)
+        edge_reprs = self.get_e_repr_by_id(eid)
         new_edge_reprs = edge_func(src_reprs, dst_reprs, edge_reprs)
-        _batch_set_repr(self._edge_frame, edge_id, new_edge_reprs)
+        self.set_e_repr_by_id(new_edge_reprs, eid)
 
     def recv(self,
              u,
@@ -509,7 +564,7 @@ class DGLGraph(DiGraph):
             else:
                 reshaped_in_msgs = utils.LazyDict(
                         lambda key: _reshape_fn(in_msgs[key]), self._msg_frame.schemes)
-            dst_reprs = _get_repr(self._node_frame.select_rows(v_bkt))
+            dst_reprs = self.get_n_repr(v_bkt)
             reduced_msgs.append(f_reduce(dst_reprs, reshaped_in_msgs))
 
         # TODO: clear partial messages
@@ -517,14 +572,14 @@ class DGLGraph(DiGraph):
 
         # Read the node states in the degree-bucketing order.
         reordered_v = F.pack(v_buckets)
-        reordered_ns = _get_repr(self._node_frame.select_rows(reordered_v))
+        reordered_ns = self.get_n_repr(reordered_v)
         # Pack all reduced msgs together
-        if isinstance(reduced_msgs, dict):
+        if isinstance(reduced_msgs[0], dict):
             all_reduced_msgs = {key : F.pack(val) for key, val in reduced_msgs.items()}
         else:
             all_reduced_msgs = F.pack(reduced_msgs)
         new_ns = f_update(reordered_ns, all_reduced_msgs)
-        _batch_set_repr(self._node_frame, reordered_v, new_ns)
+        self.set_n_repr(new_ns, reordered_v)
 
     def update_by_edge(self,
                        u, v,
@@ -568,9 +623,9 @@ class DGLGraph(DiGraph):
     def _nonbatch_update_by_edge(
             self,
             u, v,
-            message_func=None,
-            reduce_func=None,
-            update_func=None):
+            message_func,
+            reduce_func,
+            update_func):
         self._nonbatch_sendto(u, v, message_func)
         dst = set()
         for uu, vv in utils.edge_iter(u, v):
@@ -580,13 +635,24 @@ class DGLGraph(DiGraph):
     def _batch_update_by_edge(
             self,
             u, v,
-            message_func=None,
-            reduce_func=None,
-            update_func=None):
-        if message_func == 'from_src' and reduce_func == 'sum':
-            # Specialized to generic-SPMV
-            raise NotImplementedError('SPVM specialization')
+            message_func,
+            reduce_func,
+            update_func):
+        if message_func == 'from_src' and reduce_func == 'sum' \
+                and is_all(u) and is_all(v):
+            # TODO(minjie): SPMV is only supported for updating all nodes right now.
+            adjmat = self.cached_graph.adjmat
+            reduced_msgs = {}
+            for key in self._node_frame.schemes:
+                col = self._node_frame[key]
+                reduced_msgs[key] = F.spmm(adjmat, col)
+            node_repr = self.get_n_repr()
+            if len(reduced_msgs) == 1 and __REPR__ in reduced_msgs:
+                reduced_msgs = reduced_msgs[__REPR__]
+            self.set_n_repr(update_func(node_repr, reduced_msgs))
         else:
+            if is_all(u) and is_all(v):
+                u, v = self.cached_graph.edges()
             self._batch_sendto(u, v, message_func)
             unique_v = F.unique(v)
             self._batch_recv(unique_v, reduce_func, update_func)
@@ -701,8 +767,7 @@ class DGLGraph(DiGraph):
         assert reduce_func is not None
         assert update_func is not None
         if batchable:
-            u, v = self.cached_graph.edges()
-            self._batch_update_by_edge(u, v,
+            self._batch_update_by_edge(ALL, ALL,
                     message_func, reduce_func, update_func)
         else:
             u = [uu for uu, _ in self.edges]
@@ -785,8 +850,7 @@ class DGLGraph(DiGraph):
         return self.edges() if edges == ALL else edges
 
     def _add_node_callback(self, node):
-        #print('New node:', node)
-        pass
+        self._cached_graph = None
 
     def _add_edge_callback(self, u, v):
         # In networkx 2.1, two adjlists are maintained. One for succ, one for pred.
@@ -795,6 +859,7 @@ class DGLGraph(DiGraph):
             #print('New edge:', u, v)
             self._edge_list.append((u, v))
         self._edge_cb_state = not self._edge_cb_state
+        self._cached_graph = None
 
     @property
     def edge_list(self):
@@ -812,12 +877,6 @@ def _set_repr(attr_dict, attr):
         attr_dict.update(attr)
     else:
         attr_dict[__REPR__] = attr
-
-def _batch_set_repr(frame, rows, attr):
-    if isinstance(attr, dict):
-        frame.update_rows(rows, attr)
-    else:
-        frame.update_rows(rows, {__REPR__ : attr})
 
 def _get_reduce_func(reduce_func):
     if isinstance(reduce_func, str):

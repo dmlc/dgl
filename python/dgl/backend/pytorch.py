@@ -5,7 +5,7 @@ import scipy.sparse
 
 # Tensor types
 Tensor = th.Tensor
-SparseTensor = scipy.sparse.spmatrix
+SparseTensor = th.sparse.FloatTensor
 
 # Data types
 float16 = th.float16
@@ -19,6 +19,7 @@ int64 = th.int64
 
 # Operators
 tensor = th.tensor
+sparse_tensor = th.sparse.FloatTensor
 sum = th.sum
 max = th.max
 
@@ -57,4 +58,7 @@ nonzero = th.nonzero
 def eq_scalar(x, val):
     return th.eq(x, float(val))
 squeeze = th.squeeze
+unsqueeze = th.unsqueeze
 reshape = th.reshape
+ones = th.ones
+spmm = th.spmm
