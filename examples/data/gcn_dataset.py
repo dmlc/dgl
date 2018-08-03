@@ -70,7 +70,7 @@ class GCNDataset:
 
         features = sp.vstack((allx, tx)).tolil()
         features[test_idx_reorder, :] = features[test_idx_range, :]
-        adj = nx.adjacency_matrix(nx.from_dict_of_lists(graph))
+        graph = nx.from_dict_of_lists(graph)
 
         onehot_labels = np.vstack((ally, ty))
         onehot_labels[test_idx_reorder, :] = onehot_labels[test_idx_range, :]
@@ -91,7 +91,7 @@ class GCNDataset:
         #y_val[val_mask, :] = labels[val_mask, :]
         #y_test[test_mask, :] = labels[test_mask, :]
 
-        self.adj = adj
+        self.graph = graph
         self.features = _preprocess_features(features)
         self.labels = labels
         self.onehot_labels = onehot_labels

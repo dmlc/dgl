@@ -26,6 +26,7 @@ class NodeUpdateModule(nn.Module):
 
 class GCN(nn.Module):
     def __init__(self,
+                 nx_graph,
                  in_feats,
                  n_hidden,
                  n_classes,
@@ -33,6 +34,7 @@ class GCN(nn.Module):
                  activation,
                  dropout):
         super(GCN, self).__init__()
+        self.g = DGLGraph(nx_graph)
         self.dropout = dropout
         # input layer
         self.layers = nn.ModuleList([NodeUpdateModule(in_feats, n_hidden, activation)])
@@ -42,13 +44,15 @@ class GCN(nn.Module):
         # output layer
         self.layers.append(NodeUpdateModule(n_hidden, n_classes))
 
-    def forward(self, g):
+    def forward(self, features):
+        self.g.set_n_repr(features)
         for layer in self.layers:
             # apply dropout
             if self.dropout:
-                g.set_n_repr(F.dropout(g.get_n_repr(), p=self.dropout))
-            g.update_all('from_src', 'sum', layer, batchable=True)
-        return g
+                val = F.dropout(self.g.get_n_repr(), p=self.dropout)
+                self.g.set_n_repr(val)
+            self.g.update_all('from_src', 'sum', layer, batchable=True)
+        return self.g.get_n_repr()
 
 def main(args):
     # load and preprocess dataset
@@ -76,7 +80,13 @@ def main(args):
         mask = mask.cuda()
 
     # create GCN model
-    model = GCN(in_feats, args.n_hidden, n_classes, args.n_layers, F.relu, args.dropout)
+    model = GCN(data.graph,
+                in_feats,
+                args.n_hidden,
+                n_classes,
+                args.n_layers,
+                F.relu,
+                args.dropout)
 
     if cuda:
         model.cuda()
@@ -85,13 +95,10 @@ def main(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     # initialize graph
-    g = DGLGraph(data.adj)
     t0 = time.time()
     for epoch in range(args.n_epochs):
         # forward
-        g.set_n_repr(features)
-        g = model(g)
-        logits = g.get_n_repr()
+        logits = model(features)
         logp = F.log_softmax(logits, 1)
         loss = F.nll_loss(logp[mask], labels[mask])
         print("epoch {} loss: {}".format(epoch, loss.item()))
