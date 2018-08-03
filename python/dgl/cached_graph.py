@@ -19,6 +19,9 @@ class CachedGraph:
     def add_nodes(self, num_nodes):
         self._graph.add_vertices(num_nodes)
 
+    def add_edge(self, u, v):
+        self._graph.add_edge(u, v)
+
     def add_edges(self, u, v):
         # The edge will be assigned ids equal to the order.
         for uu, vv in utils.edge_iter(u, v):
@@ -83,9 +86,8 @@ class CachedGraph:
         return self._adjmat
 
 def create_cached_graph(dglgraph):
-    # TODO: tensorize the loop
     cg = CachedGraph()
     cg.add_nodes(dglgraph.number_of_nodes())
     for u, v in dglgraph.edge_list:
-        cg.add_edges(u, v)
+        cg.add_edge(u, v)
     return cg

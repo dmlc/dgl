@@ -77,8 +77,7 @@ class DGLGraph(DiGraph):
         self.adjlist_outer_dict_factory = None
         self.adjlist_inner_dict_factory = lambda : _AdjInnerDict(self._add_edge_callback)
         self.edge_attr_dict_factory = dict
-        # call base class init
-        super(DGLGraph, self).__init__(graph_data, **attr)
+        # cached graph and storage
         self._cached_graph = None
         self._node_frame = Frame()
         self._edge_frame = Frame()
@@ -91,6 +90,8 @@ class DGLGraph(DiGraph):
         self._edge_func = None
         self._edge_cb_state = True
         self._edge_list = []
+        # call base class init
+        super(DGLGraph, self).__init__(graph_data, **attr)
 
     def set_n_repr(self, hu, u=ALL):
         """Set node(s) representation.

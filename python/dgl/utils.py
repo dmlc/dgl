@@ -44,10 +44,11 @@ def convert_to_id_container(x):
         return x
     elif is_id_tensor(x):
         return F.asnumpy(x)
-    elif isinstance(x, int):
-        return [x]
     else:
-        raise TypeError('Error node: %s' % str(x))
+        try:
+            return [int(x)]
+        except:
+            raise TypeError('Error node: %s' % str(x))
     return None
 
 def convert_to_id_tensor(x):
@@ -56,11 +57,11 @@ def convert_to_id_tensor(x):
         return F.tensor(x)
     elif is_id_tensor(x):
         return x
-    elif isinstance(x, int):
-        x = F.tensor([x])
-        return x
     else:
-        raise TypeError('Error node: %s' % str(x))
+        try:
+            return F.tensor([int(x)])
+        except:
+            raise TypeError('Error node: %s' % str(x))
     return None
 
 class LazyDict(Mapping):
