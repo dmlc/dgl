@@ -2,15 +2,16 @@
 Semi-Supervised Classification with Graph Convolutional Networks
 Paper: https://arxiv.org/abs/1609.02907
 Code: https://github.com/tkipf/gcn
-"""
 
+GCN with SPMV specialization.
+"""
 import argparse
 import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl import DGLGraph
-from data import load_cora, load_citeseer, load_pubmed
+from dgl.data import load_cora, load_citeseer, load_pubmed
 
 class NodeUpdateModule(nn.Module):
     def __init__(self, in_feats, out_feats, activation=None):

@@ -133,3 +133,9 @@ def extract_archive(file, target_dir):
         raise Exception('Unrecognized file type: ' + file)
     archive.extractall(path=target_dir)
     archive.close()
+
+def get_download_dir():
+    dirname = '_download'
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+    return dirname

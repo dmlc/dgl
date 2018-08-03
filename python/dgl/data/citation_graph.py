@@ -9,7 +9,7 @@ import networkx as nx
 import scipy.sparse as sp
 import os, sys
 
-from dgl.data import download, extract_archive
+from dgl.data.utils import download, extract_archive, get_download_dir
 
 _urls = {
     'cora' : 'https://www.dropbox.com/s/3ggdpkj7ou8svoc/cora.zip?dl=1',
@@ -20,9 +20,10 @@ _urls = {
 class GCNDataset:
     def __init__(self, name):
         self.name = name
-        self.zip_file_path='{}.zip'.format(name)
+        self.dir = get_download_dir()
+        self.zip_file_path='{}/{}.zip'.format(self.dir, name)
         download(_urls[name], path=self.zip_file_path)
-        extract_archive(self.zip_file_path, name)
+        extract_archive(self.zip_file_path, '{}/{}'.format(self.dir, name))
 
     def load(self):
         """Loads input data from gcn/data directory
@@ -43,7 +44,7 @@ class GCNDataset:
         :param name: Dataset name
         :return: All data input files loaded (as well the training/test data).
         """
-        root = self.name
+        root = '{}/{}'.format(self.dir, self.name)
         objnames = ['x', 'y', 'tx', 'ty', 'allx', 'ally', 'graph']
         objects = []
         for i in range(len(objnames)):
