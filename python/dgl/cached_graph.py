@@ -88,6 +88,5 @@ class CachedGraph:
 def create_cached_graph(dglgraph):
     cg = CachedGraph()
     cg.add_nodes(dglgraph.number_of_nodes())
-    for u, v in dglgraph.edge_list:
-        cg.add_edge(u, v)
+    cg._graph.add_edges(dglgraph.edge_list)
     return cg

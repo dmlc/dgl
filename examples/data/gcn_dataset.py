@@ -70,11 +70,11 @@ class GCNDataset:
 
         features = sp.vstack((allx, tx)).tolil()
         features[test_idx_reorder, :] = features[test_idx_range, :]
-        graph = nx.from_dict_of_lists(graph)
+        graph = nx.DiGraph(nx.from_dict_of_lists(graph))
 
         onehot_labels = np.vstack((ally, ty))
         onehot_labels[test_idx_reorder, :] = onehot_labels[test_idx_range, :]
-        labels = np.nonzero(onehot_labels)[1]
+        labels = np.argmax(onehot_labels, 1)
 
         idx_test = test_idx_range.tolist()
         idx_train = range(len(y))
@@ -99,6 +99,15 @@ class GCNDataset:
         self.train_mask = train_mask
         self.val_mask = val_mask
         self.test_mask = test_mask
+
+        print('Finished data loading and preprocessing.')
+        print('  NumNodes: {}'.format(self.graph.number_of_nodes()))
+        print('  NumEdges: {}'.format(self.graph.number_of_edges()))
+        print('  NumFeats: {}'.format(self.features.shape[1]))
+        print('  NumClasses: {}'.format(self.num_labels))
+        print('  NumTrainingSamples: {}'.format(len(np.nonzero(self.train_mask)[0])))
+        print('  NumValidationSamples: {}'.format(len(np.nonzero(self.val_mask)[0])))
+        print('  NumTestSamples: {}'.format(len(np.nonzero(self.test_mask)[0])))
 
 def _preprocess_features(features):
     """Row-normalize feature matrix and convert to tuple representation"""
