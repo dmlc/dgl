@@ -24,8 +24,8 @@ class CachedGraph:
 
     def add_edges(self, u, v):
         # The edge will be assigned ids equal to the order.
-        for uu, vv in utils.edge_iter(u, v):
-            self._graph.add_edge(uu, vv)
+        uvs = list(utils.edge_iter(u, v))
+        self._graph.add_edges(uvs)
 
     def get_edge_id(self, u, v):
         uvs = list(utils.edge_iter(u, v))

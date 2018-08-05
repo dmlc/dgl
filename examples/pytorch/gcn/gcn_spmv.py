@@ -6,6 +6,7 @@ Code: https://github.com/tkipf/gcn
 GCN with SPMV specialization.
 """
 import argparse
+import numpy as np
 import time
 import torch
 import torch.nn as nn
@@ -68,8 +69,9 @@ def main(args):
     features = torch.FloatTensor(data.features)
     labels = torch.LongTensor(data.labels)
     mask = torch.ByteTensor(data.train_mask)
-    in_feats = features.size(1)
+    in_feats = features.shape[1]
     n_classes = data.num_labels
+    n_edges = data.graph.number_of_edges()
 
     if args.gpu < 0:
         cuda = False
@@ -96,19 +98,24 @@ def main(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     # initialize graph
-    t0 = time.time()
+    dur = []
     for epoch in range(args.n_epochs):
+        if epoch >= 3:
+            t0 = time.time()
         # forward
         logits = model(features)
         logp = F.log_softmax(logits, 1)
         loss = F.nll_loss(logp[mask], labels[mask])
-        print("epoch {} loss: {}".format(epoch, loss.item()))
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-    print('%f seconds/epoch' % ((time.time() - t0) / args.n_epochs))
+        if epoch >= 3:
+            dur.append(time.time() - t0)
+
+        print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
+            epoch, loss.item(), np.mean(dur), n_edges / np.mean(dur) / 1000))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
@@ -120,7 +127,7 @@ if __name__ == '__main__':
             help="gpu")
     parser.add_argument("--lr", type=float, default=1e-3,
             help="learning rate")
-    parser.add_argument("--n-epochs", type=int, default=10,
+    parser.add_argument("--n-epochs", type=int, default=20,
             help="number of training epochs")
     parser.add_argument("--n-hidden", type=int, default=16,
             help="number of hidden gcn units")

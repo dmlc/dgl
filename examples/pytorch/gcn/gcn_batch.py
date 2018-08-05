@@ -2,6 +2,8 @@
 Semi-Supervised Classification with Graph Convolutional Networks
 Paper: https://arxiv.org/abs/1609.02907
 Code: https://github.com/tkipf/gcn
+
+GCN with batch processing
 """
 import argparse
 import numpy as np
@@ -13,10 +15,10 @@ from dgl import DGLGraph
 from dgl.data import load_cora, load_citeseer, load_pubmed
 
 def gcn_msg(src, edge):
-    return src['h']
+    return src
 
 def gcn_reduce(node, msgs):
-    return sum(msgs)
+    return torch.sum(msgs, 1)
 
 class NodeUpdateModule(nn.Module):
     def __init__(self, in_feats, out_feats, activation=None):
@@ -28,7 +30,7 @@ class NodeUpdateModule(nn.Module):
         h = self.linear(accum)
         if self.activation:
             h = self.activation(h)
-        return {'h' : h}
+        return h
 
 class GCN(nn.Module):
     def __init__(self,
@@ -50,15 +52,15 @@ class GCN(nn.Module):
         # output layer
         self.layers.append(NodeUpdateModule(n_hidden, n_classes))
 
-    def forward(self, features, train_nodes):
-        for n, feat in features.items():
-            self.g.nodes[n]['h'] = feat
+    def forward(self, features):
+        self.g.set_n_repr(features)
         for layer in self.layers:
             # apply dropout
             if self.dropout:
-                self.g.nodes[n]['h'] = F.dropout(g.nodes[n]['h'], p=self.dropout)
-            self.g.update_all(gcn_msg, gcn_reduce, layer)
-        return torch.cat([self.g.nodes[n]['h'] for n in train_nodes])
+                val = F.dropout(self.g.get_n_repr(), p=self.dropout)
+                self.g.set_n_repr(val)
+            self.g.update_all(gcn_msg, gcn_reduce, layer, batchable=True)
+        return self.g.get_n_repr()
 
 def main(args):
     # load and preprocess dataset
@@ -70,18 +72,10 @@ def main(args):
         data = load_pubmed()
     else:
         raise RuntimeError('Error dataset: {}'.format(args.dataset))
-
-    # features of each samples
-    features = {}
-    labels = []
-    train_nodes = []
-    for n in data.graph.nodes():
-        features[n] = torch.FloatTensor(data.features[n, :])
-        if data.train_mask[n] == 1:
-            train_nodes.append(n)
-            labels.append(data.labels[n])
-    labels = torch.LongTensor(labels)
-    in_feats = data.features.shape[1]
+    features = torch.FloatTensor(data.features)
+    labels = torch.LongTensor(data.labels)
+    mask = torch.ByteTensor(data.train_mask)
+    in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
 
@@ -115,9 +109,9 @@ def main(args):
         if epoch >= 3:
             t0 = time.time()
         # forward
-        logits = model(features, train_nodes)
+        logits = model(features)
         logp = F.log_softmax(logits, 1)
-        loss = F.nll_loss(logp, labels)
+        loss = F.nll_loss(logp[mask], labels[mask])
 
         optimizer.zero_grad()
         loss.backward()
