@@ -41,6 +41,10 @@ def test_batch_setter_getter():
     # set all nodes
     g.set_n_repr({'h' : th.zeros((10, D))})
     assert _pfc(g.get_n_repr()['h']) == [0.] * 10
+    # pop nodes
+    assert _pfc(g.pop_n_repr('h')) == [0.] * 10
+    assert len(g.get_n_repr()) == 0
+    g.set_n_repr({'h' : th.zeros((10, D))})
     # set partial nodes
     u = th.tensor([1, 3, 5])
     g.set_n_repr({'h' : th.ones((3, D))}, u)
@@ -72,6 +76,10 @@ def test_batch_setter_getter():
     # set all edges
     g.set_e_repr({'l' : th.zeros((17, D))})
     assert _pfc(g.get_e_repr()['l']) == [0.] * 17
+    # pop edges
+    assert _pfc(g.pop_e_repr('l')) == [0.] * 17
+    assert len(g.get_e_repr()) == 0
+    g.set_e_repr({'l' : th.zeros((17, D))})
     # set partial edges (many-many)
     u = th.tensor([0, 0, 2, 5, 9])
     v = th.tensor([1, 3, 9, 9, 0])

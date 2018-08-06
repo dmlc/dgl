@@ -26,11 +26,6 @@ max = th.max
 def asnumpy(a):
     return a.cpu().numpy()
 
-def packable(tensors):
-    return all(isinstance(x, th.Tensor) and \
-               x.dtype == tensors[0].dtype and \
-               x.shape[1:] == tensors[0].shape[1:] for x in tensors)
-
 def pack(tensors):
     return th.cat(tensors)
 
@@ -55,8 +50,10 @@ def broadcast_to(x, to_array):
     return x + th.zeros_like(to_array)
 
 nonzero = th.nonzero
+
 def eq_scalar(x, val):
     return th.eq(x, float(val))
+
 squeeze = th.squeeze
 unsqueeze = th.unsqueeze
 reshape = th.reshape

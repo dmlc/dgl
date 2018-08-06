@@ -156,6 +156,16 @@ class DGLGraph(DiGraph):
             else:
                 return self._node_frame.select_rows(u)
 
+    def pop_n_repr(self, key=__REPR__):
+        """Get and remove the specified node repr.
+
+        Parameters
+        ----------
+        key : str
+          The attribute name.
+        """
+        return self._node_frame.pop(key)
+
     def set_e_repr(self, h_uv, u=ALL, v=ALL):
         """Set edge(s) representation.
 
@@ -267,6 +277,16 @@ class DGLGraph(DiGraph):
                 return self._edge_frame[__REPR__][eid]
             else:
                 return self._edge_frame.select_rows(eid)
+
+    def pop_e_repr(self, key=__REPR__):
+        """Get and remove the specified edge repr.
+
+        Parameters
+        ----------
+        key : str
+          The attribute name.
+        """
+        return self._edge_frame.pop(key)
 
     def get_e_repr_by_id(self, eid=ALL):
         """Get edge(s) representation by edge id.

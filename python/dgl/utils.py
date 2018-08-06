@@ -54,12 +54,12 @@ def convert_to_id_container(x):
 def convert_to_id_tensor(x):
     if is_id_container(x):
         assert homogeneous(x, int)
-        return F.tensor(x)
+        return F.tensor(x, dtype=F.int64)
     elif is_id_tensor(x):
         return x
     else:
         try:
-            return F.tensor([int(x)])
+            return F.tensor([int(x)], dtype=F.int64)
         except:
             raise TypeError('Error node: %s' % str(x))
     return None

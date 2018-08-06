@@ -43,6 +43,15 @@ class Frame:
         else:
             self.update_rows(key, val)
 
+    def __delitem__(self, key):
+        # delete column
+        del self._columns[key]
+
+    def pop(self, key):
+        col = self._columns[key]
+        del self._columns[key]
+        return col
+
     def add_column(self, name, col):
         if self.num_columns == 0:
             self._num_rows = F.shape(col)[0]

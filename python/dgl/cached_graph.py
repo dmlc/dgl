@@ -30,7 +30,7 @@ class CachedGraph:
     def get_edge_id(self, u, v):
         uvs = list(utils.edge_iter(u, v))
         eids = self._graph.get_eids(uvs)
-        return F.tensor(eids, dtype=F.int64)
+        return utils.convert_to_id_tensor(eids)
 
     def in_edges(self, v):
         src = []
@@ -39,8 +39,8 @@ class CachedGraph:
             uu = self._graph.predecessors(vv)
             src += uu
             dst += [vv] * len(uu)
-        src = F.tensor(src, dtype=F.int64)
-        dst = F.tensor(dst, dtype=F.int64)
+        src = utils.convert_to_id_tensor(src)
+        dst = utils.convert_to_id_tensor(dst)
         return src, dst
 
     def out_edges(self, u):

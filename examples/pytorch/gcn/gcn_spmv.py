@@ -54,7 +54,7 @@ class GCN(nn.Module):
                 val = F.dropout(self.g.get_n_repr(), p=self.dropout)
                 self.g.set_n_repr(val)
             self.g.update_all('from_src', 'sum', layer, batchable=True)
-        return self.g.get_n_repr()
+        return self.g.pop_n_repr()
 
 def main(args):
     # load and preprocess dataset
