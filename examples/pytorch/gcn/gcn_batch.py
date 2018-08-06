@@ -13,7 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl
 from dgl import DGLGraph
-from dgl.data import load_cora, load_citeseer, load_pubmed
+from dgl.data import register_data_args, load_data
 
 def gcn_msg(src, edge):
     return src
@@ -65,14 +65,8 @@ class GCN(nn.Module):
 
 def main(args):
     # load and preprocess dataset
-    if args.dataset == 'cora':
-        data = load_cora()
-    elif args.dataset == 'citeseer':
-        data = load_citeseer()
-    elif args.dataset == 'pubmed':
-        data = load_pubmed()
-    else:
-        raise RuntimeError('Error dataset: {}'.format(args.dataset))
+    data = load_data(args)
+
     features = torch.FloatTensor(data.features)
     labels = torch.LongTensor(data.labels)
     mask = torch.ByteTensor(data.train_mask)
@@ -129,8 +123,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
-    parser.add_argument("--dataset", type=str, required=True,
-            help="dataset")
+    register_data_args(parser)
     parser.add_argument("--dropout", type=float, default=0,
             help="dropout probability")
     parser.add_argument("--gpu", type=int, default=-1,

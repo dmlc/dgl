@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl import DGLGraph
-from dgl.data import load_cora, load_citeseer, load_pubmed
+from dgl.data import register_data_args, load_data
 
 def gcn_msg(src, edge):
     return src['h']
@@ -58,18 +58,11 @@ class GCN(nn.Module):
             if self.dropout:
                 self.g.nodes[n]['h'] = F.dropout(g.nodes[n]['h'], p=self.dropout)
             self.g.update_all(gcn_msg, gcn_reduce, layer)
-        return torch.cat([self.g.nodes[n]['h'] for n in train_nodes])
+        return torch.cat([torch.unsqueeze(self.g.nodes[n]['h'], 0) for n in train_nodes])
 
 def main(args):
     # load and preprocess dataset
-    if args.dataset == 'cora':
-        data = load_cora()
-    elif args.dataset == 'citeseer':
-        data = load_citeseer()
-    elif args.dataset == 'pubmed':
-        data = load_pubmed()
-    else:
-        raise RuntimeError('Error dataset: {}'.format(args.dataset))
+    data = load_data(args)
 
     # features of each samples
     features = {}
@@ -131,8 +124,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
-    parser.add_argument("--dataset", type=str, required=True,
-            help="dataset")
+    register_data_args(parser)
     parser.add_argument("--dropout", type=float, default=0,
             help="dropout probability")
     parser.add_argument("--gpu", type=int, default=-1,
