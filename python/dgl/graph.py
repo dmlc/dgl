@@ -405,6 +405,8 @@ class DGLGraph(DiGraph):
             self.edges[uu, vv][__MSG__] = ret
 
     def _batch_sendto(self, u, v, message_func):
+        if is_all(u) and is_all(v):
+            u, v = self.cached_graph.edges()
         u = utils.convert_to_id_tensor(u)
         v = utils.convert_to_id_tensor(v)
         edge_id = self.cached_graph.get_edge_id(u, v)
@@ -540,6 +542,9 @@ class DGLGraph(DiGraph):
             _set_repr(self.nodes[uu], ret)
 
     def _batch_recv(self, v, reduce_func, update_func):
+        v_is_all = is_all(v)
+        if v_is_all:
+            v = list(range(self.number_of_nodes()))
         # sanity checks
         v = utils.convert_to_id_tensor(v)
         f_reduce = _get_reduce_func(reduce_func)
@@ -580,7 +585,17 @@ class DGLGraph(DiGraph):
         else:
             all_reduced_msgs = F.pack(reduced_msgs)
         new_ns = f_update(reordered_ns, all_reduced_msgs)
-        self.set_n_repr(new_ns, reordered_v)
+        if v_is_all:
+            # First do reorder and then replace the whole column.
+            _, indices = F.sort(reordered_v)
+            if isinstance(new_ns, dict):
+                for key, val in new_ns.items():
+                    self._node_frame[key] = F.gather_row(val, indices)
+            else:
+                self._node_frame[__REPR__] = F.gather_row(new_ns, indices)
+        else:
+            # Use setter to do reorder.
+            self.set_n_repr(new_ns, reordered_v)
 
     def update_by_edge(self,
                        u, v,
@@ -653,10 +668,12 @@ class DGLGraph(DiGraph):
             self.set_n_repr(update_func(node_repr, reduced_msgs))
         else:
             if is_all(u) and is_all(v):
-                u, v = self.cached_graph.edges()
-            self._batch_sendto(u, v, message_func)
-            unique_v = F.unique(v)
-            self._batch_recv(unique_v, reduce_func, update_func)
+                self._batch_sendto(u, v, message_func)
+                self._batch_recv(v, reduce_func, update_func)
+            else:
+                self._batch_sendto(u, v, message_func)
+                unique_v = F.unique(v)
+                self._batch_recv(unique_v, reduce_func, update_func)
 
     def update_to(self,
                   v,

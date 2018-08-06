@@ -62,3 +62,4 @@ unsqueeze = th.unsqueeze
 reshape = th.reshape
 ones = th.ones
 spmm = th.spmm
+sort = th.sort
