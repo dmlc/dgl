@@ -1,7 +1,18 @@
 import torch as th
+import numpy as np
 from dgl.graph import DGLGraph
 
-D = 32
+D = 5
+
+def check_eq(a, b):
+    if not np.allclose(a.numpy(), b.numpy()):
+        print(a, b)
+
+def message_func(hu, edge):
+    return hu
+
+def reduce_func(hv, msgs):
+    return th.sum(msgs, 1)
 
 def update_func(hv, accum):
     assert hv.shape == accum.shape
@@ -17,9 +28,8 @@ def generate_graph():
         g.add_edge(i, 9)
     # add a back flow from 9 to 0
     g.add_edge(9, 0)
-    # TODO: use internal interface to set data.
     col = th.randn(10, D)
-    g._node_frame['h'] = col
+    g.set_n_repr(col)
     return g
 
 def test_spmv_specialize():
@@ -27,7 +37,15 @@ def test_spmv_specialize():
     g.register_message_func('from_src', batchable=True)
     g.register_reduce_func('sum', batchable=True)
     g.register_update_func(update_func, batchable=True)
+    v1 = g.get_n_repr()
     g.update_all()
+    v2 = g.get_n_repr()
+    g.set_n_repr(v1)
+    g.register_message_func(message_func, batchable=True)
+    g.register_reduce_func(reduce_func, batchable=True)
+    g.update_all()
+    v3 = g.get_n_repr()
+    check_eq(v2, v3)
 
 if __name__ == '__main__':
     test_spmv_specialize()

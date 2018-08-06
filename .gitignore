@@ -132,3 +132,6 @@ examples/pytorch/data/ind.citeseer.allx
 examples/pytorch/.DS_Store
 examples/.DS_Store
 .DS_Store
+
+# data directory
+_download

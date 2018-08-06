@@ -5,7 +5,7 @@ import scipy.sparse
 
 # Tensor types
 Tensor = th.Tensor
-SparseTensor = scipy.sparse.spmatrix
+SparseTensor = th.sparse.FloatTensor
 
 # Data types
 float16 = th.float16
@@ -19,16 +19,12 @@ int64 = th.int64
 
 # Operators
 tensor = th.tensor
+sparse_tensor = th.sparse.FloatTensor
 sum = th.sum
 max = th.max
 
 def asnumpy(a):
     return a.cpu().numpy()
-
-def packable(tensors):
-    return all(isinstance(x, th.Tensor) and \
-               x.dtype == tensors[0].dtype and \
-               x.shape[1:] == tensors[0].shape[1:] for x in tensors)
 
 def pack(tensors):
     return th.cat(tensors)
@@ -54,7 +50,24 @@ def broadcast_to(x, to_array):
     return x + th.zeros_like(to_array)
 
 nonzero = th.nonzero
+
 def eq_scalar(x, val):
     return th.eq(x, float(val))
+
 squeeze = th.squeeze
+unsqueeze = th.unsqueeze
 reshape = th.reshape
+ones = th.ones
+spmm = th.spmm
+sort = th.sort
+
+def to_context(x, ctx):
+    if ctx is None:
+        return x
+    elif ctx.device == 'gpu':
+        th.cuda.set_device(ctx.device_id)
+        return x.cuda()
+    elif ctx.device == 'cpu':
+        return x.cpu()
+    else:
+        raise RuntimeError('Invalid context', ctx)
