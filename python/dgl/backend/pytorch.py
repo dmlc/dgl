@@ -60,3 +60,14 @@ reshape = th.reshape
 ones = th.ones
 spmm = th.spmm
 sort = th.sort
+
+def to_context(x, ctx):
+    if ctx is None:
+        return x
+    elif ctx.device == 'gpu':
+        th.cuda.set_device(ctx.device_id)
+        return x.cuda()
+    elif ctx.device == 'cpu':
+        return x.cpu()
+    else:
+        raise RuntimeError('Invalid context', ctx)

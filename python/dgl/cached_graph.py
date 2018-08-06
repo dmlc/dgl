@@ -50,24 +50,23 @@ class CachedGraph:
             vv = self._graph.successors(uu)
             src += [uu] * len(vv)
             dst += vv
-        src = F.tensor(src, dtype=F.int64)
-        dst = F.tensor(dst, dtype=F.int64)
+        src = utils.convert_to_id_tensor(src)
+        dst = utils.convert_to_id_tensor(dst)
         return src, dst
 
     def edges(self):
         elist = self._graph.get_edgelist()
         src = [u for u, _ in elist]
         dst = [v for _, v in elist]
-        src = F.tensor(src, dtype=F.int64)
-        dst = F.tensor(dst, dtype=F.int64)
+        src = utils.convert_to_id_tensor(src)
+        dst = utils.convert_to_id_tensor(dst)
         return src, dst
 
     def in_degrees(self, v):
         degs = self._graph.indegree(list(v))
-        return F.tensor(degs, dtype=F.int64)
+        return utils.convert_to_id_tensor(degs)
 
-    @property
-    def adjmat(self):
+    def adjmat(self, ctx):
         """Return a sparse adjacency matrix.
 
         The row dimension represents the dst nodes; the column dimension
@@ -77,12 +76,14 @@ class CachedGraph:
             elist = self._graph.get_edgelist()
             src = [u for u, _ in elist]
             dst = [v for _, v in elist]
-            src = F.unsqueeze(F.tensor(src, dtype=F.int64), 0)
-            dst = F.unsqueeze(F.tensor(dst, dtype=F.int64), 0)
+            src = F.unsqueeze(utils.convert_to_id_tensor(src), 0)
+            dst = F.unsqueeze(utils.convert_to_id_tensor(dst), 0)
             idx = F.pack([dst, src])
             n = self._graph.vcount()
             dat = F.ones((len(elist),))
             self._adjmat = F.sparse_tensor(idx, dat, [n, n])
+            # TODO(minjie): manually convert adjmat to context
+            self._adjmat = F.to_context(self._adjmat, ctx)
         return self._adjmat
 
 def create_cached_graph(dglgraph):

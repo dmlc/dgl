@@ -10,8 +10,9 @@ from dgl.base import ALL, is_all
 import dgl.backend as F
 from dgl.backend import Tensor
 import dgl.builtin as builtin
-from dgl.frame import Frame
 from dgl.cached_graph import CachedGraph, create_cached_graph
+import dgl.context as context
+from dgl.frame import Frame
 import dgl.scheduler as scheduler
 import dgl.utils as utils
 
@@ -90,6 +91,7 @@ class DGLGraph(DiGraph):
         self._edge_func = None
         self._edge_cb_state = True
         self._edge_list = []
+        self._context = context.cpu()
         # call base class init
         super(DGLGraph, self).__init__(graph_data, **attr)
 
@@ -115,7 +117,7 @@ class DGLGraph(DiGraph):
         if isinstance(u, str) and u == ALL:
             num_nodes = self.number_of_nodes()
         else:
-            u = utils.convert_to_id_tensor(u)
+            u = utils.convert_to_id_tensor(u, self.context)
             num_nodes = len(u)
         if isinstance(hu, dict):
             for key, val in hu.items():
@@ -150,7 +152,7 @@ class DGLGraph(DiGraph):
             else:
                 return dict(self._node_frame)
         else:
-            u = utils.convert_to_id_tensor(u)
+            u = utils.convert_to_id_tensor(u, self.context)
             if len(self._node_frame) == 1 and __REPR__ in self._node_frame:
                 return self._node_frame[__REPR__][u]
             else:
@@ -193,8 +195,8 @@ class DGLGraph(DiGraph):
         if u_is_all:
             num_edges = self.number_of_edges()
         else:
-            u = utils.convert_to_id_tensor(u)
-            v = utils.convert_to_id_tensor(v)
+            u = utils.convert_to_id_tensor(u, self.context)
+            v = utils.convert_to_id_tensor(v, self.context)
             num_edges = max(len(u), len(v))
         if isinstance(h_uv, dict):
             for key, val in h_uv.items():
@@ -230,7 +232,7 @@ class DGLGraph(DiGraph):
         if isinstance(eid, str) and eid == ALL:
             num_edges = self.number_of_edges()
         else:
-            eid = utils.convert_to_id_tensor(eid)
+            eid = utils.convert_to_id_tensor(eid, self.context)
             num_edges = len(eid)
         if isinstance(h_uv, dict):
             for key, val in h_uv.items():
@@ -270,8 +272,8 @@ class DGLGraph(DiGraph):
             else:
                 return dict(self._edge_frame)
         else:
-            u = utils.convert_to_id_tensor(u)
-            v = utils.convert_to_id_tensor(v)
+            u = utils.convert_to_id_tensor(u, self.context)
+            v = utils.convert_to_id_tensor(v, self.context)
             eid = self.cached_graph.get_edge_id(u, v)
             if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
                 return self._edge_frame[__REPR__][eid]
@@ -302,11 +304,26 @@ class DGLGraph(DiGraph):
             else:
                 return dict(self._edge_frame)
         else:
-            eid = utils.convert_to_id_tensor(eid)
+            eid = utils.convert_to_id_tensor(eid, self.context)
             if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
                 return self._edge_frame[__REPR__][eid]
             else:
                 return self._edge_frame.select_rows(eid)
+
+    def set_device(self, ctx):
+        """Set device context for this graph.
+
+        Parameters
+        ----------
+        ctx : dgl.context.Context
+          The device context.
+        """
+        self._context = ctx
+
+    @property
+    def context(self):
+        """Get the device context of this graph."""
+        return self._context
 
     def register_message_func(self,
                               message_func,
@@ -429,12 +446,13 @@ class DGLGraph(DiGraph):
             u, v = self.cached_graph.edges()
         u = utils.convert_to_id_tensor(u)
         v = utils.convert_to_id_tensor(v)
-        edge_id = self.cached_graph.get_edge_id(u, v)
+        eid = self.cached_graph.get_edge_id(u, v)
         self.msg_graph.add_edges(u, v)
         if len(u) != len(v) and len(u) == 1:
             u = F.broadcast_to(u, v)
+        # call UDF
         src_reprs = self.get_n_repr(u)
-        edge_reprs = self.get_e_repr_by_id(edge_id)
+        edge_reprs = self.get_e_repr_by_id(eid)
         msgs = message_func(src_reprs, edge_reprs)
         if isinstance(msgs, dict):
             self._msg_frame.append(msgs)
@@ -486,6 +504,7 @@ class DGLGraph(DiGraph):
             u = F.broadcast_to(u, v)
         elif len(u) != len(v) and len(v) == 1:
             v = F.broadcast_to(v, u)
+        # call the UDF
         src_reprs = self.get_n_repr(u)
         dst_reprs = self.get_n_repr(v)
         edge_reprs = self.get_e_repr_by_id(eid)
@@ -576,9 +595,8 @@ class DGLGraph(DiGraph):
             bkt_len = len(v_bkt)
             uu, vv = self.msg_graph.in_edges(v_bkt)
             in_msg_ids = self.msg_graph.get_edge_id(uu, vv)
-            # The in_msgs represents the rows selected. Since our storage
-            # is column-based, it will only be materialized when user
-            # tries to get the column (e.g. when user called `msgs['h']`)
+            # TODO(minjie): manually convert ids to context.
+            in_msg_ids = F.to_context(in_msg_ids, self.context)
             in_msgs = self._msg_frame.select_rows(in_msg_ids)
             # Reshape the column tensor to (B, Deg, ...).
             def _reshape_fn(msg):
@@ -608,6 +626,8 @@ class DGLGraph(DiGraph):
         if v_is_all:
             # First do reorder and then replace the whole column.
             _, indices = F.sort(reordered_v)
+            # TODO(minjie): manually convert ids to context.
+            indices = F.to_context(indices, self.context)
             if isinstance(new_ns, dict):
                 for key, val in new_ns.items():
                     self._node_frame[key] = F.gather_row(val, indices)
@@ -677,7 +697,7 @@ class DGLGraph(DiGraph):
         if message_func == 'from_src' and reduce_func == 'sum' \
                 and is_all(u) and is_all(v):
             # TODO(minjie): SPMV is only supported for updating all nodes right now.
-            adjmat = self.cached_graph.adjmat
+            adjmat = self.cached_graph.adjmat(self.context)
             reduced_msgs = {}
             for key in self._node_frame.schemes:
                 col = self._node_frame[key]

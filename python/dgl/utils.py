@@ -34,13 +34,8 @@ def edge_iter(u, v):
     else:
         raise ValueError('Error edges:', u, v)
 
-def homogeneous(x_list, type_x=None):
-    type_x = type_x if type_x else type(x_list[0])
-    return all(type(x) == type_x for x in x_list)
-
 def convert_to_id_container(x):
     if is_id_container(x):
-        assert homogeneous(x, int)
         return x
     elif is_id_tensor(x):
         return F.asnumpy(x)
@@ -51,18 +46,18 @@ def convert_to_id_container(x):
             raise TypeError('Error node: %s' % str(x))
     return None
 
-def convert_to_id_tensor(x):
+def convert_to_id_tensor(x, ctx=None):
     if is_id_container(x):
-        assert homogeneous(x, int)
-        return F.tensor(x, dtype=F.int64)
+        ret = F.tensor(x, dtype=F.int64)
     elif is_id_tensor(x):
-        return x
+        ret = x
     else:
         try:
-            return F.tensor([int(x)], dtype=F.int64)
+            ret = F.tensor([int(x)], dtype=F.int64)
         except:
             raise TypeError('Error node: %s' % str(x))
-    return None
+    ret = F.to_context(ret, ctx)
+    return ret
 
 class LazyDict(Mapping):
     """A readonly dictionary that does not materialize the storage."""

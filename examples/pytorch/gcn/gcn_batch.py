@@ -11,6 +11,7 @@ import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import dgl
 from dgl import DGLGraph
 from dgl.data import load_cora, load_citeseer, load_pubmed
 
@@ -34,7 +35,7 @@ class NodeUpdateModule(nn.Module):
 
 class GCN(nn.Module):
     def __init__(self,
-                 nx_graph,
+                 g,
                  in_feats,
                  n_hidden,
                  n_classes,
@@ -42,7 +43,7 @@ class GCN(nn.Module):
                  activation,
                  dropout):
         super(GCN, self).__init__()
-        self.g = DGLGraph(nx_graph)
+        self.g = g
         self.dropout = dropout
         # input layer
         self.layers = nn.ModuleList([NodeUpdateModule(in_feats, n_hidden, activation)])
@@ -89,7 +90,10 @@ def main(args):
         mask = mask.cuda()
 
     # create GCN model
-    model = GCN(data.graph,
+    g = DGLGraph(data.graph)
+    if cuda:
+        g.set_device(dgl.gpu(args.gpu))
+    model = GCN(g,
                 in_feats,
                 args.n_hidden,
                 n_classes,
