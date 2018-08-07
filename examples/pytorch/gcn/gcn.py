@@ -83,9 +83,8 @@ def main(args):
     else:
         cuda = True
         torch.cuda.set_device(args.gpu)
-        features = features.cuda()
+        features = {k : v.cuda() for k, v in features.items()}
         labels = labels.cuda()
-        mask = mask.cuda()
 
     # create GCN model
     model = GCN(data.graph,
@@ -131,7 +130,7 @@ if __name__ == '__main__':
             help="gpu")
     parser.add_argument("--lr", type=float, default=1e-3,
             help="learning rate")
-    parser.add_argument("--n-epochs", type=int, default=20,
+    parser.add_argument("--n-epochs", type=int, default=10,
             help="number of training epochs")
     parser.add_argument("--n-hidden", type=int, default=16,
             help="number of hidden gcn units")

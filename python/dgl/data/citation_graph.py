@@ -164,7 +164,8 @@ class GCNSyntheticDataset(object):
         num_nodes = self.graph.number_of_nodes()
         
         # generate features
-        self.features = rng.randn(num_nodes, num_feats).astype(np.float32)
+        #self.features = rng.randn(num_nodes, num_feats).astype(np.float32)
+        self.features = np.zeros((num_nodes, num_feats), dtype=np.float32)
 
         # generate labels
         self.labels = rng.randint(num_classes, size=num_nodes)
@@ -214,7 +215,8 @@ def load_synthetic(args):
             args.syn_nclasses,
             args.syn_train_ratio,
             args.syn_val_ratio,
-            args.syn_test_ratio)
+            args.syn_test_ratio,
+            args.syn_seed)
 
 def register_args(parser):
     # Args for synthetic graphs.
@@ -235,3 +237,5 @@ def register_args(parser):
             help='n in gnp random graph')
     parser.add_argument('--syn-gnp-p', type=float, default=0.0,
             help='p in gnp random graph')
+    parser.add_argument('--syn-seed', type=int, default=42,
+            help='random seed')
