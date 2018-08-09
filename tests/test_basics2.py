@@ -8,7 +8,7 @@ def message_not_called(hu, e_uv):
     assert False
     return hu
 
-def reduce_not_called(msgs):
+def reduce_not_called(h, msgs):
     assert False
     return 0
 
@@ -70,18 +70,7 @@ def test_recv_no_pred():
     g.register_update_func(update_no_msg)
     g.recv(0)
 
-def test_skipped_reduce():
-    g = generate_graph()
-    check(g, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-    g.register_message_func(message_func)
-    g.register_reduce_func(reduce_not_called)
-    g.register_update_func(update_func)
-    g.sendto(0, 1)
-    g.recv(1)
-    check(g, [1, 3, 3, 4, 5, 6, 7, 8, 9, 10])
-
 if __name__ == '__main__':
     test_no_msg_update()
     test_double_recv()
     test_recv_no_pred()
-    test_skipped_reduce()
