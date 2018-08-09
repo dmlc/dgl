@@ -134,9 +134,9 @@ class DGLGraph(DiGraph):
         else:
             if isinstance(hu, dict):
                 for key, val in hu.items():
-                    self._node_frame[key][u] = val
+                    self._node_frame[key] = F.scatter_row(self._node_frame[key], u, val)
             else:
-                self._node_frame[__REPR__][u] = hu
+                self._node_frame[__REPR__] = F.scatter_row(self._node_frame[__REPR__], u, hu)
 
     def get_n_repr(self, u=ALL):
         """Get node(s) representation.
@@ -214,9 +214,9 @@ class DGLGraph(DiGraph):
             eid = self.cached_graph.get_edge_id(u, v)
             if isinstance(h_uv, dict):
                 for key, val in h_uv.items():
-                    self._edge_frame[key][eid] = val
+                    self._edge_frame[key] = F.scatter_row(self._edge_frame[key], eid, val)
             else:
-                self._edge_frame[__REPR__][eid] = h_uv
+                self._edge_frame[__REPR__] = F.scatter_row(self._edge_frame[__REPR__], eid, h_uv)
 
     def set_e_repr_by_id(self, h_uv, eid=ALL):
         """Set edge(s) representation by edge id.
@@ -249,9 +249,9 @@ class DGLGraph(DiGraph):
         else:
             if isinstance(h_uv, dict):
                 for key, val in h_uv.items():
-                    self._edge_frame[key][eid] = val
+                    self._edge_frame[key] = F.scatter_row(self._edge_frame[key], eid, val)
             else:
-                self._edge_frame[__REPR__][eid] = h_uv
+                self._edge_frame[__REPR__] = F.scatter_row(self._edge_frame[__REPR__], eid, h_uv)
 
     def get_e_repr(self, u=ALL, v=ALL):
         """Get node(s) representation.
