@@ -12,6 +12,7 @@ import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import dgl
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 
@@ -85,7 +86,7 @@ class GAT(nn.Module):
                  residual):
         super(GAT, self).__init__()
         self.g = g
-        self.num_layers = num_layers + 1 # one extra output projection
+        self.num_layers = num_layers
         self.num_heads = num_heads
         self.prp = nn.ModuleList()
         self.red = nn.ModuleList()
@@ -104,15 +105,14 @@ class GAT(nn.Module):
                 self.fnl.append(GATFinalize(hid, num_hidden * num_heads,
                                             num_hidden, activation, residual))
         # output projection
-        for hid in range(num_heads):
-            self.prp.append(GATPrepare(num_hidden * num_heads, num_classes, in_drop))
-            self.red.append(GATReduce(attn_drop))
-            self.fnl.append(GATFinalize(hid, num_hidden * num_heads,
-                                        num_classes, activation, residual))
+        self.prp.append(GATPrepare(num_hidden * num_heads, num_classes, in_drop))
+        self.red.append(GATReduce(attn_drop))
+        self.fnl.append(GATFinalize(0, num_hidden * num_heads,
+                                    num_classes, activation, residual))
         # sanity check
-        assert len(self.prp) == self.num_layers * self.num_heads
-        assert len(self.red) == self.num_layers * self.num_heads
-        assert len(self.fnl) == self.num_layers * self.num_heads
+        assert len(self.prp) == self.num_layers * self.num_heads + 1
+        assert len(self.red) == self.num_layers * self.num_heads + 1
+        assert len(self.fnl) == self.num_layers * self.num_heads + 1
 
     def forward(self, features):
         last = features
@@ -124,12 +124,13 @@ class GAT(nn.Module):
                 # message passing
                 self.g.update_all(gat_message, self.red[i], self.fnl[i], batchable=True)
             # merge all the heads
-            if l < self.num_layers - 1:
-                agg = lambda lst : torch.cat(lst, dim=1)
-            else:
-                agg = sum
-            last = agg([self.g.pop_n_repr('head%d' % hid) for hid in range(self.num_heads)])
-        return last
+            last = torch.cat(
+                    [self.g.pop_n_repr('head%d' % hid) for hid in range(self.num_heads)],
+                    dim=1)
+        # output projection
+        self.g.set_n_repr(self.prp[-1](last))
+        self.g.update_all(gat_message, self.red[-1], self.fnl[-1], batchable=True)
+        return self.g.pop_n_repr('head0')
 
 def main(args):
     # load and preprocess dataset
@@ -209,11 +210,11 @@ if __name__ == '__main__':
             help="size of hidden units")
     parser.add_argument("--residual", action="store_false",
             help="use residual connection")
-    parser.add_argument("--in-drop", type=float, default=.2,
+    parser.add_argument("--in-drop", type=float, default=.6,
             help="input feature dropout")
-    parser.add_argument("--attn-drop", type=float, default=.2,
+    parser.add_argument("--attn-drop", type=float, default=.6,
             help="attention dropout")
-    parser.add_argument("--lr", type=float, default=0.001,
+    parser.add_argument("--lr", type=float, default=0.005,
             help="learning rate")
     args = parser.parse_args()
     print(args)
