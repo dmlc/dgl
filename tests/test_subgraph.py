@@ -14,3 +14,13 @@ g.set_e_repr(e_repr)
 sg = g.subgraph([0, 1])
 assert th.max(th.abs(sg.get_n_repr() - n_repr[:2])) < eps
 assert th.max(th.abs(sg.get_e_repr() - e_repr[:1])) < eps
+
+sg_n_repr = n_repr[:2]
+sg.set_n_repr(sg_n_repr)
+n_repr.zero_()
+assert th.max(th.abs(sg.get_n_repr() - sg_n_repr)) < eps
+
+sg_e_repr = n_repr[:1]
+sg.set_e_repr(sg_e_repr)
+e_repr.zero_()
+assert th.max(th.abs(sg.get_e_repr() - sg_e_repr)) < eps
