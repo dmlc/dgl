@@ -6,6 +6,7 @@ from collections import MutableMapping
 import networkx as nx
 from networkx.classes.digraph import DiGraph
 
+import dgl
 from dgl.base import ALL, is_all
 import dgl.backend as F
 from dgl.backend import Tensor
@@ -309,6 +310,14 @@ class DGLGraph(DiGraph):
                 return self._edge_frame[__REPR__][eid]
             else:
                 return self._edge_frame.select_rows(eid)
+
+    def subgraph(self, nodes):
+        induced_nodes = nx.filters.show_nodes(self.nbunch_iter(nodes))
+        DGLSubGraph = dgl.graphviews.DGLSubGraph
+        # if already a subgraph, don't make a chain
+        if hasattr(self, '_NODE_OK'):
+            return DGLSubGraph(self._graph, induced_nodes, self._EDGE_OK)
+        return DGLSubGraph(self, induced_nodes)
 
     def set_device(self, ctx):
         """Set device context for this graph.
