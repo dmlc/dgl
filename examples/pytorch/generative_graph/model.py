@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import argparse
+from util import DataLoader, pad_ground_truth
 
 class MLP(nn.Module):
     def __init__(self, num_hidden, num_classes, num_layers):
@@ -73,7 +74,7 @@ class DGMG(nn.Module):
             hu = hV.narrow(0, 0, n - 1)
             huv = torch.cat((hu, hv.expand(n - 1, -1)), dim=1)
             s = F.softmax(self.fs(huv), dim=0).view(1, -1)
-            dst = torch.LongTensor([self.ground_truth[self.step][1]])
+            dst = torch.LongTensor([self.ground_truth[self.step][0]])
             if self.use_cuda:
                 dst = dst.cuda()
             self.loss += self.loss_func(s, dst)
@@ -155,7 +156,7 @@ def main(args):
     #     3
 
     # ground truth
-    ground_truth = [0, 1, (1, 0), 2, 3, (3, 0), (3, 1), (3, 2)]
+    # ground_truth = [0, 1, (0, 1), 2, 3, (0, 3), (1, 3), (2, 3)]
 
     g = DGLGraph()
 
@@ -176,12 +177,18 @@ def main(args):
     # training loop
     for ep in range(args.n_epochs):
         print("epoch: {}".format(ep))
-        optimizer.zero_grad()
-        # create new empty graphs
-        model.forward(True, ground_truth)
-        print("loss: {}".format(model.loss.item()))
-        model.loss.backward()
-        optimizer.step()
+        for idx, batch in enumerate(DataLoader(args.dataset, args.batch_size)):
+            label, node_select, mask = pad_ground_truth(batch)
+            if use_cuda:
+                label = label.cuda()
+                node_select = node_select.cuda()
+                mask = mask.cuda()
+            optimizer.zero_grad()
+            # create new empty graphs
+            model.forward(True, batch[0])
+            print("iter {}: loss {}".format(idx, model.loss.item()))
+            model.loss.backward()
+            optimizer.step()
 
 
 if __name__ == '__main__':
@@ -192,7 +199,7 @@ if __name__ == '__main__':
             help="gpu")
     parser.add_argument("--lr", type=float, default=1e-3,
             help="learning rate")
-    parser.add_argument("--n-epochs", type=int, default=20,
+    parser.add_argument("--n-epochs", type=int, default=1,
             help="number of training epochs")
     parser.add_argument("--n-hidden-node", type=int, default=16,
             help="number of hidden DGMG node units")
@@ -200,6 +207,10 @@ if __name__ == '__main__':
             help="number of hidden DGMG graph units")
     parser.add_argument("--n-layers", type=int, default=2,
             help="number of hidden gcn layers")
+    parser.add_argument("--dataset", type=str, default='samples.p',
+            help="dataset pickle file")
+    parser.add_argument("--batch-size", type=int, default=2,
+            help="batch size")
     args = parser.parse_args()
     print(args)
 
