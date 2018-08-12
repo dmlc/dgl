@@ -1,5 +1,4 @@
 import dgl
-from dgl.nn import GCN
 from dgl.graph import DGLGraph
 import torch
 import torch.nn as nn
@@ -7,6 +6,7 @@ import torch.nn.functional as F
 import numpy as np
 import argparse
 from util import DataLoader, pad_ground_truth
+from batch import batch
 
 class MLP(nn.Module):
     def __init__(self, num_hidden, num_classes, num_layers):
@@ -24,15 +24,25 @@ class MLP(nn.Module):
         return self.layers(x)
 
 
+class GCN(dgl.nn.GCN):
+    def forward(self):
+        # assuming set_n_repr called outside
+        for layer in self.layers:
+            if self.dropout:
+                val = F.dropout(self.g.get_n_repr(), p=self.dropout)
+                self.g.set_n_repr(val)
+            self.g.update_all('from_src', 'sum', layer, batchable=True)
+
+
 class DGMG(nn.Module):
-    def __init__(self, g, node_num_hidden, graph_num_hidden, T, num_MLP_layers=1, loss_func=None, dropout=0.0, use_cuda=False):
+    def __init__(self, node_num_hidden, graph_num_hidden, T, num_MLP_layers=1, loss_func=None, dropout=0.0, use_cuda=False):
         super(DGMG, self).__init__()
         # hidden size of node and graph
-        self.g = g
+        self.batched_graph = DGLGraph() # batched graph
         self.node_num_hidden = node_num_hidden
         self.graph_num_hidden = graph_num_hidden
         # use GCN as a simple propagation model
-        self.gcn = GCN(g, node_num_hidden, node_num_hidden, None, T, F.relu, dropout, projection=False)
+        self.gcn = GCN(self.batched_graph, node_num_hidden, node_num_hidden, None, T, F.relu, dropout, projection=False)
         # project node repr to graph repr (higher dimension)
         self.graph_project = nn.Linear(node_num_hidden, graph_num_hidden)
         # add node
@@ -47,118 +57,139 @@ class DGMG(nn.Module):
         self.loss_func = loss_func
         # use gpu
         self.use_cuda = use_cuda
-        # create 1-label and 0-label for training use
-        self.label1 = torch.ones(1, dtype=torch.long)
-        self.label0 = torch.zeros(1, dtype=torch.long)
-        if self.use_cuda:
-            self.label1 = self.label1.cuda()
-            self.label0 = self.label0.cuda()
 
-    def decide_add_node(self, hG, label=1):
-        h = self.fan(hG)
+    def decide_add_node(self, hGs):
+        h = self.fan(hGs)
         p = F.softmax(h, dim=1)
         # calc loss
-        label = self.label1 if label == 1 else self.label0
-        self.loss += self.loss_func(p, label)
+        self.loss += self.loss_func(p, self.labels[self.step], self.masks[self.step])
 
-    def decide_add_edge(self, hG, hV, label=1):
-        n = len(self.g)
-        hv = hV.narrow(0, n - 1, 1)
-        h = self.fae(torch.cat((hG, hv), dim=1))
+    def decide_add_edge(self, hGs, graph_list):
+        hvs = [g.get_n_repr(len(g) - 1) for g in graph_list]
+        h = self.fae(torch.cat((hGs, torch.cat(hvs, dim=0)), dim=1))
         p = F.sigmoid(h)
         p = torch.cat([1 - p, p], dim=1)
-        if label == 1:
-            self.loss += self.loss_func(p, self.label1)
+        self.loss += self.loss_func(p, self.labels[self.step], self.masks[self.step])
 
-            # select node to add edge
-            hu = hV.narrow(0, 0, n - 1)
-            huv = torch.cat((hu, hv.expand(n - 1, -1)), dim=1)
-            s = F.softmax(self.fs(huv), dim=0).view(1, -1)
-            dst = torch.LongTensor([self.ground_truth[self.step][0]])
-            if self.use_cuda:
-                dst = dst.cuda()
-            self.loss += self.loss_func(s, dst)
+        # select node to add edge
+        for idx, g in enumerate(graph_list):
+            if self.labels[self.step][idx].item() == 1:
+                n = len(g)
+                hV = g.get_n_repr()
+                hu = hV.narrow(0, 0, n - 1)
+                huv = torch.cat((hu, hvs[idx].expand(n - 1, -1)), dim=1)
+                s = F.softmax(self.fs(huv), dim=0).view(1, -1)
+                dst = self.node_select[self.step][idx].view(-1)
+                self.loss += self.loss_func(s, dst)
+
+                # add edge
+                src = n - 1
+                dst = dst.item()
+                g.add_edge(src, dst)
+                g.add_edge(dst, src)
+
+    def move2cuda(x):
+        # recursively move a object to cuda
+        if isinstance(x, torch.Tensor):
+            # if Tensor, move directly
+            return x.cuda()
         else:
-            self.loss += self.loss_func(p, self.label0)
+            try:
+                # iterable, recursively move each element
+                x = [move2cuda(i) for i in x]
+                return x
+            except:
+                # don't do anything for other types like basic types
+                return x
 
-    def forward(self, training=False, ground_truth=None):
+    def update_graph_repr(self, hG, graph_list):
+        new_hGs = []
+        for idx, g in enumerate(graph_list):
+            features = g.get_n_repr()
+            hG = torch.sum(self.graph_project(features), 0, keepdim=True)
+            new_hGs.append(hG)
+        return torch.cat(new_hGs, dim=0)
+
+    def forward(self, training=False, batch_size=1, ground_truth=None):
         if training:
             assert(ground_truth is not None)
             # record ground_truth ordering
-            self.ground_truth = ground_truth
+            if self.use_cuda:
+                ground_truth = move2cuda(ground_truth)
+            nsteps, self.labels, self.node_select, self.masks = ground_truth
             # init loss
             self.loss = 0
         else:
             raise NotImplementedError("inference is not implemented yet")
 
-        # init
-        self.g.clear()
-        hV = torch.zeros(0, self.node_num_hidden)
+        # clear batched graph
+        self.batched_graph.clear()
+
+        # create empty graph for each sample
+        graph_list = [DGLGraph() for _ in range(batch_size)]
+
+        # initial node repr for each sample
+        hVs = [torch.zeros(0, self.node_num_hidden) for _ in range(batch_size)]
+
+        # initial graph repr for each sample, set to zero tensor
         # FIXME: what's the initial grpah repr for empty graph?
-        hG = torch.zeros(1, self.graph_num_hidden)
+        hGs = torch.zeros(batch_size, self.graph_num_hidden)
 
         if self.use_cuda:
-            hV = hV.cuda()
-            hG = hG.cuda()
+            hVs = move2cuda(hVs)
+            hGs = move2cuda(hGs)
 
-        # step count
         self.step = 0
-
-        nsteps = len(self.ground_truth)
-
         while self.step < nsteps:
-            assert(not isinstance(self.ground_truth[self.step], tuple)) # add nodes
+            if self.step % 2 == 0: # add node step
 
-            # decide whether to add node
-            self.decide_add_node(hG, 1)
+                if (self.masks[self.step] == 1).nonzero().nelement() > 0:
+                    # decide whether to add node
+                    self.decide_add_node(hGs)
 
-            # add node
-            self.g.add_node(self.ground_truth[self.step])
+                    # calculate initial state for new node
+                    hvs = self.finit(hGs)
 
-            # calculate initial state for new node
-            hv = self.finit(hG)
-            hV = torch.cat((hV, hv), dim=0)
+                    # add node
+                    update = []
+                    for idx, g in enumerate(graph_list):
+                        if self.labels[self.step][idx].item() == 1:
+                            g.add_node(len(g))
+                            if self.step > 0:
+                                hV = g.pop_n_repr()
+                            else:
+                                hV = hVs[idx]
+                            hV = torch.cat((hV, hvs[idx:idx+1]), dim=0)
+                            g.set_n_repr(hV)
 
-            # get new graph repr
-            hG = torch.sum(self.graph_project(hV), 0, keepdim=True)
+                    # get new graph repr
+                    hGs = self.update_graph_repr(hGs, graph_list)
+                else:
+                    # all samples are masked
+                    pass
+
+            else: # add edge step
+
+                # decide whether to add edge, which edge to add
+                # and also add edge
+                self.decide_add_edge(hGs, graph_list)
+
+                # propagate
+                to_update = (self.labels[self.step] == 1).nonzero()
+                if to_update.nelement() > 0:
+                    # at least one graph needs update
+                    to_update = [graph_list[i] for i in to_update]
+                    _, unbatch, _, _ = batch(to_update, self.batched_graph)
+                    self.gcn.forward()
+                    unbatch(self.batched_graph)
+
+                    # get new graph repr
+                    hGs = self.update_graph_repr(hGs, graph_list)
 
             self.step += 1
 
-            # decide whether to add edges (for at least once)
-            while self.step < nsteps and isinstance(self.ground_truth[self.step], tuple):
-
-                # decide whether to add edge, and which edge to add
-                self.decide_add_edge(hG, hV, 1)
-
-                # add edge
-                self.g.add_edge(*self.ground_truth[self.step])
-
-                # propagate
-                hV = self.gcn.forward(hV)
-
-                # get new graph repr
-                hG = torch.sum(self.graph_project(hV), 0, keepdim=True)
-
-                self.step += 1
-
-            # decide not to add edges
-            self.decide_add_edge(hG, hV, 0)
-
-        # decide not to add nodes any more
-        self.decide_add_node(hG, 0)
-
 
 def main(args):
-    # graph
-    # 0---1   2
-    #  \  |  /
-    #   \ | /
-    #     3
-
-    # ground truth
-    # ground_truth = [0, 1, (0, 1), 2, 3, (0, 3), (1, 3), (2, 3)]
-
-    g = DGLGraph()
 
     use_cuda = False
     if torch.cuda.is_available() and args.gpu >= 0:
@@ -166,9 +197,17 @@ def main(args):
         use_cuda = True
         g.set_device(dgl.gpu(args.gpu))
 
-    #model = DGMG(node_num_hidden, graph_num_hidden, T, loss_func=masked_loss_func)
-    model = DGMG(g, args.n_hidden_node, args.n_hidden_graph, args.n_layers,
-                 loss_func=F.cross_entropy, dropout=args.dropout, use_cuda=use_cuda)
+    def masked_cross_entropy(x, label, mask=None):
+        # x: propability tensor, i.e. after softmax
+
+        x = torch.log(x)
+        if mask is not None:
+            x = x[mask]
+            label = label[mask]
+        return F.nll_loss(x, label)
+
+    model = DGMG(args.n_hidden_node, args.n_hidden_graph, args.n_layers,
+                 loss_func=masked_cross_entropy, dropout=args.dropout, use_cuda=use_cuda)
     if use_cuda:
         model.cuda()
 
@@ -178,14 +217,10 @@ def main(args):
     for ep in range(args.n_epochs):
         print("epoch: {}".format(ep))
         for idx, batch in enumerate(DataLoader(args.dataset, args.batch_size)):
-            label, node_select, mask = pad_ground_truth(batch)
-            if use_cuda:
-                label = label.cuda()
-                node_select = node_select.cuda()
-                mask = mask.cuda()
+            ground_truth = pad_ground_truth(batch)
             optimizer.zero_grad()
             # create new empty graphs
-            model.forward(True, batch[0])
+            model.forward(True, args.batch_size, ground_truth)
             print("iter {}: loss {}".format(idx, model.loss.item()))
             model.loss.backward()
             optimizer.step()
@@ -199,17 +234,17 @@ if __name__ == '__main__':
             help="gpu")
     parser.add_argument("--lr", type=float, default=1e-3,
             help="learning rate")
-    parser.add_argument("--n-epochs", type=int, default=1,
+    parser.add_argument("--n-epochs", type=int, default=20,
             help="number of training epochs")
     parser.add_argument("--n-hidden-node", type=int, default=16,
             help="number of hidden DGMG node units")
-    parser.add_argument("--n-hidden-graph", type=int, default=32,
+    parser.add_argument("--n-hidden-graph", type=int, default=4,
             help="number of hidden DGMG graph units")
     parser.add_argument("--n-layers", type=int, default=2,
             help="number of hidden gcn layers")
     parser.add_argument("--dataset", type=str, default='samples.p',
             help="dataset pickle file")
-    parser.add_argument("--batch-size", type=int, default=2,
+    parser.add_argument("--batch-size", type=int, default=32,
             help="batch size")
     args = parser.parse_args()
     print(args)
