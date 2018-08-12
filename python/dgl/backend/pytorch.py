@@ -32,8 +32,8 @@ def asnumpy(a):
 def pack(tensors):
     return th.cat(tensors)
 
-def unpack(x):
-    return th.split(x, 1)
+def unpack(x, indices_or_sections=1):
+    return th.split(x, indices_or_sections)
 
 def shape(x):
     return x.shape
