@@ -8,7 +8,7 @@ import numpy as np
 def batch(graph_list, newgrh=None,  node_attrs=None, edge_attrs=None):
     """Batch a list of DGLGraphs into one single graph.
     The structure of merged graph is assumed to be immutable, or unbatch may fail
-    The graph_list will be reused when merged graph is split, so they should not be mutated.
+    The graph_list will be reused when merged graph is split, so their structure should not be mutated either.
 
     Parameters
     ----------
@@ -43,8 +43,6 @@ def batch(graph_list, newgrh=None,  node_attrs=None, edge_attrs=None):
     edge_offset = np.cumsum([0] + num_edges)
 
     # in-order add relabeled nodes
-    new_node_list = [np.array(g.nodes) + offset
-                        for g, offset in zip(graph_list, node_offset[:-1])]
     newgrh.add_nodes_from(range(node_offset[-1]))
 
     # in-order add relabeled edges
@@ -94,7 +92,7 @@ def batch(graph_list, newgrh=None,  node_attrs=None, edge_attrs=None):
         num_graphs = len(graph_list)
         # split and set node attrs
         if len(node_attrs) > 0:
-            hu = [{}] * num_graphs # node attr dict for each graph
+            hu = [{} for _ in range(num_graphs)] # node attr dict for each graph
             for key in node_attrs:
                 vals = F.unpack(graph_batch.pop_n_repr(key), num_nodes)
                 for h, val in zip(hu, vals):
@@ -114,4 +112,26 @@ def batch(graph_list, newgrh=None,  node_attrs=None, edge_attrs=None):
 
         return graph_list
 
-    return newgrh, unbatch, new_node_list, new_edge_list
+    graph_idx = {}
+    for idx, g in enumerate(graph_list):
+        graph_idx[g] = idx
+
+    def node_converter(g, nid):
+        """ convert nid of g to new node id
+        """
+        idx = graph_idx[g]
+        offset = node_offset[idx]
+        if isinstance(nid, int):
+            return nid + offset
+        else:
+            return np.array(nid) + offset
+
+    def edge_converter(g, src, dst):
+        idx = graph_idx[g]
+        offset = node_offset[idx]
+        if isinstance(src, int):
+            return src + offset, dst + offset
+        else:
+            return np.array(src) + offset, np.array(dst) + offset
+
+    return newgrh, unbatch, node_converter, edge_converter

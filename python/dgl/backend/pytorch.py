@@ -41,6 +41,7 @@ def shape(x):
 def isinteger(x):
     return x.dtype in [th.int, th.int8, th.int16, th.int32, th.int64]
 
+# FIXME (lingfan): th.unique requires Tensor, so it does not work with container
 unique = th.unique
 
 def gather_row(data, row_index):
