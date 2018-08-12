@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import argparse
-from util import DataLoader
+from util import DataLoader, elapsed
 from batch import batch
 import time
 
@@ -202,7 +202,6 @@ def main(args):
 
     def masked_cross_entropy(x, label, mask=None):
         # x: propability tensor, i.e. after softmax
-
         x = torch.log(x)
         if mask is not None:
             x = x[mask]
@@ -226,7 +225,7 @@ def main(args):
             model.forward(True, args.batch_size, ground_truth)
             end = time.time()
             print("iter {}: loss {}".format(idx, model.loss.item()))
-            print(end - start)
+            elapsed("model forward", start, end)
             model.loss.backward()
             optimizer.step()
 
@@ -243,7 +242,7 @@ if __name__ == '__main__':
             help="number of training epochs")
     parser.add_argument("--n-hidden-node", type=int, default=16,
             help="number of hidden DGMG node units")
-    parser.add_argument("--n-hidden-graph", type=int, default=4,
+    parser.add_argument("--n-hidden-graph", type=int, default=32,
             help="number of hidden DGMG graph units")
     parser.add_argument("--n-layers", type=int, default=2,
             help="number of hidden gcn layers")
