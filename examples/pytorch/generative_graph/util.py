@@ -15,7 +15,7 @@ def convert_graph_to_ordering(g):
 def generate_dataset():
     n = 15
     m = 2
-    n_samples = 1000
+    n_samples = 1024
     samples = []
     for _ in range(n_samples):
         g = nx.barabasi_albert_graph(n, m)
@@ -67,7 +67,7 @@ def expand_ground_truth(ordering):
             label.append(1)
             node_list.append(i)
         else:
-            assert(instance(i, tuple))
+            assert(isinstance(i, tuple))
             action.append(1)
             label.append(1)
             node_list.append(i[0]) # select src node to add
@@ -82,34 +82,36 @@ def pad_ground_truth(batch):
     a = []
     bz = len(batch)
     for sample in batch:
-        a.append(expand_ground_truth)
+        a.append(expand_ground_truth(sample))
     length, action, label, node_list = zip(*a)
     step = [0] * bz
     new_label = []
     new_node_list = []
     mask_for_batch = []
     next_action = 0
+    count = 0
     while any([step[i] < length[i] for i in range(bz)]):
         node_select = []
         label_select = []
         mask = []
         for sample_idx in range(bz):
-            if step[sample_idx] < length[ample_idx] and \
+            if step[sample_idx] < length[sample_idx] and \
                     action[sample_idx][step[sample_idx]] == next_action:
-                mask.append(0)
-                node_select.append(node_list[i][step[sample_idx]])
-                label_select.append(label[i][step[sample_idx]])
+                mask.append(1)
+                node_select.append(node_list[sample_idx][step[sample_idx]])
+                label_select.append(label[sample_idx][step[sample_idx]])
                 step[sample_idx] += 1
             else:
-                mask.append(1)
+                mask.append(0)
                 node_select.append(-1)
-                label_select.append(-1)
+                label_select.append(0)
         next_action = 1 - next_action
         new_node_list.append(torch.LongTensor(node_select))
         mask_for_batch.append(torch.ByteTensor(mask))
         new_label.append(torch.LongTensor(label_select))
+        count += 1
 
-    return new_label, new_node_list, mask_for_batch
+    return count, new_label, new_node_list, mask_for_batch
 
 if __name__ == '__main__':
     generate_dataset()
