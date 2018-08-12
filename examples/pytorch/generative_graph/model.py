@@ -5,8 +5,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import argparse
-from util import DataLoader, pad_ground_truth
+from util import DataLoader
 from batch import batch
+import time
 
 class MLP(nn.Module):
     def __init__(self, num_hidden, num_classes, num_layers):
@@ -34,6 +35,21 @@ class GCN(dgl.nn.GCN):
             self.g.update_all('from_src', 'sum', layer, batchable=True)
 
 
+def move2cuda(x):
+    # recursively move a object to cuda
+    if isinstance(x, torch.Tensor):
+        # if Tensor, move directly
+        return x.cuda()
+    else:
+        try:
+            # iterable, recursively move each element
+            x = [move2cuda(i) for i in x]
+            return x
+        except:
+            # don't do anything for other types like basic types
+            return x
+
+
 class DGMG(nn.Module):
     def __init__(self, node_num_hidden, graph_num_hidden, T, num_MLP_layers=1, loss_func=None, dropout=0.0, use_cuda=False):
         super(DGMG, self).__init__()
@@ -57,6 +73,8 @@ class DGMG(nn.Module):
         self.loss_func = loss_func
         # use gpu
         self.use_cuda = use_cuda
+        if use_cuda:
+            self.batched_graph.set_device(dgl.gpu(args.gpu))
 
     def decide_add_node(self, hGs):
         h = self.fan(hGs)
@@ -87,20 +105,6 @@ class DGMG(nn.Module):
                 dst = dst.item()
                 g.add_edge(src, dst)
                 g.add_edge(dst, src)
-
-    def move2cuda(x):
-        # recursively move a object to cuda
-        if isinstance(x, torch.Tensor):
-            # if Tensor, move directly
-            return x.cuda()
-        else:
-            try:
-                # iterable, recursively move each element
-                x = [move2cuda(i) for i in x]
-                return x
-            except:
-                # don't do anything for other types like basic types
-                return x
 
     def update_graph_repr(self, hG, graph_list):
         new_hGs = []
@@ -195,7 +199,6 @@ def main(args):
     if torch.cuda.is_available() and args.gpu >= 0:
         torch.cuda.set_device(args.gpu)
         use_cuda = True
-        g.set_device(dgl.gpu(args.gpu))
 
     def masked_cross_entropy(x, label, mask=None):
         # x: propability tensor, i.e. after softmax
@@ -216,12 +219,14 @@ def main(args):
     # training loop
     for ep in range(args.n_epochs):
         print("epoch: {}".format(ep))
-        for idx, batch in enumerate(DataLoader(args.dataset, args.batch_size)):
-            ground_truth = pad_ground_truth(batch)
+        for idx, ground_truth in enumerate(DataLoader(args.dataset, args.batch_size)):
             optimizer.zero_grad()
             # create new empty graphs
+            start = time.time()
             model.forward(True, args.batch_size, ground_truth)
+            end = time.time()
             print("iter {}: loss {}".format(idx, model.loss.item()))
+            print(end - start)
             model.loss.backward()
             optimizer.step()
 
@@ -232,7 +237,7 @@ if __name__ == '__main__':
             help="dropout probability")
     parser.add_argument("--gpu", type=int, default=-1,
             help="gpu")
-    parser.add_argument("--lr", type=float, default=1e-3,
+    parser.add_argument("--lr", type=float, default=1e-2,
             help="learning rate")
     parser.add_argument("--n-epochs", type=int, default=20,
             help="number of training epochs")

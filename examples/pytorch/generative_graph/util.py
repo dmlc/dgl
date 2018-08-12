@@ -26,28 +26,21 @@ def generate_dataset():
 
 class DataLoader(object):
     def __init__(self, fname, batch_size, shuffle=True):
-        self.batch_size = batch_size
         with open(fname, 'rb') as f:
-            self.datasets = pickle.load(f)
+            datasets = pickle.load(f)
         if shuffle:
-            random.shuffle(self.datasets)
-        self.num = len(self.datasets) // self.batch_size * self.batch_size
-        self.index = 0
+            random.shuffle(datasets)
+        num = len(datasets) // batch_size
+
+        # pre-process dataset
+        self.ground_truth = []
+        for i in range(num):
+            self.ground_truth.append(
+                    pad_ground_truth(datasets[i*batch_size: (i+1)*batch_size]))
 
     def __iter__(self):
-        return self
+        return iter(self.ground_truth)
 
-    def __next__(self):
-        if self.index >= self.num:
-            raise StopIteration
-        else:
-            start = self.index
-            self.index += self.batch_size
-            return self.datasets[start: self.index]
-
-    # for python 2
-    def next(self):
-        return self.__next__()
 
 def expand_ground_truth(ordering):
     node_list = []
