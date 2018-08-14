@@ -1,6 +1,5 @@
 import networkx as nx
 import dgl
-from batch import batch
 import torch
 import numpy as np
 
@@ -54,33 +53,63 @@ def test_batch_unbatch():
     f1 = t1.get_n_repr()
     f2 = t2.get_n_repr()
 
-    bg, unbatch, node_map, edge_map = batch([t1, t2])
-    unbatch(bg)
+    bg = dgl.batch([t1, t2])
+
+    # test immutability
+    for g in [bg, t1, t2]:
+        try:
+            g.add_node(len(g))
+            print("immutability test failed")
+        except:
+            print("pass")
+        try:
+            g.add_edge(len(g) - 2, len(g) - 1)
+            print("immutability test failed")
+        except:
+            print("pass")
+
+    dgl.unbatch(bg)
 
     assert(f1.equal(t1.get_n_repr()))
     assert(f2.equal(t2.get_n_repr()))
     print("pass")
 
+    print("good")
+    # test immutability
+    for g in [t1, t2]:
+        try:
+            g.add_node(len(g))
+            print("pass")
+        except:
+            # FIXME: this will fail...
+            # print("immutability test failed")
+            pass
+        try:
+            g.add_edge(len(g) - 2, len(g) - 1)
+            print("pass")
+        except:
+            print("immutability test failed")
+
 def test_batch_sendrecv():
     t1 = tree1()
     t2 = tree2()
 
-    bg, unbatch, node_map, edge_map = batch([t1, t2])
+    bg = dgl.batch([t1, t2])
     bg.register_message_func(lambda src, edge: src, batchable=True)
     bg.register_reduce_func(lambda node, msgs: torch.sum(msgs, 1), batchable=True)
     bg.register_update_func(lambda node, accum: accum, batchable=True)
     e1 = [(3, 1), (4, 1)]
     e2 = [(2, 4), (0, 4)]
 
-    u1, v1 = edge_map(t1, *zip(*e1))
-    u2, v2 = edge_map(t2, *zip(*e2))
+    u1, v1 = bg.query_new_edge(t1, *zip(*e1))
+    u2, v2 = bg.query_new_edge(t2, *zip(*e2))
     u = np.concatenate((u1, u2)).tolist()
     v = np.concatenate((v1, v2)).tolist()
 
     bg.sendto(u, v)
     bg.recv(v)
 
-    unbatch(bg)
+    dgl.unbatch(bg)
     assert t1.get_n_repr()[1] == 7
     assert t2.get_n_repr()[4] == 2
     print("pass")
@@ -90,7 +119,7 @@ def test_batch_propagate():
     t1 = tree1()
     t2 = tree2()
 
-    bg, unbatch, _, edge_map = batch([t1, t2])
+    bg = dgl.batch([t1, t2])
     bg.register_message_func(lambda src, edge: src, batchable=True)
     bg.register_reduce_func(lambda node, msgs: torch.sum(msgs, 1), batchable=True)
     bg.register_update_func(lambda node, accum: accum, batchable=True)
@@ -101,8 +130,8 @@ def test_batch_propagate():
     # step 1
     e1 = [(3, 1), (4, 1)]
     e2 = [(2, 4), (0, 4)]
-    u1, v1 = edge_map(t1, *zip(*e1))
-    u2, v2 = edge_map(t2, *zip(*e2))
+    u1, v1 = bg.query_new_edge(t1, *zip(*e1))
+    u2, v2 = bg.query_new_edge(t2, *zip(*e2))
     u = torch.from_numpy(np.concatenate((u1, u2)))
     v = torch.from_numpy(np.concatenate((v1, v2)))
     order.append((u, v))
@@ -110,14 +139,14 @@ def test_batch_propagate():
     # step 2
     e1 = [(1, 0), (2, 0)]
     e2 = [(4, 1), (3, 1)]
-    u1, v1 = edge_map(t1, *zip(*e1))
-    u2, v2 = edge_map(t2, *zip(*e2))
+    u1, v1 = bg.query_new_edge(t1, *zip(*e1))
+    u2, v2 = bg.query_new_edge(t2, *zip(*e2))
     u = torch.from_numpy(np.concatenate((u1, u2)))
     v = torch.from_numpy(np.concatenate((v1, v2)))
     order.append((u, v))
 
     bg.propagate(iterator=order)
-    unbatch(bg)
+    dgl.unbatch(bg)
 
     assert t1.get_n_repr()[0] == 9
     assert t2.get_n_repr()[1] == 5

@@ -33,6 +33,7 @@ class _NodeDict(MutableMapping):
     def __getitem__(self, key):
         return self._dict[key]
     def __delitem__(self, key):
+        # FIXME: add callback
         del self._dict[key]
     def __len__(self):
         return len(self._dict)
@@ -51,6 +52,7 @@ class _AdjInnerDict(MutableMapping):
     def __getitem__(self, key):
         return self._dict[key]
     def __delitem__(self, key):
+        # FIXME: add callback
         del self._dict[key]
     def __len__(self):
         return len(self._dict)
@@ -79,6 +81,8 @@ class DGLGraph(DiGraph):
         self.adjlist_inner_dict_factory = lambda : _AdjInnerDict(self._add_edge_callback)
         self.edge_attr_dict_factory = dict
         self._context = context.cpu()
+        # whether graph structure is immutable
+        self._structure_immutable = False
         # call base class init
         super(DGLGraph, self).__init__(graph_data, **attr)
         self._init_state()
@@ -101,6 +105,12 @@ class DGLGraph(DiGraph):
     def clear(self):
         super(DGLGraph, self).clear()
         self._init_state()
+
+    def get_n_attr_list(self):
+        return self._node_frame.schemes
+
+    def get_e_attr_list(self):
+        return self._edge_frame.schemes
 
     def set_n_repr(self, hu, u=ALL):
         """Set node(s) representation.
@@ -981,11 +991,15 @@ class DGLGraph(DiGraph):
         return self.edges() if edges == ALL else edges
 
     def _add_node_callback(self, node):
+        assert not self._structure_immutable, \
+                "graph structure cannot be mutated"
         self._cached_graph = None
 
     def _add_edge_callback(self, u, v):
         # In networkx 2.1, two adjlists are maintained. One for succ, one for pred.
         # We only record once for the succ addition.
+        assert not self._structure_immutable, \
+                "graph structure cannot be mutated"
         if self._edge_cb_state:
             #print('New edge:', u, v)
             self._edge_list.append((u, v))
@@ -996,6 +1010,13 @@ class DGLGraph(DiGraph):
     def edge_list(self):
         """Return edges in the addition order."""
         return self._edge_list
+
+    def toggle_structure_immutable_on(self):
+        self._structure_immutable = True
+
+    def toggle_structure_immutable_off(self):
+        self._structure_immutable = False
+
 
 def _get_repr(attr_dict):
     if len(attr_dict) == 1 and __REPR__ in attr_dict:
