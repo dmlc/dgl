@@ -47,7 +47,7 @@ class DGMG(nn.Module):
         self.node_num_hidden = node_num_hidden
         self.graph_num_hidden = graph_num_hidden
         # use GCN as a simple propagation model
-        self.gcn = nn.Sequential(*[GCN(node_num_hidden, node_num_hidden, F.relu, dropout) for _ in range(T)])
+        self.gcn = nn.ModuleList([GCN(node_num_hidden, node_num_hidden, F.relu, dropout) for _ in range(T)])
         # project node repr to graph repr (higher dimension)
         self.graph_project = nn.Linear(node_num_hidden, graph_num_hidden)
         # add node
@@ -70,7 +70,7 @@ class DGMG(nn.Module):
         self.loss += self.loss_func(p, self.labels[self.step], self.masks[self.step])
 
     def decide_add_edge(self, hGs, graph_list):
-        hvs = [g.get_n_repr(len(g) - 1) for g in graph_list]
+        hvs = [g.get_n_repr(len(g) - 1)['h'] for g in graph_list]
         h = self.fae(torch.cat((hGs, torch.cat(hvs, dim=0)), dim=1))
         p = F.sigmoid(h)
         p = torch.cat([1 - p, p], dim=1)
@@ -80,7 +80,7 @@ class DGMG(nn.Module):
         for idx, g in enumerate(graph_list):
             if self.labels[self.step][idx].item() == 1:
                 n = len(g)
-                hV = g.get_n_repr()
+                hV = g.get_n_repr()['h']
                 hu = hV.narrow(0, 0, n - 1)
                 huv = torch.cat((hu, hvs[idx].expand(n - 1, -1)), dim=1)
                 s = F.softmax(self.fs(huv), dim=0).view(1, -1)
@@ -96,7 +96,7 @@ class DGMG(nn.Module):
     def update_graph_repr(self, hG, graph_list):
         new_hGs = []
         for idx, g in enumerate(graph_list):
-            features = g.get_n_repr()
+            features = g.get_n_repr()['h']
             hG = torch.sum(self.graph_project(features), 0, keepdim=True)
             new_hGs.append(hG)
         return torch.cat(new_hGs, dim=0)
@@ -126,6 +126,8 @@ class DGMG(nn.Module):
         if self.cuda_device >= 0:
             hVs = move2cuda(hVs)
             hGs = move2cuda(hGs)
+            for g in graph_list:
+                g.set_device(dgl.gpu(self.cuda_device))
 
         self.step = 0
         while self.step < nsteps:
@@ -142,13 +144,13 @@ class DGMG(nn.Module):
                     update = []
                     for idx, g in enumerate(graph_list):
                         if self.labels[self.step][idx].item() == 1:
-                            g.add_node(len(g))
                             if self.step > 0:
-                                hV = g.pop_n_repr()
+                                hV = g.pop_n_repr('h')
                             else:
                                 hV = hVs[idx]
                             hV = torch.cat((hV, hvs[idx:idx+1]), dim=0)
-                            g.set_n_repr(hV)
+                            g.add_node(len(g))
+                            g.set_n_repr({'h': hV})
 
                     # get new graph repr
                     hGs = self.update_graph_repr(hGs, graph_list)
@@ -171,7 +173,8 @@ class DGMG(nn.Module):
                     # FIXME: should dgl.batch() handle set_device?
                     if self.cuda_device >= 0:
                         batched_graph.set_device(dgl.gpu(self.cuda_device))
-                    self.gcn.forward(batched_graph)
+                    for gcn in self.gcn:
+                        gcn.forward(batched_graph, attribute='h')
                     dgl.unbatch(batched_graph)
 
                     # get new graph repr
