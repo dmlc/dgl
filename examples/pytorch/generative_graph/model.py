@@ -1,12 +1,12 @@
 import dgl
 from dgl.graph import DGLGraph
+from dgl.nn import GCN
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import argparse
 from util import DataLoader, elapsed
-from batch import batch
 import time
 
 class MLP(nn.Module):
@@ -25,16 +25,6 @@ class MLP(nn.Module):
         return self.layers(x)
 
 
-class GCN(dgl.nn.GCN):
-    def forward(self):
-        # assuming set_n_repr called outside
-        for layer in self.layers:
-            if self.dropout:
-                val = F.dropout(self.g.get_n_repr(), p=self.dropout)
-                self.g.set_n_repr(val)
-            self.g.update_all('from_src', 'sum', layer, batchable=True)
-
-
 def move2cuda(x):
     # recursively move a object to cuda
     if isinstance(x, torch.Tensor):
@@ -51,14 +41,13 @@ def move2cuda(x):
 
 
 class DGMG(nn.Module):
-    def __init__(self, node_num_hidden, graph_num_hidden, T, num_MLP_layers=1, loss_func=None, dropout=0.0, use_cuda=False):
+    def __init__(self, node_num_hidden, graph_num_hidden, T, num_MLP_layers=1, loss_func=None, dropout=0.0, cuda_device=-1):
         super(DGMG, self).__init__()
         # hidden size of node and graph
-        self.batched_graph = DGLGraph() # batched graph
         self.node_num_hidden = node_num_hidden
         self.graph_num_hidden = graph_num_hidden
         # use GCN as a simple propagation model
-        self.gcn = GCN(self.batched_graph, node_num_hidden, node_num_hidden, None, T, F.relu, dropout, projection=False)
+        self.gcn = nn.Sequential(*[GCN(node_num_hidden, node_num_hidden, F.relu, dropout) for _ in range(T)])
         # project node repr to graph repr (higher dimension)
         self.graph_project = nn.Linear(node_num_hidden, graph_num_hidden)
         # add node
@@ -72,9 +61,7 @@ class DGMG(nn.Module):
         # loss function
         self.loss_func = loss_func
         # use gpu
-        self.use_cuda = use_cuda
-        if use_cuda:
-            self.batched_graph.set_device(dgl.gpu(args.gpu))
+        self.cuda_device = cuda_device
 
     def decide_add_node(self, hGs):
         h = self.fan(hGs)
@@ -118,16 +105,13 @@ class DGMG(nn.Module):
         if training:
             assert(ground_truth is not None)
             # record ground_truth ordering
-            if self.use_cuda:
+            if self.cuda_device >= 0:
                 ground_truth = move2cuda(ground_truth)
             nsteps, self.labels, self.node_select, self.masks = ground_truth
             # init loss
             self.loss = 0
         else:
             raise NotImplementedError("inference is not implemented yet")
-
-        # clear batched graph
-        self.batched_graph.clear()
 
         # create empty graph for each sample
         graph_list = [DGLGraph() for _ in range(batch_size)]
@@ -139,7 +123,7 @@ class DGMG(nn.Module):
         # FIXME: what's the initial grpah repr for empty graph?
         hGs = torch.zeros(batch_size, self.graph_num_hidden)
 
-        if self.use_cuda:
+        if self.cuda_device >= 0:
             hVs = move2cuda(hVs)
             hGs = move2cuda(hGs)
 
@@ -183,9 +167,12 @@ class DGMG(nn.Module):
                 if to_update.nelement() > 0:
                     # at least one graph needs update
                     to_update = [graph_list[i] for i in to_update]
-                    _, unbatch, _, _ = batch(to_update, self.batched_graph)
-                    self.gcn.forward()
-                    unbatch(self.batched_graph)
+                    batched_graph = dgl.batch(to_update)
+                    # FIXME: should dgl.batch() handle set_device?
+                    if self.cuda_device >= 0:
+                        batched_graph.set_device(dgl.gpu(self.cuda_device))
+                    self.gcn.forward(batched_graph)
+                    dgl.unbatch(batched_graph)
 
                     # get new graph repr
                     hGs = self.update_graph_repr(hGs, graph_list)
@@ -195,10 +182,12 @@ class DGMG(nn.Module):
 
 def main(args):
 
-    use_cuda = False
     if torch.cuda.is_available() and args.gpu >= 0:
         torch.cuda.set_device(args.gpu)
-        use_cuda = True
+        cuda_device = args.gpu
+    else:
+        cuda_device = -1
+
 
     def masked_cross_entropy(x, label, mask=None):
         # x: propability tensor, i.e. after softmax
@@ -209,8 +198,8 @@ def main(args):
         return F.nll_loss(x, label)
 
     model = DGMG(args.n_hidden_node, args.n_hidden_graph, args.n_layers,
-                 loss_func=masked_cross_entropy, dropout=args.dropout, use_cuda=use_cuda)
-    if use_cuda:
+                 loss_func=masked_cross_entropy, dropout=args.dropout, cuda_device=cuda_device)
+    if cuda_device >= 0:
         model.cuda()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
