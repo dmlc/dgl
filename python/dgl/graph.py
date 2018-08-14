@@ -142,9 +142,9 @@ class DGLGraph(DiGraph):
         else:
             if isinstance(hu, dict):
                 for key, val in hu.items():
-                    self._node_frame[key][u] = val
+                    self._node_frame[key] = F.scatter_row(self._node_frame[key], u, val)
             else:
-                self._node_frame[__REPR__][u] = hu
+                self._node_frame[__REPR__] = F.scatter_row(self._node_frame[__REPR__], u, hu)
 
     def get_n_repr(self, u=ALL):
         """Get node(s) representation.
@@ -222,9 +222,9 @@ class DGLGraph(DiGraph):
             eid = self.cached_graph.get_edge_id(u, v)
             if isinstance(h_uv, dict):
                 for key, val in h_uv.items():
-                    self._edge_frame[key][eid] = val
+                    self._edge_frame[key] = F.scatter_row(self._edge_frame[key], eid, val)
             else:
-                self._edge_frame[__REPR__][eid] = h_uv
+                self._edge_frame[__REPR__] = F.scatter_row(self._edge_frame[__REPR__], eid, h_uv)
 
     def set_e_repr_by_id(self, h_uv, eid=ALL):
         """Set edge(s) representation by edge id.
@@ -257,9 +257,9 @@ class DGLGraph(DiGraph):
         else:
             if isinstance(h_uv, dict):
                 for key, val in h_uv.items():
-                    self._edge_frame[key][eid] = val
+                    self._edge_frame[key] = F.scatter_row(self._edge_frame[key], eid, val)
             else:
-                self._edge_frame[__REPR__][eid] = h_uv
+                self._edge_frame[__REPR__] = F.scatter_row(self._edge_frame[__REPR__], eid, h_uv)
 
     def get_e_repr(self, u=ALL, v=ALL):
         """Get node(s) representation.
@@ -588,8 +588,6 @@ class DGLGraph(DiGraph):
                           for vv in self.pred[uu] if __MSG__ in self.edges[vv, uu]]
             if len(msgs_batch) == 0:
                 msgs_reduced = None
-            elif len(msgs_batch) == 1:
-                msgs_reduced = msgs_batch[0]
             else:
                 msgs_reduced = f_reduce(_get_repr(self.nodes[uu]), msgs_batch)
             # update phase
@@ -597,17 +595,48 @@ class DGLGraph(DiGraph):
             _set_repr(self.nodes[uu], ret)
 
     def _batch_recv(self, v, reduce_func, update_func):
-        v_is_all = is_all(v)
-        if v_is_all:
+        f_update = update_func
+        reordered_v, all_reduced_msgs = self._batch_reduce(v, reduce_func)
+        if all_reduced_msgs is None:
+            # no message; only do recv.
+            if is_all(v):
+                self.set_n_repr(f_update(self.get_n_repr(), None))
+            else:
+                self.set_n_repr(f_update(self.get_n_repr(v), None), v)
+        else:
+            # Read the node states in the degree-bucketing order.
+            reordered_ns = self.get_n_repr(reordered_v)
+            new_ns = f_update(reordered_ns, all_reduced_msgs)
+            if is_all(v):
+                # First do reorder and then replace the whole column.
+                _, indices = F.sort(reordered_v)
+                # TODO(minjie): manually convert ids to context.
+                indices = F.to_context(indices, self.context)
+                if isinstance(new_ns, dict):
+                    for key, val in new_ns.items():
+                        self._node_frame[key] = F.gather_row(val, indices)
+                else:
+                    self._node_frame[__REPR__] = F.gather_row(new_ns, indices)
+            else:
+                # Use setter to do reorder.
+                self.set_n_repr(new_ns, reordered_v)
+
+    def _batch_reduce(self, v, reduce_func):
+        if is_all(v) and len(self._msg_frame) == 0:
+            # no message has been sent
+            return None, None
+
+        if is_all(v):
             v = list(range(self.number_of_nodes()))
         # sanity checks
         v = utils.convert_to_id_tensor(v)
         f_reduce = _get_reduce_func(reduce_func)
-        f_update = update_func
         # degree bucketing
         degrees, v_buckets = scheduler.degree_bucketing(self.msg_graph, v)
         reduced_msgs = []
         for deg, v_bkt in zip(degrees, v_buckets):
+            if deg == 0:
+                continue
             bkt_len = len(v_bkt)
             uu, vv = self.msg_graph.in_edges(v_bkt)
             in_msg_ids = self.msg_graph.get_edge_id(uu, vv)
@@ -627,31 +656,22 @@ class DGLGraph(DiGraph):
             dst_reprs = self.get_n_repr(v_bkt)
             reduced_msgs.append(f_reduce(dst_reprs, reshaped_in_msgs))
 
+        if len(reduced_msgs) == 0:
+            # no message has been sent to the specified node
+            return None, None
+
         # TODO: clear partial messages
         self.clear_messages()
 
         # Read the node states in the degree-bucketing order.
         reordered_v = F.pack(v_buckets)
-        reordered_ns = self.get_n_repr(reordered_v)
         # Pack all reduced msgs together
         if isinstance(reduced_msgs[0], dict):
             all_reduced_msgs = {key : F.pack(val) for key, val in reduced_msgs.items()}
         else:
             all_reduced_msgs = F.pack(reduced_msgs)
-        new_ns = f_update(reordered_ns, all_reduced_msgs)
-        if v_is_all:
-            # First do reorder and then replace the whole column.
-            _, indices = F.sort(reordered_v)
-            # TODO(minjie): manually convert ids to context.
-            indices = F.to_context(indices, self.context)
-            if isinstance(new_ns, dict):
-                for key, val in new_ns.items():
-                    self._node_frame[key] = F.gather_row(val, indices)
-            else:
-                self._node_frame[__REPR__] = F.gather_row(new_ns, indices)
-        else:
-            # Use setter to do reorder.
-            self.set_n_repr(new_ns, reordered_v)
+
+        return reordered_v, all_reduced_msgs
 
     def update_by_edge(self,
                        u, v,

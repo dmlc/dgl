@@ -1,8 +1,14 @@
 import torch as th
+from torch.autograd import Variable
+import numpy as np
 from dgl.graph import DGLGraph
 
 D = 5
 reduce_msg_shapes = set()
+
+def check_eq(a, b):
+    assert a.shape == b.shape
+    assert th.sum(a == b) == int(np.prod(list(a.shape)))
 
 def message_func(src, edge):
     assert len(src['h'].shape) == 2
@@ -20,7 +26,7 @@ def update_func(node, accum):
     assert node['h'].shape == accum.shape
     return {'h' : node['h'] + accum}
 
-def generate_graph():
+def generate_graph(grad=False):
     g = DGLGraph()
     for i in range(10):
         g.add_node(i) # 10 nodes.
@@ -30,7 +36,7 @@ def generate_graph():
         g.add_edge(i, 9)
     # add a back flow from 9 to 0
     g.add_edge(9, 0)
-    col = th.randn(10, D)
+    col = Variable(th.randn(10, D), requires_grad=grad)
     g.set_n_repr({'h' : col})
     return g
 
@@ -112,6 +118,18 @@ def test_batch_setter_getter():
     v = th.tensor([3, 4, 5])
     assert _pfc(g.get_e_repr(u, v)['l']) == [1., 1., 1.]
 
+def test_batch_setter_autograd():
+    g = generate_graph(grad=True)
+    h1 = g.get_n_repr()['h']
+    # partial set
+    v = th.tensor([1, 2, 8])
+    hh = Variable(th.zeros((len(v), D)), requires_grad=True)
+    g.set_n_repr({'h' : hh}, v)
+    h2 = g.get_n_repr()['h']
+    h2.backward(th.ones((10, D)) * 2)
+    check_eq(h1.grad[:,0], th.tensor([2., 0., 0., 2., 2., 2., 2., 2., 0., 2.]))
+    check_eq(hh.grad[:,0], th.tensor([2., 2., 2.]))
+
 def test_batch_send():
     g = generate_graph()
     def _fmsg(src, edge):
@@ -180,6 +198,7 @@ def test_update_routines():
 
 if __name__ == '__main__':
     test_batch_setter_getter()
+    test_batch_setter_autograd()
     test_batch_send()
     test_batch_recv()
     test_update_routines()
