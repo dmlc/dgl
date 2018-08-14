@@ -59,36 +59,25 @@ def test_batch_unbatch():
     for g in [bg, t1, t2]:
         try:
             g.add_node(len(g))
-            print("immutability test failed")
-        except:
-            print("pass")
+            raise Exception("immutability test failed")
+        except AssertionError:
+            pass
         try:
             g.add_edge(len(g) - 2, len(g) - 1)
-            print("immutability test failed")
-        except:
-            print("pass")
+            raise Exception("immutability test failed")
+        except AssertionError:
+            pass
 
     dgl.unbatch(bg)
 
     assert(f1.equal(t1.get_n_repr()))
     assert(f2.equal(t2.get_n_repr()))
-    print("pass")
 
-    print("good")
     # test immutability
     for g in [t1, t2]:
-        try:
-            g.add_node(len(g))
-            print("pass")
-        except:
-            # FIXME: this will fail...
-            # print("immutability test failed")
-            pass
-        try:
-            g.add_edge(len(g) - 2, len(g) - 1)
-            print("pass")
-        except:
-            print("immutability test failed")
+        # FIXME: this will fail because of networkx...
+        # g.add_node(len(g))
+        g.add_edge(len(g) - 2, len(g) - 1)
 
 def test_batch_sendrecv():
     t1 = tree1()
@@ -112,7 +101,6 @@ def test_batch_sendrecv():
     dgl.unbatch(bg)
     assert t1.get_n_repr()[1] == 7
     assert t2.get_n_repr()[4] == 2
-    print("pass")
 
 
 def test_batch_propagate():
@@ -150,7 +138,6 @@ def test_batch_propagate():
 
     assert t1.get_n_repr()[0] == 9
     assert t2.get_n_repr()[1] == 5
-    print("pass")
 
 
 if __name__ == '__main__':

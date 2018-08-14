@@ -72,7 +72,7 @@ class DGMG(nn.Module):
     def decide_add_edge(self, hGs, graph_list):
         hvs = [g.get_n_repr(len(g) - 1)['h'] for g in graph_list]
         h = self.fae(torch.cat((hGs, torch.cat(hvs, dim=0)), dim=1))
-        p = F.sigmoid(h)
+        p = torch.sigmoid(h)
         p = torch.cat([1 - p, p], dim=1)
         self.loss += self.loss_func(p, self.labels[self.step], self.masks[self.step])
 

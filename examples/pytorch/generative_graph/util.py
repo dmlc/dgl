@@ -107,7 +107,7 @@ def pad_ground_truth(batch):
     return count, new_label, new_node_list, mask_for_batch
 
 def elapsed(msg, start, end):
-    print("{}: {:.2f} ms".format(msg, (end-start)*1000))
+    print("{}: {} ms".format(msg, int((end-start)*1000)))
 
 if __name__ == '__main__':
     generate_dataset()

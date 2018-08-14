@@ -27,22 +27,26 @@ class BatchedDGLGraph(DGLGraph):
         self.add_edges_from(np.concatenate(new_edges))
 
         # set new node attr
-        if node_attrs is None:
-            node_attrs = self.graph_list[0].get_n_attr_list()
-        attrs = {}
-        for key in node_attrs:
-            vals = [g.pop_n_repr(key) for g in self.graph_list]
-            attrs[key] = F.pack(vals)
-        self.set_n_repr(attrs)
+        if node_attrs:
+            attrs = {}
+            for key in node_attrs:
+                vals = [g.pop_n_repr(key) for g in self.graph_list]
+                attrs[key] = F.pack(vals)
+            self.set_n_repr(attrs)
+        else:
+            for g in self.graph_list:
+                self._node_frame.append(g._node_frame)
 
         # set new edge attr
-        if edge_attrs is None:
-            edge_attrs = self.graph_list[0].get_e_attr_list()
-        attrs = {}
-        for key in edge_attrs:
-            vals = [g.pop_e_repr(key) for g in self.graph_list]
-            attrs[key] = F.pack(vals)
-        self.set_e_repr(attrs)
+        if edge_attrs:
+            attrs = {}
+            for key in edge_attrs:
+                vals = [g.pop_e_repr(key) for g in self.graph_list]
+                attrs[key] = F.pack(vals)
+            self.set_e_repr(attrs)
+        else:
+            for g in self.graph_list:
+                self._edge_frame.append(g._edge_frame)
 
         # set batched graph to be structurally immutable
         self.toggle_structure_immutable_on()
