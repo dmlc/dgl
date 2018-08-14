@@ -69,7 +69,8 @@ class LazyDict(Mapping):
         return self._keys
 
     def __getitem__(self, key):
-        assert key in self._keys
+        if not key in self.keys:
+            raise KeyError(key)
         return self._fn(key)
 
     def __contains__(self, key):
@@ -81,3 +82,23 @@ class LazyDict(Mapping):
 
     def __len__(self):
         return len(self._keys)
+
+class ReadOnlyDict(Mapping):
+    """A readonly dictionary wrapper."""
+    def __init__(self, dict_like):
+        self._dict_like = dict_like
+
+    def keys(self):
+        return self._dict_like.keys()
+
+    def __getitem__(self, key):
+        return self._dict_like[key]
+
+    def __contains__(self, key):
+        return key in self._dict_like
+
+    def __iter__(self):
+        return iter(self._dict_like)
+
+    def __len__(self):
+        return len(self._dict_like)

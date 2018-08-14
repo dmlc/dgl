@@ -6,7 +6,6 @@ from collections import MutableMapping
 import networkx as nx
 from networkx.classes.digraph import DiGraph
 
-import dgl
 from dgl.base import ALL, is_all
 import dgl.backend as F
 from dgl.backend import Tensor
@@ -66,12 +65,20 @@ class DGLGraph(DiGraph):
 
     Parameters
     ----------
+    node_frame : dgl.frame.Frame
+        Node feature storage.
+    edge_frame : dgl.frame.Frame
+        Edge feature storage.
     data : graph data
         Data to initialize graph. Same as networkx's semantics.
     attr : keyword arguments, optional
         Attributes to add to graph as key=value pairs.
     """
-    def __init__(self, graph_data=None, **attr):
+    def __init__(self,
+                 node_frame=Frame(),
+                 edge_frame=Frame(),
+                 graph_data=None,
+                 **attr):
         # setup dict overlay
         self.node_dict_factory = lambda : _NodeDict(self._add_node_callback)
         # In networkx 2.1, DiGraph is not using this factory. Instead, the outer
@@ -79,10 +86,12 @@ class DGLGraph(DiGraph):
         self.adjlist_outer_dict_factory = None
         self.adjlist_inner_dict_factory = lambda : _AdjInnerDict(self._add_edge_callback)
         self.edge_attr_dict_factory = dict
+        self._edge_cb_state = True
+        self._edge_list = []
         # cached graph and storage
         self._cached_graph = None
-        self._node_frame = Frame()
-        self._edge_frame = Frame()
+        self._node_frame = node_frame
+        self._edge_frame = edge_frame
         # other class members
         self._msg_graph = None
         self._msg_frame = Frame()
@@ -90,8 +99,6 @@ class DGLGraph(DiGraph):
         self._reduce_func = None
         self._update_func = None
         self._edge_func = None
-        self._edge_cb_state = True
-        self._edge_list = []
         self._context = context.cpu()
         # call base class init
         super(DGLGraph, self).__init__(graph_data, **attr)

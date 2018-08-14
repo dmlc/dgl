@@ -47,13 +47,13 @@ def test_row_getter_setter():
     # test non-duplicate keys
     rowid = th.tensor([0, 2])
     rows = f[rowid]
-    for k, v in rows:
+    for k, v in rows.items():
         assert v.shape == (len(rowid), D)
         check_eq(v, data[k][rowid])
     # test duplicate keys
     rowid = th.tensor([8, 2, 2, 1])
     rows = f[rowid]
-    for k, v in rows:
+    for k, v in rows.items():
         assert v.shape == (len(rowid), D)
         check_eq(v, data[k][rowid])
 
@@ -64,7 +64,7 @@ def test_row_getter_setter():
             'a3' : th.zeros((len(rowid), D)),
             }
     f[rowid] = vals
-    for k, v in f[rowid]:
+    for k, v in f[rowid].items():
         check_eq(v, th.zeros((len(rowid), D)))
 
 def test_row_getter_setter_grad():
