@@ -781,6 +781,8 @@ class DGLGraph(DiGraph):
             new_node_repr = update_func(node_repr, reduced_msgs)
             self.set_n_repr(new_node_repr, new2old)
         else:
+            u = utils.convert_to_id_tensor(u, self.context)
+            v = utils.convert_to_id_tensor(v, self.context)
             self._batch_sendto(u, v, message_func)
             unique_v = F.unique(v)
             self._batch_recv(unique_v, reduce_func, update_func)

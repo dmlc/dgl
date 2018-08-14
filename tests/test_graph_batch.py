@@ -132,8 +132,8 @@ def test_batch_propagate():
     e2 = [(2, 4), (0, 4)]
     u1, v1 = bg.query_new_edge(t1, *zip(*e1))
     u2, v2 = bg.query_new_edge(t2, *zip(*e2))
-    u = torch.from_numpy(np.concatenate((u1, u2)))
-    v = torch.from_numpy(np.concatenate((v1, v2)))
+    u = np.concatenate((u1, u2)).tolist()
+    v = np.concatenate((v1, v2)).tolist()
     order.append((u, v))
 
     # step 2
@@ -141,8 +141,8 @@ def test_batch_propagate():
     e2 = [(4, 1), (3, 1)]
     u1, v1 = bg.query_new_edge(t1, *zip(*e1))
     u2, v2 = bg.query_new_edge(t2, *zip(*e2))
-    u = torch.from_numpy(np.concatenate((u1, u2)))
-    v = torch.from_numpy(np.concatenate((v1, v2)))
+    u = np.concatenate((u1, u2)).tolist()
+    v = np.concatenate((v1, v2)).tolist()
     order.append((u, v))
 
     bg.propagate(iterator=order)
