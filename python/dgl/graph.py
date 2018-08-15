@@ -13,49 +13,12 @@ import dgl.builtin as builtin
 from dgl.cached_graph import CachedGraph, create_cached_graph
 import dgl.context as context
 from dgl.frame import FrameRef
+from dgl.nx_adapt import nx_init
 import dgl.scheduler as scheduler
 import dgl.utils as utils
 
 __MSG__ = "__MSG__"
 __REPR__ = "__REPR__"
-
-class _NodeDict(MutableMapping):
-    def __init__(self, cb):
-        self._dict = {}
-        self._cb = cb
-    def __setitem__(self, key, val):
-        if isinstance(val, _AdjInnerDict):
-            # This node dict is used as adj_outer_list
-            val.src = key
-        elif key not in self._dict:
-            self._cb(key)
-        self._dict[key] = val
-    def __getitem__(self, key):
-        return self._dict[key]
-    def __delitem__(self, key):
-        del self._dict[key]
-    def __len__(self):
-        return len(self._dict)
-    def __iter__(self):
-        return iter(self._dict)
-
-class _AdjInnerDict(MutableMapping):
-    def __init__(self, cb):
-        self._dict = {}
-        self.src = None
-        self._cb = cb
-    def __setitem__(self, key, val):
-        if key not in self._dict:
-            self._cb(self.src, key)
-        self._dict[key] = val
-    def __getitem__(self, key):
-        return self._dict[key]
-    def __delitem__(self, key):
-        del self._dict[key]
-    def __len__(self):
-        return len(self._dict)
-    def __iter__(self):
-        return iter(self._dict)
 
 class DGLGraph(DiGraph):
     """Base graph class specialized for neural networks on graphs.
@@ -69,7 +32,7 @@ class DGLGraph(DiGraph):
         Node feature storage.
     edge_frame : dgl.frame.Frame
         Edge feature storage.
-    data : graph data
+    graph_data : graph data
         Data to initialize graph. Same as networkx's semantics.
     attr : keyword arguments, optional
         Attributes to add to graph as key=value pairs.
@@ -79,15 +42,13 @@ class DGLGraph(DiGraph):
                  edge_frame=None,
                  graph_data=None,
                  **attr):
-        # setup dict overlay
-        self.node_dict_factory = lambda : _NodeDict(self._add_node_callback)
-        # In networkx 2.1, DiGraph is not using this factory. Instead, the outer
-        # dict uses the same data structure as the node dict.
-        self.adjlist_outer_dict_factory = None
-        self.adjlist_inner_dict_factory = lambda : _AdjInnerDict(self._add_edge_callback)
-        self.edge_attr_dict_factory = dict
         self._edge_cb_state = True
         self._edge_list = []
+        nx_init(self,
+                self._add_node_callback,
+                self._add_edge_callback,
+                graph_data,
+                **attr)
         # cached graph and storage
         self._cached_graph = None
         self._node_frame = node_frame if node_frame is not None else FrameRef()
@@ -100,8 +61,6 @@ class DGLGraph(DiGraph):
         self._update_func = None
         self._edge_func = None
         self._context = context.cpu()
-        # call base class init
-        super(DGLGraph, self).__init__(graph_data, **attr)
 
     def set_n_repr(self, hu, u=ALL):
         """Set node(s) representation.
@@ -317,14 +276,6 @@ class DGLGraph(DiGraph):
                 return self._edge_frame[__REPR__][eid]
             else:
                 return self._edge_frame.select_rows(eid)
-
-    def subgraph(self, nodes):
-        induced_nodes = nx.filters.show_nodes(self.nbunch_iter(nodes))
-        DGLSubGraph = dgl.graphviews.DGLSubGraph
-        # if already a subgraph, don't make a chain
-        if hasattr(self, '_NODE_OK'):
-            return DGLSubGraph(self._graph, induced_nodes, self._EDGE_OK)
-        return DGLSubGraph(self, induced_nodes)
 
     def set_device(self, ctx):
         """Set device context for this graph.
@@ -908,6 +859,38 @@ class DGLGraph(DiGraph):
             for u, v in iterator:
                 self.update_by_edge(u, v,
                         message_func, reduce_func, update_func, batchable)
+
+    def subgraph(self, nodes):
+        """Generate the subgraph among the given nodes.
+
+        The generated graph contains only the graph structure. The node/edge
+        features are not shared implicitly. Use `copy_from` to get node/edge
+        features from parent graph.
+
+        Parameters
+        ----------
+        nodes : list, or iterable
+            A container of the nodes to construct subgraph.
+
+        Returns
+        -------
+        G : DGLGraph
+            The subgraph.
+        """
+        nx_sg = super(DGLGraph, self).subgraph(nodes)
+        return DGLGraph(nx_sg)
+
+    def copy_from(self, graph):
+        """Copy node/edge features from the given graph.
+
+        All old features will be removed.
+
+        Parameters
+        ----------
+        graph : DGLGraph
+            The graph to copy from.
+        """
+        pass
 
     def draw(self):
         """Plot the graph using dot."""
