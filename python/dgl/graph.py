@@ -12,7 +12,7 @@ from dgl.backend import Tensor
 import dgl.builtin as builtin
 from dgl.cached_graph import CachedGraph, create_cached_graph
 import dgl.context as context
-from dgl.frame import Frame
+from dgl.frame import FrameRef
 import dgl.scheduler as scheduler
 import dgl.utils as utils
 
@@ -75,8 +75,8 @@ class DGLGraph(DiGraph):
         Attributes to add to graph as key=value pairs.
     """
     def __init__(self,
-                 node_frame=Frame(),
-                 edge_frame=Frame(),
+                 node_frame=None,
+                 edge_frame=None,
                  graph_data=None,
                  **attr):
         # setup dict overlay
@@ -90,11 +90,11 @@ class DGLGraph(DiGraph):
         self._edge_list = []
         # cached graph and storage
         self._cached_graph = None
-        self._node_frame = node_frame
-        self._edge_frame = edge_frame
+        self._node_frame = node_frame if node_frame is not None else FrameRef()
+        self._edge_frame = edge_frame if edge_frame is not None else FrameRef()
         # other class members
         self._msg_graph = None
-        self._msg_frame = Frame()
+        self._msg_frame = FrameRef()
         self._message_func = None
         self._reduce_func = None
         self._update_func = None

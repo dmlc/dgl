@@ -58,8 +58,10 @@ squeeze = th.squeeze
 unsqueeze = th.unsqueeze
 reshape = th.reshape
 ones = th.ones
+zeros = th.zeros
 spmm = th.spmm
 sort = th.sort
+arange = th.arange
 
 def to_context(x, ctx):
     if ctx is None:

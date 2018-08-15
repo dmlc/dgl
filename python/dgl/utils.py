@@ -65,11 +65,8 @@ class LazyDict(Mapping):
         self._fn = fn
         self._keys = keys
 
-    def keys(self):
-        return self._keys
-
     def __getitem__(self, key):
-        if not key in self.keys:
+        if not key in self._keys:
             raise KeyError(key)
         return self._fn(key)
 
@@ -77,8 +74,7 @@ class LazyDict(Mapping):
         return key in self._keys
 
     def __iter__(self):
-        for key in self._keys:
-            yield key, self._fn(key)
+        return iter(self._keys)
 
     def __len__(self):
         return len(self._keys)
