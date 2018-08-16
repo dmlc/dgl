@@ -130,6 +130,26 @@ def build_relabel_map(x):
     old_to_new[unique_x] = F.astype(F.arange(len(unique_x)), F.int64)
     return unique_x, old_to_new
 
+def build_relabel_dict(x):
+    """Relabel the input ids to continuous ids that starts from zero.
+
+    The new id follows the order of the given node id list.
+
+    Parameters
+    ----------
+    x : list
+      The input ids.
+
+    Returns
+    -------
+    relabel_dict : dict
+      Dict from old id to new id.
+    """
+    relabel_dict = {}
+    for i, v in enumerate(x):
+        relabel_dict[v] = i
+    return relabel_dict
+
 def edge_broadcasting(u, v):
     """Convert one-many and many-one edges to many-many."""
     if len(u) != len(v) and len(u) == 1:

@@ -5,6 +5,7 @@ from __future__ import absolute_import
 import networkx as nx
 from networkx.classes.digraph import DiGraph
 
+import dgl
 from dgl.base import ALL, is_all
 import dgl.backend as F
 from dgl.backend import Tensor
@@ -922,7 +923,7 @@ class DGLGraph(DiGraph):
         G : DGLGraph
             The subgraph.
         """
-        return DGLSubGraph(self, nodes)
+        return dgl.DGLSubGraph(self, nodes)
 
     def copy_from(self, graph):
         """Copy node/edge features from the given graph.
@@ -934,6 +935,7 @@ class DGLGraph(DiGraph):
         graph : DGLGraph
             The graph to copy from.
         """
+        # TODO
         pass
 
     def draw(self):
