@@ -9,7 +9,6 @@ class BatchedDGLGraph(DGLGraph):
         self.graph_list = graph_list
         self.graph_idx = {}
         for idx, g in enumerate(self.graph_list):
-            g.toggle_structure_immutable_on()
             self.graph_idx[g] = idx
 
         self.num_nodes = [len(g) for g in self.graph_list]
@@ -51,9 +50,6 @@ class BatchedDGLGraph(DGLGraph):
         else:
             for g in self.graph_list:
                 self._edge_frame.append(g._edge_frame)
-
-        # set batched graph to be structurally immutable
-        self.toggle_structure_immutable_on()
 
     def query_new_node(self, g, u):
         idx = self.graph_idx[g]
@@ -106,9 +102,6 @@ def unbatch(graph_batch):
             attr[key] = val
     for attr, g in zip(attrs, graph_list):
         g.set_e_repr(attr)
-
-    for g in graph_list:
-        g.toggle_structure_immutable_off()
 
     return graph_list
 

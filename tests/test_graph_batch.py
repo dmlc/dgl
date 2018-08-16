@@ -54,30 +54,11 @@ def test_batch_unbatch():
     f2 = t2.get_n_repr()
 
     bg = dgl.batch([t1, t2])
-
-    # test immutability
-    for g in [bg, t1, t2]:
-        try:
-            g.add_node(len(g))
-            raise Exception("immutability test failed")
-        except AssertionError:
-            pass
-        try:
-            g.add_edge(len(g) - 2, len(g) - 1)
-            raise Exception("immutability test failed")
-        except AssertionError:
-            pass
-
     dgl.unbatch(bg)
 
     assert(f1.equal(t1.get_n_repr()))
     assert(f2.equal(t2.get_n_repr()))
 
-    # test immutability
-    for g in [t1, t2]:
-        # FIXME: this will fail because of networkx...
-        # g.add_node(len(g))
-        g.add_edge(len(g) - 2, len(g) - 1)
 
 def test_batch_sendrecv():
     t1 = tree1()
