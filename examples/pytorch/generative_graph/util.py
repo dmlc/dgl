@@ -9,7 +9,7 @@ def convert_graph_to_ordering(g):
     ordering = []
     h = nx.DiGraph()
     h.add_edges_from(g.edges)
-    for n in h.nodes():
+    for n in range(len(h)):
         ordering.append(n)
         for m in h.predecessors(n):
             ordering.append((m, n))
