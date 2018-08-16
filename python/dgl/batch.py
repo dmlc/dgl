@@ -17,14 +17,18 @@ class BatchedDGLGraph(DGLGraph):
 
         # calc index offset
         self.node_offset = np.cumsum([0] + self.num_nodes)
+        self.edge_offset = np.cumsum([0] + self.num_edges)
 
         # in-order add relabeled nodes
         self.add_nodes_from(range(self.node_offset[-1]))
 
         # in-order add relabeled edges
-        new_edges = [np.array(g.edges) + offset
+        self.new_edge_list = [np.array(g.edges) + offset
                         for g, offset in zip(self.graph_list, self.node_offset[:-1])]
-        self.add_edges_from(np.concatenate(new_edges))
+        self.new_edges = np.concatenate(self.new_edge_list)
+        self.add_edges_from(self.new_edges)
+
+        assert self.size() == self.edge_offset[-1]
 
         # set new node attr
         if node_attrs:
@@ -67,6 +71,13 @@ class BatchedDGLGraph(DGLGraph):
             return src + offset, dst + offset
         else:
             return np.array(src) + offset, np.array(dst) + offset
+
+    def query_node_start_offset(self):
+        return self.node_offset[:-1].copy()
+
+    def query_edge_start_offset(self):
+        return self.edge_offset[:-1].copy()
+
 
 def unbatch(graph_batch):
     """Unbatch the graph and return a list of subgraphs.
