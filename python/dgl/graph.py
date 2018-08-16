@@ -2,7 +2,6 @@
 """
 from __future__ import absolute_import
 
-from collections import MutableMapping
 import networkx as nx
 from networkx.classes.digraph import DiGraph
 
@@ -877,8 +876,7 @@ class DGLGraph(DiGraph):
         G : DGLGraph
             The subgraph.
         """
-        nx_sg = super(DGLGraph, self).subgraph(nodes)
-        return DGLGraph(nx_sg)
+        return DGLSubGraph(self, nodes)
 
     def copy_from(self, graph):
         """Copy node/edge features from the given graph.
