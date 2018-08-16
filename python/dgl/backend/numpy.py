@@ -12,8 +12,13 @@ def asnumpy(a):
 def pack(arrays):
     return np.concatenate(arrays, axis=0)
 
-def unpack(a):
-    return np.split(a, a.shape[0], axis=0)
+def unpack(a, split_size_or_sections=None):
+    if split_size_or_sections is None:
+        indices_or_sections = a.shape[0]
+    else:
+        # convert split size to split indices by cumsum
+        indices_or_sections = np.cumsum(split_size_or_sections)[:-1]
+    return np.split(a, indices_or_sections, axis=0)
 
 def shape(a):
     return a.shape

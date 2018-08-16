@@ -81,10 +81,3 @@ def nx_init(obj,
     if graph_data is not None:
         convert.to_networkx_graph(graph_data, create_using=obj)
     obj.graph.update(attr)
-
-def nx_subgraph_init(obj,
-                     add_node_cb,
-                     add_edge_cb,
-                     graph_data,
-                     **attr):
-    pass

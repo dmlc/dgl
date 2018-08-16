@@ -63,7 +63,8 @@ class Frame(MutableMapping):
             for key, col in other.items():
                 self._columns[key] = F.pack([self[key], col])
         # TODO(minjie): sanity check for num_rows
-        self._num_rows = F.shape(list(self._columns.values())[0])[0]
+        if len(self._columns) != 0:
+            self._num_rows = F.shape(list(self._columns.values())[0])[0]
 
     def clear(self):
         self._columns = {}

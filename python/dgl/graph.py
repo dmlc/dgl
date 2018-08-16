@@ -62,6 +62,12 @@ class DGLGraph(DiGraph):
         self._edge_func = None
         self._context = context.cpu()
 
+    def get_n_attr_list(self):
+        return self._node_frame.schemes
+
+    def get_e_attr_list(self):
+        return self._edge_frame.schemes
+
     def set_n_repr(self, hu, u=ALL):
         """Set node(s) representation.
 
@@ -81,7 +87,7 @@ class DGLGraph(DiGraph):
           The node(s).
         """
         # sanity check
-        if isinstance(u, str) and u == ALL:
+        if is_all(u):
             num_nodes = self.number_of_nodes()
         else:
             u = utils.convert_to_id_tensor(u, self.context)
@@ -92,7 +98,7 @@ class DGLGraph(DiGraph):
         else:
             assert F.shape(hu)[0] == num_nodes
         # set
-        if isinstance(u, str) and u == ALL:
+        if is_all(u):
             if isinstance(hu, dict):
                 for key, val in hu.items():
                     self._node_frame[key] = val
@@ -113,7 +119,7 @@ class DGLGraph(DiGraph):
         u : node, container or tensor
           The node(s).
         """
-        if isinstance(u, str) and u == ALL:
+        if is_all(u):
             if len(self._node_frame) == 1 and __REPR__ in self._node_frame:
                 return self._node_frame[__REPR__]
             else:
@@ -156,8 +162,8 @@ class DGLGraph(DiGraph):
           The destination node(s).
         """
         # sanity check
-        u_is_all = isinstance(u, str) and u == ALL
-        v_is_all = isinstance(v, str) and v == ALL
+        u_is_all = is_all(u)
+        v_is_all = is_all(v)
         assert u_is_all == v_is_all
         if u_is_all:
             num_edges = self.number_of_edges()
@@ -196,7 +202,7 @@ class DGLGraph(DiGraph):
           The edge id(s).
         """
         # sanity check
-        if isinstance(eid, str) and eid == ALL:
+        if is_all(eid):
             num_edges = self.number_of_edges()
         else:
             eid = utils.convert_to_id_tensor(eid, self.context)
@@ -207,7 +213,7 @@ class DGLGraph(DiGraph):
         else:
             assert F.shape(h_uv)[0] == num_edges
         # set
-        if isinstance(eid, str) and eid == ALL:
+        if is_all(eid):
             if isinstance(h_uv, dict):
                 for key, val in h_uv.items():
                     self._edge_frame[key] = val
@@ -230,8 +236,8 @@ class DGLGraph(DiGraph):
         v : node, container or tensor
           The destination node(s).
         """
-        u_is_all = isinstance(u, str) and u == ALL
-        v_is_all = isinstance(v, str) and v == ALL
+        u_is_all = is_all(u)
+        v_is_all = is_all(v)
         assert u_is_all == v_is_all
         if u_is_all:
             if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
@@ -265,7 +271,7 @@ class DGLGraph(DiGraph):
         eid : int, container or tensor
           The edge id(s).
         """
-        if isinstance(eid, str) and eid == ALL:
+        if is_all(eid):
             if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
                 return self._edge_frame[__REPR__]
             else:
@@ -731,6 +737,8 @@ class DGLGraph(DiGraph):
             new_node_repr = update_func(node_repr, reduced_msgs)
             self.set_n_repr(new_node_repr, new2old)
         else:
+            u = utils.convert_to_id_tensor(u, self.context)
+            v = utils.convert_to_id_tensor(v, self.context)
             self._batch_sendto(u, v, message_func)
             unique_v = F.unique(v)
             self._batch_recv(unique_v, reduce_func, update_func)

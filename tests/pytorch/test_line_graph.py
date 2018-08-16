@@ -13,6 +13,7 @@ def test_line_graph():
     G = dgl.DGLGraph(nx.star_graph(N))
     G.set_e_repr(th.randn((2*N, D)))
     L = dgl.line_graph(G)
+    print(L.get_n_repr())
     # update node features on line graph should reflect to edge features on
     # original graph.
     u = [0, 0, 2, 3]
