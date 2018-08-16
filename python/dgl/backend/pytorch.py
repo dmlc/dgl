@@ -23,6 +23,9 @@ sparse_tensor = th.sparse.FloatTensor
 sum = th.sum
 max = th.max
 
+def astype(a, ty):
+    return a.type(ty)
+
 def asnumpy(a):
     return a.cpu().numpy()
 
@@ -50,13 +53,10 @@ def broadcast_to(x, to_array):
     return x + th.zeros_like(to_array)
 
 nonzero = th.nonzero
-
-def eq_scalar(x, val):
-    return th.eq(x, float(val))
-
 squeeze = th.squeeze
 unsqueeze = th.unsqueeze
 reshape = th.reshape
+zeros = th.zeros
 ones = th.ones
 zeros = th.zeros
 spmm = th.spmm

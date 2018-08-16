@@ -34,16 +34,22 @@ def generate_graph():
 
 def test_spmv_specialize():
     g = generate_graph()
-    g.register_message_func('from_src', batchable=True)
-    g.register_reduce_func('sum', batchable=True)
-    g.register_update_func(update_func, batchable=True)
+    # update all
     v1 = g.get_n_repr()
-    g.update_all()
+    g.update_all('from_src', 'sum', update_func, batchable=True)
     v2 = g.get_n_repr()
     g.set_n_repr(v1)
-    g.register_message_func(message_func, batchable=True)
-    g.register_reduce_func(reduce_func, batchable=True)
-    g.update_all()
+    g.update_all(message_func, reduce_func, update_func, batchable=True)
+    v3 = g.get_n_repr()
+    check_eq(v2, v3)
+    # partial update
+    u = th.tensor([0, 0, 0, 3, 4, 9])
+    v = th.tensor([1, 2, 3, 9, 9, 0])
+    v1 = g.get_n_repr()
+    g.update_by_edge(u, v, 'from_src', 'sum', update_func, batchable=True)
+    v2 = g.get_n_repr()
+    g.set_n_repr(v1)
+    g.update_by_edge(u, v, message_func, reduce_func, update_func, batchable=True)
     v3 = g.get_n_repr()
     check_eq(v2, v3)
 

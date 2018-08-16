@@ -402,24 +402,32 @@ class DGLGraph(DiGraph):
 
     def _nonbatch_sendto(self, u, v, message_func):
         f_msg = _get_message_func(message_func)
+        if is_all(u) and is_all(v):
+            u, v = self.cached_graph.edges()
         for uu, vv in utils.edge_iter(u, v):
             ret = f_msg(_get_repr(self.nodes[uu]),
                         _get_repr(self.edges[uu, vv]))
             self.edges[uu, vv][__MSG__] = ret
 
     def _batch_sendto(self, u, v, message_func):
+        f_msg = _get_message_func(message_func)
         if is_all(u) and is_all(v):
             u, v = self.cached_graph.edges()
-        u = utils.convert_to_id_tensor(u)
-        v = utils.convert_to_id_tensor(v)
-        eid = self.cached_graph.get_edge_id(u, v)
-        self.msg_graph.add_edges(u, v)
-        if len(u) != len(v) and len(u) == 1:
-            u = F.broadcast_to(u, v)
-        # call UDF
-        src_reprs = self.get_n_repr(u)
-        edge_reprs = self.get_e_repr_by_id(eid)
-        msgs = message_func(src_reprs, edge_reprs)
+            self.msg_graph.add_edges(u, v)
+            # call UDF
+            src_reprs = self.get_n_repr(u)
+            edge_reprs = self.get_e_repr()
+            msgs = message_func(src_reprs, edge_reprs)
+        else:
+            u = utils.convert_to_id_tensor(u)
+            v = utils.convert_to_id_tensor(v)
+            u, v = utils.edge_broadcasting(u, v)
+            eid = self.cached_graph.get_edge_id(u, v)
+            self.msg_graph.add_edges(u, v)
+            # call UDF
+            src_reprs = self.get_n_repr(u)
+            edge_reprs = self.get_e_repr_by_id(eid)
+            msgs = message_func(src_reprs, edge_reprs)
         if isinstance(msgs, dict):
             self._msg_frame.append(msgs)
         else:
@@ -456,6 +464,8 @@ class DGLGraph(DiGraph):
             self._nonbatch_update_edge(u, v, edge_func)
 
     def _nonbatch_update_edge(self, u, v, edge_func):
+        if is_all(u) and is_all(v):
+            u, v = self.cached_graph.edges()
         for uu, vv in utils.edge_iter(u, v):
             ret = edge_func(_get_repr(self.nodes[uu]),
                             _get_repr(self.nodes[vv]),
@@ -463,19 +473,25 @@ class DGLGraph(DiGraph):
             _set_repr(self.edges[uu, vv], ret)
 
     def _batch_update_edge(self, u, v, edge_func):
-        u = utils.convert_to_id_tensor(u)
-        v = utils.convert_to_id_tensor(v)
-        eid = self.cached_graph.get_edge_id(u, v)
-        if len(u) != len(v) and len(u) == 1:
-            u = F.broadcast_to(u, v)
-        elif len(u) != len(v) and len(v) == 1:
-            v = F.broadcast_to(v, u)
-        # call the UDF
-        src_reprs = self.get_n_repr(u)
-        dst_reprs = self.get_n_repr(v)
-        edge_reprs = self.get_e_repr_by_id(eid)
-        new_edge_reprs = edge_func(src_reprs, dst_reprs, edge_reprs)
-        self.set_e_repr_by_id(new_edge_reprs, eid)
+        if is_all(u) and is_all(v):
+            u, v = self.cached_graph.edges()
+            # call the UDF
+            src_reprs = self.get_n_repr(u)
+            dst_reprs = self.get_n_repr(v)
+            edge_reprs = self.get_e_repr()
+            new_edge_reprs = edge_func(src_reprs, dst_reprs, edge_reprs)
+            self.set_e_repr(new_edge_reprs)
+        else:
+            u = utils.convert_to_id_tensor(u)
+            v = utils.convert_to_id_tensor(v)
+            u, v = utils.edge_broadcasting(u, v)
+            eid = self.cached_graph.get_edge_id(u, v)
+            # call the UDF
+            src_reprs = self.get_n_repr(u)
+            dst_reprs = self.get_n_repr(v)
+            edge_reprs = self.get_e_repr_by_id(eid)
+            new_edge_reprs = edge_func(src_reprs, dst_reprs, edge_reprs)
+            self.set_e_repr_by_id(new_edge_reprs, eid)
 
     def recv(self,
              u,
@@ -532,6 +548,8 @@ class DGLGraph(DiGraph):
     def _nonbatch_recv(self, u, reduce_func, update_func):
         f_reduce = _get_reduce_func(reduce_func)
         f_update = update_func
+        if is_all(u):
+            u = list(range(0, self.number_of_nodes()))
         for i, uu in enumerate(utils.node_iter(u)):
             # reduce phase
             msgs_batch = [self.edges[vv, uu].pop(__MSG__)
@@ -668,6 +686,8 @@ class DGLGraph(DiGraph):
             message_func,
             reduce_func,
             update_func):
+        if is_all(u) and is_all(v):
+            u, v = self.cached_graph.edges()
         self._nonbatch_sendto(u, v, message_func)
         dst = set()
         for uu, vv in utils.edge_iter(u, v):
@@ -680,26 +700,39 @@ class DGLGraph(DiGraph):
             message_func,
             reduce_func,
             update_func):
-        if message_func == 'from_src' and reduce_func == 'sum' \
-                and is_all(u) and is_all(v):
-            # TODO(minjie): SPMV is only supported for updating all nodes right now.
-            adjmat = self.cached_graph.adjmat(self.context)
+        if is_all(u) and is_all(v):
+            self.update_all(message_func, reduce_func, update_func, True)
+        elif message_func == 'from_src' and reduce_func == 'sum':
+            # TODO(minjie): check the validity of edges u->v
+            u = utils.convert_to_id_tensor(u)
+            v = utils.convert_to_id_tensor(v)
+            # TODO(minjie): broadcasting is optional for many-one input.
+            u, v = utils.edge_broadcasting(u, v)
+            # relabel destination nodes.
+            new2old, old2new = utils.build_relabel_map(v)
+            # TODO(minjie): should not directly use []
+            new_v = old2new[v]
+            # create adj mat
+            idx = F.pack([F.unsqueeze(new_v, 0), F.unsqueeze(u, 0)])
+            dat = F.ones((len(u),))
+            n = self.number_of_nodes()
+            m = len(new2old)
+            adjmat = F.sparse_tensor(idx, dat, [m, n])
+            adjmat = F.to_context(adjmat, self.context)
+            # TODO(minjie): use lazy dict for reduced_msgs
             reduced_msgs = {}
             for key in self._node_frame.schemes:
                 col = self._node_frame[key]
                 reduced_msgs[key] = F.spmm(adjmat, col)
-            node_repr = self.get_n_repr()
             if len(reduced_msgs) == 1 and __REPR__ in reduced_msgs:
                 reduced_msgs = reduced_msgs[__REPR__]
-            self.set_n_repr(update_func(node_repr, reduced_msgs))
+            node_repr = self.get_n_repr(new2old)
+            new_node_repr = update_func(node_repr, reduced_msgs)
+            self.set_n_repr(new_node_repr, new2old)
         else:
-            if is_all(u) and is_all(v):
-                self._batch_sendto(u, v, message_func)
-                self._batch_recv(v, reduce_func, update_func)
-            else:
-                self._batch_sendto(u, v, message_func)
-                unique_v = F.unique(v)
-                self._batch_recv(unique_v, reduce_func, update_func)
+            self._batch_sendto(u, v, message_func)
+            unique_v = F.unique(v)
+            self._batch_recv(unique_v, reduce_func, update_func)
 
     def update_to(self,
                   v,
@@ -811,11 +844,24 @@ class DGLGraph(DiGraph):
         assert reduce_func is not None
         assert update_func is not None
         if batchable:
-            self._batch_update_by_edge(ALL, ALL,
-                    message_func, reduce_func, update_func)
+            if message_func == 'from_src' and reduce_func == 'sum':
+                # TODO(minjie): use lazy dict for reduced_msgs
+                adjmat = self.cached_graph.adjmat(self.context)
+                reduced_msgs = {}
+                for key in self._node_frame.schemes:
+                    col = self._node_frame[key]
+                    reduced_msgs[key] = F.spmm(adjmat, col)
+                if len(reduced_msgs) == 1 and __REPR__ in reduced_msgs:
+                    reduced_msgs = reduced_msgs[__REPR__]
+                node_repr = self.get_n_repr()
+                self.set_n_repr(update_func(node_repr, reduced_msgs))
+            else:
+                self._batch_sendto(ALL, ALL, message_func)
+                self._batch_recv(ALL, reduce_func, update_func)
         else:
-            u = [uu for uu, _ in self.edges]
-            v = [vv for _, vv in self.edges]
+            u, v = zip(*self.edges)
+            u = list(u)
+            v = list(v)
             self._nonbatch_sendto(u, v, message_func)
             self._nonbatch_recv(list(self.nodes()), reduce_func, update_func)
 
