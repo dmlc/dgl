@@ -33,6 +33,7 @@ class _NodeDict(MutableMapping):
     def __getitem__(self, key):
         return self._dict[key]
     def __delitem__(self, key):
+        # FIXME: add callback
         del self._dict[key]
     def __len__(self):
         return len(self._dict)
@@ -51,6 +52,7 @@ class _AdjInnerDict(MutableMapping):
     def __getitem__(self, key):
         return self._dict[key]
     def __delitem__(self, key):
+        # FIXME: add callback
         del self._dict[key]
     def __len__(self):
         return len(self._dict)
@@ -78,6 +80,12 @@ class DGLGraph(DiGraph):
         self.adjlist_outer_dict_factory = None
         self.adjlist_inner_dict_factory = lambda : _AdjInnerDict(self._add_edge_callback)
         self.edge_attr_dict_factory = dict
+        self._context = context.cpu()
+        # call base class init
+        super(DGLGraph, self).__init__(graph_data, **attr)
+        self._init_state()
+
+    def _init_state(self):
         # cached graph and storage
         self._cached_graph = None
         self._node_frame = Frame()
@@ -91,9 +99,16 @@ class DGLGraph(DiGraph):
         self._edge_func = None
         self._edge_cb_state = True
         self._edge_list = []
-        self._context = context.cpu()
-        # call base class init
-        super(DGLGraph, self).__init__(graph_data, **attr)
+
+    def clear(self):
+        super(DGLGraph, self).clear()
+        self._init_state()
+
+    def get_n_attr_list(self):
+        return self._node_frame.schemes
+
+    def get_e_attr_list(self):
+        return self._edge_frame.schemes
 
     def set_n_repr(self, hu, u=ALL):
         """Set node(s) representation.
@@ -764,6 +779,8 @@ class DGLGraph(DiGraph):
             new_node_repr = update_func(node_repr, reduced_msgs)
             self.set_n_repr(new_node_repr, new2old)
         else:
+            u = utils.convert_to_id_tensor(u, self.context)
+            v = utils.convert_to_id_tensor(v, self.context)
             self._batch_sendto(u, v, message_func)
             unique_v = F.unique(v)
             self._batch_recv(unique_v, reduce_func, update_func)
@@ -989,6 +1006,7 @@ class DGLGraph(DiGraph):
     def edge_list(self):
         """Return edges in the addition order."""
         return self._edge_list
+
 
 def _get_repr(attr_dict):
     if len(attr_dict) == 1 and __REPR__ in attr_dict:
