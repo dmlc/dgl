@@ -48,9 +48,8 @@ class Frame:
         del self._columns[key]
 
     def pop(self, key):
-        col = self._columns.get(key)
-        if col is not None:
-            del self._columns[key]
+        col = self._columns[key]
+        del self._columns[key]
         return col
 
     def add_column(self, name, col):
