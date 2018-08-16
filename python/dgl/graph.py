@@ -28,19 +28,19 @@ class DGLGraph(DiGraph):
 
     Parameters
     ----------
+    graph_data : graph data
+        Data to initialize graph. Same as networkx's semantics.
     node_frame : dgl.frame.Frame
         Node feature storage.
     edge_frame : dgl.frame.Frame
         Edge feature storage.
-    graph_data : graph data
-        Data to initialize graph. Same as networkx's semantics.
     attr : keyword arguments, optional
         Attributes to add to graph as key=value pairs.
     """
     def __init__(self,
+                 graph_data=None,
                  node_frame=None,
                  edge_frame=None,
-                 graph_data=None,
                  **attr):
         self._edge_cb_state = True
         self._edge_list = []
@@ -966,6 +966,28 @@ class DGLGraph(DiGraph):
             self._msg_graph.add_nodes(self.number_of_nodes())
             self._msg_frame.clear()
 
+    @property
+    def edge_list(self):
+        """Return edges in the addition order."""
+        return self._edge_list
+
+    def get_edge_id(self, u, v):
+        """Return the continuous edge id(s) assigned.
+
+        Parameters
+        ----------
+        u : node, container or tensor
+          The source node(s).
+        v : node, container or tensor
+          The destination node(s).
+
+        Returns
+        -------
+        eid : tensor
+          The tensor contains edge id(s).
+        """
+        return self.cached_graph.get_edge_id(u, v)
+
     def _nodes_or_all(self, nodes):
         return self.nodes() if nodes == ALL else nodes
 
@@ -983,11 +1005,6 @@ class DGLGraph(DiGraph):
             self._edge_list.append((u, v))
         self._edge_cb_state = not self._edge_cb_state
         self._cached_graph = None
-
-    @property
-    def edge_list(self):
-        """Return edges in the addition order."""
-        return self._edge_list
 
 def _get_repr(attr_dict):
     if len(attr_dict) == 1 and __REPR__ in attr_dict:
