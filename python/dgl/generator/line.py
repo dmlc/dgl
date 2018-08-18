@@ -34,5 +34,5 @@ def line_graph(G, no_backtracking=False):
     relabel_map = {}
     for i, e in enumerate(G.edge_list):
         relabel_map[e] = i
-    nx.relabel.relabel_nodes(L, relabel_map)
+    nx.relabel.relabel_nodes(L, relabel_map, copy=False)
     return DGLGraph(L, node_frame=G._edge_frame)
