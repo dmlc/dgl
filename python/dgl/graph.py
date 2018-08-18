@@ -608,7 +608,7 @@ class DGLGraph(DiGraph):
                 assert null_v_bucket is None
                 null_v_bucket = v_bkt
                 continue
-                
+
             uu, vv = self.msg_graph.in_edges(v_bkt)
             in_msg_ids = self.msg_graph.get_edge_id(uu, vv)
             in_msgs = self._msg_frame.select_rows(in_msg_ids)
@@ -632,7 +632,7 @@ class DGLGraph(DiGraph):
 
         # TODO: clear partial messages
         self.clear_messages()
-        
+
         # Read the node states in the degree-bucketing order.
         null_v = utils.toindex(null_v_bucket or [])
         reordered_v = utils.toindex(
@@ -872,6 +872,25 @@ class DGLGraph(DiGraph):
                 for key in self._node_frame.schemes:
                     col = self._node_frame[key]
                     adjmat = self.cached_graph.adjmat(F.get_context(col))
+                    reduced_msgs[key] = F.spmm(adjmat, col)
+                if len(reduced_msgs) == 1 and __REPR__ in reduced_msgs:
+                    reduced_msgs = reduced_msgs[__REPR__]
+                node_repr = self.get_n_repr()
+                self.set_n_repr(update_func(node_repr, reduced_msgs))
+            elif message_func == 'src_mul_edge' and reduce_func == 'sum':
+                edge_repr = self.get_e_repr()
+                # must have only one edge feature, must be scalar
+                # FIXME: what's the semantics for multiple edge features? Cartesian?
+                assert len(edge_repr) == 1, \
+                        "spmv only support one edge feature"
+                edge_repr = list(edge_repr.values())[0]
+                assert edge_repr.shape[1] == 1, \
+                        "spmv only support scalar edge feature"
+                adjmat = self.cached_graph.adjmat(self.context)
+                adjmat = F.sparse_tensor(adjmat._indices(), edge_repr.view(-1), adjmat.size())
+                reduced_msgs = {}
+                for key in self._node_frame.schemes:
+                    col = self._node_frame[key]
                     reduced_msgs[key] = F.spmm(adjmat, col)
                 if len(reduced_msgs) == 1 and __REPR__ in reduced_msgs:
                     reduced_msgs = reduced_msgs[__REPR__]
