@@ -935,19 +935,6 @@ class DGLGraph(DiGraph):
         """
         return dgl.DGLSubGraph(self, nodes)
 
-    def copy_from(self, graph):
-        """Copy node/edge features from the given graph.
-
-        All old features will be removed.
-
-        Parameters
-        ----------
-        graph : DGLGraph
-            The graph to copy from.
-        """
-        # TODO
-        pass
-
     def draw(self):
         """Plot the graph using dot."""
         from networkx.drawing.nx_agraph import graphviz_layout

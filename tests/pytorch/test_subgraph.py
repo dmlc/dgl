@@ -24,13 +24,22 @@ def generate_graph(grad=False):
     g.set_e_repr({'l' : ecol})
     return g
 
-def test_subgraph():
+def test_basics():
     g = generate_graph()
     h = g.get_n_repr()['h']
     l = g.get_e_repr()['l']
-    sg = g.subgraph([0, 2, 3, 6, 7, 9])
+    nid = [0, 2, 3, 6, 7, 9]
+    eid = [2, 3, 4, 5, 10, 11, 12, 13, 16]
+    sg = g.subgraph(nid)
+    # the subgraph is empty initially
+    assert len(sg.get_n_repr()) == 0
+    assert len(sg.get_e_repr()) == 0
+    # the data is copied after explict copy from
+    sg.copy_from(g)
+    assert len(sg.get_n_repr()) == 1
+    assert len(sg.get_e_repr()) == 1
     sh = sg.get_n_repr()['h']
-    check_eq(h[th.tensor([0, 2, 3, 6, 7, 9])], sh)
+    assert check_eq(h[nid], sh)
     '''
     s, d, eid
     0, 1, 0
@@ -51,8 +60,12 @@ def test_subgraph():
     8, 9, 15
     9, 0, 16
     '''
-    eid = th.tensor([2, 3, 4, 5, 10, 11, 12, 13, 16])
-    check_eq(l[eid], sg.get_e_repr()['l'])
+    assert check_eq(l[eid], sg.get_e_repr()['l'])
+    # update the node/edge features on the subgraph should NOT
+    # reflect to the parent graph.
+    sg.set_n_repr({'h' : th.zeros((6, D))})
+    assert check_eq(h, g.get_n_repr()['h'])
 
 if __name__ == '__main__':
-    test_subgraph()
+    test_basics()
+    test_copy_from()

@@ -13,46 +13,30 @@ class DGLSubGraph(DGLGraph):
     def __init__(self,
                  parent,
                  nodes):
-        # create subgraph and relabel
-        nx_sg = nx.DiGraph.subgraph(parent, nodes)
-        # node id
-        # TODO(minjie): context
-        nid = F.tensor(nodes, dtype=F.int64)
-        # edge id
-        # TODO(minjie): slow, context
-        u, v = zip(*nx_sg.edges)
-        u = list(u)
-        v = list(v)
-        eid = parent.cached_graph.get_edge_id(u, v)
-
-        # relabel
+        super(DGLSubGraph, self).__init__()
+        # relabel nodes
         self._node_mapping = utils.build_relabel_dict(nodes)
-        nx_sg = nx.relabel.relabel_nodes(nx_sg, self._node_mapping)
+        self._parent_nid = F.tensor(nodes, dtype=F.int64) # TODO(minjie): context
+        eids = []
+        # create subgraph
+        for eid, (u, v) in enumerate(parent.edge_list):
+            if u in self._node_mapping and v in self._node_mapping:
+                self.add_edge(self._node_mapping[u],
+                              self._node_mapping[v])
+                eids.append(eid)
+        self._parent_eid = F.tensor(eids, dtype=F.int64) # TODO(minjie): context
 
-        # init
-        self._edge_list = []
-        nx_init(self,
-                self._add_node_callback,
-                self._add_edge_callback,
-                self._del_node_callback,
-                self._del_edge_callback,
-                nx_sg,
-                **parent.graph)
-        # cached graph and storage
-        self._cached_graph = None
-        if parent._node_frame.num_rows == 0:
-            self._node_frame = FrameRef()
-        else:
-            self._node_frame = FrameRef(Frame(parent._node_frame[nid]))
-        if parent._edge_frame.num_rows == 0:
-            self._edge_frame = FrameRef()
-        else:
-            self._edge_frame = FrameRef(Frame(parent._edge_frame[eid]))
-        # other class members
-        self._msg_graph = None
-        self._msg_frame = FrameRef()
-        self._message_func = parent._message_func
-        self._reduce_func = parent._reduce_func
-        self._update_func = parent._update_func
-        self._edge_func = parent._edge_func
-        self._context = parent._context
+    def copy_from(self, parent):
+        """Copy node/edge features from the parent graph.
+
+        All old features will be removed.
+
+        Parameters
+        ----------
+        parent : DGLGraph
+            The parent graph to copy from.
+        """
+        if parent._node_frame.num_rows != 0:
+            self._node_frame = FrameRef(Frame(parent._node_frame[self._parent_nid]))
+        if parent._edge_frame.num_rows != 0:
+            self._edge_frame = FrameRef(Frame(parent._edge_frame[self._parent_eid]))
