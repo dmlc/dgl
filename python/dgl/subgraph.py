@@ -30,11 +30,12 @@ class DGLSubGraph(DGLGraph):
         nx_sg = nx.relabel.relabel_nodes(nx_sg, self._node_mapping)
 
         # init
-        self._edge_cb_state = True
         self._edge_list = []
         nx_init(self,
                 self._add_node_callback,
                 self._add_edge_callback,
+                self._del_node_callback,
+                self._del_edge_callback,
                 nx_sg,
                 **parent.graph)
         # cached graph and storage

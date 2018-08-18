@@ -42,11 +42,13 @@ class DGLGraph(DiGraph):
                  node_frame=None,
                  edge_frame=None,
                  **attr):
-        self._edge_cb_state = True
+        # TODO(minjie): maintaining node/edge list is costly when graph is large.
         self._edge_list = []
         nx_init(self,
                 self._add_node_callback,
                 self._add_edge_callback,
+                self._del_node_callback,
+                self._del_edge_callback,
                 graph_data,
                 **attr)
         # cached graph and storage
@@ -1003,15 +1005,28 @@ class DGLGraph(DiGraph):
         return self.edges() if edges == ALL else edges
 
     def _add_node_callback(self, node):
+        #print('New node:', node)
+        self._cached_graph = None
+
+    def _del_node_callback(self, node):
+        #print('Del node:', node)
+        raise RuntimeError('Node removal is not supported currently.')
+        node = utils.convert_to_id_tensor(node)
+        self._node_frame.delete_rows(node)
         self._cached_graph = None
 
     def _add_edge_callback(self, u, v):
-        # In networkx 2.1, two adjlists are maintained. One for succ, one for pred.
-        # We only record once for the succ addition.
-        if self._edge_cb_state:
-            #print('New edge:', u, v)
-            self._edge_list.append((u, v))
-        self._edge_cb_state = not self._edge_cb_state
+        #print('New edge:', u, v)
+        self._edge_list.append((u, v))
+        self._cached_graph = None
+
+    def _del_edge_callback(self, u, v):
+        #print('Del edge:', u, v)
+        raise RuntimeError('Edge removal is not supported currently.')
+        u = utils.convert_to_id_tensor(u)
+        v = utils.convert_to_id_tensor(v)
+        eid = self.get_edge_id(u, v)
+        self._edge_frame.delete_rows(eid)
         self._cached_graph = None
 
 def _get_repr(attr_dict):
