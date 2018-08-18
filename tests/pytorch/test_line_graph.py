@@ -12,6 +12,7 @@ def test_line_graph():
     N = 5
     G = dgl.DGLGraph(nx.star_graph(N))
     G.set_e_repr(th.randn((2*N, D)))
+    n_edges = len(G.edges)
     L = dgl.line_graph(G)
     assert L.number_of_nodes() == 2*N
     # update node features on line graph should reflect to edge features on
@@ -21,6 +22,12 @@ def test_line_graph():
     eid = G.get_edge_id(u, v)
     L.set_n_repr(th.zeros((4, D)), eid)
     assert check_eq(G.get_e_repr(u, v), th.zeros((4, D)))
+
+    # adding a new node feature on line graph should also reflect to a new
+    # edge feature on original graph
+    data = th.randn(n_edges, D)
+    L.set_n_repr({'w': data})
+    assert check_eq(G.get_e_repr()['w'], data)
 
 def test_no_backtracking():
     N = 5

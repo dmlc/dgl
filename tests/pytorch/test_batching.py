@@ -37,7 +37,6 @@ def generate_graph(grad=False):
     # add a back flow from 9 to 0
     g.add_edge(9, 0)
     ncol = Variable(th.randn(10, D), requires_grad=grad)
-    ecol = Variable(th.randn(17, D), requires_grad=grad)
     g.set_n_repr({'h' : ncol})
     return g
 
@@ -197,8 +196,9 @@ def test_update_routines():
     assert(reduce_msg_shapes == {(1, 8, D), (9, 1, D)})
     reduce_msg_shapes.clear()
 
-def test_delete():
+def _test_delete():
     g = generate_graph()
+    ecol = Variable(th.randn(17, D), requires_grad=grad)
     g.set_e_repr({'e' : ecol})
     assert g.get_n_repr()['h'].shape[0] == 10
     assert g.get_e_repr()['e'].shape[0] == 17
