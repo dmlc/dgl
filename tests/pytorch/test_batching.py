@@ -36,8 +36,8 @@ def generate_graph(grad=False):
         g.add_edge(i, 9)
     # add a back flow from 9 to 0
     g.add_edge(9, 0)
-    col = Variable(th.randn(10, D), requires_grad=grad)
-    g.set_n_repr({'h' : col})
+    ncol = Variable(th.randn(10, D), requires_grad=grad)
+    g.set_n_repr({'h' : ncol})
     return g
 
 def test_batch_setter_getter():
@@ -196,9 +196,20 @@ def test_update_routines():
     assert(reduce_msg_shapes == {(1, 8, D), (9, 1, D)})
     reduce_msg_shapes.clear()
 
+def _test_delete():
+    g = generate_graph()
+    ecol = Variable(th.randn(17, D), requires_grad=grad)
+    g.set_e_repr({'e' : ecol})
+    assert g.get_n_repr()['h'].shape[0] == 10
+    assert g.get_e_repr()['e'].shape[0] == 17
+    g.remove_node(0)
+    assert g.get_n_repr()['h'].shape[0] == 9
+    assert g.get_e_repr()['e'].shape[0] == 8
+
 if __name__ == '__main__':
     test_batch_setter_getter()
     test_batch_setter_autograd()
     test_batch_send()
     test_batch_recv()
     test_update_routines()
+    #test_delete()

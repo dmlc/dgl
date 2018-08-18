@@ -58,6 +58,7 @@ unsqueeze = th.unsqueeze
 reshape = th.reshape
 zeros = th.zeros
 ones = th.ones
+zeros = th.zeros
 spmm = th.spmm
 sort = th.sort
 arange = th.arange

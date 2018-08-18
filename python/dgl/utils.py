@@ -71,22 +71,39 @@ class LazyDict(Mapping):
         self._fn = fn
         self._keys = keys
 
-    def keys(self):
-        return self._keys
-
     def __getitem__(self, key):
-        assert key in self._keys
+        if not key in self._keys:
+            raise KeyError(key)
         return self._fn(key)
 
     def __contains__(self, key):
         return key in self._keys
 
     def __iter__(self):
-        for key in self._keys:
-            yield key, self._fn(key)
+        return iter(self._keys)
 
     def __len__(self):
         return len(self._keys)
+
+class ReadOnlyDict(Mapping):
+    """A readonly dictionary wrapper."""
+    def __init__(self, dict_like):
+        self._dict_like = dict_like
+
+    def keys(self):
+        return self._dict_like.keys()
+
+    def __getitem__(self, key):
+        return self._dict_like[key]
+
+    def __contains__(self, key):
+        return key in self._dict_like
+
+    def __iter__(self):
+        return iter(self._dict_like)
+
+    def __len__(self):
+        return len(self._dict_like)
 
 def build_relabel_map(x):
     """Relabel the input ids to continuous ids that starts from zero.
@@ -112,6 +129,26 @@ def build_relabel_map(x):
     # TODO(minjie): should not directly use []
     old_to_new[unique_x] = F.astype(F.arange(len(unique_x)), F.int64)
     return unique_x, old_to_new
+
+def build_relabel_dict(x):
+    """Relabel the input ids to continuous ids that starts from zero.
+
+    The new id follows the order of the given node id list.
+
+    Parameters
+    ----------
+    x : list
+      The input ids.
+
+    Returns
+    -------
+    relabel_dict : dict
+      Dict from old id to new id.
+    """
+    relabel_dict = {}
+    for i, v in enumerate(x):
+        relabel_dict[v] = i
+    return relabel_dict
 
 def edge_broadcasting(u, v):
     """Convert one-many and many-one edges to many-many."""

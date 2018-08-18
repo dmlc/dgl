@@ -2,62 +2,23 @@
 """
 from __future__ import absolute_import
 
-from collections import MutableMapping
 import networkx as nx
 from networkx.classes.digraph import DiGraph
 
+import dgl
 from dgl.base import ALL, is_all
 import dgl.backend as F
 from dgl.backend import Tensor
 import dgl.builtin as builtin
 from dgl.cached_graph import CachedGraph, create_cached_graph
 import dgl.context as context
-from dgl.frame import Frame
+from dgl.frame import FrameRef
+from dgl.nx_adapt import nx_init
 import dgl.scheduler as scheduler
 import dgl.utils as utils
 
 __MSG__ = "__MSG__"
 __REPR__ = "__REPR__"
-
-class _NodeDict(MutableMapping):
-    def __init__(self, cb):
-        self._dict = {}
-        self._cb = cb
-    def __setitem__(self, key, val):
-        if isinstance(val, _AdjInnerDict):
-            # This node dict is used as adj_outer_list
-            val.src = key
-        elif key not in self._dict:
-            self._cb(key)
-        self._dict[key] = val
-    def __getitem__(self, key):
-        return self._dict[key]
-    def __delitem__(self, key):
-        # FIXME: add callback
-        del self._dict[key]
-    def __len__(self):
-        return len(self._dict)
-    def __iter__(self):
-        return iter(self._dict)
-
-class _AdjInnerDict(MutableMapping):
-    def __init__(self, cb):
-        self._dict = {}
-        self.src = None
-        self._cb = cb
-    def __setitem__(self, key, val):
-        if key not in self._dict:
-            self._cb(self.src, key)
-        self._dict[key] = val
-    def __getitem__(self, key):
-        return self._dict[key]
-    def __delitem__(self, key):
-        # FIXME: add callback
-        del self._dict[key]
-    def __len__(self):
-        return len(self._dict)
-    def __iter__(self):
-        return iter(self._dict)
 
 class DGLGraph(DiGraph):
     """Base graph class specialized for neural networks on graphs.
@@ -67,42 +28,41 @@ class DGLGraph(DiGraph):
 
     Parameters
     ----------
-    data : graph data
+    graph_data : graph data
         Data to initialize graph. Same as networkx's semantics.
+    node_frame : dgl.frame.Frame
+        Node feature storage.
+    edge_frame : dgl.frame.Frame
+        Edge feature storage.
     attr : keyword arguments, optional
         Attributes to add to graph as key=value pairs.
     """
-    def __init__(self, graph_data=None, **attr):
-        # setup dict overlay
-        self.node_dict_factory = lambda : _NodeDict(self._add_node_callback)
-        # In networkx 2.1, DiGraph is not using this factory. Instead, the outer
-        # dict uses the same data structure as the node dict.
-        self.adjlist_outer_dict_factory = None
-        self.adjlist_inner_dict_factory = lambda : _AdjInnerDict(self._add_edge_callback)
-        self.edge_attr_dict_factory = dict
-        self._context = context.cpu()
-        # call base class init
-        super(DGLGraph, self).__init__(graph_data, **attr)
-        self._init_state()
-
-    def _init_state(self):
+    def __init__(self,
+                 graph_data=None,
+                 node_frame=None,
+                 edge_frame=None,
+                 **attr):
+        # TODO(minjie): maintaining node/edge list is costly when graph is large.
+        self._edge_list = []
+        nx_init(self,
+                self._add_node_callback,
+                self._add_edge_callback,
+                self._del_node_callback,
+                self._del_edge_callback,
+                graph_data,
+                **attr)
         # cached graph and storage
         self._cached_graph = None
-        self._node_frame = Frame()
-        self._edge_frame = Frame()
+        self._node_frame = node_frame if node_frame is not None else FrameRef()
+        self._edge_frame = edge_frame if edge_frame is not None else FrameRef()
         # other class members
         self._msg_graph = None
-        self._msg_frame = Frame()
+        self._msg_frame = FrameRef()
         self._message_func = None
         self._reduce_func = None
         self._update_func = None
         self._edge_func = None
-        self._edge_cb_state = True
-        self._edge_list = []
-
-    def clear(self):
-        super(DGLGraph, self).clear()
-        self._init_state()
+        self._context = context.cpu()
 
     def get_n_attr_list(self):
         return self._node_frame.schemes
@@ -129,7 +89,7 @@ class DGLGraph(DiGraph):
           The node(s).
         """
         # sanity check
-        if isinstance(u, str) and u == ALL:
+        if is_all(u):
             num_nodes = self.number_of_nodes()
         else:
             u = utils.convert_to_id_tensor(u, self.context)
@@ -140,7 +100,7 @@ class DGLGraph(DiGraph):
         else:
             assert F.shape(hu)[0] == num_nodes
         # set
-        if isinstance(u, str) and u == ALL:
+        if is_all(u):
             if isinstance(hu, dict):
                 for key, val in hu.items():
                     self._node_frame[key] = val
@@ -161,7 +121,7 @@ class DGLGraph(DiGraph):
         u : node, container or tensor
           The node(s).
         """
-        if isinstance(u, str) and u == ALL:
+        if is_all(u):
             if len(self._node_frame) == 1 and __REPR__ in self._node_frame:
                 return self._node_frame[__REPR__]
             else:
@@ -204,8 +164,8 @@ class DGLGraph(DiGraph):
           The destination node(s).
         """
         # sanity check
-        u_is_all = isinstance(u, str) and u == ALL
-        v_is_all = isinstance(v, str) and v == ALL
+        u_is_all = is_all(u)
+        v_is_all = is_all(v)
         assert u_is_all == v_is_all
         if u_is_all:
             num_edges = self.number_of_edges()
@@ -244,7 +204,7 @@ class DGLGraph(DiGraph):
           The edge id(s).
         """
         # sanity check
-        if isinstance(eid, str) and eid == ALL:
+        if is_all(eid):
             num_edges = self.number_of_edges()
         else:
             eid = utils.convert_to_id_tensor(eid, self.context)
@@ -255,7 +215,7 @@ class DGLGraph(DiGraph):
         else:
             assert F.shape(h_uv)[0] == num_edges
         # set
-        if isinstance(eid, str) and eid == ALL:
+        if is_all(eid):
             if isinstance(h_uv, dict):
                 for key, val in h_uv.items():
                     self._edge_frame[key] = val
@@ -278,8 +238,8 @@ class DGLGraph(DiGraph):
         v : node, container or tensor
           The destination node(s).
         """
-        u_is_all = isinstance(u, str) and u == ALL
-        v_is_all = isinstance(v, str) and v == ALL
+        u_is_all = is_all(u)
+        v_is_all = is_all(v)
         assert u_is_all == v_is_all
         if u_is_all:
             if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
@@ -313,7 +273,7 @@ class DGLGraph(DiGraph):
         eid : int, container or tensor
           The edge id(s).
         """
-        if isinstance(eid, str) and eid == ALL:
+        if is_all(eid):
             if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
                 return self._edge_frame[__REPR__]
             else:
@@ -956,6 +916,38 @@ class DGLGraph(DiGraph):
                 self.update_by_edge(u, v,
                         message_func, reduce_func, update_func, batchable)
 
+    def subgraph(self, nodes):
+        """Generate the subgraph among the given nodes.
+
+        The generated graph contains only the graph structure. The node/edge
+        features are not shared implicitly. Use `copy_from` to get node/edge
+        features from parent graph.
+
+        Parameters
+        ----------
+        nodes : list, or iterable
+            A container of the nodes to construct subgraph.
+
+        Returns
+        -------
+        G : DGLGraph
+            The subgraph.
+        """
+        return dgl.DGLSubGraph(self, nodes)
+
+    def copy_from(self, graph):
+        """Copy node/edge features from the given graph.
+
+        All old features will be removed.
+
+        Parameters
+        ----------
+        graph : DGLGraph
+            The graph to copy from.
+        """
+        # TODO
+        pass
+
     def draw(self):
         """Plot the graph using dot."""
         from networkx.drawing.nx_agraph import graphviz_layout
@@ -984,6 +976,28 @@ class DGLGraph(DiGraph):
             self._msg_graph.add_nodes(self.number_of_nodes())
             self._msg_frame.clear()
 
+    @property
+    def edge_list(self):
+        """Return edges in the addition order."""
+        return self._edge_list
+
+    def get_edge_id(self, u, v):
+        """Return the continuous edge id(s) assigned.
+
+        Parameters
+        ----------
+        u : node, container or tensor
+          The source node(s).
+        v : node, container or tensor
+          The destination node(s).
+
+        Returns
+        -------
+        eid : tensor
+          The tensor contains edge id(s).
+        """
+        return self.cached_graph.get_edge_id(u, v)
+
     def _nodes_or_all(self, nodes):
         return self.nodes() if nodes == ALL else nodes
 
@@ -991,22 +1005,29 @@ class DGLGraph(DiGraph):
         return self.edges() if edges == ALL else edges
 
     def _add_node_callback(self, node):
+        #print('New node:', node)
+        self._cached_graph = None
+
+    def _del_node_callback(self, node):
+        #print('Del node:', node)
+        raise RuntimeError('Node removal is not supported currently.')
+        node = utils.convert_to_id_tensor(node)
+        self._node_frame.delete_rows(node)
         self._cached_graph = None
 
     def _add_edge_callback(self, u, v):
-        # In networkx 2.1, two adjlists are maintained. One for succ, one for pred.
-        # We only record once for the succ addition.
-        if self._edge_cb_state:
-            #print('New edge:', u, v)
-            self._edge_list.append((u, v))
-        self._edge_cb_state = not self._edge_cb_state
+        #print('New edge:', u, v)
+        self._edge_list.append((u, v))
         self._cached_graph = None
 
-    @property
-    def edge_list(self):
-        """Return edges in the addition order."""
-        return self._edge_list
-
+    def _del_edge_callback(self, u, v):
+        #print('Del edge:', u, v)
+        raise RuntimeError('Edge removal is not supported currently.')
+        u = utils.convert_to_id_tensor(u)
+        v = utils.convert_to_id_tensor(v)
+        eid = self.get_edge_id(u, v)
+        self._edge_frame.delete_rows(eid)
+        self._cached_graph = None
 
 def _get_repr(attr_dict):
     if len(attr_dict) == 1 and __REPR__ in attr_dict:

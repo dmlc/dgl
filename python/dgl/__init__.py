@@ -1,5 +1,11 @@
 from .base import ALL
-from .graph import DGLGraph
-from .graph import __MSG__, __REPR__
-from .context import cpu, gpu
+
 from .batch import batch, unbatch
+
+from .context import cpu, gpu
+
+from .graph import DGLGraph, __MSG__, __REPR__
+
+from .subgraph import DGLSubGraph
+
+from .generator import *
