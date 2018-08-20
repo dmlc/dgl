@@ -644,7 +644,10 @@ class DGLGraph(DiGraph):
         reordered_v = F.pack(v_buckets)
         # Pack all reduced msgs together
         if isinstance(reduced_msgs[0], dict):
-            all_reduced_msgs = {key : F.pack(val) for key, val in reduced_msgs.items()}
+            keys = reduced_msgs[0].keys()
+            all_reduced_msgs = {
+                    key : F.pack([m[key] for m in reduced_msgs])
+                    for key in keys}
         else:
             all_reduced_msgs = F.pack(reduced_msgs)
 
@@ -934,6 +937,25 @@ class DGLGraph(DiGraph):
             The subgraph.
         """
         return dgl.DGLSubGraph(self, nodes)
+
+    def edge_subgraph(self, edges):
+        """Generate the subgraph among the given edges.
+
+        The generated graph contains only the graph structure. The node/edge
+        features are not shared implicitly. Use `copy_from` to get node/edge
+        features from parent graph.
+
+        Parameters
+        ----------
+        edges : list, or iterable
+            A container of the edges to construct subgraph.
+
+        Returns
+        -------
+        G : DGLGraph
+            The subgraph.
+        """
+        return dgl.DGLSubGraph(self, edges=edges)
 
     def copy_from(self, graph):
         """Copy node/edge features from the given graph.
