@@ -12,15 +12,26 @@ class DGLSubGraph(DGLGraph):
     # TODO(gaiyu): ReadOnlyGraph
     def __init__(self,
                  parent,
-                 nodes):
+                 nodes=None,
+                 edges=None):
+        '''
+        Constructs a subgraph from either given nodes or given edges.
+
+        nodes and edges are mutually exclusive.
+        '''
         # create subgraph and relabel
-        nx_sg = nx.DiGraph.subgraph(parent, nodes)
+        if edges is None:
+            nx_sg = nx.DiGraph.subgraph(parent, nodes)
+            edges = list(nx_sg.edges)
+        else:
+            nx_sg = nx.DiGraph.edge_subgraph(parent, edges)
+            nodes = list(nx_sg.nodes)
         # node id
         # TODO(minjie): context
         nid = F.tensor(nodes, dtype=F.int64)
         # edge id
         # TODO(minjie): slow, context
-        u, v = zip(*nx_sg.edges)
+        u, v = zip(*edges)
         u = list(u)
         v = list(v)
         eid = parent.cached_graph.get_edge_id(u, v)

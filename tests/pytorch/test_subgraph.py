@@ -28,6 +28,7 @@ def test_subgraph():
     g = generate_graph()
     h = g.get_n_repr()['h']
     l = g.get_e_repr()['l']
+    # check node subgraph
     sg = g.subgraph([0, 2, 3, 6, 7, 9])
     sh = sg.get_n_repr()['h']
     check_eq(h[th.tensor([0, 2, 3, 6, 7, 9])], sh)
@@ -53,6 +54,11 @@ def test_subgraph():
     '''
     eid = th.tensor([2, 3, 4, 5, 10, 11, 12, 13, 16])
     check_eq(l[eid], sg.get_e_repr()['l'])
+
+    # check the edge subgraph
+    sg = g.edge_subgraph([g.edge_list[i] for i in eid])
+    check_eq(l[eid], sg.get_e_repr()['l'])
+    check_eq(h[th.tensor([0, 2, 3, 6, 7, 9])], sh)
 
 if __name__ == '__main__':
     test_subgraph()
