@@ -930,10 +930,18 @@ class DGLGraph(DiGraph):
 
         Returns
         -------
-        G : DGLGraph
+        G : DGLSubGraph
             The subgraph.
         """
         return dgl.DGLSubGraph(self, nodes)
+
+    def merge(self, subgraphs, reduce_func='sum'):
+        """Merge subgraph features back to this parent graph.
+
+        Parameters
+        ----------
+        """
+        pass
 
     def draw(self):
         """Plot the graph using dot."""
