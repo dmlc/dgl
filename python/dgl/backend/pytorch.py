@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import torch as th
 import scipy.sparse
+import dgl.context as context
 
 # Tensor types
 Tensor = th.Tensor
@@ -73,3 +74,9 @@ def to_context(x, ctx):
         return x.cpu()
     else:
         raise RuntimeError('Invalid context', ctx)
+
+def get_context(x):
+    if x.device.type == 'cpu':
+        return context.cpu()
+    else:
+        return context.gpu(x.device.index)

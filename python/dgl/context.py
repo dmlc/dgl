@@ -12,7 +12,7 @@ class Context(object):
         return self.device == other.device and self.device_id == other.device_id
 
     def __hash__(self):
-        return hash(tuple(self.device, self.device_id))
+        return hash((self.device, self.device_id))
 
 def gpu(gpuid):
     return Context('gpu', gpuid)

@@ -213,7 +213,6 @@ def main(args):
                 count, label, node_list, mask, active, label1, label1_tensor = ground_truth[0]
                 label, node_list, mask, label1_tensor = move2cuda((label, node_list, mask, label1_tensor))
                 ground_truth[0] = (count, label, node_list, mask, active, label1, label1_tensor)
-                ground_truth[1][0].set_device(dgl.gpu(args.gpu))
 
             optimizer.zero_grad()
             # create new empty graphs

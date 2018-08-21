@@ -2,6 +2,7 @@ import torch as th
 from torch.autograd import Variable
 import numpy as np
 from dgl.frame import Frame, FrameRef
+from dgl.utils import Index
 
 N = 10
 D = 5
@@ -112,7 +113,7 @@ def test_append2():
     assert not f.is_span_whole_column()
     assert f.num_rows == 3 * N
     new_idx = list(range(N)) + list(range(2*N, 4*N))
-    assert check_eq(f.index_tensor(), th.tensor(new_idx))
+    assert check_eq(f.index().totensor(), th.tensor(new_idx))
     assert data.num_rows == 4 * N
 
 def test_row1():
@@ -122,20 +123,20 @@ def test_row1():
 
     # getter
     # test non-duplicate keys
-    rowid = th.tensor([0, 2])
+    rowid = Index(th.tensor([0, 2]))
     rows = f[rowid]
     for k, v in rows.items():
         assert v.shape == (len(rowid), D)
         assert check_eq(v, data[k][rowid])
     # test duplicate keys
-    rowid = th.tensor([8, 2, 2, 1])
+    rowid = Index(th.tensor([8, 2, 2, 1]))
     rows = f[rowid]
     for k, v in rows.items():
         assert v.shape == (len(rowid), D)
         assert check_eq(v, data[k][rowid])
 
     # setter
-    rowid = th.tensor([0, 2, 4])
+    rowid = Index(th.tensor([0, 2, 4]))
     vals = {'a1' : th.zeros((len(rowid), D)),
             'a2' : th.zeros((len(rowid), D)),
             'a3' : th.zeros((len(rowid), D)),
@@ -152,13 +153,13 @@ def test_row2():
     # getter
     c1 = f['a1']
     # test non-duplicate keys
-    rowid = th.tensor([0, 2])
+    rowid = Index(th.tensor([0, 2]))
     rows = f[rowid]
     rows['a1'].backward(th.ones((len(rowid), D)))
     assert check_eq(c1.grad[:,0], th.tensor([1., 0., 1., 0., 0., 0., 0., 0., 0., 0.]))
     c1.grad.data.zero_()
     # test duplicate keys
-    rowid = th.tensor([8, 2, 2, 1])
+    rowid = Index(th.tensor([8, 2, 2, 1]))
     rows = f[rowid]
     rows['a1'].backward(th.ones((len(rowid), D)))
     assert check_eq(c1.grad[:,0], th.tensor([0., 1., 2., 0., 0., 0., 0., 0., 1., 0.]))
@@ -166,7 +167,7 @@ def test_row2():
 
     # setter
     c1 = f['a1']
-    rowid = th.tensor([0, 2, 4])
+    rowid = Index(th.tensor([0, 2, 4]))
     vals = {'a1' : Variable(th.zeros((len(rowid), D)), requires_grad=True),
             'a2' : Variable(th.zeros((len(rowid), D)), requires_grad=True),
             'a3' : Variable(th.zeros((len(rowid), D)), requires_grad=True),
@@ -210,14 +211,14 @@ def test_sharing():
     f2_a1 = f2['a1']
     # test write
     # update own ref should not been seen by the other.
-    f1[th.tensor([0, 1])] = {
+    f1[Index(th.tensor([0, 1]))] = {
             'a1' : th.zeros([2, D]),
             'a2' : th.zeros([2, D]),
             'a3' : th.zeros([2, D]),
             }
     assert check_eq(f2['a1'], f2_a1)
     # update shared space should been seen by the other.
-    f1[th.tensor([2, 3])] = {
+    f1[Index(th.tensor([2, 3]))] = {
             'a1' : th.ones([2, D]),
             'a2' : th.ones([2, D]),
             'a3' : th.ones([2, D]),

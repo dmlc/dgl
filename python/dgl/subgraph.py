@@ -16,7 +16,7 @@ class DGLSubGraph(DGLGraph):
         super(DGLSubGraph, self).__init__()
         # relabel nodes
         self._node_mapping = utils.build_relabel_dict(nodes)
-        self._parent_nid = F.tensor(nodes, dtype=F.int64) # TODO(minjie): context
+        self._parent_nid = utils.toindex(nodes) # TODO(minjie): context
         eids = []
         # create subgraph
         for eid, (u, v) in enumerate(parent.edge_list):
@@ -24,7 +24,7 @@ class DGLSubGraph(DGLGraph):
                 self.add_edge(self._node_mapping[u],
                               self._node_mapping[v])
                 eids.append(eid)
-        self._parent_eid = F.tensor(eids, dtype=F.int64) # TODO(minjie): context
+        self._parent_eid = utils.toindex(eids) # TODO(minjie): context
 
     def copy_from(self, parent):
         """Copy node/edge features from the parent graph.

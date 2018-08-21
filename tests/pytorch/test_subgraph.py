@@ -68,4 +68,3 @@ def test_basics():
 
 if __name__ == '__main__':
     test_basics()
-    test_copy_from()

@@ -154,8 +154,6 @@ def main(args):
 
     # create GCN model
     g = DGLGraph(data.graph)
-    if cuda:
-        g.set_device(dgl.gpu(args.gpu))
 
     # create model
     model = GAT(g,

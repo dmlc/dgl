@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 from collections import Mapping
 from functools import wraps
+import numpy as np
 
 import dgl.backend as F
 from dgl.backend import Tensor, SparseTensor
@@ -13,18 +14,77 @@ def is_id_tensor(u):
 
 def is_id_container(u):
     """Return whether the input is a supported id container."""
-    return isinstance(u, list)
+    return (getattr(u, '__iter__', None) is not None
+            and getattr(u, '__len__', None) is not None)
+
+class Index(object):
+    """Index class that can be easily converted to list/tensor."""
+    def __init__(self, data):
+        self._list_data = None
+        self._tensor_data = None
+        self._ctx_data = dict()
+        self._dispatch(data)
+
+    def _dispatch(self, data):
+        if is_id_tensor(data):
+            self._tensor_data = data
+        elif is_id_container(data):
+            self._list_data = data
+        else:
+            try:
+                self._list_data = [int(data)]
+            except:
+                raise TypeError('Error index data: %s' % str(x))
+
+    def tolist(self):
+        if self._list_data is None:
+            self._list_data = list(F.asnumpy(self._tensor_data))
+        return self._list_data
+
+    def totensor(self, ctx=None):
+        if self._tensor_data is None:
+            self._tensor_data = F.tensor(self._list_data, dtype=F.int64)
+        if ctx is None:
+            return self._tensor_data
+        if ctx not in self._ctx_data:
+            self._ctx_data[ctx] = F.to_context(self._tensor_data, ctx)
+        return self._ctx_data[ctx]
+
+    def __iter__(self):
+        return iter(self.tolist())
+
+    def __len__(self):
+        if self._list_data is not None:
+            return len(self._list_data)
+        else:
+            return len(self._tensor_data)
+
+    def __getitem__(self, i):
+        return self.tolist()[i]
+
+def toindex(x):
+    return x if isinstance(x, Index) else Index(x)
 
 def node_iter(n):
-    """Return an iterator that loops over the given nodes."""
-    n = convert_to_id_container(n)
-    for nn in n:
-        yield nn
+    """Return an iterator that loops over the given nodes.
+
+    Parameters
+    ----------
+    n : iterable
+        The node ids.
+    """
+    return iter(n)
 
 def edge_iter(u, v):
-    """Return an iterator that loops over the given edges."""
-    u = convert_to_id_container(u)
-    v = convert_to_id_container(v)
+    """Return an iterator that loops over the given edges.
+
+    Parameters
+    ----------
+    u : iterable
+        The src ids.
+    v : iterable
+        The dst ids.
+    """
     if len(u) == len(v):
         # many-many
         for uu, vv in zip(u, v):
@@ -40,8 +100,33 @@ def edge_iter(u, v):
     else:
         raise ValueError('Error edges:', u, v)
 
+def edge_broadcasting(u, v):
+    """Convert one-many and many-one edges to many-many.
+
+    Parameters
+    ----------
+    u : Index
+        The src id(s)
+    v : Index
+        The dst id(s)
+
+    Returns
+    -------
+    uu : Index
+        The src id(s) after broadcasting
+    vv : Index
+        The dst id(s) after broadcasting
+    """
+    if len(u) != len(v) and len(u) == 1:
+        u = toindex(F.broadcast_to(u.totensor(), v.totensor()))
+    elif len(u) != len(v) and len(v) == 1:
+        v = toindex(F.broadcast_to(v.totensor(), u.totensor()))
+    else:
+        assert len(u) == len(v)
+    return u, v
+
+'''
 def convert_to_id_container(x):
-    """Convert the input to id container."""
     if is_id_container(x):
         return x
     elif is_id_tensor(x):
@@ -54,7 +139,6 @@ def convert_to_id_container(x):
     return None
 
 def convert_to_id_tensor(x, ctx=None):
-    """Convert the input to id tensor."""
     if is_id_container(x):
         ret = F.tensor(x, dtype=F.int64)
     elif is_id_tensor(x):
@@ -66,6 +150,7 @@ def convert_to_id_tensor(x, ctx=None):
             raise TypeError('Error node: %s' % str(x))
     ret = F.to_context(ret, ctx)
     return ret
+'''
 
 class LazyDict(Mapping):
     """A readonly dictionary that does not materialize the storage."""
@@ -112,7 +197,7 @@ def build_relabel_map(x):
 
     Parameters
     ----------
-    x : int, tensor or container
+    x : Index
       The input ids.
 
     Returns
@@ -124,7 +209,7 @@ def build_relabel_map(x):
       One can use advanced indexing to convert an old id tensor to a
       new id tensor: new_id = old_to_new[old_id]
     """
-    x = convert_to_id_tensor(x)
+    x = x.totensor()
     unique_x, _ = F.sort(F.unique(x))
     map_len = int(F.max(unique_x)) + 1
     old_to_new = F.zeros(map_len, dtype=F.int64)
@@ -151,16 +236,6 @@ def build_relabel_dict(x):
     for i, v in enumerate(x):
         relabel_dict[v] = i
     return relabel_dict
-
-def edge_broadcasting(u, v):
-    """Convert one-many and many-one edges to many-many."""
-    if len(u) != len(v) and len(u) == 1:
-        u = F.broadcast_to(u, v)
-    elif len(u) != len(v) and len(v) == 1:
-        v = F.broadcast_to(v, u)
-    else:
-        assert len(u) == len(v)
-    return u, v
 
 class CtxCachedObject(object):
     """A wrapper to cache object generated by different context.

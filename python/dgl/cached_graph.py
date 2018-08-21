@@ -36,7 +36,7 @@ class CachedGraph:
     def get_edge_id(self, u, v):
         uvs = list(utils.edge_iter(u, v))
         eids = self._graph.get_eids(uvs)
-        return utils.convert_to_id_tensor(eids)
+        return utils.toindex(eids)
 
     def in_edges(self, v):
         src = []
@@ -45,8 +45,8 @@ class CachedGraph:
             uu = self._graph.predecessors(vv)
             src += uu
             dst += [vv] * len(uu)
-        src = utils.convert_to_id_tensor(src)
-        dst = utils.convert_to_id_tensor(dst)
+        src = utils.toindex(src)
+        dst = utils.toindex(dst)
         return src, dst
 
     def out_edges(self, u):
@@ -56,13 +56,13 @@ class CachedGraph:
             vv = self._graph.successors(uu)
             src += [uu] * len(vv)
             dst += vv
-        src = utils.convert_to_id_tensor(src)
-        dst = utils.convert_to_id_tensor(dst)
+        src = utils.toindex(src)
+        dst = utils.toindex(dst)
         return src, dst
 
     def in_degrees(self, v):
         degs = self._graph.indegree(list(v))
-        return utils.convert_to_id_tensor(degs)
+        return utils.toindex(degs)
 
     def num_edges(self):
         return self._graph.ecount()
@@ -72,8 +72,8 @@ class CachedGraph:
         elist = self._graph.get_edgelist()
         src = [u for u, _ in elist]
         dst = [v for _, v in elist]
-        src = utils.convert_to_id_tensor(src)
-        dst = utils.convert_to_id_tensor(dst)
+        src = utils.toindex(src)
+        dst = utils.toindex(dst)
         return src, dst
 
     @utils.ctx_cached_member
@@ -84,15 +84,15 @@ class CachedGraph:
         represents the src nodes.
         """
         elist = self._graph.get_edgelist()
-        src = [u for u, _ in elist]
-        dst = [v for _, v in elist]
-        src = F.unsqueeze(utils.convert_to_id_tensor(src), 0)
-        dst = F.unsqueeze(utils.convert_to_id_tensor(dst), 0)
+        src = F.tensor([u for u, _ in elist], dtype=F.int64)
+        dst = F.tensor([v for _, v in elist], dtype=F.int64)
+        src = F.unsqueeze(src, 0)
+        dst = F.unsqueeze(dst, 0)
         idx = F.pack([dst, src])
         n = self._graph.vcount()
         dat = F.ones((len(elist),))
         mat = F.sparse_tensor(idx, dat, [n, n])
-        mat = F.to_context(self._adjmat, ctx)
+        mat = F.to_context(mat, ctx)
         return mat
 
     def freeze(self):
