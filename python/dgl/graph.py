@@ -12,7 +12,7 @@ from dgl.backend import Tensor
 import dgl.builtin as builtin
 from dgl.cached_graph import CachedGraph, create_cached_graph
 import dgl.context as context
-from dgl.frame import FrameRef
+from dgl.frame import FrameRef, merge_frames
 from dgl.nx_adapt import nx_init
 import dgl.scheduler as scheduler
 import dgl.utils as utils
@@ -64,10 +64,10 @@ class DGLGraph(DiGraph):
         self._edge_func = None
         self._context = context.cpu()
 
-    def get_n_attr_list(self):
+    def node_attr_schemes(self):
         return self._node_frame.schemes
 
-    def get_e_attr_list(self):
+    def edge_attr_schemes(self):
         return self._edge_frame.schemes
 
     def set_n_repr(self, hu, u=ALL):
@@ -108,10 +108,9 @@ class DGLGraph(DiGraph):
                 self._node_frame[__REPR__] = hu
         else:
             if isinstance(hu, dict):
-                for key, val in hu.items():
-                    self._node_frame[key] = F.scatter_row(self._node_frame[key], u, val)
+                self._node_frame[u] = hu
             else:
-                self._node_frame[__REPR__] = F.scatter_row(self._node_frame[__REPR__], u, hu)
+                self._node_frame[u] = {__REPR__ : hu}
 
     def get_n_repr(self, u=ALL):
         """Get node(s) representation.
@@ -129,7 +128,7 @@ class DGLGraph(DiGraph):
         else:
             u = utils.convert_to_id_tensor(u, self.context)
             if len(self._node_frame) == 1 and __REPR__ in self._node_frame:
-                return self._node_frame[__REPR__][u]
+                return self._node_frame.select_rows(u)[__REPR__]
             else:
                 return self._node_frame.select_rows(u)
 
@@ -168,7 +167,7 @@ class DGLGraph(DiGraph):
         v_is_all = is_all(v)
         assert u_is_all == v_is_all
         if u_is_all:
-            num_edges = self.number_of_edges()
+            num_edges = self.cached_graph.num_edges()
         else:
             u = utils.convert_to_id_tensor(u, self.context)
             v = utils.convert_to_id_tensor(v, self.context)
@@ -188,10 +187,9 @@ class DGLGraph(DiGraph):
         else:
             eid = self.cached_graph.get_edge_id(u, v)
             if isinstance(h_uv, dict):
-                for key, val in h_uv.items():
-                    self._edge_frame[key] = F.scatter_row(self._edge_frame[key], eid, val)
+                self._edge_frame[eid] = h_uv
             else:
-                self._edge_frame[__REPR__] = F.scatter_row(self._edge_frame[__REPR__], eid, h_uv)
+                self._edge_frame[eid] = {__REPR__ : h_uv}
 
     def set_e_repr_by_id(self, h_uv, eid=ALL):
         """Set edge(s) representation by edge id.
@@ -205,7 +203,7 @@ class DGLGraph(DiGraph):
         """
         # sanity check
         if is_all(eid):
-            num_edges = self.number_of_edges()
+            num_edges = self.cached_graph.num_edges()
         else:
             eid = utils.convert_to_id_tensor(eid, self.context)
             num_edges = len(eid)
@@ -223,10 +221,9 @@ class DGLGraph(DiGraph):
                 self._edge_frame[__REPR__] = h_uv
         else:
             if isinstance(h_uv, dict):
-                for key, val in h_uv.items():
-                    self._edge_frame[key] = F.scatter_row(self._edge_frame[key], eid, val)
+                self._edge_frame[eid] = h_uv
             else:
-                self._edge_frame[__REPR__] = F.scatter_row(self._edge_frame[__REPR__], eid, h_uv)
+                self._edge_frame[eid] = {__REPR__ : h_uv}
 
     def get_e_repr(self, u=ALL, v=ALL):
         """Get node(s) representation.
@@ -251,7 +248,7 @@ class DGLGraph(DiGraph):
             v = utils.convert_to_id_tensor(v, self.context)
             eid = self.cached_graph.get_edge_id(u, v)
             if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
-                return self._edge_frame[__REPR__][eid]
+                return self._edge_frame.select_rows(eid)[__REPR__]
             else:
                 return self._edge_frame.select_rows(eid)
 
@@ -281,7 +278,7 @@ class DGLGraph(DiGraph):
         else:
             eid = utils.convert_to_id_tensor(eid, self.context)
             if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
-                return self._edge_frame[__REPR__][eid]
+                return self._edge_frame.select_rows(eid)[__REPR__]
             else:
                 return self._edge_frame.select_rows(eid)
 
@@ -355,27 +352,6 @@ class DGLGraph(DiGraph):
           Whether the provided update function allows batch computing.
         """
         self._update_func = (update_func, batchable)
-
-    def readout(self,
-                readout_func,
-                nodes=ALL,
-                edges=ALL):
-        """Trigger the readout function on the specified nodes/edges.
-
-        Parameters
-        ----------
-        readout_func : callable
-          Readout function.
-        nodes : str, node, container or tensor
-          The nodes to get reprs from.
-        edges : str, pair of nodes, pair of containers or pair of tensors
-          The edges to get reprs from.
-        """
-        nodes = self._nodes_or_all(nodes)
-        edges = self._edges_or_all(edges)
-        nstates = [self.nodes[n] for n in nodes]
-        estates = [self.edges[e] for e in edges]
-        return readout_func(nstates, estates)
 
     def sendto(self, u, v, message_func=None, batchable=False):
         """Trigger the message function on edge u->v
@@ -605,9 +581,14 @@ class DGLGraph(DiGraph):
 
         if is_all(v):
             v = list(range(self.number_of_nodes()))
+
+        # freeze message graph
+        self.msg_graph.freeze()
+
         # sanity checks
         v = utils.convert_to_id_tensor(v)
         f_reduce = _get_reduce_func(reduce_func)
+
         # degree bucketing
         degrees, v_buckets = scheduler.degree_bucketing(self.msg_graph, v)
         reduced_msgs = []
@@ -940,8 +921,34 @@ class DGLGraph(DiGraph):
 
         Parameters
         ----------
+        subgraphs : iterator of DGLSubGraph
+            The subgraphs to be merged.
+        reduce_func : str
+            The reduce function (only 'sum' is supported currently)
         """
-        pass
+        # sanity check: all the subgraphs and the parent graph
+        # should have the same node/edge feature schemes.
+        # merge node features
+        to_merge = []
+        for sg in subgraphs:
+            if len(sg.node_attr_schemes) == 0:
+                continue
+            if sg.node_attr_schemes() != self.node_attr_schemes():
+                raise RuntimeError('Subgraph and parent graph do not '
+                                   'have the same node attribute schemes.')
+            to_merge.append(sg)
+        self._node_frame = merge_frames([sg._node_frame for sg in to_merge], reduce_func)
+
+        # merge edge features
+        to_merge.clear()
+        for sg in subgraphs:
+            if len(sg.edge_attr_schemes) == 0:
+                continue
+            if sg.edge_attr_schemes() != self.edge_attr_schemes():
+                raise RuntimeError('Subgraph and parent graph do not '
+                                   'have the same edge attribute schemes.')
+            to_merge.append(sg)
+        self._edge_frame = merge_frames([sg._edge_frame for sg in to_merge], reduce_func)
 
     def draw(self):
         """Plot the graph using dot."""
@@ -992,12 +999,6 @@ class DGLGraph(DiGraph):
           The tensor contains edge id(s).
         """
         return self.cached_graph.get_edge_id(u, v)
-
-    def _nodes_or_all(self, nodes):
-        return self.nodes() if nodes == ALL else nodes
-
-    def _edges_or_all(self, edges):
-        return self.edges() if edges == ALL else edges
 
     def _add_node_callback(self, node):
         #print('New node:', node)

@@ -6,7 +6,7 @@ import numpy as np
 
 import dgl.backend as F
 from dgl.backend import Tensor
-from dgl.utils import LazyDict
+import dgl.utils as utils
 
 class Frame(MutableMapping):
     def __init__(self, data=None):
@@ -115,7 +115,7 @@ class FrameRef(MutableMapping):
         rowids = self._getrowid(query)
         def _lazy_select(key):
             return F.gather_row(self._frame[key], rowids)
-        return LazyDict(_lazy_select, keys=self.schemes)
+        return utils.LazyDict(_lazy_select, keys=self.schemes)
 
     def get_column(self, name):
         col = self._frame[name]
@@ -217,3 +217,49 @@ class FrameRef(MutableMapping):
 
     def _clear_cache(self):
         self._index_tensor = None
+
+def merge_frames(frames, indices, max_index, reduce_func):
+    """Merge a list of frames.
+
+    The result frame contains `max_index` number of rows. For each frame in
+    the given list, its row is merged as follows:
+
+        merged[indices[i][row]] += frames[i][row]
+
+    Parameters
+    ----------
+    frames : iterator of FrameRef
+        A list of frames to be merged.
+    indices : iterator of list of int
+        The indices of the frame rows.
+    reduce_func : str
+        The reduce function (only 'sum' is supported currently)
+
+    Returns
+    -------
+    merged : FrameRef
+        The merged frame.
+    """
+    assert reduce_func == 'sum'
+    assert len(frames) > 0
+    schemes = frames[0].schemes
+    # create an adj to merge
+    # row index is equal to the concatenation of all the indices.
+    row = sum(indices, [])
+    col = list(range(len(row)))
+    # TODO(minjie): context
+    n = max_index
+    m = len(row)
+    row = F.unsqueeze(utils.convert_to_id_tensor(row), 0)
+    col = F.unsqueeze(utils.convert_to_id_tensor(col), 0)
+    idx = F.pack([row, col])
+    dat = F.ones((len(row),))
+    adjmat = F.sparse_tensor(idx, dat, [n, m])
+    merged = {}
+    for key in schemes:
+        # the rhs of the spmv is the concatenation of all the frame columns
+        feats = F.pack([fr[key] for fr in frames])
+        merged_feats = F.spmm(adjmat, feats)
+        merged[key] = merged_feats
+    merged = FrameRef(Frame(merged))
+    return merged
