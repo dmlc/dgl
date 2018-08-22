@@ -6,7 +6,7 @@ import numpy as np
 
 import dgl.backend as F
 from dgl.backend import Tensor
-from dgl.utils import LazyDict
+import dgl.utils as utils
 
 class Frame(MutableMapping):
     def __init__(self, data=None):
@@ -77,15 +77,24 @@ class Frame(MutableMapping):
         return self.num_columns
 
 class FrameRef(MutableMapping):
+    """Frame reference
+
+    Parameters
+    ----------
+    frame : dgl.frame.Frame
+        The underlying frame.
+    index : iterable of int
+        The rows that are referenced in the underlying frame.
+    """
     def __init__(self, frame=None, index=None):
         self._frame = frame if frame is not None else Frame()
         if index is None:
-            self._index = slice(0, self._frame.num_rows)
+            self._index_data = slice(0, self._frame.num_rows)
         else:
-            # check no duplicate index
+            # check no duplication
             assert len(index) == len(np.unique(index))
-            self._index = index
-        self._index_tensor = None
+            self._index_data = index
+        self._index = None
 
     @property
     def schemes(self):
@@ -97,10 +106,10 @@ class FrameRef(MutableMapping):
 
     @property
     def num_rows(self):
-        if isinstance(self._index, slice):
-            return self._index.stop
+        if isinstance(self._index_data, slice):
+            return self._index_data.stop
         else:
-            return len(self._index)
+            return len(self._index_data)
 
     def __contains__(self, key):
         return key in self._frame
@@ -114,15 +123,17 @@ class FrameRef(MutableMapping):
     def select_rows(self, query):
         rowids = self._getrowid(query)
         def _lazy_select(key):
-            return F.gather_row(self._frame[key], rowids)
-        return LazyDict(_lazy_select, keys=self.schemes)
+            idx = rowids.totensor(F.get_context(self._frame[key]))
+            return F.gather_row(self._frame[key], idx)
+        return utils.LazyDict(_lazy_select, keys=self.schemes)
 
     def get_column(self, name):
         col = self._frame[name]
         if self.is_span_whole_column():
             return col
         else:
-            return F.gather_row(col, self.index_tensor())
+            idx = self.index().totensor(F.get_context(col))
+            return F.gather_row(col, idx)
 
     def __setitem__(self, key, val):
         if isinstance(key, str):
@@ -134,22 +145,26 @@ class FrameRef(MutableMapping):
         shp = F.shape(col)
         if self.is_span_whole_column():
             if self.num_columns == 0:
-                self._index = slice(0, shp[0])
+                self._index_data = slice(0, shp[0])
                 self._clear_cache()
             assert shp[0] == self.num_rows
             self._frame[name] = col
         else:
+            colctx = F.get_context(col)
             if name in self._frame:
                 fcol = self._frame[name]
             else:
                 fcol = F.zeros((self._frame.num_rows,) + shp[1:])
-            newfcol = F.scatter_row(fcol, self.index_tensor(), col)
+                fcol = F.to_context(fcol, colctx)
+            idx = self.index().totensor(colctx)
+            newfcol = F.scatter_row(fcol, idx, col)
             self._frame[name] = newfcol
 
     def update_rows(self, query, other):
         rowids = self._getrowid(query)
         for key, col in other.items():
-            self._frame[key] = F.scatter_row(self._frame[key], rowids, col)
+            idx = rowids.totensor(F.get_context(self._frame[key]))
+            self._frame[key] = F.scatter_row(self._frame[key], idx, col)
 
     def __delitem__(self, key):
         if isinstance(key, str):
@@ -161,10 +176,10 @@ class FrameRef(MutableMapping):
 
     def delete_rows(self, query):
         query = F.asnumpy(query)
-        if isinstance(self._index, slice):
-            self._index = list(range(self._index.start, self._index.stop))
-        arr = np.array(self._index, dtype=np.int32)
-        self._index = list(np.delete(arr, query))
+        if isinstance(self._index_data, slice):
+            self._index_data = list(range(self._index_data.start, self._index_data.stop))
+        arr = np.array(self._index_data, dtype=np.int32)
+        self._index_data = list(np.delete(arr, query))
         self._clear_cache()
 
     def append(self, other):
@@ -174,16 +189,16 @@ class FrameRef(MutableMapping):
         self._frame.append(other)
         # update index
         if span_whole:
-            self._index = slice(0, self._frame.num_rows)
-        else:
-            new_idx = list(range(self._index.start, self._index.stop))
+            self._index_data = slice(0, self._frame.num_rows)
+        elif contiguous:
+            new_idx = list(range(self._index_data.start, self._index_data.stop))
             new_idx += list(range(old_nrows, self._frame.num_rows))
-            self._index = new_idx
+            self._index_data = new_idx
         self._clear_cache()
 
     def clear(self):
         self._frame.clear()
-        self._index = slice(0, 0)
+        self._index_data = slice(0, 0)
         self._clear_cache()
 
     def __iter__(self):
@@ -194,26 +209,73 @@ class FrameRef(MutableMapping):
 
     def is_contiguous(self):
         # NOTE: this check could have false negative
-        return isinstance(self._index, slice)
+        return isinstance(self._index_data, slice)
 
     def is_span_whole_column(self):
         return self.is_contiguous() and self.num_rows == self._frame.num_rows
 
     def _getrowid(self, query):
-        if isinstance(self._index, slice):
+        if self.is_contiguous():
             # shortcut for identical mapping
             return query
         else:
-            return F.gather_row(self.index_tensor(), query)
+            idxtensor = self.index().totensor()
+            return utils.toindex(F.gather_row(idxtensor, query.totensor()))
 
-    def index_tensor(self):
-        # TODO(minjie): context
-        if self._index_tensor is None:
+    def index(self):
+        if self._index is None:
             if self.is_contiguous():
-                self._index_tensor = F.arange(self._index.stop, dtype=F.int64)
+                self._index = utils.toindex(
+                        F.arange(self._index_data.stop, dtype=F.int64))
             else:
-                self._index_tensor = F.tensor(self._index, dtype=F.int64)
-        return self._index_tensor
+                self._index = utils.toindex(self._index_data)
+        return self._index
 
     def _clear_cache(self):
         self._index_tensor = None
+
+def merge_frames(frames, indices, max_index, reduce_func):
+    """Merge a list of frames.
+
+    The result frame contains `max_index` number of rows. For each frame in
+    the given list, its row is merged as follows:
+
+        merged[indices[i][row]] += frames[i][row]
+
+    Parameters
+    ----------
+    frames : iterator of dgl.frame.FrameRef
+        A list of frames to be merged.
+    indices : iterator of dgl.utils.Index
+        The indices of the frame rows.
+    reduce_func : str
+        The reduce function (only 'sum' is supported currently)
+
+    Returns
+    -------
+    merged : FrameRef
+        The merged frame.
+    """
+    assert reduce_func == 'sum'
+    assert len(frames) > 0
+    schemes = frames[0].schemes
+    # create an adj to merge
+    # row index is equal to the concatenation of all the indices.
+    row = sum([idx.tolist() for idx in indices], [])
+    col = list(range(len(row)))
+    n = max_index
+    m = len(row)
+    row = F.unsqueeze(F.tensor(row, dtype=F.int64), 0)
+    col = F.unsqueeze(F.tensor(col, dtype=F.int64), 0)
+    idx = F.pack([row, col])
+    dat = F.ones((m,))
+    adjmat = F.sparse_tensor(idx, dat, [n, m])
+    ctx_adjmat = utils.CtxCachedObject(lambda ctx: F.to_context(adjmat, ctx))
+    merged = {}
+    for key in schemes:
+        # the rhs of the spmv is the concatenation of all the frame columns
+        feats = F.pack([fr[key] for fr in frames])
+        merged_feats = F.spmm(ctx_adjmat.get(F.get_context(feats)), feats)
+        merged[key] = merged_feats
+    merged = FrameRef(Frame(merged))
+    return merged

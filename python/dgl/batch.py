@@ -87,7 +87,7 @@ def unbatch(graph_batch):
     num_graphs = len(graph_list)
     # split and set node attrs
     attrs = [{} for _ in range(num_graphs)] # node attr dict for each graph
-    for key in graph_batch.get_n_attr_list():
+    for key in graph_batch.node_attr_schemes():
         vals = F.unpack(graph_batch.pop_n_repr(key), graph_batch.num_nodes)
         for attr, val in zip(attrs, vals):
             attr[key] = val
@@ -96,7 +96,7 @@ def unbatch(graph_batch):
 
     # split and set edge attrs
     attrs = [{} for _ in range(num_graphs)] # edge attr dict for each graph
-    for key in graph_batch.get_e_attr_list():
+    for key in graph_batch.edge_attr_schemes():
         vals = F.unpack(graph_batch.pop_e_repr(key), graph_batch.num_edges)
         for attr, val in zip(attrs, vals):
             attr[key] = val
