@@ -6,6 +6,12 @@ def message_func(src, edge):
 def update_func(node, accum):
     return {'h' : node['h'] + accum}
 
+def message_dict_func(src, edge):
+    return {'m' : src['h']}
+
+def update_dict_func(node, accum):
+    return {'h' : node['h'] + accum['m']}
+
 def generate_graph():
     g = DGLGraph()
     for i in range(10):
@@ -23,12 +29,18 @@ def check(g, h):
     h = [str(x) for x in h]
     assert nh == h, "nh=[%s], h=[%s]" % (' '.join(nh), ' '.join(h))
 
-def test_sendrecv():
-    g = generate_graph()
-    check(g, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+def register1(g):
     g.register_message_func(message_func)
     g.register_update_func(update_func)
     g.register_reduce_func('sum')
+
+def register2(g):
+    g.register_message_func(message_dict_func)
+    g.register_update_func(update_dict_func)
+    g.register_reduce_func('sum')
+
+def _test_sendrecv(g):
+    check(g, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     g.sendto(0, 1)
     g.recv(1)
     check(g, [1, 3, 3, 4, 5, 6, 7, 8, 9, 10])
@@ -37,12 +49,8 @@ def test_sendrecv():
     g.recv(9)
     check(g, [1, 3, 3, 4, 5, 6, 7, 8, 9, 23])
 
-def test_multi_sendrecv():
-    g = generate_graph()
+def _test_multi_sendrecv(g):
     check(g, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-    g.register_message_func(message_func)
-    g.register_update_func(update_func)
-    g.register_reduce_func('sum')
     # one-many
     g.sendto(0, [1, 2, 3])
     g.recv([1, 2, 3])
@@ -56,12 +64,8 @@ def test_multi_sendrecv():
     g.recv([4, 5, 9])
     check(g, [1, 3, 4, 5, 6, 7, 7, 8, 9, 45])
 
-def test_update_routines():
-    g = generate_graph()
+def _test_update_routines(g):
     check(g, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-    g.register_message_func(message_func)
-    g.register_update_func(update_func)
-    g.register_reduce_func('sum')
     g.update_by_edge(0, 1)
     check(g, [1, 3, 3, 4, 5, 6, 7, 8, 9, 10])
     g.update_to(9)
@@ -70,6 +74,30 @@ def test_update_routines():
     check(g, [1, 4, 4, 5, 6, 7, 8, 9, 10, 55])
     g.update_all()
     check(g, [56, 5, 5, 6, 7, 8, 9, 10, 11, 108])
+
+def test_sendrecv():
+    g = generate_graph()
+    register1(g)
+    _test_sendrecv(g)
+    g = generate_graph()
+    register2(g)
+    _test_sendrecv(g)
+
+def test_multi_sendrecv():
+    g = generate_graph()
+    register1(g)
+    _test_multi_sendrecv(g)
+    g = generate_graph()
+    register2(g)
+    _test_multi_sendrecv(g)
+
+def test_update_routines():
+    g = generate_graph()
+    register1(g)
+    _test_update_routines(g)
+    g = generate_graph()
+    register2(g)
+    _test_update_routines(g)
 
 if __name__ == '__main__':
     test_sendrecv()

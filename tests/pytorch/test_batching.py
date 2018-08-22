@@ -26,6 +26,17 @@ def update_func(node, accum):
     assert node['h'].shape == accum.shape
     return {'h' : node['h'] + accum}
 
+def reduce_dict_func(node, msgs):
+    msgs = msgs['m']
+    reduce_msg_shapes.add(tuple(msgs.shape))
+    assert len(msgs.shape) == 3
+    assert msgs.shape[2] == D
+    return {'m' : th.sum(msgs, 1)}
+
+def update_dict_func(node, accum):
+    assert node['h'].shape == accum['m'].shape
+    return {'h' : node['h'] + accum['m']}
+
 def generate_graph(grad=False):
     g = DGLGraph()
     for i in range(10):
@@ -149,11 +160,26 @@ def test_batch_send():
     v = th.tensor([9])
     g.sendto(u, v)
 
-def test_batch_recv():
+def test_batch_recv1():
+    # basic recv test
     g = generate_graph()
     g.register_message_func(message_func, batchable=True)
     g.register_reduce_func(reduce_func, batchable=True)
     g.register_update_func(update_func, batchable=True)
+    u = th.tensor([0, 0, 0, 4, 5, 6])
+    v = th.tensor([1, 2, 3, 9, 9, 9])
+    reduce_msg_shapes.clear()
+    g.sendto(u, v)
+    g.recv(th.unique(v))
+    assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
+    reduce_msg_shapes.clear()
+
+def test_batch_recv2():
+    # recv test with dict type reduce message
+    g = generate_graph()
+    g.register_message_func(message_func, batchable=True)
+    g.register_reduce_func(reduce_dict_func, batchable=True)
+    g.register_update_func(update_dict_func, batchable=True)
     u = th.tensor([0, 0, 0, 4, 5, 6])
     v = th.tensor([1, 2, 3, 9, 9, 9])
     reduce_msg_shapes.clear()
@@ -232,7 +258,8 @@ if __name__ == '__main__':
     test_batch_setter_getter()
     test_batch_setter_autograd()
     test_batch_send()
-    test_batch_recv()
+    test_batch_recv1()
+    test_batch_recv2()
     test_update_routines()
     test_reduce_0deg()
     #test_delete()
