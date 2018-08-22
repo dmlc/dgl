@@ -936,24 +936,32 @@ class DGLGraph(DiGraph):
         # merge node features
         to_merge = []
         for sg in subgraphs:
-            if len(sg.node_attr_schemes) == 0:
+            if len(sg.node_attr_schemes()) == 0:
                 continue
             if sg.node_attr_schemes() != self.node_attr_schemes():
                 raise RuntimeError('Subgraph and parent graph do not '
                                    'have the same node attribute schemes.')
             to_merge.append(sg)
-        self._node_frame = merge_frames([sg._node_frame for sg in to_merge], reduce_func)
+        self._node_frame = merge_frames(
+                [sg._node_frame for sg in to_merge],
+                [sg._parent_nid for sg in to_merge],
+                self._node_frame.num_rows,
+                reduce_func)
 
         # merge edge features
         to_merge.clear()
         for sg in subgraphs:
-            if len(sg.edge_attr_schemes) == 0:
+            if len(sg.edge_attr_schemes()) == 0:
                 continue
             if sg.edge_attr_schemes() != self.edge_attr_schemes():
                 raise RuntimeError('Subgraph and parent graph do not '
                                    'have the same edge attribute schemes.')
             to_merge.append(sg)
-        self._edge_frame = merge_frames([sg._edge_frame for sg in to_merge], reduce_func)
+        self._edge_frame = merge_frames(
+                [sg._edge_frame for sg in to_merge],
+                [sg._parent_eid for sg in to_merge],
+                self._edge_frame.num_rows,
+                reduce_func)
 
     def draw(self):
         """Plot the graph using dot."""

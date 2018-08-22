@@ -244,9 +244,9 @@ def merge_frames(frames, indices, max_index, reduce_func):
 
     Parameters
     ----------
-    frames : iterator of FrameRef
+    frames : iterator of dgl.frame.FrameRef
         A list of frames to be merged.
-    indices : iterator of list of int
+    indices : iterator of dgl.utils.Index
         The indices of the frame rows.
     reduce_func : str
         The reduce function (only 'sum' is supported currently)
@@ -261,21 +261,21 @@ def merge_frames(frames, indices, max_index, reduce_func):
     schemes = frames[0].schemes
     # create an adj to merge
     # row index is equal to the concatenation of all the indices.
-    row = sum(indices, [])
+    row = sum([idx.tolist() for idx in indices], [])
     col = list(range(len(row)))
-    # TODO(minjie): context
     n = max_index
     m = len(row)
-    row = F.unsqueeze(utils.convert_to_id_tensor(row), 0)
-    col = F.unsqueeze(utils.convert_to_id_tensor(col), 0)
+    row = F.unsqueeze(F.tensor(row, dtype=F.int64), 0)
+    col = F.unsqueeze(F.tensor(col, dtype=F.int64), 0)
     idx = F.pack([row, col])
-    dat = F.ones((len(row),))
+    dat = F.ones((m,))
     adjmat = F.sparse_tensor(idx, dat, [n, m])
+    ctx_adjmat = utils.CtxCachedObject(lambda ctx: F.to_context(adjmat, ctx))
     merged = {}
     for key in schemes:
         # the rhs of the spmv is the concatenation of all the frame columns
         feats = F.pack([fr[key] for fr in frames])
-        merged_feats = F.spmm(adjmat, feats)
+        merged_feats = F.spmm(ctx_adjmat.get(F.get_context(feats)), feats)
         merged[key] = merged_feats
     merged = FrameRef(Frame(merged))
     return merged

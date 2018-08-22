@@ -44,21 +44,21 @@ def test_basics():
     s, d, eid
     0, 1, 0
     1, 9, 1
-    0, 2, 2
-    2, 9, 3
-    0, 3, 4
-    3, 9, 5
+    0, 2, 2    1
+    2, 9, 3    1
+    0, 3, 4    1
+    3, 9, 5    1
     0, 4, 6
     4, 9, 7
     0, 5, 8
-    5, 9, 9
-    0, 6, 10
-    6, 9, 11
-    0, 7, 12
-    7, 9, 13
+    5, 9, 9       3
+    0, 6, 10   1
+    6, 9, 11   1  3
+    0, 7, 12   1
+    7, 9, 13   1  3
     0, 8, 14
-    8, 9, 15
-    9, 0, 16
+    8, 9, 15      3
+    9, 0, 16   1
     '''
     assert check_eq(l[eid], sg.get_e_repr()['l'])
     # update the node/edge features on the subgraph should NOT
@@ -66,5 +66,29 @@ def test_basics():
     sg.set_n_repr({'h' : th.zeros((6, D))})
     assert check_eq(h, g.get_n_repr()['h'])
 
+def test_merge():
+    g = generate_graph()
+    g.set_n_repr({'h' : th.zeros((10, D))})
+    g.set_e_repr({'l' : th.zeros((17, D))})
+    # subgraphs
+    sg1 = g.subgraph([0, 2, 3, 6, 7, 9])
+    sg1.set_n_repr({'h' : th.ones((6, D))})
+    sg1.set_e_repr({'l' : th.ones((9, D))})
+
+    sg2 = g.subgraph([0, 2, 3, 4])
+    sg2.set_n_repr({'h' : th.ones((4, D)) * 2})
+
+    sg3 = g.subgraph([5, 6, 7, 8, 9])
+    sg3.set_e_repr({'l' : th.ones((4, D)) * 3})
+
+    g.merge([sg1, sg2, sg3])
+
+    h = g.get_n_repr()['h'][:,0]
+    l = g.get_e_repr()['l'][:,0]
+    assert check_eq(h, th.tensor([3., 0., 3., 3., 2., 0., 1., 1., 0., 1.]))
+    assert check_eq(l,
+            th.tensor([0., 0., 1., 1., 1., 1., 0., 0., 0., 3., 1., 4., 1., 4., 0., 3., 1.]))
+
 if __name__ == '__main__':
     test_basics()
+    test_merge()
