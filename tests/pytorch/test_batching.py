@@ -196,6 +196,28 @@ def test_update_routines():
     assert(reduce_msg_shapes == {(1, 8, D), (9, 1, D)})
     reduce_msg_shapes.clear()
 
+def test_reduce_0deg():
+    g = DGLGraph()
+    g.add_nodes_from([0, 1, 2, 3, 4])
+    g.add_edge(1, 0)
+    g.add_edge(2, 0)
+    g.add_edge(3, 0)
+    g.add_edge(4, 0)
+    def _message(src, edge):
+        return src
+    def _reduce(node, msgs):
+        return node.clone().zero_() if msgs is None else msgs.sum(1)
+    def _update(node, accum):
+        return node + accum
+
+    old_repr = th.randn(5, 5)
+    g.set_n_repr(old_repr)
+    g.update_all(_message, _reduce, _update, True)
+    new_repr = g.get_n_repr()
+
+    assert th.allclose(new_repr[1:], old_repr[1:])
+    assert th.allclose(new_repr[0], old_repr.sum(0))
+
 def _test_delete():
     g = generate_graph()
     ecol = Variable(th.randn(17, D), requires_grad=grad)
@@ -212,4 +234,5 @@ if __name__ == '__main__':
     test_batch_send()
     test_batch_recv()
     test_update_routines()
+    test_reduce_0deg()
     #test_delete()

@@ -612,9 +612,14 @@ class DGLGraph(DiGraph):
         degrees, v_buckets = scheduler.degree_bucketing(self.msg_graph, v)
         reduced_msgs = []
         for deg, v_bkt in zip(degrees, v_buckets):
-            if deg == 0:
-                continue
             bkt_len = len(v_bkt)
+            dst_reprs = self.get_n_repr(v_bkt)
+
+            if deg == 0:
+                # TODO: context
+                reduced_msgs.append(f_reduce(dst_reprs, None))
+                continue
+                
             uu, vv = self.msg_graph.in_edges(v_bkt)
             in_msg_ids = self.msg_graph.get_edge_id(uu, vv)
             # TODO(minjie): manually convert ids to context.
@@ -630,7 +635,6 @@ class DGLGraph(DiGraph):
             else:
                 reshaped_in_msgs = utils.LazyDict(
                         lambda key: _reshape_fn(in_msgs[key]), self._msg_frame.schemes)
-            dst_reprs = self.get_n_repr(v_bkt)
             reduced_msgs.append(f_reduce(dst_reprs, reshaped_in_msgs))
 
         if len(reduced_msgs) == 0:
