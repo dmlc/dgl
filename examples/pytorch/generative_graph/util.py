@@ -15,16 +15,13 @@ def convert_graph_to_ordering(g):
             ordering.append((m, n))
     return ordering
 
-def generate_dataset():
-    n = 15
-    m = 2
-    n_samples = 1024
+def generate_dataset(n, m, n_samples, fname):
     samples = []
     for _ in range(n_samples):
         g = nx.barabasi_albert_graph(n, m)
         samples.append(convert_graph_to_ordering(g))
 
-    with open('samples.p', 'wb') as f:
+    with open(fname, 'wb') as f:
         pickle.dump(samples, f)
 
 class DataLoader(object):
@@ -153,4 +150,8 @@ def elapsed(msg, start, end):
     print("{}: {} ms".format(msg, int((end-start)*1000)))
 
 if __name__ == '__main__':
-    generate_dataset()
+    n = 15
+    m = 2
+    n_samples = 1024
+    fname ='samples.p'
+    generate_dataset(n, m, n_samples, fname)
