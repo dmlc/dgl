@@ -1,4 +1,5 @@
 import argparse
+import time
 import torch as th
 import torch.optim as optim
 from torch.utils.data import DataLoader
@@ -42,10 +43,16 @@ def main(args):
                         batch_size=args.batch_size,
                         collate_fn=dgl.data.SST.batcher,
                         shuffle=False,
-                        num_workers=1)
+                        num_workers=4)
     for epoch in range(args.epochs):
+        t0 = time.time()
         for step, batch in enumerate(loader):
-            pass
+            if step == 100:
+                break
+            print('Step#', step)
+            time.sleep(.1)
+        print('Epoch duration(s):', (time.time() - t0))
+        break
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

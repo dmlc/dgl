@@ -18,6 +18,8 @@ _urls = {
     'sst' : 'https://www.dropbox.com/s/dw8kr2vuq7k4dqi/sst.zip?dl=1',
 }
 
+SSTBatch = namedtuple('SSTBatch', ['graph', 'nid_with_word', 'wordid', 'label'])
+
 class SST(object):
     """SST"""
     PAD_WORD=-1
@@ -58,11 +60,11 @@ class SST(object):
                     word = self.vocab[child[0].lower()]
                     g.add_node(cid, x=word, y=int(child.label()))
                 else:
-                    g.add_node(cid, x=SST.PAD_WORD, y=child.label())
+                    g.add_node(cid, x=SST.PAD_WORD, y=int(child.label()))
                     _rec_build(cid, child)
                 g.add_edge(nid, cid)
         # add root
-        g.add_node(0, x=SST.PAD_WORD, y=root.label())
+        g.add_node(0, x=SST.PAD_WORD, y=int(root.label()))
         _rec_build(0, root)
         return dgl.DGLGraph(g)
 
@@ -74,11 +76,19 @@ class SST(object):
 
     @staticmethod
     def batcher(batch):
-        print(len(batch))
+        nid_with_word = []
+        wordid = []
+        label = []
+        gnid = 0
+        for tree in batch:
+            for nid in range(tree.number_of_nodes()):
+                if tree.nodes[nid]['x'] != SST.PAD_WORD:
+                    nid_with_word.append(gnid)
+                    wordid.append(tree.nodes[nid]['x'])
+                label.append(tree.nodes[nid]['y'])
+                gnid += 1
         batch_trees = dgl.batch(batch)
-        nid_with_words = []
-        words = []
-        labels = []
-        for nid in range(batch_trees.number_of_nodes()):
-            if batch_trees
-        assert False
+        return SSTBatch(graph=batch_trees,
+                        nid_with_word=F.tensor(nid_with_word, dtype=F.int64),
+                        wordid=F.tensor(wordid, dtype=F.int64),
+                        label=F.tensor(label, dtype=F.int64))
