@@ -22,7 +22,7 @@ class BatchedDGLGraph(DGLGraph):
         self.add_nodes_from(range(self.node_offset[-1]))
 
         # in-order add relabeled edges
-        self.new_edge_list = [np.array(g.edges) + offset
+        self.new_edge_list = [np.array(g.edge_list) + offset
                         for g, offset in zip(self.graph_list, self.node_offset[:-1])]
         self.new_edges = np.concatenate(self.new_edge_list)
         self.add_edges_from(self.new_edges)

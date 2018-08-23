@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import argparse
-from util import DataLoader, elapsed
+from util import DataLoader, elapsed, generate_dataset
 import time
 
 class MLP(nn.Module):
@@ -246,9 +246,16 @@ if __name__ == '__main__':
             help="number of hidden gcn layers")
     parser.add_argument("--dataset", type=str, default='samples.p',
             help="dataset pickle file")
+    parser.add_argument("--gen-dataset", type=str, default=None,
+            help="parameters to generate B-A graph datasets. Format: <#node>,<#edge>,<#sample>")
     parser.add_argument("--batch-size", type=int, default=32,
             help="batch size")
     args = parser.parse_args()
     print(args)
+
+    # generate dataset if needed
+    if args.gen_dataset is not None:
+        n_node, n_edge, n_sample = map(int, args.gen_dataset.split(','))
+        generate_dataset(n_node, n_edge, n_sample, args.dataset)
 
     main(args)

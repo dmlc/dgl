@@ -710,11 +710,12 @@ class DGLGraph(DiGraph):
             m = len(new2old)
             # TODO(minjie): context
             adjmat = F.sparse_tensor(idx, dat, [m, n])
+            ctx_adjmat = utils.CtxCachedObject(lambda ctx: F.to_context(adjmat, ctx))
             # TODO(minjie): use lazy dict for reduced_msgs
             reduced_msgs = {}
             for key in self._node_frame.schemes:
                 col = self._node_frame[key]
-                reduced_msgs[key] = F.spmm(adjmat, col)
+                reduced_msgs[key] = F.spmm(ctx_adjmat.get(F.get_context(col)), col)
             if len(reduced_msgs) == 1 and __REPR__ in reduced_msgs:
                 reduced_msgs = reduced_msgs[__REPR__]
             node_repr = self.get_n_repr(new2old)
