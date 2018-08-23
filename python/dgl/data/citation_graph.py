@@ -19,15 +19,17 @@ _urls = {
     'pubmed' : 'https://www.dropbox.com/s/fj5q6pi66xhymcm/pubmed.zip?dl=1',
 }
 
-class GCNDataset(object):
+class CitationGraphDataset(object):
     def __init__(self, name):
         self.name = name
+        self.mode = mode
         self.dir = get_download_dir()
         self.zip_file_path='{}/{}.zip'.format(self.dir, name)
         download(_urls[name], path=self.zip_file_path)
         extract_archive(self.zip_file_path, '{}/{}'.format(self.dir, name))
+        self._load()
 
-    def load(self):
+    def _load(self):
         """Loads input data from gcn/data directory
 
         ind.name.x => the feature vectors of the training instances as scipy.sparse.csr.csr_matrix object;
@@ -87,13 +89,6 @@ class GCNDataset(object):
         val_mask = _sample_mask(idx_val, labels.shape[0])
         test_mask = _sample_mask(idx_test, labels.shape[0])
 
-        #y_train = np.zeros(labels.shape)
-        #y_val = np.zeros(labels.shape)
-        #y_test = np.zeros(labels.shape)
-        #y_train[train_mask, :] = labels[train_mask, :]
-        #y_val[val_mask, :] = labels[val_mask, :]
-        #y_test[test_mask, :] = labels[test_mask, :]
-
         self.graph = graph
         self.features = _preprocess_features(features)
         self.labels = labels
@@ -111,6 +106,12 @@ class GCNDataset(object):
         print('  NumTrainingSamples: {}'.format(len(np.nonzero(self.train_mask)[0])))
         print('  NumValidationSamples: {}'.format(len(np.nonzero(self.val_mask)[0])))
         print('  NumTestSamples: {}'.format(len(np.nonzero(self.test_mask)[0])))
+
+    def __getitem__(self, idx):
+        return self
+
+    def __len__(self):
+        return 1
 
 def _preprocess_features(features):
     """Row-normalize feature matrix and convert to tuple representation"""
@@ -135,18 +136,15 @@ def _sample_mask(idx, l):
     return mask
 
 def load_cora():
-    data = GCNDataset('cora')
-    data.load()
+    data = CitationGraphDataset('cora')
     return data
 
 def load_citeseer():
-    data = GCNDataset('citeseer')
-    data.load()
+    data = CitationGraphDataset('citeseer')
     return data
 
 def load_pubmed():
-    data = GCNDataset('pubmed')
-    data.load()
+    data = CitationGraphDataset('pubmed')
     return data
 
 class GCNSyntheticDataset(object):
@@ -195,6 +193,12 @@ class GCNSyntheticDataset(object):
         print('  NumTrainingSamples: {}'.format(len(np.nonzero(self.train_mask)[0])))
         print('  NumValidationSamples: {}'.format(len(np.nonzero(self.val_mask)[0])))
         print('  NumTestSamples: {}'.format(len(np.nonzero(self.test_mask)[0])))
+
+    def __getitem__(self, idx):
+        return self
+
+    def __len__(self):
+        return 1
 
 def get_gnp_generator(args):
     n = args.syn_gnp_n

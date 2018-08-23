@@ -2,8 +2,6 @@
 Improved Semantic Representations From Tree-Structured Long Short-Term Memory Networks
 https://arxiv.org/abs/1503.00075
 """
-
-
 import itertools
 import networkx as nx
 import dgl.graph as G
@@ -11,19 +9,48 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
+class ChildSumTreeLSTMCell(object):
+    def __init__(self, x_size, h_size):
+        self.W_iou = nn.Linear(x_size, 3 * h_size)
+        self.U_iou = nn.Linear(h_size, 3 * h_size)
+        self.W_f = nn.Linear(x_size, h_size)
+        self.U_f = nn.Linear(h_size, h_size)
+
+    def message_func(self, src, edge):
+        return src
+
+    def reduce_func(self, node, msgs):
+        # equation (2)
+        h_tild = th.sum(msgs['h'], 1)
+        # equation (4)
+        wx = self.W_f(node['x']).unsqueeze(1)  # shape: (B, 1, H)
+        uh = self.U_f(msgs['h']) # shape: (B, deg, H)
+        f = th.sigmoid(wx + uh)  # shape: (B, deg, H)
+        # equation (7) second term
+        c_tild = th.sum(f * msgs['c'], 1)
+        return {'h_tild' : h_tild, 'c_tild' : c_tild}
+
+    def update_func(self, node, accum):
+        # equation (3), (5), (6)
+        iou = self.W_iou(node['x']) + self.U_iou(accum['h_tild'])
+        i, o, u = th.chunk(iou, 3, 1)
+        i, o, u = th.sigmoid(i), th.sigmoid(o), th.tanh(u)
+        # equation (7)
+        c = i * u + accum['c_tild']
+        # equation (8)
+        h = o * th.tanh(c)
+        return {'h' : h, 'c' : c}
 
 class TreeLSTM(nn.Module):
-    def __init__(self, n_embeddings, x_size, h_size, n_classes):
-        super().__init__()
-
+    def __init__(self, n_embeddings, x_size, h_size, n_classes, cell_type='childsum'):
+        super(TreeLSTM, self).__init__()
         self.embedding = nn.Embedding(n_embeddings, x_size)
         self.linear = nn.Linear(h_size, n_classes)
 
-    @staticmethod
-    def message_func(src, trg, _):
-        return {'h' : src.get('h'), 'c' : src.get('c')}
+    def message_func(self, src, edge):
+        return src
 
-    def leaf_update_func(self, node_reprs, edge_reprs):
+    def update_func(self, node, accum):
         x = node_reprs['x']
         iou = th.mm(x, self.iou_w) + self.iou_b
         i, o, u = th.chunk(iou, 3, 1)
@@ -84,39 +111,6 @@ class TreeLSTM(nn.Module):
         g.propagate(reversed(iterator))
 
         return self.readout_func(g, train)
-
-
-class ChildSumTreeLSTM(TreeLSTM):
-    def __init__(self, n_embeddings, x_size, h_size, n_classes):
-        super().__init__(n_embeddings, x_size, h_size, n_classes)
-
-        self.iou_w = nn.Parameter(th.randn(x_size, 3 * h_size)) # TODO initializer
-        self.iou_u = nn.Parameter(th.randn(h_size, 3 * h_size)) # TODO initializer
-        self.iou_b = nn.Parameter(th.zeros(1, 3 * h_size))
-
-        self.f_x = nn.Parameter(th.randn(x_size, h_size)) # TODO initializer
-        self.f_h = nn.Parameter(th.randn(h_size, h_size)) # TODO initializer
-        self.f_b = nn.Parameter(th.zeros(1, h_size))
-
-    def internal_update_func(self, node_reprs, edge_reprs):
-        x = node_reprs['x']
-        h_bar = sum(msg['h'] for msg in edge_reprs)
-        if x is None:
-            iou = th.mm(h_bar, self.iou_u) + self.iou_b
-        else:
-            iou = th.mm(x, self.iou_w) + th.mm(h_bar, self.iou_u) + self.iou_b
-        i, o, u = th.chunk(iou, 3, 1)
-        i, o, u = th.sigmoid(i), th.sigmoid(o), th.tanh(u)
-
-        wx = th.mm(x, self.f_x).repeat(len(edge_reprs), 1) if x is not None else 0
-        uh = th.mm(th.cat([msg['h'] for msg in edge_reprs], 0), self.f_h)
-        f = th.sigmoid(wx + uh + f_b)
-
-        c = th.cat([msg['c'] for msg in edge_reprs], 0)
-        c = i * u + th.sum(f * c, 0)
-        h = o * th.tanh(c)
-
-        return {'h' : h, 'c' : c}
 
 
 class NAryTreeLSTM(TreeLSTM):

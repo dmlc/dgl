@@ -16,12 +16,18 @@ class nx_BCT_Reader:
         self.vocab = {}
         def _rec(node):
             for child in node:
-                if isinstance(child[0], str) and child[0] not in self.vocab:
-                    self.vocab[child[0]] = len(self.vocab)
-                elif isinstance(child, Tree):
+                if isinstance(child, Tree):
                     _rec(child)
+                else:
+                    word = child.lower()
+                    if word not in self.vocab:
+                        self.vocab[word] = len(self.vocab)
         for sent in self.train:
             _rec(sent)
+        with open('vocab.txt', 'w') as f:
+            for k in self.vocab:
+                f.write('%s\n' % k)
+        assert False
         self.default = len(self.vocab) + 1
 
         self.LongTensor = th.cuda.LongTensor if cuda else th.LongTensor
@@ -55,3 +61,6 @@ class nx_BCT_Reader:
         assert mode in ['train', 'dev', 'test']
         for s in self.__dict__[mode]:
             yield self.create_BCT(s)
+
+if __name__ == '__main__':
+    reader = nx_BCT_Reader()
