@@ -1,6 +1,7 @@
 import argparse
 import torch as th
 import torch.optim as optim
+from torch.utils.data import DataLoader
 import tree_lstm
 
 import dgl
@@ -36,6 +37,15 @@ def main(args):
         if (i + 1) % args.log_every == 0:
             print('[iteration %d]cross-entropy loss: %f' % ((i + 1), nll))
     '''
+    dataset = dgl.data.SST()
+    loader = DataLoader(dataset=dataset,
+                        batch_size=args.batch_size,
+                        collate_fn=dgl.data.SST.batcher,
+                        shuffle=False,
+                        num_workers=1)
+    for epoch in range(args.epochs):
+        for step, batch in enumerate(loader):
+            pass
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -45,7 +55,7 @@ if __name__ == '__main__':
     parser.add_argument('--log-every', type=int, default=1)
     parser.add_argument('--lr', type=float, default=0.05)
     parser.add_argument('--n-ary', type=int, default=2)
-    parser.add_argument('--n-iterations', type=int, default=1000)
+    parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--weight-decay', type=float, default=1e-4)
     parser.add_argument('--x-size', type=int, default=256)
     args = parser.parse_args()

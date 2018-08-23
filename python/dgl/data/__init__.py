@@ -2,7 +2,7 @@
 from __future__ import absolute_import
 
 from . import citation_graph as citegrh
-from .tree import SST
+from .tree import *
 from .utils import *
 
 def register_data_args(parser):

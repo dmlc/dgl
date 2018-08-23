@@ -3,12 +3,15 @@
 Including:
     - SST
 """
+from __future__ import absolute_import
 
+from collections import namedtuple
 from nltk.tree import Tree
 from nltk.corpus.reader import BracketParseCorpusReader
 import networkx as nx
 
 import dgl
+import dgl.backend as F
 from dgl.data.utils import download, extract_archive, get_download_dir
 
 _urls = {
@@ -27,7 +30,9 @@ class SST(object):
         extract_archive(self.zip_file_path, '{}/sst'.format(self.dir))
         self.trees = []
         self.num_classes = 5
+        print('Preprocessing...')
         self._load()
+        print('Dataset creation finished. #Trees:', len(self.trees))
 
     def _load(self):
         files = ['{}.txt'.format(self.mode)]
@@ -67,9 +72,13 @@ class SST(object):
     def __len__(self):
         return len(self.trees)
 
-    @staticmember
+    @staticmethod
     def batcher(batch):
-        pass
-
-if __name__ == '__main__':
-    sst = SST()
+        print(len(batch))
+        batch_trees = dgl.batch(batch)
+        nid_with_words = []
+        words = []
+        labels = []
+        for nid in range(batch_trees.number_of_nodes()):
+            if batch_trees
+        assert False
