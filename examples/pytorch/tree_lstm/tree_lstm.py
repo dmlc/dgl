@@ -67,11 +67,18 @@ class ChildSumTreeLSTMCell(nn.Module):
         return {'h' : h, 'c' : c}
 
 class TreeLSTM(nn.Module):
-    def __init__(self, num_vocabs, x_size, h_size, num_classes, cell_type='childsum'):
+    def __init__(self,
+                 num_vocabs,
+                 x_size,
+                 h_size,
+                 num_classes,
+                 dropout,
+                 cell_type='childsum'):
         super(TreeLSTM, self).__init__()
         self.x_size = x_size
         # TODO(minjie): pre-trained embedding like GLoVe
         self.embedding = nn.Embedding(num_vocabs, x_size)
+        self.dropout = nn.Dropout(dropout)
         self.linear = nn.Linear(h_size, num_classes)
         if cell_type == 'childsum':
             self.cell = ChildSumTreeLSTMCell(x_size, h_size)
@@ -111,6 +118,7 @@ class TreeLSTM(nn.Module):
             g.update_to(frontier)
         # compute logits
         h = g.pop_n_repr('h')
+        h = self.dropout(h)
         logits = self.linear(h)
         return logits
 
