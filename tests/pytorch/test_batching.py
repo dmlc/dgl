@@ -234,7 +234,7 @@ def test_reduce_0deg():
     def _reduce(node, msgs):
         return node.clone().zero_() if msgs is None else msgs.sum(1)
     def _update(node, accum):
-        return node + accum
+        return (node + accum) if accum is not None else node
 
     old_repr = th.randn(5, 5)
     g.set_n_repr(old_repr)
