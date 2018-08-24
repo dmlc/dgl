@@ -107,10 +107,8 @@ class TreeLSTM(nn.Module):
         g.set_n_repr({'x' : x, 'h' : h, 'c' : c})
         # TODO(minjie): potential bottleneck
         for frontier in topological_traverse(g):
-            print('frontier', frontier)
-            print('degree', [g.in_degree(x) for x in frontier])
-            #g.update_to(frontier)
-        assert False
+            #print('frontier', frontier)
+            g.update_to(frontier)
         # compute logits
         h = g.pop_n_repr('h')
         logits = self.linear(h)

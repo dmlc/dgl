@@ -1,7 +1,7 @@
 """Tree-structured data.
 
 Including:
-    - SST
+    - Stanford Sentiment Treebank
 """
 from __future__ import absolute_import
 

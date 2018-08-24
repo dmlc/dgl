@@ -11,20 +11,27 @@ import dgl
 from tree_lstm import TreeLSTM
 
 def main(args):
-    dataset = dgl.data.SST()
-    loader = DataLoader(dataset=dataset,
-                        batch_size=args.batch_size,
-                        collate_fn=dgl.data.SST.batcher,
-                        shuffle=False,
-                        num_workers=0)
-    model = TreeLSTM(dataset.num_vocabs,
+    trainset = dgl.data.SST()
+    train_loader = DataLoader(dataset=trainset,
+                              batch_size=args.batch_size,
+                              collate_fn=dgl.data.SST.batcher,
+                              shuffle=False,
+                              num_workers=0)
+    #testset = dgl.data.SST(mode='test')
+    #test_loader = DataLoader(dataset=testset,
+    #                         batch_size=100,
+    #                         collate_fn=dgl.data.SST.batcher,
+    #                         shuffle=False,
+    #                         num_workers=0)
+
+    model = TreeLSTM(trainset.num_vocabs,
                      args.x_size,
                      args.h_size,
-                     dataset.num_classes)
+                     trainset.num_classes)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     dur = []
     for epoch in range(args.epochs):
-        for step, batch in enumerate(loader):
+        for step, batch in enumerate(train_loader):
             if step >= 3:
                 t0 = time.time()
             g = batch.graph
@@ -44,9 +51,22 @@ def main(args):
                 dur.append(time.time() - t0)
 
             if step > 0 and step % 5 == 0:
-                print("Epoch {:05d} | Step {:05d} | Loss {:.4f} | Time(s) {:.4f}".format(
-                    epoch, step, loss.item(), np.mean(dur)))
-            assert False
+                pred = th.argmax(logits, 1)
+                acc = th.sum(th.eq(batch.label, pred))
+                print("Epoch {:05d} | Step {:05d} | Loss {:.4f} | Acc {:.4f} | Time(s) {:.4f}".format(
+                    epoch, step, loss.item(), acc.item()/len(batch.label), np.mean(dur)))
+
+        # test
+        #for step, batch in enumerate(test_loader):
+        #    g = batch.graph
+        #    n = g.number_of_nodes()
+        #    x = th.zeros((n, args.x_size))
+        #    h = th.zeros((n, args.h_size))
+        #    c = th.zeros((n, args.h_size))
+        #    logits = model(batch, x, h, c, train=True)
+        #    pred = th.argmax(logits, 1)
+        #    acc = th.sum(th.eq(batch.label, pred)) / len(batch.label)
+        #    print(acc.item())
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
