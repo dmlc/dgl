@@ -583,7 +583,7 @@ class DGLGraph(DiGraph):
     def _batch_reduce(self, v, reduce_func):
         if is_all(v) and len(self._msg_frame) == 0:
             # no message has been sent
-            return None, None
+            return None, None, None
 
         if is_all(v):
             v = list(range(self.number_of_nodes()))
@@ -628,7 +628,7 @@ class DGLGraph(DiGraph):
         # FIXME: this will only trigger if reduced_msgs is empty.  Remove?
         if len(reduced_msgs) == 0:
             # no message has been sent to the specified node
-            return None, None
+            return None, None, None
 
         # TODO: clear partial messages
         self.clear_messages()
