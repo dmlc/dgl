@@ -289,3 +289,14 @@ def cached_member(func):
         else:
             return func(self)
     return wrapper
+
+def pack2(a, b):
+    if a is None:
+        return b
+    elif b is None:
+        return a
+    else:
+        if isinstance(a, dict):
+            return {k: F.pack([a[k], b[k]]) for k in a}
+        else:
+            return F.pack([a, b])
