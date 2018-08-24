@@ -232,7 +232,8 @@ def test_reduce_0deg():
     def _message(src, edge):
         return src
     def _reduce(node, msgs):
-        return node.clone().zero_() if msgs is None else msgs.sum(1)
+        assert msgs is not None
+        return msgs.sum(1)
     def _update(node, accum):
         return (node + accum) if accum is not None else node
 

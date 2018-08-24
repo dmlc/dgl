@@ -597,7 +597,7 @@ class DGLGraph(DiGraph):
 
         # degree bucketing
         degrees, v_buckets = scheduler.degree_bucketing(self.msg_graph, v)
-        null_v_buckets = []
+        null_v_bucket = None
         non_null_v_buckets = []
         reduced_msgs = []
         for deg, v_bkt in zip(degrees, v_buckets):
@@ -605,7 +605,8 @@ class DGLGraph(DiGraph):
             dst_reprs = self.get_n_repr(v_bkt)
 
             if deg == 0:
-                null_v_buckets.append(v_bkt)
+                assert null_v_bucket is None
+                null_v_bucket = v_bkt
                 continue
                 
             uu, vv = self.msg_graph.in_edges(v_bkt)
@@ -633,10 +634,7 @@ class DGLGraph(DiGraph):
         self.clear_messages()
         
         # Read the node states in the degree-bucketing order.
-        null_v = utils.toindex(
-                F.pack([v_bkt.totensor() for v_bkt in null_v_buckets])
-                if len(null_v_buckets) > 0 else []
-                )
+        null_v = utils.toindex(null_v_bucket or [])
         reordered_v = utils.toindex(
                 F.pack([v_bkt.totensor() for v_bkt in non_null_v_buckets])
                 if len(non_null_v_buckets) > 0 else []
