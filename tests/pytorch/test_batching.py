@@ -235,6 +235,7 @@ def test_reduce_0deg():
         assert msgs is not None
         return msgs.sum(1)
     def _update(node, accum):
+        # TODO: better test to check accum is None for 1-4 and not None for 0
         return (node + accum) if accum is not None else node
 
     old_repr = th.randn(5, 5)
