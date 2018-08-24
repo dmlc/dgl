@@ -93,20 +93,20 @@ class DGLGraph(DiGraph):
         else:
             u = utils.toindex(u)
             num_nodes = len(u)
-        if isinstance(hu, dict):
+        if utils.is_dict_like(hu):
             for key, val in hu.items():
                 assert F.shape(val)[0] == num_nodes
         else:
             assert F.shape(hu)[0] == num_nodes
         # set
         if is_all(u):
-            if isinstance(hu, dict):
+            if utils.is_dict_like(hu):
                 for key, val in hu.items():
                     self._node_frame[key] = val
             else:
                 self._node_frame[__REPR__] = hu
         else:
-            if isinstance(hu, dict):
+            if utils.is_dict_like(hu):
                 self._node_frame[u] = hu
             else:
                 self._node_frame[u] = {__REPR__ : hu}
@@ -171,21 +171,21 @@ class DGLGraph(DiGraph):
             u = utils.toindex(u)
             v = utils.toindex(v)
             num_edges = max(len(u), len(v))
-        if isinstance(h_uv, dict):
+        if utils.is_dict_like(h_uv):
             for key, val in h_uv.items():
                 assert F.shape(val)[0] == num_edges
         else:
             assert F.shape(h_uv)[0] == num_edges
         # set
         if u_is_all:
-            if isinstance(h_uv, dict):
+            if utils.is_dict_like(h_uv):
                 for key, val in h_uv.items():
                     self._edge_frame[key] = val
             else:
                 self._edge_frame[__REPR__] = h_uv
         else:
             eid = self.cached_graph.get_edge_id(u, v)
-            if isinstance(h_uv, dict):
+            if utils.is_dict_like(h_uv):
                 self._edge_frame[eid] = h_uv
             else:
                 self._edge_frame[eid] = {__REPR__ : h_uv}
@@ -206,20 +206,20 @@ class DGLGraph(DiGraph):
         else:
             eid = utils.toindex(eid)
             num_edges = len(eid)
-        if isinstance(h_uv, dict):
+        if utils.is_dict_like(h_uv):
             for key, val in h_uv.items():
                 assert F.shape(val)[0] == num_edges
         else:
             assert F.shape(h_uv)[0] == num_edges
         # set
         if is_all(eid):
-            if isinstance(h_uv, dict):
+            if utils.is_dict_like(h_uv):
                 for key, val in h_uv.items():
                     self._edge_frame[key] = val
             else:
                 self._edge_frame[__REPR__] = h_uv
         else:
-            if isinstance(h_uv, dict):
+            if utils.is_dict_like(h_uv):
                 self._edge_frame[eid] = h_uv
             else:
                 self._edge_frame[eid] = {__REPR__ : h_uv}
@@ -400,7 +400,7 @@ class DGLGraph(DiGraph):
             src_reprs = self.get_n_repr(u)
             edge_reprs = self.get_e_repr_by_id(eid)
             msgs = message_func(src_reprs, edge_reprs)
-        if isinstance(msgs, dict):
+        if utils.is_dict_like(msgs):
             self._msg_frame.append(msgs)
         else:
             self._msg_frame.append({__MSG__ : msgs})
@@ -557,7 +557,7 @@ class DGLGraph(DiGraph):
                 _, indices = F.sort(reordered_v.totensor())
                 indices = utils.toindex(indices)
                 # TODO(minjie): following code should be included in Frame somehow.
-                if isinstance(new_ns, dict):
+                if utils.is_dict_like(new_ns):
                     for key, val in new_ns.items():
                         idx = indices.totensor(F.get_context(val))
                         self._node_frame[key] = F.gather_row(val, idx)
@@ -617,7 +617,7 @@ class DGLGraph(DiGraph):
         reordered_v = utils.toindex(F.pack(
             [v_bkt.totensor() for v_bkt in v_buckets]))
         # Pack all reduced msgs together
-        if isinstance(reduced_msgs[0], dict):
+        if utils.is_dict_like(reduced_msgs[0]):
             keys = reduced_msgs[0].keys()
             all_reduced_msgs = {
                     key : F.pack([msg[key] for msg in reduced_msgs])
@@ -864,11 +864,11 @@ class DGLGraph(DiGraph):
             self._nonbatch_recv(list(self.nodes()), reduce_func, update_func)
 
     def propagate(self,
+                  iterator='bfs',
                   message_func=None,
                   reduce_func=None,
                   update_func=None,
                   batchable=False,
-                  iterator='bfs',
                   **kwargs):
         """Propagate messages and update nodes using iterator.
 
@@ -1048,7 +1048,7 @@ def _get_repr(attr_dict):
         return attr_dict
 
 def _set_repr(attr_dict, attr):
-    if isinstance(attr, dict):
+    if utils.is_dict_like(attr):
         attr_dict.update(attr)
     else:
         attr_dict[__REPR__] = attr

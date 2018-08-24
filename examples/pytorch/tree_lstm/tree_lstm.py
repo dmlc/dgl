@@ -4,13 +4,32 @@ https://arxiv.org/abs/1503.00075
 """
 import itertools
 import networkx as nx
-import dgl.graph as G
+import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
-class ChildSumTreeLSTMCell(object):
+def topological_traverse(G):
+    indegree_map = {v: d for v, d in G.in_degree() if d > 0}
+    # These nodes have zero indegree and ready to be returned.
+    zero_indegree = [v for v, d in G.in_degree() if d == 0]
+    while True:
+        yield zero_indegree
+        next_zero_indegree = []
+        while zero_indegree:
+            node = zero_indegree.pop()
+            for _, child in G.edges(node):
+                indegree_map[child] -= 1
+                if indegree_map[child] == 0:
+                    next_zero_indegree.append(child)
+                    del indegree_map[child]
+        if len(next_zero_indegree) == 0:
+            break
+        zero_indegree = next_zero_indegree
+
+class ChildSumTreeLSTMCell(nn.Module):
     def __init__(self, x_size, h_size):
+        super(ChildSumTreeLSTMCell, self).__init__()
         self.W_iou = nn.Linear(x_size, 3 * h_size)
         self.U_iou = nn.Linear(h_size, 3 * h_size)
         self.W_f = nn.Linear(x_size, h_size)
@@ -32,87 +51,72 @@ class ChildSumTreeLSTMCell(object):
 
     def update_func(self, node, accum):
         # equation (3), (5), (6)
-        iou = self.W_iou(node['x']) + self.U_iou(accum['h_tild'])
+        if accum is None:
+            iou = self.W_iou(node['x'])
+        else:
+            iou = self.W_iou(node['x']) + self.U_iou(accum['h_tild'])
         i, o, u = th.chunk(iou, 3, 1)
         i, o, u = th.sigmoid(i), th.sigmoid(o), th.tanh(u)
         # equation (7)
-        c = i * u + accum['c_tild']
+        if accum is None:
+            c = i * u
+        else:
+            c = i * u + accum['c_tild']
         # equation (8)
         h = o * th.tanh(c)
         return {'h' : h, 'c' : c}
 
 class TreeLSTM(nn.Module):
-    def __init__(self, n_embeddings, x_size, h_size, n_classes, cell_type='childsum'):
+    def __init__(self, num_vocabs, x_size, h_size, num_classes, cell_type='childsum'):
         super(TreeLSTM, self).__init__()
-        self.embedding = nn.Embedding(n_embeddings, x_size)
-        self.linear = nn.Linear(h_size, n_classes)
-
-    def message_func(self, src, edge):
-        return src
-
-    def update_func(self, node, accum):
-        x = node_reprs['x']
-        iou = th.mm(x, self.iou_w) + self.iou_b
-        i, o, u = th.chunk(iou, 3, 1)
-        i, o, u = th.sigmoid(i), th.sigmoid(o), th.tanh(u)
-        c = i * u
-        h = o * th.tanh(c)
-        return {'h' : h, 'c' : c}
-
-    def internal_update_func(self, node_reprs, edge_reprs):
-        raise NotImplementedError()
-
-    def readout_func(self, g, train):
-        if train:
-            h = th.cat([d['h'] for d in g.nodes.values() if d['y'] is not None], 0)
-            y = th.cat([d['y'] for d in g.nodes.values() if d['y'] is not None], 0)
-            log_p = F.log_softmax(self.linear(h), 1)
-            return -th.sum(y * log_p) / len(y)
+        self.x_size = x_size
+        # TODO(minjie): pre-trained embedding like GLoVe
+        self.embedding = nn.Embedding(num_vocabs, x_size)
+        self.linear = nn.Linear(h_size, num_classes)
+        if cell_type == 'childsum':
+            self.cell = ChildSumTreeLSTMCell(x_size, h_size)
         else:
-            h = th.cat([reprs['h'] for reprs in g.nodes.values()], 0)
-            y_bar = th.max(self.linear(h), 1)[1]
-            # TODO
-            for reprs, z in zip(labelled_reprs, y_bar):
-                reprs['y_bar'] = z.item()
+            raise RuntimeError('Unknown cell type:', cell_type)
 
-    def forward(self, g, train=False):
-        """
+    def forward(self, batch, x, h, c, train=True):
+        """Compute tree-lstm prediction given a batch.
+
         Parameters
         ----------
-        g : networkx.DiGraph
+        batch : dgl.data.SSTBatch
+            The data batch.
+        x : Tensor
+            Initial node input.
+        h : Tensor
+            Initial hidden state.
+        c : Tensor
+            Initial cell state.
+
+        Returns
+        -------
+        logits : Tensor
+            The prediction of each node.
         """
-        assert any(d['y'] is not None for d in g.nodes.values()) # TODO
+        g = batch.graph
+        g.register_message_func(self.cell.message_func, batchable=True)
+        g.register_reduce_func(self.cell.reduce_func, batchable=True)
+        g.register_update_func(self.cell.update_func, batchable=True)
+        # feed embedding
+        embeds = self.embedding(batch.wordid)
+        x = x.index_copy(0, batch.nid_with_word, embeds)
+        g.set_n_repr({'x' : x, 'h' : h, 'c' : c})
+        # TODO(minjie): potential bottleneck
+        for frontier in topological_traverse(g):
+            print('frontier', frontier)
+            print('degree', [g.in_degree(x) for x in frontier])
+            #g.update_to(frontier)
+        assert False
+        # compute logits
+        h = g.pop_n_repr('h')
+        logits = self.linear(h)
+        return logits
 
-        g = G.DGLGraph(g)
-
-        def update_func(node_reprs, edge_reprs):
-            node_reprs = node_reprs.copy()
-            if node_reprs['x'] is not None:
-                node_reprs['x'] = self.embedding(node_reprs['x'])
-            return node_reprs
-
-        g.register_message_func(self.message_func)
-        g.register_update_func(update_func, g.nodes)
-        g.update_all()
-
-        g.register_update_func(self.internal_update_func, g.nodes)
-        leaves = list(filter(lambda x: g.in_degree(x) == 0, g.nodes))
-        g.register_update_func(self.leaf_update_func, leaves)
-
-        iterator = []
-        frontier = [next(filter(lambda x: g.out_degree(x) == 0, g.nodes))]
-        while frontier:
-            src = sum([list(g.pred[x]) for x in frontier], [])
-            trg = sum([[x] * len(g.pred[x]) for x in frontier], [])
-            iterator.append((src, trg))
-            frontier = src
-
-        g.recv(leaves)
-        g.propagate(reversed(iterator))
-
-        return self.readout_func(g, train)
-
-
+'''
 class NAryTreeLSTM(TreeLSTM):
     def __init__(self, n_embeddings, x_size, h_size, n_ary, n_classes):
         super().__init__(n_embeddings, x_size, h_size, n_classes)
@@ -153,3 +157,4 @@ class NAryTreeLSTM(TreeLSTM):
         h = o * th.tanh(c)
 
         return {'h' : h, 'c' : c}
+'''

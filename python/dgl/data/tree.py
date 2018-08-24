@@ -62,7 +62,7 @@ class SST(object):
                 else:
                     g.add_node(cid, x=SST.PAD_WORD, y=int(child.label()))
                     _rec_build(cid, child)
-                g.add_edge(nid, cid)
+                g.add_edge(cid, nid)
         # add root
         g.add_node(0, x=SST.PAD_WORD, y=int(root.label()))
         _rec_build(0, root)
@@ -73,6 +73,10 @@ class SST(object):
 
     def __len__(self):
         return len(self.trees)
+
+    @property 
+    def num_vocabs(self):
+        return len(self.vocab)
 
     @staticmethod
     def batcher(batch):
