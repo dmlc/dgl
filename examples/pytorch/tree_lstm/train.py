@@ -7,20 +7,21 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 import dgl
+from dgl.data as data
 
 from tree_lstm import TreeLSTM
 
 def main(args):
-    trainset = dgl.data.SST()
+    trainset = data.SST()
     train_loader = DataLoader(dataset=trainset,
                               batch_size=args.batch_size,
-                              collate_fn=dgl.data.SST.batcher,
+                              collate_fn=data.SST.batcher,
                               shuffle=False,
                               num_workers=0)
-    #testset = dgl.data.SST(mode='test')
+    #testset = data.SST(mode='test')
     #test_loader = DataLoader(dataset=testset,
     #                         batch_size=100,
-    #                         collate_fn=dgl.data.SST.batcher,
+    #                         collate_fn=data.SST.batcher,
     #                         shuffle=False,
     #                         num_workers=0)
 
