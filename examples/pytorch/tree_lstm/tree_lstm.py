@@ -2,6 +2,7 @@
 Improved Semantic Representations From Tree-Structured Long Short-Term Memory Networks
 https://arxiv.org/abs/1503.00075
 """
+import time
 import itertools
 import networkx as nx
 import numpy as np
@@ -34,6 +35,8 @@ class ChildSumTreeLSTMCell(nn.Module):
         self.U_iou = nn.Linear(h_size, 3 * h_size)
         self.W_f = nn.Linear(x_size, h_size)
         self.U_f = nn.Linear(h_size, h_size)
+        self.rt = 0.
+        self.ut = 0.
 
     def message_func(self, src, edge):
         return src
@@ -85,7 +88,7 @@ class TreeLSTM(nn.Module):
         else:
             raise RuntimeError('Unknown cell type:', cell_type)
 
-    def forward(self, batch, x, h, c, train=True):
+    def forward(self, batch, x, h, c, iterator=None, train=True):
         """Compute tree-lstm prediction given a batch.
 
         Parameters
@@ -98,6 +101,8 @@ class TreeLSTM(nn.Module):
             Initial hidden state.
         c : Tensor
             Initial cell state.
+        iterator : graph iterator
+            External iterator on graph.
 
         Returns
         -------
@@ -113,9 +118,13 @@ class TreeLSTM(nn.Module):
         x = x.index_copy(0, batch.nid_with_word, embeds)
         g.set_n_repr({'x' : x, 'h' : h, 'c' : c})
         # TODO(minjie): potential bottleneck
-        for frontier in topological_traverse(g):
-            #print('frontier', frontier)
-            g.update_to(frontier)
+        if iterator is None:
+            for frontier in topological_traverse(g):
+                #print('frontier', frontier)
+                g.update_to(frontier)
+        else:
+            for frontier in iterator:
+                g.update_to(frontier)
         # compute logits
         h = g.pop_n_repr('h')
         h = self.dropout(h)

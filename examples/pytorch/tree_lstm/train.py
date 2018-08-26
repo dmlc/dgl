@@ -17,6 +17,24 @@ def _batch_to_cuda(batch):
                          wordid = batch.wordid.cuda(),
                          label = batch.label.cuda())
 
+import dgl.context as ctx
+def tensor_topo_traverse(g, cuda, args):
+    n = g.number_of_nodes()
+    if cuda:
+        adjmat = g.cached_graph.adjmat(ctx.gpu(args.gpu))
+        mask = th.ones((n, 1)).cuda()
+    else:
+        adjmat = g.cached_graph.adjmat(ctx.cpu())
+        mask = th.ones((n, 1))
+    degree = th.spmm(adjmat, mask)
+    while th.sum(mask) != 0.:
+        v = (degree == 0.).float()
+        v = v * mask
+        mask = mask - v
+        frontier = th.squeeze(th.squeeze(v).nonzero(), 1)
+        yield frontier
+        degree -= th.spmm(adjmat, v)
+
 def main(args):
     cuda = args.gpu >= 0
     if cuda:
@@ -47,6 +65,7 @@ def main(args):
                               weight_decay=args.weight_decay)
     dur = []
     for epoch in range(args.epochs):
+        t_epoch = time.time()
         for step, batch in enumerate(train_loader):
             if cuda:
                 batch = _batch_to_cuda(batch)
@@ -58,9 +77,11 @@ def main(args):
 
             if step >= 3:
                 t0 = time.time()
-            logits = model(batch, x, h, c, train=True)
+            # traverse graph
+            giter = list(tensor_topo_traverse(g, False, args))
+            logits = model(batch, x, h, c, iterator=giter, train=True)
             logp = F.log_softmax(logits, 1)
-            loss = F.nll_loss(logp, batch.label) / args.batch_size
+            loss = F.nll_loss(logp, batch.label)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -70,8 +91,12 @@ def main(args):
             if step > 0 and step % args.log_every == 0:
                 pred = th.argmax(logits, 1)
                 acc = th.sum(th.eq(batch.label, pred))
-                print("Epoch {:05d} | Step {:05d} | Loss {:.4f} | Acc {:.4f} | Time(s) {:.4f}".format(
-                    epoch, step, loss.item(), acc.item()/len(batch.label), np.mean(dur)))
+                mean_dur = np.mean(dur)
+                print("Epoch {:05d} | Step {:05d} | Loss {:.4f} | "
+                      "Acc {:.4f} | Time(s) {:.4f} | Trees/s {:.4f}".format(
+                    epoch, step, loss.item(), acc.item()/len(batch.label),
+                    mean_dur, args.batch_size / mean_dur))
+        print("Epoch time(s):", time.time() - t_epoch)
 
         # test
         #for step, batch in enumerate(test_loader):
