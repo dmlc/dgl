@@ -8,7 +8,27 @@ from dgl.graph import DGLGraph
 from dgl.nx_adapt import nx_init
 import dgl.utils as utils
 
-class DGLSubGraph(DGLGraph):
+class DGLSubGraphBase(DGLGraph):
+    def __init__(self):
+        super(DGLSubGraphBase, self).__init__()
+
+    def copy_from(self, parent):
+        """Copy node/edge features from the parent graph.
+
+        All old features will be removed.
+
+        Parameters
+        ----------
+        parent : DGLGraph
+            The parent graph to copy from.
+        """
+        if parent._node_frame.num_rows != 0:
+            self._node_frame = FrameRef(Frame(parent._node_frame[self._parent_nid]))
+        if parent._edge_frame.num_rows != 0:
+            self._edge_frame = FrameRef(Frame(parent._edge_frame[self._parent_eid]))
+
+
+class DGLSubGraph(DGLSubGraphBase):
     # TODO(gaiyu): ReadOnlyGraph
     def __init__(self,
                  parent,
@@ -26,17 +46,15 @@ class DGLSubGraph(DGLGraph):
                 eids.append(eid)
         self._parent_eid = utils.toindex(eids)
 
-    def copy_from(self, parent):
-        """Copy node/edge features from the parent graph.
 
-        All old features will be removed.
-
-        Parameters
-        ----------
-        parent : DGLGraph
-            The parent graph to copy from.
-        """
-        if parent._node_frame.num_rows != 0:
-            self._node_frame = FrameRef(Frame(parent._node_frame[self._parent_nid]))
-        if parent._edge_frame.num_rows != 0:
-            self._edge_frame = FrameRef(Frame(parent._edge_frame[self._parent_eid]))
+class DGLEdgeSubGraph(DGLSubGraphBase):
+    def __init__(self, parent, u, v):
+        super(DGLEdgeSubGraph, self).__init__()
+        nodes = list(set(list(u) + list(v)))
+        # relabel node
+        self._node_mapping = utils.build_relabel_dict(nodes)
+        self._parent_nid = utils.toindex(nodes)
+        # create edge subgraph
+        for uu, vv in utils.edge_iter(u, v):
+            self.add_edge(self._node_mapping[uu], self._node_mapping[vv])
+        self._parent_eid = parent.get_edge_id(u, v)

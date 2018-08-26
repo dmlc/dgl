@@ -922,7 +922,28 @@ class DGLGraph(DiGraph):
         """
         return dgl.DGLSubGraph(self, nodes)
 
-    def merge(self, subgraphs, reduce_func='sum'):
+    def edge_subgraph(self, u, v):
+        """Generate the subgraph among the given edges.
+
+        The generated graph contains only the graph structure. The node/edge
+        features are not shared implicitly. Use `copy_from` to get node/edge
+        features from parent graph.
+
+        Parameters
+        ----------
+        u : list, or iterable
+            A container of the src nodes to construct subgraph.
+        v : list, or iterable
+            A container of the dst nodes to construct subgraph.
+
+        Returns
+        -------
+        G : DGLSubGraph
+            The subgraph.
+        """
+        return dgl.DGLEdgeSubGraph(self, u, v)
+
+    def merge(self, subgraphs, node_reduce_func='sum', edge_reduce_func='sum'):
         """Merge subgraph features back to this parent graph.
 
         Parameters
@@ -935,34 +956,36 @@ class DGLGraph(DiGraph):
         # sanity check: all the subgraphs and the parent graph
         # should have the same node/edge feature schemes.
         # merge node features
-        to_merge = []
-        for sg in subgraphs:
-            if len(sg.node_attr_schemes()) == 0:
-                continue
-            if sg.node_attr_schemes() != self.node_attr_schemes():
-                raise RuntimeError('Subgraph and parent graph do not '
-                                   'have the same node attribute schemes.')
-            to_merge.append(sg)
-        self._node_frame = merge_frames(
-                [sg._node_frame for sg in to_merge],
-                [sg._parent_nid for sg in to_merge],
-                self._node_frame.num_rows,
-                reduce_func)
+        if node_reduce_func is not None:
+            to_merge = []
+            for sg in subgraphs:
+                if len(sg.node_attr_schemes()) == 0:
+                    continue
+                if sg.node_attr_schemes() != self.node_attr_schemes():
+                    raise RuntimeError('Subgraph and parent graph do not '
+                                       'have the same node attribute schemes.')
+                to_merge.append(sg)
+            self._node_frame = merge_frames(
+                    [sg._node_frame for sg in to_merge],
+                    [sg._parent_nid for sg in to_merge],
+                    self._node_frame.num_rows,
+                    reduce_func)
 
         # merge edge features
-        to_merge.clear()
-        for sg in subgraphs:
-            if len(sg.edge_attr_schemes()) == 0:
-                continue
-            if sg.edge_attr_schemes() != self.edge_attr_schemes():
-                raise RuntimeError('Subgraph and parent graph do not '
-                                   'have the same edge attribute schemes.')
-            to_merge.append(sg)
-        self._edge_frame = merge_frames(
-                [sg._edge_frame for sg in to_merge],
-                [sg._parent_eid for sg in to_merge],
-                self._edge_frame.num_rows,
-                reduce_func)
+        if edge_reduce_func is not None:
+            to_merge = []
+            for sg in subgraphs:
+                if len(sg.edge_attr_schemes()) == 0:
+                    continue
+                if sg.edge_attr_schemes() != self.edge_attr_schemes():
+                    raise RuntimeError('Subgraph and parent graph do not '
+                                       'have the same edge attribute schemes.')
+                to_merge.append(sg)
+            self._edge_frame = merge_frames(
+                    [sg._edge_frame for sg in to_merge],
+                    [sg._parent_eid for sg in to_merge],
+                    self._edge_frame.num_rows,
+                    reduce_func)
 
     def draw(self):
         """Plot the graph using dot."""
