@@ -5,6 +5,7 @@ Code: https://github.com/tkipf/relational-gcn
 
 Difference compared to tkipf/relation-gcn
 * edge directions are reversed (kipf did not transpose adj before spmv)
+* featureless case, we still have to store node feature, causing memory problems
 * l2norm applied to all weights
 * remove both in and out edges for nodes that won't be touched
 """
@@ -140,6 +141,9 @@ def main(args):
         features = torch.eye(num_nodes)
     else:
         features = torch.randn(num_nodes, args.in_feat)
+    if args.relation_limit > 0 and args.relation_limit < relations.shape[1]:
+        print("using first {} relaitons".format(args.relation_limit))
+        relations = relations[:, :args.relation_limit]
 
     # split dataset into train, validate, test
     if args.validation:
@@ -184,6 +188,7 @@ def main(args):
     # training loop
     forward_time = []
     backward_time = []
+    model.train()
     for epoch in range(args.n_epochs):
         optimizer.zero_grad()
         t0 = time.time()
@@ -202,8 +207,9 @@ def main(args):
         val_loss = F.cross_entropy(logits[val_idx], labels[val_idx])
         val_acc = torch.sum(logits[val_idx].argmax(dim=1) == labels[val_idx]).item() / len(val_idx)
         print("Train Accuracy: {:.4f} | Train Loss: {:.4f} | Validation Accuracy: {:.4f} | Validation loss: {:.4f}".format(train_acc, loss.item(), val_acc, val_loss.item()))
-
     print()
+
+    model.eval()
     logits = model.forward(features)
     test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
     test_acc = torch.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
@@ -230,12 +236,14 @@ if __name__ == '__main__':
             help="number of filter weight matrices, default: -1 [use all]")
     parser.add_argument("--n-layers", type=int, default=1,
             help="number of propagation rounds")
-    parser.add_argument("--n-epochs", type=int, default=50,
+    parser.add_argument("-e", "--n-epochs", type=int, default=50,
             help="number of training epochs")
-    parser.add_argument("--dataset", type=str, required=True,
+    parser.add_argument("-d", "--dataset", type=str, required=True,
             help="dataset to use")
     parser.add_argument("--l2norm", type=float, default=0,
             help="l2 norm coef")
+    parser.add_argument("-r", "--relation-limit", type=int, default=-1,
+            help="max number of relations to use")
     fp = parser.add_mutually_exclusive_group(required=False)
     fp.add_argument('--validation', dest='validation', action='store_true')
     fp.add_argument('--testing', dest='validation', action='store_false')
