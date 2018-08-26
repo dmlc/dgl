@@ -136,7 +136,10 @@ def main(args):
     test_idx = data.test_idx
 
     # default features are identity matrix, switch to other features here
-    features = torch.eye(num_nodes)
+    if args.in_feat is None:
+        features = torch.eye(num_nodes)
+    else:
+        features = torch.randn(num_nodes, args.in_feat)
 
     # split dataset into train, validate, test
     if args.validation:
@@ -189,11 +192,23 @@ def main(args):
         t1 = time.time()
         loss.backward()
         t2 = time.time()
-        forward_time.append(t1 - t0)
-        backward_time.append(t2 - t1)
+
         optimizer.step()
 
-        print("Epoch {:05d} | Loss {:.4f} | Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".format(epoch, loss.item(), forward_time[-1], backward_time[-1]))
+        forward_time.append(t1 - t0)
+        backward_time.append(t2 - t1)
+        print("Epoch {:05d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".format(epoch, forward_time[-1], backward_time[-1]))
+        train_acc = torch.sum(logits[train_idx].argmax(dim=1) == labels[train_idx]).item() / len(train_idx)
+        val_loss = F.cross_entropy(logits[val_idx], labels[val_idx])
+        val_acc = torch.sum(logits[val_idx].argmax(dim=1) == labels[val_idx]).item() / len(val_idx)
+        print("Train Accuracy: {:.4f} | Train Loss: {:.4f} | Validation Accuracy: {:.4f} | Validation loss: {:.4f}".format(train_acc, loss.item(), val_acc, val_loss.item()))
+
+    print()
+    logits = model.forward(features)
+    test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
+    test_acc = torch.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
+    print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
+    print()
 
     print("Mean forward time: {:4f}".format(np.mean(forward_time[len(forward_time) // 4:])))
     print("Mean backward time: {:4f}".format(np.mean(backward_time[len(backward_time) // 4:])))
@@ -205,15 +220,17 @@ if __name__ == '__main__':
             help="dropout probability")
     parser.add_argument("--n-hidden", type=int, default=16,
             help="number of hidden units")
+    parser.add_argument("--in-feat", type=int, default=None,
+            help="input feature size")
     parser.add_argument("--gpu", type=int, default=-1,
             help="gpu")
-    parser.add_argument("--lr", type=float, default=1e-3,
+    parser.add_argument("--lr", type=float, default=1e-2,
             help="learning rate")
     parser.add_argument("--n-bases", type=int, default=-1,
             help="number of filter weight matrices, default: -1 [use all]")
     parser.add_argument("--n-layers", type=int, default=1,
             help="number of propagation rounds")
-    parser.add_argument("--n-epochs", type=int, default=20,
+    parser.add_argument("--n-epochs", type=int, default=50,
             help="number of training epochs")
     parser.add_argument("--dataset", type=str, required=True,
             help="dataset to use")

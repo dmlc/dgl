@@ -19,7 +19,7 @@ from dgl.data.utils import download, extract_archive, get_download_dir
 np.random.seed(123)
 
 _urls = {
-    'task': 'https://www.dropbox.com/s/bif1e26eacaj5w4/rgcn_task.tar.gz?dl=1',
+    'task': 'https://www.dropbox.com/s/babuor115oqq2i3/rgcn_task.tgz?dl=1',
     'am': 'https://www.dropbox.com/s/htisydfgwxmrx65/am_stripped.nt.gz?dl=1',
     'aifb': 'https://www.dropbox.com/s/fkvgvkygo2gf28k/aifb_stripped.nt.gz?dl=1',
     'mutag': 'https://www.dropbox.com/s/qy8j3p8eacvm4ir/mutag_stripped.nt.gz?dl=1',
@@ -58,16 +58,16 @@ class RGCNDataset(object):
             self.relations = self.relations[eid_to_keep, :]
             # do not remove and relabel nodes, or do that to training labels as well
 
-        # FIXME: should normalize by src degree
-        src = self.edges[:, 0]
+        # FIXME: should normalize by dst degree
+        dst = self.edges[:, 1]
         for idx in range(self.relations.shape[1]):
             rel = self.relations[:, idx]
             nonzero = rel.nonzero()[0]
-            nid, count = np.unique(src[nonzero], return_counts=True)
+            nid, count = np.unique(dst[nonzero], return_counts=True)
             degree = np.zeros(self.num_nodes, dtype=np.float32)
             degree[nid] = count
             # cast to edge
-            degree = 1.0 / degree[src]
+            degree = 1.0 / degree[dst]
             degree[np.isinf(degree)] = 0
             self.relations[:, idx] *= degree
 
