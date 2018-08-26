@@ -18,27 +18,34 @@ import torch.nn.functional as F
 import dgl
 from dgl import DGLGraph
 from dgl.data import load_data
+from functools import partial
 
 class RGCNLayer(nn.Module):
-    def __init__(self, in_feat, out_feat, num_rels, num_bases=-1, bias=None, activation=None):
+    def __init__(self, in_feat, out_feat, num_gs, num_rels, num_bases=-1, bias=None, activation=None):
         super(RGCNLayer, self).__init__()
-        self.num_bases = num_bases
-        self.num_rels = num_rels
+        self.in_feat = in_feat
+        self.out_feat = out_feat
+        self.num_bases = min(num_bases, num_gs)
+        self.num_rels = min(num_rels, num_gs)
         self.bias = bias
         self.activation = activation
         if self.num_bases < 0:
             self.num_bases = self.num_rels
         self.weights = nn.ParameterList([nn.Parameter(torch.Tensor(in_feat, out_feat)) for _ in range(self.num_bases)])
+        for w in self.weights:
+            nn.init.xavier_uniform_(w, gain=nn.init.calculate_gain('relu'))
         if self.num_bases < self.num_rels:
             self.w_comp = nn.Parameter(torch.Tensor(self.num_rels, self.num_bases))
+            nn.init.xavier_uniform_(self.w_comp, gain=nn.init.calculate_gain('relu'))
         if self.bias == True:
             self.bias = nn.Parameter(torch.Tensor(out_feat))
+            nn.init.xavier_uniform_(self.bias, gain=nn.init.calculate_gain('relu'))
 
     def forward(self, parent, children):
         if self.num_bases < self.num_rels:
-            weights = torch.stack(self.weights).permute(1, 0, 2)
-            weights = torch.matmul(self.w_comp, weights).permute(1, 0, 2)
-            weights = torch.split(weights, 1, dim=0)
+            weights = torch.stack(list(self.weights)).permute(1, 0, 2)
+            weights = torch.matmul(self.w_comp, weights).view(-1, self.out_feat)
+            weights = torch.split(weights, self.in_feat, dim=0)
         else:
             weights = self.weights
 
@@ -47,7 +54,8 @@ class RGCNLayer(nn.Module):
             g.copy_from(parent)
             # propagate subgraphs
             g.update_all('src_mul_edge', 'sum',
-                         lambda node, accum: torch.mm(accum, weights[idx]))
+                         lambda node, accum: torch.mm(accum, weights[idx]),
+                         batchable=True)
 
         # merge node repr
         parent.merge(children, node_reduce_func='sum', edge_reduce_func=None)
@@ -63,7 +71,7 @@ class RGCNLayer(nn.Module):
 
 
 class RGCN(nn.Module):
-    def __init__(self, g, in_dim, h_dim, out_dim, relations, num_layers=1, num_bases=-1, dropout=0, use_cuda=False):
+    def __init__(self, g, in_dim, h_dim, out_dim, relations, num_bases=-1, num_layers=1, dropout=0, use_cuda=False):
         super(RGCN, self).__init__()
         self.g = g
         self.dropout = dropout
@@ -75,21 +83,30 @@ class RGCN(nn.Module):
         src, dst = np.transpose(np.array(self.g.edge_list))
         for rel in range(num_rels):
             sub_rel = relations[:, rel]
+            if np.count_nonzero(sub_rel) == 0:
+                # skip relations with no edges
+                continue
             sub_eid = sub_rel > 0
             u = src[sub_eid]
             v = dst[sub_eid]
             sub_rel = sub_rel[sub_eid]
             subgrh = self.g.edge_subgraph(u, v)
-            edge_repr = torch.from_numpy(sub_rel)
+            edge_repr = torch.from_numpy(sub_rel).view(-1, 1)
             if use_cuda:
                 edge_repr = edge_repr.cuda()
             subgrh.set_e_repr(edge_repr)
             self.subgraphs.append(subgrh)
 
         # create rgcn layers
-        # FIXME: more than 2 laeyrs?
-        self.i2h = RGCNLayer(in_dim, h_dim, num_rels, num_bases, F.relu)
-        self.h2o = RGCNLayer(h_dim, out_dim, num_rels, num_bases, F.softmax)
+        num_subgraphs = len(self.subgraphs)
+        self.layers = nn.ModuleList()
+        # i2h
+        self.layers.append(RGCNLayer(in_dim, h_dim, num_subgraphs, num_rels, num_bases, activation=F.relu))
+        # h2h
+        for _ in range(1, num_layers):
+            self.layers.append(RGCNLayer(h_dim, h_dim, num_subgraphs, num_rels, num_bases, activation=F.relu))
+        # h2o
+        self.layers.append(RGCNLayer(h_dim, out_dim, num_subgraphs, num_rels, num_bases, activation=partial(F.softmax, dim=1)))
 
         # dropout layer
         if dropout > 0:
@@ -99,11 +116,12 @@ class RGCN(nn.Module):
 
     def forward(self, features):
         self.g.set_n_repr(features)
-        self.i2h(self.g, self.subgraphs)
-        if self.dropout:
-            features = self.dropout(self.g.get_n_repr())
-            self.g.set_n_repr(features)
-        self.h2o(self.g, self.subgraphs)
+        self.layers[0](self.g, self.subgraphs)
+        for i in range(1, len(self.layers)):
+            if self.dropout:
+                features = self.dropout(self.g.get_n_repr())
+                self.g.set_n_repr(features)
+            self.layers[i](self.g, self.subgraphs)
         return self.g.pop_n_repr()
 
 
@@ -129,6 +147,8 @@ def main(args):
 
     # check cuda
     use_cuda = args.gpu >= 0 and torch.cuda.is_available()
+    if use_cuda:
+        torch.cuda.set_device(args.gpu)
 
     # create graph
     g = DGLGraph()
@@ -141,16 +161,16 @@ def main(args):
                  args.n_hidden,
                  labels.shape[1],
                  relations,
-                 args.n_bases,
+                 num_bases=args.n_bases,
+                 num_layers=args.n_layers,
                  dropout=args.dropout,
                  use_cuda=use_cuda)
 
     # convert to pytorch label format
-    labels = np.argmax(labels, axis=0)
+    labels = np.argmax(labels, axis=1)
     labels = torch.from_numpy(labels).view(-1)
 
     if use_cuda:
-        torch.cuda.set_device(args.gpu)
         model.cuda()
         features = features.cuda()
         labels = labels.cuda()
@@ -163,20 +183,20 @@ def main(args):
     backward_time = []
     for epoch in range(args.n_epochs):
         optimizer.zero_grad()
-        if epoch >= 3:
-            t0 = time.time()
+        t0 = time.time()
         logits = model.forward(features)
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
-        if epoch >= 3:
-            t1 = time.time()
+        t1 = time.time()
         loss.backward()
-        if epoch >= 3:
-            t2 = time.time()
-            forward_time.append(t1 - t0)
-            backward_time.append(t2 - t1)
+        t2 = time.time()
+        forward_time.append(t1 - t0)
+        backward_time.append(t2 - t1)
         optimizer.step()
 
-        print("Epoch {:05d} | Loss {:.4f} | Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".format(epoch, loss.item(), np.mean(forward_time), np.mean(backward_time)))
+        print("Epoch {:05d} | Loss {:.4f} | Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".format(epoch, loss.item(), forward_time[-1], backward_time[-1]))
+
+    print("Mean forward time: {:4f}".format(np.mean(forward_time[len(forward_time) // 4:])))
+    print("Mean backward time: {:4f}".format(np.mean(backward_time[len(backward_time) // 4:])))
 
 
 if __name__ == '__main__':
@@ -193,7 +213,7 @@ if __name__ == '__main__':
             help="number of filter weight matrices, default: -1 [use all]")
     parser.add_argument("--n-layers", type=int, default=1,
             help="number of propagation rounds")
-    parser.add_argument("--n-epochs", type=int, default=50,
+    parser.add_argument("--n-epochs", type=int, default=20,
             help="number of training epochs")
     parser.add_argument("--dataset", type=str, required=True,
             help="dataset to use")

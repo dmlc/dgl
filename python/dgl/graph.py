@@ -881,16 +881,17 @@ class DGLGraph(DiGraph):
                 edge_repr = self.get_e_repr()
                 # must have only one edge feature, must be scalar
                 # FIXME: what's the semantics for multiple edge features? Cartesian?
-                assert len(edge_repr) == 1, \
-                        "spmv only support one edge feature"
-                edge_repr = list(edge_repr.values())[0]
+                if isinstance(edge_repr, dict):
+                    assert len(edge_repr) == 1, \
+                            "spmv only support one edge feature"
+                    edge_repr = list(edge_repr.values())[0]
                 assert edge_repr.shape[1] == 1, \
                         "spmv only support scalar edge feature"
-                adjmat = self.cached_graph.adjmat(self.context)
-                adjmat = F.sparse_tensor(adjmat._indices(), edge_repr.view(-1), adjmat.size())
                 reduced_msgs = {}
                 for key in self._node_frame.schemes:
                     col = self._node_frame[key]
+                    adjmat = self.cached_graph.adjmat(F.get_context(col))
+                    adjmat = F.sparse_tensor(adjmat._indices(), edge_repr.view(-1), adjmat.size())
                     reduced_msgs[key] = F.spmm(adjmat, col)
                 if len(reduced_msgs) == 1 and __REPR__ in reduced_msgs:
                     reduced_msgs = reduced_msgs[__REPR__]
@@ -1012,7 +1013,7 @@ class DGLGraph(DiGraph):
                     [sg._node_frame for sg in to_merge],
                     [sg._parent_nid for sg in to_merge],
                     self._node_frame.num_rows,
-                    reduce_func)
+                    node_reduce_func)
 
         # merge edge features
         if edge_reduce_func is not None:
@@ -1028,7 +1029,7 @@ class DGLGraph(DiGraph):
                     [sg._edge_frame for sg in to_merge],
                     [sg._parent_eid for sg in to_merge],
                     self._edge_frame.num_rows,
-                    reduce_func)
+                    edge_reduce_func)
 
     def draw(self):
         """Plot the graph using dot."""

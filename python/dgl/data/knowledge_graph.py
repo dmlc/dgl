@@ -64,11 +64,12 @@ class RGCNDataset(object):
             rel = self.relations[:, idx]
             nonzero = rel.nonzero()[0]
             nid, count = np.unique(src[nonzero], return_counts=True)
-            degree = np.zeros(self.num_nodes, dtype=np.float)
+            degree = np.zeros(self.num_nodes, dtype=np.float32)
             degree[nid] = count
-            degree = degree[src]
-            self.relations[:, idx] /= degree
-        self.relations[np.isinf(self.relations)] = 0
+            # cast to edge
+            degree = 1.0 / degree[src]
+            degree[np.isinf(degree)] = 0
+            self.relations[:, idx] *= degree
 
 
 def load_aifb(args):
@@ -284,7 +285,7 @@ def _load_data(dataset_str='aifb', dataset_path=None):
             print('Number of nodes: ', num_node)
             print('Number of relations in the data: ', num_rel)
 
-            edge_dict = defaultdict(lambda: np.zeros(2 * num_rel + 1)) # +1: self-rel
+            edge_dict = defaultdict(lambda: np.zeros(2 * num_rel + 1, dtype=np.float32)) # +1: self-rel
 
             relations_dict = {rel: i for i, rel in enumerate(list(relations))}
             nodes_dict = {node: i for i, node in enumerate(nodes)}
