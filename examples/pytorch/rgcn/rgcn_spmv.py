@@ -22,15 +22,16 @@ from dgl.data import load_data
 from functools import partial
 
 class RGCNLayer(nn.Module):
-    def __init__(self, in_feat, out_feat, num_gs, num_rels, num_bases=-1, bias=None, activation=None):
+    def __init__(self, in_feat, out_feat, num_gs, num_rels, num_bases=-1, featureless=False, bias=None, activation=None):
         super(RGCNLayer, self).__init__()
         self.in_feat = in_feat
         self.out_feat = out_feat
         self.num_bases = min(num_bases, num_gs)
         self.num_rels = min(num_rels, num_gs)
+        self.featureless = featureless
         self.bias = bias
         self.activation = activation
-        if self.num_bases < 0:
+        if self.num_bases <= 0:
             self.num_bases = self.num_rels
         self.weights = nn.ParameterList([nn.Parameter(torch.Tensor(in_feat, out_feat)) for _ in range(self.num_bases)])
         for w in self.weights:
@@ -51,15 +52,24 @@ class RGCNLayer(nn.Module):
             weights = self.weights
 
         for idx, g in enumerate(children):
-            # update subgraph node repr
-            g.copy_from(parent)
-            # propagate subgraphs
-            g.update_all('src_mul_edge', 'sum',
-                         lambda node, accum: torch.mm(accum, weights[idx]),
-                         batchable=True)
+            if self.featureless:
+                # hack to avoid materize node features to avoid memory issues
+                g.set_n_repr(weights[idx][g.parent_nid])
+                g.update_all('src_mul_edge', 'sum',
+                             lambda node, accum: accum,
+                             batchable=True)
+            else:
+                # update subgraph node repr
+                g.copy_from(parent)
+                g.update_all('src_mul_edge', 'sum',
+                             lambda node, accum: torch.mm(accum, weights[idx]),
+                             batchable=True)
 
         # merge node repr
         parent.merge(children, node_reduce_func='sum', edge_reduce_func=None)
+
+        for g in children:
+            g.pop_n_repr()
 
         # apply bias and activation
         node_repr = parent.get_n_repr()
@@ -72,12 +82,12 @@ class RGCNLayer(nn.Module):
 
 
 class RGCN(nn.Module):
-    def __init__(self, g, in_dim, h_dim, out_dim, relations, num_bases=-1, num_layers=1, dropout=0, use_cuda=False):
+    def __init__(self, g, h_dim, out_dim, relations, num_bases=-1, num_layers=1, dropout=0, use_cuda=False):
         super(RGCN, self).__init__()
         self.g = g
         self.dropout = dropout
         num_rels = relations.shape[1]
-        assert num_bases != 0 and num_bases <= num_rels
+        assert num_bases <= num_rels
 
         # generate subgraphs
         self.subgraphs = []
@@ -98,11 +108,16 @@ class RGCN(nn.Module):
             subgrh.set_e_repr(edge_repr)
             self.subgraphs.append(subgrh)
 
+        # hack to make subgraph merging work for featureless case
+        self.features = torch.zeros(len(self.g), 1)
+        if use_cuda:
+            self.features = self.features.cuda()
+
         # create rgcn layers
         num_subgraphs = len(self.subgraphs)
         self.layers = nn.ModuleList()
         # i2h
-        self.layers.append(RGCNLayer(in_dim, h_dim, num_subgraphs, num_rels, num_bases, activation=F.relu))
+        self.layers.append(RGCNLayer(len(self.g), h_dim, num_subgraphs, num_rels, num_bases, featureless=True, activation=F.relu))
         # h2h
         for _ in range(1, num_layers):
             self.layers.append(RGCNLayer(h_dim, h_dim, num_subgraphs, num_rels, num_bases, activation=F.relu))
@@ -115,8 +130,8 @@ class RGCN(nn.Module):
         else:
             self.dropout = None
 
-    def forward(self, features):
-        self.g.set_n_repr(features)
+    def forward(self):
+        self.g.set_n_repr(self.features)
         self.layers[0](self.g, self.subgraphs)
         for i in range(1, len(self.layers)):
             if self.dropout:
@@ -136,11 +151,6 @@ def main(args):
     train_idx = data.train_idx
     test_idx = data.test_idx
 
-    # default features are identity matrix, switch to other features here
-    if args.in_feat is None:
-        features = torch.eye(num_nodes)
-    else:
-        features = torch.randn(num_nodes, args.in_feat)
     if args.relation_limit > 0 and args.relation_limit < relations.shape[1]:
         print("using first {} relaitons".format(args.relation_limit))
         relations = relations[:, :args.relation_limit]
@@ -164,7 +174,6 @@ def main(args):
 
     # create model
     model = RGCN(g,
-                 features.shape[1],
                  args.n_hidden,
                  labels.shape[1],
                  relations,
@@ -179,7 +188,6 @@ def main(args):
 
     if use_cuda:
         model.cuda()
-        features = features.cuda()
         labels = labels.cuda()
 
     # optimizer
@@ -192,7 +200,7 @@ def main(args):
     for epoch in range(args.n_epochs):
         optimizer.zero_grad()
         t0 = time.time()
-        logits = model.forward(features)
+        logits = model.forward()
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         t1 = time.time()
         loss.backward()
@@ -210,7 +218,7 @@ def main(args):
     print()
 
     model.eval()
-    logits = model.forward(features)
+    logits = model.forward()
     test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
     test_acc = torch.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
     print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))
@@ -226,8 +234,6 @@ if __name__ == '__main__':
             help="dropout probability")
     parser.add_argument("--n-hidden", type=int, default=16,
             help="number of hidden units")
-    parser.add_argument("--in-feat", type=int, default=None,
-            help="input feature size")
     parser.add_argument("--gpu", type=int, default=-1,
             help="gpu")
     parser.add_argument("--lr", type=float, default=1e-2,

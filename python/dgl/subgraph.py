@@ -27,6 +27,10 @@ class DGLSubGraphBase(DGLGraph):
         if parent._edge_frame.num_rows != 0:
             self._edge_frame = FrameRef(Frame(parent._edge_frame[self._parent_eid]))
 
+    @property
+    def parent_nid(self):
+        return self._parent_nid
+
 
 class DGLSubGraph(DGLSubGraphBase):
     # TODO(gaiyu): ReadOnlyGraph
