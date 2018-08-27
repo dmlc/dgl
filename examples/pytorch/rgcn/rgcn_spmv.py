@@ -183,6 +183,8 @@ def main(args):
                  use_cuda=use_cuda)
 
     # convert to pytorch label format
+
+    row = labels.tocoo().row
     labels = np.argmax(labels, axis=1)
     labels = torch.from_numpy(labels).view(-1)
 
@@ -250,6 +252,8 @@ if __name__ == '__main__':
             help="l2 norm coef")
     parser.add_argument("-r", "--relation-limit", type=int, default=-1,
             help="max number of relations to use")
+    parser.add_argument("--relabel", default=False, action='store_true',
+            help="remove untouched nodes and relabel")
     fp = parser.add_mutually_exclusive_group(required=False)
     fp.add_argument('--validation', dest='validation', action='store_true')
     fp.add_argument('--testing', dest='validation', action='store_false')

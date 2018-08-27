@@ -38,7 +38,7 @@ class RGCNDataset(object):
         graph_file_path = os.path.join(self.dir, '{}_stripped.nt.gz'.format(self.name))
         download(_urls[self.name], path=graph_file_path)
 
-    def load(self, bfs_level=2):
+    def load(self, bfs_level=2, relabel=False):
         self.num_nodes, self.edges, self.relations, self.labels, labeled_nodes_idx, self.train_idx, self.test_idx, _, _, _ = _load_data(self.name, self.dir)
 
         # bfs to reduce edges
@@ -56,7 +56,17 @@ class RGCNDataset(object):
             eid_to_keep = np.logical_not(eid_to_delete)
             self.edges = self.edges[eid_to_keep, :]
             self.relations = self.relations[eid_to_keep, :]
-            # do not remove and relabel nodes, or do that to training labels as well
+
+            if relabel:
+                uniq_nodes, edges = np.unique(self.edges, return_inverse=True)
+                self.edges = np.reshape(edges, (-1, 2))
+                node_map = np.zeros(self.num_nodes, dtype=int)
+                self.num_nodes = len(uniq_nodes)
+                node_map[uniq_nodes] = np.arange(self.num_nodes)
+                self.labels = self.labels[uniq_nodes]
+                self.train_idx = node_map[self.train_idx]
+                self.test_idx = node_map[self.test_idx]
+                print("{} nodes left".format(self.num_nodes))
 
         # FIXME: should normalize by dst degree
         dst = self.edges[:, 1]
@@ -74,22 +84,22 @@ class RGCNDataset(object):
 
 def load_aifb(args):
     data = RGCNDataset('aifb')
-    data.load(args.bfs_level)
+    data.load(args.bfs_level, args.relabel)
     return data
 
 def load_mutag(args):
     data = RGCNDataset('mutag')
-    data.load(args.bfs_level)
+    data.load(args.bfs_level, args.relabel)
     return data
 
 def load_bgs(args):
     data = RGCNDataset('bgs')
-    data.load(args.bfs_level)
+    data.load(args.bfs_level, args.relabel)
     return data
 
 def load_am(args):
     data = RGCNDataset('am')
-    data.load(args.bfs_level)
+    data.load(args.bfs_level, args.relabel)
     return data
 
 
