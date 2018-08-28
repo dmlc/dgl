@@ -93,20 +93,20 @@ class DGLGraph(DiGraph):
         else:
             u = utils.toindex(u)
             num_nodes = len(u)
-        if isinstance(hu, dict):
+        if utils.is_dict_like(hu):
             for key, val in hu.items():
                 assert F.shape(val)[0] == num_nodes
         else:
             assert F.shape(hu)[0] == num_nodes
         # set
         if is_all(u):
-            if isinstance(hu, dict):
+            if utils.is_dict_like(hu):
                 for key, val in hu.items():
                     self._node_frame[key] = val
             else:
                 self._node_frame[__REPR__] = hu
         else:
-            if isinstance(hu, dict):
+            if utils.is_dict_like(hu):
                 self._node_frame[u] = hu
             else:
                 self._node_frame[u] = {__REPR__ : hu}
@@ -171,21 +171,21 @@ class DGLGraph(DiGraph):
             u = utils.toindex(u)
             v = utils.toindex(v)
             num_edges = max(len(u), len(v))
-        if isinstance(h_uv, dict):
+        if utils.is_dict_like(h_uv):
             for key, val in h_uv.items():
                 assert F.shape(val)[0] == num_edges
         else:
             assert F.shape(h_uv)[0] == num_edges
         # set
         if u_is_all:
-            if isinstance(h_uv, dict):
+            if utils.is_dict_like(h_uv):
                 for key, val in h_uv.items():
                     self._edge_frame[key] = val
             else:
                 self._edge_frame[__REPR__] = h_uv
         else:
             eid = self.cached_graph.get_edge_id(u, v)
-            if isinstance(h_uv, dict):
+            if utils.is_dict_like(h_uv):
                 self._edge_frame[eid] = h_uv
             else:
                 self._edge_frame[eid] = {__REPR__ : h_uv}
@@ -206,20 +206,20 @@ class DGLGraph(DiGraph):
         else:
             eid = utils.toindex(eid)
             num_edges = len(eid)
-        if isinstance(h_uv, dict):
+        if utils.is_dict_like(h_uv):
             for key, val in h_uv.items():
                 assert F.shape(val)[0] == num_edges
         else:
             assert F.shape(h_uv)[0] == num_edges
         # set
         if is_all(eid):
-            if isinstance(h_uv, dict):
+            if utils.is_dict_like(h_uv):
                 for key, val in h_uv.items():
                     self._edge_frame[key] = val
             else:
                 self._edge_frame[__REPR__] = h_uv
         else:
-            if isinstance(h_uv, dict):
+            if utils.is_dict_like(h_uv):
                 self._edge_frame[eid] = h_uv
             else:
                 self._edge_frame[eid] = {__REPR__ : h_uv}
@@ -400,7 +400,7 @@ class DGLGraph(DiGraph):
             src_reprs = self.get_n_repr(u)
             edge_reprs = self.get_e_repr_by_id(eid)
             msgs = message_func(src_reprs, edge_reprs)
-        if isinstance(msgs, dict):
+        if utils.is_dict_like(msgs):
             self._msg_frame.append(msgs)
         else:
             self._msg_frame.append({__MSG__ : msgs})
@@ -522,11 +522,11 @@ class DGLGraph(DiGraph):
 
     def _nonbatch_recv(self, u, reduce_func, update_func):
         f_reduce = _get_reduce_func(reduce_func)
-        f_update = update_func
         if is_all(u):
             u = list(range(0, self.number_of_nodes()))
         else:
             u = utils.toindex(u)
+
         for i, uu in enumerate(utils.node_iter(u)):
             # reduce phase
             msgs_batch = [self.edges[vv, uu].pop(__MSG__)
@@ -536,31 +536,31 @@ class DGLGraph(DiGraph):
             else:
                 msgs_reduced = f_reduce(_get_repr(self.nodes[uu]), msgs_batch)
             # update phase
-            ret = f_update(_get_repr(self.nodes[uu]), msgs_reduced)
+            ret = update_func(_get_repr(self.nodes[uu]), msgs_reduced)
             _set_repr(self.nodes[uu], ret)
 
     def _batch_recv(self, v, reduce_func, update_func):
-        f_update = update_func
+        if len(v) == 0:
+            # no vertex to be triggered.
+            return
         null_v, reordered_v, all_reduced_msgs = self._batch_reduce(v, reduce_func)
         if all_reduced_msgs is None:
             # no message; only do recv.
             if is_all(v):
-                self.set_n_repr(f_update(self.get_n_repr(), None))
+                self.set_n_repr(update_func(self.get_n_repr(), None))
             else:
-                self.set_n_repr(f_update(self.get_n_repr(v), None), v)
+                self.set_n_repr(update_func(self.get_n_repr(v), None), v)
         else:
-            # Read the node states in the degree-bucketing order.
+            # Compute new node repr for nodes with no in-coming messages.
             if len(null_v) == 0:
-                null_ns = new_null_ns = None
+                new_null_ns = None
             else:
-                null_ns = self.get_n_repr(null_v)
-                new_null_ns = f_update(null_ns, None)
+                new_null_ns = update_func(self.get_n_repr(null_v), None)
+            # Read the node states in the degree-bucketing order.
             if len(reordered_v) == 0:
-                reordered_ns = new_reordered_ns = None
+                new_reordered_ns = None
             else:
-                reordered_ns = self.get_n_repr(reordered_v)
-                new_reordered_ns = f_update(reordered_ns, all_reduced_msgs)
-
+                new_reordered_ns = update_func(self.get_n_repr(reordered_v), all_reduced_msgs)
             v_tensor = utils.pack2(null_v.totensor(), reordered_v.totensor())
             new_ns = utils.pack2(new_null_ns, new_reordered_ns)
 
@@ -569,7 +569,7 @@ class DGLGraph(DiGraph):
                 _, indices = F.sort(v_tensor)
                 indices = utils.toindex(indices)
                 # TODO(minjie): following code should be included in Frame somehow.
-                if isinstance(new_ns, dict):
+                if utils.is_dict_like(new_ns):
                     for key, val in new_ns.items():
                         idx = indices.totensor(F.get_context(val))
                         self._node_frame[key] = F.gather_row(val, idx)
@@ -581,15 +581,12 @@ class DGLGraph(DiGraph):
                 self.set_n_repr(new_ns, v_tensor)
 
     def _batch_reduce(self, v, reduce_func):
-        if is_all(v) and len(self._msg_frame) == 0:
-            # no message has been sent
+        if self._msg_frame.num_rows == 0:
+            # no message has ever been sent
             return None, None, None
 
         if is_all(v):
             v = list(range(self.number_of_nodes()))
-
-        # freeze message graph
-        self.msg_graph.freeze()
 
         # sanity checks
         v = utils.toindex(v)
@@ -609,7 +606,7 @@ class DGLGraph(DiGraph):
                 null_v_bucket = v_bkt
                 continue
                 
-            uu, vv = self.msg_graph.in_edges(v_bkt)
+            uu, vv, _ = self.msg_graph.in_edges(v_bkt)
             in_msg_ids = self.msg_graph.get_edge_id(uu, vv)
             in_msgs = self._msg_frame.select_rows(in_msg_ids)
             # Reshape the column tensor to (B, Deg, ...).
@@ -625,14 +622,13 @@ class DGLGraph(DiGraph):
             non_null_v_buckets.append(v_bkt)
             reduced_msgs.append(f_reduce(dst_reprs, reshaped_in_msgs))
 
-        # TODO: clear partial messages
-        self.clear_messages()
-
-        # FIXME: this will only trigger if reduced_msgs is empty.  Remove?
         if len(reduced_msgs) == 0:
             # no message has been sent to the specified node
             return None, None, None
-        
+
+        # TODO: clear partial messages
+        self.clear_messages()
+
         # Read the node states in the degree-bucketing order.
         null_v = utils.toindex(null_v_bucket or [])
         reordered_v = utils.toindex(
@@ -641,7 +637,7 @@ class DGLGraph(DiGraph):
                 )
 
         # Pack all reduced msgs together
-        if isinstance(reduced_msgs[0], dict):
+        if utils.is_dict_like(reduced_msgs[0]):
             keys = reduced_msgs[0].keys()
             all_reduced_msgs = {
                     key : F.pack([msg[key] for msg in reduced_msgs])
@@ -713,7 +709,10 @@ class DGLGraph(DiGraph):
             message_func,
             reduce_func,
             update_func):
-        if is_all(u) and is_all(v):
+        if len(u) == 0:
+            # no message
+            assert len(v) == 0
+        elif is_all(u) and is_all(v):
             self.update_all(message_func, reduce_func, update_func, True)
         elif message_func == 'from_src' and reduce_func == 'sum':
             # TODO(minjie): check the validity of edges u->v
@@ -732,7 +731,6 @@ class DGLGraph(DiGraph):
             dat = F.ones((len(u),))
             n = self.number_of_nodes()
             m = len(new2old)
-            # TODO(minjie): context
             adjmat = F.sparse_tensor(idx, dat, [m, n])
             ctx_adjmat = utils.CtxCachedObject(lambda ctx: F.to_context(adjmat, ctx))
             # TODO(minjie): use lazy dict for reduced_msgs
@@ -784,11 +782,11 @@ class DGLGraph(DiGraph):
         assert update_func is not None
         if batchable:
             v = utils.toindex(v)
-            uu, vv = self.cached_graph.in_edges(v)
-
-            if len(uu) > 0:
-                self._batch_sendto(uu, vv, message_func)
-            self._batch_recv(v, reduce_func, update_func)
+            uu, vv, orphan = self.cached_graph.in_edges(v)
+            self._batch_update_by_edge(uu, vv, message_func,
+                    reduce_func, update_func)
+            # trigger update function for nodes that have no incoming messages.
+            self._batch_recv(orphan, reduce_func, update_func)
         else:
             v = utils.toindex(v)
             for vv in utils.node_iter(v):
@@ -830,7 +828,7 @@ class DGLGraph(DiGraph):
         assert update_func is not None
         if batchable:
             u = utils.toindex(u)
-            uu, vv = self.cached_graph.out_edges(u)
+            uu, vv, _ = self.cached_graph.out_edges(u)
             self._batch_update_by_edge(uu, vv, message_func,
                     reduce_func, update_func)
         else:
@@ -891,11 +889,11 @@ class DGLGraph(DiGraph):
             self._nonbatch_recv(list(self.nodes()), reduce_func, update_func)
 
     def propagate(self,
+                  iterator='bfs',
                   message_func=None,
                   reduce_func=None,
                   update_func=None,
                   batchable=False,
-                  iterator='bfs',
                   **kwargs):
         """Propagate messages and update nodes using iterator.
 
@@ -1075,7 +1073,7 @@ def _get_repr(attr_dict):
         return attr_dict
 
 def _set_repr(attr_dict, attr):
-    if isinstance(attr, dict):
+    if utils.is_dict_like(attr):
         attr_dict.update(attr)
     else:
         attr_dict[__REPR__] = attr

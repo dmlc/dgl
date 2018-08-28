@@ -31,4 +31,5 @@ def degree_bucketing(cached_graph, v):
     for deg in unique_degrees:
         idx = np.where(degrees == deg)
         v_bkt.append(utils.Index(v_np[idx]))
+    #print('degree-bucketing:', unique_degrees, [len(b) for b in v_bkt])
     return unique_degrees, v_bkt

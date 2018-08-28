@@ -21,13 +21,15 @@ def test_basics():
     u = Index(th.tensor([0, 0, 1, 1, 2, 2]))
     v = Index(th.tensor([1, 2, 2, 3, 4, 5]))
     check_eq(cg.get_edge_id(u, v).totensor(), th.tensor([0, 5, 1, 2, 3, 4]))
-    query = Index(th.tensor([1, 2]))
-    s, d = cg.in_edges(query)
-    check_eq(s.totensor(), th.tensor([0, 0, 1]))
-    check_eq(d.totensor(), th.tensor([1, 2, 2]))
-    s, d = cg.out_edges(query)
-    check_eq(s.totensor(), th.tensor([1, 1, 2, 2]))
-    check_eq(d.totensor(), th.tensor([2, 3, 4, 5]))
+    query = Index(th.tensor([0, 1, 2, 5]))
+    s, d, orphan = cg.in_edges(query)
+    check_eq(s.totensor(), th.tensor([0, 0, 1, 2]))
+    check_eq(d.totensor(), th.tensor([1, 2, 2, 5]))
+    assert orphan.tolist() == [0]
+    s, d, orphan = cg.out_edges(query)
+    check_eq(s.totensor(), th.tensor([0, 0, 1, 1, 2, 2]))
+    check_eq(d.totensor(), th.tensor([1, 2, 2, 3, 4, 5]))
+    assert orphan.tolist() == [5]
 
 if __name__ == '__main__':
     test_basics()

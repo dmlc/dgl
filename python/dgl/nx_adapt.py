@@ -64,6 +64,13 @@ class AdjInnerDict(MutableMapping):
     def __iter__(self):
         return iter(self._dict)
 
+class AdjInnerDictFactory(object):
+    def __init__(self, cb1, cb2):
+        self._cb1 = cb1
+        self._cb2 = cb2
+    def __call__(self):
+        return AdjInnerDict(self._cb1, self._cb2)
+
 def nx_init(obj,
             add_node_cb,
             add_edge_cb,
@@ -88,7 +95,7 @@ def nx_init(obj,
     """
     # The following codes work for networkx 2.1.
     obj.adjlist_outer_dict_factory = None
-    obj.adjlist_inner_dict_factory = lambda : AdjInnerDict(add_edge_cb, del_edge_cb)
+    obj.adjlist_inner_dict_factory = AdjInnerDictFactory(add_edge_cb, del_edge_cb)
     obj.edge_attr_dict_factory = dict
 
     obj.root_graph = obj

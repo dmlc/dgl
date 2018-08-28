@@ -39,26 +39,68 @@ class CachedGraph:
         return utils.toindex(eids)
 
     def in_edges(self, v):
+        """Get in-edges of the vertices.
+
+        Parameters
+        ----------
+        v : utils.Index
+            The vertex ids.
+
+        Returns
+        -------
+        src : utils.Index
+            The src vertex ids.
+        dst : utils.Index
+            The dst vertex ids.
+        orphan : utils.Index
+            The vertice that have no in-edges.
+        """
         src = []
         dst = []
+        orphan = []
         for vv in utils.node_iter(v):
             uu = self._graph.predecessors(vv)
-            src += uu
-            dst += [vv] * len(uu)
+            if len(uu) == 0:
+                orphan.append(vv)
+            else:
+                src += uu
+                dst += [vv] * len(uu)
         src = utils.toindex(src)
         dst = utils.toindex(dst)
-        return src, dst
+        orphan = utils.toindex(orphan)
+        return src, dst, orphan
 
     def out_edges(self, u):
+        """Get out-edges of the vertices.
+
+        Parameters
+        ----------
+        v : utils.Index
+            The vertex ids.
+
+        Returns
+        -------
+        src : utils.Index
+            The src vertex ids.
+        dst : utils.Index
+            The dst vertex ids.
+        orphan : utils.Index
+            The vertice that have no out-edges.
+        """
         src = []
         dst = []
+        orphan = []
         for uu in utils.node_iter(u):
             vv = self._graph.successors(uu)
-            src += [uu] * len(vv)
-            dst += vv
+            if len(vv) == 0:
+                orphan.append(uu)
+            else:
+                src += [uu] * len(vv)
+                dst += vv
         src = utils.toindex(src)
         dst = utils.toindex(dst)
-        return src, dst
+        orphan = utils.toindex(orphan)
+        return src, dst, orphan
 
     def in_degrees(self, v):
         degs = self._graph.indegree(list(v))
