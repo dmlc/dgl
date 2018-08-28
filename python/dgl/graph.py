@@ -6,7 +6,7 @@ import networkx as nx
 from networkx.classes.digraph import DiGraph
 
 import dgl
-from dgl.base import ALL, is_all
+from dgl.base import ALL, is_all, __MSG__, __REPR__
 import dgl.backend as F
 from dgl.backend import Tensor
 import dgl.builtin as builtin
@@ -16,9 +16,6 @@ from dgl.frame import FrameRef, merge_frames
 from dgl.nx_adapt import nx_init
 import dgl.scheduler as scheduler
 import dgl.utils as utils
-
-__MSG__ = "__MSG__"
-__REPR__ = "__REPR__"
 
 class DGLGraph(DiGraph):
     """Base graph class specialized for neural networks on graphs.
@@ -60,8 +57,9 @@ class DGLGraph(DiGraph):
         self._msg_frame = FrameRef()
         self._message_func = None
         self._reduce_func = None
-        self._update_func = None
         self._edge_func = None
+        self._apply_node_func = None
+        self._apply_edge_func = None
 
     def node_attr_schemes(self):
         return self._node_frame.schemes
@@ -281,20 +279,6 @@ class DGLGraph(DiGraph):
             else:
                 return self._edge_frame.select_rows(eid)
 
-    def register_message_func(self,
-                              message_func,
-                              batchable=False):
-        """Register global message function.
-
-        Parameters
-        ----------
-        message_func : callable
-          Message function on the edge.
-        batchable : bool
-          Whether the provided message function allows batch computing.
-        """
-        self._message_func = (message_func, batchable)
-
     def register_edge_func(self,
                            edge_func,
                            batchable=False):
@@ -308,6 +292,20 @@ class DGLGraph(DiGraph):
           Whether the provided message function allows batch computing.
         """
         self._edge_func = (edge_func, batchable)
+
+    def register_message_func(self,
+                              message_func,
+                              batchable=False):
+        """Register global message function.
+
+        Parameters
+        ----------
+        message_func : callable
+          Message function on the edge.
+        batchable : bool
+          Whether the provided message function allows batch computing.
+        """
+        self._message_func = (message_func, batchable)
 
     def register_reduce_func(self,
                              reduce_func,
@@ -323,21 +321,94 @@ class DGLGraph(DiGraph):
         """
         self._reduce_func = (reduce_func, batchable)
 
-    def register_update_func(self,
-                             update_func,
-                             batchable=False):
-        """Register global node update function.
+    def register_apply_node_func(self,
+                                 apply_node_func,
+                                 batchable=False):
+        """Register global node apply function.
 
         Parameters
         ----------
-        update_func : callable
-          Update function on the node.
+        apply_node_func : callable
+          Apply function on the node.
         batchable : bool
-          Whether the provided update function allows batch computing.
+          Whether the provided function allows batch computing.
         """
-        self._update_func = (update_func, batchable)
+        self._apply_node_func = (apply_node_func, batchable)
 
-    def sendto(self, u, v, message_func=None, batchable=False):
+    def register_apply_edge_func(self,
+                                 apply_edge_func,
+                                 batchable=False):
+        """Register global edge apply function.
+
+        Parameters
+        ----------
+        apply_edge_func : callable
+          Apply function on the edge.
+        batchable : bool
+          Whether the provided function allows batch computing.
+        """
+        self._apply_edge_func = (apply_edge_func, batchable)
+
+    def apply_nodes(self,
+                    v,
+                    apply_node_func=None,
+                    batchable=False):
+        """Apply the function on node representations.
+
+        Parameters
+        ----------
+        v : int, iterable of int, tensor
+          The node id(s).
+        apply_node_func : callable
+          The apply node function.
+        batchable : bool
+          Whether the provided function allows batch computing.
+        """
+        if apply_node_func is None:
+            apply_node_func, batchable = self._apply_node_func
+        if batchable:
+            new_repr = apply_node_func(self.get_n_repr(v))
+            self.set_n_repr(v, new_repr)
+        else:
+            if is_all(v):
+                v = self.nodes()
+            v = utils.toindex(v)
+            for vv in utils.node_iter(v):
+                ret = apply_node_func(_get_repr(self.nodes[vv]))
+                _set_repr(self.nodes[vv], ret)
+
+    def apply_edges(self,
+                    u, v,
+                    apply_edge_func=None,
+                    batchable=False):
+        """Apply the function on edge representations.
+
+        Parameters
+        ----------
+        u : int, iterable of int, tensor
+          The src node id(s).
+        v : int, iterable of int, tensor
+          The dst node id(s).
+        apply_edge_func : callable
+          The apply edge function.
+        batchable : bool
+          Whether the provided function allows batch computing.
+        """
+        if apply_edge_func is None:
+            apply_edge_func, batchable = self._apply_edge_func
+        if batchable:
+            new_repr = apply_edge_func(self.get_e_repr(u, v))
+            self.set_e_repr(u, v, new_repr)
+        else:
+            if is_all(u) == is_all(v):
+                u, v = zip(*self.edges)
+            u = utils.toindex(u)
+            v = utils.toindex(v)
+            for uu, vv in utils.edge_iter(u, v):
+                ret = apply_edge_func(_get_repr(self.edges[uu, vv]))
+                _set_repr(self.edges[uu, vv], ret)
+
+    def send(self, u, v, message_func=None, batchable=False):
         """Trigger the message function on edge u->v
 
         The message function should be compatible with following signature:
@@ -365,11 +436,11 @@ class DGLGraph(DiGraph):
             message_func, batchable = self._message_func
         assert message_func is not None
         if batchable:
-            self._batch_sendto(u, v, message_func)
+            self._batch_send(u, v, message_func)
         else:
-            self._nonbatch_sendto(u, v, message_func)
+            self._nonbatch_send(u, v, message_func)
 
-    def _nonbatch_sendto(self, u, v, message_func):
+    def _nonbatch_send(self, u, v, message_func):
         f_msg = _get_message_func(message_func)
         if is_all(u) and is_all(v):
             u, v = self.cached_graph.edges()
@@ -381,7 +452,7 @@ class DGLGraph(DiGraph):
                         _get_repr(self.edges[uu, vv]))
             self.edges[uu, vv][__MSG__] = ret
 
-    def _batch_sendto(self, u, v, message_func):
+    def _batch_send(self, u, v, message_func):
         f_msg = _get_message_func(message_func)
         if is_all(u) and is_all(v):
             u, v = self.cached_graph.edges()
@@ -471,32 +542,28 @@ class DGLGraph(DiGraph):
     def recv(self,
              u,
              reduce_func=None,
-             update_func=None,
+             apply_node=None,
              batchable=False):
         """Receive in-coming messages and update representation on node u.
 
         It computes the new node state using the messages sent from the predecessors
         of node u. If no message is found from the predecessors, reduce function
-        will be skipped and a None type will be provided as the reduced messages for
-        the update function.
+        will be skipped.
 
         The reduce function should be compatible with following signature:
 
-            (node_reprs, batched_messages) -> reduced_messages
-
-        It computes the reduced edge representations using the representations
-        of the in-coming edges (the same concept as messages).
-        The reduce function can be any of the pre-defined functions ('sum',
-        'max'). If built-in function is used, computation will be performed
-        efficiently (using generic-SPMV kernels).
-
-        The update function should be compatible with following signature:
-
-            (node_reprs, reduced_messages) -> node_reprs
+            (node_reprs, batched_messages) -> node_reprs
 
         It computes the new node representations using the representations
-        of the in-coming edges (the same concept as messages) and the node
-        itself. All node_reprs and edge_reprs are dictionaries.
+        of the in-coming edges (the same concept as messages).
+        The reduce function can also be pre-defined functions.
+
+        An optinoal apply_node function could be specified and should follow following
+        signature:
+
+            node_reprs -> node_reprs
+
+        All node_reprs and edge_reprs support tensor and dictionary types.
 
         Parameters
         ----------
@@ -504,23 +571,22 @@ class DGLGraph(DiGraph):
           The node to be updated.
         reduce_func : str or callable
           The reduce function.
-        update_func : str or callable
+        apply_node : callable, optional
           The update function.
-        batchable : bool
+        batchable : bool, optional
           Whether the reduce and update function allows batched computation.
         """
         if reduce_func is None:
             reduce_func, batchable = self._reduce_func
-        if update_func is None:
-            update_func, batchable = self._update_func
         assert reduce_func is not None
-        assert update_func is not None
+        if apply_node is None:
+            apply_node, batchable = self._apply_node_func
         if batchable:
-            self._batch_recv(u, reduce_func, update_func)
+            self._batch_recv(u, reduce_func, apply_node)
         else:
-            self._nonbatch_recv(u, reduce_func, update_func)
+            self._nonbatch_recv(u, reduce_func, apply_node)
 
-    def _nonbatch_recv(self, u, reduce_func, update_func):
+    def _nonbatch_recv(self, u, reduce_func, apply_node):
         f_reduce = _get_reduce_func(reduce_func)
         if is_all(u):
             u = list(range(0, self.number_of_nodes()))
@@ -531,19 +597,20 @@ class DGLGraph(DiGraph):
             # reduce phase
             msgs_batch = [self.edges[vv, uu].pop(__MSG__)
                           for vv in self.pred[uu] if __MSG__ in self.edges[vv, uu]]
-            if len(msgs_batch) == 0:
-                msgs_reduced = None
-            else:
-                msgs_reduced = f_reduce(_get_repr(self.nodes[uu]), msgs_batch)
-            # update phase
-            ret = update_func(_get_repr(self.nodes[uu]), msgs_reduced)
-            _set_repr(self.nodes[uu], ret)
+            if len(msgs_batch) != 0:
+                new_repr = f_reduce(_get_repr(self.nodes[uu]), msgs_batch)
+                _set_repr(self.nodes[uu], new_repr)
+        # optional apply
+        if apply_node is not None:
+            self.apply_nodes(u, apply_node, False)
 
     def _batch_recv(self, v, reduce_func, update_func):
         if len(v) == 0:
             # no vertex to be triggered.
             return
+
         null_v, reordered_v, all_reduced_msgs = self._batch_reduce(v, reduce_func)
+
         if all_reduced_msgs is None:
             # no message; only do recv.
             if is_all(v):
@@ -675,7 +742,7 @@ class DGLGraph(DiGraph):
         if reduce_func is None:
             reduce_func, batchable = self._reduce_func
         if update_func is None:
-            update_func, batchable = self._update_func
+            update_func, batchable = self._apply_node_func
         assert message_func is not None
         assert reduce_func is not None
         assert update_func is not None
@@ -697,7 +764,7 @@ class DGLGraph(DiGraph):
         else:
             u = utils.toindex(u)
             v = utils.toindex(v)
-        self._nonbatch_sendto(u, v, message_func)
+        self._nonbatch_send(u, v, message_func)
         dst = set()
         for uu, vv in utils.edge_iter(u, v):
             dst.add(vv)
@@ -746,7 +813,7 @@ class DGLGraph(DiGraph):
         else:
             u = utils.toindex(u)
             v = utils.toindex(v)
-            self._batch_sendto(u, v, message_func)
+            self._batch_send(u, v, message_func)
             unique_v = F.unique(v.totensor())
             self._batch_recv(unique_v, reduce_func, update_func)
 
@@ -776,7 +843,7 @@ class DGLGraph(DiGraph):
         if reduce_func is None:
             reduce_func, batchable = self._reduce_func
         if update_func is None:
-            update_func, batchable = self._update_func
+            update_func, batchable = self._apply_node_func
         assert message_func is not None
         assert reduce_func is not None
         assert update_func is not None
@@ -793,7 +860,7 @@ class DGLGraph(DiGraph):
                 assert vv in self.nodes
                 uu = list(self.pred[vv])
                 if len(uu) > 0:
-                    self._nonbatch_sendto(uu, vv, message_func)
+                    self._nonbatch_send(uu, vv, message_func)
                 self._nonbatch_recv(vv, reduce_func, update_func)
 
     def update_from(self,
@@ -822,7 +889,7 @@ class DGLGraph(DiGraph):
         if reduce_func is None:
             reduce_func, batchable = self._reduce_func
         if update_func is None:
-            update_func, batchable = self._update_func
+            update_func, batchable = self._apply_node_func
         assert message_func is not None
         assert reduce_func is not None
         assert update_func is not None
@@ -862,7 +929,7 @@ class DGLGraph(DiGraph):
         if reduce_func is None:
             reduce_func, batchable = self._reduce_func
         if update_func is None:
-            update_func, batchable = self._update_func
+            update_func, batchable = self._apply_node_func
         assert message_func is not None
         assert reduce_func is not None
         assert update_func is not None
@@ -879,13 +946,13 @@ class DGLGraph(DiGraph):
                 node_repr = self.get_n_repr()
                 self.set_n_repr(update_func(node_repr, reduced_msgs))
             else:
-                self._batch_sendto(ALL, ALL, message_func)
+                self._batch_send(ALL, ALL, message_func)
                 self._batch_recv(ALL, reduce_func, update_func)
         else:
             u, v = zip(*self.edges)
             u = list(u)
             v = list(v)
-            self._nonbatch_sendto(u, v, message_func)
+            self._nonbatch_send(u, v, message_func)
             self._nonbatch_recv(list(self.nodes()), reduce_func, update_func)
 
     def propagate(self,

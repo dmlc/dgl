@@ -82,7 +82,7 @@ def test_batch_sendrecv():
     u = np.concatenate((u1, u2)).tolist()
     v = np.concatenate((v1, v2)).tolist()
 
-    bg.sendto(u, v)
+    bg.send(u, v)
     bg.recv(v)
 
     dgl.unbatch(bg)

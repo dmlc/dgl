@@ -51,7 +51,7 @@ class ChildSumTreeLSTMCell(nn.Module):
         # equation (7) second term
         c_tild = th.sum(f * msgs['c'], 1)
         return {'h_tild' : h_tild, 'c_tild' : c_tild}
-
+    
     def update_func(self, node, accum):
         # equation (3), (5), (6)
         if accum is None:

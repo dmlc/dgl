@@ -135,18 +135,18 @@ def test_batch_send():
         assert hu.shape == (5, D)
         return hu
     g.register_message_func(_fmsg, batchable=True)
-    # many-many sendto
+    # many-many send
     u = th.tensor([0, 0, 0, 0, 0])
     v = th.tensor([1, 2, 3, 4, 5])
-    g.sendto(u, v)
-    # one-many sendto
+    g.send(u, v)
+    # one-many send
     u = th.tensor([0])
     v = th.tensor([1, 2, 3, 4, 5])
-    g.sendto(u, v)
-    # many-one sendto
+    g.send(u, v)
+    # many-one send
     u = th.tensor([1, 2, 3, 4, 5])
     v = th.tensor([9])
-    g.sendto(u, v)
+    g.send(u, v)
 
 def test_batch_recv():
     g = generate_graph()
@@ -156,7 +156,7 @@ def test_batch_recv():
     u = th.tensor([0, 0, 0, 4, 5, 6])
     v = th.tensor([1, 2, 3, 9, 9, 9])
     reduce_msg_shapes.clear()
-    g.sendto(u, v)
+    g.send(u, v)
     g.recv(th.unique(v))
     assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     reduce_msg_shapes.clear()

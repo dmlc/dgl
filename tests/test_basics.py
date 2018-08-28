@@ -41,26 +41,26 @@ def register2(g):
 
 def _test_sendrecv(g):
     check(g, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-    g.sendto(0, 1)
+    g.send(0, 1)
     g.recv(1)
     check(g, [1, 3, 3, 4, 5, 6, 7, 8, 9, 10])
-    g.sendto(5, 9)
-    g.sendto(6, 9)
+    g.send(5, 9)
+    g.send(6, 9)
     g.recv(9)
     check(g, [1, 3, 3, 4, 5, 6, 7, 8, 9, 23])
 
 def _test_multi_sendrecv(g):
     check(g, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     # one-many
-    g.sendto(0, [1, 2, 3])
+    g.send(0, [1, 2, 3])
     g.recv([1, 2, 3])
     check(g, [1, 3, 4, 5, 5, 6, 7, 8, 9, 10])
     # many-one
-    g.sendto([6, 7, 8], 9)
+    g.send([6, 7, 8], 9)
     g.recv(9)
     check(g, [1, 3, 4, 5, 5, 6, 7, 8, 9, 34])
     # many-many
-    g.sendto([0, 0, 4, 5], [4, 5, 9, 9])
+    g.send([0, 0, 4, 5], [4, 5, 9, 9])
     g.recv([4, 5, 9])
     check(g, [1, 3, 4, 5, 6, 7, 7, 8, 9, 45])
 

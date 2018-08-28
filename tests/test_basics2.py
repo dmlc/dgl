@@ -51,8 +51,8 @@ def test_double_recv():
     g.register_message_func(message_func)
     g.register_reduce_func('sum')
     g.register_update_func(update_func)
-    g.sendto(1, 9)
-    g.sendto(2, 9)
+    g.send(1, 9)
+    g.send(2, 9)
     g.recv(9)
     check(g, [1, 2, 3, 4, 5, 6, 7, 8, 9, 15])
     try:
