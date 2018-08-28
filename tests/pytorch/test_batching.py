@@ -250,6 +250,35 @@ def test_reduce_0deg():
     assert th.allclose(new_repr[1:], old_repr[1:])
     assert th.allclose(new_repr[0], old_repr.sum(0))
 
+def test_update_to_0deg():
+    g = DGLGraph()
+    g.add_nodes_from([0, 1])
+    g.add_edge(0, 1)
+    def _message(src, edge):
+        return src
+    def _reduce(node, msgs):
+        assert msgs is not None
+        return msgs.sum(1)
+    def _update(node, accum):
+        return node * 2 if accum is None else accum
+
+    old_repr = th.randn(2, 5)
+    g.set_n_repr(old_repr)
+    g.update_to(0, _message, _reduce, _update, True)
+    new_repr = g.get_n_repr()
+    assert th.allclose(new_repr[0], old_repr[0] * 2)
+    assert th.allclose(new_repr[1], old_repr[1])
+    g.update_to(1, _message, _reduce, _update, True)
+    new_repr = g.get_n_repr()
+    assert th.allclose(new_repr[1], old_repr[0] * 2)
+
+    old_repr = th.randn(2, 5)
+    g.set_n_repr(old_repr)
+    g.update_to([0, 1], _message, _reduce, _update, True)
+    new_repr = g.get_n_repr()
+    assert th.allclose(new_repr[0], old_repr[0] * 2)
+    assert th.allclose(new_repr[1], old_repr[0])
+
 def _test_delete():
     g = generate_graph()
     ecol = Variable(th.randn(17, D), requires_grad=grad)
@@ -268,4 +297,5 @@ if __name__ == '__main__':
     test_batch_recv2()
     test_update_routines()
     test_reduce_0deg()
+    test_update_to_0deg()
     #test_delete()

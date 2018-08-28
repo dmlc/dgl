@@ -75,6 +75,22 @@ def _test_update_routines(g):
     g.update_all()
     check(g, [56, 5, 5, 6, 7, 8, 9, 10, 11, 108])
 
+def _test_update_to_0deg():
+    g = DGLGraph()
+    g.add_node(0, h=2)
+    g.add_node(1, h=1)
+    g.add_edge(0, 1)
+    def _message(src, edge):
+        return src
+    def _reduce(node, msgs):
+        assert msgs is not None
+        return msgs.sum(1)
+    def _update(node, accum):
+        assert accum is None
+        return {'h': node['h'] * 2}
+    g.update_to(0, _message, _reduce, _update)
+    assert g.nodes[0]['h'] == 4
+
 def test_sendrecv():
     g = generate_graph()
     register1(g)
@@ -98,6 +114,8 @@ def test_update_routines():
     g = generate_graph()
     register2(g)
     _test_update_routines(g)
+
+    _test_update_to_0deg()
 
 if __name__ == '__main__':
     test_sendrecv()

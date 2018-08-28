@@ -290,6 +290,9 @@ def cached_member(func):
             return func(self)
     return wrapper
 
+def is_dict_like(obj):
+    return isinstance(obj, Mapping)
+
 def pack2(a, b):
     if a is None:
         return b
