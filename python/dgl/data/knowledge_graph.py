@@ -39,7 +39,7 @@ class RGCNDataset(object):
         download(_urls[self.name], path=graph_file_path)
 
     def load(self, bfs_level=2, relabel=False):
-        self.num_nodes, self.edges, self.relations, self.labels, labeled_nodes_idx, self.train_idx, self.test_idx, _, _, _ = _load_data(self.name, self.dir)
+        self.num_nodes, self.edges, num_rels, relations, self.labels, labeled_nodes_idx, self.train_idx, self.test_idx, _, _, _ = _load_data(self.name, self.dir)
 
         # bfs to reduce edges
         if bfs_level > 0:
@@ -55,7 +55,13 @@ class RGCNDataset(object):
             eid_to_delete = np.isin(row, to_delete) + np.isin(col, to_delete)
             eid_to_keep = np.logical_not(eid_to_delete)
             self.edges = self.edges[eid_to_keep, :]
-            self.relations = self.relations[eid_to_keep, :]
+            eid_to_keep = np.nonzero(eid_to_keep)[0]
+            self.relations = []
+            for eid in eid_to_keep:
+                rel = np.zeros(num_rels, dtype=np.float32)
+                rel[relations[eid]] = 1
+                self.relations.append(rel)
+            self.relations = np.stack(self.relations)
 
             if relabel:
                 uniq_nodes, edges = np.unique(self.edges, return_inverse=True)
@@ -248,7 +254,8 @@ def _load_data(dataset_str='aifb', dataset_path=None):
     train_names_file = os.path.join(dataset_path, 'train_names.npy')
     test_names_file = os.path.join(dataset_path, 'test_names.npy')
     rel_dict_file = os.path.join(dataset_path, 'rel_dict.pkl')
-    nodes_file = os.path.join(dataset_path, 'nodes.pkl')
+    relation_file = os.path.join(dataset_path, 'relations.pkl')
+    #nodes_file = os.path.join(dataset_path, 'nodes.pkl')
 
     if os.path.isfile(adj_file) and os.path.isfile(labels_file) and \
             os.path.isfile(train_idx_file) and os.path.isfile(test_idx_file):
@@ -257,10 +264,12 @@ def _load_data(dataset_str='aifb', dataset_path=None):
         adjmat = np.load(adj_file)
         num_node = adjmat['n'].item()
         all_edges = adjmat['edges']
-        edge_types = adjmat['relations']
+        rel_info = pkl.load(open(relation_file, 'rb'))
+        edge_types = rel_info['relations']
+        num_rel = rel_info['num_rel']
 
         print('Number of nodes: ', num_node)
-        print('Number of relations: ', edge_types.shape[1])
+        print('Number of relations: ', num_rel)
 
         labels = _load_sparse_csr(labels_file)
         labeled_nodes_idx = list(labels.nonzero()[0])
@@ -291,11 +300,12 @@ def _load_data(dataset_str='aifb', dataset_path=None):
             nodes = list(subjects.union(objects))
             num_node = len(nodes)
             num_rel = len(relations)
+            num_rel = 2 * num_rel + 1 # +1 is for self-relation
 
             print('Number of nodes: ', num_node)
             print('Number of relations in the data: ', num_rel)
 
-            edge_dict = defaultdict(lambda: np.zeros(2 * num_rel + 1, dtype=np.float32)) # +1: self-rel
+            edge_dict = defaultdict(list) # +1: self-rel
 
             relations_dict = {rel: i for i, rel in enumerate(list(relations))}
             nodes_dict = {node: i for i, node in enumerate(nodes)}
@@ -304,7 +314,7 @@ def _load_data(dataset_str='aifb', dataset_path=None):
 
             # self relation
             for i in range(num_node):
-                edge_dict[(i, i)][0] = 1
+                edge_dict[(i, i)].append(0)
 
             for i, (s, p, o) in enumerate(reader.triples()):
                 src = nodes_dict[s]
@@ -312,18 +322,18 @@ def _load_data(dataset_str='aifb', dataset_path=None):
                 assert src < num_node and dst < num_node
                 rel = relations_dict[p]
                 # add relation edge
-                edge_dict[(src, dst)][2 * rel + 1] = 1
+                edge_dict[(src, dst)].append(2 * rel + 1)
                 # add reverse relation edge
-                edge_dict[(dst, src)][2 * rel + 2] = 1
+                edge_dict[(dst, src)].append(2 * rel + 2)
 
             # sort indices and save
             all_edges = sorted(list(edge_dict.keys()))
             edge_types = []
             for edge in all_edges:
                 edge_types.append(edge_dict[edge])
-            edge_types = np.stack(edge_types)
             all_edges = np.array(all_edges, dtype=np.int)
-            np.savez(adj_file, edges=all_edges, relations=edge_types, n=np.array(num_node))
+            np.savez(adj_file, edges=all_edges, n=np.array(num_node))
+            pkl.dump({'num_rel': num_rel, 'relations': edge_types}, open(relation_file, 'wb'))
 
         # Reload the adjacency matrices from disk
         adjmat = np.load(adj_file)
@@ -385,9 +395,8 @@ def _load_data(dataset_str='aifb', dataset_path=None):
         np.save(test_names_file, test_names)
 
         pkl.dump(relations_dict, open(rel_dict_file, 'wb'))
-        pkl.dump(nodes, open(nodes_file, 'wb'))
 
-    return num_node, all_edges, edge_types, labels, labeled_nodes_idx, train_idx, test_idx, relations_dict, train_names, test_names
+    return num_node, all_edges, num_rel, edge_types, labels, labeled_nodes_idx, train_idx, test_idx, relations_dict, train_names, test_names
 
 
 def to_unicode(input):

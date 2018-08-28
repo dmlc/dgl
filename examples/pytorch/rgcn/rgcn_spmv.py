@@ -5,9 +5,8 @@ Code: https://github.com/tkipf/relational-gcn
 
 Difference compared to tkipf/relation-gcn
 * edge directions are reversed (kipf did not transpose adj before spmv)
-* featureless case, we still have to store node feature, causing memory problems
 * l2norm applied to all weights
-* remove both in and out edges for nodes that won't be touched
+* remove nodes that won't be touched
 """
 
 import argparse
@@ -183,8 +182,6 @@ def main(args):
                  use_cuda=use_cuda)
 
     # convert to pytorch label format
-
-    row = labels.tocoo().row
     labels = np.argmax(labels, axis=1)
     labels = torch.from_numpy(labels).view(-1)
 
@@ -196,6 +193,7 @@ def main(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2norm)
 
     # training loop
+    print("start training...")
     forward_time = []
     backward_time = []
     model.train()
