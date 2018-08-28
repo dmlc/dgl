@@ -272,6 +272,13 @@ def test_update_to_0deg():
     new_repr = g.get_n_repr()
     assert th.allclose(new_repr[1], old_repr[0] * 2)
 
+    old_repr = th.randn(2, 5)
+    g.set_n_repr(old_repr)
+    g.update_to([0, 1], _message, _reduce, _update, True)
+    new_repr = g.get_n_repr()
+    assert th.allclose(new_repr[0], old_repr[0] * 2)
+    assert th.allclose(new_repr[1], old_repr[0])
+
 def _test_delete():
     g = generate_graph()
     ecol = Variable(th.randn(17, D), requires_grad=grad)

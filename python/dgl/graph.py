@@ -785,13 +785,10 @@ class DGLGraph(DiGraph):
         if batchable:
             v = utils.toindex(v)
             uu, vv = self.cached_graph.in_edges(v)
-            
-            if len(uu) == 0:
-                # no send, just do a recv
-                self._batch_recv(v, reduce_func, update_func)
-            else:
-                self._batch_update_by_edge(uu, vv, message_func,
-                        reduce_func, update_func)
+
+            if len(uu) > 0:
+                self._batch_sendto(uu, vv, message_func)
+            self._batch_recv(v, reduce_func, update_func)
         else:
             v = utils.toindex(v)
             for vv in utils.node_iter(v):
