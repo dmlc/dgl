@@ -625,13 +625,13 @@ class DGLGraph(DiGraph):
             non_null_v_buckets.append(v_bkt)
             reduced_msgs.append(f_reduce(dst_reprs, reshaped_in_msgs))
 
+        # TODO: clear partial messages
+        self.clear_messages()
+
         # FIXME: this will only trigger if reduced_msgs is empty.  Remove?
         if len(reduced_msgs) == 0:
             # no message has been sent to the specified node
             return None, None, None
-
-        # TODO: clear partial messages
-        self.clear_messages()
         
         # Read the node states in the degree-bucketing order.
         null_v = utils.toindex(null_v_bucket or [])
@@ -785,14 +785,20 @@ class DGLGraph(DiGraph):
         if batchable:
             v = utils.toindex(v)
             uu, vv = self.cached_graph.in_edges(v)
-            self._batch_update_by_edge(uu, vv, message_func,
-                    reduce_func, update_func)
+            
+            if len(uu) == 0:
+                # no send, just do a recv
+                self._batch_recv(v, reduce_func, update_func)
+            else:
+                self._batch_update_by_edge(uu, vv, message_func,
+                        reduce_func, update_func)
         else:
             v = utils.toindex(v)
             for vv in utils.node_iter(v):
                 assert vv in self.nodes
                 uu = list(self.pred[vv])
-                self._nonbatch_sendto(uu, vv, message_func)
+                if len(uu) > 0:
+                    self._nonbatch_sendto(uu, vv, message_func)
                 self._nonbatch_recv(vv, reduce_func, update_func)
 
     def update_from(self,
