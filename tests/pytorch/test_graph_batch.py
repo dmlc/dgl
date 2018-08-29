@@ -73,7 +73,6 @@ def test_batch_sendrecv():
     bg = dgl.batch([t1, t2])
     bg.register_message_func(lambda src, edge: src, batchable=True)
     bg.register_reduce_func(lambda node, msgs: torch.sum(msgs, 1), batchable=True)
-    bg.register_update_func(lambda node, accum: accum, batchable=True)
     e1 = [(3, 1), (4, 1)]
     e2 = [(2, 4), (0, 4)]
 
@@ -97,7 +96,6 @@ def test_batch_propagate():
     bg = dgl.batch([t1, t2])
     bg.register_message_func(lambda src, edge: src, batchable=True)
     bg.register_reduce_func(lambda node, msgs: torch.sum(msgs, 1), batchable=True)
-    bg.register_update_func(lambda node, accum: accum, batchable=True)
     # get leaves.
 
     order = []

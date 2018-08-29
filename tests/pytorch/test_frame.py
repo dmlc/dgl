@@ -145,6 +145,11 @@ def test_row1():
     for k, v in f[rowid].items():
         assert check_eq(v, th.zeros((len(rowid), D)))
 
+    # setting rows with new column should automatically add a new column
+    vals['a4'] = th.ones((len(rowid), D))
+    f[rowid] = vals
+    assert len(f) == 4
+
 def test_row2():
     # test row getter/setter autograd compatibility
     data = create_test_data(grad=True)

@@ -14,7 +14,7 @@ def message_func(hu, edge):
 def reduce_func(hv, msgs):
     return th.sum(msgs, 1)
 
-def update_func(hv, accum):
+def update_func(hv):
     assert hv.shape == accum.shape
     return hv + accum
 
@@ -46,12 +46,12 @@ def test_spmv_specialize():
     u = th.tensor([0, 0, 0, 3, 4, 9])
     v = th.tensor([1, 2, 3, 9, 9, 0])
     v1 = g.get_n_repr()
-    g.update_by_edge(u, v, 'from_src', 'sum', update_func, batchable=True)
+    g.send_and_recv(u, v, 'from_src', 'sum', update_func, batchable=True)
     v2 = g.get_n_repr()
     g.set_n_repr(v1)
-    g.update_by_edge(u, v, message_func, reduce_func, update_func, batchable=True)
+    g.send_and_recv(u, v, message_func, reduce_func, update_func, batchable=True)
     v3 = g.get_n_repr()
     check_eq(v2, v3)
 
 if __name__ == '__main__':
-    test_spmv_specialize()
+    est_spmv_specialize()
