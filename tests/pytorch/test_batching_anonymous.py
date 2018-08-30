@@ -19,11 +19,7 @@ def reduce_func(hv, msgs):
     reduce_msg_shapes.add(tuple(msgs.shape))
     assert len(msgs.shape) == 3
     assert msgs.shape[2] == D
-    return th.sum(msgs, 1)
-
-def update_func(hv, accum):
-    assert hv.shape == accum.shape
-    return hv + accum
+    return hv + th.sum(msgs, 1)
 
 def generate_graph(grad=False):
     g = DGLGraph()
@@ -152,7 +148,6 @@ def test_batch_recv():
     g = generate_graph()
     g.register_message_func(message_func, batchable=True)
     g.register_reduce_func(reduce_func, batchable=True)
-    g.register_update_func(update_func, batchable=True)
     u = th.tensor([0, 0, 0, 4, 5, 6])
     v = th.tensor([1, 2, 3, 9, 9, 9])
     reduce_msg_shapes.clear()
@@ -165,27 +160,26 @@ def test_update_routines():
     g = generate_graph()
     g.register_message_func(message_func, batchable=True)
     g.register_reduce_func(reduce_func, batchable=True)
-    g.register_update_func(update_func, batchable=True)
 
-    # update_by_edge
+    # send_and_recv
     reduce_msg_shapes.clear()
     u = th.tensor([0, 0, 0, 4, 5, 6])
     v = th.tensor([1, 2, 3, 9, 9, 9])
-    g.update_by_edge(u, v)
+    g.send_and_recv(u, v)
     assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     reduce_msg_shapes.clear()
 
-    # update_to
+    # pull
     v = th.tensor([1, 2, 3, 9])
     reduce_msg_shapes.clear()
-    g.update_to(v)
+    g.pull(v)
     assert(reduce_msg_shapes == {(1, 8, D), (3, 1, D)})
     reduce_msg_shapes.clear()
 
-    # update_from
+    # push
     v = th.tensor([0, 1, 2, 3])
     reduce_msg_shapes.clear()
-    g.update_from(v)
+    g.push(v)
     assert(reduce_msg_shapes == {(1, 3, D), (8, 1, D)})
     reduce_msg_shapes.clear()
 

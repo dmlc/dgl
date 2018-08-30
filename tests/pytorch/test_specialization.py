@@ -1,6 +1,7 @@
 import torch as th
 import numpy as np
-from dgl.graph import DGLGraph
+import dgl
+import dgl.function as fn
 
 D = 5
 
@@ -14,12 +15,8 @@ def message_func(hu, edge):
 def reduce_func(hv, msgs):
     return th.sum(msgs, 1)
 
-def update_func(hv):
-    assert hv.shape == accum.shape
-    return hv + accum
-
 def generate_graph():
-    g = DGLGraph()
+    g = dgl.DGLGraph()
     for i in range(10):
         g.add_node(i) # 10 nodes.
     # create a graph where 0 is the source and 9 is the sink
@@ -36,22 +33,22 @@ def test_spmv_specialize():
     g = generate_graph()
     # update all
     v1 = g.get_n_repr()
-    g.update_all('from_src', 'sum', update_func, batchable=True)
+    g.update_all(fn.copy_src(), fn.sum(), batchable=True)
     v2 = g.get_n_repr()
     g.set_n_repr(v1)
-    g.update_all(message_func, reduce_func, update_func, batchable=True)
+    g.update_all(message_func, reduce_func, batchable=True)
     v3 = g.get_n_repr()
     check_eq(v2, v3)
     # partial update
     u = th.tensor([0, 0, 0, 3, 4, 9])
     v = th.tensor([1, 2, 3, 9, 9, 0])
     v1 = g.get_n_repr()
-    g.send_and_recv(u, v, 'from_src', 'sum', update_func, batchable=True)
+    g.send_and_recv(u, v, fn.copy_src(), fn.sum(), batchable=True)
     v2 = g.get_n_repr()
     g.set_n_repr(v1)
-    g.send_and_recv(u, v, message_func, reduce_func, update_func, batchable=True)
+    g.send_and_recv(u, v, message_func, reduce_func, batchable=True)
     v3 = g.get_n_repr()
     check_eq(v2, v3)
 
 if __name__ == '__main__':
-    est_spmv_specialize()
+    test_spmv_specialize()
