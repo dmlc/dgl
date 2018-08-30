@@ -1,7 +1,7 @@
 """Built-in message function."""
 from __future__ import absolute_import
 
-import dgl.backend as F
+import operator
 
 __all__ = ["MessageFunction", "src_mul_edge", "copy_src", "copy_edge"]
 
@@ -52,12 +52,14 @@ class CopySrcMessageFunction(MessageFunction):
         self.out_field = out_field
 
     def __call__(self, src, edge):
-        if self.out_field is None and self.src_field is None:
-            return src
-        elif self.out_field is None:
-            return {self.src_field : src[self.src_field]}
+        if self.src_field is not None:
+            ret = src[self.src_field]
         else:
-            return {self.out_field : src[self.src_field]}
+            ret = src
+        if self.out_field is None:
+            return ret
+        else:
+            return {self.out_field : ret}
 
 class CopyEdgeMessageFunction(MessageFunction):
     def __init__(self, edge_field=None, out_field=None):
@@ -65,16 +67,18 @@ class CopyEdgeMessageFunction(MessageFunction):
         self.out_field = out_field
 
     def __call__(self, src, edge):
-        if self.out_field is None and self.edge_field is None:
-            return edge
-        elif self.out_field is None:
-            return {self.edge_field : edge[self.edge_field]}
+        if self.edge_field is not None:
+            ret = edge[self.edge_field]
         else:
-            return {self.out_field : src[self.edge_field]}
-
+            ret = edge
+        if self.out_field is None:
+            return ret
+        else:
+            return {self.out_field : ret}
+        
 def src_mul_edge(src=None, edge=None, out=None):
     """TODO(minjie): docstring """
-    return SrcMulEdgeMessageFunction(F.mul, src, edge, out)
+    return SrcMulEdgeMessageFunction(operator.mul, src, edge, out)
 
 def copy_src(src=None, out=None):
     """TODO(minjie): docstring """

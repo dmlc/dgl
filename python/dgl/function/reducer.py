@@ -50,10 +50,12 @@ class SumReducerFunction(ReduceFunction):
         if self.out_field is None:
             return ret
         else:
-            return {self.out_field, ret}
+            return {self.out_field : ret}
 
+_python_sum = sum
 def sum(msgs=None, out=None):
-    return SumReducerFunction(F.sum, sum, msgs, out)
+    return SumReducerFunction(F.sum, _python_sum, msgs, out)
 
+_python_max = max
 def max(msgs=None, out=None):
-    return SumReducerFunction(F.max, max, msgs, out)
+    return SumReducerFunction(F.max, _python_max, msgs, out)

@@ -441,19 +441,17 @@ class DGLGraph(DiGraph):
             self._nonbatch_send(u, v, message_func)
 
     def _nonbatch_send(self, u, v, message_func):
-        f_msg = _get_message_func(message_func)
         if is_all(u) and is_all(v):
             u, v = self.cached_graph.edges()
         else:
             u = utils.toindex(u)
             v = utils.toindex(v)
         for uu, vv in utils.edge_iter(u, v):
-            ret = f_msg(_get_repr(self.nodes[uu]),
-                        _get_repr(self.edges[uu, vv]))
+            ret = message_func(_get_repr(self.nodes[uu]),
+                               _get_repr(self.edges[uu, vv]))
             self.edges[uu, vv][__MSG__] = ret
 
     def _batch_send(self, u, v, message_func):
-        f_msg = _get_message_func(message_func)
         if is_all(u) and is_all(v):
             u, v = self.cached_graph.edges()
             self.msg_graph.add_edges(u, v)
@@ -587,7 +585,6 @@ class DGLGraph(DiGraph):
         self.apply_nodes(u, apply_node_func, batchable)
 
     def _nonbatch_recv(self, u, reduce_func):
-        f_reduce = _get_reduce_func(reduce_func)
         if is_all(u):
             u = list(range(0, self.number_of_nodes()))
         else:
@@ -597,7 +594,7 @@ class DGLGraph(DiGraph):
             msgs_batch = [self.edges[vv, uu].pop(__MSG__)
                           for vv in self.pred[uu] if __MSG__ in self.edges[vv, uu]]
             if len(msgs_batch) != 0:
-                new_repr = f_reduce(_get_repr(self.nodes[uu]), msgs_batch)
+                new_repr = reduce_func(_get_repr(self.nodes[uu]), msgs_batch)
                 _set_repr(self.nodes[uu], new_repr)
 
     def _batch_recv(self, v, reduce_func):
@@ -619,7 +616,6 @@ class DGLGraph(DiGraph):
             # no message has been sent to the specified node
             return
 
-        f_reduce = _get_reduce_func(reduce_func)
         reordered_v = []
         new_reprs = []
         has_zero_degree = False
@@ -644,7 +640,7 @@ class DGLGraph(DiGraph):
                 reshaped_in_msgs = utils.LazyDict(
                         lambda key: _reshape_fn(in_msgs[key]), self._msg_frame.schemes)
             reordered_v.append(v_bkt.totensor())
-            new_reprs.append(f_reduce(dst_reprs, reshaped_in_msgs))
+            new_reprs.append(reduce_func(dst_reprs, reshaped_in_msgs))
 
         # TODO: clear partial messages
         self.clear_messages()
@@ -1066,25 +1062,3 @@ def _set_repr(attr_dict, attr):
         attr_dict.update(attr)
     else:
         attr_dict[__REPR__] = attr
-
-def _get_reduce_func(reduce_func):
-    if isinstance(reduce_func, str):
-        # built-in reduce func
-        if reduce_func == 'sum':
-            return builtin.reduce_sum
-        elif reduce_func == 'max':
-            return builtin.reduce_max
-        else:
-            raise ValueError(
-                    "Unknown built-in reduce function: %s" % reduce_func)
-    return reduce_func
-
-def _get_message_func(message_func):
-    if isinstance(message_func, str):
-        # built-in message func
-        if message_func == 'from_src':
-            return builtin.message_from_src
-        else:
-            raise ValueError(
-                    "Unknown built-in message function: %s" % message_func)
-    return message_func
