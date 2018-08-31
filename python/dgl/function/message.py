@@ -7,7 +7,10 @@ __all__ = ["MessageFunction", "src_mul_edge", "copy_src", "copy_edge"]
 
 class MessageFunction(object):
     def __call__(self, src, edge):
-        raise NotImplementedError()
+        raise NotImplementedError
+
+    def name(self):
+        raise NotImplementedError
 
 class BundledMessageFunction(MessageFunction):
     def __init__(self, fn_list):
@@ -28,6 +31,9 @@ class BundledMessageFunction(MessageFunction):
                                        " for the builtin message function.")
         return ret
 
+    def name(self):
+        return "bundled"
+
 class SrcMulEdgeMessageFunction(MessageFunction):
     def __init__(self, mul_op, src_field=None, edge_field=None, out_field=None):
         self.mul_op = mul_op
@@ -46,6 +52,9 @@ class SrcMulEdgeMessageFunction(MessageFunction):
         else:
             return {self.out_field : ret}
 
+    def name(self):
+        return "src_mul_edge"
+
 class CopySrcMessageFunction(MessageFunction):
     def __init__(self, src_field=None, out_field=None):
         self.src_field = src_field
@@ -61,6 +70,9 @@ class CopySrcMessageFunction(MessageFunction):
         else:
             return {self.out_field : ret}
 
+    def name(self):
+        return "copy_src"
+
 class CopyEdgeMessageFunction(MessageFunction):
     def __init__(self, edge_field=None, out_field=None):
         self.edge_field = edge_field
@@ -75,6 +87,9 @@ class CopyEdgeMessageFunction(MessageFunction):
             return ret
         else:
             return {self.out_field : ret}
+
+    def name(self):
+        return "copy_edge"
         
 def src_mul_edge(src=None, edge=None, out=None):
     """TODO(minjie): docstring """

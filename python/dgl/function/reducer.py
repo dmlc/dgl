@@ -7,7 +7,10 @@ __all__ = ["ReduceFunction", "sum", "max"]
 
 class ReduceFunction(object):
     def __call__(self, node, msgs):
-        raise NotImplementedError()
+        raise NotImplementedError
+
+    def name(self):
+        raise NotImplementedError
 
 class BundledReduceFunction(ReduceFunction):
     def __init__(self, fn_list):
@@ -28,6 +31,8 @@ class BundledReduceFunction(ReduceFunction):
                                        " for the builtin reduce function.")
         return ret
 
+    def name(self):
+        return "bundled"
 
 class SumReducerFunction(ReduceFunction):
     def __init__(self, batch_sum_op, nonbatch_sum_op, msg_field=None, out_field=None):
@@ -51,6 +56,9 @@ class SumReducerFunction(ReduceFunction):
             return ret
         else:
             return {self.out_field : ret}
+
+    def name(self):
+        return "sum"
 
 _python_sum = sum
 def sum(msgs=None, out=None):

@@ -9,7 +9,6 @@ import dgl
 from dgl.base import ALL, is_all, __MSG__, __REPR__
 import dgl.backend as F
 from dgl.backend import Tensor
-import dgl.builtin as builtin
 from dgl.cached_graph import CachedGraph, create_cached_graph
 import dgl.context as context
 from dgl.frame import FrameRef, merge_frames
@@ -693,82 +692,29 @@ class DGLGraph(DiGraph):
             # no edges to be triggered
             assert len(v) == 0
             return
+        unique_v = utils.toindex(F.unique(v.totensor()))
 
         # TODO(minjie): better way to figure out `batchable` flag
         if message_func == "default":
             message_func, batchable = self._message_func
         if reduce_func == "default":
             reduce_func, _ = self._reduce_func
-        if apply_node_func == "default":
-            apply_node_func, _ = self._apply_node_func
         assert message_func is not None
         assert reduce_func is not None
 
         if batchable:
-            self._batch_send_and_recv(u, v, message_func, reduce_func, apply_node_func)
+            executor = scheduler.get_executor(
+                    'send_and_recv', self, src=u, dst=v,
+                    message_func=message_func, reduce_func=reduce_func)
         else:
-            self._nonbatch_send_and_recv(u, v, message_func, reduce_func, apply_node_func)
+            executor = None
 
-    def _nonbatch_send_and_recv(
-            self,
-            u, v,
-            message_func,
-            reduce_func,
-            apply_node_func):
-        u = utils.toindex(u)
-        v = utils.toindex(v)
-        self._nonbatch_send(u, v, message_func)
-        dst = set()
-        for uu, vv in utils.edge_iter(u, v):
-            dst.add(vv)
-        dst = list(dst)
-        self._nonbatch_recv(dst, reduce_func)
-        self.apply_nodes(dst, apply_node_func, False)
-
-    def _batch_send_and_recv(
-            self,
-            u, v,
-            message_func,
-            reduce_func,
-            apply_node_func):
-        u = utils.toindex(u)
-        v = utils.toindex(v)
-        self._batch_send(u, v, message_func)
-        unique_v = F.unique(v.totensor())
-        self._batch_recv(unique_v, reduce_func)
-        self.apply_nodes(unique_v, apply_node_func, True)
-        '''
-        elif message_func == 'from_src' and reduce_func == 'sum':
-            assert False
-            # TODO(minjie): check the validity of edges u->v
-            u = utils.toindex(u)
-            v = utils.toindex(v)
-            # TODO(minjie): broadcasting is optional for many-one input.
-            u, v = utils.edge_broadcasting(u, v)
-            # relabel destination nodes.
-            new2old, old2new = utils.build_relabel_map(v)
-            u = u.totensor()
-            v = v.totensor()
-            # TODO(minjie): should not directly use []
-            new_v = old2new[v]
-            # create adj mat
-            idx = F.pack([F.unsqueeze(new_v, 0), F.unsqueeze(u, 0)])
-            dat = F.ones((len(u),))
-            n = self.number_of_nodes()
-            m = len(new2old)
-            adjmat = F.sparse_tensor(idx, dat, [m, n])
-            ctx_adjmat = utils.CtxCachedObject(lambda ctx: F.to_context(adjmat, ctx))
-            # TODO(minjie): use lazy dict for reduced_msgs
-            reduced_msgs = {}
-            for key in self._node_frame.schemes:
-                col = self._node_frame[key]
-                reduced_msgs[key] = F.spmm(ctx_adjmat.get(F.get_context(col)), col)
-            if len(reduced_msgs) == 1 and __REPR__ in reduced_msgs:
-                reduced_msgs = reduced_msgs[__REPR__]
-            node_repr = self.get_n_repr(new2old)
-            new_node_repr = update_func(node_repr, reduced_msgs)
-            self.set_n_repr(new_node_repr, new2old)
-        '''
+        if executor:
+            executor.run()
+        else:
+            self.send(u, v, message_func, batchable=batchable)
+            self.recv(unique_v, reduce_func, None, batchable=batchable)
+        self.apply_nodes(unique_v, apply_node_func, batchable=batchable)
 
     def pull(self,
              v,
@@ -846,32 +792,25 @@ class DGLGraph(DiGraph):
         batchable : bool
           Whether the reduce and update function allows batched computation.
         """
-        if False:
-            if message_func == "default":
-                message_func, batchable = self._message_func
-            if reduce_func == "default":
-                reduce_func, _ = self._reduce_func
-            if apply_node_func == "default":
-                apply_node_func, _ = self._apply_node_func
-            assert message_func is not None
-            assert reduce_func is not None
-            '''
-            if message_func == 'from_src' and reduce_func == 'sum':
-                # TODO(minjie): use lazy dict for reduced_msgs
-                reduced_msgs = {}
-                for key in self._node_frame.schemes:
-                    col = self._node_frame[key]
-                    adjmat = self.cached_graph.adjmat(F.get_context(col))
-                    reduced_msgs[key] = F.spmm(adjmat, col)
-                if len(reduced_msgs) == 1 and __REPR__ in reduced_msgs:
-                    reduced_msgs = reduced_msgs[__REPR__]
-                node_repr = self.get_n_repr()
-                self.set_n_repr(apply_node_func(node_repr, reduced_msgs))
-            '''
-            assert False
+        if message_func == "default":
+            message_func, batchable = self._message_func
+        if reduce_func == "default":
+            reduce_func, _ = self._reduce_func
+        assert message_func is not None
+        assert reduce_func is not None
+
+        if batchable:
+            executor = scheduler.get_executor(
+                    "update_all", self, message_func=message_func, reduce_func=reduce_func)
+        else:
+            executor = None
+
+        if executor:
+            executor.run()
         else:
             self.send(ALL, ALL, message_func, batchable=batchable)
-            self.recv(ALL, reduce_func, apply_node_func, batchable=batchable)
+            self.recv(ALL, reduce_func, None, batchable=batchable)
+        self.apply_nodes(ALL, apply_node_func, batchable=batchable)
 
     def propagate(self,
                   iterator='bfs',
