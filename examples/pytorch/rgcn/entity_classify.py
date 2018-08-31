@@ -21,13 +21,15 @@ from dgl.data import load_data
 from functools import partial
 
 from layers import RGCNBasisLayer as RGCNLayer
-from model import RGCN
+from model import BaseRGCN
 
-class EntityClassify(RGCN):
-    '''
-    def __init__():
-        super(EntityClassify, self).__init__()
-    '''
+class EntityClassify(BaseRGCN):
+    def create_features(self):
+        # just a hack to make subgraph merge work
+        features = torch.zeros(len(self.g), 1)
+        if self.use_cuda:
+            features = features.cuda()
+        return features
 
     def build_input_layer(self):
         return RGCNLayer(len(self.g), self.h_dim, len(self.subgraphs), self.num_rels, self.num_bases, activation=F.relu, featureless=True)
@@ -85,13 +87,9 @@ def main(args):
     labels = np.argmax(labels, axis=1)
     labels = torch.from_numpy(labels).view(-1)
 
-    # hack to make subgraph merging work for featureless case
-    features = torch.arange(len(g), dtype=torch.float).view(-1, 1)
-
     if use_cuda:
         model.cuda()
         labels = labels.cuda()
-        features = features.cuda()
 
     # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2norm)
@@ -104,7 +102,7 @@ def main(args):
     for epoch in range(args.n_epochs):
         optimizer.zero_grad()
         t0 = time.time()
-        logits = model.forward(features)
+        logits = model.forward()
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         t1 = time.time()
         loss.backward()
@@ -122,7 +120,7 @@ def main(args):
     print()
 
     model.eval()
-    logits = model.forward(features)
+    logits = model.forward()
     test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
     test_acc = torch.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
     print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))

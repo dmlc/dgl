@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-class RGCN(nn.Module):
+class BaseRGCN(nn.Module):
     def __init__(self, g, h_dim, out_dim, relations, num_bases=-1, num_layers=1, dropout=0, use_cuda=False):
-        super(RGCN, self).__init__()
+        super(BaseRGCN, self).__init__()
         self.g = g
         self.dropout = dropout
         self.h_dim = h_dim
@@ -23,6 +23,9 @@ class RGCN(nn.Module):
 
         # create rgcn layers
         self.build_model()
+
+        # create initial features
+        self.features = self.create_features()
 
     def build_subgraph_per_relation(self, relations):
         self.subgraphs = []
@@ -57,17 +60,21 @@ class RGCN(nn.Module):
         if h2o is not None:
             self.layers.append(h2o)
 
-    def build_input_layer(self):
+    def create_features(self):
         raise NotImplementedError
+
+    def build_input_layer(self):
+        return None
 
     def build_hidden_layer(self):
         raise NotImplementedError
 
     def build_output_layer(self):
-        raise NotImplementedError
+        return None
 
-    def forward(self, features):
-        self.g.set_n_repr(features)
+    def forward(self):
+        if self.features is not None:
+            self.g.set_n_repr(self.features)
         for i in range(0, len(self.layers)):
             self.layers[i](self.g, self.subgraphs)
         return self.g.pop_n_repr()
