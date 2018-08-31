@@ -52,19 +52,19 @@ class ChildSumTreeLSTMCell(nn.Module):
         c_tild = th.sum(f * msgs['c'], 1)
         return {'h_tild' : h_tild, 'c_tild' : c_tild}
     
-    def update_func(self, node, accum):
+    def update_func(self, node):
         # equation (3), (5), (6)
         if accum is None:
             iou = self.W_iou(node['x'])
         else:
-            iou = self.W_iou(node['x']) + self.U_iou(accum['h_tild'])
+            iou = self.W_iou(node['x']) + self.U_iou(node['h_tild'])
         i, o, u = th.chunk(iou, 3, 1)
         i, o, u = th.sigmoid(i), th.sigmoid(o), th.tanh(u)
         # equation (7)
         if accum is None:
             c = i * u
         else:
-            c = i * u + accum['c_tild']
+            c = i * u + node['c_tild']
         # equation (8)
         h = o * th.tanh(c)
         return {'h' : h, 'c' : c}
@@ -121,10 +121,10 @@ class TreeLSTM(nn.Module):
         if iterator is None:
             for frontier in topological_traverse(g):
                 #print('frontier', frontier)
-                g.update_to(frontier)
+                g.pull(frontier)
         else:
             for frontier in iterator:
-                g.update_to(frontier)
+                g.pull(frontier)
         # compute logits
         h = g.pop_n_repr('h')
         h = self.dropout(h)

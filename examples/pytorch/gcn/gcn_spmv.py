@@ -12,17 +12,18 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import dgl
+import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 
-class NodeUpdateModule(nn.Module):
+class NodeApplyModule(nn.Module):
     def __init__(self, in_feats, out_feats, activation=None):
-        super(NodeUpdateModule, self).__init__()
+        super(NodeApplyModule, self).__init__()
         self.linear = nn.Linear(in_feats, out_feats)
         self.activation = activation
 
-    def forward(self, node, accum):
-        h = self.linear(accum)
+    def forward(self, node):
+        h = self.linear(node)
         if self.activation:
             h = self.activation(h)
         return h
@@ -40,12 +41,12 @@ class GCN(nn.Module):
         self.g = g
         self.dropout = dropout
         # input layer
-        self.layers = nn.ModuleList([NodeUpdateModule(in_feats, n_hidden, activation)])
+        self.layers = nn.ModuleList([NodeApplyModule(in_feats, n_hidden, activation)])
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.append(NodeUpdateModule(n_hidden, n_hidden, activation))
+            self.layers.append(NodeApplyModule(n_hidden, n_hidden, activation))
         # output layer
-        self.layers.append(NodeUpdateModule(n_hidden, n_classes))
+        self.layers.append(NodeApplyModule(n_hidden, n_classes))
 
     def forward(self, features):
         self.g.set_n_repr(features)
@@ -54,7 +55,7 @@ class GCN(nn.Module):
             if self.dropout:
                 val = F.dropout(self.g.get_n_repr(), p=self.dropout)
                 self.g.set_n_repr(val)
-            self.g.update_all('from_src', 'sum', layer, batchable=True)
+            self.g.update_all(fn.copy_src(), fn.sum(), layer, batchable=True)
         return self.g.pop_n_repr()
 
 def main(args):
