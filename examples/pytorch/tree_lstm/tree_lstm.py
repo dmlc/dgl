@@ -52,19 +52,13 @@ class ChildSumTreeLSTMCell(nn.Module):
         c_tild = th.sum(f * msgs['c'], 1)
         return {'h_tild' : h_tild, 'c_tild' : c_tild}
     
-    def update_func(self, node):
+    def apply_func(self, node):
         # equation (3), (5), (6)
-        if accum is None:
-            iou = self.W_iou(node['x'])
-        else:
-            iou = self.W_iou(node['x']) + self.U_iou(node['h_tild'])
+        iou = self.W_iou(node['x']) + self.U_iou(node['h_tild'])
         i, o, u = th.chunk(iou, 3, 1)
         i, o, u = th.sigmoid(i), th.sigmoid(o), th.tanh(u)
         # equation (7)
-        if accum is None:
-            c = i * u
-        else:
-            c = i * u + node['c_tild']
+        c = i * u + node['c_tild']
         # equation (8)
         h = o * th.tanh(c)
         return {'h' : h, 'c' : c}
@@ -79,6 +73,7 @@ class TreeLSTM(nn.Module):
                  cell_type='childsum'):
         super(TreeLSTM, self).__init__()
         self.x_size = x_size
+        self.h_size = h_size
         # TODO(minjie): pre-trained embedding like GLoVe
         self.embedding = nn.Embedding(num_vocabs, x_size)
         self.dropout = nn.Dropout(dropout)
@@ -88,20 +83,20 @@ class TreeLSTM(nn.Module):
         else:
             raise RuntimeError('Unknown cell type:', cell_type)
 
-    def forward(self, batch, x, h, c, iterator=None, train=True):
+    def forward(self, batch, zero_initializer, h=None, c=None, iterator=None, train=True):
         """Compute tree-lstm prediction given a batch.
 
         Parameters
         ----------
         batch : dgl.data.SSTBatch
             The data batch.
-        x : Tensor
-            Initial node input.
-        h : Tensor
+        zero_initializer : callable
+            Function to return zero value tensor.
+        h : Tensor, optional
             Initial hidden state.
-        c : Tensor
+        c : Tensor, optional
             Initial cell state.
-        iterator : graph iterator
+        iterator : graph iterator, optional
             External iterator on graph.
 
         Returns
@@ -110,13 +105,21 @@ class TreeLSTM(nn.Module):
             The prediction of each node.
         """
         g = batch.graph
+        n = g.number_of_nodes()
         g.register_message_func(self.cell.message_func, batchable=True)
         g.register_reduce_func(self.cell.reduce_func, batchable=True)
-        g.register_update_func(self.cell.update_func, batchable=True)
+        g.register_apply_node_func(self.cell.apply_func, batchable=True)
         # feed embedding
         embeds = self.embedding(batch.wordid)
+        x = zero_initializer((n, self.x_size))
         x = x.index_copy(0, batch.nid_with_word, embeds)
-        g.set_n_repr({'x' : x, 'h' : h, 'c' : c})
+        if h is None:
+            h = zero_initializer((n, self.h_size))
+        h_tild = zero_initializer((n, self.h_size))
+        if c is None:
+            c = zero_initializer((n, self.h_size))
+        c_tild = zero_initializer((n, self.h_size))
+        g.set_n_repr({'x' : x, 'h' : h, 'c' : c, 'h_tild' : h_tild, 'c_tild' : c_tild})
         # TODO(minjie): potential bottleneck
         if iterator is None:
             for frontier in topological_traverse(g):
