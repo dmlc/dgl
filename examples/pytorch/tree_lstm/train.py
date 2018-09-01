@@ -21,10 +21,10 @@ import dgl.context as ctx
 def tensor_topo_traverse(g, cuda, args):
     n = g.number_of_nodes()
     if cuda:
-        adjmat = g.cached_graph.adjmat(ctx.gpu(args.gpu))
+        adjmat = g.cached_graph.adjmat().get(ctx.gpu(args.gpu))
         mask = th.ones((n, 1)).cuda()
     else:
-        adjmat = g.cached_graph.adjmat(ctx.cpu())
+        adjmat = g.cached_graph.adjmat().get(ctx.cpu())
         mask = th.ones((n, 1))
     degree = th.spmm(adjmat, mask)
     while th.sum(mask) != 0.:
@@ -59,6 +59,9 @@ def main(args):
                      args.dropout)
     if cuda:
         model.cuda()
+        zero_initializer = lambda shape : th.zeros(shape).cuda()
+    else:
+        zero_initializer = th.zeros
     print(model)
     optimizer = optim.Adagrad(model.parameters(),
                               lr=args.lr,
@@ -68,21 +71,14 @@ def main(args):
         t_epoch = time.time()
         for step, batch in enumerate(train_loader):
             g = batch.graph
-            n = g.number_of_nodes()
-            x = th.zeros((n, args.x_size))
-            h = th.zeros((n, args.h_size))
-            c = th.zeros((n, args.h_size))
             if cuda:
                 batch = _batch_to_cuda(batch)
-                x = x.cuda()
-                h = h.cuda()
-                c = c.cuda()
 
             if step >= 3:
                 t0 = time.time()
             # traverse graph
             giter = list(tensor_topo_traverse(g, False, args))
-            logits = model(batch, x, h, c, iterator=giter, train=True)
+            logits = model(batch, zero_initializer, iterator=giter, train=True)
             logp = F.log_softmax(logits, 1)
             loss = F.nll_loss(logp, batch.label)
             optimizer.zero_grad()

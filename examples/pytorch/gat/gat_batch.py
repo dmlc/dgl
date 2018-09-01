@@ -33,7 +33,7 @@ class GATReduce(nn.Module):
         e = F.softmax(F.leaky_relu(a), dim=1)
         if self.attn_drop != 0.0:
             e = F.dropout(e, self.attn_drop)
-        return torch.sum(e * ft, dim=1) # shape (B, D)
+        return {'accum' : torch.sum(e * ft, dim=1)} # shape (B, D)
 
 class GATFinalize(nn.Module):
     def __init__(self, headid, indim, hiddendim, activation, residual):
@@ -46,8 +46,8 @@ class GATFinalize(nn.Module):
             if indim != hiddendim:
                 self.residual_fc = nn.Linear(indim, hiddendim)
 
-    def forward(self, node, accum):
-        ret = accum
+    def forward(self, node):
+        ret = node['accum']
         if self.residual:
             if self.residual_fc is not None:
                 ret = self.residual_fc(node['h']) + ret

@@ -22,7 +22,6 @@ _urls = {
 class CitationGraphDataset(object):
     def __init__(self, name):
         self.name = name
-        self.mode = mode
         self.dir = get_download_dir()
         self.zip_file_path='{}/{}.zip'.format(self.dir, name)
         download(_urls[name], path=self.zip_file_path)

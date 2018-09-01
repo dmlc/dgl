@@ -118,8 +118,8 @@ class CachedGraph:
         dst = utils.toindex(dst)
         return src, dst
 
-    @utils.ctx_cached_member
-    def adjmat(self, ctx):
+    @utils.cached_member
+    def adjmat(self):
         """Return a sparse adjacency matrix.
 
         The row dimension represents the dst nodes; the column dimension
@@ -134,8 +134,7 @@ class CachedGraph:
         n = self._graph.vcount()
         dat = F.ones((len(elist),))
         mat = F.sparse_tensor(idx, dat, [n, n])
-        mat = F.to_context(mat, ctx)
-        return mat
+        return utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
 
     def freeze(self):
         self._freeze = True

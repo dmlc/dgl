@@ -20,22 +20,10 @@ def reduce_func(node, msgs):
     reduce_msg_shapes.add(tuple(msgs.shape))
     assert len(msgs.shape) == 3
     assert msgs.shape[2] == D
-    return th.sum(msgs, 1)
-
-def update_func(node, accum):
-    assert node['h'].shape == accum.shape
-    return {'h' : node['h'] + accum}
-
-def reduce_dict_func(node, msgs):
-    msgs = msgs['m']
-    reduce_msg_shapes.add(tuple(msgs.shape))
-    assert len(msgs.shape) == 3
-    assert msgs.shape[2] == D
     return {'m' : th.sum(msgs, 1)}
 
-def update_dict_func(node, accum):
-    assert node['h'].shape == accum['m'].shape
-    return {'h' : node['h'] + accum['m']}
+def apply_node_func(node):
+    return {'h' : node['h'] + node['m']}
 
 def generate_graph(grad=False):
     g = DGLGraph()
@@ -147,43 +135,29 @@ def test_batch_send():
         assert src['h'].shape == (5, D)
         return {'m' : src['h']}
     g.register_message_func(_fmsg, batchable=True)
-    # many-many sendto
+    # many-many send
     u = th.tensor([0, 0, 0, 0, 0])
     v = th.tensor([1, 2, 3, 4, 5])
-    g.sendto(u, v)
-    # one-many sendto
+    g.send(u, v)
+    # one-many send
     u = th.tensor([0])
     v = th.tensor([1, 2, 3, 4, 5])
-    g.sendto(u, v)
-    # many-one sendto
+    g.send(u, v)
+    # many-one send
     u = th.tensor([1, 2, 3, 4, 5])
     v = th.tensor([9])
-    g.sendto(u, v)
+    g.send(u, v)
 
-def test_batch_recv1():
+def test_batch_recv():
     # basic recv test
     g = generate_graph()
     g.register_message_func(message_func, batchable=True)
     g.register_reduce_func(reduce_func, batchable=True)
-    g.register_update_func(update_func, batchable=True)
+    g.register_apply_node_func(apply_node_func, batchable=True)
     u = th.tensor([0, 0, 0, 4, 5, 6])
     v = th.tensor([1, 2, 3, 9, 9, 9])
     reduce_msg_shapes.clear()
-    g.sendto(u, v)
-    g.recv(th.unique(v))
-    assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
-    reduce_msg_shapes.clear()
-
-def test_batch_recv2():
-    # recv test with dict type reduce message
-    g = generate_graph()
-    g.register_message_func(message_func, batchable=True)
-    g.register_reduce_func(reduce_dict_func, batchable=True)
-    g.register_update_func(update_dict_func, batchable=True)
-    u = th.tensor([0, 0, 0, 4, 5, 6])
-    v = th.tensor([1, 2, 3, 9, 9, 9])
-    reduce_msg_shapes.clear()
-    g.sendto(u, v)
+    g.send(u, v)
     g.recv(th.unique(v))
     assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     reduce_msg_shapes.clear()
@@ -192,27 +166,27 @@ def test_update_routines():
     g = generate_graph()
     g.register_message_func(message_func, batchable=True)
     g.register_reduce_func(reduce_func, batchable=True)
-    g.register_update_func(update_func, batchable=True)
+    g.register_apply_node_func(apply_node_func, batchable=True)
 
-    # update_by_edge
+    # send_and_recv
     reduce_msg_shapes.clear()
     u = th.tensor([0, 0, 0, 4, 5, 6])
     v = th.tensor([1, 2, 3, 9, 9, 9])
-    g.update_by_edge(u, v)
+    g.send_and_recv(u, v)
     assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     reduce_msg_shapes.clear()
 
-    # update_to
+    # pull
     v = th.tensor([1, 2, 3, 9])
     reduce_msg_shapes.clear()
-    g.update_to(v)
+    g.pull(v)
     assert(reduce_msg_shapes == {(1, 8, D), (3, 1, D)})
     reduce_msg_shapes.clear()
 
-    # update_from
+    # push
     v = th.tensor([0, 1, 2, 3])
     reduce_msg_shapes.clear()
-    g.update_from(v)
+    g.push(v)
     assert(reduce_msg_shapes == {(1, 3, D), (8, 1, D)})
     reduce_msg_shapes.clear()
 
@@ -233,24 +207,16 @@ def test_reduce_0deg():
         return src
     def _reduce(node, msgs):
         assert msgs is not None
-        return msgs.sum(1)
-    def _update(node, accum):
-        if node.shape[0] == 4:
-            assert accum is None
-            return node
-        else:
-            assert accum is not None
-            return node + accum
-
+        return node + msgs.sum(1)
     old_repr = th.randn(5, 5)
     g.set_n_repr(old_repr)
-    g.update_all(_message, _reduce, _update, True)
+    g.update_all(_message, _reduce, batchable=True)
     new_repr = g.get_n_repr()
 
     assert th.allclose(new_repr[1:], old_repr[1:])
     assert th.allclose(new_repr[0], old_repr.sum(0))
 
-def test_update_to_0deg():
+def test_pull_0deg():
     g = DGLGraph()
     g.add_nodes_from([0, 1])
     g.add_edge(0, 1)
@@ -259,24 +225,22 @@ def test_update_to_0deg():
     def _reduce(node, msgs):
         assert msgs is not None
         return msgs.sum(1)
-    def _update(node, accum):
-        return node * 2 if accum is None else accum
 
     old_repr = th.randn(2, 5)
     g.set_n_repr(old_repr)
-    g.update_to(0, _message, _reduce, _update, True)
+    g.pull(0, _message, _reduce, batchable=True)
     new_repr = g.get_n_repr()
-    assert th.allclose(new_repr[0], old_repr[0] * 2)
+    assert th.allclose(new_repr[0], old_repr[0])
     assert th.allclose(new_repr[1], old_repr[1])
-    g.update_to(1, _message, _reduce, _update, True)
+    g.pull(1, _message, _reduce, batchable=True)
     new_repr = g.get_n_repr()
-    assert th.allclose(new_repr[1], old_repr[0] * 2)
+    assert th.allclose(new_repr[1], old_repr[0])
 
     old_repr = th.randn(2, 5)
     g.set_n_repr(old_repr)
-    g.update_to([0, 1], _message, _reduce, _update, True)
+    g.pull([0, 1], _message, _reduce, batchable=True)
     new_repr = g.get_n_repr()
-    assert th.allclose(new_repr[0], old_repr[0] * 2)
+    assert th.allclose(new_repr[0], old_repr[0])
     assert th.allclose(new_repr[1], old_repr[0])
 
 def _test_delete():
@@ -293,9 +257,8 @@ if __name__ == '__main__':
     test_batch_setter_getter()
     test_batch_setter_autograd()
     test_batch_send()
-    test_batch_recv1()
-    test_batch_recv2()
+    test_batch_recv()
     test_update_routines()
     test_reduce_0deg()
-    test_update_to_0deg()
+    test_pull_0deg()
     #test_delete()

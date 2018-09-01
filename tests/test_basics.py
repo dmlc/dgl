@@ -3,14 +3,20 @@ from dgl.graph import DGLGraph
 def message_func(src, edge):
     return src['h']
 
-def update_func(node, accum):
-    return {'h' : node['h'] + accum}
+def reduce_func(node, msgs):
+    return {'m' : sum(msgs)}
+
+def apply_func(node):
+    return {'h' : node['h'] + node['m']}
 
 def message_dict_func(src, edge):
     return {'m' : src['h']}
 
-def update_dict_func(node, accum):
-    return {'h' : node['h'] + accum['m']}
+def reduce_dict_func(node, msgs):
+    return {'m' : sum([msg['m'] for msg in msgs])}
+
+def apply_dict_func(node):
+    return {'h' : node['h'] + node['m']}
 
 def generate_graph():
     g = DGLGraph()
@@ -31,65 +37,49 @@ def check(g, h):
 
 def register1(g):
     g.register_message_func(message_func)
-    g.register_update_func(update_func)
-    g.register_reduce_func('sum')
+    g.register_reduce_func(reduce_func)
+    g.register_apply_node_func(apply_func)
 
 def register2(g):
     g.register_message_func(message_dict_func)
-    g.register_update_func(update_dict_func)
-    g.register_reduce_func('sum')
+    g.register_reduce_func(reduce_dict_func)
+    g.register_apply_node_func(apply_dict_func)
 
 def _test_sendrecv(g):
     check(g, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-    g.sendto(0, 1)
+    g.send(0, 1)
     g.recv(1)
     check(g, [1, 3, 3, 4, 5, 6, 7, 8, 9, 10])
-    g.sendto(5, 9)
-    g.sendto(6, 9)
+    g.send(5, 9)
+    g.send(6, 9)
     g.recv(9)
     check(g, [1, 3, 3, 4, 5, 6, 7, 8, 9, 23])
 
 def _test_multi_sendrecv(g):
     check(g, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     # one-many
-    g.sendto(0, [1, 2, 3])
+    g.send(0, [1, 2, 3])
     g.recv([1, 2, 3])
     check(g, [1, 3, 4, 5, 5, 6, 7, 8, 9, 10])
     # many-one
-    g.sendto([6, 7, 8], 9)
+    g.send([6, 7, 8], 9)
     g.recv(9)
     check(g, [1, 3, 4, 5, 5, 6, 7, 8, 9, 34])
     # many-many
-    g.sendto([0, 0, 4, 5], [4, 5, 9, 9])
+    g.send([0, 0, 4, 5], [4, 5, 9, 9])
     g.recv([4, 5, 9])
     check(g, [1, 3, 4, 5, 6, 7, 7, 8, 9, 45])
 
 def _test_update_routines(g):
     check(g, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-    g.update_by_edge(0, 1)
+    g.send_and_recv(0, 1)
     check(g, [1, 3, 3, 4, 5, 6, 7, 8, 9, 10])
-    g.update_to(9)
+    g.pull(9)
     check(g, [1, 3, 3, 4, 5, 6, 7, 8, 9, 55])
-    g.update_from(0)
+    g.push(0)
     check(g, [1, 4, 4, 5, 6, 7, 8, 9, 10, 55])
     g.update_all()
     check(g, [56, 5, 5, 6, 7, 8, 9, 10, 11, 108])
-
-def _test_update_to_0deg():
-    g = DGLGraph()
-    g.add_node(0, h=2)
-    g.add_node(1, h=1)
-    g.add_edge(0, 1)
-    def _message(src, edge):
-        return src
-    def _reduce(node, msgs):
-        assert msgs is not None
-        return msgs.sum(1)
-    def _update(node, accum):
-        assert accum is None
-        return {'h': node['h'] * 2}
-    g.update_to(0, _message, _reduce, _update)
-    assert g.nodes[0]['h'] == 4
 
 def test_sendrecv():
     g = generate_graph()
@@ -114,8 +104,6 @@ def test_update_routines():
     g = generate_graph()
     register2(g)
     _test_update_routines(g)
-
-    _test_update_to_0deg()
 
 if __name__ == '__main__':
     test_sendrecv()

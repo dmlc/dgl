@@ -21,14 +21,14 @@ def gcn_msg(src, edge):
 def gcn_reduce(node, msgs):
     return torch.sum(msgs, 1)
 
-class NodeUpdateModule(nn.Module):
+class NodeApplyModule(nn.Module):
     def __init__(self, in_feats, out_feats, activation=None):
-        super(NodeUpdateModule, self).__init__()
+        super(NodeApplyModule, self).__init__()
         self.linear = nn.Linear(in_feats, out_feats)
         self.activation = activation
 
-    def forward(self, node, accum):
-        h = self.linear(accum)
+    def forward(self, node):
+        h = self.linear(node)
         if self.activation:
             h = self.activation(h)
         return h
@@ -46,12 +46,12 @@ class GCN(nn.Module):
         self.g = g
         self.dropout = dropout
         # input layer
-        self.layers = nn.ModuleList([NodeUpdateModule(in_feats, n_hidden, activation)])
+        self.layers = nn.ModuleList([NodeApplyModule(in_feats, n_hidden, activation)])
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.append(NodeUpdateModule(n_hidden, n_hidden, activation))
+            self.layers.append(NodeApplyModule(n_hidden, n_hidden, activation))
         # output layer
-        self.layers.append(NodeUpdateModule(n_hidden, n_classes))
+        self.layers.append(NodeApplyModule(n_hidden, n_classes))
 
     def forward(self, features):
         self.g.set_n_repr(features)

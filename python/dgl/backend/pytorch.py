@@ -63,6 +63,7 @@ zeros = th.zeros
 spmm = th.spmm
 sort = th.sort
 arange = th.arange
+mul = th.mul
 
 def to_context(x, ctx):
     if ctx is None:
