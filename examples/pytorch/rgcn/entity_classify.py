@@ -79,7 +79,7 @@ def main(args):
                            labels.shape[1],
                            relations,
                            num_bases=args.n_bases,
-                           num_layers=args.n_layers,
+                           num_hidden_layers=args.n_layers - 2,
                            dropout=args.dropout,
                            use_cuda=use_cuda)
 
@@ -142,7 +142,7 @@ if __name__ == '__main__':
             help="learning rate")
     parser.add_argument("--n-bases", type=int, default=-1,
             help="number of filter weight matrices, default: -1 [use all]")
-    parser.add_argument("--n-layers", type=int, default=1,
+    parser.add_argument("--n-layers", type=int, default=2,
             help="number of propagation rounds")
     parser.add_argument("-e", "--n-epochs", type=int, default=50,
             help="number of training epochs")

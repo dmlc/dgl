@@ -3,7 +3,7 @@ import torch.nn as nn
 import numpy as np
 
 class BaseRGCN(nn.Module):
-    def __init__(self, g, h_dim, out_dim, relations, num_bases=-1, num_layers=1, dropout=0, use_cuda=False):
+    def __init__(self, g, h_dim, out_dim, relations, num_bases=-1, num_hidden_layers=1, dropout=0, use_cuda=False):
         super(BaseRGCN, self).__init__()
         self.g = g
         self.dropout = dropout
@@ -11,7 +11,7 @@ class BaseRGCN(nn.Module):
         self.out_dim = out_dim
         self.num_rels = relations.shape[1]
         self.num_bases = num_bases
-        self.num_layers = num_layers
+        self.num_hidden_layers = num_hidden_layers
         self.dropout = dropout
         self.use_cuda = use_cuda
 
@@ -53,7 +53,7 @@ class BaseRGCN(nn.Module):
         if i2h is not None:
             self.layers.append(i2h)
         # h2h
-        for _ in range(1, self.num_layers):
+        for _ in range(self.num_hidden_layers):
             h2h = self.build_hidden_layer()
         # h2o
         h2o = self.build_output_layer()
