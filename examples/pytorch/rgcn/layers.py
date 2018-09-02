@@ -75,3 +75,26 @@ class RGCNBasisLayer(RGCNLayer):
             g.pop_n_repr()
 
 
+class RGCNBlockLayer(RGCNLayer):
+    def __init__(self, in_feat, out_feat, num_gs, num_rels, num_bases=-1,featureless=False, bias=None, activation=None):
+        super(RGCNBlockLayer, self).__init__(bias, activation)
+        self.num_rels = min(num_rels, num_gs)
+        self.num_bases = num_bases
+        assert self.num_bases > 0
+
+        # assuming in_feat and out_feat are divisible by num_bases
+        self.submat_in = in_feat // self.num_bases
+        self.submat_out = out_feat // self.num_bases
+        self.weight = nn.Parameter(torch.Tensor(self.num_rels, self.num_bases * self.submat_in * self.submat_out))
+        nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+
+    def propagate(self, parent, children):
+        for idx, g in enumerate(children):
+            g.copy_from(parent)
+            weight = self.weight[idx].view(self.submat_in, self.submat_out)
+            g.update_all('src_mul_edge', 'sum',
+                         lambda node, accum: torch.mm(accum, weight),
+                         batchable=True)
+
+            # merge node repr
+            parent.merge(children, node_reduce_func='sum', edge_reduce_func=None)
