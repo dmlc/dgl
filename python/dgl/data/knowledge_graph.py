@@ -19,20 +19,23 @@ from dgl.data.utils import download, extract_archive, get_download_dir
 np.random.seed(123)
 
 _urls = {
-    'task': 'https://www.dropbox.com/s/babuor115oqq2i3/rgcn_task.tgz?dl=1',
     'am': 'https://www.dropbox.com/s/htisydfgwxmrx65/am_stripped.nt.gz?dl=1',
     'aifb': 'https://www.dropbox.com/s/fkvgvkygo2gf28k/aifb_stripped.nt.gz?dl=1',
     'mutag': 'https://www.dropbox.com/s/qy8j3p8eacvm4ir/mutag_stripped.nt.gz?dl=1',
-    'bgs': 'https://www.dropbox.com/s/uqi0k9jd56j02gh/bgs_stripped.nt.gz?dl=1'
+    'bgs': 'https://www.dropbox.com/s/uqi0k9jd56j02gh/bgs_stripped.nt.gz?dl=1',
+    'entity_classify': 'https://www.dropbox.com/s/babuor115oqq2i3/rgcn_entity_classify.tgz?dl=1',
+    'FB15k-237': 'https://www.dropbox.com/s/werqxn21mt19nj4/FB15k-237.tgz?dl=1',
+    'FB15k': 'https://www.dropbox.com/s/zbyvjuwu1phlxb5/FB15k.tgz?dl=1',
+    'wn18': 'https://www.dropbox.com/s/53fvtwxe70j3aon/wn18.tgz?dl=1'
 }
 
 
-class RGCNDataset(object):
+class RGCNEntityDataset(object):
     def __init__(self, name):
         self.name = name
         self.dir = get_download_dir()
-        task_gz_path = os.path.join(self.dir, 'rgcn_task.tar.gz')
-        download(_urls['task'], task_gz_path)
+        task_gz_path = os.path.join(self.dir, 'rgcn_entity_classify.tar.gz')
+        download(_urls['entity_classify'], task_gz_path)
         extract_archive(task_gz_path, self.dir)
         self.dir = os.path.join(self.dir, self.name)
         graph_file_path = os.path.join(self.dir, '{}_stripped.nt.gz'.format(self.name))
@@ -88,25 +91,61 @@ class RGCNDataset(object):
             self.relations[:, idx] *= degree
 
 
-def load_aifb(args):
-    data = RGCNDataset('aifb')
+class RGCNLinkDataset(object):
+    def __init__(self, name):
+        self.name = name
+        self.dir = get_download_dir()
+        tgz_file_path = os.path.join(self.dir, '{}.tar.gz'.format(self.name))
+        download(_urls[self.name], tgz_file_path)
+        extract_archive(tgz_file_path, self.dir)
+        self.dir = os.path.join(self.dir, self.name)
+
+    def load(self):
+        entity_path = os.path.join(self.dir, 'entities.dict')
+        relation_path = os.path.join(self.dir, 'relations.dict')
+        train_path = os.path.join(self.dir, 'train.txt')
+        valid_path = os.path.join(self.dir, 'valid.txt')
+        test_path = os.path.join(self.dir, 'test.txt')
+        entity_dict = _read_dictionary(entity_path)
+        relation_dict = _read_dictionary(relation_path)
+        self.train = _read_triplets_as_list(train_path, entity_dict, relation_dict)
+        self.valid = _read_triplets_as_list(valid_path, entity_dict, relation_dict)
+        self.test = _read_triplets_as_list(test_path, entity_dict, relation_dict)
+        self.num_nodes = len(entity_dict)
+        num_rels = len(relation_dict)
+        print("# entities: {}".format(self.num_nodes))
+        print("# relations: {}".format(num_rels))
+        self.edges, self.relations = self.build_adj(self.train, num_rels)
+        print("# edges: {}".format(len(self.relations)))
+
+    def build_adj(self, triplets, num_rels):
+        num_rels *= 2 # add reverse
+        edge_dict = defaultdict(lambda: np.zeros(num_rels))
+        for s, r, o in triplets:
+            edge_dict[(s, o)][2 * r] = 1
+            edge_dict[(o, s)][2 * r + 1] = 1 # reverse rel
+
+        edges = sorted(list(edge_dict.keys()))
+        edge_types = np.stack([edge_dict[e] for e in edges])
+        edge_count = np.sum(edge_types, axis=1)
+        edges = np.array(edges)
+        src, dst = edges.transpose()
+        csr = sp.csr_matrix((edge_count, (src, dst)), shape=[self.num_nodes, self.num_nodes])
+        edge_count = np.reshape(np.asarray(csr.sum(axis=0)), (-1, 1))
+        edge_values = edge_types / edge_count[dst]
+        return edges, edge_values
+
+
+def load_entity(args):
+    data = RGCNEntityDataset(args.dataset)
     data.load(args.bfs_level, args.relabel)
     return data
 
-def load_mutag(args):
-    data = RGCNDataset('mutag')
-    data.load(args.bfs_level, args.relabel)
+def load_link(args):
+    data = RGCNLinkDataset(args.dataset)
+    data.load()
     return data
 
-def load_bgs(args):
-    data = RGCNDataset('bgs')
-    data.load(args.bfs_level, args.relabel)
-    return data
-
-def load_am(args):
-    data = RGCNDataset('am')
-    data.load(args.bfs_level, args.relabel)
-    return data
 
 
 def _sp_row_vec_from_idx_list(idx_list, dim):
@@ -409,3 +448,27 @@ def to_unicode(input):
         return input.decode('utf-8', errors='replace')
     return str(input).decode('utf-8', errors='replace')
     """
+
+
+def _read_dictionary(filename):
+    d = {}
+    with open(filename, 'r+') as f:
+        for line in f:
+            line = line.strip().split('\t')
+            d[line[1]] = int(line[0])
+    return d
+
+def _read_triplets(filename):
+    with open(filename, 'r+') as f:
+        for line in f:
+            processed_line = line.strip().split('\t')
+            yield processed_line
+
+def _read_triplets_as_list(filename, entity_dict, relation_dict):
+    l = []
+    for triplet in _read_triplets(filename):
+        s = entity_dict[triplet[0]]
+        r = relation_dict[triplet[1]]
+        o = entity_dict[triplet[2]]
+        l.append([s, r, o])
+    return l

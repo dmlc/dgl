@@ -19,13 +19,9 @@ def load_data(args):
         return citegrh.load_pubmed()
     elif args.dataset == 'syn':
         return citegrh.load_synthetic(args)
-    elif args.dataset == 'aifb':
-        return knwlgrh.load_aifb(args)
-    elif args.dataset == 'mutag':
-        return knwlgrh.load_mutag(args)
-    elif args.dataset == 'bgs':
-        return knwlgrh.load_bgs(args)
-    elif args.dataset == 'am':
-        return knwlgrh.load_am(args)
+    elif args.dataset in ['aifb', 'mutag', 'bgs', 'am']:
+        return knwlgrh.load_entity(args)
+    elif args.dataset in ['FB15k', 'wn18', 'FB15k-237']:
+        return knwlgrh.load_link(args)
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
