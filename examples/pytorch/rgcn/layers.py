@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import dgl.function as fn
 
 class RGCNLayer(nn.Module):
     def __init__(self, in_feat, out_feat, bias=None, activation=None, self_loop=None, dropout=0.0):
@@ -77,14 +78,12 @@ class RGCNBasisLayer(RGCNLayer):
             if self.featureless:
                 # hack to avoid materize node features to avoid memory issues
                 g.set_n_repr(weights[idx][g.parent_nid])
-                g.update_all('src_mul_edge', 'sum',
-                             lambda node, accum: accum,
-                             batchable=True)
+                g.update_all(fn.src_mul_edge(), fn.sum(), None, batchable=True)
             else:
                 # update subgraph node repr
                 g.copy_from(parent)
-                g.update_all('src_mul_edge', 'sum',
-                             lambda node, accum: torch.mm(accum, weights[idx]),
+                g.update_all(fn.src_mul_edge(), fn.sum(),
+                             lambda node: torch.mm(node, weights[idx]),
                              batchable=True)
         # end for
 
@@ -116,27 +115,25 @@ class RGCNBlockLayer(RGCNLayer):
             """
             XXX: pytorch matmul broadcast duplicates weight tensor..., so this impl
                  wastes more than 2GB memory
-            def node_update(node, accum):
-                accum = accum.view(-1, self.num_bases, 1, self.submat_in)
+            def node_update(node, node):
+                node = node.view(-1, self.num_bases, 1, self.submat_in)
                 weight = self.weight[idx].view(self.num_bases, self.submat_in, self.submat_out)
-                return torch.matmul(accum, weight).view(-1, self.out_feat)
+                return torch.matmul(node, weight).view(-1, self.out_feat)
             """
 
             # (lingfan): following hack saves memory
-            def node_update(node, accum):
+            def node_update(node):
                 # num_bases x num_nodes x submat_in
-                accum = accum.view(-1, self.num_bases, self.submat_in).transpose(0, 1)
+                node = node.view(-1, self.num_bases, self.submat_in).transpose(0, 1)
                 # num_bases x submat_in x submat_out
                 weight = self.weight[idx].view(self.num_bases, self.submat_in, self.submat_out)
                 out = []
                 for i in range(self.num_bases):
-                    out.append(torch.mm(accum[i], weight[i]))
+                    out.append(torch.mm(node[i], weight[i]))
                 out = torch.stack(out) # num_bases x num_nodes x submat_out
                 return out.transpose(0, 1).contiguous().view(-1, self.out_feat)
 
-            g.update_all('src_mul_edge', 'sum',
-                         node_update,
-                         batchable=True)
+            g.update_all(fn.src_mul_edge(), fn.sum(), node_update, batchable=True)
         # end for
 
         # merge node repr
