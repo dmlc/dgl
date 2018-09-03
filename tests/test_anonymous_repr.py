@@ -4,8 +4,8 @@ from dgl.graph import __REPR__
 def message_func(hu, e_uv):
     return hu + e_uv
 
-def update_func(h, accum):
-    return h + accum
+def reduce_func(h, msgs):
+    return h + sum(msgs)
 
 def generate_graph():
     g = DGLGraph()
@@ -28,34 +28,32 @@ def test_sendrecv():
     g = generate_graph()
     check(g, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
     g.register_message_func(message_func)
-    g.register_update_func(update_func)
-    g.register_reduce_func('sum')
-    g.sendto(0, 1)
+    g.register_reduce_func(reduce_func)
+    g.send(0, 1)
     g.recv(1)
     check(g, [1, 4, 3, 4, 5, 6, 7, 8, 9, 10])
-    g.sendto(5, 9)
-    g.sendto(6, 9)
+    g.send(5, 9)
+    g.send(6, 9)
     g.recv(9)
     check(g, [1, 4, 3, 4, 5, 6, 7, 8, 9, 25])
 
 def message_func_hybrid(src, edge):
     return src[__REPR__] + edge
 
-def update_func_hybrid(node, accum):
-    return node[__REPR__] + accum
+def reduce_func_hybrid(node, msgs):
+    return node[__REPR__] + sum(msgs)
 
 def test_hybridrepr():
     g = generate_graph()
     for i in range(10):
         g.nodes[i]['id'] = -i
     g.register_message_func(message_func_hybrid)
-    g.register_update_func(update_func_hybrid)
-    g.register_reduce_func('sum')
-    g.sendto(0, 1)
+    g.register_reduce_func(reduce_func_hybrid)
+    g.send(0, 1)
     g.recv(1)
     check(g, [1, 4, 3, 4, 5, 6, 7, 8, 9, 10])
-    g.sendto(5, 9)
-    g.sendto(6, 9)
+    g.send(5, 9)
+    g.send(6, 9)
     g.recv(9)
     check(g, [1, 4, 3, 4, 5, 6, 7, 8, 9, 25])
 

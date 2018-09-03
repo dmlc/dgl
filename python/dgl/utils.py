@@ -290,6 +290,9 @@ def cached_member(func):
             return func(self)
     return wrapper
 
+def is_dict_like(obj):
+    return isinstance(obj, Mapping)
+
 def pack2(a, b):
     if a is None:
         return b
@@ -300,3 +303,19 @@ def pack2(a, b):
             return {k: F.pack([a[k], b[k]]) for k in a}
         else:
             return F.pack([a, b])
+
+def reorder(dict_like, index):
+    """Reorder each column in the dict according to the index.
+
+    Parameters
+    ----------
+    dict_like : dict of tensors
+        The dict to be reordered.
+    index : dgl.utils.Index
+        The reorder index.
+    """
+    new_dict = {}
+    for key, val in dict_like.items():
+        idx_ctx = index.totensor(F.get_context(val))
+        new_dict[key] = F.gather_row(val, idx_ctx)
+    return new_dict

@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 from . import citation_graph as citegrh
 from . import knowledge_graph as knwlgrh
+from .tree import *
 from .utils import *
 
 def register_data_args(parser):

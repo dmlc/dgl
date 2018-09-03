@@ -16,16 +16,16 @@ def gcn_msg(src, edge):
     return src['h']
 
 def gcn_reduce(node, msgs):
-    return sum(msgs)
+    return {'h' : sum(msgs)}
 
-class NodeUpdateModule(nn.Module):
+class NodeApplyModule(nn.Module):
     def __init__(self, in_feats, out_feats, activation=None):
-        super(NodeUpdateModule, self).__init__()
+        super(NodeApplyModule, self).__init__()
         self.linear = nn.Linear(in_feats, out_feats)
         self.activation = activation
 
-    def forward(self, node, accum):
-        h = self.linear(accum)
+    def forward(self, node):
+        h = self.linear(node['h'])
         if self.activation:
             h = self.activation(h)
         return {'h' : h}
@@ -43,12 +43,12 @@ class GCN(nn.Module):
         self.g = DGLGraph(nx_graph)
         self.dropout = dropout
         # input layer
-        self.layers = nn.ModuleList([NodeUpdateModule(in_feats, n_hidden, activation)])
+        self.layers = nn.ModuleList([NodeApplyModule(in_feats, n_hidden, activation)])
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.append(NodeUpdateModule(n_hidden, n_hidden, activation))
+            self.layers.append(NodeApplyModule(n_hidden, n_hidden, activation))
         # output layer
-        self.layers.append(NodeUpdateModule(n_hidden, n_classes))
+        self.layers.append(NodeApplyModule(n_hidden, n_classes))
 
     def forward(self, features, train_nodes):
         for n, feat in features.items():

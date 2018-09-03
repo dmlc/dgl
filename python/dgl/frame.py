@@ -163,6 +163,10 @@ class FrameRef(MutableMapping):
     def update_rows(self, query, other):
         rowids = self._getrowid(query)
         for key, col in other.items():
+            if key not in self:
+                # add new column
+                tmpref = FrameRef(self._frame, rowids)
+                tmpref.add_column(key, col)
             idx = rowids.totensor(F.get_context(self._frame[key]))
             self._frame[key] = F.scatter_row(self._frame[key], idx, col)
 

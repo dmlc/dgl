@@ -6,6 +6,9 @@ Code: https://github.com/tkipf/gcn
 GCN with SPMV specialization.
 """
 import torch.nn as nn
+
+import dgl
+import dgl.function as fn
 from dgl.base import ALL, is_all
 
 class NodeUpdateModule(nn.Module):
@@ -15,13 +18,8 @@ class NodeUpdateModule(nn.Module):
         self.activation = activation
         self.attribute = None
 
-    def set_attribute_to_update(self, attribute):
-        self.attribute = attribute
-
-    def forward(self, node, accum, attribute=None):
-        if self.attribute:
-            accum = accum[self.attribute]
-        h = self.linear(accum)
+    def forward(self, node):
+        h = self.linear(node['accum'])
         if self.activation:
             h = self.activation(h)
         if self.attribute:
@@ -41,9 +39,16 @@ class GCN(nn.Module):
         self.update_func = NodeUpdateModule(in_feats, out_feats, activation)
 
     def forward(self, g, u=ALL, v=ALL, attribute=None):
-        self.update_func.set_attribute_to_update(attribute)
         if is_all(u) and is_all(v):
-            g.update_all('from_src', 'sum', self.update_func, batchable=True)
+            g.update_all(fn.copy_src(src=attribute),
+                         fn.sum(out='accum'),
+                         self.update_func,
+                         batchable=True)
         else:
-            g.update_by_edge(u, v, 'from_src', 'sum', self.update_func, batchable=True)
+            g.send_and_recv(u, v,
+                            fn.copy_src(src=attribute),
+                            fn.sum(out='accum'),
+                            self.update_func,
+                            batchable=True)
+        g.pop_n_repr('accum')
         return g
