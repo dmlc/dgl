@@ -19,10 +19,10 @@ from dgl.data.utils import download, extract_archive, get_download_dir
 np.random.seed(123)
 
 _urls = {
-    'am': 'https://www.dropbox.com/s/htisydfgwxmrx65/am_stripped.nt.gz?dl=1',
-    'aifb': 'https://www.dropbox.com/s/fkvgvkygo2gf28k/aifb_stripped.nt.gz?dl=1',
-    'mutag': 'https://www.dropbox.com/s/qy8j3p8eacvm4ir/mutag_stripped.nt.gz?dl=1',
-    'bgs': 'https://www.dropbox.com/s/uqi0k9jd56j02gh/bgs_stripped.nt.gz?dl=1',
+    'am': ['https://www.dropbox.com/s/t60huxz616x4c4o/am.tgz?dl=1', 'https://www.dropbox.com/s/htisydfgwxmrx65/am_stripped.nt.gz?dl=1'],
+    'aifb': ['https://www.dropbox.com/s/0emedu261l4la82/aifb.tgz?dl=1', 'https://www.dropbox.com/s/fkvgvkygo2gf28k/aifb_stripped.nt.gz?dl=1'],
+    'bgs': ['https://www.dropbox.com/s/5wzxsuuof185p12/bgs.tgz?dl=1', 'https://www.dropbox.com/s/uqi0k9jd56j02gh/bgs_stripped.nt.gz?dl=1'],
+    'mutag': ['https://www.dropbox.com/s/k4y1qpni83dvei1/mutag.tgz?dl=1', 'https://www.dropbox.com/s/qy8j3p8eacvm4ir/mutag_stripped.nt.gz?dl=1'],
     'entity_classify': 'https://www.dropbox.com/s/babuor115oqq2i3/rgcn_entity_classify.tgz?dl=1',
     'FB15k-237': 'https://www.dropbox.com/s/werqxn21mt19nj4/FB15k-237.tgz?dl=1',
     'FB15k': 'https://www.dropbox.com/s/zbyvjuwu1phlxb5/FB15k.tgz?dl=1',
@@ -34,12 +34,12 @@ class RGCNEntityDataset(object):
     def __init__(self, name):
         self.name = name
         self.dir = get_download_dir()
-        task_gz_path = os.path.join(self.dir, 'rgcn_entity_classify.tar.gz')
-        download(_urls['entity_classify'], task_gz_path)
-        extract_archive(task_gz_path, self.dir)
+        tgz_path = os.path.join(self.dir, '{}.tgz'.format(self.name))
+        download(_urls[self.name][0], tgz_path)
+        extract_archive(tgz_path, self.dir)
         self.dir = os.path.join(self.dir, self.name)
         graph_file_path = os.path.join(self.dir, '{}_stripped.nt.gz'.format(self.name))
-        download(_urls[self.name], path=graph_file_path)
+        download(_urls[self.name][1], path=graph_file_path) # no need to uncompress
 
     def load(self, bfs_level=2, relabel=False):
         self.num_nodes, self.edges, num_rels, relations, self.labels, labeled_nodes_idx, self.train_idx, self.test_idx, _, _, _ = _load_data(self.name, self.dir)
