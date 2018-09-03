@@ -35,7 +35,7 @@ def sort_and_rank(score, target):
     indices = indices[:, 1].view(-1)
     return indices
 
-def perturb_and_get_rank(embedding, w, a, r, b, num_entity, batch_size=128):
+def perturb_and_get_rank(embedding, w, a, r, b, num_entity, batch_size=100):
     n_batch = (num_entity + batch_size - 1) // batch_size
     ranks = []
     for idx in range(n_batch):
@@ -56,7 +56,7 @@ def perturb_and_get_rank(embedding, w, a, r, b, num_entity, batch_size=128):
 
 # return MRR (raw, filtered), and Hits @ (1, 3, 10)
 # default use CPU
-def evaluate(model, test_triplets, num_entity, hits=[], eval_bz=128):
+def evaluate(model, test_triplets, num_entity, hits=[], eval_bz=100):
     with torch.no_grad():
         embedding, w = model.evaluate()
         s = test_triplets[:, 0]

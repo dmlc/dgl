@@ -120,7 +120,7 @@ class RGCNLinkDataset(object):
 
     def build_adj(self, triplets, num_rels):
         num_rels *= 2 # add reverse
-        edge_dict = defaultdict(lambda: np.zeros(num_rels))
+        edge_dict = defaultdict(lambda: np.zeros(num_rels, dtype=np.float32))
         for s, r, o in triplets:
             edge_dict[(s, o)][2 * r] = 1
             edge_dict[(o, s)][2 * r + 1] = 1 # reverse rel

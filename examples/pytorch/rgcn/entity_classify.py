@@ -34,7 +34,7 @@ class EntityClassify(BaseRGCN):
     def build_input_layer(self):
         return RGCNLayer(len(self.g), self.h_dim, len(self.subgraphs), self.num_rels, self.num_bases, activation=F.relu, featureless=True)
 
-    def build_hidden_layer(self):
+    def build_hidden_layer(self, idx):
         return RGCNLayer(self.h_dim, self.h_dim, len(self.subgraphs), self.num_rels, self.num_bases, activation=F.relu)
 
     def build_output_layer(self):

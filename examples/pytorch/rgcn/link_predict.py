@@ -4,10 +4,10 @@ Paper: https://arxiv.org/abs/1703.06103
 Code: https://github.com/MichSchli/RelationPrediction
 
 Difference compared to tkipf/relation-gcn
-* edge directions are reversed (kipf did not transpose adj before spmv)
-* l2norm applied to all weights
 * do not report filtered metrics
 * mini-batch fashion evaluation
+* hack impl for weight basis multiply
+* sample for each graph batch?
 """
 
 import argparse
@@ -35,14 +35,16 @@ class RGCN(BaseRGCN):
         nn.init.xavier_uniform_(features, gain=nn.init.calculate_gain('relu'))
         return features
 
-    def build_hidden_layer(self):
-        return RGCNLayer(self.h_dim, self.h_dim, len(self.subgraphs), self.num_rels, self.num_bases, activation=F.relu)
+    def build_hidden_layer(self, idx):
+        act = F.relu if idx < self.num_hidden_layers - 1 else None
+        return RGCNLayer(self.h_dim, self.h_dim, len(self.subgraphs), self.num_rels, self.num_bases, activation=act, self_loop=True, dropout=self.dropout)
 
 
 class LinkPredict(nn.Module):
-    def __init__(self, g, h_dim, relations, num_bases=-1, num_hidden_layers=1, dropout=0, use_cuda=False):
+    def __init__(self, g, h_dim, relations, num_bases=-1, num_hidden_layers=1, dropout=0, use_cuda=False, reg_param=0):
         super(LinkPredict, self).__init__()
         self.rgcn = RGCN(g, h_dim, h_dim, relations, num_bases, num_hidden_layers, dropout, use_cuda)
+        self.reg_param = reg_param
         self.w_relation = nn.Parameter(torch.Tensor(relations.shape[1] // 2, h_dim))
         nn.init.xavier_uniform_(self.w_relation, gain=nn.init.calculate_gain('relu'))
 
@@ -52,14 +54,23 @@ class LinkPredict(nn.Module):
         o = embedding[triplets[:,2]]
         return torch.sum(s * r * o, dim=1)
 
-    def forward(self, triplets, training=True):
-        embedding = self.rgcn.forward()
-        return self.calc_score(embedding, triplets)
+    def forward(self):
+        return self.rgcn.forward()
 
     def evaluate(self):
         # get embedding and relation weight without grad
-        embedding = self.rgcn.forward()
+        embedding = self.forward()
         return embedding.detach(), self.w_relation.detach()
+
+    def regularization_loss(self, embedding):
+        return torch.mean(embedding.pow(2)) + torch.mean(self.w_relation.pow(2))
+
+    def get_loss(self, triplets, labels):
+        embedding = self.forward()
+        score = self.calc_score(embedding, triplets)
+        predict_loss = F.binary_cross_entropy_with_logits(score, labels)
+        reg_loss = self.regularization_loss(embedding)
+        return predict_loss + self.reg_param * reg_loss
 
 
 def main(args):
@@ -91,7 +102,8 @@ def main(args):
                         num_bases=args.n_bases,
                         num_hidden_layers=args.n_layers,
                         dropout=args.dropout,
-                        use_cuda=use_cuda)
+                        use_cuda=use_cuda,
+                        reg_param=args.regularization)
 
     valid_data = torch.LongTensor(valid_data)
     test_data = torch.LongTensor(test_data)
@@ -102,18 +114,21 @@ def main(args):
 
 
     # optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2norm)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     # training loop
     print("start training...")
     forward_time = []
     backward_time = []
-    model.train()
+
+    # load dataset
     dataset = Dataset(train_data)
+    # negative sampling fn
     collate_fn = partial(negative_sampling, num_entity=num_nodes, negative_rate=args.negative_sample)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn)
 
     for epoch in range(args.n_epochs):
+        model.train()
         print("Epoch {:03d}".format(epoch))
         for batch_idx, (data, labels) in enumerate(dataloader):
             if use_cuda:
@@ -123,20 +138,27 @@ def main(args):
                 data, labels = data.cuda(), labels.cuda()
             optimizer.zero_grad()
             t0 = time.time()
-            logits = model.forward(data, training=True)
-            loss = F.binary_cross_entropy_with_logits(logits, labels)
+            loss = model.get_loss(data, labels)
             t1 = time.time()
             loss.backward()
             t2 = time.time()
+            # clip gradients
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_norm)
             optimizer.step()
 
             forward_time.append(t1 - t0)
             backward_time.append(t2 - t1)
             print("Batch {:03d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".format(batch_idx, forward_time[-1], backward_time[-1]))
 
+        if use_cuda:
+            torch.cuda.empty_cache()
+        model.eval()
         evaluate(model, valid_data, num_nodes, hits=[1, 3, 10], eval_bz=args.eval_batch_size)
 
     print("test set:")
+    if use_cuda:
+        torch.cuda.empty_cache()
+    model.eval()
     evaluate(model, test_data, num_nodes, hits=[1, 3, 10], eval_bz=args.eval_batch_size)
 
 
@@ -152,7 +174,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='RGCN')
-    parser.add_argument("--dropout", type=float, default=0,
+    parser.add_argument("--dropout", type=float, default=0.2,
             help="dropout probability")
     parser.add_argument("--n-hidden", type=int, default=500,
             help="number of hidden units")
@@ -162,20 +184,22 @@ if __name__ == '__main__':
             help="learning rate")
     parser.add_argument("--n-bases", type=int, default=100,
             help="number of weight blocks for each relation")
-    parser.add_argument("--n-layers", type=int, default=1,
+    parser.add_argument("--n-layers", type=int, default=2,
             help="number of propagation rounds")
     parser.add_argument("-e", "--n-epochs", type=int, default=50,
             help="number of training epochs")
     parser.add_argument("-d", "--dataset", type=str, required=True,
             help="dataset to use")
-    parser.add_argument("--l2norm", type=float, default=0,
-            help="l2 norm coef")
     parser.add_argument("--negative-sample", type=int, default=10,
             help="number of negative samples per positive sample")
     parser.add_argument("--batch-size", type=int, default=30000,
             help="number of possible samples to process in a batch")
     parser.add_argument("--eval-batch-size", type=int, default=128,
             help="batch size when evaluating")
+    parser.add_argument("--regularization", type=float, default=0.01,
+            help="regularization weight")
+    parser.add_argument("--grad-norm", type=float, default=1.0,
+            help="norm to clip gradient to")
 
     args = parser.parse_args()
     print(args)

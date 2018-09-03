@@ -53,8 +53,9 @@ class BaseRGCN(nn.Module):
         if i2h is not None:
             self.layers.append(i2h)
         # h2h
-        for _ in range(self.num_hidden_layers):
-            h2h = self.build_hidden_layer()
+        for idx in range(self.num_hidden_layers):
+            h2h = self.build_hidden_layer(idx)
+            self.layers.append(h2h)
         # h2o
         h2o = self.build_output_layer()
         if h2o is not None:
@@ -75,7 +76,7 @@ class BaseRGCN(nn.Module):
     def forward(self):
         if self.features is not None:
             self.g.set_n_repr(self.features)
-        for i in range(0, len(self.layers)):
-            self.layers[i](self.g, self.subgraphs)
+        for layer in self.layers:
+            layer(self.g, self.subgraphs)
         return self.g.pop_n_repr()
 
