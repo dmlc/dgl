@@ -193,9 +193,9 @@ if __name__ == '__main__':
             help="dataset to use")
     parser.add_argument("--negative-sample", type=int, default=10,
             help="number of negative samples per positive sample")
-    parser.add_argument("--batch-size", type=int, default=30000,
+    parser.add_argument("--batch-size", type=int, default=18000,
             help="number of possible samples to process in a batch")
-    parser.add_argument("--eval-batch-size", type=int, default=128,
+    parser.add_argument("--eval-batch-size", type=int, default=100,
             help="batch size when evaluating")
     parser.add_argument("--regularization", type=float, default=0.01,
             help="regularization weight")
