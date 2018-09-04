@@ -4,10 +4,11 @@ Paper: https://arxiv.org/abs/1703.06103
 Code: https://github.com/MichSchli/RelationPrediction
 
 Difference compared to tkipf/relation-gcn
-* do not report filtered metrics
 * mini-batch fashion evaluation
 * hack impl for weight basis multiply
 * sample for each graph batch?
+* report filtered metrics (todo)
+* early stopping (todo)
 """
 
 import argparse
@@ -60,7 +61,7 @@ class LinkPredict(nn.Module):
     def evaluate(self):
         # get embedding and relation weight without grad
         embedding = self.forward()
-        return embedding.detach(), self.w_relation.detach()
+        return embedding, self.w_relation
 
     def regularization_loss(self, embedding):
         return torch.mean(embedding.pow(2)) + torch.mean(self.w_relation.pow(2))

@@ -3,7 +3,7 @@ import torch.nn as nn
 import dgl.function as fn
 
 class RGCNLayer(nn.Module):
-    def __init__(self, in_feat, out_feat, bias=None, activation=None, self_loop=None, dropout=0.0):
+    def __init__(self, in_feat, out_feat, bias=None, activation=None, self_loop=False, dropout=0.0):
         super(RGCNLayer, self).__init__()
         self.bias = bias
         self.activation = activation
@@ -38,10 +38,10 @@ class RGCNLayer(nn.Module):
         node_repr = parent.get_n_repr()
         if self.bias:
             node_repr = node_repr + self.bias
-        if self.activation:
-            node_repr = self.activation(node_repr)
         if self.self_loop:
             node_repr = node_repr + loop_message
+        if self.activation:
+            node_repr = self.activation(node_repr)
 
         parent.set_n_repr(node_repr)
 
@@ -95,11 +95,10 @@ class RGCNBasisLayer(RGCNLayer):
 
 
 class RGCNBlockLayer(RGCNLayer):
-    def __init__(self, in_feat, out_feat, num_gs, num_rels, num_bases=-1,featureless=False, bias=None, activation=None, self_loop=False, dropout=0.0):
+    def __init__(self, in_feat, out_feat, num_gs, num_rels, num_bases, bias=None, activation=None, self_loop=False, dropout=0.0):
         super(RGCNBlockLayer, self).__init__(in_feat, out_feat, bias, activation, self_loop=self_loop, dropout=dropout)
         self.num_rels = min(num_rels, num_gs)
         self.num_bases = num_bases
-        self.out_feat = out_feat
         assert self.num_bases > 0
 
         # assuming in_feat and out_feat are divisible by num_bases
@@ -107,7 +106,6 @@ class RGCNBlockLayer(RGCNLayer):
         self.submat_out = out_feat // self.num_bases
         self.weight = nn.Parameter(torch.Tensor(self.num_rels, self.num_bases * self.submat_in * self.submat_out))
         nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
-
 
     def propagate(self, parent, children):
         for idx, g in enumerate(children):
@@ -131,7 +129,7 @@ class RGCNBlockLayer(RGCNLayer):
                 for i in range(self.num_bases):
                     out.append(torch.mm(node[i], weight[i]))
                 out = torch.stack(out) # num_bases x num_nodes x submat_out
-                return out.transpose(0, 1).contiguous().view(-1, self.out_feat)
+                return out.transpose(0, 1).contiguous().view(-1, self.num_bases * self.submat_out)
 
             g.update_all(fn.src_mul_edge(), fn.sum(), node_update, batchable=True)
         # end for

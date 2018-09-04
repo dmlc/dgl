@@ -127,11 +127,15 @@ class RGCNLinkDataset(object):
 
         edges = sorted(list(edge_dict.keys()))
         edge_types = np.stack([edge_dict[e] for e in edges])
-        edge_count = np.sum(edge_types, axis=1)
         edges = np.array(edges)
+
+        # normalize edge_types for edge repr
+        # count edge type for each edge
+        edge_type_count = np.sum(edge_types, axis=1)
         src, dst = edges.transpose()
-        csr = sp.csr_matrix((edge_count, (src, dst)), shape=[self.num_nodes, self.num_nodes])
-        edge_count = np.reshape(np.asarray(csr.sum(axis=0)), (-1, 1))
+        coo = sp.coo_matrix((edge_type_count, (src, dst)), shape=[self.num_nodes, self.num_nodes])
+        # normalize per dst node
+        edge_count = np.reshape(np.asarray(coo.sum(axis=0)), (-1, 1))
         edge_values = edge_types / edge_count[dst]
         return edges, edge_values
 
@@ -145,7 +149,6 @@ def load_link(args):
     data = RGCNLinkDataset(args.dataset)
     data.load()
     return data
-
 
 
 def _sp_row_vec_from_idx_list(idx_list, dim):
