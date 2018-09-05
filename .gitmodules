@@ -1,0 +1,6 @@
+[submodule "third_party/dmlc-core"]
+	path = third_party/dmlc-core
+	url = https://github.com/dmlc/dmlc-core.git
+[submodule "third_party/dlpack"]
+	path = third_party/dlpack
+	url = https://github.com/dmlc/dlpack.git
