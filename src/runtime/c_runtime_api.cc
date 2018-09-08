@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2016 by Contributors
  * \file c_runtime_api.cc
- * \brief Device specific implementations
+ * \brief Runtime API implementation
  */
 #include <dmlc/thread_local.h>
 #include <dgl/runtime/c_runtime_api.h>
