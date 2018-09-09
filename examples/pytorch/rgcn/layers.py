@@ -102,8 +102,6 @@ class RGCNBlockLayer(RGCNLayer):
         assert self.num_bases > 0
 
         # assuming in_feat and out_feat are divisible by num_bases
-        self.submat_in = in_feat // self.num_bases
-        self.submat_out = out_feat // self.num_bases
         self.linears = nn.ModuleList()
         for _ in range(self.num_rels):
             l = nn.Conv1d(in_feat, out_feat, kernel_size=1, groups=self.num_bases, bias=False)
@@ -113,27 +111,6 @@ class RGCNBlockLayer(RGCNLayer):
     def propagate(self, parent, children):
         for idx, g in enumerate(children):
             g.copy_from(parent)
-            """
-            XXX: pytorch matmul broadcast duplicates weight tensor..., so this impl
-                 wastes more than 2GB memory
-            def node_update(node, node):
-                node = node.view(-1, self.num_bases, 1, self.submat_in)
-                weight = self.weight[idx].view(self.num_bases, self.submat_in, self.submat_out)
-                return torch.matmul(node, weight).view(-1, self.out_feat)
-
-            # (lingfan): following hack saves memory
-            def node_update(node):
-                # num_bases x num_nodes x submat_in
-                node = node.view(-1, self.num_bases, self.submat_in).transpose(0, 1)
-                # num_bases x submat_in x submat_out
-                weight = self.weight[idx].view(self.num_bases, self.submat_in, self.submat_out)
-                out = []
-                for i in range(self.num_bases):
-                    out.append(torch.mm(node[i], weight[i]))
-                out = torch.stack(out) # num_bases x num_nodes x submat_out
-                return out.transpose(0, 1).contiguous().view(-1, self.num_bases * self.submat_out)
-            """
-
             g.update_all(fn.src_mul_edge(), fn.sum(), lambda x: self.linears[idx](x.unsqueeze(2)).squeeze(), batchable=True)
         # end for
 
