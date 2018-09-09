@@ -104,8 +104,11 @@ class RGCNBlockLayer(RGCNLayer):
         # assuming in_feat and out_feat are divisible by num_bases
         self.submat_in = in_feat // self.num_bases
         self.submat_out = out_feat // self.num_bases
-        self.weight = nn.Parameter(torch.Tensor(self.num_rels, self.num_bases * self.submat_in * self.submat_out))
-        nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+        self.linears = nn.ModuleList()
+        for _ in range(self.num_rels):
+            l = nn.Conv1d(in_feat, out_feat, kernel_size=1, groups=self.num_bases, bias=False)
+            nn.init.xavier_uniform_(l.weight, gain=nn.init.calculate_gain('relu'))
+            self.linears.append(l)
 
     def propagate(self, parent, children):
         for idx, g in enumerate(children):
@@ -117,7 +120,6 @@ class RGCNBlockLayer(RGCNLayer):
                 node = node.view(-1, self.num_bases, 1, self.submat_in)
                 weight = self.weight[idx].view(self.num_bases, self.submat_in, self.submat_out)
                 return torch.matmul(node, weight).view(-1, self.out_feat)
-            """
 
             # (lingfan): following hack saves memory
             def node_update(node):
@@ -130,8 +132,9 @@ class RGCNBlockLayer(RGCNLayer):
                     out.append(torch.mm(node[i], weight[i]))
                 out = torch.stack(out) # num_bases x num_nodes x submat_out
                 return out.transpose(0, 1).contiguous().view(-1, self.num_bases * self.submat_out)
+            """
 
-            g.update_all(fn.src_mul_edge(), fn.sum(), node_update, batchable=True)
+            g.update_all(fn.src_mul_edge(), fn.sum(), lambda x: self.linears[idx](x.unsqueeze(2)).squeeze(), batchable=True)
         # end for
 
         # merge node repr

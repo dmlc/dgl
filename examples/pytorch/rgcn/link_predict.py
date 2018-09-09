@@ -128,6 +128,9 @@ def main(args):
     collate_fn = partial(negative_sampling, num_entity=num_nodes, negative_rate=args.negative_sample)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn)
 
+    best_mrr = 0
+    model_state_file = 'model_state.pth'
+
     for epoch in range(args.n_epochs):
         model.train()
         print("Epoch {:03d}".format(epoch))
@@ -154,15 +157,13 @@ def main(args):
         if use_cuda:
             torch.cuda.empty_cache()
         model.eval()
-        evaluate(model, valid_data, num_nodes, hits=[1, 3, 10], eval_bz=args.eval_batch_size)
+        mrr = evaluate(model, valid_data, num_nodes, hits=[1, 3, 10], eval_bz=args.eval_batch_size)
+        if mrr > best_mrr:
+            best_mrr = mrr
+            torch.save({'state_dict': model.state_dict(), 'epoch': epoch},
+                       model_state_file)
 
-    print("test set:")
-    if use_cuda:
-        torch.cuda.empty_cache()
-    model.eval()
-    evaluate(model, test_data, num_nodes, hits=[1, 3, 10], eval_bz=args.eval_batch_size)
-
-
+    print("training done")
     print("Mean iteration forward time: {:4f}".format(np.mean(forward_time[len(forward_time) // 4:])))
     print("Mean iteration backward time: {:4f}".format(np.mean(backward_time[len(backward_time) // 4:])))
 
@@ -171,6 +172,15 @@ def main(args):
 
     print("Mean epoch forward time: {:4f}".format(np.mean(forward_time[len(forward_time) // 4:])))
     print("Mean epoch backward time: {:4f}".format(np.mean(backward_time[len(backward_time) // 4:])))
+
+    print("\nstart testing:")
+    if use_cuda:
+        torch.cuda.empty_cache()
+    checkpoint = torch.load(model_state_file)
+    model.load_state_dict(checkpoint['state_dict'])
+    model.eval()
+    print("Using best epoch: {}".format(checkpoint['epoch']))
+    evaluate(model, test_data, num_nodes, hits=[1, 3, 10], eval_bz=args.eval_batch_size)
 
 
 if __name__ == '__main__':
@@ -193,7 +203,7 @@ if __name__ == '__main__':
             help="dataset to use")
     parser.add_argument("--negative-sample", type=int, default=10,
             help="number of negative samples per positive sample")
-    parser.add_argument("--batch-size", type=int, default=18000,
+    parser.add_argument("--batch-size", type=int, default=21000,
             help="number of possible samples to process in a batch")
     parser.add_argument("--eval-batch-size", type=int, default=100,
             help="batch size when evaluating")

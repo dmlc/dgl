@@ -76,4 +76,5 @@ def evaluate(model, test_triplets, num_entity, hits=[], eval_bz=100):
         for hit in hits:
             avg_count = torch.mean((ranks <= hit).float())
             print("Hits (raw) @ {}: {:.6f}".format(hit, avg_count.item()))
+    return mrr.item()
 
