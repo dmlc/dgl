@@ -61,6 +61,7 @@ class BaseRGCN(nn.Module):
         if h2o is not None:
             self.layers.append(h2o)
 
+    # initialize feature for each node
     def create_features(self):
         raise NotImplementedError
 

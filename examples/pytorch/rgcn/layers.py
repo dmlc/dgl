@@ -23,6 +23,7 @@ class RGCNLayer(nn.Module):
         else:
             self.dropout = None
 
+    # define how propagation for each children is done and merged back to parent
     def propagate(self, parent, children):
         raise NotImplementedError
 
@@ -101,7 +102,7 @@ class RGCNBlockLayer(RGCNLayer):
         self.num_bases = num_bases
         assert self.num_bases > 0
 
-        # assuming in_feat and out_feat are divisible by num_bases
+        # use graph convolution to implement block decomposition model, assuming in_feat and out_feat are divisible by num_bases
         self.linears = nn.ModuleList()
         for _ in range(self.num_rels):
             l = nn.Conv1d(in_feat, out_feat, kernel_size=1, groups=self.num_bases, bias=False)
@@ -112,7 +113,6 @@ class RGCNBlockLayer(RGCNLayer):
         for idx, g in enumerate(children):
             g.copy_from(parent)
             g.update_all(fn.src_mul_edge(), fn.sum(), lambda x: self.linears[idx](x.unsqueeze(2)).squeeze(), batchable=True)
-        # end for
 
         # merge node repr
         parent.merge(children, node_reduce_func='sum', edge_reduce_func=None)

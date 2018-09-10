@@ -8,7 +8,7 @@ Difference compared to tkipf/relation-gcn
 * hack impl for weight basis multiply
 * sample for each graph batch?
 * report filtered metrics (todo)
-* early stopping (todo)
+* early stopping (by save model with best validation mrr)
 """
 
 import argparse
@@ -158,6 +158,7 @@ def main(args):
             torch.cuda.empty_cache()
         model.eval()
         mrr = evaluate(model, valid_data, num_nodes, hits=[1, 3, 10], eval_bz=args.eval_batch_size)
+        # save best model
         if mrr > best_mrr:
             best_mrr = mrr
             torch.save({'state_dict': model.state_dict(), 'epoch': epoch},
@@ -176,6 +177,7 @@ def main(args):
     print("\nstart testing:")
     if use_cuda:
         torch.cuda.empty_cache()
+    # use best model checkpoint
     checkpoint = torch.load(model_state_file)
     model.load_state_dict(checkpoint['state_dict'])
     model.eval()
