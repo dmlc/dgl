@@ -34,7 +34,7 @@ class Index(object):
             try:
                 self._list_data = [int(data)]
             except:
-                raise TypeError('Error index data: %s' % str(x))
+                raise TypeError('Error index data: %s' % str(data))
 
     def tolist(self):
         if self._list_data is None:
