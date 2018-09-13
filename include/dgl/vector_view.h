@@ -15,10 +15,42 @@ namespace dgl {
  */
 template<typename ValueType>
 class vector_view {
-  struct vector_view_iterator;
-
  public:
-  typedef vector_view_iterator iterator;
+  /*! \brief iterator class */
+  class iterator : public std::iterator<std::forward_iterator_tag, ValueType> {
+   public:
+    /*! \brief iterator constructor */
+    iterator(const vector_view<ValueType>* vec, size_t pos): vec_(vec), pos_(pos) {}
+    /*! \brief move to next */
+    iterator& operator++() {
+      ++pos_;
+      return *this;
+    }
+    /*! \brief move to next */
+    iterator operator++(int) {
+      iterator retval = *this;
+      ++(*this);
+      return retval;
+    }
+    /*! \brief equal operator */
+    bool operator==(iterator other) const {
+      return vec_ == other.vec_ and pos_ == other.pos_;
+    }
+    /*! \brief not equal operator */
+    bool operator!=(iterator other) const {
+      return !(*this == other);
+    }
+    /*! \brief dereference operator */
+    const ValueType& operator*() const {
+      return (*vec_)[pos_];
+    }
+   private:
+    /*! \brief vector_view pointer */
+    const vector_view<ValueType>* vec_;
+    /*! \brief current position */
+    size_t pos_;
+  };
+
   /*! \brief Default constructor. Create an empty vector. */
   vector_view()
     : data_(std::make_shared<std::vector<ValueType> >()) {}
@@ -28,7 +60,7 @@ class vector_view {
     : data_(vec.data_), index_(index), is_view_(true) {}
 
   /*! \brief constructor from a vector pointer */
-  vector_view(const std::shared_ptr<std::vector<ValueType> >& other)
+  explicit vector_view(const std::shared_ptr<std::vector<ValueType> >& other)
     : data_(other) {}
 
   /*! \brief default copy constructor */
@@ -53,7 +85,7 @@ class vector_view {
   ~vector_view() = default;
 
   /*! \brief default assign constructor */
-  vector_view& operator=(const vector_view<ValueType>& other) = default;
+  vector_view<ValueType>& operator=(const vector_view<ValueType>& other) = default;
 
   /*! \return the size of the vector */
   size_t size() const {
@@ -87,11 +119,15 @@ class vector_view {
     }
   }
 
-  // TODO(minjie)
-  iterator begin() const;
+  /*! \return an iterator pointing at the first element */
+  iterator begin() const {
+    return iterator(this, 0);
+  }
 
-  // TODO(minjie)
-  iterator end() const;
+  /*! \return an iterator pointing at the last element */
+  iterator end() const {
+    return iterator(this, size());
+  }
 
   // Modifiers
   // NOTE: The modifiers are not allowed for view.
@@ -112,10 +148,17 @@ class vector_view {
     data_ = std::make_shared<std::vector<ValueType> >();
   }
 
- private:
-  struct vector_view_iterator {
-    // TODO
-  };
+  /*! \brief Resize the vector */
+  void resize(size_t size) {
+    CHECK(!is_view_);
+    data_->resize(size);
+  }
+
+  /*! \brief Resize the vector with init value */
+  void resize(size_t size, const ValueType& val) {
+    CHECK(!is_view_);
+    data_->resize(size, val);
+  }
 
  private:
   /*! \brief pointer to the underlying vector data */
