@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import numpy as np
 import mxnet as mx
+import mxnet.ndarray as F
 import scipy.sparse
 import dgl.context as context
 
@@ -22,17 +23,17 @@ int64 = 'int64'
 # Operators
 tensor = mx.nd.array
 #sparse_tensor = th.sparse.FloatTensor
-sum = mx.nd.sum
-max = mx.nd.max
+sum = F.sum
+max = F.max
 
 def astype(a, ty):
-    return mx.nd.cast(a, ty)
+    return F.cast(a, ty)
 
 def asnumpy(a):
     return a.asnumpy()
 
 def pack(tensors):
-    return mx.nd.concat(*tensors, dim=0)
+    return F.concat(*tensors, dim=0)
 
 #def unpack(x, indices_or_sections=1):
 #    return th.split(x, indices_or_sections)
@@ -55,22 +56,22 @@ def gather_row(data, row_index):
 #def broadcast_to(x, to_array):
 #    return x + th.zeros_like(to_array)
 
-squeeze = mx.nd.squeeze
+squeeze = F.squeeze
 #unsqueeze = th.unsqueeze
 # TODO this doesn't exist for symbol.
-reshape = mx.nd.reshape
-ones = mx.nd.ones
-zeros = mx.nd.zeros
-arange = mx.nd.arange
+reshape = F.reshape
+ones = F.ones
+zeros = F.zeros
+arange = F.arange
 
 def sort(x, dim=None, descending=False):
     if dim is None:
         dim = -1
     ascend = not descending
     # TODO this isn't an ideal implementation.
-    val = mx.nd.sort(x, axis=dim, is_ascend=ascend)
-    idx = mx.nd.argsort(x, axis=dim, is_ascend=ascend)
-    idx = mx.nd.cast(idx, dtype='int32')
+    val = F.sort(x, axis=dim, is_ascend=ascend)
+    idx = F.argsort(x, axis=dim, is_ascend=ascend)
+    idx = F.cast(idx, dtype='int32')
     return val, idx
 
 def to_context(x, ctx):
