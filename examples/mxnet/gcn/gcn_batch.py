@@ -92,7 +92,7 @@ def main(args):
     model.initialize(ctx=ctx)
 
     # use optimizer
-    trainer = gluon.Trainer(model.collect_params(), 'sgd', {'learning_rate': args.lr})
+    trainer = gluon.Trainer(model.collect_params(), 'adam', {'learning_rate': args.lr})
 
     # initialize graph
     dur = []
@@ -102,7 +102,7 @@ def main(args):
         # forward
         with mx.autograd.record():
             logits = model(features)
-            loss = mx.nd.softmax_cross_entropy(logits[mask], labels[mask])
+            loss = mx.nd.softmax_cross_entropy(logits, labels)
 
         #optimizer.zero_grad()
         loss.backward()
