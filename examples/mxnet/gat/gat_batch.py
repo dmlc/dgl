@@ -174,7 +174,7 @@ def main(args):
     model.initialize()
 
     # use optimizer
-    trainer = gluon.Trainer(model.collect_params(), 'sgd', {'learning_rate': args.lr})
+    trainer = gluon.Trainer(model.collect_params(), 'adam', {'learning_rate': args.lr})
 
     # initialize graph
     dur = []
