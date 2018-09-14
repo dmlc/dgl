@@ -72,12 +72,13 @@ def main(args):
 
     if args.gpu <= 0:
         cuda = False
+        ctx = mx.cpu(0)
     else:
         cuda = True
-        torch.cuda.set_device(args.gpu)
-        features = features.cuda()
-        labels = labels.cuda()
-        mask = mask.cuda()
+        features = features.as_in_context(mx.gpu(0))
+        labels = labels.as_in_context(mx.gpu(0))
+        mask = mask.as_in_context(mx.gpu(0))
+        ctx = mx.gpu(0)
 
     # create GCN model
     g = DGLGraph(data.graph)
@@ -88,10 +89,7 @@ def main(args):
                 args.n_layers,
                 'relu',
                 args.dropout)
-    model.initialize()
-
-    if cuda:
-        model.cuda()
+    model.initialize(ctx=ctx)
 
     # use optimizer
     trainer = gluon.Trainer(model.collect_params(), 'sgd', {'learning_rate': args.lr})
