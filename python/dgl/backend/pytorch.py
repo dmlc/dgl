@@ -4,7 +4,7 @@ import torch as th
 
 from .._ffi.runtime_ctypes import TVMType, TVMContext, TVMArray
 from .._ffi.runtime_ctypes import TypeCode, tvm_shape_index_t
-from ..context as cpu, gpu
+from ..context import cpu, gpu
 
 # Tensor types
 Tensor = th.Tensor

@@ -2,11 +2,12 @@
 from __future__ import absolute_import
 
 import networkx as nx
-import dgl.backend as F
-from dgl.frame import Frame, FrameRef
-from dgl.graph import DGLGraph
-from dgl.nx_adapt import nx_init
-import dgl.utils as utils
+
+from . import backend as F
+from .frame import Frame, FrameRef
+from .graph import DGLGraph
+from .nx_adapt import nx_init
+from . import utils
 
 class DGLSubGraph(DGLGraph):
     # TODO(gaiyu): ReadOnlyGraph

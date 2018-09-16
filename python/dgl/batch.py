@@ -3,9 +3,8 @@ from __future__ import absolute_import
 
 import numpy as np
 
-from dgl.graph import DGLGraph
-import dgl.backend as F
-import dgl
+from .graph import DGLGraph
+from . import backend as F
 
 class BatchedDGLGraph(DGLGraph):
     def __init__(self, graph_list, node_attrs=None, edge_attrs=None, **attr):

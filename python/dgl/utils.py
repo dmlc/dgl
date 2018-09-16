@@ -5,8 +5,8 @@ from collections import Mapping
 from functools import wraps
 import numpy as np
 
-import dgl.backend as F
-from dgl.backend import Tensor, SparseTensor
+from . import backend as F
+from .backend import Tensor, SparseTensor
 
 def is_id_tensor(u):
     """Return whether the input is a supported id tensor."""

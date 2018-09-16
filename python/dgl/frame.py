@@ -4,9 +4,9 @@ from __future__ import absolute_import
 from collections import MutableMapping
 import numpy as np
 
-import dgl.backend as F
-from dgl.backend import Tensor
-import dgl.utils as utils
+from . import backend as F
+from .backend import Tensor
+from . import utils
 
 class Frame(MutableMapping):
     def __init__(self, data=None):

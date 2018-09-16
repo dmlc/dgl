@@ -6,15 +6,15 @@ import networkx as nx
 from networkx.classes.digraph import DiGraph
 
 import dgl
-from dgl.base import ALL, is_all, __MSG__, __REPR__
-import dgl.backend as F
-from dgl.backend import Tensor
-from dgl.cached_graph import CachedGraph, create_cached_graph
-import dgl.context as context
-from dgl.frame import FrameRef, merge_frames
-from dgl.nx_adapt import nx_init
-import dgl.scheduler as scheduler
-import dgl.utils as utils
+from .base import ALL, is_all, __MSG__, __REPR__
+from . import backend as F
+from .backend import Tensor
+from .cached_graph import CachedGraph, create_cached_graph
+from . import context
+from .frame import FrameRef, merge_frames
+from .nx_adapt import nx_init
+from . import scheduler
+from . import utils
 
 class DGLGraph(DiGraph):
     """Base graph class specialized for neural networks on graphs.

@@ -10,9 +10,9 @@ from nltk.tree import Tree
 from nltk.corpus.reader import BracketParseCorpusReader
 import networkx as nx
 
-import dgl
-import dgl.backend as F
-from dgl.data.utils import download, extract_archive, get_download_dir
+from .. import backend as F
+from ..graph import DGLGraph
+from .utils import download, extract_archive, get_download_dir
 
 _urls = {
     'sst' : 'https://www.dropbox.com/s/dw8kr2vuq7k4dqi/sst.zip?dl=1',

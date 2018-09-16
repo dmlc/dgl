@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
 from ._ffi.function import _init_api
-import .backend as F
+from . import backend as F
 
 class DGLGraph(object):
     def __init__(self):

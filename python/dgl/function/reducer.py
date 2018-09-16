@@ -1,7 +1,7 @@
 """Built-in reducer function."""
 from __future__ import absolute_import
 
-import dgl.backend as F
+from .. import backend as F
 
 __all__ = ["ReduceFunction", "sum", "max"]
 

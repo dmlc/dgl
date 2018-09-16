@@ -4,9 +4,9 @@ from __future__ import absolute_import
 import networkx as nx
 import numpy as np
 
-import dgl.backend as F
-from dgl.graph import DGLGraph
-from dgl.frame import FrameRef
+from .. import backend as F
+from ..graph import DGLGraph
+from ..frame import FrameRef
 
 def line_graph(G, no_backtracking=False):
     """Create the line graph that shares the underlying features.

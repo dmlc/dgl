@@ -3,10 +3,10 @@ from __future__ import absolute_import
 
 import numpy as np
 
-import dgl.backend as F
-import dgl.function.message as fmsg
-import dgl.function.reducer as fred
-import dgl.utils as utils
+from . import backend as F
+from .function import message as fmsg
+from .function import reducer as fred
+from . import utils
 
 __all__ = ["degree_bucketing", "get_executor"]
 
