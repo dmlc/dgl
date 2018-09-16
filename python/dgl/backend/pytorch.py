@@ -1,8 +1,10 @@
 from __future__ import absolute_import
 
 import torch as th
-import scipy.sparse
-import dgl.context as context
+
+from .._ffi.runtime_ctypes import TVMType, TVMContext, TVMArray
+from .._ffi.runtime_ctypes import TypeCode, tvm_shape_index_t
+from ..context as cpu, gpu
 
 # Tensor types
 Tensor = th.Tensor
@@ -78,6 +80,18 @@ def to_context(x, ctx):
 
 def get_context(x):
     if x.device.type == 'cpu':
-        return context.cpu()
+        return cpu()
     else:
-        return context.gpu(x.device.index)
+        return gpu(x.device.index)
+
+def asdglarray(arr):
+    assert arr.is_contiguous()
+    rst = TVMArray()
+    rst.data = arr.data_ptr()
+    rst.shape = c_array(tvm_shape_index_t, arr.shape)
+    rst.strides = None
+    # TODO: dtype
+    rst.dtype = TVMType(arr.dtype)
+    rst.ndim = arr.ndimension()
+    # TODO: ctx
+    return rst

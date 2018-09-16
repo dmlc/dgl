@@ -29,7 +29,7 @@ except IMPORT_EXCEPT:
 FunctionHandle = ctypes.c_void_p
 
 class Function(_FunctionBase):
-    """The PackedFunc object used in TVM.
+    """The PackedFunc object.
 
     Function plays an key role to bridge front and backend in TVM.
     Function provide a type-erased interface, you can call function with positional arguments.
@@ -275,7 +275,7 @@ def _init_api(namespace, target_module_name=None):
     """
     target_module_name = (
         target_module_name if target_module_name else namespace)
-    if namespace.startswith("tvm."):
+    if namespace.startswith("dgl."):
         _init_api_prefix(target_module_name, namespace[4:])
     else:
         _init_api_prefix(target_module_name, namespace)
@@ -288,7 +288,7 @@ def _init_api_prefix(module_name, prefix):
         if prefix == "api":
             fname = name
             if name.startswith("_"):
-                target_module = sys.modules["tvm._api_internal"]
+                target_module = sys.modules["dgl._api_internal"]
             else:
                 target_module = module
         else:
@@ -302,7 +302,7 @@ def _init_api_prefix(module_name, prefix):
         f = get_global_func(name)
         ff = _get_api(f)
         ff.__name__ = fname
-        ff.__doc__ = ("TVM PackedFunc %s. " % fname)
+        ff.__doc__ = ("DGL PackedFunc %s. " % fname)
         setattr(target_module, ff.__name__, ff)
 
 _set_class_function(Function)

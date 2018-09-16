@@ -118,9 +118,10 @@ def _make_tvm_args(args, temp_args):
         elif isinstance(arg, string_types):
             values[i].v_str = c_str(arg)
             type_codes[i] = TypeCode.STR
-        elif isinstance(arg, _CLASS_MODULE):
-            values[i].v_handle = arg.handle
-            type_codes[i] = TypeCode.MODULE_HANDLE
+        # NOTE(minjie): module is not used in DGL
+        #elif isinstance(arg, _CLASS_MODULE):
+        #    values[i].v_handle = arg.handle
+        #    type_codes[i] = TypeCode.MODULE_HANDLE
         elif isinstance(arg, FunctionBase):
             values[i].v_handle = arg.handle
             type_codes[i] = TypeCode.FUNC_HANDLE

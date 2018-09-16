@@ -58,7 +58,7 @@ BoolArray Graph::HasVertices(IdArray vids) const {
   BoolArray rst = BoolArray::Empty({len}, vids->dtype, vids->ctx);
   const int64_t* vid_data = static_cast<int64_t*>(vids->data);
   int64_t* rst_data = static_cast<int64_t*>(rst->data);
-  const uint64_t nverts = NumVertices();
+  const int64_t nverts = NumVertices();
   for (int64_t i = 0; i < len; ++i) {
     rst_data[i] = (vid_data[i] < nverts)? 1 : 0;
   }

@@ -103,7 +103,7 @@ class vector_view {
    */
   ValueType& operator[](size_t i) {
     CHECK(!is_view_);
-    return data_[i];
+    return (*data_)[i];
   }
 
   /*!
@@ -113,9 +113,9 @@ class vector_view {
    */
   const ValueType& operator[](size_t i) const {
     if (is_view_) {
-      return data_[index_[i]];
+      return (*data_)[index_[i]];
     } else {
-      return data_[i];
+      return (*data_)[i];
     }
   }
 
