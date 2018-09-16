@@ -218,6 +218,9 @@ class TVMContext(ctypes.Structure):
         return "%s(%d)" % (
             TVMContext.MASK2STR[self.device_type], self.device_id)
 
+    def __hash__(self):
+        return hash((self.device_type, self.device_id))
+
 
 class TVMArray(ctypes.Structure):
     """TVMValue in C API"""

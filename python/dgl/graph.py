@@ -10,7 +10,6 @@ from .base import ALL, is_all, __MSG__, __REPR__
 from . import backend as F
 from .backend import Tensor
 from .cached_graph import CachedGraph, create_cached_graph
-from . import context
 from .frame import FrameRef, merge_frames
 from .nx_adapt import nx_init
 from . import scheduler

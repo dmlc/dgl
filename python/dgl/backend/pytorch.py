@@ -4,7 +4,6 @@ import torch as th
 
 from .._ffi.runtime_ctypes import TVMType, TVMContext, TVMArray
 from .._ffi.runtime_ctypes import TypeCode, tvm_shape_index_t
-from ..context import cpu, gpu
 
 # Tensor types
 Tensor = th.Tensor
@@ -67,22 +66,23 @@ sort = th.sort
 arange = th.arange
 mul = th.mul
 
-def to_context(x, ctx):
+def to_context(arr, ctx):
     if ctx is None:
-        return x
-    elif ctx.device == 'gpu':
+        return arr
+    elif ctx.device_type == TVMContext.STR2MASK['cuda']:
         th.cuda.set_device(ctx.device_id)
-        return x.cuda()
-    elif ctx.device == 'cpu':
-        return x.cpu()
+        return arr.cuda()
+    elif ctx.device_type == TVMContext.STR2MASK['cpu']:
+        return arr.cpu()
     else:
         raise RuntimeError('Invalid context', ctx)
 
-def get_context(x):
-    if x.device.type == 'cpu':
-        return cpu()
+def get_context(arr):
+    if arr.device.type == 'cpu':
+        return TVMContext(TVMContext.STR2MASK['cpu'], 0)
     else:
-        return gpu(x.device.index)
+        return TVMContext(
+                TVMContext.STR2MASK[arr.device.type], arr.device.index)
 
 def asdglarray(arr):
     assert arr.is_contiguous()
