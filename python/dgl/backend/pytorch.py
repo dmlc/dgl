@@ -1,9 +1,12 @@
 from __future__ import absolute_import
 
+import ctypes
 import torch as th
 
+from .._ffi.base import _LIB, check_call, c_array
 from .._ffi.runtime_ctypes import TVMType, TVMContext, TVMArray
 from .._ffi.runtime_ctypes import TypeCode, tvm_shape_index_t
+from .. import ndarray as nd
 
 # Tensor types
 Tensor = th.Tensor
@@ -84,14 +87,31 @@ def get_context(arr):
         return TVMContext(
                 TVMContext.STR2MASK[arr.device.type], arr.device.index)
 
+def _typestr(arr_dtype):
+    if arr_dtype in (th.float16, th.half):
+        return 'float16'
+    elif arr_dtype in (th.float32, th.float):
+        return 'float32'
+    elif arr_dtype in (th.float64, th.double):
+        return 'float64'
+    elif arr_dtype in (th.int16, th.short):
+        return 'int16'
+    elif arr_dtype in (th.int32, th.int):
+        return 'int32'
+    elif arr_dtype in (th.int64, th.long):
+        return 'int64'
+    elif arr_dtype == th.int8:
+        return 'int8'
+    elif arr_dtype == th.uint8:
+        return 'uint8'
+    else:
+        raise RuntimeError('Unsupported data type:', arr_dtype)
+
 def asdglarray(arr):
+    """The data is copied to the new array."""
     assert arr.is_contiguous()
-    rst = TVMArray()
-    rst.data = arr.data_ptr()
-    rst.shape = c_array(tvm_shape_index_t, arr.shape)
-    rst.strides = None
-    # TODO: dtype
-    rst.dtype = TVMType(arr.dtype)
-    rst.ndim = arr.ndimension()
-    # TODO: ctx
+    rst = nd.empty(tuple(arr.shape), _typestr(arr.dtype), get_context(arr))
+    data = ctypes.cast(arr.data_ptr(), ctypes.c_void_p)
+    nbytes = ctypes.c_size_t(arr.numel() * arr.element_size())
+    check_call(_LIB.TVMArrayCopyFromBytes(rst.handle, data, nbytes))
     return rst
