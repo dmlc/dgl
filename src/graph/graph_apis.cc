@@ -8,74 +8,222 @@ using tvm::runtime::TVMRetValue;
 using tvm::runtime::PackedFunc;
 
 namespace dgl {
+namespace {
 
+template<typename T1, typename T2>
+PackedFunc ConvertPairToPackedFunc(const std::pair<T1, T2>& pair) {
+  auto body = [pair] (TVMArgs args, TVMRetValue* rv) {
+      int which = args[0];
+      *rv = which? pair.second : pair.first;
+    };
+  return PackedFunc(body);
+}
+
+}  // namespace
+
+// Graph handler type
 typedef void* GraphHandle;
 
-void DGLGraphCreate(TVMArgs args, TVMRetValue* rv) {
-  GraphHandle ghandle = new Graph();
-  *rv = ghandle;
-}
-
 TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphCreate")
-.set_body(DGLGraphCreate);
-
-void DGLGraphFree(TVMArgs args, TVMRetValue* rv) {
-  GraphHandle ghandle = args[0];
-  Graph* gptr = static_cast<Graph*>(ghandle);
-  delete gptr;
-}
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = new Graph();
+    *rv = ghandle;
+  });
 
 TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphFree")
-.set_body(DGLGraphFree);
-
-void DGLGraphAddVertices(TVMArgs args, TVMRetValue* rv) {
-  GraphHandle ghandle = args[0];
-  Graph* gptr = static_cast<Graph*>(ghandle);
-  uint64_t num_vertices = args[1];
-  gptr->AddVertices(num_vertices);
-}
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    Graph* gptr = static_cast<Graph*>(ghandle);
+    delete gptr;
+  });
 
 TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphAddVertices")
-.set_body(DGLGraphAddVertices);
-
-void DGLGraphAddEdge(TVMArgs args, TVMRetValue* rv) {
-  GraphHandle ghandle = args[0];
-  Graph* gptr = static_cast<Graph*>(ghandle);
-  const dgl_id_t src = args[1];
-  const dgl_id_t dst = args[2];
-  gptr->AddEdge(src, dst);
-}
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    Graph* gptr = static_cast<Graph*>(ghandle);
+    uint64_t num_vertices = args[1];
+    gptr->AddVertices(num_vertices);
+  });
 
 TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphAddEdge")
-.set_body(DGLGraphAddEdge);
-
-void DGLGraphAddEdges(TVMArgs args, TVMRetValue* rv) {
-  GraphHandle ghandle = args[0];
-  Graph* gptr = static_cast<Graph*>(ghandle);
-  const IdArray src = args[1];
-  const IdArray dst = args[2];
-  gptr->AddEdges(src, dst);
-}
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    Graph* gptr = static_cast<Graph*>(ghandle);
+    const dgl_id_t src = args[1];
+    const dgl_id_t dst = args[2];
+    gptr->AddEdge(src, dst);
+  });
 
 TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphAddEdges")
-.set_body(DGLGraphAddEdges);
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    Graph* gptr = static_cast<Graph*>(ghandle);
+    const IdArray src = args[1];
+    const IdArray dst = args[2];
+    gptr->AddEdges(src, dst);
+  });
 
-void DGLGraphNumVertices(TVMArgs args, TVMRetValue* rv) {
-  GraphHandle ghandle = args[0];
-  const Graph* gptr = static_cast<Graph*>(ghandle);
-  *rv = static_cast<int64_t>(gptr->NumVertices());
-}
+TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphClear")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    Graph* gptr = static_cast<Graph*>(ghandle);
+    gptr->Clear();
+  });
 
 TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphNumVertices")
-.set_body(DGLGraphNumVertices);
-
-void DGLGraphNumEdges(TVMArgs args, TVMRetValue* rv) {
-  GraphHandle ghandle = args[0];
-  const Graph* gptr = static_cast<Graph*>(ghandle);
-  *rv = static_cast<int64_t>(gptr->NumEdges());
-}
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    *rv = static_cast<int64_t>(gptr->NumVertices());
+  });
 
 TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphNumEdges")
-.set_body(DGLGraphNumEdges);
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    *rv = static_cast<int64_t>(gptr->NumEdges());
+  });
+
+TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphHasVertex")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const dgl_id_t vid = args[1];
+    *rv = gptr->HasVertex(vid);
+  });
+
+TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphHasVertices")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const IdArray vids = args[1];
+    *rv = gptr->HasVertices(vids);
+  });
+
+TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphHasEdge")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const dgl_id_t src = args[1];
+    const dgl_id_t dst = args[2];
+    *rv = gptr->HasEdge(src, dst);
+  });
+
+TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphHasEdges")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const IdArray src = args[1];
+    const IdArray dst = args[2];
+    *rv = gptr->HasEdges(src, dst);
+  });
+
+TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphPredecessors")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const dgl_id_t vid = args[1];
+    const uint64_t radius = args[2];
+    *rv = gptr->Predecessors(vid, radius);
+  });
+
+TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphSuccessors")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const dgl_id_t vid = args[1];
+    const uint64_t radius = args[2];
+    *rv = gptr->Successors(vid, radius);
+  });
+
+TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphEdgeId")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const dgl_id_t src = args[1];
+    const dgl_id_t dst = args[2];
+    *rv = static_cast<int64_t>(gptr->EdgeId(src, dst));
+  });
+
+TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphEdgeIds")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const IdArray src = args[1];
+    const IdArray dst = args[2];
+    *rv = gptr->EdgeIds(src, dst);
+  });
+
+TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphInEdges_1")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const dgl_id_t vid = args[1];
+    *rv = ConvertPairToPackedFunc(gptr->InEdges(vid));
+  });
+
+TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphInEdges_2")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const IdArray vids = args[1];
+    *rv = ConvertPairToPackedFunc(gptr->InEdges(vids));
+  });
+
+TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphOutEdges_1")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const dgl_id_t vid = args[1];
+    *rv = ConvertPairToPackedFunc(gptr->OutEdges(vid));
+  });
+
+TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphOutEdges_2")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const IdArray vids = args[1];
+    *rv = ConvertPairToPackedFunc(gptr->OutEdges(vids));
+  });
+
+TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphEdges")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const bool sorted = args[1];
+    *rv = ConvertPairToPackedFunc(gptr->Edges(sorted));
+  });
+
+TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphInDegree")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const dgl_id_t vid = args[1];
+    *rv = static_cast<int64_t>(gptr->InDegree(vid));
+  });
+
+TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphInDegrees")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const IdArray vids = args[1];
+    *rv = gptr->InDegrees(vids);
+  });
+
+TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphOutDegree")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const dgl_id_t vid = args[1];
+    *rv = static_cast<int64_t>(gptr->OutDegree(vid));
+  });
+
+TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphOutDegrees")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const IdArray vids = args[1];
+    *rv = gptr->OutDegrees(vids);
+  });
 
 }  // namespace dgl

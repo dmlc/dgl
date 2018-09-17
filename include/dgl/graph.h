@@ -115,16 +115,18 @@ class Graph {
   /*!
    * \brief Find the predecessors of a vertex.
    * \param vid The vertex id.
+   * \param radius The radius of the neighborhood. Default is immediate neighbor (radius=1).
    * \return the predecessor id array.
    */
-  IdArray Predecessors(dgl_id_t vid) const;
+  IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const;
 
   /*!
    * \brief Find the successors of a vertex.
    * \param vid The vertex id.
+   * \param radius The radius of the neighborhood. Default is immediate neighbor (radius=1).
    * \return the successor id array.
    */
-  IdArray Successors(dgl_id_t vid) const;
+  IdArray Successors(dgl_id_t vid, uint64_t radius = 1) const;
 
   /*!
    * \brief Get the id of the given edge.
@@ -176,9 +178,10 @@ class Graph {
 
   /*!
    * \brief Get all the edges in the graph.
+   * \param sorted Whether the returned edge list is sorted by their edge ids.
    * \return the id arrays of the two endpoints of the edges.
    */
-  std::pair<IdArray, IdArray> Edges() const;
+  std::pair<IdArray, IdArray> Edges(bool sorted = false) const;
 
   /*!
    * \brief Get the in degree of the given vertex.

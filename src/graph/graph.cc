@@ -104,8 +104,9 @@ BoolArray Graph::HasEdges(IdArray src_ids, IdArray dst_ids) const {
 }
 
 // The data is copy-out; support zero-copy?
-IdArray Graph::Predecessors(dgl_id_t vid) const {
+IdArray Graph::Predecessors(dgl_id_t vid, uint64_t radius) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
+  CHECK(radius >= 1) << "invalid radius: " << radius;
   const auto& pred = adjlist_[vid].pred;
   const int64_t len = pred.size();
   IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
@@ -117,8 +118,9 @@ IdArray Graph::Predecessors(dgl_id_t vid) const {
 }
 
 // The data is copy-out; support zero-copy?
-IdArray Graph::Successors(dgl_id_t vid) const {
+IdArray Graph::Successors(dgl_id_t vid, uint64_t radius) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
+  CHECK(radius >= 1) << "invalid radius: " << radius;
   const auto& succ = adjlist_[vid].succ;
   const int64_t len = succ.size();
   IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
@@ -241,31 +243,43 @@ std::pair<IdArray, IdArray> Graph::OutEdges(IdArray vids) const {
   return std::make_pair(src, dst);
 }
 
-// O(E*log(E)) due to sorting
-std::pair<IdArray, IdArray> Graph::Edges() const {
+// O(E*log(E)) if sort is required; otherwise, O(E)
+std::pair<IdArray, IdArray> Graph::Edges(bool sorted) const {
   const int64_t len = num_edges_;
-  typedef std::tuple<int64_t, int64_t, int64_t> Tuple;
-  std::vector<Tuple> tuples;
-  tuples.reserve(len);
-  for (dgl_id_t u = 0; u < NumVertices(); ++u) {
-    for (size_t i = 0; i < adjlist_[u].succ.size(); ++i) {
-      tuples.push_back(std::make_tuple(u, adjlist_[u].succ[i], adjlist_[u].edge_id[i]));
-    }
-  }
-  // sort according to edge ids
-  std::sort(tuples.begin(), tuples.end(),
-      [] (const Tuple& t1, const Tuple& t2) {
-        return std::get<2>(t1) < std::get<2>(t2);
-      });
-  
-  // make return arrays
   IdArray src = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   IdArray dst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  int64_t* src_ptr = static_cast<int64_t*>(src->data);
-  int64_t* dst_ptr = static_cast<int64_t*>(dst->data);
-  for (int64_t i = 0; i < len; ++i) {
-    src_ptr[i] = std::get<0>(tuples[i]);
-    dst_ptr[i] = std::get<1>(tuples[i]);
+
+  if (sorted) {
+    typedef std::tuple<int64_t, int64_t, int64_t> Tuple;
+    std::vector<Tuple> tuples;
+    tuples.reserve(len);
+    for (dgl_id_t u = 0; u < NumVertices(); ++u) {
+      for (size_t i = 0; i < adjlist_[u].succ.size(); ++i) {
+        tuples.push_back(std::make_tuple(u, adjlist_[u].succ[i], adjlist_[u].edge_id[i]));
+      }
+    }
+    // sort according to edge ids
+    std::sort(tuples.begin(), tuples.end(),
+        [] (const Tuple& t1, const Tuple& t2) {
+          return std::get<2>(t1) < std::get<2>(t2);
+        });
+    
+    // make return arrays
+    int64_t* src_ptr = static_cast<int64_t*>(src->data);
+    int64_t* dst_ptr = static_cast<int64_t*>(dst->data);
+    for (int64_t i = 0; i < len; ++i) {
+      src_ptr[i] = std::get<0>(tuples[i]);
+      dst_ptr[i] = std::get<1>(tuples[i]);
+    }
+  } else {
+    int64_t* src_ptr = static_cast<int64_t*>(src->data);
+    int64_t* dst_ptr = static_cast<int64_t*>(dst->data);
+    for (dgl_id_t u = 0; u < NumVertices(); ++u) {
+      for (size_t i = 0; i < adjlist_[u].succ.size(); ++i) {
+        *(src_ptr++) = u;
+        *(dst_ptr++) = adjlist_[u].succ[i];
+      }
+    }
   }
 
   return std::make_pair(src, dst);
