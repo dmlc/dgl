@@ -136,15 +136,15 @@ class BundledExecutor(Executor):
         return func_pairs
 
     def run(self):
-        new_attr = {}
+        attr = None
         for exe in self.executors:
-            attr = exe.run()
-            if isinstance(attr, dict):
-                new_attr.update(attr)
+            res = exe.run()
+            if attr is None:
+                attr = res
             else:
-                self.g.set_n_repr(attr, self.graph_mapping)
-        if len(new_attr) > 0:
-            self.g.set_n_repr(new_attr, self.graph_mapping)
+                # attr and res must be dict
+                attr.update(res)
+        self.g.set_n_repr(attr, self.graph_mapping)
 
 
 class BundledUpdateAllExecutor(BundledExecutor):

@@ -114,5 +114,5 @@ def test_send_and_recv():
     _test('f2')
 
 if __name__ == '__main__':
-    #test_update_all()
+    test_update_all()
     test_send_and_recv()
