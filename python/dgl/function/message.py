@@ -2,8 +2,10 @@
 from __future__ import absolute_import
 
 import operator
+import dgl.backend as F
 
 __all__ = ["MessageFunction", "src_mul_edge", "copy_src", "copy_edge"]
+
 
 class MessageFunction(object):
     def __call__(self, src, edge):
@@ -12,9 +14,26 @@ class MessageFunction(object):
     def name(self):
         raise NotImplementedError
 
+    def is_spmv_supported(self, g):
+        raise NotImplementedError
+
+
 class BundledMessageFunction(MessageFunction):
     def __init__(self, fn_list):
+        if not isinstance(fn_list, (list, tuple)):
+            fn_list = [fn_list]
+        else:
+            # sanity check on out field
+            for fn in fn_list:
+                assert fn.out_field is not None, \
+                        "Not specifying out field for multi-field message is ambiguous"
         self.fn_list = fn_list
+
+    def is_spmv_supported(self, g):
+        for fn in self.fn_list:
+            if not isinstance(fn, MessageFunction) or not fn.is_spmv_supported(g):
+                return False
+        return True
 
     def __call__(self, src, edge):
         ret = None
@@ -23,16 +42,31 @@ class BundledMessageFunction(MessageFunction):
             if ret is None:
                 ret = msg
             else:
-                try:
-                    ret.update(msg)
-                except e:
-                    raise RuntimeError("Failed to merge results of two builtin"
-                                       " message functions. Please specify out_field"
-                                       " for the builtin message function.")
+                # ret and msg must be dict
+                ret.update(msg)
         return ret
 
     def name(self):
         return "bundled"
+
+
+def _is_spmv_supported_node_feat(g, field):
+    if field is None:
+        feat = g.get_n_repr()
+    else:
+        feat = g.get_n_repr()[field]
+    shape = F.shape(feat)
+    return len(shape) == 1 or len(shape) == 2
+
+def _is_spmv_supported_edge_feat(g, field):
+    # check shape, only scalar edge feature can be optimized at the moment
+    if field is None:
+        feat = g.get_e_repr()
+    else:
+        feat = g.get_e_repr()[field]
+    shape = F.shape(feat)
+    return len(shape) == 1 or (len(shape) == 2 and shape[1] == 1)
+
 
 class SrcMulEdgeMessageFunction(MessageFunction):
     def __init__(self, mul_op, src_field=None, edge_field=None, out_field=None):
@@ -40,6 +74,10 @@ class SrcMulEdgeMessageFunction(MessageFunction):
         self.src_field = src_field
         self.edge_field = edge_field
         self.out_field = out_field
+
+    def is_spmv_supported(self, g):
+        return _is_spmv_supported_node_feat(g, self.src_field) \
+                and _is_spmv_supported_edge_feat(g, self.edge_field)
 
     def __call__(self, src, edge):
         if self.src_field is not None:
@@ -60,6 +98,9 @@ class CopySrcMessageFunction(MessageFunction):
         self.src_field = src_field
         self.out_field = out_field
 
+    def is_spmv_supported(self, g):
+        return _is_spmv_supported_node_feat(g, self.src_field)
+
     def __call__(self, src, edge):
         if self.src_field is not None:
             ret = src[self.src_field]
@@ -78,6 +119,11 @@ class CopyEdgeMessageFunction(MessageFunction):
         self.edge_field = edge_field
         self.out_field = out_field
 
+    def is_spmv_supported(self, g):
+        # TODO: support this with g-spmv
+        return False
+        # return _is_spmv_supported_edge_feat(g, self.edge_field)
+
     def __call__(self, src, edge):
         if self.edge_field is not None:
             ret = edge[self.edge_field]
@@ -90,7 +136,8 @@ class CopyEdgeMessageFunction(MessageFunction):
 
     def name(self):
         return "copy_edge"
-        
+
+
 def src_mul_edge(src=None, edge=None, out=None):
     """TODO(minjie): docstring """
     return SrcMulEdgeMessageFunction(operator.mul, src, edge, out)

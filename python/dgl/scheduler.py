@@ -7,6 +7,7 @@ import dgl.backend as F
 import dgl.function.message as fmsg
 import dgl.function.reducer as fred
 import dgl.utils as utils
+from dgl.base import ALL
 
 __all__ = ["degree_bucketing", "get_executor"]
 
@@ -38,254 +39,240 @@ def degree_bucketing(cached_graph, v):
     #print('degree-bucketing:', unique_degrees, [len(b) for b in v_bkt])
     return unique_degrees, v_bkt
 
+
 class Executor(object):
-    def run(self, graph):
+    def run(self):
         raise NotImplementedError
 
-    def _to_list_of_fields(self, src_field, dst_field, edge_field):
-        src_field = src_field if isinstance(src_field, (tuple, list)) else [src_field]
-        dst_field = dst_field if isinstance(dst_field, (tuple, list)) else [dst_field]
-        edge_field = edge_field if isinstance(edge_field, (tuple, list)) else [edge_field]
-        n_src = len(src_field)
-        n_dst = len(dst_field)
-        n_edge = len(edge_field)
-        # only 1-1-1, N-1-N, 1-N-N, N-N-N supported
-        assert n_src == n_dst and (n_edge == n_src or n_edge == 1) or \
-                n_edge == n_dst and (n_src == n_edge or n_src == 1)
-        return src_field, dst_field, edge_field
 
-
-class UpdateAllSPMVExecutor(Executor):
-    def __init__(self, graph, src_field, dst_field, edge_field, use_adj):
-        self.graph = graph
-        self.src_field, self.dst_field, self.edge_field = \
-                self._to_list_of_fields(src_field, dst_field, edge_field)
-        self.use_adj = use_adj
+class SPMVExecutor(Executor):
+    def __init__(self, src_field, edge_field, dst_field, use_edge_feat,
+                 node_repr, adj_build_fn):
+        self.src_field = src_field
+        self.edge_field = edge_field
+        self.dst_field = dst_field
+        self.use_edge_feat = use_edge_feat
+        self.node_repr = node_repr
+        self.adj_build_fn = adj_build_fn
 
     def run(self):
-        g = self.graph
-        n = g.number_of_nodes()
-        adjmat_cache = g.cached_graph.adjmat()
-
-        # cache src
-        if len(self.src_field) == 1:
-            src_field = self.src_field[0]
-            if src_field is None:
-                srccol_cache = g.get_n_repr()
-            else:
-                srccol_cache = g.get_n_repr()[src_field]
-            ctx = F.get_context(srccol_cache)
+        # get src col
+        if self.src_field is None:
+            srccol = self.node_repr
         else:
-            srccol_cache = None
+            srccol = self.node_repr[self.src_field]
+        ctx = F.get_context(srccol)
 
-        # cache edge
-        if len(self.edge_field) == 1:
-            edge_field = self.edge_field[0]
-            # build adjmat dat
-            if not self.use_adj:
-                if edge_field is None:
-                    edgecol = g.get_e_repr()
-                else:
-                    edgecol = g.get_e_repr()[edge_field]
-                edgecol = F.squeeze(edgecol)
+        # build adjmat
+        adjmat = self.adj_build_fn(self.edge_field, ctx, self.use_edge_feat)
+
+        # spmm
+        if len(F.shape(srccol)) == 1:
+            srccol = F.unsqueeze(srccol, 1)
+            dstcol = F.spmm(adjmat, srccol)
+            dstcol = F.squeeze(dstcol)
         else:
-            edgecol = None
+            dstcol = F.spmm(adjmat, srccol)
+        if self.dst_field is None:
+            return dstcol
+        else:
+            return {self.dst_field : dstcol}
 
-        # loop over fields
-        for idx, dst_field in enumerate(self.dst_field):
-            if srccol_cache is None:
-                src_field = self.src_field[idx]
-                if src_field is None:
-                    srccol = g.get_n_repr()
-                else:
-                    srccol = g.get_n_repr()[src_field]
-                ctx = F.get_context(srccol)
-            else:
-                srccol = srccol_cache
 
-            adjmat = adjmat_cache.get(ctx)
-            if not self.use_adj:
-                if edgecol is None:
-                    edge_field = self.edge_field[idx]
-                    if edge_field is None:
-                        dat = g.get_e_repr()
-                    else:
-                        dat = g.get_e_repr()[edge_field]
-                    dat = F.squeeze(dat)
-                else:
-                    dat = edgecol
-                # TODO(minjie): should not directly use _indices
-                adjmat = F.sparse_tensor(adjmat._indices(), dat, [n, n])
-            # spmm
-            if len(F.shape(srccol)) == 1:
-                srccol = F.unsqueeze(srccol, 1)
-                dstcol = F.spmm(adjmat, srccol)
-                dstcol = F.squeeze(dstcol)
-            else:
-                dstcol = F.spmm(adjmat, srccol)
-            if dst_field is None:
-                g.set_n_repr(dstcol)
-            else:
-                g.set_n_repr({dst_field : dstcol})
+class BundledExecutor(Executor):
+    """
+    Base class for Bundled execution
+    All shared structure like graph index should be cached in this class or its subclass
+    BundledUpdateAllExecutor and BundledSendRecvExecutor should subclass BundledExecutor
+    """
+    def __init__(self, graph, mfunc, rfunc):
+        self.g = graph
+        func_pairs = self._match_message_with_reduce(mfunc, rfunc)
+        # create all executors
+        self._build_executors(func_pairs)
 
-class SendRecvSPMVExecutor(Executor):
-    def __init__(self, graph, src, dst, src_field, dst_field, edge_field, use_edge_dat):
-        self.graph = graph
-        self.src = src
-        self.dst = dst
-        self.src_field, self.dst_field, self.edge_field = \
-                self._to_list_of_fields(src_field, dst_field, edge_field)
-        self.use_edge_dat = use_edge_dat
+    @property
+    def node_repr(self):
+        raise NotImplementedError
+
+    @property
+    def edge_repr(self):
+        raise NotImplementedError
+
+    def _adj_build_fn(self, edge_field, ctx, use_edge_feat):
+        raise NotImplementedError
+
+    def _build_executors(self, func_pairs):
+        self.executors = []
+        for mfunc, rfunc in func_pairs:
+            if isinstance(mfunc, fmsg.CopySrcMessageFunction):
+                exe = SPMVExecutor(src_field=mfunc.src_field,
+                                   edge_field=None,
+                                   dst_field=rfunc.out_field,
+                                   use_edge_feat=False,
+                                   node_repr=self.node_repr,
+                                   adj_build_fn=self._adj_build_fn)
+            elif isinstance(mfunc, fmsg.SrcMulEdgeMessageFunction):
+                exe = SPMVExecutor(src_field=mfunc.src_field,
+                                   edge_field=mfunc.edge_field,
+                                   dst_field=rfunc.out_field,
+                                   use_edge_feat=True,
+                                   node_repr=self.node_repr,
+                                   adj_build_fn=self._adj_build_fn)
+            else:
+                # degree bucketing here
+                raise NotImplementedError
+            self.executors.append(exe)
+
+    def _match_message_with_reduce(self, mfunc, rfunc):
+        out2mfunc = {fn.out_field: fn for fn in mfunc.fn_list}
+        func_pairs = []
+        for rfn in rfunc.fn_list:
+            mfn = out2mfunc.get(rfn.msg_field, None)
+            # field check
+            assert mfn is not None, \
+                    "cannot match message func with reduce func"
+            func_pairs.append((mfn, rfn))
+        return func_pairs
 
     def run(self):
-        g = self.graph
+        new_attr = {}
+        for exe in self.executors:
+            attr = exe.run()
+            if isinstance(attr, dict):
+                new_attr.update(attr)
+            else:
+                self.g.set_n_repr(attr, self.graph_mapping)
+        if len(new_attr) > 0:
+            self.g.set_n_repr(new_attr, self.graph_mapping)
 
-        # build adjmat index
-        u, v = utils.edge_broadcasting(self.src, self.dst)
-        new2old, old2new = utils.build_relabel_map(v)
-        u = u.totensor()
-        v = v.totensor()
+
+class BundledUpdateAllExecutor(BundledExecutor):
+    def __init__(self, graph, mfunc, rfunc):
+        self._node_repr = None
+        self._edge_repr = None
+        super(BundledUpdateAllExecutor, self).__init__(graph, mfunc, rfunc)
+        self._graph_idx = None
+        self._graph_shape = None
+        self._graph_mapping = None
+
+    @property
+    def graph_idx(self):
+        if self._graph_idx is None:
+            self._graph_idx = self.g.cached_graph.adjmat()
+        return self._graph_idx
+
+    @property
+    def graph_shape(self):
+        if self._graph_shape is None:
+            n = self.g.number_of_nodes()
+            self._graph_shape = [n, n]
+        return self._graph_shape
+
+    @property
+    def graph_mapping(self):
+        return ALL
+
+    @property
+    def node_repr(self):
+        if self._node_repr is None:
+            self._node_repr = self.g.get_n_repr()
+        return self._node_repr
+
+    @property
+    def edge_repr(self):
+        if self._edge_repr is None:
+            self._edge_repr = self.g.get_e_repr()
+        return self._edge_repr
+
+    def _adj_build_fn(self, edge_field, ctx, use_edge_feat):
+        if use_edge_feat:
+            if edge_field is None:
+                dat = self.edge_repr
+            else:
+                dat = self.edge_repr[edge_field]
+            dat = F.squeeze(dat)
+            # TODO(minjie): should not directly use _indices
+            idx = self.graph_idx.get(ctx)._indices()
+            adjmat = F.sparse_tensor(idx, dat, self.graph_shape)
+        else:
+            adjmat = self.graph_idx.get(ctx)
+        return adjmat
+
+
+class BundledSendRecvExecutor(BundledExecutor):
+    def __init__(self, graph, src, dst, mfunc, rfunc):
+        self.u, self.v = utils.edge_broadcasting(src, dst)
+        self._node_repr = None
+        self._edge_repr = None
+        super(BundledSendRecvExecutor, self).__init__(graph, mfunc, rfunc)
+        self._graph_idx = None
+        self._graph_shape = None
+        self._graph_mapping = None
+
+    @property
+    def graph_idx(self):
+        if self._graph_idx is None:
+            self._build_adjmat()
+        return self._graph_idx
+
+    @property
+    def graph_shape(self):
+        if self._graph_shape is None:
+            self._build_adjmat()
+        return self._graph_shape
+
+    @property
+    def graph_mapping(self):
+        if self._graph_mapping is None:
+            self._build_adjmat()
+        return self._graph_mapping
+
+    @property
+    def node_repr(self):
+        if self._node_repr is None:
+            self._node_repr = self.g.get_n_repr()
+        return self._node_repr
+
+    @property
+    def edge_repr(self):
+        if self._edge_repr is None:
+            self._edge_repr = self.g.get_e_repr(self.u, self.v)
+        return self._edge_repr
+
+    def _build_adjmat(self):
+        # handle graph index
+        new2old, old2new = utils.build_relabel_map(self.v)
+        u = self.u.totensor()
+        v = self.v.totensor()
         # TODO(minjie): should not directly use []
         new_v = old2new[v]
-        idx = F.pack([F.unsqueeze(new_v, 0), F.unsqueeze(u, 0)])
-        n = g.number_of_nodes()
+        n = self.g.number_of_nodes()
         m = len(new2old)
+        self._graph_idx = F.pack([F.unsqueeze(new_v, 0), F.unsqueeze(u, 0)])
+        self._graph_shape = [m, n]
+        self._graph_mapping = new2old
 
-        # cache edge frame lazy dict
-        edge_feat = g.get_e_repr(u, v)
-
-        # cache src
-        if len(self.src_field) == 1:
-            src_field = self.src_field[0]
-            if src_field is None:
-                srccol_cache = g.get_n_repr()
+    def _adj_build_fn(self, edge_field, ctx, use_edge_feat):
+        if use_edge_feat:
+            if edge_field is None:
+                dat = self.edge_repr
             else:
-                srccol_cache = g.get_n_repr()[src_field]
-            ctx = F.get_context(srccol_cache)
+                dat = self.edge_repr[edge_field]
+            dat = F.squeeze(dat)
         else:
-            srccol_cache = None
+            dat = F.ones((len(self.u), ))
+        adjmat = F.sparse_tensor(self.graph_idx, dat, self.graph_shape)
+        return F.to_context(adjmat, ctx)
 
-        # cache edge
-        if len(self.edge_field) == 1:
-            edge_field = self.edge_field[0]
-            # build adjmat dat
-            if self.use_edge_dat:
-                if edge_field is None:
-                    dat = edge_feat
-                else:
-                    dat = edge_feat[edge_field]
-                dat = F.squeeze(dat)
-            else:
-                dat = F.ones((len(u),))
-            adjmat_cache = F.sparse_tensor(idx, dat, [m, n])
-        else:
-            adjmat_cache = None
-
-        # loop over fields
-        for idx, dst_field in enumerate(self.dst_field):
-            # get src col
-            if srccol_cache is None:
-                src_field = self.src_field[idx]
-                if src_field is None:
-                    srccol = g.get_n_repr()
-                else:
-                    srccol = g.get_n_repr()[src_field]
-                ctx = F.get_context(srccol)
-            else:
-                srccol = srccol_cache
-
-            # get adjmat
-            if adjmat_cache is None:
-                edge_field = self.edge_field[idx]
-                # build adjmat dat
-                if self.use_edge_dat:
-                    if edge_field is None:
-                        dat = edge_feat
-                    else:
-                        dat = edge_feat[edge_field]
-                    dat = F.squeeze(dat)
-                else:
-                    dat = F.ones((len(u),))
-                # build adjmat
-                adjmat = F.sparse_tensor(idx, dat, [m, n])
-            else:
-                adjmat = adjmat_cache
-
-            # convert to context
-            adjmat = F.to_context(adjmat, ctx)
-            # spmm
-            if len(F.shape(srccol)) == 1:
-                srccol = F.unsqueeze(srccol, 1)
-                dstcol = F.spmm(adjmat, srccol)
-                dstcol = F.squeeze(dstcol)
-            else:
-                dstcol = F.spmm(adjmat, srccol)
-            if dst_field is None:
-                g.set_n_repr(dstcol, new2old)
-            else:
-                g.set_n_repr({dst_field : dstcol}, new2old)
-
-def _is_spmv_supported_node_feat(g, field):
-    features = g.get_n_repr()
-    if field is None:
-        pass
-    elif isinstance(field, str):
-        features = features[field]
-    else: # iterable
-        features = [features[f] for f in field]
-    if isinstance(features, list):
-        for feat in features:
-            shape = F.shape(feat)
-            if len(shape) != 1 and len(shape) != 2:
-                return False
-        return True
-    else:
-        shape = F.shape(features)
-        return len(shape) == 1 or len(shape) == 2
-
-def _is_spmv_supported_edge_feat(g, field):
-    # check shape, only scalar edge feature can be optimized at the moment.
-    features = g.get_e_repr()
-    if field is None:
-        pass
-    elif isinstance(field, str):
-        features = features[field]
-    else: # iterable
-        features = [features[f] for f in field]
-    if isinstance(features, list):
-        for feat in features:
-            shape = F.shape(feat)
-            if not (len(shape) == 1 or (len(shape) == 2 and shape[1] == 1)):
-                return False
-        return True
-    else:
-        shape = F.shape(features)
-        return len(shape) == 1 or (len(shape) == 2 and shape[1] == 1)
 
 def _create_update_all_exec(graph, **kwargs):
     mfunc = kwargs.pop('message_func')
     rfunc = kwargs.pop('reduce_func')
-    if (isinstance(mfunc, fmsg.CopySrcMessageFunction)
-            and isinstance(rfunc, fred.SumReducerFunction)
-            and _is_spmv_supported_node_feat(graph, mfunc.src_field)):
-        # TODO(minjie): more sanity check on field names
-        return UpdateAllSPMVExecutor(graph,
-                                     src_field=mfunc.src_field,
-                                     dst_field=rfunc.out_field,
-                                     edge_field=None,
-                                     use_adj=True)
-    elif (isinstance(mfunc, fmsg.SrcMulEdgeMessageFunction)
-            and isinstance(rfunc, fred.SumReducerFunction)
-            and _is_spmv_supported_node_feat(graph, mfunc.src_field)
-            and _is_spmv_supported_edge_feat(graph, mfunc.edge_field)):
-        return UpdateAllSPMVExecutor(graph,
-                                     src_field=mfunc.src_field,
-                                     dst_field=rfunc.out_field,
-                                     edge_field=mfunc.edge_field,
-                                     use_adj=False)
-    elif (isinstance(mfunc, fmsg.CopyEdgeMessageFunction)
-            and isinstance(rfunc, fred.SumReducerFunction)):
-        return None
+    mfunc = fmsg.BundledMessageFunction(mfunc)
+    rfunc = fred.BundledReduceFunction(rfunc)
+    if mfunc.is_spmv_supported(graph) and rfunc.is_spmv_supported():
+        return BundledUpdateAllExecutor(graph, mfunc=mfunc, rfunc=rfunc)
     else:
         return None
 
@@ -294,28 +281,10 @@ def _create_send_and_recv_exec(graph, **kwargs):
     dst = kwargs.pop('dst')
     mfunc = kwargs.pop('message_func')
     rfunc = kwargs.pop('reduce_func')
-    if (isinstance(mfunc, fmsg.CopySrcMessageFunction)
-            and isinstance(rfunc, fred.SumReducerFunction)
-            and _is_spmv_supported_node_feat(graph, mfunc.src_field)):
-        # TODO(minjie): more sanity check on field names
-        return SendRecvSPMVExecutor(graph,
-                                    src=src,
-                                    dst=dst,
-                                    src_field=mfunc.src_field,
-                                    dst_field=rfunc.out_field,
-                                    edge_field=None,
-                                    use_edge_dat=False)
-    elif (isinstance(mfunc, fmsg.SrcMulEdgeMessageFunction)
-            and isinstance(rfunc, fred.SumReducerFunction)
-            and _is_spmv_supported_node_feat(graph, mfunc.src_field)
-            and _is_spmv_supported_edge_feat(graph, mfunc.edge_field)):
-        return SendRecvSPMVExecutor(graph,
-                                    src=src,
-                                    dst=dst,
-                                    src_field=mfunc.src_field,
-                                    dst_field=rfunc.out_field,
-                                    edge_field=mfunc.edge_field,
-                                    use_edge_dat=True)
+    mfunc = fmsg.BundledMessageFunction(mfunc)
+    rfunc = fred.BundledReduceFunction(rfunc)
+    if mfunc.is_spmv_supported(graph) and rfunc.is_spmv_supported():
+        return BundledSendRecvExecutor(graph, src=src, dst=dst, mfunc=mfunc, rfunc=rfunc)
     else:
         return None
 
