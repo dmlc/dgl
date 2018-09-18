@@ -477,7 +477,7 @@ class DGLGraph(DiGraph):
         else:
             self._msg_frame.append({__MSG__ : msgs})
 
-    def update_edge(self, u, v, edge_func="default", batchable=False):
+    def update_edge(self, u=ALL, v=ALL, edge_func="default", batchable=False):
         """Update representation on edge u->v
 
         The edge function should be compatible with following signature:
