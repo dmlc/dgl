@@ -44,8 +44,7 @@ class Executor(object):
     def run(self):
         raise NotImplementedError
 
-
-class SPMVExecutor(Executor):
+class SPMVOperator(Executor):
     def __init__(self, src_field, edge_field, dst_field, use_edge_feat,
                  node_repr, adj_build_fn):
         self.src_field = src_field
@@ -79,17 +78,10 @@ class SPMVExecutor(Executor):
             return {self.dst_field : dstcol}
 
 
-class BundledExecutor(Executor):
-    """
-    Base class for Bundled execution
-    All shared structure like graph index should be cached in this class or its subclass
-    BundledUpdateAllExecutor and BundledSendRecvExecutor should subclass BundledExecutor
-    """
+class BasicExecutor(Executor):
     def __init__(self, graph, mfunc, rfunc):
         self.g = graph
-        func_pairs = self._match_message_with_reduce(mfunc, rfunc)
-        # create all executors
-        self._build_executors(func_pairs)
+        self.exe = self._build_exec(mfunc, rfunc)
 
     @property
     def node_repr(self):
@@ -99,59 +91,42 @@ class BundledExecutor(Executor):
     def edge_repr(self):
         raise NotImplementedError
 
-    def _adj_build_fn(self, edge_field, ctx, use_edge_feat):
+    @property
+    def graph_mapping(self):
         raise NotImplementedError
 
-    def _build_executors(self, func_pairs):
-        self.executors = []
-        for mfunc, rfunc in func_pairs:
-            if isinstance(mfunc, fmsg.CopySrcMessageFunction):
-                exe = SPMVExecutor(src_field=mfunc.src_field,
-                                   edge_field=None,
-                                   dst_field=rfunc.out_field,
-                                   use_edge_feat=False,
-                                   node_repr=self.node_repr,
-                                   adj_build_fn=self._adj_build_fn)
-            elif isinstance(mfunc, fmsg.SrcMulEdgeMessageFunction):
-                exe = SPMVExecutor(src_field=mfunc.src_field,
-                                   edge_field=mfunc.edge_field,
-                                   dst_field=rfunc.out_field,
-                                   use_edge_feat=True,
-                                   node_repr=self.node_repr,
-                                   adj_build_fn=self._adj_build_fn)
-            else:
-                # degree bucketing here
-                raise NotImplementedError
-            self.executors.append(exe)
-
-    def _match_message_with_reduce(self, mfunc, rfunc):
-        out2mfunc = {fn.out_field: fn for fn in mfunc.fn_list}
-        func_pairs = []
-        for rfn in rfunc.fn_list:
-            mfn = out2mfunc.get(rfn.msg_field, None)
-            # field check
-            assert mfn is not None, \
-                    "cannot match message func with reduce func"
-            func_pairs.append((mfn, rfn))
-        return func_pairs
+    def _build_exec(self, mfunc, rfunc):
+        if isinstance(mfunc, fmsg.CopySrcMessageFunction):
+            exe = SPMVOperator(src_field=mfunc.src_field,
+                               edge_field=None,
+                               dst_field=rfunc.out_field,
+                               use_edge_feat=False,
+                               node_repr=self.node_repr,
+                               adj_build_fn=self._adj_build_fn)
+        elif isinstance(mfunc, fmsg.SrcMulEdgeMessageFunction):
+            exe = SPMVOperator(src_field=mfunc.src_field,
+                               edge_field=mfunc.edge_field,
+                               dst_field=rfunc.out_field,
+                               use_edge_feat=True,
+                               node_repr=self.node_repr,
+                               adj_build_fn=self._adj_build_fn)
+        else:
+            raise NotImplementedError("message func type {}".format(type(mfunc)))
+        return exe
 
     def run(self):
-        attr = None
-        for exe in self.executors:
-            res = exe.run()
-            if attr is None:
-                attr = res
-            else:
-                # attr and res must be dict
-                attr.update(res)
+        attr = self.exe.run()
         self.g.set_n_repr(attr, self.graph_mapping)
 
 
-class BundledUpdateAllExecutor(BundledExecutor):
+class UpdateAllExecutor(BasicExecutor):
     def __init__(self, graph, mfunc, rfunc):
+        self._init_state()
+        super(UpdateAllExecutor, self).__init__(graph, mfunc, rfunc)
+
+    def _init_state(self):
         self._node_repr = None
         self._edge_repr = None
-        super(BundledUpdateAllExecutor, self).__init__(graph, mfunc, rfunc)
         self._graph_idx = None
         self._graph_shape = None
         self._graph_mapping = None
@@ -200,12 +175,15 @@ class BundledUpdateAllExecutor(BundledExecutor):
         return adjmat
 
 
-class BundledSendRecvExecutor(BundledExecutor):
+class SendRecvExecutor(BasicExecutor):
     def __init__(self, graph, src, dst, mfunc, rfunc):
+        self._init_state(src, dst)
+        super(SendRecvExecutor, self).__init__(graph, mfunc, rfunc)
+
+    def _init_state(self, src, dst):
         self.u, self.v = utils.edge_broadcasting(src, dst)
         self._node_repr = None
         self._edge_repr = None
-        super(BundledSendRecvExecutor, self).__init__(graph, mfunc, rfunc)
         self._graph_idx = None
         self._graph_shape = None
         self._graph_mapping = None
@@ -266,13 +244,78 @@ class BundledSendRecvExecutor(BundledExecutor):
         return F.to_context(adjmat, ctx)
 
 
+class BundledExecutor(BasicExecutor):
+    """
+    Base class for Bundled execution
+    All shared structure like graph index should be cached in this class or its subclass
+    BundledUpdateAllExecutor and BundledSendRecvExecutor should subclass BundledExecutor
+    """
+    def __init__(self, graph, mfunc, rfunc):
+        self.g = graph
+        func_pairs = self._match_message_with_reduce(mfunc, rfunc)
+        # create all executors
+        self.executors = self._build_executors(func_pairs)
+
+    def _build_executors(self, func_pairs):
+        executors = []
+        for mfunc, rfunc in func_pairs:
+            exe = self._build_exec(mfunc, rfunc)
+            executors.append(exe)
+        return executors
+
+    def _match_message_with_reduce(self, mfunc, rfunc):
+        out2mfunc = {fn.out_field: fn for fn in mfunc.fn_list}
+        func_pairs = []
+        for rfn in rfunc.fn_list:
+            mfn = out2mfunc.get(rfn.msg_field, None)
+            # field check
+            assert mfn is not None, \
+                    "cannot find message func for reduce func in-field {}".format(rfn.msg_field)
+            func_pairs.append((mfn, rfn))
+        return func_pairs
+
+    def run(self):
+        attr = None
+        for exe in self.executors:
+            res = exe.run()
+            if attr is None:
+                attr = res
+            else:
+                # attr and res must be dict
+                attr.update(res)
+        self.g.set_n_repr(attr, self.graph_mapping)
+
+
+class BundledUpdateAllExecutor(BundledExecutor, UpdateAllExecutor):
+    def __init__(self, graph, mfunc, rfunc):
+        self._init_state()
+        BundledExecutor.__init__(self, graph, mfunc, rfunc)
+
+
+class BundledSendRecvExecutor(BundledExecutor, SendRecvExecutor):
+    def __init__(self, graph, src, dst, mfunc, rfunc):
+        self._init_state(src, dst)
+        BundledExecutor.__init__(self, graph, mfunc, rfunc)
+
+def _is_spmv_supported(fn, graph=None):
+    if isinstance(fn, fmsg.MessageFunction):
+        return fn.is_spmv_supported(graph)
+    elif isinstance(fn, fred.ReduceFunction):
+        return fn.is_spmv_supported()
+    else:
+        return False
+
 def _create_update_all_exec(graph, **kwargs):
     mfunc = kwargs.pop('message_func')
     rfunc = kwargs.pop('reduce_func')
-    mfunc = fmsg.BundledMessageFunction(mfunc)
-    rfunc = fred.BundledReduceFunction(rfunc)
-    if mfunc.is_spmv_supported(graph) and rfunc.is_spmv_supported():
-        return BundledUpdateAllExecutor(graph, mfunc=mfunc, rfunc=rfunc)
+    if isinstance(mfunc, (list, tuple)) or isinstance(rfunc, (list, tuple)):
+        mfunc = fmsg.BundledMessageFunction(mfunc)
+        rfunc = fred.BundledReduceFunction(rfunc)
+        exec_cls = BundledUpdateAllExecutor
+    else:
+        exec_cls = UpdateAllExecutor
+    if _is_spmv_supported(mfunc, graph) and _is_spmv_supported(rfunc):
+        return exec_cls(graph, mfunc=mfunc, rfunc=rfunc)
     else:
         return None
 
@@ -281,10 +324,14 @@ def _create_send_and_recv_exec(graph, **kwargs):
     dst = kwargs.pop('dst')
     mfunc = kwargs.pop('message_func')
     rfunc = kwargs.pop('reduce_func')
-    mfunc = fmsg.BundledMessageFunction(mfunc)
-    rfunc = fred.BundledReduceFunction(rfunc)
-    if mfunc.is_spmv_supported(graph) and rfunc.is_spmv_supported():
-        return BundledSendRecvExecutor(graph, src=src, dst=dst, mfunc=mfunc, rfunc=rfunc)
+    if isinstance(mfunc, (list, tuple)) or isinstance(rfunc, (list, tuple)):
+        mfunc = fmsg.BundledMessageFunction(mfunc)
+        rfunc = fred.BundledReduceFunction(rfunc)
+        exec_cls = BundledSendRecvExecutor
+    else:
+        exec_cls = SendRecvExecutor
+    if _is_spmv_supported(mfunc, graph) and _is_spmv_supported(rfunc):
+        return exec_cls(graph, src=src, dst=dst, mfunc=mfunc, rfunc=rfunc)
     else:
         return None
 
