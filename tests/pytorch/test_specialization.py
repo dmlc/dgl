@@ -113,6 +113,85 @@ def test_send_and_recv():
     # test 2d node features
     _test('f2')
 
+def test_update_all_multi_fn():
+    def message_func(hu, edge):
+        return {'m2': hu['f2']}
+
+    def message_func_edge(hu, edge):
+        return {'m2': hu['f2'] * edge['e2']}
+
+    def reduce_func(hv, msgs):
+        return {'v2': th.sum(msgs['m2'], 1)}
+
+    g = generate_graph()
+    fld = 'f2'
+    # send and recv
+    g.update_all([fn.copy_src(src=fld, out='m1'), message_func],
+                 [fn.sum(msgs='m1', out='v1'), reduce_func],
+                 None, batchable=True)
+    v1 = g.get_n_repr()['v1']
+    v2 = g.get_n_repr()['v2']
+    g.update_all(fn.copy_src(src=fld), fn.sum(out='v1'), None, batchable=True)
+    v1 = g.get_n_repr()['v1']
+    assert th.allclose(v1, v2)
+
+    # send and recv with edge weights
+    g.update_all([fn.src_mul_edge(src=fld, edge='e1', out='m1'), fn.src_mul_edge(src=fld, edge='e2', out='m2')],
+                 [fn.sum(msgs='m1', out='v1'), fn.sum(msgs='m2', out='v2'), fn.sum(msgs='m1', out='v3')],
+                 None, batchable=True)
+    v1 = g.get_n_repr()['v1']
+    v2 = g.get_n_repr()['v2']
+    v3 = g.get_n_repr()['v3']
+    assert th.allclose(v1, v2)
+    assert th.allclose(v1, v3)
+    g.update_all(message_func_edge, reduce_func, None, batchable=True)
+    v2 = g.get_n_repr()['v2']
+    assert th.allclose(v1, v2)
+
+def test_send_and_recv_multi_fn():
+    u = th.tensor([0, 0, 0, 3, 4, 9])
+    v = th.tensor([1, 2, 3, 9, 9, 0])
+
+    def message_func(hu, edge):
+        return {'m2': hu['f2']}
+
+    def message_func_edge(hu, edge):
+        return {'m2': hu['f2'] * edge['e2']}
+
+    def reduce_func(hv, msgs):
+        return {'v2' : th.sum(msgs['m2'], 1)}
+
+    g = generate_graph()
+    fld = 'f2'
+    # send and recv
+    g.send_and_recv(u, v,
+                    [fn.copy_src(src=fld, out='m1'), message_func],
+                    [fn.sum(msgs='m1', out='v1'), reduce_func],
+                    None, batchable=True)
+    v1 = g.get_n_repr()['v1']
+    v2 = g.get_n_repr()['v2']
+    g.send_and_recv(u, v, fn.copy_src(src=fld), fn.sum(out='v1'),
+                    None, batchable=True)
+    v2 = g.get_n_repr()['v1']
+    assert th.allclose(v1, v2)
+
+    # send and recv with edge weights
+    g.send_and_recv(u, v,
+                    [fn.src_mul_edge(src=fld, edge='e1', out='m1'), fn.src_mul_edge(src=fld, edge='e2', out='m2')],
+                    [fn.sum(msgs='m1', out='v1'), fn.sum(msgs='m2', out='v2'), fn.sum(msgs='m1', out='v3')],
+                    None, batchable=True)
+    v1 = g.get_n_repr()['v1']
+    v2 = g.get_n_repr()['v2']
+    v3 = g.get_n_repr()['v3']
+    assert th.allclose(v1, v2)
+    assert th.allclose(v1, v3)
+    g.send_and_recv(u, v, message_func_edge,
+            reduce_func, None, batchable=True)
+    v2 = g.get_n_repr()['v2']
+    assert th.allclose(v1, v2)
+
 if __name__ == '__main__':
     test_update_all()
     test_send_and_recv()
+    test_update_all_multi_fn()
+    test_send_and_recv_multi_fn()
