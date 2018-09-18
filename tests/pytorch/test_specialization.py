@@ -125,17 +125,27 @@ def test_update_all_multi_fn():
 
     g = generate_graph()
     fld = 'f2'
-    # send and recv
+    # update all, mix of builtin and UDF
     g.update_all([fn.copy_src(src=fld, out='m1'), message_func],
                  [fn.sum(msgs='m1', out='v1'), reduce_func],
                  None, batchable=True)
     v1 = g.get_n_repr()['v1']
     v2 = g.get_n_repr()['v2']
+    assert th.allclose(v1, v2)
+
+    # run builtin with single message and reduce
     g.update_all(fn.copy_src(src=fld), fn.sum(out='v1'), None, batchable=True)
     v1 = g.get_n_repr()['v1']
     assert th.allclose(v1, v2)
 
-    # send and recv with edge weights
+    # 1 message, 2 reduces, using anonymous repr
+    g.update_all(fn.copy_src(src=fld), [fn.sum(out='v2'), fn.sum(out='v3')], None, batchable=True)
+    v2 = g.get_n_repr()['v2']
+    v3 = g.get_n_repr()['v3']
+    assert th.allclose(v1, v2)
+    assert th.allclose(v1, v3)
+
+    # update all with edge weights, 2 message, 3 reduces
     g.update_all([fn.src_mul_edge(src=fld, edge='e1', out='m1'), fn.src_mul_edge(src=fld, edge='e2', out='m2')],
                  [fn.sum(msgs='m1', out='v1'), fn.sum(msgs='m2', out='v2'), fn.sum(msgs='m1', out='v3')],
                  None, batchable=True)
@@ -144,6 +154,8 @@ def test_update_all_multi_fn():
     v3 = g.get_n_repr()['v3']
     assert th.allclose(v1, v2)
     assert th.allclose(v1, v3)
+
+    # run UDF with single message and reduce
     g.update_all(message_func_edge, reduce_func, None, batchable=True)
     v2 = g.get_n_repr()['v2']
     assert th.allclose(v1, v2)
@@ -163,19 +175,30 @@ def test_send_and_recv_multi_fn():
 
     g = generate_graph()
     fld = 'f2'
-    # send and recv
+
+    # send and recv, mix of builtin and UDF
     g.send_and_recv(u, v,
                     [fn.copy_src(src=fld, out='m1'), message_func],
                     [fn.sum(msgs='m1', out='v1'), reduce_func],
                     None, batchable=True)
     v1 = g.get_n_repr()['v1']
     v2 = g.get_n_repr()['v2']
-    g.send_and_recv(u, v, fn.copy_src(src=fld), fn.sum(out='v1'),
-                    None, batchable=True)
-    v2 = g.get_n_repr()['v1']
     assert th.allclose(v1, v2)
 
-    # send and recv with edge weights
+    # run builtin with single message and reduce
+    g.send_and_recv(u, v, fn.copy_src(src=fld), fn.sum(out='v1'),
+                    None, batchable=True)
+    v1 = g.get_n_repr()['v1']
+    assert th.allclose(v1, v2)
+
+    # 1 message, 2 reduces, using anonymous repr
+    g.send_and_recv(u, v, fn.copy_src(src=fld), [fn.sum(out='v2'), fn.sum(out='v3')], None, batchable=True)
+    v2 = g.get_n_repr()['v2']
+    v3 = g.get_n_repr()['v3']
+    assert th.allclose(v1, v2)
+    assert th.allclose(v1, v3)
+
+    # send and recv with edge weights, 2 message, 3 reduces
     g.send_and_recv(u, v,
                     [fn.src_mul_edge(src=fld, edge='e1', out='m1'), fn.src_mul_edge(src=fld, edge='e2', out='m2')],
                     [fn.sum(msgs='m1', out='v1'), fn.sum(msgs='m2', out='v2'), fn.sum(msgs='m1', out='v3')],
@@ -185,6 +208,8 @@ def test_send_and_recv_multi_fn():
     v3 = g.get_n_repr()['v3']
     assert th.allclose(v1, v2)
     assert th.allclose(v1, v3)
+
+    # run UDF with single message and reduce
     g.send_and_recv(u, v, message_func_edge,
             reduce_func, None, batchable=True)
     v2 = g.get_n_repr()['v2']
