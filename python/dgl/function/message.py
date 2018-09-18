@@ -25,8 +25,9 @@ class BundledMessageFunction(MessageFunction):
         else:
             # sanity check on out field
             for fn in fn_list:
-                assert fn.out_field is not None, \
-                        "Not specifying out field for multi-field message is ambiguous"
+                # cannot perform check for udf
+                if isinstance(fn, MessageFunction) and fn.out_field is None:
+                    raise RuntimeError("Not specifying out field for multiple message is ambiguous")
         self.fn_list = fn_list
 
     def is_spmv_supported(self, g):
@@ -42,8 +43,11 @@ class BundledMessageFunction(MessageFunction):
             if ret is None:
                 ret = msg
             else:
-                # ret and msg must be dict
-                ret.update(msg)
+                try:
+                    # ret and msg must be dict
+                    ret.update(msg)
+                except:
+                    raise RuntimeError("Must specify out field for multiple message")
         return ret
 
     def name(self):

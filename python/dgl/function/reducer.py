@@ -22,8 +22,8 @@ class BundledReduceFunction(ReduceFunction):
         else:
             # sanity check on out field
             for fn in fn_list:
-                assert fn.out_field is not None, \
-                        "Not specifying out field for multi-field reduce is ambiguous"
+                if isinstance(fn, ReduceFunction) and fn.out_field is None:
+                    raise RuntimeError("Not specifying out field for multiple reduce is ambiguous")
         self.fn_list = fn_list
 
     def is_spmv_supported(self):
@@ -39,8 +39,11 @@ class BundledReduceFunction(ReduceFunction):
             if ret is None:
                 ret = rpr
             else:
-                # ret and rpr must be dict
-                ret.update(rpr)
+                try:
+                    # ret and rpr must be dict
+                    ret.update(rpr)
+                except:
+                    raise RuntimeError("Must specify out field for multiple reudce")
         return ret
 
     def name(self):
