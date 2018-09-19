@@ -35,8 +35,8 @@ def asnumpy(a):
 def pack(tensors):
     return F.concat(*tensors, dim=0)
 
-#def unpack(x, indices_or_sections=1):
-#    return th.split(x, indices_or_sections)
+def unpack(x, indices_or_sections=1):
+    return th.split(x, indices_or_sections)
 
 # TODO this doesn't exist for symbol.
 def shape(x):
@@ -53,11 +53,11 @@ def gather_row(data, row_index):
 #def scatter_row(data, row_index, value):
 #    return data.index_copy(0, row_index, value)
 
-#def broadcast_to(x, to_array):
-#    return x + th.zeros_like(to_array)
+def broadcast_to(x, to_array):
+    return x + F.zeros_like(to_array)
 
 squeeze = F.squeeze
-#unsqueeze = th.unsqueeze
+unsqueeze = F.expand_dims
 # TODO this doesn't exist for symbol.
 reshape = F.reshape
 ones = F.ones
