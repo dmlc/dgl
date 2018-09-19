@@ -10,11 +10,18 @@ using tvm::runtime::PackedFunc;
 namespace dgl {
 namespace {
 
-template<typename T1, typename T2>
-PackedFunc ConvertPairToPackedFunc(const std::pair<T1, T2>& pair) {
-  auto body = [pair] (TVMArgs args, TVMRetValue* rv) {
+PackedFunc ConvertEdgeArrayToPackedFunc(const Graph::EdgeArray& ea) {
+  auto body = [ea] (TVMArgs args, TVMRetValue* rv) {
       int which = args[0];
-      *rv = which? pair.second : pair.first;
+      if (which == 0) {
+        *rv = ea.src;
+      } else if (which == 1) {
+        *rv = ea.dst;
+      } else if (which == 2) {
+        *rv = ea.id;
+      } else {
+        LOG(FATAL) << "invalid choice";
+      }
     };
   return PackedFunc(body);
 }
@@ -159,7 +166,7 @@ TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphInEdges_1")
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const dgl_id_t vid = args[1];
-    *rv = ConvertPairToPackedFunc(gptr->InEdges(vid));
+    *rv = ConvertEdgeArrayToPackedFunc(gptr->InEdges(vid));
   });
 
 TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphInEdges_2")
@@ -167,7 +174,7 @@ TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphInEdges_2")
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const IdArray vids = args[1];
-    *rv = ConvertPairToPackedFunc(gptr->InEdges(vids));
+    *rv = ConvertEdgeArrayToPackedFunc(gptr->InEdges(vids));
   });
 
 TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphOutEdges_1")
@@ -175,7 +182,7 @@ TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphOutEdges_1")
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const dgl_id_t vid = args[1];
-    *rv = ConvertPairToPackedFunc(gptr->OutEdges(vid));
+    *rv = ConvertEdgeArrayToPackedFunc(gptr->OutEdges(vid));
   });
 
 TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphOutEdges_2")
@@ -183,7 +190,7 @@ TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphOutEdges_2")
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const IdArray vids = args[1];
-    *rv = ConvertPairToPackedFunc(gptr->OutEdges(vids));
+    *rv = ConvertEdgeArrayToPackedFunc(gptr->OutEdges(vids));
   });
 
 TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphEdges")
@@ -191,7 +198,7 @@ TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphEdges")
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const bool sorted = args[1];
-    *rv = ConvertPairToPackedFunc(gptr->Edges(sorted));
+    *rv = ConvertEdgeArrayToPackedFunc(gptr->Edges(sorted));
   });
 
 TVM_REGISTER_GLOBAL("cgraph._CAPI_DGLGraphInDegree")

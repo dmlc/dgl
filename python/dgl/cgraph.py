@@ -67,42 +67,51 @@ class DGLGraph(object):
         v_array = F.asdglarray(v.totensor())
         return _CAPI_DGLGraphEdgeIds(self._handle, u_array, v_array)
 
-    def inedges(self, v):
+    def in_edges(self, v):
         if isinstance(v, int):
-            pair = _CAPI_DGLGraphInEdges_1(self._handle, v)
+            edge_array = _CAPI_DGLGraphInEdges_1(self._handle, v)
         else:
             v = utils.Index(v)
             v_array = F.asdglarray(v.totensor())
-            pair = _CAPI_DGLGraphInEdges_2(self._handle, v_array)
-        return pair(0), pair(1)
+            edge_array = _CAPI_DGLGraphInEdges_2(self._handle, v_array)
+        src = edge_array(0)
+        dst = edge_array(1)
+        eid = edge_array(2)
+        return src, dst, eid
 
-    def outedges(self, v):
+    def out_edges(self, v):
         if isinstance(v, int):
-            pair = _CAPI_DGLGraphOutEdges_1(self._handle, v)
+            edge_array = _CAPI_DGLGraphOutEdges_1(self._handle, v)
         else:
             v = utils.Index(v)
             v_array = F.asdglarray(v.totensor())
-            pair = _CAPI_DGLGraphOutEdges_2(self._handle, v_array)
-        return pair(0), pair(1)
+            edge_array = _CAPI_DGLGraphOutEdges_2(self._handle, v_array)
+        src = edge_array(0)
+        dst = edge_array(1)
+        eid = edge_array(2)
+        return src, dst, eid
 
-    def indegree(self, v):
+    def edges(self, sorted=False):
+        edge_array = _CAPI_DGLGraphEdges(self._handle, sorted)
+        src = edge_array(0)
+        dst = edge_array(1)
+        eid = edge_array(2)
+        return src, dst, eid
+
+    def in_degree(self, v):
         return _CAPI_DGLGraphInDegree(self._handle, v)
 
-    def indegrees(self, v):
+    def in_degrees(self, v):
         v = utils.Index(v)
         v_array = F.asdglarray(v.totensor())
         return _CAPI_DGLGraphInDegrees(self._handle, v_array)
 
-    def outdegree(self, v):
+    def out_degree(self, v):
         return _CAPI_DGLGraphOutDegree(self._handle, v)
 
-    def outdegrees(self, v):
+    def out_degrees(self, v):
         v = utils.Index(v)
         v_array = F.asdglarray(v.totensor())
         return _CAPI_DGLGraphOutDegrees(self._handle, v_array)
-
-    def edges(self, sorted=False):
-        pair = _CAPI_DGLGraphEdges(self._handle, sorted)
-        return pair(0), pair(1)
 
 _init_api("dgl.cgraph")

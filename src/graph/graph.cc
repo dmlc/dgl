@@ -21,8 +21,9 @@ void Graph::AddEdge(dgl_id_t src, dgl_id_t dst) {
     << "In valid vertices: " << src << " " << dst;
   dgl_id_t eid = num_edges_++;
   adjlist_[src].succ.push_back(dst);
-  adjlist_[src].edge_id.push_back(eid);
+  adjlist_[src].succ_edge_id.push_back(eid);
   adjlist_[dst].pred.push_back(src);
+  adjlist_[dst].pred_edge_id.push_back(eid);
 }
 
 void Graph::AddEdges(IdArray src_ids, IdArray dst_ids) {
@@ -137,7 +138,7 @@ dgl_id_t Graph::EdgeId(dgl_id_t src, dgl_id_t dst) const {
   const auto& succ = adjlist_[src].succ;
   for (size_t i = 0; i < succ.size(); ++i) {
     if (succ[i] == dst) {
-      return adjlist_[src].edge_id[i];
+      return adjlist_[src].succ_edge_id[i];
     }
   }
   LOG(FATAL) << "invalid edge: " << src << " -> " << dst;
@@ -176,17 +177,25 @@ IdArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
 }
 
 // O(E)
-std::pair<IdArray, IdArray> Graph::InEdges(dgl_id_t vid) const {
-  const auto& src = Predecessors(vid);
-  const auto srclen = src->shape[0];
-  IdArray dst = IdArray::Empty({srclen}, src->dtype, src->ctx);
+Graph::EdgeArray Graph::InEdges(dgl_id_t vid) const {
+  CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
+  const int64_t len = adjlist_[vid].pred.size();
+  IdArray src = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  IdArray dst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  IdArray eid = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  int64_t* src_data = static_cast<int64_t*>(src->data);
   int64_t* dst_data = static_cast<int64_t*>(dst->data);
-  std::fill(dst_data, dst_data + srclen, vid);
-  return std::make_pair(src, dst);
+  int64_t* eid_data = static_cast<int64_t*>(eid->data);
+  for (int64_t i = 0; i < len; ++i) {
+    src_data[i] = adjlist_[vid].pred[i];
+    eid_data[i] = adjlist_[vid].pred_edge_id[i];
+  }
+  std::fill(dst_data, dst_data + len, vid);
+  return EdgeArray{src, dst, eid};
 }
 
 // O(E)
-std::pair<IdArray, IdArray> Graph::InEdges(IdArray vids) const {
+Graph::EdgeArray Graph::InEdges(IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
   const auto len = vids->shape[0];
   const int64_t* vid_data = static_cast<int64_t*>(vids->data);
@@ -197,30 +206,42 @@ std::pair<IdArray, IdArray> Graph::InEdges(IdArray vids) const {
   }
   IdArray src = IdArray::Empty({rstlen}, vids->dtype, vids->ctx);
   IdArray dst = IdArray::Empty({rstlen}, vids->dtype, vids->ctx);
+  IdArray eid = IdArray::Empty({rstlen}, vids->dtype, vids->ctx);
   int64_t* src_ptr = static_cast<int64_t*>(src->data);
   int64_t* dst_ptr = static_cast<int64_t*>(dst->data);
+  int64_t* eid_ptr = static_cast<int64_t*>(eid->data);
   for (int64_t i = 0; i < len; ++i) {
     const auto& pred = adjlist_[vid_data[i]].pred;
+    const auto& eids = adjlist_[vid_data[i]].pred_edge_id;
     for (size_t j = 0; j < pred.size(); ++j) {
       *(src_ptr++) = pred[j];
       *(dst_ptr++) = vid_data[i];
+      *(eid_ptr++) = eids[j];
     }
   }
-  return std::make_pair(src, dst);
+  return EdgeArray{src, dst, eid};
 }
 
 // O(E)
-std::pair<IdArray, IdArray> Graph::OutEdges(dgl_id_t vid) const {
-  const auto& dst = Successors(vid);
-  const auto dstlen = dst->shape[0];
-  IdArray src = IdArray::Empty({dstlen}, dst->dtype, dst->ctx);
+Graph::EdgeArray Graph::OutEdges(dgl_id_t vid) const {
+  CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
+  const int64_t len = adjlist_[vid].succ.size();
+  IdArray src = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  IdArray dst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  IdArray eid = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   int64_t* src_data = static_cast<int64_t*>(src->data);
-  std::fill(src_data, src_data + dstlen, vid);
-  return std::make_pair(src, dst);
+  int64_t* dst_data = static_cast<int64_t*>(dst->data);
+  int64_t* eid_data = static_cast<int64_t*>(eid->data);
+  for (int64_t i = 0; i < len; ++i) {
+    dst_data[i] = adjlist_[vid].succ[i];
+    eid_data[i] = adjlist_[vid].succ_edge_id[i];
+  }
+  std::fill(src_data, src_data + len, vid);
+  return EdgeArray{src, dst, eid};
 }
 
 // O(E)
-std::pair<IdArray, IdArray> Graph::OutEdges(IdArray vids) const {
+Graph::EdgeArray Graph::OutEdges(IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
   const auto len = vids->shape[0];
   const int64_t* vid_data = static_cast<int64_t*>(vids->data);
@@ -231,23 +252,28 @@ std::pair<IdArray, IdArray> Graph::OutEdges(IdArray vids) const {
   }
   IdArray src = IdArray::Empty({rstlen}, vids->dtype, vids->ctx);
   IdArray dst = IdArray::Empty({rstlen}, vids->dtype, vids->ctx);
+  IdArray eid = IdArray::Empty({rstlen}, vids->dtype, vids->ctx);
   int64_t* src_ptr = static_cast<int64_t*>(src->data);
   int64_t* dst_ptr = static_cast<int64_t*>(dst->data);
+  int64_t* eid_ptr = static_cast<int64_t*>(eid->data);
   for (int64_t i = 0; i < len; ++i) {
     const auto& succ = adjlist_[vid_data[i]].succ;
+    const auto& eids = adjlist_[vid_data[i]].succ_edge_id;
     for (size_t j = 0; j < succ.size(); ++j) {
       *(src_ptr++) = vid_data[i];
       *(dst_ptr++) = succ[j];
+      *(eid_ptr++) = eids[j];
     }
   }
-  return std::make_pair(src, dst);
+  return EdgeArray{src, dst, eid};
 }
 
 // O(E*log(E)) if sort is required; otherwise, O(E)
-std::pair<IdArray, IdArray> Graph::Edges(bool sorted) const {
+Graph::EdgeArray Graph::Edges(bool sorted) const {
   const int64_t len = num_edges_;
   IdArray src = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   IdArray dst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  IdArray eid = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
 
   if (sorted) {
     typedef std::tuple<int64_t, int64_t, int64_t> Tuple;
@@ -255,7 +281,7 @@ std::pair<IdArray, IdArray> Graph::Edges(bool sorted) const {
     tuples.reserve(len);
     for (dgl_id_t u = 0; u < NumVertices(); ++u) {
       for (size_t i = 0; i < adjlist_[u].succ.size(); ++i) {
-        tuples.push_back(std::make_tuple(u, adjlist_[u].succ[i], adjlist_[u].edge_id[i]));
+        tuples.emplace_back(u, adjlist_[u].succ[i], adjlist_[u].succ_edge_id[i]);
       }
     }
     // sort according to edge ids
@@ -267,22 +293,26 @@ std::pair<IdArray, IdArray> Graph::Edges(bool sorted) const {
     // make return arrays
     int64_t* src_ptr = static_cast<int64_t*>(src->data);
     int64_t* dst_ptr = static_cast<int64_t*>(dst->data);
+    int64_t* eid_ptr = static_cast<int64_t*>(eid->data);
     for (int64_t i = 0; i < len; ++i) {
       src_ptr[i] = std::get<0>(tuples[i]);
       dst_ptr[i] = std::get<1>(tuples[i]);
+      eid_ptr[i] = std::get<2>(tuples[i]);
     }
   } else {
     int64_t* src_ptr = static_cast<int64_t*>(src->data);
     int64_t* dst_ptr = static_cast<int64_t*>(dst->data);
+    int64_t* eid_ptr = static_cast<int64_t*>(eid->data);
     for (dgl_id_t u = 0; u < NumVertices(); ++u) {
       for (size_t i = 0; i < adjlist_[u].succ.size(); ++i) {
         *(src_ptr++) = u;
         *(dst_ptr++) = adjlist_[u].succ[i];
+        *(eid_ptr++) = adjlist_[u].succ_edge_id[i];
       }
     }
   }
 
-  return std::make_pair(src, dst);
+  return EdgeArray{src, dst, eid};
 }
 
 // O(V)

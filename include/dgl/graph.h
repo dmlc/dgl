@@ -33,6 +33,12 @@ class Graph;
  */
 class Graph {
  public:
+  /* \brief structure used to represent a list of edges */
+  typedef struct {
+    /* \brief the two endpoints and the id of the edge */
+    IdArray src, dst, id;
+  } EdgeArray;
+
   /*! \brief default constructor */
   Graph() {}
 
@@ -129,7 +135,7 @@ class Graph {
   IdArray Successors(dgl_id_t vid, uint64_t radius = 1) const;
 
   /*!
-   * \brief Get the id of the given edge.
+   * \brief Get the edge id using the two endpoints
    * \note Edges are associated with an integer id start from zero.
    *       The id is assigned when the edge is being added to the graph.
    * \param src The source vertex.
@@ -139,7 +145,7 @@ class Graph {
   dgl_id_t EdgeId(dgl_id_t src, dgl_id_t dst) const;
 
   /*!
-   * \brief Get the id of the given edges.
+   * \brief Get the edge id using the two endpoints
    * \note Edges are associated with an integer id start from zero.
    *       The id is assigned when the edge is being added to the graph.
    * \return the edge id array.
@@ -150,16 +156,16 @@ class Graph {
    * \brief Get the in edges of the vertex.
    * \note The returned dst id array is filled with vid.
    * \param vid The vertex id.
-   * \return the id arrays of the two endpoints of the edges.
+   * \return the edges
    */
-  std::pair<IdArray, IdArray> InEdges(dgl_id_t vid) const;
+  EdgeArray InEdges(dgl_id_t vid) const;
 
   /*!
    * \brief Get the in edges of the vertices.
    * \param vids The vertex id array.
    * \return the id arrays of the two endpoints of the edges.
    */
-  std::pair<IdArray, IdArray> InEdges(IdArray vids) const;
+  EdgeArray InEdges(IdArray vids) const;
   
   /*!
    * \brief Get the out edges of the vertex.
@@ -167,21 +173,22 @@ class Graph {
    * \param vid The vertex id.
    * \return the id arrays of the two endpoints of the edges.
    */
-  std::pair<IdArray, IdArray> OutEdges(dgl_id_t vid) const;
+  EdgeArray OutEdges(dgl_id_t vid) const;
 
   /*!
    * \brief Get the out edges of the vertices.
    * \param vids The vertex id array.
    * \return the id arrays of the two endpoints of the edges.
    */
-  std::pair<IdArray, IdArray> OutEdges(IdArray vids) const;
+  EdgeArray OutEdges(IdArray vids) const;
 
   /*!
    * \brief Get all the edges in the graph.
+   * \note If sorted is true, the id array is not returned.
    * \param sorted Whether the returned edge list is sorted by their edge ids.
    * \return the id arrays of the two endpoints of the edges.
    */
-  std::pair<IdArray, IdArray> Edges(bool sorted = false) const;
+  EdgeArray Edges(bool sorted = false) const;
 
   /*!
    * \brief Get the in degree of the given vertex.
@@ -262,6 +269,10 @@ class Graph {
    */
   Graph Reverse() const;
 
+  static Graph Merge(std::vector<Graph> graphs);
+
+  std::vector<Graph> Split(std::vector<IdArray> vids_array) const;
+
  private:
   /*! \brief Internal edge list type */
   struct EdgeList {
@@ -270,7 +281,9 @@ class Graph {
     /*! \brief predecessor vertex list */
     vector_view<dgl_id_t> pred;
     /*! \brief (local) succ edge id property */
-    std::vector<dgl_id_t> edge_id;
+    std::vector<dgl_id_t> succ_edge_id;
+    /*! \brief (local) pred edge id property */
+    std::vector<dgl_id_t> pred_edge_id;
   };
   /*! \brief Adjacency list using vector storage */
   // TODO(minjie): adjacent list is good for graph mutation and finding pred/succ.
