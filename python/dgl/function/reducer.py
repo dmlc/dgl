@@ -49,39 +49,41 @@ class BundledReduceFunction(ReduceFunction):
     def name(self):
         return "bundled"
 
-class SumReducerFunction(ReduceFunction):
-    def __init__(self, batch_sum_op, nonbatch_sum_op, msg_field=None, out_field=None):
-        self.batch_sum_op = batch_sum_op
-        self.nonbatch_sum_op = nonbatch_sum_op
+class ReducerFunctionTemplate(ReduceFunction):
+    def __init__(self, name, batch_op, nonbatch_op, msg_field=None, out_field=None):
+        self.name = name
+        self.batch_op = batch_op
+        self.nonbatch_op = nonbatch_op
         self.msg_field = msg_field
         self.out_field = out_field
 
     def is_spmv_supported(self):
-        return True
+        # TODO: support max
+        return self.name == "sum"
 
     def __call__(self, node, msgs):
         if isinstance(msgs, list):
             if self.msg_field is None:
-                ret = self.nonbatch_sum_op(msgs)
+                ret = self.nonbatch_op(msgs)
             else:
-                ret = self.nonbatch_sum_op([msg[self.msg_field] for msg in msgs])
+                ret = self.nonbatch_op([msg[self.msg_field] for msg in msgs])
         else:
             if self.msg_field is None:
-                ret = self.batch_sum_op(msgs, 1)
+                ret = self.batch_op(msgs, 1)
             else:
-                ret = self.batch_sum_op(msgs[self.msg_field], 1)
+                ret = self.batch_op(msgs[self.msg_field], 1)
         if self.out_field is None:
             return ret
         else:
             return {self.out_field : ret}
 
     def name(self):
-        return "sum"
+        return self.name
 
 _python_sum = sum
 def sum(msgs=None, out=None):
-    return SumReducerFunction(F.sum, _python_sum, msgs, out)
+    return ReducerFunctionTemplate("sum", F.sum, _python_sum, msgs, out)
 
 _python_max = max
 def max(msgs=None, out=None):
-    return SumReducerFunction(F.max, _python_max, msgs, out)
+    return ReducerFunctionTemplate("max", F.max, _python_max, msgs, out)
