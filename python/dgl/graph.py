@@ -663,6 +663,41 @@ class DGLGraph(DiGraph):
             # Use setter to do reorder.
             self.set_n_repr(new_reprs, reordered_v)
 
+    def _send_and_recv(self, u, v, unique_v,
+                       message_func="default",
+                       reduce_func="default",
+                       apply_node_func="default",
+                       batchable=False):
+        u = utils.toindex(u)
+        v = utils.toindex(v)
+        if len(u) == 0:
+            # no edges to be triggered
+            assert len(v) == 0
+            return
+        unique_v = utils.toindex(unique_v.totensor())
+
+        # TODO(minjie): better way to figure out `batchable` flag
+        if message_func == "default":
+            message_func, batchable = self._message_func
+        if reduce_func == "default":
+            reduce_func, _ = self._reduce_func
+        assert message_func is not None
+        assert reduce_func is not None
+
+        if batchable:
+            executor = scheduler.get_executor(
+                    'send_and_recv', self, src=u, dst=v,
+                    message_func=message_func, reduce_func=reduce_func)
+        else:
+            executor = None
+
+        if executor:
+            executor.run()
+        else:
+            self.send(u, v, message_func, batchable=batchable)
+            self.recv(unique_v, reduce_func, None, batchable=batchable)
+        self.apply_nodes(unique_v, apply_node_func, batchable=batchable)
+
     def send_and_recv(self,
                       u, v,
                       message_func="default",
@@ -686,35 +721,14 @@ class DGLGraph(DiGraph):
         batchable : bool
           Whether the reduce and update function allows batched computation.
         """
-        u = utils.toindex(u)
-        v = utils.toindex(v)
         if len(u) == 0:
             # no edges to be triggered
             assert len(v) == 0
             return
-        unique_v = utils.toindex(F.unique(v.totensor()))
-
-        # TODO(minjie): better way to figure out `batchable` flag
-        if message_func == "default":
-            message_func, batchable = self._message_func
-        if reduce_func == "default":
-            reduce_func, _ = self._reduce_func
-        assert message_func is not None
-        assert reduce_func is not None
-
-        if batchable:
-            executor = scheduler.get_executor(
-                    'send_and_recv', self, src=u, dst=v,
-                    message_func=message_func, reduce_func=reduce_func)
-        else:
-            executor = None
-
-        if executor:
-            executor.run()
-        else:
-            self.send(u, v, message_func, batchable=batchable)
-            self.recv(unique_v, reduce_func, None, batchable=batchable)
-        self.apply_nodes(unique_v, apply_node_func, batchable=batchable)
+        unique_v = F.unique(v.totensor())
+        _send_and_recv(u, v, unique_v,
+                      message_func, reduce_func, apply_node_func,
+                      batchable)
 
     def pull(self,
              v,
@@ -741,10 +755,9 @@ class DGLGraph(DiGraph):
         if len(v) == 0:
             return
         uu, vv, _ = self.cached_graph.in_edges(v)
-        self.send_and_recv(uu, vv, message_func, reduce_func,
-                apply_node_func=None, batchable=batchable)
-        unique_v = F.unique(v.totensor())
-        self.apply_nodes(unique_v, apply_node_func, batchable=batchable)
+        self._send_and_recv(uu, vv, v, message_func, reduce_func,
+                            apply_node_func=apply_node_func,
+                            batchable=batchable)
 
     def push(self,
              u,
