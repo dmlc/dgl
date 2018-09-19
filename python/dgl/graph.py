@@ -66,7 +66,7 @@ class DGLGraph(DiGraph):
     def edge_attr_schemes(self):
         return self._edge_frame.schemes
 
-    def set_n_repr(self, hu, u=ALL):
+    def set_n_repr(self, hu, u=ALL, inplace=False):
         """Set node(s) representation.
 
         To set multiple node representations at once, pass `u` with a tensor or
@@ -104,9 +104,9 @@ class DGLGraph(DiGraph):
                 self._node_frame[__REPR__] = hu
         else:
             if utils.is_dict_like(hu):
-                self._node_frame[u] = hu
+                self._node_frame.update_rows(u, hu, inplace=inplace)
             else:
-                self._node_frame[u] = {__REPR__ : hu}
+                self._node_frame.update_rows(u, {__REPR__ : hu}, inplace=inplace)
 
     def get_n_repr(self, u=ALL):
         """Get node(s) representation.

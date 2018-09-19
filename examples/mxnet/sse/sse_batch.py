@@ -97,6 +97,8 @@ def main(args):
             loss.backward()
             trainer.step(batch.data[0].shape[0])
 
+            g.set_n_repr(logits, batch.data[0], inplace=True)
+
         dur.append(time.time() - t0)
         print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
             epoch, loss.asnumpy()[0], np.mean(dur), n_edges / np.mean(dur) / 1000))
