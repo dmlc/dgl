@@ -141,6 +141,23 @@ def test_batched_edge_ordering():
     r2 = g1.get_e_repr()[g1.get_edge_id(4, 5)]
     assert torch.equal(r1, r2)
 
+def test_batch_no_edge():
+    g1 = dgl.DGLGraph()
+    g1.add_nodes_from([0,1,2, 3, 4, 5])
+    g1.add_edges_from([(4, 5), (4, 3), (2, 3), (2, 1), (0, 1)])
+    g1.edge_list
+    e1 = torch.randn(5, 10)
+    g1.set_e_repr(e1)
+    g2 = dgl.DGLGraph()
+    g2.add_nodes_from([0, 1, 2, 3, 4, 5])
+    g2.add_edges_from([(0, 1), (1, 2), (2, 3), (5, 4), (4, 3), (5, 0)])
+    e2 = torch.randn(6, 10)
+    g2.set_e_repr(e2)
+    g3 = dgl.DGLGraph()
+    g3.add_nodes_from([0])  # no edges
+
+    g = dgl.batch([g1, g3, g2]) # should not throw an error
+
 if __name__ == '__main__':
     test_batch_unbatch()
     test_batched_edge_ordering()
