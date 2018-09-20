@@ -163,3 +163,4 @@ if __name__ == '__main__':
     test_batched_edge_ordering()
     test_batch_sendrecv()
     test_batch_propagate()
+    test_batch_no_edge()
