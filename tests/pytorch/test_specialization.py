@@ -7,8 +7,7 @@ D = 5
 
 def generate_graph():
     g = dgl.DGLGraph()
-    for i in range(10):
-        g.add_node(i) # 10 nodes.
+    g.add_nodes(10)
     # create a graph where 0 is the source and 9 is the sink
     for i in range(1, 9):
         g.add_edge(0, i)

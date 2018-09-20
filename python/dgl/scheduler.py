@@ -134,7 +134,7 @@ class UpdateAllExecutor(BasicExecutor):
     @property
     def graph_idx(self):
         if self._graph_idx is None:
-            self._graph_idx = self.g.cached_graph.adjmat()
+            self._graph_idx = self.g._graph.adjacency_matrix()
         return self._graph_idx
 
     @property
@@ -221,8 +221,8 @@ class SendRecvExecutor(BasicExecutor):
     def _build_adjmat(self):
         # handle graph index
         new2old, old2new = utils.build_relabel_map(self.v)
-        u = self.u.totensor()
-        v = self.v.totensor()
+        u = self.u.tousertensor()
+        v = self.v.tousertensor()
         # TODO(minjie): should not directly use []
         new_v = old2new[v]
         n = self.g.number_of_nodes()

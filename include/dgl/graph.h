@@ -4,7 +4,6 @@
 
 #include <stdint.h>
 #include "runtime/ndarray.h"
-#include "./vector_view.h"
 
 namespace dgl {
 
@@ -89,7 +88,8 @@ class Graph {
    * \brief Clear the graph. Remove all vertices/edges.
    */
   void Clear() {
-    adjlist_ = vector_view<EdgeList>();
+    adjlist_.clear();
+    reverse_adjlist_.clear();
     read_only_ = false;
     num_edges_ = 0;
   }
@@ -184,8 +184,9 @@ class Graph {
 
   /*!
    * \brief Get all the edges in the graph.
-   * \note If sorted is true, the id array is not returned.
-   * \param sorted Whether the returned edge list is sorted by their edge ids.
+   * \note If sorted is true, the returned edges list is sorted by their src and
+   *       dst ids. Otherwise, they are in their edge id order.
+   * \param sorted Whether the returned edge list is sorted by their src and dst ids
    * \return the id arrays of the two endpoints of the edges.
    */
   EdgeArray Edges(bool sorted = false) const;
@@ -197,7 +198,7 @@ class Graph {
    */
   uint64_t InDegree(dgl_id_t vid) const {
     CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
-    return adjlist_[vid].pred.size();
+    return reverse_adjlist_[vid].succ.size();
   }
 
   /*!
@@ -277,23 +278,22 @@ class Graph {
   /*! \brief Internal edge list type */
   struct EdgeList {
     /*! \brief successor vertex list */
-    vector_view<dgl_id_t> succ;
+    std::vector<dgl_id_t> succ;
     /*! \brief predecessor vertex list */
-    vector_view<dgl_id_t> pred;
-    /*! \brief (local) succ edge id property */
-    std::vector<dgl_id_t> succ_edge_id;
-    /*! \brief (local) pred edge id property */
-    std::vector<dgl_id_t> pred_edge_id;
+    std::vector<dgl_id_t> edge_id;
   };
-  /*! \brief Adjacency list using vector storage */
-  // TODO(minjie): adjacent list is good for graph mutation and finding pred/succ.
-  // It is not good for getting all the edges of the graph. If the graph is known
-  // to be static, how to design a data structure to speed this up? This idea can
-  // be further extended. For example, CSC/CSR graph storage is known to be more
-  // compact than adjlist, but is difficult to be mutated. Shall we switch to a CSR/CSC
-  // graph structure at some point? When shall such conversion happen? Which one
-  // will more likely to be a bottleneck? memory or computation?
-  vector_view<EdgeList> adjlist_;
+  typedef std::vector<EdgeList> AdjacencyList;
+
+  /*! \brief adjacency list using vector storage */
+  AdjacencyList adjlist_;
+  /*! \brief reverse adjacency list using vector storage */
+  AdjacencyList reverse_adjlist_;
+
+  /*! \brief all edges' src endpoints in their edge id order */
+  std::vector<dgl_id_t> all_edges_src_;
+  /*! \brief all edges' dst endpoints in their edge id order */
+  std::vector<dgl_id_t> all_edges_dst_;
+
   /*! \brief read only flag */
   bool read_only_{false};
   /*! \brief number of edges */

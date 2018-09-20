@@ -121,6 +121,10 @@ class DGLGraph(object):
         """
         return self._graph.number_of_nodes()
 
+    def __len__(self):
+        """Return the number of nodes."""
+        return self.number_of_nodes()
+
     def number_of_edges(self):
         """Return the number of edges.
 
@@ -144,6 +148,10 @@ class DGLGraph(object):
         bool
             True if the node exists
         """
+        return self.has_node(vid)
+    
+    def __contains__(self, vid):
+        """Same as has_node."""
         return self.has_node(vid)
 
     def has_nodes(self, vids):
@@ -319,7 +327,7 @@ class DGLGraph(object):
         Parameters
         ----------
         sorted : bool
-            True if the returned edges are sorted by their ids.
+            True if the returned edges are sorted by their src and dst ids.
         
         Returns
         -------
@@ -543,29 +551,12 @@ class DGLGraph(object):
         v_is_all = is_all(v)
         assert u_is_all == v_is_all
         if u_is_all:
-            num_edges = self.number_of_edges()
+            self.set_e_repr_by_id(h_uv, eid=ALL)
         else:
             u = utils.toindex(u)
             v = utils.toindex(v)
-            num_edges = max(len(u), len(v))
-        if utils.is_dict_like(h_uv):
-            for key, val in h_uv.items():
-                assert F.shape(val)[0] == num_edges
-        else:
-            assert F.shape(h_uv)[0] == num_edges
-        # set
-        if u_is_all:
-            if utils.is_dict_like(h_uv):
-                for key, val in h_uv.items():
-                    self._edge_frame[key] = val
-            else:
-                self._edge_frame[__REPR__] = h_uv
-        else:
             eid = self._graph.edge_ids(u, v)
-            if utils.is_dict_like(h_uv):
-                self._edge_frame[eid] = h_uv
-            else:
-                self._edge_frame[eid] = {__REPR__ : h_uv}
+            self.set_e_repr_by_id(h_uv, eid=eid)
 
     def set_e_repr_by_id(self, h_uv, eid=ALL):
         """Set edge(s) representation by edge id.
@@ -622,18 +613,12 @@ class DGLGraph(object):
         if len(self.edge_attr_schemes()) == 0:
             return dict()
         if u_is_all:
-            if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
-                return self._edge_frame[__REPR__]
-            else:
-                return dict(self._edge_frame)
+            return self.get_e_repr_by_id(eid=ALL)
         else:
             u = utils.toindex(u)
             v = utils.toindex(v)
             eid = self._graph.edge_ids(u, v)
-            if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
-                return self._edge_frame.select_rows(eid)[__REPR__]
-            else:
-                return self._edge_frame.select_rows(eid)
+            return self.get_e_repr_by_id(eid=eid)
 
     def pop_e_repr(self, key=__REPR__):
         """Get and remove the specified edge repr.
@@ -855,7 +840,7 @@ class DGLGraph(object):
 
     def _batch_send(self, u, v, message_func):
         if is_all(u) and is_all(v):
-            u, v, _ = self._graph.edges(sorted=True)
+            u, v, _ = self._graph.edges()
             self._msg_graph.add_edges(u, v)
             # call UDF
             src_reprs = self.get_n_repr(u)
@@ -920,7 +905,7 @@ class DGLGraph(object):
 
     def _batch_update_edge(self, u, v, edge_func):
         if is_all(u) and is_all(v):
-            u, v = self._graph.edges(sorted=True)
+            u, v = self._graph.edges()
             # call the UDF
             src_reprs = self.get_n_repr(u)
             dst_reprs = self.get_n_repr(v)

@@ -21,6 +21,7 @@ class GraphIndex(object):
             self.from_networkx(graph_data)
         elif graph_data is not None:
             self.from_networkx(nx.DiGraph(graph_data))
+        self._cache = {}
 
     def __del__(self):
         """Free this graph index object."""
@@ -35,6 +36,7 @@ class GraphIndex(object):
             Number of nodes to be added.
         """
         _CAPI_DGLGraphAddVertices(self._handle, num);
+        self._cache.clear()
 
     def add_edge(self, u, v):
         """Add one edge.
@@ -47,6 +49,7 @@ class GraphIndex(object):
             The dst node.
         """
         _CAPI_DGLGraphAddEdge(self._handle, u, v);
+        self._cache.clear()
 
     def add_edges(self, u, v):
         """Add many edges.
@@ -61,10 +64,12 @@ class GraphIndex(object):
         u_array = u.todgltensor()
         v_array = v.todgltensor()
         _CAPI_DGLGraphAddEdges(self._handle, u_array, v_array)
+        self._cache.clear()
 
     def clear(self):
         """Clear the graph."""
         _CAPI_DGLGraphClear(self._handle)
+        self._cache.clear()
 
     def number_of_nodes(self):
         """Return the number of nodes.
@@ -283,7 +288,7 @@ class GraphIndex(object):
         Parameters
         ----------
         sorted : bool
-            True if the returned edges are sorted by their ids.
+            True if the returned edges are sorted by their src and dst ids.
         
         Returns
         -------
@@ -361,6 +366,25 @@ class GraphIndex(object):
         """
         v_array = v.todgltensor()
         return utils.toindex(_CAPI_DGLGraphOutDegrees(self._handle, v_array))
+
+    def adjacency_matrix(self):
+        """Return the adjacency matrix representation of this graph.
+
+        Returns
+        -------
+        utils.CtxCachedObject
+            An object that returns tensor given context.
+        """
+        if not 'adj' in self._cache:
+            src, dst, _ = self.edges(sorted=False)
+            src = F.unsqueeze(src.tousertensor(), 0)
+            dst = F.unsqueeze(dst.tousertensor(), 0)
+            idx = F.pack([dst, src])
+            n = self.number_of_nodes()
+            dat = F.ones((self.number_of_edges(),))
+            mat = F.sparse_tensor(idx, dat, [n, n])
+            self._cache['adj'] = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
+        return self._cache['adj']
 
     def to_networkx(self):
         """Convert to networkx graph.
