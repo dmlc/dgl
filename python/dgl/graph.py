@@ -3,19 +3,17 @@
 from __future__ import absolute_import
 
 import networkx as nx
-from networkx.classes.digraph import DiGraph
 
 import dgl
 from .base import ALL, is_all, __MSG__, __REPR__
 from . import backend as F
 from .backend import Tensor
-from .cached_graph import CachedGraph, create_cached_graph
+from .graph_index import GraphIndex
 from .frame import FrameRef, merge_frames
-from .nx_adapt import nx_init
 from . import scheduler
 from . import utils
 
-class DGLGraph(DiGraph):
+class DGLGraph(object):
     """Base graph class specialized for neural networks on graphs.
 
     TODO(minjie): document of batching semantics
@@ -38,20 +36,20 @@ class DGLGraph(DiGraph):
                  edge_frame=None,
                  **attr):
         # TODO(minjie): maintaining node/edge list is costly when graph is large.
-        self._edge_list = []
-        nx_init(self,
-                self._add_node_callback,
-                self._add_edge_callback,
-                self._del_node_callback,
-                self._del_edge_callback,
-                graph_data,
-                **attr)
-        # cached graph and storage
-        self._cached_graph = None
+        #nx_init(self,
+        #        self._add_node_callback,
+        #        self._add_edge_callback,
+        #        self._del_node_callback,
+        #        self._del_edge_callback,
+        #        graph_data,
+        #        **attr)
+        # graph
+        self._graph = GraphIndex(graph_data)
+        # frame
         self._node_frame = node_frame if node_frame is not None else FrameRef()
         self._edge_frame = edge_frame if edge_frame is not None else FrameRef()
         # other class members
-        self._msg_graph = None
+        self._msg_graph = GraphIndex()
         self._msg_frame = FrameRef()
         self._message_func = (None, None)
         self._reduce_func = (None, None)
@@ -918,13 +916,6 @@ class DGLGraph(DiGraph):
 
         pos = graphviz_layout(self, prog='dot')
         nx.draw(self, pos, with_labels=True)
-
-    @property
-    def cached_graph(self):
-        # TODO: dirty flag when mutated
-        if self._cached_graph is None:
-            self._cached_graph = create_cached_graph(self)
-        return self._cached_graph
 
     @property
     def msg_graph(self):

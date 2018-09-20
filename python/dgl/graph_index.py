@@ -1,5 +1,8 @@
 from __future__ import absolute_import
 
+import numpy as np
+import networkx as nx
+
 from ._ffi.function import _init_api
 from . import backend as F
 from . import utils
@@ -9,12 +12,15 @@ class GraphIndex(object):
 
     Parameters
     ----------
-    graph_data : graph data
+    graph_data : graph data, optional
         Data to initialize graph. Same as networkx's semantics.
     """
     def __init__(self, graph_data=None):
-        # TODO: convert from graph data
         self._handle = _CAPI_DGLGraphCreate()
+        if isinstance(graph_data, nx.DiGraph):
+            self.from_networkx(graph_data)
+        elif graph_data is not None:
+            self.from_networkx(nx.DiGraph(graph_data))
 
     def __del__(self):
         """Free this graph index object."""
@@ -52,10 +58,6 @@ class GraphIndex(object):
         v : utils.Index
             The dst nodes.
         """
-        #u = utils.Index(u)
-        #v = utils.Index(v)
-        #u_array = F.asdglarray(u.totensor())
-        #v_array = F.asdglarray(v.totensor())
         u_array = u.todgltensor()
         v_array = v.todgltensor()
         _CAPI_DGLGraphAddEdges(self._handle, u_array, v_array)
@@ -113,7 +115,7 @@ class GraphIndex(object):
             0-1 array indicating existence
         """
         vid_array = vids.todgltensor()
-        return utils.Index(_CAPI_DGLGraphHasVertices(self._handle, vid_array))
+        return utils.toindex(_CAPI_DGLGraphHasVertices(self._handle, vid_array))
 
     def has_edge(self, u, v):
         """Return true if the edge exists.
@@ -149,7 +151,7 @@ class GraphIndex(object):
         """
         u_array = u.todgltensor()
         v_array = v.todgltensor()
-        return utils.Index(_CAPI_DGLGraphHasEdges(self._handle, u_array, v_array))
+        return utils.toindex(_CAPI_DGLGraphHasEdges(self._handle, u_array, v_array))
 
     def predecessors(self, v, radius=1):
         """Return the predecessors of the node.
@@ -166,7 +168,7 @@ class GraphIndex(object):
         utils.Index
             Array of predecessors
         """
-        return utils.Index(_CAPI_DGLGraphPredecessors(self._handle, v, radius))
+        return utils.toindex(_CAPI_DGLGraphPredecessors(self._handle, v, radius))
 
     def successors(self, v, radius=1):
         """Return the successors of the node.
@@ -183,7 +185,7 @@ class GraphIndex(object):
         utils.Index
             Array of successors
         """
-        return utils.Index(_CAPI_DGLGraphSuccessors(self._handle, v, radius))
+        return utils.toindex(_CAPI_DGLGraphSuccessors(self._handle, v, radius))
 
     def edge_id(self, u, v):
         """Return the id of the edge.
@@ -219,7 +221,7 @@ class GraphIndex(object):
         """
         u_array = u.todgltensor()
         v_array = v.todgltensor()
-        return utils.Index(_CAPI_DGLGraphEdgeIds(self._handle, u_array, v_array))
+        return utils.toindex(_CAPI_DGLGraphEdgeIds(self._handle, u_array, v_array))
 
     def in_edges(self, v):
         """Return the in edges of the node(s).
@@ -243,9 +245,9 @@ class GraphIndex(object):
         else:
             v_array = v.todgltensor()
             edge_array = _CAPI_DGLGraphInEdges_2(self._handle, v_array)
-        src = utils.Index(edge_array(0))
-        dst = utils.Index(edge_array(1))
-        eid = utils.Index(edge_array(2))
+        src = utils.toindex(edge_array(0))
+        dst = utils.toindex(edge_array(1))
+        eid = utils.toindex(edge_array(2))
         return src, dst, eid
 
     def out_edges(self, v):
@@ -270,9 +272,9 @@ class GraphIndex(object):
         else:
             v_array = v.todgltensor()
             edge_array = _CAPI_DGLGraphOutEdges_2(self._handle, v_array)
-        src = utils.Index(edge_array(0))
-        dst = utils.Index(edge_array(1))
-        eid = utils.Index(edge_array(2))
+        src = utils.toindex(edge_array(0))
+        dst = utils.toindex(edge_array(1))
+        eid = utils.toindex(edge_array(2))
         return src, dst, eid
 
     def edges(self, sorted=False):
@@ -293,9 +295,9 @@ class GraphIndex(object):
             The edge ids.
         """
         edge_array = _CAPI_DGLGraphEdges(self._handle, sorted)
-        src = edge_array(0)
-        dst = edge_array(1)
-        eid = edge_array(2)
+        src = utils.toindex(edge_array(0))
+        dst = utils.toindex(edge_array(1))
+        eid = utils.toindex(edge_array(2))
         return src, dst, eid
 
     def in_degree(self, v):
@@ -327,7 +329,7 @@ class GraphIndex(object):
             The in degree array.
         """
         v_array = v.todgltensor()
-        return utils.Index(_CAPI_DGLGraphInDegrees(self._handle, v_array))
+        return utils.toindex(_CAPI_DGLGraphInDegrees(self._handle, v_array))
 
     def out_degree(self, v):
         """Return the out degree of the node.
@@ -358,17 +360,56 @@ class GraphIndex(object):
             The out degree array.
         """
         v_array = v.todgltensor()
-        return utils.Index(_CAPI_DGLGraphOutDegrees(self._handle, v_array))
+        return utils.toindex(_CAPI_DGLGraphOutDegrees(self._handle, v_array))
 
-    def asnetworkx(self):
+    def to_networkx(self):
         """Convert to networkx graph.
+
+        The edge id will be saved as the 'id' edge attribute.
 
         Returns
         -------
         networkx.DiGraph
             The nx graph
         """
-        # TODO
-        return None
+        src, dst, eid = self.edges()
+        ret = nx.DiGraph()
+        for u, v, id in zip(src, dst, eid):
+            ret.add_edge(u, v, id=id)
+        return ret
 
-_init_api("dgl.graph")
+    def from_networkx(self, nx_graph):
+        """Convert from networkx graph.
+
+        If 'id' edge attribute exists, the edge will be added follows
+        the edge id order. Otherwise, order is undefined.
+        
+        Parameters
+        ----------
+        nx_graph : networkx.DiGraph
+            The nx graph
+        """
+        self.clear()
+        num_nodes = nx_graph.number_of_nodes()
+        self.add_nodes(num_nodes)
+        has_edge_id = 'id' in next(iter(nx_graph.edges))
+        if has_edge_id:
+            num_edges = nx_graph.number_of_edges()
+            src = np.zeros((num_edges,), dtype=np.int64)
+            dst = np.zeros((num_edges,), dtype=np.int64)
+            for e, attr in nx_graph.edges.items:
+                u, v = e
+                eid = attr['id']
+                src[eid] = u
+                dst[eid] = v
+        else:
+            src = []
+            dst = []
+            for u, v in nx_graph.edges:
+                src.append(u)
+                dst.append(v)
+        src = utils.toindex(src)
+        dst = utils.toindex(dst)
+        self.add_edges(src, dst)
+
+_init_api("dgl.graph_index")

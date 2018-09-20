@@ -7,48 +7,68 @@ import numpy as np
 
 from . import backend as F
 from .backend import Tensor, SparseTensor
-
-def is_id_tensor(u):
-    """Return whether the input is a supported id tensor."""
-    return isinstance(u, Tensor) and F.isinteger(u) and len(F.shape(u)) == 1
-
-def is_id_container(u):
-    """Return whether the input is a supported id container."""
-    return (getattr(u, '__iter__', None) is not None
-            and getattr(u, '__len__', None) is not None)
+from . import ndarray as nd
 
 class Index(object):
     """Index class that can be easily converted to list/tensor."""
     def __init__(self, data):
-        self._list_data = None
-        self._tensor_data = None
-        self._ctx_data = dict()
+        self._list_data = None  # a numpy type data
+        self._user_tensor_data = dict()  # dictionary of user tensors
+        self._dgl_tensor_data = None  # a dgl ndarray
         self._dispatch(data)
 
     def _dispatch(self, data):
-        if is_id_tensor(data):
-            self._tensor_data = data
-        elif is_id_container(data):
-            self._list_data = data
+        """Store data based on its type."""
+        if isinstance(data, Tensor):
+            if not (F.dtype(data) == F.int64 and len(F.shape(data)) == 1):
+                raise ValueError('Index data must be 1D int64 vector, but got: %s' % str(data))
+            self._user_tensor_data[F.get_context(data)] = data
+        elif isinstance(data, nd.NDArray): 
+            if not (data.dtype == 'int64' and len(data.shape) == 1):
+                raise ValueError('Index data must be 1D int64 vector, but got: %s' % str(data))
+            self._dgl_tensor_data = data
         else:
             try:
-                self._list_data = [int(data)]
+                self._list_data = np.array([int(data)]).astype(np.int64)
             except:
-                raise TypeError('Error index data: %s' % str(x))
+                try:
+                    self._list_data = np.array(data).astype(np.int64)
+                except:
+                    raise ValueError('Error index data: %s' % str(data))
 
     def tolist(self):
+        """Convert to a python-list compatible object."""
         if self._list_data is None:
-            self._list_data = list(F.asnumpy(self._tensor_data))
+            if self._dgl_tensor_data is not None:
+                self._list_data = self._dgl_tensor_data.asnumpy()
+            else:
+                assert len(self._user_tensor_data) > 0
+                data = next(iter(self._user_tensor_data.values()))
+                self._list_data = F.asnumpy(data)
         return self._list_data
 
-    def totensor(self, ctx=None):
-        if self._tensor_data is None:
-            self._tensor_data = F.tensor(self._list_data, dtype=F.int64)
+    def tousertensor(self, ctx=None):
+        """Convert to user tensor (defined in `backend`)."""
+        if len(self._user_tensor_data) == 0:
+            self._user_tensor_data[nd.cpu()] = F.from_numpy(self.tolist())
         if ctx is None:
-            return self._tensor_data
-        if ctx not in self._ctx_data:
-            self._ctx_data[ctx] = F.to_context(self._tensor_data, ctx)
-        return self._ctx_data[ctx]
+            ctx = nd.cpu()
+        if ctx not in self._user_tensor_data:
+            data = next(iter(self._user_tensor_data.values()))
+            self._user_tensor_data[ctx] = F.to_context(data, ctx)
+        return self._user_tensor_data[ctx]
+
+    def todgltensor(self):
+        """Convert to dgl.NDArray."""
+        if self._dgl_tensor_data is None:
+            if self._list_data is not None:
+                # create a view ndarray from numpy
+                self._dgl_tensor_data = nd.from_numpy(self._list_data)
+            else:
+                # create a view ndarray from user tensor
+                self._dgl_tensor_data = nd.from_user_tensor(
+                        self.tousertensor(ctx=nd.cpu()))
+        return self._dgl_tensor_data
 
     def __iter__(self):
         return iter(self.tolist())
@@ -56,8 +76,11 @@ class Index(object):
     def __len__(self):
         if self._list_data is not None:
             return len(self._list_data)
+        elif len(self._user_tensor_data) > 0:
+            data = next(iter(self._user_tensor_data.values()))
+            return len(data)
         else:
-            return len(self._tensor_data)
+            return len(self._dgl_tensor_data)
 
     def __getitem__(self, i):
         return self.tolist()[i]
@@ -124,33 +147,6 @@ def edge_broadcasting(u, v):
     else:
         assert len(u) == len(v)
     return u, v
-
-'''
-def convert_to_id_container(x):
-    if is_id_container(x):
-        return x
-    elif is_id_tensor(x):
-        return F.asnumpy(x)
-    else:
-        try:
-            return [int(x)]
-        except:
-            raise TypeError('Error node: %s' % str(x))
-    return None
-
-def convert_to_id_tensor(x, ctx=None):
-    if is_id_container(x):
-        ret = F.tensor(x, dtype=F.int64)
-    elif is_id_tensor(x):
-        ret = x
-    else:
-        try:
-            ret = F.tensor([int(x)], dtype=F.int64)
-        except:
-            raise TypeError('Error node: %s' % str(x))
-    ret = F.to_context(ret, ctx)
-    return ret
-'''
 
 class LazyDict(Mapping):
     """A readonly dictionary that does not materialize the storage."""

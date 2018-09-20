@@ -1,19 +1,24 @@
 """DGL Runtime NDArray API.
 
-dgl.ndarray provides a minimum runtime array API to unify
-different array libraries used as backend.
+dgl.ndarray provides a minimum runtime array structure to be
+used with C++ library.
 """
 # pylint: disable=invalid-name,unused-import
 from __future__ import absolute_import as _abs
+
+import ctypes
+import operator
 import numpy as _np
 
 from ._ffi.ndarray import TVMContext, TVMType, NDArrayBase
-from ._ffi.ndarray import context, empty, from_dlpack
+from ._ffi.ndarray import context, empty, from_dlpack, numpyasarray
 from ._ffi.ndarray import _set_class_ndarray
+from . import backend as F
 
 class NDArray(NDArrayBase):
     """Lightweight NDArray class for DGL framework."""
-    pass
+    def __len__(self):
+        return reduce(operator.mul, self.shape, 1)
 
 def cpu(dev_id=0):
     """Construct a CPU device
@@ -65,5 +70,39 @@ def array(arr, ctx=cpu(0)):
     if not isinstance(arr, (_np.ndarray, NDArray)):
         arr = _np.array(arr)
     return empty(arr.shape, arr.dtype, ctx).copyfrom(arr)
+
+def from_numpy(np_data):
+    """Create an array that shares the given numpy data.
+
+    Parameters
+    ----------
+    np_data : numpy.ndarray
+        The numpy data
+
+    Returns
+    -------
+    NDArray
+        The array
+    """
+    arr, _ = numpyasarray(np_data)
+    handle = ctypes.pointer(arr)
+    return NDArray(handle, is_view=True)
+
+def from_user_tensor(data):
+    """Create an array that shares the given user tensor data.
+
+    Parameters
+    ----------
+    data : F.Tensor
+        The user tensor data.
+
+    Returns
+    -------
+    NDArray
+        The array
+    """
+    arr = F.astvmarray(data)
+    handle = ctypes.pointer(arr)
+    return NDArray(handle, is_view=True)
 
 _set_class_ndarray(NDArray)

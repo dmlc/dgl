@@ -34,6 +34,9 @@ def astype(a, ty):
 def asnumpy(a):
     return a.cpu().numpy()
 
+def from_numpy(np_data):
+    return th.from_numpy(np_data)
+
 def pack(tensors):
     return th.cat(tensors)
 
@@ -43,8 +46,8 @@ def unpack(x, indices_or_sections=1):
 def shape(x):
     return x.shape
 
-def isinteger(x):
-    return x.dtype in [th.int, th.int8, th.int16, th.int32, th.int64]
+def dtype(x):
+    return x.dtype
 
 unique = th.unique
 
@@ -107,11 +110,16 @@ def _typestr(arr_dtype):
     else:
         raise RuntimeError('Unsupported data type:', arr_dtype)
 
-def asdglarray(arr):
-    """The data is copied to the new array."""
-    assert arr.is_contiguous()
-    rst = nd.empty(tuple(arr.shape), _typestr(arr.dtype), get_context(arr))
-    data = ctypes.cast(arr.data_ptr(), ctypes.c_void_p)
-    nbytes = ctypes.c_size_t(arr.numel() * arr.element_size())
-    check_call(_LIB.TVMArrayCopyFromBytes(rst.handle, data, nbytes))
-    return rst
+def astvmarray(arr_data):
+    """Return a TVMArray representation of the underlying data."""
+    data = arr_data
+    assert data.is_contiguous()
+    arr = TVMArray()
+    shape = c_array(tvm_shape_index_t, tuple(data.shape))
+    arr.data = ctypes.cast(data.data_ptr(), ctypes.c_void_p)
+    arr.shape = shape
+    arr.strides = None
+    arr.dtype = TVMType(_typestr(data.dtype))
+    arr.ndim = len(shape)
+    arr.ctx = get_context(data)
+    return arr
