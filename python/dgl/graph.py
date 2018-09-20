@@ -12,6 +12,8 @@ from .graph_index import GraphIndex
 from .frame import FrameRef, merge_frames
 from . import scheduler
 from . import utils
+from .function.message import BundledMessageFunction
+from .function.reducer import BundledReduceFunction
 
 class DGLGraph(object):
     """Base graph class specialized for neural networks on graphs.
@@ -431,6 +433,8 @@ class DGLGraph(object):
         if message_func == "default":
             message_func, batchable = self._message_func
         assert message_func is not None
+        if isinstance(message_func, (tuple, list)):
+            message_func = BundledMessageFunction(message_func)
         if batchable:
             self._batch_send(u, v, message_func)
         else:
@@ -470,7 +474,7 @@ class DGLGraph(object):
         else:
             self._msg_frame.append({__MSG__ : msgs})
 
-    def update_edge(self, u, v, edge_func="default", batchable=False):
+    def update_edge(self, u=ALL, v=ALL, edge_func="default", batchable=False):
         """Update representation on edge u->v
 
         The edge function should be compatible with following signature:
@@ -573,6 +577,8 @@ class DGLGraph(object):
         if reduce_func == "default":
             reduce_func, batchable = self._reduce_func
         assert reduce_func is not None
+        if isinstance(reduce_func, (list, tuple)):
+            reduce_func = BundledReduceFunction(reduce_func)
         if batchable:
             self._batch_recv(u, reduce_func)
         else:
