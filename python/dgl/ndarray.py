@@ -7,6 +7,7 @@ used with C++ library.
 from __future__ import absolute_import as _abs
 
 import ctypes
+import functools
 import operator
 import numpy as _np
 
@@ -18,7 +19,7 @@ from . import backend as F
 class NDArray(NDArrayBase):
     """Lightweight NDArray class for DGL framework."""
     def __len__(self):
-        return reduce(operator.mul, self.shape, 1)
+        return functools.reduce(operator.mul, self.shape, 1)
 
 def cpu(dev_id=0):
     """Construct a CPU device

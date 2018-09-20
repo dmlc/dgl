@@ -8,12 +8,14 @@ import dgl
 from .base import ALL, is_all, __MSG__, __REPR__
 from . import backend as F
 from .backend import Tensor
-from .graph_index import GraphIndex
 from .frame import FrameRef, merge_frames
-from . import scheduler
-from . import utils
 from .function.message import BundledMessageFunction
 from .function.reducer import BundledReduceFunction
+from .graph_index import GraphIndex
+from . import scheduler
+from . import utils
+
+__all__ = ['DLGraph']
 
 class DGLGraph(object):
     """Base graph class specialized for neural networks on graphs.
@@ -63,9 +65,11 @@ class DGLGraph(object):
             Optional node representations.
         """
         self._graph.add_nodes(num)
+        self._msg_graph.add_nodes(num)
         #TODO(minjie): change frames
+        assert reprs is None
 
-    def add_edge(self, u, v, repr=None):
+    def add_edge(self, u, v, reprs=None):
         """Add one edge.
         
         Parameters
@@ -74,11 +78,12 @@ class DGLGraph(object):
             The src node.
         v : int
             The dst node.
-        repr : dict
+        reprs : dict
             Optional edge representation.
         """
         self._graph.add_edge(u, v)
         #TODO(minjie): change frames
+        assert reprs is None
 
     def add_edges(self, u, v, reprs=None):
         """Add many edges.
@@ -96,6 +101,7 @@ class DGLGraph(object):
         v = utils.toindex(v)
         self._graph.add_edges(u, v)
         #TODO(minjie): change frames
+        assert reprs is None
 
     def clear(self):
         """Clear the graph and its storage."""
@@ -483,6 +489,8 @@ class DGLGraph(object):
         dict
             Representation dict
         """
+        if len(self.node_attr_schemes()) == 0:
+            return dict()
         if is_all(u):
             if len(self._node_frame) == 1 and __REPR__ in self._node_frame:
                 return self._node_frame[__REPR__]
@@ -535,7 +543,7 @@ class DGLGraph(object):
         v_is_all = is_all(v)
         assert u_is_all == v_is_all
         if u_is_all:
-            num_edges = self.cached_graph.num_edges()
+            num_edges = self.number_of_edges()
         else:
             u = utils.toindex(u)
             v = utils.toindex(v)
@@ -553,7 +561,7 @@ class DGLGraph(object):
             else:
                 self._edge_frame[__REPR__] = h_uv
         else:
-            eid = self.cached_graph.get_edge_id(u, v)
+            eid = self._graph.edge_ids(u, v)
             if utils.is_dict_like(h_uv):
                 self._edge_frame[eid] = h_uv
             else:
@@ -571,7 +579,7 @@ class DGLGraph(object):
         """
         # sanity check
         if is_all(eid):
-            num_edges = self.cached_graph.num_edges()
+            num_edges = self.number_of_edges()
         else:
             eid = utils.toindex(eid)
             num_edges = len(eid)
@@ -611,6 +619,8 @@ class DGLGraph(object):
         u_is_all = is_all(u)
         v_is_all = is_all(v)
         assert u_is_all == v_is_all
+        if len(self.edge_attr_schemes()) == 0:
+            return dict()
         if u_is_all:
             if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
                 return self._edge_frame[__REPR__]
@@ -619,7 +629,7 @@ class DGLGraph(object):
         else:
             u = utils.toindex(u)
             v = utils.toindex(v)
-            eid = self.cached_graph.get_edge_id(u, v)
+            eid = self._graph.edge_ids(u, v)
             if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
                 return self._edge_frame.select_rows(eid)[__REPR__]
             else:
@@ -653,6 +663,8 @@ class DGLGraph(object):
         dict
             Representation dict
         """
+        if len(self.edge_attr_schemes()) == 0:
+            return dict()
         if is_all(eid):
             if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
                 return self._edge_frame[__REPR__]
@@ -843,8 +855,8 @@ class DGLGraph(object):
 
     def _batch_send(self, u, v, message_func):
         if is_all(u) and is_all(v):
-            u, v = self.cached_graph.edges()
-            self.msg_graph.add_edges(u, v)
+            u, v, _ = self._graph.edges(sorted=True)
+            self._msg_graph.add_edges(u, v)
             # call UDF
             src_reprs = self.get_n_repr(u)
             edge_reprs = self.get_e_repr()
@@ -853,11 +865,10 @@ class DGLGraph(object):
             u = utils.toindex(u)
             v = utils.toindex(v)
             u, v = utils.edge_broadcasting(u, v)
-            eid = self.cached_graph.get_edge_id(u, v)
-            self.msg_graph.add_edges(u, v)
+            self._msg_graph.add_edges(u, v)
             # call UDF
             src_reprs = self.get_n_repr(u)
-            edge_reprs = self.get_e_repr_by_id(eid)
+            edge_reprs = self.get_e_repr(u, v)
             msgs = message_func(src_reprs, edge_reprs)
         if utils.is_dict_like(msgs):
             self._msg_frame.append(msgs)
@@ -909,7 +920,7 @@ class DGLGraph(object):
 
     def _batch_update_edge(self, u, v, edge_func):
         if is_all(u) and is_all(v):
-            u, v = self.cached_graph.edges()
+            u, v = self._graph.edges(sorted=True)
             # call the UDF
             src_reprs = self.get_n_repr(u)
             dst_reprs = self.get_n_repr(v)
@@ -920,7 +931,7 @@ class DGLGraph(object):
             u = utils.toindex(u)
             v = utils.toindex(v)
             u, v = utils.edge_broadcasting(u, v)
-            eid = self.cached_graph.get_edge_id(u, v)
+            eid = self._graph.edge_ids(u, v)
             # call the UDF
             src_reprs = self.get_n_repr(u)
             dst_reprs = self.get_n_repr(v)
@@ -1005,7 +1016,7 @@ class DGLGraph(object):
         v = utils.toindex(v)
 
         # degree bucketing
-        degrees, v_buckets = scheduler.degree_bucketing(self.msg_graph, v)
+        degrees, v_buckets = scheduler.degree_bucketing(self._msg_graph, v)
         if degrees == [0]:
             # no message has been sent to the specified node
             return
@@ -1020,8 +1031,7 @@ class DGLGraph(object):
                 continue
             bkt_len = len(v_bkt)
             dst_reprs = self.get_n_repr(v_bkt)
-            uu, vv, _ = self.msg_graph.in_edges(v_bkt)
-            in_msg_ids = self.msg_graph.get_edge_id(uu, vv)
+            uu, vv, in_msg_ids = self._msg_graph.in_edges(v_bkt)
             in_msgs = self._msg_frame.select_rows(in_msg_ids)
             # Reshape the column tensor to (B, Deg, ...).
             def _reshape_fn(msg):
@@ -1033,7 +1043,7 @@ class DGLGraph(object):
             else:
                 reshaped_in_msgs = utils.LazyDict(
                         lambda key: _reshape_fn(in_msgs[key]), self._msg_frame.schemes)
-            reordered_v.append(v_bkt.totensor())
+            reordered_v.append(v_bkt.tousertensor())
             new_reprs.append(reduce_func(dst_reprs, reshaped_in_msgs))
 
         # TODO: clear partial messages
@@ -1087,7 +1097,7 @@ class DGLGraph(object):
             # no edges to be triggered
             assert len(v) == 0
             return
-        unique_v = utils.toindex(F.unique(v.totensor()))
+        unique_v = utils.toindex(F.unique(v.tousertensor()))
 
         # TODO(minjie): better way to figure out `batchable` flag
         if message_func == "default":
@@ -1135,10 +1145,10 @@ class DGLGraph(object):
         v = utils.toindex(v)
         if len(v) == 0:
             return
-        uu, vv, _ = self.cached_graph.in_edges(v)
+        uu, vv, _ = self._graph.in_edges(v)
         self.send_and_recv(uu, vv, message_func, reduce_func,
                 apply_node_func=None, batchable=batchable)
-        unique_v = F.unique(v.totensor())
+        unique_v = F.unique(v.tousertensor())
         self.apply_nodes(unique_v, apply_node_func, batchable=batchable)
 
     def push(self,
@@ -1165,7 +1175,7 @@ class DGLGraph(object):
         u = utils.toindex(u)
         if len(u) == 0:
             return
-        uu, vv, _ = self.cached_graph.out_edges(u)
+        uu, vv, _ = self._graph.out_edges(u)
         self.send_and_recv(uu, vv, message_func,
                 reduce_func, apply_node_func, batchable=batchable)
 
@@ -1309,8 +1319,10 @@ class DGLGraph(object):
                 reduce_func)
 
     def clear_messages(self):
+        """Clear all messages."""
         self._msg_graph.clear()
         self._msg_frame.clear()
+        self._msg_graph.add_nodes(self.number_of_nodes())
 
 def _get_repr(attr_dict):
     if len(attr_dict) == 1 and __REPR__ in attr_dict:

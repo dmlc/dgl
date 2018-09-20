@@ -141,9 +141,9 @@ def edge_broadcasting(u, v):
         The dst id(s) after broadcasting
     """
     if len(u) != len(v) and len(u) == 1:
-        u = toindex(F.broadcast_to(u.totensor(), v.totensor()))
+        u = toindex(F.broadcast_to(u.tousertensor(), v.tousertensor()))
     elif len(u) != len(v) and len(v) == 1:
-        v = toindex(F.broadcast_to(v.totensor(), u.totensor()))
+        v = toindex(F.broadcast_to(v.tousertensor(), u.tousertensor()))
     else:
         assert len(u) == len(v)
     return u, v
@@ -205,7 +205,7 @@ def build_relabel_map(x):
       One can use advanced indexing to convert an old id tensor to a
       new id tensor: new_id = old_to_new[old_id]
     """
-    x = x.totensor()
+    x = x.tousertensor()
     unique_x, _ = F.sort(F.unique(x))
     map_len = int(F.max(unique_x)) + 1
     old_to_new = F.zeros(map_len, dtype=F.int64)
@@ -312,6 +312,6 @@ def reorder(dict_like, index):
     """
     new_dict = {}
     for key, val in dict_like.items():
-        idx_ctx = index.totensor(F.get_context(val))
+        idx_ctx = index.tousertensor(F.get_context(val))
         new_dict[key] = F.gather_row(val, idx_ctx)
     return new_dict

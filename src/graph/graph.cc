@@ -31,7 +31,7 @@ void Graph::AddEdges(IdArray src_ids, IdArray dst_ids) {
   CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
   CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
   const auto srclen = src_ids->shape[0];
-  const auto dstlen = src_ids->shape[0];
+  const auto dstlen = dst_ids->shape[0];
   const int64_t* src_data = static_cast<int64_t*>(src_ids->data);
   const int64_t* dst_data = static_cast<int64_t*>(dst_ids->data);
   if (srclen == 1) {
@@ -78,7 +78,7 @@ BoolArray Graph::HasEdges(IdArray src_ids, IdArray dst_ids) const {
   CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
   CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
   const auto srclen = src_ids->shape[0];
-  const auto dstlen = src_ids->shape[0];
+  const auto dstlen = dst_ids->shape[0];
   const auto rstlen = std::max(srclen, dstlen);
   BoolArray rst = BoolArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
   int64_t* rst_data = static_cast<int64_t*>(rst->data);
@@ -150,7 +150,7 @@ IdArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
   CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
   CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
   const auto srclen = src_ids->shape[0];
-  const auto dstlen = src_ids->shape[0];
+  const auto dstlen = dst_ids->shape[0];
   const auto rstlen = std::max(srclen, dstlen);
   IdArray rst = IdArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
   int64_t* rst_data = static_cast<int64_t*>(rst->data);

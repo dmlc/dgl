@@ -123,7 +123,7 @@ class FrameRef(MutableMapping):
     def select_rows(self, query):
         rowids = self._getrowid(query)
         def _lazy_select(key):
-            idx = rowids.totensor(F.get_context(self._frame[key]))
+            idx = rowids.tousertensor(F.get_context(self._frame[key]))
             return F.gather_row(self._frame[key], idx)
         return utils.LazyDict(_lazy_select, keys=self.schemes)
 
@@ -132,7 +132,7 @@ class FrameRef(MutableMapping):
         if self.is_span_whole_column():
             return col
         else:
-            idx = self.index().totensor(F.get_context(col))
+            idx = self.index().tousertensor(F.get_context(col))
             return F.gather_row(col, idx)
 
     def __setitem__(self, key, val):
@@ -156,7 +156,7 @@ class FrameRef(MutableMapping):
             else:
                 fcol = F.zeros((self._frame.num_rows,) + shp[1:])
                 fcol = F.to_context(fcol, colctx)
-            idx = self.index().totensor(colctx)
+            idx = self.index().tousertensor(colctx)
             newfcol = F.scatter_row(fcol, idx, col)
             self._frame[name] = newfcol
 
@@ -167,7 +167,7 @@ class FrameRef(MutableMapping):
                 # add new column
                 tmpref = FrameRef(self._frame, rowids)
                 tmpref.add_column(key, col)
-            idx = rowids.totensor(F.get_context(self._frame[key]))
+            idx = rowids.tousertensor(F.get_context(self._frame[key]))
             self._frame[key] = F.scatter_row(self._frame[key], idx, col)
 
     def __delitem__(self, key):
@@ -223,8 +223,8 @@ class FrameRef(MutableMapping):
             # shortcut for identical mapping
             return query
         else:
-            idxtensor = self.index().totensor()
-            return utils.toindex(F.gather_row(idxtensor, query.totensor()))
+            idxtensor = self.index().tousertensor()
+            return utils.toindex(F.gather_row(idxtensor, query.tousertensor()))
 
     def index(self):
         if self._index is None:

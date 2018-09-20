@@ -27,8 +27,7 @@ def apply_node_func(node):
 
 def generate_graph(grad=False):
     g = DGLGraph()
-    for i in range(10):
-        g.add_node(i) # 10 nodes.
+    g.add_nodes(10) # 10 nodes.
     # create a graph where 0 is the source and 9 is the sink
     for i in range(1, 9):
         g.add_edge(0, i)
@@ -198,7 +197,7 @@ def test_update_routines():
 
 def test_reduce_0deg():
     g = DGLGraph()
-    g.add_nodes_from([0, 1, 2, 3, 4])
+    g.add_nodes(5)
     g.add_edge(1, 0)
     g.add_edge(2, 0)
     g.add_edge(3, 0)
@@ -218,7 +217,7 @@ def test_reduce_0deg():
 
 def test_pull_0deg():
     g = DGLGraph()
-    g.add_nodes_from([0, 1])
+    g.add_nodes(2)
     g.add_edge(0, 1)
     def _message(src, edge):
         return src
@@ -243,16 +242,6 @@ def test_pull_0deg():
     assert th.allclose(new_repr[0], old_repr[0])
     assert th.allclose(new_repr[1], old_repr[0])
 
-def _test_delete():
-    g = generate_graph()
-    ecol = Variable(th.randn(17, D), requires_grad=grad)
-    g.set_e_repr({'e' : ecol})
-    assert g.get_n_repr()['h'].shape[0] == 10
-    assert g.get_e_repr()['e'].shape[0] == 17
-    g.remove_node(0)
-    assert g.get_n_repr()['h'].shape[0] == 9
-    assert g.get_e_repr()['e'].shape[0] == 8
-
 if __name__ == '__main__':
     test_batch_setter_getter()
     test_batch_setter_autograd()
@@ -261,4 +250,3 @@ if __name__ == '__main__':
     test_update_routines()
     test_reduce_0deg()
     test_pull_0deg()
-    #test_delete()

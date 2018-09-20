@@ -5,8 +5,7 @@ from dgl.graph import __REPR__
 
 def generate_graph():
     g = dgl.DGLGraph()
-    for i in range(10):
-        g.add_node(i) # 10 nodes.
+    g.add_nodes(10) # 10 nodes.
     h = th.arange(1, 11)
     g.set_n_repr({'h': h})
     # create a graph where 0 is the source and 9 is the sink
@@ -23,8 +22,7 @@ def generate_graph():
 def generate_graph1():
     """graph with anonymous repr"""
     g = dgl.DGLGraph()
-    for i in range(10):
-        g.add_node(i) # 10 nodes.
+    g.add_nodes(10) # 10 nodes.
     h = th.arange(1, 11)
     g.set_n_repr(h)
     # create a graph where 0 is the source and 9 is the sink

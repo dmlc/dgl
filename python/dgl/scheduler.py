@@ -11,12 +11,12 @@ from . import utils
 
 __all__ = ["degree_bucketing", "get_executor"]
 
-def degree_bucketing(cached_graph, v):
+def degree_bucketing(graph, v):
     """Create degree bucketing scheduling policy.
 
     Parameters
     ----------
-    cached_graph : dgl.cached_graph.CachedGraph
+    graph : dgl.graph_index.GraphIndex
         the graph
     v : dgl.utils.Index
         the nodes to gather messages
@@ -29,7 +29,7 @@ def degree_bucketing(cached_graph, v):
         list of node id buckets; nodes belong to the same bucket have
         the same degree
     """
-    degrees = F.asnumpy(cached_graph.in_degrees(v).totensor())
+    degrees = np.array(graph.in_degrees(v).tolist())
     unique_degrees = list(np.unique(degrees))
     v_np = np.array(v.tolist())
     v_bkt = []

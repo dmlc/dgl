@@ -113,7 +113,7 @@ def test_append2():
     assert not f.is_span_whole_column()
     assert f.num_rows == 3 * N
     new_idx = list(range(N)) + list(range(2*N, 4*N))
-    assert check_eq(f.index().totensor(), th.tensor(new_idx))
+    assert check_eq(f.index().tousertensor(), th.tensor(new_idx))
     assert data.num_rows == 4 * N
 
 def test_row1():
