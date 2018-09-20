@@ -78,7 +78,7 @@ def main(args):
     model.initialize(ctx=ctx)
 
     # use optimizer
-    trainer = gluon.Trainer(model.collect_params(), 'adam', {'learning_rate': args.lr})
+    trainer = gluon.Trainer(model.collect_params(), 'adam', {'learning_rate': args.lr * 10})
 
     # initialize graph
     dur = []
@@ -86,8 +86,11 @@ def main(args):
         t0 = time.time()
         randv = np.random.permutation(g.number_of_nodes())
         rand_labels = labels[randv]
+        if epoch > args.warmup:
+            trainer = gluon.Trainer(model.collect_params(), 'adam', {'learning_rate': args.lr})
         data_iter = mx.io.NDArrayIter(data=mx.nd.array(randv, dtype='int32'), label=rand_labels,
                                       batch_size=args.batch_size)
+        tot_loss = 0
         for batch in data_iter:
             # TODO this isn't exactly how the model is trained.
             # We should enable the semi-supervised training.
@@ -96,12 +99,13 @@ def main(args):
                 loss = mx.nd.softmax_cross_entropy(logits, batch.label[0])
             loss.backward()
             trainer.step(batch.data[0].shape[0])
+            tot_loss += loss.asnumpy()[0]
 
             g.set_n_repr(logits, batch.data[0], inplace=True)
 
         dur.append(time.time() - t0)
         print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
-            epoch, loss.asnumpy()[0], np.mean(dur), n_edges / np.mean(dur) / 1000))
+            epoch, tot_loss, np.mean(dur), n_edges / np.mean(dur) / 1000))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
@@ -116,6 +120,8 @@ if __name__ == '__main__':
             help="number of training epochs")
     parser.add_argument("--n-hidden", type=int, default=16,
             help="number of hidden gcn units")
+    parser.add_argument("--warmup", type=int, default=10,
+            help="number of iterations to warm up with large learning rate")
     args = parser.parse_args()
 
     main(args)
