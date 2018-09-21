@@ -45,9 +45,10 @@ class DGLGraph(object):
         # frame
         self._node_frame = node_frame if node_frame is not None else FrameRef()
         self._edge_frame = edge_frame if edge_frame is not None else FrameRef()
-        # other class members
+        # msg graph & frame
         self._msg_graph = create_graph_index()
         self._msg_frame = FrameRef()
+        # registered functions
         self._message_func = (None, None)
         self._reduce_func = (None, None)
         self._edge_func = (None, None)
@@ -110,6 +111,12 @@ class DGLGraph(object):
         self._edge_frame.clear()
         self._msg_graph.clear()
         self._msg_frame.clear()
+
+    def clear_messages(self):
+        """Clear all messages."""
+        self._msg_graph.clear()
+        self._msg_frame.clear()
+        self._msg_graph.add_nodes(self.number_of_nodes())
 
     def number_of_nodes(self):
         """Return the number of nodes.
@@ -421,6 +428,23 @@ class DGLGraph(object):
         nx_graph = self._graph.to_networkx()
         #TODO: attributes
         return nx_graph
+
+    def from_networkx(self, nx_graph, node_attrs=None, edge_attrs=None):
+        """Convert from networkx graph.
+
+        If 'id' edge attribute exists, the edge will be added follows
+        the edge id order. Otherwise, order is undefined.
+        
+        Parameters
+        ----------
+        nx_graph : networkx.DiGraph
+            The nx graph
+        """
+        self.clear()
+        self._graph.from_networkx(nx_graph)
+        self._msg_graph.add_nodes(self._graph.number_of_nodes())
+        #TODO: attributes
+        pass
 
     def node_attr_schemes(self):
         """Return the node attribute schemes.
@@ -1302,12 +1326,6 @@ class DGLGraph(object):
                 [sg._parent_eid for sg in to_merge],
                 self._edge_frame.num_rows,
                 reduce_func)
-
-    def clear_messages(self):
-        """Clear all messages."""
-        self._msg_graph.clear()
-        self._msg_frame.clear()
-        self._msg_graph.add_nodes(self.number_of_nodes())
 
 def _get_repr(attr_dict):
     if len(attr_dict) == 1 and __REPR__ in attr_dict:

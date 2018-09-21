@@ -66,7 +66,9 @@ class SST(object):
         # add root
         g.add_node(0, x=SST.PAD_WORD, y=int(root.label()))
         _rec_build(0, root)
-        return dgl.DGLGraph(g)
+        ret = DGLGraph()
+        ret.from_networkx(g)
+        return ret
 
     def __getitem__(self, idx):
         return self.trees[idx]
