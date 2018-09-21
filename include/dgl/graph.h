@@ -270,9 +270,12 @@ class Graph {
    */
   Graph Reverse() const;
 
-  static Graph Merge(std::vector<Graph> graphs);
-
   std::vector<Graph> Split(std::vector<IdArray> vids_array) const;
+
+  /*!
+   * \brief Merge several graphs
+   */
+  static Graph Merge(std::vector<Graph> graphs);
 
  private:
   /*! \brief Internal edge list type */
