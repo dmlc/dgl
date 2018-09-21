@@ -242,4 +242,20 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphOutDegrees")
     *rv = gptr->OutDegrees(vids);
   });
 
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphMerge")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    void* list = args[0];
+    GraphHandle* inhandles = static_cast<GraphHandle*>(list);
+    int list_size = args[1];
+    std::vector<const Graph*> graphs;
+    for (int i = 0; i < list_size; ++i) {
+      const Graph* gr = static_cast<const Graph*>(inhandles[i]);
+      graphs.push_back(gr);
+    }
+    Graph* gptr = new Graph();
+    *gptr = Graph::Merge(std::move(graphs));
+    GraphHandle ghandle = gptr;
+    *rv = ghandle;
+  });
+
 }  // namespace dgl

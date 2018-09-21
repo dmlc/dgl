@@ -11,7 +11,7 @@ from .backend import Tensor
 from .frame import FrameRef, merge_frames
 from .function.message import BundledMessageFunction
 from .function.reducer import BundledReduceFunction
-from .graph_index import GraphIndex
+from .graph_index import GraphIndex, create_graph_index
 from . import scheduler
 from . import utils
 
@@ -41,12 +41,12 @@ class DGLGraph(object):
                  **attr):
         # TODO: keyword attr
         # graph
-        self._graph = GraphIndex(graph_data)
+        self._graph = create_graph_index(graph_data)
         # frame
         self._node_frame = node_frame if node_frame is not None else FrameRef()
         self._edge_frame = edge_frame if edge_frame is not None else FrameRef()
         # other class members
-        self._msg_graph = GraphIndex()
+        self._msg_graph = create_graph_index()
         self._msg_frame = FrameRef()
         self._message_func = (None, None)
         self._reduce_func = (None, None)

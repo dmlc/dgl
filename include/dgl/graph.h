@@ -50,6 +50,9 @@ class Graph {
 #else
   Graph(Graph&& other) {
     adjlist_ = other.adjlist_;
+    reverse_adjlist_ = other.reverse_adjlist_;
+    all_edges_src_ = other.all_edges_src_;
+    all_edges_dst_ = other.all_edges_dst_;
     read_only_ = other.read_only_;
     num_edges_ = other.num_edges_;
     other.clear();
@@ -90,6 +93,8 @@ class Graph {
   void Clear() {
     adjlist_.clear();
     reverse_adjlist_.clear();
+    all_edges_src_.clear();
+    all_edges_dst_.clear();
     read_only_ = false;
     num_edges_ = 0;
   }
@@ -270,12 +275,22 @@ class Graph {
    */
   Graph Reverse() const;
 
+  // TODO
   std::vector<Graph> Split(std::vector<IdArray> vids_array) const;
 
   /*!
-   * \brief Merge several graphs
+   * \brief Merge several graphs into one graph.
+   *
+   * The new graph will include all the nodes/edges in the given graphs.
+   * Nodes/Edges will be relabled by adding the cumsum of the previous graph sizes
+   * in the given sequence order. For example, giving input [g1, g2, g3], where
+   * they have 5, 6, 7 nodes respectively. Then node#2 of g2 will become node#7
+   * in the result graph. Edge ids are re-assigned similarly.
+   *
+   * \param graphs A list of input graphs to be merged.
+   * \return the merged graph
    */
-  static Graph Merge(std::vector<Graph> graphs);
+  static Graph Merge(std::vector<const Graph*> graphs);
 
  private:
   /*! \brief Internal edge list type */
@@ -298,7 +313,7 @@ class Graph {
   std::vector<dgl_id_t> all_edges_dst_;
 
   /*! \brief read only flag */
-  bool read_only_{false};
+  bool read_only_ = false;
   /*! \brief number of edges */
   uint64_t num_edges_ = 0;
 };
