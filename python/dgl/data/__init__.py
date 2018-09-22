@@ -21,3 +21,15 @@ def load_data(args):
         return citegrh.load_synthetic(args)
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
+
+def load_data_dict(args):
+    if args["dataset"] == 'cora':
+        return citegrh.load_cora()
+    elif args["dataset"] == 'citeseer':
+        return citegrh.load_citeseer()
+    elif args["dataset"] == 'pubmed':
+        return citegrh.load_pubmed()
+    elif args["dataset"] == 'syn':
+        return citegrh.load_synthetic_dict(args)
+    else:
+        raise ValueError('Unknown dataset: {}'.format(args["dataset"]))

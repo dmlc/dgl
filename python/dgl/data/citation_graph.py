@@ -221,6 +221,29 @@ def load_synthetic(args):
             args.syn_test_ratio,
             args.syn_seed)
 
+def get_gnp_generator_dict(args):
+    n = args["syn_gnp_n"]
+    p = (2 * np.log(n) / n) if args["syn_gnp_p"] == 0. else args["syn_gnp_p"]
+    def _gen(seed):
+        return nx.fast_gnp_random_graph(n, p, seed, True)
+    return _gen
+
+def load_synthetic_dict(args):
+    ty = args["syn_type"]
+    if ty == 'gnp':
+        gen = get_gnp_generator(args)
+    else:
+        raise ValueError('Unknown graph generator type: {}'.format(ty))
+    return GCNSyntheticDataset(
+            gen,
+            args["syn_nfeats"],
+            args["syn_nclasses"],
+            args["syn_train_ratio"],
+            args["syn_val_ratio"],
+            args["syn_test_ratio"],
+            args["syn_seed"])
+
+
 def register_args(parser):
     # Args for synthetic graphs.
     parser.add_argument('--syn-type', type=str, default='gnp',

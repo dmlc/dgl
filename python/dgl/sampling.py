@@ -15,6 +15,19 @@ def seeds(V, seed_size, num_batches):
     return [list(npr.choice(V, seed_size, replace=False)) for _ in range(num_batches)]
     #return list(chunk_iter(npr.permutation(V), s))[0:k]
 
+def seeds_consume(V, seed_size, num_nodes=None, percent_nodes=.90):
+    if num_nodes is None:
+        num_nodes = int(np.round(len(V)*percent_nodes))
+    return list(chunk_iter(list(npr.permutation(V)[0:min([num_nodes, len(V)])]), seed_size))
+
+#http://stackoverflow.com/questions/8290397/how-to-split-an-iterable-in-constant-size-chunks
+def chunk_iter(iterable, n=1):
+    l = len(iterable)
+    for ndx in range(0, l, n):
+        yield iterable[ndx:min(ndx + n, l)]
+
+
+
 def minibatch(G,seedset_list,depth, fn_neighborhood, max_neighbors = np.inf):
     rr = []
     for S in seedset_list:
