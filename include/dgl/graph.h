@@ -13,6 +13,8 @@ typedef tvm::runtime::NDArray DegreeArray;
 typedef tvm::runtime::NDArray BoolArray;
 
 class Graph;
+class GraphOp;
+struct Subgraph;
 
 /*!
  * \brief Base dgl graph class.
@@ -246,7 +248,7 @@ class Graph {
    * \param vids The vertices in the subgraph.
    * \return the induced subgraph
    */
-  Graph Subgraph(IdArray vids) const;
+  Subgraph VertexSubgraph(IdArray vids) const;
 
   /*!
    * \brief Construct the induced edge subgraph of the given edges.
@@ -264,7 +266,7 @@ class Graph {
    * \param vids The edges in the subgraph.
    * \return the induced edge subgraph
    */
-  Graph EdgeSubgraph(IdArray src, IdArray dst) const;
+  Subgraph EdgeSubgraph(IdArray src, IdArray dst) const;
 
   /*!
    * \brief Return a new graph with all the edges reversed.
@@ -275,24 +277,8 @@ class Graph {
    */
   Graph Reverse() const;
 
-  // TODO
-  std::vector<Graph> Split(std::vector<IdArray> vids_array) const;
-
-  /*!
-   * \brief Merge several graphs into one graph.
-   *
-   * The new graph will include all the nodes/edges in the given graphs.
-   * Nodes/Edges will be relabled by adding the cumsum of the previous graph sizes
-   * in the given sequence order. For example, giving input [g1, g2, g3], where
-   * they have 5, 6, 7 nodes respectively. Then node#2 of g2 will become node#7
-   * in the result graph. Edge ids are re-assigned similarly.
-   *
-   * \param graphs A list of input graphs to be merged.
-   * \return the merged graph
-   */
-  static Graph Merge(std::vector<const Graph*> graphs);
-
- private:
+ protected:
+  friend class GraphOp;
   /*! \brief Internal edge list type */
   struct EdgeList {
     /*! \brief successor vertex list */
@@ -316,6 +302,22 @@ class Graph {
   bool read_only_ = false;
   /*! \brief number of edges */
   uint64_t num_edges_ = 0;
+};
+
+/*! \brief Subgraph data structure */
+struct Subgraph {
+  /*! \brief The graph. */
+  Graph graph;
+  /*! 
+   * \brief The induced vertex ids.
+   * \note This is also a map from the new vertex id to the vertex id in the parent graph.
+   */
+  IdArray induced_vertices;
+  /*! 
+   * \brief The induced edge ids.
+   * \note This is also a map from the new edge id to the edge id in the parent graph.
+   */
+  IdArray induced_edges;
 };
 
 }  // namespace dgl

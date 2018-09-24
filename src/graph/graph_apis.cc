@@ -1,6 +1,7 @@
 #include <dgl/runtime/packed_func.h>
 #include <dgl/runtime/registry.h>
 #include <dgl/graph.h>
+#include <dgl/graph_op.h>
 
 using tvm::runtime::TVMArgs;
 using tvm::runtime::TVMArgValue;
@@ -8,17 +9,21 @@ using tvm::runtime::TVMRetValue;
 using tvm::runtime::PackedFunc;
 
 namespace dgl {
+
+// Graph handler type
+typedef void* GraphHandle;
+
 namespace {
-/*!\brief Convert EdgeArray structure to PackedFunc */
+// Convert EdgeArray structure to PackedFunc.
 PackedFunc ConvertEdgeArrayToPackedFunc(const Graph::EdgeArray& ea) {
   auto body = [ea] (TVMArgs args, TVMRetValue* rv) {
       int which = args[0];
       if (which == 0) {
-        *rv = ea.src;
+        *rv = std::move(ea.src);
       } else if (which == 1) {
-        *rv = ea.dst;
+        *rv = std::move(ea.dst);
       } else if (which == 2) {
-        *rv = ea.id;
+        *rv = std::move(ea.id);
       } else {
         LOG(FATAL) << "invalid choice";
       }
@@ -26,6 +31,27 @@ PackedFunc ConvertEdgeArrayToPackedFunc(const Graph::EdgeArray& ea) {
   return PackedFunc(body);
 }
 
+// Convert Subgraph structure to PackedFunc.
+PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
+  auto body = [sg] (TVMArgs args, TVMRetValue* rv) {
+      int which = args[0];
+      if (which == 0) {
+        Graph* gptr = new Graph();
+        *gptr = std::move(sg.graph);
+        GraphHandle ghandle = gptr;
+        *rv = ghandle;
+      } else if (which == 1) {
+        *rv = std::move(sg.induced_vertices);
+      } else if (which == 2) {
+        *rv = std::move(sg.induced_edges);
+      } else {
+        LOG(FATAL) << "invalid choice";
+      }
+    };
+  return PackedFunc(body);
+}
+
+// Convert the given DLTensor to a temporary DLManagedTensor that does not own memory.
 DLManagedTensor* CreateTmpDLManagedTensor(const TVMArgValue& arg) {
   const DLTensor* dl_tensor = arg;
   DLManagedTensor* ret = new DLManagedTensor();
@@ -36,9 +62,6 @@ DLManagedTensor* CreateTmpDLManagedTensor(const TVMArgValue& arg) {
 }
 
 }  // namespace
-
-// Graph handler type
-typedef void* GraphHandle;
 
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
@@ -242,7 +265,15 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphOutDegrees")
     *rv = gptr->OutDegrees(vids);
   });
 
-TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphMerge")
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphVertexSubgraph")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    *rv = ConvertSubgraphToPackedFunc(gptr->VertexSubgraph(vids));
+  });
+
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     void* list = args[0];
     GraphHandle* inhandles = static_cast<GraphHandle*>(list);
@@ -253,7 +284,7 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphMerge")
       graphs.push_back(gr);
     }
     Graph* gptr = new Graph();
-    *gptr = Graph::Merge(std::move(graphs));
+    *gptr = GraphOp::DisjointUnion(std::move(graphs));
     GraphHandle ghandle = gptr;
     *rv = ghandle;
   });

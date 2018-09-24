@@ -367,6 +367,27 @@ class GraphIndex(object):
         v_array = v.todgltensor()
         return utils.toindex(_CAPI_DGLGraphOutDegrees(self._handle, v_array))
 
+    def node_subgraph(self, v):
+        """Return the induced node subgraph.
+
+        Parameters
+        ----------
+        v : utils.Index
+            The nodes.
+
+        Returns
+        -------
+        GraphIndex
+            The subgraph index.
+        utils.Index
+            The induced edge ids. This is also a map from new edge id to parent edge id.
+        """
+        v_array = v.todgltensor()
+        rst = _CAPI_DGLGraphVertexSubgraph(self._handle, v_array)
+        gi = GraphIndex(rst(0))
+        induced_edges = utils.toindex(rst(2))
+        return gi, induced_edges
+
     def adjacency_matrix(self):
         """Return the adjacency matrix representation of this graph.
 
@@ -438,30 +459,29 @@ class GraphIndex(object):
         dst = utils.toindex(dst)
         self.add_edges(src, dst)
 
-    @staticmethod
-    def merge(graphs):
-        """Merge a list of graphs into one graph.
+def disjoint_union(graphs):
+    """Return a disjoint union of the input graphs.
 
-        The new graph will include all the nodes/edges in the given graphs.
-        Nodes/Edges will be relabled by adding the cumsum of the previous graph sizes
-        in the given sequence order. For example, giving input [g1, g2, g3], where
-        they have 5, 6, 7 nodes respectively. Then node#2 of g2 will become node#7
-        in the result graph. Edge ids are re-assigned similarly.
+    The new graph will include all the nodes/edges in the given graphs.
+    Nodes/Edges will be relabled by adding the cumsum of the previous graph sizes
+    in the given sequence order. For example, giving input [g1, g2, g3], where
+    they have 5, 6, 7 nodes respectively. Then node#2 of g2 will become node#7
+    in the result graph. Edge ids are re-assigned similarly.
 
-        Parameters
-        ----------
-        graphs : iterable of GraphIndex
-            The input graphs
+    Parameters
+    ----------
+    graphs : iterable of GraphIndex
+        The input graphs
 
-        Returns
-        -------
-        GraphIndex
-            The merged graph
-        """
-        inputs = c_array(GraphIndexHandle, [gr._handle for gr in graphs])
-        inputs = ctypes.cast(inputs, ctypes.c_void_p)
-        handle = _CAPI_DGLGraphMerge(inputs, len(graphs))
-        return GraphIndex(handle)
+    Returns
+    -------
+    GraphIndex
+        The disjoint union
+    """
+    inputs = c_array(GraphIndexHandle, [gr._handle for gr in graphs])
+    inputs = ctypes.cast(inputs, ctypes.c_void_p)
+    handle = _CAPI_DGLDisjointUnion(inputs, len(graphs))
+    return GraphIndex(handle)
 
 def create_graph_index(graph_data=None):
     """Create a graph index object.
@@ -471,6 +491,8 @@ def create_graph_index(graph_data=None):
     graph_data : graph data, optional
         Data to initialize graph. Same as networkx's semantics.
     """
+    if isinstance(graph_data, GraphIndex):
+        return graph_data
     handle = _CAPI_DGLGraphCreate()
     gi = GraphIndex(handle)
     if graph_data is not None:

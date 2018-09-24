@@ -1,5 +1,6 @@
 // Graph class implementation
 #include <algorithm>
+#include <unordered_map>
 #include <dgl/graph.h>
 
 namespace dgl {
@@ -345,32 +346,43 @@ DegreeArray Graph::OutDegrees(IdArray vids) const {
   return rst;
 }
 
-Graph Graph::Subgraph(IdArray vids) const {
-  LOG(FATAL) << "not implemented";
-  return *this;
+Subgraph Graph::VertexSubgraph(IdArray vids) const {
+  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
+  const auto len = vids->shape[0];
+  std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
+  std::vector<dgl_id_t> edges;
+  const int64_t* vid_data = static_cast<int64_t*>(vids->data);
+  for (int64_t i = 0; i < len; ++i) {
+    oldv2newv[vid_data[i]] = i;
+  }
+  Subgraph rst;
+  rst.induced_vertices = vids;
+  rst.graph.AddVertices(len);
+  for (int64_t i = 0; i < len; ++i) {
+    const dgl_id_t oldvid = vid_data[i];
+    const dgl_id_t newvid = i;
+    for (size_t j = 0; j < adjlist_[oldvid].succ.size(); ++j) {
+      const dgl_id_t oldsucc = adjlist_[oldvid].succ[j];
+      if (oldv2newv.count(oldsucc)) {
+        const dgl_id_t newsucc = oldv2newv[oldsucc];
+        edges.push_back(adjlist_[oldvid].edge_id[j]);
+        rst.graph.AddEdge(newvid, newsucc);
+      }
+    }
+  }
+  rst.induced_edges = IdArray::Empty({static_cast<int64_t>(edges.size())}, vids->dtype, vids->ctx);
+  std::copy(edges.begin(), edges.end(), static_cast<int64_t*>(rst.induced_edges->data));
+  return rst;
 }
 
-Graph Graph::EdgeSubgraph(IdArray src, IdArray dst) const {
+Subgraph Graph::EdgeSubgraph(IdArray src, IdArray dst) const {
   LOG(FATAL) << "not implemented";
-  return *this;
+  return Subgraph();
 }
 
 Graph Graph::Reverse() const {
   LOG(FATAL) << "not implemented";
   return *this;
-}
-
-Graph Graph::Merge(std::vector<const Graph*> graphs) {
-  Graph rst;
-  uint64_t cumsum = 0;
-  for (const Graph* gr : graphs) {
-    rst.AddVertices(gr->NumVertices());
-    for (uint64_t i = 0; i < gr->NumEdges(); ++i) {
-      rst.AddEdge(gr->all_edges_src_[i] + cumsum, gr->all_edges_dst_[i] + cumsum);
-    }
-    cumsum += gr->NumVertices();
-  }
-  return rst;
 }
 
 }  // namespace dgl
