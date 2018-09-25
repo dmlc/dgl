@@ -48,6 +48,7 @@ class DGLGraph(object):
         # msg graph & frame
         self._msg_graph = create_graph_index()
         self._msg_frame = FrameRef()
+        self.reset_messages()
         # registered functions
         self._message_func = (None, None)
         self._reduce_func = (None, None)
@@ -112,7 +113,7 @@ class DGLGraph(object):
         self._msg_graph.clear()
         self._msg_frame.clear()
 
-    def clear_messages(self):
+    def reset_messages(self):
         """Clear all messages."""
         self._msg_graph.clear()
         self._msg_frame.clear()
@@ -447,6 +448,7 @@ class DGLGraph(object):
         self.clear()
         self._graph.from_networkx(nx_graph)
         self._msg_graph.add_nodes(self._graph.number_of_nodes())
+        # copy attributes
         def _batcher(lst):
             if isinstance(lst[0], Tensor):
                 return F.pack([F.unsqueeze(x, 0) for x in lst])
@@ -1078,7 +1080,7 @@ class DGLGraph(object):
             new_reprs.append(reduce_func(dst_reprs, reshaped_in_msgs))
 
         # TODO: clear partial messages
-        self.clear_messages()
+        self.reset_messages()
 
         # Pack all reducer results together
         reordered_v = F.pack(reordered_v)

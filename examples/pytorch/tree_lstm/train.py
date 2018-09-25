@@ -8,23 +8,17 @@ from torch.utils.data import DataLoader
 
 import dgl
 import dgl.data as data
+import dgl.ndarray as nd
 
 from tree_lstm import TreeLSTM
 
-def _batch_to_cuda(batch):
-    return data.SSTBatch(graph=batch.graph,
-                         nid_with_word = batch.nid_with_word.cuda(),
-                         wordid = batch.wordid.cuda(),
-                         label = batch.label.cuda())
-
-import dgl.context as ctx
 def tensor_topo_traverse(g, cuda, args):
     n = g.number_of_nodes()
     if cuda:
-        adjmat = g.cached_graph.adjmat().get(ctx.gpu(args.gpu))
+        adjmat = g._graph.adjacency_matrix().get(nd.gpu(args.gpu))
         mask = th.ones((n, 1)).cuda()
     else:
-        adjmat = g.cached_graph.adjmat().get(ctx.cpu())
+        adjmat = g._graph.adjacency_matrix().get(nd.cpu())
         mask = th.ones((n, 1))
     degree = th.spmm(adjmat, mask)
     while th.sum(mask) != 0.:
@@ -39,10 +33,17 @@ def main(args):
     cuda = args.gpu >= 0
     if cuda:
         th.cuda.set_device(args.gpu)
+    def _batcher(trees):
+        bg = dgl.batch(trees)
+        if cuda:
+            reprs = bg.get_n_repr()
+            reprs = {key : reprs[key].cuda()}
+            bg.set_n_repr(reprs)
+        return bg
     trainset = data.SST()
     train_loader = DataLoader(dataset=trainset,
                               batch_size=args.batch_size,
-                              collate_fn=data.SST.batcher,
+                              collate_fn=_batcher,
                               shuffle=False,
                               num_workers=0)
     #testset = data.SST(mode='test')
@@ -69,18 +70,15 @@ def main(args):
     dur = []
     for epoch in range(args.epochs):
         t_epoch = time.time()
-        for step, batch in enumerate(train_loader):
-            g = batch.graph
-            if cuda:
-                batch = _batch_to_cuda(batch)
-
+        for step, graph in enumerate(train_loader):
             if step >= 3:
                 t0 = time.time()
+            label = graph.pop_n_repr('y')
             # traverse graph
-            giter = list(tensor_topo_traverse(g, False, args))
-            logits = model(batch, zero_initializer, iterator=giter, train=True)
+            giter = list(tensor_topo_traverse(graph, False, args))
+            logits = model(graph, zero_initializer, iterator=giter, train=True)
             logp = F.log_softmax(logits, 1)
-            loss = F.nll_loss(logp, batch.label)
+            loss = F.nll_loss(logp, label)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -89,11 +87,11 @@ def main(args):
 
             if step > 0 and step % args.log_every == 0:
                 pred = th.argmax(logits, 1)
-                acc = th.sum(th.eq(batch.label, pred))
+                acc = th.sum(th.eq(label, pred))
                 mean_dur = np.mean(dur)
                 print("Epoch {:05d} | Step {:05d} | Loss {:.4f} | "
                       "Acc {:.4f} | Time(s) {:.4f} | Trees/s {:.4f}".format(
-                    epoch, step, loss.item(), acc.item()/len(batch.label),
+                    epoch, step, loss.item(), acc.item() / args.batch_size,
                     mean_dur, args.batch_size / mean_dur))
         print("Epoch time(s):", time.time() - t_epoch)
 

@@ -20,7 +20,7 @@ void Graph::AddVertices(uint64_t num_vertices) {
 void Graph::AddEdge(dgl_id_t src, dgl_id_t dst) {
   CHECK(!read_only_) << "Graph is read-only. Mutations are not allowed.";
   CHECK(HasVertex(src) && HasVertex(dst))
-    << "In valid vertices: " << src << " " << dst;
+    << "Invalid vertices: src=" << src << " dst=" << dst;
   dgl_id_t eid = num_edges_++;
   adjlist_[src].succ.push_back(dst);
   adjlist_[src].edge_id.push_back(eid);

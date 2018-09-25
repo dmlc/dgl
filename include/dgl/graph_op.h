@@ -9,6 +9,12 @@ namespace dgl {
 class GraphOp {
  public:
   /*!
+   * \brief Return the line graph.
+   * \param graph The input graph.
+   * \return the line graph
+   */
+  static Graph LineGraph(const Graph* graph);
+  /*!
    * \brief Return a disjoint union of the input graphs.
    *
    * The new graph will include all the nodes/edges in the given graphs.

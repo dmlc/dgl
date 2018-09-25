@@ -10,23 +10,7 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 
-def topological_traverse(G):
-    indegree_map = {v: d for v, d in G.in_degree() if d > 0}
-    # These nodes have zero indegree and ready to be returned.
-    zero_indegree = [v for v, d in G.in_degree() if d == 0]
-    while True:
-        yield zero_indegree
-        next_zero_indegree = []
-        while zero_indegree:
-            node = zero_indegree.pop()
-            for _, child in G.edges(node):
-                indegree_map[child] -= 1
-                if indegree_map[child] == 0:
-                    next_zero_indegree.append(child)
-                    del indegree_map[child]
-        if len(next_zero_indegree) == 0:
-            break
-        zero_indegree = next_zero_indegree
+import dgl
 
 class ChildSumTreeLSTMCell(nn.Module):
     def __init__(self, x_size, h_size):
@@ -83,13 +67,13 @@ class TreeLSTM(nn.Module):
         else:
             raise RuntimeError('Unknown cell type:', cell_type)
 
-    def forward(self, batch, zero_initializer, h=None, c=None, iterator=None, train=True):
+    def forward(self, graph, zero_initializer, h=None, c=None, iterator=None, train=True):
         """Compute tree-lstm prediction given a batch.
 
         Parameters
         ----------
-        batch : dgl.data.SSTBatch
-            The data batch.
+        graph : dgl.DGLGraph
+            The batched trees.
         zero_initializer : callable
             Function to return zero value tensor.
         h : Tensor, optional
@@ -104,15 +88,17 @@ class TreeLSTM(nn.Module):
         logits : Tensor
             The prediction of each node.
         """
-        g = batch.graph
+        g = graph
         n = g.number_of_nodes()
         g.register_message_func(self.cell.message_func, batchable=True)
         g.register_reduce_func(self.cell.reduce_func, batchable=True)
         g.register_apply_node_func(self.cell.apply_func, batchable=True)
         # feed embedding
-        embeds = self.embedding(batch.wordid)
-        x = zero_initializer((n, self.x_size))
-        x = x.index_copy(0, batch.nid_with_word, embeds)
+        wordid = g.pop_n_repr('x')
+        mask = (wordid != dgl.data.SST.PAD_WORD)
+        wordid = wordid * mask.long()
+        embeds = self.embedding(wordid)
+        x = embeds * th.unsqueeze(mask, 1).float()
         if h is None:
             h = zero_initializer((n, self.h_size))
         h_tild = zero_initializer((n, self.h_size))
