@@ -31,11 +31,11 @@ class BatchedDGLGraph(DGLGraph):
         # NOTE: following code will materialize the columns of the input graphs.
         batched_node_frame = FrameRef()
         for gr in graph_list:
-            cols = {gr._node_frame[key] for key in node_attrs}
+            cols = {key : gr._node_frame[key] for key in node_attrs}
             batched_node_frame.append(cols)
         batched_edge_frame = FrameRef()
         for gr in graph_list:
-            cols = {gr._edge_frame[key] for key in edge_attrs}
+            cols = {key : gr._edge_frame[key] for key in edge_attrs}
             batched_edge_frame.append(cols)
         super(BatchedDGLGraph, self).__init__(
                 graph_data=batched_index,
@@ -169,12 +169,12 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
         node_attrs = []
     elif is_all(node_attrs):
         node_attrs = graph_list[0].node_attr_schemes()
-    elif if isinstance(node_attrs, str):
+    elif isinstance(node_attrs, str):
         node_attrs = [node_attrs]
     if edge_attrs is None:
         edge_attrs = []
     elif is_all(edge_attrs):
         edge_attrs = graph_list[0].edge_attr_schemes()
-    elif if isinstance(edge_attrs, str):
+    elif isinstance(edge_attrs, str):
         edge_attrs = [edge_attrs]
     return BatchedDGLGraph(graph_list, node_attrs, edge_attrs)

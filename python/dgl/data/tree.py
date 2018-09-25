@@ -67,7 +67,7 @@ class SST(object):
         g.add_node(0, x=SST.PAD_WORD, y=int(root.label()))
         _rec_build(0, root)
         ret = DGLGraph()
-        ret.from_networkx(g)
+        ret.from_networkx(g, node_attrs=['x', 'y'])
         return ret
 
     def __getitem__(self, idx):

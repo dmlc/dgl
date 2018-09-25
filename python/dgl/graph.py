@@ -439,12 +439,34 @@ class DGLGraph(object):
         ----------
         nx_graph : networkx.DiGraph
             The nx graph
+        node_attrs : iterable of str, optional
+            The node attributes needs to be copied.
+        edge_attrs : iterable of str, optional
+            The edge attributes needs to be copied.
         """
         self.clear()
         self._graph.from_networkx(nx_graph)
         self._msg_graph.add_nodes(self._graph.number_of_nodes())
-        #TODO: attributes
-        pass
+        def _batcher(lst):
+            if isinstance(lst[0], Tensor):
+                return F.pack([F.unsqueeze(x, 0) for x in lst])
+            else:
+                return F.tensor(lst)
+        if node_attrs is not None:
+            attr_dict = {attr : [] for attr in node_attrs}
+            for nid in range(self.number_of_nodes()):
+                for attr in node_attrs:
+                    attr_dict[attr].append(nx_graph.nodes[nid][attr])
+            for attr in node_attrs:
+                self._node_frame[attr] = _batcher(attr_dict[attr])
+        if edge_attrs is not None:
+            attr_dict = {attr : [] for attr in edge_attrs}
+            src, dst, _ = self._graph.edges()
+            for u, v in zip(src.tolist(), dst.tolist()):
+                for attr in edge_attrs:
+                    attr_dict[attr].append(nx_graph.edges[u, v][attr])
+            for attr in edge_attrs:
+                self._edge_frame[attr] = _batcher(attr_dict[attr])
 
     def node_attr_schemes(self):
         """Return the node attribute schemes.
