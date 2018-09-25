@@ -26,9 +26,26 @@ def chunk_iter(iterable, n=1):
     for ndx in range(0, l, n):
         yield iterable[ndx:min(ndx + n, l)]
 
+def importance_sampling_networkx(G, n, levels, batches=100, fn="degree"):    
+    q = {}
+    ret = []
+    if fn == "degree":
+        degrees = G.degree
+        s = sum(dict(degrees).values())
+        for v in G.nodes:
+            q[v] = degrees[v]/s
+        for i in range(batches):
+            r = {}
+            for l in range(levels):
+                r[l] = set([int(i) for i in npr.choice(list(q.keys()), size=n, replace=False, p=list(q.values()))])
+            ret.append(r)
+    return ret, q
 
-
-def minibatch(G,seedset_list,depth, fn_neighborhood, max_neighbors = np.inf):
+def minibatch_seed_traverse(G,  seed_size, depth, fn_neighborhood, max_neighbors = np.inf, num_nodes=None, percent_nodes=.90):
+    seedset_list = seeds_consume(G.nodes, seed_size =  seed_size, num_nodes=num_nodes,percent_nodes=percent_nodes)
+    return minibatch_traverse(G,seedset_list,depth, fn_neighborhood, max_neighbors=max_neighbors)
+    
+def minibatch_traverse(G,seedset_list,depth, fn_neighborhood, max_neighbors = np.inf):
     rr = []
     for S in seedset_list:
         d = {}
@@ -63,6 +80,12 @@ def minibatch(G,seedset_list,depth, fn_neighborhood, max_neighbors = np.inf):
         rr.append(dict(r))
         #print(dict(r))
     return rr
+
+def nodes_networkx(G):
+    return G.nodes
+
+def degree_networkx(G, i):
+    return G
 
 def neighborhood_networkx(G, i):
     return [n_i for n_i in G[i]]
