@@ -37,7 +37,7 @@ def main(args):
         bg = dgl.batch(trees)
         if cuda:
             reprs = bg.get_n_repr()
-            reprs = {key : reprs[key].cuda()}
+            reprs = {key : val.cuda() for key, val in reprs.items()}
             bg.set_n_repr(reprs)
         return bg
     trainset = data.SST()
