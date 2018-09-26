@@ -31,7 +31,7 @@ class NodeApplyModule(nn.Module):
 
 class GCN(nn.Module):   
     def gcn_msg(self, src, edge):
-        return src['h']  
+        return src  
     def gcn_reduce(self, node, msgs):
         return torch.sum(msgs['h'], 1)   
     def importance_msg(self, src, edge):        
@@ -56,7 +56,6 @@ class GCN(nn.Module):
                  dropout, 
                  fn_batch,
                  fn_batch_params):
-        
         super(GCN, self).__init__()
         
         #add self loops
@@ -68,7 +67,7 @@ class GCN(nn.Module):
             self.batch_type={"IS":True, "NS":False}  #convenience flags
             self.batches, q = fn_batch(**fn_batch_params)            
             self.q = q
-        elif fn_batch == sampling.minibatch_seed_traverse: #if neighborhood sampling
+        elif fn_batch in [sampling.seed_expansion_sampling, sampling.seed_BFS_frontier_sampling, sampling.seed_BFS_frontier_sampling]: #if neighborhood sampling
             self.batch_type={"IS":False, "NS":True}
             self.batches = fn_batch(**fn_batch_params)
         else:
@@ -102,6 +101,7 @@ class GCN(nn.Module):
         ret = torch.zeros((features.size()[0], self.n_classes)) #output layer aggregate 
         node_count = 0 #bookkeeping
         for batch in self.batches:
+
             nodes_prev = None
             for l_id, layer in enumerate(self.layers):
                 
@@ -120,6 +120,7 @@ class GCN(nn.Module):
                         g_sub.set_n_repr({'h':features_sub, 'q':q_sub})
                     elif self.batch_type["NS"]:
                         g_sub.set_n_repr({'h':features_sub})
+
                 else:  #else deeper level                  
                     idx = np.array([[i, key_i] for i, key_i in enumerate(nodes_prev) if key_i in nodes])  #if subgraph shrinks, reindex. e.g. where are old [0, M] indices in [0, N] ? M >= N 
                     g_sub_new = dgl.DGLSubGraph(parent=g_sub, nodes=idx[:, 0])
@@ -198,7 +199,7 @@ def default_params():
               "lr":1e-3,
               "epochs":20, 
               "hidden":16,
-              "layers": fn_batch_params["depth"], 
+              "layers": fn_batch_params["depth"]-2, 
               "fn_batch": sampling.seed_BFS_frontier_sampling,
               "fn_batch_params":fn_batch_params,
               "fn_loss": F.nll_loss}

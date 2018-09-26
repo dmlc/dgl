@@ -31,7 +31,7 @@ def seeds(V, seed_size, num_batches, replace=False):
 ###
 ## Sample batches of size 'seed_size' until 'percent_nodes'*len(V) of 'V' is consumed. This will produce a variable number of seed-sets over a fixed number (but random selection) of nodes. To fix the source set, pre-sample and consume this list
 ## @param seed_size int
-## @param num_batches int
+## @param num_nodes int
 ## @param percent_nodes float
 ## @param @replace boolean
 ## @return a 2-D list of [[seeds], [seeds]....]
@@ -54,14 +54,18 @@ def seeds_consume(V, seed_size, num_nodes=None, percent_nodes=.90):
 ## This is merely sampling nodes porportional to degree. The authors then induce subgraphs over this set of sampled nodes 
 ## (This implements for a networkx object, implementation may vary slightly for other representations) 
 ## @param G a networkx graph 
-## @param n int the size of the node sample
+## @param seed_size int the size of the node sample
 ## @param batches int the number of repeated node samples
 ## @param fn string the the sampling criteria to weight samples, (we're using degree, implement any others)
 ## @return list a list of batch dictionaries [d1, d2... di...] where dictionary d_i = {0: [nodes]} 
 ##     this representation allows for multiple levels in other sampling methods. This method has only one level.
 ## @return dict probability distribution where q[v] = degree(v)/|E| (for degree weighting)
 ###
-def importance_sampling_networkx(G, n=100, batches=100, fn="degree"):    
+def importance_sampling_networkx(G, seed_size=100, num_nodes=None,percent_nodes=.90, fn="degree"):    
+    
+    if num_nodes is None:
+        num_nodes = int(np.floor(len(G.nodes)*percent_nodes)) 
+        
     q = {} #probability distribution for each q[v]
     ret = [] #list of batch samples 
     if fn == "degree":
@@ -69,9 +73,9 @@ def importance_sampling_networkx(G, n=100, batches=100, fn="degree"):
         s = sum(dict(degrees).values()) #total edges (directed)
         for v in G.nodes:
             q[v] = degrees[v]/s #my degree
-        for i in range(batches):
+        for i in range(np.floor(num_nodes/seed_size)):
             r = {}
-            r[0] = set([int(i) for i in npr.choice(list(q.keys()), size=n, replace=False, p=list(q.values()))]) # select 'n' keys using probability distribution 'q.values()'  
+            r[0] = set([int(i) for i in npr.choice(list(q.keys()), size=seed_size, replace=False, p=list(q.values()))]) # select 'n' keys using probability distribution 'q.values()'  
             ret.append(r)
     return ret, q
 
