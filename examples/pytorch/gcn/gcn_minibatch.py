@@ -61,23 +61,16 @@ class GCN(nn.Module):
         #add self loops
         g = self.add_self_edges_networkx(g)
         
-        #generate minibatches
-        if fn_batch == sampling.importance_sampling_networkx:  #if Importance Sampling (IS)
-            self.q = sampling.importance_sampling_distribution_networkx(g, 'degree')
-            fn_batch_params["q"] = self.q 
-            self.batch_type={"IS":True, "NS":False}  #convenience flags
-            self.batches = fn_batch(**fn_batch_params)
-            #self.q = q
-        elif fn_batch in [sampling.seed_expansion_sampling, sampling.seed_BFS_frontier_sampling, sampling.seed_random_walk_sampling]: #if neighborhood sampling
-            fn_batch_params["G"] = g 
-            self.batch_type={"IS":False, "NS":True}
-            self.batches = fn_batch(**fn_batch_params)
-        else:
-            raise Exception("sampling not supported") #what are you doing?
+        self.fn_batch = fn_batch
+        self.fn_batch_params = fn_batch_params
+        
         self.g = g    
         self.dropout = dropout
         self.n_classes = n_classes
-              
+        
+        if fn_batch == sampling.importance_sampling: 
+            self.q = sampling.importance_sampling_distribution_networkx(g, 'degree')
+        
         # input layer
         self.layers = nn.ModuleList([NodeApplyModule(in_feats, n_hidden, activation)])
 
@@ -88,52 +81,66 @@ class GCN(nn.Module):
         # output layer
         self.layers.append(NodeApplyModule(n_hidden, n_classes))
         
-    def forward(self, features, labels, mask, fn_reduce=F.log_softmax, log=False):
-        #set up functions and data
-        if self.batch_type["IS"]:
-            q = self.q
-            q_rep = torch.unsqueeze(torch.tensor([q[i] if i in q else 0 for i in range(features.shape[0])]),1) #store degree distribution
+    def forward(self, features, labels, mask, optimizer, fn_reduce=F.log_softmax, fn_loss=F.nll_loss):
+
+        #generate minibatches
+        if self.fn_batch == sampling.importance_sampling:  #if Importance Sampling (IS)
+            self.fn_batch_params["q"] = self.q 
+            self.batch_type={"IS":True, "NS":False}  #convenience flags
+            self.batches = self.fn_batch(**self.fn_batch_params)
+            q_rep = torch.unsqueeze(torch.tensor([self.q[i] if i in self.q else 0 for i in range(features.shape[0])]),1) #store degree distribution
             gcn_reduce = self.importance_reduce
-            gcn_msg = self.importance_msg
-        elif self.batch_type["NS"]:
+            gcn_msg = self.importance_msg            
+            #self.q = q
+        elif self.fn_batch in [sampling.seed_expansion_sampling, sampling.seed_BFS_frontier_sampling, sampling.seed_random_walk_sampling]: #if neighborhood sampling
+            self.fn_batch_params["G"] = self.g 
+            self.batch_type={"IS":False, "NS":True}
+            self.batches = self.fn_batch(**self.fn_batch_params)
             self.g.set_n_repr({'h':features})
             gcn_reduce = self.gcn_reduce
-            gcn_msg = self.gcn_msg
+            gcn_msg = self.gcn_msg            
+        else:
+            raise Exception("sampling not supported") #what are you doing?
         
-        ret = torch.zeros((features.size()[0], self.n_classes)) #output layer aggregate 
+        #ret = torch.zeros((features.size()[0], self.n_classes)) #output layer aggregate 
+        batch_sizes = []
         node_count = 0 #bookkeeping
         for batch in self.batches:
-
             nodes_prev = None
-            for l_id, layer in enumerate(self.layers):
-                
+            for l_id, layer in enumerate(self.layers):            
                 #handle subgraph nodes
                 if self.batch_type["IS"]: # use fixed node set
                     nodes = batch[0]
                 elif self.batch_type["NS"]: #expand node set
                     nodes = set.union(*[nodeset for depth,nodeset in batch.items() if depth >= l_id])
 
-                if l_id==0:  #if level 0 use input features                                     
+                if l_id==0:  #if level 0 use input features   
+                    batch_sizes.append(len(nodes))                                  
                     g_sub = dgl.DGLSubGraph(parent=self.g, nodes=list(nodes))
                     a = torch.tensor(list(nodes))
                     features_sub = torch.index_select(features, dim=0, index=a)
+                    labels_sub = torch.index_select(labels, dim=0, index=a)
+                    mask_sub = torch.index_select(mask, dim=0, index=a)
                     if self.batch_type["IS"]:  #branch because we might need more fields
                         q_sub = torch.index_select(q_rep, dim=0, index=a)
                         g_sub.set_n_repr({'h':features_sub, 'q':q_sub})
                     elif self.batch_type["NS"]:
                         g_sub.set_n_repr({'h':features_sub})
-
                 else:  #else deeper level                  
                     idx = np.array([[i, key_i] for i, key_i in enumerate(nodes_prev) if key_i in nodes])  #if subgraph shrinks, reindex. e.g. where are old [0, M] indices in [0, N] ? M >= N 
                     g_sub_new = dgl.DGLSubGraph(parent=g_sub, nodes=idx[:, 0])
                     g_sub_new.copy_from(parent=g_sub)
+                    labels_sub = torch.index_select(labels_sub, dim=0, index=torch.tensor(idx[:, 0]))
+                    mask_sub = torch.index_select(mask_sub, dim=0, index=torch.tensor(idx[:, 0]))
                     g_sub = g_sub_new
                 nodes_prev = list(nodes)
                 g_sub.update_all(gcn_msg, gcn_reduce, layer, batchable=True)
-                node_count+= len(g_sub.nodes)
-            idx_sub = torch.tensor(idx[:, 1])
-            ret.index_copy_(0, idx_sub, fn_reduce(g_sub.pop_n_repr(key='h'), 1))
-        return ret, node_count            
+                node_count+= len(g_sub.nodes)                  
+            loss = fn_loss(fn_reduce(g_sub.pop_n_repr(key='h'))[mask_sub], labels_sub[mask_sub])  
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()    
+        return loss.item(), node_count , batch_sizes           
            
 def main(params, data = None):
     ret = {'time':[], 'loss':[], 'nodes':[] }
@@ -173,26 +180,27 @@ def main(params, data = None):
     # use optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=params["lr"])
 
+    t_total=0
+    n_counts = []
+    losses = []
+    batches = []
     for epoch in range(params["epochs"]):
         t=time.time()
-        logp, node_count = model(features, labels, mask, fn_reduce=F.log_softmax)            
-        loss = params["fn_loss"](logp[mask], labels[mask])  
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        t_delta = time.time()-t
-        
-        print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | Nodes {:d}".format(
-            epoch, loss.item(), t_delta, node_count))
-        ret["time"].append(t_delta)   #bookkeeping here
-        ret["loss"].append(loss.item())
-        ret["nodes"].append(node_count)
+        loss, node_count, batch_size = model(features, labels, mask, optimizer, fn_reduce=F.log_softmax, fn_loss=params["fn_loss"])         
+        t_total += time.time()-t
+        losses.append(loss)
+        batches.extend(batch_size)
+        n_counts.append(node_count)    
+        print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | Node Updates {:d} | Mean Subgraph Size {:d}".format(
+            epoch, loss, t_total, int(np.round(np.mean(n_counts))), int(np.round(np.mean(batches))) ))
+    ret["time"]= t_total
+    ret["loss"]= losses[-1]
+    ret["mean node updates"] = int(np.round(np.mean(n_counts)))
+    ret["mean batch size"] = int(np.round(np.mean(batches)))
     return ret
 
 #build all default parameters for execution
 def default_params():
-    
-    #seed_BFS_frontier_sampling(G,  seed_size, depth, fn_neighborhood, max_level_nodes = None, seed_nodes=None, percent_nodes=.90)
     
     fn_batch_params = {"depth": 3, "fn_neighborhood": sampling.neighborhood_networkx, "max_level_nodes":100, 'seed_size':10, 'percent_nodes':0.9}    
     return {"dataset":"cora",
