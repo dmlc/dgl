@@ -62,12 +62,14 @@ class GCN(nn.Module):
         g = self.add_self_edges_networkx(g)
         
         #generate minibatches
-        fn_batch_params["G"] = g               
         if fn_batch == sampling.importance_sampling_networkx:  #if Importance Sampling (IS)
+            self.q = sampling.importance_sampling_distribution_networkx(g, 'degree')
+            fn_batch_params["q"] = self.q 
             self.batch_type={"IS":True, "NS":False}  #convenience flags
-            self.batches, q = fn_batch(**fn_batch_params)            
-            self.q = q
-        elif fn_batch in [sampling.seed_expansion_sampling, sampling.seed_BFS_frontier_sampling, sampling.seed_BFS_frontier_sampling]: #if neighborhood sampling
+            self.batches = fn_batch(**fn_batch_params)
+            #self.q = q
+        elif fn_batch in [sampling.seed_expansion_sampling, sampling.seed_BFS_frontier_sampling, sampling.seed_random_walk_sampling]: #if neighborhood sampling
+            fn_batch_params["G"] = g 
             self.batch_type={"IS":False, "NS":True}
             self.batches = fn_batch(**fn_batch_params)
         else:

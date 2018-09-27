@@ -26,7 +26,9 @@ import numpy.random as npr
 ## @return a 2-D list of [[seeds], [seeds]....]
 ###
 def seeds(V, seed_size, num_batches, replace=False):
-    return [list(npr.choice(V, seed_size, replace=replace)) for _ in range(num_batches)]
+    for i in range(num_batches):
+        yield list(npr.choice(V, seed_size, replace=replace))
+    return [list() for _ in range(num_batches)]
 
 ###
 ## Sample batches of size 'seed_size' until 'percent_nodes'*len(V) of 'V' is consumed. This will produce a variable number of seed-sets over a fixed number (but random selection) of nodes. To fix the source set, pre-sample and consume this list
@@ -39,9 +41,10 @@ def seeds(V, seed_size, num_batches, replace=False):
 def seeds_consume(V, seed_size, num_nodes=None, percent_nodes=.90):
     if num_nodes is None:
         num_nodes = int(np.round(len(V)*percent_nodes))
-    return list(chunk_iter(list(npr.permutation(V)[0:min([num_nodes, len(V)])]), seed_size))
-
-
+    node_list = npr.permutation(V)[0:min([num_nodes, len(V)])]
+    l = len(node_list)
+    for ndx in range(0, l, seed_size):
+        yield list(node_list[ndx:min(ndx + seed_size, l)])
 
 ###
 ## Graph Traversal Methods
@@ -61,25 +64,24 @@ def seeds_consume(V, seed_size, num_nodes=None, percent_nodes=.90):
 ##     this representation allows for multiple levels in other sampling methods. This method has only one level.
 ## @return dict probability distribution where q[v] = degree(v)/|E| (for degree weighting)
 ###
-def importance_sampling_networkx(G, seed_size=100, num_nodes=None,percent_nodes=.90, fn="degree"):    
-    
+def importance_sampling(q,seed_size=100, num_nodes=None,percent_nodes=.90):     
     if num_nodes is None:
-        num_nodes = int(np.floor(len(G.nodes)*percent_nodes)) 
-        
+        num_nodes = int(np.floor(len(q)*percent_nodes)) 
+        for i in range(int(np.floor(num_nodes/seed_size))):
+            r = {}
+            r[0] = set([int(i) for i in npr.choice(list(q.keys()), size=seed_size, replace=False, p=list(q.values()))]) # select 'n' keys using probability distribution 'q.values()'  
+            #ret.append(r)
+            yield r
+
+def importance_sampling_distribution_networkx(G, fn="degree"):
     q = {} #probability distribution for each q[v]
-    ret = [] #list of batch samples 
     if fn == "degree":
         degrees = G.degree
         s = sum(dict(degrees).values()) #total edges (directed)
         for v in G.nodes:
-            q[v] = degrees[v]/s #my degree
-        for i in range(np.floor(num_nodes/seed_size)):
-            r = {}
-            r[0] = set([int(i) for i in npr.choice(list(q.keys()), size=seed_size, replace=False, p=list(q.values()))]) # select 'n' keys using probability distribution 'q.values()'  
-            ret.append(r)
-    return ret, q
-
-
+            q[v] = degrees[v]/s #my degree    
+    return q
+    
 ###
 ## Samples 'nodes' nodes based on hitting probability of a random walker over seed sets in list 'seedset_list' (advanced: using seed selection probability list 'weights' of len(seedset), assumes fixed-length seed-set)
 ## The walker randomly selects a node, walks with 'p_restart' probability of restarting, for 'iters' iterations. Each visitation is a hit. Nodes are ranked by hits selected in descending order.
@@ -106,7 +108,7 @@ def seed_random_walk(G, seedset_list, depth, fn_neighborhood, max_level_nodes=No
     elif isinstance(max_level_nodes, int):
         max_level_nodes = [max_level_nodes for i in range(depth)]    
     
-    rr = []
+    #rr = []
     for S in seedset_list:
         dists = c.defaultdict(lambda:np.inf) #store best distances. Note: this approximates minimum path lengths, possible that dists[v] > minimum_path_length(v)
         hits = c.defaultdict(int) #store node hits
@@ -132,8 +134,9 @@ def seed_random_walk(G, seedset_list, depth, fn_neighborhood, max_level_nodes=No
             k_iter = int(depth-1-dists[key])
             if len(r[k_iter]) < max_level_nodes[k_iter]: #enforce maximum number per level
                 r[k_iter].add(int(key))
-        rr.append(dict(r))
-    return rr   
+        yield(dict(r))
+        #rr.append(dict(r))
+    #return rr   
 
 ###
 ## Samples neighbors around a seed set in a BFS fashion, where we ensure exactly 'max_neighbors' of each sampled node are sampled
@@ -153,7 +156,7 @@ def seed_neighbor_expansion(G,seedset_list,depth, fn_neighborhood, max_neighbors
     elif isinstance(max_neighbors, int):
         max_neighbors = [max_neighbors for i in range(depth)]
     
-    rr = []
+    #rr = []
     for S in seedset_list: #for seed-set
         d = {} #distances
         to_visit = set(S)  
@@ -182,8 +185,9 @@ def seed_neighbor_expansion(G,seedset_list,depth, fn_neighborhood, max_neighbors
         
         for key,d_k in d.items():
             r[int(depth-1-d_k)].add(int(key))
-        rr.append(dict(r))
-    return rr
+        yield(dict(r))
+        #rr.append(dict(r))
+    #return rr
     
 ## Samples neighbors around a seed set in a BFS fashion, where we ensure exactly 'max_level_nodes' are randomly sampled per level in depth
 ##
@@ -201,7 +205,7 @@ def seed_BFS_frontier(G,seedset_list,depth, fn_neighborhood, max_level_nodes = N
     elif isinstance(max_level_nodes, int):
         max_level_nodes = [max_level_nodes for i in range(depth)]
     
-    rr = []
+    #rr = []
     for S in seedset_list: #for seedset
         d = {} #distances
         to_visit = set(S) 
@@ -234,34 +238,33 @@ def seed_BFS_frontier(G,seedset_list,depth, fn_neighborhood, max_level_nodes = N
         for key,d_k in d.items():
             if d_k != np.inf: #if we didnt kill
                 r[int(depth-1-d_k)].add(int(key))
-        rr.append(dict(r))
-    return rr
+        yield dict(r)
+        #rr.append(dict(r))
+    #return rr
 
 ###
 # Seeded Graph Traversals
 # Convenience methods combining seeding and minibatch sampling
 ### 
 def seed_expansion_sampling(G, seed_size, depth, fn_neighborhood, max_neighbors = None, seed_nodes=None, percent_nodes=.90):
-    seedset_list = seeds_consume(G.nodes, seed_size =  seed_size, num_nodes=seed_nodes,percent_nodes=percent_nodes)
-    return seed_neighbor_expansion(G,seedset_list,depth, fn_neighborhood, max_neighbors=max_neighbors)
+    seedset_iter = seeds_consume(G.nodes, seed_size =  seed_size, num_nodes=seed_nodes,percent_nodes=percent_nodes)
+    return seed_neighbor_expansion(G,seedset_iter,depth, fn_neighborhood, max_neighbors=max_neighbors)
 
 def seed_BFS_frontier_sampling(G,  seed_size, depth, fn_neighborhood, max_level_nodes = None, seed_nodes=None, percent_nodes=.90):
-    seedset_list = seeds_consume(G.nodes, seed_size =  seed_size, num_nodes=seed_nodes,percent_nodes=percent_nodes)
-    return seed_BFS_frontier(G,seedset_list,depth, fn_neighborhood, max_level_nodes=max_level_nodes)
+    seedset_iter = seeds_consume(G.nodes, seed_size =  seed_size, num_nodes=seed_nodes,percent_nodes=percent_nodes)
+    return seed_BFS_frontier(G,seedset_iter,depth, fn_neighborhood, max_level_nodes=max_level_nodes)
 
 def seed_random_walk_sampling(G, seed_size, depth, fn_neighborhood, max_level_nodes=None, seed_nodes=None, percent_nodes=.90, p_restart=0.3, iters=1000, weights=1, max_path_length=10):
-    seedset_list = seeds_consume(G.nodes, seed_size =  seed_size, num_nodes=seed_nodes,percent_nodes=percent_nodes)
-    return seed_random_walk(G, seedset_list, depth, fn_neighborhood, max_level_nodes=max_level_nodes, p_restart=p_restart, iters=iters, weights=weights, max_path_length=max_path_length)
+    seedset_iter = seeds_consume(G.nodes, seed_size =  seed_size, num_nodes=seed_nodes,percent_nodes=percent_nodes)
+    return seed_random_walk(G, seedset_iter, depth, fn_neighborhood, max_level_nodes=max_level_nodes, p_restart=p_restart, iters=iters, weights=weights, max_path_length=max_path_length)
 
 ####
 ## Accessories
 #####
 
-#http://stackoverflow.com/questions/8290397/how-to-split-an-iterable-in-constant-size-chunks
-def chunk_iter(iterable, n=1):
-    l = len(iterable)
-    for ndx in range(0, l, n):
-        yield iterable[ndx:min(ndx + n, l)]
+##http://stackoverflow.com/questions/8290397/how-to-split-an-iterable-in-constant-size-chunks
+#def chunk_iter(iterable, n=1):
+#
 
 def nodes_networkx(G):
     return G.nodes
