@@ -44,7 +44,9 @@ def seeds_consume(V, seed_size, num_nodes=None, percent_nodes=.90):
     node_list = npr.permutation(V)[0:min([num_nodes, len(V)])]
     l = len(node_list)
     for ndx in range(0, l, seed_size):
-        yield list(node_list[ndx:min(ndx + seed_size, l)])
+        r = list(node_list[ndx:min(ndx + seed_size, l)])
+        if len(r) == seed_size:
+            yield r
 
 ###
 ## Graph Traversal Methods

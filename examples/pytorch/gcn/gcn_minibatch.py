@@ -135,11 +135,12 @@ class GCN(nn.Module):
                     g_sub = g_sub_new
                 nodes_prev = list(nodes)
                 g_sub.update_all(gcn_msg, gcn_reduce, layer, batchable=True)
-                node_count+= len(g_sub.nodes)                  
-            loss = fn_loss(fn_reduce(g_sub.pop_n_repr(key='h'))[mask_sub], labels_sub[mask_sub])  
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()    
+                node_count+= len(g_sub.nodes)             
+            if torch.nonzero(mask_sub).size(0):
+                loss = fn_loss(fn_reduce(g_sub.pop_n_repr(key='h'))[mask_sub], labels_sub[mask_sub])  
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()    
         return loss.item(), node_count , batch_sizes           
            
 def main(params, data = None):
@@ -209,7 +210,7 @@ def default_params():
               "lr":1e-3,
               "epochs":20, 
               "hidden":16,
-              "layers": fn_batch_params["depth"]-2, 
+              "layers": fn_batch_params["depth"]-1, 
               "fn_batch": sampling.seed_BFS_frontier_sampling,
               "fn_batch_params":fn_batch_params,
               "fn_loss": F.nll_loss}
