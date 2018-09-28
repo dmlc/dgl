@@ -69,19 +69,24 @@ def seeds_consume(V, seed_size, num_nodes=None, percent_nodes=.90):
 def importance_sampling(q,seed_size=100, num_nodes=None,percent_nodes=.90):     
     if num_nodes is None:
         num_nodes = int(np.floor(len(q)*percent_nodes)) 
-        for i in range(int(np.floor(num_nodes/seed_size))):
-            r = {}
-            r[0] = set([int(i) for i in npr.choice(list(q.keys()), size=seed_size, replace=False, p=list(q.values()))]) # select 'n' keys using probability distribution 'q.values()'  
-            #ret.append(r)
-            yield r
+    for i in range(int(np.floor(num_nodes/seed_size))):
+        r = {}
+        r[0] = set([int(i) for i in npr.choice(list(q.keys()), size=seed_size, replace=False, p=list(q.values()))]) # select 'n' keys using probability distribution 'q.values()'  
+        #ret.append(r)
+        yield r
 
-def importance_sampling_distribution_networkx(G, fn="degree"):
+def importance_sampling_distribution_networkx(G, fn="neighborhood"):
     q = {} #probability distribution for each q[v]
     if fn == "degree":
         degrees = G.degree
         s = sum(dict(degrees).values()) #total edges (directed)
         for v in G.nodes:
-            q[v] = degrees[v]/s #my degree    
+            q[v] = degrees[v]/s #my degree   
+    if fn=="neighborhood":
+        degrees = G.degree
+        for v in G.nodes:
+            q[v] = (1/degrees(v))*sum([1/degrees[vi] for vi in neighborhood_networkx(G, v)])
+            
     return q
     
 ###

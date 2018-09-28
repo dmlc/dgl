@@ -105,6 +105,8 @@ class GCN(nn.Module):
         #ret = torch.zeros((features.size()[0], self.n_classes)) #output layer aggregate 
         batch_sizes = []
         node_count = 0 #bookkeeping
+        loss_total = 0
+        instances_total = 0
         for batch in self.batches:
             nodes_prev = None
             for l_id, layer in enumerate(self.layers):            
@@ -137,11 +139,13 @@ class GCN(nn.Module):
                 g_sub.update_all(gcn_msg, gcn_reduce, layer, batchable=True)
                 node_count+= len(g_sub.nodes)             
             if torch.nonzero(mask_sub).size(0):
-                loss = fn_loss(fn_reduce(g_sub.pop_n_repr(key='h'))[mask_sub], labels_sub[mask_sub])  
+                loss = fn_loss(fn_reduce(g_sub.pop_n_repr(key='h'))[mask_sub], labels_sub[mask_sub], reduction='sum')
+                loss_total += float(loss)
+                instances_total += float(torch.nonzero(mask_sub).size(0))
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()    
-        return loss.item(), node_count , batch_sizes           
+        return loss_total/instances_total, node_count , batch_sizes           
            
 def main(params, data = None):
     ret = {'time':[], 'loss':[], 'nodes':[] }
