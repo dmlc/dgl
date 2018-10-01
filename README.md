@@ -16,6 +16,18 @@ Show below, there are three sets of APIs for different models.
 
 ## How to build (the `cpp` branch)
 
+Before building, make sure that the submodules are cloned.  If you haven't initialized the submodules, run
+
+```sh
+$ git submodule init
+```
+
+To sync the submodules, run
+
+```sh
+$ git submodule update
+```
+
 At the root directory of the repo:
 
 ```sh
