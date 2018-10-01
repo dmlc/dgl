@@ -3,12 +3,9 @@ Supervised Community Detection with Hierarchical Graph Neural Networks
 https://arxiv.org/abs/1705.08415
 
 Deviations from paper:
-- Addition of global aggregation operator.
 - Message passing is equivalent to `A^j \cdot X`, instead of `\min(1, A^j) \cdot X`.
+- Pm Pd
 """
-
-
-# TODO self-loop?
 
 
 import copy
@@ -86,7 +83,7 @@ class GNN(nn.Module):
         self.x = self.normalize(th.tensor(x, dtype=th.float).unsqueeze(1))
         y = list(zip(*lg.degree))[1]
         self.y = self.normalize(th.tensor(y, dtype=th.float).unsqueeze(1))
-        self.eid2nid = th.tensor([n for [[_, n], _] in lg.edges])
+        self.eid2nid = th.tensor([int(n) for [[_, n], [_, _]] in lg.edges])
 
         self.g = dgl.DGLGraph(g)
         self.lg = dgl.DGLGraph(nx.convert_node_labels_to_integers(lg))

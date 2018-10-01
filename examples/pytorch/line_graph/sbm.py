@@ -32,7 +32,7 @@ class SSBM:
             self.a = a * math.log(n) / n
             self.b = b * math.log(n) / n
         elif regime == 'constant':
-            snr = (a - b) ** 2 / (k * (a + (k - 1) * b))
+            snr = (a - b) ** 2 / (k * (a + (k + 1) * b))
             if snr > 1:
                 print('SSBM model with possible detection.')
             else:
