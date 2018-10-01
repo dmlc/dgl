@@ -23,7 +23,7 @@ $ mkdir build
 $ cd build
 $ cmake ..
 $ make
-$ export DGL_LIBRARY_PATH=$PWD/build
+$ export DGL_LIBRARY_PATH=$PWD
 ```
 
 The `DGL_LIBRARY_PATH` environment variable should point to the library `libdgl.so` built by CMake.
