@@ -16,23 +16,21 @@ class DGLSubGraph(DGLGraph):
                  nodes):
         super(DGLSubGraph, self).__init__()
         # relabel nodes
+        self._parent = parent
         self._parent_nid = utils.toindex(nodes)
         self._graph, self._parent_eid = parent._graph.node_subgraph(self._parent_nid)
-        if parent._node_frame.num_rows != 0:
-            self._node_frame = FrameRef(Frame(parent._node_frame[self._parent_nid]))
-        if parent._edge_frame.num_rows != 0:
-            self._edge_frame = FrameRef(Frame(parent._edge_frame[self._parent_eid]))
         self.reset_messages()
 
-    def copy_from(self, parent):
+    def copy_to_parent(self, inplace=False):
+        self._parent._node_frame.update_rows(self._parent_nid, self._node_frame, inplace=inplace)
+        self._parent._edge_frame.update_rows(self._parent_eid, self._edge_frame, inplace=inplace)
+
+    def copy_from_parent(self):
         """Copy node/edge features from the parent graph.
-        TODO do we need this?
 
         All old features will be removed.
-
-        Parameters
-        ----------
-        parent : DGLGraph
-            The parent graph to copy from.
         """
-        pass
+        if self._parent._node_frame.num_rows != 0:
+            self._node_frame = FrameRef(Frame(self._parent._node_frame[self._parent_nid]))
+        if self._parent._edge_frame.num_rows != 0:
+            self._edge_frame = FrameRef(Frame(self._parent._edge_frame[self._parent_eid]))

@@ -35,7 +35,7 @@ def test_basics():
     assert len(sg.get_n_repr()) == 0
     assert len(sg.get_e_repr()) == 0
     # the data is copied after explict copy from
-    sg.copy_from(g)
+    sg.copy_from_parent()
     assert len(sg.get_n_repr()) == 1
     assert len(sg.get_e_repr()) == 1
     sh = sg.get_n_repr()['h']
