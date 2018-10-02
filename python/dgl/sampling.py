@@ -54,27 +54,31 @@ def seeds_consume(V, seed_size, num_nodes=None, percent_nodes=.90):
 
 
 
+
 ###
 ## This implements Importance Sampling (IS) node sampling in https://arxiv.org/abs/1801.10247
-## This is merely sampling nodes porportional to degree. The authors then induce subgraphs over this set of sampled nodes 
-## (This implements for a networkx object, implementation may vary slightly for other representations) 
-## @param G a networkx graph 
+## This is merely sampling nodes porportional to neighboring node degrees. The authors then induce subgraphs over this set of sampled nodes  
+## @param q a dictionary of node weights where q[v] = w_v
 ## @param seed_size int the size of the node sample
-## @param batches int the number of repeated node samples
-## @param fn string the the sampling criteria to weight samples, (we're using degree, implement any others)
-## @return list a list of batch dictionaries [d1, d2... di...] where dictionary d_i = {0: [nodes]} 
+## @param num_nodes int
+## @param percent_nodes float
+## @return generator, a generator function of batch dictionaries [d1, d2... di...] where dictionary d_i = {0: [nodes]} 
 ##     this representation allows for multiple levels in other sampling methods. This method has only one level.
-## @return dict probability distribution where q[v] = degree(v)/|E| (for degree weighting)
 ###
+
 def importance_sampling(q,seed_size=100, num_nodes=None,percent_nodes=.90):     
     if num_nodes is None:
         num_nodes = int(np.floor(len(q)*percent_nodes)) 
     for i in range(int(np.floor(num_nodes/seed_size))):
         r = {}
-        r[0] = set([int(i) for i in npr.choice(list(q.keys()), size=seed_size, replace=False, p=list(q.values()))]) # select 'n' keys using probability distribution 'q.values()'  
-        #ret.append(r)
+        values = np.array(list(q.values()))
+        keys = list(q.keys())
+        r[0] = set([int(i) for i in npr.choice(keys, size=seed_size, replace=False, p=values/np.sum(values))]) # select 'n' keys using probability distribution 'q.values()'  
         yield r
 
+#this function builds the likelihood dictionary used in importance sampling, according to 'fn' criteria
+## @param graph G, a networkx graph object
+## @param fn string the the sampling criteria to weight samples, (we're using degree, implement any others)
 def importance_sampling_distribution_networkx(G, fn="neighborhood"):
     q = {} #probability distribution for each q[v]
     if fn == "degree":
@@ -82,11 +86,13 @@ def importance_sampling_distribution_networkx(G, fn="neighborhood"):
         s = sum(dict(degrees).values()) #total edges (directed)
         for v in G.nodes:
             q[v] = degrees[v]/s #my degree   
-    if fn=="neighborhood":
+    elif fn=="neighborhood":
         degrees = G.degree
         for v in G.nodes:
             q[v] = (1/degrees(v))*sum([1/degrees[vi] for vi in neighborhood_networkx(G, v)])
-            
+    elif fn == "uniform":
+        for v in G.nodes:
+            q[v] = 1/len(G.nodes)
     return q
     
 ###
@@ -106,9 +112,9 @@ def importance_sampling_distribution_networkx(G, fn="neighborhood"):
 ## @param iters int the number of walking iterations
 ## @param weights a vector specifying weights for seed selection (default: integer, uniform sampling)
 ## @param max_path_length int the maximum path length, (so we can generate path lengths with a single bernoulli sampling)
-## @return list a list of batch dictionaries [d1, d2... di...] where dictionary d_i = {0: [nodes], 1:[nodes]...} 
+## @return generator, a generator function returning batch dictionaries [d1, d2... di...] where dictionary d_i = {0: [nodes], 1:[nodes]...} 
 ###
-def seed_random_walk(G, seedset_list, depth, fn_neighborhood, max_level_nodes=None, p_restart=0.1, iters=1000, weights=1, max_path_length=20):
+def seed_random_walk(G, seedset_list, depth, fn_neighborhood, max_level_nodes=None, p_restart=0.1, iters=300, weights=1, max_path_length=10):
     
     if max_level_nodes is None:
         max_level_nodes = [np.inf for i in range(depth)]
@@ -153,7 +159,7 @@ def seed_random_walk(G, seedset_list, depth, fn_neighborhood, max_level_nodes=No
 ## @param depth int the number of levels of nodes (e.g. in geodesic distance) to generate
 ## @param fn_neighborhood *function a function pointer implementing the neighborhood function on G (see 'Accessory Functions' below)
 ## @param max_neighbors int, list, or None: the maximum number of neighbors sampled per visited node at the current depth. if a list, samples according to 'max_neighbors[curr]' current node depth
-## @return list a list of batch dictionaries [d1, d2... di...] where dictionary d_i = {0: [nodes], 1:[nodes]...} 
+## @return generator, a generator function returning batch dictionaries [d1, d2... di...] where dictionary d_i = {0: [nodes], 1:[nodes]...} 
 ##
 ###
 def seed_neighbor_expansion(G,seedset_list,depth, fn_neighborhood, max_neighbors = None):
@@ -203,7 +209,7 @@ def seed_neighbor_expansion(G,seedset_list,depth, fn_neighborhood, max_neighbors
 ## @param depth int the number of levels of nodes (e.g. in geodesic distance) to generate
 ## @param fn_neighborhood *function a function pointer implementing the neighborhood function on G (see 'Accessory Functions' below)
 ## @param max_level_nodes int, list, or None: the maximum number of neighbors sampled per level over *all* visited nodes at this level. if a list, samples according to 'max_neighbors[curr]' current node depth
-## @return list a list of batch dictionaries [d1, d2... di...] where dictionary d_i = {0: [nodes], 1:[nodes]...} 
+## @return generator, a generator function returning batch dictionaries [d1, d2... di...] where dictionary d_i = {0: [nodes], 1:[nodes]...} 
     
 def seed_BFS_frontier(G,seedset_list,depth, fn_neighborhood, max_level_nodes = None):
     
@@ -264,6 +270,10 @@ def seed_BFS_frontier_sampling(G,  seed_size, depth, fn_neighborhood, max_level_
 def seed_random_walk_sampling(G, seed_size, depth, fn_neighborhood, max_level_nodes=None, seed_nodes=None, percent_nodes=.90, p_restart=0.3, iters=1000, weights=1, max_path_length=10):
     seedset_iter = seeds_consume(G.nodes, seed_size =  seed_size, num_nodes=seed_nodes,percent_nodes=percent_nodes)
     return seed_random_walk(G, seedset_iter, depth, fn_neighborhood, max_level_nodes=max_level_nodes, p_restart=p_restart, iters=iters, weights=weights, max_path_length=max_path_length)
+
+def importance_sampling_wrapper_networkx(G, fn="neighborhood", seed_size=100, num_nodes=None, percent_nodes=.90):
+    q = importance_sampling_distribution_networkx(G, fn=fn)
+    return importance_sampling(q, seed_size=seed_size, num_nodes=num_nodes, percent_nodes=percent_nodes), q
 
 ####
 ## Accessories
