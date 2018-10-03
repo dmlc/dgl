@@ -31,14 +31,28 @@ class GraphOp {
   /*!
    * \brief Partition the graph into several subgraphs.
    *
-   * The graph will be partitioned by the node ids. Edges between partitions
-   * will be ignored. This requires the given number of partitions to evenly
+   * This is a reverse operation of DisjointUnion. The graph will be partitioned
+   * into num graphs. This requires the given number of partitions to evenly
    * divides the number of nodes in the graph.
    * 
+   * \param graph The graph to be partitioned.
    * \param num The number of partitions.
    * \return a list of partitioned graphs
    */
-  static std::vector<Graph> PartitionByNum(const Graph* graph, size_t num);
+  static std::vector<Graph> DisjointPartitionByNum(const Graph* graph, int64_t num);
+
+  /*!
+   * \brief Partition the graph into several subgraphs.
+   *
+   * This is a reverse operation of DisjointUnion. The graph will be partitioned
+   * based on the given sizes. This requires the sum of the given sizes is equal
+   * to the number of nodes in the graph.
+   * 
+   * \param graph The graph to be partitioned.
+   * \param sizes The number of partitions.
+   * \return a list of partitioned graphs
+   */
+  static std::vector<Graph> DisjointPartitionBySizes(const Graph* graph, IdArray sizes);
 };
 
 }  // namespace dgl
