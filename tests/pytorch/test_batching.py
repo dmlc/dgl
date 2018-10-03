@@ -133,7 +133,7 @@ def test_batch_send():
     def _fmsg(src, edge):
         assert src['h'].shape == (5, D)
         return {'m' : src['h']}
-    g.register_message_func(_fmsg, batchable=True)
+    g.register_message_func(_fmsg)
     # many-many send
     u = th.tensor([0, 0, 0, 0, 0])
     v = th.tensor([1, 2, 3, 4, 5])
@@ -150,9 +150,9 @@ def test_batch_send():
 def test_batch_recv():
     # basic recv test
     g = generate_graph()
-    g.register_message_func(message_func, batchable=True)
-    g.register_reduce_func(reduce_func, batchable=True)
-    g.register_apply_node_func(apply_node_func, batchable=True)
+    g.register_message_func(message_func)
+    g.register_reduce_func(reduce_func)
+    g.register_apply_node_func(apply_node_func)
     u = th.tensor([0, 0, 0, 4, 5, 6])
     v = th.tensor([1, 2, 3, 9, 9, 9])
     reduce_msg_shapes.clear()
@@ -163,9 +163,9 @@ def test_batch_recv():
 
 def test_update_routines():
     g = generate_graph()
-    g.register_message_func(message_func, batchable=True)
-    g.register_reduce_func(reduce_func, batchable=True)
-    g.register_apply_node_func(apply_node_func, batchable=True)
+    g.register_message_func(message_func)
+    g.register_reduce_func(reduce_func)
+    g.register_apply_node_func(apply_node_func)
 
     # send_and_recv
     reduce_msg_shapes.clear()
@@ -209,7 +209,7 @@ def test_reduce_0deg():
         return node + msgs.sum(1)
     old_repr = th.randn(5, 5)
     g.set_n_repr(old_repr)
-    g.update_all(_message, _reduce, batchable=True)
+    g.update_all(_message, _reduce)
     new_repr = g.get_n_repr()
 
     assert th.allclose(new_repr[1:], old_repr[1:])
@@ -227,17 +227,17 @@ def test_pull_0deg():
 
     old_repr = th.randn(2, 5)
     g.set_n_repr(old_repr)
-    g.pull(0, _message, _reduce, batchable=True)
+    g.pull(0, _message, _reduce)
     new_repr = g.get_n_repr()
     assert th.allclose(new_repr[0], old_repr[0])
     assert th.allclose(new_repr[1], old_repr[1])
-    g.pull(1, _message, _reduce, batchable=True)
+    g.pull(1, _message, _reduce)
     new_repr = g.get_n_repr()
     assert th.allclose(new_repr[1], old_repr[0])
 
     old_repr = th.randn(2, 5)
     g.set_n_repr(old_repr)
-    g.pull([0, 1], _message, _reduce, batchable=True)
+    g.pull([0, 1], _message, _reduce)
     new_repr = g.get_n_repr()
     assert th.allclose(new_repr[0], old_repr[0])
     assert th.allclose(new_repr[1], old_repr[0])

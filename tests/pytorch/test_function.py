@@ -51,32 +51,32 @@ def reducer_none(node, msgs):
 def test_copy_src():
     # copy_src with both fields
     g = generate_graph()
-    g.register_message_func(fn.copy_src(src='h', out='m'), batchable=True)
-    g.register_reduce_func(reducer_both, batchable=True)
+    g.register_message_func(fn.copy_src(src='h', out='m'))
+    g.register_reduce_func(reducer_both)
     g.update_all()
     assert th.allclose(g.get_n_repr()['h'],
             th.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
 
     # copy_src with only src field; the out field should use anonymous repr
     g = generate_graph()
-    g.register_message_func(fn.copy_src(src='h'), batchable=True)
-    g.register_reduce_func(reducer_out, batchable=True)
+    g.register_message_func(fn.copy_src(src='h'))
+    g.register_reduce_func(reducer_out)
     g.update_all()
     assert th.allclose(g.get_n_repr()['h'],
             th.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
 
     # copy_src with no src field; should use anonymous repr
     g = generate_graph1()
-    g.register_message_func(fn.copy_src(out='m'), batchable=True)
-    g.register_reduce_func(reducer_both, batchable=True)
+    g.register_message_func(fn.copy_src(out='m'))
+    g.register_reduce_func(reducer_both)
     g.update_all()
     assert th.allclose(g.get_n_repr()['h'],
             th.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
 
     # copy src with no fields;
     g = generate_graph1()
-    g.register_message_func(fn.copy_src(), batchable=True)
-    g.register_reduce_func(reducer_out, batchable=True)
+    g.register_message_func(fn.copy_src())
+    g.register_reduce_func(reducer_out)
     g.update_all()
     assert th.allclose(g.get_n_repr()['h'],
             th.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
@@ -84,32 +84,32 @@ def test_copy_src():
 def test_copy_edge():
     # copy_edge with both fields
     g = generate_graph()
-    g.register_message_func(fn.copy_edge(edge='h', out='m'), batchable=True)
-    g.register_reduce_func(reducer_both, batchable=True)
+    g.register_message_func(fn.copy_edge(edge='h', out='m'))
+    g.register_reduce_func(reducer_both)
     g.update_all()
     assert th.allclose(g.get_n_repr()['h'],
             th.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
 
     # copy_edge with only edge field; the out field should use anonymous repr
     g = generate_graph()
-    g.register_message_func(fn.copy_edge(edge='h'), batchable=True)
-    g.register_reduce_func(reducer_out, batchable=True)
+    g.register_message_func(fn.copy_edge(edge='h'))
+    g.register_reduce_func(reducer_out)
     g.update_all()
     assert th.allclose(g.get_n_repr()['h'],
             th.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
 
     # copy_edge with no edge field; should use anonymous repr
     g = generate_graph1()
-    g.register_message_func(fn.copy_edge(out='m'), batchable=True)
-    g.register_reduce_func(reducer_both, batchable=True)
+    g.register_message_func(fn.copy_edge(out='m'))
+    g.register_reduce_func(reducer_both)
     g.update_all()
     assert th.allclose(g.get_n_repr()['h'],
             th.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
 
     # copy edge with no fields;
     g = generate_graph1()
-    g.register_message_func(fn.copy_edge(), batchable=True)
-    g.register_reduce_func(reducer_out, batchable=True)
+    g.register_message_func(fn.copy_edge())
+    g.register_reduce_func(reducer_out)
     g.update_all()
     assert th.allclose(g.get_n_repr()['h'],
             th.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
@@ -117,36 +117,36 @@ def test_copy_edge():
 def test_src_mul_edge():
     # src_mul_edge with all fields
     g = generate_graph()
-    g.register_message_func(fn.src_mul_edge(src='h', edge='h', out='m'), batchable=True)
-    g.register_reduce_func(reducer_both, batchable=True)
+    g.register_message_func(fn.src_mul_edge(src='h', edge='h', out='m'))
+    g.register_reduce_func(reducer_both)
     g.update_all()
     assert th.allclose(g.get_n_repr()['h'],
             th.tensor([100., 1., 1., 1., 1., 1., 1., 1., 1., 284.]))
 
     g = generate_graph()
-    g.register_message_func(fn.src_mul_edge(src='h', edge='h'), batchable=True)
-    g.register_reduce_func(reducer_out, batchable=True)
+    g.register_message_func(fn.src_mul_edge(src='h', edge='h'))
+    g.register_reduce_func(reducer_out)
     g.update_all()
     assert th.allclose(g.get_n_repr()['h'],
             th.tensor([100., 1., 1., 1., 1., 1., 1., 1., 1., 284.]))
 
     g = generate_graph1()
-    g.register_message_func(fn.src_mul_edge(out='m'), batchable=True)
-    g.register_reduce_func(reducer_both, batchable=True)
+    g.register_message_func(fn.src_mul_edge(out='m'))
+    g.register_reduce_func(reducer_both)
     g.update_all()
     assert th.allclose(g.get_n_repr()['h'],
             th.tensor([100., 1., 1., 1., 1., 1., 1., 1., 1., 284.]))
 
     g = generate_graph1()
-    g.register_message_func(fn.src_mul_edge(), batchable=True)
-    g.register_reduce_func(reducer_out, batchable=True)
+    g.register_message_func(fn.src_mul_edge())
+    g.register_reduce_func(reducer_out)
     g.update_all()
     assert th.allclose(g.get_n_repr()['h'],
             th.tensor([100., 1., 1., 1., 1., 1., 1., 1., 1., 284.]))
 
     g = generate_graph1()
-    g.register_message_func(fn.src_mul_edge(), batchable=True)
-    g.register_reduce_func(reducer_none, batchable=True)
+    g.register_message_func(fn.src_mul_edge())
+    g.register_reduce_func(reducer_none)
     g.update_all()
     assert th.allclose(g.get_n_repr(),
             th.tensor([100., 1., 1., 1., 1., 1., 1., 1., 1., 284.]))
