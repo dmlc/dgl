@@ -135,7 +135,9 @@ class GCN(nn.Module):
                 #since we're iterating over minibatches (and therefore need to backprop) 
                 
         self.fn_batch_params["G"] = self.g 
-        
+
+        if self.dropout:
+            features = F.dropout(features, p=self.dropout)
         #generate minibatches
         if self.fn_batch == sampling.importance_sampling_wrapper_networkx:  #if Importance Sampling (IS)
             batches, self.q = sampling.importance_sampling_wrapper_networkx(**self.fn_batch_params)
@@ -143,14 +145,16 @@ class GCN(nn.Module):
             gcn_reduce = self.importance_reduce
             gcn_msg = self.importance_msg     
             
-            batch_type={"IS":True, "NS":False}  #convenience flags
+            batch_type={"IS":True, "NS":False, "Null":False}  #convenience flags
             #self.q = q
-        elif self.fn_batch in [sampling.seed_expansion_sampling, sampling.seed_BFS_frontier_sampling, sampling.seed_random_walk_sampling]: #if neighborhood sampling
-            self.g.set_n_repr({'h':features})
+        elif self.fn_batch in [sampling.seed_expansion_sampling, sampling.seed_BFS_frontier_sampling, sampling.seed_random_walk_sampling, sampling.full_batch_networkx]: #if neighborhood sampling
             gcn_reduce = self.gcn_reduce
             gcn_msg = self.gcn_msg
             batches = self.fn_batch(**self.fn_batch_params)
-            batch_type={"IS":False, "NS":True}            
+            batch_type={"IS":False, "NS":True, "Null":False}     
+        elif self.fn_batch is None:
+            batch_type={"IS":False, "NS":False, "Null":True}
+            batches = [[]]
         else:
             raise Exception("sampling not supported") #what are you doing?
         if self.cv: #if control variate
@@ -173,6 +177,8 @@ class GCN(nn.Module):
                     nodes = batch[0]
                 elif batch_type["NS"]: #expand node set
                     nodes = set.union(*[nodeset for depth,nodeset in batch.items() if depth >= l_id])
+                elif batch_type["Null"]:
+                    break
 
                 if l_id==0:  #if level 0 use input features   
                     batch_sizes.append(len(nodes))                                  
@@ -197,8 +203,17 @@ class GCN(nn.Module):
                 nodes_prev = list(nodes)
                 g_sub.update_all(gcn_msg, gcn_reduce, layer, batchable=True)
                 node_count+= len(g_sub.nodes)
+            if batch_type["Null"]:
+                mask_sub = mask
+                rep = torch.tensor(npr.random(size=(labels.size(0), self.n_classes)))
+                validation = True
+                labels_sub = labels
+                batch_sizes.append(0)
+            else:
+                rep = g_sub.pop_n_repr(key='h')      
             if torch.nonzero(mask_sub).size(0): #if we have evaluation labels in this batch
-                loss = fn_loss(fn_reduce(g_sub.pop_n_repr(key='h'), dim=0)[mask_sub], labels_sub[mask_sub], reduction='sum')  #sum reduction because we'll aggregate over minibatches
+                l_pred = fn_reduce(rep, dim=0)[mask_sub]                  
+                loss = fn_loss(l_pred, labels_sub[mask_sub], reduction='sum')  #sum reduction because we'll aggregate over minibatches
                 loss_total += float(loss)
                 instances_total += float(torch.nonzero(mask_sub).size(0))  #number of labeled instances
                 if not validation: #if we're training, backprop 

@@ -275,6 +275,13 @@ def importance_sampling_wrapper_networkx(G, fn="neighborhood", seed_size=100, nu
     q = importance_sampling_distribution_networkx(G, fn=fn)
     return importance_sampling(q, seed_size=seed_size, num_nodes=num_nodes, percent_nodes=percent_nodes), q
 
+def full_batch_networkx(G, depth, num_nodes=None, percent_nodes=1):
+    V = G.nodes
+    if num_nodes is None:
+        num_nodes = int(np.round(len(V)*percent_nodes))
+    node_list = set([int(i) for i in npr.permutation(V)[0:min([num_nodes, len(V)])]])
+    return [{i:node_list for i in range(depth)}]  
+
 ####
 ## Accessories
 #####
