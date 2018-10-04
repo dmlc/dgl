@@ -143,12 +143,10 @@ def unbatch(graph):
     node_frames = [FrameRef() for i in range(bsize)]
     edge_frames = [FrameRef() for i in range(bsize)]
     for attr, col in graph._node_frame.items():
-        # TODO: device context
         col_splits = F.unpack(col, bn)
         for i in range(bsize):
             node_frames[i][attr] = col_splits[i]
     for attr, col in graph._edge_frame.items():
-        # TODO: device context
         col_splits = F.unpack(col, be)
         for i in range(bsize):
             edge_frames[i][attr] = col_splits[i]

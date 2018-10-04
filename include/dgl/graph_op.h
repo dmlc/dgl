@@ -10,10 +10,16 @@ class GraphOp {
  public:
   /*!
    * \brief Return the line graph.
+   *
+   * If i~j and j~i are two edges in original graph G, then
+   * (i,j)~(j,i) and (j,i)~(i,j) are the "backtracking" edges on
+   * the line graph.
+   *
    * \param graph The input graph.
+   * \param backtracking Whether the backtracking edges are included or not
    * \return the line graph
    */
-  static Graph LineGraph(const Graph* graph);
+  static Graph LineGraph(const Graph* graph, bool backtracking);
   /*!
    * \brief Return a disjoint union of the input graphs.
    *

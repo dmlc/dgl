@@ -31,15 +31,11 @@ class DGLGraph(object):
         Node feature storage.
     edge_frame : FrameRef
         Edge feature storage.
-    attr : keyword arguments, optional
-        Attributes to add to graph as key=value pairs.
     """
     def __init__(self,
                  graph_data=None,
                  node_frame=None,
-                 edge_frame=None,
-                 **attr):
-        # TODO: keyword attr
+                 edge_frame=None):
         # graph
         self._graph = create_graph_index(graph_data)
         # frame

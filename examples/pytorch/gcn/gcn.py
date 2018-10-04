@@ -2,6 +2,8 @@
 Semi-Supervised Classification with Graph Convolutional Networks
 Paper: https://arxiv.org/abs/1609.02907
 Code: https://github.com/tkipf/gcn
+
+GCN with batch processing
 """
 import argparse
 import numpy as np
@@ -9,14 +11,15 @@ import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import dgl
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 
 def gcn_msg(src, edge):
-    return src['h']
+    return src
 
 def gcn_reduce(node, msgs):
-    return {'h' : sum(msgs)}
+    return torch.sum(msgs, 1)
 
 class NodeApplyModule(nn.Module):
     def __init__(self, in_feats, out_feats, activation=None):
@@ -25,14 +28,14 @@ class NodeApplyModule(nn.Module):
         self.activation = activation
 
     def forward(self, node):
-        h = self.linear(node['h'])
+        h = self.linear(node)
         if self.activation:
             h = self.activation(h)
-        return {'h' : h}
+        return h
 
 class GCN(nn.Module):
     def __init__(self,
-                 nx_graph,
+                 g,
                  in_feats,
                  n_hidden,
                  n_classes,
@@ -40,7 +43,7 @@ class GCN(nn.Module):
                  activation,
                  dropout):
         super(GCN, self).__init__()
-        self.g = DGLGraph(nx_graph)
+        self.g = g
         self.dropout = dropout
         # input layer
         self.layers = nn.ModuleList([NodeApplyModule(in_feats, n_hidden, activation)])
@@ -50,31 +53,24 @@ class GCN(nn.Module):
         # output layer
         self.layers.append(NodeApplyModule(n_hidden, n_classes))
 
-    def forward(self, features, train_nodes):
-        for n, feat in features.items():
-            self.g.nodes[n]['h'] = feat
+    def forward(self, features):
+        self.g.set_n_repr(features)
         for layer in self.layers:
             # apply dropout
             if self.dropout:
-                self.g.nodes[n]['h'] = F.dropout(g.nodes[n]['h'], p=self.dropout)
+                val = F.dropout(self.g.get_n_repr(), p=self.dropout)
+                self.g.set_n_repr(val)
             self.g.update_all(gcn_msg, gcn_reduce, layer)
-        return torch.cat([torch.unsqueeze(self.g.nodes[n]['h'], 0) for n in train_nodes])
+        return self.g.pop_n_repr()
 
 def main(args):
     # load and preprocess dataset
     data = load_data(args)
 
-    # features of each samples
-    features = {}
-    labels = []
-    train_nodes = []
-    for n in data.graph.nodes():
-        features[n] = torch.FloatTensor(data.features[n, :])
-        if data.train_mask[n] == 1:
-            train_nodes.append(n)
-            labels.append(data.labels[n])
-    labels = torch.LongTensor(labels)
-    in_feats = data.features.shape[1]
+    features = torch.FloatTensor(data.features)
+    labels = torch.LongTensor(data.labels)
+    mask = torch.ByteTensor(data.train_mask)
+    in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
 
@@ -83,11 +79,13 @@ def main(args):
     else:
         cuda = True
         torch.cuda.set_device(args.gpu)
-        features = {k : v.cuda() for k, v in features.items()}
+        features = features.cuda()
         labels = labels.cuda()
+        mask = mask.cuda()
 
     # create GCN model
-    model = GCN(data.graph,
+    g = DGLGraph(data.graph)
+    model = GCN(g,
                 in_feats,
                 args.n_hidden,
                 n_classes,
@@ -107,9 +105,9 @@ def main(args):
         if epoch >= 3:
             t0 = time.time()
         # forward
-        logits = model(features, train_nodes)
+        logits = model(features)
         logp = F.log_softmax(logits, 1)
-        loss = F.nll_loss(logp, labels)
+        loss = F.nll_loss(logp[mask], labels[mask])
 
         optimizer.zero_grad()
         loss.backward()
@@ -130,7 +128,7 @@ if __name__ == '__main__':
             help="gpu")
     parser.add_argument("--lr", type=float, default=1e-3,
             help="learning rate")
-    parser.add_argument("--n-epochs", type=int, default=10,
+    parser.add_argument("--n-epochs", type=int, default=20,
             help="number of training epochs")
     parser.add_argument("--n-hidden", type=int, default=16,
             help="number of hidden gcn units")
