@@ -96,6 +96,25 @@ class BatchedDGLGraph(DGLGraph):
         # TODO
         pass
 
+    def readout(self, reduce_func):
+        """Perform readout for each graph in the batch.
+
+        The readout value is a tensor of shape (B, D1, D2, ...) where B is the
+        batch size.
+
+        Parameters
+        ----------
+        reduce_func : callable
+            The reduce function for readout.
+
+        Returns
+        -------
+        dict of tensors
+            The readout values.
+        """
+        # TODO
+        pass
+
     '''
     def query_new_node(self, g, u):
         idx = self.graph_idx[g]
