@@ -91,7 +91,7 @@ def main(args):
                 mean_dur = np.mean(dur)
                 print("Epoch {:05d} | Step {:05d} | Loss {:.4f} | "
                       "Acc {:.4f} | Time(s) {:.4f} | Trees/s {:.4f}".format(
-                    epoch, step, loss.item(), acc.item() / args.batch_size,
+                    epoch, step, loss.item(), acc.item() / len(label),
                     mean_dur, args.batch_size / mean_dur))
         print("Epoch time(s):", time.time() - t_epoch)
 

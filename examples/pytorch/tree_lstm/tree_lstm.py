@@ -23,7 +23,7 @@ class ChildSumTreeLSTMCell(nn.Module):
         self.ut = 0.
 
     def message_func(self, src, edge):
-        return src
+        return {'h' : src['h'], 'c' : src['c']}
 
     def reduce_func(self, node, msgs):
         # equation (2)
@@ -90,9 +90,9 @@ class TreeLSTM(nn.Module):
         """
         g = graph
         n = g.number_of_nodes()
-        g.register_message_func(self.cell.message_func, batchable=True)
-        g.register_reduce_func(self.cell.reduce_func, batchable=True)
-        g.register_apply_node_func(self.cell.apply_func, batchable=True)
+        g.register_message_func(self.cell.message_func)
+        g.register_reduce_func(self.cell.reduce_func)
+        g.register_apply_node_func(self.cell.apply_func)
         # feed embedding
         wordid = g.pop_n_repr('x')
         mask = (wordid != dgl.data.SST.PAD_WORD)
