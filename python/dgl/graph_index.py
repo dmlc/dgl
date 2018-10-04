@@ -542,6 +542,40 @@ def disjoint_union(graphs):
     handle = _CAPI_DGLDisjointUnion(inputs, len(graphs))
     return GraphIndex(handle)
 
+def disjoint_partition(graph, num_or_size_splits):
+    """Partition the graph disjointly.
+   
+    This is a reverse operation of DisjointUnion. The graph will be partitioned
+    into num graphs. This requires the given number of partitions to evenly
+    divides the number of nodes in the graph. If the a size list is given,
+    the sum of the given sizes is equal.
+
+    Parameters
+    ----------
+    graph : GraphIndex
+        The graph to be partitioned
+    num_or_size_splits : int or utils.Index
+        The partition number of size splits
+
+    Returns
+    -------
+    list of GraphIndex
+        The partitioned graphs
+    """
+    if isinstance(num_or_size_splits, utils.Index):
+        rst = _CAPI_DGLDisjointPartitionBySizes(
+                graph._handle,
+                num_or_size_splits.todgltensor())
+    else:
+        rst = _CAPI_DGLDisjointPartitionByNum(
+                graph._handle,
+                int(num_or_size_splits))
+    graphs = []
+    for val in rst.asnumpy():
+        handle = ctypes.cast(int(val), ctypes.c_void_p)
+        graphs.append(GraphIndex(handle))
+    return graphs
+
 def create_graph_index(graph_data=None):
     """Create a graph index object.
 

@@ -129,7 +129,7 @@ def test_batch_send():
     def _fmsg(hu, edge):
         assert hu.shape == (5, D)
         return hu
-    g.register_message_func(_fmsg, batchable=True)
+    g.register_message_func(_fmsg)
     # many-many send
     u = th.tensor([0, 0, 0, 0, 0])
     v = th.tensor([1, 2, 3, 4, 5])
@@ -145,8 +145,8 @@ def test_batch_send():
 
 def test_batch_recv():
     g = generate_graph()
-    g.register_message_func(message_func, batchable=True)
-    g.register_reduce_func(reduce_func, batchable=True)
+    g.register_message_func(message_func)
+    g.register_reduce_func(reduce_func)
     u = th.tensor([0, 0, 0, 4, 5, 6])
     v = th.tensor([1, 2, 3, 9, 9, 9])
     reduce_msg_shapes.clear()
@@ -157,8 +157,8 @@ def test_batch_recv():
 
 def test_update_routines():
     g = generate_graph()
-    g.register_message_func(message_func, batchable=True)
-    g.register_reduce_func(reduce_func, batchable=True)
+    g.register_message_func(message_func)
+    g.register_reduce_func(reduce_func)
 
     # send_and_recv
     reduce_msg_shapes.clear()

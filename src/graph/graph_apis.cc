@@ -7,6 +7,7 @@ using tvm::runtime::TVMArgs;
 using tvm::runtime::TVMArgValue;
 using tvm::runtime::TVMRetValue;
 using tvm::runtime::PackedFunc;
+using tvm::runtime::NDArray;
 
 namespace dgl {
 
@@ -289,4 +290,39 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")
     *rv = ghandle;
   });
 
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointPartitionByNum")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    int64_t num = args[1];
+    std::vector<Graph>&& rst = GraphOp::DisjointPartitionByNum(gptr, num);
+    // return the pointer array as an integer array
+    const int64_t len = rst.size();
+    NDArray ptr_array = NDArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    int64_t* ptr_array_data = static_cast<int64_t*>(ptr_array->data);
+    for (size_t i = 0; i < rst.size(); ++i) {
+      Graph* ptr = new Graph();
+      *ptr = std::move(rst[i]);
+      ptr_array_data[i] = reinterpret_cast<std::intptr_t>(ptr);
+    }
+    *rv = ptr_array;
+  });
+
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointPartitionBySizes")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const IdArray sizes = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    std::vector<Graph>&& rst = GraphOp::DisjointPartitionBySizes(gptr, sizes);
+    // return the pointer array as an integer array
+    const int64_t len = rst.size();
+    NDArray ptr_array = NDArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    int64_t* ptr_array_data = static_cast<int64_t*>(ptr_array->data);
+    for (size_t i = 0; i < rst.size(); ++i) {
+      Graph* ptr = new Graph();
+      *ptr = std::move(rst[i]);
+      ptr_array_data[i] = reinterpret_cast<std::intptr_t>(ptr);
+    }
+    *rv = ptr_array;
+  });
 }  // namespace dgl

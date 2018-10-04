@@ -8,6 +8,7 @@ from .frame import FrameRef
 from .graph import DGLGraph
 from . import graph_index as gi
 from . import backend as F
+from . import utils
 
 class BatchedDGLGraph(DGLGraph):
     """The batched DGL graph.
@@ -24,7 +25,6 @@ class BatchedDGLGraph(DGLGraph):
         The edge attributes to also be batched.
     """
     def __init__(self, graph_list, node_attrs, edge_attrs):
-        # TODO(minjie): handle the input is again a batched graph.
         # create batched graph index
         batched_index = gi.disjoint_union([g._graph for g in graph_list])
         # create batched node and edge frames
@@ -43,9 +43,19 @@ class BatchedDGLGraph(DGLGraph):
                 edge_frame=batched_edge_frame)
 
         # extra members
-        self._batch_size = len(graph_list)
-        self._batch_num_nodes = [gr.number_of_nodes() for gr in graph_list]
-        self._batch_num_edges = [gr.number_of_edges() for gr in graph_list]
+        self._batch_size = 0
+        self._batch_num_nodes = []
+        self._batch_num_edges = []
+        for gr in graph_list:
+            if isinstance(gr, BatchedDGLGraph):
+                # handle the input is again a batched graph.
+                self._batch_size += gr._batch_size
+                self._batch_num_nodes += gr._batch_num_nodes
+                self._batch_num_edges += gr._batch_num_edges
+            else:
+                self._batch_size += 1
+                self._batch_num_nodes.append(gr.number_of_nodes())
+                self._batch_num_edges.append(gr.number_of_edges())
 
     @property
     def batch_size(self):
@@ -78,10 +88,12 @@ class BatchedDGLGraph(DGLGraph):
     # new APIs
     def __getitem__(self, idx):
         """Slice the batch and return the batch of graphs specified by the idx."""
+        # TODO
         pass
 
     def __setitem__(self, idx, val):
         """Set the value of the slice. The graph size cannot be changed."""
+        # TODO
         pass
 
     '''
@@ -114,37 +126,36 @@ def split(graph_batch, num_or_size_splits):
     # TODO(minjie): could follow torch.split syntax
     pass
 
-def unbatch(graph_batch):
+def unbatch(graph):
     """Unbatch the graph and return a list of subgraphs.
 
     Parameters
     ----------
-    graph_batch : DGLGraph
+    graph : BatchedDGLGraph
         The batched graph.
     """
-    assert False, "disabled for now"
-    graph_list = graph_batch.graph_list
-    num_graphs = len(graph_list)
-    # split and set node attrs
-    attrs = [{} for _ in range(num_graphs)] # node attr dict for each graph
-    for key in graph_batch.node_attr_schemes():
-        vals = F.unpack(graph_batch.pop_n_repr(key), graph_batch.num_nodes)
-        for attr, val in zip(attrs, vals):
-            attr[key] = val
-    for attr, g in zip(attrs, graph_list):
-        g.set_n_repr(attr)
-
-    # split and set edge attrs
-    attrs = [{} for _ in range(num_graphs)] # edge attr dict for each graph
-    for key in graph_batch.edge_attr_schemes():
-        vals = F.unpack(graph_batch.pop_e_repr(key), graph_batch.num_edges)
-        for attr, val in zip(attrs, vals):
-            attr[key] = val
-    for attr, g in zip(attrs, graph_list):
-        g.set_e_repr(attr)
-
-    return graph_list
-
+    assert isinstance(graph, BatchedDGLGraph)
+    bsize = graph.batch_size
+    bn = graph.batch_num_nodes
+    be = graph.batch_num_edges
+    pttns = gi.disjoint_partition(graph._graph, utils.toindex(bn))
+    # split the frames
+    node_frames = [FrameRef() for i in range(bsize)]
+    edge_frames = [FrameRef() for i in range(bsize)]
+    for attr, col in graph._node_frame.items():
+        # TODO: device context
+        col_splits = F.unpack(col, bn)
+        for i in range(bsize):
+            node_frames[i][attr] = col_splits[i]
+    for attr, col in graph._edge_frame.items():
+        # TODO: device context
+        col_splits = F.unpack(col, be)
+        for i in range(bsize):
+            edge_frames[i][attr] = col_splits[i]
+    return [DGLGraph(graph_data=pttns[i],
+                     node_frame=node_frames[i],
+                     edge_frame=edge_frames[i]) for i in range(bsize)]
+    
 def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     """Batch a list of DGLGraphs into one single graph.
 
