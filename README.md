@@ -12,6 +12,6 @@ Show below, there are three sets of APIs for different models.
 
 ## For Model developers
 - Always choose the API at the *highest* possible level.
-- Refer to [the default modules](examples/pytorch/util.py) to see how to register message and node update functions as well as readout functions; note how you can control sharing of parameters by adding a counter.
+- Refer to the [GCN example](examples/pytorch/gcn/gcn_batch.py) to see how to register message and node update functions;
 
 
