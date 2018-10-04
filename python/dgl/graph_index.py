@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import ctypes
 import numpy as np
 import networkx as nx
+import scipy as sp
 
 from ._ffi.base import c_array
 from ._ffi.function import _init_api
@@ -407,6 +408,34 @@ class GraphIndex(object):
             self._cache['adj'] = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
         return self._cache['adj']
 
+    def incidence_matrix(self):
+        """Return the incidence matrix representation of this graph.
+
+        Returns
+        -------
+        utils.CtxCachedObject
+            An object that returns tensor given context.
+        """
+        # TODO(gaiyu): DiGraph
+        if not 'inc' in self._cache:
+            src, dst, _ = self.edges(sorted=True)
+            src = src.tousertensor()
+            dst = dst.tousertensor()
+            m = self.number_of_edges()
+            eid = F.arange(m, dtype=F.int64)
+            row = F.pack([src, dst])
+            col = F.pack([eid, eid])
+            idx = F.stack([row, col])
+
+            x = F.ones((m,))
+            x[src == dst] = 0
+            dat = F.pack([x, x])
+            n = self.number_of_nodes()
+            mat = F.sparse_tensor(idx, dat, [n, m])
+            self._cache['inc'] = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
+
+        return self._cache['inc']
+
     def to_networkx(self):
         """Convert to networkx graph.
 
@@ -458,6 +487,36 @@ class GraphIndex(object):
         src = utils.toindex(src)
         dst = utils.toindex(dst)
         self.add_edges(src, dst)
+
+    def from_scipy_sparse_matrix(self, adj):
+        """Convert from scipy sparse matrix.
+
+        Parameters
+        ----------
+        adj :
+        """
+        self.clear()
+        self.add_nodes(adj.shape[0])
+        adj_coo = adj.tocoo()
+        src = utils.toindex(adj_coo.row)
+        dst = utils.toindex(adj_coo.col)
+        self.add_edges(src, dst)
+
+    def line_graph(self):
+        """Return the line graph of this graph.
+
+        Returns
+        -------
+        GraphIndex
+            The line graph of this graph.
+        """
+        m = self.number_of_edges()
+        ctx = F.get_context(F.ones(1)) # TODO(gaiyu):
+        inc = F.to_scipy_sparse(self.incidence_matrix().get(ctx))
+        adj = inc.transpose().dot(inc) - 2 * sp.sparse.eye(m)
+        lg = create_graph_index()
+        lg.from_scipy_sparse_matrix(adj)
+        return lg
 
 def disjoint_union(graphs):
     """Return a disjoint union of the input graphs.

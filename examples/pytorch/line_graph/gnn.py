@@ -3,7 +3,6 @@ Supervised Community Detection with Hierarchical Graph Neural Networks
 https://arxiv.org/abs/1705.08415
 
 Deviations from paper:
-- Message passing is equivalent to `A^j \cdot X`, instead of `\min(1, A^j) \cdot X`.
 - Pm Pd
 """
 
@@ -53,15 +52,17 @@ class GNNModule(nn.Module):
         xy = F.embedding(eid2nid, x)
 
         x_list = [theta(z) for theta, z in zip(self.theta_list, self.aggregate(g, x))]
+
         g.set_e_repr(y)
         g.update_all(fn.copy_edge(), fn.sum(), batchable=True)
         yx = g.get_n_repr()
+
         x = self.theta_x(x) + self.theta_deg(deg_g * x) + sum(x_list) + self.theta_y(yx)
         x = self.bn_x(x[:, :self.out_feats] + F.relu(x[:, self.out_feats:]))
 
         y_list = [gamma(z) for gamma, z in zip(self.gamma_list, self.aggregate(lg, y))]
-        lg.set_e_repr(xy)
-        lg.update_all(fn.copy_edge(), fn.sum(), batchable=True)
+        lg.set_n_repr(xy)
+        lg.update_all(fn.copy_src(), fn.sum(), batchable=True)
         xy = lg.get_n_repr()
         y = self.gamma_y(y) + self.gamma_deg(deg_lg * y) + sum(y_list) + self.gamma_x(xy)
         y = self.bn_y(y[:, :self.out_feats] + F.relu(y[:, self.out_feats:]))
@@ -70,42 +71,25 @@ class GNNModule(nn.Module):
 
 
 class GNN(nn.Module):
-    def __init__(self, g, feats, radius, n_classes):
+    def __init__(self, feats, radius, n_classes):
         """
         Parameters
         ----------
         g : networkx.DiGraph
         """
         super(GNN, self).__init__()
-
-        lg = nx.line_graph(g)
-        x = list(zip(*g.degree))[1]
-        self.x = self.normalize(th.tensor(x, dtype=th.float).unsqueeze(1))
-        y = list(zip(*lg.degree))[1]
-        self.y = self.normalize(th.tensor(y, dtype=th.float).unsqueeze(1))
-        self.eid2nid = th.tensor([int(n) for [[_, n], [_, _]] in lg.edges])
-
-        self.g = dgl.DGLGraph(g)
-        self.lg = dgl.DGLGraph(nx.convert_node_labels_to_integers(lg))
-
         self.linear = nn.Linear(feats[-1], n_classes)
         self.module_list = nn.ModuleList([GNNModule(m, n, radius)
                                           for m, n in zip(feats[:-1], feats[1:])])
 
-    @staticmethod
-    def normalize(x):
-        x = x - th.mean(x, 0)
-        x = x / th.sqrt(th.mean(x * x, 0))
-        return x
+    def forward(self, g, lg, deg_g, deg_lg, eid2nid):
+        def normalize(x):
+            x = x - th.mean(x, 0)
+            x = x / th.sqrt(th.mean(x * x, 0))
+            return x
 
-    def cuda(self):
-        self.x = self.x.cuda()
-        self.y = self.y.cuda()
-        self.eid2nid = self.eid2nid.cuda()
-        super(GNN, self).cuda()
-
-    def forward(self):
-        x, y = self.x, self.y
+        x = normalize(deg_g)
+        y = normalize(deg_lg)
         for module in self.module_list:
-            x, y = module(self.g, self.lg, x, y, self.x, self.y, self.eid2nid)
+            x, y = module(g, lg, x, y, deg_g, deg_lg, eid2nid)
         return self.linear(x)

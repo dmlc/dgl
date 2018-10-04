@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import ctypes
+import scipy as sp
 import torch as th
 
 from .._ffi.base import _LIB, check_call, c_array
@@ -27,6 +28,9 @@ tensor = th.tensor
 sparse_tensor = th.sparse.FloatTensor
 sum = th.sum
 max = th.max
+abs = th.abs
+all = lambda x: x.byte().all()
+stack = th.stack
 
 def astype(a, ty):
     return a.type(ty)
@@ -37,8 +41,25 @@ def asnumpy(a):
 def from_numpy(np_data):
     return th.from_numpy(np_data)
 
-def pack(tensors):
-    return th.cat(tensors)
+def from_scipy_sparse(x):
+    x_coo = x.tocoo()
+    row = th.LongTensor(x_coo.row)
+    col = th.LongTensor(x_coo.col)
+    idx = th.stack([row, col])
+    dat = th.FloatTensor(x_coo.data)
+    return th.sparse.FloatTensor(idx, dat, x_coo.shape)
+
+def to_scipy_sparse(x):
+    x_cpu = x.cpu()
+    idx = x._indices()
+    row, col = idx.chunk(2, 0)
+    row = row.squeeze(0).numpy()
+    col = col.squeeze(0).numpy()
+    dat = x._values().numpy()
+    return sp.sparse.coo_matrix((dat, (row, col)), shape=x.shape)
+
+def pack(tensors, dim=0):
+    return th.cat(tensors, dim)
 
 def unpack(x, indices_or_sections=1):
     return th.split(x, indices_or_sections)
@@ -48,6 +69,9 @@ def shape(x):
 
 def dtype(x):
     return x.dtype
+
+def item(x):
+    return x.item()
 
 unique = th.unique
 

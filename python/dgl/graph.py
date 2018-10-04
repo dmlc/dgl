@@ -3,6 +3,7 @@
 from __future__ import absolute_import
 
 import networkx as nx
+import scipy as sp
 
 import dgl
 from .base import ALL, is_all, __MSG__, __REPR__
@@ -469,6 +470,17 @@ class DGLGraph(object):
                     attr_dict[attr].append(nx_graph.edges[u, v][attr])
             for attr in edge_attrs:
                 self._edge_frame[attr] = _batcher(attr_dict[attr])
+
+    def from_scipy_sparse_matrix(self, a):
+        """ Convert from scipy sparse matrix.
+
+        Parameters
+        ----------
+        a :
+        """
+        self.clear()
+        self._graph.from_scipy_sparse_matrix(a)
+        self._msg_graph.add_nodes(self._graph.number_of_nodes())
 
     def node_attr_schemes(self):
         """Return the node attribute schemes.
@@ -1350,6 +1362,36 @@ class DGLGraph(object):
                 [sg._parent_eid for sg in to_merge],
                 self._edge_frame.num_rows,
                 reduce_func)
+
+    def adjacency_matrix(self):
+        """Return the adjacency matrix representation of this graph.
+
+        Returns
+        -------
+        utils.CtxCachedObject
+            An object that returns tensor given context.
+        """
+        return self._graph.adjacency_matrix()
+
+    def incidence_matrix(self):
+        """Return the incidence matrix representation of this graph.
+
+        Returns
+        -------
+        utils.CtxCachedObject
+            An object that returns tensor given context.
+        """
+        return self._graph.incidence_matrix()
+
+    def line_graph(self):
+        """Return the line graph of this graph.
+
+        Returns
+        -------
+        DGLGraph
+            The line graph of this graph.
+        """
+        return DGLGraph(self._graph.line_graph())
 
 def _get_repr(attr_dict):
     if len(attr_dict) == 1 and __REPR__ in attr_dict:
