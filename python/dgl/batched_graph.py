@@ -10,6 +10,8 @@ from . import graph_index as gi
 from . import backend as F
 from . import utils
 
+__all__ = ['BatchedDGLGraph', 'batch', 'unbatch', 'split']
+
 class BatchedDGLGraph(DGLGraph):
     """The batched DGL graph.
 
@@ -146,7 +148,7 @@ def split(graph_batch, num_or_size_splits):
     pass
 
 def unbatch(graph):
-    """Unbatch the graph and return a list of subgraphs.
+    """Unbatch and return the list of graphs in this batch.
 
     Parameters
     ----------

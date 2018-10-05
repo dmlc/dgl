@@ -6,7 +6,6 @@ import networkx as nx
 from . import backend as F
 from .frame import Frame, FrameRef
 from .graph import DGLGraph
-from .nx_adapt import nx_init
 from . import utils
 
 class DGLSubGraph(DGLGraph):

@@ -5,3 +5,4 @@ Python APIs
    :maxdepth: 2
 
    graph
+   batch
