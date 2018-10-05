@@ -76,15 +76,15 @@ class BatchedDGLGraph(DGLGraph):
 
     # override APIs
     def add_nodes(self, num, reprs=None):
-        """Add nodes."""
+        """Add nodes. Disabled because BatchedDGLGraph is read-only."""
         raise RuntimeError('Readonly graph. Mutation is not allowed.')
 
     def add_edge(self, u, v, reprs=None):
-        """Add one edge."""
+        """Add one edge. Disabled because BatchedDGLGraph is read-only."""
         raise RuntimeError('Readonly graph. Mutation is not allowed.')
 
     def add_edges(self, u, v, reprs=None):
-        """Add many edges."""
+        """Add many edges. Disabled because BatchedDGLGraph is read-only."""
         raise RuntimeError('Readonly graph. Mutation is not allowed.')
 
     # new APIs
