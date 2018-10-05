@@ -9,7 +9,7 @@ from ._ffi.function import register_func, get_global_func, list_global_func_name
 from ._ffi.base import DGLError, __version__
 
 from .base import ALL
-from .batch import batch, unbatch
+from .batched_graph import *
 from .generator import *
 from .graph import DGLGraph, __MSG__, __REPR__
 from .subgraph import DGLSubGraph

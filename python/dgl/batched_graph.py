@@ -10,6 +10,8 @@ from . import graph_index as gi
 from . import backend as F
 from . import utils
 
+__all__ = ['BatchedDGLGraph', 'batch', 'unbatch', 'split']
+
 class BatchedDGLGraph(DGLGraph):
     """The batched DGL graph.
 
@@ -74,15 +76,15 @@ class BatchedDGLGraph(DGLGraph):
 
     # override APIs
     def add_nodes(self, num, reprs=None):
-        """Add nodes."""
+        """Add nodes. Disabled because BatchedDGLGraph is read-only."""
         raise RuntimeError('Readonly graph. Mutation is not allowed.')
 
     def add_edge(self, u, v, reprs=None):
-        """Add one edge."""
+        """Add one edge. Disabled because BatchedDGLGraph is read-only."""
         raise RuntimeError('Readonly graph. Mutation is not allowed.')
 
     def add_edges(self, u, v, reprs=None):
-        """Add many edges."""
+        """Add many edges. Disabled because BatchedDGLGraph is read-only."""
         raise RuntimeError('Readonly graph. Mutation is not allowed.')
 
     # new APIs
@@ -146,7 +148,7 @@ def split(graph_batch, num_or_size_splits):
     pass
 
 def unbatch(graph):
-    """Unbatch the graph and return a list of subgraphs.
+    """Unbatch and return the list of graphs in this batch.
 
     Parameters
     ----------
