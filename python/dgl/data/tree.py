@@ -79,22 +79,3 @@ class SST(object):
     @property 
     def num_vocabs(self):
         return len(self.vocab)
-
-    @staticmethod
-    def batcher(batch):
-        nid_with_word = []
-        wordid = []
-        label = []
-        gnid = 0
-        for tree in batch:
-            for nid in range(tree.number_of_nodes()):
-                if tree.nodes[nid]['x'] != SST.PAD_WORD:
-                    nid_with_word.append(gnid)
-                    wordid.append(tree.nodes[nid]['x'])
-                label.append(tree.nodes[nid]['y'])
-                gnid += 1
-        batch_trees = dgl.batch(batch)
-        return SSTBatch(graph=batch_trees,
-                        nid_with_word=F.tensor(nid_with_word, dtype=F.int64),
-                        wordid=F.tensor(wordid, dtype=F.int64),
-                        label=F.tensor(label, dtype=F.int64))

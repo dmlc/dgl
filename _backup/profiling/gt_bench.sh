@@ -1,5 +1,0 @@
-echo "   ncalls  tottime  percall  cumtime  percall filename:lineno(function)"
-cat gt_bench | grep "__init__.py:1501(shortest_distance)"
-cat gt_bench | grep "__init__.py:62(pagerank)"
-cat gt_bench | grep "__init__.py:1427(kcore_decomposition)"
-cat gt_bench | grep "__init__.py:627(min_spanning_tree)"

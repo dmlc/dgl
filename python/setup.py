@@ -17,7 +17,6 @@ setuptools.setup(
         'numpy>=1.14.0',
         'scipy>=1.1.0',
         'networkx>=2.1',
-        'python-igraph>=0.7.0',
     ],
     data_files=[('', ['VERSION'])],
-    url='https://github.com/jermainewang/dgl-1')
+    url='https://github.com/jermainewang/dgl')

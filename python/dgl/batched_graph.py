@@ -10,6 +10,8 @@ from . import graph_index as gi
 from . import backend as F
 from . import utils
 
+__all__ = ['BatchedDGLGraph', 'batch', 'unbatch', 'split']
+
 class BatchedDGLGraph(DGLGraph):
     """The batched DGL graph.
 
@@ -74,15 +76,15 @@ class BatchedDGLGraph(DGLGraph):
 
     # override APIs
     def add_nodes(self, num, reprs=None):
-        """Add nodes."""
+        """Add nodes. Disabled because BatchedDGLGraph is read-only."""
         raise RuntimeError('Readonly graph. Mutation is not allowed.')
 
     def add_edge(self, u, v, reprs=None):
-        """Add one edge."""
+        """Add one edge. Disabled because BatchedDGLGraph is read-only."""
         raise RuntimeError('Readonly graph. Mutation is not allowed.')
 
     def add_edges(self, u, v, reprs=None):
-        """Add many edges."""
+        """Add many edges. Disabled because BatchedDGLGraph is read-only."""
         raise RuntimeError('Readonly graph. Mutation is not allowed.')
 
     # new APIs
@@ -93,6 +95,25 @@ class BatchedDGLGraph(DGLGraph):
 
     def __setitem__(self, idx, val):
         """Set the value of the slice. The graph size cannot be changed."""
+        # TODO
+        pass
+
+    def readout(self, reduce_func):
+        """Perform readout for each graph in the batch.
+
+        The readout value is a tensor of shape (B, D1, D2, ...) where B is the
+        batch size.
+
+        Parameters
+        ----------
+        reduce_func : callable
+            The reduce function for readout.
+
+        Returns
+        -------
+        dict of tensors
+            The readout values.
+        """
         # TODO
         pass
 
@@ -127,7 +148,7 @@ def split(graph_batch, num_or_size_splits):
     pass
 
 def unbatch(graph):
-    """Unbatch the graph and return a list of subgraphs.
+    """Unbatch and return the list of graphs in this batch.
 
     Parameters
     ----------
@@ -143,12 +164,10 @@ def unbatch(graph):
     node_frames = [FrameRef() for i in range(bsize)]
     edge_frames = [FrameRef() for i in range(bsize)]
     for attr, col in graph._node_frame.items():
-        # TODO: device context
         col_splits = F.unpack(col, bn)
         for i in range(bsize):
             node_frames[i][attr] = col_splits[i]
     for attr, col in graph._edge_frame.items():
-        # TODO: device context
         col_splits = F.unpack(col, be)
         for i in range(bsize):
             edge_frames[i][attr] = col_splits[i]

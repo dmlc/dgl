@@ -32,15 +32,11 @@ class DGLGraph(object):
         Node feature storage.
     edge_frame : FrameRef
         Edge feature storage.
-    attr : keyword arguments, optional
-        Attributes to add to graph as key=value pairs.
     """
     def __init__(self,
                  graph_data=None,
                  node_frame=None,
-                 edge_frame=None,
-                 **attr):
-        # TODO: keyword attr
+                 edge_frame=None):
         # graph
         self._graph = create_graph_index(graph_data)
         # frame
@@ -502,7 +498,7 @@ class DGLGraph(object):
         """
         return self._edge_frame.schemes
 
-    def set_n_repr(self, hu, u=ALL):
+    def set_n_repr(self, hu, u=ALL, inplace=False):
         """Set node(s) representation.
 
         To set multiple node representations at once, pass `u` with a tensor or
@@ -540,9 +536,9 @@ class DGLGraph(object):
                 self._node_frame[__REPR__] = hu
         else:
             if utils.is_dict_like(hu):
-                self._node_frame[u] = hu
+                self._node_frame.update_rows(u, hu, inplace=inplace)
             else:
-                self._node_frame[u] = {__REPR__ : hu}
+                self._node_frame.update_rows(u, {__REPR__ : hu}, inplace=inplace)
 
     def get_n_repr(self, u=ALL):
         """Get node(s) representation.
@@ -842,7 +838,7 @@ class DGLGraph(object):
     def _batch_send(self, u, v, message_func):
         if is_all(u) and is_all(v):
             u, v, _ = self._graph.edges()
-            self._msg_graph.add_edges(u, v)
+            self._msg_graph.add_edges(u, v) # TODO(minjie): can be optimized
             # call UDF
             src_reprs = self.get_n_repr(u)
             edge_reprs = self.get_e_repr()
@@ -1144,30 +1140,28 @@ class DGLGraph(object):
         self.apply_nodes(ALL, apply_node_func)
 
     def propagate(self,
-                  iterator='bfs',
+                  traverser='topo',
                   message_func="default",
                   reduce_func="default",
                   apply_node_func="default",
                   **kwargs):
-        """Propagate messages and update nodes using iterator.
+        """Propagate messages and update nodes using graph traversal.
 
         A convenient function for passing messages and updating
-        nodes according to the iterator. The iterator can be
-        any of the pre-defined iterators ('bfs', 'dfs', 'pre-order',
-        'mid-order', 'post-order'). The computation will be unrolled
-        in the backend efficiently. User can also provide custom
-        iterator that generates the edges and nodes.
+        nodes according to the traverser. The traverser can be
+        any of the pre-defined traverser (e.g. 'topo'). User can also provide custom
+        traverser that generates the edges and nodes.
 
         Parameters
         ----------
+        traverser : str or generator of edges.
+          The traverser of the graph.
         message_func : str or callable
           The message function.
         reduce_func : str or callable
           The reduce function.
         apply_node_func : str or callable
           The update function.
-        iterator : str or generator of steps.
-          The iterator of the graph.
         kwargs : keyword arguments, optional
             Arguments for pre-defined iterators.
         """
@@ -1197,7 +1191,9 @@ class DGLGraph(object):
         G : DGLSubGraph
             The subgraph.
         """
-        return dgl.DGLSubGraph(self, nodes)
+        induced_nodes = utils.toindex(nodes)
+        gi, induced_edges = self._graph.node_subgraph(induced_nodes)
+        return dgl.DGLSubGraph(self, induced_nodes, induced_edges, gi)
 
     def merge(self, subgraphs, reduce_func='sum'):
         """Merge subgraph features back to this parent graph.
