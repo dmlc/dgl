@@ -1179,7 +1179,9 @@ class DGLGraph(object):
         G : DGLSubGraph
             The subgraph.
         """
-        return dgl.DGLSubGraph(self, nodes)
+        induced_nodes = utils.toindex(nodes)
+        gi, induced_edges = self._graph.node_subgraph(induced_nodes)
+        return dgl.DGLSubGraph(self, induced_nodes, induced_edges, gi)
 
     def merge(self, subgraphs, reduce_func='sum'):
         """Merge subgraph features back to this parent graph.
