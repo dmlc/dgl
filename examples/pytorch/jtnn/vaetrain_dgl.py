@@ -7,16 +7,16 @@ from torch.utils.data import DataLoader
 import math, random, sys
 from optparse import OptionParser
 from collections import deque
+import rdkit
 
 from jtnn import *
-import rdkit
 
 lg = rdkit.RDLogger.logger() 
 lg.setLevel(rdkit.RDLogger.CRITICAL)
 
 parser = OptionParser()
-parser.add_option("-t", "--train", dest="train_path")
-parser.add_option("-v", "--vocab", dest="vocab_path")
+parser.add_option("-t", "--train", dest="train", default='train', help='Training file name')
+parser.add_option("-v", "--vocab", dest="vocab", default='vocab', help='Vocab file name')
 parser.add_option("-s", "--save_dir", dest="save_path")
 parser.add_option("-m", "--model", dest="model_path", default=None)
 parser.add_option("-b", "--batch", dest="batch_size", default=40)
@@ -26,9 +26,9 @@ parser.add_option("-d", "--depth", dest="depth", default=3)
 parser.add_option("-z", "--beta", dest="beta", default=1.0)
 parser.add_option("-q", "--lr", dest="lr", default=1e-3)
 opts,args = parser.parse_args()
-   
-vocab = [x.strip("\r\n ") for x in open(opts.vocab_path)] 
-vocab = Vocab(vocab)
+
+dataset = JTNNDataset(data=opts.train, vocab=opts.vocab)
+vocab = Vocab([x.strip("\r\n ") for x in open(dataset.vocab_file)])
 
 batch_size = int(opts.batch_size)
 hidden_size = int(opts.hidden_size)
@@ -56,16 +56,20 @@ optimizer = optim.Adam(model.parameters(), lr=lr)
 scheduler = lr_scheduler.ExponentialLR(optimizer, 0.9)
 scheduler.step()
 
-dataset = DGLMoleculeDataset(opts.train_path)
-
 MAX_EPOCH = 1
 PRINT_ITER = 20
 
 @profile
 def train():
-    for epoch in range(MAX_EPOCH):
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0, collate_fn=lambda x:x, drop_last=True)
+    dataloader = DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=0,
+            collate_fn=lambda x:x,
+            drop_last=True)
 
+    for epoch in range(MAX_EPOCH):
         word_acc,topo_acc,assm_acc,steo_acc = 0,0,0,0
 
         for it, batch in enumerate(dataloader):
@@ -91,14 +95,16 @@ def train():
                 assm_acc = assm_acc / PRINT_ITER * 100
                 steo_acc = steo_acc / PRINT_ITER * 100
 
-                print("KL: %.1f, Word: %.2f, Topo: %.2f, Assm: %.2f, Steo: %.2f" % (kl_div, word_acc, topo_acc, assm_acc, steo_acc))
+                print("KL: %.1f, Word: %.2f, Topo: %.2f, Assm: %.2f, Steo: %.2f" % (
+                    kl_div, word_acc, topo_acc, assm_acc, steo_acc))
                 word_acc,topo_acc,assm_acc,steo_acc = 0,0,0,0
                 sys.stdout.flush()
 
             if (it + 1) % 1500 == 0: #Fast annealing
                 scheduler.step()
                 print("learning rate: %.6f" % scheduler.get_lr()[0])
-                torch.save(model.state_dict(), opts.save_path + "/model.iter-%d-%d" % (epoch, it + 1))
+                torch.save(model.state_dict(),
+                           opts.save_path + "/model.iter-%d-%d" % (epoch, it + 1))
 
         scheduler.step()
         print("learning rate: %.6f" % scheduler.get_lr()[0])

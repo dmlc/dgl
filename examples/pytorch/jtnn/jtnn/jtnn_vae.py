@@ -92,9 +92,9 @@ class DGLJTNNVAE(nn.Module):
         self.z_log_var = z_log_var
 
         epsilon = cuda(torch.randn(batch_size, self.latent_size // 2)) if e1 is None else e1
-        tree_vec = tree_mean + torch.exp(tree_log_var // 2) * epsilon
+        tree_vec = tree_mean + torch.exp(tree_log_var / 2) * epsilon
         epsilon = cuda(torch.randn(batch_size, self.latent_size // 2)) if e2 is None else e2
-        mol_vec = mol_mean + torch.exp(mol_log_var // 2) * epsilon
+        mol_vec = mol_mean + torch.exp(mol_log_var / 2) * epsilon
 
         self.tree_vec = tree_vec
         self.mol_vec = mol_vec
