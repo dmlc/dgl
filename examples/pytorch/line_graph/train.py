@@ -15,16 +15,26 @@ import gnn
 import utils
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--batch-size', type=int)
-parser.add_argument('--gpu', type=int)
-parser.add_argument('--n-communities', type=int)
-parser.add_argument('--n-features', type=int)
-parser.add_argument('--n-graphs', type=int)
-parser.add_argument('--n-iterations', type=int)
-parser.add_argument('--n-layers', type=int)
-parser.add_argument('--n-nodes', type=int)
-parser.add_argument('--model-path', type=str)
-parser.add_argument('--radius', type=int)
+parser.add_argument('--batch-size', type=int,
+                    help='Batch size', default=4)
+parser.add_argument('--gpu', type=int,
+                    help='GPU', default=-1)
+parser.add_argument('--n-communities', type=int,
+                    help='Number of communities', default=2)
+parser.add_argument('--n-features', type=int,
+                    help='Number of features per layer', default=2)
+parser.add_argument('--n-graphs', type=int,
+                    help='Number of graphs', default=6000)
+parser.add_argument('--n-iterations', type=int,
+                    help='Number of iterations', default=10000)
+parser.add_argument('--n-layers', type=int,
+                    help='Number of layers', default=30)
+parser.add_argument('--n-nodes', type=int,
+                    help='Number of nodes', default=1000)
+parser.add_argument('--model-path', type=str,
+                    help='Path to the checkpoint of model', default='model')
+parser.add_argument('--radius', type=int,
+                    help='Radius', default=3)
 args = parser.parse_args()
 
 dev = th.device('cpu') if args.gpu < 0 else th.device('cuda:%d' % args.gpu)
