@@ -1165,10 +1165,6 @@ class DGLGraph(object):
     def subgraph(self, nodes):
         """Generate the subgraph among the given nodes.
 
-        The generated graph contains only the graph structure. The node/edge
-        features are not shared implicitly. Use `copy_from` to get node/edge
-        features from parent graph.
-
         Parameters
         ----------
         nodes : list, or iterable
