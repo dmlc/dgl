@@ -1240,7 +1240,6 @@ class DGLGraph(object):
                 [sg._parent_eid for sg in to_merge],
                 self._edge_frame.num_rows,
                 reduce_func)
-<<<<<<< HEAD
 
     def adjacency_matrix(self):
         """Return the adjacency matrix representation of this graph.
@@ -1283,5 +1282,3 @@ def _set_repr(attr_dict, attr):
         attr_dict.update(attr)
     else:
         attr_dict[__REPR__] = attr
-=======
->>>>>>> 2be55fb50ab08c1f0a3bbb40df8f9265d73b4d2d
