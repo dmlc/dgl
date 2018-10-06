@@ -16,7 +16,7 @@ import dgl
 import dgl.data as dgld
 import dgl.sampling as sampling
 import sys
-
+import collections as c
                  
 class NodeApplyModule(nn.Module):
     def __init__(self, in_feats, out_feats, activation=None, height=None):
@@ -163,11 +163,17 @@ class GCN(nn.Module):
             batches = [{i:set(self.g.nodes) for i in range(len(self.layers))}]       
         
         #bookkeeping
-        batch_sizes = []
-        node_count = 0 
-        loss_total = 0
-        instances_total = 0
+        books = c.defaultdict(list)
+        book_keys = ['batch sizes', 'total node updates','time batch sample', 'time data copy', 'time node update', 'time backward', 'total loss', 'eval node counts']
+        
+        t_batch_start = 0
         for batch in batches:
+            for k_iter in book_keys:
+                books[k_iter].append(0)
+                
+            if t_batch_start != 0:
+                books['time batch sample'][-1] += time.time()-t_batch_start
+                
             nodes_prev = None
             for l_id, layer in enumerate(self.layers):  
                 self.layer_curr = l_id
@@ -181,7 +187,8 @@ class GCN(nn.Module):
                     break
 
                 if l_id==0:  #if level 0 use input features   
-                    batch_sizes.append(len(nodes))                                  
+                    books['batch sizes'][-1] += len(nodes)                     
+                    t = time.time()
                     g_sub = dgl.DGLSubGraph(parent=self.g, nodes=list(nodes))
                     a = torch.tensor(list(nodes))
                     features_sub = torch.index_select(features, dim=0, index=a)
@@ -192,47 +199,67 @@ class GCN(nn.Module):
                         g_sub.set_n_repr({'h':features_sub, 'q':q_sub})
                     elif batch_type["NS"]:
                         g_sub.set_n_repr({'h':features_sub})
+                    books['time data copy'][-1] += time.time()-t
                 else:  #else deeper level  
                     #subset our graph
+                    
+                    t = time.time()
                     idx = np.array([[i, key_i] for i, key_i in enumerate(nodes_prev) if key_i in nodes])  #if subgraph shrinks, reindex. e.g. where are old [0, M] indices in [0, N] ? M >= N 
                     g_sub_new = dgl.DGLSubGraph(parent=g_sub, nodes=idx[:, 0])
                     g_sub_new.copy_from(parent=g_sub)
                     labels_sub = torch.index_select(labels_sub, dim=0, index=torch.tensor(idx[:, 0]))
                     mask_sub = torch.index_select(mask_sub, dim=0, index=torch.tensor(idx[:, 0]))
+                    books['time data copy'][-1] += time.time()-t
                     g_sub = g_sub_new
                 nodes_prev = list(nodes)
+                t = time.time()
                 g_sub.update_all(gcn_msg, gcn_reduce, layer, batchable=True)
-                node_count+= len(g_sub.nodes)
+                books['time node update'][-1] += time.time()-t
+                books['total node updates'][-1] += len(g_sub.nodes)
+                
             if batch_type["Null"]:
                 mask_sub = mask
                 rep = torch.tensor(npr.random(size=(labels.size(0), self.n_classes)))
                 validation = True
                 labels_sub = labels
-                batch_sizes.append(0)
             else:
-                rep = g_sub.pop_n_repr(key='h')      
+                t = time.time()
+                rep = g_sub.pop_n_repr(key='h')
+                books['time data copy'][-1] += time.time()-t
             if torch.nonzero(mask_sub).size(0): #if we have evaluation labels in this batch
+                t = time.time()
                 l_pred = fn_reduce(rep, dim=0)[mask_sub]                  
                 loss = fn_loss(l_pred, labels_sub[mask_sub], reduction='sum')  #sum reduction because we'll aggregate over minibatches
-                loss_total += float(loss)
-                instances_total += float(torch.nonzero(mask_sub).size(0))  #number of labeled instances
+                books["total loss"][-1] += float(loss)
+                books["eval node counts"][-1] += float(torch.nonzero(mask_sub).size(0))  #number of labeled instances
                 if not validation: #if we're training, backprop 
                     optimizer.zero_grad()
                     loss.backward()
-                    optimizer.step()    
-        return loss_total/instances_total, node_count , batch_sizes           
+                    optimizer.step()  
+                books['time backward'][-1] += time.time()-t
+            t_batch_start = time.time() 
+        return sum(books["total loss"])/sum(books["eval node counts"]), books         
            
 def main(params, data = None):
-    ret = {'time':[], 'loss':[], 'nodes':[] }
     # load and preprocess dataset
     if data is None:
         data = dgld.load_data_dict(params)
+    if "train fraction" not in params:
+        params["train fraction"] = 0.8
 
     features = torch.FloatTensor(data.features)
+        
+    split_ind = int(np.floor(len(data.labels)*params["train fraction"]))
+    idx = npr.permutation(range(len(data.labels)))
+    mask = np.zeros(len(data.labels))
+    mask[idx[0:split_ind]] = 1
+    mask = torch.ByteTensor(mask)    
+    mask_test = np.zeros(len(data.labels))
+    mask_test[idx[split_ind::]] = 1
+    mask_test= torch.ByteTensor(mask_test)
+    
     labels = torch.LongTensor(data.labels)
-    mask = torch.ByteTensor(data.train_mask)
-    mask_val = torch.ByteTensor(data.val_mask)
-    mask_test = torch.ByteTensor(data.test_mask)
+    
     in_feats = features.shape[1]
     n_classes = data.num_labels
 
@@ -262,34 +289,47 @@ def main(params, data = None):
 
     # use optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=params["lr"])
+    books = c.defaultdict(int)
+    book_sum_keys = ['time batch sample', 'time data copy', 'time node update', 'time backward']
+    
+    
+    t_train_total=0
+    t_test_total=0
 
-    t_total=0
     n_counts = []
-    losses = []
+    loss_train = []
+    loss_test = []
     batches = []
     for epoch in range(params["epochs"]):
         t=time.time()
-        loss, node_count, batch_size = model(features, labels, mask, optimizer, fn_reduce=F.log_softmax, fn_loss=params["fn_loss"])         
-        t_total += time.time()-t
-        losses.append(loss)
-        batches.extend(batch_size)
-        n_counts.append(node_count)
+        l_train, books_train = model(features, labels, mask, optimizer, fn_reduce=F.log_softmax, fn_loss=params["fn_loss"])   
+        t_train_total += time.time()-t
+        
+        t = time.time()
+        l_test, _ = model(features, labels, mask_test, optimizer=None, fn_reduce=F.log_softmax, fn_loss=params["fn_loss"], validation=True) 
+        t_test_total += time.time()-t
+        
+        loss_train.append(l_train)
+        loss_test.append(l_test)
+        batches.extend(books_train['batch sizes'])
+        #batches.extend(batch_size)
+        n_counts.append(sum(books_train['total node updates']))
+        for k_iter in book_sum_keys:
+            books[k_iter] += sum(books_train[k_iter])
+
         if "verbose" in params and params["verbose"]:
-            print("[TRAINING]: Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | Node Updates {:d} | Mean Subgraph Size {:d}".format(
-                epoch, loss, t_total, int(np.round(np.mean(n_counts))), int(np.round(np.mean(batches))) ))
-    t = time.time() 
-    loss_val, _, _ = model(features, labels, mask_val, optimizer=None, fn_reduce=F.log_softmax, fn_loss=params["fn_loss"], validation=True) 
-    loss_test, _, _ = model(features, labels, mask_test, optimizer=None, fn_reduce=F.log_softmax, fn_loss=params["fn_loss"], validation=True) 
-    t_test = time.time()-t
-    ret["val loss"]= loss_val
-    ret["test loss"] =loss_test 
-    ret["time train"]= t_total
-    ret["time test"] = t_test
-    ret["loss"]= losses[-1]
-    ret["mean node updates"] = int(np.round(np.mean(n_counts)))
-    ret["mean batch size"] = int(np.round(np.mean(batches)))
-    print("[VALIDATION]: Loss {:.4f} | Test Loss {:.4f} | Test Time {:.4f} | Training Time {:.4f}".format(ret["val loss"], ret["test loss"], ret["time test"], ret["time train"]))
-    return ret
+            total_time = books['time batch sample']+ books['time data copy']+ books['time node update']+ books['time backward']
+            print("[TRAINING]: Epoch {:05d} | Loss (Train, Test) ({:.3f}, {:.3f}) | Time (Train, Test)  ({:.3f}, {:.3f}) | Time % (Batch, Data, Update, Back) ({:.3f}, {:.3f}, {:.3f}, {:.3f})  | Mean Subgraph Size {:d}".format(
+                epoch, l_train, l_test, t_train_total, t_test_total, books['time batch sample']/total_time, books['time data copy']/total_time, books['time node update']/total_time, books['time backward']/total_time, int(np.round(np.mean(batches))) ))   
+    books["loss test"] =loss_test 
+    books["time train"]= t_train_total
+    books["time test"] = t_test_total
+    books["loss train"]= loss_train
+    books["loss test"]= loss_test
+    books["mean node updates"] = int(np.round(np.mean(n_counts)))
+    books["mean batch size"] = int(np.round(np.mean(batches)))
+    print("[TEST]: Best Loss (Train, Test) ({:.4f}, {:.4f}) | Time (Train, Test) ({:.4f}, {:.4f})".format(np.min(books["loss train"]),np.min(books["loss test"]), books["time train"], books["time test"]))
+    return books
 
 #build all default parameters for execution
 def default_params():

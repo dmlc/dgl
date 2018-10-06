@@ -67,43 +67,39 @@ def parallel_handler(key, value):
     print("[KEY]: "+str(key))
     return (key,gcn.main(value, data=value["data"]))
 
-if __name__== '__main__':    
-    seed_sizes = [100,200,300,400,500]
-    max_neighbors = [2,5]
-    max_level_nodes = [100, 200]
+if __name__== '__main__':
+    tag = "highepoch"     
+    cvs = [None, 5]    
+    seed_sizes = [100, 200,300,400,500]
+    max_neighbors = [2, 4]
+    max_level_nodes = [100, 200, 300]
 
     model_count = 5
-    epochs = 150
+    epochs = 200
     percent_nodes = 1
-    cv = None
     verbose=False
-    dropout=0.5
-    
-    rets = {}
-    datasets = ['cora', 'citeseer'] 
-    for d_iter in datasets:   
-        
-        params_iter = gcn.default_params()
-        params_iter["dataset"] = d_iter
-        d = dgld.load_data_dict(params_iter)
-
-    
-        p_merge = {'ES': {"expand": "max_neighbors", 'fn': sampling.seed_expansion_sampling,'max_neighbors':max_neighbors },
-                      'RW': {"expand": "max_level_nodes", 'fn': sampling.seed_random_walk_sampling, 'max_level_nodes':max_level_nodes},
-                      'FF': {"expand": "max_level_nodes",'fn': sampling.seed_BFS_frontier_sampling, 'max_level_nodes':max_level_nodes},
-                      'IS': {"expand": "n",'fn':sampling.importance_sampling_wrapper_networkx, 'n':[None]},
-                      'FB': {"expand": "n",'fn':sampling.full_batch_networkx, 'n':[None]}}
-        
-        #p_merge = {'FB':p_merge['FB']}
-        ret ={}
-        
-        for key, v in p_merge.items():
-            if key not in ret:
-                params = generate_paramater_list(v,d, seed_sizes, model_count=model_count, epochs = epochs, cv=cv, key=key, verbose=verbose, dropout=dropout)
-                #ret[key] = [parallel_handler(key, value) for key, value in params]
-                ret[key] = jl.Parallel(n_jobs=4, verbose=10)(jl.delayed(parallel_handler)(a,b) for a,b in tqdm.tqdm(list(params)))      
-        rets[d_iter] = ret
-        if cv is not None:
-            pickle.dump(ret, open('/Users/ivabruge/'+ str(d_iter) + 'highepoch_cv.result', 'wb'))
-        else:
-            pickle.dump(ret, open('/Users/ivabruge/'+ str(d_iter) + 'highepoch.result', 'wb'))
+    dropout=0
+    for cv in cvs:               
+        rets = {}
+        datasets = ['cora', 'citeseer'] 
+        for d_iter in datasets:               
+            params_iter = gcn.default_params()
+            params_iter["dataset"] = d_iter
+            d = dgld.load_data_dict(params_iter)            
+            p_merge = {'ES': {"expand": "max_neighbors", 'fn': sampling.seed_expansion_sampling,'max_neighbors':max_neighbors },
+                          'RW': {"expand": "max_level_nodes", 'fn': sampling.seed_random_walk_sampling, 'max_level_nodes':max_level_nodes},
+                          'FF': {"expand": "max_level_nodes",'fn': sampling.seed_BFS_frontier_sampling, 'max_level_nodes':max_level_nodes},
+                          'IS': {"expand": "n",'fn':sampling.importance_sampling_wrapper_networkx, 'n':[None]},
+                          'FB': {"expand": "n",'fn':sampling.full_batch_networkx, 'n':[None]}, 
+                          'NULL':{'expand':'n', 'fn':None, 'n':[None]}}
+            ret ={}            
+            for key, v in p_merge.items():
+                if key not in ret:
+                    params = generate_paramater_list(v,d, seed_sizes, model_count=model_count, epochs = epochs, cv=cv, key=key, verbose=verbose, dropout=dropout)
+                    #ret[key] = [parallel_handler(key, value) for key, value in params]
+                    ret[key] = jl.Parallel(n_jobs=4, verbose=10)(jl.delayed(parallel_handler)(a,b) for a,b in tqdm.tqdm(list(params)))      
+            rets[d_iter] = ret
+            if cv is not None:
+                pickle.dump(ret, open('/Users/ivabruge/'+ str(d_iter)+ '_'+tag+'_cv_'+str(cv)+'.result', 'wb'))
+            else:
+                pickle.dump(ret, open('/Users/ivabruge/'+ str(d_iter) +'_'+tag+'.result', 'wb'))

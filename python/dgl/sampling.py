@@ -114,7 +114,7 @@ def importance_sampling_distribution_networkx(G, fn="neighborhood"):
 ## @param max_path_length int the maximum path length, (so we can generate path lengths with a single bernoulli sampling)
 ## @return generator, a generator function returning batch dictionaries [d1, d2... di...] where dictionary d_i = {0: [nodes], 1:[nodes]...} 
 ###
-def seed_random_walk(G, seedset_list, depth, fn_neighborhood, max_level_nodes=None, p_restart=0.1, iters=300, weights=1, max_path_length=10):
+def seed_random_walk(G, seedset_list, depth, fn_neighborhood, max_level_nodes=None, p_restart=0, iters=200, weights=1, max_path_length=6):
     
     if max_level_nodes is None:
         max_level_nodes = [np.inf for i in range(depth)]
@@ -307,6 +307,7 @@ def neighborhood_graphtool(G, i):
 
 def neighborhood_igraph(G, i):
     return G.neighbors(i, mode="OUT")    
+
 
 
 ####
