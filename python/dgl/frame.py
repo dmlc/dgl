@@ -141,7 +141,7 @@ class FrameRef(MutableMapping):
         else:
             self.update_rows(key, val)
 
-    def add_column(self, name, col):
+    def add_column(self, name, col, inplace=False):
         shp = F.shape(col)
         if self.is_span_whole_column():
             if self.num_columns == 0:
@@ -157,18 +157,25 @@ class FrameRef(MutableMapping):
                 fcol = F.zeros((self._frame.num_rows,) + shp[1:])
                 fcol = F.to_context(fcol, colctx)
             idx = self.index().tousertensor(colctx)
-            newfcol = F.scatter_row(fcol, idx, col)
-            self._frame[name] = newfcol
+            if inplace:
+                self._frame[name] = fcol
+                self._frame[name][idx] = col
+            else:
+                newfcol = F.scatter_row(fcol, idx, col)
+                self._frame[name] = newfcol
 
-    def update_rows(self, query, other):
+    def update_rows(self, query, other, inplace=False):
         rowids = self._getrowid(query)
         for key, col in other.items():
             if key not in self:
                 # add new column
                 tmpref = FrameRef(self._frame, rowids)
-                tmpref.add_column(key, col)
+                tmpref.add_column(key, col, inplace)
             idx = rowids.tousertensor(F.get_context(self._frame[key]))
-            self._frame[key] = F.scatter_row(self._frame[key], idx, col)
+            if inplace:
+                self._frame[key][idx] = col
+            else:
+                self._frame[key] = F.scatter_row(self._frame[key], idx, col)
 
     def __delitem__(self, key):
         if isinstance(key, str):
