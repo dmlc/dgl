@@ -519,12 +519,22 @@ class GraphIndex(object):
             The line graph of this graph.
         """
         m = self.number_of_edges()
-        ctx = F.get_context(F.ones(1)) # TODO(gaiyu):
+        ctx = F.get_context(F.ones(1))
         inc = F.to_scipy_sparse(self.incidence_matrix(oriented=True).get(ctx))
-        adj = inc.transpose().dot(inc)
+        adj = inc.transpose().dot(inc).tocoo()
         adj.data[adj.data != -1] = 0
         adj.eliminate_zeros()
-        adj = sp.triu(adj)
+
+        u, v, _ = self.edges(sorted=True) # TODO(gaiyu): sorted
+        u = u.tousertensor()
+        v = v.tousertensor()
+        src = F.gather_row(v, F.tensor(adj.row, dtype=F.int64))
+        dst = F.gather_row(u, F.tensor(adj.col, dtype=F.int64))
+        dat = F.tensor(adj.data)
+        dat[src != dst] = 0
+        adj.data = dat.numpy()
+        adj.eliminate_zeros()
+
         lg = create_graph_index()
         lg.from_scipy_sparse_matrix(adj)
         return lg

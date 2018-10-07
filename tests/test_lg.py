@@ -17,5 +17,5 @@ assert lg_sparse.number_of_edges() == lg_cpp.number_of_edges()
 
 src_sparse, dst_sparse, _ = lg_sparse.edges(sorted=True)
 src_cpp, dst_cpp, _ = lg_cpp.edges(sorted=True)
-# assert (src_sparse == src_cpp).all()
-# assert (dst_sparse == dst_cpp).all()
+assert (src_sparse == src_cpp).all()
+assert (dst_sparse == dst_cpp).all()
