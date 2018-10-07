@@ -20,7 +20,7 @@ pipeline {
                         }
                         stage('BUILD') {
                             steps {
-                                sh 'mkdir build'
+                                sh 'if [ -d build ]; then rm -rf build; fi; mkdir build'
                                 dir('python') {
                                     sh 'python3 setup.py install'
                                 }
@@ -63,7 +63,7 @@ pipeline {
                         }
                         stage('BUILD') {
                             steps {
-                                sh 'mkdir build'
+                                sh 'if [ -d build ]; then rm -rf build; fi; mkdir build'
                                 dir('python') {
                                     sh 'python3 setup.py install'
                                 }
