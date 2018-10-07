@@ -174,7 +174,7 @@ def unbatch(graph):
     return [DGLGraph(graph_data=pttns[i],
                      node_frame=node_frames[i],
                      edge_frame=edge_frames[i]) for i in range(bsize)]
-    
+
 def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     """Batch a list of DGLGraphs into one single graph.
 

@@ -1,33 +1,95 @@
 pipeline {
-    agent {
-        docker {
-            image 'pytorch/pytorch'
-        }
-    }
+    agent none
     stages {
-        stage('SETUP') {
-            steps {
-                sh 'easy_install nose'
-                sh 'apt-get update && apt-get install -y libxml2-dev'
-            }
-        }
-        stage('BUILD') {
-            steps {
-                dir('python') {
-                    sh 'python setup.py install'
+        stage('Build and Test') {
+            parallel {
+                stage('CPU') {
+                    agent {
+                        docker {
+                            image 'lingfanyu/dgl-cpu'
+                            args '-u root'
+                        }
+                    }
+                    stages {
+                        stage('SETUP') {
+                            steps {
+                                sh 'easy_install nose'
+                                sh 'git submodule init'
+                                sh 'git submodule update'
+                            }
+                        }
+                        stage('BUILD') {
+                            steps {
+                                sh 'mkdir build'
+                                dir('python') {
+                                    sh 'python3 setup.py install'
+                                }
+                                dir ('build') {
+                                    sh 'cmake ..'
+                                    sh 'make -j$(nproc)'
+                                }
+                            }
+                        }
+                        stage('TEST') {
+                            steps {
+                                withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
+                                    sh 'echo $DGL_LIBRARY_PATH'
+                                    sh 'nosetests tests -v --with-xunit'
+                                    sh 'nosetests tests/pytorch -v --with-xunit'
+                                }
+                            }
+                        }
+                    }
+                    post {
+                        always {
+                            junit '*.xml'
+                        }
+                    }
+                }
+                stage('GPU') {
+                    agent {
+                        docker {
+                            image 'lingfanyu/dgl-gpu'
+                            args '--runtime nvidia -u root'
+                        }
+                    }
+                    stages {
+                        stage('SETUP') {
+                            steps {
+                                sh 'easy_install nose'
+                                sh 'git submodule init'
+                                sh 'git submodule update'
+                            }
+                        }
+                        stage('BUILD') {
+                            steps {
+                                sh 'mkdir build'
+                                dir('python') {
+                                    sh 'python3 setup.py install'
+                                }
+                                dir ('build') {
+                                    sh 'cmake ..'
+                                    sh 'make -j$(nproc)'
+                                }
+                            }
+                        }
+                        stage('TEST') {
+                            steps {
+                                withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
+                                    sh 'echo $DGL_LIBRARY_PATH'
+                                    sh 'nosetests tests -v --with-xunit'
+                                    sh 'nosetests tests/pytorch -v --with-xunit'
+                                }
+                            }
+                        }
+                    }
+                    post {
+                        always {
+                            junit '*.xml'
+                        }
+                    }
                 }
             }
-        }
-        stage('TEST') {
-            steps {
-                sh 'nosetests tests -v --with-xunit'
-                sh 'nosetests tests/pytorch -v --with-xunit'
-            }
-        }
-    }
-    post {
-        always {
-            junit '*.xml'
         }
     }
 }
