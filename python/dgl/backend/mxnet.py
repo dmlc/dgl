@@ -26,6 +26,9 @@ tensor = mx.nd.array
 sum = F.sum
 max = F.max
 
+def sparse_tensor(idx, data, shape):
+    return mx.nd.sparse.csr_matrix((data, (idx[0], idx[1])), tuple(shape))
+
 def astype(a, ty):
     return F.cast(a, ty)
 
@@ -63,6 +66,9 @@ reshape = F.reshape
 ones = F.ones
 zeros = F.zeros
 arange = F.arange
+
+def spmm(spm, mat):
+    return mx.nd.dot(spm, mat)
 
 def sort(x, dim=None, descending=False):
     if dim is None:
