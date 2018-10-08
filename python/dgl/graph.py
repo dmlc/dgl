@@ -1247,7 +1247,7 @@ class DGLGraph(object):
         """
         return self._graph.adjacency_matrix()
 
-    def incidence_matrix(self, oriented=False):
+    def incidence_matrix(self, oriented=False, sorted=False):
         """Return the incidence matrix representation of this graph.
 
         Returns
@@ -1255,9 +1255,9 @@ class DGLGraph(object):
         utils.CtxCachedObject
             An object that returns tensor given context.
         """
-        return self._graph.incidence_matrix(oriented)
+        return self._graph.incidence_matrix(oriented, sorted)
 
-    def line_graph(self):
+    def line_graph(self, backtracking=True, sorted=False):
         """Return the line graph of this graph.
 
         Returns
@@ -1265,9 +1265,9 @@ class DGLGraph(object):
         DGLGraph
             The line graph of this graph.
         """
-        return DGLGraph(self._graph.line_graph())
+        return DGLGraph(self._graph.line_graph(backtracking, sorted))
 
-    def _line_graph(self, backtracking=False):
+    def _line_graph(self, backtracking=True, sorted=False):
         """Return the line graph of this graph.
 
         Returns
@@ -1275,7 +1275,7 @@ class DGLGraph(object):
         DGLGraph
             The line graph of this graph.
         """
-        return DGLGraph(self._graph._line_graph(backtracking))
+        return DGLGraph(self._graph._line_graph(backtracking, sorted))
 
 def _get_repr(attr_dict):
     if len(attr_dict) == 1 and __REPR__ in attr_dict:

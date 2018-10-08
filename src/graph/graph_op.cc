@@ -25,7 +25,7 @@ Graph GraphOp::LineGraph(const Graph* g, bool backtracking){
     auto j = adj.find(v);
     if (j != adj.end()) {
       for (size_t k = 0; k != j->second.size(); ++k) {
-        if (j->second[k].first != u) {
+        if (backtracking || (!backtracking && j->second[k].first != u)) {
           lg_src.push_back(i);
           lg_dst.push_back(j->second[k].second);
         }

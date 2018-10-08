@@ -10,8 +10,9 @@ b = sp.sparse.triu(a, 1) + sp.sparse.triu(a, 1).transpose()
 g = dgl.DGLGraph()
 g.from_scipy_sparse_matrix(b)
 
-lg_sparse = g.line_graph()
-lg_cpp = g._line_graph()
+backtracking = True
+lg_sparse = g.line_graph(backtracking)
+lg_cpp = g._line_graph(backtracking)
 assert lg_sparse.number_of_nodes() == lg_cpp.number_of_nodes()
 assert lg_sparse.number_of_edges() == lg_cpp.number_of_edges()
 

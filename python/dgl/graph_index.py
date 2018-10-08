@@ -408,17 +408,26 @@ class GraphIndex(object):
             self._cache['adj'] = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
         return self._cache['adj']
 
-    def incidence_matrix(self, oriented=False):
+    def incidence_matrix(self, oriented=False, sorted=False):
         """Return the incidence matrix representation of this graph.
+        
+        Parameters
+        ----------
+        oriented : bool, optional (default=False)
+          Whether the returned incidence matrix is oriented.
+        sorted : bool, optional (default=False)
+          If true, nodes in L(G) are sorted as pairs.
+          If False, nodes in L(G) are ordered by their edge id's in G.
 
         Returns
         -------
         utils.CtxCachedObject
             An object that returns tensor given context.
         """
-        key = ('oriented ' if oriented else '') + 'incidence matrix'
+        key = ('oriented ' if oriented else '') + \
+                ('sorted ' if sorted else '') + 'incidence matrix'
         if not key in self._cache:
-            src, dst, _ = self.edges(sorted=True)
+            src, dst, _ = self.edges(sorted=sorted)
             src = src.tousertensor()
             dst = dst.tousertensor()
             m = self.number_of_edges()
@@ -501,7 +510,7 @@ class GraphIndex(object):
 
         Parameters
         ----------
-        adj :
+        adj : scipy sparse matrix
         """
         self.clear()
         self.add_nodes(adj.shape[0])
@@ -510,8 +519,17 @@ class GraphIndex(object):
         dst = utils.toindex(adj_coo.col)
         self.add_edges(src, dst)
 
-    def line_graph(self):
+    def line_graph(self, backtracking=True, sorted=False):
         """Return the line graph of this graph.
+
+        Parameters
+        ----------
+        backtracking : bool, optional (default=False)
+          Whether (i, j) ~ (j, i) in L(G).
+          (i, j) ~ (j, i) is the behavior of networkx.line_graph.
+        sorted : bool, optional (default=False)
+          If true, nodes in L(G) are sorted as pairs.
+          If False, nodes in L(G) are ordered by their edge id's in G.
 
         Returns
         -------
@@ -520,12 +538,15 @@ class GraphIndex(object):
         """
         m = self.number_of_edges()
         ctx = F.get_context(F.ones(1))
-        inc = F.to_scipy_sparse(self.incidence_matrix(oriented=True).get(ctx))
+        inc = F.to_scipy_sparse(self.incidence_matrix(True, sorted).get(ctx))
         adj = inc.transpose().dot(inc).tocoo()
-        adj.data[adj.data != -1] = 0
+        if backtracking:
+            adj.data[adj.data >= 0] = 0
+        else:
+            adj.data[adj.data != -1] = 0
         adj.eliminate_zeros()
 
-        u, v, _ = self.edges(sorted=True) # TODO(gaiyu): sorted
+        u, v, _ = self.edges(sorted=sorted)
         u = u.tousertensor()
         v = v.tousertensor()
         src = F.gather_row(v, F.tensor(adj.row, dtype=F.int64))
@@ -539,7 +560,7 @@ class GraphIndex(object):
         lg.from_scipy_sparse_matrix(adj)
         return lg
 
-    def _line_graph(self, backtracking):
+    def _line_graph(self, backtracking=True, sorted=False):
         handle = _CAPI_DGLGraphLineGraph(self._handle, backtracking)
         return GraphIndex(handle)
         
