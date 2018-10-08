@@ -24,7 +24,9 @@ int64 = 'int64'
 tensor = mx.nd.array
 #sparse_tensor = th.sparse.FloatTensor
 sum = F.sum
-max = F.max
+
+def max(x):
+    return F.max(x).asnumpy()[0]
 
 def sparse_tensor(idx, data, shape):
     return mx.nd.sparse.csr_matrix((data, (idx[0], idx[1])), tuple(shape))
@@ -48,7 +50,11 @@ def shape(x):
 def isinteger(x):
     return x.dtype in [np.int, np.int8, np.int16, np.int32, np.int64]
 
-#unique = th.unique
+def unique(x):
+    # TODO this isn't the best way of running unique.
+    tmp = x.asnumpy()
+    tmp = np.unique(tmp)
+    return mx.nd.array(tmp, ctx=x.context)
 
 def gather_row(data, row_index):
     return data[row_index,]
