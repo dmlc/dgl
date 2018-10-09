@@ -18,13 +18,23 @@ def test_edge_id():
     assert 0 in eid
 
     gi.add_edges(toindex([0, 1, 1, 2]), toindex([2, 2, 2, 3]))
-    src, dst, eid = gi.edge_ids(toindex([0, 0, 1, 2]), toindex([1, 2, 2, 3]))
-
     true_eids = {
             (0, 1): [0, 1],
             (0, 2): [2],
             (1, 2): [3, 4],
             (2, 3): [5],
     }
+
+    src, dst, eid = gi.edge_ids(toindex([0, 0, 1, 2]), toindex([1, 2, 2, 3]))
+    for s, d, e in zip(src, dst, eid):
+        assert e in true_eids[s, d]
+
+    # source broadcasting
+    src, dst, eid = gi.edge_ids(toindex([0]), toindex([1, 2]))
+    for s, d, e in zip(src, dst, eid):
+        assert e in true_eids[s, d]
+
+    # destination broadcasting
+    src, dst, eid = gi.edge_ids(toindex([0, 1]), toindex([2]))
     for s, d, e in zip(src, dst, eid):
         assert e in true_eids[s, d]
