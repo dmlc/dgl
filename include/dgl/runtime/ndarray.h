@@ -249,9 +249,14 @@ struct NDArray::Container {
   friend class RPCWrappedFunc;
   /*!
    * \brief The shape container,
-   *  can be used used for shape data.
+   *  can be used for shape data.
    */
   std::vector<int64_t> shape_;
+  /*!
+   * \brief The stride container,
+   *  can be used for stride data.
+   */
+  std::vector<int64_t> stride_;
   /*! \brief The internal array object */
   std::atomic<int> ref_counter_{0};
 };

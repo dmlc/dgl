@@ -24,6 +24,10 @@ def _from_dlpack(dltensor):
     dltensor = ctypes.py_object(dltensor)
     if ctypes.pythonapi.PyCapsule_IsValid(dltensor, _c_str_dltensor):
         ptr = ctypes.pythonapi.PyCapsule_GetPointer(dltensor, _c_str_dltensor)
+        # XXX(minjie): The below cast should be unnecessary given the code to
+        #   set restype of PyCapsule calls. But weirdly, this does not
+        #   work out always.
+        ptr = ctypes.cast(ptr, ctypes.c_void_p)
         handle = TVMArrayHandle()
         check_call(_LIB.TVMArrayFromDLPack(ptr, ctypes.byref(handle)))
         ctypes.pythonapi.PyCapsule_SetName(dltensor, _c_str_used_dltensor)
@@ -36,8 +40,12 @@ def _dlpack_deleter(pycapsule):
     pycapsule = ctypes.cast(pycapsule, ctypes.py_object)
     if ctypes.pythonapi.PyCapsule_IsValid(pycapsule, _c_str_dltensor):
         ptr = ctypes.pythonapi.PyCapsule_GetPointer(pycapsule, _c_str_dltensor)
+        # XXX(minjie): The below cast should be unnecessary given the code to
+        #   set restype of PyCapsule calls. But weirdly, this does not
+        #   work out always.
+        ptr = ctypes.cast(ptr, ctypes.c_void_p)
         _LIB.TVMDLManagedTensorCallDeleter(ptr)
-        ctypes.pythonapi.PyCapsule_SetDestructor(dltensor, TVMPyCapsuleDestructor(0))
+        ctypes.pythonapi.PyCapsule_SetDestructor(pycapsule, TVMPyCapsuleDestructor(0))
 
 _c_dlpack_deleter = TVMPyCapsuleDestructor(_dlpack_deleter)
 
@@ -72,9 +80,9 @@ class NDArrayBase(object):
         -------
         dlpack : DLPack tensor view of the array data
         """
-        handle = ctypes.c_void_p()
-        check_call(_LIB.TVMArrayToDLPack(self.handle, ctypes.byref(handle)))
-        return ctypes.pythonapi.PyCapsule_New(handle, _c_str_dltensor, _c_dlpack_deleter)
+        ptr = ctypes.c_void_p()
+        check_call(_LIB.TVMArrayToDLPack(self.handle, ctypes.byref(ptr)))
+        return ctypes.pythonapi.PyCapsule_New(ptr, _c_str_dltensor, _c_dlpack_deleter)
 
 
 def _make_array(handle, is_view):
