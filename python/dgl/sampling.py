@@ -9,6 +9,43 @@ Created on Thu Sep 20 10:43:03 2018
 import collections as c
 import numpy as np
 import numpy.random as npr
+import scipy.sparse as scs
+import dgl
+import time
+
+####
+## Accessories
+#####
+
+##http://stackoverflow.com/questions/8290397/how-to-split-an-iterable-in-constant-size-chunks
+#def chunk_iter(iterable, n=1):
+#
+
+def nodes_networkx(G):
+    return G.nodes
+
+def degree_networkx(G, i):
+    return G
+
+def neighborhood_networkx(G, i):
+    return [n_i for n_i in G[i]]
+
+def neighborhood_csr(G, i):
+    return list(G[i].indices) 
+    
+def neighborhood_graphtool(G, i):
+    return [int(s_i) for s_i in G.vertex(i).out_neighbors()]
+
+def neighborhood_igraph(G, i):
+    return G.neighbors(i, mode="OUT")    
+
+def get_nodes(G):   
+    if type(G) == scs.csr.csr_matrix:
+        nodes = range(G.shape[0])
+    elif type(G) ==dgl.graph.DGLGraph:
+        nodes = G.nodes
+    return nodes
+
 
 #####
 ### Seed Methods
@@ -69,30 +106,38 @@ def seeds_consume(V, seed_size, num_nodes=None, percent_nodes=.90):
 def importance_sampling(q,seed_size=100, num_nodes=None,percent_nodes=.90):     
     if num_nodes is None:
         num_nodes = int(np.floor(len(q)*percent_nodes)) 
-    for i in range(int(np.floor(num_nodes/seed_size))):
+    keys = len(q)
+    values =  q/np.sum(q)
+    for j in range(int(np.floor(num_nodes/seed_size))):
         r = {}
-        values = np.array(list(q.values()))
-        keys = list(q.keys())
-        r[0] = set([int(i) for i in npr.choice(keys, size=seed_size, replace=False, p=values/np.sum(values))]) # select 'n' keys using probability distribution 'q.values()'  
+        r[0] = set(npr.choice(keys, size=seed_size, replace=True, p=values).astype(int)) # select 'n' keys using probability distribution 'q.values()'  
         yield r
 
-#this function builds the likelihood dictionary used in importance sampling, according to 'fn' criteria
+
+#this function builds the likelihood vector used in importance sampling, according to 'fn' criteria
 ## @param graph G, a networkx graph object
 ## @param fn string the the sampling criteria to weight samples, (we're using degree, implement any others)
-def importance_sampling_distribution_networkx(G, fn="neighborhood"):
-    q = {} #probability distribution for each q[v]
-    if fn == "degree":
+## @return a numpy array 'a' with probabilities a[v] = P(v) 
+def importance_sampling_distribution(G, graph_type="networkx", fn_name="neighborhood", fn=neighborhood_networkx):
+    
+    if graph_type=="networkx":
         degrees = G.degree
+        nodes = G.nodes
+    elif graph_type=="csr":
+        degrees = np.squeeze(np.asarray(G.sum(axis=0)))
+        nodes = range(len(degrees))
+    
+    q = np.zeros(len(nodes))#probability distribution for each q[v]    
+    if fn_name == "degree":        
         s = sum(dict(degrees).values()) #total edges (directed)
-        for v in G.nodes:
+        for v in range(len(nodes)):
             q[v] = degrees[v]/s #my degree   
-    elif fn=="neighborhood":
-        degrees = G.degree
-        for v in G.nodes:
-            q[v] = (1/degrees(v))*sum([1/degrees[vi] for vi in neighborhood_networkx(G, v)])
-    elif fn == "uniform":
-        for v in G.nodes:
-            q[v] = 1/len(G.nodes)
+    elif fn_name=="neighborhood":
+        for v in range(len(nodes)):
+            q[v] = (1/degrees[v])*sum([1/degrees[vi] for vi in fn(G, v)])
+    elif fn_name == "uniform":
+        for v in range(len(nodes)):
+            q[v] = 1/len(nodes)
     return q
     
 ###
@@ -259,56 +304,33 @@ def seed_BFS_frontier(G,seedset_list,depth, fn_neighborhood, max_level_nodes = N
 # Seeded Graph Traversals
 # Convenience methods combining seeding and minibatch sampling
 ### 
-def seed_expansion_sampling(G, seed_size, depth, fn_neighborhood, max_neighbors = None, seed_nodes=None, percent_nodes=.90):
-    seedset_iter = seeds_consume(G.nodes, seed_size =  seed_size, num_nodes=seed_nodes,percent_nodes=percent_nodes)
+def seed_expansion_sampling(G, seed_size, depth, fn_neighborhood, max_neighbors = None, seed_nodes=None, percent_nodes=1):
+
+    seedset_iter = seeds_consume(get_nodes(G), seed_size =  seed_size, num_nodes=seed_nodes,percent_nodes=percent_nodes)
     return seed_neighbor_expansion(G,seedset_iter,depth, fn_neighborhood, max_neighbors=max_neighbors)
 
-def seed_BFS_frontier_sampling(G,  seed_size, depth, fn_neighborhood, max_level_nodes = None, seed_nodes=None, percent_nodes=.90):
-    seedset_iter = seeds_consume(G.nodes, seed_size =  seed_size, num_nodes=seed_nodes,percent_nodes=percent_nodes)
+def seed_BFS_frontier_sampling(G,  seed_size, depth, fn_neighborhood, max_level_nodes = None, seed_nodes=None, percent_nodes=1):
+    seedset_iter = seeds_consume(get_nodes(G), seed_size =  seed_size, num_nodes=seed_nodes,percent_nodes=percent_nodes)
     return seed_BFS_frontier(G,seedset_iter,depth, fn_neighborhood, max_level_nodes=max_level_nodes)
 
-def seed_random_walk_sampling(G, seed_size, depth, fn_neighborhood, max_level_nodes=None, seed_nodes=None, percent_nodes=.90, p_restart=0.3, iters=1000, weights=1, max_path_length=10):
-    seedset_iter = seeds_consume(G.nodes, seed_size =  seed_size, num_nodes=seed_nodes,percent_nodes=percent_nodes)
+def seed_random_walk_sampling(G, seed_size, depth, fn_neighborhood, max_level_nodes=None, seed_nodes=None, percent_nodes=1, p_restart=0, iters=250, weights=1, max_path_length=6):
+    seedset_iter = seeds_consume(get_nodes(G), seed_size =  seed_size, num_nodes=seed_nodes,percent_nodes=percent_nodes)
     return seed_random_walk(G, seedset_iter, depth, fn_neighborhood, max_level_nodes=max_level_nodes, p_restart=p_restart, iters=iters, weights=weights, max_path_length=max_path_length)
 
-def importance_sampling_wrapper_networkx(G, fn="neighborhood", seed_size=100, num_nodes=None, percent_nodes=.90):
-    q = importance_sampling_distribution_networkx(G, fn=fn)
+def importance_sampling_wrapper(G, fn_name="neighborhood",  graph_type="networkx", fn=neighborhood_networkx, seed_size=100, num_nodes=None, percent_nodes=1):
+    q = importance_sampling_distribution(G, fn_name=fn_name, graph_type=graph_type, fn=fn)
     return importance_sampling(q, seed_size=seed_size, num_nodes=num_nodes, percent_nodes=percent_nodes), q
 
-def full_batch_networkx(G, depth, num_nodes=None, percent_nodes=1):
-    V = G.nodes
+def full_batch(G, depth, num_nodes=None, percent_nodes=1):
+    V = get_nodes(G)
     if num_nodes is None:
         num_nodes = int(np.round(len(V)*percent_nodes))
     node_list = set([int(i) for i in npr.permutation(V)[0:min([num_nodes, len(V)])]])
     return [{i:node_list for i in range(depth)}]  
 
-####
-## Accessories
-#####
 
-##http://stackoverflow.com/questions/8290397/how-to-split-an-iterable-in-constant-size-chunks
-#def chunk_iter(iterable, n=1):
-#
 
-def nodes_networkx(G):
-    return G.nodes
-
-def degree_networkx(G, i):
-    return G
-
-def neighborhood_networkx(G, i):
-    return [n_i for n_i in G[i]]
-
-def neighborhood_csr(G, i):
-    return list(G[i].indices) 
     
-def neighborhood_graphtool(G, i):
-    return [int(s_i) for s_i in G.vertex(i).out_neighbors()]
-
-def neighborhood_igraph(G, i):
-    return G.neighbors(i, mode="OUT")    
-
-
 
 ####
 ####
