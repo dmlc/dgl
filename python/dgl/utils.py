@@ -35,6 +35,7 @@ class Index(object):
                     self._list_data = np.array(data).astype(np.int64)
                 except:
                     raise ValueError('Error index data: %s' % str(data))
+            self._user_tensor_data[nd.cpu()] = F.zerocopy_from_numpy(self._list_data)
 
     def tolist(self):
         """Convert to a python-list compatible object."""
@@ -42,18 +43,20 @@ class Index(object):
             if self._dgl_tensor_data is not None:
                 self._list_data = self._dgl_tensor_data.asnumpy()
             else:
-                assert len(self._user_tensor_data) > 0
-                data = next(iter(self._user_tensor_data.values()))
-                self._list_data = F.asnumpy(data)
+                data = self.tousertensor()
+                self._list_data = F.zerocopy_to_numpy(data)
         return self._list_data
 
     def tousertensor(self, ctx=None):
         """Convert to user tensor (defined in `backend`)."""
-        if len(self._user_tensor_data) == 0:
-            self._user_tensor_data[nd.cpu()] = F.from_numpy(self.tolist())
         if ctx is None:
             ctx = nd.cpu()
+        if len(self._user_tensor_data) == 0:
+            # zero copy from dgl tensor
+            dl = self._dgl_tensor_data.to_dlpack()
+            self._user_tensor_data[nd.cpu()] = F.zerocopy_from_dlpack(dl)
         if ctx not in self._user_tensor_data:
+            # copy from cpu to another device
             data = next(iter(self._user_tensor_data.values()))
             self._user_tensor_data[ctx] = F.to_context(data, ctx)
         return self._user_tensor_data[ctx]
@@ -61,13 +64,10 @@ class Index(object):
     def todgltensor(self):
         """Convert to dgl.NDArray."""
         if self._dgl_tensor_data is None:
-            if self._list_data is not None:
-                # create a view ndarray from numpy
-                self._dgl_tensor_data = nd.from_numpy(self._list_data)
-            else:
-                # create a view ndarray from user tensor
-                self._dgl_tensor_data = nd.from_user_tensor(
-                        self.tousertensor(ctx=nd.cpu()))
+            # zero copy from user tensor
+            tsor = self.tousertensor()
+            dl = F.zerocopy_to_dlpack(tsor)
+            self._dgl_tensor_data = nd.from_dlpack(dl)
         return self._dgl_tensor_data
 
     def __iter__(self):
