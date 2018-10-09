@@ -182,7 +182,7 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeId")
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const dgl_id_t src = args[1];
     const dgl_id_t dst = args[2];
-    *rv = static_cast<int64_t>(gptr->EdgeId(src, dst));
+    *rv = gptr->EdgeId(src, dst);
   });
 
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeIds")
@@ -191,7 +191,7 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeIds")
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     const IdArray dst = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
-    *rv = gptr->EdgeIds(src, dst);
+    *rv = ConvertEdgeArrayToPackedFunc(gptr->EdgeIds(src, dst));
   });
 
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphInEdges_1")

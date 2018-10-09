@@ -1,6 +1,7 @@
 // Graph class implementation
 #include <algorithm>
 #include <unordered_map>
+#include <functional>
 #include <dgl/graph.h>
 
 namespace dgl {
@@ -21,13 +22,19 @@ void Graph::AddEdge(dgl_id_t src, dgl_id_t dst) {
   CHECK(!read_only_) << "Graph is read-only. Mutations are not allowed.";
   CHECK(HasVertex(src) && HasVertex(dst))
     << "Invalid vertices: src=" << src << " dst=" << dst;
+
   dgl_id_t eid = num_edges_++;
+
   adjlist_[src].succ.push_back(dst);
   adjlist_[src].edge_id.push_back(eid);
   reverse_adjlist_[dst].succ.push_back(src);
   reverse_adjlist_[dst].edge_id.push_back(eid);
+
   all_edges_src_.push_back(src);
   all_edges_dst_.push_back(dst);
+
+  std::vector<dgl_id_t>& edgelist = edgemap_[std::make_pair(src, dst)];
+  edgelist.push_back(eid);
 }
 
 void Graph::AddEdges(IdArray src_ids, IdArray dst_ids) {
@@ -70,14 +77,15 @@ BoolArray Graph::HasVertices(IdArray vids) const {
   return rst;
 }
 
-// O(E)
+// O(1) Amortized
 bool Graph::HasEdge(dgl_id_t src, dgl_id_t dst) const {
-  if (!HasVertex(src) || !HasVertex(dst)) return false;
-  const auto& succ = adjlist_[src].succ;
-  return std::find(succ.begin(), succ.end(), dst) != succ.end();
+  if (!HasVertex(src) || !HasVertex(dst))
+    return false;
+
+  return edgemap_.find(std::make_pair(src, dst)) != edgemap_.end();
 }
 
-// O(E*K) pretty slow
+// O(N) Amortized
 BoolArray Graph::HasEdges(IdArray src_ids, IdArray dst_ids) const {
   CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
   CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
@@ -136,48 +144,86 @@ IdArray Graph::Successors(dgl_id_t vid, uint64_t radius) const {
   return rst;
 }
 
-// O(E)
-dgl_id_t Graph::EdgeId(dgl_id_t src, dgl_id_t dst) const {
-  CHECK(HasVertex(src)) << "invalid edge: " << src << " -> " << dst;
-  const auto& succ = adjlist_[src].succ;
-  for (size_t i = 0; i < succ.size(); ++i) {
-    if (succ[i] == dst) {
-      return adjlist_[src].edge_id[i];
-    }
-  }
-  LOG(FATAL) << "invalid edge: " << src << " -> " << dst;
-  return 0;
+// O(e) Amortized (the number of edges in between)
+IdArray Graph::EdgeId(dgl_id_t src, dgl_id_t dst) const {
+  CHECK(HasVertex(src) && HasVertex(dst)) << "invalid edge: " << src << " -> " << dst;
+
+  const auto& it = edgemap_.find(std::make_pair(src, dst));
+  // TODO: should we return an empty array instead of complaining?
+  if (it == edgemap_.end())
+    LOG(FATAL) << "invalid edge: " << src << " -> " << dst;
+
+  const std::vector<dgl_id_t>& edgelist = it->second;
+  // FIXME: signed?  Also it seems that we are using int64_t everywhere...
+  const int64_t len = edgelist.size();
+  IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  // FIXME: signed?
+  int64_t* rst_data = static_cast<int64_t*>(rst->data);
+
+  std::copy(edgelist.begin(), edgelist.end(), rst_data);
+
+  return rst;
 }
 
-// O(E*k) pretty slow
-IdArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
+// O(N*e) Amortized (the number of edges in between)
+Graph::EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
   CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
   CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
-  const auto srclen = src_ids->shape[0];
-  const auto dstlen = dst_ids->shape[0];
-  const auto rstlen = std::max(srclen, dstlen);
-  IdArray rst = IdArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
-  int64_t* rst_data = static_cast<int64_t*>(rst->data);
+
+  const int64_t srclen = src_ids->shape[0];
+  const int64_t dstlen = dst_ids->shape[0];
+  int64_t rstlen = 0;
+  CHECK((srclen == dstlen) || (srclen == 1) || (dstlen == 1))
+    << "Invalid src and dst id array.";
+
+  const int64_t src_stride = (srclen == 1) ? 0 : 1;
+  const int64_t dst_stride = (dstlen == 1) ? 0 : 1;
   const int64_t* src_data = static_cast<int64_t*>(src_ids->data);
   const int64_t* dst_data = static_cast<int64_t*>(dst_ids->data);
-  if (srclen == 1) {
-    // one-many
-    for (int64_t i = 0; i < dstlen; ++i) {
-      rst_data[i] = EdgeId(src_data[0], dst_data[i]);
-    }
-  } else if (dstlen == 1) {
-    // many-one
-    for (int64_t i = 0; i < srclen; ++i) {
-      rst_data[i] = EdgeId(src_data[i], dst_data[0]);
-    }
-  } else {
-    // many-many
-    CHECK(srclen == dstlen) << "Invalid src and dst id array.";
-    for (int64_t i = 0; i < srclen; ++i) {
-      rst_data[i] = EdgeId(src_data[i], dst_data[i]);
+  // vector of vector references
+  std::vector<dgl_id_t> effective_src;
+  std::vector<dgl_id_t> effective_dst;
+  std::vector<std::reference_wrapper<const std::vector<dgl_id_t>>> edgelists;
+  int64_t i, j;
+
+  for (i = 0, j = 0; i < srclen && j < dstlen; i += src_stride, j += dst_stride) {
+    const dgl_id_t src_id = src_data[i], dst_id = dst_data[j];
+    const auto& it = edgemap_.find(std::make_pair(src_id, dst_id));
+    // TODO: should we return an empty array instead of complaining?
+    if (it == edgemap_.end()) {
+      LOG(FATAL) << "invalid edge: " << src_id << " -> " << dst_id;
+    } else {
+      effective_src.push_back(src_id);
+      effective_dst.push_back(dst_id);
+      const std::vector<dgl_id_t>& edgelist = it->second;
+      edgelists.push_back(edgelist);
+      rstlen += edgelist.size();
     }
   }
-  return rst;
+
+  IdArray rst_src = IdArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
+  IdArray rst_dst = IdArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
+  IdArray rst_eid = IdArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
+  int64_t* rst_src_data = static_cast<int64_t*>(rst_src->data);
+  int64_t* rst_dst_data = static_cast<int64_t*>(rst_dst->data);
+  int64_t* rst_eid_data = static_cast<int64_t*>(rst_eid->data);
+
+  // FIXME: int64_t <-> uint64_t
+  for (i = 0; i < (int64_t)(edgelists.size()); ++i) {
+    const dgl_id_t src_id = effective_src[i], dst_id = effective_dst[i];
+    const std::vector<dgl_id_t>& edgelist = edgelists[i];
+    const auto len = edgelist.size();
+
+    std::copy(edgelist.begin(), edgelist.end(), rst_eid_data);
+    std::fill(rst_src_data, rst_src_data + len, src_id);
+    std::fill(rst_dst_data, rst_dst_data + len, dst_id);
+
+    rst_src_data += len;
+    rst_dst_data += len;
+    rst_eid_data += len;
+  }
+
+  return EdgeArray{rst_src, rst_dst, rst_eid};
 }
 
 // O(E)

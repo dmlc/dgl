@@ -193,7 +193,7 @@ class GraphIndex(object):
         return utils.toindex(_CAPI_DGLGraphSuccessors(self._handle, v, radius))
 
     def edge_id(self, u, v):
-        """Return the id of the edge.
+        """Return the id array of all edges between u and v.
 
         Parameters
         ----------
@@ -204,13 +204,13 @@ class GraphIndex(object):
 
         Returns
         -------
-        int
-            The edge id.
+        utils.Index
+            The edge id array.
         """
-        return _CAPI_DGLGraphEdgeId(self._handle, u, v)
+        return utils.toindex(_CAPI_DGLGraphEdgeId(self._handle, u, v))
 
     def edge_ids(self, u, v):
-        """Return the edge ids.
+        """Return a triplet of arrays that contains the edge IDs.
 
         Parameters
         ----------
@@ -222,11 +222,21 @@ class GraphIndex(object):
         Returns
         -------
         utils.Index
-            Teh edge id array.
+            The src nodes.
+        utils.Index
+            The dst nodes.
+        utils.Index
+            The edge ids.
         """
         u_array = u.todgltensor()
         v_array = v.todgltensor()
-        return utils.toindex(_CAPI_DGLGraphEdgeIds(self._handle, u_array, v_array))
+        edge_array = _CAPI_DGLGraphEdgeIds(self._handle, u_array, v_array)
+
+        src = utils.toindex(edge_array(0))
+        dst = utils.toindex(edge_array(1))
+        eid = utils.toindex(edge_array(2))
+
+        return src, dst, eid
 
     def in_edges(self, v):
         """Return the in edges of the node(s).

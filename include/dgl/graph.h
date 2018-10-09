@@ -3,6 +3,8 @@
 #define DGL_DGLGRAPH_H_
 
 #include <stdint.h>
+#include <utility>
+#include <unordered_map>
 #include "runtime/ndarray.h"
 
 namespace dgl {
@@ -142,22 +144,23 @@ class Graph {
   IdArray Successors(dgl_id_t vid, uint64_t radius = 1) const;
 
   /*!
-   * \brief Get the edge id using the two endpoints
+   * \brief Get all edge ids between the two given endpoints
    * \note Edges are associated with an integer id start from zero.
    *       The id is assigned when the edge is being added to the graph.
    * \param src The source vertex.
    * \param dst The destination vertex.
-   * \return the edge id.
-   */
-  dgl_id_t EdgeId(dgl_id_t src, dgl_id_t dst) const;
-
-  /*!
-   * \brief Get the edge id using the two endpoints
-   * \note Edges are associated with an integer id start from zero.
-   *       The id is assigned when the edge is being added to the graph.
    * \return the edge id array.
    */
-  IdArray EdgeIds(IdArray src, IdArray dst) const;
+  IdArray EdgeId(dgl_id_t src, dgl_id_t dst) const;
+
+  /*!
+   * \brief Get all edge ids between the given endpoint pairs.
+   * \note Edges are associated with an integer id start from zero.
+   *       The id is assigned when the edge is being added to the graph.
+   *       If duplicate pairs exist, the returned edge IDs will also duplicate.
+   * \return EdgeArray containing all edges between all pairs.
+   */
+  EdgeArray EdgeIds(IdArray src, IdArray dst) const;
 
   /*!
    * \brief Get the in edges of the vertex.
@@ -288,6 +291,19 @@ class Graph {
   };
   typedef std::vector<EdgeList> AdjacencyList;
 
+  /* hash definition for ID pairs to be used for unordered_map */
+  typedef std::pair<dgl_id_t, dgl_id_t> IdPair;
+  struct IdPairHash {
+   public:
+    size_t operator () (const IdPair &p) const {
+      uint64_t h1 = (p.first + 0x3333333333333333) * 0x1f1f1f1f1f1f1f1f;
+      uint64_t h2 = (p.second + 0xcccccccccccccccc) * 0x0f0f0f0f0f0f0f0f;
+      return (size_t)(h1 ^ h2);
+    }
+  };
+  /*! \brief Internal hashmap with vertex pairs as keys and edge ID as values */
+  typedef std::unordered_map<IdPair, std::vector<dgl_id_t>, IdPairHash> EdgeMap;
+
   /*! \brief adjacency list using vector storage */
   AdjacencyList adjlist_;
   /*! \brief reverse adjacency list using vector storage */
@@ -297,6 +313,9 @@ class Graph {
   std::vector<dgl_id_t> all_edges_src_;
   /*! \brief all edges' dst endpoints in their edge id order */
   std::vector<dgl_id_t> all_edges_dst_;
+
+  /*! \brief hashmap for indexing list of edges given vertex pairs */
+  EdgeMap edgemap_;
 
   /*! \brief read only flag */
   bool read_only_ = false;
