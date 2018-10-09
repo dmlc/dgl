@@ -55,7 +55,7 @@ class DGLGraph(object):
 
     def add_nodes(self, num, reprs=None):
         """Add nodes.
-        
+
         Parameters
         ----------
         num : int
@@ -70,7 +70,7 @@ class DGLGraph(object):
 
     def add_edge(self, u, v, reprs=None):
         """Add one edge.
-        
+
         Parameters
         ----------
         u : int
@@ -86,7 +86,7 @@ class DGLGraph(object):
 
     def add_edges(self, u, v, reprs=None):
         """Add many edges.
-        
+
         Parameters
         ----------
         u : list, tensor
@@ -154,7 +154,7 @@ class DGLGraph(object):
             True if the node exists
         """
         return self.has_node(vid)
-    
+
     def __contains__(self, vid):
         """Same as has_node."""
         return self.has_node(vid)
@@ -291,7 +291,7 @@ class DGLGraph(object):
         ----------
         v : int, list, tensor
             The node(s).
-        
+
         Returns
         -------
         tensor
@@ -312,7 +312,7 @@ class DGLGraph(object):
         ----------
         v : int, list, tensor
             The node(s).
-        
+
         Returns
         -------
         tensor
@@ -333,7 +333,7 @@ class DGLGraph(object):
         ----------
         sorted : bool
             True if the returned edges are sorted by their src and dst ids.
-        
+
         Returns
         -------
         tensor
@@ -432,7 +432,7 @@ class DGLGraph(object):
 
         If 'id' edge attribute exists, the edge will be added follows
         the edge id order. Otherwise, order is undefined.
-        
+
         Parameters
         ----------
         nx_graph : networkx.DiGraph
@@ -1165,21 +1165,17 @@ class DGLGraph(object):
         kwargs : keyword arguments, optional
             Arguments for pre-defined iterators.
         """
-        if isinstance(iterator, str):
+        if isinstance(traverser, str):
             # TODO Call pre-defined routine to unroll the computation.
             raise RuntimeError('Not implemented.')
         else:
             # NOTE: the iteration can return multiple edges at each step.
-            for u, v in iterator:
+            for u, v in traverser:
                 self.send_and_recv(u, v,
                         message_func, reduce_func, apply_node_func)
 
     def subgraph(self, nodes):
         """Generate the subgraph among the given nodes.
-
-        The generated graph contains only the graph structure. The node/edge
-        features are not shared implicitly. Use `copy_from` to get node/edge
-        features from parent graph.
 
         Parameters
         ----------
