@@ -1,7 +1,6 @@
 from dgl import DGLError
 from dgl.utils import toindex
 from dgl.graph_index import create_graph_index
-from unittest import TestCase
 import networkx as nx
 
 def test_edge_id():
