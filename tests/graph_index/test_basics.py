@@ -82,6 +82,30 @@ def test_nx():
     gi.from_networkx(nxg)
     assert gi.is_multigraph()
 
+def test_predsucc():
+    gi = create_graph_index()
+
+    gi.add_nodes(4)
+    gi.add_edge(0, 1)
+    gi.add_edge(0, 1)
+    gi.add_edge(0, 2)
+    gi.add_edge(2, 0)
+    gi.add_edge(3, 0)
+    gi.add_edge(0, 0)
+    gi.add_edge(0, 0)
+
+    pred = gi.predecessors(0)
+    assert len(pred) == 3
+    assert 2 in pred
+    assert 3 in pred
+    assert 0 in pred
+
+    succ = gi.successors(0)
+    assert len(succ) == 3
+    assert 1 in succ
+    assert 2 in succ
+    assert 0 in succ
+
 
 if __name__ == '__main__':
     test_edge_id()

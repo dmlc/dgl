@@ -1,6 +1,7 @@
 // Graph class implementation
 #include <algorithm>
 #include <unordered_map>
+#include <set>
 #include <functional>
 #include <dgl/graph.h>
 
@@ -122,13 +123,16 @@ BoolArray Graph::HasEdges(IdArray src_ids, IdArray dst_ids) const {
 IdArray Graph::Predecessors(dgl_id_t vid, uint64_t radius) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
   CHECK(radius >= 1) << "invalid radius: " << radius;
-  const auto& pred = reverse_adjlist_[vid].succ;
-  const int64_t len = pred.size();
+  std::set<dgl_id_t> vset;
+
+  for (auto& it : reverse_adjlist_[vid].succ)
+    vset.insert(it);
+
+  const int64_t len = vset.size();
   IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   int64_t* rst_data = static_cast<int64_t*>(rst->data);
-  for (int64_t i = 0; i < len; ++i) {
-    rst_data[i] = pred[i];
-  }
+
+  std::copy(vset.begin(), vset.end(), rst_data);
   return rst;
 }
 
@@ -136,13 +140,16 @@ IdArray Graph::Predecessors(dgl_id_t vid, uint64_t radius) const {
 IdArray Graph::Successors(dgl_id_t vid, uint64_t radius) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
   CHECK(radius >= 1) << "invalid radius: " << radius;
-  const auto& succ = adjlist_[vid].succ;
-  const int64_t len = succ.size();
+  std::set<dgl_id_t> vset;
+
+  for (auto& it : adjlist_[vid].succ)
+    vset.insert(it);
+
+  const int64_t len = vset.size();
   IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   int64_t* rst_data = static_cast<int64_t*>(rst->data);
-  for (int64_t i = 0; i < len; ++i) {
-    rst_data[i] = succ[i];
-  }
+
+  std::copy(vset.begin(), vset.end(), rst_data);
   return rst;
 }
 
