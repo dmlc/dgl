@@ -72,7 +72,7 @@ def array(arr, ctx=cpu(0)):
         arr = _np.array(arr)
     return empty(arr.shape, arr.dtype, ctx).copyfrom(arr)
 
-def from_numpy(np_data):
+def zerocopy_from_numpy(np_data):
     """Create an array that shares the given numpy data.
 
     Parameters
@@ -86,23 +86,6 @@ def from_numpy(np_data):
         The array
     """
     arr, _ = numpyasarray(np_data)
-    handle = ctypes.pointer(arr)
-    return NDArray(handle, is_view=True)
-
-def from_user_tensor(data):
-    """Create an array that shares the given user tensor data.
-
-    Parameters
-    ----------
-    data : F.Tensor
-        The user tensor data.
-
-    Returns
-    -------
-    NDArray
-        The array
-    """
-    arr = F.astvmarray(data)
     handle = ctypes.pointer(arr)
     return NDArray(handle, is_view=True)
 
