@@ -40,11 +40,11 @@ class GNNModule(nn.Module):
     def aggregate(self, g, z):
         z_list = []
         g.set_n_repr(z)
-        g.update_all(fn.copy_src(), fn.sum(), batchable=True)
+        g.update_all(fn.copy_src(), fn.sum())
         z_list.append(g.get_n_repr())
         for i in range(self.radius - 1):
             for j in range(2 ** i):
-                g.update_all(fn.copy_src(), fn.sum(), batchable=True)
+                g.update_all(fn.copy_src(), fn.sum())
             z_list.append(g.get_n_repr())
         return z_list
 
@@ -54,7 +54,7 @@ class GNNModule(nn.Module):
         x_list = [theta(z) for theta, z in zip(self.theta_list, self.aggregate(g, x))]
 
         g.set_e_repr(y)
-        g.update_all(fn.copy_edge(), fn.sum(), batchable=True)
+        g.update_all(fn.copy_edge(), fn.sum())
         yx = g.get_n_repr()
 
         x = self.theta_x(x) + self.theta_deg(deg_g * x) + sum(x_list) + self.theta_y(yx)
@@ -62,7 +62,7 @@ class GNNModule(nn.Module):
 
         y_list = [gamma(z) for gamma, z in zip(self.gamma_list, self.aggregate(lg, y))]
         lg.set_n_repr(xy)
-        lg.update_all(fn.copy_src(), fn.sum(), batchable=True)
+        lg.update_all(fn.copy_src(), fn.sum())
         xy = lg.get_n_repr()
         y = self.gamma_y(y) + self.gamma_deg(deg_lg * y) + sum(y_list) + self.gamma_x(xy)
         y = self.bn_y(y[:, :self.out_feats] + F.relu(y[:, self.out_feats:]))

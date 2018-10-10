@@ -1263,16 +1263,6 @@ class DGLGraph(object):
         """
         return DGLGraph(self._graph.line_graph(backtracking, sorted))
 
-    def _line_graph(self, backtracking=True, sorted=False):
-        """Return the line graph of this graph.
-
-        Returns
-        -------
-        DGLGraph
-            The line graph of this graph.
-        """
-        return DGLGraph(self._graph._line_graph(backtracking, sorted))
-
 def _get_repr(attr_dict):
     if len(attr_dict) == 1 and __REPR__ in attr_dict:
         return attr_dict[__REPR__]

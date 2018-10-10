@@ -16,7 +16,7 @@ import utils
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--batch-size', type=int,
-                    help='Batch size', default=4)
+                    help='Batch size', default=1)
 parser.add_argument('--gpu', type=int,
                     help='GPU', default=-1)
 parser.add_argument('--n-communities', type=int,

@@ -9,7 +9,7 @@ import networkx as nx
 from torch.utils.data import Dataset
 
 from .. import backend as F
-from ..batch import batch
+from ..batched_graph import batch
 from ..graph import DGLGraph
 from ..utils import Index
 
