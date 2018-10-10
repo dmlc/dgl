@@ -2,6 +2,7 @@ from dgl import DGLError
 from dgl.utils import toindex
 from dgl.graph_index import create_graph_index
 from unittest import TestCase
+import networkx as nx
 
 def test_edge_id():
     gi = create_graph_index()
@@ -60,6 +61,29 @@ def test_edge_id():
     assert len(eid) == 1
     assert eid[0] == 0
 
+def test_nx():
+    gi = create_graph_index()
+
+    gi.add_nodes(2)
+    gi.add_edge(0, 1)
+    nxg = gi.to_networkx()
+    assert not nxg.is_multigraph()
+    gi.add_edge(0, 1)
+    nxg = gi.to_networkx()
+    assert nxg.is_multigraph()
+
+    nxg = nx.Graph()
+    nxg.add_edge(0, 1)
+    gi.from_networkx(nxg)
+    assert not gi.is_multigraph()
+
+    nxg = nx.MultiGraph()
+    nxg.add_edge(0, 1)
+    nxg.add_edge(0, 1)
+    gi.from_networkx(nxg)
+    assert gi.is_multigraph()
+
 
 if __name__ == '__main__':
     test_edge_id()
+    test_nx()
