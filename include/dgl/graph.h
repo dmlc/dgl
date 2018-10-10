@@ -57,7 +57,9 @@ class Graph {
     reverse_adjlist_ = other.reverse_adjlist_;
     all_edges_src_ = other.all_edges_src_;
     all_edges_dst_ = other.all_edges_dst_;
+    edgemap_ = other.edgemap_;
     read_only_ = other.read_only_;
+    is_multigraph_ = other.is_multigraph_;
     num_edges_ = other.num_edges_;
     other.clear();
   }
@@ -99,8 +101,15 @@ class Graph {
     reverse_adjlist_.clear();
     all_edges_src_.clear();
     all_edges_dst_.clear();
+    edgemap_.clear();
     read_only_ = false;
+    is_multigraph_ = false;
     num_edges_ = 0;
+  }
+
+  /*! \return whether the graph is a multigraph */
+  bool IsMultigraph() const {
+    return is_multigraph_;
   }
 
   /*! \return the number of vertices in the graph.*/
@@ -319,6 +328,12 @@ class Graph {
 
   /*! \brief read only flag */
   bool read_only_ = false;
+  /*!
+   * \brief Whether if this is a multigraph.
+   *
+   * When a multiedge is added, this flag switches to true.
+   */
+  bool is_multigraph_ = false;
   /*! \brief number of edges */
   uint64_t num_edges_ = 0;
 };

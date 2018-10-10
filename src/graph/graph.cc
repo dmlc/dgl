@@ -34,6 +34,8 @@ void Graph::AddEdge(dgl_id_t src, dgl_id_t dst) {
   all_edges_dst_.push_back(dst);
 
   std::vector<dgl_id_t>& edgelist = edgemap_[std::make_pair(src, dst)];
+  if (edgelist.size() > 0)
+    is_multigraph_ = true;
   edgelist.push_back(eid);
 }
 

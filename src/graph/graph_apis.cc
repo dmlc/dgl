@@ -110,6 +110,13 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphClear")
     gptr->Clear();
   });
 
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphIsMultigraph")
+.set_body([] (TVMArgs args, TVMRetValue *rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    *rv = gptr->IsMultigraph();
+  });
+
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphNumVertices")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     GraphHandle ghandle = args[0];

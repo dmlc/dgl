@@ -71,6 +71,16 @@ class GraphIndex(object):
         _CAPI_DGLGraphClear(self._handle)
         self._cache.clear()
 
+    def is_multigraph(self):
+        """Return whether the graph is a multigraph
+
+        Returns
+        -------
+        int
+            1 if it is a multigraph, 0 otherwise.
+        """
+        return _CAPI_DGLGraphIsMultigraph(self._handle)
+
     def number_of_nodes(self):
         """Return the number of nodes.
 
@@ -101,8 +111,8 @@ class GraphIndex(object):
 
         Returns
         -------
-        bool
-            True if the node exists
+        int
+            1 if the node exists, 0 otherwise.
         """
         return _CAPI_DGLGraphHasVertex(self._handle, vid)
 
@@ -134,8 +144,8 @@ class GraphIndex(object):
 
         Returns
         -------
-        bool
-            True if the edge exists
+        int
+            1 if the edge exists, 0 otherwise
         """
         return _CAPI_DGLGraphHasEdge(self._handle, u, v)
 
