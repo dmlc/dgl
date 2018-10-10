@@ -80,6 +80,13 @@ struct NDArray::Internal {
     data->shape_ = std::move(shape);
     data->dl_tensor.shape = dmlc::BeginPtr(data->shape_);
     data->dl_tensor.ndim = static_cast<int>(data->shape_.size());
+    // setup stride (this should be optional, but some framework
+    //   does not support NULL stride and thus will crash the program).
+    data->stride_.resize(data->dl_tensor.ndim, 1);
+    for (int i = data->dl_tensor.ndim - 2; i >= 0; --i) {
+      data->stride_[i] = data->shape_[i+1] * data->stride_[i+1];
+    }
+    data->dl_tensor.strides = dmlc::BeginPtr(data->stride_);
     // setup dtype
     data->dl_tensor.dtype = dtype;
     // setup ctx

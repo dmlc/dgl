@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import ctypes
 import torch as th
+from torch.utils import dlpack
 
 from .._ffi.base import _LIB, check_call, c_array
 from .._ffi.runtime_ctypes import TVMType, TVMContext, TVMArray
@@ -31,12 +32,6 @@ max = th.max
 def astype(a, ty):
     return a.type(ty)
 
-def asnumpy(a):
-    return a.cpu().numpy()
-
-def from_numpy(np_data):
-    return th.from_numpy(np_data)
-
 def pack(tensors):
     return th.cat(tensors)
 
@@ -48,6 +43,9 @@ def shape(x):
 
 def dtype(x):
     return x.dtype
+
+def asnumpy(a):
+    return a.cpu().numpy()
 
 unique = th.unique
 
@@ -110,8 +108,24 @@ def _typestr(arr_dtype):
     else:
         raise RuntimeError('Unsupported data type:', arr_dtype)
 
-def astvmarray(arr_data):
-    """Return a TVMArray representation of the underlying data."""
+def zerocopy_to_dlpack(arr):
+    """Return a dlpack compatible array using zero copy."""
+    return dlpack.to_dlpack(arr)
+
+def zerocopy_from_dlpack(dlpack_arr):
+    """Return a tensor using zero copy."""
+    return dlpack.from_dlpack(dlpack_arr)
+
+def zerocopy_to_numpy(arr):
+    """Return a numpy array that shares the data."""
+    # TODO(minjie): zero copy
+    return arr.numpy()
+
+def zerocopy_from_numpy(np_data):
+    """Return a tensor that shares the numpy data."""
+    return th.from_numpy(np_data)
+
+    '''
     data = arr_data
     assert data.is_contiguous()
     arr = TVMArray()
@@ -123,3 +137,4 @@ def astvmarray(arr_data):
     arr.ndim = len(shape)
     arr.ctx = get_context(data)
     return arr
+    '''
