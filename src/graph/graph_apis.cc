@@ -281,6 +281,14 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphVertexSubgraph")
     *rv = ConvertSubgraphToPackedFunc(gptr->VertexSubgraph(vids));
   });
 
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeSubgraph")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph *gptr = static_cast<Graph*>(ghandle);
+    const IdArray eids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    *rv = ConvertSubgraphToPackedFunc(gptr->EdgeSubgraph(eids));
+  });
+
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     void* list = args[0];

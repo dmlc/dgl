@@ -275,10 +275,10 @@ class Graph {
    *
    * The result subgraph is read-only.
    *
-   * \param vids The edges in the subgraph.
+   * \param eids The edges in the subgraph.
    * \return the induced edge subgraph
    */
-  Subgraph EdgeSubgraph(IdArray src, IdArray dst) const;
+  Subgraph EdgeSubgraph(IdArray eids) const;
 
   /*!
    * \brief Return a new graph with all the edges reversed.

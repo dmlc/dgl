@@ -408,6 +408,27 @@ class GraphIndex(object):
         induced_edges = utils.toindex(rst(2))
         return gi, induced_edges
 
+    def edge_subgraph(self, e):
+        """Return the induced edge subgraph.
+
+        Parameters
+        ----------
+        e : utils.Index
+            The edges.
+
+        Returns
+        -------
+        GraphIndex
+            The subgraph index.
+        utils.Index
+            The induced node ids. This is also a map from new node id to parent node id.
+        """
+        e_array = e.todgltensor()
+        rst = _CAPI_DGLGraphEdgeSubgraph(self._handle, e_array)
+        gi = GraphIndex(rst(0))
+        induced_nodes = utils.toindex(rst(1))
+        return gi, induced_nodes
+
     def adjacency_matrix(self):
         """Return the adjacency matrix representation of this graph.
 

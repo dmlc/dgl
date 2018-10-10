@@ -423,9 +423,37 @@ Subgraph Graph::VertexSubgraph(IdArray vids) const {
   return rst;
 }
 
-Subgraph Graph::EdgeSubgraph(IdArray src, IdArray dst) const {
-  LOG(FATAL) << "not implemented";
-  return Subgraph();
+Subgraph Graph::EdgeSubgraph(IdArray eids) const {
+  CHECK(IsValidIdArray(eids)) << "Invalid vertex id array.";
+
+  const auto len = eids->shape[0];
+  std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
+  std::vector<dgl_id_t> nodes;
+  const int64_t* eid_data = static_cast<int64_t*>(eids->data);
+
+  for (int64_t i = 0; i < len; ++i) {
+    dgl_id_t src_id = all_edges_src_[eid_data[i]];
+    dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
+    if (oldv2newv.insert(std::make_pair(src_id, oldv2newv.size())).second)
+      nodes.push_back(src_id);
+    if (oldv2newv.insert(std::make_pair(dst_id, oldv2newv.size())).second)
+      nodes.push_back(dst_id);
+  }
+
+  Subgraph rst;
+  rst.induced_edges = eids;
+  rst.graph.AddVertices(nodes.size());
+
+  for (int64_t i = 0; i < len; ++i) {
+    dgl_id_t src_id = all_edges_src_[eid_data[i]];
+    dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
+    rst.graph.AddEdge(oldv2newv[src_id], oldv2newv[dst_id]);
+  }
+
+  rst.induced_vertices = IdArray::Empty({static_cast<int64_t>(nodes.size())}, eids->dtype, eids->ctx);
+  std::copy(nodes.begin(), nodes.end(), static_cast<int64_t*>(rst.induced_vertices->data));
+
+  return rst;
 }
 
 Graph Graph::Reverse() const {
