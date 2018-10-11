@@ -33,18 +33,16 @@ PackedFunc ConvertEdgeArrayToPackedFunc(const Graph::EdgeArray& ea) {
 }
 
 // Convert Subgraph structure to PackedFunc.
-PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
+PackedFunc ConvertSubgraphToPackedFunc(Subgraph *sg) {
   auto body = [sg] (TVMArgs args, TVMRetValue* rv) {
       int which = args[0];
       if (which == 0) {
-        Graph* gptr = new Graph();
-        *gptr = std::move(sg.graph);
-        GraphHandle ghandle = gptr;
+        GraphHandle ghandle = sg;
         *rv = ghandle;
       } else if (which == 1) {
-        *rv = std::move(sg.induced_vertices);
+        *rv = std::move(sg->induced_vertices);
       } else if (which == 2) {
-        *rv = std::move(sg.induced_edges);
+        *rv = std::move(sg->induced_edges);
       } else {
         LOG(FATAL) << "invalid choice";
       }
@@ -272,6 +270,14 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphVertexSubgraph")
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     *rv = ConvertSubgraphToPackedFunc(gptr->VertexSubgraph(vids));
+  });
+
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphSubgraphMapVFromParent")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Subgraph* gptr = static_cast<Subgraph*>(ghandle);
+    const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    *rv = gptr->MapVFromParent(vids);
   });
 
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")

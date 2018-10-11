@@ -248,7 +248,7 @@ class Graph {
    * \param vids The vertices in the subgraph.
    * \return the induced subgraph
    */
-  Subgraph VertexSubgraph(IdArray vids) const;
+  Subgraph *VertexSubgraph(IdArray vids) const;
 
   /*!
    * \brief Construct the induced edge subgraph of the given edges.
@@ -305,9 +305,7 @@ class Graph {
 };
 
 /*! \brief Subgraph data structure */
-struct Subgraph {
-  /*! \brief The graph. */
-  Graph graph;
+struct Subgraph: public Graph {
   /*! 
    * \brief The induced vertex ids.
    * \note This is also a map from the new vertex id to the vertex id in the parent graph.
@@ -318,6 +316,13 @@ struct Subgraph {
    * \note This is also a map from the new edge id to the edge id in the parent graph.
    */
   IdArray induced_edges;
+
+  /*!
+   * \brief A map from the old parent vertex Id to the new subgraph vertex Id.
+   */
+  std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
+
+  IdArray MapVFromParent(IdArray parent) const;
 };
 
 }  // namespace dgl

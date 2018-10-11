@@ -533,4 +533,7 @@ def create_graph_index(graph_data=None):
         gi.from_networkx(graph_data)
     return gi
 
+def _map_to_subgraph_nid(gi, v):
+    return _CAPI_DGLGraphSubgraphMapVFromParent(gi._handle, v)
+
 _init_api("dgl.graph_index")
