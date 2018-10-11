@@ -167,6 +167,8 @@ class Graph {
    * \note Edges are associated with an integer id start from zero.
    *       The id is assigned when the edge is being added to the graph.
    *       If duplicate pairs exist, the returned edge IDs will also duplicate.
+   *       The order of returned edge IDs will follow the order of src-dst pairs
+   *       first, and ties are broken by the order of edge ID.
    * \return EdgeArray containing all edges between all pairs.
    */
   EdgeArray EdgeIds(IdArray src, IdArray dst) const;

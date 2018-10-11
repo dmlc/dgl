@@ -17,31 +17,27 @@ def test_edge_id():
     gi.add_edge(0, 1)
     eid = gi.edge_id(0, 1).tolist()
     assert len(eid) == 2
-    assert 1 in eid
-    assert 0 in eid
+    assert eid[0] == 0
+    assert eid[1] == 1
     assert gi.is_multigraph()
 
     gi.add_edges(toindex([0, 1, 1, 2]), toindex([2, 2, 2, 3]))
-    true_eids = {
-            (0, 1): [0, 1],
-            (0, 2): [2],
-            (1, 2): [3, 4],
-            (2, 3): [5],
-    }
-
-    src, dst, eid = gi.edge_ids(toindex([0, 0, 1, 2]), toindex([1, 2, 2, 3]))
-    for s, d, e in zip(src, dst, eid):
-        assert e in true_eids[s, d]
+    src, dst, eid = gi.edge_ids(toindex([0, 0, 2, 1]), toindex([2, 1, 3, 2]))
+    eid_answer = [2, 0, 1, 5, 3, 4]
+    assert len(eid) == 6
+    assert all(e == ea for e, ea in zip(eid, eid_answer))
 
     # source broadcasting
     src, dst, eid = gi.edge_ids(toindex([0]), toindex([1, 2]))
-    for s, d, e in zip(src, dst, eid):
-        assert e in true_eids[s, d]
+    eid_answer = [0, 1, 2]
+    assert len(eid) == 3
+    assert all(e == ea for e, ea in zip(eid, eid_answer))
 
     # destination broadcasting
-    src, dst, eid = gi.edge_ids(toindex([0, 1]), toindex([2]))
-    for s, d, e in zip(src, dst, eid):
-        assert e in true_eids[s, d]
+    src, dst, eid = gi.edge_ids(toindex([1, 0]), toindex([2]))
+    eid_answer = [3, 4, 2]
+    assert len(eid) == 3
+    assert all(e == ea for e, ea in zip(eid, eid_answer))
 
     gi.clear()
     assert not gi.is_multigraph()
