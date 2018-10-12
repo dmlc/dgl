@@ -1026,7 +1026,6 @@ class DGLGraph(object):
             # no edges to be triggered
             assert len(v) == 0
             return
-        unique_v = utils.toindex(F.unique(v.tousertensor()))
 
         if message_func == "default":
             message_func = self._message_func
@@ -1040,9 +1039,50 @@ class DGLGraph(object):
                 message_func=message_func, reduce_func=reduce_func)
         if executor:
             executor.run()
+            unique_v = utils.toindex(F.unique(v.tousertensor()))
         else:
-            self.send(u, v, message_func)
-            self.recv(unique_v, reduce_func, None)
+            # message func
+            u, v = utils.edge_broadcasting(u, v)
+            src_reprs = self.get_n_repr(u)
+            edge_reprs = self.get_e_repr(u, v)
+            msgs = message_func(src_reprs, edge_reprs)
+            msg_frame = FrameRef()
+            if utils.is_dict_like(msgs):
+                msg_frame.append(msgs)
+            else:
+                msg_frame.append({__MSG__: msgs})
+
+            # recv with degree bucketing
+            deg_buckets = scheduler.light_degree_bucketing(u, v)
+            reordered_v = []
+            new_reprs = []
+            for deg, vv, msg_ids in deg_buckets:
+                dst_reprs = self.get_n_repr(vv)
+                in_msgs = msg_frame.select_rows(msg_ids)
+                def _reshape_fn(msg):
+                    msg_shape = F.shape(msg)
+                    new_shape = (len(vv), deg) + msg_shape[1:]
+                    return F.reshape(msg, new_shape)
+                if len(in_msgs) == 1 and __MSG__ in in_msgs:
+                    reshaped_in_msgs = _reshape_fn(in_msgs[__MSG__])
+                else:
+                    reshaped_in_msgs = utils.LazyDict(
+                            lambda key: _reshape_fn(in_msgs[key]), msg_frame.schemes)
+                reordered_v.append(vv.tousertensor())
+                new_reprs.append(reduce_func(dst_reprs, reshaped_in_msgs))
+
+            # Pack all reducer results together
+            unique_v = F.pack(reordered_v)
+            if utils.is_dict_like(new_reprs[0]):
+                keys = new_reprs[0].keys()
+                new_reprs = {key : F.pack([repr[key] for repr in new_reprs])
+                             for key in keys}
+            else:
+                new_reprs = {__REPR__ : F.pack(new_reprs)}
+
+            # Use setter to do reorder
+            self.set_n_repr(new_reprs, unique_v)
+
         self.apply_nodes(unique_v, apply_node_func)
 
     def pull(self,

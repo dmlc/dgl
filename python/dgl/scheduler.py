@@ -8,6 +8,7 @@ from . import backend as F
 from .function import message as fmsg
 from .function import reducer as fred
 from . import utils
+from collections import defaultdict as ddict
 
 __all__ = ["degree_bucketing", "get_executor"]
 
@@ -38,6 +39,24 @@ def degree_bucketing(graph, v):
         v_bkt.append(utils.Index(v_np[idx]))
     #print('degree-bucketing:', unique_degrees, [len(b) for b in v_bkt])
     return unique_degrees, v_bkt
+
+
+def light_degree_bucketing(u, v):
+    in_edges = ddict(list)
+    for idx, (_, vv) in enumerate(zip(u, v)):
+        in_edges[vv].append(idx)
+
+    degree = ddict(list)
+    for vv in in_edges:
+        degree[len(in_edges[vv])].append(vv)
+
+    buckets = []
+    for deg in degree:
+        buckets.append((deg,
+                        utils.Index(degree[deg]),
+                        utils.Index(sum([in_edges[vv] for vv in degree[deg]], []))))
+
+    return buckets
 
 
 class Executor(object):
