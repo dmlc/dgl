@@ -235,6 +235,30 @@ Graph::EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
   return EdgeArray{rst_src, rst_dst, rst_eid};
 }
 
+Graph::EdgeArray Graph::FindEdges(IdArray eids) const {
+  int64_t len = eids->shape[0];
+
+  IdArray rst_src = IdArray::Empty({len}, eids->dtype, eids->ctx);
+  IdArray rst_dst = IdArray::Empty({len}, eids->dtype, eids->ctx);
+  IdArray rst_eid = IdArray::Empty({len}, eids->dtype, eids->ctx);
+  int64_t* eid_data = static_cast<int64_t*>(eids->data);
+  int64_t* rst_src_data = static_cast<int64_t*>(rst_src->data);
+  int64_t* rst_dst_data = static_cast<int64_t*>(rst_dst->data);
+  int64_t* rst_eid_data = static_cast<int64_t*>(rst_eid->data);
+
+  for (uint64_t i = 0; i < (uint64_t)len; ++i) {
+    dgl_id_t eid = eid_data[i];
+    if (eid >= num_edges_)
+      LOG(FATAL) << "invalid edge id:" << eid;
+
+    rst_src_data[i] = all_edges_src_[eid];
+    rst_dst_data[i] = all_edges_dst_[eid];
+    rst_eid_data[i] = eid;
+  }
+
+  return EdgeArray{rst_src, rst_dst, rst_eid};
+}
+
 // O(E)
 Graph::EdgeArray Graph::InEdges(dgl_id_t vid) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;

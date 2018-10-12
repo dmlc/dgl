@@ -248,6 +248,32 @@ class GraphIndex(object):
 
         return src, dst, eid
 
+    def find_edges(self, eid):
+        """Return a triplet of arrays that contains the edge IDs.
+
+        Parameters
+        ----------
+        eid : utils.Index
+            The edge ids.
+
+        Returns
+        -------
+        utils.Index
+            The src nodes.
+        utils.Index
+            The dst nodes.
+        utils.Index
+            The edge ids.
+        """
+        eid_array = eid.todgltensor()
+        edge_array = _CAPI_DGLGraphFindEdges(self._handle, eid_array)
+
+        src = utils.toindex(edge_array(0))
+        dst = utils.toindex(edge_array(1))
+        eid = utils.toindex(edge_array(2))
+
+        return src, dst, eid
+
     def in_edges(self, v):
         """Return the in edges of the node(s).
 

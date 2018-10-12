@@ -27,6 +27,13 @@ def test_edge_id():
     assert len(eid) == 6
     assert all(e == ea for e, ea in zip(eid, eid_answer))
 
+    # find edges
+    src, dst, eid = gi.find_edges(toindex([1, 3, 5]))
+    assert len(src) == len(dst) == len(eid) == 3
+    assert src[0] == 0 and src[1] == 1 and src[2] == 2
+    assert dst[0] == 1 and dst[1] == 2 and dst[2] == 3
+    assert eid[0] == 1 and eid[1] == 3 and eid[2] == 5
+
     # source broadcasting
     src, dst, eid = gi.edge_ids(toindex([0]), toindex([1, 2]))
     eid_answer = [0, 1, 2]

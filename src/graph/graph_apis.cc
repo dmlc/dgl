@@ -201,6 +201,14 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeIds")
     *rv = ConvertEdgeArrayToPackedFunc(gptr->EdgeIds(src, dst));
   });
 
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphFindEdges")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const IdArray eids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    *rv = ConvertEdgeArrayToPackedFunc(gptr->FindEdges(eids));
+  });
+
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphInEdges_1")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     GraphHandle ghandle = args[0];

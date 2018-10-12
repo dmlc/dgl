@@ -174,6 +174,13 @@ class Graph {
   EdgeArray EdgeIds(IdArray src, IdArray dst) const;
 
   /*!
+   * \brief Find the edge IDs and return their source and target node IDs.
+   * \param eids The edge ID array.
+   * \return EdgeArray containing all edges with id in eid.  The order is preserved.
+   */
+  EdgeArray FindEdges(IdArray eids) const;
+
+  /*!
    * \brief Get the in edges of the vertex.
    * \note The returned dst id array is filled with vid.
    * \param vid The vertex id.
