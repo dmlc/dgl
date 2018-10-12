@@ -22,7 +22,6 @@ int64 = 'int64'
 
 # Operators
 tensor = mx.nd.array
-#sparse_tensor = th.sparse.FloatTensor
 sum = F.sum
 
 def max(x):
@@ -59,8 +58,7 @@ def unique(x):
 def gather_row(data, row_index):
     return data[row_index,]
 
-#def scatter_row(data, row_index, value):
-#    return data.index_copy(0, row_index, value)
+scatter_row = mx.nd.contrib.index_copy
 
 def broadcast_to(x, to_array):
     return x + F.zeros_like(to_array)
