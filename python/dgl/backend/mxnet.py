@@ -114,6 +114,23 @@ def get_context(x):
 def _typestr(arr_dtype):
     return arr_dtype
 
+def zerocopy_to_dlpack(arr):
+    """Return a dlpack compatible array using zero copy."""
+    return dlpack.to_dlpack(arr)
+
+def zerocopy_from_dlpack(dlpack_arr):
+    """Return a tensor using zero copy."""
+    return dlpack.from_dlpack(dlpack_arr)
+
+def zerocopy_to_numpy(arr):
+    """Return a numpy array that shares the data."""
+    return arr.asnumpy()
+
+def zerocopy_from_numpy(np_data):
+    """Return a tensor that shares the numpy data."""
+    return mx.nd.array(np_data)
+
+'''
 def astvmarray(arr_data):
     """Return a TVMArray representation of the underlying data."""
     data = arr_data
@@ -127,3 +144,4 @@ def astvmarray(arr_data):
     arr.ndim = len(shape)
     arr.ctx = get_context(data)
     return arr
+'''
