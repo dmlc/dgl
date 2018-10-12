@@ -423,16 +423,13 @@ class GraphIndex(object):
 
         Returns
         -------
-        GraphIndex
+        SubgraphIndex
             The subgraph index.
-        utils.Index
-            The induced edge ids. This is also a map from new edge id to parent edge id.
         """
         v_array = v.todgltensor()
         rst = _CAPI_DGLGraphVertexSubgraph(self._handle, v_array)
-        gi = GraphIndex(rst(0))
         induced_edges = utils.toindex(rst(2))
-        return gi, induced_edges
+        return SubgraphIndex(rst(0), self, v, induced_edges)
 
     def edge_subgraph(self, e):
         """Return the induced edge subgraph.
@@ -444,16 +441,14 @@ class GraphIndex(object):
 
         Returns
         -------
-        GraphIndex
+        SubgraphIndex
             The subgraph index.
-        utils.Index
-            The induced node ids. This is also a map from new node id to parent node id.
         """
         e_array = e.todgltensor()
         rst = _CAPI_DGLGraphEdgeSubgraph(self._handle, e_array)
         gi = GraphIndex(rst(0))
         induced_nodes = utils.toindex(rst(1))
-        return gi, induced_nodes
+        return SubgraphIndex(rst(0), self, induced_nodes, e)
 
     def adjacency_matrix(self):
         """Return the adjacency matrix representation of this graph.
@@ -533,6 +528,32 @@ class GraphIndex(object):
         src = utils.toindex(src)
         dst = utils.toindex(dst)
         self.add_edges(src, dst)
+
+
+class SubgraphIndex(GraphIndex):
+    def __init__(self, handle, parent, induced_nodes, induced_edges):
+        super().__init__(handle)
+
+        self._parent = parent
+        self._induced_nodes = induced_nodes
+        self._induced_edges = induced_edges
+
+    def add_nodes(self, num):
+        raise RuntimeError('Readonly graph. Mutation is not allowed.')
+
+    def add_edge(self, u, v):
+        raise RuntimeError('Readonly graph. Mutation is not allowed.')
+
+    def add_edges(self, u, v):
+        raise RuntimeError('Readonly graph. Mutation is not allowed.')
+
+    @property
+    def induced_edges(self):
+        return self._induced_edges
+
+    @property
+    def induced_nodes(self):
+        return self._induced_nodes
 
 def disjoint_union(graphs):
     """Return a disjoint union of the input graphs.
