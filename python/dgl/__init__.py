@@ -2,6 +2,7 @@ from . import backend
 from . import data
 from . import function
 from . import generator
+from . import nn
 
 from ._ffi.runtime_ctypes import TypeCode
 from ._ffi.function import register_func, get_global_func, list_global_func_names, extract_ext_funcs
