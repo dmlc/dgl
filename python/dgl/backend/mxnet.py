@@ -129,19 +129,3 @@ def zerocopy_to_numpy(arr):
 def zerocopy_from_numpy(np_data):
     """Return a tensor that shares the numpy data."""
     return mx.nd.array(np_data, dtype=np_data.dtype)
-
-'''
-def astvmarray(arr_data):
-    """Return a TVMArray representation of the underlying data."""
-    data = arr_data
-    #assert data.is_contiguous()
-    arr = TVMArray()
-    shape = c_array(tvm_shape_index_t, tuple(data.shape))
-    arr.data = ctypes.cast(data.data_ptr(), ctypes.c_void_p)
-    arr.shape = shape
-    arr.strides = None
-    arr.dtype = TVMType(_typestr(data.dtype))
-    arr.ndim = len(shape)
-    arr.ctx = get_context(data)
-    return arr
-'''
