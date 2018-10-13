@@ -3,7 +3,6 @@
 from __future__ import absolute_import
 
 import networkx as nx
-import scipy as sp
 
 import dgl
 from .base import ALL, is_all, __MSG__, __REPR__
@@ -472,7 +471,8 @@ class DGLGraph(object):
 
         Parameters
         ----------
-        a :
+        a : scipy sparse matrix
+            The graph's adjacency matrix
         """
         self.clear()
         self._graph.from_scipy_sparse_matrix(a)
@@ -1233,44 +1233,55 @@ class DGLGraph(object):
                 self._edge_frame.num_rows,
                 reduce_func)
 
-    def adjacency_matrix(self):
+    def adjacency_matrix(self, ctx=None):
         """Return the adjacency matrix representation of this graph.
 
+        Parameters
+        ----------
+        ctx : optional
+            The context of returned adjacency matrix.
+
         Returns
         -------
-        utils.CtxCachedObject
-            An object that returns tensor given context.
+        sparse_tensor
+            The adjacency matrix.
         """
-        return self._graph.adjacency_matrix()
+        return self._graph.adjacency_matrix().get(ctx)
 
-    def incidence_matrix(self, oriented=False, sorted=False):
+    def incidence_matrix(self, oriented=False, ctx=None):
         """Return the incidence matrix representation of this graph.
 
+        Parameters
+        ----------
+        oriented : bool, optional
+            Whether the returned incidence matrix is oriented.
+
+        ctx : optional
+            The context of returned incidence matrix.
+
         Returns
         -------
-        utils.CtxCachedObject
-            An object that returns tensor given context.
+        sparse_tensor
+            The incidence matrix.
         """
-        return self._graph.incidence_matrix(oriented, sorted)
+        return self._graph.incidence_matrix(oriented).get(ctx)
 
-    def line_graph(self, backtracking=True, sorted=False):
+    def line_graph(self, backtracking=True, shared=False):
         """Return the line graph of this graph.
+
+        Parameters
+        ----------
+        backtracking : bool, optional
+            Whether the returned line graph is backtracking.
+
+        shared : bool, optional
+            Whether the returned line graph shares representations with `self`.
 
         Returns
         -------
         DGLGraph
             The line graph of this graph.
         """
-        return DGLGraph(self._graph.line_graph(backtracking, sorted))
-
-def _get_repr(attr_dict):
-    if len(attr_dict) == 1 and __REPR__ in attr_dict:
-        return attr_dict[__REPR__]
-    else:
-        return attr_dict
-
-def _set_repr(attr_dict, attr):
-    if utils.is_dict_like(attr):
-        attr_dict.update(attr)
-    else:
-        attr_dict[__REPR__] = attr
+        graph_data = self._graph.line_graph(backtracking)
+        node_frame = self._edge_frame if shared else None
+        return DGLGraph(graph_data, node_frame)

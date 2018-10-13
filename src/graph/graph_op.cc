@@ -1,7 +1,6 @@
 // Graph operation implementation
 #include <dgl/graph_op.h>
 #include <algorithm>
-#include <stdio.h>
 
 namespace dgl {
 

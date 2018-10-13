@@ -18,10 +18,19 @@ def sbm(n_blocks, block_size, p, q, rng=None):
 
     Parameters
     ----------
-    n_blocks : number of blocks
-    block_size : block size
-    p : probability for intra-community edge
-    q : probability for inter-community edge
+    n_blocks : int
+        Number of blocks.
+    block_size : int
+        Block size.
+    p : float
+        Probability for intra-community edge.
+    q : float
+        Probability for inter-community edge.
+
+    Returns
+    -------
+    scipy sparse matrix
+        The adjacency matrix of generated graph.
     """
     n = n_blocks * block_size
     p /= n
@@ -45,17 +54,28 @@ def sbm(n_blocks, block_size, p, q, rng=None):
     return adj
 
 class SBMMixture(Dataset):
+    """ Symmetric Stochastic Block Model Mixture
+    Please refer to Appendix C of "Supervised Community Detection with Hierarchical Graph Neural Networks" (https://arxiv.org/abs/1705.08415) for details.
+
+    Parameters
+    ----------
+    n_graphs : int
+        Number of graphs.
+    n_nodes : int
+        Number of nodes.
+    n_communities : int
+        Number of communities.
+    k : int, optional
+        Multiplier.
+    avg_deg : int, optional
+        Average degree.
+    p : callable or str, optional
+        Random density generator.
+    rng : numpy.random.RandomState, optional
+        Random number generator.
+    """
     def __init__(self, n_graphs, n_nodes, n_communities,
                  k=2, avg_deg=3, p='Appendix C', rng=None):
-        """ Symmetric Stochastic Block Model Mixture
-        n_graphs : number of graphs
-        n_nodes : number of nodes
-        n_communities : number of communities
-        k : multiplier, optional
-        avg_deg : average degree, optional
-        p : random density generator, optional
-        rng : random number generator, optional
-        """
         super(SBMMixture, self).__init__()
         self._n_nodes = n_nodes
         assert n_nodes % n_communities == 0

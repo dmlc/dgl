@@ -408,26 +408,22 @@ class GraphIndex(object):
             self._cache['adj'] = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
         return self._cache['adj']
 
-    def incidence_matrix(self, oriented=False, sorted=False):
+    def incidence_matrix(self, oriented=False):
         """Return the incidence matrix representation of this graph.
         
         Parameters
         ----------
         oriented : bool, optional (default=False)
           Whether the returned incidence matrix is oriented.
-        sorted : bool, optional (default=False)
-          If true, nodes in L(G) are sorted as pairs.
-          If False, nodes in L(G) are ordered by their edge id's in G.
 
         Returns
         -------
         utils.CtxCachedObject
             An object that returns tensor given context.
         """
-        key = ('oriented ' if oriented else '') + \
-                ('sorted ' if sorted else '') + 'incidence matrix'
+        key = ('oriented ' if oriented else '') + 'incidence matrix'
         if not key in self._cache:
-            src, dst, _ = self.edges(sorted=sorted)
+            src, dst, _ = self.edges(sorted=False)
             src = src.tousertensor()
             dst = dst.tousertensor()
             m = self.number_of_edges()
@@ -519,7 +515,7 @@ class GraphIndex(object):
         dst = utils.toindex(adj_coo.col)
         self.add_edges(src, dst)
 
-    def line_graph(self, backtracking=True, sorted=False):
+    def line_graph(self, backtracking=True):
         """Return the line graph of this graph.
 
         Parameters
@@ -527,9 +523,6 @@ class GraphIndex(object):
         backtracking : bool, optional (default=False)
           Whether (i, j) ~ (j, i) in L(G).
           (i, j) ~ (j, i) is the behavior of networkx.line_graph.
-        sorted : bool, optional (default=False)
-          If true, nodes in L(G) are sorted as pairs.
-          If False, nodes in L(G) are ordered by their edge id's in G.
 
         Returns
         -------
