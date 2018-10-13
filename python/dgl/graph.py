@@ -1053,12 +1053,12 @@ class DGLGraph(object):
                 msg_frame.append({__MSG__: msgs})
 
             # recv with degree bucketing
-            deg_buckets = scheduler.light_degree_bucketing(u, v)
-            reordered_v = []
+            unique_v, degs, dsts, msg_ids = scheduler.light_degree_bucketing(v)
+
             new_reprs = []
-            for deg, vv, msg_ids in deg_buckets:
+            for deg, vv, msg_id in zip(degs, dsts, msg_ids):
                 dst_reprs = self.get_n_repr(vv)
-                in_msgs = msg_frame.select_rows(msg_ids)
+                in_msgs = msg_frame.select_rows(utils.toindex(msg_id))
                 def _reshape_fn(msg):
                     msg_shape = F.shape(msg)
                     new_shape = (len(vv), deg) + msg_shape[1:]
@@ -1068,11 +1068,9 @@ class DGLGraph(object):
                 else:
                     reshaped_in_msgs = utils.LazyDict(
                             lambda key: _reshape_fn(in_msgs[key]), msg_frame.schemes)
-                reordered_v.append(vv.tousertensor())
                 new_reprs.append(reduce_func(dst_reprs, reshaped_in_msgs))
 
             # Pack all reducer results together
-            unique_v = F.pack(reordered_v)
             if utils.is_dict_like(new_reprs[0]):
                 keys = new_reprs[0].keys()
                 new_reprs = {key : F.pack([repr[key] for repr in new_reprs])

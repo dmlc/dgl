@@ -10,6 +10,8 @@ from .function import reducer as fred
 from . import utils
 from collections import defaultdict as ddict
 
+from ._ffi.function import _init_api
+
 __all__ = ["degree_bucketing", "get_executor"]
 
 def degree_bucketing(graph, v):
@@ -40,23 +42,26 @@ def degree_bucketing(graph, v):
     #print('degree-bucketing:', unique_degrees, [len(b) for b in v_bkt])
     return unique_degrees, v_bkt
 
+def light_degree_bucketing(v):
+    buckets = _CAPI_DGLDegreeBucket(v.todgltensor())
 
-def light_degree_bucketing(u, v):
-    in_edges = ddict(list)
-    for idx, (_, vv) in enumerate(zip(u, v)):
-        in_edges[vv].append(idx)
+    # get back results
+    degs = utils.toindex(buckets(0))
+    v = utils.toindex(buckets(1))
+    v_section = utils.toindex(buckets(2))
+    msg_ids = utils.toindex(buckets(3))
+    msg_section = utils.toindex(buckets(4))
 
-    degree = ddict(list)
-    for vv in in_edges:
-        degree[len(in_edges[vv])].append(vv)
+    # FIXME: convert directly from dgl ndarary to python list
+    # split buckets
+    unique_v = v.tousertensor()
+    v_section = v_section.tolist().tolist() # pytorch split only accepts list, tuple
+    msg_ids = msg_ids.tousertensor()
+    msg_section = msg_section.tolist().tolist()
+    dsts = F.unpack(unique_v, v_section)
+    msg_ids = F.unpack(msg_ids, msg_section)
 
-    buckets = []
-    for deg in degree:
-        buckets.append((deg,
-                        utils.Index(degree[deg]),
-                        utils.Index(sum([in_edges[vv] for vv in degree[deg]], []))))
-
-    return buckets
+    return unique_v, degs, dsts, msg_ids
 
 
 class Executor(object):
@@ -361,3 +366,5 @@ def get_executor(call_type, graph, **kwargs):
         return _create_send_and_recv_exec(graph, **kwargs)
     else:
         return None
+
+_init_api("dgl.scheduler")
