@@ -124,14 +124,14 @@ class GAT(gluon.Block):
                 # prepare
                 self.g.set_n_repr(self.prp[i](last))
                 # message passing
-                self.g.update_all(gat_message, self.red[i], self.fnl[i], batchable=True)
+                self.g.update_all(gat_message, self.red[i], self.fnl[i])
             # merge all the heads
             last = mx.nd.concat(
                     *[self.g.pop_n_repr('head%d' % hid) for hid in range(self.num_heads)],
                     dim=1)
         # output projection
         self.g.set_n_repr(self.prp[-1](last))
-        self.g.update_all(gat_message, self.red[-1], self.fnl[-1], batchable=True)
+        self.g.update_all(gat_message, self.red[-1], self.fnl[-1])
         return self.g.pop_n_repr('head0')
 
 def main(args):
