@@ -116,11 +116,11 @@ def _typestr(arr_dtype):
 
 def zerocopy_to_dlpack(arr):
     """Return a dlpack compatible array using zero copy."""
-    return dlpack.to_dlpack(arr)
+    return arr.to_dlpack_for_read()
 
 def zerocopy_from_dlpack(dlpack_arr):
     """Return a tensor using zero copy."""
-    return dlpack.from_dlpack(dlpack_arr)
+    return mx.nd.from_dlpack(dlpack_arr)
 
 def zerocopy_to_numpy(arr):
     """Return a numpy array that shares the data."""
@@ -128,7 +128,7 @@ def zerocopy_to_numpy(arr):
 
 def zerocopy_from_numpy(np_data):
     """Return a tensor that shares the numpy data."""
-    return mx.nd.array(np_data)
+    return mx.nd.array(np_data, dtype=np_data.dtype)
 
 '''
 def astvmarray(arr_data):
