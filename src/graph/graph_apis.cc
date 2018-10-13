@@ -1,13 +1,6 @@
-#include <dgl/runtime/packed_func.h>
-#include <dgl/runtime/registry.h>
+#include <dgl/c_api_common.h>
 #include <dgl/graph.h>
 #include <dgl/graph_op.h>
-
-using tvm::runtime::TVMArgs;
-using tvm::runtime::TVMArgValue;
-using tvm::runtime::TVMRetValue;
-using tvm::runtime::PackedFunc;
-using tvm::runtime::NDArray;
 
 namespace dgl {
 
@@ -50,16 +43,6 @@ PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
       }
     };
   return PackedFunc(body);
-}
-
-// Convert the given DLTensor to a temporary DLManagedTensor that does not own memory.
-DLManagedTensor* CreateTmpDLManagedTensor(const TVMArgValue& arg) {
-  const DLTensor* dl_tensor = arg;
-  DLManagedTensor* ret = new DLManagedTensor();
-  ret->deleter = [] (DLManagedTensor* self) { delete self; };
-  ret->manager_ctx = nullptr;
-  ret->dl_tensor = *dl_tensor;
-  return ret;
 }
 
 }  // namespace
