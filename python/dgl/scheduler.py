@@ -48,16 +48,16 @@ def light_degree_bucketing(v):
     # get back results
     degs = utils.toindex(buckets(0))
     v = utils.toindex(buckets(1))
-    v_section = utils.toindex(buckets(2))
+    # FIXME: convert directly from ndarary to python list?
+    v_section = buckets(2).asnumpy().tolist()
     msg_ids = utils.toindex(buckets(3))
-    msg_section = utils.toindex(buckets(4))
+    msg_section = buckets(4).asnumpy().tolist()
 
-    # FIXME: convert directly from dgl ndarary to python list
     # split buckets
     unique_v = v.tousertensor()
-    v_section = v_section.tolist().tolist() # pytorch split only accepts list, tuple
+    #v_section = v_section.tolist().tolist() # pytorch split only accepts list, tuple
     msg_ids = msg_ids.tousertensor()
-    msg_section = msg_section.tolist().tolist()
+    #msg_section = msg_section.tolist().tolist()
     dsts = F.unpack(unique_v, v_section)
     msg_ids = F.unpack(msg_ids, msg_section)
 
