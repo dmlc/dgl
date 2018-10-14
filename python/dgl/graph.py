@@ -1351,6 +1351,23 @@ class DGLGraph(object):
         sgi = self._graph.node_subgraph(induced_nodes)
         return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
 
+    def edge_subgraph(self, edges):
+        """Generate the subgraph among the given edges.
+
+        Parameters
+        ----------
+        edges : list, or iterable
+            A container of the edges to construct subgraph.
+
+        Returns
+        -------
+        G : DGLSubGraph
+            The subgraph.
+        """
+        induced_edges = utils.toindex(edges)
+        sgi = self._graph.edge_subgraph(induced_edges)
+        return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
+
     def merge(self, subgraphs, reduce_func='sum'):
         """Merge subgraph features back to this parent graph.
 
