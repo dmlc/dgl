@@ -348,4 +348,15 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointPartitionBySizes")
     }
     *rv = ptr_array;
   });
+
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLineGraph")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    bool backtracking = args[1];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    Graph* lgptr = new Graph();
+    *lgptr = GraphOp::LineGraph(gptr, backtracking);
+    GraphHandle lghandle = lgptr;
+    *rv = lghandle;
+  });
 }  // namespace dgl

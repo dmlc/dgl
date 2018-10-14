@@ -484,6 +484,18 @@ class DGLGraph(object):
             for attr in edge_attrs:
                 self._edge_frame[attr] = _batcher(attr_dict[attr])
 
+    def from_scipy_sparse_matrix(self, a):
+        """ Convert from scipy sparse matrix.
+
+        Parameters
+        ----------
+        a : scipy sparse matrix
+            The graph's adjacency matrix
+        """
+        self.clear()
+        self._graph.from_scipy_sparse_matrix(a)
+        self._msg_graph.add_nodes(self._graph.number_of_nodes())
+
     def node_attr_schemes(self):
         """Return the node attribute schemes.
 
@@ -1249,3 +1261,56 @@ class DGLGraph(object):
                 [sg._parent_eid for sg in to_merge],
                 self._edge_frame.num_rows,
                 reduce_func)
+
+    def adjacency_matrix(self, ctx=None):
+        """Return the adjacency matrix representation of this graph.
+
+        Parameters
+        ----------
+        ctx : optional
+            The context of returned adjacency matrix.
+
+        Returns
+        -------
+        sparse_tensor
+            The adjacency matrix.
+        """
+        return self._graph.adjacency_matrix().get(ctx)
+
+    def incidence_matrix(self, oriented=False, ctx=None):
+        """Return the incidence matrix representation of this graph.
+
+        Parameters
+        ----------
+        oriented : bool, optional
+            Whether the returned incidence matrix is oriented.
+
+        ctx : optional
+            The context of returned incidence matrix.
+
+        Returns
+        -------
+        sparse_tensor
+            The incidence matrix.
+        """
+        return self._graph.incidence_matrix(oriented).get(ctx)
+
+    def line_graph(self, backtracking=True, shared=False):
+        """Return the line graph of this graph.
+
+        Parameters
+        ----------
+        backtracking : bool, optional
+            Whether the returned line graph is backtracking.
+
+        shared : bool, optional
+            Whether the returned line graph shares representations with `self`.
+
+        Returns
+        -------
+        DGLGraph
+            The line graph of this graph.
+        """
+        graph_data = self._graph.line_graph(backtracking)
+        node_frame = self._edge_frame if shared else None
+        return DGLGraph(graph_data, node_frame)
