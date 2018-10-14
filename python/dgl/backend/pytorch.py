@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import ctypes
+import scipy as sp
 import torch as th
 from torch.utils import dlpack
 
@@ -28,12 +29,19 @@ tensor = th.tensor
 sparse_tensor = th.sparse.FloatTensor
 sum = th.sum
 max = th.max
+stack = th.stack
 
 def astype(a, ty):
     return a.type(ty)
 
-def pack(tensors):
-    return th.cat(tensors)
+def asnumpy(a):
+    return a.cpu().numpy()
+
+def from_numpy(np_data):
+    return th.from_numpy(np_data)
+
+def pack(tensors, dim=0):
+    return th.cat(tensors, dim)
 
 def unpack(x, indices_or_sections=1):
     return th.split(x, indices_or_sections)
@@ -43,9 +51,6 @@ def shape(x):
 
 def dtype(x):
     return x.dtype
-
-def asnumpy(a):
-    return a.cpu().numpy()
 
 unique = th.unique
 
