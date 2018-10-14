@@ -1041,6 +1041,12 @@ class DGLGraph(object):
             executor.run()
             unique_v = utils.toindex(F.unique(v.tousertensor()))
         else:
+            # handle multiple message and reduce func
+            if isinstance(message_func, (tuple, list)):
+                message_func = BundledMessageFunction(message_func)
+            if isinstance(reduce_func, (list, tuple)):
+                reduce_func = BundledReduceFunction(reduce_func)
+
             # message func
             u, v = utils.edge_broadcasting(u, v)
             src_reprs = self.get_n_repr(u)
