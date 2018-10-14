@@ -131,10 +131,10 @@ class Graph {
   BoolArray HasVertices(IdArray vids) const;
 
   /*! \return true if the given edge is in the graph.*/
-  bool HasEdge(dgl_id_t src, dgl_id_t dst) const;
+  bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const;
 
   /*! \return a 0-1 array indicating whether the given edges are in the graph.*/
-  BoolArray HasEdges(IdArray src_ids, IdArray dst_ids) const;
+  BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const;
 
   /*!
    * \brief Find the predecessors of a vertex.
@@ -264,7 +264,8 @@ class Graph {
    * of the edges preserve the index order in the original graph. Vertices not in the
    * original graph are ignored.
    *
-   * The result subgraph is read-only.
+   * The result subgraph can be expanded by ExpandVertexSubgraph and ExpandEdgeSubgraph
+   * methods, and is otherwise read-only.
    *
    * \param vids The vertices in the subgraph.
    * \return the induced subgraph
@@ -282,7 +283,8 @@ class Graph {
    * of the vertices preserve the index order in the original graph. Edges not in the
    * original graph are ignored.
    *
-   * The result subgraph is read-only.
+   * The result subgraph can be expanded by ExpandVertexSubgraph and ExpandEdgeSubgraph
+   * methods, and is otherwise read-only.
    *
    * \param eids The edges in the subgraph.
    * \return the induced edge subgraph

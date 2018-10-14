@@ -132,7 +132,7 @@ class GraphIndex(object):
         vid_array = vids.todgltensor()
         return utils.toindex(_CAPI_DGLGraphHasVertices(self._handle, vid_array))
 
-    def has_edge(self, u, v):
+    def has_edge_between(self, u, v):
         """Return true if the edge exists.
 
         Parameters
@@ -147,9 +147,9 @@ class GraphIndex(object):
         int
             1 if the edge exists, 0 otherwise
         """
-        return _CAPI_DGLGraphHasEdge(self._handle, u, v)
+        return _CAPI_DGLGraphHasEdgeBetween(self._handle, u, v)
 
-    def has_edges(self, u, v):
+    def has_edges_between(self, u, v):
         """Return true if the edge exists.
 
         Parameters
@@ -166,7 +166,7 @@ class GraphIndex(object):
         """
         u_array = u.todgltensor()
         v_array = v.todgltensor()
-        return utils.toindex(_CAPI_DGLGraphHasEdges(self._handle, u_array, v_array))
+        return utils.toindex(_CAPI_DGLGraphHasEdgesBetween(self._handle, u_array, v_array))
 
     def predecessors(self, v, radius=1):
         """Return the predecessors of the node.

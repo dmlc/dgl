@@ -147,22 +147,22 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasVertices")
     *rv = gptr->HasVertices(vids);
   });
 
-TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasEdge")
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasEdgeBetween")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const dgl_id_t src = args[1];
     const dgl_id_t dst = args[2];
-    *rv = gptr->HasEdge(src, dst);
+    *rv = gptr->HasEdgeBetween(src, dst);
   });
 
-TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasEdges")
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasEdgesBetween")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     const IdArray dst = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
-    *rv = gptr->HasEdges(src, dst);
+    *rv = gptr->HasEdgesBetween(src, dst);
   });
 
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphPredecessors")

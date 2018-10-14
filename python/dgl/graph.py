@@ -129,6 +129,12 @@ class DGLGraph(object):
         """Return the number of nodes."""
         return self.number_of_nodes()
 
+    @property
+    def is_multigraph(self):
+        """Whether the graph is a multigraph.
+        """
+        return bool(self._graph.is_multigraph())
+
     def number_of_edges(self):
         """Return the number of edges.
 
@@ -175,7 +181,7 @@ class DGLGraph(object):
         rst = self._graph.has_nodes(vids)
         return rst.tousertensor()
 
-    def has_edge(self, u, v):
+    def has_edge_between(self, u, v):
         """Return true if the edge exists.
 
         Parameters
@@ -190,9 +196,9 @@ class DGLGraph(object):
         bool
             True if the edge exists
         """
-        return self._graph.has_edge(u, v)
+        return self._graph.has_edge_between(u, v)
 
-    def has_edges(self, u, v):
+    def has_edges_between(self, u, v):
         """Return true if the edge exists.
 
         Parameters
@@ -209,7 +215,7 @@ class DGLGraph(object):
         """
         u = utils.toindex(u)
         v = utils.toindex(v)
-        rst = self._graph.has_edges(u, v)
+        rst = self._graph.has_edges_between(u, v)
         return rst.tousertensor()
 
     def predecessors(self, v, radius=1):
@@ -246,7 +252,7 @@ class DGLGraph(object):
         """
         return self._graph.successors(v).tousertensor()
 
-    def edge_id(self, u, v):
+    def edge_id(self, u, v, force_multi=False):
         """Return the id of the edge.
 
         Parameters
@@ -255,15 +261,20 @@ class DGLGraph(object):
             The src node.
         v : int
             The dst node.
+        force_multi : bool
+            If False, will return a single edge ID if the graph is a simple graph.
+            If True, will always return an array.
 
         Returns
         -------
-        int
-            The edge id.
+        int or tensor
+            The edge id if force_multi == True and the graph is a simple graph.
+            The edge id array otherwise.
         """
-        return self._graph.edge_id(u, v)
+        idx = self._graph.edge_id(u, v)
+        return idx.tousertensor() if force_multi or self.is_multigraph else idx[0]
 
-    def edge_ids(self, u, v):
+    def edge_ids(self, u, v, force_multi=False):
         """Return the edge ids.
 
         Parameters
@@ -272,16 +283,23 @@ class DGLGraph(object):
             The src nodes.
         v : list, tensor
             The dst nodes.
+        force_multi : bool
+            If False, will return a single edge ID array if the graph is a simple graph.
+            If True, will always return 3 arrays (src nodes, dst nodes, edge ids).
 
         Returns
         -------
-        tensor
-            The edge id array.
+        tensor, or (tensor, tensor, tensor)
+        If force_multi is True or the graph is multigraph, return (src nodes, dst nodes, edge ids)
+        Otherwise, return a single tensor of edge ids.
         """
         u = utils.toindex(u)
         v = utils.toindex(v)
-        rst = self._graph.edge_ids(u, v)
-        return rst.tousertensor()
+        src, dst, eid = self._graph.edge_ids(u, v)
+        if force_multi or self.is_multigraph:
+            return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
+        else:
+            return eid.tousertensor()
 
     def in_edges(self, v):
         """Return the in edges of the node(s).
@@ -599,7 +617,7 @@ class DGLGraph(object):
         else:
             u = utils.toindex(u)
             v = utils.toindex(v)
-            eid = self._graph.edge_ids(u, v)
+            _, _, eid = self._graph.edge_ids(u, v)
             self.set_e_repr_by_id(h_uv, eid=eid)
 
     def set_e_repr_by_id(self, h_uv, eid=ALL):
@@ -661,7 +679,7 @@ class DGLGraph(object):
         else:
             u = utils.toindex(u)
             v = utils.toindex(v)
-            eid = self._graph.edge_ids(u, v)
+            _, _, eid = self._graph.edge_ids(u, v)
             return self.get_e_repr_by_id(eid=eid)
 
     def pop_e_repr(self, key=__REPR__):
@@ -774,7 +792,7 @@ class DGLGraph(object):
         new_repr = apply_node_func(self.get_n_repr(v))
         self.set_n_repr(new_repr, v)
 
-    def apply_edges(self, u, v, apply_edge_func="default"):
+    def apply_edges(self, u, v, eid=None, apply_edge_func="default"):
         """Apply the function on edge representations.
 
         Parameters
@@ -783,6 +801,8 @@ class DGLGraph(object):
           The src node id(s).
         v : int, iterable of int, tensor
           The dst node id(s).
+        eid : None, edge, container or tensor
+          The edge to update on.  If eid is not None then u and v are ignored.
         apply_edge_func : callable
           The apply edge function.
         """
@@ -791,8 +811,13 @@ class DGLGraph(object):
         if not apply_edge_func:
             # Skip none function call.
             return
-        new_repr = apply_edge_func(self.get_e_repr(u, v))
-        self.set_e_repr(new_repr, u, v)
+
+        if eid is None:
+            new_repr = apply_edge_func(self.get_e_repr(u, v))
+            self.set_e_repr(new_repr, u, v)
+        else:
+            new_repr = apply_edge_func(self.get_e_repr_by_id(eid))
+            self.set_e_repr_by_id(new_repr, eid)
 
     def send(self, u, v, message_func="default"):
         """Trigger the message function on edge u->v
@@ -845,7 +870,7 @@ class DGLGraph(object):
         else:
             self._msg_frame.append({__MSG__ : msgs})
 
-    def update_edge(self, u=ALL, v=ALL, edge_func="default"):
+    def update_edge(self, u=ALL, v=ALL, eid=None, edge_func="default"):
         """Update representation on edge u->v
 
         The edge function should be compatible with following signature:
@@ -862,16 +887,18 @@ class DGLGraph(object):
           The source node(s).
         v : node, container or tensor
           The destination node(s).
+        eid : None, edge, container or tensor
+          The edge to update on.  If eid is not None then u and v are ignored.
         edge_func : callable
           The update function.
         """
         if edge_func == "default":
             edge_func = self._edge_func
         assert edge_func is not None
-        self._batch_update_edge(u, v, edge_func)
+        self._batch_update_edge(u, v, eid, edge_func)
 
-    def _batch_update_edge(self, u, v, edge_func):
-        if is_all(u) and is_all(v):
+    def _batch_update_edge(self, u, v, eid, edge_func):
+        if is_all(u) and is_all(v) and eid is None:
             u, v = self._graph.edges()
             # call the UDF
             src_reprs = self.get_n_repr(u)
@@ -880,10 +907,12 @@ class DGLGraph(object):
             new_edge_reprs = edge_func(src_reprs, dst_reprs, edge_reprs)
             self.set_e_repr(new_edge_reprs)
         else:
-            u = utils.toindex(u)
-            v = utils.toindex(v)
-            u, v = utils.edge_broadcasting(u, v)
-            eid = self._graph.edge_ids(u, v)
+            if eid is None:
+                u = utils.toindex(u)
+                v = utils.toindex(v)
+                u, v = utils.edge_broadcasting(u, v)
+                _, _, eid = self._graph.edge_ids(u, v)
+
             # call the UDF
             src_reprs = self.get_n_repr(u)
             dst_reprs = self.get_n_repr(v)
@@ -1176,8 +1205,8 @@ class DGLGraph(object):
             The subgraph.
         """
         induced_nodes = utils.toindex(nodes)
-        gi, induced_edges = self._graph.node_subgraph(induced_nodes)
-        return dgl.DGLSubGraph(self, induced_nodes, induced_edges, gi)
+        sgi = self._graph.node_subgraph(induced_nodes)
+        return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
 
     def merge(self, subgraphs, reduce_func='sum'):
         """Merge subgraph features back to this parent graph.

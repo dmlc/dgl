@@ -81,7 +81,7 @@ BoolArray Graph::HasVertices(IdArray vids) const {
 }
 
 // O(1) Amortized
-bool Graph::HasEdge(dgl_id_t src, dgl_id_t dst) const {
+bool Graph::HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
   if (!HasVertex(src) || !HasVertex(dst))
     return false;
 
@@ -89,7 +89,7 @@ bool Graph::HasEdge(dgl_id_t src, dgl_id_t dst) const {
 }
 
 // O(N) Amortized
-BoolArray Graph::HasEdges(IdArray src_ids, IdArray dst_ids) const {
+BoolArray Graph::HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const {
   CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
   CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
   const auto srclen = src_ids->shape[0];
@@ -102,18 +102,18 @@ BoolArray Graph::HasEdges(IdArray src_ids, IdArray dst_ids) const {
   if (srclen == 1) {
     // one-many
     for (int64_t i = 0; i < dstlen; ++i) {
-      rst_data[i] = HasEdge(src_data[0], dst_data[i])? 1 : 0;
+      rst_data[i] = HasEdgeBetween(src_data[0], dst_data[i])? 1 : 0;
     }
   } else if (dstlen == 1) {
     // many-one
     for (int64_t i = 0; i < srclen; ++i) {
-      rst_data[i] = HasEdge(src_data[i], dst_data[0])? 1 : 0;
+      rst_data[i] = HasEdgeBetween(src_data[i], dst_data[0])? 1 : 0;
     }
   } else {
     // many-many
     CHECK(srclen == dstlen) << "Invalid src and dst id array.";
     for (int64_t i = 0; i < srclen; ++i) {
-      rst_data[i] = HasEdge(src_data[i], dst_data[i])? 1 : 0;
+      rst_data[i] = HasEdgeBetween(src_data[i], dst_data[i])? 1 : 0;
     }
   }
   return rst;
