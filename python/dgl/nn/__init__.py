@@ -9,5 +9,5 @@ if __backend__ == 'numpy':
     pass
 elif __backend__ == 'pytorch':
     from .pytorch import *
-else:
+elif __backend__ != 'mxnet':
     raise Exception("Unsupported backend %s" % __backend__)
