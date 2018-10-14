@@ -807,7 +807,7 @@ class DGLGraph(object):
         new_repr = apply_node_func(self.get_n_repr(v))
         self.set_n_repr(new_repr, v)
 
-    def apply_edges(self, u, v, eid=None, apply_edge_func="default"):
+    def apply_edges(self, u, v, apply_edge_func="default", eid=None):
         """Apply the function on edge representations.
 
         Parameters
@@ -816,10 +816,10 @@ class DGLGraph(object):
           The src node id(s).
         v : int, iterable of int, tensor
           The dst node id(s).
-        eid : None, edge, container or tensor
-          The edge to update on.  If eid is not None then u and v are ignored.
         apply_edge_func : callable
           The apply edge function.
+        eid : None, edge, container or tensor
+          The edge to update on.  If eid is not None then u and v are ignored.
         """
         if apply_edge_func == "default":
             apply_edge_func = self._apply_edge_func
@@ -834,8 +834,8 @@ class DGLGraph(object):
             new_repr = apply_edge_func(self.get_e_repr_by_id(eid))
             self.set_e_repr_by_id(new_repr, eid)
 
-    def send(self, u, v, message_func="default"):
-        """Trigger the message function on edge u->v
+    def send(self, u=None, v=None, message_func="default", eid=None):
+        """Trigger the message function on edge u->v or eid
 
         The message function should be compatible with following signature:
 
@@ -853,42 +853,15 @@ class DGLGraph(object):
 
         Parameters
         ----------
-        u : node, container or tensor
+        u : None, node, container or tensor
           The source node(s).
-        v : node, container or tensor
+        v : None, node, container or tensor
           The destination node(s).
         message_func : callable
           The message function.
+        eid : None, edge, container or tensor
+          The edge to update on.  If eid is not None then u and v are ignored.
         """
-        self._send(u, v, None, message_func)
-
-    def send_on(self, eid, message_func="default"):
-        """Trigger the message function on edges eid
-
-        The message function should be compatible with following signature:
-
-        (node_reprs, edge_reprs) -> message
-
-        It computes the representation of a message using the
-        representations of the source node, and the edge u->v.
-        All node_reprs and edge_reprs are dictionaries.
-        The message function can be any of the pre-defined functions
-        ('from_src').
-
-        Currently, we require the message functions of consecutive send's and
-        sendon's to return the same keys.  Otherwise the behavior will be
-        undefined.
-
-        Parameters
-        ----------
-        eid : edge, container or tensor
-          The edge(s) to compute messages on.
-        message_func : callable
-          The message function.
-        """
-        self._send(None, None, eid, message_func)
-
-    def _send(self, u, v, eid, message_func):
         if message_func == "default":
             message_func = self._message_func
         assert message_func is not None
@@ -968,7 +941,7 @@ class DGLGraph(object):
                         {__MSG__: F.gather_row(msgs, msg_append_rows.tousertensor())}
                         )
 
-    def update_edge(self, u=ALL, v=ALL, eid=None, edge_func="default"):
+    def update_edge(self, u=ALL, v=ALL, edge_func="default", eid=None):
         """Update representation on edge u->v
 
         The edge function should be compatible with following signature:
@@ -985,10 +958,10 @@ class DGLGraph(object):
           The source node(s).
         v : node, container or tensor
           The destination node(s).
-        eid : None, edge, container or tensor
-          The edge to update on.  If eid is not None then u and v are ignored.
         edge_func : callable
           The update function.
+        eid : None, edge, container or tensor
+          The edge to update on.  If eid is not None then u and v are ignored.
         """
         if edge_func == "default":
             edge_func = self._edge_func
@@ -1128,17 +1101,19 @@ class DGLGraph(object):
             self.set_n_repr(new_reprs, reordered_v)
 
     def send_and_recv(self,
-                      u, v,
+                      u=None, v=None,
                       message_func="default",
                       reduce_func="default",
-                      apply_node_func="default"):
-        """Trigger the message function on u->v and update v.
+                      apply_node_func="default",
+                      eid=None):
+        """Trigger the message function on u->v and update v, or on edge eid
+        and update the destination nodes.
 
         Parameters
         ----------
-        u : node, container or tensor
+        u : None, node, container or tensor
           The source node(s).
-        v : node, container or tensor
+        v : None, node, container or tensor
           The destination node(s).
         message_func : callable
           The message function.
@@ -1147,14 +1122,6 @@ class DGLGraph(object):
         apply_node_func : callable, optional
           The update function.
         """
-        u = utils.toindex(u)
-        v = utils.toindex(v)
-        if len(u) == 0:
-            # no edges to be triggered
-            assert len(v) == 0
-            return
-        unique_v = utils.toindex(F.unique(v.tousertensor()))
-
         if message_func == "default":
             message_func = self._message_func
         if reduce_func == "default":
@@ -1162,57 +1129,36 @@ class DGLGraph(object):
         assert message_func is not None
         assert reduce_func is not None
 
-        executor = scheduler.get_executor(
-                'send_and_recv', self, src=u, dst=v,
-                message_func=message_func, reduce_func=reduce_func)
+        if eid is None:
+            u = utils.toindex(u)
+            v = utils.toindex(v)
+            if len(u) == 0:
+                # no edges to be triggered
+                assert len(v) == 0
+                return
+            unique_v = utils.toindex(F.unique(v.tousertensor()))
+
+            executor = scheduler.get_executor(
+                    'send_and_recv', self, src=u, dst=v,
+                    message_func=message_func, reduce_func=reduce_func)
+        else:
+            eid = utils.toindex(eid)
+            if len(eid) == 0:
+                # no edges to be triggered
+                return
+
+            executor = None
+
         if executor:
             executor.run()
-        else:
+        elif eid is None:
             self.send(u, v, message_func)
             self.recv(unique_v, reduce_func, None)
-        self.apply_nodes(unique_v, apply_node_func)
-
-    def send_and_recv_on(self,
-                         eid,
-                         message_func="default",
-                         reduce_func="default",
-                         apply_node_func="default"):
-        """Trigger the message function on edge eid and update the destination
-        nodes.
-
-        Parameters
-        ----------
-        eid : edge, container or tensor
-          The edges.
-        message_func : callable
-          The message function.
-        reduce_func : callable
-          The reduce function.
-        apply_node_func : callable, optional
-          The update function.
-        """
-        eid = utils.toindex(eid)
-        if len(eid) == 0:
-            # no edges to be triggered
-            return
-
-        if message_func == "default":
-            message_func = self._message_func
-        if reduce_func == "default":
-            reduce_func = self._reduce_func
-        assert message_func is not None
-        assert reduce_func is not None
-
-        # TODO executor on edges?
-        executor = None
-
-        if executor:
-            executor.run()
         else:
             _, v, _ = self._graph.find_edges(eid)
             unique_v = utils.toindex(F.unique(v.tousertensor()))
 
-            self.send_on(eid, message_func)
+            self.send(eid=eid, message_func=message_func)
             self.recv(unique_v, reduce_func, None)
 
         self.apply_nodes(unique_v, apply_node_func)
