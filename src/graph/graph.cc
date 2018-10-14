@@ -185,8 +185,8 @@ Graph::EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
   CHECK((srclen == dstlen) || (srclen == 1) || (dstlen == 1))
     << "Invalid src and dst id array.";
 
-  const int64_t src_stride = (srclen == 1) ? 0 : 1;
-  const int64_t dst_stride = (dstlen == 1) ? 0 : 1;
+  const int64_t src_stride = (srclen == 1 && dstlen != 1) ? 0 : 1;
+  const int64_t dst_stride = (dstlen == 1 && srclen != 1) ? 0 : 1;
   const int64_t* src_data = static_cast<int64_t*>(src_ids->data);
   const int64_t* dst_data = static_cast<int64_t*>(dst_ids->data);
   // vector of vector references

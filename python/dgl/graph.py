@@ -44,6 +44,7 @@ class DGLGraph(object):
         # msg graph & frame
         self._msg_graph = create_graph_index()
         self._msg_frame = FrameRef()
+        self._msg_edges = []
         self.reset_messages()
         # registered functions
         self._message_func = None
@@ -108,11 +109,13 @@ class DGLGraph(object):
         self._edge_frame.clear()
         self._msg_graph.clear()
         self._msg_frame.clear()
+        self._msg_edges.clear()
 
     def reset_messages(self):
         """Clear all messages."""
         self._msg_graph.clear()
         self._msg_frame.clear()
+        self._msg_edges.clear()
         self._msg_graph.add_nodes(self.number_of_nodes())
 
     def number_of_nodes(self):
@@ -844,6 +847,10 @@ class DGLGraph(object):
         The message function can be any of the pre-defined functions
         ('from_src').
 
+        Currently, we require the message functions of consecutive send's and
+        send_on's to return the same keys.  Otherwise the behavior will be
+        undefined.
+
         Parameters
         ----------
         u : node, container or tensor
@@ -853,34 +860,113 @@ class DGLGraph(object):
         message_func : callable
           The message function.
         """
+        self._send(u, v, None, message_func)
+
+    def send_on(self, eid, message_func="default"):
+        """Trigger the message function on edges eid
+
+        The message function should be compatible with following signature:
+
+        (node_reprs, edge_reprs) -> message
+
+        It computes the representation of a message using the
+        representations of the source node, and the edge u->v.
+        All node_reprs and edge_reprs are dictionaries.
+        The message function can be any of the pre-defined functions
+        ('from_src').
+
+        Currently, we require the message functions of consecutive send's and
+        sendon's to return the same keys.  Otherwise the behavior will be
+        undefined.
+
+        Parameters
+        ----------
+        eid : edge, container or tensor
+          The edge(s) to compute messages on.
+        message_func : callable
+          The message function.
+        """
+        self._send(None, None, eid, message_func)
+
+    def _send(self, u, v, eid, message_func):
         if message_func == "default":
             message_func = self._message_func
         assert message_func is not None
         if isinstance(message_func, (tuple, list)):
             message_func = BundledMessageFunction(message_func)
-        self._batch_send(u, v, message_func)
+        self._batch_send(u, v, eid, message_func)
 
-    def _batch_send(self, u, v, message_func):
-        if is_all(u) and is_all(v):
-            u, v, _ = self._graph.edges()
-            self._msg_graph.add_edges(u, v) # TODO(minjie): can be optimized
+    def _batch_send(self, u, v, eid, message_func):
+        if is_all(u) and is_all(v) and eid is None:
+            u, v, eid = self._graph.edges()
             # call UDF
             src_reprs = self.get_n_repr(u)
             edge_reprs = self.get_e_repr()
             msgs = message_func(src_reprs, edge_reprs)
+        elif eid is not None:
+            eid = utils.toindex(eid)
+            u, v, _ = self._graph.find_edges(eid)
+            # call UDF
+            src_reprs = self.get_n_repr(u)
+            edge_reprs = self.get_e_repr_by_id(eid)
+            msgs = message_func(src_reprs, edge_reprs)
         else:
             u = utils.toindex(u)
             v = utils.toindex(v)
-            u, v = utils.edge_broadcasting(u, v)
-            self._msg_graph.add_edges(u, v)
+            u, v, eid = self._graph.edge_ids(u, v)
             # call UDF
             src_reprs = self.get_n_repr(u)
-            edge_reprs = self.get_e_repr(u, v)
+            edge_reprs = self.get_e_repr_by_id(eid)
             msgs = message_func(src_reprs, edge_reprs)
+
+        # TODO: can we somehow lower part of this logic to C++?
+        new_uv = []
+        msg_target_rows = []
+        msg_update_rows = []
+        msg_append_rows = []
+        for i, (_u, _v, _eid) in enumerate(zip(u, v, eid)):
+            if _eid in self._msg_edges:
+                msg_target_rows.append(self._msg_edges.index(_eid))
+                msg_update_rows.append(i)
+            else:
+                new_uv.append((_u, _v))
+                self._msg_edges.append(_eid)
+                msg_append_rows.append(i)
+
+        msg_target_rows = utils.toindex(msg_target_rows)
+        msg_update_rows = utils.toindex(msg_update_rows)
+        msg_append_rows = utils.toindex(msg_append_rows)
+
         if utils.is_dict_like(msgs):
-            self._msg_frame.append(msgs)
+            if len(msg_target_rows) > 0:
+                self._msg_frame.update_rows(
+                        msg_target_rows,
+                        {k: F.gather_row(msgs[k], msg_update_rows.tousertensor())
+                            for k in msgs}
+                        )
+            if len(msg_append_rows) > 0:
+                new_u, new_v = zip(*new_uv)
+                new_u = utils.toindex(new_u)
+                new_v = utils.toindex(new_v)
+                self._msg_graph.add_edges(new_u, new_v)
+                self._msg_frame.append(
+                        {k: F.gather_row(msgs[k], msg_append_rows.tousertensor())
+                            for k in msgs}
+                        )
         else:
-            self._msg_frame.append({__MSG__ : msgs})
+            if len(msg_target_rows) > 0:
+                self._msg_frame.update_rows(
+                        msg_target_rows,
+                        {__MSG__: F.gather_row(msgs, msg_update_rows.tousertensor())}
+                        )
+            if len(msg_append_rows) > 0:
+                new_u, new_v = zip(*new_uv)
+                new_u = utils.toindex(new_u)
+                new_v = utils.toindex(new_v)
+                self._msg_graph.add_edges(new_u, new_v)
+                self._msg_frame.append(
+                        {__MSG__: F.gather_row(msgs, msg_append_rows.tousertensor())}
+                        )
 
     def update_edge(self, u=ALL, v=ALL, eid=None, edge_func="default"):
         """Update representation on edge u->v
@@ -1084,6 +1170,51 @@ class DGLGraph(object):
         else:
             self.send(u, v, message_func)
             self.recv(unique_v, reduce_func, None)
+        self.apply_nodes(unique_v, apply_node_func)
+
+    def send_and_recv_on(self,
+                         eid,
+                         message_func="default",
+                         reduce_func="default",
+                         apply_node_func="default"):
+        """Trigger the message function on edge eid and update the destination
+        nodes.
+
+        Parameters
+        ----------
+        eid : edge, container or tensor
+          The edges.
+        message_func : callable
+          The message function.
+        reduce_func : callable
+          The reduce function.
+        apply_node_func : callable, optional
+          The update function.
+        """
+        eid = utils.toindex(eid)
+        if len(eid) == 0:
+            # no edges to be triggered
+            return
+
+        if message_func == "default":
+            message_func = self._message_func
+        if reduce_func == "default":
+            reduce_func = self._reduce_func
+        assert message_func is not None
+        assert reduce_func is not None
+
+        # TODO executor on edges?
+        executor = None
+
+        if executor:
+            executor.run()
+        else:
+            _, v, _ = self._graph.find_edges(eid)
+            unique_v = utils.toindex(F.unique(v.tousertensor()))
+
+            self.send_on(eid, message_func)
+            self.recv(unique_v, reduce_func, None)
+
         self.apply_nodes(unique_v, apply_node_func)
 
     def pull(self,
