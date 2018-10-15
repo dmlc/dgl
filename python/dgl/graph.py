@@ -1187,10 +1187,10 @@ class DGLGraph(object):
         executor = scheduler.get_executor(
                 "update_all", self, message_func=message_func, reduce_func=reduce_func)
         if executor:
-            new_repr = executor.run()
+            new_reprs = executor.run()
             if not utils.is_dict_like(new_reprs):
-                new_repr = {__REPR__: new_repr}
-            self._apply_nodes(ALL, apply_node_func, reduce_accum=new_repr)
+                new_reprs = {__REPR__: new_reprs}
+            self._apply_nodes(ALL, apply_node_func, reduce_accum=new_reprs)
         else:
             self.send(ALL, ALL, message_func)
             self.recv(ALL, reduce_func, apply_node_func)
