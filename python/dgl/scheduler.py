@@ -139,8 +139,8 @@ class BasicExecutor(Executor):
         return exe
 
     def run(self):
-        attr = self.exe.run()
-        self.g.set_n_repr(attr, self.graph_mapping)
+        return self.exe.run()
+        # self.g.set_n_repr(attr, self.graph_mapping)
 
 
 class UpdateAllExecutor(BasicExecutor):
@@ -307,7 +307,7 @@ class BundledExecutor(BasicExecutor):
             else:
                 # attr and res must be dict
                 attr.update(res)
-        self.g.set_n_repr(attr, self.graph_mapping)
+        return attr
 
 
 class BundledUpdateAllExecutor(BundledExecutor, UpdateAllExecutor):

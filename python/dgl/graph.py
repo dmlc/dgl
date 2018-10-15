@@ -1062,9 +1062,8 @@ class DGLGraph(object):
         if executor:
             # FIXME: executor.run should not directly write to storage
             #        fuse reduce and apply to avoid index operations
-            executor.run()
-            unique_v = utils.toindex(F.unique(v.tousertensor()))
-            self.apply_nodes(unique_v, apply_node_func)
+            new_repr = executor.run()
+            unique_v = executor.graph_mapping
         else:
             # handle multiple message and reduce func
             if isinstance(message_func, (tuple, list)):
@@ -1110,10 +1109,7 @@ class DGLGraph(object):
             else:
                 new_reprs = {__REPR__ : F.pack(new_reprs)}
 
-            # Use setter to do reorder
-            # self.set_n_repr(new_reprs, unique_v)
-
-            self._apply_nodes(unique_v, apply_node_func, reduce_accum=new_reprs)
+        self._apply_nodes(unique_v, apply_node_func, reduce_accum=new_reprs)
 
     def pull(self,
              v,
@@ -1191,11 +1187,13 @@ class DGLGraph(object):
         executor = scheduler.get_executor(
                 "update_all", self, message_func=message_func, reduce_func=reduce_func)
         if executor:
-            executor.run()
+            new_repr = executor.run()
+            if not utils.is_dict_like(new_reprs):
+                new_repr = {__REPR__: new_repr}
+            self._apply_nodes(ALL, apply_node_func, reduce_accum=new_repr)
         else:
             self.send(ALL, ALL, message_func)
-            self.recv(ALL, reduce_func, None)
-        self.apply_nodes(ALL, apply_node_func)
+            self.recv(ALL, reduce_func, apply_node_func)
 
     def propagate(self,
                   traverser='topo',
