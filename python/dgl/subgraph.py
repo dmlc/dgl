@@ -6,8 +6,8 @@ import networkx as nx
 from . import backend as F
 from .frame import Frame, FrameRef
 from .graph import DGLGraph
+from ._ffi.function import _init_api
 from . import utils
-from .graph_index import _map_to_subgraph_nid
 
 class DGLSubGraph(DGLGraph):
     """The subgraph class.
@@ -117,7 +117,8 @@ class DGLSubGraph(DGLGraph):
                 self._parent._edge_frame[self._parent_eid]))
 
     def map_to_subgraph_nid(self, parent_nid):
-        print(parent_nid.dtype)
         v = utils.toindex(parent_nid)
         v = v.todgltensor()
-        return _map_to_subgraph_nid(self._graph, v)
+        return _CAPI_DGLGraphSubgraphMapVFromParent(self._graph._handle, v)
+
+_init_api("dgl.subgraph")

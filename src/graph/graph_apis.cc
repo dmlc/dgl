@@ -274,7 +274,7 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphVertexSubgraph")
     *rv = ConvertSubgraphToPackedFunc(gptr->VertexSubgraph(vids));
   });
 
-TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphSubgraphMapVFromParent")
+TVM_REGISTER_GLOBAL("subgraph._CAPI_DGLGraphSubgraphMapVFromParent")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Subgraph* gptr = static_cast<Subgraph*>(ghandle);

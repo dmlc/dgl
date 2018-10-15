@@ -7,7 +7,6 @@ from torch.utils import dlpack
 from .._ffi.base import _LIB, check_call, c_array
 from .._ffi.runtime_ctypes import TVMType, TVMContext, TVMArray
 from .._ffi.runtime_ctypes import TypeCode, tvm_shape_index_t
-from .. import ndarray as nd
 
 # Tensor types
 Tensor = th.Tensor
