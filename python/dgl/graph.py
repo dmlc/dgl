@@ -1062,7 +1062,9 @@ class DGLGraph(object):
         if executor:
             # FIXME: executor.run should not directly write to storage
             #        fuse reduce and apply to avoid index operations
-            new_repr = executor.run()
+            new_reprs = executor.run()
+            if not utils.is_dict_like(new_reprs):
+                new_reprs = {__REPR__: new_reprs}
             unique_v = executor.graph_mapping
         else:
             # handle multiple message and reduce func
