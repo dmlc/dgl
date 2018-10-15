@@ -766,12 +766,34 @@ class DGLGraph(object):
         apply_node_func : callable
           The apply node function.
         """
+        self._apply_nodes(v, apply_node_func)
+
+    def _apply_nodes(self, v, apply_node_func="default", reduce_accum=None):
+        """Internal apply nodes
+
+        Parameters
+        ----------
+        reduce_accum: dict-like
+          The output of reduce func
+        """
         if apply_node_func == "default":
             apply_node_func = self._apply_node_func
         if not apply_node_func:
             # Skip none function call.
+            if reduce_accum is not None:
+                # write reduce result back
+                self.set_n_repr(reduce_accum, v)
             return
-        new_repr = apply_node_func(self.get_n_repr(v))
+        # take out current node repr
+        curr_repr = self.get_n_repr(v)
+        if reduce_accum is not None:
+            # merge current node_repr with reduce output
+            curr_repr = utils.HybridDict(reduce_accum, curr_repr)
+        new_repr = apply_node_func(curr_repr)
+        if reduce_accum is not None and utils.is_dict_like(new_repr) :
+            # merge new node_repr with reduce output
+            reduce_accum.update(new_repr)
+            new_repr = reduce_accum
         self.set_n_repr(new_repr, v)
 
     def apply_edges(self, u, v, apply_edge_func="default"):
@@ -1038,8 +1060,11 @@ class DGLGraph(object):
                 'send_and_recv', self, src=u, dst=v,
                 message_func=message_func, reduce_func=reduce_func)
         if executor:
+            # FIXME: executor.run should not directly write to storage
+            #        fuse reduce and apply to avoid index operations
             executor.run()
             unique_v = utils.toindex(F.unique(v.tousertensor()))
+            self.apply_nodes(unique_v, apply_node_func)
         else:
             # handle multiple message and reduce func
             if isinstance(message_func, (tuple, list)):
@@ -1060,6 +1085,7 @@ class DGLGraph(object):
 
             # recv with degree bucketing
             unique_v, degs, dsts, msg_ids = scheduler.light_degree_bucketing(v)
+            unique_v = utils.toindex(unique_v)
 
             new_reprs = []
             for deg, vv, msg_id in zip(degs, dsts, msg_ids):
@@ -1085,9 +1111,9 @@ class DGLGraph(object):
                 new_reprs = {__REPR__ : F.pack(new_reprs)}
 
             # Use setter to do reorder
-            self.set_n_repr(new_reprs, unique_v)
+            # self.set_n_repr(new_reprs, unique_v)
 
-        self.apply_nodes(unique_v, apply_node_func)
+            self._apply_nodes(unique_v, apply_node_func, reduce_accum=new_reprs)
 
     def pull(self,
              v,
