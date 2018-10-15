@@ -14,7 +14,7 @@ typedef tvm::runtime::NDArray BoolArray;
 
 class Graph;
 class GraphOp;
-struct Subgraph;
+class Subgraph;
 
 /*!
  * \brief Base dgl graph class.
@@ -248,7 +248,7 @@ class Graph {
    * \param vids The vertices in the subgraph.
    * \return the induced subgraph
    */
-  Subgraph *VertexSubgraph(IdArray vids) const;
+  Subgraph VertexSubgraph(IdArray vids) const;
 
   /*!
    * \brief Construct the induced edge subgraph of the given edges.
@@ -305,7 +305,7 @@ class Graph {
 };
 
 /*! \brief Subgraph data structure */
-struct Subgraph: public Graph {
+class Subgraph: public Graph {
   /*! 
    * \brief The induced vertex ids.
    * \note This is also a map from the new vertex id to the vertex id in the parent graph.
@@ -322,7 +322,25 @@ struct Subgraph: public Graph {
    */
   std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
 
+  friend class Graph;
+
+public:
+  /*!
+   * \brief This method maps the vertex Ids in the parent graph to the Ids in the subgraph.
+   */
   IdArray MapVFromParent(IdArray parent) const;
+  /*!
+   * \brief Get the Ids of the induced vertices.
+   */
+  IdArray GetInducedVertices() const {
+    return induced_vertices;
+  }
+  /*!
+   * \brief Get the Ids of the induced edges.
+   */
+  IdArray GetInducedEdges() const {
+    return induced_edges;
+  }
 };
 
 }  // namespace dgl

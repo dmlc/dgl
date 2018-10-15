@@ -33,16 +33,18 @@ PackedFunc ConvertEdgeArrayToPackedFunc(const Graph::EdgeArray& ea) {
 }
 
 // Convert Subgraph structure to PackedFunc.
-PackedFunc ConvertSubgraphToPackedFunc(Subgraph *sg) {
+PackedFunc ConvertSubgraphToPackedFunc(Subgraph sg) {
   auto body = [sg] (TVMArgs args, TVMRetValue* rv) {
       int which = args[0];
       if (which == 0) {
-        GraphHandle ghandle = sg;
+        // TODO(zhengda) Here we need to make a copy of the entire subgraph.
+        // Is there a way of avoiding the memory copy.
+        GraphHandle ghandle = new Subgraph(sg);
         *rv = ghandle;
       } else if (which == 1) {
-        *rv = std::move(sg->induced_vertices);
+        *rv = sg.GetInducedVertices();
       } else if (which == 2) {
-        *rv = std::move(sg->induced_edges);
+        *rv = sg.GetInducedEdges();
       } else {
         LOG(FATAL) << "invalid choice";
       }

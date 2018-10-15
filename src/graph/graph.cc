@@ -346,18 +346,18 @@ DegreeArray Graph::OutDegrees(IdArray vids) const {
   return rst;
 }
 
-Subgraph *Graph::VertexSubgraph(IdArray vids) const {
+Subgraph Graph::VertexSubgraph(IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
   const auto len = vids->shape[0];
-  Subgraph *rst = new Subgraph();
-  std::unordered_map<dgl_id_t, dgl_id_t> &oldv2newv = rst->oldv2newv;
+  Subgraph rst;
+  std::unordered_map<dgl_id_t, dgl_id_t> &oldv2newv = rst.oldv2newv;
   std::vector<dgl_id_t> edges;
   const int64_t* vid_data = static_cast<int64_t*>(vids->data);
   for (int64_t i = 0; i < len; ++i) {
     oldv2newv[vid_data[i]] = i;
   }
-  rst->induced_vertices = vids;
-  rst->AddVertices(len);
+  rst.induced_vertices = vids;
+  rst.AddVertices(len);
   for (int64_t i = 0; i < len; ++i) {
     const dgl_id_t oldvid = vid_data[i];
     const dgl_id_t newvid = i;
@@ -366,12 +366,12 @@ Subgraph *Graph::VertexSubgraph(IdArray vids) const {
       if (oldv2newv.count(oldsucc)) {
         const dgl_id_t newsucc = oldv2newv[oldsucc];
         edges.push_back(adjlist_[oldvid].edge_id[j]);
-        rst->AddEdge(newvid, newsucc);
+        rst.AddEdge(newvid, newsucc);
       }
     }
   }
-  rst->induced_edges = IdArray::Empty({static_cast<int64_t>(edges.size())}, vids->dtype, vids->ctx);
-  std::copy(edges.begin(), edges.end(), static_cast<int64_t*>(rst->induced_edges->data));
+  rst.induced_edges = IdArray::Empty({static_cast<int64_t>(edges.size())}, vids->dtype, vids->ctx);
+  std::copy(edges.begin(), edges.end(), static_cast<int64_t*>(rst.induced_edges->data));
   return rst;
 }
 
