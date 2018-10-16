@@ -4,6 +4,48 @@
 
 namespace dgl {
 
+Graph GraphOp::LineGraph(const Graph* g, bool backtracking){
+  typedef std::pair<dgl_id_t, dgl_id_t> entry;
+  typedef std::map<dgl_id_t, std::vector<entry>> csm; // Compressed Sparse Matrix
+
+  csm adj;
+  std::vector<entry> vec;
+  for (size_t i = 0; i != g->all_edges_src_.size(); ++i) {
+    auto u = g->all_edges_src_[i];
+    auto v = g->all_edges_dst_[i];
+    auto ret = adj.insert(csm::value_type(u, vec));
+    (ret.first)->second.push_back(std::make_pair(v, i));
+  }
+
+  std::vector<dgl_id_t> lg_src, lg_dst;
+  for (size_t i = 0; i != g->all_edges_src_.size(); ++i) {
+    auto u = g->all_edges_src_[i];
+    auto v = g->all_edges_dst_[i];
+    auto j = adj.find(v);
+    if (j != adj.end()) {
+      for (size_t k = 0; k != j->second.size(); ++k) {
+        if (backtracking || (!backtracking && j->second[k].first != u)) {
+          lg_src.push_back(i);
+          lg_dst.push_back(j->second[k].second);
+        }
+      }
+    }
+  }
+
+  const int64_t len = lg_src.size();
+  IdArray src = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  IdArray dst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  int64_t* src_ptr = static_cast<int64_t*>(src->data);
+  int64_t* dst_ptr = static_cast<int64_t*>(dst->data);
+  std::copy(lg_src.begin(), lg_src.end(), src_ptr);
+  std::copy(lg_dst.begin(), lg_dst.end(), dst_ptr);
+
+  Graph lg;
+  lg.AddVertices(g->NumEdges());
+  lg.AddEdges(src, dst);
+  return lg;
+}
+
 Graph GraphOp::DisjointUnion(std::vector<const Graph*> graphs) {
   Graph rst;
   uint64_t cumsum = 0;

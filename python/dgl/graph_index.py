@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import ctypes
 import numpy as np
 import networkx as nx
+import scipy.sparse as sp
 
 from ._ffi.base import c_array
 from ._ffi.function import _init_api
@@ -407,6 +408,47 @@ class GraphIndex(object):
             self._cache['adj'] = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
         return self._cache['adj']
 
+    def incidence_matrix(self, oriented=False):
+        """Return the incidence matrix representation of this graph.
+        
+        Parameters
+        ----------
+        oriented : bool, optional (default=False)
+          Whether the returned incidence matrix is oriented.
+
+        Returns
+        -------
+        utils.CtxCachedObject
+            An object that returns tensor given context.
+        """
+        key = ('oriented ' if oriented else '') + 'incidence matrix'
+        if not key in self._cache:
+            src, dst, _ = self.edges(sorted=False)
+            src = src.tousertensor()
+            dst = dst.tousertensor()
+            m = self.number_of_edges()
+            eid = F.arange(m, dtype=F.int64)
+            row = F.pack([src, dst])
+            col = F.pack([eid, eid])
+            idx = F.stack([row, col])
+
+            diagonal = (src == dst)
+            if oriented:
+                x = -F.ones((m,))
+                y = F.ones((m,))
+                x[diagonal] = 0
+                y[diagonal] = 0
+                dat = F.pack([x, y])
+            else:
+                x = F.ones((m,))
+                x[diagonal] = 0
+                dat = F.pack([x, x])
+            n = self.number_of_nodes()
+            mat = F.sparse_tensor(idx, dat, [n, m])
+            self._cache[key] = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
+
+        return self._cache[key]
+
     def to_networkx(self):
         """Convert to networkx graph.
 
@@ -459,6 +501,37 @@ class GraphIndex(object):
         dst = utils.toindex(dst)
         self.add_edges(src, dst)
 
+    def from_scipy_sparse_matrix(self, adj):
+        """Convert from scipy sparse matrix.
+
+        Parameters
+        ----------
+        adj : scipy sparse matrix
+        """
+        self.clear()
+        self.add_nodes(adj.shape[0])
+        adj_coo = adj.tocoo()
+        src = utils.toindex(adj_coo.row)
+        dst = utils.toindex(adj_coo.col)
+        self.add_edges(src, dst)
+
+    def line_graph(self, backtracking=True):
+        """Return the line graph of this graph.
+
+        Parameters
+        ----------
+        backtracking : bool, optional (default=False)
+          Whether (i, j) ~ (j, i) in L(G).
+          (i, j) ~ (j, i) is the behavior of networkx.line_graph.
+
+        Returns
+        -------
+        GraphIndex
+            The line graph of this graph.
+        """
+        handle = _CAPI_DGLGraphLineGraph(self._handle, backtracking)
+        return GraphIndex(handle)
+        
 def disjoint_union(graphs):
     """Return a disjoint union of the input graphs.
 
