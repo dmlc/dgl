@@ -528,9 +528,6 @@ class GraphIndex(object):
         return ret
 
     def from_networkx(self, nx_graph):
-        # FIXME: the doc says that the argument should be nx.DiGraph but in
-        # fact it can take in any data convertible to nx.DiGraph.  Is this
-        # intended?
         """Convert from networkx graph.
 
         If 'id' edge attribute exists, the edge will be added follows

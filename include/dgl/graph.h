@@ -264,9 +264,6 @@ class Graph {
    * of the edges preserve the index order in the original graph. Vertices not in the
    * original graph are ignored.
    *
-   * The result subgraph can be expanded by ExpandVertexSubgraph and ExpandEdgeSubgraph
-   * methods, and is otherwise read-only.
-   *
    * \param vids The vertices in the subgraph.
    * \return the induced subgraph
    */
@@ -282,9 +279,6 @@ class Graph {
    * index of the edges preserve the order of the given id array, while the local index
    * of the vertices preserve the index order in the original graph. Edges not in the
    * original graph are ignored.
-   *
-   * The result subgraph can be expanded by ExpandVertexSubgraph and ExpandEdgeSubgraph
-   * methods, and is otherwise read-only.
    *
    * \param eids The edges in the subgraph.
    * \return the induced edge subgraph

@@ -807,14 +807,14 @@ class DGLGraph(object):
         new_repr = apply_node_func(self.get_n_repr(v))
         self.set_n_repr(new_repr, v)
 
-    def apply_edges(self, u, v, apply_edge_func="default", eid=None):
+    def apply_edges(self, u=None, v=None, apply_edge_func="default", eid=None):
         """Apply the function on edge representations.
 
         Parameters
         ----------
-        u : int, iterable of int, tensor
+        u : optional, int, iterable of int, tensor
           The src node id(s).
-        v : int, iterable of int, tensor
+        v : optional, int, iterable of int, tensor
           The dst node id(s).
         apply_edge_func : callable
           The apply edge function.
@@ -853,13 +853,13 @@ class DGLGraph(object):
 
         Parameters
         ----------
-        u : None, node, container or tensor
+        u : optional, node, container or tensor
           The source node(s).
-        v : None, node, container or tensor
+        v : optional, node, container or tensor
           The destination node(s).
         message_func : callable
           The message function.
-        eid : None, edge, container or tensor
+        eid : optional, edge, container or tensor
           The edge to update on.  If eid is not None then u and v are ignored.
         """
         if message_func == "default":
@@ -892,7 +892,6 @@ class DGLGraph(object):
             edge_reprs = self.get_e_repr_by_id(eid)
             msgs = message_func(src_reprs, edge_reprs)
 
-        # TODO: can we somehow lower part of this logic to C++?
         new_uv = []
         msg_target_rows = []
         msg_update_rows = []
@@ -960,7 +959,7 @@ class DGLGraph(object):
           The destination node(s).
         edge_func : callable
           The update function.
-        eid : None, edge, container or tensor
+        eid : optional, edge, container or tensor
           The edge to update on.  If eid is not None then u and v are ignored.
         """
         if edge_func == "default":
@@ -1111,9 +1110,9 @@ class DGLGraph(object):
 
         Parameters
         ----------
-        u : None, node, container or tensor
+        u : optional, node, container or tensor
           The source node(s).
-        v : None, node, container or tensor
+        v : optional, node, container or tensor
           The destination node(s).
         message_func : callable
           The message function.
