@@ -970,7 +970,7 @@ class DGLGraph(object):
 
     def _batch_update_edge(self, u, v, eid, edge_func):
         if is_all(u) and is_all(v) and eid is None:
-            u, v = self._graph.edges()
+            u, v, eid = self._graph.edges()
             # call the UDF
             src_reprs = self.get_n_repr(u)
             dst_reprs = self.get_n_repr(v)
