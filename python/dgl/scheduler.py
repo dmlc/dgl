@@ -173,6 +173,8 @@ class DegreeBucketingExecutor(Executor):
 
     def run(self):
         new_reprs = []
+        # loop over each bucket
+        # FIXME (lingfan): handle zero-degree case
         for deg, vv, msg_id in zip(self.degrees, self.dsts, self.msg_ids):
             dst_reprs = self.g.get_n_repr(vv)
             in_msgs = self.msg_frame.select_rows(msg_id)
