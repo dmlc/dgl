@@ -11,7 +11,7 @@ typedef tvm::runtime::NDArray IdArray;
 
 namespace scheduler {
 
-std::vector<IdArray> DegreeBucketing(IdArray vids);
+std::vector<IdArray> DegreeBucketing(const IdArray& vids);
 
 } // namespace scheduler
 

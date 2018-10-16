@@ -8,7 +8,7 @@ namespace dgl {
 
 namespace scheduler {
 
-std::vector<IdArray> DegreeBucketing(IdArray vids) {
+std::vector<IdArray> DegreeBucketing(const IdArray& vids) {
     const auto n_msgs = vids->shape[0];
     const int64_t* vid_data = static_cast<int64_t*>(vids->data);
 
