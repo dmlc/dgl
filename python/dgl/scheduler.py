@@ -3,7 +3,7 @@ from __future__ import absolute_import
 
 import numpy as np
 
-from .base import ALL
+from .base import ALL, __MSG__, __REPR__
 from . import backend as F
 from .function import message as fmsg
 from .function import reducer as fred
@@ -12,7 +12,7 @@ from collections import defaultdict as ddict
 
 from ._ffi.function import _init_api
 
-__all__ = ["degree_bucketing", "get_executor"]
+__all__ = ["degree_bucketing", "get_recv_executor", "get_executor"]
 
 def degree_bucketing(graph, v):
     """Create degree bucketing scheduling policy.
@@ -42,13 +42,12 @@ def degree_bucketing(graph, v):
     #print('degree-bucketing:', unique_degrees, [len(b) for b in v_bkt])
     return unique_degrees, v_bkt
 
-def light_degree_bucketing(v):
-    buckets = _CAPI_DGLDegreeBucket(v.todgltensor())
-
+def _process_buckets(buckets):
+    """read bucketing auxiliary data"""
     # get back results
     degs = utils.toindex(buckets(0))
     v = utils.toindex(buckets(1))
-    # FIXME: convert directly from ndarary to python list?
+    # FIXME: how to convert directly from ndarary to python list?
     v_section = buckets(2).asnumpy().tolist()
     msg_ids = utils.toindex(buckets(3))
     msg_section = buckets(4).asnumpy().tolist()
@@ -61,7 +60,56 @@ def light_degree_bucketing(v):
     dsts = F.unpack(unique_v, v_section)
     msg_ids = F.unpack(msg_ids, msg_section)
 
+    # convert to utils.Index
+    unique_v = utils.toindex(unique_v)
+    dsts = [utils.toindex(dst) for dst in dsts]
+    msg_ids = [utils.toindex(msg_id) for msg_id in msg_ids]
+
     return unique_v, degs, dsts, msg_ids
+
+def light_degree_bucketing(v):
+    """Return the bucketing by degree scheduling for destination nodes of messages
+
+    Parameters
+    ----------
+    v: utils.Index
+        destionation node for each message
+
+    Returns
+    -------
+    unique_v: utils.Index
+        unqiue destination nodes
+    degrees: utils.Index
+        A list of degree for each bucket
+    v_bkt: list of utils.Index
+        A list of node id buckets, nodes in each bucket have the same degree
+    msg_ids: list of utils.Index
+        A list of message id buckets, each node in the ith node id bucket has
+        degree[i] messages in the ith message id bucket
+    """
+    buckets = _CAPI_DGLDegreeBucketing(v.todgltensor())
+    return _process_buckets(buckets)
+
+def light_degree_bucketing_for_graph(graph):
+    """Return the bucketing by degree scheduling for the entire graph
+
+    Parameters:
+        graph: GraphIndex
+
+    Returns
+    -------
+    unique_v: utils.Index
+        unqiue destination nodes
+    degrees: utils.Index
+        A list of degree for each bucket
+    v_bkt: list of utils.Index
+        A list of node id buckets, nodes in each bucket have the same degree
+    msg_ids: list of utils.Index
+        A list of message id buckets, each node in the ith node id bucket has
+        degree[i] messages in the ith message id bucket
+    """
+    buckets = _CAPI_DGLDegreeBucketingFromGraph(self._handle)
+    return _process_buckets(buckets)
 
 
 class Executor(object):
@@ -100,6 +148,53 @@ class SPMVOperator(Executor):
             return dstcol
         else:
             return {self.dst_field : dstcol}
+
+
+# FIXME: refactorize in scheduler/executor redesign
+class DegreeBucketingExecutor(Executor):
+    def __init__(self, g, rfunc, message_frame, edges=None):
+        self.g = g
+        self.rfunc = rfunc
+        self.msg_frame = message_frame
+
+        # calc degree bucketing schedule
+        if edges is not None:
+            unique_v, degs, dsts, msg_ids = light_degree_bucketing(edges[1])
+        else:
+            unique_v, degs, dsts, msg_ids = light_degree_bucketing_for_graph(g._graph)
+        self._recv_nodes = unique_v
+        self.degrees = degs
+        self.dsts = dsts
+        self.msg_ids = msg_ids
+
+    @property
+    def recv_nodes(self):
+        return self._recv_nodes
+
+    def run(self):
+        new_reprs = []
+        for deg, vv, msg_id in zip(self.degrees, self.dsts, self.msg_ids):
+            dst_reprs = self.g.get_n_repr(vv)
+            in_msgs = self.msg_frame.select_rows(msg_id)
+            def _reshape_fn(msg):
+                msg_shape = F.shape(msg)
+                new_shape = (len(vv), deg) + msg_shape[1:]
+                return F.reshape(msg, new_shape)
+            if len(in_msgs) == 1 and __MSG__ in in_msgs:
+                reshaped_in_msgs = _reshape_fn(in_msgs[__MSG__])
+            else:
+                reshaped_in_msgs = utils.LazyDict(
+                        lambda key: _reshape_fn(in_msgs[key]), self.msg_frame.schemes)
+            new_reprs.append(self.rfunc(dst_reprs, reshaped_in_msgs))
+
+        # Pack all reducer results together
+        if utils.is_dict_like(new_reprs[0]):
+            keys = new_reprs[0].keys()
+            new_reprs = {key : F.pack([repr[key] for repr in new_reprs])
+                         for key in keys}
+        else:
+            new_reprs = {__REPR__ : F.pack(new_reprs)}
+        return new_reprs
 
 
 class BasicExecutor(Executor):
@@ -366,5 +461,24 @@ def get_executor(call_type, graph, **kwargs):
         return _create_send_and_recv_exec(graph, **kwargs)
     else:
         return None
+
+def get_recv_executor(graph, reduce_func, message_frame, edges=None):
+    """Create executor for recv phase
+
+    Parameters
+    ----------
+    graph: DGLGraph
+        DGLGraph on which to perform recv
+    reduce_func: callable
+        The reduce function
+    message_frame: FrameRef
+        Message frame
+    edges: tuple/list of utils.Index
+        src and dst Index representing edges along which messages are sent
+        If not specified, all edges of graph are used instead
+    """
+
+    # FIXME: handle builtin spmv executor case
+    return DegreeBucketingExecutor(graph, reduce_func, message_frame, edges)
 
 _init_api("dgl.scheduler")

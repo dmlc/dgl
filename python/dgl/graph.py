@@ -1085,31 +1085,12 @@ class DGLGraph(object):
                 msg_frame.append({__MSG__: msgs})
 
             # recv with degree bucketing
-            unique_v, degs, dsts, msg_ids = scheduler.light_degree_bucketing(v)
-            unique_v = utils.toindex(unique_v)
-
-            new_reprs = []
-            for deg, vv, msg_id in zip(degs, dsts, msg_ids):
-                dst_reprs = self.get_n_repr(vv)
-                in_msgs = msg_frame.select_rows(utils.toindex(msg_id))
-                def _reshape_fn(msg):
-                    msg_shape = F.shape(msg)
-                    new_shape = (len(vv), deg) + msg_shape[1:]
-                    return F.reshape(msg, new_shape)
-                if len(in_msgs) == 1 and __MSG__ in in_msgs:
-                    reshaped_in_msgs = _reshape_fn(in_msgs[__MSG__])
-                else:
-                    reshaped_in_msgs = utils.LazyDict(
-                            lambda key: _reshape_fn(in_msgs[key]), msg_frame.schemes)
-                new_reprs.append(reduce_func(dst_reprs, reshaped_in_msgs))
-
-            # Pack all reducer results together
-            if utils.is_dict_like(new_reprs[0]):
-                keys = new_reprs[0].keys()
-                new_reprs = {key : F.pack([repr[key] for repr in new_reprs])
-                             for key in keys}
-            else:
-                new_reprs = {__REPR__ : F.pack(new_reprs)}
+            executor = scheduler.get_recv_executor(graph=self,
+                                                   reduce_func=reduce_func,
+                                                   message_frame=msg_frame,
+                                                   edges=(u, v))
+            new_reprs = executor.run()
+            unique_v = executor.recv_nodes
 
         self._apply_nodes(unique_v, apply_node_func, reduce_accum=new_reprs)
 
