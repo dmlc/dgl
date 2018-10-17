@@ -480,22 +480,22 @@ class DGLGraph(object):
         self._msg_graph.add_nodes(self._graph.number_of_nodes())
 
     def node_attr_schemes(self):
-        """Return the node attribute schemes.
+        """Return the node feature schemes.
 
         Returns
         -------
-        iterable
-            The set of attribute names
+        dict of str to schemes
+            The schemes of node feature columns.
         """
         return self._node_frame.schemes
 
     def edge_attr_schemes(self):
-        """Return the edge attribute schemes.
+        """Return the edge feature schemes.
 
         Returns
         -------
-        iterable
-            The set of attribute names
+        dict of str to schemes
+            The schemes of edge feature columns.
         """
         return self._edge_frame.schemes
 
@@ -510,12 +510,17 @@ class DGLGraph(object):
         Dictionary type is also supported for `hu`. In this case, each item
         will be treated as separate attribute of the nodes.
 
+        All update will be done out-placely to work with autograd unless the inplace
+        flag is true.
+
         Parameters
         ----------
         hu : tensor or dict of tensor
-          Node representation.
+            Node representation.
         u : node, container or tensor
-          The node(s).
+            The node(s).
+        inplace : bool
+            True if the update is done inplacely
         """
         # sanity check
         if is_all(u):
@@ -583,7 +588,7 @@ class DGLGraph(object):
         """
         return self._node_frame.pop(key)
 
-    def set_e_repr(self, h_uv, u=ALL, v=ALL):
+    def set_e_repr(self, h_uv, u=ALL, v=ALL, inplace=False):
         """Set edge(s) representation.
 
         To set multiple edge representations at once, pass `u` and `v` with tensors or
@@ -594,6 +599,9 @@ class DGLGraph(object):
         Dictionary type is also supported for `h_uv`. In this case, each item
         will be treated as separate attribute of the edges.
 
+        All update will be done out-placely to work with autograd unless the inplace
+        flag is true.
+
         Parameters
         ----------
         h_uv : tensor or dict of tensor
@@ -602,21 +610,26 @@ class DGLGraph(object):
           The source node(s).
         v : node, container or tensor
           The destination node(s).
+        inplace : bool
+            True if the update is done inplacely
         """
         # sanity check
         u_is_all = is_all(u)
         v_is_all = is_all(v)
         assert u_is_all == v_is_all
         if u_is_all:
-            self.set_e_repr_by_id(h_uv, eid=ALL)
+            self.set_e_repr_by_id(h_uv, eid=ALL, inplace=inplace)
         else:
             u = utils.toindex(u)
             v = utils.toindex(v)
             eid = self._graph.edge_ids(u, v)
-            self.set_e_repr_by_id(h_uv, eid=eid)
+            self.set_e_repr_by_id(h_uv, eid=eid, inplace=inplace)
 
-    def set_e_repr_by_id(self, h_uv, eid=ALL):
+    def set_e_repr_by_id(self, h_uv, eid=ALL, inplace=False):
         """Set edge(s) representation by edge id.
+
+        All update will be done out-placely to work with autograd unless the inplace
+        flag is true.
 
         Parameters
         ----------
@@ -624,6 +637,8 @@ class DGLGraph(object):
           Edge representation.
         eid : int, container or tensor
           The edge id(s).
+        inplace : bool
+            True if the update is done inplacely
         """
         # sanity check
         if is_all(eid):
@@ -638,16 +653,18 @@ class DGLGraph(object):
             assert F.shape(h_uv)[0] == num_edges
         # set
         if is_all(eid):
+            # update column
             if utils.is_dict_like(h_uv):
                 for key, val in h_uv.items():
                     self._edge_frame[key] = val
             else:
                 self._edge_frame[__REPR__] = h_uv
         else:
+            # update row
             if utils.is_dict_like(h_uv):
-                self._edge_frame[eid] = h_uv
+                self._edge_frame.update_rows(eid, h_uv, inplace=inplace)
             else:
-                self._edge_frame[eid] = {__REPR__ : h_uv}
+                self._edge_frame.update_rows(eid, {__REPR__ : h_uv}, inplace=inplace)
 
     def get_e_repr(self, u=ALL, v=ALL):
         """Get node(s) representation.

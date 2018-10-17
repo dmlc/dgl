@@ -24,7 +24,7 @@ class Scheme(object):
         self.dtype = dtype
 
     def __repr__(self):
-        return 'shape=%s dtype=%s' % (repr(self.shape), repr(self.dtype))
+        return '{shape=%s, dtype=%s}' % (repr(self.shape), repr(self.dtype))
 
     def __eq__(self, other):
         return self.shape == other.shape and self.dtype == other.dtype
@@ -35,7 +35,7 @@ class Scheme(object):
     @staticmethod
     def infer_scheme(tensor):
         """Infer the scheme of the given tensor."""
-        return Scheme(F.shape(tensor)[1:], F.get_tvmtype(tensor))
+        return Scheme(tuple(F.shape(tensor)[1:]), F.get_tvmtype(tensor))
 
 class Column(object):
     """A column is a compact store of features of multiple nodes/edges.
@@ -54,9 +54,9 @@ class Column(object):
 
     def __len__(self):
         """The column length."""
-        return F.shape(data)[0]
+        return F.shape(self.data)[0]
 
-    def __getitem__(idx):
+    def __getitem__(self, idx):
         """Return the feature data given the index.
 
         Parameters
@@ -72,7 +72,7 @@ class Column(object):
         user_idx = idx.tousertensor(F.get_context(self.data))
         return F.gather_row(self.data, user_idx)
 
-    def __setitem__(idx, feats):
+    def __setitem__(self, idx, feats):
         """Update the feature data given the index.
 
         The update is performed out-placely so it can be used in autograd mode.
@@ -230,10 +230,14 @@ class Frame(MutableMapping):
             The frame data to be appended.
         """
         if len(self._columns) == 0:
-            for key, col in other.items():
+            for key, val in other.items():
+                col = Column.create(val)
                 self._columns[key] = col
+                # TODO(minjie): sanity check for num_rows
+                self._num_rows = len(col)
         else:
-            for key, col in other.items():
+            for key, val in other.items():
+                col = Column.create(val)
                 sch = self._columns[key].scheme
                 other_sch = col.scheme
                 if sch != other_sch:
