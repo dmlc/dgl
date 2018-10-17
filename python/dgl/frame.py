@@ -4,9 +4,9 @@ from __future__ import absolute_import
 from collections import MutableMapping
 import numpy as np
 
-import dgl.backend as F
-from dgl.backend import Tensor
-import dgl.utils as utils
+from . import backend as F
+from .backend import Tensor
+from . import utils
 
 class Frame(MutableMapping):
     def __init__(self, data=None):
@@ -123,7 +123,7 @@ class FrameRef(MutableMapping):
     def select_rows(self, query):
         rowids = self._getrowid(query)
         def _lazy_select(key):
-            idx = rowids.totensor(F.get_context(self._frame[key]))
+            idx = rowids.tousertensor(F.get_context(self._frame[key]))
             return F.gather_row(self._frame[key], idx)
         return utils.LazyDict(_lazy_select, keys=self.schemes)
 
@@ -132,7 +132,7 @@ class FrameRef(MutableMapping):
         if self.is_span_whole_column():
             return col
         else:
-            idx = self.index().totensor(F.get_context(col))
+            idx = self.index().tousertensor(F.get_context(col))
             return F.gather_row(col, idx)
 
     def __setitem__(self, key, val):
@@ -141,7 +141,7 @@ class FrameRef(MutableMapping):
         else:
             self.update_rows(key, val)
 
-    def add_column(self, name, col):
+    def add_column(self, name, col, inplace=False):
         shp = F.shape(col)
         if self.is_span_whole_column():
             if self.num_columns == 0:
@@ -156,19 +156,26 @@ class FrameRef(MutableMapping):
             else:
                 fcol = F.zeros((self._frame.num_rows,) + shp[1:])
                 fcol = F.to_context(fcol, colctx)
-            idx = self.index().totensor(colctx)
-            newfcol = F.scatter_row(fcol, idx, col)
-            self._frame[name] = newfcol
+            idx = self.index().tousertensor(colctx)
+            if inplace:
+                self._frame[name] = fcol
+                self._frame[name][idx] = col
+            else:
+                newfcol = F.scatter_row(fcol, idx, col)
+                self._frame[name] = newfcol
 
-    def update_rows(self, query, other):
+    def update_rows(self, query, other, inplace=False):
         rowids = self._getrowid(query)
         for key, col in other.items():
             if key not in self:
                 # add new column
                 tmpref = FrameRef(self._frame, rowids)
-                tmpref.add_column(key, col)
-            idx = rowids.totensor(F.get_context(self._frame[key]))
-            self._frame[key] = F.scatter_row(self._frame[key], idx, col)
+                tmpref.add_column(key, col, inplace)
+            idx = rowids.tousertensor(F.get_context(self._frame[key]))
+            if inplace:
+                self._frame[key][idx] = col
+            else:
+                self._frame[key] = F.scatter_row(self._frame[key], idx, col)
 
     def __delitem__(self, key):
         if isinstance(key, str):
@@ -223,8 +230,8 @@ class FrameRef(MutableMapping):
             # shortcut for identical mapping
             return query
         else:
-            idxtensor = self.index().totensor()
-            return utils.toindex(F.gather_row(idxtensor, query.totensor()))
+            idxtensor = self.index().tousertensor()
+            return utils.toindex(F.gather_row(idxtensor, query.tousertensor()))
 
     def index(self):
         if self._index is None:

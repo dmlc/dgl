@@ -12,6 +12,30 @@ Show below, there are three sets of APIs for different models.
 
 ## For Model developers
 - Always choose the API at the *highest* possible level.
-- Refer to [the default modules](examples/pytorch/util.py) to see how to register message and node update functions as well as readout functions; note how you can control sharing of parameters by adding a counter.
+- Refer to the [GCN example](examples/pytorch/gcn/gcn_batch.py) to see how to register message and node update functions;
 
+## How to build (the `cpp` branch)
 
+Before building, make sure that the submodules are cloned.  If you haven't initialized the submodules, run
+
+```sh
+$ git submodule init
+```
+
+To sync the submodules, run
+
+```sh
+$ git submodule update
+```
+
+At the root directory of the repo:
+
+```sh
+$ mkdir build
+$ cd build
+$ cmake ..
+$ make
+$ export DGL_LIBRARY_PATH=$PWD
+```
+
+The `DGL_LIBRARY_PATH` environment variable should point to the library `libdgl.so` built by CMake.

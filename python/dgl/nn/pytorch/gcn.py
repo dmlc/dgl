@@ -7,9 +7,8 @@ GCN with SPMV specialization.
 """
 import torch.nn as nn
 
-import dgl
-import dgl.function as fn
-from dgl.base import ALL, is_all
+from ... import function as fn
+from ...base import ALL, is_all
 
 class NodeUpdateModule(nn.Module):
     def __init__(self, in_feats, out_feats, activation=None):

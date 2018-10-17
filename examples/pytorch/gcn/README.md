@@ -4,43 +4,9 @@ Graph Convolutional Networks (GCN)
 Paper link: [https://arxiv.org/abs/1609.02907](https://arxiv.org/abs/1609.02907)
 Author's code repo: [https://github.com/tkipf/gcn](https://github.com/tkipf/gcn)
 
-The folder contains three different implementations using DGL.
+The folder contains two different implementations using DGL.
 
-Naive GCN (gcn.py)
--------
-The model is defined in the finest granularity (aka on *one* edge and *one* node).
-
-* The message function `gcn_msg` computes the message for one edge. It simply returns the `h` representation of the source node.
-  ```python
-  def gcn_msg(src, edge):
-    # src['h'] is a tensor of shape (D,). D is the feature length.
-    return src['h']
-  ```
-* The reduce function `gcn_reduce` accumulates the incoming messages for one node. The `msgs` argument is a list of all the messages. In GCN, the incoming messages are summed up.
-  ```python
-  def gcn_reduce(node, msgs):
-    # msgs is a list of in-coming messages.
-    return sum(msgs)
-  ```
-* The update function `NodeUpdateModule` computes the new new node representation `h` using non-linear transformation on the reduced messages.
-  ```python
-  class NodeUpdateModule(nn.Module):
-    def __init__(self, in_feats, out_feats, activation=None):
-      super(NodeUpdateModule, self).__init__()
-      self.linear = nn.Linear(in_feats, out_feats)
-      self.activation = activation
-
-    def forward(self, node, accum):
-      # accum is a tensor of shape (D,).
-      h = self.linear(accum)
-      if self.activation:
-          h = self.activation(h)
-      return {'h' : h}
-  ```
-
-After defining the functions on each node/edge, the message passing is triggered by calling `update_all` on the DGLGraph object (in GCN module).
-
-Batched GCN (gcn_batch.py)
+Batched GCN (gcn.py)
 -----------
 Defining the model on only one node and edge makes it hard to fully utilize GPUs. As a result, we allow users to define model on a *batch of* nodes and edges.
 

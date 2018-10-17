@@ -11,7 +11,7 @@ import networkx as nx
 import scipy.sparse as sp
 import os, sys
 
-from dgl.data.utils import download, extract_archive, get_download_dir
+from .utils import download, extract_archive, get_download_dir
 
 _urls = {
     'cora' : 'https://www.dropbox.com/s/3ggdpkj7ou8svoc/cora.zip?dl=1',
