@@ -779,12 +779,34 @@ class DGLGraph(object):
         apply_node_func : callable
           The apply node function.
         """
+        self._apply_nodes(v, apply_node_func)
+
+    def _apply_nodes(self, v, apply_node_func="default", reduce_accum=None):
+        """Internal apply nodes
+
+        Parameters
+        ----------
+        reduce_accum: dict-like
+          The output of reduce func
+        """
         if apply_node_func == "default":
             apply_node_func = self._apply_node_func
         if not apply_node_func:
             # Skip none function call.
+            if reduce_accum is not None:
+                # write reduce result back
+                self.set_n_repr(reduce_accum, v)
             return
-        new_repr = apply_node_func(self.get_n_repr(v))
+        # take out current node repr
+        curr_repr = self.get_n_repr(v)
+        if reduce_accum is not None:
+            # merge current node_repr with reduce output
+            curr_repr = utils.HybridDict(reduce_accum, curr_repr)
+        new_repr = apply_node_func(curr_repr)
+        if reduce_accum is not None and utils.is_dict_like(new_repr) :
+            # merge new node_repr with reduce output
+            reduce_accum.update(new_repr)
+            new_repr = reduce_accum
         self.set_n_repr(new_repr, v)
 
     def apply_edges(self, u, v, apply_edge_func="default"):
@@ -1039,7 +1061,6 @@ class DGLGraph(object):
             # no edges to be triggered
             assert len(v) == 0
             return
-        unique_v = utils.toindex(F.unique(v.tousertensor()))
 
         if message_func == "default":
             message_func = self._message_func
@@ -1052,11 +1073,37 @@ class DGLGraph(object):
                 'send_and_recv', self, src=u, dst=v,
                 message_func=message_func, reduce_func=reduce_func)
         if executor:
-            executor.run()
+            new_reprs = executor.run()
+            if not utils.is_dict_like(new_reprs):
+                new_reprs = {__REPR__: new_reprs}
+            unique_v = executor.recv_nodes
         else:
-            self.send(u, v, message_func)
-            self.recv(unique_v, reduce_func, None)
-        self.apply_nodes(unique_v, apply_node_func)
+            # handle multiple message and reduce func
+            if isinstance(message_func, (tuple, list)):
+                message_func = BundledMessageFunction(message_func)
+            if isinstance(reduce_func, (list, tuple)):
+                reduce_func = BundledReduceFunction(reduce_func)
+
+            # message func
+            u, v = utils.edge_broadcasting(u, v)
+            src_reprs = self.get_n_repr(u)
+            edge_reprs = self.get_e_repr(u, v)
+            msgs = message_func(src_reprs, edge_reprs)
+            msg_frame = FrameRef()
+            if utils.is_dict_like(msgs):
+                msg_frame.append(msgs)
+            else:
+                msg_frame.append({__MSG__: msgs})
+
+            # recv with degree bucketing
+            executor = scheduler.get_recv_executor(graph=self,
+                                                   reduce_func=reduce_func,
+                                                   message_frame=msg_frame,
+                                                   edges=(u, v))
+            new_reprs = executor.run()
+            unique_v = executor.recv_nodes
+
+        self._apply_nodes(unique_v, apply_node_func, reduce_accum=new_reprs)
 
     def pull(self,
              v,
@@ -1134,11 +1181,13 @@ class DGLGraph(object):
         executor = scheduler.get_executor(
                 "update_all", self, message_func=message_func, reduce_func=reduce_func)
         if executor:
-            executor.run()
+            new_reprs = executor.run()
+            if not utils.is_dict_like(new_reprs):
+                new_reprs = {__REPR__: new_reprs}
+            self._apply_nodes(ALL, apply_node_func, reduce_accum=new_reprs)
         else:
             self.send(ALL, ALL, message_func)
-            self.recv(ALL, reduce_func, None)
-        self.apply_nodes(ALL, apply_node_func)
+            self.recv(ALL, reduce_func, apply_node_func)
 
     def propagate(self,
                   traverser='topo',
