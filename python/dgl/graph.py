@@ -1075,7 +1075,7 @@ class DGLGraph(object):
             new_reprs = executor.run()
             if not utils.is_dict_like(new_reprs):
                 new_reprs = {__REPR__: new_reprs}
-            unique_v = executor.graph_mapping
+            unique_v = executor.recv_nodes
         else:
             # handle multiple message and reduce func
             if isinstance(message_func, (tuple, list)):

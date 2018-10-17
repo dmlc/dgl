@@ -211,7 +211,7 @@ class BasicExecutor(Executor):
         raise NotImplementedError
 
     @property
-    def graph_mapping(self):
+    def recv_nodes(self):
         raise NotImplementedError
 
     def _build_exec(self, mfunc, rfunc):
@@ -247,7 +247,7 @@ class UpdateAllExecutor(BasicExecutor):
         self._edge_repr = None
         self._graph_idx = None
         self._graph_shape = None
-        self._graph_mapping = None
+        self._recv_nodes = None
 
     @property
     def graph_idx(self):
@@ -263,7 +263,7 @@ class UpdateAllExecutor(BasicExecutor):
         return self._graph_shape
 
     @property
-    def graph_mapping(self):
+    def recv_nodes(self):
         return ALL
 
     @property
@@ -304,7 +304,7 @@ class SendRecvExecutor(BasicExecutor):
         self._edge_repr = None
         self._graph_idx = None
         self._graph_shape = None
-        self._graph_mapping = None
+        self._recv_nodes = None
 
     @property
     def graph_idx(self):
@@ -319,10 +319,10 @@ class SendRecvExecutor(BasicExecutor):
         return self._graph_shape
 
     @property
-    def graph_mapping(self):
-        if self._graph_mapping is None:
+    def recv_nodes(self):
+        if self._recv_nodes is None:
             self._build_adjmat()
-        return self._graph_mapping
+        return self._recv_nodes
 
     @property
     def node_repr(self):
@@ -347,7 +347,7 @@ class SendRecvExecutor(BasicExecutor):
         m = len(new2old)
         self._graph_idx = F.pack([F.unsqueeze(new_v, 0), F.unsqueeze(u, 0)])
         self._graph_shape = [m, n]
-        self._graph_mapping = new2old
+        self._recv_nodes = new2old
 
     def _adj_build_fn(self, edge_field, ctx, use_edge_feat):
         if use_edge_feat:
