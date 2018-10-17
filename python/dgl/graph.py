@@ -3,6 +3,7 @@
 from __future__ import absolute_import
 
 import networkx as nx
+import numpy as np
 
 import dgl
 from .base import ALL, is_all, __MSG__, __REPR__
@@ -802,12 +803,34 @@ class DGLGraph(object):
         apply_node_func : callable
           The apply node function.
         """
+        self._apply_nodes(v, apply_node_func)
+
+    def _apply_nodes(self, v, apply_node_func="default", reduce_accum=None):
+        """Internal apply nodes
+
+        Parameters
+        ----------
+        reduce_accum: dict-like
+          The output of reduce func
+        """
         if apply_node_func == "default":
             apply_node_func = self._apply_node_func
         if not apply_node_func:
             # Skip none function call.
+            if reduce_accum is not None:
+                # write reduce result back
+                self.set_n_repr(reduce_accum, v)
             return
-        new_repr = apply_node_func(self.get_n_repr(v))
+        # take out current node repr
+        curr_repr = self.get_n_repr(v)
+        if reduce_accum is not None:
+            # merge current node_repr with reduce output
+            curr_repr = utils.HybridDict(reduce_accum, curr_repr)
+        new_repr = apply_node_func(curr_repr)
+        if reduce_accum is not None and utils.is_dict_like(new_repr) :
+            # merge new node_repr with reduce output
+            reduce_accum.update(new_repr)
+            new_repr = reduce_accum
         self.set_n_repr(new_repr, v)
 
     def apply_edges(self, u=None, v=None, apply_edge_func="default", eid=None):
@@ -1152,18 +1175,46 @@ class DGLGraph(object):
             executor = None
 
         if executor:
-            executor.run()
-        elif eid is None:
-            self.send(u, v, message_func)
-            self.recv(unique_v, reduce_func, None)
-        else:
+            new_reprs = executor.run()
+            if not utils.is_dict_like(new_reprs):
+                new_reprs = {__REPR__: new_reprs}
+            unique_v = executor.recv_nodes
+            self._apply_nodes(unique_v, apply_node_func, reduce_accum=new_reprs)
+        elif eid is not None:
             _, v, _ = self._graph.find_edges(eid)
             unique_v = utils.toindex(F.unique(v.tousertensor()))
 
+            # TODO: replace with the new DegreeBucketingScheduler
             self.send(eid=eid, message_func=message_func)
             self.recv(unique_v, reduce_func, None)
+            self.apply_nodes(unique_v, apply_node_func)
+        else:
+            # handle multiple message and reduce func
+            if isinstance(message_func, (tuple, list)):
+                message_func = BundledMessageFunction(message_func)
+            if isinstance(reduce_func, (list, tuple)):
+                reduce_func = BundledReduceFunction(reduce_func)
 
-        self.apply_nodes(unique_v, apply_node_func)
+            # message func
+            u, v = utils.edge_broadcasting(u, v)
+            src_reprs = self.get_n_repr(u)
+            edge_reprs = self.get_e_repr(u, v)
+            msgs = message_func(src_reprs, edge_reprs)
+            msg_frame = FrameRef()
+            if utils.is_dict_like(msgs):
+                msg_frame.append(msgs)
+            else:
+                msg_frame.append({__MSG__: msgs})
+
+            # recv with degree bucketing
+            executor = scheduler.get_recv_executor(graph=self,
+                                                   reduce_func=reduce_func,
+                                                   message_frame=msg_frame,
+                                                   edges=(u, v))
+            new_reprs = executor.run()
+            unique_v = executor.recv_nodes
+
+            self._apply_nodes(unique_v, apply_node_func, reduce_accum=new_reprs)
 
     def pull(self,
              v,
@@ -1241,11 +1292,13 @@ class DGLGraph(object):
         executor = scheduler.get_executor(
                 "update_all", self, message_func=message_func, reduce_func=reduce_func)
         if executor:
-            executor.run()
+            new_reprs = executor.run()
+            if not utils.is_dict_like(new_reprs):
+                new_reprs = {__REPR__: new_reprs}
+            self._apply_nodes(ALL, apply_node_func, reduce_accum=new_reprs)
         else:
             self.send(ALL, ALL, message_func)
-            self.recv(ALL, reduce_func, None)
-        self.apply_nodes(ALL, apply_node_func)
+            self.recv(ALL, reduce_func, apply_node_func)
 
     def propagate(self,
                   traverser='topo',
@@ -1410,3 +1463,57 @@ class DGLGraph(object):
         graph_data = self._graph.line_graph(backtracking)
         node_frame = self._edge_frame if shared else None
         return DGLGraph(graph_data, node_frame)
+
+    def filter_nodes(self, predicate, nodes=ALL):
+        """Return a tensor of node IDs that satisfy the given predicate.
+
+        Parameters
+        ----------
+        predicate : callable
+            The predicate should take in a dict of tensors whose values
+            are concatenation of node representations by node ID (same as
+            get_n_repr()), and return a boolean tensor with N elements
+            indicating which node satisfy the predicate.
+        nodes : container or tensor
+            The nodes to filter on
+
+        Returns
+        -------
+        tensor
+            The filtered nodes
+        """
+        n_repr = self.get_n_repr(nodes)
+        n_mask = predicate(n_repr)
+
+        if is_all(nodes):
+            return F.nonzero_1d(n_mask)
+        else:
+            nodes = F.Tensor(nodes)
+            return nodes[n_mask]
+
+    def filter_edges(self, predicate, edges=ALL):
+        """Return a tensor of edge IDs that satisfy the given predicate.
+
+        Parameters
+        ----------
+        predicate : callable
+            The predicate should take in a dict of tensors whose values
+            are concatenation of edge representations by edge ID (same as
+            get_e_repr_by_id()), and return a boolean tensor with N elements
+            indicating which node satisfy the predicate.
+        edges : container or tensor
+            The edges to filter on
+
+        Returns
+        -------
+        tensor
+            The filtered edges
+        """
+        e_repr = self.get_e_repr_by_id(edges)
+        e_mask = predicate(e_repr)
+
+        if is_all(edges):
+            return F.nonzero_1d(e_mask)
+        else:
+            edges = F.Tensor(edges)
+            return edges[e_mask]

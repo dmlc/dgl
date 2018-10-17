@@ -86,9 +86,7 @@ endif(MSVC)
 #assign_source_group("Include" ${GROUP_INCLUDE})
 
 # Source file lists
-file(GLOB CORE_SRCS
-    src/graph/*.cc
-    )
+file(GLOB CORE_SRCS src/graph/*.cc src/*.cc src/scheduler/*.cc)
 
 file(GLOB RUNTIME_SRCS src/runtime/*.cc)
 

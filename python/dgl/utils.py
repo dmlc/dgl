@@ -23,7 +23,7 @@ class Index(object):
             if not (F.dtype(data) == F.int64 and len(F.shape(data)) == 1):
                 raise ValueError('Index data must be 1D int64 vector, but got: %s' % str(data))
             self._user_tensor_data[F.get_context(data)] = data
-        elif isinstance(data, nd.NDArray): 
+        elif isinstance(data, nd.NDArray):
             if not (data.dtype == 'int64' and len(data.shape) == 1):
                 raise ValueError('Index data must be 1D int64 vector, but got: %s' % str(data))
             self._dgl_tensor_data = data
@@ -167,6 +167,34 @@ class LazyDict(Mapping):
 
     def __len__(self):
         return len(self._keys)
+
+class HybridDict(Mapping):
+    """A readonly dictonary that merges several dict-like (python dict, LazyDict).
+       If there are duplicate keys, early keys have priority over latter ones
+    """
+    def __init__(self, *dict_like_list):
+        self._dict_like_list = dict_like_list
+        self._keys = None
+
+    def keys(self):
+        if self._keys is None:
+            self._keys = sum([set(d.keys()) for d in self._dict_like_list], set())
+            self._keys = list(self._keys)
+        return self._keys
+
+    def __getitem__(self, key):
+        for d in self._dict_like_list:
+            if key in d:
+                return d[key]
+
+    def __contains__(self, key):
+        return key in self.keys()
+
+    def __iter__(self):
+        return iter(self.keys())
+
+    def __len__(self):
+        return len(self.keys())
 
 class ReadOnlyDict(Mapping):
     """A readonly dictionary wrapper."""
