@@ -34,10 +34,11 @@ void Graph::AddEdge(dgl_id_t src, dgl_id_t dst) {
   all_edges_src_.push_back(src);
   all_edges_dst_.push_back(dst);
 
-  std::vector<dgl_id_t>& edgelist = edgemap_[std::make_pair(src, dst)];
-  if (edgelist.size() > 0)
-    is_multigraph_ = true;
-  edgelist.push_back(eid);
+  if (!is_multigraph_)
+    // If an edge is added and currently the graph is a simple graph, we
+    // refresh the locked flag.  If the current graph is already multigraph
+    // then we won't change it.
+    is_multigraph_locked_ = false;
 }
 
 void Graph::AddEdges(IdArray src_ids, IdArray dst_ids) {
@@ -67,6 +68,28 @@ void Graph::AddEdges(IdArray src_ids, IdArray dst_ids) {
   }
 }
 
+// very inefficient
+bool Graph::IsMultigraph() {
+  if (is_multigraph_locked_)
+    return is_multigraph_;
+
+  is_multigraph_ = false;
+  is_multigraph_locked_ = true;
+  for (uint64_t src = 0; src < NumVertices(); ++src) {
+    std::set<dgl_id_t> dsts;
+    for (const auto& it : adjlist_[src].succ) {
+      if (dsts.count(it)) {
+	is_multigraph_ = true;
+	return true;
+      } else {
+	dsts.insert(it);
+      }
+    }
+  }
+
+  return false;
+}
+
 BoolArray Graph::HasVertices(IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
   const auto len = vids->shape[0];
@@ -80,15 +103,14 @@ BoolArray Graph::HasVertices(IdArray vids) const {
   return rst;
 }
 
-// O(1) Amortized
+// O(E)
 bool Graph::HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
-  if (!HasVertex(src) || !HasVertex(dst))
-    return false;
-
-  return edgemap_.find(std::make_pair(src, dst)) != edgemap_.end();
+  if (!HasVertex(src) || !HasVertex(dst)) return false;
+  const auto& succ = adjlist_[src].succ;
+  return std::find(succ.begin(), succ.end(), dst) != succ.end();
 }
 
-// O(N) Amortized
+// O(E*k) pretty slow
 BoolArray Graph::HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const {
   CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
   CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
@@ -153,16 +175,18 @@ IdArray Graph::Successors(dgl_id_t vid, uint64_t radius) const {
   return rst;
 }
 
-// O(e) Amortized (the number of edges in between)
+// O(E)
 IdArray Graph::EdgeId(dgl_id_t src, dgl_id_t dst) const {
   CHECK(HasVertex(src) && HasVertex(dst)) << "invalid edge: " << src << " -> " << dst;
 
-  const auto& it = edgemap_.find(std::make_pair(src, dst));
-  // TODO: should we return an empty array instead of complaining?
-  if (it == edgemap_.end())
-    LOG(FATAL) << "invalid edge: " << src << " -> " << dst;
+  const auto& succ = adjlist_[src].succ;
+  std::vector<dgl_id_t> edgelist;
 
-  const std::vector<dgl_id_t>& edgelist = it->second;
+  for (size_t i = 0; i < succ.size(); ++i) {
+    if (succ[i] == dst)
+      edgelist.push_back(adjlist_[src].edge_id[i]);
+  }
+
   // FIXME: signed?  Also it seems that we are using int64_t everywhere...
   const int64_t len = edgelist.size();
   IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
@@ -174,14 +198,14 @@ IdArray Graph::EdgeId(dgl_id_t src, dgl_id_t dst) const {
   return rst;
 }
 
-// O(N*e) Amortized (the number of edges in between)
+// O(E*k) pretty slow
 Graph::EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
   CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
   CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
+  const auto srclen = src_ids->shape[0];
+  const auto dstlen = dst_ids->shape[0];
+  int64_t i, j;
 
-  const int64_t srclen = src_ids->shape[0];
-  const int64_t dstlen = dst_ids->shape[0];
-  int64_t rstlen = 0;
   CHECK((srclen == dstlen) || (srclen == 1) || (dstlen == 1))
     << "Invalid src and dst id array.";
 
@@ -189,27 +213,22 @@ Graph::EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
   const int64_t dst_stride = (dstlen == 1 && srclen != 1) ? 0 : 1;
   const int64_t* src_data = static_cast<int64_t*>(src_ids->data);
   const int64_t* dst_data = static_cast<int64_t*>(dst_ids->data);
-  // vector of vector references
-  std::vector<dgl_id_t> effective_src;
-  std::vector<dgl_id_t> effective_dst;
-  std::vector<std::reference_wrapper<const std::vector<dgl_id_t>>> edgelists;
-  int64_t i, j;
+
+  std::vector<dgl_id_t> src, dst, eid;
 
   for (i = 0, j = 0; i < srclen && j < dstlen; i += src_stride, j += dst_stride) {
     const dgl_id_t src_id = src_data[i], dst_id = dst_data[j];
-    const auto& it = edgemap_.find(std::make_pair(src_id, dst_id));
-    // TODO: should we return an empty array instead of complaining?
-    if (it == edgemap_.end()) {
-      LOG(FATAL) << "invalid edge: " << src_id << " -> " << dst_id;
-    } else {
-      effective_src.push_back(src_id);
-      effective_dst.push_back(dst_id);
-      const std::vector<dgl_id_t>& edgelist = it->second;
-      edgelists.push_back(edgelist);
-      rstlen += edgelist.size();
+    const auto& succ = adjlist_[src_id].succ;
+    for (size_t k = 0; k < succ.size(); ++k) {
+      if (succ[k] == dst_id) {
+	src.push_back(src_id);
+	dst.push_back(dst_id);
+	eid.push_back(adjlist_[src_id].edge_id[k]);
+      }
     }
   }
 
+  int64_t rstlen = src.size();
   IdArray rst_src = IdArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
   IdArray rst_dst = IdArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
   IdArray rst_eid = IdArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
@@ -217,20 +236,9 @@ Graph::EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
   int64_t* rst_dst_data = static_cast<int64_t*>(rst_dst->data);
   int64_t* rst_eid_data = static_cast<int64_t*>(rst_eid->data);
 
-  // FIXME: int64_t <-> uint64_t
-  for (i = 0; i < (int64_t)(edgelists.size()); ++i) {
-    const dgl_id_t src_id = effective_src[i], dst_id = effective_dst[i];
-    const std::vector<dgl_id_t>& edgelist = edgelists[i];
-    const auto len = edgelist.size();
-
-    std::copy(edgelist.begin(), edgelist.end(), rst_eid_data);
-    std::fill(rst_src_data, rst_src_data + len, src_id);
-    std::fill(rst_dst_data, rst_dst_data + len, dst_id);
-
-    rst_src_data += len;
-    rst_dst_data += len;
-    rst_eid_data += len;
-  }
+  std::copy(src.begin(), src.end(), rst_src_data);
+  std::copy(dst.begin(), dst.end(), rst_dst_data);
+  std::copy(eid.begin(), eid.end(), rst_eid_data);
 
   return EdgeArray{rst_src, rst_dst, rst_eid};
 }

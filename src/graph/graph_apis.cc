@@ -113,7 +113,8 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphClear")
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphIsMultigraph")
 .set_body([] (TVMArgs args, TVMRetValue *rv) {
     GraphHandle ghandle = args[0];
-    const Graph* gptr = static_cast<Graph*>(ghandle);
+    // NOTE: not const since we have caches
+    Graph* gptr = static_cast<Graph*>(ghandle);
     *rv = gptr->IsMultigraph();
   });
 

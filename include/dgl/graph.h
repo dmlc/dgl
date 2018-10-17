@@ -3,8 +3,6 @@
 #define DGL_DGLGRAPH_H_
 
 #include <stdint.h>
-#include <utility>
-#include <unordered_map>
 #include "runtime/ndarray.h"
 
 namespace dgl {
@@ -57,9 +55,9 @@ class Graph {
     reverse_adjlist_ = other.reverse_adjlist_;
     all_edges_src_ = other.all_edges_src_;
     all_edges_dst_ = other.all_edges_dst_;
-    edgemap_ = other.edgemap_;
     read_only_ = other.read_only_;
     is_multigraph_ = other.is_multigraph_;
+    is_multigraph_locked_ = other.is_multigraph_locked_;
     num_edges_ = other.num_edges_;
     other.clear();
   }
@@ -101,16 +99,17 @@ class Graph {
     reverse_adjlist_.clear();
     all_edges_src_.clear();
     all_edges_dst_.clear();
-    edgemap_.clear();
     read_only_ = false;
     is_multigraph_ = false;
+    is_multigraph_locked_ = false;
     num_edges_ = 0;
   }
 
-  /*! \return whether the graph is a multigraph */
-  bool IsMultigraph() const {
-    return is_multigraph_;
-  }
+  /*!
+   * \note not const since we have caches
+   * \return whether the graph is a multigraph
+   */
+  bool IsMultigraph();
 
   /*! \return the number of vertices in the graph.*/
   uint64_t NumVertices() const {
@@ -264,6 +263,8 @@ class Graph {
    * of the edges preserve the index order in the original graph. Vertices not in the
    * original graph are ignored.
    *
+   * The result subgraph is read-only.
+   *
    * \param vids The vertices in the subgraph.
    * \return the induced subgraph
    */
@@ -279,6 +280,8 @@ class Graph {
    * index of the edges preserve the order of the given id array, while the local index
    * of the vertices preserve the index order in the original graph. Edges not in the
    * original graph are ignored.
+   *
+   * The result subgraph is read-only.
    *
    * \param eids The edges in the subgraph.
    * \return the induced edge subgraph
@@ -305,19 +308,6 @@ class Graph {
   };
   typedef std::vector<EdgeList> AdjacencyList;
 
-  /* hash definition for ID pairs to be used for unordered_map */
-  typedef std::pair<dgl_id_t, dgl_id_t> IdPair;
-  struct IdPairHash {
-   public:
-    size_t operator () (const IdPair &p) const {
-      uint64_t h1 = (p.first + 0x3333333333333333) * 0x1f1f1f1f1f1f1f1f;
-      uint64_t h2 = (p.second + 0xcccccccccccccccc) * 0x0f0f0f0f0f0f0f0f;
-      return (size_t)(h1 ^ h2);
-    }
-  };
-  /*! \brief Internal hashmap with vertex pairs as keys and edge ID as values */
-  typedef std::unordered_map<IdPair, std::vector<dgl_id_t>, IdPairHash> EdgeMap;
-
   /*! \brief adjacency list using vector storage */
   AdjacencyList adjlist_;
   /*! \brief reverse adjacency list using vector storage */
@@ -328,9 +318,6 @@ class Graph {
   /*! \brief all edges' dst endpoints in their edge id order */
   std::vector<dgl_id_t> all_edges_dst_;
 
-  /*! \brief hashmap for indexing list of edges given vertex pairs */
-  EdgeMap edgemap_;
-
   /*! \brief read only flag */
   bool read_only_ = false;
   /*!
@@ -339,6 +326,8 @@ class Graph {
    * When a multiedge is added, this flag switches to true.
    */
   bool is_multigraph_ = false;
+  /*! \brief whether the result of IsMultigraph is locked */
+  bool is_multigraph_locked_ = false;
   /*! \brief number of edges */
   uint64_t num_edges_ = 0;
 };
