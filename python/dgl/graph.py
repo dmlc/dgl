@@ -887,6 +887,11 @@ class DGLGraph(object):
           The message function.
         eid : optional, edge, container or tensor
           The edge to update on.  If eid is not None then u and v are ignored.
+
+        Notes
+        -----
+        On multigraphs, if u and v are specified, then the messages will be sent
+        along all edges between u and v.
         """
         if message_func == "default":
             message_func = self._message_func
@@ -1146,6 +1151,11 @@ class DGLGraph(object):
           The reduce function.
         apply_node_func : callable, optional
           The update function.
+
+        Notes
+        -----
+        On multigraphs, if u and v are specified, then the messages will be sent
+        and received along all edges between u and v.
         """
         if message_func == "default":
             message_func = self._message_func
