@@ -1,11 +1,14 @@
-#include <dgl/c_api_common.h>
 #include <dgl/graph.h>
 #include <dgl/graph_op.h>
+#include "../c_api_common.h"
+
+using tvm::runtime::TVMArgs;
+using tvm::runtime::TVMArgValue;
+using tvm::runtime::TVMRetValue;
+using tvm::runtime::PackedFunc;
+using tvm::runtime::NDArray;
 
 namespace dgl {
-
-// Graph handler type
-typedef void* GraphHandle;
 
 namespace {
 // Convert EdgeArray structure to PackedFunc.

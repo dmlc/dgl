@@ -1072,8 +1072,6 @@ class DGLGraph(object):
                 'send_and_recv', self, src=u, dst=v,
                 message_func=message_func, reduce_func=reduce_func)
         if executor:
-            # FIXME: executor.run should not directly write to storage
-            #        fuse reduce and apply to avoid index operations
             new_reprs = executor.run()
             if not utils.is_dict_like(new_reprs):
                 new_reprs = {__REPR__: new_reprs}

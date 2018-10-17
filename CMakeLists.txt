@@ -86,11 +86,7 @@ endif(MSVC)
 #assign_source_group("Include" ${GROUP_INCLUDE})
 
 # Source file lists
-file(GLOB COMMON_SRCS src/common/*.cc)
-
-file(GLOB CORE_SRCS src/graph/*.cc)
-
-file(GLOB SCHEDULER_SRCS src/scheduler/*.cc)
+file(GLOB CORE_SRCS src/graph/*.cc src/*.cc src/scheduler/*.cc)
 
 file(GLOB RUNTIME_SRCS src/runtime/*.cc)
 
@@ -140,7 +136,7 @@ file(GLOB RUNTIME_SRCS src/runtime/*.cc)
 #include(cmake/modules/contrib/Sort.cmake)
 #include(cmake/modules/contrib/NNPack.cmake)
 
-add_library(dgl SHARED ${CORE_SRCS} ${COMMON_SRCS} ${SCHEDULER_SRCS} ${RUNTIME_SRCS})
+add_library(dgl SHARED ${CORE_SRCS} ${RUNTIME_SRCS})
 #add_library(dgl_runtime SHARED ${RUNTIME_SRCS})
 
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})

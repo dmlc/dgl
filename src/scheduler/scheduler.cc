@@ -5,8 +5,7 @@
 #include <dgl/scheduler.h>
 
 namespace dgl {
-
-namespace scheduler {
+namespace sched {
 
 std::vector<IdArray> DegreeBucketing(const IdArray& vids) {
     const auto n_msgs = vids->shape[0];
@@ -63,6 +62,6 @@ std::vector<IdArray> DegreeBucketing(const IdArray& vids) {
     return std::move(ret);
 }
 
-} // namespace scheduler
+} // namespace sched
 
 } // namespace dgl
