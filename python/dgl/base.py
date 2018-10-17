@@ -1,4 +1,7 @@
 """Module for base types and utilities."""
+from __future__ import absolute_import
+
+from ._ffi.base import DGLError
 
 # A special argument for selecting all nodes/edges.
 ALL = "__ALL__"
