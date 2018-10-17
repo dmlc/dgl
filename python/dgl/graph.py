@@ -786,12 +786,12 @@ class DGLGraph(object):
         """
         self._apply_edge_func = apply_edge_func
 
-    def apply_nodes(self, v, apply_node_func="default"):
+    def apply_nodes(self, v=ALL, apply_node_func="default"):
         """Apply the function on node representations.
 
         Parameters
         ----------
-        v : int, iterable of int, tensor
+        v : int, iterable of int, tensor, optional
           The node id(s).
         apply_node_func : callable
           The apply node function.
