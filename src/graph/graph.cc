@@ -33,12 +33,6 @@ void Graph::AddEdge(dgl_id_t src, dgl_id_t dst) {
 
   all_edges_src_.push_back(src);
   all_edges_dst_.push_back(dst);
-
-  if (!is_multigraph_)
-    // If an edge is added and currently the graph is a simple graph, we
-    // refresh the locked flag.  If the current graph is already multigraph
-    // then we won't change it.
-    is_multigraph_locked_ = false;
 }
 
 void Graph::AddEdges(IdArray src_ids, IdArray dst_ids) {
@@ -66,28 +60,6 @@ void Graph::AddEdges(IdArray src_ids, IdArray dst_ids) {
       AddEdge(src_data[i], dst_data[i]);
     }
   }
-}
-
-// very inefficient
-bool Graph::IsMultigraph() {
-  if (is_multigraph_locked_)
-    return is_multigraph_;
-
-  is_multigraph_ = false;
-  is_multigraph_locked_ = true;
-  for (uint64_t src = 0; src < NumVertices(); ++src) {
-    std::set<dgl_id_t> dsts;
-    for (const auto& it : adjlist_[src].succ) {
-      if (dsts.count(it)) {
-	is_multigraph_ = true;
-	return true;
-      } else {
-	dsts.insert(it);
-      }
-    }
-  }
-
-  return false;
 }
 
 BoolArray Graph::HasVertices(IdArray vids) const {

@@ -66,7 +66,8 @@ DLManagedTensor* CreateTmpDLManagedTensor(const TVMArgValue& arg) {
 
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
-    GraphHandle ghandle = new Graph();
+    bool multigraph = static_cast<bool>(args[0]);
+    GraphHandle ghandle = new Graph(multigraph);
     *rv = ghandle;
   });
 
@@ -114,7 +115,7 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphIsMultigraph")
 .set_body([] (TVMArgs args, TVMRetValue *rv) {
     GraphHandle ghandle = args[0];
     // NOTE: not const since we have caches
-    Graph* gptr = static_cast<Graph*>(ghandle);
+    const Graph* gptr = static_cast<Graph*>(ghandle);
     *rv = gptr->IsMultigraph();
   });
 

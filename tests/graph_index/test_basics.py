@@ -4,14 +4,17 @@ from dgl.graph_index import create_graph_index
 import networkx as nx
 
 def test_edge_id():
-    gi = create_graph_index()
+    gi = create_graph_index(multigraph=False)
+    assert not gi.is_multigraph()
+
+    gi = create_graph_index(multigraph=True)
 
     gi.add_nodes(4)
     gi.add_edge(0, 1)
     eid = gi.edge_id(0, 1).tolist()
     assert len(eid) == 1
     assert eid[0] == 0
-    assert not gi.is_multigraph()
+    assert gi.is_multigraph()
 
     # multiedges
     gi.add_edge(0, 1)
@@ -19,7 +22,6 @@ def test_edge_id():
     assert len(eid) == 2
     assert eid[0] == 0
     assert eid[1] == 1
-    assert gi.is_multigraph()
 
     gi.add_edges(toindex([0, 1, 1, 2]), toindex([2, 2, 2, 3]))
     src, dst, eid = gi.edge_ids(toindex([0, 0, 2, 1]), toindex([2, 1, 3, 2]))
@@ -47,7 +49,6 @@ def test_edge_id():
     assert all(e == ea for e, ea in zip(eid, eid_answer))
 
     gi.clear()
-    assert not gi.is_multigraph()
     # the following assumes that grabbing nonexistent edge will throw an error
     try:
         gi.edge_id(0, 1)
@@ -64,29 +65,35 @@ def test_edge_id():
     assert eid[0] == 0
 
 def test_nx():
-    gi = create_graph_index()
+    gi = create_graph_index(multigraph=True)
 
     gi.add_nodes(2)
     gi.add_edge(0, 1)
     nxg = gi.to_networkx()
-    assert not nxg.is_multigraph()
+    assert len(nxg.nodes) == 2
+    assert len(nxg.edges(0, 1)) == 1
     gi.add_edge(0, 1)
     nxg = gi.to_networkx()
-    assert nxg.is_multigraph()
+    assert len(nxg.edges(0, 1)) == 2
 
-    nxg = nx.Graph()
+    nxg = nx.DiGraph()
     nxg.add_edge(0, 1)
     gi.from_networkx(nxg)
-    assert not gi.is_multigraph()
+    assert gi.number_of_nodes() == 2
+    assert gi.number_of_edges() == 1
+    assert gi.edge_id(0, 1)[0] == 0
 
-    nxg = nx.MultiGraph()
+    nxg = nx.MultiDiGraph()
     nxg.add_edge(0, 1)
     nxg.add_edge(0, 1)
     gi.from_networkx(nxg)
-    assert gi.is_multigraph()
+    assert gi.number_of_nodes() == 2
+    assert gi.number_of_edges() == 2
+    assert 0 in gi.edge_id(0, 1)
+    assert 1 in gi.edge_id(0, 1)
 
 def test_predsucc():
-    gi = create_graph_index()
+    gi = create_graph_index(multigraph=True)
 
     gi.add_nodes(4)
     gi.add_edge(0, 1)
@@ -113,3 +120,4 @@ def test_predsucc():
 if __name__ == '__main__':
     test_edge_id()
     test_nx()
+    test_predsucc()

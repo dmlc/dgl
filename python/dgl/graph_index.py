@@ -541,8 +541,8 @@ class GraphIndex(object):
         self.clear()
 
         if not isinstance(nx_graph, nx.Graph):
-            # Assumes MultiDiGraph; GraphIndex doesn't care anyway
-            nx_graph = nx.MultiDiGraph(nx_graph)
+            nx_graph = (nx.MultiDiGraph(nx_graph) if self.is_multigraph()
+                    else nx.DiGraph(nx_graph))
         else:
             nx_graph = nx_graph.to_directed()
 
@@ -682,17 +682,19 @@ def disjoint_partition(graph, num_or_size_splits):
         graphs.append(GraphIndex(handle))
     return graphs
 
-def create_graph_index(graph_data=None):
+def create_graph_index(graph_data=None, multigraph=False):
     """Create a graph index object.
 
     Parameters
     ----------
     graph_data : graph data, optional
         Data to initialize graph. Same as networkx's semantics.
+    multigraph : bool, optional
+        Whether the graph is multigraph (default is False)
     """
     if isinstance(graph_data, GraphIndex):
         return graph_data
-    handle = _CAPI_DGLGraphCreate()
+    handle = _CAPI_DGLGraphCreate(multigraph)
     gi = GraphIndex(handle)
     if graph_data is not None:
         gi.from_networkx(graph_data)

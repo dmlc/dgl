@@ -41,7 +41,7 @@ class Graph {
   } EdgeArray;
 
   /*! \brief default constructor */
-  Graph() {}
+  Graph(bool multigraph = false) : is_multigraph_(multigraph) {}
 
   /*! \brief default copy constructor */
   Graph(const Graph& other) = default;
@@ -57,9 +57,8 @@ class Graph {
     all_edges_dst_ = other.all_edges_dst_;
     read_only_ = other.read_only_;
     is_multigraph_ = other.is_multigraph_;
-    is_multigraph_locked_ = other.is_multigraph_locked_;
     num_edges_ = other.num_edges_;
-    other.clear();
+    other.Clear();
   }
 #endif  // _MSC_VER
 
@@ -101,7 +100,6 @@ class Graph {
     all_edges_dst_.clear();
     read_only_ = false;
     is_multigraph_ = false;
-    is_multigraph_locked_ = false;
     num_edges_ = 0;
   }
 
@@ -109,7 +107,9 @@ class Graph {
    * \note not const since we have caches
    * \return whether the graph is a multigraph
    */
-  bool IsMultigraph();
+  bool IsMultigraph() const {
+    return is_multigraph_;
+  }
 
   /*! \return the number of vertices in the graph.*/
   uint64_t NumVertices() const {
@@ -326,8 +326,6 @@ class Graph {
    * When a multiedge is added, this flag switches to true.
    */
   bool is_multigraph_ = false;
-  /*! \brief whether the result of IsMultigraph is locked */
-  bool is_multigraph_locked_ = false;
   /*! \brief number of edges */
   uint64_t num_edges_ = 0;
 };

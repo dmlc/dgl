@@ -31,18 +31,21 @@ class DGLGraph(object):
         Node feature storage.
     edge_frame : FrameRef
         Edge feature storage.
+    multigraph : bool, optional
+        Whether the graph would be a multigraph (default: False)
     """
     def __init__(self,
                  graph_data=None,
                  node_frame=None,
-                 edge_frame=None):
+                 edge_frame=None,
+                 multigraph=False):
         # graph
-        self._graph = create_graph_index(graph_data)
+        self._graph = create_graph_index(graph_data, multigraph)
         # frame
         self._node_frame = node_frame if node_frame is not None else FrameRef()
         self._edge_frame = edge_frame if edge_frame is not None else FrameRef()
         # msg graph & frame
-        self._msg_graph = create_graph_index()
+        self._msg_graph = create_graph_index(multigraph=multigraph)
         self._msg_frame = FrameRef()
         self._msg_edges = []
         self.reset_messages()
