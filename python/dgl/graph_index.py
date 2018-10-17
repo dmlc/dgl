@@ -691,14 +691,9 @@ def create_graph_index(graph_data=None, multigraph=False):
         Data to initialize graph. Same as networkx's semantics.
     multigraph : bool, optional
         Whether the graph is multigraph (default is False)
-        If graph_data is a NetworkX graph, multigraph is automatically
-        determined (and this argument is ignored)
     """
     if isinstance(graph_data, GraphIndex):
         return graph_data
-
-    if isinstance(graph_data, nx.Graph):
-        multigraph = graph_data.is_multigraph()
 
     handle = _CAPI_DGLGraphCreate(multigraph)
     gi = GraphIndex(handle)

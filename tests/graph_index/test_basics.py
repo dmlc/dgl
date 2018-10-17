@@ -87,7 +87,7 @@ def test_nx():
     nxg = nx.MultiDiGraph()
     nxg.add_edge(0, 1)
     nxg.add_edge(0, 1)
-    gi = create_graph_index(nxg)
+    gi = create_graph_index(nxg, True)
     assert gi.is_multigraph()
     assert gi.number_of_nodes() == 2
     assert gi.number_of_edges() == 2
