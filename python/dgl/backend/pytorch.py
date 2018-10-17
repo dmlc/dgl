@@ -143,3 +143,8 @@ def zerocopy_from_numpy(np_data):
     arr.ctx = get_context(data)
     return arr
     '''
+
+def nonzero_1d(arr):
+    """Return a 1D tensor with nonzero element indices in a 1D vector"""
+    assert arr.dim() == 1
+    return th.nonzero(arr)[:, 0]

@@ -3,6 +3,7 @@
 from __future__ import absolute_import
 
 import networkx as nx
+import numpy as np
 
 import dgl
 from .base import ALL, is_all, __MSG__, __REPR__
@@ -1285,3 +1286,57 @@ class DGLGraph(object):
         graph_data = self._graph.line_graph(backtracking)
         node_frame = self._edge_frame if shared else None
         return DGLGraph(graph_data, node_frame)
+
+    def filter_nodes(self, predicate, nodes=ALL):
+        """Return a tensor of node IDs that satisfy the given predicate.
+
+        Parameters
+        ----------
+        predicate : callable
+            The predicate should take in a dict of tensors whose values
+            are concatenation of node representations by node ID (same as
+            get_n_repr()), and return a boolean tensor with N elements
+            indicating which node satisfy the predicate.
+        nodes : container or tensor
+            The nodes to filter on
+
+        Returns
+        -------
+        tensor
+            The filtered nodes
+        """
+        n_repr = self.get_n_repr(nodes)
+        n_mask = predicate(n_repr)
+
+        if is_all(nodes):
+            return F.nonzero_1d(n_mask)
+        else:
+            nodes = F.Tensor(nodes)
+            return nodes[n_mask]
+
+    def filter_edges(self, predicate, edges=ALL):
+        """Return a tensor of edge IDs that satisfy the given predicate.
+
+        Parameters
+        ----------
+        predicate : callable
+            The predicate should take in a dict of tensors whose values
+            are concatenation of edge representations by edge ID (same as
+            get_e_repr_by_id()), and return a boolean tensor with N elements
+            indicating which node satisfy the predicate.
+        edges : container or tensor
+            The edges to filter on
+
+        Returns
+        -------
+        tensor
+            The filtered edges
+        """
+        e_repr = self.get_e_repr_by_id(edges)
+        e_mask = predicate(e_repr)
+
+        if is_all(edges):
+            return F.nonzero_1d(e_mask)
+        else:
+            edges = F.Tensor(edges)
+            return edges[e_mask]
