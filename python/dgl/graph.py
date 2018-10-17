@@ -1311,8 +1311,7 @@ class DGLGraph(object):
         if is_all(nodes):
             return F.nonzero_1d(n_mask)
         else:
-            n_array = np.array(nodes)
-            return F.from_numpy(n_array[np.array(n_mask, dtype='bool')])
+            return n_array[n_mask]
 
     def filter_edges(self, predicate, edges=ALL):
         """Return a tensor of edge IDs that satisfy the given predicate.
@@ -1338,5 +1337,4 @@ class DGLGraph(object):
         if is_all(edges):
             return F.nonzero_1d(e_mask)
         else:
-            e_array = np.array(edges)
-            return F.from_numpy(e_array[np.array(e_mask, dtype='bool')])
+            return e_array[e_mask]
