@@ -25,7 +25,7 @@ namespace sched {
  */
 std::vector<IdArray> DegreeBucketing(const IdArray& vids);
 
-} // namespace scheduler
+} // namespace sched
 
 } // namespace dgl
 

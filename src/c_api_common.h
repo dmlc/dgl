@@ -1,4 +1,4 @@
-// DGL Common util functions
+// DGL C API common util functions
 #ifndef DGL_C_API_COMMON_H_
 #define DGL_C_API_COMMON_H_
 
@@ -20,4 +20,4 @@ tvm::runtime::PackedFunc ConvertNDArrayVectorToPackedFunc(const std::vector<tvm:
 
 } // namespace dgl
 
-#endif // DGL_COMMON_H_
+#endif // DGL_C_API_COMMON_H_
