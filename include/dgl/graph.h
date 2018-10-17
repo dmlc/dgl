@@ -99,7 +99,6 @@ class Graph {
     all_edges_src_.clear();
     all_edges_dst_.clear();
     read_only_ = false;
-    is_multigraph_ = false;
     num_edges_ = 0;
   }
 

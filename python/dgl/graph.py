@@ -140,7 +140,7 @@ class DGLGraph(object):
     def is_multigraph(self):
         """Whether the graph is a multigraph.
         """
-        return bool(self._graph.is_multigraph())
+        return self._graph.is_multigraph()
 
     def number_of_edges(self):
         """Return the number of edges.
@@ -1155,6 +1155,9 @@ class DGLGraph(object):
         assert reduce_func is not None
 
         if eid is None:
+            if u is None or v is None:
+                raise ValueError('u and v must be given if eid is None')
+
             u = utils.toindex(u)
             v = utils.toindex(v)
             if len(u) == 0:
@@ -1186,8 +1189,7 @@ class DGLGraph(object):
 
             # TODO: replace with the new DegreeBucketingScheduler
             self.send(eid=eid, message_func=message_func)
-            self.recv(unique_v, reduce_func, None)
-            self.apply_nodes(unique_v, apply_node_func)
+            self.recv(unique_v, reduce_func, apply_node_func)
         else:
             # handle multiple message and reduce func
             if isinstance(message_func, (tuple, list)):

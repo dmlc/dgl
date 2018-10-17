@@ -77,10 +77,10 @@ class GraphIndex(object):
 
         Returns
         -------
-        int
-            1 if it is a multigraph, 0 otherwise.
+        bool
+            True if it is a multigraph, False otherwise.
         """
-        return _CAPI_DGLGraphIsMultigraph(self._handle)
+        return bool(_CAPI_DGLGraphIsMultigraph(self._handle))
 
     def number_of_nodes(self):
         """Return the number of nodes.
@@ -112,10 +112,10 @@ class GraphIndex(object):
 
         Returns
         -------
-        int
-            1 if the node exists, 0 otherwise.
+        bool
+            True if the node exists, False otherwise.
         """
-        return _CAPI_DGLGraphHasVertex(self._handle, vid)
+        return bool(_CAPI_DGLGraphHasVertex(self._handle, vid))
 
     def has_nodes(self, vids):
         """Return true if the nodes exist.
@@ -145,10 +145,10 @@ class GraphIndex(object):
 
         Returns
         -------
-        int
-            1 if the edge exists, 0 otherwise
+        bool
+            True if the edge exists, False otherwise
         """
-        return _CAPI_DGLGraphHasEdgeBetween(self._handle, u, v)
+        return bool(_CAPI_DGLGraphHasEdgeBetween(self._handle, u, v))
 
     def has_edges_between(self, u, v):
         """Return true if the edge exists.
@@ -691,9 +691,15 @@ def create_graph_index(graph_data=None, multigraph=False):
         Data to initialize graph. Same as networkx's semantics.
     multigraph : bool, optional
         Whether the graph is multigraph (default is False)
+        If graph_data is a NetworkX graph, multigraph is automatically
+        determined (and this argument is ignored)
     """
     if isinstance(graph_data, GraphIndex):
         return graph_data
+
+    if isinstance(graph_data, nx.Graph):
+        multigraph = graph_data.is_multigraph()
+
     handle = _CAPI_DGLGraphCreate(multigraph)
     gi = GraphIndex(handle)
     if graph_data is not None:

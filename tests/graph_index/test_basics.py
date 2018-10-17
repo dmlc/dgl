@@ -78,7 +78,8 @@ def test_nx():
 
     nxg = nx.DiGraph()
     nxg.add_edge(0, 1)
-    gi.from_networkx(nxg)
+    gi = create_graph_index(nxg)
+    assert not gi.is_multigraph()
     assert gi.number_of_nodes() == 2
     assert gi.number_of_edges() == 1
     assert gi.edge_id(0, 1)[0] == 0
@@ -86,7 +87,8 @@ def test_nx():
     nxg = nx.MultiDiGraph()
     nxg.add_edge(0, 1)
     nxg.add_edge(0, 1)
-    gi.from_networkx(nxg)
+    gi = create_graph_index(nxg)
+    assert gi.is_multigraph()
     assert gi.number_of_nodes() == 2
     assert gi.number_of_edges() == 2
     assert 0 in gi.edge_id(0, 1)
