@@ -9,7 +9,7 @@ reduce_msg_shapes = set()
 
 def check_eq(a, b):
     assert a.shape == b.shape
-    assert mx.sum(a == b) == int(np.prod(list(a.shape)))
+    assert mx.nd.sum(a == b).asnumpy() == int(np.prod(list(a.shape)))
 
 def message_func(src, edge):
     assert len(src['h'].shape) == 2
@@ -53,16 +53,12 @@ def test_batch_setter_getter():
     assert len(g.get_n_repr()) == 0
     g.set_n_repr({'h' : mx.nd.zeros((10, D))})
     # set partial nodes
-    # TODO we need to enable the test later.
-    '''
     u = mx.nd.array([1, 3, 5], dtype='int64')
     g.set_n_repr({'h' : mx.nd.ones((3, D))}, u)
     assert _pfc(g.get_n_repr()['h']) == [0., 1., 0., 1., 0., 1., 0., 0., 0., 0.]
     # get partial nodes
     u = mx.nd.array([1, 2, 3], dtype='int64')
-    print(g.get_n_repr(u)['h'])
     assert _pfc(g.get_n_repr(u)['h']) == [1., 0., 1.]
-    '''
 
     '''
     s, d, eid
@@ -127,9 +123,11 @@ def test_batch_setter_autograd():
     with mx.autograd.record():
         g = generate_graph(grad=True)
         h1 = g.get_n_repr()['h']
+        h1.attach_grad()
         # partial set
         v = mx.nd.array([1, 2, 8], dtype='int64')
         hh = mx.nd.zeros((len(v), D))
+        hh.attach_grad()
         g.set_n_repr({'h' : hh}, v)
         h2 = g.get_n_repr()['h']
     h2.backward(mx.nd.ones((10, D)) * 2)
@@ -252,8 +250,7 @@ def test_pull_0deg():
 
 if __name__ == '__main__':
     test_batch_setter_getter()
-    # TODO we need to enable it after index_copy is implemented.
-    #test_batch_setter_autograd()
+    test_batch_setter_autograd()
     test_batch_send()
     test_batch_recv()
     test_update_routines()

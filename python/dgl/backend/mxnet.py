@@ -46,8 +46,14 @@ def from_numpy(np_data):
 def pack(tensors):
     return F.concat(*tensors, dim=0)
 
-def unpack(x, indices_or_sections=1):
-    return th.split(x, indices_or_sections)
+def unpack(x, split_sizes_or_sections=1):
+    if isinstance(split_sizes_or_sections, list):
+        np_arr = x.asnumpy()
+        indices = np.cumsum(split_sizes_or_sections)
+        res = np.split(np_arr, indices[:-1])
+        return [tensor(arr, dtype=x.dtype) for arr in res]
+    else:
+        return F.split(x, split_sizes_or_sections)
 
 # TODO this doesn't exist for symbol.
 def shape(x):
@@ -66,7 +72,10 @@ def unique(x):
     return mx.nd.array(tmp, ctx=x.context, dtype=x.dtype)
 
 def gather_row(data, row_index):
-    return data[row_index,]
+    if isinstance(row_index, F.NDArray):
+        return F.take(data, row_index)
+    else:
+        return data[row_index,]
 
 scatter_row = mx.nd.contrib.index_copy
 
