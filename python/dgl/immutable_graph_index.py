@@ -398,9 +398,10 @@ class ImmutableGraphIndex(object):
             An object that returns tensor given context.
         """
         if edge_type == 'in':
-            return self._in_csr
+            mat = self._in_csr.astype(np.float32)
         else:
-            return self._out_csr
+            mat = self._out_csr.astype(np.float32)
+        return utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
 
     def incidence_matrix(self, oriented=False):
         """Return the incidence matrix representation of this graph.
