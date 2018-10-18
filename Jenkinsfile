@@ -39,6 +39,15 @@ pipeline {
                                 }
                             }
                         }
+                        stage('EXAMPLE TEST') {
+                            steps {
+                                dir ('tests/scripts') {
+                                    withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
+                                        sh './test_examples.sh'
+                                    }
+                                }
+                            }
+                        }
                     }
                     post {
                         always {
@@ -86,7 +95,7 @@ pipeline {
                             steps {
                                 dir ('tests/scripts') {
                                     withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
-                                        sh './test_examples'
+                                        sh './test_examples_gpu.sh'
                                     }
                                 }
                             }
