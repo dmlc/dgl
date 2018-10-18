@@ -242,6 +242,104 @@ def test_pull_0deg():
     assert th.allclose(new_repr[0], old_repr[0])
     assert th.allclose(new_repr[1], old_repr[0])
 
+def test_send_twice():
+    g = DGLGraph()
+    g.add_nodes(3)
+    g.add_edge(0, 1)
+    g.add_edge(2, 1)
+    def _message_a(src, edge):
+        return {'a': src['a']}
+    def _message_b(src, edge):
+        return {'a': src['a'] * 3}
+    def _reduce(node, msgs):
+        assert msgs is not None
+        return {'a': msgs['a'].max(1)[0]}
+
+    old_repr = th.randn(3, 5)
+    g.set_n_repr({'a': old_repr})
+    g.send(0, 1, _message_a)
+    g.send(0, 1, _message_b)
+    g.recv([1], _reduce)
+    new_repr = g.get_n_repr()['a']
+    assert th.allclose(new_repr[1], old_repr[0] * 3)
+
+    g.set_n_repr({'a': old_repr})
+    g.send(0, 1, _message_a)
+    g.send(2, 1, _message_b)
+    g.recv([1], _reduce)
+    new_repr = g.get_n_repr()['a']
+    assert th.allclose(new_repr[1], th.stack([old_repr[0], old_repr[2] * 3], 0).max(0)[0])
+
+def test_send_multigraph():
+    g = DGLGraph(multigraph=True)
+    g.add_nodes(3)
+    g.add_edge(0, 1)
+    g.add_edge(0, 1)
+    g.add_edge(0, 1)
+    g.add_edge(2, 1)
+
+    def _message_a(src, edge):
+        return {'a': edge['a']}
+    def _message_b(src, edge):
+        return {'a': edge['a'] * 3}
+    def _reduce(node, msgs):
+        assert msgs is not None
+        return {'a': msgs['a'].max(1)[0]}
+
+    def answer(*args):
+        return th.stack(args, 0).max(0)[0]
+
+    # send by eid
+    old_repr = th.randn(4, 5)
+    g.set_n_repr({'a': th.zeros(3, 5)})
+    g.set_e_repr({'a': old_repr})
+    g.send(eid=[0, 2], message_func=_message_a)
+    g.recv([1], _reduce)
+    new_repr = g.get_n_repr()['a']
+    assert th.allclose(new_repr[1], answer(old_repr[0], old_repr[2]))
+
+    g.set_n_repr({'a': th.zeros(3, 5)})
+    g.set_e_repr({'a': old_repr})
+    g.send(eid=[0, 2, 3], message_func=_message_a)
+    g.recv([1], _reduce)
+    new_repr = g.get_n_repr()['a']
+    assert th.allclose(new_repr[1], answer(old_repr[0], old_repr[2], old_repr[3]))
+
+    # send on multigraph
+    g.set_n_repr({'a': th.zeros(3, 5)})
+    g.set_e_repr({'a': old_repr})
+    g.send([0, 2], [1, 1], _message_a)
+    g.recv([1], _reduce)
+    new_repr = g.get_n_repr()['a']
+    assert th.allclose(new_repr[1], old_repr.max(0)[0])
+
+    # consecutive send and send_on
+    g.set_n_repr({'a': th.zeros(3, 5)})
+    g.set_e_repr({'a': old_repr})
+    g.send(2, 1, _message_a)
+    g.send(eid=[0, 1], message_func=_message_b)
+    g.recv([1], _reduce)
+    new_repr = g.get_n_repr()['a']
+    assert th.allclose(new_repr[1], answer(old_repr[0] * 3, old_repr[1] * 3, old_repr[3]))
+
+    # consecutive send_on
+    g.set_n_repr({'a': th.zeros(3, 5)})
+    g.set_e_repr({'a': old_repr})
+    g.send(eid=0, message_func=_message_a)
+    g.send(eid=1, message_func=_message_b)
+    g.recv([1], _reduce)
+    new_repr = g.get_n_repr()['a']
+    assert th.allclose(new_repr[1], answer(old_repr[0], old_repr[1] * 3))
+
+    # send_and_recv_on
+    g.set_n_repr({'a': th.zeros(3, 5)})
+    g.set_e_repr({'a': old_repr})
+    g.send_and_recv(eid=[0, 2, 3], message_func=_message_a, reduce_func=_reduce)
+    new_repr = g.get_n_repr()['a']
+    assert th.allclose(new_repr[1], answer(old_repr[0], old_repr[2], old_repr[3]))
+    assert th.allclose(new_repr[[0, 2]], th.zeros(2, 5))
+
+
 if __name__ == '__main__':
     test_batch_setter_getter()
     test_batch_setter_autograd()
@@ -250,3 +348,5 @@ if __name__ == '__main__':
     test_update_routines()
     test_reduce_0deg()
     test_pull_0deg()
+    test_send_twice()
+    test_send_multigraph()

@@ -35,6 +35,7 @@ pipeline {
                                 withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
                                     sh 'nosetests tests -v --with-xunit'
                                     sh 'nosetests tests/pytorch -v --with-xunit'
+                                    sh 'nosetests tests/graph_index -v --with-xunit'
                                 }
                             }
                         }
@@ -77,6 +78,7 @@ pipeline {
                                 withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
                                     sh 'nosetests tests -v --with-xunit'
                                     sh 'nosetests tests/pytorch -v --with-xunit'
+                                    sh 'nosetests tests/graph_index -v --with-xunit'
                                 }
                             }
                         }

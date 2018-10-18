@@ -41,7 +41,7 @@ class Graph {
   } EdgeArray;
 
   /*! \brief default constructor */
-  Graph() {}
+  Graph(bool multigraph = false) : is_multigraph_(multigraph) {}
 
   /*! \brief default copy constructor */
   Graph(const Graph& other) = default;
@@ -56,8 +56,9 @@ class Graph {
     all_edges_src_ = other.all_edges_src_;
     all_edges_dst_ = other.all_edges_dst_;
     read_only_ = other.read_only_;
+    is_multigraph_ = other.is_multigraph_;
     num_edges_ = other.num_edges_;
-    other.clear();
+    other.Clear();
   }
 #endif  // _MSC_VER
 
@@ -101,6 +102,14 @@ class Graph {
     num_edges_ = 0;
   }
 
+  /*!
+   * \note not const since we have caches
+   * \return whether the graph is a multigraph
+   */
+  bool IsMultigraph() const {
+    return is_multigraph_;
+  }
+
   /*! \return the number of vertices in the graph.*/
   uint64_t NumVertices() const {
     return adjlist_.size();
@@ -120,10 +129,10 @@ class Graph {
   BoolArray HasVertices(IdArray vids) const;
 
   /*! \return true if the given edge is in the graph.*/
-  bool HasEdge(dgl_id_t src, dgl_id_t dst) const;
+  bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const;
 
   /*! \return a 0-1 array indicating whether the given edges are in the graph.*/
-  BoolArray HasEdges(IdArray src_ids, IdArray dst_ids) const;
+  BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const;
 
   /*!
    * \brief Find the predecessors of a vertex.
@@ -142,22 +151,32 @@ class Graph {
   IdArray Successors(dgl_id_t vid, uint64_t radius = 1) const;
 
   /*!
-   * \brief Get the edge id using the two endpoints
+   * \brief Get all edge ids between the two given endpoints
    * \note Edges are associated with an integer id start from zero.
    *       The id is assigned when the edge is being added to the graph.
    * \param src The source vertex.
    * \param dst The destination vertex.
-   * \return the edge id.
-   */
-  dgl_id_t EdgeId(dgl_id_t src, dgl_id_t dst) const;
-
-  /*!
-   * \brief Get the edge id using the two endpoints
-   * \note Edges are associated with an integer id start from zero.
-   *       The id is assigned when the edge is being added to the graph.
    * \return the edge id array.
    */
-  IdArray EdgeIds(IdArray src, IdArray dst) const;
+  IdArray EdgeId(dgl_id_t src, dgl_id_t dst) const;
+
+  /*!
+   * \brief Get all edge ids between the given endpoint pairs.
+   * \note Edges are associated with an integer id start from zero.
+   *       The id is assigned when the edge is being added to the graph.
+   *       If duplicate pairs exist, the returned edge IDs will also duplicate.
+   *       The order of returned edge IDs will follow the order of src-dst pairs
+   *       first, and ties are broken by the order of edge ID.
+   * \return EdgeArray containing all edges between all pairs.
+   */
+  EdgeArray EdgeIds(IdArray src, IdArray dst) const;
+
+  /*!
+   * \brief Find the edge IDs and return their source and target node IDs.
+   * \param eids The edge ID array.
+   * \return EdgeArray containing all edges with id in eid.  The order is preserved.
+   */
+  EdgeArray FindEdges(IdArray eids) const;
 
   /*!
    * \brief Get the in edges of the vertex.
@@ -263,10 +282,10 @@ class Graph {
    *
    * The result subgraph is read-only.
    *
-   * \param vids The edges in the subgraph.
+   * \param eids The edges in the subgraph.
    * \return the induced edge subgraph
    */
-  Subgraph EdgeSubgraph(IdArray src, IdArray dst) const;
+  Subgraph EdgeSubgraph(IdArray eids) const;
 
   /*!
    * \brief Return a new graph with all the edges reversed.
@@ -300,6 +319,12 @@ class Graph {
 
   /*! \brief read only flag */
   bool read_only_ = false;
+  /*!
+   * \brief Whether if this is a multigraph.
+   *
+   * When a multiedge is added, this flag switches to true.
+   */
+  bool is_multigraph_ = false;
   /*! \brief number of edges */
   uint64_t num_edges_ = 0;
 };

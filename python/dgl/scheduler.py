@@ -416,6 +416,14 @@ class BundledSendRecvExecutor(BundledExecutor, SendRecvExecutor):
         BundledExecutor.__init__(self, graph, mfunc, rfunc)
 
 def _is_spmv_supported(fn, graph=None):
+    # FIXME: also take into account
+    # (1) which backend DGL is under.
+    # (2) whether the graph is a multigraph.
+    #
+    # Current SPMV optimizer assumes that duplicate entries are summed up
+    # in sparse matrices, which is the case for PyTorch but not MXNet.
+    # The result is that on multigraphs, SPMV can still work for reducer=sum
+    # and message=copy_src/src_mul_edge *only in PyTorch*.
     if isinstance(fn, fmsg.MessageFunction):
         return fn.is_spmv_supported(graph)
     elif isinstance(fn, fred.ReduceFunction):

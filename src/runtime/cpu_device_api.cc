@@ -25,7 +25,7 @@ class CPUDeviceAPI final : public DeviceAPI {
                        size_t alignment,
                        TVMType type_hint) final {
     void* ptr;
-#if _MSC_VER
+#if _MSC_VER || defined(__MINGW32__)
     ptr = _aligned_malloc(nbytes, alignment);
     if (ptr == nullptr) throw std::bad_alloc();
 #elif defined(_LIBCPP_SGX_CONFIG)
@@ -39,7 +39,7 @@ class CPUDeviceAPI final : public DeviceAPI {
   }
 
   void FreeDataSpace(TVMContext ctx, void* ptr) final {
-#if _MSC_VER
+#if _MSC_VER || defined(__MINGW32__)
     _aligned_free(ptr);
 #else
     free(ptr);
