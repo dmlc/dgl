@@ -355,5 +355,4 @@ if __name__ == '__main__':
     test_update_routines()
     test_reduce_0deg()
     test_pull_0deg()
-    test_send_twice()
     test_send_multigraph()
