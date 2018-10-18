@@ -93,23 +93,24 @@ def get_context(arr):
         return TVMContext(
                 TVMContext.STR2MASK[arr.device.type], arr.device.index)
 
-def _typestr(arr_dtype):
+def get_tvmtype(arr):
+    arr_dtype = arr.dtype
     if arr_dtype in (th.float16, th.half):
-        return 'float16'
+        return TVMType('float16')
     elif arr_dtype in (th.float32, th.float):
-        return 'float32'
+        return TVMType('float32')
     elif arr_dtype in (th.float64, th.double):
-        return 'float64'
+        return TVMType('float64')
     elif arr_dtype in (th.int16, th.short):
-        return 'int16'
+        return TVMType('int16')
     elif arr_dtype in (th.int32, th.int):
-        return 'int32'
+        return TVMType('int32')
     elif arr_dtype in (th.int64, th.long):
-        return 'int64'
+        return TVMType('int64')
     elif arr_dtype == th.int8:
-        return 'int8'
+        return TVMType('int8')
     elif arr_dtype == th.uint8:
-        return 'uint8'
+        return TVMType('uint8')
     else:
         raise RuntimeError('Unsupported data type:', arr_dtype)
 
@@ -129,20 +130,6 @@ def zerocopy_to_numpy(arr):
 def zerocopy_from_numpy(np_data):
     """Return a tensor that shares the numpy data."""
     return th.from_numpy(np_data)
-
-    '''
-    data = arr_data
-    assert data.is_contiguous()
-    arr = TVMArray()
-    shape = c_array(tvm_shape_index_t, tuple(data.shape))
-    arr.data = ctypes.cast(data.data_ptr(), ctypes.c_void_p)
-    arr.shape = shape
-    arr.strides = None
-    arr.dtype = TVMType(_typestr(data.dtype))
-    arr.ndim = len(shape)
-    arr.ctx = get_context(data)
-    return arr
-    '''
 
 def nonzero_1d(arr):
     """Return a 1D tensor with nonzero element indices in a 1D vector"""
