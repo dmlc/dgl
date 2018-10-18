@@ -136,8 +136,8 @@ DLManagedTensor* NDArray::ToDLPack() const {
 }
 
 NDArray NDArray::Empty(std::vector<int64_t> shape,
-                        DLDataType dtype,
-                        DLContext ctx) {
+                       DLDataType dtype,
+                       DLContext ctx) {
   NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
