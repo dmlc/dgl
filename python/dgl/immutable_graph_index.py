@@ -457,8 +457,11 @@ class ImmutableGraphIndex(object):
         ----------
         adj : scipy sparse matrix
         """
-        assert isinstance(adj, sp.csr_matrix), "The input matrix has to be a SciPy sparse matrix."
-        self._out_csr = mx.nd.sparse.csr_matrix(adj)
+        assert isinstance(adj, sp.csr_matrix) or isinstance(adj, sp.coo_matrix), \
+                "The input matrix has to be a SciPy sparse matrix."
+        self._out_csr = mx.nd.sparse.csr_matrix(adj.tocsr(), dtype=np.int64)
+        csc = adj.tocsc()
+        self._in_csr = mx.nd.sparse.csr_matrix(csc.transpose(), dtype=np.int64)
 
     def line_graph(self, backtracking=True):
         """Return the line graph of this graph.
@@ -486,12 +489,22 @@ def create_immutable_graph_index(graph_data=None):
     """
     if isinstance(graph_data, ImmutableGraphIndex):
         return graph_data
+    if graph_data is None:
+        return ImmutableGraphIndex(None, None)
+
+    try:
+        graph_data = graph_data.get_graph()
+    except AttributeError:
+        pass
+
     if isinstance(graph_data, nx.DiGraph):
         gi = ImmutableGraphIndex(None, None)
         gi.from_networkx(graph_data)
-    elif isinstance(graph_data, sp.csr_matrix):
+    elif isinstance(graph_data, sp.csr_matrix) or isinstance(graph_data, sp.coo_matrix):
         gi = ImmutableGraphIndex(None, None)
         gi.from_scipy_sparse_matrix(graph_data)
     elif isinstance(graph_data, mx.nd.sparse.CSRNDArray):
         gi = ImmutableGraphIndex(graph_data, None)
+    else:
+        raise Exception('cannot create an immutable graph index from unknown format')
     return gi

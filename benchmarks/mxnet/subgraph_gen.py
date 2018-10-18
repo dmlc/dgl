@@ -20,7 +20,7 @@ def subgraph_gen1(g, i, batch_size, get_in_edges):
     seed = np.arange(i * batch_size, (i + 1) * batch_size, dtype=np.int64)
     vs = np.concatenate((src.tousertensor().asnumpy(), seed), axis=0)
     vs = mx.nd.array(np.unique(vs), dtype=np.int64)
-    subg, _ = g.node_subgraph(utils.toindex(vs))
+    subg = g.node_subgraph(utils.toindex(vs))
     return subg
 
 def subgraph_gen2(g, i, batch_size, get_in_edges):
@@ -45,9 +45,17 @@ def subgraph_gen3(g, n, batch_idx, batch_size, get_in_edges):
 
 def test_subgraph_gen(args):
     # load and preprocess dataset
+    t0 = time.time()
     data = load_data(args)
+    print("load data: " + str(time.time() - t0))
+
+    t0 = time.time()
     g = create_graph_index(data.graph)
+    print("create graph index: " + str(time.time() - t0))
+
+    t0 = time.time()
     ig = create_immutable_graph_index(data.graph)
+    print("create immutable graph index: " + str(time.time() - t0))
 
     t0 = time.time()
     for _ in range(1):
