@@ -123,6 +123,7 @@ def test_update_all_multi_fn():
         return {'v2': th.sum(msgs['m2'], 1)}
 
     g = generate_graph()
+    g.set_n_repr({'v1' : th.zeros((10,)), 'v2' : th.zeros((10,))})
     fld = 'f2'
     # update all, mix of builtin and UDF
     g.update_all([fn.copy_src(src=fld, out='m1'), message_func],
@@ -173,6 +174,8 @@ def test_send_and_recv_multi_fn():
         return {'v2' : th.sum(msgs['m2'], 1)}
 
     g = generate_graph()
+    g.set_n_repr({'v1' : th.zeros((10, D)), 'v2' : th.zeros((10, D)),
+        'v3' : th.zeros((10, D))})
     fld = 'f2'
 
     # send and recv, mix of builtin and UDF

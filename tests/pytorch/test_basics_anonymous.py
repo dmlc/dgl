@@ -30,8 +30,10 @@ def generate_graph(grad=False):
         g.add_edge(i, 9)
     # add a back flow from 9 to 0
     g.add_edge(9, 0)
-    col = Variable(th.randn(10, D), requires_grad=grad)
-    g.set_n_repr(col)
+    ncol = Variable(th.randn(10, D), requires_grad=grad)
+    ecol = Variable(th.randn(17, D), requires_grad=grad)
+    g.set_n_repr(ncol)
+    g.set_e_repr(ecol)
     return g
 
 def test_batch_setter_getter():

@@ -962,8 +962,8 @@ class DGLGraph(object):
                 self._msg_frame.update_rows(
                         msg_target_rows,
                         {k: F.gather_row(msgs[k], msg_update_rows.tousertensor())
-                            for k in msgs}
-                        )
+                            for k in msgs},
+                        inplace=False)
             if len(msg_append_rows) > 0:
                 new_u, new_v = zip(*new_uv)
                 new_u = utils.toindex(new_u)
@@ -971,14 +971,13 @@ class DGLGraph(object):
                 self._msg_graph.add_edges(new_u, new_v)
                 self._msg_frame.append(
                         {k: F.gather_row(msgs[k], msg_append_rows.tousertensor())
-                            for k in msgs}
-                        )
+                            for k in msgs})
         else:
             if len(msg_target_rows) > 0:
                 self._msg_frame.update_rows(
                         msg_target_rows,
-                        {__MSG__: F.gather_row(msgs, msg_update_rows.tousertensor())}
-                        )
+                        {__MSG__: F.gather_row(msgs, msg_update_rows.tousertensor())},
+                        inplace=False)
             if len(msg_append_rows) > 0:
                 new_u, new_v = zip(*new_uv)
                 new_u = utils.toindex(new_u)

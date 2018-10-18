@@ -142,7 +142,10 @@ class Frame(MutableMapping):
             # Note that we always create a new column for the given data.
             # This avoids two frames accidentally sharing the same column.
             self._columns = {k : Column.create(v) for k, v in data.items()}
-            self._num_rows = F.shape(list(data.values())[0])[0]
+            if len(self._columns) != 0:
+                self._num_rows = len(next(iter(self._columns.values())))
+            else:
+                self._num_rows = 0
             # sanity check
             for name, col in self._columns.items():
                 if len(col) != self._num_rows:
@@ -475,7 +478,9 @@ class FrameRef(MutableMapping):
             self._frame[name] = col
         else:
             if name not in self._frame:
-                raise DGLError('Cannot update column %s. Column does not exist.' % name)
+                raise DGLError('Cannot update column. Column "%s" does not exist.'
+                               ' Did you forget to init the column using `set_n_repr`'
+                               ' or `set_e_repr`?' % name)
             fcol = self._frame[name]
             fcol.update(self.index(), data, inplace)
 
@@ -500,8 +505,9 @@ class FrameRef(MutableMapping):
         rowids = self._getrowid(query)
         for key, col in data.items():
             if key not in self:
-                raise DGLError('Cannot update rows.'
-                               ' The data contains non-exist column %s.' % key)
+                raise DGLError('Cannot update rows. Column "%s" does not exist.'
+                               ' Did you forget to init the column using `set_n_repr`'
+                               ' or `set_e_repr`?' % key)
             else:
                 self._frame[key].update(rowids, col, inplace)
 
