@@ -963,7 +963,14 @@ class DGLGraph(object):
             src_reprs = self.get_n_repr(u)
             edge_reprs = self.get_e_repr_by_id(eid)
             msgs = message_func(src_reprs, edge_reprs)
+        self._msg_graph.add_edges(u, v)
+        if utils.is_dict_like(msgs):
+            self._msg_frame.append(msgs)
+        else:
+            self._msg_frame.append({__MSG__ : msgs})
 
+        # TODO(minjie): Fix these codes in next PR.
+        """
         new_uv = []
         msg_target_rows = []
         msg_update_rows = []
@@ -1010,6 +1017,7 @@ class DGLGraph(object):
                 self._msg_frame.append(
                         {__MSG__: F.gather_row(msgs, msg_append_rows.tousertensor())}
                         )
+        """
 
     def update_edge(self, u=ALL, v=ALL, edge_func="default", eid=None):
         """Update representation on edge u->v
