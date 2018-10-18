@@ -39,8 +39,7 @@ def generate_graph(grad=False):
     accumcol = Variable(th.randn(10, D), requires_grad=grad)
     ecol = Variable(th.randn(17, D), requires_grad=grad)
     g.set_n_repr({'h' : ncol})
-    g.set_n_repr({'accum' : accumcol})
-    g.set_e_repr({'m' : ecol})
+    g.set_n_initializer(lambda shape, dtype : th.zeros(shape))
     return g
 
 def test_batch_setter_getter():

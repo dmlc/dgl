@@ -6,7 +6,7 @@ import numpy as np
 
 from . import backend as F
 from .backend import Tensor
-from .base import DGLError
+from .base import DGLError, dgl_warning
 from . import utils
 
 class Scheme(object):
@@ -151,6 +151,27 @@ class Frame(MutableMapping):
                 if len(col) != self._num_rows:
                     raise DGLError('Expected all columns to have same # rows (%d), '
                                    'got %d on %r.' % (self._num_rows, len(col), name))
+        # Initializer for empty values. Initializer is a callable.
+        # If is none, then a warning will be raised
+        # in the first call and zero initializer will be used later.
+        self._initializer = None
+
+    def set_initializer(self, initializer):
+        """Set the initializer for empty values.
+
+        Initializer is a callable that returns a tensor given the shape and data type.
+
+        Parameters
+        ----------
+        initializer : callable
+            The initializer.
+        """
+        self._initializer = initializer
+
+    @property
+    def initializer(self):
+        """Return the initializer of this frame."""
+        return self._initializer
 
     @property
     def schemes(self):
@@ -209,6 +230,38 @@ class Frame(MutableMapping):
         del self._columns[name]
         if len(self._columns) == 0:
             self._num_rows = 0
+
+    def add_column(self, name, scheme, ctx):
+        """Add a new column to the frame.
+
+        The frame will be initialized by the initializer.
+
+        Parameters
+        ----------
+        name : str
+            The column name.
+        scheme : Scheme
+            The column scheme.
+        ctx : TVMContext
+            The column context.
+        """
+        if name in self:
+            dgl_warning('Column "%s" already exists. Ignore adding this column again.' % name)
+            return
+        if self.num_rows == 0:
+            raise DGLError('Cannot add column "%s" using column schemes because'
+                           ' number of rows is unknown. Make sure there is at least'
+                           ' one column in the frame so number of rows can be inferred.')
+        if self.initializer is None:
+            dgl_warning('Initializer is not set. Use zero initializer instead.'
+                        ' To suppress this warning, use `set_initializer` to'
+                        ' explicitly specify which initializer to use.')
+            # TODO(minjie): handle data type
+            self.set_initializer(lambda shape, dtype : F.zeros(shape))
+        # TODO(minjie): directly init data on the targer device.
+        init_data = self.initializer((self.num_rows,) + scheme.shape, scheme.dtype)
+        init_data = F.to_context(init_data, ctx)
+        self._columns[name] = Column(init_data, scheme)
 
     def update_column(self, name, data):
         """Add or replace the column with the given name and data.
@@ -322,6 +375,18 @@ class FrameRef(MutableMapping):
             return self._index_data.stop
         else:
             return len(self._index_data)
+
+    def set_initializer(self, initializer):
+        """Set the initializer for empty values.
+
+        Initializer is a callable that returns a tensor given the shape and data type.
+
+        Parameters
+        ----------
+        initializer : callable
+            The initializer.
+        """
+        self._frame.set_initializer(initializer)
 
     def index(self):
         """Return the index object.
@@ -478,9 +543,13 @@ class FrameRef(MutableMapping):
             self._frame[name] = col
         else:
             if name not in self._frame:
-                raise DGLError('Cannot update column. Column "%s" does not exist.'
-                               ' Did you forget to init the column using `set_n_repr`'
-                               ' or `set_e_repr`?' % name)
+                feat_shape = F.shape(data)[1:]
+                feat_dtype = F.get_tvmtype(data)
+                ctx = F.get_context(data)
+                self._frame.add_column(name, Scheme(feat_shape, feat_dtype), ctx)
+                #raise DGLError('Cannot update column. Column "%s" does not exist.'
+                #               ' Did you forget to init the column using `set_n_repr`'
+                #               ' or `set_e_repr`?' % name)
             fcol = self._frame[name]
             fcol.update(self.index(), data, inplace)
 
@@ -505,9 +574,12 @@ class FrameRef(MutableMapping):
         rowids = self._getrowid(query)
         for key, col in data.items():
             if key not in self:
-                raise DGLError('Cannot update rows. Column "%s" does not exist.'
-                               ' Did you forget to init the column using `set_n_repr`'
-                               ' or `set_e_repr`?' % key)
+                # add new column
+                tmpref = FrameRef(self._frame, rowids)
+                tmpref.update_column(key, col, inplace)
+                #raise DGLError('Cannot update rows. Column "%s" does not exist.'
+                #               ' Did you forget to init the column using `set_n_repr`'
+                #               ' or `set_e_repr`?' % key)
             else:
                 self._frame[key].update(rowids, col, inplace)
 
@@ -624,6 +696,7 @@ def merge_frames(frames, indices, max_index, reduce_func):
     merged : FrameRef
         The merged frame.
     """
+    # TODO(minjie)
     assert False, 'Buggy code, disabled for now.'
     assert reduce_func == 'sum'
     assert len(frames) > 0

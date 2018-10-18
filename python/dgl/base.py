@@ -11,3 +11,6 @@ def is_all(arg):
 
 __MSG__ = "__MSG__"
 __REPR__ = "__REPR__"
+
+def dgl_warning(msg):
+    print('DGL Warning: %s' % msg)
