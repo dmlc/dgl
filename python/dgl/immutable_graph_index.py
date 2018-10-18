@@ -239,7 +239,7 @@ class ImmutableGraphIndex(object):
             The edge ids.
         """
         dst = v.tousertensor()
-        rows = self._in_csr[dst]
+        rows = mx.nd.take(self._in_csr, dst)
         return utils.toindex(rows.indices), None, None
 
     def out_edges(self, v):
@@ -260,7 +260,7 @@ class ImmutableGraphIndex(object):
             The edge ids.
         """
         src = v.tousertensor()
-        rows = self._out_csr[src]
+        rows = mx.nd.take(self._out_csr, src)
         return utils.toindex(rows.indices), None, None
 
     def edges(self, sorted=False):
@@ -360,20 +360,46 @@ class ImmutableGraphIndex(object):
         -------
         GraphIndex
             The subgraph index.
-        utils.Index
-            The induced edge ids. This is also a map from new edge id to parent edge id.
         """
-        return mx.nd.contrib.dgl_subgraph(self._in_csr, v.todgltensor())
+        in_csr = mx.nd.contrib.dgl_subgraph(self._in_csr, v.tousertensor(), return_mapping=False)
+        return ImmutableGraphIndex(in_csr, None)
 
-    def adjacency_matrix(self):
+    def node_subgraphs(self, vs_arr):
+        """Return the induced node subgraphs.
+
+        Parameters
+        ----------
+        vs_arr : a vector of utils.Index
+            The nodes.
+
+        Returns
+        -------
+        a vector of GraphIndex
+            The subgraph index.
+        """
+        vs_arr = [v.todgltensor() for v in vs_arr]
+        return mx.nd.contrib.dgl_subgraph(self._in_csr, vs_arr)
+
+    def adjacency_matrix(self, edge_type='in'):
         """Return the adjacency matrix representation of this graph.
+        For a directed graph, we can construct two adjacency matrices:
+        one stores in-edges as non-zero entries, the other stores out-edges
+        as non-zero entries.
+
+        Parameters
+        ----------
+        edge_type : a string
+            The edge type used for constructing an adjacency matrix.
 
         Returns
         -------
         utils.CtxCachedObject
             An object that returns tensor given context.
         """
-        return self._out_csr
+        if edge_type == 'in':
+            return self._in_csr
+        else:
+            return self._out_csr
 
     def incidence_matrix(self, oriented=False):
         """Return the incidence matrix representation of this graph.
@@ -418,8 +444,9 @@ class ImmutableGraphIndex(object):
             The nx graph
         """
         assert isinstance(nx_graph, nx.DiGraph), "The input graph has to be a NetworkX DiGraph."
-        out_mat = nx.convert_matrix.to_scipy_sparse_matrix(nx_graph, dtype=np.float32, format='csr')
-        in_mat = nx.convert_matrix.to_scipy_sparse_matrix(nx_graph, dtype=np.float32, format='csc').transpose()
+        # We store edge Ids as an edge attribute.
+        out_mat = nx.convert_matrix.to_scipy_sparse_matrix(nx_graph, dtype=np.int32, format='csr').astype(np.int64)
+        in_mat = nx.convert_matrix.to_scipy_sparse_matrix(nx_graph, dtype=np.int32, format='csc').astype(np.int64).transpose()
         self.__init__(mx.nd.sparse.csr_matrix(in_mat), mx.nd.sparse.csr_matrix(out_mat))
 
     def from_scipy_sparse_matrix(self, adj):
