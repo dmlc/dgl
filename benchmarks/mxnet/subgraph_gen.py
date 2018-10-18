@@ -3,7 +3,7 @@ import numpy as np
 import time
 import argparse
 from dgl.graph import create_graph_index
-from dgl import create_immutable_graph_index, utils
+from dgl import utils
 from dgl.data import register_data_args, load_data
 
 def get_in_edges(g, i, batch_size):
@@ -54,7 +54,7 @@ def test_subgraph_gen(args):
     print("create graph index: " + str(time.time() - t0))
 
     t0 = time.time()
-    ig = create_immutable_graph_index(data.graph)
+    ig = create_graph_index(data.graph, immutable_graph=True)
     print("create immutable graph index: " + str(time.time() - t0))
 
     t0 = time.time()

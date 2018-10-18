@@ -9,6 +9,7 @@ from ._ffi.base import c_array
 from ._ffi.function import _init_api
 from . import backend as F
 from . import utils
+from .immutable_graph_index import create_immutable_graph_index
 
 GraphIndexHandle = ctypes.c_void_p
 
@@ -716,7 +717,7 @@ def disjoint_partition(graph, num_or_size_splits):
         graphs.append(GraphIndex(handle))
     return graphs
 
-def create_graph_index(graph_data=None, multigraph=False):
+def create_graph_index(graph_data=None, multigraph=False, immutable_graph=False):
     """Create a graph index object.
 
     Parameters
@@ -728,6 +729,9 @@ def create_graph_index(graph_data=None, multigraph=False):
     """
     if isinstance(graph_data, GraphIndex):
         return graph_data
+
+    if immutable_graph:
+        return create_immutable_graph_index(graph_data)
 
     handle = _CAPI_DGLGraphCreate(multigraph)
     gi = GraphIndex(handle)

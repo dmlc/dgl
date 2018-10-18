@@ -38,9 +38,10 @@ class DGLGraph(object):
                  graph_data=None,
                  node_frame=None,
                  edge_frame=None,
-                 multigraph=False):
+                 multigraph=False,
+                 immutable_graph=False):
         # graph
-        self._graph = create_graph_index(graph_data, multigraph)
+        self._graph = create_graph_index(graph_data, multigraph, immutable_graph)
         # frame
         self._node_frame = node_frame if node_frame is not None else FrameRef()
         self._edge_frame = edge_frame if edge_frame is not None else FrameRef()
