@@ -41,7 +41,7 @@ class Column(object):
     """A column is a compact store of features of multiple nodes/edges.
 
     Currently, we use one dense tensor to batch all the feature tensors
-    together.
+    together (along the first dimension).
 
     Parameters
     ----------
@@ -123,6 +123,8 @@ class Frame(MutableMapping):
 
     The frame is a dictionary from feature fields to feature columns.
 
+    All columns should have the same number of rows (i.e. the same first dimension).
+
     Parameters
     ----------
     data : dict-like, optional
@@ -138,8 +140,8 @@ class Frame(MutableMapping):
             # sanity check
             for name, col in self._columns.items():
                 if len(col) != self._num_rows:
-                    raise DGLError('All columns in the frame should have the same length.'
-                                   ' Got %d and %d.' % (len(col), self._num_rows))
+                    raise DGLError('Expected all columns to have same # rows (%d), '
+                                   'got %d on %r.' % (self._num_rows, len(col), name))
 
     @property
     def schemes(self):
@@ -213,8 +215,8 @@ class Frame(MutableMapping):
         if self.num_columns == 0:
             self._num_rows = len(col)
         elif len(col) != self._num_rows:
-            raise DGLError('All columns in the frame should have the same length.'
-                           ' Got %d and %d.' % (len(col), self._num_rows))
+            raise DGLError('Expected data to have %d rows, got %d.' %
+                           (self._num_rows, len(col)))
         self._columns[name] = col
 
     def append(self, other):
@@ -266,7 +268,7 @@ class Frame(MutableMapping):
         return self._columns.keys()
 
 class FrameRef(MutableMapping):
-    """Reference object to a frame.
+    """Reference object to a frame on a subset of rows.
 
     Parameters
     ----------
@@ -307,6 +309,9 @@ class FrameRef(MutableMapping):
     def num_rows(self):
         """Return the number of rows referred."""
         if isinstance(self._index_data, slice):
+            # NOTE: we are assuming that the index is a slice ONLY IF
+            # index=None during construction.
+            # As such, start is always 0, and step is always 1.
             return self._index_data.stop
         else:
             return len(self._index_data)
@@ -573,7 +578,8 @@ class FrameRef(MutableMapping):
 
     def is_contiguous(self):
         """Return whether this refers to a contiguous range of rows."""
-        # NOTE: this check could have false negative
+        # NOTE: this check could have false negatives and false positives
+        # (step other than 1)
         return isinstance(self._index_data, slice)
 
     def is_span_whole_column(self):
