@@ -1,7 +1,6 @@
-#include <dgl/runtime/packed_func.h>
-#include <dgl/runtime/registry.h>
 #include <dgl/graph.h>
 #include <dgl/graph_op.h>
+#include "../c_api_common.h"
 
 using tvm::runtime::TVMArgs;
 using tvm::runtime::TVMArgValue;
@@ -10,9 +9,6 @@ using tvm::runtime::PackedFunc;
 using tvm::runtime::NDArray;
 
 namespace dgl {
-
-// Graph handler type
-typedef void* GraphHandle;
 
 namespace {
 // Convert EdgeArray structure to PackedFunc.
@@ -52,21 +48,12 @@ PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
   return PackedFunc(body);
 }
 
-// Convert the given DLTensor to a temporary DLManagedTensor that does not own memory.
-DLManagedTensor* CreateTmpDLManagedTensor(const TVMArgValue& arg) {
-  const DLTensor* dl_tensor = arg;
-  DLManagedTensor* ret = new DLManagedTensor();
-  ret->deleter = [] (DLManagedTensor* self) { delete self; };
-  ret->manager_ctx = nullptr;
-  ret->dl_tensor = *dl_tensor;
-  return ret;
-}
-
 }  // namespace
 
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
-    GraphHandle ghandle = new Graph();
+    bool multigraph = static_cast<bool>(args[0]);
+    GraphHandle ghandle = new Graph(multigraph);
     *rv = ghandle;
   });
 
@@ -110,6 +97,14 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphClear")
     gptr->Clear();
   });
 
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphIsMultigraph")
+.set_body([] (TVMArgs args, TVMRetValue *rv) {
+    GraphHandle ghandle = args[0];
+    // NOTE: not const since we have caches
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    *rv = gptr->IsMultigraph();
+  });
+
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphNumVertices")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     GraphHandle ghandle = args[0];
@@ -140,22 +135,22 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasVertices")
     *rv = gptr->HasVertices(vids);
   });
 
-TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasEdge")
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasEdgeBetween")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const dgl_id_t src = args[1];
     const dgl_id_t dst = args[2];
-    *rv = gptr->HasEdge(src, dst);
+    *rv = gptr->HasEdgeBetween(src, dst);
   });
 
-TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasEdges")
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasEdgesBetween")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     const IdArray dst = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
-    *rv = gptr->HasEdges(src, dst);
+    *rv = gptr->HasEdgesBetween(src, dst);
   });
 
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphPredecessors")
@@ -182,7 +177,7 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeId")
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const dgl_id_t src = args[1];
     const dgl_id_t dst = args[2];
-    *rv = static_cast<int64_t>(gptr->EdgeId(src, dst));
+    *rv = gptr->EdgeId(src, dst);
   });
 
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeIds")
@@ -191,7 +186,15 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeIds")
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     const IdArray dst = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
-    *rv = gptr->EdgeIds(src, dst);
+    *rv = ConvertEdgeArrayToPackedFunc(gptr->EdgeIds(src, dst));
+  });
+
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphFindEdges")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const IdArray eids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    *rv = ConvertEdgeArrayToPackedFunc(gptr->FindEdges(eids));
   });
 
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphInEdges_1")
@@ -272,6 +275,14 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphVertexSubgraph")
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     *rv = ConvertSubgraphToPackedFunc(gptr->VertexSubgraph(vids));
+  });
+
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeSubgraph")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph *gptr = static_cast<Graph*>(ghandle);
+    const IdArray eids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    *rv = ConvertSubgraphToPackedFunc(gptr->EdgeSubgraph(eids));
   });
 
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")
