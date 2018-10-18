@@ -123,6 +123,27 @@ def get_context(x):
 def _typestr(arr_dtype):
     return arr_dtype
 
+def get_tvmtype(arr):
+    arr_dtype = arr.dtype
+    if arr_dtype == np.float16:
+        return TVMType('float16')
+    elif arr_dtype == np.float32:
+        return TVMType('float32')
+    elif arr_dtype == np.float64:
+        return TVMType('float64')
+    elif arr_dtype == np.int16:
+        return TVMType('int16')
+    elif arr_dtype == np.int32:
+        return TVMType('int32')
+    elif arr_dtype == np.int64:
+        return TVMType('int64')
+    elif arr_dtype == np.int8:
+        return TVMType('int8')
+    elif arr_dtype == np.uint8:
+        return TVMType('uint8')
+    else:
+        raise RuntimeError('Unsupported data type:', arr_dtype)
+
 def zerocopy_to_dlpack(arr):
     """Return a dlpack compatible array using zero copy."""
     return arr.to_dlpack_for_read()
