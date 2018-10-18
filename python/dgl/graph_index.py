@@ -601,7 +601,7 @@ class GraphIndex(object):
 
 class SubgraphIndex(GraphIndex):
     def __init__(self, handle, parent, induced_nodes, induced_edges):
-        super().__init__(handle)
+        super(SubgraphIndex, self).__init__(handle)
 
         self._parent = parent
         self._induced_nodes = induced_nodes
@@ -697,8 +697,20 @@ def create_graph_index(graph_data=None, multigraph=False):
 
     handle = _CAPI_DGLGraphCreate(multigraph)
     gi = GraphIndex(handle)
-    if graph_data is not None:
+    if graph_data is None:
+        return gi
+
+    try:
+        graph_data = graph_data.get_graph()
+    except AttributeError:
+        pass
+
+    if isinstance(graph_data, nx.DiGraph):
         gi.from_networkx(graph_data)
+    elif isinstance(graph_data, sp.coo_matrix) or isinstance(graph_data, sp.csr_matrix):
+        gi.from_scipy_sparse_matrix(graph_data)
+    else:
+        raise Exception('cannot create a graph index from unknown format')
     return gi
 
 _init_api("dgl.graph_index")

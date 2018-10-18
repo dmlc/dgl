@@ -206,10 +206,32 @@ def get_gnp_generator(args):
         return nx.fast_gnp_random_graph(n, p, seed, True)
     return _gen
 
+class ScipyGraph:
+    def __init__(self, mat):
+        self._mat = mat
+
+    def get_graph(self):
+        return self._mat
+
+    def number_of_nodes(self):
+        return self._mat.shape[0]
+
+    def number_of_edges(self):
+        return self._mat.getnnz()
+
+def get_scipy_generator(args):
+    n = args.syn_gnp_n
+    p = (2 * np.log(n) / n) if args.syn_gnp_p == 0. else args.syn_gnp_p
+    def _gen(seed):
+        return ScipyGraph(sp.random(n, n, p, format='coo'))
+    return _gen
+
 def load_synthetic(args):
     ty = args.syn_type
     if ty == 'gnp':
         gen = get_gnp_generator(args)
+    elif ty == 'scipy':
+        gen = get_scipy_generator(args)
     else:
         raise ValueError('Unknown graph generator type: {}'.format(ty))
     return GCNSyntheticDataset(
