@@ -72,7 +72,8 @@ def test_column2():
     # set column should reflect on the referenced data
     f['a1'] = th.zeros([5, D])
     assert th.allclose(data['a1'].data[3:8], th.zeros([5, D]))
-    # add new column should fail
+    # add new partial column should fail with error initializer
+    f.set_initializer(lambda shape, dtype : assert_(False))
     def failed_add_col():
         f['a4'] = th.ones([5, D])
     assert check_fail(failed_add_col)
@@ -94,7 +95,7 @@ def test_append1():
     f3 = {'a1' : th.zeros((3, D)), 'a2' : th.zeros((3, D)), 'a3' : th.zeros((2, D))}
     def failed_append():
         f1.append(f3)
-    check_fail(failed_append)
+    assert check_fail(failed_append)
 
 def test_append2():
     # test append on FrameRef
@@ -146,11 +147,12 @@ def test_row1():
     for k, v in f[rowid].items():
         assert th.allclose(v, th.zeros((len(rowid), D)))
 
-    # setting rows with new column should raise error
+    # setting rows with new column should raise error with error initializer
+    f.set_initializer(lambda shape, dtype : assert_(False))
     def failed_update_rows():
         vals['a4'] = th.ones((len(rowid), D))
         f[rowid] = vals
-    check_fail(failed_update_rows)
+    assert check_fail(failed_update_rows)
 
 def test_row2():
     # test row getter/setter autograd compatibility
