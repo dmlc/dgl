@@ -143,25 +143,17 @@ def test_batched_edge_ordering():
     assert th.equal(r1, r2)
 
 def test_batch_no_edge():
-    # FIXME: current impl cannot handle this case!!!
-    #        comment out for now to test CI
-    return
-    """
     g1 = dgl.DGLGraph()
     g1.add_nodes(6)
     g1.add_edges([4, 4, 2, 2, 0], [5, 3, 3, 1, 1])
     e1 = th.randn(5, 10)
-    g1.set_e_repr(e1)
     g2 = dgl.DGLGraph()
     g2.add_nodes(6)
     g2.add_edges([0, 1, 2, 5, 4, 5], [1 ,2 ,3, 4, 3, 0])
     e2 = th.randn(6, 10)
-    g2.set_e_repr(e2)
     g3 = dgl.DGLGraph()
     g3.add_nodes(1)  # no edges
-
     g = dgl.batch([g1, g3, g2]) # should not throw an error
-    """
 
 if __name__ == '__main__':
     test_batch_unbatch()
