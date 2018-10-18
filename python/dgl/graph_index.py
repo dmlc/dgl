@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import ctypes
 import numpy as np
 import networkx as nx
-import scipy.sparse as sp
+import scipy
 
 from ._ffi.base import c_array
 from ._ffi.function import _init_api
@@ -600,29 +600,58 @@ class GraphIndex(object):
         return GraphIndex(handle)
 
 class SubgraphIndex(GraphIndex):
+    """Graph index for subgraph.
+
+    Parameters
+    ----------
+    handle : GraphIndexHandle
+        The capi handle.
+    paranet : GraphIndex
+        The parent graph index.
+    induced_nodes : utils.Index
+        The parent node ids in this subgraph.
+    induced_edges : utils.Index
+        The parent edge ids in this subgraph.
+    """
     def __init__(self, handle, parent, induced_nodes, induced_edges):
         super(SubgraphIndex, self).__init__(handle)
-
         self._parent = parent
         self._induced_nodes = induced_nodes
         self._induced_edges = induced_edges
 
     def add_nodes(self, num):
+        """Add nodes. Disabled because SubgraphIndex is read-only."""
         raise RuntimeError('Readonly graph. Mutation is not allowed.')
 
     def add_edge(self, u, v):
+        """Add edges. Disabled because SubgraphIndex is read-only."""
         raise RuntimeError('Readonly graph. Mutation is not allowed.')
 
     def add_edges(self, u, v):
+        """Add edges. Disabled because SubgraphIndex is read-only."""
         raise RuntimeError('Readonly graph. Mutation is not allowed.')
 
     @property
-    def induced_edges(self):
-        return self._induced_edges
+    def induced_nodes(self):
+        """Return parent node ids.
+
+        Returns
+        -------
+        utils.Index
+            The parent node ids.
+        """
+        return self._induced_nodes
 
     @property
-    def induced_nodes(self):
-        return self._induced_nodes
+    def induced_edges(self):
+        """Return parent edge ids.
+
+        Returns
+        -------
+        utils.Index
+            The parent edge ids.
+        """
+        return self._induced_edges
 
 def disjoint_union(graphs):
     """Return a disjoint union of the input graphs.
@@ -697,20 +726,25 @@ def create_graph_index(graph_data=None, multigraph=False):
 
     handle = _CAPI_DGLGraphCreate(multigraph)
     gi = GraphIndex(handle)
+
     if graph_data is None:
         return gi
 
-    try:
-        graph_data = graph_data.get_graph()
-    except AttributeError:
-        pass
+    # scipy format
+    if isinstance(graph_data, scipy.sparse.spmatrix):
+        try:
+            gi.from_scipy_sparse_matrix(graph_data)
+            return gi
+        except:
+            raise Exception('Graph data is not a valid scipy sparse matrix.')
 
-    if isinstance(graph_data, nx.DiGraph):
+    # networkx - any format
+    try:
         gi.from_networkx(graph_data)
-    elif isinstance(graph_data, sp.coo_matrix) or isinstance(graph_data, sp.csr_matrix):
-        gi.from_scipy_sparse_matrix(graph_data)
-    else:
-        raise Exception('cannot create a graph index from unknown format')
+    except:
+        raise Exception('Error while creating graph from input of type "%s".'
+                         % type(graph_data))
+
     return gi
 
 _init_api("dgl.graph_index")

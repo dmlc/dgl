@@ -206,7 +206,8 @@ def get_gnp_generator(args):
         return nx.fast_gnp_random_graph(n, p, seed, True)
     return _gen
 
-class ScipyGraph:
+class ScipyGraph(object):
+    """A simple graph object that uses scipy matrix."""
     def __init__(self, mat):
         self._mat = mat
 
