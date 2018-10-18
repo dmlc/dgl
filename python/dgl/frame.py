@@ -47,10 +47,12 @@ class Column(object):
     ----------
     data : Tensor
         The initial data of the column.
+    scheme : Scheme, optional
+        The scheme of the column. Will be inferred if not provided.
     """
-    def __init__(self, data):
+    def __init__(self, data, scheme=None):
         self.data = data
-        self.scheme = Scheme.infer_scheme(data)
+        self.scheme = scheme if scheme else Scheme.infer_scheme(data)
 
     def __len__(self):
         """The column length."""
@@ -112,9 +114,9 @@ class Column(object):
 
     @staticmethod
     def create(data):
-        """Convert the data to column."""
+        """Create a new column using the given data."""
         if isinstance(data, Column):
-            return data
+            return Column(data.data)
         else:
             return Column(data)
 
@@ -122,19 +124,23 @@ class Frame(MutableMapping):
     """The columnar storage for node/edge features.
 
     The frame is a dictionary from feature fields to feature columns.
-
     All columns should have the same number of rows (i.e. the same first dimension).
 
     Parameters
     ----------
     data : dict-like, optional
-        The frame data in dictionary.
+        The frame data in dictionary. If the provided data is another frame,
+        this frame will NOT share columns with the given frame. So any out-place
+        update on one will not reflect to the other. The inplace update will
+        be seen by both. This follows the semantic of python's container.
     """
     def __init__(self, data=None):
         if data is None:
             self._columns = dict()
             self._num_rows = 0
         else:
+            # Note that we always create a new column for the given data.
+            # This avoids two frames accidentally sharing the same column.
             self._columns = {k : Column.create(v) for k, v in data.items()}
             self._num_rows = F.shape(list(data.values())[0])[0]
             # sanity check
@@ -223,32 +229,30 @@ class Frame(MutableMapping):
         """Append another frame's data into this frame.
 
         If the current frame is empty, it will just use the columns of the
-        given frame. Otherwise, the given frame and the current frame should
-        have the same column schemes.
+        given frame. Otherwise, the given data should contain all the
+        column keys of this frame.
 
         Parameters
         ----------
         other : Frame or dict-like
             The frame data to be appended.
         """
+        if not isinstance(other, Frame):
+            other = Frame(other)
         if len(self._columns) == 0:
-            for key, val in other.items():
-                col = Column.create(val)
+            for key, col in other.items():
                 self._columns[key] = col
-                # TODO(minjie): sanity check for num_rows
-                self._num_rows = len(col)
+            self._num_rows = other.num_rows
         else:
-            for key, val in other.items():
-                col = Column.create(val)
+            for key, col in other.items():
                 sch = self._columns[key].scheme
                 other_sch = col.scheme
                 if sch != other_sch:
                     raise DGLError("Cannot append column of scheme %s to column of scheme %s."
-                            % (other_scheme, sch))
+                                   % (other_scheme, sch))
                 self._columns[key].data = F.pack(
                         [self._columns[key].data, col.data])
-                # TODO(minjie): sanity check for num_rows
-                self._num_rows = len(self._columns[key])
+            self._num_rows += other.num_rows
 
     def clear(self):
         """Clear this frame. Remove all the columns."""
@@ -450,8 +454,8 @@ class FrameRef(MutableMapping):
         equivalent to update the column of the frame.
 
         If this frameref only points to part of the rows, then update the column
-        here will correspond to update part of the column in the frame. If the
-        given column name does not exist, a new zero column will be created first.
+        here will correspond to update part of the column in the frame. Raise error
+        if the given column name does not exist.
 
         Parameters
         ----------
@@ -471,13 +475,7 @@ class FrameRef(MutableMapping):
             self._frame[name] = col
         else:
             if name not in self._frame:
-                # create a zero column
-                shp = F.shape(data)
-                ctx = F.get_context(data)
-                # TODO(minjie): directly create the zero col on the target device
-                zero_col = F.zeros((self._frame.num_rows,) + shp[1:])
-                zero_col = F.to_context(zero_col, ctx)
-                self._frame[name] = zero_col
+                raise DGLError('Cannot update column %s. Column does not exist.' % name)
             fcol = self._frame[name]
             fcol.update(self.index(), data, inplace)
 
@@ -502,9 +500,8 @@ class FrameRef(MutableMapping):
         rowids = self._getrowid(query)
         for key, col in data.items():
             if key not in self:
-                # add new column
-                tmpref = FrameRef(self._frame, rowids)
-                tmpref.update_column(key, col, inplace)
+                raise DGLError('Cannot update rows.'
+                               ' The data contains non-exist column %s.' % key)
             else:
                 self._frame[key].update(rowids, col, inplace)
 

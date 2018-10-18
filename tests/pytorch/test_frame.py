@@ -72,12 +72,10 @@ def test_column2():
     # set column should reflect on the referenced data
     f['a1'] = th.zeros([5, D])
     assert th.allclose(data['a1'].data[3:8], th.zeros([5, D]))
-    # add new column should be padded with zero
-    f['a4'] = th.ones([5, D])
-    assert len(data) == 4
-    assert th.allclose(data['a4'].data[0:3], th.zeros([3, D]))
-    assert th.allclose(data['a4'].data[3:8], th.ones([5, D]))
-    assert th.allclose(data['a4'].data[8:10], th.zeros([2, D]))
+    # add new column should fail
+    def failed_add_col():
+        f['a4'] = th.ones([5, D])
+    assert check_fail(failed_add_col)
 
 def test_append1():
     # test append API on Frame
@@ -92,6 +90,11 @@ def test_append1():
     assert c1.data.shape == (2 * N, D)
     truth = th.cat([data['a1'], data['a1']])
     assert th.allclose(truth, c1.data)
+    # append dict of different length columns should fail
+    f3 = {'a1' : th.zeros((3, D)), 'a2' : th.zeros((3, D)), 'a3' : th.zeros((2, D))}
+    def failed_append():
+        f1.append(f3)
+    check_fail(failed_append)
 
 def test_append2():
     # test append on FrameRef
@@ -143,10 +146,11 @@ def test_row1():
     for k, v in f[rowid].items():
         assert th.allclose(v, th.zeros((len(rowid), D)))
 
-    # setting rows with new column should automatically add a new column
-    vals['a4'] = th.ones((len(rowid), D))
-    f[rowid] = vals
-    assert len(f) == 4
+    # setting rows with new column should raise error
+    def failed_update_rows():
+        vals['a4'] = th.ones((len(rowid), D))
+        f[rowid] = vals
+    check_fail(failed_update_rows)
 
 def test_row2():
     # test row getter/setter autograd compatibility
