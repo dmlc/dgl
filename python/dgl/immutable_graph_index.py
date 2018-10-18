@@ -377,8 +377,9 @@ class ImmutableGraphIndex(object):
         a vector of GraphIndex
             The subgraph index.
         """
-        vs_arr = [v.todgltensor() for v in vs_arr]
-        return mx.nd.contrib.dgl_subgraph(self._in_csr, vs_arr)
+        vs_arr = [v.tousertensor() for v in vs_arr]
+        in_csrs = mx.nd.contrib.dgl_subgraph(self._in_csr, *vs_arr, return_mapping=False)
+        return [ImmutableGraphIndex(in_csr, None) for in_csr in in_csrs]
 
     def adjacency_matrix(self, edge_type='in'):
         """Return the adjacency matrix representation of this graph.
