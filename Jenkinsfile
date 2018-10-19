@@ -36,6 +36,20 @@ def example_test(dev) {
 pipeline {
     agent none
     stages {
+        stage('Lint Check') {
+            agent {
+                docker {
+                    image 'lingfanyu/dgl-lint'
+                }
+            }
+            stages {
+                stage('cpp lint check') {
+                    steps {
+                        sh 'tests/scripts/task_lint.sh'
+                    }
+                }
+            }
+        }
         stage('Build and Test') {
             parallel {
                 stage('CPU') {
