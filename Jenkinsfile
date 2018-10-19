@@ -1,9 +1,13 @@
 #!/usr/bin/env groovy
 
-def setup() {
-    sh 'easy_install nose'
+def init_git_submodule() {
     sh 'git submodule init'
     sh 'git submodule update'
+}
+
+def setup() {
+    sh 'easy_install nose'
+    init_git_submodule()
 }
 
 def build_dgl() {
@@ -36,6 +40,21 @@ def example_test(dev) {
 pipeline {
     agent none
     stages {
+        stage('Lint Check') {
+            agent {
+                docker {
+                    image 'lingfanyu/dgl-lint'
+                }
+            }
+            stages {
+                stage('CHECK') {
+                    steps {
+                        init_git_submodule()
+                        sh 'tests/scripts/task_lint.sh'
+                    }
+                }
+            }
+        }
         stage('Build and Test') {
             parallel {
                 stage('CPU') {
