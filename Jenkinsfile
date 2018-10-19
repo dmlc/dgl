@@ -1,6 +1,34 @@
-def init_git() {
+def setup() {
+    sh 'easy_install nose'
     sh 'git submodule init'
     sh 'git submodule update'
+}
+
+def build_dgl() {
+    sh 'if [ -d build ]; then rm -rf build; fi; mkdir build'
+    dir('python') {
+        sh 'python3 setup.py install'
+    }
+    dir ('build') {
+        sh 'cmake ..'
+        sh 'make -j$(nproc)'
+    }
+}
+
+def unit_test() {
+    withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
+        sh 'nosetests tests -v --with-xunit'
+        sh 'nosetests tests/pytorch -v --with-xunit'
+        sh 'nosetests tests/graph_index -v --with-xunit'
+    }
+}
+
+def example_test() {
+    dir ('tests/scripts') {
+        withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
+            sh './test_examples.sh'
+        }
+    }
 }
 
 pipeline {
@@ -18,38 +46,22 @@ pipeline {
                     stages {
                         stage('SETUP') {
                             steps {
-                                sh 'easy_install nose'
-                                init_git()
+                                setup()
                             }
                         }
                         stage('BUILD') {
                             steps {
-                                sh 'if [ -d build ]; then rm -rf build; fi; mkdir build'
-                                dir('python') {
-                                    sh 'python3 setup.py install'
-                                }
-                                dir ('build') {
-                                    sh 'cmake ..'
-                                    sh 'make -j$(nproc)'
-                                }
+                                build_dgl()
                             }
                         }
                         stage('UNIT TEST') {
                             steps {
-                                withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
-                                    sh 'nosetests tests -v --with-xunit'
-                                    sh 'nosetests tests/pytorch -v --with-xunit'
-                                    sh 'nosetests tests/graph_index -v --with-xunit'
-                                }
+                                unit_test()
                             }
                         }
                         stage('EXAMPLE TEST') {
                             steps {
-                                dir ('tests/scripts') {
-                                    withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
-                                        sh './test_examples.sh'
-                                    }
-                                }
+                                example_test()
                             }
                         }
                     }
