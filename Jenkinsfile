@@ -42,7 +42,6 @@ pipeline {
                     agent {
                         docker {
                             image 'lingfanyu/dgl-cpu'
-                            args '-u root'
                         }
                     }
                     stages {
@@ -77,7 +76,7 @@ pipeline {
                     agent {
                         docker {
                             image 'lingfanyu/dgl-gpu'
-                            args '--runtime nvidia -u root'
+                            args '--runtime nvidia'
                         }
                     }
                     stages {
