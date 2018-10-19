@@ -23,10 +23,10 @@ class NodeApplyModule(nn.Module):
         self.activation = activation
 
     def forward(self, node):
-        h = self.linear(node)
+        h = self.linear(node['h'])
         if self.activation:
             h = self.activation(h)
-        return h
+        return {'h' : h}
 
 class GCN(nn.Module):
     def __init__(self,
@@ -49,14 +49,16 @@ class GCN(nn.Module):
         self.layers.append(NodeApplyModule(n_hidden, n_classes))
 
     def forward(self, features):
-        self.g.set_n_repr(features)
+        self.g.set_n_repr({'h' : features})
         for layer in self.layers:
             # apply dropout
             if self.dropout:
-                val = F.dropout(self.g.get_n_repr(), p=self.dropout)
-                self.g.set_n_repr(val)
-            self.g.update_all(fn.copy_src(), fn.sum(), layer, batchable=True)
-        return self.g.pop_n_repr()
+                g.apply_nodes(apply_node_func=
+                        lambda node: F.dropout(node['h'], p=self.dropout))
+            self.g.update_all(fn.copy_src(src='h', out='m'),
+                              fn.sum(msg='m', out='h'),
+                              layer)
+        return self.g.pop_n_repr('h')
 
 def main(args):
     # load and preprocess dataset

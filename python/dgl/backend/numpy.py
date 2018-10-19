@@ -22,3 +22,7 @@ def unpack(a, split_size_or_sections=None):
 
 def shape(a):
     return a.shape
+
+def nonzero_1d(a):
+    assert a.ndim == 2
+    return np.nonzero(a)[0]

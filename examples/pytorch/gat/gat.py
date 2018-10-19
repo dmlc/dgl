@@ -2,6 +2,8 @@
 Graph Attention Networks
 Paper: https://arxiv.org/abs/1710.10903
 Code: https://github.com/PetarV-/GAT
+
+GAT with batch processing
 """
 
 import argparse
@@ -10,6 +12,7 @@ import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import dgl
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 
@@ -22,15 +25,15 @@ class GATReduce(nn.Module):
         self.attn_drop = attn_drop
 
     def forward(self, node, msgs):
-        a1 = torch.unsqueeze(node['a1'], 0)  # shape (1, 1)
-        a2 = torch.cat([torch.unsqueeze(m['a2'], 0) for m in msgs], dim=0) # shape (deg, 1)
-        ft = torch.cat([torch.unsqueeze(m['ft'], 0) for m in msgs], dim=0) # shape (deg, D)
+        a1 = torch.unsqueeze(node['a1'], 1)  # shape (B, 1, 1)
+        a2 = msgs['a2'] # shape (B, deg, 1)
+        ft = msgs['ft'] # shape (B, deg, D)
         # attention
-        a = a1 + a2  # shape (deg, 1)
-        e = F.softmax(F.leaky_relu(a), dim=0)
+        a = a1 + a2  # shape (B, deg, 1)
+        e = F.softmax(F.leaky_relu(a), dim=1)
         if self.attn_drop != 0.0:
             e = F.dropout(e, self.attn_drop)
-        return {'accum' : torch.sum(e * ft, dim=0)} # shape (D,)
+        return {'accum' : torch.sum(e * ft, dim=1)} # shape (B, D)
 
 class GATFinalize(nn.Module):
     def __init__(self, headid, indim, hiddendim, activation, residual):
@@ -71,7 +74,7 @@ class GATPrepare(nn.Module):
 
 class GAT(nn.Module):
     def __init__(self,
-                 nx_graph,
+                 g,
                  num_layers,
                  in_dim,
                  num_hidden,
@@ -82,8 +85,8 @@ class GAT(nn.Module):
                  attn_drop,
                  residual):
         super(GAT, self).__init__()
-        self.g = DGLGraph(nx_graph)
-        self.num_layers = num_layers # one extra output projection
+        self.g = g
+        self.num_layers = num_layers
         self.num_heads = num_heads
         self.prp = nn.ModuleList()
         self.red = nn.ModuleList()
@@ -104,48 +107,39 @@ class GAT(nn.Module):
         # output projection
         self.prp.append(GATPrepare(num_hidden * num_heads, num_classes, in_drop))
         self.red.append(GATReduce(attn_drop))
-        self.fnl.append(GATFinalize(0, num_hidden * num_heads, num_classes, activation, residual))
+        self.fnl.append(GATFinalize(0, num_hidden * num_heads,
+                                    num_classes, activation, residual))
         # sanity check
         assert len(self.prp) == self.num_layers * self.num_heads + 1
         assert len(self.red) == self.num_layers * self.num_heads + 1
         assert len(self.fnl) == self.num_layers * self.num_heads + 1
 
-    def forward(self, features, train_nodes):
+    def forward(self, features):
         last = features
         for l in range(self.num_layers):
             for hid in range(self.num_heads):
                 i = l * self.num_heads + hid
                 # prepare
-                for n, h in last.items():
-                    self.g.nodes[n].update(self.prp[i](h))
+                self.g.set_n_repr(self.prp[i](last))
                 # message passing
                 self.g.update_all(gat_message, self.red[i], self.fnl[i])
             # merge all the heads
-            last = {}
-            for n in self.g.nodes():
-                last[n] = torch.cat(
-                    [self.g.nodes[n]['head%d' % hid] for hid in range(self.num_heads)])
+            last = torch.cat(
+                    [self.g.pop_n_repr('head%d' % hid) for hid in range(self.num_heads)],
+                    dim=1)
         # output projection
-        for n, h in last.items():
-          self.g.nodes[n].update(self.prp[-1](h))
+        self.g.set_n_repr(self.prp[-1](last))
         self.g.update_all(gat_message, self.red[-1], self.fnl[-1])
-        return torch.cat([torch.unsqueeze(self.g.nodes[n]['head0'], 0) for n in train_nodes])
+        return self.g.pop_n_repr('head0')
 
 def main(args):
     # load and preprocess dataset
     data = load_data(args)
 
-    # features of each samples
-    features = {}
-    labels = []
-    train_nodes = []
-    for n in data.graph.nodes():
-        features[n] = torch.FloatTensor(data.features[n, :])
-        if data.train_mask[n] == 1:
-            train_nodes.append(n)
-            labels.append(data.labels[n])
-    labels = torch.LongTensor(labels)
-    in_feats = data.features.shape[1]
+    features = torch.FloatTensor(data.features)
+    labels = torch.LongTensor(data.labels)
+    mask = torch.ByteTensor(data.train_mask)
+    in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
 
@@ -154,11 +148,15 @@ def main(args):
     else:
         cuda = True
         torch.cuda.set_device(args.gpu)
-        features = {k : v.cuda() for k, v in features.items()}
+        features = features.cuda()
         labels = labels.cuda()
+        mask = mask.cuda()
+
+    # create GCN model
+    g = DGLGraph(data.graph)
 
     # create model
-    model = GAT(data.graph,
+    model = GAT(g,
                 args.num_layers,
                 in_feats,
                 args.num_hidden,
@@ -181,7 +179,7 @@ def main(args):
         if epoch >= 3:
             t0 = time.time()
         # forward
-        logits = model(features, train_nodes)
+        logits = model(features)
         logp = F.log_softmax(logits, 1)
         loss = F.nll_loss(logp, labels)
 
@@ -202,7 +200,7 @@ if __name__ == '__main__':
             help="Which GPU to use. Set -1 to use CPU.")
     parser.add_argument("--epochs", type=int, default=20,
             help="number of training epochs")
-    parser.add_argument("--num-heads", type=int, default=8,
+    parser.add_argument("--num-heads", type=int, default=3,
             help="number of attentional heads to use")
     parser.add_argument("--num-layers", type=int, default=1,
             help="number of hidden layers")

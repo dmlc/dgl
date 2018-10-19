@@ -2,13 +2,10 @@ import torch as th
 from torch.autograd import Variable
 import numpy as np
 from dgl.frame import Frame, FrameRef
-from dgl.utils import Index
+from dgl.utils import Index, toindex
 
 N = 10
 D = 5
-
-def check_eq(a, b):
-    return a.shape == b.shape and np.allclose(a.numpy(), b.numpy())
 
 def check_fail(fn):
     try:
@@ -27,12 +24,13 @@ def test_create():
     data = create_test_data()
     f1 = Frame()
     for k, v in data.items():
-        f1.add_column(k, v)
-    assert f1.schemes == set(data.keys())
+        f1.update_column(k, v)
+    print(f1.schemes)
+    assert f1.keys() == set(data.keys())
     assert f1.num_columns == 3
     assert f1.num_rows == N
     f2 = Frame(data)
-    assert f2.schemes == set(data.keys())
+    assert f2.keys() == set(data.keys())
     assert f2.num_columns == 3
     assert f2.num_rows == N
     f1.clear()
@@ -45,9 +43,9 @@ def test_column1():
     f = Frame(data)
     assert f.num_rows == N
     assert len(f) == 3
-    assert check_eq(f['a1'], data['a1'])
+    assert th.allclose(f['a1'].data, data['a1'].data)
     f['a1'] = data['a2']
-    assert check_eq(f['a2'], data['a2'])
+    assert th.allclose(f['a2'].data, data['a2'].data)
     # add a different length column should fail
     def failed_add_col():
         f['a4'] = th.zeros([N+1, D])
@@ -70,16 +68,15 @@ def test_column2():
     f = FrameRef(data, [3, 4, 5, 6, 7])
     assert f.num_rows == 5
     assert len(f) == 3
-    assert check_eq(f['a1'], data['a1'][3:8])
+    assert th.allclose(f['a1'], data['a1'].data[3:8])
     # set column should reflect on the referenced data
     f['a1'] = th.zeros([5, D])
-    assert check_eq(data['a1'][3:8], th.zeros([5, D]))
-    # add new column should be padded with zero
-    f['a4'] = th.ones([5, D])
-    assert len(data) == 4
-    assert check_eq(data['a4'][0:3], th.zeros([3, D]))
-    assert check_eq(data['a4'][3:8], th.ones([5, D]))
-    assert check_eq(data['a4'][8:10], th.zeros([2, D]))
+    assert th.allclose(data['a1'].data[3:8], th.zeros([5, D]))
+    # add new partial column should fail with error initializer
+    f.set_initializer(lambda shape, dtype : assert_(False))
+    def failed_add_col():
+        f['a4'] = th.ones([5, D])
+    assert check_fail(failed_add_col)
 
 def test_append1():
     # test append API on Frame
@@ -91,9 +88,14 @@ def test_append1():
     f1.append(f2)
     assert f1.num_rows == 2 * N
     c1 = f1['a1']
-    assert c1.shape == (2 * N, D)
+    assert c1.data.shape == (2 * N, D)
     truth = th.cat([data['a1'], data['a1']])
-    assert check_eq(truth, c1)
+    assert th.allclose(truth, c1.data)
+    # append dict of different length columns should fail
+    f3 = {'a1' : th.zeros((3, D)), 'a2' : th.zeros((3, D)), 'a3' : th.zeros((2, D))}
+    def failed_append():
+        f1.append(f3)
+    assert check_fail(failed_append)
 
 def test_append2():
     # test append on FrameRef
@@ -113,7 +115,7 @@ def test_append2():
     assert not f.is_span_whole_column()
     assert f.num_rows == 3 * N
     new_idx = list(range(N)) + list(range(2*N, 4*N))
-    assert check_eq(f.index().totensor(), th.tensor(new_idx))
+    assert th.all(f.index().tousertensor() == th.tensor(new_idx, dtype=th.int64))
     assert data.num_rows == 4 * N
 
 def test_row1():
@@ -127,13 +129,13 @@ def test_row1():
     rows = f[rowid]
     for k, v in rows.items():
         assert v.shape == (len(rowid), D)
-        assert check_eq(v, data[k][rowid])
+        assert th.allclose(v, data[k][rowid])
     # test duplicate keys
     rowid = Index(th.tensor([8, 2, 2, 1]))
     rows = f[rowid]
     for k, v in rows.items():
         assert v.shape == (len(rowid), D)
-        assert check_eq(v, data[k][rowid])
+        assert th.allclose(v, data[k][rowid])
 
     # setter
     rowid = Index(th.tensor([0, 2, 4]))
@@ -143,12 +145,14 @@ def test_row1():
             }
     f[rowid] = vals
     for k, v in f[rowid].items():
-        assert check_eq(v, th.zeros((len(rowid), D)))
+        assert th.allclose(v, th.zeros((len(rowid), D)))
 
-    # setting rows with new column should automatically add a new column
-    vals['a4'] = th.ones((len(rowid), D))
-    f[rowid] = vals
-    assert len(f) == 4
+    # setting rows with new column should raise error with error initializer
+    f.set_initializer(lambda shape, dtype : assert_(False))
+    def failed_update_rows():
+        vals['a4'] = th.ones((len(rowid), D))
+        f[rowid] = vals
+    assert check_fail(failed_update_rows)
 
 def test_row2():
     # test row getter/setter autograd compatibility
@@ -161,13 +165,13 @@ def test_row2():
     rowid = Index(th.tensor([0, 2]))
     rows = f[rowid]
     rows['a1'].backward(th.ones((len(rowid), D)))
-    assert check_eq(c1.grad[:,0], th.tensor([1., 0., 1., 0., 0., 0., 0., 0., 0., 0.]))
+    assert th.allclose(c1.grad[:,0], th.tensor([1., 0., 1., 0., 0., 0., 0., 0., 0., 0.]))
     c1.grad.data.zero_()
     # test duplicate keys
     rowid = Index(th.tensor([8, 2, 2, 1]))
     rows = f[rowid]
     rows['a1'].backward(th.ones((len(rowid), D)))
-    assert check_eq(c1.grad[:,0], th.tensor([0., 1., 2., 0., 0., 0., 0., 0., 1., 0.]))
+    assert th.allclose(c1.grad[:,0], th.tensor([0., 1., 2., 0., 0., 0., 0., 0., 1., 0.]))
     c1.grad.data.zero_()
 
     # setter
@@ -180,8 +184,8 @@ def test_row2():
     f[rowid] = vals
     c11 = f['a1']
     c11.backward(th.ones((N, D)))
-    assert check_eq(c1.grad[:,0], th.tensor([0., 1., 0., 1., 0., 1., 1., 1., 1., 1.]))
-    assert check_eq(vals['a1'].grad, th.ones((len(rowid), D)))
+    assert th.allclose(c1.grad[:,0], th.tensor([0., 1., 0., 1., 0., 1., 1., 1., 1., 1.]))
+    assert th.allclose(vals['a1'].grad, th.ones((len(rowid), D)))
     assert vals['a2'].grad is None
 
 def test_row3():
@@ -201,8 +205,9 @@ def test_row3():
     newidx = list(range(N))
     newidx.pop(2)
     newidx.pop(2)
+    newidx = toindex(newidx)
     for k, v in f.items():
-        assert check_eq(v, data[k][th.tensor(newidx)])
+        assert th.allclose(v, data[k][newidx])
 
 def test_sharing():
     data = Frame(create_test_data())
@@ -210,10 +215,10 @@ def test_sharing():
     f2 = FrameRef(data, index=[2, 3, 4, 5, 6])
     # test read
     for k, v in f1.items():
-        assert check_eq(data[k][0:4], v)
+        assert th.allclose(data[k].data[0:4], v)
     for k, v in f2.items():
-        assert check_eq(data[k][2:7], v)
-    f2_a1 = f2['a1']
+        assert th.allclose(data[k].data[2:7], v)
+    f2_a1 = f2['a1'].data
     # test write
     # update own ref should not been seen by the other.
     f1[Index(th.tensor([0, 1]))] = {
@@ -221,7 +226,7 @@ def test_sharing():
             'a2' : th.zeros([2, D]),
             'a3' : th.zeros([2, D]),
             }
-    assert check_eq(f2['a1'], f2_a1)
+    assert th.allclose(f2['a1'], f2_a1)
     # update shared space should been seen by the other.
     f1[Index(th.tensor([2, 3]))] = {
             'a1' : th.ones([2, D]),
@@ -229,7 +234,7 @@ def test_sharing():
             'a3' : th.ones([2, D]),
             }
     f2_a1[0:2] = th.ones([2, D])
-    assert check_eq(f2['a1'], f2_a1)
+    assert th.allclose(f2['a1'], f2_a1)
 
 if __name__ == '__main__':
     test_create()

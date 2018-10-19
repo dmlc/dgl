@@ -14,4 +14,50 @@ Show below, there are three sets of APIs for different models.
 - Always choose the API at the *highest* possible level.
 - Refer to the [GCN example](examples/pytorch/gcn/gcn_batch.py) to see how to register message and node update functions;
 
+## How to build (the `cpp` branch)
 
+Before building, make sure that the submodules are cloned.  If you haven't initialized the submodules, run
+
+```sh
+$ git submodule init
+```
+
+To sync the submodules, run
+
+```sh
+$ git submodule update
+```
+
+### Linux
+
+At the root directory of the repo:
+
+```sh
+$ mkdir build
+$ cd build
+$ cmake ..
+$ make
+$ export DGL_LIBRARY_PATH=$PWD
+```
+
+The `DGL_LIBRARY_PATH` environment variable should point to the library `libdgl.so` built by CMake.
+
+### Windows/MinGW (Experimental)
+
+Make sure you have the following installed:
+
+* CMake
+* MinGW/GCC (G++)
+* MinGW/Make
+
+You can grab them from Anaconda.
+
+In the command line prompt, run:
+
+```
+> md build
+> cd build
+> cmake -DCMAKE_CXX_FLAGS="-DDMLC_LOG_STACK_TRACE=0 -DTVM_EXPORTS" .. -G "MinGW Makefiles"
+> mingw32-make
+> set DGL_LIBRARY_PATH=%CD%
+```
