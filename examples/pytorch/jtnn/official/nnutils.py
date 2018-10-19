@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+import os
 
 def create_var(tensor, requires_grad=None):
     if requires_grad is None:
@@ -9,7 +10,7 @@ def create_var(tensor, requires_grad=None):
         return Variable(tensor, requires_grad=requires_grad)
 
 def cuda(tensor):
-    if torch.cuda.is_available():
+    if torch.cuda.is_available() and not os.getenv('NOCUDA', None):
         return tensor.cuda()
     else:
         return tensor

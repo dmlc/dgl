@@ -79,11 +79,6 @@ class DGLJTNNVAE(nn.Module):
         mol_mean = self.G_mean(mol_vec)
         mol_log_var = -torch.abs(self.G_var(mol_vec))
 
-        self.tree_mean = tree_mean
-        self.tree_log_var = tree_log_var
-        self.mol_mean = mol_mean
-        self.mol_log_var = mol_log_var
-
         z_mean = torch.cat([tree_mean, mol_mean], dim=1)
         z_log_var = torch.cat([tree_log_var, mol_log_var], dim=1)
         kl_loss = -0.5 * torch.sum(1.0 + z_log_var - z_mean * z_mean - torch.exp(z_log_var)) / batch_size
@@ -95,7 +90,9 @@ class DGLJTNNVAE(nn.Module):
         tree_vec = tree_mean + torch.exp(tree_log_var / 2) * epsilon
         epsilon = cuda(torch.randn(batch_size, self.latent_size // 2)) if e2 is None else e2
         mol_vec = mol_mean + torch.exp(mol_log_var / 2) * epsilon
-
+        self.tree_mean = tree_mean
+        self.tree_log_var = tree_log_var
+        self.e1 = epsilon
         self.tree_vec = tree_vec
         self.mol_vec = mol_vec
 
