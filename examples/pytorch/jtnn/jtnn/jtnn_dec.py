@@ -5,7 +5,7 @@ from .mol_tree import Vocab
 from .nnutils import GRUUpdate, cuda
 import copy
 import itertools
-from dgl import batch, line_graph
+from dgl import batch
 import dgl.function as DGLF
 import networkx as nx
 from .line_profiler_integration import profile
@@ -19,6 +19,7 @@ def dfs_order(forest, roots):
     Returns edge source, edge destination, tree ID, and whether u is generating
     a new children
     '''
+    forest = forest.to_networkx()
     edge_list = []
 
     for i, root in enumerate(roots):
@@ -39,7 +40,7 @@ def dfs_order(forest, roots):
 
 
 dec_tree_node_msg = DGLF.copy_edge(edge='m', out='m')
-dec_tree_node_reduce = DGLF.sum(msgs='m', out='h')
+dec_tree_node_reduce = DGLF.sum(msg='m', out='h')
 
 
 def dec_tree_node_update(node):
@@ -47,7 +48,7 @@ def dec_tree_node_update(node):
 
 
 dec_tree_edge_msg = [DGLF.copy_src(src='m', out='m'), DGLF.copy_src(src='rm', out='rm')]
-dec_tree_edge_reduce = [DGLF.sum(msgs='m', out='s'), DGLF.sum(msgs='rm', out='accum_rm')]
+dec_tree_edge_reduce = [DGLF.sum(msg='m', out='s'), DGLF.sum(msg='rm', out='accum_rm')]
 
 
 class DGLJTNNDecoder(nn.Module):
@@ -77,7 +78,7 @@ class DGLJTNNDecoder(nn.Module):
         ground truth tree
         '''
         mol_tree_batch = batch(mol_trees)
-        mol_tree_batch_lg = line_graph(mol_tree_batch, no_backtracking=True)
+        mol_tree_batch_lg = mol_tree_batch.line_graph(backtracking=False, shared=True)
         n_trees = len(mol_trees)
 
         return self.run(mol_tree_batch, mol_tree_batch_lg, n_trees, tree_vec)
