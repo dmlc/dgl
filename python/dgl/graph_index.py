@@ -523,6 +523,7 @@ class GraphIndex(object):
         """
         src, dst, eid = self.edges()
         ret = nx.MultiDiGraph() if self.is_multigraph() else nx.DiGraph()
+        ret.add_nodes_from(range(self.number_of_nodes()))
         for u, v, id in zip(src, dst, eid):
             ret.add_edge(u, v, id=id)
         return ret
@@ -548,25 +549,27 @@ class GraphIndex(object):
 
         num_nodes = nx_graph.number_of_nodes()
         self.add_nodes(num_nodes)
-        has_edge_id = 'id' in next(iter(nx_graph.edges))
-        if has_edge_id:
-            num_edges = nx_graph.number_of_edges()
-            src = np.zeros((num_edges,), dtype=np.int64)
-            dst = np.zeros((num_edges,), dtype=np.int64)
-            for e, attr in nx_graph.edges.items:
-                # MultiDiGraph returns a triplet in e while DiGraph returns a pair
-                eid = attr['id']
-                src[eid] = e[0]
-                dst[eid] = e[1]
-        else:
-            src = []
-            dst = []
-            for e in nx_graph.edges:
-                src.append(e[0])
-                dst.append(e[1])
-        src = utils.toindex(src)
-        dst = utils.toindex(dst)
-        self.add_edges(src, dst)
+
+        if len(nx_graph.edges) > 0:
+            has_edge_id = 'id' in next(iter(nx_graph.edges))
+            if has_edge_id:
+                num_edges = nx_graph.number_of_edges()
+                src = np.zeros((num_edges,), dtype=np.int64)
+                dst = np.zeros((num_edges,), dtype=np.int64)
+                for e, attr in nx_graph.edges.items:
+                    # MultiDiGraph returns a triplet in e while DiGraph returns a pair
+                    eid = attr['id']
+                    src[eid] = e[0]
+                    dst[eid] = e[1]
+            else:
+                src = []
+                dst = []
+                for e in nx_graph.edges:
+                    src.append(e[0])
+                    dst.append(e[1])
+            src = utils.toindex(src)
+            dst = utils.toindex(dst)
+            self.add_edges(src, dst)
 
     def from_scipy_sparse_matrix(self, adj):
         """Convert from scipy sparse matrix.
