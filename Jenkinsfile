@@ -27,10 +27,9 @@ def unit_test() {
 
 def example_test(dev) {
     dir ('tests/scripts') {
-        sh 'echo ${dev}'
         withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
-            sh 'echo ${dev}'
-            sh './test_examples_${dev}.sh'
+            echo "${dev}"
+            ./test_examples_${dev}.sh
         }
     }
 }
