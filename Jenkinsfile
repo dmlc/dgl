@@ -28,7 +28,7 @@ def unit_test() {
 def example_test(dev) {
     dir ('tests/scripts') {
         withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
-            sh "./test_examples_${dev}.sh"
+            sh "./test_examples.sh ${dev}"
         }
     }
 }
@@ -62,7 +62,7 @@ pipeline {
                         }
                         stage('EXAMPLE TEST') {
                             steps {
-                                example_test('cpu')
+                                example_test('CPU')
                             }
                         }
                     }
@@ -97,7 +97,7 @@ pipeline {
                         }
                         stage('EXAMPLE TEST') {
                             steps {
-                                example_test('gpu')
+                                example_test('GPU')
                             }
                         }
                     }
