@@ -158,9 +158,7 @@ class DGLMPN(nn.Module):
         n_nodes = mol_graph.number_of_nodes()
 
         mol_graph.update_edge(
-            #*zip(*mol_graph.edge_list),
             edge_func=lambda src, dst, edge: {'src_x': src['x']},
-            batchable=True,
         )
 
         bond_features = mol_line_graph.get_n_repr()['x']
@@ -183,14 +181,12 @@ class DGLMPN(nn.Module):
                 mpn_loopy_bp_msg,
                 mpn_loopy_bp_reduce,
                 self.loopy_bp_updater,
-                True
             )
 
         mol_graph.update_all(
             mpn_gather_msg,
             mpn_gather_reduce,
             self.gather_updater,
-            True
         )
 
         return mol_graph
