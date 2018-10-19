@@ -14,8 +14,10 @@ class ImmutableGraphIndex(object):
 
     Parameters
     ----------
-    handle : GraphIndexHandle
-        Handler
+    in_csr : a csr array that stores in-edges.
+        MXNet CSRArray
+    out_csr : a csr array that stores out-edges.
+        MXNet CSRArray
     """
     def __init__(self, in_csr, out_csr):
         self._in_csr = in_csr
@@ -364,13 +366,14 @@ class ImmutableGraphIndex(object):
 
         Returns
         -------
-        GraphIndex
+        ImmutableSubgraphIndex
             The subgraph index.
         """
         v = v.tousertensor()
         v = mx.nd.sort(v)
-        in_csr = mx.nd.contrib.dgl_subgraph(self._in_csr, v, return_mapping=False)
-        return ImmutableGraphIndex(in_csr, None)
+        csr = mx.nd.contrib.dgl_subgraph(self._in_csr, v, return_mapping=True)
+        induced_nodes = utils.toindex(v)
+        return ImmutableSubgraphIndex(csr, None, self, induced_nodes, None)
 
     def node_subgraphs(self, vs_arr):
         """Return the induced node subgraphs.
@@ -382,13 +385,16 @@ class ImmutableGraphIndex(object):
 
         Returns
         -------
-        a vector of GraphIndex
+        a vector of ImmutableSubgraphIndex
             The subgraph index.
         """
         vs_arr = [v.tousertensor() for v in vs_arr]
         vs_arr = [mx.nd.sort(v) for v in vs_arr]
-        in_csrs = mx.nd.contrib.dgl_subgraph(self._in_csr, *vs_arr, return_mapping=False)
-        return [ImmutableGraphIndex(in_csr, None) for in_csr in in_csrs]
+        in_csrs = mx.nd.contrib.dgl_subgraph(self._in_csr, *vs_arr, return_mapping=True)
+        induced_nodes = [utils.toindex(vs) for vs in vs_arr]
+        assert len(in_csrs) == len(induced_nodes)
+        return [ImmutableSubgraphIndex(in_csr, None, self, induced_n,
+            None) for in_csr, induced_n in zip(in_csrs, induced_nodes)]
 
     def adjacency_matrix(self, edge_type='in'):
         """Return the adjacency matrix representation of this graph.
@@ -501,10 +507,26 @@ class ImmutableGraphIndex(object):
 
         Returns
         -------
-        GraphIndex
+        ImmutableGraphIndex
             The line graph of this graph.
         """
         raise Exception('immutable graph doesn\'t support line_graph')
+
+class ImmutableSubgraphIndex(ImmutableGraphIndex):
+    def __init__(self, in_csr, out_csr, parent, induced_nodes, induced_edges):
+        super(ImmutableSubgraphIndex, self).__init__(in_csr, out_csr)
+
+        self._parent = parent
+        self._induced_nodes = induced_nodes
+        self._induced_edges = induced_edges
+
+    @property
+    def induced_edges(self):
+        return self._induced_edges
+
+    @property
+    def induced_nodes(self):
+        return self._induced_nodes
 
 def create_immutable_graph_index(graph_data=None):
     """Create a graph index object.
