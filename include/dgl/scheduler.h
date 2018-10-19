@@ -1,9 +1,13 @@
-// DGL Scheduler interface
+/*!
+ *  Copyright (c) 2018 by Contributors
+ * \file dgl/scheduler.h
+ * \brief Operations on graph index.
+ */
 #ifndef DGL_SCHEDULER_H_
 #define DGL_SCHEDULER_H_
 
-#include "runtime/ndarray.h"
 #include <vector>
+#include "runtime/ndarray.h"
 
 namespace dgl {
 
@@ -25,8 +29,8 @@ namespace sched {
  */
 std::vector<IdArray> DegreeBucketing(const IdArray& vids);
 
-} // namespace sched
+}  // namespace sched
 
-} // namespace dgl
+}  // namespace dgl
 
-#endif // DGL_SCHEDULER_H_
+#endif  // DGL_SCHEDULER_H_

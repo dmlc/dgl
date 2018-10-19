@@ -1,10 +1,10 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file tvm/runtime/ndarray.h
+ * \file dgl/runtime/ndarray.h
  * \brief Abstract device memory management API
  */
-#ifndef TVM_RUNTIME_NDARRAY_H_
-#define TVM_RUNTIME_NDARRAY_H_
+#ifndef DGL_RUNTIME_NDARRAY_H_
+#define DGL_RUNTIME_NDARRAY_H_
 
 #include <atomic>
 #include <vector>
@@ -422,4 +422,4 @@ inline bool NDArray::Load(dmlc::Stream* strm) {
 
 }  // namespace runtime
 }  // namespace tvm
-#endif  // TVM_RUNTIME_NDARRAY_H_
+#endif  // DGL_RUNTIME_NDARRAY_H_

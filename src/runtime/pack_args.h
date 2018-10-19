@@ -10,8 +10,8 @@
  *                 union_32bit args[N], int num_args);
  *      - Pack buffer by address, pack rest parameter into 32bit union buffer.
  */
-#ifndef TVM_RUNTIME_PACK_ARGS_H_
-#define TVM_RUNTIME_PACK_ARGS_H_
+#ifndef DGL_RUNTIME_PACK_ARGS_H_
+#define DGL_RUNTIME_PACK_ARGS_H_
 
 #include <dgl/runtime/c_runtime_api.h>
 #include <vector>
@@ -307,4 +307,4 @@ inline PackedFunc PackFuncPackedArg(F f, const std::vector<TVMType>& arg_types) 
 }
 }  // namespace runtime
 }  // namespace tvm
-#endif  // TVM_RUNTIME_PACK_ARGS_H_
+#endif  // DGL_RUNTIME_PACK_ARGS_H_

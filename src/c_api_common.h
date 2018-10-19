@@ -1,4 +1,8 @@
-// DGL C API common util functions
+/*!
+ *  Copyright (c) 2018 by Contributors
+ * \file c_api_common.h
+ * \brief DGL C API common util functions
+ */
 #ifndef DGL_C_API_COMMON_H_
 #define DGL_C_API_COMMON_H_
 
@@ -12,12 +16,20 @@ namespace dgl {
 // Graph handler type
 typedef void* GraphHandle;
 
-// Convert the given DLTensor to a temporary DLManagedTensor that does not own memory.
-DLManagedTensor* CreateTmpDLManagedTensor(const tvm::runtime::TVMArgValue& arg);
+/*!
+ * \brief Convert the given DLTensor to DLManagedTensor.
+ *
+ * Return a temporary DLManagedTensor that does not own memory.
+ */
+DLManagedTensor* CreateTmpDLManagedTensor(
+    const tvm::runtime::TVMArgValue& arg);
 
-// Convert a vector of NDArray to PackedFunc
-tvm::runtime::PackedFunc ConvertNDArrayVectorToPackedFunc(const std::vector<tvm::runtime::NDArray>& vec);
+/*!
+ * \brief Convert a vector of NDArray to PackedFunc.
+ */
+tvm::runtime::PackedFunc ConvertNDArrayVectorToPackedFunc(
+    const std::vector<tvm::runtime::NDArray>& vec);
 
-} // namespace dgl
+}  // namespace dgl
 
-#endif // DGL_C_API_COMMON_H_
+#endif  // DGL_C_API_COMMON_H_

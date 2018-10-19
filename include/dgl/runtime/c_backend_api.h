@@ -7,8 +7,8 @@
  *  used by compiled tvm operators, usually user do not need to use these
  *  function directly.
  */
-#ifndef TVM_RUNTIME_C_BACKEND_API_H_
-#define TVM_RUNTIME_C_BACKEND_API_H_
+#ifndef DGL_RUNTIME_C_BACKEND_API_H_
+#define DGL_RUNTIME_C_BACKEND_API_H_
 
 #include "c_runtime_api.h"
 
@@ -136,4 +136,4 @@ TVM_DLL int TVMBackendRunOnce(void** handle,
 #ifdef __cplusplus
 }  // TVM_EXTERN_C
 #endif
-#endif  // TVM_RUNTIME_C_BACKEND_API_H_
+#endif  // DGL_RUNTIME_C_BACKEND_API_H_
