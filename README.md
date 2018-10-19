@@ -28,6 +28,8 @@ To sync the submodules, run
 $ git submodule update
 ```
 
+### Linux
+
 At the root directory of the repo:
 
 ```sh
@@ -39,3 +41,23 @@ $ export DGL_LIBRARY_PATH=$PWD
 ```
 
 The `DGL_LIBRARY_PATH` environment variable should point to the library `libdgl.so` built by CMake.
+
+### Windows/MinGW (Experimental)
+
+Make sure you have the following installed:
+
+* CMake
+* MinGW/GCC (G++)
+* MinGW/Make
+
+You can grab them from Anaconda.
+
+In the command line prompt, run:
+
+```
+> md build
+> cd build
+> cmake -DCMAKE_CXX_FLAGS="-DDMLC_LOG_STACK_TRACE=0 -DTVM_EXPORTS" .. -G "MinGW Makefiles"
+> mingw32-make
+> set DGL_LIBRARY_PATH=%CD%
+```

@@ -3,8 +3,8 @@
  * \file thread_storage_scope.h
  * \brief Extract thread axis configuration from TVMArgs.
  */
-#ifndef TVM_RUNTIME_THREAD_STORAGE_SCOPE_H_
-#define TVM_RUNTIME_THREAD_STORAGE_SCOPE_H_
+#ifndef DGL_RUNTIME_THREAD_STORAGE_SCOPE_H_
+#define DGL_RUNTIME_THREAD_STORAGE_SCOPE_H_
 
 #include <dgl/runtime/packed_func.h>
 #include <string>
@@ -204,4 +204,4 @@ struct hash<::tvm::runtime::StorageScope> {
   }
 };
 }  // namespace std
-#endif  // TVM_RUNTIME_THREAD_STORAGE_SCOPE_H_
+#endif  // DGL_RUNTIME_THREAD_STORAGE_SCOPE_H_

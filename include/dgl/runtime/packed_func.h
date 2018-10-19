@@ -1,10 +1,10 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file tvm/runtime/packed_func.h
+ * \file dgl/runtime/packed_func.h
  * \brief Type-erased function used across TVM API.
  */
-#ifndef TVM_RUNTIME_PACKED_FUNC_H_
-#define TVM_RUNTIME_PACKED_FUNC_H_
+#ifndef DGL_RUNTIME_PACKED_FUNC_H_
+#define DGL_RUNTIME_PACKED_FUNC_H_
 
 #include <dmlc/logging.h>
 #include <functional>
@@ -1212,4 +1212,4 @@ inline PackedFunc Module::GetFunction(const std::string& name, bool query_import
 }
 }  // namespace runtime
 }  // namespace tvm
-#endif  // TVM_RUNTIME_PACKED_FUNC_H_
+#endif  // DGL_RUNTIME_PACKED_FUNC_H_

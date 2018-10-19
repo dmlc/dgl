@@ -1,11 +1,11 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file tvm/runtime/serializer.h
+ * \file dgl/runtime/serializer.h
  * \brief Serializer extension to support TVM data types
  *  Include this file to enable serialization of DLDataType, DLContext
  */
-#ifndef TVM_RUNTIME_SERIALIZER_H_
-#define TVM_RUNTIME_SERIALIZER_H_
+#ifndef DGL_RUNTIME_SERIALIZER_H_
+#define DGL_RUNTIME_SERIALIZER_H_
 
 #include <dmlc/io.h>
 #include <dmlc/serializer.h>
@@ -48,4 +48,4 @@ struct Handler<DLContext> {
 
 }  // namespace serializer
 }  // namespace dmlc
-#endif  // TVM_RUNTIME_SERIALIZER_H_
+#endif  // DGL_RUNTIME_SERIALIZER_H_

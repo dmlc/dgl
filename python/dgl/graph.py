@@ -6,7 +6,7 @@ import networkx as nx
 import numpy as np
 
 import dgl
-from .base import ALL, is_all, __MSG__, __REPR__
+from .base import ALL, is_all, DGLError, dgl_warning
 from . import backend as F
 from .backend import Tensor
 from .frame import FrameRef, merge_frames
@@ -22,7 +22,6 @@ class DGLGraph(object):
     """Base graph class specialized for neural networks on graphs.
 
     TODO(minjie): document of batching semantics
-    TODO(minjie): document of __REPR__ semantics
 
     Parameters
     ----------
@@ -448,7 +447,9 @@ class DGLGraph(object):
             The nx graph
         """
         nx_graph = self._graph.to_networkx()
-        #TODO: attributes
+        #TODO(minjie): attributes
+        dgl_warning('to_networkx currently does not support converting'
+                    ' node/edge features automatically.')
         return nx_graph
 
     def from_networkx(self, nx_graph, node_attrs=None, edge_attrs=None):
@@ -504,69 +505,94 @@ class DGLGraph(object):
         self._msg_graph.add_nodes(self._graph.number_of_nodes())
 
     def node_attr_schemes(self):
-        """Return the node attribute schemes.
+        """Return the node feature schemes.
 
         Returns
         -------
-        iterable
-            The set of attribute names
+        dict of str to schemes
+            The schemes of node feature columns.
         """
         return self._node_frame.schemes
 
     def edge_attr_schemes(self):
-        """Return the edge attribute schemes.
+        """Return the edge feature schemes.
 
         Returns
         -------
-        iterable
-            The set of attribute names
+        dict of str to schemes
+            The schemes of edge feature columns.
         """
         return self._edge_frame.schemes
+
+    def set_n_initializer(self, initializer):
+        """Set the initializer for empty node features.
+
+        Initializer is a callable that returns a tensor given the shape and data type.
+
+        Parameters
+        ----------
+        initializer : callable
+            The initializer.
+        """
+        self._node_frame.set_initializer(initializer)
+
+    def set_e_initializer(self, initializer):
+        """Set the initializer for empty edge features.
+
+        Initializer is a callable that returns a tensor given the shape and data type.
+
+        Parameters
+        ----------
+        initializer : callable
+            The initializer.
+        """
+        self._edge_frame.set_initializer(initializer)
 
     def set_n_repr(self, hu, u=ALL, inplace=False):
         """Set node(s) representation.
 
-        To set multiple node representations at once, pass `u` with a tensor or
-        a supported container of node ids. In this case, `hu` must be a tensor
-        of shape (B, D1, D2, ...), where B is the number of the nodes and
-        (D1, D2, ...) is the shape of the node representation tensor.
+        `hu` is a dictionary from the feature name to feature tensor. Each tensor
+        is of shape (B, D1, D2, ...), where B is the number of nodes to be updated,
+        and (D1, D2, ...) be the shape of the node representation tensor. The
+        length of the given node ids must match B (i.e, len(u) == B).
 
-        Dictionary type is also supported for `hu`. In this case, each item
-        will be treated as separate attribute of the nodes.
+        All update will be done out-placely to work with autograd unless the inplace
+        flag is true.
 
         Parameters
         ----------
-        hu : tensor or dict of tensor
-          Node representation.
+        hu : dict of tensor
+            Node representation.
         u : node, container or tensor
-          The node(s).
+            The node(s).
+        inplace : bool
+            True if the update is done inplacely
         """
         # sanity check
+        if not utils.is_dict_like(hu):
+            raise DGLError('Expect dictionary type for feature data.'
+                           ' Got "%s" instead.' % type(hu))
         if is_all(u):
             num_nodes = self.number_of_nodes()
         else:
             u = utils.toindex(u)
             num_nodes = len(u)
-        if utils.is_dict_like(hu):
-            for key, val in hu.items():
-                assert F.shape(val)[0] == num_nodes
-        else:
-            assert F.shape(hu)[0] == num_nodes
+        for key, val in hu.items():
+            nfeats = F.shape(val)[0]
+            if nfeats != num_nodes:
+                raise DGLError('Expect number of features to match number of nodes (len(u)).'
+                               ' Got %d and %d instead.' % (nfeats, num_nodes))
         # set
         if is_all(u):
-            if utils.is_dict_like(hu):
-                for key, val in hu.items():
-                    self._node_frame[key] = val
-            else:
-                self._node_frame[__REPR__] = hu
+            for key, val in hu.items():
+                self._node_frame[key] = val
         else:
-            if utils.is_dict_like(hu):
-                self._node_frame.update_rows(u, hu, inplace=inplace)
-            else:
-                self._node_frame.update_rows(u, {__REPR__ : hu}, inplace=inplace)
+            self._node_frame.update_rows(u, hu, inplace=inplace)
 
     def get_n_repr(self, u=ALL):
         """Get node(s) representation.
+
+        The returned feature tensor batches multiple node features on the first dimension.
 
         Parameters
         ----------
@@ -576,23 +602,17 @@ class DGLGraph(object):
         Returns
         -------
         dict
-            Representation dict
+            Representation dict from feature name to feature tensor.
         """
         if len(self.node_attr_schemes()) == 0:
             return dict()
         if is_all(u):
-            if len(self._node_frame) == 1 and __REPR__ in self._node_frame:
-                return self._node_frame[__REPR__]
-            else:
-                return dict(self._node_frame)
+            return dict(self._node_frame)
         else:
             u = utils.toindex(u)
-            if len(self._node_frame) == 1 and __REPR__ in self._node_frame:
-                return self._node_frame.select_rows(u)[__REPR__]
-            else:
-                return self._node_frame.select_rows(u)
+            return self._node_frame.select_rows(u)
 
-    def pop_n_repr(self, key=__REPR__):
+    def pop_n_repr(self, key):
         """Get and remove the specified node repr.
 
         Parameters
@@ -607,71 +627,83 @@ class DGLGraph(object):
         """
         return self._node_frame.pop(key)
 
-    def set_e_repr(self, h_uv, u=ALL, v=ALL):
+    def set_e_repr(self, he, u=ALL, v=ALL, inplace=False):
         """Set edge(s) representation.
 
-        To set multiple edge representations at once, pass `u` and `v` with tensors or
-        supported containers of node ids. In this case, `h_uv` must be a tensor
-        of shape (B, D1, D2, ...), where B is the number of the edges and
-        (D1, D2, ...) is the shape of the edge representation tensor.
+        `he` is a dictionary from the feature name to feature tensor. Each tensor
+        is of shape (B, D1, D2, ...), where B is the number of edges to be updated,
+        and (D1, D2, ...) be the shape of the edge representation tensor.
 
-        Dictionary type is also supported for `h_uv`. In this case, each item
-        will be treated as separate attribute of the edges.
+        All update will be done out-placely to work with autograd unless the inplace
+        flag is true.
 
         Parameters
         ----------
-        h_uv : tensor or dict of tensor
+        he : tensor or dict of tensor
           Edge representation.
         u : node, container or tensor
           The source node(s).
         v : node, container or tensor
           The destination node(s).
+        inplace : bool
+            True if the update is done inplacely
         """
         # sanity check
+        if not utils.is_dict_like(he):
+            raise DGLError('Expect dictionary type for feature data.'
+                           ' Got "%s" instead.' % type(he))
         u_is_all = is_all(u)
         v_is_all = is_all(v)
         assert u_is_all == v_is_all
         if u_is_all:
-            self.set_e_repr_by_id(h_uv, eid=ALL)
+            self.set_e_repr_by_id(he, eid=ALL, inplace=inplace)
         else:
             u = utils.toindex(u)
             v = utils.toindex(v)
             _, _, eid = self._graph.edge_ids(u, v)
-            self.set_e_repr_by_id(h_uv, eid=eid)
+            self.set_e_repr_by_id(he, eid=eid, inplace=inplace)
 
-    def set_e_repr_by_id(self, h_uv, eid=ALL):
+    def set_e_repr_by_id(self, he, eid=ALL, inplace=False):
         """Set edge(s) representation by edge id.
+
+        `he` is a dictionary from the feature name to feature tensor. Each tensor
+        is of shape (B, D1, D2, ...), where B is the number of edges to be updated,
+        and (D1, D2, ...) be the shape of the edge representation tensor.
+
+        All update will be done out-placely to work with autograd unless the inplace
+        flag is true.
 
         Parameters
         ----------
-        h_uv : tensor or dict of tensor
+        he : tensor or dict of tensor
           Edge representation.
         eid : int, container or tensor
           The edge id(s).
+        inplace : bool
+            True if the update is done inplacely
         """
         # sanity check
+        if not utils.is_dict_like(he):
+            raise DGLError('Expect dictionary type for feature data.'
+                           ' Got "%s" instead.' % type(he))
         if is_all(eid):
             num_edges = self.number_of_edges()
         else:
             eid = utils.toindex(eid)
             num_edges = len(eid)
-        if utils.is_dict_like(h_uv):
-            for key, val in h_uv.items():
-                assert F.shape(val)[0] == num_edges
-        else:
-            assert F.shape(h_uv)[0] == num_edges
+        for key, val in he.items():
+            nfeats = F.shape(val)[0]
+            if nfeats != num_edges:
+                raise DGLError('Expect number of features to match number of edges.'
+                               ' Got %d and %d instead.' % (nfeats, num_edges))
         # set
         if is_all(eid):
-            if utils.is_dict_like(h_uv):
-                for key, val in h_uv.items():
-                    self._edge_frame[key] = val
-            else:
-                self._edge_frame[__REPR__] = h_uv
+            # update column
+            for key, val in he.items():
+                self._edge_frame[key] = val
         else:
-            if utils.is_dict_like(h_uv):
-                self._edge_frame[eid] = h_uv
-            else:
-                self._edge_frame[eid] = {__REPR__ : h_uv}
+            # update row
+            self._edge_frame.update_rows(eid, he, inplace=inplace)
 
     def get_e_repr(self, u=ALL, v=ALL):
         """Get node(s) representation.
@@ -701,7 +733,7 @@ class DGLGraph(object):
             _, _, eid = self._graph.edge_ids(u, v)
             return self.get_e_repr_by_id(eid=eid)
 
-    def pop_e_repr(self, key=__REPR__):
+    def pop_e_repr(self, key):
         """Get and remove the specified edge repr.
 
         Parameters
@@ -727,21 +759,15 @@ class DGLGraph(object):
         Returns
         -------
         dict
-            Representation dict
+            Representation dict from feature name to feature tensor.
         """
         if len(self.edge_attr_schemes()) == 0:
             return dict()
         if is_all(eid):
-            if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
-                return self._edge_frame[__REPR__]
-            else:
-                return dict(self._edge_frame)
+            return dict(self._edge_frame)
         else:
             eid = utils.toindex(eid)
-            if len(self._edge_frame) == 1 and __REPR__ in self._edge_frame:
-                return self._edge_frame.select_rows(eid)[__REPR__]
-            else:
-                return self._edge_frame.select_rows(eid)
+            return self._edge_frame.select_rows(eid)
 
     def register_edge_func(self, edge_func):
         """Register global edge update function.
@@ -793,12 +819,14 @@ class DGLGraph(object):
         """
         self._apply_edge_func = apply_edge_func
 
-    def apply_nodes(self, v, apply_node_func="default"):
+    def apply_nodes(self, v=ALL, apply_node_func="default"):
         """Apply the function on node representations.
+
+        Applying a None function will be ignored.
 
         Parameters
         ----------
-        v : int, iterable of int, tensor
+        v : int, iterable of int, tensor, optional
           The node id(s).
         apply_node_func : callable
           The apply node function.
@@ -827,7 +855,7 @@ class DGLGraph(object):
             # merge current node_repr with reduce output
             curr_repr = utils.HybridDict(reduce_accum, curr_repr)
         new_repr = apply_node_func(curr_repr)
-        if reduce_accum is not None and utils.is_dict_like(new_repr) :
+        if reduce_accum is not None:
             # merge new node_repr with reduce output
             reduce_accum.update(new_repr)
             new_repr = reduce_accum
@@ -835,6 +863,8 @@ class DGLGraph(object):
 
     def apply_edges(self, u=None, v=None, apply_edge_func="default", eid=None):
         """Apply the function on edge representations.
+
+        Applying a None function will be ignored.
 
         Parameters
         ----------
@@ -852,7 +882,6 @@ class DGLGraph(object):
         if not apply_edge_func:
             # Skip none function call.
             return
-
         if eid is None:
             new_repr = apply_edge_func(self.get_e_repr(u, v))
             self.set_e_repr(new_repr, u, v)
@@ -873,9 +902,8 @@ class DGLGraph(object):
         The message function can be any of the pre-defined functions
         ('from_src').
 
-        Currently, we require the message functions of consecutive send's and
-        send_on's to return the same keys.  Otherwise the behavior will be
-        undefined.
+        Currently, we require the message functions of consecutive send's to
+        return the same keys.  Otherwise the behavior will be undefined.
 
         Parameters
         ----------
@@ -922,7 +950,11 @@ class DGLGraph(object):
             src_reprs = self.get_n_repr(u)
             edge_reprs = self.get_e_repr_by_id(eid)
             msgs = message_func(src_reprs, edge_reprs)
+        self._msg_graph.add_edges(u, v)
+        self._msg_frame.append(msgs)
 
+        # TODO(minjie): Fix these codes in next PR.
+        """
         new_uv = []
         msg_target_rows = []
         msg_update_rows = []
@@ -945,8 +977,8 @@ class DGLGraph(object):
                 self._msg_frame.update_rows(
                         msg_target_rows,
                         {k: F.gather_row(msgs[k], msg_update_rows.tousertensor())
-                            for k in msgs}
-                        )
+                            for k in msgs},
+                        inplace=False)
             if len(msg_append_rows) > 0:
                 new_u, new_v = zip(*new_uv)
                 new_u = utils.toindex(new_u)
@@ -954,14 +986,13 @@ class DGLGraph(object):
                 self._msg_graph.add_edges(new_u, new_v)
                 self._msg_frame.append(
                         {k: F.gather_row(msgs[k], msg_append_rows.tousertensor())
-                            for k in msgs}
-                        )
+                            for k in msgs})
         else:
             if len(msg_target_rows) > 0:
                 self._msg_frame.update_rows(
                         msg_target_rows,
-                        {__MSG__: F.gather_row(msgs, msg_update_rows.tousertensor())}
-                        )
+                        {__MSG__: F.gather_row(msgs, msg_update_rows.tousertensor())},
+                        inplace=False)
             if len(msg_append_rows) > 0:
                 new_u, new_v = zip(*new_uv)
                 new_u = utils.toindex(new_u)
@@ -970,6 +1001,7 @@ class DGLGraph(object):
                 self._msg_frame.append(
                         {__MSG__: F.gather_row(msgs, msg_append_rows.tousertensor())}
                         )
+        """
 
     def update_edge(self, u=ALL, v=ALL, edge_func="default", eid=None):
         """Update representation on edge u->v
@@ -1013,7 +1045,6 @@ class DGLGraph(object):
                 v = utils.toindex(v)
                 u, v = utils.edge_broadcasting(u, v)
                 _, _, eid = self._graph.edge_ids(u, v)
-
             # call the UDF
             src_reprs = self.get_n_repr(u)
             dst_reprs = self.get_n_repr(v)
@@ -1100,25 +1131,19 @@ class DGLGraph(object):
                 msg_shape = F.shape(msg)
                 new_shape = (bkt_len, deg) + msg_shape[1:]
                 return F.reshape(msg, new_shape)
-            if len(in_msgs) == 1 and __MSG__ in in_msgs:
-                reshaped_in_msgs = _reshape_fn(in_msgs[__MSG__])
-            else:
-                reshaped_in_msgs = utils.LazyDict(
-                        lambda key: _reshape_fn(in_msgs[key]), self._msg_frame.schemes)
+            reshaped_in_msgs = utils.LazyDict(
+                    lambda key: _reshape_fn(in_msgs[key]), self._msg_frame.schemes)
             reordered_v.append(v_bkt.tousertensor())
             new_reprs.append(reduce_func(dst_reprs, reshaped_in_msgs))
 
-        # TODO: clear partial messages
+        # TODO(minjie): clear partial messages
         self.reset_messages()
 
         # Pack all reducer results together
         reordered_v = F.pack(reordered_v)
-        if utils.is_dict_like(new_reprs[0]):
-            keys = new_reprs[0].keys()
-            new_reprs = {key : F.pack([repr[key] for repr in new_reprs])
-                         for key in keys}
-        else:
-            new_reprs = {__REPR__ : F.pack(new_reprs)}
+        keys = new_reprs[0].keys()
+        new_reprs = {key : F.pack([repr[key] for repr in new_reprs])
+                     for key in keys}
 
         if v_is_all and not has_zero_degree:
             # First do reorder and then replace the whole column.
@@ -1189,15 +1214,13 @@ class DGLGraph(object):
 
         if executor:
             new_reprs = executor.run()
-            if not utils.is_dict_like(new_reprs):
-                new_reprs = {__REPR__: new_reprs}
             unique_v = executor.recv_nodes
             self._apply_nodes(unique_v, apply_node_func, reduce_accum=new_reprs)
         elif eid is not None:
             _, v, _ = self._graph.find_edges(eid)
             unique_v = utils.toindex(F.unique(v.tousertensor()))
 
-            # TODO: replace with the new DegreeBucketingScheduler
+            # TODO(quan): replace with the new DegreeBucketingScheduler
             self.send(eid=eid, message_func=message_func)
             self.recv(unique_v, reduce_func, apply_node_func)
         else:
@@ -1213,10 +1236,7 @@ class DGLGraph(object):
             edge_reprs = self.get_e_repr(u, v)
             msgs = message_func(src_reprs, edge_reprs)
             msg_frame = FrameRef()
-            if utils.is_dict_like(msgs):
-                msg_frame.append(msgs)
-            else:
-                msg_frame.append({__MSG__: msgs})
+            msg_frame.append(msgs)
 
             # recv with degree bucketing
             executor = scheduler.get_recv_executor(graph=self,
@@ -1305,8 +1325,6 @@ class DGLGraph(object):
                 "update_all", self, message_func=message_func, reduce_func=reduce_func)
         if executor:
             new_reprs = executor.run()
-            if not utils.is_dict_like(new_reprs):
-                new_reprs = {__REPR__: new_reprs}
             self._apply_nodes(ALL, apply_node_func, reduce_accum=new_reprs)
         else:
             self.send(ALL, ALL, message_func)
@@ -1339,7 +1357,7 @@ class DGLGraph(object):
             Arguments for pre-defined iterators.
         """
         if isinstance(traverser, str):
-            # TODO Call pre-defined routine to unroll the computation.
+            # TODO(minjie): Call pre-defined routine to unroll the computation.
             raise RuntimeError('Not implemented.')
         else:
             # NOTE: the iteration can return multiple edges at each step.

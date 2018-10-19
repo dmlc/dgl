@@ -1,3 +1,8 @@
+/*!
+ *  Copyright (c) 2018 by Contributors
+ * \file c_runtime_api.cc
+ * \brief DGL C API common implementations
+ */
 #include "c_api_common.h"
 
 using tvm::runtime::TVMArgs;
@@ -29,5 +34,5 @@ PackedFunc ConvertNDArrayVectorToPackedFunc(const std::vector<NDArray>& vec) {
     return PackedFunc(body);
 }
 
-} // namespace dgl
+}  // namespace dgl
 

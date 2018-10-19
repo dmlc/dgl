@@ -3,7 +3,7 @@ from __future__ import absolute_import
 
 import numpy as np
 
-from .base import ALL, __MSG__, __REPR__
+from .base import ALL, DGLError
 from . import backend as F
 from .function import message as fmsg
 from .function import reducer as fred
@@ -111,7 +111,15 @@ def light_degree_bucketing_for_graph(graph):
 
 
 class Executor(object):
+    """Base class for executing graph computation."""
+
     def run(self):
+        """Run this executor.
+
+        This should return the new node features.
+
+        TODO(minjie): extend this to support computation on edges.
+        """
         raise NotImplementedError
 
 class SPMVOperator(Executor):
@@ -126,10 +134,7 @@ class SPMVOperator(Executor):
 
     def run(self):
         # get src col
-        if self.src_field is None:
-            srccol = self.node_repr
-        else:
-            srccol = self.node_repr[self.src_field]
+        srccol = self.node_repr[self.src_field]
         ctx = F.get_context(srccol)
 
         # build adjmat
@@ -142,10 +147,7 @@ class SPMVOperator(Executor):
             dstcol = F.squeeze(dstcol)
         else:
             dstcol = F.spmm(adjmat, srccol)
-        if self.dst_field is None:
-            return dstcol
-        else:
-            return {self.dst_field : dstcol}
+        return {self.dst_field : dstcol}
 
 
 # FIXME: refactorize in scheduler/executor redesign
@@ -180,20 +182,14 @@ class DegreeBucketingExecutor(Executor):
                 msg_shape = F.shape(msg)
                 new_shape = (len(vv), deg) + msg_shape[1:]
                 return F.reshape(msg, new_shape)
-            if len(in_msgs) == 1 and __MSG__ in in_msgs:
-                reshaped_in_msgs = _reshape_fn(in_msgs[__MSG__])
-            else:
-                reshaped_in_msgs = utils.LazyDict(
-                        lambda key: _reshape_fn(in_msgs[key]), self.msg_frame.schemes)
+            reshaped_in_msgs = utils.LazyDict(
+                    lambda key: _reshape_fn(in_msgs[key]), self.msg_frame.schemes)
             new_reprs.append(self.rfunc(dst_reprs, reshaped_in_msgs))
 
         # Pack all reducer results together
-        if utils.is_dict_like(new_reprs[0]):
-            keys = new_reprs[0].keys()
-            new_reprs = {key : F.pack([repr[key] for repr in new_reprs])
-                         for key in keys}
-        else:
-            new_reprs = {__REPR__ : F.pack(new_reprs)}
+        keys = new_reprs[0].keys()
+        new_reprs = {key : F.pack([repr[key] for repr in new_reprs])
+                     for key in keys}
         return new_reprs
 
 
@@ -250,12 +246,6 @@ class UpdateAllExecutor(BasicExecutor):
         self._recv_nodes = None
 
     @property
-    def graph_idx(self):
-        if self._graph_idx is None:
-            self._graph_idx = self.g._graph.adjacency_matrix()
-        return self._graph_idx
-
-    @property
     def graph_shape(self):
         if self._graph_shape is None:
             n = self.g.number_of_nodes()
@@ -280,16 +270,13 @@ class UpdateAllExecutor(BasicExecutor):
 
     def _adj_build_fn(self, edge_field, ctx, use_edge_feat):
         if use_edge_feat:
-            if edge_field is None:
-                dat = self.edge_repr
-            else:
-                dat = self.edge_repr[edge_field]
+            dat = self.edge_repr[edge_field]
             dat = F.squeeze(dat)
             # TODO(minjie): should not directly use _indices
-            idx = self.graph_idx.get(ctx)._indices()
+            idx = self.g.adjacency_matrix(ctx)._indices()
             adjmat = F.sparse_tensor(idx, dat, self.graph_shape)
         else:
-            adjmat = self.graph_idx.get(ctx)
+            adjmat = self.g.adjacency_matrix(ctx)
         return adjmat
 
 
@@ -351,10 +338,7 @@ class SendRecvExecutor(BasicExecutor):
 
     def _adj_build_fn(self, edge_field, ctx, use_edge_feat):
         if use_edge_feat:
-            if edge_field is None:
-                dat = self.edge_repr
-            else:
-                dat = self.edge_repr[edge_field]
+            dat = self.edge_repr[edge_field]
             dat = F.squeeze(dat)
         else:
             dat = F.ones((len(self.u), ))
@@ -386,9 +370,8 @@ class BundledExecutor(BasicExecutor):
         func_pairs = []
         for rfn in rfunc.fn_list:
             mfn = out2mfunc.get(rfn.msg_field, None)
-            # field check
-            assert mfn is not None, \
-                    "cannot find message func for reduce func in-field {}".format(rfn.msg_field)
+            if mfn is None:
+                raise DGLError('Cannot find message field "%s".' % rfn.msg_field)
             func_pairs.append((mfn, rfn))
         return func_pairs
 
@@ -408,7 +391,6 @@ class BundledUpdateAllExecutor(BundledExecutor, UpdateAllExecutor):
     def __init__(self, graph, mfunc, rfunc):
         self._init_state()
         BundledExecutor.__init__(self, graph, mfunc, rfunc)
-
 
 class BundledSendRecvExecutor(BundledExecutor, SendRecvExecutor):
     def __init__(self, graph, src, dst, mfunc, rfunc):

@@ -1,8 +1,11 @@
-// DGL Scheduler implementation
-
+/*!
+ *  Copyright (c) 2018 by Contributors
+ * \file scheduler/scheduler.cc
+ * \brief DGL Scheduler implementation
+ */
+#include <dgl/scheduler.h>
 #include <unordered_map>
 #include <vector>
-#include <dgl/scheduler.h>
 
 namespace dgl {
 namespace sched {
@@ -19,7 +22,7 @@ std::vector<IdArray> DegreeBucketing(const IdArray& vids) {
 
     // bkt: deg->dsts
     std::unordered_map<int64_t, std::vector<int64_t>> bkt;
-    for (auto& it: in_edges) {
+    for (const auto& it : in_edges) {
         bkt[it.second.size()].push_back(it.first);
     }
 
@@ -38,15 +41,15 @@ std::vector<IdArray> DegreeBucketing(const IdArray& vids) {
     int64_t* msec_ptr = static_cast<int64_t*>(mid_section->data);
 
     // fill in bucketing ordering
-    for (auto& it: bkt) { // for each bucket
-        int64_t deg = it.first;
-        int64_t n_dst = it.second.size();
+    for (const auto& it : bkt) {  // for each bucket
+        const int64_t deg = it.first;
+        const int64_t n_dst = it.second.size();
         *deg_ptr++ = deg;
         *nsec_ptr++ = n_dst;
         *msec_ptr++ = deg * n_dst;
-        for (auto dst: it.second) { // for each dst in this bucket
+        for (const auto dst : it.second) {  // for each dst in this bucket
             *nid_ptr++ = dst;
-            for (auto mid: in_edges[dst]) { // for each in edge of dst
+            for (const auto mid : in_edges[dst]) {  // for each in edge of dst
                 *mid_ptr++ = mid;
             }
         }
@@ -62,6 +65,6 @@ std::vector<IdArray> DegreeBucketing(const IdArray& vids) {
     return std::move(ret);
 }
 
-} // namespace sched
+}  // namespace sched
 
-} // namespace dgl
+}  // namespace dgl
