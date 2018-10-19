@@ -1,3 +1,5 @@
+#!/usr/bin/env groovy
+
 def setup() {
     sh 'easy_install nose'
     sh 'git submodule init'
@@ -25,7 +27,9 @@ def unit_test() {
 
 def example_test(dev) {
     dir ('tests/scripts') {
+        sh 'echo ${dev}'
         withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
+            sh 'echo ${dev}'
             sh './test_examples_${dev}.sh'
         }
     }
