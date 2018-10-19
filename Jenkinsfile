@@ -1,9 +1,13 @@
 #!/usr/bin/env groovy
 
-def setup() {
-    sh 'easy_install nose'
+def init_git_submodule() {
     sh 'git submodule init'
     sh 'git submodule update'
+}
+
+def setup() {
+    sh 'easy_install nose'
+    init_git_submodule()
 }
 
 def build_dgl() {
@@ -43,8 +47,9 @@ pipeline {
                 }
             }
             stages {
-                stage('cpp lint check') {
+                stage('CHECK') {
                     steps {
+                        init_git_submodule()
                         sh 'tests/scripts/task_lint.sh'
                     }
                 }
