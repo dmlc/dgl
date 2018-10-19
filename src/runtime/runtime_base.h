@@ -3,8 +3,8 @@
  * \file runtime_base.h
  * \brief Base of all C APIs
  */
-#ifndef TVM_RUNTIME_RUNTIME_BASE_H_
-#define TVM_RUNTIME_RUNTIME_BASE_H_
+#ifndef DGL_RUNTIME_RUNTIME_BASE_H_
+#define DGL_RUNTIME_RUNTIME_BASE_H_
 
 #include <dgl/runtime/c_runtime_api.h>
 #include <stdexcept>
@@ -31,4 +31,4 @@ inline int TVMAPIHandleException(const std::runtime_error &e) {
   return -1;
 }
 
-#endif  // TVM_RUNTIME_RUNTIME_BASE_H_
+#endif  // DGL_RUNTIME_RUNTIME_BASE_H_

@@ -3,8 +3,8 @@
  * \file file_util.h
  * \brief Minimum file manipulation util for runtime.
  */
-#ifndef TVM_RUNTIME_FILE_UTIL_H_
-#define TVM_RUNTIME_FILE_UTIL_H_
+#ifndef DGL_RUNTIME_FILE_UTIL_H_
+#define DGL_RUNTIME_FILE_UTIL_H_
 
 #include <string>
 #include "meta_data.h"
@@ -73,4 +73,4 @@ void LoadMetaDataFromFile(
     std::unordered_map<std::string, FunctionInfo>* fmap);
 }  // namespace runtime
 }  // namespace tvm
-#endif  // TVM_RUNTIME_FILE_UTIL_H_
+#endif  // DGL_RUNTIME_FILE_UTIL_H_

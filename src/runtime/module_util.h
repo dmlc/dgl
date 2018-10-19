@@ -3,8 +3,8 @@
  * \file module_util.h
  * \brief Helper utilities for module building
  */
-#ifndef TVM_RUNTIME_MODULE_UTIL_H_
-#define TVM_RUNTIME_MODULE_UTIL_H_
+#ifndef DGL_RUNTIME_MODULE_UTIL_H_
+#define DGL_RUNTIME_MODULE_UTIL_H_
 
 #include <dgl/runtime/module.h>
 #include <dgl/runtime/c_runtime_api.h>
@@ -58,4 +58,4 @@ void InitContextFunctions(FLookup flookup) {
 }
 }  // namespace runtime
 }  // namespace tvm
-#endif   // TVM_RUNTIME_MODULE_UTIL_H_
+#endif   // DGL_RUNTIME_MODULE_UTIL_H_

@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2016 by Contributors
- * \file tvm/runtime/c_runtime_api.h
+ * \file dgl/runtime/c_runtime_api.h
  * \brief TVM runtime library.
  *
  *  The philosophy of TVM project is to customize the compilation
@@ -15,8 +15,8 @@
  *   - Use TVMFuncListGlobalNames to get global function name
  *   - Use TVMFuncCall to call these functions.
  */
-#ifndef TVM_RUNTIME_C_RUNTIME_API_H_
-#define TVM_RUNTIME_C_RUNTIME_API_H_
+#ifndef DGL_RUNTIME_C_RUNTIME_API_H_
+#define DGL_RUNTIME_C_RUNTIME_API_H_
 
 // Macros to do weak linking
 #ifdef _MSC_VER
@@ -530,4 +530,4 @@ TVM_DLL int TVMStreamStreamSynchronize(int device_type,
 #ifdef __cplusplus
 }  // TVM_EXTERN_C
 #endif
-#endif  // TVM_RUNTIME_C_RUNTIME_API_H_
+#endif  // DGL_RUNTIME_C_RUNTIME_API_H_
