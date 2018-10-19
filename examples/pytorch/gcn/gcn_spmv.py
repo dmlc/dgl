@@ -56,7 +56,7 @@ class GCN(nn.Module):
                 g.apply_nodes(apply_node_func=
                         lambda node: F.dropout(node['h'], p=self.dropout))
             self.g.update_all(fn.copy_src(src='h', out='m'),
-                              fn.sum(msgs='m', out='h'),
+                              fn.sum(msg='m', out='h'),
                               layer)
         return self.g.pop_n_repr('h')
 
