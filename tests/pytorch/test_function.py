@@ -1,7 +1,6 @@
 import torch as th
 import dgl
 import dgl.function as fn
-from dgl.graph import __REPR__
 
 def generate_graph():
     g = dgl.DGLGraph()
@@ -37,47 +36,14 @@ def generate_graph1():
     g.set_e_repr(h)
     return g
 
-def reducer_msg(node, msgs):
-    return th.sum(msgs['m'], 1)
-
-def reducer_out(node, msgs):
-    return {'h' : th.sum(msgs, 1)}
-
 def reducer_both(node, msgs):
     return {'h' : th.sum(msgs['m'], 1)}
-
-def reducer_none(node, msgs):
-    return th.sum(msgs, 1)
 
 def test_copy_src():
     # copy_src with both fields
     g = generate_graph()
     g.register_message_func(fn.copy_src(src='h', out='m'))
     g.register_reduce_func(reducer_both)
-    g.update_all()
-    assert th.allclose(g.get_n_repr()['h'],
-            th.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
-
-    # copy_src with only src field; the out field should use anonymous repr
-    g = generate_graph()
-    g.register_message_func(fn.copy_src(src='h'))
-    g.register_reduce_func(reducer_out)
-    g.update_all()
-    assert th.allclose(g.get_n_repr()['h'],
-            th.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
-
-    # copy_src with no src field; should use anonymous repr
-    g = generate_graph1()
-    g.register_message_func(fn.copy_src(out='m'))
-    g.register_reduce_func(reducer_both)
-    g.update_all()
-    assert th.allclose(g.get_n_repr()['h'],
-            th.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
-
-    # copy src with no fields;
-    g = generate_graph1()
-    g.register_message_func(fn.copy_src())
-    g.register_reduce_func(reducer_out)
     g.update_all()
     assert th.allclose(g.get_n_repr()['h'],
             th.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
@@ -91,30 +57,6 @@ def test_copy_edge():
     assert th.allclose(g.get_n_repr()['h'],
             th.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
 
-    # copy_edge with only edge field; the out field should use anonymous repr
-    g = generate_graph()
-    g.register_message_func(fn.copy_edge(edge='h'))
-    g.register_reduce_func(reducer_out)
-    g.update_all()
-    assert th.allclose(g.get_n_repr()['h'],
-            th.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
-
-    # copy_edge with no edge field; should use anonymous repr
-    g = generate_graph1()
-    g.register_message_func(fn.copy_edge(out='m'))
-    g.register_reduce_func(reducer_both)
-    g.update_all()
-    assert th.allclose(g.get_n_repr()['h'],
-            th.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
-
-    # copy edge with no fields;
-    g = generate_graph1()
-    g.register_message_func(fn.copy_edge())
-    g.register_reduce_func(reducer_out)
-    g.update_all()
-    assert th.allclose(g.get_n_repr()['h'],
-            th.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
-
 def test_src_mul_edge():
     # src_mul_edge with all fields
     g = generate_graph()
@@ -122,34 +64,6 @@ def test_src_mul_edge():
     g.register_reduce_func(reducer_both)
     g.update_all()
     assert th.allclose(g.get_n_repr()['h'],
-            th.tensor([100., 1., 1., 1., 1., 1., 1., 1., 1., 284.]))
-
-    g = generate_graph()
-    g.register_message_func(fn.src_mul_edge(src='h', edge='h'))
-    g.register_reduce_func(reducer_out)
-    g.update_all()
-    assert th.allclose(g.get_n_repr()['h'],
-            th.tensor([100., 1., 1., 1., 1., 1., 1., 1., 1., 284.]))
-
-    g = generate_graph1()
-    g.register_message_func(fn.src_mul_edge(out='m'))
-    g.register_reduce_func(reducer_both)
-    g.update_all()
-    assert th.allclose(g.get_n_repr()['h'],
-            th.tensor([100., 1., 1., 1., 1., 1., 1., 1., 1., 284.]))
-
-    g = generate_graph1()
-    g.register_message_func(fn.src_mul_edge())
-    g.register_reduce_func(reducer_out)
-    g.update_all()
-    assert th.allclose(g.get_n_repr()['h'],
-            th.tensor([100., 1., 1., 1., 1., 1., 1., 1., 1., 284.]))
-
-    g = generate_graph1()
-    g.register_message_func(fn.src_mul_edge())
-    g.register_reduce_func(reducer_none)
-    g.update_all()
-    assert th.allclose(g.get_n_repr(),
             th.tensor([100., 1., 1., 1., 1., 1., 1., 1., 1., 284.]))
 
 if __name__ == '__main__':
