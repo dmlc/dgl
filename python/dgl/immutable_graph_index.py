@@ -21,6 +21,7 @@ class ImmutableGraphIndex(object):
         self._in_csr = in_csr
         self._out_csr = out_csr
         self._num_edges = None
+        self._cache = {}
 
     def add_nodes(self, num):
         """Add nodes.
@@ -79,7 +80,7 @@ class ImmutableGraphIndex(object):
             The number of edges
         """
         if self._num_edges is None:
-            self._num_edges = mx.nd.sum(self._in_csr)
+            self._num_edges = self._in_csr.indices.shape[0]
         return self._num_edges
 
     def has_node(self, vid):
@@ -240,7 +241,7 @@ class ImmutableGraphIndex(object):
         """
         dst = v.tousertensor()
         rows = mx.nd.take(self._in_csr, dst)
-        return utils.toindex(rows.indices), None, None
+        return utils.toindex(rows.indices), None, utils.toindex(rows.data)
 
     def out_edges(self, v):
         """Return the out edges of the node(s).
@@ -261,7 +262,7 @@ class ImmutableGraphIndex(object):
         """
         src = v.tousertensor()
         rows = mx.nd.take(self._out_csr, src)
-        return utils.toindex(rows.indices), None, None
+        return utils.toindex(rows.indices), None, utils.toindex(rows.data)
 
     def edges(self, sorted=False):
         """Return all the edges
@@ -280,7 +281,12 @@ class ImmutableGraphIndex(object):
         utils.Index
             The edge ids.
         """
-        raise Exception('Immutable graph doesn\'t support getting all edges.')
+        if "all_edges" in self._cache:
+            return self._cache["all_edges"]
+        #TODO do we need to sort the array.
+        coo = self._in_csr.asscipy().tocoo()
+        self._cache["all_edges"] = (utils.toindex(coo.col), utils.toindex(coo.row), utils.toindex(coo.data))
+        return self._cache["all_edges"]
 
     def in_degree(self, v):
         """Return the in degree of the node.
@@ -361,7 +367,9 @@ class ImmutableGraphIndex(object):
         GraphIndex
             The subgraph index.
         """
-        in_csr = mx.nd.contrib.dgl_subgraph(self._in_csr, v.tousertensor(), return_mapping=False)
+        v = v.tousertensor()
+        v = mx.nd.sort(v)
+        in_csr = mx.nd.contrib.dgl_subgraph(self._in_csr, v, return_mapping=False)
         return ImmutableGraphIndex(in_csr, None)
 
     def node_subgraphs(self, vs_arr):
@@ -378,6 +386,7 @@ class ImmutableGraphIndex(object):
             The subgraph index.
         """
         vs_arr = [v.tousertensor() for v in vs_arr]
+        vs_arr = [mx.nd.sort(v) for v in vs_arr]
         in_csrs = mx.nd.contrib.dgl_subgraph(self._in_csr, *vs_arr, return_mapping=False)
         return [ImmutableGraphIndex(in_csr, None) for in_csr in in_csrs]
 
@@ -397,11 +406,22 @@ class ImmutableGraphIndex(object):
         utils.CtxCachedObject
             An object that returns tensor given context.
         """
+        def get_adj(mat, ctx):
+            indices = mat.indices
+            indptr = mat.indptr
+            data = mx.nd.ones(indices.shape, dtype=np.float32)
+            new_mat = mx.nd.sparse.csr_matrix((data, indices, indptr), shape=mat.shape)
+            return F.to_context(new_mat, ctx)
         if edge_type == 'in':
-            mat = self._in_csr.astype(np.float32)
+            if 'in_adj' in self._cache:
+                return self._cache['in_adj']
+            else:
+                return utils.CtxCachedObject(lambda ctx: get_adj(self._in_csr, ctx))
         else:
-            mat = self._out_csr.astype(np.float32)
-        return utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
+            if 'out_adj' in self._cache:
+                return self._cache['out_adj']
+            else:
+                return utils.CtxCachedObject(lambda ctx: get_adj(self._out_csr, ctx))
 
     def incidence_matrix(self, oriented=False):
         """Return the incidence matrix representation of this graph.
@@ -434,6 +454,14 @@ class ImmutableGraphIndex(object):
             ret.add_edge(u, v, id=id)
         return ret
 
+    def _from_coo_matrix(self, out_coo):
+        edge_ids = mx.nd.arange(0, len(out_coo.data), step=1, repeat=1, dtype=np.int32)
+        src = mx.nd.array(out_coo.row, dtype=np.int64)
+        dst = mx.nd.array(out_coo.col, dtype=np.int64)
+        # TODO we can't generate a csr_matrix with np.int64 directly.
+        self.__init__(mx.nd.sparse.csr_matrix((edge_ids, (dst, src)), shape=out_coo.shape).astype(np.int64),
+                mx.nd.sparse.csr_matrix((edge_ids, (src, dst)), shape=out_coo.shape).astype(np.int64))
+
     def from_networkx(self, nx_graph):
         """Convert from networkx graph.
 
@@ -447,9 +475,8 @@ class ImmutableGraphIndex(object):
         """
         assert isinstance(nx_graph, nx.DiGraph), "The input graph has to be a NetworkX DiGraph."
         # We store edge Ids as an edge attribute.
-        out_mat = nx.convert_matrix.to_scipy_sparse_matrix(nx_graph, dtype=np.int32, format='csr').astype(np.int64)
-        in_mat = nx.convert_matrix.to_scipy_sparse_matrix(nx_graph, dtype=np.int32, format='csc').astype(np.int64).transpose()
-        self.__init__(mx.nd.sparse.csr_matrix(in_mat), mx.nd.sparse.csr_matrix(out_mat))
+        out_mat = nx.convert_matrix.to_scipy_sparse_matrix(nx_graph, format='coo')
+        self._from_coo_matrix(out_mat)
 
     def from_scipy_sparse_matrix(self, adj):
         """Convert from scipy sparse matrix.
@@ -460,9 +487,8 @@ class ImmutableGraphIndex(object):
         """
         assert isinstance(adj, sp.csr_matrix) or isinstance(adj, sp.coo_matrix), \
                 "The input matrix has to be a SciPy sparse matrix."
-        self._out_csr = mx.nd.sparse.csr_matrix(adj.tocsr(), dtype=np.int64)
-        csc = adj.tocsc()
-        self._in_csr = mx.nd.sparse.csr_matrix(csc.transpose(), dtype=np.int64)
+        out_mat = adj.tocoo()
+        self._from_coo_matrix(out_mat)
 
     def line_graph(self, backtracking=True):
         """Return the line graph of this graph.
