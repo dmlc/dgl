@@ -45,29 +45,31 @@ def mol2dgl(smiles_batch):
         n_atoms = mol.GetNumAtoms()
         n_bonds = mol.GetNumBonds()
 
-        atom_x = cuda(torch.zeros(n_atoms, ATOM_FDIM))
-        bond_x = cuda(torch.zeros(n_bonds * 2, BOND_FDIM))
+        atom_x = []
+        bond_x = []
         graph = DGLGraph()
         for i, atom in enumerate(mol.GetAtoms()):
             assert i == atom.GetIdx()
-            atom_x[i] = atom_features(atom)
+            atom_x.append(atom_features(atom))
         graph.add_nodes(n_atoms)
 
-        bond_src = torch.LongTensor(mol.GetNumBonds() * 2).zero_()
-        bond_dst = torch.LongTensor(mol.GetNumBonds() * 2).zero_()
+        bond_src = []
+        bond_dst = []
         for i, bond in enumerate(mol.GetBonds()):
             begin_idx = bond.GetBeginAtom().GetIdx()
             end_idx = bond.GetEndAtom().GetIdx()
             features = bond_features(bond)
-            bond_src[2 * i] = begin_idx
-            bond_dst[2 * i] = end_idx
-            bond_x[2 * i] = features
+            bond_src.append(begin_idx)
+            bond_dst.append(end_idx)
+            bond_x.append(features)
             # set up the reverse direction
-            bond_src[2 * i + 1] = end_idx
-            bond_dst[2 * i + 1] = begin_idx
-            bond_x[2 * i + 1] = features
+            bond_src.append(end_idx)
+            bond_dst.append(begin_idx)
+            bond_x.append(features)
         graph.add_edges(bond_src, bond_dst)
 
+        atom_x = torch.stack(atom_x, 0)
+        bond_x = torch.stack(bond_x, 0)
         graph.set_n_repr({'x': atom_x})
         if n_bonds > 0:
             graph.set_e_repr({

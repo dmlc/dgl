@@ -49,19 +49,19 @@ def mol2dgl(cand_batch, mol_tree_batch):
         n_atoms = mol.GetNumAtoms()
         n_bonds = mol.GetNumBonds()
 
-        atom_x = cuda(torch.zeros(n_atoms, ATOM_FDIM))
-        bond_x = cuda(torch.zeros(n_bonds * 2, BOND_FDIM))
+        atom_x = []
+        bond_x = []
         ctr_node = mol_tree.nodes[ctr_node_id]
         ctr_bid = ctr_node['idx']
         g = DGLGraph()
 
         for i, atom in enumerate(mol.GetAtoms()):
             assert i == atom.GetIdx()
-            atom_x[i] = atom_features(atom)
+            atom_x.append(atom_features(atom))
         g.add_nodes(n_atoms)
 
-        bond_src = torch.LongTensor(mol.GetNumBonds() * 2).zero_()
-        bond_dst = torch.LongTensor(mol.GetNumBonds() * 2).zero_()
+        bond_src = []
+        bond_dst = []
         for i, bond in enumerate(mol.GetBonds()):
             a1 = bond.GetBeginAtom()
             a2 = bond.GetEndAtom()
@@ -69,12 +69,12 @@ def mol2dgl(cand_batch, mol_tree_batch):
             end_idx = a2.GetIdx()
             features = bond_features(bond)
 
-            bond_src[2 * i] = begin_idx
-            bond_dst[2 * i] = end_idx
-            bond_x[2 * i] = features
-            bond_src[2 * i + 1] = end_idx
-            bond_dst[2 * i + 1] = begin_idx
-            bond_x[2 * i + 1] = features
+            bond_src.append(begin_idx)
+            bond_dst.append(end_idx)
+            bond_x.append(features)
+            bond_src.append(end_idx)
+            bond_dst.append(begin_idx)
+            bond_x.append(features)
 
             x_nid, y_nid = a1.GetAtomMapNum(), a2.GetAtomMapNum()
             # Tree node ID in the batch
@@ -95,6 +95,8 @@ def mol2dgl(cand_batch, mol_tree_batch):
 
         n_nodes += n_atoms
 
+        atom_x = torch.stack(atom_x, 0)
+        bond_x = torch.stack(bond_x, 0)
         g.set_n_repr({'x': atom_x})
         if n_bonds > 0:
             g.set_e_repr({
