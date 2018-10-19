@@ -1,3 +1,8 @@
+def init_git() {
+    sh 'git submodule init'
+    sh 'git submodule update'
+}
+
 pipeline {
     agent none
     stages {
@@ -14,8 +19,7 @@ pipeline {
                         stage('SETUP') {
                             steps {
                                 sh 'easy_install nose'
-                                sh 'git submodule init'
-                                sh 'git submodule update'
+                                init_git()
                             }
                         }
                         stage('BUILD') {
