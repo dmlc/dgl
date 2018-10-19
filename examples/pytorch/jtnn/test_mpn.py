@@ -20,8 +20,6 @@ import numpy as np
 lg = rdkit.RDLogger.logger() 
 lg.setLevel(rdkit.RDLogger.CRITICAL)
 
-torch.manual_seed(1)
-
 smiles_batch = '''
 CCCCCCC1=NN2C(=N)/C(=C\c3cc(C)n(-c4ccc(C)cc4C)c3C)C(=O)N=C2S1
 COCC[C@@H](C)C(=O)N(C)Cc1ccc(O)cc1
@@ -95,7 +93,7 @@ def test_treeenc():
     assert dgl_tree_mess.shape[0] == len(tree_mess)
     fail = False
     for u, v in tree_mess:
-        eid = mol_tree_batch.get_edge_id(u, v)
+        eid = mol_tree_batch.edge_id(u, v)
         if not allclose(tree_mess[(u, v)], dgl_tree_mess[eid]):
             fail = True
             print(u, v, tree_mess[(u, v)], dgl_tree_mess[eid][0])

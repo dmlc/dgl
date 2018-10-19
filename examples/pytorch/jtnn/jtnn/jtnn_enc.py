@@ -8,6 +8,7 @@ import networkx as nx
 from dgl import batch, unbatch
 import dgl.function as DGLF
 from .line_profiler_integration import profile
+import numpy as np
 
 MAX_NB = 8
 
@@ -87,10 +88,10 @@ class DGLJTNNEncoder(nn.Module):
     def run(self, mol_tree_batch, mol_tree_batch_lg):
         # Since tree roots are designated to 0.  In the batched graph we can
         # simply find the corresponding node ID by looking at node_offset
-        root_ids = mol_tree_batch.node_offset[:-1]
-        n_nodes = len(mol_tree_batch.nodes)
-        edge_list = mol_tree_batch.edge_list
-        n_edges = len(edge_list)
+        node_offset = np.cumsum([0] + mol_tree_batch.batch_num_nodes)
+        root_ids = node_offset[:-1]
+        n_nodes = mol_tree_batch.number_of_nodes()
+        n_edges = mol_tree_batch.number_of_edges()
 
         # Assign structure embeddings to tree nodes
         mol_tree_batch.set_n_repr({
@@ -114,9 +115,7 @@ class DGLJTNNEncoder(nn.Module):
 
         # Send the source/destination node features to edges
         mol_tree_batch.update_edge(
-            #*zip(*edge_list),
             edge_func=lambda src, dst, edge: {'src_x': src['x'], 'dst_x': dst['x']},
-            batchable=True,
         )
 
         # Message passing
@@ -125,13 +124,12 @@ class DGLJTNNEncoder(nn.Module):
         # we can always compute s_ij as the sum of incoming m_ij, no matter
         # if m_ij is actually computed or not.
         for u, v in level_order(mol_tree_batch, root_ids):
-            eid = mol_tree_batch.get_edge_id(u, v)
+            eid = mol_tree_batch.edge_ids(u, v)
             mol_tree_batch_lg.pull(
                 eid,
                 enc_tree_msg,
                 enc_tree_reduce,
                 self.enc_tree_update,
-                batchable=True,
             )
 
         # Readout
@@ -139,7 +137,6 @@ class DGLJTNNEncoder(nn.Module):
             enc_tree_gather_msg,
             enc_tree_gather_reduce,
             self.enc_tree_gather_update,
-            batchable=True,
         )
 
         root_vecs = mol_tree_batch.get_n_repr(root_ids)['h']
