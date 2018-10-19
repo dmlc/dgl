@@ -9,6 +9,7 @@ from dgl import batch
 import dgl.function as DGLF
 import networkx as nx
 from .line_profiler_integration import profile
+import numpy as np
 
 MAX_NB = 8
 MAX_DECODE_LEN = 100
@@ -85,10 +86,10 @@ class DGLJTNNDecoder(nn.Module):
 
     @profile
     def run(self, mol_tree_batch, mol_tree_batch_lg, n_trees, tree_vec):
-        root_ids = mol_tree_batch.node_offset[:-1]
-        n_nodes = len(mol_tree_batch.nodes)
-        edge_list = mol_tree_batch.edge_list
-        n_edges = len(edge_list)
+        node_offset = np.cumsum([0] + mol_tree_batch.batch_num_nodes)
+        root_ids = node_offset[:-1]
+        n_nodes = mol_tree_batch.number_of_nodes()
+        n_edges = mol_tree_batch.number_of_edges()
 
         mol_tree_batch.set_n_repr({
             'x': self.embedding(mol_tree_batch.get_n_repr()['wid']),
@@ -108,9 +109,7 @@ class DGLJTNNDecoder(nn.Module):
         })
 
         mol_tree_batch.update_edge(
-            #*zip(*edge_list),
             edge_func=lambda src, dst, edge: {'src_x': src['x'], 'dst_x': dst['x']},
-            batchable=True,
         )
 
         # input tensors for stop prediction (p) and label prediction (q)
@@ -125,7 +124,6 @@ class DGLJTNNDecoder(nn.Module):
             dec_tree_node_msg,
             dec_tree_node_reduce,
             dec_tree_node_update,
-            batchable=True,
         )
         # Extract hidden states and store them for stop/label prediction
         h = mol_tree_batch.get_n_repr(root_ids)['h']
@@ -142,13 +140,12 @@ class DGLJTNNDecoder(nn.Module):
             # TODO: context
             p_targets.append(cuda(torch.tensor([ip.get(_i, 0) for _i in t_set])))
             t_set = list(i)
-            eid = mol_tree_batch.get_edge_id(u, v)
+            eid = mol_tree_batch.edge_ids(u, v)
             mol_tree_batch_lg.pull(
                 eid,
                 dec_tree_edge_msg,
                 dec_tree_edge_reduce,
                 self.dec_tree_edge_update,
-                batchable=True,
             )
             is_new = mol_tree_batch.get_n_repr(v)['new']
             mol_tree_batch.pull(
@@ -156,7 +153,6 @@ class DGLJTNNDecoder(nn.Module):
                 dec_tree_node_msg,
                 dec_tree_node_reduce,
                 dec_tree_node_update,
-                batchable=True,
             )
             # Extract
             h = mol_tree_batch.get_n_repr(v)['h']
