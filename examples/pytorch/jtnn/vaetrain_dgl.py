@@ -99,6 +99,8 @@ def train():
                     kl_div, word_acc, topo_acc, assm_acc, steo_acc))
                 word_acc,topo_acc,assm_acc,steo_acc = 0,0,0,0
                 sys.stdout.flush()
+                if (it == 99):
+                    break
 
             if (it + 1) % 1500 == 0: #Fast annealing
                 scheduler.step()
