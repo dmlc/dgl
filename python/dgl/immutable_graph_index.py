@@ -371,9 +371,12 @@ class ImmutableGraphIndex(object):
         """
         v = v.tousertensor()
         v = mx.nd.sort(v)
+        # when return_mapping is turned on, dgl_subgraph returns another CSRArray that
+        # stores the edge Ids of the original graph.
         csr = mx.nd.contrib.dgl_subgraph(self._in_csr, v, return_mapping=True)
         induced_nodes = utils.toindex(v)
-        return ImmutableSubgraphIndex(csr, None, self, induced_nodes, None)
+        induced_edges = utils.toindex(csr[1].data)
+        return ImmutableSubgraphIndex(csr[0], None, self, induced_nodes, induced_edges)
 
     def node_subgraphs(self, vs_arr):
         """Return the induced node subgraphs.
@@ -390,11 +393,14 @@ class ImmutableGraphIndex(object):
         """
         vs_arr = [v.tousertensor() for v in vs_arr]
         vs_arr = [mx.nd.sort(v) for v in vs_arr]
-        in_csrs = mx.nd.contrib.dgl_subgraph(self._in_csr, *vs_arr, return_mapping=True)
+        res = mx.nd.contrib.dgl_subgraph(self._in_csr, *vs_arr, return_mapping=True)
+        in_csrs = res[0:len(vs_arr)]
         induced_nodes = [utils.toindex(vs) for vs in vs_arr]
+        induced_edges = [utils.toindex(e.data) for e in res[len(vs_arr):]]
         assert len(in_csrs) == len(induced_nodes)
+        assert len(in_csrs) == len(induced_edges)
         return [ImmutableSubgraphIndex(in_csr, None, self, induced_n,
-            None) for in_csr, induced_n in zip(in_csrs, induced_nodes)]
+            induced_e) for in_csr, induced_n, induced_e in zip(in_csrs, induced_nodes, induced_edges)]
 
     def adjacency_matrix(self, edge_type='in'):
         """Return the adjacency matrix representation of this graph.
