@@ -5,6 +5,7 @@ from . import citation_graph as citegrh
 from . import knowledge_graph as knwlgrh
 from .tree import *
 from .utils import *
+from .sbm import SBMMixture
 
 def register_data_args(parser):
     parser.add_argument("--dataset", type=str, required=True,
