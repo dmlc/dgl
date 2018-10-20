@@ -7,6 +7,12 @@
 #include <algorithm>
 
 namespace dgl {
+namespace {
+inline bool IsValidIdArray(const IdArray& arr) {
+  return arr->ctx.device_type == kDLCPU && arr->ndim == 1
+    && arr->dtype.code == kDLInt && arr->dtype.bits == 64;
+}
+}
 
 Graph GraphOp::LineGraph(const Graph* g, bool backtracking) {
   typedef std::pair<dgl_id_t, dgl_id_t> entry;
@@ -120,6 +126,38 @@ std::vector<Graph> GraphOp::DisjointPartitionBySizes(const Graph* graph, IdArray
     CHECK_EQ(rst[i].NumEdges(), num_edges);
     node_offset += sizes_data[i];
     edge_offset += num_edges;
+  }
+  return rst;
+}
+
+IdArray GraphOp::MapSubgraphNID(IdArray parent_vids, IdArray query) {
+  CHECK(IsValidIdArray(parent_vids)) << "Invalid parent id array.";
+  CHECK(IsValidIdArray(query)) << "Invalid query id array.";
+  const auto parent_len = parent_vids->shape[0];
+  const auto query_len = query->shape[0];
+  const dgl_id_t* parent_data = static_cast<dgl_id_t*>(parent_vids->data);
+  const dgl_id_t* query_data = static_cast<dgl_id_t*>(query->data);
+  IdArray rst = IdArray::Empty({query_len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
+
+  bool is_sorted = std::is_sorted(parent_data, parent_data + parent_len);
+  if (is_sorted) {
+    for (int64_t i = 0; i < query_len; i++) {
+      dgl_id_t id = query_data[i];
+      auto it = std::find(parent_data, parent_data + parent_len, id);
+      CHECK(it != parent_data + parent_len) << id << " doesn't exist in the parent Ids";
+      rst_data[i] = it - parent_data;
+    }
+  } else {
+    std::unordered_map<dgl_id_t, dgl_id_t> parent_map;
+    for (int64_t i = 0; i < parent_len; i++) {
+      dgl_id_t id = parent_data[i];
+      parent_map[id] = i;
+    }
+    for (int64_t i = 0; i < query_len; i++) {
+      dgl_id_t id = query_data[i];
+      rst_data[i] = parent_map[id];
+    }
   }
   return rst;
 }

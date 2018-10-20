@@ -659,6 +659,26 @@ class SubgraphIndex(GraphIndex):
         """
         return self._induced_edges
 
+def map_to_subgraph_nid(subgraph, parent_nids):
+    """Map parent node Ids to the subgraph node Ids.
+
+    Parameters
+    ----------
+    subgraph: SubgraphIndex or ImmutableSubgraphIndex
+        the graph index of a subgraph
+
+    parent_nids: utils.Index
+        Node Ids in the parent graph.
+
+    Returns
+    -------
+    utils.Index
+        Node Ids in the subgraph.
+    """
+    parent_nids = utils.toindex(parent_nids)
+    return utils.toindex(_CAPI_DGLMapSubgraphNID(subgraph.induced_nodes.todgltensor(),
+        parent_nids.todgltensor()))
+
 def disjoint_union(graphs):
     """Return a disjoint union of the input graphs.
 

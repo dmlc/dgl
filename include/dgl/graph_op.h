@@ -64,6 +64,16 @@ class GraphOp {
    * \return a list of partitioned graphs
    */
   static std::vector<Graph> DisjointPartitionBySizes(const Graph* graph, IdArray sizes);
+
+  /*!
+   * \brief Map vids in the parent graph to the vids in the subgraph.
+   *
+   * \param parent_vids An array that maps the vids in the parent graph to the
+   * subgraph. The elements store the vertex Ids in the parent graph, and the
+   * indices indicate the vertex Ids in the subgraph.
+   * \param query The vertex Ids in the parent graph.
+   */
+  static IdArray MapSubgraphNID(IdArray parent_vid_map, IdArray query);
 };
 
 }  // namespace dgl

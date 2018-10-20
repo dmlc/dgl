@@ -4,6 +4,7 @@ import mxnet as mx
 import numpy as np
 import scipy as sp
 from dgl.graph import GraphIndex, create_graph_index
+from dgl.graph_index import map_to_subgraph_nid
 import dgl.backend as F
 from dgl import utils
 
@@ -29,7 +30,7 @@ def check_graph_equal(g1, g2):
     ctx = F.get_context(mx.nd.array([1]))
     adj1 = g1.adjacency_matrix().get(ctx) != 0
     adj2 = g2.adjacency_matrix().get(ctx) != 0
-    print(mx.nd.sum(adj1 - adj2).asnumpy())
+    assert mx.nd.sum(adj1 - adj2).asnumpy() == 0
 
 def test_graph_gen():
     g, ig = generate_rand_graph(10)
@@ -53,11 +54,13 @@ def test_basics():
 def test_node_subgraph():
     num_vertices = 100
     g, ig = generate_rand_graph(num_vertices)
-    randv = np.random.randint(0, num_vertices, 20)
-    randv = np.unique(randv)
+    randv1 = np.random.randint(0, num_vertices, 20)
+    randv = np.unique(randv1)
     subg = g.node_subgraph(utils.toindex(randv))
     subig = ig.node_subgraph(utils.toindex(randv))
     check_graph_equal(subg, subig)
+    assert mx.nd.sum(map_to_subgraph_nid(subg, randv1[0:10]).tousertensor()
+            == map_to_subgraph_nid(subig, randv1[0:10]).tousertensor()) == 10
 
 test_basics()
 test_graph_gen()
