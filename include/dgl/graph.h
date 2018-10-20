@@ -296,6 +296,19 @@ class Graph {
    */
   Graph Reverse() const;
 
+  std::pair<IdArray, IdArray> BFS(IdArray src, bool out) const;
+
+  /*!
+   * \brief DFS
+   *
+   * Sources must belong to different connected components.
+   *
+   * \return the reversed graph
+   */
+  std::pair<IdArray, IdArray> DFS(IdArray src, bool out) const;
+
+  std::pair<IdArray, IdArray> TopologicalTraversal(bool out) const;
+
  protected:
   friend class GraphOp;
   /*! \brief Internal edge list type */

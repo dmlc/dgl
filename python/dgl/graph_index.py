@@ -7,7 +7,9 @@ import scipy.sparse as sp
 
 from ._ffi.base import c_array
 from ._ffi.function import _init_api
+from ._ffi.ndarray import TVMArrayHandle, _make_array
 from . import backend as F
+from . import ndarray as nd
 from . import utils
 
 GraphIndexHandle = ctypes.c_void_p
@@ -598,6 +600,67 @@ class GraphIndex(object):
         """
         handle = _CAPI_DGLGraphLineGraph(self._handle, backtracking)
         return GraphIndex(handle)
+
+    def bfs(self, src, out, step):
+        """ Breadth-first search.
+
+        Parameters
+        ----------
+        src :
+        out :
+        step :
+
+        Returns
+        -------
+        """
+        src = utils.toindex(src).todgltensor()
+        if step:
+            raise NotImplementedError()
+        else:
+            pair = _CAPI_DGLGraphBFS(self._handle, src, out)
+            v = utils.toindex(pair(0)).tousertensor()
+            s = utils.toindex(pair(1)).tousertensor()
+            return F.unpack(v, s.tolist())
+
+    def dfs(self, src, out, step):
+        """ Breadth-first search.
+
+        Parameters
+        ----------
+        src :
+        out :
+        step :
+
+        Returns
+        -------
+        """
+        src = utils.toindex(src).todgltensor()
+        if step:
+            raise NotImplementedError()
+        else:
+            pair = _CAPI_DGLGraphDFS(self._handle, src, out)
+            v = utils.toindex(pair(0)).tousertensor()
+            s = utils.toindex(pair(1)).tousertensor()
+            return F.unpack(v, s.tolist())
+
+    def topological_traversal(self, out, step):
+        """ Depth-first search.
+
+        Parameters
+        ----------
+        out : bool
+        step : bool
+
+        Returns
+        -------
+        """
+        if step:
+            raise NotImplementedError()
+        else:
+            pair = _CAPI_DGLGraphTopologicalTraversal(self._handle, out)
+            v = utils.toindex(pair(0)).tousertensor()
+            s = utils.toindex(pair(1)).tousertensor()
+            return F.unpack(v, s.tolist())
 
 class SubgraphIndex(GraphIndex):
     def __init__(self, handle, parent, induced_nodes, induced_edges):

@@ -48,6 +48,20 @@ PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
   return PackedFunc(body);
 }
 
+PackedFunc ConvertIdArrayPairToPackedFunc(const std::pair<IdArray, IdArray>& pair) {
+  auto body = [pair] (TVMArgs args, TVMRetValue* rv) {
+      int which = args[0];
+      if (which == 0) {
+        *rv = pair.first;
+      } else if (which == 1) {
+        *rv = pair.second;
+      } else {
+        LOG(FATAL) << "invalid choice";
+      }
+    };
+  return PackedFunc(body);
+}
+
 }  // namespace
 
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
@@ -285,6 +299,32 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeSubgraph")
     *rv = ConvertSubgraphToPackedFunc(gptr->EdgeSubgraph(eids));
   });
 
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphBFS")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    bool out = args[2];
+    *rv = ConvertIdArrayPairToPackedFunc(gptr->BFS(src, out));
+  });
+
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphDFS")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    bool out = args[2];
+    *rv = ConvertIdArrayPairToPackedFunc(gptr->DFS(src, out));
+  });
+
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphTopologicalTraversal")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    bool out = args[1];
+    *rv = ConvertIdArrayPairToPackedFunc(gptr->TopologicalTraversal(out));
+  });
+
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     void* list = args[0];
@@ -347,4 +387,5 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLineGraph")
     GraphHandle lghandle = lgptr;
     *rv = lghandle;
   });
+
 }  // namespace dgl

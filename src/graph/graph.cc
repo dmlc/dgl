@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <set>
+#include <stack>
 #include <functional>
 #include <dgl/graph.h>
 
@@ -11,6 +12,14 @@ inline bool IsValidIdArray(const IdArray& arr) {
   return arr->ctx.device_type == kDLCPU && arr->ndim == 1
     && arr->dtype.code == kDLInt && arr->dtype.bits == 64;
 }
+
+inline IdArray IdVector2IdArray(const std::vector<dgl_id_t>& v) {
+  const int64_t len = v.size();
+  auto a = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  std::copy(v.begin(), v.end(), static_cast<dgl_id_t*>(a->data));
+  return a;
+}
+
 }  // namespace
 
 void Graph::AddVertices(uint64_t num_vertices) {
@@ -403,6 +412,99 @@ DegreeArray Graph::OutDegrees(IdArray vids) const {
     rst_data[i] = adjlist_[vid].succ.size();
   }
   return rst;
+}
+
+std::pair<IdArray, IdArray> Graph::BFS(IdArray src, bool out) const {
+  std::vector<dgl_id_t> vv;
+  auto src_data = static_cast<int64_t*>(src->data);
+  std::copy(src_data, src_data + src->shape[0], std::back_inserter(vv));
+  size_t i = 0;
+  size_t j = vv.size();
+  auto adj = &(out ? adjlist_ : reverse_adjlist_);
+  std::vector<bool> visited(adjlist_.size());
+  for (auto v : vv) {
+    visited[v] = true;
+  }
+  std::vector<size_t> ss;
+  while (i < j) {
+    for (size_t k = i; k != j; k++) {
+      auto succ = (*adj)[vv[k]].succ;
+      for (auto v : succ) {
+        if (!visited[v]) {
+            visited[v] = true;
+            vv.push_back(v);
+        }
+      }
+    }
+    ss.push_back(j - i);
+    i = j;
+    j = vv.size();
+  }
+  return std::make_pair(IdVector2IdArray(vv), IdVector2IdArray(ss));
+}
+
+std::pair<IdArray, IdArray> Graph::DFS(IdArray src, bool out) const {
+  std::vector<dgl_id_t> vv;
+  std::vector<std::stack<dgl_id_t>> stacks(src->shape[0]);
+  auto src_data = static_cast<int64_t*>(src->data);
+  for (size_t i = 0; i < stacks.size(); i++) {
+    stacks[i].push(src_data[i]);
+  }
+  std::vector<bool> visited(adjlist_.size());
+  auto adj = &(out ? adjlist_ : reverse_adjlist_);
+  std::vector<size_t> ss;
+  size_t s = 0;
+  size_t d = 0;
+  do {
+    for (auto &stack : stacks) {
+      auto u = stack.top();
+      if (!visited[u]) {
+          visited[u] = true;
+          vv.push_back(u);
+      }
+      auto succ = (*adj)[u].succ;
+      stack.pop();
+      for (auto v : succ) {
+        stack.push(v);
+      }
+    }
+    ss.push_back(d = vv.size() - s);
+    s = vv.size();
+  } while (d > 0);
+  ss.pop_back();
+  return std::make_pair(IdVector2IdArray(vv), IdVector2IdArray(ss));
+}
+
+std::pair<IdArray, IdArray> Graph::TopologicalTraversal(bool out) const {
+  std::vector<dgl_id_t> uu(adjlist_.size());
+  std::iota(uu.begin(), uu.end(), 0);
+  auto u_array = IdVector2IdArray(uu);
+  auto deg = out ? InDegrees(u_array) : OutDegrees(u_array);
+  auto deg_data = static_cast<int64_t*>(deg->data);
+  std::vector<dgl_id_t> vv;
+  for (int64_t k = 0; k < deg->shape[0]; k++) {
+    if (deg_data[k] == 0) {
+      vv.push_back(k);
+    }
+  }
+  size_t i = 0;
+  size_t j = vv.size();
+  auto adj = &(out ? adjlist_ : reverse_adjlist_);
+  std::vector<dgl_id_t> ss;
+  while (i < j) {
+    for (size_t k = i; k != j; k++) {
+      auto succ = (*adj)[vv[k]].succ;
+      for (auto v : succ) {
+        if (--(deg_data[v]) == 0) {
+          vv.push_back(v);
+        }
+      }
+    }
+    ss.push_back(j - i);
+    i = j;
+    j = vv.size();
+  }
+  return std::make_pair(IdVector2IdArray(vv), IdVector2IdArray(ss));
 }
 
 Subgraph Graph::VertexSubgraph(IdArray vids) const {

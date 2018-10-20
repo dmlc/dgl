@@ -1314,6 +1314,9 @@ class DGLGraph(object):
 
     def propagate(self,
                   traverser='topo',
+                  src=None,
+                  out=True,
+                  step=False,
                   message_func="default",
                   reduce_func="default",
                   apply_node_func="default",
@@ -1329,21 +1332,35 @@ class DGLGraph(object):
         ----------
         traverser : str or generator of edges.
           The traverser of the graph.
-        message_func : str or callable
+        src : int, list or tensor, optional
+          The source(s) of traversal. `None` for topological traversal.
+        out : bool, optional
+        step : bool, optional
+        message_func : str or callable, optional
           The message function.
-        reduce_func : str or callable
+        reduce_func : str or callable, optional
           The reduce function.
-        apply_node_func : str or callable
+        apply_node_func : str or callable, optional
           The update function.
         kwargs : keyword arguments, optional
             Arguments for pre-defined iterators.
         """
         if isinstance(traverser, str):
-            # TODO Call pre-defined routine to unroll the computation.
-            raise RuntimeError('Not implemented.')
+            if traverser == 'bfs':
+                layers = self._graph.bfs(src, out, step)
+            elif traverser == 'topo':
+                layers = self._graph.topological_traversal(out, step)
+            else:
+                raise RuntimeError('Not implemented.')
         else:
-            # NOTE: the iteration can return multiple edges at each step.
-            for u, v in traverser:
+            layers = traverser
+
+        # NOTE: the iteration can return multiple edges at each step.
+        if isinstance(traverser, str):
+            for v in layers:
+                self.pull(v)
+        else:
+            for u, v in layers:
                 self.send_and_recv(u, v,
                         message_func, reduce_func, apply_node_func)
 

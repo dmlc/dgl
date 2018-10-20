@@ -5,6 +5,7 @@
 namespace dgl {
 
 Graph GraphOp::LineGraph(const Graph* g, bool backtracking){
+  // TODO(yu)
   typedef std::pair<dgl_id_t, dgl_id_t> entry;
   typedef std::map<dgl_id_t, std::vector<entry>> csm; // Compressed Sparse Matrix
 

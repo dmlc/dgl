@@ -76,6 +76,7 @@ def main(args):
             label = graph.pop_n_repr('y')
             # traverse graph
             giter = list(tensor_topo_traverse(graph, False, args))
+#           logits = model(graph, zero_initializer, train=True)
             logits = model(graph, zero_initializer, iterator=giter, train=True)
             logp = F.log_softmax(logits, 1)
             loss = F.nll_loss(logp, label)
