@@ -47,19 +47,24 @@ def test_subgraph_gen(args):
     # load and preprocess dataset
     t0 = time.time()
     data = load_data(args)
+    graph = data.graph
+    try:
+        graph_data = graph.get_graph()
+    except:
+        graph_data = graph
     print("load data: " + str(time.time() - t0))
 
     t0 = time.time()
-    g = create_graph_index(data.graph)
+    g = create_graph_index(graph_data)
     print("create graph index: " + str(time.time() - t0))
 
     t0 = time.time()
-    ig = create_graph_index(data.graph, immutable_graph=True)
+    ig = create_graph_index(graph_data, immutable_graph=True)
     print("create immutable graph index: " + str(time.time() - t0))
 
     t0 = time.time()
     for _ in range(1):
-        for i in range(data.graph.number_of_nodes() / args.subgraph_size):
+        for i in range(graph.number_of_nodes() / args.subgraph_size):
             subg = subgraph_gen1(g, i, args.subgraph_size, get_in_edges)
     mx.nd.waitall()
     t1 = time.time()
@@ -67,7 +72,7 @@ def test_subgraph_gen(args):
 
     t0 = time.time()
     for _ in range(1):
-        for i in range(data.graph.number_of_nodes() / args.subgraph_size):
+        for i in range(graph.number_of_nodes() / args.subgraph_size):
             subg = subgraph_gen2(ig, i, args.subgraph_size, get_immutable_in_edges)
     mx.nd.waitall()
     t1 = time.time()
@@ -75,7 +80,7 @@ def test_subgraph_gen(args):
 
     t0 = time.time()
     for _ in range(1):
-        for i in range(data.graph.number_of_nodes() / args.subgraph_size / 4):
+        for i in range(graph.number_of_nodes() / args.subgraph_size / 4):
             subg = subgraph_gen3(ig, 4, i * 4, args.subgraph_size, get_immutable_in_edges)
     mx.nd.waitall()
     t1 = time.time()
