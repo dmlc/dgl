@@ -42,12 +42,12 @@ class RGCNEntityDataset(object):
         download(_urls[self.name][1], path=graph_file_path) # no need to uncompress
 
     def load(self, bfs_level=2, relabel=False):
-        self.num_nodes, self.edges, num_rels, relations, self.labels, labeled_nodes_idx, self.train_idx, self.test_idx, _, _, _ = _load_data(self.name, self.dir)
+        self.num_nodes, edges, self.num_rels, self.labels, labeled_nodes_idx, self.train_idx, self.test_idx = _load_data(self.name, self.dir)
 
         # bfs to reduce edges
         if bfs_level > 0:
             print("removing nodes that are more than {} hops away".format(bfs_level))
-            row, col = self.edges.transpose()
+            row, col, edge_type = edges.transpose()
             A = sp.csr_matrix((np.ones(len(row)), (row, col)), shape=(self.num_nodes, self.num_nodes))
             bfs_generator = _bfs_relational(A, labeled_nodes_idx)
             lvls = list()
@@ -57,18 +57,13 @@ class RGCNEntityDataset(object):
             to_delete = list(set(range(self.num_nodes)) - set.union(*lvls))
             eid_to_delete = np.isin(row, to_delete) + np.isin(col, to_delete)
             eid_to_keep = np.logical_not(eid_to_delete)
-            self.edges = self.edges[eid_to_keep, :]
-            eid_to_keep = np.nonzero(eid_to_keep)[0]
-            self.relations = []
-            for eid in eid_to_keep:
-                rel = np.zeros(num_rels, dtype=np.float32)
-                rel[relations[eid]] = 1
-                self.relations.append(rel)
-            self.relations = np.stack(self.relations)
+            self.edge_src = row[eid_to_keep]
+            self.edge_dst = col[eid_to_keep]
+            self.edge_type = edge_type[eid_to_keep]
 
             if relabel:
-                uniq_nodes, edges = np.unique(self.edges, return_inverse=True)
-                self.edges = np.reshape(edges, (-1, 2))
+                uniq_nodes, edges = np.unique((self.edge_src, self.edge_dst), return_inverse=True)
+                self.src, self.dst = np.reshape(edges, (-1, 2))
                 node_map = np.zeros(self.num_nodes, dtype=int)
                 self.num_nodes = len(uniq_nodes)
                 node_map[uniq_nodes] = np.arange(self.num_nodes)
@@ -76,19 +71,13 @@ class RGCNEntityDataset(object):
                 self.train_idx = node_map[self.train_idx]
                 self.test_idx = node_map[self.test_idx]
                 print("{} nodes left".format(self.num_nodes))
+        else:
+            self.src, self.dst, self.edge_type = edges.transpose()
 
-        # FIXME: should normalize by dst degree
-        dst = self.edges[:, 1]
-        for idx in range(self.relations.shape[1]):
-            rel = self.relations[:, idx]
-            nonzero = rel.nonzero()[0]
-            nid, count = np.unique(dst[nonzero], return_counts=True)
-            degree = np.zeros(self.num_nodes, dtype=np.float32)
-            degree[nid] = count
-            # cast to edge
-            degree = 1.0 / degree[dst]
-            degree[np.isinf(degree)] = 0
-            self.relations[:, idx] *= degree
+        # normalize by dst degree
+        _, inverse_index, count = np.unique((self.dst, self.edge_type), return_inverse=True, return_counts=True)
+        degrees = count[inverse_index]
+        self.edge_norm = np.ones(num_edges, dtype=np.float) / degrees
 
 
 class RGCNLinkDataset(object):
@@ -189,7 +178,7 @@ def _bfs_relational(adj, roots):
         current_lvl = set.union(next_lvl)
 
 
-class RDFReader:
+class RDFReader(object):
     __graph = None
     __freq = {}
 
@@ -289,26 +278,23 @@ def _load_data(dataset_str='aifb', dataset_path=None):
     else:
         raise NameError('Dataset name not recognized: ' + dataset_str)
 
-    adj_file = os.path.join(dataset_path, 'adjmat.npz')
+    edge_file = os.path.join(dataset_path, 'edges.npz')
     labels_file = os.path.join(dataset_path, 'labels.npz')
     train_idx_file = os.path.join(dataset_path, 'train_idx.npy')
     test_idx_file = os.path.join(dataset_path, 'test_idx.npy')
-    train_names_file = os.path.join(dataset_path, 'train_names.npy')
-    test_names_file = os.path.join(dataset_path, 'test_names.npy')
-    rel_dict_file = os.path.join(dataset_path, 'rel_dict.pkl')
-    relation_file = os.path.join(dataset_path, 'relations.pkl')
-    #nodes_file = os.path.join(dataset_path, 'nodes.pkl')
+    # train_names_file = os.path.join(dataset_path, 'train_names.npy')
+    # test_names_file = os.path.join(dataset_path, 'test_names.npy')
+    # rel_dict_file = os.path.join(dataset_path, 'rel_dict.pkl')
+    # nodes_file = os.path.join(dataset_path, 'nodes.pkl')
 
     if os.path.isfile(adj_file) and os.path.isfile(labels_file) and \
             os.path.isfile(train_idx_file) and os.path.isfile(test_idx_file):
 
         # load precomputed adjacency matrix and labels
-        adjmat = np.load(adj_file)
-        num_node = adjmat['n'].item()
-        all_edges = adjmat['edges']
-        rel_info = pkl.load(open(relation_file, 'rb'))
-        edge_types = rel_info['relations']
-        num_rel = rel_info['num_rel']
+        all_edges = np.load(edge_file)
+        num_node = all_edges['n'].item()
+        edge_list = all_edges['edges']
+        num_rel = all_edges['nrel']
 
         print('Number of nodes: ', num_node)
         print('Number of relations: ', num_rel)
@@ -320,10 +306,10 @@ def _load_data(dataset_str='aifb', dataset_path=None):
 
         train_idx = np.load(train_idx_file)
         test_idx = np.load(test_idx_file)
-        train_names = np.load(train_names_file)
-        test_names = np.load(test_names_file)
 
-        relations_dict = pkl.load(open(rel_dict_file, 'rb'))
+        # train_names = np.load(train_names_file)
+        # test_names = np.load(test_names_file)
+        # relations_dict = pkl.load(open(rel_dict_file, 'rb'))
 
     else:
 
@@ -331,7 +317,6 @@ def _load_data(dataset_str='aifb', dataset_path=None):
         labels_df = pd.read_csv(task_file, sep='\t', encoding='utf-8')
         labels_train_df = pd.read_csv(train_file, sep='\t', encoding='utf8')
         labels_test_df = pd.read_csv(test_file, sep='\t', encoding='utf8')
-
 
         with RDFReader(graph_file) as reader:
 
@@ -344,38 +329,35 @@ def _load_data(dataset_str='aifb', dataset_path=None):
             num_rel = len(relations)
             num_rel = 2 * num_rel + 1 # +1 is for self-relation
 
+            assert num_node < np.iinfo(np.int32).max
             print('Number of nodes: ', num_node)
-            print('Number of relations in the data: ', num_rel)
+            print('Number of relations: ', num_rel)
 
-            edge_dict = defaultdict(list) # +1: self-rel
-
+            edge_list = []
             relations_dict = {rel: i for i, rel in enumerate(list(relations))}
             nodes_dict = {node: i for i, node in enumerate(nodes)}
 
-            assert num_node < np.iinfo(np.int32).max
-
             # self relation
             for i in range(num_node):
-                edge_dict[(i, i)].append(0)
+                edge_list.append(i, i, 0)
 
             for i, (s, p, o) in enumerate(reader.triples()):
-                src = nodes_dict[s]
-                dst = nodes_dict[o]
+                src = node_dict[s]
+                dst = node_dict[o]
                 assert src < num_node and dst < num_node
                 rel = relations_dict[p]
-                # add relation edge
-                edge_dict[(src, dst)].append(2 * rel + 1)
-                # add reverse relation edge
-                edge_dict[(dst, src)].append(2 * rel + 2)
+                edge_list.append(src, dst, 2 * rel + 1)
+                edge_list.append(dst, src, 2 * rel + 1)
 
-            # sort indices and save
-            all_edges = sorted(list(edge_dict.keys()))
+            # sort indices by destination
+            edge_list = sorted(edge_list, key=lambda x: (x[1], x[0], x[2]))
+            edge_list = np.array(edge_list, dtype=np.int)
+
             edge_types = []
             for edge in all_edges:
                 edge_types.append(edge_dict[edge])
             all_edges = np.array(all_edges, dtype=np.int)
-            np.savez(adj_file, edges=all_edges, n=np.array(num_node))
-            pkl.dump({'num_rel': num_rel, 'relations': edge_types}, open(relation_file, 'wb'))
+            np.savez(adj_file, edges=edge_list, n=np.array(num_node), nrel=np.array(num_rel))
 
         # Reload the adjacency matrices from disk
         adjmat = np.load(adj_file)
@@ -427,24 +409,27 @@ def _load_data(dataset_str='aifb', dataset_path=None):
 
         labeled_nodes_idx = sorted(labeled_nodes_idx)
         labels = labels.tocsr()
+        print('Number of classes: ', labels.shape[1])
 
         _save_sparse_csr(labels_file, labels)
 
         np.save(train_idx_file, train_idx)
         np.save(test_idx_file, test_idx)
 
-        np.save(train_names_file, train_names)
-        np.save(test_names_file, test_names)
+        # np.save(train_names_file, train_names)
+        # np.save(test_names_file, test_names)
 
-        pkl.dump(relations_dict, open(rel_dict_file, 'wb'))
+        # pkl.dump(relations_dict, open(rel_dict_file, 'wb'))
 
-    return num_node, all_edges, num_rel, edge_types, labels, labeled_nodes_idx, train_idx, test_idx, relations_dict, train_names, test_names
+    # end if
+
+    return num_node, edge_list, num_rel, labels, labeled_nodes_idx, train_idx, test_idx
 
 
 def to_unicode(input):
-    # FIXME: not sure about python 2 and 3 str compatibility
+    # FIXME (lingfan): not sure about python 2 and 3 str compatibility
     return str(input)
-    """
+    """ lingfan: comment out for now
     if isinstance(input, unicode):
         return input
     elif isinstance(input, str):
