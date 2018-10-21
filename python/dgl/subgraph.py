@@ -7,6 +7,7 @@ from . import backend as F
 from .frame import Frame, FrameRef
 from .graph import DGLGraph
 from . import utils
+from .graph_index import map_to_subgraph_nid
 
 class DGLSubGraph(DGLGraph):
     """The subgraph class.
@@ -43,8 +44,8 @@ class DGLSubGraph(DGLGraph):
     shared : bool, optional
         Whether the subgraph shares node/edge features with the parent graph.
     """
-    def __init__(self, parent, parent_nid, parent_eid, graph_idx, shared=False):
-        super(DGLSubGraph, self).__init__(graph_data=graph_idx)
+    def __init__(self, parent, parent_nid, parent_eid, graph_idx, shared=False, immutable_graph=False):
+        super(DGLSubGraph, self).__init__(graph_data=graph_idx, immutable_graph=immutable_graph)
         self._parent = parent
         self._parent_nid = parent_nid
         self._parent_eid = parent_eid
@@ -114,3 +115,6 @@ class DGLSubGraph(DGLGraph):
         if self._parent._edge_frame.num_rows != 0:
             self._edge_frame = FrameRef(Frame(
                 self._parent._edge_frame[self._parent_eid]))
+
+    def map_to_subgraph_nid(self, parent_vids):
+        return map_to_subgraph_nid(self._graph, parent_vids)

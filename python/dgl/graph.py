@@ -41,6 +41,7 @@ class DGLGraph(object):
                  multigraph=False,
                  immutable_graph=False):
         # graph
+        self._immutable_graph=immutable_graph
         self._graph = create_graph_index(graph_data, multigraph, immutable_graph)
         # frame
         self._node_frame = node_frame if node_frame is not None else FrameRef()
@@ -1387,7 +1388,8 @@ class DGLGraph(object):
         """
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
-        return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
+        return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
+                sgi, immutable_graph=self._immutable_graph)
 
     def edge_subgraph(self, edges):
         """Generate the subgraph among the given edges.
