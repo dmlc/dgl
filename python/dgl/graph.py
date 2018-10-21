@@ -1503,6 +1503,21 @@ class DGLGraph(object):
         """
         return self._graph.incidence_matrix(oriented).get(ctx)
 
+    def in_edge_incidence_matrix(self, ctx=None):
+        """Return the incidence matrix representing in edges of this graph.
+
+        Parameters
+        ----------
+        ctx : optional
+            The context of returned incidence matrix.
+
+        Returns
+        -------
+        sparse_tensor
+            The incidence matrix.
+        """
+        return self._graph.in_edge_incidence_matrix().get(ctx)
+
     def line_graph(self, backtracking=True, shared=False):
         """Return the line graph of this graph.
 

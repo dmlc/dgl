@@ -343,3 +343,28 @@ def reorder(dict_like, index):
         idx_ctx = index.tousertensor(F.get_context(val))
         new_dict[key] = F.gather_row(val, idx_ctx)
     return new_dict
+
+def build_in_edge_incidence_matrix(dst, n, m, eid=None):
+    """Build incidence matrix from edges to destination nodes
+
+    Parameters
+    __________
+    dst: util.Index
+        Destination nodes
+    n: int
+        Number of nodes
+    m: int
+        Number of edges
+    eid: util.Index
+        Edge ids. If None, F.arange(m) will be used
+    """
+
+    dst = dst.tousertensor()
+    if eid is None:
+        eid = F.arange(m, dtype=F.int64)
+    else:
+        eid = dst.tousertensor()
+    idx = F.stack([dst, eid])
+    dat = F.ones((m,))
+    return F.sparse_tensor(idx, dat, [n, m])
+
