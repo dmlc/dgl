@@ -106,6 +106,15 @@ def test_nx():
     assert len(nxg.nodes) == 3
     assert len(nxg.edges) == 0
 
+    nxg = nx.DiGraph()
+    nxg.add_edge(0, 1, id=0)
+    nxg.add_edge(1, 2, id=1)
+    gi = create_graph_index(nxg)
+    assert 0 in gi.edge_id(0, 1)
+    assert 1 in gi.edge_id(1, 2)
+    assert gi.number_of_edges() == 2
+    assert gi.number_of_nodes() == 3
+
 def test_predsucc():
     gi = create_graph_index(multigraph=True)
 
