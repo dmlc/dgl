@@ -264,7 +264,7 @@ class ImmutableGraphIndex(object):
         """
         src = v.tousertensor()
         rows = mx.nd.take(self._out_csr, src)
-        return utils.toindex(rows.indices), None, utils.toindex(rows.data)
+        return None, utils.toindex(rows.indices), utils.toindex(rows.data)
 
     def edges(self, sorted=False):
         """Return all the edges

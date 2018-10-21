@@ -36,8 +36,7 @@ def test_graph_gen():
     g, ig = generate_rand_graph(10)
     check_graph_equal(g, ig)
 
-def test_basics():
-    g, ig = generate_rand_graph(100)
+def check_basics(g, ig):
     assert g.number_of_nodes() == ig.number_of_nodes()
     assert g.number_of_edges() == ig.number_of_edges()
 
@@ -50,6 +49,24 @@ def test_basics():
     for i in range(g.number_of_nodes()):
         assert mx.nd.sum(g.predecessors(i).tousertensor()).asnumpy() == mx.nd.sum(ig.predecessors(i).tousertensor()).asnumpy()
         assert mx.nd.sum(g.successors(i).tousertensor()).asnumpy() == mx.nd.sum(ig.successors(i).tousertensor()).asnumpy()
+
+    randv = np.random.randint(0, g.number_of_nodes(), 10)
+    randv = utils.toindex(randv)
+    in_e1, _, in_eids1 = g.in_edges(randv)
+    in_e2, _, in_eids2 = ig.in_edges(randv)
+    nnz = in_e2.tousertensor().shape[0]
+    assert mx.nd.sum(in_e1.tousertensor() == in_e2.tousertensor()).asnumpy() == nnz
+    assert mx.nd.sum(in_eids1.tousertensor() == in_eids2.tousertensor()).asnumpy() == nnz
+
+    _, out_e1, out_eids1 = g.out_edges(randv)
+    _, out_e2, out_eids2 = ig.out_edges(randv)
+    nnz = out_e2.tousertensor().shape[0]
+    assert mx.nd.sum(out_e1.tousertensor() == out_e2.tousertensor()).asnumpy() == nnz
+    assert mx.nd.sum(out_eids1.tousertensor() == out_eids2.tousertensor()).asnumpy() == nnz
+
+def test_basics():
+    g, ig = generate_rand_graph(100)
+    check_basics(g, ig)
 
 def test_node_subgraph():
     num_vertices = 100
