@@ -560,7 +560,6 @@ class GraphIndex(object):
             src = np.zeros((num_edges,), dtype=np.int64)
             dst = np.zeros((num_edges,), dtype=np.int64)
             for u, v, attr in nx_graph.edges(data=True):
-                # MultiDiGraph returns a triplet in e while DiGraph returns a pair
                 eid = attr['id']
                 src[eid] = u
                 dst[eid] = v
