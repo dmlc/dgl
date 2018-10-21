@@ -32,21 +32,19 @@ class EntityClassify(BaseRGCN):
         return features
 
     def build_input_layer(self):
-        return RGCNLayer(len(self.g), self.h_dim, len(self.subgraphs), self.num_rels, self.num_bases, activation=F.relu, featureless=True)
+        return RGCNLayer(len(self.g), self.h_dim, self.num_rels, self.num_bases, activation=F.relu, featureless=True)
 
     def build_hidden_layer(self, idx):
-        return RGCNLayer(self.h_dim, self.h_dim, len(self.subgraphs), self.num_rels, self.num_bases, activation=F.relu)
+        return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases, activation=F.relu)
 
     def build_output_layer(self):
-        return RGCNLayer(self.h_dim, self.out_dim, len(self.subgraphs), self.num_rels,self.num_bases, activation=partial(F.softmax, dim=1))
+        return RGCNLayer(self.h_dim, self.out_dim, self.num_rels,self.num_bases, activation=partial(F.softmax, dim=1))
 
 
 def main(args):
     # load graph data
     data = load_data(args)
     num_nodes = data.num_nodes
-    edges = data.edges
-    relations = data.relations
     labels = data.labels
     train_idx = data.train_idx
     test_idx = data.test_idx
@@ -62,34 +60,39 @@ def main(args):
     else:
         val_idx = train_idx
 
-    # check cuda
-    use_cuda = args.gpu >= 0 and torch.cuda.is_available()
-    if use_cuda:
-        torch.cuda.set_device(args.gpu)
-
-    # create graph
-    g = DGLGraph()
-    g.add_nodes_from(np.arange(num_nodes))
-    g.add_edges_from(edges)
-
-
-    # create model
-    model = EntityClassify(g,
-                           args.n_hidden,
-                           labels.shape[1],
-                           relations,
-                           num_bases=args.n_bases,
-                           num_hidden_layers=args.n_layers - 2,
-                           dropout=args.dropout,
-                           use_cuda=use_cuda)
+    # edge type and normalization factor
+    edge_type = torch.from_numpy(data.edge_type)
+    edge_norm = torch.from_numpy(data.edge_norm)
 
     # convert to pytorch label format
     labels = np.argmax(labels, axis=1)
     labels = torch.from_numpy(labels).view(-1)
 
+    # check cuda
+    use_cuda = args.gpu >= 0 and torch.cuda.is_available()
+    if use_cuda:
+        torch.cuda.set_device(args.gpu)
+        edge_type = edge_type.cuda()
+        edge_norm = edge_norm.cuda()
+        labels = labels.cuda()
+
+    # create graph
+    g = DGLGraph()
+    g.add_nodes(num_nodes)
+    g.add_edges(data.edge_src, data.edge_dst)
+    g.set_e_repr({'type': edge_type, 'norm': edge_norm})
+
+    # create model
+    model = EntityClassify(g,
+                           args.n_hidden,
+                           labels.shape[1],
+                           num_bases=args.n_bases,
+                           num_hidden_layers=args.n_layers - 2,
+                           dropout=args.dropout,
+                           use_cuda=use_cuda)
+
     if use_cuda:
         model.cuda()
-        labels = labels.cuda()
 
     # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2norm)

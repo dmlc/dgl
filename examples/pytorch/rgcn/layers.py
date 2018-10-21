@@ -48,74 +48,60 @@ class RGCNLayer(nn.Module):
 
 
 class RGCNBasisLayer(RGCNLayer):
-    def __init__(self, in_feat, out_feat, num_gs, num_rels, num_bases=-1,featureless=False, bias=None, activation=None):
+    def __init__(self, in_feat, out_feat, num_rels, num_bases=-1,featureless=False, bias=None, activation=None):
         super(RGCNBasisLayer, self).__init__(in_feat, out_feat, bias, activation)
         self.in_feat = in_feat
         self.out_feat = out_feat
-        self.num_rels = min(num_rels, num_gs)
+        self.num_rels = num_rels
         self.num_bases = num_bases
         if self.num_bases <= 0 or self.num_bases > self.num_rels:
             self.num_bases = self.num_rels
         self.featureless = featureless
 
         # add weights
-        self.weights = nn.ParameterList()
-        for _ in range(self.num_bases):
-            self.weights.append(nn.Parameter(torch.Tensor(self.in_feat, self.out_feat)))
-            nn.init.xavier_uniform_(self.weights[-1], gain=nn.init.calculate_gain('relu'))
+        self.weight = nn.Parameter(torch.Tensor(self.in_feat, self.num_bases, self.out_feat))
+        nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
         if self.num_bases < self.num_rels:
             self.w_comp = nn.Parameter(torch.Tensor(self.num_rels, self.num_bases))
             nn.init.xavier_uniform_(self.w_comp, gain=nn.init.calculate_gain('relu'))
 
     def propagate(self, parent, children):
         if self.num_bases < self.num_rels:
-            weights = torch.stack(list(self.weights)).permute(1, 0, 2)
-            weights = torch.matmul(self.w_comp, weights).view(-1, self.out_feat)
-            weights = torch.split(weights, self.in_feat, dim=0)
+            # generate all weights from basis
+            weights = torch.matmul(self.w_comp, self.weight).view(self.num_rels, self.in_feat, self.out_feat)
         else:
             weights = self.weights
 
-        for idx, g in enumerate(children):
-            if self.featureless:
-                # hack to avoid materize node features to avoid memory issues
-                g.set_n_repr(weights[idx][g.parent_nid])
-                g.update_all(fn.src_mul_edge(), fn.sum(), None, batchable=True)
-            else:
-                # update subgraph node repr
-                g.copy_from(parent)
-                g.update_all(fn.src_mul_edge(), fn.sum(),
-                             lambda node: torch.mm(node, weights[idx]),
-                             batchable=True)
-        # end for
+        def msg_func(src, edge):
+            # FIXME: normalizer
+            return {'msg': torch.bmm(src['h'], weights[edge['type']])}
 
-        # merge node repr
-        parent.merge(children, node_reduce_func='sum', edge_reduce_func=None)
-
-        for g in children:
-            g.pop_n_repr()
+        # FIXME: featureless case?
+        g.update_all(msg_func, fn.sum(msg='msg', out='h'), None)
 
 
 class RGCNBlockLayer(RGCNLayer):
-    def __init__(self, in_feat, out_feat, num_gs, num_rels, num_bases, bias=None, activation=None, self_loop=False, dropout=0.0):
+    def __init__(self, in_feat, out_feat, num_rels, num_bases, bias=None, activation=None, self_loop=False, dropout=0.0):
         super(RGCNBlockLayer, self).__init__(in_feat, out_feat, bias, activation, self_loop=self_loop, dropout=dropout)
-        self.num_rels = min(num_rels, num_gs)
+        self.num_rels = num_rels
         self.num_bases = num_bases
         assert self.num_bases > 0
 
-        # use graph convolution to implement block decomposition model, assuming in_feat and out_feat are divisible by num_bases
-        self.linears = nn.ModuleList()
-        for _ in range(self.num_rels):
-            l = nn.Conv1d(in_feat, out_feat, kernel_size=1, groups=self.num_bases, bias=False)
-            nn.init.xavier_uniform_(l.weight, gain=nn.init.calculate_gain('relu'))
-            self.linears.append(l)
+        self.submat_in = in_feat // self.num_bases
+        self.submat_out = out_feat // self.num_bases
+
+        # assuming in_feat and out_feat are both divisible by num_bases
+        self.weight = nn.Parameter(torch.Tensor(self.num_rels, self.num_bases * self.submat_in * self.submat_out))
+        nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
 
     def propagate(self, parent, children):
-        for idx, g in enumerate(children):
-            g.copy_from(parent)
-            g.update_all(fn.src_mul_edge(), fn.sum(), lambda x: self.linears[idx](x.unsqueeze(2)).squeeze(), batchable=True)
+        def msg_func(src, edge):
+            lambda x: self.linears[idx](x.unsqueeze(2)).squeeze()
+            weight = self.weight[edge['type']].view(-1, self.submat_in, self.submat_out)
+            node = src['h'].view(-1, 1, self.submat_in)
+            msgs = torch.bmm(node, weight).view(-1, self.out_feat)
+            # FIXME: normalizer
+            return {'msg': msgs}
 
-        # merge node repr
-        parent.merge(children, node_reduce_func='sum', edge_reduce_func=None)
-
-        for g in children:
-            g.pop_n_repr()
+        # FIXME: featureless case?
+        g.update_all(msg_func, fn.sum(msg='msg', out='h'), None)

@@ -38,7 +38,7 @@ class RGCN(BaseRGCN):
 
     def build_hidden_layer(self, idx):
         act = F.relu if idx < self.num_hidden_layers - 1 else None
-        return RGCNLayer(self.h_dim, self.h_dim, len(self.subgraphs), self.num_rels, self.num_bases, activation=act, self_loop=True, dropout=self.dropout)
+        return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases, activation=act, self_loop=True, dropout=self.dropout)
 
 
 class LinkPredict(nn.Module):
