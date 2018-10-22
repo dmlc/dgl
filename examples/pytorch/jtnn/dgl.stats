@@ -1,210 +1,840 @@
 Timer unit: 1e-06 s
 
-Total time: 15.1528 s
-File: /home/gq/ML/dgl/python/dgl/graph.py
-Function: _apply_nodes at line 838
+Total time: 43.3399 s
+File: /home/gq/ML/dgl/python/dgl/batched_graph.py
+Function: __init__ at line 31
 
 Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
-   838                                               @profile
-   839                                               def _apply_nodes(self, v, apply_node_func="default", reduce_accum=None):
-   840                                                   """Internal apply nodes
-   841                                           
-   842                                                   Parameters
-   843                                                   ----------
-   844                                                   reduce_accum: dict-like
-   845                                                     The output of reduce func
-   846                                                   """
-   847     22987      13706.0      0.6      0.1          if apply_node_func == "default":
-   848                                                       apply_node_func = self._apply_node_func
-   849     22987      10503.0      0.5      0.1          if not apply_node_func:
-   850                                                       # Skip none function call.
-   851                                                       if reduce_accum is not None:
-   852                                                           # write reduce result back
-   853                                                           self.set_n_repr(reduce_accum, v)
-   854                                                       return
-   855                                                   # take out current node repr
-   856     22987     560411.0     24.4      3.7          curr_repr = self.get_n_repr(v)
-   857     22987      12941.0      0.6      0.1          if reduce_accum is not None:
-   858                                                       # merge current node_repr with reduce output
-   859     22247      33026.0      1.5      0.2              curr_repr = utils.HybridDict(reduce_accum, curr_repr)
-   860     22987    7356571.0    320.0     48.5          new_repr = apply_node_func(curr_repr)
-   861     22987      21841.0      1.0      0.1          if reduce_accum is not None:
-   862                                                       # merge new node_repr with reduce output
-   863     22247      28841.0      1.3      0.2              reduce_accum.update(new_repr)
-   864     22247       9409.0      0.4      0.1              new_repr = reduce_accum
-   865     22987    7105518.0    309.1     46.9          self.set_n_repr(new_repr, v)
+    31                                               @profile
+    32                                               def __init__(self, graph_list, node_attrs, edge_attrs):
+    33                                                   # create batched graph index
+    34       957    1304856.0   1363.5      3.0          batched_index = gi.disjoint_union([g._graph for g in graph_list])
+    35                                                   # create batched node and edge frames
+    36                                                   # NOTE: following code will materialize the columns of the input graphs.
+    37       957       6178.0      6.5      0.0          batched_node_frame = FrameRef()
+    38    184354     177496.0      1.0      0.4          for gr in graph_list:
+    39    183397    1221210.0      6.7      2.8              cols = {key : gr._node_frame[key] for key in node_attrs}
+    40    183397   12205375.0     66.6     28.2              batched_node_frame.append(cols)
+    41       957       4438.0      4.6      0.0          batched_edge_frame = FrameRef()
+    42    184354     173107.0      0.9      0.4          for gr in graph_list:
+    43    183397    1678129.0      9.2      3.9              cols = {key : gr._edge_frame[key] for key in edge_attrs}
+    44    183397   18627628.0    101.6     43.0              batched_edge_frame.append(cols)
+    45       957       1564.0      1.6      0.0          super(BatchedDGLGraph, self).__init__(
+    46       957        612.0      0.6      0.0                  graph_data=batched_index,
+    47       957        649.0      0.7      0.0                  node_frame=batched_node_frame,
+    48       957     160815.0    168.0      0.4                  edge_frame=batched_edge_frame)
+    49                                           
+    50                                                   # extra members
+    51       957       1026.0      1.1      0.0          self._batch_size = 0
+    52       957        852.0      0.9      0.0          self._batch_num_nodes = []
+    53       957        790.0      0.8      0.0          self._batch_num_edges = []
+    54    184354     141973.0      0.8      0.3          for gr in graph_list:
+    55    183397     150002.0      0.8      0.3              if isinstance(gr, BatchedDGLGraph):
+    56                                                           # handle the input is again a batched graph.
+    57                                                           self._batch_size += gr._batch_size
+    58                                                           self._batch_num_nodes += gr._batch_num_nodes
+    59                                                           self._batch_num_edges += gr._batch_num_edges
+    60                                                       else:
+    61    183397     144811.0      0.8      0.3                  self._batch_size += 1
+    62    183397    3705704.0     20.2      8.6                  self._batch_num_nodes.append(gr.number_of_nodes())
+    63    183397    3632724.0     19.8      8.4                  self._batch_num_edges.append(gr.number_of_edges())
 
-Total time: 41.7267 s
-File: /home/gq/ML/dgl/python/dgl/graph.py
-Function: send_and_recv at line 1161
+Total time: 76.2586 s
+File: /home/gq/ML/dgl/python/dgl/batched_graph.py
+Function: unbatch at line 153
 
 Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
-  1161                                               @profile
-  1162                                               def send_and_recv(self,
-  1163                                                                 u=None, v=None,
-  1164                                                                 message_func="default",
-  1165                                                                 reduce_func="default",
-  1166                                                                 apply_node_func="default",
-  1167                                                                 eid=None):
-  1168                                                   """Trigger the message function on u->v and update v, or on edge eid
-  1169                                                   and update the destination nodes.
-  1170                                           
-  1171                                                   Parameters
-  1172                                                   ----------
-  1173                                                   u : optional, node, container or tensor
-  1174                                                     The source node(s).
-  1175                                                   v : optional, node, container or tensor
-  1176                                                     The destination node(s).
-  1177                                                   message_func : callable
-  1178                                                     The message function.
-  1179                                                   reduce_func : callable
-  1180                                                     The reduce function.
-  1181                                                   apply_node_func : callable, optional
-  1182                                                     The update function.
-  1183                                           
-  1184                                                   Notes
-  1185                                                   -----
-  1186                                                   On multigraphs, if u and v are specified, then the messages will be sent
-  1187                                                   and received along all edges between u and v.
-  1188                                                   """
-  1189     21790      21057.0      1.0      0.1          if message_func == "default":
-  1190                                                       message_func = self._message_func
-  1191     21790      16225.0      0.7      0.0          if reduce_func == "default":
-  1192                                                       reduce_func = self._reduce_func
-  1193     21790      15511.0      0.7      0.0          assert message_func is not None
-  1194     21790      14478.0      0.7      0.0          assert reduce_func is not None
-  1195                                           
-  1196     21790      15124.0      0.7      0.0          if eid is None:
-  1197     21790      16646.0      0.8      0.0              if u is None or v is None:
-  1198                                                           raise ValueError('u and v must be given if eid is None')
-  1199                                           
-  1200     21790      32779.0      1.5      0.1              u = utils.toindex(u)
-  1201     21790      23682.0      1.1      0.1              v = utils.toindex(v)
-  1202     21790     150866.0      6.9      0.4              if len(u) == 0:
-  1203                                                           # no edges to be triggered
-  1204       623       3275.0      5.3      0.0                  assert len(v) == 0
-  1205       623        456.0      0.7      0.0                  return
-  1206     21167     962304.0     45.5      2.3              unique_v = utils.toindex(F.unique(v.tousertensor()))
-  1207                                           
-  1208     21167      21254.0      1.0      0.1              executor = scheduler.get_executor(
-  1209     21167      15113.0      0.7      0.0                      'send_and_recv', self, src=u, dst=v,
-  1210     21167    2361390.0    111.6      5.7                      message_func=message_func, reduce_func=reduce_func)
-  1211                                                   else:
-  1212                                                       eid = utils.toindex(eid)
-  1213                                                       if len(eid) == 0:
+   153                                           @profile
+   154                                           def unbatch(graph):
+   155                                               """Unbatch and return the list of graphs in this batch.
+   156                                           
+   157                                               Parameters
+   158                                               ----------
+   159                                               graph : BatchedDGLGraph
+   160                                                   The batched graph.
+   161                                               """
+   162       557        621.0      1.1      0.0      assert isinstance(graph, BatchedDGLGraph)
+   163       557        939.0      1.7      0.0      bsize = graph.batch_size
+   164       557        738.0      1.3      0.0      bn = graph.batch_num_nodes
+   165       557        661.0      1.2      0.0      be = graph.batch_num_edges
+   166       557    1593074.0   2860.1      2.1      pttns = gi.disjoint_partition(graph._graph, utils.toindex(bn))
+   167                                               # split the frames
+   168       557     651822.0   1170.2      0.9      node_frames = [FrameRef() for i in range(bsize)]
+   169       557     840836.0   1509.6      1.1      edge_frames = [FrameRef() for i in range(bsize)]
+   170      2428      16382.0      6.7      0.0      for attr, col in graph._node_frame.items():
+   171      1871    1931309.0   1032.2      2.5          col_splits = F.unpack(col, bn)
+   172    698365     534294.0      0.8      0.7          for i in range(bsize):
+   173    696494   20298071.0     29.1     26.6              node_frames[i][attr] = col_splits[i]
+   174      3542      20006.0      5.6      0.0      for attr, col in graph._edge_frame.items():
+   175      2985    3003781.0   1006.3      3.9          col_splits = F.unpack(col, be)
+   176   1050273     805512.0      0.8      1.1          for i in range(bsize):
+   177   1047288   30642292.0     29.3     40.2              edge_frames[i][attr] = col_splits[i]
+   178       557        642.0      1.2      0.0      return [DGLGraph(graph_data=pttns[i],
+   179                                                                node_frame=node_frames[i],
+   180       557   15917643.0  28577.5     20.9                       edge_frame=edge_frames[i]) for i in range(bsize)]
+
+Total time: 44.9875 s
+File: /home/gq/ML/dgl/python/dgl/batched_graph.py
+Function: batch at line 182
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   182                                           @profile
+   183                                           def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
+   184                                               """Batch a list of DGLGraphs into one single graph.
+   185                                           
+   186                                               Once batch is called, the structure of both merged graph and graphs in graph_list
+   187                                               must not be mutated, or unbatch's behavior will be undefined.
+   188                                           
+   189                                               Parameters
+   190                                               ----------
+   191                                               graph_list : iterable
+   192                                                   A list of DGLGraphs to be batched.
+   193                                               node_attrs : str or iterable, optional
+   194                                                   The node attributes to also be batched. Specify None to not batch any attributes.
+   195                                               edge_attrs : str or iterable, optional
+   196                                                   The edge attributes to also be batched. Specify None to not batch any attributes.
+   197                                           
+   198                                               Returns
+   199                                               -------
+   200                                               newgrh: BatchedDGLGraph
+   201                                                   one single batched graph
+   202                                               """
+   203       957        720.0      0.8      0.0      if node_attrs is None:
+   204                                                   node_attrs = []
+   205       957       1221.0      1.3      0.0      elif is_all(node_attrs):
+   206       957       4898.0      5.1      0.0          node_attrs = graph_list[0].node_attr_schemes()
+   207                                               elif isinstance(node_attrs, str):
+   208                                                   node_attrs = [node_attrs]
+   209       957        376.0      0.4      0.0      if edge_attrs is None:
+   210                                                   edge_attrs = []
+   211       957        734.0      0.8      0.0      elif is_all(edge_attrs):
+   212       957       2813.0      2.9      0.0          edge_attrs = graph_list[0].edge_attr_schemes()
+   213                                               elif isinstance(edge_attrs, str):
+   214                                                   edge_attrs = [edge_attrs]
+   215       957   44976787.0  46997.7    100.0      return BatchedDGLGraph(graph_list, node_attrs, edge_attrs)
+
+Total time: 24.6629 s
+File: /home/gq/ML/dgl/python/dgl/graph.py
+Function: set_n_repr at line 553
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   553                                               @profile
+   554                                               def set_n_repr(self, hu, u=ALL, inplace=False):
+   555                                                   """Set node(s) representation.
+   556                                           
+   557                                                   `hu` is a dictionary from the feature name to feature tensor. Each tensor
+   558                                                   is of shape (B, D1, D2, ...), where B is the number of nodes to be updated,
+   559                                                   and (D1, D2, ...) be the shape of the node representation tensor. The
+   560                                                   length of the given node ids must match B (i.e, len(u) == B).
+   561                                           
+   562                                                   All update will be done out-placely to work with autograd unless the inplace
+   563                                                   flag is true.
+   564                                           
+   565                                                   Parameters
+   566                                                   ----------
+   567                                                   hu : dict of tensor
+   568                                                       Node representation.
+   569                                                   u : node, container or tensor
+   570                                                       The node(s).
+   571                                                   inplace : bool
+   572                                                       True if the update is done inplacely
+   573                                                   """
+   574                                                   # sanity check
+   575    226936    1393914.0      6.1      5.7          if not utils.is_dict_like(hu):
+   576                                                       raise DGLError('Expect dictionary type for feature data.'
+   577                                                                      ' Got "%s" instead.' % type(hu))
+   578    226936     340604.0      1.5      1.4          if is_all(u):
+   579    183738    5453999.0     29.7     22.1              num_nodes = self.number_of_nodes()
+   580                                                   else:
+   581     43198     535768.0     12.4      2.2              u = utils.toindex(u)
+   582     43198     182096.0      4.2      0.7              num_nodes = len(u)
+   583    511498     406510.0      0.8      1.6          for key, val in hu.items():
+   584    284562     445282.0      1.6      1.8              nfeats = F.shape(val)[0]
+   585    284562     128348.0      0.5      0.5              if nfeats != num_nodes:
+   586                                                           raise DGLError('Expect number of features to match number of nodes (len(u)).'
+   587                                                                          ' Got %d and %d instead.' % (nfeats, num_nodes))
+   588                                                   # set
+   589    226936     243615.0      1.1      1.0          if is_all(u):
+   590    370861     244166.0      0.7      1.0              for key, val in hu.items():
+   591    187123    7913406.0     42.3     32.1                  self._node_frame[key] = val
+   592                                                   else:
+   593     43198    7375232.0    170.7     29.9              self._node_frame.update_rows(u, hu, inplace=inplace)
+
+Total time: 6.3812 s
+File: /home/gq/ML/dgl/python/dgl/graph.py
+Function: get_n_repr at line 595
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   595                                               @profile
+   596                                               def get_n_repr(self, u=ALL):
+   597                                                   """Get node(s) representation.
+   598                                           
+   599                                                   The returned feature tensor batches multiple node features on the first dimension.
+   600                                           
+   601                                                   Parameters
+   602                                                   ----------
+   603                                                   u : node, container or tensor
+   604                                                       The node(s).
+   605                                           
+   606                                                   Returns
+   607                                                   -------
+   608                                                   dict
+   609                                                       Representation dict from feature name to feature tensor.
+   610                                                   """
+   611    297710    1405306.0      4.7     22.0          if len(self.node_attr_schemes()) == 0:
+   612                                                       return dict()
+   613    297710     324820.0      1.1      5.1          if is_all(u):
+   614    220289    3487174.0     15.8     54.6              return dict(self._node_frame)
+   615                                                   else:
+   616     77421     700801.0      9.1     11.0              u = utils.toindex(u)
+   617     77421     463104.0      6.0      7.3              return self._node_frame.select_rows(u)
+
+Total time: 21.2008 s
+File: /home/gq/ML/dgl/python/dgl/graph.py
+Function: set_e_repr at line 634
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   634                                               @profile
+   635                                               def set_e_repr(self, he, u=ALL, v=ALL, inplace=False):
+   636                                                   """Set edge(s) representation.
+   637                                           
+   638                                                   `he` is a dictionary from the feature name to feature tensor. Each tensor
+   639                                                   is of shape (B, D1, D2, ...), where B is the number of edges to be updated,
+   640                                                   and (D1, D2, ...) be the shape of the edge representation tensor.
+   641                                           
+   642                                                   All update will be done out-placely to work with autograd unless the inplace
+   643                                                   flag is true.
+   644                                           
+   645                                                   Parameters
+   646                                                   ----------
+   647                                                   he : tensor or dict of tensor
+   648                                                     Edge representation.
+   649                                                   u : node, container or tensor
+   650                                                     The source node(s).
+   651                                                   v : node, container or tensor
+   652                                                     The destination node(s).
+   653                                                   inplace : bool
+   654                                                       True if the update is done inplacely
+   655                                                   """
+   656                                                   # sanity check
+   657    176954     809760.0      4.6      3.8          if not utils.is_dict_like(he):
+   658                                                       raise DGLError('Expect dictionary type for feature data.'
+   659                                                                      ' Got "%s" instead.' % type(he))
+   660    176954     217925.0      1.2      1.0          u_is_all = is_all(u)
+   661    176954     124268.0      0.7      0.6          v_is_all = is_all(v)
+   662    176954      75043.0      0.4      0.4          assert u_is_all == v_is_all
+   663    176954      65924.0      0.4      0.3          if u_is_all:
+   664    176954   19907839.0    112.5     93.9              self.set_e_repr_by_id(he, eid=ALL, inplace=inplace)
+   665                                                   else:
+   666                                                       u = utils.toindex(u)
+   667                                                       v = utils.toindex(v)
+   668                                                       _, _, eid = self._graph.edge_ids(u, v)
+   669                                                       self.set_e_repr_by_id(he, eid=eid, inplace=inplace)
+
+Total time: 18.0168 s
+File: /home/gq/ML/dgl/python/dgl/graph.py
+Function: set_e_repr_by_id at line 671
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   671                                               @profile
+   672                                               def set_e_repr_by_id(self, he, eid=ALL, inplace=False):
+   673                                                   """Set edge(s) representation by edge id.
+   674                                           
+   675                                                   `he` is a dictionary from the feature name to feature tensor. Each tensor
+   676                                                   is of shape (B, D1, D2, ...), where B is the number of edges to be updated,
+   677                                                   and (D1, D2, ...) be the shape of the edge representation tensor.
+   678                                           
+   679                                                   All update will be done out-placely to work with autograd unless the inplace
+   680                                                   flag is true.
+   681                                           
+   682                                                   Parameters
+   683                                                   ----------
+   684                                                   he : tensor or dict of tensor
+   685                                                     Edge representation.
+   686                                                   eid : int, container or tensor
+   687                                                     The edge id(s).
+   688                                                   inplace : bool
+   689                                                       True if the update is done inplacely
+   690                                                   """
+   691                                                   # sanity check
+   692    176954     445570.0      2.5      2.5          if not utils.is_dict_like(he):
+   693                                                       raise DGLError('Expect dictionary type for feature data.'
+   694                                                                      ' Got "%s" instead.' % type(he))
+   695    176954     154658.0      0.9      0.9          if is_all(eid):
+   696    176954    4610099.0     26.1     25.6              num_edges = self.number_of_edges()
+   697                                                   else:
+   698                                                       eid = utils.toindex(eid)
+   699                                                       num_edges = len(eid)
+   700    532505     342588.0      0.6      1.9          for key, val in he.items():
+   701    355551     382570.0      1.1      2.1              nfeats = F.shape(val)[0]
+   702    355551     146909.0      0.4      0.8              if nfeats != num_edges:
+   703                                                           raise DGLError('Expect number of features to match number of edges.'
+   704                                                                          ' Got %d and %d instead.' % (nfeats, num_edges))
+   705                                                   # set
+   706    176954     159486.0      0.9      0.9          if is_all(eid):
+   707                                                       # update column
+   708    532505     326346.0      0.6      1.8              for key, val in he.items():
+   709    355551   11448526.0     32.2     63.5                  self._edge_frame[key] = val
+   710                                                   else:
+   711                                                       # update row
+   712                                                       self._edge_frame.update_rows(eid, he, inplace=inplace)
+
+Total time: 1.45587 s
+File: /home/gq/ML/dgl/python/dgl/graph.py
+Function: get_e_repr at line 714
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   714                                               @profile
+   715                                               def get_e_repr(self, u=ALL, v=ALL):
+   716                                                   """Get node(s) representation.
+   717                                           
+   718                                                   Parameters
+   719                                                   ----------
+   720                                                   u : node, container or tensor
+   721                                                     The source node(s).
+   722                                                   v : node, container or tensor
+   723                                                     The destination node(s).
+   724                                           
+   725                                                   Returns
+   726                                                   -------
+   727                                                   dict
+   728                                                       Representation dict
+   729                                                   """
+   730     10308      10071.0      1.0      0.7          u_is_all = is_all(u)
+   731     10308       7855.0      0.8      0.5          v_is_all = is_all(v)
+   732     10308       4441.0      0.4      0.3          assert u_is_all == v_is_all
+   733     10308      44904.0      4.4      3.1          if len(self.edge_attr_schemes()) == 0:
+   734                                                       return dict()
+   735     10308       4303.0      0.4      0.3          if u_is_all:
+   736      1914      52699.0     27.5      3.6              return self.get_e_repr_by_id(eid=ALL)
+   737                                                   else:
+   738      8394      45828.0      5.5      3.1              u = utils.toindex(u)
+   739      8394      39919.0      4.8      2.7              v = utils.toindex(v)
+   740      8394    1104138.0    131.5     75.8              _, _, eid = self._graph.edge_ids(u, v)
+   741      8394     141709.0     16.9      9.7              return self.get_e_repr_by_id(eid=eid)
+
+Total time: 0.143346 s
+File: /home/gq/ML/dgl/python/dgl/graph.py
+Function: get_e_repr_by_id at line 758
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   758                                               @profile
+   759                                               def get_e_repr_by_id(self, eid=ALL):
+   760                                                   """Get edge(s) representation by edge id.
+   761                                           
+   762                                                   Parameters
+   763                                                   ----------
+   764                                                   eid : int, container or tensor
+   765                                                     The edge id(s).
+   766                                           
+   767                                                   Returns
+   768                                                   -------
+   769                                                   dict
+   770                                                       Representation dict from feature name to feature tensor.
+   771                                                   """
+   772     10308      46218.0      4.5     32.2          if len(self.edge_attr_schemes()) == 0:
+   773                                                       return dict()
+   774     10308      11767.0      1.1      8.2          if is_all(eid):
+   775      1914      37953.0     19.8     26.5              return dict(self._edge_frame)
+   776                                                   else:
+   777      8394       6894.0      0.8      4.8              eid = utils.toindex(eid)
+   778      8394      40514.0      4.8     28.3              return self._edge_frame.select_rows(eid)
+
+Total time: 18.4579 s
+File: /home/gq/ML/dgl/python/dgl/graph.py
+Function: _apply_nodes at line 844
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   844                                               @profile
+   845                                               def _apply_nodes(self, v, apply_node_func="default", reduce_accum=None):
+   846                                                   """Internal apply nodes
+   847                                           
+   848                                                   Parameters
+   849                                                   ----------
+   850                                                   reduce_accum: dict-like
+   851                                                     The output of reduce func
+   852                                                   """
+   853     45068      25447.0      0.6      0.1          if apply_node_func == "default":
+   854                                                       apply_node_func = self._apply_node_func
+   855     45068      18420.0      0.4      0.1          if not apply_node_func:
+   856                                                       # Skip none function call.
+   857     21287       7560.0      0.4      0.0              if reduce_accum is not None:
+   858                                                           # write reduce result back
+   859     21287    3654586.0    171.7     19.8                  self.set_n_repr(reduce_accum, v)
+   860     21287      13487.0      0.6      0.1              return
+   861                                                   # take out current node repr
+   862     23781     699627.0     29.4      3.8          curr_repr = self.get_n_repr(v)
+   863     23781      12076.0      0.5      0.1          if reduce_accum is not None:
+   864                                                       # merge current node_repr with reduce output
+   865      1114       2735.0      2.5      0.0              curr_repr = utils.HybridDict(reduce_accum, curr_repr)
+   866     23781    8327592.0    350.2     45.1          new_repr = apply_node_func(curr_repr)
+   867     23781      21412.0      0.9      0.1          if reduce_accum is not None:
+   868                                                       # merge new node_repr with reduce output
+   869      1114       1210.0      1.1      0.0              reduce_accum.update(new_repr)
+   870      1114        433.0      0.4      0.0              new_repr = reduce_accum
+   871     23781    5673268.0    238.6     30.7          self.set_n_repr(new_repr, v)
+
+Total time: 0.759527 s
+File: /home/gq/ML/dgl/python/dgl/graph.py
+Function: send at line 901
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   901                                               @profile
+   902                                               def send(self, u=None, v=None, message_func="default", eid=None):
+   903                                                   """Trigger the message function on edge u->v or eid
+   904                                           
+   905                                                   The message function should be compatible with following signature:
+   906                                           
+   907                                                   (node_reprs, edge_reprs) -> message
+   908                                           
+   909                                                   It computes the representation of a message using the
+   910                                                   representations of the source node, and the edge u->v.
+   911                                                   All node_reprs and edge_reprs are dictionaries.
+   912                                                   The message function can be any of the pre-defined functions
+   913                                                   ('from_src').
+   914                                           
+   915                                                   Currently, we require the message functions of consecutive send's to
+   916                                                   return the same keys.  Otherwise the behavior will be undefined.
+   917                                           
+   918                                                   Parameters
+   919                                                   ----------
+   920                                                   u : optional, node, container or tensor
+   921                                                     The source node(s).
+   922                                                   v : optional, node, container or tensor
+   923                                                     The destination node(s).
+   924                                                   message_func : callable
+   925                                                     The message function.
+   926                                                   eid : optional, edge, container or tensor
+   927                                                     The edge to update on.  If eid is not None then u and v are ignored.
+   928                                           
+   929                                                   Notes
+   930                                                   -----
+   931                                                   On multigraphs, if u and v are specified, then the messages will be sent
+   932                                                   along all edges between u and v.
+   933                                                   """
+   934       757        317.0      0.4      0.0          if message_func == "default":
+   935                                                       message_func = self._message_func
+   936       757        252.0      0.3      0.0          assert message_func is not None
+   937       757        447.0      0.6      0.1          if isinstance(message_func, (tuple, list)):
+   938                                                       message_func = BundledMessageFunction(message_func)
+   939       757     758511.0   1002.0     99.9          self._batch_send(u, v, eid, message_func)
+
+Total time: 0.746608 s
+File: /home/gq/ML/dgl/python/dgl/graph.py
+Function: _batch_send at line 941
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   941                                               @profile
+   942                                               def _batch_send(self, u, v, eid, message_func):
+   943       757       1231.0      1.6      0.2          if is_all(u) and is_all(v) and eid is None:
+   944       757     104944.0    138.6     14.1              u, v, eid = self._graph.edges()
+   945                                                       # call UDF
+   946       757      12981.0     17.1      1.7              src_reprs = self.get_n_repr(u)
+   947       757      30702.0     40.6      4.1              edge_reprs = self.get_e_repr()
+   948       757       1949.0      2.6      0.3              msgs = message_func(src_reprs, edge_reprs)
+   949                                                   elif eid is not None:
+   950                                                       eid = utils.toindex(eid)
+   951                                                       u, v, _ = self._graph.find_edges(eid)
+   952                                                       # call UDF
+   953                                                       src_reprs = self.get_n_repr(u)
+   954                                                       edge_reprs = self.get_e_repr_by_id(eid)
+   955                                                       msgs = message_func(src_reprs, edge_reprs)
+   956                                                   else:
+   957                                                       u = utils.toindex(u)
+   958                                                       v = utils.toindex(v)
+   959                                                       u, v, eid = self._graph.edge_ids(u, v)
+   960                                                       # call UDF
+   961                                                       src_reprs = self.get_n_repr(u)
+   962                                                       edge_reprs = self.get_e_repr_by_id(eid)
+   963                                                       msgs = message_func(src_reprs, edge_reprs)
+   964       757     558253.0    737.5     74.8          self._msg_graph.add_edges(u, v)
+   965       757      36149.0     47.8      4.8          self._msg_frame.append(msgs)
+   966                                           
+   967                                                   # TODO(minjie): Fix these codes in next PR.
+   968                                                   """
+   969                                                   new_uv = []
+   970                                                   msg_target_rows = []
+   971                                                   msg_update_rows = []
+   972                                                   msg_append_rows = []
+   973                                                   for i, (_u, _v, _eid) in enumerate(zip(u, v, eid)):
+   974                                                       if _eid in self._msg_edges:
+   975                                                           msg_target_rows.append(self._msg_edges.index(_eid))
+   976                                                           msg_update_rows.append(i)
+   977                                                       else:
+   978                                                           new_uv.append((_u, _v))
+   979                                                           self._msg_edges.append(_eid)
+   980                                                           msg_append_rows.append(i)
+   981                                           
+   982                                                   msg_target_rows = utils.toindex(msg_target_rows)
+   983                                                   msg_update_rows = utils.toindex(msg_update_rows)
+   984                                                   msg_append_rows = utils.toindex(msg_append_rows)
+   985                                           
+   986                                                   if utils.is_dict_like(msgs):
+   987                                                       if len(msg_target_rows) > 0:
+   988                                                           self._msg_frame.update_rows(
+   989                                                                   msg_target_rows,
+   990                                                                   {k: F.gather_row(msgs[k], msg_update_rows.tousertensor())
+   991                                                                       for k in msgs},
+   992                                                                   inplace=False)
+   993                                                       if len(msg_append_rows) > 0:
+   994                                                           new_u, new_v = zip(*new_uv)
+   995                                                           new_u = utils.toindex(new_u)
+   996                                                           new_v = utils.toindex(new_v)
+   997                                                           self._msg_graph.add_edges(new_u, new_v)
+   998                                                           self._msg_frame.append(
+   999                                                                   {k: F.gather_row(msgs[k], msg_append_rows.tousertensor())
+  1000                                                                       for k in msgs})
+  1001                                                   else:
+  1002                                                       if len(msg_target_rows) > 0:
+  1003                                                           self._msg_frame.update_rows(
+  1004                                                                   msg_target_rows,
+  1005                                                                   {__MSG__: F.gather_row(msgs, msg_update_rows.tousertensor())},
+  1006                                                                   inplace=False)
+  1007                                                       if len(msg_append_rows) > 0:
+  1008                                                           new_u, new_v = zip(*new_uv)
+  1009                                                           new_u = utils.toindex(new_u)
+  1010                                                           new_v = utils.toindex(new_v)
+  1011                                                           self._msg_graph.add_edges(new_u, new_v)
+  1012                                                           self._msg_frame.append(
+  1013                                                                   {__MSG__: F.gather_row(msgs, msg_append_rows.tousertensor())}
+  1014                                                                   )
+  1015       757        399.0      0.5      0.1          """
+
+Total time: 0.594349 s
+File: /home/gq/ML/dgl/python/dgl/graph.py
+Function: update_edge at line 1017
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+  1017                                               @profile
+  1018                                               def update_edge(self, u=ALL, v=ALL, edge_func="default", eid=None):
+  1019                                                   """Update representation on edge u->v
+  1020                                           
+  1021                                                   The edge function should be compatible with following signature:
+  1022                                           
+  1023                                                   (node_reprs, node_reprs, edge_reprs) -> edge_reprs
+  1024                                           
+  1025                                                   It computes the new edge representations using the representations
+  1026                                                   of the source node, target node and the edge itself.
+  1027                                                   All node_reprs and edge_reprs are dictionaries.
+  1028                                           
+  1029                                                   Parameters
+  1030                                                   ----------
+  1031                                                   u : node, container or tensor
+  1032                                                     The source node(s).
+  1033                                                   v : node, container or tensor
+  1034                                                     The destination node(s).
+  1035                                                   edge_func : callable
+  1036                                                     The update function.
+  1037                                                   eid : optional, edge, container or tensor
+  1038                                                     The edge to update on.  If eid is not None then u and v are ignored.
+  1039                                                   """
+  1040      1157        989.0      0.9      0.2          if edge_func == "default":
+  1041                                                       edge_func = self._edge_func
+  1042      1157        569.0      0.5      0.1          assert edge_func is not None
+  1043      1157     592791.0    512.4     99.7          self._batch_update_edge(u, v, eid, edge_func)
+
+Total time: 2.43229 s
+File: /home/gq/ML/dgl/python/dgl/graph.py
+Function: recv at line 1067
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+  1067                                               @profile
+  1068                                               def recv(self,
+  1069                                                        u,
+  1070                                                        reduce_func="default",
+  1071                                                        apply_node_func="default"):
+  1072                                                   """Receive and reduce in-coming messages and update representation on node u.
+  1073                                           
+  1074                                                   It computes the new node state using the messages sent from the predecessors
+  1075                                                   of node u. If no message is found from the predecessors, reduce function
+  1076                                                   will be skipped.
+  1077                                           
+  1078                                                   The reduce function should be compatible with following signature:
+  1079                                           
+  1080                                                       (node_reprs, batched_messages) -> node_reprs
+  1081                                           
+  1082                                                   It computes the new node representations using the representations
+  1083                                                   of the in-coming edges (the same concept as messages).
+  1084                                                   The reduce function can also be pre-defined functions.
+  1085                                           
+  1086                                                   An optinoal apply_node function could be specified and should follow following
+  1087                                                   signature:
+  1088                                           
+  1089                                                       node_reprs -> node_reprs
+  1090                                           
+  1091                                                   All node_reprs and edge_reprs support tensor and dictionary types.
+  1092                                           
+  1093                                                   Parameters
+  1094                                                   ----------
+  1095                                                   u : node, container or tensor
+  1096                                                     The node to be updated.
+  1097                                                   reduce_func : callable
+  1098                                                     The reduce function.
+  1099                                                   apply_node_func : callable, optional
+  1100                                                     The update function.
+  1101                                                   """
+  1102       757        387.0      0.5      0.0          if reduce_func == "default":
+  1103                                                       reduce_func = self._reduce_func
+  1104       757        294.0      0.4      0.0          assert reduce_func is not None
+  1105       757        670.0      0.9      0.0          if isinstance(reduce_func, (list, tuple)):
+  1106                                                       reduce_func = BundledReduceFunction(reduce_func)
+  1107       757    2240586.0   2959.8     92.1          self._batch_recv(u, reduce_func)
+  1108                                                   # optional apply nodes
+  1109       757     190356.0    251.5      7.8          self.apply_nodes(u, apply_node_func)
+
+Total time: 2.14765 s
+File: /home/gq/ML/dgl/python/dgl/graph.py
+Function: _batch_recv at line 1111
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+  1111                                               @profile
+  1112                                               def _batch_recv(self, v, reduce_func):
+  1113       757       1750.0      2.3      0.1          if self._msg_frame.num_rows == 0:
+  1114                                                       # no message has ever been sent
+  1115                                                       return
+  1116                                           
+  1117       757       1349.0      1.8      0.1          v_is_all = is_all(v)
+  1118       757        776.0      1.0      0.0          if v_is_all:
+  1119       757      42604.0     56.3      2.0              v = list(range(self.number_of_nodes()))
+  1120       757       1090.0      1.4      0.1          if len(v) == 0:
+  1121                                                       # no vertex to be triggered.
+  1122                                                       return
+  1123       757      98689.0    130.4      4.6          v = utils.toindex(v)
+  1124                                           
+  1125                                                   # degree bucketing
+  1126       757     234810.0    310.2     10.9          degrees, v_buckets = scheduler.degree_bucketing(self._msg_graph, v)
+  1127       757       1413.0      1.9      0.1          if degrees == [0]:
+  1128                                                       # no message has been sent to the specified node
+  1129                                                       return
+  1130                                           
+  1131       757        799.0      1.1      0.0          reordered_v = []
+  1132       757        782.0      1.0      0.0          new_reprs = []
+  1133       757        778.0      1.0      0.0          has_zero_degree = False
+  1134      3751       6982.0      1.9      0.3          for deg, v_bkt in zip(degrees, v_buckets):
+  1135      2994       7027.0      2.3      0.3              if deg == 0:
+  1136                                                           # no need to trigger reduce func for zero-degree nodes
+  1137         1          1.0      1.0      0.0                  has_zero_degree = True
+  1138         1          1.0      1.0      0.0                  continue
+  1139      2993       8380.0      2.8      0.4              bkt_len = len(v_bkt)
+  1140      2993      56316.0     18.8      2.6              dst_reprs = self.get_n_repr(v_bkt)
+  1141      2993     568056.0    189.8     26.5              uu, vv, in_msg_ids = self._msg_graph.in_edges(v_bkt)
+  1142      2993      28277.0      9.4      1.3              in_msgs = self._msg_frame.select_rows(in_msg_ids)
+  1143                                                       # Reshape the column tensor to (B, Deg, ...).
+  1144      2993       3897.0      1.3      0.2              def _reshape_fn(msg):
+  1145                                                           msg_shape = F.shape(msg)
+  1146                                                           new_shape = (bkt_len, deg) + msg_shape[1:]
+  1147                                                           return F.reshape(msg, new_shape)
+  1148      2993       3337.0      1.1      0.2              reshaped_in_msgs = utils.LazyDict(
+  1149      2993      13713.0      4.6      0.6                      lambda key: _reshape_fn(in_msgs[key]), self._msg_frame.schemes)
+  1150      2993      26518.0      8.9      1.2              reordered_v.append(v_bkt.tousertensor())
+  1151      2993     383012.0    128.0     17.8              new_reprs.append(reduce_func(dst_reprs, reshaped_in_msgs))
+  1152                                           
+  1153                                                   # TODO(minjie): clear partial messages
+  1154       757     243892.0    322.2     11.4          self.reset_messages()
+  1155                                           
+  1156                                                   # Pack all reducer results together
+  1157       757     167338.0    221.1      7.8          reordered_v = F.pack(reordered_v)
+  1158       757       1298.0      1.7      0.1          keys = new_reprs[0].keys()
+  1159       757       1035.0      1.4      0.0          new_reprs = {key : F.pack([repr[key] for repr in new_reprs])
+  1160       757      36153.0     47.8      1.7                       for key in keys}
+  1161                                           
+  1162       757       1146.0      1.5      0.1          if v_is_all and not has_zero_degree:
+  1163                                                       # First do reorder and then replace the whole column.
+  1164       756      68492.0     90.6      3.2              _, indices = F.sort(reordered_v)
+  1165       756      13941.0     18.4      0.6              indices = utils.toindex(indices)
+  1166       756      50943.0     67.4      2.4              new_reprs = utils.reorder(new_reprs, indices)
+  1167       756      72415.0     95.8      3.4              self.set_n_repr(new_reprs)
+  1168                                                   else:
+  1169                                                       # Use setter to do reorder.
+  1170         1        642.0    642.0      0.0              self.set_n_repr(new_reprs, reordered_v)
+
+Total time: 30.7251 s
+File: /home/gq/ML/dgl/python/dgl/graph.py
+Function: send_and_recv at line 1172
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+  1172                                               @profile
+  1173                                               def send_and_recv(self,
+  1174                                                                 u=None, v=None,
+  1175                                                                 message_func="default",
+  1176                                                                 reduce_func="default",
+  1177                                                                 apply_node_func="default",
+  1178                                                                 eid=None):
+  1179                                                   """Trigger the message function on u->v and update v, or on edge eid
+  1180                                                   and update the destination nodes.
+  1181                                           
+  1182                                                   Parameters
+  1183                                                   ----------
+  1184                                                   u : optional, node, container or tensor
+  1185                                                     The source node(s).
+  1186                                                   v : optional, node, container or tensor
+  1187                                                     The destination node(s).
+  1188                                                   message_func : callable
+  1189                                                     The message function.
+  1190                                                   reduce_func : callable
+  1191                                                     The reduce function.
+  1192                                                   apply_node_func : callable, optional
+  1193                                                     The update function.
+  1194                                           
+  1195                                                   Notes
+  1196                                                   -----
+  1197                                                   On multigraphs, if u and v are specified, then the messages will be sent
+  1198                                                   and received along all edges between u and v.
+  1199                                                   """
+  1200     21910      20526.0      0.9      0.1          if message_func == "default":
+  1201                                                       message_func = self._message_func
+  1202     21910      16093.0      0.7      0.1          if reduce_func == "default":
+  1203                                                       reduce_func = self._reduce_func
+  1204     21910      15267.0      0.7      0.0          assert message_func is not None
+  1205     21910      14382.0      0.7      0.0          assert reduce_func is not None
+  1206                                           
+  1207     21910      15299.0      0.7      0.0          if eid is None:
+  1208     21910      16754.0      0.8      0.1              if u is None or v is None:
+  1209                                                           raise ValueError('u and v must be given if eid is None')
+  1210                                           
+  1211     21910      29846.0      1.4      0.1              u = utils.toindex(u)
+  1212     21910      22070.0      1.0      0.1              v = utils.toindex(v)
+  1213     21910     146449.0      6.7      0.5              if len(u) == 0:
   1214                                                           # no edges to be triggered
-  1215                                                           return
-  1216                                           
-  1217                                                       executor = None
+  1215       623       3056.0      4.9      0.0                  assert len(v) == 0
+  1216       623        454.0      0.7      0.0                  return
+  1217     21287     942148.0     44.3      3.1              unique_v = utils.toindex(F.unique(v.tousertensor()))
   1218                                           
-  1219     21167      19137.0      0.9      0.0          if executor:
-  1220     13021   13052594.0   1002.4     31.3              new_reprs = executor.run()
-  1221     13021      40885.0      3.1      0.1              unique_v = executor.recv_nodes
-  1222     13021   12760220.0    980.0     30.6              self._apply_nodes(unique_v, apply_node_func, reduce_accum=new_reprs)
-  1223      8146       6358.0      0.8      0.0          elif eid is not None:
-  1224                                                       _, v, _ = self._graph.find_edges(eid)
-  1225                                                       unique_v = utils.toindex(F.unique(v.tousertensor()))
-  1226                                           
-  1227                                                       # TODO(quan): replace with the new DegreeBucketingScheduler
-  1228                                                       self.send(eid=eid, message_func=message_func)
-  1229                                                       self.recv(unique_v, reduce_func, apply_node_func)
-  1230                                                   else:
-  1231                                                       # handle multiple message and reduce func
-  1232      8146       8932.0      1.1      0.0              if isinstance(message_func, (tuple, list)):
-  1233                                                           message_func = BundledMessageFunction(message_func)
-  1234      8146       7726.0      0.9      0.0              if isinstance(reduce_func, (list, tuple)):
-  1235                                                           reduce_func = BundledReduceFunction(reduce_func)
-  1236                                           
-  1237                                                       # message func
-  1238      8146     208001.0     25.5      0.5              u, v = utils.edge_broadcasting(u, v)
-  1239      8146     109297.0     13.4      0.3              src_reprs = self.get_n_repr(u)
-  1240      8146    1247468.0    153.1      3.0              edge_reprs = self.get_e_repr(u, v)
-  1241      8146     745022.0     91.5      1.8              msgs = message_func(src_reprs, edge_reprs)
-  1242      8146      57705.0      7.1      0.1              msg_frame = FrameRef()
-  1243      8146     398286.0     48.9      1.0              msg_frame.append(msgs)
-  1244                                           
-  1245                                                       # recv with degree bucketing
-  1246      8146       8716.0      1.1      0.0              executor = scheduler.get_recv_executor(graph=self,
-  1247      8146       5807.0      0.7      0.0                                                     reduce_func=reduce_func,
-  1248      8146       5417.0      0.7      0.0                                                     message_frame=msg_frame,
-  1249      8146    2944124.0    361.4      7.1                                                     edges=(u, v))
-  1250      8146    4236178.0    520.0     10.2              new_reprs = executor.run()
-  1251      8146      22629.0      2.8      0.1              unique_v = executor.recv_nodes
-  1252                                           
-  1253      8146    2172045.0    266.6      5.2              self._apply_nodes(unique_v, apply_node_func, reduce_accum=new_reprs)
+  1219     21287      21689.0      1.0      0.1              executor = scheduler.get_executor(
+  1220     21287      15341.0      0.7      0.0                      'send_and_recv', self, src=u, dst=v,
+  1221     21287    2307575.0    108.4      7.5                      message_func=message_func, reduce_func=reduce_func)
+  1222                                                   else:
+  1223                                                       eid = utils.toindex(eid)
+  1224                                                       if len(eid) == 0:
+  1225                                                           # no edges to be triggered
+  1226                                                           return
+  1227                                           
+  1228                                                       executor = None
+  1229                                           
+  1230     21287      17736.0      0.8      0.1          if executor:
+  1231     13093   13264873.0   1013.1     43.2              new_reprs = executor.run()
+  1232     13093      40949.0      3.1      0.1              unique_v = executor.recv_nodes
+  1233     13093    2768035.0    211.4      9.0              self._apply_nodes(unique_v, apply_node_func, reduce_accum=new_reprs)
+  1234      8194       6288.0      0.8      0.0          elif eid is not None:
+  1235                                                       _, v, _ = self._graph.find_edges(eid)
+  1236                                                       unique_v = utils.toindex(F.unique(v.tousertensor()))
+  1237                                           
+  1238                                                       # TODO(quan): replace with the new DegreeBucketingScheduler
+  1239                                                       self.send(eid=eid, message_func=message_func)
+  1240                                                       self.recv(unique_v, reduce_func, apply_node_func)
+  1241                                                   else:
+  1242                                                       # handle multiple message and reduce func
+  1243      8194       8453.0      1.0      0.0              if isinstance(message_func, (tuple, list)):
+  1244                                                           message_func = BundledMessageFunction(message_func)
+  1245      8194       7183.0      0.9      0.0              if isinstance(reduce_func, (list, tuple)):
+  1246                                                           reduce_func = BundledReduceFunction(reduce_func)
+  1247                                           
+  1248                                                       # message func
+  1249      8194     191369.0     23.4      0.6              u, v = utils.edge_broadcasting(u, v)
+  1250      8194     140431.0     17.1      0.5              src_reprs = self.get_n_repr(u)
+  1251      8194    1333453.0    162.7      4.3              edge_reprs = self.get_e_repr(u, v)
+  1252      8194     696225.0     85.0      2.3              msgs = message_func(src_reprs, edge_reprs)
+  1253      8194      53270.0      6.5      0.2              msg_frame = FrameRef()
+  1254      8194     389922.0     47.6      1.3              msg_frame.append(msgs)
+  1255                                           
+  1256                                                       # recv with degree bucketing
+  1257      8194       8391.0      1.0      0.0              executor = scheduler.get_recv_executor(graph=self,
+  1258      8194       5819.0      0.7      0.0                                                     reduce_func=reduce_func,
+  1259      8194       5406.0      0.7      0.0                                                     message_frame=msg_frame,
+  1260      8194    2878598.0    351.3      9.4                                                     edges=(u, v))
+  1261      8194    4248157.0    518.4     13.8              new_reprs = executor.run()
+  1262      8194      22972.0      2.8      0.1              unique_v = executor.recv_nodes
+  1263                                           
+  1264      8194    1050655.0    128.2      3.4              self._apply_nodes(unique_v, apply_node_func, reduce_accum=new_reprs)
 
-Total time: 46.1844 s
+Total time: 50.0027 s
 File: /home/gq/ML/dgl/python/dgl/graph.py
-Function: pull at line 1255
+Function: pull at line 1266
 
 Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
-  1255                                               @profile
-  1256                                               def pull(self,
-  1257                                                        v,
-  1258                                                        message_func="default",
-  1259                                                        reduce_func="default",
-  1260                                                        apply_node_func="default"):
-  1261                                                   """Pull messages from the node's predecessors and then update it.
-  1262                                           
-  1263                                                   Parameters
-  1264                                                   ----------
-  1265                                                   v : node, container or tensor
-  1266                                                     The node to be updated.
-  1267                                                   message_func : callable
-  1268                                                     The message function.
-  1269                                                   reduce_func : callable
-  1270                                                     The reduce function.
-  1271                                                   apply_node_func : callable, optional
-  1272                                                     The update function.
-  1273                                                   """
-  1274     21790     392579.0     18.0      0.9          v = utils.toindex(v)
-  1275     21790      83063.0      3.8      0.2          if len(v) == 0:
-  1276                                                       return
-  1277     21790    3292845.0    151.1      7.1          uu, vv, _ = self._graph.in_edges(v)
-  1278     21790   42415885.0   1946.6     91.8          self.send_and_recv(uu, vv, message_func, reduce_func, apply_node_func)
+  1266                                               @profile
+  1267                                               def pull(self,
+  1268                                                        v,
+  1269                                                        message_func="default",
+  1270                                                        reduce_func="default",
+  1271                                                        apply_node_func="default"):
+  1272                                                   """Pull messages from the node's predecessors and then update it.
+  1273                                           
+  1274                                                   Parameters
+  1275                                                   ----------
+  1276                                                   v : node, container or tensor
+  1277                                                     The node to be updated.
+  1278                                                   message_func : callable
+  1279                                                     The message function.
+  1280                                                   reduce_func : callable
+  1281                                                     The reduce function.
+  1282                                                   apply_node_func : callable, optional
+  1283                                                     The update function.
+  1284                                                   """
+  1285     21910     373882.0     17.1      0.7          v = utils.toindex(v)
+  1286     21910      81322.0      3.7      0.2          if len(v) == 0:
+  1287                                                       return
+  1288     21910    3223894.0    147.1      6.4          uu, vv, _ = self._graph.in_edges(v)
+  1289     21910   31415386.0   1433.8     62.8          self.send_and_recv(uu, vv, message_func, reduce_func, apply_node_func=None)
+  1290     21910     415243.0     19.0      0.8          unique_v = F.unique(v.tousertensor())
+  1291     21910   14492971.0    661.5     29.0          self.apply_nodes(unique_v, apply_node_func)
 
-Total time: 4.73745 s
+Total time: 4.94377 s
 File: /home/gq/ML/dgl/python/dgl/graph.py
-Function: update_all at line 1305
+Function: update_all at line 1318
 
 Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
-  1305                                               @profile
-  1306                                               def update_all(self,
-  1307                                                              message_func="default",
-  1308                                                              reduce_func="default",
-  1309                                                              apply_node_func="default"):
-  1310                                                   """Send messages through all the edges and update all nodes.
-  1311                                           
-  1312                                                   Parameters
-  1313                                                   ----------
-  1314                                                   message_func : callable
-  1315                                                     The message function.
-  1316                                                   reduce_func : callable
-  1317                                                     The reduce function.
-  1318                                                   apply_node_func : callable, optional
-  1319                                                     The update function.
-  1320                                                   """
-  1321      1820       1965.0      1.1      0.0          if message_func == "default":
-  1322                                                       message_func = self._message_func
-  1323      1820       1059.0      0.6      0.0          if reduce_func == "default":
-  1324                                                       reduce_func = self._reduce_func
-  1325      1820        794.0      0.4      0.0          assert message_func is not None
-  1326      1820        635.0      0.3      0.0          assert reduce_func is not None
-  1327                                           
-  1328      1820       1124.0      0.6      0.0          executor = scheduler.get_executor(
-  1329      1820      91402.0     50.2      1.9                  "update_all", self, message_func=message_func, reduce_func=reduce_func)
-  1330      1820       1056.0      0.6      0.0          if executor:
-  1331      1080    1333044.0   1234.3     28.1              new_reprs = executor.run()
-  1332      1080     288229.0    266.9      6.1              self._apply_nodes(ALL, apply_node_func, reduce_accum=new_reprs)
-  1333                                                   else:
-  1334       740     757500.0   1023.6     16.0              self.send(ALL, ALL, message_func)
-  1335       740    2260644.0   3054.9     47.7              self.recv(ALL, reduce_func, apply_node_func)
+  1318                                               @profile
+  1319                                               def update_all(self,
+  1320                                                              message_func="default",
+  1321                                                              reduce_func="default",
+  1322                                                              apply_node_func="default"):
+  1323                                                   """Send messages through all the edges and update all nodes.
+  1324                                           
+  1325                                                   Parameters
+  1326                                                   ----------
+  1327                                                   message_func : callable
+  1328                                                     The message function.
+  1329                                                   reduce_func : callable
+  1330                                                     The reduce function.
+  1331                                                   apply_node_func : callable, optional
+  1332                                                     The update function.
+  1333                                                   """
+  1334      1871       1514.0      0.8      0.0          if message_func == "default":
+  1335                                                       message_func = self._message_func
+  1336      1871        940.0      0.5      0.0          if reduce_func == "default":
+  1337                                                       reduce_func = self._reduce_func
+  1338      1871        797.0      0.4      0.0          assert message_func is not None
+  1339      1871        699.0      0.4      0.0          assert reduce_func is not None
+  1340                                           
+  1341      1871       1137.0      0.6      0.0          executor = scheduler.get_executor(
+  1342      1871      92486.0     49.4      1.9                  "update_all", self, message_func=message_func, reduce_func=reduce_func)
+  1343      1871       1007.0      0.5      0.0          if executor:
+  1344      1114    1344878.0   1207.3     27.2              new_reprs = executor.run()
+  1345      1114     300334.0    269.6      6.1              self._apply_nodes(ALL, apply_node_func, reduce_accum=new_reprs)
+  1346                                                   else:
+  1347       757     763149.0   1008.1     15.4              self.send(ALL, ALL, message_func)
+  1348       757    2436832.0   3219.1     49.3              self.recv(ALL, reduce_func, apply_node_func)
 
-Total time: 14.1218 s
+Total time: 14.3553 s
 File: /home/gq/ML/dgl/python/dgl/scheduler.py
 Function: run at line 137
 
@@ -213,22 +843,22 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
    137                                               @profile
    138                                               def run(self):
    139                                                   # get src col
-   140     27122      18647.0      0.7      0.1          srccol = self.node_repr[self.src_field]
-   141     27122     255258.0      9.4      1.8          ctx = F.get_context(srccol)
+   140     27300      19695.0      0.7      0.1          srccol = self.node_repr[self.src_field]
+   141     27300     255035.0      9.3      1.8          ctx = F.get_context(srccol)
    142                                           
    143                                                   # build adjmat
-   144     27122    4180544.0    154.1     29.6          adjmat = self.adj_build_fn(self.edge_field, ctx, self.use_edge_feat)
+   144     27300    4204238.0    154.0     29.3          adjmat = self.adj_build_fn(self.edge_field, ctx, self.use_edge_feat)
    145                                           
    146                                                   # spmm
-   147     27122      75597.0      2.8      0.5          if len(F.shape(srccol)) == 1:
+   147     27300      77296.0      2.8      0.5          if len(F.shape(srccol)) == 1:
    148                                                       srccol = F.unsqueeze(srccol, 1)
    149                                                       dstcol = F.spmm(adjmat, srccol)
    150                                                       dstcol = F.squeeze(dstcol)
    151                                                   else:
-   152     27122    9552995.0    352.2     67.6              dstcol = F.spmm(adjmat, srccol)
-   153     27122      38723.0      1.4      0.3          return {self.dst_field : dstcol}
+   152     27300    9757447.0    357.4     68.0              dstcol = F.spmm(adjmat, srccol)
+   153     27300      41549.0      1.5      0.3          return {self.dst_field : dstcol}
 
-Total time: 3.95928 s
+Total time: 3.96987 s
 File: /home/gq/ML/dgl/python/dgl/scheduler.py
 Function: run at line 177
 
@@ -236,23 +866,23 @@ Line #      Hits         Time  Per Hit   % Time  Line Contents
 ==============================================================
    177                                               @profile
    178                                               def run(self):
-   179      8146       8212.0      1.0      0.2          new_reprs = []
+   179      8194       9970.0      1.2      0.3          new_reprs = []
    180                                                   # loop over each bucket
    181                                                   # FIXME (lingfan): handle zero-degree case
-   182     32653     392220.0     12.0      9.9          for deg, vv, msg_id in zip(self.degrees, self.dsts, self.msg_ids):
-   183     24507     364935.0     14.9      9.2              dst_reprs = self.g.get_n_repr(vv)
-   184     24507     178895.0      7.3      4.5              in_msgs = self.msg_frame.select_rows(msg_id)
-   185     24507      24812.0      1.0      0.6              def _reshape_fn(msg):
+   182     32659     371429.0     11.4      9.4          for deg, vv, msg_id in zip(self.degrees, self.dsts, self.msg_ids):
+   183     24465     481573.0     19.7     12.1              dst_reprs = self.g.get_n_repr(vv)
+   184     24465     116820.0      4.8      2.9              in_msgs = self.msg_frame.select_rows(msg_id)
+   185     24465      26536.0      1.1      0.7              def _reshape_fn(msg):
    186                                                           msg_shape = F.shape(msg)
    187                                                           new_shape = (len(vv), deg) + msg_shape[1:]
    188                                                           return F.reshape(msg, new_shape)
-   189     24507      19499.0      0.8      0.5              reshaped_in_msgs = utils.LazyDict(
-   190     24507     103638.0      4.2      2.6                      lambda key: _reshape_fn(in_msgs[key]), self.msg_frame.schemes)
-   191     24507    2546253.0    103.9     64.3              new_reprs.append(self.rfunc(dst_reprs, reshaped_in_msgs))
+   189     24465      19787.0      0.8      0.5              reshaped_in_msgs = utils.LazyDict(
+   190     24465     137398.0      5.6      3.5                      lambda key: _reshape_fn(in_msgs[key]), self.msg_frame.schemes)
+   191     24465    2478127.0    101.3     62.4              new_reprs.append(self.rfunc(dst_reprs, reshaped_in_msgs))
    192                                           
    193                                                   # Pack all reducer results together
-   194      8146      11682.0      1.4      0.3          keys = new_reprs[0].keys()
-   195      8146       8892.0      1.1      0.2          new_reprs = {key : F.pack([repr[key] for repr in new_reprs])
-   196      8146     291455.0     35.8      7.4                       for key in keys}
-   197      8146       8790.0      1.1      0.2          return new_reprs
+   194      8194      11341.0      1.4      0.3          keys = new_reprs[0].keys()
+   195      8194       9111.0      1.1      0.2          new_reprs = {key : F.pack([repr[key] for repr in new_reprs])
+   196      8194     299102.0     36.5      7.5                       for key in keys}
+   197      8194       8672.0      1.1      0.2          return new_reprs
 
