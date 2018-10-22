@@ -12,14 +12,13 @@ import mxnet as mx
 from mxnet import gluon
 import dgl
 from dgl import DGLGraph
-import dgl.function as fn
 from dgl.data import register_data_args, load_data
 
 def gcn_msg(src, edge):
-    return src['h']
+    return src
 
 def gcn_reduce(node, msgs):
-    return {'accum': mx.nd.sum(msgs, 1)}
+    return mx.nd.sum(msgs, 1)
 
 class NodeUpdateModule(gluon.Block):
     def __init__(self, out_feats, activation=None):
@@ -27,7 +26,7 @@ class NodeUpdateModule(gluon.Block):
         self.linear = gluon.nn.Dense(out_feats, activation=activation)
 
     def forward(self, node):
-        return {'h': self.linear(node['accum'])}
+        return self.linear(node)
 
 class GCN(gluon.Block):
     def __init__(self,
@@ -37,8 +36,7 @@ class GCN(gluon.Block):
                  n_classes,
                  n_layers,
                  activation,
-                 dropout,
-                 use_spmv):
+                 dropout):
         super(GCN, self).__init__()
         self.g = g
         self.dropout = dropout
@@ -50,24 +48,16 @@ class GCN(gluon.Block):
             self.layers.add(NodeUpdateModule(n_hidden, activation))
         # output layer
         self.layers.add(NodeUpdateModule(n_classes))
-        self.use_spmv = use_spmv
 
     def forward(self, features):
-        self.g.set_n_repr({'h': features})
-        if self.use_spmv:
-            msg_func = fn.copy_src(src='h', out='tmp')
-            reduce_func = fn.sum(msgs='tmp', out='accum')
-        else:
-            msg_func = gcn_msg
-            reduce_func = gcn_reduce
-
+        self.g.set_n_repr(features)
         for layer in self.layers:
             # apply dropout
             if self.dropout:
-                val = F.dropout(self.g.get_n_repr()['h'], p=self.dropout)
-                self.g.set_n_repr({'h': val})
-            self.g.update_all(msg_func, reduce_func, layer)
-        return self.g.pop_n_repr('h')
+                val = F.dropout(self.g.get_n_repr(), p=self.dropout)
+                self.g.set_n_repr(val)
+            self.g.update_all(gcn_msg, gcn_reduce, layer)
+        return self.g.pop_n_repr()
 
 def main(args):
     # load and preprocess dataset
@@ -91,15 +81,14 @@ def main(args):
         ctx = mx.gpu(0)
 
     # create GCN model
-    g = DGLGraph(data.graph, immutable_graph=True)
+    g = DGLGraph(data.graph)
     model = GCN(g,
                 in_feats,
                 args.n_hidden,
                 n_classes,
                 args.n_layers,
                 'relu',
-                args.dropout,
-                args.use_spmv)
+                args.dropout)
     model.initialize(ctx=ctx)
 
     # use optimizer
@@ -139,8 +128,6 @@ if __name__ == '__main__':
             help="number of hidden gcn units")
     parser.add_argument("--n-layers", type=int, default=1,
             help="number of hidden gcn layers")
-    parser.add_argument("--use-spmv", type=bool, default=False,
-            help="use spmv to compute GCN")
     args = parser.parse_args()
 
     main(args)
