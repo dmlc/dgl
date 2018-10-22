@@ -3,6 +3,7 @@ import numpy as np
 
 import dgl
 from dgl.data.utils import download, extract_archive, get_download_dir
+from .line_profiler_integration import profile
 
 _url = 'https://www.dropbox.com/s/4ypr0e0abcbsvoh/jtnn.zip?dl=1'
 
@@ -24,6 +25,7 @@ class JTNNDataset(Dataset):
     def __len__(self):
         return len(self.data)
 
+    @profile
     def __getitem__(self, idx):
         from .mol_tree_nx import DGLMolTree
         smiles = self.data[idx]
