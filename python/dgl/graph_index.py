@@ -544,23 +544,32 @@ class GraphIndex(object):
 
         return self._cache[key]
 
-    def in_edge_incidence_matrix(self):
+    def in_edge_incidence_matrix(self, v=None):
         """Return the incidence matrix from edges to destination nodes for this graph
+
+        Parameters
+        ----------
+        v: utils.Index
+            optional destination nodes, if None, create for entire graph
 
         Returns
         -------
         utils.CtxCachedObject
             An object that returns tensor given context.
         """
-        key = 'in edge incidence matrix'
-        if not key in self._cache:
-            _, dst, _ = self.edges()
-            n = self.num_of_nodes()
-            m = self.num_of_edges()
-            mat = utils.build_in_edge_incidence_matrix(dst, n, m)
-            self._cache[key] = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
-
-        return self._cache[key]
+        if v is None:
+            key = 'in edge incidence matrix'
+            if not key in self._cache:
+                _, dst, eid = self.edges()
+                n = self.number_of_nodes()
+                mat = utils.build_in_edge_incidence_matrix(dst, eid, n)
+                self._cache[key] = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
+            return self._cache[key]
+        else:
+            n = len(v)
+            _, dst, eid = self.in_edges(v)
+            mat = utils.build_in_edge_incidence_matrix(dst, eid, n)
+            return utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
 
     def to_networkx(self):
         """Convert to networkx graph.
