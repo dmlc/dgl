@@ -15,10 +15,10 @@ from dgl.data import register_data_args, load_data
 
 def gcn_msg(src, edge):
     # TODO should we use concat?
-    return mx.nd.concat(src['in'], src['h'], dim=1)
+    return {'m': mx.nd.concat(src['in'], src['h'], dim=1)}
 
 def gcn_reduce(node, msgs):
-    return {'accum': mx.nd.sum(msgs, 1)}
+    return {'accum': mx.nd.sum(msgs['m'], 1)}
 
 class NodeUpdate(gluon.Block):
     def __init__(self, out_feats, activation=None, alpha=0.9):
