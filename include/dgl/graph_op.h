@@ -74,6 +74,21 @@ class GraphOp {
    * \param query The vertex Ids in the parent graph.
    */
   static IdArray MapSubgraphNID(IdArray parent_vid_map, IdArray query);
+
+  /*!
+   * \brief Expand an Id array based on the offset array.
+   *
+   * For example,
+   * ids:     [0, 1, 2, 3, 4],
+   * offset:  [0, 2, 2, 5, 6, 7],
+   * result:  [0, 0, 2, 2, 2, 3, 4].
+   * The offset array has one more element than the ids array.
+   * (offset[i], offset[i+1]) shows the location of ids[i] in the result array.
+   *
+   * \param ids An array that contains the node or edge Ids.
+   * \param offset An array that contains the offset after expansion.
+   */
+  static IdArray ExpandIds(IdArray ids, IdArray offset);
 };
 
 }  // namespace dgl

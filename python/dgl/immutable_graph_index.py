@@ -6,6 +6,7 @@ import networkx as nx
 import scipy.sparse as sp
 import mxnet as mx
 
+from ._ffi.function import _init_api
 from . import backend as F
 from . import utils
 
@@ -243,7 +244,9 @@ class ImmutableGraphIndex(object):
         """
         dst = v.tousertensor()
         rows = mx.nd.take(self._in_csr, dst)
-        return utils.toindex(rows.indices), None, utils.toindex(rows.data)
+        off = utils.toindex(rows.indptr)
+        dst = _CAPI_DGLExpandIds(v.todgltensor(), off.todgltensor())
+        return utils.toindex(rows.indices), utils.toindex(dst), utils.toindex(rows.data)
 
     def out_edges(self, v):
         """Return the out edges of the node(s).
@@ -264,7 +267,9 @@ class ImmutableGraphIndex(object):
         """
         src = v.tousertensor()
         rows = mx.nd.take(self._out_csr, src)
-        return None, utils.toindex(rows.indices), utils.toindex(rows.data)
+        off = utils.toindex(rows.indptr)
+        src = _CAPI_DGLExpandIds(v.todgltensor(), off.todgltensor())
+        return utils.toindex(src), utils.toindex(rows.indices), utils.toindex(rows.data)
 
     def edges(self, sorted=False):
         """Return all the edges
@@ -563,3 +568,5 @@ def create_immutable_graph_index(graph_data=None):
     else:
         raise Exception('cannot create an immutable graph index from unknown format')
     return gi
+
+_init_api("dgl.immutable_graph_index")

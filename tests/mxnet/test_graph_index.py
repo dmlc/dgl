@@ -52,16 +52,18 @@ def check_basics(g, ig):
 
     randv = np.random.randint(0, g.number_of_nodes(), 10)
     randv = utils.toindex(randv)
-    in_e1, _, in_eids1 = g.in_edges(randv)
-    in_e2, _, in_eids2 = ig.in_edges(randv)
-    nnz = in_e2.tousertensor().shape[0]
-    assert mx.nd.sum(in_e1.tousertensor() == in_e2.tousertensor()).asnumpy() == nnz
+    in_src1, in_dst1, in_eids1 = g.in_edges(randv)
+    in_src2, in_dst2, in_eids2 = ig.in_edges(randv)
+    nnz = in_src2.tousertensor().shape[0]
+    assert mx.nd.sum(in_src1.tousertensor() == in_src2.tousertensor()).asnumpy() == nnz
+    assert mx.nd.sum(in_dst1.tousertensor() == in_dst2.tousertensor()).asnumpy() == nnz
     assert mx.nd.sum(in_eids1.tousertensor() == in_eids2.tousertensor()).asnumpy() == nnz
 
-    _, out_e1, out_eids1 = g.out_edges(randv)
-    _, out_e2, out_eids2 = ig.out_edges(randv)
-    nnz = out_e2.tousertensor().shape[0]
-    assert mx.nd.sum(out_e1.tousertensor() == out_e2.tousertensor()).asnumpy() == nnz
+    out_src1, out_dst1, out_eids1 = g.out_edges(randv)
+    out_src2, out_dst2, out_eids2 = ig.out_edges(randv)
+    nnz = out_dst2.tousertensor().shape[0]
+    assert mx.nd.sum(out_dst1.tousertensor() == out_dst2.tousertensor()).asnumpy() == nnz
+    assert mx.nd.sum(out_src1.tousertensor() == out_src2.tousertensor()).asnumpy() == nnz
     assert mx.nd.sum(out_eids1.tousertensor() == out_eids2.tousertensor()).asnumpy() == nnz
 
 def test_basics():

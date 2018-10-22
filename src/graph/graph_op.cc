@@ -162,4 +162,22 @@ IdArray GraphOp::MapSubgraphNID(IdArray parent_vids, IdArray query) {
   return rst;
 }
 
+IdArray GraphOp::ExpandIds(IdArray ids, IdArray offset) {
+  const auto id_len = ids->shape[0];
+  const auto off_len = offset->shape[0];
+  CHECK_EQ(id_len + 1, off_len);
+  const dgl_id_t *id_data = static_cast<dgl_id_t*>(ids->data);
+  const dgl_id_t *off_data = static_cast<dgl_id_t*>(offset->data);
+  const int64_t len = off_data[off_len - 1];
+  IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  dgl_id_t *rst_data = static_cast<dgl_id_t*>(rst->data);
+  for (int64_t i = 0; i < id_len; i++) {
+    int64_t local_len = off_data[i + 1] - off_data[i];
+    for (int64_t j = 0; j < local_len; j++) {
+      rst_data[off_data[i] + j] = id_data[i];
+    }
+  }
+  return rst;
+}
+
 }  // namespace dgl
