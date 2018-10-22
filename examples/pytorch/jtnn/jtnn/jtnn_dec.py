@@ -155,13 +155,16 @@ class DGLJTNNDecoder(nn.Module):
                 dec_tree_node_update,
             )
             # Extract
-            h = mol_tree_batch.get_n_repr(v)['h']
-            x = mol_tree_batch.get_n_repr(v)['x']
-            p_inputs.append(torch.cat([x, h, tree_vec[t_set]], 1))
+            n_repr = mol_tree_batch.get_n_repr(v)
+            h = n_repr['h']
+            x = n_repr['x']
+            tree_vec_set = tree_vec[t_set]
+            wid = n_repr['wid']
+            p_inputs.append(torch.cat([x, h, tree_vec_set], 1))
             # Only newly generated nodes are needed for label prediction
             # NOTE: The following works since the uncomputed messages are zeros.
-            q_inputs.append(torch.cat([h[is_new], tree_vec[t_set][is_new]], 1))
-            q_targets.append(mol_tree_batch.get_n_repr(v)['wid'][is_new])
+            q_inputs.append(torch.cat([h, tree_vec_set], 1)[is_new])
+            q_targets.append(wid[is_new])
         p_targets.append(cuda(torch.tensor([0 for _ in t_set])))
 
         # Batch compute the stop/label prediction losses
