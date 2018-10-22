@@ -53,7 +53,7 @@ def test_subgraph_gen(args):
 
     for _ in range(5):
         t0 = time.time()
-        for i in range(graph.number_of_nodes() / args.subgraph_size):
+        for i in range(int(graph.number_of_nodes() / args.subgraph_size)):
             subg = subgraph_gen1(g, args.subgraph_size)
         mx.nd.waitall()
         t1 = time.time()
@@ -61,17 +61,17 @@ def test_subgraph_gen(args):
 
     for _ in range(5):
         t0 = time.time()
-        for i in range(graph.number_of_nodes() / args.subgraph_size):
+        for i in range(int(graph.number_of_nodes() / args.subgraph_size)):
             subg = subgraph_gen2(ig, 1, args.subgraph_size)
-        mx.nd.waitall()
+            mx.nd.waitall()
         t1 = time.time()
         print("subgraph on a immutable graph: " + str(t1 - t0))
 
     for _ in range(5):
         t0 = time.time()
-        for i in range(graph.number_of_nodes() / args.subgraph_size / 4):
+        for i in range(int(graph.number_of_nodes() / args.subgraph_size / 4)):
             subg = subgraph_gen2(ig, 4, args.subgraph_size)
-        mx.nd.waitall()
+            mx.nd.waitall()
         t1 = time.time()
         print("subgraph on a immutable graph: " + str(t1 - t0))
 
