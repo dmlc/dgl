@@ -24,6 +24,8 @@ class ImmutableGraphIndex(object):
         self._in_csr = in_csr
         self._out_csr = out_csr
         self._num_edges = None
+        self._in_deg = None
+        self._out_deg = None
         self._cache = {}
 
     def add_nodes(self, num):
@@ -295,6 +297,16 @@ class ImmutableGraphIndex(object):
         self._cache["all_edges"] = (utils.toindex(coo.col), utils.toindex(coo.row), utils.toindex(coo.data))
         return self._cache["all_edges"]
 
+    def _get_in_degree(self):
+        if self._in_deg is None:
+            self._in_deg = mx.nd.contrib.getnnz(self._in_csr, axis=1)
+        return self._in_deg
+
+    def _get_out_degree(self):
+        if self._out_deg is None:
+            self._out_deg = mx.nd.contrib.getnnz(self._out_csr, axis=1)
+        return self._out_deg
+
     def in_degree(self, v):
         """Return the in degree of the node.
 
@@ -324,9 +336,9 @@ class ImmutableGraphIndex(object):
         int
             The in degree array.
         """
-        v_array = v.todgltensor()
+        v_array = v.tousertensor()
         deg = self._get_in_degree()
-        return deg[v_array]
+        return utils.toindex(mx.nd.take(deg, v_array))
 
     def out_degree(self, v):
         """Return the out degree of the node.
@@ -357,9 +369,9 @@ class ImmutableGraphIndex(object):
         int
             The out degree array.
         """
-        v_array = v.todgltensor()
+        v_array = v.tousertensor()
         deg = self._get_out_degree()
-        return deg[v_array]
+        return utils.toindex(mx.nd.take(deg, v_array))
 
     def node_subgraph(self, v):
         """Return the induced node subgraph.

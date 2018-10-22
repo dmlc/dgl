@@ -66,6 +66,14 @@ def check_basics(g, ig):
     assert mx.nd.sum(out_src1.tousertensor() == out_src2.tousertensor()).asnumpy() == nnz
     assert mx.nd.sum(out_eids1.tousertensor() == out_eids2.tousertensor()).asnumpy() == nnz
 
+    num_v = len(randv)
+    assert mx.nd.sum(g.in_degrees(randv).tousertensor() == ig.in_degrees(randv).tousertensor()).asnumpy() == num_v
+    assert mx.nd.sum(g.out_degrees(randv).tousertensor() == ig.out_degrees(randv).tousertensor()).asnumpy() == num_v
+    randv = randv.tousertensor()
+    for v in randv.asnumpy():
+        assert g.in_degree(v) == ig.in_degree(v)
+        assert g.out_degree(v) == ig.out_degree(v)
+
 def test_basics():
     g, ig = generate_rand_graph(100)
     check_basics(g, ig)
