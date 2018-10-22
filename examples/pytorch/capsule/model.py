@@ -64,10 +64,10 @@ class Net(nn.Module):
 
         # DigitCaps
         # Final layer: Capsule layer where the routing algorithm is.
-        self.digits = DGLBatchCapsuleLayer(in_unit=num_primary_unit,
-                                           in_channel=primary_unit_size,
-                                           num_unit=num_classes,
-                                           unit_size=output_unit_size,  # 16D capsule per digit class
+        self.digits = DGLBatchCapsuleLayer(input_capsule_dim=num_primary_unit,
+                                           input_capsule_num=primary_unit_size,
+                                           output_capsule_num=num_classes,
+                                           output_capsule_dim=output_unit_size,  # 16D capsule per digit class
                                            num_routing=num_routing,
                                            cuda_enabled=cuda_enabled)
 
