@@ -433,6 +433,24 @@ class GraphIndex(object):
         induced_edges = utils.toindex(rst(2))
         return SubgraphIndex(rst(0), self, v, induced_edges)
 
+    def node_subgraphs(self, vs_arr):
+        """Return the induced node subgraphs.
+
+        Parameters
+        ----------
+        vs_arr : a list of utils.Index
+            The nodes.
+
+        Returns
+        -------
+        a vector of SubgraphIndex
+            The subgraph index.
+        """
+        gis = []
+        for v in vs_arr:
+            gis.append(self.node_subgraph(v))
+        return gis
+
     def edge_subgraph(self, e):
         """Return the induced edge subgraph.
 
