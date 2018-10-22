@@ -84,12 +84,18 @@ class SSEPredict(gluon.Block):
         return self.linear2(self.linear1(hidden))
 
 def subgraph_gen(g, seed_vertices):
-    src, _, _ = g.in_edges(seed_vertices)
-    vs = np.concatenate((src.asnumpy(), seed_vertices.asnumpy()), axis=0)
-    vs = mx.nd.array(np.unique(vs), dtype=np.int64)
-    subg = g.subgraph(vs)
-    nid = subg.map_to_subgraph_nid(seed_vertices)
-    return subg, nid
+    vertices = []
+    for seed in seed_vertices:
+        src, _, _ = g.in_edges(seed)
+        vs = np.concatenate((src.asnumpy(), seed.asnumpy()), axis=0)
+        vs = mx.nd.array(np.unique(vs), dtype=np.int64)
+        vertices.append(vs)
+    subgs = g.subgraphs(vertices)
+    nids = []
+    for i, subg in enumerate(subgs):
+        subg.copy_from_parent()
+        nids.append(subg.map_to_subgraph_nid(seed_vertices[i]))
+    return subgs, nids
 
 def main(args, data):
     features = mx.nd.array(data.features)
@@ -148,15 +154,24 @@ def main(args, data):
         data_iter = mx.io.NDArrayIter(data=mx.nd.array(randv, dtype='int64'), label=rand_labels,
                                       batch_size=args.batch_size)
         train_loss = 0
+        data = []
+        labels = []
         for batch in data_iter:
-            subg, seed_ids = subgraph_gen(g, batch.data[0])
-            subg.copy_from_parent()
-            with mx.autograd.record():
-                logits = model(subg, seed_ids)
-                loss = mx.nd.softmax_cross_entropy(logits, batch.label[0])
-            loss.backward()
-            trainer.step(batch.data[0].shape[0])
-            train_loss += loss.asnumpy()[0]
+            data.append(batch.data[0])
+            labels.append(batch.label[0])
+            if len(data) < args.num_parallel_subgraphs:
+                continue
+
+            subgs, seed_ids = subgraph_gen(g, data)
+            for subg, seed_id, label, d in zip(subgs, seed_ids, labels, data):
+                with mx.autograd.record():
+                    logits = model(subg, seed_id)
+                    loss = mx.nd.softmax_cross_entropy(logits, label)
+                loss.backward()
+                trainer.step(d.shape[0])
+                train_loss += loss.asnumpy()[0]
+            data = []
+            labels = []
 
         #logits = model(eval_vs)
         #eval_loss = mx.nd.softmax_cross_entropy(logits, eval_labels)
@@ -190,6 +205,8 @@ if __name__ == '__main__':
             help="the percentage of data used for training")
     parser.add_argument("--use-spmv", type=bool, default=False,
             help="use SpMV for faster speed.")
+    parser.add_argument("--num-parallel-subgraphs", type=int, default=1,
+            help="the number of subgraphs to construct in parallel.")
     args = parser.parse_args()
 
     # load and preprocess dataset

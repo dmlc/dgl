@@ -1391,6 +1391,24 @@ class DGLGraph(object):
         return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
                 sgi, immutable_graph=self._immutable_graph)
 
+    def subgraphs(self, nodes):
+        """Generate the subgraphs among the given nodes.
+
+        Parameters
+        ----------
+        nodes : a list of lists or iterable
+            A list of the nodes to construct subgraph.
+
+        Returns
+        -------
+        G : A list of DGLSubGraph
+            The subgraphs.
+        """
+        induced_nodes = [utils.toindex(n) for n in nodes]
+        sgis = self._graph.node_subgraphs(induced_nodes)
+        return [dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
+            sgi, immutable_graph=self._immutable_graph) for sgi in sgis]
+
     def edge_subgraph(self, edges):
         """Generate the subgraph among the given edges.
 
