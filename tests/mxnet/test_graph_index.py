@@ -73,6 +73,8 @@ def test_basics():
 def test_node_subgraph():
     num_vertices = 100
     g, ig = generate_rand_graph(num_vertices)
+
+    # node_subgraph
     randv1 = np.random.randint(0, num_vertices, 20)
     randv = np.unique(randv1)
     subg = g.node_subgraph(utils.toindex(randv))
@@ -80,6 +82,18 @@ def test_node_subgraph():
     check_graph_equal(subg, subig)
     assert mx.nd.sum(map_to_subgraph_nid(subg, randv1[0:10]).tousertensor()
             == map_to_subgraph_nid(subig, randv1[0:10]).tousertensor()) == 10
+
+    # node_subgraphs
+    randvs = []
+    subgs = []
+    for i in range(4):
+        randv = np.unique(np.random.randint(0, num_vertices, 20))
+        randvs.append(utils.toindex(randv))
+        subgs.append(g.node_subgraph(utils.toindex(randv)))
+    subigs= ig.node_subgraphs(randvs)
+    for i in range(4):
+        check_graph_equal(subgs[i], subigs[i])
+
 
 test_basics()
 test_graph_gen()
