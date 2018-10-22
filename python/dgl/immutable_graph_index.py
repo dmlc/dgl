@@ -117,7 +117,7 @@ class ImmutableGraphIndex(object):
         vid_array = vids.tousertensor()
         return utils.toindex(vid_array < self.number_of_nodes())
 
-    def has_edge(self, u, v):
+    def has_edge_between(self, u, v):
         """Return true if the edge exists.
 
         Parameters
@@ -132,9 +132,11 @@ class ImmutableGraphIndex(object):
         bool
             True if the edge exists
         """
-        raise Exception('has_edge isn\'t supported temporarily')
+        u = F.tensor([u])
+        v = F.tensor([v])
+        return self._sparse.has_edges(u, v).asnumpy()[0]
 
-    def has_edges(self, u, v):
+    def has_edges_between(self, u, v):
         """Return true if the edge exists.
 
         Parameters
@@ -149,7 +151,7 @@ class ImmutableGraphIndex(object):
         utils.Index
             0-1 array indicating existence
         """
-        raise Exception('has_edges isn\'t supported temporarily')
+        return utils.toindex(self._sparse.has_edges(u.tousertensor(), v.tousertensor()))
 
     def predecessors(self, v, radius=1):
         """Return the predecessors of the node.
@@ -202,7 +204,10 @@ class ImmutableGraphIndex(object):
         int
             The edge id.
         """
-        raise Exception('edge_id isn\'t supported temporarily')
+        u = F.tensor([u])
+        v = F.tensor([v])
+        id = self._sparse.edge_ids(u, v)
+        return utils.toindex(id)
 
     def edge_ids(self, u, v):
         """Return the edge ids.
@@ -217,9 +222,12 @@ class ImmutableGraphIndex(object):
         Returns
         -------
         utils.Index
-            Teh edge id array.
+            The edge id array.
         """
-        raise Exception('edge_ids isn\'t supported temporarily')
+        u = u.tousertensor()
+        v = v.tousertensor()
+        ids = self._sparse.edge_ids(u, v)
+        return utils.toindex(ids)
 
     def in_edges(self, v):
         """Return the in edges of the node(s).

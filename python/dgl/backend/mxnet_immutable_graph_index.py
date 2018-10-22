@@ -42,6 +42,43 @@ class ImmutableGraphIndex(object):
         """
         return self._in_csr.indices.shape[0]
 
+    def has_edges(self, u, v):
+        """Return true if the edge exists.
+
+        Parameters
+        ----------
+        u : NDArray
+            The src nodes.
+        v : NDArray
+            The dst nodes.
+
+        Returns
+        -------
+        NDArray
+            0-1 array indicating existence
+        """
+        ids = mx.nd.contrib.edge_id(self._in_csr, v, u)
+        return ids >= 0
+
+    def edge_ids(self, u, v):
+        """Return the edge ids.
+
+        Parameters
+        ----------
+        u : NDArray
+            The src nodes.
+        v : NDArray
+            The dst nodes.
+
+        Returns
+        -------
+        NDArray
+            Teh edge id array.
+        """
+        ids = mx.nd.contrib.edge_id(self._in_csr, v, u)
+        ids = ids.asnumpy()
+        return ids[ids >= 0]
+
     def predecessors(self, v, radius=1):
         """Return the predecessors of the node.
 

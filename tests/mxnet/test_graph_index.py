@@ -74,6 +74,17 @@ def check_basics(g, ig):
         assert g.in_degree(v) == ig.in_degree(v)
         assert g.out_degree(v) == ig.out_degree(v)
 
+    for u in randv.asnumpy():
+        for v in randv.asnumpy():
+            if len(g.edge_id(u, v).tolist()) == 1:
+                assert g.edge_id(u, v).tolist() == ig.edge_id(u, v).tolist()
+            assert g.has_edge_between(u, v) == ig.has_edge_between(u, v)
+    randv = utils.toindex(randv)
+    ids = g.edge_ids(randv, randv)[2].tolist()
+    assert sum(ig.edge_ids(randv, randv).tolist() == ids) == len(ids)
+    assert sum(g.has_edges_between(randv, randv).tolist() == ig.has_edges_between(randv, randv).tolist()) == len(randv)
+
+
 def test_basics():
     g, ig = generate_rand_graph(100)
     check_basics(g, ig)
