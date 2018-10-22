@@ -135,11 +135,58 @@ print(star.get_n_repr()['hv_1'])
 ###############################################################################
 # Convert from/to other formats
 # -----------------------------
-#
+# DGLGraph can be easily converted from/to ``networkx`` graph.
 
+import networkx as nx
+# note that networkx create undirected graph by default, so when converting
+# to DGLGraph, directed edges of both directions will be added.
+nx_star = nx.star_graph(9)
+star = dgl.DGLGraph(nx_star)
+print('#Nodes:', star.number_of_nodes())
+print('#Edges:', star.number_of_edges())
+
+
+###############################################################################
+# Node and edge attributes can be automatically batched when converting from
+# ``networkx`` graph. Since ``networkx`` graph by default does not tell which
+# edge is added the first, we use the ``"id"`` edge attribute as a hint
+# if available.
+
+for i in range(10):
+    nx_star.nodes[i]['feat'] = th.randn((D,))
+star = dgl.DGLGraph()
+star.from_networkx(nx_star, node_attrs=['feat'])  # auto-batch specified node features
+print(star.get_n_repr()['feat'])
 
 
 ###############################################################################
 # Multi-edge graph
 # ----------------
-#
+# There are many applications that work on graphs containing multi-edges. To enable
+# this, construct ``DGLGraph`` with ``multigraph=True``.
+
+g = dgl.DGLGraph(multigraph=True)
+g.add_nodes(5)
+g.add_edge(0, 1)
+g.add_edge(1, 2)
+g.add_edge(0, 1)
+print('#Nodes:', g.number_of_nodes())
+print('#Edges:', g.number_of_edges())
+# init random edge features
+M = g.number_of_edges()
+g.set_e_repr({'he' : th.randn((M, D))})
+
+
+###############################################################################
+# Because an edge in multi-graph cannot be uniquely identified using its incident
+# nodes ``u`` and ``v``, you need to use edge id to access edge features. The
+# edge ids can be queried from ``edge_id`` interface.
+
+eid_01 = g.edge_id(0, 1)
+print(eid_01)
+
+
+###############################################################################
+# We can then use the edge id to set/get the features of the corresponding edge.
+g.set_e_repr_by_id({'he' : th.ones(len(eid_01), D)}, eid=eid_01)
+print(g.get_e_repr()['he'])
