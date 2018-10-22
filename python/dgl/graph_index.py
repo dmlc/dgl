@@ -750,8 +750,11 @@ def create_graph_index(graph_data=None, multigraph=False, immutable_graph=False)
     if isinstance(graph_data, GraphIndex):
         return graph_data
 
-    if immutable_graph:
-        return create_immutable_graph_index(graph_data)
+    if immutable_graph and graph_data is not None:
+        gi = create_immutable_graph_index(graph_data)
+        # If we can't create an immutable graph index, we'll have to fall back.
+        if gi is not None:
+            return gi
 
     handle = _CAPI_DGLGraphCreate(multigraph)
     gi = GraphIndex(handle)
