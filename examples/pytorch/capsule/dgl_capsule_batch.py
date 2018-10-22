@@ -16,20 +16,20 @@ class DGLBatchCapsuleLayer(nn.Module):
         self.num_routing = num_routing
         self.weight = nn.Parameter(
             torch.randn(input_capsule_num, output_capsule_num, output_capsule_dim, input_capsule_dim))
-        self.g, self.pre_layer_nodes, self.this_layer_nodes = self.construct_graph()
+        self.g, self.input_nodes, self.output_nodes = self.construct_graph()
 
     def construct_graph(self):
         g = dgl.DGLGraph()
         g.add_nodes(self.input_capsule_num + self.output_capsule_num)
-        pre_layer_nodes = list(range(self.input_capsule_num))
-        this_layer_nodes = list(range(self.input_capsule_num, self.input_capsule_num + self.output_capsule_num))
+        input_nodes = list(range(self.input_capsule_num))
+        output_nodes = list(range(self.input_capsule_num, self.input_capsule_num + self.output_capsule_num))
         u, v = [], []
-        for i in pre_layer_nodes:
-            for j in this_layer_nodes:
+        for i in input_nodes:
+            for j in output_nodes:
                 u.append(i)
                 v.append(j)
         g.add_edges(u, v)
-        return g, pre_layer_nodes, this_layer_nodes
+        return g, input_nodes, output_nodes
 
     def forward(self, x):
         self.batch_size = x.size(0)
