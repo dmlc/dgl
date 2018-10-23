@@ -1,4 +1,6 @@
 """
+.. _tutorial-first:
+
 Your first example in DGL
 =========================
 

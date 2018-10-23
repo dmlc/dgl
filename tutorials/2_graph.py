@@ -1,12 +1,15 @@
 """
+.. _tutorial-graph:
+
 Use DGLGraph
 ============
+**Author**: `Minjie Wang <https://jermainewang.github.io/>`_
 
 In this tutorial, we introduce how to use our graph class -- ``DGLGraph``.
 The ``DGLGraph`` is the very core data structure in our library. It provides the basic
 interfaces to manipulate graph structure, set/get node/edge features and convert
 from/to many other graph formats. You can also perform computation on the graph
-using our message passing APIs. (TODO: give a link here to the message passing doc)
+using our message passing APIs (see :ref:`tutorial-mp`).
 """
 
 ###############################################################################
@@ -32,6 +35,8 @@ print('#Edges:', star.number_of_edges())
 # source and destination nodes. Multiple nodes are represented using either a
 # list or a 1D integer tensor(vector). In addition to this, we also support
 # "edge broadcasting":
+#
+# .. _note-edge-broadcast:
 #
 # .. note::
 # 
