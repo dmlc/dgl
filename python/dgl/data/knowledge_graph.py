@@ -36,6 +36,7 @@ class RGCNEntityDataset(object):
         self.dir = get_download_dir()
         tgz_path = os.path.join(self.dir, '{}.tgz'.format(self.name))
         download(_urls[self.name][0], tgz_path)
+        self.dir = os.path.join(self.dir, self.name)
         extract_archive(tgz_path, self.dir)
         self.dir = os.path.join(self.dir, self.name)
         graph_file_path = os.path.join(self.dir, '{}_stripped.nt.gz'.format(self.name))
@@ -63,7 +64,7 @@ class RGCNEntityDataset(object):
 
             if relabel:
                 uniq_nodes, edges = np.unique((self.edge_src, self.edge_dst), return_inverse=True)
-                self.src, self.dst = np.reshape(edges, (-1, 2))
+                self.edge_src, self.edge_dst = np.reshape(edges, (-1, 2))
                 node_map = np.zeros(self.num_nodes, dtype=int)
                 self.num_nodes = len(uniq_nodes)
                 node_map[uniq_nodes] = np.arange(self.num_nodes)
@@ -75,9 +76,9 @@ class RGCNEntityDataset(object):
             self.src, self.dst, self.edge_type = edges.transpose()
 
         # normalize by dst degree
-        _, inverse_index, count = np.unique((self.dst, self.edge_type), return_inverse=True, return_counts=True)
+        _, inverse_index, count = np.unique((self.edge_dst, self.edge_type), axis=1, return_inverse=True, return_counts=True)
         degrees = count[inverse_index]
-        self.edge_norm = np.ones(num_edges, dtype=np.float) / degrees
+        self.edge_norm = np.ones(len(self.edge_dst), dtype=np.float32) / degrees.astype(np.float32)
 
 
 class RGCNLinkDataset(object):
@@ -287,14 +288,14 @@ def _load_data(dataset_str='aifb', dataset_path=None):
     # rel_dict_file = os.path.join(dataset_path, 'rel_dict.pkl')
     # nodes_file = os.path.join(dataset_path, 'nodes.pkl')
 
-    if os.path.isfile(adj_file) and os.path.isfile(labels_file) and \
+    if os.path.isfile(edge_file) and os.path.isfile(labels_file) and \
             os.path.isfile(train_idx_file) and os.path.isfile(test_idx_file):
 
         # load precomputed adjacency matrix and labels
         all_edges = np.load(edge_file)
         num_node = all_edges['n'].item()
         edge_list = all_edges['edges']
-        num_rel = all_edges['nrel']
+        num_rel = all_edges['nrel'].item()
 
         print('Number of nodes: ', num_node)
         print('Number of relations: ', num_rel)
@@ -339,28 +340,21 @@ def _load_data(dataset_str='aifb', dataset_path=None):
 
             # self relation
             for i in range(num_node):
-                edge_list.append(i, i, 0)
+                edge_list.append((i, i, 0))
 
             for i, (s, p, o) in enumerate(reader.triples()):
-                src = node_dict[s]
-                dst = node_dict[o]
+                src = nodes_dict[s]
+                dst = nodes_dict[o]
                 assert src < num_node and dst < num_node
                 rel = relations_dict[p]
-                edge_list.append(src, dst, 2 * rel + 1)
-                edge_list.append(dst, src, 2 * rel + 1)
+                edge_list.append((src, dst, 2 * rel + 1))
+                edge_list.append((dst, src, 2 * rel + 1))
 
             # sort indices by destination
             edge_list = sorted(edge_list, key=lambda x: (x[1], x[0], x[2]))
             edge_list = np.array(edge_list, dtype=np.int)
 
-            edge_types = []
-            for edge in all_edges:
-                edge_types.append(edge_dict[edge])
-            all_edges = np.array(all_edges, dtype=np.int)
-            np.savez(adj_file, edges=edge_list, n=np.array(num_node), nrel=np.array(num_rel))
-
-        # Reload the adjacency matrices from disk
-        adjmat = np.load(adj_file)
+            np.savez(edge_file, edges=edge_list, n=np.array(num_node), nrel=np.array(num_rel))
 
         nodes_u_dict = {np.unicode(to_unicode(key)): val for key, val in
                         nodes_dict.items()}

@@ -18,21 +18,36 @@ import torch.nn.functional as F
 import dgl
 from dgl import DGLGraph
 from dgl.data import load_data
+import dgl.function as fn
 from functools import partial
 
 from layers import RGCNBasisLayer as RGCNLayer
 from model import BaseRGCN
 
+class EmbeddingLayer(RGCNLayer):
+    def propagate(self, g):
+        if self.num_bases < self.num_rels:
+            weight = self.weight.view(self.in_feat, self.num_bases, self.out_feat)
+            weight = torch.matmul(self.w_comp, weight).view(self.num_rels, self.in_feat, self.out_feat)
+        else:
+            weight = self.weight
+
+        def msg_func(src, edge):
+            flattened_weight = weight.view(-1, self.out_feat)
+            index = src['h'] * self.num_rels + edge['type']
+            return {'msg': flattened_weight[index] * edge['norm']}
+
+        g.update_all(msg_func, fn.sum(msg='msg', out='h'), None)
+
 class EntityClassify(BaseRGCN):
     def create_features(self):
-        # just a hack to make subgraph merge work
-        features = torch.zeros(len(self.g), 1)
+        features = torch.arange(len(self.g))
         if self.use_cuda:
             features = features.cuda()
         return features
 
     def build_input_layer(self):
-        return RGCNLayer(len(self.g), self.h_dim, self.num_rels, self.num_bases, activation=F.relu, featureless=True)
+        return EmbeddingLayer(len(self.g), self.h_dim, self.num_rels, self.num_bases, activation=F.relu)
 
     def build_hidden_layer(self, idx):
         return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases, activation=F.relu)
@@ -45,13 +60,10 @@ def main(args):
     # load graph data
     data = load_data(args)
     num_nodes = data.num_nodes
+    num_rels = data.num_rels
     labels = data.labels
     train_idx = data.train_idx
     test_idx = data.test_idx
-
-    if args.relation_limit > 0 and args.relation_limit < relations.shape[1]:
-        print("using first {} relaitons".format(args.relation_limit))
-        relations = relations[:, :args.relation_limit]
 
     # split dataset into train, validate, test
     if args.validation:
@@ -62,11 +74,7 @@ def main(args):
 
     # edge type and normalization factor
     edge_type = torch.from_numpy(data.edge_type)
-    edge_norm = torch.from_numpy(data.edge_norm)
-
-    # convert to pytorch label format
-    labels = np.argmax(labels, axis=1)
-    labels = torch.from_numpy(labels).view(-1)
+    edge_norm = torch.from_numpy(data.edge_norm).unsqueeze(1)
 
     # check cuda
     use_cuda = args.gpu >= 0 and torch.cuda.is_available()
@@ -74,7 +82,6 @@ def main(args):
         torch.cuda.set_device(args.gpu)
         edge_type = edge_type.cuda()
         edge_norm = edge_norm.cuda()
-        labels = labels.cuda()
 
     # create graph
     g = DGLGraph()
@@ -86,13 +93,19 @@ def main(args):
     model = EntityClassify(g,
                            args.n_hidden,
                            labels.shape[1],
+                           num_rels,
                            num_bases=args.n_bases,
                            num_hidden_layers=args.n_layers - 2,
                            dropout=args.dropout,
                            use_cuda=use_cuda)
 
+    # convert to pytorch label format
+    labels = np.argmax(labels, axis=1)
+    labels = torch.from_numpy(labels).view(-1)
+
     if use_cuda:
         model.cuda()
+        labels = labels.cuda()
 
     # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2norm)
@@ -153,8 +166,6 @@ if __name__ == '__main__':
             help="dataset to use")
     parser.add_argument("--l2norm", type=float, default=0,
             help="l2 norm coef")
-    parser.add_argument("-r", "--relation-limit", type=int, default=-1,
-            help="max number of relations to use")
     parser.add_argument("--relabel", default=False, action='store_true',
             help="remove untouched nodes and relabel")
     fp = parser.add_mutually_exclusive_group(required=False)

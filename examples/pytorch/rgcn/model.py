@@ -49,9 +49,8 @@ class BaseRGCN(nn.Module):
         return None
 
     def forward(self):
-        if self.features is not None:
-            self.g.set_n_repr(self.features)
+        self.g.set_n_repr({'h': self.features})
         for layer in self.layers:
-            layer(self.g, self.subgraphs)
-        return self.g.pop_n_repr()
+            layer(self.g)
+        return self.g.pop_n_repr('h')
 
