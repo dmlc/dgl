@@ -45,6 +45,7 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
+    'sphinx_gallery.gen_gallery',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -133,7 +134,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'dgl.tex', 'dgl Documentation',
+    (master_doc, 'dgl.tex', 'DGL Documentation',
      'DGL Team', 'manual'),
 ]
 
@@ -143,7 +144,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'dgl', 'dgl Documentation',
+    (master_doc, 'dgl', 'DGL Documentation',
      [author], 1)
 ]
 
@@ -154,8 +155,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'dgl', 'dgl Documentation',
-     author, 'dgl', 'One line description of project.',
+    (master_doc, 'dgl', 'DGL Documentation',
+     author, 'dgl', 'Library for deep learning on graphs.',
      'Miscellaneous'),
 ]
 
@@ -179,3 +180,13 @@ epub_exclude_files = ['search.html']
 
 
 # -- Extension configuration -------------------------------------------------
+
+# sphinx gallery configurations
+examples_dirs = ['../../tutorials']  # path to find sources
+gallery_dirs = ['tutorials']  # path to generate docs
+
+sphinx_gallery_conf = {
+    'examples_dirs' : examples_dirs,
+    'gallery_dirs' : gallery_dirs,
+    'filename_pattern' : '.py',
+}
