@@ -45,6 +45,7 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
+    'sphinx.ext.intersphinx',
     'sphinx_gallery.gen_gallery',
 ]
 
@@ -182,11 +183,14 @@ epub_exclude_files = ['search.html']
 # -- Extension configuration -------------------------------------------------
 
 # sphinx gallery configurations
+from sphinx_gallery.sorting import FileNameSortKey
+
 examples_dirs = ['../../tutorials']  # path to find sources
 gallery_dirs = ['tutorials']  # path to generate docs
 
 sphinx_gallery_conf = {
     'examples_dirs' : examples_dirs,
     'gallery_dirs' : gallery_dirs,
+    'within_subsection_order' : FileNameSortKey,
     'filename_pattern' : '.py',
 }
