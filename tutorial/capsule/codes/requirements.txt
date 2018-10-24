@@ -1,0 +1,6 @@
+http://download.pytorch.org/whl/cu90/torch-0.3.0.post4-cp36-cp36m-linux_x86_64.whl ; sys_platform == "linux"
+http://download.pytorch.org/whl/torch-0.3.0.post4-cp36-cp36m-macosx_10_7_x86_64.whl ; sys_platform == "darwin"
+torchvision
+tensorboardX
+tensorflow
+tqdm
