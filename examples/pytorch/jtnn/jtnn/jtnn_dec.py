@@ -14,7 +14,7 @@ import numpy as np
 MAX_NB = 8
 MAX_DECODE_LEN = 100
 
-
+"""
 def dfs_order(forest, roots):
     '''
     Returns edge source, edge destination, tree ID, and whether u is generating
@@ -38,6 +38,31 @@ def dfs_order(forest, roots):
         edges = (e for e in edges if e is not None)
         u, v, i, p = zip(*edges)
         yield u, v, i, p
+"""
+def _dfs(trace, forest, i, cur, parent):
+    _, next_, down_eid = forest.out_edges(cur)
+    prev, _, up_eid = forest.in_edges(cur)
+    down_eid = dict(zip(next_.tolist(), down_eid.tolist()))
+    up_eid = dict(zip(prev.tolist(), up_eid.tolist()))
+    for n in down_eid:
+        if n == parent:
+            continue
+        trace.append((cur, n, down_eid[n], i, 1))
+        _dfs(trace, forest, i, n, cur)
+        trace.append((n, cur, up_eid[n], i, 0))
+
+def dfs_order(forest, roots):
+    edge_list = []
+    
+    for i, root in enumerate(roots):
+        trace = []
+        _dfs(trace, forest, i, root, None)
+        edge_list.append(trace)
+
+    for edges in itertools.zip_longest(*edge_list):
+        edges = (e for e in edges if e is not None)
+        u, v, e, i, p = zip(*edges)
+        yield u, v, e, i, p
 
 
 dec_tree_node_msg = DGLF.copy_edge(edge='m', out='m')
@@ -72,7 +97,6 @@ class DGLJTNNDecoder(nn.Module):
         self.W_o = nn.Linear(hidden_size, self.vocab_size)
         self.U_s = nn.Linear(hidden_size, 1)
 
-    @profile
     def forward(self, mol_trees, tree_vec):
         '''
         The training procedure which computes the prediction loss given the
@@ -84,7 +108,6 @@ class DGLJTNNDecoder(nn.Module):
 
         return self.run(mol_tree_batch, mol_tree_batch_lg, n_trees, tree_vec)
 
-    @profile
     def run(self, mol_tree_batch, mol_tree_batch_lg, n_trees, tree_vec):
         node_offset = np.cumsum([0] + mol_tree_batch.batch_num_nodes)
         root_ids = node_offset[:-1]
@@ -134,13 +157,12 @@ class DGLJTNNDecoder(nn.Module):
         q_targets.append(mol_tree_batch.get_n_repr(root_ids)['wid'])
 
         # Traverse the tree and predict on children
-        for u, v, i, p in dfs_order(mol_tree_batch, root_ids):
+        for u, v, eid, i, p in dfs_order(mol_tree_batch, root_ids):
             assert set(t_set).issuperset(i)
             ip = dict(zip(i, p))
             # TODO: context
             p_targets.append(cuda(torch.tensor([ip.get(_i, 0) for _i in t_set])))
             t_set = list(i)
-            eid = mol_tree_batch.edge_ids(u, v)
             mol_tree_batch_lg.pull(
                 eid,
                 dec_tree_edge_msg,

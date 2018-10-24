@@ -23,7 +23,7 @@ def onek_encoding_unk(x, allowable_set):
     return [x == s for s in allowable_set]
 
 def atom_features(atom):
-    return cuda(torch.Tensor(onek_encoding_unk(atom.GetSymbol(), ELEM_LIST) 
+    return (torch.Tensor(onek_encoding_unk(atom.GetSymbol(), ELEM_LIST) 
             + onek_encoding_unk(atom.GetDegree(), [0,1,2,3,4,5]) 
             + onek_encoding_unk(atom.GetFormalCharge(), [-1,-2,1,2,0])
             + onek_encoding_unk(int(atom.GetChiralTag()), [0,1,2,3])
@@ -34,9 +34,8 @@ def bond_features(bond):
     stereo = int(bond.GetStereo())
     fbond = [bt == Chem.rdchem.BondType.SINGLE, bt == Chem.rdchem.BondType.DOUBLE, bt == Chem.rdchem.BondType.TRIPLE, bt == Chem.rdchem.BondType.AROMATIC, bond.IsInRing()]
     fstereo = onek_encoding_unk(stereo, [0,1,2,3,4,5])
-    return cuda(torch.Tensor(fbond + fstereo))
+    return (torch.Tensor(fbond + fstereo))
 
-@profile
 def mol2dgl(smiles_batch):
     n_nodes = 0
     graph_list = []
@@ -68,8 +67,8 @@ def mol2dgl(smiles_batch):
             bond_x.append(features)
         graph.add_edges(bond_src, bond_dst)
 
-        atom_x = torch.stack(atom_x, 0)
-        bond_x = torch.stack(bond_x, 0)
+        atom_x = cuda(torch.stack(atom_x, 0))
+        bond_x = cuda(torch.stack(bond_x, 0))
         graph.set_n_repr({'x': atom_x})
         if n_bonds > 0:
             graph.set_e_repr({
@@ -134,7 +133,6 @@ class DGLMPN(nn.Module):
         self.n_edges_total = 0
         self.n_passes = 0
 
-    @profile
     def forward(self, mol_graph_list):
         n_samples = len(mol_graph_list)
 
@@ -155,7 +153,6 @@ class DGLMPN(nn.Module):
 
         return g_repr
 
-    @profile
     def run(self, mol_graph, mol_line_graph):
         n_nodes = mol_graph.number_of_nodes()
 

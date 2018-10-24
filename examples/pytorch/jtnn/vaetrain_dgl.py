@@ -59,7 +59,6 @@ scheduler.step()
 MAX_EPOCH = 1
 PRINT_ITER = 20
 
-@profile
 def train():
     dataloader = DataLoader(
             dataset,

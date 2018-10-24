@@ -6,7 +6,6 @@ import numpy as np
 from .line_profiler_integration import profile
 
 class DGLMolTree(DGLGraph):
-    @profile
     def __init__(self, smiles):
         DGLGraph.__init__(self)
         self.smiles = smiles
@@ -57,11 +56,9 @@ class DGLMolTree(DGLGraph):
                 set_atommap(self.nodes[i]['mol'], self.nodes[i]['nid'])
             self.nodes[i]['is_leaf'] = (self.out_degree(i) == 1)
 
-    # avoiding DiGraph.size()
     def treesize(self):
-        return len(self.nodes)
+        return self.number_of_nodes()
 
-    @profile
     def _recover_node(self, i, original_mol):
         node = self.nodes[i]
 
@@ -92,7 +89,6 @@ class DGLMolTree(DGLGraph):
 
         return node['label']
 
-    @profile
     def _assemble_node(self, i):
         neighbors = [self.nodes[j] for j in self.successors(i).numpy()
                      if self.nodes[j]['mol'].GetNumAtoms() > 1]

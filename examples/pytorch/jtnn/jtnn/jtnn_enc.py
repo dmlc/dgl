@@ -13,6 +13,43 @@ import numpy as np
 MAX_NB = 8
 
 def level_order(forest, roots):
+    edge_list = []
+    visited = set()
+    level = list(set(roots))
+    levels = [level]
+
+    while True:
+        visited.update(level)
+
+        out_src, out_dst, out_eid = forest.out_edges(level)
+        in_src, in_dst, in_eid = forest.in_edges(level)
+
+        out_src = out_src.tolist()
+        out_dst = out_dst.tolist()
+        out_eid = out_eid.tolist()
+        in_src = in_src.tolist()
+        in_dst = in_dst.tolist()
+        in_eid = in_eid.tolist()
+
+        level = set(out_dst) - visited
+        if len(level) > 0:
+            out_src, out_dst, out_eid = zip(
+                    *[(s, d, e) for s, d, e in zip(out_src, out_dst, out_eid)
+                      if d in level])
+            in_src, in_dst, in_eid = zip(
+                    *[(s, d, e) for s, d, e in zip(in_src, in_dst, in_eid)
+                      if s in level])
+
+            level = list(level)
+            edge_list.append(out_eid)
+            edge_list.insert(0, in_eid)
+        else:
+            break
+
+    return edge_list
+
+"""
+def level_order(forest, roots):
     '''
     Given the forest and the list of root nodes,
     returns iterator of list of edges ordered by depth, first in bottom-up
@@ -38,8 +75,7 @@ def level_order(forest, roots):
     for edges in edge_list:
         u, v = zip(*edges)
         yield u, v
-
-
+"""
 enc_tree_msg = [DGLF.copy_src(src='m', out='m'), DGLF.copy_src(src='rm', out='rm')]
 enc_tree_reduce = [DGLF.sum(msg='m', out='s'), DGLF.sum(msg='rm', out='accum_rm')]
 enc_tree_gather_msg = DGLF.copy_edge(edge='m', out='m')
@@ -75,7 +111,6 @@ class DGLJTNNEncoder(nn.Module):
         self.enc_tree_update = GRUUpdate(hidden_size)
         self.enc_tree_gather_update = EncoderGatherUpdate(hidden_size)
 
-    @profile
     def forward(self, mol_trees):
         mol_tree_batch = batch(mol_trees)
         
@@ -84,7 +119,6 @@ class DGLJTNNEncoder(nn.Module):
 
         return self.run(mol_tree_batch, mol_tree_batch_lg)
 
-    @profile
     def run(self, mol_tree_batch, mol_tree_batch_lg):
         # Since tree roots are designated to 0.  In the batched graph we can
         # simply find the corresponding node ID by looking at node_offset
@@ -123,8 +157,8 @@ class DGLJTNNEncoder(nn.Module):
         # messages, and the uncomputed messages are zero vectors.  Essentially,
         # we can always compute s_ij as the sum of incoming m_ij, no matter
         # if m_ij is actually computed or not.
-        for u, v in level_order(mol_tree_batch, root_ids):
-            eid = mol_tree_batch.edge_ids(u, v)
+        for eid in level_order(mol_tree_batch, root_ids):
+            #eid = mol_tree_batch.edge_ids(u, v)
             mol_tree_batch_lg.pull(
                 eid,
                 enc_tree_msg,
