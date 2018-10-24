@@ -59,8 +59,8 @@ use environment variables to find python packages.
 .. code:: bash
 
     export DGL_HOME=/path/to/dgl
-    export PYTHONPATH=$DGL_HOME$/python:${PYTHONPATH}
-    export DGL_LIBRARY_PATH=$DGL_HOME$/build
+    export PYTHONPATH=${DGL_HOME}/python:${PYTHONPATH}
+    export DGL_LIBRARY_PATH=${DGL_HOME}/build
 
 The ``DGL_LIBRARY_PATH`` variable is used for our python package to locate the shared library
 built above. Use following command to test whether the installation is successful or not.
