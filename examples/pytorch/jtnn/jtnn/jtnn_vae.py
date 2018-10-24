@@ -51,7 +51,6 @@ class DGLJTNNVAE(nn.Module):
         self.n_edges_total = 0
         self.n_tree_nodes_total = 0
 
-    @profile
     def encode(self, mol_batch):
         dgl_set_batch_nodeID(mol_batch, self.vocab)
 
@@ -68,7 +67,6 @@ class DGLJTNNVAE(nn.Module):
 
         return mol_tree_batch, tree_vec, mol_vec
 
-    @profile
     def forward(self, mol_batch, beta=0, e1=None, e2=None):
         batch_size = len(mol_batch)
 
@@ -112,7 +110,6 @@ class DGLJTNNVAE(nn.Module):
 
         return loss, kl_loss, word_acc, topo_acc, assm_acc, stereo_acc
 
-    @profile
     def assm(self, mol_batch, mol_tree_batch, mol_vec):
         cands = []
         batch_idx = []
@@ -158,7 +155,6 @@ class DGLJTNNVAE(nn.Module):
         all_loss = sum(all_loss) / len(mol_batch)
         return all_loss, acc / cnt
 
-    @profile
     def stereo(self, mol_batch, mol_vec):
         stereo_cands, batch_idx = [], []
         labels = []

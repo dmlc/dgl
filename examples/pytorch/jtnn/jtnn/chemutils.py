@@ -4,6 +4,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import minimum_spanning_tree
 from collections import defaultdict
 from rdkit.Chem.EnumerateStereoisomers import EnumerateStereoisomers, StereoEnumerationOptions
+from .line_profiler_integration import profile
 
 MST_MAX_WEIGHT = 100 
 MAX_NCAND = 2000
@@ -52,6 +53,7 @@ def copy_atom(atom):
     new_atom.SetAtomMapNum(atom.GetAtomMapNum())
     return new_atom
 
+@profile
 def copy_edit_mol(mol):
     new_mol = Chem.RWMol(Chem.MolFromSmiles(''))
     for atom in mol.GetAtoms():
@@ -160,6 +162,7 @@ def ring_bond_equal(b1, b2, reverse=False):
         b2 = (b2.GetBeginAtom(), b2.GetEndAtom())
     return atom_equal(b1[0], b2[0]) and atom_equal(b1[1], b2[1])
 
+@profile
 def attach_mols_nx(ctr_mol, neighbors, prev_nodes, nei_amap):
     prev_nids = [node['nid'] for node in prev_nodes]
     for nei_node in prev_nodes + neighbors:
@@ -185,6 +188,7 @@ def attach_mols_nx(ctr_mol, neighbors, prev_nodes, nei_amap):
                     ctr_mol.AddBond(a1, a2, bond.GetBondType())
     return ctr_mol
 
+@profile
 def local_attach_nx(ctr_mol, neighbors, prev_nodes, amap_list):
     ctr_mol = copy_edit_mol(ctr_mol)
     nei_amap = {nei['nid']: {} for nei in prev_nodes + neighbors}

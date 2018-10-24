@@ -27,17 +27,16 @@ def onek_encoding_unk(x, allowable_set):
 # the 2-D graph first, then enumerate all possible 3-D forms and find the
 # one with highest score.
 def atom_features(atom):
-    return cuda(torch.Tensor(onek_encoding_unk(atom.GetSymbol(), ELEM_LIST) 
+    return (torch.Tensor(onek_encoding_unk(atom.GetSymbol(), ELEM_LIST) 
             + onek_encoding_unk(atom.GetDegree(), [0,1,2,3,4,5]) 
             + onek_encoding_unk(atom.GetFormalCharge(), [-1,-2,1,2,0])
             + [atom.GetIsAromatic()]))
 
 def bond_features(bond):
     bt = bond.GetBondType()
-    return cuda(torch.Tensor([bt == Chem.rdchem.BondType.SINGLE, bt == Chem.rdchem.BondType.DOUBLE, bt == Chem.rdchem.BondType.TRIPLE, bt == Chem.rdchem.BondType.AROMATIC, bond.IsInRing()]))
+    return (torch.Tensor([bt == Chem.rdchem.BondType.SINGLE, bt == Chem.rdchem.BondType.DOUBLE, bt == Chem.rdchem.BondType.TRIPLE, bt == Chem.rdchem.BondType.AROMATIC, bond.IsInRing()]))
 
 
-@profile
 def mol2dgl(cand_batch, mol_tree_batch):
     cand_graphs = []
     tree_mess_source_edges = [] # map these edges from trees to...
@@ -95,8 +94,8 @@ def mol2dgl(cand_batch, mol_tree_batch):
 
         n_nodes += n_atoms
 
-        atom_x = torch.stack(atom_x, 0)
-        bond_x = torch.stack(bond_x, 0)
+        atom_x = cuda(torch.stack(atom_x, 0))
+        bond_x = cuda(torch.stack(bond_x, 0))
         g.set_n_repr({'x': atom_x})
         if n_bonds > 0:
             g.set_e_repr({
@@ -180,7 +179,6 @@ class DGLJTMPN(nn.Module):
         self.n_edges_total = 0
         self.n_passes = 0
 
-    @profile
     def forward(self, cand_batch, mol_tree_batch):
         cand_graphs, tree_mess_src_edges, tree_mess_tgt_edges, tree_mess_tgt_nodes = \
                 mol2dgl(cand_batch, mol_tree_batch)
@@ -207,7 +205,6 @@ class DGLJTMPN(nn.Module):
 
         return g_repr
 
-    @profile
     def run(self, cand_graphs, cand_line_graph, tree_mess_src_edges, tree_mess_tgt_edges,
             tree_mess_tgt_nodes, mol_tree_batch):
         n_nodes = cand_graphs.number_of_nodes()
