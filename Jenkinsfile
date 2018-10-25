@@ -21,12 +21,17 @@ def build_dgl() {
     }
 }
 
-def unit_test() {
+def pytorch_unit_test() {
     withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
         sh 'nosetests tests -v --with-xunit'
         sh 'nosetests tests/pytorch -v --with-xunit'
-        sh 'nosetests tests/mxnet -v --with-xunit'
         sh 'nosetests tests/graph_index -v --with-xunit'
+    }
+}
+
+def mxnet_unit_test() {
+    withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
+        sh 'nosetests tests/mxnet -v --with-xunit'
     }
 }
 
@@ -77,7 +82,7 @@ pipeline {
                         }
                         stage('UNIT TEST') {
                             steps {
-                                unit_test()
+                                pytorch_unit_test()
                             }
                         }
                         stage('EXAMPLE TEST') {
@@ -112,7 +117,7 @@ pipeline {
                         }
                         stage('UNIT TEST') {
                             steps {
-                                unit_test()
+                                pytorch_unit_test()
                             }
                         }
                         stage('EXAMPLE TEST') {
@@ -150,7 +155,7 @@ pipeline {
                         }
                         stage('UNIT TEST') {
                             steps {
-                                unit_test()
+                                mxnet_unit_test()
                             }
                         }
                         stage('EXAMPLE TEST') {
