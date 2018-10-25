@@ -12,6 +12,8 @@ typedef tvm::runtime::NDArray IdArray;
 typedef tvm::runtime::NDArray DegreeArray;
 typedef tvm::runtime::NDArray BoolArray;
 
+typedef std::vector<dgl_id_t> IdVector;
+
 class Graph;
 class GraphOp;
 struct Subgraph;
@@ -296,16 +298,26 @@ class Graph {
    */
   Graph Reverse() const;
 
-  std::pair<IdArray, IdArray> BFS(IdArray src, bool out) const;
+  std::pair<IdArray, IdArray> BFS(IdArray source, bool out) const;
 
   /*!
-   * \brief DFS
+   * \brief Produce edges in a depth-first-search (DFS) labeled by type.
    *
-   * Sources must belong to different connected components.
-   *
-   * \return the reversed graph
+   * https://networkx.github.io/documentation/stable/_modules/networkx/algorithms/traversal/depth_first_search.html#dfs_labeled_edges
+   * This implementation does not `yield (source, source, 'forward')` or `yield (source, source, 'reverse')`.
    */
-  std::pair<IdArray, IdArray> DFS(IdArray src, bool out) const;
+  std::tuple<IdVector, IdVector, IdVector> DFSLabeledEdges_(dgl_id_t source, bool out, bool reverse_edge, bool nontree_edge) const;
+
+  /*!
+   * \brief Produce edges in a depth-first-search (DFS) labeled by type.
+   *
+   * \param source Source vertices.
+   * \param out Whether to follow incoming or outgoing edges.
+   * \param reverse_edge Whether to yield reverse edges.
+   * \param nontree_edge Whether to yield nontree edges.
+   * \return Edges labeled by type.
+   */
+  std::tuple<IdArray, IdArray, IdArray, IdArray> DFSLabeledEdges(IdArray source, bool out, bool reverse_edge, bool nontree_edge) const;
 
   std::pair<IdArray, IdArray> TopologicalTraversal(bool out) const;
 

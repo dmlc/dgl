@@ -22,6 +22,10 @@ class GraphIndex(object):
     handle : GraphIndexHandle
         Handler
     """
+    FORWARD = 0
+    REVERSE = 1
+    NONTREE = 2
+
     def __init__(self, handle):
         self._handle = handle
         self._cache = {}
@@ -601,47 +605,41 @@ class GraphIndex(object):
         handle = _CAPI_DGLGraphLineGraph(self._handle, backtracking)
         return GraphIndex(handle)
 
-    def bfs(self, src, out, step):
+    def bfs(self, src, out):
         """ Breadth-first search.
 
         Parameters
         ----------
         src :
         out :
-        step :
 
         Returns
         -------
         """
         src = utils.toindex(src).todgltensor()
-        if step:
-            raise NotImplementedError()
-        else:
-            pair = _CAPI_DGLGraphBFS(self._handle, src, out)
-            v = utils.toindex(pair(0)).tousertensor()
-            s = utils.toindex(pair(1)).tousertensor()
-            return F.unpack(v, s.tolist())
+        pair = _CAPI_DGLGraphBFS(self._handle, src, out)
+        v = utils.toindex(pair(0)).tousertensor()
+        s = utils.toindex(pair(1)).tousertensor()
+        return F.unpack(v, s.tolist())
 
-    def dfs(self, src, out, step):
+    def dfs_labeled_edges(self, src, out, reverse_edge, nontree_edge):
         """ Breadth-first search.
 
         Parameters
         ----------
         src :
         out :
-        step :
 
         Returns
         -------
         """
         src = utils.toindex(src).todgltensor()
-        if step:
-            raise NotImplementedError()
-        else:
-            pair = _CAPI_DGLGraphDFS(self._handle, src, out)
-            v = utils.toindex(pair(0)).tousertensor()
-            s = utils.toindex(pair(1)).tousertensor()
-            return F.unpack(v, s.tolist())
+        ret = _CAPI_DGLGraphDFSLabeledEdges(self._handle, src, out, reverse_edge, nontree_edge)
+        src = utils.toindex(ret(0)).tousertensor()
+        dst = utils.toindex(ret(1)).tousertensor()
+        type = utils.toindex(ret(2)).tousertensor()
+        size = F.asnumpy(utils.toindex(ret(3)).tousertensor()).tolist()
+        return list(zip(F.unpack(src, size), F.unpack(dst, size), F.unpack(type, size)))
 
     def topological_traversal(self, out, step):
         """ Depth-first search.
@@ -649,18 +647,14 @@ class GraphIndex(object):
         Parameters
         ----------
         out : bool
-        step : bool
 
         Returns
         -------
         """
-        if step:
-            raise NotImplementedError()
-        else:
-            pair = _CAPI_DGLGraphTopologicalTraversal(self._handle, out)
-            v = utils.toindex(pair(0)).tousertensor()
-            s = utils.toindex(pair(1)).tousertensor()
-            return F.unpack(v, s.tolist())
+        pair = _CAPI_DGLGraphTopologicalTraversal(self._handle, out)
+        v = utils.toindex(pair(0)).tousertensor()
+        s = utils.toindex(pair(1)).tousertensor()
+        return F.unpack(v, s.tolist())
 
 class SubgraphIndex(GraphIndex):
     def __init__(self, handle, parent, induced_nodes, induced_edges):

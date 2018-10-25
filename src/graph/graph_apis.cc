@@ -62,6 +62,40 @@ PackedFunc ConvertIdArrayPairToPackedFunc(const std::pair<IdArray, IdArray>& pai
   return PackedFunc(body);
 }
 
+PackedFunc ConvertIdArrayTripleToPackedFunc(const std::tuple<IdArray, IdArray, IdArray>& triple) {
+  auto body = [triple] (TVMArgs args, TVMRetValue* rv) {
+      int which = args[0];
+      if (which == 0) {
+        *rv = std::get<0>(triple);
+      } else if (which == 1) {
+        *rv = std::get<1>(triple);
+      } else if (which == 2) {
+        *rv = std::get<2>(triple);
+      } else {
+        LOG(FATAL) << "invalid choice";
+      }
+    };
+  return PackedFunc(body);
+}
+
+PackedFunc ConvertIdArrayQuadrupleToPackedFunc(const std::tuple<IdArray, IdArray, IdArray, IdArray>& quadruple) {
+  auto body = [quadruple] (TVMArgs args, TVMRetValue* rv) {
+      int which = args[0];
+      if (which == 0) {
+        *rv = std::get<0>(quadruple);
+      } else if (which == 1) {
+        *rv = std::get<1>(quadruple);
+      } else if (which == 2) {
+        *rv = std::get<2>(quadruple);
+      } else if (which == 3) {
+        *rv = std::get<3>(quadruple);
+      } else {
+        LOG(FATAL) << "invalid choice";
+      }
+    };
+  return PackedFunc(body);
+}
+
 }  // namespace
 
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
@@ -308,13 +342,15 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphBFS")
     *rv = ConvertIdArrayPairToPackedFunc(gptr->BFS(src, out));
   });
 
-TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphDFS")
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphDFSLabeledEdges")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     GraphHandle ghandle = args[0];
-    const Graph* gptr = static_cast<Graph*>(ghandle);
-    const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    Graph* gptr = static_cast<Graph*>(ghandle);
+    IdArray src = args[1];
     bool out = args[2];
-    *rv = ConvertIdArrayPairToPackedFunc(gptr->DFS(src, out));
+    bool reverse_edge = args[3];
+    bool nontree_edge = args[4];
+    *rv = ConvertIdArrayQuadrupleToPackedFunc(gptr->DFSLabeledEdges(src, out, reverse_edge, nontree_edge));
   });
 
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphTopologicalTraversal")
