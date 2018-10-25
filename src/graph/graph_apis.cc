@@ -144,7 +144,7 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLMapSubgraphNID")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     const IdArray parent_vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
     const IdArray query = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
-    *rv = GraphOp::MapSubgraphNID(parent_vids, query);
+    *rv = GraphOp::MapParentIdToSubgraphId(parent_vids, query);
   });
 
 TVM_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLExpandIds")

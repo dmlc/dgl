@@ -43,9 +43,11 @@ class DGLSubGraph(DGLGraph):
         The graph index.
     shared : bool, optional
         Whether the subgraph shares node/edge features with the parent graph.
+    readonly : bool, optional
+        Whether the graph structure is read-only (default: False).
     """
-    def __init__(self, parent, parent_nid, parent_eid, graph_idx, shared=False, immutable_graph=False):
-        super(DGLSubGraph, self).__init__(graph_data=graph_idx, immutable_graph=immutable_graph)
+    def __init__(self, parent, parent_nid, parent_eid, graph_idx, shared=False, readonly=False):
+        super(DGLSubGraph, self).__init__(graph_data=graph_idx, readonly=readonly)
         self._parent = parent
         self._parent_nid = parent_nid
         self._parent_eid = parent_eid

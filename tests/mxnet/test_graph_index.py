@@ -17,13 +17,13 @@ def generate_graph():
         g.add_edge(i, 9)
     # add a back flow from 9 to 0
     g.add_edge(9, 0)
-    ig = create_graph_index(g.to_networkx(), immutable_graph=True)
+    ig = create_graph_index(g.to_networkx(), readonly=True)
     return g, ig
 
 def generate_rand_graph(n):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
     g = create_graph_index(arr)
-    ig = create_graph_index(arr, immutable_graph=True)
+    ig = create_graph_index(arr, readonly=True)
     return g, ig
 
 def check_graph_equal(g1, g2):
@@ -99,8 +99,8 @@ def test_node_subgraph():
     subg = g.node_subgraph(utils.toindex(randv))
     subig = ig.node_subgraph(utils.toindex(randv))
     check_graph_equal(subg, subig)
-    assert mx.nd.sum(map_to_subgraph_nid(subg, randv1[0:10]).tousertensor()
-            == map_to_subgraph_nid(subig, randv1[0:10]).tousertensor()) == 10
+    assert mx.nd.sum(map_to_subgraph_nid(subg, utils.toindex(randv1[0:10])).tousertensor()
+            == map_to_subgraph_nid(subig, utils.toindex(randv1[0:10])).tousertensor()) == 10
 
     # node_subgraphs
     randvs = []
@@ -114,6 +114,7 @@ def test_node_subgraph():
         check_graph_equal(subgs[i], subigs[i])
 
 
-test_basics()
-test_graph_gen()
-test_node_subgraph()
+if __name__ == '__main__':
+    test_basics()
+    test_graph_gen()
+    test_node_subgraph()

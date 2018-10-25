@@ -299,14 +299,14 @@ class ImmutableGraphIndex(object):
         return self._cache["all_edges"]
 
     def _get_in_degree(self):
-        if self._in_deg is None:
-            self._in_deg = self._sparse.get_in_degree()
-        return self._in_deg
+        if 'in_deg' not in self._cache:
+            self._cache['in_deg'] = self._sparse.get_in_degree()
+        return self._cache['in_deg']
 
     def _get_out_degree(self):
-        if self._out_deg is None:
-            self._out_deg = self._sparse.get_out_degree()
-        return self._out_deg
+        if 'out_deg' not in self._cache:
+            self._cache['out_deg'] = self._sparse.get_out_degree()
+        return self._cache['out_deg']
 
     def in_degree(self, v):
         """Return the in degree of the node.
@@ -541,26 +541,28 @@ def create_immutable_graph_index(graph_data=None):
     """
     if isinstance(graph_data, ImmutableGraphIndex):
         return graph_data
+    assert F.create_immutable_graph_index is not None, \
+            "The selected backend doesn't support read-only graph!"
+
+    gi = ImmutableGraphIndex(F.create_immutable_graph_index())
     if graph_data is None:
-        return ImmutableGraphIndex(None)
-    # If the backend doesn't support immutable graph index,
-    # we have to return None to fall back.
-    if F.create_immutable_graph_index is None:
-        return None
+        return gi
 
+    # scipy format
+    if isinstance(graph_data, sp.spmatrix):
+        try:
+            gi.from_scipy_sparse_matrix(graph_data)
+            return gi
+        except:
+            raise Exception('Graph data is not a valid scipy sparse matrix.')
+
+    # networkx - any format
     try:
-        graph_data = graph_data.get_graph()
-    except AttributeError:
-        pass
-
-    if isinstance(graph_data, nx.DiGraph):
-        gi = ImmutableGraphIndex(F.create_immutable_graph_index())
         gi.from_networkx(graph_data)
-    elif isinstance(graph_data, sp.csr_matrix) or isinstance(graph_data, sp.coo_matrix):
-        gi = ImmutableGraphIndex(F.create_immutable_graph_index())
-        gi.from_scipy_sparse_matrix(graph_data)
-    else:
-        raise Exception('cannot create an immutable graph index from unknown format')
+    except:
+        raise Exception('Error while creating graph from input of type "%s".'
+                         % type(graph_data))
+
     return gi
 
 _init_api("dgl.immutable_graph_index")

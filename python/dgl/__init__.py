@@ -11,4 +11,3 @@ from .base import ALL
 from .batched_graph import *
 from .graph import DGLGraph
 from .subgraph import DGLSubGraph
-from .immutable_graph_index import ImmutableGraphIndex, create_immutable_graph_index

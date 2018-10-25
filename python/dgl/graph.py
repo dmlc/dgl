@@ -33,16 +33,18 @@ class DGLGraph(object):
         Edge feature storage.
     multigraph : bool, optional
         Whether the graph would be a multigraph (default: False)
+    readonly : bool, optional
+        Whether the graph structure is read-only (default: False).
     """
     def __init__(self,
                  graph_data=None,
                  node_frame=None,
                  edge_frame=None,
                  multigraph=False,
-                 immutable_graph=False):
+                 readonly=False):
         # graph
-        self._immutable_graph=immutable_graph
-        self._graph = create_graph_index(graph_data, multigraph, immutable_graph)
+        self._readonly=readonly
+        self._graph = create_graph_index(graph_data, multigraph, readonly)
         # frame
         self._node_frame = node_frame if node_frame is not None else FrameRef()
         self._edge_frame = edge_frame if edge_frame is not None else FrameRef()
@@ -1389,7 +1391,7 @@ class DGLGraph(object):
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
         return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
-                sgi, immutable_graph=self._immutable_graph)
+                sgi, readonly=self._readonly)
 
     def subgraphs(self, nodes):
         """Generate the subgraphs among the given nodes.
@@ -1407,7 +1409,7 @@ class DGLGraph(object):
         induced_nodes = [utils.toindex(n) for n in nodes]
         sgis = self._graph.node_subgraphs(induced_nodes)
         return [dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
-            sgi, immutable_graph=self._immutable_graph) for sgi in sgis]
+            sgi, readonly=self._readonly) for sgi in sgis]
 
     def edge_subgraph(self, edges):
         """Generate the subgraph among the given edges.

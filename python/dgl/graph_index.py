@@ -470,7 +470,7 @@ class GraphIndex(object):
         induced_nodes = utils.toindex(rst(1))
         return SubgraphIndex(rst(0), self, induced_nodes, e)
 
-    def adjacency_matrix(self):
+    def adjacency_matrix(self, edge_type='in'):
         """Return the adjacency matrix representation of this graph.
 
         Returns
@@ -478,6 +478,7 @@ class GraphIndex(object):
         utils.CtxCachedObject
             An object that returns tensor given context.
         """
+        assert edge_type == 'in'
         if not 'adj' in self._cache:
             src, dst, _ = self.edges(sorted=False)
             src = F.unsqueeze(src.tousertensor(), 0)
@@ -693,7 +694,6 @@ def map_to_subgraph_nid(subgraph, parent_nids):
     utils.Index
         Node Ids in the subgraph.
     """
-    parent_nids = utils.toindex(parent_nids)
     return utils.toindex(_CAPI_DGLMapSubgraphNID(subgraph.induced_nodes.todgltensor(),
         parent_nids.todgltensor()))
 
@@ -755,7 +755,7 @@ def disjoint_partition(graph, num_or_size_splits):
         graphs.append(GraphIndex(handle))
     return graphs
 
-def create_graph_index(graph_data=None, multigraph=False, immutable_graph=False):
+def create_graph_index(graph_data=None, multigraph=False, readonly=False):
     """Create a graph index object.
 
     Parameters
@@ -768,7 +768,7 @@ def create_graph_index(graph_data=None, multigraph=False, immutable_graph=False)
     if isinstance(graph_data, GraphIndex):
         return graph_data
 
-    if immutable_graph and graph_data is not None:
+    if readonly and graph_data is not None:
         gi = create_immutable_graph_index(graph_data)
         # If we can't create an immutable graph index, we'll have to fall back.
         if gi is not None:

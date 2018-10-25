@@ -68,12 +68,13 @@ class GraphOp {
   /*!
    * \brief Map vids in the parent graph to the vids in the subgraph.
    *
-   * \param parent_vids An array that maps the vids in the parent graph to the
+   * \param parent_vid_map An array that maps the vids in the parent graph to the
    * subgraph. The elements store the vertex Ids in the parent graph, and the
    * indices indicate the vertex Ids in the subgraph.
    * \param query The vertex Ids in the parent graph.
+   * \return an Id array that contains the subgraph node Ids.
    */
-  static IdArray MapSubgraphNID(IdArray parent_vid_map, IdArray query);
+  static IdArray MapParentIdToSubgraphId(IdArray parent_vid_map, IdArray query);
 
   /*!
    * \brief Expand an Id array based on the offset array.
@@ -87,6 +88,7 @@ class GraphOp {
    *
    * \param ids An array that contains the node or edge Ids.
    * \param offset An array that contains the offset after expansion.
+   * \return a expanded Id array.
    */
   static IdArray ExpandIds(IdArray ids, IdArray offset);
 };

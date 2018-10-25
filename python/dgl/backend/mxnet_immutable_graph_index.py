@@ -10,6 +10,14 @@ from .mxnet import to_context
 
 class ImmutableGraphIndex(object):
     """Backend-specific graph index object on immutable graphs.
+    We can use a CSR matrix to represent a graph structure. For functionality,
+    one CSR matrix is sufficient. However, for efficient access
+    to in-edges and out-edges of a directed graph, we need to use two CSR matrices.
+    In these CSR matrices, both rows and columns represents vertices. In one CSR
+    matrix, a row stores in-edges of a vertex (whose source vertex is a neighbor
+    and destination vertex is the vertex itself). Thus, a non-zero entry is
+    the neighbor Id and the value is the corresponding edge Id.
+    The other CSR matrix stores the out-edges in the same fashion.
 
     Parameters
     ----------
@@ -174,8 +182,9 @@ class ImmutableGraphIndex(object):
         NDArray
             The edge ids.
         """
-        #TODO do we need to sort the array.
-        #TODO we need to return NDArray directly
+        #TODO(zhengda) we need to return NDArray directly
+        # We don't need to take care of the sorted flag because the vertex Ids
+        # are already sorted.
         coo = self._in_csr.asscipy().tocoo()
         return coo.col, coo.row, coo.data
 

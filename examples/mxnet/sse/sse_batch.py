@@ -10,7 +10,7 @@ import mxnet as mx
 from mxnet import gluon
 import dgl
 import dgl.function as fn
-from dgl import DGLGraph
+from dgl import DGLGraph, utils
 from dgl.data import register_data_args, load_data
 
 def gcn_msg(src, edge):
@@ -94,7 +94,7 @@ def subgraph_gen(g, seed_vertices):
     nids = []
     for i, subg in enumerate(subgs):
         subg.copy_from_parent()
-        nids.append(subg.map_to_subgraph_nid(seed_vertices[i]))
+        nids.append(subg.map_to_subgraph_nid(utils.toindex(seed_vertices[i])))
     return subgs, nids
 
 def main(args, data):
@@ -126,7 +126,7 @@ def main(args, data):
         graph = data.graph.get_graph()
     except AttributeError:
         graph = data.graph
-    g = DGLGraph(graph, immutable_graph=True)
+    g = DGLGraph(graph, readonly=True)
     g.set_n_repr({'in': features, 'h': mx.nd.random.normal(shape=(g.number_of_nodes(), args.n_hidden),
         ctx=ctx)})
 
