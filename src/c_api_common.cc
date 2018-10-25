@@ -24,7 +24,7 @@ DLManagedTensor* CreateTmpDLManagedTensor(const TVMArgValue& arg) {
 
 PackedFunc ConvertNDArrayVectorToPackedFunc(const std::vector<NDArray>& vec) {
     auto body = [vec](TVMArgs args, TVMRetValue* rv) {
-        int which = args[0];
+        size_t which = static_cast<size_t>(args[0]);
         if (which >= vec.size()) {
             LOG(FATAL) << "invalid choice";
         } else {
