@@ -13,6 +13,11 @@ help:
 
 .PHONY: help Makefile
 
+html-noexec:
+	$(SPHINXBUILD) -D plot_gallery=0 -b html "$(SOURCEDIR)" "$(BUILDDIR)/html" 
+	@echo
+	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
+
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
 %: Makefile

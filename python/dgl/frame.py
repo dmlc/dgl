@@ -251,7 +251,7 @@ class Frame(MutableMapping):
         if self.num_rows == 0:
             raise DGLError('Cannot add column "%s" using column schemes because'
                            ' number of rows is unknown. Make sure there is at least'
-                           ' one column in the frame so number of rows can be inferred.')
+                           ' one column in the frame so number of rows can be inferred.' % name)
         if self.initializer is None:
             dgl_warning('Initializer is not set. Use zero initializer instead.'
                         ' To suppress this warning, use `set_initializer` to'

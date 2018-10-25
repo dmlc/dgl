@@ -59,8 +59,8 @@ use environment variables to find python packages.
 .. code:: bash
 
     export DGL_HOME=/path/to/dgl
-    export PYTHONPATH=$DGL_HOME$/python:${PYTHONPATH}
-    export DGL_LIBRARY_PATH=$DGL_HOME$/build
+    export PYTHONPATH=${DGL_HOME}/python:${PYTHONPATH}
+    export DGL_LIBRARY_PATH=${DGL_HOME}/build
 
 The ``DGL_LIBRARY_PATH`` variable is used for our python package to locate the shared library
 built above. Use following command to test whether the installation is successful or not.
@@ -72,3 +72,23 @@ built above. Use following command to test whether the installation is successfu
 Install from docker
 -------------------
 TBD
+
+Install on Windows/MinGW
+------------------------
+Make sure you have the following installed:
+
+* CMake
+* MinGW/GCC (G++)
+* MinGW/Make
+
+You can grab them from Anaconda.
+
+In the command line prompt, run:
+
+.. code:: bash
+
+    md build
+    cd build
+    cmake -DCMAKE_CXX_FLAGS="-DDMLC_LOG_STACK_TRACE=0 -DTVM_EXPORTS" .. -G "MinGW Makefiles"
+    mingw32-make
+    set DGL_LIBRARY_PATH=%CD%
