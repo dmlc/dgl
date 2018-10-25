@@ -200,6 +200,7 @@ def local_attach_nx(ctr_mol, neighbors, prev_nodes, amap_list):
     return ctr_mol.GetMol()
 
 #This version records idx mapping between ctr_mol and nei_mol
+@profile
 def enum_attach_nx(ctr_mol, nei_node, amap, singletons):
     nei_mol,nei_idx = nei_node['mol'], nei_node['nid']
     att_confs = []
