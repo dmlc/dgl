@@ -905,6 +905,8 @@ class DGLGraph(object):
         Currently, we require the message functions of consecutive send's to
         return the same keys.  Otherwise the behavior will be undefined.
 
+        TODO(minjie): document on multiple send behavior
+
         Parameters
         ----------
         u : optional, node, container or tensor
@@ -1076,6 +1078,10 @@ class DGLGraph(object):
             node_reprs -> node_reprs
 
         All node_reprs and edge_reprs support tensor and dictionary types.
+
+        TODO(minjie): document on zero-in-degree case
+        TODO(minjie): document on how returned new features are merged with the old features
+        TODO(minjie): document on how many times UDFs will be called
 
         Parameters
         ----------
