@@ -1,56 +1,55 @@
-1301.837 <module>  vaetrain.py:1
-└─ 1299.207 train  vaetrain.py:62
-   ├─ 887.367 __next__  torch/utils/data/dataloader.py:311
-   │  └─ 887.367 <listcomp>  torch/utils/data/dataloader.py:314
-   │     └─ 887.359 __getitem__  jtnn/datautils.py:13
-   │        ├─ 827.847 assemble  jtnn/mol_tree.py:137
-   │        │  └─ 827.829 assemble  jtnn/mol_tree.py:68
-   │        │     └─ 827.312 enum_assemble  jtnn/chemutils.py:347
-   │        │        ├─ 639.104 search  jtnn/chemutils.py:352
-   │        │        │  ├─ 481.136 search  jtnn/chemutils.py:352
-   │        │        │  │  ├─ 305.606 search  jtnn/chemutils.py:352
-   │        │        │  │  │  ├─ 155.779 search  jtnn/chemutils.py:352
-   │        │        │  │  │  │  ├─ 91.797 local_attach  jtnn/chemutils.py:215
-   │        │        │  │  │  │  │  ├─ 73.720 attach_mols  jtnn/chemutils.py:164
-   │        │        │  │  │  │  │  └─ 17.170 copy_edit_mol  jtnn/chemutils.py:56
-   │        │        │  │  │  │  └─ 47.285 search  jtnn/chemutils.py:352
-   │        │        │  │  │  │     └─ 39.086 local_attach  jtnn/chemutils.py:215
-   │        │        │  │  │  │        └─ 30.686 attach_mols  jtnn/chemutils.py:164
-   │        │        │  │  │  ├─ 116.814 local_attach  jtnn/chemutils.py:215
-   │        │        │  │  │  │  ├─ 81.516 attach_mols  jtnn/chemutils.py:164
-   │        │        │  │  │  │  └─ 34.119 copy_edit_mol  jtnn/chemutils.py:56
-   │        │        │  │  │  └─ 18.803 sanitize  jtnn/chemutils.py:42
-   │        │        │  │  ├─ 138.340 local_attach  jtnn/chemutils.py:215
-   │        │        │  │  │  ├─ 82.762 attach_mols  jtnn/chemutils.py:164
-   │        │        │  │  │  └─ 53.835 copy_edit_mol  jtnn/chemutils.py:56
-   │        │        │  │  ├─ 17.001 sanitize  jtnn/chemutils.py:42
-   │        │        │  │  └─ 13.118 enum_attach  jtnn/chemutils.py:237
-   │        │        │  ├─ 117.674 local_attach  jtnn/chemutils.py:215
-   │        │        │  │  ├─ 58.490 attach_mols  jtnn/chemutils.py:164
-   │        │        │  │  └─ 57.778 copy_edit_mol  jtnn/chemutils.py:56
-   │        │        │  ├─ 17.474 sanitize  jtnn/chemutils.py:42
-   │        │        │  └─ 15.757 enum_attach  jtnn/chemutils.py:237
-   │        │        └─ 157.730 local_attach  jtnn/chemutils.py:215
-   │        │           ├─ 102.687 attach_mols  jtnn/chemutils.py:164
-   │        │           └─ 53.374 copy_edit_mol  jtnn/chemutils.py:56
-   │        ├─ 31.420 __init__  jtnn/mol_tree.py:85
+1113.149 <module>  vaetrain.py:1
+└─ 1110.977 train  vaetrain.py:62
+   ├─ 882.804 __next__  torch/utils/data/dataloader.py:311
+   │  └─ 882.804 <listcomp>  torch/utils/data/dataloader.py:314
+   │     └─ 882.787 __getitem__  jtnn/datautils.py:13
+   │        ├─ 823.348 assemble  jtnn/mol_tree.py:137
+   │        │  └─ 823.320 assemble  jtnn/mol_tree.py:68
+   │        │     └─ 822.798 enum_assemble  jtnn/chemutils.py:347
+   │        │        ├─ 634.239 search  jtnn/chemutils.py:352
+   │        │        │  ├─ 476.055 search  jtnn/chemutils.py:352
+   │        │        │  │  ├─ 301.615 search  jtnn/chemutils.py:352
+   │        │        │  │  │  ├─ 155.030 search  jtnn/chemutils.py:352
+   │        │        │  │  │  │  ├─ 89.652 local_attach  jtnn/chemutils.py:215
+   │        │        │  │  │  │  │  ├─ 72.508 attach_mols  jtnn/chemutils.py:164
+   │        │        │  │  │  │  │  └─ 16.078 copy_edit_mol  jtnn/chemutils.py:56
+   │        │        │  │  │  │  ├─ 47.539 search  jtnn/chemutils.py:352
+   │        │        │  │  │  │  │  └─ 39.275 local_attach  jtnn/chemutils.py:215
+   │        │        │  │  │  │  │     └─ 30.654 attach_mols  jtnn/chemutils.py:164
+   │        │        │  │  │  │  └─ 11.528 sanitize  jtnn/chemutils.py:42
+   │        │        │  │  │  ├─ 116.370 local_attach  jtnn/chemutils.py:215
+   │        │        │  │  │  │  ├─ 79.548 attach_mols  jtnn/chemutils.py:164
+   │        │        │  │  │  │  └─ 35.569 copy_edit_mol  jtnn/chemutils.py:56
+   │        │        │  │  │  └─ 17.129 sanitize  jtnn/chemutils.py:42
+   │        │        │  │  ├─ 138.129 local_attach  jtnn/chemutils.py:215
+   │        │        │  │  │  ├─ 82.882 attach_mols  jtnn/chemutils.py:164
+   │        │        │  │  │  └─ 53.654 copy_edit_mol  jtnn/chemutils.py:56
+   │        │        │  │  ├─ 16.562 sanitize  jtnn/chemutils.py:42
+   │        │        │  │  └─ 12.943 enum_attach  jtnn/chemutils.py:237
+   │        │        │  ├─ 118.120 local_attach  jtnn/chemutils.py:215
+   │        │        │  │  ├─ 58.410 attach_mols  jtnn/chemutils.py:164
+   │        │        │  │  └─ 58.273 copy_edit_mol  jtnn/chemutils.py:56
+   │        │        │  ├─ 16.999 sanitize  jtnn/chemutils.py:42
+   │        │        │  └─ 15.574 enum_attach  jtnn/chemutils.py:237
+   │        │        └─ 158.360 local_attach  jtnn/chemutils.py:215
+   │        │           ├─ 102.208 attach_mols  jtnn/chemutils.py:164
+   │        │           └─ 54.536 copy_edit_mol  jtnn/chemutils.py:56
+   │        ├─ 31.432 __init__  jtnn/mol_tree.py:85
    │        │  └─ 18.121 get_clique_mol  jtnn/chemutils.py:68
-   │        └─ 28.011 recover  jtnn/mol_tree.py:133
-   │           └─ 27.872 recover  jtnn/mol_tree.py:41
-   │              └─ 20.728 get_clique_mol  jtnn/chemutils.py:68
-   │                 └─ 13.410 copy_edit_mol  jtnn/chemutils.py:56
-   ├─ 347.442 __call__  torch/nn/modules/module.py:471
-   │  └─ 347.400 forward  jtnn/jtnn_vae.py:82
-   │     ├─ 307.458 assm  jtnn/jtnn_vae.py:111
-   │     │  └─ 304.796 __call__  torch/nn/modules/module.py:471
-   │     │     └─ 304.089 forward  jtnn/jtmpn.py:125
-   │     │        └─ 297.785 mol2dgl  jtnn/jtmpn.py:51
-   │     │           ├─ 43.836 bond_features  jtnn/jtmpn.py:35
-   │     │           │  └─ 29.765 cuda  jtnn/nnutils.py:11
-   │     │           └─ 35.166 atom_features  jtnn/jtmpn.py:29
-   │     │              └─ 24.057 cuda  jtnn/nnutils.py:11
-   │     └─ 22.752 encode  jtnn/jtnn_vae.py:62
-   │        └─ 17.901 mol2graph  jtnn/mpn.py:38
-   └─ 63.070 backward  torch/tensor.py:65
-      └─ 63.070 backward  torch/autograd/__init__.py:38
+   │        │     └─ 12.199 copy_edit_mol  jtnn/chemutils.py:56
+   │        └─ 27.944 recover  jtnn/mol_tree.py:133
+   │           └─ 27.804 recover  jtnn/mol_tree.py:41
+   │              └─ 20.635 get_clique_mol  jtnn/chemutils.py:68
+   │                 └─ 13.270 copy_edit_mol  jtnn/chemutils.py:56
+   ├─ 164.546 __call__  torch/nn/modules/module.py:471
+   │  └─ 164.511 forward  jtnn/jtnn_vae.py:82
+   │     ├─ 139.038 assm  jtnn/jtnn_vae.py:111
+   │     │  └─ 136.666 __call__  torch/nn/modules/module.py:471
+   │     │     └─ 135.969 forward  jtnn/jtmpn.py:125
+   │     │        └─ 129.708 mol2dgl  jtnn/jtmpn.py:51
+   │     ├─ 11.858 __call__  torch/nn/modules/module.py:471
+   │     │  └─ 11.789 forward  jtnn/jtnn_dec.py:55
+   │     └─ 11.389 encode  jtnn/jtnn_vae.py:62
+   └─ 62.348 backward  torch/tensor.py:65
+      └─ 62.348 backward  torch/autograd/__init__.py:38
 
