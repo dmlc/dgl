@@ -36,7 +36,6 @@ def bond_features(bond):
     bt = bond.GetBondType()
     return (torch.Tensor([bt == Chem.rdchem.BondType.SINGLE, bt == Chem.rdchem.BondType.DOUBLE, bt == Chem.rdchem.BondType.TRIPLE, bt == Chem.rdchem.BondType.AROMATIC, bond.IsInRing()]))
 
-
 def mol2dgl(cand_batch, mol_tree_batch):
     cand_graphs = []
     tree_mess_source_edges = [] # map these edges from trees to...
