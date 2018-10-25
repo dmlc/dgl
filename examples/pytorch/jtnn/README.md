@@ -11,3 +11,8 @@ python3 vaetrain_dgl.py
 ```
 The script will automatically download the data, which is the same as the one in the
 original repository.
+
+To disable CUDA, run with `NOCUDA` variable set:
+```
+NOCUDA=1 python3 vaetrain_dgl.py
+```
