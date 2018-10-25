@@ -4,7 +4,7 @@ from __future__ import absolute_import
 import numpy as np
 
 from .base import ALL, is_all
-from .frame import FrameRef
+from .frame import FrameRef, Frame
 from .graph import DGLGraph
 from . import graph_index as gi
 from . import backend as F
@@ -31,14 +31,14 @@ class BatchedDGLGraph(DGLGraph):
         batched_index = gi.disjoint_union([g._graph for g in graph_list])
         # create batched node and edge frames
         # NOTE: following code will materialize the columns of the input graphs.
-        batched_node_frame = FrameRef()
-        for gr in graph_list:
-            cols = {key : gr._node_frame[key] for key in node_attrs}
-            batched_node_frame.append(cols)
-        batched_edge_frame = FrameRef()
-        for gr in graph_list:
-            cols = {key : gr._edge_frame[key] for key in edge_attrs}
-            batched_edge_frame.append(cols)
+        cols = {key: F.pack([gr._node_frame[key] for gr in graph_list])
+                for key in node_attrs}
+        batched_node_frame = FrameRef(Frame(cols))
+
+        cols = {key: F.pack([gr._edge_frame[key] for gr in graph_list])
+                for key in edge_attrs}
+        batched_edge_frame = FrameRef(Frame(cols))
+
         super(BatchedDGLGraph, self).__init__(
                 graph_data=batched_index,
                 node_frame=batched_node_frame,
@@ -159,18 +159,14 @@ def unbatch(graph):
     bsize = graph.batch_size
     bn = graph.batch_num_nodes
     be = graph.batch_num_edges
+    bn_offset = [0] + np.cumsum(bn).tolist()
+    be_offset = [0] + np.cumsum(be).tolist()
     pttns = gi.disjoint_partition(graph._graph, utils.toindex(bn))
     # split the frames
-    node_frames = [FrameRef() for i in range(bsize)]
-    edge_frames = [FrameRef() for i in range(bsize)]
-    for attr, col in graph._node_frame.items():
-        col_splits = F.unpack(col, bn)
-        for i in range(bsize):
-            node_frames[i][attr] = col_splits[i]
-    for attr, col in graph._edge_frame.items():
-        col_splits = F.unpack(col, be)
-        for i in range(bsize):
-            edge_frames[i][attr] = col_splits[i]
+    node_frames = [FrameRef(graph._node_frame, slice(bn_offset[i], bn_offset[i+1]))
+                   for i in range(bsize)]
+    edge_frames = [FrameRef(graph._edge_frame, slice(be_offset[i], be_offset[i+1]))
+                   for i in range(bsize)]
     return [DGLGraph(graph_data=pttns[i],
                      node_frame=node_frames[i],
                      edge_frame=edge_frames[i]) for i in range(bsize)]

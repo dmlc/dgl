@@ -335,10 +335,12 @@ class FrameRef(MutableMapping):
     frame : Frame, optional
         The underlying frame. If not given, the reference will point to a
         new empty frame.
-    index : iterable of int, optional
+    index : iterable, slice, or int, optional
         The rows that are referenced in the underlying frame. If not given,
         the whole frame is referenced. The index should be distinct (no
         duplication is allowed).
+
+        Note that if a slice is given, the step must be None.
     """
     def __init__(self, frame=None, index=None):
         self._frame = frame if frame is not None else Frame()
@@ -369,10 +371,8 @@ class FrameRef(MutableMapping):
     def num_rows(self):
         """Return the number of rows referred."""
         if isinstance(self._index_data, slice):
-            # NOTE: we are assuming that the index is a slice ONLY IF
-            # index=None during construction.
-            # As such, start is always 0, and step is always 1.
-            return self._index_data.stop
+            # NOTE: we always assume that slice.step is None
+            return self._index_data.stop - self._index_data.start
         else:
             return len(self._index_data)
 
@@ -399,7 +399,10 @@ class FrameRef(MutableMapping):
         if self._index is None:
             if self.is_contiguous():
                 self._index = utils.toindex(
-                        F.arange(self._index_data.stop, dtype=F.int64))
+                        F.arange(
+                            self._index_data.start,
+                            self._index_data.stop,
+                            dtype=F.int64))
             else:
                 self._index = utils.toindex(self._index_data)
         return self._index
@@ -617,7 +620,8 @@ class FrameRef(MutableMapping):
         """
         query = query.tolist()
         if isinstance(self._index_data, slice):
-            self._index_data = list(range(self._index_data.start, self._index_data.stop))
+            self._index_data = list(range(
+                self._index_data.start, self._index_data.stop))
         arr = np.array(self._index_data, dtype=np.int32)
         self._index_data = list(np.delete(arr, query))
         self._clear_cache()
@@ -651,8 +655,8 @@ class FrameRef(MutableMapping):
 
     def is_contiguous(self):
         """Return whether this refers to a contiguous range of rows."""
-        # NOTE: this check could have false negatives and false positives
-        # (step other than 1)
+        # NOTE: this check could have false negatives
+        # NOTE: we always assume that slice.step is None
         return isinstance(self._index_data, slice)
 
     def is_span_whole_column(self):
