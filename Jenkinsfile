@@ -56,7 +56,7 @@ pipeline {
                 }
             }
         }
-        stage('Build and Test') {
+        stage('Build and Test on Pytorch') {
             parallel {
                 stage('CPU') {
                     agent {
@@ -118,6 +118,44 @@ pipeline {
                         stage('EXAMPLE TEST') {
                             steps {
                                 example_test('GPU')
+                            }
+                        }
+                    }
+                    post {
+                        always {
+                            junit '*.xml'
+                        }
+                    }
+                }
+            }
+        }
+        stage('Build and Test on MXNet') {
+            parallel {
+                stage('CPU') {
+                    agent {
+                        docker {
+                            image 'zhengda1936/dgl-mxnet-cpu'
+                        }
+                    }
+                    stages {
+                        stage('SETUP') {
+                            steps {
+                                setup()
+                            }
+                        }
+                        stage('BUILD') {
+                            steps {
+                                build_dgl()
+                            }
+                        }
+                        stage('UNIT TEST') {
+                            steps {
+                                unit_test()
+                            }
+                        }
+                        stage('EXAMPLE TEST') {
+                            steps {
+                                example_test('CPU')
                             }
                         }
                     }
