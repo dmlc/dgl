@@ -20,7 +20,7 @@ ig.add_edges(list(zip(a.row, a.col)))
 src = random.choice(range(n))
 
 t0 = time.time()
-layers_cpp = g._graph.bfs([src], out=True, step=False)
+layers_cpp = g._graph.bfs([src], out=True)
 t_cpp = time.time() - t0
 
 t0 = time.time()

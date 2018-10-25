@@ -316,7 +316,7 @@ class Graph {
   /*!
    * \brief Produce edges in a depth-first-search (DFS) labeled by type.
    *
-   * \param source Source vertices.
+   * \param source Source nodes.
    * \param out Whether to follow incoming or outgoing edges.
    * \param reverse_edge Whether to yield reverse edges.
    * \param nontree_edge Whether to yield nontree edges.

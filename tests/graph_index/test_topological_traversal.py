@@ -16,7 +16,6 @@ g = dgl.DGLGraph()
 n = int(sys.argv[1])
 a = sp.random(n, n, 10 / n, data_rvs=lambda n: np.ones(n))
 b = sp.tril(a, -1).tocoo()
-print(b.todense())
 g.from_scipy_sparse_matrix(b)
 
 t0 = time.time()
