@@ -48,34 +48,6 @@ def level_order(forest, roots):
 
     return edge_list
 
-"""
-def level_order(forest, roots):
-    '''
-    Given the forest and the list of root nodes,
-    returns iterator of list of edges ordered by depth, first in bottom-up
-    and then top-down
-    '''
-    forest = forest.to_networkx()
-    edge_list = []
-    node_depth = {}
-
-    edge_list.append([])
-
-    for root in roots:
-        node_depth[root] = 0
-        for u, v in nx.bfs_edges(forest, root):
-            node_depth[v] = node_depth[u] + 1
-            if len(edge_list) == node_depth[u]:
-                edge_list.append([])
-            edge_list[node_depth[u]].append((u, v))
-
-    for edges in reversed(edge_list):
-        u, v = zip(*edges)
-        yield v, u
-    for edges in edge_list:
-        u, v = zip(*edges)
-        yield u, v
-"""
 enc_tree_msg = [DGLF.copy_src(src='m', out='m'), DGLF.copy_src(src='rm', out='rm')]
 enc_tree_reduce = [DGLF.sum(msg='m', out='s'), DGLF.sum(msg='rm', out='accum_rm')]
 enc_tree_gather_msg = DGLF.copy_edge(edge='m', out='m')

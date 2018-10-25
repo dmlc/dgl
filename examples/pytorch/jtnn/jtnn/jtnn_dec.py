@@ -14,31 +14,6 @@ import numpy as np
 MAX_NB = 8
 MAX_DECODE_LEN = 100
 
-"""
-def dfs_order(forest, roots):
-    '''
-    Returns edge source, edge destination, tree ID, and whether u is generating
-    a new children
-    '''
-    forest = forest.to_networkx()
-    edge_list = []
-
-    for i, root in enumerate(roots):
-        edge_list.append([])
-        # The following gives the DFS order on edge on a tree.
-        for u, v, t in nx.dfs_labeled_edges(forest, root):
-            if u == v or t == 'nontree':
-                continue
-            elif t == 'forward':
-                edge_list[-1].append((u, v, i, 1))
-            elif t == 'reverse':
-                edge_list[-1].append((v, u, i, 0))
-
-    for edges in itertools.zip_longest(*edge_list):
-        edges = (e for e in edges if e is not None)
-        u, v, i, p = zip(*edges)
-        yield u, v, i, p
-"""
 def _dfs(trace, forest, i, cur, parent):
     _, next_, down_eid = forest.out_edges(cur)
     prev, _, up_eid = forest.in_edges(cur)
