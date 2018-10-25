@@ -10,6 +10,8 @@ from .._ffi.runtime_ctypes import TVMType, TVMContext, TVMArray
 from .._ffi.runtime_ctypes import TypeCode, tvm_shape_index_t
 from .. import ndarray as nd
 
+from functools import lru_cache
+
 # Tensor types
 Tensor = th.Tensor
 SparseTensor = th.sparse.FloatTensor
@@ -86,33 +88,32 @@ def to_context(arr, ctx):
     else:
         raise RuntimeError('Invalid context', ctx)
 
-def get_context(arr):
-    if arr.device.type == 'cpu':
+@lru_cache(maxsize=None)
+def _get_context(type, index):
+    if type == 'cpu':
         return TVMContext(TVMContext.STR2MASK['cpu'], 0)
     else:
-        return TVMContext(
-                TVMContext.STR2MASK[arr.device.type], arr.device.index)
+        return TVMContext(TVMContext.STR2MASK[type], index)
+
+def get_context(arr):
+    return _get_context(arr.device.type, arr.device.index)
+
+_tvmtypes = {
+        th.float16: TVMType('float16'),
+        th.float32: TVMType('float32'),
+        th.float64: TVMType('float64'),
+        th.int8: TVMType('int8'),
+        th.uint8: TVMType('uint8'),
+        th.int16: TVMType('int16'),
+        th.int32: TVMType('int32'),
+        th.int64: TVMType('int64'),
+        }
 
 def get_tvmtype(arr):
     arr_dtype = arr.dtype
-    if arr_dtype in (th.float16, th.half):
-        return TVMType('float16')
-    elif arr_dtype in (th.float32, th.float):
-        return TVMType('float32')
-    elif arr_dtype in (th.float64, th.double):
-        return TVMType('float64')
-    elif arr_dtype in (th.int16, th.short):
-        return TVMType('int16')
-    elif arr_dtype in (th.int32, th.int):
-        return TVMType('int32')
-    elif arr_dtype in (th.int64, th.long):
-        return TVMType('int64')
-    elif arr_dtype == th.int8:
-        return TVMType('int8')
-    elif arr_dtype == th.uint8:
-        return TVMType('uint8')
-    else:
+    if arr_dtype not in _tvmtypes:
         raise RuntimeError('Unsupported data type:', arr_dtype)
+    return _tvmtypes[arr_dtype]
 
 def zerocopy_to_dlpack(arr):
     """Return a dlpack compatible array using zero copy."""
@@ -124,7 +125,6 @@ def zerocopy_from_dlpack(dlpack_arr):
 
 def zerocopy_to_numpy(arr):
     """Return a numpy array that shares the data."""
-    # TODO(minjie): zero copy
     return arr.numpy()
 
 def zerocopy_from_numpy(np_data):

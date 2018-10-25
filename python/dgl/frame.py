@@ -543,10 +543,8 @@ class FrameRef(MutableMapping):
             self._frame[name] = col
         else:
             if name not in self._frame:
-                feat_shape = F.shape(data)[1:]
-                feat_dtype = F.get_tvmtype(data)
                 ctx = F.get_context(data)
-                self._frame.add_column(name, Scheme(feat_shape, feat_dtype), ctx)
+                self._frame.add_column(name, Scheme.infer_scheme(data), ctx)
                 #raise DGLError('Cannot update column. Column "%s" does not exist.'
                 #               ' Did you forget to init the column using `set_n_repr`'
                 #               ' or `set_e_repr`?' % name)
