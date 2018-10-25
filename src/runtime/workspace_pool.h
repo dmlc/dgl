@@ -3,8 +3,8 @@
  * \file workspace_pool.h
  * \brief Workspace pool utility.
  */
-#ifndef TVM_RUNTIME_WORKSPACE_POOL_H_
-#define TVM_RUNTIME_WORKSPACE_POOL_H_
+#ifndef DGL_RUNTIME_WORKSPACE_POOL_H_
+#define DGL_RUNTIME_WORKSPACE_POOL_H_
 
 #include <dgl/runtime/device_api.h>
 #include <vector>
@@ -58,4 +58,4 @@ class WorkspacePool {
 
 }  // namespace runtime
 }  // namespace tvm
-#endif  // TVM_RUNTIME_WORKSPACE_POOL_H_
+#endif  // DGL_RUNTIME_WORKSPACE_POOL_H_

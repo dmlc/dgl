@@ -22,23 +22,23 @@ def generate_graph():
 def test_update_all():
     def _test(fld):
         def message_func(hu, edge):
-            return hu[fld]
+            return {'m' : hu[fld]}
 
         def message_func_edge(hu, edge):
             if len(hu[fld].shape) == 1:
-                return hu[fld] * edge['e1']
+                return {'m' : hu[fld] * edge['e1']}
             else:
-                return hu[fld] * edge['e2']
+                return {'m' : hu[fld] * edge['e2']}
 
         def reduce_func(hv, msgs):
-            return {fld : th.sum(msgs, 1)}
+            return {fld : th.sum(msgs['m'], 1)}
 
         def apply_func(hu):
             return {fld : 2 * hu[fld]}
         g = generate_graph()
         # update all
         v1 = g.get_n_repr()[fld]
-        g.update_all(fn.copy_src(src=fld), fn.sum(out=fld), apply_func)
+        g.update_all(fn.copy_src(src=fld, out='m'), fn.sum(msg='m', out=fld), apply_func)
         v2 = g.get_n_repr()[fld]
         g.set_n_repr({fld : v1})
         g.update_all(message_func, reduce_func, apply_func)
@@ -46,12 +46,12 @@ def test_update_all():
         assert th.allclose(v2, v3)
         # update all with edge weights
         v1 = g.get_n_repr()[fld]
-        g.update_all(fn.src_mul_edge(src=fld, edge='e1'),
-                fn.sum(out=fld), apply_func)
+        g.update_all(fn.src_mul_edge(src=fld, edge='e1', out='m'),
+                fn.sum(msg='m', out=fld), apply_func)
         v2 = g.get_n_repr()[fld]
         g.set_n_repr({fld : v1})
-        g.update_all(fn.src_mul_edge(src=fld, edge='e2'),
-                fn.sum(out=fld), apply_func)
+        g.update_all(fn.src_mul_edge(src=fld, edge='e2', out='m'),
+                fn.sum(msg='m', out=fld), apply_func)
         v3 = g.get_n_repr()[fld]
         g.set_n_repr({fld : v1})
         g.update_all(message_func_edge, reduce_func, apply_func)
@@ -68,42 +68,40 @@ def test_send_and_recv():
     v = th.tensor([1, 2, 3, 9, 9, 0])
     def _test(fld):
         def message_func(hu, edge):
-            return hu[fld]
+            return {'m' : hu[fld]}
 
         def message_func_edge(hu, edge):
             if len(hu[fld].shape) == 1:
-                return hu[fld] * edge['e1']
+                return {'m' : hu[fld] * edge['e1']}
             else:
-                return hu[fld] * edge['e2']
+                return {'m' : hu[fld] * edge['e2']}
 
         def reduce_func(hv, msgs):
-            return {fld : th.sum(msgs, 1)}
+            return {fld : th.sum(msgs['m'], 1)}
 
         def apply_func(hu):
             return {fld : 2 * hu[fld]}
         g = generate_graph()
         # send and recv
         v1 = g.get_n_repr()[fld]
-        g.send_and_recv(u, v, fn.copy_src(src=fld),
-                fn.sum(out=fld), apply_func)
+        g.send_and_recv(u, v, fn.copy_src(src=fld, out='m'),
+                fn.sum(msg='m', out=fld), apply_func)
         v2 = g.get_n_repr()[fld]
         g.set_n_repr({fld : v1})
-        g.send_and_recv(u, v, message_func,
-                reduce_func, apply_func)
+        g.send_and_recv(u, v, message_func, reduce_func, apply_func)
         v3 = g.get_n_repr()[fld]
         assert th.allclose(v2, v3)
         # send and recv with edge weights
         v1 = g.get_n_repr()[fld]
-        g.send_and_recv(u, v, fn.src_mul_edge(src=fld, edge='e1'),
-                fn.sum(out=fld), apply_func)
+        g.send_and_recv(u, v, fn.src_mul_edge(src=fld, edge='e1', out='m'),
+                fn.sum(msg='m', out=fld), apply_func)
         v2 = g.get_n_repr()[fld]
         g.set_n_repr({fld : v1})
-        g.send_and_recv(u, v, fn.src_mul_edge(src=fld, edge='e2'),
-                fn.sum(out=fld), apply_func)
+        g.send_and_recv(u, v, fn.src_mul_edge(src=fld, edge='e2', out='m'),
+                fn.sum(msg='m', out=fld), apply_func)
         v3 = g.get_n_repr()[fld]
         g.set_n_repr({fld : v1})
-        g.send_and_recv(u, v, message_func_edge,
-                reduce_func, apply_func)
+        g.send_and_recv(u, v, message_func_edge, reduce_func, apply_func)
         v4 = g.get_n_repr()[fld]
         assert th.allclose(v2, v3)
         assert th.allclose(v3, v4)
@@ -123,22 +121,23 @@ def test_update_all_multi_fn():
         return {'v2': th.sum(msgs['m2'], 1)}
 
     g = generate_graph()
+    g.set_n_repr({'v1' : th.zeros((10,)), 'v2' : th.zeros((10,))})
     fld = 'f2'
     # update all, mix of builtin and UDF
     g.update_all([fn.copy_src(src=fld, out='m1'), message_func],
-                 [fn.sum(msgs='m1', out='v1'), reduce_func],
+                 [fn.sum(msg='m1', out='v1'), reduce_func],
                  None)
     v1 = g.get_n_repr()['v1']
     v2 = g.get_n_repr()['v2']
     assert th.allclose(v1, v2)
 
     # run builtin with single message and reduce
-    g.update_all(fn.copy_src(src=fld), fn.sum(out='v1'), None)
+    g.update_all(fn.copy_src(src=fld, out='m'), fn.sum(msg='m', out='v1'), None)
     v1 = g.get_n_repr()['v1']
     assert th.allclose(v1, v2)
 
-    # 1 message, 2 reduces, using anonymous repr
-    g.update_all(fn.copy_src(src=fld), [fn.sum(out='v2'), fn.sum(out='v3')], None)
+    # 1 message, 2 reduces
+    g.update_all(fn.copy_src(src=fld, out='m'), [fn.sum(msg='m', out='v2'), fn.sum(msg='m', out='v3')], None)
     v2 = g.get_n_repr()['v2']
     v3 = g.get_n_repr()['v3']
     assert th.allclose(v1, v2)
@@ -146,7 +145,7 @@ def test_update_all_multi_fn():
 
     # update all with edge weights, 2 message, 3 reduces
     g.update_all([fn.src_mul_edge(src=fld, edge='e1', out='m1'), fn.src_mul_edge(src=fld, edge='e2', out='m2')],
-                 [fn.sum(msgs='m1', out='v1'), fn.sum(msgs='m2', out='v2'), fn.sum(msgs='m1', out='v3')],
+                 [fn.sum(msg='m1', out='v1'), fn.sum(msg='m2', out='v2'), fn.sum(msg='m1', out='v3')],
                  None)
     v1 = g.get_n_repr()['v1']
     v2 = g.get_n_repr()['v2']
@@ -173,25 +172,30 @@ def test_send_and_recv_multi_fn():
         return {'v2' : th.sum(msgs['m2'], 1)}
 
     g = generate_graph()
+    g.set_n_repr({'v1' : th.zeros((10, D)), 'v2' : th.zeros((10, D)),
+        'v3' : th.zeros((10, D))})
     fld = 'f2'
 
     # send and recv, mix of builtin and UDF
     g.send_and_recv(u, v,
                     [fn.copy_src(src=fld, out='m1'), message_func],
-                    [fn.sum(msgs='m1', out='v1'), reduce_func],
+                    [fn.sum(msg='m1', out='v1'), reduce_func],
                     None)
     v1 = g.get_n_repr()['v1']
     v2 = g.get_n_repr()['v2']
     assert th.allclose(v1, v2)
 
     # run builtin with single message and reduce
-    g.send_and_recv(u, v, fn.copy_src(src=fld), fn.sum(out='v1'),
+    g.send_and_recv(u, v, fn.copy_src(src=fld, out='m'), fn.sum(msg='m', out='v1'),
                     None)
     v1 = g.get_n_repr()['v1']
     assert th.allclose(v1, v2)
 
-    # 1 message, 2 reduces, using anonymous repr
-    g.send_and_recv(u, v, fn.copy_src(src=fld), [fn.sum(out='v2'), fn.sum(out='v3')], None)
+    # 1 message, 2 reduces
+    g.send_and_recv(u, v,
+            fn.copy_src(src=fld, out='m'),
+            [fn.sum(msg='m', out='v2'), fn.sum(msg='m', out='v3')],
+            None)
     v2 = g.get_n_repr()['v2']
     v3 = g.get_n_repr()['v3']
     assert th.allclose(v1, v2)
@@ -200,7 +204,7 @@ def test_send_and_recv_multi_fn():
     # send and recv with edge weights, 2 message, 3 reduces
     g.send_and_recv(u, v,
                     [fn.src_mul_edge(src=fld, edge='e1', out='m1'), fn.src_mul_edge(src=fld, edge='e2', out='m2')],
-                    [fn.sum(msgs='m1', out='v1'), fn.sum(msgs='m2', out='v2'), fn.sum(msgs='m1', out='v3')],
+                    [fn.sum(msg='m1', out='v1'), fn.sum(msg='m2', out='v2'), fn.sum(msg='m1', out='v3')],
                     None)
     v1 = g.get_n_repr()['v1']
     v2 = g.get_n_repr()['v2']

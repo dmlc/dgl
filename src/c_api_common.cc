@@ -1,3 +1,8 @@
+/*!
+ *  Copyright (c) 2018 by Contributors
+ * \file c_runtime_api.cc
+ * \brief DGL C API common implementations
+ */
 #include "c_api_common.h"
 
 using tvm::runtime::TVMArgs;
@@ -19,7 +24,7 @@ DLManagedTensor* CreateTmpDLManagedTensor(const TVMArgValue& arg) {
 
 PackedFunc ConvertNDArrayVectorToPackedFunc(const std::vector<NDArray>& vec) {
     auto body = [vec](TVMArgs args, TVMRetValue* rv) {
-        size_t which = args[0];
+        int which = args[0];
         if (which >= vec.size()) {
             LOG(FATAL) << "invalid choice";
         } else {
@@ -29,5 +34,5 @@ PackedFunc ConvertNDArrayVectorToPackedFunc(const std::vector<NDArray>& vec) {
     return PackedFunc(body);
 }
 
-} // namespace dgl
+}  // namespace dgl
 

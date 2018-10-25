@@ -1,11 +1,15 @@
-// Graph class implementation
+/*!
+ *  Copyright (c) 2018 by Contributors
+ * \file graph/graph.cc
+ * \brief DGL graph index implementation
+ */
+#include <dgl/graph.h>
 #include <algorithm>
 #include <unordered_map>
 #include <set>
 #include <stack>
 #include <functional>
 #include <tuple>
-#include <dgl/graph.h>
 
 namespace dgl {
 namespace {
@@ -241,9 +245,9 @@ Graph::EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
     const auto& succ = adjlist_[src_id].succ;
     for (size_t k = 0; k < succ.size(); ++k) {
       if (succ[k] == dst_id) {
-	src.push_back(src_id);
-	dst.push_back(dst_id);
-	eid.push_back(adjlist_[src_id].edge_id[k]);
+        src.push_back(src_id);
+        dst.push_back(dst_id);
+        eid.push_back(adjlist_[src_id].edge_id[k]);
       }
     }
   }
@@ -399,7 +403,7 @@ Graph::EdgeArray Graph::Edges(bool sorted) const {
           return std::get<0>(t1) < std::get<0>(t2)
             || (std::get<0>(t1) == std::get<0>(t2) && std::get<1>(t1) < std::get<1>(t2));
         });
-    
+
     // make return arrays
     int64_t* src_ptr = static_cast<int64_t*>(src->data);
     int64_t* dst_ptr = static_cast<int64_t*>(dst->data);
@@ -628,7 +632,8 @@ Subgraph Graph::EdgeSubgraph(IdArray eids) const {
     rst.graph.AddEdge(oldv2newv[src_id], oldv2newv[dst_id]);
   }
 
-  rst.induced_vertices = IdArray::Empty({static_cast<int64_t>(nodes.size())}, eids->dtype, eids->ctx);
+  rst.induced_vertices = IdArray::Empty(
+      {static_cast<int64_t>(nodes.size())}, eids->dtype, eids->ctx);
   std::copy(nodes.begin(), nodes.end(), static_cast<int64_t*>(rst.induced_vertices->data));
 
   return rst;

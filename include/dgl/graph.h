@@ -1,8 +1,13 @@
-// DGL Graph interface
-#ifndef DGL_DGLGRAPH_H_
-#define DGL_DGLGRAPH_H_
+/*!
+ *  Copyright (c) 2018 by Contributors
+ * \file dgl/graph.h
+ * \brief DGL graph index class.
+ */
+#ifndef DGL_GRAPH_H_
+#define DGL_GRAPH_H_
 
-#include <stdint.h>
+#include <vector>
+#include <cstdint>
 #include "runtime/ndarray.h"
 
 namespace dgl {
@@ -19,7 +24,7 @@ class GraphOp;
 struct Subgraph;
 
 /*!
- * \brief Base dgl graph class.
+ * \brief Base dgl graph index class.
  *
  * DGL's graph is directed. Vertices are integers enumerated from zero. Edges
  * are uniquely identified by the two endpoints. Multi-edge is currently not
@@ -43,7 +48,7 @@ class Graph {
   } EdgeArray;
 
   /*! \brief default constructor */
-  Graph(bool multigraph = false) : is_multigraph_(multigraph) {}
+  explicit Graph(bool multigraph = false) : is_multigraph_(multigraph) {}
 
   /*! \brief default copy constructor */
   Graph(const Graph& other) = default;
@@ -194,7 +199,7 @@ class Graph {
    * \return the id arrays of the two endpoints of the edges.
    */
   EdgeArray InEdges(IdArray vids) const;
-  
+
   /*!
    * \brief Get the out edges of the vertex.
    * \note The returned src id array is filled with vid.
@@ -372,4 +377,4 @@ struct Subgraph {
 
 }  // namespace dgl
 
-#endif  // DGL_DGLGRAPH_H_
+#endif  // DGL_GRAPH_H_

@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file tvm/runtime/registry.h
+ * \file dgl/runtime/registry.h
  * \brief This file defines the TVM global function registry.
  *
  *  The registered functions will be made available to front-end
@@ -22,8 +22,8 @@
  *   });
  * \endcode
  */
-#ifndef TVM_RUNTIME_REGISTRY_H_
-#define TVM_RUNTIME_REGISTRY_H_
+#ifndef DGL_RUNTIME_REGISTRY_H_
+#define DGL_RUNTIME_REGISTRY_H_
 
 #include <string>
 #include <vector>
@@ -141,4 +141,4 @@ class Registry {
 
 }  // namespace runtime
 }  // namespace tvm
-#endif  // TVM_RUNTIME_REGISTRY_H_
+#endif  // DGL_RUNTIME_REGISTRY_H_

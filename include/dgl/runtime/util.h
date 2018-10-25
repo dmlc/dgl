@@ -1,10 +1,10 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file tvm/runtime/util.h
+ * \file dgl/runtime/util.h
  * \brief Useful runtime util.
  */
-#ifndef TVM_RUNTIME_UTIL_H_
-#define TVM_RUNTIME_UTIL_H_
+#ifndef DGL_RUNTIME_UTIL_H_
+#define DGL_RUNTIME_UTIL_H_
 
 #include "c_runtime_api.h"
 
@@ -50,4 +50,4 @@ enum TVMStructFieldKind : int {
 }  // namespace intrinsic
 }  // namespace ir
 }  // namespace tvm
-#endif  // TVM_RUNTIME_UTIL_H_
+#endif  // DGL_RUNTIME_UTIL_H_

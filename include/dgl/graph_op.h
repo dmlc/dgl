@@ -1,7 +1,12 @@
-// Graph operations
+/*!
+ *  Copyright (c) 2018 by Contributors
+ * \file dgl/graph_op.h
+ * \brief Operations on graph index.
+ */
 #ifndef DGL_GRAPH_OP_H_
 #define DGL_GRAPH_OP_H_
 
+#include <vector>
 #include "graph.h"
 
 namespace dgl {

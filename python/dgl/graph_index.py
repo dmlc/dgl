@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import ctypes
 import numpy as np
 import networkx as nx
-import scipy.sparse as sp
+import scipy
 
 from ._ffi.base import c_array
 from ._ffi.function import _init_api
@@ -529,6 +529,7 @@ class GraphIndex(object):
         """
         src, dst, eid = self.edges()
         ret = nx.MultiDiGraph() if self.is_multigraph() else nx.DiGraph()
+        ret.add_nodes_from(range(self.number_of_nodes()))
         for u, v, id in zip(src, dst, eid):
             ret.add_edge(u, v, id=id)
         return ret
@@ -554,16 +555,20 @@ class GraphIndex(object):
 
         num_nodes = nx_graph.number_of_nodes()
         self.add_nodes(num_nodes)
-        has_edge_id = 'id' in next(iter(nx_graph.edges))
+
+        if nx_graph.number_of_edges() == 0:
+            return
+
+        # nx_graph.edges(data=True) returns src, dst, attr_dict
+        has_edge_id = 'id' in next(iter(nx_graph.edges(data=True)))[-1]
         if has_edge_id:
             num_edges = nx_graph.number_of_edges()
             src = np.zeros((num_edges,), dtype=np.int64)
             dst = np.zeros((num_edges,), dtype=np.int64)
-            for e, attr in nx_graph.edges.items:
-                # MultiDiGraph returns a triplet in e while DiGraph returns a pair
+            for u, v, attr in nx_graph.edges(data=True):
                 eid = attr['id']
-                src[eid] = e[0]
-                dst[eid] = e[1]
+                src[eid] = u
+                dst[eid] = v
         else:
             src = []
             dst = []
@@ -657,29 +662,58 @@ class GraphIndex(object):
         return F.unpack(v, s.tolist())
 
 class SubgraphIndex(GraphIndex):
-    def __init__(self, handle, parent, induced_nodes, induced_edges):
-        super().__init__(handle)
+    """Graph index for subgraph.
 
+    Parameters
+    ----------
+    handle : GraphIndexHandle
+        The capi handle.
+    paranet : GraphIndex
+        The parent graph index.
+    induced_nodes : utils.Index
+        The parent node ids in this subgraph.
+    induced_edges : utils.Index
+        The parent edge ids in this subgraph.
+    """
+    def __init__(self, handle, parent, induced_nodes, induced_edges):
+        super(SubgraphIndex, self).__init__(handle)
         self._parent = parent
         self._induced_nodes = induced_nodes
         self._induced_edges = induced_edges
 
     def add_nodes(self, num):
+        """Add nodes. Disabled because SubgraphIndex is read-only."""
         raise RuntimeError('Readonly graph. Mutation is not allowed.')
 
     def add_edge(self, u, v):
+        """Add edges. Disabled because SubgraphIndex is read-only."""
         raise RuntimeError('Readonly graph. Mutation is not allowed.')
 
     def add_edges(self, u, v):
+        """Add edges. Disabled because SubgraphIndex is read-only."""
         raise RuntimeError('Readonly graph. Mutation is not allowed.')
 
     @property
-    def induced_edges(self):
-        return self._induced_edges
+    def induced_nodes(self):
+        """Return parent node ids.
+
+        Returns
+        -------
+        utils.Index
+            The parent node ids.
+        """
+        return self._induced_nodes
 
     @property
-    def induced_nodes(self):
-        return self._induced_nodes
+    def induced_edges(self):
+        """Return parent edge ids.
+
+        Returns
+        -------
+        utils.Index
+            The parent edge ids.
+        """
+        return self._induced_edges
 
 def disjoint_union(graphs):
     """Return a disjoint union of the input graphs.
@@ -754,8 +788,25 @@ def create_graph_index(graph_data=None, multigraph=False):
 
     handle = _CAPI_DGLGraphCreate(multigraph)
     gi = GraphIndex(handle)
-    if graph_data is not None:
+
+    if graph_data is None:
+        return gi
+
+    # scipy format
+    if isinstance(graph_data, scipy.sparse.spmatrix):
+        try:
+            gi.from_scipy_sparse_matrix(graph_data)
+            return gi
+        except:
+            raise Exception('Graph data is not a valid scipy sparse matrix.')
+
+    # networkx - any format
+    try:
         gi.from_networkx(graph_data)
+    except:
+        raise Exception('Error while creating graph from input of type "%s".'
+                         % type(graph_data))
+
     return gi
 
 _init_api("dgl.graph_index")
