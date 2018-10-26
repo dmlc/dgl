@@ -413,16 +413,19 @@ class ImmutableGraphIndex(object):
         return [ImmutableSubgraphIndex(gi, self, induced_n,
             induced_e) for gi, induced_n, induced_e in zip(gis, induced_nodes, induced_edges)]
 
-    def adjacency_matrix(self, edge_type='in'):
+    def adjacency_matrix(self, transpose=False):
         """Return the adjacency matrix representation of this graph.
-        For a directed graph, we can construct two adjacency matrices:
-        one stores in-edges as non-zero entries, the other stores out-edges
-        as non-zero entries.
+
+        By default, a row of returned adjacency matrix represents the destination
+        of an edge and the column represents the source.
+
+        When transpose is True, a row represents the source and a column represents
+        a destination.
 
         Parameters
         ----------
-        edge_type : a string
-            The edge type used for constructing an adjacency matrix.
+        transpose : bool
+            A flag to tranpose the returned adjacency matrix.
 
         Returns
         -------
@@ -430,12 +433,12 @@ class ImmutableGraphIndex(object):
             An object that returns tensor given context.
         """
         def get_adj(ctx):
-            new_mat = self._sparse.adjacency_matrix(edge_type)
+            new_mat = self._sparse.adjacency_matrix(transpose)
             return F.to_context(new_mat, ctx)
 
-        if edge_type == 'in' and 'in_adj' in self._cache:
+        if not transpose and 'in_adj' in self._cache:
             return self._cache['in_adj']
-        elif edge_type == 'out' and 'out_adj' in self._cache:
+        elif transpose and 'out_adj' in self._cache:
             return self._cache['out_adj']
         else:
             return utils.CtxCachedObject(lambda ctx: get_adj(ctx))

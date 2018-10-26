@@ -266,26 +266,29 @@ class ImmutableGraphIndex(object):
             induced_es.append(induced_e)
         return gis, induced_ns, induced_es
 
-    def adjacency_matrix(self, edge_type='in'):
+    def adjacency_matrix(self, transpose=False):
         """Return the adjacency matrix representation of this graph.
-        For a directed graph, we can construct two adjacency matrices:
-        one stores in-edges as non-zero entries, the other stores out-edges
-        as non-zero entries.
+
+        By default, a row of returned adjacency matrix represents the destination
+        of an edge and the column represents the source.
+
+        When transpose is True, a row represents the source and a column represents
+        a destination.
 
         Parameters
         ----------
-        edge_type : a string
-            The edge type used for constructing an adjacency matrix.
+        transpose : bool
+            A flag to tranpose the returned adjacency matrix.
 
         Returns
         -------
         NDArray
             An object that returns tensor given context.
         """
-        if edge_type == 'in':
-            mat = self._in_csr
-        else:
+        if transpose:
             mat = self._out_csr
+        else:
+            mat = self._in_csr
 
         indices = mat.indices
         indptr = mat.indptr

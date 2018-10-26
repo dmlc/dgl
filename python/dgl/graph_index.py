@@ -470,20 +470,33 @@ class GraphIndex(object):
         induced_nodes = utils.toindex(rst(1))
         return SubgraphIndex(rst(0), self, induced_nodes, e)
 
-    def adjacency_matrix(self, edge_type='in'):
+    def adjacency_matrix(self, transpose=False):
         """Return the adjacency matrix representation of this graph.
+
+        By default, a row of returned adjacency matrix represents the destination
+        of an edge and the column represents the source.
+
+        When transpose is True, a row represents the source and a column represents
+        a destination.
+
+        Parameters
+        ----------
+        transpose : bool
+            A flag to tranpose the returned adjacency matrix.
 
         Returns
         -------
         utils.CtxCachedObject
             An object that returns tensor given context.
         """
-        assert edge_type == 'in'
         if not 'adj' in self._cache:
             src, dst, _ = self.edges(sorted=False)
             src = F.unsqueeze(src.tousertensor(), 0)
             dst = F.unsqueeze(dst.tousertensor(), 0)
-            idx = F.pack([dst, src])
+            if transpose:
+                idx = F.pack([src, dst])
+            else:
+                idx = F.pack([dst, src])
             n = self.number_of_nodes()
             dat = F.ones((self.number_of_edges(),))
             mat = F.sparse_tensor(idx, dat, [n, n])
