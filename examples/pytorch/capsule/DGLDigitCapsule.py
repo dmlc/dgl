@@ -4,13 +4,6 @@ from torch import nn
 from torch.nn import functional as F
 
 
-def squash(s, dim=2):
-    sq = torch.sum(s ** 2, dim=dim, keepdim=True)
-    s_std = torch.sqrt(sq)
-    s = (sq / (1.0 + sq)) * (s / s_std)
-    return s
-
-
 class DGLDigitCapsuleLayer(nn.Module):
     def __init__(self, input_capsule_dim=8, input_capsule_num=1152, output_capsule_num=10, output_capsule_dim=16,
                  num_routing=3, device='cpu'
@@ -81,3 +74,10 @@ class DGLDigitCapsuleLayer(nn.Module):
     def capsule_update(msg):
         v_j = squash(msg['h'])
         return {'h': v_j}
+
+
+def squash(s, dim=2):
+    sq = torch.sum(s ** 2, dim=dim, keepdim=True)
+    s_std = torch.sqrt(sq)
+    s = (sq / (1.0 + sq)) * (s / s_std)
+    return s
