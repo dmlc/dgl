@@ -54,7 +54,7 @@ class GCN(nn.Module):
             # apply dropout
             if self.dropout:
                 self.g.apply_nodes(apply_node_func=
-                        lambda node: {'h': F.dropout(node['h'], p=self.dropout)})
+                        lambda node: {'h': F.dropout(node['h'], p=self.dropout, training=self.training)})
             self.g.update_all(fn.copy_src(src='h', out='m'),
                               fn.sum(msg='m', out='h'),
                               layer)
