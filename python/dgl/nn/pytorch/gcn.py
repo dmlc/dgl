@@ -30,7 +30,6 @@ class NodeUpdateModule(nn.Module):
 class GraphConvolutionLayer(nn.Module):
     """Single graph convolution layer as in https://arxiv.org/abs/1609.02907."""
     def __init__(self,
-                 g,
                  node_field,
                  in_feats,
                  out_feats,
@@ -42,7 +41,6 @@ class GraphConvolutionLayer(nn.Module):
             just AH, where A is the adjacency matrix and H is current node features.
         """
         super(GraphConvolutionLayer, self).__init__()
-        self.g = g
 
         self.node_field = node_field
 
@@ -55,20 +53,20 @@ class GraphConvolutionLayer(nn.Module):
         self.update_func = NodeUpdateModule(node_field, in_feats, out_feats,
                                             activation)
 
-    def forward(self, features, u=ALL, v=ALL):
-        self.g.set_n_repr({self.node_field : features})
+    def forward(self, g, features, u=ALL, v=ALL):
+        g.set_n_repr({self.node_field : features})
 
         if self.dropout:
-            self.g.apply_nodes(u, apply_node_func=
-                               lambda node: {self.node_field: self.dropout(node[self.node_field])})
+            g.apply_nodes(u, apply_node_func=
+            lambda node: {self.node_field: self.dropout(node[self.node_field])})
 
         if is_all(u) and is_all(v):
-            self.g.update_all(fn.copy_src(src=self.node_field, out='m'),
-                              fn.sum(msg='m', out=self.node_field),
-                              self.update_func)
+            g.update_all(fn.copy_src(src=self.node_field, out='m'),
+                         fn.sum(msg='m', out=self.node_field),
+                         self.update_func)
         else:
-            self.g.send_and_recv(u, v,
-                                 fn.copy_src(src=self.node_field, out='m'),
-                                 fn.sum(msg='m', out=self.node_field),
-                                 self.update_func)
-        return self.g.pop_n_repr(self.node_field)
+            g.send_and_recv(u, v,
+                            fn.copy_src(src=self.node_field, out='m'),
+                            fn.sum(msg='m', out=self.node_field),
+                            self.update_func)
+        return g.pop_n_repr(self.node_field)
