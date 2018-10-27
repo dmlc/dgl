@@ -53,9 +53,7 @@ class GraphConvolutionLayer(nn.Module):
         self.update_func = NodeUpdateModule(node_field, in_feats, out_feats,
                                             activation)
 
-    def forward(self, g, features, u=ALL, v=ALL):
-        g.set_n_repr({self.node_field : features})
-
+    def forward(self, g, u=ALL, v=ALL):
         if self.dropout:
             g.apply_nodes(u, apply_node_func=
             lambda node: {self.node_field: self.dropout(node[self.node_field])})
@@ -69,4 +67,4 @@ class GraphConvolutionLayer(nn.Module):
                             fn.copy_src(src=self.node_field, out='m'),
                             fn.sum(msg='m', out=self.node_field),
                             self.update_func)
-        return g.pop_n_repr(self.node_field)
+        return g
