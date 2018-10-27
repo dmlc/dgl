@@ -12,27 +12,16 @@ from ...base import ALL, is_all
 
 
 class NodeUpdateModule(nn.Module):
-    def __init__(self, node_field, in_feats, out_feats, activation=None,
-                 dropout=0):
+    def __init__(self, node_field, in_feats, out_feats, activation=None):
         super(NodeUpdateModule, self).__init__()
 
         self.node_field = node_field
-
-        if dropout:
-            self.dropout = nn.Dropout(p=dropout)
-        else:
-            self.dropout = 0.
 
         self.linear = nn.Linear(in_feats, out_feats)
         self.activation = activation
 
     def forward(self, node):
-        if self.dropout:
-            h = self.dropout(node[self.node_field])
-        else:
-            h = node[self.node_field]
-
-        h = self.linear(h)
+        h = self.linear(node[self.node_field])
         if self.activation:
             h = self.activation(h)
 
@@ -57,12 +46,21 @@ class GraphConvolutionLayer(nn.Module):
 
         self.node_field = node_field
 
+        if dropout:
+            self.dropout = nn.Dropout(p=dropout)
+        else:
+            self.dropout = 0.
+
         # input layer
         self.update_func = NodeUpdateModule(node_field, in_feats, out_feats,
-                                            activation, dropout)
+                                            activation)
 
     def forward(self, features, u=ALL, v=ALL):
         self.g.set_n_repr({self.node_field : features})
+
+        if self.dropout:
+            self.g.apply_nodes(u, apply_node_func=
+                               lambda node: {self.node_field: self.dropout(node[self.node_field])})
 
         if is_all(u) and is_all(v):
             self.g.update_all(fn.copy_src(src=self.node_field, out='m'),

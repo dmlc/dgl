@@ -21,24 +21,14 @@ def gcn_reduce(node, msgs):
     return {'h' : torch.sum(msgs['m'], 1)}
 
 class NodeApplyModule(nn.Module):
-    def __init__(self, in_feats, out_feats, activation=None, dropout=0):
+    def __init__(self, in_feats, out_feats, activation=None):
         super(NodeApplyModule, self).__init__()
-
-        if dropout:
-            self.dropout = nn.Dropout(p=dropout)
-        else:
-            self.dropout = 0.
 
         self.linear = nn.Linear(in_feats, out_feats)
         self.activation = activation
 
     def forward(self, node):
-        if self.dropout:
-            h = self.dropout(node['h'])
-        else:
-            h = node['h']
-
-        h = self.linear(h)
+        h = self.linear(node['h'])
         if self.activation:
             h = self.activation(h)
 
@@ -55,22 +45,33 @@ class GCN(nn.Module):
                  dropout):
         super(GCN, self).__init__()
         self.g = g
-        self.dropout = dropout
+
+        if dropout:
+            self.dropout = nn.Dropout(p=dropout)
+        else:
+            self.dropout = 0.
 
         # input layer
-        self.layers = nn.ModuleList([NodeApplyModule(in_feats, n_hidden, activation, dropout)])
+        self.layers = nn.ModuleList([NodeApplyModule(in_feats, n_hidden, activation)])
 
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.append(NodeApplyModule(n_hidden, n_hidden, activation, dropout))
+            self.layers.append(NodeApplyModule(n_hidden, n_hidden, activation))
 
         # output layer
         self.layers.append(NodeApplyModule(n_hidden, n_classes))
 
     def forward(self, features):
         self.g.set_n_repr({'h' : features})
-        for layer in self.layers:
+
+        # No dropout for the first layer
+        self.g.update_all(gcn_msg, gcn_reduce, self.layers[0])
+
+        for layer in self.layers[1:]:
             # apply dropout
+            if self.dropout:
+                self.g.apply_nodes(apply_node_func=
+                               lambda node: {'h': self.dropout(node['h'])})
             self.g.update_all(gcn_msg, gcn_reduce, layer)
         return self.g.pop_n_repr('h')
 
@@ -114,7 +115,6 @@ def main(args):
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
-
         if epoch >= 3:
             t0 = time.time()
         # forward
