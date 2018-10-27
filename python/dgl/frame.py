@@ -613,7 +613,6 @@ class FrameRef(MutableMapping):
 
         self.append(feat_placeholders)
 
-
     def update_rows(self, query, data, inplace):
         """Update the rows.
 
