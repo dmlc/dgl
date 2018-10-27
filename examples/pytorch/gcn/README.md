@@ -2,7 +2,7 @@ Graph Convolutional Networks (GCN)
 ============
 
 Paper link: [https://arxiv.org/abs/1609.02907](https://arxiv.org/abs/1609.02907)
-Author's code repo: [https://github.com/tkipf/gcn](https://github.com/tkipf/gcn)
+Author's code repo: [https://github.com/tkipf/gcn](https://github.com/tkipf/pygcn)
 
 The folder contains two different implementations using DGL.
 
@@ -16,7 +16,8 @@ Defining the model on only one node and edge makes it hard to fully utilize GPUs
     # src is a tensor of shape (B, D). B is the number of edges being batched.
     return {'m' : src['h']}
   ```
-* The reduce function `gcn_reduce` also accumulates messages for a batch of nodes. We batch the messages on the second dimension for the `msgs` argument:
+* The reduce function `gcn_reduce` also accumulates messages for a batch of nodes. We batch the messages on the second dimension for the `msgs` argument, 
+which for example can correspond to the neighbors of the nodes:
   ```python
   def gcn_reduce(node, msgs):
     # The msgs is a tensor of shape (B, deg, D). B is the number of nodes in the batch;
