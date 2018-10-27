@@ -139,7 +139,7 @@ pipeline {
                 stage('CPU') {
                     agent {
                         docker {
-                            image 'zhengda1936/dgl-mxnet-cpu:v2'
+                            image 'zhengda1936/dgl-mxnet-cpu:v3'
                         }
                     }
                     stages {
