@@ -143,8 +143,10 @@ class DGLMPN(nn.Module):
         n_edges = mol_graph.number_of_edges()
 
         mol_graph = self.run(mol_graph, mol_line_graph)
-        mol_graph_list = unbatch(mol_graph)
-        g_repr = torch.stack([g.get_n_repr()['h'].mean(0) for g in mol_graph_list], 0)
+
+        # TODO: replace with unbatch or readout
+        n_repr = mol_graph.pop_n_repr('h').split(mol_graph.batch_num_nodes)
+        g_repr = torch.stack([n_repr[i].mean(0) for i in range(n_samples)], 0)
 
         self.n_samples_total += n_samples
         self.n_nodes_total += n_nodes

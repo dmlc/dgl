@@ -8,6 +8,7 @@ from dgl import DGLGraph, batch, unbatch
 import dgl.function as DGLF
 from .line_profiler_integration import profile
 import os
+import numpy as np
 
 ELEM_LIST = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca', 'Fe', 'Al', 'I', 'B', 'K', 'Se', 'Zn', 'H', 'Cu', 'Mn', 'unknown']
 
@@ -27,8 +28,8 @@ def onek_encoding_unk(x, allowable_set):
 # the 2-D graph first, then enumerate all possible 3-D forms and find the
 # one with highest score.
 def atom_features(atom):
-    return (torch.Tensor(onek_encoding_unk(atom.GetSymbol(), ELEM_LIST) 
-            + onek_encoding_unk(atom.GetDegree(), [0,1,2,3,4,5]) 
+    return (torch.Tensor(onek_encoding_unk(atom.GetSymbol(), ELEM_LIST)
+            + onek_encoding_unk(atom.GetDegree(), [0,1,2,3,4,5])
             + onek_encoding_unk(atom.GetFormalCharge(), [-1,-2,1,2,0])
             + [atom.GetIsAromatic()]))
 
@@ -194,8 +195,9 @@ class DGLJTMPN(nn.Module):
                 cand_graphs, cand_line_graph, tree_mess_src_edges, tree_mess_tgt_edges,
                 tree_mess_tgt_nodes, mol_tree_batch)
 
-        cand_graphs = unbatch(cand_graphs)
-        g_repr = torch.stack([g.get_n_repr()['h'].mean(0) for g in cand_graphs], 0)
+        # TODO: replace with unbatch or readout
+        n_repr = cand_graphs.pop_n_repr('h').split(cand_graphs.batch_num_nodes)
+        g_repr = torch.stack([n_repr[i].mean(0) for i in range(n_samples)], 0)
 
         self.n_samples_total += n_samples
         self.n_nodes_total += n_nodes
