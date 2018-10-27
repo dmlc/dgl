@@ -135,6 +135,7 @@ class Column(object):
         feats = F.convert_to(feats, self.data)
         self.data = F.pack([self.data, feats])
 
+
     @staticmethod
     def create(data):
         """Create a new column using the given data."""
@@ -611,6 +612,7 @@ class FrameRef(MutableMapping):
             feat_placeholders[key] = new_data
 
         self.append(feat_placeholders)
+
 
     def update_rows(self, query, data, inplace):
         """Update the rows.
