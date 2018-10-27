@@ -11,8 +11,8 @@ from .._ffi.runtime_ctypes import TypeCode, tvm_shape_index_t
 from .. import ndarray as nd
 
 # Tensor types
-Tensor = th.Tensor
-SparseTensor = th.sparse.FloatTensor
+Tensor = th.Tensor  # replace by tensor and is_tensor
+SparseTensor = th.sparse.FloatTensor  # replace by coo_tensor and csr_tensor
 
 # Data types
 float16 = th.float16
@@ -29,7 +29,7 @@ tensor = th.tensor
 sparse_tensor = th.sparse.FloatTensor
 sum = th.sum
 max = th.max
-stack = th.stack
+stack = th.stack  # replaced by cat
 
 def astype(a, ty):
     return a.type(ty)
@@ -37,13 +37,13 @@ def astype(a, ty):
 def asnumpy(a):
     return a.cpu().numpy()
 
-def from_numpy(np_data):
+def from_numpy(np_data):  # delete
     return th.from_numpy(np_data)
 
-def pack(tensors, dim=0):
+def pack(tensors, dim=0):  # replace by cat
     return th.cat(tensors, dim)
 
-def unpack(x, indices_or_sections=1):
+def unpack(x, indices_or_sections=1):  # replace by split
     return th.split(x, indices_or_sections)
 
 def shape(x):
@@ -60,22 +60,21 @@ def gather_row(data, row_index):
 def scatter_row(data, row_index, value):
     return data.index_copy(0, row_index, value)
 
-def broadcast_to(x, to_array):
+def broadcast_to(x, to_array):  # replaced by full_1d
     return x + th.zeros_like(to_array)
 
-nonzero = th.nonzero
+nonzero = th.nonzero  # delete
 squeeze = th.squeeze
 unsqueeze = th.unsqueeze
 reshape = th.reshape
 zeros = th.zeros
 ones = th.ones
-zeros = th.zeros
 spmm = th.spmm
 sort = th.sort
 arange = th.arange
-mul = th.mul
+mul = th.mul  # delete
 
-def to_context(arr, ctx):
+def to_context(arr, ctx):  # rename to copy_to
     if ctx is None:
         return arr
     elif ctx.device_type == TVMContext.STR2MASK['cuda']:
@@ -93,7 +92,7 @@ def get_context(arr):
         return TVMContext(
                 TVMContext.STR2MASK[arr.device.type], arr.device.index)
 
-def get_tvmtype(arr):
+def get_tvmtype(arr):  # delete
     arr_dtype = arr.dtype
     if arr_dtype in (th.float16, th.half):
         return TVMType('float16')
