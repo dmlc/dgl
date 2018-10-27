@@ -37,9 +37,6 @@ def data_type_dict():
     """
     pass
 
-def context_dict():
-    pass
-
 def tensor(data, dtype=None):
     """Create a tensor given the data and data type.
 
