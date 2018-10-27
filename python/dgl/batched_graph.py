@@ -154,19 +154,31 @@ def unbatch(graph):
     ----------
     graph : BatchedDGLGraph
         The batched graph.
+
+    Notes
+    -----
+    Unbatching will partition each field tensor of the batched graph into
+    smaller partitions.  This is usually wasteful.
+
+    For simpler tasks such as node/edge state aggregation by example,
+    try to use BatchedDGLGraph.readout().
     """
     assert isinstance(graph, BatchedDGLGraph)
     bsize = graph.batch_size
     bn = graph.batch_num_nodes
     be = graph.batch_num_edges
-    bn_offset = [0] + np.cumsum(bn).tolist()
-    be_offset = [0] + np.cumsum(be).tolist()
     pttns = gi.disjoint_partition(graph._graph, utils.toindex(bn))
     # split the frames
-    node_frames = [FrameRef(graph._node_frame, slice(bn_offset[i], bn_offset[i+1]))
-                   for i in range(bsize)]
-    edge_frames = [FrameRef(graph._edge_frame, slice(be_offset[i], be_offset[i+1]))
-                   for i in range(bsize)]
+    node_frames = [FrameRef() for i in range(bsize)]
+    edge_frames = [FrameRef() for i in range(bsize)]
+    for attr, col in graph._node_frame.items():
+        col_splits = F.unpack(col, bn)
+        for i in range(bsize):
+            node_frames[i][attr] = col_splits[i]
+    for attr, col in graph._edge_frame.items():
+        col_splits = F.unpack(col, be)
+        for i in range(bsize):
+            edge_frames[i][attr] = col_splits[i]
     return [DGLGraph(graph_data=pttns[i],
                      node_frame=node_frames[i],
                      edge_frame=edge_frames[i]) for i in range(bsize)]
