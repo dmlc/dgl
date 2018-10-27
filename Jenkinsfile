@@ -21,11 +21,17 @@ def build_dgl() {
     }
 }
 
-def unit_test() {
+def pytorch_unit_test() {
     withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
         sh 'nosetests tests -v --with-xunit'
         sh 'nosetests tests/pytorch -v --with-xunit'
         sh 'nosetests tests/graph_index -v --with-xunit'
+    }
+}
+
+def mxnet_unit_test() {
+    withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
+        sh 'nosetests tests/mxnet -v --with-xunit'
     }
 }
 
@@ -55,7 +61,7 @@ pipeline {
                 }
             }
         }
-        stage('Build and Test') {
+        stage('Build and Test on Pytorch') {
             parallel {
                 stage('CPU') {
                     agent {
@@ -76,7 +82,7 @@ pipeline {
                         }
                         stage('UNIT TEST') {
                             steps {
-                                unit_test()
+                                pytorch_unit_test()
                             }
                         }
                         stage('EXAMPLE TEST') {
@@ -111,12 +117,50 @@ pipeline {
                         }
                         stage('UNIT TEST') {
                             steps {
-                                unit_test()
+                                pytorch_unit_test()
                             }
                         }
                         stage('EXAMPLE TEST') {
                             steps {
                                 example_test('GPU')
+                            }
+                        }
+                    }
+                    post {
+                        always {
+                            junit '*.xml'
+                        }
+                    }
+                }
+            }
+        }
+        stage('Build and Test on MXNet') {
+            parallel {
+                stage('CPU') {
+                    agent {
+                        docker {
+                            image 'zhengda1936/dgl-mxnet-cpu:v3'
+                        }
+                    }
+                    stages {
+                        stage('SETUP') {
+                            steps {
+                                setup()
+                            }
+                        }
+                        stage('BUILD') {
+                            steps {
+                                build_dgl()
+                            }
+                        }
+                        stage('UNIT TEST') {
+                            steps {
+                                mxnet_unit_test()
+                            }
+                        }
+                        stage('EXAMPLE TEST') {
+                            steps {
+                                example_test('CPU')
                             }
                         }
                     }

@@ -209,14 +209,13 @@ def test_reduce_0deg():
     g.add_edge(3, 0)
     g.add_edge(4, 0)
     def _message(src, edge):
-        return src
+        return {'m' : src['h']}
     def _reduce(node, msgs):
-        assert msgs is not None
-        return node + msgs.sum(1)
+        return {'h' : node['h'] + msgs['m'].sum(1)}
     old_repr = mx.nd.random.normal(shape=(5, 5))
-    g.set_n_repr(old_repr)
+    g.set_n_repr({'h': old_repr})
     g.update_all(_message, _reduce)
-    new_repr = g.get_n_repr()
+    new_repr = g.get_n_repr()['h']
 
     assert np.allclose(new_repr[1:].asnumpy(), old_repr[1:].asnumpy())
     assert np.allclose(new_repr[0].asnumpy(), old_repr.sum(0).asnumpy())
@@ -226,25 +225,24 @@ def test_pull_0deg():
     g.add_nodes(2)
     g.add_edge(0, 1)
     def _message(src, edge):
-        return src
+        return {'m' : src['h']}
     def _reduce(node, msgs):
-        assert msgs is not None
-        return msgs.sum(1)
+        return {'h' : msgs['m'].sum(1)}
 
     old_repr = mx.nd.random.normal(shape=(2, 5))
-    g.set_n_repr(old_repr)
+    g.set_n_repr({'h' : old_repr})
     g.pull(0, _message, _reduce)
-    new_repr = g.get_n_repr()
+    new_repr = g.get_n_repr()['h']
     assert np.allclose(new_repr[0].asnumpy(), old_repr[0].asnumpy())
     assert np.allclose(new_repr[1].asnumpy(), old_repr[1].asnumpy())
     g.pull(1, _message, _reduce)
-    new_repr = g.get_n_repr()
+    new_repr = g.get_n_repr()['h']
     assert np.allclose(new_repr[1].asnumpy(), old_repr[0].asnumpy())
 
     old_repr = mx.nd.random.normal(shape=(2, 5))
-    g.set_n_repr(old_repr)
+    g.set_n_repr({'h' : old_repr})
     g.pull([0, 1], _message, _reduce)
-    new_repr = g.get_n_repr()
+    new_repr = g.get_n_repr()['h']
     assert np.allclose(new_repr[0].asnumpy(), old_repr[0].asnumpy())
     assert np.allclose(new_repr[1].asnumpy(), old_repr[0].asnumpy())
 
