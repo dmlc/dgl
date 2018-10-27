@@ -64,10 +64,7 @@ class GCN(nn.Module):
     def forward(self, features):
         self.g.set_n_repr({'h' : features})
 
-        # No dropout for the first layer
-        self.g.update_all(gcn_msg, gcn_reduce, self.layers[0])
-
-        for layer in self.layers[1:]:
+        for layer in self.layers:
             # apply dropout
             if self.dropout:
                 self.g.apply_nodes(apply_node_func=
