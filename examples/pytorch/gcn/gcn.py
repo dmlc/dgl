@@ -24,19 +24,23 @@ class NodeApplyModule(nn.Module):
     def __init__(self, in_feats, out_feats, activation=None, dropout=0):
         super(NodeApplyModule, self).__init__()
 
+        if dropout:
+            self.dropout = nn.Dropout(p=dropout)
+        else:
+            self.dropout = 0.
+
         self.linear = nn.Linear(in_feats, out_feats)
         self.activation = activation
-        self.dropout = dropout
-        if self.dropout:
-            self.dropout_layer = nn.Dropout(p=dropout)
 
     def forward(self, node):
-        h = self.linear(node['h'])
+        if self.dropout:
+            h = self.dropout(node['h'])
+        else:
+            h = node['h']
 
+        h = self.linear(h)
         if self.activation:
             h = self.activation(h)
-        if self.dropout:
-            h = self.dropout_layer(h)
 
         return {'h' : h}
 

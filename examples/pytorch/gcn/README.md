@@ -1,8 +1,9 @@
 Graph Convolutional Networks (GCN)
 ============
 
-Paper link: [https://arxiv.org/abs/1609.02907](https://arxiv.org/abs/1609.02907)
-Author's code repo: [https://github.com/tkipf/pygcn](https://github.com/tkipf/pygcn)
+- Paper link: [https://arxiv.org/abs/1609.02907](https://arxiv.org/abs/1609.02907)
+- Author's code repo: [https://github.com/tkipf/gcn](https://github.com/tkipf/gcn). Note that the original code is 
+implemented with Tensorflow for the paper. 
 
 The folder contains two different implementations using DGL.
 
