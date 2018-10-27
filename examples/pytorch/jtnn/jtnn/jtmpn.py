@@ -196,6 +196,8 @@ class DGLJTMPN(nn.Module):
                 tree_mess_tgt_nodes, mol_tree_batch)
 
         # TODO: replace with unbatch or readout
+        #cand_graphs = unbatch(cand_graphs)
+        #g_repr = torch.stack([g.get_n_repr()['h'].mean(0) for g in cand_graphs], 0)
         n_repr = cand_graphs.pop_n_repr('h').split(cand_graphs.batch_num_nodes)
         g_repr = torch.stack([n_repr[i].mean(0) for i in range(n_samples)], 0)
 
