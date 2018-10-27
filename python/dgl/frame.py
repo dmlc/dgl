@@ -63,7 +63,7 @@ class Column(object):
 
         Parameters
         ----------
-        idx : utils.Index
+        idx : slice or utils.Index
             The index.
 
         Returns
@@ -71,8 +71,11 @@ class Column(object):
         Tensor
             The feature data
         """
-        user_idx = idx.tousertensor(F.get_context(self.data))
-        return F.gather_row(self.data, user_idx)
+        if isinstance(idx, slice):
+            return self.data[idx]
+        else:
+            user_idx = idx.tousertensor(F.get_context(self.data))
+            return F.gather_row(self.data, user_idx)
 
     def __setitem__(self, idx, feats):
         """Update the feature data given the index.
@@ -82,7 +85,7 @@ class Column(object):
 
         Parameters
         ----------
-        idx : utils.Index
+        idx : utils.Index or slice
             The index.
         feats : Tensor
             The new features.
@@ -94,7 +97,7 @@ class Column(object):
 
         Parameters
         ----------
-        idx : utils.Index
+        idx : utils.Index or slice
             The index.
         feats : Tensor
             The new features.
@@ -105,12 +108,23 @@ class Column(object):
         if feat_scheme != self.scheme:
             raise DGLError("Cannot update column of scheme %s using feature of scheme %s."
                     % (feat_scheme, self.scheme))
-        user_idx = idx.tousertensor(F.get_context(self.data))
+
+        if isinstance(idx, utils.Index):
+            idx = idx.tousertensor(F.get_context(self.data))
+
         if inplace:
             # TODO(minjie): do not use [] operator directly
-            self.data[user_idx] = feats
+            self.data[idx] = feats
         else:
-            self.data = F.scatter_row(self.data, user_idx, feats)
+            if isinstance(idx, slice):
+                # for contiguous indices pack is usually faster than scatter row
+                self.data = F.pack([
+                    self.data[:idx.start],
+                    feats,
+                    self.data[idx.stop:],
+                    ])
+            else:
+                self.data = F.scatter_row(self.data, idx, feats)
 
     @staticmethod
     def create(data):
@@ -345,11 +359,13 @@ class FrameRef(MutableMapping):
     def __init__(self, frame=None, index=None):
         self._frame = frame if frame is not None else Frame()
         if index is None:
+            # _index_data can be either a slice or an iterable
             self._index_data = slice(0, self._frame.num_rows)
         else:
             # TODO(minjie): check no duplication
             self._index_data = index
         self._index = None
+        self._index_or_slice = None
 
     @property
     def schemes(self):
@@ -407,6 +423,21 @@ class FrameRef(MutableMapping):
                 self._index = utils.toindex(self._index_data)
         return self._index
 
+    def index_or_slice(self):
+        """Returns the index object or the slice
+
+        Returns
+        -------
+        utils.Index or slice
+            The index or slice
+        """
+        if self._index_or_slice is None:
+            if self.is_contiguous():
+                self._index_or_slice = self._index_data
+            else:
+                self._index_or_slice = utils.toindex(self._index_data)
+        return self._index_or_slice
+
     def __contains__(self, name):
         """Return whether the column name exists."""
         return name in self._frame
@@ -427,8 +458,8 @@ class FrameRef(MutableMapping):
         """Get data from the frame.
 
         If the provided key is string, the corresponding column data will be returned.
-        If the provided key is an index, the corresponding rows will be selected. The
-        returned rows are saved in a lazy dictionary so only the real selection happens
+        If the provided key is an index or a slice, the corresponding rows will be selected.
+        The returned rows are saved in a lazy dictionary so only the real selection happens
         when the explicit column name is provided.
         
         Examples (using pytorch)
@@ -442,7 +473,7 @@ class FrameRef(MutableMapping):
         
         Parameters
         ----------
-        key : str or utils.Index
+        key : str or utils.Index or slice
             The key.
 
         Returns
@@ -475,14 +506,14 @@ class FrameRef(MutableMapping):
         if self.is_span_whole_column():
             return col.data
         else:
-            return col[self.index()]
+            return col[self.index_or_slice()]
 
     def select_rows(self, query):
         """Return the rows given the query.
 
         Parameters
         ----------
-        query : utils.Index
+        query : utils.Index or slice
             The rows to be selected.
 
         Returns
@@ -490,8 +521,8 @@ class FrameRef(MutableMapping):
         utils.LazyDict
             The lazy dictionary from str to the selected data.
         """
-        rowids = self._getrowid(query)
-        return utils.LazyDict(lambda key: self._frame[key][rowids], keys=self.keys())
+        rows = self._getrows(query)
+        return utils.LazyDict(lambda key: self._frame[key][rows], keys=self.keys())
 
     def __setitem__(self, key, val):
         """Update the data in the frame.
@@ -552,7 +583,7 @@ class FrameRef(MutableMapping):
                 #               ' Did you forget to init the column using `set_n_repr`'
                 #               ' or `set_e_repr`?' % name)
             fcol = self._frame[name]
-            fcol.update(self.index(), data, inplace)
+            fcol.update(self.index_or_slice(), data, inplace)
 
     def update_rows(self, query, data, inplace):
         """Update the rows.
@@ -565,30 +596,31 @@ class FrameRef(MutableMapping):
 
         Parameters
         ----------
-        query : utils.Index
+        query : utils.Index or slice
             The rows to be updated.
         data : dict-like
             The row data.
         inplace : bool
             True if the update is performed inplacely.
         """
-        rowids = self._getrowid(query)
+        rows = self._getrows(query)
         for key, col in data.items():
             if key not in self:
                 # add new column
-                tmpref = FrameRef(self._frame, rowids)
+                tmpref = FrameRef(self._frame, rows)
                 tmpref.update_column(key, col, inplace)
                 #raise DGLError('Cannot update rows. Column "%s" does not exist.'
                 #               ' Did you forget to init the column using `set_n_repr`'
                 #               ' or `set_e_repr`?' % key)
             else:
-                self._frame[key].update(rowids, col, inplace)
+                self._frame[key].update(rows, col, inplace)
 
     def __delitem__(self, key):
         """Delete data in the frame.
 
         If the provided key is a string, the corresponding column will be deleted.
-        If the provided key is an index object, the corresponding rows will be deleted.
+        If the provided key is an index object or a slice, the corresponding rows will
+        be deleted.
 
         Please note that "deleted" rows are not really deleted, but simply removed
         in the reference. As a result, if two FrameRefs point to the same Frame, deleting
@@ -615,15 +647,17 @@ class FrameRef(MutableMapping):
 
         Parameters
         ----------
-        query : utils.Index
+        query : utils.Index or slice
             The rows to be deleted.
         """
-        query = query.tolist()
+        if isinstance(query, slice):
+            query = range(query.start, query.stop)
+        else:
+            query = query.tolist()
+
         if isinstance(self._index_data, slice):
-            self._index_data = list(range(
-                self._index_data.start, self._index_data.stop))
-        arr = np.array(self._index_data, dtype=np.int32)
-        self._index_data = list(np.delete(arr, query))
+            self._index_data = range(self._index_data.start, self._index_data.stop)
+        self._index_data = list(np.delete(self._index_data, query))
         self._clear_cache()
 
     def append(self, other):
@@ -642,8 +676,11 @@ class FrameRef(MutableMapping):
         if span_whole:
             self._index_data = slice(0, self._frame.num_rows)
         elif contiguous:
-            new_idx = list(range(self._index_data.start, self._index_data.stop))
-            new_idx += list(range(old_nrows, self._frame.num_rows))
+            if self._index_data.stop == old_nrows:
+                new_idx = slice(self._index_data.start, self._frame.num_rows)
+            else:
+                new_idx = list(range(self._index_data.start, self._index_data.stop))
+                new_idx.extend(range(old_nrows, self._frame.num_rows))
             self._index_data = new_idx
         self._clear_cache()
 
@@ -663,18 +700,27 @@ class FrameRef(MutableMapping):
         """Return whether this refers to all the rows."""
         return self.is_contiguous() and self.num_rows == self._frame.num_rows
 
-    def _getrowid(self, query):
+    def _getrows(self, query):
         """Internal function to convert from the local row ids to the row ids of the frame."""
         if self.is_contiguous():
-            # shortcut for identical mapping
-            return query
+            start = self._index_data.start
+            if start == 0:
+                # shortcut for identical mapping
+                return query
+            elif isinstance(query, slice):
+                return slice(query.start + start, query.stop + start)
+            else:
+                query = query.tousertensor()
+                return utils.toindex(query + start)
         else:
             idxtensor = self.index().tousertensor()
-            return utils.toindex(F.gather_row(idxtensor, query.tousertensor()))
+            query = query.tousertensor()
+            return utils.toindex(F.gather_row(idxtensor, query))
 
     def _clear_cache(self):
         """Internal function to clear the cached object."""
-        self._index_tensor = None
+        self._index = None
+        self._index_or_slice = None
 
 def merge_frames(frames, indices, max_index, reduce_func):
     """Merge a list of frames.
