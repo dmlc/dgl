@@ -31,6 +31,15 @@ class BatchedDGLGraph(DGLGraph):
         batched_index = gi.disjoint_union([g._graph for g in graph_list])
         # create batched node and edge frames
         # NOTE: following code will materialize the columns of the input graphs.
+        batched_node_frame = FrameRef()
+        for gr in graph_list:
+            cols = {key : gr._node_frame[key] for key in node_attrs}
+            batched_node_frame.append(cols)
+        batched_edge_frame = FrameRef()
+        for gr in graph_list:
+            cols = {key : gr._edge_frame[key] for key in edge_attrs}
+            batched_edge_frame.append(cols)
+
         cols = {key: F.pack([gr._node_frame[key] for gr in graph_list])
                 for key in node_attrs}
         batched_node_frame = FrameRef(Frame(cols))
