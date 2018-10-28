@@ -75,7 +75,7 @@ class SBMMixture:
         Random number generator.
     """
     def __init__(self, n_graphs, n_nodes, n_communities,
-                 k=2, avg_deg=3, p='Appendix C', rng=None):
+                 k=2, avg_deg=3, pq='Appendix C', rng=None):
         self._n_nodes = n_nodes
         assert n_nodes % n_communities == 0
         block_size = n_nodes // n_communities

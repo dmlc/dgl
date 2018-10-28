@@ -29,13 +29,13 @@ class GNNModule(nn.Module):
 
     def aggregate(self, g, z):
         z_list = []
-        g.set_n_repr(z)
-        g.update_all(fn.copy_src(), fn.sum())
-        z_list.append(g.get_n_repr())
+        g.set_n_repr({'z' : z})
+        g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
+        z_list.append(g.get_n_repr()['z'])
         for i in range(self.radius - 1):
             for j in range(2 ** i):
-                g.update_all(fn.copy_src(), fn.sum())
-            z_list.append(g.get_n_repr())
+                g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
+            z_list.append(g.get_n_repr()['z'])
         return z_list
 
     def forward(self, g, lg, x, y, deg_g, deg_lg, pm_pd):
@@ -43,9 +43,9 @@ class GNNModule(nn.Module):
 
         sum_x = sum(theta(z) for theta, z in zip(self.theta_list, self.aggregate(g, x)))
 
-        g.set_e_repr(y)
-        g.update_all(fn.copy_edge(), fn.sum())
-        pmpd_y = g.get_n_repr()
+        g.set_e_repr({'y' : y})
+        g.update_all(fn.copy_edge(edge='y', out='m'), fn.sum('m', 'pmpd_y'))
+        pmpd_y = g.pop_n_repr('pmpd_y')
 
         x = self.theta_x(x) + self.theta_deg(deg_g * x) + sum_x + self.theta_y(pmpd_y)
         n = self.out_feats // 2
