@@ -15,29 +15,14 @@ inline bool IsValidIdArray(const IdArray& arr) {
 }  // namespace
 
 Graph GraphOp::LineGraph(const Graph* g, bool backtracking) {
-  typedef std::pair<dgl_id_t, dgl_id_t> entry;
-  typedef std::map<dgl_id_t, std::vector<entry>> csm;  // Compressed Sparse Matrix
-
-  csm adj;
-  std::vector<entry> vec;
-  for (size_t i = 0; i != g->all_edges_src_.size(); ++i) {
-    auto u = g->all_edges_src_[i];
-    auto v = g->all_edges_dst_[i];
-    auto ret = adj.insert(csm::value_type(u, vec));
-    (ret.first)->second.push_back(std::make_pair(v, i));
-  }
-
   std::vector<dgl_id_t> lg_src, lg_dst;
-  for (size_t i = 0; i != g->all_edges_src_.size(); ++i) {
+  for (size_t i = 0; i < g->all_edges_src_.size(); ++i) {
     auto u = g->all_edges_src_[i];
     auto v = g->all_edges_dst_[i];
-    auto j = adj.find(v);
-    if (j != adj.end()) {
-      for (size_t k = 0; k != j->second.size(); ++k) {
-        if (backtracking || (!backtracking && j->second[k].first != u)) {
-          lg_src.push_back(i);
-          lg_dst.push_back(j->second[k].second);
-        }
+    for (size_t j = 0; j < g->adjlist_[v].succ.size(); ++j) {
+      if (backtracking || (!backtracking && g->adjlist_[v].succ[j] != u)) {
+        lg_src.push_back(i);
+        lg_dst.push_back(g->adjlist_[v].edge_id[j]);
       }
     }
   }
