@@ -1524,14 +1524,14 @@ class DGLGraph(object):
         node_frame = self._edge_frame if shared else None
         return DGLGraph(graph_data, node_frame)
 
-    def bfs(self, src, out):
+    def bfs(self, src, out=True):
         """ Breadth-first search.
 
         Parameters
         ----------
         src : list or tensor
             Source nodes.
-        out : bool
+        out : bool, optional
             Whether to following incoming or outgoing edges.
 
         Returns
@@ -1542,18 +1542,18 @@ class DGLGraph(object):
         """
         return self._graph.bfs(src, out)
 
-    def dfs_labeled_edges(self, src, out, reverse_edge, nontree_edge):
+    def dfs_labeled_edges(self, src, out=True, reverse_edge=True, nontree_edge=True):
         """ Produce edges in a depth-first-search (DFS) labeled by type.
 
         Parameters
         ----------
         src : list or tensor
             Source nodes.
-        out : bool
+        out : bool, optional
             Whether to following incoming or outgoing edges.
-        reverse_edge : bool
+        reverse_edge : bool, optional
             Whether to yield reverse edges.
-        nontree_edge : bool
+        nontree_edge : bool, optional
             Whether to yield nontree edges.
 
         Returns
@@ -1567,12 +1567,12 @@ class DGLGraph(object):
         """
         return self._graph.dfs_labeled_edges(src, out, reverse_edge, nontree_edge)
 
-    def topological_traversal(self, out):
+    def topological_traversal(self, out=True):
         """ Topological Traversal.
 
         Parameters
         ----------
-        out : bool
+        out : bool, optional
             Whether to following incoming or outgoing edges.
 
         Returns

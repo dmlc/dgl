@@ -308,14 +308,6 @@ class Graph {
   /*!
    * \brief Produce edges in a depth-first-search (DFS) labeled by type.
    *
-   * https://networkx.github.io/documentation/stable/_modules/networkx/algorithms/traversal/depth_first_search.html#dfs_labeled_edges
-   * This implementation does not `yield (source, source, 'forward')` or `yield (source, source, 'reverse')`.
-   */
-  std::tuple<IdVector, IdVector, IdVector> DFSLabeledEdges_(dgl_id_t source, bool out, bool reverse_edge, bool nontree_edge) const;
-
-  /*!
-   * \brief Produce edges in a depth-first-search (DFS) labeled by type.
-   *
    * \param source Source nodes.
    * \param out Whether to follow incoming or outgoing edges.
    * \param reverse_edge Whether to yield reverse edges.
@@ -357,6 +349,15 @@ class Graph {
   bool is_multigraph_ = false;
   /*! \brief number of edges */
   uint64_t num_edges_ = 0;
+
+ private:
+  /*!
+   * \brief Produce edges in a depth-first-search (DFS) labeled by type.
+   *
+   * https://networkx.github.io/documentation/stable/_modules/networkx/algorithms/traversal/depth_first_search.html#dfs_labeled_edges
+   * This implementation does not `yield (source, source, 'forward')` or `yield (source, source, 'reverse')`.
+   */
+  std::tuple<IdVector, IdVector, IdVector> DFSLabeledEdges_(dgl_id_t source, bool out, bool reverse_edge, bool nontree_edge) const;
 };
 
 /*! \brief Subgraph data structure */
