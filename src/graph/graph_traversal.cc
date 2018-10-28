@@ -68,15 +68,15 @@ std::pair<IdArray, IdArray> Graph::BFS(IdArray src, bool out) const {
   std::copy(src_data, src_data + src->shape[0], std::back_inserter(vv));
   size_t i = 0;
   size_t j = vv.size();
-  auto adj = &(out ? adjlist_ : reverse_adjlist_);
-  std::vector<bool> visited(adjlist_.size());
+  auto &&adj = out ? adjlist_ : reverse_adjlist_;
+  std::vector<bool> visited(adj.size());
   for (auto v : vv) {
     visited[v] = true;
   }
   std::vector<size_t> ss;
   while (i < j) {
     for (size_t k = i; k != j; k++) {
-      auto succ = (*adj)[vv[k]].succ;
+      auto succ = adj[vv[k]].succ;
       for (auto v : succ) {
         if (!visited[v]) {
             visited[v] = true;
@@ -98,16 +98,16 @@ std::tuple<IdVector, IdVector, IdVector> Graph::DFSLabeledEdges_(
   IdVector src;
   IdVector dst;
   IdVector type;
-  auto adjlist = out ? adjlist_ : reverse_adjlist_;
-  typedef std::pair<dgl_id_t, std::vector<dgl_id_t>::iterator> crux_t;
+  auto &&adj = out ? adjlist_ : reverse_adjlist_;
+  typedef std::pair<dgl_id_t, std::vector<dgl_id_t>::const_iterator> crux_t;
   std::stack<crux_t> stack;
-  stack.push(std::make_pair(source, adjlist[source].succ.begin()));
-  std::vector<bool> visited(adjlist_.size());
+  stack.push(std::make_pair(source, adj[source].succ.begin()));
+  std::vector<bool> visited(adj.size());
   visited[source] = true;
   while (!stack.empty()) {
     auto parent = stack.top().first;
     auto children = stack.top().second;
-    if (children != adjlist[parent].succ.end()) {
+    if (children != adj[parent].succ.end()) {
       auto child = *children;
       ++stack.top().second;
       if (visited[child] && nontree_edge) {
@@ -119,7 +119,7 @@ std::tuple<IdVector, IdVector, IdVector> Graph::DFSLabeledEdges_(
         dst.push_back(child);
         type.push_back(forward);
         visited[child] = true;
-        stack.push(std::make_pair(child, adjlist[child].succ.begin()));
+        stack.push(std::make_pair(child, adj[child].succ.begin()));
       }
     } else {
       stack.pop();
@@ -166,11 +166,11 @@ std::pair<IdArray, IdArray> Graph::TopologicalTraversal(bool out) const {
   }
   size_t i = 0;
   size_t j = vv.size();
-  auto adj = &(out ? adjlist_ : reverse_adjlist_);
+  auto &&adj = out ? adjlist_ : reverse_adjlist_;
   IdVector ss;
   while (i < j) {
     for (size_t k = i; k != j; k++) {
-      auto succ = (*adj)[vv[k]].succ;
+      auto succ = adj[vv[k]].succ;
       for (auto v : succ) {
         if (--(deg_data[v]) == 0) {
           vv.push_back(v);

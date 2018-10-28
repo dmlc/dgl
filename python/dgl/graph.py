@@ -1346,8 +1346,6 @@ class DGLGraph(object):
 
     def propagate(self,
                   traverser,
-                  src=None,
-                  out=True,
                   message_func="default",
                   reduce_func="default",
                   apply_node_func="default",
@@ -1379,13 +1377,13 @@ class DGLGraph(object):
             Arguments for pre-defined iterators.
         """
         if isinstance(traverser, str):
-            if traverser == 'bfs':
-                layers = self._graph.bfs(src, out)
-            elif traverser == 'dfs':
-                layers = self._graph.dfs_labeled_edges(src, out)
-            elif traverser == 'topo':
-                layers = self._graph.topological_traversal(out)
-            else:
+            try:
+                layers = {
+                    'bfs'  : self._graph.bfs,
+                    'dfs'  : self._graph.dfs_labeled_edges,
+                    'topo' : self._graph.topological_traversal,
+                }[traverser](**kwargs)
+            except KeyError:
                 raise RuntimeError('Not implemented.')
         else:
             layers = traverser
