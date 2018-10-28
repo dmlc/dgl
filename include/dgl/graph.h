@@ -8,6 +8,8 @@
 
 #include <vector>
 #include <cstdint>
+#include <utility>
+#include <pair>
 #include "runtime/ndarray.h"
 
 namespace dgl {
@@ -314,7 +316,8 @@ class Graph {
    * \param nontree_edge Whether to yield nontree edges.
    * \return Edges labeled by type.
    */
-  std::tuple<IdArray, IdArray, IdArray, IdArray> DFSLabeledEdges(IdArray source, bool out, bool reverse_edge, bool nontree_edge) const;
+  std::tuple<IdArray, IdArray, IdArray, IdArray> DFSLabeledEdges(
+    IdArray source, bool out, bool reverse_edge, bool nontree_edge) const;
 
   std::pair<IdArray, IdArray> TopologicalTraversal(bool out) const;
 
@@ -357,7 +360,8 @@ class Graph {
    * https://networkx.github.io/documentation/stable/_modules/networkx/algorithms/traversal/depth_first_search.html#dfs_labeled_edges
    * This implementation does not `yield (source, source, 'forward')` or `yield (source, source, 'reverse')`.
    */
-  std::tuple<IdVector, IdVector, IdVector> DFSLabeledEdges_(dgl_id_t source, bool out, bool reverse_edge, bool nontree_edge) const;
+  std::tuple<IdVector, IdVector, IdVector> DFSLabeledEdges_(
+    dgl_id_t source, bool out, bool reverse_edge, bool nontree_edge) const;
 };
 
 /*! \brief Subgraph data structure */

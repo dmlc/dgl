@@ -1,3 +1,8 @@
+/*!
+ *  Copyright (c) 2018 by Contributors
+ * \file graph/graph_traversal.cc
+ * \brief Graph traversal implementation
+ */
 #include <dgl/graph.h>
 #include <algorithm>
 #include <stack>
@@ -17,7 +22,7 @@ inline IdArray IdVectorToIdArray(const IdVector& v) {
 /*!
  * \brief Analoguous to Python's zip, ZipIdVectorsInIdArray zips a collections of IdVectorsand return the result in a format that can be easily returned to Python.
  */
-inline std::pair<IdArray, IdArray> ZipIdVectorsInIdArray(std::vector<IdVector> &id_vectors) {
+inline std::pair<IdArray, IdArray> ZipIdVectorsInIdArray(const std::vector<IdVector> &id_vectors) {
   auto size = [](const IdVector &x) { return x.size(); };
   std::vector<size_t> s(id_vectors.size());
   std::transform(id_vectors.begin(), id_vectors.end(), s.begin(), size);
@@ -55,7 +60,7 @@ inline std::pair<IdArray, IdArray> ZipIdVectorsInIdArray(std::vector<IdVector> &
   return std::make_pair(id_array, s_array);
 }
 
-} // namespace
+}  // namespace
 
 std::pair<IdArray, IdArray> Graph::BFS(IdArray src, bool out) const {
   std::vector<dgl_id_t> vv;
@@ -86,7 +91,9 @@ std::pair<IdArray, IdArray> Graph::BFS(IdArray src, bool out) const {
   return std::make_pair(IdVectorToIdArray(vv), IdVectorToIdArray(ss));
 }
 
-std::tuple<IdVector, IdVector, IdVector> Graph::DFSLabeledEdges_(dgl_id_t source, bool out, bool reverse_edge, bool nontree_edge) const {
+std::tuple<IdVector, IdVector, IdVector> Graph::DFSLabeledEdges_(
+  dgl_id_t source, bool out, bool reverse_edge, bool nontree_edge
+) const {
   enum EdgeType { forward, reverse, nontree };
   IdVector src;
   IdVector dst;
@@ -126,7 +133,9 @@ std::tuple<IdVector, IdVector, IdVector> Graph::DFSLabeledEdges_(dgl_id_t source
   return std::make_tuple(src, dst, type);
 }
 
-std::tuple<IdArray, IdArray, IdArray, IdArray> Graph::DFSLabeledEdges(IdArray source, bool out, bool reverse_edge, bool nontree_edge) const {
+std::tuple<IdArray, IdArray, IdArray, IdArray> Graph::DFSLabeledEdges(
+  IdArray source, bool out, bool reverse_edge, bool nontree_edge
+) const {
   int64_t *source_data = static_cast<int64_t*>(source->data);
   std::vector<IdVector> src(source->shape[0]);
   std::vector<IdVector> dst(source->shape[0]);

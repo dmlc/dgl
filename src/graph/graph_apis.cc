@@ -83,7 +83,9 @@ PackedFunc ConvertIdArrayTripleToPackedFunc(const std::tuple<IdArray, IdArray, I
   return PackedFunc(body);
 }
 
-PackedFunc ConvertIdArrayQuadrupleToPackedFunc(const std::tuple<IdArray, IdArray, IdArray, IdArray>& quadruple) {
+PackedFunc ConvertIdArrayQuadrupleToPackedFunc(
+  const std::tuple<IdArray, IdArray, IdArray, IdArray>& quadruple
+) {
   auto body = [quadruple] (TVMArgs args, TVMRetValue* rv) {
       int which = args[0];
       if (which == 0) {
@@ -369,7 +371,8 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphDFSLabeledEdges")
     bool out = args[2];
     bool reverse_edge = args[3];
     bool nontree_edge = args[4];
-    *rv = ConvertIdArrayQuadrupleToPackedFunc(gptr->DFSLabeledEdges(src, out, reverse_edge, nontree_edge));
+    auto ret = gptr->DFSLabeledEdges(src, out, reverse_edge, nontree_edge);
+    *rv = ConvertIdArrayQuadrupleToPackedFunc(ret);
   });
 
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphTopologicalTraversal")
