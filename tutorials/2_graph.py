@@ -15,31 +15,81 @@ using our message passing APIs (see :ref:`tutorial-mp`).
 ###############################################################################
 # Construct a graph
 # -----------------
-# 
+#
+# The design of ``DGLGraph`` was influenced by other graph libraries. Indeed, you can
+# create a graph from `networkx <https://networkx.github.io/>`__, and convert it into a ``DGLGraph``
+# and vice versa:
+
+import networkx as nx
+import dgl
+
+g_nx = nx.petersen_graph()
+g_dgl = dgl.DGLGraph(g_nx)
+
+import matplotlib.pyplot as plt
+plt.subplot(121)
+nx.draw(g_nx, with_labels=True)
+plt.subplot(122)
+nx.draw(g_dgl.to_networkx(), with_labels=True)
+
+plt.show()
+
+###############################################################################
+# These are the same graph, except that ``DGLGraph`` are always directional.
+#
+# Creating a graph is a matter of specifying total number of nodes and the edges among them.
 # In ``DGLGraph``, all nodes are represented using consecutive integers starting from
-# zero. All edges are directed. Let us start by creating a star network of 10 nodes
+# zero, and you can add more nodes repeatedly.
+#
+# .. note::
+#
+#  ``nx.add_node(100)`` adds a node with id 100, ``dgl.add_nodes(100)`` adds another 100 nodes into the graph.
+
+g_dgl.clear()
+g_nx.clear()
+g_dgl.add_nodes(20)
+print("We have %d nodes now" % g_dgl.number_of_nodes())
+g_dgl.add_nodes(100)
+print("Now we have %d nodes!" % g_dgl.number_of_nodes())
+g_nx.add_node(100)
+print("My nx buddy only has %d :( " % g_nx.number_of_nodes())
+
+###############################################################################
+# The most naive way to add edges are just adding them one by one, with a (*src, dst*) pair:
 # where all the edges point to the center node (node#0).
 # TODO(minjie): it's better to plot the graph here.
 
-import dgl
 star = dgl.DGLGraph()
 star.add_nodes(10)  # add 10 nodes
 for i in range(1, 10):
     star.add_edge(i, 0)
-print('#Nodes:', star.number_of_nodes())
-print('#Edges:', star.number_of_edges())
-
+nx.draw(star.to_networkx(), with_labels=True)
 
 ###############################################################################
-# ``DGLGraph`` also supports adding multiple edges at once by providing multiple
-# source and destination nodes. Multiple nodes are represented using either a
-# list or a 1D integer tensor(vector). In addition to this, we also support
+# A more efficient way is to add many edges with a pair of list, or tensor. The following code
+# generates equivalent graphs, and the one with tensor is more efficient.
+
+# using lists
+star.clear()
+star.add_nodes(10)
+src = [i for i in range(1, 10)]; dst = [0]*9
+star.add_edges(src, dst)
+
+# using tensor
+star.clear()
+star.add_nodes(10)
+import torch as th
+src = th.tensor(src); dst = th.tensor(dst)
+star.add_edges(src, dst)
+
+###############################################################################
+# In addition to this, we also support
 # "edge broadcasting":
 #
 # .. _note-edge-broadcast:
 #
 # .. note::
-# 
+#
 #   Given two source and destination node list/tensor ``u`` and ``v``.
 #
 #   - If ``len(u) == len(v)``, then this is a many-many edge set and
@@ -54,9 +104,6 @@ star.clear()  # clear the previous graph
 star.add_nodes(10)
 u = list(range(1, 10))  # can also use tensor type here (e.g. torch.Tensor)
 star.add_edges(u, 0)  # many-one edge set
-print('#Nodes:', star.number_of_nodes())
-print('#Edges:', star.number_of_edges())
-
 
 ###############################################################################
 # In ``DGLGraph``, each edge is assigned an internal edge id (also a consecutive
