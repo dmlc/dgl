@@ -10,8 +10,6 @@ from .._ffi.runtime_ctypes import TVMType, TVMContext, TVMArray
 from .._ffi.runtime_ctypes import TypeCode, tvm_shape_index_t
 from .. import ndarray as nd
 
-from functools import lru_cache
-
 # Tensor types
 Tensor = th.Tensor
 SparseTensor = th.sparse.FloatTensor
@@ -88,7 +86,6 @@ def to_context(arr, ctx):
     else:
         raise RuntimeError('Invalid context', ctx)
 
-@lru_cache(maxsize=None)
 def _get_context(type, index):
     if type == 'cpu':
         return TVMContext(TVMContext.STR2MASK['cpu'], 0)
