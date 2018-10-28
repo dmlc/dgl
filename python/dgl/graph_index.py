@@ -788,17 +788,6 @@ def map_to_subgraph_nid(subgraph, parent_nids):
     return utils.toindex(_CAPI_DGLMapSubgraphNID(subgraph.induced_nodes.todgltensor(),
         parent_nids.todgltensor()))
 
-    @property
-    def induced_edges(self):
-        """Return parent edge ids.
-
-        Returns
-        -------
-        utils.Index
-            The parent edge ids.
-        """
-        return self._induced_edges
-
 def disjoint_union(graphs):
     """Return a disjoint union of the input graphs.
 

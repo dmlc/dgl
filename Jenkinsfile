@@ -21,7 +21,6 @@ def build_dgl() {
     }
 }
 
-
 def pytorch_unit_test() {
     withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
         sh 'nosetests tests -v --with-xunit'
