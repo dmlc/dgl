@@ -6,11 +6,11 @@
 #ifndef DGL_GRAPH_H_
 #define DGL_GRAPH_H_
 
+#include "runtime/ndarray.h"
 #include <vector>
 #include <cstdint>
 #include <utility>
-#include <pair>
-#include "runtime/ndarray.h"
+#include <tuple>
 
 namespace dgl {
 
