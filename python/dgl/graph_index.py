@@ -11,6 +11,7 @@ from ._ffi.ndarray import TVMArrayHandle, _make_array
 from . import backend as F
 from . import ndarray as nd
 from . import utils
+from .immutable_graph_index import create_immutable_graph_index
 
 GraphIndexHandle = ctypes.c_void_p
 
@@ -438,6 +439,24 @@ class GraphIndex(object):
         induced_edges = utils.toindex(rst(2))
         return SubgraphIndex(rst(0), self, v, induced_edges)
 
+    def node_subgraphs(self, vs_arr):
+        """Return the induced node subgraphs.
+
+        Parameters
+        ----------
+        vs_arr : a list of utils.Index
+            The nodes.
+
+        Returns
+        -------
+        a vector of SubgraphIndex
+            The subgraph index.
+        """
+        gis = []
+        for v in vs_arr:
+            gis.append(self.node_subgraph(v))
+        return gis
+
     def edge_subgraph(self, e):
         """Return the induced edge subgraph.
 
@@ -457,8 +476,19 @@ class GraphIndex(object):
         induced_nodes = utils.toindex(rst(1))
         return SubgraphIndex(rst(0), self, induced_nodes, e)
 
-    def adjacency_matrix(self):
+    def adjacency_matrix(self, transpose=False):
         """Return the adjacency matrix representation of this graph.
+
+        By default, a row of returned adjacency matrix represents the destination
+        of an edge and the column represents the source.
+
+        When transpose is True, a row represents the source and a column represents
+        a destination.
+
+        Parameters
+        ----------
+        transpose : bool
+            A flag to tranpose the returned adjacency matrix.
 
         Returns
         -------
@@ -469,7 +499,10 @@ class GraphIndex(object):
             src, dst, _ = self.edges(sorted=False)
             src = F.unsqueeze(src.tousertensor(), 0)
             dst = F.unsqueeze(dst.tousertensor(), 0)
-            idx = F.pack([dst, src])
+            if transpose:
+                idx = F.pack([src, dst])
+            else:
+                idx = F.pack([dst, src])
             n = self.number_of_nodes()
             dat = F.ones((self.number_of_edges(),))
             mat = F.sparse_tensor(idx, dat, [n, n])
@@ -736,6 +769,36 @@ class SubgraphIndex(GraphIndex):
         """
         return self._induced_edges
 
+def map_to_subgraph_nid(subgraph, parent_nids):
+    """Map parent node Ids to the subgraph node Ids.
+
+    Parameters
+    ----------
+    subgraph: SubgraphIndex or ImmutableSubgraphIndex
+        the graph index of a subgraph
+
+    parent_nids: utils.Index
+        Node Ids in the parent graph.
+
+    Returns
+    -------
+    utils.Index
+        Node Ids in the subgraph.
+    """
+    return utils.toindex(_CAPI_DGLMapSubgraphNID(subgraph.induced_nodes.todgltensor(),
+        parent_nids.todgltensor()))
+
+    @property
+    def induced_edges(self):
+        """Return parent edge ids.
+
+        Returns
+        -------
+        utils.Index
+            The parent edge ids.
+        """
+        return self._induced_edges
+
 def disjoint_union(graphs):
     """Return a disjoint union of the input graphs.
 
@@ -794,7 +857,7 @@ def disjoint_partition(graph, num_or_size_splits):
         graphs.append(GraphIndex(handle))
     return graphs
 
-def create_graph_index(graph_data=None, multigraph=False):
+def create_graph_index(graph_data=None, multigraph=False, readonly=False):
     """Create a graph index object.
 
     Parameters
@@ -806,6 +869,12 @@ def create_graph_index(graph_data=None, multigraph=False):
     """
     if isinstance(graph_data, GraphIndex):
         return graph_data
+
+    if readonly and graph_data is not None:
+        gi = create_immutable_graph_index(graph_data)
+        # If we can't create an immutable graph index, we'll have to fall back.
+        if gi is not None:
+            return gi
 
     handle = _CAPI_DGLGraphCreate(multigraph)
     gi = GraphIndex(handle)

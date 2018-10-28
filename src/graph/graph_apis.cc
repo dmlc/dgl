@@ -188,6 +188,20 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasVertices")
     *rv = gptr->HasVertices(vids);
   });
 
+TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLMapSubgraphNID")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    const IdArray parent_vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
+    const IdArray query = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    *rv = GraphOp::MapParentIdToSubgraphId(parent_vids, query);
+  });
+
+TVM_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLExpandIds")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    const IdArray ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
+    const IdArray offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    *rv = GraphOp::ExpandIds(ids, offsets);
+  });
+
 TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasEdgeBetween")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     GraphHandle ghandle = args[0];
