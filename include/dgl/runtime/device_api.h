@@ -1,10 +1,10 @@
 /*!
  *  Copyright (c) 2016 by Contributors
- * \file tvm/runtime/device_api.h
+ * \file dgl/runtime/device_api.h
  * \brief Abstract device memory management API
  */
-#ifndef TVM_RUNTIME_DEVICE_API_H_
-#define TVM_RUNTIME_DEVICE_API_H_
+#ifndef DGL_RUNTIME_DEVICE_API_H_
+#define DGL_RUNTIME_DEVICE_API_H_
 
 #include <string>
 #include "packed_func.h"
@@ -180,4 +180,4 @@ class DeviceAPI {
 constexpr int kRPCSessMask = 128;
 }  // namespace runtime
 }  // namespace tvm
-#endif  // TVM_RUNTIME_DEVICE_API_H_
+#endif  // DGL_RUNTIME_DEVICE_API_H_

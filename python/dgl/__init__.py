@@ -1,7 +1,6 @@
 from . import backend
 from . import data
 from . import function
-from . import generator
 from . import nn
 
 from ._ffi.runtime_ctypes import TypeCode
@@ -10,6 +9,5 @@ from ._ffi.base import DGLError, __version__
 
 from .base import ALL
 from .batched_graph import *
-from .generator import *
-from .graph import DGLGraph, __MSG__, __REPR__
+from .graph import DGLGraph
 from .subgraph import DGLSubGraph

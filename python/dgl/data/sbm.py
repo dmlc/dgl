@@ -7,7 +7,6 @@ import numpy as np
 import numpy.random as npr
 import scipy as sp
 import networkx as nx
-from torch.utils.data import Dataset
 
 from .. import backend as F
 from ..batched_graph import batch
@@ -54,7 +53,7 @@ def sbm(n_blocks, block_size, p, q, rng=None):
     adj = sp.sparse.triu(a) + sp.sparse.triu(a, 1).transpose()
     return adj
 
-class SBMMixture(Dataset):
+class SBMMixture:
     """ Symmetric Stochastic Block Model Mixture
     Please refer to Appendix C of "Supervised Community Detection with Hierarchical Graph Neural Networks" (https://arxiv.org/abs/1705.08415) for details.
 
@@ -76,8 +75,7 @@ class SBMMixture(Dataset):
         Random number generator.
     """
     def __init__(self, n_graphs, n_nodes, n_communities,
-                 k=2, avg_deg=3, pq='Appendix C', rng=None):
-        super(SBMMixture, self).__init__()
+                 k=2, avg_deg=3, p='Appendix C', rng=None):
         self._n_nodes = n_nodes
         assert n_nodes % n_communities == 0
         block_size = n_nodes // n_communities

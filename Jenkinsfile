@@ -1,42 +1,93 @@
+#!/usr/bin/env groovy
+
+def init_git_submodule() {
+    sh 'git submodule init'
+    sh 'git submodule update'
+}
+
+def setup() {
+    sh 'easy_install nose'
+    init_git_submodule()
+}
+
+def build_dgl() {
+    sh 'if [ -d build ]; then rm -rf build; fi; mkdir build'
+    dir('python') {
+        sh 'python3 setup.py install'
+    }
+    dir ('build') {
+        sh 'cmake ..'
+        sh 'make -j$(nproc)'
+    }
+}
+
+def pytorch_unit_test() {
+    withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
+        sh 'nosetests tests -v --with-xunit'
+        sh 'nosetests tests/pytorch -v --with-xunit'
+        sh 'nosetests tests/graph_index -v --with-xunit'
+    }
+}
+
+def mxnet_unit_test() {
+    withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
+        sh 'nosetests tests/mxnet -v --with-xunit'
+    }
+}
+
+def example_test(dev) {
+    dir ('tests/scripts') {
+        withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
+            sh "./test_examples.sh ${dev}"
+        }
+    }
+}
+
 pipeline {
     agent none
     stages {
-        stage('Build and Test') {
+        stage('Lint Check') {
+            agent {
+                docker {
+                    image 'lingfanyu/dgl-lint'
+                }
+            }
+            stages {
+                stage('CHECK') {
+                    steps {
+                        init_git_submodule()
+                        sh 'tests/scripts/task_lint.sh'
+                    }
+                }
+            }
+        }
+        stage('Build and Test on Pytorch') {
             parallel {
                 stage('CPU') {
                     agent {
                         docker {
                             image 'lingfanyu/dgl-cpu'
-                            args '-u root'
                         }
                     }
                     stages {
                         stage('SETUP') {
                             steps {
-                                sh 'easy_install nose'
-                                sh 'git submodule init'
-                                sh 'git submodule update'
+                                setup()
                             }
                         }
                         stage('BUILD') {
                             steps {
-                                sh 'if [ -d build ]; then rm -rf build; fi; mkdir build'
-                                dir('python') {
-                                    sh 'python3 setup.py install'
-                                }
-                                dir ('build') {
-                                    sh 'cmake ..'
-                                    sh 'make -j$(nproc)'
-                                }
+                                build_dgl()
                             }
                         }
-                        stage('TEST') {
+                        stage('UNIT TEST') {
                             steps {
-                                withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
-                                    sh 'echo $DGL_LIBRARY_PATH'
-                                    sh 'nosetests tests -v --with-xunit'
-                                    sh 'nosetests tests/pytorch -v --with-xunit'
-                                }
+                                pytorch_unit_test()
+                            }
+                        }
+                        stage('EXAMPLE TEST') {
+                            steps {
+                                example_test('CPU')
                             }
                         }
                     }
@@ -50,36 +101,66 @@ pipeline {
                     agent {
                         docker {
                             image 'lingfanyu/dgl-gpu'
-                            args '--runtime nvidia -u root'
+                            args '--runtime nvidia'
                         }
                     }
                     stages {
                         stage('SETUP') {
                             steps {
-                                sh 'easy_install nose'
-                                sh 'git submodule init'
-                                sh 'git submodule update'
+                                setup()
                             }
                         }
                         stage('BUILD') {
                             steps {
-                                sh 'if [ -d build ]; then rm -rf build; fi; mkdir build'
-                                dir('python') {
-                                    sh 'python3 setup.py install'
-                                }
-                                dir ('build') {
-                                    sh 'cmake ..'
-                                    sh 'make -j$(nproc)'
-                                }
+                                build_dgl()
                             }
                         }
-                        stage('TEST') {
+                        stage('UNIT TEST') {
                             steps {
-                                withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
-                                    sh 'echo $DGL_LIBRARY_PATH'
-                                    sh 'nosetests tests -v --with-xunit'
-                                    sh 'nosetests tests/pytorch -v --with-xunit'
-                                }
+                                pytorch_unit_test()
+                            }
+                        }
+                        stage('EXAMPLE TEST') {
+                            steps {
+                                example_test('GPU')
+                            }
+                        }
+                    }
+                    post {
+                        always {
+                            junit '*.xml'
+                        }
+                    }
+                }
+            }
+        }
+        stage('Build and Test on MXNet') {
+            parallel {
+                stage('CPU') {
+                    agent {
+                        docker {
+                            image 'zhengda1936/dgl-mxnet-cpu:v3'
+                        }
+                    }
+                    stages {
+                        stage('SETUP') {
+                            steps {
+                                setup()
+                            }
+                        }
+                        stage('BUILD') {
+                            steps {
+                                build_dgl()
+                            }
+                        }
+                        stage('UNIT TEST') {
+                            steps {
+                                mxnet_unit_test()
+                            }
+                        }
+                        stage('EXAMPLE TEST') {
+                            steps {
+                                example_test('CPU')
                             }
                         }
                     }

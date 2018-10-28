@@ -3,12 +3,13 @@ from __future__ import absolute_import
 import ctypes
 import numpy as np
 import networkx as nx
-import scipy.sparse as sp
+import scipy
 
 from ._ffi.base import c_array
 from ._ffi.function import _init_api
 from . import backend as F
 from . import utils
+from .immutable_graph_index import create_immutable_graph_index
 
 GraphIndexHandle = ctypes.c_void_p
 
@@ -72,6 +73,16 @@ class GraphIndex(object):
         _CAPI_DGLGraphClear(self._handle)
         self._cache.clear()
 
+    def is_multigraph(self):
+        """Return whether the graph is a multigraph
+
+        Returns
+        -------
+        bool
+            True if it is a multigraph, False otherwise.
+        """
+        return bool(_CAPI_DGLGraphIsMultigraph(self._handle))
+
     def number_of_nodes(self):
         """Return the number of nodes.
 
@@ -103,9 +114,9 @@ class GraphIndex(object):
         Returns
         -------
         bool
-            True if the node exists
+            True if the node exists, False otherwise.
         """
-        return _CAPI_DGLGraphHasVertex(self._handle, vid)
+        return bool(_CAPI_DGLGraphHasVertex(self._handle, vid))
 
     def has_nodes(self, vids):
         """Return true if the nodes exist.
@@ -123,7 +134,7 @@ class GraphIndex(object):
         vid_array = vids.todgltensor()
         return utils.toindex(_CAPI_DGLGraphHasVertices(self._handle, vid_array))
 
-    def has_edge(self, u, v):
+    def has_edge_between(self, u, v):
         """Return true if the edge exists.
 
         Parameters
@@ -136,11 +147,11 @@ class GraphIndex(object):
         Returns
         -------
         bool
-            True if the edge exists
+            True if the edge exists, False otherwise
         """
-        return _CAPI_DGLGraphHasEdge(self._handle, u, v)
+        return bool(_CAPI_DGLGraphHasEdgeBetween(self._handle, u, v))
 
-    def has_edges(self, u, v):
+    def has_edges_between(self, u, v):
         """Return true if the edge exists.
 
         Parameters
@@ -157,7 +168,7 @@ class GraphIndex(object):
         """
         u_array = u.todgltensor()
         v_array = v.todgltensor()
-        return utils.toindex(_CAPI_DGLGraphHasEdges(self._handle, u_array, v_array))
+        return utils.toindex(_CAPI_DGLGraphHasEdgesBetween(self._handle, u_array, v_array))
 
     def predecessors(self, v, radius=1):
         """Return the predecessors of the node.
@@ -194,7 +205,7 @@ class GraphIndex(object):
         return utils.toindex(_CAPI_DGLGraphSuccessors(self._handle, v, radius))
 
     def edge_id(self, u, v):
-        """Return the id of the edge.
+        """Return the id array of all edges between u and v.
 
         Parameters
         ----------
@@ -205,13 +216,13 @@ class GraphIndex(object):
 
         Returns
         -------
-        int
-            The edge id.
+        utils.Index
+            The edge id array.
         """
-        return _CAPI_DGLGraphEdgeId(self._handle, u, v)
+        return utils.toindex(_CAPI_DGLGraphEdgeId(self._handle, u, v))
 
     def edge_ids(self, u, v):
-        """Return the edge ids.
+        """Return a triplet of arrays that contains the edge IDs.
 
         Parameters
         ----------
@@ -223,11 +234,47 @@ class GraphIndex(object):
         Returns
         -------
         utils.Index
-            Teh edge id array.
+            The src nodes.
+        utils.Index
+            The dst nodes.
+        utils.Index
+            The edge ids.
         """
         u_array = u.todgltensor()
         v_array = v.todgltensor()
-        return utils.toindex(_CAPI_DGLGraphEdgeIds(self._handle, u_array, v_array))
+        edge_array = _CAPI_DGLGraphEdgeIds(self._handle, u_array, v_array)
+
+        src = utils.toindex(edge_array(0))
+        dst = utils.toindex(edge_array(1))
+        eid = utils.toindex(edge_array(2))
+
+        return src, dst, eid
+
+    def find_edges(self, eid):
+        """Return a triplet of arrays that contains the edge IDs.
+
+        Parameters
+        ----------
+        eid : utils.Index
+            The edge ids.
+
+        Returns
+        -------
+        utils.Index
+            The src nodes.
+        utils.Index
+            The dst nodes.
+        utils.Index
+            The edge ids.
+        """
+        eid_array = eid.todgltensor()
+        edge_array = _CAPI_DGLGraphFindEdges(self._handle, eid_array)
+
+        src = utils.toindex(edge_array(0))
+        dst = utils.toindex(edge_array(1))
+        eid = utils.toindex(edge_array(2))
+
+        return src, dst, eid
 
     def in_edges(self, v):
         """Return the in edges of the node(s).
@@ -378,19 +425,64 @@ class GraphIndex(object):
 
         Returns
         -------
-        GraphIndex
+        SubgraphIndex
             The subgraph index.
-        utils.Index
-            The induced edge ids. This is also a map from new edge id to parent edge id.
         """
         v_array = v.todgltensor()
         rst = _CAPI_DGLGraphVertexSubgraph(self._handle, v_array)
-        gi = GraphIndex(rst(0))
         induced_edges = utils.toindex(rst(2))
-        return gi, induced_edges
+        return SubgraphIndex(rst(0), self, v, induced_edges)
 
-    def adjacency_matrix(self):
+    def node_subgraphs(self, vs_arr):
+        """Return the induced node subgraphs.
+
+        Parameters
+        ----------
+        vs_arr : a list of utils.Index
+            The nodes.
+
+        Returns
+        -------
+        a vector of SubgraphIndex
+            The subgraph index.
+        """
+        gis = []
+        for v in vs_arr:
+            gis.append(self.node_subgraph(v))
+        return gis
+
+    def edge_subgraph(self, e):
+        """Return the induced edge subgraph.
+
+        Parameters
+        ----------
+        e : utils.Index
+            The edges.
+
+        Returns
+        -------
+        SubgraphIndex
+            The subgraph index.
+        """
+        e_array = e.todgltensor()
+        rst = _CAPI_DGLGraphEdgeSubgraph(self._handle, e_array)
+        gi = GraphIndex(rst(0))
+        induced_nodes = utils.toindex(rst(1))
+        return SubgraphIndex(rst(0), self, induced_nodes, e)
+
+    def adjacency_matrix(self, transpose=False):
         """Return the adjacency matrix representation of this graph.
+
+        By default, a row of returned adjacency matrix represents the destination
+        of an edge and the column represents the source.
+
+        When transpose is True, a row represents the source and a column represents
+        a destination.
+
+        Parameters
+        ----------
+        transpose : bool
+            A flag to tranpose the returned adjacency matrix.
 
         Returns
         -------
@@ -401,7 +493,10 @@ class GraphIndex(object):
             src, dst, _ = self.edges(sorted=False)
             src = F.unsqueeze(src.tousertensor(), 0)
             dst = F.unsqueeze(dst.tousertensor(), 0)
-            idx = F.pack([dst, src])
+            if transpose:
+                idx = F.pack([src, dst])
+            else:
+                idx = F.pack([dst, src])
             n = self.number_of_nodes()
             dat = F.ones((self.number_of_edges(),))
             mat = F.sparse_tensor(idx, dat, [n, n])
@@ -460,7 +555,8 @@ class GraphIndex(object):
             The nx graph
         """
         src, dst, eid = self.edges()
-        ret = nx.DiGraph()
+        ret = nx.MultiDiGraph() if self.is_multigraph() else nx.DiGraph()
+        ret.add_nodes_from(range(self.number_of_nodes()))
         for u, v, id in zip(src, dst, eid):
             ret.add_edge(u, v, id=id)
         return ret
@@ -477,26 +573,35 @@ class GraphIndex(object):
             The nx graph
         """
         self.clear()
-        if not isinstance(nx_graph, nx.DiGraph):
-            nx_graph = nx.DiGraph(nx_graph)
+
+        if not isinstance(nx_graph, nx.Graph):
+            nx_graph = (nx.MultiDiGraph(nx_graph) if self.is_multigraph()
+                    else nx.DiGraph(nx_graph))
+        else:
+            nx_graph = nx_graph.to_directed()
+
         num_nodes = nx_graph.number_of_nodes()
         self.add_nodes(num_nodes)
-        has_edge_id = 'id' in next(iter(nx_graph.edges))
+
+        if nx_graph.number_of_edges() == 0:
+            return
+
+        # nx_graph.edges(data=True) returns src, dst, attr_dict
+        has_edge_id = 'id' in next(iter(nx_graph.edges(data=True)))[-1]
         if has_edge_id:
             num_edges = nx_graph.number_of_edges()
             src = np.zeros((num_edges,), dtype=np.int64)
             dst = np.zeros((num_edges,), dtype=np.int64)
-            for e, attr in nx_graph.edges.items:
-                u, v = e
+            for u, v, attr in nx_graph.edges(data=True):
                 eid = attr['id']
                 src[eid] = u
                 dst[eid] = v
         else:
             src = []
             dst = []
-            for u, v in nx_graph.edges:
-                src.append(u)
-                dst.append(v)
+            for e in nx_graph.edges:
+                src.append(e[0])
+                dst.append(e[1])
         src = utils.toindex(src)
         dst = utils.toindex(dst)
         self.add_edges(src, dst)
@@ -531,7 +636,80 @@ class GraphIndex(object):
         """
         handle = _CAPI_DGLGraphLineGraph(self._handle, backtracking)
         return GraphIndex(handle)
-        
+
+class SubgraphIndex(GraphIndex):
+    """Graph index for subgraph.
+
+    Parameters
+    ----------
+    handle : GraphIndexHandle
+        The capi handle.
+    paranet : GraphIndex
+        The parent graph index.
+    induced_nodes : utils.Index
+        The parent node ids in this subgraph.
+    induced_edges : utils.Index
+        The parent edge ids in this subgraph.
+    """
+    def __init__(self, handle, parent, induced_nodes, induced_edges):
+        super(SubgraphIndex, self).__init__(handle)
+        self._parent = parent
+        self._induced_nodes = induced_nodes
+        self._induced_edges = induced_edges
+
+    def add_nodes(self, num):
+        """Add nodes. Disabled because SubgraphIndex is read-only."""
+        raise RuntimeError('Readonly graph. Mutation is not allowed.')
+
+    def add_edge(self, u, v):
+        """Add edges. Disabled because SubgraphIndex is read-only."""
+        raise RuntimeError('Readonly graph. Mutation is not allowed.')
+
+    def add_edges(self, u, v):
+        """Add edges. Disabled because SubgraphIndex is read-only."""
+        raise RuntimeError('Readonly graph. Mutation is not allowed.')
+
+    @property
+    def induced_nodes(self):
+        """Return parent node ids.
+
+        Returns
+        -------
+        utils.Index
+            The parent node ids.
+        """
+        return self._induced_nodes
+
+    @property
+    def induced_edges(self):
+        """Return parent edge ids.
+
+        Returns
+        -------
+        utils.Index
+            The parent edge ids.
+        """
+        return self._induced_edges
+
+def map_to_subgraph_nid(subgraph, parent_nids):
+    """Map parent node Ids to the subgraph node Ids.
+
+    Parameters
+    ----------
+    subgraph: SubgraphIndex or ImmutableSubgraphIndex
+        the graph index of a subgraph
+
+    parent_nids: utils.Index
+        Node Ids in the parent graph.
+
+    Returns
+    -------
+    utils.Index
+        Node Ids in the subgraph.
+    """
+    return utils.toindex(_CAPI_DGLMapSubgraphNID(subgraph.induced_nodes.todgltensor(),
+        parent_nids.todgltensor()))
+
 def disjoint_union(graphs):
     """Return a disjoint union of the input graphs.
 
@@ -590,20 +768,46 @@ def disjoint_partition(graph, num_or_size_splits):
         graphs.append(GraphIndex(handle))
     return graphs
 
-def create_graph_index(graph_data=None):
+def create_graph_index(graph_data=None, multigraph=False, readonly=False):
     """Create a graph index object.
 
     Parameters
     ----------
     graph_data : graph data, optional
         Data to initialize graph. Same as networkx's semantics.
+    multigraph : bool, optional
+        Whether the graph is multigraph (default is False)
     """
     if isinstance(graph_data, GraphIndex):
         return graph_data
-    handle = _CAPI_DGLGraphCreate()
+
+    if readonly and graph_data is not None:
+        gi = create_immutable_graph_index(graph_data)
+        # If we can't create an immutable graph index, we'll have to fall back.
+        if gi is not None:
+            return gi
+
+    handle = _CAPI_DGLGraphCreate(multigraph)
     gi = GraphIndex(handle)
-    if graph_data is not None:
+
+    if graph_data is None:
+        return gi
+
+    # scipy format
+    if isinstance(graph_data, scipy.sparse.spmatrix):
+        try:
+            gi.from_scipy_sparse_matrix(graph_data)
+            return gi
+        except:
+            raise Exception('Graph data is not a valid scipy sparse matrix.')
+
+    # networkx - any format
+    try:
         gi.from_networkx(graph_data)
+    except:
+        raise Exception('Error while creating graph from input of type "%s".'
+                         % type(graph_data))
+
     return gi
 
 _init_api("dgl.graph_index")

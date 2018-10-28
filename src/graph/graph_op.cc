@@ -1,12 +1,22 @@
-// Graph operation implementation
+/*!
+ *  Copyright (c) 2018 by Contributors
+ * \file graph/graph.cc
+ * \brief Graph operation implementation
+ */
 #include <dgl/graph_op.h>
 #include <algorithm>
 
 namespace dgl {
+namespace {
+inline bool IsValidIdArray(const IdArray& arr) {
+  return arr->ctx.device_type == kDLCPU && arr->ndim == 1
+    && arr->dtype.code == kDLInt && arr->dtype.bits == 64;
+}
+}  // namespace
 
-Graph GraphOp::LineGraph(const Graph* g, bool backtracking){
+Graph GraphOp::LineGraph(const Graph* g, bool backtracking) {
   typedef std::pair<dgl_id_t, dgl_id_t> entry;
-  typedef std::map<dgl_id_t, std::vector<entry>> csm; // Compressed Sparse Matrix
+  typedef std::map<dgl_id_t, std::vector<entry>> csm;  // Compressed Sparse Matrix
 
   csm adj;
   std::vector<entry> vec;
@@ -67,7 +77,7 @@ std::vector<Graph> GraphOp::DisjointPartitionByNum(const Graph* graph, int64_t n
   std::fill(sizes_data, sizes_data + num, graph->NumVertices() / num);
   return DisjointPartitionBySizes(graph, sizes);
 }
-  
+
 std::vector<Graph> GraphOp::DisjointPartitionBySizes(const Graph* graph, IdArray sizes) {
   const int64_t len = sizes->shape[0];
   const int64_t* sizes_data = static_cast<int64_t*>(sizes->data);
@@ -117,32 +127,58 @@ std::vector<Graph> GraphOp::DisjointPartitionBySizes(const Graph* graph, IdArray
     node_offset += sizes_data[i];
     edge_offset += num_edges;
   }
-  /*for (int64_t i = 0; i < len; ++i) {
-    rst[i].AddVertices(sizes_data[i]);
+  return rst;
+}
+
+IdArray GraphOp::MapParentIdToSubgraphId(IdArray parent_vids, IdArray query) {
+  CHECK(IsValidIdArray(parent_vids)) << "Invalid parent id array.";
+  CHECK(IsValidIdArray(query)) << "Invalid query id array.";
+  const auto parent_len = parent_vids->shape[0];
+  const auto query_len = query->shape[0];
+  const dgl_id_t* parent_data = static_cast<dgl_id_t*>(parent_vids->data);
+  const dgl_id_t* query_data = static_cast<dgl_id_t*>(query->data);
+  IdArray rst = IdArray::Empty({query_len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
+
+  const bool is_sorted = std::is_sorted(parent_data, parent_data + parent_len);
+  if (is_sorted) {
+    for (int64_t i = 0; i < query_len; i++) {
+      const dgl_id_t id = query_data[i];
+      const auto it = std::find(parent_data, parent_data + parent_len, id);
+      CHECK(it != parent_data + parent_len) << id << " doesn't exist in the parent Ids";
+      rst_data[i] = it - parent_data;
+    }
+  } else {
+    std::unordered_map<dgl_id_t, dgl_id_t> parent_map;
+    for (int64_t i = 0; i < parent_len; i++) {
+      const dgl_id_t id = parent_data[i];
+      parent_map[id] = i;
+    }
+    for (int64_t i = 0; i < query_len; i++) {
+      const dgl_id_t id = query_data[i];
+      auto it = parent_map.find(id);
+      CHECK(it != parent_map.end()) << id << " doesn't exist in the parent Ids";
+      rst_data[i] = it->second;
+    }
   }
-  for (dgl_id_t eid = 0; eid < graph->num_edges_; ++eid) {
-    const dgl_id_t src = graph->all_edges_src_[eid];
-    const dgl_id_t dst = graph->all_edges_dst_[eid];
-    size_t src_select = 0, dst_select = 0;
-    for (size_t i = 1; i < cumsum.size(); ++i) { // TODO: replace with binary search
-      if (cumsum[i] > src) {
-        src_select = i;
-        break;
-      }
+  return rst;
+}
+
+IdArray GraphOp::ExpandIds(IdArray ids, IdArray offset) {
+  const auto id_len = ids->shape[0];
+  const auto off_len = offset->shape[0];
+  CHECK_EQ(id_len + 1, off_len);
+  const dgl_id_t *id_data = static_cast<dgl_id_t*>(ids->data);
+  const dgl_id_t *off_data = static_cast<dgl_id_t*>(offset->data);
+  const int64_t len = off_data[off_len - 1];
+  IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  dgl_id_t *rst_data = static_cast<dgl_id_t*>(rst->data);
+  for (int64_t i = 0; i < id_len; i++) {
+    const int64_t local_len = off_data[i + 1] - off_data[i];
+    for (int64_t j = 0; j < local_len; j++) {
+      rst_data[off_data[i] + j] = id_data[i];
     }
-    for (size_t i = 1; i < cumsum.size(); ++i) { // TODO: replace with binary search
-      if (cumsum[i] > dst) {
-        dst_select = i;
-        break;
-      }
-    }
-    if (src_select != dst_select) {
-      // the edge is ignored if across two partitions
-      continue;
-    }
-    const int64_t offset = cumsum[src_select - 1];
-    rst[src_select - 1].AddEdge(src - offset, dst - offset);
-  }*/
+  }
   return rst;
 }
 

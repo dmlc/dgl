@@ -1,6 +1,7 @@
 """Dataset utilities."""
+from __future__ import absolute_import
 
-import os
+import os, sys
 import hashlib
 import warnings
 import zipfile
@@ -125,17 +126,22 @@ def extract_archive(file, target_dir):
     target_dir : str
         Target directory of the archive to be uncompressed
     """
+    if os.path.exists(target_dir):
+        return
     if file.endswith('.gz') or file.endswith('.tar') or file.endswith('.tgz'):
         archive = tarfile.open(file, 'r')
     elif file.endswith('.zip'):
         archive = zipfile.ZipFile(file, 'r')
     else:
         raise Exception('Unrecognized file type: ' + file)
+    print('Extracting file to {}'.format(target_dir))
     archive.extractall(path=target_dir)
     archive.close()
 
 def get_download_dir():
-    dirname = '_download'
+    """Get the absolute path to the download directory."""
+    curr_path = os.path.dirname(os.path.abspath(os.path.expanduser(__file__)))
+    dirname = os.path.join(curr_path, '../../../_download')
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     return dirname

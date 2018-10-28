@@ -1,10 +1,10 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file tvm/runtime/threading_backend.h
+ * \file dgl/runtime/threading_backend.h
  * \brief Utilities for manipulating thread pool threads.
  */
-#ifndef TVM_RUNTIME_THREADING_BACKEND_H_
-#define TVM_RUNTIME_THREADING_BACKEND_H_
+#ifndef DGL_RUNTIME_THREADING_BACKEND_H_
+#define DGL_RUNTIME_THREADING_BACKEND_H_
 
 #include <functional>
 #include <memory>
@@ -82,4 +82,4 @@ int MaxConcurrency();
 }  // namespace runtime
 }  // namespace tvm
 
-#endif  // TVM_RUNTIME_THREADING_BACKEND_H_
+#endif  // DGL_RUNTIME_THREADING_BACKEND_H_
