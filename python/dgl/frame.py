@@ -60,7 +60,7 @@ class Column(object):
 
     @property
     def shape(self):
-        return self.data.shape
+        return self.scheme.shape
 
     def __getitem__(self, idx):
         """Return the feature data given the index.
@@ -116,19 +116,20 @@ class Column(object):
         else:
             self.data = F.scatter_row(self.data, user_idx, feats)
 
-    def extend(self, feats):
+    def extend(self, feats, feat_scheme=None):
         """Extend the feature data.
-
-        Parameters
+         Parameters
         ----------
         feats : Tensor
             The new features.
         """
-        feat_scheme = Scheme.infer_scheme(feats)
+        if feat_scheme is None:
+            feat_scheme = Scheme.infer_scheme(feats)
+
         if feat_scheme != self.scheme:
             raise DGLError("Cannot update column of scheme %s using feature of scheme %s."
                     % (feat_scheme, self.scheme))
-        self.data = F.pack([self.data, feats], dim=0)
+        self.data = F.pack([self.data, feats])
 
     @staticmethod
     def create(data):
@@ -174,7 +175,14 @@ class Frame(MutableMapping):
         # in the first call and zero initializer will be used later.
         self._initializer = None
 
-    def set_initializer(self, initializer=None):
+    def _warn_and_set_initializer(self):
+        dgl_warning('Initializer is not set. Use zero initializer instead.'
+                    ' To suppress this warning, use `set_initializer` to'
+                    ' explicitly specify which initializer to use.')
+        # TODO(minjie): handle data type
+        self._initializer = lambda shape, dtype: F.zeros(shape)
+
+    def set_initializer(self, initializer):
         """Set the initializer for empty values.
 
         Initializer is a callable that returns a tensor given the shape and data type.
@@ -184,12 +192,6 @@ class Frame(MutableMapping):
         initializer : callable or None
             The initializer. If None, initialize an initializer.
         """
-        if initializer is None:
-            dgl_warning('Initializer is not set. Use zero initializer instead.'
-                        ' To suppress this warning, use `set_initializer` to'
-                        ' explicitly specify which initializer to use.')
-            # TODO(minjie): handle data type
-            initializer = lambda shape, dtype: F.zeros(shape)
         self._initializer = initializer
 
     @property
@@ -211,9 +213,6 @@ class Frame(MutableMapping):
     def num_rows(self):
         """Return the number of rows in this frame."""
         return self._num_rows
-
-    def increment_num_rows(self, num_new_rows):
-        self._num_rows += num_new_rows
 
     def __contains__(self, name):
         """Return true if the given column name exists."""
@@ -280,7 +279,7 @@ class Frame(MutableMapping):
                            ' number of rows is unknown. Make sure there is at least'
                            ' one column in the frame so number of rows can be inferred.' % name)
         if self.initializer is None:
-            self.set_initializer()
+            self._warn_and_set_initializer()
         # TODO(minjie): directly init data on the targer device.
         init_data = self.initializer((self.num_rows,) + scheme.shape, scheme.dtype)
         init_data = F.to_context(init_data, ctx)
@@ -324,13 +323,7 @@ class Frame(MutableMapping):
             self._num_rows = other.num_rows
         else:
             for key, col in other.items():
-                sch = self._columns[key].scheme
-                other_sch = col.scheme
-                if sch != other_sch:
-                    raise DGLError("Cannot append column of scheme %s to column of scheme %s."
-                                   % (other_scheme, sch))
-                self._columns[key].data = F.pack(
-                        [self._columns[key].data, col.data])
+                self._columns[key].extend(col.data, col.scheme)
             self._num_rows += other.num_rows
 
     def clear(self):
@@ -591,6 +584,8 @@ class FrameRef(MutableMapping):
         if hu is None:
             hu = {}
 
+        feat_placeholders = {}
+
         for key in self._frame:
             data = self._frame[key].data
             scheme = self._frame[key].scheme
@@ -601,32 +596,18 @@ class FrameRef(MutableMapping):
 
             if key in hu:
                 new_data = hu[key]
-                assert F.shape(new_data) == (num_rows,) + feat_shape
+                assert F.shape(new_data) == (num_rows,) + feat_shape, \
+                    'Expect features passed in have the same shape as existing features.'
             else:
                 if self._frame.initializer is None:
-                    self._frame.set_initializer()
+                    self._frame._warn_and_set_initializer()
                 new_data = self._frame.initializer((num_rows,) + scheme.shape, scheme.dtype)
-                new_data = F.to_context(new_data, ctx)
-
             # Todo: convert new_data to target tvmdtype when different
-            self._frame[key].extend(new_data)
+            new_data = F.to_context(new_data, ctx)
 
-        self.increment_num_rows(num_rows)
+            feat_placeholders[key] = new_data
 
-    def increment_num_rows(self, num_new_rows):
-        old_num_rows = self._frame.num_rows
-        self._frame.increment_num_rows(num_new_rows)
-
-        if self._index_data == slice(0, old_num_rows):
-            self._index_data = slice(0, self._frame.num_rows)
-        # Todo: handle the case where index is given.
-
-        if self._index is not None:
-            if self.is_contiguous():
-                self._index = utils.toindex(
-                    F.arange(self._index_data.stop, dtype=F.int64))
-            else:
-                self._index = utils.toindex(self._index_data)
+        self.append(feat_placeholders)
 
     def update_rows(self, query, data, inplace):
         """Update the rows.
