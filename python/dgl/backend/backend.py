@@ -25,10 +25,20 @@ def data_type_dict():
     int32
     int64
 
+    This function will be called only *once* during the initialization fo the
+    backend module. The returned dictionary will become the attributes of the
+    backend module.
+
     Examples
     --------
     >>> import torch as th
-    >>> { 'float16' : th.float16, 'float32' : th.float32, ... }
+    >>> def data_type_dict():
+    >>>   return { 'float16' : th.float16, 'float32' : th.float32, ... }
+
+    After the module is initialized.
+
+    >>> import backend as F
+    >>> F.float16  # this will point to torch.float16
 
     Returns
     -------
