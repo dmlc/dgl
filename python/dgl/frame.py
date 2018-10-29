@@ -189,8 +189,8 @@ class Frame(MutableMapping):
 
         Parameters
         ----------
-        initializer : callable or None
-            The initializer. If None, initialize an initializer.
+        initializer : callable
+            The initializer.
         """
         self._initializer = initializer
 
