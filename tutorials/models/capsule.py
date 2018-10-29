@@ -88,8 +88,8 @@ def construct_graph(self):
 #
 # .. image:: https://raw.githubusercontent.com/dmlc/web-data/master/dgl/tutorials/capsule/capsule_f5.png
 #
-# At this stage, we need to define a reduce function to aggregate all the information we
-# get from layer :math:`l` and set into layer :math:`(l+1)`'s node features.
+# At this stage, we need to define a reduce function to aggregate the node features
+# from layer :math:`l` and weighted sum them into layer :math:`(l+1)`'s node features.
 #
 # .. note::
 #    The softmax operation is over dimension :math:`j` instead of :math:`i`.
@@ -155,8 +155,12 @@ def forward(self, x):
 
 
 ##############################################################################
+# Other Workaround
+# ````````````````````````````````````````````````````````````````
 # Initialization & Affine Transformation
-# ````````````````````````````````````````````````````````````````````````````
+# ..................................................
+# This section implements the transformation operation in capsule networks,
+# which transform capsule into different dimensions.
 # - Pre-compute :math:`\hat{u}_{j|i}`, initialize :math:`b_{ij}` and store them as edge attribute
 # - Initialize node features as zero
 #
@@ -207,7 +211,7 @@ def squash(s, dim=2):
 
 ##############################################################################
 # General Setup
-# `````````````````````````
+# .................
 
 import dgl
 import torch
