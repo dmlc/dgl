@@ -1,7 +1,7 @@
 """Columnar storage for DGLGraph."""
 from __future__ import absolute_import
 
-from collections import MutableMapping
+from collections import MutableMapping, namedtuple
 import numpy as np
 
 from . import backend as F
@@ -9,7 +9,10 @@ from .backend import Tensor
 from .base import DGLError, dgl_warning
 from . import utils
 
-class Scheme(object):
+
+Scheme = namedtuple('Scheme', ['shape', 'dtype'])
+# NOTE: does not work in Python 2
+Scheme.__doc__ = \
     """The column scheme.
 
     Parameters
@@ -19,23 +22,9 @@ class Scheme(object):
     dtype : TVMType
         The feature data type.
     """
-    def __init__(self, shape, dtype):
-        self.shape = shape
-        self.dtype = dtype
 
-    def __repr__(self):
-        return '{shape=%s, dtype=%s}' % (repr(self.shape), repr(self.dtype))
-
-    def __eq__(self, other):
-        return self.shape == other.shape and self.dtype == other.dtype
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    @staticmethod
-    def infer_scheme(tensor):
-        """Infer the scheme of the given tensor."""
-        return Scheme(tuple(F.shape(tensor)[1:]), F.get_tvmtype(tensor))
+def infer_scheme(tensor):
+    return Scheme(tuple(F.shape(tensor)[1:]), F.get_tvmtype(tensor))
 
 class Column(object):
     """A column is a compact store of features of multiple nodes/edges.
@@ -52,7 +41,7 @@ class Column(object):
     """
     def __init__(self, data, scheme=None):
         self.data = data
-        self.scheme = scheme if scheme else Scheme.infer_scheme(data)
+        self.scheme = scheme if scheme else infer_scheme(data)
 
     def __len__(self):
         """The column length."""
@@ -104,7 +93,7 @@ class Column(object):
         inplace : bool
             If true, use inplace write.
         """
-        feat_scheme = Scheme.infer_scheme(feats)
+        feat_scheme = infer_scheme(feats)
         if feat_scheme != self.scheme:
             raise DGLError("Cannot update column of scheme %s using feature of scheme %s."
                     % (feat_scheme, self.scheme))
@@ -578,7 +567,7 @@ class FrameRef(MutableMapping):
         else:
             if name not in self._frame:
                 ctx = F.get_context(data)
-                self._frame.add_column(name, Scheme.infer_scheme(data), ctx)
+                self._frame.add_column(name, infer_scheme(data), ctx)
                 #raise DGLError('Cannot update column. Column "%s" does not exist.'
                 #               ' Did you forget to init the column using `set_n_repr`'
                 #               ' or `set_e_repr`?' % name)
