@@ -568,9 +568,6 @@ class FrameRef(MutableMapping):
             if name not in self._frame:
                 ctx = F.get_context(data)
                 self._frame.add_column(name, infer_scheme(data), ctx)
-                #raise DGLError('Cannot update column. Column "%s" does not exist.'
-                #               ' Did you forget to init the column using `set_n_repr`'
-                #               ' or `set_e_repr`?' % name)
             fcol = self._frame[name]
             fcol.update(self.index_or_slice(), data, inplace)
 
@@ -598,9 +595,6 @@ class FrameRef(MutableMapping):
                 # add new column
                 tmpref = FrameRef(self._frame, rows)
                 tmpref.update_column(key, col, inplace)
-                #raise DGLError('Cannot update rows. Column "%s" does not exist.'
-                #               ' Did you forget to init the column using `set_n_repr`'
-                #               ' or `set_e_repr`?' % key)
             else:
                 self._frame[key].update(rows, col, inplace)
 
