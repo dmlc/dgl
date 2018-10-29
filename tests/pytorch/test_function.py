@@ -76,32 +76,27 @@ def test_dynamic_addition():
     g.add_nodes(N)
     g.set_n_repr({'h1': th.randn(N, D),
                   'h2': th.randn(N, D)})
-    print('Node representations before dynamic addition')
-    print('--------------------------------------------')
-    print(g.get_n_repr())
     g.add_nodes(3)
-    print('Node representations after dynamic addition')
-    print('--------------------------------------------')
-    print(g.get_n_repr())
+    n_repr = g.get_n_repr()
+    assert n_repr['h1'].shape[0] == n_repr['h2'].shape[0] == N + 3
 
     # Test edge addition
     g.add_edge(0, 1)
     g.add_edge(1, 0)
     g.set_e_repr({'h1': th.randn(2, D),
                   'h2': th.randn(2, D)})
-    print('Edge representations before dynamic addition')
-    print('--------------------------------------------')
-    print(g.get_e_repr())
+    e_repr = g.get_e_repr()
+    assert e_repr['h1'].shape[0] == e_repr['h2'].shape[0] == 2
 
     g.add_edges([0, 2], [2, 0])
-    print('Edge representations after adding edge')
-    print('--------------------------------------------')
-    print(g.get_e_repr())
+    e_repr = g.get_e_repr()
+    g.set_e_repr({'h1': th.randn(4, D)})
+    assert e_repr['h1'].shape[0] == e_repr['h2'].shape[0] == 4
 
     g.add_edge(1, 2)
-    print('Edge representations after adding edges')
-    print('--------------------------------------------')
-    print(g.get_e_repr())
+    g.set_e_repr_by_id({'h1': th.randn(1, D)}, eid=4)
+    e_repr = g.get_e_repr()
+    assert e_repr['h1'].shape[0] == e_repr['h2'].shape[0] == 5
 
 if __name__ == '__main__':
     test_copy_src()
