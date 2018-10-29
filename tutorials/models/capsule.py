@@ -192,7 +192,8 @@ def initialize_nodes_and_edges_features(self, u_hat):
 # Squash function
 # ..................
 # Squashing function is to ensure that short vectors get shrunk to almost zero length and
-# long vectors get shrunk to a length slightly below 1.
+# long vectors get shrunk to a length slightly below 1. Its norm is expected to represents probabilities
+# at some levels.
 #
 # .. image:: https://raw.githubusercontent.com/dmlc/web-data/master/dgl/tutorials/capsule/squash.png
 #    :height: 100px
