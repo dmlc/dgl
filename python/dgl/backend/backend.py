@@ -7,6 +7,10 @@ The principles of this interface:
 * Default arguments should be avoided.
 * Keyword or positional arguments should be avoided.
 * Argument type should be easier to understand.
+
+It is recommended the frameworks implement all the interfaces. However, it is
+also OK to skip some. The generated backend module has an ``is_enbaled`` function
+that returns whether the interface is supported by the framework or not.
 """
 
 ###############################################################################
@@ -55,8 +59,9 @@ def tensor(data, dtype=None):
     data : input data
         The interface should at least support list and numpy array.
         The data is copied to a newly-allocated tensor.
-    dtype : data type
+    dtype : data type, optional
         It should be one of the values in the data type dict.
+        If is none, the type should be inferred from data.
 
     Returns
     -------
