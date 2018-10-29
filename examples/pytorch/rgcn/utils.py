@@ -1,20 +1,79 @@
-from torch.utils.data import Dataset as DatasetBase
 import numpy as np
 import torch.nn.functional as F
 import torch
+import dgl
 
-class Dataset(DatasetBase):
-    def __init__(self, triplets):
-        self.data = triplets
+def sample_edge_neighborhood(adj_list, degrees, n_triplets, sample_size):
 
-    def __len__(self):
-        return len(self.data)
+    edges = np.zeros((sample_size), dtype=np.int32)
 
-    def __getitem__(self, idx):
-        return self.data[idx]
+    #initialize
+    sample_counts = np.array([d for d in degrees])
+    picked = np.array([False for _ in range(n_triplets)])
+    seen = np.array([False for _ in degrees])
 
-def negative_sampling(triplets, num_entity=0, negative_rate=0):
-    pos_samples = np.array(triplets)
+    for i in range(0, sample_size):
+        weights = sample_counts * seen
+
+        if np.sum(weights) == 0:
+            weights = np.ones_like(weights)
+            weights[np.where(sample_counts == 0)] = 0
+
+        probabilities = (weights) / np.sum(weights)
+        chosen_vertex = np.random.choice(np.arange(degrees.shape[0]), p=probabilities)
+        chosen_adj_list = adj_list[chosen_vertex]
+        seen[chosen_vertex] = True
+
+        chosen_edge = np.random.choice(np.arange(chosen_adj_list.shape[0]))
+        chosen_edge = chosen_adj_list[chosen_edge]
+        edge_number = chosen_edge[0]
+
+        while picked[edge_number]:
+            chosen_edge = np.random.choice(np.arange(chosen_adj_list.shape[0]))
+            chosen_edge = chosen_adj_list[chosen_edge]
+            edge_number = chosen_edge[0]
+
+        edges[i] = edge_number
+        other_vertex = chosen_edge[1]
+        picked[edge_number] = True
+        sample_counts[chosen_vertex] -= 1
+        sample_counts[other_vertex] -= 1
+        seen[other_vertex] = True
+
+    return edges
+
+def generate_sampled_graph_and_labels(triplets, sample_size, split_size, num_rels, adj_list, degrees, negative_rete):
+    # perform edge neighbor sampling
+    edges = sample_edge_neighborhood(adjlist, degrees, len(triplets), sample_size)
+
+    # relabel edges
+    edges = triplets[edges]
+    src, rel, dst = edges.transpose()
+    uniq_v, edges = np.unique((src, dst), return_inverse=True)
+    src, dst = edges.view(2, -1)
+    relabeled_edges = np.stack(src, rel, dst).transpose()
+
+    # negative sampling
+    samples, labels = negative_sampling(relabeled_edges, len(uniq_v), negative_rate)
+
+    # further split graph
+    split_size = int(sample_size * split_size)
+    graph_split_ids = np.random.choice(np.arange(sample_size), size=split_size, replace=False)
+    src = src[graph_split_ids]
+    dst = dst[graph_split_ids]
+    rel = rel[graph_split_ids]
+
+    # build graph
+    src, dst = np.concatenate((src, dst)), np.concatenate((dst, src))
+    rel = np.concateneate((rel, rel + num_rels))
+    edges = sorted(zip(dst, src, rel))
+    dst, src, rel = np.array(edges).transpose()
+    g = dgl.DGLGraph()
+    g.add_nodes(len(uniq_v))
+    g.add_edges(src, dst)
+    return g, uniq_v, rel, samples, labels
+
+def negative_sampling(triplets, num_entity, negative_rate):
     size_of_batch = len(triplets)
     num_to_generate = size_of_batch * negative_rate
     neg_samples = np.tile(pos_samples, (negative_rate, 1))

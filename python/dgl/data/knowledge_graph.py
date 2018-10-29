@@ -98,36 +98,14 @@ class RGCNLinkDataset(object):
         test_path = os.path.join(self.dir, 'test.txt')
         entity_dict = _read_dictionary(entity_path)
         relation_dict = _read_dictionary(relation_path)
-        self.train = _read_triplets_as_list(train_path, entity_dict, relation_dict)
-        self.valid = _read_triplets_as_list(valid_path, entity_dict, relation_dict)
-        self.test = _read_triplets_as_list(test_path, entity_dict, relation_dict)
+        self.train = np.array(_read_triplets_as_list(train_path, entity_dict, relation_dict))
+        self.valid = np.array(_read_triplets_as_list(valid_path, entity_dict, relation_dict))
+        self.test = np.array(_read_triplets_as_list(test_path, entity_dict, relation_dict))
         self.num_nodes = len(entity_dict)
-        num_rels = len(relation_dict)
         print("# entities: {}".format(self.num_nodes))
-        print("# relations: {}".format(num_rels))
-        self.edges, self.relations = self.build_adj(self.train, num_rels)
-        print("# edges: {}".format(len(self.relations)))
-
-    def build_adj(self, triplets, num_rels):
-        num_rels *= 2 # add reverse
-        edge_dict = defaultdict(lambda: np.zeros(num_rels, dtype=np.float32))
-        for s, r, o in triplets:
-            edge_dict[(s, o)][2 * r] = 1
-            edge_dict[(o, s)][2 * r + 1] = 1 # reverse rel
-
-        edges = sorted(list(edge_dict.keys()))
-        edge_types = np.stack([edge_dict[e] for e in edges])
-        edges = np.array(edges)
-
-        # normalize edge_types for edge repr
-        # count edge type for each edge
-        edge_type_count = np.sum(edge_types, axis=1)
-        src, dst = edges.transpose()
-        coo = sp.coo_matrix((edge_type_count, (src, dst)), shape=[self.num_nodes, self.num_nodes])
-        # normalize per dst node
-        edge_count = np.reshape(np.asarray(coo.sum(axis=0)), (-1, 1))
-        edge_values = edge_types / edge_count[dst]
-        return edges, edge_values
+        self.num_rels = len(relation_dict)
+        print("# relations: {}".format(self.num_rels))
+        print("# edges: {}".format(len(self.train)))
 
 
 def load_entity(args):
@@ -334,10 +312,10 @@ def _load_data(dataset_str='aifb', dataset_path=None):
             print('Number of nodes: ', num_node)
             print('Number of relations: ', num_rel)
 
-            edge_list = []
             relations_dict = {rel: i for i, rel in enumerate(list(relations))}
             nodes_dict = {node: i for i, node in enumerate(nodes)}
 
+            edge_list = []
             # self relation
             for i in range(num_node):
                 edge_list.append((i, i, 0))
@@ -347,7 +325,7 @@ def _load_data(dataset_str='aifb', dataset_path=None):
                 dst = nodes_dict[o]
                 assert src < num_node and dst < num_node
                 rel = relations_dict[p]
-                edge_list.append((src, dst, 2 * rel + 1))
+                edge_list.append((src, dst, 2 * rel))
                 edge_list.append((dst, src, 2 * rel + 1))
 
             # sort indices by destination

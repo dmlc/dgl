@@ -78,12 +78,10 @@ def main(args):
     # load graph data
     data = load_data(args)
     num_nodes = data.num_nodes
-    edges = data.edges
-    relations = data.relations
     train_data = data.train
     valid_data = data.valid
     test_data = data.test
-    data = None
+    num_rels = data.num_rels
 
     # check cuda
     use_cuda = args.gpu >= 0 and torch.cuda.is_available()
@@ -122,47 +120,68 @@ def main(args):
     forward_time = []
     backward_time = []
 
-    # load dataset
-    dataset = Dataset(train_data)
-    # negative sampling fn
-    collate_fn = partial(negative_sampling, num_entity=num_nodes, negative_rate=args.negative_sample)
-    dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn)
+    # build adj list and calculate degrees
+    adj_list = [[] for _ in entities]
+    for i,triplet in enumerate(train_data):
+        adj_list[triplet[0]].append([i, triplet[2]])
+        adj_list[triplet[2]].append([i, triplet[0]])
+
+    degrees = np.array([len(a) for a in adj_list])
+    adj_list = [np.array(a) for a in adj_list]
 
     best_mrr = 0
     model_state_file = 'model_state.pth'
 
-    for epoch in range(args.n_epochs):
-        model.train()
-        print("Epoch {:03d}".format(epoch))
-        for batch_idx, (data, labels) in enumerate(dataloader):
-            if use_cuda:
-                torch.cuda.empty_cache()
-            data, labels = torch.from_numpy(data), torch.from_numpy(labels)
-            if use_cuda:
-                data, labels = data.cuda(), labels.cuda()
-            optimizer.zero_grad()
-            t0 = time.time()
-            loss = model.get_loss(data, labels)
-            t1 = time.time()
-            loss.backward()
-            t2 = time.time()
-            # clip gradients
-            torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_norm)
-            optimizer.step()
-
-            forward_time.append(t1 - t0)
-            backward_time.append(t2 - t1)
-            print("Batch {:03d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".format(batch_idx, forward_time[-1], backward_time[-1]))
-
+    forward_time = []
+    backward_time = []
+    epoch = 0
+    while True:
+        epoch += 1
         if use_cuda:
             torch.cuda.empty_cache()
-        model.eval()
-        mrr = evaluate(model, valid_data, num_nodes, hits=[1, 3, 10], eval_bz=args.eval_batch_size)
-        # save best model
-        if mrr > best_mrr:
-            best_mrr = mrr
-            torch.save({'state_dict': model.state_dict(), 'epoch': epoch},
-                       model_state_file)
+        model.train()
+        print("Epoch {:03d}".format(epoch))
+
+        # generate graph and data
+        g, node_id, edge_type, data, labels = generate_sampled_graph_and_labels(
+                train_data, args.graph_batch_size, args.graph_split_size,
+                num_rels, adj_list, degrees, args.negative_sample)
+        node_id, edge_type = torch.from_numpy(node_id), torch.from_numpy(edge_type)
+        data, labels = torch.from_numpy(data), torch.from_numpy(labels)
+        deg = g.in_degrees(range(g.number_of_nodes)).tousertensor()
+        if use_cuda:
+            node_id, edge_type, deg = node_id.cuda(), edge_type.cuda(), deg.cuda()
+            data, labels = data.cuda(), labels.cuda()
+        g.set_n_repr({'id': node_id, 'deg': deg})
+        g.set_e_repr({'type': edge_type})
+
+        optimizer.zero_grad()
+        t0 = time.time()
+        loss = model.get_loss(g, data, labels)
+        t1 = time.time()
+        loss.backward()
+        t2 = time.time()
+        # clip gradients
+        torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_norm)
+        optimizer.step()
+
+        forward_time.append(t1 - t0)
+        backward_time.append(t2 - t1)
+        print("Batch {:03d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".format(batch_idx, forward_time[-1], backward_time[-1]))
+
+        if epoch % args.evaluate_every == 0:
+            if use_cuda:
+                torch.cuda.empty_cache()
+            model.eval()
+            mrr = evaluate(model, valid_data, num_nodes, hits=[1, 3, 10], eval_bz=args.eval_batch_size)
+            # save best model
+            if mrr < best_mrr:
+                if epoch > args.n_epochs:
+                    break
+            else:
+                best_mrr = mrr
+                torch.save({'state_dict': model.state_dict(), 'epoch': epoch},
+                           model_state_file)
 
     print("training done")
     print("Mean iteration forward time: {:4f}".format(np.mean(forward_time[len(forward_time) // 4:])))
@@ -203,16 +222,20 @@ if __name__ == '__main__':
             help="number of training epochs")
     parser.add_argument("-d", "--dataset", type=str, required=True,
             help="dataset to use")
-    parser.add_argument("--negative-sample", type=int, default=10,
-            help="number of negative samples per positive sample")
-    parser.add_argument("--batch-size", type=int, default=21000,
-            help="number of possible samples to process in a batch")
     parser.add_argument("--eval-batch-size", type=int, default=100,
             help="batch size when evaluating")
     parser.add_argument("--regularization", type=float, default=0.01,
             help="regularization weight")
     parser.add_argument("--grad-norm", type=float, default=1.0,
             help="norm to clip gradient to")
+    parser.add_argument("--graph-batch-size", type=int, default=30000,
+            help="number of edges to sample in each iteration")
+    parser.add_argument("--graph-split-size", type=float, deafult=0.5,
+            help="portion of edges used as positive sample")
+    parser.add_argument("--negative-sample", type=int, default=10,
+            help="number of negative samples per positive sample")
+    parser.add_argument("--evaluate-every", type=int, default=2000,
+            help="perform evalution every n epochs")
 
     args = parser.parse_args()
     print(args)

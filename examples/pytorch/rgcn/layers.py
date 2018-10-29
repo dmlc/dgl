@@ -97,12 +97,10 @@ class RGCNBlockLayer(RGCNLayer):
 
     def propagate(self, g):
         def msg_func(src, edge):
-            lambda x: self.linears[idx](x.unsqueeze(2)).squeeze()
             weight = self.weight[edge['type']].view(-1, self.submat_in, self.submat_out)
             node = src['h'].view(-1, 1, self.submat_in)
-            msgs = torch.bmm(node, weight).view(-1, self.out_feat) * edge['norm']
-            # FIXME: normalizer
-            return {'msg': msgs}
+            msg = torch.bmm(node, weight).view(-1, self.out_feat) * edge['norm']
+            return {'msg': msg}
 
         # FIXME: featureless case?
         g.update_all(msg_func, fn.sum(msg='msg', out='h'), None)
