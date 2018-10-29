@@ -10,7 +10,13 @@ from .base import DGLError, dgl_warning
 from . import utils
 
 
+<<<<<<< HEAD
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
+=======
+Scheme = namedtuple('Scheme', ['shape', 'dtype'])
+# NOTE: does not work in Python 2
+Scheme.__doc__ = \
+>>>>>>> replacing Scheme object with namedtuple
     """The column scheme.
 
     Parameters
@@ -20,7 +26,10 @@ class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     dtype : TVMType
         The feature data type.
     """
+<<<<<<< HEAD
     pass
+=======
+>>>>>>> replacing Scheme object with namedtuple
 
 def infer_scheme(tensor):
     return Scheme(tuple(F.shape(tensor)[1:]), F.get_tvmtype(tensor))
