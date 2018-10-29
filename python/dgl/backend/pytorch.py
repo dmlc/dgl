@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import ctypes
 import scipy as sp
 import torch as th
+from functools import partial
 from torch.utils import dlpack
 
 from .._ffi.base import _LIB, check_call, c_array
