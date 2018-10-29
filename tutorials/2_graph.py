@@ -10,6 +10,8 @@ The ``DGLGraph`` is the very core data structure in our library. It provides the
 interfaces to manipulate graph structure, set/get node/edge features and convert
 from/to many other graph formats. You can also perform computation on the graph
 using our message passing APIs (see :ref:`tutorial-mp`).
+
+TODO: 1) explain `tensor`; 2) enable g.nodes/edges[:][key]; 3) networkx conversion in one place
 """
 
 ###############################################################################
@@ -35,7 +37,7 @@ nx.draw(g_dgl.to_networkx(), with_labels=True)
 plt.show()
 
 ###############################################################################
-# These are the same graph, except that ``DGLGraph`` are always directional.
+# They are the same graph, except that ``DGLGraph`` are always `directional`.
 #
 # Creating a graph is a matter of specifying total number of nodes and the edges among them.
 # In ``DGLGraph``, all nodes are represented using consecutive integers starting from
@@ -55,9 +57,8 @@ g_nx.add_node(100)
 print("My nx buddy only has %d :( " % g_nx.number_of_nodes())
 
 ###############################################################################
-# The most naive way to add edges are just adding them one by one, with a (*src, dst*) pair:
-# where all the edges point to the center node (node#0).
-# TODO(minjie): it's better to plot the graph here.
+# The most naive way to add edges are just adding them one by one, with a (*src, dst*) pair.
+# Let's generate a star graph where all the edges point to the center (node#0).
 
 star = dgl.DGLGraph()
 star.add_nodes(10)  # add 10 nodes
@@ -66,8 +67,8 @@ for i in range(1, 10):
 nx.draw(star.to_networkx(), with_labels=True)
 
 ###############################################################################
-# A more efficient way is to add many edges with a pair of list, or tensor. The following code
-# generates equivalent graphs, and the one with tensor is more efficient.
+# It's more efficient to add many edges with a pair of list, or better still, with a pair of tensors.
+# TODO: needs to explain ``tensor``, since it's not a Python primitive data type.
 
 # using lists
 star.clear()
@@ -108,9 +109,9 @@ star.add_edges(u, 0)  # many-one edge set
 ###############################################################################
 # In ``DGLGraph``, each edge is assigned an internal edge id (also a consecutive
 # integer starting from zero). The ids follow the addition order of the edges
-# and you can query the id using the ``edge_ids`` interface.
+# and you can query the id using the ``edge_ids`` interface, which returns a tensor.
 
-print(star.edge_ids(1, 0))  # the first edge
+print(star.edge_ids(1, 0))  # query edge id of 1->0; it happens to be the first edge!
 print(star.edge_ids([8, 9], 0))  # ask for ids of multiple edges
 
 
@@ -126,8 +127,8 @@ print(star.edge_ids([8, 9], 0))  # ask for ids of multiple edges
 # ----------------------
 # Nodes and edges can have feature data in tensor type. They can be accessed/updated
 # through a key-value storage interface. The key must be hashable. The value should
-# be features of each node and edge batched on the *first* dimension. For example,
-# following codes create features for all nodes (``hv``) and features for all
+# be features of each node and edge, batched on the *first* dimension. For example,
+# the following codes create features for all nodes (``hv``) and features for all
 # edges (``he``). Each feature is a vector of length 3.
 #
 # .. note::
@@ -149,12 +150,20 @@ star.set_e_repr({'he' : efeat})
 
 
 ###############################################################################
+# .. note::
+#    The first dimension of the node feature has length equal the number of nodes,
+#    whereas of the edge feature the number of edges.
+#
 # We can then set some nodes' features to be zero.
 
 # TODO(minjie): enable following syntax
 # print(star.nodes[:]['hv'])
+print("node features:")
 print(star.get_n_repr()['hv'])
+print("\nedge features:")
+print(star.get_e_repr()['he'])
 # set node 0, 2, 4 feature to zero
+print("\nresetting features at node 0, 2 and 4...")
 star.set_n_repr({'hv' : th.zeros((3, D))}, [0, 2, 4])
 print(star.get_n_repr()['hv'])
 
@@ -176,11 +185,12 @@ print(star.node_attr_schemes())
 ###############################################################################
 # If a new feature is added for some but not all of the nodes/edges, we will
 # automatically create empty features for the others to make sure that features are
-# always aligned. By default, we fill zero for the empty features. The behavior
+# always aligned. By default, we zero-fill the empty features. The behavior
 # can be changed using ``set_n_initializer`` and ``set_e_initializer``.
 
 star.set_n_repr({'hv_1' : th.randn((3, D+1))}, [0, 2, 4])
 print(star.node_attr_schemes())
+print(star.get_n_repr()['hv'])
 print(star.get_n_repr()['hv_1'])
 
 
