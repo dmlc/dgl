@@ -7,7 +7,6 @@ import scipy
 
 from ._ffi.base import c_array
 from ._ffi.function import _init_api
-from ._ffi.ndarray import TVMArrayHandle, _make_array
 from . import backend as F
 from . import ndarray as nd
 from . import utils

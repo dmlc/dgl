@@ -88,7 +88,6 @@ class TreeLSTM(nn.Module):
         logits : Tensor
             The prediction of each node.
         """
-        print(type(g))
         g = graph
         n = g.number_of_nodes()
         g.register_message_func(self.cell.message_func)

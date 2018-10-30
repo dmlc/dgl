@@ -63,12 +63,13 @@ inline std::pair<IdArray, IdArray> ZipIdVectorsInIdArray(const std::vector<IdVec
 }  // namespace
 
 std::pair<IdArray, IdArray> Graph::BFS(IdArray src, bool out) const {
+  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
   std::vector<dgl_id_t> vv;
   auto src_data = static_cast<int64_t*>(src->data);
   std::copy(src_data, src_data + src->shape[0], std::back_inserter(vv));
   size_t i = 0;
   size_t j = vv.size();
-  auto &&adj = out ? adjlist_ : reverse_adjlist_;
+  const auto &adj = out ? adjlist_ : reverse_adjlist_;
   std::vector<bool> visited(adj.size());
   for (auto v : vv) {
     visited[v] = true;
@@ -76,8 +77,7 @@ std::pair<IdArray, IdArray> Graph::BFS(IdArray src, bool out) const {
   std::vector<size_t> ss;
   while (i < j) {
     for (size_t k = i; k != j; k++) {
-      auto succ = adj[vv[k]].succ;
-      for (auto v : succ) {
+      for (auto v : adj[vv[k]].succ) {
         if (!visited[v]) {
             visited[v] = true;
             vv.push_back(v);
@@ -92,13 +92,12 @@ std::pair<IdArray, IdArray> Graph::BFS(IdArray src, bool out) const {
 }
 
 std::tuple<IdVector, IdVector, IdVector> Graph::DFSLabeledEdges_(
-  dgl_id_t source, bool out, bool reverse_edge, bool nontree_edge
-) const {
+  dgl_id_t source, bool out, bool reverse_edge, bool nontree_edge) const {
   enum EdgeType { forward, reverse, nontree };
   IdVector src;
   IdVector dst;
   IdVector type;
-  auto &&adj = out ? adjlist_ : reverse_adjlist_;
+  const auto &adj = out ? adjlist_ : reverse_adjlist_;
   typedef std::pair<dgl_id_t, std::vector<dgl_id_t>::const_iterator> crux_t;
   std::stack<crux_t> stack;
   stack.push(std::make_pair(source, adj[source].succ.begin()));
@@ -134,8 +133,8 @@ std::tuple<IdVector, IdVector, IdVector> Graph::DFSLabeledEdges_(
 }
 
 std::tuple<IdArray, IdArray, IdArray, IdArray> Graph::DFSLabeledEdges(
-  IdArray source, bool out, bool reverse_edge, bool nontree_edge
-) const {
+  IdArray source, bool out, bool reverse_edge, bool nontree_edge) const {
+  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
   int64_t *source_data = static_cast<int64_t*>(source->data);
   std::vector<IdVector> src(source->shape[0]);
   std::vector<IdVector> dst(source->shape[0]);
@@ -166,12 +165,11 @@ std::pair<IdArray, IdArray> Graph::TopologicalTraversal(bool out) const {
   }
   size_t i = 0;
   size_t j = vv.size();
-  auto &&adj = out ? adjlist_ : reverse_adjlist_;
+  const auto &adj = out ? adjlist_ : reverse_adjlist_;
   IdVector ss;
   while (i < j) {
     for (size_t k = i; k != j; k++) {
-      auto succ = adj[vv[k]].succ;
-      for (auto v : succ) {
+      for (auto v : adj[vv[k]].succ) {
         if (--(deg_data[v]) == 0) {
           vv.push_back(v);
         }

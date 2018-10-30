@@ -305,10 +305,17 @@ class Graph {
    */
   Graph Reverse() const;
 
+  /*!
+   * \brief Produce nodes in a breadth-first-search (BFS) order.
+   *
+   * \param source Source nodes.
+   * \param out Whether to follow incoming or outgoing edges.
+   * \return Nodes organized into BFS layers.
+   */
   std::pair<IdArray, IdArray> BFS(IdArray source, bool out) const;
 
   /*!
-   * \brief Produce edges in a depth-first-search (DFS) labeled by type.
+   * \brief Produce edges in a depth-first-search (DFS) order labeled by type.
    *
    * \param source Source nodes.
    * \param out Whether to follow incoming or outgoing edges.
@@ -319,6 +326,13 @@ class Graph {
   std::tuple<IdArray, IdArray, IdArray, IdArray> DFSLabeledEdges(
     IdArray source, bool out, bool reverse_edge, bool nontree_edge) const;
 
+  /*!
+   * \brief Produce nodes in a topological sort order.
+   *
+   * \param source Source nodes.
+   * \param out Whether to follow incoming or outgoing edges.
+   * \return Nodes organized into topological sort layers.
+   */
   std::pair<IdArray, IdArray> TopologicalTraversal(bool out) const;
 
  protected:

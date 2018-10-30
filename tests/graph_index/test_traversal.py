@@ -17,7 +17,7 @@ def test_bfs(n=1000):
 
     src = random.choice(range(n))
 
-    layers_dgl = g.bfs([src], out=True)
+    layers_dgl = g.bfs([src])
 
     edges = nx.bfs_edges(g_nx, src)
     layers_nx = [set([src])]
