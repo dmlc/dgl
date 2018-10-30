@@ -15,5 +15,7 @@ python train.py
 
 An experiment on the Stochastic Block Model in customized settings can be run with
 ```bash
-python train.py --batch-size BATCH_SIZE --gpu GPU --n-communities N_COMMUNITIES --n-features N_FEATURES --n-graphs N_GRAPH --n-iterations N_ITERATIONS --n-layers N_LAYER --n-nodes N_NODE --model-path MODEL_PATH --radius RADIUS
+python train.py --batch-size BATCH_SIZE --gpu GPU --n-communities N_COMMUNITIES \
+                --n-features N_FEATURES --n-graphs N_GRAPH --n-iterations N_ITERATIONS \
+                --n-layers N_LAYER --n-nodes N_NODE --model-path MODEL_PATH --radius RADIUS
 ```
