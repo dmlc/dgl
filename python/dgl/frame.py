@@ -129,6 +129,8 @@ class Column(object):
         if feat_scheme != self.scheme:
             raise DGLError("Cannot update column of scheme %s using feature of scheme %s."
                     % (feat_scheme, self.scheme))
+
+        feats = F.convert_to(feats, self.data)
         self.data = F.pack([self.data, feats])
 
     @staticmethod
@@ -569,42 +571,26 @@ class FrameRef(MutableMapping):
             fcol = self._frame[name]
             fcol.update(self.index(), data, inplace)
 
-    def add_rows(self, num_rows, hu=None):
-        """Add rows.
+    def add_rows(self, num_rows):
+        """Add blank rows.
+
+        For existing fields, the rows will be extended according to their
+        initializers.
 
         Parameters
         ----------
         num_rows : int
             Number of rows to add
-        reprs : dict of tensor
-            Node representations to be set.
         """
-        assert hu is None or utils.is_dict_like(hu), \
-            'Expect hu to be of NoneType or dict, got {}'.format(type(hu))
-        if hu is None:
-            hu = {}
 
         feat_placeholders = {}
 
         for key in self._frame:
-            data = self._frame[key].data
             scheme = self._frame[key].scheme
 
-            feat_shape = data.shape[1:]
-            feat_dtype = F.get_tvmtype(data)
-            ctx = F.get_context(data)
-
-            if key in hu:
-                new_data = hu[key]
-                assert F.shape(new_data) == (num_rows,) + feat_shape, \
-                    'Expect features passed in have the same shape as existing features.'
-            else:
-                if self._frame.initializer is None:
-                    self._frame._warn_and_set_initializer()
-                new_data = self._frame.initializer((num_rows,) + scheme.shape, scheme.dtype)
-            # Todo: convert new_data to target tvmdtype when different
-            new_data = F.to_context(new_data, ctx)
-
+            if self._frame.initializer is None:
+                self._frame._warn_and_set_initializer()
+            new_data = self._frame.initializer((num_rows,) + scheme.shape, scheme.dtype)
             feat_placeholders[key] = new_data
 
         self.append(feat_placeholders)

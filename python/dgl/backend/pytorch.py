@@ -93,6 +93,12 @@ def get_context(arr):
         return TVMContext(
                 TVMContext.STR2MASK[arr.device.type], arr.device.index)
 
+def convert_to(src, dst):
+    '''
+    Convert src to the same dtype and context as dst
+    '''
+    return src.to(dst)
+
 def get_tvmtype(arr):
     arr_dtype = arr.dtype
     if arr_dtype in (th.float16, th.half):
