@@ -63,7 +63,6 @@ inline std::pair<IdArray, IdArray> ZipIdVectorsInIdArray(const std::vector<IdVec
 }  // namespace
 
 std::pair<IdArray, IdArray> Graph::BFS(IdArray src, bool out) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
   std::vector<dgl_id_t> vv;
   auto src_data = static_cast<int64_t*>(src->data);
   std::copy(src_data, src_data + src->shape[0], std::back_inserter(vv));
@@ -134,7 +133,6 @@ std::tuple<IdVector, IdVector, IdVector> Graph::DFSLabeledEdges_(
 
 std::tuple<IdArray, IdArray, IdArray, IdArray> Graph::DFSLabeledEdges(
   IdArray source, bool out, bool reverse_edge, bool nontree_edge) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
   int64_t *source_data = static_cast<int64_t*>(source->data);
   std::vector<IdVector> src(source->shape[0]);
   std::vector<IdVector> dst(source->shape[0]);
