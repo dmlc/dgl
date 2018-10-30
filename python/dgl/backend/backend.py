@@ -339,11 +339,6 @@ def scatter_row_inplace(data, row_index, value):
         A 1-D integer tensor containing which rows to be updated.
     value : Tensor
         The new value.
-
-    Returns
-    -------
-    Tensor
-        The new data.
     """
     pass
 
