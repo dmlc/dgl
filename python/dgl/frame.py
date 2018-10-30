@@ -46,6 +46,10 @@ class Column(object):
         """The column length."""
         return F.shape(self.data)[0]
 
+    @property
+    def shape(self):
+        return self.scheme.shape
+
     def __getitem__(self, idx):
         """Return the feature data given the index.
 
@@ -114,6 +118,23 @@ class Column(object):
             else:
                 self.data = F.scatter_row(self.data, idx, feats)
 
+    def extend(self, feats, feat_scheme=None):
+        """Extend the feature data.
+         Parameters
+        ----------
+        feats : Tensor
+            The new features.
+        """
+        if feat_scheme is None:
+            feat_scheme = Scheme.infer_scheme(feats)
+
+        if feat_scheme != self.scheme:
+            raise DGLError("Cannot update column of scheme %s using feature of scheme %s."
+                    % (feat_scheme, self.scheme))
+
+        feats = F.convert_to(feats, self.data)
+        self.data = F.pack([self.data, feats])
+
     @staticmethod
     def create(data):
         """Create a new column using the given data."""
@@ -157,6 +178,13 @@ class Frame(MutableMapping):
         # If is none, then a warning will be raised
         # in the first call and zero initializer will be used later.
         self._initializer = None
+
+    def _warn_and_set_initializer(self):
+        dgl_warning('Initializer is not set. Use zero initializer instead.'
+                    ' To suppress this warning, use `set_initializer` to'
+                    ' explicitly specify which initializer to use.')
+        # TODO(minjie): handle data type
+        self._initializer = lambda shape, dtype: F.zeros(shape)
 
     def set_initializer(self, initializer):
         """Set the initializer for empty values.
@@ -255,11 +283,7 @@ class Frame(MutableMapping):
                            ' number of rows is unknown. Make sure there is at least'
                            ' one column in the frame so number of rows can be inferred.' % name)
         if self.initializer is None:
-            dgl_warning('Initializer is not set. Use zero initializer instead.'
-                        ' To suppress this warning, use `set_initializer` to'
-                        ' explicitly specify which initializer to use.')
-            # TODO(minjie): handle data type
-            self.set_initializer(lambda shape, dtype : F.zeros(shape))
+            self._warn_and_set_initializer()
         # TODO(minjie): directly init data on the targer device.
         init_data = self.initializer((self.num_rows,) + scheme.shape, scheme.dtype)
         init_data = F.to_context(init_data, ctx)
@@ -303,13 +327,7 @@ class Frame(MutableMapping):
             self._num_rows = other.num_rows
         else:
             for key, col in other.items():
-                sch = self._columns[key].scheme
-                other_sch = col.scheme
-                if sch != other_sch:
-                    raise DGLError("Cannot append column of scheme %s to column of scheme %s."
-                                   % (other_scheme, sch))
-                self._columns[key].data = F.pack(
-                        [self._columns[key].data, col.data])
+                self._columns[key].extend(col.data, col.scheme)
             self._num_rows += other.num_rows
 
     def clear(self):
@@ -569,6 +587,30 @@ class FrameRef(MutableMapping):
                 self._frame.add_column(name, infer_scheme(data), ctx)
             fcol = self._frame[name]
             fcol.update(self.index_or_slice(), data, inplace)
+
+    def add_rows(self, num_rows):
+        """Add blank rows.
+
+        For existing fields, the rows will be extended according to their
+        initializers.
+
+        Parameters
+        ----------
+        num_rows : int
+            Number of rows to add
+        """
+
+        feat_placeholders = {}
+
+        for key in self._frame:
+            scheme = self._frame[key].scheme
+
+            if self._frame.initializer is None:
+                self._frame._warn_and_set_initializer()
+            new_data = self._frame.initializer((num_rows,) + scheme.shape, scheme.dtype)
+            feat_placeholders[key] = new_data
+
+        self.append(feat_placeholders)
 
     def update_rows(self, query, data, inplace):
         """Update the rows.

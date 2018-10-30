@@ -106,6 +106,12 @@ _tvmtypes = {
         th.int64: TVMType('int64'),
         }
 
+def convert_to(src, dst):
+    '''
+    Convert src to the same dtype and context as dst
+    '''
+    return src.to(dst)
+
 def get_tvmtype(arr):
     arr_dtype = arr.dtype
     if arr_dtype not in _tvmtypes:
