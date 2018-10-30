@@ -311,6 +311,23 @@ class DGLGraph(object):
         else:
             return eid.tousertensor()
 
+    def find_edges(self, eid):
+        """Given the edge ids, return their source and destination node ids.
+
+        Parameters
+        ----------
+        eid : list, tensor
+            The edge ids.
+
+        Returns
+        -------
+        tensor, tensor
+        The source and destination node IDs.
+        """
+        eid = utils.toindex(u)
+        src, dst, _ = self._graph.find_edges(eid)
+        return src.tousertensor(), dst.tousertensor()
+
     def in_edges(self, v):
         """Return the in edges of the node(s).
 
