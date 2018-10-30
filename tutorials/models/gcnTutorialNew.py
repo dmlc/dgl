@@ -32,8 +32,23 @@ g.set_n_repr({'x': x})
 # key-value store with the key `msg`, and retrive it. Note that there may be multiple incoming edges
 # to a node, and the receiving end aggregates them.
 #
-# ..note::
-#  ``msgs`` as an argument is confusing; replacing it with ``blan`` also works, why?
+# .. note::
+#  * ``send(src, dst)`` defines an edge explictly, so ``message_func`` taking ``edge`` as an
+#    argument is confusing.
+#  * following graph construction semantics, it'll be nice to allow ``src`` and ``dst`` as a pair
+#    of lists, or a pair of tensor, though this example doesn't demonstrate it.
+#  * likewise, since we allow edge broadcasting, we should allow it in ``send`` as well.
+#  * what's the side-effect of doing a send action? we are left with the impression that the second argument
+#    in the ``reduce_func`` (i.e. ``msgs``) magically gets the stuff with the same key.
+#  * my preference is to say that expected side-effect is simply that the result  of a ``send`` action is available
+#    at ``dst['key']``, where ``key`` is whatever the user specified in ``message_func``. this allows
+#    for cases where we use ``apply_node_func``.
+#  * in other words,
+#    ``message_func`` returns ``{'hey': [1.0]}``, we expect to see ``dst['hey']``. if that happens
+#    to be the represnetation key, then a replacement is done. user can define a new key, e.g. ``accum``,
+#    then the ``reduce_func`` and ``apply_node_func`` can do whatever they want. typically,
+#    they should return with the representation key to perform update.
+#
 
 def send_source(src, edge):
     return {'msg': src['x']}
