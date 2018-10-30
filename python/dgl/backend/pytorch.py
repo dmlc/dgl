@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+grom __future__ import absolute_import
 
 import ctypes
 import scipy as sp
@@ -91,6 +91,12 @@ def get_context(arr):
     else:
         return TVMContext(
                 TVMContext.STR2MASK[arr.device.type], arr.device.index)
+
+def convert_to(src, dst):
+    '''
+    Convert src to the same dtype and context as dst
+    '''
+    return src.to(dst)
 
 def get_tvmtype(arr):  # delete
     arr_dtype = arr.dtype
