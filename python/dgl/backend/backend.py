@@ -70,27 +70,29 @@ def tensor(data, dtype=None):
     """
     pass
 
-def coo_tensor(idx, dat, shape):
-    """Create a sparse tensor in COO format.
+def coo_matrix(idx, dat, shape):
+    """Create a sparse matrix in COO format.
 
     Parameters
     ----------
     idx : Tensor
-        Coordinate tensor. It should be of shape (2, nnz)
+        Coordinate matrix. It should be of shape (2, nnz).
+        idx[0,:] should be the row index and idx[1,:] should be
+        the column index.
     dat : Tensor
-        Data tensor. It should be of shape (nnz,)
+        Data matrix. It should be of shape (nnz,)
     shape : tuple of int
-        The shape of this tensor.
+        The shape of this matrix.
 
     Returns
     -------
     SparseTensor
-        A framework-specific sparse tensor.
+        A framework-specific sparse matrix.
     """
     pass
 
-def csr_tensor(data, indices, indptr, shape):
-    """Create a sparse tensor in CSR format.
+def csr_matrix(data, indices, indptr, shape):
+    """Create a sparse matrix in CSR format.
 
     See ``scipy.sparse.csr_matrix`` for more documents on what
     each argument means.
@@ -98,16 +100,16 @@ def csr_tensor(data, indices, indptr, shape):
     Parameters
     ----------
     data : Tensor
-        The data tensor. Should be of shape (nnz,)
+        The data matrix. Should be of shape (nnz,)
     indices : Tensor
-        The indices tensor. Should be of shape (nnz,)
+        The indices matrix. Should be of shape (nnz,)
     indptr : Tensor
-        The indptr tensor. Should be of shape (nrows+1,)
+        The indptr matrix. Should be of shape (nrows+1,)
 
     Returns
     -------
     SparseTensor
-        A framework-specific sparse tensor.
+        A framework-specific sparse matrix.
     """
     pass
 

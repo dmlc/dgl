@@ -118,10 +118,13 @@ class Column(object):
 
     def extend(self, feats, feat_scheme=None):
         """Extend the feature data.
+
          Parameters
         ----------
         feats : Tensor
             The new features.
+        feat_scheme : Scheme, optional
+            The scheme
         """
         if feat_scheme is None:
             feat_scheme = Scheme.infer_scheme(feats)

@@ -16,8 +16,10 @@ def data_type_dict():
 def tensor(data, dtype=None):
     return th.tensor(data, dtype)
 
-def coo_tensor(idx, dat, shape):
+def coo_matrix(idx, dat, shape):
     return th.sparse.FloatTensor(idx, dat, shape)
+
+# csr_matrix is not enabled
 
 def is_tensor(obj):
     return isinstance(obj, th.Tensor)
@@ -93,3 +95,24 @@ def full_1d(length, fill_value):
 
 def nonzero_1d(input):
     return th.nonzero(input).squeeze()
+
+def sort_1d(input):
+    return th.sort(input)
+
+def arange(start, stop):
+    return th.arange(start, stop)
+
+def zerocopy_to_dlpack(input):
+    return dlpack.to_dlpack(input)
+
+def zerocopy_from_dlpack(dlpack_tensor):
+    return dlpack.from_dlpack(dlpack_tensor)
+
+def zerocopy_to_numpy(input):
+    # NOTE: not zerocopy
+    return asnumpy(input)
+
+def zerocopy_from_numpy(np_array):
+    return th.from_numpy(np_array)
+
+# create_immutable_graph_index not enabled
