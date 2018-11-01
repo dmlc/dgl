@@ -322,7 +322,7 @@ class SendRecvExecutor(BasicExecutor):
     @property
     def edge_repr(self):
         if self._edge_repr is None:
-            self._edge_repr = self.g.get_e_repr(self.u, self.v)
+            self._edge_repr = self.g.get_e_repr((self.u, self.v))
         return self._edge_repr
 
     def _build_adjmat(self):
@@ -434,9 +434,12 @@ def _create_send_and_recv_exec(graph, **kwargs):
     dst = kwargs.pop('dst')
     mfunc = kwargs.pop('message_func')
     rfunc = kwargs.pop('reduce_func')
-    if isinstance(mfunc, (list, tuple)) or isinstance(rfunc, (list, tuple)):
-        mfunc = fmsg.BundledMessageFunction(mfunc)
-        rfunc = fred.BundledReduceFunction(rfunc)
+    if (isinstance(mfunc, fmsg.BundledMessageFunction)
+            or isinstance(rfunc, fred.BundledReduceFunction)):
+        if not isinstance(mfunc, fmsg.BundledMessageFunction):
+            mfunc = fmsg.BundledMessageFunction(mfunc)
+        if not isinstance(rfunc, fred.BundledReduceFunction):
+            rfunc = fred.BundledReduceFunction(rfunc)
         exec_cls = BundledSendRecvExecutor
     else:
         exec_cls = SendRecvExecutor

@@ -10,7 +10,7 @@ __all__ = ["src_mul_edge", "copy_src", "copy_edge"]
 class MessageFunction(object):
     """Base builtin message function class."""
 
-    def __call__(self, src, edge):
+    def __call__(self, edges):
         """Regular computation of this builtin.
 
         This will be used when optimization is not available.
@@ -38,15 +38,11 @@ class BundledMessageFunction(MessageFunction):
                 return False
         return True
 
-    def __call__(self, src, edge):
-        ret = None
+    def __call__(self, edges):
+        ret = dict()
         for fn in self.fn_list:
-            msg = fn(src, edge)
-            if ret is None:
-                ret = msg
-            else:
-                # ret and msg must be dict
-                ret.update(msg)
+            msg = fn(edges)
+            ret.update(msg)
         return ret
 
     def name(self):
@@ -83,8 +79,9 @@ class SrcMulEdgeMessageFunction(MessageFunction):
         return _is_spmv_supported_node_feat(g, self.src_field) \
                 and _is_spmv_supported_edge_feat(g, self.edge_field)
 
-    def __call__(self, src, edge):
-        ret = self.mul_op(src[self.src_field], edge[self.edge_field])
+    def __call__(self, edges):
+        ret = self.mul_op(edges.src[self.src_field],
+                edges.data[self.edge_field])
         return {self.out_field : ret}
 
     def name(self):
@@ -98,8 +95,8 @@ class CopySrcMessageFunction(MessageFunction):
     def is_spmv_supported(self, g):
         return _is_spmv_supported_node_feat(g, self.src_field)
 
-    def __call__(self, src, edge):
-        return {self.out_field : src[self.src_field]}
+    def __call__(self, edges):
+        return {self.out_field : edges.src[self.src_field]}
 
     def name(self):
         return "copy_src"
@@ -114,15 +111,8 @@ class CopyEdgeMessageFunction(MessageFunction):
         return False
         # return _is_spmv_supported_edge_feat(g, self.edge_field)
 
-    def __call__(self, src, edge):
-        if self.edge_field is not None:
-            ret = edge[self.edge_field]
-        else:
-            ret = edge
-        if self.out_field is None:
-            return ret
-        else:
-            return {self.out_field : ret}
+    def __call__(self, edges):
+        return {self.out_field : edges.data[self.edge_field]}
 
     def name(self):
         return "copy_edge"
