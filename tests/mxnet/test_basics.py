@@ -11,20 +11,20 @@ def check_eq(a, b):
     assert a.shape == b.shape
     assert mx.nd.sum(a == b).asnumpy() == int(np.prod(list(a.shape)))
 
-def message_func(src, edge):
-    assert len(src['h'].shape) == 2
-    assert src['h'].shape[1] == D
-    return {'m' : src['h']}
+def message_func(edges):
+    assert len(edges.src['h'].shape) == 2
+    assert edges.src['h'].shape[1] == D
+    return {'m' : edges.src['h']}
 
-def reduce_func(node, msgs):
-    msgs = msgs['m']
+def reduce_func(nodes):
+    msgs = nodes.mailbox['m']
     reduce_msg_shapes.add(tuple(msgs.shape))
     assert len(msgs.shape) == 3
     assert msgs.shape[2] == D
     return {'m' : mx.nd.sum(msgs, 1)}
 
-def apply_node_func(node):
-    return {'h' : node['h'] + node['m']}
+def apply_node_func(nodes):
+    return {'h' : nodes.data['h'] + nodes.data['m']}
 
 def generate_graph(grad=False):
     g = DGLGraph()
@@ -38,7 +38,7 @@ def generate_graph(grad=False):
     ncol = mx.nd.random.normal(shape=(10, D))
     if grad:
         ncol.attach_grad()
-    g.set_n_repr({'h' : ncol})
+    g.ndata['h'] = ncol
     return g
 
 def test_batch_setter_getter():
@@ -47,15 +47,15 @@ def test_batch_setter_getter():
     g = generate_graph()
     # set all nodes
     g.set_n_repr({'h' : mx.nd.zeros((10, D))})
-    assert _pfc(g.get_n_repr()['h']) == [0.] * 10
+    assert _pfc(g.ndata['h']) == [0.] * 10
     # pop nodes
     assert _pfc(g.pop_n_repr('h')) == [0.] * 10
-    assert len(g.get_n_repr()) == 0
+    assert len(g.ndata) == 0
     g.set_n_repr({'h' : mx.nd.zeros((10, D))})
     # set partial nodes
     u = mx.nd.array([1, 3, 5], dtype='int64')
     g.set_n_repr({'h' : mx.nd.ones((3, D))}, u)
-    assert _pfc(g.get_n_repr()['h']) == [0., 1., 0., 1., 0., 1., 0., 0., 0., 0.]
+    assert _pfc(g.ndata['h']) == [0., 1., 0., 1., 0., 1., 0., 0., 0., 0.]
     # get partial nodes
     u = mx.nd.array([1, 2, 3], dtype='int64')
     assert _pfc(g.get_n_repr(u)['h']) == [1., 0., 1.]
@@ -82,10 +82,10 @@ def test_batch_setter_getter():
     '''
     # set all edges
     g.set_e_repr({'l' : mx.nd.zeros((17, D))})
-    assert _pfc(g.get_e_repr()['l']) == [0.] * 17
+    assert _pfc(g.edata['l']) == [0.] * 17
     # pop edges
     assert _pfc(g.pop_e_repr('l')) == [0.] * 17
-    assert len(g.get_e_repr()) == 0
+    assert len(g.edata) == 0
     g.set_e_repr({'l' : mx.nd.zeros((17, D))})
     # set partial edges (many-many)
     u = mx.nd.array([0, 0, 2, 5, 9], dtype='int64')
@@ -93,19 +93,19 @@ def test_batch_setter_getter():
     g.set_e_repr({'l' : mx.nd.ones((5, D))}, u, v)
     truth = [0.] * 17
     truth[0] = truth[4] = truth[3] = truth[9] = truth[16] = 1.
-    assert _pfc(g.get_e_repr()['l']) == truth
+    assert _pfc(g.edata['l']) == truth
     # set partial edges (many-one)
     u = mx.nd.array([3, 4, 6], dtype='int64')
     v = mx.nd.array([9], dtype='int64')
     g.set_e_repr({'l' : mx.nd.ones((3, D))}, u, v)
     truth[5] = truth[7] = truth[11] = 1.
-    assert _pfc(g.get_e_repr()['l']) == truth
+    assert _pfc(g.edata['l']) == truth
     # set partial edges (one-many)
     u = mx.nd.array([0], dtype='int64')
     v = mx.nd.array([4, 5, 6], dtype='int64')
     g.set_e_repr({'l' : mx.nd.ones((3, D))}, u, v)
     truth[6] = truth[8] = truth[10] = 1.
-    assert _pfc(g.get_e_repr()['l']) == truth
+    assert _pfc(g.edata['l']) == truth
     # get partial edges (many-many)
     u = mx.nd.array([0, 6, 0], dtype='int64')
     v = mx.nd.array([6, 9, 7], dtype='int64')
@@ -122,36 +122,36 @@ def test_batch_setter_getter():
 def test_batch_setter_autograd():
     with mx.autograd.record():
         g = generate_graph(grad=True)
-        h1 = g.get_n_repr()['h']
+        h1 = g.ndata['h']
         h1.attach_grad()
         # partial set
         v = mx.nd.array([1, 2, 8], dtype='int64')
         hh = mx.nd.zeros((len(v), D))
         hh.attach_grad()
         g.set_n_repr({'h' : hh}, v)
-        h2 = g.get_n_repr()['h']
+        h2 = g.ndata['h']
     h2.backward(mx.nd.ones((10, D)) * 2)
     check_eq(h1.grad[:,0], mx.nd.array([2., 0., 0., 2., 2., 2., 2., 2., 0., 2.]))
     check_eq(hh.grad[:,0], mx.nd.array([2., 2., 2.]))
 
 def test_batch_send():
     g = generate_graph()
-    def _fmsg(src, edge):
-        assert src['h'].shape == (5, D)
-        return {'m' : src['h']}
+    def _fmsg(edges):
+        assert edges.src['h'].shape == (5, D)
+        return {'m' : edges.src['h']}
     g.register_message_func(_fmsg)
     # many-many send
     u = mx.nd.array([0, 0, 0, 0, 0], dtype='int64')
     v = mx.nd.array([1, 2, 3, 4, 5], dtype='int64')
-    g.send(u, v)
+    g.send((u, v))
     # one-many send
     u = mx.nd.array([0], dtype='int64')
     v = mx.nd.array([1, 2, 3, 4, 5], dtype='int64')
-    g.send(u, v)
+    g.send((u, v))
     # many-one send
     u = mx.nd.array([1, 2, 3, 4, 5], dtype='int64')
     v = mx.nd.array([9], dtype='int64')
-    g.send(u, v)
+    g.send((u, v))
 
 def test_batch_recv():
     # basic recv test
@@ -162,7 +162,7 @@ def test_batch_recv():
     u = mx.nd.array([0, 0, 0, 4, 5, 6], dtype='int64')
     v = mx.nd.array([1, 2, 3, 9, 9, 9], dtype='int64')
     reduce_msg_shapes.clear()
-    g.send(u, v)
+    g.send((u, v))
     #g.recv(th.unique(v))
     #assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     #reduce_msg_shapes.clear()
@@ -177,7 +177,7 @@ def test_update_routines():
     reduce_msg_shapes.clear()
     u = mx.nd.array([0, 0, 0, 4, 5, 6], dtype='int64')
     v = mx.nd.array([1, 2, 3, 9, 9, 9], dtype='int64')
-    g.send_and_recv(u, v)
+    g.send_and_recv((u, v))
     assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     reduce_msg_shapes.clear()
 
@@ -208,14 +208,14 @@ def test_reduce_0deg():
     g.add_edge(2, 0)
     g.add_edge(3, 0)
     g.add_edge(4, 0)
-    def _message(src, edge):
-        return {'m' : src['h']}
-    def _reduce(node, msgs):
-        return {'h' : node['h'] + msgs['m'].sum(1)}
+    def _message(edges):
+        return {'m' : edges.src['h']}
+    def _reduce(nodes):
+        return {'h' : nodes.data['h'] + nodes.mailbox['m'].sum(1)}
     old_repr = mx.nd.random.normal(shape=(5, 5))
     g.set_n_repr({'h': old_repr})
     g.update_all(_message, _reduce)
-    new_repr = g.get_n_repr()['h']
+    new_repr = g.ndata['h']
 
     assert np.allclose(new_repr[1:].asnumpy(), old_repr[1:].asnumpy())
     assert np.allclose(new_repr[0].asnumpy(), old_repr.sum(0).asnumpy())
@@ -224,25 +224,25 @@ def test_pull_0deg():
     g = DGLGraph()
     g.add_nodes(2)
     g.add_edge(0, 1)
-    def _message(src, edge):
-        return {'m' : src['h']}
-    def _reduce(node, msgs):
-        return {'h' : msgs['m'].sum(1)}
+    def _message(edges):
+        return {'m' : edges.src['h']}
+    def _reduce(nodes):
+        return {'h' : nodes.mailbox['m'].sum(1)}
 
     old_repr = mx.nd.random.normal(shape=(2, 5))
     g.set_n_repr({'h' : old_repr})
     g.pull(0, _message, _reduce)
-    new_repr = g.get_n_repr()['h']
+    new_repr = g.ndata['h']
     assert np.allclose(new_repr[0].asnumpy(), old_repr[0].asnumpy())
     assert np.allclose(new_repr[1].asnumpy(), old_repr[1].asnumpy())
     g.pull(1, _message, _reduce)
-    new_repr = g.get_n_repr()['h']
+    new_repr = g.ndata['h']
     assert np.allclose(new_repr[1].asnumpy(), old_repr[0].asnumpy())
 
     old_repr = mx.nd.random.normal(shape=(2, 5))
     g.set_n_repr({'h' : old_repr})
     g.pull([0, 1], _message, _reduce)
-    new_repr = g.get_n_repr()['h']
+    new_repr = g.ndata['h']
     assert np.allclose(new_repr[0].asnumpy(), old_repr[0].asnumpy())
     assert np.allclose(new_repr[1].asnumpy(), old_repr[0].asnumpy())
 
