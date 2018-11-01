@@ -70,6 +70,8 @@ def gather_row(data, row_index):
     else:
         return data[row_index,]
 
+# narrow_row not enabled
+
 def scatter_row(data, row_index, value):
     return mx.nd.contrib.index_copy(data, row_index, value)
 
