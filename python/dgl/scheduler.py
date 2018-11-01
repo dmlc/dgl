@@ -5,10 +5,11 @@ import numpy as np
 
 from .base import ALL, DGLError
 from . import backend as F
+from collections import defaultdict as ddict
 from .function import message as fmsg
 from .function import reducer as fred
+from .udf import NodeBatch, EdgeBatch
 from . import utils
-from collections import defaultdict as ddict
 
 from ._ffi.function import _init_api
 
@@ -176,7 +177,7 @@ class DegreeBucketingExecutor(Executor):
         # loop over each bucket
         # FIXME (lingfan): handle zero-degree case
         for deg, vv, msg_id in zip(self.degrees, self.dsts, self.msg_ids):
-            dst_reprs = self.g.get_n_repr(vv)
+            v_data = self.g.get_n_repr(vv)
             in_msgs = self.msg_frame.select_rows(msg_id)
             def _reshape_fn(msg):
                 msg_shape = F.shape(msg)
@@ -184,7 +185,8 @@ class DegreeBucketingExecutor(Executor):
                 return F.reshape(msg, new_shape)
             reshaped_in_msgs = utils.LazyDict(
                     lambda key: _reshape_fn(in_msgs[key]), self.msg_frame.schemes)
-            new_reprs.append(self.rfunc(dst_reprs, reshaped_in_msgs))
+            nb = NodeBatch(self.g, vv, v_data, reshaped_in_msgs)
+            new_reprs.append(self.rfunc(nb))
 
         # Pack all reducer results together
         keys = new_reprs[0].keys()

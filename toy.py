@@ -13,7 +13,7 @@ g.add_nodes(2)
 g.add_edge(1, 0)
 
 x = th.tensor([[0.0, 0.0], [1.0, 2.0]])
-g.set_n_repr({'x': x})
+g.nodes[:].data['x'] = x
 
 ###############################################################################
 # What we want to do is simply to copy representation from node#1 to
@@ -33,21 +33,21 @@ def simple_reduce(nodes):  # type is dgl.NodeBatch
 
 g.send((1, 0), message_func=send_source)
 g.recv(0, reduce_func=simple_reduce)
-print(g.get_n_repr())
+print(g.nodes[:].data)
 
 ###############################################################################
 # Some times the computation may involve representations on the edges.
 # Let’s say we want to “amplify” the message:
 
 w = th.tensor([2.0])
-g.set_e_repr({'w': w})
+g.edges[:].data['w'] = w
 
 def send_source_with_edge_weight(edges):
     return {'msg': edges.src['x'] * edges.data['w']}
 
 g.send((1, 0), message_func=send_source_with_edge_weight)
 g.recv(0, reduce_func=simple_reduce)
-print(g.get_n_repr())
+print(g.nodes[:].data)
 
 ###############################################################################
 # Or we may need to involve the desination’s representation, and here
@@ -59,4 +59,4 @@ def simple_reduce_addup(nodes):
 
 g.send((1, 0), message_func=send_source_with_edge_weight)
 g.recv(0, reduce_func=simple_reduce_addup)
-print(g.get_n_repr())
+print(g.nodes[:].data)
