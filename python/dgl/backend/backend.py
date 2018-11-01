@@ -213,24 +213,6 @@ def copy_to(input, ctx):
     """
     pass
 
-def convert_to(input, target):
-    """Convert the given input tensor to the same context and data type as
-    target tensor.
-
-    Parameters
-    ----------
-    input : Tensor
-        The input tensor
-    target : Tensor
-        The target tensor
-
-    Returns
-    -------
-    Tensor
-        The copied tensor.
-    """
-    pass
-
 ###############################################################################
 # Tensor functions on feature data
 # --------------------------------
@@ -322,6 +304,29 @@ def gather_row(data, row_index):
     -------
     Tensor
         The sliced data. The first dimension should equal to ``len(row_index)``.
+    """
+    pass
+
+def narrow_row(x, start, stop):
+    """Narrow down the tensor along the first dimension.
+    
+    Parameters
+    ----------
+    x : Tensor
+        The input tensor.
+    start : int
+        The start index (inclusive).
+    stop : int
+        The stop index (exclusive).
+
+    Returns
+    -------
+    Tensor
+        The narrowed tensor
+
+    Notes
+    -----
+    The returned tensor could be a view of the original tensor.
     """
     pass
 
@@ -461,32 +466,6 @@ def spmm(x, y):
     -------
     Tensor
         The result dense matrix.
-    """
-    pass
-
-def narrow(x, dim, start, stop):
-    """Narrow down the tensor along the given dimension, from start (inclusive)
-    to stop (exclusive).
-
-    Parameters
-    ----------
-    x : Tensor
-        The input tensor.
-    dim : int
-        The narrowing dimension
-    start : int
-        The start index
-    stop : int
-        The stop index
-
-    Returns
-    -------
-    Tensor
-        The narrowed tensor
-
-    Notes
-    -----
-    The returned tensor is a view of the original tensor.
     """
     pass
 

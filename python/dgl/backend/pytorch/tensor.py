@@ -100,7 +100,7 @@ def sort_1d(input):
     return th.sort(input)
 
 def arange(start, stop):
-    return th.arange(start, stop)
+    return th.arange(start, stop, dtype=th.int64)
 
 def zerocopy_to_dlpack(input):
     return dlpack.to_dlpack(input)
