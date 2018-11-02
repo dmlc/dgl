@@ -771,10 +771,9 @@ class DGLGraph(object):
 
         Parameters
         ----------
-        u : node, container or tensor
-          The source node(s).
-        v : node, container or tensor
-          The destination node(s).
+        edges : edges
+            Edges can be a pair of endpoint nodes (u, v), or a
+            tensor of edge ids. The default value is all the edges.
 
         Returns
         -------
