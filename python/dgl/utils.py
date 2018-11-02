@@ -20,9 +20,15 @@ class Index(object):
     def _dispatch(self, data):
         """Store data based on its type."""
         if isinstance(data, Tensor):
-            if not (F.dtype(data) == F.int64 and len(F.shape(data)) == 1):
+            if not (F.dtype(data) == F.int64):
+                raise ValueError('Index data must be an int64 vector, but got: %s' % str(data))
+            if len(F.shape(data)) > 1:
                 raise ValueError('Index data must be 1D int64 vector, but got: %s' % str(data))
-            self._user_tensor_data[F.get_context(data)] = data
+            if len(F.shape(data)) == 0:
+                # a tensor of one int
+                self._dispatch(int(data))
+            else:
+                self._user_tensor_data[F.get_context(data)] = data
         elif isinstance(data, nd.NDArray):
             if not (data.dtype == 'int64' and len(data.shape) == 1):
                 raise ValueError('Index data must be 1D int64 vector, but got: %s' % str(data))
