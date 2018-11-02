@@ -16,6 +16,10 @@ x = th.tensor([[0.0, 0.0], [1.0, 2.0]])
 g.nodes[:].data['x'] = x
 
 ###############################################################################
+# A syntax sugar for accessing feature data of all nodes
+print(g.ndata['x'])
+
+###############################################################################
 # What we want to do is simply to copy representation from node#1 to
 # node#0, but with a message passing interface. We do this like what we
 # will do over a pair of sockets, with a send and a recv interface. The
@@ -33,21 +37,21 @@ def simple_reduce(nodes):  # type is dgl.NodeBatch
 
 g.send((1, 0), message_func=send_source)
 g.recv(0, reduce_func=simple_reduce)
-print(g.nodes[:].data)
+print(g.ndata)
 
 ###############################################################################
 # Some times the computation may involve representations on the edges.
 # Let’s say we want to “amplify” the message:
 
 w = th.tensor([2.0])
-g.edges[:].data['w'] = w
+g.edata['w'] = w
 
 def send_source_with_edge_weight(edges):
     return {'msg': edges.src['x'] * edges.data['w']}
 
 g.send((1, 0), message_func=send_source_with_edge_weight)
 g.recv(0, reduce_func=simple_reduce)
-print(g.nodes[:].data)
+print(g.ndata)
 
 ###############################################################################
 # Or we may need to involve the desination’s representation, and here
@@ -59,4 +63,4 @@ def simple_reduce_addup(nodes):
 
 g.send((1, 0), message_func=send_source_with_edge_weight)
 g.recv(0, reduce_func=simple_reduce_addup)
-print(g.nodes[:].data)
+print(g.ndata)
