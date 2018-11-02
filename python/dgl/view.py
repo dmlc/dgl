@@ -3,7 +3,7 @@ from __future__ import absolute_import
 
 from collections import MutableMapping, namedtuple
 
-from .base import ALL, DGLError
+from .base import ALL, is_all, DGLError
 from . import backend as F
 from . import utils
 
@@ -61,8 +61,10 @@ class NodeDataView(MutableMapping):
         self._graph.set_n_repr({key : val}, self._nodes)
 
     def __delitem__(self, key):
-        raise DGLError('Delete feature data is not supported in NodeDataView.'
-                       ' Please use G.pop_n_repr instead.')
+        if not is_all(self._nodes):
+            raise DGLError('Delete feature data is not supported on only a subset'
+                           ' of nodes. Please use `del G.ndata[key]` instead.')
+        self._graph.pop_n_repr(key)
 
     def __len__(self):
         return len(self._graph._node_frame)
@@ -113,8 +115,10 @@ class EdgeDataView(MutableMapping):
         self._graph.set_e_repr({key : val}, self._edges)
 
     def __delitem__(self, key):
-        raise DGLError('Delete feature data is not supported in EdgeDataView.'
-                       ' Please use G.pop_e_repr instead.')
+        if not is_all(self._edges):
+            raise DGLError('Delete feature data is not supported on only a subset'
+                           ' of nodes. Please use `del G.edata[key]` instead.')
+        self._graph.pop_e_repr(key)
 
     def __len__(self):
         return len(self._graph._edge_frame)

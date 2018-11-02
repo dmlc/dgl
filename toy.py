@@ -64,3 +64,6 @@ def simple_reduce_addup(nodes):
 g.send((1, 0), message_func=send_source_with_edge_weight)
 g.recv(0, reduce_func=simple_reduce_addup)
 print(g.ndata)
+
+del g.ndata['x']
+del g.edata['w']
