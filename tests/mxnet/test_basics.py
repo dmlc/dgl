@@ -81,43 +81,43 @@ def test_batch_setter_getter():
     9, 0, 16
     '''
     # set all edges
-    g.set_e_repr({'l' : mx.nd.zeros((17, D))})
+    g.edata['l'] = mx.nd.zeros((17, D))
     assert _pfc(g.edata['l']) == [0.] * 17
     # pop edges
     assert _pfc(g.pop_e_repr('l')) == [0.] * 17
     assert len(g.edata) == 0
-    g.set_e_repr({'l' : mx.nd.zeros((17, D))})
+    g.edata['l'] = mx.nd.zeros((17, D))
     # set partial edges (many-many)
     u = mx.nd.array([0, 0, 2, 5, 9], dtype='int64')
     v = mx.nd.array([1, 3, 9, 9, 0], dtype='int64')
-    g.set_e_repr({'l' : mx.nd.ones((5, D))}, u, v)
+    g.edges[u, v].data['l'] = mx.nd.ones((5, D))
     truth = [0.] * 17
     truth[0] = truth[4] = truth[3] = truth[9] = truth[16] = 1.
     assert _pfc(g.edata['l']) == truth
     # set partial edges (many-one)
     u = mx.nd.array([3, 4, 6], dtype='int64')
     v = mx.nd.array([9], dtype='int64')
-    g.set_e_repr({'l' : mx.nd.ones((3, D))}, u, v)
+    g.edges[u, v].data['l'] = mx.nd.ones((3, D))
     truth[5] = truth[7] = truth[11] = 1.
     assert _pfc(g.edata['l']) == truth
     # set partial edges (one-many)
     u = mx.nd.array([0], dtype='int64')
     v = mx.nd.array([4, 5, 6], dtype='int64')
-    g.set_e_repr({'l' : mx.nd.ones((3, D))}, u, v)
+    g.edges[u, v].data['l'] = mx.nd.ones((3, D))
     truth[6] = truth[8] = truth[10] = 1.
     assert _pfc(g.edata['l']) == truth
     # get partial edges (many-many)
     u = mx.nd.array([0, 6, 0], dtype='int64')
     v = mx.nd.array([6, 9, 7], dtype='int64')
-    assert _pfc(g.get_e_repr(u, v)['l']) == [1., 1., 0.]
+    assert _pfc(g.edges[u, v].data['l']) == [1., 1., 0.]
     # get partial edges (many-one)
     u = mx.nd.array([5, 6, 7], dtype='int64')
     v = mx.nd.array([9], dtype='int64')
-    assert _pfc(g.get_e_repr(u, v)['l']) == [1., 1., 0.]
+    assert _pfc(g.edges[u, v].data['l']) == [1., 1., 0.]
     # get partial edges (one-many)
     u = mx.nd.array([0], dtype='int64')
     v = mx.nd.array([3, 4, 5], dtype='int64')
-    assert _pfc(g.get_e_repr(u, v)['l']) == [1., 1., 1.]
+    assert _pfc(g.edges[u, v].data['l']) == [1., 1., 1.]
 
 def test_batch_setter_autograd():
     with mx.autograd.record():
