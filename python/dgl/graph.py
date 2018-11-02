@@ -60,7 +60,6 @@ class DGLGraph(object):
         self._reduce_func = None
         self._edge_func = None
         self._apply_node_func = None
-        self._apply_edge_func = None
 
     def add_nodes(self, num, reprs=None):
         """Add nodes.
@@ -799,16 +798,6 @@ class DGLGraph(object):
         """
         self._apply_node_func = apply_node_func
 
-    def register_apply_edge_func(self, apply_edge_func):
-        """Register global edge apply function.
-
-        Parameters
-        ----------
-        apply_edge_func : callable
-          Apply function on the edge.
-        """
-        self._apply_edge_func = apply_edge_func
-
     def apply_nodes(self, v=ALL, apply_node_func="default"):
         """Apply the function on node representations.
 
@@ -851,35 +840,6 @@ class DGLGraph(object):
             reduce_accum.update(new_repr)
             new_repr = reduce_accum
         self.set_n_repr(new_repr, v)
-
-    def apply_edges(self, u=None, v=None, apply_edge_func="default", eid=None):
-        """Apply the function on edge representations.
-
-        Applying a None function will be ignored.
-
-        Parameters
-        ----------
-        u : optional, int, iterable of int, tensor
-          The src node id(s).
-        v : optional, int, iterable of int, tensor
-          The dst node id(s).
-        apply_edge_func : callable
-          The apply edge function.
-        eid : None, edge, container or tensor
-          The edge to update on.  If eid is not None then u and v are ignored.
-        """
-        assert False, 'disabled for now'
-        if apply_edge_func == "default":
-            apply_edge_func = self._apply_edge_func
-        if not apply_edge_func:
-            # Skip none function call.
-            return
-        if eid is None:
-            new_repr = apply_edge_func(self.get_e_repr((u, v)))
-            self.set_e_repr(new_repr, (u, v))
-        else:
-            new_repr = apply_edge_func(self.get_e_repr(eid))
-            self.set_e_repr(new_repr, eid)
 
     def send(self, edges=ALL, message_func="default"):
         """Send messages along the given edges.
