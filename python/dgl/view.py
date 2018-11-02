@@ -97,9 +97,9 @@ class EdgeView(object):
         else:
             return EdgeSpace(data=EdgeDataView(self._graph, edges))
 
-    def __call__(self):
+    def __call__(self, *args, **kwargs):
         """Return all the edges."""
-        return self._graph.all_edges()
+        return self._graph.all_edges(*args, **kwargs)
 
 class EdgeDataView(MutableMapping):
     __slot__ = ['_graph', '_edges']

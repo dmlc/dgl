@@ -341,67 +341,94 @@ class DGLGraph(object):
         src, dst, _ = self._graph.find_edges(eid)
         return src.tousertensor(), dst.tousertensor()
 
-    def in_edges(self, v):
+    def in_edges(self, v, form='uv'):
         """Return the in edges of the node(s).
 
         Parameters
         ----------
         v : int, list, tensor
             The node(s).
+        form : str, optional
+            The return form. Currently support:
+            - 'all' : a tuple (u, v, eid)
+            - 'uv'  : a pair (u, v), default
+            - 'eid' : one eid tensor
 
         Returns
         -------
-        tensor
-            The src nodes.
-        tensor
-            The dst nodes.
-        tensor
-            The edge ids.
+        A tuple of Tensors (u, v, eid) if form == 'all'
+        A pair of Tensors (u, v) if form == 'uv'
+        One Tensor if form == 'eid'
         """
         v = utils.toindex(v)
         src, dst, eid = self._graph.in_edges(v)
-        return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
+        if form == 'all':
+            return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
+        elif form == 'uv':
+            return (src.tousertensor(), dst.tousertensor())
+        elif form == 'eid':
+            return eid.tousertensor()
+        else:
+            raise DGLError('Invalid form:', form)
 
-    def out_edges(self, v):
+    def out_edges(self, v, form='uv'):
         """Return the out edges of the node(s).
 
         Parameters
         ----------
         v : int, list, tensor
             The node(s).
+        form : str, optional
+            The return form. Currently support:
+            - 'all' : a tuple (u, v, eid)
+            - 'uv'  : a pair (u, v), default
+            - 'eid' : one eid tensor
 
         Returns
         -------
-        tensor
-            The src nodes.
-        tensor
-            The dst nodes.
-        tensor
-            The edge ids.
+        A tuple of Tensors (u, v, eid) if form == 'all'
+        A pair of Tensors (u, v) if form == 'uv'
+        One Tensor if form == 'eid'
         """
         v = utils.toindex(v)
         src, dst, eid = self._graph.out_edges(v)
-        return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
+        if form == 'all':
+            return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
+        elif form == 'uv':
+            return (src.tousertensor(), dst.tousertensor())
+        elif form == 'eid':
+            return eid.tousertensor()
+        else:
+            raise DGLError('Invalid form:', form)
 
-    def all_edges(self, sorted=False):
+    def all_edges(self, form='uv', sorted=False):
         """Return all the edges.
 
         Parameters
         ----------
+        form : str, optional
+            The return form. Currently support:
+            - 'all' : a tuple (u, v, eid)
+            - 'uv'  : a pair (u, v), default
+            - 'eid' : one eid tensor
         sorted : bool
             True if the returned edges are sorted by their src and dst ids.
 
         Returns
         -------
-        tensor
-            The src nodes.
-        tensor
-            The dst nodes.
-        tensor
-            The edge ids.
+        A tuple of Tensors (u, v, eid) if form == 'all'
+        A pair of Tensors (u, v) if form == 'uv'
+        One Tensor if form == 'eid'
         """
         src, dst, eid = self._graph.edges(sorted)
-        return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
+        if form == 'all':
+            return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
+        elif form == 'uv':
+            return (src.tousertensor(), dst.tousertensor())
+        elif form == 'eid':
+            return eid.tousertensor()
+        else:
+            raise DGLError('Invalid form:', form)
 
     def in_degree(self, v):
         """Return the in degree of the node.
