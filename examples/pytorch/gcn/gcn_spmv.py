@@ -22,8 +22,8 @@ class NodeApplyModule(nn.Module):
         self.linear = nn.Linear(in_feats, out_feats)
         self.activation = activation
 
-    def forward(self, node):
-        h = self.linear(node['h'])
+    def forward(self, nodes):
+        h = self.linear(nodes.data['h'])
         if self.activation:
             h = self.activation(h)
 
@@ -57,13 +57,13 @@ class GCN(nn.Module):
         self.layers.append(NodeApplyModule(n_hidden, n_classes))
 
     def forward(self, features):
-        self.g.set_n_repr({'h' : features})
+        self.g.ndata['h'] = features
 
         for layer in self.layers:
             # apply dropout
             if self.dropout:
                 self.g.apply_nodes(apply_node_func=
-                               lambda node: {'h': self.dropout(node['h'])})
+                               lambda nodes: {'h': self.dropout(nodes.data['h'])})
             self.g.update_all(fn.copy_src(src='h', out='m'),
                               fn.sum(msg='m', out='h'),
                               layer)
