@@ -431,6 +431,7 @@ class DGLGraph(object):
         tensor
             The in degree array.
         """
+        v = utils.toindex(v)
         return self._graph.in_degrees(v).tousertensor()
 
     def out_degree(self, v):
@@ -461,6 +462,7 @@ class DGLGraph(object):
         tensor
             The out degree array.
         """
+        v = utils.toindex(v)
         return self._graph.out_degrees(v).tousertensor()
 
     def to_networkx(self, node_attrs=None, edge_attrs=None):
