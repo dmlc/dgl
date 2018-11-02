@@ -343,3 +343,18 @@ def reorder(dict_like, index):
         idx_ctx = index.tousertensor(F.get_context(val))
         new_dict[key] = F.gather_row(val, idx_ctx)
     return new_dict
+
+def parse_edges_tuple(edges):
+    """Parse the given edges and return the tuple.
+
+    Parameters
+    ----------
+    edges : edges
+        Edges can be a pair of endpoint nodes (u, v), or a
+        tensor of edge ids. The default value is all the edges.
+
+    Returns
+    -------
+    A tuple of (u, v, eid)
+    """
+    pass

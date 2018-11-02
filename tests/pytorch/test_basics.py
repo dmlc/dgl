@@ -10,20 +10,20 @@ def check_eq(a, b):
     assert a.shape == b.shape
     assert th.sum(a == b) == int(np.prod(list(a.shape)))
 
-def message_func(src, edge):
-    assert len(src['h'].shape) == 2
-    assert src['h'].shape[1] == D
-    return {'m' : src['h']}
+def message_func(edges):
+    assert len(edges.src['h'].shape) == 2
+    assert edges.src['h'].shape[1] == D
+    return {'m' : edges.src['h']}
 
-def reduce_func(node, msgs):
-    msgs = msgs['m']
+def reduce_func(nodes):
+    msgs = nodes.mailbox['m']
     reduce_msg_shapes.add(tuple(msgs.shape))
     assert len(msgs.shape) == 3
     assert msgs.shape[2] == D
     return {'accum' : th.sum(msgs, 1)}
 
-def apply_node_func(node):
-    return {'h' : node['h'] + node['accum']}
+def apply_node_func(nodes):
+    return {'h' : nodes.data['h'] + nodes.data['accum']}
 
 def generate_graph(grad=False):
     g = DGLGraph()
@@ -36,10 +36,11 @@ def generate_graph(grad=False):
     # add a back flow from 9 to 0
     g.add_edge(9, 0)
     ncol = Variable(th.randn(10, D), requires_grad=grad)
-    accumcol = Variable(th.randn(10, D), requires_grad=grad)
     ecol = Variable(th.randn(17, D), requires_grad=grad)
-    g.set_n_repr({'h' : ncol})
+    g.ndata['h'] = ncol
+    g.edata['w'] = ecol
     g.set_n_initializer(lambda shape, dtype : th.zeros(shape))
+    g.set_e_initializer(lambda shape, dtype : th.zeros(shape))
     return g
 
 def test_batch_setter_getter():
@@ -47,20 +48,20 @@ def test_batch_setter_getter():
         return list(x.numpy()[:,0])
     g = generate_graph()
     # set all nodes
-    g.set_n_repr({'h' : th.zeros((10, D))})
-    assert _pfc(g.get_n_repr()['h']) == [0.] * 10
+    g.ndata['h'] = th.zeros((10, D))
+    assert th.allclose(g.ndata['h'], th.zeros((10, D)))
     # pop nodes
-    old_len = len(g.get_n_repr())
+    old_len = len(g.ndata)
     assert _pfc(g.pop_n_repr('h')) == [0.] * 10
-    assert len(g.get_n_repr()) == old_len - 1
-    g.set_n_repr({'h' : th.zeros((10, D))})
+    assert len(g.ndata) == old_len - 1
+    g.ndata['h'] = th.zeros((10, D))
     # set partial nodes
     u = th.tensor([1, 3, 5])
-    g.set_n_repr({'h' : th.ones((3, D))}, u)
-    assert _pfc(g.get_n_repr()['h']) == [0., 1., 0., 1., 0., 1., 0., 0., 0., 0.]
+    g.nodes[u].data['h'] = th.ones((3, D))
+    assert _pfc(g.ndata['h']) == [0., 1., 0., 1., 0., 1., 0., 0., 0., 0.]
     # get partial nodes
     u = th.tensor([1, 2, 3])
-    assert _pfc(g.get_n_repr(u)['h']) == [1., 0., 1.]
+    assert _pfc(g.nodes[u].data['h']) == [1., 0., 1.]
 
     '''
     s, d, eid
@@ -83,75 +84,75 @@ def test_batch_setter_getter():
     9, 0, 16
     '''
     # set all edges
-    g.set_e_repr({'l' : th.zeros((17, D))})
-    assert _pfc(g.get_e_repr()['l']) == [0.] * 17
+    g.edata['l'] = th.zeros((17, D))
+    assert _pfc(g.edata['l']) == [0.] * 17
     # pop edges
-    old_len = len(g.get_e_repr())
+    old_len = len(g.edata)
     assert _pfc(g.pop_e_repr('l')) == [0.] * 17
-    assert len(g.get_e_repr()) == old_len - 1
-    g.set_e_repr({'l' : th.zeros((17, D))})
+    assert len(g.edata) == old_len - 1
+    g.edata['l'] = th.zeros((17, D))
     # set partial edges (many-many)
     u = th.tensor([0, 0, 2, 5, 9])
     v = th.tensor([1, 3, 9, 9, 0])
-    g.set_e_repr({'l' : th.ones((5, D))}, u, v)
+    g.edges[u, v].data['l'] = th.ones((5, D))
     truth = [0.] * 17
     truth[0] = truth[4] = truth[3] = truth[9] = truth[16] = 1.
-    assert _pfc(g.get_e_repr()['l']) == truth
+    assert _pfc(g.edata['l']) == truth
     # set partial edges (many-one)
     u = th.tensor([3, 4, 6])
     v = th.tensor([9])
-    g.set_e_repr({'l' : th.ones((3, D))}, u, v)
+    g.edges[u, v].data['l'] = th.ones((3, D))
     truth[5] = truth[7] = truth[11] = 1.
-    assert _pfc(g.get_e_repr()['l']) == truth
+    assert _pfc(g.edata['l']) == truth
     # set partial edges (one-many)
     u = th.tensor([0])
     v = th.tensor([4, 5, 6])
-    g.set_e_repr({'l' : th.ones((3, D))}, u, v)
+    g.edges[u, v].data['l'] = th.ones((3, D))
     truth[6] = truth[8] = truth[10] = 1.
-    assert _pfc(g.get_e_repr()['l']) == truth
+    assert _pfc(g.edata['l']) == truth
     # get partial edges (many-many)
     u = th.tensor([0, 6, 0])
     v = th.tensor([6, 9, 7])
-    assert _pfc(g.get_e_repr(u, v)['l']) == [1., 1., 0.]
+    assert _pfc(g.edges[u, v].data['l']) == [1., 1., 0.]
     # get partial edges (many-one)
     u = th.tensor([5, 6, 7])
     v = th.tensor([9])
-    assert _pfc(g.get_e_repr(u, v)['l']) == [1., 1., 0.]
+    assert _pfc(g.edges[u, v].data['l']) == [1., 1., 0.]
     # get partial edges (one-many)
     u = th.tensor([0])
     v = th.tensor([3, 4, 5])
-    assert _pfc(g.get_e_repr(u, v)['l']) == [1., 1., 1.]
+    assert _pfc(g.edges[u, v].data['l']) == [1., 1., 1.]
 
 def test_batch_setter_autograd():
     g = generate_graph(grad=True)
-    h1 = g.get_n_repr()['h']
+    h1 = g.ndata['h']
     # partial set
     v = th.tensor([1, 2, 8])
     hh = Variable(th.zeros((len(v), D)), requires_grad=True)
-    g.set_n_repr({'h' : hh}, v)
-    h2 = g.get_n_repr()['h']
+    g.nodes[v].data['h'] = hh
+    h2 = g.ndata['h']
     h2.backward(th.ones((10, D)) * 2)
     check_eq(h1.grad[:,0], th.tensor([2., 0., 0., 2., 2., 2., 2., 2., 0., 2.]))
     check_eq(hh.grad[:,0], th.tensor([2., 2., 2.]))
 
 def test_batch_send():
     g = generate_graph()
-    def _fmsg(src, edge):
-        assert src['h'].shape == (5, D)
-        return {'m' : src['h']}
+    def _fmsg(edges):
+        assert edges.src['h'].shape == (5, D)
+        return {'m' : edges.src['h']}
     g.register_message_func(_fmsg)
     # many-many send
     u = th.tensor([0, 0, 0, 0, 0])
     v = th.tensor([1, 2, 3, 4, 5])
-    g.send(u, v)
+    g.send((u, v))
     # one-many send
     u = th.tensor([0])
     v = th.tensor([1, 2, 3, 4, 5])
-    g.send(u, v)
+    g.send((u, v))
     # many-one send
     u = th.tensor([1, 2, 3, 4, 5])
     v = th.tensor([9])
-    g.send(u, v)
+    g.send((u, v))
 
 def test_batch_recv():
     # basic recv test
@@ -162,10 +163,24 @@ def test_batch_recv():
     u = th.tensor([0, 0, 0, 4, 5, 6])
     v = th.tensor([1, 2, 3, 9, 9, 9])
     reduce_msg_shapes.clear()
-    g.send(u, v)
+    g.send((u, v))
     g.recv(th.unique(v))
     assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     reduce_msg_shapes.clear()
+
+def test_update_edges():
+    def _upd(edges):
+        return {'w' : edges.data['w'] * 2}
+    g = generate_graph()
+    g.register_edge_func(_upd)
+    old = g.edata['w']
+    g.update_edges()
+    assert th.allclose(old * 2, g.edata['w'])
+    u = th.tensor([0, 0, 0, 4, 5, 6])
+    v = th.tensor([1, 2, 3, 9, 9, 9])
+    g.update_edges((u, v), lambda edges : {'w' : edges.data['w'] * 0.})
+    eid = g.edge_ids(u, v)
+    assert th.allclose(g.edata['w'][eid], th.zeros((6, D)))
 
 def test_update_routines():
     g = generate_graph()
@@ -177,7 +192,7 @@ def test_update_routines():
     reduce_msg_shapes.clear()
     u = th.tensor([0, 0, 0, 4, 5, 6])
     v = th.tensor([1, 2, 3, 9, 9, 9])
-    g.send_and_recv(u, v)
+    g.send_and_recv((u, v))
     assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     reduce_msg_shapes.clear()
 
@@ -208,14 +223,14 @@ def test_reduce_0deg():
     g.add_edge(2, 0)
     g.add_edge(3, 0)
     g.add_edge(4, 0)
-    def _message(src, edge):
-        return {'m' : src['h']}
-    def _reduce(node, msgs):
-        return {'h' : node['h'] + msgs['m'].sum(1)}
+    def _message(edges):
+        return {'m' : edges.src['h']}
+    def _reduce(nodes):
+        return {'h' : nodes.data['h'] + nodes.mailbox['m'].sum(1)}
     old_repr = th.randn(5, 5)
-    g.set_n_repr({'h' : old_repr})
+    g.ndata['h'] = old_repr
     g.update_all(_message, _reduce)
-    new_repr = g.get_n_repr()['h']
+    new_repr = g.ndata['h']
 
     assert th.allclose(new_repr[1:], old_repr[1:])
     assert th.allclose(new_repr[0], old_repr.sum(0))
@@ -224,26 +239,26 @@ def test_pull_0deg():
     g = DGLGraph()
     g.add_nodes(2)
     g.add_edge(0, 1)
-    def _message(src, edge):
-        return {'m' : src['h']}
-    def _reduce(node, msgs):
-        return {'h' : msgs['m'].sum(1)}
+    def _message(edges):
+        return {'m' : edges.src['h']}
+    def _reduce(nodes):
+        return {'h' : nodes.mailbox['m'].sum(1)}
     old_repr = th.randn(2, 5)
-    g.set_n_repr({'h' : old_repr})
+    g.ndata['h'] = old_repr
 
     g.pull(0, _message, _reduce)
-    new_repr = g.get_n_repr()['h']
+    new_repr = g.ndata['h']
     assert th.allclose(new_repr[0], old_repr[0])
     assert th.allclose(new_repr[1], old_repr[1])
 
     g.pull(1, _message, _reduce)
-    new_repr = g.get_n_repr()['h']
+    new_repr = g.ndata['h']
     assert th.allclose(new_repr[1], old_repr[0])
 
     old_repr = th.randn(2, 5)
-    g.set_n_repr({'h' : old_repr})
+    g.ndata['h'] = old_repr
     g.pull([0, 1], _message, _reduce)
-    new_repr = g.get_n_repr()['h']
+    new_repr = g.ndata['h']
     assert th.allclose(new_repr[0], old_repr[0])
     assert th.allclose(new_repr[1], old_repr[0])
 
@@ -253,27 +268,26 @@ def _disabled_test_send_twice():
     g.add_nodes(3)
     g.add_edge(0, 1)
     g.add_edge(2, 1)
-    def _message_a(src, edge):
-        return {'a': src['a']}
-    def _message_b(src, edge):
-        return {'a': src['a'] * 3}
-    def _reduce(node, msgs):
-        assert msgs is not None
-        return {'a': msgs['a'].max(1)[0]}
+    def _message_a(edges):
+        return {'a': edges.src['a']}
+    def _message_b(edges):
+        return {'a': edges.src['a'] * 3}
+    def _reduce(nodes):
+        return {'a': nodes.mailbox['a'].max(1)[0]}
 
     old_repr = th.randn(3, 5)
-    g.set_n_repr({'a': old_repr})
-    g.send(0, 1, _message_a)
-    g.send(0, 1, _message_b)
-    g.recv([1], _reduce)
-    new_repr = g.get_n_repr()['a']
+    g.ndata['a'] = old_repr
+    g.send((0, 1), _message_a)
+    g.send((0, 1), _message_b)
+    g.recv(1, _reduce)
+    new_repr = g.ndata['a']
     assert th.allclose(new_repr[1], old_repr[0] * 3)
 
-    g.set_n_repr({'a': old_repr})
-    g.send(0, 1, _message_a)
-    g.send(2, 1, _message_b)
-    g.recv([1], _reduce)
-    new_repr = g.get_n_repr()['a']
+    g.ndata['a'] = old_repr
+    g.send((0, 1), _message_a)
+    g.send((2, 1), _message_b)
+    g.recv(1, _reduce)
+    new_repr = g.ndata['a']
     assert th.allclose(new_repr[1], th.stack([old_repr[0], old_repr[2] * 3], 0).max(0)[0])
 
 def test_send_multigraph():
@@ -284,64 +298,63 @@ def test_send_multigraph():
     g.add_edge(0, 1)
     g.add_edge(2, 1)
 
-    def _message_a(src, edge):
-        return {'a': edge['a']}
-    def _message_b(src, edge):
-        return {'a': edge['a'] * 3}
-    def _reduce(node, msgs):
-        assert msgs is not None
-        return {'a': msgs['a'].max(1)[0]}
+    def _message_a(edges):
+        return {'a': edges.data['a']}
+    def _message_b(edges):
+        return {'a': edges.data['a'] * 3}
+    def _reduce(nodes):
+        return {'a': nodes.mailbox['a'].max(1)[0]}
 
     def answer(*args):
         return th.stack(args, 0).max(0)[0]
 
     # send by eid
     old_repr = th.randn(4, 5)
-    g.set_n_repr({'a': th.zeros(3, 5)})
-    g.set_e_repr({'a': old_repr})
-    g.send(eid=[0, 2], message_func=_message_a)
-    g.recv([1], _reduce)
-    new_repr = g.get_n_repr()['a']
+    g.ndata['a'] = th.zeros(3, 5)
+    g.edata['a'] = old_repr
+    g.send([0, 2], message_func=_message_a)
+    g.recv(1, _reduce)
+    new_repr = g.ndata['a']
     assert th.allclose(new_repr[1], answer(old_repr[0], old_repr[2]))
 
-    g.set_n_repr({'a': th.zeros(3, 5)})
-    g.set_e_repr({'a': old_repr})
-    g.send(eid=[0, 2, 3], message_func=_message_a)
-    g.recv([1], _reduce)
-    new_repr = g.get_n_repr()['a']
+    g.ndata['a'] = th.zeros(3, 5)
+    g.edata['a'] = old_repr
+    g.send([0, 2, 3], message_func=_message_a)
+    g.recv(1, _reduce)
+    new_repr = g.ndata['a']
     assert th.allclose(new_repr[1], answer(old_repr[0], old_repr[2], old_repr[3]))
 
     # send on multigraph
-    g.set_n_repr({'a': th.zeros(3, 5)})
-    g.set_e_repr({'a': old_repr})
-    g.send([0, 2], [1, 1], _message_a)
-    g.recv([1], _reduce)
-    new_repr = g.get_n_repr()['a']
+    g.ndata['a'] = th.zeros(3, 5)
+    g.edata['a'] = old_repr
+    g.send(([0, 2], [1, 1]), _message_a)
+    g.recv(1, _reduce)
+    new_repr = g.ndata['a']
     assert th.allclose(new_repr[1], old_repr.max(0)[0])
 
     # consecutive send and send_on
-    g.set_n_repr({'a': th.zeros(3, 5)})
-    g.set_e_repr({'a': old_repr})
-    g.send(2, 1, _message_a)
-    g.send(eid=[0, 1], message_func=_message_b)
-    g.recv([1], _reduce)
-    new_repr = g.get_n_repr()['a']
+    g.ndata['a'] = th.zeros(3, 5)
+    g.edata['a'] = old_repr
+    g.send((2, 1), _message_a)
+    g.send([0, 1], message_func=_message_b)
+    g.recv(1, _reduce)
+    new_repr = g.ndata['a']
     assert th.allclose(new_repr[1], answer(old_repr[0] * 3, old_repr[1] * 3, old_repr[3]))
 
     # consecutive send_on
-    g.set_n_repr({'a': th.zeros(3, 5)})
-    g.set_e_repr({'a': old_repr})
-    g.send(eid=0, message_func=_message_a)
-    g.send(eid=1, message_func=_message_b)
-    g.recv([1], _reduce)
-    new_repr = g.get_n_repr()['a']
+    g.ndata['a'] = th.zeros(3, 5)
+    g.edata['a'] = old_repr
+    g.send(0, message_func=_message_a)
+    g.send(1, message_func=_message_b)
+    g.recv(1, _reduce)
+    new_repr = g.ndata['a']
     assert th.allclose(new_repr[1], answer(old_repr[0], old_repr[1] * 3))
 
     # send_and_recv_on
-    g.set_n_repr({'a': th.zeros(3, 5)})
-    g.set_e_repr({'a': old_repr})
-    g.send_and_recv(eid=[0, 2, 3], message_func=_message_a, reduce_func=_reduce)
-    new_repr = g.get_n_repr()['a']
+    g.ndata['a'] = th.zeros(3, 5)
+    g.edata['a'] = old_repr
+    g.send_and_recv([0, 2, 3], message_func=_message_a, reduce_func=_reduce)
+    new_repr = g.ndata['a']
     assert th.allclose(new_repr[1], answer(old_repr[0], old_repr[2], old_repr[3]))
     assert th.allclose(new_repr[[0, 2]], th.zeros(2, 5))
 
@@ -351,6 +364,7 @@ if __name__ == '__main__':
     test_batch_setter_autograd()
     test_batch_send()
     test_batch_recv()
+    test_update_edges()
     test_update_routines()
     test_reduce_0deg()
     test_pull_0deg()
