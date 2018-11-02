@@ -36,7 +36,6 @@ def cpu(dev_id=0):
     """
     return TVMContext(1, dev_id)
 
-
 def gpu(dev_id=0):
     """Construct a CPU device
 

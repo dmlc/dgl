@@ -4,7 +4,7 @@ from __future__ import absolute_import
 import numpy as np
 
 from .base import ALL, is_all
-from .frame import FrameRef
+from .frame import FrameRef, Frame
 from .graph import DGLGraph
 from . import graph_index as gi
 from . import backend as F
@@ -31,14 +31,14 @@ class BatchedDGLGraph(DGLGraph):
         batched_index = gi.disjoint_union([g._graph for g in graph_list])
         # create batched node and edge frames
         # NOTE: following code will materialize the columns of the input graphs.
-        batched_node_frame = FrameRef()
-        for gr in graph_list:
-            cols = {key : gr._node_frame[key] for key in node_attrs}
-            batched_node_frame.append(cols)
-        batched_edge_frame = FrameRef()
-        for gr in graph_list:
-            cols = {key : gr._edge_frame[key] for key in edge_attrs}
-            batched_edge_frame.append(cols)
+        cols = {key: F.pack([gr._node_frame[key] for gr in graph_list])
+                for key in node_attrs}
+        batched_node_frame = FrameRef(Frame(cols))
+
+        cols = {key: F.pack([gr._edge_frame[key] for gr in graph_list])
+                for key in edge_attrs}
+        batched_edge_frame = FrameRef(Frame(cols))
+
         super(BatchedDGLGraph, self).__init__(
                 graph_data=batched_index,
                 node_frame=batched_node_frame,
@@ -154,6 +154,14 @@ def unbatch(graph):
     ----------
     graph : BatchedDGLGraph
         The batched graph.
+
+    Notes
+    -----
+    Unbatching will partition each field tensor of the batched graph into
+    smaller partitions.  This is usually wasteful.
+
+    For simpler tasks such as node/edge state aggregation by example,
+    try to use BatchedDGLGraph.readout().
     """
     assert isinstance(graph, BatchedDGLGraph)
     bsize = graph.batch_size

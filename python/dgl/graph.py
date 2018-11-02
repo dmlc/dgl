@@ -76,6 +76,10 @@ class DGLGraph(object):
         #TODO(minjie): change frames
         assert reprs is None
 
+        # Initialize feature placeholders if there are features existing
+        if self._node_frame.num_columns > 0 and self._node_frame.num_rows > 0:
+            self._node_frame.add_rows(num)
+
     def add_edge(self, u, v, reprs=None):
         """Add one edge.
 
@@ -91,6 +95,10 @@ class DGLGraph(object):
         self._graph.add_edge(u, v)
         #TODO(minjie): change frames
         assert reprs is None
+
+        # Initialize feature placeholders if there are features existing
+        if self._edge_frame.num_columns > 0 and self._edge_frame.num_rows > 0:
+            self._edge_frame.add_rows(1)
 
     def add_edges(self, u, v, reprs=None):
         """Add many edges.
@@ -109,6 +117,10 @@ class DGLGraph(object):
         self._graph.add_edges(u, v)
         #TODO(minjie): change frames
         assert reprs is None
+
+        # Initialize feature placeholders if there are features existing
+        if self._edge_frame.num_columns > 0 and self._edge_frame.num_rows > 0:
+            self._edge_frame.add_rows(len(u))
 
     def clear(self):
         """Clear the graph and its storage."""
@@ -311,6 +323,23 @@ class DGLGraph(object):
             return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
         else:
             return eid.tousertensor()
+
+    def find_edges(self, eid):
+        """Given the edge ids, return their source and destination node ids.
+
+        Parameters
+        ----------
+        eid : list, tensor
+            The edge ids.
+
+        Returns
+        -------
+        tensor, tensor
+        The source and destination node IDs.
+        """
+        eid = utils.toindex(u)
+        src, dst, _ = self._graph.find_edges(eid)
+        return src.tousertensor(), dst.tousertensor()
 
     def in_edges(self, v):
         """Return the in edges of the node(s).
