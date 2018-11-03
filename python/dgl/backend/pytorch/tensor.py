@@ -13,8 +13,11 @@ def data_type_dict():
             'int32'   : th.int32,
             'int64'   : th.int64}
 
+def cpu():
+    return th.device('cpu')
+
 def tensor(data, dtype=None):
-    return th.tensor(data, dtype)
+    return th.tensor(data, dtype=dtype)
 
 def coo_matrix(idx, dat, shape):
     return th.sparse.FloatTensor(idx, dat, shape)
@@ -52,7 +55,8 @@ def sum(input, dim):
     return th.sum(input, dim=dim)
 
 def max(input, dim):
-    return th.max(input, dim=dim)
+    # NOTE: the second argmax array is not returned
+    return th.max(input, dim=dim)[0]
 
 def cat(seq, dim):
     return th.cat(seq, dim=dim)

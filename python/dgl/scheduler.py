@@ -56,8 +56,8 @@ def _process_buckets(buckets):
     # split buckets
     unique_v = v.tousertensor()
     msg_ids = msg_ids.tousertensor()
-    dsts = F.unpack(unique_v, v_section)
-    msg_ids = F.unpack(msg_ids, msg_section)
+    dsts = F.split(unique_v, v_section, dim=0)
+    msg_ids = F.split(msg_ids, msg_section, dim=0)
 
     # convert to utils.Index
     unique_v = utils.toindex(unique_v)
@@ -136,7 +136,7 @@ class SPMVOperator(Executor):
     def run(self):
         # get src col
         srccol = self.node_repr[self.src_field]
-        ctx = F.get_context(srccol)
+        ctx = F.context(srccol)
 
         # build adjmat
         adjmat = self.adj_build_fn(self.edge_field, ctx, self.use_edge_feat)
@@ -145,7 +145,7 @@ class SPMVOperator(Executor):
         if len(F.shape(srccol)) == 1:
             srccol = F.unsqueeze(srccol, 1)
             dstcol = F.spmm(adjmat, srccol)
-            dstcol = F.squeeze(dstcol)
+            dstcol = F.squeeze(dstcol, 1)
         else:
             dstcol = F.spmm(adjmat, srccol)
         return {self.dst_field : dstcol}
@@ -190,7 +190,7 @@ class DegreeBucketingExecutor(Executor):
 
         # Pack all reducer results together
         keys = new_reprs[0].keys()
-        new_reprs = {key : F.pack([repr[key] for repr in new_reprs])
+        new_reprs = {key : F.cat([repr[key] for repr in new_reprs], dim=0)
                      for key in keys}
         return new_reprs
 
@@ -273,10 +273,12 @@ class UpdateAllExecutor(BasicExecutor):
     def _adj_build_fn(self, edge_field, ctx, use_edge_feat):
         if use_edge_feat:
             dat = self.edge_repr[edge_field]
-            dat = F.squeeze(dat)
+            if len(F.shape(dat)) > 1:
+                # The edge feature is of shape (N, 1)
+                dat = F.squeeze(dat, 1)
             # TODO(minjie): should not directly use _indices
             idx = self.g.adjacency_matrix(ctx)._indices()
-            adjmat = F.sparse_tensor(idx, dat, self.graph_shape)
+            adjmat = F.coo_matrix(idx, dat, self.graph_shape)
         else:
             adjmat = self.g.adjacency_matrix(ctx)
         return adjmat
@@ -334,18 +336,22 @@ class SendRecvExecutor(BasicExecutor):
         new_v = old2new[v]
         n = self.g.number_of_nodes()
         m = len(new2old)
-        self._graph_idx = F.pack([F.unsqueeze(new_v, 0), F.unsqueeze(u, 0)])
+        self._graph_idx = F.cat(
+                [F.unsqueeze(new_v, 0), F.unsqueeze(u, 0)], dim=0)
         self._graph_shape = [m, n]
         self._recv_nodes = new2old
 
     def _adj_build_fn(self, edge_field, ctx, use_edge_feat):
         if use_edge_feat:
             dat = self.edge_repr[edge_field]
-            dat = F.squeeze(dat)
+            if len(F.shape(dat)) > 1:
+                # edge feature is of shape (N, 1)
+                dat = F.squeeze(dat, dim=1)
         else:
-            dat = F.ones((len(self.u), ))
-        adjmat = F.sparse_tensor(self.graph_idx, dat, self.graph_shape)
-        return F.to_context(adjmat, ctx)
+            # TODO(minjie): data type should be adjusted according t othe usage.
+            dat = F.ones((len(self.u), ), dtype=F.float32)
+        adjmat = F.coo_matrix(self.graph_idx, dat, self.graph_shape)
+        return F.copy_to(adjmat, ctx)
 
 
 class BundledExecutor(BasicExecutor):

@@ -51,6 +51,10 @@ def data_type_dict():
     """
     pass
 
+def cpu():
+    """Return a context object for CPU device."""
+    pass
+
 def tensor(data, dtype=None):
     """Create a tensor given the data and data type.
 

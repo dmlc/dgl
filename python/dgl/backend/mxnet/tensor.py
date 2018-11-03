@@ -14,16 +14,19 @@ def data_type_dict():
             'int32'   : np.int32,
             'int64'   : np.int64}
 
+def cpu():
+    return nd.cpu()
+
 def tensor(data, dtype=None):
-    return mx.nd.array(data, dtype)
+    return nd.array(data, dtype)
 
 # coo_matrix is not enabled
 
 def csr_matrix(data, indices, indptr, shape):
-    return mx.nd.sparse.csr_matrix((data, (indices, indptr)), shape)
+    return nd.sparse.csr_matrix((data, (indices, indptr)), shape)
 
 def is_tensor(obj):
-    return isinstance(obj, mx.nd.NDArray)
+    return isinstance(obj, nd.NDArray)
 
 def shape(input):
     # NOTE: the input cannot be a symbol
@@ -62,7 +65,7 @@ def split(x, sizes_or_sections=1, dim):
         res = np.split(np_arr, indices, axis=dim)
         return [tensor(arr, dtype=x.dtype) for arr in res]
     else:
-        return F.split(x, sizes_or_sections, axis=dim)
+        return nd.split(x, sizes_or_sections, axis=dim)
 
 def gather_row(data, row_index):
     if isinstance(row_index, nd.NDArray):
