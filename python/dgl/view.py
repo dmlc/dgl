@@ -45,7 +45,7 @@ class NodeView(object):
 
     def __call__(self):
         """Return the nodes."""
-        return F.arange(0, len(self))
+        return F.arange(0, len(self), dtype=F.int64)
 
 class NodeDataView(MutableMapping):
     __slot__ = ['_graph', '_nodes']
