@@ -15,8 +15,8 @@ MAX_NB = 8
 MAX_DECODE_LEN = 100
 
 def _dfs(trace, forest, i, cur, parent):
-    _, next_, down_eid = forest.out_edges(cur)
-    prev, _, up_eid = forest.in_edges(cur)
+    _, next_, down_eid = forest.out_edges(cur, 'all')
+    prev, _, up_eid = forest.in_edges(cur, 'all')
     down_eid = dict(zip(next_.tolist(), down_eid.tolist()))
     up_eid = dict(zip(prev.tolist(), up_eid.tolist()))
     for n in down_eid:
@@ -44,8 +44,8 @@ dec_tree_node_msg = DGLF.copy_edge(edge='m', out='m')
 dec_tree_node_reduce = DGLF.sum(msg='m', out='h')
 
 
-def dec_tree_node_update(node):
-    return {'new': node['new'].clone().zero_()}
+def dec_tree_node_update(nodes):
+    return {'new': nodes.data['new'].clone().zero_()}
 
 
 dec_tree_edge_msg = [DGLF.copy_src(src='m', out='m'), DGLF.copy_src(src='rm', out='rm')]
@@ -89,13 +89,13 @@ class DGLJTNNDecoder(nn.Module):
         n_nodes = mol_tree_batch.number_of_nodes()
         n_edges = mol_tree_batch.number_of_edges()
 
-        mol_tree_batch.set_n_repr({
+        mol_tree_batch.ndata.update({
             'x': self.embedding(mol_tree_batch.get_n_repr()['wid']),
             'h': cuda(torch.zeros(n_nodes, self.hidden_size)),
             'new': cuda(torch.ones(n_nodes).byte()),  # whether it's newly generated node
         })
 
-        mol_tree_batch.set_e_repr({
+        mol_tree_batch.edata.update({
             's': cuda(torch.zeros(n_edges, self.hidden_size)),
             'm': cuda(torch.zeros(n_edges, self.hidden_size)),
             'r': cuda(torch.zeros(n_edges, self.hidden_size)),
@@ -106,8 +106,8 @@ class DGLJTNNDecoder(nn.Module):
             'accum_rm': cuda(torch.zeros(n_edges, self.hidden_size)),
         })
 
-        mol_tree_batch.update_edge(
-            edge_func=lambda src, dst, edge: {'src_x': src['x'], 'dst_x': dst['x']},
+        mol_tree_batch.update_edges(
+            edge_func=lambda edges: {'src_x': edges.src['x'], 'dst_x': edges.dst['x']},
         )
 
         # input tensors for stop prediction (p) and label prediction (q)
@@ -124,12 +124,12 @@ class DGLJTNNDecoder(nn.Module):
             dec_tree_node_update,
         )
         # Extract hidden states and store them for stop/label prediction
-        h = mol_tree_batch.get_n_repr(root_ids)['h']
-        x = mol_tree_batch.get_n_repr(root_ids)['x']
+        h = mol_tree_batch.nodes[root_ids].data['h']
+        x = mol_tree_batch.nodes[root_ids].data['x']
         p_inputs.append(torch.cat([x, h, tree_vec], 1))
         t_set = list(range(len(root_ids)))
         q_inputs.append(torch.cat([h, tree_vec], 1))
-        q_targets.append(mol_tree_batch.get_n_repr(root_ids)['wid'])
+        q_targets.append(mol_tree_batch.nodes[root_ids].data['wid'])
 
         # Traverse the tree and predict on children
         for u, v, eid, i, p in dfs_order(mol_tree_batch, root_ids):
@@ -144,7 +144,7 @@ class DGLJTNNDecoder(nn.Module):
                 dec_tree_edge_reduce,
                 self.dec_tree_edge_update,
             )
-            is_new = mol_tree_batch.get_n_repr(v)['new']
+            is_new = mol_tree_batch.nodes[v].data['new']
             mol_tree_batch.pull(
                 v,
                 dec_tree_node_msg,
@@ -152,7 +152,7 @@ class DGLJTNNDecoder(nn.Module):
                 dec_tree_node_update,
             )
             # Extract
-            n_repr = mol_tree_batch.get_n_repr(v)
+            n_repr = mol_tree_batch.nodes[v].data
             h = n_repr['h']
             x = n_repr['x']
             tree_vec_set = tree_vec[t_set]

@@ -27,10 +27,10 @@ class GRUUpdate(nn.Module):
         self.W_h = nn.Linear(2 * hidden_size, hidden_size)
 
     def forward(self, node):
-        src_x = node['src_x']
-        dst_x = node['dst_x']
-        s = node['s']
-        rm = node['accum_rm']
+        src_x = node.data['src_x']
+        dst_x = node.data['dst_x']
+        s = node.data['s']
+        rm = node.data['accum_rm']
         z = torch.sigmoid(self.W_z(torch.cat([src_x, s], 1)))
         m = torch.tanh(self.W_h(torch.cat([src_x, rm], 1)))
         m = (1 - z) * s + z * m

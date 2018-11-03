@@ -21,8 +21,8 @@ def level_order(forest, roots):
     while True:
         visited.update(level)
 
-        out_src, out_dst, out_eid = forest.out_edges(level)
-        in_src, in_dst, in_eid = forest.in_edges(level)
+        out_src, out_dst, out_eid = forest.out_edges(level, 'all')
+        in_src, in_dst, in_eid = forest.in_edges(level, 'all')
 
         out_src = out_src.tolist()
         out_dst = out_dst.tolist()
@@ -60,9 +60,9 @@ class EncoderGatherUpdate(nn.Module):
 
         self.W = nn.Linear(2 * hidden_size, hidden_size)
 
-    def forward(self, node):
-        x = node['x']
-        m = node['m']
+    def forward(self, nodes):
+        x = nodes.data['x']
+        m = nodes.data['m']
         return {
             'h': torch.relu(self.W(torch.cat([x, m], 1))),
         }
@@ -100,7 +100,7 @@ class DGLJTNNEncoder(nn.Module):
         n_edges = mol_tree_batch.number_of_edges()
 
         # Assign structure embeddings to tree nodes
-        mol_tree_batch.set_n_repr({
+        mol_tree_batch.ndata.update({
             'x': self.embedding(mol_tree_batch.get_n_repr()['wid']),
             'h': cuda(torch.zeros(n_nodes, self.hidden_size)),
         })
@@ -108,7 +108,7 @@ class DGLJTNNEncoder(nn.Module):
         # Initialize the intermediate variables according to Eq (4)-(8).
         # Also initialize the src_x and dst_x fields.
         # TODO: context?
-        mol_tree_batch.set_e_repr({
+        mol_tree_batch.edata.update({
             's': cuda(torch.zeros(n_edges, self.hidden_size)),
             'm': cuda(torch.zeros(n_edges, self.hidden_size)),
             'r': cuda(torch.zeros(n_edges, self.hidden_size)),
@@ -120,8 +120,8 @@ class DGLJTNNEncoder(nn.Module):
         })
 
         # Send the source/destination node features to edges
-        mol_tree_batch.update_edge(
-            edge_func=lambda src, dst, edge: {'src_x': src['x'], 'dst_x': dst['x']},
+        mol_tree_batch.update_edges(
+            edge_func=lambda edges: {'src_x': edges.src['x'], 'dst_x': edges.dst['x']},
         )
 
         # Message passing

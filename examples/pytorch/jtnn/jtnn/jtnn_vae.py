@@ -19,11 +19,11 @@ def dgl_set_batch_nodeID(mol_batch, vocab):
     tot = 0
     for mol_tree in mol_batch:
         wid = []
-        for node in mol_tree.nodes:
-            mol_tree.nodes[node]['idx'] = tot
+        for node in mol_tree.nodes_dict:
+            mol_tree.nodes_dict[node]['idx'] = tot
             tot += 1
-            wid.append(vocab.get_index(mol_tree.nodes[node]['smiles']))
-        mol_tree.set_n_repr({'wid': cuda(torch.LongTensor(wid))})
+            wid.append(vocab.get_index(mol_tree.nodes_dict[node]['smiles']))
+        mol_tree.ndata['wid'] = cuda(torch.LongTensor(wid))
 
 class DGLJTNNVAE(nn.Module):
 
@@ -115,7 +115,7 @@ class DGLJTNNVAE(nn.Module):
         batch_idx = []
 
         for i, mol_tree in enumerate(mol_batch):
-            for node_id, node in mol_tree.nodes.items():
+            for node_id, node in mol_tree.nodes_dict.items():
                 if node['is_leaf'] or len(node['cands']) == 1:
                     continue
                 cands.extend([(cand, mol_tree, node_id) for cand in node['cand_mols']])
@@ -134,12 +134,12 @@ class DGLJTNNVAE(nn.Module):
         cnt, tot, acc = 0, 0, 0
         all_loss = []
         for i, mol_tree in enumerate(mol_batch):
-            comp_nodes = [node_id for node_id, node in mol_tree.nodes.items()
+            comp_nodes = [node_id for node_id, node in mol_tree.nodes_dict.items()
                           if len(node['cands']) > 1 and not node['is_leaf']]
             cnt += len(comp_nodes)
             # segmented accuracy and cross entropy
             for node_id in comp_nodes:
-                node = mol_tree.nodes[node_id]
+                node = mol_tree.nodes_dict[node_id]
                 label = node['cands'].index(node['label'])
                 ncand = len(node['cands'])
                 cur_score = scores[tot:tot+ncand]

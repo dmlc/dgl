@@ -69,9 +69,9 @@ def mol2dgl(smiles_batch):
 
         atom_x = cuda(torch.stack(atom_x, 0))
         bond_x = cuda(torch.stack(bond_x, 0))
-        graph.set_n_repr({'x': atom_x})
+        graph.ndata['x'] = atom_x
         if n_bonds > 0:
-            graph.set_e_repr({
+            graph.edata.update({
                 'x': bond_x,
                 'src_x': atom_x.new(n_bonds * 2, ATOM_FDIM).zero_()
             })
@@ -91,9 +91,9 @@ class LoopyBPUpdate(nn.Module):
 
         self.W_h = nn.Linear(hidden_size, hidden_size, bias=False)
 
-    def forward(self, node):
-        msg_input = node['msg_input']
-        msg_delta = self.W_h(node['accum_msg'])
+    def forward(self, nodes):
+        msg_input = nodes.data['msg_input']
+        msg_delta = self.W_h(nodes.data['accum_msg'])
         msg = F.relu(msg_input + msg_delta)
         return {'msg': msg}
 
@@ -109,10 +109,10 @@ class GatherUpdate(nn.Module):
 
         self.W_o = nn.Linear(ATOM_FDIM + hidden_size, hidden_size)
 
-    def forward(self, node):
-        m = node['m']
+    def forward(self, nodes):
+        m = nodes.data['m']
         return {
-            'h': F.relu(self.W_o(torch.cat([node['x'], m], 1))),
+            'h': F.relu(self.W_o(torch.cat([nodes.data['x'], m], 1))),
         }
 
 
@@ -158,21 +158,22 @@ class DGLMPN(nn.Module):
     def run(self, mol_graph, mol_line_graph):
         n_nodes = mol_graph.number_of_nodes()
 
-        mol_graph.update_edge(
-            edge_func=lambda src, dst, edge: {'src_x': src['x']},
+        mol_graph.update_edges(
+            edge_func=lambda edges: {'src_x': edges.src['x']},
         )
 
-        bond_features = mol_line_graph.get_n_repr()['x']
-        source_features = mol_line_graph.get_n_repr()['src_x']
+        e_repr = mol_line_graph.ndata
+        bond_features = e_repr['x']
+        source_features = e_repr['src_x']
 
         features = torch.cat([source_features, bond_features], 1)
         msg_input = self.W_i(features)
-        mol_line_graph.set_n_repr({
+        mol_line_graph.ndata.update({
             'msg_input': msg_input,
             'msg': F.relu(msg_input),
             'accum_msg': torch.zeros_like(msg_input),
         })
-        mol_graph.set_n_repr({
+        mol_graph.ndata.update({
             'm': bond_features.new(n_nodes, self.hidden_size).zero_(),
             'h': bond_features.new(n_nodes, self.hidden_size).zero_(),
         })

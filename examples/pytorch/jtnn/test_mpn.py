@@ -88,7 +88,7 @@ def test_treeenc():
     dgljtnn.enc_tree_gather_update.W = jtnn.W
 
     mol_tree_batch, dgl_tree_vec = dgljtnn(nx_mol_batch)
-    dgl_tree_mess = mol_tree_batch.get_e_repr()['m']
+    dgl_tree_mess = mol_tree_batch.edata['m']
 
     assert dgl_tree_mess.shape[0] == len(tree_mess)
     fail = False
@@ -119,7 +119,7 @@ def test_treeenc():
     cand_vec = jtmpn(cands, tree_mess)
 
     for i, mol_tree in enumerate(nx_mol_batch):
-        for node_id, node in mol_tree.nodes.items():
+        for node_id, node in mol_tree.nodes_dict.items():
             if node['is_leaf'] or len(node['cands']) == 1:
                 continue
             dglcands.extend([

@@ -252,7 +252,7 @@ def enum_attach_nx(ctr_mol, nei_node, amap, singletons):
 
 #Try rings first: Speed-Up 
 def enum_assemble_nx(graph, node_idx, neighbors, prev_nodes=[], prev_amap=[]):
-    node = graph.nodes[node_idx]
+    node = graph.nodes_dict[node_idx]
     all_attach_confs = []
     singletons = [nei_node['nid'] for nei_node in neighbors + prev_nodes if nei_node['mol'].GetNumAtoms() == 1]
 
@@ -301,14 +301,14 @@ def enum_assemble_nx(graph, node_idx, neighbors, prev_nodes=[], prev_amap=[]):
 
 #Only used for debugging purpose
 def dfs_assemble_nx(graph, cur_mol, global_amap, fa_amap, cur_node_id, fa_node_id):
-    cur_node = graph.nodes[cur_node_id]
-    fa_node = graph.nodes[fa_node_id] if fa_node_id is not None else None
+    cur_node = graph.nodes_dict[cur_node_id]
+    fa_node = graph.nodes_dict[fa_node_id] if fa_node_id is not None else None
 
     fa_nid = fa_node['nid'] if fa_node is not None else -1
     prev_nodes = [fa_node] if fa_node is not None else []
 
-    children_id = [nei for nei in graph[cur_node_id] if graph.nodes[nei]['nid'] != fa_nid]
-    children = [graph.nodes[nei] for nei in children_id]
+    children_id = [nei for nei in graph[cur_node_id] if graph.nodes_dict[nei]['nid'] != fa_nid]
+    children = [graph.nodes_dict[nei] for nei in children_id]
     neighbors = [nei for nei in children if nei['mol'].GetNumAtoms() > 1]
     neighbors = sorted(neighbors, key=lambda x:x['mol'].GetNumAtoms(), reverse=True)
     singletons = [nei for nei in children if nei['mol'].GetNumAtoms() == 1]
