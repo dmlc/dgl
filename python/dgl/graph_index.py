@@ -493,19 +493,18 @@ class GraphIndex(object):
             src, dst, _ = self.edges(sorted=False)
             src = F.unsqueeze(src.tousertensor(), 0)
             dst = F.unsqueeze(dst.tousertensor(), 0)
-            if transpose:
-                idx = F.pack([src, dst])
-            else:
-                idx = F.pack([dst, src])
             n = self.number_of_nodes()
-            dat = F.ones((self.number_of_edges(),))
-            mat = F.sparse_tensor(idx, dat, [n, n])
+            m = self.number_of_edges()
+            if transpose:
+                mat = utils.build_sparse_matrix(src, dst, [n, n], m)
+            else:
+                mat = utils.build_sparse_matrix(dst, src, [n, n], m)
             self._cache['adj'] = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
         return self._cache['adj']
 
     def incidence_matrix(self, oriented=False):
         """Return the incidence matrix representation of this graph.
-        
+
         Parameters
         ----------
         oriented : bool, optional (default=False)
@@ -544,7 +543,7 @@ class GraphIndex(object):
 
         return self._cache[key]
 
-    def in_edge_incidence_matrix(self, v=None):
+    def in_edge_incidence_matrix(self):
         """Return the incidence matrix from edges to destination nodes for this graph
 
         Parameters
@@ -557,19 +556,14 @@ class GraphIndex(object):
         utils.CtxCachedObject
             An object that returns tensor given context.
         """
-        if v is None:
-            key = 'in edge incidence matrix'
-            if not key in self._cache:
-                _, dst, eid = self.edges()
-                n = self.number_of_nodes()
-                mat = utils.build_in_edge_incidence_matrix(dst, eid, n)
-                self._cache[key] = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
-            return self._cache[key]
-        else:
-            n = len(v)
-            _, dst, eid = self.in_edges(v)
-            mat = utils.build_in_edge_incidence_matrix(dst, eid, n)
-            return utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
+        key = 'in edge incidence matrix'
+        if not key in self._cache:
+            _, dst, eid = self.edges()
+            n = self.number_of_nodes()
+            m = len(eid)
+            mat = utils.build_sparse_matrix(dst, eid, [n, m], m)
+            self._cache[key] = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
+        return self._cache[key]
 
     def to_networkx(self):
         """Convert to networkx graph.

@@ -344,23 +344,24 @@ def reorder(dict_like, index):
         new_dict[key] = F.gather_row(val, idx_ctx)
     return new_dict
 
-def build_in_edge_incidence_matrix(dst, eid, n):
-    """Build incidence matrix from edges to destination nodes
+def build_sparse_matrix(dst, src, dense_shape, nnz):
+    """Build sparse matrix
 
     Parameters
     __________
     dst: util.Index
-        Destination nodes
-    eid: util.Index
-        Edge ids.
-    n: int
-        Number of unique destination nodes
+        Destination ids
+    src: util.Index
+        Source ids
+    dense_shape: list or tuple of two integer
+        Dense shape of the sparse matrix
+    nnz: int
+        Number of non-zero elemements
     """
 
     dst = dst.tousertensor()
-    eid = eid.tousertensor()
-    m = len(eid)
-    idx = F.stack([dst, eid])
-    dat = F.ones((m,))
+    src = eid.tousertensor()
+    idx = F.stack([dst, src])
+    dat = F.ones((nnz,))
     return F.sparse_tensor(idx, dat, [n, m])
 
