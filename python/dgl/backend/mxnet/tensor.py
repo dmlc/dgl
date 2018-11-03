@@ -85,7 +85,7 @@ def squeeze(input, dim):
     return nd.squeeze(input, axis=dim)
 
 def unsqueeze(input, dim):
-    return nd.unsqueeze(input, axis=dim)
+    return nd.expand_dims(input, axis=dim)
 
 def reshape(input, shape):
     # NOTE: the input cannot be a symbol
@@ -117,8 +117,8 @@ def nonzero_1d(input):
 
 def sort_1d(input):
     # TODO: this isn't an ideal implementation.
-    val = nd.sort(input, axis=dim, is_ascend=True)
-    idx = nd.argsort(input, axis=dim, is_ascend=True)
+    val = nd.sort(input, is_ascend=True)
+    idx = nd.argsort(input, is_ascend=True)
     idx = nd.cast(idx, dtype='int64')
     return val, idx
 
