@@ -41,6 +41,65 @@ def generate_degree_bucketing_executors():
 def generate_spmv_executors():
     pass
 
+def _generate_graph_key(prefix, call_type):
+    if call_type == "update_all":
+        key = prefix + "all"
+    elif call_type == "send_and_recv":
+        key = prefix + "edges"
+    elif call_type == "recv":
+        key = prefix + "message"
+    else:
+        raise DGLError("Unsupported call type: %s" % (call_type))
+    return key
+
+def _prepare_adjmat(g, call_type, graph_store, mfunc, **kwargs):
+    key = _generate_graph_key("adjmat_")
+    if isinstance(mfunc, fmsg.SrcMulEdgeMessageFunction):
+        key += "_" + mfunc.edge_field
+    if graph_store.get(key, None):
+        # key already exists
+        return
+
+def _build_adj_idx(g, call_type, incidence=False, edge_field=None):
+    if call_type == "update_all":
+        # build full adj or incidence
+        if incidence:
+            adj_idx = self.g._handle.in_edge_incidence_matrix()
+        else:
+
+    elif call_type == "send_and_recv":
+        # build partial adj or incidence
+        if incidence:
+
+    elif call_type == "recv":
+        # build incidence
+        pass
+    else:
+        assert(0)
+
+def _build_incidence_matrix(g, call_type, v=None, edges=None):
+    if call_type == "update_all":
+        mat = self.g._graph.in_edge_incidence_matrix()
+        return mat
+
+    # partial graph case
+    if call_type == "send_and_recv":
+        v = edges[1]
+        m = len(v)
+        eid = F.arannge(m)
+    elif call_type == "recv":
+        _, v, eid = self._msg_graph.in_edges(v)
+    else:
+        raise DGLError("Unsupported call type: %s" % call_type)
+
+    new2old, old2new = utils.build_relabel_map(v)
+    v = v.tousertensor()
+    new_v = old2new[v]
+    n = len(new2old)
+    mat = utils.build_in_edge_incidence_matrix(new_v, eid, n)
+    return mat
+
+
 def _get_exec_plan(g, call_type, mfunc=None, rfunc=None, **kwargs):
     v2v_spmv = None
     e2v_spmv = None
@@ -67,6 +126,14 @@ def _get_exec_plan(g, call_type, mfunc=None, rfunc=None, **kwargs):
 
     # fused spmv
     if v2v_spmv:
+        if call_type == "send_and_recv":
+            # build partial
+            pass
+        elif call_type == "update_all":
+            # build full
+        else:
+            assert(0)
+
         # TODO(lingfan): build adjmat
         for mfn, rfn in v2v_spmv:
             # TODO(lingfan): create spmv executor using adjmat
@@ -74,6 +141,9 @@ def _get_exec_plan(g, call_type, mfunc=None, rfunc=None, **kwargs):
 
     # incidence matrix spmv
     if e2v_spmv:
+        if call_type == "send_and_recv":
+        else:
+            assert(0)
         # TODO(lingfan): build incidence mat
         for rfn in e2v_spmv:
             # TODO(lingfan): create spmv executor using incidence mat
