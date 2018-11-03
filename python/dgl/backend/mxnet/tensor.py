@@ -20,7 +20,7 @@ def cpu():
 def tensor(data, dtype=None):
     return nd.array(data, dtype=dtype)
 
-def coo_matrix(idx, dat, shape):
+def coo_matrix(idx, data, shape):
     # NOTE: use a csr_matrix for the coo input
     return nd.sparse.csr_matrix((data, (idx[0], idx[1])), shape)
 
