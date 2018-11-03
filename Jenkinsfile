@@ -61,6 +61,79 @@ pipeline {
                 }
             }
         }
+        stage('Build and Test on Pytorch') {
+            parallel {
+                stage('CPU') {
+                    agent {
+                        docker {
+                            image 'lingfanyu/dgl-cpu'
+                        }
+                    }
+                    stages {
+                        stage('SETUP') {
+                            steps {
+                                setup()
+                            }
+                        }
+                        stage('BUILD') {
+                            steps {
+                                build_dgl()
+                            }
+                        }
+                        stage('UNIT TEST') {
+                            steps {
+                                pytorch_unit_test()
+                            }
+                        }
+                        stage('EXAMPLE TEST') {
+                            steps {
+                                example_test('CPU')
+                            }
+                        }
+                    }
+                    post {
+                        always {
+                            junit '*.xml'
+                        }
+                    }
+                }
+                stage('GPU') {
+                    agent {
+                        docker {
+                            image 'lingfanyu/dgl-gpu'
+                            args '--runtime nvidia'
+                        }
+                    }
+                    stages {
+                        stage('SETUP') {
+                            steps {
+                                setup()
+                            }
+                        }
+                        stage('BUILD') {
+                            steps {
+                                build_dgl()
+                            }
+                        }
+                        stage('UNIT TEST') {
+                            steps {
+                                pytorch_unit_test()
+                            }
+                        }
+                        stage('EXAMPLE TEST') {
+                            steps {
+                                example_test('GPU')
+                            }
+                        }
+                    }
+                    post {
+                        always {
+                            junit '*.xml'
+                        }
+                    }
+                }
+            }
+        }
         stage('Build and Test on MXNet') {
             parallel {
                 stage('CPU') {
