@@ -60,22 +60,25 @@ def _prepare_adjmat(g, call_type, graph_store, mfunc, **kwargs):
         # key already exists
         return
 
-def _build_adj_idx(g, call_type, incidence=False, edge_field=None):
+def _build_adj_matrix(g, call_type, edges=None):
     if call_type == "update_all":
-        # build full adj or incidence
-        if incidence:
-            adj_idx = self.g._handle.in_edge_incidence_matrix()
-        else:
+        mat = self.g._handle.in_edge_incidence_matrix()
+        return mat
 
-    elif call_type == "send_and_recv":
-        # build partial adj or incidence
-        if incidence:
+    # partial graph case
+    if call_type != "send_and_recv":
+        raise DGLError("Unsupported call type when build adjmat: %s" % call_type)
 
-    elif call_type == "recv":
-        # build incidence
-        pass
-    else:
-        assert(0)
+    u, v = edges
+    new2old, old2new = utils.build_relabel_map(v)
+    nnz = len(u)
+    u = u.tousertensor()
+    v = v.tousertensor()
+    new_v = old2new[v]
+    n = self.g.number_of_nodes()
+    m = len(new2old)
+    mat = utils.build_sparse_matrix(new_v, u, [m, n], nnz)
+    return utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
 
 def _build_incidence_matrix(g, call_type, v=None, edges=None):
     if call_type == "update_all":
@@ -89,16 +92,16 @@ def _build_incidence_matrix(g, call_type, v=None, edges=None):
         eid = F.arannge(m)
     elif call_type == "recv":
         _, v, eid = self._msg_graph.in_edges(v)
+        m = len(eid)
     else:
-        raise DGLError("Unsupported call type: %s" % call_type)
+        raise DGLError("Unsupported call type when build incidence matrix: %s" % call_type)
 
     new2old, old2new = utils.build_relabel_map(v)
     v = v.tousertensor()
     new_v = old2new[v]
     n = len(new2old)
-    mat = utils.build_in_edge_incidence_matrix(new_v, eid, n)
-    return mat
-
+    mat = utils.build_sparse_matrix(new_v, eid, [n, m], m)
+    return utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
 
 def _get_exec_plan(g, call_type, mfunc=None, rfunc=None, **kwargs):
     v2v_spmv = None
