@@ -5,7 +5,6 @@ import numpy as np
 import scipy as sp
 from dgl.graph import GraphIndex, create_graph_index
 from dgl.graph_index import map_to_subgraph_nid
-import dgl.backend as F
 from dgl import utils
 
 def generate_graph():
@@ -27,9 +26,8 @@ def generate_rand_graph(n):
     return g, ig
 
 def check_graph_equal(g1, g2):
-    ctx = F.get_context(mx.nd.array([1]))
-    adj1 = g1.adjacency_matrix().get(ctx) != 0
-    adj2 = g2.adjacency_matrix().get(ctx) != 0
+    adj1 = g1.adjacency_matrix().get(mx.cpu()) != 0
+    adj2 = g2.adjacency_matrix().get(mx.cpu()) != 0
     assert mx.nd.sum(adj1 - adj2).asnumpy() == 0
 
 def test_graph_gen():

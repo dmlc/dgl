@@ -117,8 +117,8 @@ def nonzero_1d(input):
 
 def sort_1d(input):
     # TODO: this isn't an ideal implementation.
-    val = nd.sort(x, axis=dim, is_ascend=True)
-    idx = nd.argsort(x, axis=dim, is_ascend=True)
+    val = nd.sort(input, axis=dim, is_ascend=True)
+    idx = nd.argsort(input, axis=dim, is_ascend=True)
     idx = nd.cast(idx, dtype='int64')
     return val, idx
 
