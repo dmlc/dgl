@@ -20,10 +20,12 @@ def cpu():
 def tensor(data, dtype=None):
     return nd.array(data, dtype=dtype)
 
-# coo_matrix is not enabled
+def coo_matrix(idx, dat, shape):
+    # NOTE: use a csr_matrix for the coo input
+    return nd.sparse.csr_matrix((data, (idx[0], idx[1])), shape)
 
 def csr_matrix(data, indices, indptr, shape):
-    return nd.sparse.csr_matrix((data, (indices, indptr)), shape)
+    return nd.sparse.csr_matrix((data, indices, indptr), shape)
 
 def is_tensor(obj):
     return isinstance(obj, nd.NDArray)
