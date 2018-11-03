@@ -18,7 +18,7 @@ def cpu():
     return mx.cpu()
 
 def tensor(data, dtype=None):
-    return nd.array(data, dtype)
+    return nd.array(data, dtype=dtype)
 
 # coo_matrix is not enabled
 
