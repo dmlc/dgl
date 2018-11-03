@@ -57,7 +57,7 @@ def max(input, dim):
 def cat(seq, dim):
     return nd.concat(*seq, dim=dim)
 
-def split(x, sizes_or_sections=1, dim):
+def split(x, sizes_or_sections, dim):
     if isinstance(sizes_or_sections, list):
         # TODO: fallback to numpy is unfortunate
         np_arr = x.asnumpy()
