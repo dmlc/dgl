@@ -15,7 +15,7 @@ def data_type_dict():
             'int64'   : np.int64}
 
 def cpu():
-    return nd.cpu()
+    return mx.cpu()
 
 def tensor(data, dtype=None):
     return nd.array(data, dtype)
