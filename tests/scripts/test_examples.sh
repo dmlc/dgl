@@ -1,6 +1,6 @@
 #!/bin/bash
 
-GCN_EXAMPLE_DIR="../../examples/pytorch/gcn"
+GCN_EXAMPLE_DIR="../../examples/pytorch/"
 
 function fail {
     echo FAIL: $@
@@ -29,8 +29,9 @@ fi
 
 pushd $GCN_EXAMPLE_DIR> /dev/null
 
-# test CPU
-python3 gcn.py --dataset cora --gpu $dev || fail "run gcn.py on $1"
-python3 gcn_spmv.py --dataset cora --gpu $dev || fail "run gcn_spmv.py on $1"
+# test
+python3 pagerank.py || fail "run pagerank.py on $1"
+python3 gcn/gcn.py --dataset cora --gpu $dev || fail "run gcn/gcn.py on $1"
+python3 gcn/gcn_spmv.py --dataset cora --gpu $dev || fail "run gcn/gcn_spmv.py on $1"
 
 popd > /dev/null

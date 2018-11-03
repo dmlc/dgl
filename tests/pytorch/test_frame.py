@@ -236,6 +236,38 @@ def test_sharing():
     f2_a1[0:2] = th.ones([2, D])
     assert th.allclose(f2['a1'], f2_a1)
 
+def test_slicing():
+    data = Frame(create_test_data(grad=True))
+    f1 = FrameRef(data, index=slice(1, 5))
+    f2 = FrameRef(data, index=slice(3, 8))
+    # test read
+    for k, v in f1.items():
+        assert th.allclose(data[k].data[1:5], v)
+    f2_a1 = f2['a1'].data
+    # test write
+    f1[Index(th.tensor([0, 1]))] = {
+            'a1': th.zeros([2, D]),
+            'a2': th.zeros([2, D]),
+            'a3': th.zeros([2, D]),
+            }
+    assert th.allclose(f2['a1'], f2_a1)
+    
+    f1[Index(th.tensor([2, 3]))] = {
+            'a1': th.ones([2, D]),
+            'a2': th.ones([2, D]),
+            'a3': th.ones([2, D]),
+            }
+    f2_a1[0:2] = 1
+    assert th.allclose(f2['a1'], f2_a1)
+
+    f1[2:4] = {
+            'a1': th.zeros([2, D]),
+            'a2': th.zeros([2, D]),
+            'a3': th.zeros([2, D]),
+            }
+    f2_a1[0:2] = 0
+    assert th.allclose(f2['a1'], f2_a1)
+
 if __name__ == '__main__':
     test_create()
     test_column1()
@@ -246,3 +278,4 @@ if __name__ == '__main__':
     test_row2()
     test_row3()
     test_sharing()
+    test_slicing()

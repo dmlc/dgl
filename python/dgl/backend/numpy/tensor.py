@@ -110,7 +110,7 @@ def sort_1d(input):
     return np.sort(input), np.argsort(input)
 
 def arange(start, stop):
-    return np.arange(start, stop)
+    return np.arange(start, stop, dtype=np.int64)
 
 # zerocopy_to_dlpack not enabled
 
