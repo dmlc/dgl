@@ -73,7 +73,7 @@ def train():
 
         for it, batch in enumerate(dataloader):
             for mol_tree in batch:
-                for node_id, node in mol_tree.nodes.items():
+                for node_id, node in mol_tree.nodes_dict.items():
                     if node['label'] not in node['cands']:
                         node['cands'].append(node['label'])
                         node['cand_mols'].append(node['label_mol'])
