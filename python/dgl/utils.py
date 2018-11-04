@@ -20,9 +20,15 @@ class Index(object):
     def _dispatch(self, data):
         """Store data based on its type."""
         if isinstance(data, Tensor):
-            if not (F.dtype(data) == F.int64 and len(F.shape(data)) == 1):
+            if not (F.dtype(data) == F.int64):
+                raise ValueError('Index data must be an int64 vector, but got: %s' % str(data))
+            if len(F.shape(data)) > 1:
                 raise ValueError('Index data must be 1D int64 vector, but got: %s' % str(data))
-            self._user_tensor_data[F.get_context(data)] = data
+            if len(F.shape(data)) == 0:
+                # a tensor of one int
+                self._dispatch(int(data))
+            else:
+                self._user_tensor_data[F.get_context(data)] = data
         elif isinstance(data, nd.NDArray):
             if not (data.dtype == 'int64' and len(data.shape) == 1):
                 raise ValueError('Index data must be 1D int64 vector, but got: %s' % str(data))
@@ -343,3 +349,18 @@ def reorder(dict_like, index):
         idx_ctx = index.tousertensor(F.get_context(val))
         new_dict[key] = F.gather_row(val, idx_ctx)
     return new_dict
+
+def parse_edges_tuple(edges):
+    """Parse the given edges and return the tuple.
+
+    Parameters
+    ----------
+    edges : edges
+        Edges can be a pair of endpoint nodes (u, v), or a
+        tensor of edge ids. The default value is all the edges.
+
+    Returns
+    -------
+    A tuple of (u, v, eid)
+    """
+    pass

@@ -120,6 +120,12 @@ def get_context(x):
         return TVMContext(
                 TVMContext.STR2MASK[x.context.device_type], x.context.device_id)
 
+def convert_to(src, dst):
+    '''
+    Convert src to the same dtype and context as dst
+    '''
+    return src.copyto(dst.context).astype(dst.dtype)
+
 def _typestr(arr_dtype):
     return arr_dtype
 
