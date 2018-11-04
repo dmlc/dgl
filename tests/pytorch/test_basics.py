@@ -168,17 +168,17 @@ def test_batch_recv():
     assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     reduce_msg_shapes.clear()
 
-def test_update_edges():
+def test_apply_edges():
     def _upd(edges):
         return {'w' : edges.data['w'] * 2}
     g = generate_graph()
-    g.register_edge_func(_upd)
+    g.register_apply_edge_func(_upd)
     old = g.edata['w']
-    g.update_edges()
+    g.apply_edges()
     assert th.allclose(old * 2, g.edata['w'])
     u = th.tensor([0, 0, 0, 4, 5, 6])
     v = th.tensor([1, 2, 3, 9, 9, 9])
-    g.update_edges((u, v), lambda edges : {'w' : edges.data['w'] * 0.})
+    g.apply_edges(lambda edges : {'w' : edges.data['w'] * 0.}, (u, v))
     eid = g.edge_ids(u, v)
     assert th.allclose(g.edata['w'][eid], th.zeros((6, D)))
 
@@ -392,7 +392,7 @@ if __name__ == '__main__':
     test_batch_setter_autograd()
     test_batch_send()
     test_batch_recv()
-    test_update_edges()
+    test_apply_edges()
     test_update_routines()
     test_reduce_0deg()
     test_pull_0deg()
