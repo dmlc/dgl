@@ -163,16 +163,30 @@ class SPMVExecutor(Executor):
             pass
 
 # Two UDF executors
-class NodeExecutor(Executor):
-    pass
+class NodeExecutor(Executor): # change my name
+    def __init__(self, udf):
+        self._udf = udf
 
 class EdgeExecutor(Executor):
-    pass
+    def __init__(self, udf):
+        pass
+
+    def set_node_input(self, node_frame, src_ids, edge_ids): # take in two ids
+        pass
+
+    def set_edge_input(self, edge_frame, ids):
+        pass
+
+    def set_edge_output(self, edge_frame, ids):
+        pass
 
 class GraphData(object):
     """A component that stores the sparse matrices computed from graphs."""
     def __getitem__(self, key):
         # TODO(minjie):
+        pass
+
+    def __setitem__(self, key, value):
         pass
 
 class ExecutionPlan(object):
