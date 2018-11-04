@@ -242,8 +242,7 @@ def build_relabel_map(x):
     unique_x, _ = F.sort_1d(F.unique(x))
     map_len = int(F.max(unique_x, dim=0)) + 1
     old_to_new = F.zeros(map_len, dtype=F.int64)
-    # FIXME(minjie): should not directly use []
-    old_to_new[unique_x] = F.arange(0, len(unique_x))
+    F.scatter_row_inplace(old_to_new, unique_x, F.arange(0, len(unique_x)))
     return unique_x, old_to_new
 
 def build_relabel_dict(x):

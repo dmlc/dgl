@@ -108,9 +108,10 @@ class Column(object):
         else:
             if isinstance(idx, slice):
                 # for contiguous indices pack is usually faster than scatter row
-                # FIXME(minjie): do not use [] operator directly
-                self.data = F.cat([self.data[:idx.start], feats, self.data[idx.stop:]],
-                                  dim = 0)
+                part1 = F.narrow_row(self.data, 0, idx.start)
+                part2 = feats
+                part3 = F.narrow_row(self.data, idx.stop, len(self))
+                self.data = F.cat([part1, part2, part3], dim=0)
             else:
                 self.data = F.scatter_row(self.data, idx, feats)
 

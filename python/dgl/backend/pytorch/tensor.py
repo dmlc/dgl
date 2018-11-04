@@ -72,8 +72,7 @@ def gather_row(data, row_index):
     return th.index_select(data, 0, row_index)
 
 def narrow_row(x, start, stop):
-    length = stop - start
-    return x.narrow(0, start, length)
+    return x[start:stop]
 
 def scatter_row(data, row_index, value):
     return data.index_copy(0, row_index, value)
