@@ -18,8 +18,7 @@ typedef uint64_t dgl_id_t;
 typedef tvm::runtime::NDArray IdArray;
 typedef tvm::runtime::NDArray DegreeArray;
 typedef tvm::runtime::NDArray BoolArray;
-
-typedef std::vector<dgl_id_t> IdVector;
+typedef tvm::runtime::NDArray IntArray;
 
 class Graph;
 class GraphOp;
@@ -304,15 +303,6 @@ class Graph {
    * \return the reversed graph
    */
   Graph Reverse() const;
-
-  /*!
-   * \brief Produce nodes in a breadth-first-search (BFS) order.
-   *
-   * \param source Source nodes.
-   * \param out Whether to follow incoming or outgoing edges.
-   * \return Nodes organized into BFS layers.
-   */
-  std::pair<IdArray, IdArray> BFS(IdArray source, bool out) const;
 
   /*!
    * \brief Produce edges in a depth-first-search (DFS) order labeled by type.
