@@ -90,7 +90,7 @@ class DGLSubGraph(DGLGraph):
         Tensor
             The parent edge id array.
         """
-        return self._parent_eid.tousertensor()
+        return self._parent_eid().tousertensor()
 
     def copy_to_parent(self, inplace=False):
         """Write node/edge features to the parent graph.
@@ -102,8 +102,9 @@ class DGLSubGraph(DGLGraph):
         """
         self._parent._node_frame.update_rows(
                 self._parent_nid, self._node_frame, inplace=inplace)
-        self._parent._edge_frame.update_rows(
-                self._parent_eid, self._edge_frame, inplace=inplace)
+        if self._parent._edge_frame.num_rows != 0:
+            self._parent._edge_frame.update_rows(
+                    self._parent_eid(), self._edge_frame, inplace=inplace)
 
     def copy_from_parent(self):
         """Copy node/edge features from the parent graph.
@@ -115,7 +116,7 @@ class DGLSubGraph(DGLGraph):
                 self._parent._node_frame[self._parent_nid]))
         if self._parent._edge_frame.num_rows != 0:
             self._edge_frame = FrameRef(Frame(
-                self._parent._edge_frame[self._parent_eid]))
+                self._parent._edge_frame[self._parent_eid()]))
 
     def map_to_subgraph_nid(self, parent_vids):
         return map_to_subgraph_nid(self._graph, utils.toindex(parent_vids))

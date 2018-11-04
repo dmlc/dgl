@@ -422,9 +422,7 @@ class ImmutableGraphIndex(object):
         """
         v = v.tousertensor()
         gi, induced_n, induced_e = self._sparse.node_subgraph(v)
-        induced_nodes = utils.toindex(induced_n)
-        induced_edges = utils.toindex(induced_e)
-        return ImmutableSubgraphIndex(gi, self, induced_nodes, induced_edges)
+        return ImmutableSubgraphIndex(gi, self, induced_n, induced_e)
 
     def node_subgraphs(self, vs_arr):
         """Return the induced node subgraphs.
@@ -441,8 +439,6 @@ class ImmutableGraphIndex(object):
         """
         vs_arr = [v.tousertensor() for v in vs_arr]
         gis, induced_nodes, induced_edges = self._sparse.node_subgraphs(vs_arr)
-        induced_nodes = [utils.toindex(v) for v in induced_nodes]
-        induced_edges = [utils.toindex(e) for e in induced_edges]
         return [ImmutableSubgraphIndex(gi, self, induced_n,
             induced_e) for gi, induced_n, induced_e in zip(gis, induced_nodes, induced_edges)]
 
@@ -569,11 +565,11 @@ class ImmutableSubgraphIndex(ImmutableGraphIndex):
 
     @property
     def induced_edges(self):
-        return self._induced_edges
+        return lambda: utils.toindex(self._induced_edges())
 
     @property
     def induced_nodes(self):
-        return self._induced_nodes
+        return utils.toindex(self._induced_nodes)
 
 def create_immutable_graph_index(graph_data=None):
     """Create a graph index object.

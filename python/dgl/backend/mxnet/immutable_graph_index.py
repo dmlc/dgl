@@ -233,7 +233,7 @@ class ImmutableGraphIndex(object):
         # stores the edge Ids of the original graph.
         csr = mx.nd.contrib.dgl_subgraph(self._in_csr, v, return_mapping=True)
         induced_nodes = v
-        induced_edges = csr[1].data
+        induced_edges = lambda: csr[1].data
         return ImmutableGraphIndex(csr[0], None), induced_nodes, induced_edges
 
     def node_subgraphs(self, vs_arr):
@@ -257,7 +257,7 @@ class ImmutableGraphIndex(object):
         res = mx.nd.contrib.dgl_subgraph(self._in_csr, *vs_arr, return_mapping=True)
         in_csrs = res[0:len(vs_arr)]
         induced_nodes = vs_arr
-        induced_edges = [e.data for e in res[len(vs_arr):]]
+        induced_edges = [lambda: e.data for e in res[len(vs_arr):]]
         assert len(in_csrs) == len(induced_nodes)
         assert len(in_csrs) == len(induced_edges)
         gis = []
