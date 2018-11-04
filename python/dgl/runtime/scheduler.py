@@ -16,6 +16,18 @@ __all__ = []
 
 # XXX: multi-edge?
 
+def get_edge_idx(g, u, v, eid=None):
+    if is_all(u) and is_all(v) and eid is None:
+        u, v, eid = g._graph.edges()
+    elif eid is not None:
+        eid = utils.toindex(eid)
+        u, v, _ = g._graph.find_edges(eid)
+    else:
+        u = utils.toindex(u)
+        v = utils.toindex(v)
+        u, v, eid = self._graph.edge_ids(u, v)
+    return u, v, eid
+
 def get_send_plan(graph, message_func):
     # TODO (lingfan): doc string
     pass
@@ -28,9 +40,48 @@ def get_update_all_plan(graph, message_func, reduce_func):
     # TODO (lingfan): doc string
     pass
 
-def get_send_and_recv_plan(graph, edges, message_func, reduce_func):
+def get_send_and_recv_schedule(graph, u, v, message_func, reduce_func, eid=None):
     # TODO (lingfan): doc string
-    pass
+    u, v, eid = get_edge_idx(g, u, v, eid)
+
+    mfunc, v2v_spmv, e2v_spmv, to_deg_bucket = _get_multi_stage_plan(message_func, reduce_func)
+
+    # adjmat kv store
+    graph_data = GraphData()
+    exec_plan = ExecutionPlan()
+    node_frame = graph._node_frame
+    edge_frame = graph._edge_frame
+    message_frame = FrameRef()
+
+    # send
+    if mfunc:
+        send_exe = _build_send_executor(graph, mfunc, node_frame, edge_frame, message_frame, u, v, eid):
+        exec_plan.add_stage([send_exe])
+
+    recv_exes = []
+    spmv_out_frame = FrameRef()
+
+    # fused spmv
+    if v2v_spmv:
+        key = _build_adj_matrix(g, call_type, graph_data, edges=edges)
+        for mfn, rfn in v2v_spmv:
+            exe = _build_adj_spmv_exec(graph_data, key, mfn, rfn, node_frame, edge_frame, spmv_out_frame)
+            recv_exes.append(exe)
+
+    # incidence matrix spmv
+    if e2v_spmv:
+        key = _build_incidence_matrix(g, call_type, graph_data, **kwargs)
+        for rfn in e2v_spmv:
+            exe = _build_incidence_spmv_exec(graph_data, key, rfn, message_frame, spmv_out_frame)
+            reduce_execs.append(exe)
+
+    # degree bucketing
+    if to_deg_bucket:
+        exec_list = _build_degree_bucketing_executors(g, call_type, node_frame, message_frame)
+        recv_exes.extend(exec_list)
+
+    exec_plan.add_stage(recv_exes)
+    return exec_plan
 
 def get_push_plan(graph, u, message_func, reduce_func):
     # TODO (lingfan): doc string
@@ -44,11 +95,79 @@ def get_update_edge_plan(graph, eids):
     # TODO (lingfan): doc string
     pass
 
-def generate_degree_bucketing_executors():
-    pass
+def _build_adj_spmv_exec(graph_data, key, mfunc, rfunc, node_frame, edge_frame, out_frame):
+    if isinstance(mfunc, fmsg.SrcMulEdgeMessageFunction):
+        return _build_spmv_executors(graph_data=graph_data,
+                                     key=key,
+                                     src_field=mfunc.src_field,
+                                     src_frame=node_frame,
+                                     out_field=rfunc.out_field,
+                                     out_frame=out_frame,
+                                     use_edge_feat=True,
+                                     edge_field=mfunc.edge_field,
+                                     edge_frame=edge_frame)
+    else:
+        return _build_spmv_executors(graph_data=graph_data,
+                                     key=key,
+                                     src_field=mfunc.src_field,
+                                     src_frame=node_frame,
+                                     out_field=rfunc.out_field,
+                                     out_frame=out_frame,
+                                     use_edge_feat=False)
 
-def generate_spmv_executors():
-    pass
+def _build_incidence_spmv_exec(graph_data, key, rfunc, message_frame, out_frame):
+    return _build_spmv_executors(graph_data=graph_data,
+                                 key=key,
+                                 src_field=rfunc.msg_field,
+                                 src_frame=message_frame,
+                                 out_field=rfunc.out_field,
+                                 out_frame=out_frame,
+                                 use_edge_feat=False)
+
+def _build_spmv_executors(graph_data, key, src_field, src_frame, out_field, out_frame, use_edge_feat=False, edge_field=None, edge_frame=None):
+    exe = SPMVExecutor(graph_data, use_edge_feat)
+    exe.set_graph_key(key)
+    exe.set_node_input(src_frame, fields=src_field)
+    if use_edge_feat:
+        exe.set_edge_input(edge_frame, fields=edge_field)
+    exe.set_node_output(out_frame, fields=rfn.out_field)
+    return exe
+
+def _build_edge_executors(g, mfunc, node_frame, edge_frame, out_frame, u, v, eid=None):
+    exe = EdgeExecutor(mfunc)
+    exe.set_node_input(node_frame, u, v)
+    exe.set_edge_input(edge_frame, eid)
+    exe.set_edge_output(out_frame)
+    return exe
+
+def _build_degree_bucketing_executors(g, call_type, rfunc, node_frame, message_frame, v=None, edges=None):
+    exec_list = []
+    if len(rfunc) == 1:
+        rfunc = rfunc[0]
+    else:
+        rfunc = fred.BundledMessageFunction(rfunc)
+
+    # get degree bucketing schedule
+    if call_type == "send_and_recv":
+        v = edges[1]
+        uniq_v, degs, dsts, msg_ids = degree_bucketing_for_edges(v)
+    elif call_type == "update_all":
+        uniq_v, degs, dsts, msg_ids = degree_bucketing_for_graph(g._graph)
+    elif call_type == "recv":
+        unqi_v, degs, dsts, msg_ids = degree_bucketing_for_graph(g._msg_graph, v)
+    else:
+        raise DGLError("Unsupported call type for degree bucketing: %s" % call_type)
+
+    # TODO(lingfan): check zero degree in C++
+
+    # create UDF node executor
+    for deg, vv, mid in zip(degs, dsts, msg_ids):
+        exe = NodeExecutor(rfunc)
+        exe.set_node_input(node_frame, ids=vv)
+        exe.set_edge_input(message_frame, ids=mid)
+        exe.set_node_output(FrameRef(), ids=vv)
+        exec_list.append(exe)
+    return exec_list
 
 def _build_adj_matrix(g, call_type, graph_data, **kwargs):
     key = "adj_" + call_type
@@ -231,24 +350,8 @@ def _get_exec_plan(g, call_type, mfunc=None, rfunc=None, **kwargs):
 
     # degree bucketing
     if to_deg_bucket:
-        if len(to_deg_bucket) == 1:
-            rfunc = to_deg_bucket[0]
-        else:
-            rfunc = fred.BundledMessageFunction(to_deg_bucket)
+        _build_degree_bucketing_executors(exec_list, g, call_type, node_frame, edge_frame)
 
-        # get degree bucketing schedule
-        if call_type == "send_and_recv":
-            v = kwargs['edges'][1]
-            uniq_v, degs, dsts, msg_ids = degree_bucketing_for_edges(v)
-        elif call_type == "update_all":
-            uniq_v, degs, dsts, msg_ids = degree_bucketing_for_graph(g._graph)
-        elif call_type == "recv":
-            v = kwargs['v']
-            unqi_v, degs, dsts, msg_ids = degree_bucketing_for_graph(g._msg_graph, v)
-        else:
-            raise DGLError("Unsupported call type for degree bucketing: %s" % call_type)
-        # TODO(lingfan): check zero degree
-        # TODO(lingfan): create UDF executor
 
 
     # TODO(lingfan): create merge executor when adding stage
@@ -275,8 +378,8 @@ def _sanity_check_on_rfunc(rfunc):
         return None
 
 """
-Generate exec plan for API that involves both message and reduce func
-This function return four components:
+Generate exec plan for API that involves only reduce func
+This function return two components:
     1. reduce func for Edge-to-Node space SPMV
     2. reduce func for degree bucketing
 Note: each component is either a list or None
