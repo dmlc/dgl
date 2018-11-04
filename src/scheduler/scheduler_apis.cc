@@ -30,7 +30,8 @@ TVM_REGISTER_GLOBAL("scheduler._CAPI_DGLDegreeBucketingForRecvNodes")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
-    const auto& edges = gptr->Edges(false);
+    const IdArray vids = IdArray::FromDLPack(CreateTempDLManagedTensor(args[1]));
+    const auto& edges = gptr->InEdges(vids);
     *rv = ConvertNDArrayVectorToPackedFunc(sched::DegreeBucketing(edges.id, edges.dst));
   });
 
