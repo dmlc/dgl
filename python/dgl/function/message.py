@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 import operator
 import dgl.backend as F
+from .base import create_bundled_function_class
 
 __all__ = ["src_mul_edge", "copy_src", "copy_edge"]
 
@@ -26,27 +27,8 @@ class MessageFunction(object):
         raise NotImplementedError
 
 
-class BundledMessageFunction(MessageFunction):
-    def __init__(self, fn_list):
-        if not isinstance(fn_list, (list, tuple)):
-            fn_list = [fn_list]
-        self.fn_list = fn_list
-
-    def is_spmv_supported(self, g):
-        for fn in self.fn_list:
-            if not isinstance(fn, MessageFunction) or not fn.is_spmv_supported(g):
-                return False
-        return True
-
-    def __call__(self, edges):
-        ret = dict()
-        for fn in self.fn_list:
-            msg = fn(edges)
-            ret.update(msg)
-        return ret
-
-    def name(self):
-        return "bundled"
+BundledMessageFunction = create_bundled_function_class(
+        'BundledMessageFunction', MessageFunction)
 
 
 def _is_spmv_supported_node_feat(g, field):
