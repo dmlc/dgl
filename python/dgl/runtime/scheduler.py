@@ -7,6 +7,7 @@ from .. import backend as F
 from ..function import message as fmsg
 from ..function import reducer as fred
 from .executor import *
+from .frame import FrameRef
 
 from .._fi.function import _init_api
 
@@ -144,7 +145,7 @@ def _process_buckets(buckets):
 
     return unique_v, degs, dsts, msg_ids
 
-def degree_bucketing_for_edges(dst):
+def _degree_bucketing_for_edges(dst):
     """Return the bucketing by degree scheduling for destination nodes of messages
 
     Parameters
@@ -187,7 +188,7 @@ def _get_exec_plan(g, call_type, mfunc=None, rfunc=None, **kwargs):
     else:
         mfunc, v2v_spmv, e2v_spmv, to_deg_bucket = _get_multi_stage_plan(mfunc, rfunc)
 
-    graph_data = {}
+    graph_data = GraphData()
 
     exec_plan = ExecutionPlan()
 
@@ -200,19 +201,33 @@ def _get_exec_plan(g, call_type, mfunc=None, rfunc=None, **kwargs):
         # FIXME(lingfan): create send executor
         exec_plan.add_stage()
 
+    reduce_execs = []
+    node_frame = _get_node_repr()
+    edge_frame = _get_edge_repr()
+    spmv_out = FrameRef()
+    deg_bucket_out = []
+
     # fused spmv
     if v2v_spmv:
         key = _build_adj_matrix(g, call_type, graph_data, **kwargs)
         for mfn, rfn in v2v_spmv:
             # TODO(lingfan): create spmv executor using adjmat
-            pass
+            exe = SPMVExecutor(graph_data)
+            exe.set_graph_key(key)
+            exe.set_node_input(node_frame, fields=mfn.src_field)
+            exe.set_node_output(out_node, fields=rfn.out_field)
+            reduce_execs.append(exe)
 
     # incidence matrix spmv
     if e2v_spmv:
         key = _build_incidence_matrix(g, call_type, graph_data, **kwargs)
         for rfn in e2v_spmv:
             # TODO(lingfan): create spmv executor using incidence mat
-            pass
+            exe = SPMVExecutor(graph_data)
+            exe.set_graph_key(key)
+            exe.set_node_input(node_frame, fields=mfn.src_field)
+            exe.set_node_output(out_node, fields=rfn.out_field)
+            reduce_execs.append(exe)
 
     # degree bucketing
     if to_deg_bucket:
@@ -224,15 +239,17 @@ def _get_exec_plan(g, call_type, mfunc=None, rfunc=None, **kwargs):
         # get degree bucketing schedule
         if call_type == "send_and_recv":
             v = kwargs['edges'][1]
-            uniq_v, degs, dsts, msg_ids = degree_bucketing_with_dest(v)
+            uniq_v, degs, dsts, msg_ids = degree_bucketing_for_edges(v)
         elif call_type == "update_all":
-            uniq_v, degs, dsts, msg_ids = degree_bucketing_with_graph(g._graph)
+            uniq_v, degs, dsts, msg_ids = degree_bucketing_for_graph(g._graph)
         elif call_type == "recv":
             v = kwargs['v']
-            unqi_v, degs, dsts, msg_ids = degree_bucketing_with_graph(g._msg_graph, v)
+            unqi_v, degs, dsts, msg_ids = degree_bucketing_for_graph(g._msg_graph, v)
         else:
             raise DGLError("Unsupported call type for degree bucketing: %s" % call_type)
+        # TODO(lingfan): check zero degree
         # TODO(lingfan): create UDF executor
+
 
     # TODO(lingfan): create merge executor when adding stage
 
