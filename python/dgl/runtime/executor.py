@@ -17,7 +17,7 @@ class Executor(object):
     graph_data : GraphData
         A key-value store of graph structure data (e.g. adjmat index, incmat index)
     """
-    def __init__(self, graph_data):
+    def __init__(self, graph_data): # XXX: udf does not need graph_data
         self._graph_data = graph_data
         self._graph_key = None
         self._node_input = None
@@ -151,6 +151,24 @@ class Executor(object):
         """
         raise RuntimeError('The "run" method is not implemented by subclass.')
 
+class SPMVExecutor(Executor):
+    def __init__(self, graph_data, use_edge_feat=False):
+        pass
+
+    def run(self):
+        # check context of node/edge data
+        # adjmat = self.data_store[self.key].get(ctx)
+        if self.use_edge_feat:
+            # create adjmat using edge frame and edge field
+            pass
+
+# Two UDF executors
+class NodeExecutor(Executor):
+    pass
+
+class EdgeExecutor(Executor):
+    pass
+
 class GraphData(object):
     """A component that stores the sparse matrices computed from graphs."""
     def __getitem__(self, key):
@@ -159,15 +177,16 @@ class GraphData(object):
 
 class ExecutionPlan(object):
     """The class to represent execution plan.
-    
+
     The execution plan contains multiple stages. Each stage contains multiple executors
     that computes different feature data. The output of these executors will be merged
     by a merge-n-apply operation before passed to the next stage.
     """
     def __init__(self):
         self._executors = []
-        
+
     def add_stage(self, execs, apply_node_func, apply_edge_func):
+        # XXX: apply_edge_func not needed
         """Add one stage to the plan.
 
         Parameters
@@ -184,4 +203,18 @@ class ExecutionPlan(object):
 
 class MergeAndApplyExecutor(Executor):
     # TODO(minjie)
+
+    # Things to be covered in merge
+    # 1. Merge node dim: (Does runtime has enough info to find out how to merge?)
+    #   a) if deg bucketing, check zero degree
+    #   b) for both spmv and deg bucketing, if destination is a subset of nodes, get
+    #      other nodes not in recv nodes for outputting a full frame
+    # 2. Merge field dimension
+
+    # If apply_func is removed from recv, then ignore the following:
+    # Otherwise, apply_nodes should be happening half way during merge
+    # You should:
+    # 1. Merge all received nodes (send_and_recv and recv case)
+    # 2. perform apply
+    # 3. Incorporate nodes that not received to form a full frame
     pass
