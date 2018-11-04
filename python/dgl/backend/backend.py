@@ -162,6 +162,21 @@ def dtype(input):
     """
     pass
 
+def ndim(input):
+    """Return the number of dimensions of the tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+
+    Returns
+    -------
+    int
+        The number of dimensions
+    """
+    pass
+
 def context(input):
     """Return the context/device of the input tensor.
 

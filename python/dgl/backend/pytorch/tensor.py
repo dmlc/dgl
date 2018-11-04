@@ -37,6 +37,9 @@ def shape(input):
 def dtype(input):
     return input.dtype
 
+def ndim(input):
+    return input.dim()
+
 def context(input):
     return input.device
 

@@ -49,6 +49,9 @@ def dtype(input):
     # NOTE: the input cannot be a symbol
     return input.dtype
 
+def ndim(input):
+    return input.ndim
+
 def context(input):
     return input.context
 
