@@ -74,6 +74,37 @@ def tensor(data, dtype=None):
     """
     pass
 
+def sparse_matrix(data, index, shape, force_format=False):
+    """Create a sparse matrix.
+
+    Parameters
+    ----------
+    data : Tensor
+        Data tensor. It should be of shape (nnz,).
+    index : tuple
+        This is used to support different sparse formats.
+        For COO format:
+          index=('coo', coord), where coord is of shape (2, nnz).
+          coord[0,:] should be the row index and coord[1,:] should be
+          the column index.
+        For CSR format:
+          index=('csr', indices, indptr), where indices is of shape (nnz,)
+          and indptr is of shape (nrows+1,). See ``scipy.sparse.csr_matrix``
+          for more documents on what each array means.
+    shape : tuple of int
+        The shape.
+    force_format : bool
+        If true, the returned sparse matrix must be stored in the same
+        format as the given index.
+
+    Returns
+    -------
+    SparseMatrix
+        The framework-specific sparse matrix. It can be stored in any format
+        unless force_format is True.
+    """
+    pass
+
 def coo_matrix(idx, dat, shape):
     """Create a sparse matrix in COO format.
 
