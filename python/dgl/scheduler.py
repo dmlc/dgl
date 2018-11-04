@@ -5,10 +5,11 @@ import numpy as np
 
 from .base import ALL, DGLError
 from . import backend as F
+from collections import defaultdict as ddict
 from .function import message as fmsg
 from .function import reducer as fred
+from .udf import NodeBatch, EdgeBatch
 from . import utils
-from collections import defaultdict as ddict
 
 from ._ffi.function import _init_api
 
@@ -176,7 +177,7 @@ class DegreeBucketingExecutor(Executor):
         # loop over each bucket
         # FIXME (lingfan): handle zero-degree case
         for deg, vv, msg_id in zip(self.degrees, self.dsts, self.msg_ids):
-            dst_reprs = self.g.get_n_repr(vv)
+            v_data = self.g.get_n_repr(vv)
             in_msgs = self.msg_frame.select_rows(msg_id)
             def _reshape_fn(msg):
                 msg_shape = F.shape(msg)
@@ -184,7 +185,8 @@ class DegreeBucketingExecutor(Executor):
                 return F.reshape(msg, new_shape)
             reshaped_in_msgs = utils.LazyDict(
                     lambda key: _reshape_fn(in_msgs[key]), self.msg_frame.schemes)
-            new_reprs.append(self.rfunc(dst_reprs, reshaped_in_msgs))
+            nb = NodeBatch(self.g, vv, v_data, reshaped_in_msgs)
+            new_reprs.append(self.rfunc(nb))
 
         # Pack all reducer results together
         keys = new_reprs[0].keys()
@@ -320,7 +322,7 @@ class SendRecvExecutor(BasicExecutor):
     @property
     def edge_repr(self):
         if self._edge_repr is None:
-            self._edge_repr = self.g.get_e_repr(self.u, self.v)
+            self._edge_repr = self.g.get_e_repr((self.u, self.v))
         return self._edge_repr
 
     def _build_adjmat(self):
@@ -432,9 +434,12 @@ def _create_send_and_recv_exec(graph, **kwargs):
     dst = kwargs.pop('dst')
     mfunc = kwargs.pop('message_func')
     rfunc = kwargs.pop('reduce_func')
-    if isinstance(mfunc, (list, tuple)) or isinstance(rfunc, (list, tuple)):
-        mfunc = fmsg.BundledMessageFunction(mfunc)
-        rfunc = fred.BundledReduceFunction(rfunc)
+    if (isinstance(mfunc, fmsg.BundledMessageFunction)
+            or isinstance(rfunc, fred.BundledReduceFunction)):
+        if not isinstance(mfunc, fmsg.BundledMessageFunction):
+            mfunc = fmsg.BundledMessageFunction(mfunc)
+        if not isinstance(rfunc, fred.BundledReduceFunction):
+            rfunc = fred.BundledReduceFunction(rfunc)
         exec_cls = BundledSendRecvExecutor
     else:
         exec_cls = SendRecvExecutor

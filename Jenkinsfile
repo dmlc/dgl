@@ -17,7 +17,7 @@ def build_dgl() {
     }
     dir ('build') {
         sh 'cmake ..'
-        sh 'make -j$(nproc)'
+        sh 'make -j4'
     }
 }
 

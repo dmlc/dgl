@@ -14,24 +14,22 @@ import torch.nn.functional as F
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 
-def gcn_msg(src, edge):
-    return {'m' : src['h']}
+def gcn_msg(edges):
+    return {'m' : edges.src['h']}
 
-def gcn_reduce(node, msgs):
-    return {'h' : torch.sum(msgs['m'], 1)}
+def gcn_reduce(nodes):
+    return {'h' : torch.sum(nodes.mailbox['m'], 1)}
 
 class NodeApplyModule(nn.Module):
     def __init__(self, in_feats, out_feats, activation=None):
         super(NodeApplyModule, self).__init__()
-
         self.linear = nn.Linear(in_feats, out_feats)
         self.activation = activation
 
-    def forward(self, node):
-        h = self.linear(node['h'])
+    def forward(self, nodes):
+        h = self.linear(nodes.data['h'])
         if self.activation:
             h = self.activation(h)
-
         return {'h' : h}
 
 class GCN(nn.Module):
@@ -62,15 +60,15 @@ class GCN(nn.Module):
         self.layers.append(NodeApplyModule(n_hidden, n_classes))
 
     def forward(self, features):
-        self.g.set_n_repr({'h' : features})
+        self.g.ndata['h'] = features
 
         for layer in self.layers:
             # apply dropout
             if self.dropout:
                 self.g.apply_nodes(apply_node_func=
-                               lambda node: {'h': self.dropout(node['h'])})
+                               lambda nodes: {'h': self.dropout(nodes.data['h'])})
             self.g.update_all(gcn_msg, gcn_reduce, layer)
-        return self.g.pop_n_repr('h')
+        return self.g.ndata.pop('h')
 
 def main(args):
     # load and preprocess dataset

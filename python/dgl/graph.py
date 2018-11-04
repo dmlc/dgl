@@ -1,4 +1,4 @@
-"""Base graph class specialized for neural networks on graphs.
+g""Base graph class specialized for neural networks on graphs.
 """
 from __future__ import absolute_import
 
@@ -9,14 +9,16 @@ import dgl
 from .base import ALL, is_all, DGLError, dgl_warning
 from . import backend as F
 from .backend import Tensor
-from .frame import FrameRef, merge_frames
+from .frame import FrameRef, Frame, merge_frames
 from .function.message import BundledMessageFunction
 from .function.reducer import BundledReduceFunction
 from .graph_index import GraphIndex, create_graph_index
 from . import scheduler
+from .udf import NodeBatch, EdgeBatch
 from . import utils
+from .view import NodeView, EdgeView
 
-__all__ = ['DLGraph']
+__all__ = ['DGLGraph']
 
 class DGLGraph(object):
     """Base graph class specialized for neural networks on graphs.
@@ -60,7 +62,6 @@ class DGLGraph(object):
         # registered functions
         self._message_func = None
         self._reduce_func = None
-        self._edge_func = None
         self._apply_node_func = None
         self._apply_edge_func = None
 
@@ -79,6 +80,10 @@ class DGLGraph(object):
         #TODO(minjie): change frames
         assert reprs is None
 
+        # Initialize feature placeholders if there are features existing
+        if self._node_frame.num_columns > 0 and self._node_frame.num_rows > 0:
+            self._node_frame.add_rows(num)
+
     def add_edge(self, u, v, reprs=None):
         """Add one edge.
 
@@ -94,6 +99,10 @@ class DGLGraph(object):
         self._graph.add_edge(u, v)
         #TODO(minjie): change frames
         assert reprs is None
+
+        # Initialize feature placeholders if there are features existing
+        if self._edge_frame.num_columns > 0 and self._edge_frame.num_rows > 0:
+            self._edge_frame.add_rows(1)
 
     def add_edges(self, u, v, reprs=None):
         """Add many edges.
@@ -112,6 +121,10 @@ class DGLGraph(object):
         self._graph.add_edges(u, v)
         #TODO(minjie): change frames
         assert reprs is None
+
+        # Initialize feature placeholders if there are features existing
+        if self._edge_frame.num_columns > 0 and self._edge_frame.num_rows > 0:
+            self._edge_frame.add_rows(len(u))
 
     def clear(self):
         """Clear the graph and its storage."""
@@ -315,67 +328,111 @@ class DGLGraph(object):
         else:
             return eid.tousertensor()
 
-    def in_edges(self, v):
+    def find_edges(self, eid):
+        """Given the edge ids, return their source and destination node ids.
+
+        Parameters
+        ----------
+        eid : list, tensor
+            The edge ids.
+
+        Returns
+        -------
+        tensor, tensor
+        The source and destination node IDs.
+        """
+        eid = utils.toindex(u)
+        src, dst, _ = self._graph.find_edges(eid)
+        return src.tousertensor(), dst.tousertensor()
+
+    def in_edges(self, v, form='uv'):
         """Return the in edges of the node(s).
 
         Parameters
         ----------
         v : int, list, tensor
             The node(s).
+        form : str, optional
+            The return form. Currently support:
+            - 'all' : a tuple (u, v, eid)
+            - 'uv'  : a pair (u, v), default
+            - 'eid' : one eid tensor
 
         Returns
         -------
-        tensor
-            The src nodes.
-        tensor
-            The dst nodes.
-        tensor
-            The edge ids.
+        A tuple of Tensors (u, v, eid) if form == 'all'
+        A pair of Tensors (u, v) if form == 'uv'
+        One Tensor if form == 'eid'
         """
         v = utils.toindex(v)
         src, dst, eid = self._graph.in_edges(v)
-        return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
+        if form == 'all':
+            return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
+        elif form == 'uv':
+            return (src.tousertensor(), dst.tousertensor())
+        elif form == 'eid':
+            return eid.tousertensor()
+        else:
+            raise DGLError('Invalid form:', form)
 
-    def out_edges(self, v):
+    def out_edges(self, v, form='uv'):
         """Return the out edges of the node(s).
 
         Parameters
         ----------
         v : int, list, tensor
             The node(s).
+        form : str, optional
+            The return form. Currently support:
+            - 'all' : a tuple (u, v, eid)
+            - 'uv'  : a pair (u, v), default
+            - 'eid' : one eid tensor
 
         Returns
         -------
-        tensor
-            The src nodes.
-        tensor
-            The dst nodes.
-        tensor
-            The edge ids.
+        A tuple of Tensors (u, v, eid) if form == 'all'
+        A pair of Tensors (u, v) if form == 'uv'
+        One Tensor if form == 'eid'
         """
         v = utils.toindex(v)
         src, dst, eid = self._graph.out_edges(v)
-        return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
+        if form == 'all':
+            return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
+        elif form == 'uv':
+            return (src.tousertensor(), dst.tousertensor())
+        elif form == 'eid':
+            return eid.tousertensor()
+        else:
+            raise DGLError('Invalid form:', form)
 
-    def edges(self, sorted=False):
+    def all_edges(self, form='uv', sorted=False):
         """Return all the edges.
 
         Parameters
         ----------
+        form : str, optional
+            The return form. Currently support:
+            - 'all' : a tuple (u, v, eid)
+            - 'uv'  : a pair (u, v), default
+            - 'eid' : one eid tensor
         sorted : bool
             True if the returned edges are sorted by their src and dst ids.
 
         Returns
         -------
-        tensor
-            The src nodes.
-        tensor
-            The dst nodes.
-        tensor
-            The edge ids.
+        A tuple of Tensors (u, v, eid) if form == 'all'
+        A pair of Tensors (u, v) if form == 'uv'
+        One Tensor if form == 'eid'
         """
         src, dst, eid = self._graph.edges(sorted)
-        return src.tousertensor(), dst.tousertensor(), eid.tousertensor()
+        if form == 'all':
+            return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
+        elif form == 'uv':
+            return (src.tousertensor(), dst.tousertensor())
+        elif form == 'eid':
+            return eid.tousertensor()
+        else:
+            raise DGLError('Invalid form:', form)
 
     def in_degree(self, v):
         """Return the in degree of the node.
@@ -405,6 +462,7 @@ class DGLGraph(object):
         tensor
             The in degree array.
         """
+        v = utils.toindex(v)
         return self._graph.in_degrees(v).tousertensor()
 
     def out_degree(self, v):
@@ -435,6 +493,7 @@ class DGLGraph(object):
         tensor
             The out degree array.
         """
+        v = utils.toindex(v)
         return self._graph.out_degrees(v).tousertensor()
 
     def to_networkx(self, node_attrs=None, edge_attrs=None):
@@ -556,6 +615,26 @@ class DGLGraph(object):
         """
         self._edge_frame.set_initializer(initializer)
 
+    @property
+    def nodes(self):
+        """Return a node view that can used to set/get feature data."""
+        return NodeView(self)
+
+    @property
+    def ndata(self):
+        """Return the data view of all the nodes."""
+        return self.nodes[:].data
+
+    @property
+    def edges(self):
+        """Return a edges view that can used to set/get feature data."""
+        return EdgeView(self)
+
+    @property
+    def edata(self):
+        """Return the data view of all the edges."""
+        return self.edges[:].data
+
     def set_n_repr(self, hu, u=ALL, inplace=False):
         """Set node(s) representation.
 
@@ -635,7 +714,7 @@ class DGLGraph(object):
         """
         return self._node_frame.pop(key)
 
-    def set_e_repr(self, he, u=ALL, v=ALL, inplace=False):
+    def set_e_repr(self, he, edges=ALL, inplace=False):
         """Set edge(s) representation.
 
         `he` is a dictionary from the feature name to feature tensor. Each tensor
@@ -648,52 +727,30 @@ class DGLGraph(object):
         Parameters
         ----------
         he : tensor or dict of tensor
-          Edge representation.
-        u : node, container or tensor
-          The source node(s).
-        v : node, container or tensor
-          The destination node(s).
+            Edge representation.
+        edges : edges
+            Edges can be a pair of endpoint nodes (u, v), or a
+            tensor of edge ids. The default value is all the edges.
         inplace : bool
             True if the update is done inplacely
         """
-        # sanity check
-        if not utils.is_dict_like(he):
-            raise DGLError('Expect dictionary type for feature data.'
-                           ' Got "%s" instead.' % type(he))
-        u_is_all = is_all(u)
-        v_is_all = is_all(v)
-        assert u_is_all == v_is_all
-        if u_is_all:
-            self.set_e_repr_by_id(he, eid=ALL, inplace=inplace)
-        else:
+        # parse argument
+        if is_all(edges):
+            eid = ALL
+        elif isinstance(edges, tuple):
+            u, v = edges
             u = utils.toindex(u)
             v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
             _, _, eid = self._graph.edge_ids(u, v)
-            self.set_e_repr_by_id(he, eid=eid, inplace=inplace)
+        else:
+            eid = utils.toindex(edges)
 
-    def set_e_repr_by_id(self, he, eid=ALL, inplace=False):
-        """Set edge(s) representation by edge id.
-
-        `he` is a dictionary from the feature name to feature tensor. Each tensor
-        is of shape (B, D1, D2, ...), where B is the number of edges to be updated,
-        and (D1, D2, ...) be the shape of the edge representation tensor.
-
-        All update will be done out-placely to work with autograd unless the inplace
-        flag is true.
-
-        Parameters
-        ----------
-        he : tensor or dict of tensor
-          Edge representation.
-        eid : int, container or tensor
-          The edge id(s).
-        inplace : bool
-            True if the update is done inplacely
-        """
         # sanity check
         if not utils.is_dict_like(he):
             raise DGLError('Expect dictionary type for feature data.'
                            ' Got "%s" instead.' % type(he))
+
         if is_all(eid):
             num_edges = self.number_of_edges()
         else:
@@ -713,34 +770,40 @@ class DGLGraph(object):
             # update row
             self._edge_frame.update_rows(eid, he, inplace=inplace)
 
-    def get_e_repr(self, u=ALL, v=ALL):
+    def get_e_repr(self, edges=ALL):
         """Get node(s) representation.
 
         Parameters
         ----------
-        u : node, container or tensor
-          The source node(s).
-        v : node, container or tensor
-          The destination node(s).
+        edges : edges
+            Edges can be a pair of endpoint nodes (u, v), or a
+            tensor of edge ids. The default value is all the edges.
 
         Returns
         -------
         dict
             Representation dict
         """
-        u_is_all = is_all(u)
-        v_is_all = is_all(v)
-        assert u_is_all == v_is_all
         if len(self.edge_attr_schemes()) == 0:
             return dict()
-        if u_is_all:
-            return self.get_e_repr_by_id(eid=ALL)
-        else:
+        # parse argument
+        if is_all(edges):
+            eid = ALL
+        elif isinstance(edges, tuple):
+            u, v = edges
             u = utils.toindex(u)
             v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
             _, _, eid = self._graph.edge_ids(u, v)
-            return self.get_e_repr_by_id(eid=eid)
+        else:
+            eid = utils.toindex(edges)
 
+        if is_all(eid):
+            return dict(self._edge_frame)
+        else:
+            eid = utils.toindex(eid)
+            return self._edge_frame.select_rows(eid)
+        
     def pop_e_repr(self, key):
         """Get and remove the specified edge repr.
 
@@ -756,175 +819,110 @@ class DGLGraph(object):
         """
         return self._edge_frame.pop(key)
 
-    def get_e_repr_by_id(self, eid=ALL):
-        """Get edge(s) representation by edge id.
-
-        Parameters
-        ----------
-        eid : int, container or tensor
-          The edge id(s).
-
-        Returns
-        -------
-        dict
-            Representation dict from feature name to feature tensor.
-        """
-        if len(self.edge_attr_schemes()) == 0:
-            return dict()
-        if is_all(eid):
-            return dict(self._edge_frame)
-        else:
-            eid = utils.toindex(eid)
-            return self._edge_frame.select_rows(eid)
-
-    def register_edge_func(self, edge_func):
-        """Register global edge update function.
-
-        Parameters
-        ----------
-        edge_func : callable
-          Message function on the edge.
-        """
-        self._edge_func = edge_func
-
-    def register_message_func(self, message_func):
+    def register_message_func(self, func):
         """Register global message function.
 
         Parameters
         ----------
-        message_func : callable
+        func : callable
           Message function on the edge.
         """
-        self._message_func = message_func
+        self._message_func = func
 
-    def register_reduce_func(self, reduce_func):
+    def register_reduce_func(self, func):
         """Register global message reduce function.
 
         Parameters
         ----------
-        reduce_func : str or callable
+        func : str or callable
           Reduce function on incoming edges.
         """
-        self._reduce_func = reduce_func
+        self._reduce_func = func
 
-    def register_apply_node_func(self, apply_node_func):
+    def register_apply_node_func(self, func):
         """Register global node apply function.
 
         Parameters
         ----------
-        apply_node_func : callable
-          Apply function on the node.
+        func : callable
+            Apply function on the node.
         """
-        self._apply_node_func = apply_node_func
+        self._apply_node_func = func
 
-    def register_apply_edge_func(self, apply_edge_func):
+    def register_apply_edge_func(self, func):
         """Register global edge apply function.
 
         Parameters
         ----------
-        apply_edge_func : callable
-          Apply function on the edge.
+        edge_func : callable
+            Apply function on the edge.
         """
-        self._apply_edge_func = apply_edge_func
+        self._apply_edge_func = func
 
-    def apply_nodes(self, v=ALL, apply_node_func="default"):
-        """Apply the function on node representations.
+    def apply_nodes(self, func="default", v=ALL):
+        """Apply the function on the node features.
 
         Applying a None function will be ignored.
 
         Parameters
         ----------
+        func : callable, optional
+            The UDF applied on the node features.
         v : int, iterable of int, tensor, optional
-          The node id(s).
-        apply_node_func : callable
-          The apply node function.
+            The node id(s).
         """
-        self._apply_nodes(v, apply_node_func)
-
-    def _apply_nodes(self, v, apply_node_func="default", reduce_accum=None):
-        """Internal apply nodes
+        self._internal_apply_nodes(v, func)
+    
+    def apply_edges(self, func="default", edges=ALL):
+        """Apply the function on the edge features.
 
         Parameters
         ----------
-        reduce_accum: dict-like
-          The output of reduce func
+        func : callable, optional
+            The UDF applied on the edge features.
+        edges : edges, optional
+            Edges can be a pair of endpoint nodes (u, v), or a
+            tensor of edge ids. The default value is all the edges.
+
+        Notes
+        -----
+        On multigraphs, if u and v are specified, then all the edges
+        between u and v will be updated.
         """
-        if apply_node_func == "default":
-            apply_node_func = self._apply_node_func
-        if not apply_node_func:
-            # Skip none function call.
-            if reduce_accum is not None:
-                # write reduce result back
-                self.set_n_repr(reduce_accum, v)
-            return
-        # take out current node repr
-        curr_repr = self.get_n_repr(v)
-        if reduce_accum is not None:
-            # merge current node_repr with reduce output
-            curr_repr = utils.HybridDict(reduce_accum, curr_repr)
-        new_repr = apply_node_func(curr_repr)
-        if reduce_accum is not None:
-            # merge new node_repr with reduce output
-            reduce_accum.update(new_repr)
-            new_repr = reduce_accum
-        self.set_n_repr(new_repr, v)
+        if func == "default":
+            func = self._apply_edge_func
+        assert func is not None
 
-    def apply_edges(self, u=None, v=None, apply_edge_func="default", eid=None):
-        """Apply the function on edge representations.
-
-        Applying a None function will be ignored.
-
-        Parameters
-        ----------
-        u : optional, int, iterable of int, tensor
-          The src node id(s).
-        v : optional, int, iterable of int, tensor
-          The dst node id(s).
-        apply_edge_func : callable
-          The apply edge function.
-        eid : None, edge, container or tensor
-          The edge to update on.  If eid is not None then u and v are ignored.
-        """
-        if apply_edge_func == "default":
-            apply_edge_func = self._apply_edge_func
-        if not apply_edge_func:
-            # Skip none function call.
-            return
-        if eid is None:
-            new_repr = apply_edge_func(self.get_e_repr(u, v))
-            self.set_e_repr(new_repr, u, v)
+        if is_all(edges):
+            eid = ALL
+            u, v, _ = self._graph.edges()
+        elif isinstance(edges, tuple):
+            u, v = edges
+            u = utils.toindex(u)
+            v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            u, v, eid = self._graph.edge_ids(u, v)
         else:
-            new_repr = apply_edge_func(self.get_e_repr_by_id(eid))
-            self.set_e_repr_by_id(new_repr, eid)
+            eid = utils.toindex(edges)
+            u, v, _ = self._graph.find_edges(eid)
 
-    def send(self, u=None, v=None, message_func="default", eid=None):
-        """Trigger the message function on edge u->v or eid
+        src_data = self.get_n_repr(u)
+        edge_data = self.get_e_repr(eid)
+        dst_data = self.get_n_repr(v)
+        eb = EdgeBatch(self, (u, v, eid),
+                src_data, edge_data, dst_data)
+        self.set_e_repr(func(eb), eid)
 
-        The message function should be compatible with following signature:
-
-        (node_reprs, edge_reprs) -> message
-
-        It computes the representation of a message using the
-        representations of the source node, and the edge u->v.
-        All node_reprs and edge_reprs are dictionaries.
-        The message function can be any of the pre-defined functions
-        ('from_src').
-
-        Currently, we require the message functions of consecutive send's to
-        return the same keys.  Otherwise the behavior will be undefined.
-
-        TODO(minjie): document on multiple send behavior
+    def send(self, edges, message_func="default"):
+        """Send messages along the given edges.
 
         Parameters
         ----------
-        u : optional, node, container or tensor
-          The source node(s).
-        v : optional, node, container or tensor
-          The destination node(s).
+        edges : edges, optional
+            Edges can be a pair of endpoint nodes (u, v), or a
+            tensor of edge ids.
         message_func : callable
-          The message function.
-        eid : optional, edge, container or tensor
-          The edge to update on.  If eid is not None then u and v are ignored.
+            The message function.
 
         Notes
         -----
@@ -936,156 +934,34 @@ class DGLGraph(object):
         assert message_func is not None
         if isinstance(message_func, (tuple, list)):
             message_func = BundledMessageFunction(message_func)
-        self._batch_send(u, v, eid, message_func)
 
-    def _batch_send(self, u, v, eid, message_func):
-        if is_all(u) and is_all(v) and eid is None:
-            u, v, eid = self._graph.edges()
-            # call UDF
-            src_reprs = self.get_n_repr(u)
-            edge_reprs = self.get_e_repr()
-            msgs = message_func(src_reprs, edge_reprs)
-        elif eid is not None:
-            eid = utils.toindex(eid)
-            u, v, _ = self._graph.find_edges(eid)
-            # call UDF
-            src_reprs = self.get_n_repr(u)
-            edge_reprs = self.get_e_repr_by_id(eid)
-            msgs = message_func(src_reprs, edge_reprs)
-        else:
+        if is_all(edges):
+            eid = ALL
+            u, v, _ = self._graph.edges()
+        elif isinstance(edges, tuple):
+            u, v = edges
             u = utils.toindex(u)
             v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
             u, v, eid = self._graph.edge_ids(u, v)
-            # call UDF
-            src_reprs = self.get_n_repr(u)
-            edge_reprs = self.get_e_repr_by_id(eid)
-            msgs = message_func(src_reprs, edge_reprs)
+        else:
+            eid = utils.toindex(edges)
+            u, v, _ = self._graph.find_edges(eid)
+
+        src_data = self.get_n_repr(u)
+        edge_data = self.get_e_repr(eid)
+        dst_data = self.get_n_repr(v)
+        eb = EdgeBatch(self, (u, v, eid),
+                src_data, edge_data, dst_data)
+        msgs = message_func(eb)
         self._msg_graph.add_edges(u, v)
         self._msg_frame.append(msgs)
-
-        # TODO(minjie): Fix these codes in next PR.
-        """
-        new_uv = []
-        msg_target_rows = []
-        msg_update_rows = []
-        msg_append_rows = []
-        for i, (_u, _v, _eid) in enumerate(zip(u, v, eid)):
-            if _eid in self._msg_edges:
-                msg_target_rows.append(self._msg_edges.index(_eid))
-                msg_update_rows.append(i)
-            else:
-                new_uv.append((_u, _v))
-                self._msg_edges.append(_eid)
-                msg_append_rows.append(i)
-
-        msg_target_rows = utils.toindex(msg_target_rows)
-        msg_update_rows = utils.toindex(msg_update_rows)
-        msg_append_rows = utils.toindex(msg_append_rows)
-
-        if utils.is_dict_like(msgs):
-            if len(msg_target_rows) > 0:
-                self._msg_frame.update_rows(
-                        msg_target_rows,
-                        {k: F.gather_row(msgs[k], msg_update_rows.tousertensor())
-                            for k in msgs},
-                        inplace=False)
-            if len(msg_append_rows) > 0:
-                new_u, new_v = zip(*new_uv)
-                new_u = utils.toindex(new_u)
-                new_v = utils.toindex(new_v)
-                self._msg_graph.add_edges(new_u, new_v)
-                self._msg_frame.append(
-                        {k: F.gather_row(msgs[k], msg_append_rows.tousertensor())
-                            for k in msgs})
-        else:
-            if len(msg_target_rows) > 0:
-                self._msg_frame.update_rows(
-                        msg_target_rows,
-                        {__MSG__: F.gather_row(msgs, msg_update_rows.tousertensor())},
-                        inplace=False)
-            if len(msg_append_rows) > 0:
-                new_u, new_v = zip(*new_uv)
-                new_u = utils.toindex(new_u)
-                new_v = utils.toindex(new_v)
-                self._msg_graph.add_edges(new_u, new_v)
-                self._msg_frame.append(
-                        {__MSG__: F.gather_row(msgs, msg_append_rows.tousertensor())}
-                        )
-        """
-
-    def update_edge(self, u=ALL, v=ALL, edge_func="default", eid=None):
-        """Update representation on edge u->v
-
-        The edge function should be compatible with following signature:
-
-        (node_reprs, node_reprs, edge_reprs) -> edge_reprs
-
-        It computes the new edge representations using the representations
-        of the source node, target node and the edge itself.
-        All node_reprs and edge_reprs are dictionaries.
-
-        Parameters
-        ----------
-        u : node, container or tensor
-          The source node(s).
-        v : node, container or tensor
-          The destination node(s).
-        edge_func : callable
-          The update function.
-        eid : optional, edge, container or tensor
-          The edge to update on.  If eid is not None then u and v are ignored.
-        """
-        if edge_func == "default":
-            edge_func = self._edge_func
-        assert edge_func is not None
-        self._batch_update_edge(u, v, eid, edge_func)
-
-    def _batch_update_edge(self, u, v, eid, edge_func):
-        if is_all(u) and is_all(v) and eid is None:
-            u, v, eid = self._graph.edges()
-            # call the UDF
-            src_reprs = self.get_n_repr(u)
-            dst_reprs = self.get_n_repr(v)
-            edge_reprs = self.get_e_repr()
-            new_edge_reprs = edge_func(src_reprs, dst_reprs, edge_reprs)
-            self.set_e_repr(new_edge_reprs)
-        else:
-            if eid is None:
-                u = utils.toindex(u)
-                v = utils.toindex(v)
-                u, v = utils.edge_broadcasting(u, v)
-                _, _, eid = self._graph.edge_ids(u, v)
-            # call the UDF
-            src_reprs = self.get_n_repr(u)
-            dst_reprs = self.get_n_repr(v)
-            edge_reprs = self.get_e_repr_by_id(eid)
-            new_edge_reprs = edge_func(src_reprs, dst_reprs, edge_reprs)
-            self.set_e_repr_by_id(new_edge_reprs, eid)
 
     def recv(self,
              u,
              reduce_func="default",
              apply_node_func="default"):
         """Receive and reduce in-coming messages and update representation on node u.
-
-        It computes the new node state using the messages sent from the predecessors
-        of node u. If no message is found from the predecessors, reduce function
-        will be skipped.
-
-        The reduce function should be compatible with following signature:
-
-            (node_reprs, batched_messages) -> node_reprs
-
-        It computes the new node representations using the representations
-        of the in-coming edges (the same concept as messages).
-        The reduce function can also be pre-defined functions.
-
-        An optinoal apply_node function could be specified and should follow following
-        signature:
-
-            node_reprs -> node_reprs
-
-        All node_reprs and edge_reprs support tensor and dictionary types.
 
         TODO(minjie): document on zero-in-degree case
         TODO(minjie): document on how returned new features are merged with the old features
@@ -1107,7 +983,7 @@ class DGLGraph(object):
             reduce_func = BundledReduceFunction(reduce_func)
         self._batch_recv(u, reduce_func)
         # optional apply nodes
-        self.apply_nodes(u, apply_node_func)
+        self.apply_nodes(apply_node_func, u)
 
     def _batch_recv(self, v, reduce_func):
         if self._msg_frame.num_rows == 0:
@@ -1116,11 +992,13 @@ class DGLGraph(object):
 
         v_is_all = is_all(v)
         if v_is_all:
-            v = list(range(self.number_of_nodes()))
+            v = F.arange(0, self.number_of_nodes(), dtype=F.int64)
+        elif isinstance(v, int):
+            v = [v]
+        v = utils.toindex(v)
         if len(v) == 0:
             # no vertex to be triggered.
             return
-        v = utils.toindex(v)
 
         # degree bucketing
         degrees, v_buckets = scheduler.degree_bucketing(self._msg_graph, v)
@@ -1137,7 +1015,7 @@ class DGLGraph(object):
                 has_zero_degree = True
                 continue
             bkt_len = len(v_bkt)
-            dst_reprs = self.get_n_repr(v_bkt)
+            v_data = self.get_n_repr(v_bkt)
             uu, vv, in_msg_ids = self._msg_graph.in_edges(v_bkt)
             in_msgs = self._msg_frame.select_rows(in_msg_ids)
             # Reshape the column tensor to (B, Deg, ...).
@@ -1148,7 +1026,8 @@ class DGLGraph(object):
             reshaped_in_msgs = utils.LazyDict(
                     lambda key: _reshape_fn(in_msgs[key]), self._msg_frame.schemes)
             reordered_v.append(v_bkt.tousertensor())
-            new_reprs.append(reduce_func(dst_reprs, reshaped_in_msgs))
+            nb = NodeBatch(self, v_bkt, v_data, reshaped_in_msgs)
+            new_reprs.append(reduce_func(nb))
 
         # TODO(minjie): clear partial messages
         self.reset_messages()
@@ -1170,26 +1049,26 @@ class DGLGraph(object):
             self.set_n_repr(new_reprs, reordered_v)
 
     def send_and_recv(self,
-                      u=None, v=None,
+                      edges,
                       message_func="default",
                       reduce_func="default",
-                      apply_node_func="default",
-                      eid=None):
-        """Trigger the message function on u->v and update v, or on edge eid
-        and update the destination nodes.
+                      apply_node_func="default"):
+        """Send messages along edges and receive them on the targets.
 
         Parameters
         ----------
-        u : optional, node, container or tensor
-          The source node(s).
-        v : optional, node, container or tensor
-          The destination node(s).
-        message_func : callable
-          The message function.
-        reduce_func : callable
-          The reduce function.
+        edges : edges
+            Edges can be a pair of endpoint nodes (u, v), or a
+            tensor of edge ids. The default value is all the edges.
+        message_func : callable, optional
+            The message function. Registered function will be used if not
+            specified.
+        reduce_func : callable, optional
+            The reduce function. Registered function will be used if not
+            specified.
         apply_node_func : callable, optional
-          The update function.
+            The update function. Registered function will be used if not
+            specified.
 
         Notes
         -----
@@ -1198,69 +1077,58 @@ class DGLGraph(object):
         """
         if message_func == "default":
             message_func = self._message_func
+        elif isinstance(message_func, (tuple, list)):
+            message_func = BundledMessageFunction(message_func)
         if reduce_func == "default":
             reduce_func = self._reduce_func
+        elif isinstance(reduce_func, (list, tuple)):
+            reduce_func = BundledReduceFunction(reduce_func)
         assert message_func is not None
         assert reduce_func is not None
 
-        if eid is None:
-            if u is None or v is None:
-                raise ValueError('u and v must be given if eid is None')
-
+        if isinstance(edges, tuple):
+            u, v = edges
             u = utils.toindex(u)
             v = utils.toindex(v)
-            if len(u) == 0:
-                # no edges to be triggered
-                assert len(v) == 0
-                return
-            unique_v = utils.toindex(F.unique(v.tousertensor()))
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            u, v, eid = self._graph.edge_ids(u, v)
+        else:
+            eid = utils.toindex(edges)
+            u, v, _ = self._graph.find_edges(eid)
 
+        if len(u) == 0:
+            # no edges to be triggered
+            return
+
+        if not self.is_multigraph:
             executor = scheduler.get_executor(
                     'send_and_recv', self, src=u, dst=v,
                     message_func=message_func, reduce_func=reduce_func)
         else:
-            eid = utils.toindex(eid)
-            if len(eid) == 0:
-                # no edges to be triggered
-                return
-
             executor = None
 
         if executor:
-            new_reprs = executor.run()
+            accum = executor.run()
             unique_v = executor.recv_nodes
-            self._apply_nodes(unique_v, apply_node_func, reduce_accum=new_reprs)
-        elif eid is not None:
-            _, v, _ = self._graph.find_edges(eid)
-            unique_v = utils.toindex(F.unique(v.tousertensor()))
-
-            # TODO(quan): replace with the new DegreeBucketingScheduler
-            self.send(eid=eid, message_func=message_func)
-            self.recv(unique_v, reduce_func, apply_node_func)
         else:
-            # handle multiple message and reduce func
-            if isinstance(message_func, (tuple, list)):
-                message_func = BundledMessageFunction(message_func)
-            if isinstance(reduce_func, (list, tuple)):
-                reduce_func = BundledReduceFunction(reduce_func)
-
             # message func
-            u, v = utils.edge_broadcasting(u, v)
-            src_reprs = self.get_n_repr(u)
-            edge_reprs = self.get_e_repr(u, v)
-            msgs = message_func(src_reprs, edge_reprs)
-            msg_frame = FrameRef()
-            msg_frame.append(msgs)
-
+            src_data = self.get_n_repr(u)
+            edge_data = self.get_e_repr(eid)
+            dst_data = self.get_n_repr(v)
+            eb = EdgeBatch(self, (u, v, eid),
+                    src_data, edge_data, dst_data)
+            msgs = message_func(eb)
+            msg_frame = FrameRef(Frame(msgs))
             # recv with degree bucketing
             executor = scheduler.get_recv_executor(graph=self,
                                                    reduce_func=reduce_func,
                                                    message_frame=msg_frame,
                                                    edges=(u, v))
-            new_reprs = executor.run()
+            assert executor is not None
+            accum = executor.run()
             unique_v = executor.recv_nodes
 
-            self._apply_nodes(unique_v, apply_node_func, reduce_accum=new_reprs)
+        self._internal_apply_nodes(unique_v, apply_node_func, reduce_accum=accum)
 
     def pull(self,
              v,
@@ -1284,9 +1152,9 @@ class DGLGraph(object):
         if len(v) == 0:
             return
         uu, vv, _ = self._graph.in_edges(v)
-        self.send_and_recv(uu, vv, message_func, reduce_func, apply_node_func=None)
+        self.send_and_recv((uu, vv), message_func, reduce_func, apply_node_func=None)
         unique_v = F.unique(v.tousertensor())
-        self.apply_nodes(unique_v, apply_node_func)
+        self.apply_nodes(apply_node_func, unique_v)
 
     def push(self,
              u,
@@ -1310,7 +1178,7 @@ class DGLGraph(object):
         if len(u) == 0:
             return
         uu, vv, _ = self._graph.out_edges(u)
-        self.send_and_recv(uu, vv, message_func,
+        self.send_and_recv((uu, vv), message_func,
                 reduce_func, apply_node_func)
 
     def update_all(self,
@@ -1339,9 +1207,9 @@ class DGLGraph(object):
                 "update_all", self, message_func=message_func, reduce_func=reduce_func)
         if executor:
             new_reprs = executor.run()
-            self._apply_nodes(ALL, apply_node_func, reduce_accum=new_reprs)
+            self._internal_apply_nodes(ALL, apply_node_func, reduce_accum=new_reprs)
         else:
-            self.send(ALL, ALL, message_func)
+            self.send(ALL, message_func)
             self.recv(ALL, reduce_func, apply_node_func)
 
     def propagate(self,
@@ -1391,7 +1259,7 @@ class DGLGraph(object):
                 self.pull(v)
         else:
             for u, v in layers:
-                self.send_and_recv(u, v,
+                self.send_and_recv((u, v),
                         message_func, reduce_func, apply_node_func)
 
     def subgraph(self, nodes):
@@ -1638,18 +1506,19 @@ class DGLGraph(object):
         ----------
         predicate : callable
             The predicate should take in a dict of tensors whose values
-            are concatenation of edge representations by edge ID (same as
-            get_e_repr_by_id()), and return a boolean tensor with N elements
-            indicating which node satisfy the predicate.
-        edges : container or tensor
-            The edges to filter on
+            are concatenation of edge representations by edge ID,
+            and return a boolean tensor with N elements indicating which
+            node satisfy the predicate.
+        edges : edges
+            Edges can be a pair of endpoint nodes (u, v), or a
+            tensor of edge ids. The default value is all the edges.
 
         Returns
         -------
         tensor
             The filtered edges
         """
-        e_repr = self.get_e_repr_by_id(edges)
+        e_repr = self.get_e_repr(edges)
         e_mask = predicate(e_repr)
 
         if is_all(edges):
@@ -1657,3 +1526,32 @@ class DGLGraph(object):
         else:
             edges = F.Tensor(edges)
             return edges[e_mask]
+
+    def _internal_apply_nodes(self, v, apply_node_func="default", reduce_accum=None):
+        """Internal apply nodes
+
+        Parameters
+        ----------
+        reduce_accum: dict-like
+            The output of reduce func
+        """
+        if apply_node_func == "default":
+            apply_node_func = self._apply_node_func
+        if not apply_node_func:
+            # Skip none function call.
+            if reduce_accum is not None:
+                # write reduce result back
+                self.set_n_repr(reduce_accum, v)
+            return
+        # take out current node repr
+        curr_repr = self.get_n_repr(v)
+        if reduce_accum is not None:
+            # merge current node_repr with reduce output
+            curr_repr = utils.HybridDict(reduce_accum, curr_repr)
+        nb = NodeBatch(self, v, curr_repr)
+        new_repr = apply_node_func(nb)
+        if reduce_accum is not None:
+            # merge new node_repr with reduce output
+            reduce_accum.update(new_repr)
+            new_repr = reduce_accum
+        self.set_n_repr(new_repr, v)

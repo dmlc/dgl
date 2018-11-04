@@ -8,7 +8,7 @@ __all__ = ["sum", "max"]
 class ReduceFunction(object):
     """Base builtin reduce function class."""
 
-    def __call__(self, node, msgs):
+    def __call__(self, nodes):
         """Regular computation of this builtin.
 
         This will be used when optimization is not available.
@@ -35,15 +35,11 @@ class BundledReduceFunction(ReduceFunction):
                 return False
         return True
 
-    def __call__(self, node, msgs):
-        ret = None
+    def __call__(self, nodes):
+        ret = dict()
         for fn in self.fn_list:
-            rpr = fn(node, msgs)
-            if ret is None:
-                ret = rpr
-            else:
-                # ret and rpr must be dict
-                ret.update(rpr)
+            rpr = fn(nodes)
+            ret.update(rpr)
         return ret
 
     def name(self):
@@ -60,8 +56,8 @@ class ReducerFunctionTemplate(ReduceFunction):
         # NOTE: only sum is supported right now.
         return self.name == "sum"
 
-    def __call__(self, node, msgs):
-        return {self.out_field : self.op(msgs[self.msg_field], 1)}
+    def __call__(self, nodes):
+        return {self.out_field : self.op(nodes.mailbox[self.msg_field], 1)}
 
     def name(self):
         return self.name
