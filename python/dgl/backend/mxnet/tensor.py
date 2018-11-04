@@ -86,7 +86,8 @@ def gather_row(data, row_index):
     else:
         return data[row_index,]
 
-# narrow_row not enabled
+def narrow_row(data, start, stop):
+    return nd.slice(data, begin=start, end=stop)
 
 def scatter_row(data, row_index, value):
     return mx.nd.contrib.index_copy(data, row_index, value)
@@ -120,7 +121,7 @@ def unique(input):
     return nd.array(tmp, ctx=input.context, dtype=input.dtype)
 
 def full_1d(length, fill_value):
-    return fill_value + nd.zeros((length,))
+    return nd.full((length,), fill_value)
 
 def nonzero_1d(input):
     # TODO: fallback to numpy is unfortunate

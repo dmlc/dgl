@@ -40,7 +40,7 @@ class Index(object):
                     self._list_data = np.array(data).astype(np.int64)
                 except:
                     raise ValueError('Error index data: %s' % str(data))
-            self._user_tensor_data[nd.cpu()] = F.zerocopy_from_numpy(self._list_data)
+            self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self._list_data)
 
     def tolist(self):
         """Convert to a python-list compatible object."""
