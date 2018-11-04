@@ -13,18 +13,32 @@ using tvm::runtime::NDArray;
 
 namespace dgl {
 
-TVM_REGISTER_GLOBAL("scheduler._CAPI_DGLDegreeBucketing")
+TVM_REGISTER_GLOBAL("scheduler._CAPI_DGLDegreeBucketingForEdges")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
-    *rv = ConvertNDArrayVectorToPackedFunc(sched::DegreeBucketing(vids));
+    // XXX: better way to do arange?
+    const auto n_msgs = vids->shape[0];
+    IdArray msg_ids = IdArray::Empty({n_msgs}, vids.shape[0]}, vids->dtype, vids->ctx);
+    int64_t* mid_data = static_cast<int64_t*>(msg_ids->data);
+    for (int64_t i = 0; i < n_msgs; ++i) {
+        mid_data[i] = i;
+    }
+    *rv = ConvertNDArrayVectorToPackedFunc(sched::DegreeBucketing(msg_ids, vids));
   });
 
-TVM_REGISTER_GLOBAL("scheduler._CAPI_DGLDegreeBucketingFromGraph")
+TVM_REGISTER_GLOBAL("scheduler._CAPI_DGLDegreeBucketingForRecvNodes")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const auto& edges = gptr->Edges(false);
-    *rv = ConvertNDArrayVectorToPackedFunc(sched::DegreeBucketing(edges.dst));
+    *rv = ConvertNDArrayVectorToPackedFunc(sched::DegreeBucketing(edges.id, edges.dst));
   });
 
+TVM_REGISTER_GLOBAL("scheduler._CAPI_DGLDegreeBucketingForFullGraph")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const auto& edges = gptr->Edges(false);
+    *rv = ConvertNDArrayVectorToPackedFunc(sched::DegreeBucketing(edges.id, edges.dst));
+  });
 }  // namespace dgl

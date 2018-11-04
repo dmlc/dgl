@@ -144,7 +144,7 @@ def _process_buckets(buckets):
 
     return unique_v, degs, dsts, msg_ids
 
-def degree_bucketing_with_dest(dst):
+def degree_bucketing_for_edges(dst):
     """Return the bucketing by degree scheduling for destination nodes of messages
 
     Parameters
@@ -153,10 +153,10 @@ def degree_bucketing_with_dest(dst):
         destionation node for each message
     """
 
-    buckets = _CAPI_DGLDegreeBucketing(dst.todgltensor())
+    buckets = _CAPI_DGLDegreeBucketingForEdges(dst.todgltensor())
     return _process_buckets(buckets)
 
-def _degree_bucketing_with_graph(graph, v=ALL):
+def _degree_bucketing_for_graph(graph, v=ALL):
     """Return the bucketing by degree scheduling given graph index and option dst nodes
 
     Parameters:
@@ -167,9 +167,9 @@ def _degree_bucketing_with_graph(graph, v=ALL):
     """
 
     if is_all(v):
-        buckets = _CAPI_DGLDegreeBucketingForEntireGraph(graph._handle)
+        buckets = _CAPI_DGLDegreeBucketingForFullGraph(graph._handle)
     else:
-        buckets = _CAPI_DGLDegreeBucketingForPartialGraph(graph._handle, v)
+        buckets = _CAPI_DGLDegreeBucketingForRecvNodes(graph._handle, v)
     return _process_buckets(buckets)
 
 # FIXME: move this part back to corresponding schedulers and no need to use kwargs...

@@ -10,14 +10,16 @@
 namespace dgl {
 namespace sched {
 
-std::vector<IdArray> DegreeBucketing(const IdArray& vids) {
-    const auto n_msgs = vids->shape[0];
-    const int64_t* vid_data = static_cast<int64_t*>(vids->data);
+std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids) {
+    const auto n_msgs = mids->shape[0];
 
-    // inedge: dst->msgs
+    const int64_t* vid_data = static_cast<int64_t*>(vids->data);
+    const int64_t* msg_id_data = static_cast<int64_t*>(msg_ids->data);
+
+    // in edge: dst->msgs
     std::unordered_map<int64_t, std::vector<int64_t>> in_edges;
-    for (int64_t mid = 0; mid < n_msgs; ++mid) {
-        in_edges[vid_data[mid]].push_back(mid);
+    for (int64_t i = 0; i < n_msgs; ++i) {
+        in_edges[vid_data[i]].push_back(msg_id_data[i]);
     }
 
     // bkt: deg->dsts
