@@ -26,15 +26,19 @@ def create_bundled_function_class(name, cls):
         def name(self):
             return "bundled"
 
-        for method in (__init__, __call__, is_spmv_supported, name):
-            method.__qualname__ = f'{name}.{method.__name__}'
-
-        for method in (__call__, is_spmv_supported, name):
-            method = update_wrapper(method,
-                                    cls.__dict__[method.__name__],
-                                    ('__module__', '__doc__', '__annotations__'))
-
+    # Fake the names for introspection
+    Bundled.__module__ = cls.__module__
     Bundled.__name__ = name
     Bundled.__qualname__ = name
+
+    for method_name in ('__init__', '__call__', 'is_spmv_supported', 'name'):
+        method = getattr(Bundled, method_name)
+        method.__qualname__ = f'{Bundled.__qualname__}.{method_name}'
+
+    for method_name in ('__call__', 'is_spmv_supported', 'name'):
+        method = getattr(Bundled, method_name)
+        method = update_wrapper(method,
+                                cls.__dict__[method.__name__],
+                                ('__module__', '__doc__', '__annotations__'))
 
     return Bundled
