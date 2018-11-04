@@ -1,9 +1,19 @@
 """For different schedulers"""
+from __future__ import absolute_import
 
 from ..base import ALL, DGLError, is_all
+from .. import utils
 from .. import backend as F
 from ..function import message as fmsg
 from ..function import reducer as fred
+from .executor import *
+
+from .._fi.function import _init_api
+
+# TODO(lingfan)
+__all__ = []
+
+# XXX: multi-edge?
 
 def get_send_plan(graph, message_func):
     # TODO (lingfan): doc string
@@ -19,7 +29,6 @@ def get_update_all_plan(graph, message_func, reduce_func):
 
 def get_send_and_recv_plan(graph, edges, message_func, reduce_func):
     # TODO (lingfan): doc string
-
     pass
 
 def get_push_plan(graph, u, message_func, reduce_func):
@@ -30,7 +39,6 @@ def get_pull_plan(graph, v, message_func, reduce_func):
     # TODO (lingfan): doc string
     pass
 
-# XXX: multi-edge?
 def get_update_edge_plan(graph, eids):
     # TODO (lingfan): doc string
     pass
@@ -41,9 +49,9 @@ def generate_degree_bucketing_executors():
 def generate_spmv_executors():
     pass
 
-def _build_adj_matrix(g, call_type, graph_store, **kwargs):
+def _build_adj_matrix(g, call_type, graph_data, **kwargs):
     key = "adj_" + call_type
-    if graph_store.get(key, None):
+    if graph_data.get(key, None):
         # key already exists
         return key
 
@@ -66,12 +74,12 @@ def _build_adj_matrix(g, call_type, graph_store, **kwargs):
         mat = utils.build_sparse_matrix(new_v, u, [m, n], nnz)
         mat = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
 
-    graph_store[key] = mat
+    graph_data[key] = mat
     return key
 
-def _build_incidence_matrix(g, call_type, graph_store, **kwargs):
+def _build_incidence_matrix(g, call_type, graph_data, **kwargs):
     key = "inc_" + call_type
-    if graph_store.get(key, None):
+    if graph_data.get(key, None):
         # key already exists
         return key
 
@@ -97,9 +105,74 @@ def _build_incidence_matrix(g, call_type, graph_store, **kwargs):
         mat = utils.build_sparse_matrix(new_v, eid, [n, m], m)
         mat = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
 
-    graph_store[key] = mat
+    graph_data[key] = mat
     return key
 
+def _process_buckets(buckets):
+    """read bucketing auxiliary data
+
+    Returns
+    -------
+    unique_v: utils.Index
+        unqiue destination nodes
+    degrees: utils.Index
+        A list of degree for each bucket
+    v_bkt: list of utils.Index
+        A list of node id buckets, nodes in each bucket have the same degree
+    msg_ids: list of utils.Index
+        A list of message id buckets, each node in the ith node id bucket has
+        degree[i] messages in the ith message id bucket
+    """
+    # get back results
+    degs = utils.toindex(buckets(0))
+    v = utils.toindex(buckets(1))
+    # TODO: convert directly from ndarary to python list?
+    v_section = buckets(2).asnumpy().tolist()
+    msg_ids = utils.toindex(buckets(3))
+    msg_section = buckets(4).asnumpy().tolist()
+
+    # split buckets
+    unique_v = v.tousertensor()
+    msg_ids = msg_ids.tousertensor()
+    dsts = F.unpack(unique_v, v_section)
+    msg_ids = F.unpack(msg_ids, msg_section)
+
+    # convert to utils.Index
+    unique_v = utils.toindex(unique_v)
+    dsts = [utils.toindex(dst) for dst in dsts]
+    msg_ids = [utils.toindex(msg_id) for msg_id in msg_ids]
+
+    return unique_v, degs, dsts, msg_ids
+
+def degree_bucketing_with_dest(dst):
+    """Return the bucketing by degree scheduling for destination nodes of messages
+
+    Parameters
+    ----------
+    dst: utils.Index
+        destionation node for each message
+    """
+
+    buckets = _CAPI_DGLDegreeBucketing(dst.todgltensor())
+    return _process_buckets(buckets)
+
+def _degree_bucketing_with_graph(graph, v=ALL):
+    """Return the bucketing by degree scheduling given graph index and option dst nodes
+
+    Parameters:
+    graph: GraphIndex
+        DGLGraph Index (update all case) or message graph index (recv cases)
+    v: utils.Index
+        Destination nodes (recv cases)
+    """
+
+    if is_all(v):
+        buckets = _CAPI_DGLDegreeBucketingForEntireGraph(graph._handle)
+    else:
+        buckets = _CAPI_DGLDegreeBucketingForPartialGraph(graph._handle, v)
+    return _process_buckets(buckets)
+
+# FIXME: move this part back to corresponding schedulers and no need to use kwargs...
 def _get_exec_plan(g, call_type, mfunc=None, rfunc=None, **kwargs):
     v2v_spmv = None
     e2v_spmv = None
@@ -114,7 +187,9 @@ def _get_exec_plan(g, call_type, mfunc=None, rfunc=None, **kwargs):
     else:
         mfunc, v2v_spmv, e2v_spmv, to_deg_bucket = _get_multi_stage_plan(mfunc, rfunc)
 
-    graph_store = {}
+    graph_data = {}
+
+    exec_plan = ExecutionPlan()
 
     # send
     if mfunc:
@@ -122,19 +197,19 @@ def _get_exec_plan(g, call_type, mfunc=None, rfunc=None, **kwargs):
             mfunc = mfunc[0]
         else:
             mfunc = fmsg.BundledMessageFunction(mfunc)
-        # TODO(lingfan): create send executor
+        # FIXME(lingfan): create send executor
+        exec_plan.add_stage()
 
     # fused spmv
     if v2v_spmv:
-        key = _build_adj_matrix(g, call_type, graph_store, **kwargs)
-        # TODO(lingfan): build adjmat
+        key = _build_adj_matrix(g, call_type, graph_data, **kwargs)
         for mfn, rfn in v2v_spmv:
             # TODO(lingfan): create spmv executor using adjmat
             pass
 
     # incidence matrix spmv
     if e2v_spmv:
-        key = _build_incidence_matrix(g, call_type, graph_store, **kwargs)
+        key = _build_incidence_matrix(g, call_type, graph_data, **kwargs)
         for rfn in e2v_spmv:
             # TODO(lingfan): create spmv executor using incidence mat
             pass
@@ -145,8 +220,21 @@ def _get_exec_plan(g, call_type, mfunc=None, rfunc=None, **kwargs):
             rfunc = to_deg_bucket[0]
         else:
             rfunc = fred.BundledMessageFunction(to_deg_bucket)
-        # TODO(lingfan): get degree bucketing schedule
-        # TODO(lingfan): create degree bucketing executor
+
+        # get degree bucketing schedule
+        if call_type == "send_and_recv":
+            v = kwargs['edges'][1]
+            uniq_v, degs, dsts, msg_ids = degree_bucketing_with_dest(v)
+        elif call_type == "update_all":
+            uniq_v, degs, dsts, msg_ids = degree_bucketing_with_graph(g._graph)
+        elif call_type == "recv":
+            v = kwargs['v']
+            unqi_v, degs, dsts, msg_ids = degree_bucketing_with_graph(g._msg_graph, v)
+        else:
+            raise DGLError("Unsupported call type for degree bucketing: %s" % call_type)
+        # TODO(lingfan): create UDF executor
+
+    # TODO(lingfan): create merge executor when adding stage
 
 """Check if reduce functions are legal. The legal cases are:
 1. a list of builtin reduce function
@@ -264,3 +352,4 @@ def _get_multi_stage_plan(mfunc, rfunc):
 
     return mfunc_to_materialize, v2v_spmv_pairs, e2v_spmv, deg_bucket
 
+_init_api("dgl.scheduler")
