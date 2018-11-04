@@ -41,67 +41,64 @@ def generate_degree_bucketing_executors():
 def generate_spmv_executors():
     pass
 
-def _generate_graph_key(prefix, call_type):
-    if call_type == "update_all":
-        key = prefix + "all"
-    elif call_type == "send_and_recv":
-        key = prefix + "edges"
-    elif call_type == "recv":
-        key = prefix + "message"
-    else:
-        raise DGLError("Unsupported call type: %s" % (call_type))
-    return key
-
-def _prepare_adjmat(g, call_type, graph_store, mfunc, **kwargs):
-    key = _generate_graph_key("adjmat_")
-    if isinstance(mfunc, fmsg.SrcMulEdgeMessageFunction):
-        key += "_" + mfunc.edge_field
+def _build_adj_matrix(g, call_type, graph_store, **kwargs):
+    key = "adj_" + call_type
     if graph_store.get(key, None):
         # key already exists
-        return
+        return key
 
-def _build_adj_matrix(g, call_type, edges=None):
     if call_type == "update_all":
+        # full graph case
         mat = self.g._handle.in_edge_incidence_matrix()
-        return mat
-
-    # partial graph case
-    if call_type != "send_and_recv":
-        raise DGLError("Unsupported call type when build adjmat: %s" % call_type)
-
-    u, v = edges
-    new2old, old2new = utils.build_relabel_map(v)
-    nnz = len(u)
-    u = u.tousertensor()
-    v = v.tousertensor()
-    new_v = old2new[v]
-    n = self.g.number_of_nodes()
-    m = len(new2old)
-    mat = utils.build_sparse_matrix(new_v, u, [m, n], nnz)
-    return utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
-
-def _build_incidence_matrix(g, call_type, v=None, edges=None):
-    if call_type == "update_all":
-        mat = self.g._graph.in_edge_incidence_matrix()
-        return mat
-
-    # partial graph case
-    if call_type == "send_and_recv":
-        v = edges[1]
-        m = len(v)
-        eid = F.arannge(m)
-    elif call_type == "recv":
-        _, v, eid = self._msg_graph.in_edges(v)
-        m = len(eid)
     else:
-        raise DGLError("Unsupported call type when build incidence matrix: %s" % call_type)
+        # partial graph case
+        if call_type != "send_and_recv":
+            raise DGLError("Unsupported call type when build adjmat: %s" % call_type)
 
-    new2old, old2new = utils.build_relabel_map(v)
-    v = v.tousertensor()
-    new_v = old2new[v]
-    n = len(new2old)
-    mat = utils.build_sparse_matrix(new_v, eid, [n, m], m)
-    return utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
+        u, v = kwargs['edges']
+        new2old, old2new = utils.build_relabel_map(v)
+        nnz = len(u)
+        u = u.tousertensor()
+        v = v.tousertensor()
+        new_v = old2new[v]
+        n = self.g.number_of_nodes()
+        m = len(new2old)
+        mat = utils.build_sparse_matrix(new_v, u, [m, n], nnz)
+        mat = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
+
+    graph_store[key] = mat
+    return key
+
+def _build_incidence_matrix(g, call_type, graph_store, **kwargs):
+    key = "inc_" + call_type
+    if graph_store.get(key, None):
+        # key already exists
+        return key
+
+    if call_type == "update_all":
+        # full graph case
+        mat = self.g._graph.in_edge_incidence_matrix()
+    else:
+        # partial graph case
+        if call_type == "send_and_recv":
+            v = kwargs['edges'][1]
+            m = len(v)
+            eid = F.arannge(m)
+        elif call_type == "recv":
+            _, v, eid = self._msg_graph.in_edges(kwargs['v'])
+            m = len(eid)
+        else:
+            raise DGLError("Unsupported call type when build incidence matrix: %s" % call_type)
+
+        new2old, old2new = utils.build_relabel_map(v)
+        v = v.tousertensor()
+        new_v = old2new[v]
+        n = len(new2old)
+        mat = utils.build_sparse_matrix(new_v, eid, [n, m], m)
+        mat = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
+
+    graph_store[key] = mat
+    return key
 
 def _get_exec_plan(g, call_type, mfunc=None, rfunc=None, **kwargs):
     v2v_spmv = None
@@ -129,14 +126,7 @@ def _get_exec_plan(g, call_type, mfunc=None, rfunc=None, **kwargs):
 
     # fused spmv
     if v2v_spmv:
-        if call_type == "send_and_recv":
-            # build partial
-            pass
-        elif call_type == "update_all":
-            # build full
-        else:
-            assert(0)
-
+        key = _build_adj_matrix(g, call_type, graph_store, **kwargs)
         # TODO(lingfan): build adjmat
         for mfn, rfn in v2v_spmv:
             # TODO(lingfan): create spmv executor using adjmat
@@ -144,10 +134,7 @@ def _get_exec_plan(g, call_type, mfunc=None, rfunc=None, **kwargs):
 
     # incidence matrix spmv
     if e2v_spmv:
-        if call_type == "send_and_recv":
-        else:
-            assert(0)
-        # TODO(lingfan): build incidence mat
+        key = _build_incidence_matrix(g, call_type, graph_store, **kwargs)
         for rfn in e2v_spmv:
             # TODO(lingfan): create spmv executor using incidence mat
             pass
@@ -185,8 +172,8 @@ def _sanity_check_on_rfunc(rfunc):
 """
 Generate exec plan for API that involves both message and reduce func
 This function return four components:
-    3. reduce func for Edge-to-Node space SPMV
-    4. reduce func for degree bucketing
+    1. reduce func for Edge-to-Node space SPMV
+    2. reduce func for degree bucketing
 Note: each component is either a list or None
 """
 def _get_reduce_plan(rfunc):
