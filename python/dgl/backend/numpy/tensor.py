@@ -22,13 +22,26 @@ def cpu():
 def tensor(data, dtype=None):
     return np.array(data, dtype)
 
-def coo_matrix(idx, dat, shape):
-    i = idx[0,:]
-    j = idx[1,:]
-    return sp.coo_matrix((dat, (i, j)), shape=shape)
+def sparse_matrix(data, index, shape, force_format=False):
+    fmt = index[0]
+    if fmt == 'coo':
+        i = index[1][0,:]
+        j = index[1][1,:]
+        return sp.coo_matrix((data, (i, j)), shape=shape)
+    elif fmt == 'csr':
+        indices = index[1]
+        indptr = index[2]
+        return sp.csr_matrix((data, indices, indptr), shape=shape)
+    else:
+        raise TypeError('Invalid format: %s.' % fmt)
 
-def csr_matrix(data, indices, indptr, shape):
-    return sp.csr_matrix((data, indices, indptr), shape=shape)
+def sparse_matrix_indices(spmat):
+    if spmat.format == 'coo':
+        return ('coo', np.stack(spmat.row, spmat.col))
+    elif spmat.format == 'csr':
+        return ('csr', spmat.indices, spmat.indptr)
+    else:
+        raise TypeError('Invalid format: %s.' % spmat.format)
 
 def is_tensor(obj):
     return isinstance(obj, np.ndarray)

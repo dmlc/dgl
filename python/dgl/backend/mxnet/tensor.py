@@ -20,12 +20,23 @@ def cpu():
 def tensor(data, dtype=None):
     return nd.array(data, dtype=dtype)
 
-def coo_matrix(idx, data, shape):
-    # NOTE: use a csr_matrix for the coo input
-    return nd.sparse.csr_matrix((data, (idx[0], idx[1])), shape)
+def sparse_matrix(data, index, shape, force_format=False):
+    fmt = index[0]
+    if fmt == 'coo':
+        if force_format:
+            raise TypeError('MXNet backend only supports CSR format,'
+                            ' but COO format is forced.')
+        coord = index[1]
+        return nd.sparse.csr_matrix((data, (coord[0], coord[1])), shape)
+    elif fmt == 'csr':
+        indices = index[1]
+        indptr = index[2]
+        return nd.sparse.csr_matrix((data, indices, indptr), shape)
+    else:
+        raise TypeError('Invalid format: %s.' % fmt)
 
-def csr_matrix(data, indices, indptr, shape):
-    return nd.sparse.csr_matrix((data, indices, indptr), shape)
+def sparse_matrix_indices(spmat):
+    return ('csr', spmat.indices, spmat.indptr)
 
 def is_tensor(obj):
     return isinstance(obj, nd.NDArray)

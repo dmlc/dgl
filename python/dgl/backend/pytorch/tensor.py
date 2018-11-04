@@ -19,10 +19,14 @@ def cpu():
 def tensor(data, dtype=None):
     return th.tensor(data, dtype=dtype)
 
-def coo_matrix(idx, dat, shape):
-    return th.sparse.FloatTensor(idx, dat, shape)
+def sparse_matrix(data, index, shape, force_format=False):
+    fmt = index[0]
+    if fmt != 'coo':
+        raise TypeError('Pytorch backend only supports COO format. But got %s.' % fmt)
+    return th.sparse.FloatTensor(index[1], data, shape)
 
-# csr_matrix is not enabled
+def sparse_matrix_indices(spmat):
+    return ('coo', spmat._indices())
 
 def is_tensor(obj):
     return isinstance(obj, th.Tensor)

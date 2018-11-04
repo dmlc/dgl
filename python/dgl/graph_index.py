@@ -500,7 +500,7 @@ class GraphIndex(object):
             n = self.number_of_nodes()
             # FIXME(minjie): data type
             dat = F.ones((self.number_of_edges(),), dtype=F.float32)
-            mat = F.coo_matrix(idx, dat, (n, n))
+            mat = F.sparse_matrix(dat, ('coo', idx), (n, n))
             self._cache['adj'] = utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx))
         return self._cache['adj']
 
@@ -542,7 +542,7 @@ class GraphIndex(object):
                 x[diagonal] = 0
                 dat = F.cat([x, x], dim=0)
             n = self.number_of_nodes()
-            mat = F.coo_matrix(idx, dat, (n, m))
+            mat = F.sparse_matrix(dat, ('coo', idx), (n, m))
             self._cache[key] = utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx))
 
         return self._cache[key]

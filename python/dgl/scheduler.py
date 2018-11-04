@@ -276,9 +276,8 @@ class UpdateAllExecutor(BasicExecutor):
             if len(F.shape(dat)) > 1:
                 # The edge feature is of shape (N, 1)
                 dat = F.squeeze(dat, 1)
-            # TODO(minjie): should not directly use _indices
-            idx = self.g.adjacency_matrix(ctx)._indices()
-            adjmat = F.coo_matrix(idx, dat, self.graph_shape)
+            idx = F.sparse_matrix_indices(self.g.adjacency_matrix(ctx))
+            adjmat = F.sparse_matrix(dat, idx, self.graph_shape)
         else:
             adjmat = self.g.adjacency_matrix(ctx)
         return adjmat
@@ -350,7 +349,7 @@ class SendRecvExecutor(BasicExecutor):
         else:
             # TODO(minjie): data type should be adjusted according t othe usage.
             dat = F.ones((len(self.u), ), dtype=F.float32)
-        adjmat = F.coo_matrix(self.graph_idx, dat, self.graph_shape)
+        adjmat = F.sparse_matrix(dat, ('coo', self.graph_idx), self.graph_shape)
         return F.copy_to(adjmat, ctx)
 
 

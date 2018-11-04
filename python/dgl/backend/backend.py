@@ -105,46 +105,26 @@ def sparse_matrix(data, index, shape, force_format=False):
     """
     pass
 
-def coo_matrix(idx, dat, shape):
-    """Create a sparse matrix in COO format.
+def sparse_matrix_indices(spmat):
+    """Return the indices of the given sparse matrix.
 
     Parameters
     ----------
-    idx : Tensor
-        Coordinate matrix. It should be of shape (2, nnz).
-        idx[0,:] should be the row index and idx[1,:] should be
-        the column index.
-    dat : Tensor
-        Data matrix. It should be of shape (nnz,)
-    shape : tuple of int
-        The shape of this matrix.
+    spmat : SparseMatrix
+        The framework-specific sparse matrix.
 
     Returns
     -------
-    SparseTensor
-        A framework-specific sparse matrix.
-    """
-    pass
-
-def csr_matrix(data, indices, indptr, shape):
-    """Create a sparse matrix in CSR format.
-
-    See ``scipy.sparse.csr_matrix`` for more documents on what
-    each argument means.
-
-    Parameters
-    ----------
-    data : Tensor
-        The data matrix. Should be of shape (nnz,)
-    indices : Tensor
-        The indices matrix. Should be of shape (nnz,)
-    indptr : Tensor
-        The indptr matrix. Should be of shape (nrows+1,)
-
-    Returns
-    -------
-    SparseTensor
-        A framework-specific sparse matrix.
+    index : tuple
+        This is used to support different sparse formats.
+        For COO format:
+          index=('coo', coord), where coord is of shape (2, nnz).
+          coord[0,:] should be the row index and coord[1,:] should be
+          the column index.
+        For CSR format:
+          index=('csr', indices, indptr), where indices is of shape (nnz,)
+          and indptr is of shape (nrows+1,). See ``scipy.sparse.csr_matrix``
+          for more documents on what each array means.
     """
     pass
 
