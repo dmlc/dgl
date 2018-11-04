@@ -1,4 +1,6 @@
 """
+.. _model-capsule:
+
 Capsule Network
 ================
 

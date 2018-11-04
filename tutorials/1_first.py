@@ -1,9 +1,15 @@
 """
-.. _tutorial-first:
-
-Your first example in DGL
+DGL at a glance
 =========================
 **Author**: Minjie Wang, Quan Gan, Zheng Zhang
+
+The goal of DGL is to build, train, and deploy *machine learning models*
+on *graph-structured data*.  To achieve this, DGL provides a ``DGLGraph``
+class that defines the graph structure and the information on its nodes
+and edges.  It also provides a set of feature transformation methods
+and message passing methods to propagate information between nodes and edges.
+
+Goal of this tutorial: get a feeling of how DGL looks like!
 """
 
 ###############################################################################
@@ -60,10 +66,13 @@ plt.show()
 # Define Computation
 # ------------------
 # The focus of DGL is to provide a way to integrate representation learning
-# (using neural networks) with graph data. The way we do it is with a message-passing interface with scatter-gather paradigm. (i.e. a mailbox metaphor).
+# (using neural networks) with graph data. The way we do it is with a
+# message-passing interface with scatter-gather paradigm. (i.e. a mailbox metaphor).
 #
 # .. note::
-# For people familiar with graph convolutional network, it is easy to see the pattern here.
+#
+#    For people familiar with graph convolutional network, it is easy to see the
+#    pattern here.
 
 def super_useful_comp(g):
 
@@ -98,6 +107,7 @@ graph_sum = super_useful_comp(g_better)
 print("graph sum is: ", graph_sum)
 
 ###############################################################################
-# More...
-# Now, let's move on to blah.
-
+# Next steps
+# ----------
+# In the :doc:`next tutorial <2_basics>`, we will go through defining
+# a graph structure, as well as reading and writing node/edge representations.

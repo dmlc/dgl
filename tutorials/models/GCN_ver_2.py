@@ -1,16 +1,14 @@
 """
-.. _model-gcn:
-
 Graph Convolutional Network
 ====================================
 **Author:** Qi Huang, `Minjie Wang  <https://jermainewang.github.io/>`_,
 Yu Gai, Quan Gan, Zheng Zhang
 
 This is a gentle introduction of using DGL to implement Graph Convolutional
-Networks (Kipf & Welling et al., [Semi-Supervised Classificaton with Graph
-Convolutional Networks](https://arxiv.org/pdf/1609.02907.pdf)). We build upon
-the earlier tutorial on DGLGraph (see[]()) and demonstrate how DGL combines
-graph with deep neural network and learn structural representations.
+Networks (Kipf & Welling et al., `Semi-Supervised Classificaton with Graph
+Convolutional Networks <https://arxiv.org/pdf/1609.02907.pdf>`_). We build upon
+the :doc:`earlier tutorial <../3_pagerank>` on DGLGraph and demonstrate
+how DGL combines graph with deep neural network and learn structural representations.
 """
 
 ###############################################################################
@@ -19,8 +17,7 @@ graph with deep neural network and learn structural representations.
 # GCN from the perspective of message passing
 # ```````````````````````````````````````````````
 # We describe a layer of graph convolutional neural network from a message
-# passing perspective; the math can be found in [later part of the
-# tutorial](https://hackmd.io/IGhRjMvmSXSPPF5xBkOACA?view#GCN-in-one-formula).
+# passing perspective; the math can be found `here <math_>`_.
 # It boils down to the following step, for each node :math:`u`:
 # 
 # 1) Aggregate neighbors' representations :math:`h_{v}` to produce an
@@ -74,7 +71,7 @@ class GCN(nn.Module):
     def forward(self, g, feature):
         g.ndata['h'] = feature
         g.update_all(gcn_msg, gcn_reduce)
-        g.apply_nodes(apply_node_func=self.apply_mod)
+        g.apply_nodes(func=self.apply_mod)
         return g.ndata.pop('h')
 
 ###############################################################################
@@ -136,7 +133,10 @@ for epoch in range(30):
             epoch, loss.item(), np.mean(dur)))
 
 ###############################################################################
+# .. _math:
+#
 # GCN in one formula
+# ------------------
 # Mathematically, the GCN model follows this formula:
 # 
 # :math:`H^{(l+1)} = \sigma(\tilde{D}^{-\frac{1}{2}}\tilde{A}\tilde{D}^{-\frac{1}{2}}H^{(l)}W^{(l)})`
@@ -155,7 +155,7 @@ for epoch in range(30):
 # 
 # The equation can be efficiently implemented using sparse matrix
 # multiplication kernels (such as Kipf's
-# [pygcn](https://github.com/tkipf/pygcn) code). The above DGL implementation
+# `pygcn <https://github.com/tkipf/pygcn>`_ code). The above DGL implementation
 # in fact has already used this trick due to the use of builtin functions. To
 # understand what is under the hood, please read our tutorial on PageRank (TODO
 # link).
