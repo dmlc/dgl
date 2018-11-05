@@ -93,8 +93,8 @@ class SBMMixture:
         for g, adj in zip(self._gs, adjs):
             g.from_scipy_sparse_matrix(adj)
         self._lgs = [g.line_graph(backtracking=False) for g in self._gs]
-        in_degrees = lambda g: g.in_degrees(Index(F.arange(g.number_of_nodes(),
-                                            dtype=F.int64))).unsqueeze(1).float()
+        in_degrees = lambda g: g.in_degrees(
+                Index(F.arange(0, g.number_of_nodes()))).unsqueeze(1).float()
         self._g_degs = [in_degrees(g) for g in self._gs]
         self._lg_degs = [in_degrees(lg) for lg in self._lgs]
         self._pm_pds = list(zip(*[g.edges() for g in self._gs]))[0]

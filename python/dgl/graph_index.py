@@ -494,13 +494,14 @@ class GraphIndex(object):
             src = F.unsqueeze(src.tousertensor(), 0)
             dst = F.unsqueeze(dst.tousertensor(), 0)
             if transpose:
-                idx = F.pack([src, dst])
+                idx = F.cat([src, dst], dim=0)
             else:
-                idx = F.pack([dst, src])
+                idx = F.cat([dst, src], dim=0)
             n = self.number_of_nodes()
-            dat = F.ones((self.number_of_edges(),))
-            mat = F.sparse_tensor(idx, dat, [n, n])
-            self._cache['adj'] = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
+            # FIXME(minjie): data type
+            dat = F.ones((self.number_of_edges(),), dtype=F.float32)
+            mat = F.sparse_matrix(dat, ('coo', idx), (n, n))
+            self._cache['adj'] = utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx))
         return self._cache['adj']
 
     def incidence_matrix(self, oriented=False):
@@ -522,25 +523,27 @@ class GraphIndex(object):
             src = src.tousertensor()
             dst = dst.tousertensor()
             m = self.number_of_edges()
-            eid = F.arange(m, dtype=F.int64)
-            row = F.pack([src, dst])
-            col = F.pack([eid, eid])
-            idx = F.stack([row, col])
+            eid = F.arange(0, m)
+            row = F.unsqueeze(F.cat([src, dst], dim=0), 0)
+            col = F.unsqueeze(F.cat([eid, eid], dim=0), 0)
+            idx = F.cat([row, col], dim=0)
 
             diagonal = (src == dst)
             if oriented:
-                x = -F.ones((m,))
-                y = F.ones((m,))
+                # FIXME(minjie): data type
+                x = -F.ones((m,), dtype=F.float32)
+                y = F.ones((m,), dtype=F.float32)
                 x[diagonal] = 0
                 y[diagonal] = 0
-                dat = F.pack([x, y])
+                dat = F.cat([x, y], dim=0)
             else:
-                x = F.ones((m,))
+                # FIXME(minjie): data type
+                x = F.ones((m,), dtype=F.float32)
                 x[diagonal] = 0
-                dat = F.pack([x, x])
+                dat = F.cat([x, x], dim=0)
             n = self.number_of_nodes()
-            mat = F.sparse_tensor(idx, dat, [n, m])
-            self._cache[key] = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
+            mat = F.sparse_matrix(dat, ('coo', idx), (n, m))
+            self._cache[key] = utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx))
 
         return self._cache[key]
 
