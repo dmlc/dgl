@@ -33,20 +33,20 @@ class SimpleReduceFunction(ReduceFunction):
     """Builtin reduce function that aggregates a single field into another
     single field."""
     def __init__(self, name, op, msg_field, out_field):
-        self.name = name
+        self._name = name
         self.op = op
         self.msg_field = msg_field
         self.out_field = out_field
 
     def is_spmv_supported(self):
         # NOTE: only sum is supported right now.
-        return self.name == "sum"
+        return self._name == "sum"
 
     def __call__(self, nodes):
         return {self.out_field : self.op(nodes.mailbox[self.msg_field], 1)}
 
     def name(self):
-        return self.name
+        return self._name
 
 def sum(msg, out):
     """Builtin reduce function that aggregates messages by sum.

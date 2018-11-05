@@ -114,7 +114,9 @@ class BatchedDGLGraph(DGLGraph):
         dict of tensors
             The readout values.
         """
-        # TODO
+        # Deprecated: use things like this instead:
+        # >>> readout_sum = dgl.function.readout.sum_nodes(in_='h', out='h')
+        # >>> readouts = readout_sum(batched_graph)
         pass
 
 def split(graph_batch, num_or_size_splits):
@@ -136,7 +138,7 @@ def unbatch(graph):
     smaller partitions.  This is usually wasteful.
 
     For simpler tasks such as node/edge state aggregation by example,
-    try to use BatchedDGLGraph.readout().
+    try to use readout functions.
     """
     assert isinstance(graph, BatchedDGLGraph)
     bsize = graph.batch_size
