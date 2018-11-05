@@ -74,17 +74,16 @@ class DGLDigitCapsuleLayer(nn.Module):
 
     def initialize_nodes_and_edges_features(self, u_hat):
         b_ij = torch.zeros(self.in_nodes, self.out_nodes).to(self.device)
-        self.g.set_e_repr({'b_ij': b_ij.view(-1)})
-        self.g.set_e_repr({'u_hat': u_hat.view(-1, self.batch_size, self.out_nodes_dim)})
+        self.g.edata['b_ij'] = b_ij.view(-1)
+        self.g.edata['u_hat'] = u_hat.view(-1, self.batch_size, self.out_nodes_dim)
 
         # Initialize all node features as zero
         node_features = torch.zeros(self.in_nodes + self.out_nodes, self.batch_size,
                                     self.out_nodes_dim).to(self.device)
-        self.g.set_n_repr({'h': node_features})
+        self.g.ndata['h'] = node_features
 
     def get_out_nodes_repr(self):
-        out_nodes_feature = self.g.get_n_repr()['h'][
-                            self.in_nodes:self.in_nodes + self.out_nodes]
+        out_nodes_feature = self.g.ndata['h'][self.in_nodes:self.in_nodes + self.out_nodes]
         # shape transformation is for further classification
         return out_nodes_feature.transpose(0, 1).unsqueeze(1).unsqueeze(4).squeeze(1)
 
