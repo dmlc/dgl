@@ -31,7 +31,7 @@ class GraphIndex(object):
 
     def add_nodes(self, num):
         """Add nodes.
-        
+
         Parameters
         ----------
         num : int
@@ -42,7 +42,7 @@ class GraphIndex(object):
 
     def add_edge(self, u, v):
         """Add one edge.
-        
+
         Parameters
         ----------
         u : int
@@ -55,7 +55,7 @@ class GraphIndex(object):
 
     def add_edges(self, u, v):
         """Add many edges.
-        
+
         Parameters
         ----------
         u : utils.Index
@@ -283,7 +283,7 @@ class GraphIndex(object):
         ----------
         v : utils.Index
             The node(s).
-        
+
         Returns
         -------
         utils.Index
@@ -310,7 +310,7 @@ class GraphIndex(object):
         ----------
         v : utils.Index
             The node(s).
-        
+
         Returns
         -------
         utils.Index
@@ -337,7 +337,7 @@ class GraphIndex(object):
         ----------
         sorted : bool
             True if the returned edges are sorted by their src and dst ids.
-        
+
         Returns
         -------
         utils.Index
@@ -499,7 +499,7 @@ class GraphIndex(object):
                 mat = utils.build_sparse_matrix(src, dst, [n, n], m)
             else:
                 mat = utils.build_sparse_matrix(dst, src, [n, n], m)
-            self._cache['adj'] = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
+            self._cache['adj'] = utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx))
         return self._cache['adj']
 
     def incidence_matrix(self, oriented=False):
@@ -521,25 +521,27 @@ class GraphIndex(object):
             src = src.tousertensor()
             dst = dst.tousertensor()
             m = self.number_of_edges()
-            eid = F.arange(m, dtype=F.int64)
-            row = F.pack([src, dst])
-            col = F.pack([eid, eid])
-            idx = F.stack([row, col])
+            eid = F.arange(0, m)
+            row = F.unsqueeze(F.cat([src, dst], dim=0), 0)
+            col = F.unsqueeze(F.cat([eid, eid], dim=0), 0)
+            idx = F.cat([row, col], dim=0)
 
             diagonal = (src == dst)
             if oriented:
-                x = -F.ones((m,))
-                y = F.ones((m,))
+                # FIXME(minjie): data type
+                x = -F.ones((m,), dtype=F.float32)
+                y = F.ones((m,), dtype=F.float32)
                 x[diagonal] = 0
                 y[diagonal] = 0
-                dat = F.pack([x, y])
+                dat = F.cat([x, y], dim=0)
             else:
-                x = F.ones((m,))
+                # FIXME(minjie): data type
+                x = F.ones((m,), dtype=F.float32)
                 x[diagonal] = 0
-                dat = F.pack([x, x])
+                dat = F.cat([x, x], dim=0)
             n = self.number_of_nodes()
-            mat = F.sparse_tensor(idx, dat, [n, m])
-            self._cache[key] = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
+            mat = F.sparse_matrix(dat, ('coo', idx), (n, m))
+            self._cache[key] = utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx))
 
         return self._cache[key]
 
@@ -562,7 +564,7 @@ class GraphIndex(object):
             n = self.number_of_nodes()
             m = len(eid)
             mat = utils.build_sparse_matrix(dst, eid, [n, m], m)
-            self._cache[key] = utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
+            self._cache[key] = utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx))
         return self._cache[key]
 
     def to_networkx(self):
@@ -587,7 +589,7 @@ class GraphIndex(object):
 
         If 'id' edge attribute exists, the edge will be added follows
         the edge id order. Otherwise, order is undefined.
-        
+
         Parameters
         ----------
         nx_graph : networkx.DiGraph
@@ -757,7 +759,7 @@ def disjoint_union(graphs):
 
 def disjoint_partition(graph, num_or_size_splits):
     """Partition the graph disjointly.
-   
+
     This is a reverse operation of DisjointUnion. The graph will be partitioned
     into num graphs. This requires the given number of partitions to evenly
     divides the number of nodes in the graph. If the a size list is given,

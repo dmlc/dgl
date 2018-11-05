@@ -1,15 +1,15 @@
 """Columnar storage for DGLGraph."""
 from __future__ import absolute_import
 
-from collections import MutableMapping
+from collections import MutableMapping, namedtuple
 import numpy as np
 
 from . import backend as F
-from .backend import Tensor
 from .base import DGLError, dgl_warning
 from . import utils
 
-class Scheme(object):
+
+class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     """The column scheme.
 
     Parameters
@@ -19,23 +19,10 @@ class Scheme(object):
     dtype : TVMType
         The feature data type.
     """
-    def __init__(self, shape, dtype):
-        self.shape = shape
-        self.dtype = dtype
+    pass
 
-    def __repr__(self):
-        return '{shape=%s, dtype=%s}' % (repr(self.shape), repr(self.dtype))
-
-    def __eq__(self, other):
-        return self.shape == other.shape and self.dtype == other.dtype
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    @staticmethod
-    def infer_scheme(tensor):
-        """Infer the scheme of the given tensor."""
-        return Scheme(tuple(F.shape(tensor)[1:]), F.get_tvmtype(tensor))
+def infer_scheme(tensor):
+    return Scheme(tuple(F.shape(tensor)[1:]), F.dtype(tensor))
 
 class Column(object):
     """A column is a compact store of features of multiple nodes/edges.
@@ -52,18 +39,22 @@ class Column(object):
     """
     def __init__(self, data, scheme=None):
         self.data = data
-        self.scheme = scheme if scheme else Scheme.infer_scheme(data)
+        self.scheme = scheme if scheme else infer_scheme(data)
 
     def __len__(self):
         """The column length."""
         return F.shape(self.data)[0]
+
+    @property
+    def shape(self):
+        return self.scheme.shape
 
     def __getitem__(self, idx):
         """Return the feature data given the index.
 
         Parameters
         ----------
-        idx : utils.Index
+        idx : slice or utils.Index
             The index.
 
         Returns
@@ -71,8 +62,11 @@ class Column(object):
         Tensor
             The feature data
         """
-        user_idx = idx.tousertensor(F.get_context(self.data))
-        return F.gather_row(self.data, user_idx)
+        if isinstance(idx, slice):
+            return self.data[idx]
+        else:
+            user_idx = idx.tousertensor(F.context(self.data))
+            return F.gather_row(self.data, user_idx)
 
     def __setitem__(self, idx, feats):
         """Update the feature data given the index.
@@ -82,7 +76,7 @@ class Column(object):
 
         Parameters
         ----------
-        idx : utils.Index
+        idx : utils.Index or slice
             The index.
         feats : Tensor
             The new features.
@@ -94,23 +88,52 @@ class Column(object):
 
         Parameters
         ----------
-        idx : utils.Index
+        idx : utils.Index or slice
             The index.
         feats : Tensor
             The new features.
         inplace : bool
             If true, use inplace write.
         """
-        feat_scheme = Scheme.infer_scheme(feats)
+        feat_scheme = infer_scheme(feats)
         if feat_scheme != self.scheme:
             raise DGLError("Cannot update column of scheme %s using feature of scheme %s."
                     % (feat_scheme, self.scheme))
-        user_idx = idx.tousertensor(F.get_context(self.data))
+
+        if isinstance(idx, utils.Index):
+            idx = idx.tousertensor(F.context(self.data))
+
         if inplace:
-            # TODO(minjie): do not use [] operator directly
-            self.data[user_idx] = feats
+            F.scatter_row_inplace(self.data, idx, feats)
         else:
-            self.data = F.scatter_row(self.data, user_idx, feats)
+            if isinstance(idx, slice):
+                # for contiguous indices pack is usually faster than scatter row
+                part1 = F.narrow_row(self.data, 0, idx.start)
+                part2 = feats
+                part3 = F.narrow_row(self.data, idx.stop, len(self))
+                self.data = F.cat([part1, part2, part3], dim=0)
+            else:
+                self.data = F.scatter_row(self.data, idx, feats)
+
+    def extend(self, feats, feat_scheme=None):
+        """Extend the feature data.
+
+         Parameters
+        ----------
+        feats : Tensor
+            The new features.
+        feat_scheme : Scheme, optional
+            The scheme
+        """
+        if feat_scheme is None:
+            feat_scheme = Scheme.infer_scheme(feats)
+
+        if feat_scheme != self.scheme:
+            raise DGLError("Cannot update column of scheme %s using feature of scheme %s."
+                    % (feat_scheme, self.scheme))
+
+        feats = F.copy_to(feats, F.context(self.data))
+        self.data = F.cat([self.data, feats], dim=0)
 
     @staticmethod
     def create(data):
@@ -155,6 +178,12 @@ class Frame(MutableMapping):
         # If is none, then a warning will be raised
         # in the first call and zero initializer will be used later.
         self._initializer = None
+
+    def _warn_and_set_initializer(self):
+        dgl_warning('Initializer is not set. Use zero initializer instead.'
+                    ' To suppress this warning, use `set_initializer` to'
+                    ' explicitly specify which initializer to use.')
+        self._initializer = lambda shape, dtype: F.zeros(shape, dtype)
 
     def set_initializer(self, initializer):
         """Set the initializer for empty values.
@@ -253,14 +282,10 @@ class Frame(MutableMapping):
                            ' number of rows is unknown. Make sure there is at least'
                            ' one column in the frame so number of rows can be inferred.' % name)
         if self.initializer is None:
-            dgl_warning('Initializer is not set. Use zero initializer instead.'
-                        ' To suppress this warning, use `set_initializer` to'
-                        ' explicitly specify which initializer to use.')
-            # TODO(minjie): handle data type
-            self.set_initializer(lambda shape, dtype : F.zeros(shape))
+            self._warn_and_set_initializer()
         # TODO(minjie): directly init data on the targer device.
         init_data = self.initializer((self.num_rows,) + scheme.shape, scheme.dtype)
-        init_data = F.to_context(init_data, ctx)
+        init_data = F.copy_to(init_data, ctx)
         self._columns[name] = Column(init_data, scheme)
 
     def update_column(self, name, data):
@@ -301,13 +326,7 @@ class Frame(MutableMapping):
             self._num_rows = other.num_rows
         else:
             for key, col in other.items():
-                sch = self._columns[key].scheme
-                other_sch = col.scheme
-                if sch != other_sch:
-                    raise DGLError("Cannot append column of scheme %s to column of scheme %s."
-                                   % (other_scheme, sch))
-                self._columns[key].data = F.pack(
-                        [self._columns[key].data, col.data])
+                self._columns[key].extend(col.data, col.scheme)
             self._num_rows += other.num_rows
 
     def clear(self):
@@ -335,19 +354,23 @@ class FrameRef(MutableMapping):
     frame : Frame, optional
         The underlying frame. If not given, the reference will point to a
         new empty frame.
-    index : iterable of int, optional
+    index : iterable, slice, or int, optional
         The rows that are referenced in the underlying frame. If not given,
         the whole frame is referenced. The index should be distinct (no
         duplication is allowed).
+
+        Note that if a slice is given, the step must be None.
     """
     def __init__(self, frame=None, index=None):
         self._frame = frame if frame is not None else Frame()
         if index is None:
+            # _index_data can be either a slice or an iterable
             self._index_data = slice(0, self._frame.num_rows)
         else:
             # TODO(minjie): check no duplication
             self._index_data = index
         self._index = None
+        self._index_or_slice = None
 
     @property
     def schemes(self):
@@ -369,10 +392,8 @@ class FrameRef(MutableMapping):
     def num_rows(self):
         """Return the number of rows referred."""
         if isinstance(self._index_data, slice):
-            # NOTE: we are assuming that the index is a slice ONLY IF
-            # index=None during construction.
-            # As such, start is always 0, and step is always 1.
-            return self._index_data.stop
+            # NOTE: we always assume that slice.step is None
+            return self._index_data.stop - self._index_data.start
         else:
             return len(self._index_data)
 
@@ -399,10 +420,26 @@ class FrameRef(MutableMapping):
         if self._index is None:
             if self.is_contiguous():
                 self._index = utils.toindex(
-                        F.arange(self._index_data.stop, dtype=F.int64))
+                        F.arange(self._index_data.start,
+                                 self._index_data.stop))
             else:
                 self._index = utils.toindex(self._index_data)
         return self._index
+
+    def index_or_slice(self):
+        """Returns the index object or the slice
+
+        Returns
+        -------
+        utils.Index or slice
+            The index or slice
+        """
+        if self._index_or_slice is None:
+            if self.is_contiguous():
+                self._index_or_slice = self._index_data
+            else:
+                self._index_or_slice = utils.toindex(self._index_data)
+        return self._index_or_slice
 
     def __contains__(self, name):
         """Return whether the column name exists."""
@@ -424,8 +461,8 @@ class FrameRef(MutableMapping):
         """Get data from the frame.
 
         If the provided key is string, the corresponding column data will be returned.
-        If the provided key is an index, the corresponding rows will be selected. The
-        returned rows are saved in a lazy dictionary so only the real selection happens
+        If the provided key is an index or a slice, the corresponding rows will be selected.
+        The returned rows are saved in a lazy dictionary so only the real selection happens
         when the explicit column name is provided.
         
         Examples (using pytorch)
@@ -439,7 +476,7 @@ class FrameRef(MutableMapping):
         
         Parameters
         ----------
-        key : str or utils.Index
+        key : str or utils.Index or slice
             The key.
 
         Returns
@@ -472,14 +509,14 @@ class FrameRef(MutableMapping):
         if self.is_span_whole_column():
             return col.data
         else:
-            return col[self.index()]
+            return col[self.index_or_slice()]
 
     def select_rows(self, query):
         """Return the rows given the query.
 
         Parameters
         ----------
-        query : utils.Index
+        query : utils.Index or slice
             The rows to be selected.
 
         Returns
@@ -487,8 +524,8 @@ class FrameRef(MutableMapping):
         utils.LazyDict
             The lazy dictionary from str to the selected data.
         """
-        rowids = self._getrowid(query)
-        return utils.LazyDict(lambda key: self._frame[key][rowids], keys=self.keys())
+        rows = self._getrows(query)
+        return utils.LazyDict(lambda key: self._frame[key][rows], keys=self.keys())
 
     def __setitem__(self, key, val):
         """Update the data in the frame.
@@ -543,15 +580,34 @@ class FrameRef(MutableMapping):
             self._frame[name] = col
         else:
             if name not in self._frame:
-                feat_shape = F.shape(data)[1:]
-                feat_dtype = F.get_tvmtype(data)
-                ctx = F.get_context(data)
-                self._frame.add_column(name, Scheme(feat_shape, feat_dtype), ctx)
-                #raise DGLError('Cannot update column. Column "%s" does not exist.'
-                #               ' Did you forget to init the column using `set_n_repr`'
-                #               ' or `set_e_repr`?' % name)
+                ctx = F.context(data)
+                self._frame.add_column(name, infer_scheme(data), ctx)
             fcol = self._frame[name]
-            fcol.update(self.index(), data, inplace)
+            fcol.update(self.index_or_slice(), data, inplace)
+
+    def add_rows(self, num_rows):
+        """Add blank rows.
+
+        For existing fields, the rows will be extended according to their
+        initializers.
+
+        Parameters
+        ----------
+        num_rows : int
+            Number of rows to add
+        """
+
+        feat_placeholders = {}
+
+        for key in self._frame:
+            scheme = self._frame[key].scheme
+
+            if self._frame.initializer is None:
+                self._frame._warn_and_set_initializer()
+            new_data = self._frame.initializer((num_rows,) + scheme.shape, scheme.dtype)
+            feat_placeholders[key] = new_data
+
+        self.append(feat_placeholders)
 
     def update_rows(self, query, data, inplace):
         """Update the rows.
@@ -564,30 +620,28 @@ class FrameRef(MutableMapping):
 
         Parameters
         ----------
-        query : utils.Index
+        query : utils.Index or slice
             The rows to be updated.
         data : dict-like
             The row data.
         inplace : bool
             True if the update is performed inplacely.
         """
-        rowids = self._getrowid(query)
+        rows = self._getrows(query)
         for key, col in data.items():
             if key not in self:
                 # add new column
-                tmpref = FrameRef(self._frame, rowids)
+                tmpref = FrameRef(self._frame, rows)
                 tmpref.update_column(key, col, inplace)
-                #raise DGLError('Cannot update rows. Column "%s" does not exist.'
-                #               ' Did you forget to init the column using `set_n_repr`'
-                #               ' or `set_e_repr`?' % key)
             else:
-                self._frame[key].update(rowids, col, inplace)
+                self._frame[key].update(rows, col, inplace)
 
     def __delitem__(self, key):
         """Delete data in the frame.
 
         If the provided key is a string, the corresponding column will be deleted.
-        If the provided key is an index object, the corresponding rows will be deleted.
+        If the provided key is an index object or a slice, the corresponding rows will
+        be deleted.
 
         Please note that "deleted" rows are not really deleted, but simply removed
         in the reference. As a result, if two FrameRefs point to the same Frame, deleting
@@ -614,14 +668,17 @@ class FrameRef(MutableMapping):
 
         Parameters
         ----------
-        query : utils.Index
+        query : utils.Index or slice
             The rows to be deleted.
         """
-        query = query.tolist()
+        if isinstance(query, slice):
+            query = range(query.start, query.stop)
+        else:
+            query = query.tolist()
+
         if isinstance(self._index_data, slice):
-            self._index_data = list(range(self._index_data.start, self._index_data.stop))
-        arr = np.array(self._index_data, dtype=np.int32)
-        self._index_data = list(np.delete(arr, query))
+            self._index_data = range(self._index_data.start, self._index_data.stop)
+        self._index_data = list(np.delete(self._index_data, query))
         self._clear_cache()
 
     def append(self, other):
@@ -640,8 +697,11 @@ class FrameRef(MutableMapping):
         if span_whole:
             self._index_data = slice(0, self._frame.num_rows)
         elif contiguous:
-            new_idx = list(range(self._index_data.start, self._index_data.stop))
-            new_idx += list(range(old_nrows, self._frame.num_rows))
+            if self._index_data.stop == old_nrows:
+                new_idx = slice(self._index_data.start, self._frame.num_rows)
+            else:
+                new_idx = list(range(self._index_data.start, self._index_data.stop))
+                new_idx.extend(range(old_nrows, self._frame.num_rows))
             self._index_data = new_idx
         self._clear_cache()
 
@@ -653,26 +713,35 @@ class FrameRef(MutableMapping):
 
     def is_contiguous(self):
         """Return whether this refers to a contiguous range of rows."""
-        # NOTE: this check could have false negatives and false positives
-        # (step other than 1)
+        # NOTE: this check could have false negatives
+        # NOTE: we always assume that slice.step is None
         return isinstance(self._index_data, slice)
 
     def is_span_whole_column(self):
         """Return whether this refers to all the rows."""
         return self.is_contiguous() and self.num_rows == self._frame.num_rows
 
-    def _getrowid(self, query):
+    def _getrows(self, query):
         """Internal function to convert from the local row ids to the row ids of the frame."""
         if self.is_contiguous():
-            # shortcut for identical mapping
-            return query
+            start = self._index_data.start
+            if start == 0:
+                # shortcut for identical mapping
+                return query
+            elif isinstance(query, slice):
+                return slice(query.start + start, query.stop + start)
+            else:
+                query = query.tousertensor()
+                return utils.toindex(query + start)
         else:
             idxtensor = self.index().tousertensor()
-            return utils.toindex(F.gather_row(idxtensor, query.tousertensor()))
+            query = query.tousertensor()
+            return utils.toindex(F.gather_row(idxtensor, query))
 
     def _clear_cache(self):
         """Internal function to clear the cached object."""
-        self._index_tensor = None
+        self._index = None
+        self._index_or_slice = None
 
 def merge_frames(frames, indices, max_index, reduce_func):
     """Merge a list of frames.
@@ -709,7 +778,7 @@ def merge_frames(frames, indices, max_index, reduce_func):
     m = len(row)
     row = F.unsqueeze(F.tensor(row, dtype=F.int64), 0)
     col = F.unsqueeze(F.tensor(col, dtype=F.int64), 0)
-    idx = F.pack([row, col])
+    idx = F.cat([row, col], dim=0)
     dat = F.ones((m,))
     adjmat = F.sparse_tensor(idx, dat, [n, m])
     ctx_adjmat = utils.CtxCachedObject(lambda ctx: F.to_context(adjmat, ctx))

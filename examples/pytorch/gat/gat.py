@@ -16,18 +16,18 @@ import dgl
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 
-def gat_message(src, edge):
-    return {'ft' : src['ft'], 'a2' : src['a2']}
+def gat_message(edges):
+    return {'ft' : edges.src['ft'], 'a2' : edges.src['a2']}
 
 class GATReduce(nn.Module):
     def __init__(self, attn_drop):
         super(GATReduce, self).__init__()
         self.attn_drop = attn_drop
 
-    def forward(self, node, msgs):
-        a1 = torch.unsqueeze(node['a1'], 1)  # shape (B, 1, 1)
-        a2 = msgs['a2'] # shape (B, deg, 1)
-        ft = msgs['ft'] # shape (B, deg, D)
+    def forward(self, nodes):
+        a1 = torch.unsqueeze(nodes.data['a1'], 1)  # shape (B, 1, 1)
+        a2 = nodes.mailbox['a2'] # shape (B, deg, 1)
+        ft = nodes.mailbox['ft'] # shape (B, deg, D)
         # attention
         a = a1 + a2  # shape (B, deg, 1)
         e = F.softmax(F.leaky_relu(a), dim=1)
@@ -46,13 +46,13 @@ class GATFinalize(nn.Module):
             if indim != hiddendim:
                 self.residual_fc = nn.Linear(indim, hiddendim)
 
-    def forward(self, node):
-        ret = node['accum']
+    def forward(self, nodes):
+        ret = nodes.data['accum']
         if self.residual:
             if self.residual_fc is not None:
-                ret = self.residual_fc(node['h']) + ret
+                ret = self.residual_fc(nodes.data['h']) + ret
             else:
-                ret = node['h'] + ret
+                ret = nodes.data['h'] + ret
         return {'head%d' % self.headid : self.activation(ret)}
 
 class GATPrepare(nn.Module):
@@ -120,7 +120,7 @@ class GAT(nn.Module):
             for hid in range(self.num_heads):
                 i = l * self.num_heads + hid
                 # prepare
-                self.g.set_n_repr(self.prp[i](last))
+                self.g.ndata.update(self.prp[i](last))
                 # message passing
                 self.g.update_all(gat_message, self.red[i], self.fnl[i])
             # merge all the heads
@@ -128,7 +128,7 @@ class GAT(nn.Module):
                     [self.g.pop_n_repr('head%d' % hid) for hid in range(self.num_heads)],
                     dim=1)
         # output projection
-        self.g.set_n_repr(self.prp[-1](last))
+        self.g.ndata.update(self.prp[-1](last))
         self.g.update_all(gat_message, self.red[-1], self.fnl[-1])
         return self.g.pop_n_repr('head0')
 

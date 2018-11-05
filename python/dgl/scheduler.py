@@ -5,10 +5,11 @@ import numpy as np
 
 from .base import ALL, DGLError
 from . import backend as F
+from collections import defaultdict as ddict
 from .function import message as fmsg
 from .function import reducer as fred
+from .udf import NodeBatch, EdgeBatch
 from . import utils
-from collections import defaultdict as ddict
 
 from ._ffi.function import _init_api
 
@@ -55,8 +56,8 @@ def _process_buckets(buckets):
     # split buckets
     unique_v = v.tousertensor()
     msg_ids = msg_ids.tousertensor()
-    dsts = F.unpack(unique_v, v_section)
-    msg_ids = F.unpack(msg_ids, msg_section)
+    dsts = F.split(unique_v, v_section, dim=0)
+    msg_ids = F.split(msg_ids, msg_section, dim=0)
 
     # convert to utils.Index
     unique_v = utils.toindex(unique_v)
@@ -135,7 +136,7 @@ class SPMVOperator(Executor):
     def run(self):
         # get src col
         srccol = self.node_repr[self.src_field]
-        ctx = F.get_context(srccol)
+        ctx = F.context(srccol)
 
         # build adjmat
         adjmat = self.adj_build_fn(self.edge_field, ctx, self.use_edge_feat)
@@ -144,7 +145,7 @@ class SPMVOperator(Executor):
         if len(F.shape(srccol)) == 1:
             srccol = F.unsqueeze(srccol, 1)
             dstcol = F.spmm(adjmat, srccol)
-            dstcol = F.squeeze(dstcol)
+            dstcol = F.squeeze(dstcol, 1)
         else:
             dstcol = F.spmm(adjmat, srccol)
         return {self.dst_field : dstcol}
@@ -176,7 +177,7 @@ class DegreeBucketingExecutor(Executor):
         # loop over each bucket
         # FIXME (lingfan): handle zero-degree case
         for deg, vv, msg_id in zip(self.degrees, self.dsts, self.msg_ids):
-            dst_reprs = self.g.get_n_repr(vv)
+            v_data = self.g.get_n_repr(vv)
             in_msgs = self.msg_frame.select_rows(msg_id)
             def _reshape_fn(msg):
                 msg_shape = F.shape(msg)
@@ -184,11 +185,12 @@ class DegreeBucketingExecutor(Executor):
                 return F.reshape(msg, new_shape)
             reshaped_in_msgs = utils.LazyDict(
                     lambda key: _reshape_fn(in_msgs[key]), self.msg_frame.schemes)
-            new_reprs.append(self.rfunc(dst_reprs, reshaped_in_msgs))
+            nb = NodeBatch(self.g, vv, v_data, reshaped_in_msgs)
+            new_reprs.append(self.rfunc(nb))
 
         # Pack all reducer results together
         keys = new_reprs[0].keys()
-        new_reprs = {key : F.pack([repr[key] for repr in new_reprs])
+        new_reprs = {key : F.cat([repr[key] for repr in new_reprs], dim=0)
                      for key in keys}
         return new_reprs
 
@@ -271,10 +273,11 @@ class UpdateAllExecutor(BasicExecutor):
     def _adj_build_fn(self, edge_field, ctx, use_edge_feat):
         if use_edge_feat:
             dat = self.edge_repr[edge_field]
-            dat = F.squeeze(dat)
-            # TODO(minjie): should not directly use _indices
-            idx = self.g.adjacency_matrix(ctx)._indices()
-            adjmat = F.sparse_tensor(idx, dat, self.graph_shape)
+            if len(F.shape(dat)) > 1:
+                # The edge feature is of shape (N, 1)
+                dat = F.squeeze(dat, 1)
+            idx = F.sparse_matrix_indices(self.g.adjacency_matrix(ctx))
+            adjmat = F.sparse_matrix(dat, idx, self.graph_shape)
         else:
             adjmat = self.g.adjacency_matrix(ctx)
         return adjmat
@@ -320,7 +323,7 @@ class SendRecvExecutor(BasicExecutor):
     @property
     def edge_repr(self):
         if self._edge_repr is None:
-            self._edge_repr = self.g.get_e_repr(self.u, self.v)
+            self._edge_repr = self.g.get_e_repr((self.u, self.v))
         return self._edge_repr
 
     def _build_adjmat(self):
@@ -332,18 +335,22 @@ class SendRecvExecutor(BasicExecutor):
         new_v = old2new[v]
         n = self.g.number_of_nodes()
         m = len(new2old)
-        self._graph_idx = F.pack([F.unsqueeze(new_v, 0), F.unsqueeze(u, 0)])
+        self._graph_idx = F.cat(
+                [F.unsqueeze(new_v, 0), F.unsqueeze(u, 0)], dim=0)
         self._graph_shape = [m, n]
         self._recv_nodes = new2old
 
     def _adj_build_fn(self, edge_field, ctx, use_edge_feat):
         if use_edge_feat:
             dat = self.edge_repr[edge_field]
-            dat = F.squeeze(dat)
+            if len(F.shape(dat)) > 1:
+                # edge feature is of shape (N, 1)
+                dat = F.squeeze(dat, dim=1)
         else:
-            dat = F.ones((len(self.u), ))
-        adjmat = F.sparse_tensor(self.graph_idx, dat, self.graph_shape)
-        return F.to_context(adjmat, ctx)
+            # TODO(minjie): data type should be adjusted according t othe usage.
+            dat = F.ones((len(self.u), ), dtype=F.float32)
+        adjmat = F.sparse_matrix(dat, ('coo', self.graph_idx), self.graph_shape)
+        return F.copy_to(adjmat, ctx)
 
 
 class BundledExecutor(BasicExecutor):
@@ -432,9 +439,12 @@ def _create_send_and_recv_exec(graph, **kwargs):
     dst = kwargs.pop('dst')
     mfunc = kwargs.pop('message_func')
     rfunc = kwargs.pop('reduce_func')
-    if isinstance(mfunc, (list, tuple)) or isinstance(rfunc, (list, tuple)):
-        mfunc = fmsg.BundledMessageFunction(mfunc)
-        rfunc = fred.BundledReduceFunction(rfunc)
+    if (isinstance(mfunc, fmsg.BundledMessageFunction)
+            or isinstance(rfunc, fred.BundledReduceFunction)):
+        if not isinstance(mfunc, fmsg.BundledMessageFunction):
+            mfunc = fmsg.BundledMessageFunction(mfunc)
+        if not isinstance(rfunc, fred.BundledReduceFunction):
+            rfunc = fred.BundledReduceFunction(rfunc)
         exec_cls = BundledSendRecvExecutor
     else:
         exec_cls = SendRecvExecutor

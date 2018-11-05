@@ -6,8 +6,6 @@ import networkx as nx
 import scipy.sparse as sp
 import mxnet as mx
 
-from .mxnet import to_context
-
 class ImmutableGraphIndex(object):
     """Backend-specific graph index object on immutable graphs.
     We can use a CSR matrix to represent a graph structure. For functionality,
