@@ -12,9 +12,14 @@ from .frame import FrameRef
 from .._fi.function import _init_api
 
 # TODO(lingfan)
-__all__ = []
+# 1. handle 0 degree in c++
+# 2. adjmat index case
+# 3. double check on multi-edge
+# 4. remove graph store
+# 5. push and pull schedule
+# 6. doc string
 
-# XXX: multi-edge?
+__all__ = [] #FIXME
 
 def _get_edge_idx(g, u, v, eid):
     if is_all(u) and is_all(v) and eid is None:
@@ -32,89 +37,69 @@ def get_send_schedule(graph, u, v, eid, message_func):
     # FIXME: need to check message frame first
     # TODO (lingfan): doc string
     u, v, eid = _get_edge_idx(graph, u, v, eid)
+    graph._msg_graph.add_edges(u, v)
     if isinstance(message_func, (list, tuple)):
         message_func = fmsg.BundledMessageFunction(message_func)
-    send_exe = _build_edge_executor(message_func, graph._node_frame, graph._edge_frame, graph._msg_frame, u, v, eid)
-    graph._msg_graph.add_edges(u, v)
+    send_exe = _build_edge_executor(graph, message_func, graph._msg_frame, u, v, eid)
+    exec_plan = ExecutionPlan()
+    exec_plan.add_stage([send_exe])
+    return exec_plan
 
 def get_recv_schedule(graph, v, reduce_func):
     # TODO (lingfan): doc string
     e2v_spmv, to_deg_bucket = _get_reduce_plan(rfunc)
 
     exec_plan = ExecutionPlan()
-    reduce_execs = []
-    message_frame = graph._msg_frame
-    node_frame = graph._node_frame
 
     # incidence matrix spmv
-    if e2v_spmv:
-        graph_data = GraphData()
-        spmv_out_frame = FrameRef()
-        key = _build_incidence_matrix(graph, call_type, graph_data, **kwargs)
-        for rfn in e2v_spmv:
-            exe = _build_incidence_spmv_exec(graph_data, key, rfn, message_frame, spmv_out_frame)
-            reduce_execs.append(exe)
+    e2v_spmv_execs = _build_e2v_spmv_executors(graph, call_type, e2v_spmv, g._message_frame, v=v)
 
     # degree bucketing
-    if to_deg_bucket:
-        exec_list = _build_degree_bucketing_executors(graph, call_type, node_frame, message_frame)
-        recv_exes.extend(exec_list)
+    deg_bucket_execs = _build_degree_bucketing_executors(graph, call_type, g._message_frame, v=v)
 
-    exec_plan.add_stage(recv_exes)
+    exec_plan.add_stage(e2v_spmv_execs + deg_bucket_execs)
+    return exec_plan
 
 def get_update_all_schedule(graph, message_func, reduce_func):
     # TODO (lingfan): doc string
+    call_type = "update_all"
+
     mfunc, v2v_spmv, e2v_spmv, to_deg_bucket = _get_multi_stage_plan(message_func, reduce_func)
 
-    # adjmat kv store
     exec_plan = ExecutionPlan()
-    node_frame = graph._node_frame
-    edge_frame = graph._edge_frame
-    graph_data = GraphData()
+
+    # transient frame to store messages
     message_frame = FrameRef()
 
     # send
     if mfunc:
         u, v, eid = _get_edge_info(ALL, ALL, None)
-        send_exe = _build_edge_executor(graph, mfunc, node_frame, edge_frame, message_frame, u, v, eid):
+        send_exe = _build_edge_executor(graph, mfunc, message_frame, u, v, eid):
         exec_plan.add_stage([send_exe])
 
-    recv_exes = []
-    spmv_out_frame = FrameRef()
-
     # fused spmv
-    if v2v_spmv:
-        key = _build_adj_matrix(graph, call_type, graph_data, edges=edges)
-        for mfn, rfn in v2v_spmv:
-            exe = _build_adj_spmv_exec(graph_data, key, mfn, rfn, node_frame, edge_frame, spmv_out_frame)
-            recv_exes.append(exe)
+    v2v_spmv_execs = _build_v2v_spmv_executors(graph, call_type, v2v_spmv)
 
     # incidence matrix spmv
-    if e2v_spmv:
-        key = _build_incidence_matrix(graph, call_type, graph_data, **kwargs)
-        for rfn in e2v_spmv:
-            exe = _build_incidence_spmv_exec(graph_data, key, rfn, message_frame, spmv_out_frame)
-            reduce_execs.append(exe)
+    e2v_spmv_execs = _build_e2v_spmv_executors(graph, call_type, e2v_spmv, message_frame)
 
     # degree bucketing
-    if to_deg_bucket:
-        exec_list = _build_degree_bucketing_executors(graph, call_type, node_frame, message_frame)
-        recv_exes.extend(exec_list)
+    deg_bucket_execs = _build_degree_bucketing_executors(graph, call_type, message_frame)
 
-    exec_plan.add_stage(recv_exes)
+    exec_plan.add_stage(v2v_spmv_execs + e2v_spmv_execs + deg_bucket_execs)
     return exec_plan
 
 def get_send_and_recv_schedule(graph, u, v, eid, message_func, reduce_func):
     # TODO (lingfan): doc string
+    call_type = "send_and_recv"
+
     u, v, eid = _get_edge_idx(graph, u, v, eid)
 
     mfunc, v2v_spmv, e2v_spmv, to_deg_bucket = _get_multi_stage_plan(message_func, reduce_func)
 
-    # adjmat kv store
     exec_plan = ExecutionPlan()
-    node_frame = graph._node_frame
-    edge_frame = graph._edge_frame
-    graph_data = GraphData()
+
+    # transient frame to store messages
     message_frame = FrameRef()
 
     # send
@@ -122,29 +107,16 @@ def get_send_and_recv_schedule(graph, u, v, eid, message_func, reduce_func):
         send_exe = _build_edge_executor(graph, mfunc, node_frame, edge_frame, message_frame, u, v, eid):
         exec_plan.add_stage([send_exe])
 
-    recv_exes = []
-    spmv_out_frame = FrameRef()
-
     # fused spmv
-    if v2v_spmv:
-        key = _build_adj_matrix(graph, call_type, graph_data, edges=edges)
-        for mfn, rfn in v2v_spmv:
-            exe = _build_adj_spmv_exec(graph_data, key, mfn, rfn, node_frame, edge_frame, spmv_out_frame)
-            recv_exes.append(exe)
+    v2v_spmv_execs = _build_v2v_spmv_executors(graph, call_type, v2v_spmv, u=u, v=v)
 
     # incidence matrix spmv
-    if e2v_spmv:
-        key = _build_incidence_matrix(graph, call_type, graph_data, **kwargs)
-        for rfn in e2v_spmv:
-            exe = _build_incidence_spmv_exec(graph_data, key, rfn, message_frame, spmv_out_frame)
-            reduce_execs.append(exe)
+    e2v_spmv_execs = _build_e2v_spmv_executors(graph, call_type, e2v_spmv, message_frame, u=u, v=v)
 
     # degree bucketing
-    if to_deg_bucket:
-        exec_list = _build_degree_bucketing_executors(graph, call_type, node_frame, message_frame)
-        recv_exes.extend(exec_list)
+    deg_bucket_execs = _build_degree_bucketing_executors(graph, call_type, message_frame)
 
-    exec_plan.add_stage(recv_exes)
+    exec_plan.add_stage(v2v_spmv_execs + e2v_spmv_execs + deg_bucket_execs)
     return exec_plan
 
 def get_push_schedule(graph, u, message_func, reduce_func):
@@ -159,39 +131,65 @@ def get_update_edge_schedule(graph, u, v, eid, apply_edge_func):
     # TODO (lingfan): doc string
     u, v, eid = _get_edge_idx(graph, u, v, eid)
     if isinstance(apply_edge_func, (list, tuple)):
+        # XXX: message function in update edge case
         apply_edge_func = fmsg.BundledMessageFunction(apply_edge_func)
     exec_plan = ExecutionPlan()
     send_exe = _build_edge_executor(apply_edge_func, graph._node_frame, graph._edge_frame, graph._edge_frame, u, v, eid)
+    exec_plan.add_stage([send_exe])
     return exec_plan
 
-def _build_adj_spmv_exec(graph_data, key, mfunc, rfunc, node_frame, edge_frame, out_frame):
-    if isinstance(mfunc, fmsg.SrcMulEdgeMessageFunction):
-        return _build_spmv_executors(graph_data=graph_data,
-                                     key=key,
-                                     src_field=mfunc.src_field,
-                                     src_frame=node_frame,
-                                     out_field=rfunc.out_field,
-                                     out_frame=out_frame,
-                                     use_edge_feat=True,
-                                     edge_field=mfunc.edge_field,
-                                     edge_frame=edge_frame)
-    else:
-        return _build_spmv_executors(graph_data=graph_data,
-                                     key=key,
-                                     src_field=mfunc.src_field,
-                                     src_frame=node_frame,
-                                     out_field=rfunc.out_field,
-                                     out_frame=out_frame,
-                                     use_edge_feat=False)
+def _build_v2v_spmv_executors(graph, call_type, v2v_spmv, **kwargs):
+    if not v2v_spmv:
+        return []
 
-def _build_incidence_spmv_exec(graph_data, key, rfunc, message_frame, out_frame):
-    return _build_spmv_executors(graph_data=graph_data,
-                                 key=key,
-                                 src_field=rfunc.msg_field,
-                                 src_frame=message_frame,
-                                 out_field=rfunc.out_field,
-                                 out_frame=out_frame,
-                                 use_edge_feat=False)
+    graph_data = {}
+    key = _build_adj_matrix(graph, call_type, graph_data, **kwargs)
+    node_frame = graph._node_frame
+    edge_frame = graph._edge_frame
+    out_frame = FrameRef()
+
+    exec_list = []
+    for mfunc, rfunc in v2v_spmv:
+        if isinstance(mfunc, fmsg.SrcMulEdgeMessageFunction):
+            exe = _build_spmv_executors(graph_data=graph_data,
+                                        key=key,
+                                        src_field=mfunc.src_field,
+                                        src_frame=node_frame,
+                                        out_field=rfunc.out_field,
+                                        out_frame=out_frame,
+                                        use_edge_feat=True,
+                                        edge_field=mfunc.edge_field,
+                                        edge_frame=edge_frame)
+        else:
+            exe = _build_spmv_executors(graph_data=graph_data,
+                                        key=key,
+                                        src_field=mfunc.src_field,
+                                        src_frame=node_frame,
+                                        out_field=rfunc.out_field,
+                                        out_frame=out_frame,
+                                        use_edge_feat=False)
+        exec_list.append(exe)
+    return exec_list
+
+def _build_e2v_spmv_execuctors(graph, call_type, e2v_spmv, message_frame, **kwargs):
+    if not e2v_spmv:
+        return []
+
+    graph_data = {}
+    key = _build_incidence_matrix(graph, call_type, graph_data, **kwargs)
+
+    exec_list = []
+    out_frame = FrameRef()
+    for rfunc in e2v_spmv:
+        exe = _build_spmv_executors(graph_data=graph_data,
+                                    key=key,
+                                    src_field=rfunc.msg_field,
+                                    src_frame=message_frame,
+                                    out_field=rfunc.out_field,
+                                    out_frame=out_frame,
+                                    use_edge_feat=False)
+        exec_list.append(exe)
+    return exec_list
 
 def _build_spmv_executors(graph_data, key, src_field, src_frame, out_field, out_frame, use_edge_feat=False, edge_field=None, edge_frame=None):
     exe = SPMVExecutor(graph_data, use_edge_feat)
@@ -202,14 +200,17 @@ def _build_spmv_executors(graph_data, key, src_field, src_frame, out_field, out_
     exe.set_node_output(out_frame, fields=rfn.out_field)
     return exe
 
-def _build_edge_executors(mfunc, node_frame, edge_frame, out_frame, u, v, eid):
+def _build_edge_executors(g, mfunc, out_frame, u, v, eid):
     exe = EdgeExecutor(mfunc)
-    exe.set_node_input(node_frame, u, v)
-    exe.set_edge_input(edge_frame, eid)
+    exe.set_node_input(g._node_frame, u, v)
+    exe.set_edge_input(g._edge_frame, eid)
     exe.set_edge_output(out_frame)
     return exe
 
-def _build_degree_bucketing_executors(g, call_type, rfunc, node_frame, message_frame, v=None, edges=None):
+def _build_degree_bucketing_executors(g, call_type, rfunc, message_frame, v=None, edges=None):
+    if not rfunc:
+        return []
+
     exec_list = []
 
     # get degree bucketing schedule
@@ -228,13 +229,13 @@ def _build_degree_bucketing_executors(g, call_type, rfunc, node_frame, message_f
     # create UDF node executor
     for deg, vv, mid in zip(degs, dsts, msg_ids):
         exe = NodeExecutor(rfunc)
-        exe.set_node_input(node_frame, ids=vv)
+        exe.set_node_input(g._node_frame, ids=vv)
         exe.set_edge_input(message_frame, ids=mid)
         exe.set_node_output(FrameRef(), ids=vv)
         exec_list.append(exe)
     return exec_list
 
-def _build_adj_matrix(g, call_type, graph_data, **kwargs):
+def _build_adj_matrix(g, call_type, graph_data, u=None, v=None):
     key = "adj_" + call_type
     if graph_data.get(key, None):
         # key already exists
@@ -248,7 +249,6 @@ def _build_adj_matrix(g, call_type, graph_data, **kwargs):
         if call_type != "send_and_recv":
             raise DGLError("Unsupported call type when build adjmat: %s" % call_type)
 
-        u, v = kwargs['edges']
         new2old, old2new = utils.build_relabel_map(v)
         nnz = len(u)
         u = u.tousertensor()
@@ -262,7 +262,7 @@ def _build_adj_matrix(g, call_type, graph_data, **kwargs):
     graph_data[key] = mat
     return key
 
-def _build_incidence_matrix(g, call_type, graph_data, **kwargs):
+def _build_incidence_matrix(g, call_type, graph_data, u=None, v=None):
     key = "inc_" + call_type
     if graph_data.get(key, None):
         # key already exists
@@ -274,11 +274,10 @@ def _build_incidence_matrix(g, call_type, graph_data, **kwargs):
     else:
         # partial graph case
         if call_type == "send_and_recv":
-            v = kwargs['edges'][1]
             m = len(v)
             eid = F.arannge(m)
         elif call_type == "recv":
-            _, v, eid = g._msg_graph.in_edges(kwargs['v'])
+            _, v, eid = g._msg_graph.in_edges(v)
             m = len(eid)
         else:
             raise DGLError("Unsupported call type when build incidence matrix: %s" % call_type)
