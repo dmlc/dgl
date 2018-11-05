@@ -5,7 +5,6 @@ from collections import MutableMapping, namedtuple
 import numpy as np
 
 from . import backend as F
-from .backend import Tensor
 from .base import DGLError, dgl_warning
 from . import utils
 
@@ -23,7 +22,7 @@ class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     pass
 
 def infer_scheme(tensor):
-    return Scheme(tuple(F.shape(tensor)[1:]), F.get_tvmtype(tensor))
+    return Scheme(tuple(F.shape(tensor)[1:]), F.dtype(tensor))
 
 class Column(object):
     """A column is a compact store of features of multiple nodes/edges.
@@ -66,7 +65,7 @@ class Column(object):
         if isinstance(idx, slice):
             return self.data[idx]
         else:
-            user_idx = idx.tousertensor(F.get_context(self.data))
+            user_idx = idx.tousertensor(F.context(self.data))
             return F.gather_row(self.data, user_idx)
 
     def __setitem__(self, idx, feats):
@@ -102,28 +101,29 @@ class Column(object):
                     % (feat_scheme, self.scheme))
 
         if isinstance(idx, utils.Index):
-            idx = idx.tousertensor(F.get_context(self.data))
+            idx = idx.tousertensor(F.context(self.data))
 
         if inplace:
-            # TODO(minjie): do not use [] operator directly
-            self.data[idx] = feats
+            F.scatter_row_inplace(self.data, idx, feats)
         else:
             if isinstance(idx, slice):
                 # for contiguous indices pack is usually faster than scatter row
-                self.data = F.pack([
-                    self.data[:idx.start],
-                    feats,
-                    self.data[idx.stop:],
-                    ])
+                part1 = F.narrow_row(self.data, 0, idx.start)
+                part2 = feats
+                part3 = F.narrow_row(self.data, idx.stop, len(self))
+                self.data = F.cat([part1, part2, part3], dim=0)
             else:
                 self.data = F.scatter_row(self.data, idx, feats)
 
     def extend(self, feats, feat_scheme=None):
         """Extend the feature data.
+
          Parameters
         ----------
         feats : Tensor
             The new features.
+        feat_scheme : Scheme, optional
+            The scheme
         """
         if feat_scheme is None:
             feat_scheme = Scheme.infer_scheme(feats)
@@ -132,8 +132,8 @@ class Column(object):
             raise DGLError("Cannot update column of scheme %s using feature of scheme %s."
                     % (feat_scheme, self.scheme))
 
-        feats = F.convert_to(feats, self.data)
-        self.data = F.pack([self.data, feats])
+        feats = F.copy_to(feats, F.context(self.data))
+        self.data = F.cat([self.data, feats], dim=0)
 
     @staticmethod
     def create(data):
@@ -183,8 +183,7 @@ class Frame(MutableMapping):
         dgl_warning('Initializer is not set. Use zero initializer instead.'
                     ' To suppress this warning, use `set_initializer` to'
                     ' explicitly specify which initializer to use.')
-        # TODO(minjie): handle data type
-        self._initializer = lambda shape, dtype: F.zeros(shape)
+        self._initializer = lambda shape, dtype: F.zeros(shape, dtype)
 
     def set_initializer(self, initializer):
         """Set the initializer for empty values.
@@ -286,7 +285,7 @@ class Frame(MutableMapping):
             self._warn_and_set_initializer()
         # TODO(minjie): directly init data on the targer device.
         init_data = self.initializer((self.num_rows,) + scheme.shape, scheme.dtype)
-        init_data = F.to_context(init_data, ctx)
+        init_data = F.copy_to(init_data, ctx)
         self._columns[name] = Column(init_data, scheme)
 
     def update_column(self, name, data):
@@ -421,10 +420,8 @@ class FrameRef(MutableMapping):
         if self._index is None:
             if self.is_contiguous():
                 self._index = utils.toindex(
-                        F.arange(
-                            self._index_data.start,
-                            self._index_data.stop,
-                            dtype=F.int64))
+                        F.arange(self._index_data.start,
+                                 self._index_data.stop))
             else:
                 self._index = utils.toindex(self._index_data)
         return self._index
@@ -583,7 +580,7 @@ class FrameRef(MutableMapping):
             self._frame[name] = col
         else:
             if name not in self._frame:
-                ctx = F.get_context(data)
+                ctx = F.context(data)
                 self._frame.add_column(name, infer_scheme(data), ctx)
             fcol = self._frame[name]
             fcol.update(self.index_or_slice(), data, inplace)
@@ -781,7 +778,7 @@ def merge_frames(frames, indices, max_index, reduce_func):
     m = len(row)
     row = F.unsqueeze(F.tensor(row, dtype=F.int64), 0)
     col = F.unsqueeze(F.tensor(col, dtype=F.int64), 0)
-    idx = F.pack([row, col])
+    idx = F.cat([row, col], dim=0)
     dat = F.ones((m,))
     adjmat = F.sparse_tensor(idx, dat, [n, m])
     ctx_adjmat = utils.CtxCachedObject(lambda ctx: F.to_context(adjmat, ctx))
