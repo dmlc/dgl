@@ -1,6 +1,7 @@
 """
 DGL Basics
 ==========
+
 **Author**: Minjie Wang, Quan Gan, Yu Gai, Zheng Zhang
 
 The Goal of this tutorial:
@@ -130,8 +131,8 @@ print(g.node_attr_schemes())
 # One can also remove node/edge states from the graph. This is particularly
 # useful to save memory during inference.
 
-del g.ndata['x']
-del g.edata['w']
+g.ndata.pop('x')
+g.edata.pop('w')
 
 
 ###############################################################################

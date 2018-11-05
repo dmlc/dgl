@@ -1,6 +1,7 @@
 """
 DGL at a glance
 =========================
+
 **Author**: Minjie Wang, Quan Gan, Zheng Zhang
 
 The goal of DGL is to build, train, and deploy *machine learning models*
@@ -42,7 +43,7 @@ def an_interesting_graph():
     import networkx as nx
 
     N = 100
-    g = nx.erdos_renyi_graph(N, 0.05)
+    g = nx.erdos_renyi_graph(N, 0.1)
     g = dgl.DGLGraph(g)
 
     x = th.randn(N, 6)
@@ -59,7 +60,7 @@ g_boring = a_boring_graph()
 g_better = an_interesting_graph()
 
 import matplotlib.pyplot as plt
-nx.draw(g_better.to_networkx(), with_labels=True)
+nx.draw(g_better.to_networkx(), node_size=50, node_color=[[.5, .5, .5,]])
 plt.show()
 
 ###############################################################################

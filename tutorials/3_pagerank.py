@@ -1,6 +1,7 @@
 """
 PageRank with DGL Message Passing
 =================================
+
 **Author**: Minjie Wang, Quan Gan, Yu Gai, Zheng Zhang
 
 In this section we illustrate the usage of different levels of message
@@ -43,10 +44,10 @@ import dgl
 N = 100  # number of nodes
 DAMP = 0.85  # damping factor
 K = 10  # number of iterations
-g = nx.nx.erdos_renyi_graph(N, 0.05)
-nx.draw(g, node_size=100)
-plt.show()
+g = nx.nx.erdos_renyi_graph(N, 0.1)
 g = dgl.DGLGraph(g)
+nx.draw(g.to_networkx(), node_size=50, node_color=[[.5, .5, .5,]])
+plt.show()
 
 
 ###############################################################################
@@ -234,5 +235,5 @@ print(g.ndata['pv'])
 ###############################################################################
 # Next steps
 # ----------
-# Check out :doc:`GCN <models/GCN_ver_2>` and :doc:`Capsule <models/capsule>`
+# Check out :doc:`GCN <models/1_gcn>` and :doc:`Capsule <models/2_capsule>`
 # for more model implemenetations in DGL.
