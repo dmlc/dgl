@@ -4,6 +4,9 @@ from abc import abstractmethod
 from .. import backend as F
 from .base import create_bundled_function_class
 
+import operator
+
+
 __all__ = ['sum_nodes', 'sum_edges', 'mean_nodes', 'mean_edges',
            'weighted_sum_nodes', 'weighted_sum_edges']
 

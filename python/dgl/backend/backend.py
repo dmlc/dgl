@@ -266,6 +266,23 @@ def sum(input, dim):
     """
     pass
 
+def mean(input, dim):
+    """Reduce average the input tensor along the given dim.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+    dim : int
+        The reduce dim.
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor.
+    """
+    pass
+
 def max(input, dim):
     """Reduce max the input tensor along the given dim.
 

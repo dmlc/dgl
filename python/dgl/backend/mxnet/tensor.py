@@ -67,6 +67,9 @@ def copy_to(input, ctx):
 def sum(input, dim):
     return nd.sum(input, axis=dim)
 
+def mean(input, dim):
+    return nd.mean(input, axis=dim)
+
 def max(input, dim):
     return nd.max(input, axis=dim)
 

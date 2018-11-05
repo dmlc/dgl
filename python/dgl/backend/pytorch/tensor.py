@@ -61,6 +61,9 @@ def copy_to(input, ctx):
 def sum(input, dim):
     return th.sum(input, dim=dim)
 
+def mean(input, dim):
+    return th.mean(input, dim=dim)
+
 def max(input, dim):
     # NOTE: the second argmax array is not returned
     return th.max(input, dim=dim)[0]
