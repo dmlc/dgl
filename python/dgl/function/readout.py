@@ -7,7 +7,7 @@ from .base import create_bundled_function_class
 __all__ = ['sum_nodes', 'sum_edges', 'mean_nodes', 'mean_edges',
            'weighted_sum_nodes', 'weighted_sum_edges']
 
-class ReadoutFunction(base.Function):
+class ReadoutFunction(object):
     """Base builtin readout function class."""
 
     def __call__(self, batched_graph):
