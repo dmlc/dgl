@@ -1,4 +1,4 @@
-g""Base graph class specialized for neural networks on graphs.
+"""Base graph class specialized for neural networks on graphs.
 """
 from __future__ import absolute_import
 
