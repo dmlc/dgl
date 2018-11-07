@@ -339,7 +339,7 @@ class DGLGraph(object):
         tensor, tensor
         The source and destination node IDs.
         """
-        eid = utils.toindex(u)
+        eid = utils.toindex(eid)
         src, dst, _ = self._graph.find_edges(eid)
         return src.tousertensor(), dst.tousertensor()
 
@@ -1210,55 +1210,60 @@ class DGLGraph(object):
             self.send(ALL, message_func)
             self.recv(ALL, reduce_func, apply_node_func)
 
-    def propagate(self,
-                  traverser,
-                  message_func="default",
-                  reduce_func="default",
-                  apply_node_func="default",
-                  **kwargs):
+    def prop_nodes(self,
+                   nodes_generator,
+                   message_func="default",
+                   reduce_func="default",
+                   apply_node_func="default"):
         """Propagate messages and update nodes using graph traversal.
 
-        A convenient function for passing messages and updating
-        nodes according to the traverser. The traverser can be
-        any of the pre-defined traverser (e.g. 'topo'). User can also provide custom
-        traverser that generates the edges and nodes.
+        The traversal order is specified by the ``nodes_generator``. It generates
+        node frontiers, which is a list or a tensor of nodes. The nodes in the
+        same frontier will be triggered together, while nodes in different frontiers
+        will be triggered according to the generating order.
 
         Parameters
         ----------
-        traverser : str or generator of edges.
-          The traverser of the graph.
-          Currently only 'bfs', 'dfs' and 'topo' are supported.
-          Please refer to `DGLGraph.bfs`, `DGLGraph.dfs_labeled_edges` and `DGLGraph.topological_traversal` for details.
+        node_generators : generator
+            The generator of node frontiers.
         message_func : str or callable, optional
-          The message function.
+            The message function.
         reduce_func : str or callable, optional
-          The reduce function.
+            The reduce function.
         apply_node_func : str or callable, optional
-          The update function.
-        kwargs : keyword arguments, optional
-            Keyword arguments for pre-defined iterators.
-            Please refer to `DGLGraph.bfs`, `DGLGraph.dfs_labeled_edges` and `DGLGraph.topological_traversal` for details.
+            The update function.
         """
-        if isinstance(traverser, str):
-            try:
-                layers = {
-                    'bfs'  : self._graph.bfs,
-                    'dfs'  : self._graph.dfs_labeled_edges,
-                    'topo' : self._graph.topological_traversal,
-                }[traverser](**kwargs)
-            except KeyError:
-                raise RuntimeError('Not implemented.')
-        else:
-            layers = traverser
+        for node_frontier in nodes_generator:
+            self.pull(node_frontier,
+                    message_func, reduce_func, apply_node_func)
 
-        # NOTE: the iteration can return multiple edges at each step.
-        if isinstance(traverser, str):
-            for v in layers:
-                self.pull(v)
-        else:
-            for u, v in layers:
-                self.send_and_recv((u, v),
-                        message_func, reduce_func, apply_node_func)
+    def prop_edges(self,
+                   edge_generator,
+                   message_func="default",
+                   reduce_func="default",
+                   apply_node_func="default"):
+        """Propagate messages and update nodes using graph traversal.
+
+        The traversal order is specified by the ``edges_generator``. It
+        generates edge frontiers, which is a list or a tensor of edge ids or
+        end points.  The edges in the same frontier will be triggered together,
+        while edges in different frontiers will be triggered according to the
+        generating order.
+
+        Parameters
+        ----------
+        edge_generators : generator
+            The generator of edge frontiers.
+        message_func : str or callable, optional
+            The message function.
+        reduce_func : str or callable, optional
+            The reduce function.
+        apply_node_func : str or callable, optional
+            The update function.
+        """
+        for edge_frontier in edge_generator:
+            self.send_and_recv(edge_frontier,
+                    message_func, reduce_func, apply_node_func)
 
     def subgraph(self, nodes):
         """Generate the subgraph among the given nodes.

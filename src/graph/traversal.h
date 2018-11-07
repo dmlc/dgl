@@ -11,6 +11,8 @@
 #ifndef DGL_GRAPH_TRAVERSAL_H_
 #define DGL_GRAPH_TRAVERSAL_H_
 
+#include <stack>
+#include <tuple>
 #include <dgl/graph.h>
 
 namespace dgl {
@@ -107,9 +109,10 @@ enum DFSEdgeTag {
   kNonTree,
 };
 /*!
- * \brief Produce edge frontiers in a depth-first-search (DFS) order tagged by type.
+ * \brief Traverse the graph in a depth-first-search (DFS) order.
  *
- * There are three tags: FORWARD(0), REVERSE(1), NONTREE(2)
+ * The traversal visit edges in its DFS order. Edges have three tags:
+ * FORWARD(0), REVERSE(1), NONTREE(2)
  *
  * A FORWARD edge is one in which `u` has been visisted but `v` has not.
  * A REVERSE edge is one in which both `u` and `v` have been visisted and the edge
@@ -117,21 +120,64 @@ enum DFSEdgeTag {
  * A NONTREE edge is one in which both `u` and `v` have been visisted but the edge
  * is NOT in the DFS tree.
  *
- * Multiple source nodes can be specified to start the DFS traversal. Each starting
- * node will result in its own DFS tree, so the resulting frontiers are simply
- * the merge of the frontiers of each DFS tree.
- *
- * \param source Source nodes.
+ * \param source Source node.
  * \param reversed If true, DFS follows the in-edge direction
  * \param has_reverse_edge If true, REVERSE edges are included
  * \param has_nontree_edge If true, NONTREE edges are included
- * \return the edge frontiers
+ * \param visit The function to call when an edge is visited; the edge id and its
+ *              tag will be given as the arguments.
  */
-//Frontiers DFSEdges(const Graph& graph,
-                   //IdArray sources,
-                   //bool reversed,
-                   //bool has_reverse_edge,
-                   //bool has_nontree_edge);
+template<typename VisitFn>
+void DFSLabeledEdges(const Graph& graph,
+                     dgl_id_t source,
+                     bool reversed,
+                     bool has_reverse_edge,
+                     bool has_nontree_edge,
+                     VisitFn visit) {
+  const auto succ = reversed? &Graph::PredVec : &Graph::SuccVec;
+  const auto out_edge = reversed? &Graph::InEdgeVec : &Graph::OutEdgeVec;
+
+  if ((graph.*succ)(source).size() == 0) {
+    // no out-going edges from the source node
+    return;
+  }
+
+  typedef std::tuple<dgl_id_t, size_t, bool> StackEntry;
+  std::stack<StackEntry> stack;
+  std::vector<bool> visited(graph.NumVertices());
+  visited[source] = true;
+  stack.push(std::make_tuple(source, 0, false));
+  dgl_id_t u = 0;
+  size_t i = 0;
+  bool on_tree = false;
+
+  while (!stack.empty()) {
+    std::tie(u, i, on_tree) = stack.top();
+    LOG(INFO) << "u=" << u << " i=" << i << " on_tree=" << on_tree;
+    const dgl_id_t v = (graph.*succ)(u)[i];
+    const dgl_id_t uv = (graph.*out_edge)(u)[i];
+    if (visited[v]) {
+      if (!on_tree && has_nontree_edge) {
+        visit(uv, kNonTree);
+      } else if (on_tree && has_reverse_edge) {
+        visit(uv, kReverse);
+      }
+      stack.pop();
+      // find next one.
+      if (i < (graph.*succ)(u).size() - 1) {
+        stack.push(std::make_tuple(u, i+1, false));
+      }
+    } else {
+      visited[v] = true;
+      std::get<2>(stack.top()) = true;
+      visit(uv, kForward);
+      // expand
+      if ((graph.*succ)(v).size() > 0) {
+        stack.push(std::make_tuple(v, 0, false));
+      }
+    }
+  }
+}
 
 }  // namespace traverse
 }  // namespace dgl

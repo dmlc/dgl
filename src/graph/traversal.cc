@@ -4,7 +4,6 @@
  * \brief Graph traversal implementation
  */
 #include <algorithm>
-#include <stack>
 #include "./traversal.h"
 #include "../c_api_common.h"
 
@@ -128,56 +127,33 @@ TVM_REGISTER_GLOBAL("traversal._CAPI_DGLTopologicalNodes")
 //  });
 //
 
-//Frontiers DFSEdges(const Graph& graph,
-//                   IdArray sources,
-//                   bool reversed,
-//                   bool has_reverse_edge,
-//                   bool has_nontree_edge) {
-//  Frontiers ret;
-//  const auto next_iter = reversed? &Graph::PredVec : &Graph::SuccVec;
-//  return ret;
-//}
+// * Multiple source nodes can be specified to start the DFS traversal. One needs
+// * to make sure that each source node belongs to different connected component, so
+// * the frontiers can be easily merged. Otherwise, the behavior is undefined.
 
-/*std::tuple<IdVector, IdVector, IdVector> Graph::DFSLabeledEdges_(
-  dgl_id_t source, bool out, bool reverse_edge, bool nontree_edge) const {
-  enum EdgeType { forward, reverse, nontree };
-  IdVector src;
-  IdVector dst;
-  IdVector type;
-  const auto &adj = out ? adjlist_ : reverse_adjlist_;
-  typedef std::pair<dgl_id_t, std::vector<dgl_id_t>::const_iterator> crux_t;
-  std::stack<crux_t> stack;
-  stack.push(std::make_pair(source, adj[source].succ.begin()));
-  std::vector<bool> visited(adj.size());
-  visited[source] = true;
-  while (!stack.empty()) {
-    auto parent = stack.top().first;
-    auto children = stack.top().second;
-    if (children != adj[parent].succ.end()) {
-      auto child = *children;
-      ++stack.top().second;
-      if (visited[child] && nontree_edge) {
-        src.push_back(parent);
-        dst.push_back(child);
-        type.push_back(nontree);
-      } else if (!visited[child]) {
-        src.push_back(parent);
-        dst.push_back(child);
-        type.push_back(forward);
-        visited[child] = true;
-        stack.push(std::make_pair(child, adj[child].succ.begin()));
-      }
-    } else {
-      stack.pop();
-      if (!stack.empty() && reverse_edge) {
-        src.push_back(stack.top().first);
-        dst.push_back(parent);
-        type.push_back(reverse);
-      }
-    }
-  }
-  return std::make_tuple(src, dst, type);
-}*/
+Frontiers DFSEdgesFrontier(const Graph& graph,
+                           //IdArray sources,
+                           dgl_id_t source,
+                           bool reversed) {
+  Frontiers ret;
+  auto visit = [&] (dgl_id_t e, int tag) { ret.ids.push_back(e); };
+  LOG(INFO) << ret.ids.size();
+  DFSLabeledEdges(graph, source, reversed, false, false, visit);
+  LOG(INFO) << ret.ids.size();
+  return ret;
+}
+
+TVM_REGISTER_GLOBAL("traversal._CAPI_DGLDFSEdges")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const dgl_id_t source = args[1];
+    bool reversed = args[2];
+    const auto& front = DFSEdgesFrontier(*gptr, source, reversed);
+    IdArray node_ids = CopyVectorToNDArray(front.ids);
+    IdArray sections = CopyVectorToNDArray(front.sections);
+    *rv = ConvertNDArrayVectorToPackedFunc({node_ids, sections});
+  });
 
 }  // namespace traverse
 }  // namespace dgl

@@ -5,7 +5,7 @@ from ._ffi.function import _init_api
 from . import backend as F
 from . import utils
 
-__all__ = ['bfs_nodes_generator', 'topological_nodes_generator']
+__all__ = ['bfs_nodes_generator', 'topological_nodes_generator', 'dfs_edges_generator']
 
 def bfs_nodes_generator(graph, source, reversed=False):
     """Node frontiers generator using breadth-first search.
@@ -53,6 +53,17 @@ def topological_nodes_generator(graph, reversed=False):
     # TODO(minjie): how to support directly creating python list
     sections = utils.toindex(ret(1)).tousertensor().tolist()
     return F.split(all_nodes, sections, dim=0)
+
+def dfs_edges_generator(graph, src, reversed=False):
+    """
+    """
+    ghandle = graph._graph._handle
+    ret = _CAPI_DGLDFSEdges(ghandle, src, reversed)
+    all_edges = utils.toindex(ret(0)).tousertensor()
+    # TODO(minjie): how to support directly creating python list
+    sections = utils.toindex(ret(1)).tousertensor().tolist()
+    #return F.split(all_nodes, sections, dim=0)
+    return all_edges, sections
 
 def dfs_labeled_edges(self, src, out, reverse_edge, nontree_edge):
     """ Produce edges in a depth-first-search (DFS) labeled by type.

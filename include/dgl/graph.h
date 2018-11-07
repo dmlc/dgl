@@ -314,12 +314,30 @@ class Graph {
   }
 
   /*!
+   * \brief Return the out edge id vector
+   * \param vid The vertex id.
+   * \return the out edge id vector
+   */
+  const std::vector<dgl_id_t>& OutEdgeVec(dgl_id_t vid) const {
+    return adjlist_[vid].edge_id;
+  }
+
+  /*!
    * \brief Return the predecessor vector
    * \param vid The vertex id.
    * \return the predecessor vector
    */
   const std::vector<dgl_id_t>& PredVec(dgl_id_t vid) const {
     return reverse_adjlist_[vid].succ;
+  }
+
+  /*!
+   * \brief Return the in edge id vector
+   * \param vid The vertex id.
+   * \return the in edge id vector
+   */
+  const std::vector<dgl_id_t>& InEdgeVec(dgl_id_t vid) const {
+    return reverse_adjlist_[vid].edge_id;
   }
 
  protected:
