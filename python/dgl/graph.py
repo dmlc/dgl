@@ -7,7 +7,6 @@ import numpy as np
 import dgl
 from .base import ALL, is_all, DGLError, dgl_warning
 from . import backend as F
-from .backend import Tensor
 from .frame import FrameRef, Frame, merge_frames
 from .function.message import BundledMessageFunction
 from .function.reducer import BundledReduceFunction
@@ -538,8 +537,8 @@ class DGLGraph(object):
         self._msg_graph.add_nodes(self._graph.number_of_nodes())
         # copy attributes
         def _batcher(lst):
-            if isinstance(lst[0], Tensor):
-                return F.pack([F.unsqueeze(x, 0) for x in lst])
+            if F.is_tensor(lst[0]):
+                return F.cat([F.unsqueeze(x, 0) for x in lst], dim=0)
             else:
                 return F.tensor(lst)
         if node_attrs is not None:
@@ -991,7 +990,7 @@ class DGLGraph(object):
 
         v_is_all = is_all(v)
         if v_is_all:
-            v = F.arange(0, self.number_of_nodes(), dtype=F.int64)
+            v = F.arange(0, self.number_of_nodes())
         elif isinstance(v, int):
             v = [v]
         v = utils.toindex(v)
@@ -1032,14 +1031,14 @@ class DGLGraph(object):
         self.reset_messages()
 
         # Pack all reducer results together
-        reordered_v = F.pack(reordered_v)
+        reordered_v = F.cat(reordered_v, dim=0)
         keys = new_reprs[0].keys()
-        new_reprs = {key : F.pack([repr[key] for repr in new_reprs])
+        new_reprs = {key : F.cat([repr[key] for repr in new_reprs], dim=0)
                      for key in keys}
 
         if v_is_all and not has_zero_degree:
             # First do reorder and then replace the whole column.
-            _, indices = F.sort(reordered_v)
+            _, indices = F.sort_1d(reordered_v)
             indices = utils.toindex(indices)
             new_reprs = utils.reorder(new_reprs, indices)
             self.set_n_repr(new_reprs)
@@ -1495,7 +1494,7 @@ class DGLGraph(object):
         if is_all(nodes):
             return F.nonzero_1d(n_mask)
         else:
-            nodes = F.Tensor(nodes)
+            nodes = F.tensor(nodes)
             return nodes[n_mask]
 
     def filter_edges(self, predicate, edges=ALL):
@@ -1523,7 +1522,7 @@ class DGLGraph(object):
         if is_all(edges):
             return F.nonzero_1d(e_mask)
         else:
-            edges = F.Tensor(edges)
+            edges = F.tensor(edges)
             return edges[e_mask]
 
     def _internal_apply_nodes(self, v, apply_node_func="default", reduce_accum=None):
