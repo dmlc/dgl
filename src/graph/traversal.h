@@ -34,7 +34,6 @@ void BFSNodes(const Graph& graph,
               FrontierFn make_frontier) {
   const int64_t len = source->shape[0];
   const int64_t* src_data = static_cast<int64_t*>(source->data);
-  int64_t *begin = nullptr, *end = nullptr;
 
   std::vector<bool> visited(graph.NumVertices());
   for (int64_t i = 0; i < len; ++i) {
@@ -44,7 +43,7 @@ void BFSNodes(const Graph& graph,
   auto frontier = make_frontier();
 
   const auto neighbor_iter = reversed? &Graph::PredVec : &Graph::SuccVec;
-  while (begin != end) {
+  while (frontier.size() != 0) {
     for (const dgl_id_t u : frontier) {
       for (auto v : (graph.*neighbor_iter)(u)) {//ret.ids[k])) {
         if (!visited[v]) {
@@ -57,8 +56,8 @@ void BFSNodes(const Graph& graph,
       //ret.sections.push_back(j - i);
       //i = j;
       //j = ret.ids.size();
-      frontier = make_frontier();
     }
+    frontier = make_frontier();
   }
 }
 

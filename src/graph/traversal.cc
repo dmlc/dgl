@@ -31,6 +31,8 @@ struct VectorView {
   auto end() const -> decltype(vec->end()) {
     return vec->begin() + range_end;
   }
+
+  size_t size() const { return range_end - range_start; }
 };
 }  // namespace
 
@@ -59,7 +61,10 @@ Frontiers BFSNodesFrontiers(const Graph& graph, IdArray source, bool reversed) {
   auto make_frontier = [&] () {
       front_view.range_start = i;
       front_view.range_end = front.ids.size();
-      front.sections.push_back(front.ids.size() - i);
+      if (front.ids.size() != i) {
+        // do not push zero-length frontier
+        front.sections.push_back(front.ids.size() - i);
+      }
       i = front.ids.size();
       return front_view;
     };
