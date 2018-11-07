@@ -17,6 +17,7 @@ using tvm::runtime::NDArray;
 namespace dgl {
 namespace traverse {
 namespace {
+/*!\brief A utility view class for a range of data in a vector */
 template<typename DType>
 struct VectorView {
   const std::vector<DType>* vec;
@@ -84,6 +85,36 @@ TVM_REGISTER_GLOBAL("traversal._CAPI_DGLBFSNodes")
     *rv = ConvertNDArrayVectorToPackedFunc({node_ids, sections});
   });
 
+Frontiers TopologicalNodesFrontiers(const Graph& graph, bool reversed) {
+  Frontiers front;
+  size_t i = 0;
+  VectorView<dgl_id_t> front_view(&front.ids);
+  auto visit = [&] (const dgl_id_t v) { front.ids.push_back(v); };
+  auto make_frontier = [&] () {
+      front_view.range_start = i;
+      front_view.range_end = front.ids.size();
+      if (front.ids.size() != i) {
+        // do not push zero-length frontier
+        front.sections.push_back(front.ids.size() - i);
+      }
+      i = front.ids.size();
+      return front_view;
+    };
+  TopologicalNodes(graph, reversed, visit, make_frontier);
+  return front;
+}
+
+TVM_REGISTER_GLOBAL("traversal._CAPI_DGLTopologicalNodes")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    bool reversed = args[1];
+    const auto& front = TopologicalNodesFrontiers(*gptr, reversed);
+    IdArray node_ids = CopyVectorToNDArray(front.ids);
+    IdArray sections = CopyVectorToNDArray(front.sections);
+    *rv = ConvertNDArrayVectorToPackedFunc({node_ids, sections});
+  });
+
 //TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphDFSLabeledEdges")
 //.set_body([] (TVMArgs args, TVMRetValue* rv) {
 //    GraphHandle ghandle = args[0];
@@ -96,42 +127,6 @@ TVM_REGISTER_GLOBAL("traversal._CAPI_DGLBFSNodes")
 //    *rv = ConvertIdArrayQuadrupleToPackedFunc(ret);
 //  });
 //
-//TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphTopologicalTraversal")
-//.set_body([] (TVMArgs args, TVMRetValue* rv) {
-//    GraphHandle ghandle = args[0];
-//    const Graph* gptr = static_cast<Graph*>(ghandle);
-//    bool out = args[1];
-//    *rv = ConvertIdArrayPairToPackedFunc(gptr->TopologicalTraversal(out));
-//  });
-
-
-Frontiers TopologicalNodes(const Graph& graph, bool reversed) {
-  const auto get_degree = reversed? &Graph::OutDegree : &Graph::InDegree;
-  std::vector<uint64_t> degrees(graph.NumVertices(), 0);
-  Frontiers ret;
-  for (dgl_id_t vid = 0; vid < graph.NumVertices(); ++vid) {
-    if ((graph.*get_degree)(vid) == 0) {
-      ret.ids.push_back(vid);
-    }
-  }
-  size_t i = 0;
-  size_t j = ret.ids.size();
-  const auto next_iter = reversed? &Graph::PredVec : &Graph::SuccVec;
-  while (i < j) {
-    for (size_t k = i; k != j; k++) {
-      for (auto v : (graph.*next_iter)(ret.ids[k])) {
-        if (--(degrees[v]) == 0) {
-          ret.ids.push_back(v);
-        }
-      }
-    }
-    // new node frointer
-    ret.sections.push_back(j - i);
-    i = j;
-    j = ret.ids.size();
-  }
-  return ret;
-}
 
 //Frontiers DFSEdges(const Graph& graph,
 //                   IdArray sources,

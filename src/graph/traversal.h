@@ -17,7 +17,7 @@ namespace dgl {
 namespace traverse {
 
 /*!
- * \brief Traverse the graph and produce node frontiers in a breadth-first-search (BFS) order.
+ * \brief Traverse the graph in a breadth-first-search (BFS) order.
  *
  * \param sources Source nodes.
  * \param reversed If true, BFS follows the in-edge direction
@@ -45,30 +45,60 @@ void BFSNodes(const Graph& graph,
   const auto neighbor_iter = reversed? &Graph::PredVec : &Graph::SuccVec;
   while (frontier.size() != 0) {
     for (const dgl_id_t u : frontier) {
-      for (auto v : (graph.*neighbor_iter)(u)) {//ret.ids[k])) {
+      for (auto v : (graph.*neighbor_iter)(u)) {
         if (!visited[v]) {
           visit(v);
-          //ret.ids.push_back(v);
           visited[v] = true;
         }
       }
-      // new node frointer
-      //ret.sections.push_back(j - i);
-      //i = j;
-      //j = ret.ids.size();
     }
     frontier = make_frontier();
   }
 }
 
 /*!
- * \brief Produce node frontiers in a topological sort order.
+ * \brief Traverse the graph in topological order.
  *
- * \param source Source nodes.
  * \param reversed If true, follows the in-edge direction
- * \return node frontiers
+ * \param visit The function to call when a node is visited; the node id will be
+ *              given as its only argument.
+ * \param make_frontier The function to make a new froniter; the function should return a
+ *                      node iterator to the just created frontier.
  */
-//Frontiers TopologicalNodes(const Graph& graph, bool reversed);
+template<typename VisitFn, typename FrontierFn>
+void TopologicalNodes(const Graph& graph,
+                      bool reversed,
+                      VisitFn visit,
+                      FrontierFn make_frontier) {
+  const auto get_degree = reversed? &Graph::OutDegree : &Graph::InDegree;
+  const auto neighbor_iter = reversed? &Graph::PredVec : &Graph::SuccVec;
+  uint64_t num_visited_nodes = 0;
+  std::vector<uint64_t> degrees(graph.NumVertices(), 0);
+  for (dgl_id_t vid = 0; vid < graph.NumVertices(); ++vid) {
+    degrees[vid] = (graph.*get_degree)(vid);
+    if (degrees[vid] == 0) {
+      visit(vid);
+      ++num_visited_nodes;
+    }
+  }
+  auto frontier = make_frontier();
+
+  while (frontier.size() != 0) {
+    for (const dgl_id_t u : frontier) {
+      for (auto v : (graph.*neighbor_iter)(u)) {
+        if (--(degrees[v]) == 0) {
+          visit(v);
+          ++num_visited_nodes;
+        }
+      }
+    }
+    // new node frointer
+    frontier = make_frontier();
+  }
+  if (num_visited_nodes != graph.NumVertices()) {
+    LOG(FATAL) << "Error in topological traversal: loop detected in the given graph.";
+  }
+}
 
 /*!\brief Tags for ``DFSEdges``. */
 enum DFSEdgeTag {
