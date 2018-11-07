@@ -30,6 +30,21 @@ DLManagedTensor* CreateTmpDLManagedTensor(
 tvm::runtime::PackedFunc ConvertNDArrayVectorToPackedFunc(
     const std::vector<tvm::runtime::NDArray>& vec);
 
+/*!
+ * \brief Copy a vector to an int64_t NDArray.
+ *
+ * The element type of the vector must be convertible to int64_t.
+ */
+template<typename DType>
+tvm::runtime::NDArray CopyVectorToNDArray(
+    const std::vector<DType>& vec) {
+  using tvm::runtime::NDArray;
+  const int64_t len = vec.size();
+  NDArray a = NDArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  std::copy(vec.begin(), vec.end(), static_cast<int64_t*>(a->data));
+  return a;
+}
+
 }  // namespace dgl
 
 #endif  // DGL_C_API_COMMON_H_
