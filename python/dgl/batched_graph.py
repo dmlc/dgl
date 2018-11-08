@@ -10,7 +10,8 @@ from . import graph_index as gi
 from . import backend as F
 from . import utils
 
-__all__ = ['BatchedDGLGraph', 'batch', 'unbatch', 'split']
+__all__ = ['BatchedDGLGraph', 'batch', 'unbatch', 'split',
+           'sum_on']
 
 class BatchedDGLGraph(DGLGraph):
     """The batched DGL graph.
@@ -31,11 +32,13 @@ class BatchedDGLGraph(DGLGraph):
         batched_index = gi.disjoint_union([g._graph for g in graph_list])
         # create batched node and edge frames
         # NOTE: following code will materialize the columns of the input graphs.
-        cols = {key: F.cat([gr._node_frame[key] for gr in graph_list], dim=0)
+        cols = {key: F.cat([gr._node_frame[key] for gr in graph_list
+                            if gr.number_of_nodes() > 0], dim=0)
                 for key in node_attrs}
         batched_node_frame = FrameRef(Frame(cols))
 
-        cols = {key: F.cat([gr._edge_frame[key] for gr in graph_list], dim=0)
+        cols = {key: F.cat([gr._edge_frame[key] for gr in graph_list
+                            if gr.number_of_edges() > 0], dim=0)
                 for key in edge_attrs}
         batched_edge_frame = FrameRef(Frame(cols))
 
@@ -193,3 +196,67 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     elif isinstance(edge_attrs, str):
         edge_attrs = [edge_attrs]
     return BatchedDGLGraph(graph_list, node_attrs, edge_attrs)
+
+
+_readout_on_attrs = {
+        'nodes': ('ndata', 'batch_num_nodes', 'number_of_nodes'),
+        'edges': ('edata', 'batch_num_edges', 'number_of_edges'),
+        }
+
+def sum_on(graph, on, input, weight=None):
+    """Sums all the values of node/edge field input in graph, optionally
+    multiplies the field by node/edge field by a scalar weight.
+
+    Parameters
+    ----------
+    graph : DGLGraph or BatchedDGLGraph
+        The graph
+    on : 'nodes' or 'edges'
+        Whether to sum on either nodes or edges.
+    in_ : str
+        The input field
+    weight : optional, str
+        The weight field.  Default is all 1 (i.e. not weighting)
+
+    Returns
+    -------
+    tensor
+        The summed tensor.
+
+    Notes
+    -----
+    If graph is a BatchedDGLGraph, a stacked tensor (or dict of stacked
+    tensors) is returned instead, i.e. having an extra first dimension.
+    Each row of the stacked tensor(s) contains the readout result of
+    corresponding example in the batch.  If an example has no nodes/edges,
+    a zero tensor with the same shape is returned at the corresponding row.
+    """
+    data_attr, batch_num_objs_attr, num_objs_attr = _readout_on_attrs[on]
+    data = getattr(graph, data_attr)
+    input = data[input]
+    if isinstance(graph, BatchedDGLGraph):
+        n_graphs = graph.batch_size
+        batch_num_objs = getattr(graph, batch_num_objs_attr)
+        n_objs = getattr(graph, num_objs_attr)()
+
+        # FIXME: SPMV is slow in PyTorch for this purpose (even slower than
+        # splitting)
+        if weight is None:
+            w_nnz = F.ones((n_objs,), F.dtype(input))
+        else:
+            w_nnz = data[weight]
+        w_ind = F.zerocopy_from_numpy(np.arange(n_graphs).repeat(batch_num_objs))
+        w_ind = F.stack([w_ind, F.arange(0, n_objs)], 0)
+        w_ind = F.copy_to(w_ind, F.context(w_nnz))
+        w = F.sparse_matrix(w_nnz, ('coo', w_ind), (n_graphs, n_objs))
+
+        y = F.spmm(F.copy_to(w, F.context(input)), input)
+        return y
+    else:
+        if weight is None:
+            return F.sum(input, 0)
+        else:
+            w = data[weight]
+            w = F.reshape(w, (-1,) + (1,) * (F.ndim(input) - 1))
+            y = F.sum(w * input, 0)
+            return y

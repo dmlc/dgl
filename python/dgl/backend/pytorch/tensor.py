@@ -71,6 +71,9 @@ def max(input, dim):
 def cat(seq, dim):
     return th.cat(seq, dim=dim)
 
+def stack(seq, dim):
+    return th.stack(seq, dim=dim)
+
 def split(input, sizes_or_sections, dim):
     return th.split(input, sizes_or_sections, dim)
 

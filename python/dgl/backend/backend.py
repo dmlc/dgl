@@ -317,6 +317,23 @@ def cat(seq, dim):
     """
     pass
 
+def stack(seq, dim):
+    """Stack the sequence of tensors along the given dimension.
+
+    Parameters
+    ----------
+    seq : list of Tensor
+        The tensor sequence.
+    dim : int
+        The concat dim.
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor.
+    """
+    pass
+
 def split(input, sizes_or_sections, dim):
     """Split the input tensor into chunks.
 
