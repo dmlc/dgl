@@ -218,8 +218,8 @@ class ImmutableGraphIndex(object):
         """
         u = F.tensor([u], dtype=F.int64)
         v = F.tensor([v], dtype=F.int64)
-        id = self._sparse.edge_ids(u, v)
-        return utils.toindex(id)
+        u, v, id = self._sparse.edge_ids(u, v)
+        return utils.toindex(u), utils.toindex(v), utils.toindex(id)
 
     def edge_ids(self, u, v):
         """Return the edge ids.
@@ -234,7 +234,11 @@ class ImmutableGraphIndex(object):
         Returns
         -------
         utils.Index
-            The edge id array.
+            The src nodes.
+        utils.Index
+            The dst nodes.
+        utils.Index
+            The edge ids.
         """
         u = u.tousertensor()
         v = v.tousertensor()

@@ -81,6 +81,8 @@ class ImmutableGraphIndex(object):
         NDArray
             Teh edge id array.
         """
+        if len(u) == 0 or len(v) == 0:
+            return [], [], []
         ids = mx.nd.contrib.edge_id(self._in_csr, v, u)
         ids = ids.asnumpy()
         v = v.asnumpy()
