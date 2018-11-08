@@ -49,9 +49,9 @@ class SSEUpdateHidden(gluon.Block):
 
     def forward(self, g, vertices):
         if self.use_spmv:
-            feat = g.get_n_repr()['in']
-            h = g.get_n_repr()['h']
-            g.set_n_repr({'cat': mx.nd.concat(feat, h, dim=1)})
+            feat = g.ndata['in']
+            h = g.ndata['h']
+            g.ndata['cat'] = mx.nd.concat(feat, h, dim=1)
 
             msg_func = fn.copy_src(src='cat', out='tmp')
             reduce_func = fn.sum(msg='tmp', out='accum')
@@ -61,30 +61,26 @@ class SSEUpdateHidden(gluon.Block):
         if vertices is None:
             g.update_all(msg_func, reduce_func, None)
             if self.use_spmv:
-                g.pop_n_repr('cat')
+                g.ndata.pop('cat')
             batch_size = 100000
             num_batches = int(math.ceil(g.number_of_nodes() / batch_size))
             for i in range(num_batches):
                 vs = mx.nd.arange(i * batch_size, min((i + 1) * batch_size, g.number_of_nodes()), dtype=np.int64)
                 g.apply_nodes(self.layer, vs, inplace=True)
-            # TODO removing this makes the code much slower.
-            # The reason is that calling pull on the subgraph leads to initialize 'accum'
-            # first. If we don't remove it, the frame in the subgraph contains this column.
-            # It seems copying data is faster than creating and initializing 'accum'.
-            g.pop_n_repr('accum')
-            ret = g.get_n_repr()['h']
+            g.ndata.pop('accum')
+            ret = g.ndata['h']
         else:
             # We don't need dropout for inference.
             if self.dropout:
                 # TODO here we apply dropout on all vertex representation.
-                val = mx.nd.Dropout(g.get_n_repr()['h'], p=self.dropout)
-                g.set_n_repr({'h': val})
+                val = mx.nd.Dropout(g.ndata['h'], p=self.dropout)
+                g.ndata['h'] = val
             g.pull(vertices, msg_func, reduce_func, self.layer)
-            ctx = g.get_n_repr()['h'].context
-            ret = mx.nd.take(g.get_n_repr()['h'], vertices.tousertensor().as_in_context(ctx))
+            ctx = g.ndata['h'].context
+            ret = mx.nd.take(g.ndata['h'], vertices.tousertensor().as_in_context(ctx))
             if self.use_spmv:
-                g.pop_n_repr('cat')
-            g.pop_n_repr('accum')
+                g.ndata.pop('cat')
+            g.ndata.pop('accum')
         return ret
 
 class SSEPredict(gluon.Block):
@@ -118,9 +114,9 @@ def subgraph_gen(g, seed_vertices, ctxs):
     return subgs, nids
 
 def copy_to_gpu(subg, ctx):
-    frame = subg.get_n_repr()
+    frame = subg.ndata
     for key in frame:
-        subg.set_n_repr({key: frame[key].as_in_context(ctx)})
+        subg.ndata[key] = frame[key].as_in_context(ctx)
 
 def main(args, data):
     if isinstance(data.features, mx.nd.NDArray):
@@ -148,8 +144,9 @@ def main(args, data):
     except AttributeError:
         graph = data.graph
     g = DGLGraph(graph, readonly=True)
-    g.set_n_repr({'in': features, 'h': mx.nd.random.normal(shape=(g.number_of_nodes(), args.n_hidden),
-        ctx=mx.cpu(0))})
+    g.ndata['in'] = features
+    g.ndata['h'] = mx.nd.random.normal(shape=(g.number_of_nodes(), args.n_hidden),
+            ctx=mx.cpu(0))
 
     update_hidden_infer = SSEUpdateHidden(args.n_hidden, 'relu',
             args.update_dropout, args.use_spmv, prefix='sse')
