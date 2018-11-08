@@ -72,8 +72,7 @@ def main(args):
         for step, graph in enumerate(train_loader):
             if step >= 3:
                 t0 = time.time()
-            label = graph.ndata['y']
-            del graph.ndata['y']
+            label = graph.ndata.pop('y')
             # traverse graph
             giter = list(tensor_topo_traverse(graph, False, args))
             logits = model(graph, zero_initializer, iterator=giter, train=True)

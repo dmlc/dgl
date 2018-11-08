@@ -116,8 +116,7 @@ class TreeLSTM(nn.Module):
             for frontier in iterator:
                 g.pull(frontier)
         # compute logits
-        h = g.ndata['h']
-        del g.ndata['h']
+        h = g.ndata.pop('h')
         h = self.dropout(h)
         logits = self.linear(h)
         return logits
