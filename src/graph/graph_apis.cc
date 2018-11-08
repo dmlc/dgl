@@ -366,4 +366,5 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLineGraph")
     GraphHandle lghandle = lgptr;
     *rv = lghandle;
   });
+
 }  // namespace dgl

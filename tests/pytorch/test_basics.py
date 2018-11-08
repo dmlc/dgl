@@ -233,7 +233,7 @@ def test_reduce_0deg():
     new_repr = g.ndata['h']
 
     assert th.allclose(new_repr[1:], old_repr[1:])
-    assert th.allclose(new_repr[0], old_repr.sum(0))
+    assert th.allclose(new_repr[0], old_repr.sum(0), rtol=1e-3, atol=1e-3)
 
 def test_pull_0deg():
     g = DGLGraph()
