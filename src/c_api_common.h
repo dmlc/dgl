@@ -9,6 +9,7 @@
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/packed_func.h>
 #include <dgl/runtime/registry.h>
+#include <algorithm>
 #include <vector>
 
 namespace dgl {
