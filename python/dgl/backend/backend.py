@@ -533,6 +533,58 @@ def spmm(x, y):
     """
     pass
 
+def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
+    """Computes the sum along segments of a tensor.
+
+    Equivalent to tf.unsorted_segment_sum, but seg_id is required to be a
+    1D tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor
+    seg_id : 1D Tensor
+        The segment IDs whose values are between 0 and n_segs - 1.  Should
+        have the same length as input.
+    n_segs : int
+        Number of distinct segments
+    dim : int
+        Dimension to sum on
+
+    Returns
+    -------
+    Tensor
+        The result
+    """
+    pass
+
+def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
+    """Computes the mean along segments of a tensor.
+
+    Equivalent to tf.unsorted_segment_mean, but seg_id is required to be a
+    1D tensor.
+
+    Note that segments never appeared in seg_id will have results of 0.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor
+    seg_id : 1D Tensor
+        The segment IDs whose values are between 0 and n_segs - 1.  Should
+        have the same length as input.
+    n_segs : int
+        Number of distinct segments
+    dim : int
+        Dimension to average on
+
+    Returns
+    -------
+    Tensor
+        The result
+    """
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------

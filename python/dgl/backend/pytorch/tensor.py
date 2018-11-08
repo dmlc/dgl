@@ -107,6 +107,19 @@ def ones(shape, dtype):
 def spmm(x, y):
     return th.spmm(x, y)
 
+def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
+    y = th.zeros(n_segs, *input.shape[1:]).to(input)
+    seg_id = seg_id.view((-1,) + (1,) * (input.dim() - 1)).expand_as(input)
+    y = y.scatter_add_(dim, seg_id, input)
+    return y
+
+def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
+    w = unsorted_1d_segment_sum(th.ones_like(seg_id), seg_id, n_segs, 0).to(input)
+    w = w.clip(min=1)   # remove 0 entries
+    y = unsorted_1d_segment_sum(input, seg_id, n_segs, dim)
+    y /= w.view((-1,) + (1,) * (y.dim() - 1))
+    return y
+
 def unique(input):
     return th.unique(input)
 

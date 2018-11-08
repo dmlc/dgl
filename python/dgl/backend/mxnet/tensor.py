@@ -123,6 +123,29 @@ def ones(shape, dtype):
 def spmm(x, y):
     return nd.dot(x, y)
 
+def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
+    # Use SPMV to simulate segment sum
+    ctx = input.context
+    n_inputs = input.shape[0]
+    input_shape_suffix = input.shape[1:]
+    input = input.reshape(n_inputs, -1)
+    n_range = nd.arange(n_inputs, dtype='int64').as_in_context(input.context)
+    w_nnz = nd.ones(n_inputs).as_in_context(input.context)
+    w_nid = nd.stack(seg_id, n_range, axis=0)
+    w = nd.sparse.csr_matrix((w_nnz, (seg_id, n_range)), (n_segs, n_inputs))
+    w = w.as_in_context(input.context)
+    y = nd.dot(w, input)
+    y = nd.reshape(y, (n_segs,) + input_shape_suffix)
+    return y
+
+def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
+    n_ones = nd.ones_like(seg_id).astype(input.dtype)
+    w = unsorted_1d_segment_sum(n_ones, seg_id, n_segs, 0)
+    w = nd.clip(w, a_min=1, a_max=np.inf)
+    y = unsorted_1d_segment_sum(input, seg_id, n_segs, dim)
+    y /= w.reshape((-1,) + (1,) * (y.ndim - 1))
+    return y
+
 def unique(input):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
