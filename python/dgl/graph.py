@@ -854,7 +854,7 @@ class DGLGraph(object):
         """
         self._apply_edge_func = func
 
-    def apply_nodes(self, func="default", v=ALL):
+    def apply_nodes(self, func="default", v=ALL, inplace=False):
         """Apply the function on the node features.
 
         Applying a None function will be ignored.
@@ -866,7 +866,7 @@ class DGLGraph(object):
         v : int, iterable of int, tensor, optional
             The node id(s).
         """
-        self._internal_apply_nodes(v, func)
+        self._internal_apply_nodes(v, func, inplace=inplace)
     
     def apply_edges(self, func="default", edges=ALL):
         """Apply the function on the edge features.
@@ -1445,7 +1445,8 @@ class DGLGraph(object):
             edges = F.tensor(edges)
             return edges[e_mask]
 
-    def _internal_apply_nodes(self, v, apply_node_func="default", reduce_accum=None):
+    def _internal_apply_nodes(self, v, apply_node_func="default", reduce_accum=None,
+            inplace=False):
         """Internal apply nodes
 
         Parameters
@@ -1459,7 +1460,7 @@ class DGLGraph(object):
             # Skip none function call.
             if reduce_accum is not None:
                 # write reduce result back
-                self.set_n_repr(reduce_accum, v)
+                self.set_n_repr(reduce_accum, v, inplace=inplace)
             return
         # take out current node repr
         curr_repr = self.get_n_repr(v)
@@ -1472,4 +1473,4 @@ class DGLGraph(object):
             # merge new node_repr with reduce output
             reduce_accum.update(new_repr)
             new_repr = reduce_accum
-        self.set_n_repr(new_repr, v)
+        self.set_n_repr(new_repr, v, inplace=inplace)

@@ -62,6 +62,17 @@ class ImmutableGraphIndex(object):
         """Clear the graph."""
         raise Exception('Immutable graph doesn\'t support clearing up')
 
+    def is_multigraph(self):
+        """Return whether the graph is a multigraph
+
+        Returns
+        -------
+        bool
+            True if it is a multigraph, False otherwise.
+        """
+        # Immutable graph doesn't support multi-edge.
+        return False
+
     def number_of_nodes(self):
         """Return the number of nodes.
 
@@ -227,8 +238,8 @@ class ImmutableGraphIndex(object):
         """
         u = u.tousertensor()
         v = v.tousertensor()
-        ids = self._sparse.edge_ids(u, v)
-        return utils.toindex(ids)
+        u, v, ids = self._sparse.edge_ids(u, v)
+        return utils.toindex(u), utils.toindex(v), utils.toindex(ids)
 
     def in_edges(self, v):
         """Return the in edges of the node(s).
