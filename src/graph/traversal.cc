@@ -165,18 +165,14 @@ TVM_REGISTER_GLOBAL("traversal._CAPI_DGLTopologicalNodes")
     *rv = ConvertNDArrayVectorToPackedFunc({node_ids, sections});
   });
 
-// * Multiple source nodes can be specified to start the DFS traversal. One needs
-// * to make sure that each source node belongs to different connected component, so
-// * the frontiers can be easily merged. Otherwise, the behavior is undefined.
 
 TVM_REGISTER_GLOBAL("traversal._CAPI_DGLDFSEdges")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const IdArray source = args[1];
-    bool reversed = args[2];
-    CHECK(IsValidIdArray(source))
-      << "Invalid source node id array.";
+    const bool reversed = args[2];
+    CHECK(IsValidIdArray(source)) << "Invalid source node id array.";
     const int64_t len = source->shape[0];
     const int64_t* src_data = static_cast<int64_t*>(source->data);
     std::vector<std::vector<dgl_id_t>> edges(len);
@@ -189,18 +185,45 @@ TVM_REGISTER_GLOBAL("traversal._CAPI_DGLDFSEdges")
     *rv = ConvertNDArrayVectorToPackedFunc({ids, sections});
   });
 
-//TVM_REGISTER_GLOBAL("traversal._CAPI_DGLDFSLabeledEdges")
-//.set_body([] (TVMArgs args, TVMRetValue* rv) {
-//    // TODO
-//    GraphHandle ghandle = args[0];
-//    const Graph* gptr = static_cast<Graph*>(ghandle);
-//    const dgl_id_t source = args[1];
-//    bool reversed = args[2];
-//    const auto& front = DFSEdgesFrontier(*gptr, source, reversed);
-//    IdArray node_ids = CopyVectorToNDArray(front.ids);
-//    IdArray sections = CopyVectorToNDArray(front.sections);
-//    *rv = ConvertNDArrayVectorToPackedFunc({node_ids, sections});
-//  });
+TVM_REGISTER_GLOBAL("traversal._CAPI_DGLDFSLabeledEdges")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const IdArray source = args[1];
+    const bool reversed = args[2];
+    const bool has_reverse_edge = args[3];
+    const bool has_nontree_edge = args[4];
+    const bool return_labels = args[5];
+
+    CHECK(IsValidIdArray(source)) << "Invalid source node id array.";
+    const int64_t len = source->shape[0];
+    const int64_t* src_data = static_cast<int64_t*>(source->data);
+
+    std::vector<std::vector<dgl_id_t>> edges(len);
+    std::vector<std::vector<int64_t>> tags;
+    if (return_labels) {
+      tags.resize(len);
+    }
+    for (int64_t i = 0; i < len; ++i) {
+      auto visit = [&] (dgl_id_t e, int tag) {
+        edges[i].push_back(e);
+        if (return_labels) {
+          tags[i].push_back(tag);
+        }
+      };
+      DFSLabeledEdges(*gptr, src_data[i], reversed,
+          has_reverse_edge, has_nontree_edge, visit);
+    }
+
+    IdArray ids = MergeMultipleTraversals(edges);
+    IdArray sections = ComputeMergedSections(edges);
+    if (return_labels) {
+      IdArray labels = MergeMultipleTraversals(tags);
+      *rv = ConvertNDArrayVectorToPackedFunc({ids, labels, sections});
+    } else {
+      *rv = ConvertNDArrayVectorToPackedFunc({ids, sections});
+    }
+  });
 
 }  // namespace traverse
 }  // namespace dgl

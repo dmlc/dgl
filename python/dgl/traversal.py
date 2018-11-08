@@ -5,7 +5,8 @@ from ._ffi.function import _init_api
 from . import backend as F
 from . import utils
 
-__all__ = ['bfs_nodes_generator', 'topological_nodes_generator', 'dfs_edges_generator']
+__all__ = ['bfs_nodes_generator', 'topological_nodes_generator',
+           'dfs_edges_generator', 'dfs_labeled_edges_generator',]
 
 def bfs_nodes_generator(graph, source, reversed=False):
     """Node frontiers generator using breadth-first search.
@@ -57,8 +58,15 @@ def topological_nodes_generator(graph, reversed=False):
 def dfs_edges_generator(graph, source, reversed=False):
     """Edge frontiers generator using depth-first-search (DFS).
 
+    Multiple source nodes can be specified to start the DFS traversal. One
+    needs to make sure that each source node belongs to different connected
+    component, so the frontiers can be easily merged. Otherwise, the behavior
+    is undefined.
+
     Parameters
     ----------
+    graph : DGLGraph
+        The graph object.
     source : list, tensor of nodes
         Source nodes.
     reversed : bool, optional
@@ -77,35 +85,67 @@ def dfs_edges_generator(graph, source, reversed=False):
     sections = utils.toindex(ret(1)).tousertensor().tolist()
     return F.split(all_edges, sections, dim=0)
 
-def dfs_labeled_edges(self, src, out, reverse_edge, nontree_edge):
-    """ Produce edges in a depth-first-search (DFS) labeled by type.
+def dfs_labeled_edges_generator(
+        graph,
+        source,
+        reversed=False,
+        has_reverse_edge=False,
+        has_nontree_edge=False,
+        return_labels=True):
+    """Produce edges in a depth-first-search (DFS) labeled by type.
+
+    There are three labels: FORWARD(0), REVERSE(1), NONTREE(2)
+
+    A FORWARD edge is one in which `u` has been visisted but `v` has not. A
+    REVERSE edge is one in which both `u` and `v` have been visisted and the
+    edge is in the DFS tree. A NONTREE edge is one in which both `u` and `v`
+    have been visisted but the edge is NOT in the DFS tree.
+
+    Multiple source nodes can be specified to start the DFS traversal. One
+    needs to make sure that each source node belongs to different connected
+    component, so the frontiers can be easily merged. Otherwise, the behavior
+    is undefined.
 
     Parameters
     ----------
-    src : int, list or tensor
+    graph : DGLGraph
+        The graph object.
+    source : list, tensor of nodes
         Source nodes.
-    out : bool
-        Whether to following incoming or outgoing edges.
-    reverse_edge : bool
-        Whether to yield reverse edges.
-    nontree_edge : bool
-        Whether to yield nontree edges.
+    reversed : bool, optional
+        If true, traverse following the in-edge direction.
+    has_reverse_edge : bool, optional
+        True to include reverse edges.
+    has_nontree_edge : bool, optional
+        True to include nontree edges.
+    return_labels : bool, optional
+        True to return the labels of each edge.
 
     Returns
     -------
-    list of tuple of tensor
-        A tuple in returned list consists of three tensors:
-        * src: Source id's.
-        * dst: Destination id's.
-        * type: A tensor that takes value in `GraphIndex.FORWARD`, `GraphIndex.REVERSE` and `GraphIndex.NONTREE`.
-        Propagation from source nodes to destination nodes in the same tuple can be parallelized.
+    list of edge frontiers
+        Each edge frontier is a list, tensor of edges.
+    list of list of int
+        Label of each edge, organized in the same as the edge frontiers.
     """
-    src = utils.toindex(src).todgltensor()
-    ret = _CAPI_DGLGraphDFSLabeledEdges(self._handle, src, out, reverse_edge, nontree_edge)
-    src = utils.toindex(ret(0)).tousertensor()
-    dst = utils.toindex(ret(1)).tousertensor()
-    type = utils.toindex(ret(2)).tousertensor()
-    size = F.asnumpy(utils.toindex(ret(3)).tousertensor()).tolist()
-    return list(zip(F.unpack(src, size), F.unpack(dst, size), F.unpack(type, size)))
+    ghandle = graph._graph._handle
+    source = utils.toindex(source).todgltensor()
+    ret = _CAPI_DGLDFSLabeledEdges(
+            ghandle,
+            source,
+            reversed,
+            has_reverse_edge,
+            has_nontree_edge,
+            return_labels)
+    all_edges = utils.toindex(ret(0)).tousertensor()
+    # TODO(minjie): how to support directly creating python list
+    if return_labels:
+        all_labels = utils.toindex(ret(1)).tousertensor()
+        sections = utils.toindex(ret(2)).tousertensor().tolist()
+        return (F.split(all_edges, sections, dim=0),
+                F.split(all_labels, sections, dim=0))
+    else:
+        sections = utils.toindex(ret(1)).tousertensor().tolist()
+        return F.split(all_edges, sections, dim=0)
 
 _init_api("dgl.traversal")
