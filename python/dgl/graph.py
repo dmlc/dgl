@@ -1211,7 +1211,7 @@ class DGLGraph(object):
                    message_func="default",
                    reduce_func="default",
                    apply_node_func="default"):
-        """Propagate messages and update nodes using graph traversal.
+        """Propagate messages using graph traversal by triggering pull() on nodes.
 
         The traversal order is specified by the ``nodes_generator``. It generates
         node frontiers, which is a list or a tensor of nodes. The nodes in the
@@ -1238,7 +1238,7 @@ class DGLGraph(object):
                    message_func="default",
                    reduce_func="default",
                    apply_node_func="default"):
-        """Propagate messages and update nodes using graph traversal.
+        """Propagate messages using graph traversal by triggering send_and_recv() on edges.
 
         The traversal order is specified by the ``edges_generator``. It
         generates edge frontiers, which is a list or a tensor of edge ids or
