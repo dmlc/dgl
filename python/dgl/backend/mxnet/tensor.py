@@ -124,6 +124,9 @@ def spmm(x, y):
     return nd.dot(x, y)
 
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
+    # TODO: support other dimensions
+    assert dim == 0, 'MXNet only supports segment sum on first dimension'
+
     # Use SPMV to simulate segment sum
     ctx = input.context
     n_inputs = input.shape[0]
@@ -139,6 +142,9 @@ def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     return y
 
 def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
+    # TODO: support other dimensions
+    assert dim == 0, 'MXNet only supports segment mean on first dimension'
+
     n_ones = nd.ones_like(seg_id).astype(input.dtype)
     w = unsorted_1d_segment_sum(n_ones, seg_id, n_segs, 0)
     w = nd.clip(w, a_min=1, a_max=np.inf)
