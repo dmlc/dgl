@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <unordered_map>
 #include <set>
-#include <stack>
 #include <functional>
 #include <tuple>
 #include "../c_api_common.h"

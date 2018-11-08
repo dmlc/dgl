@@ -8,7 +8,6 @@ import scipy
 from ._ffi.base import c_array
 from ._ffi.function import _init_api
 from . import backend as F
-from . import ndarray as nd
 from . import utils
 from .immutable_graph_index import create_immutable_graph_index
 
@@ -22,10 +21,6 @@ class GraphIndex(object):
     handle : GraphIndexHandle
         Handler
     """
-    FORWARD = 0
-    REVERSE = 1
-    NONTREE = 2
-
     def __init__(self, handle):
         self._handle = handle
         self._cache = {}
