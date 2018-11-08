@@ -4,7 +4,7 @@ from __future__ import absolute_import
 from . import traversal as trv
 
 __all__ = ['bfs_nodes', 'topological_nodes',
-           'bfs_edges', 'dfs_labeled_edges']
+           'dfs_edges', 'dfs_labeled_edges']
 
 def bfs_nodes(graph,
               source,
