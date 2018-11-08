@@ -3,6 +3,7 @@ os.environ['DGLBACKEND'] = 'mxnet'
 import mxnet as mx
 import numpy as np
 from dgl.graph import DGLGraph
+import scipy.sparse as spsp
 
 D = 5
 reduce_msg_shapes = set()
@@ -26,20 +27,39 @@ def reduce_func(nodes):
 def apply_node_func(nodes):
     return {'h' : nodes.data['h'] + nodes.data['m']}
 
-def generate_graph(grad=False):
-    g = DGLGraph()
-    g.add_nodes(10) # 10 nodes.
-    # create a graph where 0 is the source and 9 is the sink
-    for i in range(1, 9):
-        g.add_edge(0, i)
-        g.add_edge(i, 9)
-    # add a back flow from 9 to 0
-    g.add_edge(9, 0)
-    ncol = mx.nd.random.normal(shape=(10, D))
-    if grad:
-        ncol.attach_grad()
-    g.ndata['h'] = ncol
-    return g
+def generate_graph(grad=False, readonly=False):
+    if readonly:
+        row_idx = []
+        col_idx = []
+        for i in range(1, 9):
+            row_idx.append(0)
+            col_idx.append(i)
+            row_idx.append(i)
+            col_idx.append(9)
+        row_idx.append(9)
+        col_idx.append(0)
+        ones = np.ones(shape=(len(row_idx)))
+        csr = spsp.csr_matrix((ones, (row_idx, col_idx)), shape=(10, 10))
+        g = DGLGraph(csr, readonly=True)
+        ncol = mx.nd.random.normal(shape=(10, D))
+        if grad:
+            ncol.attach_grad()
+        g.ndata['h'] = ncol
+        return g
+    else:
+        g = DGLGraph()
+        g.add_nodes(10) # 10 nodes.
+        # create a graph where 0 is the source and 9 is the sink
+        for i in range(1, 9):
+            g.add_edge(0, i)
+            g.add_edge(i, 9)
+        # add a back flow from 9 to 0
+        g.add_edge(9, 0)
+        ncol = mx.nd.random.normal(shape=(10, D))
+        if grad:
+            ncol.attach_grad()
+        g.ndata['h'] = ncol
+        return g
 
 def test_batch_setter_getter():
     def _pfc(x):
@@ -121,7 +141,7 @@ def test_batch_setter_getter():
 
 def test_batch_setter_autograd():
     with mx.autograd.record():
-        g = generate_graph(grad=True)
+        g = generate_graph(grad=True, readonly=True)
         h1 = g.ndata['h']
         h1.attach_grad()
         # partial set
@@ -153,9 +173,9 @@ def test_batch_send():
     v = mx.nd.array([9], dtype='int64')
     g.send((u, v))
 
-def test_batch_recv():
+def check_batch_recv(readonly):
     # basic recv test
-    g = generate_graph()
+    g = generate_graph(readonly=readonly)
     g.register_message_func(message_func)
     g.register_reduce_func(reduce_func)
     g.register_apply_node_func(apply_node_func)
@@ -167,8 +187,12 @@ def test_batch_recv():
     #assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     #reduce_msg_shapes.clear()
 
-def test_update_routines():
-    g = generate_graph()
+def test_batch_recv():
+    check_batch_recv(True)
+    check_batch_recv(False)
+
+def check_update_routines(readonly):
+    g = generate_graph(readonly=readonly)
     g.register_message_func(message_func)
     g.register_reduce_func(reduce_func)
     g.register_apply_node_func(apply_node_func)
@@ -201,13 +225,27 @@ def test_update_routines():
     assert(reduce_msg_shapes == {(1, 8, D), (9, 1, D)})
     reduce_msg_shapes.clear()
 
-def test_reduce_0deg():
-    g = DGLGraph()
-    g.add_nodes(5)
-    g.add_edge(1, 0)
-    g.add_edge(2, 0)
-    g.add_edge(3, 0)
-    g.add_edge(4, 0)
+def test_update_routines():
+    check_update_routines(True)
+    check_update_routines(False)
+
+def check_reduce_0deg(readonly):
+    if readonly:
+        row_idx = []
+        col_idx = []
+        for i in range(1, 5):
+            row_idx.append(i)
+            col_idx.append(0)
+        ones = np.ones(shape=(len(row_idx)))
+        csr = spsp.csr_matrix((ones, (row_idx, col_idx)), shape=(5, 5))
+        g = DGLGraph(csr, readonly=True)
+    else:
+        g = DGLGraph()
+        g.add_nodes(5)
+        g.add_edge(1, 0)
+        g.add_edge(2, 0)
+        g.add_edge(3, 0)
+        g.add_edge(4, 0)
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
@@ -220,10 +258,23 @@ def test_reduce_0deg():
     assert np.allclose(new_repr[1:].asnumpy(), old_repr[1:].asnumpy())
     assert np.allclose(new_repr[0].asnumpy(), old_repr.sum(0).asnumpy())
 
-def test_pull_0deg():
-    g = DGLGraph()
-    g.add_nodes(2)
-    g.add_edge(0, 1)
+def test_reduce_0deg():
+    check_reduce_0deg(True)
+    check_reduce_0deg(False)
+
+def check_pull_0deg(readonly):
+    if readonly:
+        row_idx = []
+        col_idx = []
+        row_idx.append(0)
+        col_idx.append(1)
+        ones = np.ones(shape=(len(row_idx)))
+        csr = spsp.csr_matrix((ones, (row_idx, col_idx)), shape=(2, 2))
+        g = DGLGraph(csr, readonly=True)
+    else:
+        g = DGLGraph()
+        g.add_nodes(2)
+        g.add_edge(0, 1)
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
@@ -245,6 +296,10 @@ def test_pull_0deg():
     new_repr = g.ndata['h']
     assert np.allclose(new_repr[0].asnumpy(), old_repr[0].asnumpy())
     assert np.allclose(new_repr[1].asnumpy(), old_repr[0].asnumpy())
+
+def test_pull_0deg():
+    check_pull_0deg(True)
+    check_pull_0deg(False)
 
 if __name__ == '__main__':
     test_batch_setter_getter()

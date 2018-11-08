@@ -67,7 +67,7 @@ def check_basics(g, ig):
             assert g.has_edge_between(u, v) == ig.has_edge_between(u, v)
     randv = utils.toindex(randv)
     ids = g.edge_ids(randv, randv)[2].tolist()
-    assert sum(ig.edge_ids(randv, randv).tolist() == ids) == len(ids)
+    assert sum(ig.edge_ids(randv, randv)[2].tolist() == ids) == len(ids)
     assert sum(g.has_edges_between(randv, randv).tolist() == ig.has_edges_between(randv, randv).tolist()) == len(randv)
 
 
