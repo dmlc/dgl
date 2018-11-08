@@ -1,5 +1,4 @@
-"""Base graph class specialized for neural networks on graphs.
-"""
+"""Base graph class specialized for neural networks on graphs."""
 from __future__ import absolute_import
 
 import networkx as nx
@@ -336,7 +335,7 @@ class DGLGraph(object):
         tensor, tensor
         The source and destination node IDs.
         """
-        eid = utils.toindex(u)
+        eid = utils.toindex(eid)
         src, dst, _ = self._graph.find_edges(eid)
         return src.tousertensor(), dst.tousertensor()
 
@@ -854,7 +853,7 @@ class DGLGraph(object):
         """
         self._apply_edge_func = func
 
-    def apply_nodes(self, func="default", v=ALL):
+    def apply_nodes(self, func="default", v=ALL, inplace=False):
         """Apply the function on the node features.
 
         Applying a None function will be ignored.
@@ -866,7 +865,7 @@ class DGLGraph(object):
         v : int, iterable of int, tensor, optional
             The node id(s).
         """
-        self._internal_apply_nodes(v, func)
+        self._internal_apply_nodes(v, func, inplace=inplace)
     
     def apply_edges(self, func="default", edges=ALL):
         """Apply the function on the edge features.
@@ -1207,40 +1206,60 @@ class DGLGraph(object):
             self.send(ALL, message_func)
             self.recv(ALL, reduce_func, apply_node_func)
 
-    def propagate(self,
-                  traverser='topo',
-                  message_func="default",
-                  reduce_func="default",
-                  apply_node_func="default",
-                  **kwargs):
-        """Propagate messages and update nodes using graph traversal.
+    def prop_nodes(self,
+                   nodes_generator,
+                   message_func="default",
+                   reduce_func="default",
+                   apply_node_func="default"):
+        """Propagate messages using graph traversal by triggering pull() on nodes.
 
-        A convenient function for passing messages and updating
-        nodes according to the traverser. The traverser can be
-        any of the pre-defined traverser (e.g. 'topo'). User can also provide custom
-        traverser that generates the edges and nodes.
+        The traversal order is specified by the ``nodes_generator``. It generates
+        node frontiers, which is a list or a tensor of nodes. The nodes in the
+        same frontier will be triggered together, while nodes in different frontiers
+        will be triggered according to the generating order.
 
         Parameters
         ----------
-        traverser : str or generator of edges.
-          The traverser of the graph.
-        message_func : str or callable
-          The message function.
-        reduce_func : str or callable
-          The reduce function.
-        apply_node_func : str or callable
-          The update function.
-        kwargs : keyword arguments, optional
-            Arguments for pre-defined iterators.
+        node_generators : generator
+            The generator of node frontiers.
+        message_func : str or callable, optional
+            The message function.
+        reduce_func : str or callable, optional
+            The reduce function.
+        apply_node_func : str or callable, optional
+            The update function.
         """
-        if isinstance(traverser, str):
-            # TODO(minjie): Call pre-defined routine to unroll the computation.
-            raise RuntimeError('Not implemented.')
-        else:
-            # NOTE: the iteration can return multiple edges at each step.
-            for u, v in traverser:
-                self.send_and_recv((u, v),
-                        message_func, reduce_func, apply_node_func)
+        for node_frontier in nodes_generator:
+            self.pull(node_frontier,
+                    message_func, reduce_func, apply_node_func)
+
+    def prop_edges(self,
+                   edge_generator,
+                   message_func="default",
+                   reduce_func="default",
+                   apply_node_func="default"):
+        """Propagate messages using graph traversal by triggering send_and_recv() on edges.
+
+        The traversal order is specified by the ``edges_generator``. It
+        generates edge frontiers, which is a list or a tensor of edge ids or
+        end points.  The edges in the same frontier will be triggered together,
+        while edges in different frontiers will be triggered according to the
+        generating order.
+
+        Parameters
+        ----------
+        edge_generators : generator
+            The generator of edge frontiers.
+        message_func : str or callable, optional
+            The message function.
+        reduce_func : str or callable, optional
+            The reduce function.
+        apply_node_func : str or callable, optional
+            The update function.
+        """
+        for edge_frontier in edge_generator:
+            self.send_and_recv(edge_frontier,
+                    message_func, reduce_func, apply_node_func)
 
     def subgraph(self, nodes):
         """Generate the subgraph among the given nodes.
@@ -1337,7 +1356,7 @@ class DGLGraph(object):
                 self._edge_frame.num_rows,
                 reduce_func)
 
-    def adjacency_matrix(self, ctx=None):
+    def adjacency_matrix(self, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
 
         Parameters
@@ -1352,7 +1371,7 @@ class DGLGraph(object):
         """
         return self._graph.adjacency_matrix().get(ctx)
 
-    def incidence_matrix(self, oriented=False, ctx=None):
+    def incidence_matrix(self, oriented=False, ctx=F.cpu()):
         """Return the incidence matrix representation of this graph.
 
         Parameters
@@ -1445,7 +1464,8 @@ class DGLGraph(object):
             edges = F.tensor(edges)
             return edges[e_mask]
 
-    def _internal_apply_nodes(self, v, apply_node_func="default", reduce_accum=None):
+    def _internal_apply_nodes(self, v, apply_node_func="default", reduce_accum=None,
+            inplace=False):
         """Internal apply nodes
 
         Parameters
@@ -1459,7 +1479,7 @@ class DGLGraph(object):
             # Skip none function call.
             if reduce_accum is not None:
                 # write reduce result back
-                self.set_n_repr(reduce_accum, v)
+                self.set_n_repr(reduce_accum, v, inplace=inplace)
             return
         # take out current node repr
         curr_repr = self.get_n_repr(v)
@@ -1472,4 +1492,4 @@ class DGLGraph(object):
             # merge new node_repr with reduce output
             reduce_accum.update(new_repr)
             new_repr = reduce_accum
-        self.set_n_repr(new_repr, v)
+        self.set_n_repr(new_repr, v, inplace=inplace)

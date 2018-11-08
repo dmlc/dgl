@@ -14,11 +14,11 @@ import dgl
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 
-def gcn_msg(src, edge):
-    return src
+def gcn_msg(edge):
+    return {'m': edge.src['h']}
 
-def gcn_reduce(node, msgs):
-    return mx.nd.sum(msgs, 1)
+def gcn_reduce(node):
+    return {'accum': mx.nd.sum(node.mailbox['m'], 1)}
 
 class NodeUpdateModule(gluon.Block):
     def __init__(self, out_feats, activation=None):
@@ -26,7 +26,7 @@ class NodeUpdateModule(gluon.Block):
         self.linear = gluon.nn.Dense(out_feats, activation=activation)
 
     def forward(self, node):
-        return self.linear(node)
+        return {'h': self.linear(node.data['accum'])}
 
 class GCN(gluon.Block):
     def __init__(self,
@@ -50,14 +50,14 @@ class GCN(gluon.Block):
         self.layers.add(NodeUpdateModule(n_classes))
 
     def forward(self, features):
-        self.g.set_n_repr(features)
+        self.g.ndata['h'] = features
         for layer in self.layers:
             # apply dropout
             if self.dropout:
-                val = F.dropout(self.g.get_n_repr(), p=self.dropout)
-                self.g.set_n_repr(val)
+                val = F.dropout(self.g.ndata['h'], p=self.dropout)
+                self.g.ndata['h'] = val
             self.g.update_all(gcn_msg, gcn_reduce, layer)
-        return self.g.pop_n_repr()
+        return self.g.ndata.pop('h')
 
 def main(args):
     # load and preprocess dataset
