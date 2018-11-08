@@ -107,7 +107,7 @@ class TreeLSTM(nn.Module):
             c = zero_initializer((n, self.h_size))
         g.ndata['c'] = c
         g.ndata['c_tild'] = zero_initializer((n, self.h_size))
-        dgl.topological_nodes(g)
+        dgl.prop_nodes_topo(g)
         # compute logits
         h = g.ndata.pop('h')
         h = self.dropout(h)
