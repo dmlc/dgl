@@ -48,7 +48,6 @@ def test_simple_readout():
     s = dgl.sum_on(g, 'edges', 'x')
     m = dgl.mean_on(g, 'edges', 'x')
     assert th.allclose(s, th.stack([se1, th.zeros(5)], 0))
-    print(m)
     assert th.allclose(m, th.stack([me1, th.zeros(5)], 0))
 
 

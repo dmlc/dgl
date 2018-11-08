@@ -245,7 +245,8 @@ def sum_on(graph, on, input, weight=None):
         batch_num_objs = getattr(graph, batch_num_objs_attr)
         n_objs = getattr(graph, num_objs_attr)()
 
-        seg_id = F.zerocopy_from_numpy(np.arange(n_graphs).repeat(batch_num_objs))
+        seg_id = F.zerocopy_from_numpy(
+                np.arange(n_graphs, dtype='int64').repeat(batch_num_objs))
         seg_id = F.copy_to(seg_id, F.context(input))
         y = F.unsorted_1d_segment_sum(input, seg_id, n_graphs, 0)
         return y
@@ -295,7 +296,8 @@ def mean_on(graph, on, input, weight=None):
         batch_num_objs = getattr(graph, batch_num_objs_attr)
         n_objs = getattr(graph, num_objs_attr)()
 
-        seg_id = F.zerocopy_from_numpy(np.arange(n_graphs).repeat(batch_num_objs))
+        seg_id = F.zerocopy_from_numpy(
+                np.arange(n_graphs, dtype='int64').repeat(batch_num_objs))
         seg_id = F.copy_to(seg_id, F.context(input))
         if weight is not None:
             w = F.unsorted_1d_segment_sum(weight, seg_id, n_graphs, 0)

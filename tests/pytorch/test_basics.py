@@ -190,11 +190,19 @@ def test_update_routines():
 
     # send_and_recv
     reduce_msg_shapes.clear()
-    u = th.tensor([0, 0, 0, 4, 5, 6])
-    v = th.tensor([1, 2, 3, 9, 9, 9])
+    u = [0, 0, 0, 4, 5, 6]
+    v = [1, 2, 3, 9, 9, 9]
     g.send_and_recv((u, v))
     assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     reduce_msg_shapes.clear()
+    g.send_and_recv((th.tensor(u), th.tensor(v)))
+    assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
+    reduce_msg_shapes.clear()
+    try:
+        g.send_and_recv([u, v])
+        assert False
+    except ValueError:
+        pass
 
     # pull
     v = th.tensor([1, 2, 3, 9])

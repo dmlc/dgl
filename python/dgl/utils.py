@@ -37,6 +37,9 @@ class Index(object):
                 self._list_data = np.array([int(data)]).astype(np.int64)
             except:
                 try:
+                    data = np.array(data).astype(np.int64)
+                    if data.ndim != 1:
+                        raise ValueError('Index data must be 1D int64 vector, but got: %s' % str(data))
                     self._list_data = np.array(data).astype(np.int64)
                 except:
                     raise ValueError('Error index data: %s' % str(data))
