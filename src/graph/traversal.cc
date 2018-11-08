@@ -16,7 +16,7 @@ using tvm::runtime::NDArray;
 namespace dgl {
 namespace traverse {
 namespace {
-/*!\brief A utility view class for a range of data in a vector */
+// A utility view class for a range of data in a vector.
 template<typename DType>
 struct VectorView {
   const std::vector<DType>* vec;
@@ -34,6 +34,57 @@ struct VectorView {
 
   size_t size() const { return range_end - range_start; }
 };
+
+// Internal function to merge multiple traversal traces into one ndarray.
+// It is similar to zip the vectors together.
+template<typename DType>
+IdArray MergeMultipleTraversals(
+    const std::vector<std::vector<DType>>& traces) {
+  int64_t max_len = 0, total_len = 0;
+  for (size_t i = 0; i < traces.size(); ++i) {
+    const int64_t tracelen = traces[i].size();
+    max_len = std::max(max_len, tracelen);
+    total_len += traces[i].size();
+  }
+  IdArray ret = IdArray::Empty({total_len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  int64_t* ret_data = static_cast<int64_t*>(ret->data);
+  for (int64_t i = 0; i < max_len; ++i) {
+    for (size_t j = 0; j < traces.size(); ++j) {
+      const int64_t tracelen = traces[j].size();
+      if (i >= tracelen) {
+        continue;
+      }
+      *(ret_data++) = traces[j][i];
+    }
+  }
+  return ret;
+}
+
+// Internal function to compute sections if multiple traversal traces
+// are merged into one ndarray.
+template<typename DType>
+IdArray ComputeMergedSections(
+    const std::vector<std::vector<DType>>& traces) {
+  int64_t max_len = 0;
+  for (size_t i = 0; i < traces.size(); ++i) {
+    const int64_t tracelen = traces[i].size();
+    max_len = std::max(max_len, tracelen);
+  }
+  IdArray ret = IdArray::Empty({max_len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  int64_t* ret_data = static_cast<int64_t*>(ret->data);
+  for (int64_t i = 0; i < max_len; ++i) {
+    int64_t sec_len = 0;
+    for (size_t j = 0; j < traces.size(); ++j) {
+      const int64_t tracelen = traces[j].size();
+      if (i < tracelen) {
+        ++sec_len;
+      }
+    }
+    *(ret_data++) = sec_len;
+  }
+  return ret;
+}
+
 }  // namespace
 
 /*!
@@ -114,46 +165,42 @@ TVM_REGISTER_GLOBAL("traversal._CAPI_DGLTopologicalNodes")
     *rv = ConvertNDArrayVectorToPackedFunc({node_ids, sections});
   });
 
-//TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphDFSLabeledEdges")
-//.set_body([] (TVMArgs args, TVMRetValue* rv) {
-//    GraphHandle ghandle = args[0];
-//    Graph* gptr = static_cast<Graph*>(ghandle);
-//    IdArray src = args[1];
-//    bool out = args[2];
-//    bool reverse_edge = args[3];
-//    bool nontree_edge = args[4];
-//    auto ret = gptr->DFSLabeledEdges(src, out, reverse_edge, nontree_edge);
-//    *rv = ConvertIdArrayQuadrupleToPackedFunc(ret);
-//  });
-//
-
 // * Multiple source nodes can be specified to start the DFS traversal. One needs
 // * to make sure that each source node belongs to different connected component, so
 // * the frontiers can be easily merged. Otherwise, the behavior is undefined.
-
-Frontiers DFSEdgesFrontier(const Graph& graph,
-                           //IdArray sources,
-                           dgl_id_t source,
-                           bool reversed) {
-  Frontiers ret;
-  auto visit = [&] (dgl_id_t e, int tag) { ret.ids.push_back(e); };
-  LOG(INFO) << ret.ids.size();
-  DFSLabeledEdges(graph, source, reversed, false, false, visit);
-  LOG(INFO) << ret.ids.size();
-  return ret;
-}
 
 TVM_REGISTER_GLOBAL("traversal._CAPI_DGLDFSEdges")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
-    const dgl_id_t source = args[1];
+    const IdArray source = args[1];
     bool reversed = args[2];
-    const auto& front = DFSEdgesFrontier(*gptr, source, reversed);
-    IdArray node_ids = CopyVectorToNDArray(front.ids);
-    IdArray sections = CopyVectorToNDArray(front.sections);
-    *rv = ConvertNDArrayVectorToPackedFunc({node_ids, sections});
+    CHECK(IsValidIdArray(source))
+      << "Invalid source node id array.";
+    const int64_t len = source->shape[0];
+    const int64_t* src_data = static_cast<int64_t*>(source->data);
+    std::vector<std::vector<dgl_id_t>> edges(len);
+    for (int64_t i = 0; i < len; ++i) {
+      auto visit = [&] (dgl_id_t e, int tag) { edges[i].push_back(e); };
+      DFSLabeledEdges(*gptr, src_data[i], reversed, false, false, visit);
+    }
+    IdArray ids = MergeMultipleTraversals(edges);
+    IdArray sections = ComputeMergedSections(edges);
+    *rv = ConvertNDArrayVectorToPackedFunc({ids, sections});
   });
+
+//TVM_REGISTER_GLOBAL("traversal._CAPI_DGLDFSLabeledEdges")
+//.set_body([] (TVMArgs args, TVMRetValue* rv) {
+//    // TODO
+//    GraphHandle ghandle = args[0];
+//    const Graph* gptr = static_cast<Graph*>(ghandle);
+//    const dgl_id_t source = args[1];
+//    bool reversed = args[2];
+//    const auto& front = DFSEdgesFrontier(*gptr, source, reversed);
+//    IdArray node_ids = CopyVectorToNDArray(front.ids);
+//    IdArray sections = CopyVectorToNDArray(front.sections);
+//    *rv = ConvertNDArrayVectorToPackedFunc({node_ids, sections});
+//  });
 
 }  // namespace traverse
 }  // namespace dgl

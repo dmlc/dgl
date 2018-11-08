@@ -54,16 +54,28 @@ def topological_nodes_generator(graph, reversed=False):
     sections = utils.toindex(ret(1)).tousertensor().tolist()
     return F.split(all_nodes, sections, dim=0)
 
-def dfs_edges_generator(graph, src, reversed=False):
-    """
+def dfs_edges_generator(graph, source, reversed=False):
+    """Edge frontiers generator using depth-first-search (DFS).
+
+    Parameters
+    ----------
+    source : list, tensor of nodes
+        Source nodes.
+    reversed : bool, optional
+        If true, traverse following the in-edge direction.
+
+    Returns
+    -------
+    list of edge frontiers
+        Each edge frontier is a list, tensor of edges.
     """
     ghandle = graph._graph._handle
-    ret = _CAPI_DGLDFSEdges(ghandle, src, reversed)
+    source = utils.toindex(source).todgltensor()
+    ret = _CAPI_DGLDFSEdges(ghandle, source, reversed)
     all_edges = utils.toindex(ret(0)).tousertensor()
     # TODO(minjie): how to support directly creating python list
     sections = utils.toindex(ret(1)).tousertensor().tolist()
-    #return F.split(all_nodes, sections, dim=0)
-    return all_edges, sections
+    return F.split(all_edges, sections, dim=0)
 
 def dfs_labeled_edges(self, src, out, reverse_edge, nontree_edge):
     """ Produce edges in a depth-first-search (DFS) labeled by type.

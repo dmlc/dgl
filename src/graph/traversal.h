@@ -153,7 +153,7 @@ void DFSLabeledEdges(const Graph& graph,
 
   while (!stack.empty()) {
     std::tie(u, i, on_tree) = stack.top();
-    LOG(INFO) << "u=" << u << " i=" << i << " on_tree=" << on_tree;
+    //LOG(INFO) << "u=" << u << " i=" << i << " on_tree=" << on_tree;
     const dgl_id_t v = (graph.*succ)(u)[i];
     const dgl_id_t uv = (graph.*out_edge)(u)[i];
     if (visited[v]) {
