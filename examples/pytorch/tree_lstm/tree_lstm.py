@@ -108,9 +108,7 @@ class TreeLSTM(nn.Module):
         g.set_n_repr({'x' : x, 'h' : h, 'c' : c, 'h_tild' : h_tild, 'c_tild' : c_tild})
         # TODO(minjie): potential bottleneck
         if iterator is None:
-            for frontier in topological_traverse(g):
-                #print('frontier', frontier)
-                g.pull(frontier)
+            g.propagate('topo')
         else:
             for frontier in iterator:
                 g.pull(frontier)

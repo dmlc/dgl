@@ -120,7 +120,7 @@ def test_batch_propagate():
     v = [0, 0, 1 + 5, 1 + 5]
     order.append((u, v))
 
-    bg.propagate(traverser=order)
+    bg.prop_edges(order)
     t1, t2 = dgl.unbatch(bg)
 
     assert t1.ndata['h'][0] == 9

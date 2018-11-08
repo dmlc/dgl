@@ -8,15 +8,10 @@
 #include <unordered_map>
 #include <set>
 #include <functional>
+#include <tuple>
+#include "../c_api_common.h"
 
 namespace dgl {
-namespace {
-inline bool IsValidIdArray(const IdArray& arr) {
-  return arr->ctx.device_type == kDLCPU && arr->ndim == 1
-    && arr->dtype.code == kDLInt && arr->dtype.bits == 64;
-}
-}  // namespace
-
 void Graph::AddVertices(uint64_t num_vertices) {
   CHECK(!read_only_) << "Graph is read-only. Mutations are not allowed.";
   adjlist_.resize(adjlist_.size() + num_vertices);

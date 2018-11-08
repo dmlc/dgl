@@ -11,4 +11,5 @@ from .base import ALL
 from .batched_graph import *
 from .graph import DGLGraph
 from .subgraph import DGLSubGraph
+from .traversal import *
 from .udf import NodeBatch, EdgeBatch

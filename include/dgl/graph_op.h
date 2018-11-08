@@ -25,6 +25,7 @@ class GraphOp {
    * \return the line graph
    */
   static Graph LineGraph(const Graph* graph, bool backtracking);
+
   /*!
    * \brief Return a disjoint union of the input graphs.
    *
