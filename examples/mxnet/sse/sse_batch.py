@@ -14,12 +14,12 @@ import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 
-def gcn_msg(src, edge):
+def gcn_msg(edges):
     # TODO should we use concat?
-    return {'m': mx.nd.concat(src['in'], src['h'], dim=1)}
+    return {'m': mx.nd.concat(edges.src['in'], edges.src['h'], dim=1)}
 
-def gcn_reduce(node, msgs):
-    return {'accum': mx.nd.sum(msgs['m'], 1)}
+def gcn_reduce(nodes):
+    return {'accum': mx.nd.sum(nodes.mailbox['m'], 1)}
 
 class NodeUpdate(gluon.Block):
     def __init__(self, out_feats, activation=None, alpha=0.9, **kwargs):
@@ -29,10 +29,10 @@ class NodeUpdate(gluon.Block):
         self.linear2 = gluon.nn.Dense(out_feats)
         self.alpha = alpha
 
-    def forward(self, node):
-        hidden = mx.nd.concat(node['in'], node['accum'], dim=1)
+    def forward(self, nodes):
+        hidden = mx.nd.concat(nodes.data['in'], nodes.data['accum'], dim=1)
         hidden = self.linear2(self.linear1(hidden))
-        return {'h': node['h'] * (1 - self.alpha) + self.alpha * hidden}
+        return {'h': nodes.data['h'] * (1 - self.alpha) + self.alpha * hidden}
 
 class SSEUpdateHidden(gluon.Block):
     def __init__(self,
@@ -66,7 +66,7 @@ class SSEUpdateHidden(gluon.Block):
             num_batches = int(math.ceil(g.number_of_nodes() / batch_size))
             for i in range(num_batches):
                 vs = mx.nd.arange(i * batch_size, min((i + 1) * batch_size, g.number_of_nodes()), dtype=np.int64)
-                g.apply_nodes(vs, self.layer, inplace=True)
+                g.apply_nodes(self.layer, vs, inplace=True)
             # TODO removing this makes the code much slower.
             # The reason is that calling pull on the subgraph leads to initialize 'accum'
             # first. If we don't remove it, the frame in the subgraph contains this column.
@@ -106,7 +106,7 @@ def subgraph_gen(g, seed_vertices, ctxs):
     assert len(seed_vertices) % len(ctxs) == 0
     vertices = []
     for seed in seed_vertices:
-        src, _, _ = g.in_edges(seed)
+        src, _ = g.in_edges(seed)
         vs = np.concatenate((src.asnumpy(), seed.asnumpy()), axis=0)
         vs = mx.nd.array(np.unique(vs), dtype=np.int64)
         vertices.append(vs)
@@ -147,7 +147,7 @@ def main(args, data):
         graph = data.graph.get_graph()
     except AttributeError:
         graph = data.graph
-    g = DGLGraph(graph, immutable_graph=True)
+    g = DGLGraph(graph, readonly=True)
     g.set_n_repr({'in': features, 'h': mx.nd.random.normal(shape=(g.number_of_nodes(), args.n_hidden),
         ctx=mx.cpu(0))})
 
