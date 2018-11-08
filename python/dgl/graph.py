@@ -1360,7 +1360,7 @@ class DGLGraph(object):
                 self._edge_frame.num_rows,
                 reduce_func)
 
-    def adjacency_matrix(self, ctx=None):
+    def adjacency_matrix(self, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
 
         Parameters
@@ -1375,7 +1375,7 @@ class DGLGraph(object):
         """
         return self._graph.adjacency_matrix().get(ctx)
 
-    def incidence_matrix(self, oriented=False, ctx=None):
+    def incidence_matrix(self, oriented=False, ctx=F.cpu()):
         """Return the incidence matrix representation of this graph.
 
         Parameters
