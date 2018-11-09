@@ -1,7 +1,7 @@
 """Built-in message function."""
 from __future__ import absolute_import
 
-from .builtin import BuiltinFunction
+from .function import BuiltinFunction
 import operator
 import dgl.backend as F
 
@@ -25,29 +25,6 @@ class MessageFunction(BuiltinFunction):
     def is_spmv_supported(self, g):
         """Return whether the SPMV optimization is supported."""
         raise NotImplementedError
-
-
-class BundledMessageFunction(MessageFunction):
-    def __init__(self, fn_list):
-        if not isinstance(fn_list, (list, tuple)):
-            fn_list = [fn_list]
-        self.fn_list = fn_list
-
-    def is_spmv_supported(self, g):
-        for fn in self.fn_list:
-            if not isinstance(fn, MessageFunction) or not fn.is_spmv_supported(g):
-                return False
-        return True
-
-    def __call__(self, edges):
-        ret = dict()
-        for fn in self.fn_list:
-            msg = fn(edges)
-            ret.update(msg)
-        return ret
-
-    def name(self):
-        return "bundled"
 
 
 def _is_spmv_supported_node_feat(g, field):

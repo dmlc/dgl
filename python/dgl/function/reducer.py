@@ -2,7 +2,7 @@
 from __future__ import absolute_import
 
 from .. import backend as F
-from .builtin import BuiltinFunction
+from .funtion import BuiltinFunction
 
 __all__ = ["sum", "max"]
 
@@ -23,28 +23,6 @@ class ReduceFunction(BuiltinFunction):
     def is_spmv_supported(self):
         """Return whether the SPMV optimization is supported."""
         raise NotImplementedError
-
-class BundledReduceFunction(ReduceFunction):
-    def __init__(self, fn_list):
-        if not isinstance(fn_list, (list, tuple)):
-            fn_list = [fn_list]
-        self.fn_list = fn_list
-
-    def is_spmv_supported(self):
-        for fn in self.fn_list:
-            if not isinstance(fn, ReduceFunction) or not fn.is_spmv_supported():
-                return False
-        return True
-
-    def __call__(self, nodes):
-        ret = dict()
-        for fn in self.fn_list:
-            rpr = fn(nodes)
-            ret.update(rpr)
-        return ret
-
-    def name(self):
-        return "bundled"
 
 class ReducerFunctionTemplate(ReduceFunction):
     def __init__(self, name, op, msg_field, out_field):

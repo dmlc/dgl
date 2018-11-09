@@ -14,3 +14,16 @@ class BuiltinFunction(object):
     def name(self):
         """Return the name of this builtin function."""
         raise NotImplementedError
+
+class BundledFunction(object):
+    def __init__(self, fn_list):
+        self.fn_list = fn_list
+
+    def __call__(self, *args):
+        ret = {}
+        for fn in self.fn_list:
+            ret.update(fn(*args))
+        return ret
+
+    def name(self):
+        return "bundled"
