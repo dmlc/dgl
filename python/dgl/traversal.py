@@ -27,10 +27,12 @@ def bfs_nodes_generator(graph, source, reversed=False):
 
     Examples
     --------
-    Given a graph:
-          2 - 4
-         / \ 
-    0 - 1 - 3 - 5
+    Given a graph (directed, edges from small node id to large):
+    ::
+
+              2 - 4
+             / \ 
+        0 - 1 - 3 - 5
 
     >>> g = ... # the graph above
     >>> list(dgl.bfs_nodes_generator(g, 0))
@@ -62,9 +64,11 @@ def topological_nodes_generator(graph, reversed=False):
     Examples
     --------
     Given a graph (directed, edges from small node id to large):
-          2 - 4
-         / \ 
-    0 - 1 - 3 - 5
+    ::
+
+              2 - 4
+             / \ 
+        0 - 1 - 3 - 5
 
     >>> g = ... # the graph above
     >>> list(dgl.topological_nodes_generator(g))
@@ -102,9 +106,12 @@ def dfs_edges_generator(graph, source, reversed=False):
     Examples
     --------
     Given a graph (directed, edges from small node id to large):
-          2 - 4
-         / \ 
-    0 - 1 - 3 - 5
+    ::
+
+              2 - 4
+             / \ 
+        0 - 1 - 3 - 5
+
     Edge addition order [(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)]
 
     >>> g = ... # the graph above
