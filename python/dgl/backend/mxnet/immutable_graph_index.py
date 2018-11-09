@@ -81,9 +81,13 @@ class ImmutableGraphIndex(object):
         NDArray
             Teh edge id array.
         """
+        if len(u) == 0 or len(v) == 0:
+            return [], [], []
         ids = mx.nd.contrib.edge_id(self._in_csr, v, u)
         ids = ids.asnumpy()
-        return ids[ids >= 0]
+        v = v.asnumpy()
+        u = u.asnumpy()
+        return u[ids >= 0], v[ids >= 0], ids[ids >= 0]
 
     def predecessors(self, v, radius=1):
         """Return the predecessors of the node.

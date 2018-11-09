@@ -13,7 +13,7 @@ from . import utils
 __all__ = ['BatchedDGLGraph', 'batch', 'unbatch', 'split']
 
 class BatchedDGLGraph(DGLGraph):
-    """The batched DGL graph.
+    """Class for batched DGL graphs.
 
     The batched graph is read-only.
 

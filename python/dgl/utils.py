@@ -37,7 +37,10 @@ class Index(object):
                 self._list_data = np.array([int(data)]).astype(np.int64)
             except:
                 try:
-                    self._list_data = np.array(data).astype(np.int64)
+                    data = np.array(data).astype('int64')
+                    if data.ndim != 1:
+                        raise ValueError('Index data must be 1D int64 vector, but got: %s' % str(data))
+                    self._list_data = data
                 except:
                     raise ValueError('Error index data: %s' % str(data))
             self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self._list_data)

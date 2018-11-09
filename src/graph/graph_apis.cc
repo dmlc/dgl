@@ -19,7 +19,7 @@ namespace {
 // Convert EdgeArray structure to PackedFunc.
 PackedFunc ConvertEdgeArrayToPackedFunc(const Graph::EdgeArray& ea) {
   auto body = [ea] (TVMArgs args, TVMRetValue* rv) {
-      int which = args[0];
+      const int which = args[0];
       if (which == 0) {
         *rv = std::move(ea.src);
       } else if (which == 1) {
@@ -36,7 +36,7 @@ PackedFunc ConvertEdgeArrayToPackedFunc(const Graph::EdgeArray& ea) {
 // Convert Subgraph structure to PackedFunc.
 PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
   auto body = [sg] (TVMArgs args, TVMRetValue* rv) {
-      int which = args[0];
+      const int which = args[0];
       if (which == 0) {
         Graph* gptr = new Graph();
         *gptr = std::move(sg.graph);
@@ -366,4 +366,5 @@ TVM_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLineGraph")
     GraphHandle lghandle = lgptr;
     *rv = lghandle;
   });
+
 }  // namespace dgl
