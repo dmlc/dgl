@@ -27,6 +27,10 @@ class ImmutableGraphIndex(object):
     def __init__(self, in_csr, out_csr):
         self._in_csr = in_csr
         self._out_csr = out_csr
+        if in_csr is not None:
+            assert mx.nd.sum(in_csr.indices < in_csr.shape[1]).asnumpy()[0] == len(in_csr.indices)
+        if out_csr is not None:
+            assert mx.nd.sum(out_csr.indices < out_csr.shape[1]).asnumpy()[0] == len(out_csr.indices)
 
     def number_of_nodes(self):
         """Return the number of nodes.
@@ -240,7 +244,7 @@ class ImmutableGraphIndex(object):
 
         Parameters
         ----------
-        vs_arr : a vector of utils.Index
+        vs_arr : a vector of NDArray
             The nodes.
 
         Returns
@@ -267,6 +271,18 @@ class ImmutableGraphIndex(object):
             induced_ns.append(induced_n)
             induced_es.append(induced_e)
         return gis, induced_ns, induced_es
+
+    def neighbor_sampling(self, seed_ids, expand_factor, num_hops, node_prob, max_subgraph_size):
+        assert expand_factor == 'ALL'
+        assert num_hops == 1
+        assert node_prob is None
+        vertices = []
+        for seed in seed_ids:
+            _, src, _ = self.in_edges(seed)
+            vs = np.concatenate((src.asnumpy(), seed.asnumpy()), axis=0)
+            vs = mx.nd.array(np.unique(vs), dtype=np.int64)
+            vertices.append(vs)
+        return self.node_subgraphs(vertices)
 
     def adjacency_matrix(self, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
