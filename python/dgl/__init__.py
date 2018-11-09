@@ -1,5 +1,6 @@
 from . import backend
-from . import data
+# One has to manually import dgl.data; fixes #125
+#from . import data
 from . import function
 from . import nn
 
