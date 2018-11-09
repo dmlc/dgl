@@ -1,4 +1,6 @@
 """
+.. currentmodule:: dgl
+
 DGL Basics
 ==========
 
@@ -13,8 +15,8 @@ The Goal of this tutorial:
 ###############################################################################
 # Graph Creation
 # --------------
-# The design of ``DGLGraph`` was influenced by other graph libraries. Indeed,
-# you can create a graph from networkx, and convert it into a ``DGLGraph`` and
+# The design of :class:`DGLGraph` was influenced by other graph libraries. Indeed,
+# you can create a graph from networkx, and convert it into a :class:`DGLGraph` and
 # vice versa:
 
 import networkx as nx
@@ -33,13 +35,14 @@ plt.show()
 
 
 ###############################################################################
-# They are the same graph, except that DGLGraph are *always* directional.
+# They are the same graph, except that :class:`DGLGraph` is *always* directional.
 #
 # One can also create a graph by calling DGL's own interface.
 # 
-# Now let's build a star graph. DGLGraph nodes are consecutive range of
-# integers between 0 and ``g.number_of_nodes()`` and can grow by calling
-# ``g.add_nodes``. DGLGraph edges are in order of their additions. Note that
+# Now let's build a star graph. :class:`DGLGraph` nodes are consecutive range of
+# integers between 0 and :func:`number_of_nodes() <DGLGraph.number_of_nodes>`
+# and can grow by calling :func:`add_nodes <DGLGraph.add_nodes>`.
+# :class:`DGLGraph` edges are in order of their additions. Note that
 # edges are accessed in much the same way as nodes, with one extra feature
 # of *edge broadcasting*:
 
@@ -72,11 +75,11 @@ plt.show()
 ###############################################################################
 # Feature Assignment
 # ------------------
-# One can also assign features to nodes and edges of a ``DGLGraph``.  The
+# One can also assign features to nodes and edges of a :class:`DGLGraph`.  The
 # features are represented as dictionary of names (strings) and tensors,
 # called **fields**.
 #
-# The following code snippet assigns each node a 3-D vector.
+# The following code snippet assigns each node a vector (len=3).
 #
 # .. note::
 #
@@ -91,8 +94,9 @@ g.ndata['x'] = x
 
 
 ###############################################################################
-# ``ndata`` is a syntax sugar to access states of all nodes, states are stored
-# in a container `data` that hosts user defined dictionary.
+# :func:`ndata <DGLGraph.ndata>` is a syntax sugar to access states of all nodes,
+# states are stored
+# in a container ``data`` that hosts user defined dictionary.
 
 print(g.ndata['x'] == g.nodes[:].data['x'])
 
@@ -138,7 +142,7 @@ g.edata.pop('w')
 ###############################################################################
 # Multigraphs
 # ~~~~~~~~~~~
-# Many graph applications need multi-edges. To enable this, construct DGLGraph
+# Many graph applications need multi-edges. To enable this, construct :class:`DGLGraph`
 # with ``multigraph=True``.
 
 g_multi = dgl.DGLGraph(multigraph=True)
