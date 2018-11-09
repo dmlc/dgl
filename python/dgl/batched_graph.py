@@ -14,7 +14,7 @@ __all__ = ['BatchedDGLGraph', 'batch', 'unbatch', 'split',
            'sum_on', 'mean_on']
 
 class BatchedDGLGraph(DGLGraph):
-    """The batched DGL graph.
+    """Class for batched DGL graphs.
 
     The batched graph is read-only.
 
