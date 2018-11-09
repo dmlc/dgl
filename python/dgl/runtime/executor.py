@@ -1,234 +1,88 @@
-"""Executors used by runtime."""
 from __future__ import absolute_import
 
-from collections import namedtuple
-from abc import abstractmethod
+from .. import backend as F
+from ..udf import NodeBatch, EdgeBatch
+from .. import utils
 
-FrameData = namedtuple('FrameData', ['frame', 'fields', 'ids'])
+__all__ = ["SPMVExecutor", "DegreeBucketingExecutor", "EdgeExecutor"]
 
 class Executor(object):
-    """Executor is the basic unit of computation.
-
-    An executor transforms the node and edge features into new ones. An executor
-    can operate only on a part of the feature space of node/edge space.
-
-    Parameters
-    ----------
-    graph_data : GraphData
-        A key-value store of graph structure data (e.g. adjmat index, incmat index)
-    """
-    def __init__(self, graph_data): # XXX: udf does not need graph_data
-        self._graph_data = graph_data
-        self._graph_key = None
-        self._node_input = None
-        self._edge_input = None
-        self._node_output = None
-        self._edge_output = None
-
-    @property
-    def graph_data(self):
-        """Return the graph data."""
-        return self._graph_data
-
-    def set_graph_key(self, key):
-        """Set the key to the structure data this executor requires.
-
-        For example, the subclass can get the adjmat of the graph as follows:
-        >>> def run(self):
-        >>>     adjmat = self.graph_data[self.graph_key]
-        >>>     ...
-
-        Parameters
-        ----------
-        """
-        self._graph_key = key
-
-    @property
-    def graph_key(self):
-        """Return the graph key."""
-        return self._graph_key
-
-    def set_node_input(self, node_frame, fields=None, ids=None):
-        """Set the input node features.
-
-        Parameters
-        ----------
-        node_frame : frame.FrameRef
-            The frame containing node features.
-        fields : list of str, optional
-            The fields to be read. If none, all fields are required.
-        ids : utils.Index, optional
-            The node ids. If none, all the nodes are required.
-        """
-        self._node_input = FrameData(node_frame, fields, ids)
-
-    def set_edge_input(self, edge_frame, fields=None, ids=None):
-        """Set the input edge features.
-
-        Parameters
-        ----------
-        edge_frame : frame.FrameRef
-            The frame containing edge features.
-        fields : list of str, optional
-            The fields to be read. If none, all fields are required.
-        ids : utils.Index, optional
-            The edge ids. If none, all the edges are required.
-        """
-        self._edge_input = FrameData(edge_frame, fields, ids)
-
-    def set_node_output(self, node_frame, fields=None, ids=None):
-        """Set the output node features.
-
-        Parameters
-        ----------
-        node_frame : frame.FrameRef
-            The frame to write to.
-        fields : list of str, optional
-            The output field. If none, the output fields cannot be determined
-            before running (e.g. UDFs).
-        ids : utils.Index
-            The node ids. If none, all the nodes are updated.
-        """
-        self._node_output = FrameData(node_frame, fields, ids)
-
-    def set_edge_output(self, edge_frame, edge_field=None, edge_ids=None):
-        """Set the output edge features.
-
-        Parameters
-        ----------
-        edge_frame : frame.FrameRef
-            The frame to write to.
-        fields : list of str, optional
-            The output field. If none, the output fields cannot be determined
-            before running (e.g. UDFs).
-        ids : utils.Index
-            The node ids. If none, all the edges are updated.
-        """
-        self._edge_output = FrameData(edge_frame, fields, ids)
-
-    def read_node_input(self):
-        """Read the input and return the feature data.
-
-        Returns
-        -------
-        dict
-            The node feature data.
-        """
-        fd = self._node_input
-        if fd.fields is None and fd.ids is None:
-            return fd.frame
-        elif fd.fields is None and fd.ids is not None:
-            return fd.frame[fd.ids]
-        elif fd.fields is not None and fd.ids is None:
-            return {fld : fd.frame[fld] for fld in fd.fields}
-        else:
-            sub = fd.frame[fd.ids]
-            return {fld : sub[fld] for fld in fd.fields}
-
-    def read_edge_input(self):
-        # TODO(minjie)
-        pass
-
-    def write_node_output(self, data):
-        """Write the data to the output.
-        """
-        # TODO(minjie)
-        pass
-
-    def write_edge_output(self, data):
-        # TODO(minjie)
-        pass
-
-    @abstractmethod
     def run(self):
-        """Run the executor and compute new features.
-
-        This method should be inherited by subclass. A normal procedure looks like this:
-        (1) Use read_[node|edge]_input to get the feature data.
-        (2) [optional] Use self.graph_data[self.graph_key] to get the graph tensor.
-        (3) Call the pre-bound function.
-        (4) Use write_[node|edge]_output to write the output.
-        """
-        raise RuntimeError('The "run" method is not implemented by subclass.')
+        raise NotImplementedError
 
 class SPMVExecutor(Executor):
-    def __init__(self, graph_data, use_edge_feat=False):
-        pass
+    def __init__(self, src_field, src_repr, out_field, out_repr, adjmat, use_edge_feat=False, edge_field=None, edge_repr=None, dense_shape=None):
+        self.src_field = src_field
+        self.src_repr = src_repr
+        self.out_field = out_field
+        self.out_repr = out_repr
+        self.use_edge_feat = use_edge_feat
+        self.adjmat = adjmat
+        if self.use_edge_feat:
+            self.edge_field = edge_field
+            self.edge_repr = edge_repr
+            self.dense_shape = dense_shape
 
     def run(self):
-        # check context of node/edge data
-        # adjmat = self.data_store[self.key].get(ctx)
-        if self.use_edge_feat:
-            # create adjmat using edge frame and edge field
-            pass
+        # get src col
+        srccol = self.src_repr[self.src_field]
 
-# Two UDF executors
-class NodeExecutor(Executor): # change my name
-    def __init__(self, udf):
-        self._udf = udf
+        # move to context
+        self.adjmat = self.adjmat.get(F.context(srccol))
+
+        # build adjmat
+        if self.use_edge_feat:
+            dat = self.edge_repr[self.edge_field]
+            self.adjmat = F.sparse_matrix(dat, self.adjmat, self.dense_shape)
+
+        # spmm
+        if len(F.shape(srccol)) == 1:
+            srccol = F.unsqueeze(srccol, 1)
+            dstcol = F.spmm(self.adjmat, srccol)
+            dstcol = F.squeeze(dstcol, 1)
+        else:
+            dstcol = F.spmm(self.adjmat, srccol)
+
+        # update repr
+        self.out_repr[self.out_field] = dstcol
+
+class DegreeBucketingExecutor(Executor):
+    def __init__(self, g, rfunc, message_frame, out_repr, buckets, zero_deg_nodes=None, reorder=True):
+        self.g = g
+        self.rfunc = rfunc
+        self.msg_frame = message_frame
+        self.degrees, self.dsts, self.msg_ids = buckets
+        self.zero_deg_nodes = zero_deg_nodes
+        self.reorder = reorder
+        self.out_repr = out_repr
+
+    def run(self):
+        new_reprs = []
+        # loop over each bucket
+        # FIXME (lingfan): handle zero-degree case
+        for deg, vv, msg_id in zip(self.degrees, self.dsts, self.msg_ids):
+            v_data = self.g.get_n_repr(vv)
+            in_msgs = self.msg_frame.select_rows(msg_id)
+            def _reshape_fn(msg):
+                msg_shape = F.shape(msg)
+                new_shape = (len(vv), deg) + msg_shape[1:]
+                return F.reshape(msg, new_shape)
+            reshaped_in_msgs = utils.LazyDict(
+                    lambda key: _reshape_fn(in_msgs[key]), self.msg_frame.schemes)
+            nb = NodeBatch(self.g, vv, v_data, reshaped_in_msgs)
+            new_reprs.append(self.rfunc(nb))
+
+        # Pack all reducer results together
+        keys = new_reprs[0].keys()
+        new_reprs = {key : F.cat([repr[key] for repr in new_reprs], dim=0)
+                     for key in keys}
+        self.out_repr.update(new_reprs)
 
 class EdgeExecutor(Executor):
-    def __init__(self, udf):
-        pass
+    def __init__(self, mfunc, graph, u, v, eid, out_repr):
+        self.mfunc = mfunc
+        self.eb = EdgeBatch(graph, (u, v, eid))
+        self.out_repr = out_repr
 
-    def set_node_input(self, node_frame, src_ids, edge_ids): # take in two ids
-        pass
-
-    def set_edge_input(self, edge_frame, ids):
-        pass
-
-    def set_edge_output(self, edge_frame, ids):
-        pass
-
-class GraphData(object):
-    """A component that stores the sparse matrices computed from graphs."""
-    def __getitem__(self, key):
-        # TODO(minjie):
-        pass
-
-    def __setitem__(self, key, value):
-        pass
-
-class ExecutionPlan(object):
-    """The class to represent execution plan.
-
-    The execution plan contains multiple stages. Each stage contains multiple executors
-    that computes different feature data. The output of these executors will be merged
-    by a merge-n-apply operation before passed to the next stage.
-    """
-    def __init__(self):
-        self._executors = []
-
-    def add_stage(self, execs, apply_node_func, apply_edge_func):
-        # XXX: apply_edge_func not needed
-        """Add one stage to the plan.
-
-        Parameters
-        ----------
-        execs : list of Executor
-            The executors in this stage.
-        apply_node_func : callable
-            The apply_node_func. This can be None.
-        apply_edge_func : callable
-            The apply_edge_func. This can be None.
-        """
-        # TODO(minjie):
-        pass
-
-class MergeAndApplyExecutor(Executor):
-    # TODO(minjie)
-
-    # Things to be covered in merge
-    # 1. Merge node dim: (Does runtime has enough info to find out how to merge?)
-    #   a) if deg bucketing, check zero degree
-    #   b) for both spmv and deg bucketing, if destination is a subset of nodes, get
-    #      other nodes not in recv nodes for outputting a full frame
-    # 2. Merge field dimension
-
-    # If apply_func is removed from recv, then ignore the following:
-    # Otherwise, apply_nodes should be happening half way during merge
-    # You should:
-    # 1. Merge all received nodes (send_and_recv and recv case)
-    # 2. perform apply
-    # 3. Incorporate nodes that not received to form a full frame
-    pass
+    def run(self):
+        self.out_repr.update(self.mfunc(self.eb))
