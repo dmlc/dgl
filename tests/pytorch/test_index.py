@@ -4,6 +4,7 @@ from dgl.utils import toindex
 import numpy as np
 import torch as th
 from torch.utils import dlpack
+import utils as U
 
 def test_dlpack():
     # test dlpack conversion.

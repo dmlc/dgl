@@ -1,6 +1,7 @@
 import torch as th
 import numpy as np
 from dgl.graph import DGLGraph
+import utils as U
 
 def test_filter():
     g = DGLGraph()
