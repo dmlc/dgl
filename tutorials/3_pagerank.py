@@ -1,4 +1,6 @@
 """
+.. currentmodule:: dgl
+
 PageRank with DGL Message Passing
 =================================
 
@@ -34,7 +36,7 @@ interface.
 # A naive implementation
 # ----------------------
 # Let us first create a graph with 100 nodes with NetworkX and convert it to a
-# ``DGLGraph``:
+# :class:`DGLGraph`:
 
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -153,8 +155,8 @@ def pagerank_level2(g):
 
 ###############################################################################
 # Besides ``update_all``, we also have ``pull``, ``push``, and ``send_and_recv``
-# in this level-2 category. Please refer to their own API reference documents
-# for more details. (TODO: a link to the document).
+# in this level-2 category. Please refer to the :doc:`API reference <../api/python/graph>`
+# for more details.
 
 
 ###############################################################################
@@ -164,11 +166,13 @@ def pagerank_level2(g):
 # provides **builtin functions**. For example, two builtin functions can be
 # used in the PageRank example.
 #
-# * ``dgl.function.copy_src(src, out)`` is an edge UDF that computes the
+# * :func:`dgl.function.copy_src(src, out) <function.copy_src>`
+#   is an edge UDF that computes the
 #   output using the source node feature data. User needs to specify the name of
 #   the source feature data (``src``) and the output name (``out``).
 # 
-# * ``dgl.function.sum(msg, out)`` is a node UDF that sums the messages in
+# * :func:`dgl.function.sum(msg, out) <function.sum>` is a node UDF
+#   that sums the messages in
 #   the node's mailbox. User needs to specify the message name (``msg``) and the
 #   output name (``out``).
 #
@@ -184,7 +188,8 @@ def pagerank_builtin(g):
 
 
 ###############################################################################
-# Here, we directly provide the UDFs to the `update_all` as its arguments.
+# Here, we directly provide the UDFs to the :func:`update_all <DGLGraph.update_all>`
+# as its arguments.
 # This will override the previously registered UDFs.
 #
 # In addition to cleaner code, using builtin functions also gives DGL the
@@ -194,7 +199,7 @@ def pagerank_builtin(g):
 #
 # `This section <spmv_>`_ describes why spMV can speed up the scatter-gather
 # phase in PageRank.  For more details about the builtin functions in DGL,
-# please read their API reference documents. (TODO: a link here).
+# please read the :doc:`API reference <../api/python/function>`.
 #
 # You can also download and run the codes to feel the difference.
 

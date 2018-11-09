@@ -19,22 +19,117 @@ from .view import NodeView, EdgeView
 __all__ = ['DGLGraph']
 
 class DGLGraph(object):
-    """Base graph class specialized for neural networks on graphs.
+    """Base graph class.
 
-    TODO(minjie): document of batching semantics
+    The graph stores nodes, edges and also their features.
+
+    DGL graph is always directional. Undirected graph can be represented using
+    two bi-directional edges.
+
+    Nodes are identified by consecutive integers starting from zero.
+    
+    Edges can be specified by two end points (u, v) or the integer id assigned
+    when the edges are added.
+
+    Node and edge features are stored as a dictionary from the feature name
+    to the feature data (in tensor).
 
     Parameters
     ----------
-    graph_data : graph data
+    graph_data : graph data, optional
         Data to initialize graph. Same as networkx's semantics.
-    node_frame : FrameRef
+    node_frame : FrameRef, optional
         Node feature storage.
-    edge_frame : FrameRef
+    edge_frame : FrameRef, optional
         Edge feature storage.
     multigraph : bool, optional
         Whether the graph would be a multigraph (default: False)
     readonly : bool, optional
         Whether the graph structure is read-only (default: False).
+
+    Examples
+    --------
+    Create an empty graph with no nodes and edges.
+
+    >>> G = dgl.DGLGraph()
+
+    G can be grown in several ways.
+
+    **Nodes:**
+
+    Add N nodes:
+
+    >>> G.add_nodes(10)  # 10 isolated nodes are added
+
+    **Edges:**
+
+    Add one edge at a time,
+
+    >>> G.add_edge(0, 1)
+
+    or multiple edges,
+
+    >>> G.add_edges([1, 2, 3], [3, 4, 5])  # three edges: 1->3, 2->4, 3->5
+
+    or multiple edges starting from the same node,
+
+    >>> G.add_edges(4, [7, 8, 9])  # three edges: 4->7, 4->8, 4->9
+
+    or multiple edges pointing to the same node,
+
+    >>> G.add_edges([2, 6, 8], 5)  # three edges: 2->5, 6->5, 8->5
+
+    or multiple edges using tensor type (demo in pytorch syntax).
+
+    >>> import torch as th
+    >>> G.add_edges(th.tensor([3, 4, 5]), 1)  # three edges: 3->1, 4->1, 5->1
+
+    NOTE: Removing nodes and edges is not supported by DGLGraph.
+
+    **Features:**
+
+    Both nodes and edges can have feature data. Features are stored as
+    key/value pair. The key must be hashable while the value must be tensor
+    type. Features are batched on the first dimension.
+
+    Use G.ndata to get/set features for all nodes.
+
+    >>> G = dgl.DGLGraph()
+    >>> G.add_nodes(3)
+    >>> G.ndata['x'] = th.zeros((3, 5))  # init 3 nodes with zero vector(len=5)
+    >>> G.ndata
+    {'x' : tensor([[0., 0., 0., 0., 0.],
+                   [0., 0., 0., 0., 0.],
+                   [0., 0., 0., 0., 0.]])}
+
+    Use G.nodes to get/set features for some nodes.
+
+    >>> G.nodes[[0, 2]].data['x'] = th.ones((2, 5))
+    >>> G.ndata
+    {'x' : tensor([[1., 1., 1., 1., 1.],
+                   [0., 0., 0., 0., 0.],
+                   [1., 1., 1., 1., 1.]])}
+
+    Similarly, use G.edata and G.edges to get/set features for edges.
+
+    >>> G.add_edges([0, 1], 2)  # 0->2, 1->2
+    >>> G.edata['y'] = th.zeros((2, 4))  # init 2 edges with zero vector(len=4)
+    >>> G.edata
+    {'y' : tensor([[0., 0., 0., 0.],
+                   [0., 0., 0., 0.]])}
+    >>> G.edges[1, 2].data['y'] = th.ones((1, 4))
+    >>> G.edata
+    {'y' : tensor([[0., 0., 0., 0.],
+                   [1., 1., 1., 1.]])}
+
+    Note that each edge is assigned a unique id equal to its adding
+    order. So edge 1->2 has id=1. DGL supports directly use edge id
+    to access edge features.
+
+    >>> G.edges[0].data['y'] += 2.
+    >>> G.edata
+    {'y' : tensor([[2., 2., 2., 2.],
+                   [1., 1., 1., 1.]])}
     """
     def __init__(self,
                  graph_data=None,
@@ -89,6 +184,10 @@ class DGLGraph(object):
             The dst node.
         reprs : dict
             Optional edge representation.
+
+        See Also
+        --------
+        add_edges
         """
         self._graph.add_edge(u, v)
         #TODO(minjie): change frames
@@ -109,6 +208,10 @@ class DGLGraph(object):
             The dst nodes.
         reprs : dict
             Optional node representations.
+
+        See Also
+        --------
+        add_edge
         """
         u = utils.toindex(u)
         v = utils.toindex(v)
@@ -178,6 +281,10 @@ class DGLGraph(object):
         -------
         bool
             True if the node exists
+
+        See Also
+        --------
+        has_nodes
         """
         return self.has_node(vid)
 
@@ -197,6 +304,10 @@ class DGLGraph(object):
         -------
         tensor
             0-1 array indicating existence
+
+        See Also
+        --------
+        has_node
         """
         vids = utils.toindex(vids)
         rst = self._graph.has_nodes(vids)
@@ -216,6 +327,10 @@ class DGLGraph(object):
         -------
         bool
             True if the edge exists
+
+        See Also
+        --------
+        has_edges_between
         """
         return self._graph.has_edge_between(u, v)
 
@@ -233,6 +348,10 @@ class DGLGraph(object):
         -------
         tensor
             0-1 array indicating existence
+
+        See Also
+        --------
+        has_edge_between
         """
         u = utils.toindex(u)
         v = utils.toindex(v)
@@ -291,6 +410,10 @@ class DGLGraph(object):
         int or tensor
             The edge id if force_multi == True and the graph is a simple graph.
             The edge id array otherwise.
+
+        See Also
+        --------
+        edge_ids
         """
         idx = self._graph.edge_id(u, v)
         return idx.tousertensor() if force_multi or self.is_multigraph else idx[0]
@@ -313,6 +436,10 @@ class DGLGraph(object):
         tensor, or (tensor, tensor, tensor)
         If force_multi is True or the graph is multigraph, return (src nodes, dst nodes, edge ids)
         Otherwise, return a single tensor of edge ids.
+
+        See Also
+        --------
+        edge_id
         """
         u = utils.toindex(u)
         v = utils.toindex(v)
@@ -332,8 +459,10 @@ class DGLGraph(object):
 
         Returns
         -------
-        tensor, tensor
-        The source and destination node IDs.
+        tensor
+            The source nodes.
+        tensor
+            The destination nodes.
         """
         eid = utils.toindex(eid)
         src, dst, _ = self._graph.find_edges(eid)
@@ -440,6 +569,10 @@ class DGLGraph(object):
         -------
         int
             The in degree.
+
+        See Also
+        --------
+        in_degrees
         """
         return self._graph.in_degree(v)
 
@@ -455,6 +588,10 @@ class DGLGraph(object):
         -------
         tensor
             The in degree array.
+
+        See Also
+        --------
+        in_degree
         """
         v = utils.toindex(v)
         return self._graph.in_degrees(v).tousertensor()
@@ -471,6 +608,10 @@ class DGLGraph(object):
         -------
         int
             The out degree.
+
+        See Also
+        --------
+        out_degrees
         """
         return self._graph.out_degree(v)
 
@@ -486,6 +627,10 @@ class DGLGraph(object):
         -------
         tensor
             The out degree array.
+
+        See Also
+        --------
+        out_degree
         """
         v = utils.toindex(v)
         return self._graph.out_degrees(v).tousertensor()
@@ -1273,6 +1418,10 @@ class DGLGraph(object):
         -------
         G : DGLSubGraph
             The subgraph.
+
+        See Also
+        --------
+        subgraphs
         """
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
@@ -1291,6 +1440,10 @@ class DGLGraph(object):
         -------
         G : A list of DGLSubGraph
             The subgraphs.
+
+        See Also
+        --------
+        subgraph
         """
         induced_nodes = [utils.toindex(n) for n in nodes]
         sgis = self._graph.node_subgraphs(induced_nodes)
