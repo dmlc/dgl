@@ -1,11 +1,13 @@
 """
+.. currentmodule:: dgl
+
 DGL at a glance
 =========================
 
 **Author**: Minjie Wang, Quan Gan, Zheng Zhang
 
 The goal of DGL is to build, train, and deploy *machine learning models*
-on *graph-structured data*.  To achieve this, DGL provides a ``DGLGraph``
+on *graph-structured data*.  To achieve this, DGL provides a :class:`DGLGraph`
 class that defines the graph structure and the information on its nodes
 and edges.  It also provides a set of feature transformation methods
 and message passing methods to propagate information between nodes and edges.
@@ -54,7 +56,7 @@ def an_interesting_graph():
     return g
 
 ###############################################################################
-# One thing to be aware of is that DGL graphs are directional:
+# One thing to be aware of is that :class:`DGLGraph` is directional:
 
 g_boring = a_boring_graph()
 g_better = an_interesting_graph()
@@ -96,7 +98,7 @@ def super_useful_comp(g):
     return readout(g)
 
 ###############################################################################
-# The point is, regardless of what kind of graphs and the form of repretations,
+# The point is, regardless of what kind of graphs and the form of representations,
 # DGL handles it uniformly and efficiently.
 
 g_boring = a_boring_graph()

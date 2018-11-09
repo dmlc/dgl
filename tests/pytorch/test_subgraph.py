@@ -2,6 +2,7 @@ import torch as th
 from torch.autograd import Variable
 import numpy as np
 from dgl.graph import DGLGraph
+import utils as U
 
 D = 5
 
@@ -37,7 +38,7 @@ def test_basics():
     assert len(sg.ndata) == 1
     assert len(sg.edata) == 1
     sh = sg.ndata['h']
-    assert th.allclose(h[nid], sh)
+    assert U.allclose(h[nid], sh)
     '''
     s, d, eid
     0, 1, 0
@@ -58,11 +59,11 @@ def test_basics():
     8, 9, 15      3
     9, 0, 16   1
     '''
-    assert th.allclose(l[eid], sg.edata['l'])
+    assert U.allclose(l[eid], sg.edata['l'])
     # update the node/edge features on the subgraph should NOT
     # reflect to the parent graph.
     sg.ndata['h'] = th.zeros((6, D))
-    assert th.allclose(h, g.ndata['h'])
+    assert U.allclose(h, g.ndata['h'])
 
 def test_merge():
     # FIXME: current impl cannot handle this case!!!
@@ -87,8 +88,8 @@ def test_merge():
 
     h = g.ndata['h'][:,0]
     l = g.edata['l'][:,0]
-    assert th.allclose(h, th.tensor([3., 0., 3., 3., 2., 0., 1., 1., 0., 1.]))
-    assert th.allclose(l,
+    assert U.allclose(h, th.tensor([3., 0., 3., 3., 2., 0., 1., 1., 0., 1.]))
+    assert U.allclose(l,
             th.tensor([0., 0., 1., 1., 1., 1., 0., 0., 0., 3., 1., 4., 1., 4., 0., 3., 1.]))
     """
 
