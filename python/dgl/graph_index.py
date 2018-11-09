@@ -470,6 +470,41 @@ class GraphIndex(object):
         induced_nodes = utils.toindex(rst(1))
         return SubgraphIndex(rst(0), self, induced_nodes, e)
 
+    def adjacency_matrix_indices_and_shape(self, transpose=False):
+        """Return the indices and dense shape of adjacency matrix representation of
+        this graph.
+
+        By default, a row of returned adjacency matrix represents the destination
+        of an edge and the column represents the source.
+
+        When transpose is True, a row represents the source and a column represents
+        a destination.
+
+        Parameters
+        ----------
+        transpose : bool
+            A flag to tranpose the returned adjacency matrix.
+
+        Returns
+        -------
+        utils.CtxCachedObject
+            An object that returns indices tensor given context.
+        tuple
+            Dense shape of the adjacency matrix
+        """
+        if not 'adj_ind_shape' in self._cache:
+            src, dst, _ = self.edges(sorted=False)
+            src = F.unsqueeze(src.tousertensor(), 0)
+            dst = F.unsqueeze(dst.tousertensor(), 0)
+            n = self.number_of_nodes()
+            if transpose:
+                idx = F.cat([src, dst], dim=0)
+            else:
+                idx = F.cat([dst, src], dim=0)
+            idx = utils.CtxCachedObject(lambda ctx: F.copy_to(idx, ctx))
+            self._cache['adj_ind_shape'] = (idx, (n, n))
+        return self._cache['adj_ind_shape']
+
     def adjacency_matrix(self, transpose=False):
         """Return the adjacency matrix representation of this graph.
 
@@ -491,8 +526,8 @@ class GraphIndex(object):
         """
         if not 'adj' in self._cache:
             src, dst, _ = self.edges(sorted=False)
-            src = F.unsqueeze(src.tousertensor(), 0)
-            dst = F.unsqueeze(dst.tousertensor(), 0)
+            src = src.tousertensor()
+            dst = dst.tousertensor()
             n = self.number_of_nodes()
             m = self.number_of_edges()
             if transpose:
@@ -561,6 +596,8 @@ class GraphIndex(object):
         key = 'in edge incidence matrix'
         if not key in self._cache:
             _, dst, eid = self.edges()
+            dst = dst.tousertensor()
+            eid = eid.tousertensor()
             n = self.number_of_nodes()
             m = len(eid)
             mat = utils.build_sparse_matrix(dst, eid, [n, m], m)

@@ -342,9 +342,9 @@ def build_sparse_matrix(dst, src, dense_shape, nnz):
 
     Parameters
     __________
-    dst: util.Index
+    dst: Tensor
         Destination ids
-    src: util.Index
+    src: Tensor
         Source ids
     dense_shape: list or tuple of two integer
         Dense shape of the sparse matrix
@@ -352,8 +352,8 @@ def build_sparse_matrix(dst, src, dense_shape, nnz):
         Number of non-zero elemements
     """
 
-    dst = F.unsqueeze(dst.tousertensor(), 0)
-    src = F.unsqueeze(eid.tousertensor(), 0)
+    dst = F.unsqueeze(dst, 0)
+    src = F.unsqueeze(src, 0)
     idx = F.cat([dst, src], dim=0)
     # FIXME(minjie): data type
     dat = F.ones((nnz,), dtype=F.float32)
