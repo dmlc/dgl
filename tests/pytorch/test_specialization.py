@@ -2,6 +2,7 @@ import torch as th
 import numpy as np
 import dgl
 import dgl.function as fn
+import utils as U
 
 D = 5
 
@@ -43,7 +44,7 @@ def test_update_all():
         g.set_n_repr({fld : v1})
         g.update_all(message_func, reduce_func, apply_func)
         v3 = g.ndata[fld]
-        assert th.allclose(v2, v3)
+        assert U.allclose(v2, v3)
         # update all with edge weights
         v1 = g.ndata[fld]
         g.update_all(fn.src_mul_edge(src=fld, edge='e1', out='m'),
@@ -56,8 +57,8 @@ def test_update_all():
         g.set_n_repr({fld : v1})
         g.update_all(message_func_edge, reduce_func, apply_func)
         v4 = g.ndata[fld]
-        assert th.allclose(v2, v3)
-        assert th.allclose(v3, v4)
+        assert U.allclose(v2, v3)
+        assert U.allclose(v3, v4)
     # test 1d node features
     _test('f1')
     # test 2d node features
@@ -90,7 +91,7 @@ def test_send_and_recv():
         g.set_n_repr({fld : v1})
         g.send_and_recv((u, v), message_func, reduce_func, apply_func)
         v3 = g.ndata[fld]
-        assert th.allclose(v2, v3)
+        assert U.allclose(v2, v3)
         # send and recv with edge weights
         v1 = g.ndata[fld]
         g.send_and_recv((u, v), fn.src_mul_edge(src=fld, edge='e1', out='m'),
@@ -103,8 +104,8 @@ def test_send_and_recv():
         g.set_n_repr({fld : v1})
         g.send_and_recv((u, v), message_func_edge, reduce_func, apply_func)
         v4 = g.ndata[fld]
-        assert th.allclose(v2, v3)
-        assert th.allclose(v3, v4)
+        assert U.allclose(v2, v3)
+        assert U.allclose(v3, v4)
     # test 1d node features
     _test('f1')
     # test 2d node features
@@ -129,19 +130,19 @@ def test_update_all_multi_fn():
                  None)
     v1 = g.ndata['v1']
     v2 = g.ndata['v2']
-    assert th.allclose(v1, v2)
+    assert U.allclose(v1, v2)
 
     # run builtin with single message and reduce
     g.update_all(fn.copy_src(src=fld, out='m'), fn.sum(msg='m', out='v1'), None)
     v1 = g.ndata['v1']
-    assert th.allclose(v1, v2)
+    assert U.allclose(v1, v2)
 
     # 1 message, 2 reduces
     g.update_all(fn.copy_src(src=fld, out='m'), [fn.sum(msg='m', out='v2'), fn.sum(msg='m', out='v3')], None)
     v2 = g.ndata['v2']
     v3 = g.ndata['v3']
-    assert th.allclose(v1, v2)
-    assert th.allclose(v1, v3)
+    assert U.allclose(v1, v2)
+    assert U.allclose(v1, v3)
 
     # update all with edge weights, 2 message, 3 reduces
     g.update_all([fn.src_mul_edge(src=fld, edge='e1', out='m1'), fn.src_mul_edge(src=fld, edge='e2', out='m2')],
@@ -150,13 +151,13 @@ def test_update_all_multi_fn():
     v1 = g.ndata['v1']
     v2 = g.ndata['v2']
     v3 = g.ndata['v3']
-    assert th.allclose(v1, v2)
-    assert th.allclose(v1, v3)
+    assert U.allclose(v1, v2)
+    assert U.allclose(v1, v3)
 
     # run UDF with single message and reduce
     g.update_all(message_func_edge, reduce_func, None)
     v2 = g.ndata['v2']
-    assert th.allclose(v1, v2)
+    assert U.allclose(v1, v2)
 
 def test_send_and_recv_multi_fn():
     u = th.tensor([0, 0, 0, 3, 4, 9])
@@ -183,13 +184,13 @@ def test_send_and_recv_multi_fn():
                     None)
     v1 = g.ndata['v1']
     v2 = g.ndata['v2']
-    assert th.allclose(v1, v2)
+    assert U.allclose(v1, v2)
 
     # run builtin with single message and reduce
     g.send_and_recv((u, v), fn.copy_src(src=fld, out='m'), fn.sum(msg='m', out='v1'),
                     None)
     v1 = g.ndata['v1']
-    assert th.allclose(v1, v2)
+    assert U.allclose(v1, v2)
 
     # 1 message, 2 reduces
     g.send_and_recv((u, v),
@@ -198,8 +199,8 @@ def test_send_and_recv_multi_fn():
             None)
     v2 = g.ndata['v2']
     v3 = g.ndata['v3']
-    assert th.allclose(v1, v2)
-    assert th.allclose(v1, v3)
+    assert U.allclose(v1, v2)
+    assert U.allclose(v1, v3)
 
     # send and recv with edge weights, 2 message, 3 reduces
     g.send_and_recv((u, v),
@@ -209,14 +210,14 @@ def test_send_and_recv_multi_fn():
     v1 = g.ndata['v1']
     v2 = g.ndata['v2']
     v3 = g.ndata['v3']
-    assert th.allclose(v1, v2)
-    assert th.allclose(v1, v3)
+    assert U.allclose(v1, v2)
+    assert U.allclose(v1, v3)
 
     # run UDF with single message and reduce
     g.send_and_recv((u, v), message_func_edge,
             reduce_func, None)
     v2 = g.ndata['v2']
-    assert th.allclose(v1, v2)
+    assert U.allclose(v1, v2)
 
 if __name__ == '__main__':
     test_update_all()

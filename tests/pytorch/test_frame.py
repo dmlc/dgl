@@ -3,6 +3,7 @@ from torch.autograd import Variable
 import numpy as np
 from dgl.frame import Frame, FrameRef
 from dgl.utils import Index, toindex
+import utils as U
 
 N = 10
 D = 5
@@ -43,9 +44,9 @@ def test_column1():
     f = Frame(data)
     assert f.num_rows == N
     assert len(f) == 3
-    assert th.allclose(f['a1'].data, data['a1'].data)
+    assert U.allclose(f['a1'].data, data['a1'].data)
     f['a1'] = data['a2']
-    assert th.allclose(f['a2'].data, data['a2'].data)
+    assert U.allclose(f['a2'].data, data['a2'].data)
     # add a different length column should fail
     def failed_add_col():
         f['a4'] = th.zeros([N+1, D])
@@ -68,10 +69,10 @@ def test_column2():
     f = FrameRef(data, [3, 4, 5, 6, 7])
     assert f.num_rows == 5
     assert len(f) == 3
-    assert th.allclose(f['a1'], data['a1'].data[3:8])
+    assert U.allclose(f['a1'], data['a1'].data[3:8])
     # set column should reflect on the referenced data
     f['a1'] = th.zeros([5, D])
-    assert th.allclose(data['a1'].data[3:8], th.zeros([5, D]))
+    assert U.allclose(data['a1'].data[3:8], th.zeros([5, D]))
     # add new partial column should fail with error initializer
     f.set_initializer(lambda shape, dtype : assert_(False))
     def failed_add_col():
@@ -90,7 +91,7 @@ def test_append1():
     c1 = f1['a1']
     assert c1.data.shape == (2 * N, D)
     truth = th.cat([data['a1'], data['a1']])
-    assert th.allclose(truth, c1.data)
+    assert U.allclose(truth, c1.data)
     # append dict of different length columns should fail
     f3 = {'a1' : th.zeros((3, D)), 'a2' : th.zeros((3, D)), 'a3' : th.zeros((2, D))}
     def failed_append():
@@ -129,13 +130,13 @@ def test_row1():
     rows = f[rowid]
     for k, v in rows.items():
         assert v.shape == (len(rowid), D)
-        assert th.allclose(v, data[k][rowid])
+        assert U.allclose(v, data[k][rowid])
     # test duplicate keys
     rowid = Index(th.tensor([8, 2, 2, 1]))
     rows = f[rowid]
     for k, v in rows.items():
         assert v.shape == (len(rowid), D)
-        assert th.allclose(v, data[k][rowid])
+        assert U.allclose(v, data[k][rowid])
 
     # setter
     rowid = Index(th.tensor([0, 2, 4]))
@@ -145,7 +146,7 @@ def test_row1():
             }
     f[rowid] = vals
     for k, v in f[rowid].items():
-        assert th.allclose(v, th.zeros((len(rowid), D)))
+        assert U.allclose(v, th.zeros((len(rowid), D)))
 
     # setting rows with new column should raise error with error initializer
     f.set_initializer(lambda shape, dtype : assert_(False))
@@ -165,13 +166,13 @@ def test_row2():
     rowid = Index(th.tensor([0, 2]))
     rows = f[rowid]
     rows['a1'].backward(th.ones((len(rowid), D)))
-    assert th.allclose(c1.grad[:,0], th.tensor([1., 0., 1., 0., 0., 0., 0., 0., 0., 0.]))
+    assert U.allclose(c1.grad[:,0], th.tensor([1., 0., 1., 0., 0., 0., 0., 0., 0., 0.]))
     c1.grad.data.zero_()
     # test duplicate keys
     rowid = Index(th.tensor([8, 2, 2, 1]))
     rows = f[rowid]
     rows['a1'].backward(th.ones((len(rowid), D)))
-    assert th.allclose(c1.grad[:,0], th.tensor([0., 1., 2., 0., 0., 0., 0., 0., 1., 0.]))
+    assert U.allclose(c1.grad[:,0], th.tensor([0., 1., 2., 0., 0., 0., 0., 0., 1., 0.]))
     c1.grad.data.zero_()
 
     # setter
@@ -184,8 +185,8 @@ def test_row2():
     f[rowid] = vals
     c11 = f['a1']
     c11.backward(th.ones((N, D)))
-    assert th.allclose(c1.grad[:,0], th.tensor([0., 1., 0., 1., 0., 1., 1., 1., 1., 1.]))
-    assert th.allclose(vals['a1'].grad, th.ones((len(rowid), D)))
+    assert U.allclose(c1.grad[:,0], th.tensor([0., 1., 0., 1., 0., 1., 1., 1., 1., 1.]))
+    assert U.allclose(vals['a1'].grad, th.ones((len(rowid), D)))
     assert vals['a2'].grad is None
 
 def test_row3():
@@ -207,7 +208,7 @@ def test_row3():
     newidx.pop(2)
     newidx = toindex(newidx)
     for k, v in f.items():
-        assert th.allclose(v, data[k][newidx])
+        assert U.allclose(v, data[k][newidx])
 
 def test_sharing():
     data = Frame(create_test_data())
@@ -215,9 +216,9 @@ def test_sharing():
     f2 = FrameRef(data, index=[2, 3, 4, 5, 6])
     # test read
     for k, v in f1.items():
-        assert th.allclose(data[k].data[0:4], v)
+        assert U.allclose(data[k].data[0:4], v)
     for k, v in f2.items():
-        assert th.allclose(data[k].data[2:7], v)
+        assert U.allclose(data[k].data[2:7], v)
     f2_a1 = f2['a1'].data
     # test write
     # update own ref should not been seen by the other.
@@ -226,7 +227,7 @@ def test_sharing():
             'a2' : th.zeros([2, D]),
             'a3' : th.zeros([2, D]),
             }
-    assert th.allclose(f2['a1'], f2_a1)
+    assert U.allclose(f2['a1'], f2_a1)
     # update shared space should been seen by the other.
     f1[Index(th.tensor([2, 3]))] = {
             'a1' : th.ones([2, D]),
@@ -234,7 +235,7 @@ def test_sharing():
             'a3' : th.ones([2, D]),
             }
     f2_a1[0:2] = th.ones([2, D])
-    assert th.allclose(f2['a1'], f2_a1)
+    assert U.allclose(f2['a1'], f2_a1)
 
 def test_slicing():
     data = Frame(create_test_data(grad=True))
@@ -242,7 +243,7 @@ def test_slicing():
     f2 = FrameRef(data, index=slice(3, 8))
     # test read
     for k, v in f1.items():
-        assert th.allclose(data[k].data[1:5], v)
+        assert U.allclose(data[k].data[1:5], v)
     f2_a1 = f2['a1'].data
     # test write
     f1[Index(th.tensor([0, 1]))] = {
@@ -250,7 +251,7 @@ def test_slicing():
             'a2': th.zeros([2, D]),
             'a3': th.zeros([2, D]),
             }
-    assert th.allclose(f2['a1'], f2_a1)
+    assert U.allclose(f2['a1'], f2_a1)
     
     f1[Index(th.tensor([2, 3]))] = {
             'a1': th.ones([2, D]),
@@ -258,7 +259,7 @@ def test_slicing():
             'a3': th.ones([2, D]),
             }
     f2_a1[0:2] = 1
-    assert th.allclose(f2['a1'], f2_a1)
+    assert U.allclose(f2['a1'], f2_a1)
 
     f1[2:4] = {
             'a1': th.zeros([2, D]),
@@ -266,7 +267,7 @@ def test_slicing():
             'a3': th.zeros([2, D]),
             }
     f2_a1[0:2] = 0
-    assert th.allclose(f2['a1'], f2_a1)
+    assert U.allclose(f2['a1'], f2_a1)
 
 if __name__ == '__main__':
     test_create()

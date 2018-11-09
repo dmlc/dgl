@@ -160,4 +160,4 @@ for epoch in range(30):
 # multiplication kernels (such as Kipf's
 # `pygcn <https://github.com/tkipf/pygcn>`_ code). The above DGL implementation
 # in fact has already used this trick due to the use of builtin functions. To
-# understand what is under the hood, please read our tutorial on :doc:` PageRank <3_pagerank>`.
+# understand what is under the hood, please read our tutorial on :doc:`PageRank <../3_pagerank>`.

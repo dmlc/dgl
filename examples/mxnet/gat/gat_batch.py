@@ -18,18 +18,18 @@ from dgl.data import register_data_args, load_data
 def elu(data):
     return mx.nd.LeakyReLU(data, act_type='elu')
 
-def gat_message(src, edge):
-    return {'ft' : src['ft'], 'a2' : src['a2']}
+def gat_message(edges):
+    return {'ft' : edges.src['ft'], 'a2' : edges.src['a2']}
 
 class GATReduce(gluon.Block):
     def __init__(self, attn_drop):
         super(GATReduce, self).__init__()
         self.attn_drop = attn_drop
 
-    def forward(self, node, msgs):
-        a1 = mx.nd.expand_dims(node['a1'], 1)  # shape (B, 1, 1)
-        a2 = msgs['a2'] # shape (B, deg, 1)
-        ft = msgs['ft'] # shape (B, deg, D)
+    def forward(self, nodes):
+        a1 = mx.nd.expand_dims(nodes.data['a1'], 1)  # shape (B, 1, 1)
+        a2 = nodes.mailbox['a2'] # shape (B, deg, 1)
+        ft = nodes.mailbox['ft'] # shape (B, deg, D)
         # attention
         a = a1 + a2  # shape (B, deg, 1)
         e = mx.nd.softmax(mx.nd.LeakyReLU(a))
@@ -48,13 +48,13 @@ class GATFinalize(gluon.Block):
             if indim != hiddendim:
                 self.residual_fc = gluon.nn.Dense(hiddendim)
 
-    def forward(self, node):
-        ret = node['accum']
+    def forward(self, nodes):
+        ret = nodes.data['accum']
         if self.residual:
             if self.residual_fc is not None:
-                ret = self.residual_fc(node['h']) + ret
+                ret = self.residual_fc(nodes.data['h']) + ret
             else:
-                ret = node['h'] + ret
+                ret = nodes.data['h'] + ret
         return {'head%d' % self.headid : self.activation(ret)}
 
 class GATPrepare(gluon.Block):

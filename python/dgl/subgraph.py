@@ -119,4 +119,4 @@ class DGLSubGraph(DGLGraph):
                 self._parent._edge_frame[self._parent_eid]))
 
     def map_to_subgraph_nid(self, parent_vids):
-        return map_to_subgraph_nid(self._graph, parent_vids)
+        return map_to_subgraph_nid(self._graph, utils.toindex(parent_vids))
