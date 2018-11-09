@@ -141,6 +141,6 @@ def prop_edges_dfs(graph,
     dgl.traversal.dfs_labeled_edges_generator
     """
     edges_gen = trv.dfs_labeled_edges_generator(
-            graph, source, reversed, has_reverse_edges, has_nontree_edge,
+            graph, source, reversed, has_reverse_edge, has_nontree_edge,
             return_labels=False)
     prop_edges(graph, edges_gen, message_func, reduce_func, apply_node_func)
