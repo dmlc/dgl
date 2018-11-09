@@ -2,10 +2,11 @@
 from __future__ import absolute_import
 
 from .. import backend as F
+from .builtin import BuiltinFunction
 
 __all__ = ["sum", "max"]
 
-class ReduceFunction(object):
+class ReduceFunction(BuiltinFunction):
     """Base builtin reduce function class."""
 
     def __call__(self, nodes):

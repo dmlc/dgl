@@ -1,13 +1,14 @@
 """Built-in message function."""
 from __future__ import absolute_import
 
+from .builtin import BuiltinFunction
 import operator
 import dgl.backend as F
 
 __all__ = ["src_mul_edge", "copy_src", "copy_edge"]
 
 
-class MessageFunction(object):
+class MessageFunction(BuiltinFunction):
     """Base builtin message function class."""
 
     def __call__(self, edges):
