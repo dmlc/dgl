@@ -142,6 +142,10 @@ def dfs_labeled_edges_generator(
     edge is in the DFS tree. A NONTREE edge is one in which both `u` and `v`
     have been visisted but the edge is NOT in the DFS tree.
 
+    See ``networkx``'s :func:`dfs_labeled_edges
+    <networkx.algorithms.traversal.depth_first_search.dfs_labeled_edges>`
+    for more details.
+
     Multiple source nodes can be specified to start the DFS traversal. One
     needs to make sure that each source node belongs to different connected
     component, so the frontiers can be easily merged. Otherwise, the behavior
