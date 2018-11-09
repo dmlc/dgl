@@ -7,6 +7,7 @@ import networkx as nx
 import numpy as np
 import scipy.sparse as sp
 import torch as th
+import utils as U
 
 np.random.seed(42)
 
