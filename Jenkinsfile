@@ -46,6 +46,12 @@ def example_test(dev) {
 pipeline {
   agent none
   stages {
+    stage("XXX") {
+      agent none
+      steps {
+        sh "Workspace: ${env.WORKSPACE}"
+      }
+    }
     stage("Lint Check") {
       agent {
         docker {
