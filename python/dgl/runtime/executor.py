@@ -52,12 +52,11 @@ class SPMVExecutor(Executor):
         self.out_repr[self.out_field] = dstcol
 
 class DegreeBucketingExecutor(Executor):
-    def __init__(self, g, rfunc, message_frame, out_repr, buckets, zero_deg_nodes=None, reorder=True):
+    def __init__(self, g, rfunc, message_frame, out_repr, buckets, reorder=True):
         self.g = g
         self.rfunc = rfunc
         self.msg_frame = message_frame
-        self.v, self.degrees, self.dsts, self.msg_ids = buckets
-        self.zero_deg_nodes = zero_deg_nodes
+        self.v, self.degrees, self.dsts, self.msg_ids, self.zero_deg_nodes = buckets
         self.reorder = reorder
         self.out_repr = out_repr
 
@@ -79,6 +78,8 @@ class DegreeBucketingExecutor(Executor):
 
         # Pack all reducer results together
         keys = new_repr[0].keys()
+        if self.zero_deg_nodes:
+            new_repr.append(self.g.get_n_repr(self.zero_deg_nodes))
         new_repr = {key : F.cat([repr[key] for repr in new_repr], dim=0)
                      for key in keys}
         if self.reorder:

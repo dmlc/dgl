@@ -27,7 +27,7 @@ namespace sched {
  *         mids: message ids
  *         mid_section: number of messages in each bucket (used to split mids)
  */
-std::vector<IdArray> DegreeBucketing(const IdArray& vids);
+std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids, const IdArray& recv_ids);
 
 }  // namespace sched
 

@@ -359,7 +359,16 @@ def _process_buckets(buckets):
     dsts = [utils.toindex(dst) for dst in dsts]
     msg_ids = [utils.toindex(msg_id) for msg_id in msg_ids]
 
-    return unique_v, degs, dsts, msg_ids
+    # handle zero deg
+    degs = degs.tolist()
+    if degs[-1] == 0:
+        degs = degs[:-1]
+        zero_deg_nodes = dsts[-1]
+        dsts = dsts[-1]
+    else:
+        zero_deg_nodes = None
+
+    return unique_v, degs, dsts, msg_ids, zero_deg_nodes
 
 def _degree_bucketing_for_edges(dst):
     """Return the bucketing by degree scheduling for destination nodes of messages
@@ -400,17 +409,17 @@ def _degree_bucket_exec(exec_list, out_repr, rfunc, g, call_type, message_repr, 
 
     # get degree bucketing schedule
     if call_type == "send_and_recv":
-        buckets, zero_deg_nodes = _degree_bucketing_for_edges(v)
+        buckets = _degree_bucketing_for_edges(v)
     elif call_type == "update_all":
-        buckets, zero_deg_nodes = _degree_bucketing_for_graph(g._graph)
+        buckets = _degree_bucketing_for_graph(g._graph)
     elif call_type == "recv":
-        buckets, zero_deg_nodes = _degree_bucketing_for_graph(g._msg_graph, v)
+        buckets = _degree_bucketing_for_graph(g._msg_graph, v)
     else:
         raise DGLError("Unsupported call type for degree bucketing: %s" % call_type)
 
     # TODO(lingfan): check zero degree in C++
 
-    exe = DegreeBucketingExecutor(rfunc, g, rfunc, message_frame, out_repr, buckets, zero_deg_nodes)
+    exe = DegreeBucketingExecutor(rfunc, g, rfunc, message_frame, out_repr, buckets)
     exec_list.append(exe)
 
 _init_api("dgl.scheduler")
