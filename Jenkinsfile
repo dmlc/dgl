@@ -2,30 +2,30 @@
 
 def init_git_submodule() {
   sh 'git submodule init'
-    sh 'git submodule update'
+  sh 'git submodule update'
 }
 
 def setup() {
   sh 'easy_install nose'
-    init_git_submodule()
+  init_git_submodule()
 }
 
 def build_dgl() {
   sh 'if [ -d build ]; then rm -rf build; fi; mkdir build'
-    dir('python') {
-      sh 'python3 setup.py install'
-    }
+  dir('python') {
+    sh 'python3 setup.py install'
+  }
   dir ('build') {
     sh 'cmake ..'
-      sh 'make -j4'
+    sh 'make -j4'
   }
 }
 
 def pytorch_unit_test() {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
     sh 'nosetests tests -v --with-xunit'
-      sh 'nosetests tests/pytorch -v --with-xunit'
-      sh 'nosetests tests/graph_index -v --with-xunit'
+    sh 'nosetests tests/pytorch -v --with-xunit'
+    sh 'nosetests tests/graph_index -v --with-xunit'
   }
 }
 
@@ -52,13 +52,10 @@ pipeline {
           image 'lingfanyu/dgl-lint'
         }
       }
-      stages {
-        stage('CHECK') {
-          steps {
-            init_git_submodule()
-              sh 'tests/scripts/task_lint.sh'
-          }
-        }
+      steps {
+        init_git_submodule()
+        setup()
+        sh 'tests/scripts/task_lint.sh'
       }
     }
     stage('Build') {
