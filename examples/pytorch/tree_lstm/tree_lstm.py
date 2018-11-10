@@ -93,6 +93,7 @@ class TreeLSTM(nn.Module):
             The prediction of each node.
         """
         g = batch.graph
+#        print(g.number_of_nodes(), g.number_of_edges())
         g.register_message_func(self.cell.message_func)
         g.register_reduce_func(self.cell.reduce_func)
         g.register_apply_node_func(self.cell.apply_node_func)

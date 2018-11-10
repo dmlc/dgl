@@ -94,10 +94,10 @@ def main(args):
             if step > 0 and step % args.log_every == 0:
                 pred = th.argmax(logits, 1)
                 acc = th.sum(th.eq(batch.label, pred))
-                #root_ids = [x for x in batch.graph if batch.graph.out_degree(x)==0]
-                #root_acc = np.sum(batch.label.cpu().data.numpy()[root_ids] == pred.cpu().data.numpy()[root_ids])
+                root_ids = [i for i in range(batch.graph.number_of_nodes()) if batch.graph.out_degree(i)==0]
+                root_acc = np.sum(batch.label.cpu().data.numpy()[root_ids] == pred.cpu().data.numpy()[root_ids])
                 print("Epoch {:05d} | Step {:05d} | Loss {:.4f} | Acc {:.4f} | Root Acc {:.4f} | Time(s) {:.4f}".format(
-                    epoch, step, loss.item(), 1.0*acc.item()/len(batch.label), 0, np.mean(dur)))# 1.0*root_acc/len(root_ids), np.mean(dur)))
+                    epoch, step, loss.item(), 1.0*acc.item()/len(batch.label), 1.0*root_acc/len(root_ids), np.mean(dur)))
 
         # test on dev set
         accs = []
@@ -122,7 +122,7 @@ def main(args):
             pred = th.argmax(logits, 1)
             acc = th.sum(th.eq(batch.label, pred)).item()
             accs.append([acc, len(batch.label)])
-            root_ids = [x for x in batch.graph if batch.graph.out_degree(x)==0]
+            root_ids = [i for i in range(batch.graph.number_of_nodes()) if batch.graph.out_degree(i)==0]
             root_acc = np.sum(batch.label.cpu().data.numpy()[root_ids] == pred.cpu().data.numpy()[root_ids])
             root_accs.append([root_acc, len(root_ids)])
         for param_group in optimizer.param_groups:
@@ -153,7 +153,7 @@ def main(args):
             pred = th.argmax(logits, 1)
             acc = th.sum(th.eq(batch.label, pred)).item()
             accs.append([acc, len(batch.label)])
-            root_ids = [x for x in batch.graph if batch.graph.out_degree(x)==0]
+            root_ids = [i for i in range(batch.graph.number_of_nodes()) if batch.graph.out_degree(i)==0]
             root_acc = np.sum(batch.label.cpu().data.numpy()[root_ids] == pred.cpu().data.numpy()[root_ids])
             root_accs.append([root_acc, len(root_ids)])
         #lr decay
