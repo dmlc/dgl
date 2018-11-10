@@ -16,25 +16,6 @@ using tvm::runtime::NDArray;
 namespace dgl {
 namespace traverse {
 namespace {
-// A utility view class for a range of data in a vector.
-template<typename DType>
-struct VectorView {
-  const std::vector<DType>* vec;
-  size_t range_start, range_end;
-
-  explicit VectorView(const std::vector<DType>* vec): vec(vec) {}
-
-  auto begin() const -> decltype(vec->begin()) {
-    return vec->begin() + range_start;
-  }
-
-  auto end() const -> decltype(vec->end()) {
-    return vec->begin() + range_end;
-  }
-
-  size_t size() const { return range_end - range_start; }
-};
-
 // A utility view class to wrap a vector into a queue.
 template<typename DType>
 struct VectorQueueWrapper {
