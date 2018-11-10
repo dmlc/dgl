@@ -4,7 +4,12 @@ from .. import backend as F
 from ..udf import NodeBatch, EdgeBatch
 from .. import utils
 
-__all__ = ["SPMVExecutor", "DegreeBucketingExecutor", "EdgeExecutor"]
+__all__ = [
+           "SPMVExecutor",
+           "DegreeBucketingExecutor",
+           "EdgeExecutor",
+           "NodeExecutor"
+          ]
 
 class Executor(object):
     def run(self):
@@ -78,11 +83,27 @@ class DegreeBucketingExecutor(Executor):
                      for key in keys}
         self.out_repr.update(new_reprs)
 
-class EdgeExecutor(Executor):
-    def __init__(self, mfunc, graph, u, v, eid, out_repr):
-        self.mfunc = mfunc
-        self.eb = EdgeBatch(graph, (u, v, eid))
+class NodeExecutor(Executor):
+    def __init__(self, func, graph, u, out_repr, reduce_accum=None):
+        self.func = func
+        node_data = graph.get_n_repr(u)
+        if reduce_accum:
+            node_data = utils.HybridDict(reduce_accum, node_data)
+        self.nb = NodeBatch(graph, u, node_data)
         self.out_repr = out_repr
 
     def run(self):
-        self.out_repr.update(self.mfunc(self.eb))
+        self.out_repr.update(self.func(self.nb))
+
+class EdgeExecutor(Executor):
+    def __init__(self, func, graph, u, v, eid, out_repr):
+        self.func = func
+        src_data = graph.get_n_repr(u)
+        edge_data = graph.get_e_repr(eid)
+        dst_data = graph.get_n_repr(v)
+        self.eb = EdgeBatch(graph, (u, v, eid),
+                    src_data, edge_data, dst_data)
+        self.out_repr = out_repr
+
+    def run(self):
+        self.out_repr.update(self.func(self.eb))
