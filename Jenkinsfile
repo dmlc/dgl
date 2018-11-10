@@ -47,7 +47,7 @@ pipeline {
   agent none
   stages {
     stage("XXX") {
-      agent none
+      agent any
       steps {
         sh "Workspace: ${env.WORKSPACE}"
       }
