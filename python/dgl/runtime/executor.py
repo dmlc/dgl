@@ -56,13 +56,13 @@ class DegreeBucketingExecutor(Executor):
         self.g = g
         self.rfunc = rfunc
         self.msg_frame = message_frame
-        self.degrees, self.dsts, self.msg_ids = buckets
+        self.v, self.degrees, self.dsts, self.msg_ids = buckets
         self.zero_deg_nodes = zero_deg_nodes
         self.reorder = reorder
         self.out_repr = out_repr
 
     def run(self):
-        new_reprs = []
+        new_repr = []
         # loop over each bucket
         # FIXME (lingfan): handle zero-degree case
         for deg, vv, msg_id in zip(self.degrees, self.dsts, self.msg_ids):
@@ -75,13 +75,17 @@ class DegreeBucketingExecutor(Executor):
             reshaped_in_msgs = utils.LazyDict(
                     lambda key: _reshape_fn(in_msgs[key]), self.msg_frame.schemes)
             nb = NodeBatch(self.g, vv, v_data, reshaped_in_msgs)
-            new_reprs.append(self.rfunc(nb))
+            new_repr.append(self.rfunc(nb))
 
         # Pack all reducer results together
-        keys = new_reprs[0].keys()
-        new_reprs = {key : F.cat([repr[key] for repr in new_reprs], dim=0)
+        keys = new_repr[0].keys()
+        new_repr = {key : F.cat([repr[key] for repr in new_repr], dim=0)
                      for key in keys}
-        self.out_repr.update(new_reprs)
+        if self.reorder:
+            _, indices = F.sort_id(self.v)
+            indices = utils.toindex(indices)
+            new_repr = utils.reorder(new_repr, indices)
+        self.out_repr.update(new_repr)
 
 class NodeExecutor(Executor):
     def __init__(self, func, graph, u, out_repr, reduce_accum=None):

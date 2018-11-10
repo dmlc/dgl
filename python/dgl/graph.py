@@ -15,6 +15,8 @@ from . import scheduler
 from .udf import NodeBatch, EdgeBatch
 from . import utils
 from .view import NodeView, EdgeView
+from .runtime import scheduler
+from .runtime.runtime import Runtime
 
 __all__ = ['DGLGraph']
 
@@ -27,7 +29,7 @@ class DGLGraph(object):
     two bi-directional edges.
 
     Nodes are identified by consecutive integers starting from zero.
-    
+
     Edges can be specified by two end points (u, v) or the integer id assigned
     when the edges are added.
 
@@ -942,7 +944,7 @@ class DGLGraph(object):
         else:
             eid = utils.toindex(eid)
             return self._edge_frame.select_rows(eid)
-        
+
     def pop_e_repr(self, key):
         """Get and remove the specified edge repr.
 
@@ -1011,7 +1013,7 @@ class DGLGraph(object):
             The node id(s).
         """
         self._internal_apply_nodes(v, func, inplace=inplace)
-    
+
     def apply_edges(self, func="default", edges=ALL):
         """Apply the function on the edge features.
 
@@ -1097,7 +1099,7 @@ class DGLGraph(object):
         self._msg_frame.append(msgs)
 
     def recv(self,
-             u,
+             v,
              reduce_func="default",
              apply_node_func="default"):
         """Receive and reduce in-coming messages and update representation on node u.
@@ -1108,7 +1110,7 @@ class DGLGraph(object):
 
         Parameters
         ----------
-        u : node, container or tensor
+        v : node, container or tensor
           The node to be updated.
         reduce_func : callable
           The reduce function.
@@ -1118,13 +1120,7 @@ class DGLGraph(object):
         if reduce_func == "default":
             reduce_func = self._reduce_func
         assert reduce_func is not None
-        if isinstance(reduce_func, (list, tuple)):
-            reduce_func = BundledReduceFunction(reduce_func)
-        self._batch_recv(u, reduce_func)
-        # optional apply nodes
-        self.apply_nodes(apply_node_func, u)
 
-    def _batch_recv(self, v, reduce_func):
         if self._msg_frame.num_rows == 0:
             # no message has ever been sent
             return
@@ -1139,53 +1135,14 @@ class DGLGraph(object):
             # no vertex to be triggered.
             return
 
-        # degree bucketing
-        degrees, v_buckets = scheduler.degree_bucketing(self._msg_graph, v)
-        if degrees == [0]:
-            # no message has been sent to the specified node
-            return
+        execs, out_repr, v = scheduler.get_recv_schedule(graph=self,
+                                                         v=v,
+                                                         reduce_func=reduce_func,
+                                                         apply_func=apply_node_func)
+        Runtime.run(execs)
+        self.set_n_repr(out_repr, v)
 
-        reordered_v = []
-        new_reprs = []
-        has_zero_degree = False
-        for deg, v_bkt in zip(degrees, v_buckets):
-            if deg == 0:
-                # no need to trigger reduce func for zero-degree nodes
-                has_zero_degree = True
-                continue
-            bkt_len = len(v_bkt)
-            v_data = self.get_n_repr(v_bkt)
-            uu, vv, in_msg_ids = self._msg_graph.in_edges(v_bkt)
-            in_msgs = self._msg_frame.select_rows(in_msg_ids)
-            # Reshape the column tensor to (B, Deg, ...).
-            def _reshape_fn(msg):
-                msg_shape = F.shape(msg)
-                new_shape = (bkt_len, deg) + msg_shape[1:]
-                return F.reshape(msg, new_shape)
-            reshaped_in_msgs = utils.LazyDict(
-                    lambda key: _reshape_fn(in_msgs[key]), self._msg_frame.schemes)
-            reordered_v.append(v_bkt.tousertensor())
-            nb = NodeBatch(self, v_bkt, v_data, reshaped_in_msgs)
-            new_reprs.append(reduce_func(nb))
-
-        # TODO(minjie): clear partial messages
         self.reset_messages()
-
-        # Pack all reducer results together
-        reordered_v = F.cat(reordered_v, dim=0)
-        keys = new_reprs[0].keys()
-        new_reprs = {key : F.cat([repr[key] for repr in new_reprs], dim=0)
-                     for key in keys}
-
-        if v_is_all and not has_zero_degree:
-            # First do reorder and then replace the whole column.
-            _, indices = F.sort_1d(reordered_v)
-            indices = utils.toindex(indices)
-            new_reprs = utils.reorder(new_reprs, indices)
-            self.set_n_repr(new_reprs)
-        else:
-            # Use setter to do reorder.
-            self.set_n_repr(new_reprs, reordered_v)
 
     def send_and_recv(self,
                       edges,
@@ -1216,12 +1173,9 @@ class DGLGraph(object):
         """
         if message_func == "default":
             message_func = self._message_func
-        elif isinstance(message_func, (tuple, list)):
-            message_func = BundledMessageFunction(message_func)
         if reduce_func == "default":
             reduce_func = self._reduce_func
-        elif isinstance(reduce_func, (list, tuple)):
-            reduce_func = BundledReduceFunction(reduce_func)
+
         assert message_func is not None
         assert reduce_func is not None
 
@@ -1239,35 +1193,14 @@ class DGLGraph(object):
             # no edges to be triggered
             return
 
-        if not self.is_multigraph:
-            executor = scheduler.get_executor(
-                    'send_and_recv', self, src=u, dst=v,
-                    message_func=message_func, reduce_func=reduce_func)
-        else:
-            executor = None
-
-        if executor:
-            accum = executor.run()
-            unique_v = executor.recv_nodes
-        else:
-            # message func
-            src_data = self.get_n_repr(u)
-            edge_data = self.get_e_repr(eid)
-            dst_data = self.get_n_repr(v)
-            eb = EdgeBatch(self, (u, v, eid),
-                    src_data, edge_data, dst_data)
-            msgs = message_func(eb)
-            msg_frame = FrameRef(Frame(msgs))
-            # recv with degree bucketing
-            executor = scheduler.get_recv_executor(graph=self,
-                                                   reduce_func=reduce_func,
-                                                   message_frame=msg_frame,
-                                                   edges=(u, v))
-            assert executor is not None
-            accum = executor.run()
-            unique_v = executor.recv_nodes
-
-        self._internal_apply_nodes(unique_v, apply_node_func, reduce_accum=accum)
+        execs, out_repr, uniq_v = scheduler.get_snr_schedule(graph=self,
+                                                             u=u,
+                                                             v=v,
+                                                             eid=eid,
+                                                             message_func=message_func,
+                                                             reduce_func=reduce_func)
+        Runtime.run(execs)
+        self.set_n_repr(out_repr, uniq_v)
 
     def pull(self,
              v,
@@ -1342,14 +1275,12 @@ class DGLGraph(object):
         assert message_func is not None
         assert reduce_func is not None
 
-        executor = scheduler.get_executor(
-                "update_all", self, message_func=message_func, reduce_func=reduce_func)
-        if executor:
-            new_reprs = executor.run()
-            self._internal_apply_nodes(ALL, apply_node_func, reduce_accum=new_reprs)
-        else:
-            self.send(ALL, message_func)
-            self.recv(ALL, reduce_func, apply_node_func)
+        execs, out_repr, _ = scheduler.get_update_all_schedule(graph=self,
+                                                               message_func=message_func,
+                                                               reduce_func=reduce_func,
+                                                               apply_func=apply_node_func)
+        Runtime.run(execs)
+        self.set_n_repr(out_repr)
 
     def prop_nodes(self,
                    nodes_generator,

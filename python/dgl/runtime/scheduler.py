@@ -19,6 +19,7 @@ from .._fi.function import _init_api
 # 5. push and pull schedule
 # 6. doc string
 # 7. reorder arguments
+# 8. message graph
 
 # Attention:
 # 1. recv v could become different after query in_edge
@@ -48,7 +49,7 @@ def get_recv_schedule(graph, v, reduce_func, apply_func):
     if apply_func:
         apply_exec, out_repr = build_node_executor(graph, v, apply_func, reduce_accum=out_repr)
         execs += apply_exec
-    return execs, out_repr
+    return execs, out_repr, v
 
 def get_snr_schedule(graph, u, v, eid, message_func, reduce_func, apply_func):
     # TODO (lingfan): doc string
@@ -67,11 +68,11 @@ def get_update_all_schedule(graph, message_func, reduce_func, apply_func):
     if apply_func:
         apply_exec, out_repr = build_node_executor(graph, ALL, apply_func, reduce_accum=out_repr)
         execs += apply_exec
-    return execs, out_repr
+    return execs, out_repr, ALL
 
-def get_apply_nodes_schedule(graph, u, apply_func):
+def get_apply_nodes_schedule(graph, v, apply_func):
     # TODO (lingfan): doc string
-    return build_node_executor(graph, u, apply_func)
+    return build_node_executor(graph, v, apply_func)
 
 def get_apply_edges_schedule(graph, u, v, eid, apply_func):
     # TODO (lingfan): doc string
@@ -85,13 +86,13 @@ def get_pull_schedule(graph, v, message_func, reduce_func):
     # TODO (lingfan): doc string
     pass
 
-def build_node_executor(graph, u, func, reduce_accum=None):
+def build_node_executor(graph, v, func, reduce_accum=None):
     execs = []
     if reduce_accum:
         out_repr = reduce_accum
     else:
         out_repr = {}
-    _node_exec(execs, out_repr, func, graph, u)
+    _node_exec(execs, out_repr, func, graph, v)
     return execs, out_repr
 
 def build_edge_executor(graph, u, v, eid, func):
@@ -358,7 +359,7 @@ def _process_buckets(buckets):
     dsts = [utils.toindex(dst) for dst in dsts]
     msg_ids = [utils.toindex(msg_id) for msg_id in msg_ids]
 
-    return degs, dsts, msg_ids
+    return unique_v, degs, dsts, msg_ids
 
 def _degree_bucketing_for_edges(dst):
     """Return the bucketing by degree scheduling for destination nodes of messages
