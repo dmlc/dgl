@@ -4,10 +4,8 @@ from __future__ import absolute_import
 from ..base import ALL, DGLError, is_all
 from .. import utils
 from .. import backend as F
-from ..function import message as fmsg
-from ..function import reducer as fred
-from ..function.builtin import BuiltinFunction
-from .executor import SPMVExecutor, DegreeBucketingExecutor, EdgeExecutor
+from ..function.function import BuiltinFunction, BundledFunction
+from .executor import SPMVExecutor, DegreeBucketingExecutor, EdgeExecutor, NodeExecutor
 from .frame import FrameRef, Frame
 from collections import Iterable
 
@@ -24,30 +22,60 @@ from .._fi.function import _init_api
 
 # Attention:
 # 1. recv v could become different after query in_edge
+# 2. unique_v is calculated multiple times
 
-__all__ = [] #FIXME
+__all__ = [
+            "get_send_schedule",
+            "get_recv_schedule",
+            "get_update_all_schedule",
+            "get_snr_schedule",
+            "get_apply_nodes_schedule",
+            "get_apply_edges_schedule",
+            "get_push_schedule",
+            "get_pull_schedule"
+          ]
 
 def get_send_schedule(graph, u, v, eid, message_func):
+    # TODO (lingfan): doc string
     call_type = "send"
-    return build_send_executor(graph, call_type, u, v, eid, message_func)
-
-def get_recv_schedule(graph, v, reduce_func):
-    call_type = "recv"
-    execs, out_repr = build_recv_executor(graph, call_type, v, reduce_func)
+    execs, out_repr = build_edge_executor(graph, call_type, u, v, eid, message_func)
     return execs, out_repr
 
-def get_send_and_recv_schedule(graph, u, v, eid, message_func, reduce_func):
+def get_recv_schedule(graph, v, reduce_func, apply_func):
+    # TODO (lingfan): doc string
+    call_type = "recv"
+    execs, out_repr = build_recv_executor(graph, call_type, v, reduce_func)
+    if apply_func:
+        apply_exec, out_repr = build_node_executor(graph, v, apply_func, reduce_accum=out_repr)
+        execs += apply_exec
+    return execs, out_repr
+
+def get_snr_schedule(graph, u, v, eid, message_func, reduce_func, apply_func):
     # TODO (lingfan): doc string
     call_type = "send_and_recv"
-    return build_send_and_recv_executor(graph, call_type, u, v, eid, message_func, reduce_func)
+    execs, out_repr = build_send_and_recv_executor(graph, call_type, u, v, eid, message_func, reduce_func)
+    unique_v = F.unique(v.tousertensor())
+    if apply_func:
+        apply_exec, out_repr = build_node_executor(graph, unique_v, apply_func, reduce_accum=out_repr)
+        execs += apply_exec
+    return execs, out_repr, unique_v
 
-def get_update_all_schedule(graph, message_func, reduce_func):
+def get_update_all_schedule(graph, message_func, reduce_func, apply_func):
+    # TODO (lingfan): doc string
     call_type = "update_all"
-    return build_send_and_recv_executor(graph, call_type, ALL, ALL, ALL, message_func, reduce_func)
+    execs, out_repr = build_send_and_recv_executor(graph, call_type, ALL, ALL, ALL, message_func, reduce_func)
+    if apply_func:
+        apply_exec, out_repr = build_node_executor(graph, ALL, apply_func, reduce_accum=out_repr)
+        execs += apply_exec
+    return execs, out_repr
 
-def get_edge_update_schedule(graph, u, v, eid, message_func):
-    call_type = "update_edge"
-    return build_send_executor(graph, call_type, u, v, eid, message_func)
+def get_apply_nodes_schedule(graph, u, apply_func):
+    # TODO (lingfan): doc string
+    return build_node_executor(graph, u, apply_func)
+
+def get_apply_edges_schedule(graph, u, v, eid, apply_func):
+    # TODO (lingfan): doc string
+    return build_edge_executor(graph, u, v, eid, apply_func)
 
 def get_push_schedule(graph, u, message_func, reduce_func):
     # TODO (lingfan): doc string
@@ -57,11 +85,37 @@ def get_pull_schedule(graph, v, message_func, reduce_func):
     # TODO (lingfan): doc string
     pass
 
-def build_send_executor(graph, call_type, u, v, eid, mfunc):
-    send_execs = []
+def build_node_executor(graph, u, func, reduce_accum=None):
+    execs = []
+    if reduce_accum:
+        out_repr = reduce_accum
+    else:
+        out_repr = {}
+    _node_exec(execs, out_repr, func, graph, u)
+    return execs, out_repr
+
+def build_edge_executor(graph, u, v, eid, func):
+    execs = []
     out_repr = {}
-    _send_exec(send_execs, out_repr, mfunc, graph, call_type, u, v, eid)
-    return send_execs, out_repr
+    _edge_exec(execs, out_repr, func, graph, u, v, eid)
+    return execs, out_repr
+
+def build_recv_executor(rfunc, graph, call_type, v, eid):
+    rfunc = _standardize_func_usage(rfunc)
+
+    recv_execs = []
+
+    out_repr = {}
+
+    if _is_iterable(rfunc):
+        # build e2v spmv
+        message_repr = dict(graph._msg_frame)
+        rfunc = _analyze_e2v_spmv(recv_execs, out_repr, rfunc, graph, call_type, v, eid, message_repr)
+
+    # build degree bucketing
+    _degree_bucket_exec(recv_execs, out_repr, rfunc, graph, call_type, v, message_repr)
+
+    return recv_execs, out_repr
 
 def build_send_and_recv_executor(graph, call_type, u, v, eid, mfunc, rfunc):
     mfunc = _standardize_func_usage(mfunc)
@@ -84,7 +138,7 @@ def build_send_and_recv_executor(graph, call_type, u, v, eid, mfunc, rfunc):
         mfunc, rfunc = _analyze_v2v_spmv(recv_execs, out_repr, pairs, graph, call_type, u, v, eid)
 
     # build send executor
-    _send_exec(send_execs, message_repr, mfunc, graph, u, v, eid)
+    _edge_exec(send_execs, message_repr, mfunc, graph, u, v, eid)
 
     if rfunc_is_list:
         # build e2v spmv
@@ -94,23 +148,6 @@ def build_send_and_recv_executor(graph, call_type, u, v, eid, mfunc, rfunc):
     _degree_bucket_exec(recv_execs, out_repr, rfunc, graph, call_type, v, message_repr)
 
     return send_execs + recv_execs, out_repr
-
-def build_recv_executor(rfunc, graph, call_type, v, eid):
-    rfunc = _standardize_func_usage(rfunc)
-
-    recv_execs = []
-
-    out_repr = {}
-
-    if _is_iterable(rfunc):
-        # build e2v spmv
-        message_repr = dict(graph._msg_frame)
-        rfunc = _analyze_e2v_spmv(recv_execs, out_repr, rfunc, graph, call_type, v, eid, message_repr)
-
-    # build degree bucketing
-    _degree_bucket_exec(recv_execs, out_repr, rfunc, graph, call_type, v, message_repr)
-
-    return recv_execs, out_repr
 
 def _is_iterable(x):
     return isinstance(x, Iterable)
@@ -201,7 +238,7 @@ def _analyze_v2v_spmv(exec_list, out_repr, pairs, graph, call_type, u, v, eid):
     edge_repr = graph.get_e_repr(eid)
     for mfn, rfn in pairs:
         if mfn.is_spmv_supported() and rfn.is_spmv_supported():
-            use_edge_feat = isinstance(mfn, fmsg.SrcMulEdgeMessageFunction)
+            use_edge_feat = mfn.use_edge_feature()
             if use_edge_feat:
                 if adj_idx_shape is None:
                     adj_idx_shape = _build_adj_matrix(graph, call_type, u, v,
@@ -275,11 +312,17 @@ def _e2v_spmv_exec(rfunc, adjmat, message_repr, out_repr):
                         adjmat=adjmat,
                         use_edge_feat=False)
 
-def _send_exec(exec_list, out_repr, mfunc, graph, u, v, eid):
-    if mfunc:
-        if _is_iterable(mfunc):
-            mfunc = fmsg.BundledMessageFunction(mfunc)
-        exec_list.append(EdgeExecutor(mfunc, graph, u, v, eid, out_repr))
+def _node_exec(exec_list, out_repr, func, graph, u, reduce_accum):
+    if func:
+        if _is_iterable(func):
+            func = BundledFunction(func)
+        exec_list.append(NodeExecutor(func, graph, u, out_repr, reduce_accum))
+
+def _edge_exec(exec_list, out_repr, func, graph, u, v, eid):
+    if func:
+        if _is_iterable(func):
+            func = BundledFunction(func)
+        exec_list.append(EdgeExecutor(func, graph, u, v, eid, out_repr))
 
 def _process_buckets(buckets):
     """read bucketing auxiliary data
@@ -315,7 +358,7 @@ def _process_buckets(buckets):
     dsts = [utils.toindex(dst) for dst in dsts]
     msg_ids = [utils.toindex(msg_id) for msg_id in msg_ids]
 
-    return unique_v, degs, dsts, msg_ids
+    return degs, dsts, msg_ids
 
 def _degree_bucketing_for_edges(dst):
     """Return the bucketing by degree scheduling for destination nodes of messages
@@ -352,7 +395,7 @@ def _degree_bucket_exec(exec_list, out_repr, rfunc, g, call_type, message_repr, 
     message_frame = FrameRef(Frame(message_repr))
 
     if _is_iterable(rfunc):
-        rfunc = fred.BundledReduceFunction(rfunc)
+        rfunc = BundledFunction(rfunc)
 
     # get degree bucketing schedule
     if call_type == "send_and_recv":
