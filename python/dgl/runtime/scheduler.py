@@ -12,9 +12,9 @@ from collections import Iterable
 from .._fi.function import _init_api
 
 # TODO(lingfan)
-# 1. handle 0 degree in c++
+# 1. handle 0 degree in c++ (done)
 # 2. adjmat index case (done)
-# 3. double check on multi-edge in graph.py
+# 3. double check on multi-edge in graph.py (need clean up)
 # 4. remove graph store (done)
 # 5. push and pull schedule
 # 6. doc string

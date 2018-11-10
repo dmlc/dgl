@@ -15,8 +15,7 @@ from . import scheduler
 from .udf import NodeBatch, EdgeBatch
 from . import utils
 from .view import NodeView, EdgeView
-from .runtime import scheduler
-from .runtime.runtime import Runtime
+from .runtime import scheduler, Runtime
 
 __all__ = ['DGLGraph']
 
