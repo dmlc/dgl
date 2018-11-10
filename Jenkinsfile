@@ -54,7 +54,6 @@ pipeline {
       }
       steps {
         init_git_submodule()
-        setup()
         sh 'tests/scripts/task_lint.sh'
       }
     }
@@ -67,8 +66,8 @@ pipeline {
             build_dgl()
           }
         }
-        stage('CPU Build') {
-          agent { docker { image 'lingfanyu/dgl-cpu' } }
+        stage('GPU Build') {
+          agent { docker { image 'lingfanyu/dgl-gpu' } }
           steps {
             setup()
             build_dgl()
@@ -88,10 +87,10 @@ pipeline {
         stage('Pytorch CPU') {
           agent { docker { image 'lingfanyu/dgl-cpu' } }
           stages {
-            stage('Unittest') {
+            stage('Pytorch unittest') {
               steps { pytorch_unit_test() }
             }
-            stage('Example test') {
+            stage('Pytorch example test') {
               steps { example_test('CPU') }
             }
           }
@@ -108,7 +107,7 @@ pipeline {
           }
           stages {
             stage('Unittest') {
-              steps { mxnet_unit_test() }
+              steps { pytorch_unit_test() }
             }
             stage('Example test') {
               steps { example_test('CPU') }
@@ -122,7 +121,7 @@ pipeline {
           agent { docker { image 'zhengda1936/dgl-mxnet-cpu:v3' } }
           stages {
             stage('Unittest') {
-              steps { pytorch_unit_test() }
+              steps { mxnet_unit_test() }
             }
             stage('Example test') {
               steps { example_test('GPU') }
