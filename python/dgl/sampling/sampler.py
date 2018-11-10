@@ -8,8 +8,8 @@ from ..subgraph import DGLSubGraph
 __all__ = ['NeighborSampler']
 
 class NSSubgraphLoader(object):
-    def __init__(self, g, batch_size, expand_factor,
-                 num_hops=1, node_prob=None, seed_nodes=None,
+    def __init__(self, g, batch_size, expand_factor, num_hops=1,
+                 neighbor_type='in', node_prob=None, seed_nodes=None,
                  shuffle=False, num_workers=1, max_subgraph_size=None):
         self._g = g
         self._batch_size = batch_size
@@ -31,6 +31,7 @@ class NSSubgraphLoader(object):
             self._max_subgraph_size = 1000000
         else:
             self._max_subgraph_size = max_subgraph_size
+        self._neighbor_type = neighbor_type
         self._subgraphs = []
         self._seed_ids = []
         self._subgraph_idx = 0
@@ -47,8 +48,8 @@ class NSSubgraphLoader(object):
             seed_ids.append(utils.toindex(self._seed_nodes[start:end]))
             self._subgraph_idx += 1
         sgi = self._g._graph.neighbor_sampling(seed_ids, self._expand_factor,
-                                               self._num_hops, self._node_prob,
-                                               self._max_subgraph_size)
+                                               self._num_hops, self._neighbor_type,
+                                               self._node_prob, self._max_subgraph_size)
         subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
                 i, readonly=self._g._readonly) for i in sgi]
         self._subgraphs.extend(subgraphs)
@@ -109,5 +110,5 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
     -------
     A subgraph generator.
     '''
-    return NSSubgraphLoader(g, batch_size, expand_factor, num_hops, node_prob,
+    return NSSubgraphLoader(g, batch_size, expand_factor, num_hops, neighbor_type, node_prob,
                             seed_nodes, shuffle, num_workers, max_subgraph_size)

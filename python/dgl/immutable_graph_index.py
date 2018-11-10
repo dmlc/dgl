@@ -429,13 +429,14 @@ class ImmutableGraphIndex(object):
         return [ImmutableSubgraphIndex(gi, self, induced_n,
             induced_e) for gi, induced_n, induced_e in zip(gis, induced_nodes, induced_edges)]
 
-    def neighbor_sampling(self, seed_ids, expand_factor, num_hops, node_prob,
-                          max_subgraph_size):
+    def neighbor_sampling(self, seed_ids, expand_factor, num_hops, neighbor_type,
+                          node_prob, max_subgraph_size):
         if len(seed_ids) == 0:
             return []
         seed_ids = [v.tousertensor() for v in seed_ids]
         gis, induced_nodes, induced_edges = self._sparse.neighbor_sampling(seed_ids, expand_factor,
-                                                                           num_hops, node_prob,
+                                                                           num_hops, neighbor_type,
+                                                                           node_prob,
                                                                            max_subgraph_size)
         induced_nodes = [utils.toindex(v) for v in induced_nodes]
         induced_edges = [utils.toindex(e) for e in induced_edges]

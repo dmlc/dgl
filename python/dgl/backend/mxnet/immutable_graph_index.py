@@ -272,17 +272,41 @@ class ImmutableGraphIndex(object):
             induced_es.append(induced_e)
         return gis, induced_ns, induced_es
 
-    def neighbor_sampling(self, seed_ids, expand_factor, num_hops, node_prob, max_subgraph_size):
-        assert expand_factor == 'ALL'
-        assert num_hops == 1
+    def neighbor_sampling(self, seed_ids, expand_factor, num_hops, neighbor_type,
+                          node_prob, max_subgraph_size):
         assert node_prob is None
+        if neighbor_type == 'in':
+            g = self._in_csr
+        elif neighbor_type == 'out':
+            g = self._out_csr
+        else:
+            raise NotImplementedError
+        subgraphs = []
         vertices = []
+        num_nodes = []
         for seed in seed_ids:
-            _, src, _ = self.in_edges(seed)
-            vs = np.concatenate((src.asnumpy(), seed.asnumpy()), axis=0)
-            vs = mx.nd.array(np.unique(vs), dtype=np.int64)
-            vertices.append(vs)
-        return self.node_subgraphs(vertices)
+            res = mx.nd.contrib.neighbor_sample(g, seed, num_hops=num_hops,
+                                                num_neighbor=expand_factor,
+                                                max_num_vertices=max_subgraph_size)
+            subg_v, subg = res[0], res[1]
+            subgraphs.append(subg)
+            vertices.append(subg_v)
+            # TODO this blocks the thread.
+            num = mx.nd.sum(subg_v >= 0).asnumpy()[0]
+            num_nodes.append(num)
+        inputs = []
+        inputs.extend(subgraphs)
+        inputs.extend(vertices)
+        compacts = mx.nd.contrib.dgl_graph_compact(*inputs, graph_sizes=num_nodes, return_mapping=False)
+        if isinstance(compacts, mx.nd.sparse.CSRNDArray):
+            compacts = [compacts]
+        if neighbor_type == 'in':
+            gis = [ImmutableGraphIndex(csr, None) for csr in compacts]
+        elif neighbor_type == 'out':
+            gis = [ImmutableGraphIndex(None, csr) for csr in compacts]
+        parent_nodes = [v[0:size] for v, size in zip(vertices, num_nodes)]
+        parent_edges = [e.data for e in subgraphs]
+        return gis, parent_nodes, parent_edges
 
     def adjacency_matrix(self, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
