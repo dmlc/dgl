@@ -62,6 +62,17 @@ class ImmutableGraphIndex(object):
         """Clear the graph."""
         raise Exception('Immutable graph doesn\'t support clearing up')
 
+    def is_multigraph(self):
+        """Return whether the graph is a multigraph
+
+        Returns
+        -------
+        bool
+            True if it is a multigraph, False otherwise.
+        """
+        # Immutable graph doesn't support multi-edge.
+        return False
+
     def number_of_nodes(self):
         """Return the number of nodes.
 
@@ -132,8 +143,8 @@ class ImmutableGraphIndex(object):
         bool
             True if the edge exists
         """
-        u = F.tensor([u])
-        v = F.tensor([v])
+        u = F.tensor([u], dtype=F.int64)
+        v = F.tensor([v], dtype=F.int64)
         return self._sparse.has_edges(u, v).asnumpy()[0]
 
     def has_edges_between(self, u, v):
@@ -151,7 +162,8 @@ class ImmutableGraphIndex(object):
         utils.Index
             0-1 array indicating existence
         """
-        return utils.toindex(self._sparse.has_edges(u.tousertensor(), v.tousertensor()))
+        ret = self._sparse.has_edges(u.tousertensor(), v.tousertensor())
+        return utils.toindex(ret)
 
     def predecessors(self, v, radius=1):
         """Return the predecessors of the node.
@@ -204,9 +216,9 @@ class ImmutableGraphIndex(object):
         int
             The edge id.
         """
-        u = F.tensor([u])
-        v = F.tensor([v])
-        id = self._sparse.edge_ids(u, v)
+        u = F.tensor([u], dtype=F.int64)
+        v = F.tensor([v], dtype=F.int64)
+        _, _, id = self._sparse.edge_ids(u, v)
         return utils.toindex(id)
 
     def edge_ids(self, u, v):
@@ -222,12 +234,16 @@ class ImmutableGraphIndex(object):
         Returns
         -------
         utils.Index
-            The edge id array.
+            The src nodes.
+        utils.Index
+            The dst nodes.
+        utils.Index
+            The edge ids.
         """
         u = u.tousertensor()
         v = v.tousertensor()
-        ids = self._sparse.edge_ids(u, v)
-        return utils.toindex(ids)
+        u, v, ids = self._sparse.edge_ids(u, v)
+        return utils.toindex(u), utils.toindex(v), utils.toindex(ids)
 
     def in_edges(self, v):
         """Return the in edges of the node(s).
@@ -434,7 +450,7 @@ class ImmutableGraphIndex(object):
         """
         def get_adj(ctx):
             new_mat = self._sparse.adjacency_matrix(transpose)
-            return F.to_context(new_mat, ctx)
+            return F.copy_to(new_mat, ctx)
 
         if not transpose and 'in_adj' in self._cache:
             return self._cache['in_adj']

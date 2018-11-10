@@ -5,20 +5,7 @@ import numpy as np
 import scipy as sp
 from dgl.graph import GraphIndex, create_graph_index
 from dgl.graph_index import map_to_subgraph_nid
-import dgl.backend as F
 from dgl import utils
-
-def generate_graph():
-    g = create_graph_index()
-    g.add_nodes(10) # 10 nodes.
-    # create a graph where 0 is the source and 9 is the sink
-    for i in range(1, 9):
-        g.add_edge(0, i)
-        g.add_edge(i, 9)
-    # add a back flow from 9 to 0
-    g.add_edge(9, 0)
-    ig = create_graph_index(g.to_networkx(), readonly=True)
-    return g, ig
 
 def generate_rand_graph(n):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
@@ -27,9 +14,8 @@ def generate_rand_graph(n):
     return g, ig
 
 def check_graph_equal(g1, g2):
-    ctx = F.get_context(mx.nd.array([1]))
-    adj1 = g1.adjacency_matrix().get(ctx) != 0
-    adj2 = g2.adjacency_matrix().get(ctx) != 0
+    adj1 = g1.adjacency_matrix().get(mx.cpu()) != 0
+    adj2 = g2.adjacency_matrix().get(mx.cpu()) != 0
     assert mx.nd.sum(adj1 - adj2).asnumpy() == 0
 
 def test_graph_gen():
@@ -81,7 +67,7 @@ def check_basics(g, ig):
             assert g.has_edge_between(u, v) == ig.has_edge_between(u, v)
     randv = utils.toindex(randv)
     ids = g.edge_ids(randv, randv)[2].tolist()
-    assert sum(ig.edge_ids(randv, randv).tolist() == ids) == len(ids)
+    assert sum(ig.edge_ids(randv, randv)[2].tolist() == ids) == len(ids)
     assert sum(g.has_edges_between(randv, randv).tolist() == ig.has_edges_between(randv, randv).tolist()) == len(randv)
 
 

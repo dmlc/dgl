@@ -12,23 +12,6 @@ import dgl.ndarray as nd
 
 from tree_lstm import TreeLSTM
 
-def tensor_topo_traverse(g, cuda, args):
-    n = g.number_of_nodes()
-    if cuda:
-        adjmat = g._graph.adjacency_matrix().get(nd.gpu(args.gpu))
-        mask = th.ones((n, 1)).cuda()
-    else:
-        adjmat = g._graph.adjacency_matrix().get(nd.cpu())
-        mask = th.ones((n, 1))
-    degree = th.spmm(adjmat, mask)
-    while th.sum(mask) != 0.:
-        v = (degree == 0.).float()
-        v = v * mask
-        mask = mask - v
-        frontier = th.squeeze(th.squeeze(v).nonzero(), 1)
-        yield frontier
-        degree -= th.spmm(adjmat, v)
-
 def main(args):
     cuda = args.gpu >= 0
     if cuda:
@@ -36,9 +19,8 @@ def main(args):
     def _batcher(trees):
         bg = dgl.batch(trees)
         if cuda:
-            reprs = bg.get_n_repr()
-            reprs = {key : val.cuda() for key, val in reprs.items()}
-            bg.set_n_repr(reprs)
+            for key in bg.node_attr_schemes().keys():
+                bg.ndata[key] = bg.ndata[key].cuda()
         return bg
     trainset = data.SST()
     train_loader = DataLoader(dataset=trainset,
@@ -73,10 +55,9 @@ def main(args):
         for step, graph in enumerate(train_loader):
             if step >= 3:
                 t0 = time.time()
-            label = graph.pop_n_repr('y')
+            label = graph.ndata.pop('y')
             # traverse graph
-            giter = list(tensor_topo_traverse(graph, False, args))
-            logits = model(graph, zero_initializer, iterator=giter, train=True)
+            logits = model(graph, zero_initializer, train=True)
             logp = F.log_softmax(logits, 1)
             loss = F.nll_loss(logp, label)
             optimizer.zero_grad()

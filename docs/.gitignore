@@ -1,4 +1,5 @@
 build
 
 # tutorials are auto-generated
-tutorials
+source/tutorials
+source/generated

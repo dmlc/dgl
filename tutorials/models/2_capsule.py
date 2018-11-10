@@ -1,13 +1,16 @@
 """
+.. _model-capsule:
+
 Capsule Network
 ================
 
 **Author**: `Jinjing Zhou`
  
 This tutorial explains how to use DGL library and its language to implement the
-`capsule network <http://arxiv.org/abs/1710.09829>`__ proposed by Geoffrey Hinton and his team.
-The algorithm aims to provide a better alternative to current neural network structures.
-By using DGL library, users can implement the algorithm in a more intuitive way.
+`capsule network <http://arxiv.org/abs/1710.09829>`__ proposed by Geoffrey
+Hinton and his team.  The algorithm aims to provide a better alternative to
+current neural network structures.  By using DGL library, users can implement
+the algorithm in a more intuitive way.
 """
 
 
@@ -16,29 +19,33 @@ By using DGL library, users can implement the algorithm in a more intuitive way.
 # ---------------
 # Introduction
 # ```````````````````
-# Capsule Network were first introduced in 2011 by Geoffrey Hinton, et al.,
-# in paper `Transforming Autoencoders <https://www.cs.toronto.edu/~fritz/absps/transauto6.pdf>`__,
-# but it was only a few months ago, in November 2017, that Sara Sabour, Nicholas Frosst,
-# and Geoffrey Hinton published a paper called Dynamic Routing between Capsules, where they
-# introduced a CapsNet architecture that reached state-of-the-art performance on MNIST.
+# Capsule Network were first introduced in 2011 by Geoffrey Hinton, et al., in
+# paper `Transforming Autoencoders
+# <https://www.cs.toronto.edu/~fritz/absps/transauto6.pdf>`__, but it was only
+# a few months ago, in November 2017, that Sara Sabour, Nicholas Frosst, and
+# Geoffrey Hinton published a paper called Dynamic Routing between Capsules,
+# where they introduced a CapsNet architecture that reached state-of-the-art
+# performance on MNIST.
 #  
 # What's a capsule?
 # ```````````````````
-# In papers, author states that "A capsule is a group of neurons whose activity vector
-# represents the instantiation parameters of a specific type of entity such as an object
-# or an object part."
+# In papers, author states that "A capsule is a group of neurons whose activity
+# vector represents the instantiation parameters of a specific type of entity
+# such as an object or an object part."
 #
-# Generally speaking, the idea of capsule is to encode all the information about the
-# features into a vector form, by substituting scalars in traditional neural network with vectors.
-# And use the norm of the vector to represents the meaning of original scalars. 
+# Generally speaking, the idea of capsule is to encode all the information
+# about the features into a vector form, by substituting scalars in traditional
+# neural network with vectors.  And use the norm of the vector to represents
+# the meaning of original scalars. 
 # 
 # .. image:: https://raw.githubusercontent.com/dmlc/web-data/master/dgl/tutorials/capsule/capsule_f1.png
 # 
 # Dynamic Routing Algorithm
 # `````````````````````````````
-# Due to the different structure of network, capsules network has different operations to
-# calculate results. This figure shows the comparison, drawn by
-# `Max Pechyonkin <https://medium.com/ai%C2%B3-theory-practice-business/understanding-hintons-capsule-networks-part-ii-how-capsules-work-153b6ade9f66O>`__
+# Due to the different structure of network, capsules network has different
+# operations to calculate results. This figure shows the comparison, drawn by
+# `Max Pechyonkin
+# <https://medium.com/ai%C2%B3-theory-practice-business/understanding-hintons-capsule-networks-part-ii-how-capsules-work-153b6ade9f66O>`__
 # 
 # .. image:: https://raw.githubusercontent.com/dmlc/web-data/master/dgl/tutorials/capsule/capsule_f2.png
 #    :height: 250px
@@ -195,9 +202,9 @@ def initialize_nodes_and_edges_features(self, u_hat):
 ##############################################################################
 # Squash function
 # ..................
-# Squashing function is to ensure that short vectors get shrunk to almost zero length and
-# long vectors get shrunk to a length slightly below 1. Its norm is expected to represents probabilities
-# at some levels.
+# Squashing function is to ensure that short vectors get shrunk to almost zero
+# length and long vectors get shrunk to a length slightly below 1. Its norm is
+# expected to represents probabilities at some levels.
 #
 # .. image:: https://raw.githubusercontent.com/dmlc/web-data/master/dgl/tutorials/capsule/squash.png
 #    :height: 100px
@@ -220,8 +227,13 @@ from torch import nn
 
 
 class DGLDigitCapsuleLayer(nn.Module):
-    def __init__(self, input_capsule_dim=8, input_capsule_num=1152, output_capsule_num=10, output_capsule_dim=16,
-                 num_routing=3, device='cpu'):
+    def __init__(self,
+                 input_capsule_dim=8,
+                 input_capsule_num=1152,
+                 output_capsule_num=10,
+                 output_capsule_dim=16,
+                 num_routing=3,
+                 device='cpu'):
         super(DGLDigitCapsuleLayer, self).__init__()
         self.device = device
         self.input_capsule_dim = input_capsule_dim

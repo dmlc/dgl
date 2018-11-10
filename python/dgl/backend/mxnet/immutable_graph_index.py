@@ -6,8 +6,6 @@ import networkx as nx
 import scipy.sparse as sp
 import mxnet as mx
 
-from .mxnet import to_context
-
 class ImmutableGraphIndex(object):
     """Backend-specific graph index object on immutable graphs.
     We can use a CSR matrix to represent a graph structure. For functionality,
@@ -83,9 +81,13 @@ class ImmutableGraphIndex(object):
         NDArray
             Teh edge id array.
         """
+        if len(u) == 0 or len(v) == 0:
+            return [], [], []
         ids = mx.nd.contrib.edge_id(self._in_csr, v, u)
         ids = ids.asnumpy()
-        return ids[ids >= 0]
+        v = v.asnumpy()
+        u = u.asnumpy()
+        return u[ids >= 0], v[ids >= 0], ids[ids >= 0]
 
     def predecessors(self, v, radius=1):
         """Return the predecessors of the node.

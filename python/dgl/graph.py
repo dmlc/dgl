@@ -1,5 +1,4 @@
-"""Base graph class specialized for neural networks on graphs.
-"""
+"""Base graph class specialized for neural networks on graphs."""
 from __future__ import absolute_import
 
 import networkx as nx
@@ -8,7 +7,6 @@ import numpy as np
 import dgl
 from .base import ALL, is_all, DGLError, dgl_warning
 from . import backend as F
-from .backend import Tensor
 from .frame import FrameRef, Frame, merge_frames
 from .function.message import BundledMessageFunction
 from .function.reducer import BundledReduceFunction
@@ -21,22 +19,117 @@ from .view import NodeView, EdgeView
 __all__ = ['DGLGraph']
 
 class DGLGraph(object):
-    """Base graph class specialized for neural networks on graphs.
+    """Base graph class.
 
-    TODO(minjie): document of batching semantics
+    The graph stores nodes, edges and also their features.
+
+    DGL graph is always directional. Undirected graph can be represented using
+    two bi-directional edges.
+
+    Nodes are identified by consecutive integers starting from zero.
+    
+    Edges can be specified by two end points (u, v) or the integer id assigned
+    when the edges are added.
+
+    Node and edge features are stored as a dictionary from the feature name
+    to the feature data (in tensor).
 
     Parameters
     ----------
-    graph_data : graph data
+    graph_data : graph data, optional
         Data to initialize graph. Same as networkx's semantics.
-    node_frame : FrameRef
+    node_frame : FrameRef, optional
         Node feature storage.
-    edge_frame : FrameRef
+    edge_frame : FrameRef, optional
         Edge feature storage.
     multigraph : bool, optional
         Whether the graph would be a multigraph (default: False)
     readonly : bool, optional
         Whether the graph structure is read-only (default: False).
+
+    Examples
+    --------
+    Create an empty graph with no nodes and edges.
+
+    >>> G = dgl.DGLGraph()
+
+    G can be grown in several ways.
+
+    **Nodes:**
+
+    Add N nodes:
+
+    >>> G.add_nodes(10)  # 10 isolated nodes are added
+
+    **Edges:**
+
+    Add one edge at a time,
+
+    >>> G.add_edge(0, 1)
+
+    or multiple edges,
+
+    >>> G.add_edges([1, 2, 3], [3, 4, 5])  # three edges: 1->3, 2->4, 3->5
+
+    or multiple edges starting from the same node,
+
+    >>> G.add_edges(4, [7, 8, 9])  # three edges: 4->7, 4->8, 4->9
+
+    or multiple edges pointing to the same node,
+
+    >>> G.add_edges([2, 6, 8], 5)  # three edges: 2->5, 6->5, 8->5
+
+    or multiple edges using tensor type (demo in pytorch syntax).
+
+    >>> import torch as th
+    >>> G.add_edges(th.tensor([3, 4, 5]), 1)  # three edges: 3->1, 4->1, 5->1
+
+    NOTE: Removing nodes and edges is not supported by DGLGraph.
+
+    **Features:**
+
+    Both nodes and edges can have feature data. Features are stored as
+    key/value pair. The key must be hashable while the value must be tensor
+    type. Features are batched on the first dimension.
+
+    Use G.ndata to get/set features for all nodes.
+
+    >>> G = dgl.DGLGraph()
+    >>> G.add_nodes(3)
+    >>> G.ndata['x'] = th.zeros((3, 5))  # init 3 nodes with zero vector(len=5)
+    >>> G.ndata
+    {'x' : tensor([[0., 0., 0., 0., 0.],
+                   [0., 0., 0., 0., 0.],
+                   [0., 0., 0., 0., 0.]])}
+
+    Use G.nodes to get/set features for some nodes.
+
+    >>> G.nodes[[0, 2]].data['x'] = th.ones((2, 5))
+    >>> G.ndata
+    {'x' : tensor([[1., 1., 1., 1., 1.],
+                   [0., 0., 0., 0., 0.],
+                   [1., 1., 1., 1., 1.]])}
+
+    Similarly, use G.edata and G.edges to get/set features for edges.
+
+    >>> G.add_edges([0, 1], 2)  # 0->2, 1->2
+    >>> G.edata['y'] = th.zeros((2, 4))  # init 2 edges with zero vector(len=4)
+    >>> G.edata
+    {'y' : tensor([[0., 0., 0., 0.],
+                   [0., 0., 0., 0.]])}
+    >>> G.edges[1, 2].data['y'] = th.ones((1, 4))
+    >>> G.edata
+    {'y' : tensor([[0., 0., 0., 0.],
+                   [1., 1., 1., 1.]])}
+
+    Note that each edge is assigned a unique id equal to its adding
+    order. So edge 1->2 has id=1. DGL supports directly use edge id
+    to access edge features.
+
+    >>> G.edges[0].data['y'] += 2.
+    >>> G.edata
+    {'y' : tensor([[2., 2., 2., 2.],
+                   [1., 1., 1., 1.]])}
     """
     def __init__(self,
                  graph_data=None,
@@ -58,8 +151,8 @@ class DGLGraph(object):
         # registered functions
         self._message_func = None
         self._reduce_func = None
-        self._edge_func = None
         self._apply_node_func = None
+        self._apply_edge_func = None
 
     def add_nodes(self, num, reprs=None):
         """Add nodes.
@@ -91,6 +184,10 @@ class DGLGraph(object):
             The dst node.
         reprs : dict
             Optional edge representation.
+
+        See Also
+        --------
+        add_edges
         """
         self._graph.add_edge(u, v)
         #TODO(minjie): change frames
@@ -111,6 +208,10 @@ class DGLGraph(object):
             The dst nodes.
         reprs : dict
             Optional node representations.
+
+        See Also
+        --------
+        add_edge
         """
         u = utils.toindex(u)
         v = utils.toindex(v)
@@ -180,6 +281,10 @@ class DGLGraph(object):
         -------
         bool
             True if the node exists
+
+        See Also
+        --------
+        has_nodes
         """
         return self.has_node(vid)
 
@@ -199,6 +304,10 @@ class DGLGraph(object):
         -------
         tensor
             0-1 array indicating existence
+
+        See Also
+        --------
+        has_node
         """
         vids = utils.toindex(vids)
         rst = self._graph.has_nodes(vids)
@@ -218,6 +327,10 @@ class DGLGraph(object):
         -------
         bool
             True if the edge exists
+
+        See Also
+        --------
+        has_edges_between
         """
         return self._graph.has_edge_between(u, v)
 
@@ -235,6 +348,10 @@ class DGLGraph(object):
         -------
         tensor
             0-1 array indicating existence
+
+        See Also
+        --------
+        has_edge_between
         """
         u = utils.toindex(u)
         v = utils.toindex(v)
@@ -293,6 +410,10 @@ class DGLGraph(object):
         int or tensor
             The edge id if force_multi == True and the graph is a simple graph.
             The edge id array otherwise.
+
+        See Also
+        --------
+        edge_ids
         """
         idx = self._graph.edge_id(u, v)
         return idx.tousertensor() if force_multi or self.is_multigraph else idx[0]
@@ -315,6 +436,10 @@ class DGLGraph(object):
         tensor, or (tensor, tensor, tensor)
         If force_multi is True or the graph is multigraph, return (src nodes, dst nodes, edge ids)
         Otherwise, return a single tensor of edge ids.
+
+        See Also
+        --------
+        edge_id
         """
         u = utils.toindex(u)
         v = utils.toindex(v)
@@ -334,10 +459,12 @@ class DGLGraph(object):
 
         Returns
         -------
-        tensor, tensor
-        The source and destination node IDs.
+        tensor
+            The source nodes.
+        tensor
+            The destination nodes.
         """
-        eid = utils.toindex(u)
+        eid = utils.toindex(eid)
         src, dst, _ = self._graph.find_edges(eid)
         return src.tousertensor(), dst.tousertensor()
 
@@ -443,6 +570,10 @@ class DGLGraph(object):
         -------
         int
             The in degree.
+
+        See Also
+        --------
+        in_degrees
         """
         return self._graph.in_degree(v)
 
@@ -458,6 +589,10 @@ class DGLGraph(object):
         -------
         tensor
             The in degree array.
+
+        See Also
+        --------
+        in_degree
         """
         v = utils.toindex(v)
         return self._graph.in_degrees(v).tousertensor()
@@ -474,6 +609,10 @@ class DGLGraph(object):
         -------
         int
             The out degree.
+
+        See Also
+        --------
+        out_degrees
         """
         return self._graph.out_degree(v)
 
@@ -489,6 +628,10 @@ class DGLGraph(object):
         -------
         tensor
             The out degree array.
+
+        See Also
+        --------
+        out_degree
         """
         v = utils.toindex(v)
         return self._graph.out_degrees(v).tousertensor()
@@ -536,8 +679,8 @@ class DGLGraph(object):
         self._msg_graph.add_nodes(self._graph.number_of_nodes())
         # copy attributes
         def _batcher(lst):
-            if isinstance(lst[0], Tensor):
-                return F.pack([F.unsqueeze(x, 0) for x in lst])
+            if F.is_tensor(lst[0]):
+                return F.cat([F.unsqueeze(x, 0) for x in lst], dim=0)
             else:
                 return F.tensor(lst)
         if node_attrs is not None:
@@ -816,97 +959,108 @@ class DGLGraph(object):
         """
         return self._edge_frame.pop(key)
 
-    def register_edge_func(self, edge_func):
-        """Register global edge update function.
-
-        Parameters
-        ----------
-        edge_func : callable
-          Message function on the edge.
-        """
-        self._edge_func = edge_func
-
-    def register_message_func(self, message_func):
+    def register_message_func(self, func):
         """Register global message function.
 
         Parameters
         ----------
-        message_func : callable
+        func : callable
           Message function on the edge.
         """
-        self._message_func = message_func
+        self._message_func = func
 
-    def register_reduce_func(self, reduce_func):
+    def register_reduce_func(self, func):
         """Register global message reduce function.
 
         Parameters
         ----------
-        reduce_func : str or callable
+        func : str or callable
           Reduce function on incoming edges.
         """
-        self._reduce_func = reduce_func
+        self._reduce_func = func
 
-    def register_apply_node_func(self, apply_node_func):
+    def register_apply_node_func(self, func):
         """Register global node apply function.
 
         Parameters
         ----------
-        apply_node_func : callable
-          Apply function on the node.
+        func : callable
+            Apply function on the node.
         """
-        self._apply_node_func = apply_node_func
+        self._apply_node_func = func
 
-    def apply_nodes(self, v=ALL, apply_node_func="default"):
-        """Apply the function on node representations.
+    def register_apply_edge_func(self, func):
+        """Register global edge apply function.
+
+        Parameters
+        ----------
+        edge_func : callable
+            Apply function on the edge.
+        """
+        self._apply_edge_func = func
+
+    def apply_nodes(self, func="default", v=ALL, inplace=False):
+        """Apply the function on the node features.
 
         Applying a None function will be ignored.
 
         Parameters
         ----------
+        func : callable, optional
+            The UDF applied on the node features.
         v : int, iterable of int, tensor, optional
-          The node id(s).
-        apply_node_func : callable
-          The apply node function.
+            The node id(s).
         """
-        self._apply_nodes(v, apply_node_func)
-
-    def _apply_nodes(self, v, apply_node_func="default", reduce_accum=None):
-        """Internal apply nodes
+        self._internal_apply_nodes(v, func, inplace=inplace)
+    
+    def apply_edges(self, func="default", edges=ALL):
+        """Apply the function on the edge features.
 
         Parameters
         ----------
-        reduce_accum: dict-like
-          The output of reduce func
-        """
-        if apply_node_func == "default":
-            apply_node_func = self._apply_node_func
-        if not apply_node_func:
-            # Skip none function call.
-            if reduce_accum is not None:
-                # write reduce result back
-                self.set_n_repr(reduce_accum, v)
-            return
-        # take out current node repr
-        curr_repr = self.get_n_repr(v)
-        if reduce_accum is not None:
-            # merge current node_repr with reduce output
-            curr_repr = utils.HybridDict(reduce_accum, curr_repr)
-        nb = NodeBatch(self, v, curr_repr)
-        new_repr = apply_node_func(nb)
-        if reduce_accum is not None:
-            # merge new node_repr with reduce output
-            reduce_accum.update(new_repr)
-            new_repr = reduce_accum
-        self.set_n_repr(new_repr, v)
+        func : callable, optional
+            The UDF applied on the edge features.
+        edges : edges, optional
+            Edges can be a pair of endpoint nodes (u, v), or a
+            tensor of edge ids. The default value is all the edges.
 
-    def send(self, edges=ALL, message_func="default"):
+        Notes
+        -----
+        On multigraphs, if u and v are specified, then all the edges
+        between u and v will be updated.
+        """
+        if func == "default":
+            func = self._apply_edge_func
+        assert func is not None
+
+        if is_all(edges):
+            eid = ALL
+            u, v, _ = self._graph.edges()
+        elif isinstance(edges, tuple):
+            u, v = edges
+            u = utils.toindex(u)
+            v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            u, v, eid = self._graph.edge_ids(u, v)
+        else:
+            eid = utils.toindex(edges)
+            u, v, _ = self._graph.find_edges(eid)
+
+        src_data = self.get_n_repr(u)
+        edge_data = self.get_e_repr(eid)
+        dst_data = self.get_n_repr(v)
+        eb = EdgeBatch(self, (u, v, eid),
+                src_data, edge_data, dst_data)
+        self.set_e_repr(func(eb), eid)
+
+    def send(self, edges, message_func="default"):
         """Send messages along the given edges.
 
         Parameters
         ----------
         edges : edges, optional
             Edges can be a pair of endpoint nodes (u, v), or a
-            tensor of edge ids. The default value is all the edges.
+            tensor of edge ids.
         message_func : callable
             The message function.
 
@@ -943,46 +1097,6 @@ class DGLGraph(object):
         self._msg_graph.add_edges(u, v)
         self._msg_frame.append(msgs)
 
-    def update_edges(self, edges=ALL, edge_func="default"):
-        """Update features on the given edges.
-
-        Parameters
-        ----------
-        edges : edges, optional
-            Edges can be a pair of endpoint nodes (u, v), or a
-            tensor of edge ids. The default value is all the edges.
-        edge_func : callable
-            The update function.
-
-        Notes
-        -----
-        On multigraphs, if u and v are specified, then all the edges
-        between u and v will be updated.
-        """
-        if edge_func == "default":
-            edge_func = self._edge_func
-        assert edge_func is not None
-
-        if is_all(edges):
-            eid = ALL
-            u, v, _ = self._graph.edges()
-        elif isinstance(edges, tuple):
-            u, v = edges
-            u = utils.toindex(u)
-            v = utils.toindex(v)
-            # Rewrite u, v to handle edge broadcasting and multigraph.
-            u, v, eid = self._graph.edge_ids(u, v)
-        else:
-            eid = utils.toindex(edges)
-            u, v, _ = self._graph.find_edges(eid)
-
-        src_data = self.get_n_repr(u)
-        edge_data = self.get_e_repr(eid)
-        dst_data = self.get_n_repr(v)
-        eb = EdgeBatch(self, (u, v, eid),
-                src_data, edge_data, dst_data)
-        self.set_e_repr(edge_func(eb), eid)
-
     def recv(self,
              u,
              reduce_func="default",
@@ -1009,7 +1123,7 @@ class DGLGraph(object):
             reduce_func = BundledReduceFunction(reduce_func)
         self._batch_recv(u, reduce_func)
         # optional apply nodes
-        self.apply_nodes(u, apply_node_func)
+        self.apply_nodes(apply_node_func, u)
 
     def _batch_recv(self, v, reduce_func):
         if self._msg_frame.num_rows == 0:
@@ -1018,7 +1132,7 @@ class DGLGraph(object):
 
         v_is_all = is_all(v)
         if v_is_all:
-            v = F.arange(0, self.number_of_nodes(), dtype=F.int64)
+            v = F.arange(0, self.number_of_nodes())
         elif isinstance(v, int):
             v = [v]
         v = utils.toindex(v)
@@ -1059,14 +1173,14 @@ class DGLGraph(object):
         self.reset_messages()
 
         # Pack all reducer results together
-        reordered_v = F.pack(reordered_v)
+        reordered_v = F.cat(reordered_v, dim=0)
         keys = new_reprs[0].keys()
-        new_reprs = {key : F.pack([repr[key] for repr in new_reprs])
+        new_reprs = {key : F.cat([repr[key] for repr in new_reprs], dim=0)
                      for key in keys}
 
         if v_is_all and not has_zero_degree:
             # First do reorder and then replace the whole column.
-            _, indices = F.sort(reordered_v)
+            _, indices = F.sort_1d(reordered_v)
             indices = utils.toindex(indices)
             new_reprs = utils.reorder(new_reprs, indices)
             self.set_n_repr(new_reprs)
@@ -1154,7 +1268,7 @@ class DGLGraph(object):
             accum = executor.run()
             unique_v = executor.recv_nodes
 
-        self._apply_nodes(unique_v, apply_node_func, reduce_accum=accum)
+        self._internal_apply_nodes(unique_v, apply_node_func, reduce_accum=accum)
 
     def pull(self,
              v,
@@ -1180,7 +1294,7 @@ class DGLGraph(object):
         uu, vv, _ = self._graph.in_edges(v)
         self.send_and_recv((uu, vv), message_func, reduce_func, apply_node_func=None)
         unique_v = F.unique(v.tousertensor())
-        self.apply_nodes(unique_v, apply_node_func)
+        self.apply_nodes(apply_node_func, unique_v)
 
     def push(self,
              u,
@@ -1233,45 +1347,65 @@ class DGLGraph(object):
                 "update_all", self, message_func=message_func, reduce_func=reduce_func)
         if executor:
             new_reprs = executor.run()
-            self._apply_nodes(ALL, apply_node_func, reduce_accum=new_reprs)
+            self._internal_apply_nodes(ALL, apply_node_func, reduce_accum=new_reprs)
         else:
             self.send(ALL, message_func)
             self.recv(ALL, reduce_func, apply_node_func)
 
-    def propagate(self,
-                  traverser='topo',
-                  message_func="default",
-                  reduce_func="default",
-                  apply_node_func="default",
-                  **kwargs):
-        """Propagate messages and update nodes using graph traversal.
+    def prop_nodes(self,
+                   nodes_generator,
+                   message_func="default",
+                   reduce_func="default",
+                   apply_node_func="default"):
+        """Propagate messages using graph traversal by triggering pull() on nodes.
 
-        A convenient function for passing messages and updating
-        nodes according to the traverser. The traverser can be
-        any of the pre-defined traverser (e.g. 'topo'). User can also provide custom
-        traverser that generates the edges and nodes.
+        The traversal order is specified by the ``nodes_generator``. It generates
+        node frontiers, which is a list or a tensor of nodes. The nodes in the
+        same frontier will be triggered together, while nodes in different frontiers
+        will be triggered according to the generating order.
 
         Parameters
         ----------
-        traverser : str or generator of edges.
-          The traverser of the graph.
-        message_func : str or callable
-          The message function.
-        reduce_func : str or callable
-          The reduce function.
-        apply_node_func : str or callable
-          The update function.
-        kwargs : keyword arguments, optional
-            Arguments for pre-defined iterators.
+        node_generators : generator
+            The generator of node frontiers.
+        message_func : callable, optional
+            The message function.
+        reduce_func : callable, optional
+            The reduce function.
+        apply_node_func : callable, optional
+            The update function.
         """
-        if isinstance(traverser, str):
-            # TODO(minjie): Call pre-defined routine to unroll the computation.
-            raise RuntimeError('Not implemented.')
-        else:
-            # NOTE: the iteration can return multiple edges at each step.
-            for u, v in traverser:
-                self.send_and_recv((u, v),
-                        message_func, reduce_func, apply_node_func)
+        for node_frontier in nodes_generator:
+            self.pull(node_frontier,
+                    message_func, reduce_func, apply_node_func)
+
+    def prop_edges(self,
+                   edges_generator,
+                   message_func="default",
+                   reduce_func="default",
+                   apply_node_func="default"):
+        """Propagate messages using graph traversal by triggering send_and_recv() on edges.
+
+        The traversal order is specified by the ``edges_generator``. It
+        generates edge frontiers, which is a list or a tensor of edge ids or
+        end points.  The edges in the same frontier will be triggered together,
+        while edges in different frontiers will be triggered according to the
+        generating order.
+
+        Parameters
+        ----------
+        edges_generator : generator
+            The generator of edge frontiers.
+        message_func : callable, optional
+            The message function.
+        reduce_func : callable, optional
+            The reduce function.
+        apply_node_func : callable, optional
+            The update function.
+        """
+        for edge_frontier in edges_generator:
+            self.send_and_recv(edge_frontier,
+                    message_func, reduce_func, apply_node_func)
 
     def subgraph(self, nodes):
         """Generate the subgraph among the given nodes.
@@ -1285,6 +1419,10 @@ class DGLGraph(object):
         -------
         G : DGLSubGraph
             The subgraph.
+
+        See Also
+        --------
+        subgraphs
         """
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
@@ -1303,6 +1441,10 @@ class DGLGraph(object):
         -------
         G : A list of DGLSubGraph
             The subgraphs.
+
+        See Also
+        --------
+        subgraph
         """
         induced_nodes = [utils.toindex(n) for n in nodes]
         sgis = self._graph.node_subgraphs(induced_nodes)
@@ -1368,7 +1510,7 @@ class DGLGraph(object):
                 self._edge_frame.num_rows,
                 reduce_func)
 
-    def adjacency_matrix(self, ctx=None):
+    def adjacency_matrix(self, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
 
         Parameters
@@ -1383,7 +1525,7 @@ class DGLGraph(object):
         """
         return self._graph.adjacency_matrix().get(ctx)
 
-    def incidence_matrix(self, oriented=False, ctx=None):
+    def incidence_matrix(self, oriented=False, ctx=F.cpu()):
         """Return the incidence matrix representation of this graph.
 
         Parameters
@@ -1445,7 +1587,7 @@ class DGLGraph(object):
         if is_all(nodes):
             return F.nonzero_1d(n_mask)
         else:
-            nodes = F.Tensor(nodes)
+            nodes = F.tensor(nodes)
             return nodes[n_mask]
 
     def filter_edges(self, predicate, edges=ALL):
@@ -1473,5 +1615,35 @@ class DGLGraph(object):
         if is_all(edges):
             return F.nonzero_1d(e_mask)
         else:
-            edges = F.Tensor(edges)
+            edges = F.tensor(edges)
             return edges[e_mask]
+
+    def _internal_apply_nodes(self, v, apply_node_func="default", reduce_accum=None,
+            inplace=False):
+        """Internal apply nodes
+
+        Parameters
+        ----------
+        reduce_accum: dict-like
+            The output of reduce func
+        """
+        if apply_node_func == "default":
+            apply_node_func = self._apply_node_func
+        if not apply_node_func:
+            # Skip none function call.
+            if reduce_accum is not None:
+                # write reduce result back
+                self.set_n_repr(reduce_accum, v, inplace=inplace)
+            return
+        # take out current node repr
+        curr_repr = self.get_n_repr(v)
+        if reduce_accum is not None:
+            # merge current node_repr with reduce output
+            curr_repr = utils.HybridDict(reduce_accum, curr_repr)
+        nb = NodeBatch(self, v, curr_repr)
+        new_repr = apply_node_func(nb)
+        if reduce_accum is not None:
+            # merge new node_repr with reduce output
+            reduce_accum.update(new_repr)
+            new_repr = reduce_accum
+        self.set_n_repr(new_repr, v, inplace=inplace)

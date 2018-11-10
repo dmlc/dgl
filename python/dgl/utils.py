@@ -6,7 +6,6 @@ from functools import wraps
 import numpy as np
 
 from . import backend as F
-from .backend import Tensor, SparseTensor
 from . import ndarray as nd
 
 class Index(object):
@@ -19,7 +18,7 @@ class Index(object):
 
     def _dispatch(self, data):
         """Store data based on its type."""
-        if isinstance(data, Tensor):
+        if F.is_tensor(data):
             if not (F.dtype(data) == F.int64):
                 raise ValueError('Index data must be an int64 vector, but got: %s' % str(data))
             if len(F.shape(data)) > 1:
@@ -28,7 +27,7 @@ class Index(object):
                 # a tensor of one int
                 self._dispatch(int(data))
             else:
-                self._user_tensor_data[F.get_context(data)] = data
+                self._user_tensor_data[F.context(data)] = data
         elif isinstance(data, nd.NDArray):
             if not (data.dtype == 'int64' and len(data.shape) == 1):
                 raise ValueError('Index data must be 1D int64 vector, but got: %s' % str(data))
@@ -38,10 +37,13 @@ class Index(object):
                 self._list_data = np.array([int(data)]).astype(np.int64)
             except:
                 try:
-                    self._list_data = np.array(data).astype(np.int64)
+                    data = np.array(data).astype('int64')
+                    if data.ndim != 1:
+                        raise ValueError('Index data must be 1D int64 vector, but got: %s' % str(data))
+                    self._list_data = data
                 except:
                     raise ValueError('Error index data: %s' % str(data))
-            self._user_tensor_data[nd.cpu()] = F.zerocopy_from_numpy(self._list_data)
+            self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self._list_data)
 
     def tolist(self):
         """Convert to a python-list compatible object."""
@@ -56,15 +58,15 @@ class Index(object):
     def tousertensor(self, ctx=None):
         """Convert to user tensor (defined in `backend`)."""
         if ctx is None:
-            ctx = nd.cpu()
+            ctx = F.cpu()
         if len(self._user_tensor_data) == 0:
             # zero copy from dgl tensor
             dl = self._dgl_tensor_data.to_dlpack()
-            self._user_tensor_data[nd.cpu()] = F.zerocopy_from_dlpack(dl)
+            self._user_tensor_data[F.cpu()] = F.zerocopy_from_dlpack(dl)
         if ctx not in self._user_tensor_data:
             # copy from cpu to another device
             data = next(iter(self._user_tensor_data.values()))
-            self._user_tensor_data[ctx] = F.to_context(data, ctx)
+            self._user_tensor_data[ctx] = F.copy_to(data, ctx)
         return self._user_tensor_data[ctx]
 
     def todgltensor(self):
@@ -147,9 +149,9 @@ def edge_broadcasting(u, v):
         The dst id(s) after broadcasting
     """
     if len(u) != len(v) and len(u) == 1:
-        u = toindex(F.broadcast_to(u.tousertensor(), v.tousertensor()))
+        u = toindex(F.full_1d(len(v), u[0]))
     elif len(u) != len(v) and len(v) == 1:
-        v = toindex(F.broadcast_to(v.tousertensor(), u.tousertensor()))
+        v = toindex(F.full_1d(len(u), v[0]))
     else:
         assert len(u) == len(v)
     return u, v
@@ -240,11 +242,10 @@ def build_relabel_map(x):
       new id tensor: new_id = old_to_new[old_id]
     """
     x = x.tousertensor()
-    unique_x, _ = F.sort(F.unique(x))
-    map_len = int(F.max(unique_x)) + 1
+    unique_x, _ = F.sort_1d(F.unique(x))
+    map_len = int(F.max(unique_x, dim=0)) + 1
     old_to_new = F.zeros(map_len, dtype=F.int64)
-    # TODO(minjie): should not directly use []
-    old_to_new[unique_x] = F.astype(F.arange(len(unique_x)), F.int64)
+    F.scatter_row_inplace(old_to_new, unique_x, F.arange(0, len(unique_x)))
     return unique_x, old_to_new
 
 def build_relabel_dict(x):
@@ -323,17 +324,6 @@ def cached_member(func):
 def is_dict_like(obj):
     return isinstance(obj, Mapping)
 
-def pack2(a, b):
-    if a is None:
-        return b
-    elif b is None:
-        return a
-    else:
-        if isinstance(a, dict):
-            return {k: F.pack([a[k], b[k]]) for k in a}
-        else:
-            return F.pack([a, b])
-
 def reorder(dict_like, index):
     """Reorder each column in the dict according to the index.
 
@@ -346,7 +336,7 @@ def reorder(dict_like, index):
     """
     new_dict = {}
     for key, val in dict_like.items():
-        idx_ctx = index.tousertensor(F.get_context(val))
+        idx_ctx = index.tousertensor(F.context(val))
         new_dict[key] = F.gather_row(val, idx_ctx)
     return new_dict
 

@@ -68,7 +68,7 @@ class GCN(nn.Module):
                 self.g.apply_nodes(apply_node_func=
                                lambda nodes: {'h': self.dropout(nodes.data['h'])})
             self.g.update_all(gcn_msg, gcn_reduce, layer)
-        return self.g.pop_n_repr('h')
+        return self.g.ndata.pop('h')
 
 def main(args):
     # load and preprocess dataset

@@ -13,7 +13,7 @@ from . import utils
 __all__ = ['BatchedDGLGraph', 'batch', 'unbatch', 'split']
 
 class BatchedDGLGraph(DGLGraph):
-    """The batched DGL graph.
+    """Class for batched DGL graphs.
 
     The batched graph is read-only.
 
@@ -31,11 +31,11 @@ class BatchedDGLGraph(DGLGraph):
         batched_index = gi.disjoint_union([g._graph for g in graph_list])
         # create batched node and edge frames
         # NOTE: following code will materialize the columns of the input graphs.
-        cols = {key: F.pack([gr._node_frame[key] for gr in graph_list])
+        cols = {key: F.cat([gr._node_frame[key] for gr in graph_list], dim=0)
                 for key in node_attrs}
         batched_node_frame = FrameRef(Frame(cols))
 
-        cols = {key: F.pack([gr._edge_frame[key] for gr in graph_list])
+        cols = {key: F.cat([gr._edge_frame[key] for gr in graph_list], dim=0)
                 for key in edge_attrs}
         batched_edge_frame = FrameRef(Frame(cols))
 
@@ -117,31 +117,6 @@ class BatchedDGLGraph(DGLGraph):
         # TODO
         pass
 
-    '''
-    def query_new_node(self, g, u):
-        idx = self.graph_idx[g]
-        offset = self.node_offset[idx]
-        if isinstance(u, (int, np.array, F.Tensor)):
-            return u + offset
-        else:
-            return np.array(u) + offset
-
-    def query_new_edge(self, g, src, dst):
-        idx = self.graph_idx[g]
-        offset = self.node_offset[idx]
-        if isinstance(src, (int, np.ndarray, F.Tensor)) and \
-                isinstance(dst, (int, np.ndarray, F.Tensor)):
-            return src + offset, dst + offset
-        else:
-            return np.array(src) + offset, np.array(dst) + offset
-
-    def query_node_start_offset(self):
-        return self.node_offset[:-1].copy()
-
-    def query_edge_start_offset(self):
-        return self.edge_offset[:-1].copy()
-    '''
-
 def split(graph_batch, num_or_size_splits):
     """Split the batch."""
     # TODO(minjie): could follow torch.split syntax
@@ -172,11 +147,11 @@ def unbatch(graph):
     node_frames = [FrameRef() for i in range(bsize)]
     edge_frames = [FrameRef() for i in range(bsize)]
     for attr, col in graph._node_frame.items():
-        col_splits = F.unpack(col, bn)
+        col_splits = F.split(col, bn, dim=0)
         for i in range(bsize):
             node_frames[i][attr] = col_splits[i]
     for attr, col in graph._edge_frame.items():
-        col_splits = F.unpack(col, be)
+        col_splits = F.split(col, be, dim=0)
         for i in range(bsize):
             edge_frames[i][attr] = col_splits[i]
     return [DGLGraph(graph_data=pttns[i],

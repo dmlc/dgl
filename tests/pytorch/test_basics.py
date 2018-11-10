@@ -2,6 +2,7 @@ import torch as th
 from torch.autograd import Variable
 import numpy as np
 from dgl.graph import DGLGraph
+import utils as U
 
 D = 5
 reduce_msg_shapes = set()
@@ -49,7 +50,7 @@ def test_batch_setter_getter():
     g = generate_graph()
     # set all nodes
     g.ndata['h'] = th.zeros((10, D))
-    assert th.allclose(g.ndata['h'], th.zeros((10, D)))
+    assert U.allclose(g.ndata['h'], th.zeros((10, D)))
     # pop nodes
     old_len = len(g.ndata)
     assert _pfc(g.pop_n_repr('h')) == [0.] * 10
@@ -168,19 +169,19 @@ def test_batch_recv():
     assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     reduce_msg_shapes.clear()
 
-def test_update_edges():
+def test_apply_edges():
     def _upd(edges):
         return {'w' : edges.data['w'] * 2}
     g = generate_graph()
-    g.register_edge_func(_upd)
+    g.register_apply_edge_func(_upd)
     old = g.edata['w']
-    g.update_edges()
-    assert th.allclose(old * 2, g.edata['w'])
+    g.apply_edges()
+    assert U.allclose(old * 2, g.edata['w'])
     u = th.tensor([0, 0, 0, 4, 5, 6])
     v = th.tensor([1, 2, 3, 9, 9, 9])
-    g.update_edges((u, v), lambda edges : {'w' : edges.data['w'] * 0.})
+    g.apply_edges(lambda edges : {'w' : edges.data['w'] * 0.}, (u, v))
     eid = g.edge_ids(u, v)
-    assert th.allclose(g.edata['w'][eid], th.zeros((6, D)))
+    assert U.allclose(g.edata['w'][eid], th.zeros((6, D)))
 
 def test_update_routines():
     g = generate_graph()
@@ -190,11 +191,16 @@ def test_update_routines():
 
     # send_and_recv
     reduce_msg_shapes.clear()
-    u = th.tensor([0, 0, 0, 4, 5, 6])
-    v = th.tensor([1, 2, 3, 9, 9, 9])
+    u = [0, 0, 0, 4, 5, 6]
+    v = [1, 2, 3, 9, 9, 9]
     g.send_and_recv((u, v))
     assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     reduce_msg_shapes.clear()
+    try:
+        g.send_and_recv([u, v])
+        assert False
+    except ValueError:
+        pass
 
     # pull
     v = th.tensor([1, 2, 3, 9])
@@ -232,8 +238,8 @@ def test_reduce_0deg():
     g.update_all(_message, _reduce)
     new_repr = g.ndata['h']
 
-    assert th.allclose(new_repr[1:], old_repr[1:])
-    assert th.allclose(new_repr[0], old_repr.sum(0))
+    assert U.allclose(new_repr[1:], old_repr[1:])
+    assert U.allclose(new_repr[0], old_repr.sum(0))
 
 def test_pull_0deg():
     g = DGLGraph()
@@ -248,19 +254,19 @@ def test_pull_0deg():
 
     g.pull(0, _message, _reduce)
     new_repr = g.ndata['h']
-    assert th.allclose(new_repr[0], old_repr[0])
-    assert th.allclose(new_repr[1], old_repr[1])
+    assert U.allclose(new_repr[0], old_repr[0])
+    assert U.allclose(new_repr[1], old_repr[1])
 
     g.pull(1, _message, _reduce)
     new_repr = g.ndata['h']
-    assert th.allclose(new_repr[1], old_repr[0])
+    assert U.allclose(new_repr[1], old_repr[0])
 
     old_repr = th.randn(2, 5)
     g.ndata['h'] = old_repr
     g.pull([0, 1], _message, _reduce)
     new_repr = g.ndata['h']
-    assert th.allclose(new_repr[0], old_repr[0])
-    assert th.allclose(new_repr[1], old_repr[0])
+    assert U.allclose(new_repr[0], old_repr[0])
+    assert U.allclose(new_repr[1], old_repr[0])
 
 def _disabled_test_send_twice():
     # TODO(minjie): please re-enable this unittest after the send code problem is fixed.
@@ -281,14 +287,14 @@ def _disabled_test_send_twice():
     g.send((0, 1), _message_b)
     g.recv(1, _reduce)
     new_repr = g.ndata['a']
-    assert th.allclose(new_repr[1], old_repr[0] * 3)
+    assert U.allclose(new_repr[1], old_repr[0] * 3)
 
     g.ndata['a'] = old_repr
     g.send((0, 1), _message_a)
     g.send((2, 1), _message_b)
     g.recv(1, _reduce)
     new_repr = g.ndata['a']
-    assert th.allclose(new_repr[1], th.stack([old_repr[0], old_repr[2] * 3], 0).max(0)[0])
+    assert U.allclose(new_repr[1], th.stack([old_repr[0], old_repr[2] * 3], 0).max(0)[0])
 
 def test_send_multigraph():
     g = DGLGraph(multigraph=True)
@@ -315,14 +321,14 @@ def test_send_multigraph():
     g.send([0, 2], message_func=_message_a)
     g.recv(1, _reduce)
     new_repr = g.ndata['a']
-    assert th.allclose(new_repr[1], answer(old_repr[0], old_repr[2]))
+    assert U.allclose(new_repr[1], answer(old_repr[0], old_repr[2]))
 
     g.ndata['a'] = th.zeros(3, 5)
     g.edata['a'] = old_repr
     g.send([0, 2, 3], message_func=_message_a)
     g.recv(1, _reduce)
     new_repr = g.ndata['a']
-    assert th.allclose(new_repr[1], answer(old_repr[0], old_repr[2], old_repr[3]))
+    assert U.allclose(new_repr[1], answer(old_repr[0], old_repr[2], old_repr[3]))
 
     # send on multigraph
     g.ndata['a'] = th.zeros(3, 5)
@@ -330,7 +336,7 @@ def test_send_multigraph():
     g.send(([0, 2], [1, 1]), _message_a)
     g.recv(1, _reduce)
     new_repr = g.ndata['a']
-    assert th.allclose(new_repr[1], old_repr.max(0)[0])
+    assert U.allclose(new_repr[1], old_repr.max(0)[0])
 
     # consecutive send and send_on
     g.ndata['a'] = th.zeros(3, 5)
@@ -339,7 +345,7 @@ def test_send_multigraph():
     g.send([0, 1], message_func=_message_b)
     g.recv(1, _reduce)
     new_repr = g.ndata['a']
-    assert th.allclose(new_repr[1], answer(old_repr[0] * 3, old_repr[1] * 3, old_repr[3]))
+    assert U.allclose(new_repr[1], answer(old_repr[0] * 3, old_repr[1] * 3, old_repr[3]))
 
     # consecutive send_on
     g.ndata['a'] = th.zeros(3, 5)
@@ -348,15 +354,15 @@ def test_send_multigraph():
     g.send(1, message_func=_message_b)
     g.recv(1, _reduce)
     new_repr = g.ndata['a']
-    assert th.allclose(new_repr[1], answer(old_repr[0], old_repr[1] * 3))
+    assert U.allclose(new_repr[1], answer(old_repr[0], old_repr[1] * 3))
 
     # send_and_recv_on
     g.ndata['a'] = th.zeros(3, 5)
     g.edata['a'] = old_repr
     g.send_and_recv([0, 2, 3], message_func=_message_a, reduce_func=_reduce)
     new_repr = g.ndata['a']
-    assert th.allclose(new_repr[1], answer(old_repr[0], old_repr[2], old_repr[3]))
-    assert th.allclose(new_repr[[0, 2]], th.zeros(2, 5))
+    assert U.allclose(new_repr[1], answer(old_repr[0], old_repr[2], old_repr[3]))
+    assert U.allclose(new_repr[[0, 2]], th.zeros(2, 5))
 
 def test_dynamic_addition():
     N = 3
@@ -392,7 +398,7 @@ if __name__ == '__main__':
     test_batch_setter_autograd()
     test_batch_send()
     test_batch_recv()
-    test_update_edges()
+    test_apply_edges()
     test_update_routines()
     test_reduce_0deg()
     test_pull_0deg()

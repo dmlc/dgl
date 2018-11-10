@@ -2,6 +2,7 @@ import networkx as nx
 import dgl
 import torch as th
 import numpy as np
+import utils as U
 
 def tree1():
     """Generate a tree
@@ -57,10 +58,10 @@ def test_batch_unbatch():
     assert bg.batch_num_edges == [4, 4]
 
     tt1, tt2 = dgl.unbatch(bg)
-    assert th.allclose(t1.ndata['h'], tt1.ndata['h'])
-    assert th.allclose(t1.edata['h'], tt1.edata['h'])
-    assert th.allclose(t2.ndata['h'], tt2.ndata['h'])
-    assert th.allclose(t2.edata['h'], tt2.edata['h'])
+    assert U.allclose(t1.ndata['h'], tt1.ndata['h'])
+    assert U.allclose(t1.edata['h'], tt1.edata['h'])
+    assert U.allclose(t2.ndata['h'], tt2.ndata['h'])
+    assert U.allclose(t2.edata['h'], tt2.edata['h'])
 
 def test_batch_unbatch1():
     t1 = tree1()
@@ -74,12 +75,12 @@ def test_batch_unbatch1():
     assert b2.batch_num_edges == [4, 4, 4]
 
     s1, s2, s3 = dgl.unbatch(b2)
-    assert th.allclose(t2.ndata['h'], s1.ndata['h'])
-    assert th.allclose(t2.edata['h'], s1.edata['h'])
-    assert th.allclose(t1.ndata['h'], s2.ndata['h'])
-    assert th.allclose(t1.edata['h'], s2.edata['h'])
-    assert th.allclose(t2.ndata['h'], s3.ndata['h'])
-    assert th.allclose(t2.edata['h'], s3.edata['h'])
+    assert U.allclose(t2.ndata['h'], s1.ndata['h'])
+    assert U.allclose(t2.edata['h'], s1.edata['h'])
+    assert U.allclose(t1.ndata['h'], s2.ndata['h'])
+    assert U.allclose(t1.edata['h'], s2.edata['h'])
+    assert U.allclose(t2.ndata['h'], s3.ndata['h'])
+    assert U.allclose(t2.edata['h'], s3.edata['h'])
 
 def test_batch_sendrecv():
     t1 = tree1()
@@ -120,7 +121,7 @@ def test_batch_propagate():
     v = [0, 0, 1 + 5, 1 + 5]
     order.append((u, v))
 
-    bg.propagate(traverser=order)
+    bg.prop_edges(order)
     t1, t2 = dgl.unbatch(bg)
 
     assert t1.ndata['h'][0] == 9

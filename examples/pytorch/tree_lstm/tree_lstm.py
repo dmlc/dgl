@@ -22,27 +22,27 @@ class ChildSumTreeLSTMCell(nn.Module):
         self.rt = 0.
         self.ut = 0.
 
-    def message_func(self, src, edge):
-        return {'h' : src['h'], 'c' : src['c']}
+    def message_func(self, edges):
+        return {'h' : edges.src['h'], 'c' : edges.src['c']}
 
-    def reduce_func(self, node, msgs):
+    def reduce_func(self, nodes):
         # equation (2)
-        h_tild = th.sum(msgs['h'], 1)
+        h_tild = th.sum(nodes.mailbox['h'], 1)
         # equation (4)
-        wx = self.W_f(node['x']).unsqueeze(1)  # shape: (B, 1, H)
-        uh = self.U_f(msgs['h']) # shape: (B, deg, H)
+        wx = self.W_f(nodes.data['x']).unsqueeze(1)  # shape: (B, 1, H)
+        uh = self.U_f(nodes.mailbox['h']) # shape: (B, deg, H)
         f = th.sigmoid(wx + uh)  # shape: (B, deg, H)
         # equation (7) second term
-        c_tild = th.sum(f * msgs['c'], 1)
+        c_tild = th.sum(f * nodes.mailbox['c'], 1)
         return {'h_tild' : h_tild, 'c_tild' : c_tild}
     
-    def apply_func(self, node):
+    def apply_func(self, nodes):
         # equation (3), (5), (6)
-        iou = self.W_iou(node['x']) + self.U_iou(node['h_tild'])
+        iou = self.W_iou(nodes.data['x']) + self.U_iou(nodes.data['h_tild'])
         i, o, u = th.chunk(iou, 3, 1)
         i, o, u = th.sigmoid(i), th.sigmoid(o), th.tanh(u)
         # equation (7)
-        c = i * u + node['c_tild']
+        c = i * u + nodes.data['c_tild']
         # equation (8)
         h = o * th.tanh(c)
         return {'h' : h, 'c' : c}
@@ -67,7 +67,7 @@ class TreeLSTM(nn.Module):
         else:
             raise RuntimeError('Unknown cell type:', cell_type)
 
-    def forward(self, graph, zero_initializer, h=None, c=None, iterator=None, train=True):
+    def forward(self, graph, zero_initializer, h=None, c=None, train=True):
         """Compute tree-lstm prediction given a batch.
 
         Parameters
@@ -98,24 +98,18 @@ class TreeLSTM(nn.Module):
         mask = (wordid != dgl.data.SST.PAD_WORD)
         wordid = wordid * mask.long()
         embeds = self.embedding(wordid)
-        x = embeds * th.unsqueeze(mask, 1).float()
+        g.ndata['x'] = embeds * th.unsqueeze(mask, 1).float()
         if h is None:
             h = zero_initializer((n, self.h_size))
-        h_tild = zero_initializer((n, self.h_size))
+        g.ndata['h'] = h
+        g.ndata['h_tild'] = zero_initializer((n, self.h_size))
         if c is None:
             c = zero_initializer((n, self.h_size))
-        c_tild = zero_initializer((n, self.h_size))
-        g.set_n_repr({'x' : x, 'h' : h, 'c' : c, 'h_tild' : h_tild, 'c_tild' : c_tild})
-        # TODO(minjie): potential bottleneck
-        if iterator is None:
-            for frontier in topological_traverse(g):
-                #print('frontier', frontier)
-                g.pull(frontier)
-        else:
-            for frontier in iterator:
-                g.pull(frontier)
+        g.ndata['c'] = c
+        g.ndata['c_tild'] = zero_initializer((n, self.h_size))
+        dgl.prop_nodes_topo(g)
         # compute logits
-        h = g.pop_n_repr('h')
+        h = g.ndata.pop('h')
         h = self.dropout(h)
         logits = self.linear(h)
         return logits

@@ -2,6 +2,7 @@ import torch as th
 import networkx as nx
 import numpy as np
 import dgl
+import utils as U
 
 D = 5
 
@@ -19,13 +20,13 @@ def test_line_graph():
     v = [1, 2, 0, 0]
     eid = G.edge_ids(u, v)
     L.nodes[eid].data['h'] = th.zeros((4, D))
-    assert th.allclose(G.edges[u, v].data['h'], th.zeros((4, D)))
+    assert U.allclose(G.edges[u, v].data['h'], th.zeros((4, D)))
 
     # adding a new node feature on line graph should also reflect to a new
     # edge feature on original graph
     data = th.randn(n_edges, D)
     L.ndata['w'] = data
-    assert th.allclose(G.edata['w'], data)
+    assert U.allclose(G.edata['w'], data)
 
 def test_no_backtracking():
     N = 5
