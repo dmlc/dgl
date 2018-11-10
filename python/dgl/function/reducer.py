@@ -2,7 +2,7 @@
 from __future__ import absolute_import
 
 from .. import backend as F
-from .funtion import BuiltinFunction
+from .function import BuiltinFunction
 
 __all__ = ["sum", "max"]
 
