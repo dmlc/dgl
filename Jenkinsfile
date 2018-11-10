@@ -21,7 +21,7 @@ def build_dgl() {
   }
 }
 
-def pytorch_unit_test() {
+def pytorch_unit_test(dev) {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
     sh 'nosetests tests -v --with-xunit'
     sh 'nosetests tests/pytorch -v --with-xunit'
@@ -29,7 +29,7 @@ def pytorch_unit_test() {
   }
 }
 
-def mxnet_unit_test() {
+def mxnet_unit_test(dev) {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
     sh 'nosetests tests/mxnet -v --with-xunit'
   }
@@ -67,7 +67,12 @@ pipeline {
           }
         }
         stage('GPU Build') {
-          agent { docker { image 'lingfanyu/dgl-gpu' } }
+          agent {
+            docker {
+              image 'lingfanyu/dgl-gpu'
+              args '--runtime nvidia'
+            }
+          }
           steps {
             setup()
             build_dgl()
@@ -87,10 +92,10 @@ pipeline {
         stage('Pytorch CPU') {
           agent { docker { image 'lingfanyu/dgl-cpu' } }
           stages {
-            stage('Pytorch unittest') {
-              steps { pytorch_unit_test() }
+            stage('TH CPU unittest') {
+              steps { pytorch_unit_test('CPU') }
             }
-            stage('Pytorch example test') {
+            stage('TH CPU example test') {
               steps { example_test('CPU') }
             }
           }
@@ -106,11 +111,11 @@ pipeline {
             }
           }
           stages {
-            stage('Unittest') {
-              steps { pytorch_unit_test() }
+            stage('TH GPU unittest') {
+              steps { pytorch_unit_test('GPU') }
             }
-            stage('Example test') {
-              steps { example_test('CPU') }
+            stage('TH GPU example test') {
+              steps { example_test('GPU') }
             }
           }
           post {
@@ -120,11 +125,8 @@ pipeline {
         stage('MXNet CPU') {
           agent { docker { image 'zhengda1936/dgl-mxnet-cpu:v3' } }
           stages {
-            stage('Unittest') {
-              steps { mxnet_unit_test() }
-            }
-            stage('Example test') {
-              steps { example_test('GPU') }
+            stage('MX Unittest') {
+              steps { mxnet_unit_test('CPU') }
             }
           }
           post {
