@@ -60,8 +60,14 @@ pipeline {
     stage('Build') {
       parallel {
         stage('CPU Build') {
-          agent { docker { image 'lingfanyu/dgl-cpu' } }
+          agent {
+            docker {
+              image 'lingfanyu/dgl-cpu'
+              args '-v ${env.WORKSPACE}:/workspace'
+            }
+          }
           steps {
+            dir '/workspace'
             setup()
             build_dgl()
           }
@@ -71,16 +77,24 @@ pipeline {
             docker {
               image 'lingfanyu/dgl-gpu'
               args '--runtime nvidia'
+              args '-v ${env.WORKSPACE}:/workspace'
             }
           }
           steps {
+            dir '/workspace'
             setup()
             build_dgl()
           }
         }
         stage('MXNet CPU Build (temp)') {
-          agent { docker { image 'zhengda1936/dgl-mxnet-cpu:v3' } }
+          agent {
+            docker {
+              image 'zhengda1936/dgl-mxnet-cpu:v3'
+              args '-v ${env.WORKSPACE}:/workspace'
+            }
+          }
           steps {
+            dir '/workspace'
             setup()
             build_dgl()
           }
@@ -90,7 +104,12 @@ pipeline {
     stage('Test') {
       parallel {
         stage('Pytorch CPU') {
-          agent { docker { image 'lingfanyu/dgl-cpu' } }
+          agent {
+            docker {
+              image 'lingfanyu/dgl-cpu'
+              args '-v ${env.WORKSPACE}:/workspace'
+            }
+          }
           stages {
             stage('TH CPU unittest') {
               steps { pytorch_unit_test('CPU') }
@@ -108,6 +127,7 @@ pipeline {
             docker {
               image 'lingfanyu/dgl-gpu'
               args '--runtime nvidia'
+              args '-v ${env.WORKSPACE}:/workspace'
             }
           }
           stages {
@@ -123,7 +143,12 @@ pipeline {
           }
         }
         stage('MXNet CPU') {
-          agent { docker { image 'zhengda1936/dgl-mxnet-cpu:v3' } }
+          agent {
+            docker {
+              image 'zhengda1936/dgl-mxnet-cpu:v3'
+              args '-v ${env.WORKSPACE}:/workspace'
+            }
+          }
           stages {
             stage('MX Unittest') {
               steps { mxnet_unit_test('CPU') }
