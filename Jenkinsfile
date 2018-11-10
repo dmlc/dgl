@@ -49,7 +49,7 @@ pipeline {
     stage("XXX") {
       agent any
       steps {
-        sh "Workspace: ${env.WORKSPACE}"
+        sh "echo ${env.WORKSPACE}"
       }
     }
     stage("Lint Check") {
