@@ -119,8 +119,11 @@ IdArray GraphOp::MapParentIdToSubgraphId(IdArray parent_vids, IdArray query) {
     for (int64_t i = 0; i < query_len; i++) {
       const dgl_id_t id = query_data[i];
       const auto it = std::find(parent_data, parent_data + parent_len, id);
-      CHECK(it != parent_data + parent_len) << id << " doesn't exist in the parent Ids";
-      rst_data[i] = it - parent_data;
+      // If the vertex Id doesn't exist, the vid in the subgraph is -1.
+      if (it != parent_data + parent_len)
+        rst_data[i] = it - parent_data;
+      else
+        rst_data[i] = -1;
     }
   } else {
     std::unordered_map<dgl_id_t, dgl_id_t> parent_map;
@@ -131,8 +134,11 @@ IdArray GraphOp::MapParentIdToSubgraphId(IdArray parent_vids, IdArray query) {
     for (int64_t i = 0; i < query_len; i++) {
       const dgl_id_t id = query_data[i];
       auto it = parent_map.find(id);
-      CHECK(it != parent_map.end()) << id << " doesn't exist in the parent Ids";
-      rst_data[i] = it->second;
+      // If the vertex Id doesn't exist, the vid in the subgraph is -1.
+      if (it != parent_map.end())
+        rst_data[i] = it->second;
+      else
+        rst_data[i] = -1;
     }
   }
   return rst;
