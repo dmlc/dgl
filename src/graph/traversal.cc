@@ -35,6 +35,35 @@ struct VectorView {
   size_t size() const { return range_end - range_start; }
 };
 
+// A utility view class to wrap a vector into a queue.
+template<typename DType>
+struct VectorQueueWrapper {
+  std::vector<DType>* vec;
+  size_t head = 0;
+
+  explicit VectorQueueWrapper(std::vector<DType>* vec): vec(vec) {}
+
+  void push(const DType& elem) {
+    vec->push_back(elem);
+  }
+
+  DType top() const {
+    return vec->operator[](head);
+  }
+
+  void pop() {
+    ++head;
+  }
+
+  bool empty() const {
+    return head == vec->size();
+  }
+
+  size_t size() const {
+    return vec->size() - head;
+  }
+};
+
 // Internal function to merge multiple traversal traces into one ndarray.
 // It is similar to zip the vectors together.
 template<typename DType>
@@ -106,20 +135,15 @@ struct Frontiers {
 
 Frontiers BFSNodesFrontiers(const Graph& graph, IdArray source, bool reversed) {
   Frontiers front;
-  size_t i = 0;
-  VectorView<dgl_id_t> front_view(&front.ids);
-  auto visit = [&] (const dgl_id_t v) { front.ids.push_back(v); };
+  VectorQueueWrapper<dgl_id_t> queue(&front.ids);
+  auto visit = [&] (const dgl_id_t v) { };
   auto make_frontier = [&] () {
-      front_view.range_start = i;
-      front_view.range_end = front.ids.size();
-      if (front.ids.size() != i) {
+      if (!queue.empty()) {
         // do not push zero-length frontier
-        front.sections.push_back(front.ids.size() - i);
+        front.sections.push_back(queue.size());
       }
-      i = front.ids.size();
-      return front_view;
     };
-  BFSNodes(graph, source, reversed, visit, make_frontier);
+  BFSNodes(graph, source, reversed, &queue, visit, make_frontier);
   return front;
 }
 
@@ -137,20 +161,15 @@ TVM_REGISTER_GLOBAL("traversal._CAPI_DGLBFSNodes")
 
 Frontiers TopologicalNodesFrontiers(const Graph& graph, bool reversed) {
   Frontiers front;
-  size_t i = 0;
-  VectorView<dgl_id_t> front_view(&front.ids);
-  auto visit = [&] (const dgl_id_t v) { front.ids.push_back(v); };
+  VectorQueueWrapper<dgl_id_t> queue(&front.ids);
+  auto visit = [&] (const dgl_id_t v) { };
   auto make_frontier = [&] () {
-      front_view.range_start = i;
-      front_view.range_end = front.ids.size();
-      if (front.ids.size() != i) {
+      if (!queue.empty()) {
         // do not push zero-length frontier
-        front.sections.push_back(front.ids.size() - i);
+        front.sections.push_back(queue.size());
       }
-      i = front.ids.size();
-      return front_view;
     };
-  TopologicalNodes(graph, reversed, visit, make_frontier);
+  TopologicalNodes(graph, reversed, &queue, visit, make_frontier);
   return front;
 }
 
