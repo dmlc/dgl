@@ -41,16 +41,23 @@ void BFSNodes(const Graph& graph,
   std::vector<bool> visited(graph.NumVertices());
   for (int64_t i = 0; i < len; ++i) {
     visited[src_data[i]] = true;
-    visit(src_data[i]);
+    visit(src_data[i], DGL_INVALID_ID);
   }
   auto frontier = make_frontier();
 
   const auto neighbor_iter = reversed? &Graph::PredVec : &Graph::SuccVec;
+  const auto edge_iter = reversed? &Graph::InEdgeVec : &Graph::OutEdgeVec;
   while (frontier.size() != 0) {
     for (const dgl_id_t u : frontier) {
-      for (auto v : (graph.*neighbor_iter)(u)) {
+      const std::vector<dgl_id_t>& neighbor_vec = (graph.*neighbor_iter)(u);
+      const std::vector<dgl_id_t>& edge_vec = (graph.*edge_iter)(u);
+      auto neighbor_it = neighbor_vec.begin();
+      auto edge_it = edge_vec.begin();
+      for ( ; neighbor_it != neighbor_vec.end(); ++neighbor_it, ++edge_it) {
+        dgl_id_t v = *neighbor_it;
+        dgl_id_t e = *edge_it;
         if (!visited[v]) {
-          visit(v);
+          visit(v, e);
           visited[v] = true;
         }
       }
@@ -95,7 +102,7 @@ void TopologicalNodes(const Graph& graph,
         }
       }
     }
-    // new node frointer
+    // new node frontier
     frontier = make_frontier();
   }
   if (num_visited_nodes != graph.NumVertices()) {

@@ -24,6 +24,8 @@ class Graph;
 class GraphOp;
 struct Subgraph;
 
+const dgl_id_t DGL_INVALID_ID = static_cast<dgl_id_t>(-1);
+
 /*!
  * \brief Base dgl graph index class.
  *

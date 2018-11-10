@@ -8,7 +8,7 @@ from . import utils
 __all__ = ['bfs_nodes_generator', 'topological_nodes_generator',
            'dfs_edges_generator', 'dfs_labeled_edges_generator',]
 
-def bfs_nodes_generator(graph, source, reversed=False):
+def bfs_nodes_generator(graph, source, reversed=False, return_edges=False):
     """Node frontiers generator using breadth-first search.
 
     Parameters
@@ -17,13 +17,15 @@ def bfs_nodes_generator(graph, source, reversed=False):
         The graph object.
     source : list, tensor of nodes
         Source nodes.
-    reversed : bool, optional
+    reversed : bool, default False
         If true, traverse following the in-edge direction.
+    return_edges: bool, default False
+        If true, return edge frontiers
 
     Returns
     -------
-    list of node frontiers
-        Each node frontier is a list, tensor of nodes.
+    list of node frontiers, or (list of node frontiers, list of edge frontiers)
+        Each node/edge frontier is a list, tensor of nodes/edges.
 
     Examples
     --------
@@ -42,9 +44,15 @@ def bfs_nodes_generator(graph, source, reversed=False):
     source = utils.toindex(source).todgltensor()
     ret = _CAPI_DGLBFSNodes(ghandle, source, reversed)
     all_nodes = utils.toindex(ret(0)).tousertensor()
+    all_edges = utils.toindex(ret(1)).tousertensor()
     # TODO(minjie): how to support directly creating python list
-    sections = utils.toindex(ret(1)).tousertensor().tolist()
-    return F.split(all_nodes, sections, dim=0)
+    sections = utils.toindex(ret(2)).tousertensor().tolist()
+    node_frontiers = F.split(all_nodes, sections, dim=0)
+    if return_edges:
+        edge_frontiers = F.split(all_edges, sections[1:], dim=0)
+        return node_frontiers, edge_frontiers
+    else:
+        return node_frontiers
 
 def topological_nodes_generator(graph, reversed=False):
     """Node frontiers generator using topological traversal.

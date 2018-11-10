@@ -19,22 +19,29 @@ def test_bfs_nodes(n=100):
 
     src = random.choice(range(n))
 
-    layers_dgl = dgl.bfs_nodes_generator(g, src)
+    layers_dgl, edges_dgl = dgl.bfs_nodes_generator(g, src, return_edges=True)
 
     edges = nx.bfs_edges(g_nx, src)
     layers_nx = [set([src])]
+    edges_nx = []
     frontier = set()
+    edge_frontier = set()
     for u, v in edges:
         if u in layers_nx[-1]:
             frontier.add(v)
+            edge_frontier.add(g.edge_id(u, v))
         else:
             layers_nx.append(frontier)
+            edges_nx.append(edge_frontier)
             frontier = set([v])
+            edge_frontier = set([g.edge_id(u, v)])
     layers_nx.append(frontier)
+    edges_nx.append(edge_frontier)
 
     toset = lambda x: set(x.tolist())
     assert len(layers_dgl) == len(layers_nx)
     assert all(toset(x) == y for x, y in zip(layers_dgl, layers_nx))
+    assert all(toset(x) == y for x, y in zip(edges_dgl, edges_nx))
 
 def test_topological_nodes(n=100):
     g = dgl.DGLGraph()
