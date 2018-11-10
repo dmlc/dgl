@@ -11,7 +11,7 @@ from . import backend as F
 from . import utils
 
 __all__ = ['BatchedDGLGraph', 'batch', 'unbatch', 'split',
-           'sum_on', 'mean_on']
+           'sum_nodes', 'sum_edges', 'mean_nodes', 'mean_edges']
 
 class BatchedDGLGraph(DGLGraph):
     """Class for batched DGL graphs.
@@ -101,27 +101,6 @@ class BatchedDGLGraph(DGLGraph):
         # TODO
         pass
 
-    def readout(self, reduce_func):
-        """Perform readout for each graph in the batch.
-
-        The readout value is a tensor of shape (B, D1, D2, ...) where B is the
-        batch size.
-
-        Parameters
-        ----------
-        reduce_func : callable
-            The reduce function for readout.
-
-        Returns
-        -------
-        dict of tensors
-            The readout values.
-        """
-        # Deprecated: use things like this instead:
-        # >>> readout_sum = dgl.function.readout.sum_nodes(in_='h', out='h')
-        # >>> readouts = readout_sum(batched_graph)
-        pass
-
 def split(graph_batch, num_or_size_splits):
     """Split the batch."""
     # TODO(minjie): could follow torch.split syntax
@@ -203,34 +182,7 @@ _readout_on_attrs = {
         'edges': ('edata', 'batch_num_edges', 'number_of_edges'),
         }
 
-def sum_on(graph, on, input, weight=None):
-    """Sums all the values of node/edge field `input` in `graph`, optionally
-    multiplies the field by a scalar node/edge field `weight`.
-
-    Parameters
-    ----------
-    graph : DGLGraph or BatchedDGLGraph
-        The graph
-    on : 'nodes' or 'edges'
-        Whether to sum on either nodes or edges.
-    in_ : str
-        The input field
-    weight : optional, str
-        The weight field.  Default is all 1 (i.e. not weighting)
-
-    Returns
-    -------
-    tensor
-        The summed tensor.
-
-    Notes
-    -----
-    If graph is a BatchedDGLGraph, a stacked tensor (or dict of stacked
-    tensors) is returned instead, i.e. having an extra first dimension.
-    Each row of the stacked tensor(s) contains the readout result of
-    corresponding example in the batch.  If an example has no nodes/edges,
-    a zero tensor with the same shape is returned at the corresponding row.
-    """
+def _sum_on(graph, on, input, weight):
     data_attr, batch_num_objs_attr, num_objs_attr = _readout_on_attrs[on]
     data = getattr(graph, data_attr)
     input = data[input]
@@ -253,18 +205,15 @@ def sum_on(graph, on, input, weight=None):
     else:
         return F.sum(input, 0)
 
-
-def mean_on(graph, on, input, weight=None):
-    """Averages all the values of node/edge field `input` in `graph`, optionally
-    multiplies the field by a scalar node/edge field `weight`.
+def sum_nodes(graph, input, weight=None):
+    """Sums all the values of node field `input` in `graph`, optionally
+    multiplies the field by a scalar node field `weight`.
 
     Parameters
     ----------
     graph : DGLGraph or BatchedDGLGraph
         The graph
-    on : 'nodes' or 'edges'
-        Whether to sum on either nodes or edges.
-    in_ : str
+    input : str
         The input field
     weight : optional, str
         The weight field.  Default is all 1 (i.e. not weighting)
@@ -276,12 +225,44 @@ def mean_on(graph, on, input, weight=None):
 
     Notes
     -----
-    If graph is a BatchedDGLGraph, a stacked tensor (or dict of stacked
-    tensors) is returned instead, i.e. having an extra first dimension.
-    Each row of the stacked tensor(s) contains the readout result of
-    corresponding example in the batch.  If an example has no nodes/edges,
+    If graph is a BatchedDGLGraph, a stacked tensor is returned instead,
+    i.e. having an extra first dimension.
+    Each row of the stacked tensor contains the readout result of
+    corresponding example in the batch.  If an example has no nodes,
     a zero tensor with the same shape is returned at the corresponding row.
     """
+    return _sum_on(graph, 'nodes', input, weight)
+
+def sum_edges(graph, input, weight=None):
+    """Sums all the values of edge field `input` in `graph`, optionally
+    multiplies the field by a scalar edge field `weight`.
+
+    Parameters
+    ----------
+    graph : DGLGraph or BatchedDGLGraph
+        The graph
+    input : str
+        The input field
+    weight : optional, str
+        The weight field.  Default is all 1 (i.e. not weighting)
+
+    Returns
+    -------
+    tensor
+        The summed tensor.
+
+    Notes
+    -----
+    If graph is a BatchedDGLGraph, a stacked tensor is returned instead,
+    i.e. having an extra first dimension.
+    Each row of the stacked tensor contains the readout result of
+    corresponding example in the batch.  If an example has no edges,
+    a zero tensor with the same shape is returned at the corresponding row.
+    """
+    return _sum_on(graph, 'edges', input, weight)
+
+
+def _mean_on(graph, on, input, weight):
     data_attr, batch_num_objs_attr, num_objs_attr = _readout_on_attrs[on]
     data = getattr(graph, data_attr)
     input = data[input]
@@ -312,3 +293,59 @@ def mean_on(graph, on, input, weight=None):
         else:
             y = F.sum(input, 0) / F.sum(weight, 0)
             return y
+
+def mean_nodes(graph, input, weight=None):
+    """Averages all the values of node field `input` in `graph`, optionally
+    multiplies the field by a scalar node field `weight`.
+
+    Parameters
+    ----------
+    graph : DGLGraph or BatchedDGLGraph
+        The graph
+    input : str
+        The input field
+    weight : optional, str
+        The weight field.  Default is all 1 (i.e. not weighting)
+
+    Returns
+    -------
+    tensor
+        The averaged tensor.
+
+    Notes
+    -----
+    If graph is a BatchedDGLGraph, a stacked tensor is returned instead,
+    i.e. having an extra first dimension.
+    Each row of the stacked tensor contains the readout result of
+    corresponding example in the batch.  If an example has no nodes,
+    a zero tensor with the same shape is returned at the corresponding row.
+    """
+    return _mean_on(graph, 'nodes', input, weight)
+
+def mean_edges(graph, input, weight=None):
+    """Averages all the values of edge field `input` in `graph`, optionally
+    multiplies the field by a scalar edge field `weight`.
+
+    Parameters
+    ----------
+    graph : DGLGraph or BatchedDGLGraph
+        The graph
+    input : str
+        The input field
+    weight : optional, str
+        The weight field.  Default is all 1 (i.e. not weighting)
+
+    Returns
+    -------
+    tensor
+        The averaged tensor.
+
+    Notes
+    -----
+    If graph is a BatchedDGLGraph, a stacked tensor is returned instead,
+    i.e. having an extra first dimension.
+    Each row of the stacked tensor contains the readout result of
+    corresponding example in the batch.  If an example has no edges,
+    a zero tensor with the same shape is returned at the corresponding row.
+    """
+    return _mean_on(graph, 'edges', input, weight)
