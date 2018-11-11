@@ -1,7 +1,5 @@
-import networkx as nx
 import dgl
 import torch as th
-import numpy as np
 import utils as U
 
 def tree1():
@@ -45,10 +43,6 @@ def tree2():
 def test_batch_unbatch():
     t1 = tree1()
     t2 = tree2()
-    n1 = t1.ndata['h']
-    n2 = t2.ndata['h']
-    e1 = t1.edata['h']
-    e2 = t2.edata['h']
 
     bg = dgl.batch([t1, t2])
     assert bg.number_of_nodes() == 10
@@ -82,7 +76,7 @@ def test_batch_unbatch1():
     assert U.allclose(t2.ndata['h'], s3.ndata['h'])
     assert U.allclose(t2.edata['h'], s3.edata['h'])
 
-def test_batch_sendrecv():
+def test_batch_send_then_recv():
     t1 = tree1()
     t2 = tree2()
 
@@ -93,12 +87,27 @@ def test_batch_sendrecv():
     v = [1, 1, 4 + 5, 4 + 5]
 
     bg.send((u, v))
-    bg.recv(v)
+    bg.recv([1, 9]) # assuming recv takes in unique nodes
 
     t1, t2 = dgl.unbatch(bg)
     assert t1.ndata['h'][1] == 7
     assert t2.ndata['h'][4] == 2
 
+def test_batch_send_and_recv():
+    t1 = tree1()
+    t2 = tree2()
+
+    bg = dgl.batch([t1, t2])
+    bg.register_message_func(lambda edges: {'m' : edges.src['h']})
+    bg.register_reduce_func(lambda nodes: {'h' : th.sum(nodes.mailbox['m'], 1)})
+    u = [3, 4, 2 + 5, 0 + 5]
+    v = [1, 1, 4 + 5, 4 + 5]
+
+    bg.send_and_recv((u, v))
+
+    t1, t2 = dgl.unbatch(bg)
+    assert t1.ndata['h'][1] == 7
+    assert t2.ndata['h'][4] == 2
 
 def test_batch_propagate():
     t1 = tree1()
@@ -147,11 +156,9 @@ def test_batch_no_edge():
     g1 = dgl.DGLGraph()
     g1.add_nodes(6)
     g1.add_edges([4, 4, 2, 2, 0], [5, 3, 3, 1, 1])
-    e1 = th.randn(5, 10)
     g2 = dgl.DGLGraph()
     g2.add_nodes(6)
     g2.add_edges([0, 1, 2, 5, 4, 5], [1 ,2 ,3, 4, 3, 0])
-    e2 = th.randn(6, 10)
     g3 = dgl.DGLGraph()
     g3.add_nodes(1)  # no edges
     g = dgl.batch([g1, g3, g2]) # should not throw an error
@@ -160,6 +167,7 @@ if __name__ == '__main__':
     test_batch_unbatch()
     test_batch_unbatch1()
     test_batched_edge_ordering()
-    test_batch_sendrecv()
+    test_batch_send_then_recv()
+    test_batch_send_and_recv()
     test_batch_propagate()
     test_batch_no_edge()

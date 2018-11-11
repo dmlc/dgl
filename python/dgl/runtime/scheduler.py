@@ -111,6 +111,7 @@ def build_edge_executor(graph, u, v, eid, func):
     return execs, out_repr
 
 def build_recv_executor(graph, v, rfunc):
+    call_type = "recv"
     rfunc = _standardize_func_usage(rfunc)
 
     recv_execs = []
@@ -124,7 +125,6 @@ def build_recv_executor(graph, v, rfunc):
         rfunc = _analyze_e2v_spmv(recv_execs, out_repr, rfunc, graph, call_type, v, eid, message_repr)
 
     # build degree bucketing
-    call_type = "recv"
     _degree_bucket_exec(recv_execs, out_repr, rfunc, graph, call_type, graph._msg_frame, v)
 
     return recv_execs, out_repr
