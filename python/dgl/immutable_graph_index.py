@@ -4,6 +4,7 @@ import ctypes
 import numpy as np
 import networkx as nx
 import scipy.sparse as sp
+import mxnet as mx
 
 from ._ffi.function import _init_api
 from . import backend as F
@@ -582,6 +583,8 @@ def create_immutable_graph_index(graph_data=None):
             return gi
         except:
             raise Exception('Graph data is not a valid scipy sparse matrix.')
+    if isinstance(graph_data, mx.nd.sparse.CSRNDArray):
+        return ImmutableGraphIndex(F.create_immutable_graph_index(graph_data, None))
 
     # networkx - any format
     try:

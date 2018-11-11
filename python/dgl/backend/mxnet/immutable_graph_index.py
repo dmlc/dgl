@@ -351,7 +351,7 @@ class ImmutableGraphIndex(object):
         self.__init__(mx.nd.sparse.csr_matrix((edge_ids, (dst, src)), shape=out_coo.shape).astype(np.int64),
                 mx.nd.sparse.csr_matrix((edge_ids, (src, dst)), shape=out_coo.shape).astype(np.int64))
 
-def create_immutable_graph_index():
+def create_immutable_graph_index(in_csr=None, out_csr=None):
     """ Create an empty backend-specific immutable graph index.
 
     Returns
@@ -359,4 +359,4 @@ def create_immutable_graph_index():
     ImmutableGraphIndex
         The backend-specific immutable graph index.
     """
-    return ImmutableGraphIndex(None, None)
+    return ImmutableGraphIndex(in_csr, out_csr)
