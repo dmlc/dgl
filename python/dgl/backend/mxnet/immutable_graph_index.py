@@ -281,19 +281,13 @@ class ImmutableGraphIndex(object):
             g = self._out_csr
         else:
             raise NotImplementedError
-        subgraphs = []
-        vertices = []
         num_nodes = []
-        for seed in seed_ids:
-            res = mx.nd.contrib.neighbor_sample(g, seed, num_hops=num_hops,
-                                                num_neighbor=expand_factor,
-                                                max_num_vertices=max_subgraph_size)
-            subg_v, subg = res[0], res[1]
-            subgraphs.append(subg)
-            vertices.append(subg_v)
-            # TODO this blocks the thread.
-            num = mx.nd.sum(subg_v >= 0).asnumpy()[0]
-            num_nodes.append(num)
+        num_subgs = len(seed_ids)
+        res = mx.nd.contrib.neighbor_sample(g, *seed_ids, num_hops=num_hops,
+                                            num_neighbor=expand_factor,
+                                            max_num_vertices=max_subgraph_size)
+        vertices, subgraphs = res[0:num_subgs], res[num_subgs:len(res)]
+        num_nodes = [mx.nd.sum(subg_v >= 0).asnumpy()[0] for subg_v in vertices]
         inputs = []
         inputs.extend(subgraphs)
         inputs.extend(vertices)
