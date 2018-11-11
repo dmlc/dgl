@@ -11,22 +11,6 @@ from ..immutable_graph_index import ImmutableGraphIndex
 
 from .._ffi.function import _init_api
 
-# TODO(lingfan)
-# 1. handle 0 degree in c++ (done)
-# 2. adjmat index case (done)
-# 3. parse edge for mutli-edge
-# 4. remove graph store (done)
-# 5. push and pull schedule (done)
-# 6. doc string
-# 7. reorder arguments
-# 8. fix send recv message graph (done)
-# 9. write back executor (done)
-# 10. fix mxnet (done)
-
-# Attention:
-# 1. recv v could become different after query in_edge
-# 2. unique_v is calculated multiple times
-
 __all__ = [
             "get_send_schedule",
             "get_recv_schedule",
@@ -39,91 +23,245 @@ __all__ = [
           ]
 
 def get_send_schedule(graph, u, v, eid, message_func):
-    # TODO (lingfan): doc string
+    """get send schedule
+
+    Parameters
+    ----------
+    graph: DGLGraph
+        The DGLGraph to use
+    u : utils.Index
+        Source nodes
+    v : utils.Index
+        Destination nodes
+    eid : utils.Index
+        Ids of sending edges
+    message_func: callable or list of callable
+        The message function
+
+    Returns
+    -------
+    A list of executors for DGL Runtime
+    """
     send_exec, out_repr = build_edge_executor(graph, u, v, eid, message_func)
     wb_exec = build_write_back_exec(graph, out_repr, None, "message")
     return send_exec + wb_exec
 
 def get_recv_schedule(graph, v, reduce_func, apply_func):
-    # TODO (lingfan): doc string
+    """get recv schedule
+
+    Parameters
+    ----------
+    graph: DGLGraph
+        The DGLGraph to use
+    v : utils.Index
+        Destination nodes
+    reduce_func: callable or list of callable
+        The reduce function
+    apply_func: callable
+        The apply node function
+
+    Returns
+    -------
+    A list of executors for DGL Runtime
+    """
     execs, out_repr = build_recv_executor(graph, v, reduce_func)
     if apply_func:
-        apply_exec, out_repr = build_node_executor(graph, v, apply_func, reduce_accum=out_repr)
+        apply_exec, out_repr = build_node_executor(graph, v, apply_func,
+                                                   reduce_accum=out_repr)
         execs += apply_exec
     wb_exec = build_write_back_exec(graph, out_repr, v, "node")
     execs += wb_exec
     return execs
 
 def get_snr_schedule(graph, u, v, eid, message_func, reduce_func, apply_func):
-    # TODO (lingfan): doc string
+    """get send and recv schedule
+
+    Parameters
+    ----------
+    graph: DGLGraph
+        The DGLGraph to use
+    u : utils.Index
+        Source nodes
+    v : utils.Index
+        Destination nodes
+    eid : utils.Index
+        Ids of sending edges
+    message_func: callable or list of callable
+        The message function
+    reduce_func: callable or list of callable
+        The reduce function
+    apply_func: callable
+        The apply node function
+
+    Returns
+    -------
+    A list of executors for DGL Runtime
+    """
     call_type = "send_and_recv"
-    execs, out_repr = build_send_and_recv_executor(graph, call_type, u, v, eid, message_func, reduce_func)
+    execs, out_repr = build_send_and_recv_executor(graph, call_type, u, v, eid,
+                                                   message_func, reduce_func)
     unique_v, _ = F.sort_1d(F.unique(v.tousertensor()))
     if apply_func:
-        apply_exec, out_repr = build_node_executor(graph, unique_v, apply_func, reduce_accum=out_repr)
+        apply_exec, out_repr = build_node_executor(graph, unique_v, apply_func,
+                                                   reduce_accum=out_repr)
         execs += apply_exec
     wb_exec = build_write_back_exec(graph, out_repr, unique_v, "node")
     execs += wb_exec
     return execs
 
 def get_update_all_schedule(graph, message_func, reduce_func, apply_func):
-    # TODO (lingfan): doc string
+    """get send and recv schedule
+
+    Parameters
+    ----------
+    graph: DGLGraph
+        The DGLGraph to use
+    message_func: callable or list of callable
+        The message function
+    reduce_func: callable or list of callable
+        The reduce function
+    apply_func: callable
+        The apply node function
+
+    Returns
+    -------
+    A list of executors for DGL Runtime
+    """
     call_type = "update_all"
     u, v, eid = ALL, ALL, ALL
-    execs, out_repr = build_send_and_recv_executor(graph, call_type, u, v, eid, message_func, reduce_func)
+    execs, out_repr = build_send_and_recv_executor(graph, call_type, u, v, eid,
+                                                   message_func, reduce_func)
     if apply_func:
-        apply_exec, out_repr = build_node_executor(graph, ALL, apply_func, reduce_accum=out_repr)
+        apply_exec, out_repr = build_node_executor(graph, ALL, apply_func,
+                                                   reduce_accum=out_repr)
         execs += apply_exec
     wb_exec = build_write_back_exec(graph, out_repr, ALL, "node")
     execs += wb_exec
     return execs
 
 def get_apply_nodes_schedule(graph, v, apply_func):
-    # TODO (lingfan): doc string
+    """get apply nodes schedule
+
+    Parameters
+    ----------
+    graph: DGLGraph
+        The DGLGraph to use
+    v : utils.Index
+        Nodes to apply
+    apply_func: callable
+        The apply node function
+
+    Returns
+    -------
+    A list of executors for DGL Runtime
+    """
     apply_exec, out_repr = build_node_executor(graph, v, apply_func)
     wb_exec = build_write_back_exec(graph, out_repr, v, "node")
     return apply_exec + wb_exec
 
 def get_apply_edges_schedule(graph, u, v, eid, apply_func):
-    # TODO (lingfan): doc string
+    """get apply edges schedule
+
+    Parameters
+    ----------
+    graph: DGLGraph
+        The DGLGraph to use
+    u : utils.Index
+        Source nodes of edges to apply
+    v : utils.Index
+        Destination nodes of edges to apply
+    eid : utils.Index
+        Ids of sending edges
+    apply_func: callable
+        The apply edge function
+
+    Returns
+    -------
+    A list of executors for DGL Runtime
+    """
     apply_exec, out_repr = build_edge_executor(graph, u, v, eid, apply_func)
     wb_exec = build_write_back_exec(graph, out_repr, eid, "edge")
     return apply_exec + wb_exec
 
 def get_push_schedule(graph, u, message_func, reduce_func, apply_func):
-    # TODO (lingfan): doc string
+    """get push schedule
+
+    Parameters
+    ----------
+    graph: DGLGraph
+        The DGLGraph to use
+    u : utils.Index
+        Source nodes for push
+    message_func: callable or list of callable
+        The message function
+    reduce_func: callable or list of callable
+        The reduce function
+    apply_func: callable
+        The apply node function
+
+    Returns
+    -------
+    A list of executors for DGL Runtime
+    """
     # XXX: for now, use send_and_recv to implement push
     u, v, eid = graph._graph.out_edges(u)
     if len(eid) == 0:
         return []
-    return get_snr_schedule(graph, u, v, eid, message_func, reduce_func, apply_func)
+    return get_snr_schedule(graph, u, v, eid,
+                            message_func, reduce_func, apply_func)
 
 def get_pull_schedule(graph, v, message_func, reduce_func, apply_func):
-    # TODO (lingfan): doc string
+    """get pull schedule
+
+    Parameters
+    ----------
+    graph: DGLGraph
+        The DGLGraph to use
+    v : utils.Index
+        Destination nodes for pull
+    message_func: callable or list of callable
+        The message function
+    reduce_func: callable or list of callable
+        The reduce function
+    apply_func: callable
+        The apply node function
+
+    Returns
+    -------
+    A list of executors for DGL Runtime
+    """
     # XXX: for now, use send_and_recv to implement pull
     u, v, eid = graph._graph.in_edges(v)
     if len(eid) == 0:
         return []
-    return get_snr_schedule(graph, u, v, eid, message_func, reduce_func, apply_func)
+    return get_snr_schedule(graph, u, v, eid,
+                            message_func, reduce_func, apply_func)
 
 def build_node_executor(graph, v, func, reduce_accum=None):
     execs = []
     if reduce_accum:
+        # if has reduce phase, apply should update the output of reduce
         out_repr = reduce_accum
     else:
         out_repr = {}
-    _node_exec(execs, out_repr, func, graph, v, reduce_accum)
+    if func:
+        exe = _node_exec(out_repr, func, graph, v, reduce_accum)
+        execs.append(exe)
     return execs, out_repr
 
 def build_edge_executor(graph, u, v, eid, func):
-    if is_all(eid):
-        u, v, _ = graph._graph.edges()
     execs = []
     out_repr = {}
-    _edge_exec(execs, out_repr, func, graph, u, v, eid)
+    if func:
+        if is_all(eid):
+            # if edges is ALL, look up source and destination ndoes
+            u, v, _ = graph._graph.edges()
+        exe = _edge_exec(out_repr, func, graph, u, v, eid)
+        execs.append(exe)
     return execs, out_repr
 
 def build_recv_executor(graph, v, rfunc):
+    """Build executors for recv"""
     call_type = "recv"
     rfunc = _standardize_func_usage(rfunc)
 
@@ -135,14 +273,17 @@ def build_recv_executor(graph, v, rfunc):
         # build e2v spmv
         message_repr = dict(graph._msg_frame)
         u, v, eid = graph._msg_graph.in_edges(v)
-        rfunc = _analyze_e2v_spmv(recv_execs, out_repr, rfunc, graph, call_type, v, eid, message_repr)
+        rfunc = _analyze_e2v_spmv(recv_execs, out_repr, rfunc,
+                                  graph, call_type, v, eid, message_repr)
 
     # build degree bucketing
-    _degree_bucket_exec(recv_execs, out_repr, rfunc, graph, call_type, graph._msg_frame, v)
+    _degree_bucket_exec(recv_execs, out_repr, rfunc,
+                        graph, call_type, graph._msg_frame, v)
 
     return recv_execs, out_repr
 
 def build_send_and_recv_executor(graph, call_type, u, v, eid, mfunc, rfunc):
+    """Build executors for send_and_recv"""
     mfunc = _standardize_func_usage(mfunc)
     rfunc = _standardize_func_usage(rfunc)
 
@@ -153,22 +294,26 @@ def build_send_and_recv_executor(graph, call_type, u, v, eid, mfunc, rfunc):
 
     out_repr = {}
 
+    # both message and reduce are a list of builtin
     if mfunc_is_list and rfunc_is_list:
         # pair mfunc with rfunc
         pairs = _pair_reduce_with_message(mfunc, rfunc)
 
         # build v2v spmv
-        mfunc, rfunc = _analyze_v2v_spmv(recv_execs, out_repr, pairs, graph, call_type, u, v, eid)
+        mfunc, rfunc = _analyze_v2v_spmv(recv_execs, out_repr, pairs,
+                                         graph, call_type, u, v, eid)
 
     # build send executor
     send_execs, message_repr = build_edge_executor(graph, u, v, eid, mfunc)
 
     if rfunc_is_list:
         # build e2v spmv
-        rfunc = _analyze_e2v_spmv(recv_execs, out_repr, rfunc, graph, call_type, v, eid, message_repr)
+        rfunc = _analyze_e2v_spmv(recv_execs, out_repr, rfunc,
+                                  graph, call_type, v, eid, message_repr)
 
     # build degree bucketing
-    _degree_bucket_exec(recv_execs, out_repr, rfunc, graph, call_type, message_repr, v)
+    _degree_bucket_exec(recv_execs, out_repr, rfunc,
+                        graph, call_type, message_repr, v)
 
     return send_execs + recv_execs, out_repr
 
@@ -176,11 +321,27 @@ def _is_iterable(x):
     return isinstance(x, Iterable)
 
 def _check_builtin_func_list(func_list):
+    """Check whether func_list only contains builtin functions
+    """
     for fn in func_list:
         if not isinstance(fn, BuiltinFunction):
-            raise DGLError("If specify multiple message/reduce functions, all of them must be builtin")
+            raise DGLError("If specify multiple message/reduce functions, \
+                           all of them must be builtin")
 
 def _standardize_func_usage(func):
+    """Standardize usages of message and reduce functions
+    Message or reduce funtion can be:
+        1. a UDF
+        2. a dgl builtin function
+        3. a list of dgl builtin function
+
+    This function checks if func meets the requirement, and merges last two cases
+    by putting builtin function in case 2 into a list
+
+    Returns:
+    One single UDF function or a list of builtin function
+    """
+
     if _is_iterable(func):
         # rfunc is a list of builtin
         _check_builtin_func_list(func)
@@ -193,6 +354,8 @@ def _standardize_func_usage(func):
         return func
 
 def _pair_reduce_with_message(mfunc, rfunc):
+    """Look up message function for reduce function based on the message field
+    """
     mfunc = {fn.out_field: fn for fn in mfunc}
     func_list = []
     for rfn in rfunc:
@@ -200,10 +363,14 @@ def _pair_reduce_with_message(mfunc, rfunc):
         if mfn:
             func_list.append((mfn, rfn))
         else:
-            raise DGLError("Cannot find message function that generates field %s." % rfn.msg_field)
+            raise DGLError("Cannot find message function that \
+                           generates field %s." % rfn.msg_field)
     return func_list
 
 def _build_adj_matrix(g, call_type, u, v, indices_and_shape=False):
+    """Build sparse adjacency matrix based on the call type
+    If indices_and_shape is True, return packed indices and shape instead
+    """
     if call_type == "update_all":
         # full graph case
         if indices_and_shape:
@@ -227,9 +394,11 @@ def _build_adj_matrix(g, call_type, u, v, indices_and_shape=False):
             mat = utils.build_sparse_matrix(new_v, u, [m, n], nnz)
             return utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx))
     else:
-        raise DGLError("Unsupported call type when build adjmat: %s" % call_type)
+        raise DGLError("Unsupported call type when build adjmat: %s"
+                       % call_type)
 
 def _build_incidence_matrix(g, call_type, v, eid):
+    """Build incidence matrix based on call type"""
     if call_type == "update_all":
         # full graph case
         return g._graph.in_edge_incidence_matrix()
@@ -242,7 +411,8 @@ def _build_incidence_matrix(g, call_type, v, eid):
             _, v, eid = g._msg_graph.in_edges(v)
             m = len(eid)
         else:
-            raise DGLError("Unsupported call type when build incidence matrix: %s" % call_type)
+            raise DGLError("Unsupported call type when build incidence matrix:\
+                           %s" % call_type)
 
         new2old, old2new = utils.build_relabel_map(v)
         v = v.tousertensor()
@@ -253,12 +423,46 @@ def _build_incidence_matrix(g, call_type, v, eid):
         return utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
 
 def _analyze_v2v_spmv(exec_list, out_repr, pairs, graph, call_type, u, v, eid):
+    """Analyze if SPMV from node space to node space can be applied
+
+    Parameters
+    ----------
+    exec_list: list
+        A list where generated executor will be put in
+    out_repr: dict
+        A dictionary to be binded to the executor to store the execution output
+        This dictionary is empty until Runtime executes and materialize results
+    pairs: list of tuple
+        A list of tuples, each tuple is a message and reduce function pair
+    graph: DGLGraph
+        DGLGraph to use
+    call_type: str
+        Call_type of current graph API, could be "update_all" or "send_and_recv"
+    u: utils.Index
+        Source nodes
+    v: utils.Index
+        Destination nodes
+    eid: utils.Index
+        Edge ids
+
+    Returns:
+    mfunc_left: list
+        A list of message functions that can't use v2v spmv. In other
+        words, these message functions need to be materialized
+    rfunc_left: list
+        A list of reduce functions that can't use v2v spmv
+    """
     mfunc_left = []
     rfunc_left = []
+
+    # cache adjmat or adj_idx_shape
     adjmat = None
     adj_idx_shape = None
+
+    # node/edge repr for spmv
     node_repr = graph.get_n_repr()
     edge_repr = graph.get_e_repr(eid)
+
     for mfn, rfn in pairs:
         # XXX: should pre-compile a look up table
         if mfn.is_spmv_supported(graph) and rfn.is_spmv_supported():
@@ -289,18 +493,45 @@ def _analyze_v2v_spmv(exec_list, out_repr, pairs, graph, call_type, u, v, eid):
             rfunc_left.append(rfn)
     return mfunc_left, rfunc_left
 
-def _analyze_e2v_spmv(exec_list, out_repr, rfunc, graph, call_type, v, eid, message_repr):
+def _analyze_e2v_spmv(exec_list, out_repr, rfunc,
+                      graph, call_type, v, eid, message_repr):
+    """Analyze if SPMV from edge space to node space can be applied
+
+    Parameters
+    ----------
+    exec_list: list
+        A list where generated executor will be put in
+    out_repr: dict
+        A dictionary to be binded to the executor to store the execution output
+        This dictionary is empty until Runtime executes and materialize results
+    rfunc: list
+        A list of reduce functions to be analyzed
+    graph: DGLGraph
+        DGLGraph to use
+    call_type: str
+        Call_type of current graph API, could be "update_all" or "send_and_recv"
+    v: utils.Index
+        Destination nodes
+    eid: utils.Index
+        Edge ids
+    message_repr: dict
+        Message representations (generated by message function)
+
+    Returns:
+    rfunc_left: list
+        A list of reduce functions that can't use e2v spmv
+    """
     if not rfunc:
         return []
 
     rfunc_left = []
-    incidence_mat = None
+    icd_mat = None
     for rfn in rfunc:
         if rfn.is_spmv_supported():
-            if incidence_mat is None:
-                incidence_mat = _build_incidence_matrix(graph, call_type, v, eid)
+            if icd_mat is None:
+                icd_mat = _build_incidence_matrix(graph, call_type, v, eid)
                 exe = _e2v_spmv_exec(rfunc=rfn,
-                                     adjmat=incidence_mat,
+                                     adjmat=icd_mat,
                                      message_repr=message_repr,
                                      out_repr=out_repr)
                 exec_list.append(exe)
@@ -310,6 +541,7 @@ def _analyze_e2v_spmv(exec_list, out_repr, rfunc, graph, call_type, v, eid, mess
 
 def _v2v_spmv_exec(mfunc, rfunc, adjmat, node_repr, out_repr,
                    use_edge_feat=False, edge_repr=None):
+    """Build v2v spmv executor"""
     if use_edge_feat:
         index, shape = adjmat
         return SPMVExecutor(src_field=mfunc.src_field,
@@ -330,6 +562,7 @@ def _v2v_spmv_exec(mfunc, rfunc, adjmat, node_repr, out_repr,
                             use_edge_feat=False)
 
 def _e2v_spmv_exec(rfunc, adjmat, message_repr, out_repr):
+    """Build e2v spmv executor"""
     return SPMVExecutor(src_field=rfunc.msg_field,
                         src_repr=message_repr,
                         out_field=rfunc.out_field,
@@ -337,17 +570,17 @@ def _e2v_spmv_exec(rfunc, adjmat, message_repr, out_repr):
                         adjmat=adjmat,
                         use_edge_feat=False)
 
-def _node_exec(exec_list, out_repr, func, graph, u, reduce_accum):
-    if func:
-        if _is_iterable(func):
-            func = BundledFunction(func)
-        exec_list.append(NodeExecutor(func, graph, u, out_repr, reduce_accum))
+def _node_exec(out_repr, func, graph, u, reduce_accum):
+    """Build node apply executor"""
+    if _is_iterable(func):
+        func = BundledFunction(func)
+    return NodeExecutor(func, graph, u, out_repr, reduce_accum)
 
-def _edge_exec(exec_list, out_repr, func, graph, u, v, eid):
-    if func:
-        if _is_iterable(func):
-            func = BundledFunction(func)
-        exec_list.append(EdgeExecutor(func, graph, u, v, eid, out_repr))
+def _edge_exec(out_repr, func, graph, u, v, eid):
+    """Build edge apply executor"""
+    if _is_iterable(func):
+        func = BundledFunction(func)
+    return EdgeExecutor(func, graph, u, v, eid, out_repr)
 
 def _process_buckets(buckets):
     """read bucketing auxiliary data
@@ -367,7 +600,7 @@ def _process_buckets(buckets):
     # get back results
     degs = utils.toindex(buckets(0))
     v = utils.toindex(buckets(1))
-    # TODO: convert directly from ndarary to python list?
+    # XXX: convert directly from ndarary to python list?
     v_section = buckets(2).asnumpy().tolist()
     msg_ids = utils.toindex(buckets(3))
     msg_section = buckets(4).asnumpy().tolist()
@@ -395,7 +628,8 @@ def _process_buckets(buckets):
     return unique_v, degs, dsts, msg_ids, zero_deg_nodes
 
 def _degree_bucketing_schedule(mids, dsts, v):
-    """Return the bucketing by degree scheduling for destination nodes of messages
+    """Return the bucketing by degree scheduling for destination nodes of
+    messages
 
     Parameters
     ----------
@@ -407,11 +641,13 @@ def _degree_bucketing_schedule(mids, dsts, v):
         all receiving nodes (for checking zero degree nodes)
     """
 
-    buckets = _CAPI_DGLDegreeBucketing(mids.todgltensor(), dsts.todgltensor(), v.todgltensor())
+    buckets = _CAPI_DGLDegreeBucketing(mids.todgltensor(), dsts.todgltensor(),
+                                       v.todgltensor())
     return _process_buckets(buckets)
 
 def _degree_bucketing_for_edges(dsts):
-    """Return the bucketing by degree scheduling for destination nodes of messages
+    """Return the bucketing by degree scheduling for destination nodes of
+    messages
 
     Parameters
     ----------
@@ -423,7 +659,8 @@ def _degree_bucketing_for_edges(dsts):
     return _process_buckets(buckets)
 
 def _degree_bucketing_for_graph(graph, v=ALL):
-    """Return the bucketing by degree scheduling given graph index and option dst nodes
+    """Return the bucketing by degree scheduling given graph index and optional
+    dst nodes
 
     Parameters:
     graph: GraphIndex
@@ -435,10 +672,33 @@ def _degree_bucketing_for_graph(graph, v=ALL):
     if is_all(v):
         buckets = _CAPI_DGLDegreeBucketingForFullGraph(graph._handle)
     else:
-        buckets = _CAPI_DGLDegreeBucketingForRecvNodes(graph._handle, v.todgltensor())
+        buckets = _CAPI_DGLDegreeBucketingForRecvNodes(graph._handle,
+                                                       v.todgltensor())
     return _process_buckets(buckets)
 
-def _degree_bucket_exec(exec_list, out_repr, rfunc, g, call_type, message_repr, v=None):
+def _degree_bucket_exec(exec_list, out_repr, rfunc,
+                        graph, call_type, message_repr, v=None):
+    """Create degree bucketing schedule
+
+    Parameters
+    ----------
+    exec_list: list
+        A list where generated executor will be put in
+    out_repr: dict
+        A dictionary to be binded to the executor to store the execution output
+        This dictionary is empty until Runtime executes and materialize results
+    rfunc: list
+        A list of reduce functions to use degree bucketing
+    graph: DGLGraph
+        DGLGraph to use
+    call_type: str
+        Call_type of current graph API, could be "update_all" or "send_and_recv"
+    message_repr: dict or Frame
+        Message representations (generated by message function)
+    v: utils.Index
+        Optional Receiving nodes
+
+    """
     if not rfunc:
         return
 
@@ -446,33 +706,33 @@ def _degree_bucket_exec(exec_list, out_repr, rfunc, g, call_type, message_repr, 
         rfunc = BundledFunction(rfunc)
 
     # get degree bucketing schedule
-    if isinstance(g._graph, ImmutableGraphIndex):
+    if isinstance(graph._graph, ImmutableGraphIndex):
         # immutable graph case (no c++ support)
         if call_type == "send_and_recv":
             mids = utils.toindex(range(0, len(v)))
             dsts = v
         elif call_type == "update_all":
-            _, dsts, mids = g._graph.edges()
-            v = utils.toindex(range(g._graph.number_of_nodes()))
+            _, dsts, mids = graph._graph.edges()
+            v = utils.toindex(range(graph._graph.number_of_nodes()))
         elif call_type == "recv":
-            _, dsts, mids = g._msg_graph.in_edges(v)
+            _, dsts, mids = graph._msg_graph.in_edges(v)
         else:
-            raise DGLError("Unsupported call type for degree bucketing: %s" % call_type)
+            raise DGLError("Unsupported call type for degree bucketing: %s"
+                           % call_type)
         buckets = _degree_bucketing_schedule(mids, dsts, v)
     else:
         # mutable graph case
         if call_type == "send_and_recv":
             buckets = _degree_bucketing_for_edges(v)
         elif call_type == "update_all":
-            buckets = _degree_bucketing_for_graph(g._graph)
+            buckets = _degree_bucketing_for_graph(graph._graph)
         elif call_type == "recv":
-            buckets = _degree_bucketing_for_graph(g._msg_graph, v)
+            buckets = _degree_bucketing_for_graph(graph._msg_graph, v)
         else:
-            raise DGLError("Unsupported call type for degree bucketing: %s" % call_type)
+            raise DGLError("Unsupported call type for degree bucketing: %s"
+                           % call_type)
 
-    # TODO(lingfan): check zero degree in C++
-
-    exe = DegreeBucketingExecutor(g, rfunc, message_repr, out_repr, buckets)
+    exe = DegreeBucketingExecutor(graph, rfunc, message_repr, out_repr, buckets)
     exec_list.append(exe)
 
 def build_write_back_exec(graph, new_repr, ids, target):

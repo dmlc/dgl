@@ -9,7 +9,6 @@ from .base import ALL, is_all, DGLError, dgl_warning
 from . import backend as F
 from .frame import FrameRef, Frame, merge_frames
 from .graph_index import GraphIndex, create_graph_index
-from .udf import NodeBatch, EdgeBatch
 from . import utils
 from .view import NodeView, EdgeView
 from .runtime import scheduler, Runtime

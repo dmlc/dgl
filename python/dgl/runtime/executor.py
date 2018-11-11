@@ -18,7 +18,10 @@ class Executor(object):
         raise NotImplementedError
 
 class SPMVExecutor(Executor):
-    def __init__(self, src_field, src_repr, out_field, out_repr, adjmat, use_edge_feat=False, edge_field=None, edge_repr=None, dense_shape=None):
+    """Executor to perform SPMV for one field"""
+    def __init__(self, src_field, src_repr, out_field, out_repr, adjmat,
+                 use_edge_feat=False, edge_field=None, edge_repr=None,
+                 dense_shape=None):
         self.src_field = src_field
         self.src_repr = src_repr
         self.out_field = out_field
@@ -43,7 +46,8 @@ class SPMVExecutor(Executor):
             if len(F.shape(dat)) > 1:
                 # The edge feature is of shape (N, 1)
                 dat = F.squeeze(dat, 1)
-            self.adjmat = F.sparse_matrix(dat, ('coo', self.adjmat), self.dense_shape)
+            self.adjmat = F.sparse_matrix(dat, ('coo', self.adjmat),
+                                          self.dense_shape)
 
         # spmm
         if len(F.shape(srccol)) == 1:
@@ -57,11 +61,12 @@ class SPMVExecutor(Executor):
         self.out_repr[self.out_field] = dstcol
 
 class DegreeBucketingExecutor(Executor):
+    """Executor for degree bucketing schedule"""
     def __init__(self, g, rfunc, message_frame, out_repr, buckets, reorder=True):
         self.g = g
         self.rfunc = rfunc
         self.msg_frame = message_frame
-        self.v, self.degrees, self.dsts, self.msg_ids, self.zero_deg_nodes = buckets
+        self.v, self.degs, self.dsts, self.msg_ids, self.zero_deg_nodes = buckets
         self.reorder = reorder
         self.out_repr = out_repr
 
@@ -71,8 +76,7 @@ class DegreeBucketingExecutor(Executor):
             self.msg_frame = FrameRef(Frame(self.msg_frame))
         new_repr = []
         # loop over each bucket
-        # FIXME (lingfan): handle zero-degree case
-        for deg, vv, msg_id in zip(self.degrees, self.dsts, self.msg_ids):
+        for deg, vv, msg_id in zip(self.degs, self.dsts, self.msg_ids):
             v_data = self.g.get_n_repr(vv)
             in_msgs = self.msg_frame.select_rows(msg_id)
             def _reshape_fn(msg):
@@ -80,7 +84,8 @@ class DegreeBucketingExecutor(Executor):
                 new_shape = (len(vv), deg) + msg_shape[1:]
                 return F.reshape(msg, new_shape)
             reshaped_in_msgs = utils.LazyDict(
-                    lambda key: _reshape_fn(in_msgs[key]), self.msg_frame.schemes)
+                    lambda key: _reshape_fn(in_msgs[key]),
+                                self.msg_frame.schemes)
             nb = NodeBatch(self.g, vv, v_data, reshaped_in_msgs)
             new_repr.append(self.rfunc(nb))
 
@@ -97,6 +102,7 @@ class DegreeBucketingExecutor(Executor):
         self.out_repr.update(new_repr)
 
 class NodeExecutor(Executor):
+    """Executor to perform apply_nodes"""
     def __init__(self, func, graph, u, out_repr, reduce_accum=None):
         self.func = func
         self.graph = graph
@@ -112,6 +118,7 @@ class NodeExecutor(Executor):
         self.out_repr.update(self.func(nb))
 
 class EdgeExecutor(Executor):
+    """Executor to perform edge related computation like send and apply_edges"""
     def __init__(self, func, graph, u, v, eid, out_repr):
         self.func = func
         self.graph = graph
@@ -129,6 +136,7 @@ class EdgeExecutor(Executor):
         self.out_repr.update(self.func(eb))
 
 class WriteBackExecutor(Executor):
+    """Executor to write results back to frame storage"""
     def __init__(self, graph, new_repr, ids, target):
         self.graph = graph
         self.new_repr = new_repr
@@ -143,5 +151,6 @@ class WriteBackExecutor(Executor):
         elif self.target == "message":
             self.graph._msg_frame.append(self.new_repr)
         else:
-            raise RuntimeError("Write back target %s not supported." % self.target)
+            raise RuntimeError("Write back target %s not supported."
+                               % self.target)
 
