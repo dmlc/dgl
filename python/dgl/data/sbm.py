@@ -118,7 +118,7 @@ class SBMMixture:
         g, lg, deg_g, deg_lg, pm_pd = zip(*x)
         g_batch = batch(g)
         lg_batch = batch(lg)
-        degg_batch = F.pack(deg_g)
-        deglg_batch = F.pack(deg_lg)
-        pm_pd_batch = F.pack([x + i * self._n_nodes for i, x in enumerate(pm_pd)])
+        degg_batch = F.cat(deg_g, dim=0)
+        deglg_batch = F.cat(deg_lg, dim=0)
+        pm_pd_batch = F.cat([x + i * self._n_nodes for i, x in enumerate(pm_pd)], dim=0)
         return g_batch, lg_batch, degg_batch, deglg_batch, pm_pd_batch
