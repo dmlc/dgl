@@ -4,6 +4,7 @@
  * \brief Graph traversal implementation
  */
 #include <algorithm>
+#include <queue>
 #include "./traversal.h"
 #include "../c_api_common.h"
 
@@ -16,23 +17,33 @@ using tvm::runtime::NDArray;
 namespace dgl {
 namespace traverse {
 namespace {
-// A utility view class for a range of data in a vector.
+// A utility view class to wrap a vector into a queue.
 template<typename DType>
-struct VectorView {
-  const std::vector<DType>* vec;
-  size_t range_start, range_end;
+struct VectorQueueWrapper {
+  std::vector<DType>* vec;
+  size_t head = 0;
 
-  explicit VectorView(const std::vector<DType>* vec): vec(vec) {}
+  explicit VectorQueueWrapper(std::vector<DType>* vec): vec(vec) {}
 
-  auto begin() const -> decltype(vec->begin()) {
-    return vec->begin() + range_start;
+  void push(const DType& elem) {
+    vec->push_back(elem);
   }
 
-  auto end() const -> decltype(vec->end()) {
-    return vec->begin() + range_end;
+  DType top() const {
+    return vec->operator[](head);
   }
 
-  size_t size() const { return range_end - range_start; }
+  void pop() {
+    ++head;
+  }
+
+  bool empty() const {
+    return head == vec->size();
+  }
+
+  size_t size() const {
+    return vec->size() - head;
+  }
 };
 
 // Internal function to merge multiple traversal traces into one ndarray.
@@ -94,10 +105,10 @@ IdArray ComputeMergedSections(
  * An optional tag can be specified on each node/edge (represented by an int value).
  */
 struct Frontiers {
-  /*!\brief a vector store for the edges in all the fronties */
+  /*!\brief a vector store for the nodes/edges in all the frontiers */
   std::vector<dgl_id_t> ids;
 
-  /*!\brief a vector store for edge tags. The vector is empty is no tags. */
+  /*!\brief a vector store for node/edge tags. Empty if no tags are requested */
   std::vector<int64_t> tags;
 
   /*!\brief a section vector to indicate each frontier */
@@ -106,20 +117,15 @@ struct Frontiers {
 
 Frontiers BFSNodesFrontiers(const Graph& graph, IdArray source, bool reversed) {
   Frontiers front;
-  size_t i = 0;
-  VectorView<dgl_id_t> front_view(&front.ids);
-  auto visit = [&] (const dgl_id_t v) { front.ids.push_back(v); };
+  VectorQueueWrapper<dgl_id_t> queue(&front.ids);
+  auto visit = [&] (const dgl_id_t v) { };
   auto make_frontier = [&] () {
-      front_view.range_start = i;
-      front_view.range_end = front.ids.size();
-      if (front.ids.size() != i) {
+      if (!queue.empty()) {
         // do not push zero-length frontier
-        front.sections.push_back(front.ids.size() - i);
+        front.sections.push_back(queue.size());
       }
-      i = front.ids.size();
-      return front_view;
     };
-  BFSNodes(graph, source, reversed, visit, make_frontier);
+  BFSNodes(graph, source, reversed, &queue, visit, make_frontier);
   return front;
 }
 
@@ -135,22 +141,48 @@ TVM_REGISTER_GLOBAL("traversal._CAPI_DGLBFSNodes")
     *rv = ConvertNDArrayVectorToPackedFunc({node_ids, sections});
   });
 
+Frontiers BFSEdgesFrontiers(const Graph& graph, IdArray source, bool reversed) {
+  Frontiers front;
+  // NOTE: std::queue has no top() method.
+  std::vector<dgl_id_t> nodes;
+  VectorQueueWrapper<dgl_id_t> queue(&nodes);
+  auto visit = [&] (const dgl_id_t e) { front.ids.push_back(e); };
+  bool first_frontier = true;
+  auto make_frontier = [&] {
+      if (first_frontier) {
+        first_frontier = false;   // do not push the first section when doing edges
+      } else if (!queue.empty()) {
+        // do not push zero-length frontier
+        front.sections.push_back(queue.size());
+      }
+    };
+  BFSEdges(graph, source, reversed, &queue, visit, make_frontier);
+  return front;
+}
+
+TVM_REGISTER_GLOBAL("traversal._CAPI_DGLBFSEdges")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    bool reversed = args[2];
+    const auto& front = BFSEdgesFrontiers(*gptr, src, reversed);
+    IdArray edge_ids = CopyVectorToNDArray(front.ids);
+    IdArray sections = CopyVectorToNDArray(front.sections);
+    *rv = ConvertNDArrayVectorToPackedFunc({edge_ids, sections});
+  });
+
 Frontiers TopologicalNodesFrontiers(const Graph& graph, bool reversed) {
   Frontiers front;
-  size_t i = 0;
-  VectorView<dgl_id_t> front_view(&front.ids);
-  auto visit = [&] (const dgl_id_t v) { front.ids.push_back(v); };
+  VectorQueueWrapper<dgl_id_t> queue(&front.ids);
+  auto visit = [&] (const dgl_id_t v) { };
   auto make_frontier = [&] () {
-      front_view.range_start = i;
-      front_view.range_end = front.ids.size();
-      if (front.ids.size() != i) {
+      if (!queue.empty()) {
         // do not push zero-length frontier
-        front.sections.push_back(front.ids.size() - i);
+        front.sections.push_back(queue.size());
       }
-      i = front.ids.size();
-      return front_view;
     };
-  TopologicalNodes(graph, reversed, visit, make_frontier);
+  TopologicalNodes(graph, reversed, &queue, visit, make_frontier);
   return front;
 }
 

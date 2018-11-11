@@ -22,17 +22,33 @@ namespace traverse {
 /*!
  * \brief Traverse the graph in a breadth-first-search (BFS) order.
  *
+ * The queue object must suffice following interface:
+ *   Members:
+ *   void push(dgl_id_t);  // push one node
+ *   dgl_id_t top();       // get the first node
+ *   void pop();           // pop one node
+ *   bool empty();         // return true if the queue is empty
+ *   size_t size();        // return the size of the queue
+ * For example, std::queue<dgl_id_t> is a valid queue type.
+ *
+ * The visit function must be compatible with following interface:
+ *   void (*visit)(dgl_id_t );
+ *
+ * The frontier function must be compatible with following interface:
+ *   void (*make_frontier)(void);
+ *
+ * \param graph The graph.
  * \param sources Source nodes.
  * \param reversed If true, BFS follows the in-edge direction
- * \param visit The function to call when a node is visited; the node id will be
- *              given as its only argument.
- * \param make_frontier The function to make a new froniter; the function should return a
- *                      node iterator to the just created frontier.
+ * \param queue The queue used to do bfs.
+ * \param visit The function to call when a node is visited.
+ * \param make_frontier The function to indicate that a new froniter can be made;
  */
-template<typename VisitFn, typename FrontierFn>
+template<typename Queue, typename VisitFn, typename FrontierFn>
 void BFSNodes(const Graph& graph,
               IdArray source,
               bool reversed,
+              Queue* queue,
               VisitFn visit,
               FrontierFn make_frontier) {
   const int64_t len = source->shape[0];
@@ -40,37 +56,123 @@ void BFSNodes(const Graph& graph,
 
   std::vector<bool> visited(graph.NumVertices());
   for (int64_t i = 0; i < len; ++i) {
-    visited[src_data[i]] = true;
-    visit(src_data[i]);
+    const dgl_id_t u = src_data[i];
+    visited[u] = true;
+    visit(u);
+    queue->push(u);
   }
-  auto frontier = make_frontier();
+  make_frontier();
 
   const auto neighbor_iter = reversed? &Graph::PredVec : &Graph::SuccVec;
-  while (frontier.size() != 0) {
-    for (const dgl_id_t u : frontier) {
+  while (!queue->empty()) {
+    const size_t size = queue->size();
+    for (size_t i = 0; i < size; ++i) {
+      const dgl_id_t u = queue->top();
+      queue->pop();
       for (auto v : (graph.*neighbor_iter)(u)) {
         if (!visited[v]) {
-          visit(v);
           visited[v] = true;
+          visit(v);
+          queue->push(v);
         }
       }
     }
-    frontier = make_frontier();
+    make_frontier();
+  }
+}
+
+/*!
+ * \brief Traverse the graph in a breadth-first-search (BFS) order, returning
+ *        the edges of the BFS tree.
+ *
+ * The queue object must suffice following interface:
+ *   Members:
+ *   void push(dgl_id_t);  // push one node
+ *   dgl_id_t top();       // get the first node
+ *   void pop();           // pop one node
+ *   bool empty();         // return true if the queue is empty
+ *   size_t size();        // return the size of the queue
+ * For example, std::queue<dgl_id_t> is a valid queue type.
+ *
+ * The visit function must be compatible with following interface:
+ *   void (*visit)(dgl_id_t );
+ *
+ * The frontier function must be compatible with following interface:
+ *   void (*make_frontier)(void);
+ *
+ * \param graph The graph.
+ * \param sources Source nodes.
+ * \param reversed If true, BFS follows the in-edge direction
+ * \param queue The queue used to do bfs.
+ * \param visit The function to call when a node is visited.
+ *        The argument would be edge ID.
+ * \param make_frontier The function to indicate that a new frontier can be made;
+ */
+template<typename Queue, typename VisitFn, typename FrontierFn>
+void BFSEdges(const Graph& graph,
+              IdArray source,
+              bool reversed,
+              Queue* queue,
+              VisitFn visit,
+              FrontierFn make_frontier) {
+  const int64_t len = source->shape[0];
+  const int64_t* src_data = static_cast<int64_t*>(source->data);
+
+  std::vector<bool> visited(graph.NumVertices());
+  for (int64_t i = 0; i < len; ++i) {
+    const dgl_id_t u = src_data[i];
+    visited[u] = true;
+    queue->push(u);
+  }
+  make_frontier();
+
+  const auto neighbor_iter = reversed? &Graph::InEdgeVec : &Graph::OutEdgeVec;
+  while (!queue->empty()) {
+    const size_t size = queue->size();
+    for (size_t i = 0; i < size; ++i) {
+      const dgl_id_t u = queue->top();
+      queue->pop();
+      for (auto e : (graph.*neighbor_iter)(u)) {
+        const dgl_id_t v = graph.FindEdge(e).second;
+        if (!visited[v]) {
+          visited[v] = true;
+          visit(e);
+          queue->push(v);
+        }
+      }
+    }
+    make_frontier();
   }
 }
 
 /*!
  * \brief Traverse the graph in topological order.
  *
+ * The queue object must suffice following interface:
+ *   Members:
+ *   void push(dgl_id_t);  // push one node
+ *   dgl_id_t top();       // get the first node
+ *   void pop();           // pop one node
+ *   bool empty();         // return true if the queue is empty
+ *   size_t size();        // return the size of the queue
+ * For example, std::queue<dgl_id_t> is a valid queue type.
+ *
+ * The visit function must be compatible with following interface:
+ *   void (*visit)(dgl_id_t );
+ *
+ * The frontier function must be compatible with following interface:
+ *   void (*make_frontier)(void);
+ *
+ * \param graph The graph.
  * \param reversed If true, follows the in-edge direction
- * \param visit The function to call when a node is visited; the node id will be
- *              given as its only argument.
- * \param make_frontier The function to make a new froniter; the function should return a
- *                      node iterator to the just created frontier.
+ * \param queue The queue used to do bfs.
+ * \param visit The function to call when a node is visited.
+ * \param make_frontier The function to indicate that a new froniter can be made;
  */
-template<typename VisitFn, typename FrontierFn>
+template<typename Queue, typename VisitFn, typename FrontierFn>
 void TopologicalNodes(const Graph& graph,
                       bool reversed,
+                      Queue* queue,
                       VisitFn visit,
                       FrontierFn make_frontier) {
   const auto get_degree = reversed? &Graph::OutDegree : &Graph::InDegree;
@@ -81,23 +183,28 @@ void TopologicalNodes(const Graph& graph,
     degrees[vid] = (graph.*get_degree)(vid);
     if (degrees[vid] == 0) {
       visit(vid);
+      queue->push(vid);
       ++num_visited_nodes;
     }
   }
-  auto frontier = make_frontier();
+  make_frontier();
 
-  while (frontier.size() != 0) {
-    for (const dgl_id_t u : frontier) {
+  while (!queue->empty()) {
+    const size_t size = queue->size();
+    for (size_t i = 0; i < size; ++i) {
+      const dgl_id_t u = queue->top();
+      queue->pop();
       for (auto v : (graph.*neighbor_iter)(u)) {
         if (--(degrees[v]) == 0) {
           visit(v);
+          queue->push(v);
           ++num_visited_nodes;
         }
       }
     }
-    // new node frointer
-    frontier = make_frontier();
+    make_frontier();
   }
+
   if (num_visited_nodes != graph.NumVertices()) {
     LOG(FATAL) << "Error in topological traversal: loop detected in the given graph.";
   }
