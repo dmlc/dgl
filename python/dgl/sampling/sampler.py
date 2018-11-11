@@ -24,7 +24,7 @@ class NSSubgraphLoader(object):
         else:
             self._seed_nodes = seed_nodes
         if shuffle:
-            self._seed_nodes = np.random.shuffle(self._seed_nodes)
+            np.random.shuffle(self._seed_nodes)
         self._num_workers = num_workers
         if max_subgraph_size is None:
             # This size is set temporarily.
