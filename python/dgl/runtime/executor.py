@@ -9,7 +9,8 @@ __all__ = [
            "SPMVExecutor",
            "DegreeBucketingExecutor",
            "EdgeExecutor",
-           "NodeExecutor"
+           "NodeExecutor",
+           "WriteBackExecutor"
           ]
 
 class Executor(object):
@@ -126,3 +127,21 @@ class EdgeExecutor(Executor):
         eb = EdgeBatch(self.graph, (self.u, self.v, self.eid),
                     src_data, edge_data, dst_data)
         self.out_repr.update(self.func(eb))
+
+class WriteBackExecutor(Executor):
+    def __init__(self, graph, new_repr, ids, target):
+        self.graph = graph
+        self.new_repr = new_repr
+        self.ids = ids
+        self.target = target
+
+    def run(self):
+        if self.target == "node":
+            self.graph.set_n_repr(self.new_repr, self.ids)
+        elif self.target == "edge":
+            self.graph.set_e_repr(self.new_repr, self.ids)
+        elif self.target == "message":
+            self.graph._msg_frame.append(self.new_repr)
+        else:
+            raise RuntimeError("Write back target %s not supported." % self.target)
+

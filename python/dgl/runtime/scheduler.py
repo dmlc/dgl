@@ -5,7 +5,7 @@ from ..base import ALL, DGLError, is_all
 from .. import utils
 from .. import backend as F
 from ..function.function import BuiltinFunction, BundledFunction
-from .executor import SPMVExecutor, DegreeBucketingExecutor, EdgeExecutor, NodeExecutor
+from .executor import *
 from collections import Iterable
 from ..immutable_graph_index import ImmutableGraphIndex
 
@@ -20,7 +20,8 @@ from .._ffi.function import _init_api
 # 6. doc string
 # 7. reorder arguments
 # 8. fix send recv message graph (done)
-# 9. write back executor
+# 9. write back executor (done)
+# 10. fix mxnet (done)
 
 # Attention:
 # 1. recv v could become different after query in_edge
@@ -39,8 +40,9 @@ __all__ = [
 
 def get_send_schedule(graph, u, v, eid, message_func):
     # TODO (lingfan): doc string
-    execs, out_repr = build_edge_executor(graph, u, v, eid, message_func)
-    return execs, out_repr
+    send_exec, out_repr = build_edge_executor(graph, u, v, eid, message_func)
+    wb_exec = build_write_back_exec(graph, out_repr, None, "message")
+    return send_exec + wb_exec
 
 def get_recv_schedule(graph, v, reduce_func, apply_func):
     # TODO (lingfan): doc string
@@ -48,7 +50,9 @@ def get_recv_schedule(graph, v, reduce_func, apply_func):
     if apply_func:
         apply_exec, out_repr = build_node_executor(graph, v, apply_func, reduce_accum=out_repr)
         execs += apply_exec
-    return execs, out_repr, v
+    wb_exec = build_write_back_exec(graph, out_repr, v, "node")
+    execs += wb_exec
+    return execs
 
 def get_snr_schedule(graph, u, v, eid, message_func, reduce_func, apply_func):
     # TODO (lingfan): doc string
@@ -58,7 +62,9 @@ def get_snr_schedule(graph, u, v, eid, message_func, reduce_func, apply_func):
     if apply_func:
         apply_exec, out_repr = build_node_executor(graph, unique_v, apply_func, reduce_accum=out_repr)
         execs += apply_exec
-    return execs, out_repr, unique_v
+    wb_exec = build_write_back_exec(graph, out_repr, unique_v, "node")
+    execs += wb_exec
+    return execs
 
 def get_update_all_schedule(graph, message_func, reduce_func, apply_func):
     # TODO (lingfan): doc string
@@ -68,22 +74,28 @@ def get_update_all_schedule(graph, message_func, reduce_func, apply_func):
     if apply_func:
         apply_exec, out_repr = build_node_executor(graph, ALL, apply_func, reduce_accum=out_repr)
         execs += apply_exec
-    return execs, out_repr, ALL
+    wb_exec = build_write_back_exec(graph, out_repr, ALL, "node")
+    execs += wb_exec
+    return execs
 
 def get_apply_nodes_schedule(graph, v, apply_func):
     # TODO (lingfan): doc string
-    return build_node_executor(graph, v, apply_func)
+    apply_exec, out_repr = build_node_executor(graph, v, apply_func)
+    wb_exec = build_write_back_exec(graph, out_repr, v, "node")
+    return apply_exec + wb_exec
 
 def get_apply_edges_schedule(graph, u, v, eid, apply_func):
     # TODO (lingfan): doc string
-    return build_edge_executor(graph, u, v, eid, apply_func)
+    apply_exec, out_repr = build_edge_executor(graph, u, v, eid, apply_func)
+    wb_exec = build_write_back_exec(graph, out_repr, eid, "edge")
+    return apply_exec + wb_exec
 
 def get_push_schedule(graph, u, message_func, reduce_func, apply_func):
     # TODO (lingfan): doc string
     # XXX: for now, use send_and_recv to implement push
     u, v, eid = graph._graph.out_edges(u)
     if len(eid) == 0:
-        return None, None, None
+        return []
     return get_snr_schedule(graph, u, v, eid, message_func, reduce_func, apply_func)
 
 def get_pull_schedule(graph, v, message_func, reduce_func, apply_func):
@@ -91,7 +103,7 @@ def get_pull_schedule(graph, v, message_func, reduce_func, apply_func):
     # XXX: for now, use send_and_recv to implement pull
     u, v, eid = graph._graph.in_edges(v)
     if len(eid) == 0:
-        return None, None, None
+        return []
     return get_snr_schedule(graph, u, v, eid, message_func, reduce_func, apply_func)
 
 def build_node_executor(graph, v, func, reduce_accum=None):
@@ -462,5 +474,9 @@ def _degree_bucket_exec(exec_list, out_repr, rfunc, g, call_type, message_repr, 
 
     exe = DegreeBucketingExecutor(g, rfunc, message_repr, out_repr, buckets)
     exec_list.append(exe)
+
+def build_write_back_exec(graph, new_repr, ids, target):
+    return [WriteBackExecutor(graph, new_repr, ids, target)]
+
 
 _init_api("dgl.runtime.scheduler")
