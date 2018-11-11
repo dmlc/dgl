@@ -65,6 +65,7 @@ pipeline {
             }
           }
           steps {
+            sh 'pwd'
             setup()
             build_dgl()
           }
@@ -79,7 +80,6 @@ pipeline {
           steps {
             setup()
             build_dgl()
-            sh "nvidia-smi"
           }
         }
         stage("MXNet CPU Build (temp)") {
