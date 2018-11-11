@@ -66,10 +66,10 @@ pipeline {
               args "-v cpu-ws:/workspace"
             }
           }
-          steps { dir ("/workspace") {
+          steps {
             setup()
             build_dgl()
-          }}
+          }
         }
         stage("GPU Build") {
           agent {
@@ -79,10 +79,10 @@ pipeline {
               args "-v gpu-ws:/workspace"
             }
           }
-          steps { dir ("/workspace") {
+          steps {
             setup()
             build_dgl()
-          }}
+          }
         }
         stage("MXNet CPU Build (temp)") {
           agent {
@@ -91,10 +91,10 @@ pipeline {
               args "-v mx-cpu-ws:/workspace"
             }
           }
-          steps { dir ("/workspace") {
+          steps {
             setup()
             build_dgl()
-          }}
+          }
         }
       }
     }
