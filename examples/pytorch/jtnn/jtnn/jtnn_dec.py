@@ -158,7 +158,12 @@ class DGLJTNNDecoder(nn.Module):
                 p_target_list.append(p_target)
             p_targets.append(torch.tensor(p_target_list))
             t_set = [i for i in t_set if i not in t_finalize]
-            t_finalize = [t_set[i] for i in range(len(t_set)) if np.isin(v, root_ids)[i]]
+            t_finalize = []
+            for _i, root_id in enumerate(root_ids):
+                if root_id in v:
+                    root_out_degrees[_i] -= 1
+                    if root_out_degrees[_i] == 0:
+                        t_finalize.append(_i)
 
             mol_tree_batch_lg.pull(
                 eid,

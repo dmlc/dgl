@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from .nnutils import *
 from .chemutils import get_mol
 from networkx import Graph, DiGraph, convert_node_labels_to_integers
-from dgl import DGLGraph, batch, unbatch
+from dgl import DGLGraph, batch, unbatch, mean_nodes
 import dgl.function as DGLF
 from functools import partial
 from .line_profiler_integration import profile
@@ -145,8 +145,7 @@ class DGLMPN(nn.Module):
         mol_graph = self.run(mol_graph, mol_line_graph)
 
         # TODO: replace with unbatch or readout
-        n_repr = mol_graph.pop_n_repr('h').split(mol_graph.batch_num_nodes)
-        g_repr = torch.stack([n_repr[i].mean(0) for i in range(n_samples)], 0)
+        g_repr = mean_nodes(mol_graph, 'h')
 
         self.n_samples_total += n_samples
         self.n_nodes_total += n_nodes
