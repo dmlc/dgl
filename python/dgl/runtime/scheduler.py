@@ -7,7 +7,7 @@ from .. import backend as F
 from ..function.function import BuiltinFunction, BundledFunction
 from .executor import SPMVExecutor, DegreeBucketingExecutor, EdgeExecutor, NodeExecutor
 from collections import Iterable
-from ..immutable_graph_index import ImmutableSubgraphIndex
+from ..immutable_graph_index import ImmutableGraphIndex
 
 from .._ffi.function import _init_api
 
@@ -434,14 +434,14 @@ def _degree_bucket_exec(exec_list, out_repr, rfunc, g, call_type, message_repr, 
         rfunc = BundledFunction(rfunc)
 
     # get degree bucketing schedule
-    if isinstance(g._graph, ImmutableSubgraphIndex):
+    if isinstance(g._graph, ImmutableGraphIndex):
         # immutable graph case (no c++ support)
         if call_type == "send_and_recv":
-            mids = utils.tolist(range(0, len(v)))
+            mids = utils.toindex(range(0, len(v)))
             dsts = v
         elif call_type == "update_all":
             _, dsts, mids = g._graph.edges()
-            v = utils.tolist(range(g._graph.number_of_nodes()))
+            v = utils.toindex(range(g._graph.number_of_nodes()))
         elif call_type == "recv":
             _, dsts, mids = g._msg_graph.in_edges(v)
         else:
