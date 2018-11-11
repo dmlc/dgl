@@ -62,8 +62,6 @@ pipeline {
           agent {
             docker {
               image "lingfanyu/dgl-cpu"
-              args "-v cpu-ws:/workspace"
-              args "-w /workspace"
             }
           }
           steps {
@@ -76,8 +74,6 @@ pipeline {
             docker {
               image "lingfanyu/dgl-gpu"
               args "--runtime nvidia"
-              args "-v gpu-ws:/workspace"
-              args "-w /workspace"
             }
           }
           steps {
@@ -90,8 +86,6 @@ pipeline {
           agent {
             docker {
               image "zhengda1936/dgl-mxnet-cpu:v3"
-              args "-v mx-cpu-ws:/workspace"
-              args "-w /workspace"
             }
           }
           steps {
@@ -107,8 +101,6 @@ pipeline {
           agent {
             docker {
               image "lingfanyu/dgl-cpu"
-              args "-v cpu-ws:/workspace"
-              args "-w /workspace"
             }
           }
           stages {
@@ -128,8 +120,6 @@ pipeline {
             docker {
               image "lingfanyu/dgl-gpu"
               args "--runtime nvidia"
-              args "-v gpu-ws:/workspace"
-              args "-w /workspace"
             }
           }
           stages {
@@ -148,8 +138,6 @@ pipeline {
           agent {
             docker {
               image "zhengda1936/dgl-mxnet-cpu:v3"
-              args "-v mx-cpu-ws:/workspace"
-              args "-w /workspace"
             }
           }
           stages {
