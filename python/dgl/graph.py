@@ -1005,7 +1005,12 @@ class DGLGraph(object):
         v : int, iterable of int, tensor, optional
             The node id(s).
         """
-        self._internal_apply_nodes(v, func, inplace=inplace)
+        if func == "default":
+            func = self._apply_node_func
+        execs = scheduler.get_apply_nodes_schedule(graph=self,
+                                                   v=v,
+                                                   apply_func=func)
+        Runtime.run(execs)
 
     def apply_edges(self, func="default", edges=ALL):
         """Apply the function on the edge features.
@@ -1040,12 +1045,12 @@ class DGLGraph(object):
             eid = utils.toindex(edges)
             u, v, _ = self._graph.find_edges(eid)
 
-        src_data = self.get_n_repr(u)
-        edge_data = self.get_e_repr(eid)
-        dst_data = self.get_n_repr(v)
-        eb = EdgeBatch(self, (u, v, eid),
-                src_data, edge_data, dst_data)
-        self.set_e_repr(func(eb), eid)
+        execs = scheduler.get_apply_edges_schedule(graph=self,
+                                                   u=u,
+                                                   v=v,
+                                                   eid=eid,
+                                                   apply_func=func)
+        Runtime.run(execs)
 
     def send(self, edges, message_func="default"):
         """Send messages along the given edges.
@@ -1585,32 +1590,3 @@ class DGLGraph(object):
             edges = F.tensor(edges)
             return edges[e_mask]
 
-    def _internal_apply_nodes(self, v, apply_node_func="default", reduce_accum=None,
-            inplace=False):
-        """Internal apply nodes
-
-        Parameters
-        ----------
-        reduce_accum: dict-like
-            The output of reduce func
-        """
-        if apply_node_func == "default":
-            apply_node_func = self._apply_node_func
-        if not apply_node_func:
-            # Skip none function call.
-            if reduce_accum is not None:
-                # write reduce result back
-                self.set_n_repr(reduce_accum, v, inplace=inplace)
-            return
-        # take out current node repr
-        curr_repr = self.get_n_repr(v)
-        if reduce_accum is not None:
-            # merge current node_repr with reduce output
-            curr_repr = utils.HybridDict(reduce_accum, curr_repr)
-        nb = NodeBatch(self, v, curr_repr)
-        new_repr = apply_node_func(nb)
-        if reduce_accum is not None:
-            # merge new node_repr with reduce output
-            reduce_accum.update(new_repr)
-            new_repr = reduce_accum
-        self.set_n_repr(new_repr, v, inplace=inplace)

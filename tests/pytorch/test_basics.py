@@ -169,6 +169,18 @@ def test_batch_recv():
     assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     reduce_msg_shapes.clear()
 
+def test_apply_nodes():
+    def _upd(nodes):
+        return {'h' : nodes.data['h'] * 2}
+    g = generate_graph()
+    g.register_apply_node_func(_upd)
+    old = g.ndata['h']
+    g.apply_nodes()
+    assert U.allclose(old * 2, g.ndata['h'])
+    u = th.tensor([0, 3, 4, 6])
+    g.apply_nodes(lambda nodes : {'h' : nodes.data['h'] * 0.}, u)
+    assert U.allclose(g.ndata['h'][u], th.zeros((4, D)))
+
 def test_apply_edges():
     def _upd(edges):
         return {'w' : edges.data['w'] * 2}
@@ -398,6 +410,7 @@ if __name__ == '__main__':
     test_batch_setter_autograd()
     test_batch_send()
     test_batch_recv()
+    test_apply_nodes()
     test_apply_edges()
     test_update_routines()
     test_reduce_0deg()
