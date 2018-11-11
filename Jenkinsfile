@@ -6,7 +6,6 @@ def init_git_submodule() {
 }
 
 def setup() {
-  sh "easy_install nose"
   init_git_submodule()
 }
 
@@ -23,15 +22,15 @@ def build_dgl() {
 
 def pytorch_unit_test(dev) {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
-    sh "nosetests tests -v --with-xunit"
-    sh "nosetests tests/pytorch -v --with-xunit"
-    sh "nosetests tests/graph_index -v --with-xunit"
+    sh "python3 -m nose -v --with-xunit tests"
+    sh "python3 -m nose -v --with-xunit tests/pytorch"
+    sh "python3 -m nose -v --with-xunit tests/graph_index"
   }
 }
 
 def mxnet_unit_test(dev) {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
-    sh "nosetests tests/mxnet -v --with-xunit"
+    sh "python3 -m nose -v --with-xunit tests/mxnet"
   }
 }
 
@@ -64,6 +63,7 @@ pipeline {
             docker {
               image "lingfanyu/dgl-cpu"
               args "-v cpu-ws:/workspace"
+              args "-w /workspace"
             }
           }
           steps {
@@ -77,6 +77,7 @@ pipeline {
               image "lingfanyu/dgl-gpu"
               args "--runtime nvidia"
               args "-v gpu-ws:/workspace"
+              args "-w /workspace"
             }
           }
           steps {
@@ -89,6 +90,7 @@ pipeline {
             docker {
               image "zhengda1936/dgl-mxnet-cpu:v3"
               args "-v mx-cpu-ws:/workspace"
+              args "-w /workspace"
             }
           }
           steps {
@@ -105,6 +107,7 @@ pipeline {
             docker {
               image "lingfanyu/dgl-cpu"
               args "-v cpu-ws:/workspace"
+              args "-w /workspace"
             }
           }
           stages {
@@ -125,6 +128,7 @@ pipeline {
               image "lingfanyu/dgl-gpu"
               args "--runtime nvidia"
               args "-v gpu-ws:/workspace"
+              args "-w /workspace"
             }
           }
           stages {
@@ -144,6 +148,7 @@ pipeline {
             docker {
               image "zhengda1936/dgl-mxnet-cpu:v3"
               args "-v mx-cpu-ws:/workspace"
+              args "-w /workspace"
             }
           }
           stages {
