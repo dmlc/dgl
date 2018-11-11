@@ -65,7 +65,6 @@ pipeline {
             }
           }
           steps {
-            sh 'pwd'
             setup()
             build_dgl()
           }
