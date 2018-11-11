@@ -30,13 +30,22 @@ def test_1neighbor_sampler_all():
         child_src1 = subg.map_to_subgraph_nid(src)
         assert mx.nd.sum(child_src1.tousertensor() == child_src.tousertensor()).asnumpy() == len(src)
 
+def is_sorted(arr):
+    return np.sum(np.sort(arr) == arr) == len(arr)
+
 def verify_subgraph(g, subg, seed_id):
     seed_id = utils.toindex(seed_id)
     src, dst, eid = g._graph.in_edges(seed_id)
     child_id = subg.map_to_subgraph_nid(seed_id)
     child_src, child_dst, child_eid = subg._graph.in_edges(child_id)
     child_src = child_src.tousertensor().asnumpy()
+    # We don't allow duplicate elements in the neighbor list.
+    assert(len(np.unique(child_src)) == len(child_src))
+    # The neighbor list also needs to be sorted.
+    assert(is_sorted(child_src))
+
     child_src1 = subg.map_to_subgraph_nid(src).tousertensor().asnumpy()
+    child_src1 = child_src1[child_src1 >= 0]
     for i in child_src:
         assert i in child_src1
 
