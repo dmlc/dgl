@@ -133,7 +133,8 @@ void BFSEdges(const Graph& graph,
       const dgl_id_t u = queue->top();
       queue->pop();
       for (auto e : (graph.*neighbor_iter)(u)) {
-        const dgl_id_t v = graph.FindEdge(e).second;
+        const auto uv = graph.FindEdge(e);
+        const dgl_id_t v = (reversed ? uv.first : uv.second);
         if (!visited[v]) {
           visited[v] = true;
           visit(e);
