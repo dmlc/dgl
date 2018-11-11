@@ -1,7 +1,7 @@
 """Built-in message function."""
 from __future__ import absolute_import
 
-from .function import BuiltinFunction
+from .base import BuiltinFunction
 import operator
 import dgl.backend as F
 
@@ -61,8 +61,12 @@ class SrcMulEdgeMessageFunction(MessageFunction):
                 and _is_spmv_supported_edge_feat(g, self.edge_field)
 
     def __call__(self, edges):
+        src_data = edges.src[self.src_field]
+        edata = edges.data[self.edge_field]
+        src_dim = F.ndim(src_data)
+        eshape = F.shape(edata)[0]
         ret = self.mul_op(edges.src[self.src_field],
-                edges.data[self.edge_field])
+                F.reshape(edges.data[self.edge_field], (eshape,) + (1,) * (src_dim - 1)))
         return {self.out_field : ret}
 
     def name(self):

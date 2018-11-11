@@ -19,10 +19,10 @@ class BundledFunction(object):
     def __init__(self, fn_list):
         self.fn_list = fn_list
 
-    def __call__(self, *args):
+    def __call__(self, *args, **kwargs):
         ret = {}
         for fn in self.fn_list:
-            ret.update(fn(*args))
+            ret.update(fn(*args, **kwargs))
         return ret
 
     def name(self):

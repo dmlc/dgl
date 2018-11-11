@@ -4,7 +4,7 @@ from __future__ import absolute_import
 from ..base import ALL, DGLError, is_all
 from .. import utils
 from .. import backend as F
-from ..function.function import BuiltinFunction, BundledFunction
+from ..function.base import BuiltinFunction, BundledFunction
 from .executor import *
 from collections import Iterable
 from ..immutable_graph_index import ImmutableGraphIndex
