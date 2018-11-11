@@ -13,7 +13,8 @@ def generate_rand_graph(n):
 def test_1neighbor_sampler_all():
     g = generate_rand_graph(100)
     # In this case, NeighborSampling simply gets the neighborhood of a single vertex.
-    for subg, seed_ids in dgl.sampling.NeighborSampler(g, 1, 'ALL', neighbor_type='in'):
+    for subg, seed_ids in dgl.sampling.NeighborSampler(g, 1, 100, neighbor_type='in',
+                                                       num_workers=4):
         assert len(seed_ids) == 1
         src, dst, eid = g._graph.in_edges(seed_ids)
         # Test if there is a self loop
@@ -61,7 +62,8 @@ def test_1neighbor_sampler():
 def test_10neighbor_sampler_all():
     g = generate_rand_graph(100)
     # In this case, NeighborSampling simply gets the neighborhood of a single vertex.
-    for subg, seed_ids in dgl.sampling.NeighborSampler(g, 10, 'ALL', neighbor_type='in'):
+    for subg, seed_ids in dgl.sampling.NeighborSampler(g, 10, 100, neighbor_type='in',
+                                                       num_workers=4):
         src, dst, eid = g._graph.in_edges(seed_ids)
 
         child_ids = subg.map_to_subgraph_nid(seed_ids)
@@ -81,5 +83,7 @@ def test_10neighbor_sampler():
             verify_subgraph(g, subg, seed_id)
 
 if __name__ == '__main__':
+    test_1neighbor_sampler_all()
+    test_10neighbor_sampler_all()
     test_1neighbor_sampler()
     test_10neighbor_sampler()
