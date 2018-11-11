@@ -162,6 +162,21 @@ def dtype(input):
     """
     pass
 
+def ndim(input):
+    """Return the number of dimensions of the tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+
+    Returns
+    -------
+    int
+        The number of dimensions
+    """
+    pass
+
 def context(input):
     """Return the context/device of the input tensor.
 
@@ -251,6 +266,23 @@ def sum(input, dim):
     """
     pass
 
+def mean(input, dim):
+    """Reduce average the input tensor along the given dim.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor.
+    dim : int
+        The reduce dim.
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor.
+    """
+    pass
+
 def max(input, dim):
     """Reduce max the input tensor along the given dim.
 
@@ -270,6 +302,23 @@ def max(input, dim):
 
 def cat(seq, dim):
     """Concat the sequence of tensors in the given dimension.
+
+    Parameters
+    ----------
+    seq : list of Tensor
+        The tensor sequence.
+    dim : int
+        The concat dim.
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor.
+    """
+    pass
+
+def stack(seq, dim):
+    """Stack the sequence of tensors along the given dimension.
 
     Parameters
     ----------
@@ -481,6 +530,58 @@ def spmm(x, y):
     -------
     Tensor
         The result dense matrix.
+    """
+    pass
+
+def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
+    """Computes the sum along segments of a tensor.
+
+    Equivalent to tf.unsorted_segment_sum, but seg_id is required to be a
+    1D tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor
+    seg_id : 1D Tensor
+        The segment IDs whose values are between 0 and n_segs - 1.  Should
+        have the same length as input.
+    n_segs : int
+        Number of distinct segments
+    dim : int
+        Dimension to sum on
+
+    Returns
+    -------
+    Tensor
+        The result
+    """
+    pass
+
+def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
+    """Computes the mean along segments of a tensor.
+
+    Equivalent to tf.unsorted_segment_mean, but seg_id is required to be a
+    1D tensor.
+
+    Note that segments never appeared in seg_id will have results of 0.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor
+    seg_id : 1D Tensor
+        The segment IDs whose values are between 0 and n_segs - 1.  Should
+        have the same length as input.
+    n_segs : int
+        Number of distinct segments
+    dim : int
+        Dimension to average on
+
+    Returns
+    -------
+    Tensor
+        The result
     """
     pass
 

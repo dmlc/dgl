@@ -16,15 +16,13 @@ np.random.seed(42)
 def toset(x):
     return set(x.tolist())
 
-def test_bfs_nodes(n=100):
+def test_bfs_nodes(n=1000):
     g = dgl.DGLGraph()
     a = sp.random(n, n, 10 / n, data_rvs=lambda n: np.ones(n))
     g.from_scipy_sparse_matrix(a)
     g_nx = g.to_networkx()
 
     src = random.choice(range(n))
-
-    layers_dgl, edges_dgl = dgl.bfs_nodes_generator(g, src, return_edges=True)
 
     edges = nx.bfs_edges(g_nx, src)
     layers_nx = [set([src])]
@@ -43,12 +41,17 @@ def test_bfs_nodes(n=100):
     layers_nx.append(frontier)
     edges_nx.append(edge_frontier)
 
-    toset = lambda x: set(x.tolist())
+    layers_dgl = dgl.bfs_nodes_generator(g, src)
+
     assert len(layers_dgl) == len(layers_nx)
     assert all(toset(x) == y for x, y in zip(layers_dgl, layers_nx))
+
+    edges_dgl = dgl.bfs_edges_generator(g, src)
+
+    assert len(edges_dgl) == len(edges_nx)
     assert all(toset(x) == y for x, y in zip(edges_dgl, edges_nx))
 
-def test_topological_nodes(n=100):
+def test_topological_nodes(n=1000):
     g = dgl.DGLGraph()
     a = sp.random(n, n, 10 / n, data_rvs=lambda n: np.ones(n))
     b = sp.tril(a, -1).tocoo()

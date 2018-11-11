@@ -182,6 +182,15 @@ class Graph {
   EdgeArray EdgeIds(IdArray src, IdArray dst) const;
 
   /*!
+   * \brief Find the edge ID and return the pair of endpoints
+   * \param eid The edge ID
+   * \return a pair whose first element is the source and the second the destination.
+   */
+  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const {
+    return std::make_pair(all_edges_src_[eid], all_edges_dst_[eid]);
+  };
+
+  /*!
    * \brief Find the edge IDs and return their source and target node IDs.
    * \param eids The edge ID array.
    * \return EdgeArray containing all edges with id in eid.  The order is preserved.
