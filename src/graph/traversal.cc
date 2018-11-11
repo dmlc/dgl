@@ -150,7 +150,7 @@ Frontiers BFSEdgesFrontiers(const Graph& graph, IdArray source, bool reversed) {
   bool first_frontier = true;
   auto make_frontier = [&] {
       if (first_frontier) {
-        first_frontier = false; // do not push the first section when doing edges
+        first_frontier = false;   // do not push the first section when doing edges
       } else if (!queue.empty()) {
         // do not push zero-length frontier
         front.sections.push_back(queue.size());
