@@ -13,12 +13,13 @@ from .._ffi.function import _init_api
 # TODO(lingfan)
 # 1. handle 0 degree in c++ (done)
 # 2. adjmat index case (done)
-# 3. double check on multi-edge in graph.py (need clean up)
+# 3. parse edge for mutli-edge
 # 4. remove graph store (done)
-# 5. push and pull schedule
+# 5. push and pull schedule (done)
 # 6. doc string
 # 7. reorder arguments
 # 8. fix send recv message graph
+# 9. write back executor
 
 # Attention:
 # 1. recv v could become different after query in_edge
@@ -37,14 +38,12 @@ __all__ = [
 
 def get_send_schedule(graph, u, v, eid, message_func):
     # TODO (lingfan): doc string
-    call_type = "send"
-    execs, out_repr = build_edge_executor(graph, call_type, u, v, eid, message_func)
+    execs, out_repr = build_edge_executor(graph, u, v, eid, message_func)
     return execs, out_repr
 
 def get_recv_schedule(graph, v, reduce_func, apply_func):
     # TODO (lingfan): doc string
-    call_type = "recv"
-    execs, out_repr = build_recv_executor(graph, call_type, v, reduce_func)
+    execs, out_repr = build_recv_executor(graph, v, reduce_func)
     if apply_func:
         apply_exec, out_repr = build_node_executor(graph, v, apply_func, reduce_accum=out_repr)
         execs += apply_exec
@@ -111,7 +110,7 @@ def build_edge_executor(graph, u, v, eid, func):
     _edge_exec(execs, out_repr, func, graph, u, v, eid)
     return execs, out_repr
 
-def build_recv_executor(rfunc, graph, call_type, v, eid):
+def build_recv_executor(graph, v, rfunc):
     rfunc = _standardize_func_usage(rfunc)
 
     recv_execs = []
@@ -121,10 +120,12 @@ def build_recv_executor(rfunc, graph, call_type, v, eid):
     if _is_iterable(rfunc):
         # build e2v spmv
         message_repr = dict(graph._msg_frame)
+        u, v, eid = graph._msg_graph.in_edges(v)
         rfunc = _analyze_e2v_spmv(recv_execs, out_repr, rfunc, graph, call_type, v, eid, message_repr)
 
     # build degree bucketing
-    _degree_bucket_exec(recv_execs, out_repr, rfunc, graph, call_type, message_repr, v)
+    call_type = "recv"
+    _degree_bucket_exec(recv_execs, out_repr, rfunc, graph, call_type, graph._msg_frame, v)
 
     return recv_execs, out_repr
 
@@ -404,7 +405,7 @@ def _degree_bucketing_for_graph(graph, v=ALL):
     if is_all(v):
         buckets = _CAPI_DGLDegreeBucketingForFullGraph(graph._handle)
     else:
-        buckets = _CAPI_DGLDegreeBucketingForRecvNodes(graph._handle, v)
+        buckets = _CAPI_DGLDegreeBucketingForRecvNodes(graph._handle, v.todgltensor())
     return _process_buckets(buckets)
 
 def _degree_bucket_exec(exec_list, out_repr, rfunc, g, call_type, message_repr, v=None):

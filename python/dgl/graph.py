@@ -144,7 +144,6 @@ class DGLGraph(object):
         # msg graph & frame
         self._msg_graph = create_graph_index(multigraph=multigraph)
         self._msg_frame = FrameRef()
-        self._msg_edges = []
         self.reset_messages()
         # registered functions
         self._message_func = None
@@ -228,13 +227,11 @@ class DGLGraph(object):
         self._edge_frame.clear()
         self._msg_graph.clear()
         self._msg_frame.clear()
-        self._msg_edges.clear()
 
     def reset_messages(self):
         """Clear all messages."""
         self._msg_graph.clear()
         self._msg_frame.clear()
-        self._msg_edges.clear()
         self._msg_graph.add_nodes(self.number_of_nodes())
 
     def number_of_nodes(self):
@@ -1083,14 +1080,16 @@ class DGLGraph(object):
             eid = utils.toindex(edges)
             u, v, _ = self._graph.find_edges(eid)
 
-        src_data = self.get_n_repr(u)
-        edge_data = self.get_e_repr(eid)
-        dst_data = self.get_n_repr(v)
-        eb = EdgeBatch(self, (u, v, eid),
-                src_data, edge_data, dst_data)
-        msgs = message_func(eb)
+        execs, out_repr = scheduler.get_send_schedule(graph=self,
+                                                      u=u,
+                                                      v=v,
+                                                      eid=eid,
+                                                      message_func=message_func)
+        Runtime.run(execs)
+
+        # update message graph and frame
         self._msg_graph.add_edges(u, v)
-        self._msg_frame.append(msgs)
+        self._msg_frame.append(out_repr)
 
     def recv(self,
              v,
@@ -1138,6 +1137,7 @@ class DGLGraph(object):
         Runtime.run(execs)
         self.set_n_repr(out_repr, v)
 
+        # clear message
         self.reset_messages()
 
     def send_and_recv(self,
