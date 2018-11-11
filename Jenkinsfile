@@ -48,7 +48,7 @@ pipeline {
     stage("Lint Check") {
       agent {
         docker {
-          image "lingfanyu/dgl-lint"
+          image "dgllib/dgl-ci-lint"
         }
       }
       steps {
@@ -61,7 +61,7 @@ pipeline {
         stage("CPU Build") {
           agent {
             docker {
-              image "lingfanyu/dgl-cpu"
+              image "dgllib/dgl-ci-cpu"
             }
           }
           steps {
@@ -72,7 +72,7 @@ pipeline {
         stage("GPU Build") {
           agent {
             docker {
-              image "lingfanyu/dgl-gpu"
+              image "dgllib/dgl-ci-gpu"
               args "--runtime nvidia"
             }
           }
@@ -84,7 +84,7 @@ pipeline {
         stage("MXNet CPU Build (temp)") {
           agent {
             docker {
-              image "zhengda1936/dgl-mxnet-cpu:v3"
+              image "dgllib/dgl-ci-mxnet-cpu"
             }
           }
           steps {
@@ -99,7 +99,7 @@ pipeline {
         stage("Pytorch CPU") {
           agent {
             docker {
-              image "lingfanyu/dgl-cpu"
+              image "dgllib/dgl-ci-cpu"
             }
           }
           stages {
@@ -117,7 +117,7 @@ pipeline {
         stage("Pytorch GPU") {
           agent {
             docker {
-              image "lingfanyu/dgl-gpu"
+              image "dgllib/dgl-ci-gpu"
               args "--runtime nvidia"
             }
           }
@@ -136,7 +136,7 @@ pipeline {
         stage("MXNet CPU") {
           agent {
             docker {
-              image "zhengda1936/dgl-mxnet-cpu:v3"
+              image "dgllib/dgl-ci-mxnet-cpu"
             }
           }
           stages {
