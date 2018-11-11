@@ -3,7 +3,7 @@ apt-get update
 apt-get install -y python-dev python3-dev
 
 # install pip
-cd /tmp && wget --no-check-certificate https://bootstrap.pypa.io/get-pip.py
+cd /tmp && wget https://bootstrap.pypa.io/get-pip.py
 python2 get-pip.py
 python3 get-pip.py
 
