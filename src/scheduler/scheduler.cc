@@ -10,7 +10,8 @@
 namespace dgl {
 namespace sched {
 
-std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids, const IdArray& recv_ids) {
+std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids,
+        const IdArray& recv_ids) {
     auto n_msgs = msg_ids->shape[0];
 
     const int64_t* vid_data = static_cast<int64_t*>(vids->data);
@@ -40,7 +41,7 @@ std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids
     // calc output size
     int64_t n_deg = bkt.size();
     int64_t n_dst = in_edges.size();
-    int64_t n_mid_sec = bkt.size(); // zero deg won't affect message size
+    int64_t n_mid_sec = bkt.size();  // zero deg won't affect message size
     if (n_zero_deg > 0) {
         n_deg += 1;
         n_dst += n_zero_deg;
