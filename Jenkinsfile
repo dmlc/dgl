@@ -46,15 +46,6 @@ def example_test(dev) {
 pipeline {
   agent none
   stages {
-    stage("XXX") {
-      agent any
-      steps {
-        sh """
-           echo ${env.WORKSPACE}
-           echo ${pwd}
-           """
-      }
-    }
     stage("Lint Check") {
       agent {
         docker {
@@ -72,7 +63,7 @@ pipeline {
           agent {
             docker {
               image "lingfanyu/dgl-cpu"
-              args "-v ${env.WORKSPACE}:/workspace"
+              args "-v cpu-ws:/workspace"
             }
           }
           steps { dir ("/workspace") {
@@ -85,7 +76,7 @@ pipeline {
             docker {
               image "lingfanyu/dgl-gpu"
               args "--runtime nvidia"
-              args "-v ${env.WORKSPACE}:/workspace"
+              args "-v gpu-ws:/workspace"
             }
           }
           steps { dir ("/workspace") {
@@ -97,7 +88,7 @@ pipeline {
           agent {
             docker {
               image "zhengda1936/dgl-mxnet-cpu:v3"
-              args "-v ${env.WORKSPACE}:/workspace"
+              args "-v mx-cpu-ws:/workspace"
             }
           }
           steps { dir ("/workspace") {
@@ -113,7 +104,7 @@ pipeline {
           agent {
             docker {
               image "lingfanyu/dgl-cpu"
-              args "-v ${env.WORKSPACE}:/workspace"
+              args "-v cpu-ws:/workspace"
             }
           }
           stages {
@@ -133,7 +124,7 @@ pipeline {
             docker {
               image "lingfanyu/dgl-gpu"
               args "--runtime nvidia"
-              args "-v ${env.WORKSPACE}:/workspace"
+              args "-v gpu-ws:/workspace"
             }
           }
           stages {
@@ -152,7 +143,7 @@ pipeline {
           agent {
             docker {
               image "zhengda1936/dgl-mxnet-cpu:v3"
-              args "-v ${env.WORKSPACE}:/workspace"
+              args "-v mx-cpu-ws:/workspace"
             }
           }
           stages {
