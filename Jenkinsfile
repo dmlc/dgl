@@ -37,7 +37,15 @@ def mxnet_unit_test(dev) {
 def example_test(dev) {
   dir ("tests/scripts") {
     withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
-      sh "./test_examples.sh ${dev}"
+      sh "./task_example_test.sh ${dev}"
+    }
+  }
+}
+
+def pytorch_tutorials() {
+  dir ("tests/scripts") {
+    withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
+      sh "./task_tutorial_test.sh"
     }
   }
 }
@@ -122,9 +130,10 @@ pipeline {
             }
           }
           stages {
-            stage("TH GPU unittest") {
-              steps { pytorch_unit_test("GPU") }
-            }
+            // TODO: have GPU unittest
+            //stage("TH GPU unittest") {
+            //  steps { pytorch_unit_test("GPU") }
+            //}
             stage("TH GPU example test") {
               steps { example_test("GPU") }
             }
@@ -147,6 +156,18 @@ pipeline {
           post {
             always { junit "*.xml" }
           }
+        }
+      }
+    }
+    stage("Doc") {
+      agent {
+        docker {
+          image "dgllib/dgl-ci-cpu"
+        }
+      }
+      stages {
+        stage("TH tutorials") {
+          steps { pytorch_tutorials() }
         }
       }
     }
