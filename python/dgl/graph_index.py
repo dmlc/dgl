@@ -501,8 +501,8 @@ class GraphIndex(object):
                 idx = F.cat([src, dst], dim=0)
             else:
                 idx = F.cat([dst, src], dim=0)
-            idx = utils.CtxCachedObject(lambda ctx: F.copy_to(idx, ctx))
-            self._cache['adj_ind_shape'] = (idx, (n, n))
+            cached_idx = utils.CtxCachedObject(lambda ctx: F.copy_to(idx, ctx))
+            self._cache['adj_ind_shape'] = (cached_idx, (n, n))
         return self._cache['adj_ind_shape']
 
     def adjacency_matrix(self, transpose=False):

@@ -8,10 +8,7 @@ import dgl
 from .base import ALL, is_all, DGLError, dgl_warning
 from . import backend as F
 from .frame import FrameRef, Frame, merge_frames
-from .function.message import BundledMessageFunction
-from .function.reducer import BundledReduceFunction
 from .graph_index import GraphIndex, create_graph_index
-from . import scheduler
 from .udf import NodeBatch, EdgeBatch
 from . import utils
 from .view import NodeView, EdgeView
@@ -1072,8 +1069,6 @@ class DGLGraph(object):
         if message_func == "default":
             message_func = self._message_func
         assert message_func is not None
-        if isinstance(message_func, (tuple, list)):
-            message_func = BundledMessageFunction(message_func)
 
         if is_all(edges):
             eid = ALL
@@ -1118,6 +1113,8 @@ class DGLGraph(object):
         """
         if reduce_func == "default":
             reduce_func = self._reduce_func
+        if apply_node_func == "default":
+            apply_node_func = self._apply_node_func
         assert reduce_func is not None
 
         if self._msg_frame.num_rows == 0:
@@ -1174,6 +1171,8 @@ class DGLGraph(object):
             message_func = self._message_func
         if reduce_func == "default":
             reduce_func = self._reduce_func
+        if apply_node_func == "default":
+            apply_node_func = self._apply_node_func
 
         assert message_func is not None
         assert reduce_func is not None
@@ -1197,7 +1196,8 @@ class DGLGraph(object):
                                                              v=v,
                                                              eid=eid,
                                                              message_func=message_func,
-                                                             reduce_func=reduce_func)
+                                                             reduce_func=reduce_func,
+                                                             apply_func=apply_node_func)
         Runtime.run(execs)
         self.set_n_repr(out_repr, uniq_v)
 
@@ -1271,6 +1271,8 @@ class DGLGraph(object):
             message_func = self._message_func
         if reduce_func == "default":
             reduce_func = self._reduce_func
+        if apply_node_func == "default":
+            apply_node_func = self._apply_node_func
         assert message_func is not None
         assert reduce_func is not None
 

@@ -40,6 +40,7 @@ std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids
     // calc output size
     int64_t n_deg = bkt.size();
     int64_t n_dst = in_edges.size();
+    int64_t n_mid_sec = bkt.size(); // zero deg won't affect message size
     if (n_zero_deg > 0) {
         n_deg += 1;
         n_dst += n_zero_deg;
@@ -50,7 +51,7 @@ std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids
     IdArray nids = IdArray::Empty({n_dst}, vids->dtype, vids->ctx);
     IdArray nid_section = IdArray::Empty({n_deg}, vids->dtype, vids->ctx);
     IdArray mids = IdArray::Empty({n_msgs}, vids->dtype, vids->ctx);
-    IdArray mid_section = IdArray::Empty({n_deg}, vids->dtype, vids->ctx);
+    IdArray mid_section = IdArray::Empty({n_mid_sec}, vids->dtype, vids->ctx);
     int64_t* deg_ptr = static_cast<int64_t*>(degs->data);
     int64_t* nid_ptr = static_cast<int64_t*>(nids->data);
     int64_t* nsec_ptr = static_cast<int64_t*>(nid_section->data);

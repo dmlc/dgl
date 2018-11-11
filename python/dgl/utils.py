@@ -360,7 +360,7 @@ def build_sparse_matrix(dst, src, dense_shape, nnz):
     idx = F.cat([dst, src], dim=0)
     # FIXME(minjie): data type
     dat = F.ones((nnz,), dtype=F.float32)
-    return F.sparse_tensor(dat, ('coo', idx), dense_shape)
+    return F.sparse_matrix(dat, ('coo', idx), dense_shape)
 
 def parse_edges_tuple(edges):
     """Parse the given edges and return the tuple.

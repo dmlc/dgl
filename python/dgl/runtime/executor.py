@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from .. import backend as F
 from ..udf import NodeBatch, EdgeBatch
 from .. import utils
+from ..frame import Frame, FrameRef
 
 __all__ = [
            "SPMVExecutor",
@@ -38,7 +39,10 @@ class SPMVExecutor(Executor):
         # build adjmat
         if self.use_edge_feat:
             dat = self.edge_repr[self.edge_field]
-            self.adjmat = F.sparse_matrix(dat, self.adjmat, self.dense_shape)
+            if len(F.shape(dat)) > 1:
+                # The edge feature is of shape (N, 1)
+                dat = F.squeeze(dat, 1)
+            self.adjmat = F.sparse_matrix(dat, ('coo', self.adjmat), self.dense_shape)
 
         # spmm
         if len(F.shape(srccol)) == 1:
@@ -61,6 +65,9 @@ class DegreeBucketingExecutor(Executor):
         self.out_repr = out_repr
 
     def run(self):
+        if isinstance(self.msg_frame, dict):
+            # only at this point we are should messages have been materialized
+            self.msg_frame = FrameRef(Frame(self.msg_frame))
         new_repr = []
         # loop over each bucket
         # FIXME (lingfan): handle zero-degree case
@@ -83,7 +90,7 @@ class DegreeBucketingExecutor(Executor):
         new_repr = {key : F.cat([repr[key] for repr in new_repr], dim=0)
                      for key in keys}
         if self.reorder:
-            _, indices = F.sort_id(self.v)
+            _, indices = F.sort_1d(self.v)
             indices = utils.toindex(indices)
             new_repr = utils.reorder(new_repr, indices)
         self.out_repr.update(new_repr)
@@ -91,24 +98,31 @@ class DegreeBucketingExecutor(Executor):
 class NodeExecutor(Executor):
     def __init__(self, func, graph, u, out_repr, reduce_accum=None):
         self.func = func
-        node_data = graph.get_n_repr(u)
-        if reduce_accum:
-            node_data = utils.HybridDict(reduce_accum, node_data)
-        self.nb = NodeBatch(graph, u, node_data)
+        self.graph = graph
+        self.u = u
         self.out_repr = out_repr
+        self.reduce_accum = reduce_accum
 
     def run(self):
-        self.out_repr.update(self.func(self.nb))
+        node_data = self.graph.get_n_repr(self.u)
+        if self.reduce_accum:
+            node_data = utils.HybridDict(self.reduce_accum, node_data)
+        nb = NodeBatch(self.graph, self.u, node_data)
+        self.out_repr.update(self.func(nb))
 
 class EdgeExecutor(Executor):
     def __init__(self, func, graph, u, v, eid, out_repr):
         self.func = func
-        src_data = graph.get_n_repr(u)
-        edge_data = graph.get_e_repr(eid)
-        dst_data = graph.get_n_repr(v)
-        self.eb = EdgeBatch(graph, (u, v, eid),
-                    src_data, edge_data, dst_data)
+        self.graph = graph
+        self.u = u
+        self.v = v
+        self.eid = eid
         self.out_repr = out_repr
 
     def run(self):
-        self.out_repr.update(self.func(self.eb))
+        src_data = self.graph.get_n_repr(self.u)
+        edge_data = self.graph.get_e_repr(self.eid)
+        dst_data = self.graph.get_n_repr(self.v)
+        eb = EdgeBatch(self.graph, (self.u, self.v, self.eid),
+                    src_data, edge_data, dst_data)
+        self.out_repr.update(self.func(eb))
