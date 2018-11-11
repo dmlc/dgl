@@ -1367,11 +1367,11 @@ class DGLGraph(object):
         ----------
         node_generators : generator
             The generator of node frontiers.
-        message_func : str or callable, optional
+        message_func : callable, optional
             The message function.
-        reduce_func : str or callable, optional
+        reduce_func : callable, optional
             The reduce function.
-        apply_node_func : str or callable, optional
+        apply_node_func : callable, optional
             The update function.
         """
         for node_frontier in nodes_generator:
@@ -1379,7 +1379,7 @@ class DGLGraph(object):
                     message_func, reduce_func, apply_node_func)
 
     def prop_edges(self,
-                   edge_generator,
+                   edges_generator,
                    message_func="default",
                    reduce_func="default",
                    apply_node_func="default"):
@@ -1393,16 +1393,16 @@ class DGLGraph(object):
 
         Parameters
         ----------
-        edge_generators : generator
+        edges_generator : generator
             The generator of edge frontiers.
-        message_func : str or callable, optional
+        message_func : callable, optional
             The message function.
-        reduce_func : str or callable, optional
+        reduce_func : callable, optional
             The reduce function.
-        apply_node_func : str or callable, optional
+        apply_node_func : callable, optional
             The update function.
         """
-        for edge_frontier in edge_generator:
+        for edge_frontier in edges_generator:
             self.send_and_recv(edge_frontier,
                     message_func, reduce_func, apply_node_func)
 

@@ -81,10 +81,9 @@ def main(args):
                 t0 = time.time()
 
             # traverse graph
-            #giter = list(tensor_topo_traverse(g, False, args))
-            logits = model(batch, x, h, c, iterator=False, train=True)
+            logits = model(batch, x, h, c)
             logp = F.log_softmax(logits, 1)
-            loss = F.nll_loss(logp, batch.label, size_average=True)
+            loss = F.nll_loss(logp, batch.label, reduction='elementwise_mean') 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -108,16 +107,17 @@ def main(args):
                 batch = _batch_to_cuda(batch)
             g = batch.graph
             n = g.number_of_nodes()
-            x = th.zeros((n, args.h_size * 3))
-            h = th.zeros((n, args.h_size))
-            c = th.zeros((n, args.h_size))
-            if cuda:
-                x = x.cuda()
-                h = h.cuda()
-                c = c.cuda()
+            with th.no_grad():
+                x = th.zeros((n, args.h_size * 3))
+                h = th.zeros((n, args.h_size))
+                c = th.zeros((n, args.h_size))
+                if cuda:
+                    x = x.cuda()
+                    h = h.cuda()
+                    c = c.cuda()
 
-            # traverse graph
-            logits = model(batch, x, h, c, iterator=False, train=True)
+                # traverse graph
+                logits = model(batch, x, h, c)
 
             pred = th.argmax(logits, 1)
             acc = th.sum(th.eq(batch.label, pred)).item()
@@ -139,16 +139,17 @@ def main(args):
                 batch = _batch_to_cuda(batch)
             g = batch.graph
             n = g.number_of_nodes()
-            x = th.zeros((n, args.h_size * 3))
-            h = th.zeros((n, args.h_size))
-            c = th.zeros((n, args.h_size))
-            if cuda:
-                x = x.cuda()
-                h = h.cuda()
-                c = c.cuda()
+            with th.no_grad():
+                x = th.zeros((n, args.h_size * 3))
+                h = th.zeros((n, args.h_size))
+                c = th.zeros((n, args.h_size))
+                if cuda:
+                    x = x.cuda()
+                    h = h.cuda()
+                    c = c.cuda()
 
-            # traverse graph
-            logits = model(batch, x, h, c, iterator=None, train=True)
+                # traverse graph
+                logits = model(batch, x, h, c)
 
             pred = th.argmax(logits, 1)
             acc = th.sum(th.eq(batch.label, pred)).item()
@@ -172,7 +173,7 @@ if __name__ == '__main__':
     parser.add_argument('--log-every', type=int, default=5)
     parser.add_argument('--lr', type=float, default=0.05)
     parser.add_argument('--weight-decay', type=float, default=1e-4)
-    parser.add_argument('--dropout', type=float, default=0.3)
+    parser.add_argument('--dropout', type=float, default=0.5)
     args = parser.parse_args()
     print(args)
     main(args)

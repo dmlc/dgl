@@ -11,23 +11,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl
 
-def tensor_topo_traverse(g, cuda):
-    n = g.number_of_nodes()
-    if cuda:
-        adjmat = g._graph.adjacency_matrix().get(th.device('cuda:{}'.format(cuda)))
-        mask = th.ones((n, 1)).cuda()
-    else:
-        adjmat = g._graph.adjacency_matrix().get(th.device('cpu'))
-        mask = th.ones((n, 1))
-    degree = th.spmm(adjmat, mask)
-    while th.sum(mask) != 0.:
-        v = (degree == 0.).float()
-        v = v * mask
-        mask = mask - v
-        frontier = th.squeeze(th.squeeze(v).nonzero(), 1)
-        yield frontier
-        degree -= th.spmm(adjmat, v)
-
 class TreeLSTMCell(nn.Module):
     def __init__(self, x_size, h_size):
         super(TreeLSTMCell, self).__init__()
@@ -46,9 +29,10 @@ class TreeLSTMCell(nn.Module):
 
     def apply_node_func(self, nodes):
         iou = nodes.data['x']
+        c = nodes.data['c']
         i, o, u = th.chunk(iou, 3, 1)
         i, o, u = th.sigmoid(i), th.sigmoid(o), th.tanh(u)
-        c = i * u + nodes.data['c']
+        c += i * u
         h = o * th.tanh(c)
         return {'h' : h, 'c' : c}
 
@@ -71,7 +55,7 @@ class TreeLSTM(nn.Module):
         self.linear = nn.Linear(h_size, num_classes)
         self.cell = TreeLSTMCell(x_size, h_size)
 
-    def forward(self, batch, x, h, c, iterator=None, train=True):
+    def forward(self, batch, x, h, c):
         """Compute tree-lstm prediction given a batch.
 
         Parameters
@@ -93,7 +77,6 @@ class TreeLSTM(nn.Module):
             The prediction of each node.
         """
         g = batch.graph
-#        print(g.number_of_nodes(), g.number_of_edges())
         g.register_message_func(self.cell.message_func)
         g.register_reduce_func(self.cell.reduce_func)
         g.register_apply_node_func(self.cell.apply_node_func)
@@ -104,11 +87,8 @@ class TreeLSTM(nn.Module):
         g.ndata['x'] = x
         g.ndata['h'] = h
         g.ndata['c'] = c
-        # TODO(minjie): potential bottleneck
-
-        g.prop_nodes(dgl.topological_nodes_generator(g))#tensor_topo_traverse(g, 0)) #dgl.topological_nodes_generator(g))
+        dgl.prop_nodes_topo(g)
         # compute logits
-        h = g.ndata.pop('h')
-        h = self.dropout(h)
+        h = self.dropout(g.ndata.pop('h'))
         logits = self.linear(h)
         return logits

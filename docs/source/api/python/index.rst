@@ -8,3 +8,4 @@ API Reference
    batch
    function
    traversal
+   propagate

@@ -103,8 +103,6 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-*.swp
-*.swo
 examples/pytorch/data/ind.pubmed.y
 examples/pytorch/data/ind.pubmed.x
 examples/pytorch/data/ind.pubmed.ty
@@ -136,3 +134,13 @@ examples/pytorch/generative_graph/*.p
 
 # data directory
 _download
+
+# CTags & CScope
+tags
+cscope.*
+
+# Vim
+*.swp
+*.swo
+*.un~
+*~

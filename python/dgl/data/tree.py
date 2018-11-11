@@ -23,9 +23,30 @@ _urls = {
 SSTBatch = namedtuple('SSTBatch', ['graph', 'nid_with_word', 'wordid', 'label'])
 
 class SST(object):
-    """SST"""
-    PAD_WORD=-1
-    UNK_WORD=-1
+    """Stanford Sentiment Treebank dataset.
+
+    Each sample is the constituency tree of a sentence. The leaf nodes
+    represent words. The word is a int value stored in the "x" feature field.
+    The non-leaf node has a special value PAD_WORD.
+    Each node also has a sentiment annotation: 5 classes (very negative,
+    negative, neutral, positive and very positive). The sentiment label is a
+    int value stored in the "y" feature field.
+
+    .. note::
+        This dataset class is compatible with pytorch's Dataset class.
+
+    .. note::
+        All the samples will be loaded and preprocessed in the memory first.
+    
+    Parameters
+    ----------
+    mode : str, optional
+        Can be 'train', 'val', 'test'. Which data file to use.
+    vocab_file : str, optional
+        Optional vocabulary file.
+    """
+    PAD_WORD=-1  # special pad word id
+    UNK_WORD=-1  # out-of-vocabulary word id
     def __init__(self, mode='train', vocab_file=None):
         self.mode = mode
         self.dir = get_download_dir()
@@ -54,8 +75,8 @@ class SST(object):
             glove_emb = {}
             with open(self.pretrained_file, 'r') as pf:
                 for line in pf.readlines():
-                    sp = line.split()
-                    if self.vocab.has_key(sp[0].lower()):
+                    sp = line.split(' ')
+                    if sp[0].lower() in self.vocab:
                         glove_emb[sp[0].lower()] = np.array([float(x) for x in sp[1:]])
         files = ['{}.txt'.format(self.mode)]
         corpus = BracketParseCorpusReader('{}/sst'.format(self.dir), files)
@@ -66,7 +87,7 @@ class SST(object):
         fail_cnt = 0
         for line in self.vocab.keys():
             if self.pretrained_file != '' and os.path.exists(self.pretrained_file):
-                if not glove_emb.has_key(line.lower()):
+                if not line.lower() in glove_emb:
                     fail_cnt += 1
                 pretrained_emb.append(glove_emb.get(line.lower(), np.random.uniform(-0.05, 0.05, 300)))
 
@@ -96,7 +117,7 @@ class SST(object):
         _rec_build(0, root)
         ret = dgl.DGLGraph()
         ret.from_networkx(g, node_attrs=['x', 'y'])
-        return ret #dgl.DGLGraph(g)
+        return ret
 
     def __getitem__(self, idx):
         return self.trees[idx]
