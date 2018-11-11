@@ -5,7 +5,7 @@ from .mol_tree import Vocab
 from .nnutils import GRUUpdate, cuda
 import copy
 import itertools
-from dgl import batch
+from dgl import batch, dfs_labeled_edges_generator
 import dgl.function as DGLF
 import networkx as nx
 from .line_profiler_integration import profile
@@ -14,6 +14,7 @@ import numpy as np
 MAX_NB = 8
 MAX_DECODE_LEN = 100
 
+'''
 def _dfs(trace, forest, i, cur, parent):
     _, next_, down_eid = forest.out_edges(cur, 'all')
     prev, _, up_eid = forest.in_edges(cur, 'all')
@@ -38,7 +39,15 @@ def dfs_order(forest, roots):
         edges = (e for e in edges if e is not None)
         u, v, e, i, p = zip(*edges)
         yield u, v, e, i, p
+'''
 
+def dfs_order(forest, roots):
+    edges = dfs_labeled_edges_generator(forest, roots, has_reverse_edge=True)
+    for e, l in zip(*edges):
+        # I exploited the fact that the reverse edge ID equal to 1 xor forward
+        # edge ID for molecule trees.  Normally, I should locate reverse edges
+        # using find_edges().
+        yield e ^ l, l
 
 dec_tree_node_msg = DGLF.copy_edge(edge='m', out='m')
 dec_tree_node_reduce = DGLF.sum(msg='m', out='h')
@@ -106,8 +115,8 @@ class DGLJTNNDecoder(nn.Module):
             'accum_rm': cuda(torch.zeros(n_edges, self.hidden_size)),
         })
 
-        mol_tree_batch.update_edges(
-            edge_func=lambda edges: {'src_x': edges.src['x'], 'dst_x': edges.dst['x']},
+        mol_tree_batch.apply_edges(
+            func=lambda edges: {'src_x': edges.src['x'], 'dst_x': edges.dst['x']},
         )
 
         # input tensors for stop prediction (p) and label prediction (q)
@@ -127,17 +136,30 @@ class DGLJTNNDecoder(nn.Module):
         h = mol_tree_batch.nodes[root_ids].data['h']
         x = mol_tree_batch.nodes[root_ids].data['x']
         p_inputs.append(torch.cat([x, h, tree_vec], 1))
+        # If the out degree is 0 we don't generate any edges at all
         t_set = list(range(len(root_ids)))
+        root_out_degrees = mol_tree_batch.out_degrees(root_ids)
+        t_finalize = [i for i in range(len(root_ids)) if root_out_degrees[i] == 0]
         q_inputs.append(torch.cat([h, tree_vec], 1))
         q_targets.append(mol_tree_batch.nodes[root_ids].data['wid'])
 
         # Traverse the tree and predict on children
-        for u, v, eid, i, p in dfs_order(mol_tree_batch, root_ids):
-            assert set(t_set).issuperset(i)
-            ip = dict(zip(i, p))
-            # TODO: context
-            p_targets.append(cuda(torch.tensor([ip.get(_i, 0) for _i in t_set])))
-            t_set = list(i)
+        for eid, p in dfs_order(mol_tree_batch, root_ids):
+            u, v = mol_tree_batch.find_edges(eid)
+
+            p_target_list = []
+            _i = 0
+            for i in t_set:
+                if i in t_finalize:
+                    p_target = 0
+                else:
+                    p_target = 1 - p[_i]
+                    _i += 1
+                p_target_list.append(p_target)
+            p_targets.append(torch.tensor(p_target_list))
+            t_set = [i for i in t_set if i not in t_finalize]
+            t_finalize = [t_set[i] for i in range(len(t_set)) if np.isin(v, root_ids)[i]]
+
             mol_tree_batch_lg.pull(
                 eid,
                 dec_tree_edge_msg,
@@ -162,11 +184,11 @@ class DGLJTNNDecoder(nn.Module):
             # NOTE: The following works since the uncomputed messages are zeros.
             q_inputs.append(torch.cat([h, tree_vec_set], 1)[is_new])
             q_targets.append(wid[is_new])
-        p_targets.append(cuda(torch.tensor([0 for _ in t_set])))
+        p_targets.append(torch.tensor([0] * len(t_finalize)))
 
         # Batch compute the stop/label prediction losses
         p_inputs = torch.cat(p_inputs, 0)
-        p_targets = torch.cat(p_targets, 0)
+        p_targets = cuda(torch.cat(p_targets, 0))
         q_inputs = torch.cat(q_inputs, 0)
         q_targets = torch.cat(q_targets, 0)
 

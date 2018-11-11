@@ -5,13 +5,14 @@ from .mol_tree import Vocab
 from .nnutils import GRUUpdate, cuda
 import itertools
 import networkx as nx
-from dgl import batch, unbatch
+from dgl import batch, unbatch, bfs_edges_generator
 import dgl.function as DGLF
 from .line_profiler_integration import profile
 import numpy as np
 
 MAX_NB = 8
 
+'''
 def level_order(forest, roots):
     edge_list = []
     visited = set()
@@ -47,6 +48,14 @@ def level_order(forest, roots):
             break
 
     return edge_list
+'''
+
+def level_order(forest, roots):
+    edges = bfs_edges_generator(forest, roots)
+    _, leaves = forest.find_edges(edges[-1])
+    edges_back = bfs_edges_generator(forest, roots, reversed=True)
+    yield from reversed(edges_back)
+    yield from edges
 
 enc_tree_msg = [DGLF.copy_src(src='m', out='m'), DGLF.copy_src(src='rm', out='rm')]
 enc_tree_reduce = [DGLF.sum(msg='m', out='s'), DGLF.sum(msg='rm', out='accum_rm')]
@@ -120,8 +129,8 @@ class DGLJTNNEncoder(nn.Module):
         })
 
         # Send the source/destination node features to edges
-        mol_tree_batch.update_edges(
-            edge_func=lambda edges: {'src_x': edges.src['x'], 'dst_x': edges.dst['x']},
+        mol_tree_batch.apply_edges(
+            func=lambda edges: {'src_x': edges.src['x'], 'dst_x': edges.dst['x']},
         )
 
         # Message passing

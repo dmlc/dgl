@@ -158,8 +158,8 @@ class DGLMPN(nn.Module):
     def run(self, mol_graph, mol_line_graph):
         n_nodes = mol_graph.number_of_nodes()
 
-        mol_graph.update_edges(
-            edge_func=lambda edges: {'src_x': edges.src['x']},
+        mol_graph.apply_edges(
+            func=lambda edges: {'src_x': edges.src['x']},
         )
 
         e_repr = mol_line_graph.ndata

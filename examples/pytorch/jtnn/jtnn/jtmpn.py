@@ -212,8 +212,8 @@ class DGLJTMPN(nn.Module):
             tree_mess_tgt_nodes, mol_tree_batch):
         n_nodes = cand_graphs.number_of_nodes()
 
-        cand_graphs.update_edges(
-            edge_func=lambda edges: {'src_x': edges.src['x']},
+        cand_graphs.apply_edges(
+            func=lambda edges: {'src_x': edges.src['x']},
         )
 
         bond_features = cand_line_graph.ndata['x']
@@ -247,8 +247,8 @@ class DGLJTMPN(nn.Module):
                         .expand_as(alpha))
             node_alpha = zero_node_state.clone().scatter_add(0, node_idx, alpha)
             cand_graphs.ndata['alpha'] = node_alpha
-            cand_graphs.update_edges(
-                edge_func=lambda edges: {'alpha': edges.src['alpha']},
+            cand_graphs.apply_edges(
+                func=lambda edges: {'alpha': edges.src['alpha']},
             )
 
         for i in range(self.depth - 1):
