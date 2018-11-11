@@ -1,5 +1,6 @@
 from . import backend
-from . import data
+# One has to manually import dgl.data; fixes #125
+#from . import data
 from . import function
 from . import nn
 
@@ -12,4 +13,5 @@ from .batched_graph import *
 from .graph import DGLGraph
 from .subgraph import DGLSubGraph
 from .traversal import *
+from .propagate import *
 from .udf import NodeBatch, EdgeBatch

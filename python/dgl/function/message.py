@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 import operator
 import dgl.backend as F
+from .base import create_bundled_function_class
 
 __all__ = ["src_mul_edge", "copy_src", "copy_edge"]
 
@@ -26,27 +27,8 @@ class MessageFunction(object):
         raise NotImplementedError
 
 
-class BundledMessageFunction(MessageFunction):
-    def __init__(self, fn_list):
-        if not isinstance(fn_list, (list, tuple)):
-            fn_list = [fn_list]
-        self.fn_list = fn_list
-
-    def is_spmv_supported(self, g):
-        for fn in self.fn_list:
-            if not isinstance(fn, MessageFunction) or not fn.is_spmv_supported(g):
-                return False
-        return True
-
-    def __call__(self, edges):
-        ret = dict()
-        for fn in self.fn_list:
-            msg = fn(edges)
-            ret.update(msg)
-        return ret
-
-    def name(self):
-        return "bundled"
+BundledMessageFunction = create_bundled_function_class(
+        'BundledMessageFunction', MessageFunction)
 
 
 def _is_spmv_supported_node_feat(g, field):
@@ -80,8 +62,12 @@ class SrcMulEdgeMessageFunction(MessageFunction):
                 and _is_spmv_supported_edge_feat(g, self.edge_field)
 
     def __call__(self, edges):
+        src_data = edges.src[self.src_field]
+        edata = edges.data[self.edge_field]
+        src_dim = F.ndim(src_data)
+        eshape = F.shape(edata)[0]
         ret = self.mul_op(edges.src[self.src_field],
-                edges.data[self.edge_field])
+                F.reshape(edges.data[self.edge_field], (eshape,) + (1,) * (src_dim - 1)))
         return {self.out_field : ret}
 
     def name(self):

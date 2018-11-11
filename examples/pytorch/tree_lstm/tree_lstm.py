@@ -67,7 +67,7 @@ class TreeLSTM(nn.Module):
         else:
             raise RuntimeError('Unknown cell type:', cell_type)
 
-    def forward(self, graph, zero_initializer, h=None, c=None, iterator=None, train=True):
+    def forward(self, graph, zero_initializer, h=None, c=None, train=True):
         """Compute tree-lstm prediction given a batch.
 
         Parameters
@@ -107,12 +107,7 @@ class TreeLSTM(nn.Module):
             c = zero_initializer((n, self.h_size))
         g.ndata['c'] = c
         g.ndata['c_tild'] = zero_initializer((n, self.h_size))
-        # TODO(minjie): potential bottleneck
-        if iterator is None:
-            g.propagate('topo')
-        else:
-            for frontier in iterator:
-                g.pull(frontier)
+        dgl.prop_nodes_topo(g)
         # compute logits
         h = g.ndata.pop('h')
         h = self.dropout(h)

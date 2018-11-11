@@ -24,6 +24,19 @@ def bfs_nodes_generator(graph, source, reversed=False):
     -------
     list of node frontiers
         Each node frontier is a list, tensor of nodes.
+
+    Examples
+    --------
+    Given a graph (directed, edges from small node id to large):
+    ::
+
+              2 - 4
+             / \ 
+        0 - 1 - 3 - 5
+
+    >>> g = ... # the graph above
+    >>> list(dgl.bfs_nodes_generator(g, 0))
+    [tensor([0]), tensor([1]), tensor([2, 3]), tensor([4, 5])]
     """
     ghandle = graph._graph._handle
     source = utils.toindex(source).todgltensor()
@@ -47,6 +60,19 @@ def topological_nodes_generator(graph, reversed=False):
     -------
     list of node frontiers
         Each node frontier is a list, tensor of nodes.
+
+    Examples
+    --------
+    Given a graph (directed, edges from small node id to large):
+    ::
+
+              2 - 4
+             / \ 
+        0 - 1 - 3 - 5
+
+    >>> g = ... # the graph above
+    >>> list(dgl.topological_nodes_generator(g))
+    [tensor([0]), tensor([1]), tensor([2]), tensor([3, 4]), tensor([5])]
     """
     ghandle = graph._graph._handle
     ret = _CAPI_DGLTopologicalNodes(ghandle, reversed)
@@ -76,6 +102,21 @@ def dfs_edges_generator(graph, source, reversed=False):
     -------
     list of edge frontiers
         Each edge frontier is a list, tensor of edges.
+
+    Examples
+    --------
+    Given a graph (directed, edges from small node id to large):
+    ::
+
+              2 - 4
+             / \ 
+        0 - 1 - 3 - 5
+
+    Edge addition order [(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)]
+
+    >>> g = ... # the graph above
+    >>> list(dgl.dfs_edges_generator(g))
+    [tensor([0]), tensor([1]), tensor([4]), tensor([3]), tensor([5]), tensor([2])]
     """
     ghandle = graph._graph._handle
     source = utils.toindex(source).todgltensor()
@@ -100,6 +141,10 @@ def dfs_labeled_edges_generator(
     REVERSE edge is one in which both `u` and `v` have been visisted and the
     edge is in the DFS tree. A NONTREE edge is one in which both `u` and `v`
     have been visisted but the edge is NOT in the DFS tree.
+
+    See ``networkx``'s :func:`dfs_labeled_edges
+    <networkx.algorithms.traversal.depth_first_search.dfs_labeled_edges>`
+    for more details.
 
     Multiple source nodes can be specified to start the DFS traversal. One
     needs to make sure that each source node belongs to different connected

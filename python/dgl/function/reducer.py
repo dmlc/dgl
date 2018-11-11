@@ -2,6 +2,7 @@
 from __future__ import absolute_import
 
 from .. import backend as F
+from .base import create_bundled_function_class
 
 __all__ = ["sum", "max"]
 
@@ -23,44 +24,29 @@ class ReduceFunction(object):
         """Return whether the SPMV optimization is supported."""
         raise NotImplementedError
 
-class BundledReduceFunction(ReduceFunction):
-    def __init__(self, fn_list):
-        if not isinstance(fn_list, (list, tuple)):
-            fn_list = [fn_list]
-        self.fn_list = fn_list
 
-    def is_spmv_supported(self):
-        for fn in self.fn_list:
-            if not isinstance(fn, ReduceFunction) or not fn.is_spmv_supported():
-                return False
-        return True
+BundledReduceFunction = create_bundled_function_class(
+        'BundledReduceFunction', ReduceFunction)
 
-    def __call__(self, nodes):
-        ret = dict()
-        for fn in self.fn_list:
-            rpr = fn(nodes)
-            ret.update(rpr)
-        return ret
 
-    def name(self):
-        return "bundled"
-
-class ReducerFunctionTemplate(ReduceFunction):
+class SimpleReduceFunction(ReduceFunction):
+    """Builtin reduce function that aggregates a single field into another
+    single field."""
     def __init__(self, name, op, msg_field, out_field):
-        self.name = name
+        self._name = name
         self.op = op
         self.msg_field = msg_field
         self.out_field = out_field
 
     def is_spmv_supported(self):
         # NOTE: only sum is supported right now.
-        return self.name == "sum"
+        return self._name == "sum"
 
     def __call__(self, nodes):
         return {self.out_field : self.op(nodes.mailbox[self.msg_field], 1)}
 
     def name(self):
-        return self.name
+        return self._name
 
 def sum(msg, out):
     """Builtin reduce function that aggregates messages by sum.
@@ -72,7 +58,7 @@ def sum(msg, out):
     out : str
         The output node feature name.
     """
-    return ReducerFunctionTemplate("sum", F.sum, msg, out)
+    return SimpleReduceFunction("sum", F.sum, msg, out)
 
 def max(msg, out):
     """Builtin reduce function that aggregates messages by max.
@@ -84,4 +70,4 @@ def max(msg, out):
     out : str
         The output node feature name.
     """
-    return ReducerFunctionTemplate("max", F.max, msg, out)
+    return SimpleReduceFunction("max", F.max, msg, out)

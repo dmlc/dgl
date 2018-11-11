@@ -12,23 +12,6 @@ import dgl.ndarray as nd
 
 from tree_lstm import TreeLSTM
 
-def tensor_topo_traverse(g, cuda, args):
-    n = g.number_of_nodes()
-    if cuda:
-        adjmat = g._graph.adjacency_matrix().get(th.device('cuda:{}'.format(cuda)))
-        mask = th.ones((n, 1)).cuda()
-    else:
-        adjmat = g._graph.adjacency_matrix().get(th.device('cpu'))
-        mask = th.ones((n, 1))
-    degree = th.spmm(adjmat, mask)
-    while th.sum(mask) != 0.:
-        v = (degree == 0.).float()
-        v = v * mask
-        mask = mask - v
-        frontier = th.squeeze(th.squeeze(v).nonzero(), 1)
-        yield frontier
-        degree -= th.spmm(adjmat, v)
-
 def main(args):
     cuda = args.gpu >= 0
     if cuda:
@@ -74,8 +57,7 @@ def main(args):
                 t0 = time.time()
             label = graph.ndata.pop('y')
             # traverse graph
-            giter = list(tensor_topo_traverse(graph, False, args))
-            logits = model(graph, zero_initializer, iterator=giter, train=True)
+            logits = model(graph, zero_initializer, train=True)
             logp = F.log_softmax(logits, 1)
             loss = F.nll_loss(logp, label)
             optimizer.zero_grad()
