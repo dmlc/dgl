@@ -13,8 +13,8 @@ RUN bash /install/ubuntu_install_python.sh
 COPY install/ubuntu_install_python_package.sh /install/ubuntu_install_python_package.sh
 RUN bash /install/ubuntu_install_python_package.sh
 
-COPY install/ubuntu_install_mxnet_cpu_package.sh /install/ubuntu_install_mxnet_cpu_package.sh
-RUN bash /install/ubuntu_install_mxnet_cpu_package.sh
+COPY install/ubuntu_install_mxnet_cpu.sh /install/ubuntu_install_mxnet_cpu.sh
+RUN bash /install/ubuntu_install_mxnet_cpu.sh
 
 # Environment variables
 ENV PATH=/usr/local/nvidia/bin:${PATH}
