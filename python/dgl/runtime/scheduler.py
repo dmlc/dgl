@@ -78,13 +78,21 @@ def get_apply_edges_schedule(graph, u, v, eid, apply_func):
     # TODO (lingfan): doc string
     return build_edge_executor(graph, u, v, eid, apply_func)
 
-def get_push_schedule(graph, u, message_func, reduce_func):
+def get_push_schedule(graph, u, message_func, reduce_func, apply_func):
     # TODO (lingfan): doc string
-    pass
+    # XXX: for now, use send_and_recv to implement push
+    u, v, eid = graph._graph.out_edges(u)
+    if len(eid) == 0:
+        return None, None, None
+    return get_snr_schedule(graph, u, v, eid, message_func, reduce_func, apply_func)
 
-def get_pull_schedule(graph, v, message_func, reduce_func):
+def get_pull_schedule(graph, v, message_func, reduce_func, apply_func):
     # TODO (lingfan): doc string
-    pass
+    # XXX: for now, use send_and_recv to implement pull
+    u, v, eid = graph._graph.in_edges(v)
+    if len(eid) == 0:
+        return None, None, None
+    return get_snr_schedule(graph, u, v, eid, message_func, reduce_func, apply_func)
 
 def build_node_executor(graph, v, func, reduce_accum=None):
     execs = []

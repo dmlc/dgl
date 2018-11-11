@@ -1219,13 +1219,28 @@ class DGLGraph(object):
         apply_node_func : callable, optional
           The update function.
         """
+        if message_func == "default":
+            message_func = self._message_func
+        if reduce_func == "default":
+            reduce_func = self._reduce_func
+        if apply_node_func == "default":
+            apply_node_func = self._apply_node_func
+
+        assert message_func is not None
+        assert reduce_func is not None
+
         v = utils.toindex(v)
         if len(v) == 0:
             return
-        uu, vv, _ = self._graph.in_edges(v)
-        self.send_and_recv((uu, vv), message_func, reduce_func, apply_node_func=None)
-        unique_v = F.unique(v.tousertensor())
-        self.apply_nodes(apply_node_func, unique_v)
+        execs, out_repr, v = scheduler.get_pull_schedule(graph=self,
+                                                         v = v,
+                                                         message_func=message_func,
+                                                         reduce_func=reduce_func,
+                                                         apply_func=apply_node_func)
+        if execs is None:
+            return
+        Runtime.run(execs)
+        self.set_n_repr(out_repr, v)
 
     def push(self,
              u,
@@ -1245,12 +1260,28 @@ class DGLGraph(object):
         apply_node_func : callable
           The update function.
         """
+        if message_func == "default":
+            message_func = self._message_func
+        if reduce_func == "default":
+            reduce_func = self._reduce_func
+        if apply_node_func == "default":
+            apply_node_func = self._apply_node_func
+
+        assert message_func is not None
+        assert reduce_func is not None
+
         u = utils.toindex(u)
         if len(u) == 0:
             return
-        uu, vv, _ = self._graph.out_edges(u)
-        self.send_and_recv((uu, vv), message_func,
-                reduce_func, apply_node_func)
+        execs, out_repr, v = scheduler.get_push_schedule(graph=self,
+                                                         u = u,
+                                                         message_func=message_func,
+                                                         reduce_func=reduce_func,
+                                                         apply_func=apply_node_func)
+        if execs is None:
+            return
+        Runtime.run(execs)
+        self.set_n_repr(out_repr, v)
 
     def update_all(self,
                    message_func="default",
