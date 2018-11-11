@@ -27,10 +27,6 @@ class ImmutableGraphIndex(object):
     def __init__(self, in_csr, out_csr):
         self._in_csr = in_csr
         self._out_csr = out_csr
-        if in_csr is not None:
-            assert mx.nd.sum(in_csr.indices < in_csr.shape[1]).asnumpy()[0] == len(in_csr.indices)
-        if out_csr is not None:
-            assert mx.nd.sum(out_csr.indices < out_csr.shape[1]).asnumpy()[0] == len(out_csr.indices)
 
     def number_of_nodes(self):
         """Return the number of nodes.
@@ -354,9 +350,20 @@ class ImmutableGraphIndex(object):
 def create_immutable_graph_index(in_csr=None, out_csr=None):
     """ Create an empty backend-specific immutable graph index.
 
+    Parameters
+    ----------
+    in_csr : MXNet CSRNDArray
+        The in-edge CSR array.
+    out_csr : MXNet CSRNDArray
+        The out-edge CSR array.
+
     Returns
     -------
     ImmutableGraphIndex
         The backend-specific immutable graph index.
     """
+    if in_csr is not None and not isinstance(in_csr, mx.nd.sparse.CSRNDArray):
+        raise TypeError()
+    if out_csr is not None and not isinstance(out_csr, mx.nd.sparse.CSRNDArray):
+        raise TypeError()
     return ImmutableGraphIndex(in_csr, out_csr)

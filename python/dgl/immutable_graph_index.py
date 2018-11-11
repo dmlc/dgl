@@ -4,7 +4,6 @@ import ctypes
 import numpy as np
 import networkx as nx
 import scipy.sparse as sp
-import mxnet as mx
 
 from ._ffi.function import _init_api
 from . import backend as F
@@ -572,9 +571,17 @@ def create_immutable_graph_index(graph_data=None):
     assert F.create_immutable_graph_index is not None, \
             "The selected backend doesn't support read-only graph!"
 
+    try:
+        # Let's try using the graph data to generate an immutable graph index.
+        # If we are successful, we can return the immutable graph index immediately.
+        # If graph_data is None, we return an empty graph index.
+        # If we can't create a graph index, we'll use the code below to handle the graph.
+        return ImmutableGraphIndex(F.create_immutable_graph_index(graph_data))
+    except:
+        pass
+
+    # Let's create an empty graph index first.
     gi = ImmutableGraphIndex(F.create_immutable_graph_index())
-    if graph_data is None:
-        return gi
 
     # scipy format
     if isinstance(graph_data, sp.spmatrix):
@@ -583,8 +590,6 @@ def create_immutable_graph_index(graph_data=None):
             return gi
         except:
             raise Exception('Graph data is not a valid scipy sparse matrix.')
-    if isinstance(graph_data, mx.nd.sparse.CSRNDArray):
-        return ImmutableGraphIndex(F.create_immutable_graph_index(graph_data, None))
 
     # networkx - any format
     try:
