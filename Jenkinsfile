@@ -138,9 +138,10 @@ pipeline {
               steps { example_test("GPU") }
             }
           }
-          post {
-            always { junit "*.xml" }
-          }
+          // TODO: have GPU unittest
+          //post {
+          //  always { junit "*.xml" }
+          //}
         }
         stage("MXNet CPU") {
           agent {
