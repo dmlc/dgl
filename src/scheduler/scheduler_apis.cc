@@ -13,6 +13,15 @@ using tvm::runtime::NDArray;
 
 namespace dgl {
 
+TVM_REGISTER_GLOBAL("runtime.scheduler._CAPI_DGLDegreeBucketing")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    const IdArray msg_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
+    const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray nids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
+
+    *rv = ConvertNDArrayVectorToPackedFunc(sched::DegreeBucketing(msg_ids, vids, nids));
+  });
+
 TVM_REGISTER_GLOBAL("runtime.scheduler._CAPI_DGLDegreeBucketingForEdges")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));

@@ -7,6 +7,7 @@ from .. import backend as F
 from ..function.function import BuiltinFunction, BundledFunction
 from .executor import SPMVExecutor, DegreeBucketingExecutor, EdgeExecutor, NodeExecutor
 from collections import Iterable
+from ..immutable_graph_index import ImmutableSubgraphIndex
 
 from .._ffi.function import _init_api
 
@@ -18,7 +19,7 @@ from .._ffi.function import _init_api
 # 5. push and pull schedule (done)
 # 6. doc string
 # 7. reorder arguments
-# 8. fix send recv message graph
+# 8. fix send recv message graph (done)
 # 9. write back executor
 
 # Attention:
@@ -247,6 +248,7 @@ def _analyze_v2v_spmv(exec_list, out_repr, pairs, graph, call_type, u, v, eid):
     node_repr = graph.get_n_repr()
     edge_repr = graph.get_e_repr(eid)
     for mfn, rfn in pairs:
+        # XXX: should pre-compile a look up table
         if mfn.is_spmv_supported(graph) and rfn.is_spmv_supported():
             use_edge_feat = mfn.use_edge_feature()
             if use_edge_feat:
@@ -380,16 +382,32 @@ def _process_buckets(buckets):
 
     return unique_v, degs, dsts, msg_ids, zero_deg_nodes
 
-def _degree_bucketing_for_edges(dst):
+def _degree_bucketing_schedule(mids, dsts, v):
     """Return the bucketing by degree scheduling for destination nodes of messages
 
     Parameters
     ----------
-    dst: utils.Index
-        destionation node for each message
+    mids: utils.Index
+        edge id for each message
+    dsts: utils.Index
+        destination node for each message
+    v: utils.Index
+        all receiving nodes (for checking zero degree nodes)
     """
 
-    buckets = _CAPI_DGLDegreeBucketingForEdges(dst.todgltensor())
+    buckets = _CAPI_DGLDegreeBucketing(mids.todgltensor(), dsts.todgltensor(), v.todgltensor())
+    return _process_buckets(buckets)
+
+def _degree_bucketing_for_edges(dsts):
+    """Return the bucketing by degree scheduling for destination nodes of messages
+
+    Parameters
+    ----------
+    dsts: utils.Index
+        destination node for each message
+    """
+
+    buckets = _CAPI_DGLDegreeBucketingForEdges(dsts.todgltensor())
     return _process_buckets(buckets)
 
 def _degree_bucketing_for_graph(graph, v=ALL):
@@ -416,14 +434,29 @@ def _degree_bucket_exec(exec_list, out_repr, rfunc, g, call_type, message_repr, 
         rfunc = BundledFunction(rfunc)
 
     # get degree bucketing schedule
-    if call_type == "send_and_recv":
-        buckets = _degree_bucketing_for_edges(v)
-    elif call_type == "update_all":
-        buckets = _degree_bucketing_for_graph(g._graph)
-    elif call_type == "recv":
-        buckets = _degree_bucketing_for_graph(g._msg_graph, v)
+    if isinstance(g._graph, ImmutableSubgraphIndex):
+        # immutable graph case (no c++ support)
+        if call_type == "send_and_recv":
+            mids = utils.tolist(range(0, len(v)))
+            dsts = v
+        elif call_type == "update_all":
+            _, dsts, mids = g._graph.edges()
+            v = utils.tolist(range(g._graph.number_of_nodes()))
+        elif call_type == "recv":
+            _, dsts, mids = g._msg_graph.in_edges(v)
+        else:
+            raise DGLError("Unsupported call type for degree bucketing: %s" % call_type)
+        buckets = _degree_bucketing_schedule(mids, dsts, v)
     else:
-        raise DGLError("Unsupported call type for degree bucketing: %s" % call_type)
+        # mutable graph case
+        if call_type == "send_and_recv":
+            buckets = _degree_bucketing_for_edges(v)
+        elif call_type == "update_all":
+            buckets = _degree_bucketing_for_graph(g._graph)
+        elif call_type == "recv":
+            buckets = _degree_bucketing_for_graph(g._msg_graph, v)
+        else:
+            raise DGLError("Unsupported call type for degree bucketing: %s" % call_type)
 
     # TODO(lingfan): check zero degree in C++
 
