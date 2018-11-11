@@ -286,12 +286,15 @@ class ImmutableGraphIndex(object):
         res = mx.nd.contrib.neighbor_sample(g, *seed_ids, num_hops=num_hops,
                                             num_neighbor=expand_factor,
                                             max_num_vertices=max_subgraph_size)
+
         vertices, subgraphs = res[0:num_subgs], res[num_subgs:len(res)]
-        num_nodes = [mx.nd.sum(subg_v >= 0).asnumpy()[0] for subg_v in vertices]
+        num_nodes = [subg_v[-1].asnumpy()[0] for subg_v in vertices]
+
         inputs = []
         inputs.extend(subgraphs)
         inputs.extend(vertices)
         compacts = mx.nd.contrib.dgl_graph_compact(*inputs, graph_sizes=num_nodes, return_mapping=False)
+
         if isinstance(compacts, mx.nd.sparse.CSRNDArray):
             compacts = [compacts]
         if neighbor_type == 'in':
