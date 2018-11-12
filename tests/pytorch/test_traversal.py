@@ -17,10 +17,9 @@ def toset(x):
     return set(x.tolist())
 
 def test_bfs_nodes(n=1000):
+    g_nx = nx.random_tree(n)
     g = dgl.DGLGraph()
-    a = sp.random(n, n, 10 / n, data_rvs=lambda n: np.ones(n))
-    g.from_scipy_sparse_matrix(a)
-    g_nx = g.to_networkx()
+    g.from_networkx(g_nx)
 
     src = random.choice(range(n))
 
