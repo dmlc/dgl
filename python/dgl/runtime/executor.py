@@ -1,9 +1,11 @@
+"""Module for executor classes."""
 from __future__ import absolute_import
 
 from .. import backend as F
+from ..frame import Frame, FrameRef
+from ..function.base import BuiltinFunction, BundledFunction
 from ..udf import NodeBatch, EdgeBatch
 from .. import utils
-from ..frame import Frame, FrameRef
 
 __all__ = [
            "SPMVExecutor",
@@ -14,7 +16,9 @@ __all__ = [
           ]
 
 class Executor(object):
+    """Base executor class."""
     def run(self):
+        """The function to run this executor."""
         raise NotImplementedError
 
 class SPMVExecutor(Executor):
@@ -102,9 +106,23 @@ class DegreeBucketingExecutor(Executor):
         self.out_repr.update(new_repr)
 
 class NodeExecutor(Executor):
-    """Executor to perform apply_nodes"""
+    """Executor to perform apply_nodes.
+
+    Parameters
+    ----------
+    func : callable, or a list of callable
+        The node UDF(s).
+    graph : DGLGraph
+        The graph.
+    u : utils.Index
+        The nodes to be applied.
+    out_repr : dict
+        The dict for writing outputs.
+    reduce_accum : dict
+        The dict containing reduced results.
+    """
     def __init__(self, func, graph, u, out_repr, reduce_accum=None):
-        self.func = func
+        self.func = BundledFunction(func) if utils.is_iterable(func) else func
         self.graph = graph
         self.u = u
         self.out_repr = out_repr
@@ -118,9 +136,25 @@ class NodeExecutor(Executor):
         self.out_repr.update(self.func(nb))
 
 class EdgeExecutor(Executor):
-    """Executor to perform edge related computation like send and apply_edges"""
+    """Executor to perform edge related computation like send and apply_edges.
+
+    Parameters
+    ----------
+    func : callable, or a list of callable
+        The edge UDF(s).
+    graph : DGLGraph
+        The graph.
+    u : utils.Index
+        The src nodes.
+    v : utils.Index
+        The dst nodes.
+    eid : utils.Index
+        The edge ids.
+    out_repr : dict
+        The dict for writing outputs.
+    """
     def __init__(self, func, graph, u, v, eid, out_repr):
-        self.func = func
+        self.func = BundledFunction(func) if utils.is_iterable(func) else func
         self.graph = graph
         self.u = u
         self.v = v
@@ -153,4 +187,3 @@ class WriteBackExecutor(Executor):
         else:
             raise RuntimeError("Write back target %s not supported."
                                % self.target)
-

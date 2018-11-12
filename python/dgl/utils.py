@@ -1,7 +1,7 @@
 """Utility module."""
 from __future__ import absolute_import
 
-from collections import Mapping
+from collections import Mapping, Iterable
 from functools import wraps
 import numpy as np
 
@@ -376,3 +376,7 @@ def parse_edges_tuple(edges):
     A tuple of (u, v, eid)
     """
     pass
+
+def is_iterable(obj):
+    """Return true if the object is an iterable."""
+    return isinstance(obj, Iterable)

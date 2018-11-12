@@ -6,7 +6,6 @@ from .. import utils
 from .. import backend as F
 from ..function.base import BuiltinFunction, BundledFunction
 from .executor import *
-from collections import Iterable
 from ..immutable_graph_index import ImmutableGraphIndex
 
 from .._ffi.function import _init_api
@@ -246,7 +245,7 @@ def build_node_executor(graph, v, func, reduce_accum=None):
     else:
         out_repr = {}
     if func:
-        exe = _node_exec(out_repr, func, graph, v, reduce_accum)
+        exe = NodeExecutor(func, graph, u, out_repr, reduce_accum)
         execs.append(exe)
     return execs, out_repr
 
@@ -257,7 +256,7 @@ def build_edge_executor(graph, u, v, eid, func):
         if is_all(eid):
             # if edges is ALL, look up source and destination nodes
             u, v, _ = graph._graph.edges()
-        exe = _edge_exec(out_repr, func, graph, u, v, eid)
+        exe = EdgeExecutor(func, graph, u, v, eid, out_repr)
         execs.append(exe)
     return execs, out_repr
 
@@ -270,7 +269,7 @@ def build_recv_executor(graph, v, rfunc):
 
     out_repr = {}
 
-    if _is_iterable(rfunc):
+    if utils.is_iterable(rfunc):
         # build e2v spmv
         message_repr = dict(graph._msg_frame)
         u, v, eid = graph._msg_graph.in_edges(v)
@@ -288,8 +287,8 @@ def build_send_and_recv_executor(graph, call_type, u, v, eid, mfunc, rfunc):
     mfunc = _standardize_func_usage(mfunc)
     rfunc = _standardize_func_usage(rfunc)
 
-    mfunc_is_list = _is_iterable(mfunc)
-    rfunc_is_list = _is_iterable(rfunc)
+    mfunc_is_list = utils.is_iterable(mfunc)
+    rfunc_is_list = utils.is_iterable(rfunc)
 
     recv_execs = []
 
@@ -318,9 +317,6 @@ def build_send_and_recv_executor(graph, call_type, u, v, eid, mfunc, rfunc):
 
     return send_execs + recv_execs, out_repr
 
-def _is_iterable(x):
-    return isinstance(x, Iterable)
-
 def _check_builtin_func_list(func_list):
     """Check whether func_list only contains builtin functions
     """
@@ -343,7 +339,7 @@ def _standardize_func_usage(func):
     One single UDF function or a list of builtin function
     """
 
-    if _is_iterable(func):
+    if utils.is_iterable(func):
         # rfunc is a list of builtin
         _check_builtin_func_list(func)
         return func
@@ -570,18 +566,6 @@ def _e2v_spmv_exec(rfunc, adjmat, message_repr, out_repr):
                         adjmat=adjmat,
                         use_edge_feat=False)
 
-def _node_exec(out_repr, func, graph, u, reduce_accum):
-    """Build node apply executor"""
-    if _is_iterable(func):
-        func = BundledFunction(func)
-    return NodeExecutor(func, graph, u, out_repr, reduce_accum)
-
-def _edge_exec(out_repr, func, graph, u, v, eid):
-    """Build edge apply executor"""
-    if _is_iterable(func):
-        func = BundledFunction(func)
-    return EdgeExecutor(func, graph, u, v, eid, out_repr)
-
 def _process_buckets(buckets):
     """read bucketing auxiliary data
 
@@ -702,7 +686,7 @@ def _degree_bucket_exec(exec_list, out_repr, rfunc,
     if not rfunc:
         return
 
-    if _is_iterable(rfunc):
+    if utils.is_iterable(rfunc):
         rfunc = BundledFunction(rfunc)
 
     # get degree bucketing schedule
