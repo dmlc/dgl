@@ -92,6 +92,7 @@ class DGLJTNNDecoder(nn.Module):
 
         return self.run(mol_tree_batch, mol_tree_batch_lg, n_trees, tree_vec)
 
+    @profile
     def run(self, mol_tree_batch, mol_tree_batch_lg, n_trees, tree_vec):
         node_offset = np.cumsum([0] + mol_tree_batch.batch_num_nodes)
         root_ids = node_offset[:-1]
@@ -137,9 +138,7 @@ class DGLJTNNDecoder(nn.Module):
         x = mol_tree_batch.nodes[root_ids].data['x']
         p_inputs.append(torch.cat([x, h, tree_vec], 1))
         # If the out degree is 0 we don't generate any edges at all
-        t_set = list(range(len(root_ids)))
         root_out_degrees = mol_tree_batch.out_degrees(root_ids)
-        t_finalize = [i for i in range(len(root_ids)) if root_out_degrees[i] == 0]
         q_inputs.append(torch.cat([h, tree_vec], 1))
         q_targets.append(mol_tree_batch.nodes[root_ids].data['wid'])
 
@@ -147,23 +146,13 @@ class DGLJTNNDecoder(nn.Module):
         for eid, p in dfs_order(mol_tree_batch, root_ids):
             u, v = mol_tree_batch.find_edges(eid)
 
-            p_target_list = []
-            _i = 0
-            for i in t_set:
-                if i in t_finalize:
-                    p_target = 0
-                else:
-                    p_target = 1 - p[_i]
-                    _i += 1
-                p_target_list.append(p_target)
+            p_target_list = torch.zeros_like(root_out_degrees)
+            p_target_list[root_out_degrees > 0] = 1 - p
+            p_target_list = p_target_list[root_out_degrees >= 0]
             p_targets.append(torch.tensor(p_target_list))
-            t_set = [i for i in t_set if i not in t_finalize]
-            t_finalize = []
-            for _i, root_id in enumerate(root_ids):
-                if root_id in v:
-                    root_out_degrees[_i] -= 1
-                    if root_out_degrees[_i] == 0:
-                        t_finalize.append(_i)
+
+            root_out_degrees -= (root_out_degrees == 0).long()
+            root_out_degrees -= torch.tensor(np.isin(root_ids, v).astype('int64'))
 
             mol_tree_batch_lg.pull(
                 eid,
@@ -182,14 +171,14 @@ class DGLJTNNDecoder(nn.Module):
             n_repr = mol_tree_batch.nodes[v].data
             h = n_repr['h']
             x = n_repr['x']
-            tree_vec_set = tree_vec[t_set]
+            tree_vec_set = tree_vec[root_out_degrees >= 0]
             wid = n_repr['wid']
             p_inputs.append(torch.cat([x, h, tree_vec_set], 1))
             # Only newly generated nodes are needed for label prediction
             # NOTE: The following works since the uncomputed messages are zeros.
             q_inputs.append(torch.cat([h, tree_vec_set], 1)[is_new])
             q_targets.append(wid[is_new])
-        p_targets.append(torch.tensor([0] * len(t_finalize)))
+        p_targets.append(torch.zeros((root_out_degrees == 0).sum()).long())
 
         # Batch compute the stop/label prediction losses
         p_inputs = torch.cat(p_inputs, 0)
