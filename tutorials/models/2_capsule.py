@@ -67,7 +67,7 @@ import matplotlib.pyplot as plt
 import dgl
 
 
-def init_graph(in_nodes, out_nodes, f_size, u_hat):
+def init_graph(in_nodes, out_nodes, f_size):
     g = dgl.DGLGraph()
     all_nodes = in_nodes + out_nodes
     g.add_nodes(all_nodes)
@@ -80,7 +80,6 @@ def init_graph(in_nodes, out_nodes, f_size, u_hat):
 
     # init states
     g.ndata['v'] = th.zeros(all_nodes, f_size)
-    g.edata['u_hat'] = u_hat
     g.edata['b'] = th.zeros(in_nodes * out_nodes, 1)
     return g
 
@@ -115,15 +114,16 @@ def init_graph(in_nodes, out_nodes, f_size, u_hat):
 #       between current capsule and updated capsule,
 #       :math:`b_{ij}=b_{ij}+\hat{u}_{j|i}\cdot v_j`
 class DGLRoutingLayer(nn.Module):
-    def __init__(self, in_nodes, out_nodes, f_size, u_hat):
+    def __init__(self, in_nodes, out_nodes, f_size):
         super(DGLRoutingLayer, self).__init__()
-        self.g = init_graph(in_nodes, out_nodes, f_size, u_hat)
+        self.g = init_graph(in_nodes, out_nodes, f_size)
         self.in_nodes = in_nodes
         self.out_nodes = out_nodes
         self.in_indx = list(range(in_nodes))
         self.out_indx = list(range(in_nodes, in_nodes + out_nodes))
 
-    def forward(self, routing_num=1):
+    def forward(self, u_hat, routing_num=1):
+        self.g.edata['u_hat'] = u_hat
         for r in range(routing_num):
             # step 1 (line 4): normalize over out edges
             in_edges = self.g.edata['b'].view(self.in_nodes, self.out_nodes)
@@ -165,7 +165,7 @@ in_nodes = 20
 out_nodes = 10
 f_size = 4
 u_hat = th.randn(in_nodes * out_nodes, f_size)
-routing = DGLRoutingLayer(in_nodes, out_nodes, f_size, u_hat)
+routing = DGLRoutingLayer(in_nodes, out_nodes, f_size)
 
 ############################################################################################################
 # We can visualize the behavior by monitoring the entropy of outgoing
@@ -175,7 +175,7 @@ entropy_list = []
 dist_list = []
 
 for i in range(10):
-    routing(1)
+    routing(u_hat)
     dist_matrix = routing.g.edata['c'].view(in_nodes, out_nodes)
     entropy = (-dist_matrix * th.log(dist_matrix)).sum(dim=1)
     entropy_list.append(entropy.data.numpy())
