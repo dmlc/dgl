@@ -50,11 +50,11 @@ class DGLRoutingLayer(nn.Module):
                 self.g.edata['b'] = self.g.edata['b'] + (self.g.edata['u_hat'] * v).sum(dim=1, keepdim=True)
 
     def end(self):
-        pass
-        del self.g.edata['u_hat']
-        del self.g.ndata['v']
-        del self.g.ndata['s']
-        del self.g.edata['b']
+        del self.g
+        # del self.g.edata['u_hat']
+        # del self.g.ndata['v']
+        # del self.g.ndata['s']
+        # del self.g.edata['b']
 
 
 def squash(s, dim=1):
