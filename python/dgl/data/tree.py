@@ -17,10 +17,10 @@ import dgl.backend as F
 from dgl.data.utils import download, extract_archive, get_download_dir
 
 _urls = {
-    'sst' : 'https://www.dropbox.com/s/w0b4fka64096wqz/sst.zip?dl=1',
+    'sst' : 'https://www.dropbox.com/s/6qa8rm43r2nmbyw/sst.zip?dl=1',
 }
 
-SSTBatch = namedtuple('SSTBatch', ['graph', 'nid_with_word', 'wordid', 'label'])
+SSTBatch = namedtuple('SSTBatch', ['graph', 'is_leaf', 'nid_with_word', 'wordid', 'label'])
 
 class SST(object):
     """Stanford Sentiment Treebank dataset.
@@ -133,6 +133,7 @@ class SST(object):
     def batcher(batch):
         nid_with_word = []
         wordid = []
+        is_leaf = []
         label = []
         gnid = 0
         for tree in batch:
@@ -140,10 +141,14 @@ class SST(object):
                 if tree.nodes[nid].data['x'] != SST.PAD_WORD:
                     nid_with_word.append(gnid)
                     wordid.append(tree.nodes[nid].data['x'])
+                    is_leaf.append([1])
+                else:
+                    is_leaf.append([0])
                 label.append(tree.nodes[nid].data['y'])
                 gnid += 1
         batch_trees = dgl.batch(batch)
         return SSTBatch(graph=batch_trees,
+                        is_leaf=F.tensor(is_leaf, dtype=F.float32), 
                         nid_with_word=F.tensor(nid_with_word, dtype=F.int64),
                         wordid=F.tensor(wordid, dtype=F.int64),
                         label=F.tensor(label, dtype=F.int64))

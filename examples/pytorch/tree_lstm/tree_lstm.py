@@ -30,7 +30,6 @@ class TreeLSTMCell(nn.Module):
     def apply_node_func(self, nodes):
         is_leaf = nodes.data['is_leaf']
         # Treat leaf node and non-leaf node differently.
-        print(is_leaf)
         iou = is_leaf * self.W_iou(nodes.data['x']) + (1 - is_leaf) * self.U_iou(nodes.data['h_cat'])
         i, o, u = th.chunk(iou, 3, 1)
         i, o, u = th.sigmoid(i), th.sigmoid(o), th.tanh(u)

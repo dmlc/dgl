@@ -170,7 +170,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', type=int, default=-1)
-    parser.add_argument('--seed', type=int, default=12110)
+    parser.add_argument('--seed', type=int, default=1)
     parser.add_argument('--batch-size', type=int, default=25)
     parser.add_argument('--x-size', type=int, default=300)
     parser.add_argument('--h-size', type=int, default=150)
