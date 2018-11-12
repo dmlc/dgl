@@ -1,254 +1,201 @@
 """
 .. _model-capsule:
 
-Capsule Network
-================
+Capsule Network Tutorial
+===========================
 
-**Author**: `Jinjing Zhou`
- 
-This tutorial explains how to use DGL library and its language to implement the
-`capsule network <http://arxiv.org/abs/1710.09829>`__ proposed by Geoffrey
-Hinton and his team.  The algorithm aims to provide a better alternative to
-current neural network structures.  By using DGL library, users can implement
-the algorithm in a more intuitive way.
+**Author**: `Jinjing Zhou`, `Zheng Zhang`
+
+It is perhaps a little surprising that some of the more classical models can also be described in terms of graphs,
+offering a different perspective.
+This tutorial describes how this is done for the `capsule network <http://arxiv.org/abs/1710.09829>`__.
 """
-
-
-##############################################################################
-# Model Overview
-# ---------------
-# Introduction
-# ```````````````````
-# Capsule Network were first introduced in 2011 by Geoffrey Hinton, et al., in
-# paper `Transforming Autoencoders
-# <https://www.cs.toronto.edu/~fritz/absps/transauto6.pdf>`__, but it was only
-# a few months ago, in November 2017, that Sara Sabour, Nicholas Frosst, and
-# Geoffrey Hinton published a paper called Dynamic Routing between Capsules,
-# where they introduced a CapsNet architecture that reached state-of-the-art
-# performance on MNIST.
-#  
-# What's a capsule?
-# ```````````````````
-# In papers, author states that "A capsule is a group of neurons whose activity
-# vector represents the instantiation parameters of a specific type of entity
-# such as an object or an object part."
+#######################################################################################
+# Key ideas of Capsule
+# --------------------
 #
-# Generally speaking, the idea of capsule is to encode all the information
-# about the features into a vector form, by substituting scalars in traditional
-# neural network with vectors.  And use the norm of the vector to represents
-# the meaning of original scalars. 
-# 
-# .. image:: https://raw.githubusercontent.com/dmlc/web-data/master/dgl/tutorials/capsule/capsule_f1.png
-# 
-# Dynamic Routing Algorithm
-# `````````````````````````````
-# Due to the different structure of network, capsules network has different
-# operations to calculate results. This figure shows the comparison, drawn by
-# `Max Pechyonkin
-# <https://medium.com/ai%C2%B3-theory-practice-business/understanding-hintons-capsule-networks-part-ii-how-capsules-work-153b6ade9f66O>`__
-# 
-# .. image:: https://raw.githubusercontent.com/dmlc/web-data/master/dgl/tutorials/capsule/capsule_f2.png
-#    :height: 250px
-# 
-# The key idea is that the output of each capsule is the sum of weighted input vectors.
-# We will go into details in the later section with code implementations.
-# 
-# Model Implementations
-# -------------------------
-
-##############################################################################
-# Algorithm Overview
-# ```````````````````````````
+# There are two key ideas that the Capsule model offers.
 #
-# .. image:: https://raw.githubusercontent.com/VoVAllen/DGL_Capsule/master/algorithm.png
+# **Richer representations** In classic convolutional network, a scalar
+# value represents the activation of a given feature. Instead, a capsule
+# outputs a vector, whose norm represents the probability of a feature,
+# and the orientation its properties.
 #
-# The main step of routing algorithm is line 4 - 7. In ``DGLGraph`` structure, we consider these steps as a message passing
-# procedure.
-
-##############################################################################
-# Consider capsule routing as a graph structure
-# ````````````````````````````````````````````````````````````````````````````
-# We can consider each capsule as a node in a graph, and connect all the nodes between layers.
+# .. figure:: https://i.imgur.com/55Ovkdh.png
+#    :alt:
 #
-# .. image:: https://raw.githubusercontent.com/dmlc/web-data/master/dgl/tutorials/capsule/capsule_f3.png
-#    :height: 150px
+# **Dynamic routing** To generalize max-pooling, there is another
+# interesting proposed by the authors, as a representational more powerful
+# way to construct higher level feature from its low levels. Consider a
+# capsule :math:`u_i`. The way :math:`u_i` is integrated to the next level
+# capsules take two steps:
 #
-def construct_graph(self):
-    g = dgl.DGLGraph()
-    g.add_nodes(self.input_capsule_num + self.output_capsule_num)
-    input_nodes = list(range(self.input_capsule_num))
-    output_nodes = list(range(self.input_capsule_num, self.input_capsule_num + self.output_capsule_num))
-    u, v = [], []
-    for i in input_nodes:
-        for j in output_nodes:
-            u.append(i)
-            v.append(j)
-    g.add_edges(u, v)
-    return g, input_nodes, output_nodes
-
-
-##############################################################################
-# Write Message Passing Functions
-# ``````````````````````````````````
-# Reduce Functions (line 4 - 5)
-# .............................................
+# 1. :math:`u_i` projects differently to different higher level capsules
+#    via a linear transformation: :math:`\hat{u}_{j|i} = W_{ij}u_i`.
+# 2. :math:`\hat{u}_{j|i}` routes to the higher level capsules by
+#    spreading itself with a weighted sum, and the weight is dynamically
+#    determined by iteratively modify the and checking against the
+#    "consistency" between :math:`\hat{u}_{j|i}` and :math:`v_j`, for any
+#    :math:`v_j`. Note that this is similar to a k-means algorithm or
+#    `competive
+#    learning <https://en.wikipedia.org/wiki/Competitive_learning>`__ in
+#    spirit. At the end of iterations, :math:`v_j` now integrates the
+#    lower level capsules.
 #
-# .. image:: https://raw.githubusercontent.com/dmlc/web-data/master/dgl/tutorials/capsule/capsule_f5.png
+# The full algorithm is the following: |image0|
 #
-# At this stage, we need to define a reduce function to aggregate the node features
-# from layer :math:`l` and weighted sum them into layer :math:`(l+1)`'s node features.
+# The dynamic routing step can be naturally expressed as a graph
+# algorithm. This is the focus of this tutorial. Our implementation is
+# adapted from `Cedric
+# Chee <https://github.com/cedrickchee/capsule-net-pytorch>`__, replacing
+# only the routing layer, and achieving similar speed and accuracy.
 #
-# .. note::
-#    The softmax operation is over dimension :math:`j` instead of :math:`i`.
-def capsule_reduce(node, msg):
-    b_ij_c, u_hat = msg['b_ij'], msg['u_hat']
-    # line 4
-    c_i = F.softmax(b_ij_c, dim=0)
-    # line 5
-    s_j = (c_i.unsqueeze(2).unsqueeze(3) * u_hat).sum(dim=1)
-    return {'h': s_j}
-
-
-##############################################################################
-# Node Update Functions (line 6)
-# ......................................................
-# Squash the intermediate representations into node features :math:`v_j`
+# Model Implementation
+# -----------------------------------
+# Step 1: Setup and Graph Initialiation
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
-# .. image:: https://raw.githubusercontent.com/dmlc/web-data/master/dgl/tutorials/capsule/step6.png
+# The below figure shows the directed bipartitie graph built for capsules
+# network. We denote :math:`b_{ij}`, :math:`\hat{u}_{j|i}` as edge
+# features and :math:`v_j` as node features. |image1|
 #
-def capsule_update(msg):
-    v_j = squash(msg['h'])
-    return {'h': v_j}
-
-
-##############################################################################
-# Edge Update Functions (line 7)
-# ...........................................................................
-# Update the routing parameters by updating edges in graph
-#
-# .. image:: https://raw.githubusercontent.com/dmlc/web-data/master/dgl/tutorials/capsule/step7.png
-#
-def update_edge(u, v, edge):
-    return {'b_ij': edge['b_ij'] + (v['h'] * edge['u_hat']).mean(dim=1).sum(dim=1)}
-
-
-##############################################################################
-# Call DGL function to execute algorithm
-# ````````````````````````````````````````````````````````````````````````````
-# Call ``update_all`` and ``update_edge`` functions to execute the whole algorithms.
-# Message function is to define which attributes are needed in further computations
-#
-def routing(self):
-    def capsule_msg(src, edge):
-        return {'b_ij': edge['b_ij'], 'h': src['h'], 'u_hat': edge['u_hat']}
-
-    self.g.update_all(capsule_msg, capsule_reduce, capsule_update)
-    self.g.update_edge(edge_func=update_edge)
-
-
-##############################################################################
-# Forward Function
-# ````````````````````````````````````````````````````````````````````````````
-# This section shows the whole process of forward process of capsule routing algorithm.
-def forward(self, x):
-    self.batch_size = x.size(0)
-    u_hat = self.compute_uhat(x)
-    self.initialize_nodes_and_edges_features(u_hat)
-    for i in range(self.num_routing):
-        self.routing()
-    this_layer_nodes_feature = self.g.get_n_repr()['h'][
-                               self.input_capsule_num:self.input_capsule_num + self.output_capsule_num]
-    return this_layer_nodes_feature.transpose(0, 1).unsqueeze(1).unsqueeze(4).squeeze(1)
-
-
-##############################################################################
-# Other Workaround
-# ````````````````````````````````````````````````````````````````
-# Initialization & Affine Transformation
-# ..................................................
-# This section implements the transformation operation in capsule networks,
-# which transform capsule into different dimensions.
-# - Pre-compute :math:`\hat{u}_{j|i}`, initialize :math:`b_{ij}` and store them as edge attribute
-# - Initialize node features as zero
-#
-# .. image:: https://raw.githubusercontent.com/dmlc/web-data/master/dgl/tutorials/capsule/capsule_f4.png
-#
-
-def compute_uhat(self, x):
-    # x is the input vextor with shape [batch_size, input_capsule_dim, input_num]
-    # Transpose x to [batch_size, input_num, input_capsule_dim]
-    x = x.transpose(1, 2)
-    # Expand x to [batch_size, input_num, output_num, input_capsule_dim, 1]
-    x = torch.stack([x] * self.output_capsule_num, dim=2).unsqueeze(4)
-    # Expand W from [input_num, output_num, input_capsule_dim, output_capsule_dim]
-    # to [batch_size, input_num, output_num, output_capsule_dim, input_capsule_dim]
-    W = self.weight.expand(self.batch_size, *self.weight.size())
-    # u_hat's shape is [input_num, output_num, batch_size, output_capsule_dim]
-    u_hat = torch.matmul(W, x).permute(1, 2, 0, 3, 4).squeeze().contiguous()
-    return u_hat
-
-
-def initialize_nodes_and_edges_features(self, u_hat):
-    b_ij = torch.zeros(self.input_capsule_num, self.output_capsule_num).to(self.device)
-    self.g.set_e_repr({'b_ij': b_ij.view(-1)})
-    self.g.set_e_repr({'u_hat': u_hat.view(-1, self.batch_size, self.output_capsule_dim)})
-
-    # Initialize all node features as zero
-    node_features = torch.zeros(self.input_capsule_num + self.output_capsule_num, self.batch_size,
-                                self.output_capsule_dim).to(self.device)
-    self.g.set_n_repr({'h': node_features})
-
-
-##############################################################################
-# Squash function
-# ..................
-# Squashing function is to ensure that short vectors get shrunk to almost zero
-# length and long vectors get shrunk to a length slightly below 1. Its norm is
-# expected to represents probabilities at some levels.
-#
-# .. image:: https://raw.githubusercontent.com/dmlc/web-data/master/dgl/tutorials/capsule/squash.png
-#    :height: 100px
-#
-def squash(s, dim=2):
-    sq = torch.sum(s ** 2, dim=dim, keepdim=True)
-    s_std = torch.sqrt(sq)
-    s = (sq / (1.0 + sq)) * (s / s_std)
-    return s
-
-
-##############################################################################
-# General Setup
-# .................
-
-import dgl
-import torch
+import torch.nn as nn
+import torch as th
 import torch.nn.functional as F
-from torch import nn
+import numpy as np
+import matplotlib.pyplot as plt
+import dgl
 
 
-class DGLDigitCapsuleLayer(nn.Module):
-    def __init__(self,
-                 input_capsule_dim=8,
-                 input_capsule_num=1152,
-                 output_capsule_num=10,
-                 output_capsule_dim=16,
-                 num_routing=3,
-                 device='cpu'):
-        super(DGLDigitCapsuleLayer, self).__init__()
-        self.device = device
-        self.input_capsule_dim = input_capsule_dim
-        self.input_capsule_num = input_capsule_num
-        self.output_capsule_dim = output_capsule_dim
-        self.output_capsule_num = output_capsule_num
-        self.num_routing = num_routing
-        self.weight = nn.Parameter(
-            torch.randn(input_capsule_num, output_capsule_num, output_capsule_dim, input_capsule_dim))
-        self.g, self.input_nodes, self.output_nodes = self.construct_graph()
+def init_graph(in_nodes, out_nodes, f_size, u_hat):
+    g = dgl.DGLGraph()
+    all_nodes = in_nodes + out_nodes
+    g.add_nodes(all_nodes)
+
+    in_indx = list(range(in_nodes))
+    out_indx = list(range(in_nodes, in_nodes + out_nodes))
+    # add edges use edge broadcasting
+    for u in in_indx:
+        g.add_edges(u, out_indx)
+
+    # init states
+    g.ndata['v'] = th.zeros(all_nodes, f_size)
+    g.edata['u_hat'] = u_hat
+    g.edata['b'] = th.zeros(in_nodes * out_nodes, 1)
+    return g
 
 
-# This section is for defining class in multiple cells.
-DGLDigitCapsuleLayer.construct_graph = construct_graph
-DGLDigitCapsuleLayer.forward = forward
-DGLDigitCapsuleLayer.routing = routing
-DGLDigitCapsuleLayer.compute_uhat = compute_uhat
-DGLDigitCapsuleLayer.initialize_nodes_and_edges_features = initialize_nodes_and_edges_features
+#########################################################################################
+# Step 2: Define message passing functions
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Recall the following steps, and they are implemented in the class
+# ``DGLRoutingLayer`` as the followings:
+#
+# 1. Normalize over out edges
+#
+#    -  Softmax over all out-edge of in-capsules
+#       :math:`\textbf{c}_i = \text{softmax}(\textbf{b}_i)`.
+#
+# 2. Weighted sum over all in-capsules
+#
+#    -  Out-capsules equals weighted sum of in-capsules
+#       :math:`s_j=\sum_i c_{ij}\hat{u}_{j|i}`
+#
+# 3. Squash Operation
+#
+#    -  Squashing function is to ensure that short capsule vectors get
+#       shrunk to almost zero length while the long capsule vectors get
+#       shrunk to a length slightly below 1. Its norm is expected to
+#       represents probabilities at some levels.
+#    -  :math:`v_j=\text{squash}(s_j)=\frac{||s_j||^2}{1+||s_j||^2}\frac{s_j}{||s_j||}`
+#
+# 4. Update weights by agreement
+#
+#    -  :math:`\hat{u}_{j|i}\cdot v_j` can be considered as agreement
+#       between current capsule and updated capsule,
+#       :math:`b_{ij}=b_{ij}+\hat{u}_{j|i}\cdot v_j`
+class DGLRoutingLayer(nn.Module):
+    def __init__(self, in_nodes, out_nodes, f_size, u_hat):
+        super(DGLRoutingLayer, self).__init__()
+        self.g = init_graph(in_nodes, out_nodes, f_size, u_hat)
+        self.in_nodes = in_nodes
+        self.out_nodes = out_nodes
+        self.in_indx = list(range(in_nodes))
+        self.out_indx = list(range(in_nodes, in_nodes + out_nodes))
+
+    def forward(self, routing_num=1):
+        for r in range(routing_num):
+            # step 1 (line 4): normalize over out edges
+            in_edges = self.g.edata['b'].view(self.in_nodes, self.out_nodes)
+            self.g.edata['c'] = F.softmax(in_edges, dim=1).view(-1, 1)
+
+            def cap_message(edges):
+                return {'m': edges.data['c'] * edges.data['u_hat']}
+            self.g.register_message_func(cap_message)
+
+            # step 2 (line 5)
+            def cap_reduce(nodes):
+                return {'s': th.sum(nodes.mailbox['m'], dim=1)}
+            self.g.register_reduce_func(cap_reduce)
+
+            # Execute step 1 & 2
+            self.g.update_all()
+
+            # step 3 (line 6)
+            self.g.nodes[self.out_indx].data['v'] = self.squash(self.g.nodes[self.out_indx].data['s'], dim=1)
+
+            # step 4 (line 7)
+            v = th.cat([self.g.nodes[self.out_indx].data['v']] * self.in_nodes, dim=0)
+            self.g.edata['b'] = self.g.edata['b'] + (self.g.edata['u_hat'] * v).sum(dim=1, keepdim=True)
+
+    @staticmethod
+    def squash(s, dim=1):
+        sq = th.sum(s ** 2, dim=dim, keepdim=True)
+        s_norm = th.sqrt(sq)
+        s = (sq / (1.0 + sq)) * (s / s_norm)
+        return s
+
+
+############################################################################################################
+# Step 3: Testing
+# ~~~~~~~~~~~~~~~
+#
+# Let's make a simple 20x10 capsule layer:
+in_nodes = 20
+out_nodes = 10
+f_size = 4
+u_hat = th.randn(in_nodes * out_nodes, f_size)
+routing = DGLRoutingLayer(in_nodes, out_nodes, f_size, u_hat)
+
+############################################################################################################
+# We can visualize the behavior by monitoring the entropy of outgoing
+# weights, they should start high and then drop, as the assignment
+# gradually concentrate:
+entropy_list = []
+dist_list = []
+
+for i in range(10):
+    routing(1)
+    dist_matrix = routing.g.edata['c'].view(in_nodes, out_nodes)
+    entropy = (-dist_matrix * th.log(dist_matrix)).sum(dim=1)
+    entropy_list.append(entropy.data.numpy())
+    dist_list.append(dist_matrix.data.numpy())
+
+############################################################################################################
+#
+# .. figure:: https://i.imgur.com/dMvu7p3.png
+#    :alt:
+#
+# Alternatively, we can also watch the evolution of histograms: |image2|
+#
+# Or monitor the how lower level capcules gradually attach to one of the
+# higher level ones: |image3|
+#
+# The full code of this visulization is provided at (link); the complete
+# code that trains on MNIST is at (link).
+#
+# .. |image0| image:: https://i.imgur.com/mv1W9Rv.png
+# .. |image1| image:: https://i.imgur.com/9tc6GLl.png
+# .. |image2| image:: https://github.com/VoVAllen/DGL_Capsule/raw/master/routing_dist.gif
+# .. |image3| image:: https://github.com/VoVAllen/DGL_Capsule/raw/master/routing_vis.gif
+#
