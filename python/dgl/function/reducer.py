@@ -16,6 +16,7 @@ class ReduceFunction(BuiltinFunction):
         """
         raise NotImplementedError
 
+    @property
     def name(self):
         """Return the name of this builtin function."""
         raise NotImplementedError
@@ -41,6 +42,7 @@ class SimpleReduceFunction(ReduceFunction):
     def __call__(self, nodes):
         return {self.out_field : self.op(nodes.mailbox[self.msg_field], 1)}
 
+    @property
     def name(self):
         return self._name
 

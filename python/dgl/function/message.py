@@ -18,6 +18,7 @@ class MessageFunction(BuiltinFunction):
         """
         raise NotImplementedError
 
+    @property
     def name(self):
         """Return the name of this builtin function."""
         raise NotImplementedError
@@ -26,6 +27,7 @@ class MessageFunction(BuiltinFunction):
         """Return whether the SPMV optimization is supported."""
         raise NotImplementedError
 
+    @property
     def use_edge_feature(self):
         raise NotImplementedError
 
@@ -69,9 +71,11 @@ class SrcMulEdgeMessageFunction(MessageFunction):
                 F.reshape(edges.data[self.edge_field], (eshape,) + (1,) * (src_dim - 1)))
         return {self.out_field : ret}
 
+    @property
     def name(self):
         return "src_mul_edge"
 
+    @property
     def use_edge_feature(self):
         return True
 
@@ -86,9 +90,11 @@ class CopySrcMessageFunction(MessageFunction):
     def __call__(self, edges):
         return {self.out_field : edges.src[self.src_field]}
 
+    @property
     def name(self):
         return "copy_src"
 
+    @property
     def use_edge_feature(self):
         return False
 
@@ -105,9 +111,11 @@ class CopyEdgeMessageFunction(MessageFunction):
     def __call__(self, edges):
         return {self.out_field : edges.data[self.edge_field]}
 
+    @property
     def name(self):
         return "copy_edge"
 
+    @property
     def use_edge_feature(self):
         return True
 

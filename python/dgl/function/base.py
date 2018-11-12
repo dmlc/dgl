@@ -11,6 +11,7 @@ class BuiltinFunction(object):
         """
         raise NotImplementedError
 
+    @property
     def name(self):
         """Return the name of this builtin function."""
         raise NotImplementedError
@@ -25,5 +26,6 @@ class BundledFunction(object):
             ret.update(fn(*args, **kwargs))
         return ret
 
+    @property
     def name(self):
         return "bundled"

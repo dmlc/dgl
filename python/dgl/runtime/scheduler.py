@@ -100,6 +100,7 @@ def get_snr_schedule(graph, u, v, eid, message_func, reduce_func, apply_func):
     call_type = "send_and_recv"
     execs, out_repr = build_send_and_recv_executor(graph, call_type, u, v, eid,
                                                    message_func, reduce_func)
+    # XXX: unique_v is calculated multiple times...
     unique_v, _ = F.sort_1d(F.unique(v.tousertensor()))
     if apply_func:
         apply_exec, out_repr = build_node_executor(graph, unique_v, apply_func,
@@ -254,7 +255,7 @@ def build_edge_executor(graph, u, v, eid, func):
     out_repr = {}
     if func:
         if is_all(eid):
-            # if edges is ALL, look up source and destination ndoes
+            # if edges is ALL, look up source and destination nodes
             u, v, _ = graph._graph.edges()
         exe = _edge_exec(out_repr, func, graph, u, v, eid)
         execs.append(exe)
@@ -466,8 +467,7 @@ def _analyze_v2v_spmv(exec_list, out_repr, pairs, graph, call_type, u, v, eid):
     for mfn, rfn in pairs:
         # XXX: should pre-compile a look up table
         if mfn.is_spmv_supported(graph) and rfn.is_spmv_supported():
-            use_edge_feat = mfn.use_edge_feature()
-            if use_edge_feat:
+            if mfn.use_edge_feature:
                 if adj_idx_shape is None:
                     adj_idx_shape = _build_adj_matrix(graph, call_type, u, v,
                                                       indices_and_shape=True)

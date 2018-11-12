@@ -1098,7 +1098,7 @@ class DGLGraph(object):
              v,
              reduce_func="default",
              apply_node_func="default"):
-        """Receive and reduce in-coming messages and update representation on node u.
+        """Receive and reduce in-coming messages and update representation on node v.
 
         TODO(minjie): document on zero-in-degree case
         TODO(minjie): document on how returned new features are merged with the old features
