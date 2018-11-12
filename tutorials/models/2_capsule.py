@@ -210,7 +210,6 @@ def dist_animate(i):
 
 ani = animation.FuncAnimation(fig, dist_animate, frames=len(entropy_list), interval=500)
 plt.close()
-# ani.save("./capsule_dist.gif",writer='imagemagick')
 
 ############################################################################################################
 # Alternatively, we can also watch the evolution of histograms: |image2|
@@ -246,7 +245,7 @@ def weight_animate(i):
 
 ani2 = animation.FuncAnimation(fig2, weight_animate, frames=len(dist_list), interval=500)
 plt.close()
-# ani2.save("./capsule_viz.gif",writer='imagemagick')
+
 ############################################################################################################
 # |image3|
 #
