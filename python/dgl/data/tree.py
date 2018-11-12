@@ -65,7 +65,7 @@ class SST(object):
     def _load(self):
         # load vocab file
         self.vocab = OrderedDict()
-        with open(self.vocab_file) as vf:
+        with open(self.vocab_file, encoding='utf-8') as vf:
             for line in vf.readlines():
                 line = line.strip()
                 self.vocab[line] = len(self.vocab)
@@ -73,7 +73,7 @@ class SST(object):
         # filter glove
         if self.pretrained_file != '' and os.path.exists(self.pretrained_file):
             glove_emb = {}
-            with open(self.pretrained_file, 'r') as pf:
+            with open(self.pretrained_file, 'r', encoding='utf-8') as pf:
                 for line in pf.readlines():
                     sp = line.split(' ')
                     if sp[0].lower() in self.vocab:
