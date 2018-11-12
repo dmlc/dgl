@@ -245,7 +245,7 @@ def build_node_executor(graph, v, func, reduce_accum=None):
     else:
         out_repr = {}
     if func:
-        exe = NodeExecutor(func, graph, u, out_repr, reduce_accum)
+        exe = NodeExecutor(func, graph, v, out_repr, reduce_accum)
         execs.append(exe)
     return execs, out_repr
 
@@ -318,8 +318,7 @@ def build_send_and_recv_executor(graph, call_type, u, v, eid, mfunc, rfunc):
     return send_execs + recv_execs, out_repr
 
 def _check_builtin_func_list(func_list):
-    """Check whether func_list only contains builtin functions
-    """
+    """Check whether func_list only contains builtin functions."""
     for fn in func_list:
         if not isinstance(fn, BuiltinFunction):
             raise DGLError("If specify multiple message/reduce functions, \
