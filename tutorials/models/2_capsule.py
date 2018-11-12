@@ -181,13 +181,69 @@ for i in range(10):
     entropy_list.append(entropy.data.numpy())
     dist_list.append(dist_matrix.data.numpy())
 
+stds = np.std(entropy_list, axis=1)
+means = np.mean(entropy_list, axis=1)
+plt.errorbar(np.arange(len(entropy_list)), means, stds, marker='o')
+plt.ylabel("Entropy of Weight Distribution")
+plt.xlabel("Number of Routing")
+plt.xticks(np.arange(len(entropy_list)))
 ############################################################################################################
 #
 # .. figure:: https://i.imgur.com/dMvu7p3.png
 #    :alt:
-#
+
+import seaborn as sns
+import matplotlib.animation as animation
+
+fig = plt.figure(dpi=150)
+fig.clf()
+ax = fig.subplots()
+
+
+def dist_animate(i):
+    ax.cla()
+    sns.distplot(dist_list[i].reshape(-1), kde=False, ax=ax)
+    ax.set_xlabel("Weight Distribution Histogram")
+    ax.set_title("Routing: %d" % (i))
+
+
+ani = animation.FuncAnimation(fig, dist_animate, frames=len(entropy_list), interval=500)
+# ani.save("./capsule_dist.gif",writer='imagemagick')
+
+############################################################################################################
 # Alternatively, we can also watch the evolution of histograms: |image2|
-#
+import networkx as nx
+from networkx.algorithms import bipartite
+
+g = routing.g.to_networkx()
+X, Y = bipartite.sets(g)
+height_in = 10
+height_out = height_in * 0.8
+height_in_y = np.linspace(0, height_in, in_nodes)
+height_out_y = np.linspace((height_in - height_out) / 2, height_out, out_nodes)
+pos = dict()
+
+fig2 = plt.figure(figsize=(8, 3), dpi=150)
+fig2.clf()
+ax = fig2.subplots()
+pos.update((n, (i, 1)) for i, n in zip(height_in_y, X))  # put nodes from X at x=1
+pos.update((n, (i, 2)) for i, n in zip(height_out_y, Y))  # put nodes from Y at x=2
+
+
+def weight_animate(i):
+    ax.cla()
+    ax.axis('off')
+    ax.set_title("Routing: %d  " % i)
+    dm = dist_list[i]
+    nx.draw_networkx_nodes(g, pos, nodelist=range(in_nodes), node_color='r', node_size=100, ax=ax)
+    nx.draw_networkx_nodes(g, pos, nodelist=range(in_nodes, in_nodes + out_nodes), node_color='b', node_size=100, ax=ax)
+    for edge in g.edges():
+        nx.draw_networkx_edges(g, pos, edgelist=[edge], width=dm[edge[0], edge[1] - in_nodes] * 1.5, ax=ax)
+
+
+ani2 = animation.FuncAnimation(fig2, weight_animate, frames=len(dist_list), interval=500)
+# ani2.save("./capsule_viz.gif",writer='imagemagick')
+############################################################################################################
 # Or monitor the how lower level capcules gradually attach to one of the
 # higher level ones: |image3|
 #
