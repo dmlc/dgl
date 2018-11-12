@@ -3,6 +3,7 @@ import time
 import numpy as np
 import torch as th
 import torch.nn.functional as F
+import torch.nn.init as INIT
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
@@ -11,18 +12,18 @@ import dgl.data as data
 
 from tree_lstm import TreeLSTM
 
-rand_seed = 12110 
-np.random.seed(rand_seed)
-th.manual_seed(rand_seed)
-th.cuda.manual_seed(rand_seed)
-
 def _batch_to_cuda(batch):
     return data.SSTBatch(graph=batch.graph,
+                         is_leaf = batch.is_leaf.cuda(),
                          nid_with_word = batch.nid_with_word.cuda(),
                          wordid = batch.wordid.cuda(),
                          label = batch.label.cuda())
 
 def main(args):
+    np.random.seed(args.seed)
+    th.manual_seed(args.seed)
+    th.cuda.manual_seed(args.seed)
+
     cuda = args.gpu >= 0
     if cuda:
         th.cuda.set_device(args.gpu)
@@ -59,7 +60,7 @@ def main(args):
     params_ex_emb =[x for x in list(model.parameters()) if x.requires_grad and x.size(0)!=trainset.num_vocabs]
     params_emb = list(model.embedding.parameters())
 
-    optimizer = optim.Adagrad([{'params':params_ex_emb, 'lr':args.lr, 'weight_decay':args.weight_decay}, {'params':params_emb, 'lr':args.lr*0.1}])
+    optimizer = optim.Adagrad([{'params':params_ex_emb, 'lr':args.lr, 'weight_decay':args.weight_decay}, {'params':params_emb, 'lr':0.1*args.lr}])
     dur = []
     for epoch in range(args.epochs):
         t_epoch = time.time()
@@ -69,7 +70,8 @@ def main(args):
                 batch = _batch_to_cuda(batch)
             g = batch.graph
             n = g.number_of_nodes()
-            x = th.zeros((n, args.h_size * 3))
+            is_leaf = batch.is_leaf
+            x = th.zeros((n, args.x_size))
             h = th.zeros((n, args.h_size))
             c = th.zeros((n, args.h_size))
             if cuda:
@@ -81,7 +83,7 @@ def main(args):
                 t0 = time.time()
 
             # traverse graph
-            logits = model(batch, x, h, c)
+            logits = model(batch, x, h, c, is_leaf)
             logp = F.log_softmax(logits, 1)
             loss = F.nll_loss(logp, batch.label, reduction='elementwise_mean') 
             optimizer.zero_grad()
@@ -108,7 +110,8 @@ def main(args):
             g = batch.graph
             n = g.number_of_nodes()
             with th.no_grad():
-                x = th.zeros((n, args.h_size * 3))
+                is_leaf = batch.is_leaf
+                x = th.zeros((n, args.x_size))
                 h = th.zeros((n, args.h_size))
                 c = th.zeros((n, args.h_size))
                 if cuda:
@@ -117,7 +120,7 @@ def main(args):
                     c = c.cuda()
 
                 # traverse graph
-                logits = model(batch, x, h, c)
+                logits = model(batch, x, h, c, is_leaf)
 
             pred = th.argmax(logits, 1)
             acc = th.sum(th.eq(batch.label, pred)).item()
@@ -140,7 +143,8 @@ def main(args):
             g = batch.graph
             n = g.number_of_nodes()
             with th.no_grad():
-                x = th.zeros((n, args.h_size * 3))
+                is_leaf = batch.is_leaf
+                x = th.zeros((n, args.x_size))
                 h = th.zeros((n, args.h_size))
                 c = th.zeros((n, args.h_size))
                 if cuda:
@@ -149,7 +153,7 @@ def main(args):
                     c = c.cuda()
 
                 # traverse graph
-                logits = model(batch, x, h, c)
+                logits = model(batch, x, h, c, is_leaf)
 
             pred = th.argmax(logits, 1)
             acc = th.sum(th.eq(batch.label, pred)).item()
@@ -166,6 +170,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', type=int, default=-1)
+    parser.add_argument('--seed', type=int, default=12110)
     parser.add_argument('--batch-size', type=int, default=25)
     parser.add_argument('--x-size', type=int, default=300)
     parser.add_argument('--h-size', type=int, default=150)
@@ -173,7 +178,7 @@ if __name__ == '__main__':
     parser.add_argument('--log-every', type=int, default=5)
     parser.add_argument('--lr', type=float, default=0.05)
     parser.add_argument('--weight-decay', type=float, default=1e-4)
-    parser.add_argument('--dropout', type=float, default=0.5)
+    parser.add_argument('--dropout', type=float, default=0.3)
     args = parser.parse_args()
     print(args)
     main(args)
