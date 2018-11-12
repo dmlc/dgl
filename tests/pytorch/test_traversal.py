@@ -9,32 +9,51 @@ import scipy.sparse as sp
 import torch as th
 import utils as U
 
+import itertools
+
 np.random.seed(42)
 
-def test_bfs_nodes(n=1000):
+def toset(x):
+    return set(x.tolist())
+
+def test_bfs(n=1000):
+    def _bfs_nx(g_nx, src):
+        edges = nx.bfs_edges(g_nx, src)
+        layers_nx = [set([src])]
+        edges_nx = []
+        frontier = set()
+        edge_frontier = set()
+        for u, v in edges:
+            if u in layers_nx[-1]:
+                frontier.add(v)
+                edge_frontier.add(g.edge_id(u, v))
+            else:
+                layers_nx.append(frontier)
+                edges_nx.append(edge_frontier)
+                frontier = set([v])
+                edge_frontier = set([g.edge_id(u, v)])
+        layers_nx.append(frontier)
+        edges_nx.append(edge_frontier)
+        return layers_nx, edges_nx
+
     g = dgl.DGLGraph()
     a = sp.random(n, n, 10 / n, data_rvs=lambda n: np.ones(n))
     g.from_scipy_sparse_matrix(a)
     g_nx = g.to_networkx()
-
     src = random.choice(range(n))
-
-    edges = nx.bfs_edges(g_nx, src)
-    layers_nx = [set([src])]
-    frontier = set()
-    for u, v in edges:
-        if u in layers_nx[-1]:
-            frontier.add(v)
-        else:
-            layers_nx.append(frontier)
-            frontier = set([v])
-    layers_nx.append(frontier)
-
+    layers_nx, _ = _bfs_nx(g_nx, src)
     layers_dgl = dgl.bfs_nodes_generator(g, src)
-
-    toset = lambda x: set(x.tolist())
     assert len(layers_dgl) == len(layers_nx)
     assert all(toset(x) == y for x, y in zip(layers_dgl, layers_nx))
+
+    g_nx = nx.random_tree(n, seed=42)
+    g = dgl.DGLGraph()
+    g.from_networkx(g_nx)
+    src = 0
+    _, edges_nx = _bfs_nx(g_nx, src)
+    edges_dgl = dgl.bfs_edges_generator(g, src)
+    assert len(edges_dgl) == len(edges_nx)
+    assert all(toset(x) == y for x, y in zip(edges_dgl, edges_nx))
 
 def test_topological_nodes(n=1000):
     g = dgl.DGLGraph()
@@ -59,31 +78,47 @@ def test_topological_nodes(n=1000):
 
     layers_spmv = list(tensor_topo_traverse())
 
-    toset = lambda x: set(x.tolist())
     assert len(layers_dgl) == len(layers_spmv)
     assert all(toset(x) == toset(y) for x, y in zip(layers_dgl, layers_spmv))
 
 DFS_LABEL_NAMES = ['forward', 'reverse', 'nontree']
 def test_dfs_labeled_edges(n=1000, example=False):
-    nx_g = nx.DiGraph()
-    nx_g.add_edges_from([(0, 1), (1, 2), (0, 2)])
-    nx_rst = list(nx.dfs_labeled_edges(nx_g, 0))[1:-1]  # the first and the last are not edges
-
     dgl_g = dgl.DGLGraph()
-    dgl_g.add_nodes(3)
-    dgl_g.add_edge(0, 1)
-    dgl_g.add_edge(1, 2)
-    dgl_g.add_edge(0, 2)
+    dgl_g.add_nodes(6)
+    dgl_g.add_edges([0, 1, 0, 3, 3], [1, 2, 2, 4, 5])
     dgl_edges, dgl_labels = dgl.dfs_labeled_edges_generator(
-            dgl_g, 0, has_reverse_edge=True, has_nontree_edge=True)
-    dgl_edges = [dgl_g.find_edges(e) for e in dgl_edges]
-    dgl_u = [int(u) for u, v in dgl_edges]
-    dgl_v = [int(v) for u, v in dgl_edges]
-    dgl_labels = [DFS_LABEL_NAMES[l] for l in dgl_labels]
-    dgl_rst = list(zip(dgl_u, dgl_v, dgl_labels))
-    assert nx_rst == dgl_rst
+            dgl_g, [0, 3], has_reverse_edge=True, has_nontree_edge=True)
+    dgl_edges = [toset(t) for t in dgl_edges]
+    dgl_labels = [toset(t) for t in dgl_labels]
+
+    g1_solutions = [
+            # edges           labels
+            [[0, 1, 1, 0, 2], [0, 0, 1, 1, 2]],
+            [[2, 2, 0, 1, 0], [0, 1, 0, 2, 1]],
+    ]
+    g2_solutions = [
+            # edges        labels
+            [[3, 3, 4, 4], [0, 1, 0, 1]],
+            [[4, 4, 3, 3], [0, 1, 0, 1]],
+    ]
+
+    def combine_frontiers(sol):
+        es, ls = zip(*sol)
+        es = [set(i for i in t if i is not None)
+              for t in itertools.zip_longest(*es)]
+        ls = [set(i for i in t if i is not None)
+              for t in itertools.zip_longest(*ls)]
+        return es, ls
+
+    for sol_set in itertools.product(g1_solutions, g2_solutions):
+        es, ls = combine_frontiers(sol_set)
+        if es == dgl_edges and ls == dgl_labels:
+            break
+    else:
+        assert False
+
 
 if __name__ == '__main__':
-    test_bfs_nodes()
+    test_bfs()
     test_topological_nodes()
     test_dfs_labeled_edges()
