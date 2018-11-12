@@ -192,7 +192,7 @@ def main(args, data):
             subg_seeds = subg.map_to_subgraph_nid(seeds)
             with mx.autograd.record():
                 logits = model(subg, subg_seeds)
-                batch_labels = mx.nd.array(labels[seeds], ctx=logits.context)
+                batch_labels = mx.nd.array(labels[seeds.asnumpy()], ctx=logits.context)
                 loss = mx.nd.softmax_cross_entropy(logits, batch_labels)
             loss.backward()
             losses.append(loss)
