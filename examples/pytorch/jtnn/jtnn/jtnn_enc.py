@@ -12,44 +12,6 @@ import numpy as np
 
 MAX_NB = 8
 
-'''
-def level_order(forest, roots):
-    edge_list = []
-    visited = set()
-    level = list(set(roots))
-    levels = [level]
-
-    while True:
-        visited.update(level)
-
-        out_src, out_dst, out_eid = forest.out_edges(level, 'all')
-        in_src, in_dst, in_eid = forest.in_edges(level, 'all')
-
-        out_src = out_src.tolist()
-        out_dst = out_dst.tolist()
-        out_eid = out_eid.tolist()
-        in_src = in_src.tolist()
-        in_dst = in_dst.tolist()
-        in_eid = in_eid.tolist()
-
-        level = set(out_dst) - visited
-        if len(level) > 0:
-            out_src, out_dst, out_eid = zip(
-                    *[(s, d, e) for s, d, e in zip(out_src, out_dst, out_eid)
-                      if d in level])
-            in_src, in_dst, in_eid = zip(
-                    *[(s, d, e) for s, d, e in zip(in_src, in_dst, in_eid)
-                      if s in level])
-
-            level = list(level)
-            edge_list.append(out_eid)
-            edge_list.insert(0, in_eid)
-        else:
-            break
-
-    return edge_list
-'''
-
 def level_order(forest, roots):
     edges = bfs_edges_generator(forest, roots)
     _, leaves = forest.find_edges(edges[-1])

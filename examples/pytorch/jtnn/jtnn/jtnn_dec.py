@@ -14,32 +14,6 @@ import numpy as np
 MAX_NB = 8
 MAX_DECODE_LEN = 100
 
-'''
-def _dfs(trace, forest, i, cur, parent):
-    _, next_, down_eid = forest.out_edges(cur, 'all')
-    prev, _, up_eid = forest.in_edges(cur, 'all')
-    down_eid = dict(zip(next_.tolist(), down_eid.tolist()))
-    up_eid = dict(zip(prev.tolist(), up_eid.tolist()))
-    for n in down_eid:
-        if n == parent:
-            continue
-        trace.append((cur, n, down_eid[n], i, 1))
-        _dfs(trace, forest, i, n, cur)
-        trace.append((n, cur, up_eid[n], i, 0))
-
-def dfs_order(forest, roots):
-    edge_list = []
-    
-    for i, root in enumerate(roots):
-        trace = []
-        _dfs(trace, forest, i, root, None)
-        edge_list.append(trace)
-
-    for edges in itertools.zip_longest(*edge_list):
-        edges = (e for e in edges if e is not None)
-        u, v, e, i, p = zip(*edges)
-        yield u, v, e, i, p
-'''
 
 def dfs_order(forest, roots):
     edges = dfs_labeled_edges_generator(forest, roots, has_reverse_edge=True)
