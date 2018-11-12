@@ -98,21 +98,6 @@ class SSEPredict(gluon.Block):
             hidden = mx.nd.Dropout(hidden, p=self.dropout)
         return self.linear2(self.linear1(hidden))
 
-def subgraph_gen(g, seed_vertices, ctxs):
-    assert len(seed_vertices) % len(ctxs) == 0
-    vertices = []
-    for seed in seed_vertices:
-        src, _ = g.in_edges(seed)
-        vs = np.concatenate((src.asnumpy(), seed.asnumpy()), axis=0)
-        vs = mx.nd.array(np.unique(vs), dtype=np.int64)
-        vertices.append(vs)
-    subgs = g.subgraphs(vertices)
-    nids = []
-    for i, subg in enumerate(subgs):
-        subg.copy_from_parent()
-        nids.append(subg.map_to_subgraph_nid(seed_vertices[i]))
-    return subgs, nids
-
 def copy_to_gpu(subg, ctx):
     frame = subg.ndata
     for key in frame:
