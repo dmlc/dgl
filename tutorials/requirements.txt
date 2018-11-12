@@ -3,3 +3,4 @@ torch
 numpy
 seaborn
 matplotlib
+pygraphviz
