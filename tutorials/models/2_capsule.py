@@ -187,6 +187,7 @@ plt.errorbar(np.arange(len(entropy_list)), means, stds, marker='o')
 plt.ylabel("Entropy of Weight Distribution")
 plt.xlabel("Number of Routing")
 plt.xticks(np.arange(len(entropy_list)))
+plt.close()
 ############################################################################################################
 #
 # .. figure:: https://i.imgur.com/dMvu7p3.png
@@ -208,10 +209,12 @@ def dist_animate(i):
 
 
 ani = animation.FuncAnimation(fig, dist_animate, frames=len(entropy_list), interval=500)
+plt.close()
 # ani.save("./capsule_dist.gif",writer='imagemagick')
 
 ############################################################################################################
 # Alternatively, we can also watch the evolution of histograms: |image2|
+# Or monitor the how lower level capcules gradually attach to one of the higher level ones:
 import networkx as nx
 from networkx.algorithms import bipartite
 
@@ -242,10 +245,10 @@ def weight_animate(i):
 
 
 ani2 = animation.FuncAnimation(fig2, weight_animate, frames=len(dist_list), interval=500)
+plt.close()
 # ani2.save("./capsule_viz.gif",writer='imagemagick')
 ############################################################################################################
-# Or monitor the how lower level capcules gradually attach to one of the
-# higher level ones: |image3|
+# |image3|
 #
 # The full code of this visulization is provided at (link); the complete
 # code that trains on MNIST is at (link).
