@@ -18,9 +18,9 @@ class DGLDigitCapsuleLayer(nn.Module):
     def forward(self, x):
         self.batch_size = x.size(0)
         u_hat = self.compute_uhat(x)
-        routing = DGLRoutingLayer(self.in_nodes, self.out_nodes, self.out_nodes_dim, u_hat, has_batch_dim=True,
+        routing = DGLRoutingLayer(self.in_nodes, self.out_nodes, self.out_nodes_dim, batch_size=self.batch_size,
                                   device=self.device)
-        routing(3)
+        routing(u_hat, routing_num=3)
         out_nodes_feature = routing.g.nodes[routing.out_indx].data['v']
         routing.end()
         # shape transformation is for further classification
