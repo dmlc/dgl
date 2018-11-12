@@ -15,9 +15,6 @@ def train(args, model, device, train_loader, optimizer, epoch):
         loss = model.margin_loss(output, target)
         loss.backward()
         optimizer.step()
-        # import objgraph
-        # objgraph.show_refs([model], filename='sample-graph.png')
-        # exit()
         if batch_idx % args.log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
@@ -45,9 +42,9 @@ def test(args, model, device, test_loader):
 def main():
     # Training settings
     parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
-    parser.add_argument('--batch-size', type=int, default=256, metavar='N',
+    parser.add_argument('--batch-size', type=int, default=512, metavar='N',
                         help='input batch size for training (default: 64)')
-    parser.add_argument('--test-batch-size', type=int, default=256, metavar='N',
+    parser.add_argument('--test-batch-size', type=int, default=512, metavar='N',
                         help='input batch size for testing (default: 1000)')
     parser.add_argument('--epochs', type=int, default=10, metavar='N',
                         help='number of epochs to train (default: 10)')
