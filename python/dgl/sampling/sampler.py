@@ -38,7 +38,7 @@ class NSSubgraphLoader(object):
 
     def _prefetch(self):
         seed_ids = []
-        num_nodes = self._g.number_of_nodes()
+        num_nodes = len(self._seed_nodes)
         for i in range(self._num_workers):
             start = self._subgraph_idx * self._batch_size
             # if we have visited all nodes, don't do anything.
