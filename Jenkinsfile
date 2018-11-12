@@ -142,7 +142,7 @@ pipeline {
     }
     stage("Doc") {
       agent { docker { image "dgllib/dgl-ci-cpu" } }
-      stages {
+      steps {
         pytorch_tutorials()
       }
     }
