@@ -27,11 +27,11 @@ def sparse_matrix(data, index, shape, force_format=False):
             raise TypeError('MXNet backend only supports CSR format,'
                             ' but COO format is forced.')
         coord = index[1]
-        return nd.sparse.csr_matrix((data, (coord[0], coord[1])), shape)
+        return nd.sparse.csr_matrix((data, (coord[0], coord[1])), tuple(shape))
     elif fmt == 'csr':
         indices = index[1]
         indptr = index[2]
-        return nd.sparse.csr_matrix((data, indices, indptr), shape)
+        return nd.sparse.csr_matrix((data, indices, indptr), tuple(shape))
     else:
         raise TypeError('Invalid format: %s.' % fmt)
 
@@ -49,6 +49,9 @@ def dtype(input):
     # NOTE: the input cannot be a symbol
     return input.dtype
 
+def ndim(input):
+    return input.ndim
+
 def context(input):
     return input.context
 
@@ -64,11 +67,17 @@ def copy_to(input, ctx):
 def sum(input, dim):
     return nd.sum(input, axis=dim)
 
+def mean(input, dim):
+    return nd.mean(input, axis=dim)
+
 def max(input, dim):
-    return nd.max(input, axis=dim)
+    return nd.max(input, axis=dim).asnumpy()[0]
 
 def cat(seq, dim):
     return nd.concat(*seq, dim=dim)
+
+def stack(seq, dim):
+    return nd.stack(*seq, dim=dim)
 
 def split(x, sizes_or_sections, dim):
     if isinstance(sizes_or_sections, list):
@@ -114,6 +123,35 @@ def ones(shape, dtype):
 def spmm(x, y):
     return nd.dot(x, y)
 
+def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
+    # TODO: support other dimensions
+    assert dim == 0, 'MXNet only supports segment sum on first dimension'
+
+    # Use SPMV to simulate segment sum
+    ctx = input.context
+    n_inputs = input.shape[0]
+    input_shape_suffix = input.shape[1:]
+    input = input.reshape(n_inputs, -1)
+    n_range = nd.arange(n_inputs, dtype='int64').as_in_context(input.context)
+    w_nnz = nd.ones(n_inputs).as_in_context(input.context)
+    w_nid = nd.stack(seg_id, n_range, axis=0)
+    w = nd.sparse.csr_matrix((w_nnz, (seg_id, n_range)), (n_segs, n_inputs))
+    w = w.as_in_context(input.context)
+    y = nd.dot(w, input)
+    y = nd.reshape(y, (n_segs,) + input_shape_suffix)
+    return y
+
+def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
+    # TODO: support other dimensions
+    assert dim == 0, 'MXNet only supports segment mean on first dimension'
+
+    n_ones = nd.ones_like(seg_id).astype(input.dtype)
+    w = unsorted_1d_segment_sum(n_ones, seg_id, n_segs, 0)
+    w = nd.clip(w, a_min=1, a_max=np.inf)
+    y = unsorted_1d_segment_sum(input, seg_id, n_segs, dim)
+    y /= w.reshape((-1,) + (1,) * (y.ndim - 1))
+    return y
+
 def unique(input):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
@@ -131,7 +169,7 @@ def nonzero_1d(input):
 
 def sort_1d(input):
     # TODO: this isn't an ideal implementation.
-    val = nd.sort(input, is_ascend=True)
+    val = nd.sort(input, axis=None, is_ascend=True)
     idx = nd.argsort(input, is_ascend=True)
     idx = nd.cast(idx, dtype='int64')
     return val, idx

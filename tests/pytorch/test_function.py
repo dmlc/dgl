@@ -1,6 +1,7 @@
 import torch as th
 import dgl
 import dgl.function as fn
+import utils as U
 
 def generate_graph():
     g = dgl.DGLGraph()
@@ -27,7 +28,7 @@ def test_copy_src():
     g.register_message_func(fn.copy_src(src='h', out='m'))
     g.register_reduce_func(reducer_both)
     g.update_all()
-    assert th.allclose(g.ndata['h'],
+    assert U.allclose(g.ndata['h'],
             th.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
 
 def test_copy_edge():
@@ -36,7 +37,7 @@ def test_copy_edge():
     g.register_message_func(fn.copy_edge(edge='h', out='m'))
     g.register_reduce_func(reducer_both)
     g.update_all()
-    assert th.allclose(g.ndata['h'],
+    assert U.allclose(g.ndata['h'],
             th.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
 
 def test_src_mul_edge():
@@ -45,7 +46,7 @@ def test_src_mul_edge():
     g.register_message_func(fn.src_mul_edge(src='h', edge='h', out='m'))
     g.register_reduce_func(reducer_both)
     g.update_all()
-    assert th.allclose(g.ndata['h'],
+    assert U.allclose(g.ndata['h'],
             th.tensor([100., 1., 1., 1., 1., 1., 1., 1., 1., 284.]))
 
 if __name__ == '__main__':

@@ -182,14 +182,32 @@ epub_exclude_files = ['search.html']
 
 
 # -- Extension configuration -------------------------------------------------
+autosummary_generate = True
+
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/{.major}'.format(sys.version_info), None),
+    'numpy': ('http://docs.scipy.org/doc/numpy/', None),
+    'scipy': ('http://docs.scipy.org/doc/scipy/reference', None),
+    'matplotlib': ('http://matplotlib.org/', None),
+    'networkx' : ('https://networkx.github.io/documentation/stable', None),
+}
 
 # sphinx gallery configurations
 from sphinx_gallery.sorting import FileNameSortKey
 
 examples_dirs = ['../../tutorials']  # path to find sources
 gallery_dirs = ['tutorials']  # path to generate docs
+reference_url = {
+    'dgl' : None,
+    'numpy': 'http://docs.scipy.org/doc/numpy/',
+    'scipy': 'http://docs.scipy.org/doc/scipy/reference',
+    'matplotlib': 'http://matplotlib.org/',
+    'networkx' : 'https://networkx.github.io/documentation/stable',
+}
 
 sphinx_gallery_conf = {
+    'backreferences_dir' : 'generated/backreferences',
+    'doc_module' : ('dgl', 'numpy'),
     'examples_dirs' : examples_dirs,
     'gallery_dirs' : gallery_dirs,
     'within_subsection_order' : FileNameSortKey,

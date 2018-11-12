@@ -18,11 +18,30 @@ _urls = {
     'sst' : 'https://www.dropbox.com/s/dw8kr2vuq7k4dqi/sst.zip?dl=1',
 }
 
-SSTBatch = namedtuple('SSTBatch', ['graph', 'nid_with_word', 'wordid', 'label'])
-
 class SST(object):
-    """SST"""
-    PAD_WORD=-1
+    """Stanford Sentiment Treebank dataset.
+
+    Each sample is the constituency tree of a sentence. The leaf nodes
+    represent words. The word is a int value stored in the "x" feature field.
+    The non-leaf node has a special value PAD_WORD.
+    Each node also has a sentiment annotation: 5 classes (very negative,
+    negative, neutral, positive and very positive). The sentiment label is a
+    int value stored in the "y" feature field.
+
+    .. note::
+        This dataset class is compatible with pytorch's Dataset class.
+
+    .. note::
+        All the samples will be loaded and preprocessed in the memory first.
+    
+    Parameters
+    ----------
+    mode : str, optional
+        Can be 'train', 'val', 'test'. Which data file to use.
+    vocab_file : str, optional
+        Optional vocabulary file.
+    """
+    PAD_WORD=-1  # special pad word id
     def __init__(self, mode='train', vocab_file=None):
         self.mode = mode
         self.dir = get_download_dir()

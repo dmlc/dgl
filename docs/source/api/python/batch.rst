@@ -1,9 +1,15 @@
-dgl.BatchedDGLGraph
--------------------
-.. autoclass:: dgl.BatchedDGLGraph
-    :members:
-    :show-inheritance:
+BatchedDGLGraph
+===============
 
-.. autofunction:: dgl.batch
+.. automodule:: dgl.batched_graph
+.. autoclass:: BatchedDGLGraph
 
-.. autofunction:: dgl.unbatch
+.. autosummary::
+    :toctree: ../../generated/
+
+    batch
+    unbatch
+    sum_nodes
+    sum_edges
+    mean_nodes
+    mean_edges
