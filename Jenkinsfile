@@ -54,11 +54,7 @@ pipeline {
   agent none
   stages {
     stage("Lint Check") {
-      agent {
-        docker {
-          image "dgllib/dgl-ci-lint"
-        }
-      }
+      agent { docker { image "dgllib/dgl-ci-lint" } }
       steps {
         init_git_submodule()
         sh "tests/scripts/task_lint.sh"
@@ -67,11 +63,7 @@ pipeline {
     stage("Build") {
       parallel {
         stage("CPU Build") {
-          agent {
-            docker {
-              image "dgllib/dgl-ci-cpu"
-            }
-          }
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
           steps {
             setup()
             build_dgl()
@@ -90,11 +82,7 @@ pipeline {
           }
         }
         stage("MXNet CPU Build (temp)") {
-          agent {
-            docker {
-              image "dgllib/dgl-ci-mxnet-cpu"
-            }
-          }
+          agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
           steps {
             setup()
             build_dgl()
@@ -105,11 +93,7 @@ pipeline {
     stage("Test") {
       parallel {
         stage("Pytorch CPU") {
-          agent {
-            docker {
-              image "dgllib/dgl-ci-cpu"
-            }
-          }
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
           stages {
             stage("TH CPU unittest") {
               steps { pytorch_unit_test("CPU") }
@@ -144,11 +128,7 @@ pipeline {
           //}
         }
         stage("MXNet CPU") {
-          agent {
-            docker {
-              image "dgllib/dgl-ci-mxnet-cpu"
-            }
-          }
+          agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
           stages {
             stage("MX Unittest") {
               steps { mxnet_unit_test("CPU") }
@@ -161,15 +141,9 @@ pipeline {
       }
     }
     stage("Doc") {
-      agent {
-        docker {
-          image "dgllib/dgl-ci-cpu"
-        }
-      }
+      agent { docker { image "dgllib/dgl-ci-cpu" } }
       stages {
-        stage("TH tutorials") {
-          steps { pytorch_tutorials() }
-        }
+        pytorch_tutorials()
       }
     }
   }
