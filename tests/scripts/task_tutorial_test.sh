@@ -1,4 +1,5 @@
 #!/bin/bash
+# The working directory for this script will be "tests/scripts"
 
 function fail {
     echo FAIL: $@
@@ -7,10 +8,8 @@ function fail {
 
 export MPLBACKEND=Agg
 
-pushd "tests/scripts" > /dev/null
 for f in $(find "../../tutorials" -name "*.py")
 do
     echo "Running tutorial ${f} ..."
     python3 $f || fail "run ${f}"
 done
-popd > /dev/null
