@@ -132,8 +132,7 @@ def main(args, data):
     eval_vs = np.arange(train_size, len(labels), dtype='int64')
     print("train size: " + str(len(train_vs)))
     print("eval size: " + str(len(eval_vs)))
-    train_labels = mx.nd.array(data.labels[train_vs])
-    eval_labels = mx.nd.array(data.labels[eval_vs])
+    labels = data.labels
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
@@ -178,43 +177,31 @@ def main(args, data):
     dur = []
     for epoch in range(args.n_epochs):
         t0 = time.time()
-        permute = np.random.permutation(len(train_vs))
-        randv = train_vs[permute]
-        rand_labels = train_labels[permute]
-        data_iter = mx.io.NDArrayIter(data=mx.nd.array(randv, dtype='int64'), label=rand_labels,
-                                      batch_size=args.batch_size)
         train_loss = 0
-        data = []
-        labels = []
-        for batch in data_iter:
-            data.append(batch.data[0])
-            labels.append(batch.label[0])
-            if len(data) < args.num_parallel_subgraphs:
-                continue
-
-            subgs, seed_ids = subgraph_gen(g, data, train_ctxs)
+        i = 0
+        for subg, seeds in dgl.sampling.NeighborSampler(g, args.batch_size, g.number_of_nodes(),
+                neighbor_type='in', num_workers=args.num_parallel_subgraphs, seed_nodes=train_vs,
+                shuffle=True):
+            subg.copy_from_parent()
 
             losses = []
-            i = 0
-            for subg, seed_id, label, d in zip(subgs, seed_ids, labels, data):
-                if args.gpu > 0:
-                    ctx = mx.gpu(i % args.gpu)
-                    copy_to_gpu(subg, ctx)
-                with mx.autograd.record():
-                    logits = model(subg, seed_id)
-                    if label.context != logits.context:
-                        label = label.as_in_context(logits.context)
-                    loss = mx.nd.softmax_cross_entropy(logits, label)
-                loss.backward()
-                losses.append(loss)
-                i = i + 1
-                if i % args.gpu == 0:
-                    trainer.step(d.shape[0] * len(subgs))
-                    for loss in losses:
-                        train_loss += loss.asnumpy()[0]
-                    losses = []
-            data = []
-            labels = []
+            if args.gpu > 0:
+                ctx = mx.gpu(i % args.gpu)
+                copy_to_gpu(subg, ctx)
+
+            subg_seeds = subg.map_to_subgraph_nid(seeds)
+            with mx.autograd.record():
+                logits = model(subg, subg_seeds)
+                batch_labels = mx.nd.array(labels[seeds], ctx=logits.context)
+                loss = mx.nd.softmax_cross_entropy(logits, batch_labels)
+            loss.backward()
+            losses.append(loss)
+            i = i + 1
+            if i % args.gpu == 0:
+                trainer.step(len(seeds) * len(losses))
+                for loss in losses:
+                    train_loss += loss.asnumpy()[0]
+                losses = []
 
         #logits = model(eval_vs)
         #eval_loss = mx.nd.softmax_cross_entropy(logits, eval_labels)
