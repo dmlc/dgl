@@ -82,6 +82,71 @@ void BFSNodes(const Graph& graph,
 }
 
 /*!
+ * \brief Traverse the graph in a breadth-first-search (BFS) order, returning
+ *        the edges of the BFS tree.
+ *
+ * The queue object must suffice following interface:
+ *   Members:
+ *   void push(dgl_id_t);  // push one node
+ *   dgl_id_t top();       // get the first node
+ *   void pop();           // pop one node
+ *   bool empty();         // return true if the queue is empty
+ *   size_t size();        // return the size of the queue
+ * For example, std::queue<dgl_id_t> is a valid queue type.
+ *
+ * The visit function must be compatible with following interface:
+ *   void (*visit)(dgl_id_t );
+ *
+ * The frontier function must be compatible with following interface:
+ *   void (*make_frontier)(void);
+ *
+ * \param graph The graph.
+ * \param sources Source nodes.
+ * \param reversed If true, BFS follows the in-edge direction
+ * \param queue The queue used to do bfs.
+ * \param visit The function to call when a node is visited.
+ *        The argument would be edge ID.
+ * \param make_frontier The function to indicate that a new frontier can be made;
+ */
+template<typename Queue, typename VisitFn, typename FrontierFn>
+void BFSEdges(const Graph& graph,
+              IdArray source,
+              bool reversed,
+              Queue* queue,
+              VisitFn visit,
+              FrontierFn make_frontier) {
+  const int64_t len = source->shape[0];
+  const int64_t* src_data = static_cast<int64_t*>(source->data);
+
+  std::vector<bool> visited(graph.NumVertices());
+  for (int64_t i = 0; i < len; ++i) {
+    const dgl_id_t u = src_data[i];
+    visited[u] = true;
+    queue->push(u);
+  }
+  make_frontier();
+
+  const auto neighbor_iter = reversed? &Graph::InEdgeVec : &Graph::OutEdgeVec;
+  while (!queue->empty()) {
+    const size_t size = queue->size();
+    for (size_t i = 0; i < size; ++i) {
+      const dgl_id_t u = queue->top();
+      queue->pop();
+      for (auto e : (graph.*neighbor_iter)(u)) {
+        const auto uv = graph.FindEdge(e);
+        const dgl_id_t v = (reversed ? uv.first : uv.second);
+        if (!visited[v]) {
+          visited[v] = true;
+          visit(e);
+          queue->push(v);
+        }
+      }
+    }
+    make_frontier();
+  }
+}
+
+/*!
  * \brief Traverse the graph in topological order.
  *
  * The queue object must suffice following interface:
