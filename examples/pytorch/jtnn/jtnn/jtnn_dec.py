@@ -92,7 +92,6 @@ class DGLJTNNDecoder(nn.Module):
 
         return self.run(mol_tree_batch, mol_tree_batch_lg, n_trees, tree_vec)
 
-    @profile
     def run(self, mol_tree_batch, mol_tree_batch_lg, n_trees, tree_vec):
         node_offset = np.cumsum([0] + mol_tree_batch.batch_num_nodes)
         root_ids = node_offset[:-1]
