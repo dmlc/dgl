@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 
-fail () {
+function fail {
     echo FAIL: $@
     exit -1
 }
