@@ -16,7 +16,7 @@ def test_1neighbor_sampler_all():
     for subg, seed_ids in dgl.sampling.NeighborSampler(g, 1, 100, neighbor_type='in',
                                                        num_workers=4):
         assert len(seed_ids) == 1
-        src, dst, eid = g._graph.in_edges(seed_ids)
+        src, dst, eid = g._graph.in_edges(utils.toindex(seed_ids))
         # Test if there is a self loop
         self_loop = mx.nd.sum(src.tousertensor() == dst.tousertensor()).asnumpy() == 1
         if self_loop:
@@ -36,7 +36,7 @@ def is_sorted(arr):
 
 def verify_subgraph(g, subg, seed_id):
     seed_id = utils.toindex(seed_id)
-    src, dst, eid = g._graph.in_edges(seed_id)
+    src, dst, eid = g._graph.in_edges(utils.toindex(seed_id))
     child_id = subg.map_to_subgraph_nid(seed_id)
     child_src, child_dst, child_eid = subg._graph.in_edges(child_id)
     child_src = child_src.tousertensor().asnumpy()
@@ -64,7 +64,7 @@ def test_10neighbor_sampler_all():
     # In this case, NeighborSampling simply gets the neighborhood of a single vertex.
     for subg, seed_ids in dgl.sampling.NeighborSampler(g, 10, 100, neighbor_type='in',
                                                        num_workers=4):
-        src, dst, eid = g._graph.in_edges(seed_ids)
+        src, dst, eid = g._graph.in_edges(utils.toindex(seed_ids))
 
         child_ids = subg.map_to_subgraph_nid(seed_ids)
         child_src, child_dst, child_eid = subg._graph.in_edges(child_ids)
@@ -79,7 +79,7 @@ def test_10neighbor_sampler():
                                                        num_workers=4):
         assert subg.number_of_nodes() <= 6 * len(seed_ids)
         assert subg.number_of_edges() <= 5 * len(seed_ids)
-        for seed_id in seed_ids.tousertensor():
+        for seed_id in seed_ids:
             verify_subgraph(g, subg, seed_id)
 
 if __name__ == '__main__':
