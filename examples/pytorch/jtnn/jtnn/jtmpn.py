@@ -43,13 +43,14 @@ def mol2dgl(cand_batch, mol_tree_batch):
     tree_mess_target_edges = [] # these edges on candidate graphs
     tree_mess_target_nodes = []
     n_nodes = 0
+    n_edges = 0
+    atom_x = []
+    bond_x = []
 
     for mol, mol_tree, ctr_node_id in cand_batch:
         n_atoms = mol.GetNumAtoms()
         n_bonds = mol.GetNumBonds()
 
-        atom_x = []
-        bond_x = []
         ctr_node = mol_tree.nodes_dict[ctr_node_id]
         ctr_bid = ctr_node['idx']
         g = DGLGraph()
@@ -93,16 +94,19 @@ def mol2dgl(cand_batch, mol_tree_batch):
         g.add_edges(bond_src, bond_dst)
 
         n_nodes += n_atoms
-
-        atom_x = cuda(torch.stack(atom_x, 0))
-        bond_x = cuda(torch.stack(bond_x, 0))
-        g.ndata['x'] = atom_x
-        if n_bonds > 0:
-            g.edata.update({
-                'x': bond_x,
-                'src_x': atom_x.new(n_bonds * 2, ATOM_FDIM).zero_(),
-            })
+        n_edges += n_bonds
         cand_graphs.append(g)
+
+    cand_graphs = batch(cand_graphs)
+
+    atom_x = cuda(torch.stack(atom_x, 0))
+    bond_x = cuda(torch.stack(bond_x, 0))
+    cand_graphs.ndata['x'] = atom_x
+    if n_edges > 0:
+        cand_graphs.edata.update({
+            'x': bond_x,
+            'src_x': atom_x.new(n_edges * 2, ATOM_FDIM).zero_(),
+        })
 
     return cand_graphs, tree_mess_source_edges, tree_mess_target_edges, \
            tree_mess_target_nodes
@@ -185,7 +189,6 @@ class DGLJTMPN(nn.Module):
 
         n_samples = len(cand_graphs)
 
-        cand_graphs = batch(cand_graphs)
         cand_line_graph = cand_graphs.line_graph(backtracking=False, shared=True)
 
         n_nodes = cand_graphs.number_of_nodes()
