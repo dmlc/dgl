@@ -37,15 +37,15 @@ def bond_features(bond):
     return (torch.Tensor(fbond + fstereo))
 
 def mol2dgl(smiles_batch):
-    n_nodes = 0
+    n_edges = 0
     graph_list = []
+
+    atom_x = []
+    bond_x = []
     for smiles in smiles_batch:
         mol = get_mol(smiles)
         n_atoms = mol.GetNumAtoms()
         n_bonds = mol.GetNumBonds()
-
-        atom_x = []
-        bond_x = []
         graph = DGLGraph()
         for i, atom in enumerate(mol.GetAtoms()):
             assert i == atom.GetIdx()
@@ -67,15 +67,19 @@ def mol2dgl(smiles_batch):
             bond_x.append(features)
         graph.add_edges(bond_src, bond_dst)
 
-        atom_x = cuda(torch.stack(atom_x, 0))
-        bond_x = cuda(torch.stack(bond_x, 0))
-        graph.ndata['x'] = atom_x
-        if n_bonds > 0:
-            graph.edata.update({
-                'x': bond_x,
-                'src_x': atom_x.new(n_bonds * 2, ATOM_FDIM).zero_()
-            })
+        n_edges += n_bonds
+
         graph_list.append(graph)
+
+    graph_list = batch(graph_list)
+    atom_x = cuda(torch.stack(atom_x, 0))
+    bond_x = cuda(torch.stack(bond_x, 0))
+    graph_list.ndata['x'] = atom_x
+    if n_bonds > 0:
+        graph_list.edata.update({
+            'x': bond_x,
+            'src_x': atom_x.new(n_edges * 2, ATOM_FDIM).zero_()
+        })
 
     return graph_list
 
@@ -133,10 +137,9 @@ class DGLMPN(nn.Module):
         self.n_edges_total = 0
         self.n_passes = 0
 
-    def forward(self, mol_graph_list):
-        n_samples = len(mol_graph_list)
+    def forward(self, mol_graph):
+        n_samples = mol_graph.batch_size
 
-        mol_graph = batch(mol_graph_list)
         mol_line_graph = mol_graph.line_graph(backtracking=False, shared=True)
 
         n_nodes = mol_graph.number_of_nodes()

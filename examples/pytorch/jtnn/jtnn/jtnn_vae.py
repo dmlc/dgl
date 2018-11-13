@@ -60,8 +60,8 @@ class DGLJTNNVAE(nn.Module):
         # mol_batch is a junction tree
         mol_tree_batch, tree_vec = self.jtnn(mol_batch)
 
-        self.n_nodes_total += sum(g.number_of_nodes() for g in mol_graphs)
-        self.n_edges_total += sum(g.number_of_edges() for g in mol_graphs)
+        self.n_nodes_total += mol_graphs.number_of_nodes()
+        self.n_edges_total += mol_graphs.number_of_edges()
         self.n_tree_nodes_total += sum(t.number_of_nodes() for t in mol_batch)
         self.n_passes += 1
 

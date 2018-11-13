@@ -49,8 +49,6 @@ def test_mpn():
     mpn.W_o = dglmpn.gather_updater.W_o
     mpn.W_h = dglmpn.loopy_bp_updater.W_h
 
-    glb = batch(gl)
-
     result = dglmpn.forward(gl)
     mol_vec = mpn(mol2graph(smiles_batch))
 
