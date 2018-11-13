@@ -451,7 +451,7 @@ class ImmutableGraphIndex(object):
         def get_adj(ctx):
             new_mat = self._sparse.adjacency_matrix(transpose)
             return F.copy_to(new_mat, ctx)
-        return self._sparse.adjacency_matrix(transpopse, ctx)
+        return self._sparse.adjacency_matrix(transpose, ctx)
 
     def incidence_matrix(self, oriented=False):
         """Return the incidence matrix representation of this graph.

@@ -1553,7 +1553,7 @@ class DGLGraph(object):
         sparse_tensor
             The incidence matrix.
         """
-        if not isinstance(transpose, bool):
+        if not isinstance(oriented, bool):
             raise DGLError('Expect bool value for "oriented" arg,'
                            ' but got %s.' % (type(oriented)))
         return self._graph.incidence_matrix(oriented, ctx)
