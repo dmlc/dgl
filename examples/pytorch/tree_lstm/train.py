@@ -30,10 +30,10 @@ def main(args):
                               num_workers=0)
     devset = data.SST(mode='dev')
     dev_loader = DataLoader(dataset=devset,
-                             batch_size=100,
-                             collate_fn=data.SST.batcher(device),
-                             shuffle=False,
-                             num_workers=0)
+                            batch_size=100,
+                            collate_fn=data.SST.batcher(device),
+                            shuffle=False,
+                            num_workers=0)
 
     testset = data.SST(mode='test')
     test_loader = DataLoader(dataset=testset,
@@ -52,7 +52,9 @@ def main(args):
     params_ex_emb =[x for x in list(model.parameters()) if x.requires_grad and x.size(0)!=trainset.num_vocabs]
     params_emb = list(model.embedding.parameters())
 
-    optimizer = optim.Adagrad([{'params':params_ex_emb, 'lr':args.lr, 'weight_decay':args.weight_decay}, {'params':params_emb, 'lr':0.1*args.lr}])
+    optimizer = optim.Adagrad([
+        {'params':params_ex_emb, 'lr':args.lr, 'weight_decay':args.weight_decay},
+        {'params':params_emb, 'lr':0.1*args.lr}])
     dur = []
     for epoch in range(args.epochs):
         t_epoch = time.time()
@@ -104,8 +106,10 @@ def main(args):
             root_accs.append([root_acc, len(root_ids)])
         for param_group in optimizer.param_groups:
             param_group['lr'] = max(1e-5, param_group['lr']*0.99) #10
-
-        print("Epoch {:05d} | Dev Acc {:.4f} | Root Acc {:.4f}".format(epoch, 1.0*np.sum([x[0] for x in accs])/np.sum([x[1] for x in accs]), 1.0*np.sum([x[0] for x in root_accs])/np.sum([x[1] for x in root_accs])  ))
+        dev_acc = 1.0*np.sum([x[0] for x in accs])/np.sum([x[1] for x in accs])
+        dev_root_acc = 1.0*np.sum([x[0] for x in root_accs])/np.sum([x[1] for x in root_accs])
+        print("Epoch {:05d} | Dev Acc {:.4f} | Root Acc {:.4f}".format(
+            epoch, dev_acc, dev_root_acc))
 
         # test
         accs = []
@@ -128,8 +132,10 @@ def main(args):
         #lr decay
         for param_group in optimizer.param_groups:
             param_group['lr'] = max(1e-5, param_group['lr']*0.99) #10
-
-        print("Epoch {:05d} | Test Acc {:.4f} | Root Acc {:.4f}".format(epoch, 1.0*np.sum([x[0] for x in accs])/np.sum([x[1] for x in accs]), 1.0*np.sum([x[0] for x in root_accs])/np.sum([x[1] for x in root_accs])  ))
+        test_acc = 1.0*np.sum([x[0] for x in accs])/np.sum([x[1] for x in accs])
+        test_root_acc = 1.0*np.sum([x[0] for x in root_accs])/np.sum([x[1] for x in root_accs])
+        print("Epoch {:05d} | Test Acc {:.4f} | Root Acc {:.4f}".format(
+            epoch, test_acc, test_root_acc))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
