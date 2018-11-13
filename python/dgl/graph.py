@@ -733,7 +733,8 @@ class DGLGraph(object):
     def set_n_initializer(self, initializer):
         """Set the initializer for empty node features.
 
-        Initializer is a callable that returns a tensor given the shape and data type.
+        Initializer is a callable that returns a tensor given the shape, data type
+        and device context.
 
         Parameters
         ----------
@@ -745,7 +746,8 @@ class DGLGraph(object):
     def set_e_initializer(self, initializer):
         """Set the initializer for empty edge features.
 
-        Initializer is a callable that returns a tensor given the shape and data type.
+        Initializer is a callable that returns a tensor given the shape, data type
+        and device context.
 
         Parameters
         ----------
@@ -1509,12 +1511,20 @@ class DGLGraph(object):
                 self._edge_frame.num_rows,
                 reduce_func)
 
-    def adjacency_matrix(self, ctx=F.cpu()):
+    def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
+
+        By default, a row of returned adjacency matrix represents the destination
+        of an edge and the column represents the source.
+
+        When transpose is True, a row represents the source and a column represents
+        a destination.
 
         Parameters
         ----------
-        ctx : optional
+        transpose : bool, optional (default=False)
+            A flag to tranpose the returned adjacency matrix.
+        ctx : context, optional (default=cpu)
             The context of returned adjacency matrix.
 
         Returns
@@ -1522,7 +1532,7 @@ class DGLGraph(object):
         sparse_tensor
             The adjacency matrix.
         """
-        return self._graph.adjacency_matrix().get(ctx)
+        return self._graph.adjacency_matrix(transpose, ctx)
 
     def incidence_matrix(self, oriented=False, ctx=F.cpu()):
         """Return the incidence matrix representation of this graph.
@@ -1540,7 +1550,7 @@ class DGLGraph(object):
         sparse_tensor
             The incidence matrix.
         """
-        return self._graph.incidence_matrix(oriented).get(ctx)
+        return self._graph.incidence_matrix(oriented, ctx)
 
     def line_graph(self, backtracking=True, shared=False):
         """Return the line graph of this graph.
