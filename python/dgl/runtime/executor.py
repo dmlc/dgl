@@ -22,7 +22,58 @@ class Executor(object):
         raise NotImplementedError
 
 class SPMVExecutor(Executor):
-    """Executor to perform SPMV for one field"""
+    """Executor to perform SPMV.
+
+    The SPMV is a sparse matrix operation as follows:
+    ::
+
+        C := A op B
+
+    , where A is a sparse matrix, B is a dense matrix, C is a dense matrix.
+    The op can be any *diverse semi-ring*. However, only (*,+) is supported
+    at the moment.
+
+    When running this executor, B's data will be fetched by the given field;
+    A is created using the given sparse index and the data fetched by the
+    given field; C is then write to the given output field.
+
+    Parameters
+    ----------
+    A_index : sparse index
+        The sparse index of A.
+    A_shape : tuple of int
+        The dense shape of A.
+    A_store : dict
+        The k-v store of A's data.
+    A_field : str
+        Field name of A's data.
+    B_store : dict
+        The k-v store of B's data.
+    B_field : str
+        Field name of B's data.
+    C_store : dict
+        The k-v store of C's data.
+    C_field : str
+        Field name of C's data.
+
+    See Also
+    --------
+    dgl.backend.sparse_matrix
+    dgl.backend.sparse_matrix_indices
+    """
+    '''
+    def __init__(self, cache,
+                 A_cache_key, A_store, A_field,
+                 B_store, B_field, C_store, C_field):
+        self.cache = cache
+        self.A_cache_key = A_cache_key
+        self.A_store = A_store
+        self.A_field = A_field
+        self.B_store = B_store
+        self.B_field = B_field
+        self.C_store = C_store
+        self.C_field = C_field
+    '''
     def __init__(self, src_field, src_repr, out_field, out_repr, adjmat,
                  use_edge_feat=False, edge_field=None, edge_repr=None,
                  dense_shape=None):

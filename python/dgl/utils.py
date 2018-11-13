@@ -344,7 +344,7 @@ def build_sparse_matrix(dst, src, dense_shape, nnz):
     """Build sparse matrix
 
     Parameters
-    __________
+    ----------
     dst: Tensor
         Destination ids
     src: Tensor
