@@ -4,3 +4,4 @@ numpy
 seaborn
 matplotlib
 pygraphviz
+graphviz
