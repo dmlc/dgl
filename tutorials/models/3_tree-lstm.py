@@ -68,7 +68,7 @@ for token in a_tree.ndata['x'].tolist():
 # ----------------
 #
 # The first step is to throw all the trees into one graph, using
-# ``dgl.batch`` API.
+# the :func:`~dgl.batched_graph.batch` API.
 #
 
 import networkx as nx
@@ -85,12 +85,13 @@ def plot_tree(g):
 plot_tree(graph.to_networkx())
 
 ##############################################################################
-# You can read more about the definition of ``dgl.batch``, or can skip
-# ahead to the next step (link):
+# You can read more about the definition of :func:`~dgl.batched_graph.batch`
+# (by clicking the API), or can skip ahead to the next step:
 # 
 # .. note::
-#    **Definition**: a ``BatchedDGLGraph`` is a ``DGLGraph`` that
-#    unions a list of ``DGLGraph``\ s. 
+#
+#    **Definition**: a :class:`~dgl.batched_graph.BatchedDGLGraph` is a
+#    :class:`~dgl.DGLGraph` that unions a list of :class:`~dgl.DGLGraph`\ s. 
 #    
 #    - The union includes all the nodes,
 #      edges, and their features. The order of nodes, edges and features are
@@ -102,27 +103,29 @@ plot_tree(graph.to_networkx())
 #          :math:`j + \sum_{k=1}^{i-1} V_k` in the batched graph. 
 #    
 #        - Therefore, performing feature transformation and message passing on
-#          ``BatchedDGLGraph`` is equivalent to doing those on all ``DGLGraph``
-#          constituents in parallel. 
+#          ``BatchedDGLGraph`` is equivalent to doing those
+#          on all ``DGLGraph`` constituents in parallel. 
+#
 #    - Duplicate references to the same graph are
 #      treated as deep copies; the nodes, edges, and features are duplicated,
 #      and mutation on one reference does not affect the other. 
-#    - Currently, ``BatchedDGLGraph`` is immutable in graph structure (i.e. one can't add
+#    - Currently, ``BatchedDGLGraph`` is immutable in
+#      graph structure (i.e. one can't add
 #      nodes and edges to it). We need to support mutable batched graphs in
 #      (far) future. 
 #    - The ``BatchedDGLGraph`` keeps track of the meta
-#      information of the constituents so it can be ``unbatch``\ ed to list of
-#      ``DGLGraph``\ s.
+#      information of the constituents so it can be
+#      :func:`~dgl.batched_graph.unbatch`\ ed to list of ``DGLGraph``\ s.
 #
-# For more details about the ``BatchedDGLGraph`` module in DGL, please
-# read the :doc:`API reference <../../api/python/batch>`.
+# For more details about the :class:`~dgl.batched_graph.BatchedDGLGraph`
+# module in DGL, you can click the class name.
 #
 # Step 2: Tree-LSTM Cell with message-passing APIs
 # ------------------------------------------------
 #
 # .. note::
 #    The paper proposed two types of Tree LSTM: Child-Sum
-#    Tree-LSTMs, and :math:`N`-arr Tree-LSTMs. In this tutorial we focus on
+#    Tree-LSTMs, and :math:`N`-ary Tree-LSTMs. In this tutorial we focus on
 #    the later one. We use PyTorch as our backend framework to set up the
 #    network.
 #
@@ -147,7 +150,8 @@ plot_tree(graph.to_networkx())
 #
 # ``apply_node_func`` is a new node UDF we have not introduced before. In
 # ``apply_node_func``, user specifies what to do with node features,
-# without considering edge features and messages. In Tree-LSTM case, ``apply_node_func`` is a must, since there exists (leaf) nodes with
+# without considering edge features and messages. In Tree-LSTM case,
+# ``apply_node_func`` is a must, since there exists (leaf) nodes with
 # :math:`0` incoming edges, which would not be updated via
 # ``reduce_func``.
 #
@@ -168,16 +172,14 @@ class TreeLSTMCell(nn.Module):
     def reduce_func(self, nodes):
         h_cat = nodes.mailbox['h'].view(nodes.mailbox['h'].size(0), -1)
         f = th.sigmoid(self.U_f(h_cat)).view(*nodes.mailbox['h'].size())
-        c_f = th.sum(f * nodes.mailbox['c'], 1)
-        return {'h_cat': h_cat, 'c_f': c_f}
+        c = th.sum(f * nodes.mailbox['c'], 1)
+        return {'iou': self.U_iou(h_cat), 'c': c}
 
     def apply_node_func(self, nodes):
-        is_leaf = nodes.data['is_leaf']
-        # Treat leaf node and non-leaf node differently.
-        iou = is_leaf * self.W_iou(nodes.data['x']) + (1 - is_leaf) * self.U_iou(nodes.data['h_cat'])
+        iou = nodes.data['iou']
         i, o, u = th.chunk(iou, 3, 1)
         i, o, u = th.sigmoid(i), th.sigmoid(o), th.tanh(u)
-        c = i * u + nodes.data['c_f']
+        c = i * u + nodes.data['c']
         h = o * th.tanh(c)
         return {'h' : h, 'c' : c}
 
@@ -203,14 +205,20 @@ class TreeLSTMCell(nn.Module):
 # followings:
 #
 
+print('Traversing one tree:')
 print(dgl.topological_nodes_generator(a_tree))
+
+print('Traversing many trees at the same time:')
 print(dgl.topological_nodes_generator(graph))
 
 ##############################################################################
-# The ``graph.prop_nodes`` then call triggers the message passing:
+# We then call :meth:`~dgl.DGLGraph.prop_nodes` to trigger the message passing:
 #
 # .. note::
-#    **notice**: Before we call `graph.prop_nodes`, we must specify a `message_func` and `reduce_func` in advance, here we use built-in copy-from-source and sum function as our message function and reduce 
+#
+#    Before we call :meth:`~dgl.DGLGraph.prop_nodes`, we must specify a
+#    `message_func` and `reduce_func` in advance, here we use built-in
+#    copy-from-source and sum function as our message function and reduce
 #    function for demonstration.
 
 import dgl.function as fn
@@ -225,8 +233,6 @@ graph.prop_nodes(traversal_order)
 
 # the following is a syntax sugar that does the same
 # dgl.prop_nodes_topo(graph)
-
-print(graph.ndata['a'])
 
 ##############################################################################
 # Putting it together
@@ -254,21 +260,17 @@ class TreeLSTM(nn.Module):
         self.linear = nn.Linear(h_size, num_classes)
         self.cell = TreeLSTMCell(x_size, h_size)
 
-    def forward(self, batch, x, h, c, is_leaf):
+    def forward(self, batch, h, c):
         """Compute tree-lstm prediction given a batch.
 
         Parameters
         ----------
         batch : dgl.data.SSTBatch
             The data batch.
-        x : Tensor
-            Initial node input.
         h : Tensor
             Initial hidden state.
         c : Tensor
             Initial cell state.
-        is_leaf: Tensor
-            Indicator of whether a node is leaf or not.
 
         Returns
         -------
@@ -280,15 +282,10 @@ class TreeLSTM(nn.Module):
         g.register_reduce_func(self.cell.reduce_func)
         g.register_apply_node_func(self.cell.apply_node_func)
         # feed embedding
-        embeds = self.embedding(batch.wordid)
-        x = x.index_copy(0, batch.nid_with_word, embeds)
-        g.ndata['is_leaf'] = is_leaf
-        g.ndata['x'] = x
+        embeds = self.embedding(batch.wordid * batch.mask)
+        g.ndata['iou'] = self.cell.W_iou(embeds) * batch.mask.float().unsqueeze(-1)
         g.ndata['h'] = h
         g.ndata['c'] = c
-        # init h_cat and c_f for message passing
-        g.ndata['h_cat'] = th.zeros_like(h).repeat(1, 2)
-        g.ndata['c_f'] = th.zeros_like(c)
         # propagate
         dgl.prop_nodes_topo(g)
         # compute logits
@@ -306,6 +303,7 @@ class TreeLSTM(nn.Module):
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 
+device = th.device('cpu')
 # hyper parameters
 x_size = 256
 h_size = 256
@@ -329,7 +327,7 @@ optimizer = th.optim.Adagrad(model.parameters(),
                           
 train_loader = DataLoader(dataset=tiny_sst,
                           batch_size=5,
-                          collate_fn=data.SST.batcher,
+                          collate_fn=data.SST.batcher(device),
                           shuffle=False,
                           num_workers=0)
 
@@ -338,19 +336,18 @@ for epoch in range(epochs):
     for step, batch in enumerate(train_loader):
         g = batch.graph
         n = g.number_of_nodes()
-        is_leaf = batch.is_leaf
-        x = th.zeros((n, x_size))
         h = th.zeros((n, h_size))
         c = th.zeros((n, h_size))
-        logits = model(batch, x, h, c, is_leaf)
+        logits = model(batch, h, c)
         logp = F.log_softmax(logits, 1)
         loss = F.nll_loss(logp, batch.label, reduction='elementwise_mean') 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         pred = th.argmax(logits, 1)
-        acc = th.sum(th.eq(batch.label, pred))
-        print("Epoch {:05d} | Step {:05d} | Loss {:.4f} | Acc {:.4f} |".format(epoch, step, loss.item(), 1.0*acc.item()/len(batch.label)))
+        acc = float(th.sum(th.eq(batch.label, pred))) / len(batch.label)
+        print("Epoch {:05d} | Step {:05d} | Loss {:.4f} | Acc {:.4f} |".format(
+            epoch, step, loss.item(), acc))
 
 ##############################################################################
 # To train the model on full dataset with different settings(CPU/GPU,
