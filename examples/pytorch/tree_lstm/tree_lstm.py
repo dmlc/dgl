@@ -24,16 +24,14 @@ class TreeLSTMCell(nn.Module):
     def reduce_func(self, nodes):
         h_cat = nodes.mailbox['h'].view(nodes.mailbox['h'].size(0), -1)
         f = th.sigmoid(self.U_f(h_cat)).view(*nodes.mailbox['h'].size())
-        c_f = th.sum(f * nodes.mailbox['c'], 1)
-        return {'h_cat': h_cat, 'c_f': c_f}
+        c = th.sum(f * nodes.mailbox['c'], 1)
+        return {'iou': self.U_iou(h_cat), 'c': c}
 
     def apply_node_func(self, nodes):
-        is_leaf = nodes.data['is_leaf']
-        # Treat leaf node and non-leaf node differently.
-        iou = is_leaf * self.W_iou(nodes.data['x']) + (1 - is_leaf) * self.U_iou(nodes.data['h_cat'])
+        iou = nodes.data['iou']
         i, o, u = th.chunk(iou, 3, 1)
         i, o, u = th.sigmoid(i), th.sigmoid(o), th.tanh(u)
-        c = i * u + nodes.data['c_f']
+        c = i * u + nodes.data['c']
         h = o * th.tanh(c)
         return {'h' : h, 'c' : c}
 
@@ -56,21 +54,17 @@ class TreeLSTM(nn.Module):
         self.linear = nn.Linear(h_size, num_classes)
         self.cell = TreeLSTMCell(x_size, h_size)
 
-    def forward(self, batch, x, h, c, is_leaf):
+    def forward(self, batch, h, c):
         """Compute tree-lstm prediction given a batch.
 
         Parameters
         ----------
         batch : dgl.data.SSTBatch
             The data batch.
-        x : Tensor
-            Initial node input.
         h : Tensor
             Initial hidden state.
         c : Tensor
             Initial cell state.
-        is_leaf: Tensor
-            Indicator of whether a node is leaf or not.
 
         Returns
         -------
@@ -82,15 +76,10 @@ class TreeLSTM(nn.Module):
         g.register_reduce_func(self.cell.reduce_func)
         g.register_apply_node_func(self.cell.apply_node_func)
         # feed embedding
-        embeds = self.embedding(batch.wordid)
-        x = x.index_copy(0, batch.nid_with_word, embeds)
-        g.ndata['is_leaf'] = is_leaf
-        g.ndata['x'] = x
+        embeds = self.embedding(batch.wordid * batch.mask)
+        g.ndata['iou'] = self.cell.W_iou(embeds) * batch.mask.float().unsqueeze(-1)
         g.ndata['h'] = h
         g.ndata['c'] = c
-        # init h_cat and c_f for message passing
-        g.ndata['h_cat'] = th.zeros_like(h).repeat(1, 2)
-        g.ndata['c_f'] = th.zeros_like(c)
         # propagate
         dgl.prop_nodes_topo(g)
         # compute logits

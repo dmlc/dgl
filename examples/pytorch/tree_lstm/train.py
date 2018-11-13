@@ -12,39 +12,33 @@ import dgl.data as data
 
 from tree_lstm import TreeLSTM
 
-def _batch_to_cuda(batch):
-    return data.SSTBatch(graph=batch.graph,
-                         is_leaf = batch.is_leaf.cuda(),
-                         nid_with_word = batch.nid_with_word.cuda(),
-                         wordid = batch.wordid.cuda(),
-                         label = batch.label.cuda())
-
 def main(args):
     np.random.seed(args.seed)
     th.manual_seed(args.seed)
     th.cuda.manual_seed(args.seed)
 
     cuda = args.gpu >= 0
+    device = th.device('cuda:{}'.format(args.gpu)) if cuda else th.device('cpu')
     if cuda:
         th.cuda.set_device(args.gpu)
 
     trainset = data.SST()
     train_loader = DataLoader(dataset=trainset,
                               batch_size=args.batch_size,
-                              collate_fn=data.SST.batcher,
+                              collate_fn=data.SST.batcher(device),
                               shuffle=True,
                               num_workers=0)
     devset = data.SST(mode='dev')
     dev_loader = DataLoader(dataset=devset,
                              batch_size=100,
-                             collate_fn=data.SST.batcher,
+                             collate_fn=data.SST.batcher(device),
                              shuffle=False,
                              num_workers=0)
 
     testset = data.SST(mode='test')
     test_loader = DataLoader(dataset=testset,
                              batch_size=100,
-                             collate_fn=data.SST.batcher,
+                             collate_fn=data.SST.batcher(device),
                              shuffle=False,
                              num_workers=0)
 
@@ -53,9 +47,7 @@ def main(args):
                      args.h_size,
                      trainset.num_classes,
                      args.dropout,
-                     pretrained_emb = trainset.pretrained_emb)
-    if cuda:
-        model.cuda()
+                     pretrained_emb = trainset.pretrained_emb).to(device)
     print(model)
     params_ex_emb =[x for x in list(model.parameters()) if x.requires_grad and x.size(0)!=trainset.num_vocabs]
     params_emb = list(model.embedding.parameters())
@@ -66,31 +58,22 @@ def main(args):
         t_epoch = time.time()
         model.train()
         for step, batch in enumerate(train_loader):
-            if cuda:
-                batch = _batch_to_cuda(batch)
             g = batch.graph
             n = g.number_of_nodes()
-            is_leaf = batch.is_leaf
-            x = th.zeros((n, args.x_size))
-            h = th.zeros((n, args.h_size))
-            c = th.zeros((n, args.h_size))
-            if cuda:
-                x = x.cuda()
-                h = h.cuda()
-                c = c.cuda()
-
+            h = th.zeros((n, args.h_size)).to(device)
+            c = th.zeros((n, args.h_size)).to(device)
             if step >= 3:
-                t0 = time.time()
+                t0 = time.time() # tik
 
-            # traverse graph
-            logits = model(batch, x, h, c, is_leaf)
+            logits = model(batch, h, c)
             logp = F.log_softmax(logits, 1)
             loss = F.nll_loss(logp, batch.label, reduction='elementwise_mean') 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+
             if step >= 3:
-                dur.append(time.time() - t0)
+                dur.append(time.time() - t0) # tok
 
             if step > 0 and step % args.log_every == 0:
                 pred = th.argmax(logits, 1)
@@ -99,28 +82,19 @@ def main(args):
                 root_acc = np.sum(batch.label.cpu().data.numpy()[root_ids] == pred.cpu().data.numpy()[root_ids])
                 print("Epoch {:05d} | Step {:05d} | Loss {:.4f} | Acc {:.4f} | Root Acc {:.4f} | Time(s) {:.4f}".format(
                     epoch, step, loss.item(), 1.0*acc.item()/len(batch.label), 1.0*root_acc/len(root_ids), np.mean(dur)))
+        print('Epoch {:05d} training time {:.4f}s'.format(epoch, time.time() - t_epoch))
 
         # test on dev set
         accs = []
         root_accs = []
         model.eval()
         for step, batch in enumerate(dev_loader):
-            if cuda:
-                batch = _batch_to_cuda(batch)
             g = batch.graph
             n = g.number_of_nodes()
             with th.no_grad():
-                is_leaf = batch.is_leaf
-                x = th.zeros((n, args.x_size))
-                h = th.zeros((n, args.h_size))
-                c = th.zeros((n, args.h_size))
-                if cuda:
-                    x = x.cuda()
-                    h = h.cuda()
-                    c = c.cuda()
-
-                # traverse graph
-                logits = model(batch, x, h, c, is_leaf)
+                h = th.zeros((n, args.h_size)).to(device)
+                c = th.zeros((n, args.h_size)).to(device)
+                logits = model(batch, h, c)
 
             pred = th.argmax(logits, 1)
             acc = th.sum(th.eq(batch.label, pred)).item()
@@ -138,22 +112,12 @@ def main(args):
         root_accs = []
         model.eval()
         for step, batch in enumerate(test_loader):
-            if cuda:
-                batch = _batch_to_cuda(batch)
             g = batch.graph
             n = g.number_of_nodes()
             with th.no_grad():
-                is_leaf = batch.is_leaf
-                x = th.zeros((n, args.x_size))
-                h = th.zeros((n, args.h_size))
-                c = th.zeros((n, args.h_size))
-                if cuda:
-                    x = x.cuda()
-                    h = h.cuda()
-                    c = c.cuda()
-
-                # traverse graph
-                logits = model(batch, x, h, c, is_leaf)
+                h = th.zeros((n, args.h_size)).to(device)
+                c = th.zeros((n, args.h_size)).to(device)
+                logits = model(batch, h, c)
 
             pred = th.argmax(logits, 1)
             acc = th.sum(th.eq(batch.label, pred)).item()
@@ -170,7 +134,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu', type=int, default=-1)
-    parser.add_argument('--seed', type=int, default=1111)
+    parser.add_argument('--seed', type=int, default=12110)
     parser.add_argument('--batch-size', type=int, default=25)
     parser.add_argument('--x-size', type=int, default=300)
     parser.add_argument('--h-size', type=int, default=150)

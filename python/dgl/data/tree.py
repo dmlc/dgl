@@ -20,7 +20,7 @@ _urls = {
     'sst' : 'https://www.dropbox.com/s/6qa8rm43r2nmbyw/sst.zip?dl=1',
 }
 
-SSTBatch = namedtuple('SSTBatch', ['graph', 'is_leaf', 'nid_with_word', 'wordid', 'label'])
+SSTBatch = namedtuple('SSTBatch', ['graph', 'mask', 'wordid', 'label'])
 
 class SST(object):
     """Stanford Sentiment Treebank dataset.
@@ -106,17 +106,17 @@ class SST(object):
                 cid = g.number_of_nodes()
                 if isinstance(child[0], str) or isinstance(child[0], bytes):
                     # leaf node
-                    word = self.vocab.get(child[0].lower(), SST.UNK_WORD)
-                    g.add_node(cid, x=word, y=int(child.label()))
+                    word = self.vocab.get(child[0].lower(), self.UNK_WORD)
+                    g.add_node(cid, x=word, y=int(child.label()), mask=(word!=self.UNK_WORD))
                 else:
-                    g.add_node(cid, x=SST.PAD_WORD, y=int(child.label()))
+                    g.add_node(cid, x=SST.PAD_WORD, y=int(child.label()), mask=0)
                     _rec_build(cid, child)
                 g.add_edge(cid, nid)
         # add root
-        g.add_node(0, x=SST.PAD_WORD, y=int(root.label()))
+        g.add_node(0, x=SST.PAD_WORD, y=int(root.label()), mask=0)
         _rec_build(0, root)
         ret = dgl.DGLGraph()
-        ret.from_networkx(g, node_attrs=['x', 'y'])
+        ret.from_networkx(g, node_attrs=['x', 'y', 'mask'])
         return ret
 
     def __getitem__(self, idx):
@@ -125,30 +125,16 @@ class SST(object):
     def __len__(self):
         return len(self.trees)
 
-    @property 
+    @property
     def num_vocabs(self):
         return len(self.vocab)
 
     @staticmethod
-    def batcher(batch):
-        nid_with_word = []
-        wordid = []
-        is_leaf = []
-        label = []
-        gnid = 0
-        for tree in batch:
-            for nid in range(tree.number_of_nodes()):
-                if tree.nodes[nid].data['x'] != SST.PAD_WORD:
-                    nid_with_word.append(gnid)
-                    wordid.append(tree.nodes[nid].data['x'])
-                    is_leaf.append([1])
-                else:
-                    is_leaf.append([0])
-                label.append(tree.nodes[nid].data['y'])
-                gnid += 1
-        batch_trees = dgl.batch(batch)
-        return SSTBatch(graph=batch_trees,
-                        is_leaf=F.tensor(is_leaf, dtype=F.float32), 
-                        nid_with_word=F.tensor(nid_with_word, dtype=F.int64),
-                        wordid=F.tensor(wordid, dtype=F.int64),
-                        label=F.tensor(label, dtype=F.int64))
+    def batcher(device):
+        def batcher_dev(batch):
+            batch_trees = dgl.batch(batch)
+            return SSTBatch(graph=batch_trees,
+                            mask=batch_trees.ndata['mask'].to(device),
+                            wordid=batch_trees.ndata['x'].to(device),
+                            label=batch_trees.ndata['y'].to(device))
+        return batcher_dev
