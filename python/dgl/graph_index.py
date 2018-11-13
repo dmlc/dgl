@@ -489,7 +489,8 @@ class GraphIndex(object):
         utils.CtxCachedObject
             An object that returns tensor given context.
         """
-        if not 'adj' in self._cache:
+        key = 'transposed adj' if transpose else 'adj'
+        if not key in self._cache:
             src, dst, _ = self.edges(sorted=False)
             src = F.unsqueeze(src.tousertensor(), 0)
             dst = F.unsqueeze(dst.tousertensor(), 0)
@@ -501,8 +502,8 @@ class GraphIndex(object):
             # FIXME(minjie): data type
             dat = F.ones((self.number_of_edges(),), dtype=F.float32)
             mat = F.sparse_matrix(dat, ('coo', idx), (n, n))
-            self._cache['adj'] = utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx))
-        return self._cache['adj']
+            self._cache[key] = utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx))
+        return self._cache[key]
 
     def incidence_matrix(self, oriented=False):
         """Return the incidence matrix representation of this graph.
