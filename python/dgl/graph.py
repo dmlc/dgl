@@ -1532,6 +1532,9 @@ class DGLGraph(object):
         sparse_tensor
             The adjacency matrix.
         """
+        if not isinstance(transpose, bool):
+            raise DGLError('Expect bool value for "transpose" arg,'
+                           ' but got %s.' % (type(transpose)))
         return self._graph.adjacency_matrix(transpose, ctx)
 
     def incidence_matrix(self, oriented=False, ctx=F.cpu()):
@@ -1550,6 +1553,9 @@ class DGLGraph(object):
         sparse_tensor
             The incidence matrix.
         """
+        if not isinstance(transpose, bool):
+            raise DGLError('Expect bool value for "oriented" arg,'
+                           ' but got %s.' % (type(oriented)))
         return self._graph.incidence_matrix(oriented, ctx)
 
     def line_graph(self, backtracking=True, shared=False):
