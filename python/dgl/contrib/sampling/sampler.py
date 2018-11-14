@@ -2,8 +2,8 @@
 
 import numpy as np
 
-from .. import utils
-from ..subgraph import DGLSubGraph
+from ... import utils
+from ...subgraph import DGLSubGraph
 
 __all__ = ['NeighborSampler']
 
