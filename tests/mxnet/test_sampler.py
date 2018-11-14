@@ -73,15 +73,20 @@ def test_10neighbor_sampler_all():
         child_src1 = subg.map_to_subgraph_nid(src)
         assert mx.nd.sum(child_src1.tousertensor() == child_src.tousertensor()).asnumpy() == len(src)
 
-def test_10neighbor_sampler():
-    g = generate_rand_graph(100)
+def check_10neighbor_sampler(g, seeds):
     # In this case, NeighborSampling simply gets the neighborhood of a single vertex.
     for subg, seed_ids in dgl.contrib.sampling.NeighborSampler(g, 10, 5, neighbor_type='in',
-                                                               num_workers=4):
+                                                               num_workers=4, seed_nodes=seeds):
         assert subg.number_of_nodes() <= 6 * len(seed_ids)
         assert subg.number_of_edges() <= 5 * len(seed_ids)
         for seed_id in seed_ids:
             verify_subgraph(g, subg, seed_id)
+
+def test_10neighbor_sampler():
+    g = generate_rand_graph(100)
+    check_10neighbor_sampler(g, None)
+    check_10neighbor_sampler(g, seeds=np.unique(np.random.randint(0, g.number_of_nodes(),
+                                                                  size=int(g.number_of_nodes() / 10))))
 
 if __name__ == '__main__':
     test_1neighbor_sampler_all()
