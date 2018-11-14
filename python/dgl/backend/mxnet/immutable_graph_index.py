@@ -268,7 +268,7 @@ class ImmutableGraphIndex(object):
             induced_es.append(induced_e)
         return gis, induced_ns, induced_es
 
-    def adjacency_matrix(self, transpose=False):
+    def adjacency_matrix(self, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
 
         By default, a row of returned adjacency matrix represents the destination
@@ -281,6 +281,8 @@ class ImmutableGraphIndex(object):
         ----------
         transpose : bool
             A flag to tranpose the returned adjacency matrix.
+        ctx : context
+            The device context of the returned matrix.
 
         Returns
         -------
@@ -294,7 +296,7 @@ class ImmutableGraphIndex(object):
 
         indices = mat.indices
         indptr = mat.indptr
-        data = mx.nd.ones(indices.shape, dtype=np.float32)
+        data = mx.nd.ones(indices.shape, dtype=np.float32, ctx=ctx)
         return mx.nd.sparse.csr_matrix((data, indices, indptr), shape=mat.shape)
 
     def from_coo_matrix(self, out_coo):

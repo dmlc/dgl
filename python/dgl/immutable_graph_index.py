@@ -429,7 +429,7 @@ class ImmutableGraphIndex(object):
         return [ImmutableSubgraphIndex(gi, self, induced_n,
             induced_e) for gi, induced_n, induced_e in zip(gis, induced_nodes, induced_edges)]
 
-    def adjacency_matrix(self, transpose=False):
+    def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
 
         By default, a row of returned adjacency matrix represents the destination
@@ -451,13 +451,7 @@ class ImmutableGraphIndex(object):
         def get_adj(ctx):
             new_mat = self._sparse.adjacency_matrix(transpose)
             return F.copy_to(new_mat, ctx)
-
-        if not transpose and 'in_adj' in self._cache:
-            return self._cache['in_adj']
-        elif transpose and 'out_adj' in self._cache:
-            return self._cache['out_adj']
-        else:
-            return utils.CtxCachedObject(lambda ctx: get_adj(ctx))
+        return self._sparse.adjacency_matrix(transpose, ctx)
 
     def incidence_matrix(self, oriented=False):
         """Return the incidence matrix representation of this graph.
