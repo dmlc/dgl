@@ -69,6 +69,8 @@ class GraphOp {
   /*!
    * \brief Map vids in the parent graph to the vids in the subgraph.
    *
+   * If the Id doesn't exist in the subgraph, -1 will be used.
+   *
    * \param parent_vid_map An array that maps the vids in the parent graph to the
    * subgraph. The elements store the vertex Ids in the parent graph, and the
    * indices indicate the vertex Ids in the subgraph.
