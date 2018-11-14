@@ -40,8 +40,8 @@ def generate_graph(grad=False):
     ecol = Variable(th.randn(17, D), requires_grad=grad)
     g.ndata['h'] = ncol
     g.edata['w'] = ecol
-    g.set_n_initializer(lambda shape, dtype : th.zeros(shape))
-    g.set_e_initializer(lambda shape, dtype : th.zeros(shape))
+    g.set_n_initializer(lambda shape, dtype, ctx : th.zeros(shape, dtype=dtype, device=ctx))
+    g.set_e_initializer(lambda shape, dtype, ctx : th.zeros(shape, dtype=dtype, device=ctx))
     return g
 
 def test_batch_setter_getter():

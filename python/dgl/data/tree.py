@@ -5,18 +5,22 @@ Including:
 """
 from __future__ import absolute_import
 
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 from nltk.tree import Tree
 from nltk.corpus.reader import BracketParseCorpusReader
 import networkx as nx
 
-from .. import backend as F
-from ..graph import DGLGraph
-from .utils import download, extract_archive, get_download_dir
+import numpy as np
+import os
+import dgl
+import dgl.backend as F
+from dgl.data.utils import download, extract_archive, get_download_dir
 
 _urls = {
-    'sst' : 'https://www.dropbox.com/s/dw8kr2vuq7k4dqi/sst.zip?dl=1',
+    'sst' : 'https://www.dropbox.com/s/6qa8rm43r2nmbyw/sst.zip?dl=1',
 }
+
+SSTBatch = namedtuple('SSTBatch', ['graph', 'mask', 'wordid', 'label'])
 
 class SST(object):
     """Stanford Sentiment Treebank dataset.
@@ -42,10 +46,13 @@ class SST(object):
         Optional vocabulary file.
     """
     PAD_WORD=-1  # special pad word id
+    UNK_WORD=-1  # out-of-vocabulary word id
     def __init__(self, mode='train', vocab_file=None):
         self.mode = mode
         self.dir = get_download_dir()
         self.zip_file_path='{}/sst.zip'.format(self.dir)
+        self.pretrained_file = 'glove.840B.300d.txt' if mode == 'train' else ''
+        self.pretrained_emb = None
         self.vocab_file = '{}/sst/vocab.txt'.format(self.dir) if vocab_file is None else vocab_file
         download(_urls['sst'], path=self.zip_file_path)
         extract_archive(self.zip_file_path, '{}/sst'.format(self.dir))
@@ -56,37 +63,60 @@ class SST(object):
         print('Dataset creation finished. #Trees:', len(self.trees))
 
     def _load(self):
-        files = ['{}.txt'.format(self.mode)]
-        corpus = BracketParseCorpusReader('{}/sst'.format(self.dir), files)
-        sents = corpus.parsed_sents(files[0])
         # load vocab file
-        self.vocab = {}
-        with open(self.vocab_file) as vf:
+        self.vocab = OrderedDict()
+        with open(self.vocab_file, encoding='utf-8') as vf:
             for line in vf.readlines():
                 line = line.strip()
                 self.vocab[line] = len(self.vocab)
+
+        # filter glove
+        if self.pretrained_file != '' and os.path.exists(self.pretrained_file):
+            glove_emb = {}
+            with open(self.pretrained_file, 'r', encoding='utf-8') as pf:
+                for line in pf.readlines():
+                    sp = line.split(' ')
+                    if sp[0].lower() in self.vocab:
+                        glove_emb[sp[0].lower()] = np.array([float(x) for x in sp[1:]])
+        files = ['{}.txt'.format(self.mode)]
+        corpus = BracketParseCorpusReader('{}/sst'.format(self.dir), files)
+        sents = corpus.parsed_sents(files[0])
+
+        #initialize with glove
+        pretrained_emb = []
+        fail_cnt = 0
+        for line in self.vocab.keys():
+            if self.pretrained_file != '' and os.path.exists(self.pretrained_file):
+                if not line.lower() in glove_emb:
+                    fail_cnt += 1
+                pretrained_emb.append(glove_emb.get(line.lower(), np.random.uniform(-0.05, 0.05, 300)))
+
+        if self.pretrained_file != '' and os.path.exists(self.pretrained_file):
+            self.pretrained_emb = F.tensor(np.stack(pretrained_emb, 0))
+            print('Miss word in GloVe {0:.4f}'.format(1.0*fail_cnt/len(self.pretrained_emb)))
         # build trees
         for sent in sents:
             self.trees.append(self._build_tree(sent))
+
 
     def _build_tree(self, root):
         g = nx.DiGraph()
         def _rec_build(nid, node):
             for child in node:
                 cid = g.number_of_nodes()
-                if isinstance(child[0], str):
+                if isinstance(child[0], str) or isinstance(child[0], bytes):
                     # leaf node
-                    word = self.vocab[child[0].lower()]
-                    g.add_node(cid, x=word, y=int(child.label()))
+                    word = self.vocab.get(child[0].lower(), self.UNK_WORD)
+                    g.add_node(cid, x=word, y=int(child.label()), mask=(word!=self.UNK_WORD))
                 else:
-                    g.add_node(cid, x=SST.PAD_WORD, y=int(child.label()))
+                    g.add_node(cid, x=SST.PAD_WORD, y=int(child.label()), mask=0)
                     _rec_build(cid, child)
                 g.add_edge(cid, nid)
         # add root
-        g.add_node(0, x=SST.PAD_WORD, y=int(root.label()))
+        g.add_node(0, x=SST.PAD_WORD, y=int(root.label()), mask=0)
         _rec_build(0, root)
-        ret = DGLGraph()
-        ret.from_networkx(g, node_attrs=['x', 'y'])
+        ret = dgl.DGLGraph()
+        ret.from_networkx(g, node_attrs=['x', 'y', 'mask'])
         return ret
 
     def __getitem__(self, idx):
@@ -95,6 +125,16 @@ class SST(object):
     def __len__(self):
         return len(self.trees)
 
-    @property 
+    @property
     def num_vocabs(self):
         return len(self.vocab)
+
+    @staticmethod
+    def batcher(device):
+        def batcher_dev(batch):
+            batch_trees = dgl.batch(batch)
+            return SSTBatch(graph=batch_trees,
+                            mask=batch_trees.ndata['mask'].to(device),
+                            wordid=batch_trees.ndata['x'].to(device),
+                            label=batch_trees.ndata['y'].to(device))
+        return batcher_dev

@@ -77,6 +77,9 @@ def tensor(data, dtype=None):
 def sparse_matrix(data, index, shape, force_format=False):
     """Create a sparse matrix.
 
+    NOTE: Please make sure that the data and index tensors are not
+    copied. This is critical to the performance.
+
     Parameters
     ----------
     data : Tensor
@@ -482,7 +485,7 @@ def reshape(input, shape):
     """
     pass
 
-def zeros(shape, dtype):
+def zeros(shape, dtype, ctx):
     """Create a zero tensor.
 
     Parameters
@@ -491,6 +494,8 @@ def zeros(shape, dtype):
         The tensor shape.
     dtype : data type
         It should be one of the values in the data type dict.
+    ctx : context
+        The device of the result tensor.
 
     Returns
     -------
@@ -499,7 +504,7 @@ def zeros(shape, dtype):
     """
     pass
 
-def ones(shape, dtype):
+def ones(shape, dtype, ctx):
     """Create a one tensor.
 
     Parameters
@@ -508,6 +513,8 @@ def ones(shape, dtype):
         The tensor shape.
     dtype : data type
         It should be one of the values in the data type dict.
+    ctx : context
+        The device of the result tensor.
 
     Returns
     -------
