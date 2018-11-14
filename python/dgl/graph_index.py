@@ -7,6 +7,7 @@ import scipy
 
 from ._ffi.base import c_array
 from ._ffi.function import _init_api
+from .base import DGLError
 from . import backend as F
 from . import utils
 from .immutable_graph_index import create_immutable_graph_index
@@ -347,11 +348,14 @@ class GraphIndex(object):
         utils.Index
             The edge ids.
         """
-        edge_array = _CAPI_DGLGraphEdges(self._handle, sorted)
-        src = utils.toindex(edge_array(0))
-        dst = utils.toindex(edge_array(1))
-        eid = utils.toindex(edge_array(2))
-        return src, dst, eid
+        key = 'edges_s%d' % sorted
+        if key not in self._cache:
+            edge_array = _CAPI_DGLGraphEdges(self._handle, sorted)
+            src = utils.toindex(edge_array(0))
+            dst = utils.toindex(edge_array(1))
+            eid = utils.toindex(edge_array(2))
+            self._cache[key] = (src, dst, eid)
+        return self._cache[key]
 
     def in_degree(self, v):
         """Return the in degree of the node.
@@ -470,7 +474,7 @@ class GraphIndex(object):
         induced_nodes = utils.toindex(rst(1))
         return SubgraphIndex(rst(0), self, induced_nodes, e)
 
-    def adjacency_matrix(self, transpose=False):
+    def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
 
         By default, a row of returned adjacency matrix represents the destination
@@ -481,31 +485,30 @@ class GraphIndex(object):
 
         Parameters
         ----------
-        transpose : bool
+        transpose : bool, optional (default=False)
             A flag to tranpose the returned adjacency matrix.
 
         Returns
         -------
-        utils.CtxCachedObject
-            An object that returns tensor given context.
+        SparseTensor
+            The adjacency matrix.
         """
-        key = 'transposed adj' if transpose else 'adj'
-        if not key in self._cache:
-            src, dst, _ = self.edges(sorted=False)
-            src = F.unsqueeze(src.tousertensor(), 0)
-            dst = F.unsqueeze(dst.tousertensor(), 0)
-            if transpose:
-                idx = F.cat([src, dst], dim=0)
-            else:
-                idx = F.cat([dst, src], dim=0)
-            n = self.number_of_nodes()
-            # FIXME(minjie): data type
-            dat = F.ones((self.number_of_edges(),), dtype=F.float32)
-            mat = F.sparse_matrix(dat, ('coo', idx), (n, n))
-            self._cache[key] = utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx))
-        return self._cache[key]
+        src, dst, _ = self.edges(sorted=False)
+        src = src.tousertensor(ctx)  # the index of the ctx will be cached
+        dst = dst.tousertensor(ctx)  # the index of the ctx will be cached
+        src = F.unsqueeze(src, dim=0)
+        dst = F.unsqueeze(dst, dim=0)
+        if transpose:
+            idx = F.cat([src, dst], dim=0)
+        else:
+            idx = F.cat([dst, src], dim=0)
+        n = self.number_of_nodes()
+        # FIXME(minjie): data type
+        dat = F.ones((self.number_of_edges(),), dtype=F.float32, ctx=ctx)
+        adj = F.sparse_matrix(dat, ('coo', idx), (n, n))
+        return adj
 
-    def incidence_matrix(self, oriented=False):
+    def incidence_matrix(self, oriented=False, ctx=F.cpu()):
         """Return the incidence matrix representation of this graph.
         
         Parameters
@@ -515,38 +518,35 @@ class GraphIndex(object):
 
         Returns
         -------
-        utils.CtxCachedObject
-            An object that returns tensor given context.
+        SparseTensor
+            The incidence matrix.
         """
-        key = ('oriented ' if oriented else '') + 'incidence matrix'
-        if not key in self._cache:
-            src, dst, _ = self.edges(sorted=False)
-            src = src.tousertensor()
-            dst = dst.tousertensor()
-            m = self.number_of_edges()
-            eid = F.arange(0, m)
-            row = F.unsqueeze(F.cat([src, dst], dim=0), 0)
-            col = F.unsqueeze(F.cat([eid, eid], dim=0), 0)
-            idx = F.cat([row, col], dim=0)
-
-            diagonal = (src == dst)
-            if oriented:
-                # FIXME(minjie): data type
-                x = -F.ones((m,), dtype=F.float32)
-                y = F.ones((m,), dtype=F.float32)
-                x[diagonal] = 0
-                y[diagonal] = 0
-                dat = F.cat([x, y], dim=0)
-            else:
-                # FIXME(minjie): data type
-                x = F.ones((m,), dtype=F.float32)
-                x[diagonal] = 0
-                dat = F.cat([x, x], dim=0)
-            n = self.number_of_nodes()
-            mat = F.sparse_matrix(dat, ('coo', idx), (n, m))
-            self._cache[key] = utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx))
-
-        return self._cache[key]
+        src, dst, eid = self.edges(sorted=False)
+        src = src.tousertensor(ctx)  # the index of the ctx will be cached
+        dst = dst.tousertensor(ctx)  # the index of the ctx will be cached
+        eid = eid.tousertensor(ctx)  # the index of the ctx will be cached
+        n = self.number_of_nodes()
+        m = self.number_of_edges()
+        # create index
+        row = F.unsqueeze(F.cat([src, dst], dim=0), 0)
+        col = F.unsqueeze(F.cat([eid, eid], dim=0), 0)
+        idx = F.cat([row, col], dim=0)
+        # create data
+        diagonal = (src == dst)
+        if oriented:
+            # FIXME(minjie): data type
+            x = -F.ones((m,), dtype=F.float32, ctx=ctx)
+            y = F.ones((m,), dtype=F.float32, ctx=ctx)
+            x[diagonal] = 0
+            y[diagonal] = 0
+            dat = F.cat([x, y], dim=0)
+        else:
+            # FIXME(minjie): data type
+            x = F.ones((m,), dtype=F.float32, ctx=ctx)
+            x[diagonal] = 0
+            dat = F.cat([x, x], dim=0)
+        inc = F.sparse_matrix(dat, ('coo', idx), (n, m))
+        return inc
 
     def to_networkx(self):
         """Convert to networkx graph.

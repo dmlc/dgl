@@ -244,7 +244,7 @@ def build_relabel_map(x):
     x = x.tousertensor()
     unique_x, _ = F.sort_1d(F.unique(x))
     map_len = int(F.max(unique_x, dim=0)) + 1
-    old_to_new = F.zeros(map_len, dtype=F.int64)
+    old_to_new = F.zeros(map_len, dtype=F.int64, ctx=F.cpu())
     F.scatter_row_inplace(old_to_new, unique_x, F.arange(0, len(unique_x)))
     return unique_x, old_to_new
 
