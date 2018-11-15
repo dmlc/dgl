@@ -13,7 +13,7 @@ using tvm::runtime::NDArray;
 
 namespace dgl {
 
-TVM_REGISTER_GLOBAL("runtime.scheduler._CAPI_DGLDegreeBucketing")
+TVM_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLDegreeBucketing")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     const IdArray msg_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
     const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
@@ -22,7 +22,7 @@ TVM_REGISTER_GLOBAL("runtime.scheduler._CAPI_DGLDegreeBucketing")
     *rv = ConvertNDArrayVectorToPackedFunc(sched::DegreeBucketing(msg_ids, vids, nids));
   });
 
-TVM_REGISTER_GLOBAL("runtime.scheduler._CAPI_DGLDegreeBucketingForEdges")
+TVM_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLDegreeBucketingForEdges")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
     // XXX: better way to do arange?
@@ -35,7 +35,7 @@ TVM_REGISTER_GLOBAL("runtime.scheduler._CAPI_DGLDegreeBucketingForEdges")
     *rv = ConvertNDArrayVectorToPackedFunc(sched::DegreeBucketing(msg_ids, vids, vids));
   });
 
-TVM_REGISTER_GLOBAL("runtime.scheduler._CAPI_DGLDegreeBucketingForRecvNodes")
+TVM_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLDegreeBucketingForRecvNodes")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
@@ -44,7 +44,7 @@ TVM_REGISTER_GLOBAL("runtime.scheduler._CAPI_DGLDegreeBucketingForRecvNodes")
     *rv = ConvertNDArrayVectorToPackedFunc(sched::DegreeBucketing(edges.id, edges.dst, vids));
   });
 
-TVM_REGISTER_GLOBAL("runtime.scheduler._CAPI_DGLDegreeBucketingForFullGraph")
+TVM_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLDegreeBucketingForFullGraph")
 .set_body([] (TVMArgs args, TVMRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);

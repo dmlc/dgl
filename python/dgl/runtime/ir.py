@@ -121,6 +121,7 @@ class Inst(namedtuple('Inst', ['opcode', 'args', 'ret'])):
     SPMV_WITH_DATA = InstSpec(OpCode.SPMV_WITH_DATA,
             [VarType.SPMAT, VarType.FEAT, VarType.FEAT],
             VarType.FEAT)
+    # merge always sort
     MERGE = InstSpec(OpCode.MERGE,
             [VarType.IDX, '*', VarType.FEAT_DICT, '*'],
             VarType.FEAT_DICT)
