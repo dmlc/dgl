@@ -75,6 +75,9 @@ def test_pickling_graph():
     # registered functions are not pickled
     g.register_message_func(lambda nodes: {'x': nodes.data['x']})
 
+    # custom attributes should be pickled
+    g.foo = 2
+
     f = io.BytesIO()
     pickle.dump(g, f)
     f.seek(0)
@@ -82,6 +85,7 @@ def test_pickling_graph():
     f.close()
 
     _assert_is_identical(g, new_g)
+    assert new_g.foo == 2
 
     # test batched graph
     g2 = dgl.DGLGraph()
