@@ -114,11 +114,11 @@ def reshape(input, shape):
     # NOTE: the input cannot be a symbol
     return nd.reshape(input ,shape)
 
-def zeros(shape, dtype):
-    return nd.zeros(shape, dtype=dtype)
+def zeros(shape, dtype, ctx):
+    return nd.zeros(shape, dtype=dtype, ctx=ctx)
 
-def ones(shape, dtype):
-    return nd.ones(shape, dtype=dtype)
+def ones(shape, dtype, ctx):
+    return nd.ones(shape, dtype=dtype, ctx=ctx)
 
 def spmm(x, y):
     return nd.dot(x, y)

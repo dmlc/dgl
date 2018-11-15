@@ -184,7 +184,7 @@ class Frame(MutableMapping):
         dgl_warning('Initializer is not set. Use zero initializer instead.'
                     ' To suppress this warning, use `set_initializer` to'
                     ' explicitly specify which initializer to use.')
-        self._initializer = lambda shape, dtype: F.zeros(shape, dtype)
+        self._initializer = lambda shape, dtype, ctx: F.zeros(shape, dtype, ctx)
 
     def set_initializer(self, initializer):
         """Set the initializer for empty values.
@@ -284,9 +284,7 @@ class Frame(MutableMapping):
                            ' one column in the frame so number of rows can be inferred.' % name)
         if self.initializer is None:
             self._warn_and_set_initializer()
-        # TODO(minjie): directly init data on the targer device.
-        init_data = self.initializer((self.num_rows,) + scheme.shape, scheme.dtype)
-        init_data = F.copy_to(init_data, ctx)
+        init_data = self.initializer((self.num_rows,) + scheme.shape, scheme.dtype, ctx)
         self._columns[name] = Column(init_data, scheme)
 
     def update_column(self, name, data):
@@ -602,10 +600,10 @@ class FrameRef(MutableMapping):
 
         for key in self._frame:
             scheme = self._frame[key].scheme
-
+            ctx = F.context(self._frame[key].data)
             if self._frame.initializer is None:
                 self._frame._warn_and_set_initializer()
-            new_data = self._frame.initializer((num_rows,) + scheme.shape, scheme.dtype)
+            new_data = self._frame.initializer((num_rows,) + scheme.shape, scheme.dtype, ctx)
             feat_placeholders[key] = new_data
 
         self.append(feat_placeholders)
