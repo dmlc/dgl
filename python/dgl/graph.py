@@ -1195,14 +1195,15 @@ class DGLGraph(object):
             # no edges to be triggered
             return
 
-        execs = scheduler.get_snr_schedule(graph=self,
+        prog = scheduler.get_snr_schedule(graph=self,
                                            u=u,
                                            v=v,
                                            eid=eid,
                                            message_func=message_func,
                                            reduce_func=reduce_func,
                                            apply_func=apply_node_func)
-        Runtime.run(execs)
+        prog.pprint()
+        #Runtime.run(execs)
 
     def pull(self,
              v,
