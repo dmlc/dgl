@@ -4,7 +4,8 @@
 DGL at a glance
 =========================
 
-**Author**: Minjie Wang, Quan Gan, Zheng Zhang
+**Author**: `Minjie Wang <https://jermainewang.github.io/>`_, Quan Gan, `Jake
+Zhao <https://cs.nyu.edu/~jakezhao/>`_, Zheng Zhang
 
 The goal of DGL is to build, train, and deploy *machine learning models*
 on *graph-structured data*.  To achieve this, DGL provides a :class:`DGLGraph`

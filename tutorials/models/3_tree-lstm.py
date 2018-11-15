@@ -4,8 +4,9 @@
 Tree LSTM DGL Tutorial
 =========================
 
-**Author**: `Zihao Ye`, `Qipeng Guo`, `Minjie Wang`, `Zheng Zhang`
-
+**Author**: Zihao Ye, Qipeng Guo, `Minjie Wang
+<https://jermainewang.github.io/>`_, `Jake Zhao
+<https://cs.nyu.edu/~jakezhao/>`_, Zheng Zhang
 """
  
 ##############################################################################

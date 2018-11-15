@@ -4,7 +4,8 @@
 DGL Basics
 ==========
 
-**Author**: Minjie Wang, Quan Gan, Yu Gai, Zheng Zhang
+**Author**: `Minjie Wang <https://jermainewang.github.io/>`_, Quan Gan, Yu Gai,
+Zheng Zhang
 
 The Goal of this tutorial:
 
