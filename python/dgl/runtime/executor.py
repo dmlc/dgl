@@ -37,12 +37,16 @@ class SPMVExecutor(Executor):
     A is created using the given sparse index and the data fetched by the
     given field; C is then write to the given output field.
 
+    Note that the sparse index of A is not directly given to the constructor
+    of this executor because the device context is unknown until the B matrix
+    is computed.
+
     Parameters
     ----------
-    A_index : sparse index
-        The sparse index of A.
-    A_shape : tuple of int
-        The dense shape of A.
+    A_creator : callable
+        The function to create the sparse matrix A. The function should
+        comply with following signature:
+        def fn(data_store : dict, key : str, ctx : context): -> SparseTensor
     A_store : dict
         The k-v store of A's data.
     A_field : str
@@ -61,18 +65,30 @@ class SPMVExecutor(Executor):
     dgl.backend.sparse_matrix
     dgl.backend.sparse_matrix_indices
     """
-    '''
-    def __init__(self, cache,
-                 A_cache_key, A_store, A_field,
+    def __init__(self, A_creator, A_store, A_field,
                  B_store, B_field, C_store, C_field):
-        self.cache = cache
-        self.A_cache_key = A_cache_key
+        self.A_creator = A_creator
         self.A_store = A_store
         self.A_field = A_field
         self.B_store = B_store
         self.B_field = B_field
         self.C_store = C_store
         self.C_field = C_field
+
+    def run(self):
+        B = self.B_store[self.B_field]
+        ctx = F.context(B)
+        A = self.A_creator(self.A_store, self.A_field, ctx)
+        # spmv
+        if F.ndim(B) == 1:
+            # B is a vector, append a (1,) dim at the end
+            B = F.unsqueeze(B, 1)
+            C = F.spmm(A, B)
+            C = F.squeeze(C, 1)
+        else:
+            C = F.spmm(A, B)
+        self.C_store[self.C_field] = C
+
     '''
     def __init__(self, src_field, src_repr, out_field, out_repr, adjmat,
                  use_edge_feat=False, edge_field=None, edge_repr=None,
@@ -87,7 +103,6 @@ class SPMVExecutor(Executor):
             self.edge_field = edge_field
             self.edge_repr = edge_repr
             self.dense_shape = dense_shape
-
     def run(self):
         # get src col
         srccol = self.src_repr[self.src_field]
@@ -114,6 +129,8 @@ class SPMVExecutor(Executor):
 
         # update repr
         self.out_repr[self.out_field] = dstcol
+    '''
+
 
 class DegreeBucketingExecutor(Executor):
     """Executor for degree bucketing schedule"""

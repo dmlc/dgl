@@ -1486,7 +1486,7 @@ class DGLGraph(object):
 
         Returns
         -------
-        sparse_tensor
+        SparseTensor
             The adjacency matrix.
         """
         return self._graph.adjacency_matrix(transpose, ctx)

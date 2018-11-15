@@ -534,9 +534,16 @@ def _analyze_e2v_spmv(exec_list, out_repr, rfunc,
             rfunc_left.append(rfn)
     return rfunc_left
 
-def _v2v_spmv_exec(mfunc, rfunc, adjmat, node_repr, out_repr,
-                   use_edge_feat=False, edge_repr=None):
+def _v2v_spmv_exec(mfunc,
+                   rfunc,
+                   adjmat_creator,
+                   node_feat,
+                   out_feat,
+                   edge_feat):
     """Build v2v spmv executor"""
+    #return SPMVExecutor(A_creator=adjmat_creator,
+                        #A_store=edge_feat,
+                        #A_field=
     if use_edge_feat:
         index, shape = adjmat
         return SPMVExecutor(src_field=mfunc.src_field,
