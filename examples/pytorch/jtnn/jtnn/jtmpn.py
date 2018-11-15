@@ -37,6 +37,69 @@ def bond_features(bond):
     bt = bond.GetBondType()
     return (torch.Tensor([bt == Chem.rdchem.BondType.SINGLE, bt == Chem.rdchem.BondType.DOUBLE, bt == Chem.rdchem.BondType.TRIPLE, bt == Chem.rdchem.BondType.AROMATIC, bond.IsInRing()]))
 
+def mol2dgl_single(cand_batch):
+    cand_graphs = []
+    tree_mess_source_edges = [] # map these edges from trees to...
+    tree_mess_target_edges = [] # these edges on candidate graphs
+    tree_mess_target_nodes = []
+    n_nodes = 0
+    n_edges = 0
+    atom_x = []
+    bond_x = []
+
+    for mol, mol_tree, ctr_node_id in cand_batch:
+        n_atoms = mol.GetNumAtoms()
+        n_bonds = mol.GetNumBonds()
+
+        ctr_node = mol_tree.nodes_dict[ctr_node_id]
+        ctr_bid = ctr_node['idx']
+        g = DGLGraph()
+
+        for i, atom in enumerate(mol.GetAtoms()):
+            assert i == atom.GetIdx()
+            atom_x.append(atom_features(atom))
+        g.add_nodes(n_atoms)
+
+        bond_src = []
+        bond_dst = []
+        for i, bond in enumerate(mol.GetBonds()):
+            a1 = bond.GetBeginAtom()
+            a2 = bond.GetEndAtom()
+            begin_idx = a1.GetIdx()
+            end_idx = a2.GetIdx()
+            features = bond_features(bond)
+
+            bond_src.append(begin_idx)
+            bond_dst.append(end_idx)
+            bond_x.append(features)
+            bond_src.append(end_idx)
+            bond_dst.append(begin_idx)
+            bond_x.append(features)
+
+            x_nid, y_nid = a1.GetAtomMapNum(), a2.GetAtomMapNum()
+            # Tree node ID in the batch
+            x_bid = mol_tree.nodes_dict[x_nid - 1]['idx'] if x_nid > 0 else -1
+            y_bid = mol_tree.nodes_dict[y_nid - 1]['idx'] if y_nid > 0 else -1
+            if x_bid >= 0 and y_bid >= 0 and x_bid != y_bid:
+                if mol_tree.has_edge_between(x_bid, y_bid):
+                    tree_mess_target_edges.append((begin_idx + n_nodes, end_idx + n_nodes))
+                    tree_mess_source_edges.append((x_bid, y_bid))
+                    tree_mess_target_nodes.append(end_idx + n_nodes)
+                if mol_tree.has_edge_between(y_bid, x_bid):
+                    tree_mess_target_edges.append((end_idx + n_nodes, begin_idx + n_nodes))
+                    tree_mess_source_edges.append((y_bid, x_bid))
+                    tree_mess_target_nodes.append(begin_idx + n_nodes)
+
+        n_nodes += n_atoms
+        g.add_edges(bond_src, bond_dst)
+        cand_graphs.append(g)
+
+    return cand_graphs, torch.stack(atom_x), torch.stack(bond_x), \
+            torch.LongTensor(tree_mess_source_edges), \
+            torch.LongTensor(tree_mess_target_edges), \
+            torch.LongTensor(tree_mess_target_nodes)
+
+
 def mol2dgl(cand_batch, mol_tree_batch):
     cand_graphs = []
     tree_mess_source_edges = [] # map these edges from trees to...
@@ -186,8 +249,7 @@ class DGLJTMPN(nn.Module):
         self.n_passes = 0
 
     def forward(self, cand_batch, mol_tree_batch):
-        cand_graphs, tree_mess_src_edges, tree_mess_tgt_edges, tree_mess_tgt_nodes = \
-                mol2dgl(cand_batch, mol_tree_batch)
+        cand_graphs, tree_mess_src_edges, tree_mess_tgt_edges, tree_mess_tgt_nodes = cand_batch
 
         n_samples = len(cand_graphs)
 
@@ -236,14 +298,14 @@ class DGLJTMPN(nn.Module):
             cand_graphs.edata['alpha'] = \
                     cuda(torch.zeros(cand_graphs.number_of_edges(), self.hidden_size))
 
-            src_u, src_v = zip(*tree_mess_src_edges)
-            tgt_u, tgt_v = zip(*tree_mess_tgt_edges)
+            src_u, src_v = tree_mess_src_edges.unbind(1)
+            tgt_u, tgt_v = tree_mess_tgt_edges.unbind(1)
             alpha = mol_tree_batch.edges[src_u, src_v].data['m']
             cand_graphs.edges[tgt_u, tgt_v].data['alpha'] = alpha
         else:
-            src_u, src_v = zip(*tree_mess_src_edges)
+            src_u, src_v = tree_mess_src_edges.unbind(1)
             alpha = mol_tree_batch.edges[src_u, src_v].data['m']
-            node_idx = (torch.LongTensor(tree_mess_tgt_nodes)
+            node_idx = (tree_mess_tgt_nodes
                         .to(device=zero_node_state.device)[:, None]
                         .expand_as(alpha))
             node_alpha = zero_node_state.clone().scatter_add(0, node_idx, alpha)

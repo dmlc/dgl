@@ -49,35 +49,22 @@ class DGLJTNNVAE(nn.Module):
         self.n_edges_total = 0
         self.n_tree_nodes_total = 0
 
-    @staticmethod
-    def _assign_tree_id(mol_batch):
-        node_offset = 0
-        for i, mol_tree in enumerate(mol_batch):
-            mol_tree.batch_id = i
-            mol_tree.node_offset = node_offset
-            node_offset += mol_tree.number_of_nodes()
-
-        return mol_batch
-
     def encode(self, mol_batch):
-        dgl_set_batch_nodeID(mol_batch, self.vocab)
-
-        smiles_batch = [mol_tree.smiles for mol_tree in mol_batch]
-        mol_graphs = mol2dgl(smiles_batch)
+        mol_graphs = mol_batch['mol_graph_batch']
         mol_vec = self.mpn(mol_graphs)
 
-        self._assign_tree_id(mol_batch)
-        mol_tree_batch, tree_vec = self.jtnn(mol_batch)
+        mol_tree_batch, tree_vec = self.jtnn(mol_batch['mol_trees'])
 
         self.n_nodes_total += mol_graphs.number_of_nodes()
         self.n_edges_total += mol_graphs.number_of_edges()
-        self.n_tree_nodes_total += sum(t.number_of_nodes() for t in mol_batch)
+        self.n_tree_nodes_total += sum(t.number_of_nodes() for t in mol_batch['mol_trees'])
         self.n_passes += 1
 
         return mol_tree_batch, tree_vec, mol_vec
 
     def forward(self, mol_batch, beta=0, e1=None, e2=None):
-        batch_size = len(mol_batch)
+        mol_trees = mol_batch['mol_trees']
+        batch_size = len(mol_trees)
 
         mol_tree_batch, tree_vec, mol_vec = self.encode(mol_batch)
 
@@ -101,9 +88,8 @@ class DGLJTNNVAE(nn.Module):
         self.tree_log_var = tree_log_var
         self.e1 = epsilon
         self.tree_vec = tree_vec
-        self.mol_vec = mol_vec
 
-        word_loss, topo_loss, word_acc, topo_acc = self.decoder(mol_batch, tree_vec)
+        word_loss, topo_loss, word_acc, topo_acc = self.decoder(mol_trees, tree_vec)
         assm_loss, assm_acc = self.assm(mol_batch, mol_tree_batch, mol_vec)
         stereo_loss, stereo_acc = self.stereo(mol_batch, mol_vec)
 
@@ -120,29 +106,25 @@ class DGLJTNNVAE(nn.Module):
         return loss, kl_loss, word_acc, topo_acc, assm_acc, stereo_acc
 
     def assm(self, mol_batch, mol_tree_batch, mol_vec):
-        cands = []
-        batch_idx = []
-
-        for i, mol_tree in enumerate(mol_batch):
-            for node_id, node in mol_tree.nodes_dict.items():
-                if node['is_leaf'] or len(node['cands']) == 1:
-                    continue
-                cands.extend([(cand, mol_tree, node_id) for cand in node['cand_mols']])
-                batch_idx.extend([i] * len(node['cands']))
-
+        cands = [mol_batch['cand_graph_batch'],
+                 mol_batch['tree_mess_src_e'],
+                 mol_batch['tree_mess_tgt_e'],
+                 mol_batch['tree_mess_tgt_n']]
         cand_vec = self.jtmpn(cands, mol_tree_batch)
         cand_vec = self.G_mean(cand_vec)
 
-        batch_idx = cuda(torch.LongTensor(batch_idx))
+        batch_idx = cuda(torch.LongTensor(mol_batch['cand_batch_idx']))
         mol_vec = mol_vec[batch_idx]
+        self.mol_vec_v = mol_vec
 
         mol_vec = mol_vec.view(-1, 1, self.latent_size // 2)
         cand_vec = cand_vec.view(-1, self.latent_size // 2, 1)
         scores = (mol_vec @ cand_vec)[:, 0, 0]
+        self.scores = scores
 
         cnt, tot, acc = 0, 0, 0
         all_loss = []
-        for i, mol_tree in enumerate(mol_batch):
+        for i, mol_tree in enumerate(mol_batch['mol_trees']):
             comp_nodes = [node_id for node_id, node in mol_tree.nodes_dict.items()
                           if len(node['cands']) > 1 and not node['is_leaf']]
             cnt += len(comp_nodes)
@@ -161,35 +143,28 @@ class DGLJTNNVAE(nn.Module):
                 all_loss.append(
                     F.cross_entropy(cur_score.view(1, -1), label, size_average=False))
 
-        all_loss = sum(all_loss) / len(mol_batch)
+        all_loss = sum(all_loss) / len(mol_batch['mol_trees'])
         return all_loss, acc / cnt
 
     def stereo(self, mol_batch, mol_vec):
-        stereo_cands, batch_idx = [], []
-        labels = []
-        for i, mol_tree in enumerate(mol_batch):
-            cands = mol_tree.stereo_cands
-            if len(cands) == 1:
-                continue
-            if mol_tree.smiles3D not in cands:
-                cands.append(mol_tree.smiles3D)
-            stereo_cands.extend(cands)
-            batch_idx.extend([i] * len(cands))
-            labels.append((cands.index(mol_tree.smiles3D), len(cands)))
+        stereo_cands = mol_batch['stereo_cand_graph_batch']
+        batch_idx = mol_batch['stereo_cand_batch_idx']
+        labels = mol_batch['stereo_cand_labels']
+        lengths = mol_batch['stereo_cand_lengths']
 
         if len(labels) == 0:
             # Only one stereoisomer exists; do nothing
             return cuda(torch.tensor(0.)), 1.
 
         batch_idx = cuda(torch.LongTensor(batch_idx))
-        stereo_cands = self.mpn(mol2dgl(stereo_cands))
+        stereo_cands = self.mpn(stereo_cands)
         stereo_cands = self.G_mean(stereo_cands)
         stereo_labels = mol_vec[batch_idx]
         scores = F.cosine_similarity(stereo_cands, stereo_labels)
 
         st, acc = 0, 0
         all_loss = []
-        for label, le in labels:
+        for label, le in zip(labels, lengths):
             cur_scores = scores[st:st+le]
             if cur_scores.data[label].item() >= cur_scores.max().item():
                 acc += 1

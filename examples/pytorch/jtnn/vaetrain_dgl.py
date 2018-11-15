@@ -27,8 +27,8 @@ parser.add_option("-z", "--beta", dest="beta", default=1.0)
 parser.add_option("-q", "--lr", dest="lr", default=1e-3)
 opts,args = parser.parse_args()
 
-dataset = JTNNDataset(data=opts.train, vocab=opts.vocab)
-vocab = Vocab([x.strip("\r\n ") for x in open(dataset.vocab_file)])
+dataset = JTNNDataset(data=opts.train, vocab=opts.vocab, training=True)
+vocab = dataset.vocab
 
 batch_size = int(opts.batch_size)
 hidden_size = int(opts.hidden_size)
@@ -48,8 +48,7 @@ else:
         else:
             nn.init.xavier_normal(param)
 
-if torch.cuda.is_available():
-    model = model.cuda()
+model = cuda(model)
 print("Model #Params: %dK" % (sum([x.nelement() for x in model.parameters()]) / 1000,))
 
 optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -65,19 +64,13 @@ def train():
             batch_size=batch_size,
             shuffle=True,
             num_workers=0,
-            collate_fn=lambda x:x,
+            collate_fn=JTNNCollator(vocab, True),
             drop_last=True)
 
     for epoch in range(MAX_EPOCH):
         word_acc,topo_acc,assm_acc,steo_acc = 0,0,0,0
 
         for it, batch in enumerate(dataloader):
-            for mol_tree in batch:
-                for node_id, node in mol_tree.nodes_dict.items():
-                    if node['label'] not in node['cands']:
-                        node['cands'].append(node['label'])
-                        node['cand_mols'].append(node['label_mol'])
-
             model.zero_grad()
             loss, kl_div, wacc, tacc, sacc, dacc = model(batch, beta)
             loss.backward()

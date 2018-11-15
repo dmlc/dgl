@@ -1,3 +1,5 @@
+from jtnn.datautils import JTNNDataset, JTNNCollator
+from official.datautils import MoleculeDataset
 from jtnn.mpn import mol2dgl, DGLMPN
 from official.mpn import MPN, mol2graph
 from jtnn.jtnn_enc import DGLJTNNEncoder
@@ -19,6 +21,12 @@ import numpy as np
 
 lg = rdkit.RDLogger.logger() 
 lg.setLevel(rdkit.RDLogger.CRITICAL)
+#smiles_batch = '''
+#c1ccccc1
+#'''.strip().split()
+
+jtnn_dataset = JTNNDataset('trainmini', 'vocab', True)
+official_dataset = MoleculeDataset('data/trainmini.txt')
 
 smiles_batch = '''
 CCCCCCC1=NN2C(=N)/C(=C\c3cc(C)n(-c4ccc(C)cc4C)c3C)C(=O)N=C2S1
@@ -30,9 +38,6 @@ Cc1ccc([C@@H](C)[NH2+][C@H](C)C(=O)Nc2ccccc2F)cc1
 O=c1cc(C[NH2+]Cc2cccc(Cl)c2)nc(N2CCCC2)[nH]1
 O=C(Cn1nc(C(=O)[O-])c2ccccc2c1=O)Nc1ccc2c(c1)C(=O)c1ccccc1C2=O
 '''.strip().split()
-#smiles_batch = '''
-#c1ccccc1
-#'''.strip().split()
 
 def allclose(a, b):
     return torch.allclose(a, b, rtol=1e-4, atol=1e-7)
@@ -40,7 +45,7 @@ def allclose(a, b):
 def isclose(a, b):
     return torch.isclose(a, b, rtol=1e-4, atol=1e-7)
 
-
+'''
 def test_mpn():
     gl = mol2dgl(smiles_batch)
     dglmpn = DGLMPN(5, 4)
@@ -173,26 +178,22 @@ def test_treedec():
     assert isclose(q_loss, dgl_q_loss)
     assert isclose(p_acc, dgl_p_acc)
     assert isclose(q_acc, dgl_q_acc)
-
+'''
 
 def test_vae():
     vocab = [x.strip('\r\n ') for x in open('data/vocab.txt')]
     vocab = Vocab(vocab)
-    mol_batch = [MolTree(smiles) for smiles in smiles_batch]
+    mol_batch = [official_dataset[i] for i in range(10)]
     for mol_tree in mol_batch:
         mol_tree.recover()
         mol_tree.assemble()
     set_batch_nodeID(mol_batch, vocab)
-    nx_mol_batch = [DGLMolTree(smiles) for smiles in smiles_batch]
-    for nx_mol_tree in nx_mol_batch:
-        nx_mol_tree.recover()
-        nx_mol_tree.assemble()
-    dgl_set_batch_nodeID(nx_mol_batch, vocab)
+    nx_mol_batch = JTNNCollator(vocab, True)([jtnn_dataset[i] for i in range(10)])
 
     vae = JTNNVAE(vocab, 50, 50, 3)
     dglvae = DGLJTNNVAE(vocab, 50, 50, 3)
-    e1 = torch.randn(len(smiles_batch), 25)
-    e2 = torch.randn(len(smiles_batch), 25)
+    e1 = torch.randn(len(mol_batch), 25)
+    e2 = torch.randn(len(mol_batch), 25)
 
     dglvae.embedding = vae.embedding
     dgljtnn, dgljtmpn, dglmpn, dgldecoder = dglvae.jtnn, dglvae.jtmpn, dglvae.mpn, dglvae.decoder
@@ -235,7 +236,9 @@ def test_vae():
 
 
 if __name__ == '__main__':
+    '''
     test_mpn()
     test_treeenc()
     test_treedec()
+    '''
     test_vae()

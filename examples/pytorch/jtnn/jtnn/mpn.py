@@ -36,6 +36,40 @@ def bond_features(bond):
     fstereo = onek_encoding_unk(stereo, [0,1,2,3,4,5])
     return (torch.Tensor(fbond + fstereo))
 
+def mol2dgl_single(smiles):
+    n_edges = 0
+
+    atom_x = []
+    bond_x = []
+
+    mol = get_mol(smiles)
+    n_atoms = mol.GetNumAtoms()
+    n_bonds = mol.GetNumBonds()
+    graph = DGLGraph()
+    for i, atom in enumerate(mol.GetAtoms()):
+        assert i == atom.GetIdx()
+        atom_x.append(atom_features(atom))
+    graph.add_nodes(n_atoms)
+
+    bond_src = []
+    bond_dst = []
+    for i, bond in enumerate(mol.GetBonds()):
+        begin_idx = bond.GetBeginAtom().GetIdx()
+        end_idx = bond.GetEndAtom().GetIdx()
+        features = bond_features(bond)
+        bond_src.append(begin_idx)
+        bond_dst.append(end_idx)
+        bond_x.append(features)
+        # set up the reverse direction
+        bond_src.append(end_idx)
+        bond_dst.append(begin_idx)
+        bond_x.append(features)
+    graph.add_edges(bond_src, bond_dst)
+
+    n_edges += n_bonds
+    return graph, torch.stack(atom_x), torch.stack(bond_x)
+
+
 def mol2dgl(smiles_batch):
     n_edges = 0
     graph_list = []
@@ -75,7 +109,7 @@ def mol2dgl(smiles_batch):
     atom_x = cuda(torch.stack(atom_x, 0))
     bond_x = cuda(torch.stack(bond_x, 0))
     graph_list.ndata['x'] = atom_x
-    if n_bonds > 0:
+    if n_edges > 0:
         graph_list.edata.update({
             'x': bond_x,
             'src_x': atom_x.new(n_edges * 2, ATOM_FDIM).zero_()
