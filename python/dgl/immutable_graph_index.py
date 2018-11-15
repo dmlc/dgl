@@ -429,6 +429,20 @@ class ImmutableGraphIndex(object):
         return [ImmutableSubgraphIndex(gi, self, induced_n,
             induced_e) for gi, induced_n, induced_e in zip(gis, induced_nodes, induced_edges)]
 
+    def neighbor_sampling(self, seed_ids, expand_factor, num_hops, neighbor_type,
+                          node_prob, max_subgraph_size):
+        if len(seed_ids) == 0:
+            return []
+        seed_ids = [v.tousertensor() for v in seed_ids]
+        gis, induced_nodes, induced_edges = self._sparse.neighbor_sampling(seed_ids, expand_factor,
+                                                                           num_hops, neighbor_type,
+                                                                           node_prob,
+                                                                           max_subgraph_size)
+        induced_nodes = [utils.toindex(v) for v in induced_nodes]
+        induced_edges = [utils.toindex(e) for e in induced_edges]
+        return [ImmutableSubgraphIndex(gi, self, induced_n,
+            induced_e) for gi, induced_n, induced_e in zip(gis, induced_nodes, induced_edges)]
+
     def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
 
@@ -557,9 +571,17 @@ def create_immutable_graph_index(graph_data=None):
     assert F.create_immutable_graph_index is not None, \
             "The selected backend doesn't support read-only graph!"
 
+    try:
+        # Let's try using the graph data to generate an immutable graph index.
+        # If we are successful, we can return the immutable graph index immediately.
+        # If graph_data is None, we return an empty graph index.
+        # If we can't create a graph index, we'll use the code below to handle the graph.
+        return ImmutableGraphIndex(F.create_immutable_graph_index(graph_data))
+    except:
+        pass
+
+    # Let's create an empty graph index first.
     gi = ImmutableGraphIndex(F.create_immutable_graph_index())
-    if graph_data is None:
-        return gi
 
     # scipy format
     if isinstance(graph_data, sp.spmatrix):

@@ -240,7 +240,7 @@ class ImmutableGraphIndex(object):
 
         Parameters
         ----------
-        vs_arr : a vector of utils.Index
+        vs_arr : a vector of NDArray
             The nodes.
 
         Returns
@@ -267,6 +267,39 @@ class ImmutableGraphIndex(object):
             induced_ns.append(induced_n)
             induced_es.append(induced_e)
         return gis, induced_ns, induced_es
+
+    def neighbor_sampling(self, seed_ids, expand_factor, num_hops, neighbor_type,
+                          node_prob, max_subgraph_size):
+        assert node_prob is None
+        if neighbor_type == 'in':
+            g = self._in_csr
+        elif neighbor_type == 'out':
+            g = self._out_csr
+        else:
+            raise NotImplementedError
+        num_nodes = []
+        num_subgs = len(seed_ids)
+        res = mx.nd.contrib.neighbor_sample(g, *seed_ids, num_hops=num_hops,
+                                            num_neighbor=expand_factor,
+                                            max_num_vertices=max_subgraph_size)
+
+        vertices, subgraphs = res[0:num_subgs], res[num_subgs:len(res)]
+        num_nodes = [subg_v[-1].asnumpy()[0] for subg_v in vertices]
+
+        inputs = []
+        inputs.extend(subgraphs)
+        inputs.extend(vertices)
+        compacts = mx.nd.contrib.dgl_graph_compact(*inputs, graph_sizes=num_nodes, return_mapping=False)
+
+        if isinstance(compacts, mx.nd.sparse.CSRNDArray):
+            compacts = [compacts]
+        if neighbor_type == 'in':
+            gis = [ImmutableGraphIndex(csr, None) for csr in compacts]
+        elif neighbor_type == 'out':
+            gis = [ImmutableGraphIndex(None, csr) for csr in compacts]
+        parent_nodes = [v[0:size] for v, size in zip(vertices, num_nodes)]
+        parent_edges = [e.data for e in subgraphs]
+        return gis, parent_nodes, parent_edges
 
     def adjacency_matrix(self, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
@@ -314,12 +347,23 @@ class ImmutableGraphIndex(object):
         self.__init__(mx.nd.sparse.csr_matrix((edge_ids, (dst, src)), shape=out_coo.shape).astype(np.int64),
                 mx.nd.sparse.csr_matrix((edge_ids, (src, dst)), shape=out_coo.shape).astype(np.int64))
 
-def create_immutable_graph_index():
+def create_immutable_graph_index(in_csr=None, out_csr=None):
     """ Create an empty backend-specific immutable graph index.
+
+    Parameters
+    ----------
+    in_csr : MXNet CSRNDArray
+        The in-edge CSR array.
+    out_csr : MXNet CSRNDArray
+        The out-edge CSR array.
 
     Returns
     -------
     ImmutableGraphIndex
         The backend-specific immutable graph index.
     """
-    return ImmutableGraphIndex(None, None)
+    if in_csr is not None and not isinstance(in_csr, mx.nd.sparse.CSRNDArray):
+        raise TypeError()
+    if out_csr is not None and not isinstance(out_csr, mx.nd.sparse.CSRNDArray):
+        raise TypeError()
+    return ImmutableGraphIndex(in_csr, out_csr)
