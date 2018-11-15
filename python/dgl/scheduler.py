@@ -348,8 +348,9 @@ class SendRecvExecutor(BasicExecutor):
                 dat = F.squeeze(dat, dim=1)
         else:
             dat = F.ones((len(self.u), ), dtype=F.float32, ctx=ctx)
-        adjmat = F.sparse_matrix(dat, ('coo', self.graph_idx), self.graph_shape)
-        return F.copy_to(adjmat, ctx)
+        adjmat = F.sparse_matrix(
+                dat, ('coo', F.copy_to(self.graph_idx, ctx)), self.graph_shape)
+        return adjmat
 
 
 class BundledExecutor(BasicExecutor):
