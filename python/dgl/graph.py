@@ -1672,12 +1672,10 @@ class DGLGraph(object):
         self.set_n_repr(new_repr, v, inplace=inplace)
 
     def __getstate__(self):
-        return self._graph, \
-               self._node_frame, \
-               self._edge_frame, \
-               self._graph.is_multigraph(), \
-               self._readonly
+        dic = self.__dict__.copy()
 
-    def __setstate__(self, state):
-        graph, node_frame, edge_frame, multigraph, readonly = state
-        self._init_graph(graph, node_frame, edge_frame, multigraph, readonly)
+        for attr in ['_msg_graph', '_msg_frame', '_msg_edges', '_message_func',
+                     '_reduce_func', '_apply_node_func', '_apply_edge_func']:
+            del dic[attr]
+
+        return dic

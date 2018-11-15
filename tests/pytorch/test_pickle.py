@@ -39,6 +39,21 @@ def test_pickling_graph_index():
     assert torch.equal(dst_idx.tousertensor(), dst_idx2.tousertensor())
 
 
+def _assert_is_identical(g, g2):
+    assert g.number_of_nodes() == g2.number_of_nodes()
+    src, dst = g.all_edges()
+    src2, dst2 = g2.all_edges()
+    assert torch.equal(src, src2)
+    assert torch.equal(dst, dst2)
+
+    assert len(g.ndata) == len(g2.ndata)
+    assert len(g.edata) == len(g2.edata)
+    for k in g.ndata:
+        assert U.allclose(g.ndata[k], g2.ndata[k])
+    for k in g.edata:
+        assert U.allclose(g.edata[k], g2.edata[k])
+
+
 def test_pickling_graph():
     # graph structures and frames are pickled
     g = dgl.DGLGraph()
@@ -63,18 +78,40 @@ def test_pickling_graph():
     f = io.BytesIO()
     pickle.dump(g, f)
     f.seek(0)
-    g2 = pickle.load(f)
+    new_g = pickle.load(f)
     f.close()
 
-    assert g.number_of_nodes() == g2.number_of_nodes()
-    src2, dst2 = g2.all_edges()
-    assert torch.equal(src, src2)
-    assert torch.equal(dst, dst2)
+    _assert_is_identical(g, new_g)
 
-    for k in g.ndata:
-        assert U.allclose(g.ndata[k], g2.ndata[k])
-    for k in g.edata:
-        assert U.allclose(g.edata[k], g2.edata[k])
+    # test batched graph
+    g2 = dgl.DGLGraph()
+    g2.add_nodes(4)
+    src2 = torch.LongTensor([0, 1])
+    dst2 = torch.LongTensor([2, 3])
+    g2.add_edges(src2, dst2)
+
+    x2 = torch.randn(4, 7)
+    y2 = torch.randn(4, 5)
+    a2 = torch.randn(2, 6)
+    b2 = torch.randn(2, 4)
+
+    g2.ndata['x'] = x2
+    g2.ndata['y'] = y2
+    g2.edata['a'] = a2
+    g2.edata['b'] = b2
+
+    bg = dgl.batch([g, g2])
+
+    f = io.BytesIO()
+    pickle.dump(bg, f)
+    f.seek(0)
+    bg2 = pickle.load(f)
+    f.close()
+
+    _assert_is_identical(bg, bg2)
+    new_g, new_g2 = dgl.unbatch(bg2)
+    _assert_is_identical(g, new_g)
+    _assert_is_identical(g2, new_g2)
 
 
 if __name__ == '__main__':
