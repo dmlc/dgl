@@ -39,6 +39,11 @@ class DGLNodeUpdate(gluon.Block):
         self.update = update
 
     def forward(self, node):
+        '''
+        print('in', std(node.data['in']))
+        print('h', std(node.data['h']))
+        print('accum', std(node.data['accum']))
+        '''
         return {'h1': self.update(node.data['in'], node.data['h'], node.data['accum'])}
 
 class SSEUpdateHidden(gluon.Block):
@@ -65,7 +70,11 @@ class SSEUpdateHidden(gluon.Block):
             cat = mx.nd.concat(feat, hidden_data, dim=1)
             slices = mx.nd.take(self.g.adjacency_matrix(), vertices)
             accum = mx.nd.dot(slices, cat) / mx.nd.take(self.deg, vertices)
-            return self.layer(mx.nd.take(feat, vertices), mx.nd.take(hidden_data, vertices), accum)
+            print('feat', mean(feat), std(feat))
+            print('hidden_data', mean(hidden_data), std(hidden_data))
+            print('accum', mean(accum), std(accum))
+            return self.layer(mx.nd.take(feat, vertices),
+            mx.nd.take(hidden_data, vertices), accum)
 
 class DGLSSEUpdateHidden(gluon.Block):
     def __init__(self,
@@ -102,7 +111,8 @@ class DGLSSEUpdateHidden(gluon.Block):
                 # TODO here we apply dropout on all vertex representation.
                 val = mx.nd.Dropout(hidden_data, p=self.dropout)
                 self.g.set_n_repr({'h': val})
-            self.g.pull(vertices, msg_func, reduce_func, self.layer)
+            #self.g.pull(vertices, msg_func, reduce_func, self.layer)
+            self.g.update_all(msg_func, reduce_func, self.layer)
             return self.g.get_n_repr()['h1'][vertices]
 
 class SSEPredict(gluon.Block):
@@ -115,6 +125,7 @@ class SSEPredict(gluon.Block):
 
     def forward(self, vertices, hidden_data):
         hidden = self.update_hidden(vertices, hidden_data)
+        #print('SSEPredict', mean(hidden), std(hidden))
         if self.dropout:
             hidden = mx.nd.Dropout(hidden, p=self.dropout)
         return self.linear2(self.linear1(hidden)), hidden
@@ -146,9 +157,9 @@ def main(args, data):
     # create the SSE model
     g = DGLGraph(data.graph)
     update_hidden = DGLSSEUpdateHidden(g, features, args.n_hidden, 'relu', args.update_dropout, args.use_spmv)
-    update_hidden1 = SSEUpdateHidden(g, features, args.n_hidden, 'relu')
-    #model = SSEPredict(update_hidden, args.n_hidden, args.predict_dropout)
-    model = SSEPredict(update_hidden1, args.n_hidden, args.predict_dropout)
+    if not args.dgl:
+        update_hidden = SSEUpdateHidden(g, features, args.n_hidden, 'relu')
+    model = SSEPredict(update_hidden, args.n_hidden, args.predict_dropout)
     model.initialize(ctx=ctx)
     #model1.initialize(ctx=ctx)
 
@@ -169,8 +180,7 @@ def main(args, data):
     dur = []
     for epoch in range(args.n_epochs):
         # compute vertex embedding.
-        all_hidden = update_hidden1(None, g.ndata['h'])
-        #all_hidden = update_hidden(None, g.ndata['h'])
+        all_hidden = update_hidden(None, g.ndata['h'])
         g.ndata['h'] = all_hidden
         rets.append(all_hidden)
 
@@ -225,8 +235,9 @@ if __name__ == '__main__':
             help="the dropout rate for prediction")
     parser.add_argument("--train_percent", type=float, default=0.5,
             help="the percentage of data used for training")
-    parser.add_argument("--use-spmv", type=bool, default=False,
+    parser.add_argument("--use-spmv", action="store_true",
             help="use SpMV for faster speed.")
+    parser.add_argument("--dgl", action="store_true")
     args = parser.parse_args()
 
     # load and preprocess dataset
