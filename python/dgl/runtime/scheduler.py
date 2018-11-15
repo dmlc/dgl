@@ -10,6 +10,8 @@ from ..immutable_graph_index import ImmutableGraphIndex
 
 from .._ffi.function import _init_api
 
+from . import ir
+
 __all__ = [
             "get_send_schedule",
             "get_recv_schedule",
@@ -72,7 +74,7 @@ def get_recv_schedule(graph, v, reduce_func, apply_func):
     execs += wb_exec
     return execs
 
-def get_snr_schedule(graph, u, v, eid, message_func, reduce_func, apply_func):
+def _get_snr_schedule(graph, u, v, eid, message_func, reduce_func, apply_func):
     """get send and recv schedule
 
     Parameters
@@ -108,6 +110,82 @@ def get_snr_schedule(graph, u, v, eid, message_func, reduce_func, apply_func):
     wb_exec = build_write_back_exec(graph, out_repr, unique_v, "node")
     execs += wb_exec
     return execs
+
+def get_snr_schedule(graph,
+                     u,
+                     v,
+                     eid,
+                     message_func,
+                     reduce_func,
+                     apply_func):
+    """
+    env={nf, u, v, e, inc, unique_v, mfunc, rfunc
+        vb1, vb2, ..., eb1, eb2, ...}
+    FeatDict t1 = READ_ROW(nf, u)
+    FeatDict t2 = READ_ROW(nf, v)
+    FeatDict t3 = READ_ROW(ef, e)
+    FeatDict t10 = CALL(mfunc, t1, t2, t3)
+
+    FeatDict fdvb1 = READ_ROW(nf, vb1)
+    FeatDict fdeb1 = READ_ROW(t10, eb1)
+    FeatDict fdvb1 = CALL(rfunc, fdvb1, fdeb1)  # bkt1
+
+    FeatDict fdvb2 = READ_ROW(nf, vb2)
+    FeatDict fdeb2 = READ_ROW(t10, eb2)
+    FeatDict fdvb2 = CALL(rfunc, fdvb2, fdeb2)  # bkt2
+
+    FeatDict fdvb3 = READ_ROW(nf, vb3)
+    FeatDict fdeb3 = READ_ROW(t10, eb3)
+    FeatDict fdvb3 = CALL(rfunc, fdvb3, fdeb3)  # bkt3
+
+    FeatDict t15 = MERGE(vb1, fdvb1,
+                         vb2, fdvb2,
+                         vb3, fdvb3,
+                         unique_v)
+
+    WRITE(nf, unique_v, t15)
+    """
+    prog = []
+    # env
+    nf = ir.Var.FEAT_DICT(graph._node_frame)
+    ef = ir.Var.FEAT_DICT(graph._edge_frame)
+    u = ir.Var.IDX(u)
+    v = ir.Var.IDX(v)
+    eid = ir.Var.IDX(eid)
+    mfunc = ir.Var.FUNC(message_func)
+    afunc = ir.Var.FUNC(apply_func)
+    with ir.prog() as prog:
+        # send
+        fdsrc = ir.READ_ROW(nf, u)
+        fddst = ir.READ_ROW(nf, v)
+        fdedge = ir.READ_ROW(ef, eid)
+        msg = ir.CALL(mfunc, [fdsrc, fdedge, fddst])
+
+        # recv (degree bucketing)
+        buckets = _degree_bucketing_for_edges(v.data)
+        _, degs, dsts, msg_ids, zero_deg_nodes = buckets
+        # loop over each bucket
+        idx_list = []
+        fd_list = []
+        for deg, vb, mid in zip(degs, dsts, msg_ids):
+            fdvb = ir.Var.FEAT_DICT()
+            fdeb = ir.Var.FEAT_DICT()
+            vb = ir.Var.IDX(vb)
+            mid = ir.Var.IDX(mid)
+            # TODO: wrap reshape into it
+            rfunc = ir.Var.FUNC(reduce_func)
+            fdvb = ir.READ_ROW(nf, vb)
+            fdeb = ir.READ_ROW(msg, mid)
+            fdvb = ir.CALL(rfunc, [fdvb, fdeb], ret=fdvb)  # reuse var
+            # save for merge
+            idx_list.append(vb)
+            fd_list.append(fdvb)
+        # merge buckets
+        unique_v = ir.Var.IDX(utils.toindex(F.unique(v.data.tousertensor())))
+        new_feat = ir.MERGE(idx_list, fd_list)
+        ir.WRITE_ROW(nf, unique_v, new_feat)
+        # TODO: apply func
+        prog.pprint()
 
 def get_update_all_schedule(graph, message_func, reduce_func, apply_func):
     """get send and recv schedule
