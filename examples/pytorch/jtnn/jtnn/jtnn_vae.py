@@ -16,12 +16,10 @@ from rdkit.Chem import AllChem
 import copy, math
 
 def dgl_set_batch_nodeID(mol_batch, vocab):
-    tot = 0
     for mol_tree in mol_batch:
         wid = []
-        for node in mol_tree.nodes_dict:
-            mol_tree.nodes_dict[node]['idx'] = tot
-            tot += 1
+        for i, node in enumerate(mol_tree.nodes_dict):
+            mol_tree.nodes_dict[node]['idx'] = i
             wid.append(vocab.get_index(mol_tree.nodes_dict[node]['smiles']))
         mol_tree.ndata['wid'] = cuda(torch.LongTensor(wid))
 
@@ -51,13 +49,24 @@ class DGLJTNNVAE(nn.Module):
         self.n_edges_total = 0
         self.n_tree_nodes_total = 0
 
+    @staticmethod
+    def _assign_tree_id(mol_batch):
+        node_offset = 0
+        for i, mol_tree in enumerate(mol_batch):
+            mol_tree.batch_id = i
+            mol_tree.node_offset = node_offset
+            node_offset += mol_tree.number_of_nodes()
+
+        return mol_batch
+
     def encode(self, mol_batch):
         dgl_set_batch_nodeID(mol_batch, self.vocab)
 
         smiles_batch = [mol_tree.smiles for mol_tree in mol_batch]
         mol_graphs = mol2dgl(smiles_batch)
         mol_vec = self.mpn(mol_graphs)
-        # mol_batch is a junction tree
+
+        self._assign_tree_id(mol_batch)
         mol_tree_batch, tree_vec = self.jtnn(mol_batch)
 
         self.n_nodes_total += mol_graphs.number_of_nodes()

@@ -76,6 +76,7 @@ def test_treeenc():
     for nx_mol_tree in nx_mol_batch:
         nx_mol_tree.recover()
         nx_mol_tree.assemble()
+    DGLJTNNVAE._assign_tree_id(nx_mol_batch)
     dgl_set_batch_nodeID(nx_mol_batch, vocab)
 
     dgljtnn = DGLJTNNEncoder(vocab, 5, emb)
@@ -150,6 +151,7 @@ def test_treedec():
     for nx_mol_tree in nx_mol_batch:
         nx_mol_tree.recover()
         nx_mol_tree.assemble()
+    DGLJTNNVAE._assign_tree_id(nx_mol_batch)
     dgl_set_batch_nodeID(nx_mol_batch, vocab)
 
     emb = nn.Embedding(vocab.size(), 5)
