@@ -11,8 +11,10 @@ import rdkit
 
 from jtnn import *
 
-lg = rdkit.RDLogger.logger() 
-lg.setLevel(rdkit.RDLogger.CRITICAL)
+def worker_init_fn(id_):
+    lg = rdkit.RDLogger.logger() 
+    lg.setLevel(rdkit.RDLogger.CRITICAL)
+worker_init_fn(None)
 
 parser = OptionParser()
 parser.add_option("-t", "--train", dest="train", default='train', help='Training file name')
@@ -65,7 +67,8 @@ def train():
             shuffle=True,
             num_workers=0,
             collate_fn=JTNNCollator(vocab, True),
-            drop_last=True)
+            drop_last=True,
+            worker_init_fn=worker_init_fn)
 
     for epoch in range(MAX_EPOCH):
         word_acc,topo_acc,assm_acc,steo_acc = 0,0,0,0

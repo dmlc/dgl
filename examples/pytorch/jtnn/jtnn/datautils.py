@@ -9,7 +9,6 @@ from .mol_tree import Vocab
 
 from .mpn import mol2dgl_single as mol2dgl_enc
 from .jtmpn import mol2dgl_single as mol2dgl_dec
-from .nnutils import cuda
 
 _url = 'https://www.dropbox.com/s/4ypr0e0abcbsvoh/jtnn.zip?dl=1'
 
@@ -136,12 +135,13 @@ class JTNNCollator(object):
         mol_trees = _unpack_field(examples, 'mol_tree')
         wid = _unpack_field(examples, 'wid')
         for _wid, mol_tree in zip(wid, mol_trees):
-            mol_tree.ndata['wid'] = cuda(torch.LongTensor(_wid))
+            mol_tree.ndata['wid'] = torch.LongTensor(_wid)
 
+        # TODO: either support pickling or get around ctypes pointers using scipy
         # batch molecule graphs
         mol_graphs = _unpack_field(examples, 'mol_graph')
-        atom_x = cuda(torch.cat(_unpack_field(examples, 'atom_x_enc')))
-        bond_x = cuda(torch.cat(_unpack_field(examples, 'bond_x_enc')))
+        atom_x = torch.cat(_unpack_field(examples, 'atom_x_enc'))
+        bond_x = torch.cat(_unpack_field(examples, 'bond_x_enc'))
         mol_graph_batch = self._batch_and_set(mol_graphs, atom_x, bond_x, False)
 
         result = {
@@ -155,8 +155,8 @@ class JTNNCollator(object):
         # batch candidate graphs
         cand_graphs = _unpack_field(examples, 'cand_graphs')
         cand_batch_idx = []
-        atom_x = cuda(torch.cat(_unpack_field(examples, 'atom_x_dec')))
-        bond_x = cuda(torch.cat(_unpack_field(examples, 'bond_x_dec')))
+        atom_x = torch.cat(_unpack_field(examples, 'atom_x_dec'))
+        bond_x = torch.cat(_unpack_field(examples, 'bond_x_dec'))
         tree_mess_src_e = _unpack_field(examples, 'tree_mess_src_e')
         tree_mess_tgt_e = _unpack_field(examples, 'tree_mess_tgt_e')
         tree_mess_tgt_n = _unpack_field(examples, 'tree_mess_tgt_n')
@@ -178,8 +178,8 @@ class JTNNCollator(object):
 
         # batch stereoisomers
         stereo_cand_graphs = _unpack_field(examples, 'stereo_cand_graphs')
-        atom_x = cuda(torch.cat(_unpack_field(examples, 'stereo_atom_x_enc')))
-        bond_x = cuda(torch.cat(_unpack_field(examples, 'stereo_bond_x_enc')))
+        atom_x = torch.cat(_unpack_field(examples, 'stereo_atom_x_enc'))
+        bond_x = torch.cat(_unpack_field(examples, 'stereo_bond_x_enc'))
         stereo_cand_batch_idx = []
         for i in range(len(stereo_cand_graphs)):
             stereo_cand_batch_idx.extend([i] * len(stereo_cand_graphs[i]))

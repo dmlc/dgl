@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from .mol_tree import Vocab
-from .nnutils import create_var, cuda
+from .nnutils import create_var, cuda, move_dgl_to_cuda
 from .jtnn_enc import DGLJTNNEncoder
 from .jtnn_dec import DGLJTNNDecoder
 from .mpn import DGLMPN, mol2dgl
@@ -49,6 +49,16 @@ class DGLJTNNVAE(nn.Module):
         self.n_edges_total = 0
         self.n_tree_nodes_total = 0
 
+    @staticmethod
+    def move_to_cuda(mol_batch):
+        for t in mol_batch['mol_trees']:
+            move_dgl_to_cuda(t)
+
+        move_dgl_to_cuda(mol_batch['mol_graph_batch'])
+        move_dgl_to_cuda(mol_batch['cand_graph_batch'])
+        if mol_batch['stereo_cand_graph_batch'] is not None:
+            move_dgl_to_cuda(mol_batch['stereo_cand_graph_batch'])
+
     def encode(self, mol_batch):
         mol_graphs = mol_batch['mol_graph_batch']
         mol_vec = self.mpn(mol_graphs)
@@ -63,6 +73,8 @@ class DGLJTNNVAE(nn.Module):
         return mol_tree_batch, tree_vec, mol_vec
 
     def forward(self, mol_batch, beta=0, e1=None, e2=None):
+        self.move_to_cuda(mol_batch)
+
         mol_trees = mol_batch['mol_trees']
         batch_size = len(mol_trees)
 
