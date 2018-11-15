@@ -137,6 +137,14 @@ class DGLGraph(object):
                  edge_frame=None,
                  multigraph=False,
                  readonly=False):
+        self._init_graph(graph_data, node_frame, edge_frame, multigraph, readonly)
+
+    def _init_graph(self,
+                    graph_data=None,
+                    node_frame=None,
+                    edge_frame=None,
+                    multigraph=False,
+                    readonly=False):
         # graph
         self._readonly=readonly
         self._graph = create_graph_index(graph_data, multigraph, readonly)
@@ -1662,3 +1670,14 @@ class DGLGraph(object):
             reduce_accum.update(new_repr)
             new_repr = reduce_accum
         self.set_n_repr(new_repr, v, inplace=inplace)
+
+    def __getstate__(self):
+        return self._graph, \
+               self._node_frame, \
+               self._edge_frame, \
+               self._graph.is_multigraph(), \
+               self._readonly
+
+    def __setstate__(self, state):
+        graph, node_frame, edge_frame, multigraph, readonly = state
+        self._init_graph(graph, node_frame, edge_frame, multigraph, readonly)
