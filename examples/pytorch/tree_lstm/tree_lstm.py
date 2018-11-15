@@ -35,6 +35,30 @@ class TreeLSTMCell(nn.Module):
         h = o * th.tanh(c)
         return {'h' : h, 'c' : c}
 
+class ChildSumTreeLSTMCell(nn.Module):
+    def __init__(self, x_size, h_size):
+        super(ChildSumTreeLSTMCell, self).__init__()
+        self.W_iou = nn.Linear(x_size, 3 * h_size)
+        self.U_iou = nn.Linear(h_size, 3 * h_size)
+        self.U_f = nn.Linear(h_size, h_size)
+
+    def message_func(self, edges):
+        return {'h': edges.src['h'], 'c': edges.src['c']}
+
+    def reduce_func(self, nodes):
+        h_tild = th.sum(nodes.mailbox['h'], 1)
+        f = th.sigmoid(self.U_f(nodes.mailbox['h']))
+        c = th.sum(f * nodes.mailbox['c'], 1)
+        return {'iou': self.U_iou(h_tild), 'c': c}
+
+    def apply_node_func(self, nodes):
+        iou = nodes.data['iou']
+        i, o, u = th.chunk(iou, 3, 1)
+        i, o, u = th.sigmoid(i), th.sigmoid(o), th.tanh(u)
+        c = i * u + nodes.data['c']
+        h = o * th.tanh(c)
+        return {'h': h, 'c': c}
+
 class TreeLSTM(nn.Module):
     def __init__(self,
                  num_vocabs,
@@ -42,6 +66,7 @@ class TreeLSTM(nn.Module):
                  h_size,
                  num_classes,
                  dropout,
+                 cell_type='nary',
                  pretrained_emb=None):
         super(TreeLSTM, self).__init__()
         self.x_size = x_size
@@ -52,7 +77,8 @@ class TreeLSTM(nn.Module):
             self.embedding.weight.requires_grad = True
         self.dropout = nn.Dropout(dropout)
         self.linear = nn.Linear(h_size, num_classes)
-        self.cell = TreeLSTMCell(x_size, h_size)
+        cell = TreeLSTMCell if cell_type == 'nary' else ChildSumTreeLSTMCell
+        self.cell = cell(x_size, h_size)
 
     def forward(self, batch, h, c):
         """Compute tree-lstm prediction given a batch.
