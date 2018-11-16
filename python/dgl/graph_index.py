@@ -641,6 +641,26 @@ class GraphIndex(object):
         handle = _CAPI_DGLGraphLineGraph(self._handle, backtracking)
         return GraphIndex(handle)
 
+    def __getstate__(self):
+        src, dst, _ = self.edges()
+        n_nodes = self.number_of_nodes()
+        multigraph = self.is_multigraph()
+
+        return n_nodes, multigraph, src, dst
+
+    def __setstate__(self, state):
+        """The pickle state of GraphIndex is defined as a triplet
+        (number_of_nodes, multigraph, src_nodes, dst_nodes)
+        """
+        n_nodes, multigraph, src, dst = state
+
+        self._handle = _CAPI_DGLGraphCreate(multigraph)
+        self._cache = {}
+
+        self.clear()
+        self.add_nodes(n_nodes)
+        self.add_edges(src, dst)
+
 class SubgraphIndex(GraphIndex):
     """Graph index for subgraph.
 
@@ -694,6 +714,14 @@ class SubgraphIndex(GraphIndex):
             The parent edge ids.
         """
         return self._induced_edges
+
+    def __getstate__(self):
+        raise NotImplementedError(
+                "SubgraphIndex pickling is not supported yet.")
+
+    def __setstate__(self, state):
+        raise NotImplementedError(
+                "SubgraphIndex unpickling is not supported yet.")
 
 def map_to_subgraph_nid(subgraph, parent_nids):
     """Map parent node Ids to the subgraph node Ids.
