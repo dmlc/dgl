@@ -2,6 +2,8 @@ import dgl
 from dgl.frame import Frame, FrameRef, Column
 from dgl.graph_index import create_graph_index
 from dgl.utils import toindex
+import dgl.backend as backend
+import dgl.function as F
 import utils as U
 import torch
 import pickle
@@ -74,6 +76,9 @@ def _assert_is_identical(g, g2):
         assert U.allclose(g.edata[k], g2.edata[k])
 
 
+def _global_message_func(nodes):
+    return {'x': nodes.data['x']}
+
 def test_pickling_graph():
     # graph structures and frames are pickled
     g = dgl.DGLGraph()
@@ -92,8 +97,10 @@ def test_pickling_graph():
     g.edata['a'] = a
     g.edata['b'] = b
 
-    # registered functions are not pickled
-    g.register_message_func(lambda nodes: {'x': nodes.data['x']})
+    # registered functions are pickled
+    g.register_message_func(_global_message_func)
+    reduce_func = F.sum('x', 'x')
+    g.register_reduce_func(reduce_func)
 
     # custom attributes should be pickled
     g.foo = 2
@@ -102,6 +109,12 @@ def test_pickling_graph():
 
     _assert_is_identical(g, new_g)
     assert new_g.foo == 2
+    assert new_g._message_func == _global_message_func
+    assert isinstance(new_g._reduce_func, type(reduce_func))
+    assert new_g._reduce_func._name == 'sum'
+    assert new_g._reduce_func.op == backend.sum
+    assert new_g._reduce_func.msg_field == 'x'
+    assert new_g._reduce_func.out_field == 'x'
 
     # test batched graph with partial set case
     g2 = dgl.DGLGraph()
