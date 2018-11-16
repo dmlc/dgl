@@ -67,7 +67,8 @@ def mol2dgl_single(smiles):
     graph.add_edges(bond_src, bond_dst)
 
     n_edges += n_bonds
-    return graph, torch.stack(atom_x), torch.stack(bond_x)
+    return graph, torch.stack(atom_x), \
+            torch.stack(bond_x) if len(bond_x) > 0 else torch.zeros(0)
 
 
 def mol2dgl(smiles_batch):

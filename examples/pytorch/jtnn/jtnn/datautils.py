@@ -77,8 +77,16 @@ class JTNNDataset(Dataset):
                 continue
             cands.extend([(cand, mol_tree, node_id)
                          for cand in node['cand_mols']])
-        cand_graphs, atom_x_dec, bond_x_dec, tree_mess_src_e, \
-                tree_mess_tgt_e, tree_mess_tgt_n = mol2dgl_dec(cands)
+        if len(cands) > 0:
+            cand_graphs, atom_x_dec, bond_x_dec, tree_mess_src_e, \
+                    tree_mess_tgt_e, tree_mess_tgt_n = mol2dgl_dec(cands)
+        else:
+            cand_graphs = []
+            atom_x_dec = torch.zeros(0, atom_x_enc.shape[1])
+            bond_x_dec = torch.zeros(0, bond_x_enc.shape[1])
+            tree_mess_src_e = torch.zeros(0, 2).long()
+            tree_mess_tgt_e = torch.zeros(0, 2).long()
+            tree_mess_tgt_n = torch.zeros(0, 2).long()
 
         # prebuild the stereoisomers
         cands = mol_tree.stereo_cands

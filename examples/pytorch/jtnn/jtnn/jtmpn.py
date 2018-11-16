@@ -94,7 +94,8 @@ def mol2dgl_single(cand_batch):
         g.add_edges(bond_src, bond_dst)
         cand_graphs.append(g)
 
-    return cand_graphs, torch.stack(atom_x), torch.stack(bond_x), \
+    return cand_graphs, torch.stack(atom_x), \
+            torch.stack(bond_x) if len(bond_x) > 0 else torch.zeros(0), \
             torch.LongTensor(tree_mess_source_edges), \
             torch.LongTensor(tree_mess_target_edges), \
             torch.LongTensor(tree_mess_target_nodes)
