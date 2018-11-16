@@ -56,6 +56,8 @@ def test_pickling_frame():
     assert U.allclose(fr2['x'].data, x)
     assert U.allclose(fr2['y'].data, y)
 
+    fr = Frame()
+
 
 def _assert_is_identical(g, g2):
     assert g.number_of_nodes() == g2.number_of_nodes()
@@ -101,7 +103,7 @@ def test_pickling_graph():
     _assert_is_identical(g, new_g)
     assert new_g.foo == 2
 
-    # test batched graph
+    # test batched graph with partial set case
     g2 = dgl.DGLGraph()
     g2.add_nodes(4)
     src2 = torch.LongTensor([0, 1])
@@ -109,12 +111,12 @@ def test_pickling_graph():
     g2.add_edges(src2, dst2)
 
     x2 = torch.randn(4, 7)
-    y2 = torch.randn(4, 5)
+    y2 = torch.randn(3, 5)
     a2 = torch.randn(2, 6)
     b2 = torch.randn(2, 4)
 
     g2.ndata['x'] = x2
-    g2.ndata['y'] = y2
+    g2.nodes[[0, 1, 3]].data['y'] = y2
     g2.edata['a'] = a2
     g2.edata['b'] = b2
 
