@@ -70,11 +70,7 @@ class SSEUpdateHidden(gluon.Block):
             cat = mx.nd.concat(feat, hidden_data, dim=1)
             slices = mx.nd.take(self.g.adjacency_matrix(), vertices)
             accum = mx.nd.dot(slices, cat) / mx.nd.take(self.deg, vertices)
-            print('feat', mean(feat), std(feat))
-            print('hidden_data', mean(hidden_data), std(hidden_data))
-            print('accum', mean(accum), std(accum))
-            return self.layer(mx.nd.take(feat, vertices),
-            mx.nd.take(hidden_data, vertices), accum)
+            return self.layer(mx.nd.take(feat, vertices), mx.nd.take(hidden_data, vertices), accum)
 
 class DGLSSEUpdateHidden(gluon.Block):
     def __init__(self,
@@ -103,7 +99,10 @@ class DGLSSEUpdateHidden(gluon.Block):
             msg_func = gcn_msg
             reduce_func = gcn_reduce
         if vertices is None:
-            self.g.update_all(msg_func, reduce_func, self.layer)
+            self.g.update_all(msg_func, reduce_func, None)
+            if self.use_spmv:
+                self.g.ndata['accum'] = self.g.ndata['accum'] / self.deg
+            self.g.apply_nodes(self.layer)
             return self.g.get_n_repr()['h1']
         else:
             # We don't need dropout for inference.
@@ -112,7 +111,10 @@ class DGLSSEUpdateHidden(gluon.Block):
                 val = mx.nd.Dropout(hidden_data, p=self.dropout)
                 self.g.set_n_repr({'h': val})
             #self.g.pull(vertices, msg_func, reduce_func, self.layer)
-            self.g.update_all(msg_func, reduce_func, self.layer)
+            self.g.update_all(msg_func, reduce_func, None)
+            if self.use_spmv:
+                self.g.ndata['accum'] = self.g.ndata['accum'] / self.deg
+            self.g.apply_nodes(self.layer)
             return self.g.get_n_repr()['h1'][vertices]
 
 class SSEPredict(gluon.Block):
