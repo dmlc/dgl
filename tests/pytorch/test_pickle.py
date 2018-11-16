@@ -1,4 +1,5 @@
 import dgl
+from dgl.frame import Frame, FrameRef, Column
 from dgl.graph_index import create_graph_index
 from dgl.utils import toindex
 import utils as U
@@ -6,16 +7,21 @@ import torch
 import pickle
 import io
 
+def _reconstruct_pickle(obj):
+    f = io.BytesIO()
+    pickle.dump(obj, f)
+    f.seek(0)
+    obj = pickle.load(f)
+    f.close()
+
+    return obj
+
 def test_pickling_index():
     i = toindex([1, 2, 3])
     i.tousertensor()
     i.todgltensor() # construct a dgl tensor which is unpicklable
 
-    f = io.BytesIO()
-    pickle.dump(i, f)
-    f.seek(0)
-    i2 = pickle.load(f)
-    f.close()
+    i2 = _reconstruct_pickle(i)
 
     assert torch.equal(i2.tousertensor(), i.tousertensor())
 
@@ -27,16 +33,28 @@ def test_pickling_graph_index():
     dst_idx = toindex([1, 2])
     gi.add_edges(src_idx, dst_idx)
 
-    f = io.BytesIO()
-    pickle.dump(gi, f)
-    f.seek(0)
-    gi2 = pickle.load(f)
-    f.close()
+    gi2 = _reconstruct_pickle(gi)
 
     assert gi2.number_of_nodes() == gi.number_of_nodes()
     src_idx2, dst_idx2, _ = gi2.edges()
     assert torch.equal(src_idx.tousertensor(), src_idx2.tousertensor())
     assert torch.equal(dst_idx.tousertensor(), dst_idx2.tousertensor())
+
+
+def test_pickling_frame():
+    x = torch.randn(3, 7)
+    y = torch.randn(3, 5)
+
+    c = Column(x)
+
+    c2 = _reconstruct_pickle(c)
+    assert U.allclose(c.data, c2.data)
+
+    fr = Frame({'x': x, 'y': y})
+
+    fr2 = _reconstruct_pickle(fr)
+    assert U.allclose(fr2['x'].data, x)
+    assert U.allclose(fr2['y'].data, y)
 
 
 def _assert_is_identical(g, g2):
@@ -78,11 +96,7 @@ def test_pickling_graph():
     # custom attributes should be pickled
     g.foo = 2
 
-    f = io.BytesIO()
-    pickle.dump(g, f)
-    f.seek(0)
-    new_g = pickle.load(f)
-    f.close()
+    new_g = _reconstruct_pickle(g)
 
     _assert_is_identical(g, new_g)
     assert new_g.foo == 2
@@ -106,11 +120,7 @@ def test_pickling_graph():
 
     bg = dgl.batch([g, g2])
 
-    f = io.BytesIO()
-    pickle.dump(bg, f)
-    f.seek(0)
-    bg2 = pickle.load(f)
-    f.close()
+    bg2 = _reconstruct_pickle(bg)
 
     _assert_is_identical(bg, bg2)
     new_g, new_g2 = dgl.unbatch(bg2)
@@ -121,4 +131,5 @@ def test_pickling_graph():
 if __name__ == '__main__':
     test_pickling_index()
     test_pickling_graph_index()
+    test_pickling_frame()
     test_pickling_graph()
