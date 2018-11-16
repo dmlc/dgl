@@ -340,26 +340,29 @@ def reorder(dict_like, index):
         new_dict[key] = F.gather_row(val, idx_ctx)
     return new_dict
 
-def build_sparse_matrix(dst, src, dense_shape, nnz):
-    """Build sparse matrix
+def build_coo_sparse_matrix(dat, row, col, dense_shape):
+    """Build coo sparse matrix
 
     Parameters
     ----------
-    dst: Tensor
-        Destination ids
-    src: Tensor
-        Source ids
+    dat: Tensor
+        Data.
+    row: Tensor
+        Row index.
+    col: Tensor
+        Column index.
     dense_shape: list or tuple of two integer
         Dense shape of the sparse matrix
-    nnz: int
-        Number of non-zero elemements
-    """
 
-    dst = F.unsqueeze(dst, 0)
-    src = F.unsqueeze(src, 0)
-    idx = F.cat([dst, src], dim=0)
-    # FIXME(minjie): data type
-    dat = F.ones((nnz,), dtype=F.float32)
+    Returns
+    -------
+    SparseTensor
+        The sparse matrix.
+    """
+    nnz = len(row)
+    row = F.unsqueeze(row, 0)
+    col = F.unsqueeze(col, 0)
+    idx = F.cat([row, col], dim=0)
     return F.sparse_matrix(dat, ('coo', idx), dense_shape)
 
 def parse_edges_tuple(edges):

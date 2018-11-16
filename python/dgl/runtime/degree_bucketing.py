@@ -13,7 +13,8 @@ def gen_degree_bucketing_schedule(
         msg,
         reduce_func,
         graph,
-        v=None):
+        recv_nodes,
+        out):
     """Create degree bucketing schedule
 
     Parameters
@@ -28,22 +29,12 @@ def gen_degree_bucketing_schedule(
         The UDF to reduce messages.
     graph: DGLGraph
         DGLGraph to use
-    v: utils.Index
-        Optional Receiving nodes
-
-    Returns
-    -------
-    ir.Var
-        The variable for the reduced node ids.
-    ir.Var
-        The variable for the reduced node features.
+    recv_nodes: ir.Var
+        Receiving nodes
+    out : ir.Var
+        The variable for output feature dicts.
     """
-    #if not rfunc:
-    #    return
-
-    #if utils.is_iterable(rfunc):
-    #    rfunc = BundledFunction(rfunc)
-
+    v = recv_nodes.data
     # Get degree bucketing schedule
     if isinstance(graph._graph, ImmutableGraphIndex):
         # NOTE: this is a workaround because immutable graph does not have (c++ support)
@@ -71,7 +62,7 @@ def gen_degree_bucketing_schedule(
             raise DGLError("Unsupported call type for degree bucketing: %s"
                            % call_type)
     # generate schedule
-    unique_v, degs, dsts, msg_ids, zero_deg_nodes = buckets
+    _, degs, dsts, msg_ids, zero_deg_nodes = buckets
     # loop over each bucket
     idx_list = []
     fd_list = []
@@ -86,12 +77,15 @@ def gen_degree_bucketing_schedule(
         # save for merge
         idx_list.append(vb)
         fd_list.append(fdvb)
+    # zero-degree feats
+    if zero_deg_nodes is not None:
+        zero_deg_nodes = ir.Var.IDX(zero_deg_nodes)
+        zero_deg_feat = ir.READ_ROW(nf, zero_deg_nodes)
+        idx_list.append(zero_deg_nodes)
+        fd_list.append(zero_deg_feat)
     # merge buckets
-    reduced_feat = ir.MERGE(idx_list, fd_list)
-    # node id
-    reduced_v, _ = F.sort_1d(unique_v)
-    reduced_v = ir.Var.IDX(utils.toindex(reduced_v))
-    return reduced_v, reduced_feat
+    reduced_feat = ir.MERGE_ROW(recv_nodes, idx_list, fd_list)
+    ir.WRITE_DICT_(out, reduced_feat)
 
 def _degree_bucketing_schedule(mids, dsts, v):
     """Return the bucketing by degree scheduling for destination nodes of
@@ -157,6 +151,8 @@ def _process_buckets(buckets):
     msg_ids: list of utils.Index
         A list of message id buckets, each node in the ith node id bucket has
         degree[i] messages in the ith message id bucket
+    zero_deg_nodes : utils.Index
+        The zero-degree nodes
     """
     # get back results
     degs = utils.toindex(buckets(0))

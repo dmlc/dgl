@@ -44,9 +44,19 @@ def get_send_schedule(graph, u, v, eid, message_func):
     -------
     A list of executors for DGL Runtime
     """
-    send_exec, out_repr = build_edge_executor(graph, u, v, eid, message_func)
-    wb_exec = build_write_back_exec(graph, out_repr, None, "message")
-    return send_exec + wb_exec
+    with ir.prog() as prog:
+        # vars
+        nf = ir.Var.FEAT_DICT(graph._node_frame)
+        ef = ir.Var.FEAT_DICT(graph._edge_frame)
+        mf = ir.Var.FEAT_DICT(graph._msg_frame)
+        u = ir.Var.IDX(u)
+        v = ir.Var.IDX(v)
+        eid = ir.Var.IDX(eid)
+        mfunc = ir.Var.FUNC(message_func)
+        msg = gen_udf_send_schedule(nf, ef, u, v, eid, mfunc)
+        # TODO: handle duplicate messages
+        ir.APPEND_ROW(mf, msg)
+        return prog
 
 def get_recv_schedule(graph, v, reduce_func, apply_func):
     """get recv schedule
@@ -120,65 +130,87 @@ def get_snr_schedule(graph,
                      reduce_func,
                      apply_func):
     call_type = 'send_and_recv'
-    nf = ir.Var.FEAT_DICT(graph._node_frame)
-    ef = ir.Var.FEAT_DICT(graph._edge_frame)
-    u = ir.Var.IDX(u)
-    v = ir.Var.IDX(v)
-    eid = ir.Var.IDX(eid)
     with ir.prog() as prog:
-        mfunc = _standardize_func_usage(message_func)
-        rfunc = _standardize_func_usage(reduce_func)
-        mfunc_is_list = utils.is_iterable(mfunc)
-        rfunc_is_list = utils.is_iterable(rfunc)
-        if mfunc_is_list and rfunc_is_list:
-            # builtin message + builtin reducer
-            # analyze v2v spmv
-            spmv_pairs, mfunc, rfunc = spmv.analyze_v2v_spmv(graph, mfunc, rfunc)
-            reduced_v, reduced_feat = spmv.gen_v2v_spmv_schedule_uv(
-                    spmv_pairs, nf, ef, u, v, eid)
-
-            if len(mfunc) == 0:
-                # All mfunc and rfunc have been converted to v2v spmv.
-                ir.WRITE_ROW(nf, reduced_v, reduced_feat)
-                return prog
-
-            # converting remaining mfunc to UDFs
-            mfunc = BundledFunction(mfunc)
-        
-        # generate UDF send schedule
-        mfunc = ir.Var.FUNC(mfunc)
-        msg = gen_udf_send_schedule(nf, ef, u, v, eid, mfunc)
-
-        if rfunc_is_list:
-            # UDF message + builtin reducer
-            # analyze e2v spmv
-            spmv_rfunc, rfunc = spmv.analyze_e2v_spmv(graph, rfunc)
-            # gen e2v
-            for rfn in spmv_rfunc:
-                # TODO: gen e2v spmv schedule
-                print('e2v rfn=%s' % rfn.name)
-                pass
-
-            if len(rfunc) == 0:
-                # All mfunc and rfunc has been processed.
-                #ir.WRITE_ROW(nf, reduced_v, reduced_feat)
-                return prog
-
-            # convert the remaining rfunc to UDFs
-            rfunc = BundledFunction(rfunc)
-
-        # gen UDF degree bucketing schedule for UDF recv
-        rfunc = ir.Var.FUNC(rfunc)
-        reduced_v, reduced_feat = gen_degree_bucketing_schedule(
-                call_type, nf, msg, rfunc, graph, v.data)
-
-        ir.WRITE_ROW(nf, reduced_v, reduced_feat)
+        nf = ir.Var.FEAT_DICT(graph._node_frame, name='nf')
+        unique_v, _ = F.sort_1d(F.unique(v.tousertensor()))
+        unique_v = ir.Var.IDX(unique_v, name='unique_v')
+        reduced_feat = _x_get_snr_schedule(
+                call_type, graph, u, v, eid, message_func, reduce_func)
+        if apply_func:
+            # To avoid writing reduced features back to node frame and reading
+            # it again for apply phase. Instead, we first read the the node
+            # features and "merge" it with the reduced features.
+            v_nf = ir.READ_ROW(nf, v)
+            v_nf = ir.UPDATE_DICT(v_nf, reduced_feat)
+            # TODO: wrap afunc to the proper signature
+            afunc = ir.Var.FUNC(apply_func)
+            applied_feat = ir.CALL(afunc, [v_nf])
+            final_feat = ir.UPDATE_DICT(applied_feat, reduced_feat)
+        else:
+            final_feat = reduced_feat
+        ir.WRITE_ROW_(nf, unique_v, final_feat)
         return prog
+
+def _x_get_snr_schedule(call_type, graph, u, v, eid,
+        message_func, reduce_func):
+    # arg vars
+    nf = ir.Var.FEAT_DICT(graph._node_frame, name='nf')
+    ef = ir.Var.FEAT_DICT(graph._edge_frame, name='ef')
+    u = ir.Var.IDX(u, name='u')
+    v = ir.Var.IDX(v, name='v')
+    eid = ir.Var.IDX(eid, name='eid')
+
+    # format the input functions
+    mfunc = _standardize_func_usage(message_func)
+    rfunc = _standardize_func_usage(reduce_func)
+    mfunc_is_list = utils.is_iterable(mfunc)
+    rfunc_is_list = utils.is_iterable(rfunc)
+
+    out = ir.Var.FEAT_DICT() 
+
+    if mfunc_is_list and rfunc_is_list:
+        # builtin message + builtin reducer
+        # analyze v2v spmv
+        spmv_pairs, mfunc, rfunc = spmv.analyze_v2v_spmv(graph, mfunc, rfunc)
+        adj = spmv.build_adj_matrix(call_type, graph, u.data, v.data)
+        spmv.gen_v2v_spmv_schedule(adj, spmv_pairs, nf, ef, eid, out)
+
+        if len(mfunc) == 0:
+            # All mfunc and rfunc have been converted to v2v spmv.
+            return out
+
+        # converting remaining mfunc to UDFs
+        mfunc = BundledFunction(mfunc)
+    
+    # generate UDF send schedule
+    mfunc = ir.Var.FUNC(mfunc)
+    msg = gen_udf_send_schedule(nf, ef, u, v, eid, mfunc)
+
+    if rfunc_is_list:
+        # UDF message + builtin reducer
+        # analyze e2v spmv
+        spmv_rfunc, rfunc = spmv.analyze_e2v_spmv(graph, rfunc)
+        inc = spmv.build_inc_matrix(call_type, graph, eid.data, v.data)
+        spmv.gen_e2v_spmv_schedule(inc, spmv_rfunc, msg, out)
+
+        if len(rfunc) == 0:
+            # All mfunc and rfunc has been processed.
+            return out
+
+        # convert the remaining rfunc to UDFs
+        rfunc = BundledFunction(rfunc)
+
+    # gen degree bucketing schedule for UDF recv
+    rfunc = ir.Var.FUNC(rfunc)
+    gen_degree_bucketing_schedule(call_type, nf, msg,
+            rfunc, graph, v, out)
+    return out
 
 def gen_udf_send_schedule(nf, ef, u, v, eid, mfunc):
     fdsrc = ir.READ_ROW(nf, u)
     fddst = ir.READ_ROW(nf, v)
     fdedge = ir.READ_ROW(ef, eid)
+    # TODO: wrap mfunc and change it to UDF signature.
     msg = ir.CALL(mfunc, [fdsrc, fdedge, fddst])
     return msg
 
@@ -421,61 +453,6 @@ def _standardize_func_usage(func):
     else:
         # rfunc is one UDF
         return func
-
-def _build_adj_matrix(g, call_type, u, v, indices_and_shape=False):
-    """Build sparse adjacency matrix based on the call type
-    If indices_and_shape is True, return packed indices and shape instead
-    """
-    if call_type == "update_all":
-        # full graph case
-        if indices_and_shape:
-            return g._graph.adjacency_matrix_indices_and_shape()
-        else:
-            return g._graph.adjacency_matrix()
-    elif call_type == "send_and_recv":
-        # partial graph case
-        new2old, old2new = utils.build_relabel_map(v)
-        nnz = len(u)
-        u = u.tousertensor()
-        v = v.tousertensor()
-        new_v = old2new[v]
-        n = g.number_of_nodes()
-        m = len(new2old)
-        if indices_and_shape:
-            idx = F.cat([F.unsqueeze(new_v, 0), F.unsqueeze(u, 0)], dim=0)
-            cached_idx = utils.CtxCachedObject(lambda ctx: F.copy_to(idx, ctx))
-            return cached_idx, (m, n)
-        else:
-            mat = utils.build_sparse_matrix(new_v, u, [m, n], nnz)
-            return utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx))
-    else:
-        raise DGLError("Unsupported call type when build adjmat: %s"
-                       % call_type)
-
-def _build_incidence_matrix(g, call_type, v, eid):
-    """Build incidence matrix based on call type"""
-    if call_type == "update_all":
-        # full graph case
-        return g._graph.in_edge_incidence_matrix()
-    else:
-        # partial graph case
-        if call_type == "send_and_recv":
-            m = len(v)
-            eid = F.arannge(m)
-        elif call_type == "recv":
-            _, v, eid = g._msg_graph.in_edges(v)
-            m = len(eid)
-        else:
-            raise DGLError("Unsupported call type when build incidence matrix:\
-                           %s" % call_type)
-
-        new2old, old2new = utils.build_relabel_map(v)
-        v = v.tousertensor()
-        eid = eid.tousertensor()
-        new_v = old2new[v]
-        n = len(new2old)
-        mat = utils.build_sparse_matrix(new_v, eid, [n, m], m)
-        return utils.CtxCachedObject(lambda ctx: F.to_context(mat, ctx))
 
 def _analyze_v2v_spmv(exec_list, out_repr, pairs, graph, call_type, u, v, eid):
     """Analyze if SPMV from node space to node space can be applied
