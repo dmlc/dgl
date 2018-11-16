@@ -151,7 +151,6 @@ class Column(object):
         feats = F.copy_to(feats, F.context(self.data))
         self.data = F.cat([self.data, feats], dim=0)
 
-
     @staticmethod
     def create(data):
         """Create a new column using the given data."""
