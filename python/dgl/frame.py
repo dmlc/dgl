@@ -161,7 +161,7 @@ class Column(object):
             return Column(data)
 
 
-def zero_initializer(shape, dtype, ctx):
+def _default_zero_initializer(shape, dtype, ctx):
     return F.zeros(shape, dtype, ctx)
 
 
@@ -205,7 +205,7 @@ class Frame(MutableMapping):
         dgl_warning('Initializer is not set. Use zero initializer instead.'
                     ' To suppress this warning, use `set_initializer` to'
                     ' explicitly specify which initializer to use.')
-        self._initializer = zero_initializer
+        self._initializer = _default_zero_initializer
 
     def set_initializer(self, initializer):
         """Set the initializer for empty values.
