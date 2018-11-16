@@ -11,6 +11,8 @@ import rdkit
 
 from jtnn import *
 
+torch.multiprocessing.set_sharing_strategy('file_system')
+
 def worker_init_fn(id_):
     lg = rdkit.RDLogger.logger() 
     lg.setLevel(rdkit.RDLogger.CRITICAL)

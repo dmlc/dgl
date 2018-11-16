@@ -71,54 +71,6 @@ def mol2dgl_single(smiles):
             torch.stack(bond_x) if len(bond_x) > 0 else torch.zeros(0)
 
 
-def mol2dgl(smiles_batch):
-    n_edges = 0
-    graph_list = []
-
-    atom_x = []
-    bond_x = []
-    for smiles in smiles_batch:
-        mol = get_mol(smiles)
-        n_atoms = mol.GetNumAtoms()
-        n_bonds = mol.GetNumBonds()
-        graph = DGLGraph()
-        for i, atom in enumerate(mol.GetAtoms()):
-            assert i == atom.GetIdx()
-            atom_x.append(atom_features(atom))
-        graph.add_nodes(n_atoms)
-
-        bond_src = []
-        bond_dst = []
-        for i, bond in enumerate(mol.GetBonds()):
-            begin_idx = bond.GetBeginAtom().GetIdx()
-            end_idx = bond.GetEndAtom().GetIdx()
-            features = bond_features(bond)
-            bond_src.append(begin_idx)
-            bond_dst.append(end_idx)
-            bond_x.append(features)
-            # set up the reverse direction
-            bond_src.append(end_idx)
-            bond_dst.append(begin_idx)
-            bond_x.append(features)
-        graph.add_edges(bond_src, bond_dst)
-
-        n_edges += n_bonds
-
-        graph_list.append(graph)
-
-    graph_list = batch(graph_list)
-    atom_x = cuda(torch.stack(atom_x, 0))
-    bond_x = cuda(torch.stack(bond_x, 0))
-    graph_list.ndata['x'] = atom_x
-    if n_edges > 0:
-        graph_list.edata.update({
-            'x': bond_x,
-            'src_x': atom_x.new(n_edges * 2, ATOM_FDIM).zero_()
-        })
-
-    return graph_list
-
-
 mpn_loopy_bp_msg = DGLF.copy_src(src='msg', out='msg')
 mpn_loopy_bp_reduce = DGLF.sum(msg='msg', out='accum_msg')
 

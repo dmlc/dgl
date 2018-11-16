@@ -5,7 +5,7 @@ from .mol_tree import Vocab
 from .nnutils import create_var, cuda, move_dgl_to_cuda
 from .jtnn_enc import DGLJTNNEncoder
 from .jtnn_dec import DGLJTNNDecoder
-from .mpn import DGLMPN, mol2dgl
+from .mpn import DGLMPN
 from .jtmpn import DGLJTMPN
 from .line_profiler_integration import profile
 
@@ -14,14 +14,6 @@ import rdkit.Chem as Chem
 from rdkit import DataStructs
 from rdkit.Chem import AllChem
 import copy, math
-
-def dgl_set_batch_nodeID(mol_batch, vocab):
-    for mol_tree in mol_batch:
-        wid = []
-        for i, node in enumerate(mol_tree.nodes_dict):
-            mol_tree.nodes_dict[node]['idx'] = i
-            wid.append(vocab.get_index(mol_tree.nodes_dict[node]['smiles']))
-        mol_tree.ndata['wid'] = cuda(torch.LongTensor(wid))
 
 class DGLJTNNVAE(nn.Module):
 
