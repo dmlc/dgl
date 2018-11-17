@@ -227,6 +227,19 @@ class ReadOnlyDict(Mapping):
 def build_relabel_map(x):
     """Relabel the input ids to continuous ids that starts from zero.
 
+    Ids are assigned new ids according to their ascending order.
+
+    Examples
+    --------
+    >>> x = [1, 5, 3, 6]
+    >>> n2o, o2n = build_relabel_map(x)
+    >>> n2o
+    [1, 3, 5, 6]
+    >>> o2n
+    [n/a, 0, n/a, 2, n/a, 3, 4]
+
+    "n/a" will be filled with 0
+
     Parameters
     ----------
     x : Index

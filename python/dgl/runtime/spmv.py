@@ -104,6 +104,22 @@ def gen_v2v_spmv_schedule(adjmat, spmv_pairs, nf, ef, eid, out):
         # save for merge
         ir.WRITE_COL_(out, ir.Var.STR(mfn.out_field), ftdst)
 
+def gen_e2v_spmv_schedule(inc, spmv_rfunc, mf, out):
+    """
+    inc : sparse matrix
+        The incidence matrix
+    spmv_rfunc : list of builtin reducers
+    mf : ir.Var
+        Variable for message frame.
+    out : ir.Var
+        Variable for output reduced features.
+    """
+    inc_var = ir.Var.SPMAT(inc)
+    for rfn in spmv_rfunc:
+        ftmsg = ir.READ_COL(mf, ir.Var.STR(rfn.msg_field))
+        ftdst = ir.SPMV(inc_var, ftmsg)
+        ir.WRITE_COL_(out, ir.Var.STR(rfn.out_field), ftdst)
+
 def build_adj_matrix(call_type, graph, u, v):
     """
     call_type : str
@@ -127,6 +143,10 @@ def build_adj_matrix_index_uv(graph, u, v):
     The matrix is of shape (len(v), n), where n is the number of nodes
     in the graph. Therefore, when doing SPMV, the src node data
     should be all the node features.
+
+    The dst nodes will be sorted in the *unique-ascending* order of
+    their ids. This is compatible with other reduce scheduler such as
+    degree-bucketing scheduler.
 
     Paramters
     ---------
@@ -209,6 +229,10 @@ def build_inc_matrix_eid(eid, v):
     
     Invariant: len(eid) == len(v)
 
+    The dst nodes will be sorted in the *unique-ascending* order of
+    their ids. This is compatible with other reduce scheduler such as
+    degree-bucketing scheduler.
+
     eid : utils.Index
     v : utils.Index
     """
@@ -233,5 +257,5 @@ def build_inc_matrix_v(v):
     
     v : utils.Index
     """
-    eid = F.arange(len(v))
+    eid = utils.toindex(F.arange(0, len(v)))
     return build_inc_matrix_eid(eid, v)

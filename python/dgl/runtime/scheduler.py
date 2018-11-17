@@ -10,7 +10,7 @@ from .executor import *
 from .._ffi.function import _init_api
 
 from . import ir
-from . degree_bucketing import gen_degree_bucketing_schedule
+from . import degree_bucketing as db
 from . import spmv
 
 __all__ = [
@@ -53,20 +53,20 @@ def get_send_schedule(graph, u, v, eid, message_func):
         v = ir.Var.IDX(v)
         eid = ir.Var.IDX(eid)
         mfunc = ir.Var.FUNC(message_func)
-        msg = gen_udf_send_schedule(nf, ef, u, v, eid, mfunc)
+        msg = _gen_send(nf, ef, u, v, eid, mfunc)
         # TODO: handle duplicate messages
         ir.APPEND_ROW(mf, msg)
         return prog
 
-def get_recv_schedule(graph, v, reduce_func, apply_func):
+def get_recv_schedule(graph, nodes, reduce_func, apply_func):
     """get recv schedule
 
     Parameters
     ----------
     graph: DGLGraph
         The DGLGraph to use
-    v : utils.Index
-        Destination nodes
+    nodes : utils.Index
+        Nodes to recv.
     reduce_func: callable or list of callable
         The reduce function
     apply_func: callable
@@ -76,71 +76,17 @@ def get_recv_schedule(graph, v, reduce_func, apply_func):
     -------
     A list of executors for DGL Runtime
     """
-    execs, out_repr = build_recv_executor(graph, v, reduce_func)
-    if apply_func:
-        apply_exec, out_repr = build_node_executor(graph, v, apply_func,
-                                                   reduce_accum=out_repr)
-        execs += apply_exec
-    wb_exec = build_write_back_exec(graph, out_repr, v, "node")
-    execs += wb_exec
-    return execs
-
-def _get_snr_schedule(graph, u, v, eid, message_func, reduce_func, apply_func):
-    """get send and recv schedule
-
-    Parameters
-    ----------
-    graph: DGLGraph
-        The DGLGraph to use
-    u : utils.Index
-        Source nodes
-    v : utils.Index
-        Destination nodes
-    eid : utils.Index
-        Ids of sending edges
-    message_func: callable or list of callable
-        The message function
-    reduce_func: callable or list of callable
-        The reduce function
-    apply_func: callable
-        The apply node function
-
-    Returns
-    -------
-    A list of executors for DGL Runtime
-    """
-    call_type = "send_and_recv"
-    execs, out_repr = build_send_and_recv_executor(graph, call_type, u, v, eid,
-                                                   message_func, reduce_func)
-    # XXX: unique_v is calculated multiple times...
-    unique_v, _ = F.sort_1d(F.unique(v.tousertensor()))
-    if apply_func:
-        apply_exec, out_repr = build_node_executor(graph, unique_v, apply_func,
-                                                   reduce_accum=out_repr)
-        execs += apply_exec
-    wb_exec = build_write_back_exec(graph, out_repr, unique_v, "node")
-    execs += wb_exec
-    return execs
-
-def get_snr_schedule(graph,
-                     u,
-                     v,
-                     eid,
-                     message_func,
-                     reduce_func,
-                     apply_func):
-    call_type = 'send_and_recv'
     with ir.prog() as prog:
         nf = ir.Var.FEAT_DICT(graph._node_frame, name='nf')
-        unique_v, _ = F.sort_1d(F.unique(v.tousertensor()))
-        unique_v = ir.Var.IDX(unique_v, name='unique_v')
-        reduced_feat = _x_get_snr_schedule(
-                call_type, graph, u, v, eid, message_func, reduce_func)
+        # sort and unique the argument
+        nodes, _ = F.sort_1d(F.unique(nodes.tousertensor()))
+        nodes = ir.Var.IDX(recv_nodes, name='recv_nodes')
+        reduced_feat = _gen_reduce(graph, reduce_func, nodes)
         if apply_func:
             # To avoid writing reduced features back to node frame and reading
             # it again for apply phase. Instead, we first read the the node
             # features and "merge" it with the reduced features.
-            v_nf = ir.READ_ROW(nf, v)
+            v_nf = ir.READ_ROW(nf, nodes)
             v_nf = ir.UPDATE_DICT(v_nf, reduced_feat)
             # TODO: wrap afunc to the proper signature
             afunc = ir.Var.FUNC(apply_func)
@@ -148,12 +94,89 @@ def get_snr_schedule(graph,
             final_feat = ir.UPDATE_DICT(applied_feat, reduced_feat)
         else:
             final_feat = reduced_feat
-        ir.WRITE_ROW_(nf, unique_v, final_feat)
+        ir.WRITE_ROW_(nf, nodes, final_feat)
         return prog
 
-def _x_get_snr_schedule(call_type, graph, u, v, eid,
-        message_func, reduce_func):
+def _gen_reduce(graph, reduce_func, nodes):
+    call_type = "recv"
+    u, v, eid = graph._msg_graph.in_edges(nodes)
+    msg = ir.Var.FEAT_DICT(graph._msg_frame, 'msg')
+    nf = ir.Var.FEAT_DICT(graph._node_frame, 'nf')
+    u = ir.Var.IDX(u)
+    v = ir.Var.IDX(v)
+    eid = ir.Var.IDX(eid)
+
+    rfunc = _standardize_func_usage(reduce_func)
+    rfunc_is_list = utils.is_iterable(rfunc)
+
+    out = ir.Var.FEAT_DICT() 
+
+    if rfunc_is_list:
+        # UDF message + builtin reducer
+        # analyze e2v spmv
+        spmv_rfunc, rfunc = spmv.analyze_e2v_spmv(graph, rfunc)
+        inc = spmv.build_inc_matrix(call_type, graph, eid.data, v.data)
+        spmv.gen_e2v_spmv_schedule(inc, spmv_rfunc, msg, out)
+
+        if len(rfunc) == 0:
+            # All mfunc and rfunc has been processed.
+            return out
+
+        # convert the remaining rfunc to UDFs
+        rfunc = BundledFunction(rfunc)
+
+    # gen degree bucketing schedule for UDF recv
+    rfunc = ir.Var.FUNC(rfunc)
+    db.gen_degree_bucketing_schedule(call_type, nf, msg,
+            rfunc, graph, v, out)
+    return out
+
+def get_snr_schedule(graph,
+                     edge_tuples,
+                     message_func,
+                     reduce_func,
+                     apply_func):
+    call_type = 'send_and_recv'
+    with ir.prog() as prog:
+        nf = ir.Var.FEAT_DICT(graph._node_frame, name='nf')
+        recv_nodes, _ = F.sort_1d(F.unique(edge_tuples[2].tousertensor()))
+        recv_nodes = ir.Var.IDX(recv_nodes, name='recv_nodes')
+        reduced_feat = _gen_send_reduce(call_type, graph,
+                edge_tuples, message_func, reduce_func)
+        if apply_func:
+            # To avoid writing reduced features back to node frame and reading
+            # it again for apply phase. Instead, we first read the the node
+            # features and "merge" it with the reduced features.
+            v_nf = ir.READ_ROW(nf, recv_nodes)
+            v_nf = ir.UPDATE_DICT(v_nf, reduced_feat)
+            # TODO: wrap afunc to the proper signature
+            afunc = ir.Var.FUNC(apply_func)
+            applied_feat = ir.CALL(afunc, [v_nf])
+            final_feat = ir.UPDATE_DICT(applied_feat, reduced_feat)
+        else:
+            final_feat = reduced_feat
+        ir.WRITE_ROW_(nf, recv_nodes, final_feat)
+        return prog
+
+def _gen_send_reduce(
+        call_type,
+        graph,
+        edge_tuples,
+        message_func,
+        reduce_func):
+    """Generate 
+
+    This guarantees that the returned reduced features are batched
+    in the *unique-ascending* order of the edge destination node ids.
+
+    call_type : str
+    graph : DGLGraph
+    edge_tuples : (u, v, eid) tuple of utils.Index
+    message_func : callable, list of builtins
+    reduce_func : callable, list of builtins
+    """
     # arg vars
+    u, v, eid = edge_tuples
     nf = ir.Var.FEAT_DICT(graph._node_frame, name='nf')
     ef = ir.Var.FEAT_DICT(graph._edge_frame, name='ef')
     u = ir.Var.IDX(u, name='u')
@@ -184,7 +207,7 @@ def _x_get_snr_schedule(call_type, graph, u, v, eid,
     
     # generate UDF send schedule
     mfunc = ir.Var.FUNC(mfunc)
-    msg = gen_udf_send_schedule(nf, ef, u, v, eid, mfunc)
+    msg = _gen_send(nf, ef, u, v, eid, mfunc)
 
     if rfunc_is_list:
         # UDF message + builtin reducer
@@ -202,11 +225,11 @@ def _x_get_snr_schedule(call_type, graph, u, v, eid,
 
     # gen degree bucketing schedule for UDF recv
     rfunc = ir.Var.FUNC(rfunc)
-    gen_degree_bucketing_schedule(call_type, nf, msg,
+    db.gen_degree_bucketing_schedule(call_type, nf, msg,
             rfunc, graph, v, out)
     return out
 
-def gen_udf_send_schedule(nf, ef, u, v, eid, mfunc):
+def _gen_send(nf, ef, u, v, eid, mfunc):
     fdsrc = ir.READ_ROW(nf, u)
     fddst = ir.READ_ROW(nf, v)
     fdedge = ir.READ_ROW(ef, eid)
@@ -342,86 +365,6 @@ def get_pull_schedule(graph, v, message_func, reduce_func, apply_func):
     return get_snr_schedule(graph, u, v, eid,
                             message_func, reduce_func, apply_func)
 
-def build_node_executor(graph, v, func, reduce_accum=None):
-    execs = []
-    if reduce_accum:
-        # if has reduce phase, apply should update the output of reduce
-        out_repr = reduce_accum
-    else:
-        out_repr = {}
-    if func:
-        exe = NodeExecutor(func, graph, v, out_repr, reduce_accum)
-        execs.append(exe)
-    return execs, out_repr
-
-def build_edge_executor(graph, u, v, eid, func):
-    execs = []
-    out_repr = {}
-    if func:
-        if is_all(eid):
-            # if edges is ALL, look up source and destination nodes
-            u, v, _ = graph._graph.edges()
-        exe = EdgeExecutor(func, graph, u, v, eid, out_repr)
-        execs.append(exe)
-    return execs, out_repr
-
-def build_recv_executor(graph, v, rfunc):
-    """Build executors for recv"""
-    call_type = "recv"
-    rfunc = _standardize_func_usage(rfunc)
-
-    recv_execs = []
-
-    out_repr = {}
-
-    if utils.is_iterable(rfunc):
-        # build e2v spmv
-        message_repr = dict(graph._msg_frame)
-        u, v, eid = graph._msg_graph.in_edges(v)
-        rfunc = _analyze_e2v_spmv(recv_execs, out_repr, rfunc,
-                                  graph, call_type, v, eid, message_repr)
-
-    # build degree bucketing
-    _degree_bucket_exec(recv_execs, out_repr, rfunc,
-                        graph, call_type, graph._msg_frame, v)
-
-    return recv_execs, out_repr
-
-def build_send_and_recv_executor(graph, call_type, u, v, eid, mfunc, rfunc):
-    """Build executors for send_and_recv"""
-    mfunc = _standardize_func_usage(mfunc)
-    rfunc = _standardize_func_usage(rfunc)
-
-    mfunc_is_list = utils.is_iterable(mfunc)
-    rfunc_is_list = utils.is_iterable(rfunc)
-
-    recv_execs = []
-
-    out_repr = {}
-
-    # both message and reduce are a list of builtin
-    if mfunc_is_list and rfunc_is_list:
-        # pair mfunc with rfunc
-        pairs = _pair_reduce_with_message(mfunc, rfunc)
-
-        # build v2v spmv
-        mfunc, rfunc = _analyze_v2v_spmv(recv_execs, out_repr, pairs,
-                                         graph, call_type, u, v, eid)
-
-    # build send executor
-    send_execs, message_repr = build_edge_executor(graph, u, v, eid, mfunc)
-
-    if rfunc_is_list:
-        # build e2v spmv
-        rfunc = _analyze_e2v_spmv(recv_execs, out_repr, rfunc,
-                                  graph, call_type, v, eid, message_repr)
-
-    # build degree bucketing
-    _degree_bucket_exec(recv_execs, out_repr, rfunc,
-                        graph, call_type, message_repr, v)
-
-    return send_execs + recv_execs, out_repr
-
 def _check_builtin_func_list(func_list):
     """Check whether func_list only contains builtin functions."""
     for fn in func_list:
@@ -453,162 +396,5 @@ def _standardize_func_usage(func):
     else:
         # rfunc is one UDF
         return func
-
-def _analyze_v2v_spmv(exec_list, out_repr, pairs, graph, call_type, u, v, eid):
-    """Analyze if SPMV from node space to node space can be applied
-
-    Parameters
-    ----------
-    exec_list: list
-        A list where generated executor will be put in
-    out_repr: dict
-        A dictionary to be binded to the executor to store the execution output
-        This dictionary is empty until Runtime executes and materialize results
-    pairs: list of tuple
-        A list of tuples, each tuple is a message and reduce function pair
-    graph: DGLGraph
-        DGLGraph to use
-    call_type: str
-        Call_type of current graph API, could be "update_all" or "send_and_recv"
-    u: utils.Index
-        Source nodes
-    v: utils.Index
-        Destination nodes
-    eid: utils.Index
-        Edge ids
-
-    Returns:
-    mfunc_left: list
-        A list of message functions that can't use v2v spmv. In other
-        words, these message functions need to be materialized
-    rfunc_left: list
-        A list of reduce functions that can't use v2v spmv
-    """
-    mfunc_left = []
-    rfunc_left = []
-
-    # cache adjmat or adj_idx_shape
-    adjmat = None
-    adj_idx_shape = None
-
-    # node/edge repr for spmv
-    node_repr = graph.get_n_repr()
-    edge_repr = graph.get_e_repr(eid)
-
-    for mfn, rfn in pairs:
-        # XXX: should pre-compile a look up table
-        if mfn.is_spmv_supported(graph) and rfn.is_spmv_supported():
-            if mfn.use_edge_feature:
-                if adj_idx_shape is None:
-                    adj_idx_shape = _build_adj_matrix(graph, call_type, u, v,
-                                                      indices_and_shape=True)
-                exe = _v2v_spmv_exec(mfunc=mfn,
-                                     rfunc=rfn,
-                                     adjmat=adj_idx_shape,
-                                     node_repr=node_repr,
-                                     out_repr=out_repr,
-                                     use_edge_feat=True,
-                                     edge_repr=edge_repr)
-            else:
-                if adjmat is None:
-                    adjmat = _build_adj_matrix(graph, call_type, u, v)
-                exe = _v2v_spmv_exec(mfunc=mfn,
-                                     rfunc=rfn,
-                                     adjmat=adjmat,
-                                     node_repr=node_repr,
-                                     out_repr=out_repr,
-                                     use_edge_feat=False)
-            exec_list.append(exe)
-        else:
-            mfunc_left.append(mfn)
-            rfunc_left.append(rfn)
-    return mfunc_left, rfunc_left
-
-def _analyze_e2v_spmv(exec_list, out_repr, rfunc,
-                      graph, call_type, v, eid, message_repr):
-    """Analyze if SPMV from edge space to node space can be applied
-
-    Parameters
-    ----------
-    exec_list: list
-        A list where generated executor will be put in
-    out_repr: dict
-        A dictionary to be binded to the executor to store the execution output
-        This dictionary is empty until Runtime executes and materialize results
-    rfunc: list
-        A list of reduce functions to be analyzed
-    graph: DGLGraph
-        DGLGraph to use
-    call_type: str
-        Call_type of current graph API, could be "update_all" or "send_and_recv"
-    v: utils.Index
-        Destination nodes
-    eid: utils.Index
-        Edge ids
-    message_repr: dict
-        Message representations (generated by message function)
-
-    Returns:
-    rfunc_left: list
-        A list of reduce functions that can't use e2v spmv
-    """
-    if not rfunc:
-        return []
-
-    rfunc_left = []
-    icd_mat = None
-    for rfn in rfunc:
-        if rfn.is_spmv_supported():
-            if icd_mat is None:
-                icd_mat = _build_incidence_matrix(graph, call_type, v, eid)
-                exe = _e2v_spmv_exec(rfunc=rfn,
-                                     adjmat=icd_mat,
-                                     message_repr=message_repr,
-                                     out_repr=out_repr)
-                exec_list.append(exe)
-        else:
-            rfunc_left.append(rfn)
-    return rfunc_left
-
-def _v2v_spmv_exec(mfunc,
-                   rfunc,
-                   adjmat_creator,
-                   node_feat,
-                   out_feat,
-                   edge_feat):
-    """Build v2v spmv executor"""
-    #return SPMVExecutor(A_creator=adjmat_creator,
-                        #A_store=edge_feat,
-                        #A_field=
-    if use_edge_feat:
-        index, shape = adjmat
-        return SPMVExecutor(src_field=mfunc.src_field,
-                            src_repr=node_repr,
-                            out_field=rfunc.out_field,
-                            out_repr=out_repr,
-                            adjmat = index,
-                            use_edge_feat=True,
-                            edge_field=mfunc.edge_field,
-                            edge_repr=edge_repr,
-                            dense_shape=shape)
-    else:
-        return SPMVExecutor(src_field=mfunc.src_field,
-                            src_repr=node_repr,
-                            out_field=rfunc.out_field,
-                            out_repr=out_repr,
-                            adjmat = adjmat,
-                            use_edge_feat=False)
-
-def _e2v_spmv_exec(rfunc, adjmat, message_repr, out_repr):
-    """Build e2v spmv executor"""
-    return SPMVExecutor(src_field=rfunc.msg_field,
-                        src_repr=message_repr,
-                        out_field=rfunc.out_field,
-                        out_repr=out_repr,
-                        adjmat=adjmat,
-                        use_edge_feat=False)
-
-def build_write_back_exec(graph, new_repr, ids, target):
-    return [WriteBackExecutor(graph, new_repr, ids, target)]
 
 _init_api("dgl.runtime.scheduler")

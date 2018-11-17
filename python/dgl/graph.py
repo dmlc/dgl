@@ -1195,13 +1195,8 @@ class DGLGraph(object):
             # no edges to be triggered
             return
 
-        prog = scheduler.get_snr_schedule(graph=self,
-                                           u=u,
-                                           v=v,
-                                           eid=eid,
-                                           message_func=message_func,
-                                           reduce_func=reduce_func,
-                                           apply_func=apply_node_func)
+        prog = scheduler.get_snr_schedule(
+                self, (u, v, eid), message_func, reduce_func, apply_node_func)
         prog.pprint()
         #Runtime.run(execs)
 

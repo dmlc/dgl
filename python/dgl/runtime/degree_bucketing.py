@@ -13,9 +13,15 @@ def gen_degree_bucketing_schedule(
         msg,
         reduce_func,
         graph,
-        recv_nodes,
+        edge_dst,
         out):
-    """Create degree bucketing schedule
+    """Create degree bucketing schedule.
+
+    The messages will be divided by their receivers into buckets. Each bucket
+    contains nodes that have the same in-degree. The reduce UDF will be applied
+    on each bucket. The per-bucket result will be merged according to the
+    *unique-ascending order* of the recv node ids. The order is important to
+    be compatible with other reduce scheduler such as v2v_spmv.
 
     Parameters
     ----------
@@ -29,12 +35,13 @@ def gen_degree_bucketing_schedule(
         The UDF to reduce messages.
     graph: DGLGraph
         DGLGraph to use
-    recv_nodes: ir.Var
-        Receiving nodes
+    edge_dst: ir.Var
+        The destination nodes of the edges. The number
+        should be equal to the number of triggered edges.
     out : ir.Var
         The variable for output feature dicts.
     """
-    v = recv_nodes.data
+    v = edge_dst.data
     # Get degree bucketing schedule
     if isinstance(graph._graph, ImmutableGraphIndex):
         # NOTE: this is a workaround because immutable graph does not have (c++ support)
@@ -62,11 +69,11 @@ def gen_degree_bucketing_schedule(
             raise DGLError("Unsupported call type for degree bucketing: %s"
                            % call_type)
     # generate schedule
-    _, degs, dsts, msg_ids, zero_deg_nodes = buckets
+    unique_dst, degs, buckets, msg_ids, zero_deg_nodes = buckets
     # loop over each bucket
     idx_list = []
     fd_list = []
-    for deg, vb, mid in zip(degs, dsts, msg_ids):
+    for deg, vb, mid in zip(degs, buckets, msg_ids):
         vb = ir.Var.IDX(vb)
         mid = ir.Var.IDX(mid)
         # TODO: wrap reshape into it
@@ -83,8 +90,10 @@ def gen_degree_bucketing_schedule(
         zero_deg_feat = ir.READ_ROW(nf, zero_deg_nodes)
         idx_list.append(zero_deg_nodes)
         fd_list.append(zero_deg_feat)
-    # merge buckets
-    reduced_feat = ir.MERGE_ROW(recv_nodes, idx_list, fd_list)
+    # merge buckets according to the ascending order of the node ids.
+    order = F.sort_1d(unique_dst.tousertensor())[0]
+    order_var = ir.Var.IDX(utils.toindex(order))
+    reduced_feat = ir.MERGE_ROW(order_var, idx_list, fd_list)
     ir.WRITE_DICT_(out, reduced_feat)
 
 def _degree_bucketing_schedule(mids, dsts, v):
@@ -163,9 +172,8 @@ def _process_buckets(buckets):
     msg_section = buckets(4).asnumpy().tolist()
 
     # split buckets
-    unique_v = v.tousertensor()
     msg_ids = msg_ids.tousertensor()
-    dsts = F.split(unique_v, v_section, 0)
+    dsts = F.split(v.tousertensor(), v_section, 0)
     msg_ids = F.split(msg_ids, msg_section, 0)
 
     # convert to utils.Index
@@ -181,6 +189,6 @@ def _process_buckets(buckets):
     else:
         zero_deg_nodes = None
 
-    return unique_v, degs, dsts, msg_ids, zero_deg_nodes
+    return v, degs, dsts, msg_ids, zero_deg_nodes
 
 _init_api("dgl.runtime.degree_bucketing")
