@@ -137,7 +137,7 @@ def arange(start, stop):
     return th.arange(start, stop, dtype=th.int64)
 
 def zerocopy_to_dlpack(input):
-    return dlpack.to_dlpack(input)
+    return dlpack.to_dlpack(input.contiguous())
 
 def zerocopy_from_dlpack(dlpack_tensor):
     return dlpack.from_dlpack(dlpack_tensor)

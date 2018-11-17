@@ -11,6 +11,9 @@ from . import ndarray as nd
 class Index(object):
     """Index class that can be easily converted to list/tensor."""
     def __init__(self, data):
+        self._initialize_data(data)
+
+    def _initialize_data(self, data):
         self._list_data = None  # a numpy type data
         self._user_tensor_data = dict()  # dictionary of user tensors
         self._dgl_tensor_data = None  # a dgl ndarray
@@ -92,6 +95,12 @@ class Index(object):
 
     def __getitem__(self, i):
         return self.tolist()[i]
+
+    def __getstate__(self):
+        return self.tousertensor()
+
+    def __setstate__(self, state):
+        self._initialize_data(state)
 
 def toindex(x):
     return x if isinstance(x, Index) else Index(x)
