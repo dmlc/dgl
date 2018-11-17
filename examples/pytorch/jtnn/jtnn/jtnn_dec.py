@@ -170,3 +170,27 @@ class DGLJTNNDecoder(nn.Module):
         q_acc = (q.max(1)[1] == q_targets).float().sum() / q_targets.shape[0]
 
         return q_loss, p_loss, q_acc, p_acc
+
+    def decode(self, mol_vec, prob_decode):
+        assert mol_vec.shape[0] == 1
+
+        mol_tree = DGLMolTree(None)
+
+        init_hidden = cuda(torch.zeros(1, self.hidden_size))
+
+        root_hidden = torch.cat([init_hidden, mol_vec], 1)
+        root_hidden = F.relu(self.W(root_hidden))
+        root_score = self.W_o(root_hidden)
+        _, root_wid = torch.max(root_score, 1)
+        root_wid = root_wid.item()
+
+        mol_tree.add_nodes(1)   # root
+        mol_tree.nodes[0].data['wid'] = cuda(torch.tensor(root_wid))
+
+        stack, trace = [], []
+        stack.append((0, self.vocab.get_slots(root_wid)))
+
+        all_nodes = [0]
+        h = {}
+
+        # TODO

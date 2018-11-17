@@ -8,9 +8,13 @@ from .line_profiler_integration import profile
 class DGLMolTree(DGLGraph):
     def __init__(self, smiles):
         DGLGraph.__init__(self)
+        self.nodes_dict = {}
+
+        if smiles is None:
+            return
+
         self.smiles = smiles
         self.mol = get_mol(smiles)
-        self.nodes_dict = {}
 
         # Stereo Generation
         mol = Chem.MolFromSmiles(smiles)
