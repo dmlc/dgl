@@ -13,16 +13,16 @@ import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 
-def gcn_msg(edge):
+def gcn_msg(edges):
     # TODO should we use concat?
-    return {'m': mx.nd.concat(edge.src['in'], edge.src['h'], dim=1)}
+    return {'m': mx.nd.concat(edges.src['in'], edges.src['h'], dim=1)}
 
-def gcn_reduce(node):
-    return {'accum': mx.nd.sum(node.mailbox['m'], 1) / node.mailbox['m'].shape[1]}
+def gcn_reduce(nodes):
+    return {'accum': mx.nd.sum(nodes.mailbox['m'], 1) / nodes.mailbox['m'].shape[1]}
 
 class NodeUpdate(gluon.Block):
-    def __init__(self, out_feats, activation=None, alpha=0.1):
-        super(NodeUpdate, self).__init__()
+    def __init__(self, out_feats, activation=None, alpha=0.1, **kwargs):
+        super(NodeUpdate, self).__init__(**kwargs)
         self.linear1 = gluon.nn.Dense(out_feats, activation=activation)
         # TODO what is the dimension here?
         self.linear2 = gluon.nn.Dense(out_feats)
@@ -76,16 +76,18 @@ class DGLSSEUpdateHidden(gluon.Block):
                  n_hidden,
                  activation,
                  dropout,
-                 use_spmv):
-        super(DGLSSEUpdateHidden, self).__init__()
+                 use_spmv,
+                 **kwargs):
+        super(DGLSSEUpdateHidden, self).__init__(**kwargs)
         self.layer = DGLNodeUpdate(NodeUpdate(n_hidden, activation))
         self.dropout = dropout
         self.use_spmv = use_spmv
 
     def forward(self, g, vertices):
         if self.use_spmv:
-            feat = g.get_n_repr()['in']
-            g.set_n_repr({'cat': mx.nd.concat(feat, g.ndata['h'], dim=1)})
+            feat = g.ndata['in']
+            g.ndata['cat'] = mx.nd.concat(feat, g.ndata['h'], dim=1)
+
             msg_func = fn.copy_src(src='cat', out='m')
             reduce_func = fn.sum(msg='m', out='accum')
         else:
@@ -95,8 +97,10 @@ class DGLSSEUpdateHidden(gluon.Block):
         if vertices is None:
             g.update_all(msg_func, reduce_func, None)
             if self.use_spmv:
+                g.ndata.pop('cat')
                 g.ndata['accum'] = g.ndata['accum'] / deg
             g.apply_nodes(self.layer)
+            g.ndata.pop('accum')
             return g.get_n_repr()['h1']
         else:
             # We don't need dropout for inference.
@@ -105,8 +109,10 @@ class DGLSSEUpdateHidden(gluon.Block):
                 g.ndata['h'] = mx.nd.Dropout(g.ndata['h'], p=self.dropout)
             g.pull(vertices, msg_func, reduce_func, None)
             if self.use_spmv:
+                g.ndata.pop('cat')
                 g.ndata['accum'] = g.ndata['accum'] / deg
             g.apply_nodes(self.layer, vertices)
+            g.ndata.pop('accum')
             return g.get_n_repr()['h1'][vertices]
 
 class SSEPredict(gluon.Block):
