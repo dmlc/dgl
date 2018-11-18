@@ -6,6 +6,7 @@ Paper: http://proceedings.mlr.press/v80/dai18a.html
 import argparse
 import numpy as np
 import time
+import math
 import mxnet as mx
 from mxnet import gluon
 import dgl
@@ -99,7 +100,11 @@ class DGLSSEUpdateHidden(gluon.Block):
             if self.use_spmv:
                 g.ndata.pop('cat')
                 g.ndata['accum'] = g.ndata['accum'] / deg
-            g.apply_nodes(self.layer)
+            batch_size = 100000
+            num_batches = int(math.ceil(g.number_of_nodes() / batch_size))
+            for i in range(num_batches):
+                vs = mx.nd.arange(i * batch_size, min((i + 1) * batch_size, g.number_of_nodes()), dtype=np.int64)
+                g.apply_nodes(self.layer, vs, inplace=True)
             g.ndata.pop('accum')
             return g.get_n_repr()['h1']
         else:
