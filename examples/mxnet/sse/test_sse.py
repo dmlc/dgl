@@ -152,7 +152,7 @@ def main(args, data):
         ctx = mx.gpu(0)
 
     # create the SSE model
-    g = DGLGraph(data.graph)
+    g = DGLGraph(data.graph, readonly=True)
     update_hidden = DGLSSEUpdateHidden(g, features, args.n_hidden, 'relu', args.update_dropout, args.use_spmv)
     if not args.dgl:
         update_hidden = SSEUpdateHidden(g, features, args.n_hidden, args.update_dropout, 'relu')
