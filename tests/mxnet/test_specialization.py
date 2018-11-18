@@ -1,3 +1,5 @@
+import os
+os.environ['DGLBACKEND'] = 'mxnet'
 import mxnet as mx
 from mxnet import autograd
 import scipy as sp
