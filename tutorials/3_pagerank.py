@@ -4,7 +4,8 @@
 PageRank with DGL Message Passing
 =================================
 
-**Author**: Minjie Wang, Quan Gan, Yu Gai, Zheng Zhang
+**Author**: `Minjie Wang <https://jermainewang.github.io/>`_, Quan Gan, Yu Gai,
+Zheng Zhang
 
 In this section we illustrate the usage of different levels of message
 passing API with PageRank on a small graph. In DGL, the message passing and
