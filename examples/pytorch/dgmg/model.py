@@ -1,261 +1,375 @@
 import dgl
-from dgl.graph import DGLGraph
-from dgl.nn import GCN
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-import argparse
-from util import DataLoader, elapsed, generate_dataset
-import time
-
-class MLP(nn.Module):
-    def __init__(self, num_hidden, num_classes, num_layers):
-        super(MLP, self).__init__()
-        layers = []
-        # hidden layers
-        for _ in range(num_layers):
-            layers.append(nn.Linear(num_hidden, num_hidden))
-            layers.append(nn.Sigmoid())
-        # output projection
-        layers.append(nn.Linear(num_hidden, num_classes))
-        self.layers = nn.Sequential(*layers)
-
-    def forward(self, x):
-        return self.layers(x)
+from functools import partial
+from torch.distributions import Bernoulli, Categorical
 
 
-def move2cuda(x):
-    # recursively move a object to cuda
-    if isinstance(x, torch.Tensor):
-        # if Tensor, move directly
-        return x.cuda()
+class GraphEmbed(nn.Module):
+    def __init__(self, node_hidden_size):
+        super(GraphEmbed, self).__init__()
+
+        # Setting from the paper
+        self.graph_hidden_size = 2 * node_hidden_size
+
+        # Embed graphs
+        self.node_gating = nn.Sequential(
+            nn.Linear(node_hidden_size, 1),
+            nn.Sigmoid()
+        )
+        self.node_to_graph = nn.Linear(node_hidden_size,
+                                       self.graph_hidden_size)
+
+    def forward(self, g):
+        if g.number_of_nodes() == 0:
+            return torch.zeros(1, self.graph_hidden_size)
+        else:
+            # Node features are stored as hv in ndata.
+            hvs = g.ndata['hv']
+            return (self.node_gating(hvs) *
+                    self.node_to_graph(hvs)).sum(0, keepdim=True)
+
+
+class GraphProp(nn.Module):
+    def __init__(self, num_prop_rounds, node_hidden_size):
+        super(GraphProp, self).__init__()
+
+        self.num_prop_rounds = num_prop_rounds
+
+        # Setting from the paper
+        self.node_activation_hidden_size = 2 * node_hidden_size
+
+        message_funcs = []
+        node_update_funcs = []
+        self.reduce_funcs = []
+
+        for t in range(num_prop_rounds):
+            # input being [hv, hu, xuv]
+            message_funcs.append(nn.Linear(2 * node_hidden_size + 1,
+                                           self.node_activation_hidden_size))
+
+            node_update_funcs.append(
+                nn.GRUCell(self.node_activation_hidden_size,
+                           node_hidden_size))
+
+            self.reduce_funcs.append(partial(self.dgmg_reduce, round=t))
+
+        self.message_funcs = nn.ModuleList(message_funcs)
+        self.node_update_funcs = nn.ModuleList(node_update_funcs)
+
+    def dgmg_msg(self, edges):
+        """For an edge u->v, return concat([h_u, x_uv])"""
+        return {'m': torch.cat([edges.src['hv'],
+                                edges.data['he']],
+                               dim=1)}
+
+    def dgmg_reduce(self, nodes, round):
+        hv_old = nodes.data['hv']
+        m = nodes.mailbox['m']
+        message = torch.cat([
+            hv_old.unsqueeze(1).expand(-1, m.size(1), -1), m], dim=2)
+        node_activation = (self.message_funcs[round](message)).sum(1)
+
+        return {'hv': self.node_update_funcs[round](node_activation, hv_old)}
+
+    def forward(self, g):
+        if g.number_of_nodes() == 0:
+            return
+
+        for t in range(self.num_prop_rounds):
+            if g.number_of_edges() > 0:
+                g.update_all(message_func=self.dgmg_msg,
+                             reduce_func=self.reduce_funcs[t])
+
+
+# Define two functions for calculating p and log p with
+# samples from Bernoulli distributions
+def bernoulli_action_prob(prob, action):
+    return 1. - prob if action == 0 else prob
+
+def bernoulli_action_log_prob(logit, action):
+    # Use logit rather than prob for numerical stability
+    if action == 0:
+        return F.logsigmoid(-logit)
     else:
-        try:
-            # iterable, recursively move each element
-            x = [move2cuda(i) for i in x]
-            return x
-        except:
-            # don't do anything for other types like basic types
-            return x
+        return F.logsigmoid(logit)
+
+
+class AddNode(nn.Module):
+    def __init__(self, graph_embed_func, node_hidden_size):
+        super(AddNode, self).__init__()
+
+        self.graph_op = {'embed': graph_embed_func}
+
+        self.stop = 1
+        self.add_node = nn.Linear(graph_embed_func.graph_hidden_size, 1)
+
+        # If to add a node, initialize its hv
+        self.node_type_embed = nn.Embedding(1, node_hidden_size)
+        self.initialize_hv = nn.Linear(node_hidden_size + \
+                                       graph_embed_func.graph_hidden_size,
+                                       node_hidden_size)
+
+    def _initialize_node_repr(self, g, node_type, graph_embed):
+        num_nodes = g.number_of_nodes()
+        hv_init = self.initialize_hv(
+            torch.cat([
+                self.node_type_embed(torch.LongTensor([node_type])),
+                graph_embed], dim=1))
+        if num_nodes == 1:
+            g.ndata['hv'] = hv_init
+        else:
+            g.nodes[num_nodes - 1].data['hv'] = hv_init
+
+    def prepare_training(self):
+        self.prob = []
+        self.log_prob = []
+
+    def forward(self, g, **kwargs):
+        graph_embed = self.graph_op['embed'](g)
+
+        logit = self.add_node(graph_embed)
+        prob = torch.sigmoid(logit)
+
+        if self.training:
+            action = kwargs.get('a')
+        else:
+            action = Bernoulli(prob).sample().item()
+        stop = bool(action == self.stop)
+
+        if not stop:
+            g.add_nodes(1)
+            self._initialize_node_repr(g, action, graph_embed)
+
+        if self.training:
+            sample_prob = bernoulli_action_prob(prob, action)
+            sample_log_prob = bernoulli_action_log_prob(logit, action)
+
+            self.prob.append(sample_prob.detach())
+            self.log_prob.append(sample_log_prob)
+
+        return stop
+
+
+class AddEdge(nn.Module):
+    def __init__(self, graph_embed_func, node_hidden_size):
+        super(AddEdge, self).__init__()
+
+        self.graph_op = {'embed': graph_embed_func}
+        self.add_edge = nn.Linear(graph_embed_func.graph_hidden_size + \
+                                  node_hidden_size, 1)
+
+    def prepare_training(self):
+        self.prob = []
+        self.log_prob = []
+
+    def forward(self, g, **kwargs):
+        graph_embed = self.graph_op['embed'](g)
+        src_embed = g.nodes[g.number_of_nodes() - 1].data['hv']
+
+        logit = self.add_edge(torch.cat(
+            [graph_embed, src_embed], dim=1))
+        prob = torch.sigmoid(logit)
+
+        if self.training:
+            action = kwargs.get('a')
+        else:
+            action = Bernoulli(prob).sample().item()
+        to_add_edge = bool(action == 0)
+
+        if self.training:
+            sample_prob = bernoulli_action_prob(prob, action)
+            sample_log_prob = bernoulli_action_log_prob(logit, action)
+
+            self.prob.append(sample_prob.detach())
+            self.log_prob.append(sample_log_prob)
+
+        return to_add_edge
+
+
+class ChooseDestAndUpdate(nn.Module):
+    def __init__(self, graph_prop_func, node_hidden_size):
+        super(ChooseDestAndUpdate, self).__init__()
+
+        self.graph_op = {'prop': graph_prop_func}
+        self.choose_dest = nn.Linear(2 * node_hidden_size, 1)
+
+    def _initialize_edge_repr(self, g, src_list, dest_list):
+        # For untyped edges, we only add 1 to indicate its existence.
+        # For multiple edge types, we can use a one hot representation
+        # or an embedding module.
+        edge_repr = torch.ones(len(src_list), 1)
+
+        if g.number_of_edges() - len(src_list) == 0:
+            g.edata['he'] = edge_repr
+        else:
+            g.edges[src_list, dest_list].data['he'] = edge_repr
+
+    def prepare_training(self):
+        self.prob = []
+        self.log_prob = []
+
+    def forward(self, g, **kwargs):
+        src = g.number_of_nodes() - 1
+        possible_dests = range(src)
+
+        src_embed_expand = g.nodes[src].data['hv'].expand(src, -1)
+        possible_dests_embed = g.nodes[possible_dests].data['hv']
+
+        dests_scores = self.choose_dest(
+            torch.cat([possible_dests_embed,
+                       src_embed_expand], dim=1)).view(1, -1)
+        dests_probs = F.softmax(dests_scores, dim=1)
+
+        if self.training:
+            dest = kwargs.get('a')
+        else:
+            dest = Categorical(dests_probs).sample().item()
+
+        if not g.has_edge_between(src, dest):
+            # For undirected graphs, we add edges for both directions
+            # so that we can perform graph propagation.
+            src_list = [src, dest]
+            dest_list = [dest, src]
+
+            g.add_edges(src_list, dest_list)
+            self._initialize_edge_repr(g, src_list, dest_list)
+
+            self.graph_op['prop'](g)
+
+        if self.training:
+            if dests_probs.nelement() > 1:
+                self.prob.append(dests_probs[:, dest: dest + 1])
+                self.log_prob.append(
+                    F.log_softmax(dests_scores, dim=1)[:, dest: dest + 1])
 
 
 class DGMG(nn.Module):
-    def __init__(self, node_num_hidden, graph_num_hidden, T, num_MLP_layers=1, loss_func=None, dropout=0.0, use_cuda=False):
+    def __init__(self, v_max, node_hidden_size,
+                 num_prop_rounds):
         super(DGMG, self).__init__()
-        # hidden size of node and graph
-        self.node_num_hidden = node_num_hidden
-        self.graph_num_hidden = graph_num_hidden
-        # use GCN as a simple propagation model
-        self.gcn = nn.ModuleList([GCN(node_num_hidden, node_num_hidden, F.relu, dropout) for _ in range(T)])
-        # project node repr to graph repr (higher dimension)
-        self.graph_project = nn.Linear(node_num_hidden, graph_num_hidden)
-        # add node
-        self.fan = MLP(graph_num_hidden, 2, num_MLP_layers)
-        # add edge
-        self.fae = MLP(graph_num_hidden + node_num_hidden, 1, num_MLP_layers)
-        # select node to add edge
-        self.fs = MLP(node_num_hidden * 2, 1, num_MLP_layers)
-        # init node state
-        self.finit = MLP(graph_num_hidden, node_num_hidden, num_MLP_layers)
-        # loss function
-        self.loss_func = loss_func
-        # use gpu
-        self.use_cuda = use_cuda
 
-    def decide_add_node(self, hGs):
-        h = self.fan(hGs)
-        p = F.softmax(h, dim=1)
-        # calc loss
-        self.loss += self.loss_func(p, self.labels[self.step], self.masks[self.step])
+        # Graph configuration
+        self.v_max = v_max
 
-    def decide_add_edge(self, batched_graph, hGs):
-        hvs = batched_graph.get_n_repr((self.sample_node_curr_idx - 1).tolist())['h']
-        h = self.fae(torch.cat((hGs, hvs), dim=1))
-        p = torch.sigmoid(h)
-        p = torch.cat([1 - p, p], dim=1)
-        self.loss += self.loss_func(p, self.labels[self.step], self.masks[self.step])
+        # Graph embedding module
+        self.graph_embed = GraphEmbed(node_hidden_size)
 
-    def select_node_to_add_edge(self, batched_graph, indices):
-        node_indices = self.sample_node_curr_idx[indices].tolist()
-        node_start = self.sample_node_start_idx[indices].tolist()
-        node_repr = batched_graph.get_n_repr()['h']
-        for i, j, idx in zip(node_start, node_indices, indices):
-            hu = node_repr.narrow(0, i, j-i)
-            hv = node_repr.narrow(0, j-1, 1)
-            huv = torch.cat((hu, hv.expand(j-i, -1)), dim=1)
-            s = F.softmax(self.fs(huv), dim=0).view(1, -1)
-            dst = self.node_select[self.step][idx].view(-1)
-            self.loss += self.loss_func(s, dst)
+        # Graph propagation module
+        self.graph_prop = GraphProp(num_prop_rounds,
+                                    node_hidden_size)
 
-    def update_graph_repr(self, batched_graph, hGs, indices, indices_tensor):
-        start = self.sample_node_start_idx[indices].tolist()
-        stop = self.sample_node_curr_idx[indices].tolist()
-        node_repr = batched_graph.get_n_repr()['h']
-        graph_repr = self.graph_project(node_repr)
-        new_hGs = []
-        for i, j in zip(start, stop):
-            h = graph_repr.narrow(0, i, j-i)
-            hG = torch.sum(h, 0, keepdim=True)
-            new_hGs.append(hG)
-        new_hGs = torch.cat(new_hGs, dim=0)
-        return hGs.index_copy(0, indices_tensor, new_hGs)
+        # Actions
+        self.add_node_agent = AddNode(
+            self.graph_embed, node_hidden_size)
+        self.add_edge_agent = AddEdge(
+            self.graph_embed, node_hidden_size)
+        self.choose_dest_agent = ChooseDestAndUpdate(
+            self.graph_prop, node_hidden_size)
 
-    def propagate(self, batched_graph, indices):
-        edge_src = [self.sample_edge_src[idx][0: self.sample_edge_count[idx]] for idx in indices]
-        edge_dst = [self.sample_edge_dst[idx][0: self.sample_edge_count[idx]] for idx in indices]
-        u = np.concatenate(edge_src).tolist()
-        v = np.concatenate(edge_dst).tolist()
-        for gcn in self.gcn:
-            gcn.forward(batched_graph, u, v, attribute='h')
+        # Weight initialization
+        self.init_weights()
 
-    def forward(self, training=False, ground_truth=None):
-        if not training:
-            raise NotImplementedError("inference is not implemented yet")
+    def init_weights(self):
+        from utils import weights_init, dgmg_message_weight_init
 
-        assert(ground_truth is not None)
-        signals, (batched_graph, self.sample_edge_src, self.sample_edge_dst) = ground_truth
-        nsteps, self.labels, self.node_select, self.masks, active_step, label1_set, label1_set_tensor = signals
-        # init loss
-        self.loss = 0
+        self.graph_embed.apply(weights_init)
+        self.graph_prop.apply(weights_init)
+        self.add_node_agent.apply(weights_init)
+        self.add_edge_agent.apply(weights_init)
+        self.choose_dest_agent.apply(weights_init)
 
-        batch_size = len(self.sample_edge_src)
-        # initial node repr for each sample
-        hVs = torch.zeros(len(batched_graph), self.node_num_hidden)
-        # FIXME: what's the initial grpah repr for empty graph?
-        hGs = torch.zeros(batch_size, self.graph_num_hidden)
+        self.graph_prop.message_funcs.apply(dgmg_message_weight_init)
 
-        if self.use_cuda:
-            hVs = hVs.cuda()
-            hGs = hGs.cuda()
-        batched_graph.set_n_repr({'h': hVs})
+    @property
+    def graph_size(self):
+        return self.g.number_of_nodes()
 
-        self.sample_node_start_idx = batched_graph.query_node_start_offset()
-        self.sample_node_curr_idx = self.sample_node_start_idx.copy()
-        self.sample_edge_count = np.zeros(batch_size, dtype=int)
+    @property
+    def action_step(self):
+        old_step_count = self.step_count
+        self.step_count += 1
 
-        self.step = 0
-        while self.step < nsteps:
-            if self.step % 2 == 0: # add node step
-                if active_step[self.step]:
-                    # decide whether to add node
-                    self.decide_add_node(hGs)
+        return old_step_count
 
-                    # calculate initial state for new node
-                    hvs = self.finit(hGs)
+    def prepare_for_train(self):
+        self.step_count = 0
 
-                    # add node
-                    update = label1_set[self.step]
-                    if len(update) > 0:
-                        hvs = torch.index_select(hvs, 0, label1_set_tensor[self.step])
-                        scatter_indices = self.sample_node_curr_idx[update]
-                        batched_graph.set_n_repr({'h': hvs}, scatter_indices.tolist())
-                        self.sample_node_curr_idx[update] += 1
+        self.add_node_agent.prepare_training()
+        self.add_edge_agent.prepare_training()
+        self.choose_dest_agent.prepare_training()
 
-                        # get new graph repr
-                        hGs = self.update_graph_repr(batched_graph, hGs, update, label1_set_tensor[self.step])
-                else:
-                    # all samples are masked
-                    pass
+    def add_node_and_update(self, **kwargs):
+        """Decide if to add a new node.
+        If a new node should be added, update the graph."""
 
-            else: # add edge step
+        return self.add_node_agent(self.g, **kwargs)
 
-                # decide whether to add edge, which edge to add
-                # and also add edge
-                self.decide_add_edge(batched_graph, hGs)
+    def add_edge_or_not(self, **kwargs):
+        """Decide if a new edge should be added."""
 
-                # propagate
-                to_add_edge = label1_set[self.step]
-                if len(to_add_edge) > 0:
-                    # at least one graph needs update
-                    self.select_node_to_add_edge(batched_graph, to_add_edge)
-                    # update edge count for each sample
-                    self.sample_edge_count[to_add_edge] += 2 # undirected graph
+        return self.add_edge_agent(self.g, **kwargs)
 
-                    # perform gcn propagation
-                    self.propagate(batched_graph, to_add_edge)
+    def choose_dest_and_update(self, **kwargs):
+        """Choose destination and connect it to the latest node.
+        Add edges for both directions and update the graph."""
 
-                    # get new graph repr
-                    hGs = self.update_graph_repr(batched_graph, hGs, label1_set[self.step], label1_set_tensor[self.step])
+        self.choose_dest_agent(self.g, **kwargs)
 
-            self.step += 1
+    def get_log_prob(self):
+        return torch.cat(self.add_node_agent.log_prob).sum()\
+               + torch.cat(self.add_edge_agent.log_prob).sum()\
+               + torch.cat(self.choose_dest_agent.log_prob).sum()
 
+    def get_prob(self):
+        return torch.cat(self.add_node_agent.prob).prod()\
+               * torch.cat(self.add_edge_agent.prob).prod()\
+               * torch.cat(self.choose_dest_agent.prob).prod()
 
-def main(args):
+    def forward_train(self, actions):
+        self.prepare_for_train()
 
-    if torch.cuda.is_available() and args.gpu >= 0:
-        torch.cuda.set_device(args.gpu)
-        use_cuda = True
-    else:
-        use_cuda = False
+        stop = self.add_node_and_update(a=actions[self.action_step])
 
+        while (not stop) and (self.graph_size < self.v_max + 1):
+            num_trials = 0
+            to_add_edge = self.add_edge_or_not(a=actions[self.action_step])
+            while to_add_edge and (num_trials
+                                   < self.graph_size - 1):
+                self.choose_dest_and_update(a=actions[self.action_step])
+                num_trials += 1
+                to_add_edge = self.add_edge_or_not(a=actions[self.action_step])
+            stop = self.add_node_and_update(a=actions[self.action_step])
 
-    def masked_cross_entropy(x, label, mask=None):
-        # x: propability tensor, i.e. after softmax
-        x = torch.log(x)
-        if mask is not None:
-            x = x[mask]
-            label = label[mask]
-        return F.nll_loss(x, label)
+        return self.get_log_prob(), self.get_prob()
 
-    model = DGMG(args.n_hidden_node, args.n_hidden_graph, args.n_layers,
-                 loss_func=masked_cross_entropy, dropout=args.dropout, use_cuda=use_cuda)
-    if use_cuda:
-        model.cuda()
+    def forward_inference(self):
+        stop = self.add_node_and_update()
+        while (not stop) and (self.graph_size < self.v_max + 1):
+            num_trials = 0
+            to_add_edge = self.add_edge_or_not()
+            while to_add_edge and (num_trials
+                                   < self.graph_size - 1):
+                self.choose_dest_and_update()
+                num_trials += 1
+                to_add_edge = self.add_edge_or_not()
+            stop = self.add_node_and_update()
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+        return self.g
 
-    # training loop
-    for ep in range(args.n_epochs):
-        print("epoch: {}".format(ep))
-        for idx, ground_truth in enumerate(DataLoader(args.dataset, args.batch_size)):
-            if use_cuda:
-                count, label, node_list, mask, active, label1, label1_tensor = ground_truth[0]
-                label, node_list, mask, label1_tensor = move2cuda((label, node_list, mask, label1_tensor))
-                ground_truth[0] = (count, label, node_list, mask, active, label1, label1_tensor)
+    def forward(self, **kwargs):
+        # The graph we will work on
+        self.g = dgl.DGLGraph()
 
-            optimizer.zero_grad()
-            # create new empty graphs
-            start = time.time()
-            model.forward(True, ground_truth)
-            end = time.time()
-            elapsed("model forward", start, end)
-            start = time.time()
-            model.loss.backward()
-            optimizer.step()
-            end = time.time()
-            elapsed("model backward", start, end)
-            print("iter {}: loss {}".format(idx, model.loss.item()))
+        # If there are some features for nodes and edges,
+        # zero tensors will be set for those of new nodes and edges.
+        self.g.set_n_initializer(lambda shape, dtype, ctx:
+                                 torch.zeros(shape, device=ctx))
+        self.g.set_e_initializer(lambda shape, dtype, ctx:
+                                 torch.zeros(shape, device=ctx))
 
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='DGMG')
-    parser.add_argument("--dropout", type=float, default=0,
-            help="dropout probability")
-    parser.add_argument("--gpu", type=int, default=-1,
-            help="gpu")
-    parser.add_argument("--lr", type=float, default=1e-2,
-            help="learning rate")
-    parser.add_argument("--n-epochs", type=int, default=20,
-            help="number of training epochs")
-    parser.add_argument("--n-hidden-node", type=int, default=16,
-            help="number of hidden DGMG node units")
-    parser.add_argument("--n-hidden-graph", type=int, default=32,
-            help="number of hidden DGMG graph units")
-    parser.add_argument("--n-layers", type=int, default=2,
-            help="number of hidden gcn layers")
-    parser.add_argument("--dataset", type=str, default='samples.p',
-            help="dataset pickle file")
-    parser.add_argument("--gen-dataset", type=str, default=None,
-            help="parameters to generate B-A graph datasets. Format: <#node>,<#edge>,<#sample>")
-    parser.add_argument("--batch-size", type=int, default=32,
-            help="batch size")
-    args = parser.parse_args()
-    print(args)
-
-    # generate dataset if needed
-    if args.gen_dataset is not None:
-        n_node, n_edge, n_sample = map(int, args.gen_dataset.split(','))
-        generate_dataset(n_node, n_edge, n_sample, args.dataset)
-
-    main(args)
+        if self.training:
+            return self.forward_train(kwargs.get('actions'))
+        else:
+            return self.forward_inference()
