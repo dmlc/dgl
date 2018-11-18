@@ -23,7 +23,8 @@ def sparse_matrix(data, index, shape, force_format=False):
     fmt = index[0]
     if fmt != 'coo':
         raise TypeError('Pytorch backend only supports COO format. But got %s.' % fmt)
-    return th.sparse.FloatTensor(index[1], data, shape)
+    # NOTE: use _sparse_coo_tensor_unsafe to avoid unnecessary boundary check
+    return th._sparse_coo_tensor_unsafe(index[1], data, shape)
 
 def sparse_matrix_indices(spmat):
     return ('coo', spmat._indices())
@@ -98,11 +99,11 @@ def unsqueeze(input, dim):
 def reshape(input, shape):
     return th.reshape(input ,shape)
 
-def zeros(shape, dtype):
-    return th.zeros(shape, dtype=dtype)
+def zeros(shape, dtype, ctx):
+    return th.zeros(shape, dtype=dtype, device=ctx)
 
-def ones(shape, dtype):
-    return th.ones(shape, dtype=dtype)
+def ones(shape, dtype, ctx):
+    return th.ones(shape, dtype=dtype, device=ctx)
 
 def spmm(x, y):
     return th.spmm(x, y)
@@ -136,7 +137,7 @@ def arange(start, stop):
     return th.arange(start, stop, dtype=th.int64)
 
 def zerocopy_to_dlpack(input):
-    return dlpack.to_dlpack(input)
+    return dlpack.to_dlpack(input.contiguous())
 
 def zerocopy_from_dlpack(dlpack_tensor):
     return dlpack.from_dlpack(dlpack_tensor)

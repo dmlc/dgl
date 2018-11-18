@@ -8,6 +8,8 @@ from . import backend as F
 from .base import DGLError, dgl_warning
 from . import utils
 
+import sys
+
 
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     """The column scheme.
@@ -19,7 +21,21 @@ class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     dtype : TVMType
         The feature data type.
     """
-    pass
+    # FIXME:
+    # Python 3.5.2 is unable to pickle torch dtypes; this is a workaround.
+    # I also have to create data_type_dict and reverse_data_type_dict
+    # attribute just for this bug.
+    # I raised an issue in PyTorch bug tracker:
+    # https://github.com/pytorch/pytorch/issues/14057
+    if sys.version_info.major == 3 and sys.version_info.minor == 5:
+        def __reduce__(self):
+            return self._reconstruct_scheme, \
+                   (self.shape, F.reverse_data_type_dict[self.dtype])
+
+        @classmethod
+        def _reconstruct_scheme(cls, shape, dtype_str):
+            dtype = F.data_type_dict[dtype_str]
+            return cls(shape, dtype)
 
 def infer_scheme(tensor):
     return Scheme(tuple(F.shape(tensor)[1:]), F.dtype(tensor))
@@ -143,6 +159,11 @@ class Column(object):
         else:
             return Column(data)
 
+
+def _default_zero_initializer(shape, dtype, ctx):
+    return F.zeros(shape, dtype, ctx)
+
+
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
 
@@ -183,7 +204,7 @@ class Frame(MutableMapping):
         dgl_warning('Initializer is not set. Use zero initializer instead.'
                     ' To suppress this warning, use `set_initializer` to'
                     ' explicitly specify which initializer to use.')
-        self._initializer = lambda shape, dtype: F.zeros(shape, dtype)
+        self._initializer = _default_zero_initializer
 
     def set_initializer(self, initializer):
         """Set the initializer for empty values.
@@ -283,9 +304,7 @@ class Frame(MutableMapping):
                            ' one column in the frame so number of rows can be inferred.' % name)
         if self.initializer is None:
             self._warn_and_set_initializer()
-        # TODO(minjie): directly init data on the targer device.
-        init_data = self.initializer((self.num_rows,) + scheme.shape, scheme.dtype)
-        init_data = F.copy_to(init_data, ctx)
+        init_data = self.initializer((self.num_rows,) + scheme.shape, scheme.dtype, ctx)
         self._columns[name] = Column(init_data, scheme)
 
     def update_column(self, name, data):
@@ -601,10 +620,10 @@ class FrameRef(MutableMapping):
 
         for key in self._frame:
             scheme = self._frame[key].scheme
-
+            ctx = F.context(self._frame[key].data)
             if self._frame.initializer is None:
                 self._frame._warn_and_set_initializer()
-            new_data = self._frame.initializer((num_rows,) + scheme.shape, scheme.dtype)
+            new_data = self._frame.initializer((num_rows,) + scheme.shape, scheme.dtype, ctx)
             feat_placeholders[key] = new_data
 
         self.append(feat_placeholders)
