@@ -110,11 +110,10 @@ class DGLSSEUpdateHidden(gluon.Block):
                 # TODO here we apply dropout on all vertex representation.
                 val = mx.nd.Dropout(hidden_data, p=self.dropout)
                 self.g.set_n_repr({'h': val})
-            #self.g.pull(vertices, msg_func, reduce_func, self.layer)
-            self.g.update_all(msg_func, reduce_func, None)
+            self.g.pull(vertices, msg_func, reduce_func, None)
             if self.use_spmv:
                 self.g.ndata['accum'] = self.g.ndata['accum'] / self.deg
-            self.g.apply_nodes(self.layer)
+            self.g.apply_nodes(self.layer, vertices)
             return self.g.get_n_repr()['h1'][vertices]
 
 class SSEPredict(gluon.Block):
