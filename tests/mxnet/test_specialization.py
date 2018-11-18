@@ -35,8 +35,6 @@ def generate_graph2(n):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
     g1 = dgl.DGLGraph(arr, readonly=True)
     g2 = dgl.DGLGraph(arr, readonly=True)
-    #g1 = generate_test()
-    #g2 = generate_test()
     num_nodes = g1.number_of_nodes()
     g1.set_n_repr({'f1' : mx.nd.random.normal(shape=(num_nodes,)),
         'f2' : mx.nd.random.normal(shape=(num_nodes, D))})
@@ -64,29 +62,47 @@ def test_update_all():
 
         def apply_func(nodes):
             return {fld : 2 * nodes.data[fld]}
-        g = generate_graph(100)
+        g1, g2 = generate_graph2(100)
         # update all
-        v1 = g.ndata[fld]
-        g.update_all(fn.copy_src(src=fld, out='m'), fn.sum(msg='m', out=fld), apply_func)
-        v2 = g.ndata[fld]
-        g.set_n_repr({fld : v1})
-        g.update_all(message_func, reduce_func, apply_func)
-        v3 = g.ndata[fld]
-        assert np.allclose(v2.asnumpy(), v3.asnumpy(), rtol=1e-05, atol=1e-05)
+        g1_data = g1.ndata[fld]
+        g2_data = g2.ndata[fld]
+        g1_data.attach_grad()
+        g2_data.attach_grad()
+        with mx.autograd.record():
+            g1.update_all(fn.copy_src(src=fld, out='m'), fn.sum(msg='m', out=fld), apply_func)
+            g2.update_all(message_func, reduce_func, apply_func)
+        g1_res = g1.ndata[fld]
+        g2_res = g2.ndata[fld]
+        assert np.allclose(g1_res.asnumpy(), g2_res.asnumpy(), rtol=1e-05, atol=1e-05)
+        g1_res.backward()
+        g2_res.backward()
+        assert np.allclose(g1_data.grad.asnumpy(), g2_data.grad.asnumpy(), rtol=1e-05, atol=1e-05)
+
         # update all with edge weights
-        v1 = g.ndata[fld]
-        g.update_all(fn.src_mul_edge(src=fld, edge='e1', out='m'),
-                fn.sum(msg='m', out=fld), apply_func)
-        v2 = g.ndata[fld]
-        g.set_n_repr({fld : v1})
-        g.update_all(fn.src_mul_edge(src=fld, edge='e2', out='m'),
-                fn.sum(msg='m', out=fld), apply_func)
-        v3 = g.ndata[fld]
-        g.set_n_repr({fld : v1})
-        g.update_all(message_func_edge, reduce_func, apply_func)
-        v4 = g.ndata[fld]
+        g1_data = g1.ndata[fld]
+        g1.update_all(fn.src_mul_edge(src=fld, edge='e1', out='m'),
+                      fn.sum(msg='m', out=fld), apply_func)
+        v2 = g1.ndata[fld]
+        g1.set_n_repr({fld : g1_data})
+        g1.update_all(fn.src_mul_edge(src=fld, edge='e2', out='m'),
+                      fn.sum(msg='m', out=fld), apply_func)
+        v3 = g1.ndata[fld]
         assert np.allclose(v2.asnumpy(), v3.asnumpy(), rtol=1e-05, atol=1e-05)
-        assert np.allclose(v3.asnumpy(), v4.asnumpy(), rtol=1e-05, atol=1e-05)
+
+        g1.set_n_repr({fld : g1_data})
+        g2_data = g2.ndata[fld]
+        g1_data.attach_grad()
+        g2_data.attach_grad()
+        with mx.autograd.record():
+            g1.update_all(fn.src_mul_edge(src=fld, edge='e2', out='m'),
+                          fn.sum(msg='m', out=fld), apply_func)
+            g2.update_all(message_func_edge, reduce_func, apply_func)
+        g1_res = g1.ndata[fld]
+        g2_res = g2.ndata[fld]
+        assert np.allclose(g1_res.asnumpy(), g2_res.asnumpy(), rtol=1e-05, atol=1e-05)
+        g1_res.backward()
+        g2_res.backward()
+        assert np.allclose(g1_data.grad.asnumpy(), g2_data.grad.asnumpy(), rtol=1e-05, atol=1e-05)
     # test 1d node features
     _test('f1')
     # test 2d node features
@@ -111,32 +127,50 @@ def test_send_and_recv():
         def apply_func(nodes):
             return {fld : 2 * nodes.data[fld]}
 
-        g = generate_graph(100)
+        g1, g2 = generate_graph2(100)
         # send and recv
-        v1 = g.ndata[fld]
-        g.send_and_recv((u, v), fn.copy_src(src=fld, out='m'),
-                fn.sum(msg='m', out=fld), apply_func)
-        v2 = g.ndata[fld]
-        g.set_n_repr({fld : v1})
-        g.send_and_recv((u, v), message_func, reduce_func, apply_func)
-        v3 = g.ndata[fld]
-        assert np.allclose(v2.asnumpy(), v3.asnumpy(), rtol=1e-05, atol=1e-05)
+        g1_data = g1.ndata[fld]
+        g2_data = g2.ndata[fld]
+        g1_data.attach_grad()
+        g2_data.attach_grad()
+        with mx.autograd.record():
+            g1.send_and_recv((u, v), fn.copy_src(src=fld, out='m'),
+                             fn.sum(msg='m', out=fld), apply_func)
+            g2.send_and_recv((u, v), message_func, reduce_func, apply_func)
+        g1_res = g1.ndata[fld]
+        g2_res = g2.ndata[fld]
+        assert np.allclose(g1_res.asnumpy(), g2_res.asnumpy(), rtol=1e-05, atol=1e-05)
+        g1_res.backward()
+        g2_res.backward()
+        assert np.allclose(g1_data.grad.asnumpy(), g2_data.grad.asnumpy(), rtol=1e-05, atol=1e-05)
+
         # send and recv with edge weights
-        v1 = g.ndata[fld]
-        g.send_and_recv((u, v), fn.src_mul_edge(src=fld, edge='e1', out='m'),
-                fn.sum(msg='m', out=fld), apply_func)
-        v2 = g.ndata[fld]
-        g.set_n_repr({fld : v1})
-        g.send_and_recv((u, v), fn.src_mul_edge(src=fld, edge='e2', out='m'),
-                fn.sum(msg='m', out=fld), apply_func)
-        v3 = g.ndata[fld]
-        g.set_n_repr({fld : v1})
-        g.send_and_recv((u, v), message_func_edge, reduce_func, apply_func)
-        v4 = g.ndata[fld]
+        g1_data = g1.ndata[fld]
+        g1.send_and_recv((u, v), fn.src_mul_edge(src=fld, edge='e1', out='m'),
+                         fn.sum(msg='m', out=fld), apply_func)
+        v2 = g1.ndata[fld]
+        g1.set_n_repr({fld : g1_data})
+        g1.send_and_recv((u, v), fn.src_mul_edge(src=fld, edge='e2', out='m'),
+                         fn.sum(msg='m', out=fld), apply_func)
+        v3 = g1.ndata[fld]
         assert np.allclose(v2.asnumpy(), v3.asnumpy(), rtol=1e-05, atol=1e-05)
-        assert np.allclose(v3.asnumpy(), v4.asnumpy(), rtol=1e-05, atol=1e-05)
+
+        g1.set_n_repr({fld : g1_data})
+        g2_data = g2.ndata[fld]
+        g1_data.attach_grad()
+        g2_data.attach_grad()
+        with mx.autograd.record():
+            g1.send_and_recv((u, v), fn.src_mul_edge(src=fld, edge='e2', out='m'),
+                             fn.sum(msg='m', out=fld), apply_func)
+            g2.send_and_recv((u, v), message_func_edge, reduce_func, apply_func)
+        g1_res = g1.ndata[fld]
+        g2_res = g2.ndata[fld]
+        assert np.allclose(g1_res.asnumpy(), g2_res.asnumpy(), rtol=1e-05, atol=1e-05)
+        g1_res.backward()
+        g2_res.backward()
+        assert np.allclose(g1_data.grad.asnumpy(), g1_data.grad.asnumpy(), rtol=1e-05, atol=1e-05)
     # test 1d node features
-    _test('f1')
+    #_test('f1')
     # test 2d node features
     _test('f2')
 
