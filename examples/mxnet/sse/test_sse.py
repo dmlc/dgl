@@ -42,76 +42,72 @@ class DGLNodeUpdate(gluon.Block):
         return {'h1': self.update(node.data['in'], node.data['h'], node.data['accum'])}
 
 class SSEUpdateHidden(gluon.Block):
-    def __init__(self, g, features,
+    def __init__(self, features,
                  n_hidden,
                  dropout,
                  activation):
         super(SSEUpdateHidden, self).__init__()
-        self.g = g
-        self.deg = mx.nd.expand_dims(g.in_degrees(np.arange(0, g.number_of_nodes())), 1).astype(np.float32)
         self.layer = NodeUpdate(n_hidden, activation)
         self.dropout = dropout
 
-    def forward(self, vertices):
+    def forward(self, g, vertices):
         if vertices is None:
-            feat = self.g.get_n_repr()['in']
-            cat = mx.nd.concat(feat, self.g.ndata['h'], dim=1)
-            accum = mx.nd.dot(self.g.adjacency_matrix(), cat) / self.deg
-            return self.layer(feat, self.g.ndata['h'], accum)
+            deg = mx.nd.expand_dims(g.in_degrees(np.arange(0, g.number_of_nodes())), 1).astype(np.float32)
+            feat = g.get_n_repr()['in']
+            cat = mx.nd.concat(feat, g.ndata['h'], dim=1)
+            accum = mx.nd.dot(g.adjacency_matrix(), cat) / deg
+            return self.layer(feat, g.ndata['h'], accum)
         else:
+            deg = mx.nd.expand_dims(g.in_degrees(vertices), 1).astype(np.float32)
             # We don't need dropout for inference.
             if self.dropout:
                 # TODO here we apply dropout on all vertex representation.
-                self.g.ndata['h'] = mx.nd.Dropout(self.g.ndata['h'], p=self.dropout)
-            feat = self.g.get_n_repr()['in']
-            cat = mx.nd.concat(feat, self.g.ndata['h'], dim=1)
-            slices = mx.nd.take(self.g.adjacency_matrix(), vertices)
-            accum = mx.nd.dot(slices, cat) / mx.nd.take(self.deg, vertices)
+                g.ndata['h'] = mx.nd.Dropout(g.ndata['h'], p=self.dropout)
+            feat = g.get_n_repr()['in']
+            cat = mx.nd.concat(feat, g.ndata['h'], dim=1)
+            slices = mx.nd.take(g.adjacency_matrix(), vertices)
+            accum = mx.nd.dot(slices, cat) / deg
             return self.layer(mx.nd.take(feat, vertices),
-                              mx.nd.take(self.g.ndata['h'], vertices), accum)
+                              mx.nd.take(g.ndata['h'], vertices), accum)
 
 class DGLSSEUpdateHidden(gluon.Block):
     def __init__(self,
-                 g,
                  features,
                  n_hidden,
                  activation,
                  dropout,
                  use_spmv):
         super(DGLSSEUpdateHidden, self).__init__()
-        self.g = g
-        self.g.set_n_repr({'in': features,
-                           'h': mx.nd.random.normal(shape=(g.number_of_nodes(), n_hidden), ctx=features.context)})
         self.layer = DGLNodeUpdate(NodeUpdate(n_hidden, activation))
         self.dropout = dropout
         self.use_spmv = use_spmv
-        self.deg = mx.nd.expand_dims(g.in_degrees(np.arange(0, g.number_of_nodes())), 1).astype(np.float32)
 
-    def forward(self, vertices):
+    def forward(self, g, vertices):
         if self.use_spmv:
-            feat = self.g.get_n_repr()['in']
-            self.g.set_n_repr({'cat': mx.nd.concat(feat, self.g.ndata['h'], dim=1)})
+            feat = g.get_n_repr()['in']
+            g.set_n_repr({'cat': mx.nd.concat(feat, g.ndata['h'], dim=1)})
             msg_func = fn.copy_src(src='cat', out='m')
             reduce_func = fn.sum(msg='m', out='accum')
         else:
             msg_func = gcn_msg
             reduce_func = gcn_reduce
+        deg = mx.nd.expand_dims(g.in_degrees(np.arange(0, g.number_of_nodes())), 1).astype(np.float32)
         if vertices is None:
-            self.g.update_all(msg_func, reduce_func, None)
+            g.update_all(msg_func, reduce_func, None)
             if self.use_spmv:
-                self.g.ndata['accum'] = self.g.ndata['accum'] / self.deg
-            self.g.apply_nodes(self.layer)
-            return self.g.get_n_repr()['h1']
+                g.ndata['accum'] = g.ndata['accum'] / deg
+            g.apply_nodes(self.layer)
+            return g.get_n_repr()['h1']
         else:
             # We don't need dropout for inference.
             if self.dropout:
                 # TODO here we apply dropout on all vertex representation.
-                self.g.ndata['h'] = mx.nd.Dropout(self.g.ndata['h'], p=self.dropout)
-            self.g.pull(vertices, msg_func, reduce_func, None)
+                g.ndata['h'] = mx.nd.Dropout(g.ndata['h'], p=self.dropout)
+            g.pull(vertices, msg_func, reduce_func, None)
             if self.use_spmv:
-                self.g.ndata['accum'] = self.g.ndata['accum'] / self.deg
-            self.g.apply_nodes(self.layer, vertices)
-            return self.g.get_n_repr()['h1'][vertices]
+                g.ndata['accum'] = g.ndata['accum'] / deg
+            g.apply_nodes(self.layer, vertices)
+            return g.get_n_repr()['h1'][vertices]
 
 class SSEPredict(gluon.Block):
     def __init__(self, update_hidden, out_feats, dropout):
@@ -121,11 +117,11 @@ class SSEPredict(gluon.Block):
         self.update_hidden = update_hidden
         self.dropout = dropout
 
-    def forward(self, vertices):
-        hidden = self.update_hidden(vertices)
+    def forward(self, g, vertices):
+        hidden = self.update_hidden(g, vertices)
         if self.dropout:
             hidden = mx.nd.Dropout(hidden, p=self.dropout)
-        return self.linear2(self.linear1(hidden)), hidden
+        return self.linear2(self.linear1(hidden))
 
 def main(args, data):
     features = mx.nd.array(data.features)
@@ -153,9 +149,13 @@ def main(args, data):
 
     # create the SSE model
     g = DGLGraph(data.graph, readonly=True)
-    update_hidden = DGLSSEUpdateHidden(g, features, args.n_hidden, 'relu', args.update_dropout, args.use_spmv)
+    g.ndata['in'] = features
+    g.ndata['h'] = mx.nd.random.normal(shape=(g.number_of_nodes(), args.n_hidden),
+            ctx=features.context)
+
+    update_hidden = DGLSSEUpdateHidden(features, args.n_hidden, 'relu', args.update_dropout, args.use_spmv)
     if not args.dgl:
-        update_hidden = SSEUpdateHidden(g, features, args.n_hidden, args.update_dropout, 'relu')
+        update_hidden = SSEUpdateHidden(features, args.n_hidden, args.update_dropout, 'relu')
     model = SSEPredict(update_hidden, args.n_hidden, args.predict_dropout)
     model.initialize(ctx=ctx)
 
@@ -172,30 +172,35 @@ def main(args, data):
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
+        print("epoch: " + str(epoch))
         # compute vertex embedding.
-        all_hidden = update_hidden(None)
+        all_hidden = update_hidden(g, None)
         g.ndata['h'] = all_hidden
         rets.append(all_hidden)
 
         t0 = time.time()
-        permute = np.random.permutation(len(train_vs))
-        permute = permute[0:int(len(permute) / 3)]
-        randv = train_vs[permute]
-        rand_labels = train_labels[permute]
-        data_iter = mx.io.NDArrayIter(data=mx.nd.array(randv, dtype='int64'), label=rand_labels,
-                                      batch_size=args.batch_size)
         train_loss = 0
-        for batch in data_iter:
-            # TODO this isn't exactly how the model is trained.
-            # We should enable the semi-supervised training.
+        i = 0
+        num_batches = len(train_vs) / args.batch_size
+        for subg, seeds in dgl.contrib.sampling.NeighborSampler(g, args.batch_size, g.number_of_nodes(),
+                neighbor_type='in', num_workers=args.num_parallel_subgraphs, seed_nodes=train_vs,
+                shuffle=True):
+            subg.copy_from_parent()
+
+            subg_seeds = subg.map_to_subgraph_nid(seeds)
             with mx.autograd.record():
-                logits, hidden = model(mx.nd.array(batch.data[0], dtype=np.int64))
-                loss = mx.nd.softmax_cross_entropy(logits, batch.label[0])
+                logits = model(subg, subg_seeds.tousertensor())
+                batch_labels = mx.nd.array(labels[seeds.asnumpy()], ctx=logits.context)
+                loss = mx.nd.softmax_cross_entropy(logits, batch_labels)
             loss.backward()
-            trainer.step(batch.data[0].shape[0])
+            trainer.step(seeds.shape[0])
             train_loss += loss.asnumpy()[0]
 
-        logits, hidden = model(mx.nd.array(eval_vs, dtype=np.int64))
+            i += 1
+            if i > num_batches / 3:
+                break
+
+        logits = model(g, mx.nd.array(eval_vs, dtype=np.int64))
         eval_loss = mx.nd.softmax_cross_entropy(logits, eval_labels)
         eval_loss = eval_loss.asnumpy()[0]
 
@@ -229,6 +234,8 @@ if __name__ == '__main__':
     parser.add_argument("--use-spmv", action="store_true",
             help="use SpMV for faster speed.")
     parser.add_argument("--dgl", action="store_true")
+    parser.add_argument("--num-parallel-subgraphs", type=int, default=1,
+            help="the number of subgraphs to construct in parallel.")
     args = parser.parse_args()
 
     # load and preprocess dataset
