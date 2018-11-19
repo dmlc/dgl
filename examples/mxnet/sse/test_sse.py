@@ -67,7 +67,7 @@ class SSEUpdateHidden(gluon.Block):
             feat = g.get_n_repr()['in']
             cat = mx.nd.concat(feat, g.ndata['h'], dim=1)
             slices = mx.nd.take(g.adjacency_matrix(), vertices)
-            accum = mx.nd.dot(slices, cat) / deg
+            accum = mx.nd.dot(slices, cat) / deg.as_in_context(cat.context)
             return self.layer(mx.nd.take(feat, vertices),
                               mx.nd.take(g.ndata['h'], vertices), accum)
 
@@ -115,10 +115,11 @@ class DGLSSEUpdateHidden(gluon.Block):
             g.pull(vertices, msg_func, reduce_func, None)
             if self.use_spmv:
                 g.ndata.pop('cat')
+                deg = deg.as_in_context(g.ndata['accum'].context)
                 g.ndata['accum'] = g.ndata['accum'] / deg
             g.apply_nodes(self.layer, vertices)
             g.ndata.pop('accum')
-            return g.get_n_repr()['h1'][vertices]
+            return g.ndata['h1'][vertices.as_in_context(g.ndata['h1'].context)]
 
 class SSEPredict(gluon.Block):
     def __init__(self, update_hidden, out_feats, dropout, **kwargs):
