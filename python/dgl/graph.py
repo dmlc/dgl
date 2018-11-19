@@ -1198,7 +1198,7 @@ class DGLGraph(object):
         sched = scheduler.get_snr_schedule(
                 self, (u, v, eid), message_func, reduce_func, apply_node_func)
         sched.pprint()
-        #Runtime.run(sched)
+        Runtime.run(sched)
 
     def pull(self,
              v,

@@ -3,5 +3,5 @@
 class Runtime(object):
     @staticmethod
     def run(prog):
-        for inst in prog.insts:
-            inst.run()
+        for exe in prog.execs:
+            exe.run()

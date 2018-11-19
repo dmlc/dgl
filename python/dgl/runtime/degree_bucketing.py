@@ -5,6 +5,7 @@ from .._ffi.function import _init_api
 from .. import utils
 from .. import backend as F
 from ..immutable_graph_index import ImmutableGraphIndex
+from ..udf import EdgeBatch, NodeBatch
 
 from . import ir
 from .ir import var as var
@@ -13,7 +14,7 @@ def gen_degree_bucketing_schedule(
         call_type,
         nf,
         msg,
-        reduce_func,
+        reduce_udf,
         graph,
         edge_dst,
         out):
@@ -33,7 +34,7 @@ def gen_degree_bucketing_schedule(
         The variable for node features.
     msg : var.Var
         The variable for messages.
-    rfunc: callable
+    reduce_udf: callable
         The UDF to reduce messages.
     graph: DGLGraph
         DGLGraph to use
@@ -76,13 +77,16 @@ def gen_degree_bucketing_schedule(
     idx_list = []
     fd_list = []
     for deg, vb, mid in zip(degs, buckets, msg_ids):
+        # create per-bkt rfunc
+        rfunc = _create_per_bkt_rfunc(graph, reduce_udf, deg, vb)
+        # vars
         vb = var.IDX(vb)
         mid = var.IDX(mid)
-        # TODO: wrap reshape into it
-        rfunc = var.FUNC(reduce_func)
+        rfunc = var.FUNC(rfunc)
+        # logic
         fdvb = ir.READ_ROW(nf, vb)
-        fdeb = ir.READ_ROW(msg, mid)
-        fdvb = ir.CALL(rfunc, [fdvb, fdeb], ret=fdvb)  # reuse var
+        fdmail = ir.READ_ROW(msg, mid)
+        fdvb = ir.NODE_UDF(rfunc, fdvb, fdmail, ret=fdvb)  # reuse var
         # save for merge
         idx_list.append(vb)
         fd_list.append(fdvb)
@@ -192,5 +196,16 @@ def _process_buckets(buckets):
         zero_deg_nodes = None
 
     return v, degs, dsts, msg_ids, zero_deg_nodes
+
+def _create_per_bkt_rfunc(graph, reduce_udf, deg, vb):
+    def _rfunc_wrapper(node_data, mail_data):
+        def _reshaped_getter(key):
+            msg = mail_data[key]
+            new_shape = (len(vb), deg) + F.shape(msg)[1:]
+            return F.reshape(msg, new_shape)
+        reshaped_mail_data = utils.LazyDict(_reshaped_getter, mail_data.keys())
+        nb = NodeBatch(graph, vb, node_data, reshaped_mail_data)
+        return reduce_udf(nb)
+    return _rfunc_wrapper
 
 _init_api("dgl.runtime.degree_bucketing")

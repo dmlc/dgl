@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from abc import abstractmethod
 
 from ... import backend as F
+from ...frame import FrameRef, Frame
 
 from .program import get_current_prog
 from . import var
@@ -11,14 +12,15 @@ from .registry import IR_REGISTRY
 
 class OpCode(object):
     # immutable op
-    CALL = 0
-    SPMV = 1
-    SPMV_WITH_DATA = 2
-    READ = 3
-    READ_COL = 4
-    READ_ROW = 5
-    MERGE_ROW = 6
-    UPDATE_DICT = 7
+    NODE_UDF = 0
+    EDGE_UDF = 1
+    SPMV = 2
+    SPMV_WITH_DATA = 3
+    READ = 4
+    READ_COL = 5
+    READ_ROW = 6
+    MERGE_ROW = 7
+    UPDATE_DICT = 8
     # mutable op (no return)
     # remember the name is suffixed with "_"
     WRITE_ = 21
@@ -44,36 +46,82 @@ class Executor(object):
     def run(self):
         raise NotImplementedError
 
-class CallExecutor(Executor):
-    def __init__(self, fn, args, ret):
+class NodeUDFExecutor(Executor):
+    def __init__(self, fn, fdnode, fdmail, ret):
         self.fn = fn
-        self.args = args
+        self.fdnode = fdnode
+        self.fdmail = fdmail
         self.ret = ret
 
     def opcode(self):
-        return OpCode.CALL
+        return OpCode.NODE_UDF
 
     def arg_vars(self):
-        return [self.fn] + self.args
+        if self.fdmail is None:
+            return [self.fn, self.fdnode]
+        else:
+            return [self.fn, self.fdnode, self.fdmail]
 
     def ret_var(self):
         return self.ret
 
     def run(self):
         fn_data = self.fn.data
-        args_data = [a.data for a in self.args]
-        self.ret.data = fn_data(*args_data)
+        node_data = self.fdnode.data
+        if self.fdmail is None:
+            udf_ret = fn_data(node_data)
+        else:
+            mail_data = self.fdmail.data
+            udf_ret = fn_data(node_data, mail_data)
+        self.ret.data = FrameRef(Frame(udf_ret))
 
-IR_REGISTRY[OpCode.CALL] = {
-    'name' : 'CALL',
-    'args_type' : [VarType.FUNC, VarType.FEAT_DICT, '*'],
+IR_REGISTRY[OpCode.NODE_UDF] = {
+    'name' : 'NODE_UDF',
+    'args_type' : [VarType.FUNC, VarType.FEAT_DICT, VarType.FEAT_DICT],
     'ret_type' : VarType.FEAT_DICT,
-    'executor_cls' : CallExecutor,
+    'executor_cls' : NodeUDFExecutor,
 }
-def CALL(func, args, ret=None):
-    reg = IR_REGISTRY[OpCode.CALL]
+def NODE_UDF(fn, fdnode, fdmail=None, ret=None):
+    reg = IR_REGISTRY[OpCode.NODE_UDF]
     ret = var.new(reg['ret_type']) if ret is None else ret
-    get_current_prog().issue(reg['executor_cls'](func, args, ret))
+    get_current_prog().issue(reg['executor_cls'](fn, fdnode, fdmail, ret))
+    return ret
+
+class EdgeUDFExecutor(Executor):
+    def __init__(self, fn, fdsrc, fdedge, fddst, ret):
+        self.fn = fn
+        self.fdsrc = fdsrc
+        self.fdedge = fdedge
+        self.fddst = fddst
+        self.ret = ret
+
+    def opcode(self):
+        return OpCode.EDGE_UDF
+
+    def arg_vars(self):
+        return [self.fn, self.fdsrc, self.fdedge, self.fddst]
+
+    def ret_var(self):
+        return self.ret
+
+    def run(self):
+        fn_data = self.fn.data
+        src_data = self.fdsrc.data
+        edge_data = self.fdedge.data
+        dst_data = self.fddst.data
+        udf_ret = fn_data(src_data, edge_data, dst_data)
+        self.ret.data = FrameRef(Frame(udf_ret))
+
+IR_REGISTRY[OpCode.EDGE_UDF] = {
+    'name' : 'EDGE_UDF',
+    'args_type' : [VarType.FUNC, VarType.FEAT_DICT, VarType.FEAT_DICT],
+    'ret_type' : VarType.FEAT_DICT,
+    'executor_cls' : EdgeUDFExecutor,
+}
+def EDGE_UDF(fn, fdsrc, fdedge, fddst, ret=None):
+    reg = IR_REGISTRY[OpCode.EDGE_UDF]
+    ret = var.new(reg['ret_type']) if ret is None else ret
+    get_current_prog().issue(reg['executor_cls'](fn, fdsrc, fdedge, fddst, ret))
     return ret
 
 class ReadExecutor(Executor):

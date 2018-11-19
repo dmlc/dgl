@@ -5,6 +5,7 @@ from .._ffi.function import _init_api
 from ..base import ALL, DGLError, is_all
 from .. import backend as F
 from ..function.base import BuiltinFunction, BundledFunction
+from ..udf import EdgeBatch, NodeBatch
 from .. import utils
 
 from . import ir
@@ -51,8 +52,7 @@ def get_send_schedule(graph, u, v, eid, message_func):
         u = var.IDX(u)
         v = var.IDX(v)
         eid = var.IDX(eid)
-        mfunc = var.FUNC(message_func)
-        msg = _gen_send(nf, ef, u, v, eid, mfunc)
+        msg = _gen_send(graph, nf, ef, u, v, eid, mfunc)
         # TODO: handle duplicate messages
         ir.APPEND_ROW_(mf, msg)
         return prog
@@ -79,7 +79,7 @@ def get_recv_schedule(graph, nodes, reduce_func, apply_func):
         nf = var.FEAT_DICT(graph._node_frame, name='nf')
         # sort and unique the argument
         nodes, _ = F.sort_1d(F.unique(nodes.tousertensor()))
-        nodes = var.IDX(recv_nodes, name='recv_nodes')
+        nodes = var.IDX(nodes, name='recv_nodes')
         reduced_feat = _gen_reduce(graph, reduce_func, nodes)
         if apply_func:
             # To avoid writing reduced features back to node frame and reading
@@ -87,9 +87,11 @@ def get_recv_schedule(graph, nodes, reduce_func, apply_func):
             # features and "merge" it with the reduced features.
             v_nf = ir.READ_ROW(nf, nodes)
             v_nf = ir.UPDATE_DICT(v_nf, reduced_feat)
-            # TODO: wrap afunc to the proper signature
-            afunc = var.FUNC(apply_func)
-            applied_feat = ir.CALL(afunc, [v_nf])
+            def _afunc_wrapper(node_data):
+                nb = NodeBatch(graph, nodes.data, node_data)
+                return apply_func(nb)
+            afunc = var.FUNC(_afunc_wrapper)
+            applied_feat = ir.NODE_UDF(afunc, v_nf)
             final_feat = ir.UPDATE_DICT(applied_feat, reduced_feat)
         else:
             final_feat = reduced_feat
@@ -148,9 +150,11 @@ def get_snr_schedule(graph,
             # features and "merge" it with the reduced features.
             v_nf = ir.READ_ROW(nf, recv_nodes)
             v_nf = ir.UPDATE_DICT(v_nf, reduced_feat)
-            # TODO: wrap afunc to the proper signature
-            afunc = var.FUNC(apply_func)
-            applied_feat = ir.CALL(afunc, [v_nf])
+            def _afunc_wrapper(node_data):
+                nb = NodeBatch(graph, recv_nodes.data, node_data)
+                return apply_func(nb)
+            afunc = var.FUNC(_afunc_wrapper)
+            applied_feat = ir.NODE_UDF(afunc, v_nf)
             final_feat = ir.UPDATE_DICT(applied_feat, reduced_feat)
         else:
             final_feat = reduced_feat
@@ -205,8 +209,7 @@ def _gen_send_reduce(
         mfunc = BundledFunction(mfunc)
     
     # generate UDF send schedule
-    mfunc = var.FUNC(mfunc)
-    msg = _gen_send(nf, ef, u, v, eid, mfunc)
+    msg = _gen_send(graph, nf, ef, u, v, eid, mfunc)
 
     if rfunc_is_list:
         # UDF message + builtin reducer
@@ -223,17 +226,20 @@ def _gen_send_reduce(
         rfunc = BundledFunction(rfunc)
 
     # gen degree bucketing schedule for UDF recv
-    rfunc = var.FUNC(rfunc)
     db.gen_degree_bucketing_schedule(call_type, nf, msg,
             rfunc, graph, v, out)
     return out
 
-def _gen_send(nf, ef, u, v, eid, mfunc):
+def _gen_send(graph, nf, ef, u, v, eid, mfunc):
     fdsrc = ir.READ_ROW(nf, u)
     fddst = ir.READ_ROW(nf, v)
     fdedge = ir.READ_ROW(ef, eid)
-    # TODO: wrap mfunc and change it to UDF signature.
-    msg = ir.CALL(mfunc, [fdsrc, fdedge, fddst])
+    def _mfunc_wrapper(src_data, edge_data, dst_data):
+        eb = EdgeBatch(graph, (u.data, v.data, eid.data),
+                src_data, edge_data, dst_data)
+        return mfunc(eb)
+    _mfunc_wrapper = var.FUNC(_mfunc_wrapper)
+    msg = ir.EDGE_UDF(_mfunc_wrapper, fdsrc, fdedge, fddst)
     return msg
 
 def get_update_all_schedule(graph, message_func, reduce_func, apply_func):
@@ -267,9 +273,11 @@ def get_update_all_schedule(graph, message_func, reduce_func, apply_func):
             # features and "merge" it with the reduced features.
             v_nf = ir.READ_ROW(nf, recv_nodes)
             v_nf = ir.UPDATE_DICT(v_nf, reduced_feat)
-            # TODO: wrap afunc to the proper signature
-            afunc = var.FUNC(apply_func)
-            applied_feat = ir.CALL(afunc, [v_nf])
+            def _afunc_wrapper(node_data):
+                nb = NodeBatch(graph, ALL, node_data)
+                return apply_func(nb)
+            afunc = var.FUNC(_afunc_wrapper)
+            applied_feat = ir.NODE_UDF(afunc, v_nf)
             final_feat = ir.UPDATE_DICT(applied_feat, reduced_feat)
         else:
             final_feat = reduced_feat

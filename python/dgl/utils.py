@@ -176,6 +176,9 @@ class LazyDict(Mapping):
     def __len__(self):
         return len(self._keys)
 
+    def keys(self):
+        return self._keys
+
 class HybridDict(Mapping):
     """A readonly dictonary that merges several dict-like (python dict, LazyDict).
        If there are duplicate keys, early keys have priority over latter ones
