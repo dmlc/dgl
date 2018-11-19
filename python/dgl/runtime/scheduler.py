@@ -14,17 +14,17 @@ from . import degree_bucketing as db
 from . import spmv
 
 __all__ = [
-            "get_send_schedule",
-            "get_recv_schedule",
-            "get_update_all_schedule",
-            "get_snr_schedule",
-            "get_apply_nodes_schedule",
-            "get_apply_edges_schedule",
-            "get_push_schedule",
-            "get_pull_schedule"
+            "schedule_send",
+            "schedule_recv",
+            "schedule_update_all",
+            "schedule_snr",
+            "schedule_apply_nodes",
+            "schedule_apply_edges",
+            "schedule_push",
+            "schedule_pull"
           ]
 
-def get_send_schedule(graph, u, v, eid, message_func):
+def schedule_send(graph, u, v, eid, message_func):
     """get send schedule
 
     Parameters
@@ -39,25 +39,19 @@ def get_send_schedule(graph, u, v, eid, message_func):
         Ids of sending edges
     message_func: callable or list of callable
         The message function
-
-    Returns
-    -------
-    A list of executors for DGL Runtime
     """
-    with ir.prog() as prog:
-        # vars
-        nf = var.FEAT_DICT(graph._node_frame)
-        ef = var.FEAT_DICT(graph._edge_frame)
-        mf = var.FEAT_DICT(graph._msg_frame)
-        u = var.IDX(u)
-        v = var.IDX(v)
-        eid = var.IDX(eid)
-        msg = _gen_send(graph, nf, ef, u, v, eid, mfunc)
-        # TODO: handle duplicate messages
-        ir.APPEND_ROW_(mf, msg)
-        return prog
+    # vars
+    nf = var.FEAT_DICT(graph._node_frame)
+    ef = var.FEAT_DICT(graph._edge_frame)
+    mf = var.FEAT_DICT(graph._msg_frame)
+    u = var.IDX(u)
+    v = var.IDX(v)
+    eid = var.IDX(eid)
+    msg = _gen_send(graph, nf, ef, u, v, eid, mfunc)
+    # TODO: handle duplicate messages
+    ir.APPEND_ROW_(mf, msg)
 
-def get_recv_schedule(graph, nodes, reduce_func, apply_func):
+def schedule_recv(graph, nodes, reduce_func, apply_func):
     """get recv schedule
 
     Parameters
@@ -70,33 +64,27 @@ def get_recv_schedule(graph, nodes, reduce_func, apply_func):
         The reduce function
     apply_func: callable
         The apply node function
-
-    Returns
-    -------
-    A list of executors for DGL Runtime
     """
-    with ir.prog() as prog:
-        nf = var.FEAT_DICT(graph._node_frame, name='nf')
-        # sort and unique the argument
-        nodes, _ = F.sort_1d(F.unique(nodes.tousertensor()))
-        nodes = var.IDX(nodes, name='recv_nodes')
-        reduced_feat = _gen_reduce(graph, reduce_func, nodes)
-        if apply_func:
-            # To avoid writing reduced features back to node frame and reading
-            # it again for apply phase. Instead, we first read the the node
-            # features and "merge" it with the reduced features.
-            v_nf = ir.READ_ROW(nf, nodes)
-            v_nf = ir.UPDATE_DICT(v_nf, reduced_feat)
-            def _afunc_wrapper(node_data):
-                nb = NodeBatch(graph, nodes.data, node_data)
-                return apply_func(nb)
-            afunc = var.FUNC(_afunc_wrapper)
-            applied_feat = ir.NODE_UDF(afunc, v_nf)
-            final_feat = ir.UPDATE_DICT(reduced_feat, applied_feat)
-        else:
-            final_feat = reduced_feat
-        ir.WRITE_ROW_(nf, nodes, final_feat)
-        return prog
+    nf = var.FEAT_DICT(graph._node_frame, name='nf')
+    # sort and unique the argument
+    nodes, _ = F.sort_1d(F.unique(nodes.tousertensor()))
+    nodes = var.IDX(nodes, name='recv_nodes')
+    reduced_feat = _gen_reduce(graph, reduce_func, nodes)
+    if apply_func:
+        # To avoid writing reduced features back to node frame and reading
+        # it again for apply phase. Instead, we first read the the node
+        # features and "merge" it with the reduced features.
+        v_nf = ir.READ_ROW(nf, nodes)
+        v_nf = ir.UPDATE_DICT(v_nf, reduced_feat)
+        def _afunc_wrapper(node_data):
+            nb = NodeBatch(graph, nodes.data, node_data)
+            return apply_func(nb)
+        afunc = var.FUNC(_afunc_wrapper)
+        applied_feat = ir.NODE_UDF(afunc, v_nf)
+        final_feat = ir.UPDATE_DICT(reduced_feat, applied_feat)
+    else:
+        final_feat = reduced_feat
+    ir.WRITE_ROW_(nf, nodes, final_feat)
 
 def _gen_reduce(graph, reduce_func, nodes):
     call_type = "recv"
@@ -132,34 +120,32 @@ def _gen_reduce(graph, reduce_func, nodes):
             rfunc, graph, v, out)
     return out
 
-def get_snr_schedule(graph,
+def schedule_snr(graph,
                      edge_tuples,
                      message_func,
                      reduce_func,
                      apply_func):
     call_type = 'send_and_recv'
-    with ir.prog() as prog:
-        nf = var.FEAT_DICT(graph._node_frame, name='nf')
-        recv_nodes, _ = F.sort_1d(F.unique(edge_tuples[1].tousertensor()))
-        recv_nodes = var.IDX(recv_nodes, name='recv_nodes')
-        reduced_feat = _gen_send_reduce(call_type, graph,
-                edge_tuples, message_func, reduce_func)
-        if apply_func:
-            # To avoid writing reduced features back to node frame and reading
-            # it again for apply phase. Instead, we first read the the node
-            # features and "merge" it with the reduced features.
-            v_nf = ir.READ_ROW(nf, recv_nodes)
-            v_nf = ir.UPDATE_DICT(v_nf, reduced_feat)
-            def _afunc_wrapper(node_data):
-                nb = NodeBatch(graph, recv_nodes.data, node_data)
-                return apply_func(nb)
-            afunc = var.FUNC(_afunc_wrapper)
-            applied_feat = ir.NODE_UDF(afunc, v_nf)
-            final_feat = ir.UPDATE_DICT(reduced_feat, applied_feat)
-        else:
-            final_feat = reduced_feat
-        ir.WRITE_ROW_(nf, recv_nodes, final_feat)
-        return prog
+    nf = var.FEAT_DICT(graph._node_frame, name='nf')
+    recv_nodes, _ = F.sort_1d(F.unique(edge_tuples[1].tousertensor()))
+    recv_nodes = var.IDX(recv_nodes, name='recv_nodes')
+    reduced_feat = _gen_send_reduce(call_type, graph,
+            edge_tuples, message_func, reduce_func)
+    if apply_func:
+        # To avoid writing reduced features back to node frame and reading
+        # it again for apply phase. Instead, we first read the the node
+        # features and "merge" it with the reduced features.
+        v_nf = ir.READ_ROW(nf, recv_nodes)
+        v_nf = ir.UPDATE_DICT(v_nf, reduced_feat)
+        def _afunc_wrapper(node_data):
+            nb = NodeBatch(graph, recv_nodes.data, node_data)
+            return apply_func(nb)
+        afunc = var.FUNC(_afunc_wrapper)
+        applied_feat = ir.NODE_UDF(afunc, v_nf)
+        final_feat = ir.UPDATE_DICT(reduced_feat, applied_feat)
+    else:
+        final_feat = reduced_feat
+    ir.WRITE_ROW_(nf, recv_nodes, final_feat)
 
 def _gen_send_reduce(
         call_type,
@@ -242,7 +228,7 @@ def _gen_send(graph, nf, ef, u, v, eid, mfunc):
     msg = ir.EDGE_UDF(_mfunc_wrapper, fdsrc, fdedge, fddst)
     return msg
 
-def get_update_all_schedule(graph, message_func, reduce_func, apply_func):
+def schedule_update_all(graph, message_func, reduce_func, apply_func):
     """get send and recv schedule
 
     Parameters
@@ -255,36 +241,30 @@ def get_update_all_schedule(graph, message_func, reduce_func, apply_func):
         The reduce function
     apply_func: callable
         The apply node function
-
-    Returns
-    -------
-    A list of executors for DGL Runtime
     """
     call_type = 'update_all'
     edge_tuples = (ALL, ALL, ALL)
-    with ir.prog() as prog:
-        nf = var.FEAT_DICT(graph._node_frame, name='nf')
-        recv_nodes = var.IDX(edge_tupes[2], name='recv_nodes')
-        reduced_feat = _gen_send_reduce(call_type, graph,
-                edge_tuples, message_func, reduce_func)
-        if apply_func:
-            # To avoid writing reduced features back to node frame and reading
-            # it again for apply phase. Instead, we first read the the node
-            # features and "merge" it with the reduced features.
-            v_nf = ir.READ_ROW(nf, recv_nodes)
-            v_nf = ir.UPDATE_DICT(v_nf, reduced_feat)
-            def _afunc_wrapper(node_data):
-                nb = NodeBatch(graph, ALL, node_data)
-                return apply_func(nb)
-            afunc = var.FUNC(_afunc_wrapper)
-            applied_feat = ir.NODE_UDF(afunc, v_nf)
-            final_feat = ir.UPDATE_DICT(reduced_feat, applied_feat)
-        else:
-            final_feat = reduced_feat
-        ir.WRITE_ROW_(nf, recv_nodes, final_feat)
-        return prog
+    nf = var.FEAT_DICT(graph._node_frame, name='nf')
+    recv_nodes = var.IDX(edge_tupes[2], name='recv_nodes')
+    reduced_feat = _gen_send_reduce(call_type, graph,
+            edge_tuples, message_func, reduce_func)
+    if apply_func:
+        # To avoid writing reduced features back to node frame and reading
+        # it again for apply phase. Instead, we first read the the node
+        # features and "merge" it with the reduced features.
+        v_nf = ir.READ_ROW(nf, recv_nodes)
+        v_nf = ir.UPDATE_DICT(v_nf, reduced_feat)
+        def _afunc_wrapper(node_data):
+            nb = NodeBatch(graph, ALL, node_data)
+            return apply_func(nb)
+        afunc = var.FUNC(_afunc_wrapper)
+        applied_feat = ir.NODE_UDF(afunc, v_nf)
+        final_feat = ir.UPDATE_DICT(reduced_feat, applied_feat)
+    else:
+        final_feat = reduced_feat
+    ir.WRITE_ROW_(nf, recv_nodes, final_feat)
 
-def get_apply_nodes_schedule(graph, v, apply_func):
+def schedule_apply_nodes(graph, v, apply_func):
     """get apply nodes schedule
 
     Parameters
@@ -305,7 +285,7 @@ def get_apply_nodes_schedule(graph, v, apply_func):
     wb_exec = build_write_back_exec(graph, out_repr, v, "node")
     return apply_exec + wb_exec
 
-def get_apply_edges_schedule(graph, u, v, eid, apply_func):
+def schedule_apply_edges(graph, u, v, eid, apply_func):
     """get apply edges schedule
 
     Parameters
@@ -330,7 +310,7 @@ def get_apply_edges_schedule(graph, u, v, eid, apply_func):
     wb_exec = build_write_back_exec(graph, out_repr, eid, "edge")
     return apply_exec + wb_exec
 
-def get_push_schedule(graph, u, message_func, reduce_func, apply_func):
+def schedule_push(graph, u, message_func, reduce_func, apply_func):
     """get push schedule
 
     Parameters
@@ -350,15 +330,14 @@ def get_push_schedule(graph, u, message_func, reduce_func, apply_func):
     -------
     A list of executors for DGL Runtime
     """
-    assert False
-    # XXX: for now, use send_and_recv to implement push
+    # FIXME: for now, use send_and_recv to implement push
     u, v, eid = graph._graph.out_edges(u)
     if len(eid) == 0:
         return []
-    return get_snr_schedule(graph, u, v, eid,
+    return schedule_snr(graph, (u, v, eid),
                             message_func, reduce_func, apply_func)
 
-def get_pull_schedule(graph, v, message_func, reduce_func, apply_func):
+def schedule_pull(graph, v, message_func, reduce_func, apply_func):
     """get pull schedule
 
     Parameters
@@ -378,13 +357,11 @@ def get_pull_schedule(graph, v, message_func, reduce_func, apply_func):
     -------
     A list of executors for DGL Runtime
     """
-    assert False
-    # XXX: for now, use send_and_recv to implement pull
+    # FIXME: for now, use send_and_recv to implement pull
     u, v, eid = graph._graph.in_edges(v)
     if len(eid) == 0:
         return []
-    return get_snr_schedule(graph, u, v, eid,
-                            message_func, reduce_func, apply_func)
+    schedule_snr(graph, (u, v, eid), message_func, reduce_func, apply_func)
 
 def _check_builtin_func_list(func_list):
     """Check whether func_list only contains builtin functions."""

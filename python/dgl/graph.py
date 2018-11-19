@@ -9,9 +9,9 @@ from .base import ALL, is_all, DGLError, dgl_warning
 from . import backend as F
 from .frame import FrameRef, Frame, merge_frames
 from .graph_index import GraphIndex, create_graph_index
+from .runtime import ir, scheduler, Runtime
 from . import utils
 from .view import NodeView, EdgeView
-from .runtime import scheduler, Runtime
 
 __all__ = ['DGLGraph']
 
@@ -1008,9 +1008,7 @@ class DGLGraph(object):
         """
         if func == "default":
             func = self._apply_node_func
-        sched = scheduler.get_apply_nodes_schedule(graph=self,
-                                                   v=v,
-                                                   apply_func=func)
+        sched = scheduler.schedule_apply_nodes(graph=self, v=v, apply_func=func)
         Runtime.run(sched)
 
     def apply_edges(self, func="default", edges=ALL):
@@ -1046,11 +1044,8 @@ class DGLGraph(object):
             eid = utils.toindex(edges)
             u, v, _ = self._graph.find_edges(eid)
 
-        sched = scheduler.get_apply_edges_schedule(graph=self,
-                                                   u=u,
-                                                   v=v,
-                                                   eid=eid,
-                                                   apply_func=func)
+        sched = scheduler.schedule_apply_edges(graph=self, u=u, v=v,
+                eid=eid, apply_func=func)
         Runtime.run(sched)
 
     def send(self, edges, message_func="default"):
@@ -1086,12 +1081,10 @@ class DGLGraph(object):
             eid = utils.toindex(edges)
             u, v, _ = self._graph.find_edges(eid)
 
-        sched = scheduler.get_send_schedule(graph=self,
-                                            u=u,
-                                            v=v,
-                                            eid=eid,
-                                            message_func=message_func)
-        Runtime.run(sched)
+        with ir.prog() as prog:
+            scheduler.schedule_send(graph=self, u=u, v=v, eid=eid,
+                                    message_func=message_func)
+            Runtime.run(prog)
 
         # update message graph and frame
         self._msg_graph.add_edges(u, v)
@@ -1135,11 +1128,11 @@ class DGLGraph(object):
             # no vertex to be triggered.
             return
 
-        sched = scheduler.get_recv_schedule(graph=self,
-                                            v=v,
-                                            reduce_func=reduce_func,
-                                            apply_func=apply_node_func)
-        Runtime.run(sched)
+        
+        with ir.prog() as prog:
+            scheduler.schedule_recv(graph=self, v=v,
+                    reduce_func=reduce_func, apply_func=apply_node_func)
+            Runtime.run(prog)
 
         # FIXME(minjie): multi send bug
         self.reset_messages()
@@ -1195,10 +1188,10 @@ class DGLGraph(object):
             # no edges to be triggered
             return
 
-        sched = scheduler.get_snr_schedule(
-                self, (u, v, eid), message_func, reduce_func, apply_node_func)
-        sched.pprint()
-        Runtime.run(sched)
+        with ir.prog() as prog:
+            scheduler.schedule_snr(self, (u, v, eid),
+                    message_func, reduce_func, apply_node_func)
+            Runtime.run(prog)
 
     def pull(self,
              v,
@@ -1231,12 +1224,11 @@ class DGLGraph(object):
         v = utils.toindex(v)
         if len(v) == 0:
             return
-        sched = scheduler.get_pull_schedule(graph=self,
-                                            v = v,
-                                            message_func=message_func,
-                                            reduce_func=reduce_func,
-                                            apply_func=apply_node_func)
-        Runtime.run(sched)
+        with ir.prog() as prog:
+            scheduler.schedule_pull(graph=self, v=v,
+                    message_func=message_func, reduce_func=reduce_func,
+                    apply_func=apply_node_func)
+            Runtime.run(prog)
 
     def push(self,
              u,
@@ -1269,12 +1261,11 @@ class DGLGraph(object):
         u = utils.toindex(u)
         if len(u) == 0:
             return
-        sched = scheduler.get_push_schedule(graph=self,
-                                            u = u,
-                                            message_func=message_func,
-                                            reduce_func=reduce_func,
-                                            apply_func=apply_node_func)
-        Runtime.run(sched)
+        with ir.prog() as prog:
+            scheduler.schedule_push(graph=self, u=u,
+                    message_func=message_func, reduce_func=reduce_func,
+                    apply_func=apply_node_func)
+            Runtime.run(prog)
 
     def update_all(self,
                    message_func="default",
@@ -1300,11 +1291,10 @@ class DGLGraph(object):
         assert message_func is not None
         assert reduce_func is not None
 
-        sched = scheduler.get_update_all_schedule(graph=self,
-                                                  message_func=message_func,
-                                                  reduce_func=reduce_func,
-                                                  apply_func=apply_node_func)
-        Runtime.run(sched)
+        with ir.prog() as prog:
+            scheduler.schedule_update_all(graph=self, message_func=message_func,
+                    reduce_func=reduce_func, apply_func=apply_node_func)
+            Runtime.run(prog)
 
     def prop_nodes(self,
                    nodes_generator,
