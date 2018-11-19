@@ -43,7 +43,7 @@ class DGLNodeUpdate(gluon.Block):
         return {'h1': self.update(node.data['in'], node.data['h'], node.data['accum'])}
 
 class SSEUpdateHidden(gluon.Block):
-    def __init__(self, features,
+    def __init__(self,
                  n_hidden,
                  dropout,
                  activation):
@@ -73,14 +73,14 @@ class SSEUpdateHidden(gluon.Block):
 
 class DGLSSEUpdateHidden(gluon.Block):
     def __init__(self,
-                 features,
                  n_hidden,
                  activation,
                  dropout,
                  use_spmv,
                  **kwargs):
         super(DGLSSEUpdateHidden, self).__init__(**kwargs)
-        self.layer = DGLNodeUpdate(NodeUpdate(n_hidden, activation))
+        with self.name_scope():
+            self.layer = DGLNodeUpdate(NodeUpdate(n_hidden, activation))
         self.dropout = dropout
         self.use_spmv = use_spmv
 
@@ -121,10 +121,11 @@ class DGLSSEUpdateHidden(gluon.Block):
             return g.get_n_repr()['h1'][vertices]
 
 class SSEPredict(gluon.Block):
-    def __init__(self, update_hidden, out_feats, dropout):
-        super(SSEPredict, self).__init__()
-        self.linear1 = gluon.nn.Dense(out_feats, activation='relu')
-        self.linear2 = gluon.nn.Dense(out_feats)
+    def __init__(self, update_hidden, out_feats, dropout, **kwargs):
+        super(SSEPredict, self).__init__(**kwargs)
+        with self.name_scope():
+            self.linear1 = gluon.nn.Dense(out_feats, activation='relu')
+            self.linear2 = gluon.nn.Dense(out_feats)
         self.update_hidden = update_hidden
         self.dropout = dropout
 
@@ -134,6 +135,11 @@ class SSEPredict(gluon.Block):
             hidden = mx.nd.Dropout(hidden, p=self.dropout)
         return self.linear2(self.linear1(hidden))
 
+def copy_to_gpu(subg, ctx):
+    frame = subg.ndata
+    for key in frame:
+        subg.ndata[key] = frame[key].as_in_context(ctx)
+
 def main(args, data):
     features = mx.nd.array(data.features)
     labels = mx.nd.array(data.labels)
@@ -142,53 +148,55 @@ def main(args, data):
     eval_vs = np.arange(train_size, len(labels), dtype='int64')
     print("train size: " + str(len(train_vs)))
     print("eval size: " + str(len(eval_vs)))
-    train_labels = mx.nd.array(data.labels[train_vs])
     eval_labels = mx.nd.array(data.labels[eval_vs])
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
 
-    if args.gpu <= 0:
-        cuda = False
-        ctx = mx.cpu(0)
-    else:
-        cuda = True
-        features = features.as_in_context(mx.gpu(0))
-        train_labels = train_labels.as_in_context(mx.gpu(0))
-        eval_labels = eval_labels.as_in_context(mx.gpu(0))
-        ctx = mx.gpu(0)
-
     # create the SSE model
     g = DGLGraph(data.graph, readonly=True)
     g.ndata['in'] = features
     g.ndata['h'] = mx.nd.random.normal(shape=(g.number_of_nodes(), args.n_hidden),
-            ctx=features.context)
+            ctx=mx.cpu(0))
 
-    update_hidden = DGLSSEUpdateHidden(features, args.n_hidden, 'relu', args.update_dropout, args.use_spmv)
+    update_hidden_infer = DGLSSEUpdateHidden(args.n_hidden, 'relu',
+                                             args.update_dropout, args.use_spmv,
+                                             prefix='sse')
+    update_hidden_train = DGLSSEUpdateHidden(args.n_hidden, 'relu',
+                                             args.update_dropout, args.use_spmv,
+                                             prefix='sse')
     if not args.dgl:
-        update_hidden = SSEUpdateHidden(features, args.n_hidden, args.update_dropout, 'relu')
-    model = SSEPredict(update_hidden, args.n_hidden, args.predict_dropout)
-    model.initialize(ctx=ctx)
+        update_hidden_infer = SSEUpdateHidden(args.n_hidden, args.update_dropout, 'relu',
+                                              prefix='sse')
+        update_hidden_train = SSEUpdateHidden(args.n_hidden, args.update_dropout, 'relu',
+                                              prefix='sse')
+    update_hidden_infer.initialize(ctx=mx.cpu(0))
+
+    model = SSEPredict(update_hidden_train, args.n_hidden, args.predict_dropout, prefix='app')
+    if args.gpu <= 0:
+        model.initialize(ctx=mx.cpu(0))
+    else:
+        train_ctxs = []
+        for i in range(args.gpu):
+            train_ctxs.append(mx.gpu(i))
+        model.initialize(ctx=train_ctxs)
 
     # use optimizer
     num_batches = int(g.number_of_nodes() / args.batch_size)
     scheduler = mx.lr_scheduler.CosineScheduler(args.n_epochs * num_batches,
             args.lr * 10, 0, 0, args.lr/5)
     trainer = gluon.Trainer(model.collect_params(), 'adam', {'learning_rate': args.lr,
-        'lr_scheduler': scheduler})
+        'lr_scheduler': scheduler}, kvstore=mx.kv.create('device'))
 
+    # compute vertex embedding.
+    all_hidden = update_hidden_infer(g, None)
+    g.ndata['h'] = all_hidden
     rets = []
-    rets.append(g.get_n_repr()['h'])
+    rets.append(all_hidden)
 
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
-        print("epoch: " + str(epoch))
-        # compute vertex embedding.
-        all_hidden = update_hidden(g, None)
-        g.ndata['h'] = all_hidden
-        rets.append(all_hidden)
-
         t0 = time.time()
         train_loss = 0
         i = 0
@@ -198,22 +206,44 @@ def main(args, data):
                 shuffle=True):
             subg.copy_from_parent()
 
+            losses = []
+            if args.gpu > 0:
+                ctx = mx.gpu(i % args.gpu)
+                copy_to_gpu(subg, ctx)
+
             subg_seeds = subg.map_to_subgraph_nid(seeds)
             with mx.autograd.record():
                 logits = model(subg, subg_seeds.tousertensor())
                 batch_labels = mx.nd.array(labels[seeds.asnumpy()], ctx=logits.context)
                 loss = mx.nd.softmax_cross_entropy(logits, batch_labels)
             loss.backward()
-            trainer.step(seeds.shape[0])
-            train_loss += loss.asnumpy()[0]
-
+            losses.append(loss)
             i += 1
+            if args.gpu <= 0:
+                trainer.step(seeds.shape[0])
+                train_loss += loss.asnumpy()[0]
+                losses = []
+            elif i % args.gpu == 0:
+                trainer.step(len(seeds) * len(losses))
+                for loss in losses:
+                    train_loss += loss.asnumpy()[0]
+                losses = []
+
             if i > num_batches / 3:
                 break
 
         logits = model(g, mx.nd.array(eval_vs, dtype=np.int64))
         eval_loss = mx.nd.softmax_cross_entropy(logits, eval_labels)
         eval_loss = eval_loss.asnumpy()[0]
+
+        # compute vertex embedding.
+        infer_params = update_hidden_infer.collect_params()
+        for key in infer_params:
+            idx = trainer._param2idx[key]
+            trainer._kvstore.pull(idx, out=infer_params[key].data())
+        all_hidden = update_hidden_infer(g, None)
+        g.ndata['h'] = all_hidden
+        rets.append(all_hidden)
 
         dur.append(time.time() - t0)
         print("Epoch {:05d} | Train Loss {:.4f} | Eval Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
