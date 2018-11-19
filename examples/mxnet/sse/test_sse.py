@@ -171,22 +171,23 @@ def main(args, data):
                                               prefix='sse')
         update_hidden_train = SSEUpdateHidden(args.n_hidden, args.update_dropout, 'relu',
                                               prefix='sse')
-    update_hidden_infer.initialize(ctx=mx.cpu(0))
 
-    model = SSEPredict(update_hidden_train, args.n_hidden, args.predict_dropout, prefix='app')
+    model_train = SSEPredict(update_hidden_train, args.n_hidden, args.predict_dropout, prefix='app')
+    model_infer = SSEPredict(update_hidden_infer, args.n_hidden, args.predict_dropout, prefix='app')
+    model_infer.initialize(ctx=mx.cpu(0))
     if args.gpu <= 0:
-        model.initialize(ctx=mx.cpu(0))
+        model_train.initialize(ctx=mx.cpu(0))
     else:
         train_ctxs = []
         for i in range(args.gpu):
             train_ctxs.append(mx.gpu(i))
-        model.initialize(ctx=train_ctxs)
+        model_train.initialize(ctx=train_ctxs)
 
     # use optimizer
     num_batches = int(g.number_of_nodes() / args.batch_size)
     scheduler = mx.lr_scheduler.CosineScheduler(args.n_epochs * num_batches,
             args.lr * 10, 0, 0, args.lr/5)
-    trainer = gluon.Trainer(model.collect_params(), 'adam', {'learning_rate': args.lr,
+    trainer = gluon.Trainer(model_train.collect_params(), 'adam', {'learning_rate': args.lr,
         'lr_scheduler': scheduler}, kvstore=mx.kv.create('device'))
 
     # compute vertex embedding.
@@ -214,7 +215,7 @@ def main(args, data):
 
             subg_seeds = subg.map_to_subgraph_nid(seeds)
             with mx.autograd.record():
-                logits = model(subg, subg_seeds.tousertensor())
+                logits = model_train(subg, subg_seeds.tousertensor())
                 batch_labels = mx.nd.array(labels[seeds.asnumpy()], ctx=logits.context)
                 loss = mx.nd.softmax_cross_entropy(logits, batch_labels)
             loss.backward()
@@ -233,15 +234,18 @@ def main(args, data):
             if i > num_batches / 3:
                 break
 
-        logits = model(g, mx.nd.array(eval_vs, dtype=np.int64))
+        # prediction.
+        logits = model_infer(g, mx.nd.array(eval_vs, dtype=np.int64))
         eval_loss = mx.nd.softmax_cross_entropy(logits, eval_labels)
         eval_loss = eval_loss.asnumpy()[0]
 
-        # compute vertex embedding.
-        infer_params = update_hidden_infer.collect_params()
+        # update the inference model.
+        infer_params = model_infer.collect_params()
         for key in infer_params:
             idx = trainer._param2idx[key]
             trainer._kvstore.pull(idx, out=infer_params[key].data())
+
+        # Update node embeddings.
         all_hidden = update_hidden_infer(g, None)
         g.ndata['h'] = all_hidden
         rets.append(all_hidden)
