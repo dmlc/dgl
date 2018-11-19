@@ -12,17 +12,6 @@ D = 5
 mx.random.seed(1)
 np.random.seed(1)
 
-def generate_test():
-    g = dgl.DGLGraph()
-    g.add_nodes(10)
-    # create a graph where 0 is the source and 9 is the sink
-    for i in range(1, 9):
-        g.add_edge(0, i)
-        g.add_edge(i, 9)
-    # add a back flow from 9 to 0
-    g.add_edge(9, 0)
-    return g
-
 def generate_graph(n):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
     g = dgl.DGLGraph(arr, readonly=True)
