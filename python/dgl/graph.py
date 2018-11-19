@@ -1008,8 +1008,9 @@ class DGLGraph(object):
         """
         if func == "default":
             func = self._apply_node_func
-        sched = scheduler.schedule_apply_nodes(graph=self, v=v, apply_func=func)
-        Runtime.run(sched)
+        with ir.prog() as prog:
+            scheduler.schedule_apply_nodes(graph=self, v=v, apply_func=func)
+            Runtime.run(prog)
 
     def apply_edges(self, func="default", edges=ALL):
         """Apply the function on the edge features.
@@ -1128,9 +1129,8 @@ class DGLGraph(object):
             # no vertex to be triggered.
             return
 
-        
         with ir.prog() as prog:
-            scheduler.schedule_recv(graph=self, v=v,
+            scheduler.schedule_recv(graph=self, recv_nodes=v,
                     reduce_func=reduce_func, apply_func=apply_node_func)
             Runtime.run(prog)
 
@@ -1585,4 +1585,3 @@ class DGLGraph(object):
         else:
             edges = F.tensor(edges)
             return edges[e_mask]
-

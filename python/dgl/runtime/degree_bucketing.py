@@ -2,21 +2,23 @@
 from __future__ import absolute_import
 
 from .._ffi.function import _init_api
-from .. import utils
+from ..base import is_all, ALL
 from .. import backend as F
 from ..immutable_graph_index import ImmutableGraphIndex
 from ..udf import EdgeBatch, NodeBatch
+from .. import utils
 
 from . import ir
 from .ir import var as var
 
 def gen_degree_bucketing_schedule(
         call_type,
-        nf,
-        msg,
-        reduce_udf,
         graph,
-        edge_dst,
+        nf,
+        mf,
+        reduce_udf,
+        edge_tuples,
+        recv_nodes,
         out):
     """Create degree bucketing schedule.
 
@@ -30,47 +32,23 @@ def gen_degree_bucketing_schedule(
     ----------
     call_type: str
         Call_type of current graph API, could be 'update_all', 'send_and_recv', 'recv'
+    graph: DGLGraph
+        DGLGraph to use
     nf : var.Var
         The variable for node features.
-    msg : var.Var
+    mf : var.Var
         The variable for messages.
     reduce_udf: callable
         The UDF to reduce messages.
-    graph: DGLGraph
-        DGLGraph to use
-    edge_dst: var.Var
-        The destination nodes of the edges. The number
-        should be equal to the number of triggered edges.
+    edge_tuples : tuple of var.Var
+        (u, v, eid)
+    recv_nodes : var.Var
+        The unique nodes that perform recv.
     out : var.Var
         The variable for output feature dicts.
     """
-    v = edge_dst.data
-    # Get degree bucketing schedule
-    if isinstance(graph._graph, ImmutableGraphIndex):
-        # NOTE: this is a workaround because immutable graph does not have (c++ support)
-        if call_type == "send_and_recv":
-            mids = utils.toindex(range(0, len(v)))
-            dsts = v
-        elif call_type == "update_all":
-            _, dsts, mids = graph._graph.edges()
-            v = utils.toindex(range(graph._graph.number_of_nodes()))
-        elif call_type == "recv":
-            _, dsts, mids = graph._msg_graph.in_edges(v)
-        else:
-            raise DGLError("Unsupported call type for degree bucketing: %s"
-                           % call_type)
-        buckets = _degree_bucketing_schedule(mids, dsts, v)
-    else:
-        # mutable graph case
-        if call_type == "send_and_recv":
-            buckets = _degree_bucketing_for_edges(v)
-        elif call_type == "update_all":
-            buckets = _degree_bucketing_for_graph(graph._graph)
-        elif call_type == "recv":
-            buckets = _degree_bucketing_for_graph(graph._msg_graph, v)
-        else:
-            raise DGLError("Unsupported call type for degree bucketing: %s"
-                           % call_type)
+    src, dst, eid = edge_tuples
+    buckets = _degree_bucketing_schedule(eid.data, dst.data, recv_nodes.data)
     # generate schedule
     unique_dst, degs, buckets, msg_ids, zero_deg_nodes = buckets
     # loop over each bucket
@@ -83,9 +61,9 @@ def gen_degree_bucketing_schedule(
         vb = var.IDX(vb)
         mid = var.IDX(mid)
         rfunc = var.FUNC(rfunc)
-        # logic
+        # recv on each bucket
         fdvb = ir.READ_ROW(nf, vb)
-        fdmail = ir.READ_ROW(msg, mid)
+        fdmail = ir.READ_ROW(mf, mid)
         fdvb = ir.NODE_UDF(rfunc, fdvb, fdmail, ret=fdvb)  # reuse var
         # save for merge
         idx_list.append(vb)
@@ -113,7 +91,6 @@ def _degree_bucketing_schedule(mids, dsts, v):
     v: utils.Index
         all receiving nodes (for checking zero degree nodes)
     """
-
     buckets = _CAPI_DGLDegreeBucketing(mids.todgltensor(), dsts.todgltensor(),
                                        v.todgltensor())
     return _process_buckets(buckets)

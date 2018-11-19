@@ -8,7 +8,6 @@ from . import backend as F
 from .base import DGLError, dgl_warning
 from . import utils
 
-
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     """The column scheme.
 
