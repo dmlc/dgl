@@ -65,10 +65,12 @@ class SrcMulEdgeMessageFunction(MessageFunction):
     def __call__(self, edges):
         src_data = edges.src[self.src_field]
         edata = edges.data[self.edge_field]
-        src_dim = F.ndim(src_data)
-        eshape = F.shape(edata)[0]
-        ret = self.mul_op(edges.src[self.src_field],
-                F.reshape(edges.data[self.edge_field], (eshape,) + (1,) * (src_dim - 1)))
+        if F.ndim(edata) == 1:
+            # edge feature is a scalar, unsqueeze dims of len 1
+            src_dim = F.ndim(src_data)
+            new_eshape = (F.shape(edata)[0],) + (1,) * (src_dim - 1)
+            edata = F.reshape(edata, new_eshape)
+        ret = self.mul_op(src_data, edata)
         return {self.out_field : ret}
 
     @property

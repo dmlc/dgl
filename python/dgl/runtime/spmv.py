@@ -104,7 +104,7 @@ def gen_v2v_spmv_schedule(adjmat, spmv_pairs, nf, ef, eid, out):
             ftsrc = ir.READ_COL(nf, var.STR(mfn.src_field))
             ftdst = ir.SPMV(adj_var, ftsrc)
         # save for merge
-        ir.WRITE_COL_(out, var.STR(mfn.out_field), ftdst)
+        ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
 def gen_e2v_spmv_schedule(inc, spmv_rfunc, mf, out):
     """
@@ -142,7 +142,7 @@ def build_adj_matrix(call_type, graph, u, v):
 def build_adj_matrix_index_uv(graph, u, v):
     """Build adj matrix index and shape using the given (u, v) edges.
 
-    The matrix is of shape (len(v), n), where n is the number of nodes
+    The matrix is of shape (len(unique(v)), n), where n is the number of nodes
     in the graph. Therefore, when doing SPMV, the src node data
     should be all the node features.
 
@@ -171,7 +171,7 @@ def build_adj_matrix_index_uv(graph, u, v):
     v = v.tousertensor()
     new_v = old2new[v]  # FIXME(minjie): no use []
     n = graph.number_of_nodes()
-    m = len(v)
+    m = len(new2old)
     row = F.unsqueeze(new_v, 0)
     col = F.unsqueeze(u, 0)
     idx = F.cat([row, col], dim=0)

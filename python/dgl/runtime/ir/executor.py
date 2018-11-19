@@ -239,8 +239,18 @@ class SPMVExecutor(Executor):
         return self.ret
 
     def run(self):
-        assert False
-        pass
+        spA_ctxobj = self.spA.data
+        B = self.B.data
+        ctx = F.context(B)
+        spA = spA_ctxobj.get(ctx)
+        if F.ndim(B) == 1:
+            # B is a vector, append a (1,) dim at the end
+            B = F.unsqueeze(B, 1)
+            C = F.spmm(spA, B)
+            C = F.squeeze(C, 1)
+        else:
+            C = F.spmm(spA, B)
+        self.ret.data = C
 
 IR_REGISTRY[OpCode.SPMV] = {
     'name' : 'SPMV',
@@ -271,8 +281,24 @@ class SPMVWithDataExecutor(Executor):
         return self.ret
 
     def run(self):
-        assert False
-        pass
+        spA_ctxobj = self.spA.data
+        A_data = self.A_data.data
+        B = self.B.data
+
+        ctx = F.context(B)
+        spA = spA_ctxobj.get(ctx)
+        spidx = F.sparse_matrix_indices(spA)
+        shape = F.shape(spA)
+        spA = F.sparse_matrix(A_data, spidx, shape)
+
+        if F.ndim(B) == 1:
+            # B is a vector, append a (1,) dim at the end
+            B = F.unsqueeze(B, 1)
+            C = F.spmm(spA, B)
+            C = F.squeeze(C, 1)
+        else:
+            C = F.spmm(spA, B)
+        self.ret.data = C
 
 IR_REGISTRY[OpCode.SPMV_WITH_DATA] = {
     'name' : 'SPMV_WITH_DATA',
@@ -342,8 +368,16 @@ class UpdateDictExecutor(Executor):
         return self.ret
 
     def run(self):
-        assert False
-        pass
+        fd1_data = self.fd1.data
+        fd2_data = self.fd2.data
+        if (isinstance(fd1_data, utils.LazyDict)
+            or isinstance(fd2_data, utils.LazyDict)):
+            # NOTE: fd2 has higher priority
+            ret_data = utils.HybridDict(fd2_data, fd1_data)
+        else:
+            ret_data = {k : v for k, v in fd1_data.items()}
+            ret_data.update(fd2_data)
+        self.ret.data = ret_data
 
 IR_REGISTRY[OpCode.UPDATE_DICT] = {
     'name' : 'UPDATE_DICT',

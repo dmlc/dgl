@@ -92,7 +92,7 @@ def get_recv_schedule(graph, nodes, reduce_func, apply_func):
                 return apply_func(nb)
             afunc = var.FUNC(_afunc_wrapper)
             applied_feat = ir.NODE_UDF(afunc, v_nf)
-            final_feat = ir.UPDATE_DICT(applied_feat, reduced_feat)
+            final_feat = ir.UPDATE_DICT(reduced_feat, applied_feat)
         else:
             final_feat = reduced_feat
         ir.WRITE_ROW_(nf, nodes, final_feat)
@@ -155,7 +155,7 @@ def get_snr_schedule(graph,
                 return apply_func(nb)
             afunc = var.FUNC(_afunc_wrapper)
             applied_feat = ir.NODE_UDF(afunc, v_nf)
-            final_feat = ir.UPDATE_DICT(applied_feat, reduced_feat)
+            final_feat = ir.UPDATE_DICT(reduced_feat, applied_feat)
         else:
             final_feat = reduced_feat
         ir.WRITE_ROW_(nf, recv_nodes, final_feat)
@@ -278,7 +278,7 @@ def get_update_all_schedule(graph, message_func, reduce_func, apply_func):
                 return apply_func(nb)
             afunc = var.FUNC(_afunc_wrapper)
             applied_feat = ir.NODE_UDF(afunc, v_nf)
-            final_feat = ir.UPDATE_DICT(applied_feat, reduced_feat)
+            final_feat = ir.UPDATE_DICT(reduced_feat, applied_feat)
         else:
             final_feat = reduced_feat
         ir.WRITE_ROW_(nf, recv_nodes, final_feat)
