@@ -142,8 +142,14 @@ def copy_to_gpu(subg, ctx):
         subg.ndata[key] = frame[key].as_in_context(ctx)
 
 def main(args, data):
-    features = mx.nd.array(data.features)
-    labels = mx.nd.array(data.labels)
+    if isinstance(data.features, mx.nd.NDArray):
+        features = data.features
+    else:
+        features = mx.nd.array(data.features)
+    if isinstance(data.labels, mx.nd.NDArray):
+        labels = data.labels
+    else:
+        labels = mx.nd.array(data.labels)
     train_size = len(labels) * args.train_percent
     train_vs = np.arange(train_size, dtype='int64')
     eval_vs = np.arange(train_size, len(labels), dtype='int64')
@@ -155,7 +161,11 @@ def main(args, data):
     n_edges = data.graph.number_of_edges()
 
     # create the SSE model
-    g = DGLGraph(data.graph, readonly=True)
+    try:
+        graph = data.graph.get_graph()
+    except AttributeError:
+        graph = data.graph
+    g = DGLGraph(graph, readonly=True)
     g.ndata['in'] = features
     g.ndata['h'] = mx.nd.random.normal(shape=(g.number_of_nodes(), args.n_hidden),
             ctx=mx.cpu(0))
@@ -256,9 +266,37 @@ def main(args, data):
 
     return rets
 
+class MXNetGraph(object):
+    """A simple graph object that uses scipy matrix."""
+    def __init__(self, mat):
+        self._mat = mat
+
+    def get_graph(self):
+        return self._mat
+
+    def number_of_nodes(self):
+        return self._mat.shape[0]
+
+    def number_of_edges(self):
+        return mx.nd.contrib.getnnz(self._mat)
+
+class GraphData:
+    def __init__(self, csr, num_feats):
+        num_edges = mx.nd.contrib.getnnz(csr).asnumpy()[0]
+        edge_ids = mx.nd.arange(0, num_edges, step=1, repeat=1, dtype=np.int64)
+        csr = mx.nd.sparse.csr_matrix((edge_ids, csr.indices, csr.indptr), shape=csr.shape, dtype=np.int64)
+        self.graph = MXNetGraph(csr)
+        self.features = mx.nd.random.normal(shape=(csr.shape[0], num_feats))
+        self.labels = mx.nd.floor(mx.nd.random.normal(loc=0, scale=10, shape=(csr.shape[0])))
+        self.num_labels = 10
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
     register_data_args(parser)
+    parser.add_argument("--graph-file", type=str, default="",
+            help="graph file")
+    parser.add_argument("--num-feats", type=int, default=10,
+            help="the number of features")
     parser.add_argument("--gpu", type=int, default=-1,
             help="gpu")
     parser.add_argument("--lr", type=float, default=1e-3,
@@ -285,7 +323,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # load and preprocess dataset
-    data = load_data(args)
+    if args.graph_file != '':
+        csr = mx.nd.load(args.graph_file)[0]
+        data = GraphData(csr, args.num_feats)
+        csr = None
+    else:
+        data = load_data(args)
     rets1 = main(args, data)
     rets2 = main(args, data)
     for hidden1, hidden2 in zip(rets1, rets2):
