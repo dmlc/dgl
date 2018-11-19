@@ -140,7 +140,7 @@ def get_snr_schedule(graph,
     call_type = 'send_and_recv'
     with ir.prog() as prog:
         nf = var.FEAT_DICT(graph._node_frame, name='nf')
-        recv_nodes, _ = F.sort_1d(F.unique(edge_tuples[2].tousertensor()))
+        recv_nodes, _ = F.sort_1d(F.unique(edge_tuples[1].tousertensor()))
         recv_nodes = var.IDX(recv_nodes, name='recv_nodes')
         reduced_feat = _gen_send_reduce(call_type, graph,
                 edge_tuples, message_func, reduce_func)
@@ -192,7 +192,7 @@ def _gen_send_reduce(
     mfunc_is_list = utils.is_iterable(mfunc)
     rfunc_is_list = utils.is_iterable(rfunc)
 
-    out = var.FEAT_DICT() 
+    out = var.FEAT_DICT(data={})
 
     if mfunc_is_list and rfunc_is_list:
         # builtin message + builtin reducer

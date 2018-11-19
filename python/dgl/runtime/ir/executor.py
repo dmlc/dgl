@@ -4,6 +4,7 @@ from abc import abstractmethod
 
 from ... import backend as F
 from ...frame import FrameRef, Frame
+from ... import utils
 
 from .program import get_current_prog
 from . import var
@@ -286,8 +287,7 @@ def SPMV_WITH_DATA(spA, A_data, B, ret=None):
     return ret
 
 class MergeRowExecutor(Executor):
-    def __init__(self, order, idx_list, fd_list, ret):
-        self.order = order
+    def __init__(self, idx_list, fd_list, ret):
         self.idx_list = idx_list
         self.fd_list = fd_list
         self.ret = ret
@@ -296,14 +296,23 @@ class MergeRowExecutor(Executor):
         return OpCode.MERGE_ROW
 
     def arg_vars(self):
-        return [self.order] + self.idx_list + self.fd_list
+        return self.idx_list + self.fd_list
 
     def ret_var(self):
         return self.ret
 
     def run(self):
-        assert False
-        pass
+        # merge buckets according to the ascending order of the node ids.
+        idx_data = [i.data.tousertensor() for i in self.idx_list]
+        all_idx = F.cat(idx_data, dim=0)
+        _, indices = F.sort_1d(all_idx)
+        indices = utils.toindex(indices)  # FIXME: redundant conversion
+        fd_data = [fd.data for fd in self.fd_list]
+        keys = fd_data[0].keys()
+        all_fd = {key : F.cat([fd[key] for fd in fd_data], dim=0)
+                  for key in keys}
+        ret_fd = utils.reorder(all_fd, indices)
+        self.ret.data = ret_fd
 
 IR_REGISTRY[OpCode.MERGE_ROW] = {
     'name' : 'MERGE_ROW',
@@ -311,10 +320,10 @@ IR_REGISTRY[OpCode.MERGE_ROW] = {
     'ret_type' : VarType.FEAT_DICT,
     'executor_cls' : MergeRowExecutor,
 }
-def MERGE_ROW(order, idx_list, fd_list, ret=None):
+def MERGE_ROW(idx_list, fd_list, ret=None):
     reg = IR_REGISTRY[OpCode.MERGE_ROW]
     ret = var.new(reg['ret_type']) if ret is None else ret
-    get_current_prog().issue(reg['executor_cls'](order, idx_list, fd_list, ret))
+    get_current_prog().issue(reg['executor_cls'](idx_list, fd_list, ret))
     return ret
 
 class UpdateDictExecutor(Executor):
