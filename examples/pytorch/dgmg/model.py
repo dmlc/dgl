@@ -49,11 +49,10 @@ class GraphProp(nn.Module):
             message_funcs.append(nn.Linear(2 * node_hidden_size + 1,
                                            self.node_activation_hidden_size))
 
+            self.reduce_funcs.append(partial(self.dgmg_reduce, round=t))
             node_update_funcs.append(
                 nn.GRUCell(self.node_activation_hidden_size,
                            node_hidden_size))
-
-            self.reduce_funcs.append(partial(self.dgmg_reduce, round=t))
 
         self.message_funcs = nn.ModuleList(message_funcs)
         self.node_update_funcs = nn.ModuleList(node_update_funcs)
@@ -71,16 +70,17 @@ class GraphProp(nn.Module):
             hv_old.unsqueeze(1).expand(-1, m.size(1), -1), m], dim=2)
         node_activation = (self.message_funcs[round](message)).sum(1)
 
-        return {'hv': self.node_update_funcs[round](node_activation, hv_old)}
+        return {'a': node_activation}
 
     def forward(self, g):
-        if g.number_of_nodes() == 0:
+        if g.number_of_edges() == 0:
             return
-
-        for t in range(self.num_prop_rounds):
-            if g.number_of_edges() > 0:
+        else:
+            for t in range(self.num_prop_rounds):
                 g.update_all(message_func=self.dgmg_msg,
                              reduce_func=self.reduce_funcs[t])
+                g.ndata['hv'] = self.node_update_funcs[t](
+                    g.ndata['a'], g.ndata['hv'])
 
 
 # Define two functions for calculating p and log p with
@@ -111,6 +111,8 @@ class AddNode(nn.Module):
                                        graph_embed_func.graph_hidden_size,
                                        node_hidden_size)
 
+        self.init_node_activation = torch.zeros(1, 2 * node_hidden_size)
+
     def _initialize_node_repr(self, g, node_type, graph_embed):
         num_nodes = g.number_of_nodes()
         hv_init = self.initialize_hv(
@@ -121,20 +123,19 @@ class AddNode(nn.Module):
             g.ndata['hv'] = hv_init
         else:
             g.nodes[num_nodes - 1].data['hv'] = hv_init
+        g.nodes[num_nodes - 1].data['a'] = self.init_node_activation
 
     def prepare_training(self):
         self.prob = []
         self.log_prob = []
 
-    def forward(self, g, **kwargs):
+    def forward(self, g, action=None):
         graph_embed = self.graph_op['embed'](g)
 
         logit = self.add_node(graph_embed)
         prob = torch.sigmoid(logit)
 
-        if self.training:
-            action = kwargs.get('a')
-        else:
+        if not self.training:
             action = Bernoulli(prob).sample().item()
         stop = bool(action == self.stop)
 
@@ -164,7 +165,7 @@ class AddEdge(nn.Module):
         self.prob = []
         self.log_prob = []
 
-    def forward(self, g, **kwargs):
+    def forward(self, g, action=None):
         graph_embed = self.graph_op['embed'](g)
         src_embed = g.nodes[g.number_of_nodes() - 1].data['hv']
 
@@ -172,9 +173,7 @@ class AddEdge(nn.Module):
             [graph_embed, src_embed], dim=1))
         prob = torch.sigmoid(logit)
 
-        if self.training:
-            action = kwargs.get('a')
-        else:
+        if not self.training:
             action = Bernoulli(prob).sample().item()
         to_add_edge = bool(action == 0)
 
@@ -210,7 +209,7 @@ class ChooseDestAndUpdate(nn.Module):
         self.prob = []
         self.log_prob = []
 
-    def forward(self, g, **kwargs):
+    def forward(self, g, dest):
         src = g.number_of_nodes() - 1
         possible_dests = range(src)
 
@@ -222,9 +221,7 @@ class ChooseDestAndUpdate(nn.Module):
                        src_embed_expand], dim=1)).view(1, -1)
         dests_probs = F.softmax(dests_scores, dim=1)
 
-        if self.training:
-            dest = kwargs.get('a')
-        else:
+        if not self.training:
             dest = Categorical(dests_probs).sample().item()
 
         if not g.has_edge_between(src, dest):
@@ -283,7 +280,7 @@ class DGMG(nn.Module):
         self.graph_prop.message_funcs.apply(dgmg_message_weight_init)
 
     @property
-    def graph_size(self):
+    def num_nodes(self):
         return self.g.number_of_nodes()
 
     @property
@@ -300,22 +297,22 @@ class DGMG(nn.Module):
         self.add_edge_agent.prepare_training()
         self.choose_dest_agent.prepare_training()
 
-    def add_node_and_update(self, **kwargs):
+    def add_node_and_update(self, a=None):
         """Decide if to add a new node.
         If a new node should be added, update the graph."""
 
-        return self.add_node_agent(self.g, **kwargs)
+        return self.add_node_agent(self.g, a)
 
-    def add_edge_or_not(self, **kwargs):
+    def add_edge_or_not(self, a=None):
         """Decide if a new edge should be added."""
 
-        return self.add_edge_agent(self.g, **kwargs)
+        return self.add_edge_agent(self.g, a)
 
-    def choose_dest_and_update(self, **kwargs):
+    def choose_dest_and_update(self, a=None):
         """Choose destination and connect it to the latest node.
         Add edges for both directions and update the graph."""
 
-        self.choose_dest_agent(self.g, **kwargs)
+        self.choose_dest_agent(self.g, a)
 
     def get_log_prob(self):
         return torch.cat(self.add_node_agent.log_prob).sum()\
@@ -332,13 +329,10 @@ class DGMG(nn.Module):
 
         stop = self.add_node_and_update(a=actions[self.action_step])
 
-        while (not stop) and (self.graph_size < self.v_max + 1):
-            num_trials = 0
+        while not stop:
             to_add_edge = self.add_edge_or_not(a=actions[self.action_step])
-            while to_add_edge and (num_trials
-                                   < self.graph_size - 1):
+            while to_add_edge:
                 self.choose_dest_and_update(a=actions[self.action_step])
-                num_trials += 1
                 to_add_edge = self.add_edge_or_not(a=actions[self.action_step])
             stop = self.add_node_and_update(a=actions[self.action_step])
 
@@ -346,11 +340,10 @@ class DGMG(nn.Module):
 
     def forward_inference(self):
         stop = self.add_node_and_update()
-        while (not stop) and (self.graph_size < self.v_max + 1):
+        while (not stop) and (self.num_nodes < self.v_max + 1):
             num_trials = 0
             to_add_edge = self.add_edge_or_not()
-            while to_add_edge and (num_trials
-                                   < self.graph_size - 1):
+            while to_add_edge and (num_trials < self.num_nodes - 1):
                 self.choose_dest_and_update()
                 num_trials += 1
                 to_add_edge = self.add_edge_or_not()
@@ -358,7 +351,7 @@ class DGMG(nn.Module):
 
         return self.g
 
-    def forward(self, **kwargs):
+    def forward(self, actions=None):
         # The graph we will work on
         self.g = dgl.DGLGraph()
 
@@ -370,6 +363,6 @@ class DGMG(nn.Module):
                                  torch.zeros(shape, device=ctx))
 
         if self.training:
-            return self.forward_train(kwargs.get('actions'))
+            return self.forward_train(actions)
         else:
             return self.forward_inference()
