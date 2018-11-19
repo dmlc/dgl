@@ -1008,6 +1008,10 @@ class DGLGraph(object):
         """
         if func == "default":
             func = self._apply_node_func
+        if is_all(v):
+            v = utils.toindex(slice(0, self.number_of_nodes()))
+        else:
+            v = utils.toindex(v)
         with ir.prog() as prog:
             scheduler.schedule_apply_nodes(graph=self, v=v, apply_func=func)
             Runtime.run(prog)
@@ -1033,8 +1037,7 @@ class DGLGraph(object):
         assert func is not None
 
         if is_all(edges):
-            eid = ALL
-            u, v, _ = self._graph.edges()
+            u, v, eid = self._graph.edges()
         elif isinstance(edges, tuple):
             u, v = edges
             u = utils.toindex(u)

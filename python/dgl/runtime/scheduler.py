@@ -253,26 +253,32 @@ def schedule_update_all(graph, message_func, reduce_func, apply_func):
         The apply node function
     """
     call_type = 'update_all'
-    edge_tuples = (ALL, ALL, ALL)
-    nf = var.FEAT_DICT(graph._node_frame, name='nf')
-    recv_nodes = var.IDX(edge_tupes[2], name='recv_nodes')
+    src, dst, _ = graph._graph.edges()
+    eid = utils.toindex(slice(0, graph.number_of_edges()))  # shortcut for ALL
+    recv_nodes = utils.toindex(slice(0, graph.number_of_nodes()))  # shortcut for ALL
+    # create vars
+    var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
+    var_recv_nodes = var.IDX(recv_nodes, name='recv_nodes')
+    var_src = var.IDX(src)
+    var_dst = var.IDX(dst)
+    var_eid = var.IDX(eid)
     reduced_feat = _gen_send_reduce(call_type, graph,
-            edge_tuples, message_func, reduce_func)
+            message_func, reduce_func, (var_src, var_dst, var_eid), var_recv_nodes)
     if apply_func:
         # To avoid writing reduced features back to node frame and reading
         # it again for apply phase. Instead, we first read the the node
         # features and "merge" it with the reduced features.
-        v_nf = ir.READ_ROW(nf, recv_nodes)
+        v_nf = ir.READ_ROW(var_nf, var_recv_nodes)
         v_nf = ir.UPDATE_DICT(v_nf, reduced_feat)
         def _afunc_wrapper(node_data):
-            nb = NodeBatch(graph, ALL, node_data)
+            nb = NodeBatch(graph, recv_nodes, node_data)
             return apply_func(nb)
         afunc = var.FUNC(_afunc_wrapper)
         applied_feat = ir.NODE_UDF(afunc, v_nf)
         final_feat = ir.UPDATE_DICT(reduced_feat, applied_feat)
     else:
         final_feat = reduced_feat
-    ir.WRITE_ROW_(nf, recv_nodes, final_feat)
+    ir.WRITE_DICT_(var_nf, final_feat)
 
 def schedule_apply_nodes(graph, v, apply_func):
     """get apply nodes schedule

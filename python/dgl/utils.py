@@ -1,28 +1,50 @@
 """Utility module."""
-from __future__ import absolute_import
+from __future__ import absolute_import, division
 
 from collections import Mapping, Iterable
 from functools import wraps
 import numpy as np
 
+from .base import DGLError
 from . import backend as F
 from . import ndarray as nd
 
 class Index(object):
     """Index class that can be easily converted to list/tensor."""
     def __init__(self, data):
-        self._list_data = None  # a numpy type data
+        self._list_data = None  # a numpy type data or a slice
         self._user_tensor_data = dict()  # dictionary of user tensors
         self._dgl_tensor_data = None  # a dgl ndarray
         self._dispatch(data)
+
+    def __iter__(self):
+        return iter(self.tolist())
+
+    def __len__(self):
+        if self._list_data is not None and isinstance(self._list_data, slice):
+            slc = self._list_data
+            if slc.step is None:
+                return slc.stop - slc.start
+            else:
+                return (slc.stop - slc.start) // slc.step
+        elif self._list_data is not None:
+            return len(self._list_data)
+        elif len(self._user_tensor_data) > 0:
+            data = next(iter(self._user_tensor_data.values()))
+            return len(data)
+        else:
+            return len(self._dgl_tensor_data)
+
+    def __getitem__(self, i):
+        return self.tolist()[i]
 
     def _dispatch(self, data):
         """Store data based on its type."""
         if F.is_tensor(data):
             if not (F.dtype(data) == F.int64):
-                raise ValueError('Index data must be an int64 vector, but got: %s' % str(data))
+                raise DGLError('Index data must be an int64 vector, but got: %s' % str(data))
             if len(F.shape(data)) > 1:
-                raise ValueError('Index data must be 1D int64 vector, but got: %s' % str(data))
+                raise DGLError('Index data must be 1D int64 vector, but got: %s' % str(data))
             if len(F.shape(data)) == 0:
                 # a tensor of one int
                 self._dispatch(int(data))
@@ -30,19 +52,23 @@ class Index(object):
                 self._user_tensor_data[F.context(data)] = data
         elif isinstance(data, nd.NDArray):
             if not (data.dtype == 'int64' and len(data.shape) == 1):
-                raise ValueError('Index data must be 1D int64 vector, but got: %s' % str(data))
+                raise DGLError('Index data must be 1D int64 vector, but got: %s' % str(data))
             self._dgl_tensor_data = data
+        elif isinstance(data, slice):
+            # save it in the _list_data temporarily; materialize it if `tolist` is called
+            self._list_data = data
         else:
             try:
                 self._list_data = np.array([int(data)]).astype(np.int64)
             except:
                 try:
-                    data = np.array(data).astype('int64')
+                    data = np.array(data).astype(np.int64)
                     if data.ndim != 1:
-                        raise ValueError('Index data must be 1D int64 vector, but got: %s' % str(data))
+                        raise DGLError('Index data must be 1D int64 vector,'
+                                       ' but got: %s' % str(data))
                     self._list_data = data
                 except:
-                    raise ValueError('Error index data: %s' % str(data))
+                    raise DGLError('Error index data: %s' % str(data))
             self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self._list_data)
 
     def tolist(self):
@@ -53,6 +79,10 @@ class Index(object):
             else:
                 data = self.tousertensor()
                 self._list_data = F.zerocopy_to_numpy(data)
+        elif isinstance(self._list_data, slice):
+            # convert it to numpy array
+            slc = self._list_data
+            self._list_data = np.arange(slc.start, slc.stop, slc.step).astype(np.int64)
         return self._list_data
 
     def tousertensor(self, ctx=None):
@@ -60,9 +90,13 @@ class Index(object):
         if ctx is None:
             ctx = F.cpu()
         if len(self._user_tensor_data) == 0:
-            # zero copy from dgl tensor
-            dl = self._dgl_tensor_data.to_dlpack()
-            self._user_tensor_data[F.cpu()] = F.zerocopy_from_dlpack(dl)
+            if self._dgl_tensor_data is not None:
+                # zero copy from dgl tensor
+                dl = self._dgl_tensor_data.to_dlpack()
+                self._user_tensor_data[F.cpu()] = F.zerocopy_from_dlpack(dl)
+            else:
+                # zero copy from numpy array
+                self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self.tolist())
         if ctx not in self._user_tensor_data:
             # copy from cpu to another device
             data = next(iter(self._user_tensor_data.values()))
@@ -78,20 +112,9 @@ class Index(object):
             self._dgl_tensor_data = nd.from_dlpack(dl)
         return self._dgl_tensor_data
 
-    def __iter__(self):
-        return iter(self.tolist())
-
-    def __len__(self):
-        if self._list_data is not None:
-            return len(self._list_data)
-        elif len(self._user_tensor_data) > 0:
-            data = next(iter(self._user_tensor_data.values()))
-            return len(data)
-        else:
-            return len(self._dgl_tensor_data)
-
-    def __getitem__(self, i):
-        return self.tolist()[i]
+    def is_slice(start, stop, step=None):
+        return (isinstance(self._list_data, slice)
+                and self._list_data == slice(start, stop, step))
 
 def toindex(x):
     return x if isinstance(x, Index) else Index(x)
