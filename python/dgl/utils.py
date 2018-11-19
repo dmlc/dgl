@@ -96,66 +96,6 @@ class Index(object):
 def toindex(x):
     return x if isinstance(x, Index) else Index(x)
 
-def node_iter(n):
-    """Return an iterator that loops over the given nodes.
-
-    Parameters
-    ----------
-    n : iterable
-        The node ids.
-    """
-    return iter(n)
-
-def edge_iter(u, v):
-    """Return an iterator that loops over the given edges.
-
-    Parameters
-    ----------
-    u : iterable
-        The src ids.
-    v : iterable
-        The dst ids.
-    """
-    if len(u) == len(v):
-        # many-many
-        for uu, vv in zip(u, v):
-            yield uu, vv
-    elif len(v) == 1:
-        # many-one
-        for uu in u:
-            yield uu, v[0]
-    elif len(u) == 1:
-        # one-many
-        for vv in v:
-            yield u[0], vv
-    else:
-        raise ValueError('Error edges:', u, v)
-
-def edge_broadcasting(u, v):
-    """Convert one-many and many-one edges to many-many.
-
-    Parameters
-    ----------
-    u : Index
-        The src id(s)
-    v : Index
-        The dst id(s)
-
-    Returns
-    -------
-    uu : Index
-        The src id(s) after broadcasting
-    vv : Index
-        The dst id(s) after broadcasting
-    """
-    if len(u) != len(v) and len(u) == 1:
-        u = toindex(F.full_1d(len(v), u[0]))
-    elif len(u) != len(v) and len(v) == 1:
-        v = toindex(F.full_1d(len(u), v[0]))
-    else:
-        assert len(u) == len(v)
-    return u, v
-
 class LazyDict(Mapping):
     """A readonly dictionary that does not materialize the storage."""
     def __init__(self, fn, keys):
@@ -380,21 +320,6 @@ def build_coo_sparse_matrix(dat, row, col, dense_shape):
     col = F.unsqueeze(col, 0)
     idx = F.cat([row, col], dim=0)
     return F.sparse_matrix(dat, ('coo', idx), dense_shape)
-
-def parse_edges_tuple(edges):
-    """Parse the given edges and return the tuple.
-
-    Parameters
-    ----------
-    edges : edges
-        Edges can be a pair of endpoint nodes (u, v), or a
-        tensor of edge ids. The default value is all the edges.
-
-    Returns
-    -------
-    A tuple of (u, v, eid)
-    """
-    pass
 
 def is_iterable(obj):
     """Return true if the object is an iterable."""

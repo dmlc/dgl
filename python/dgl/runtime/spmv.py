@@ -9,7 +9,7 @@ from . import ir
 from .ir import var as var
 
 def analyze_v2v_spmv(graph, mfunc, rfunc):
-    """Analyze if SPMV from node space to node space can be applied
+    """Analyze if SPMV from node space to node space can be applied.
 
     Parameters
     ----------
@@ -55,7 +55,7 @@ def analyze_v2v_spmv(graph, mfunc, rfunc):
     return spmv_pairs, mfunc_left, rfunc_left
 
 def analyze_e2v_spmv(graph, rfunc):
-    """Analyze if SPMV from edge space to node space can be applied
+    """Analyze if SPMV from edge space to node space can be applied.
 
     Parameters
     ----------
