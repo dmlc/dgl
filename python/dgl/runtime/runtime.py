@@ -1,6 +1,7 @@
 """DGL mini-runtime."""
+
 class Runtime(object):
     @staticmethod
-    def run(execs):
-        for exe in execs:
-            exe.run()
+    def run(prog):
+        for inst in prog.insts:
+            inst.run()

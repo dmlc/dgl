@@ -5,7 +5,9 @@ from .._ffi.function import _init_api
 from .. import utils
 from .. import backend as F
 from ..immutable_graph_index import ImmutableGraphIndex
+
 from . import ir
+from .ir import var as var
 
 def gen_degree_bucketing_schedule(
         call_type,
@@ -27,18 +29,18 @@ def gen_degree_bucketing_schedule(
     ----------
     call_type: str
         Call_type of current graph API, could be 'update_all', 'send_and_recv', 'recv'
-    nf : ir.Var
+    nf : var.Var
         The variable for node features.
-    msg : ir.Var
+    msg : var.Var
         The variable for messages.
     rfunc: callable
         The UDF to reduce messages.
     graph: DGLGraph
         DGLGraph to use
-    edge_dst: ir.Var
+    edge_dst: var.Var
         The destination nodes of the edges. The number
         should be equal to the number of triggered edges.
-    out : ir.Var
+    out : var.Var
         The variable for output feature dicts.
     """
     v = edge_dst.data
@@ -74,10 +76,10 @@ def gen_degree_bucketing_schedule(
     idx_list = []
     fd_list = []
     for deg, vb, mid in zip(degs, buckets, msg_ids):
-        vb = ir.Var.IDX(vb)
-        mid = ir.Var.IDX(mid)
+        vb = var.IDX(vb)
+        mid = var.IDX(mid)
         # TODO: wrap reshape into it
-        rfunc = ir.Var.FUNC(reduce_func)
+        rfunc = var.FUNC(reduce_func)
         fdvb = ir.READ_ROW(nf, vb)
         fdeb = ir.READ_ROW(msg, mid)
         fdvb = ir.CALL(rfunc, [fdvb, fdeb], ret=fdvb)  # reuse var
@@ -86,13 +88,13 @@ def gen_degree_bucketing_schedule(
         fd_list.append(fdvb)
     # zero-degree feats
     if zero_deg_nodes is not None:
-        zero_deg_nodes = ir.Var.IDX(zero_deg_nodes)
+        zero_deg_nodes = var.IDX(zero_deg_nodes)
         zero_deg_feat = ir.READ_ROW(nf, zero_deg_nodes)
         idx_list.append(zero_deg_nodes)
         fd_list.append(zero_deg_feat)
     # merge buckets according to the ascending order of the node ids.
     order = F.sort_1d(unique_dst.tousertensor())[0]
-    order_var = ir.Var.IDX(utils.toindex(order))
+    order_var = var.IDX(utils.toindex(order))
     reduced_feat = ir.MERGE_ROW(order_var, idx_list, fd_list)
     ir.WRITE_DICT_(out, reduced_feat)
 

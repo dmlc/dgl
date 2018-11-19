@@ -4,7 +4,9 @@ from __future__ import absolute_import
 from ..base import DGLError
 from .. import backend as F
 from .. import utils
+
 from . import ir
+from .ir import var as var
 
 def analyze_v2v_spmv(graph, mfunc, rfunc):
     """Analyze if SPMV from node space to node space can be applied
@@ -82,43 +84,43 @@ def gen_v2v_spmv_schedule(adjmat, spmv_pairs, nf, ef, eid, out):
     """
     adjmat : sparse matrix
     spmv_pairs : list of pair
-    nf : ir.Var
+    nf : var.Var
         input node features
-    ef : ir.Var
+    ef : var.Var
         input edge features
-    eid : ir.Var
+    eid : var.Var
         eid index
-    out : ir.Var
+    out : var.Var
         output node features
     """
-    adj_var = ir.Var.SPMAT(adjmat)
+    adj_var = var.SPMAT(adjmat)
     for mfn, rfn in spmv_pairs:
         #print('v2v mfn=%s rfn=%s' % (mfn.name, rfn.name))
         if mfn.use_edge_feature:
-            ftedge = ir.READ(ef, eid, ir.Var.STR(mfn.edge_field))
-            ftsrc = ir.READ_COL(nf, ir.Var.STR(mfn.src_field))
+            ftedge = ir.READ(ef, eid, var.STR(mfn.edge_field))
+            ftsrc = ir.READ_COL(nf, var.STR(mfn.src_field))
             ftdst = ir.SPMV_WITH_DATA(adj_var, ftedge, ftsrc)
         else:
-            ftsrc = ir.READ_COL(nf, ir.Var.STR(mfn.src_field))
+            ftsrc = ir.READ_COL(nf, var.STR(mfn.src_field))
             ftdst = ir.SPMV(adj_var, ftsrc)
         # save for merge
-        ir.WRITE_COL_(out, ir.Var.STR(mfn.out_field), ftdst)
+        ir.WRITE_COL_(out, var.STR(mfn.out_field), ftdst)
 
 def gen_e2v_spmv_schedule(inc, spmv_rfunc, mf, out):
     """
     inc : sparse matrix
         The incidence matrix
     spmv_rfunc : list of builtin reducers
-    mf : ir.Var
+    mf : var.Var
         Variable for message frame.
-    out : ir.Var
+    out : var.Var
         Variable for output reduced features.
     """
-    inc_var = ir.Var.SPMAT(inc)
+    inc_var = var.SPMAT(inc)
     for rfn in spmv_rfunc:
-        ftmsg = ir.READ_COL(mf, ir.Var.STR(rfn.msg_field))
+        ftmsg = ir.READ_COL(mf, var.STR(rfn.msg_field))
         ftdst = ir.SPMV(inc_var, ftmsg)
-        ir.WRITE_COL_(out, ir.Var.STR(rfn.out_field), ftdst)
+        ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
 def build_adj_matrix(call_type, graph, u, v):
     """

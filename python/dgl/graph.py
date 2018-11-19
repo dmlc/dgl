@@ -1008,10 +1008,10 @@ class DGLGraph(object):
         """
         if func == "default":
             func = self._apply_node_func
-        execs = scheduler.get_apply_nodes_schedule(graph=self,
+        sched = scheduler.get_apply_nodes_schedule(graph=self,
                                                    v=v,
                                                    apply_func=func)
-        Runtime.run(execs)
+        Runtime.run(sched)
 
     def apply_edges(self, func="default", edges=ALL):
         """Apply the function on the edge features.
@@ -1046,12 +1046,12 @@ class DGLGraph(object):
             eid = utils.toindex(edges)
             u, v, _ = self._graph.find_edges(eid)
 
-        execs = scheduler.get_apply_edges_schedule(graph=self,
+        sched = scheduler.get_apply_edges_schedule(graph=self,
                                                    u=u,
                                                    v=v,
                                                    eid=eid,
                                                    apply_func=func)
-        Runtime.run(execs)
+        Runtime.run(sched)
 
     def send(self, edges, message_func="default"):
         """Send messages along the given edges.
@@ -1086,12 +1086,12 @@ class DGLGraph(object):
             eid = utils.toindex(edges)
             u, v, _ = self._graph.find_edges(eid)
 
-        execs = scheduler.get_send_schedule(graph=self,
+        sched = scheduler.get_send_schedule(graph=self,
                                             u=u,
                                             v=v,
                                             eid=eid,
                                             message_func=message_func)
-        Runtime.run(execs)
+        Runtime.run(sched)
 
         # update message graph and frame
         self._msg_graph.add_edges(u, v)
@@ -1135,13 +1135,13 @@ class DGLGraph(object):
             # no vertex to be triggered.
             return
 
-        execs = scheduler.get_recv_schedule(graph=self,
+        sched = scheduler.get_recv_schedule(graph=self,
                                             v=v,
                                             reduce_func=reduce_func,
                                             apply_func=apply_node_func)
-        Runtime.run(execs)
+        Runtime.run(sched)
 
-        # clear message
+        # FIXME(minjie): multi send bug
         self.reset_messages()
 
     def send_and_recv(self,
@@ -1195,10 +1195,10 @@ class DGLGraph(object):
             # no edges to be triggered
             return
 
-        prog = scheduler.get_snr_schedule(
+        sched = scheduler.get_snr_schedule(
                 self, (u, v, eid), message_func, reduce_func, apply_node_func)
-        prog.pprint()
-        #Runtime.run(execs)
+        sched.pprint()
+        #Runtime.run(sched)
 
     def pull(self,
              v,
@@ -1231,12 +1231,12 @@ class DGLGraph(object):
         v = utils.toindex(v)
         if len(v) == 0:
             return
-        execs = scheduler.get_pull_schedule(graph=self,
+        sched = scheduler.get_pull_schedule(graph=self,
                                             v = v,
                                             message_func=message_func,
                                             reduce_func=reduce_func,
                                             apply_func=apply_node_func)
-        Runtime.run(execs)
+        Runtime.run(sched)
 
     def push(self,
              u,
@@ -1269,12 +1269,12 @@ class DGLGraph(object):
         u = utils.toindex(u)
         if len(u) == 0:
             return
-        execs = scheduler.get_push_schedule(graph=self,
+        sched = scheduler.get_push_schedule(graph=self,
                                             u = u,
                                             message_func=message_func,
                                             reduce_func=reduce_func,
                                             apply_func=apply_node_func)
-        Runtime.run(execs)
+        Runtime.run(sched)
 
     def update_all(self,
                    message_func="default",
@@ -1300,11 +1300,11 @@ class DGLGraph(object):
         assert message_func is not None
         assert reduce_func is not None
 
-        execs = scheduler.get_update_all_schedule(graph=self,
+        sched = scheduler.get_update_all_schedule(graph=self,
                                                   message_func=message_func,
                                                   reduce_func=reduce_func,
                                                   apply_func=apply_node_func)
-        Runtime.run(execs)
+        Runtime.run(sched)
 
     def prop_nodes(self,
                    nodes_generator,
