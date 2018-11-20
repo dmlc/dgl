@@ -4,28 +4,30 @@
 Tree LSTM DGL Tutorial
 =========================
 
-**Author**: `Zihao Ye`, `Qipeng Guo`, `Minjie Wang`, `Zheng Zhang`
-
+**Author**: Zihao Ye, Qipeng Guo, `Minjie Wang
+<https://jermainewang.github.io/>`_, `Jake Zhao
+<https://cs.nyu.edu/~jakezhao/>`_, Zheng Zhang
 """
  
 ##############################################################################
 #
-# Tree-LSTM structure was first introduced by Kai et. al in their ACL 2015
+# Tree-LSTM structure was first introduced by Kai et. al in an ACL 2015 
 # paper: `Improved Semantic Representations From Tree-Structured Long
-# Short-Term Memory Networks <https://arxiv.org/pdf/1503.00075.pdf>`__,
-# aiming to introduce syntactic information in the network by extending
-# chain structured LSTM to tree structured LSTM, and uses Dependency
-# Tree/Constituency Tree as the latent tree structure.
+# Short-Term Memory Networks <https://arxiv.org/pdf/1503.00075.pdf>`__.
+# The core idea is to introduce syntactic information for language tasks by 
+# extending the chain-structured LSTM to a tree-structured LSTM. The Dependency 
+# Tree/Constituency Tree techniques were leveraged to obtain a ''latent tree''.
 #
-# The difficulty of training Tree-LSTM is that trees have different shape,
-# making it difficult to parallelize. DGL offers a neat alternative. The
-# key points are pooling all the trees into one graph, and then induce
-# message passing over them.
+# One, if not all, difficulty of training Tree-LSTMs is batching --- a standard 
+# technique in machine learning to accelerate optimization. However, since trees 
+# generally have different shapes by nature, parallization becomes non trivial. 
+# DGL offers an alternative: to pool all the trees into one single graph then 
+# induce the message passing over them guided by the structure of each tree.
 #
 # The task and the dataset
 # ------------------------
-#
-# We will use Tree-LSTM for sentiment analysis task. We have wrapped the
+# In this tutorial, we will use Tree-LSTMs for sentiment analysis.
+# We have wrapped the
 # `Stanford Sentiment Treebank <https://nlp.stanford.edu/sentiment/>`__ in
 # ``dgl.data``. The dataset provides a fine-grained tree level sentiment
 # annotation: 5 classes(very negative, negative, neutral, positive, and
@@ -123,37 +125,38 @@ plot_tree(graph.to_networkx())
 # Step 2: Tree-LSTM Cell with message-passing APIs
 # ------------------------------------------------
 #
-# .. note::
-#    The paper proposed two types of Tree LSTM: Child-Sum
-#    Tree-LSTMs, and :math:`N`-ary Tree-LSTMs. In this tutorial we focus on
-#    the later one. We use PyTorch as our backend framework to set up the
-#    network.
+# The authors proposed two types of Tree LSTM: Child-Sum
+# Tree-LSTMs, and :math:`N`-ary Tree-LSTMs. In this tutorial we focus 
+# on applying *Binary* Tree-LSTM to binarized constituency trees(this 
+# application is also known as *Constituency Tree-LSTM*). We use PyTorch 
+# as our backend framework to set up the network.
 #
-# In Tree LSTM, each unit at node :math:`j` maintains a hidden
+# In `N`-ary Tree LSTM, each unit at node :math:`j` maintains a hidden
 # representation :math:`h_j` and a memory cell :math:`c_j`. The unit
 # :math:`j` takes the input vector :math:`x_j` and the hidden
-# representations of the their child units: :math:`h_k, k\in C(j)` as
-# input, then compute its new hidden representation :math:`h_j` and memory
-# cell :math:`c_j` in the following way.
+# representations of the their child units: :math:`h_{jl}, 1\leq l\leq N` as
+# input, then update its new hidden representation :math:`h_j` and memory
+# cell :math:`c_j` by: 
 #
 # .. math::
 #
-#    i_j = \sigma\left(W^{(i)}x_j + \sum_{l=1}^{N}U^{(i)}_l h_{jl} + b^{(i)}\right), \\
-#    f_{jk} = \sigma\left(W^{(f)}x_j + \sum_{l=1}^{N}U_{kl}^{(f)} h_{jl} + b^{(f)} \right), \\
-#    o_j = \sigma\left(W^{(o)}x_j + \sum_{l=1}^{N}U_{l}^{(o)} h_{jl} + b^{(o)} \right), \\
-#    u_j = \textrm{tanh}\left(W^{(u)}x_j + \sum_{l=1}^{N} U_l^{(u)}h_{jl} + b^{(u)} \right) , \\
-#    c_j = i_j \odot u_j + \sum_{l=1}^{N} f_{jl} \odot c_{jl}, \\
-#    h_j = o_j \cdot \textrm{tanh}(c_j), \\
+#    i_j & = & \sigma\left(W^{(i)}x_j + \sum_{l=1}^{N}U^{(i)}_l h_{jl} + b^{(i)}\right),  & (1)\\
+#    f_{jk} & = & \sigma\left(W^{(f)}x_j + \sum_{l=1}^{N}U_{kl}^{(f)} h_{jl} + b^{(f)} \right), &  (2)\\
+#    o_j & = & \sigma\left(W^{(o)}x_j + \sum_{l=1}^{N}U_{l}^{(o)} h_{jl} + b^{(o)} \right), & (3)  \\
+#    u_j & = & \textrm{tanh}\left(W^{(u)}x_j + \sum_{l=1}^{N} U_l^{(u)}h_{jl} + b^{(u)} \right), & (4)\\
+#    c_j & = & i_j \odot u_j + \sum_{l=1}^{N} f_{jl} \odot c_{jl}, &(5) \\
+#    h_j & = & o_j \cdot \textrm{tanh}(c_j), &(6)  \\
 #
-# The process can be decomposed into three phases: ``message_func``,
+# It can be decomposed into three phases: ``message_func``,
 # ``reduce_func`` and ``apply_node_func``.
 #
-# ``apply_node_func`` is a new node UDF we have not introduced before. In
-# ``apply_node_func``, user specifies what to do with node features,
-# without considering edge features and messages. In Tree-LSTM case,
-# ``apply_node_func`` is a must, since there exists (leaf) nodes with
-# :math:`0` incoming edges, which would not be updated via
-# ``reduce_func``.
+# .. note::
+#    ``apply_node_func`` is a new node UDF we have not introduced before. In
+#    ``apply_node_func``, user specifies what to do with node features,
+#    without considering edge features and messages. In Tree-LSTM case,
+#    ``apply_node_func`` is a must, since there exists (leaf) nodes with
+#    :math:`0` incoming edges, which would not be updated via
+#    ``reduce_func``.
 #
 
 import torch as th
@@ -170,16 +173,22 @@ class TreeLSTMCell(nn.Module):
         return {'h': edges.src['h'], 'c': edges.src['c']}
 
     def reduce_func(self, nodes):
-        h_cat = nodes.mailbox['h'].view(nodes.mailbox['h'].size(0), -1)
-        f = th.sigmoid(self.U_f(h_cat)).view(*nodes.mailbox['h'].size())
-        c = th.sum(f * nodes.mailbox['c'], 1)
-        return {'iou': self.U_iou(h_cat), 'c': c}
+        # concatenate h_jl for equation (1), (2), (3), (4)
+        h_cat = nodes.mailbox['h'].view(nodes.mailbox['h'].size(0), -1)      
+        # equation (2)
+        f = th.sigmoid(self.U_f(h_cat)).view(*nodes.mailbox['h'].size())    
+        # second term of equation (5)
+        c = th.sum(f * nodes.mailbox['c'], 1)                               
+        return {'iou': self.U_iou(h_cat), 'c': c} 
 
     def apply_node_func(self, nodes):
+        # equation (1), (3), (4)
         iou = nodes.data['iou']
-        i, o, u = th.chunk(iou, 3, 1)
-        i, o, u = th.sigmoid(i), th.sigmoid(o), th.tanh(u)
-        c = i * u + nodes.data['c']
+        i, o, u = th.chunk(iou, 3, 1)                                       
+        i, o, u = th.sigmoid(i), th.sigmoid(o), th.tanh(u)                  
+        # equation (5)
+        c = i * u + nodes.data['c'] 
+        # equation (6)
         h = o * th.tanh(c)
         return {'h' : h, 'c' : c}
 
@@ -213,13 +222,6 @@ print(dgl.topological_nodes_generator(graph))
 
 ##############################################################################
 # We then call :meth:`~dgl.DGLGraph.prop_nodes` to trigger the message passing:
-#
-# .. note::
-#
-#    Before we call :meth:`~dgl.DGLGraph.prop_nodes`, we must specify a
-#    `message_func` and `reduce_func` in advance, here we use built-in
-#    copy-from-source and sum function as our message function and reduce
-#    function for demonstration.
 
 import dgl.function as fn
 import torch as th
@@ -235,6 +237,13 @@ graph.prop_nodes(traversal_order)
 # dgl.prop_nodes_topo(graph)
 
 ##############################################################################
+# .. note::
+#
+#    Before we call :meth:`~dgl.DGLGraph.prop_nodes`, we must specify a
+#    `message_func` and `reduce_func` in advance, here we use built-in
+#    copy-from-source and sum function as our message function and reduce
+#    function for demonstration.
+#
 # Putting it together
 # -------------------
 #
@@ -353,3 +362,4 @@ for epoch in range(epochs):
 # To train the model on full dataset with different settings(CPU/GPU,
 # etc.), please refer to our repo's
 # `example <https://github.com/jermainewang/dgl/tree/master/examples/pytorch/tree_lstm>`__.
+# Besides, we also provide an implementation of the Child-Sum Tree LSTM.

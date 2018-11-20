@@ -166,8 +166,7 @@ class DGLGraph(object):
         assert reprs is None
 
         # Initialize feature placeholders if there are features existing
-        if self._node_frame.num_columns > 0 and self._node_frame.num_rows > 0:
-            self._node_frame.add_rows(num)
+        self._node_frame.add_rows(num)
 
     def add_edge(self, u, v, reprs=None):
         """Add one edge.
@@ -190,8 +189,7 @@ class DGLGraph(object):
         assert reprs is None
 
         # Initialize feature placeholders if there are features existing
-        if self._edge_frame.num_columns > 0 and self._edge_frame.num_rows > 0:
-            self._edge_frame.add_rows(1)
+        self._edge_frame.add_rows(1)
 
     def add_edges(self, u, v, reprs=None):
         """Add many edges.
@@ -216,8 +214,7 @@ class DGLGraph(object):
         assert reprs is None
 
         # Initialize feature placeholders if there are features existing
-        if self._edge_frame.num_columns > 0 and self._edge_frame.num_rows > 0:
-            self._edge_frame.add_rows(len(u))
+        self._edge_frame.add_rows(len(u))
 
     def clear(self):
         """Clear the graph and its storage."""
