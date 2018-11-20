@@ -56,7 +56,8 @@ def main(opts):
 
         for i, data in enumerate(data_loader):
 
-            log_prob, prob = model(actions=data)
+            log_prob = model(actions=data)
+            prob = log_prob.detach().exp()
 
             loss = - log_prob / opts['batch_size']
             prob_averaged = prob / opts['batch_size']

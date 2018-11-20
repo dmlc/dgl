@@ -41,8 +41,8 @@ class GraphProp(nn.Module):
         self.node_activation_hidden_size = 2 * node_hidden_size
 
         message_funcs = []
-        node_update_funcs = []
         self.reduce_funcs = []
+        node_update_funcs = []
 
         for t in range(num_prop_rounds):
             # input being [hv, hu, xuv]
@@ -83,13 +83,9 @@ class GraphProp(nn.Module):
                     g.ndata['a'], g.ndata['hv'])
 
 
-# Define two functions for calculating p and log p with
-# samples from Bernoulli distributions
-def bernoulli_action_prob(prob, action):
-    return 1. - prob if action == 0 else prob
-
 def bernoulli_action_log_prob(logit, action):
-    # Use logit rather than prob for numerical stability
+    """Calculate the log p of an action with respect to a Bernoulli
+    distribution. Use logit rather than prob for numerical stability."""
     if action == 0:
         return F.logsigmoid(-logit)
     else:
@@ -126,7 +122,6 @@ class AddNode(nn.Module):
         g.nodes[num_nodes - 1].data['a'] = self.init_node_activation
 
     def prepare_training(self):
-        self.prob = []
         self.log_prob = []
 
     def forward(self, g, action=None):
@@ -144,10 +139,7 @@ class AddNode(nn.Module):
             self._initialize_node_repr(g, action, graph_embed)
 
         if self.training:
-            sample_prob = bernoulli_action_prob(prob, action)
             sample_log_prob = bernoulli_action_log_prob(logit, action)
-
-            self.prob.append(sample_prob.detach())
             self.log_prob.append(sample_log_prob)
 
         return stop
@@ -162,7 +154,6 @@ class AddEdge(nn.Module):
                                   node_hidden_size, 1)
 
     def prepare_training(self):
-        self.prob = []
         self.log_prob = []
 
     def forward(self, g, action=None):
@@ -178,10 +169,7 @@ class AddEdge(nn.Module):
         to_add_edge = bool(action == 0)
 
         if self.training:
-            sample_prob = bernoulli_action_prob(prob, action)
             sample_log_prob = bernoulli_action_log_prob(logit, action)
-
-            self.prob.append(sample_prob.detach())
             self.log_prob.append(sample_log_prob)
 
         return to_add_edge
@@ -206,7 +194,6 @@ class ChooseDestAndUpdate(nn.Module):
             g.edges[src_list, dest_list].data['he'] = edge_repr
 
     def prepare_training(self):
-        self.prob = []
         self.log_prob = []
 
     def forward(self, g, dest):
@@ -237,7 +224,6 @@ class ChooseDestAndUpdate(nn.Module):
 
         if self.training:
             if dests_probs.nelement() > 1:
-                self.prob.append(dests_probs[:, dest: dest + 1])
                 self.log_prob.append(
                     F.log_softmax(dests_scores, dim=1)[:, dest: dest + 1])
 
@@ -280,10 +266,6 @@ class DGMG(nn.Module):
         self.graph_prop.message_funcs.apply(dgmg_message_weight_init)
 
     @property
-    def num_nodes(self):
-        return self.g.number_of_nodes()
-
-    @property
     def action_step(self):
         old_step_count = self.step_count
         self.step_count += 1
@@ -319,11 +301,6 @@ class DGMG(nn.Module):
                + torch.cat(self.add_edge_agent.log_prob).sum()\
                + torch.cat(self.choose_dest_agent.log_prob).sum()
 
-    def get_prob(self):
-        return torch.cat(self.add_node_agent.prob).prod()\
-               * torch.cat(self.add_edge_agent.prob).prod()\
-               * torch.cat(self.choose_dest_agent.prob).prod()
-
     def forward_train(self, actions):
         self.prepare_for_train()
 
@@ -336,14 +313,14 @@ class DGMG(nn.Module):
                 to_add_edge = self.add_edge_or_not(a=actions[self.action_step])
             stop = self.add_node_and_update(a=actions[self.action_step])
 
-        return self.get_log_prob(), self.get_prob()
+        return self.get_log_prob()
 
     def forward_inference(self):
         stop = self.add_node_and_update()
-        while (not stop) and (self.num_nodes < self.v_max + 1):
+        while (not stop) and (self.g.number_of_nodes() < self.v_max + 1):
             num_trials = 0
             to_add_edge = self.add_edge_or_not()
-            while to_add_edge and (num_trials < self.num_nodes - 1):
+            while to_add_edge and (num_trials < self.g.number_of_nodes() - 1):
                 self.choose_dest_and_update()
                 num_trials += 1
                 to_add_edge = self.add_edge_or_not()
@@ -357,10 +334,8 @@ class DGMG(nn.Module):
 
         # If there are some features for nodes and edges,
         # zero tensors will be set for those of new nodes and edges.
-        self.g.set_n_initializer(lambda shape, dtype, ctx:
-                                 torch.zeros(shape, device=ctx))
-        self.g.set_e_initializer(lambda shape, dtype, ctx:
-                                 torch.zeros(shape, device=ctx))
+        self.g.set_n_initializer(dgl.frame.zero_initializer)
+        self.g.set_e_initializer(dgl.frame.zero_initializer)
 
         if self.training:
             return self.forward_train(actions)
