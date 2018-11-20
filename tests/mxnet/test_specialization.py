@@ -210,6 +210,8 @@ def test_send_and_recv():
         g2_res.backward()
         assert np.allclose(g1_data.grad.asnumpy(), g1_data.grad.asnumpy(), rtol=1e-05, atol=1e-05)
     # test 1d node features
+    # TODO for some reason, this test doesn't pass in MXNet.
+    # somehow, it fails in backward.
     #_test('f1')
     # test 2d node features
     _test('f2')
