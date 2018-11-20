@@ -1,6 +1,5 @@
-import citation_graph as citegrh
 import dgl
-from ..batch_graph import batch
+from ..batched_graph import batch
 from ..graph import DGLGraph
 from ..utils import Index
 
@@ -41,6 +40,8 @@ class CORABinary:
         self._sublabels = []
         
         for i,j in itertools.combinations([i for i in range(num_classes)],2):
+            subg = g.subgraph([0,1,2])
+            print(type(subg))
             subgraph, new2oldindex = self.binary_subgraph_cora(self._g_nx, 
                                                                self._community_to_node, 
                                                                i, 
@@ -62,7 +63,7 @@ class CORABinary:
         self._line_graphs = [g.line_graph(backtracking=False) 
                              for g in self._subgraphs]
         in_degrees = lambda g: g.in_degrees(
-                             Index(th.arange(0, g.number_of_nodes()))).unsqueeze(1).float()
+                             Index(np.arange(0, g.number_of_nodes()))).unsqueeze(1).float()
         #TODO : replace th.arange to F.arange when migrating back to /data
         
         self._g_degs = [in_degrees(g) for g in self._subgraphs]
@@ -71,7 +72,7 @@ class CORABinary:
         
         self._equi_labels = []
         for label in self._sublabels:
-            mirror_label = th.ones(label.shape).long() - label
+            mirror_label = np.ones(label.shape) - label
             self._equi_labels.append(mirror_label)
     
     def binary_subgraph_cora(self,
@@ -86,7 +87,7 @@ class CORABinary:
         candidate_edge_list = []
         for edge in sub.edges():
             # Only look at src node of edges that cross communities
-            if (labels[edge[0]] != labels[edge[1]]):
+            if (self._labels[edge[0]] != self._labels[edge[1]]):
                 candidate_edge_list.append(edge)
         component_list = []
         for edge in candidate_edge_list:
@@ -126,20 +127,20 @@ class CORABinary:
         subgraph_batch = batch(subgraph)
         line_graph_batch = batch(line_graph)
         # TODO : change to F.cat when migrating to /data
-        deg_g_batch = th.cat(deg_g, dim=0)
-        deg_lg_batch = th.cat(deg_lg, dim=0)
+        deg_g_batch = np.concatenate(deg_g, axis=0)
+        deg_lg_batch = np.concatenate(deg_lg, axis=0)
         
         self.total = 0
         def offset(pm_pd):
             prev_total = self.total
             self.total += pm_pd.size(0)
             return prev_total
-        pm_pd_batch = th.cat([x + offset(x) for i, x in enumerate(pm_pd)], 
-                             dim=0)
+        pm_pd_batch = np.concatenate([x + offset(x) for i, x in enumerate(pm_pd)], 
+                             axis=0)
         
-        subfeature_batch = th.cat(subfeature, dim=0)
-        sublabel_batch = th.cat(sublabel, dim=0)
-        equilabel_batch = th.cat(equi_label, dim=0)
+        subfeature_batch = np.concatenate(subfeature, axis=0)
+        sublabel_batch = np.concatenate(sublabel, axis=0)
+        equilabel_batch = np.concatenate(equi_label, axis=0)
         
         return subgraph_batch, line_graph_batch, deg_g_batch, deg_lg_batch, pm_pd_batch,subfeature_batch, sublabel_batch, equilabel_batch    
 
