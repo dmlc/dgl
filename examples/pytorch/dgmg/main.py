@@ -23,10 +23,10 @@ def main(opts):
 
         dataset = CycleDataset(fname=opts['path_to_dataset'])
         evaluator = CycleModelEvaluation(v_min=opts['min_size'],
-                                         v_max=opts['max_size'], dir=opts['log_dir'])
+                                         v_max=opts['max_size'],
+                                         dir=opts['log_dir'])
         printer = CyclePrinting(num_epochs=opts['nepochs'],
-                                num_batches=opts['ds_size'] // opts['batch_size'],
-                                batch_size=opts['batch_size'])
+                                num_batches=opts['ds_size'] // opts['batch_size'])
     else:
         raise ValueError('Unsupported dataset: {}'.format(opts['dataset']))
 
