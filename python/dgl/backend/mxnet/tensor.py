@@ -27,11 +27,13 @@ def sparse_matrix(data, index, shape, force_format=False):
             raise TypeError('MXNet backend only supports CSR format,'
                             ' but COO format is forced.')
         coord = index[1]
-        return nd.sparse.csr_matrix((data, (coord[0], coord[1])), tuple(shape))
+        return nd.sparse.csr_matrix((data, (coord[0], coord[1])),
+                tuple(shape), ctx=data.context)
     elif fmt == 'csr':
         indices = index[1]
         indptr = index[2]
-        return nd.sparse.csr_matrix((data, indices, indptr), tuple(shape))
+        return nd.sparse.csr_matrix((data, indices, indptr),
+                tuple(shape), ctx=data.context)
     else:
         raise TypeError('Invalid format: %s.' % fmt)
 
