@@ -19,7 +19,7 @@ def generate_graph():
     g.set_e_repr({'e1': weights, 'e2': th.unsqueeze(weights, 1)})
     return g
 
-def test_update_all():
+def test_v2v_update_all():
     def _test(fld):
         def message_func(edges):
             return {'m' : edges.src[fld]}
@@ -63,7 +63,7 @@ def test_update_all():
     # test 2d node features
     _test('f2')
 
-def test_send_and_recv():
+def test_v2v_snr():
     u = th.tensor([0, 0, 0, 3, 4, 9])
     v = th.tensor([1, 2, 3, 9, 9, 0])
     def _test(fld):
@@ -110,7 +110,7 @@ def test_send_and_recv():
     # test 2d node features
     _test('f2')
 
-def test_update_all_multi_fn():
+def test_v2v_update_all_multi_fn():
     def message_func(edges):
         return {'m2': edges.src['f2']}
 
@@ -149,7 +149,7 @@ def test_update_all_multi_fn():
     v2 = g.ndata['v2']
     assert U.allclose(v1, v2)
 
-def test_send_and_recv_multi_fn():
+def test_v2v_snr_multi_fn():
     u = th.tensor([0, 0, 0, 3, 4, 9])
     v = th.tensor([1, 2, 3, 9, 9, 0])
 
@@ -197,7 +197,7 @@ def test_send_and_recv_multi_fn():
     v2 = g.ndata['v2']
     assert U.allclose(v1, v2)
 
-def test_builtin_reduce():
+def test_e2v_reduce():
     def _test(fld):
         def message_func(edges):
             return {'m' : edges.src[fld]}
@@ -232,9 +232,87 @@ def test_builtin_reduce():
     # test 2d node features
     _test('f2')
 
+def test_multi_fn_fallback():
+    # create a graph with zero in degree nodes
+    g = dgl.DGLGraph()
+    g.add_nodes(10)
+    for i in range(1, 9):
+        g.add_edge(0, i)
+        g.add_edge(i, 9)
+    g.ndata['h'] = th.randn(10, D)
+    g.edata['w1'] = th.randn(16,)
+    g.edata['w2'] = th.randn(16, D)
+    def _mfunc_hxw1(edges):
+        return {'m1' : edges.src['h'] * th.unsqueeze(edges.data['w1'], 1)}
+    def _mfunc_hxw2(edges):
+        return {'m2' : edges.src['h'] * edges.data['w2']}
+    def _rfunc_m1(nodes):
+        return {'o1' : th.sum(nodes.mailbox['m1'], 1)}
+    def _rfunc_m2(nodes):
+        return {'o2' : th.sum(nodes.mailbox['m2'], 1)}
+    def _rfunc_m1max(nodes):
+        return {'o3' : th.max(nodes.mailbox['m1'], 1)[0]}
+    def _afunc(nodes):
+        ret = {}
+        for k, v in nodes.data.items():
+            if k.startswith('o'):
+                ret[k] = 2 * v
+        return ret
+    # compute ground truth
+    g.ndata['o1'] = th.zeros(10, D)  # init accum
+    g.update_all(_mfunc_hxw1, _rfunc_m1, _afunc)
+    o1 = g.ndata.pop('o1')
+    g.ndata['o2'] = th.zeros(10, D)  # init accum
+    g.update_all(_mfunc_hxw2, _rfunc_m2, _afunc)
+    o2 = g.ndata.pop('o2')
+    g.ndata['o3'] = th.zeros(10, D)  # init accum
+    g.update_all(_mfunc_hxw1, _rfunc_m1max, _afunc)
+    o3 = g.ndata.pop('o3')
+    # v2v spmv
+    g.update_all(fn.src_mul_edge(src='h', edge='w1', out='m1'),
+                 fn.sum(msg='m1', out='o1'),
+                 _afunc)
+    assert U.allclose(o1, g.ndata.pop('o1'))
+    # v2v fallback to e2v
+    g.update_all(fn.src_mul_edge(src='h', edge='w2', out='m2'),
+                 fn.sum(msg='m2', out='o2'),
+                 _afunc)
+    assert U.allclose(o2, g.ndata.pop('o2'))
+    # v2v fallback to degree bucketing
+    g.ndata['o3'] = th.zeros(10, D)  # init accum (this is necessary unfortunately)
+    g.update_all(fn.src_mul_edge(src='h', edge='w1', out='m1'),
+                 fn.max(msg='m1', out='o3'),
+                 _afunc)
+    assert U.allclose(o3, g.ndata.pop('o3'))
+    # multi builtins, both v2v spmv
+    g.update_all([fn.src_mul_edge(src='h', edge='w1', out='m1'), fn.src_mul_edge(src='h', edge='w1', out='m2')],
+                 [fn.sum(msg='m1', out='o1'), fn.sum(msg='m2', out='o2')],
+                 _afunc)
+    assert U.allclose(o1, g.ndata.pop('o1'))
+    assert U.allclose(o1, g.ndata.pop('o2'))
+    # multi builtins, one v2v spmv, one fallback to e2v
+    g.update_all([fn.src_mul_edge(src='h', edge='w1', out='m1'), fn.src_mul_edge(src='h', edge='w2', out='m2')],
+                 [fn.sum(msg='m1', out='o1'), fn.sum(msg='m2', out='o2')],
+                 _afunc)
+    assert U.allclose(o1, g.ndata.pop('o1'))
+    assert U.allclose(o2, g.ndata.pop('o2'))
+    # multi builtins, one v2v spmv, one fallback to e2v, one fallback to degree-bucketing
+    g.ndata['o3'] = th.zeros(10, D)  # init accum (this is necessary unfortunately)
+    g.update_all([fn.src_mul_edge(src='h', edge='w1', out='m1'),
+                  fn.src_mul_edge(src='h', edge='w2', out='m2'),
+                  fn.src_mul_edge(src='h', edge='w1', out='m3')],
+                 [fn.sum(msg='m1', out='o1'),
+                  fn.sum(msg='m2', out='o2'),
+                  fn.max(msg='m3', out='o3')],
+                 _afunc)
+    assert U.allclose(o1, g.ndata.pop('o1'))
+    assert U.allclose(o2, g.ndata.pop('o2'))
+    assert U.allclose(o3, g.ndata.pop('o3'))
+
 if __name__ == '__main__':
-    test_builtin_reduce()
-    test_update_all()
-    test_send_and_recv()
-    test_update_all_multi_fn()
-    test_send_and_recv_multi_fn()
+    test_e2v_reduce()
+    test_v2v_update_all()
+    test_v2v_snr()
+    test_v2v_update_all_multi_fn()
+    test_v2v_snr_multi_fn()
+    test_multi_fn_fallback()

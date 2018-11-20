@@ -157,12 +157,11 @@ class HybridDict(Mapping):
     """
     def __init__(self, *dict_like_list):
         self._dict_like_list = dict_like_list
-        self._keys = None
+        self._keys = set()
+        for d in dict_like_list:
+            self._keys.update(d.keys())
 
     def keys(self):
-        if self._keys is None:
-            self._keys = sum([set(d.keys()) for d in self._dict_like_list], set())
-            self._keys = list(self._keys)
         return self._keys
 
     def __getitem__(self, key):
