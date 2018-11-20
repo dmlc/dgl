@@ -40,8 +40,6 @@ class CORABinary:
         self._sublabels = []
         
         for i,j in itertools.combinations([i for i in range(num_classes)],2):
-            subg = g.subgraph([0,1,2])
-            print(type(subg))
             subgraph, new2oldindex = self.binary_subgraph_cora(self._g_nx, 
                                                                self._community_to_node, 
                                                                i, 
@@ -115,6 +113,7 @@ class CORABinary:
 
 
         return reindex_graph, new2oldindex
+        
     
     def __len__(self):
         return len(self._subgraphs)
