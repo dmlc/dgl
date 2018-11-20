@@ -283,6 +283,9 @@ class SPMVWithDataExecutor(Executor):
     def run(self):
         spA_ctxobj = self.spA.data
         A_data = self.A_data.data
+        if F.ndim(A_data) > 1:
+            # A_data is of shape (E, 1). Squeeze the last dim.
+            A_data = F.squeeze(A_data, 1)
         B = self.B.data
 
         ctx = F.context(B)

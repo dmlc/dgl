@@ -200,7 +200,12 @@ def _gen_send_reduce(
             # All mfunc and rfunc have been converted to v2v spmv.
             return var_out
 
-        # converting remaining mfunc to UDFs
+    if mfunc_is_list:
+        # Two cases:
+        #  - mfunc is builtin while rfunc is UDF.
+        #  - mfunc and rfunc are both builtin but some combinations
+        #    fall through from the v2v spmv analysis.
+        # In both cases, convert the mfunc to UDF.
         mfunc = BundledFunction(mfunc)
     
     # generate UDF send schedule
