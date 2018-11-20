@@ -213,6 +213,7 @@ def main(args, data):
         train_loss = 0
         i = 0
         num_batches = len(train_vs) / args.batch_size
+        start1 = time.time()
         for subg, seeds in dgl.contrib.sampling.NeighborSampler(g, args.batch_size, g.number_of_nodes(),
                 neighbor_type='in', num_workers=args.num_parallel_subgraphs, seed_nodes=train_vs,
                 shuffle=True):
@@ -240,6 +241,12 @@ def main(args, data):
                 for loss in losses:
                     train_loss += loss.asnumpy()[0]
                 losses = []
+
+            if i % args.num_parallel_subgraphs == 0:
+                end1 = time.time()
+                print("process " + str(args.num_parallel_subgraphs)
+                        + " subgraphs takes " + str(end1 - start1))
+                start1 = end1
 
             if i > num_batches / 3:
                 break
@@ -278,7 +285,7 @@ class MXNetGraph(object):
         return self._mat.shape[0]
 
     def number_of_edges(self):
-        return mx.nd.contrib.getnnz(self._mat)
+        return mx.nd.contrib.getnnz(self._mat).asnumpy()[0]
 
 class GraphData:
     def __init__(self, csr, num_feats):
