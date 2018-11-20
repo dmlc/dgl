@@ -155,7 +155,8 @@ class CycleModelEvaluation(object):
                 fig, ((ax0, ax1), (ax2, ax3)) = plt.subplots(2, 2)
                 axes = {0: ax0, 1: ax1, 2: ax2, 3: ax3}
                 for i in range(4):
-                    nx.draw_circular(nx.from_dict_of_lists(adj_lists_to_plot[i]), with_labels=True, ax=axes[i])
+                    nx.draw_circular(nx.from_dict_of_lists(adj_lists_to_plot[i]),
+                                     with_labels=True, ax=axes[i])
 
                 plt.savefig(self.dir + '/samples/{:d}'.format(plot_times))
                 plt.close()
@@ -200,12 +201,11 @@ class CycleModelEvaluation(object):
 
 
 class CyclePrinting(object):
-    def __init__(self, num_epochs, num_batches, batch_size):
+    def __init__(self, num_epochs, num_batches):
         super(CyclePrinting, self).__init__()
 
         self.num_epochs = num_epochs
         self.num_batches = num_batches
-        self.batch_size = batch_size
         self.batch_count = 0
 
     def update(self, epoch, metrics):
