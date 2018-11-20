@@ -12,14 +12,14 @@ from . import ir
 from .ir import var as var
 
 def gen_degree_bucketing_schedule(
-        call_type,
         graph,
-        nf,
-        mf,
         reduce_udf,
-        edge_tuples,
+        message_ids,
+        dst_nodes,
         recv_nodes,
-        out):
+        var_nf,
+        var_mf,
+        var_out):
     """Create degree bucketing schedule.
 
     The messages will be divided by their receivers into buckets. Each bucket
@@ -30,25 +30,27 @@ def gen_degree_bucketing_schedule(
 
     Parameters
     ----------
-    call_type: str
-        Call_type of current graph API, could be 'update_all', 'send_and_recv', 'recv'
-    graph: DGLGraph
+    graph : DGLGraph
         DGLGraph to use
-    nf : var.Var
-        The variable for node features.
-    mf : var.Var
-        The variable for messages.
-    reduce_udf: callable
+    reduce_udf : callable
         The UDF to reduce messages.
-    edge_tuples : tuple of var.Var
-        (u, v, eid)
-    recv_nodes : var.Var
+    message_ids : utils.Index
+        The variable for message ids.
+        Invariant: len(message_ids) == len(dst_nodes)
+    dst_nodes : utils.Index
+        The variable for dst node of each message.
+        Invariant: len(message_ids) == len(dst_nodes)
+    recv_nodes : utils.Index
         The unique nodes that perform recv.
-    out : var.Var
+        Invariant: recv_nodes = sort(unique(dst_nodes))
+    var_nf : var.FEAT_DICT
+        The variable for node feature frame.
+    var_mf : var.FEAT_DICT
+        The variable for message frame.
+    var_out : var.FEAT_DICT
         The variable for output feature dicts.
     """
-    src, dst, eid = edge_tuples
-    buckets = _degree_bucketing_schedule(eid.data, dst.data, recv_nodes.data)
+    buckets = _degree_bucketing_schedule(message_ids, dst_nodes, recv_nodes)
     # generate schedule
     unique_dst, degs, buckets, msg_ids, zero_deg_nodes = buckets
     # loop over each bucket
@@ -62,8 +64,8 @@ def gen_degree_bucketing_schedule(
         mid = var.IDX(mid)
         rfunc = var.FUNC(rfunc)
         # recv on each bucket
-        fdvb = ir.READ_ROW(nf, vb)
-        fdmail = ir.READ_ROW(mf, mid)
+        fdvb = ir.READ_ROW(var_nf, vb)
+        fdmail = ir.READ_ROW(var_mf, mid)
         fdvb = ir.NODE_UDF(rfunc, fdvb, fdmail, ret=fdvb)  # reuse var
         # save for merge
         idx_list.append(vb)
@@ -71,12 +73,12 @@ def gen_degree_bucketing_schedule(
     # zero-degree feats
     if zero_deg_nodes is not None:
         zero_deg_nodes = var.IDX(zero_deg_nodes)
-        zero_deg_feat = ir.READ_ROW(nf, zero_deg_nodes)
+        zero_deg_feat = ir.READ_ROW(var_nf, zero_deg_nodes)
         idx_list.append(zero_deg_nodes)
         fd_list.append(zero_deg_feat)
     # merge buckets according to the ascending order of the node ids.
     reduced_feat = ir.MERGE_ROW(idx_list, fd_list)
-    ir.WRITE_DICT_(out, reduced_feat)
+    ir.WRITE_DICT_(var_out, reduced_feat)
 
 def _degree_bucketing_schedule(mids, dsts, v):
     """Return the bucketing by degree scheduling for destination nodes of

@@ -1048,9 +1048,10 @@ class DGLGraph(object):
             eid = utils.toindex(edges)
             u, v, _ = self._graph.find_edges(eid)
 
-        sched = scheduler.schedule_apply_edges(graph=self, u=u, v=v,
-                eid=eid, apply_func=func)
-        Runtime.run(sched)
+        with ir.prog() as prog:
+            scheduler.schedule_apply_edges(graph=self, u=u, v=v,
+                    eid=eid, apply_func=func)
+            Runtime.run(prog)
 
     def send(self, edges, message_func="default"):
         """Send messages along the given edges.

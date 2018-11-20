@@ -112,7 +112,7 @@ class Index(object):
             self._dgl_tensor_data = nd.from_dlpack(dl)
         return self._dgl_tensor_data
 
-    def is_slice(start, stop, step=None):
+    def is_slice(self, start, stop, step=None):
         return (isinstance(self._list_data, slice)
                 and self._list_data == slice(start, stop, step))
 

@@ -483,6 +483,12 @@ class FrameRef(MutableMapping):
         """
         if isinstance(key, str):
             return self.select_column(key)
+        elif isinstance(key, slice) and key == slice(0, self.num_rows):
+            # shortcut for selecting all the rows
+            return self
+        elif isinstance(key, utils.Index) and key.is_slice(0, self.num_rows):
+            # shortcut for selecting all the rows
+            return self
         else:
             return self.select_rows(key)
 
@@ -546,6 +552,12 @@ class FrameRef(MutableMapping):
         """
         if isinstance(key, str):
             self.update_column(key, val, inplace=False)
+        elif isinstance(key, slice) and key == slice(0, self.num_rows):
+            # shortcut for updating all the rows
+            return self.update(val)
+        elif isinstance(key, utils.Index) and key.is_slice(0, self.num_rows):
+            # shortcut for selecting all the rows
+            return self.update(val)
         else:
             self.update_rows(key, val, inplace=False)
 
