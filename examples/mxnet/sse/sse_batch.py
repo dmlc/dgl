@@ -46,9 +46,11 @@ class SSEUpdateHidden(gluon.Block):
     def __init__(self,
                  n_hidden,
                  dropout,
-                 activation):
-        super(SSEUpdateHidden, self).__init__()
-        self.layer = NodeUpdate(n_hidden, activation)
+                 activation,
+                 **kwargs):
+        super(SSEUpdateHidden, self).__init__(**kwargs)
+        with self.name_scope():
+            self.layer = NodeUpdate(n_hidden, activation)
         self.dropout = dropout
 
     def forward(self, g, vertices):
@@ -66,8 +68,9 @@ class SSEUpdateHidden(gluon.Block):
                 g.ndata['h'] = mx.nd.Dropout(g.ndata['h'], p=self.dropout)
             feat = g.get_n_repr()['in']
             cat = mx.nd.concat(feat, g.ndata['h'], dim=1)
-            slices = mx.nd.take(g.adjacency_matrix(), vertices)
+            slices = mx.nd.take(g.adjacency_matrix(), vertices).as_in_context(cat.context)
             accum = mx.nd.dot(slices, cat) / deg.as_in_context(cat.context)
+            vertices = vertices.as_in_context(g.ndata['in'].context)
             return self.layer(mx.nd.take(feat, vertices),
                               mx.nd.take(g.ndata['h'], vertices), accum)
 
