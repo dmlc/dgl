@@ -115,10 +115,7 @@ class AddNode(nn.Module):
             torch.cat([
                 self.node_type_embed(torch.LongTensor([node_type])),
                 graph_embed], dim=1))
-        if num_nodes == 1:
-            g.ndata['hv'] = hv_init
-        else:
-            g.nodes[num_nodes - 1].data['hv'] = hv_init
+        g.nodes[num_nodes - 1].data['hv'] = hv_init
         g.nodes[num_nodes - 1].data['a'] = self.init_node_activation
 
     def prepare_training(self):
@@ -187,11 +184,7 @@ class ChooseDestAndUpdate(nn.Module):
         # For multiple edge types, we can use a one hot representation
         # or an embedding module.
         edge_repr = torch.ones(len(src_list), 1)
-
-        if g.number_of_edges() - len(src_list) == 0:
-            g.edata['he'] = edge_repr
-        else:
-            g.edges[src_list, dest_list].data['he'] = edge_repr
+        g.edges[src_list, dest_list].data['he'] = edge_repr
 
     def prepare_training(self):
         self.log_prob = []

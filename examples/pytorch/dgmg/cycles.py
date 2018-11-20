@@ -152,11 +152,10 @@ class CycleModelEvaluation(object):
 
             if len(adj_lists_to_plot) == 4:
                 plot_times += 1
-                fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
-                nx.draw(nx.from_dict_of_lists(adj_lists_to_plot[0]), with_labels=True, ax=ax1)
-                nx.draw(nx.from_dict_of_lists(adj_lists_to_plot[1]), with_labels=True, ax=ax2)
-                nx.draw(nx.from_dict_of_lists(adj_lists_to_plot[2]), with_labels=True, ax=ax3)
-                nx.draw(nx.from_dict_of_lists(adj_lists_to_plot[3]), with_labels=True, ax=ax4)
+                fig, ((ax0, ax1), (ax2, ax3)) = plt.subplots(2, 2)
+                axes = {0: ax0, 1: ax1, 2: ax2, 3: ax3}
+                for i in range(4):
+                    nx.draw_circular(nx.from_dict_of_lists(adj_lists_to_plot[i]), with_labels=True, ax=axes[i])
 
                 plt.savefig(self.dir + '/samples/{:d}'.format(plot_times))
                 plt.close()
