@@ -51,7 +51,6 @@ class CORABinary:
             sublabel[sublabel<=i] = 0
             sublabel[sublabel>i] = 1
             self._subgraphs.append(DGLGraph(subgraph))
-            #/TODO: directly build DGL subgraph
             self._subfeatures.append(subfeature)
             self._sublabels.append(sublabel)
         
@@ -62,7 +61,6 @@ class CORABinary:
                              for g in self._subgraphs]
         in_degrees = lambda g: g.in_degrees(
                              Index(np.arange(0, g.number_of_nodes()))).unsqueeze(1).float()
-        #TODO : replace th.arange to F.arange when migrating back to /data
         
         self._g_degs = [in_degrees(g) for g in self._subgraphs]
         self._lg_degs = [in_degrees(lg) for lg in self._line_graphs]
@@ -106,7 +104,6 @@ class CORABinary:
             reindex_edges.append((old2newindex[src], old2newindex[dst]))
 
         #use old2newindex to manually reindex the subgraph
-        #/TODO(hq): send nodelist directly to DGLgraph
         reindex_graph = nx.DiGraph()
         reindex_graph.add_nodes_from(reindex_nodes)
         reindex_graph.add_edges_from(reindex_edges)
@@ -125,7 +122,6 @@ class CORABinary:
         subgraph, line_graph, deg_g, deg_lg, pm_pd, subfeature, sublabel, equi_label = zip(*x)
         subgraph_batch = batch(subgraph)
         line_graph_batch = batch(line_graph)
-        # TODO : change to F.cat when migrating to /data
         deg_g_batch = np.concatenate(deg_g, axis=0)
         deg_lg_batch = np.concatenate(deg_lg, axis=0)
         
