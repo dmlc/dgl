@@ -6,4 +6,4 @@ DGLBACKEND=mxnet python3 -m pyinstrument -o prof.out examples/mxnet/sse/sse_batc
 DGLBACKEND=mxnet python3 examples/mxnet/sse/sse_batch.py --graph-file ../../data/5_5_csr.nd  --n-epochs 1 --lr 0.0005 --batch-size 2048 --use-spmv 1 --num-parallel-subgraphs 32 --gpu 8 --n-hidden 500
 
 # test convergence
-DGLBACKEND=mxnet python3 test_sse.py --dataset "pubmed" --n-epochs 100 --lr 0.005 --batch-size 1024 --use-spmv 1
+DGLBACKEND=mxnet python3 examples/mxnet/sse/sse_batch.py --dataset "pubmed" --n-epochs 100 --lr 0.005 --batch-size 1024 --use-spmv 1
