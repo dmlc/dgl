@@ -77,7 +77,7 @@ def generate_dataset(v_min, v_max, n_samples, fname):
 
 
 class CycleDataset(Dataset):
-    def __init__(self, fname, shuffle=True):
+    def __init__(self, fname):
         super(CycleDataset, self).__init__()
 
         with open(fname, 'rb') as f:
