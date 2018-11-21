@@ -316,8 +316,8 @@ def SPMV_WITH_DATA(spA, A_data, B, ret=None):
     return ret
 
 class MergeRowExecutor(Executor):
-    def __init__(self, idx_list, fd_list, ret):
-        self.idx_list = idx_list
+    def __init__(self, order, fd_list, ret):
+        self.order = order
         self.fd_list = fd_list
         self.ret = ret
 
@@ -325,22 +325,19 @@ class MergeRowExecutor(Executor):
         return OpCode.MERGE_ROW
 
     def arg_vars(self):
-        return self.idx_list + self.fd_list
+        return [self.order] + self.fd_list
 
     def ret_var(self):
         return self.ret
 
     def run(self):
         # merge buckets according to the ascending order of the node ids.
-        idx_data = [i.data.tousertensor() for i in self.idx_list]
-        all_idx = F.cat(idx_data, dim=0)
-        _, indices = F.sort_1d(all_idx)
-        indices = utils.toindex(indices)  # FIXME: redundant conversion
+        order_data = self.order.data
         fd_data = [fd.data for fd in self.fd_list]
         keys = fd_data[0].keys()
         all_fd = {key : F.cat([fd[key] for fd in fd_data], dim=0)
                   for key in keys}
-        ret_fd = utils.reorder(all_fd, indices)
+        ret_fd = utils.reorder(all_fd, order_data)
         self.ret.data = ret_fd
 
 IR_REGISTRY[OpCode.MERGE_ROW] = {

@@ -1,10 +1,11 @@
 """For different schedulers"""
 from __future__ import absolute_import
 
-from .. import frame, utils
+from .. import utils
 from .._ffi.function import _init_api
 from ..base import ALL, DGLError, is_all
 from .. import backend as F
+from ..frame import frame_like, FrameRef
 from ..function.base import BuiltinFunction, BundledFunction
 from ..udf import EdgeBatch, NodeBatch
 
@@ -101,7 +102,7 @@ def _gen_reduce(graph, reduce_func, recv_nodes):
     # The frame has the same size and schemes of the
     # node frame.
     # TODO(minjie): should replace this with an IR call to make the program stateless.
-    tmpframe = frame.frame_like(graph._node_frame)
+    tmpframe = FrameRef(frame_like(graph._node_frame._frame, len(recv_nodes)))
 
     # vars
     msg = var.FEAT_DICT(graph._msg_frame, 'msg')
@@ -196,7 +197,7 @@ def _gen_send_reduce(
     # The frame has the same size and schemes of the
     # node frame.
     # TODO(minjie): should replace this with an IR call to make the program stateless.
-    tmpframe = frame.frame_like(graph._node_frame)
+    tmpframe = FrameRef(frame_like(graph._node_frame._frame, len(recv_nodes)))
     var_out = var.FEAT_DICT(data=tmpframe)
 
     if mfunc_is_list and rfunc_is_list:

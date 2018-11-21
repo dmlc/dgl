@@ -8,6 +8,7 @@ import numpy as np
 
 from . import backend as F
 from .base import DGLError, dgl_warning
+from .init import zero_initializer
 from . import utils
 
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
@@ -158,11 +159,6 @@ class Column(object):
             return Column(data.data, data.scheme)
         else:
             return Column(data)
-
-
-def zero_initializer(shape, dtype, ctx):
-    return F.zeros(shape, dtype, ctx)
-
 
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
@@ -319,7 +315,8 @@ class Frame(MutableMapping):
         if self.get_initializer(name) is None:
             self._warn_and_set_initializer()
         init_data = self.get_initializer(name)(
-                (self.num_rows,) + scheme.shape, scheme.dtype, ctx)
+                (self.num_rows,) + scheme.shape, scheme.dtype,
+                ctx, slice(0, self.num_rows))
         self._columns[name] = Column(init_data, scheme)
 
     def add_rows(self, num_rows):
@@ -333,8 +330,6 @@ class Frame(MutableMapping):
         num_rows : int
             The number of new rows
         """
-        self._num_rows += num_rows
-
         feat_placeholders = {}
         for key, col in self._columns.items():
             scheme = col.scheme
@@ -342,10 +337,11 @@ class Frame(MutableMapping):
             if self.get_initializer(key) is None:
                 self._warn_and_set_initializer()
             new_data = self.get_initializer(key)(
-                    (num_rows,) + scheme.shape, scheme.dtype, ctx)
+                    (num_rows,) + scheme.shape, scheme.dtype,
+                    ctx, slice(self._num_rows, self._num_rows + num_rows))
             feat_placeholders[key] = new_data
-
         self._append(Frame(feat_placeholders))
+        self._num_rows += num_rows
 
     def update_column(self, name, data):
         """Add or replace the column with the given name and data.
@@ -833,21 +829,32 @@ class FrameRef(MutableMapping):
         self._index = None
         self._index_or_slice = None
 
-def frame_like(other):
-    """Create an empty frame that has the same scheme and the number of rows
-    as the given one.
+def frame_like(other, num_rows):
+    """Create a new frame that has the same scheme as the given one.
 
     Parameters
     ----------
-    other : FrameRef
+    other : Frame
         The given frame.
+    num_rows : int
+        The number of rows of the new one.
 
     Returns
     -------
-    FrameRef
+    Frame
         The new frame.
     """
-    pass
+    # TODO(minjie): scheme is not inherited at the moment. Fix this
+    #   when moving per-col initializer to column scheme.
+    newf = Frame(num_rows=num_rows)
+    # set global initializr
+    if other.get_initializer() is None:
+        other._warn_and_set_initializer()
+    newf._default_initializer = other._default_initializer
+    # set per-col initializer
+    for key in other.keys():
+        newf.set_initializer(other.get_initializer(key), key)
+    return newf
 
 def merge_frames(frames, indices, max_index, reduce_func):
     """Merge a list of frames.

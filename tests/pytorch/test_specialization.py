@@ -338,13 +338,10 @@ def test_multi_fn_fallback():
                 ret[k] = 2 * v
         return ret
     # compute ground truth
-    g.ndata['o1'] = th.zeros(10, D)  # init accum
     g.update_all(_mfunc_hxw1, _rfunc_m1, _afunc)
     o1 = g.ndata.pop('o1')
-    g.ndata['o2'] = th.zeros(10, D)  # init accum
     g.update_all(_mfunc_hxw2, _rfunc_m2, _afunc)
     o2 = g.ndata.pop('o2')
-    g.ndata['o3'] = th.zeros(10, D)  # init accum
     g.update_all(_mfunc_hxw1, _rfunc_m1max, _afunc)
     o3 = g.ndata.pop('o3')
     # v2v spmv
@@ -358,7 +355,6 @@ def test_multi_fn_fallback():
                  _afunc)
     assert U.allclose(o2, g.ndata.pop('o2'))
     # v2v fallback to degree bucketing
-    g.ndata['o3'] = th.zeros(10, D)  # init accum (this is necessary unfortunately)
     g.update_all(fn.src_mul_edge(src='h', edge='w1', out='m1'),
                  fn.max(msg='m1', out='o3'),
                  _afunc)
@@ -376,7 +372,6 @@ def test_multi_fn_fallback():
     assert U.allclose(o1, g.ndata.pop('o1'))
     assert U.allclose(o2, g.ndata.pop('o2'))
     # multi builtins, one v2v spmv, one fallback to e2v, one fallback to degree-bucketing
-    g.ndata['o3'] = th.zeros(10, D)  # init accum (this is necessary unfortunately)
     g.update_all([fn.src_mul_edge(src='h', edge='w1', out='m1'),
                   fn.src_mul_edge(src='h', edge='w2', out='m2'),
                   fn.src_mul_edge(src='h', edge='w1', out='m3')],

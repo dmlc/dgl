@@ -1,6 +1,7 @@
 import torch as th
 from torch.autograd import Variable
 import numpy as np
+import dgl
 from dgl.graph import DGLGraph
 import utils as U
 
@@ -40,8 +41,8 @@ def generate_graph(grad=False):
     ecol = Variable(th.randn(17, D), requires_grad=grad)
     g.ndata['h'] = ncol
     g.edata['w'] = ecol
-    g.set_n_initializer(lambda shape, dtype, ctx : th.zeros(shape, dtype=dtype, device=ctx))
-    g.set_e_initializer(lambda shape, dtype, ctx : th.zeros(shape, dtype=dtype, device=ctx))
+    g.set_n_initializer(dgl.init.zero_initializer)
+    g.set_e_initializer(dgl.init.zero_initializer)
     return g
 
 def test_batch_setter_getter():
@@ -245,12 +246,17 @@ def test_reduce_0deg():
         return {'m' : edges.src['h']}
     def _reduce(nodes):
         return {'h' : nodes.data['h'] + nodes.mailbox['m'].sum(1)}
+    def _init2(shape, dtype, ctx, ids):
+        return 2 + th.zeros(shape, dtype=dtype, device=ctx)
+    g.set_n_initializer(_init2, 'h')
     old_repr = th.randn(5, 5)
     g.ndata['h'] = old_repr
     g.update_all(_message, _reduce)
     new_repr = g.ndata['h']
-
-    assert U.allclose(new_repr[1:], old_repr[1:])
+    # the first row of the new_repr should be the sum of all the node
+    # features; while the 0-deg nodes should be initialized by the
+    # initializer.
+    assert U.allclose(new_repr[1:], 2+th.zeros((4,5)))
     assert U.allclose(new_repr[0], old_repr.sum(0))
 
 def test_pull_0deg():

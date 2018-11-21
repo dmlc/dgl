@@ -13,20 +13,23 @@ class Prog(object):
     def issue(self, exe):
         self.execs.append(exe)
 
+    def pprint_exe(self, exe):
+        argstr = ', '.join([str(av) for av in exe.arg_vars()])
+        if exe.ret_var() is None:
+            # stmt
+            print("%s(%s)" % (
+                IR_REGISTRY[exe.opcode()]['name'],
+                argstr))
+        else:
+            print("%s %s = %s(%s)" % (
+                exe.ret_var().typestr(),
+                exe.ret.name,
+                IR_REGISTRY[exe.opcode()]['name'],
+                argstr))
+
     def pprint(self):
         for exe in self.execs:
-            argstr = ', '.join([str(av) for av in exe.arg_vars()])
-            if exe.ret_var() is None:
-                # stmt
-                print("%s(%s)" % (
-                    IR_REGISTRY[exe.opcode()]['name'],
-                    argstr))
-            else:
-                print("%s %s = %s(%s)" % (
-                    exe.ret_var().typestr(),
-                    exe.ret.name,
-                    IR_REGISTRY[exe.opcode()]['name'],
-                    argstr))
+            self.pprint_exe(exe)
 
 _current_prog = None
 

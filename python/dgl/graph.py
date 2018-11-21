@@ -732,7 +732,7 @@ class DGLGraph(object):
         """
         return self._edge_frame.schemes
 
-    def set_n_initializer(self, initializer):
+    def set_n_initializer(self, initializer, field=None):
         """Set the initializer for empty node features.
 
         Initializer is a callable that returns a tensor given the shape, data type
@@ -742,10 +742,17 @@ class DGLGraph(object):
         ----------
         initializer : callable
             The initializer.
-        """
-        self._node_frame.set_initializer(initializer)
+        field : str, optional
+            The feature field name. Default is set an initializer for all the
+            feature fields.
 
-    def set_e_initializer(self, initializer):
+        See Also
+        --------
+        dgl.init.base_initializer
+        """
+        self._node_frame.set_initializer(initializer, field)
+
+    def set_e_initializer(self, initializer, field=None):
         """Set the initializer for empty edge features.
 
         Initializer is a callable that returns a tensor given the shape, data type
@@ -755,8 +762,15 @@ class DGLGraph(object):
         ----------
         initializer : callable
             The initializer.
+        field : str, optional
+            The feature field name. Default is set an initializer for all the
+            feature fields.
+
+        See Also
+        --------
+        dgl.init.base_initializer
         """
-        self._edge_frame.set_initializer(initializer)
+        self._edge_frame.set_initializer(initializer, field)
 
     @property
     def nodes(self):
