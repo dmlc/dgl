@@ -222,6 +222,15 @@ def test_row3():
     for k, v in f.items():
         assert U.allclose(v, data[k][newidx])
 
+def test_row4():
+    # test updating row with empty frame but has preset num_rows
+    f = FrameRef(Frame(num_rows=5))
+    rowid = Index(th.tensor([0, 2, 4]))
+    f[rowid] = {'h' : th.ones((3, 2))}
+    ans = th.zeros((5, 2))
+    ans[th.tensor([0, 2, 4])] = th.ones((3, 2))
+    assert U.allclose(f['h'], ans)
+
 def test_sharing():
     data = Frame(create_test_data())
     f1 = FrameRef(data, index=[0, 1, 2, 3])
@@ -306,6 +315,7 @@ if __name__ == '__main__':
     test_row1()
     test_row2()
     test_row3()
+    test_row4()
     test_sharing()
     test_slicing()
     test_add_rows()
