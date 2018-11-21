@@ -1295,7 +1295,6 @@ class DGLGraph(object):
         with ir.prog() as prog:
             scheduler.schedule_update_all(graph=self, message_func=message_func,
                     reduce_func=reduce_func, apply_func=apply_node_func)
-            prog.pprint()
             Runtime.run(prog)
 
     def prop_nodes(self,

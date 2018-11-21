@@ -475,6 +475,21 @@ class FrameRef(MutableMapping):
         """
         self._frame.set_initializer(initializer, column=column)
 
+    def get_initializer(self, column=None):
+        """Get the initializer for empty values for the given column.
+
+        Parameters
+        ----------
+        column : str
+            The column
+
+        Returns
+        -------
+        callable
+            The initializer
+        """
+        return self._frame.get_initializer(column)
+
     def index(self):
         """Return the index object.
 
@@ -819,6 +834,22 @@ class FrameRef(MutableMapping):
         """Internal function to clear the cached object."""
         self._index = None
         self._index_or_slice = None
+
+def frame_like(other):
+    """Create an empty frame that has the same scheme and the number of rows
+    as the given one.
+
+    Parameters
+    ----------
+    other : FrameRef
+        The given frame.
+
+    Returns
+    -------
+    FrameRef
+        The new frame.
+    """
+    pass
 
 def merge_frames(frames, indices, max_index, reduce_func):
     """Merge a list of frames.

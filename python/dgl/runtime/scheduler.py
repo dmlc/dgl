@@ -1,12 +1,12 @@
 """For different schedulers"""
 from __future__ import absolute_import
 
+from .. import frame, utils
 from .._ffi.function import _init_api
 from ..base import ALL, DGLError, is_all
 from .. import backend as F
 from ..function.base import BuiltinFunction, BundledFunction
 from ..udf import EdgeBatch, NodeBatch
-from .. import utils
 
 from . import ir
 from .ir import var as var
@@ -97,11 +97,16 @@ def _gen_reduce(graph, reduce_func, recv_nodes):
     _, dst, mid = graph._msg_graph.in_edges(recv_nodes)
     rfunc = _standardize_func_usage(reduce_func)
     rfunc_is_list = utils.is_iterable(rfunc)
+    # Create a tmp frame to hold the feature data.
+    # The frame has the same size and schemes of the
+    # node frame.
+    # TODO(minjie): should replace this with an IR call to make the program stateless.
+    tmpframe = frame.frame_like(graph._node_frame)
 
     # vars
     msg = var.FEAT_DICT(graph._msg_frame, 'msg')
     nf = var.FEAT_DICT(graph._node_frame, 'nf')
-    out = var.FEAT_DICT(data={}) 
+    out = var.FEAT_DICT(data=tmpframe) 
 
     if rfunc_is_list:
         # UDF message + builtin reducer
@@ -187,7 +192,12 @@ def _gen_send_reduce(
     mfunc_is_list = utils.is_iterable(mfunc)
     rfunc_is_list = utils.is_iterable(rfunc)
 
-    var_out = var.FEAT_DICT(data={})
+    # Create a tmp frame to hold the feature data.
+    # The frame has the same size and schemes of the
+    # node frame.
+    # TODO(minjie): should replace this with an IR call to make the program stateless.
+    tmpframe = frame.frame_like(graph._node_frame)
+    var_out = var.FEAT_DICT(data=tmpframe)
 
     if mfunc_is_list and rfunc_is_list:
         # builtin message + builtin reducer
