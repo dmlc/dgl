@@ -145,7 +145,7 @@ class ReadExecutor(Executor):
         fd_data = self.fd.data  # feature dict
         row_data = self.row.data  # idx
         col_data = self.col.data  # key str
-        self.ret.data = fd_data[col_data][row_data]
+        self.ret.data = fd_data[row_data][col_data]
 
 IR_REGISTRY[OpCode.READ] = {
     'name' : 'READ',
