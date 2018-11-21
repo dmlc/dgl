@@ -221,7 +221,8 @@ class DGLGraph(object):
         self._graph.add_edges(u, v)
         if data is None:
             # Initialize feature placeholders if there are features existing
-            self._edge_frame.add_rows(len(u))
+            # NOTE: use max due to edge broadcasting syntax
+            self._edge_frame.add_rows(max(len(u), len(v)))
         else:
             self._edge_frame.append(data)
 
