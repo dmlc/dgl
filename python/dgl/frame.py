@@ -29,15 +29,14 @@ class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     # https://github.com/pytorch/pytorch/issues/14057
     if sys.version_info.major == 3 and sys.version_info.minor == 5:
         def __reduce__(self):
-            state = (self.shape, F.reverse_data_type_dict[self.dtype],
-                    self.initializer)
+            state = (self.shape, F.reverse_data_type_dict[self.dtype])
             return self._reconstruct_scheme, state
                    
 
         @classmethod
-        def _reconstruct_scheme(cls, shape, dtype_str, initializer):
+        def _reconstruct_scheme(cls, shape, dtype_str):
             dtype = F.data_type_dict[dtype_str]
-            return cls(shape, dtype, initializer)
+            return cls(shape, dtype)
 
 def infer_scheme(tensor):
     return Scheme(tuple(F.shape(tensor)[1:]), F.dtype(tensor))
