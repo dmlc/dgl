@@ -4,6 +4,27 @@ import numpy as np
 import scipy.sparse as sp
 import torch as th
 import dgl
+import utils as U
+
+def test_graph_creation():
+    g = dgl.DGLGraph()
+    # test add nodes with data
+    g.add_nodes(5)
+    g.add_nodes(5, {'h' : th.ones((5, 2))})
+    ans = th.cat([th.zeros(5, 2), th.ones(5, 2)], 0)
+    U.allclose(ans, g.ndata['h'])
+    g.ndata['w'] = 2 * th.ones((10, 2))
+    assert U.allclose(2 * th.ones((10, 2)), g.ndata['w'])
+    # test add edges with data
+    g.add_edges([2, 3], [3, 4])
+    g.add_edges([0, 1], [1, 2], {'m' : th.ones((2, 2))})
+    ans = th.cat([th.zeros(2, 2), th.ones(2, 2)], 0)
+    assert U.allclose(ans, g.edata['m'])
+    # test clear and add again
+    g.clear()
+    g.add_nodes(5)
+    g.ndata['h'] = 3 * th.ones((5, 2))
+    assert U.allclose(3 * th.ones((5, 2)), g.ndata['h'])
 
 def test_adjmat_speed():
     n = 1000
@@ -36,5 +57,6 @@ def test_incmat_speed():
     assert dur2 < dur1
 
 if __name__ == '__main__':
+    test_graph_creation()
     test_adjmat_speed()
     test_incmat_speed()

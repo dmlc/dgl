@@ -141,12 +141,17 @@ class DGLGraph(object):
         self._readonly=readonly
         self._graph = create_graph_index(graph_data, multigraph, readonly)
         # frame
-        self._node_frame = node_frame if node_frame is not None else FrameRef()
-        self._edge_frame = edge_frame if edge_frame is not None else FrameRef()
+        if node_frame is None:
+            self._node_frame = FrameRef(Frame(num_rows=self.number_of_nodes()))
+        else:
+            self._node_frame = node_frame
+        if edge_frame is None:
+            self._edge_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
+        else:
+            self._edge_frame = edge_frame
         # msg graph & frame
         self._msg_graph = create_graph_index(multigraph=multigraph)
         self._msg_frame = FrameRef()
-        self._msg_edges = []
         self.reset_messages()
         # registered functions
         self._message_func = None
@@ -154,25 +159,25 @@ class DGLGraph(object):
         self._apply_node_func = None
         self._apply_edge_func = None
 
-    def add_nodes(self, num, reprs=None):
+    def add_nodes(self, num, data=None):
         """Add nodes.
 
         Parameters
         ----------
         num : int
             Number of nodes to be added.
-        reprs : dict
-            Optional node representations.
+        data : dict
+            Optional node feature data.
         """
         self._graph.add_nodes(num)
         self._msg_graph.add_nodes(num)
-        #TODO(minjie): change frames
-        assert reprs is None
+        if data is None:
+            # Initialize feature placeholders if there are features existing
+            self._node_frame.add_rows(num)
+        else:
+            self._node_frame.append(data)
 
-        # Initialize feature placeholders if there are features existing
-        self._node_frame.add_rows(num)
-
-    def add_edge(self, u, v, reprs=None):
+    def add_edge(self, u, v, data=None):
         """Add one edge.
 
         Parameters
@@ -181,21 +186,21 @@ class DGLGraph(object):
             The src node.
         v : int
             The dst node.
-        reprs : dict
-            Optional edge representation.
+        data : dict
+            Optional node feature data.
 
         See Also
         --------
         add_edges
         """
         self._graph.add_edge(u, v)
-        #TODO(minjie): change frames
-        assert reprs is None
+        if data is None:
+            # Initialize feature placeholders if there are features existing
+            self._edge_frame.add_rows(1)
+        else:
+            self._edge_frame.append(data)
 
-        # Initialize feature placeholders if there are features existing
-        self._edge_frame.add_rows(1)
-
-    def add_edges(self, u, v, reprs=None):
+    def add_edges(self, u, v, data=None):
         """Add many edges.
 
         Parameters
@@ -214,11 +219,12 @@ class DGLGraph(object):
         u = utils.toindex(u)
         v = utils.toindex(v)
         self._graph.add_edges(u, v)
-        #TODO(minjie): change frames
-        assert reprs is None
-
-        # Initialize feature placeholders if there are features existing
-        self._edge_frame.add_rows(len(u))
+        if data is None:
+            # Initialize feature placeholders if there are features existing
+            # NOTE: use max due to edge broadcasting syntax
+            self._edge_frame.add_rows(max(len(u), len(v)))
+        else:
+            self._edge_frame.append(data)
 
     def clear(self):
         """Clear the graph and its storage."""
@@ -227,13 +233,11 @@ class DGLGraph(object):
         self._edge_frame.clear()
         self._msg_graph.clear()
         self._msg_frame.clear()
-        self._msg_edges.clear()
 
     def reset_messages(self):
         """Clear all messages."""
         self._msg_graph.clear()
         self._msg_frame.clear()
-        self._msg_edges.clear()
         self._msg_graph.add_nodes(self.number_of_nodes())
 
     def number_of_nodes(self):
@@ -672,6 +676,8 @@ class DGLGraph(object):
         """
         self.clear()
         self._graph.from_networkx(nx_graph)
+        self._node_frame.add_rows(self.number_of_nodes())
+        self._edge_frame.add_rows(self.number_of_edges())
         self._msg_graph.add_nodes(self._graph.number_of_nodes())
         # copy attributes
         def _batcher(lst):
@@ -705,6 +711,8 @@ class DGLGraph(object):
         """
         self.clear()
         self._graph.from_scipy_sparse_matrix(a)
+        self._node_frame.add_rows(self.number_of_nodes())
+        self._edge_frame.add_rows(self.number_of_edges())
         self._msg_graph.add_nodes(self._graph.number_of_nodes())
 
     def node_attr_schemes(self):
