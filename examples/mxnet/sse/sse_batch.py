@@ -154,11 +154,11 @@ def main(args, data):
     else:
         labels = mx.nd.array(data.labels)
     train_size = len(labels) * args.train_percent
-    train_vs = np.arange(train_size, dtype='int64')
-    eval_vs = np.arange(train_size, len(labels), dtype='int64')
+    train_vs = mx.nd.arange(0, train_size, dtype='int64')
+    eval_vs = mx.nd.arange(train_size, len(labels), dtype='int64')
     print("train size: " + str(len(train_vs)))
     print("eval size: " + str(len(eval_vs)))
-    eval_labels = mx.nd.array(data.labels[eval_vs])
+    eval_labels = mx.nd.take(labels, eval_vs)
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
@@ -255,7 +255,7 @@ def main(args, data):
                 break
 
         # prediction.
-        logits = model_infer(g, mx.nd.array(eval_vs, dtype=np.int64))
+        logits = model_infer(g, eval_vs)
         eval_loss = mx.nd.softmax_cross_entropy(logits, eval_labels)
         eval_loss = eval_loss.asnumpy()[0]
 
