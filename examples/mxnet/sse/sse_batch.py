@@ -115,7 +115,7 @@ class DGLSSEUpdateHidden(gluon.Block):
             if self.dropout:
                 # TODO here we apply dropout on all vertex representation.
                 g.ndata['h'] = mx.nd.Dropout(g.ndata['h'], p=self.dropout)
-            g.pull(vertices, msg_func, reduce_func, None)
+            g.update_all(msg_func, reduce_func, None)
             if self.use_spmv:
                 g.ndata.pop('cat')
                 deg = deg.as_in_context(g.ndata['accum'].context)
