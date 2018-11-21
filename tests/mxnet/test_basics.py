@@ -250,12 +250,15 @@ def check_reduce_0deg(readonly):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
         return {'h' : nodes.data['h'] + nodes.mailbox['m'].sum(1)}
+    def _init2(shape, dtype, ctx, ids):
+        return 2 + mx.nd.zeros(shape, dtype=dtype, ctx=ctx)
+    g.set_n_initializer(_init2, 'h')
     old_repr = mx.nd.random.normal(shape=(5, 5))
     g.set_n_repr({'h': old_repr})
     g.update_all(_message, _reduce)
     new_repr = g.ndata['h']
 
-    assert np.allclose(new_repr[1:].asnumpy(), old_repr[1:].asnumpy())
+    assert np.allclose(new_repr[1:].asnumpy(), 2+mx.nd.zeros((4, 5)).asnumpy())
     assert np.allclose(new_repr[0].asnumpy(), old_repr.sum(0).asnumpy())
 
 def test_reduce_0deg():
@@ -279,7 +282,6 @@ def check_pull_0deg(readonly):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
         return {'h' : nodes.mailbox['m'].sum(1)}
-
     old_repr = mx.nd.random.normal(shape=(2, 5))
     g.set_n_repr({'h' : old_repr})
     g.pull(0, _message, _reduce)
