@@ -153,7 +153,6 @@ class Column(object):
                     % (feat_scheme, self.scheme))
 
         feats = F.copy_to(feats, F.context(self.data))
-        print(F.shape(self.data), F.shape(feats))
         self.data = F.cat([self.data, feats], dim=0)
 
     @staticmethod
@@ -375,11 +374,16 @@ class Frame(MutableMapping):
 
     def _append(self, other):
         # NOTE: `other` can be empty.
-        if len(self._columns) == 0:
+        if self.num_rows == 0:
+            # if no rows in current frame; append is equivalent to
+            # directly updating columns.
+            self._columns = {key: Column.create(data) for key, data in other.items()}
+        else:
             for key, col in other.items():
-                self.add_column(key, col.scheme, F.context(col.data))
-        for key, col in other.items():
-            self._columns[key].extend(col.data, col.scheme)
+                if key not in self._columns:
+                    # the column does not exist; init a new column
+                    self.add_column(key, col.scheme, F.context(col.data))
+                self._columns[key].extend(col.data, col.scheme)
 
     def append(self, other):
         """Append another frame's data into this frame.

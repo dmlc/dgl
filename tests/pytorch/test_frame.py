@@ -122,6 +122,14 @@ def test_append3():
     assert f.num_rows == 8
     ans = th.cat([th.zeros((5, 2)), th.ones((3, 2))], dim=0)
     assert U.allclose(f['h'].data, ans)
+    # test append with new column
+    data = {'h' : 2 * th.ones((3, 2)), 'w' : 2 * th.ones((3, 2))}
+    f.append(data)
+    assert f.num_rows == 11
+    ans1 = th.cat([ans, 2 * th.ones((3, 2))], 0)
+    ans2 = th.cat([th.zeros((8, 2)), 2 * th.ones((3, 2))], 0)
+    assert U.allclose(f['h'].data, ans1)
+    assert U.allclose(f['w'].data, ans2)
 
 def test_row1():
     # test row getter/setter
