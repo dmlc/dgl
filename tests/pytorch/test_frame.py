@@ -23,7 +23,7 @@ def create_test_data(grad=False):
 
 def test_create():
     data = create_test_data()
-    f1 = Frame()
+    f1 = Frame(num_rows=N)
     for k, v in data.items():
         f1.update_column(k, v)
     print(f1.schemes)
@@ -56,12 +56,7 @@ def test_column1():
     del f['a2']
     assert len(f) == 1
     del f['a3']
-    assert f.num_rows == 0
     assert len(f) == 0
-    # add a different length column should succeed
-    f['a4'] = th.zeros([N+1, D])
-    assert f.num_rows == N+1
-    assert len(f) == 1
 
 def test_column2():
     # Test frameref column getter/setter
@@ -118,6 +113,15 @@ def test_append2():
     new_idx = list(range(N)) + list(range(2*N, 4*N))
     assert th.all(f.index().tousertensor() == th.tensor(new_idx, dtype=th.int64))
     assert data.num_rows == 4 * N
+
+def test_append3():
+    # test append on empty frame
+    f = Frame(num_rows=5)
+    data = {'h' : th.ones((3, 2))}
+    f.append(data)
+    assert f.num_rows == 8
+    ans = th.cat([th.zeros((5, 2)), th.ones((3, 2))], dim=0)
+    assert U.allclose(f['h'].data, ans)
 
 def test_row1():
     # test row getter/setter
@@ -290,6 +294,7 @@ if __name__ == '__main__':
     test_column2()
     test_append1()
     test_append2()
+    test_append3()
     test_row1()
     test_row2()
     test_row3()

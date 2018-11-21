@@ -11,15 +11,17 @@ from . import utils
 import sys
 
 
-class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
+class Scheme(namedtuple('Scheme', ['shape', 'dtype', 'initializer'])):
     """The column scheme.
 
     Parameters
     ----------
     shape : tuple of int
         The feature shape.
-    dtype : TVMType
+    dtype : backend-specific type object
         The feature data type.
+    initializer : callable
+        The initialize function.
     """
     # FIXME:
     # Python 3.5.2 is unable to pickle torch dtypes; this is a workaround.
@@ -29,16 +31,18 @@ class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     # https://github.com/pytorch/pytorch/issues/14057
     if sys.version_info.major == 3 and sys.version_info.minor == 5:
         def __reduce__(self):
-            return self._reconstruct_scheme, \
-                   (self.shape, F.reverse_data_type_dict[self.dtype])
+            state = (self.shape, F.reverse_data_type_dict[self.dtype],
+                    self.initializer)
+            return self._reconstruct_scheme, state
+                   
 
         @classmethod
-        def _reconstruct_scheme(cls, shape, dtype_str):
+        def _reconstruct_scheme(cls, shape, dtype_str, initializer):
             dtype = F.data_type_dict[dtype_str]
-            return cls(shape, dtype)
+            return cls(shape, dtype, initializer)
 
 def infer_scheme(tensor):
-    return Scheme(tuple(F.shape(tensor)[1:]), F.dtype(tensor))
+    return Scheme(tuple(F.shape(tensor)[1:]), F.dtype(tensor), None)
 
 class Column(object):
     """A column is a compact store of features of multiple nodes/edges.
@@ -155,7 +159,7 @@ class Column(object):
     def create(data):
         """Create a new column using the given data."""
         if isinstance(data, Column):
-            return Column(data.data)
+            return Column(data.data, data.scheme)
         else:
             return Column(data)
 
@@ -177,11 +181,14 @@ class Frame(MutableMapping):
         this frame will NOT share columns with the given frame. So any out-place
         update on one will not reflect to the other. The inplace update will
         be seen by both. This follows the semantic of python's container.
+    num_rows : int, optional [default=0]
+        The number of rows in this frame. If ``data`` is provided, ``num_rows``
+        will be ignored and inferred from the given data.
     """
-    def __init__(self, data=None):
+    def __init__(self, data=None, num_rows=0):
         if data is None:
             self._columns = dict()
-            self._num_rows = 0
+            self._num_rows = num_rows
         else:
             # Note that we always create a new column for the given data.
             # This avoids two frames accidentally sharing the same column.
@@ -198,7 +205,6 @@ class Frame(MutableMapping):
         # Initializer for empty values. Initializer is a callable.
         # If is none, then a warning will be raised
         # in the first call and zero initializer will be used later.
-        self._initializers = {}
         self._default_initializer = None
 
     def _warn_and_set_initializer(self):
@@ -220,7 +226,13 @@ class Frame(MutableMapping):
         callable
             The initializer
         """
-        return self._initializers.get(column, self._default_initializer)
+        if column is None:
+            return self._default_initializer
+        col_sch = self._columns[column].scheme
+        if col_sch.initializer is None:
+            return self._default_initializer
+        else:
+            return col_sch.initializer
 
     def set_initializer(self, initializer, column=None):
         """Set the initializer for empty values, for a given column or all future
@@ -238,7 +250,7 @@ class Frame(MutableMapping):
         if column is None:
             self._default_initializer = initializer
         else:
-            self._initializers[column] = initializer
+            self._columns[column].scheme.initializer = initializer
 
     @property
     def schemes(self):
@@ -295,8 +307,6 @@ class Frame(MutableMapping):
             The column name.
         """
         del self._columns[name]
-        if len(self._columns) == 0:
-            self._num_rows = 0
 
     def add_column(self, name, scheme, ctx):
         """Add a new column to the frame.
@@ -315,13 +325,9 @@ class Frame(MutableMapping):
         if name in self:
             dgl_warning('Column "%s" already exists. Ignore adding this column again.' % name)
             return
-        if self.num_rows == 0:
-            raise DGLError('Cannot add column "%s" using column schemes because'
-                           ' number of rows is unknown. Make sure there is at least'
-                           ' one column in the frame so number of rows can be inferred.' % name)
-        if self.get_initializer(name) is None:
+        if self.get_initializer() is None:
             self._warn_and_set_initializer()
-        init_data = self.get_initializer(name)(
+        init_data = self.get_initializer()(
                 (self.num_rows,) + scheme.shape, scheme.dtype, ctx)
         self._columns[name] = Column(init_data, scheme)
 
@@ -361,20 +367,18 @@ class Frame(MutableMapping):
             The column data.
         """
         col = Column.create(data)
-        if self.num_columns == 0:
-            self._num_rows = len(col)
-        elif len(col) != self._num_rows:
+        if len(col) != self.num_rows:
             raise DGLError('Expected data to have %d rows, got %d.' %
-                           (self._num_rows, len(col)))
+                           (self.num_rows, len(col)))
         self._columns[name] = col
 
     def _append(self, other):
         # NOTE: `other` can be empty.
         if len(self._columns) == 0:
-            self._columns = {key: col for key, col in other.items()}
-        else:
             for key, col in other.items():
-                self._columns[key].extend(col.data, col.scheme)
+                self.add_column(key, col.scheme, F.context(col.data))
+        for key, col in other.items():
+            self._columns[key].extend(col.data, col.scheme)
 
     def append(self, other):
         """Append another frame's data into this frame.
@@ -390,7 +394,6 @@ class Frame(MutableMapping):
         """
         if not isinstance(other, Frame):
             other = Frame(other)
-
         self._append(other)
         self._num_rows += other.num_rows
 
@@ -711,7 +714,7 @@ class FrameRef(MutableMapping):
 
         Please note that "deleted" rows are not really deleted, but simply removed
         in the reference. As a result, if two FrameRefs point to the same Frame, deleting
-        from one ref will not relect on the other. By contrast, deleting columns is real.
+        from one ref will not relect on the other. However, deleting columns is real.
 
         Parameters
         ----------
@@ -720,8 +723,6 @@ class FrameRef(MutableMapping):
         """
         if isinstance(key, str):
             del self._frame[key]
-            if len(self._frame) == 0:
-                self.clear()
         else:
             self.delete_rows(key)
 
