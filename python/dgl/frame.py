@@ -153,6 +153,7 @@ class Column(object):
                     % (feat_scheme, self.scheme))
 
         feats = F.copy_to(feats, F.context(self.data))
+        print(F.shape(self.data), F.shape(feats))
         self.data = F.cat([self.data, feats], dim=0)
 
     @staticmethod
