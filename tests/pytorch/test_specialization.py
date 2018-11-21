@@ -197,22 +197,20 @@ def test_v2v_snr_multi_fn():
     v2 = g.ndata['v2']
     assert U.allclose(v1, v2)
 
-def test_e2v_reduce():
+def test_e2v_update_all_multi_fn():
     def _test(fld):
         def message_func(edges):
-            return {'m' : edges.src[fld]}
-
-        def message_func_edge(edges):
-            if len(edges.src[fld].shape) == 1:
-                return {'m' : edges.src[fld] * edges.data['e1']}
-            else:
-                return {'m' : edges.src[fld] * edges.data['e2']}
+            return {'m1' : edges.src[fld] + edges.dst[fld],
+                    'm2' : edges.src[fld] * edges.dst[fld]}
 
         def reduce_func(nodes):
-            return {fld : th.sum(nodes.mailbox['m'], 1)}
+            return {fld : th.sum(nodes.mailbox['m1'] + nodes.mailbox['m2'], 1)}
 
         def apply_func(nodes):
             return {fld : 2 * nodes.data[fld]}
+
+        def apply_func_2(nodes):
+            return {fld : 2 * nodes.data['r1'] + 2 * nodes.data['r2']}
 
         g = generate_graph()
         # update all
@@ -221,8 +219,89 @@ def test_e2v_reduce():
         g.update_all(message_func, reduce_func, apply_func)
         v2 = g.get_n_repr()[fld]
 
+        # user break reduce func into 2 builtin
         g.set_n_repr({fld : v1})
-        g.update_all(message_func, fn.sum(msg='m', out=fld), apply_func)
+        g.update_all(message_func,
+                     [fn.sum(msg='m1', out='r1'), fn.sum(msg='m2', out='r2')],
+                     apply_func_2)
+        v3 = g.get_n_repr()[fld]
+
+        assert th.allclose(v2, v3)
+
+    # test 1d node features
+    _test('f1')
+    # test 2d node features
+    _test('f2')
+
+def test_e2v_snr_multi_fn():
+    u = th.tensor([0, 0, 0, 3, 4, 9])
+    v = th.tensor([1, 2, 3, 9, 9, 0])
+    def _test(fld):
+        def message_func(edges):
+            return {'m1' : edges.src[fld] + edges.dst[fld],
+                    'm2' : edges.src[fld] * edges.dst[fld]}
+
+        def reduce_func(nodes):
+            return {fld : th.sum(nodes.mailbox['m1'] + nodes.mailbox['m2'], 1)}
+
+        def apply_func(nodes):
+            return {fld : 2 * nodes.data[fld]}
+
+        def apply_func_2(nodes):
+            return {fld : 2 * nodes.data['r1'] + 2 * nodes.data['r2']}
+
+        g = generate_graph()
+        # send_and_recv
+        v1 = g.get_n_repr()[fld]
+        # no specialization
+        g.send_and_recv((u, v), message_func, reduce_func, apply_func)
+        v2 = g.get_n_repr()[fld]
+
+        # user break reduce func into 2 builtin
+        g.set_n_repr({fld : v1})
+        g.send_and_recv((u, v), message_func,
+                        [fn.sum(msg='m1', out='r1'), fn.sum(msg='m2', out='r2')],
+                        apply_func_2)
+        v3 = g.get_n_repr()[fld]
+
+        assert th.allclose(v2, v3)
+
+    # test 1d node features
+    _test('f1')
+    # test 2d node features
+    _test('f2')
+
+def test_e2v_recv_multi_fn():
+    u = th.tensor([0, 0, 0, 3, 4, 9])
+    v = th.tensor([1, 2, 3, 9, 9, 0])
+    def _test(fld):
+        def message_func(edges):
+            return {'m1' : edges.src[fld] + edges.dst[fld],
+                    'm2' : edges.src[fld] * edges.dst[fld]}
+
+        def reduce_func(nodes):
+            return {fld : th.sum(nodes.mailbox['m1'] + nodes.mailbox['m2'], 1)}
+
+        def apply_func(nodes):
+            return {fld : 2 * nodes.data[fld]}
+
+        def apply_func_2(nodes):
+            return {fld : 2 * nodes.data['r1'] + 2 * nodes.data['r2']}
+
+        g = generate_graph()
+        # recv
+        v1 = g.get_n_repr()[fld]
+        # no specialization
+        g.send((u, v), message_func)
+        g.recv([0,1,2,3,9], reduce_func, apply_func)
+        v2 = g.get_n_repr()[fld]
+
+        # user break reduce func into 2 builtin
+        g.set_n_repr({fld : v1})
+        g.send((u, v), message_func)
+        g.recv([0,1,2,3,9],
+               [fn.sum(msg='m1', out='r1'), fn.sum(msg='m2', out='r2')],
+               apply_func_2)
         v3 = g.get_n_repr()[fld]
 
         assert th.allclose(v2, v3)
@@ -310,9 +389,11 @@ def test_multi_fn_fallback():
     assert U.allclose(o3, g.ndata.pop('o3'))
 
 if __name__ == '__main__':
-    test_e2v_reduce()
     test_v2v_update_all()
     test_v2v_snr()
     test_v2v_update_all_multi_fn()
     test_v2v_snr_multi_fn()
+    test_e2v_update_all_multi_fn()
+    test_e2v_snr_multi_fn()
+    test_e2v_recv_multi_fn()
     test_multi_fn_fallback()
