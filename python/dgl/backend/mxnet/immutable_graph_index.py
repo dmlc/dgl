@@ -330,7 +330,7 @@ class ImmutableGraphIndex(object):
         indices = mat.indices
         indptr = mat.indptr
         data = mx.nd.ones(indices.shape, dtype=np.float32, ctx=ctx)
-        return mx.nd.sparse.csr_matrix((data, indices, indptr), shape=mat.shape)
+        return mx.nd.sparse.csr_matrix((data, indices, indptr), shape=mat.shape, ctx=ctx)
 
     def from_coo_matrix(self, out_coo):
         """construct the graph index from a SciPy coo matrix.
