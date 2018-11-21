@@ -11,7 +11,7 @@ from . import utils
 import sys
 
 
-class Scheme(namedtuple('Scheme', ['shape', 'dtype', 'initializer'])):
+class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     """The column scheme.
 
     Parameters
@@ -20,8 +20,6 @@ class Scheme(namedtuple('Scheme', ['shape', 'dtype', 'initializer'])):
         The feature shape.
     dtype : backend-specific type object
         The feature data type.
-    initializer : callable
-        The initialize function.
     """
     # FIXME:
     # Python 3.5.2 is unable to pickle torch dtypes; this is a workaround.
@@ -42,7 +40,7 @@ class Scheme(namedtuple('Scheme', ['shape', 'dtype', 'initializer'])):
             return cls(shape, dtype, initializer)
 
 def infer_scheme(tensor):
-    return Scheme(tuple(F.shape(tensor)[1:]), F.dtype(tensor), None)
+    return Scheme(tuple(F.shape(tensor)[1:]), F.dtype(tensor))
 
 class Column(object):
     """A column is a compact store of features of multiple nodes/edges.
@@ -205,6 +203,7 @@ class Frame(MutableMapping):
         # Initializer for empty values. Initializer is a callable.
         # If is none, then a warning will be raised
         # in the first call and zero initializer will be used later.
+        self._initializers = {}  # per-column initializers
         self._default_initializer = None
 
     def _warn_and_set_initializer(self):
@@ -226,13 +225,7 @@ class Frame(MutableMapping):
         callable
             The initializer
         """
-        if column is None:
-            return self._default_initializer
-        col_sch = self._columns[column].scheme
-        if col_sch.initializer is None:
-            return self._default_initializer
-        else:
-            return col_sch.initializer
+        return self._initializers.get(column, self._default_initializer) 
 
     def set_initializer(self, initializer, column=None):
         """Set the initializer for empty values, for a given column or all future
@@ -250,7 +243,7 @@ class Frame(MutableMapping):
         if column is None:
             self._default_initializer = initializer
         else:
-            self._columns[column].scheme.initializer = initializer
+            self._initializers[column] = initializer
 
     @property
     def schemes(self):
@@ -325,9 +318,9 @@ class Frame(MutableMapping):
         if name in self:
             dgl_warning('Column "%s" already exists. Ignore adding this column again.' % name)
             return
-        if self.get_initializer() is None:
+        if self.get_initializer(name) is None:
             self._warn_and_set_initializer()
-        init_data = self.get_initializer()(
+        init_data = self.get_initializer(name)(
                 (self.num_rows,) + scheme.shape, scheme.dtype, ctx)
         self._columns[name] = Column(init_data, scheme)
 
