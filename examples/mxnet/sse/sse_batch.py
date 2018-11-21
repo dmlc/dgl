@@ -209,6 +209,10 @@ def main(args, data):
     rets = []
     rets.append(all_hidden)
 
+    if args.neigh_expand <= 0:
+        neigh_expand = g.number_of_nodes()
+    else:
+        neigh_expand = args.neigh_expand
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
@@ -217,7 +221,7 @@ def main(args, data):
         i = 0
         num_batches = len(train_vs) / args.batch_size
         start1 = time.time()
-        for subg, seeds in dgl.contrib.sampling.NeighborSampler(g, args.batch_size, g.number_of_nodes(),
+        for subg, seeds in dgl.contrib.sampling.NeighborSampler(g, args.batch_size, neigh_expand,
                 neighbor_type='in', num_workers=args.num_parallel_subgraphs, seed_nodes=train_vs,
                 shuffle=True):
             subg.copy_from_parent()
@@ -330,6 +334,8 @@ if __name__ == '__main__':
     parser.add_argument("--dgl", action="store_true")
     parser.add_argument("--num-parallel-subgraphs", type=int, default=1,
             help="the number of subgraphs to construct in parallel.")
+    parser.add_argument("--neigh-expand", type=int, default=16,
+            help="the number of neighbors to sample.")
     args = parser.parse_args()
 
     # load and preprocess dataset
