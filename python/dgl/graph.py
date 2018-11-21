@@ -676,6 +676,8 @@ class DGLGraph(object):
         """
         self.clear()
         self._graph.from_networkx(nx_graph)
+        self._node_frame.add_rows(self.number_of_nodes())
+        self._edge_frame.add_rows(self.number_of_edges())
         self._msg_graph.add_nodes(self._graph.number_of_nodes())
         # copy attributes
         def _batcher(lst):
@@ -709,6 +711,8 @@ class DGLGraph(object):
         """
         self.clear()
         self._graph.from_scipy_sparse_matrix(a)
+        self._node_frame.add_rows(self.number_of_nodes())
+        self._edge_frame.add_rows(self.number_of_edges())
         self._msg_graph.add_nodes(self._graph.number_of_nodes())
 
     def node_attr_schemes(self):
