@@ -79,6 +79,10 @@ def build_graph_from_triplets(num_nodes, num_rels, triplets):
     g.add_edges(src, dst)
     return g, rel
 
+def build_test_graph(num_nodes, num_rels, edges):
+    src, rel, dst = edges.transpose()
+    return build_graph_from_triplets(num_nodes, num_rels, (src, rel, dst))
+
 
 def negative_sampling(pos_samples, num_entity, negative_rate):
     size_of_batch = len(pos_samples)

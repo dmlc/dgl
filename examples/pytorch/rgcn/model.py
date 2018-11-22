@@ -47,9 +47,9 @@ class BaseRGCN(nn.Module):
         return None
 
     def forward(self, g):
-        if self.features:
-            g.set_n_repr({'h': self.features})
+        if self.features is not None:
+            g.ndata['h'] = self.features
         for layer in self.layers:
             layer(g)
-        return g.pop_n_repr('h')
+        return g.ndata.pop('h')
 

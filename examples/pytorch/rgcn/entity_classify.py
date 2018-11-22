@@ -30,10 +30,10 @@ class EmbeddingLayer(RGCNLayer):
         else:
             weight = self.weight
 
-        def msg_func(src, edge):
+        def msg_func(edges):
             flattened_weight = weight.view(-1, self.out_feat)
-            index = src['h'] * self.num_rels + edge['type']
-            return {'msg': flattened_weight[index] * edge['norm']}
+            index = edges.src['h'] * self.num_rels + edges.data['type']
+            return {'msg': flattened_weight[index] * edges.data['norm']}
 
         g.update_all(msg_func, fn.sum(msg='msg', out='h'), None)
 
@@ -45,7 +45,7 @@ class EntityClassify(BaseRGCN):
         return features
 
     def build_input_layer(self):
-        return EmbeddingLayer(self.in_dim, self.h_dim, self.num_rels, self.num_bases, activation=F.relu)
+        return EmbeddingLayer(self.num_nodes, self.h_dim, self.num_rels, self.num_bases, activation=F.relu)
 
     def build_hidden_layer(self, idx):
         return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases, activation=F.relu)
@@ -85,7 +85,7 @@ def main(args):
     g = DGLGraph()
     g.add_nodes(num_nodes)
     g.add_edges(data.edge_src, data.edge_dst)
-    g.set_e_repr({'type': edge_type, 'norm': edge_norm})
+    g.edata.update({'type': edge_type, 'norm': edge_norm})
 
     # create model
     model = EntityClassify(len(g),

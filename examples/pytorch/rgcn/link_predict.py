@@ -31,8 +31,7 @@ class EmbeddingLayer(nn.Module):
 
     def forward(self, g):
         node_id = g.get_n_repr()['id']
-        g.set_n_repr({'h': self.embedding(node_id)})
-
+        g.ndata['h'] = self.embedding(node_id)
 
 class RGCN(BaseRGCN):
     def build_input_layer(self):
@@ -41,7 +40,6 @@ class RGCN(BaseRGCN):
     def build_hidden_layer(self, idx):
         act = F.relu if idx < self.num_hidden_layers - 1 else None
         return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases, activation=act, self_loop=True, dropout=self.dropout)
-
 
 class LinkPredict(nn.Module):
     def __init__(self, in_dim, h_dim, num_rels, num_bases=-1, num_hidden_layers=1, dropout=0, use_cuda=False, reg_param=0):
@@ -86,7 +84,8 @@ def main(args):
     num_rels = data.num_rels
 
     # build test graph
-    test_graph, test_rel = utils.build_graph_from_triplets(num_nodes, num_rels, train_data)
+    test_graph, test_rel = utils.build_test_graph(
+        num_nodes, num_rels, train_data)
     test_deg = test_graph.in_degrees(range(test_graph.number_of_nodes()))
 
     # check cuda
@@ -116,8 +115,8 @@ def main(args):
         test_rel = test_rel.cuda()
         test_deg = test_deg.cuda()
 
-    test_graph.set_n_repr({'id': test_node_id, 'deg': test_deg})
-    test_graph.set_e_repr({'type': test_rel})
+    test_graph.ndata.update({'id': test_node_id, 'deg': test_deg})
+    test_graph.edata['type'] = test_rel
 
     # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -163,8 +162,8 @@ def main(args):
             node_id, deg = node_id.cuda(), deg.cuda()
             edge_type = edge_type.cuda()
             data, labels = data.cuda(), labels.cuda()
-        g.set_n_repr({'id': node_id, 'deg': deg})
-        g.set_e_repr({'type': edge_type})
+        g.ndata.update({'id': node_id, 'deg': deg})
+        g.edata['type'] = edge_type
 
         optimizer.zero_grad()
         t0 = time.time()

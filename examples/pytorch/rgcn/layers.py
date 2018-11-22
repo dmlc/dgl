@@ -44,8 +44,7 @@ class RGCNLayer(nn.Module):
         if self.activation:
             node_repr = self.activation(node_repr)
 
-        g.set_n_repr({'h': node_repr})
-
+        g.ndata['h'] = node_repr
 
 class RGCNBasisLayer(RGCNLayer):
     def __init__(self, in_feat, out_feat, num_rels, num_bases=-1, bias=None, activation=None):
@@ -72,10 +71,10 @@ class RGCNBasisLayer(RGCNLayer):
         else:
             weight = self.weight
 
-        def msg_func(src, edge):
+        def msg_func(edges):
             # FIXME: normalizer
-            w = weight[edge['type']]
-            msg = torch.bmm(src['h'].unsqueeze(1), w).squeeze()
+            w = weight[edges.data['type']]
+            msg = torch.bmm(edges.src['h'].unsqueeze(1), w).squeeze()
             return {'msg': msg}
 
         g.update_all(msg_func, fn.sum(msg='msg', out='h'), None)
@@ -97,9 +96,10 @@ class RGCNBlockLayer(RGCNLayer):
         nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
 
     def propagate(self, g):
-        def msg_func(src, edge):
-            weight = self.weight[edge['type']].view(-1, self.submat_in, self.submat_out)
-            node = src['h'].view(-1, 1, self.submat_in)
+        def msg_func(edges):
+            weight = self.weight[edges.data['type']].view(
+                        -1, self.submat_in, self.submat_out)
+            node = edges.src['h'].view(-1, 1, self.submat_in)
             # FIXME: whose deg?
             msg = torch.bmm(node, weight).view(-1, self.out_feat)
             return {'msg': msg}
