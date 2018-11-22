@@ -12,6 +12,7 @@ from .graph_index import GraphIndex, create_graph_index
 from .runtime import ir, scheduler, Runtime
 from . import utils
 from .view import NodeView, EdgeView
+from .udf import NodeBatch, EdgeBatch
 
 __all__ = ['DGLGraph']
 
@@ -1574,8 +1575,13 @@ class DGLGraph(object):
         tensor
             The filtered nodes
         """
-        n_repr = self.get_n_repr(nodes)
-        nb = NodeBatch(self, nodes, n_repr)
+        if is_all(nodes):
+            v = utils.toindex(slice(0, self.number_of_nodes()))
+        else:
+            v = utils.toindex(nodes)
+
+        n_repr = self.get_n_repr(v)
+        nb = NodeBatch(self, v, n_repr)
         n_mask = predicate(nb)
 
         if is_all(nodes):
@@ -1590,7 +1596,7 @@ class DGLGraph(object):
         Parameters
         ----------
         predicate : callable
-            The predicate should take in a EdgeBatch object, and return a
+            The predicate should take in an EdgeBatch object, and return a
             boolean tensor with E elements indicating which edge satisfy
             the predicate.
         edges : edges
