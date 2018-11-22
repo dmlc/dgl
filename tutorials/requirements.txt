@@ -1,0 +1,7 @@
+networkx
+torch
+numpy
+seaborn
+matplotlib
+pygraphviz
+graphviz

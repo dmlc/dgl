@@ -4,6 +4,7 @@
  * \brief Graph traversal implementation
  */
 #include <algorithm>
+#include <queue>
 #include "./traversal.h"
 #include "../c_api_common.h"
 
@@ -104,10 +105,10 @@ IdArray ComputeMergedSections(
  * An optional tag can be specified on each node/edge (represented by an int value).
  */
 struct Frontiers {
-  /*!\brief a vector store for the edges in all the fronties */
+  /*!\brief a vector store for the nodes/edges in all the frontiers */
   std::vector<dgl_id_t> ids;
 
-  /*!\brief a vector store for edge tags. The vector is empty is no tags. */
+  /*!\brief a vector store for node/edge tags. Empty if no tags are requested */
   std::vector<int64_t> tags;
 
   /*!\brief a section vector to indicate each frontier */
@@ -138,6 +139,37 @@ TVM_REGISTER_GLOBAL("traversal._CAPI_DGLBFSNodes")
     IdArray node_ids = CopyVectorToNDArray(front.ids);
     IdArray sections = CopyVectorToNDArray(front.sections);
     *rv = ConvertNDArrayVectorToPackedFunc({node_ids, sections});
+  });
+
+Frontiers BFSEdgesFrontiers(const Graph& graph, IdArray source, bool reversed) {
+  Frontiers front;
+  // NOTE: std::queue has no top() method.
+  std::vector<dgl_id_t> nodes;
+  VectorQueueWrapper<dgl_id_t> queue(&nodes);
+  auto visit = [&] (const dgl_id_t e) { front.ids.push_back(e); };
+  bool first_frontier = true;
+  auto make_frontier = [&] {
+      if (first_frontier) {
+        first_frontier = false;   // do not push the first section when doing edges
+      } else if (!queue.empty()) {
+        // do not push zero-length frontier
+        front.sections.push_back(queue.size());
+      }
+    };
+  BFSEdges(graph, source, reversed, &queue, visit, make_frontier);
+  return front;
+}
+
+TVM_REGISTER_GLOBAL("traversal._CAPI_DGLBFSEdges")
+.set_body([] (TVMArgs args, TVMRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const Graph* gptr = static_cast<Graph*>(ghandle);
+    const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    bool reversed = args[2];
+    const auto& front = BFSEdgesFrontiers(*gptr, src, reversed);
+    IdArray edge_ids = CopyVectorToNDArray(front.ids);
+    IdArray sections = CopyVectorToNDArray(front.sections);
+    *rv = ConvertNDArrayVectorToPackedFunc({edge_ids, sections});
   });
 
 Frontiers TopologicalNodesFrontiers(const Graph& graph, bool reversed) {

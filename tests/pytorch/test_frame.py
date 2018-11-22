@@ -23,7 +23,7 @@ def create_test_data(grad=False):
 
 def test_create():
     data = create_test_data()
-    f1 = Frame()
+    f1 = Frame(num_rows=N)
     for k, v in data.items():
         f1.update_column(k, v)
     print(f1.schemes)
@@ -56,12 +56,7 @@ def test_column1():
     del f['a2']
     assert len(f) == 1
     del f['a3']
-    assert f.num_rows == 0
     assert len(f) == 0
-    # add a different length column should succeed
-    f['a4'] = th.zeros([N+1, D])
-    assert f.num_rows == N+1
-    assert len(f) == 1
 
 def test_column2():
     # Test frameref column getter/setter
@@ -118,6 +113,23 @@ def test_append2():
     new_idx = list(range(N)) + list(range(2*N, 4*N))
     assert th.all(f.index().tousertensor() == th.tensor(new_idx, dtype=th.int64))
     assert data.num_rows == 4 * N
+
+def test_append3():
+    # test append on empty frame
+    f = Frame(num_rows=5)
+    data = {'h' : th.ones((3, 2))}
+    f.append(data)
+    assert f.num_rows == 8
+    ans = th.cat([th.zeros((5, 2)), th.ones((3, 2))], dim=0)
+    assert U.allclose(f['h'].data, ans)
+    # test append with new column
+    data = {'h' : 2 * th.ones((3, 2)), 'w' : 2 * th.ones((3, 2))}
+    f.append(data)
+    assert f.num_rows == 11
+    ans1 = th.cat([ans, 2 * th.ones((3, 2))], 0)
+    ans2 = th.cat([th.zeros((8, 2)), 2 * th.ones((3, 2))], 0)
+    assert U.allclose(f['h'].data, ans1)
+    assert U.allclose(f['w'].data, ans2)
 
 def test_row1():
     # test row getter/setter
@@ -210,6 +222,15 @@ def test_row3():
     for k, v in f.items():
         assert U.allclose(v, data[k][newidx])
 
+def test_row4():
+    # test updating row with empty frame but has preset num_rows
+    f = FrameRef(Frame(num_rows=5))
+    rowid = Index(th.tensor([0, 2, 4]))
+    f[rowid] = {'h' : th.ones((3, 2))}
+    ans = th.zeros((5, 2))
+    ans[th.tensor([0, 2, 4])] = th.ones((3, 2))
+    assert U.allclose(f['h'], ans)
+
 def test_sharing():
     data = Frame(create_test_data())
     f1 = FrameRef(data, index=[0, 1, 2, 3])
@@ -269,14 +290,32 @@ def test_slicing():
     f2_a1[0:2] = 0
     assert U.allclose(f2['a1'], f2_a1)
 
+def test_add_rows():
+    data = Frame()
+    f1 = FrameRef(data)
+    f1.add_rows(4)
+    x = th.randn(1, 4)
+    f1[Index(th.tensor([0]))] = {'x': x}
+    ans = th.cat([x, th.zeros(3, 4)])
+    assert U.allclose(f1['x'], ans)
+    f1.add_rows(4)
+    f1[4:8] = {'x': th.ones(4, 4), 'y': th.ones(4, 5)}
+    ans = th.cat([ans, th.ones(4, 4)])
+    assert U.allclose(f1['x'], ans)
+    ans = th.cat([th.zeros(4, 5), th.ones(4, 5)])
+    assert U.allclose(f1['y'], ans)
+
 if __name__ == '__main__':
     test_create()
     test_column1()
     test_column2()
     test_append1()
     test_append2()
+    test_append3()
     test_row1()
     test_row2()
     test_row3()
+    test_row4()
     test_sharing()
     test_slicing()
+    test_add_rows()

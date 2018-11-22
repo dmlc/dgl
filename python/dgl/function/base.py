@@ -33,7 +33,7 @@ def create_bundled_function_class(name, cls):
 
     for method_name in ('__init__', '__call__', 'is_spmv_supported', 'name'):
         method = getattr(Bundled, method_name)
-        method.__qualname__ = f'{Bundled.__qualname__}.{method_name}'
+        method.__qualname__ = '{}.{}'.format(Bundled.__qualname__, method_name)
 
     for method_name in ('__call__', 'is_spmv_supported', 'name'):
         method = getattr(Bundled, method_name)
