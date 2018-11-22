@@ -61,7 +61,7 @@ def main():
 
     torch.manual_seed(args.seed)
 
-    device = torch.device("cuda:1" if use_cuda else "cpu")
+    device = torch.device("cuda" if use_cuda else "cpu")
 
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
     train_loader = torch.utils.data.DataLoader(
