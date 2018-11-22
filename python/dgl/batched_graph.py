@@ -128,8 +128,8 @@ def unbatch(graph):
     be = graph.batch_num_edges
     pttns = gi.disjoint_partition(graph._graph, utils.toindex(bn))
     # split the frames
-    node_frames = [FrameRef() for i in range(bsize)]
-    edge_frames = [FrameRef() for i in range(bsize)]
+    node_frames = [FrameRef(Frame(num_rows=n)) for n in bn]
+    edge_frames = [FrameRef(Frame(num_rows=n)) for n in be]
     for attr, col in graph._node_frame.items():
         col_splits = F.split(col, bn, dim=0)
         for i in range(bsize):
