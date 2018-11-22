@@ -88,6 +88,7 @@ class RGCNBlockLayer(RGCNLayer):
         self.num_bases = num_bases
         assert self.num_bases > 0
 
+        self.out_feat = out_feat
         self.submat_in = in_feat // self.num_bases
         self.submat_out = out_feat // self.num_bases
 
@@ -99,8 +100,12 @@ class RGCNBlockLayer(RGCNLayer):
         def msg_func(src, edge):
             weight = self.weight[edge['type']].view(-1, self.submat_in, self.submat_out)
             node = src['h'].view(-1, 1, self.submat_in)
-            msg = torch.bmm(node, weight).view(-1, self.out_feat) * edge['norm']
+            # FIXME: whose deg?
+            msg = torch.bmm(node, weight).view(-1, self.out_feat)
             return {'msg': msg}
+
+        def apply_func(nodes):
+            return {'h': nodes['h'] / nodes['deg']}
 
         # FIXME: featureless case?
         g.update_all(msg_func, fn.sum(msg='msg', out='h'), None)

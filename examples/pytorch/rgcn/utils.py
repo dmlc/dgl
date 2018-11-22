@@ -1,5 +1,4 @@
 import numpy as np
-import torch.nn.functional as F
 import torch
 import dgl
 
@@ -42,16 +41,16 @@ def sample_edge_neighborhood(adj_list, degrees, n_triplets, sample_size):
 
     return edges
 
-def generate_sampled_graph_and_labels(triplets, sample_size, split_size, num_rels, adj_list, degrees, negative_rete):
+def generate_sampled_graph_and_labels(triplets, sample_size, split_size, num_rels, adj_list, degrees, negative_rate):
     # perform edge neighbor sampling
-    edges = sample_edge_neighborhood(adjlist, degrees, len(triplets), sample_size)
+    edges = sample_edge_neighborhood(adj_list, degrees, len(triplets), sample_size)
 
     # relabel edges
     edges = triplets[edges]
     src, rel, dst = edges.transpose()
     uniq_v, edges = np.unique((src, dst), return_inverse=True)
-    src, dst = edges.view(2, -1)
-    relabeled_edges = np.stack(src, rel, dst).transpose()
+    src, dst = np.reshape(edges, (2, -1))
+    relabeled_edges = np.stack((src, rel, dst)).transpose()
 
     # negative sampling
     samples, labels = negative_sampling(relabeled_edges, len(uniq_v), negative_rate)
@@ -64,17 +63,25 @@ def generate_sampled_graph_and_labels(triplets, sample_size, split_size, num_rel
     rel = rel[graph_split_ids]
 
     # build graph
-    src, dst = np.concatenate((src, dst)), np.concatenate((dst, src))
-    rel = np.concateneate((rel, rel + num_rels))
-    edges = sorted(zip(dst, src, rel))
-    dst, src, rel = np.array(edges).transpose()
-    g = dgl.DGLGraph()
-    g.add_nodes(len(uniq_v))
-    g.add_edges(src, dst)
+    print("# sampled nodes: {}".format(len(uniq_v)))
+    print("# sampled edges: {}".format(len(src) * 2))
+    g, rel = build_graph_from_triplets(len(uniq_v), num_rels, (src, rel, dst))
     return g, uniq_v, rel, samples, labels
 
-def negative_sampling(triplets, num_entity, negative_rate):
-    size_of_batch = len(triplets)
+def build_graph_from_triplets(num_nodes, num_rels, triplets):
+    g = dgl.DGLGraph()
+    g.add_nodes(num_nodes)
+    src, rel, dst = triplets
+    src, dst = np.concatenate((src, dst)), np.concatenate((dst, src))
+    rel = np.concatenate((rel, rel + num_rels))
+    edges = sorted(zip(dst, src, rel))
+    dst, src, rel = np.array(edges).transpose()
+    g.add_edges(src, dst)
+    return g, rel
+
+
+def negative_sampling(pos_samples, num_entity, negative_rate):
+    size_of_batch = len(pos_samples)
     num_to_generate = size_of_batch * negative_rate
     neg_samples = np.tile(pos_samples, (negative_rate, 1))
     labels = np.zeros(size_of_batch * (negative_rate + 1), dtype=np.float32)
@@ -114,9 +121,9 @@ def perturb_and_get_rank(embedding, w, a, r, b, num_entity, batch_size=100):
 
 # TODO (lingfan): implement filtered metrics
 # return MRR (raw), and Hits @ (1, 3, 10)
-def evaluate(model, test_triplets, num_entity, hits=[], eval_bz=100):
+def evaluate(test_graph, model, test_triplets, num_entity, hits=[], eval_bz=100):
     with torch.no_grad():
-        embedding, w = model.evaluate()
+        embedding, w = model.evaluate(test_graph)
         s = test_triplets[:, 0]
         r = test_triplets[:, 1]
         o = test_triplets[:, 2]
