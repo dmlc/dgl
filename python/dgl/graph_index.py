@@ -32,7 +32,7 @@ class GraphIndex(object):
 
     def add_nodes(self, num):
         """Add nodes.
-        
+
         Parameters
         ----------
         num : int
@@ -43,7 +43,7 @@ class GraphIndex(object):
 
     def add_edge(self, u, v):
         """Add one edge.
-        
+
         Parameters
         ----------
         u : int
@@ -56,7 +56,7 @@ class GraphIndex(object):
 
     def add_edges(self, u, v):
         """Add many edges.
-        
+
         Parameters
         ----------
         u : utils.Index
@@ -284,7 +284,7 @@ class GraphIndex(object):
         ----------
         v : utils.Index
             The node(s).
-        
+
         Returns
         -------
         utils.Index
@@ -311,7 +311,7 @@ class GraphIndex(object):
         ----------
         v : utils.Index
             The node(s).
-        
+
         Returns
         -------
         utils.Index
@@ -338,7 +338,7 @@ class GraphIndex(object):
         ----------
         sorted : bool
             True if the returned edges are sorted by their src and dst ids.
-        
+
         Returns
         -------
         utils.Index
@@ -474,7 +474,29 @@ class GraphIndex(object):
         induced_nodes = utils.toindex(rst(1))
         return SubgraphIndex(rst(0), self, induced_nodes, e)
 
-    def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
+    def adjacency_matrix_indices_and_shape(self, transpose=False):
+        """Return the indices and dense shape of adjacency matrix representation of
+        this graph.
+
+        utils.CtxCachedObject
+            An object that returns indices tensor given context.
+        tuple
+            Dense shape of the adjacency matrix
+        """
+        if not 'adj_ind_shape' in self._cache:
+            src, dst, _ = self.edges(sorted=False)
+            src = F.unsqueeze(src.tousertensor(), 0)
+            dst = F.unsqueeze(dst.tousertensor(), 0)
+            n = self.number_of_nodes()
+            if transpose:
+                idx = F.cat([src, dst], dim=0)
+            else:
+                idx = F.cat([dst, src], dim=0)
+            cached_idx = utils.CtxCachedObject(lambda ctx: F.copy_to(idx, ctx))
+            self._cache['adj_ind_shape'] = (cached_idx, (n, n))
+        return self._cache['adj_ind_shape']
+
+    def adjacency_matrix(self, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
 
         By default, a row of returned adjacency matrix represents the destination
@@ -485,14 +507,19 @@ class GraphIndex(object):
 
         Parameters
         ----------
-        transpose : bool, optional (default=False)
+        transpose : bool
             A flag to tranpose the returned adjacency matrix.
+        ctx : context
+            The context of the returned matrix.
 
         Returns
         -------
         SparseTensor
             The adjacency matrix.
         """
+        if not isinstance(transpose, bool):
+            raise DGLError('Expect bool value for "transpose" arg,'
+                           ' but got %s.' % (type(transpose)))
         src, dst, _ = self.edges(sorted=False)
         src = src.tousertensor(ctx)  # the index of the ctx will be cached
         dst = dst.tousertensor(ctx)  # the index of the ctx will be cached
@@ -503,18 +530,38 @@ class GraphIndex(object):
         else:
             idx = F.cat([dst, src], dim=0)
         n = self.number_of_nodes()
+        m = self.number_of_edges()
         # FIXME(minjie): data type
-        dat = F.ones((self.number_of_edges(),), dtype=F.float32, ctx=ctx)
+        dat = F.ones((m,), dtype=F.float32, ctx=ctx)
         adj = F.sparse_matrix(dat, ('coo', idx), (n, n))
         return adj
 
-    def incidence_matrix(self, oriented=False, ctx=F.cpu()):
+    def incidence_matrix(self, type, ctx):
         """Return the incidence matrix representation of this graph.
-        
+
+        An incidence matrix is an n x m sparse matrix, where n is
+        the number of nodes and m is the number of edges. Each nnz
+        value indicating whether the edge is incident to the node
+        or not.
+
+        There are three types of an incidence matrix `I`:
+        * "in":
+          - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
+          - I[v, e] = 0 otherwise.
+        * "out":
+          - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
+          - I[v, e] = 0 otherwise.
+        * "both":
+          - I[v, e] = 1 if e is the in-edge of v;
+          - I[v, e] = -1 if e is the out-edge of v;
+          - I[v, e] = 0 otherwise (including self-loop).
+
         Parameters
         ----------
-        oriented : bool, optional (default=False)
-          Whether the returned incidence matrix is oriented.
+        type : str
+            Can be either "in", "out" or "both"
+        ctx : context
+            The context of returned incidence matrix.
 
         Returns
         -------
@@ -527,25 +574,36 @@ class GraphIndex(object):
         eid = eid.tousertensor(ctx)  # the index of the ctx will be cached
         n = self.number_of_nodes()
         m = self.number_of_edges()
-        # create index
-        row = F.unsqueeze(F.cat([src, dst], dim=0), 0)
-        col = F.unsqueeze(F.cat([eid, eid], dim=0), 0)
-        idx = F.cat([row, col], dim=0)
-        # create data
-        diagonal = (src == dst)
-        if oriented:
+        if type == 'in':
+            row = F.unsqueeze(dst, 0)
+            col = F.unsqueeze(eid, 0)
+            idx = F.cat([row, col], dim=0)
+            # FIXME(minjie): data type
+            dat = F.ones((m,), dtype=F.float32, ctx=ctx)
+            inc = F.sparse_matrix(dat, ('coo', idx), (n, m))
+        elif type == 'out':
+            row = F.unsqueeze(src, 0)
+            col = F.unsqueeze(eid, 0)
+            idx = F.cat([row, col], dim=0)
+            # FIXME(minjie): data type
+            dat = F.ones((m,), dtype=F.float32, ctx=ctx)
+            inc = F.sparse_matrix(dat, ('coo', idx), (n, m))
+        elif type == 'both':
+            # create index
+            row = F.unsqueeze(F.cat([src, dst], dim=0), 0)
+            col = F.unsqueeze(F.cat([eid, eid], dim=0), 0)
+            idx = F.cat([row, col], dim=0)
+            # create data
+            diagonal = (src == dst)
             # FIXME(minjie): data type
             x = -F.ones((m,), dtype=F.float32, ctx=ctx)
             y = F.ones((m,), dtype=F.float32, ctx=ctx)
             x[diagonal] = 0
             y[diagonal] = 0
             dat = F.cat([x, y], dim=0)
+            inc = F.sparse_matrix(dat, ('coo', idx), (n, m))
         else:
-            # FIXME(minjie): data type
-            x = F.ones((m,), dtype=F.float32, ctx=ctx)
-            x[diagonal] = 0
-            dat = F.cat([x, x], dim=0)
-        inc = F.sparse_matrix(dat, ('coo', idx), (n, m))
+            raise DGLError('Invalid incidence matrix type: %s' % str(type))
         return inc
 
     def to_networkx(self):
@@ -570,7 +628,7 @@ class GraphIndex(object):
 
         If 'id' edge attribute exists, the edge will be added follows
         the edge id order. Otherwise, order is undefined.
-        
+
         Parameters
         ----------
         nx_graph : networkx.DiGraph
@@ -768,7 +826,7 @@ def disjoint_union(graphs):
 
 def disjoint_partition(graph, num_or_size_splits):
     """Partition the graph disjointly.
-   
+
     This is a reverse operation of DisjointUnion. The graph will be partitioned
     into num graphs. This requires the given number of partitions to evenly
     divides the number of nodes in the graph. If the a size list is given,

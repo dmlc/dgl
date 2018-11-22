@@ -1,6 +1,7 @@
 import torch as th
 from torch.autograd import Variable
 import numpy as np
+import dgl
 from dgl.graph import DGLGraph
 import utils as U
 
@@ -40,8 +41,8 @@ def generate_graph(grad=False):
     ecol = Variable(th.randn(17, D), requires_grad=grad)
     g.ndata['h'] = ncol
     g.edata['w'] = ecol
-    g.set_n_initializer(lambda shape, dtype, ctx : th.zeros(shape, dtype=dtype, device=ctx))
-    g.set_e_initializer(lambda shape, dtype, ctx : th.zeros(shape, dtype=dtype, device=ctx))
+    g.set_n_initializer(dgl.init.zero_initializer)
+    g.set_e_initializer(dgl.init.zero_initializer)
     return g
 
 def test_batch_setter_getter():
@@ -169,6 +170,18 @@ def test_batch_recv():
     assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     reduce_msg_shapes.clear()
 
+def test_apply_nodes():
+    def _upd(nodes):
+        return {'h' : nodes.data['h'] * 2}
+    g = generate_graph()
+    g.register_apply_node_func(_upd)
+    old = g.ndata['h']
+    g.apply_nodes()
+    assert U.allclose(old * 2, g.ndata['h'])
+    u = th.tensor([0, 3, 4, 6])
+    g.apply_nodes(lambda nodes : {'h' : nodes.data['h'] * 0.}, u)
+    assert U.allclose(g.ndata['h'][u], th.zeros((4, D)))
+
 def test_apply_edges():
     def _upd(edges):
         return {'w' : edges.data['w'] * 2}
@@ -199,7 +212,7 @@ def test_update_routines():
     try:
         g.send_and_recv([u, v])
         assert False
-    except ValueError:
+    except:
         pass
 
     # pull
@@ -233,12 +246,17 @@ def test_reduce_0deg():
         return {'m' : edges.src['h']}
     def _reduce(nodes):
         return {'h' : nodes.data['h'] + nodes.mailbox['m'].sum(1)}
+    def _init2(shape, dtype, ctx, ids):
+        return 2 + th.zeros(shape, dtype=dtype, device=ctx)
+    g.set_n_initializer(_init2, 'h')
     old_repr = th.randn(5, 5)
     g.ndata['h'] = old_repr
     g.update_all(_message, _reduce)
     new_repr = g.ndata['h']
-
-    assert U.allclose(new_repr[1:], old_repr[1:])
+    # the first row of the new_repr should be the sum of all the node
+    # features; while the 0-deg nodes should be initialized by the
+    # initializer.
+    assert U.allclose(new_repr[1:], 2+th.zeros((4,5)))
     assert U.allclose(new_repr[0], old_repr.sum(0))
 
 def test_pull_0deg():
@@ -398,6 +416,7 @@ if __name__ == '__main__':
     test_batch_setter_autograd()
     test_batch_send()
     test_batch_recv()
+    test_apply_nodes()
     test_apply_edges()
     test_update_routines()
     test_reduce_0deg()
