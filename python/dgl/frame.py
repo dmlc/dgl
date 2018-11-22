@@ -2,14 +2,14 @@
 from __future__ import absolute_import
 
 from collections import MutableMapping, namedtuple
+
+import sys
 import numpy as np
 
 from . import backend as F
 from .base import DGLError, dgl_warning
+from .init import zero_initializer
 from . import utils
-
-import sys
-
 
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     """The column scheme.
@@ -159,11 +159,6 @@ class Column(object):
             return Column(data.data, data.scheme)
         else:
             return Column(data)
-
-
-def zero_initializer(shape, dtype, ctx):
-    return F.zeros(shape, dtype, ctx)
-
 
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
@@ -320,7 +315,8 @@ class Frame(MutableMapping):
         if self.get_initializer(name) is None:
             self._warn_and_set_initializer()
         init_data = self.get_initializer(name)(
-                (self.num_rows,) + scheme.shape, scheme.dtype, ctx)
+                (self.num_rows,) + scheme.shape, scheme.dtype,
+                ctx, slice(0, self.num_rows))
         self._columns[name] = Column(init_data, scheme)
 
     def add_rows(self, num_rows):
@@ -334,8 +330,6 @@ class Frame(MutableMapping):
         num_rows : int
             The number of new rows
         """
-        self._num_rows += num_rows
-
         feat_placeholders = {}
         for key, col in self._columns.items():
             scheme = col.scheme
@@ -343,10 +337,11 @@ class Frame(MutableMapping):
             if self.get_initializer(key) is None:
                 self._warn_and_set_initializer()
             new_data = self.get_initializer(key)(
-                    (num_rows,) + scheme.shape, scheme.dtype, ctx)
+                    (num_rows,) + scheme.shape, scheme.dtype,
+                    ctx, slice(self._num_rows, self._num_rows + num_rows))
             feat_placeholders[key] = new_data
-
         self._append(Frame(feat_placeholders))
+        self._num_rows += num_rows
 
     def update_column(self, name, data):
         """Add or replace the column with the given name and data.
@@ -476,6 +471,21 @@ class FrameRef(MutableMapping):
         """
         self._frame.set_initializer(initializer, column=column)
 
+    def get_initializer(self, column=None):
+        """Get the initializer for empty values for the given column.
+
+        Parameters
+        ----------
+        column : str
+            The column
+
+        Returns
+        -------
+        callable
+            The initializer
+        """
+        return self._frame.get_initializer(column)
+
     def index(self):
         """Return the index object.
 
@@ -553,6 +563,12 @@ class FrameRef(MutableMapping):
         """
         if isinstance(key, str):
             return self.select_column(key)
+        elif isinstance(key, slice) and key == slice(0, self.num_rows):
+            # shortcut for selecting all the rows
+            return self
+        elif isinstance(key, utils.Index) and key.is_slice(0, self.num_rows):
+            # shortcut for selecting all the rows
+            return self
         else:
             return self.select_rows(key)
 
@@ -616,6 +632,12 @@ class FrameRef(MutableMapping):
         """
         if isinstance(key, str):
             self.update_column(key, val, inplace=False)
+        elif isinstance(key, slice) and key == slice(0, self.num_rows):
+            # shortcut for updating all the rows
+            return self.update(val)
+        elif isinstance(key, utils.Index) and key.is_slice(0, self.num_rows):
+            # shortcut for selecting all the rows
+            return self.update(val)
         else:
             self.update_rows(key, val, inplace=False)
 
@@ -806,6 +828,33 @@ class FrameRef(MutableMapping):
         """Internal function to clear the cached object."""
         self._index = None
         self._index_or_slice = None
+
+def frame_like(other, num_rows):
+    """Create a new frame that has the same scheme as the given one.
+
+    Parameters
+    ----------
+    other : Frame
+        The given frame.
+    num_rows : int
+        The number of rows of the new one.
+
+    Returns
+    -------
+    Frame
+        The new frame.
+    """
+    # TODO(minjie): scheme is not inherited at the moment. Fix this
+    #   when moving per-col initializer to column scheme.
+    newf = Frame(num_rows=num_rows)
+    # set global initializr
+    if other.get_initializer() is None:
+        other._warn_and_set_initializer()
+    newf._default_initializer = other._default_initializer
+    # set per-col initializer
+    for key in other.keys():
+        newf.set_initializer(other.get_initializer(key), key)
+    return newf
 
 def merge_frames(frames, indices, max_index, reduce_func):
     """Merge a list of frames.

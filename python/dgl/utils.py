@@ -1,10 +1,11 @@
 """Utility module."""
-from __future__ import absolute_import
+from __future__ import absolute_import, division
 
-from collections import Mapping
+from collections import Mapping, Iterable
 from functools import wraps
 import numpy as np
 
+from .base import DGLError
 from . import backend as F
 from . import ndarray as nd
 
@@ -14,18 +15,39 @@ class Index(object):
         self._initialize_data(data)
 
     def _initialize_data(self, data):
-        self._list_data = None  # a numpy type data
+        self._list_data = None   # a numpy type data or a slice
         self._user_tensor_data = dict()  # dictionary of user tensors
         self._dgl_tensor_data = None  # a dgl ndarray
         self._dispatch(data)
+
+    def __iter__(self):
+        return iter(self.tolist())
+
+    def __len__(self):
+        if self._list_data is not None and isinstance(self._list_data, slice):
+            slc = self._list_data
+            if slc.step is None:
+                return slc.stop - slc.start
+            else:
+                return (slc.stop - slc.start) // slc.step
+        elif self._list_data is not None:
+            return len(self._list_data)
+        elif len(self._user_tensor_data) > 0:
+            data = next(iter(self._user_tensor_data.values()))
+            return len(data)
+        else:
+            return len(self._dgl_tensor_data)
+
+    def __getitem__(self, i):
+        return self.tolist()[i]
 
     def _dispatch(self, data):
         """Store data based on its type."""
         if F.is_tensor(data):
             if not (F.dtype(data) == F.int64):
-                raise ValueError('Index data must be an int64 vector, but got: %s' % str(data))
+                raise DGLError('Index data must be an int64 vector, but got: %s' % str(data))
             if len(F.shape(data)) > 1:
-                raise ValueError('Index data must be 1D int64 vector, but got: %s' % str(data))
+                raise DGLError('Index data must be 1D int64 vector, but got: %s' % str(data))
             if len(F.shape(data)) == 0:
                 # a tensor of one int
                 self._dispatch(int(data))
@@ -33,19 +55,23 @@ class Index(object):
                 self._user_tensor_data[F.context(data)] = data
         elif isinstance(data, nd.NDArray):
             if not (data.dtype == 'int64' and len(data.shape) == 1):
-                raise ValueError('Index data must be 1D int64 vector, but got: %s' % str(data))
+                raise DGLError('Index data must be 1D int64 vector, but got: %s' % str(data))
             self._dgl_tensor_data = data
+        elif isinstance(data, slice):
+            # save it in the _list_data temporarily; materialize it if `tolist` is called
+            self._list_data = data
         else:
             try:
                 self._list_data = np.array([int(data)]).astype(np.int64)
             except:
                 try:
-                    data = np.array(data).astype('int64')
+                    data = np.array(data).astype(np.int64)
                     if data.ndim != 1:
-                        raise ValueError('Index data must be 1D int64 vector, but got: %s' % str(data))
+                        raise DGLError('Index data must be 1D int64 vector,'
+                                       ' but got: %s' % str(data))
                     self._list_data = data
                 except:
-                    raise ValueError('Error index data: %s' % str(data))
+                    raise DGLError('Error index data: %s' % str(data))
             self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self._list_data)
 
     def tolist(self):
@@ -56,6 +82,10 @@ class Index(object):
             else:
                 data = self.tousertensor()
                 self._list_data = F.zerocopy_to_numpy(data)
+        elif isinstance(self._list_data, slice):
+            # convert it to numpy array
+            slc = self._list_data
+            self._list_data = np.arange(slc.start, slc.stop, slc.step).astype(np.int64)
         return self._list_data
 
     def tousertensor(self, ctx=None):
@@ -63,9 +93,13 @@ class Index(object):
         if ctx is None:
             ctx = F.cpu()
         if len(self._user_tensor_data) == 0:
-            # zero copy from dgl tensor
-            dl = self._dgl_tensor_data.to_dlpack()
-            self._user_tensor_data[F.cpu()] = F.zerocopy_from_dlpack(dl)
+            if self._dgl_tensor_data is not None:
+                # zero copy from dgl tensor
+                dl = self._dgl_tensor_data.to_dlpack()
+                self._user_tensor_data[F.cpu()] = F.zerocopy_from_dlpack(dl)
+            else:
+                # zero copy from numpy array
+                self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self.tolist())
         if ctx not in self._user_tensor_data:
             # copy from cpu to another device
             data = next(iter(self._user_tensor_data.values()))
@@ -81,20 +115,9 @@ class Index(object):
             self._dgl_tensor_data = nd.from_dlpack(dl)
         return self._dgl_tensor_data
 
-    def __iter__(self):
-        return iter(self.tolist())
-
-    def __len__(self):
-        if self._list_data is not None:
-            return len(self._list_data)
-        elif len(self._user_tensor_data) > 0:
-            data = next(iter(self._user_tensor_data.values()))
-            return len(data)
-        else:
-            return len(self._dgl_tensor_data)
-
-    def __getitem__(self, i):
-        return self.tolist()[i]
+    def is_slice(self, start, stop, step=None):
+        return (isinstance(self._list_data, slice)
+                and self._list_data == slice(start, stop, step))
 
     def __getstate__(self):
         return self.tousertensor()
@@ -104,66 +127,6 @@ class Index(object):
 
 def toindex(x):
     return x if isinstance(x, Index) else Index(x)
-
-def node_iter(n):
-    """Return an iterator that loops over the given nodes.
-
-    Parameters
-    ----------
-    n : iterable
-        The node ids.
-    """
-    return iter(n)
-
-def edge_iter(u, v):
-    """Return an iterator that loops over the given edges.
-
-    Parameters
-    ----------
-    u : iterable
-        The src ids.
-    v : iterable
-        The dst ids.
-    """
-    if len(u) == len(v):
-        # many-many
-        for uu, vv in zip(u, v):
-            yield uu, vv
-    elif len(v) == 1:
-        # many-one
-        for uu in u:
-            yield uu, v[0]
-    elif len(u) == 1:
-        # one-many
-        for vv in v:
-            yield u[0], vv
-    else:
-        raise ValueError('Error edges:', u, v)
-
-def edge_broadcasting(u, v):
-    """Convert one-many and many-one edges to many-many.
-
-    Parameters
-    ----------
-    u : Index
-        The src id(s)
-    v : Index
-        The dst id(s)
-
-    Returns
-    -------
-    uu : Index
-        The src id(s) after broadcasting
-    vv : Index
-        The dst id(s) after broadcasting
-    """
-    if len(u) != len(v) and len(u) == 1:
-        u = toindex(F.full_1d(len(v), u[0]))
-    elif len(u) != len(v) and len(v) == 1:
-        v = toindex(F.full_1d(len(u), v[0]))
-    else:
-        assert len(u) == len(v)
-    return u, v
 
 class LazyDict(Mapping):
     """A readonly dictionary that does not materialize the storage."""
@@ -185,18 +148,20 @@ class LazyDict(Mapping):
     def __len__(self):
         return len(self._keys)
 
+    def keys(self):
+        return self._keys
+
 class HybridDict(Mapping):
     """A readonly dictonary that merges several dict-like (python dict, LazyDict).
        If there are duplicate keys, early keys have priority over latter ones
     """
     def __init__(self, *dict_like_list):
         self._dict_like_list = dict_like_list
-        self._keys = None
+        self._keys = set()
+        for d in dict_like_list:
+            self._keys.update(d.keys())
 
     def keys(self):
-        if self._keys is None:
-            self._keys = sum([set(d.keys()) for d in self._dict_like_list], set())
-            self._keys = list(self._keys)
         return self._keys
 
     def __getitem__(self, key):
@@ -235,6 +200,19 @@ class ReadOnlyDict(Mapping):
 
 def build_relabel_map(x):
     """Relabel the input ids to continuous ids that starts from zero.
+
+    Ids are assigned new ids according to their ascending order.
+
+    Examples
+    --------
+    >>> x = [1, 5, 3, 6]
+    >>> n2o, o2n = build_relabel_map(x)
+    >>> n2o
+    [1, 3, 5, 6]
+    >>> o2n
+    [n/a, 0, n/a, 2, n/a, 3, 4]
+
+    "n/a" will be filled with 0
 
     Parameters
     ----------
@@ -349,17 +327,31 @@ def reorder(dict_like, index):
         new_dict[key] = F.gather_row(val, idx_ctx)
     return new_dict
 
-def parse_edges_tuple(edges):
-    """Parse the given edges and return the tuple.
+def build_coo_sparse_matrix(dat, row, col, dense_shape):
+    """Build coo sparse matrix
 
     Parameters
     ----------
-    edges : edges
-        Edges can be a pair of endpoint nodes (u, v), or a
-        tensor of edge ids. The default value is all the edges.
+    dat: Tensor
+        Data.
+    row: Tensor
+        Row index.
+    col: Tensor
+        Column index.
+    dense_shape: list or tuple of two integer
+        Dense shape of the sparse matrix
 
     Returns
     -------
-    A tuple of (u, v, eid)
+    SparseTensor
+        The sparse matrix.
     """
-    pass
+    nnz = len(row)
+    row = F.unsqueeze(row, 0)
+    col = F.unsqueeze(col, 0)
+    idx = F.cat([row, col], dim=0)
+    return F.sparse_matrix(dat, ('coo', idx), dense_shape)
+
+def is_iterable(obj):
+    """Return true if the object is an iterable."""
+    return isinstance(obj, Iterable)
