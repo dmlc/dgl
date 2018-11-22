@@ -13,9 +13,7 @@ import argparse
 import numpy as np
 import time
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-import dgl
 from dgl import DGLGraph
 from dgl.data import load_data
 import dgl.function as fn
@@ -41,13 +39,13 @@ class EmbeddingLayer(RGCNLayer):
 
 class EntityClassify(BaseRGCN):
     def create_features(self):
-        features = torch.arange(len(self.g))
+        features = torch.arange(self.num_nodes)
         if self.use_cuda:
             features = features.cuda()
         return features
 
     def build_input_layer(self):
-        return EmbeddingLayer(len(self.g), self.h_dim, self.num_rels, self.num_bases, activation=F.relu)
+        return EmbeddingLayer(self.in_dim, self.h_dim, self.num_rels, self.num_bases, activation=F.relu)
 
     def build_hidden_layer(self, idx):
         return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases, activation=F.relu)
@@ -90,7 +88,7 @@ def main(args):
     g.set_e_repr({'type': edge_type, 'norm': edge_norm})
 
     # create model
-    model = EntityClassify(g,
+    model = EntityClassify(len(g),
                            args.n_hidden,
                            labels.shape[1],
                            num_rels,
@@ -118,7 +116,7 @@ def main(args):
     for epoch in range(args.n_epochs):
         optimizer.zero_grad()
         t0 = time.time()
-        logits = model.forward()
+        logits = model.forward(g)
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         t1 = time.time()
         loss.backward()
@@ -136,7 +134,7 @@ def main(args):
     print()
 
     model.eval()
-    logits = model.forward()
+    logits = model.forward(g)
     test_loss = F.cross_entropy(logits[test_idx], labels[test_idx])
     test_acc = torch.sum(logits[test_idx].argmax(dim=1) == labels[test_idx]).item() / len(test_idx)
     print("Test Accuracy: {:.4f} | Test loss: {:.4f}".format(test_acc, test_loss.item()))

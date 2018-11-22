@@ -1,11 +1,9 @@
-import torch
 import torch.nn as nn
-import numpy as np
 
 class BaseRGCN(nn.Module):
-    def __init__(self, g, h_dim, out_dim, num_rels, num_bases=-1, num_hidden_layers=1, dropout=0, use_cuda=False):
+    def __init__(self, num_nodes, h_dim, out_dim, num_rels, num_bases=-1, num_hidden_layers=1, dropout=0, use_cuda=False):
         super(BaseRGCN, self).__init__()
-        self.g = g
+        self.num_nodes = num_nodes
         self.h_dim = h_dim
         self.out_dim = out_dim
         self.num_rels = num_rels
@@ -37,7 +35,7 @@ class BaseRGCN(nn.Module):
 
     # initialize feature for each node
     def create_features(self):
-        raise NotImplementedError
+        return None
 
     def build_input_layer(self):
         return None
@@ -48,9 +46,10 @@ class BaseRGCN(nn.Module):
     def build_output_layer(self):
         return None
 
-    def forward(self):
-        self.g.set_n_repr({'h': self.features})
+    def forward(self, g):
+        if self.features:
+            g.set_n_repr({'h': self.features})
         for layer in self.layers:
-            layer(self.g)
-        return self.g.pop_n_repr('h')
+            layer(g)
+        return g.pop_n_repr('h')
 
