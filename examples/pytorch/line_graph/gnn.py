@@ -6,6 +6,7 @@ import networkx as nx
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
 class GNNModule(nn.Module):
     def __init__(self, in_feats, out_feats, radius):

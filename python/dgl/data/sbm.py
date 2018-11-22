@@ -8,7 +8,6 @@ import numpy.random as npr
 import scipy as sp
 import networkx as nx
 
-from .. import backend as F
 from ..batched_graph import batch
 from ..graph import DGLGraph
 from ..utils import Index
@@ -94,7 +93,7 @@ class SBMMixture:
             g.from_scipy_sparse_matrix(adj)
         self._lgs = [g.line_graph(backtracking=False) for g in self._gs]
         in_degrees = lambda g: g.in_degrees(
-                Index(F.arange(0, g.number_of_nodes()))).unsqueeze(1).float()
+                Index(np.arange(0, g.number_of_nodes()))).unsqueeze(1).float()
         self._g_degs = [in_degrees(g) for g in self._gs]
         self._lg_degs = [in_degrees(lg) for lg in self._lgs]
         self._pm_pds = list(zip(*[g.edges() for g in self._gs]))[0]
@@ -118,7 +117,7 @@ class SBMMixture:
         g, lg, deg_g, deg_lg, pm_pd = zip(*x)
         g_batch = batch(g)
         lg_batch = batch(lg)
-        degg_batch = F.cat(deg_g, dim=0)
-        deglg_batch = F.cat(deg_lg, dim=0)
-        pm_pd_batch = F.cat([x + i * self._n_nodes for i, x in enumerate(pm_pd)], dim=0)
+        degg_batch = np.concatenate(deg_g, axis=0)
+        deglg_batch = np.concatenate(deg_lg, axis=0)
+        pm_pd_batch = np.concatenate([x + i * self._n_nodes for i, x in enumerate(pm_pd)], axis=0)
         return g_batch, lg_batch, degg_batch, deglg_batch, pm_pd_batch
