@@ -286,6 +286,11 @@ def check_pull_0deg(readonly):
     g.set_n_repr({'h' : old_repr})
     g.pull(0, _message, _reduce)
     new_repr = g.ndata['h']
+    # TODO(minjie): this is not the intended behavior. Pull node#0
+    #   should reset node#0 to the initial value. The bug is because
+    #   current pull is implemented using send_and_recv. Since there
+    #   is no edge to node#0 so the send_and_recv is skipped. Fix this
+    #   behavior when optimizing the pull scheduler.
     assert np.allclose(new_repr[0].asnumpy(), old_repr[0].asnumpy())
     assert np.allclose(new_repr[1].asnumpy(), old_repr[1].asnumpy())
     g.pull(1, _message, _reduce)
