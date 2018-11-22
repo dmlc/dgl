@@ -536,7 +536,7 @@ class GraphIndex(object):
         adj = F.sparse_matrix(dat, ('coo', idx), (n, n))
         return adj
 
-    def incidence_matrix(self, type, ctx=F.cpu()):
+    def incidence_matrix(self, type, ctx):
         """Return the incidence matrix representation of this graph.
 
         An incidence matrix is an n x m sparse matrix, where n is
@@ -560,7 +560,7 @@ class GraphIndex(object):
         ----------
         type : str
             Can be either "in", "out" or "both"
-        ctx : context, optional (default=cpu)
+        ctx : context
             The context of returned incidence matrix.
 
         Returns
