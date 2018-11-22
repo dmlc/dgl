@@ -1,132 +1,150 @@
 #!/usr/bin/env groovy
 
 def init_git_submodule() {
-    sh 'git submodule init'
-    sh 'git submodule update'
+  sh "git submodule init"
+  sh "git submodule update"
 }
 
 def setup() {
-    sh 'easy_install nose'
-    init_git_submodule()
+  init_git_submodule()
 }
 
 def build_dgl() {
-    sh 'if [ -d build ]; then rm -rf build; fi; mkdir build'
-    dir('python') {
-        sh 'python3 setup.py install'
-    }
-    dir ('build') {
-        sh 'cmake ..'
-        sh 'make -j$(nproc)'
-    }
+  sh "if [ -d build ]; then rm -rf build; fi; mkdir build"
+  dir("python") {
+    sh "python3 setup.py install"
+  }
+  dir ("build") {
+    sh "cmake .."
+    sh "make -j4"
+  }
 }
 
-def unit_test() {
-    withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
-        sh 'nosetests tests -v --with-xunit'
-        sh 'nosetests tests/pytorch -v --with-xunit'
-        sh 'nosetests tests/graph_index -v --with-xunit'
-    }
+def pytorch_unit_test(dev) {
+  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
+    sh "python3 -m nose -v --with-xunit tests"
+    sh "python3 -m nose -v --with-xunit tests/pytorch"
+    sh "python3 -m nose -v --with-xunit tests/graph_index"
+  }
+}
+
+def mxnet_unit_test(dev) {
+  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
+    sh "python3 -m nose -v --with-xunit tests/mxnet"
+  }
 }
 
 def example_test(dev) {
-    dir ('tests/scripts') {
-        withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build"]) {
-            sh "./test_examples.sh ${dev}"
-        }
+  dir ("tests/scripts") {
+    withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
+      sh "./task_example_test.sh ${dev}"
     }
+  }
+}
+
+def pytorch_tutorials() {
+  dir ("tests/scripts") {
+    withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
+      sh "./task_tutorial_test.sh"
+    }
+  }
 }
 
 pipeline {
-    agent none
-    stages {
-        stage('Lint Check') {
-            agent {
-                docker {
-                    image 'lingfanyu/dgl-lint'
-                }
-            }
-            stages {
-                stage('CHECK') {
-                    steps {
-                        init_git_submodule()
-                        sh 'tests/scripts/task_lint.sh'
-                    }
-                }
-            }
-        }
-        stage('Build and Test') {
-            parallel {
-                stage('CPU') {
-                    agent {
-                        docker {
-                            image 'lingfanyu/dgl-cpu'
-                        }
-                    }
-                    stages {
-                        stage('SETUP') {
-                            steps {
-                                setup()
-                            }
-                        }
-                        stage('BUILD') {
-                            steps {
-                                build_dgl()
-                            }
-                        }
-                        stage('UNIT TEST') {
-                            steps {
-                                unit_test()
-                            }
-                        }
-                        stage('EXAMPLE TEST') {
-                            steps {
-                                example_test('CPU')
-                            }
-                        }
-                    }
-                    post {
-                        always {
-                            junit '*.xml'
-                        }
-                    }
-                }
-                stage('GPU') {
-                    agent {
-                        docker {
-                            image 'lingfanyu/dgl-gpu'
-                            args '--runtime nvidia'
-                        }
-                    }
-                    stages {
-                        stage('SETUP') {
-                            steps {
-                                setup()
-                            }
-                        }
-                        stage('BUILD') {
-                            steps {
-                                build_dgl()
-                            }
-                        }
-                        stage('UNIT TEST') {
-                            steps {
-                                unit_test()
-                            }
-                        }
-                        stage('EXAMPLE TEST') {
-                            steps {
-                                example_test('GPU')
-                            }
-                        }
-                    }
-                    post {
-                        always {
-                            junit '*.xml'
-                        }
-                    }
-                }
-            }
-        }
+  agent none
+  stages {
+    stage("Lint Check") {
+      agent { docker { image "dgllib/dgl-ci-lint" } }
+      steps {
+        init_git_submodule()
+        sh "tests/scripts/task_lint.sh"
+      }
     }
+    stage("Build") {
+      parallel {
+        stage("CPU Build") {
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          steps {
+            setup()
+            build_dgl()
+          }
+        }
+        stage("GPU Build") {
+          agent {
+            docker {
+              image "dgllib/dgl-ci-gpu"
+              args "--runtime nvidia"
+            }
+          }
+          steps {
+            setup()
+            build_dgl()
+          }
+        }
+        stage("MXNet CPU Build (temp)") {
+          agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
+          steps {
+            setup()
+            build_dgl()
+          }
+        }
+      }
+    }
+    stage("Test") {
+      parallel {
+        stage("Pytorch CPU") {
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          stages {
+            stage("TH CPU unittest") {
+              steps { pytorch_unit_test("CPU") }
+            }
+            stage("TH CPU example test") {
+              steps { example_test("CPU") }
+            }
+          }
+          post {
+            always { junit "*.xml" }
+          }
+        }
+        stage("Pytorch GPU") {
+          agent {
+            docker {
+              image "dgllib/dgl-ci-gpu"
+              args "--runtime nvidia"
+            }
+          }
+          stages {
+            // TODO: have GPU unittest
+            //stage("TH GPU unittest") {
+            //  steps { pytorch_unit_test("GPU") }
+            //}
+            stage("TH GPU example test") {
+              steps { example_test("GPU") }
+            }
+          }
+          // TODO: have GPU unittest
+          //post {
+          //  always { junit "*.xml" }
+          //}
+        }
+        stage("MXNet CPU") {
+          agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
+          stages {
+            stage("MX Unittest") {
+              steps { mxnet_unit_test("CPU") }
+            }
+          }
+          post {
+            always { junit "*.xml" }
+          }
+        }
+      }
+    }
+    stage("Doc") {
+      agent { docker { image "dgllib/dgl-ci-cpu" } }
+      steps {
+        pytorch_tutorials()
+      }
+    }
+  }
 }

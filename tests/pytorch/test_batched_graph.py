@@ -1,7 +1,6 @@
-import networkx as nx
 import dgl
 import torch as th
-import numpy as np
+import utils as U
 
 def tree1():
     """Generate a tree
@@ -18,8 +17,8 @@ def tree1():
     g.add_edge(4, 1)
     g.add_edge(1, 0)
     g.add_edge(2, 0)
-    g.set_n_repr({'h' : th.Tensor([0, 1, 2, 3, 4])})
-    g.set_e_repr({'h' : th.randn(4, 10)})
+    g.ndata['h'] = th.Tensor([0, 1, 2, 3, 4])
+    g.edata['h'] = th.randn(4, 10)
     return g
 
 def tree2():
@@ -37,17 +36,13 @@ def tree2():
     g.add_edge(0, 4)
     g.add_edge(4, 1)
     g.add_edge(3, 1)
-    g.set_n_repr({'h' : th.Tensor([0, 1, 2, 3, 4])})
-    g.set_e_repr({'h' : th.randn(4, 10)})
+    g.ndata['h'] = th.Tensor([0, 1, 2, 3, 4])
+    g.edata['h'] = th.randn(4, 10)
     return g
 
 def test_batch_unbatch():
     t1 = tree1()
     t2 = tree2()
-    n1 = t1.get_n_repr()['h']
-    n2 = t2.get_n_repr()['h']
-    e1 = t1.get_e_repr()['h']
-    e2 = t2.get_e_repr()['h']
 
     bg = dgl.batch([t1, t2])
     assert bg.number_of_nodes() == 10
@@ -57,10 +52,10 @@ def test_batch_unbatch():
     assert bg.batch_num_edges == [4, 4]
 
     tt1, tt2 = dgl.unbatch(bg)
-    assert th.allclose(t1.get_n_repr()['h'], tt1.get_n_repr()['h'])
-    assert th.allclose(t1.get_e_repr()['h'], tt1.get_e_repr()['h'])
-    assert th.allclose(t2.get_n_repr()['h'], tt2.get_n_repr()['h'])
-    assert th.allclose(t2.get_e_repr()['h'], tt2.get_e_repr()['h'])
+    assert U.allclose(t1.ndata['h'], tt1.ndata['h'])
+    assert U.allclose(t1.edata['h'], tt1.edata['h'])
+    assert U.allclose(t2.ndata['h'], tt2.ndata['h'])
+    assert U.allclose(t2.edata['h'], tt2.edata['h'])
 
 def test_batch_unbatch1():
     t1 = tree1()
@@ -74,38 +69,67 @@ def test_batch_unbatch1():
     assert b2.batch_num_edges == [4, 4, 4]
 
     s1, s2, s3 = dgl.unbatch(b2)
-    assert th.allclose(t2.get_n_repr()['h'], s1.get_n_repr()['h'])
-    assert th.allclose(t2.get_e_repr()['h'], s1.get_e_repr()['h'])
-    assert th.allclose(t1.get_n_repr()['h'], s2.get_n_repr()['h'])
-    assert th.allclose(t1.get_e_repr()['h'], s2.get_e_repr()['h'])
-    assert th.allclose(t2.get_n_repr()['h'], s3.get_n_repr()['h'])
-    assert th.allclose(t2.get_e_repr()['h'], s3.get_e_repr()['h'])
+    assert U.allclose(t2.ndata['h'], s1.ndata['h'])
+    assert U.allclose(t2.edata['h'], s1.edata['h'])
+    assert U.allclose(t1.ndata['h'], s2.ndata['h'])
+    assert U.allclose(t1.edata['h'], s2.edata['h'])
+    assert U.allclose(t2.ndata['h'], s3.ndata['h'])
+    assert U.allclose(t2.edata['h'], s3.edata['h'])
 
-def test_batch_sendrecv():
+def test_batch_unbatch2():
+    # test setting/getting features after batch
+    a = dgl.DGLGraph()
+    a.add_nodes(4)
+    a.add_edges(0, [1, 2, 3])
+    b = dgl.DGLGraph()
+    b.add_nodes(3)
+    b.add_edges(0, [1, 2])
+    c = dgl.batch([a, b])
+    c.ndata['h'] = th.ones(7, 1)
+    c.edata['w'] = th.ones(5, 1)
+    assert U.allclose(c.ndata['h'], th.ones(7, 1))
+    assert U.allclose(c.edata['w'], th.ones(5, 1))
+
+def test_batch_send_then_recv():
     t1 = tree1()
     t2 = tree2()
 
     bg = dgl.batch([t1, t2])
-    bg.register_message_func(lambda src, edge: {'m' : src['h']})
-    bg.register_reduce_func(lambda node, msgs: {'h' : th.sum(msgs['m'], 1)})
+    bg.register_message_func(lambda edges: {'m' : edges.src['h']})
+    bg.register_reduce_func(lambda nodes: {'h' : th.sum(nodes.mailbox['m'], 1)})
     u = [3, 4, 2 + 5, 0 + 5]
     v = [1, 1, 4 + 5, 4 + 5]
 
-    bg.send(u, v)
-    bg.recv(v)
+    bg.send((u, v))
+    bg.recv([1, 9]) # assuming recv takes in unique nodes
 
     t1, t2 = dgl.unbatch(bg)
-    assert t1.get_n_repr()['h'][1] == 7
-    assert t2.get_n_repr()['h'][4] == 2
+    assert t1.ndata['h'][1] == 7
+    assert t2.ndata['h'][4] == 2
 
+def test_batch_send_and_recv():
+    t1 = tree1()
+    t2 = tree2()
+
+    bg = dgl.batch([t1, t2])
+    bg.register_message_func(lambda edges: {'m' : edges.src['h']})
+    bg.register_reduce_func(lambda nodes: {'h' : th.sum(nodes.mailbox['m'], 1)})
+    u = [3, 4, 2 + 5, 0 + 5]
+    v = [1, 1, 4 + 5, 4 + 5]
+
+    bg.send_and_recv((u, v))
+
+    t1, t2 = dgl.unbatch(bg)
+    assert t1.ndata['h'][1] == 7
+    assert t2.ndata['h'][4] == 2
 
 def test_batch_propagate():
     t1 = tree1()
     t2 = tree2()
 
     bg = dgl.batch([t1, t2])
-    bg.register_message_func(lambda src, edge: {'m' : src['h']})
-    bg.register_reduce_func(lambda node, msgs: {'h' : th.sum(msgs['m'], 1)})
+    bg.register_message_func(lambda edges: {'m' : edges.src['h']})
+    bg.register_reduce_func(lambda nodes: {'h' : th.sum(nodes.mailbox['m'], 1)})
     # get leaves.
 
     order = []
@@ -120,37 +144,35 @@ def test_batch_propagate():
     v = [0, 0, 1 + 5, 1 + 5]
     order.append((u, v))
 
-    bg.propagate(traverser=order)
+    bg.prop_edges(order)
     t1, t2 = dgl.unbatch(bg)
 
-    assert t1.get_n_repr()['h'][0] == 9
-    assert t2.get_n_repr()['h'][1] == 5
+    assert t1.ndata['h'][0] == 9
+    assert t2.ndata['h'][1] == 5
 
 def test_batched_edge_ordering():
     g1 = dgl.DGLGraph()
     g1.add_nodes(6)
     g1.add_edges([4, 4, 2, 2, 0], [5, 3, 3, 1, 1])
     e1 = th.randn(5, 10)
-    g1.set_e_repr({'h' : e1})
+    g1.edata['h'] = e1
     g2 = dgl.DGLGraph()
     g2.add_nodes(6)
     g2.add_edges([0, 1 ,2 ,5, 4 ,5], [1, 2, 3, 4, 3, 0])
     e2 = th.randn(6, 10)
-    g2.set_e_repr({'h' : e2})
+    g2.edata['h'] = e2
     g = dgl.batch([g1, g2])
-    r1 = g.get_e_repr()['h'][g.edge_id(4, 5)]
-    r2 = g1.get_e_repr()['h'][g1.edge_id(4, 5)]
+    r1 = g.edata['h'][g.edge_id(4, 5)]
+    r2 = g1.edata['h'][g1.edge_id(4, 5)]
     assert th.equal(r1, r2)
 
 def test_batch_no_edge():
     g1 = dgl.DGLGraph()
     g1.add_nodes(6)
     g1.add_edges([4, 4, 2, 2, 0], [5, 3, 3, 1, 1])
-    e1 = th.randn(5, 10)
     g2 = dgl.DGLGraph()
     g2.add_nodes(6)
     g2.add_edges([0, 1, 2, 5, 4, 5], [1 ,2 ,3, 4, 3, 0])
-    e2 = th.randn(6, 10)
     g3 = dgl.DGLGraph()
     g3.add_nodes(1)  # no edges
     g = dgl.batch([g1, g3, g2]) # should not throw an error
@@ -158,7 +180,9 @@ def test_batch_no_edge():
 if __name__ == '__main__':
     test_batch_unbatch()
     test_batch_unbatch1()
+    test_batch_unbatch2()
     test_batched_edge_ordering()
-    test_batch_sendrecv()
+    test_batch_send_then_recv()
+    test_batch_send_and_recv()
     test_batch_propagate()
     test_batch_no_edge()

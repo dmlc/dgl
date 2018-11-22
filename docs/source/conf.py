@@ -45,6 +45,9 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.graphviz',
+    'sphinx_gallery.gen_gallery',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -133,7 +136,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'dgl.tex', 'dgl Documentation',
+    (master_doc, 'dgl.tex', 'DGL Documentation',
      'DGL Team', 'manual'),
 ]
 
@@ -143,7 +146,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'dgl', 'dgl Documentation',
+    (master_doc, 'dgl', 'DGL Documentation',
      [author], 1)
 ]
 
@@ -154,8 +157,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'dgl', 'dgl Documentation',
-     author, 'dgl', 'One line description of project.',
+    (master_doc, 'dgl', 'DGL Documentation',
+     author, 'dgl', 'Library for deep learning on graphs.',
      'Miscellaneous'),
 ]
 
@@ -179,3 +182,34 @@ epub_exclude_files = ['search.html']
 
 
 # -- Extension configuration -------------------------------------------------
+autosummary_generate = True
+
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/{.major}'.format(sys.version_info), None),
+    'numpy': ('http://docs.scipy.org/doc/numpy/', None),
+    'scipy': ('http://docs.scipy.org/doc/scipy/reference', None),
+    'matplotlib': ('http://matplotlib.org/', None),
+    'networkx' : ('https://networkx.github.io/documentation/stable', None),
+}
+
+# sphinx gallery configurations
+from sphinx_gallery.sorting import FileNameSortKey
+
+examples_dirs = ['../../tutorials']  # path to find sources
+gallery_dirs = ['tutorials']  # path to generate docs
+reference_url = {
+    'dgl' : None,
+    'numpy': 'http://docs.scipy.org/doc/numpy/',
+    'scipy': 'http://docs.scipy.org/doc/scipy/reference',
+    'matplotlib': 'http://matplotlib.org/',
+    'networkx' : 'https://networkx.github.io/documentation/stable',
+}
+
+sphinx_gallery_conf = {
+    'backreferences_dir' : 'generated/backreferences',
+    'doc_module' : ('dgl', 'numpy'),
+    'examples_dirs' : examples_dirs,
+    'gallery_dirs' : gallery_dirs,
+    'within_subsection_order' : FileNameSortKey,
+    'filename_pattern' : '.py',
+}

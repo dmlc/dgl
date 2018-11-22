@@ -8,6 +8,8 @@
 
 #include <vector>
 #include <cstdint>
+#include <utility>
+#include <tuple>
 #include "runtime/ndarray.h"
 
 namespace dgl {
@@ -16,6 +18,7 @@ typedef uint64_t dgl_id_t;
 typedef tvm::runtime::NDArray IdArray;
 typedef tvm::runtime::NDArray DegreeArray;
 typedef tvm::runtime::NDArray BoolArray;
+typedef tvm::runtime::NDArray IntArray;
 
 class Graph;
 class GraphOp;
@@ -177,6 +180,15 @@ class Graph {
   EdgeArray EdgeIds(IdArray src, IdArray dst) const;
 
   /*!
+   * \brief Find the edge ID and return the pair of endpoints
+   * \param eid The edge ID
+   * \return a pair whose first element is the source and the second the destination.
+   */
+  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const {
+    return std::make_pair(all_edges_src_[eid], all_edges_dst_[eid]);
+  }
+
+  /*!
    * \brief Find the edge IDs and return their source and target node IDs.
    * \param eids The edge ID array.
    * \return EdgeArray containing all edges with id in eid.  The order is preserved.
@@ -300,6 +312,42 @@ class Graph {
    * \return the reversed graph
    */
   Graph Reverse() const;
+
+  /*!
+   * \brief Return the successor vector
+   * \param vid The vertex id.
+   * \return the successor vector
+   */
+  const std::vector<dgl_id_t>& SuccVec(dgl_id_t vid) const {
+    return adjlist_[vid].succ;
+  }
+
+  /*!
+   * \brief Return the out edge id vector
+   * \param vid The vertex id.
+   * \return the out edge id vector
+   */
+  const std::vector<dgl_id_t>& OutEdgeVec(dgl_id_t vid) const {
+    return adjlist_[vid].edge_id;
+  }
+
+  /*!
+   * \brief Return the predecessor vector
+   * \param vid The vertex id.
+   * \return the predecessor vector
+   */
+  const std::vector<dgl_id_t>& PredVec(dgl_id_t vid) const {
+    return reverse_adjlist_[vid].succ;
+  }
+
+  /*!
+   * \brief Return the in edge id vector
+   * \param vid The vertex id.
+   * \return the in edge id vector
+   */
+  const std::vector<dgl_id_t>& InEdgeVec(dgl_id_t vid) const {
+    return reverse_adjlist_[vid].edge_id;
+  }
 
  protected:
   friend class GraphOp;

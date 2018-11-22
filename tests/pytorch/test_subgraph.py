@@ -2,6 +2,7 @@ import torch as th
 from torch.autograd import Variable
 import numpy as np
 from dgl.graph import DGLGraph
+import utils as U
 
 D = 5
 
@@ -16,28 +17,28 @@ def generate_graph(grad=False):
     g.add_edge(9, 0)
     ncol = Variable(th.randn(10, D), requires_grad=grad)
     ecol = Variable(th.randn(17, D), requires_grad=grad)
-    g.set_n_repr({'h' : ncol})
-    g.set_e_repr({'l' : ecol})
+    g.ndata['h'] = ncol
+    g.edata['l'] = ecol
     return g
 
 def test_basics():
     g = generate_graph()
-    h = g.get_n_repr()['h']
-    l = g.get_e_repr()['l']
+    h = g.ndata['h']
+    l = g.edata['l']
     nid = [0, 2, 3, 6, 7, 9]
     sg = g.subgraph(nid)
     eid = {2, 3, 4, 5, 10, 11, 12, 13, 16}
     assert set(sg.parent_eid.numpy()) == eid
     eid = sg.parent_eid
     # the subgraph is empty initially
-    assert len(sg.get_n_repr()) == 0
-    assert len(sg.get_e_repr()) == 0
+    assert len(sg.ndata) == 0
+    assert len(sg.edata) == 0
     # the data is copied after explict copy from
     sg.copy_from_parent()
-    assert len(sg.get_n_repr()) == 1
-    assert len(sg.get_e_repr()) == 1
-    sh = sg.get_n_repr()['h']
-    assert th.allclose(h[nid], sh)
+    assert len(sg.ndata) == 1
+    assert len(sg.edata) == 1
+    sh = sg.ndata['h']
+    assert U.allclose(h[nid], sh)
     '''
     s, d, eid
     0, 1, 0
@@ -58,11 +59,11 @@ def test_basics():
     8, 9, 15      3
     9, 0, 16   1
     '''
-    assert th.allclose(l[eid], sg.get_e_repr()['l'])
+    assert U.allclose(l[eid], sg.edata['l'])
     # update the node/edge features on the subgraph should NOT
     # reflect to the parent graph.
-    sg.set_n_repr({'h' : th.zeros((6, D))})
-    assert th.allclose(h, g.get_n_repr()['h'])
+    sg.ndata['h'] = th.zeros((6, D))
+    assert U.allclose(h, g.ndata['h'])
 
 def test_merge():
     # FIXME: current impl cannot handle this case!!!
@@ -85,10 +86,10 @@ def test_merge():
 
     g.merge([sg1, sg2, sg3])
 
-    h = g.get_n_repr()['h'][:,0]
-    l = g.get_e_repr()['l'][:,0]
-    assert th.allclose(h, th.tensor([3., 0., 3., 3., 2., 0., 1., 1., 0., 1.]))
-    assert th.allclose(l,
+    h = g.ndata['h'][:,0]
+    l = g.edata['l'][:,0]
+    assert U.allclose(h, th.tensor([3., 0., 3., 3., 2., 0., 1., 1., 0., 1.]))
+    assert U.allclose(l,
             th.tensor([0., 0., 1., 1., 1., 1., 0., 0., 0., 3., 1., 4., 1., 4., 0., 3., 1.]))
     """
 

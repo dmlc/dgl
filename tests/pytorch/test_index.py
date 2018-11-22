@@ -4,6 +4,7 @@ from dgl.utils import toindex
 import numpy as np
 import torch as th
 from torch.utils import dlpack
+import utils as U
 
 def test_dlpack():
     # test dlpack conversion.
@@ -27,8 +28,21 @@ def test_dlpack():
         x[0] = 1
         assert np.allclose(y.asnumpy(), ans)
 
+    def th2nd_incontiguous():
+        import dgl.backend as F
+
+        x = th.LongTensor([[0, 1], [2, 3]])
+        ans = np.array([0, 2])
+        y = x[:2, 0]
+        # Uncomment this line and comment the one below to observe error
+        #dl = dlpack.to_dlpack(y)
+        dl = F.zerocopy_to_dlpack(y)
+        z = nd.from_dlpack(dl)
+        assert np.allclose(z.asnumpy(), ans)
+
     nd2th()
     th2nd()
+    th2nd_incontiguous()
 
 def test_index():
     ans = np.ones((10,), dtype=np.int64) * 10

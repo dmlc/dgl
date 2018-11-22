@@ -7,46 +7,26 @@
 #include <algorithm>
 
 namespace dgl {
+namespace {
+inline bool IsValidIdArray(const IdArray& arr) {
+  return arr->ctx.device_type == kDLCPU && arr->ndim == 1
+    && arr->dtype.code == kDLInt && arr->dtype.bits == 64;
+}
+}  // namespace
 
 Graph GraphOp::LineGraph(const Graph* g, bool backtracking) {
-  typedef std::pair<dgl_id_t, dgl_id_t> entry;
-  typedef std::map<dgl_id_t, std::vector<entry>> csm;  // Compressed Sparse Matrix
-
-  csm adj;
-  std::vector<entry> vec;
-  for (size_t i = 0; i != g->all_edges_src_.size(); ++i) {
-    auto u = g->all_edges_src_[i];
-    auto v = g->all_edges_dst_[i];
-    auto ret = adj.insert(csm::value_type(u, vec));
-    (ret.first)->second.push_back(std::make_pair(v, i));
-  }
-
-  std::vector<dgl_id_t> lg_src, lg_dst;
-  for (size_t i = 0; i != g->all_edges_src_.size(); ++i) {
-    auto u = g->all_edges_src_[i];
-    auto v = g->all_edges_dst_[i];
-    auto j = adj.find(v);
-    if (j != adj.end()) {
-      for (size_t k = 0; k != j->second.size(); ++k) {
-        if (backtracking || (!backtracking && j->second[k].first != u)) {
-          lg_src.push_back(i);
-          lg_dst.push_back(j->second[k].second);
-        }
+  Graph lg;
+  lg.AddVertices(g->NumEdges());
+  for (size_t i = 0; i < g->all_edges_src_.size(); ++i) {
+    const auto u = g->all_edges_src_[i];
+    const auto v = g->all_edges_dst_[i];
+    for (size_t j = 0; j < g->adjlist_[v].succ.size(); ++j) {
+      if (backtracking || (!backtracking && g->adjlist_[v].succ[j] != u)) {
+        lg.AddEdge(i, g->adjlist_[v].edge_id[j]);
       }
     }
   }
 
-  const int64_t len = lg_src.size();
-  IdArray src = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray dst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  int64_t* src_ptr = static_cast<int64_t*>(src->data);
-  int64_t* dst_ptr = static_cast<int64_t*>(dst->data);
-  std::copy(lg_src.begin(), lg_src.end(), src_ptr);
-  std::copy(lg_dst.begin(), lg_dst.end(), dst_ptr);
-
-  Graph lg;
-  lg.AddVertices(g->NumEdges());
-  lg.AddEdges(src, dst);
   return lg;
 }
 
@@ -120,6 +100,66 @@ std::vector<Graph> GraphOp::DisjointPartitionBySizes(const Graph* graph, IdArray
     CHECK_EQ(rst[i].NumEdges(), num_edges);
     node_offset += sizes_data[i];
     edge_offset += num_edges;
+  }
+  return rst;
+}
+
+IdArray GraphOp::MapParentIdToSubgraphId(IdArray parent_vids, IdArray query) {
+  CHECK(IsValidIdArray(parent_vids)) << "Invalid parent id array.";
+  CHECK(IsValidIdArray(query)) << "Invalid query id array.";
+  const auto parent_len = parent_vids->shape[0];
+  const auto query_len = query->shape[0];
+  const dgl_id_t* parent_data = static_cast<dgl_id_t*>(parent_vids->data);
+  const dgl_id_t* query_data = static_cast<dgl_id_t*>(query->data);
+  IdArray rst = IdArray::Empty({query_len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
+
+  const bool is_sorted = std::is_sorted(parent_data, parent_data + parent_len);
+  if (is_sorted) {
+    for (int64_t i = 0; i < query_len; i++) {
+      const dgl_id_t id = query_data[i];
+      const auto it = std::find(parent_data, parent_data + parent_len, id);
+      // If the vertex Id doesn't exist, the vid in the subgraph is -1.
+      if (it != parent_data + parent_len) {
+        rst_data[i] = it - parent_data;
+      } else {
+        rst_data[i] = -1;
+      }
+    }
+  } else {
+    std::unordered_map<dgl_id_t, dgl_id_t> parent_map;
+    for (int64_t i = 0; i < parent_len; i++) {
+      const dgl_id_t id = parent_data[i];
+      parent_map[id] = i;
+    }
+    for (int64_t i = 0; i < query_len; i++) {
+      const dgl_id_t id = query_data[i];
+      auto it = parent_map.find(id);
+      // If the vertex Id doesn't exist, the vid in the subgraph is -1.
+      if (it != parent_map.end()) {
+        rst_data[i] = it->second;
+      } else {
+        rst_data[i] = -1;
+      }
+    }
+  }
+  return rst;
+}
+
+IdArray GraphOp::ExpandIds(IdArray ids, IdArray offset) {
+  const auto id_len = ids->shape[0];
+  const auto off_len = offset->shape[0];
+  CHECK_EQ(id_len + 1, off_len);
+  const dgl_id_t *id_data = static_cast<dgl_id_t*>(ids->data);
+  const dgl_id_t *off_data = static_cast<dgl_id_t*>(offset->data);
+  const int64_t len = off_data[off_len - 1];
+  IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  dgl_id_t *rst_data = static_cast<dgl_id_t*>(rst->data);
+  for (int64_t i = 0; i < id_len; i++) {
+    const int64_t local_len = off_data[i + 1] - off_data[i];
+    for (int64_t j = 0; j < local_len; j++) {
+      rst_data[off_data[i] + j] = id_data[i];
+    }
   }
   return rst;
 }

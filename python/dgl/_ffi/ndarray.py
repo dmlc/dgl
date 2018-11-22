@@ -27,7 +27,6 @@ except IMPORT_EXCEPT:
     from ._ctypes.ndarray import _set_class_ndarray, _reg_extension, _make_array, _from_dlpack
     from ._ctypes.ndarray import NDArrayBase as _NDArrayBase
 
-
 def context(dev_type, dev_id=0):
     """Construct a TVM context with given device type and id.
 

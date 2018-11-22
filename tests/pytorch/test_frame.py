@@ -3,6 +3,7 @@ from torch.autograd import Variable
 import numpy as np
 from dgl.frame import Frame, FrameRef
 from dgl.utils import Index, toindex
+import utils as U
 
 N = 10
 D = 5
@@ -22,7 +23,7 @@ def create_test_data(grad=False):
 
 def test_create():
     data = create_test_data()
-    f1 = Frame()
+    f1 = Frame(num_rows=N)
     for k, v in data.items():
         f1.update_column(k, v)
     print(f1.schemes)
@@ -43,9 +44,9 @@ def test_column1():
     f = Frame(data)
     assert f.num_rows == N
     assert len(f) == 3
-    assert th.allclose(f['a1'].data, data['a1'].data)
+    assert U.allclose(f['a1'].data, data['a1'].data)
     f['a1'] = data['a2']
-    assert th.allclose(f['a2'].data, data['a2'].data)
+    assert U.allclose(f['a2'].data, data['a2'].data)
     # add a different length column should fail
     def failed_add_col():
         f['a4'] = th.zeros([N+1, D])
@@ -55,12 +56,7 @@ def test_column1():
     del f['a2']
     assert len(f) == 1
     del f['a3']
-    assert f.num_rows == 0
     assert len(f) == 0
-    # add a different length column should succeed
-    f['a4'] = th.zeros([N+1, D])
-    assert f.num_rows == N+1
-    assert len(f) == 1
 
 def test_column2():
     # Test frameref column getter/setter
@@ -68,10 +64,10 @@ def test_column2():
     f = FrameRef(data, [3, 4, 5, 6, 7])
     assert f.num_rows == 5
     assert len(f) == 3
-    assert th.allclose(f['a1'], data['a1'].data[3:8])
+    assert U.allclose(f['a1'], data['a1'].data[3:8])
     # set column should reflect on the referenced data
     f['a1'] = th.zeros([5, D])
-    assert th.allclose(data['a1'].data[3:8], th.zeros([5, D]))
+    assert U.allclose(data['a1'].data[3:8], th.zeros([5, D]))
     # add new partial column should fail with error initializer
     f.set_initializer(lambda shape, dtype : assert_(False))
     def failed_add_col():
@@ -90,7 +86,7 @@ def test_append1():
     c1 = f1['a1']
     assert c1.data.shape == (2 * N, D)
     truth = th.cat([data['a1'], data['a1']])
-    assert th.allclose(truth, c1.data)
+    assert U.allclose(truth, c1.data)
     # append dict of different length columns should fail
     f3 = {'a1' : th.zeros((3, D)), 'a2' : th.zeros((3, D)), 'a3' : th.zeros((2, D))}
     def failed_append():
@@ -118,6 +114,23 @@ def test_append2():
     assert th.all(f.index().tousertensor() == th.tensor(new_idx, dtype=th.int64))
     assert data.num_rows == 4 * N
 
+def test_append3():
+    # test append on empty frame
+    f = Frame(num_rows=5)
+    data = {'h' : th.ones((3, 2))}
+    f.append(data)
+    assert f.num_rows == 8
+    ans = th.cat([th.zeros((5, 2)), th.ones((3, 2))], dim=0)
+    assert U.allclose(f['h'].data, ans)
+    # test append with new column
+    data = {'h' : 2 * th.ones((3, 2)), 'w' : 2 * th.ones((3, 2))}
+    f.append(data)
+    assert f.num_rows == 11
+    ans1 = th.cat([ans, 2 * th.ones((3, 2))], 0)
+    ans2 = th.cat([th.zeros((8, 2)), 2 * th.ones((3, 2))], 0)
+    assert U.allclose(f['h'].data, ans1)
+    assert U.allclose(f['w'].data, ans2)
+
 def test_row1():
     # test row getter/setter
     data = create_test_data()
@@ -129,13 +142,13 @@ def test_row1():
     rows = f[rowid]
     for k, v in rows.items():
         assert v.shape == (len(rowid), D)
-        assert th.allclose(v, data[k][rowid])
+        assert U.allclose(v, data[k][rowid])
     # test duplicate keys
     rowid = Index(th.tensor([8, 2, 2, 1]))
     rows = f[rowid]
     for k, v in rows.items():
         assert v.shape == (len(rowid), D)
-        assert th.allclose(v, data[k][rowid])
+        assert U.allclose(v, data[k][rowid])
 
     # setter
     rowid = Index(th.tensor([0, 2, 4]))
@@ -145,7 +158,7 @@ def test_row1():
             }
     f[rowid] = vals
     for k, v in f[rowid].items():
-        assert th.allclose(v, th.zeros((len(rowid), D)))
+        assert U.allclose(v, th.zeros((len(rowid), D)))
 
     # setting rows with new column should raise error with error initializer
     f.set_initializer(lambda shape, dtype : assert_(False))
@@ -165,13 +178,13 @@ def test_row2():
     rowid = Index(th.tensor([0, 2]))
     rows = f[rowid]
     rows['a1'].backward(th.ones((len(rowid), D)))
-    assert th.allclose(c1.grad[:,0], th.tensor([1., 0., 1., 0., 0., 0., 0., 0., 0., 0.]))
+    assert U.allclose(c1.grad[:,0], th.tensor([1., 0., 1., 0., 0., 0., 0., 0., 0., 0.]))
     c1.grad.data.zero_()
     # test duplicate keys
     rowid = Index(th.tensor([8, 2, 2, 1]))
     rows = f[rowid]
     rows['a1'].backward(th.ones((len(rowid), D)))
-    assert th.allclose(c1.grad[:,0], th.tensor([0., 1., 2., 0., 0., 0., 0., 0., 1., 0.]))
+    assert U.allclose(c1.grad[:,0], th.tensor([0., 1., 2., 0., 0., 0., 0., 0., 1., 0.]))
     c1.grad.data.zero_()
 
     # setter
@@ -184,8 +197,8 @@ def test_row2():
     f[rowid] = vals
     c11 = f['a1']
     c11.backward(th.ones((N, D)))
-    assert th.allclose(c1.grad[:,0], th.tensor([0., 1., 0., 1., 0., 1., 1., 1., 1., 1.]))
-    assert th.allclose(vals['a1'].grad, th.ones((len(rowid), D)))
+    assert U.allclose(c1.grad[:,0], th.tensor([0., 1., 0., 1., 0., 1., 1., 1., 1., 1.]))
+    assert U.allclose(vals['a1'].grad, th.ones((len(rowid), D)))
     assert vals['a2'].grad is None
 
 def test_row3():
@@ -207,7 +220,16 @@ def test_row3():
     newidx.pop(2)
     newidx = toindex(newidx)
     for k, v in f.items():
-        assert th.allclose(v, data[k][newidx])
+        assert U.allclose(v, data[k][newidx])
+
+def test_row4():
+    # test updating row with empty frame but has preset num_rows
+    f = FrameRef(Frame(num_rows=5))
+    rowid = Index(th.tensor([0, 2, 4]))
+    f[rowid] = {'h' : th.ones((3, 2))}
+    ans = th.zeros((5, 2))
+    ans[th.tensor([0, 2, 4])] = th.ones((3, 2))
+    assert U.allclose(f['h'], ans)
 
 def test_sharing():
     data = Frame(create_test_data())
@@ -215,9 +237,9 @@ def test_sharing():
     f2 = FrameRef(data, index=[2, 3, 4, 5, 6])
     # test read
     for k, v in f1.items():
-        assert th.allclose(data[k].data[0:4], v)
+        assert U.allclose(data[k].data[0:4], v)
     for k, v in f2.items():
-        assert th.allclose(data[k].data[2:7], v)
+        assert U.allclose(data[k].data[2:7], v)
     f2_a1 = f2['a1'].data
     # test write
     # update own ref should not been seen by the other.
@@ -226,7 +248,7 @@ def test_sharing():
             'a2' : th.zeros([2, D]),
             'a3' : th.zeros([2, D]),
             }
-    assert th.allclose(f2['a1'], f2_a1)
+    assert U.allclose(f2['a1'], f2_a1)
     # update shared space should been seen by the other.
     f1[Index(th.tensor([2, 3]))] = {
             'a1' : th.ones([2, D]),
@@ -234,7 +256,54 @@ def test_sharing():
             'a3' : th.ones([2, D]),
             }
     f2_a1[0:2] = th.ones([2, D])
-    assert th.allclose(f2['a1'], f2_a1)
+    assert U.allclose(f2['a1'], f2_a1)
+
+def test_slicing():
+    data = Frame(create_test_data(grad=True))
+    f1 = FrameRef(data, index=slice(1, 5))
+    f2 = FrameRef(data, index=slice(3, 8))
+    # test read
+    for k, v in f1.items():
+        assert U.allclose(data[k].data[1:5], v)
+    f2_a1 = f2['a1'].data
+    # test write
+    f1[Index(th.tensor([0, 1]))] = {
+            'a1': th.zeros([2, D]),
+            'a2': th.zeros([2, D]),
+            'a3': th.zeros([2, D]),
+            }
+    assert U.allclose(f2['a1'], f2_a1)
+    
+    f1[Index(th.tensor([2, 3]))] = {
+            'a1': th.ones([2, D]),
+            'a2': th.ones([2, D]),
+            'a3': th.ones([2, D]),
+            }
+    f2_a1[0:2] = 1
+    assert U.allclose(f2['a1'], f2_a1)
+
+    f1[2:4] = {
+            'a1': th.zeros([2, D]),
+            'a2': th.zeros([2, D]),
+            'a3': th.zeros([2, D]),
+            }
+    f2_a1[0:2] = 0
+    assert U.allclose(f2['a1'], f2_a1)
+
+def test_add_rows():
+    data = Frame()
+    f1 = FrameRef(data)
+    f1.add_rows(4)
+    x = th.randn(1, 4)
+    f1[Index(th.tensor([0]))] = {'x': x}
+    ans = th.cat([x, th.zeros(3, 4)])
+    assert U.allclose(f1['x'], ans)
+    f1.add_rows(4)
+    f1[4:8] = {'x': th.ones(4, 4), 'y': th.ones(4, 5)}
+    ans = th.cat([ans, th.ones(4, 4)])
+    assert U.allclose(f1['x'], ans)
+    ans = th.cat([th.zeros(4, 5), th.ones(4, 5)])
+    assert U.allclose(f1['y'], ans)
 
 if __name__ == '__main__':
     test_create()
@@ -242,7 +311,11 @@ if __name__ == '__main__':
     test_column2()
     test_append1()
     test_append2()
+    test_append3()
     test_row1()
     test_row2()
     test_row3()
+    test_row4()
     test_sharing()
+    test_slicing()
+    test_add_rows()

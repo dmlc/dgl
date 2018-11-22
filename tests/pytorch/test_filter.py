@@ -1,6 +1,7 @@
 import torch as th
 import numpy as np
 from dgl.graph import DGLGraph
+import utils as U
 
 def test_filter():
     g = DGLGraph()
@@ -12,11 +13,11 @@ def test_filter():
     n_repr[[1, 3]] = 1
     e_repr[[1, 3]] = 1
 
-    g.set_n_repr({'a': n_repr})
-    g.set_e_repr({'a': e_repr})
+    g.ndata['a'] = n_repr
+    g.edata['a'] = e_repr
 
     def predicate(r):
-        return r['a'].max(1)[0] > 0
+        return r.data['a'].max(1)[0] > 0
 
     # full node filter
     n_idx = g.filter_nodes(predicate)

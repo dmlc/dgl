@@ -44,33 +44,44 @@ class TVMType(ctypes.Structure):
         2 : 'float',
         4 : 'handle'
     }
-    def __init__(self, type_str):
-        super(TVMType, self).__init__()
+    _cache = {}
+
+    def __new__(cls, type_str):
+        if type_str in cls._cache:
+            return cls._cache[type_str]
+
+        inst = super(TVMType, cls).__new__(TVMType)
+
         if isinstance(type_str, np.dtype):
             type_str = str(type_str)
         arr = type_str.split("x")
         head = arr[0]
-        self.lanes = int(arr[1]) if len(arr) > 1 else 1
+        inst.lanes = int(arr[1]) if len(arr) > 1 else 1
         bits = 32
 
         if head.startswith("int"):
-            self.type_code = 0
+            inst.type_code = 0
             head = head[3:]
         elif head.startswith("uint"):
-            self.type_code = 1
+            inst.type_code = 1
             head = head[4:]
         elif head.startswith("float"):
-            self.type_code = 2
+            inst.type_code = 2
             head = head[5:]
         elif head.startswith("handle"):
-            self.type_code = 4
+            inst.type_code = 4
             bits = 64
             head = ""
         else:
             raise ValueError("Donot know how to handle type %s" % type_str)
         bits = int(head) if head else bits
-        self.bits = bits
+        inst.bits = bits
 
+        cls._cache[type_str] = inst
+        return inst
+
+    def __init__(self, type_str):
+        pass
 
     def __repr__(self):
         x = "%s%d" % (TVMType.CODE2STR[self.type_code], self.bits)
@@ -124,10 +135,22 @@ class TVMContext(ctypes.Structure):
         'opengl': 11,
         'ext_dev': 12,
     }
+    _cache = {}
+
+    def __new__(cls, device_type, device_id):
+        if (device_type, device_id) in cls._cache:
+            return cls._cache[(device_type, device_id)]
+
+        inst = super(TVMContext, cls).__new__(TVMContext)
+
+        inst.device_type = device_type
+        inst.device_id = device_id
+
+        cls._cache[(device_type, device_id)] = inst
+        return inst
+
     def __init__(self, device_type, device_id):
-        super(TVMContext, self).__init__()
-        self.device_type = device_type
-        self.device_id = device_id
+        pass
 
     @property
     def exist(self):

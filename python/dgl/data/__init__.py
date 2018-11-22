@@ -8,7 +8,7 @@ from .utils import *
 from .sbm import SBMMixture
 
 def register_data_args(parser):
-    parser.add_argument("--dataset", type=str, required=True,
+    parser.add_argument("--dataset", type=str, required=False,
             help="The input dataset.")
     citegrh.register_args(parser)
 
