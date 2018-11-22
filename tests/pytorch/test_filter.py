@@ -17,7 +17,7 @@ def test_filter():
     g.edata['a'] = e_repr
 
     def predicate(r):
-        return r['a'].max(1)[0] > 0
+        return r.data['a'].max(1)[0] > 0
 
     # full node filter
     n_idx = g.filter_nodes(predicate)
