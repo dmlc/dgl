@@ -6,13 +6,11 @@ https://github.com/tkipf/relational-gcn
 from __future__ import print_function
 from __future__ import absolute_import
 import numpy as np
-import pickle as pkl
-import networkx as nx
 import scipy.sparse as sp
-import os, re, sys, gzip
+import os, gzip
 import rdflib as rdf
 import pandas as pd
-from collections import Counter, defaultdict
+from collections import Counter
 
 from dgl.data.utils import download, extract_archive, get_download_dir
 
@@ -87,6 +85,7 @@ class RGCNLinkDataset(object):
         self.dir = get_download_dir()
         tgz_file_path = os.path.join(self.dir, '{}.tar.gz'.format(self.name))
         download(_urls[self.name], tgz_file_path)
+        self.dir = os.path.join(self.dir, self.name)
         extract_archive(tgz_file_path, self.dir)
         self.dir = os.path.join(self.dir, self.name)
 
@@ -235,8 +234,6 @@ def _load_data(dataset_str='aifb', dataset_path=None):
     """
 
     print('Loading dataset', dataset_str)
-
-    dirname = os.path.dirname(os.path.realpath(sys.argv[0]))
 
     graph_file = os.path.join(dataset_path, '{}_stripped.nt.gz'.format(dataset_str))
     task_file = os.path.join(dataset_path, 'completeDataset.tsv')
