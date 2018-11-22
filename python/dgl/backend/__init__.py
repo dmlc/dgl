@@ -27,6 +27,12 @@ def _load_backend():
             data_type_dict = mod.__dict__[api]()
             for name, dtype in data_type_dict.items():
                 setattr(thismod, name, dtype)
+
+            # override data type dict function
+            setattr(thismod, 'data_type_dict', data_type_dict)
+            setattr(thismod,
+                    'reverse_data_type_dict',
+                    {v: k for k, v in data_type_dict.items()})
         else:
             # load functions
             if api in mod.__dict__:

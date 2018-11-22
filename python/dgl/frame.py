@@ -8,6 +8,8 @@ from . import backend as F
 from .base import DGLError, dgl_warning
 from . import utils
 
+import sys
+
 
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     """The column scheme.
@@ -16,10 +18,25 @@ class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     ----------
     shape : tuple of int
         The feature shape.
-    dtype : TVMType
+    dtype : backend-specific type object
         The feature data type.
     """
-    pass
+    # FIXME:
+    # Python 3.5.2 is unable to pickle torch dtypes; this is a workaround.
+    # I also have to create data_type_dict and reverse_data_type_dict
+    # attribute just for this bug.
+    # I raised an issue in PyTorch bug tracker:
+    # https://github.com/pytorch/pytorch/issues/14057
+    if sys.version_info.major == 3 and sys.version_info.minor == 5:
+        def __reduce__(self):
+            state = (self.shape, F.reverse_data_type_dict[self.dtype])
+            return self._reconstruct_scheme, state
+                   
+
+        @classmethod
+        def _reconstruct_scheme(cls, shape, dtype_str):
+            dtype = F.data_type_dict[dtype_str]
+            return cls(shape, dtype)
 
 def infer_scheme(tensor):
     return Scheme(tuple(F.shape(tensor)[1:]), F.dtype(tensor))
@@ -139,9 +156,14 @@ class Column(object):
     def create(data):
         """Create a new column using the given data."""
         if isinstance(data, Column):
-            return Column(data.data)
+            return Column(data.data, data.scheme)
         else:
             return Column(data)
+
+
+def zero_initializer(shape, dtype, ctx):
+    return F.zeros(shape, dtype, ctx)
+
 
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
@@ -156,11 +178,14 @@ class Frame(MutableMapping):
         this frame will NOT share columns with the given frame. So any out-place
         update on one will not reflect to the other. The inplace update will
         be seen by both. This follows the semantic of python's container.
+    num_rows : int, optional [default=0]
+        The number of rows in this frame. If ``data`` is provided, ``num_rows``
+        will be ignored and inferred from the given data.
     """
-    def __init__(self, data=None):
+    def __init__(self, data=None, num_rows=0):
         if data is None:
             self._columns = dict()
-            self._num_rows = 0
+            self._num_rows = num_rows
         else:
             # Note that we always create a new column for the given data.
             # This avoids two frames accidentally sharing the same column.
@@ -177,16 +202,33 @@ class Frame(MutableMapping):
         # Initializer for empty values. Initializer is a callable.
         # If is none, then a warning will be raised
         # in the first call and zero initializer will be used later.
-        self._initializer = None
+        self._initializers = {}  # per-column initializers
+        self._default_initializer = None
 
     def _warn_and_set_initializer(self):
         dgl_warning('Initializer is not set. Use zero initializer instead.'
                     ' To suppress this warning, use `set_initializer` to'
                     ' explicitly specify which initializer to use.')
-        self._initializer = lambda shape, dtype: F.zeros(shape, dtype)
+        self._default_initializer = zero_initializer
 
-    def set_initializer(self, initializer):
-        """Set the initializer for empty values.
+    def get_initializer(self, column=None):
+        """Get the initializer for empty values for the given column.
+
+        Parameters
+        ----------
+        column : str
+            The column
+
+        Returns
+        -------
+        callable
+            The initializer
+        """
+        return self._initializers.get(column, self._default_initializer) 
+
+    def set_initializer(self, initializer, column=None):
+        """Set the initializer for empty values, for a given column or all future
+        columns.
 
         Initializer is a callable that returns a tensor given the shape and data type.
 
@@ -194,13 +236,13 @@ class Frame(MutableMapping):
         ----------
         initializer : callable
             The initializer.
+        column : str, optional
+            The column name
         """
-        self._initializer = initializer
-
-    @property
-    def initializer(self):
-        """Return the initializer of this frame."""
-        return self._initializer
+        if column is None:
+            self._default_initializer = initializer
+        else:
+            self._initializers[column] = initializer
 
     @property
     def schemes(self):
@@ -257,8 +299,6 @@ class Frame(MutableMapping):
             The column name.
         """
         del self._columns[name]
-        if len(self._columns) == 0:
-            self._num_rows = 0
 
     def add_column(self, name, scheme, ctx):
         """Add a new column to the frame.
@@ -277,16 +317,36 @@ class Frame(MutableMapping):
         if name in self:
             dgl_warning('Column "%s" already exists. Ignore adding this column again.' % name)
             return
-        if self.num_rows == 0:
-            raise DGLError('Cannot add column "%s" using column schemes because'
-                           ' number of rows is unknown. Make sure there is at least'
-                           ' one column in the frame so number of rows can be inferred.' % name)
-        if self.initializer is None:
+        if self.get_initializer(name) is None:
             self._warn_and_set_initializer()
-        # TODO(minjie): directly init data on the targer device.
-        init_data = self.initializer((self.num_rows,) + scheme.shape, scheme.dtype)
-        init_data = F.copy_to(init_data, ctx)
+        init_data = self.get_initializer(name)(
+                (self.num_rows,) + scheme.shape, scheme.dtype, ctx)
         self._columns[name] = Column(init_data, scheme)
+
+    def add_rows(self, num_rows):
+        """Add blank rows to this frame.
+
+        For existing fields, the rows will be extended according to their
+        initializers.
+
+        Parameters
+        ----------
+        num_rows : int
+            The number of new rows
+        """
+        self._num_rows += num_rows
+
+        feat_placeholders = {}
+        for key, col in self._columns.items():
+            scheme = col.scheme
+            ctx = F.context(col.data)
+            if self.get_initializer(key) is None:
+                self._warn_and_set_initializer()
+            new_data = self.get_initializer(key)(
+                    (num_rows,) + scheme.shape, scheme.dtype, ctx)
+            feat_placeholders[key] = new_data
+
+        self._append(Frame(feat_placeholders))
 
     def update_column(self, name, data):
         """Add or replace the column with the given name and data.
@@ -299,12 +359,23 @@ class Frame(MutableMapping):
             The column data.
         """
         col = Column.create(data)
-        if self.num_columns == 0:
-            self._num_rows = len(col)
-        elif len(col) != self._num_rows:
+        if len(col) != self.num_rows:
             raise DGLError('Expected data to have %d rows, got %d.' %
-                           (self._num_rows, len(col)))
+                           (self.num_rows, len(col)))
         self._columns[name] = col
+
+    def _append(self, other):
+        # NOTE: `other` can be empty.
+        if self.num_rows == 0:
+            # if no rows in current frame; append is equivalent to
+            # directly updating columns.
+            self._columns = {key: Column.create(data) for key, data in other.items()}
+        else:
+            for key, col in other.items():
+                if key not in self._columns:
+                    # the column does not exist; init a new column
+                    self.add_column(key, col.scheme, F.context(col.data))
+                self._columns[key].extend(col.data, col.scheme)
 
     def append(self, other):
         """Append another frame's data into this frame.
@@ -320,14 +391,8 @@ class Frame(MutableMapping):
         """
         if not isinstance(other, Frame):
             other = Frame(other)
-        if len(self._columns) == 0:
-            for key, col in other.items():
-                self._columns[key] = col
-            self._num_rows = other.num_rows
-        else:
-            for key, col in other.items():
-                self._columns[key].extend(col.data, col.scheme)
-            self._num_rows += other.num_rows
+        self._append(other)
+        self._num_rows += other.num_rows
 
     def clear(self):
         """Clear this frame. Remove all the columns."""
@@ -397,7 +462,7 @@ class FrameRef(MutableMapping):
         else:
             return len(self._index_data)
 
-    def set_initializer(self, initializer):
+    def set_initializer(self, initializer, column=None):
         """Set the initializer for empty values.
 
         Initializer is a callable that returns a tensor given the shape and data type.
@@ -406,8 +471,10 @@ class FrameRef(MutableMapping):
         ----------
         initializer : callable
             The initializer.
+        column : str, optional
+            The column name
         """
-        self._frame.set_initializer(initializer)
+        self._frame.set_initializer(initializer, column=column)
 
     def index(self):
         """Return the index object.
@@ -586,28 +653,27 @@ class FrameRef(MutableMapping):
             fcol.update(self.index_or_slice(), data, inplace)
 
     def add_rows(self, num_rows):
-        """Add blank rows.
+        """Add blank rows to the underlying frame.
 
         For existing fields, the rows will be extended according to their
         initializers.
+
+        Note: only available for FrameRef that spans the whole column.  The row
+        span will extend to new rows.  Other FrameRefs referencing the same
+        frame will not be affected.
 
         Parameters
         ----------
         num_rows : int
             Number of rows to add
         """
-
-        feat_placeholders = {}
-
-        for key in self._frame:
-            scheme = self._frame[key].scheme
-
-            if self._frame.initializer is None:
-                self._frame._warn_and_set_initializer()
-            new_data = self._frame.initializer((num_rows,) + scheme.shape, scheme.dtype)
-            feat_placeholders[key] = new_data
-
-        self.append(feat_placeholders)
+        if not self.is_span_whole_column():
+            raise RuntimeError('FrameRef not spanning whole column.')
+        self._frame.add_rows(num_rows)
+        if self.is_contiguous():
+            self._index_data = slice(0, self._index_data.stop + num_rows)
+        else:
+            self._index_data.extend(range(self.num_rows, self.num_rows + num_rows))
 
     def update_rows(self, query, data, inplace):
         """Update the rows.
@@ -645,7 +711,7 @@ class FrameRef(MutableMapping):
 
         Please note that "deleted" rows are not really deleted, but simply removed
         in the reference. As a result, if two FrameRefs point to the same Frame, deleting
-        from one ref will not relect on the other. By contrast, deleting columns is real.
+        from one ref will not relect on the other. However, deleting columns is real.
 
         Parameters
         ----------
@@ -654,8 +720,6 @@ class FrameRef(MutableMapping):
         """
         if isinstance(key, str):
             del self._frame[key]
-            if len(self._frame) == 0:
-                self.clear()
         else:
             self.delete_rows(key)
 

@@ -276,10 +276,10 @@ class UpdateAllExecutor(BasicExecutor):
             if len(F.shape(dat)) > 1:
                 # The edge feature is of shape (N, 1)
                 dat = F.squeeze(dat, 1)
-            idx = F.sparse_matrix_indices(self.g.adjacency_matrix(ctx))
+            idx = F.sparse_matrix_indices(self.g.adjacency_matrix(ctx=ctx))
             adjmat = F.sparse_matrix(dat, idx, self.graph_shape)
         else:
-            adjmat = self.g.adjacency_matrix(ctx)
+            adjmat = self.g.adjacency_matrix(ctx=ctx)
         return adjmat
 
 
@@ -347,10 +347,10 @@ class SendRecvExecutor(BasicExecutor):
                 # edge feature is of shape (N, 1)
                 dat = F.squeeze(dat, dim=1)
         else:
-            # TODO(minjie): data type should be adjusted according t othe usage.
-            dat = F.ones((len(self.u), ), dtype=F.float32)
-        adjmat = F.sparse_matrix(dat, ('coo', self.graph_idx), self.graph_shape)
-        return F.copy_to(adjmat, ctx)
+            dat = F.ones((len(self.u), ), dtype=F.float32, ctx=ctx)
+        adjmat = F.sparse_matrix(
+                dat, ('coo', F.copy_to(self.graph_idx, ctx)), self.graph_shape)
+        return adjmat
 
 
 class BundledExecutor(BasicExecutor):
