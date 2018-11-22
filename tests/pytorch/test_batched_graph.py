@@ -82,6 +82,20 @@ def test_batch_unbatch1():
     assert U.allclose(t2.ndata['h'], s3.ndata['h'])
     assert U.allclose(t2.edata['h'], s3.edata['h'])
 
+def test_batch_unbatch2():
+    # test setting/getting features after batch
+    a = dgl.DGLGraph()
+    a.add_nodes(4)
+    a.add_edges(0, [1, 2, 3])
+    b = dgl.DGLGraph()
+    b.add_nodes(3)
+    b.add_edges(0, [1, 2])
+    c = dgl.batch([a, b])
+    c.ndata['h'] = th.ones(7, 1)
+    c.edata['w'] = th.ones(5, 1)
+    assert U.allclose(c.ndata['h'], th.ones(7, 1))
+    assert U.allclose(c.edata['w'], th.ones(5, 1))
+
 def test_batch_sendrecv():
     t1 = tree1()
     t2 = tree2()
@@ -159,6 +173,7 @@ def test_batch_no_edge():
 if __name__ == '__main__':
     test_batch_unbatch()
     test_batch_unbatch1()
+    test_batch_unbatch2()
     test_batched_edge_ordering()
     test_batch_sendrecv()
     test_batch_propagate()
