@@ -168,6 +168,7 @@ class HybridDict(Mapping):
         for d in self._dict_like_list:
             if key in d:
                 return d[key]
+        raise KeyError(key)
 
     def __contains__(self, key):
         return key in self.keys()

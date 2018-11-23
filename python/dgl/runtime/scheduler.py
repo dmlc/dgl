@@ -109,6 +109,10 @@ def _gen_reduce(graph, reduce_func, recv_nodes):
     nf = var.FEAT_DICT(graph._node_frame, 'nf')
     out = var.FEAT_DICT(data=tmpframe) 
 
+    if len(dst) == 0:
+        # All the recv nodes are zero-degree nodes.
+        return out
+
     if rfunc_is_list:
         # UDF message + builtin reducer
         # analyze e2v spmv
