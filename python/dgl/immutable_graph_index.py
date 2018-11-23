@@ -8,6 +8,7 @@ import scipy.sparse as sp
 from ._ffi.function import _init_api
 from . import backend as F
 from . import utils
+from .base import ALL, is_all
 
 class ImmutableGraphIndex(object):
     """Graph index object on immutable graphs.
@@ -353,9 +354,12 @@ class ImmutableGraphIndex(object):
         int
             The in degree array.
         """
-        v_array = v.tousertensor()
         deg = self._get_in_degree()
-        return utils.toindex(F.gather_row(deg, v_array))
+        if is_all(v):
+            return utils.toindex(deg)
+        else:
+            v_array = v.tousertensor()
+            return utils.toindex(F.gather_row(deg, v_array))
 
     def out_degree(self, v):
         """Return the out degree of the node.
@@ -386,9 +390,12 @@ class ImmutableGraphIndex(object):
         int
             The out degree array.
         """
-        v_array = v.tousertensor()
         deg = self._get_out_degree()
-        return utils.toindex(F.gather_row(deg, v_array))
+        if is_all(v):
+            return utils.toindex(deg)
+        else:
+            v_array = v.tousertensor()
+            return utils.toindex(F.gather_row(deg, v_array))
 
     def node_subgraph(self, v):
         """Return the induced node subgraph.

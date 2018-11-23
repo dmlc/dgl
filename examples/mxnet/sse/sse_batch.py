@@ -56,7 +56,7 @@ class SSEUpdateHidden(gluon.Block):
 
     def forward(self, g, vertices):
         if vertices is None:
-            deg = mx.nd.expand_dims(g.in_degrees(np.arange(0, g.number_of_nodes())), 1).astype(np.float32)
+            deg = mx.nd.expand_dims(g.in_degrees(), 1).astype(np.float32)
             feat = g.get_n_repr()['in']
             cat = mx.nd.concat(feat, g.ndata['h'], dim=1)
             accum = mx.nd.dot(g.adjacency_matrix(), cat) / deg
@@ -98,7 +98,7 @@ class DGLSSEUpdateHidden(gluon.Block):
         else:
             msg_func = gcn_msg
             reduce_func = gcn_reduce
-        deg = mx.nd.expand_dims(g.in_degrees(np.arange(0, g.number_of_nodes())), 1).astype(np.float32)
+        deg = mx.nd.expand_dims(g.in_degrees(), 1).astype(np.float32)
         if vertices is None:
             g.update_all(msg_func, reduce_func, None)
             if self.use_spmv:

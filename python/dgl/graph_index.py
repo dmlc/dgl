@@ -385,6 +385,9 @@ class GraphIndex(object):
         int
             The in degree array.
         """
+        if is_all(v):
+            v = np.arange(0, self.number_of_nodes(), dtype=np.int64)
+            v = utils.toindex(v)
         v_array = v.todgltensor()
         return utils.toindex(_CAPI_DGLGraphInDegrees(self._handle, v_array))
 
@@ -416,6 +419,9 @@ class GraphIndex(object):
         int
             The out degree array.
         """
+        if is_all(v):
+            v = np.arange(0, self.number_of_nodes(), dtype=np.int64)
+            v = utils.toindex(v)
         v_array = v.todgltensor()
         return utils.toindex(_CAPI_DGLGraphOutDegrees(self._handle, v_array))
 
