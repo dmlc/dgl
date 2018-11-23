@@ -194,7 +194,6 @@ def main(args, data):
     print("eval size: " + str(len(eval_vs)))
     eval_labels = mx.nd.take(labels, eval_vs)
     in_feats = features.shape[1]
-    n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
 
     # create the SSE model
@@ -337,8 +336,7 @@ class GraphData:
         csr = mx.nd.sparse.csr_matrix((edge_ids, csr.indices, csr.indptr), shape=csr.shape, dtype=np.int64)
         self.graph = MXNetGraph(csr)
         self.features = mx.nd.random.normal(shape=(csr.shape[0], num_feats))
-        self.labels = mx.nd.floor(mx.nd.random.normal(loc=0, scale=10, shape=(csr.shape[0])))
-        self.num_labels = 10
+        self.labels = mx.nd.floor(mx.nd.random.uniform(low=0, high=10, shape=(csr.shape[0])))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
