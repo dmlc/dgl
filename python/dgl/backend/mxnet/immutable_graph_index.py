@@ -27,6 +27,7 @@ class ImmutableGraphIndex(object):
     def __init__(self, in_csr, out_csr):
         self._in_csr = in_csr
         self._out_csr = out_csr
+        self._cached_adj = {}
 
     def number_of_nodes(self):
         """Return the number of nodes.
@@ -322,6 +323,9 @@ class ImmutableGraphIndex(object):
         NDArray
             An object that returns tensor given context.
         """
+        if transpose in self._cached_adj:
+            return self._cached_adj[transpose].as_in_context(ctx)
+
         if transpose:
             mat = self._out_csr
         else:
@@ -329,8 +333,10 @@ class ImmutableGraphIndex(object):
 
         indices = mat.indices
         indptr = mat.indptr
-        data = mx.nd.ones(indices.shape, dtype=np.float32, ctx=ctx)
-        return mx.nd.sparse.csr_matrix((data, indices, indptr), shape=mat.shape, ctx=ctx)
+        data = mx.nd.ones(indices.shape, dtype=np.float32)
+        adj = mx.nd.sparse.csr_matrix((data, indices, indptr), shape=mat.shape)
+        self._cached_adj[transpose] = adj
+        return adj.as_in_context(ctx)
 
     def from_coo_matrix(self, out_coo):
         """construct the graph index from a SciPy coo matrix.
