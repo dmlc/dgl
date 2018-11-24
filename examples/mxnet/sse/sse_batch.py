@@ -254,7 +254,6 @@ def main(args, data):
         neigh_expand = args.neigh_expand
     # initialize graph
     dur = []
-    train_time = 0
     sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, neigh_expand,
             neighbor_type='in', num_workers=args.num_parallel_subgraphs, seed_nodes=train_vs,
             shuffle=True)
@@ -270,6 +269,7 @@ def main(args, data):
         num_nodes = 0
         num_edges = 0
         sampler.restart()
+        train_time = 0
         for subg, seeds, subg_seeds in sampler:
             tmp = time.time()
             num_nodes += subg.number_of_nodes()
