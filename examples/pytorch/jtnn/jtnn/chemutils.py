@@ -251,8 +251,7 @@ def enum_attach_nx(ctr_mol, nei_node, amap, singletons):
     return att_confs
 
 #Try rings first: Speed-Up 
-def enum_assemble_nx(graph, node_idx, neighbors, prev_nodes=[], prev_amap=[]):
-    node = graph.nodes_dict[node_idx]
+def enum_assemble_nx(node, neighbors, prev_nodes=[], prev_amap=[]):
     all_attach_confs = []
     singletons = [nei_node['nid'] for nei_node in neighbors + prev_nodes if nei_node['mol'].GetNumAtoms() == 1]
 
