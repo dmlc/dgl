@@ -314,7 +314,7 @@ def dfs_assemble_nx(graph, cur_mol, global_amap, fa_amap, cur_node_id, fa_node_i
     neighbors = singletons + neighbors
 
     cur_amap = [(fa_nid,a2,a1) for nid,a1,a2 in fa_amap if nid == cur_node['nid']]
-    cands = enum_assemble_nx(graph, cur_node_id, neighbors, prev_nodes, cur_amap)
+    cands = enum_assemble_nx(graph.nodes_dict[cur_node_id], neighbors, prev_nodes, cur_amap)
     if len(cands) == 0:
         return
 

@@ -101,7 +101,7 @@ class DGLMolTree(DGLGraph):
                       if self.nodes_dict[j]['mol'].GetNumAtoms() == 1]
         neighbors = singletons + neighbors
 
-        cands = enum_assemble_nx(self, i, neighbors)
+        cands = enum_assemble_nx(self.nodes_dict[i], neighbors)
 
         if len(cands) > 0:
             self.nodes_dict[i]['cands'], self.nodes_dict[i]['cand_mols'], _ = list(zip(*cands))

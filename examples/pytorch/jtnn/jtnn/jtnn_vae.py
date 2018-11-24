@@ -94,7 +94,6 @@ class DGLJTNNVAE(nn.Module):
         self.tree_vec = tree_vec
 
         word_loss, topo_loss, word_acc, topo_acc = self.decoder(mol_trees, tree_vec)
-        _test_mol_tree = self.decoder.decode(mol_vec[0:1])
         assm_loss, assm_acc = self.assm(mol_batch, mol_tree_batch, mol_vec)
         stereo_loss, stereo_acc = self.stereo(mol_batch, mol_vec)
 

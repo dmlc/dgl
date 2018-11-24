@@ -1,6 +1,6 @@
 from jtnn.datautils import JTNNDataset, JTNNCollator
 from official.datautils import MoleculeDataset
-from jtnn.mpn import mol2dgl, DGLMPN
+from jtnn.mpn import DGLMPN
 from official.mpn import MPN, mol2graph
 from jtnn.jtnn_enc import DGLJTNNEncoder
 from official.jtnn_enc import JTNNEncoder
@@ -10,7 +10,7 @@ from jtnn.jtmpn import DGLJTMPN
 from official.jtmpn import JTMPN
 from official.mol_tree import MolTree, Vocab
 from jtnn.mol_tree_nx import DGLMolTree
-from jtnn.jtnn_vae import dgl_set_batch_nodeID, DGLJTNNVAE
+from jtnn.jtnn_vae import DGLJTNNVAE
 from official.jtnn_vae import set_batch_nodeID, JTNNVAE
 import torch
 from torch import nn
