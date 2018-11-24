@@ -8,13 +8,11 @@ import dgl
 from .base import ALL, is_all, DGLError, dgl_warning
 from . import backend as F
 from .frame import FrameRef, Frame, merge_frames
-from .function.message import BundledMessageFunction
-from .function.reducer import BundledReduceFunction
 from .graph_index import GraphIndex, create_graph_index
-from . import scheduler
-from .udf import NodeBatch, EdgeBatch
+from .runtime import ir, scheduler, Runtime
 from . import utils
 from .view import NodeView, EdgeView
+from .udf import NodeBatch, EdgeBatch
 
 __all__ = ['DGLGraph']
 
@@ -27,7 +25,7 @@ class DGLGraph(object):
     two bi-directional edges.
 
     Nodes are identified by consecutive integers starting from zero.
-    
+
     Edges can be specified by two end points (u, v) or the integer id assigned
     when the edges are added.
 
@@ -735,7 +733,7 @@ class DGLGraph(object):
         """
         return self._edge_frame.schemes
 
-    def set_n_initializer(self, initializer):
+    def set_n_initializer(self, initializer, field=None):
         """Set the initializer for empty node features.
 
         Initializer is a callable that returns a tensor given the shape, data type
@@ -745,10 +743,17 @@ class DGLGraph(object):
         ----------
         initializer : callable
             The initializer.
-        """
-        self._node_frame.set_initializer(initializer)
+        field : str, optional
+            The feature field name. Default is set an initializer for all the
+            feature fields.
 
-    def set_e_initializer(self, initializer):
+        See Also
+        --------
+        dgl.init.base_initializer
+        """
+        self._node_frame.set_initializer(initializer, field)
+
+    def set_e_initializer(self, initializer, field=None):
         """Set the initializer for empty edge features.
 
         Initializer is a callable that returns a tensor given the shape, data type
@@ -758,8 +763,15 @@ class DGLGraph(object):
         ----------
         initializer : callable
             The initializer.
+        field : str, optional
+            The feature field name. Default is set an initializer for all the
+            feature fields.
+
+        See Also
+        --------
+        dgl.init.base_initializer
         """
-        self._edge_frame.set_initializer(initializer)
+        self._edge_frame.set_initializer(initializer, field)
 
     @property
     def nodes(self):
@@ -949,7 +961,7 @@ class DGLGraph(object):
         else:
             eid = utils.toindex(eid)
             return self._edge_frame.select_rows(eid)
-        
+
     def pop_e_repr(self, key):
         """Get and remove the specified edge repr.
 
@@ -1017,8 +1029,16 @@ class DGLGraph(object):
         v : int, iterable of int, tensor, optional
             The node id(s).
         """
-        self._internal_apply_nodes(v, func, inplace=inplace)
-    
+        if func == "default":
+            func = self._apply_node_func
+        if is_all(v):
+            v = utils.toindex(slice(0, self.number_of_nodes()))
+        else:
+            v = utils.toindex(v)
+        with ir.prog() as prog:
+            scheduler.schedule_apply_nodes(graph=self, v=v, apply_func=func)
+            Runtime.run(prog)
+
     def apply_edges(self, func="default", edges=ALL):
         """Apply the function on the edge features.
 
@@ -1040,8 +1060,7 @@ class DGLGraph(object):
         assert func is not None
 
         if is_all(edges):
-            eid = ALL
-            u, v, _ = self._graph.edges()
+            u, v, eid = self._graph.edges()
         elif isinstance(edges, tuple):
             u, v = edges
             u = utils.toindex(u)
@@ -1052,12 +1071,10 @@ class DGLGraph(object):
             eid = utils.toindex(edges)
             u, v, _ = self._graph.find_edges(eid)
 
-        src_data = self.get_n_repr(u)
-        edge_data = self.get_e_repr(eid)
-        dst_data = self.get_n_repr(v)
-        eb = EdgeBatch(self, (u, v, eid),
-                src_data, edge_data, dst_data)
-        self.set_e_repr(func(eb), eid)
+        with ir.prog() as prog:
+            scheduler.schedule_apply_edges(graph=self, u=u, v=v,
+                    eid=eid, apply_func=func)
+            Runtime.run(prog)
 
     def send(self, edges, message_func="default"):
         """Send messages along the given edges.
@@ -1078,8 +1095,6 @@ class DGLGraph(object):
         if message_func == "default":
             message_func = self._message_func
         assert message_func is not None
-        if isinstance(message_func, (tuple, list)):
-            message_func = BundledMessageFunction(message_func)
 
         if is_all(edges):
             eid = ALL
@@ -1094,20 +1109,19 @@ class DGLGraph(object):
             eid = utils.toindex(edges)
             u, v, _ = self._graph.find_edges(eid)
 
-        src_data = self.get_n_repr(u)
-        edge_data = self.get_e_repr(eid)
-        dst_data = self.get_n_repr(v)
-        eb = EdgeBatch(self, (u, v, eid),
-                src_data, edge_data, dst_data)
-        msgs = message_func(eb)
+        with ir.prog() as prog:
+            scheduler.schedule_send(graph=self, u=u, v=v, eid=eid,
+                                    message_func=message_func)
+            Runtime.run(prog)
+
+        # update message graph and frame
         self._msg_graph.add_edges(u, v)
-        self._msg_frame.append(msgs)
 
     def recv(self,
-             u,
+             v,
              reduce_func="default",
              apply_node_func="default"):
-        """Receive and reduce in-coming messages and update representation on node u.
+        """Receive and reduce in-coming messages and update representation on node v.
 
         TODO(minjie): document on zero-in-degree case
         TODO(minjie): document on how returned new features are merged with the old features
@@ -1115,7 +1129,7 @@ class DGLGraph(object):
 
         Parameters
         ----------
-        u : node, container or tensor
+        v : node, container or tensor
           The node to be updated.
         reduce_func : callable
           The reduce function.
@@ -1124,14 +1138,10 @@ class DGLGraph(object):
         """
         if reduce_func == "default":
             reduce_func = self._reduce_func
+        if apply_node_func == "default":
+            apply_node_func = self._apply_node_func
         assert reduce_func is not None
-        if isinstance(reduce_func, (list, tuple)):
-            reduce_func = BundledReduceFunction(reduce_func)
-        self._batch_recv(u, reduce_func)
-        # optional apply nodes
-        self.apply_nodes(apply_node_func, u)
 
-    def _batch_recv(self, v, reduce_func):
         if self._msg_frame.num_rows == 0:
             # no message has ever been sent
             return
@@ -1146,53 +1156,13 @@ class DGLGraph(object):
             # no vertex to be triggered.
             return
 
-        # degree bucketing
-        degrees, v_buckets = scheduler.degree_bucketing(self._msg_graph, v)
-        if degrees == [0]:
-            # no message has been sent to the specified node
-            return
+        with ir.prog() as prog:
+            scheduler.schedule_recv(graph=self, recv_nodes=v,
+                    reduce_func=reduce_func, apply_func=apply_node_func)
+            Runtime.run(prog)
 
-        reordered_v = []
-        new_reprs = []
-        has_zero_degree = False
-        for deg, v_bkt in zip(degrees, v_buckets):
-            if deg == 0:
-                # no need to trigger reduce func for zero-degree nodes
-                has_zero_degree = True
-                continue
-            bkt_len = len(v_bkt)
-            v_data = self.get_n_repr(v_bkt)
-            uu, vv, in_msg_ids = self._msg_graph.in_edges(v_bkt)
-            in_msgs = self._msg_frame.select_rows(in_msg_ids)
-            # Reshape the column tensor to (B, Deg, ...).
-            def _reshape_fn(msg):
-                msg_shape = F.shape(msg)
-                new_shape = (bkt_len, deg) + msg_shape[1:]
-                return F.reshape(msg, new_shape)
-            reshaped_in_msgs = utils.LazyDict(
-                    lambda key: _reshape_fn(in_msgs[key]), self._msg_frame.schemes)
-            reordered_v.append(v_bkt.tousertensor())
-            nb = NodeBatch(self, v_bkt, v_data, reshaped_in_msgs)
-            new_reprs.append(reduce_func(nb))
-
-        # TODO(minjie): clear partial messages
+        # FIXME(minjie): multi send bug
         self.reset_messages()
-
-        # Pack all reducer results together
-        reordered_v = F.cat(reordered_v, dim=0)
-        keys = new_reprs[0].keys()
-        new_reprs = {key : F.cat([repr[key] for repr in new_reprs], dim=0)
-                     for key in keys}
-
-        if v_is_all and not has_zero_degree:
-            # First do reorder and then replace the whole column.
-            _, indices = F.sort_1d(reordered_v)
-            indices = utils.toindex(indices)
-            new_reprs = utils.reorder(new_reprs, indices)
-            self.set_n_repr(new_reprs)
-        else:
-            # Use setter to do reorder.
-            self.set_n_repr(new_reprs, reordered_v)
 
     def send_and_recv(self,
                       edges,
@@ -1223,12 +1193,11 @@ class DGLGraph(object):
         """
         if message_func == "default":
             message_func = self._message_func
-        elif isinstance(message_func, (tuple, list)):
-            message_func = BundledMessageFunction(message_func)
         if reduce_func == "default":
             reduce_func = self._reduce_func
-        elif isinstance(reduce_func, (list, tuple)):
-            reduce_func = BundledReduceFunction(reduce_func)
+        if apply_node_func == "default":
+            apply_node_func = self._apply_node_func
+
         assert message_func is not None
         assert reduce_func is not None
 
@@ -1246,35 +1215,10 @@ class DGLGraph(object):
             # no edges to be triggered
             return
 
-        if not self.is_multigraph:
-            executor = scheduler.get_executor(
-                    'send_and_recv', self, src=u, dst=v,
-                    message_func=message_func, reduce_func=reduce_func)
-        else:
-            executor = None
-
-        if executor:
-            accum = executor.run()
-            unique_v = executor.recv_nodes
-        else:
-            # message func
-            src_data = self.get_n_repr(u)
-            edge_data = self.get_e_repr(eid)
-            dst_data = self.get_n_repr(v)
-            eb = EdgeBatch(self, (u, v, eid),
-                    src_data, edge_data, dst_data)
-            msgs = message_func(eb)
-            msg_frame = FrameRef(Frame(msgs))
-            # recv with degree bucketing
-            executor = scheduler.get_recv_executor(graph=self,
-                                                   reduce_func=reduce_func,
-                                                   message_frame=msg_frame,
-                                                   edges=(u, v))
-            assert executor is not None
-            accum = executor.run()
-            unique_v = executor.recv_nodes
-
-        self._internal_apply_nodes(unique_v, apply_node_func, reduce_accum=accum)
+        with ir.prog() as prog:
+            scheduler.schedule_snr(self, (u, v, eid),
+                    message_func, reduce_func, apply_node_func)
+            Runtime.run(prog)
 
     def pull(self,
              v,
@@ -1294,13 +1238,24 @@ class DGLGraph(object):
         apply_node_func : callable, optional
           The update function.
         """
+        if message_func == "default":
+            message_func = self._message_func
+        if reduce_func == "default":
+            reduce_func = self._reduce_func
+        if apply_node_func == "default":
+            apply_node_func = self._apply_node_func
+
+        assert message_func is not None
+        assert reduce_func is not None
+
         v = utils.toindex(v)
         if len(v) == 0:
             return
-        uu, vv, _ = self._graph.in_edges(v)
-        self.send_and_recv((uu, vv), message_func, reduce_func, apply_node_func=None)
-        unique_v = F.unique(v.tousertensor())
-        self.apply_nodes(apply_node_func, unique_v)
+        with ir.prog() as prog:
+            scheduler.schedule_pull(graph=self, v=v,
+                    message_func=message_func, reduce_func=reduce_func,
+                    apply_func=apply_node_func)
+            Runtime.run(prog)
 
     def push(self,
              u,
@@ -1320,12 +1275,24 @@ class DGLGraph(object):
         apply_node_func : callable
           The update function.
         """
+        if message_func == "default":
+            message_func = self._message_func
+        if reduce_func == "default":
+            reduce_func = self._reduce_func
+        if apply_node_func == "default":
+            apply_node_func = self._apply_node_func
+
+        assert message_func is not None
+        assert reduce_func is not None
+
         u = utils.toindex(u)
         if len(u) == 0:
             return
-        uu, vv, _ = self._graph.out_edges(u)
-        self.send_and_recv((uu, vv), message_func,
-                reduce_func, apply_node_func)
+        with ir.prog() as prog:
+            scheduler.schedule_push(graph=self, u=u,
+                    message_func=message_func, reduce_func=reduce_func,
+                    apply_func=apply_node_func)
+            Runtime.run(prog)
 
     def update_all(self,
                    message_func="default",
@@ -1346,17 +1313,15 @@ class DGLGraph(object):
             message_func = self._message_func
         if reduce_func == "default":
             reduce_func = self._reduce_func
+        if apply_node_func == "default":
+            apply_node_func = self._apply_node_func
         assert message_func is not None
         assert reduce_func is not None
 
-        executor = scheduler.get_executor(
-                "update_all", self, message_func=message_func, reduce_func=reduce_func)
-        if executor:
-            new_reprs = executor.run()
-            self._internal_apply_nodes(ALL, apply_node_func, reduce_accum=new_reprs)
-        else:
-            self.send(ALL, message_func)
-            self.recv(ALL, reduce_func, apply_node_func)
+        with ir.prog() as prog:
+            scheduler.schedule_update_all(graph=self, message_func=message_func,
+                    reduce_func=reduce_func, apply_func=apply_node_func)
+            Runtime.run(prog)
 
     def prop_nodes(self,
                    nodes_generator,
@@ -1534,34 +1499,44 @@ class DGLGraph(object):
 
         Returns
         -------
-        sparse_tensor
+        SparseTensor
             The adjacency matrix.
         """
-        if not isinstance(transpose, bool):
-            raise DGLError('Expect bool value for "transpose" arg,'
-                           ' but got %s.' % (type(transpose)))
         return self._graph.adjacency_matrix(transpose, ctx)
 
-    def incidence_matrix(self, oriented=False, ctx=F.cpu()):
+    def incidence_matrix(self, type, ctx=F.cpu()):
         """Return the incidence matrix representation of this graph.
+
+        An incidence matrix is an n x m sparse matrix, where n is
+        the number of nodes and m is the number of edges. Each nnz
+        value indicating whether the edge is incident to the node
+        or not.
+
+        There are three types of an incidence matrix `I`:
+        * "in":
+          - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
+          - I[v, e] = 0 otherwise.
+        * "out":
+          - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
+          - I[v, e] = 0 otherwise.
+        * "both":
+          - I[v, e] = 1 if e is the in-edge of v;
+          - I[v, e] = -1 if e is the out-edge of v;
+          - I[v, e] = 0 otherwise (including self-loop).
 
         Parameters
         ----------
-        oriented : bool, optional
-            Whether the returned incidence matrix is oriented.
-
-        ctx : optional
+        type : str
+            Can be either "in", "out" or "both"
+        ctx : context, optional (default=cpu)
             The context of returned incidence matrix.
 
         Returns
         -------
-        sparse_tensor
+        SparseTensor
             The incidence matrix.
         """
-        if not isinstance(oriented, bool):
-            raise DGLError('Expect bool value for "oriented" arg,'
-                           ' but got %s.' % (type(oriented)))
-        return self._graph.incidence_matrix(oriented, ctx)
+        return self._graph.incidence_matrix(type, ctx)
 
     def line_graph(self, backtracking=True, shared=False):
         """Return the line graph of this graph.
@@ -1589,10 +1564,9 @@ class DGLGraph(object):
         Parameters
         ----------
         predicate : callable
-            The predicate should take in a dict of tensors whose values
-            are concatenation of node representations by node ID (same as
-            get_n_repr()), and return a boolean tensor with N elements
-            indicating which node satisfy the predicate.
+            The predicate should take in a NodeBatch object, and return a
+            boolean tensor with N elements indicating which node satisfy
+            the predicate.
         nodes : container or tensor
             The nodes to filter on
 
@@ -1601,8 +1575,14 @@ class DGLGraph(object):
         tensor
             The filtered nodes
         """
-        n_repr = self.get_n_repr(nodes)
-        n_mask = predicate(n_repr)
+        if is_all(nodes):
+            v = utils.toindex(slice(0, self.number_of_nodes()))
+        else:
+            v = utils.toindex(nodes)
+
+        n_repr = self.get_n_repr(v)
+        nb = NodeBatch(self, v, n_repr)
+        n_mask = predicate(nb)
 
         if is_all(nodes):
             return F.nonzero_1d(n_mask)
@@ -1616,10 +1596,9 @@ class DGLGraph(object):
         Parameters
         ----------
         predicate : callable
-            The predicate should take in a dict of tensors whose values
-            are concatenation of edge representations by edge ID,
-            and return a boolean tensor with N elements indicating which
-            node satisfy the predicate.
+            The predicate should take in an EdgeBatch object, and return a
+            boolean tensor with E elements indicating which edge satisfy
+            the predicate.
         edges : edges
             Edges can be a pair of endpoint nodes (u, v), or a
             tensor of edge ids. The default value is all the edges.
@@ -1629,41 +1608,29 @@ class DGLGraph(object):
         tensor
             The filtered edges
         """
-        e_repr = self.get_e_repr(edges)
-        e_mask = predicate(e_repr)
+        if is_all(edges):
+            eid = ALL
+            u, v, _ = self._graph.edges()
+        elif isinstance(edges, tuple):
+            u, v = edges
+            u = utils.toindex(u)
+            v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            u, v, eid = self._graph.edge_ids(u, v)
+        else:
+            eid = utils.toindex(edges)
+            u, v, _ = self._graph.find_edges(eid)
+
+        src_data = self.get_n_repr(u)
+        edge_data = self.get_e_repr(eid)
+        dst_data = self.get_n_repr(v)
+        eb = EdgeBatch(self, (u, v, eid),
+                src_data, edge_data, dst_data)
+
+        e_mask = predicate(eb)
 
         if is_all(edges):
             return F.nonzero_1d(e_mask)
         else:
             edges = F.tensor(edges)
             return edges[e_mask]
-
-    def _internal_apply_nodes(self, v, apply_node_func="default", reduce_accum=None,
-            inplace=False):
-        """Internal apply nodes
-
-        Parameters
-        ----------
-        reduce_accum: dict-like
-            The output of reduce func
-        """
-        if apply_node_func == "default":
-            apply_node_func = self._apply_node_func
-        if not apply_node_func:
-            # Skip none function call.
-            if reduce_accum is not None:
-                # write reduce result back
-                self.set_n_repr(reduce_accum, v, inplace=inplace)
-            return
-        # take out current node repr
-        curr_repr = self.get_n_repr(v)
-        if reduce_accum is not None:
-            # merge current node_repr with reduce output
-            curr_repr = utils.HybridDict(reduce_accum, curr_repr)
-        nb = NodeBatch(self, v, curr_repr)
-        new_repr = apply_node_func(nb)
-        if reduce_accum is not None:
-            # merge new node_repr with reduce output
-            reduce_accum.update(new_repr)
-            new_repr = reduce_accum
-        self.set_n_repr(new_repr, v, inplace=inplace)

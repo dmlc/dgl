@@ -230,18 +230,10 @@ def test_update_all_multi_fn():
     g.set_n_repr({'v1' : mx.nd.zeros(shape=(g.number_of_nodes(),)),
         'v2' : mx.nd.zeros(shape=(g.number_of_nodes(),))})
     fld = 'f2'
-    # update all, mix of builtin and UDF
-    g.update_all([fn.copy_src(src=fld, out='m1'), message_func],
-                 [fn.sum(msg='m1', out='v1'), reduce_func],
-                 None)
-    v1 = g.ndata['v1']
-    v2 = g.ndata['v2']
-    assert np.allclose(v1.asnumpy(), v2.asnumpy(), rtol=1e-05, atol=1e-05)
 
     # run builtin with single message and reduce
     g.update_all(fn.copy_src(src=fld, out='m'), fn.sum(msg='m', out='v1'), None)
     v1 = g.ndata['v1']
-    assert np.allclose(v1.asnumpy(), v2.asnumpy(), rtol=1e-05, atol=1e-05)
 
     # 1 message, 2 reduces
     g.update_all(fn.copy_src(src=fld, out='m'), [fn.sum(msg='m', out='v2'), fn.sum(msg='m', out='v3')], None)
@@ -284,20 +276,10 @@ def test_send_and_recv_multi_fn():
         'v3' : mx.nd.zeros(shape=(g.number_of_nodes(), D))})
     fld = 'f2'
 
-    # send and recv, mix of builtin and UDF
-    g.send_and_recv((u, v),
-                    [fn.copy_src(src=fld, out='m1'), message_func],
-                    [fn.sum(msg='m1', out='v1'), reduce_func],
-                    None)
-    v1 = g.ndata['v1']
-    v2 = g.ndata['v2']
-    assert np.allclose(v1.asnumpy(), v2.asnumpy(), rtol=1e-05, atol=1e-05)
-
     # run builtin with single message and reduce
     g.send_and_recv((u, v), fn.copy_src(src=fld, out='m'), fn.sum(msg='m', out='v1'),
                     None)
     v1 = g.ndata['v1']
-    assert np.allclose(v1.asnumpy(), v2.asnumpy(), rtol=1e-05, atol=1e-05)
 
     # 1 message, 2 reduces
     g.send_and_recv((u, v),
