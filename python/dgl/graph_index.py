@@ -7,7 +7,7 @@ import scipy
 
 from ._ffi.base import c_array
 from ._ffi.function import _init_api
-from .base import DGLError
+from .base import DGLError, is_all
 from . import backend as F
 from . import utils
 from .immutable_graph_index import create_immutable_graph_index
