@@ -148,7 +148,10 @@ def copy_to_gpu(subg, ctx):
 
 class CachedSubgraph(object):
     def __init__(self, subg, seeds, subg_seeds):
-        self.subg = subg
+        # We can't cache the input subgraph because it contains node frames
+        # and data frames.
+        self.subg = dgl.DGLSubGraph(subg._parent, subg._parent_nid, subg._parent_eid,
+                                subg._graph)
         self.seeds = seeds
         self.subg_seeds = subg_seeds
 
