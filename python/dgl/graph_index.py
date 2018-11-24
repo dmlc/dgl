@@ -84,6 +84,16 @@ class GraphIndex(object):
         """
         return bool(_CAPI_DGLGraphIsMultigraph(self._handle))
 
+    def is_readonly(self):
+        """Indicate whether the graph index is read-only.
+
+        Returns
+        -------
+        bool
+            True if it is a read-only graph, False otherwise.
+        """
+        return False
+
     def number_of_nodes(self):
         """Return the number of nodes.
 

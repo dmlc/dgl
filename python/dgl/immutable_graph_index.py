@@ -74,6 +74,16 @@ class ImmutableGraphIndex(object):
         # Immutable graph doesn't support multi-edge.
         return False
 
+    def is_readonly(self):
+        """Indicate whether the graph index is read-only.
+
+        Returns
+        -------
+        bool
+            True if it is a read-only graph, False otherwise.
+        """
+        return True
+
     def number_of_nodes(self):
         """Return the number of nodes.
 
