@@ -10,6 +10,7 @@ import time
 import math
 import mxnet as mx
 from mxnet import gluon
+from mxnet import profiler
 import dgl
 import dgl.function as fn
 from dgl import DGLGraph
@@ -237,10 +238,15 @@ def main(args, data):
         'lr_scheduler': scheduler}, kvstore=mx.kv.create('device'))
 
     # compute vertex embedding.
+    tmp = time.time()
     all_hidden = update_hidden_infer(g, None)
+    all_hidden.wait_to_read()
+    print("infer: " + str(time.time() - tmp))
     g.ndata['h'] = all_hidden
     rets = []
     rets.append(all_hidden)
+
+    profiler.set_config(profile_all=True, aggregate_stats=True, filename='profile_output.json')
 
     if args.neigh_expand <= 0:
         neigh_expand = g.number_of_nodes()
@@ -248,6 +254,7 @@ def main(args, data):
         neigh_expand = args.neigh_expand
     # initialize graph
     dur = []
+    train_time = 0
     sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, neigh_expand,
             neighbor_type='in', num_workers=args.num_parallel_subgraphs, seed_nodes=train_vs,
             shuffle=True)
@@ -257,9 +264,17 @@ def main(args, data):
         train_loss = 0
         i = 0
         num_batches = len(train_vs) / args.batch_size
+        if epoch == 1:
+            profiler.set_state('run')
         start1 = time.time()
+        num_nodes = 0
+        num_edges = 0
         sampler.restart()
         for subg, seeds, subg_seeds in sampler:
+            tmp = time.time()
+            num_nodes += subg.number_of_nodes()
+            num_edges += subg.number_of_edges()
+            train_start = time.time()
             subg.copy_from_parent()
 
             losses = []
@@ -290,28 +305,42 @@ def main(args, data):
                         + " subgraphs takes " + str(end1 - start1))
                 start1 = end1
 
+            train_time += (time.time() - train_start)
             if i > num_batches / 3:
                 break
+        if epoch == 1:
+            profiler.set_state('stop')
+        print("sampling: #nodes: " + str(num_nodes) + ", #edges: " + str(num_edges))
 
         # prediction.
+        tmp = time.time()
         logits = model_infer(g, eval_vs)
         eval_loss = mx.nd.softmax_cross_entropy(logits, eval_labels)
         eval_loss = eval_loss.asnumpy()[0]
+        print("eval: " + str(time.time() - tmp))
 
         # update the inference model.
+        tmp = time.time()
         infer_params = model_infer.collect_params()
         for key in infer_params:
             idx = trainer._param2idx[key]
             trainer._kvstore.pull(idx, out=infer_params[key].data())
+        print("kvstore: " + str(time.time() - tmp))
 
         # Update node embeddings.
+        tmp = time.time()
         all_hidden = update_hidden_infer(g, None)
+        all_hidden.wait_to_read()
+        print("infer: " + str(time.time() - tmp))
         g.ndata['h'] = all_hidden
         rets.append(all_hidden)
 
         dur.append(time.time() - t0)
+        print("train takes " + str(train_time))
         print("Epoch {:05d} | Train Loss {:.4f} | Eval Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
             epoch, train_loss, eval_loss, np.mean(dur), n_edges / np.mean(dur) / 1000))
+
+    print(profiler.dumps())
 
     return rets
 
@@ -380,6 +409,6 @@ if __name__ == '__main__':
     else:
         data = load_data(args)
     rets1 = main(args, data)
-    rets2 = main(args, data)
-    for hidden1, hidden2 in zip(rets1, rets2):
-        print("hidden: " + str(mx.nd.sum(mx.nd.abs(hidden1 - hidden2)).asnumpy()))
+    #rets2 = main(args, data)
+    #for hidden1, hidden2 in zip(rets1, rets2):
+    #    print("hidden: " + str(mx.nd.sum(mx.nd.abs(hidden1 - hidden2)).asnumpy()))
