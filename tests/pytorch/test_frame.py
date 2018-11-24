@@ -269,6 +269,21 @@ def test_slicing():
     f2_a1[0:2] = 0
     assert U.allclose(f2['a1'], f2_a1)
 
+def test_add_rows():
+    data = Frame()
+    f1 = FrameRef(data)
+    f1.add_rows(4)
+    x = th.randn(1, 4)
+    f1[Index(th.tensor([0]))] = {'x': x}
+    ans = th.cat([x, th.zeros(3, 4)])
+    assert U.allclose(f1['x'], ans)
+    f1.add_rows(4)
+    f1[4:8] = {'x': th.ones(4, 4), 'y': th.ones(4, 5)}
+    ans = th.cat([ans, th.ones(4, 4)])
+    assert U.allclose(f1['x'], ans)
+    ans = th.cat([th.zeros(4, 5), th.ones(4, 5)])
+    assert U.allclose(f1['y'], ans)
+
 if __name__ == '__main__':
     test_create()
     test_column1()
@@ -280,3 +295,4 @@ if __name__ == '__main__':
     test_row3()
     test_sharing()
     test_slicing()
+    test_add_rows()
