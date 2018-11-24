@@ -1398,8 +1398,7 @@ class DGLGraph(object):
         """
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
-        return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
-                sgi, readonly=self._readonly)
+        return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
 
     def subgraphs(self, nodes):
         """Generate the subgraphs among the given nodes.
@@ -1421,7 +1420,7 @@ class DGLGraph(object):
         induced_nodes = [utils.toindex(n) for n in nodes]
         sgis = self._graph.node_subgraphs(induced_nodes)
         return [dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
-            sgi, readonly=self._readonly) for sgi in sgis]
+            sgi) for sgi in sgis]
 
     def edge_subgraph(self, edges):
         """Generate the subgraph among the given edges.

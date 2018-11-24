@@ -54,7 +54,7 @@ class NSSubgraphLoader(object):
                                                self._num_hops, self._neighbor_type,
                                                self._node_prob, self._max_subgraph_size)
         subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
-                i, readonly=self._g._readonly) for i in sgi]
+                i) for i in sgi]
         self._subgraphs.extend(subgraphs)
         self._seed_ids.extend(seed_ids)
 
