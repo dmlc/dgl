@@ -1,17 +1,17 @@
 """
 Learning Deep Generative Models of Graphs
 Paper: https://arxiv.org/pdf/1803.03324.pdf
-
-This implementation works with a minibatch of size 1 only for both training and inference.
+This implementation works with a minibatch of size larger than 1 for training and 1 for inference.
 """
 import argparse
 import datetime
 import time
+import torch
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torch.nn.utils import clip_grad_norm_
 
-from model import DGMG
+from model_batch import DGMG
 
 
 def main(opts):
@@ -24,14 +24,14 @@ def main(opts):
         dataset = CycleDataset(fname=opts['path_to_dataset'])
         evaluator = CycleModelEvaluation(v_min=opts['min_size'],
                                          v_max=opts['max_size'],
-                                         dir=opts['log_dir'])
+                                         dir = opts['log_dir'])
         printer = CyclePrinting(num_epochs=opts['nepochs'],
-                                num_batches=opts['ds_size'] // opts['batch_size'])
+                                num_batches=len(dataset) // opts['batch_size'])
     else:
         raise ValueError('Unsupported dataset: {}'.format(opts['dataset']))
 
-    data_loader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=0,
-                             collate_fn=dataset.collate_single)
+    data_loader = DataLoader(dataset, batch_size=opts['batch_size'], shuffle=True, num_workers=0,
+                             collate_fn=dataset.collate_batch)
 
     # Initialize_model
     model = DGMG(v_max=opts['max_size'],
@@ -49,37 +49,22 @@ def main(opts):
     # Training
     model.train()
     for epoch in range(opts['nepochs']):
-        batch_count = 0
-        batch_loss = 0
-        batch_prob = 0
-        optimizer.zero_grad()
+        for batch, data in enumerate(data_loader):
 
-        for i, data in enumerate(data_loader):
-
-            log_prob = model(actions=data)
-            prob = log_prob.detach().exp()
+            log_prob = model(batch_size=opts['batch_size'], actions=data)
 
             loss = - log_prob / opts['batch_size']
-            prob_averaged = prob / opts['batch_size']
+            batch_avg_prob = (log_prob / opts['batch_size']).detach().exp()
+            batch_avg_loss = loss.item()
 
+            optimizer.zero_grad()
             loss.backward()
+            if opts['clip_grad']:
+                clip_grad_norm_(model.parameters(), opts['clip_bound'])
+            optimizer.step()
 
-            batch_loss += loss.item()
-            batch_prob += prob_averaged.item()
-            batch_count += 1
-
-            if batch_count % opts['batch_size'] == 0:
-                printer.update(epoch + 1, {'averaged_loss': batch_loss,
-                                           'averaged_prob': batch_prob})
-
-                if opts['clip_grad']:
-                    clip_grad_norm_(model.parameters(), opts['clip_bound'])
-
-                optimizer.step()
-
-                batch_loss = 0
-                batch_prob = 0
-                optimizer.zero_grad()
+            printer.update(epoch + 1,  {'averaged loss': batch_avg_loss,
+                                        'averaged prob': batch_avg_prob})
 
     t3 = time.time()
 
@@ -96,9 +81,12 @@ def main(opts):
     print('On average, an epoch takes {}.'.format(datetime.timedelta(
         seconds=(t3-t2) / opts['nepochs'])))
 
+    del model.g_list
+    torch.save(model, './model.pth')
+
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='DGMG')
+    parser = argparse.ArgumentParser(description='batched DGMG')
 
     # configure
     parser.add_argument('--seed', type=int, default=9284, help='random seed')
