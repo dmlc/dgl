@@ -459,7 +459,6 @@ def test_pull_multi_fallback():
     # nodes to pull
     def _pull_nodes(nodes):
         # compute ground truth
-        print('>>>>')
         g.pull(nodes, _mfunc_hxw1, _rfunc_m1, _afunc)
         o1 = g.ndata.pop('o1')
         g.pull(nodes, _mfunc_hxw2, _rfunc_m2, _afunc)
@@ -509,19 +508,19 @@ def test_pull_multi_fallback():
         assert U.allclose(o3, g.ndata.pop('o3'))
     # test#1: non-0deg nodes
     nodes = [1, 2, 9]
-    #_pull_nodes(nodes)
+    _pull_nodes(nodes)
     # test#2: 0deg nodes + non-0deg nodes
     nodes = [0, 1, 2, 9]
     _pull_nodes(nodes)
 
 if __name__ == '__main__':
-    #test_v2v_update_all()
-    #test_v2v_snr()
-    #test_v2v_pull()
-    #test_v2v_update_all_multi_fn()
-    #test_v2v_snr_multi_fn()
-    #test_e2v_update_all_multi_fn()
-    #test_e2v_snr_multi_fn()
-    #test_e2v_recv_multi_fn()
-    #test_update_all_multi_fallback()
+    test_v2v_update_all()
+    test_v2v_snr()
+    test_v2v_pull()
+    test_v2v_update_all_multi_fn()
+    test_v2v_snr_multi_fn()
+    test_e2v_update_all_multi_fn()
+    test_e2v_snr_multi_fn()
+    test_e2v_recv_multi_fn()
+    test_update_all_multi_fallback()
     test_pull_multi_fallback()

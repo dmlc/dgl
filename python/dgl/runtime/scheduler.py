@@ -71,7 +71,8 @@ def schedule_recv(graph, recv_nodes, reduce_func, apply_func):
     src, dst, mid = graph._msg_graph.in_edges(recv_nodes)
     if len(mid) == 0:
         # All recv nodes are 0-degree nodes; downgrade to apply nodes.
-        schedule_apply_nodes(graph, recv_nodes, apply_func)
+        if apply_func is not None:
+            schedule_apply_nodes(graph, recv_nodes, apply_func)
     else:
         var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
         # sort and unique the argument
@@ -122,8 +123,9 @@ def schedule_update_all(graph, message_func, reduce_func, apply_func):
     """
     if graph.number_of_edges() == 0:
         # All the nodes are zero degree; downgrade to apply nodes
-        nodes = utils.toindex(slice(0, graph.number_of_nodes()))
-        schedule_apply_nodes(graph, nodes, apply_func)
+        if apply_func is not None:
+            nodes = utils.toindex(slice(0, graph.number_of_nodes()))
+            schedule_apply_nodes(graph, nodes, apply_func)
     else:
         call_type = 'update_all'
         src, dst, _ = graph._graph.edges()
@@ -250,7 +252,8 @@ def schedule_pull(graph, pull_nodes, message_func, reduce_func, apply_func):
     u, v, eid = graph._graph.in_edges(pull_nodes)
     if len(eid) == 0:
         # All the nodes are 0deg; downgrades to apply.
-        schedule_apply_nodes(graph, pull_nodes, apply_func)
+        if apply_func is not None:
+            schedule_apply_nodes(graph, pull_nodes, apply_func)
     else:
         call_type = 'send_and_recv'
         pull_nodes, _ = F.sort_1d(F.unique(pull_nodes.tousertensor()))
@@ -359,7 +362,9 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
         # UDF message + builtin reducer
         # analyze e2v spmv
         spmv_rfunc, rfunc = spmv.analyze_e2v_spmv(graph, rfunc)
-        inc = spmv.build_inc_matrix(call_type, graph, mid, dst)
+        # FIXME: refactor this when fixing the multi-recv bug
+        mat = spmv.build_incmat_by_eid(graph._msg_frame.num_rows, mid, dst, recv_nodes)
+        inc = utils.CtxCachedObject(lambda ctx : F.copy_to(mat, ctx))
         spmv.gen_e2v_spmv_schedule(inc, spmv_rfunc, msg, out)
 
         if len(rfunc) == 0:
@@ -415,7 +420,8 @@ def _gen_send_reduce(
         # builtin message + builtin reducer
         # analyze v2v spmv
         spmv_pairs, mfunc, rfunc = spmv.analyze_v2v_spmv(graph, mfunc, rfunc)
-        adj = spmv.build_adj_matrix(call_type, graph, var_u.data, var_v.data)
+        adj = spmv.build_adj_matrix(call_type, graph,
+                (var_u.data, var_v.data), recv_nodes)
         spmv.gen_v2v_spmv_schedule(adj, spmv_pairs, var_nf, var_ef, var_eid, var_out)
 
         if len(mfunc) == 0:
@@ -437,7 +443,7 @@ def _gen_send_reduce(
         # UDF message + builtin reducer
         # analyze e2v spmv
         spmv_rfunc, rfunc = spmv.analyze_e2v_spmv(graph, rfunc)
-        inc = spmv.build_inc_matrix(call_type, graph, var_eid.data, var_v.data)
+        inc = spmv.build_inc_matrix(call_type, graph, var_v.data, recv_nodes)
         spmv.gen_e2v_spmv_schedule(inc, spmv_rfunc, var_mf, var_out)
 
         if len(rfunc) == 0:
