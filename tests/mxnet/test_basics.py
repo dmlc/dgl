@@ -286,10 +286,11 @@ def check_pull_0deg(readonly):
         return {'h' : nodes.data['h'] * 2}
     def _init2(shape, dtype, ctx, ids):
         return 2 + mx.nd.zeros(shape, dtype=dtype, ctx=ctx)
+    g.set_n_initializer(_init2, 'h')
     old_repr = mx.nd.random.normal(shape=(2, 5))
-    g.ndata['h'] = old_repr
 
     # test#1: pull only 0-deg node
+    g.ndata['h'] = old_repr
     g.pull(0, _message, _reduce, _apply)
     new_repr = g.ndata['h']
     # 0deg check: equal to apply_nodes
@@ -308,12 +309,10 @@ def check_pull_0deg(readonly):
 
     # test#3: pull only both nodes
     g.ndata['h'] = old_repr
-    g.pull([0, 1], _message, _reduce)
+    g.pull([0, 1], _message, _reduce, _apply)
     new_repr = g.ndata['h']
     # 0deg check: init and applied
     t = mx.nd.zeros(shape=(2,5)) + 4
-    print(old_repr)
-    print(new_repr)
     assert np.allclose(new_repr[0].asnumpy(), t.asnumpy())
     # non-0deg check: recv node0 and applied
     assert np.allclose(new_repr[1].asnumpy(), old_repr[0].asnumpy() * 2)
