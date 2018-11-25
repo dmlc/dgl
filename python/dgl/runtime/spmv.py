@@ -181,7 +181,7 @@ def build_adj_matrix_index_uv(graph, edges, reduce_nodes):
         The dense shape.
     """
     # TODO(minjie): add node frontier for this
-    new2old, old2new = utils.build_relabel_map(reduce_nodes)
+    new2old, old2new = utils.build_relabel_map(reduce_nodes, sorted=True)
     u, v = edges
     u = u.tousertensor()
     v = v.tousertensor()
@@ -300,7 +300,7 @@ def build_incmat_by_eid(m, eid, dst, reduce_nodes):
     Sparse matrix
         The incidence matrix on CPU
     """
-    new2old, old2new = utils.build_relabel_map(reduce_nodes)
+    new2old, old2new = utils.build_relabel_map(reduce_nodes, sorted=True)
     dst = dst.tousertensor()
     eid = eid.tousertensor()
     # relabel edges dsts
