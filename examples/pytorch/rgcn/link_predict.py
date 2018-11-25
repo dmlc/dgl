@@ -17,10 +17,13 @@ import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import random
 from dgl.data import load_data
 
 from layers import RGCNBlockLayer as RGCNLayer
 from model import BaseRGCN
+import gc
+import objgraph
 
 import utils
 
@@ -30,7 +33,7 @@ class EmbeddingLayer(nn.Module):
         self.embedding = torch.nn.Embedding(num_nodes, h_dim)
 
     def forward(self, g):
-        node_id = g.get_n_repr()['id']
+        node_id = g.ndata['id'].squeeze()
         g.ndata['h'] = self.embedding(node_id)
 
 class RGCN(BaseRGCN):
@@ -39,15 +42,19 @@ class RGCN(BaseRGCN):
 
     def build_hidden_layer(self, idx):
         act = F.relu if idx < self.num_hidden_layers - 1 else None
-        return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases, activation=act, self_loop=True, dropout=self.dropout)
+        return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases,
+                         activation=act, self_loop=True, dropout=self.dropout)
 
 class LinkPredict(nn.Module):
-    def __init__(self, in_dim, h_dim, num_rels, num_bases=-1, num_hidden_layers=1, dropout=0, use_cuda=False, reg_param=0):
+    def __init__(self, in_dim, h_dim, num_rels, num_bases=-1,
+                 num_hidden_layers=1, dropout=0, use_cuda=False, reg_param=0):
         super(LinkPredict, self).__init__()
-        self.rgcn = RGCN(in_dim, h_dim, h_dim, num_rels * 2, num_bases, num_hidden_layers, dropout, use_cuda)
+        self.rgcn = RGCN(in_dim, h_dim, h_dim, num_rels * 2, num_bases,
+                         num_hidden_layers, dropout, use_cuda)
         self.reg_param = reg_param
         self.w_relation = nn.Parameter(torch.Tensor(num_rels, h_dim))
-        nn.init.xavier_uniform_(self.w_relation, gain=nn.init.calculate_gain('relu'))
+        nn.init.xavier_uniform_(self.w_relation,
+                                gain=nn.init.calculate_gain('relu'))
 
     def calc_score(self, embedding, triplets):
         s = embedding[triplets[:,0]]
@@ -86,7 +93,8 @@ def main(args):
     # build test graph
     test_graph, test_rel = utils.build_test_graph(
         num_nodes, num_rels, train_data)
-    test_deg = test_graph.in_degrees(range(test_graph.number_of_nodes()))
+    test_deg = test_graph.in_degrees(
+                range(test_graph.number_of_nodes())).float().view(-1,1)
 
     # check cuda
     use_cuda = args.gpu >= 0 and torch.cuda.is_available()
@@ -105,8 +113,8 @@ def main(args):
 
     valid_data = torch.LongTensor(valid_data)
     test_data = torch.LongTensor(test_data)
-    test_node_id = torch.arange(0, num_nodes, dtype=torch.long)
-    test_rel = torch.from_numpy(test_rel)
+    test_node_id = torch.arange(0, num_nodes, dtype=torch.long).view(-1, 1)
+    test_rel = torch.from_numpy(test_rel).view(-1, 1)
     if use_cuda:
         model.cuda()
         valid_data = valid_data.cuda()
@@ -141,12 +149,27 @@ def main(args):
     forward_time = []
     backward_time = []
     epoch = 0
+    objgraph.show_growth(limit=3)
     while True:
         epoch += 1
+        print("Epoch {:03d}".format(epoch))
+
+        model.train()
+        #optimizer.zero_grad()
+        gc.collect()
         if use_cuda:
             torch.cuda.empty_cache()
-        model.train()
-        print("Epoch {:03d}".format(epoch))
+        objgraph.show_growth()
+        if epoch > 1:
+            aaa = 0
+            for idx, tensor in enumerate(objgraph.by_type('Tensor')):
+                aaa += tensor.shape[0] * tensor.shape[1]
+                del tensor
+            print(aaa)
+        gc.collect()
+        if use_cuda:
+            torch.cuda.empty_cache()
+
 
         # generate graph and data
         g, node_id, edge_type, data, labels = \
@@ -154,10 +177,10 @@ def main(args):
                 train_data, args.graph_batch_size, args.graph_split_size,
                 num_rels, adj_list, degrees, args.negative_sample)
         print("Done edge sampling")
-        node_id = torch.from_numpy(node_id)
-        edge_type = torch.from_numpy(edge_type)
+        node_id = torch.from_numpy(node_id).view(-1, 1)
+        edge_type = torch.from_numpy(edge_type).view(-1, 1)
         data, labels = torch.from_numpy(data), torch.from_numpy(labels)
-        deg = g.in_degrees(range(g.number_of_nodes()))
+        deg = g.in_degrees(range(g.number_of_nodes())).float().view(-1, 1)
         if use_cuda:
             node_id, deg = node_id.cuda(), deg.cuda()
             edge_type = edge_type.cuda()
@@ -165,7 +188,6 @@ def main(args):
         g.ndata.update({'id': node_id, 'deg': deg})
         g.edata['type'] = edge_type
 
-        optimizer.zero_grad()
         t0 = time.time()
         loss = model.get_loss(g, data, labels)
         t1 = time.time()
@@ -180,9 +202,26 @@ def main(args):
         print("Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".format(
                 forward_time[-1], backward_time[-1]))
 
+        if use_cuda:
+            torch.cuda.synchronize()
+        node_id = None
+        edge_type = None
+        data = None
+        labels = None
+        deg = None
+
+        del loss
+        loss = None
+        g = None
+        optimizer.zero_grad()
+        for p in model.parameters():
+            p.grad = None
+
         if epoch % args.evaluate_every == 0:
+            gc.collect()
             if use_cuda:
                 torch.cuda.empty_cache()
+            time.sleep(10)
             model.eval()
             mrr = utils.evaluate(test_graph, model, valid_data, num_nodes,
                                  hits=[1, 3, 10], eval_bz=args.eval_batch_size)
@@ -194,6 +233,7 @@ def main(args):
                 best_mrr = mrr
                 torch.save({'state_dict': model.state_dict(), 'epoch': epoch},
                            model_state_file)
+        """
 
     print("training done")
     print("Mean iteration forward time: {:4f}".format(
@@ -201,11 +241,15 @@ def main(args):
     print("Mean iteration backward time: {:4f}".format(
             np.mean(backward_time[len(backward_time) // 4:])))
 
-    forward_time = np.sum(np.reshape(forward_time, (args.n_epochs, -1)), axis=1)
-    backward_time = np.sum(np.reshape(backward_time, (args.n_epochs, -1)), axis=1)
+    forward_time = np.sum(np.reshape(
+            forward_time, (args.n_epochs, -1)), axis=1)
+    backward_time = np.sum(np.reshape(
+            backward_time, (args.n_epochs, -1)), axis=1)
 
-    print("Mean epoch forward time: {:4f}".format(np.mean(forward_time[len(forward_time) // 4:])))
-    print("Mean epoch backward time: {:4f}".format(np.mean(backward_time[len(backward_time) // 4:])))
+    print("Mean epoch forward time: {:4f}".format(
+            np.mean(forward_time[len(forward_time) // 4:])))
+    print("Mean epoch backward time: {:4f}".format(
+            np.mean(backward_time[len(backward_time) // 4:])))
 
     print("\nstart testing:")
     if use_cuda:
@@ -217,6 +261,7 @@ def main(args):
     print("Using best epoch: {}".format(checkpoint['epoch']))
     utils.evaluate(test_graph, model, test_data, num_nodes, hits=[1, 3, 10],
                    eval_bz=args.eval_batch_size)
+        """
 
 
 if __name__ == '__main__':

@@ -62,7 +62,7 @@ class RGCNEntityDataset(object):
 
             if relabel:
                 uniq_nodes, edges = np.unique((self.edge_src, self.edge_dst), return_inverse=True)
-                self.edge_src, self.edge_dst = np.reshape(edges, (-1, 2))
+                self.edge_src, self.edge_dst = np.reshape(edges, (2, -1))
                 node_map = np.zeros(self.num_nodes, dtype=int)
                 self.num_nodes = len(uniq_nodes)
                 node_map[uniq_nodes] = np.arange(self.num_nodes)
@@ -273,6 +273,7 @@ def _load_data(dataset_str='aifb', dataset_path=None):
         num_rel = all_edges['nrel'].item()
 
         print('Number of nodes: ', num_node)
+        print('Number of edges: ', len(edge_list))
         print('Number of relations: ', num_rel)
 
         labels = _load_sparse_csr(labels_file)
@@ -328,6 +329,7 @@ def _load_data(dataset_str='aifb', dataset_path=None):
             # sort indices by destination
             edge_list = sorted(edge_list, key=lambda x: (x[1], x[0], x[2]))
             edge_list = np.array(edge_list, dtype=np.int)
+            print('Number of edges: ', len(edge_list))
 
             np.savez(edge_file, edges=edge_list, n=np.array(num_node), nrel=np.array(num_rel))
 

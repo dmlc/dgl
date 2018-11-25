@@ -65,8 +65,8 @@ def main(args):
 
     # split dataset into train, validate, test
     if args.validation:
-        train_idx = train_idx[len(train_idx) // 5:]
         val_idx = train_idx[:len(train_idx) // 5]
+        train_idx = train_idx[len(train_idx) // 5:]
     else:
         val_idx = train_idx
 

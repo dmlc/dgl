@@ -3,7 +3,8 @@ import torch.nn as nn
 import dgl.function as fn
 
 class RGCNLayer(nn.Module):
-    def __init__(self, in_feat, out_feat, bias=None, activation=None, self_loop=False, dropout=0.0):
+    def __init__(self, in_feat, out_feat, bias=None, activation=None,
+                 self_loop=False, dropout=0.0):
         super(RGCNLayer, self).__init__()
         self.bias = bias
         self.activation = activation
@@ -11,12 +12,14 @@ class RGCNLayer(nn.Module):
 
         if self.bias == True:
             self.bias = nn.Parameter(torch.Tensor(out_feat))
-            nn.init.xavier_uniform_(self.bias, gain=nn.init.calculate_gain('relu'))
+            nn.init.xavier_uniform_(self.bias,
+                                    gain=nn.init.calculate_gain('relu'))
 
         # weight for self loop
         if self.self_loop:
             self.loop_weight = nn.Parameter(torch.Tensor(in_feat, out_feat))
-            nn.init.xavier_uniform_(self.loop_weight, gain=nn.init.calculate_gain('relu'))
+            nn.init.xavier_uniform_(self.loop_weight,
+                                    gain=nn.init.calculate_gain('relu'))
 
         if dropout:
             self.dropout = nn.Dropout(dropout)
@@ -29,14 +32,14 @@ class RGCNLayer(nn.Module):
 
     def forward(self, g):
         if self.self_loop:
-            loop_message = torch.mm(g.get_n_repr()['h'], self.loop_weight)
+            loop_message = torch.mm(g.ndata['h'], self.loop_weight)
             if self.dropout is not None:
                 loop_message = self.dropout(loop_message)
 
         self.propagate(g)
 
         # apply bias and activation
-        node_repr = g.get_n_repr()['h']
+        node_repr = g.ndata['h']
         if self.bias:
             node_repr = node_repr + self.bias
         if self.self_loop:
@@ -47,7 +50,8 @@ class RGCNLayer(nn.Module):
         g.ndata['h'] = node_repr
 
 class RGCNBasisLayer(RGCNLayer):
-    def __init__(self, in_feat, out_feat, num_rels, num_bases=-1, bias=None, activation=None):
+    def __init__(self, in_feat, out_feat, num_rels, num_bases=-1, bias=None,
+                 activation=None):
         super(RGCNBasisLayer, self).__init__(in_feat, out_feat, bias, activation)
         self.in_feat = in_feat
         self.out_feat = out_feat
@@ -57,32 +61,40 @@ class RGCNBasisLayer(RGCNLayer):
             self.num_bases = self.num_rels
 
         # add weights
-        self.weight = nn.Parameter(torch.Tensor(self.num_bases, self.in_feat, self.out_feat))
+        self.weight = nn.Parameter(torch.Tensor(self.num_bases, self.in_feat,
+                                                self.out_feat))
         nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
         if self.num_bases < self.num_rels:
-            self.w_comp = nn.Parameter(torch.Tensor(self.num_rels, self.num_bases))
-            nn.init.xavier_uniform_(self.w_comp, gain=nn.init.calculate_gain('relu'))
+            self.w_comp = nn.Parameter(torch.Tensor(self.num_rels,
+                                                    self.num_bases))
+            nn.init.xavier_uniform_(self.w_comp,
+                                    gain=nn.init.calculate_gain('relu'))
 
     def propagate(self, g):
         if self.num_bases < self.num_rels:
             # generate all weights from basis
-            weight = self.weight.view(self.in_feat, self.num_bases, self.out_feat)
-            weight = torch.matmul(self.w_comp, weight).view(self.num_rels, self.in_feat, self.out_feat)
+            weight = self.weight.view(self.in_feat, self.num_bases,
+                                      self.out_feat)
+            weight = torch.matmul(self.w_comp, weight).view(
+                                    self.num_rels, self.in_feat, self.out_feat)
         else:
             weight = self.weight
 
         def msg_func(edges):
-            # FIXME: normalizer
             w = weight[edges.data['type']]
             msg = torch.bmm(edges.src['h'].unsqueeze(1), w).squeeze()
+            msg = msg * edges.data['norm']
             return {'msg': msg}
 
         g.update_all(msg_func, fn.sum(msg='msg', out='h'), None)
 
 
 class RGCNBlockLayer(RGCNLayer):
-    def __init__(self, in_feat, out_feat, num_rels, num_bases, bias=None, activation=None, self_loop=False, dropout=0.0):
-        super(RGCNBlockLayer, self).__init__(in_feat, out_feat, bias, activation, self_loop=self_loop, dropout=dropout)
+    def __init__(self, in_feat, out_feat, num_rels, num_bases, bias=None,
+                 activation=None, self_loop=False, dropout=0.0):
+        super(RGCNBlockLayer, self).__init__(in_feat, out_feat, bias,
+                                             activation, self_loop=self_loop,
+                                             dropout=dropout)
         self.num_rels = num_rels
         self.num_bases = num_bases
         assert self.num_bases > 0
@@ -92,20 +104,20 @@ class RGCNBlockLayer(RGCNLayer):
         self.submat_out = out_feat // self.num_bases
 
         # assuming in_feat and out_feat are both divisible by num_bases
-        self.weight = nn.Parameter(torch.Tensor(self.num_rels, self.num_bases * self.submat_in * self.submat_out))
+        self.weight = nn.Parameter(torch.Tensor(
+            self.num_rels, self.num_bases * self.submat_in * self.submat_out))
         nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
 
+    def msg_func(self, edges):
+        weight = self.weight[edges.data['type']].view(
+                    -1, self.submat_in, self.submat_out)
+        node = edges.src['h'].view(-1, 1, self.submat_in)
+        msg = torch.bmm(node, weight).view(-1, self.out_feat)
+        return {'msg': msg}
+
     def propagate(self, g):
-        def msg_func(edges):
-            weight = self.weight[edges.data['type']].view(
-                        -1, self.submat_in, self.submat_out)
-            node = edges.src['h'].view(-1, 1, self.submat_in)
-            # FIXME: whose deg?
-            msg = torch.bmm(node, weight).view(-1, self.out_feat)
-            return {'msg': msg}
+        g.update_all(self.msg_func, fn.sum(msg='msg', out='h'), self.apply_func)
 
-        def apply_func(nodes):
-            return {'h': nodes['h'] / nodes['deg']}
+    def apply_func(self, nodes):
+        return {'h': nodes.data['h'] / nodes.data['deg']}
 
-        # FIXME: featureless case?
-        g.update_all(msg_func, fn.sum(msg='msg', out='h'), None)

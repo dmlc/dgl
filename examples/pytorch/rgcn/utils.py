@@ -76,7 +76,9 @@ def build_graph_from_triplets(num_nodes, num_rels, triplets):
     rel = np.concatenate((rel, rel + num_rels))
     edges = sorted(zip(dst, src, rel))
     dst, src, rel = np.array(edges).transpose()
+    print("Test graph:")
     g.add_edges(src, dst)
+    print("# nodes: {}, # edges: {}".format(num_nodes, len(src)))
     return g, rel
 
 def build_test_graph(num_nodes, num_rels, edges):
