@@ -312,6 +312,8 @@ def check_pull_0deg(readonly):
     new_repr = g.ndata['h']
     # 0deg check: init and applied
     t = mx.nd.zeros(shape=(2,5)) + 4
+    print(old_repr)
+    print(new_repr)
     assert np.allclose(new_repr[0].asnumpy(), t.asnumpy())
     # non-0deg check: recv node0 and applied
     assert np.allclose(new_repr[1].asnumpy(), old_repr[0].asnumpy() * 2)
