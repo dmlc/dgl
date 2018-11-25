@@ -111,4 +111,5 @@ class TreeLSTM(nn.Module):
         # compute logits
         h = self.dropout(g.ndata.pop('h'))
         logits = self.linear(h)
+        assert False
         return logits
