@@ -7,8 +7,8 @@ Capsule Network Tutorial
 **Author**: Jinjing Zhou, `Jake
 Zhao <https://cs.nyu.edu/~jakezhao/>`_, Zheng Zhang
 
-It is perhaps a little surprising that some of the more classical models can also be described in terms of graphs,
-offering a different perspective.
+It is perhaps a little surprising that some of the more classical models can
+also be described in terms of graphs, offering a different perspective.
 This tutorial describes how this is done for the `capsule network <http://arxiv.org/abs/1710.09829>`__.
 """
 #######################################################################################
