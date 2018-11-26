@@ -19,7 +19,7 @@ class BinaryDistribution(Distribution):
     def is_pure(self):
         return False
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+CURRENT_DIR = os.path.dirname(__file__)
 
 def get_lib_path():
     """Get library path, name and version"""
@@ -54,7 +54,6 @@ if wheel_include_libs:
         for path in LIBS:
             shutil.copy(path, os.path.join(CURRENT_DIR, 'dgl'))
             _, libname = os.path.split(path)
-            print(libname)
             fo.write("include dgl/%s\n" % libname)
     setup_kwargs = {
         "include_package_data": True
@@ -64,7 +63,6 @@ if wheel_include_libs:
 if include_libs:
     for i, path in enumerate(LIBS):
         LIBS[i] = os.path.relpath(path, CURRENT_DIR)
-    print('!!!!!', LIBS)
     setup_kwargs = {
         "include_package_data": True,
         "data_files": [('dgl', LIBS)]
