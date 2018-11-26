@@ -852,8 +852,9 @@ def frame_like(other, num_rows):
         other._warn_and_set_initializer()
     newf._default_initializer = other._default_initializer
     # set per-col initializer
-    for key in other.keys():
-        newf.set_initializer(other.get_initializer(key), key)
+    # TODO(minjie): hack; cannot rely on keys as the _initializers
+    #   now supports non-exist columns.
+    newf._initializers = other._initializers
     return newf
 
 def merge_frames(frames, indices, max_index, reduce_func):

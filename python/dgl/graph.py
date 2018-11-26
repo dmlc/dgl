@@ -1094,7 +1094,6 @@ class DGLGraph(object):
         """
         if message_func == "default":
             message_func = self._message_func
-        assert message_func is not None
 
         if is_all(edges):
             eid = ALL
@@ -1252,7 +1251,7 @@ class DGLGraph(object):
         if len(v) == 0:
             return
         with ir.prog() as prog:
-            scheduler.schedule_pull(graph=self, v=v,
+            scheduler.schedule_pull(graph=self, pull_nodes=v,
                     message_func=message_func, reduce_func=reduce_func,
                     apply_func=apply_node_func)
             Runtime.run(prog)

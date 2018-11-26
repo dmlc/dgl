@@ -282,27 +282,40 @@ def check_pull_0deg(readonly):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
         return {'h' : nodes.mailbox['m'].sum(1)}
+    def _apply(nodes):
+        return {'h' : nodes.data['h'] * 2}
+    def _init2(shape, dtype, ctx, ids):
+        return 2 + mx.nd.zeros(shape, dtype=dtype, ctx=ctx)
+    g.set_n_initializer(_init2, 'h')
     old_repr = mx.nd.random.normal(shape=(2, 5))
-    g.set_n_repr({'h' : old_repr})
-    g.pull(0, _message, _reduce)
-    new_repr = g.ndata['h']
-    # TODO(minjie): this is not the intended behavior. Pull node#0
-    #   should reset node#0 to the initial value. The bug is because
-    #   current pull is implemented using send_and_recv. Since there
-    #   is no edge to node#0 so the send_and_recv is skipped. Fix this
-    #   behavior when optimizing the pull scheduler.
-    assert np.allclose(new_repr[0].asnumpy(), old_repr[0].asnumpy())
-    assert np.allclose(new_repr[1].asnumpy(), old_repr[1].asnumpy())
-    g.pull(1, _message, _reduce)
-    new_repr = g.ndata['h']
-    assert np.allclose(new_repr[1].asnumpy(), old_repr[0].asnumpy())
 
-    old_repr = mx.nd.random.normal(shape=(2, 5))
-    g.set_n_repr({'h' : old_repr})
-    g.pull([0, 1], _message, _reduce)
+    # test#1: pull only 0-deg node
+    g.ndata['h'] = old_repr
+    g.pull(0, _message, _reduce, _apply)
     new_repr = g.ndata['h']
+    # 0deg check: equal to apply_nodes
+    assert np.allclose(new_repr[0].asnumpy(), old_repr[0].asnumpy() * 2)
+    # non-0deg check: untouched
+    assert np.allclose(new_repr[1].asnumpy(), old_repr[1].asnumpy())
+
+    # test#2: pull only non-deg node
+    g.ndata['h'] = old_repr
+    g.pull(1, _message, _reduce, _apply)
+    new_repr = g.ndata['h']
+    # 0deg check: untouched
     assert np.allclose(new_repr[0].asnumpy(), old_repr[0].asnumpy())
-    assert np.allclose(new_repr[1].asnumpy(), old_repr[0].asnumpy())
+    # non-0deg check: recved node0 and got applied
+    assert np.allclose(new_repr[1].asnumpy(), old_repr[0].asnumpy() * 2)
+
+    # test#3: pull only both nodes
+    g.ndata['h'] = old_repr
+    g.pull([0, 1], _message, _reduce, _apply)
+    new_repr = g.ndata['h']
+    # 0deg check: init and applied
+    t = mx.nd.zeros(shape=(2,5)) + 4
+    assert np.allclose(new_repr[0].asnumpy(), t.asnumpy())
+    # non-0deg check: recv node0 and applied
+    assert np.allclose(new_repr[1].asnumpy(), old_repr[0].asnumpy() * 2)
 
 def test_pull_0deg():
     check_pull_0deg(True)
