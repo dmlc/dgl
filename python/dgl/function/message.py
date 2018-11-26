@@ -33,13 +33,8 @@ class MessageFunction(BuiltinFunction):
 
 
 def _is_spmv_supported_node_feat(g, field):
-    """Return whether the node feature shape supports SPMV optimization.
-
-    Only scalar and vector features are supported currently.
-    """
-    feat = g.get_n_repr()[field]
-    shape = F.shape(feat)
-    return len(shape) == 1 or len(shape) == 2
+    """Return whether the node feature shape supports SPMV optimization."""
+    return True
 
 def _is_spmv_supported_edge_feat(g, field):
     """Return whether the edge feature shape supports SPMV optimization.
