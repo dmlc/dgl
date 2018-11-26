@@ -64,6 +64,7 @@ if wheel_include_libs:
 if include_libs:
     for i, path in enumerate(LIBS):
         LIBS[i] = os.path.relpath(path, CURRENT_DIR)
+    print('!!!!!', LIBS)
     setup_kwargs = {
         "include_package_data": True,
         "data_files": [('dgl', LIBS)]
