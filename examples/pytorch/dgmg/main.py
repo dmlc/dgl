@@ -7,6 +7,7 @@ This implementation works with a minibatch of size 1 only for both training and 
 import argparse
 import datetime
 import time
+import torch
 from torch.optim import Adam
 from torch.utils.data import DataLoader
 from torch.nn.utils import clip_grad_norm_
@@ -95,6 +96,9 @@ def main(opts):
     print('--------------------------------------------------------------------------')
     print('On average, an epoch takes {}.'.format(datetime.timedelta(
         seconds=(t3-t2) / opts['nepochs'])))
+
+    del model.g
+    torch.save(model, './model_batched.pth')
 
 
 if __name__ == '__main__':

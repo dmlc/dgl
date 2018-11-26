@@ -128,6 +128,11 @@ class CycleModelEvaluation(object):
         for i in range(num_samples):
             sampled_graph = model()
             if isinstance(sampled_graph, list):
+                # When the model is a batched implementation, a list of
+                # DGLGraph objects is returned. Note that with model(),
+                # we generate a single graph as with the non-batched
+                # implementation. We actually support batched generation
+                # during the inference so feel free to modify the code.
                 sampled_graph = sampled_graph[0]
 
             sampled_adj_list = dglGraph_to_adj_list(sampled_graph)

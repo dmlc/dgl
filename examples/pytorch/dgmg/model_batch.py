@@ -61,7 +61,9 @@ class GraphProp(nn.Module):
         self.node_update_funcs = nn.ModuleList(node_update_funcs)
 
     def dgmg_msg(self, edges):
-        """For an edge u->v, return concat([h_u, x_uv])"""
+        """
+        For an edge u->v, return concat([h_u, x_uv])
+        """
         return {'m': torch.cat([edges.src['hv'],
                                 edges.data['he']],
                                dim=1)}
@@ -76,6 +78,7 @@ class GraphProp(nn.Module):
         return {'a': node_activation}
 
     def forward(self, g_list):
+        # Merge small graphs into a large graph.
         bg = dgl.batch(g_list)
 
         if bg.number_of_edges() == 0:
@@ -91,9 +94,11 @@ class GraphProp(nn.Module):
 
 
 def bernoulli_action_log_prob(logit, action):
-    """Calculate the log p of an action with respect to a Bernoulli
+    """
+    Calculate the log p of an action with respect to a Bernoulli
     distribution across a batch of actions. Use logit rather than
-    prob for numerical stability."""
+    prob for numerical stability.
+    """
     log_probs = torch.cat([F.logsigmoid(-logit), F.logsigmoid(logit)], dim=1)
     return log_probs.gather(1, torch.tensor(action).unsqueeze(1))
 
@@ -128,6 +133,7 @@ class AddNode(nn.Module):
         self.log_prob = []
 
     def forward(self, g_list, a=None):
+        # Graphs for which a node is added
         g_non_stop = []
 
         batch_graph_embed = self.graph_op['embed'](g_list)
@@ -166,6 +172,7 @@ class AddEdge(nn.Module):
         self.log_prob = []
 
     def forward(self, g_list, a=None):
+        # Graphs for which an edge is to be added.
         g_to_add_edge = []
 
         batch_graph_embed = self.graph_op['embed'](g_list)
@@ -226,8 +233,8 @@ class ChooseDestAndUpdate(nn.Module):
                 dest = d[i]
 
             if not g.has_edge_between(src, dest):
-                # For undirected graphs, we add edges for both directions
-                # so that we can perform graph propagation.
+                # For undirected graphs, we add edges for both
+                # directions so that we can perform graph propagation.
                 src_list = [src, dest]
                 dest_list = [dest, src]
 
@@ -277,6 +284,7 @@ class DGMG(nn.Module):
         self.graph_prop.message_funcs.apply(dgmg_message_weight_init)
 
     def prepare(self, batch_size):
+        # Track how many actions have been taken for each graph.
         self.step_count = [0] * batch_size
         self.g_list = []
         # indices for graphs being generated
@@ -302,6 +310,14 @@ class DGMG(nn.Module):
         return [self.g_list[i] for i in indices]
 
     def get_action_step(self, indices):
+        """
+        This function should only be called during training.
+
+        Collect the number of actions taken for each graph
+        whose index is in the indices. After collecting
+        the number of actions, increment it by 1.
+        """
+
         old_step_count = []
 
         for i in indices:
@@ -311,9 +327,20 @@ class DGMG(nn.Module):
         return old_step_count
 
     def get_actions(self, mode):
+        """
+        This function should only be called during training.
+
+        Decide which graphs are related with the next batched
+        decision and extract the actions to take for each of
+        the graph.
+        """
+
         if mode == 'node':
+            # Graphs being generated
             indices = self.g_active
         elif mode == 'edge':
+            # Graphs having more edges to be added
+            # starting from the latest node.
             indices = self.g_to_add_edge
         else:
             raise ValueError("Expected mode to be in ['node', 'edge'], "
@@ -329,18 +356,31 @@ class DGMG(nn.Module):
         return actions_t
 
     def add_node_and_update(self, a=None):
-        """Decide if to add a new node.
-        If a new node should be added, update the graph."""
+        """
+        Decide if to add a new node for each graph being generated.
+        If a new node should be added, update the graph.
+
+        The action(s) a are passed during training and
+        sampled (hence None) during inference.
+        """
         g_list = self._get_graphs(self.g_active)
         g_non_stop = self.add_node_agent(g_list, a)
 
         self.g_active = g_non_stop
+        # For all newly added nodes we need to decide
+        # if an edge is to be added for each of them.
         self.g_to_add_edge = g_non_stop
 
         return len(self.g_active) == 0
 
     def add_edge_or_not(self, a=None):
-        """Decide if a new edge should be added."""
+        """
+        Decide if a new edge should be added for each
+        graph that may need one more edge.
+
+        The action(s) a are passed during training and
+        sampled (hence None) during inference.
+        """
         g_list = self._get_graphs(self.g_to_add_edge)
         g_to_add_edge = self.add_edge_agent(g_list, a)
         self.g_to_add_edge = g_to_add_edge
@@ -348,8 +388,14 @@ class DGMG(nn.Module):
         return len(self.g_to_add_edge) > 0
 
     def choose_dest_and_update(self, a=None):
-        """Choose destination and connect it to the latest node.
-        Add edges for both directions and update the graph."""
+        """
+        For each graph that requires one more edge, choose
+        destination and connect it to the latest node.
+        Add edges for both directions and update the graph.
+
+        The action(s) a are passed during training and
+        sampled (hence None) during inference.
+        """
         g_list = self._get_graphs(self.g_to_add_edge)
         self.choose_dest_agent(g_list, a)
 
@@ -370,8 +416,11 @@ class DGMG(nn.Module):
 
         stop = self.add_node_and_update(a=self.get_actions('node'))
 
+        # Some graphs haven't been completely generated.
         while not stop:
             to_add_edge = self.add_edge_or_not(a=self.get_actions('edge'))
+
+            # Some graphs need more edges to be added for the latest node.
             while to_add_edge:
                 self.choose_dest_and_update(a=self.get_actions('edge'))
                 to_add_edge = self.add_edge_or_not(a=self.get_actions('edge'))
@@ -381,10 +430,18 @@ class DGMG(nn.Module):
 
     def forward_inference(self):
         stop = self.add_node_and_update()
+
+        # Some graphs haven't been completely generated and their numbers of
+        # nodes do not exceed the limit of self.v_max.
         while (not stop) and (self.g_list[self.g_active[0]].number_of_nodes()
                               < self.v_max + 1):
             num_trials = 0
             to_add_edge = self.add_edge_or_not()
+
+            # Some graphs need more edges to be added for the latest node and
+            # the number of trials does not exceed the number of maximum possible
+            # edges. Note that this limit on the number of edges eliminate the
+            # possibility of multi-graph and one may want to remove it.
             while to_add_edge and (num_trials <
                                    self.g_list[self.g_active[0]].number_of_nodes() - 1):
                 self.choose_dest_and_update()
