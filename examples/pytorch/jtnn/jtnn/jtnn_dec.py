@@ -239,12 +239,13 @@ class DGLJTNNDecoder(nn.Module):
         mol_tree.nodes[0].data['x'] = self.embedding(root_wid)
         mol_tree.nodes[0].data['h'] = init_hidden
         mol_tree.nodes[0].data['fail'] = cuda(torch.tensor([0]))
-        mol_tree.nodes_dict[0] = create_node_dict(self.vocab.get_smiles(root_wid))
+        mol_tree.nodes_dict[0] = root_node_dict = create_node_dict(
+                self.vocab.get_smiles(root_wid))
 
         stack, trace = [], []
         stack.append((0, self.vocab.get_slots(root_wid)))
 
-        all_nodes = [0]
+        all_nodes = {0: root_node_dict}
         h = {}
         first = True
         new_node_id = 0
@@ -330,6 +331,7 @@ class DGLJTNNDecoder(nn.Module):
                     vdata['wid'] = next_wid
                     vdata['x'] = self.embedding(next_wid)
                     mol_tree.nodes_dict[v] = next_node_dict
+                    all_nodes[v] = next_node_dict
                     stack.append((v, next_slots))
                     mol_tree.add_edge(v, u)
                     vu = new_edge_id
@@ -366,6 +368,5 @@ class DGLJTNNDecoder(nn.Module):
                 stack.pop()
 
         effective_nodes = mol_tree.filter_nodes(lambda nodes: nodes['fail'] != 1)
-        mol_tree_sg = mol_tree.subgraph(effective_nodes)
-        mol_tree_sg.copy_from_parent()
-        return mol_tree_sg
+        effective_nodes, _ = torch.sort(effective_nodes)
+        return mol_tree, all_nodes, effective_nodes

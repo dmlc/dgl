@@ -179,3 +179,128 @@ class DGLJTNNVAE(nn.Module):
 
         all_loss = sum(all_loss) / len(labels)
         return all_loss, acc / len(labels)
+
+    def decode(self, tree_vec, mol_vec):
+        mol_tree, nodes_dict, effective_nodes = self.decoder.decode(tree_vec)
+        nodes_dict = [nodes_dict[v] for v in effective_nodes.tolist()]
+
+        for i, node in enumerate(nodes_dict):
+            nodes_dict[node]['nid'] = i + 1
+            if mol_tree.in_degree(node) > 1:
+                nodes_dict[node]['is_leaf'] = False
+                set_atommap(nodes_dict[node]['mol'], nodes_dict[node]['nid'])
+
+        mol_tree_sg = mol_tree.subgraph(effective_nodes)
+        mol_tree_msg, _ = self.jtnn([mol_tree_sg])
+        mol_tree_msg = unbatch(mol_tree_msg)[0]
+        mol_tree_msg.nodes_dict = nodes_dict
+
+        cur_mol = copy_edit_mol(nodes_dict[0].mol)
+        global_amap = [{}] + [{} for node in nodes_dict]
+        global_amap[1] = {atom.GetIdx(): atom.GetIdx() for atom in cur_mol.GetAtoms()}
+
+        cur_mol = self.dfs_assemble(mol_tree_msg, mol_vec, cur_mol, global_amap, [], 0, None)
+        if cur_mol is None:
+            return None
+
+        cur_mol = cur_mol.GetMol()
+        set_atommap(cur_mol)
+        cur_mol = Chem.MolFromSmiles(Chem.MolToSmiles(cur_mol))
+        if cur_mol is None:
+            return None
+
+        smiles2D = Chem.MolToSmiles(cur_mol)
+        stereo_cands = decode_stereo(smiles2D)
+        if len(stereo_cands) == 1:
+            return stereo_cands[0]
+        stereo_graphs = [mol2dgl_enc(c) for c in cands]
+        stereo_cand_graphs, atom_x, bond_x = \
+                zip(*stereo_graphs)
+        stereo_cand_graphs = batch(stereo_cand_graphs)
+        atom_x = torch.cat(atom_x)
+        bond_x = torch.cat(bond_x)
+        stereo_cand_graphs.ndata['x'] = atom_x
+        stereo_cand_graphs.edata['x'] = bond_x
+        stereo_cand_graphs.edata['src_x'] = atom_x.new(
+                bond_x.shape[0], atom_x.shape[1]).zero_()
+        stereo_vecs = self.mpn(stereo_cand_graphs)
+        stereo_vecs = self.G_mean(stereo_vecs)
+        scores = F.cosine_similarity(stereo_vecs, mol_vec)
+        _, max_id = scores.max(0)
+        return stereo_cands[max_id.item()]
+
+    def dfs_assemble(self, mol_tree_msg, mol_vec, cur_mol,
+                     global_amap, fa_amap, cur_node_id, fa_node_id):
+        nodes_dict = mol_tree_msg.nodes_dict
+        fa_node = nodes_dict[fa_node_id] if fa_node_id is not None else None
+        cur_node = nodes_dict[cur_node_id]
+
+        fa_nid = fa_node['nid'] if fa_node is not None else -1
+        prev_nodes = [fa_node] if fa_node is not None else []
+
+        children_node_id = [v for v in mol_tree_msg.successors(cur_node_id)
+                            if nodes_dict[v]['nid'] != fa_nid]
+        children = [nodes_dict[v] for v in children_node_id]
+        neighbors = [nei for nei in children if nei['mol'].GetNumAtoms() > 1]
+        neighbors = sorted(neighbors, key=lambda x: x['mol'].GetNumAtoms(), reverse=True)
+        singletons = [nei for nei in children if nei['mol'].GetNumAtoms() == 1]
+        neighbors = singletons + neighbors
+
+        cur_amap = [(fa_nid, a2, a1) for nid, a1, a2 in fa_amap if nid == cur_node['nid']]
+        cands = enum_assemble_nx(cur_node, neighbors, prev_nodes, cur_amap)
+        if len(cands) == 0:
+            return None
+        cand_smiles, cand_mols, cand_amap = list(zip(*cands))
+
+        cands = [(candmol, mol_tree_msg, cur_node_id) for candmol in cand_mols]
+        cand_graphs, atom_x, bond_x, tree_mess_src_edges, \
+                tree_mess_tgt_edges, tree_mess_tgt_nodes = mol2dgl_dec(
+                        cands)
+        cand_graphs = batch(cand_graphs)
+        cand_graphs.ndata['x'] = atom_x
+        cand_graphs.edata['x'] = bond_x
+        cand_graphs.edata['src_x'] = atom_x.new(bond_x.shape[0], atom_x.shape[1]).zero_()
+
+        cand_vecs = self.jtmpn(
+                (cand_graphs, tree_mess_src_edges, tree_mess_tgt_edges, tree_mess_tgt_nodes),
+                mol_tree_msg,
+                )
+        cand_vecs = self.G_mean(cand_vecs)
+        mol_vec = mol_vec.squeeze()
+        scores = cand_vecs @ mol_vec
+
+        _, cand_idx = torch.sort(scores, descending=True)
+
+        backup_mol = Chem.RWMol(cur_mol)
+        for i in range(len(cand_idx)):
+            cur_mol = Chem.RWMol(backup_mol)
+            pred_amap = cand_amap[cand_idx[i].item()]
+            new_global_amap = copy.deepcopy(global_amap)
+
+            for nei_id, ctr_atom, nei_atom in pred_amap:
+                if nei_id == fa_nid:
+                    continue
+                new_global_amap[nei_id][nei_atom] = new_global_amap[cur_node['nid']][ctr_atom]
+
+            cur_mol = attach_mols_nx(cur_mol, children, [], new_global_amap)
+            new_mol = cur_mol.GetMol()
+            new_mol = Chem.MolFromSmiles(Chem.MolToSmiles(new_mol))
+
+            if new_mol is None:
+                continue
+
+            result = True
+            for nei_node_id, nei_node in zip(children_node_id, children):
+                if nei_node['is_leaf']:
+                    continue
+                cur_mol = self.dfs_assemble(
+                        mol_tree_msg, mol_vec, cur_mol, new_global_amap, pred_amap,
+                        nei_node_id, cur_node_id)
+                if cur_mol is None:
+                    result = False
+                    break
+
+            if result:
+                return cur_mol
+
+        return None
