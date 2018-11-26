@@ -62,9 +62,6 @@ if wheel_include_libs:
 
 # For source tree setup
 if include_libs:
-    curr_path = os.path.dirname(os.path.abspath(os.path.expanduser(__file__)))
-    for i, path in enumerate(LIBS):
-        LIBS[i] = os.path.relpath(path, curr_path)
     setup_kwargs = {
         "include_package_data": True,
         "data_files": [('dgl', LIBS)]
