@@ -1,6 +1,8 @@
 from __future__ import absolute_import
 
 from abc import abstractmethod
+import functools
+import operator
 
 from ...base import DGLError
 from ... import backend as F
@@ -250,6 +252,16 @@ class SPMVExecutor(Executor):
             B = F.unsqueeze(B, 1)
             C = F.spmm(spA, B)
             C = F.squeeze(C, 1)
+        elif F.ndim(B) > 2:
+            # Flatten the dim 1:~
+            B_shape = F.shape(B)
+            feat_shape = B_shape[1:]
+            tmp_B_shape = (B_shape[0],
+                    functools.reduce(operator.mul, feat_shape, 1))
+            B = F.reshape(B, tmp_B_shape)
+            C = F.spmm(spA, B)
+            C_shape = (F.shape(C)[0],) + feat_shape
+            C = F.reshape(C, C_shape)
         else:
             C = F.spmm(spA, B)
         self.ret.data = C
@@ -301,6 +313,16 @@ class SPMVWithDataExecutor(Executor):
             B = F.unsqueeze(B, 1)
             C = F.spmm(spA, B)
             C = F.squeeze(C, 1)
+        elif F.ndim(B) > 2:
+            # Flatten the dim 1:~
+            B_shape = F.shape(B)
+            feat_shape = B_shape[1:]
+            tmp_B_shape = (B_shape[0],
+                    functools.reduce(operator.mul, feat_shape, 1))
+            B = F.reshape(B, tmp_B_shape)
+            C = F.spmm(spA, B)
+            C_shape = (F.shape(C)[0],) + feat_shape
+            C = F.reshape(C, C_shape)
         else:
             C = F.spmm(spA, B)
         self.ret.data = C
