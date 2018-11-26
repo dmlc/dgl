@@ -1,4 +1,6 @@
 import torch as th
+import numpy as np
+import scipy.sparse as sp
 import dgl
 import dgl.function as fn
 import utils as U
@@ -513,6 +515,60 @@ def test_pull_multi_fallback():
     nodes = [0, 1, 2, 9]
     _pull_nodes(nodes)
 
+def test_spmv_3d_feat():
+    def src_mul_edge_udf(edges):
+        return {'sum': edges.src['h'] * edges.data['h'].unsqueeze(1).unsqueeze(1)}
+
+    def sum_udf(nodes):
+        return {'h': nodes.mailbox['sum'].sum(1)}
+
+    n = 100
+    p = 0.1
+    a = sp.random(n, n, p, data_rvs=lambda n: np.ones(n))
+    g = dgl.DGLGraph(a)
+    m = g.number_of_edges()
+
+    # test#1: v2v with adj data
+    h = th.randn((n, 5, 5))
+    e = th.randn((m,))
+
+    g.ndata['h'] = h
+    g.edata['h'] = e
+    g.update_all(message_func=fn.src_mul_edge('h', 'h', 'sum'), reduce_func=fn.sum('sum', 'h')) # 1
+    ans = g.ndata['h']
+
+    g.ndata['h'] = h
+    g.edata['h'] = e
+    g.update_all(message_func=src_mul_edge_udf, reduce_func=fn.sum('sum', 'h')) # 2
+    assert U.allclose(g.ndata['h'], ans)
+
+    g.ndata['h'] = h
+    g.edata['h'] = e
+    g.update_all(message_func=src_mul_edge_udf, reduce_func=sum_udf) # 3
+    assert U.allclose(g.ndata['h'], ans)
+
+    # test#2: e2v
+    def src_mul_edge_udf(edges):
+        return {'sum': edges.src['h'] * edges.data['h']}
+
+    h = th.randn((n, 5, 5))
+    e = th.randn((m, 5, 5))
+
+    g.ndata['h'] = h
+    g.edata['h'] = e
+    g.update_all(message_func=fn.src_mul_edge('h', 'h', 'sum'), reduce_func=fn.sum('sum', 'h')) # 1
+    ans = g.ndata['h']
+
+    g.ndata['h'] = h
+    g.edata['h'] = e
+    g.update_all(message_func=src_mul_edge_udf, reduce_func=fn.sum('sum', 'h')) # 2
+    assert U.allclose(g.ndata['h'], ans)
+
+    g.ndata['h'] = h
+    g.edata['h'] = e
+    g.update_all(message_func=src_mul_edge_udf, reduce_func=sum_udf) # 3
+    assert U.allclose(g.ndata['h'], ans)
+
 if __name__ == '__main__':
     test_v2v_update_all()
     test_v2v_snr()
@@ -524,3 +580,4 @@ if __name__ == '__main__':
     test_e2v_recv_multi_fn()
     test_update_all_multi_fallback()
     test_pull_multi_fallback()
+    test_spmv_3d_feat()
