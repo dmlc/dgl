@@ -16,6 +16,9 @@ class BinaryDistribution(Distribution):
     def has_ext_modules(self):
         return True
 
+    def is_pure(self):
+        return False
+
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def get_lib_path():
