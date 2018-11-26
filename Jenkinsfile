@@ -17,7 +17,7 @@ def build_dgl() {
   }
   dir("python") {
     sh "rm -rf build *.egg-info dist"
-    sh "ls"
+    sh "pip3 uninstall -y dgl"
     sh "python3 setup.py install"
   }
 }
