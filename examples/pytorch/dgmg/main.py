@@ -98,7 +98,7 @@ def main(opts):
         seconds=(t3-t2) / opts['nepochs'])))
 
     del model.g
-    torch.save(model, './model_batched.pth')
+    torch.save(model, './model.pth')
 
 
 if __name__ == '__main__':
