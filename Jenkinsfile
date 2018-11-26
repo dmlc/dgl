@@ -16,8 +16,8 @@ def build_dgl() {
     sh "make -j4"
   }
   dir("python") {
+    sh "rm -rf build *.egg-info dist"
     sh "ls"
-    sh "cat setup.py"
     sh "python3 setup.py install"
   }
 }
