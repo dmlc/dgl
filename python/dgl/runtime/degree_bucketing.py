@@ -70,19 +70,19 @@ def gen_degree_bucketing_schedule(
         # save for merge
         idx_list.append(vb)
         fd_list.append(fdvb)
+    if zero_deg_nodes is not None:
+        # NOTE: there must be at least one non-zero-deg node; otherwise,
+        #   degree bucketing should not be called.
+        var_0deg = var.IDX(zero_deg_nodes)
+        zero_feat = ir.NEW_DICT(var_out, var_0deg, fd_list[0])
+        idx_list.append(var_0deg)
+        fd_list.append(zero_feat)
     # merge buckets according to the ascending order of the node ids.
     all_idx = F.cat([idx.data.tousertensor() for idx in idx_list], dim=0)
-    sorted_idx, order = F.sort_1d(all_idx)
-    var_sorted_idx = var.IDX(utils.toindex(sorted_idx))
+    _, order = F.sort_1d(all_idx)
     var_order = var.IDX(utils.toindex(order))
     reduced_feat = ir.MERGE_ROW(var_order, fd_list)
-    if zero_deg_nodes is not None:
-        # If has zero degrees, scatter the result back to the frame. As
-        # a result, the features for zero degree nodes will be initialized
-        # correctly.
-        ir.WRITE_ROW_(var_out, var_sorted_idx, reduced_feat)
-    else:
-        ir.WRITE_DICT_(var_out, reduced_feat)
+    ir.WRITE_DICT_(var_out, reduced_feat)
 
 def _degree_bucketing_schedule(mids, dsts, v):
     """Return the bucketing by degree scheduling for destination nodes of
