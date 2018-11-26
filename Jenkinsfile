@@ -23,24 +23,32 @@ def build_dgl() {
 }
 
 def pytorch_unit_test(dev) {
-  sh "python3 -m nose -v --with-xunit tests"
-  sh "python3 -m nose -v --with-xunit tests/pytorch"
-  sh "python3 -m nose -v --with-xunit tests/graph_index"
+  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
+    sh "python3 -m nose -v --with-xunit tests"
+    sh "python3 -m nose -v --with-xunit tests/pytorch"
+    sh "python3 -m nose -v --with-xunit tests/graph_index"
+  }
 }
 
 def mxnet_unit_test(dev) {
-  sh "python3 -m nose -v --with-xunit tests/mxnet"
+  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
+    sh "python3 -m nose -v --with-xunit tests/mxnet"
+  }
 }
 
 def example_test(dev) {
-  dir ("tests/scripts") {
-    sh "./task_example_test.sh ${dev}"
+  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
+    dir ("tests/scripts") {
+      sh "./task_example_test.sh ${dev}"
+    }
   }
 }
 
 def pytorch_tutorials() {
-  dir ("tests/scripts") {
-    sh "./task_tutorial_test.sh"
+  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
+    dir ("tests/scripts") {
+      sh "./task_tutorial_test.sh"
+    }
   }
 }
 
