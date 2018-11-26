@@ -54,6 +54,7 @@ class SSEUpdateHidden(gluon.Block):
         with self.name_scope():
             self.layer = NodeUpdate(n_hidden, activation)
         self.dropout = dropout
+        self.n_hidden = n_hidden
 
     def forward(self, g, vertices):
         if vertices is None:
@@ -61,7 +62,15 @@ class SSEUpdateHidden(gluon.Block):
             feat = g.get_n_repr()['in']
             cat = mx.nd.concat(feat, g.ndata['h'], dim=1)
             accum = mx.nd.dot(g.adjacency_matrix(), cat) / deg
-            return self.layer(feat, g.ndata['h'], accum)
+            batch_size = 100000
+            num_batches = int(math.ceil(g.number_of_nodes() / batch_size))
+            ret = mx.nd.empty(shape=(feat.shape[0], self.n_hidden), ctx=feat.context)
+            for i in range(num_batches):
+                vs = mx.nd.arange(i * batch_size, min((i + 1) * batch_size, g.number_of_nodes()), dtype=np.int64)
+                ret[vs] = self.layer(mx.nd.take(feat, vs),
+                                     mx.nd.take(g.ndata['h'], vs),
+                                     mx.nd.take(accum, vs))
+            return ret
         else:
             deg = mx.nd.expand_dims(g.in_degrees(vertices), 1).astype(np.float32)
             # We don't need dropout for inference.
