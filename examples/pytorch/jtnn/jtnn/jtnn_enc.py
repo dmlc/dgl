@@ -72,7 +72,7 @@ class DGLJTNNEncoder(nn.Module):
 
         # Assign structure embeddings to tree nodes
         mol_tree_batch.ndata.update({
-            'x': self.embedding(mol_tree_batch.get_n_repr()['wid']),
+            'x': self.embedding(mol_tree_batch.ndata['wid']),
             'h': cuda(torch.zeros(n_nodes, self.hidden_size)),
         })
 
