@@ -91,12 +91,14 @@ class DGLSSEUpdateHidden(gluon.Block):
                  activation,
                  dropout,
                  use_spmv,
+                 inference,
                  **kwargs):
         super(DGLSSEUpdateHidden, self).__init__(**kwargs)
         with self.name_scope():
             self.layer = DGLNodeUpdate(NodeUpdate(n_hidden, activation))
         self.dropout = dropout
         self.use_spmv = use_spmv
+        self.inference = inference
 
     def forward(self, g, vertices):
         if self.use_spmv:
@@ -118,7 +120,7 @@ class DGLSSEUpdateHidden(gluon.Block):
             num_batches = int(math.ceil(g.number_of_nodes() / batch_size))
             for i in range(num_batches):
                 vs = mx.nd.arange(i * batch_size, min((i + 1) * batch_size, g.number_of_nodes()), dtype=np.int64)
-                g.apply_nodes(self.layer, vs, inplace=True)
+                g.apply_nodes(self.layer, vs, inplace=self.inference)
             g.ndata.pop('accum')
             return g.get_n_repr()['h1']
         else:
@@ -127,13 +129,14 @@ class DGLSSEUpdateHidden(gluon.Block):
                 # TODO here we apply dropout on all vertex representation.
                 g.ndata['h'] = mx.nd.Dropout(g.ndata['h'], p=self.dropout)
             g.update_all(msg_func, reduce_func, None)
+            ctx = g.ndata['accum'].context
             if self.use_spmv:
                 g.ndata.pop('cat')
-                deg = deg.as_in_context(g.ndata['accum'].context)
+                deg = deg.as_in_context(ctx)
                 g.ndata['accum'] = g.ndata['accum'] / deg
-            g.apply_nodes(self.layer, vertices)
+            g.apply_nodes(self.layer, vertices, inplace=self.inference)
             g.ndata.pop('accum')
-            return g.ndata['h1'][vertices.as_in_context(g.ndata['h1'].context)]
+            return mx.nd.take(g.ndata['h1'], vertices.as_in_context(ctx))
 
 class SSEPredict(gluon.Block):
     def __init__(self, update_hidden, out_feats, dropout, **kwargs):
@@ -221,10 +224,10 @@ def main(args, data):
 
     update_hidden_infer = DGLSSEUpdateHidden(args.n_hidden, 'relu',
                                              args.update_dropout, args.use_spmv,
-                                             prefix='sse')
+                                             inference=True, prefix='sse')
     update_hidden_train = DGLSSEUpdateHidden(args.n_hidden, 'relu',
                                              args.update_dropout, args.use_spmv,
-                                             prefix='sse')
+                                             inference=False, prefix='sse')
     if not args.dgl:
         update_hidden_infer = SSEUpdateHidden(args.n_hidden, args.update_dropout, 'relu',
                                               prefix='sse')
