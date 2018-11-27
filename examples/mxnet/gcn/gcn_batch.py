@@ -90,6 +90,7 @@ def main(args):
                 'relu',
                 args.dropout)
     model.initialize(ctx=ctx)
+    loss_fcn = gluon.loss.SoftmaxCELoss()
 
     # use optimizer
     trainer = gluon.Trainer(model.collect_params(), 'adam', {'learning_rate': args.lr})
@@ -101,8 +102,8 @@ def main(args):
             t0 = time.time()
         # forward
         with mx.autograd.record():
-            logits = model(features)
-            loss = mx.nd.softmax_cross_entropy(logits, labels)
+            pred = model(features)
+            loss = loss_fcn(pred, labels, mask)
 
         #optimizer.zero_grad()
         loss.backward()
@@ -112,6 +113,12 @@ def main(args):
             dur.append(time.time() - t0)
             print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
                 epoch, loss.asnumpy()[0], np.mean(dur), n_edges / np.mean(dur) / 1000))
+
+    # test set accuracy
+    pred = model(features)
+    accuracy = (pred*100).softmax().pick(labels).mean()
+    print("Final accuracy {:.2%}".format(accuracy.mean().asscalar()))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
