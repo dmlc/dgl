@@ -32,10 +32,6 @@ class MessageFunction(BuiltinFunction):
         raise NotImplementedError
 
 
-def _is_spmv_supported_node_feat(g, field):
-    """Return whether the node feature shape supports SPMV optimization."""
-    return True
-
 def _is_spmv_supported_edge_feat(g, field):
     """Return whether the edge feature shape supports SPMV optimization.
 
@@ -54,8 +50,7 @@ class SrcMulEdgeMessageFunction(MessageFunction):
         self.out_field = out_field
 
     def is_spmv_supported(self, g):
-        return _is_spmv_supported_node_feat(g, self.src_field) \
-                and _is_spmv_supported_edge_feat(g, self.edge_field)
+        return _is_spmv_supported_edge_feat(g, self.edge_field)
 
     def __call__(self, edges):
         src_data = edges.src[self.src_field]
@@ -82,7 +77,7 @@ class CopySrcMessageFunction(MessageFunction):
         self.out_field = out_field
 
     def is_spmv_supported(self, g):
-        return _is_spmv_supported_node_feat(g, self.src_field)
+        return True
 
     def __call__(self, edges):
         return {self.out_field : edges.src[self.src_field]}
@@ -101,7 +96,7 @@ class CopyEdgeMessageFunction(MessageFunction):
         self.out_field = out_field
 
     def is_spmv_supported(self, g):
-        # TODO: support this with g-spmv
+        # TODO: support this with e2v spmv
         return False
         # return _is_spmv_supported_edge_feat(g, self.edge_field)
 
