@@ -29,6 +29,7 @@ parser.add_option("-l", "--latent", dest="latent_size", default=56)
 parser.add_option("-d", "--depth", dest="depth", default=3)
 parser.add_option("-z", "--beta", dest="beta", default=1.0)
 parser.add_option("-q", "--lr", dest="lr", default=1e-3)
+parser.add_option("-T", "--test", dest="test", action="store_true")
 opts,args = parser.parse_args()
 
 dataset = JTNNDataset(data=opts.train, vocab=opts.vocab, training=True)
@@ -66,8 +67,8 @@ def train():
     dataloader = DataLoader(
             dataset,
             batch_size=batch_size,
-            shuffle=True,
-            num_workers=0,
+            shuffle=False,
+            num_workers=4,
             collate_fn=JTNNCollator(vocab, True),
             drop_last=True,
             worker_init_fn=worker_init_fn)
@@ -92,8 +93,8 @@ def train():
                 assm_acc = assm_acc / PRINT_ITER * 100
                 steo_acc = steo_acc / PRINT_ITER * 100
 
-                print("KL: %.1f, Word: %.2f, Topo: %.2f, Assm: %.2f, Steo: %.2f" % (
-                    kl_div, word_acc, topo_acc, assm_acc, steo_acc))
+                print("KL: %.1f, Word: %.2f, Topo: %.2f, Assm: %.2f, Steo: %.2f, Loss: %.6f" % (
+                    kl_div, word_acc, topo_acc, assm_acc, steo_acc, loss.item()))
                 word_acc,topo_acc,assm_acc,steo_acc = 0,0,0,0
                 sys.stdout.flush()
 
@@ -107,8 +108,33 @@ def train():
         print("learning rate: %.6f" % scheduler.get_lr()[0])
         torch.save(model.state_dict(), opts.save_path + "/model.iter-" + str(epoch))
 
+def test():
+    dataloader = DataLoader(
+            dataset,
+            batch_size=1,
+            shuffle=False,
+            num_workers=0,
+            collate_fn=JTNNCollator(vocab, True),
+            drop_last=True,
+            worker_init_fn=worker_init_fn)
+
+    # Just an example of molecule decoding; in reality you may want to sample
+    # tree and molecule vectors.
+    for it, batch in enumerate(dataloader):
+        gt_smiles = batch['mol_trees'][0].smiles
+        loss, kl_div, wacc, tacc, sacc, dacc = model(batch, beta, e1=0, e2=0)
+        model.move_to_cuda(batch)
+        _, tree_vec, mol_vec = model.encode(batch)
+        tree_vec = model.T_mean(tree_vec)
+        mol_vec = model.G_mean(mol_vec)
+        smiles = model.decode(tree_vec, mol_vec)
+        print(gt_smiles)
+        print(smiles)
+
 if __name__ == '__main__':
     train()
+    if opts.test:
+        test()
 
     print('# passes:', model.n_passes)
     print('Total # nodes processed:', model.n_nodes_total)

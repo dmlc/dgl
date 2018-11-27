@@ -219,6 +219,13 @@ class DGLJTNNDecoder(nn.Module):
         p_acc = ((p > 0).long() == p_targets).sum().float() / p_targets.shape[0]
         q_acc = (q.max(1)[1] == q_targets).float().sum() / q_targets.shape[0]
 
+        self.q_inputs = q_inputs
+        self.q_targets = q_targets
+        self.q = q
+        self.p_inputs = p_inputs
+        self.p_targets = p_targets
+        self.p = p
+
         return q_loss, p_loss, q_acc, p_acc
 
     def decode(self, mol_vec):
@@ -367,6 +374,6 @@ class DGLJTNNDecoder(nn.Module):
                 )
                 stack.pop()
 
-        effective_nodes = mol_tree.filter_nodes(lambda nodes: nodes['fail'] != 1)
+        effective_nodes = mol_tree.filter_nodes(lambda nodes: nodes.data['fail'] != 1)
         effective_nodes, _ = torch.sort(effective_nodes)
         return mol_tree, all_nodes, effective_nodes

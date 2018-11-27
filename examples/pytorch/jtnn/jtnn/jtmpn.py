@@ -218,25 +218,26 @@ class DGLJTMPN(nn.Module):
             'h': zero_node_state.clone(),
         })
 
-        if PAPER:
-            cand_graphs.edata['alpha'] = \
-                    cuda(torch.zeros(cand_graphs.number_of_edges(), self.hidden_size))
-
-            src_u, src_v = tree_mess_src_edges.unbind(1)
-            tgt_u, tgt_v = tree_mess_tgt_edges.unbind(1)
-            alpha = mol_tree_batch.edges[src_u, src_v].data['m']
-            cand_graphs.edges[tgt_u, tgt_v].data['alpha'] = alpha
-        else:
-            src_u, src_v = tree_mess_src_edges.unbind(1)
-            alpha = mol_tree_batch.edges[src_u, src_v].data['m']
-            node_idx = (tree_mess_tgt_nodes
-                        .to(device=zero_node_state.device)[:, None]
-                        .expand_as(alpha))
-            node_alpha = zero_node_state.clone().scatter_add(0, node_idx, alpha)
-            cand_graphs.ndata['alpha'] = node_alpha
-            cand_graphs.apply_edges(
-                func=lambda edges: {'alpha': edges.src['alpha']},
-            )
+        cand_graphs.edata['alpha'] = \
+                cuda(torch.zeros(cand_graphs.number_of_edges(), self.hidden_size))
+        cand_graphs.ndata['alpha'] = zero_node_state
+        if tree_mess_src_edges.shape[0] > 0:
+            if PAPER:
+                src_u, src_v = tree_mess_src_edges.unbind(1)
+                tgt_u, tgt_v = tree_mess_tgt_edges.unbind(1)
+                alpha = mol_tree_batch.edges[src_u, src_v].data['m']
+                cand_graphs.edges[tgt_u, tgt_v].data['alpha'] = alpha
+            else:
+                src_u, src_v = tree_mess_src_edges.unbind(1)
+                alpha = mol_tree_batch.edges[src_u, src_v].data['m']
+                node_idx = (tree_mess_tgt_nodes
+                            .to(device=zero_node_state.device)[:, None]
+                            .expand_as(alpha))
+                node_alpha = zero_node_state.clone().scatter_add(0, node_idx, alpha)
+                cand_graphs.ndata['alpha'] = node_alpha
+                cand_graphs.apply_edges(
+                    func=lambda edges: {'alpha': edges.src['alpha']},
+                )
 
         for i in range(self.depth - 1):
             cand_line_graph.update_all(
