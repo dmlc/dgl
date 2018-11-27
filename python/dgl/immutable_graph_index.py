@@ -452,7 +452,6 @@ class ImmutableGraphIndex(object):
                                                                            node_prob,
                                                                            max_subgraph_size)
         induced_nodes = [utils.toindex(v) for v in induced_nodes]
-        induced_edges = [utils.toindex(e) for e in induced_edges]
         return [ImmutableSubgraphIndex(gi, self, induced_n,
             induced_e) for gi, induced_n, induced_e in zip(gis, induced_nodes, induced_edges)]
 

@@ -299,7 +299,7 @@ class ImmutableGraphIndex(object):
         elif neighbor_type == 'out':
             gis = [ImmutableGraphIndex(None, csr) for csr in compacts]
         parent_nodes = [v[0:size] for v, size in zip(vertices, num_nodes)]
-        parent_edges = [e.data for e in subgraphs]
+        parent_edges = [lambda: e.data for e in subgraphs]
         return gis, parent_nodes, parent_edges
 
     def adjacency_matrix(self, transpose, ctx):
