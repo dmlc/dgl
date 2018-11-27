@@ -75,7 +75,7 @@ def find_lib_path(name=None, search_path=None, optional=False):
     if not lib_found:
         message = ('Cannot find the files.\n' +
                    'List of candidates:\n' +
-                   str('\n'.join(lib_dll_path + runtime_dll_path)))
+                   str('\n'.join(lib_dll_path)))
         if not optional:
             raise RuntimeError(message)
         return None
@@ -87,4 +87,4 @@ def find_lib_path(name=None, search_path=None, optional=False):
 # We use the version of the incoming release for code
 # that is under development.
 # The following line is set by tvm/python/update_version.py
-__version__ = "0.5.dev"
+__version__ = "0.0.1"

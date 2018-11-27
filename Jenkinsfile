@@ -11,12 +11,14 @@ def setup() {
 
 def build_dgl() {
   sh "if [ -d build ]; then rm -rf build; fi; mkdir build"
-  dir("python") {
-    sh "python3 setup.py install"
-  }
   dir ("build") {
     sh "cmake .."
     sh "make -j4"
+  }
+  dir("python") {
+    sh "rm -rf build *.egg-info dist"
+    sh "pip3 uninstall -y dgl"
+    sh "python3 setup.py install"
   }
 }
 
@@ -35,16 +37,16 @@ def mxnet_unit_test(dev) {
 }
 
 def example_test(dev) {
-  dir ("tests/scripts") {
-    withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
+  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
+    dir ("tests/scripts") {
       sh "./task_example_test.sh ${dev}"
     }
   }
 }
 
 def pytorch_tutorials() {
-  dir ("tests/scripts") {
-    withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
+  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
+    dir ("tests/scripts") {
       sh "./task_tutorial_test.sh"
     }
   }
