@@ -11,6 +11,7 @@ import time
 import argparse
 from itertools import permutations
 
+import numpy as np
 import torch as th
 import torch.nn.functional as F
 import torch.optim as optim
@@ -57,8 +58,18 @@ def compute_overlap(z_list):
         overlap_list.append(overlap)
     return sum(overlap_list) / len(overlap_list)
 
+def from_np(f, *args):
+    def wrap(*args):
+        new = [th.from_numpy(x) if isinstance(x, np.ndarray) else x for x in args]
+        return f(*new)
+    return wrap
+
+@from_np
 def step(i, j, g, lg, deg_g, deg_lg, pm_pd):
     """ One step of training. """
+    deg_g = deg_g.to(dev)
+    deg_lg = deg_lg.to(dev)
+    pm_pd = pm_pd.to(dev)
     t0 = time.time()
     z = model(g, lg, deg_g, deg_lg, pm_pd)
     t_forward = time.time() - t0
@@ -75,6 +86,15 @@ def step(i, j, g, lg, deg_g, deg_lg, pm_pd):
 
     return loss, overlap, t_forward, t_backward
 
+@from_np
+def inference(g, lg, deg_g, deg_lg, pm_pd):
+    deg_g = deg_g.to(dev)
+    deg_lg = deg_lg.to(dev)
+    pm_pd = pm_pd.to(dev)
+
+    z = model(g, lg, deg_g, deg_lg, pm_pd)
+
+    return z
 def test():
     p_list =[6, 5.5, 5, 4.5, 1.5, 1, 0.5, 0]
     q_list =[0, 0.5, 1, 1.5, 4.5, 5, 5.5, 6]
@@ -84,10 +104,7 @@ def test():
         dataset = SBMMixture(N, args.n_nodes, K, pq=[[p, q]] * N)
         loader = DataLoader(dataset, N, collate_fn=dataset.collate_fn)
         g, lg, deg_g, deg_lg, pm_pd = next(iter(loader))
-        deg_g = deg_g.to(dev)
-        deg_lg = deg_lg.to(dev)
-        pm_pd = pm_pd.to(dev)
-        z = model(g, lg, deg_g, deg_lg, pm_pd)
+        z = inference(g, lg, deg_g, deg_lg, pm_pd)
         overlap_list.append(compute_overlap(th.chunk(z, N, 0)))
     return overlap_list
 
@@ -95,9 +112,6 @@ n_iterations = args.n_graphs // args.batch_size
 for i in range(args.n_epochs):
     total_loss, total_overlap, s_forward, s_backward = 0, 0, 0, 0
     for j, [g, lg, deg_g, deg_lg, pm_pd] in enumerate(training_loader):
-        deg_g = deg_g.to(dev)
-        deg_lg = deg_lg.to(dev)
-        pm_pd = pm_pd.to(dev)
         loss, overlap, t_forward, t_backward = step(i, j, g, lg, deg_g, deg_lg, pm_pd)
 
         total_loss += loss
