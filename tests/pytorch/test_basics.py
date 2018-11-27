@@ -1,6 +1,7 @@
 import torch as th
 from torch.autograd import Variable
 import numpy as np
+import dgl
 from dgl.graph import DGLGraph
 import utils as U
 
@@ -40,8 +41,8 @@ def generate_graph(grad=False):
     ecol = Variable(th.randn(17, D), requires_grad=grad)
     g.ndata['h'] = ncol
     g.edata['w'] = ecol
-    g.set_n_initializer(lambda shape, dtype, ctx : th.zeros(shape, dtype=dtype, device=ctx))
-    g.set_e_initializer(lambda shape, dtype, ctx : th.zeros(shape, dtype=dtype, device=ctx))
+    g.set_n_initializer(dgl.init.zero_initializer)
+    g.set_e_initializer(dgl.init.zero_initializer)
     return g
 
 def test_batch_setter_getter():
@@ -169,6 +170,18 @@ def test_batch_recv():
     assert(reduce_msg_shapes == {(1, 3, D), (3, 1, D)})
     reduce_msg_shapes.clear()
 
+def test_apply_nodes():
+    def _upd(nodes):
+        return {'h' : nodes.data['h'] * 2}
+    g = generate_graph()
+    g.register_apply_node_func(_upd)
+    old = g.ndata['h']
+    g.apply_nodes()
+    assert U.allclose(old * 2, g.ndata['h'])
+    u = th.tensor([0, 3, 4, 6])
+    g.apply_nodes(lambda nodes : {'h' : nodes.data['h'] * 0.}, u)
+    assert U.allclose(g.ndata['h'][u], th.zeros((4, D)))
+
 def test_apply_edges():
     def _upd(edges):
         return {'w' : edges.data['w'] * 2}
@@ -199,7 +212,7 @@ def test_update_routines():
     try:
         g.send_and_recv([u, v])
         assert False
-    except ValueError:
+    except:
         pass
 
     # pull
@@ -222,7 +235,87 @@ def test_update_routines():
     assert(reduce_msg_shapes == {(1, 8, D), (9, 1, D)})
     reduce_msg_shapes.clear()
 
-def test_reduce_0deg():
+def test_recv_0deg():
+    # test recv with 0deg nodes;
+    g = DGLGraph()
+    g.add_nodes(2)
+    g.add_edge(0, 1)
+    def _message(edges):
+        return {'m' : edges.src['h']}
+    def _reduce(nodes):
+        return {'h' : nodes.data['h'] + nodes.mailbox['m'].sum(1)}
+    def _apply(nodes):
+        return {'h' : nodes.data['h'] * 2}
+    def _init2(shape, dtype, ctx, ids):
+        return 2 + th.zeros(shape, dtype=dtype, device=ctx)
+    g.register_message_func(_message)
+    g.register_reduce_func(_reduce)
+    g.register_apply_node_func(_apply)
+    g.set_n_initializer(_init2, 'h')
+    # test#1: recv both 0deg and non-0deg nodes
+    old = th.randn((2, 5))
+    g.ndata['h'] = old
+    g.send((0, 1))
+    g.recv([0, 1])
+    new = g.ndata.pop('h')
+    # 0deg check: initialized with the func and got applied
+    assert U.allclose(new[0], th.full((5,), 4))
+    # non-0deg check
+    assert U.allclose(new[1], th.sum(old, 0) * 2)
+
+    # test#2: recv only 0deg node is equal to apply
+    old = th.randn((2, 5))
+    g.ndata['h'] = old
+    g.send((0, 1))
+    g.recv(0)
+    new = g.ndata.pop('h')
+    # 0deg check: equal to apply_nodes
+    assert U.allclose(new[0], 2 * old[0])
+    # non-0deg check: untouched
+    assert U.allclose(new[1], old[1])
+
+def test_recv_0deg_newfld():
+    # test recv with 0deg nodes; the reducer also creates a new field
+    g = DGLGraph()
+    g.add_nodes(2)
+    g.add_edge(0, 1)
+    def _message(edges):
+        return {'m' : edges.src['h']}
+    def _reduce(nodes):
+        return {'h1' : nodes.data['h'] + nodes.mailbox['m'].sum(1)}
+    def _apply(nodes):
+        return {'h1' : nodes.data['h1'] * 2}
+    def _init2(shape, dtype, ctx, ids):
+        return 2 + th.zeros(shape, dtype=dtype, device=ctx)
+    g.register_message_func(_message)
+    g.register_reduce_func(_reduce)
+    g.register_apply_node_func(_apply)
+    # test#1: recv both 0deg and non-0deg nodes
+    old = th.randn((2, 5))
+    g.set_n_initializer(_init2, 'h1')
+    g.ndata['h'] = old
+    g.send((0, 1))
+    g.recv([0, 1])
+    new = g.ndata.pop('h1')
+    # 0deg check: initialized with the func and got applied
+    assert U.allclose(new[0], th.full((5,), 4))
+    # non-0deg check
+    assert U.allclose(new[1], th.sum(old, 0) * 2)
+
+    # test#2: recv only 0deg node
+    old = th.randn((2, 5))
+    g.ndata['h'] = old
+    g.ndata['h1'] = th.full((2, 5), -1)  # this is necessary
+    g.send((0, 1))
+    g.recv(0)
+    new = g.ndata.pop('h1')
+    # 0deg check: fallback to apply
+    assert U.allclose(new[0], th.full((5,), -2))
+    # non-0deg check: not changed
+    assert U.allclose(new[1], th.full((5,), -1))
+
+def test_update_all_0deg():
+    # test#1
     g = DGLGraph()
     g.add_nodes(5)
     g.add_edge(1, 0)
@@ -233,13 +326,30 @@ def test_reduce_0deg():
         return {'m' : edges.src['h']}
     def _reduce(nodes):
         return {'h' : nodes.data['h'] + nodes.mailbox['m'].sum(1)}
+    def _apply(nodes):
+        return {'h' : nodes.data['h'] * 2}
+    def _init2(shape, dtype, ctx, ids):
+        return 2 + th.zeros(shape, dtype=dtype, device=ctx)
+    g.set_n_initializer(_init2, 'h')
     old_repr = th.randn(5, 5)
     g.ndata['h'] = old_repr
-    g.update_all(_message, _reduce)
+    g.update_all(_message, _reduce, _apply)
     new_repr = g.ndata['h']
-
-    assert U.allclose(new_repr[1:], old_repr[1:])
-    assert U.allclose(new_repr[0], old_repr.sum(0))
+    # the first row of the new_repr should be the sum of all the node
+    # features; while the 0-deg nodes should be initialized by the
+    # initializer and applied with UDF.
+    assert U.allclose(new_repr[1:], 2*(2+th.zeros((4,5))))
+    assert U.allclose(new_repr[0], 2 * old_repr.sum(0))
+    
+    # test#2: graph with no edge
+    g = DGLGraph()
+    g.add_nodes(5)
+    g.set_n_initializer(_init2, 'h')
+    g.ndata['h'] = old_repr
+    g.update_all(_message, _reduce, _apply)
+    new_repr = g.ndata['h']
+    # should fallback to apply
+    assert U.allclose(new_repr, 2*old_repr)
 
 def test_pull_0deg():
     g = DGLGraph()
@@ -248,25 +358,34 @@ def test_pull_0deg():
     def _message(edges):
         return {'m' : edges.src['h']}
     def _reduce(nodes):
-        return {'h' : nodes.mailbox['m'].sum(1)}
-    old_repr = th.randn(2, 5)
-    g.ndata['h'] = old_repr
+        return {'h' : nodes.data['h'] + nodes.mailbox['m'].sum(1)}
+    def _apply(nodes):
+        return {'h' : nodes.data['h'] * 2}
+    def _init2(shape, dtype, ctx, ids):
+        return 2 + th.zeros(shape, dtype=dtype, device=ctx)
+    g.register_message_func(_message)
+    g.register_reduce_func(_reduce)
+    g.register_apply_node_func(_apply)
+    g.set_n_initializer(_init2, 'h')
+    # test#1: pull both 0deg and non-0deg nodes
+    old = th.randn((2, 5))
+    g.ndata['h'] = old
+    g.pull([0, 1])
+    new = g.ndata.pop('h')
+    # 0deg check: initialized with the func and got applied
+    assert U.allclose(new[0], th.full((5,), 4))
+    # non-0deg check
+    assert U.allclose(new[1], th.sum(old, 0) * 2)
 
-    g.pull(0, _message, _reduce)
-    new_repr = g.ndata['h']
-    assert U.allclose(new_repr[0], old_repr[0])
-    assert U.allclose(new_repr[1], old_repr[1])
-
-    g.pull(1, _message, _reduce)
-    new_repr = g.ndata['h']
-    assert U.allclose(new_repr[1], old_repr[0])
-
-    old_repr = th.randn(2, 5)
-    g.ndata['h'] = old_repr
-    g.pull([0, 1], _message, _reduce)
-    new_repr = g.ndata['h']
-    assert U.allclose(new_repr[0], old_repr[0])
-    assert U.allclose(new_repr[1], old_repr[0])
+    # test#2: pull only 0deg node
+    old = th.randn((2, 5))
+    g.ndata['h'] = old
+    g.pull(0)
+    new = g.ndata.pop('h')
+    # 0deg check: fallback to apply
+    assert U.allclose(new[0], 2*old[0])
+    # non-0deg check: not touched
+    assert U.allclose(new[1], old[1])
 
 def _disabled_test_send_twice():
     # TODO(minjie): please re-enable this unittest after the send code problem is fixed.
@@ -398,9 +517,12 @@ if __name__ == '__main__':
     test_batch_setter_autograd()
     test_batch_send()
     test_batch_recv()
+    test_apply_nodes()
     test_apply_edges()
     test_update_routines()
-    test_reduce_0deg()
+    test_recv_0deg()
+    test_recv_0deg_newfld()
+    test_update_all_0deg()
     test_pull_0deg()
     test_send_multigraph()
     test_dynamic_addition()

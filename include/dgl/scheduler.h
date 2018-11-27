@@ -17,7 +17,9 @@ namespace sched {
 
 /*!
  * \brief Generate degree bucketing schedule
- * \param vids The destination vertex for messages
+ * \param msg_ids The edge id for each message
+ * \param vids The destination vertex for each message
+ * \param recv_ids The recv nodes (for checking zero degree nodes)
  * \note If there are multiple messages going into the same destination vertex, then
  *       there will be multiple copies of the destination vertex in vids
  * \return a vector of 5 IdArrays for degree bucketing. The 5 arrays are:
@@ -27,7 +29,8 @@ namespace sched {
  *         mids: message ids
  *         mid_section: number of messages in each bucket (used to split mids)
  */
-std::vector<IdArray> DegreeBucketing(const IdArray& vids);
+std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids,
+        const IdArray& recv_ids);
 
 }  // namespace sched
 

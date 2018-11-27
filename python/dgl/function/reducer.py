@@ -2,11 +2,11 @@
 from __future__ import absolute_import
 
 from .. import backend as F
-from .base import create_bundled_function_class
+from .base import BuiltinFunction
 
 __all__ = ["sum", "max"]
 
-class ReduceFunction(object):
+class ReduceFunction(BuiltinFunction):
     """Base builtin reduce function class."""
 
     def __call__(self, nodes):
@@ -16,6 +16,7 @@ class ReduceFunction(object):
         """
         raise NotImplementedError
 
+    @property
     def name(self):
         """Return the name of this builtin function."""
         raise NotImplementedError
@@ -23,10 +24,6 @@ class ReduceFunction(object):
     def is_spmv_supported(self):
         """Return whether the SPMV optimization is supported."""
         raise NotImplementedError
-
-
-BundledReduceFunction = create_bundled_function_class(
-        'BundledReduceFunction', ReduceFunction)
 
 
 class SimpleReduceFunction(ReduceFunction):
@@ -45,6 +42,7 @@ class SimpleReduceFunction(ReduceFunction):
     def __call__(self, nodes):
         return {self.out_field : self.op(nodes.mailbox[self.msg_field], 1)}
 
+    @property
     def name(self):
         return self._name
 

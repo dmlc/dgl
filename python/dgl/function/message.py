@@ -1,14 +1,14 @@
 """Built-in message function."""
 from __future__ import absolute_import
 
+from .base import BuiltinFunction
 import operator
 import dgl.backend as F
-from .base import create_bundled_function_class
 
 __all__ = ["src_mul_edge", "copy_src", "copy_edge"]
 
 
-class MessageFunction(object):
+class MessageFunction(BuiltinFunction):
     """Base builtin message function class."""
 
     def __call__(self, edges):
@@ -18,6 +18,7 @@ class MessageFunction(object):
         """
         raise NotImplementedError
 
+    @property
     def name(self):
         """Return the name of this builtin function."""
         raise NotImplementedError
@@ -26,19 +27,10 @@ class MessageFunction(object):
         """Return whether the SPMV optimization is supported."""
         raise NotImplementedError
 
+    @property
+    def use_edge_feature(self):
+        raise NotImplementedError
 
-BundledMessageFunction = create_bundled_function_class(
-        'BundledMessageFunction', MessageFunction)
-
-
-def _is_spmv_supported_node_feat(g, field):
-    """Return whether the node feature shape supports SPMV optimization.
-
-    Only scalar and vector features are supported currently.
-    """
-    feat = g.get_n_repr()[field]
-    shape = F.shape(feat)
-    return len(shape) == 1 or len(shape) == 2
 
 def _is_spmv_supported_edge_feat(g, field):
     """Return whether the edge feature shape supports SPMV optimization.
@@ -58,20 +50,26 @@ class SrcMulEdgeMessageFunction(MessageFunction):
         self.out_field = out_field
 
     def is_spmv_supported(self, g):
-        return _is_spmv_supported_node_feat(g, self.src_field) \
-                and _is_spmv_supported_edge_feat(g, self.edge_field)
+        return _is_spmv_supported_edge_feat(g, self.edge_field)
 
     def __call__(self, edges):
         src_data = edges.src[self.src_field]
         edata = edges.data[self.edge_field]
-        src_dim = F.ndim(src_data)
-        eshape = F.shape(edata)[0]
-        ret = self.mul_op(edges.src[self.src_field],
-                F.reshape(edges.data[self.edge_field], (eshape,) + (1,) * (src_dim - 1)))
+        if F.ndim(edata) == 1:
+            # edge feature is a scalar, unsqueeze dims of len 1
+            src_dim = F.ndim(src_data)
+            new_eshape = (F.shape(edata)[0],) + (1,) * (src_dim - 1)
+            edata = F.reshape(edata, new_eshape)
+        ret = self.mul_op(src_data, edata)
         return {self.out_field : ret}
 
+    @property
     def name(self):
         return "src_mul_edge"
+
+    @property
+    def use_edge_feature(self):
+        return True
 
 class CopySrcMessageFunction(MessageFunction):
     def __init__(self, src_field, out_field):
@@ -79,13 +77,18 @@ class CopySrcMessageFunction(MessageFunction):
         self.out_field = out_field
 
     def is_spmv_supported(self, g):
-        return _is_spmv_supported_node_feat(g, self.src_field)
+        return True
 
     def __call__(self, edges):
         return {self.out_field : edges.src[self.src_field]}
 
+    @property
     def name(self):
         return "copy_src"
+
+    @property
+    def use_edge_feature(self):
+        return False
 
 class CopyEdgeMessageFunction(MessageFunction):
     def __init__(self, edge_field=None, out_field=None):
@@ -93,15 +96,20 @@ class CopyEdgeMessageFunction(MessageFunction):
         self.out_field = out_field
 
     def is_spmv_supported(self, g):
-        # TODO: support this with g-spmv
+        # TODO: support this with e2v spmv
         return False
         # return _is_spmv_supported_edge_feat(g, self.edge_field)
 
     def __call__(self, edges):
         return {self.out_field : edges.data[self.edge_field]}
 
+    @property
     def name(self):
         return "copy_edge"
+
+    @property
+    def use_edge_feature(self):
+        return True
 
 
 def src_mul_edge(src, edge, out):
