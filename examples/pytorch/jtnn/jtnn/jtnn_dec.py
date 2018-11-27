@@ -319,7 +319,7 @@ class DGLJTNNDecoder(nn.Module):
                 sort_wid = sort_wid.squeeze()
 
                 next_wid = None
-                for wid in sort_wid.tolist():
+                for wid in sort_wid.tolist()[:5]:
                     slots = self.vocab.get_slots(wid)
                     cand_node_dict = create_node_dict(self.vocab.get_smiles(wid))
                     if (have_slots(u_slots, slots) and can_assemble(mol_tree, u, cand_node_dict)):
