@@ -120,9 +120,8 @@ def main(args):
         loss = F.cross_entropy(logits[train_idx], labels[train_idx])
         t1 = time.time()
         loss.backward()
-        t2 = time.time()
-
         optimizer.step()
+        t2 = time.time()
 
         forward_time.append(t1 - t0)
         backward_time.append(t2 - t1)

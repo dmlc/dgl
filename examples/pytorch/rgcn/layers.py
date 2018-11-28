@@ -119,5 +119,5 @@ class RGCNBlockLayer(RGCNLayer):
         g.update_all(self.msg_func, fn.sum(msg='msg', out='h'), self.apply_func)
 
     def apply_func(self, nodes):
-        return {'h': nodes.data['h'] / nodes.data['deg']}
+        return {'h': nodes.data['h'] * nodes.data['norm']}
 

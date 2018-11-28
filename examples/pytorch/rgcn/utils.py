@@ -65,8 +65,14 @@ def generate_sampled_graph_and_labels(triplets, sample_size, split_size, num_rel
     # build graph
     print("# sampled nodes: {}".format(len(uniq_v)))
     print("# sampled edges: {}".format(len(src) * 2))
-    g, rel = build_graph_from_triplets(len(uniq_v), num_rels, (src, rel, dst))
-    return g, uniq_v, rel, samples, labels
+    g, rel, norm = build_graph_from_triplets(len(uniq_v), num_rels, (src, rel, dst))
+    return g, uniq_v, rel, norm, samples, labels
+
+def comp_deg_norm(g):
+    in_deg = g.in_degrees(range(g.number_of_nodes())).float().numpy()
+    norm = 1.0 / in_deg
+    norm[np.isinf(norm)] = 0
+    return norm
 
 def build_graph_from_triplets(num_nodes, num_rels, triplets):
     g = dgl.DGLGraph()
@@ -76,13 +82,14 @@ def build_graph_from_triplets(num_nodes, num_rels, triplets):
     rel = np.concatenate((rel, rel + num_rels))
     edges = sorted(zip(dst, src, rel))
     dst, src, rel = np.array(edges).transpose()
-    print("Test graph:")
     g.add_edges(src, dst)
+    norm = comp_deg_norm(g)
     print("# nodes: {}, # edges: {}".format(num_nodes, len(src)))
-    return g, rel
+    return g, rel, norm
 
 def build_test_graph(num_nodes, num_rels, edges):
     src, rel, dst = edges.transpose()
+    print("Test graph:")
     return build_graph_from_triplets(num_nodes, num_rels, (src, rel, dst))
 
 
@@ -111,6 +118,7 @@ def perturb_and_get_rank(embedding, w, a, r, b, num_entity, batch_size=100):
     n_batch = (num_entity + batch_size - 1) // batch_size
     ranks = []
     for idx in range(n_batch):
+        print("batch {} / {}".format(idx, n_batch))
         batch_start = idx * batch_size
         batch_end = min(num_entity, (idx + 1) * batch_size)
         batch_a = a[batch_start: batch_end]

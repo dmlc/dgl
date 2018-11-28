@@ -22,8 +22,6 @@ from dgl.data import load_data
 
 from layers import RGCNBlockLayer as RGCNLayer
 from model import BaseRGCN
-import gc
-import objgraph
 
 import utils
 
@@ -60,7 +58,8 @@ class LinkPredict(nn.Module):
         s = embedding[triplets[:,0]]
         r = self.w_relation[triplets[:,1]]
         o = embedding[triplets[:,2]]
-        return torch.sum(s * r * o, dim=1)
+        score = torch.sum(s * r * o, dim=1)
+        return score
 
     def forward(self, g):
         return self.rgcn.forward(g)
@@ -90,12 +89,6 @@ def main(args):
     test_data = data.test
     num_rels = data.num_rels
 
-    # build test graph
-    test_graph, test_rel = utils.build_test_graph(
-        num_nodes, num_rels, train_data)
-    test_deg = test_graph.in_degrees(
-                range(test_graph.number_of_nodes())).float().view(-1,1)
-
     # check cuda
     use_cuda = args.gpu >= 0 and torch.cuda.is_available()
     if use_cuda:
@@ -111,28 +104,37 @@ def main(args):
                         use_cuda=use_cuda,
                         reg_param=args.regularization)
 
+    # build test graph
     valid_data = torch.LongTensor(valid_data)
+
+    test_graph, test_rel, test_norm = utils.build_test_graph(
+        num_nodes, num_rels, train_data)
+    test_deg = test_graph.in_degrees(
+                range(test_graph.number_of_nodes())).float().view(-1,1)
     test_data = torch.LongTensor(test_data)
     test_node_id = torch.arange(0, num_nodes, dtype=torch.long).view(-1, 1)
     test_rel = torch.from_numpy(test_rel).view(-1, 1)
+    test_norm = torch.from_numpy(test_norm).view(-1, 1)
+
+    test_graph.ndata.update({'id': test_node_id, 'norm': test_norm})
+    test_graph.edata['type'] = test_rel
+
     if use_cuda:
         model.cuda()
+        """
         valid_data = valid_data.cuda()
         test_data = test_data.cuda()
         test_node_id = test_node_id.cuda()
         test_rel = test_rel.cuda()
         test_deg = test_deg.cuda()
-
-    test_graph.ndata.update({'id': test_node_id, 'deg': test_deg})
-    test_graph.edata['type'] = test_rel
+        """
 
     # optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    # Can't use adam due to pytorch memory issue
+    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
 
     # training loop
     print("start training...")
-    forward_time = []
-    backward_time = []
 
     # build adj list and calculate degrees
     adj_list = [[] for _ in range(num_nodes)]
@@ -146,84 +148,71 @@ def main(args):
     best_mrr = 0
     model_state_file = 'model_state.pth'
 
-    forward_time = []
-    backward_time = []
+    epoch_time = []
     epoch = 0
-    objgraph.show_growth(limit=3)
     while True:
         epoch += 1
         print("Epoch {:03d}".format(epoch))
 
         model.train()
-        #optimizer.zero_grad()
-        gc.collect()
         if use_cuda:
             torch.cuda.empty_cache()
-        objgraph.show_growth()
-        if epoch > 1:
-            aaa = 0
-            for idx, tensor in enumerate(objgraph.by_type('Tensor')):
-                aaa += tensor.shape[0] * tensor.shape[1]
-                del tensor
-            print(aaa)
-        gc.collect()
-        if use_cuda:
-            torch.cuda.empty_cache()
-
 
         # generate graph and data
-        g, node_id, edge_type, data, labels = \
+        g, node_id, edge_type, node_norm, data, labels = \
             utils.generate_sampled_graph_and_labels(
                 train_data, args.graph_batch_size, args.graph_split_size,
                 num_rels, adj_list, degrees, args.negative_sample)
         print("Done edge sampling")
         node_id = torch.from_numpy(node_id).view(-1, 1)
         edge_type = torch.from_numpy(edge_type).view(-1, 1)
+        node_norm = torch.from_numpy(node_norm).view(-1, 1)
         data, labels = torch.from_numpy(data), torch.from_numpy(labels)
         deg = g.in_degrees(range(g.number_of_nodes())).float().view(-1, 1)
         if use_cuda:
             node_id, deg = node_id.cuda(), deg.cuda()
-            edge_type = edge_type.cuda()
+            edge_type, node_norm = edge_type.cuda(), node_norm.cuda()
             data, labels = data.cuda(), labels.cuda()
-        g.ndata.update({'id': node_id, 'deg': deg})
+        g.ndata.update({'id': node_id, 'norm': node_norm})
         g.edata['type'] = edge_type
 
         t0 = time.time()
         loss = model.get_loss(g, data, labels)
-        t1 = time.time()
         loss.backward()
-        t2 = time.time()
         # clip gradients
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_norm)
         optimizer.step()
+        t1 = time.time()
 
-        forward_time.append(t1 - t0)
-        backward_time.append(t2 - t1)
-        print("Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".format(
-                forward_time[-1], backward_time[-1]))
+        epoch_time.append(t1 - t0)
+        print("Train Epoch Time(s) {:.4f} | Loss {:.4f}".format(
+                epoch_time[-1], loss.item()))
 
-        if use_cuda:
-            torch.cuda.synchronize()
-        node_id = None
-        edge_type = None
-        data = None
-        labels = None
-        deg = None
-
-        del loss
-        loss = None
-        g = None
         optimizer.zero_grad()
         for p in model.parameters():
             p.grad = None
+        if use_cuda:
+            torch.cuda.empty_cache()
 
         if epoch % args.evaluate_every == 0:
-            gc.collect()
-            if use_cuda:
-                torch.cuda.empty_cache()
-            time.sleep(10)
-            model.eval()
-            mrr = utils.evaluate(test_graph, model, valid_data, num_nodes,
+            # save parameter
+            torch.save({'state_dict': model.state_dict(), 'epoch': epoch},
+                       'model_state_latest.pth')
+
+            # create new model
+            test_model = LinkPredict(num_nodes,
+                                args.n_hidden,
+                                num_rels,
+                                num_bases=args.n_bases,
+                                num_hidden_layers=args.n_layers,
+                                dropout=args.dropout,
+                                use_cuda=False,
+                                reg_param=args.regularization)
+            checkpoint = torch.load('model_state_latest.pth')
+            test_model.load_state_dict(checkpoint['state_dict'])
+            test_model.eval()
+            print("start eval")
+            mrr = utils.evaluate(test_graph, test_model, valid_data, num_nodes,
                                  hits=[1, 3, 10], eval_bz=args.eval_batch_size)
             # save best model
             if mrr < best_mrr:
@@ -231,7 +220,7 @@ def main(args):
                     break
             else:
                 best_mrr = mrr
-                torch.save({'state_dict': model.state_dict(), 'epoch': epoch},
+                torch.save({'state_dict': test_model.state_dict(), 'epoch': epoch},
                            model_state_file)
         """
 
@@ -282,7 +271,7 @@ if __name__ == '__main__':
             help="number of minimum training epochs")
     parser.add_argument("-d", "--dataset", type=str, required=True,
             help="dataset to use")
-    parser.add_argument("--eval-batch-size", type=int, default=100,
+    parser.add_argument("--eval-batch-size", type=int, default=500,
             help="batch size when evaluating")
     parser.add_argument("--regularization", type=float, default=0.01,
             help="regularization weight")
@@ -294,7 +283,7 @@ if __name__ == '__main__':
             help="portion of edges used as positive sample")
     parser.add_argument("--negative-sample", type=int, default=10,
             help="number of negative samples per positive sample")
-    parser.add_argument("--evaluate-every", type=int, default=2000,
+    parser.add_argument("--evaluate-every", type=int, default=100,
             help="perform evalution every n epochs")
 
     args = parser.parse_args()
