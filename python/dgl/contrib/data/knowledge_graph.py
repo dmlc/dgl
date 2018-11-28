@@ -107,13 +107,13 @@ class RGCNLinkDataset(object):
         print("# edges: {}".format(len(self.train)))
 
 
-def load_entity(args):
-    data = RGCNEntityDataset(args.dataset)
-    data.load(args.bfs_level, args.relabel)
+def load_entity(dataset, bfs_level, relabel):
+    data = RGCNEntityDataset(dataset)
+    data.load(bfs_level, relabel)
     return data
 
-def load_link(args):
-    data = RGCNLinkDataset(args.dataset)
+def load_link(dataset):
+    data = RGCNLinkDataset(dataset)
     data.load()
     return data
 

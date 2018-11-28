@@ -18,7 +18,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import random
-from dgl.data import load_data
+from dgl.contrib.data import load_data
 
 from layers import RGCNBlockLayer as RGCNLayer
 from model import BaseRGCN
@@ -82,7 +82,7 @@ class LinkPredict(nn.Module):
 
 def main(args):
     # load graph data
-    data = load_data(args)
+    data = load_data(args.dataset)
     num_nodes = data.num_nodes
     train_data = data.train
     valid_data = data.valid
@@ -131,7 +131,7 @@ def main(args):
 
     # optimizer
     # Can't use adam due to pytorch memory issue
-    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     # training loop
     print("start training...")
@@ -217,7 +217,8 @@ def main(args):
             # save best model
             if mrr < best_mrr:
                 if epoch > args.n_epochs:
-                    break
+                    # break
+                    pass # do nothing
             else:
                 best_mrr = mrr
                 torch.save({'state_dict': test_model.state_dict(), 'epoch': epoch},
@@ -283,7 +284,7 @@ if __name__ == '__main__':
             help="portion of edges used as positive sample")
     parser.add_argument("--negative-sample", type=int, default=10,
             help="number of negative samples per positive sample")
-    parser.add_argument("--evaluate-every", type=int, default=100,
+    parser.add_argument("--evaluate-every", type=int, default=500,
             help="perform evalution every n epochs")
 
     args = parser.parse_args()

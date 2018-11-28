@@ -15,7 +15,7 @@ import time
 import torch
 import torch.nn.functional as F
 from dgl import DGLGraph
-from dgl.data import load_data
+from dgl.contrib.data import load_data
 import dgl.function as fn
 from functools import partial
 
@@ -56,7 +56,7 @@ class EntityClassify(BaseRGCN):
 
 def main(args):
     # load graph data
-    data = load_data(args)
+    data = load_data(args.dataset, bfs_level=args.bfs_level, relabel=args.relabel)
     num_nodes = data.num_nodes
     num_rels = data.num_rels
     labels = data.labels
