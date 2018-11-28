@@ -28,7 +28,6 @@ if __name__ == '__main__':
     argparser = argparse.ArgumentParser('training translation model')
     argparser.add_argument('--gpus', default='-1', type=str, help='gpu id')
     argparser.add_argument('--N', default=6, type=int, help='enc/dec layers')
-    argparser.add_argument('--sparse', action='store_true', help='use sparse connection')
     argparser.add_argument('--dataset', default='multi30k', help='dataset')
     argparser.add_argument('--batch', default=128, type=int, help='batch size')
     args = argparser.parse_args()
@@ -41,7 +40,7 @@ if __name__ == '__main__':
     criterion = LabelSmoothing(V, padding_idx=dataset.pad_id, smoothing=0.1)
     dim_model = 512
 
-    graph_pool = GraphPool(sparse=args.sparse)
+    graph_pool = GraphPool()
     model = make_model(V, V, N=args.N, dim_model=dim_model)
 
     # Sharing weights between Encoder & Decoder

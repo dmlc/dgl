@@ -13,7 +13,7 @@ Graph = namedtuple('Graph',
                    ['g', 'src', 'tgt', 'tgt_y', 'nids', 'eids', 'n_nodes', 'n_edges', 'n_tokens'])
 
 class GraphPool:
-    def __init__(self, n=50, m=50, sparse=False):
+    def __init__(self, n=50, m=50):
         logging.info('start creating graph pool...')
         tic = time.time()
         self.n, self.m = n, m
@@ -31,51 +31,22 @@ class GraphPool:
             enc_nodes = th.arange(src_length, dtype=th.long)
             dec_nodes = th.arange(tgt_length, dtype=th.long) + src_length
 
-            if sparse:
-                # enc -> enc
-                us, vs = [], []
-                for x in range(src_length):
-                    for dy in [-32, -16, -8, -4, -2, -1, 0, 1, 2, 4, 8, 16, 32]:
-                        y = x + dy
-                        if y >= 0 and y < src_length:
-                            us.append(enc_nodes[x])
-                            vs.append(enc_nodes[y])
-                g_pool[i][j].add_edges(us, vs)
-                num_edges['ee'][i][j] = len(us)
-
-                # enc -> dec
-                us = enc_nodes.unsqueeze(-1).repeat(1, tgt_length).view(-1)
-                vs = dec_nodes.repeat(src_length)
-                g_pool[i][j].add_edges(us, vs)
-                num_edges['ed'][i][j] = len(us)
-
-                # dec -> dec
-                us, vs = [], []
-                for x in range(tgt_length):
-                    for dy in [0, 1, 2, 4, 8, 16, 32]:
-                        y = x + dy
-                        if y >= 0 and y < tgt_length:
-                            us.append(dec_nodes[x])
-                            vs.append(dec_nodes[y])
-                g_pool[i][j].add_edges(us, vs)
-                num_edges['dd'][i][j] = len(us)
-            else:
-                # enc -> enc
-                us = enc_nodes.unsqueeze(-1).repeat(1, src_length).view(-1)
-                vs = enc_nodes.repeat(src_length)
-                g_pool[i][j].add_edges(us, vs)
-                num_edges['ee'][i][j] = len(us)
-                # enc -> dec
-                us = enc_nodes.unsqueeze(-1).repeat(1, tgt_length).view(-1)
-                vs = dec_nodes.repeat(src_length)
-                g_pool[i][j].add_edges(us, vs)
-                num_edges['ed'][i][j] = len(us)
-                # dec -> dec
-                indices = th.triu(th.ones(tgt_length, tgt_length)) == 1
-                us = dec_nodes.unsqueeze(-1).repeat(1, tgt_length)[indices]
-                vs = dec_nodes.unsqueeze(0).repeat(tgt_length, 1)[indices]
-                g_pool[i][j].add_edges(us, vs)
-                num_edges['dd'][i][j] = len(us)
+            # enc -> enc
+            us = enc_nodes.unsqueeze(-1).repeat(1, src_length).view(-1)
+            vs = enc_nodes.repeat(src_length)
+            g_pool[i][j].add_edges(us, vs)
+            num_edges['ee'][i][j] = len(us)
+            # enc -> dec
+            us = enc_nodes.unsqueeze(-1).repeat(1, tgt_length).view(-1)
+            vs = dec_nodes.repeat(src_length)
+            g_pool[i][j].add_edges(us, vs)
+            num_edges['ed'][i][j] = len(us)
+            # dec -> dec
+            indices = th.triu(th.ones(tgt_length, tgt_length)) == 1
+            us = dec_nodes.unsqueeze(-1).repeat(1, tgt_length)[indices]
+            vs = dec_nodes.unsqueeze(0).repeat(tgt_length, 1)[indices]
+            g_pool[i][j].add_edges(us, vs)
+            num_edges['dd'][i][j] = len(us)
 
         logging.info('successfully created graph pool, time: {0:0.3f}s'.format(time.time() - tic))
         self.g_pool = g_pool
