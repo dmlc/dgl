@@ -2,11 +2,16 @@ package:
   name: dgl
   version: "0.0.1"
 
+source:
+  git_rev: "0.0.1"
+  git_url: https://github.com/jermainewang/dgl.git
+
 requirements:
   build:
-    - python >=3.5,<3.7
+    - python >=3.5
     - setuptools
     - cmake
+    - m2w64-gcc # [win]
   run:
     - python
     - numpy
