@@ -1,1 +1,1 @@
-DGLBACKEND=numpy python -c 'import dgl'
+DGLBACKEND=numpy $PYTHON -c 'import dgl'

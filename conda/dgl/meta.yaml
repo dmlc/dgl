@@ -3,7 +3,7 @@ package:
   version: "0.0.1"
 
 source:
-  git_rev: "0.0.1"
+  git_rev: conda
   git_url: https://github.com/jermainewang/dgl.git
 
 requirements:
@@ -11,7 +11,8 @@ requirements:
     - python >=3.5
     - setuptools
     - cmake
-    - m2w64-gcc # [win]
+    - m2w64-gcc         # [win]
+    - m2w64-make        # [win]
   run:
     - python
     - numpy
@@ -21,4 +22,4 @@ requirements:
 about:
   home: https://github.com/jermainewang/dgl.git
   license: Apache
-  license_file: ../LICENSE
+  license_file: ../../LICENSE
