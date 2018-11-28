@@ -141,7 +141,7 @@ class BatchedDGLGraph(DGLGraph):
                 g_num_nodes = g.number_of_nodes()
                 g_node_attrs = set(g.node_attr_schemes().keys())
                 if len(node_attrs) == 0:
-                    if g_num_nodes > 0:
+                    if g_num_nodes > 0 and len(g_node_attrs) > 0:
                         node_attrs = g_node_attrs
                         ref_g_index = i
                 elif g_node_attrs != node_attrs and g_num_nodes > 0:
@@ -161,7 +161,7 @@ class BatchedDGLGraph(DGLGraph):
                 g_num_edges = g.number_of_edges()
                 g_edge_attrs = set(g.edge_attr_schemes().keys())
                 if len(edge_attrs) == 0:
-                    if g_num_edges > 0:
+                    if g_num_edges > 0 and len(g_edge_attrs) > 0:
                         edge_attrs = g_edge_attrs
                         ref_g_index = i
                 elif g_edge_attrs != edge_attrs and g_num_edges > 0:
