@@ -6,6 +6,26 @@ Author's code repo: [https://github.com/tkipf/gcn](https://github.com/tkipf/gcn)
 
 The folder contains three different implementations using DGL.
 
+Results
+-------
+These results are based on single-run training to minimize the cross-entropy loss of the first 20 examples in each class. To keep the demo simple, we did not use normalized graphs or repeated experiments as the original paper suggested, which may lead to slightly different results. However, the accuracies are within the same order of magnitudes.
+
+```
+# Final accuracy 72.90%
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "citeseer" --n-epochs 200 --gpu 1
+```
+
+```
+# Final accuracy 83.11%
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "cora" --n-epochs 200 --gpu 1
+```
+
+```
+# Final accuracy 82.99%
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "pubmed" --n-epochs 200 --gpu 1
+```
+
+
 Naive GCN (gcn.py)
 -------
 The model is defined in the finest granularity (aka on *one* edge and *one* node).
