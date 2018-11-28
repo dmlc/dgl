@@ -39,10 +39,10 @@ class BatchedDGLGraph(DGLGraph):
     graph_list : iterable
         A collection of :class:`~dgl.DGLGraphs` to be batched.
     node_attrs : None, str or iterable, optional
-        The node attributes to be batched. If ``None``, the :class:`BatchedDGLGraph`
-        object will not have any node attributes. By default, all node attributes will
-        be batched. If ``str`` or ``iterable``, this should specify exactly what node
-        attributes to be batched.
+        The node attributes to be batched. If ``None``, the :class:`BatchedDGLGraph` object
+        will not have any node attributes. By default, all node attributes will be batched.
+        An error will be raised if graphs having nodes have different attributes. If ``str``
+        or ``iterable``, this should specify exactly what node attributes to be batched.
     edge_attrs : None, str or iterable, optional
         Same as for the case of :attr:`node_attrs`
 
@@ -139,7 +139,7 @@ class BatchedDGLGraph(DGLGraph):
             ref_node_attrs = node_attrs
             for i in range(1, len(graph_list)):
                 node_attrs = set(graph_list[i].node_attr_schemes().keys())
-                if node_attrs != ref_node_attrs:
+                if node_attrs != ref_node_attrs and graph_list[i].number_of_nodes() > 0:
                     raise ValueError('Expect graph {} and {} to have the same node attributes '
                                      'when node_attrs=ALL, got {} and {}'.format(
                         0, i, ref_node_attrs, node_attrs))
@@ -153,7 +153,7 @@ class BatchedDGLGraph(DGLGraph):
             ref_edge_attrs = edge_attrs
             for i in range(1, len(graph_list)):
                 edge_attrs = set(graph_list[i].edge_attr_schemes().keys())
-                if edge_attrs != ref_edge_attrs:
+                if edge_attrs != ref_edge_attrs and graph_list[i].number_of_edges() > 0:
                     raise ValueError('Expect graph {} and {} to have the same edge attributes '
                                      'when edge_attrs=ALL, got {} and {}'.format(
                         0, i, ref_edge_attrs, edge_attrs))
