@@ -1,0 +1,19 @@
+package:
+  name: dgl
+  version: "0.0.1"
+
+requirements:
+  build:
+    - python >=3.5,<3.7
+    - setuptools
+    - cmake
+  run:
+    - python
+    - numpy
+    - scipy
+    - networkx
+
+about:
+  home: https://github.com/jermainewang/dgl.git
+  license: Apache
+  license_file: ../LICENSE
