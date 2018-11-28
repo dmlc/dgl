@@ -22,8 +22,10 @@ class GraphEmbed(nn.Module):
                                        self.graph_hidden_size)
 
     def forward(self, g_list):
-        # With our current implementation, all graphs in the
-        # graph_list should have the same number of nodes.
+        # With our current batched implementation of DGMG, new nodes
+        # are not added for any graph until all graphs are done with
+        # adding edges starting from the last node. Therefore all graphs
+        # in the graph_list should have the same number of nodes.
         if g_list[0].number_of_nodes() == 0:
             return torch.zeros(len(g_list), self.graph_hidden_size)
 
@@ -130,9 +132,42 @@ class AddNode(nn.Module):
         g.nodes[num_nodes - 1].data['a'] = self.init_node_activation
 
     def prepare_training(self):
+        """
+        This function will only be called during training.
+        It stores all log probabilities for AddNode actions.
+        Each element is a tensor of shape [batch_size, 1].
+        """
         self.log_prob = []
 
     def forward(self, g_list, a=None):
+        """
+        Decide if a new node should be added for each graph in
+        the `g_list`. If a new node is added, initialize its
+        node representations. Record graphs for which a new node
+        is added.
+
+        During training, the action is passed rather than made
+        and the log P of the action is recorded.
+
+        During inference, the action is sampled from a Bernoulli
+        distribution modeled.
+
+        Parameters
+        ----------
+        g_list : list
+            A list of dgl.DGLGraph objects
+        a : None or list
+            - During training, a is a list of integers specifying
+              whether a new node should be added.
+            - During inference, a is None.
+
+        Returns
+        -------
+        g_non_stop : list
+            list of indices to specify which graphs in the
+            g_list have a new node added
+        """
+
         # Graphs for which a node is added
         g_non_stop = []
 
@@ -169,9 +204,41 @@ class AddEdge(nn.Module):
                                   node_hidden_size, 1)
 
     def prepare_training(self):
+        """
+        This function will only be called during training.
+        It stores all log probabilities for AddEdge actions.
+        Each element is a tensor of shape [batch_size, 1].
+        """
         self.log_prob = []
 
     def forward(self, g_list, a=None):
+        """
+        Decide if a new edge should be added for each graph in
+        the `g_list`. Record graphs for which a new edge is to
+        be added.
+
+        During training, the action is passed rather than made
+        and the log P of the action is recorded.
+
+        During inference, the action is sampled from a Bernoulli
+        distribution modeled.
+
+        Parameters
+        ----------
+        g_list : list
+            A list of dgl.DGLGraph objects
+        a : None or list
+            - During training, a is a list of integers specifying
+              whether a new edge should be added.
+            - During inference, a is None.
+
+        Returns
+        -------
+        g_to_add_edge : list
+            list of indices to specify which graphs in the
+            g_list need a new edge to be added
+        """
+
         # Graphs for which an edge is to be added.
         g_to_add_edge = []
 
@@ -212,9 +279,35 @@ class ChooseDestAndUpdate(nn.Module):
         g.edges[src_list, dest_list].data['he'] = edge_repr
 
     def prepare_training(self):
+        """
+        This function will only be called during training.
+        It stores all log probabilities for ChooseDest actions.
+        Each element is a tensor of shape [1, 1].
+        """
         self.log_prob = []
 
-    def forward(self, g_list, d):
+    def forward(self, g_list, d=None):
+        """
+        For each g in g_list, add an edge (src, dest)
+        if (src, dst) does not exist. The src is just the latest
+        node in g. Initialize edge features if new edges are added.
+
+        During training, dst is passed rather than chosen and the
+        log P of the action is recorded.
+
+        During inference, dst is sampled from a Categorical
+        distribution modeled.
+
+        Parameters
+        ----------
+        g_list : list
+            A list of dgl.DGLGraph objects
+        d : None or list
+            - During training, d is a list of integers specifying dst for
+              each graph in g_list.
+            - During inference, d is None.
+        """
+
         for i, g in enumerate(g_list):
             src = g.number_of_nodes() - 1
             possible_dests = range(src)
@@ -232,6 +325,7 @@ class ChooseDestAndUpdate(nn.Module):
             else:
                 dest = d[i]
 
+            # Note that we are not considering multigraph here.
             if not g.has_edge_between(src, dest):
                 # For undirected graphs, we add edges for both
                 # directions so that we can perform graph propagation.
@@ -412,6 +506,20 @@ class DGMG(nn.Module):
                + torch.cat(self.choose_dest_agent.log_prob).sum()
 
     def forward_train(self, actions):
+        """
+        Go through all decisions in actions and record their
+        log probabilities for calculating the loss.
+
+        Parameters
+        ----------
+        actions : list
+            list of decisions extracted for generating a graph using DGMG
+
+        Returns
+        -------
+        tensor of shape torch.Size([])
+            log P(Generate a batch of graphs using DGMG)
+        """
         self.actions = actions
 
         stop = self.add_node_and_update(a=self.get_actions('node'))
@@ -429,6 +537,14 @@ class DGMG(nn.Module):
         return self.get_log_prob()
 
     def forward_inference(self):
+        """
+        Generate graph(s) on the fly.
+
+        Returns
+        -------
+        self.g_list : list
+            A list of dgl.DGLGraph objects.
+        """
         stop = self.add_node_and_update()
 
         # Some graphs haven't been completely generated and their numbers of
