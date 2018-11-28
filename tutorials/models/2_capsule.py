@@ -127,8 +127,8 @@ class DGLRoutingLayer(nn.Module):
         self.g.edata['u_hat'] = u_hat
         for r in range(routing_num):
             # step 1 (line 4): normalize over out edges
-            in_edges = self.g.edata['b'].view(self.in_nodes, self.out_nodes)
-            self.g.edata['c'] = F.softmax(in_edges, dim=1).view(-1, 1)
+            edges_b = self.g.edata['b'].view(self.in_nodes, self.out_nodes)
+            self.g.edata['c'] = F.softmax(edges_b, dim=1).view(-1, 1)
 
             def cap_message(edges):
                 return {'m': edges.data['c'] * edges.data['u_hat']}
