@@ -1,0 +1,5 @@
+*.en
+!nonbreaking_prefix.en
+*.de
+!nonbreaking_prefix.de
+*.txt

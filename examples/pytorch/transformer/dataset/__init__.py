@@ -1,0 +1,147 @@
+from .graph import *
+from .fields import *
+from .utils import prepare_dataset
+import os
+import numpy as np
+
+class ClassificationDataset:
+    """
+    Dataset class for classification task.
+    """
+    def __init__(self):
+        pass
+
+class TranslationDataset:
+    """
+    Dataset class for translation task.
+    - By default, the source language shares the same vocabulary with the target language.
+    """
+    INIT_TOKEN = '<sos>'
+    EOS_TOKEN = '<eos>'
+    PAD_TOKEN = '<pad>'
+    MAX_LENGTH = 50
+    def __init__(self, path, exts, train='train', valid='valid', test='test', vocab='vocab.txt', replace_oov=None):
+        vocab_path = os.path.join(path, vocab)
+        self.src = {}
+        self.tgt = {}
+        with open(os.path.join(path, train + '.' + exts[0]), 'r') as f:
+            self.src['train'] = f.readlines()
+        with open(os.path.join(path, train + '.' + exts[1]), 'r') as f:
+            self.tgt['train'] = f.readlines()
+        with open(os.path.join(path, valid + '.' + exts[0]), 'r') as f:
+            self.src['valid'] = f.readlines()
+        with open(os.path.join(path, valid + '.' + exts[1]), 'r') as f:
+            self.tgt['valid'] = f.readlines()
+        with open(os.path.join(path, test + '.' + exts[0]), 'r') as f:
+            self.src['test'] = f.readlines()
+        with open(os.path.join(path, test + '.' + exts[1]), 'r') as f:
+            self.tgt['test'] = f.readlines()
+        vocab = Vocab(init_token=self.INIT_TOKEN,
+                      eos_token=self.EOS_TOKEN,
+                      pad_token=self.PAD_TOKEN,
+                      unk_token=replace_oov)
+        vocab.load(vocab_path)
+        self.vocab = vocab
+        strip_func = lambda x: x[:self.MAX_LENGTH]
+        self.src_field = Field(vocab,
+                               preprocessing=None,
+                               postprocessing=strip_func)
+        self.tgt_field = Field(vocab,
+                               preprocessing=lambda seq: [self.INIT_TOKEN] + seq + [self.EOS_TOKEN],
+                               postprocessing=strip_func)
+
+    @property
+    def vocab_size(self):
+        return len(self.vocab)
+
+    @property
+    def pad_id(self):
+        return self.vocab[self.PAD_TOKEN]
+
+    @property
+    def sos_id(self):
+        return self.vocab[self.INIT_TOKEN]
+
+    @property
+    def eos_id(self):
+        return self.vocab[self.EOS_TOKEN]
+
+    def __call__(self, graph_pool, mode='train', batch_size=32, device='cpu', k=1, devices=['cpu']):
+        dev_id, gs = 0, []
+        src_data, tgt_data = self.src[mode], self.tgt[mode]
+        #order = np.argsort([len(_) for _ in src_data])
+        n = len(src_data)
+        order = np.random.permutation(n) if mode != 'test' else range(n)
+        src_buf, tgt_buf = [], []
+        for idx in order:
+            src_sample = self.src_field(
+                src_data[idx].strip().split())
+            tgt_sample = self.tgt_field(
+                tgt_data[idx].strip().split())
+            src_buf.append(src_sample)
+            tgt_buf.append(tgt_sample)
+            if len(src_buf) == batch_size:
+                if mode == 'test':
+                    yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device) # we only allow single gpu for inference
+                else:
+                    gs.append(graph_pool(src_buf, tgt_buf, device=devices[dev_id]))
+                    dev_id += 1
+                    if dev_id == len(devices):
+                        yield gs
+                        dev_id, gs = 0, []
+                src_buf, tgt_buf = [], []
+        if len(src_buf) != 0:
+            if mode == 'test':
+                yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device)
+            else:
+                gs.append(graph_pool(src_buf, tgt_buf, device=devices[dev_id]))
+                yield gs
+
+    def get_sequence(self, batch):
+        ret = []
+        filter_list = set([self.pad_id, self.sos_id, self.eos_id])
+        for seq in batch:
+            try:
+                l = seq.index(self.eos_id)
+            except:
+                l = len(seq)
+            ret.append(' '.join(self.vocab[token] for token in seq[:l] if not token in filter_list))
+        return ret
+
+def get_dataset(dataset):
+    prepare_dataset(dataset)
+    if dataset == 'babi':
+        raise NotImplementedError
+    elif dataset == 'copy':
+        return TranslationDataset(
+            'data/copy',
+            ('in', 'out'),
+            train='train',
+            valid='valid',
+            test='test',
+        )
+    elif dataset == 'sort':
+        return TranslationDataset(
+            'data/sort', ('in', 'out'), train='train',
+            valid='valid',
+            test='test',
+        )
+    elif dataset == 'multi30k':
+        return TranslationDataset(
+            'data/multi30k',
+            ('en.atok', 'de.atok'),
+            train='train',
+            valid='val',
+            test='test2016',
+            replace_oov='<unk>'
+        )
+    elif dataset == 'wmt14':
+        return TranslationDataset(
+            'data/wmt14',
+            ('en', 'de'),
+            train='train.tok.clean.bpe.32000',
+            valid='newstest2013.tok.bpe.32000',
+            test='newstest2014.tok.bpe.32000',
+            vocab='vocab.bpe.32000')
+    else:
+        raise KeyError()

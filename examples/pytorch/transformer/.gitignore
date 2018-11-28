@@ -1,0 +1,9 @@
+*~
+data/
+checkpoints/
+*__pycache__*
+*.pdf
+*.tar.gz
+*.pyc
+*.lprof
+*.swp
