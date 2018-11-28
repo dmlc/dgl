@@ -135,28 +135,40 @@ class BatchedDGLGraph(DGLGraph):
         if node_attrs is None:
             node_attrs = []
         elif is_all(node_attrs):
-            node_attrs = set(graph_list[0].node_attr_schemes().keys())
-            ref_node_attrs = node_attrs
-            for i in range(1, len(graph_list)):
-                node_attrs = set(graph_list[i].node_attr_schemes().keys())
-                if node_attrs != ref_node_attrs and graph_list[i].number_of_nodes() > 0:
+            node_attrs = set()
+            for i in range(len(graph_list)):
+                g = graph_list[i]
+                g_num_nodes = g.number_of_nodes()
+                g_node_attrs = set(g.node_attr_schemes().keys())
+                if len(node_attrs) == 0:
+                    if g_num_nodes > 0:
+                        node_attrs = g_node_attrs
+                        ref_g_index = i
+                elif g_node_attrs != node_attrs and g_num_nodes > 0:
                     raise ValueError('Expect graph {} and {} to have the same node attributes '
-                                     'when node_attrs=ALL, got {} and {}'.format(
-                        0, i, ref_node_attrs, node_attrs))
+                                     'when node_attrs=ALL, got {} and {}'.format(ref_g_index, i,
+                                                                                 node_attrs,
+                                                                                 g_node_attrs))
         elif isinstance(node_attrs, str):
             node_attrs = [node_attrs]
 
         if edge_attrs is None:
             edge_attrs = []
         elif is_all(edge_attrs):
-            edge_attrs = set(graph_list[0].edge_attr_schemes().keys())
-            ref_edge_attrs = edge_attrs
-            for i in range(1, len(graph_list)):
-                edge_attrs = set(graph_list[i].edge_attr_schemes().keys())
-                if edge_attrs != ref_edge_attrs and graph_list[i].number_of_edges() > 0:
+            edge_attrs = set()
+            for i in range(len(graph_list)):
+                g = graph_list[i]
+                g_num_edges = g.number_of_edges()
+                g_edge_attrs = set(g.edge_attr_schemes().keys())
+                if len(edge_attrs) == 0:
+                    if g_num_edges > 0:
+                        edge_attrs = g_edge_attrs
+                        ref_g_index = i
+                elif g_edge_attrs != edge_attrs and g_num_edges > 0:
                     raise ValueError('Expect graph {} and {} to have the same edge attributes '
-                                     'when edge_attrs=ALL, got {} and {}'.format(
-                        0, i, ref_edge_attrs, edge_attrs))
+                                     'when edge_attrs=ALL, got {} and {}'.format(ref_g_index, i,
+                                                                                 edge_attrs,
+                                                                                 g_edge_attrs))
         elif isinstance(edge_attrs, str):
             edge_attrs = [edge_attrs]
 
