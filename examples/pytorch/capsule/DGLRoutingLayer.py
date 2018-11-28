@@ -21,8 +21,8 @@ class DGLRoutingLayer(nn.Module):
 
         for r in range(routing_num):
             # step 1 (line 4): normalize over out edges
-            edges = self.g.edata['b'].view(self.in_nodes, self.out_nodes)
-            self.g.edata['c'] = F.softmax(edges, dim=1).view(-1, 1)
+            edges_b = self.g.edata['b'].view(self.in_nodes, self.out_nodes)
+            self.g.edata['c'] = F.softmax(edges_b, dim=1).view(-1, 1)
 
             def cap_message(edges):
                 if batch_size:
