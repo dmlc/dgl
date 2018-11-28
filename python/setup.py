@@ -39,7 +39,7 @@ LIBS, VERSION = get_lib_path()
 
 include_libs = False
 wheel_include_libs = False
-if "bdist_wheel" in sys.argv:
+if "bdist_wheel" in sys.argv or os.getenv('CONDA_BUILD'):
     wheel_include_libs = True
 else:
     include_libs = True
