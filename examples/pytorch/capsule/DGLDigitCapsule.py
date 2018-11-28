@@ -22,7 +22,6 @@ class DGLDigitCapsuleLayer(nn.Module):
                                   device=self.device)
         routing(u_hat, routing_num=3)
         out_nodes_feature = routing.g.nodes[routing.out_indx].data['v']
-        routing.end()
         # shape transformation is for further classification
         return out_nodes_feature.transpose(0, 1).unsqueeze(1).unsqueeze(4).squeeze(1)
 
