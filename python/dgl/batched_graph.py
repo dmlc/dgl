@@ -24,13 +24,15 @@ class BatchedDGLGraph(DGLGraph):
     The nodes and edges are re-indexed with a new id in the batched graph with the
     rule below:
 
-           |   Graph 1  |         Graph 2          |...| Graph k
-    --------------------------------------------------------------------------------
-    raw id | 0, ..., N1 |   0   , ...,      N2     |...| ..., Nk
-    new id | 0, ..., N1 | N1 + 1, ..., N1 + N2 + 1 |...| ..., N1 + ... + Nk + k - 1
+    ======  ==========  ========================  ===  ==========================
+    item    Graph 1     Graph 2                   ...  Graph k
+    ======  ==========  ========================  ===  ==========================
+    raw id  0, ..., N1       0, ..., N2           ...  ..., Nk
+    new id  0, ..., N1  N1 + 1, ..., N1 + N2 + 1  ...  ..., N1 + ... + Nk + k - 1
+    ======  ==========  ========================  ===  ==========================
 
     The batched graph is read-only, i.e. one cannot further add nodes and edges.
-    A RuntimeError will be raised if one attempts.
+    A ``RuntimeError`` will be raised if one attempts.
 
     To modify the features in :class:`BatchedDGLGraph` has no effect on the original
     graphs. See the examples below about how to work around.
@@ -38,7 +40,7 @@ class BatchedDGLGraph(DGLGraph):
     Parameters
     ----------
     graph_list : iterable
-        A collection of :class:`~dgl.DGLGraphs` to be batched.
+        A collection of :class:`~dgl.DGLGraph` objects to be batched.
     node_attrs : None, str or iterable, optional
         The node attributes to be batched. If ``None``, the :class:`BatchedDGLGraph` object
         will not have any node attributes. By default, all node attributes will be batched.
@@ -49,7 +51,7 @@ class BatchedDGLGraph(DGLGraph):
 
     Examples
     --------
-    Create two :class:`~dgl.DGLGraphs` objects.
+    Create two :class:`~dgl.DGLGraph` objects.
 
     **Instantiation:**
 
@@ -67,7 +69,7 @@ class BatchedDGLGraph(DGLGraph):
     >>> g2.ndata['hv'] = th.tensor([[2.], [3.], [4.]]) # Initialize node features
     >>> g2.edata['he'] = th.tensor([[1.], [2.]])       # Initialize edge features
 
-    Merge two :class:`~dgl.DGLGraphs` objects into one :class:`BatchedDGLGraph` object.
+    Merge two :class:`~dgl.DGLGraph` objects into one :class:`BatchedDGLGraph` object.
     When merging a list of graphs, we can choose to include only a subset of the attributes.
 
     >>> bg = dgl.batch([g1, g2], edge_attrs=None)
@@ -89,6 +91,7 @@ class BatchedDGLGraph(DGLGraph):
     **Property:**
 
     We can still get a brief summary of the graphs that constitute the batched graph.
+
     >>> bg.batch_size
     2
     >>> bg.batch_num_nodes
@@ -100,11 +103,11 @@ class BatchedDGLGraph(DGLGraph):
 
     Another common demand for graph neural networks is graph readout, which is a
     function that takes in the node attributes and/or edge attributes for a graph
-    and outputs a vector summarizing the information in the graph. `BatchedDGLGraph`
-    also supports performing readout for a batch of graphs at once.
+    and outputs a vector summarizing the information in the graph.
+    :class:`BatchedDGLGraph` also supports performing readout for a batch of graphs at once.
 
     Below we take the built-in readout function :func:`sum_nodes` as an example, which
-    sums a particular node attribute for each graph.
+    sums over a particular kind of node attribute for each graph.
 
     >>> dgl.sum_nodes(bg, 'hv') # Sum the node attribute 'hv' for each graph.
     tensor([[1.],               # 0 + 1
@@ -113,7 +116,7 @@ class BatchedDGLGraph(DGLGraph):
     **Message passing:**
 
     For message passing and related operations, :class:`BatchedDGLGraph` acts exactly
-    the same as :class:`~dgl.DGLGraphs`.
+    the same as :class:`~dgl.DGLGraph`.
 
     **Update Attributes:**
 
@@ -126,7 +129,8 @@ class BatchedDGLGraph(DGLGraph):
 
     Instead, we can decompose the batched graph back into a list of graphs and use them
     to replace the original graphs.
-    >>> g1, g2 = dgl.unbatch(bg)    # returns a list of DGLGraphs
+
+    >>> g1, g2 = dgl.unbatch(bg)    # returns a list of DGLGraph objects
     >>> g2.edata['he']
     tensor([[0., 0.],
             [0., 0.]])}
@@ -286,7 +290,7 @@ def unbatch(graph):
     Returns
     -------
     list
-        A list of :class:`~dgl.DGLGraphs` objects whose attributes are obtained
+        A list of :class:`~dgl.DGLGraph` objects whose attributes are obtained
         by partitioning the attributes of the :attr:`graph`. The length of the
         list is the same as the batch size of :attr:`graph`.
 
@@ -323,13 +327,13 @@ def unbatch(graph):
                      edge_frame=edge_frames[i]) for i in range(bsize)]
 
 def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
-    """Batch a collection of :class:`~dgl.DGLGraphs` and return a
+    """Batch a collection of :class:`~dgl.DGLGraph` and return a
     :class:`BatchedDGLGraph` object that is independent of the :attr:`graph_list`.
 
     Parameters
     ----------
     graph_list : iterable
-        A collection of :class:`~dgl.DGLGraphs` to be batched.
+        A collection of :class:`~dgl.DGLGraph` to be batched.
     node_attrs : None, str or iterable
         The node attributes to be batched. If ``None``, the :class:`BatchedDGLGraph`
         object will not have any node attributes. By default, all node attributes will
@@ -381,7 +385,7 @@ def _sum_on(graph, on, input, weight):
 
 def sum_nodes(graph, input, weight=None):
     """Sums all the values of node field :attr:`input` in :attr:`graph`, optionally
-    multiplies the field by a scalar node field :attr`weight`.
+    multiplies the field by a scalar node field :attr:`weight`.
 
     Parameters
     ----------
@@ -393,7 +397,7 @@ def sum_nodes(graph, input, weight=None):
         The weight field. If None, no weighting will be performed,
         otherwise, weight each node feature with field :attr:`input`.
         for summation. The weight feature associated in the :attr:`graph`
-        should be a tensor of shape [graph.number_of_nodes(), 1].
+        should be a tensor of shape ``[graph.number_of_nodes(), 1]``.
 
     Returns
     -------
@@ -414,7 +418,7 @@ def sum_nodes(graph, input, weight=None):
     >>> import dgl
     >>> import torch as th
 
-    Create two :class:`~dgl.DGLGraphs` objects and initialize their
+    Create two :class:`~dgl.DGLGraph` objects and initialize their
     node features.
 
     >>> g1 = dgl.DGLGraph()                           # Graph 1
@@ -426,15 +430,17 @@ def sum_nodes(graph, input, weight=None):
     >>> g2.add_nodes(3)
     >>> g2.ndata['h'] = th.tensor([[1.], [2.], [3.]])
 
-    Sum over node attribute 'h' without weighting for each graph in a
+    Sum over node attribute :attr:`h` without weighting for each graph in a
     batched graph.
+
     >>> bg = dgl.batch([g1, g2], node_attrs='h')
     >>> dgl.sum_nodes(bg, 'h')
     tensor([[3.],   # 1 + 2
             [6.]])  # 1 + 2 + 3
 
-    Sum node attribute 'h' with weight from node attribute 'w' for a single
-    graph.
+    Sum node attribute :attr:`h` with weight from node attribute :attr:`w`
+    for a single graph.
+
     >>> dgl.sum_nodes(g1, 'h', 'w')
     tensor([15.])   # 1 * 3 + 2 * 6
 
@@ -460,7 +466,7 @@ def sum_edges(graph, input, weight=None):
         The weight field. If None, no weighting will be performed,
         otherwise, weight each edge feature with field :attr:`input`.
         for summation. The weight feature associated in the :attr:`graph`
-        should be a tensor of shape [graph.number_of_edges(), 1].
+        should be a tensor of shape ``[graph.number_of_edges(), 1]``.
 
     Returns
     -------
@@ -481,7 +487,7 @@ def sum_edges(graph, input, weight=None):
     >>> import dgl
     >>> import torch as th
 
-    Create two :class:`~dgl.DGLGraphs` objects and initialize their
+    Create two :class:`~dgl.DGLGraph` objects and initialize their
     edge features.
 
     >>> g1 = dgl.DGLGraph()                           # Graph 1
@@ -495,15 +501,17 @@ def sum_edges(graph, input, weight=None):
     >>> g2.add_edges([0, 1, 2], [1, 2, 0])
     >>> g2.edata['h'] = th.tensor([[1.], [2.], [3.]])
 
-    Sum over edge attribute 'h' without weighting for each graph in a
+    Sum over edge attribute :attr:`h` without weighting for each graph in a
     batched graph.
+
     >>> bg = dgl.batch([g1, g2], edge_attrs='h')
     >>> dgl.sum_edges(bg, 'h')
     tensor([[3.],   # 1 + 2
             [6.]])  # 1 + 2 + 3
 
-    Sum edge attribute 'h' with weight from edge attribute 'w' for a single
-    graph.
+    Sum edge attribute :attr:`h` with weight from edge attribute :attr:`w`
+    for a single graph.
+
     >>> dgl.sum_edges(g1, 'h', 'w')
     tensor([15.])   # 1 * 3 + 2 * 6
 
@@ -562,7 +570,7 @@ def mean_nodes(graph, input, weight=None):
         The weight field. If None, no weighting will be performed,
         otherwise, weight each node feature with field :attr:`input`.
         for calculating mean. The weight feature associated in the :attr:`graph`
-        should be a tensor of shape [graph.number_of_nodes(), 1].
+        should be a tensor of shape ``[graph.number_of_nodes(), 1]``.
 
     Returns
     -------
@@ -583,7 +591,7 @@ def mean_nodes(graph, input, weight=None):
     >>> import dgl
     >>> import torch as th
 
-    Create two :class:`~dgl.DGLGraphs` objects and initialize their
+    Create two :class:`~dgl.DGLGraph` objects and initialize their
     node features.
 
     >>> g1 = dgl.DGLGraph()                           # Graph 1
@@ -595,15 +603,17 @@ def mean_nodes(graph, input, weight=None):
     >>> g2.add_nodes(3)
     >>> g2.ndata['h'] = th.tensor([[1.], [2.], [3.]])
 
-    Average over node attribute 'h' without weighting for each graph in a
+    Average over node attribute :attr:`h` without weighting for each graph in a
     batched graph.
+
     >>> bg = dgl.batch([g1, g2], node_attrs='h')
     >>> dgl.mean_nodes(bg, 'h')
     tensor([[1.5000],    # (1 + 2) / 2
             [2.0000]])   # (1 + 2 + 3) / 3
 
-    Sum node attribute 'h' with normalized weight from node attribute 'w'
+    Sum node attribute :attr:`h` with normalized weight from node attribute :attr:`w`
     for a single graph.
+
     >>> dgl.mean_nodes(g1, 'h', 'w') # h1 * (w1 / (w1 + w2)) + h2 * (w2 / (w1 + w2))
     tensor([1.6667])                 # 1 * (3 / (3 + 6)) + 2 * (6 / (3 + 6))
 
@@ -629,7 +639,7 @@ def mean_edges(graph, input, weight=None):
         The weight field. If None, no weighting will be performed,
         otherwise, weight each edge feature with field :attr:`input`.
         for calculating mean. The weight feature associated in the :attr:`graph`
-        should be a tensor of shape [graph.number_of_edges(), 1].
+        should be a tensor of shape ``[graph.number_of_edges(), 1]``.
 
     Returns
     -------
@@ -650,7 +660,7 @@ def mean_edges(graph, input, weight=None):
     >>> import dgl
     >>> import torch as th
 
-    Create two :class:`~dgl.DGLGraphs` objects and initialize their
+    Create two :class:`~dgl.DGLGraph` objects and initialize their
     edge features.
 
     >>> g1 = dgl.DGLGraph()                           # Graph 1
@@ -664,15 +674,17 @@ def mean_edges(graph, input, weight=None):
     >>> g2.add_edges([0, 1, 2], [1, 2, 0])
     >>> g2.edata['h'] = th.tensor([[1.], [2.], [3.]])
 
-    Average over edge attribute 'h' without weighting for each graph in a
+    Average over edge attribute :attr:`h` without weighting for each graph in a
     batched graph.
+
     >>> bg = dgl.batch([g1, g2], edge_attrs='h')
     >>> dgl.mean_edges(bg, 'h')
     tensor([[1.5000],    # (1 + 2) / 2
             [2.0000]])   # (1 + 2 + 3) / 3
 
-    Sum edge attribute 'h' with normalized weight from edge attribute 'w'
+    Sum edge attribute :attr:`h` with normalized weight from edge attribute :attr:`w`
     for a single graph.
+
     >>> dgl.mean_edges(g1, 'h', 'w') # h1 * (w1 / (w1 + w2)) + h2 * (w2 / (w1 + w2))
     tensor([1.6667])                 # 1 * (3 / (3 + 6)) + 2 * (6 / (3 + 6))
 
