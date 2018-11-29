@@ -29,22 +29,20 @@ def get_lib_path():
     libinfo = {'__file__': libinfo_py}
     exec(compile(open(libinfo_py, "rb").read(), libinfo_py, 'exec'), libinfo, libinfo)
     version = libinfo['__version__']
-    if not os.getenv('CONDA_BUILD'):
-        lib_path = libinfo['find_lib_path']()
-        libs = [lib_path[0]]
-    else:
-        libs = None
+
+    lib_path = libinfo['find_lib_path']()
+    libs = [lib_path[0]]
+
     return libs, version
 
 LIBS, VERSION = get_lib_path()
 
 include_libs = False
 wheel_include_libs = False
-if not os.getenv('CONDA_BUILD'):
-    if "bdist_wheel" in sys.argv:
-        wheel_include_libs = True
-    else:
-        include_libs = True
+if "bdist_wheel" in sys.argv or os.getenv('CONDA_BUILD'):
+    wheel_include_libs = True
+else:
+    include_libs = True
 
 setup_kwargs = {}
 
@@ -60,6 +58,7 @@ if wheel_include_libs:
     }
 
 # For source tree setup
+# Conda build also includes the binary library
 if include_libs:
     rpath = [os.path.relpath(path, CURRENT_DIR) for path in LIBS]
     setup_kwargs = {
