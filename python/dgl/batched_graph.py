@@ -2,6 +2,7 @@
 from __future__ import absolute_import
 
 import numpy as np
+from collections import Iterable
 
 from .base import ALL, is_all
 from .frame import FrameRef, Frame
@@ -130,47 +131,50 @@ class BatchedDGLGraph(DGLGraph):
     tensor([[0., 0.],
             [0., 0.]])}
     """
-    def __init__(self, graph_list, node_attrs=ALL, edge_attrs=ALL):
+    def __init__(self, graph_list, node_attrs, edge_attrs):
 
-        if node_attrs is None:
-            node_attrs = []
-        elif is_all(node_attrs):
-            node_attrs = set()
-            for i in range(len(graph_list)):
-                g = graph_list[i]
-                g_num_nodes = g.number_of_nodes()
-                g_node_attrs = set(g.node_attr_schemes().keys())
-                if len(node_attrs) == 0:
-                    if g_num_nodes > 0 and len(g_node_attrs) > 0:
-                        node_attrs = g_node_attrs
-                        ref_g_index = i
-                elif g_node_attrs != node_attrs and g_num_nodes > 0:
-                    raise ValueError('Expect graph {} and {} to have the same node attributes '
-                                     'when node_attrs=ALL, got {} and {}'.format(ref_g_index, i,
-                                                                                 node_attrs,
-                                                                                 g_node_attrs))
-        elif isinstance(node_attrs, str):
-            node_attrs = [node_attrs]
+        def _get_num_item_and_attr_types(g, mode):
+            if mode == 'node':
+                num_items = g.number_of_nodes()
+                attr_types = set(g.node_attr_schemes().keys())
+            elif mode == 'edge':
+                num_items = g.number_of_edges()
+                attr_types = set(g.edge_attr_schemes().keys())
+            return num_items, attr_types
 
-        if edge_attrs is None:
-            edge_attrs = []
-        elif is_all(edge_attrs):
-            edge_attrs = set()
-            for i in range(len(graph_list)):
-                g = graph_list[i]
-                g_num_edges = g.number_of_edges()
-                g_edge_attrs = set(g.edge_attr_schemes().keys())
-                if len(edge_attrs) == 0:
-                    if g_num_edges > 0 and len(g_edge_attrs) > 0:
-                        edge_attrs = g_edge_attrs
+        def _init_attrs(attrs, mode):
+            if attrs is None:
+                return []
+            elif is_all(attrs):
+                attrs = set()
+                # Check if at least a graph has mode items and associated features.
+                for i in range(len(graph_list)):
+                    g = graph_list[i]
+                    g_num_items, g_attrs = _get_num_item_and_attr_types(g, mode)
+                    if g_num_items > 0 and len(g_attrs) > 0:
+                        attrs = g_attrs
                         ref_g_index = i
-                elif g_edge_attrs != edge_attrs and g_num_edges > 0:
-                    raise ValueError('Expect graph {} and {} to have the same edge attributes '
-                                     'when edge_attrs=ALL, got {} and {}'.format(ref_g_index, i,
-                                                                                 edge_attrs,
-                                                                                 g_edge_attrs))
-        elif isinstance(edge_attrs, str):
-            edge_attrs = [edge_attrs]
+                        break
+                # Check if all the graphs with mode items have the same associated features.
+                if len(attrs) > 0:
+                    for i in range(len(graph_list)):
+                        g = graph_list[i]
+                        g_num_items, g_attrs = _get_num_item_and_attr_types(g, mode)
+                        if g_attrs != attrs and g_num_items > 0:
+                            raise ValueError('Expect graph {} and {} to have the same {} '
+                                             'attributes when {}_attrs=ALL, got {} and '
+                                             '{}'.format(ref_g_index, i, mode, mode, attrs, g_attrs))
+                return attrs
+            elif isinstance(attrs, str):
+                return [attrs]
+            elif isinstance(attrs, Iterable):
+                return attrs
+            else:
+                raise ValueError('Expected {} attrs to be of type None str or Iterable, '
+                                 'got type {}'.format(mode, type(attrs)))
+
+        node_attrs = _init_attrs(node_attrs, 'node')
+        edge_attrs = _init_attrs(edge_attrs, 'edge')
 
         # create batched graph index
         batched_index = gi.disjoint_union([g._graph for g in graph_list])
@@ -214,7 +218,8 @@ class BatchedDGLGraph(DGLGraph):
 
     @property
     def batch_size(self):
-        """
+        """Number of graphs in this batch.
+
         Returns
         -------
         int
@@ -223,7 +228,8 @@ class BatchedDGLGraph(DGLGraph):
 
     @property
     def batch_num_nodes(self):
-        """
+        """Number of nodes of each graph in this batch.
+
         Returns
         -------
         list
@@ -232,7 +238,8 @@ class BatchedDGLGraph(DGLGraph):
 
     @property
     def batch_num_edges(self):
-        """
+        """Number of edges of each graph in this batch.
+
         Returns
         -------
         list
@@ -286,7 +293,7 @@ def unbatch(graph):
     Notes
     -----
     Unbatching will break each field tensor of the batched graph into smaller
-    partitions. This is usually wasteful.
+    partitions.
 
     For simpler tasks such as node/edge state aggregation, try to use
     readout functions.
@@ -317,13 +324,7 @@ def unbatch(graph):
 
 def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     """Batch a collection of :class:`~dgl.DGLGraphs` and return a
-    :class:`BatchedDGLGraph` object.
-
-    .. Warning:: Once :func:`batch` is called, the structure of both merged graph and
-        graphs in :attr:`graph`graph_list` must not be mutated, or :func:`unbatch`'s
-        behavior will be undefined. If one of the original graphs is mutated after
-        batching, although no error will be raised when calling :func:`unbatch`, this
-        is still discouraged as it may bring about potential conflicts.
+    :class:`BatchedDGLGraph` object that is independent of the :attr:`graph_list`.
 
     Parameters
     ----------
@@ -382,9 +383,6 @@ def sum_nodes(graph, input, weight=None):
     """Sums all the values of node field :attr:`input` in :attr:`graph`, optionally
     multiplies the field by a scalar node field :attr`weight`.
 
-    .. Warning:: weight should be a tensor of shape
-        [graph.number_of_nodes(), 1]
-
     Parameters
     ----------
     graph : DGLGraph or BatchedDGLGraph
@@ -394,7 +392,8 @@ def sum_nodes(graph, input, weight=None):
     weight : str, optional
         The weight field. If None, no weighting will be performed,
         otherwise, weight each node feature with field :attr:`input`.
-        for summation.
+        for summation. The weight feature associated in the :attr:`graph`
+        should be a tensor of shape [graph.number_of_nodes(), 1].
 
     Returns
     -------
@@ -460,7 +459,8 @@ def sum_edges(graph, input, weight=None):
     weight : str, optional
         The weight field. If None, no weighting will be performed,
         otherwise, weight each edge feature with field :attr:`input`.
-        for summation.
+        for summation. The weight feature associated in the :attr:`graph`
+        should be a tensor of shape [graph.number_of_edges(), 1].
 
     Returns
     -------
@@ -561,7 +561,8 @@ def mean_nodes(graph, input, weight=None):
     weight : str, optional
         The weight field. If None, no weighting will be performed,
         otherwise, weight each node feature with field :attr:`input`.
-        for calculating mean.
+        for calculating mean. The weight feature associated in the :attr:`graph`
+        should be a tensor of shape [graph.number_of_nodes(), 1].
 
     Returns
     -------
@@ -627,7 +628,8 @@ def mean_edges(graph, input, weight=None):
     weight : optional, str
         The weight field. If None, no weighting will be performed,
         otherwise, weight each edge feature with field :attr:`input`.
-        for calculating mean.
+        for calculating mean. The weight feature associated in the :attr:`graph`
+        should be a tensor of shape [graph.number_of_edges(), 1].
 
     Returns
     -------
