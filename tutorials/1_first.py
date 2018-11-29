@@ -109,17 +109,19 @@ plt.show()
 #    :align: center
 #
 
+def readout(g):
+    # read the aggregated node feature 'x' on graph
+    return th.sum(g.ndata['x'], dim=0)
+
 def super_useful_comp(g):
 
     def send_source(edges):
+        # pass the source node feature 'x' weighted by edge feature 'w'
         return {'msg': edges.src['x'] * edges.data['w']}
 
     def simple_reduce(nodes):
         msgs = nodes.mailbox['msg']
         return {'x': msgs.sum(1) + nodes.data['x']}
-
-    def readout(g):
-        return th.sum(g.ndata['x'], dim=0)
 
     g.register_message_func(send_source)
     g.register_reduce_func(simple_reduce)
@@ -127,18 +129,22 @@ def super_useful_comp(g):
     g.send(g.edges())
     g.recv(g.nodes())
 
-    return readout(g)
-
 ###############################################################################
 # See the python wrapper:
 
 g_boring = a_boring_graph()
-graph_sum = super_useful_comp(g_boring)
-print("graph sum is: ", graph_sum)
+graph_sum = readout(g_boring)
+print("graph sum before send() and recv() is: ", graph_sum)
+super_useful_comp(g_boring)
+graph_sum = readout(g_boring)
+print("graph sum after send() and recv() is: ", graph_sum)
 
 g_better = an_interesting_graph()
-graph_sum = super_useful_comp(g_better)
-print("graph sum is: ", graph_sum)
+graph_sum = readout(g_better)
+print("graph sum before send() and recv() is: ", graph_sum)
+super_useful_comp(g_better)
+graph_sum = readout(g_better)
+print("graph sum after send() and recv() is: ", graph_sum)
 
 ###############################################################################
 # Next steps
