@@ -28,7 +28,7 @@ def gcn_reduce(node, normalization=None):
     accum = mx.nd.sum(node.mailbox['m'], 1)
     if normalization == 'sym':
         accum = accum / node.data['in_degree'].sqrt().reshape((-1,1))
-    elif normalization == 'asym':
+    elif normalization == 'left':
         accum = accum / node.data['in_degree'].reshape((-1,1))
     return {'accum': accum}
 
@@ -181,7 +181,7 @@ if __name__ == '__main__':
     parser.add_argument("--n-layers", type=int, default=2,
             help="number of hidden gcn layers")
     parser.add_argument("--normalization",
-            choices=['sym','asym'], default=None,
+            choices=['sym','left'], default=None,
             help="graph normalization types (default=None)")
     parser.add_argument("--self-loop", action='store_true',
             help="graph self-loop (default=False)")
