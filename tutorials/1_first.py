@@ -1,7 +1,7 @@
 """
 .. currentmodule:: dgl
 
-DGL at a glance
+DGL at a Glance
 =========================
 
 **Author**: `Minjie Wang <https://jermainewang.github.io/>`_, Quan Gan, `Jake
