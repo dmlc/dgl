@@ -89,6 +89,6 @@ In the command line prompt, run:
 
     md build
     cd build
-    cmake -DCMAKE_CXX_FLAGS="-DDMLC_LOG_STACK_TRACE=0 -DTVM_EXPORTS" .. -G "MinGW Makefiles"
+    cmake -DCMAKE_CXX_FLAGS="-DDMLC_LOG_STACK_TRACE=0 -DTVM_EXPORTS" -DCMAKE_MAKE_PROGRAM=mingw32-make .. -G "MSYS Makefiles"
     mingw32-make
     set DGL_LIBRARY_PATH=%CD%
