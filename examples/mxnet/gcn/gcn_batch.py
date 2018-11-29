@@ -42,7 +42,7 @@ class NodeUpdateModule(gluon.Block):
     def forward(self, node):
         accum = self.linear(node.data['accum'])
         if self.dropout:
-            accum = mx.nd.Dropout(accum)
+            accum = mx.nd.Dropout(accum, p=self.dropout)
         return {'h': mx.nd.concat(node.data['h'], accum, dim=1)}
 
 
@@ -55,23 +55,23 @@ class GCN(gluon.Block):
                  n_layers,
                  activation,
                  dropout,
-                 normalization):
+                 normalization,
+                 ):
         super(GCN, self).__init__()
         self.g = g
         self.dropout = dropout
 
         self.inp_layer = gluon.nn.Dense(n_hidden, activation)
 
-        # conv_layers
         self.conv_layers = gluon.nn.Sequential()
         for i in range(n_layers):
             self.conv_layers.add(NodeUpdateModule(n_hidden, activation, dropout))
 
-        # output layer
         self.out_layer = gluon.nn.Dense(n_classes)
 
         self.gcn_msg = partial(gcn_msg, normalization=normalization)
         self.gcn_reduce = partial(gcn_reduce, normalization=normalization)
+
 
     def forward(self, features):
         emb_inp = [features, self.inp_layer(features)]
@@ -79,13 +79,12 @@ class GCN(gluon.Block):
             emb_inp[-1] = mx.nd.Dropout(emb_inp[-1], p=self.dropout)
 
         self.g.ndata['h'] = mx.nd.concat(*emb_inp, dim=1)
-
         for layer in self.conv_layers:
             self.g.update_all(self.gcn_msg, self.gcn_reduce, layer)
 
         emb_out = self.g.ndata.pop('h')
-
         return self.out_layer(emb_out)
+
 
 def main(args):
     # load and preprocess dataset
