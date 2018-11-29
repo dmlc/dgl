@@ -10,16 +10,14 @@ Results
 -------
 These results are based on single-run training to minimize the cross-entropy loss of the first 20 examples in each class. To keep the demo simple, we did not use repeated experiments as the original paper suggested, which may lead to slightly different results. However, we see clear improvements over MLP baselines by using GCN connections.
 
-Accuracy tends to improve as more GCN n-layers are added. On the other hand, using fewer layers would accelerate the computations.
-
 ```
 # Final accuracy 75.34% MLP without GCN
 DGLBACKEND=mxnet python examples/mxnet/gcn/gcn_batch.py --dataset "citeseer" --n-epochs 200 --gpu 1 --n-layers 0
 
-# Final accuracy 87.20% with 10-layer GCN (symmetric normalization)
+# Final accuracy 86.57% with 10-layer GCN (symmetric normalization)
 DGLBACKEND=mxnet python examples/mxnet/gcn/gcn_batch.py --dataset "citeseer" --n-epochs 200 --gpu 1 --n-layers 10 --normalization 'sym' --self-loop
 
-# Final accuracy 84.60% with 10-layer GCN (unnormalized)
+# Final accuracy 84.42% with 10-layer GCN (unnormalized)
 DGLBACKEND=mxnet python examples/mxnet/gcn/gcn_batch.py --dataset "citeseer" --n-epochs 200 --gpu 1 --n-layers 10
 ```
 
@@ -44,6 +42,8 @@ DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "pubmed" --n-
 # Final accuracy 83.80% with 10-layer GCN (unnormalized)
 DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "pubmed" --n-epochs 200 --gpu 1 --n-layers 10
 ```
+
+Using GCN with more layers improves accuracy but can also exponentially increase the computational complexity. The original paper recommends n-layers=2 to balance speed and accuracy.
 
 
 Naive GCN (gcn.py)
