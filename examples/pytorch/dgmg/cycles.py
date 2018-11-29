@@ -89,9 +89,12 @@ class CycleDataset(Dataset):
     def __getitem__(self, index):
         return self.dataset[index]
 
-    def collate(self, batch):
+    def collate_single(self, batch):
         assert len(batch) == 1, 'Currently we do not support batched training'
         return batch[0]
+
+    def collate_batch(self, batch):
+        return batch
 
 
 def dglGraph_to_adj_list(g):
@@ -112,14 +115,6 @@ class CycleModelEvaluation(object):
 
         self.dir = dir
 
-    def _initialize(self):
-        self.num_samples_examined = 0
-
-        self.average_size = 0
-        self.valid_size_ratio = 0
-        self.cycle_ratio = 0
-        self.valid_ratio = 0
-
     def rollout_and_examine(self, model, num_samples):
         assert not model.training, 'You need to call model.eval().'
 
@@ -132,14 +127,22 @@ class CycleModelEvaluation(object):
 
         for i in range(num_samples):
             sampled_graph = model()
+            if isinstance(sampled_graph, list):
+                # When the model is a batched implementation, a list of
+                # DGLGraph objects is returned. Note that with model(),
+                # we generate a single graph as with the non-batched
+                # implementation. We actually support batched generation
+                # during the inference so feel free to modify the code.
+                sampled_graph = sampled_graph[0]
+
             sampled_adj_list = dglGraph_to_adj_list(sampled_graph)
             adj_lists_to_plot.append(sampled_adj_list)
 
-            generated_graph_size = sampled_graph.number_of_nodes()
-            valid_size = (self.v_min <= generated_graph_size <= self.v_max)
+            graph_size = sampled_graph.number_of_nodes()
+            valid_size = (self.v_min <= graph_size <= self.v_max)
             cycle = is_cycle(sampled_graph)
 
-            num_total_size += generated_graph_size
+            num_total_size += graph_size
 
             if valid_size:
                 num_valid_size += 1
@@ -150,7 +153,7 @@ class CycleModelEvaluation(object):
             if valid_size and cycle:
                 num_valid += 1
 
-            if len(adj_lists_to_plot) == 4:
+            if len(adj_lists_to_plot) >= 4:
                 plot_times += 1
                 fig, ((ax0, ax1), (ax2, ax3)) = plt.subplots(2, 2)
                 axes = {0: ax0, 1: ax1, 2: ax2, 3: ax3}
@@ -197,7 +200,6 @@ class CycleModelEvaluation(object):
                 f.write(msg)
 
         print('Saved model evaluation statistics to {}'.format(model_eval_path))
-        self._initialize()
 
 
 class CyclePrinting(object):
