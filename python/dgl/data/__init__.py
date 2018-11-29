@@ -9,15 +9,17 @@ from .sbm import SBMMixture
 def register_data_args(parser):
     parser.add_argument("--dataset", type=str, required=False,
             help="The input dataset.")
+    parser.add_argument("--seed", type=int, required=False, default=None,
+            help="Seed for data splits (default None uses the original splits).")
     citegrh.register_args(parser)
 
 def load_data(args):
     if args.dataset == 'cora':
-        return citegrh.load_cora()
+        return citegrh.load_cora(args)
     elif args.dataset == 'citeseer':
-        return citegrh.load_citeseer()
+        return citegrh.load_citeseer(args)
     elif args.dataset == 'pubmed':
-        return citegrh.load_pubmed()
+        return citegrh.load_pubmed(args)
     elif args.dataset == 'syn':
         return citegrh.load_synthetic(args)
     else:

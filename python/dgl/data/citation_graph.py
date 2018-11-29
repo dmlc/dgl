@@ -20,12 +20,13 @@ _urls = {
 }
 
 class CitationGraphDataset(object):
-    def __init__(self, name):
+    def __init__(self, name, seed=None):
         self.name = name
         self.dir = get_download_dir()
         self.zip_file_path='{}/{}.zip'.format(self.dir, name)
         download(_urls[name], path=self.zip_file_path)
         extract_archive(self.zip_file_path, '{}/{}'.format(self.dir, name))
+        self.seed = seed
         self._load()
 
     def _load(self):
@@ -80,9 +81,12 @@ class CitationGraphDataset(object):
         onehot_labels[test_idx_reorder, :] = onehot_labels[test_idx_range, :]
         labels = np.argmax(onehot_labels, 1)
 
-        idx_test = test_idx_range.tolist()
-        idx_train = range(len(y))
-        idx_val = range(len(y), len(y)+500)
+        if self.seed is not None:
+            idx_train, idx_val, idx_test = _sample_idx(labels, self.seed)
+        else:
+            idx_test = test_idx_range.tolist()
+            idx_train = range(len(y))
+            idx_val = range(len(y), len(y)+500)
 
         train_mask = _sample_mask(idx_train, labels.shape[0])
         val_mask = _sample_mask(idx_val, labels.shape[0])
@@ -128,22 +132,36 @@ def _parse_index_file(filename):
         index.append(int(line.strip()))
     return index
 
+
+def _sample_idx(labels, seed):
+    rng = np.random.RandomState(seed)
+    idx_train = []
+    idx_val   = []
+    idx_test  = []
+    for cls in np.unique(labels):
+        idx_cls = rng.choice(np.nonzero(labels==cls)[0], 60, replace=False)
+        idx_train.extend(idx_cls[:20])
+        idx_val.extend(idx_cls[20:40])
+        idx_test.extend(idx_cls[40:])
+    return idx_train, idx_val, idx_test
+
+
 def _sample_mask(idx, l):
     """Create mask."""
     mask = np.zeros(l)
     mask[idx] = 1
     return mask
 
-def load_cora():
-    data = CitationGraphDataset('cora')
+def load_cora(args):
+    data = CitationGraphDataset('cora', seed=args.seed)
     return data
 
-def load_citeseer():
-    data = CitationGraphDataset('citeseer')
+def load_citeseer(args):
+    data = CitationGraphDataset('citeseer', seed=args.seed)
     return data
 
-def load_pubmed():
-    data = CitationGraphDataset('pubmed')
+def load_pubmed(args):
+    data = CitationGraphDataset('pubmed', seed=args.seed)
     return data
 
 class GCNSyntheticDataset(object):

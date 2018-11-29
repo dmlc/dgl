@@ -8,21 +8,41 @@ The folder contains three different implementations using DGL.
 
 Results
 -------
-These results are based on single-run training to minimize the cross-entropy loss of the first 20 examples in each class. To keep the demo simple, we did not use normalized graphs or repeated experiments as the original paper suggested, which may lead to slightly different results. However, the accuracies are within the same order of magnitudes.
+These results are based on single-run training to minimize the cross-entropy loss of the first 20 examples in each class. To keep the demo simple, we did not use repeated experiments as the original paper suggested, which may lead to slightly different results. However, we see clear improvements over MLP baselines by using GCN connections.
+
+Accuracy tends to improve as more GCN n-layers are added. On the other hand, using fewer layers would accelerate the computations.
 
 ```
-# Final accuracy 72.90%
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "citeseer" --n-epochs 200 --gpu 1
+# Final accuracy 75.34% MLP without GCN
+DGLBACKEND=mxnet python examples/mxnet/gcn/gcn_batch.py --dataset "citeseer" --n-epochs 200 --gpu 1 --n-layers 0
+
+# Final accuracy 87.20% with 10-layer GCN (symmetric normalization)
+DGLBACKEND=mxnet python examples/mxnet/gcn/gcn_batch.py --dataset "citeseer" --n-epochs 200 --gpu 1 --n-layers 10 --normalization 'sym' --self-loop
+
+# Final accuracy 84.60% with 10-layer GCN (unnormalized)
+DGLBACKEND=mxnet python examples/mxnet/gcn/gcn_batch.py --dataset "citeseer" --n-epochs 200 --gpu 1 --n-layers 10
 ```
 
 ```
-# Final accuracy 83.11%
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "cora" --n-epochs 200 --gpu 1
+# Final accuracy 40.62% MLP without GCN
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "cora" --n-epochs 200 --gpu 1 --n-layers 0
+
+# Final accuracy 92.63% with 10-layer GCN (symmetric normalization)
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "cora" --n-epochs 200 --gpu 1 --n-layers 10 --normalization 'sym' --self-loop
+
+# Final accuracy 86.60% with 10-layer GCN (unnormalized)
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "cora" --n-epochs 200 --gpu 1 --n-layers 10
 ```
 
 ```
-# Final accuracy 82.99%
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "pubmed" --n-epochs 200 --gpu 1
+# Final accuracy 72.97% MLP without GCN
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "pubmed" --n-epochs 200 --gpu 1 --n-layers 0
+
+# Final accuracy 88.33% with 10-layer GCN (symmetric normalization)
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "pubmed" --n-epochs 200 --gpu 1 --n-layers 10 --normalization 'sym' --self-loop
+
+# Final accuracy 83.80% with 10-layer GCN (unnormalized)
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "pubmed" --n-epochs 200 --gpu 1 --n-layers 10
 ```
 
 
