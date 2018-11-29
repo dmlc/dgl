@@ -53,8 +53,9 @@ class DGLJTNNVAE(nn.Module):
             move_dgl_to_cuda(t)
 
         move_dgl_to_cuda(mol_batch['mol_graph_batch'])
-        move_dgl_to_cuda(mol_batch['cand_graph_batch'])
-        if mol_batch['stereo_cand_graph_batch'] is not None:
+        if 'cand_graph_batch' in mol_batch:
+            move_dgl_to_cuda(mol_batch['cand_graph_batch'])
+        if mol_batch.get('stereo_cand_graph_batch') is not None:
             move_dgl_to_cuda(mol_batch['stereo_cand_graph_batch'])
 
     def encode(self, mol_batch):
@@ -70,6 +71,22 @@ class DGLJTNNVAE(nn.Module):
 
         return mol_tree_batch, tree_vec, mol_vec
 
+    def sample(self, tree_vec, mol_vec, e1=None, e2=None):
+        tree_mean = self.T_mean(tree_vec)
+        tree_log_var = -torch.abs(self.T_var(tree_vec))
+        mol_mean = self.G_mean(mol_vec)
+        mol_log_var = -torch.abs(self.G_var(mol_vec))
+
+        epsilon = cuda(torch.randn(*tree_mean.shape)) if e1 is None else e1
+        tree_vec = tree_mean + torch.exp(tree_log_var / 2) * epsilon
+        epsilon = cuda(torch.randn(*mol_mean.shape)) if e2 is None else e2
+        mol_vec = mol_mean + torch.exp(mol_log_var / 2) * epsilon
+
+        z_mean = torch.cat([tree_mean, mol_mean], 1)
+        z_log_var = torch.cat([tree_log_var, mol_log_var], 1)
+
+        return tree_vec, mol_vec, z_mean, z_log_var
+
     def forward(self, mol_batch, beta=0, e1=None, e2=None):
         self.move_to_cuda(mol_batch)
 
@@ -78,19 +95,8 @@ class DGLJTNNVAE(nn.Module):
 
         mol_tree_batch, tree_vec, mol_vec = self.encode(mol_batch)
 
-        tree_mean = self.T_mean(tree_vec)
-        tree_log_var = -torch.abs(self.T_var(tree_vec))
-        mol_mean = self.G_mean(mol_vec)
-        mol_log_var = -torch.abs(self.G_var(mol_vec))
-
-        z_mean = torch.cat([tree_mean, mol_mean], dim=1)
-        z_log_var = torch.cat([tree_log_var, mol_log_var], dim=1)
+        tree_vec, mol_vec, z_mean, z_log_var = self.sample(tree_vec, mol_vec, e1, e2)
         kl_loss = -0.5 * torch.sum(1.0 + z_log_var - z_mean * z_mean - torch.exp(z_log_var)) / batch_size
-
-        epsilon = cuda(torch.randn(batch_size, self.latent_size // 2)) if e1 is None else e1
-        tree_vec = tree_mean + torch.exp(tree_log_var / 2) * epsilon
-        epsilon = cuda(torch.randn(batch_size, self.latent_size // 2)) if e2 is None else e2
-        mol_vec = mol_mean + torch.exp(mol_log_var / 2) * epsilon
 
         word_loss, topo_loss, word_acc, topo_acc = self.decoder(mol_trees, tree_vec)
         assm_loss, assm_acc = self.assm(mol_batch, mol_tree_batch, mol_vec)

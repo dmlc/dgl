@@ -64,6 +64,7 @@ MAX_EPOCH = 1
 PRINT_ITER = 20
 
 def train():
+    dataset.training = True
     dataloader = DataLoader(
             dataset,
             batch_size=batch_size,
@@ -78,7 +79,11 @@ def train():
 
         for it, batch in enumerate(dataloader):
             model.zero_grad()
-            loss, kl_div, wacc, tacc, sacc, dacc = model(batch, beta)
+            try:
+                loss, kl_div, wacc, tacc, sacc, dacc = model(batch, beta)
+            except:
+                print([t.smiles for t in batch['mol_trees']])
+                raise
             loss.backward()
             optimizer.step()
 
@@ -109,12 +114,13 @@ def train():
         torch.save(model.state_dict(), opts.save_path + "/model.iter-" + str(epoch))
 
 def test():
+    dataset.training = False
     dataloader = DataLoader(
             dataset,
             batch_size=1,
             shuffle=False,
             num_workers=0,
-            collate_fn=JTNNCollator(vocab, True),
+            collate_fn=JTNNCollator(vocab, False),
             drop_last=True,
             worker_init_fn=worker_init_fn)
 
@@ -122,19 +128,18 @@ def test():
     # tree and molecule vectors.
     for it, batch in enumerate(dataloader):
         gt_smiles = batch['mol_trees'][0].smiles
-        loss, kl_div, wacc, tacc, sacc, dacc = model(batch, beta, e1=0, e2=0)
+        print(gt_smiles)
         model.move_to_cuda(batch)
         _, tree_vec, mol_vec = model.encode(batch)
-        tree_vec = model.T_mean(tree_vec)
-        mol_vec = model.G_mean(mol_vec)
+        tree_vec, mol_vec, _, _ = model.sample(tree_vec, mol_vec)
         smiles = model.decode(tree_vec, mol_vec)
-        print(gt_smiles)
         print(smiles)
 
 if __name__ == '__main__':
-    train()
     if opts.test:
         test()
+    else:
+        train()
 
     print('# passes:', model.n_passes)
     print('Total # nodes processed:', model.n_nodes_total)
