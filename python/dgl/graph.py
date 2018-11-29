@@ -285,11 +285,11 @@ class DGLGraph(object):
         --------
         has_nodes
         """
-        return self.has_node(vid)
+        return self._graph.has_node(vid)
 
     def __contains__(self, vid):
         """Same as has_node."""
-        return self.has_node(vid)
+        return self._graph.has_node(vid)
 
     def has_nodes(self, vids):
         """Return true if the nodes exist.
