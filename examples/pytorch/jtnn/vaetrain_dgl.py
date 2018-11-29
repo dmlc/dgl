@@ -60,7 +60,7 @@ optimizer = optim.Adam(model.parameters(), lr=lr)
 scheduler = lr_scheduler.ExponentialLR(optimizer, 0.9)
 scheduler.step()
 
-MAX_EPOCH = 1
+MAX_EPOCH = 100
 PRINT_ITER = 20
 
 def train():
