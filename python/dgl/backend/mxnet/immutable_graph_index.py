@@ -280,7 +280,7 @@ class ImmutableGraphIndex(object):
             raise NotImplementedError
         num_nodes = []
         num_subgs = len(seed_ids)
-        res = mx.nd.contrib.csr_neighbor_uniform_sample(g, *seed_ids, num_hops=num_hops,
+        res = mx.nd.contrib.dgl_csr_neighbor_uniform_sample(g, *seed_ids, num_hops=num_hops,
                                             num_neighbor=expand_factor,
                                             max_num_vertices=max_subgraph_size)
 
