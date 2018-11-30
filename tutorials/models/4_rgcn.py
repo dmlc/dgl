@@ -32,7 +32,7 @@ base. This tutorial shows how to implement R-GCN with DGL.
 #
 # - **Entity classification**, i.e., assign types and categorical
 #   properties to entities.
-# - **Link prediction**, i.e. recover missing triples.
+# - **Link prediction**, i.e., recover missing triples.
 #
 # In both cases, missing information are expected to be recovered from
 # neighborhood structure of the graph. Here is the example from the R-GCN
@@ -44,7 +44,7 @@ base. This tutorial shows how to implement R-GCN with DGL.
 # knowledge graph."
 #
 # R-GCN solves these two problems using a common graph convolutional network
-# extended with multi-edge encoing to compute embedding of the entities, but
+# extended with multi-edge encoding to compute embedding of the entities, but
 # with different downstream processing:
 #
 # - Entity classification is done by attaching a softmax classifier at the
@@ -71,7 +71,7 @@ base. This tutorial shows how to implement R-GCN with DGL.
 # The key difference between R-GCN and GCN is that in R-GCN, edges can
 # represent different relations. In GCN, weight :math:`W^{(l)}` in equation
 # :math:`(1)` is shared by all edges in layer :math:`l`. In contrast, in
-# R-GCN, different edge type uses different weights and only edges of the
+# R-GCN, different edge types use different weights and only edges of the
 # same relation type :math:`r` are associated with the same projection weight
 # :math:`W_r^{(l)}`.
 #
@@ -98,8 +98,8 @@ base. This tutorial shows how to implement R-GCN with DGL.
 # in the knowledge base.
 #
 # .. note::
-#    Another weight regularization, block-decomposition, is implemented in the
-#    link prediction task.
+#    Another weight regularization, block-decomposition, is implemented in
+#    the `link prediction <link-prediction_>`_.
 #
 # Implement R-GCN in DGL
 # ----------------------
@@ -190,6 +190,7 @@ class RGCNLayer(nn.Module):
                 # FIXME: normalizer
                 w = weight[edges.data['rel_type']]
                 msg = torch.bmm(edges.src['h'].unsqueeze(1), w).squeeze()
+                msg = msg * edges.data['norm']
                 return {'msg': msg}
 
         def apply_func(nodes):
@@ -214,8 +215,8 @@ class RGCNLayer(nn.Module):
 # The message function for R-GCN replicates weights onto edges and then
 # generates messages (line 55-59). But for the first layer, since the node
 # feature is the node id, the transformation from node feature to messages
-# can be computed more efficently by performing an embedding lookup (line
-# 49-53)
+# can be computed more efficiently by performing an embedding lookup (line
+# 49-53).
 #
 # Define full R-GCN model
 # ~~~~~~~~~~~~~~~~~~~~~~~
@@ -275,7 +276,7 @@ class Model(nn.Module):
         return g.ndata.pop('h')
 
 ###############################################################################
-# Handling dataset
+# Handle dataset
 # ~~~~~~~~~~~~~~~~
 # In this tutorial, we use AIFB dataset from R-GCN paper:
 
@@ -300,8 +301,9 @@ edge_norm = torch.from_numpy(data.edge_norm).unsqueeze(1)
 labels = np.argmax(labels, axis=1)
 labels = torch.from_numpy(labels).view(-1)
 
-# Main loop
-# ~~~~~~~~~~
+###############################################################################
+# Create graph and model
+# ~~~~~~~~~~~~~~~~~~~~~~~
 
 # configurations
 n_hidden = 16 # number of hidden units
@@ -324,10 +326,14 @@ model = Model(len(g),
               num_rels,
               num_bases=n_bases,
               num_hidden_layers=n_hidden_layers)
+
+###############################################################################
+# Training loop
+# ~~~~~~~~~~~~~~~~
+
 # optimizer
 optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=l2norm)
 
-# training loop
 print("start training...")
 model.train()
 for epoch in range(n_epochs):
@@ -350,6 +356,8 @@ for epoch in range(n_epochs):
               val_acc, val_loss.item()))
 
 ###############################################################################
+# .. _link-prediction:
+#
 # The second task: Link prediction
 # --------------------------------
 # So far, we have seen how to use DGL to implement entity classification with
@@ -362,4 +370,4 @@ for epoch in range(n_epochs):
 # The implementation is similar to the above but with an extra DistMult layer
 # stacked on top of the R-GCN layers. You may find the complete
 # implementation of link prediction with R-GCN in our `example
-# code <https://github.com/jermainewang/dgl/blob/rgcn/examples/pytorch/rgcn/link_predict.py>`_.
+# code <https://github.com/jermainewang/dgl/blob/master/examples/pytorch/rgcn/link_predict.py>`_.
