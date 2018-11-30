@@ -37,7 +37,7 @@ class EdgeBatch(object):
 
         Returns
         -------
-        dict with ``str`` keys and ``tensor`` values
+        dict with str keys and tensor values
             Features of the source nodes.
         """
         return self._src_data
@@ -48,7 +48,7 @@ class EdgeBatch(object):
 
         Returns
         -------
-        dict with ``str`` keys and ``tensor`` values
+        dict with str keys and tensor values
             Features of the destination nodes.
         """
         return self._dst_data
@@ -59,7 +59,7 @@ class EdgeBatch(object):
 
         Returns
         -------
-        dict with ``str`` keys and ``tensor`` values
+        dict with str keys and tensor values
             Features of the edges.
         """
         return self._edge_data
@@ -122,7 +122,7 @@ class NodeBatch(object):
 
         Returns
         -------
-        dict with ``str`` keys and ``tensor`` values
+        dict with str keys and tensor values
             Features of the nodes.
         """
         return self._data
