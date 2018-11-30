@@ -11,7 +11,7 @@ class ImmutableGraphIndex(object):
     We can use a CSR matrix to represent a graph structure. For functionality,
     one CSR matrix is sufficient. However, for efficient access
     to in-edges and out-edges of a directed graph, we need to use two CSR matrices.
-    In these CSR matrices, both rows and columns represents vertices. In one CSR
+    In these CSR matrices, both rows and columns represent vertices. In one CSR
     matrix, a row stores in-edges of a vertex (whose source vertex is a neighbor
     and destination vertex is the vertex itself). Thus, a non-zero entry is
     the neighbor Id and the value is the corresponding edge Id.
