@@ -37,8 +37,8 @@ class EdgeBatch(object):
 
         Returns
         -------
-        dict
-            With ``str`` keys and ``tensor`` values.
+        dict with ``str`` keys and ``tensor`` values
+            Features of the source nodes.
         """
         return self._src_data
 
@@ -48,8 +48,8 @@ class EdgeBatch(object):
 
         Returns
         -------
-        dict
-            With ``str`` keys and ``tensor`` values.
+        dict with ``str`` keys and ``tensor`` values
+            Features of the destination nodes.
         """
         return self._dst_data
 
@@ -59,8 +59,8 @@ class EdgeBatch(object):
 
         Returns
         -------
-        dict
-            With ``str`` keys and ``tensor`` values.
+        dict with ``str`` keys and ``tensor`` values
+            Features of the edges.
         """
         return self._edge_data
 
@@ -69,7 +69,7 @@ class EdgeBatch(object):
 
         Returns
         -------
-        tuple of tensors
+        tuple of three tensors
             The edge tuple :math:`(src, dst, eid)`. :math:`src[i],
             dst[i], eid[i]` separately specifies the source node,
             destination node and the edge id for the ith edge
@@ -122,8 +122,8 @@ class NodeBatch(object):
 
         Returns
         -------
-        dict
-            With ``str`` keys and ``tensor`` values.
+        dict with ``str`` keys and ``tensor`` values
+            Features of the nodes.
         """
         return self._data
 
@@ -136,8 +136,8 @@ class NodeBatch(object):
         Returns
         -------
         dict or None
-            If dict, the keys are ``str`` and the values are
-            ``tensor``.
+            The messages nodes received. If dict, the keys are
+            ``str`` and the values are ``tensor``.
         """
         return self._msgs
 
