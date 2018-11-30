@@ -26,14 +26,14 @@ class SST(object):
     """Stanford Sentiment Treebank dataset.
 
     Each sample is the constituency tree of a sentence. The leaf nodes
-    represent words. The word is a int value stored in the "x" feature field.
-    The non-leaf node has a special value PAD_WORD.
+    represent words. The word is a int value stored in the ``x`` feature field.
+    The non-leaf node has a special value ``PAD_WORD`` in the ``x`` field.
     Each node also has a sentiment annotation: 5 classes (very negative,
     negative, neutral, positive and very positive). The sentiment label is a
-    int value stored in the "y" feature field.
+    int value stored in the ``y`` feature field.
 
     .. note::
-        This dataset class is compatible with pytorch's Dataset class.
+        This dataset class is compatible with pytorch's :class:`Dataset` class.
 
     .. note::
         All the samples will be loaded and preprocessed in the memory first.
@@ -41,7 +41,7 @@ class SST(object):
     Parameters
     ----------
     mode : str, optional
-        Can be 'train', 'val', 'test'. Which data file to use.
+        Can be ``'train'``, ``'val'``, ``'test'`` and specifies which data file to use.
     vocab_file : str, optional
         Optional vocabulary file.
     """
@@ -120,9 +120,28 @@ class SST(object):
         return ret
 
     def __getitem__(self, idx):
+        """Get the tree with index idx.
+
+        Parameters
+        ----------
+        idx : int
+            Tree index.
+
+        Returns
+        -------
+        dgl.DGLGraph
+            Tree.
+        """
         return self.trees[idx]
 
     def __len__(self):
+        """Get the number of trees in the dataset.
+
+        Returns
+        -------
+        int
+            Number of trees.
+        """
         return len(self.trees)
 
     @property
