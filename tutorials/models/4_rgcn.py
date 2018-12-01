@@ -180,14 +180,13 @@ class RGCNLayer(nn.Module):
 
         if self.is_input_layer:
             def message_func(edges):
-                # calculate embedding index = id + edge_type_id * num_nodes
-                # self.in_feat == num_nodes
+                # for input layer, matrix multiply can be converted to be
+                # an embedding lookup using source node id
                 embed = weight.view(-1, self.out_feat)
                 index = edges.data['rel_type'] * self.in_feat + edges.src['id']
                 return {'msg': embed[index] * edges.data['norm']}
         else:
             def message_func(edges):
-                # FIXME: normalizer
                 w = weight[edges.data['rel_type']]
                 msg = torch.bmm(edges.src['h'].unsqueeze(1), w).squeeze()
                 msg = msg * edges.data['norm']
@@ -297,8 +296,6 @@ train_idx = train_idx[len(train_idx) // 5:]
 edge_type = torch.from_numpy(data.edge_type)
 edge_norm = torch.from_numpy(data.edge_norm).unsqueeze(1)
 
-# convert to pytorch label format
-labels = np.argmax(labels, axis=1)
 labels = torch.from_numpy(labels).view(-1)
 
 ###############################################################################
