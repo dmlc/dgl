@@ -1,7 +1,10 @@
 from __future__ import absolute_import
 
 from abc import abstractmethod
+import functools
+import operator
 
+from ...base import DGLError
 from ... import backend as F
 from ...frame import FrameRef, Frame
 from ... import utils
@@ -22,6 +25,7 @@ class OpCode(object):
     READ_ROW = 6
     MERGE_ROW = 7
     UPDATE_DICT = 8
+    NEW_DICT = 9
     # mutable op (no return)
     # remember the name is suffixed with "_"
     WRITE_ = 21
@@ -248,6 +252,16 @@ class SPMVExecutor(Executor):
             B = F.unsqueeze(B, 1)
             C = F.spmm(spA, B)
             C = F.squeeze(C, 1)
+        elif F.ndim(B) > 2:
+            # Flatten the dim 1:~
+            B_shape = F.shape(B)
+            feat_shape = B_shape[1:]
+            tmp_B_shape = (B_shape[0],
+                    functools.reduce(operator.mul, feat_shape, 1))
+            B = F.reshape(B, tmp_B_shape)
+            C = F.spmm(spA, B)
+            C_shape = (F.shape(C)[0],) + feat_shape
+            C = F.reshape(C, C_shape)
         else:
             C = F.spmm(spA, B)
         self.ret.data = C
@@ -299,6 +313,16 @@ class SPMVWithDataExecutor(Executor):
             B = F.unsqueeze(B, 1)
             C = F.spmm(spA, B)
             C = F.squeeze(C, 1)
+        elif F.ndim(B) > 2:
+            # Flatten the dim 1:~
+            B_shape = F.shape(B)
+            feat_shape = B_shape[1:]
+            tmp_B_shape = (B_shape[0],
+                    functools.reduce(operator.mul, feat_shape, 1))
+            B = F.reshape(B, tmp_B_shape)
+            C = F.spmm(spA, B)
+            C_shape = (F.shape(C)[0],) + feat_shape
+            C = F.reshape(C, C_shape)
         else:
             C = F.spmm(spA, B)
         self.ret.data = C
@@ -389,6 +413,49 @@ def UPDATE_DICT(fd1, fd2, ret=None):
     reg = IR_REGISTRY[OpCode.UPDATE_DICT]
     ret = var.new(reg['ret_type']) if ret is None else ret
     get_current_prog().issue(reg['executor_cls'](fd1, fd2, ret))
+    return ret
+
+class NewDictExecutor(Executor):
+    def __init__(self, fd_init, idx, fd_scheme, ret):
+        self.fd_init = fd_init  # the feat dict to borrow initializer
+        self.idx = idx  # the index to look for number or rows
+        self.fd_scheme = fd_scheme  # the feat dict to look for column scheme
+        self.ret = ret  # the result
+
+    def opcode(self):
+        return OpCode.NEW_DICT
+
+    def arg_vars(self):
+        return [self.fd_init, self.idx, self.fd_scheme]
+
+    def ret_var(self):
+        return self.ret
+
+    def run(self):
+        fd_init_data = self.fd_init.data
+        idx_data = self.idx.data
+        fd_scheme_data = self.fd_scheme.data
+        schemes = fd_scheme_data.schemes
+        ret_dict = {}
+        for key, sch in schemes.items():
+            initializer = fd_init_data.get_initializer(key)
+            ctx = F.context(fd_scheme_data[key])
+            shape = (len(idx_data),) + sch.shape
+            # FIXME: the last argument here can only be idx; range
+            #   is meaningless. Need to rethink the signature.
+            ret_dict[key] = initializer(shape, sch.dtype, ctx, idx_data)
+        self.ret.data = FrameRef(Frame(ret_dict))
+
+IR_REGISTRY[OpCode.NEW_DICT] = {
+    'name' : 'NEW_DICT',
+    'args_type' : [VarType.FEAT_DICT, VarType.IDX, VarType.FEAT_DICT],
+    'ret_type' : VarType.FEAT_DICT,
+    'executor_cls' : NewDictExecutor,
+}
+def NEW_DICT(fd_init, idx, fd_scheme, ret=None):
+    reg = IR_REGISTRY[OpCode.NEW_DICT]
+    ret = var.new(reg['ret_type']) if ret is None else ret
+    get_current_prog().issue(reg['executor_cls'](fd_init, idx, fd_scheme, ret))
     return ret
 
 class Write_Executor(Executor):

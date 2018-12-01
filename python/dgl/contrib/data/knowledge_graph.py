@@ -1,6 +1,7 @@
-""" Knowledge graph dataset for rgcn
-Code adapted from tkipf/relational-gcn
+""" Knowledge graph dataset for Relational-GCN
+Code adapted from authors' implementation of Relational-GCN
 https://github.com/tkipf/relational-gcn
+https://github.com/MichSchli/RelationPrediction
 """
 
 from __future__ import print_function
@@ -16,29 +17,77 @@ from dgl.data.utils import download, extract_archive, get_download_dir
 
 np.random.seed(123)
 
-_urls = {
-    'am': ['https://www.dropbox.com/s/t60huxz616x4c4o/am.tgz?dl=1', 'https://www.dropbox.com/s/htisydfgwxmrx65/am_stripped.nt.gz?dl=1'],
-    'aifb': ['https://www.dropbox.com/s/0emedu261l4la82/aifb.tgz?dl=1', 'https://www.dropbox.com/s/fkvgvkygo2gf28k/aifb_stripped.nt.gz?dl=1'],
-    'bgs': ['https://www.dropbox.com/s/5wzxsuuof185p12/bgs.tgz?dl=1', 'https://www.dropbox.com/s/uqi0k9jd56j02gh/bgs_stripped.nt.gz?dl=1'],
-    'mutag': ['https://www.dropbox.com/s/k4y1qpni83dvei1/mutag.tgz?dl=1', 'https://www.dropbox.com/s/qy8j3p8eacvm4ir/mutag_stripped.nt.gz?dl=1'],
-    'entity_classify': 'https://www.dropbox.com/s/babuor115oqq2i3/rgcn_entity_classify.tgz?dl=1',
-    'FB15k-237': 'https://www.dropbox.com/s/werqxn21mt19nj4/FB15k-237.tgz?dl=1',
-    'FB15k': 'https://www.dropbox.com/s/zbyvjuwu1phlxb5/FB15k.tgz?dl=1',
-    'wn18': 'https://www.dropbox.com/s/53fvtwxe70j3aon/wn18.tgz?dl=1'
-}
-
+_downlaod_prefix = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/'
 
 class RGCNEntityDataset(object):
+    """RGCN Entity Classification dataset
+
+    The dataset contains a graph depicting the connectivity of a knowledge
+    base. Currently, four knowledge bases from the
+    `RGCN paper <https://arxiv.org/pdf/1703.06103.pdf>`_ are supported: aifb,
+    mutag, bgs, and am.
+
+    The original knowledge base is stored as an RDF file, and this class will
+    download and parse the RDF file, and performs preprocessing.
+
+    An object of this class has 11 member attributes needed for entity
+    classification:
+
+    num_nodes: int
+        number of entities of knowledge base
+    num_rels: int
+        number of relations (including reverse relation) of knowledge base
+    num_classes: int
+        number of classes/labels that of entities in knowledge base
+    edge_src: numpy.array
+        source node ids of all edges
+    edge_dst: numpy.array
+        destination node ids of all edges
+    edge_type: numpy.array
+        type of all edges
+    edge_norm: numpy.array
+        normalization factor of all edges
+    labels: numpy.array
+        labels of node entities
+    train_idx: numpy.array
+        ids of entities used for training
+    valid_idx: numpy.array
+        ids of entities used for validation
+    test_idx: numpy.array
+        ids of entities used for testing
+
+    Usage
+    -----
+    Usually, user don't need to directly use this class. Instead, DGL provides
+    wrapper function to load data (see example below).
+    When loading data, besides specifying dataset name, user can provide two
+    optional arguments:
+
+    bfs_level: int
+        prune out nodes that are more than ``bfs_level`` hops away from
+        labeled nodes, i.e., nodes won't be touched during propagation. If set
+        to a number less or equal to 0, all nodes will be retained.
+    relabel: bool
+        After pruning, whether or not to relabel all nodes with consecutive
+        node ids
+
+    Example
+    -------
+    Load aifb dataset, prune out nodes that are more than 3 hops away from
+    labeled nodes, and relabel the remaining nodes with consecutive ids
+
+    >>> from dgl.contrib.data import load_data
+    >>> data = load_data(dataset='aifb', bfs_level=3, relabel=True)
+
+    """
+
     def __init__(self, name):
         self.name = name
         self.dir = get_download_dir()
         tgz_path = os.path.join(self.dir, '{}.tgz'.format(self.name))
-        download(_urls[self.name][0], tgz_path)
+        download(_downlaod_prefix + '{}.tgz'.format(self.name), tgz_path)
         self.dir = os.path.join(self.dir, self.name)
         extract_archive(tgz_path, self.dir)
-        self.dir = os.path.join(self.dir, self.name)
-        graph_file_path = os.path.join(self.dir, '{}_stripped.nt.gz'.format(self.name))
-        download(_urls[self.name][1], path=graph_file_path) # no need to uncompress
 
     def load(self, bfs_level=2, relabel=False):
         self.num_nodes, edges, self.num_rels, self.labels, labeled_nodes_idx, self.train_idx, self.test_idx = _load_data(self.name, self.dir)
@@ -78,16 +127,56 @@ class RGCNEntityDataset(object):
         degrees = count[inverse_index]
         self.edge_norm = np.ones(len(self.edge_dst), dtype=np.float32) / degrees.astype(np.float32)
 
+        # convert to pytorch label format
+        self.num_classes = self.labels.shape[1]
+        self.labels = np.argmax(self.labels, axis=1)
+
 
 class RGCNLinkDataset(object):
+    """RGCN link prediction dataset
+
+    The dataset contains a graph depicting the connectivity of a knowledge
+    base. Currently, the knowledge bases from the
+    `RGCN paper <https://arxiv.org/pdf/1703.06103.pdf>`_ supported are
+    FB15k-237, FB15k, wn18
+
+    The original knowledge base is stored as an RDF file, and this class will
+    download and parse the RDF file, and performs preprocessing.
+
+    An object of this class has 5 member attributes needed for link
+    prediction:
+
+    num_nodes: int
+        number of entities of knowledge base
+    num_rels: int
+        number of relations (including reverse relation) of knowledge base
+    train: numpy.array
+        all relation triplets (src, rel, dst) for training
+    valid: numpy.array
+        all relation triplets (src, rel, dst) for validation
+    test: numpy.array
+        all relation triplets (src, rel, dst) for testing
+
+    Usage
+    -----
+    Usually, user don't need to directly use this class. Instead, DGL provides
+    wrapper function to load data (see example below).
+
+    Example
+    -------
+    Load FB15k-237 dataset
+
+    >>> from dgl.contrib.data import load_data
+    >>> data = load_data(dataset='FB15k-237')
+
+    """
     def __init__(self, name):
         self.name = name
         self.dir = get_download_dir()
-        tgz_file_path = os.path.join(self.dir, '{}.tar.gz'.format(self.name))
-        download(_urls[self.name], tgz_file_path)
+        tgz_path = os.path.join(self.dir, '{}.tar.gz'.format(self.name))
+        download(_downlaod_prefix + '{}.tgz'.format(self.name), tgz_path)
         self.dir = os.path.join(self.dir, self.name)
-        extract_archive(tgz_file_path, self.dir)
-        self.dir = os.path.join(self.dir, self.name)
+        extract_archive(tgz_path, self.dir)
 
     def load(self):
         entity_path = os.path.join(self.dir, 'entities.dict')

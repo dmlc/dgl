@@ -168,6 +168,7 @@ class HybridDict(Mapping):
         for d in self._dict_like_list:
             if key in d:
                 return d[key]
+        raise KeyError(key)
 
     def __contains__(self, key):
         return key in self.keys()
@@ -198,7 +199,7 @@ class ReadOnlyDict(Mapping):
     def __len__(self):
         return len(self._dict_like)
 
-def build_relabel_map(x):
+def build_relabel_map(x, sorted=False):
     """Relabel the input ids to continuous ids that starts from zero.
 
     Ids are assigned new ids according to their ascending order.
@@ -217,19 +218,24 @@ def build_relabel_map(x):
     Parameters
     ----------
     x : Index
-      The input ids.
+        The input ids.
+    sorted : bool, default=False
+        Whether the input has already been unique and sorted.
 
     Returns
     -------
     new_to_old : tensor
-      The mapping from new id to old id.
+        The mapping from new id to old id.
     old_to_new : tensor
-      The mapping from old id to new id. It is a vector of length MAX(x).
-      One can use advanced indexing to convert an old id tensor to a
-      new id tensor: new_id = old_to_new[old_id]
+        The mapping from old id to new id. It is a vector of length MAX(x).
+        One can use advanced indexing to convert an old id tensor to a
+        new id tensor: new_id = old_to_new[old_id]
     """
     x = x.tousertensor()
-    unique_x, _ = F.sort_1d(F.unique(x))
+    if not sorted:
+        unique_x, _ = F.sort_1d(F.unique(x))
+    else:
+        unique_x = x
     map_len = int(F.max(unique_x, dim=0)) + 1
     old_to_new = F.zeros(map_len, dtype=F.int64, ctx=F.cpu())
     F.scatter_row_inplace(old_to_new, unique_x, F.arange(0, len(unique_x)))

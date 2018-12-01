@@ -285,11 +285,11 @@ class DGLGraph(object):
         --------
         has_nodes
         """
-        return self.has_node(vid)
+        return self._graph.has_node(vid)
 
     def __contains__(self, vid):
         """Same as has_node."""
-        return self.has_node(vid)
+        return self._graph.has_node(vid)
 
     def has_nodes(self, vids):
         """Return true if the nodes exist.
@@ -1094,7 +1094,6 @@ class DGLGraph(object):
         """
         if message_func == "default":
             message_func = self._message_func
-        assert message_func is not None
 
         if is_all(edges):
             eid = ALL
@@ -1252,7 +1251,7 @@ class DGLGraph(object):
         if len(v) == 0:
             return
         with ir.prog() as prog:
-            scheduler.schedule_pull(graph=self, v=v,
+            scheduler.schedule_pull(graph=self, pull_nodes=v,
                     message_func=message_func, reduce_func=reduce_func,
                     apply_func=apply_node_func)
             Runtime.run(prog)

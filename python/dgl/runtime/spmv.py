@@ -43,7 +43,7 @@ def analyze_v2v_spmv(graph, mfunc, rfunc):
             raise DGLError('Reduce function requires message field "%s",'
                            ' but no message function generates it.' % mfld)
         mfn = fld2mfunc[mfld]
-        # FIXME: should pre-compile a look up table
+        # TODO(minjie): should pre-compile a look up table
         if mfn.is_spmv_supported(graph) and rfn.is_spmv_supported():
             spmv_pairs.append((mfn, rfn))
         else:
@@ -122,27 +122,25 @@ def gen_e2v_spmv_schedule(inc, spmv_rfunc, mf, out):
         ftdst = ir.SPMV(inc_var, ftmsg)
         ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
-def build_adj_matrix(call_type, graph, u, v):
-    """
-    call_type : str
-    graph : DGLGraph
-    u : utils.Index
-    v : utils.Index
-    """
-    if call_type == "update_all":
-        # full graph case
-        return utils.CtxCachedObject(lambda ctx : graph.adjacency_matrix(ctx=ctx))
-    elif call_type == "send_and_recv":
-        # edgeset case
-        mat = build_adj_matrix_uv(graph, u, v)
-        return utils.CtxCachedObject(lambda ctx : F.copy_to(mat, ctx))
-    else:
-        raise DGLError('Invalid call type:', call_type)
+def build_adj_matrix_graph(graph):
+    """Build adjacency matrix of the whole graph.
 
-def build_adj_matrix_index_uv(graph, u, v):
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph
+
+    Returns
+    -------
+    utils.CtxCachedObject
+        Get be used to get adjacency matrix on the provided ctx.
+    """
+    return utils.CtxCachedObject(lambda ctx : graph.adjacency_matrix(ctx=ctx))
+
+def build_adj_matrix_index_uv(graph, edges, reduce_nodes):
     """Build adj matrix index and shape using the given (u, v) edges.
 
-    The matrix is of shape (len(unique(v)), n), where n is the number of nodes
+    The matrix is of shape (len(reduce_nodes), n), where n is the number of nodes
     in the graph. Therefore, when doing SPMV, the src node data
     should be all the node features.
 
@@ -154,10 +152,11 @@ def build_adj_matrix_index_uv(graph, u, v):
     ---------
     graph : DGLGraph
         The graph
-    u : utils.Index
-        Src nodes.
-    v : utils.Index
-        Dst nodes.
+    edges : tuple of utils.Index
+        (u, v)
+    reduce_nodes : utils.Index
+        The nodes to reduce messages, which will be target dimension
+        of the adjmat. The nodes include unique(v) and zero-degree-nodes.
 
     Returns
     -------
@@ -166,21 +165,23 @@ def build_adj_matrix_index_uv(graph, u, v):
     tupe of int
         The dense shape.
     """
-    new2old, old2new = utils.build_relabel_map(v)
+    # TODO(minjie): add node frontier for this
+    new2old, old2new = utils.build_relabel_map(reduce_nodes, sorted=True)
+    u, v = edges
     u = u.tousertensor()
     v = v.tousertensor()
     new_v = old2new[v]  # FIXME(minjie): no use []
     n = graph.number_of_nodes()
-    m = len(new2old)
+    m = len(reduce_nodes)
     row = F.unsqueeze(new_v, 0)
     col = F.unsqueeze(u, 0)
     idx = F.cat([row, col], dim=0)
     return ('coo', idx), (m, n)
 
-def build_adj_matrix_uv(graph, u, v):
-    """Build adj matrix using the given (u, v) edges.
+def build_adj_matrix_uv(graph, edges, reduce_nodes):
+    """Build adj matrix using the given (u, v) edges and target nodes.
 
-    The matrix is of shape (len(v), n), where n is the number of nodes
+    The matrix is of shape (len(reduce_nodes), n), where n is the number of nodes
     in the graph. Therefore, when doing SPMV, the src node data
     should be all the node features.
 
@@ -188,76 +189,135 @@ def build_adj_matrix_uv(graph, u, v):
     ---------
     graph : DGLGraph
         The graph
-    u : utils.Index
-        Src nodes.
-    v : utils.Index
-        Dst nodes.
+    edges : tuple of utils.Index
+        (u, v)
+    reduce_nodes : utils.Index
+        The nodes to reduce messages, which will be target dimension
+        of the adjmat. The nodes include unique(v) and zero-degree-nodes.
 
     Returns
     -------
-    Sparse matrix
-        The adjacency matrix on CPU
+    utils.CtxCachedObject
+        Get be used to get adjacency matrix on the provided ctx.
     """
-    sp_idx, shape = build_adj_matrix_index_uv(graph, u, v)
+    sp_idx, shape = build_adj_matrix_index_uv(graph, edges, reduce_nodes)
+    u, v = edges
     nnz = len(u)
     # FIXME(minjie): data type
     dat = F.ones((nnz,), dtype=F.float32, ctx=F.cpu())
     mat = F.sparse_matrix(dat, sp_idx, shape)
-    return mat
+    return utils.CtxCachedObject(lambda ctx : F.copy_to(mat, ctx))
 
-def build_inc_matrix(call_type, graph, eid, v):
-    """
-    call_type : str
+def build_inc_matrix_graph(graph):
+    """Build incidence matrix.
+
+    Parameters
+    ----------
     graph : DGLGraph
-    eid : utils.Index
-    v : utils.Index
-    """
-    if call_type == "update_all":
-        # full graph case
-        return utils.CtxCachedObject(lambda ctx : graph.incidence_matrix(type='in', ctx=ctx))
-    elif call_type == "send_and_recv":
-        # edgeset case
-        mat = build_inc_matrix_v(v)
-        return utils.CtxCachedObject(lambda ctx : F.copy_to(mat, ctx))
-    elif call_type == "recv":
-        # dst nodeset case
-        mat = build_inc_matrix_eid(eid, v)
-        return utils.CtxCachedObject(lambda ctx : F.copy_to(mat, ctx))
-    else:
-        raise DGLError('Invalid call type:', call_type)
+        The graph.
 
-def build_inc_matrix_eid(eid, v):
-    """A spmat of shape (n, m), where n=len(unique(v)), m=len(eid).
+    Returns
+    -------
+    utils.CtxCachedObject
+        Get be used to get incidence matrix on the provided ctx.
+    """
+    return utils.CtxCachedObject(lambda ctx : graph.incidence_matrix(type='in', ctx=ctx))
+
+def build_inc_matrix_eid(m, eid, dst, reduce_nodes):
+    """Build incidence matrix using edge id and edge dst nodes.
+
+    The incidence matrix is of shape (n, m), where n=len(reduce_nodes).
+    The nnz is equal to len(eid).
     
-    Invariant: len(eid) == len(v)
+    Invariant: len(eid) == len(dst)
 
     The dst nodes will be sorted in the *unique-ascending* order of
     their ids. This is compatible with other reduce scheduler such as
     degree-bucketing scheduler.
 
+    Examples
+    --------
+    Total of seven edges. Three edges point to node 1 (eid=0,1,2);
+    two point to node 3 (eid=3,4); two point to node 4 (eid=5,6).
+    Only five edges should be included in the result incmat (eid=1,2,3,5,6).
+    There are five nodes in the final target dimension (0~4),
+    where node 0 and 2 are two 0-deg nodes.
+    >>> m = 7
+    >>> eid = [1, 2, 3, 5, 6]
+    >>> dst = [1, 1, 3, 4, 4]
+    >>> reduce_nodes = [0, 1, 2, 3, 4]
+    >>> build_inc_matrix_eid(m, eid, dst, reduce_nodes)
+    tensor([[0, 0, 0, 0, 0, 0, 0],
+            [0, 1, 1, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 1, 0, 0, 0],
+            [0, 0, 0, 0, 0, 1, 1]], shape=(5, 7))
+
+    Paramters
+    ---------
+    m : int
+        The source dimension size of the incidence matrix.
     eid : utils.Index
-    v : utils.Index
+        The edge ids. All ids must be in range [0, m).
+    dst : utils.Index
+        The edge destination nodes. len(eid) == len(dst).
+    reduce_nodes : utils.Index
+        The nodes to reduce messages, which will be target dimension
+        of the incmat. The nodes include unique(dst) and zero-degree-nodes.
+
+    Returns
+    -------
+    utils.CtxCachedObject
+        Get be used to get incidence matrix on the provided ctx.
     """
-    # relabel v to range(0, len(unique(v)))
-    new2old, old2new = utils.build_relabel_map(v)
-    v = v.tousertensor()
+    new2old, old2new = utils.build_relabel_map(reduce_nodes, sorted=True)
+    dst = dst.tousertensor()
     eid = eid.tousertensor()
-    new_v = old2new[v]  # FIXME(minjie): no use []
+    # relabel edges dsts
+    new_v = old2new[dst]  # FIXME(minjie): no use []
     # create sparse index tensor
-    m = len(eid)
-    n = len(new2old)
+    n = len(reduce_nodes)
     row = F.unsqueeze(new_v, 0)
     col = F.unsqueeze(eid, 0)
     idx = F.cat([row, col], dim=0)
     # create dat tensor
     nnz = len(eid)
     dat = F.ones((nnz,), dtype=F.float32, ctx=F.cpu())
-    return F.sparse_matrix(dat, ('coo', idx), (n, m))
+    mat = F.sparse_matrix(dat, ('coo', idx), (n, m))
+    return utils.CtxCachedObject(lambda ctx : F.copy_to(mat, ctx))
 
-def build_inc_matrix_v(v):
-    """A spmat of shape (n, m), where n=len(unique(v)), m=len(v).
+def build_inc_matrix_dst(dst, reduce_nodes):
+    """Build incidence matrix using only edge destinations.
+
+    The incidence matrix is of shape (n, m), where n=len(reduce_nodes), m=len(dst).
+    The nnz is equal to len(dst).
+
+    Examples
+    --------
+    Five edges. Two edges point to node 1; one points to node 3;
+    two point to node 4. There are five nodes in the final
+    target dimension (0~4), where node 0 and 2 are two 0-deg nodes.
+    >>> dst = [1, 1, 3, 4, 4]
+    >>> reduce_nodes = [0, 1, 2, 3, 4]
+    >>> build_inc_matrix_dst(dst, reduced_nodes)
+    tensor([[0, 0, 0, 0, 0],
+            [1, 1, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+            [0, 0, 1, 0, 0],
+            [0, 0, 0, 1, 1]], shape=(5, 5))
     
-    v : utils.Index
+    Parameters
+    ----------
+    dst : utils.Index
+        The edge destinations.
+    reduce_nodes : utils.Index
+        The nodes to reduce messages, which will be target dimension
+        of the incmat. The nodes include unique(dst) and zero-degree-nodes.
+
+    Returns
+    -------
+    utils.CtxCachedObject
+        Get be used to get incidence matrix on the provided ctx.
     """
-    eid = utils.toindex(F.arange(0, len(v)))
-    return build_inc_matrix_eid(eid, v)
+    eid = utils.toindex(F.arange(0, len(dst)))
+    return build_inc_matrix_eid(len(eid), eid, dst, reduce_nodes)
