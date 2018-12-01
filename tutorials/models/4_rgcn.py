@@ -336,10 +336,8 @@ model.train()
 for epoch in range(n_epochs):
     optimizer.zero_grad()
     logits = model.forward(g)
-    print("after forward")
     loss = F.cross_entropy(logits[train_idx], labels[train_idx])
     loss.backward()
-    print("after backward")
 
     optimizer.step()
 
