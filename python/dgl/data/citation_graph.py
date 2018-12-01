@@ -15,9 +15,9 @@ import os, sys
 from .utils import download, extract_archive, get_download_dir
 
 _urls = {
-    'cora' : 'https://s3.amazonaws.com/dgl-data/dataset/cora.zip',
-    'citeseer' : 'https://s3.amazonaws.com/dgl-data/dataset/citeseer.zip',
-    'pubmed' : 'https://s3.amazonaws.com/dgl-data/dataset/pubmed.zip',
+    'cora' : 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/cora.zip',
+    'citeseer' : 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/citeseer.zip',
+    'pubmed' : 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/pubmed.zip',
 }
 
 class CitationGraphDataset(object):
