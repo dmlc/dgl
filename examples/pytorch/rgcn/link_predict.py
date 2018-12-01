@@ -4,11 +4,7 @@ Paper: https://arxiv.org/abs/1703.06103
 Code: https://github.com/MichSchli/RelationPrediction
 
 Difference compared to tkipf/relation-gcn
-* mini-batch fashion evaluation
-* hack impl for weight basis multiply
-* sample for each graph batch?
-* report filtered metrics (todo)
-* early stopping (by save model with best validation mrr)
+* report filtered metrics
 """
 
 import argparse
@@ -104,33 +100,25 @@ def main(args):
                         use_cuda=use_cuda,
                         reg_param=args.regularization)
 
-    # build test graph
+    # validation and testing triplets
     valid_data = torch.LongTensor(valid_data)
+    test_data = torch.LongTensor(test_data)
 
+    # build test graph
     test_graph, test_rel, test_norm = utils.build_test_graph(
         num_nodes, num_rels, train_data)
     test_deg = test_graph.in_degrees(
                 range(test_graph.number_of_nodes())).float().view(-1,1)
-    test_data = torch.LongTensor(test_data)
     test_node_id = torch.arange(0, num_nodes, dtype=torch.long).view(-1, 1)
     test_rel = torch.from_numpy(test_rel).view(-1, 1)
     test_norm = torch.from_numpy(test_norm).view(-1, 1)
-
     test_graph.ndata.update({'id': test_node_id, 'norm': test_norm})
     test_graph.edata['type'] = test_rel
 
     if use_cuda:
         model.cuda()
-        """
-        valid_data = valid_data.cuda()
-        test_data = test_data.cuda()
-        test_node_id = test_node_id.cuda()
-        test_rel = test_rel.cuda()
-        test_deg = test_deg.cuda()
-        """
 
     # optimizer
-    # Can't use adam due to pytorch memory issue
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     # training loop
@@ -148,22 +136,21 @@ def main(args):
     best_mrr = 0
     model_state_file = 'model_state.pth'
 
-    epoch_time = []
+    forward_time = []
+    backward_time = []
     epoch = 0
     while True:
+        model.train()
         epoch += 1
         print("Epoch {:03d}".format(epoch))
 
-        model.train()
-        if use_cuda:
-            torch.cuda.empty_cache()
-
-        # generate graph and data
+        # perform edge neighborhood sampling to generate training graph and data
         g, node_id, edge_type, node_norm, data, labels = \
             utils.generate_sampled_graph_and_labels(
                 train_data, args.graph_batch_size, args.graph_split_size,
                 num_rels, adj_list, degrees, args.negative_sample)
         print("Done edge sampling")
+
         node_id = torch.from_numpy(node_id).view(-1, 1)
         edge_type = torch.from_numpy(edge_type).view(-1, 1)
         node_norm = torch.from_numpy(node_norm).view(-1, 1)
@@ -178,80 +165,54 @@ def main(args):
 
         t0 = time.time()
         loss = model.get_loss(g, data, labels)
+        t1 = time.time()
         loss.backward()
         # clip gradients
         torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_norm)
         optimizer.step()
-        t1 = time.time()
+        t2 = time.time()
 
-        epoch_time.append(t1 - t0)
-        print("Train Epoch Time(s) {:.4f} | Loss {:.4f}".format(
-                epoch_time[-1], loss.item()))
+        forward_time.append(t1 - t0)
+        backward_time.append(t2 - t1)
+        print("Epoch {:04d} | Loss {:.4f} | Best MRR {:.4f} | Forward {:.4f}s | Backward {:.4f}s".
+              format(epoch, loss.item(), best_mrr, forward_time[-1], backward_time[-1]))
 
         optimizer.zero_grad()
-        for p in model.parameters():
-            p.grad = None
-        if use_cuda:
-            torch.cuda.empty_cache()
 
+        # validation
         if epoch % args.evaluate_every == 0:
-            # save parameter
-            torch.save({'state_dict': model.state_dict(), 'epoch': epoch},
-                       'model_state_latest.pth')
-
-            # create new model
-            test_model = LinkPredict(num_nodes,
-                                args.n_hidden,
-                                num_rels,
-                                num_bases=args.n_bases,
-                                num_hidden_layers=args.n_layers,
-                                dropout=args.dropout,
-                                use_cuda=False,
-                                reg_param=args.regularization)
-            checkpoint = torch.load('model_state_latest.pth')
-            test_model.load_state_dict(checkpoint['state_dict'])
-            test_model.eval()
+            # perform validation on CPU because full graph is too large
+            if use_cuda:
+                model.cpu()
+            model.eval()
             print("start eval")
-            mrr = utils.evaluate(test_graph, test_model, valid_data, num_nodes,
+            mrr = utils.evaluate(test_graph, model, valid_data, num_nodes,
                                  hits=[1, 3, 10], eval_bz=args.eval_batch_size)
             # save best model
             if mrr < best_mrr:
                 if epoch > args.n_epochs:
-                    # break
-                    pass # do nothing
+                    break
             else:
                 best_mrr = mrr
-                torch.save({'state_dict': test_model.state_dict(), 'epoch': epoch},
+                torch.save({'state_dict': model.state_dict(), 'epoch': epoch},
                            model_state_file)
-        """
+            if use_cuda:
+                model.cuda()
 
     print("training done")
-    print("Mean iteration forward time: {:4f}".format(
-            np.mean(forward_time[len(forward_time) // 4:])))
-    print("Mean iteration backward time: {:4f}".format(
-            np.mean(backward_time[len(backward_time) // 4:])))
-
-    forward_time = np.sum(np.reshape(
-            forward_time, (args.n_epochs, -1)), axis=1)
-    backward_time = np.sum(np.reshape(
-            backward_time, (args.n_epochs, -1)), axis=1)
-
-    print("Mean epoch forward time: {:4f}".format(
-            np.mean(forward_time[len(forward_time) // 4:])))
-    print("Mean epoch backward time: {:4f}".format(
-            np.mean(backward_time[len(backward_time) // 4:])))
+    print("Mean forward time: {:4f}s".format(np.mean(forward_time)))
+    print("Mean Backward time: {:4f}s".format(np.mean(backward_time)))
 
     print("\nstart testing:")
-    if use_cuda:
-        torch.cuda.empty_cache()
     # use best model checkpoint
     checkpoint = torch.load(model_state_file)
-    model.load_state_dict(checkpoint['state_dict'])
+    if use_cuda:
+        model.cpu()
     model.eval()
+    model.load_state_dict(checkpoint['state_dict'])
     print("Using best epoch: {}".format(checkpoint['epoch']))
     utils.evaluate(test_graph, model, test_data, num_nodes, hits=[1, 3, 10],
                    eval_bz=args.eval_batch_size)
-        """
 
 
 if __name__ == '__main__':
@@ -268,7 +229,7 @@ if __name__ == '__main__':
             help="number of weight blocks for each relation")
     parser.add_argument("--n-layers", type=int, default=2,
             help="number of propagation rounds")
-    parser.add_argument("-e", "--n-epochs", type=int, default=6000,
+    parser.add_argument("--n-epochs", type=int, default=6000,
             help="number of minimum training epochs")
     parser.add_argument("-d", "--dataset", type=str, required=True,
             help="dataset to use")
