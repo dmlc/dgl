@@ -109,17 +109,14 @@ plt.show()
 #    :align: center
 #
 
-def readout(g):
-    # read the aggregated node feature 'x' on graph
-    return th.sum(g.ndata['x'], dim=0)
-
 def super_useful_comp(g):
 
     def send_source(edges):
-        # pass the source node feature 'x' weighted by edge feature 'w'
+        # 1. pass the source node feature 'x' weighted by edge feature 'w'
         return {'msg': edges.src['x'] * edges.data['w']}
 
     def simple_reduce(nodes):
+        # 2. perform reduction on received messages and update feature 'x'
         msgs = nodes.mailbox['msg']
         return {'x': msgs.sum(1) + nodes.data['x']}
 
@@ -128,6 +125,10 @@ def super_useful_comp(g):
 
     g.send(g.edges())
     g.recv(g.nodes())
+
+def readout(g):
+    # 3. read the aggregated node feature 'x' on graph
+    return th.sum(g.ndata['x'], dim=0)
 
 ###############################################################################
 # See the python wrapper:
