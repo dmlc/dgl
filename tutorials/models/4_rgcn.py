@@ -4,7 +4,7 @@
 Relational Graph Convolutional Network Tutorial
 ================================================
 
-**Author:** Lingfan Yu, Murphy Li, Zheng Zhang
+**Author:** Lingfan Yu, Mufei Li, Zheng Zhang
 
 The vanilla Graph Convolutional Network (GCN)
 (`paper <https://arxiv.org/pdf/1609.02907.pdf>`_,
@@ -336,8 +336,10 @@ model.train()
 for epoch in range(n_epochs):
     optimizer.zero_grad()
     logits = model.forward(g)
+    print("after forward")
     loss = F.cross_entropy(logits[train_idx], labels[train_idx])
     loss.backward()
+    print("after backward")
 
     optimizer.step()
 
