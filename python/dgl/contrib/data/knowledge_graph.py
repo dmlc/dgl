@@ -39,13 +39,15 @@ class RGCNEntityDataset(object):
     The original knowledge base is stored as an RDF file, and this class will
     download and parse the RDF file, and performs preprocessing.
 
-    An object of this class has 10 member attributes needed for entity
+    An object of this class has 11 member attributes needed for entity
     classification:
 
     num_nodes: int
         number of entities of knowledge base
     num_rels: int
         number of relations (including reverse relation) of knowledge base
+    num_classes: int
+        number of classes/labels that of entities in knowledge base
     edge_src: numpy.array
         source node ids of all edges
     edge_dst: numpy.array
@@ -138,6 +140,7 @@ class RGCNEntityDataset(object):
         self.edge_norm = np.ones(len(self.edge_dst), dtype=np.float32) / degrees.astype(np.float32)
 
         # convert to pytorch label format
+        self.num_classes = self.labels.shape[1]
         self.labels = np.argmax(self.labels, axis=1)
 
 

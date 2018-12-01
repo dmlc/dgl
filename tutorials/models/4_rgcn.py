@@ -285,9 +285,9 @@ import numpy as np
 data = load_data(dataset='aifb')
 num_nodes = data.num_nodes
 num_rels = data.num_rels
+num_classes = data.num_classes
 labels = data.labels
 train_idx = data.train_idx
-num_classes = labels.shape[1]
 # split training and validation set
 val_idx = train_idx[:len(train_idx) // 5]
 train_idx = train_idx[len(train_idx) // 5:]
