@@ -138,7 +138,7 @@ class DGLGraph(object):
     In the example below, the source nodes add 1 to their node features as
     the messages and send the messages to the destinations.
 
-    >>> # Define the function for sending node features as messages.
+    >>> # Define the function for sending messages.
     >>> def send_source(edges): return {'m': edges.src['x'] + 1}
     >>> # Set the function defined to be the default message function.
     >>> G.register_message_func(send_source)
@@ -151,7 +151,7 @@ class DGLGraph(object):
     >>> # Define a function for summing messages received and replacing the original feature.
     >>> def simple_reduce(nodes): return {'x': nodes.mailbox['m'].sum(1)}
     >>> # Set the function defined to be the default message reduce function.
-    >>> G.registe r_reduce_func(simple_reduce)
+    >>> G.register_reduce_func(simple_reduce)
     >>> # All existing edges have node 2 as the destination.
     >>> # Receive the messages for node 2 and update its feature.
     >>> G.recv(v=2)
@@ -1036,8 +1036,8 @@ class DGLGraph(object):
 
         Parameters
         ----------
-        func : str or callable
-            Reduce function on incoming edges. ``func(nodes) -> dict`` ``dict``
+        func : callable
+            Reduce function on incoming edges. ``func(nodes) -> dict``. ``dict``
             has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
             objects as in :mod:`~dgl.udf`.
         """
@@ -1247,7 +1247,7 @@ class DGLGraph(object):
              v=ALL,
              reduce_func="default",
              apply_node_func="default"):
-        """Receive and reduce in-coming messages and update representation on node(s) :math:`v`.
+        """Receive and reduce incoming messages and update representation on node(s) :math:`v`.
 
         * When all the nodes have zero-in-degrees, nothing will happen.
         * :attr:`reduce_func` returns a dictionary with ``str`` keys and ``tensor`` values, specifying
@@ -1299,7 +1299,7 @@ class DGLGraph(object):
         >>> # Set the function defined to be the default message reduce function.
         >>> g.register_reduce_func(simple_reduce)
 
-        Send and receive messages. Note that although node :math:`0` has no in-coming edges,
+        Send and receive messages. Note that although node :math:`0` has no incoming edges,
         its feature gets changed from :math:`1` to :math:`0` as it is also included in
         ``g.nodes()``.
 
@@ -1411,7 +1411,7 @@ class DGLGraph(object):
                 [2.]])
 
         Note that the feature of node :math:`0` remains the same as it has no
-        in-coming edges.
+        incoming edges.
 
         Notes
         -----
@@ -1459,9 +1459,9 @@ class DGLGraph(object):
              apply_node_func="default"):
         """Pull messages from the node's predecessors and then update its feature.
 
-        * If all nodes have no in-coming edges, nothing will happen.
-        * If some nodes have in-coming edges and some do not, the features for nodes
-          with no in-coming edges will be re-initialized with a placeholder. By default
+        * If all nodes have no incoming edges, nothing will happen.
+        * If some nodes have incoming edges and some do not, the features for nodes
+          with no incoming edges will be re-initialized with a placeholder. By default
           the placeholder is a zero tensor. See :func:`set_n_initializer` about how to
           configure the placeholder setting for node features. Be careful about that
           and do not include these nodes in :attr:`v` if you do not want to re-initialize
