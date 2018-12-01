@@ -16,3 +16,11 @@ To disable CUDA, run with `NOCUDA` variable set:
 ```
 NOCUDA=1 python3 vaetrain_dgl.py
 ```
+
+To decode for new molecules, run
+```
+python3 vaetrain_dgl.py -T
+```
+
+Currently, decoding involves encoding a training example, sampling from the posterior
+distribution, and decoding a molecule from that.
