@@ -17,7 +17,7 @@ import dgl.backend as F
 from dgl.data.utils import download, extract_archive, get_download_dir
 
 _urls = {
-    'sst': 'https://www.dropbox.com/s/aqejdgrs3jkrmc7/sst.zip?dl=1',
+    'sst' : 'https://s3.amazonaws.com/dgl-data/dataset/sst.zip',
 }
 
 SSTBatch = namedtuple('SSTBatch', ['graph', 'mask', 'wordid', 'label'])
