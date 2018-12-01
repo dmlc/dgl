@@ -25,15 +25,15 @@ from model import BaseRGCN
 class EmbeddingLayer(RGCNLayer):
     def propagate(self, g):
         if self.num_bases < self.num_rels:
-            weight = self.weight.view(self.in_feat, self.num_bases, self.out_feat)
+            weight = self.weight.view(self.num_bases, self.in_feat * self.out_feat)
             weight = torch.matmul(self.w_comp, weight).view(self.num_rels, self.in_feat, self.out_feat)
         else:
             weight = self.weight
 
         def msg_func(edges):
-            flattened_weight = weight.view(-1, self.out_feat)
-            index = edges.src['h'] * self.num_rels + edges.data['type']
-            return {'msg': flattened_weight[index] * edges.data['norm']}
+            embed = weight.view(-1, self.out_feat)
+            index = edges.data['type'] * self.in_feat + edges.src['id']
+            return {'msg': embed[index] * edges.data['norm']}
 
         g.update_all(msg_func, fn.sum(msg='msg', out='h'), None)
 
