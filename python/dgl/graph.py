@@ -128,6 +128,38 @@ class DGLGraph(object):
     >>> G.edata
     {'y' : tensor([[2., 2., 2., 2.],
                    [1., 1., 1., 1.]])}
+
+    **Message Passing:**
+
+    One common operation for updating node features is message passing,
+    where the source nodes send messages through edges to the destinations.
+    With :class:`DGLGraph`, we can do this with :func:`send` and :func:`recv`.
+
+    In the example below, the source nodes add 1 to their node features as
+    the messages and send the messages to the destinations.
+
+    >>> # Define the function for sending node features as messages.
+    >>> def send_source(edges): return {'m': edges.src['x'] + 1}
+    >>> # Set the function defined to be the default message function.
+    >>> G.register_message_func(send_source)
+    >>> # Send messages through all edges.
+    >>> G.send(G.edges())
+
+    Just like you need to go to your mailbox for retrieving mails, the destination
+    nodes also need to receive the messages and potentially update their features.
+
+    >>> # Define a function for summing messages received and replacing the original feature.
+    >>> def simple_reduce(nodes): return {'x': nodes.mailbox['m'].sum(1)}
+    >>> # Set the function defined to be the default message reduce function.
+    >>> G.registe r_reduce_func(simple_reduce)
+    >>> # All existing edges have node 2 as the destination.
+    >>> # Receive the messages for node 2 and update its feature.
+    >>> G.recv(v=2)
+    >>> G.ndata
+    {'x': tensor([[1., 1., 1., 1., 1.],
+                  [0., 0., 0., 0., 0.],
+                  [3., 3., 3., 3., 3.]])} # 3 = (1 + 1) + (0 + 1)
+
     """
     def __init__(self,
                  graph_data=None,
@@ -980,54 +1012,112 @@ class DGLGraph(object):
     def register_message_func(self, func):
         """Register global message function.
 
+        Once registered, :attr:`func` will be used as the default
+        message function in message passing operations, including
+        :func:`send`, :func:`send_and_recv`, :func:`pull`,
+        :func:`push`, :func:`update_all`.
+
         Parameters
         ----------
         func : callable
-          Message function on the edge.
+            Message function on the edge. ``func(edges) -> dict``. ``dict`` has
+            ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
+            objects as in :mod:`~dgl.udf`.
         """
         self._message_func = func
 
     def register_reduce_func(self, func):
         """Register global message reduce function.
 
+        Once registered, :attr:`func` will be used as the default
+        message reduce function in message passing operations, including
+        :func:`recv`, :func:`send_and_recv`, :func:`push`, :func:`pull`,
+        :func:`update_all`.
+
         Parameters
         ----------
         func : str or callable
-          Reduce function on incoming edges.
+            Reduce function on incoming edges. ``func(nodes) -> dict`` ``dict``
+            has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
+            objects as in :mod:`~dgl.udf`.
         """
         self._reduce_func = func
 
     def register_apply_node_func(self, func):
         """Register global node apply function.
 
+        Once registered, :attr:`func` will be used as the default apply
+        node function. Related operations include :func:`apply_nodes`,
+        :func:`recv`, :func:`send_and_recv`, :func:`push`, :func:`pull`,
+        :func:`update_all`.
+
         Parameters
         ----------
         func : callable
-            Apply function on the node.
+            Apply function on the nodes. ``func(nodes) -> dict``. ``dict``
+            has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
+            objects as in :mod:`~dgl.udf`.
+
+        See Also
+        --------
+        register_apply_edge_func
         """
         self._apply_node_func = func
 
     def register_apply_edge_func(self, func):
         """Register global edge apply function.
 
+        Once registered, :attr:`func` will be used as the default apply
+        edge function in :func:`apply_edges`.
+
         Parameters
         ----------
-        edge_func : callable
-            Apply function on the edge.
+        func : callable
+            Apply function on the edges. ``func(edges) -> dict``. ``dict``
+            has ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
+            objects as in :mod:`~dgl.udf`.
+
+        See Also
+        --------
+        register_apply_node_func
         """
         self._apply_edge_func = func
 
     def apply_nodes(self, func="default", v=ALL, inplace=False):
         """Apply the function on the node features.
 
-        Applying a None function will be ignored.
-
         Parameters
         ----------
-        func : callable, optional
-            The UDF applied on the node features.
+        func : callable or None, optional
+            The user defined applied function on the node features. If
+            None, nothing will happen. A callable function takes the form
+            ``func(nodes) -> dict``. ``dict`` has ``str`` keys and ``tensor``
+            values. nodes are :class:`NodeBatch` objects as in :mod:`~dgl.udf`.
         v : int, iterable of int, tensor, optional
-            The node id(s).
+            The node (ids) on which to apply :attr:`func`. The default
+            value is all the nodes.
+
+        Examples
+        --------
+
+        >>> import dgl
+        >>> import torch as th
+
+        >>> g = dgl.DGLGraph()
+        >>> g.add_nodes(3)
+        >>> g.ndata['x'] = th.ones(3, 1)
+
+        >>> # Increment the node feature by 1.
+        >>> def increment_feature(nodes): return {'x': nodes.data['x'] + 1}
+        >>> g.apply_nodes(func=increment_feature, v=[0, 2]) # Apply func to nodes 0, 2
+        >>> g.ndata
+        {'x': tensor([[2.],
+                      [1.],
+                      [2.]])}
+
+        See Also
+        --------
+        apply_edges
         """
         if func == "default":
             func = self._apply_node_func
@@ -1045,15 +1135,43 @@ class DGLGraph(object):
         Parameters
         ----------
         func : callable, optional
-            The UDF applied on the edge features.
-        edges : edges, optional
-            Edges can be a pair of endpoint nodes (u, v), or a
-            tensor of edge ids. The default value is all the edges.
+            The user defined applied function on the edge features. A
+            callable function takes the form ``func(edges) -> dict``. ``dict``
+            has ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
+            objects as in :mod:`~dgl.udf`.
+        edges : tuple of 2 tensors, tuple of 2 iterable of int, int, iterable of int, or tensor, optional
+            Edges on which to apply :attr:`func`. The default value is all the
+            edges. :attr:`edges` can be pair(s) of endpoint nodes :math:`(u, v)`
+            represented as a ``tuple of 2 tensors`` or a
+            ``tuple of 2 iterable of int``. It can also be specified with edge ids,
+            using a ``tensor`` of edge ids, an ``int``, an ``iterable of int``.
 
         Notes
         -----
-        On multigraphs, if u and v are specified, then all the edges
-        between u and v will be updated.
+        On multigraphs, if :math:`u` and :math:`v` are specified, then all the edges
+        between :math:`u` and :math:`v` will be updated.
+
+        Examples
+        --------
+
+        >>> import dgl
+        >>> import torch as th
+
+        >>> g = dgl.DGLGraph()
+        >>> g.add_nodes(3)
+        >>> g.add_edges([0, 1], [1, 2])   # 0 -> 1, 1 -> 2
+        >>> g.edata['y'] = th.ones(2, 1)
+
+        >>> # Doubles the edge feature.
+        >>> def double_feature(edges): return {'y': edges.data['y'] * 2}
+        >>> g.apply_edges(func=double_feature, edges=0) # Apply func to the first edge.
+        >>> g.edata
+        {'y': tensor([[2.],   # 2 * 1
+                      [1.]])}
+
+        See Also
+        --------
+        apply_nodes
         """
         if func == "default":
             func = self._apply_edge_func
@@ -1081,16 +1199,25 @@ class DGLGraph(object):
 
         Parameters
         ----------
-        edges : edges, optional
-            Edges can be a pair of endpoint nodes (u, v), or a
-            tensor of edge ids.
+        edges : tuple of 2 tensors, tuple of 2 iterable of int, int, iterable of int, or tensor
+            Edges on which to apply :attr:`message_func`. :attr:`edges` can be pair(s) of
+            endpoint nodes :math:`(u, v)` represented as a ``tuple of 2 tensors``
+            or a ``tuple of 2 iterable of int``. It can also be specified with
+            edge ids, using a ``tensor`` of edge ids, an ``int``, an ``iterable of int``.
         message_func : callable
-            The message function.
+            Message function on the edges. ``func(edges) -> dict``. ``dict``
+            has ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
+            objects as in :mod:`~dgl.udf`.
 
         Notes
         -----
-        On multigraphs, if u and v are specified, then the messages will be sent
-        along all edges between u and v.
+        On multigraphs, if :math:`u` and :math:`v` are specified, then the messages will be sent
+        along all edges between :math:`u` and :math:`v`.
+
+        Examples
+        --------
+
+        See the *message passing* example in :class:`DGLGraph` or :func:`recv`.
         """
         if message_func == "default":
             message_func = self._message_func
@@ -1117,10 +1244,22 @@ class DGLGraph(object):
         self._msg_graph.add_edges(u, v)
 
     def recv(self,
-             v,
+             v=ALL,
              reduce_func="default",
              apply_node_func="default"):
-        """Receive and reduce in-coming messages and update representation on node v.
+        """Receive and reduce in-coming messages and update representation on node(s) :math:`v`.
+
+        * When all the nodes have zero-in-degrees, nothing will happen.
+        * :attr:`reduce_func` returns a dictionary with ``str`` keys and ``tensor`` values, specifying
+          different node features. If a type of node feature, specified by the key, already exists,
+          the old features will be replaced, otherwise a new type of node feature is added.
+        * When some but not all nodes have zero-in-degrees, a placeholder for that attribute will be
+          used, by default a zero tensor. See :func:`set_n_initializer` about how to configure
+          the placeholder setting for node features. If you do not want to re-initialize those nodes,
+          you should not include them in :attr:`v`.
+
+        Once the messages are received (and used to update related features), one needs to perform
+        :func:`send` again before another :func:`recv` trial. Otherwise, nothing will happen.
 
         TODO(minjie): document on zero-in-degree case
         TODO(minjie): document on how returned new features are merged with the old features
@@ -1129,11 +1268,56 @@ class DGLGraph(object):
         Parameters
         ----------
         v : node, container or tensor
-          The node to be updated.
-        reduce_func : callable
-          The reduce function.
-        apply_node_func : callable, optional
-          The update function.
+            The node to be updated.
+        reduce_func : callable, optional
+            Reduce function on incoming edges. ``func(nodes) -> dict``.
+            ``dict`` has ``str`` keys and ``tensor`` values. nodes are
+            :class:`NodeBatch` objects as in :mod:`~dgl.udf`.
+        apply_node_func : callable
+            Apply function on the nodes. ``func(nodes) -> dict``. ``dict``
+            has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
+            objects as in :mod:`~dgl.udf`.
+
+        Examples
+        --------
+        Create a graph object for demo.
+
+        >>> import dgl
+        >>> import torch as th
+        >>> g = dgl.DGLGraph()
+        >>> g.add_nodes(3)
+        >>> g.ndata['x'] = th.tensor([[1.], [2.], [3.]])
+        >>> g.add_edges([0, 1], [1, 2])
+
+        >>> # Define the function for sending node features as messages.
+        >>> def send_source(edges): return {'m': edges.src['x']}
+        >>> # Set the function defined to be the default message function.
+        >>> g.register_message_func(send_source)
+
+        >>> # Sum the messages received and use this to replace the original node feature.
+        >>> def simple_reduce(nodes): return {'x': nodes.mailbox['m'].sum(1)}
+        >>> # Set the function defined to be the default message reduce function.
+        >>> g.register_reduce_func(simple_reduce)
+
+        Send and receive messages. Note that although node :math:`0` has no in-coming edges,
+        its feature gets changed from :math:`1` to :math:`0` as it is also included in
+        ``g.nodes()``.
+
+        >>> g.send(g.edges())
+        >>> g.recv(g.nodes())
+        >>> g.ndata['x']
+        tensor([[0.],
+                [1.],
+                [2.]])
+
+        Once messages are received, one will need another call of :func:`send` again before
+        another call of :func:`recv`. Otherwise, nothing will happen.
+
+        >>> g.recv(g.nodes())
+        >>> g.ndata['x']
+        tensor([[0.],
+                [1.],
+                [2.]])
         """
         if reduce_func == "default":
             reduce_func = self._reduce_func
@@ -1168,27 +1352,76 @@ class DGLGraph(object):
                       message_func="default",
                       reduce_func="default",
                       apply_node_func="default"):
-        """Send messages along edges and receive them on the targets.
+        """Send messages along edges and let destinations receive them.
+        Optionally, apply a function to update the node features.
+
+        This is a convenient combination of performing in order
+        ``send(self, self.edges, message_func)`` and
+        ``recv(self, dst, reduce_func, apply_node_func)``, where :attr:`dst`
+        are the destinations of the :attr:`edges`.
 
         Parameters
         ----------
-        edges : edges
-            Edges can be a pair of endpoint nodes (u, v), or a
-            tensor of edge ids. The default value is all the edges.
+        edges : tuple of 2 tensors, tuple of 2 iterable of int, int, iterable of int, or tensor
+            Edges on which to apply :attr:`message_func`. :attr:`edges` can be pair(s) of
+            endpoint nodes :math:`(u, v)` represented as a ``tuple of 2 tensors``
+            or a ``tuple of 2 iterable of int``. It can also be specified with
+            edge ids, using a ``tensor`` of edge ids, an ``int``, an ``iterable of int``.
         message_func : callable, optional
-            The message function. Registered function will be used if not
+            Message function on the edges. ``func(edges) -> dict``. ``dict``
+            has ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
+            objects as in :mod:`~dgl.udf`. Registered function will be used if not
             specified.
         reduce_func : callable, optional
-            The reduce function. Registered function will be used if not
-            specified.
+            Reduce function on incoming edges. ``func(nodes) -> dict``. ``dict``
+            has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
+            objects as in :mod:`~dgl.udf`. Registered function will be used
+            if not specified.
         apply_node_func : callable, optional
-            The update function. Registered function will be used if not
-            specified.
+            Apply function on the nodes. ``func(nodes) -> dict``. ``dict`` has
+            ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
+            objects as in :mod:`~dgl.udf`. Registered function will be
+            used if not specified.
+
+        Examples
+        --------
+        >>> import dgl
+        >>> import torch as th
+        >>> g = dgl.DGLGraph()
+        >>> g.add_nodes(3)
+        >>> g.ndata['x'] = th.tensor([[1.], [2.], [3.]])
+        >>> g.add_edges([0, 1], [1, 2])
+
+        >>> # Define the function for sending node features as messages.
+        >>> def send_source(edges): return {'m': edges.src['x']}
+        >>> # Set the function defined to be the default message function.
+        >>> g.register_message_func(send_source)
+
+        >>> # Sum the messages received and use this to replace the original node feature.
+        >>> def simple_reduce(nodes): return {'x': nodes.mailbox['m'].sum(1)}
+        >>> # Set the function defined to be the default message reduce function.
+        >>> g.register_reduce_func(simple_reduce)
+
+        Send and receive messages.
+
+        >>> g.send_and_recv(g.edges())
+        >>> g.ndata['x']
+        tensor([[1.],
+                [1.],
+                [2.]])
+
+        Note that the feature of node :math:`0` remains the same as it has no
+        in-coming edges.
 
         Notes
         -----
         On multigraphs, if u and v are specified, then the messages will be sent
         and received along all edges between u and v.
+
+        See Also
+        --------
+        send
+        recv
         """
         if message_func == "default":
             message_func = self._message_func
@@ -1224,18 +1457,81 @@ class DGLGraph(object):
              message_func="default",
              reduce_func="default",
              apply_node_func="default"):
-        """Pull messages from the node's predecessors and then update it.
+        """Pull messages from the node's predecessors and then update its feature.
+
+        * If all nodes have no in-coming edges, nothing will happen.
+        * If some nodes have in-coming edges and some do not, the features for nodes
+          with no in-coming edges will be re-initialized with a placeholder. By default
+          the placeholder is a zero tensor. See :func:`set_n_initializer` about how to
+          configure the placeholder setting for node features. Be careful about that
+          and do not include these nodes in :attr:`v` if you do not want to re-initialize
+          their features.
 
         Parameters
         ----------
-        v : node, container or tensor
-          The node to be updated.
-        message_func : callable
-          The message function.
-        reduce_func : callable
-          The reduce function.
+        v : int, iterable of int, or tensor
+            The node to be updated.
+        message_func : callable, optional
+            Message function on the edges. ``func(edges) -> dict``. ``dict``
+            has ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
+            objects as in :mod:`~dgl.udf`. Registered function will be used if not
+            specified.
+        reduce_func : callable, optional
+            Reduce function on incoming edges. ``func(nodes) -> dict``. ``dict``
+            has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
+            objects as in :mod:`~dgl.udf`. Registered function will be used
+            if not specified.
         apply_node_func : callable, optional
-          The update function.
+            Apply function on the nodes. ``func(nodes) -> dict``. ``dict`` has
+            ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
+            objects as in :mod:`~dgl.udf`. Registered function will be
+            used if not specified.
+
+        Examples
+        --------
+        Create a graph for demo.
+
+        >>> import dgl
+        >>> import torch as th
+        >>> g = dgl.DGLGraph()
+        >>> g.add_nodes(3)
+        >>> g.ndata['x'] = th.tensor([[0.], [1.], [2.]])
+
+        Use the built-in message function :func:`~dgl.function.copy_src` for copying
+        node features as the message.
+
+        >>> m_func = dgl.function.copy_src('x', 'm')
+        >>> g.register_message_func(m_func)
+
+        Use the built-int message reducing function :func:`~dgl.function.sum`, which
+        sums the messages received and replace the old node features with it.
+
+        >>> m_reduce_func = dgl.function.sum('m', 'x')
+        >>> g.register_reduce_func(m_reduce_func)
+
+        As no edges exist, nothing happens.
+
+        >>> g.pull(g.nodes())
+        >>> g.ndata['x']
+        tensor([[0.],
+                [1.],
+                [2.]])
+
+        Add edges ``0 -> 1, 1 -> 2``. Pull messages for the node :math:`2`.
+
+        >>> g.add_edges([0, 1], [1, 2])
+        >>> g.pull(2)
+        >>> g.ndata['x']
+        tensor([[0.],
+                [1.],
+                [1.]])
+
+        The feature of node :math:`2` changes but the feature of node :math:`1`
+        remains the same as we did not :func:`pull` (and reduce) messages for it.
+
+        See Also
+        --------
+        push
         """
         if message_func == "default":
             message_func = self._message_func
@@ -1265,14 +1561,69 @@ class DGLGraph(object):
 
         Parameters
         ----------
-        u : node, container or tensor
-          The node that sends out messages.
-        message_func : callable
-          The message function.
-        reduce_func : callable
-          The reduce function.
-        apply_node_func : callable
-          The update function.
+        u : int, iterable of int, or tensor
+            The node to be updated.
+        message_func : callable, optional
+            Message function on the edges. ``func(edges) -> dict``. ``dict``
+            has ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
+            objects as in :mod:`~dgl.udf`. Registered function will be used if not
+            specified.
+        reduce_func : callable, optional
+            Reduce function on incoming edges. ``func(nodes) -> dict``. ``dict``
+            has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
+            objects as in :mod:`~dgl.udf`. Registered function will be used
+            if not specified.
+        apply_node_func : callable, optional
+            Apply function on the nodes. ``func(nodes) -> dict``. ``dict`` has
+            ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
+            objects as in :mod:`~dgl.udf`. Registered function will be
+            used if not specified.
+
+        Examples
+        --------
+        Create a graph for demo.
+
+        >>> import dgl
+        >>> import torch as th
+        >>> g = dgl.DGLGraph()
+        >>> g.add_nodes(3)
+        >>> g.ndata['x'] = th.tensor([[1.], [2.], [3.]])
+
+        Use the built-in message function :func:`~dgl.function.copy_src` for copying
+        node features as the message.
+
+        >>> m_func = dgl.function.copy_src('x', 'm')
+        >>> g.register_message_func(m_func)
+
+        Use the built-int message reducing function :func:`~dgl.function.sum`, which
+        sums the messages received and replace the old node features with it.
+
+        >>> m_reduce_func = dgl.function.sum('m', 'x')
+        >>> g.register_reduce_func(m_reduce_func)
+
+        As no edges exist, nothing happens.
+
+        >>> g.push(g.nodes())
+        >>> g.ndata['x']
+        tensor([[1.],
+                [2.],
+                [3.]])
+
+        Add edges ``0 -> 1, 1 -> 2``. Send messages from the node :math:`1`. and update.
+
+        >>> g.add_edges([0, 1], [1, 2])
+        >>> g.push(1)
+        >>> g.ndata['x']
+        tensor([[1.],
+                [2.],
+                [2.]])
+
+        The feature of node :math:`2` changes but the feature of node :math:`1`
+        remains the same as we did not :func:`push` for node :math:`0`.
+
+        See Also
+        --------
+        pull
         """
         if message_func == "default":
             message_func = self._message_func
@@ -1297,16 +1648,34 @@ class DGLGraph(object):
                    message_func="default",
                    reduce_func="default",
                    apply_node_func="default"):
-        """Send messages through all the edges and update all nodes.
+        """Send messages through all edges and update all nodes.
+
+        This is a convenient combination of performing in order
+        ``send(self, self.edges(), message_func)`` and
+        ``recv(self, self.nodes(), reduce_func, apply_node_func)``.
 
         Parameters
         ----------
-        message_func : callable
-          The message function.
-        reduce_func : callable
-          The reduce function.
+        message_func : callable, optional
+            Message function on the edges. ``func(edges) -> dict``. ``dict``
+            has ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
+            objects as in :mod:`~dgl.udf`. Registered function will be used if not
+            specified.
+        reduce_func : callable, optional
+            Reduce function on incoming edges. ``func(nodes) -> dict``. ``dict``
+            has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
+            objects as in :mod:`~dgl.udf`. Registered function will be used
+            if not specified.
         apply_node_func : callable, optional
-          The update function.
+            Apply function on the nodes. ``func(nodes) -> dict``. ``dict`` has
+            ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
+            objects as in :mod:`~dgl.udf`. Registered function will be
+            used if not specified.
+
+        See Also
+        --------
+        send
+        recv
         """
         if message_func == "default":
             message_func = self._message_func
@@ -1327,7 +1696,8 @@ class DGLGraph(object):
                    message_func="default",
                    reduce_func="default",
                    apply_node_func="default"):
-        """Propagate messages using graph traversal by triggering pull() on nodes.
+        """Propagate messages using graph traversal by triggering
+        :func:`pull()` on nodes.
 
         The traversal order is specified by the ``nodes_generator``. It generates
         node frontiers, which is a list or a tensor of nodes. The nodes in the
@@ -1336,14 +1706,66 @@ class DGLGraph(object):
 
         Parameters
         ----------
-        node_generators : generator
-            The generator of node frontiers.
+        node_generators : iterable, each element is a list or a tensor of node ids
+            The generator of node frontiers. It specifies which nodes perform
+            :func:`pull` at each timestep.
         message_func : callable, optional
-            The message function.
+            Message function on the edges. ``func(edges) -> dict``. ``dict``
+            has ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
+            objects as in :mod:`~dgl.udf`. Registered function will be used if not
+            specified.
         reduce_func : callable, optional
-            The reduce function.
+            Reduce function on incoming edges. ``func(nodes) -> dict``. ``dict``
+            has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
+            objects as in :mod:`~dgl.udf`. Registered function will be used
+            if not specified.
         apply_node_func : callable, optional
-            The update function.
+            Apply function on the nodes. ``func(nodes) -> dict``. ``dict`` has
+            ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
+            objects as in :mod:`~dgl.udf`. Registered function will be
+            used if not specified.
+
+        Examples
+        --------
+        Create a graph for demo.
+
+        >>> import dgl
+        >>> import torch as th
+        >>> g = dgl.DGLGraph()
+        >>> g.add_nodes(4)
+        >>> g.ndata['x'] = th.tensor([[1.], [2.], [3.], [4.]])
+        >>> g.add_edges([0, 1, 1, 2], [1, 2, 3, 3])
+
+        Prepare message function and message reduce function for demo.
+
+        >>> def send_source(edges): return {'m': edges.src['x']}
+        >>> g.register_message_func(send_source)
+        >>> def simple_reduce(nodes): return {'x': nodes.mailbox['m'].sum(1)}
+        >>> g.register_reduce_func(simple_reduce)
+
+        First pull messages for nodes :math:`1, 2` with edges ``0 -> 1`` and
+        ``1 -> 2``; and then pull messages for node :math:`3` with edges
+        ``1 -> 3`` and ``2 -> 3``.
+
+        >>> g.prop_nodes([[1, 2], [3]])
+        >>> g.ndata['x']
+        tensor([[1.],
+                [1.],
+                [2.],
+                [3.]])
+
+        In the first stage, we pull messages for nodes :math:`1, 2`.
+        The feature of node :math:`1` is replaced by that of node :math:`0`, i.e. 1
+        The feature of node :math:`2` is replaced by that of node :math:`1`, i.e. 2.
+        Both of the replacement happen simultaneously.
+
+        In the second stage, we pull messages for node :math:`3`.
+        The feature of node :math:`3` becomes the sum of node :math:`1`'s feature and
+        :math:`2`'s feature, i.e. 1 + 2 = 3.
+
+        See Also
+        --------
+        prop_edges
         """
         for node_frontier in nodes_generator:
             self.pull(node_frontier,
@@ -1354,24 +1776,86 @@ class DGLGraph(object):
                    message_func="default",
                    reduce_func="default",
                    apply_node_func="default"):
-        """Propagate messages using graph traversal by triggering send_and_recv() on edges.
+        """Propagate messages using graph traversal by triggering
+        :func:`send_and_recv()` on edges.
 
-        The traversal order is specified by the ``edges_generator``. It
-        generates edge frontiers, which is a list or a tensor of edge ids or
-        end points.  The edges in the same frontier will be triggered together,
-        while edges in different frontiers will be triggered according to the
-        generating order.
+        The traversal order is specified by the ``edges_generator``. It generates
+        edge frontiers, which is an iterable of edge ids or edge end points.
+
+        edge ids can be represented as an int, or an iterable or tensor of ints. Edge
+        end points can be represented by a tuple consisting of two tensors/iterables
+        of ints. The first tensor/iterable specifies the source nodes and the second
+        tensor/iterable specifies the dest nodes.
+
+        Edges in the same frontier will be triggered together, while edges in
+        different frontiers will be triggered according to the generating order.
 
         Parameters
         ----------
         edges_generator : generator
             The generator of edge frontiers.
         message_func : callable, optional
-            The message function.
+            Message function on the edges. ``func(edges) -> dict``. ``dict``
+            has ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
+            objects as in :mod:`~dgl.udf`. Registered function will be used if not
+            specified.
         reduce_func : callable, optional
-            The reduce function.
+            Reduce function on incoming edges. ``func(nodes) -> dict``. ``dict``
+            has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
+            objects as in :mod:`~dgl.udf`. Registered function will be used
+            if not specified.
         apply_node_func : callable, optional
-            The update function.
+            Apply function on the nodes. ``func(nodes) -> dict``. ``dict`` has
+            ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
+            objects as in :mod:`~dgl.udf`. Registered function will be
+            used if not specified.
+
+        Examples
+        --------
+
+        Create a graph for demo.
+
+        >>> import dgl
+        >>> import torch as th
+        >>> g = dgl.DGLGraph()
+        >>> g.add_nodes(4)
+        >>> g.ndata['x'] = th.tensor([[1.], [2.], [3.], [4.]])
+        >>> g.add_edges([0, 1, 1, 2], [1, 2, 3, 3])
+
+        Prepare message function and message reduce function for demo.
+
+        >>> def send_source(edges): return {'m': edges.src['x']}
+        >>> g.register_message_func(send_source)
+        >>> def simple_reduce(nodes): return {'x': nodes.mailbox['m'].sum(1)}
+        >>> g.register_reduce_func(simple_reduce)
+
+        First propagate messages for edges ``0 -> 1``, ``1 -> 3`` and then
+        propagate messages for edges ``1 -> 2``, ``2 -> 3``.
+
+        >>> g.prop_edges([([0, 1], [1, 3]), ([1, 2], [2, 3])])
+        >>> g.ndata['x']
+        tensor([[1.],
+                [1.],
+                [1.],
+                [3.]])
+
+        In the first stage, the following happens simultaneously.
+
+            - The feature of node :math:`1` is replaced by that of
+              node :math:`0`, i.e. 1.
+            - The feature of node :math:`3` is replaced by that of
+              node :math:`1`, i.e. 2.
+
+        In the second stage, the following happens simultaneously.
+
+            - The feature of node :math:`2` is replaced by that of
+              node :math:`1`, i.e. 1.
+            - The feature of node :math:`3` is replaced by that of
+              node :math:`2`, i.e. 3.
+
+        See Also
+        --------
+        prop_nodes
         """
         for edge_frontier in edges_generator:
             self.send_and_recv(edge_frontier,
@@ -1511,22 +1995,25 @@ class DGLGraph(object):
         value indicating whether the edge is incident to the node
         or not.
 
-        There are three types of an incidence matrix `I`:
-        * "in":
-          - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
-          - I[v, e] = 0 otherwise.
-        * "out":
-          - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
-          - I[v, e] = 0 otherwise.
-        * "both":
-          - I[v, e] = 1 if e is the in-edge of v;
-          - I[v, e] = -1 if e is the out-edge of v;
-          - I[v, e] = 0 otherwise (including self-loop).
+        There are three types of an incidence matrix :math:`I`:
+
+        * ``in``:
+            - :math:`I[v, e] = 1` if :math:`e` is the in-edge of :math:`v`
+              (or :math:`v` is the dst node of :math:`e`);
+            - :math:`I[v, e] = 0` otherwise.
+        * ``out``:
+            - :math:`I[v, e] = 1` if :math:`e` is the out-edge of :math:`v`
+              (or :math:`v` is the src node of :math:`e`);
+            - :math:`I[v, e] = 0` otherwise.
+        * ``both``:
+            - :math:`I[v, e] = 1` if :math:`e` is the in-edge of :math:`v`;
+            - :math:`I[v, e] = -1` if :math:`e` is the out-edge of :math:`v`;
+            - :math:`I[v, e] = 0` otherwise (including self-loop).
 
         Parameters
         ----------
         type : str
-            Can be either "in", "out" or "both"
+            Can be either ``in``, ``out`` or ``both``
         ctx : context, optional (default=cpu)
             The context of returned incidence matrix.
 
@@ -1563,16 +2050,40 @@ class DGLGraph(object):
         Parameters
         ----------
         predicate : callable
-            The predicate should take in a NodeBatch object, and return a
-            boolean tensor with N elements indicating which node satisfy
-            the predicate.
-        nodes : container or tensor
-            The nodes to filter on
+            ``func(nodes) -> tensor``. ``nodes`` are :class:`NodeBatch`
+            objects as in :mod:`~dgl.udf`. The ``tensor`` returned should
+            be a 1-D boolean tensor with :func:`~dgl.udf.NodeBatch.batch_size`
+            elements indicating which nodes satisfy the predicate.
+        nodes : int, iterable or tensor of ints
+            The nodes to filter on.
 
         Returns
         -------
         tensor
-            The filtered nodes
+            The filtered nodes.
+
+        Examples
+        --------
+        Construct a graph object for demo.
+
+        >>> import dgl
+        >>> import torch as th
+        >>> g = dgl.DGLGraph()
+        >>> g.add_nodes(3)
+        >>> g.ndata['x'] = th.tensor([[1.], [-1.], [1.]])
+
+        Define a function for filtering nodes with feature :math:`1`.
+
+        >>> def has_feature_one(nodes): return (nodes.data['x'] == 1).squeeze(1)
+
+        Filter the nodes with feature :math:`1`.
+
+        >>> g.filter_nodes(has_feature_one)
+        tensor([0, 2])
+
+        See Also
+        --------
+        filter_edges
         """
         if is_all(nodes):
             v = utils.toindex(slice(0, self.number_of_nodes()))
@@ -1595,17 +2106,46 @@ class DGLGraph(object):
         Parameters
         ----------
         predicate : callable
-            The predicate should take in an EdgeBatch object, and return a
-            boolean tensor with E elements indicating which edge satisfy
-            the predicate.
+            ``func(edges) -> tensor``. ``edges`` are :class:`EdgeBatch`
+            objects as in :mod:`~dgl.udf`. The ``tensor`` returned should
+            be a 1-D boolean tensor with :func:`~dgl.udf.EdgeBatch.batch_size`
+            elements indicating which edges satisfy the predicate.
         edges : edges
-            Edges can be a pair of endpoint nodes (u, v), or a
-            tensor of edge ids. The default value is all the edges.
+            Edges can be pair(s) of endpoint nodes (u, v), or a
+            tensor/iterable of edge ids. If the edges are pair(s) of endpoint
+            nodes, they will be represented as a tuple of two iterable/tensors
+            of nodes. The first one is for the source nodes while the second one
+            is for the destinations. The default value is all the edges.
 
         Returns
         -------
         tensor
-            The filtered edges
+            The filtered edges represented by their ids.
+
+        Examples
+        --------
+        Construct a graph object for demo.
+
+        >>> import dgl
+        >>> import torch as th
+        >>> g = dgl.DGLGraph()
+        >>> g.add_nodes(3)
+        >>> g.ndata['x'] = th.tensor([[1.], [-1.], [1.]])
+        >>> g.add_edges([0, 1, 2], [2, 2, 1])
+
+        Define a function for filtering edges whose destinations have
+        node feature :math:`1`.
+
+        >>> def has_dst_one(edges): return (edges.dst['x'] == 1).squeeze(1)
+
+        Filter the edges whose destination nodes have feature :math:`1`.
+
+        >>> g.filter_edges(has_dst_one)
+        tensor([0, 1])
+
+        See Also
+        --------
+        filter_nodes
         """
         if is_all(edges):
             eid = ALL
