@@ -48,7 +48,9 @@ def example_test(dev) {
 def pytorch_tutorials() {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
     dir ("tests/scripts") {
+      sh "ls -l"
       sh "./task_tutorial_test.sh"
+      sh "ls -l"
     }
   }
 }
