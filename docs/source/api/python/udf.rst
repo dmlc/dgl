@@ -4,6 +4,7 @@ User-defined function related data structures
 ==================================================
 
 .. currentmodule:: dgl.udf
+.. automodule:: dgl.udf
 
 EdgeBatch
 ---------
