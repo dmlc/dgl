@@ -1,14 +1,14 @@
 """
 .. _model-line-graph:
-
-Line Graph Neural Network Tutorial
-=========================
+Line Graph Neural Network
+=====================================
 
 **Author**: Qi Huang, Yu Gai, Zheng Zhang
 """
 
 ###########################################################################################
-# In :doc: `GCN <1_gcn>` , we demonstrate how to classify nodes on an input
+# 
+# In :doc:`GCN <1_gcn>` , we demonstrate how to classify nodes on an input
 # graph in a semi-supervised setting, using graph convolutional neural network
 # as embedding mechanism for graph features.
 # In this tutorial, we shift our focus to community detection problem. The
@@ -17,15 +17,15 @@ Line Graph Neural Network Tutorial
 # one another.
 #
 # To generalize GNN to supervised community detection, Chen et al. introduced
-# a line-graph based variation of graph neural network in `Supervised
-# Community Detection with Line Graph Neural Networks<https://arxiv.org/abs/1705.08415>`__. 
+# a line-graph based variation of graph neural network in 
+# `Supervised Community Detection with Line Graph Neural Networks <https://arxiv.org/abs/1705.08415>`__. 
 # One of the highlight of their model is
 # to augment the vanilla graph neural network(GNN) architecture to operate on
 # the line graph of edge adajcencies, defined with non-backtracking operator.
 #
 # In addition to its high performance, LGNN offers an opportunity to
 # illustrate how DGL can implement an advanced graph algorithm by flexibly
-# mixing vanillar tensor operations, sparse-matrix multiplication and message-
+# mixing vanilla tensor operations, sparse-matrix multiplication and message-
 # passing APIs.
 #
 # In the following sections, we will go through community detection, line
@@ -40,7 +40,7 @@ Line Graph Neural Network Tutorial
 # density in each cluster.
 #
 # What's the difference between community detection and node classification？
-# Comparing to node classification, community detection focus on retrieving
+# Comparing to node classification, community detection focuses on retrieving
 # cluster information in the graph, rather than assigning a specific label to
 # a node. For example, as long as a node is clusetered with its community
 # members, it doesn't matter whether the node is assigned as "community A",
@@ -48,7 +48,7 @@ Line Graph Neural Network Tutorial
 # will be a disaster in a movie network classification task.
 #
 # What's the difference then, between a community detection algorithm and
-# other clustring such as k-means? Community detection algorithm operates on
+# other clustering algorithm such as k-means? Community detection algorithm operates on
 # graph-structured data. Comparing to k-means, community detection leverages
 # graph structure, instead of simply clustering nodes based on their
 # features.
@@ -56,7 +56,7 @@ Line Graph Neural Network Tutorial
 # CORA
 # ~~~~~
 # To be consistent with Graph Convolutional Network tutorial, 
-# we use `CORA<https://linqs.soe.ucsc.edu/data>__` 
+# we use `CORA <https://linqs.soe.ucsc.edu/data>`__ 
 # to illustrate a simple community detection task. To refresh our memory, 
 # CORA is a scientific publication dataset, with 2708 papers belonging to 7 
 # different mahcine learning sub-fields. Here, we formulate CORA as a 
@@ -69,7 +69,7 @@ Line Graph Neural Network Tutorial
 #
 # CORA naturally contains 7 "classes", and statistics below show that each
 # "class" does satisfy our assumption of community, i.e. nodes of same class
-# class have higher connection probability than with nodes of diferent class.
+# class have higher connection probability among them than with nodes of diferent class.
 # The following code snippet verifies that there are more intra-class edges
 # than inter-class:
 
@@ -88,6 +88,7 @@ utils.check_intra_prob(data.graph, data.labels, num_classes)
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Without loss of generality, in this tutorial we limit the scope of our
 # task to binary community detection.
+# 
 # .. note::
 #
 #    To create a toy binary-community dataset from CORA, We first extract
@@ -116,7 +117,7 @@ utils.graph_viz(label, g.to_networkx())
 # unsupervised approaches. Same as the original paper, we formulate
 # Community Detection in a supervised setting as follows:
 #
-# - Each training example consists of :math:`(G, L)`, where :math`G` is a
+# - Each training example consists of :math:`(G, L)`, where :math:`G` is a
 #   directed graph :math:`(V, E)`. For each node :math:`v` in :math:`V`, we
 #   assign a ground truth community label :math:`z_v \in \{0,1\}`.
 # - The parameterized model :math:`f(G, \theta)` predicts a label set
@@ -145,7 +146,7 @@ utils.graph_viz(label, g.to_networkx())
 #    community assignment :math:`\{A, A, A, B\}`, with each node's label
 #    :math:`l \in \{0,1\}`,The group of all possible permutations
 #    :math:`S_c = \{\{0,0,0,1\}, \{1,1,1,0\}\}`.
-
+# 
 # Line Graph Neural network: key ideas
 # ------------------------------------
 # An key innovation in this paper is the use of line-graph.
@@ -160,6 +161,7 @@ utils.graph_viz(label, g.to_networkx())
 # Specifically, a line-graph `lg` turns an edge of the original graph `g`
 # into a node.This is illustrated with the graph below (taken from the
 # paper)
+# 
 # .. figure:: https://i.imgur.com/4WO5jEm.png
 #    :alt:
 #
@@ -171,10 +173,11 @@ utils.graph_viz(label, g.to_networkx())
 # connect two "edges"? Here, we use the following connection rule:
 #
 # Two nodes :math:`v^{l}_{A}`, :math:`v^{l}_{B}` in `lg` are connected if
-# the corresponding two edges :math:`e_{A}, e_{B}` in `g` share one and only # one node:
+# the corresponding two edges :math:`e_{A}, e_{B}` in `g` share one and only 
+# one node:
 # :math:`e_{A}`'s destination node is :math:`e_{B}`'s source node
 # (:math:`j`).
-
+# 
 # .. note::
 #
 #    Mathematically, this definition corresponds to a notion called non-
@@ -193,6 +196,7 @@ utils.graph_viz(label, g.to_networkx())
 # LGNN chains up a series of line-graph neural network layers. The graph
 # reprentation :math:`x` and its line-graph companion :math:`y` evolve with
 # the dataflow as follows,
+# 
 # .. figure:: https://i.imgur.com/bZGGIGp.png
 #    :alt:
 #
@@ -209,7 +213,8 @@ utils.graph_viz(label, g.to_networkx())
 #    \qquad i \in V, l = 1,2,3, ... b_{k+1}/2
 #    \end{split}
 #
-# Then, the line-graph representation $y^{(k+1)}_{i,l}$ with,
+# Then, the line-graph representation :math:`y^{(k+1)}_{i,l}` with,
+#
 # .. math::
 #
 #    \begin{split}
@@ -229,17 +234,18 @@ utils.graph_viz(label, g.to_networkx())
 # General idea
 # ~~~~~~~~~~~~
 # The above equations look intimidating. However, we observe the following:
+# 
 # - The two equations are symmetric and can be implemented as two instances
 #   of the same class with different parameters.
-#    Mainly, the first equation operates on graph representation :math:`x`,
-#    whereas the sedond operates on line-graph
-#    representation :math:`y`. Denote this abstraction as :math:`f`, then
-#    the first is :math:`f(x,y; \theta_x)`, and the second
-#    is :math:`f(y,x, \theta_y)`. That is, they are parameterized to compute
-#    representations of the original graph and its
-#    companion line graph, respectively.
+#   Mainly, the first equation operates on graph representation :math:`x`,
+#   whereas the sedond operates on line-graph
+#   representation :math:`y`. Denote this abstraction as :math:`f`, then
+#   the first is :math:`f(x,y; \theta_x)`, and the second
+#   is :math:`f(y,x, \theta_y)`. That is, they are parameterized to compute
+#   representations of the original graph and its
+#   companion line graph, respectively.
 #
-# - Each equation consists of 4 terms: (take the first as example)
+# - Each equation consists of 4 terms: (take the first as example):
 #        - :math:`x^{(k)}\theta^{(k)}_{1,l}`, a linear projection of previous layer's output :math:`x^{(k)}`, denote as
 #          :math:`\text{prev}(x)`.
 #        - :math:`(Dx^{(k)})\theta^{(k)}_{2,l}`, a linear projection of degree operator on :math:`x^{(k)}`, denote as
@@ -253,6 +259,7 @@ utils.graph_viz(label, g.to_networkx())
 # - In addition, each of the terms are performed again with different
 #   parameters, and without the nonlinearity after the sum.
 #   Therefore, :math:`f` could be written as:
+# 
 #   .. math::
 #      \begin{split}
 #      f(x^{(k)},y^{(k)}) = {}\rho[&\text{prev}_{1}(x^{(k-1)}) + \text{deg}_{1}(x^{(k-1)}) +\text{sum}_{1}(x^{k-1})
@@ -261,15 +268,16 @@ utils.graph_viz(label, g.to_networkx())
 #      \end{split}
 #
 # - Two equations are chained up in the following order :
+# 
 #   .. math::
 #      \begin{split}
 #      x^{(k+1)} = {}& f(x^{(k)}, y^{(k)})\\
 #      y^{(k+1)} = {}& f(y^{(k)}, x^{(k+1)})
 #      \end{split}
-
+# 
 # With these observations, we proceed to implementation.
 # The important point is we are to use different strategies for these terms.
-
+# 
 # .. note::
 #    For a detailed explanation of :math:`\{Pm, Pd\}`, please go to [advanced topics].
 #
@@ -279,16 +287,23 @@ utils.graph_viz(label, g.to_networkx())
 # multiplication, we can write them as PyTorch tensor operation.
 #
 # In ``__init__``, we define the projection variables:
-self.new_linear = lambda: nn.Linear(feats, out_feats)
-self.linear_prev, self.linear_deg = self.new_linear(), self.new_linear()
-#########################################################################
+# 
+# ::
+# 
+#    self.new_linear = lambda: nn.Linear(feats, out_feats)
+#    self.linear_prev, self.linear_deg = self.new_linear(), self.new_linear()
+# 
 #
 # In ``forward()``, :math:`\text{prev}` and :math:`\text{deg}` are the same
 # as any other PyTorch tensor operations.
-prev_proj = self.linear_prev(feat_a)
-deg_proj = self.linear_deg(deg * feat_a)
-########################################
-# Implementing math:`\text{sum}` as message passing in DGL
+# 
+# ::
+# 
+#   prev_proj = self.linear_prev(feat_a)
+# 
+#   deg_proj = self.linear_deg(deg * feat_a)
+# 
+# Implementing :math:`\text{sum}` as message passing in DGL
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # As discussed in GCN tutorial, we can formulate one adjacency operator as
 # doing one step message passing. As a generalization, :math:`2^j` adjacency
@@ -299,9 +314,14 @@ deg_proj = self.linear_deg(deg * feat_a)
 #
 # In ``__init__``, we define the projection variables used in each
 # :math:`2^j` steps of message passing:
-self.new_linear_list = lambda: nn.ModuleList([self.new_linear() for i in range(radius)])
-self.linear_aggregate = self.new_linear_list()
-#########################################################################
+# 
+# ::
+# 
+#   self.new_linear_list = lambda: nn.ModuleList([self.new_linear() for i in range(radius)])
+# 
+#   self.linear_aggregate = self.new_linear_list()
+# 
+#
 #
 # In ``__forward__``, we define the ``sum`` operation as ``aggregate()``:
 def aggregate(g, z):
@@ -318,41 +338,56 @@ def aggregate(g, z):
                 z_list.append(g.ndata['z'])
             return z_list
 #########################################################################
-twoj_hop = lambda feat : sum(linear(z) for linear, z in
-                             zip(self.linear_aggregate,
-                                 aggregate(g, feat)))
-sum_a = twoj_hop(feat_a)
+def twoj_hop(feat):
+    return sum(linear(z) for linear, z in zip(self.linear_aggregate,
+                                              aggregate(g,feat)))
 #########################################################################
+# 
+# Then 
+# ::
+# 
+#   sum_a = twoj_hop(feat_a)
+# 
 # Implementing :math:`\text{fuse}` as sparse matrix multiplication
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # :math:`\{Pm, Pd\}` is a sparse matrix with only two non-zero entries on
 # each column. Therefore, we construct it as a sparse matrix in the dataset, # and implement :math:`\text{fuse}` as a sparse matrix multiplication.
 #
-# in ``__init__``:
-self.new_linear = lambda: nn.Linear(feats, out_feats)
-self.new_linear_other = lambda: nn.Linear(out_feats, out_feats)
-if (mode == 'g'):
-            self.linear_fuse = self.new_linear()
-        else:
-            #since the second equation take same layer's x as input
-            self.linear_fuse = self.new_linear_other()
-######################################################################
 # in ``__forward__``:
-pmpd_exp = lambda feat : th.matmul(pm_pd, feat)
-fuse = self.linear_fuse(pmpd_exp(feat_b))
-###############################################
+# 
+# ::
+# 
+#   pmpd_exp = lambda feat : th.matmul(pm_pd, feat)
+# 
+#   fuse = self.linear_fuse(pmpd_exp(feat_b))
+#
 # Completing :math:`f(x, y)`
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Finally, we sum up all the terms together, pass it to skip connection and
 # batch-norm.
-result = prev_proj + deg_proj + sum_a + fuse
-
-n = self.out_feats // 2
-
-result = th.cat([result[:, :n], F.relu(result[:, n:])], 1) #skip connection
-result = self.bn(result) #Batch Normalization.
-###########################################################################
+# 
+# ::
+#
+#   result = prev_proj + deg_proj + sum_a + fuse``
+# 
+# Then pass result to skip connection: 
+# 
+# ::
+# 
+#   result = th.cat([result[:, :n], F.relu(result[:, n:])], 1)``
+# 
+# Then batch norm
+# 
+# ::
+# 
+#   result = self.bn(result) #Batch Normalization.``
+# 
+#
 # Below is the complete code for one LGNN layer's abstraction :math:`f(x,y)`
+import torch.nn as nn
+import dgl.function as fn
+import torch as th
+import torch.nn.functional as F
 class LGNNCore(nn.Module):
     def __init__(self, feats, out_feats, radius, mode='g'):
         super(LGNNCore, self).__init__()
@@ -417,6 +452,7 @@ class LGNNCore(nn.Module):
 # Chain up LGNN abstractions as a LGNN layer
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # To implement:
+# 
 # .. math::
 #    \begin{split}
 #    x^{(k+1)} = {}& f(x^{(k)}, y^{(k)})\\
@@ -440,6 +476,7 @@ class LGNNLayer(nn.Module):
 # Chain up LGNN layers
 # ~~~~~~~~~~~~~~~~~~~~
 # The final LGNN class is defined by chaining up arbitrary number of LGNN layers.
+from dgl.tutorial_utils import from_npsp
 class LGNN(nn.Module):
     def __init__(self, feats, radius, n_classes):
         """
@@ -466,7 +503,7 @@ class LGNN(nn.Module):
 # -----------------------
 # We first load the data
 from torch.utils.data import DataLoader
-n_batch_size = 1
+n_batch_size = 2
 
 indices = list(range(num_train))
 training_loader = DataLoader(train_set,
@@ -475,13 +512,17 @@ training_loader = DataLoader(train_set,
                              drop_last=True)
 ##############################################################
 # The line graph construction is done with DGL's line graph API. Here is a code snippet:
-self._line_graphs = [g.line_graph(backtracking=False)
-                     for g in self._subgraphs]
-######################################################
+# 
+# ::
+# 
+#  self._line_graphs = [g.line_graph(backtracking=False) for g in self._subgraphs]``
+# 
+# 
+#
 # ``backracking = false`` means we use non-backtracking operator to define the line graph.
 # See code link at here (link to data/binary-sub-grph).
 # Here we define a main loop to train a 3 layers LGNN for 20 epochs on the toy-datset.
-# We first define a ``step``function to describe each step of training:
+# We first define a ``step()`` function to describe each step of training:
 import time
 @from_npsp
 def step(i, j, g, lg, deg_g, deg_lg, pmpd, feature, label, equi_label, n_batchsize):
@@ -509,7 +550,7 @@ import torch.optim as optim
 n_features = 16
 n_layers = 3
 radius = 3
-lr = 1e-3
+lr = 1e-2
 K = 2 # num_of_classes
 inference_idx = 1
 feats = [1] + [n_features]*n_layers + [K]
@@ -518,8 +559,8 @@ model = LGNN(feats, radius, K)
 optimizer = optim.Adam(model.parameters(), lr=lr)
 ######################################################################################################
 # Below is the main training loop
-n_iterations = 2 #main loop
-n_epochs = 3
+n_iterations = 20 #main loop
+n_epochs = 20
 vali_label_change = [] # This is probably not the best practice
 total_time = 0
 for i in range(n_epochs):
@@ -549,6 +590,7 @@ vali_label_change.append(equi_label)
 # we visualize the network's community prediction on one training example,
 # together with the ground truth.
 print("visualization on one training example...")
+import matplotlib.pyplot as plt
 
 [g, lg, g_deg, lg_deg, pmpd, subfeature, label, equi_label] = train_set[inference_idx]
 utils.linegraph_inference_viz(g, lg, g_deg, lg_deg, pmpd,
@@ -559,12 +601,11 @@ plt.show()
 utils.graph_viz(label, g.to_networkx())
 plt.show()
 #########################################
-# We then provide an animation to better understand the process.
+# We then provide an animation to better understand the process. (40 epochs)
 import matplotlib.animation as animation #Save in local disk
-%matplotlib notebook
 
 [g, lg, g_deg, lg_deg, pm_pd, subfeature, label, equi_label] = train_set[inference_idx]
-utils.animate(g, vali_label_change)
+# utils.animate(g, vali_label_change)
 #########################################################################################
 # .. figure:: https://i.imgur.com/KDUyE1S.gif 
 #    :alt:
@@ -600,8 +641,8 @@ def collate_fn(self, x):
         return subgraph_batch, line_graph_batch, deg_g_batch, deg_lg_batch, pmpd_batch, subfeature_batch, sublabel_batch, equilabel_batch
 ##########################################################################################################################
 # You can check out the complete code here (link to dataloader).
-# Change batch size to 2 to try out (also change the learning rate).
-
+# 
+# 
 # Advanced topic #2: what's the business with :math:`\{Pm, Pd\}`?
 # ----------------------------------------------------------------
 # Rougly speaking, there is a relationship between how :math:`g` and
