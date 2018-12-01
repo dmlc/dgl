@@ -39,6 +39,9 @@ At the end of this tutorial, we hope you get a brief feeling of how DGL works.
 # 33). A visualization of the network and the community is as follows:
 #
 # .. image:: http://historicaldataninjas.com/wp-content/uploads/2014/05/karate.jpg 
+#    :height: 400px
+#    :width: 500px
+#    :align: center
 #
 # Out task is to **build a graph neural network to predict which side each
 # member will join.**
@@ -91,16 +94,16 @@ print('We have %d edges.' % G.number_of_edges())
 
 import networkx as nx
 nx_G = G.to_networkx()
-#pos = nx.circular_layout(nx_G)
-#nx.draw(nx_G, pos, with_labels=True)
+pos = nx.circular_layout(nx_G)
+nx.draw(nx_G, pos, with_labels=True)
 
 ###############################################################################
 # Assign features
 # ---------------
 # Features are tensor data associated with nodes and edges. The features of
 # mulitple nodes/edges are batched along the first dimension. Following codes
-# assign a one-hot encoding feature for each node in the graph (e.g. $v_i$ got
-# a feature vector $[0,\ldots,1,\dots,0]$, where the $i^{th}$ location is one).
+# assign a one-hot encoding feature for each node in the graph (e.g. :math:`v_i` got
+# a feature vector :math:`[0,\ldots,1,\dots,0]`, where the :math:`i^{th}` location is one).
 
 import torch
 
@@ -124,15 +127,13 @@ print(G.nodes[[10, 11]].data['feat'])
 # Welling <https://arxiv.org/abs/1609.02907>`_. The GCN model can be summarized,
 # in a high-level as follows:
 #
-# - Each node $v_i$ has a feature vector $h_i$.
-# - Each node accumulates the feature vectors $h_j$ from its neighbors, performs
+# - Each node :math:`v_i` has a feature vector :math:`h_i`.
+# - Each node accumulates the feature vectors :math:`h_j` from its neighbors, performs
 #   an affine and non-linear transformation to update its own feature.
 #
 # A graphical demonstration is displayed below.
 #
-# .. image:: https://drive.google.com/uc?export=view&id=1rc9cR0Iw96m_wjS55V9LJOJ4RpQBja15
-#    :height: 300px
-#    :width: 400px
+# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/1_first/mailbox.png
 #    :alt: mailbox
 #    :align: center
 #
@@ -201,8 +202,8 @@ net = Net(34, 5, 2)
 # Train the GCN model to predict community
 # ----------------------------------------
 #
-# To prepare the input features and labels, again, we adopt the
-# semi-supervised setting developed by Kipf. Each node is initialized by an
+# To prepare the input features and labels, again, we adopt a 
+# semi-supervised setting. Each node is initialized by an
 # one-hot encoding, and only the instructor (node 0) and the club president
 # (node 33) are labeled.
 
@@ -249,26 +250,36 @@ def draw(i):
     ax.cla()
     ax.axis('off')
     ax.set_title('Epoch: %d' % i)
-    #nx.draw_networkx(nx_G.to_undirected(), pos, node_color=colors,
-            #with_labels=True, node_size=300, ax=ax)
-    #nx.draw(nx_G.to_undirected(), pos, node_color=colors,
-            #with_labels=True, node_size=300)
+    nx.draw_networkx(nx_G.to_undirected(), pos, node_color=colors,
+            with_labels=True, node_size=300, ax=ax)
 
 ###############################################################################
 # We first plot the initial guess before training. As you can see, the nodes
 # are not classified correctly.
 
-#draw(0)  # draw the prediction of the first epoch
+fig = plt.figure(dpi=150)
+fig.clf()
+ax = fig.subplots()
+draw(0)  # draw the prediction of the first epoch
+plt.close()
+
+###############################################################################
+# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/1_first/karate0.png
+#    :height: 300px
+#    :width: 400px
+#    :align: center
 
 ###############################################################################
 # The following animation shows how the model correctly predicts the community
 # after training.
 
-fig = plt.figure(dpi=150)
-fig.clf()
-ax = fig.subplots()
 ani = animation.FuncAnimation(fig, draw, frames=len(all_logits), interval=200)
-plt.close()
+
+###############################################################################
+# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/1_first/karate.gif
+#    :height: 300px
+#    :width: 400px
+#    :align: center
 
 ###############################################################################
 # Next steps
