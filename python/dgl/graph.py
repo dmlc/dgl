@@ -1738,21 +1738,46 @@ class DGLGraph(object):
                     message_func, reduce_func, apply_node_func)
 
     def subgraph(self, nodes):
-        """Generate the subgraph among the given nodes.
+        """Return the subgraph induced on given nodes.
 
         Parameters
         ----------
         nodes : list, or iterable
-            A container of the nodes to construct subgraph.
+            A node ID array to construct subgraph.
+            All nodes must exist in the graph.
 
         Returns
         -------
         G : DGLSubGraph
             The subgraph.
+            The nodes are relabeled so that node `i` in the subgraph is mapped
+            to node `nodes[i]` in the original graph.
+            The edges are also relabeled.
+            One can retrieve the mapping from subgraph node/edge ID to parent
+            node/edge ID via `parent_nid` and `parent_eid` properties of the
+            subgraph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(5)
+        >>> G.add_edges([0, 1, 2, 3, 4], [1, 2, 3, 4, 0])   # 5-node cycle
+        >>> SG = G.subgraph([0, 1, 4])
+        >>> SG.nodes()
+        tensor([0, 1, 2])
+        >>> SG.edges()
+        (tensor([0, 2]), tensor([1, 0]))
+        >>> SG.parent_nid
+        tensor([0, 1, 4])
+        >>> SG.parent_eid
+        tensor([0, 4])
 
         See Also
         --------
+        DGLSubGraph
         subgraphs
+        edge_subgraph
         """
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
@@ -1760,12 +1785,17 @@ class DGLGraph(object):
                 sgi, readonly=self._readonly)
 
     def subgraphs(self, nodes):
-        """Generate the subgraphs among the given nodes.
+        """Return a list of subgraphs, each induced in the corresponding given
+        nodes in the list.
+
+        Equivalent to
+        [self.subgraph(nodes_list) for nodes_list in nodes]
 
         Parameters
         ----------
         nodes : a list of lists or iterable
-            A list of the nodes to construct subgraph.
+            A list of node ID arrays to construct corresponding subgraphs.
+            All nodes in all the list items must exist in the graph.
 
         Returns
         -------
@@ -1774,6 +1804,7 @@ class DGLGraph(object):
 
         See Also
         --------
+        DGLSubGraph
         subgraph
         """
         induced_nodes = [utils.toindex(n) for n in nodes]
@@ -1782,24 +1813,54 @@ class DGLGraph(object):
             sgi, readonly=self._readonly) for sgi in sgis]
 
     def edge_subgraph(self, edges):
-        """Generate the subgraph among the given edges.
+        """Return the subgraph induced on given edges.
 
         Parameters
         ----------
         edges : list, or iterable
-            A container of the edges to construct subgraph.
+            An edge ID array to construct subgraph.
+            All edges must exist in the subgraph.
 
         Returns
         -------
         G : DGLSubGraph
             The subgraph.
+            The edges are relabeled so that edge `i` in the subgraph is mapped
+            to edge `edges[i]` in the original graph.
+            The nodes are also relabeled.
+            One can retrieve the mapping from subgraph node/edge ID to parent
+            node/edge ID via `parent_nid` and `parent_eid` properties of the
+            subgraph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(5)
+        >>> G.add_edges([0, 1, 2, 3, 4], [1, 2, 3, 4, 0])   # 5-node cycle
+        >>> SG = G.edge_subgraph([0, 4])
+        >>> SG.nodes()
+        tensor([0, 1, 2])
+        >>> SG.edges()
+        (tensor([0, 2]), tensor([1, 0]))
+        >>> SG.parent_nid
+        tensor([0, 1, 4])
+        >>> SG.parent_eid
+        tensor([0, 4])
+
+        See Also
+        --------
+        DGLSubGraph
+        subgraph
         """
         induced_edges = utils.toindex(edges)
         sgi = self._graph.edge_subgraph(induced_edges)
         return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
 
     def merge(self, subgraphs, reduce_func='sum'):
-        """Merge subgraph features back to this parent graph.
+        """NOT IMPLEMENTED.  DO NOT USE.
+
+        Merge subgraph features back to this parent graph.
 
         Parameters
         ----------
@@ -1811,6 +1872,7 @@ class DGLGraph(object):
         # sanity check: all the subgraphs and the parent graph
         # should have the same node/edge feature schemes.
         # merge node features
+        assert False, "Not yet implemented"
         to_merge = []
         for sg in subgraphs:
             if len(sg.node_attr_schemes()) == 0:
