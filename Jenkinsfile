@@ -11,6 +11,7 @@ def setup() {
 
 def build_dgl() {
   sh "if [ -d build ]; then rm -rf build; fi; mkdir build"
+  sh "ls -l"
   dir ("build") {
     sh "cmake .."
     sh "make -j4"
