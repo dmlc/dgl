@@ -29,6 +29,65 @@ _urls = {
 
 
 class RGCNEntityDataset(object):
+    """RGCN Entity Classification dataset
+
+    The dataset contains a graph depicting the connectivity of a knowledge
+    base. Currently, four knowledge bases from the
+    `RGCN paper <https://arxiv.org/pdf/1703.06103.pdf>`_ are supported: aifb,
+    mutag, bgs, and am.
+
+    The original knowledge base is stored as an RDF file, and this class will
+    download and parse the RDF file, and performs preprocessing.
+
+    An object of this class has 10 member attributes needed for entity
+    classification:
+
+    num_nodes: int
+        number of entities of knowledge base
+    num_rels: int
+        number of relations (including reverse relation) of knowledge base
+    edge_src: numpy.array
+        source node ids of all edges
+    edge_dst: numpy.array
+        destination node ids of all edges
+    edge_type: numpy.array
+        type of all edges
+    edge_norm: numpy.array
+        normalization factor of all edges
+    labels: numpy.array
+        labels of node entities
+    train_idx: numpy.array
+        ids of entities used for training
+    valid_idx: numpy.array
+        ids of entities used for validation
+    test_idx: numpy.array
+        ids of entities used for testing
+
+    Usage
+    -----
+    Usually, user don't need to directly use this class. Instead, DGL provides
+    wrapper function to load data (see example below).
+    When loading data, besides specifying dataset name, user can provide two
+    optional arguments:
+
+    bfs_level: int
+        prune out nodes that are more than ``bfs_level`` hops away from
+        labeled nodes, i.e., nodes won't be touched during propagation. If set
+        to a number less or equal to 0, all nodes will be retained.
+    relabel: bool
+        After pruning, whether or not to relabel all nodes with consecutive
+        node ids
+
+    Example
+    -------
+    Load aifb dataset, prune out nodes that are more than 3 hops away from
+    labeled nodes, and relabel the remaining nodes with consecutive ids
+
+    >>> from dgl.contrib.data import load_data
+    >>> data = load_data(dataset='aifb', bfs_level=3, relabel=True)
+
+    """
+
     def __init__(self, name):
         self.name = name
         self.dir = get_download_dir()
@@ -78,8 +137,48 @@ class RGCNEntityDataset(object):
         degrees = count[inverse_index]
         self.edge_norm = np.ones(len(self.edge_dst), dtype=np.float32) / degrees.astype(np.float32)
 
+        # convert to pytorch label format
+        self.labels = np.argmax(self.labels, axis=1)
+
 
 class RGCNLinkDataset(object):
+    """RGCN link prediction dataset
+
+    The dataset contains a graph depicting the connectivity of a knowledge
+    base. Currently, the knowledge bases from the
+    `RGCN paper <https://arxiv.org/pdf/1703.06103.pdf>`_ supported is
+    FB15k-237
+
+    The original knowledge base is stored as an RDF file, and this class will
+    download and parse the RDF file, and performs preprocessing.
+
+    An object of this class has 5 member attributes needed for link
+    prediction:
+
+    num_nodes: int
+        number of entities of knowledge base
+    num_rels: int
+        number of relations (including reverse relation) of knowledge base
+    train: numpy.array
+        all relation triplets (src, rel, dst) for training
+    valid: numpy.array
+        all relation triplets (src, rel, dst) for validation
+    test: numpy.array
+        all relation triplets (src, rel, dst) for testing
+
+    Usage
+    -----
+    Usually, user don't need to directly use this class. Instead, DGL provides
+    wrapper function to load data (see example below).
+
+    Example
+    -------
+    Load FB15k-237 dataset
+
+    >>> from dgl.contrib.data import load_data
+    >>> data = load_data(dataset='FB15k-237')
+
+    """
     def __init__(self, name):
         self.name = name
         self.dir = get_download_dir()
