@@ -1,3 +1,4 @@
+
 """Cora, citeseer, pubmed dataset.
 
 (lingfan): following dataset loading and preprocessing code from tkipf/gcn
@@ -14,9 +15,9 @@ import os, sys
 from .utils import download, extract_archive, get_download_dir
 
 _urls = {
-    'cora' : 'https://www.dropbox.com/s/3ggdpkj7ou8svoc/cora.zip?dl=1',
-    'citeseer' : 'https://www.dropbox.com/s/cr4m05shgp8advz/citeseer.zip?dl=1',
-    'pubmed' : 'https://www.dropbox.com/s/fj5q6pi66xhymcm/pubmed.zip?dl=1',
+    'cora' : 'https://s3.amazonaws.com/dgl-data/dataset/cora.zip',
+    'citeseer' : 'https://s3.amazonaws.com/dgl-data/dataset/citeseer.zip',
+    'pubmed' : 'https://s3.amazonaws.com/dgl-data/dataset/pubmed.zip',
 }
 
 class CitationGraphDataset(object):
