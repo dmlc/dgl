@@ -1,6 +1,7 @@
-""" Knowledge graph dataset for rgcn
-Code adapted from tkipf/relational-gcn
+""" Knowledge graph dataset for Relational-GCN
+Code adapted from authors' implementation of Relational-GCN
 https://github.com/tkipf/relational-gcn
+https://github.com/MichSchli/RelationPrediction
 """
 
 from __future__ import print_function
@@ -16,17 +17,7 @@ from dgl.data.utils import download, extract_archive, get_download_dir
 
 np.random.seed(123)
 
-_urls = {
-    'am': ['https://www.dropbox.com/s/t60huxz616x4c4o/am.tgz?dl=1', 'https://www.dropbox.com/s/htisydfgwxmrx65/am_stripped.nt.gz?dl=1'],
-    'aifb': ['https://www.dropbox.com/s/0emedu261l4la82/aifb.tgz?dl=1', 'https://www.dropbox.com/s/fkvgvkygo2gf28k/aifb_stripped.nt.gz?dl=1'],
-    'bgs': ['https://www.dropbox.com/s/5wzxsuuof185p12/bgs.tgz?dl=1', 'https://www.dropbox.com/s/uqi0k9jd56j02gh/bgs_stripped.nt.gz?dl=1'],
-    'mutag': ['https://www.dropbox.com/s/k4y1qpni83dvei1/mutag.tgz?dl=1', 'https://www.dropbox.com/s/qy8j3p8eacvm4ir/mutag_stripped.nt.gz?dl=1'],
-    'entity_classify': 'https://www.dropbox.com/s/babuor115oqq2i3/rgcn_entity_classify.tgz?dl=1',
-    'FB15k-237': 'https://www.dropbox.com/s/werqxn21mt19nj4/FB15k-237.tgz?dl=1',
-    'FB15k': 'https://www.dropbox.com/s/zbyvjuwu1phlxb5/FB15k.tgz?dl=1',
-    'wn18': 'https://www.dropbox.com/s/53fvtwxe70j3aon/wn18.tgz?dl=1'
-}
-
+_downlaod_prefix = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/'
 
 class RGCNEntityDataset(object):
     """RGCN Entity Classification dataset
@@ -94,12 +85,9 @@ class RGCNEntityDataset(object):
         self.name = name
         self.dir = get_download_dir()
         tgz_path = os.path.join(self.dir, '{}.tgz'.format(self.name))
-        download(_urls[self.name][0], tgz_path)
+        download(_downlaod_prefix + '{}.tgz'.format(self.name), tgz_path)
         self.dir = os.path.join(self.dir, self.name)
         extract_archive(tgz_path, self.dir)
-        self.dir = os.path.join(self.dir, self.name)
-        graph_file_path = os.path.join(self.dir, '{}_stripped.nt.gz'.format(self.name))
-        download(_urls[self.name][1], path=graph_file_path) # no need to uncompress
 
     def load(self, bfs_level=2, relabel=False):
         self.num_nodes, edges, self.num_rels, self.labels, labeled_nodes_idx, self.train_idx, self.test_idx = _load_data(self.name, self.dir)
@@ -149,8 +137,8 @@ class RGCNLinkDataset(object):
 
     The dataset contains a graph depicting the connectivity of a knowledge
     base. Currently, the knowledge bases from the
-    `RGCN paper <https://arxiv.org/pdf/1703.06103.pdf>`_ supported is
-    FB15k-237
+    `RGCN paper <https://arxiv.org/pdf/1703.06103.pdf>`_ supported are
+    FB15k-237, FB15k, wn18
 
     The original knowledge base is stored as an RDF file, and this class will
     download and parse the RDF file, and performs preprocessing.
@@ -185,11 +173,10 @@ class RGCNLinkDataset(object):
     def __init__(self, name):
         self.name = name
         self.dir = get_download_dir()
-        tgz_file_path = os.path.join(self.dir, '{}.tar.gz'.format(self.name))
-        download(_urls[self.name], tgz_file_path)
+        tgz_path = os.path.join(self.dir, '{}.tar.gz'.format(self.name))
+        download(_downlaod_prefix + '{}.tgz'.format(self.name), tgz_path)
         self.dir = os.path.join(self.dir, self.name)
-        extract_archive(tgz_file_path, self.dir)
-        self.dir = os.path.join(self.dir, self.name)
+        extract_archive(tgz_path, self.dir)
 
     def load(self):
         entity_path = os.path.join(self.dir, 'entities.dict')
