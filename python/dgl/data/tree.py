@@ -17,7 +17,7 @@ import dgl.backend as F
 from dgl.data.utils import download, extract_archive, get_download_dir
 
 _urls = {
-    'sst' : 'https://www.dropbox.com/s/6qa8rm43r2nmbyw/sst.zip?dl=1',
+    'sst' : 'https://s3.amazonaws.com/dgl-data/dataset/sst.zip',
 }
 
 SSTBatch = namedtuple('SSTBatch', ['graph', 'mask', 'wordid', 'label'])
@@ -37,7 +37,7 @@ class SST(object):
 
     .. note::
         All the samples will be loaded and preprocessed in the memory first.
-    
+
     Parameters
     ----------
     mode : str, optional
@@ -107,7 +107,7 @@ class SST(object):
                 if isinstance(child[0], str) or isinstance(child[0], bytes):
                     # leaf node
                     word = self.vocab.get(child[0].lower(), self.UNK_WORD)
-                    g.add_node(cid, x=word, y=int(child.label()), mask=(word!=self.UNK_WORD))
+                    g.add_node(cid, x=word, y=int(child.label()), mask=1)
                 else:
                     g.add_node(cid, x=SST.PAD_WORD, y=int(child.label()), mask=0)
                     _rec_build(cid, child)
