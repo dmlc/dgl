@@ -592,7 +592,9 @@ class DGLGraph(object):
         --------
         in_degree
         """
-        if not is_all(v):
+        if is_all(v):
+            v  = utils.toindex(slice(0, self.number_of_nodes()))
+        else:
             v = utils.toindex(v)
         return self._graph.in_degrees(v).tousertensor()
 
@@ -632,7 +634,9 @@ class DGLGraph(object):
         --------
         out_degree
         """
-        if not is_all(v):
+        if is_all(v):
+            v  = utils.toindex(slice(0, self.number_of_nodes()))
+        else:
             v = utils.toindex(v)
         return self._graph.out_degrees(v).tousertensor()
 
