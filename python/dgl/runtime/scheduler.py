@@ -78,7 +78,7 @@ def schedule_recv(graph,
     if len(mid) == 0:
         # All recv nodes are 0-degree nodes; downgrade to apply nodes.
         if apply_func is not None:
-            schedule_apply_nodes(graph, recv_nodes, apply_func)
+            schedule_apply_nodes(graph, recv_nodes, apply_func, inplace)
     else:
         var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
         # sort and unique the argument
@@ -164,7 +164,7 @@ def schedule_update_all(graph,
         # All the nodes are zero degree; downgrade to apply nodes
         if apply_func is not None:
             nodes = utils.toindex(slice(0, graph.number_of_nodes()))
-            schedule_apply_nodes(graph, nodes, apply_func)
+            schedule_apply_nodes(graph, nodes, apply_func, inplace)
     else:
         call_type = 'update_all'
         eid = utils.toindex(slice(0, graph.number_of_edges()))  # shortcut for ALL
@@ -327,7 +327,7 @@ def schedule_pull(graph,
     if len(eid) == 0:
         # All the nodes are 0deg; downgrades to apply.
         if apply_func is not None:
-            schedule_apply_nodes(graph, pull_nodes, apply_func)
+            schedule_apply_nodes(graph, pull_nodes, apply_func, inplace)
     else:
         call_type = 'send_and_recv'
         pull_nodes, _ = F.sort_1d(F.unique(pull_nodes.tousertensor()))
