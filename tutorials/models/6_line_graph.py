@@ -1,5 +1,6 @@
 """
 .. _model-line-graph:
+
 Line Graph Neural Network
 =====================================
 
@@ -589,26 +590,23 @@ vali_label_change.append(equi_label)
 # To intuitively understand the training progress of a LGNN,
 # we visualize the network's community prediction on one training example,
 # together with the ground truth.
-print("visualization on one training example...")
 import matplotlib.pyplot as plt
 
 [g, lg, g_deg, lg_deg, pmpd, subfeature, label, equi_label] = train_set[inference_idx]
 utils.linegraph_inference_viz(g, lg, g_deg, lg_deg, pmpd,
                                   subfeature, model)
 plt.show()
+
 #######################################################################################
 # Below is ground truth.
 utils.graph_viz(label, g.to_networkx())
 plt.show()
+
 #########################################
 # We then provide an animation to better understand the process. (40 epochs)
-import matplotlib.animation as animation #Save in local disk
-
-[g, lg, g_deg, lg_deg, pm_pd, subfeature, label, equi_label] = train_set[inference_idx]
-# utils.animate(g, vali_label_change)
-#########################################################################################
 # .. figure:: https://i.imgur.com/KDUyE1S.gif 
 #    :alt:
+#
 # Advanced topic #1: batching
 # ---------------------------
 # LGNN takes a collection of different graphs.
@@ -639,6 +637,7 @@ def collate_fn(self, x):
         pmpd_batch = sp.sparse.block_diag(pmpd)
 
         return subgraph_batch, line_graph_batch, deg_g_batch, deg_lg_batch, pmpd_batch, subfeature_batch, sublabel_batch, equilabel_batch
+
 ##########################################################################################################################
 # You can check out the complete code here (link to dataloader).
 # 
@@ -651,5 +650,3 @@ def collate_fn(self, x):
 # and stack them as tensors when batching. Another batching solution is to
 # treat :math:`\{Pm, Pd\}` as the adjacency matrix of a bipartie graph, which maps
 # line graph's feature to graph's, and vice versa.
-
-

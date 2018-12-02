@@ -95,10 +95,6 @@ def check_intra_prob(g, labels, num_classes):
         class_to_intra_sum[int(labels[i])] += intra_num
     for i in range(num_classes):
         class_to_intra_prob[i] = class_to_intra_sum[i] / class_to_total[i]
-
-
-
-
     for cat in class_to_intra_prob:
         print("Class {} : intra connection probability {}".format(cat, class_to_intra_prob[cat]))
 
