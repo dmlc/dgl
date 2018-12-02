@@ -9,7 +9,7 @@ Zhao <https://cs.nyu.edu/~jakezhao/>`_, Zheng Zhang
 
 The goal of this tutorial:
 
-- Understand how DGL builds a graph and performs computation on graph from a
+- Understand how DGL enables computation on a graph from a
   high level.
 - Train a simple graph neural network in DGL to classify nodes in a graph.
 
@@ -19,32 +19,33 @@ At the end of this tutorial, we hope you get a brief feeling of how DGL works.
 ###############################################################################
 # Why DGL?
 # ----------------
-# DGL is designed to bring **machine learning** closer to **graph-structured
-# data**. Specifically DGL enables trouble-free implementation of graph neural
-# network (GNN) model family. Unlike PyTorch or Tensorflow, DGL provides
-# friendly APIs to perform the fundamental operations in GNNs such as message
-# passing and reduction. Through DGL, we hope to benefit both researchers
-# trying out new ideas and engineers in production. 
+# DGL is designed to perform **machine learning** on **graph-structured
+# data**. Specifically, DGL enables trouble-free implementation of a class of deep learning 
+# models called graph neural networks (GNN). DGL is a library built on top of PyTorch.
+# It provides friendly APIs for performing custom computation on graphs based on message passing.
+# Through DGL, we hope to benefit both researchers
+# and practitioners doing machine learning on structured data.
 #
 # *This tutorial assumes basic familiarity with pytorch.*
 
 ###############################################################################
-# A toy graph: Zachary's Karate Club
+# A Toy Problem: classification for Zachary's Karate Club
 # ----------------------------------
 #
-# We start by creating the well-knowned "Zachary's karate club" social network.
-# The network captures 34 members of a karate club, documenting pairwise links
-# between members who interacted outside the club. The club later splits into
-# two communities led by the instructor (node 0) and the club president (node
-# 33). A visualization of the network and the community is as follows:
+# We illustrate how to use DGL by walking through an example to classify nodes on the well-known 
+# `Zachary's Karate Club social network <https://en.wikipedia.org/wiki/Zachary%27s_karate_club>`
+# The network contains 34 club members, and edges capture pairs of members that interacted outside of the club.
+# The club has subsequently ``split'' into two sub-groups due to conflicts between the instructor and the club president.
+# **Our task is to classify which sub-group each member joins based on the social network structure.**
+#
+# The graph below is a visualization of the karate club network. 
+# Node 0 and 33 are the instructor and the club president, respectively.
 #
 # .. image:: http://historicaldataninjas.com/wp-content/uploads/2014/05/karate.jpg 
 #    :height: 400px
 #    :width: 500px
 #    :align: center
 #
-# Out task is to **build a graph neural network to predict which side each
-# member will join.**
 
 
 ###############################################################################
@@ -59,7 +60,7 @@ def build_karate_club_graph():
     g = dgl.DGLGraph()
     # add 34 nodes into the graph; nodes are labeled from 0~33
     g.add_nodes(34)
-    # all the 78 edges in a list of tuple
+    # all 78 edges as a list of tuples
     edge_list = [(1, 0), (2, 0), (2, 1), (3, 0), (3, 1), (3, 2),
         (4, 0), (5, 0), (6, 0), (6, 4), (6, 5), (7, 0), (7, 1),
         (7, 2), (7, 3), (8, 0), (8, 2), (9, 2), (10, 0), (10, 4),
@@ -73,23 +74,23 @@ def build_karate_club_graph():
         (33, 14), (33, 15), (33, 18), (33, 19), (33, 20), (33, 22),
         (33, 23), (33, 26), (33, 27), (33, 28), (33, 29), (33, 30),
         (33, 31), (33, 32)]
-    # edges in DGL is added by two list of nodes: src and dst
+    # add edges using two list of nodes: src and dst
     src, dst = tuple(zip(*edge_list))
     g.add_edges(src, dst)
-    # edges are directional in DGL; make it bi-directional
+    # edges are directional in DGL; make them bi-directional
     g.add_edges(dst, src)
 
     return g
 
 ###############################################################################
-# We can test it to see we have the correct number of nodes and edges:
+# We can print out the number of nodes and edges in our newly constructed graph:
 
 G = build_karate_club_graph()
 print('We have %d nodes.' % G.number_of_nodes())
 print('We have %d edges.' % G.number_of_edges())
 
 ###############################################################################
-# We can also visualize it by converting it to a `networkx
+# We can also visualize the graph by converting it to a `networkx
 # <https://networkx.github.io/documentation/stable/>`_ graph:
 
 import networkx as nx
@@ -100,10 +101,14 @@ nx.draw(nx_G, pos, with_labels=True)
 ###############################################################################
 # Assign features
 # ---------------
-# Features are tensor data associated with nodes and edges. The features of
-# mulitple nodes/edges are batched along the first dimension. Following codes
-# assign a one-hot encoding feature for each node in the graph (e.g. :math:`v_i` got
-# a feature vector :math:`[0,\ldots,1,\dots,0]`, where the :math:`i^{th}` location is one).
+# Graph neural networks associate features with nodes and edges for training. 
+# For our classification example, we assign each node's an input feature as a one-hot vector:
+# node :math:`v_i`'s  
+# feature vector is :math:`[0,\ldots,1,\dots,0]`, where the :math:`i^{th}` position is one).
+#
+# In DGL, we can add features for all nodes at once, using a feature tensor that
+# batches node features along the first dimension. This code below adds the one-hot
+# feature for all nodes:
 
 import torch
 
@@ -122,13 +127,13 @@ print(G.nodes[[10, 11]].data['feat'])
 ###############################################################################
 # Define a Graph Convolutional Network (GCN)
 # ------------------------------------------
-# To classify whose side each node will join, we adopt the Graph Convolutional
+# To solve our classification problem, we use the Graph Convolutional
 # Network (GCN) developed by `Kipf and
-# Welling <https://arxiv.org/abs/1609.02907>`_. The GCN model can be summarized,
-# in a high-level as follows:
+# Welling <https://arxiv.org/abs/1609.02907>`_. At a high-level, the GCN model does 
+# the following:
 #
 # - Each node :math:`v_i` has a feature vector :math:`h_i`.
-# - Each node accumulates the feature vectors :math:`h_j` from its neighbors, performs
+# - Each node aggregates the feature vectors :math:`h_j` from its neighbors, performs
 #   an affine and non-linear transformation to update its own feature.
 #
 # A graphical demonstration is displayed below.
@@ -137,32 +142,40 @@ print(G.nodes[[10, 11]].data['feat'])
 #    :alt: mailbox
 #    :align: center
 #
-# The GCN layer can be easily implemented in DGL using the message passing
-# interface. It typically consists of three steps:
+# A GCN model may consist of several layers, each of which uses a separate weight tensor for the affine transformation.
+#
+#
+# We use DGL's message passing interface to implement a GCN layer.  In DGL, in order to specify computation
+# based on message passing, programmers must provide the following three components:
 #
 # 1. Define the message function.
+#    - The message function specifies, for each edge, what message to send to the ``mailbox'' of the edge's downstream node.
 # 2. Define the reduce function.
-# 3. Define how they are triggered using message passing APIs (e.g. ``send`` and ``recv``).
+#    - The reduce function specifies, for each node, how messages received at its ``mailbox'' are aggregated.
+# 3. Specify the set of nodes and edges to perform message passing.
 #
-# Following is how it looks like:
+# To enable gradient-based optimization, programmers should sub-class PyTorch's `nn.Module <https://pytorch.org/docs/stable/nn.html` and perform message-passing in the 
+# forward function of the module.
 
+# This is how a GCN layer is implemented:
+ 
 import torch.nn as nn
 import torch.nn.functional as F
 
-# Define the message & reduce function
-# NOTE: we ignore the normalization constant c_ij for this tutorial.
+# Define the message function to generate messages along edges
+# NOTE: we ignore the GCN's normalization constant c_ij for this tutorial.
 def gcn_message(edges):
     # The argument is a batch of edges.
-    # This computes a message called 'msg' using the source node's feature 'h'.
+    # This computes a (batch of) message called 'msg' using the source node's feature 'h'.
     return {'msg' : edges.src['h']}
 
+# Define the reduce function to aggregate incoming messages at nodes
 def gcn_reduce(nodes):
     # The argument is a batch of nodes.
-    # This computes the new 'h' features by summing the received 'msg'
-    # in mailbox.
+    # This computes the new 'h' features by summing received 'msg' in each node's mailbox.
     return {'h' : torch.sum(nodes.mailbox['msg'], dim=1)}
 
-# Define the GCNLayer module
+# Define the GCNLayer module to perform message passing 
 class GCNLayer(nn.Module):
     def __init__(self, in_feats, out_feats):
         super(GCNLayer, self).__init__()
@@ -172,8 +185,9 @@ class GCNLayer(nn.Module):
         # g is the graph and the inputs is the input node features
         # first set the node features
         g.ndata['h'] = inputs
-        # trigger message passing on all the edges and nodes
+        # trigger message passing on all edges 
         g.send(g.edges(), gcn_message)
+        # trigger aggregation at all nodes
         g.recv(g.nodes(), gcn_reduce)
         # get the result node features
         h = g.ndata.pop('h')
@@ -181,7 +195,10 @@ class GCNLayer(nn.Module):
         return self.linear(h)
 
 ###############################################################################
-# We then define a neural network that contains two GCN layers:
+# We then define a neural network that contains two GCN layers. The first layer 
+# transforms input features of size of 34 to a hidden size of 5. The second layer 
+# transforms the hidden size of 5 to output features of size 2 which correspond to the two sub-groups
+# of the karate club.
 
 # Define a 2-layer GCN model
 class Net(nn.Module):
@@ -199,12 +216,12 @@ class Net(nn.Module):
 net = Net(34, 5, 2)
 
 ###############################################################################
-# Train the GCN model to predict community
+# Train the GCN model to classify nodes
 # ----------------------------------------
 #
-# To prepare the input features and labels, again, we adopt a 
-# semi-supervised setting. Each node is initialized by an
-# one-hot encoding, and only the instructor (node 0) and the club president
+# To prepare the input features and labels, we adopt a 
+# semi-supervised setting. The input feature of each node is initialized by 
+# one-hot encoding. Only the instructor (node 0) and the club president
 # (node 33) are labeled.
 
 inputs = torch.eye(34)
@@ -212,7 +229,7 @@ labeled_nodes = torch.tensor([0, 33])  # only the instructor and the president n
 labels = torch.tensor([0, 1])  # their labels are different
 
 ###############################################################################
-# The training loop is no fancier than other NN models. We (1) create an optimizer,
+# The training loop is the same as other NN models. We (1) create an optimizer,
 # (2) feed the inputs to the model, (3) calculate the loss and (4) use autograd
 # to optimize the model.
 
@@ -233,8 +250,9 @@ for epoch in range(30):
     print('Epoch %d | Loss: %.4f' % (epoch, loss.item()))
 
 ###############################################################################
-# Since the model produces a 2-dimensional vector for each node, we can
-# visualize it very easily.
+# Since the model produces an output feature of size 2 for each node, we can
+# visualize by plotting the output feature in a 2D space.
+
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 
@@ -271,7 +289,7 @@ plt.close()
 
 ###############################################################################
 # The following animation shows how the model correctly predicts the community
-# after training.
+# after a series of training epochs.
 
 ani = animation.FuncAnimation(fig, draw, frames=len(all_logits), interval=200)
 
