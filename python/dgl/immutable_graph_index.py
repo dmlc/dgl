@@ -555,6 +555,19 @@ class ImmutableGraphIndex(object):
         raise Exception('immutable graph doesn\'t support line_graph')
 
 class ImmutableSubgraphIndex(ImmutableGraphIndex):
+    """Graph index for an immutable subgraph.
+
+    Parameters
+    ----------
+    backend_sparse : a sparse matrix from the backend framework.
+        The sparse matrix that represents a subgraph.
+    paranet : GraphIndex
+        The parent graph index.
+    induced_nodes : tensor
+        The parent node ids in this subgraph.
+    induced_edges : a lambda function that returns a tensor
+        The parent edge ids in this subgraph.
+    """
     def __init__(self, backend_sparse, parent, induced_nodes, induced_edges):
         super(ImmutableSubgraphIndex, self).__init__(backend_sparse)
 
@@ -564,10 +577,24 @@ class ImmutableSubgraphIndex(ImmutableGraphIndex):
 
     @property
     def induced_edges(self):
+        """Return parent edge ids.
+
+        Returns
+        -------
+        A lambda function that returns utils.Index
+            The parent edge ids.
+        """
         return lambda: utils.toindex(self._induced_edges())
 
     @property
     def induced_nodes(self):
+        """Return parent node ids.
+
+        Returns
+        -------
+        utils.Index
+            The parent node ids.
+        """
         return utils.toindex(self._induced_nodes)
 
 def create_immutable_graph_index(graph_data=None):
