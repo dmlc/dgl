@@ -281,8 +281,8 @@ class ImmutableGraphIndex(object):
         num_nodes = []
         num_subgs = len(seed_ids)
         res = mx.nd.contrib.dgl_csr_neighbor_uniform_sample(g, *seed_ids, num_hops=num_hops,
-                                            num_neighbor=expand_factor,
-                                            max_num_vertices=max_subgraph_size)
+                                                            num_neighbor=expand_factor,
+                                                            max_num_vertices=max_subgraph_size)
 
         vertices, subgraphs = res[0:num_subgs], res[num_subgs:(2*num_subgs)]
         num_nodes = [subg_v[-1].asnumpy()[0] for subg_v in vertices]
