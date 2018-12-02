@@ -274,7 +274,7 @@ def test_e2v_update_all_multi_fn():
                      apply_func_2)
         v3 = g.get_n_repr()[fld]
 
-        assert U.allclose(v2, v3)
+        assert th.allclose(v2, v3)
 
     # test 1d node features
     _test('f1')
@@ -312,7 +312,7 @@ def test_e2v_snr_multi_fn():
                         apply_func_2)
         v3 = g.get_n_repr()[fld]
 
-        assert U.allclose(v2, v3)
+        assert th.allclose(v2, v3)
 
     # test 1d node features
     _test('f1')
@@ -352,7 +352,7 @@ def test_e2v_recv_multi_fn():
                apply_func_2)
         v3 = g.get_n_repr()[fld]
 
-        assert U.allclose(v2, v3)
+        assert th.allclose(v2, v3)
 
     # test 1d node features
     _test('f1')

@@ -886,7 +886,7 @@ def merge_frames(frames, indices, max_index, reduce_func):
     schemes = frames[0].schemes
     # create an adj to merge
     # row index is equal to the concatenation of all the indices.
-    row = F.pack([idx.totensor() for idx in indices])
+    row = sum([idx.tolist() for idx in indices], [])
     col = list(range(len(row)))
     n = max_index
     m = len(row)
