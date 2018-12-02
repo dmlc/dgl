@@ -14,7 +14,7 @@ from dgl import DGLGraph
 """
 def graph_viz(labels,subgraph):
     value = [labels[node] for node in subgraph.nodes()]
-    pos = nx.spring_layout(subgraph, random_state=1)
+    pos = nx.spring_layout(subgraph, seed=1)
     plt.figure(figsize=(10,10))
     plt.axis('off')
     nx.draw_networkx(subgraph,
