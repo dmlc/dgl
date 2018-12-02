@@ -1391,7 +1391,7 @@ class DGLGraph(object):
         v : int, iterable of int, tensor, optional
             The node id(s).
         inplace: bool, optional
-          If True, update will happen in place.
+            If True, update will happen in place.
         """
         if func == "default":
             func = self._apply_node_func
@@ -1417,7 +1417,7 @@ class DGLGraph(object):
             Edges can be a pair of endpoint nodes (u, v), or a
             tensor of edge ids. The default value is all the edges.
         inplace: bool, optional
-          If True, update will happen in place.
+            If True, update will happen in place.
 
         Notes
         -----
@@ -1429,7 +1429,8 @@ class DGLGraph(object):
         assert func is not None
 
         if is_all(edges):
-            u, v, eid = self._graph.edges()
+            u, v, _ = self._graph.edges()
+            eid = utils.toindex(slice(0, self.number_of_edges()))
         elif isinstance(edges, tuple):
             u, v = edges
             u = utils.toindex(u)
@@ -1565,7 +1566,7 @@ class DGLGraph(object):
             The update function. Registered function will be used if not
             specified.
         inplace: bool, optional
-          If True, update will happen in place.
+            If True, update will happen in place.
 
         Notes
         -----

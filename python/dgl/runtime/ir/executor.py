@@ -573,7 +573,7 @@ class WriteRowInplace_Executor(Executor):
         fd_data = self.fd.data  # feature dict
         row_data = self.row.data  # idx
         val_data = self.val.data
-        fd_data.update_row(row_data, value_data, inplace=True)
+        fd_data.set_item_inplace(row_data, val_data, inplace=True)
 
 IR_REGISTRY[OpCode.WRITE_ROW_INPLACE_] = {
     'name' : 'WRITE_ROW_INPLACE_',
