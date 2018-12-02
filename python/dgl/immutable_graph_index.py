@@ -365,7 +365,7 @@ class ImmutableGraphIndex(object):
             The in degree array.
         """
         deg = self._get_in_degree()
-        if is_all(v):
+        if v.is_slice(0, self.number_of_nodes()):
             return utils.toindex(deg)
         else:
             v_array = v.tousertensor()
@@ -401,7 +401,7 @@ class ImmutableGraphIndex(object):
             The out degree array.
         """
         deg = self._get_out_degree()
-        if is_all(v):
+        if v.is_slice(0, self.number_of_nodes()):
             return utils.toindex(deg)
         else:
             v_array = v.tousertensor()
