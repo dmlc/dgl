@@ -55,9 +55,10 @@ g.add_edges([2, 0], [0, 2]) # Add edges (2, 0), (0, 2)
 # with different sizes, topologies, node types, edge types, and the possibility
 # of multigraphs. Besides, a same graph can be generated in many different
 # orders. Regardless, the generative process entails a few steps:
-#      - Encode a changing graph,
-#      - Perform actions stochastically,
-#      - Collect error signals and optimize the model parameters (If we are training)
+#
+# - Encode a changing graph,
+# - Perform actions stochastically,
+# - Collect error signals and optimize the model parameters (If we are training)
 #
 # When it comes to implementation, another important aspect is speed: how do we
 # parallelize the computation given that generating a graph is fundamentally a
