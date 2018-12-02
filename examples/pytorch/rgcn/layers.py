@@ -51,43 +51,53 @@ class RGCNLayer(nn.Module):
 
 class RGCNBasisLayer(RGCNLayer):
     def __init__(self, in_feat, out_feat, num_rels, num_bases=-1, bias=None,
-                 activation=None):
+                 activation=None, is_input_layer=False):
         super(RGCNBasisLayer, self).__init__(in_feat, out_feat, bias, activation)
         self.in_feat = in_feat
         self.out_feat = out_feat
         self.num_rels = num_rels
         self.num_bases = num_bases
+        self.is_input_layer = is_input_layer
         if self.num_bases <= 0 or self.num_bases > self.num_rels:
             self.num_bases = self.num_rels
 
-        # add weights
+        # add basis weights
         self.weight = nn.Parameter(torch.Tensor(self.num_bases, self.in_feat,
                                                 self.out_feat))
-        nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
         if self.num_bases < self.num_rels:
+            # linear combination coefficients
             self.w_comp = nn.Parameter(torch.Tensor(self.num_rels,
                                                     self.num_bases))
+        nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
+        if self.num_bases < self.num_rels:
             nn.init.xavier_uniform_(self.w_comp,
                                     gain=nn.init.calculate_gain('relu'))
 
     def propagate(self, g):
         if self.num_bases < self.num_rels:
-            # generate all weights from basis
-            weight = self.weight.view(self.in_feat, self.num_bases,
-                                      self.out_feat)
+            # generate all weights from bases
+            weight = self.weight.view(self.num_bases,
+                                      self.in_feat * self.out_feat)
             weight = torch.matmul(self.w_comp, weight).view(
                                     self.num_rels, self.in_feat, self.out_feat)
         else:
             weight = self.weight
 
-        def msg_func(edges):
-            w = weight[edges.data['type']]
-            msg = torch.bmm(edges.src['h'].unsqueeze(1), w).squeeze()
-            msg = msg * edges.data['norm']
-            return {'msg': msg}
+        if self.is_input_layer:
+            def msg_func(edges):
+                # for input layer, matrix multiply can be converted to be
+                # an embedding lookup using source node id
+                embed = weight.view(-1, self.out_feat)
+                index = edges.data['type'] * self.in_feat + edges.src['id']
+                return {'msg': embed[index] * edges.data['norm']}
+        else:
+            def msg_func(edges):
+                w = weight[edges.data['type']]
+                msg = torch.bmm(edges.src['h'].unsqueeze(1), w).squeeze()
+                msg = msg * edges.data['norm']
+                return {'msg': msg}
 
         g.update_all(msg_func, fn.sum(msg='msg', out='h'), None)
-
 
 class RGCNBlockLayer(RGCNLayer):
     def __init__(self, in_feat, out_feat, num_rels, num_bases, bias=None,

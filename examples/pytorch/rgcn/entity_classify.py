@@ -21,21 +21,6 @@ from functools import partial
 from layers import RGCNBasisLayer as RGCNLayer
 from model import BaseRGCN
 
-class EmbeddingLayer(RGCNLayer):
-    def propagate(self, g):
-        if self.num_bases < self.num_rels:
-            weight = self.weight.view(self.num_bases, self.in_feat * self.out_feat)
-            weight = torch.matmul(self.w_comp, weight).view(self.num_rels, self.in_feat, self.out_feat)
-        else:
-            weight = self.weight
-
-        def msg_func(edges):
-            embed = weight.view(-1, self.out_feat)
-            index = edges.data['type'] * self.in_feat + edges.src['id']
-            return {'msg': embed[index] * edges.data['norm']}
-
-        g.update_all(msg_func, fn.sum(msg='msg', out='h'), None)
-
 class EntityClassify(BaseRGCN):
     def create_features(self):
         features = torch.arange(self.num_nodes)
@@ -44,14 +29,16 @@ class EntityClassify(BaseRGCN):
         return features
 
     def build_input_layer(self):
-        return EmbeddingLayer(self.num_nodes, self.h_dim, self.num_rels, self.num_bases, activation=F.relu)
+        return RGCNLayer(self.num_nodes, self.h_dim, self.num_rels, self.num_bases,
+                         activation=F.relu, is_input_layer=True)
 
     def build_hidden_layer(self, idx):
-        return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases, activation=F.relu)
+        return RGCNLayer(self.h_dim, self.h_dim, self.num_rels, self.num_bases,
+                         activation=F.relu)
 
     def build_output_layer(self):
-        return RGCNLayer(self.h_dim, self.out_dim, self.num_rels,self.num_bases, activation=partial(F.softmax, dim=1))
-
+        return RGCNLayer(self.h_dim, self.out_dim, self.num_rels,self.num_bases,
+                         activation=partial(F.softmax, dim=1))
 
 def main(args):
     # load graph data
