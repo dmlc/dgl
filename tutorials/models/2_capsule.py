@@ -7,8 +7,8 @@ Capsule Network Tutorial
 **Author**: Jinjing Zhou, `Jake
 Zhao <https://cs.nyu.edu/~jakezhao/>`_, Zheng Zhang
 
-It is perhaps a little surprising that some of the more classical models can also be described in terms of graphs,
-offering a different perspective.
+It is perhaps a little surprising that some of the more classical models can
+also be described in terms of graphs, offering a different perspective.
 This tutorial describes how this is done for the `capsule network <http://arxiv.org/abs/1710.09829>`__.
 """
 #######################################################################################
@@ -125,19 +125,22 @@ class DGLRoutingLayer(nn.Module):
 
     def forward(self, u_hat, routing_num=1):
         self.g.edata['u_hat'] = u_hat
+
+        # step 2 (line 5)
+        def cap_message(edges):
+            return {'m': edges.data['c'] * edges.data['u_hat']}
+
+        self.g.register_message_func(cap_message)
+
+        def cap_reduce(nodes):
+            return {'s': th.sum(nodes.mailbox['m'], dim=1)}
+
+        self.g.register_reduce_func(cap_reduce)
+
         for r in range(routing_num):
             # step 1 (line 4): normalize over out edges
-            in_edges = self.g.edata['b'].view(self.in_nodes, self.out_nodes)
-            self.g.edata['c'] = F.softmax(in_edges, dim=1).view(-1, 1)
-
-            def cap_message(edges):
-                return {'m': edges.data['c'] * edges.data['u_hat']}
-            self.g.register_message_func(cap_message)
-
-            # step 2 (line 5)
-            def cap_reduce(nodes):
-                return {'s': th.sum(nodes.mailbox['m'], dim=1)}
-            self.g.register_reduce_func(cap_reduce)
+            edges_b = self.g.edata['b'].view(self.in_nodes, self.out_nodes)
+            self.g.edata['c'] = F.softmax(edges_b, dim=1).view(-1, 1)
 
             # Execute step 1 & 2
             self.g.update_all()
