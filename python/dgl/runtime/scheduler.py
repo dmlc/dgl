@@ -164,7 +164,7 @@ def schedule_update_all(graph,
         # All the nodes are zero degree; downgrade to apply nodes
         if apply_func is not None:
             nodes = utils.toindex(slice(0, graph.number_of_nodes()))
-            schedule_apply_nodes(graph, nodes, apply_func, inplace)
+            schedule_apply_nodes(graph, nodes, apply_func, inplace=False)
     else:
         call_type = 'update_all'
         eid = utils.toindex(slice(0, graph.number_of_edges()))  # shortcut for ALL
