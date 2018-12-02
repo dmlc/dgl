@@ -21,7 +21,7 @@ DGL supports multiple tensor libraries (e.g. PyTorch, MXNet) as backends; refer
 `Working with different backends`_ for requirements on backends and how to select a
 backend.
 
-Install from ``conda``
+Install from conda
 ----------------------
 One can either grab `miniconda <https://conda.io/miniconda.html>`_ or
 the full `anaconda <https://www.anaconda.com/download/>`_ if he/she does not have
