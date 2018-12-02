@@ -784,10 +784,10 @@ class SubgraphIndex(GraphIndex):
 
         Returns
         -------
-        utils.Index
+        A lambda function that returns utils.Index
             The parent edge ids.
         """
-        return self._induced_edges
+        return lambda: self._induced_edges
 
     def __getstate__(self):
         raise NotImplementedError(
