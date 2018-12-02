@@ -3,8 +3,8 @@ Modeling Relational Data with Graph Convolutional Networks
 Paper: https://arxiv.org/abs/1703.06103
 Code: https://github.com/MichSchli/RelationPrediction
 
-Difference compared to tkipf/relation-gcn
-* report filtered metrics
+Difference compared to MichSchli/RelationPrediction
+* report raw metrics instead of filtered metrics
 """
 
 import argparse
@@ -124,7 +124,7 @@ def main(args):
     # training loop
     print("start training...")
 
-    # build adj list and calculate degrees
+    # build adj list and calculate degrees for sampling
     adj_list = [[] for _ in range(num_nodes)]
     for i,triplet in enumerate(train_data):
         adj_list[triplet[0]].append([i, triplet[2]])
@@ -142,7 +142,6 @@ def main(args):
     while True:
         model.train()
         epoch += 1
-        print("Epoch {:03d}".format(epoch))
 
         # perform edge neighborhood sampling to generate training graph and data
         g, node_id, edge_type, node_norm, data, labels = \
@@ -151,6 +150,7 @@ def main(args):
                 num_rels, adj_list, degrees, args.negative_sample)
         print("Done edge sampling")
 
+        # set node/edge feature
         node_id = torch.from_numpy(node_id).view(-1, 1)
         edge_type = torch.from_numpy(edge_type).view(-1, 1)
         node_norm = torch.from_numpy(node_norm).view(-1, 1)
@@ -167,8 +167,7 @@ def main(args):
         loss = model.get_loss(g, data, labels)
         t1 = time.time()
         loss.backward()
-        # clip gradients
-        torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_norm)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), args.grad_norm) # clip gradients
         optimizer.step()
         t2 = time.time()
 
@@ -207,7 +206,7 @@ def main(args):
     # use best model checkpoint
     checkpoint = torch.load(model_state_file)
     if use_cuda:
-        model.cpu()
+        model.cpu() # test on CPU
     model.eval()
     model.load_state_dict(checkpoint['state_dict'])
     print("Using best epoch: {}".format(checkpoint['epoch']))
