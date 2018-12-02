@@ -3,25 +3,27 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to DGL's documentation!
-===============================
+DGL documentation
+=================
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-
-Get Started
------------
-.. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
+   :caption: Get Started
+   :glob:
 
    install/index
-   tutorials/index
 
-API Reference
--------------
 .. toctree::
    :maxdepth: 2
+   :caption: Tutorials
+   :glob:
+
+   tutorials/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API Reference
+   :glob:
 
    api/python/index
 
