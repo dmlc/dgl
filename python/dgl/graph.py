@@ -901,15 +901,15 @@ class DGLGraph(object):
         """
         return self._graph.in_degree(v)
 
-    def in_degrees(self, v):
+    def in_degrees(self, v=ALL):
         """Return the array `d` of in-degrees of the node array `v`.
 
         `d[i]` is the in-degree of node `v[i]`.
 
         Parameters
         ----------
-        v : list, tensor
-            The node ID array.
+        v : list, tensor, optional.
+            The node ID array. Default is to return the degrees of all the nodes.
 
         Returns
         -------
@@ -929,7 +929,10 @@ class DGLGraph(object):
         --------
         in_degree
         """
-        v = utils.toindex(v)
+        if is_all(v):
+            v  = utils.toindex(slice(0, self.number_of_nodes()))
+        else:
+            v = utils.toindex(v)
         return self._graph.in_degrees(v).tousertensor()
 
     def out_degree(self, v):
@@ -959,7 +962,7 @@ class DGLGraph(object):
         """
         return self._graph.out_degree(v)
 
-    def out_degrees(self, v):
+    def out_degrees(self, v=ALL):
         """Return the array `d` of out-degrees of the node array `v`.
 
         `d[i]` is the out-degree of node `v[i]`.
@@ -967,7 +970,7 @@ class DGLGraph(object):
         Parameters
         ----------
         v : list, tensor
-            The node ID array.
+            The node ID array. Default is to return the degrees of all the nodes.
 
         Returns
         -------
@@ -987,7 +990,10 @@ class DGLGraph(object):
         --------
         out_degree
         """
-        v = utils.toindex(v)
+        if is_all(v):
+            v  = utils.toindex(slice(0, self.number_of_nodes()))
+        else:
+            v = utils.toindex(v)
         return self._graph.out_degrees(v).tousertensor()
 
     def to_networkx(self, node_attrs=None, edge_attrs=None):
@@ -1777,8 +1783,7 @@ class DGLGraph(object):
         """
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
-        return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
-                sgi, readonly=self._readonly)
+        return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
 
     def subgraphs(self, nodes):
         """Return a list of subgraphs, each induced in the corresponding given
@@ -1806,7 +1811,7 @@ class DGLGraph(object):
         induced_nodes = [utils.toindex(n) for n in nodes]
         sgis = self._graph.node_subgraphs(induced_nodes)
         return [dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
-            sgi, readonly=self._readonly) for sgi in sgis]
+            sgi) for sgi in sgis]
 
     def edge_subgraph(self, edges):
         """Return the subgraph induced on given edges.
