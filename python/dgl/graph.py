@@ -511,7 +511,7 @@ class DGLGraph(object):
         rst = self._graph.has_edges_between(u, v)
         return rst.tousertensor()
 
-    def predecessors(self, v, _radius=1):
+    def predecessors(self, v):
         """Return the predecessors of node `v` in the graph.
 
         Node `u` is a predecessor of `v` if an edge `(u, v)` exist in the
@@ -521,8 +521,6 @@ class DGLGraph(object):
         ----------
         v : int
             The node.
-        _radius : ignored
-            Do not use
 
         Returns
         -------
@@ -544,7 +542,7 @@ class DGLGraph(object):
         """
         return self._graph.predecessors(v).tousertensor()
 
-    def successors(self, v, _radius=1):
+    def successors(self, v):
         """Return the successors of node `v` in the graph.
 
         Node `u` is a successor of `v` if an edge `(v, u)` exist in the
@@ -554,8 +552,6 @@ class DGLGraph(object):
         ----------
         v : int
             The node.
-        _radius : ignored
-            Do not use
 
         Returns
         -------
@@ -1856,51 +1852,6 @@ class DGLGraph(object):
         induced_edges = utils.toindex(edges)
         sgi = self._graph.edge_subgraph(induced_edges)
         return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
-
-    def merge(self, subgraphs, reduce_func='sum'):
-        """NOT IMPLEMENTED.  DO NOT USE.
-
-        Merge subgraph features back to this parent graph.
-
-        Parameters
-        ----------
-        subgraphs : iterator of DGLSubGraph
-            The subgraphs to be merged.
-        reduce_func : str
-            The reduce function (only 'sum' is supported currently)
-        """
-        # sanity check: all the subgraphs and the parent graph
-        # should have the same node/edge feature schemes.
-        # merge node features
-        assert False, "Not yet implemented"
-        to_merge = []
-        for sg in subgraphs:
-            if len(sg.node_attr_schemes()) == 0:
-                continue
-            if sg.node_attr_schemes() != self.node_attr_schemes():
-                raise RuntimeError('Subgraph and parent graph do not '
-                                   'have the same node attribute schemes.')
-            to_merge.append(sg)
-        self._node_frame = merge_frames(
-                [sg._node_frame for sg in to_merge],
-                [sg._parent_nid for sg in to_merge],
-                self._node_frame.num_rows,
-                reduce_func)
-
-        # merge edge features
-        to_merge.clear()
-        for sg in subgraphs:
-            if len(sg.edge_attr_schemes()) == 0:
-                continue
-            if sg.edge_attr_schemes() != self.edge_attr_schemes():
-                raise RuntimeError('Subgraph and parent graph do not '
-                                   'have the same edge attribute schemes.')
-            to_merge.append(sg)
-        self._edge_frame = merge_frames(
-                [sg._edge_frame for sg in to_merge],
-                [sg._parent_eid for sg in to_merge],
-                self._edge_frame.num_rows,
-                reduce_func)
 
     def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
