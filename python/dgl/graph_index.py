@@ -7,7 +7,7 @@ import scipy
 
 from ._ffi.base import c_array
 from ._ffi.function import _init_api
-from .base import DGLError
+from .base import DGLError, is_all
 from . import backend as F
 from . import utils
 from .immutable_graph_index import create_immutable_graph_index
@@ -83,6 +83,16 @@ class GraphIndex(object):
             True if it is a multigraph, False otherwise.
         """
         return bool(_CAPI_DGLGraphIsMultigraph(self._handle))
+
+    def is_readonly(self):
+        """Indicate whether the graph index is read-only.
+
+        Returns
+        -------
+        bool
+            True if it is a read-only graph, False otherwise.
+        """
+        return False
 
     def number_of_nodes(self):
         """Return the number of nodes.
@@ -385,6 +395,9 @@ class GraphIndex(object):
         int
             The in degree array.
         """
+        if is_all(v):
+            v = np.arange(0, self.number_of_nodes(), dtype=np.int64)
+            v = utils.toindex(v)
         v_array = v.todgltensor()
         return utils.toindex(_CAPI_DGLGraphInDegrees(self._handle, v_array))
 
@@ -416,6 +429,9 @@ class GraphIndex(object):
         int
             The out degree array.
         """
+        if is_all(v):
+            v = np.arange(0, self.number_of_nodes(), dtype=np.int64)
+            v = utils.toindex(v)
         v_array = v.todgltensor()
         return utils.toindex(_CAPI_DGLGraphOutDegrees(self._handle, v_array))
 
