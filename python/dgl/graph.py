@@ -27,7 +27,9 @@ class DGLGraph(object):
     Nodes are identified by consecutive integers starting from zero.
 
     Edges can be specified by two end points (u, v) or the integer id assigned
-    when the edges are added.
+    when the edges are added.  Edge IDs are automatically assigned by the order
+    of addition, i.e. the first edge being added has an ID of 0, the second
+    being 1, so on so forth.
 
     Node and edge features are stored as a dictionary from the feature name
     to the feature data (in tensor).
@@ -158,14 +160,43 @@ class DGLGraph(object):
         self._apply_edge_func = None
 
     def add_nodes(self, num, data=None):
-        """Add nodes.
+        """Add multiple new nodes.
 
         Parameters
         ----------
         num : int
             Number of nodes to be added.
-        data : dict
-            Optional node feature data.
+        data : dict, optional
+            Feature data of the added nodes.
+
+        Notes
+        -----
+        If new nodes are added with features, and any of the old nodes
+        do not have some of the feature fields, those fields are filled
+        by initializers defined with ``set_n_initializer`` (default filling
+        with zeros).
+
+        Examples
+        --------
+        >>> G = dgl.DGLGraph()
+        >>> g.add_nodes(2)
+        >>> g.number_of_nodes()
+        2
+        >>> g.add_nodes(3)
+        >>> g.number_of_nodes()
+        5
+
+        Adding new nodes with features (using PyTorch as example):
+        >>> import torch as th
+        >>> g.add_nodes(2, {'x': th.ones(2, 4)})    # default zero initializer
+        >>> g.ndata['x']
+        tensor([[0., 0., 0., 0.],
+                [0., 0., 0., 0.],
+                [0., 0., 0., 0.],
+                [0., 0., 0., 0.],
+                [0., 0., 0., 0.],
+                [1., 1., 1., 1.],
+                [1., 1., 1., 1.]])
         """
         self._graph.add_nodes(num)
         self._msg_graph.add_nodes(num)
@@ -176,16 +207,41 @@ class DGLGraph(object):
             self._node_frame.append(data)
 
     def add_edge(self, u, v, data=None):
-        """Add one edge.
+        """Add one new edge between u and v.
 
         Parameters
         ----------
         u : int
-            The src node.
+            The source node ID.  Must exist in the graph.
         v : int
-            The dst node.
-        data : dict
-            Optional node feature data.
+            The destination node ID.  Must exist in the graph.
+        data : dict, optional
+            Feature data of the added edges.
+
+        Notes
+        -----
+        If new edges are added with features, and any of the old edges
+        do not have some of the feature fields, those fields are filled
+        by initializers defined with ``set_e_initializer`` (default filling
+        with zeros).
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edge(0, 1)
+
+        Adding new edge with features
+        >>> import torch as th
+        >>> G.add_edge(0, 2, {'x': th.ones(1, 4)})
+        >>> G.edges()
+        (tensor([0, 0]), tensor([1, 2]))
+        >>> G.edata['x']
+        tensor([[0., 0., 0., 0.],
+                [1., 1., 1., 1.]])
+        >>> G.edges[0, 2].data['x']
+        tensor([[1., 1., 1., 1.]])
 
         See Also
         --------
@@ -199,16 +255,40 @@ class DGLGraph(object):
             self._edge_frame.append(data)
 
     def add_edges(self, u, v, data=None):
-        """Add many edges.
+        """Add multiple edges for list of source nodes u and destination nodes
+        v.  A single edge is added between every pair of ``u[i]`` and ``v[i]``.
 
         Parameters
         ----------
         u : list, tensor
-            The src nodes.
+            The source node IDs.  All nodes must exist in the graph.
         v : list, tensor
-            The dst nodes.
-        reprs : dict
-            Optional node representations.
+            The destination node IDs.  All nodes must exist in the graph.
+        data : dict, optional
+            Feature data of the added edges.
+
+        Notes
+        -----
+        If new edges are added with features, and any of the old edges
+        do not have some of the feature fields, those fields are filled
+        by initializers defined with ``set_e_initializer`` (default filling
+        with zeros).
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(4)
+        >>> G.add_edges([0, 2], [1, 3]) # add edges (0, 1) and (2, 3)
+
+        Adding new edges with features
+        >>> import torch as th
+        >>> G.add_edges([1, 3], [2, 0], {'x': th.ones(2, 4)}) # (1, 2), (3, 0)
+        >>> G.edata['x']
+        tensor([[0., 0., 0., 0.],
+                [0., 0., 0., 0.],
+                [1., 1., 1., 1.],
+                [1., 1., 1., 1.]])
 
         See Also
         --------
@@ -225,7 +305,24 @@ class DGLGraph(object):
             self._edge_frame.append(data)
 
     def clear(self):
-        """Clear the graph and its storage."""
+        """Remove all nodes and edges, as well as their features, from the
+        graph.
+
+        Examples
+        --------
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(4)
+        >>> G.add_edges([0, 1, 2, 3], [1, 2, 3, 0])
+        >>> G.number_of_nodes()
+        4
+        >>> G.number_of_edges()
+        4
+        >>> G.clear()
+        >>> G.number_of_nodes()
+        0
+        >>> G.number_of_edges()
+        0
+        """
         self._graph.clear()
         self._node_frame.clear()
         self._edge_frame.clear()
@@ -239,7 +336,7 @@ class DGLGraph(object):
         self._msg_graph.add_nodes(self.number_of_nodes())
 
     def number_of_nodes(self):
-        """Return the number of nodes.
+        """Return the number of nodes in the graph.
 
         Returns
         -------
@@ -249,17 +346,17 @@ class DGLGraph(object):
         return self._graph.number_of_nodes()
 
     def __len__(self):
-        """Return the number of nodes."""
+        """Return the number of nodes in the graph."""
         return self.number_of_nodes()
 
     @property
     def is_multigraph(self):
-        """Whether the graph is a multigraph.
+        """True if the graph is a multigraph, False otherwise.
         """
         return self._graph.is_multigraph()
 
     def number_of_edges(self):
-        """Return the number of edges.
+        """Return the number of edges in the graph.
 
         Returns
         -------
@@ -269,17 +366,32 @@ class DGLGraph(object):
         return self._graph.number_of_edges()
 
     def has_node(self, vid):
-        """Return true if the node exists.
+        """Return True if the graph contains node `vid`.
+
+        Identical to `vid in G`.
 
         Parameters
         ----------
         vid : int
-            The nodes
+            The node ID.
 
         Returns
         -------
         bool
             True if the node exists
+
+        Examples
+        --------
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.has_node(0)
+        True
+        >>> G.has_node(4)
+        False
+
+        Equivalently,
+        >>> 0 in G
+        True
 
         See Also
         --------
@@ -288,21 +400,39 @@ class DGLGraph(object):
         return self._graph.has_node(vid)
 
     def __contains__(self, vid):
-        """Same as has_node."""
+        """Return True if the graph contains node `vid`.
+
+        Examples
+        --------
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> 0 in G
+        True
+        """
         return self._graph.has_node(vid)
 
     def has_nodes(self, vids):
-        """Return true if the nodes exist.
+        """Return a 0-1 array `a` given the node ID array `vids`.
+
+        `a[i]` is 1 if the graph contains node `vids[i]`, 0 otherwise.
 
         Parameters
         ----------
-        vid : list, tensor
-            The nodes
+        vid : list or tensor
+            The array of node IDs.
 
         Returns
         -------
-        tensor
+        a : tensor
             0-1 array indicating existence
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.has_nodes([0, 1, 2, 3, 4])
+        tensor([1, 1, 1, 0, 0])
 
         See Also
         --------
@@ -313,19 +443,29 @@ class DGLGraph(object):
         return rst.tousertensor()
 
     def has_edge_between(self, u, v):
-        """Return true if the edge exists.
+        """Return True if the edge (u, v) is in the graph.
 
         Parameters
         ----------
         u : int
-            The src node.
+            The source node ID.
         v : int
-            The dst node.
+            The destination node ID.
 
         Returns
         -------
         bool
-            True if the edge exists
+            True if the edge is in the graph, False otherwise.
+
+        Examples
+        --------
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edge(0, 1)
+        >>> G.has_edge_between(0, 1)
+        True
+        >>> G.has_edge_between(1, 0)
+        False
 
         See Also
         --------
@@ -334,19 +474,33 @@ class DGLGraph(object):
         return self._graph.has_edge_between(u, v)
 
     def has_edges_between(self, u, v):
-        """Return true if the edge exists.
+        """Return a 0-1 array `a` given the source node ID array `u` and
+        destination node ID array `v`.
+
+        `a[i]` is 1 if the graph contains edge `(u[i], v[i])`, 0 otherwise.
 
         Parameters
         ----------
         u : list, tensor
-            The src nodes.
+            The source node ID array.
         v : list, tensor
-            The dst nodes.
+            The destination node ID array.
 
         Returns
         -------
-        tensor
-            0-1 array indicating existence
+        a : tensor
+            0-1 array indicating existence.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([0, 0], [1, 2]) # (0, 1), (0, 2)
+
+        Check if (0, 1), (0, 2), (1, 0), (2, 0) exist in the graph above:
+        >>> G.has_edges_between([0, 0, 1, 2], [1, 2, 0, 0])
+        tensor([1, 1, 0, 0])
 
         See Also
         --------
@@ -357,49 +511,78 @@ class DGLGraph(object):
         rst = self._graph.has_edges_between(u, v)
         return rst.tousertensor()
 
-    def predecessors(self, v, radius=1):
-        """Return the predecessors of the node.
+    def predecessors(self, v):
+        """Return the predecessors of node `v` in the graph.
+
+        Node `u` is a predecessor of `v` if an edge `(u, v)` exist in the
+        graph.
 
         Parameters
         ----------
         v : int
             The node.
-        radius : int, optional
-            The radius of the neighborhood.
 
         Returns
         -------
         tensor
-            Array of predecessors
+            Array of predecessor node IDs.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([1, 2], [0, 0]) # (1, 0), (2, 0)
+        >>> G.predecessors(0)
+        tensor([1, 2])
+
+        See Also
+        --------
+        successors
         """
         return self._graph.predecessors(v).tousertensor()
 
-    def successors(self, v, radius=1):
-        """Return the successors of the node.
+    def successors(self, v):
+        """Return the successors of node `v` in the graph.
+
+        Node `u` is a successor of `v` if an edge `(v, u)` exist in the
+        graph.
 
         Parameters
         ----------
         v : int
             The node.
-        radius : int, optional
-            The radius of the neighborhood.
 
         Returns
         -------
         tensor
-            Array of successors
+            Array of successor node IDs.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([0, 0], [1, 2]) # (0, 1), (0, 2)
+        >>> G.successors(0)
+        tensor([1, 2])
+
+        See Also
+        --------
+        predecessors
         """
         return self._graph.successors(v).tousertensor()
 
     def edge_id(self, u, v, force_multi=False):
-        """Return the id of the edge.
+        """Return the edge ID, or an array of edge IDs, between source node
+        `u` and destination node `v`.
 
         Parameters
         ----------
         u : int
-            The src node.
+            The source node ID.
         v : int
-            The dst node.
+            The destination node ID.
         force_multi : bool
             If False, will return a single edge ID if the graph is a simple graph.
             If True, will always return an array.
@@ -407,8 +590,31 @@ class DGLGraph(object):
         Returns
         -------
         int or tensor
-            The edge id if force_multi == True and the graph is a simple graph.
-            The edge id array otherwise.
+            The edge ID if force_multi == True and the graph is a simple graph.
+            The edge ID array otherwise.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        For simple graphs:
+        >>> G = dgl.DGLGraph()
+        >>> G.add_node(3)
+        >>> G.add_edges([0, 0], [1, 2]) # (0, 1), (0, 2)
+        >>> G.edge_id(0, 2)
+        1
+        >>> G.edge_id(0, 1)
+        0
+
+        For multigraphs:
+        >>> G = dgl.DGLGraph(multigraph=True)
+        >>> G.add_nodes(3)
+
+        Adding edges (0, 1), (0, 2), (0, 1), (0, 2), so edge ID 0 and 2 both
+        connect from 0 and 1, while edge ID 1 and 3 both connect from 0 and 2.
+        >>> G.add_edges([0, 0, 0, 0], [1, 2, 1, 2])
+        >>> G.edge_id(0, 1)
+        tensor([0, 2])
 
         See Also
         --------
@@ -418,23 +624,54 @@ class DGLGraph(object):
         return idx.tousertensor() if force_multi or self.is_multigraph else idx[0]
 
     def edge_ids(self, u, v, force_multi=False):
-        """Return the edge ids.
+        """Return all edge IDs between source node array `u` and destination
+        node array `v`.
 
         Parameters
         ----------
         u : list, tensor
-            The src nodes.
+            The source node ID array.
         v : list, tensor
-            The dst nodes.
+            The destination node ID array.
         force_multi : bool
-            If False, will return a single edge ID array if the graph is a simple graph.
-            If True, will always return 3 arrays (src nodes, dst nodes, edge ids).
+            Whether to always treat the graph as a multigraph.
 
         Returns
         -------
         tensor, or (tensor, tensor, tensor)
-        If force_multi is True or the graph is multigraph, return (src nodes, dst nodes, edge ids)
-        Otherwise, return a single tensor of edge ids.
+            If the graph is a simple graph and `force_multi` is False, return
+            a single edge ID array `e`.  `e[i]` is the edge ID between `u[i]`
+            and `v[i]`.
+            Otherwise, return three arrays `(eu, ev, e)`.  `e[i]` is the ID
+            of an edge between `eu[i]` and `ev[i]`.  All edges between `u[i]`
+            and `v[i]` are returned.
+
+        Notes
+        -----
+        If the graph is a simple graph, `force_multi` is False, and no edge
+        exist between some pairs of `u[i]` and `v[i]`, the result is undefined.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        For simple graphs:
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([0, 0], [1, 2]) # (0, 1), (0, 2)
+        >>> G.edge_ids([0, 0], [2, 1])  # get edge ID of (0, 2) and (0, 1)
+        >>> G.edge_ids([0, 0], [2, 1])
+        tensor([1, 0])
+
+        For multigraphs
+        >>> G = dgl.DGLGraph(multigraph=True)
+        >>> G.add_nodes(4)
+        >>> G.add_edges([0, 0, 0], [1, 1, 2])   # (0, 1), (0, 1), (0, 2)
+
+        Get all edges between (0, 1), (0, 2), (0, 3).  Note that there is no
+        edge between 0 and 3:
+        >>> G.edge_ids([0, 0, 0], [1, 2, 3])
+        (tensor([0, 0, 0]), tensor([1, 1, 2]), tensor([0, 1, 2]))
 
         See Also
         --------
@@ -449,26 +686,38 @@ class DGLGraph(object):
             return eid.tousertensor()
 
     def find_edges(self, eid):
-        """Given the edge ids, return their source and destination node ids.
+        """Given an edge ID array, return the source and destination node ID
+        array `s` and `d`.  `s[i]` and `d[i]` are source and destination node
+        ID for edge `eid[i]`.
 
         Parameters
         ----------
         eid : list, tensor
-            The edge ids.
+            The edge ID array.
 
         Returns
         -------
         tensor
-            The source nodes.
+            The source node ID array.
         tensor
-            The destination nodes.
+            The destination node ID array.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([0, 0, 1], [1, 2, 2])   # (0, 1), (0, 2), (1, 2)
+        >>> G.find_edges([0, 2])
+        (tensor([0, 1]), tensor([1, 2]))
         """
         eid = utils.toindex(eid)
         src, dst, _ = self._graph.find_edges(eid)
         return src.tousertensor(), dst.tousertensor()
 
     def in_edges(self, v, form='uv'):
-        """Return the in edges of the node(s).
+        """Return the inbound edges of the node(s).
 
         Parameters
         ----------
@@ -482,9 +731,35 @@ class DGLGraph(object):
 
         Returns
         -------
-        A tuple of Tensors (u, v, eid) if form == 'all'
-        A pair of Tensors (u, v) if form == 'uv'
+        A tuple of Tensors `(eu, ev, eid)` if `form == 'all'`.
+            `eid[i]` is the ID of an inbound edge to `ev[i]` from `eu[i]`.
+            All inbound edges to `v` are returned.
+        A pair of Tensors (eu, ev) if form == 'uv'
+            `eu[i]` is the source node of an inbound edge to `ev[i]`.
+            All inbound edges to `v` are returned.
         One Tensor if form == 'eid'
+            `eid[i]` is ID of an inbound edge to any of the nodes in `v`.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([0, 0, 1], [1, 2, 2])   # (0, 1), (0, 2), (1, 2)
+
+        For a single node:
+        >>> G.in_edges(2)
+        (tensor([0, 1]), tensor([2, 2]))
+        >>> G.in_edges(2, 'all')
+        (tensor([0, 1]), tensor([2, 2]), tensor([1, 2]))
+        >>> G.in_edges(2, 'eid')
+        tensor([1, 2])
+
+        For multiple nodes:
+        >>> G.in_edges([1, 2])
+        (tensor([0, 0, 1]), tensor([1, 2, 2]))
+        >>> G.in_edges([1, 2], 'all')
+        (tensor([0, 0, 1]), tensor([1, 2, 2]), tensor([0, 1, 2]))
         """
         v = utils.toindex(v)
         src, dst, eid = self._graph.in_edges(v)
@@ -498,7 +773,7 @@ class DGLGraph(object):
             raise DGLError('Invalid form:', form)
 
     def out_edges(self, v, form='uv'):
-        """Return the out edges of the node(s).
+        """Return the outbound edges of the node(s).
 
         Parameters
         ----------
@@ -512,9 +787,35 @@ class DGLGraph(object):
 
         Returns
         -------
-        A tuple of Tensors (u, v, eid) if form == 'all'
-        A pair of Tensors (u, v) if form == 'uv'
+        A tuple of Tensors `(eu, ev, eid)` if `form == 'all'`.
+            `eid[i]` is the ID of an outbound edge from `eu[i]` from `ev[i]`.
+            All outbound edges from `v` are returned.
+        A pair of Tensors (eu, ev) if form == 'uv'
+            `ev[i]` is the destination node of an outbound edge from `eu[i]`.
+            All outbound edges from `v` are returned.
         One Tensor if form == 'eid'
+            `eid[i]` is ID of an outbound edge from any of the nodes in `v`.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([0, 0, 1], [1, 2, 2])   # (0, 1), (0, 2), (1, 2)
+
+        For a single node:
+        >>> G.out_edges(0)
+        (tensor([0, 0]), tensor([1, 2]))
+        >>> G.out_edges(0, 'all')
+        (tensor([0, 0]), tensor([1, 2]), tensor([0, 1]))
+        >>> G.out_edges(0, 'eid')
+        tensor([0, 1])
+
+        For multiple nodes:
+        >>> G.out_edges([0, 1])
+        (tensor([0, 0, 1]), tensor([1, 2, 2]))
+        >>> G.out_edges([0, 1], 'all')
+        (tensor([0, 0, 1]), tensor([1, 2, 2]), tensor([0, 1, 2]))
         """
         v = utils.toindex(v)
         src, dst, eid = self._graph.out_edges(v)
@@ -543,8 +844,25 @@ class DGLGraph(object):
         Returns
         -------
         A tuple of Tensors (u, v, eid) if form == 'all'
+            `eid[i]` is the ID of an edge between `u[i]` and `v[i]`.
+            All edges are returned.
         A pair of Tensors (u, v) if form == 'uv'
+            An edge exists between `u[i]` and `v[i]`.
+            If `n` edges exist between `u` and `v`, then `u` and `v` as a pair
+            will appear `n` times.
         One Tensor if form == 'eid'
+            `eid[i]` is the ID of an edge in the graph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([0, 0, 1], [1, 2, 2])   # (0, 1), (0, 2), (1, 2)
+        >>> G.all_edges()
+        (tensor([0, 0, 1]), tensor([1, 2, 2]))
+        >>> G.all_edges('all')
+        (tensor([0, 0, 1]), tensor([1, 2, 2]), tensor([0, 1, 2]))
         """
         src, dst, eid = self._graph.edges(sorted)
         if form == 'all':
@@ -557,17 +875,25 @@ class DGLGraph(object):
             raise DGLError('Invalid form:', form)
 
     def in_degree(self, v):
-        """Return the in degree of the node.
+        """Return the in-degree of node `v`.
 
         Parameters
         ----------
         v : int
-            The node.
+            The node ID.
 
         Returns
         -------
         int
-            The in degree.
+            The in-degree.
+
+        Examples
+        --------
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([0, 0, 1], [1, 2, 2])   # (0, 1), (0, 2), (1, 2)
+        >>> G.in_degree(2)
+        2
 
         See Also
         --------
@@ -576,17 +902,28 @@ class DGLGraph(object):
         return self._graph.in_degree(v)
 
     def in_degrees(self, v=ALL):
-        """Return the in degrees of the nodes.
+        """Return the array `d` of in-degrees of the node array `v`.
+
+        `d[i]` is the in-degree of node `v[i]`.
 
         Parameters
         ----------
-        v : list, tensor
-            The nodes.
+        v : list, tensor, optional.
+            The node ID array. Default is to return the degrees of all the nodes.
 
         Returns
         -------
-        tensor
-            The in degree array.
+        d : tensor
+            The in-degree array.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([0, 0, 1], [1, 2, 2])   # (0, 1), (0, 2), (1, 2)
+        >>> G.in_degrees([1, 2])
+        tensor([1, 2])
 
         See Also
         --------
@@ -599,17 +936,25 @@ class DGLGraph(object):
         return self._graph.in_degrees(v).tousertensor()
 
     def out_degree(self, v):
-        """Return the out degree of the node.
+        """Return the out-degree of node `v`.
 
         Parameters
         ----------
         v : int
-            The node.
+            The node ID.
 
         Returns
         -------
         int
-            The out degree.
+            The out-degree.
+
+        Examples
+        --------
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([0, 0, 1], [1, 2, 2])   # (0, 1), (0, 2), (1, 2)
+        >>> G.out_degree(0)
+        2
 
         See Also
         --------
@@ -618,17 +963,28 @@ class DGLGraph(object):
         return self._graph.out_degree(v)
 
     def out_degrees(self, v=ALL):
-        """Return the out degrees of the nodes.
+        """Return the array `d` of out-degrees of the node array `v`.
+
+        `d[i]` is the out-degree of node `v[i]`.
 
         Parameters
         ----------
         v : list, tensor
-            The nodes.
+            The node ID array. Default is to return the degrees of all the nodes.
 
         Returns
         -------
-        tensor
-            The out degree array.
+        d : tensor
+            The out-degree array.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([0, 0, 1], [1, 2, 2])   # (0, 1), (0, 2), (1, 2)
+        >>> G.out_degrees([0, 1])
+        tensor([2, 1])
 
         See Also
         --------
@@ -1384,33 +1740,63 @@ class DGLGraph(object):
                     message_func, reduce_func, apply_node_func)
 
     def subgraph(self, nodes):
-        """Generate the subgraph among the given nodes.
+        """Return the subgraph induced on given nodes.
 
         Parameters
         ----------
         nodes : list, or iterable
-            A container of the nodes to construct subgraph.
+            A node ID array to construct subgraph.
+            All nodes must exist in the graph.
 
         Returns
         -------
         G : DGLSubGraph
             The subgraph.
+            The nodes are relabeled so that node `i` in the subgraph is mapped
+            to node `nodes[i]` in the original graph.
+            The edges are also relabeled.
+            One can retrieve the mapping from subgraph node/edge ID to parent
+            node/edge ID via `parent_nid` and `parent_eid` properties of the
+            subgraph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(5)
+        >>> G.add_edges([0, 1, 2, 3, 4], [1, 2, 3, 4, 0])   # 5-node cycle
+        >>> SG = G.subgraph([0, 1, 4])
+        >>> SG.nodes()
+        tensor([0, 1, 2])
+        >>> SG.edges()
+        (tensor([0, 2]), tensor([1, 0]))
+        >>> SG.parent_nid
+        tensor([0, 1, 4])
+        >>> SG.parent_eid
+        tensor([0, 4])
 
         See Also
         --------
+        DGLSubGraph
         subgraphs
+        edge_subgraph
         """
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
         return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
 
     def subgraphs(self, nodes):
-        """Generate the subgraphs among the given nodes.
+        """Return a list of subgraphs, each induced in the corresponding given
+        nodes in the list.
+
+        Equivalent to
+        [self.subgraph(nodes_list) for nodes_list in nodes]
 
         Parameters
         ----------
         nodes : a list of lists or iterable
-            A list of the nodes to construct subgraph.
+            A list of node ID arrays to construct corresponding subgraphs.
+            All nodes in all the list items must exist in the graph.
 
         Returns
         -------
@@ -1419,6 +1805,7 @@ class DGLGraph(object):
 
         See Also
         --------
+        DGLSubGraph
         subgraph
         """
         induced_nodes = [utils.toindex(n) for n in nodes]
@@ -1427,63 +1814,49 @@ class DGLGraph(object):
             sgi) for sgi in sgis]
 
     def edge_subgraph(self, edges):
-        """Generate the subgraph among the given edges.
+        """Return the subgraph induced on given edges.
 
         Parameters
         ----------
         edges : list, or iterable
-            A container of the edges to construct subgraph.
+            An edge ID array to construct subgraph.
+            All edges must exist in the subgraph.
 
         Returns
         -------
         G : DGLSubGraph
             The subgraph.
+            The edges are relabeled so that edge `i` in the subgraph is mapped
+            to edge `edges[i]` in the original graph.
+            The nodes are also relabeled.
+            One can retrieve the mapping from subgraph node/edge ID to parent
+            node/edge ID via `parent_nid` and `parent_eid` properties of the
+            subgraph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(5)
+        >>> G.add_edges([0, 1, 2, 3, 4], [1, 2, 3, 4, 0])   # 5-node cycle
+        >>> SG = G.edge_subgraph([0, 4])
+        >>> SG.nodes()
+        tensor([0, 1, 2])
+        >>> SG.edges()
+        (tensor([0, 2]), tensor([1, 0]))
+        >>> SG.parent_nid
+        tensor([0, 1, 4])
+        >>> SG.parent_eid
+        tensor([0, 4])
+
+        See Also
+        --------
+        DGLSubGraph
+        subgraph
         """
         induced_edges = utils.toindex(edges)
         sgi = self._graph.edge_subgraph(induced_edges)
         return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
-
-    def merge(self, subgraphs, reduce_func='sum'):
-        """Merge subgraph features back to this parent graph.
-
-        Parameters
-        ----------
-        subgraphs : iterator of DGLSubGraph
-            The subgraphs to be merged.
-        reduce_func : str
-            The reduce function (only 'sum' is supported currently)
-        """
-        # sanity check: all the subgraphs and the parent graph
-        # should have the same node/edge feature schemes.
-        # merge node features
-        to_merge = []
-        for sg in subgraphs:
-            if len(sg.node_attr_schemes()) == 0:
-                continue
-            if sg.node_attr_schemes() != self.node_attr_schemes():
-                raise RuntimeError('Subgraph and parent graph do not '
-                                   'have the same node attribute schemes.')
-            to_merge.append(sg)
-        self._node_frame = merge_frames(
-                [sg._node_frame for sg in to_merge],
-                [sg._parent_nid for sg in to_merge],
-                self._node_frame.num_rows,
-                reduce_func)
-
-        # merge edge features
-        to_merge.clear()
-        for sg in subgraphs:
-            if len(sg.edge_attr_schemes()) == 0:
-                continue
-            if sg.edge_attr_schemes() != self.edge_attr_schemes():
-                raise RuntimeError('Subgraph and parent graph do not '
-                                   'have the same edge attribute schemes.')
-            to_merge.append(sg)
-        self._edge_frame = merge_frames(
-                [sg._edge_frame for sg in to_merge],
-                [sg._parent_eid for sg in to_merge],
-                self._edge_frame.num_rows,
-                reduce_func)
 
     def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
