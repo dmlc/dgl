@@ -4,7 +4,6 @@ Paper: https://arxiv.org/abs/1703.06103
 Code: https://github.com/tkipf/relational-gcn
 
 Difference compared to tkipf/relation-gcn
-* edge directions are reversed (kipf did not transpose adj before spmv)
 * l2norm applied to all weights
 * remove nodes that won't be touched
 """
@@ -59,6 +58,7 @@ def main(args):
     data = load_data(args.dataset, bfs_level=args.bfs_level, relabel=args.relabel)
     num_nodes = data.num_nodes
     num_rels = data.num_rels
+    num_classes = data.num_classes
     labels = data.labels
     train_idx = data.train_idx
     test_idx = data.test_idx
@@ -73,6 +73,7 @@ def main(args):
     # edge type and normalization factor
     edge_type = torch.from_numpy(data.edge_type)
     edge_norm = torch.from_numpy(data.edge_norm).unsqueeze(1)
+    labels = torch.from_numpy(labels).view(-1)
 
     # check cuda
     use_cuda = args.gpu >= 0 and torch.cuda.is_available()
@@ -80,6 +81,7 @@ def main(args):
         torch.cuda.set_device(args.gpu)
         edge_type = edge_type.cuda()
         edge_norm = edge_norm.cuda()
+        labels = labels.cuda()
 
     # create graph
     g = DGLGraph()
@@ -90,20 +92,15 @@ def main(args):
     # create model
     model = EntityClassify(len(g),
                            args.n_hidden,
-                           labels.shape[1],
+                           num_classes,
                            num_rels,
                            num_bases=args.n_bases,
                            num_hidden_layers=args.n_layers - 2,
                            dropout=args.dropout,
                            use_cuda=use_cuda)
 
-    # convert to pytorch label format
-    labels = np.argmax(labels, axis=1)
-    labels = torch.from_numpy(labels).view(-1)
-
     if use_cuda:
         model.cuda()
-        labels = labels.cuda()
 
     # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2norm)
@@ -125,11 +122,13 @@ def main(args):
 
         forward_time.append(t1 - t0)
         backward_time.append(t2 - t1)
-        print("Epoch {:05d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".format(epoch, forward_time[-1], backward_time[-1]))
+        print("Epoch {:05d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".
+              format(epoch, forward_time[-1], backward_time[-1]))
         train_acc = torch.sum(logits[train_idx].argmax(dim=1) == labels[train_idx]).item() / len(train_idx)
         val_loss = F.cross_entropy(logits[val_idx], labels[val_idx])
         val_acc = torch.sum(logits[val_idx].argmax(dim=1) == labels[val_idx]).item() / len(val_idx)
-        print("Train Accuracy: {:.4f} | Train Loss: {:.4f} | Validation Accuracy: {:.4f} | Validation loss: {:.4f}".format(train_acc, loss.item(), val_acc, val_loss.item()))
+        print("Train Accuracy: {:.4f} | Train Loss: {:.4f} | Validation Accuracy: {:.4f} | Validation loss: {:.4f}".
+              format(train_acc, loss.item(), val_acc, val_loss.item()))
     print()
 
     model.eval()

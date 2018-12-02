@@ -1,7 +1,9 @@
 # Relational-GCN
 
 ### Prerequisites
-Two extra python packages are needed for this example: rdflib, pandas
+Two extra python packages are needed for this example: 
+rdflib
+pandas
 
 ### Entity Classification
 AIFB:
