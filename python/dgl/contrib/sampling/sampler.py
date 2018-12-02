@@ -12,6 +12,8 @@ class NSSubgraphLoader(object):
                  neighbor_type='in', node_prob=None, seed_nodes=None,
                  shuffle=False, num_workers=1, max_subgraph_size=None):
         self._g = g
+        if not g._graph.is_readonly():
+            raise NotImplementedError("subgraph loader only support read-only graphs.")
         self._batch_size = batch_size
         self._expand_factor = expand_factor
         self._num_hops = num_hops
@@ -51,7 +53,7 @@ class NSSubgraphLoader(object):
                                                self._num_hops, self._neighbor_type,
                                                self._node_prob, self._max_subgraph_size)
         subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
-                i, readonly=self._g._readonly) for i in sgi]
+                i) for i in sgi]
         self._subgraphs.extend(subgraphs)
         self._seed_ids.extend(seed_ids)
 
