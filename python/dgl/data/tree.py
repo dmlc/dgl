@@ -14,10 +14,10 @@ import numpy as np
 import os
 import dgl
 import dgl.backend as F
-from dgl.data.utils import download, extract_archive, get_download_dir
+from dgl.data.utils import download, extract_archive, get_download_dir, _get_dgl_url
 
 _urls = {
-    'sst' : 'https://s3.amazonaws.com/dgl-data/dataset/sst.zip',
+    'sst' : 'dataset/sst.zip',
 }
 
 SSTBatch = namedtuple('SSTBatch', ['graph', 'mask', 'wordid', 'label'])
@@ -54,7 +54,7 @@ class SST(object):
         self.pretrained_file = 'glove.840B.300d.txt' if mode == 'train' else ''
         self.pretrained_emb = None
         self.vocab_file = '{}/sst/vocab.txt'.format(self.dir) if vocab_file is None else vocab_file
-        download(_urls['sst'], path=self.zip_file_path)
+        download(_get_dgl_url(_urls['sst']), path=self.zip_file_path)
         extract_archive(self.zip_file_path, '{}/sst'.format(self.dir))
         self.trees = []
         self.num_classes = 5

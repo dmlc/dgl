@@ -1996,16 +1996,21 @@ class DGLGraph(object):
         or not.
 
         There are three types of an incidence matrix :math:`I`:
-
+        
         * ``in``:
+        
             - :math:`I[v, e] = 1` if :math:`e` is the in-edge of :math:`v`
               (or :math:`v` is the dst node of :math:`e`);
             - :math:`I[v, e] = 0` otherwise.
+            
         * ``out``:
+        
             - :math:`I[v, e] = 1` if :math:`e` is the out-edge of :math:`v`
               (or :math:`v` is the src node of :math:`e`);
             - :math:`I[v, e] = 0` otherwise.
+            
         * ``both``:
+        
             - :math:`I[v, e] = 1` if :math:`e` is the in-edge of :math:`v`;
             - :math:`I[v, e] = -1` if :math:`e` is the out-edge of :math:`v`;
             - :math:`I[v, e] = 0` otherwise (including self-loop).

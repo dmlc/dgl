@@ -1,4 +1,3 @@
-
 """Cora, citeseer, pubmed dataset.
 
 (lingfan): following dataset loading and preprocessing code from tkipf/gcn
@@ -12,12 +11,12 @@ import networkx as nx
 import scipy.sparse as sp
 import os, sys
 
-from .utils import download, extract_archive, get_download_dir
+from .utils import download, extract_archive, get_download_dir, _get_dgl_url
 
 _urls = {
-    'cora' : 'https://s3.amazonaws.com/dgl-data/dataset/cora.zip',
-    'citeseer' : 'https://s3.amazonaws.com/dgl-data/dataset/citeseer.zip',
-    'pubmed' : 'https://s3.amazonaws.com/dgl-data/dataset/pubmed.zip',
+    'cora' : 'dataset/cora.zip',
+    'citeseer' : 'dataset/citeseer.zip',
+    'pubmed' : 'dataset/pubmed.zip',
 }
 
 class CitationGraphDataset(object):
@@ -25,7 +24,7 @@ class CitationGraphDataset(object):
         self.name = name
         self.dir = get_download_dir()
         self.zip_file_path='{}/{}.zip'.format(self.dir, name)
-        download(_urls[name], path=self.zip_file_path)
+        download(_get_dgl_url(_urls[name]), path=self.zip_file_path)
         extract_archive(self.zip_file_path, '{}/{}'.format(self.dir, name))
         self._load()
 
