@@ -503,7 +503,7 @@ class LGNN(nn.Module):
 # -----------------------
 # We first load the data
 from torch.utils.data import DataLoader
-n_batch_size = 2
+n_batch_size = 1
 
 indices = list(range(num_train))
 training_loader = DataLoader(train_set,
@@ -550,7 +550,7 @@ import torch.optim as optim
 n_features = 16
 n_layers = 3
 radius = 3
-lr = 1e-2
+lr = 1e-3
 K = 2 # num_of_classes
 inference_idx = 1
 feats = [1] + [n_features]*n_layers + [K]
