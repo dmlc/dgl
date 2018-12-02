@@ -3,7 +3,7 @@
 Line Graph Neural Network
 =====================================
 
-**Author**: Qi Huang, Yu Gai, Zheng Zhang
+**Author**: `Qi Huang <https://github.com/HQ01>`_, Yu Gai, Zheng Zhang
 """
 
 ###########################################################################################
@@ -279,7 +279,7 @@ utils.graph_viz(label, g.to_networkx())
 # The important point is we are to use different strategies for these terms.
 # 
 # .. note::
-#    For a detailed explanation of :math:`\{Pm, Pd\}`, please go to [advanced topics].
+#    For a detailed explanation of :math:`\{Pm, Pd\}`, please go to ``Advanced Topic #2``.
 #
 # Implementing :math:`\text{prev}` and :math:`\text{deg}` as tensor operation
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
