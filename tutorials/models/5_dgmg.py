@@ -55,9 +55,10 @@ g.add_edges([2, 0], [0, 2]) # Add edges (2, 0), (0, 2)
 # with different sizes, topologies, node types, edge types, and the possibility
 # of multigraphs. Besides, a same graph can be generated in many different
 # orders. Regardless, the generative process entails a few steps:
-#      - Encode a changing graph,
-#      - Perform actions stochastically,
-#      - Collect error signals and optimize the model parameters (If we are training)
+#
+# - Encode a changing graph,
+# - Perform actions stochastically,
+# - Collect error signals and optimize the model parameters (If we are training)
 #
 # When it comes to implementation, another important aspect is speed: how do we
 # parallelize the computation given that generating a graph is fundamentally a
@@ -713,7 +714,7 @@ class DGMG(DGMGSkeleton):
 import torch.utils.model_zoo as model_zoo
 
 # Download a pre-trained model state dict for generating cycles with 10-20 nodes.
-state_dict = model_zoo.load_url('https://s3.amazonaws.com/dgl-data/model/dgmg_cycles-5a0c40be.pth')
+state_dict = model_zoo.load_url('https://s3.us-east-2.amazonaws.com/dgl.ai/model/dgmg_cycles-5a0c40be.pth')
 model = DGMG(v_max=20, node_hidden_size=16, num_prop_rounds=2)
 model.load_state_dict(state_dict)
 model.eval()

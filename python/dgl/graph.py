@@ -1884,17 +1884,23 @@ class DGLGraph(object):
         value indicating whether the edge is incident to the node
         or not.
 
-        There are three types of an incidence matrix `I`:
+        There are three types of an incidence matrix :math:`I`:
+
         * "in":
-          - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
-          - I[v, e] = 0 otherwise.
+
+          - :math:`I[v, e] = 1` if e is the in-edge of v (or v is the dst node of e);
+          - :math:`I[v, e] = 0` otherwise.
+
         * "out":
-          - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
-          - I[v, e] = 0 otherwise.
+
+          - :math:`I[v, e] = 1` if e is the out-edge of v (or v is the src node of e);
+          - :math:`I[v, e] = 0` otherwise.
+
         * "both":
-          - I[v, e] = 1 if e is the in-edge of v;
-          - I[v, e] = -1 if e is the out-edge of v;
-          - I[v, e] = 0 otherwise (including self-loop).
+
+          - :math:`I[v, e] = 1` if e is the in-edge of v;
+          - :math:`I[v, e] = -1` if e is the out-edge of v;
+          - :math:`I[v, e] = 0` otherwise (including self-loop).
 
         Parameters
         ----------
