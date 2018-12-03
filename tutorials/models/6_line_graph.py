@@ -2,7 +2,7 @@
 .. _model-line-graph:
 
 Line Graph Neural Network
-=====================================
+=========================
 
 **Author**: `Qi Huang <https://github.com/HQ01>`_, Yu Gai,
 `Minjie Wang <https://jermainewang.github.io/>`_, Zheng Zhang
@@ -67,7 +67,10 @@ Line Graph Neural Network
 # CORA dataset.
 #
 # .. figure:: https://i.imgur.com/X404Byc.png
-#    :alt:
+#    :alt: cora
+#    :height: 400px
+#    :width: 500px
+#    :align: center
 #
 # CORA naturally contains 7 "classes", and statistics below show that each
 # "class" does satisfy our assumption of community, i.e. nodes of same class
@@ -105,11 +108,10 @@ print('Intra-class edges percent: %.4f' % (len(intra_src) / len(src_labels)))
 #    To create a toy binary-community dataset from CORA, We first extract
 #    all two-class pairs from the original CORA 7 classes. For each pair, we
 #    treat each class as one community, and find the largest subgraph that
-#    at least contain one cross-community edge as the training example.Here
-#    is a simple example of an extracted binary commnity subraph from CORA.
-#    Nodes in blue belong to one community, nodes in red belong to another.
+#    at least contain one cross-community edge as the training example. As
+#    a result, there are a total of 21 training samples in this mini-dataset.
 #
-# Here is an example:
+# Here we visualize one of the training sample with its community structure:
 import networkx as nx
 import matplotlib.pyplot as plt
 
@@ -144,8 +146,6 @@ visualize(label1, nx_G1)
 # - For each example :math:`(G,L)`, the model learn to minimize a specially-
 #   designed loss function (equivariant loss) :math:`L_{equivariant} =
 #   (\tilde{Z}，Z)`
-# Interested readers can check note to see a detalied explanation of the
-# equivariant loss.
 #
 # .. note::
 #
@@ -178,12 +178,13 @@ visualize(label1, nx_G1)
 # In graph theory, line graph is a graph representation that encodes the
 # edge adjacency sturcutre in the original graph.
 #
-# Specifically, a line-graph `lg` turns an edge of the original graph `g`
-# into a node.This is illustrated with the graph below (taken from the
+# Specifically, a line-graph :math`L(G)` turns an edge of the original graph `G`
+# into a node. This is illustrated with the graph below (taken from the
 # paper)
 # 
 # .. figure:: https://i.imgur.com/4WO5jEm.png
-#    :alt:
+#    :alt: lg
+#    :align: center
 #
 # Here, :math:`e_{A}:= （i\rightarrow j）` and :math:`e_{B}:= (j\rightarrow k)`
 # are two edges in the original graph :math:`G`. In line graph :math:`G_L`,
@@ -200,8 +201,8 @@ visualize(label1, nx_G1)
 # 
 # .. note::
 #
-#    Mathematically, this definition corresponds to a notion called non-
-#    backtracking operator:
+#    Mathematically, this definition corresponds to a notion called non-backtracking
+#    operator:
 #    :math:`B_{(i \rightarrow j), (\hat{i} \rightarrow \hat{j})}`
 #    :math:`= \begin{cases}
 #    1 \text{ if } j = \hat{i}, \hat{j} \neq i\\
@@ -212,13 +213,13 @@ visualize(label1, nx_G1)
 # One layer in LGNN -- algorithm sturcture
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
-#
 # LGNN chains up a series of line-graph neural network layers. The graph
 # reprentation :math:`x` and its line-graph companion :math:`y` evolve with
 # the dataflow as follows,
 # 
 # .. figure:: https://i.imgur.com/bZGGIGp.png
-#    :alt:
+#    :alt: alg
+#    :align: center
 #
 # At the :math:`k`-th layer, the :math:`i`-th neuron of the :math:`l`-th
 # channel updates its embedding :math:`x^{(k+1)}_{i,l}` with:
@@ -245,6 +246,7 @@ visualize(label1, nx_G1)
 #    &+\text{skip-connection}
 #    \qquad i^{'} \in V_{l}, l^{'} = 1,2,3, ... b^{'}_{k+1}/2
 #    \end{split}
+#
 # Where :math:`\text{skip-connection}` refers to performing the same operation without the non-linearity
 # :math:`\rho`, and with linear projection :math:`\theta_\{\frac{b_{k+1}}{2} + 1, ..., b_{k+1}-1, b_{k+1}\}`
 # and :math:`\gamma_\{\frac{b_{k+1}}{2} + 1, ..., b_{k+1}-1, b_{k+1}\}`.
@@ -266,13 +268,14 @@ visualize(label1, nx_G1)
 #   companion line graph, respectively.
 #
 # - Each equation consists of 4 terms: (take the first as example):
+#
 #   - :math:`x^{(k)}\theta^{(k)}_{1,l}`, a linear projection of previous
 #     layer's output :math:`x^{(k)}`, denote as :math:`\text{prev}(x)`.
 #   - :math:`(Dx^{(k)})\theta^{(k)}_{2,l}`, a linear projection of degree
 #     operator on :math:`x^{(k)}`, denote as :math:`\text{deg}(x)`.
 #   - :math:`\sum^{J-1}_{j=0}(A^{2^{j}}x^{(k)})\theta^{(k)}_{3+j,l}`,
 #     a summation of :math:`2^{j}` adjacency operator on :math:`x^{(k)}`,
-#     denote as :math:`\text{sum}(x)`
+#     denote as :math:`\text{radius}(x)`
 #   - :math:`[\{Pm,Pd\}y^{(k)}]\theta^{(k)}_{3+J,l}`, fusing another
 #     graph's embedding information using incidence matrix
 #     :math:`\{Pm, Pd\}`, followed with a linear porjection,
@@ -284,9 +287,9 @@ visualize(label1, nx_G1)
 # 
 #   .. math::
 #      \begin{split}
-#      f(x^{(k)},y^{(k)}) = {}\rho[&\text{prev}_{1}(x^{(k-1)}) + \text{deg}_{1}(x^{(k-1)}) +\text{sum}_{1}(x^{k-1})
-#      +\text{fuse}_{1}(y^{(k)})]\\
-#      +&\text{prev}_{1}(x^{(k-1)}) + \text{deg}_{1}(x^{(k-1)}) +\text{sum}_{1}(x^{k-1}) +\text{fuse}_{1}(y^{(k)})
+#      f(x^{(k)},y^{(k)}) = {}\rho[&\text{prev}(x^{(k-1)}) + \text{deg}(x^{(k-1)}) +\text{radius}(x^{k-1})
+#      +\text{fuse}(y^{(k)})]\\
+#      +&\text{prev}(x^{(k-1)}) + \text{deg}(x^{(k-1)}) +\text{radius}(x^{k-1}) +\text{fuse}(y^{(k)})
 #      \end{split}
 #
 # - Two equations are chained up in the following order :
@@ -301,10 +304,10 @@ visualize(label1, nx_G1)
 # The important point is we are to use different strategies for these terms.
 # 
 # .. note::
-#    For a detailed explanation of :math:`\{Pm, Pd\}`, please go to ``Advanced Topic #2``.
+#    For a detailed explanation of :math:`\{Pm, Pd\}`, please go to `Advanced Topic <adv2>`_.
 #
 # Implementing :math:`\text{prev}` and :math:`\text{deg}` as tensor operation
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Since linear projection and degree operation are both simply matrix
 # multiplication, we can write them as PyTorch tensor operation.
 #
@@ -312,8 +315,8 @@ visualize(label1, nx_G1)
 # 
 # ::
 # 
-#    self.new_linear = lambda: nn.Linear(feats, out_feats)
-#    self.linear_prev, self.linear_deg = self.new_linear(), self.new_linear()
+#    self.linear_prev = nn.Linear(in_feats, out_feats)
+#    self.linear_deg = nn.Linear(in_feats, out_feats)
 # 
 #
 # In ``forward()``, :math:`\text{prev}` and :math:`\text{deg}` are the same
@@ -321,12 +324,11 @@ visualize(label1, nx_G1)
 # 
 # ::
 # 
-#   prev_proj = self.linear_prev(feat_a)
+#    prev_proj = self.linear_prev(feat_a)
+#    deg_proj = self.linear_deg(deg * feat_a)
 # 
-#   deg_proj = self.linear_deg(deg * feat_a)
-# 
-# Implementing :math:`\text{sum}` as message passing in DGL
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Implementing :math:`\text{radius}` as message passing in DGL
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # As discussed in GCN tutorial, we can formulate one adjacency operator as
 # doing one step message passing. As a generalization, :math:`2^j` adjacency
 # operations can be formulated as performing :math:`2^j` step of message
@@ -339,11 +341,15 @@ visualize(label1, nx_G1)
 # 
 # ::
 # 
-#   self.new_linear_list = lambda: nn.ModuleList([self.new_linear() for i in range(radius)])
-# 
-#   self.linear_radius = self.new_linear_list()
+#   self.linear_radius = nn.ModuleList(
+#           [nn.Linear(in_feats, out_feats) for i in range(radius)])
 #
-# In ``__forward__``, we define the ``sum`` operation as ``aggregate_radius()``:
+# In ``__forward__``, we use following function ``aggregate_radius()`` to
+# gather data from multiple hop. Note that the ``update_all`` is called
+# multiple times.
+
+# Return a list containing features gathered from multiple radius.
+import dgl.function as fn
 def aggregate_radius(radius, g, z):
     # initializing list to collect message passing result
     z_list = []
@@ -359,11 +365,6 @@ def aggregate_radius(radius, g, z):
     return z_list
 
 #########################################################################
-# Then 
-# ::
-# 
-#   sum_a = twoj_hop(feat_a)
-# 
 # Implementing :math:`\text{fuse}` as sparse matrix multiplication
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # :math:`\{Pm, Pd\}` is a sparse matrix with only two non-zero entries on
@@ -374,9 +375,7 @@ def aggregate_radius(radius, g, z):
 # 
 # ::
 # 
-#   pmpd_exp = lambda feat : th.matmul(pm_pd, feat)
-# 
-#   fuse = self.linear_fuse(pmpd_exp(feat_b))
+#   fuse = self.linear_fuse(th.mm(pm_pd, feat_b))
 #
 # Completing :math:`f(x, y)`
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -385,7 +384,7 @@ def aggregate_radius(radius, g, z):
 # 
 # ::
 #
-#   result = prev_proj + deg_proj + sum_a + fuse``
+#   result = prev_proj + deg_proj + radius_proj + fuse``
 # 
 # Then pass result to skip connection: 
 # 
@@ -401,8 +400,6 @@ def aggregate_radius(radius, g, z):
 # 
 #
 # Below is the complete code for one LGNN layer's abstraction :math:`f(x,y)`
-import dgl.function as fn
-
 class LGNNCore(nn.Module):
     def __init__(self, in_feats, out_feats, radius):
         super(LGNNCore, self).__init__()
@@ -417,23 +414,23 @@ class LGNNCore(nn.Module):
         self.bn = nn.BatchNorm1d(out_feats)
 
     def forward(self, g, feat_a, feat_b, deg, pm_pd):
-        # equation term ?
+        # term "prev"
         prev_proj = self.linear_prev(feat_a)
-        # equation term ?
+        # term "deg"
         deg_proj = self.linear_deg(deg * feat_a)
 
-        # equation term ?
+        # term "radius"
         # aggregate 2^j-hop features
         hop2j_list = aggregate_radius(self.radius, g, feat_a)
         # apply linear transformation
         hop2j_list = [linear(x) for linear, x in zip(self.linear_radius, hop2j_list)]
-        sum_a = sum(hop2j_list)
+        radius_proj = sum(hop2j_list)
 
-        # equation term ?
+        # term "fuse"
         fuse = self.linear_fuse(th.mm(pm_pd, feat_b))
 
         # sum them together
-        result = prev_proj + deg_proj + sum_a + fuse
+        result = prev_proj + deg_proj + radius_proj + fuse
 
         # skip connection and batch norm
         n = self.out_feats // 2
@@ -452,6 +449,7 @@ class LGNNCore(nn.Module):
 #    x^{(k+1)} = {}& f(x^{(k)}, y^{(k)})\\
 #    y^{(k+1)} = {}& f(y^{(k)}, x^{(k+1)})
 #    \end{split}
+#
 # We chain up 2 ``LGNNCore`` instances with different parameter in the forward pass.
 class LGNNLayer(nn.Module):
     def __init__(self, in_feats, out_feats, radius):
@@ -462,7 +460,7 @@ class LGNNLayer(nn.Module):
     def forward(self, g, lg, x, lg_x, deg_g, deg_lg, pm_pd):
         next_x = self.g_layer(g, x, lg_x, deg_g, pm_pd)
         pm_pd_y = th.transpose(pm_pd, 0, 1)
-        next_lg_x = self.lg_layer(lg, lg_x, x, deg_lg, pm_pd_y) # Here we can add pm_pd_y
+        next_lg_x = self.lg_layer(lg, lg_x, x, deg_lg, pm_pd_y)
         return next_x, next_lg_x
 
 ########################################################################################
@@ -471,11 +469,6 @@ class LGNNLayer(nn.Module):
 # We then define an LGNN with three hidden layers.
 class LGNN(nn.Module):
     def __init__(self, radius):
-        """
-        Parameters
-        ----------
-        radius : radius of neighborhood message passing
-        """
         super(LGNN, self).__init__()
         self.layer1 = LGNNLayer(1, 16, radius)  # input is scalar feature
         self.layer2 = LGNNLayer(16, 16, radius)  # hidden size is 16
@@ -501,24 +494,24 @@ training_loader = DataLoader(train_set,
                              batch_size=1,
                              collate_fn=train_set.collate_fn,
                              drop_last=True)
-##############################################################
-# The line graph construction is done with DGL's line graph API. Here is a code snippet:
-# 
+
+#######################################################################################
+# We then define the main training loop. Note that each training sample contains
+# three objects: a :class:`~dgl.DGLGraph`, a scipy sparse matrix ``pmpd`` and label
+# array in ``numpy.ndarray``. We first generate the line graph using:
+#
 # ::
 # 
-#  self._line_graphs = [g.line_graph(backtracking=False) for g in self._subgraphs]``
-# 
-# 
+#   lg = g.line_graph(backtracking=False)
 #
-# ``backracking = false`` means we use non-backtracking operator to define the line graph.
-# See code link at here (link to data/binary-sub-grph).
-# Here we define a main loop to train a 3 layers LGNN for 20 epochs on the toy-datset.
-# We first define a ``step()`` function to describe each step of training:
-
+# Note that ``backtracking=False`` is required to correctly simulate non-backtracking
+# operation. We also define a utility function to convert the scipy sparse matrix to
+# torch sparse tensor.
 
 #######################################################################################
 # initialize the model
 model = LGNN(radius=3)
+# define the optimizer
 optimizer = th.optim.Adam(model.parameters(), lr=1e-2)
 
 # a util function to convert a scipy.coo_matrix to torch.SparseFloat
@@ -528,8 +521,7 @@ def sparse2th(mat):
     tensor = th.sparse.FloatTensor(indices, th.from_numpy(value).float(), mat.shape)
     return tensor
 
-#######################################################################################
-# Below is the main training loop
+# train for 20 epochs
 for i in range(20):
     all_loss = []
     all_acc = []
@@ -571,9 +563,9 @@ for i in range(20):
 #######################################################################################
 # Visualizing training progress
 # -----------------------------
-# To intuitively understand the training progress of a LGNN,
-# we visualize the network's community prediction on one training example,
+# We visualize the network's community prediction on one training example,
 # together with the ground truth.
+
 pmpd1 = sparse2th(pmpd1)
 LG1 = G1.line_graph(backtracking=False)
 z = model(G1, LG1, pmpd1)
@@ -581,30 +573,33 @@ _, pred = th.max(z, 1)
 visualize(pred, nx_G1)
 
 #######################################################################################
-# Below is ground truth.
+# Compared with the ground truth. Note that the color might be reversed for the
+# two community as the model is to correctly predict the "partitioning".
 visualize(label1, nx_G1)
 
 #########################################
-# We then provide an animation to better understand the process. (40 epochs)
+# Here is an animation to better understand the process. (40 epochs)
 #
 # .. figure:: https://i.imgur.com/KDUyE1S.gif 
 #    :alt: lgnn-anim
 #
-# Advanced topic #1: batching
-# ---------------------------
+# Advanced topic
+# --------------
+#
+# Batching
+# ~~~~~~~~
 # LGNN takes a collection of different graphs.
 # Thus, it's natural we use batching to explore parallelism.
 # Why is it not done?
 #
 # As it turned out, we moved batching into the dataloader itself.
-#
 # In the ``collate_fn`` for PyTorch Dataloader, we batch graphs using DGL's
-# batched_graph API.  Degree matrices are simply numpy arrays, thus we
-# concatenate them.  To refresh our memory, DGL batches graphs by merging them
+# batched_graph API. To refresh our memory, DGL batches graphs by merging them
 # into a large graph, with each smaller graph's adjacency matrix being a block
 # along the diagonal of the large graph's adjacency matrix.  We concatentate
 # :math`\{Pm,Pd\}` as block diagonal matrix in corespondance to DGL batched
 # graph API.
+
 def collate_fn(batch):
     graphs, pmpds, labels = zip(*batch)
     batched_graphs = dgl.batch(graphs)
@@ -613,10 +608,10 @@ def collate_fn(batch):
     return batched_graphs, batched_pmpds, batched_labels
 
 ######################################################################################
-# You can check out the complete code here (link to dataloader).
+# You can check out the complete code `here <>`.
 # 
-# Advanced topic #2: what's the business with :math:`\{Pm, Pd\}`?
-# ----------------------------------------------------------------
+# What's the business with :math:`\{Pm, Pd\}`?
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Rougly speaking, there is a relationship between how :math:`g` and
 # :math:`lg` (the line graph) working together with loopy brief propagation.
 # Here, we implement :math:`\{Pm, Pd\}` as scipy coo sparse matrix in the datset,

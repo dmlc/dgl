@@ -273,6 +273,12 @@ def register_args(parser):
 
 class CoraBinary(object):
     """A mini-dataset for binary classification task using Cora.
+
+    After loaded, it has following members:
+
+    graphs : list of :class:`~dgl.DGLGraph`
+    pmpds : list of :class:`scipy.sparse.coo_matrix`
+    labels : list of :class:`numpy.ndarray`
     """
     def __init__(self):
         self.dir = get_download_dir()
