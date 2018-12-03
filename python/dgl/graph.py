@@ -187,6 +187,7 @@ class DGLGraph(object):
         5
 
         Adding new nodes with features (using PyTorch as example):
+
         >>> import torch as th
         >>> g.add_nodes(2, {'x': th.ones(2, 4)})    # default zero initializer
         >>> g.ndata['x']
@@ -228,11 +229,13 @@ class DGLGraph(object):
         Examples
         --------
         The following example uses PyTorch backend.
+
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
         >>> G.add_edge(0, 1)
 
         Adding new edge with features
+
         >>> import torch as th
         >>> G.add_edge(0, 2, {'x': th.ones(1, 4)})
         >>> G.edges()
@@ -277,11 +280,13 @@ class DGLGraph(object):
         Examples
         --------
         The following example uses PyTorch backend.
+
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(4)
         >>> G.add_edges([0, 2], [1, 3]) # add edges (0, 1) and (2, 3)
 
         Adding new edges with features
+
         >>> import torch as th
         >>> G.add_edges([1, 3], [2, 0], {'x': th.ones(2, 4)}) # (1, 2), (3, 0)
         >>> G.edata['x']
@@ -1078,20 +1083,43 @@ class DGLGraph(object):
     def node_attr_schemes(self):
         """Return the node feature schemes.
 
+        Each feature scheme is a named tuple that stores the shape and data type
+        of the node feature
+
         Returns
         -------
         dict of str to schemes
             The schemes of node feature columns.
+
+        Examples
+        --------
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.ndata['x'] = torch.zeros((3,5))
+        >>> G.node_attr_schemes()
+        {'x': Scheme(shape=(5,), dtype=torch.float32)}
         """
         return self._node_frame.schemes
 
     def edge_attr_schemes(self):
         """Return the edge feature schemes.
 
+        Each feature scheme is a named tuple that stores the shape and data type
+        of the node feature
+
         Returns
         -------
         dict of str to schemes
             The schemes of edge feature columns.
+
+        Examples
+        --------
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([0, 1], 2)  # 0->2, 1->2
+        >>> G.edata['y'] = th.zeros((2, 4))
+        >>> G.edge_attr_schemes()
+        {'y': Scheme(shape=(4,), dtype=torch.float32)}
         """
         return self._edge_frame.schemes
 
@@ -1101,6 +1129,9 @@ class DGLGraph(object):
         Initializer is a callable that returns a tensor given the shape, data type
         and device context.
 
+        When a subset of the nodes are assigned a new feature, initializer is
+        used to create feature for rest of the nodes.
+
         Parameters
         ----------
         initializer : callable
@@ -1109,17 +1140,43 @@ class DGLGraph(object):
             The feature field name. Default is set an initializer for all the
             feature fields.
 
+        Examples
+        --------
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+
+        Set initializer for all node features
+
+        >>> G.set_n_initializer(dgl.init.zero_initializer)
+
+        Set feature for partial nodes
+
+        >>> G.nodes[[0, 2]].data['x'] = th.ones((2, 5))
+        >>> G.ndata
+        {'x' : tensor([[1., 1., 1., 1., 1.],
+                       [0., 0., 0., 0., 0.],
+                       [1., 1., 1., 1., 1.]])}
+
+        Note
+        -----
+        User defined initializer must follow the signature of
+        dgl.init.base_initializer
+
         See Also
         --------
         dgl.init.base_initializer
+
         """
         self._node_frame.set_initializer(initializer, field)
 
     def set_e_initializer(self, initializer, field=None):
         """Set the initializer for empty edge features.
 
-        Initializer is a callable that returns a tensor given the shape, data type
-        and device context.
+        Initializer is a callable that returns a tensor given the shape, data
+        type and device context.
+
+        When a subset of the edges are assigned a new feature, initializer is
+        used to create feature for rest of the edges.
 
         Parameters
         ----------
@@ -1129,30 +1186,147 @@ class DGLGraph(object):
             The feature field name. Default is set an initializer for all the
             feature fields.
 
+        Examples
+        --------
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([0, 1], 2)  # 0->2, 1->2
+
+        Set initializer for edge features
+
+        >>> G.set_e_initializer(dgl.init.zero_initializer)
+
+        Set feature for partial edges
+
+        >>> G.edges[1, 2].data['y'] = th.ones((1, 4))
+        >>> G.edata
+        {'y' : tensor([[0., 0., 0., 0.],
+                       [1., 1., 1., 1.]])}
+
+        Note
+        -----
+        User defined initializer must follow the signature of
+        dgl.init.base_initializer
+
         See Also
         --------
         dgl.init.base_initializer
+
         """
         self._edge_frame.set_initializer(initializer, field)
 
     @property
     def nodes(self):
-        """Return a node view that can used to set/get feature data."""
+        """Return a node view that can used to set/get feature data.
+
+        Examples
+        --------
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+
+        Get nodes in graph G:
+
+        >>> G.nodes()
+        tensor([0, 1, 2])
+
+        Get feature dictionary of all nodes:
+
+        >>> G.nodes[:].data
+        {}
+
+        The above can be abbreviated as
+
+        >>> G.ndata
+        {}
+
+        Init all 3 nodes with zero vector(len=5)
+
+        >>> G.ndata['x'] = th.zeros((3, 5))
+        >>> G.ndata['x']
+        {'x' : tensor([[0., 0., 0., 0., 0.],
+                       [0., 0., 0., 0., 0.],
+                       [0., 0., 0., 0., 0.]])}
+
+        Use G.nodes to get/set features for some nodes.
+
+        >>> G.nodes[[0, 2]].data['x'] = th.ones((2, 5))
+        >>> G.ndata
+        {'x' : tensor([[1., 1., 1., 1., 1.],
+                       [0., 0., 0., 0., 0.],
+                       [1., 1., 1., 1., 1.]])}
+
+        See Also
+        --------
+        dgl.DGLGraph.ndata
+
+        """
         return NodeView(self)
 
     @property
     def ndata(self):
-        """Return the data view of all the nodes."""
+        """Return the data view of all the nodes.
+
+        DGLGraph.ndata is an abbreviation of DGLGraph.nodes[:].data
+
+        See Also
+        --------
+        dgl.DGLGraph.nodes
+        """
         return self.nodes[:].data
 
     @property
     def edges(self):
-        """Return a edges view that can used to set/get feature data."""
+        """Return a edges view that can used to set/get feature data.
+
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([0, 1], 2)  # 0->2, 1->2
+
+        Get edges in graph G:
+
+        >>> G.edges()
+        (tensor([0, 1]), tensor([2, 2]))
+
+        Get feature dictionary of all edges:
+
+        >>> G.edges[:].data
+        {}
+
+        The above can be abbreviated as
+
+        >>> G.edata
+        {}
+
+        Init 2 edges with zero vector(len=4)
+
+        >>> G.edata['y'] = th.zeros((2, 4))
+        >>> G.edata
+        {'y' : tensor([[0., 0., 0., 0.],
+                       [0., 0., 0., 0.]])}
+
+        Use G.edges to get/set features for some edges.
+
+        >>> G.edges[1, 2].data['y'] = th.ones((1, 4))
+        >>> G.edata
+        {'y' : tensor([[0., 0., 0., 0.],
+                       [1., 1., 1., 1.]])}
+
+        See Also
+        --------
+        dgl.DGLGraph.edata
+        """
         return EdgeView(self)
 
     @property
     def edata(self):
-        """Return the data view of all the edges."""
+        """Return the data view of all the edges.
+
+        DGLGraph.data is an abbreviation of DGLGraph.edges[:].data
+
+        See Also
+        --------
+        dgl.DGLGraph.edges
+        """
         return self.edges[:].data
 
     def set_n_repr(self, hu, u=ALL, inplace=False):
