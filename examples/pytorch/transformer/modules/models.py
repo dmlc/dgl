@@ -76,19 +76,15 @@ lock = threading.Lock()
 class Transformer(nn.Module):
     def __init__(self, encoder, decoder, src_embed, tgt_embed, pos_enc, generator, h, d_k):
         super(Transformer, self).__init__()
-        self.encoder = encoder
-        self.decoder = decoder
-        self.src_embed = src_embed
-        self.tgt_embed = tgt_embed
+        self.encoder,  self.decoder = encoder, decoder
+        self.src_embed, self.tgt_embed = src_embed, tgt_embed
         self.pos_enc = pos_enc
         self.generator = generator
-        self.h = h
-        self.d_k = d_k
+        self.h, self.d_k = h, d_k
         self.att_weight_map = None
 
     def update_graph(self, g, eids, pre_pairs, post_pairs):
-        "Update the node states and edge states of the graph."
-
+        """Update the node states and edge states of the graph."""
         # Pre-compute queries and key-value pairs.
         for pre_func, nids in pre_pairs:
             g.apply_nodes(pre_func, nids)
