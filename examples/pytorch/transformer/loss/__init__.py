@@ -42,7 +42,7 @@ class SimpleLossCompute(nn.Module):
         opt is required during training
         """
         super(SimpleLossCompute, self).__init__()
-        self.criterion = criterion[0] if isinstance(criterion, list) else criterion
+        self.criterion = criterion
         self.opt = opt
         self.reset()
 
@@ -59,8 +59,7 @@ class SimpleLossCompute(nn.Module):
         self.n_correct = 0
         self.norm_term = 0
 
-    def __call__(self, y_preds, ys, norms):
-        y_pred, y, norm = y_preds[0], ys[0], norms[0]
+    def __call__(self, y_pred, y, norm):
         y_pred = y_pred.contiguous().view(-1, y_pred.shape[-1])
         y = y.contiguous().view(-1)
         loss = self.criterion(

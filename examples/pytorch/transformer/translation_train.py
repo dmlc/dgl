@@ -13,12 +13,19 @@ from tqdm import tqdm
 import numpy as np
 import argparse
 
-def run_epoch(data_iter, models, loss_compute, is_train=True):
-    for i, gs in tqdm(enumerate(data_iter)):
+def run_epoch(data_iter, model, loss_compute, is_train=True):
+    for i, g in tqdm(enumerate(data_iter)):
         with T.set_grad_enabled(is_train):
-            models = models[:len(gs)]
-            outputs = parallel_apply(models, gs)
-            loss = loss_compute(outputs, [g.tgt_y for g in gs], [g.n_tokens for g in gs])
+            if isinstance(model, list):
+                model = model[:len(gs)]
+                output = parallel_apply(model, g)
+                tgt_y = [g.tgt_y for g in gs]
+                n_tokens = [g.n_tokens for g in gs]
+            else:
+                output = model(g)
+                tgt_y = g.tgt_y
+                n_tokens = g.n_tokens
+            loss = loss_compute(output, tgt_y, n_tokens)
     print('average loss: {}'.format(loss_compute.avg_loss))
     print('accuracy: {}'.format(loss_compute.accuracy))
 
@@ -54,9 +61,7 @@ if __name__ == '__main__':
     model_opt = NoamOpt(dim_model, 1, 400,
                         T.optim.Adam(model.parameters(), lr=1e-3, betas=(0.9, 0.98), eps=1e-9))
     if len(devices) > 1:
-        models, criterions = map(nn.parallel.replicate, [model, criterion], [devices, devices])
-    else:
-        models, criterions = [model], [criterion]
+        model, criterion = map(nn.parallel.replicate, [model, criterion], [devices, devices])
     loss_compute = SimpleLossCompute if len(devices) == 1 else MultiGPULossCompute
 
     for epoch in range(100):
@@ -64,13 +69,13 @@ if __name__ == '__main__':
         valid_iter = dataset(graph_pool, mode='valid', batch_size=args.batch, devices=devices)
         print('Epoch: {} Training...'.format(epoch))
         model.train(True)
-        run_epoch(train_iter, models,
-                      loss_compute(criterions, model_opt), is_train=True)
+        run_epoch(train_iter, model,
+                      loss_compute(criterion, model_opt), is_train=True)
         print('Epoch: {} Evaluating...'.format(epoch))
         model.att_weight_map = None
         model.eval()
-        run_epoch(valid_iter, models,
-                      loss_compute(criterions, None), is_train=False)
+        run_epoch(valid_iter, model,
+                      loss_compute(criterion, None), is_train=False)
         # Visualize attention
         if args.viz:
             src_seq = dataset.get_seq_by_id(VIZ_IDX, mode='valid', field='src')

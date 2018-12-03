@@ -25,7 +25,7 @@ def prepare_dataset(dataset_name):
     elif dataset_name == 'wmt14':
         download(_urls['wmt'], path='wmt16_en_de.tar.gz')
         os.system('bash scripts/prepare-wmt14.sh')
-    elif dataset_name == 'copy':
+    elif dataset_name == 'copy' or dataset_name == 'tiny_copy':
         train_size = 9000
         valid_size = 1000
         test_size = 1000
@@ -58,7 +58,7 @@ def prepare_dataset(dataset_name):
             for c in char_list:
                 f.write(c + '\n')
 
-    elif dataset_name == 'sort':
+    elif dataset_name == 'sort' or dataset_name == 'tiny_sort':
         train_size = 9000
         valid_size = 1000
         test_size = 1000

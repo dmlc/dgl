@@ -121,7 +121,7 @@ class TranslationDataset:
                     gs.append(graph_pool(src_buf, tgt_buf, device=devices[dev_id]))
                     dev_id += 1
                     if dev_id == len(devices):
-                        yield gs
+                        yield gs if len(devices) > 1 else gs[0]
                         dev_id, gs = 0, []
                 src_buf, tgt_buf = [], []
 
@@ -130,7 +130,7 @@ class TranslationDataset:
                 yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=devices[0])
             else:
                 gs.append(graph_pool(src_buf, tgt_buf, device=devices[dev_id]))
-                yield gs
+                yield gs if len(devices) > 1 else gs[0]
 
     def get_sequence(self, batch):
         "return a list of sequence from a list of index arrays"
@@ -149,17 +149,11 @@ def get_dataset(dataset):
     prepare_dataset(dataset)
     if dataset == 'babi':
         raise NotImplementedError
-    elif dataset == 'copy':
+    elif dataset == 'copy' or dataset == 'sort':
         return TranslationDataset(
-            'data/copy',
-            ('in', 'out'),
+            'data/{}'.format(dataset), 
+            ('in', 'out'), 
             train='train',
-            valid='valid',
-            test='test',
-        )
-    elif dataset == 'sort':
-        return TranslationDataset(
-            'data/sort', ('in', 'out'), train='train',
             valid='valid',
             test='test',
         )
