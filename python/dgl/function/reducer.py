@@ -52,9 +52,20 @@ def sum(msg, out):
     Parameters
     ----------
     msg : str
-        The message name.
+        The message field.
     out : str
-        The output node feature name.
+        The output node feature field.
+    Example
+    -------
+    >>> import dgl
+    >>> reduce_func = dgl.function.sum(msg='m', out='h')
+
+    The above example is equivalent to the following user defined function
+    (if using PyTorch):
+
+    >>> import torch
+    >>> def reduce_func(nodes):
+    >>>     return {'h': torch.sum(nodes.mailbox['m'], dim=1)}
     """
     return SimpleReduceFunction("sum", F.sum, msg, out)
 
@@ -64,8 +75,20 @@ def max(msg, out):
     Parameters
     ----------
     msg : str
-        The message name.
+        The message field.
     out : str
-        The output node feature name.
+        The output node feature field.
+
+    Example
+    -------
+    >>> import dgl
+    >>> reduce_func = dgl.function.max(msg='m', out='h')
+
+    The above example is equivalent to the following user defined function
+    (if using PyTorch):
+
+    >>> import torch
+    >>> def reduce_func(nodes):
+    >>>     return {'h': torch.max(nodes.mailbox['m'], dim=1)}
     """
     return SimpleReduceFunction("max", F.max, msg, out)
