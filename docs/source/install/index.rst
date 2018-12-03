@@ -111,10 +111,43 @@ Build the shared library and install the Python binding afterwards:
    cd ../python
    python setup.py install
 
-OSX
-```
+macOS
+`````
 
-TODO
+Installation on macOS is similar to Linux. But macOS users need to install
+building tools like clang, GNU Make, cmake first.
+
+Tools like clang and GNU Make are packaged in **Command Line Tools** for macOS. To
+install:
+
+.. code:: bash
+
+   xcode-select --install
+
+To install other needed packages like cmake, we recommend first installing
+**Homebrew**, which is a popular package manager for macOS. Detailed
+instructions can be found on its `homepage <https://brew.sh/>`_.
+
+After installation of Homebrew, install cmake by:
+
+.. code:: bash
+
+   brew install cmake
+
+Then go to root directory of DGL repository, build shared library and
+install Python binding for DGL:
+
+.. code:: bash
+
+   mkdir build
+   cd build
+   cmake ..
+   make -j4
+   cd ../python
+   python setup.py install
+
+We tested installation on macOS X with clang 10.0.0, GNU Make 3.81, and cmake
+3.13.1.
 
 Windows
 ```````
