@@ -32,7 +32,7 @@ def bfs_nodes_generator(graph, source, reversed=False):
     ::
 
               2 - 4
-             / \
+             / \\
         0 - 1 - 3 - 5
 
     >>> g = dgl.DGLGraph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
@@ -72,7 +72,7 @@ def bfs_edges_generator(graph, source, reversed=False):
     ::
 
               2 - 4
-             / \
+             / \\
         0 - 1 - 3 - 5
 
     >>> g = dgl.DGLGraph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
@@ -109,7 +109,7 @@ def topological_nodes_generator(graph, reversed=False):
     ::
 
               2 - 4
-             / \
+             / \\
         0 - 1 - 3 - 5
 
     >>> g = dgl.DGLGraph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
@@ -151,7 +151,7 @@ def dfs_edges_generator(graph, source, reversed=False):
     ::
 
               2 - 4
-             / \
+             / \\
         0 - 1 - 3 - 5
 
     Edge addition order [(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)]
@@ -221,7 +221,7 @@ def dfs_labeled_edges_generator(
     ::
 
               2 - 4
-             / \
+             / \\
         0 - 1 - 3 - 5
 
     Edge addition order [(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)]
