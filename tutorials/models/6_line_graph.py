@@ -384,19 +384,19 @@ def aggregate_radius(radius, g, z):
 # 
 # ::
 #
-#   result = prev_proj + deg_proj + radius_proj + fuse``
+#   result = prev_proj + deg_proj + radius_proj + fuse
 # 
 # Then pass result to skip connection: 
 # 
 # ::
 # 
-#   result = th.cat([result[:, :n], F.relu(result[:, n:])], 1)``
+#   result = th.cat([result[:, :n], F.relu(result[:, n:])], 1)
 # 
 # Then batch norm
 # 
 # ::
 # 
-#   result = self.bn(result) #Batch Normalization.``
+#   result = self.bn(result) #Batch Normalization.
 # 
 #
 # Below is the complete code for one LGNN layer's abstraction :math:`f(x,y)`
@@ -450,7 +450,7 @@ class LGNNCore(nn.Module):
 #    y^{(k+1)} = {}& f(y^{(k)}, x^{(k+1)})
 #    \end{split}
 #
-# We chain up 2 ``LGNNCore`` instances with different parameter in the forward pass.
+# We chain up two ``LGNNCore`` instances with different parameter in the forward pass.
 class LGNNLayer(nn.Module):
     def __init__(self, in_feats, out_feats, radius):
         super(LGNNLayer, self).__init__()
@@ -508,8 +508,7 @@ training_loader = DataLoader(train_set,
 # operation. We also define a utility function to convert the scipy sparse matrix to
 # torch sparse tensor.
 
-#######################################################################################
-# initialize the model
+# create the model
 model = LGNN(radius=3)
 # define the optimizer
 optimizer = th.optim.Adam(model.parameters(), lr=1e-2)
