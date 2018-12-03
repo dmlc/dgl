@@ -2,10 +2,17 @@ from dgl import DGLGraph
 import rdkit.Chem as Chem
 from .chemutils import get_clique_mol, tree_decomp, get_mol, get_smiles, \
                        set_atommap, enum_assemble_nx, decode_stereo
+import numpy as np
+from .line_profiler_integration import profile
 
 class DGLMolTree(DGLGraph):
     def __init__(self, smiles):
         DGLGraph.__init__(self)
+        self.nodes_dict = {}
+
+        if smiles is None:
+            return
+
         self.smiles = smiles
         self.mol = get_mol(smiles)
 
@@ -21,39 +28,43 @@ class DGLMolTree(DGLGraph):
         for i, c in enumerate(cliques):
             cmol = get_clique_mol(self.mol, c)
             csmiles = get_smiles(cmol)
-            self.add_node(
-                    i,
+            self.nodes_dict[i] = dict(
                     smiles=csmiles,
                     mol=get_mol(csmiles),
                     clique=c,
                     )
             if min(c) == 0:
                 root = i
+        self.add_nodes(len(cliques))
 
         # The clique with atom ID 0 becomes root
         if root > 0:
-            for attr in self.nodes[0]:
-                self.nodes[0][attr], self.nodes[root][attr] = \
-                        self.nodes[root][attr], self.nodes[0][attr]
+            for attr in self.nodes_dict[0]:
+                self.nodes_dict[0][attr], self.nodes_dict[root][attr] = \
+                        self.nodes_dict[root][attr], self.nodes_dict[0][attr]
 
-        for _x, _y in edges:
+        src = np.zeros((len(edges) * 2,), dtype='int')
+        dst = np.zeros((len(edges) * 2,), dtype='int')
+        for i, (_x, _y) in enumerate(edges):
             x = 0 if _x == root else root if _x == 0 else _x
             y = 0 if _y == root else root if _y == 0 else _y
-            self.add_edge(x, y)
-            self.add_edge(y, x)
+            src[2 * i] = x
+            dst[2 * i] = y
+            src[2 * i + 1] = y
+            dst[2 * i + 1] = x
+        self.add_edges(src, dst)
 
-        for i in self.nodes:
-            self.nodes[i]['nid'] = i + 1
-            if len(self[i]) > 1:    # Leaf node mol is not marked
-                set_atommap(self.nodes[i]['mol'], self.nodes[i]['nid'])
-            self.nodes[i]['is_leaf'] = (len(self[i]) == 1)
+        for i in self.nodes_dict:
+            self.nodes_dict[i]['nid'] = i + 1
+            if self.out_degree(i) > 1:    # Leaf node mol is not marked
+                set_atommap(self.nodes_dict[i]['mol'], self.nodes_dict[i]['nid'])
+            self.nodes_dict[i]['is_leaf'] = (self.out_degree(i) == 1)
 
-    # avoiding DiGraph.size()
     def treesize(self):
-        return len(self.nodes)
+        return self.number_of_nodes()
 
     def _recover_node(self, i, original_mol):
-        node = self.nodes[i]
+        node = self.nodes_dict[i]
 
         clique = []
         clique.extend(node['clique'])
@@ -61,8 +72,8 @@ class DGLMolTree(DGLGraph):
             for cidx in node['clique']:
                 original_mol.GetAtomWithIdx(cidx).SetAtomMapNum(node['nid'])
 
-        for j in self[i]:
-            nei_node = self.nodes[j]
+        for j in self.successors(i).numpy():
+            nei_node = self.nodes_dict[j]
             clique.extend(nei_node['clique'])
             if nei_node['is_leaf']: # Leaf node, no need to mark
                 continue
@@ -83,25 +94,27 @@ class DGLMolTree(DGLGraph):
         return node['label']
 
     def _assemble_node(self, i):
-        neighbors = [self.nodes[j] for j in self[i] if self.nodes[j]['mol'].GetNumAtoms() > 1]
+        neighbors = [self.nodes_dict[j] for j in self.successors(i).numpy()
+                     if self.nodes_dict[j]['mol'].GetNumAtoms() > 1]
         neighbors = sorted(neighbors, key=lambda x: x['mol'].GetNumAtoms(), reverse=True)
-        singletons = [self.nodes[j] for j in self[i] if self.nodes[j]['mol'].GetNumAtoms() == 1]
+        singletons = [self.nodes_dict[j] for j in self.successors(i).numpy()
+                      if self.nodes_dict[j]['mol'].GetNumAtoms() == 1]
         neighbors = singletons + neighbors
 
-        cands = enum_assemble_nx(self, i, neighbors)
+        cands = enum_assemble_nx(self.nodes_dict[i], neighbors)
 
         if len(cands) > 0:
-            self.nodes[i]['cands'], self.nodes[i]['cand_mols'], _ = list(zip(*cands))
-            self.nodes[i]['cands'] = list(self.nodes[i]['cands'])
-            self.nodes[i]['cand_mols'] = list(self.nodes[i]['cand_mols'])
+            self.nodes_dict[i]['cands'], self.nodes_dict[i]['cand_mols'], _ = list(zip(*cands))
+            self.nodes_dict[i]['cands'] = list(self.nodes_dict[i]['cands'])
+            self.nodes_dict[i]['cand_mols'] = list(self.nodes_dict[i]['cand_mols'])
         else:
-            self.nodes[i]['cands'] = []
-            self.nodes[i]['cand_mols'] = []
+            self.nodes_dict[i]['cands'] = []
+            self.nodes_dict[i]['cand_mols'] = []
 
     def recover(self):
-        for i in self.nodes:
+        for i in self.nodes_dict:
             self._recover_node(i, self.mol)
 
     def assemble(self):
-        for i in self.nodes:
+        for i in self.nodes_dict:
             self._assemble_node(i)

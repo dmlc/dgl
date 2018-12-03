@@ -11,8 +11,12 @@ import rdkit
 
 from jtnn import *
 
-lg = rdkit.RDLogger.logger() 
-lg.setLevel(rdkit.RDLogger.CRITICAL)
+torch.multiprocessing.set_sharing_strategy('file_system')
+
+def worker_init_fn(id_):
+    lg = rdkit.RDLogger.logger() 
+    lg.setLevel(rdkit.RDLogger.CRITICAL)
+worker_init_fn(None)
 
 parser = OptionParser()
 parser.add_option("-t", "--train", dest="train", default='train', help='Training file name')
@@ -25,10 +29,11 @@ parser.add_option("-l", "--latent", dest="latent_size", default=56)
 parser.add_option("-d", "--depth", dest="depth", default=3)
 parser.add_option("-z", "--beta", dest="beta", default=1.0)
 parser.add_option("-q", "--lr", dest="lr", default=1e-3)
+parser.add_option("-T", "--test", dest="test", action="store_true")
 opts,args = parser.parse_args()
 
-dataset = JTNNDataset(data=opts.train, vocab=opts.vocab)
-vocab = Vocab([x.strip("\r\n ") for x in open(dataset.vocab_file)])
+dataset = JTNNDataset(data=opts.train, vocab=opts.vocab, training=True)
+vocab = dataset.vocab
 
 batch_size = int(opts.batch_size)
 hidden_size = int(opts.hidden_size)
@@ -48,39 +53,37 @@ else:
         else:
             nn.init.xavier_normal(param)
 
-if torch.cuda.is_available():
-    model = model.cuda()
+model = cuda(model)
 print("Model #Params: %dK" % (sum([x.nelement() for x in model.parameters()]) / 1000,))
 
 optimizer = optim.Adam(model.parameters(), lr=lr)
 scheduler = lr_scheduler.ExponentialLR(optimizer, 0.9)
 scheduler.step()
 
-MAX_EPOCH = 1
+MAX_EPOCH = 100
 PRINT_ITER = 20
 
-@profile
 def train():
+    dataset.training = True
     dataloader = DataLoader(
             dataset,
             batch_size=batch_size,
             shuffle=True,
-            num_workers=0,
-            collate_fn=lambda x:x,
-            drop_last=True)
+            num_workers=4,
+            collate_fn=JTNNCollator(vocab, True),
+            drop_last=True,
+            worker_init_fn=worker_init_fn)
 
     for epoch in range(MAX_EPOCH):
         word_acc,topo_acc,assm_acc,steo_acc = 0,0,0,0
 
         for it, batch in enumerate(dataloader):
-            for mol_tree in batch:
-                for node_id, node in mol_tree.nodes.items():
-                    if node['label'] not in node['cands']:
-                        node['cands'].append(node['label'])
-                        node['cand_mols'].append(node['label_mol'])
-
             model.zero_grad()
-            loss, kl_div, wacc, tacc, sacc, dacc = model(batch, beta)
+            try:
+                loss, kl_div, wacc, tacc, sacc, dacc = model(batch, beta)
+            except:
+                print([t.smiles for t in batch['mol_trees']])
+                raise
             loss.backward()
             optimizer.step()
 
@@ -95,8 +98,8 @@ def train():
                 assm_acc = assm_acc / PRINT_ITER * 100
                 steo_acc = steo_acc / PRINT_ITER * 100
 
-                print("KL: %.1f, Word: %.2f, Topo: %.2f, Assm: %.2f, Steo: %.2f" % (
-                    kl_div, word_acc, topo_acc, assm_acc, steo_acc))
+                print("KL: %.1f, Word: %.2f, Topo: %.2f, Assm: %.2f, Steo: %.2f, Loss: %.6f" % (
+                    kl_div, word_acc, topo_acc, assm_acc, steo_acc, loss.item()))
                 word_acc,topo_acc,assm_acc,steo_acc = 0,0,0,0
                 sys.stdout.flush()
 
@@ -110,8 +113,33 @@ def train():
         print("learning rate: %.6f" % scheduler.get_lr()[0])
         torch.save(model.state_dict(), opts.save_path + "/model.iter-" + str(epoch))
 
+def test():
+    dataset.training = False
+    dataloader = DataLoader(
+            dataset,
+            batch_size=1,
+            shuffle=False,
+            num_workers=0,
+            collate_fn=JTNNCollator(vocab, False),
+            drop_last=True,
+            worker_init_fn=worker_init_fn)
+
+    # Just an example of molecule decoding; in reality you may want to sample
+    # tree and molecule vectors.
+    for it, batch in enumerate(dataloader):
+        gt_smiles = batch['mol_trees'][0].smiles
+        print(gt_smiles)
+        model.move_to_cuda(batch)
+        _, tree_vec, mol_vec = model.encode(batch)
+        tree_vec, mol_vec, _, _ = model.sample(tree_vec, mol_vec)
+        smiles = model.decode(tree_vec, mol_vec)
+        print(smiles)
+
 if __name__ == '__main__':
-    train()
+    if opts.test:
+        test()
+    else:
+        train()
 
     print('# passes:', model.n_passes)
     print('Total # nodes processed:', model.n_nodes_total)
