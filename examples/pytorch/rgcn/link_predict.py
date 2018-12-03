@@ -51,6 +51,7 @@ class LinkPredict(nn.Module):
                                 gain=nn.init.calculate_gain('relu'))
 
     def calc_score(self, embedding, triplets):
+        # DistMult
         s = embedding[triplets[:,0]]
         r = self.w_relation[triplets[:,1]]
         o = embedding[triplets[:,2]]
@@ -118,27 +119,21 @@ def main(args):
     if use_cuda:
         model.cuda()
 
+    # build adj list and calculate degrees for sampling
+    adj_list, degrees = utils.get_adj_and_degrees(num_nodes, train_data)
+
     # optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+
+    model_state_file = 'model_state.pth'
+    forward_time = []
+    backward_time = []
 
     # training loop
     print("start training...")
 
-    # build adj list and calculate degrees for sampling
-    adj_list = [[] for _ in range(num_nodes)]
-    for i,triplet in enumerate(train_data):
-        adj_list[triplet[0]].append([i, triplet[2]])
-        adj_list[triplet[2]].append([i, triplet[0]])
-
-    degrees = np.array([len(a) for a in adj_list])
-    adj_list = [np.array(a) for a in adj_list]
-
-    best_mrr = 0
-    model_state_file = 'model_state.pth'
-
-    forward_time = []
-    backward_time = []
     epoch = 0
+    best_mrr = 0
     while True:
         model.train()
         epoch += 1

@@ -1,8 +1,35 @@
+"""
+Utility functions for link prediction
+Most code is adapted from authors' implementation of RGCN link prediction:
+https://github.com/MichSchli/RelationPrediction
+
+"""
+
 import numpy as np
 import torch
 import dgl
 
+#######################################################################
+#
+# Utility function for building training and testing graphs
+#
+#######################################################################
+
+def get_adj_and_degrees(num_nodes, triplets):
+    """ Get adjacency list and degrees of the graph
+    """
+    adj_list = [[] for _ in range(num_nodes)]
+    for i,triplet in enumerate(triplets):
+        adj_list[triplet[0]].append([i, triplet[2]])
+        adj_list[triplet[2]].append([i, triplet[0]])
+
+    degrees = np.array([len(a) for a in adj_list])
+    adj_list = [np.array(a) for a in adj_list]
+    return adj_list, degrees
+
 def sample_edge_neighborhood(adj_list, degrees, n_triplets, sample_size):
+    """ Edge neighborhood sampling to reduce training graph size
+    """
 
     edges = np.zeros((sample_size), dtype=np.int32)
 
@@ -19,7 +46,8 @@ def sample_edge_neighborhood(adj_list, degrees, n_triplets, sample_size):
             weights[np.where(sample_counts == 0)] = 0
 
         probabilities = (weights) / np.sum(weights)
-        chosen_vertex = np.random.choice(np.arange(degrees.shape[0]), p=probabilities)
+        chosen_vertex = np.random.choice(np.arange(degrees.shape[0]),
+                                         p=probabilities)
         chosen_adj_list = adj_list[chosen_vertex]
         seen[chosen_vertex] = True
 
@@ -41,11 +69,18 @@ def sample_edge_neighborhood(adj_list, degrees, n_triplets, sample_size):
 
     return edges
 
-def generate_sampled_graph_and_labels(triplets, sample_size, split_size, num_rels, adj_list, degrees, negative_rate):
+def generate_sampled_graph_and_labels(triplets, sample_size, split_size,
+                                      num_rels, adj_list, degrees,
+                                      negative_rate):
+    """Get training graph and signals
+    First perform edge neighborhood sampling on graph, then perform negative
+    sampling to generate negative samples
+    """
     # perform edge neighbor sampling
-    edges = sample_edge_neighborhood(adj_list, degrees, len(triplets), sample_size)
+    edges = sample_edge_neighborhood(adj_list, degrees, len(triplets),
+                                     sample_size)
 
-    # relabel edges
+    # relabel nodes to have consecutive node ids
     edges = triplets[edges]
     src, rel, dst = edges.transpose()
     uniq_v, edges = np.unique((src, dst), return_inverse=True)
@@ -53,19 +88,23 @@ def generate_sampled_graph_and_labels(triplets, sample_size, split_size, num_rel
     relabeled_edges = np.stack((src, rel, dst)).transpose()
 
     # negative sampling
-    samples, labels = negative_sampling(relabeled_edges, len(uniq_v), negative_rate)
+    samples, labels = negative_sampling(relabeled_edges, len(uniq_v),
+                                        negative_rate)
 
-    # further split graph
+    # further split graph, only half of the edges will be used as graph
+    # structure, while the rest half is used as unseen positive samples
     split_size = int(sample_size * split_size)
-    graph_split_ids = np.random.choice(np.arange(sample_size), size=split_size, replace=False)
+    graph_split_ids = np.random.choice(np.arange(sample_size),
+                                       size=split_size, replace=False)
     src = src[graph_split_ids]
     dst = dst[graph_split_ids]
     rel = rel[graph_split_ids]
 
-    # build graph
+    # build DGL graph
     print("# sampled nodes: {}".format(len(uniq_v)))
     print("# sampled edges: {}".format(len(src) * 2))
-    g, rel, norm = build_graph_from_triplets(len(uniq_v), num_rels, (src, rel, dst))
+    g, rel, norm = build_graph_from_triplets(len(uniq_v), num_rels,
+                                             (src, rel, dst))
     return g, uniq_v, rel, norm, samples, labels
 
 def comp_deg_norm(g):
@@ -75,6 +114,11 @@ def comp_deg_norm(g):
     return norm
 
 def build_graph_from_triplets(num_nodes, num_rels, triplets):
+    """ Create a DGL graph. The graph is bidirectional because RGCN authors
+        use reversed relations.
+        This function also generates edge type and normalization factor
+        (reciprocal of node incoming degree)
+    """
     g = dgl.DGLGraph()
     g.add_nodes(num_nodes)
     src, rel, dst = triplets
@@ -92,7 +136,6 @@ def build_test_graph(num_nodes, num_rels, edges):
     print("Test graph:")
     return build_graph_from_triplets(num_nodes, num_rels, (src, rel, dst))
 
-
 def negative_sampling(pos_samples, num_entity, negative_rate):
     size_of_batch = len(pos_samples)
     num_to_generate = size_of_batch * negative_rate
@@ -108,6 +151,12 @@ def negative_sampling(pos_samples, num_entity, negative_rate):
 
     return np.concatenate((pos_samples, neg_samples)), labels
 
+#######################################################################
+#
+# Utility function for evaluations
+#
+#######################################################################
+
 def sort_and_rank(score, target):
     _, indices = torch.sort(score, dim=1, descending=True)
     indices = torch.nonzero(indices == target.view(-1, 1))
@@ -115,6 +164,8 @@ def sort_and_rank(score, target):
     return indices
 
 def perturb_and_get_rank(embedding, w, a, r, b, num_entity, batch_size=100):
+    """ Perturb one element in the triplets
+    """
     n_batch = (num_entity + batch_size - 1) // batch_size
     ranks = []
     for idx in range(n_batch):
@@ -123,7 +174,8 @@ def perturb_and_get_rank(embedding, w, a, r, b, num_entity, batch_size=100):
         batch_end = min(num_entity, (idx + 1) * batch_size)
         batch_a = a[batch_start: batch_end]
         batch_r = r[batch_start: batch_end]
-        emb_ar= (embedding[batch_a] * w[batch_r]).transpose(0, 1).unsqueeze(2) # size: D x E x 1
+        emb_ar = embedding[batch_a] * w[batch_r]
+        emb_ar = emb_ar.transpose(0, 1).unsqueeze(2) # size: D x E x 1
         emb_c = embedding.transpose(0, 1).unsqueeze(1) # size: D x 1 x V
         # out-prod and reduce sum
         out_prod = torch.bmm(emb_ar, emb_c) # size D x E x V
