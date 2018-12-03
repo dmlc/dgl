@@ -111,7 +111,8 @@ print('Intra-class edges percent: %.4f' % (len(intra_src) / len(src_labels)))
 #    at least contain one cross-community edge as the training example. As
 #    a result, there are a total of 21 training samples in this mini-dataset.
 #
-# Here we visualize one of the training sample with its community structure:
+# Here we visualize one of the training samples and its community structure:
+
 import networkx as nx
 import matplotlib.pyplot as plt
 
@@ -143,7 +144,7 @@ visualize(label1, nx_G1)
 #   assign a ground truth community label :math:`z_v \in \{0,1\}`.
 # - The parameterized model :math:`f(G, \theta)` predicts a label set
 #   :math:`\tilde{Z} = f(G)` for nodes :math:`V`.
-# - For each example :math:`(G,L)`, the model learn to minimize a specially-
+# - For each example :math:`(G,L)`, the model learns to minimize a specially
 #   designed loss function (equivariant loss) :math:`L_{equivariant} =
 #   (\tilde{Z}，Z)`
 #
@@ -178,7 +179,7 @@ visualize(label1, nx_G1)
 # In graph theory, line graph is a graph representation that encodes the
 # edge adjacency sturcutre in the original graph.
 #
-# Specifically, a line-graph :math`L(G)` turns an edge of the original graph `G`
+# Specifically, a line-graph :math:`L(G)` turns an edge of the original graph `G`
 # into a node. This is illustrated with the graph below (taken from the
 # paper)
 # 
@@ -260,14 +261,14 @@ visualize(label1, nx_G1)
 # - The two equations are symmetric and can be implemented as two instances
 #   of the same class with different parameters.
 #   Mainly, the first equation operates on graph representation :math:`x`,
-#   whereas the sedond operates on line-graph
-#   representation :math:`y`. Denote this abstraction as :math:`f`, then
+#   whereas the second operates on line-graph
+#   representation :math:`y`. Let us denote this abstraction as :math:`f`. Then
 #   the first is :math:`f(x,y; \theta_x)`, and the second
 #   is :math:`f(y,x, \theta_y)`. That is, they are parameterized to compute
 #   representations of the original graph and its
 #   companion line graph, respectively.
 #
-# - Each equation consists of 4 terms: (take the first as example):
+# - Each equation consists of 4 terms (take the first one as an example):
 #
 #   - :math:`x^{(k)}\theta^{(k)}_{1,l}`, a linear projection of previous
 #     layer's output :math:`x^{(k)}`, denote as :math:`\text{prev}(x)`.
@@ -526,8 +527,6 @@ for i in range(20):
     all_acc = []
     for [g, pmpd, label] in training_loader:
         # Generate the line graph.
-        # NOTE: in practice, it is better to move this out of the loop as the
-        #       graph in this example is static
         lg = g.line_graph(backtracking=False)
         # Create torch tensors
         pmpd = sparse2th(pmpd)
@@ -560,7 +559,7 @@ for i in range(20):
         sum(all_loss) / niters, sum(all_acc) / niters))
 
 #######################################################################################
-# Visualizing training progress
+# Visualize training progress
 # -----------------------------
 # We visualize the network's community prediction on one training example,
 # together with the ground truth.
@@ -608,7 +607,7 @@ def collate_fn(batch):
 
 ######################################################################################
 # You can check out the complete code
-# `here <https://github.com/jermainewang/dgl/blob/master/python/dgl/data/citation_graph.py>`_.
+# `here <https://github.com/jermainewang/dgl/tree/master/examples/pytorch/line_graph>`_.
 # 
 # What's the business with :math:`\{Pm, Pd\}`?
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
