@@ -24,8 +24,8 @@ backend.
 Install from conda
 ----------------------
 One can either grab `miniconda <https://conda.io/miniconda.html>`_ or
-the full `anaconda <https://www.anaconda.com/download/>`_ if he/she does not have
-``conda`` installed.
+the full `anaconda <https://www.anaconda.com/download/>`_ if ``conda``
+has not been installed.
 
 Once the conda environment is activated, run
 
