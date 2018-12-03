@@ -15,7 +15,7 @@ from dgl.contrib.transformer import get_dataset, GraphPool
 def run_epoch(data_iter, models, loss_compute, is_train=True):
     for i, gs in tqdm(enumerate(data_iter)):
         with th.set_grad_enabled(is_train):
-            outputs = models[0](gs[0])
+            outputs = [models[0](gs[0])]
             loss = loss_compute(outputs, [g.tgt_y for g in gs], [g.n_tokens for g in gs])
     print('average loss: {}'.format(loss_compute.avg_loss))
     print('accuracy: {}'.format(loss_compute.accuracy))
