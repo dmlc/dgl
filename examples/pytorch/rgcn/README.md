@@ -6,6 +6,8 @@ Two extra python packages are needed for this example:
 - rdflib
 - pandas
 
+Example code was tested with rdflib 4.2.2 and pandas 0.23.4
+
 ### Entity Classification
 AIFB:
 ```
