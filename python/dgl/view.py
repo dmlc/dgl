@@ -16,7 +16,7 @@ class NodeView(object):
 
     See Also
     --------
-    dgl.graph.nodes
+    dgl.DGLGraph.nodes
     """
     __slots__ = ['_graph']
 
@@ -78,7 +78,7 @@ class EdgeView(object):
 
     See Also
     --------
-    dgl.graph.edges
+    dgl.DGLGraph.edges
     """
     __slots__ = ['_graph']
 
