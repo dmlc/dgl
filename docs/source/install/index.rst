@@ -8,10 +8,10 @@ System requirements
 Currently DGL is tested on
 
 * Ubuntu 16.04
-* OS X
+* macOS X
 * Windows 7
 
-DGL is expected to work on all Linux distributions later than Ubuntu 16.04, OS X, and
+DGL is expected to work on all Linux distributions later than Ubuntu 16.04, macOS X, and
 Windows 7 or later.
 
 DGL also requires the Python version to be 3.5 or later.  Python 3.4 or less is not
