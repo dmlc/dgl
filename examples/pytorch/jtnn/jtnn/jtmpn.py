@@ -4,10 +4,11 @@ from .nnutils import cuda
 from .chemutils import get_mol
 #from mpn import atom_features, bond_features, ATOM_FDIM, BOND_FDIM
 import rdkit.Chem as Chem
-from dgl import DGLGraph, line_graph, batch, unbatch
+from dgl import DGLGraph, batch, unbatch, mean_nodes
 import dgl.function as DGLF
 from .line_profiler_integration import profile
 import os
+import numpy as np
 
 ELEM_LIST = ['C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na', 'Ca', 'Fe', 'Al', 'I', 'B', 'K', 'Se', 'Zn', 'H', 'Cu', 'Mn', 'unknown']
 
@@ -27,81 +28,81 @@ def onek_encoding_unk(x, allowable_set):
 # the 2-D graph first, then enumerate all possible 3-D forms and find the
 # one with highest score.
 def atom_features(atom):
-    return cuda(torch.Tensor(onek_encoding_unk(atom.GetSymbol(), ELEM_LIST) 
-            + onek_encoding_unk(atom.GetDegree(), [0,1,2,3,4,5]) 
+    return (torch.Tensor(onek_encoding_unk(atom.GetSymbol(), ELEM_LIST)
+            + onek_encoding_unk(atom.GetDegree(), [0,1,2,3,4,5])
             + onek_encoding_unk(atom.GetFormalCharge(), [-1,-2,1,2,0])
             + [atom.GetIsAromatic()]))
 
 def bond_features(bond):
     bt = bond.GetBondType()
-    return cuda(torch.Tensor([bt == Chem.rdchem.BondType.SINGLE, bt == Chem.rdchem.BondType.DOUBLE, bt == Chem.rdchem.BondType.TRIPLE, bt == Chem.rdchem.BondType.AROMATIC, bond.IsInRing()]))
+    return (torch.Tensor([bt == Chem.rdchem.BondType.SINGLE, bt == Chem.rdchem.BondType.DOUBLE, bt == Chem.rdchem.BondType.TRIPLE, bt == Chem.rdchem.BondType.AROMATIC, bond.IsInRing()]))
 
-
-@profile
-def mol2dgl(cand_batch, mol_tree_batch):
+def mol2dgl_single(cand_batch):
     cand_graphs = []
     tree_mess_source_edges = [] # map these edges from trees to...
     tree_mess_target_edges = [] # these edges on candidate graphs
     tree_mess_target_nodes = []
     n_nodes = 0
+    n_edges = 0
+    atom_x = []
+    bond_x = []
 
     for mol, mol_tree, ctr_node_id in cand_batch:
-        atom_feature_list = []
-        bond_feature_list = []
-        ctr_node = mol_tree.nodes[ctr_node_id]
+        n_atoms = mol.GetNumAtoms()
+        n_bonds = mol.GetNumBonds()
+
+        ctr_node = mol_tree.nodes_dict[ctr_node_id]
         ctr_bid = ctr_node['idx']
         g = DGLGraph()
 
-        for atom in mol.GetAtoms():
-            atom_feature_list.append(atom_features(atom))
-            g.add_node(atom.GetIdx())
+        for i, atom in enumerate(mol.GetAtoms()):
+            assert i == atom.GetIdx()
+            atom_x.append(atom_features(atom))
+        g.add_nodes(n_atoms)
 
-        for bond in mol.GetBonds():
+        bond_src = []
+        bond_dst = []
+        for i, bond in enumerate(mol.GetBonds()):
             a1 = bond.GetBeginAtom()
             a2 = bond.GetEndAtom()
             begin_idx = a1.GetIdx()
             end_idx = a2.GetIdx()
             features = bond_features(bond)
 
-            g.add_edge(begin_idx, end_idx)
-            bond_feature_list.append(features)
-            g.add_edge(end_idx, begin_idx)
-            bond_feature_list.append(features)
+            bond_src.append(begin_idx)
+            bond_dst.append(end_idx)
+            bond_x.append(features)
+            bond_src.append(end_idx)
+            bond_dst.append(begin_idx)
+            bond_x.append(features)
 
             x_nid, y_nid = a1.GetAtomMapNum(), a2.GetAtomMapNum()
             # Tree node ID in the batch
-            x_bid = mol_tree.nodes[x_nid - 1]['idx'] if x_nid > 0 else -1
-            y_bid = mol_tree.nodes[y_nid - 1]['idx'] if y_nid > 0 else -1
+            x_bid = mol_tree.nodes_dict[x_nid - 1]['idx'] if x_nid > 0 else -1
+            y_bid = mol_tree.nodes_dict[y_nid - 1]['idx'] if y_nid > 0 else -1
             if x_bid >= 0 and y_bid >= 0 and x_bid != y_bid:
-                if (x_bid, y_bid) in mol_tree_batch.edge_list:
-                    tree_mess_target_edges.append(
-                            (begin_idx + n_nodes, end_idx + n_nodes))
+                if mol_tree.has_edge_between(x_bid, y_bid):
+                    tree_mess_target_edges.append((begin_idx + n_nodes, end_idx + n_nodes))
                     tree_mess_source_edges.append((x_bid, y_bid))
                     tree_mess_target_nodes.append(end_idx + n_nodes)
-                if (y_bid, x_bid) in mol_tree_batch.edge_list:
-                    tree_mess_target_edges.append(
-                            (end_idx + n_nodes, begin_idx + n_nodes))
+                if mol_tree.has_edge_between(y_bid, x_bid):
+                    tree_mess_target_edges.append((end_idx + n_nodes, begin_idx + n_nodes))
                     tree_mess_source_edges.append((y_bid, x_bid))
                     tree_mess_target_nodes.append(begin_idx + n_nodes)
 
-        n_nodes += len(g.nodes)
-
-        atom_x = torch.stack(atom_feature_list)
-        g.set_n_repr({'x': atom_x})
-        if len(bond_feature_list) > 0:
-            bond_x = torch.stack(bond_feature_list)
-            g.set_e_repr({
-                'x': bond_x,
-                'src_x': atom_x.new(len(bond_feature_list), ATOM_FDIM).zero_()
-            })
+        n_nodes += n_atoms
+        g.add_edges(bond_src, bond_dst)
         cand_graphs.append(g)
 
-    return cand_graphs, tree_mess_source_edges, tree_mess_target_edges, \
-           tree_mess_target_nodes
+    return cand_graphs, torch.stack(atom_x), \
+            torch.stack(bond_x) if len(bond_x) > 0 else torch.zeros(0), \
+            torch.LongTensor(tree_mess_source_edges), \
+            torch.LongTensor(tree_mess_target_edges), \
+            torch.LongTensor(tree_mess_target_nodes)
 
 
 mpn_loopy_bp_msg = DGLF.copy_src(src='msg', out='msg')
-mpn_loopy_bp_reduce = DGLF.sum(msgs='msg', out='accum_msg')
+mpn_loopy_bp_reduce = DGLF.sum(msg='msg', out='accum_msg')
 
 
 class LoopyBPUpdate(nn.Module):
@@ -112,8 +113,8 @@ class LoopyBPUpdate(nn.Module):
         self.W_h = nn.Linear(hidden_size, hidden_size, bias=False)
 
     def forward(self, node):
-        msg_input = node['msg_input']
-        msg_delta = self.W_h(node['accum_msg'] + node['alpha'])
+        msg_input = node.data['msg_input']
+        msg_delta = self.W_h(node.data['accum_msg'] + node.data['alpha'])
         msg = torch.relu(msg_input + msg_delta)
         return {'msg': msg}
 
@@ -129,11 +130,11 @@ else:
 
 if PAPER:
     mpn_gather_reduce = [
-        DGLF.sum(msgs='msg', out='m'),
-        DGLF.sum(msgs='alpha', out='accum_alpha'),
+        DGLF.sum(msg='msg', out='m'),
+        DGLF.sum(msg='alpha', out='accum_alpha'),
     ]
 else:
-    mpn_gather_reduce = DGLF.sum(msgs='msg', out='m')
+    mpn_gather_reduce = DGLF.sum(msg='msg', out='m')
 
 
 class GatherUpdate(nn.Module):
@@ -146,11 +147,11 @@ class GatherUpdate(nn.Module):
     def forward(self, node):
         if PAPER:
             #m = node['m']
-            m = node['m'] + node['accum_alpha']
+            m = node.data['m'] + node.data['accum_alpha']
         else:
-            m = node['m'] + node['alpha']
+            m = node.data['m'] + node.data['alpha']
         return {
-            'h': torch.relu(self.W_o(torch.cat([node['x'], m], 1))),
+            'h': torch.relu(self.W_o(torch.cat([node.data['x'], m], 1))),
         }
 
 
@@ -171,25 +172,21 @@ class DGLJTMPN(nn.Module):
         self.n_edges_total = 0
         self.n_passes = 0
 
-    @profile
     def forward(self, cand_batch, mol_tree_batch):
-        cand_graphs, tree_mess_src_edges, tree_mess_tgt_edges, tree_mess_tgt_nodes = \
-                mol2dgl(cand_batch, mol_tree_batch)
+        cand_graphs, tree_mess_src_edges, tree_mess_tgt_edges, tree_mess_tgt_nodes = cand_batch
 
         n_samples = len(cand_graphs)
 
-        cand_graphs = batch(cand_graphs)
-        cand_line_graph = line_graph(cand_graphs, no_backtracking=True)
+        cand_line_graph = cand_graphs.line_graph(backtracking=False, shared=True)
 
-        n_nodes = len(cand_graphs.nodes)
-        n_edges = len(cand_graphs.edges)
+        n_nodes = cand_graphs.number_of_nodes()
+        n_edges = cand_graphs.number_of_edges()
 
         cand_graphs = self.run(
                 cand_graphs, cand_line_graph, tree_mess_src_edges, tree_mess_tgt_edges,
                 tree_mess_tgt_nodes, mol_tree_batch)
 
-        cand_graphs = unbatch(cand_graphs)
-        g_repr = torch.stack([g.get_n_repr()['h'].mean(0) for g in cand_graphs], 0)
+        g_repr = mean_nodes(cand_graphs, 'h')
 
         self.n_samples_total += n_samples
         self.n_nodes_total += n_nodes
@@ -198,65 +195,61 @@ class DGLJTMPN(nn.Module):
 
         return g_repr
 
-    @profile
     def run(self, cand_graphs, cand_line_graph, tree_mess_src_edges, tree_mess_tgt_edges,
             tree_mess_tgt_nodes, mol_tree_batch):
-        n_nodes = len(cand_graphs.nodes)
+        n_nodes = cand_graphs.number_of_nodes()
 
-        cand_graphs.update_edge(
-            #*zip(*cand_graphs.edge_list),
-            edge_func=lambda src, dst, edge: {'src_x': src['x']},
-            batchable=True,
+        cand_graphs.apply_edges(
+            func=lambda edges: {'src_x': edges.src['x']},
         )
 
-        bond_features = cand_line_graph.get_n_repr()['x']
-        source_features = cand_line_graph.get_n_repr()['src_x']
+        bond_features = cand_line_graph.ndata['x']
+        source_features = cand_line_graph.ndata['src_x']
         features = torch.cat([source_features, bond_features], 1)
         msg_input = self.W_i(features)
-        cand_line_graph.set_n_repr({
+        cand_line_graph.ndata.update({
             'msg_input': msg_input,
             'msg': torch.relu(msg_input),
             'accum_msg': torch.zeros_like(msg_input),
         })
         zero_node_state = bond_features.new(n_nodes, self.hidden_size).zero_()
-        cand_graphs.set_n_repr({
+        cand_graphs.ndata.update({
             'm': zero_node_state.clone(),
             'h': zero_node_state.clone(),
         })
 
-        if PAPER:
-            cand_graphs.set_e_repr({
-                'alpha': cuda(torch.zeros(len(cand_graphs.edge_list), self.hidden_size))
-            })
-
-            alpha = mol_tree_batch.get_e_repr(*zip(*tree_mess_src_edges))['m']
-            cand_graphs.set_e_repr({'alpha': alpha}, *zip(*tree_mess_tgt_edges))
-        else:
-            alpha = mol_tree_batch.get_e_repr(*zip(*tree_mess_src_edges))['m']
-            node_idx = (torch.LongTensor(tree_mess_tgt_nodes)
-                        .to(device=zero_node_state.device)[:, None]
-                        .expand_as(alpha))
-            node_alpha = zero_node_state.clone().scatter_add(0, node_idx, alpha)
-            cand_graphs.set_n_repr({'alpha': node_alpha})
-            cand_graphs.update_edge(
-                #*zip(*cand_graphs.edge_list),
-                edge_func=lambda src, dst, edge: {'alpha': src['alpha']},
-                batchable=True,
-            )
+        cand_graphs.edata['alpha'] = \
+                cuda(torch.zeros(cand_graphs.number_of_edges(), self.hidden_size))
+        cand_graphs.ndata['alpha'] = zero_node_state
+        if tree_mess_src_edges.shape[0] > 0:
+            if PAPER:
+                src_u, src_v = tree_mess_src_edges.unbind(1)
+                tgt_u, tgt_v = tree_mess_tgt_edges.unbind(1)
+                alpha = mol_tree_batch.edges[src_u, src_v].data['m']
+                cand_graphs.edges[tgt_u, tgt_v].data['alpha'] = alpha
+            else:
+                src_u, src_v = tree_mess_src_edges.unbind(1)
+                alpha = mol_tree_batch.edges[src_u, src_v].data['m']
+                node_idx = (tree_mess_tgt_nodes
+                            .to(device=zero_node_state.device)[:, None]
+                            .expand_as(alpha))
+                node_alpha = zero_node_state.clone().scatter_add(0, node_idx, alpha)
+                cand_graphs.ndata['alpha'] = node_alpha
+                cand_graphs.apply_edges(
+                    func=lambda edges: {'alpha': edges.src['alpha']},
+                )
 
         for i in range(self.depth - 1):
             cand_line_graph.update_all(
                 mpn_loopy_bp_msg,
                 mpn_loopy_bp_reduce,
                 self.loopy_bp_updater,
-                True
             )
 
         cand_graphs.update_all(
             mpn_gather_msg,
             mpn_gather_reduce,
             self.gather_updater,
-            True
         )
 
         return cand_graphs

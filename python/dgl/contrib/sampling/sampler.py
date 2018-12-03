@@ -12,6 +12,8 @@ class NSSubgraphLoader(object):
                  neighbor_type='in', node_prob=None, seed_nodes=None,
                  shuffle=False, num_workers=1, max_subgraph_size=None):
         self._g = g
+        if not g._graph.is_readonly():
+            raise NotImplementedError("subgraph loader only support read-only graphs.")
         self._batch_size = batch_size
         self._expand_factor = expand_factor
         self._num_hops = num_hops
@@ -51,7 +53,7 @@ class NSSubgraphLoader(object):
                                                self._num_hops, self._neighbor_type,
                                                self._node_prob, self._max_subgraph_size)
         subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
-                i, readonly=self._g._readonly) for i in sgi]
+                i) for i in sgi]
         self._subgraphs.extend(subgraphs)
         self._seed_ids.extend(seed_ids)
 
@@ -100,7 +102,8 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
     node_prob: the probability that a neighbor node is sampled.
         1D Tensor. None means uniform sampling. Otherwise, the number of elements
         should be the same as the number of vertices in the graph.
-    seed_nodes: a list of nodes where we sample subgraphs from. If it's None, the seed vertices are all vertices in the graph.
+    seed_nodes: a list of nodes where we sample subgraphs from.
+        If it's None, the seed vertices are all vertices in the graph.
     shuffle: indicates the sampled subgraphs are shuffled.
     num_workers: the number of worker threads that sample subgraphs in parallel.
     max_subgraph_size: the maximal subgraph size in terms of the number of nodes.
@@ -108,7 +111,8 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
     
     Returns
     -------
-    A subgraph generator.
+    A subgraph loader that returns a batch of subgraphs and
+        the Ids of the seed vertices used in the batch.
     '''
     return NSSubgraphLoader(g, batch_size, expand_factor, num_hops, neighbor_type, node_prob,
                             seed_nodes, shuffle, num_workers, max_subgraph_size)

@@ -54,25 +54,31 @@ def schedule_send(graph, u, v, eid, message_func):
     # TODO: handle duplicate messages
     ir.APPEND_ROW_(mf, msg)
 
-def schedule_recv(graph, recv_nodes, reduce_func, apply_func):
+def schedule_recv(graph,
+                  recv_nodes,
+                  reduce_func,
+                  apply_func,
+                  inplace):
     """Schedule recv.
 
     Parameters
     ----------
     graph: DGLGraph
         The DGLGraph to use
-    v : utils.Index
+    recv_nodes: utils.Index
         Nodes to recv.
     reduce_func: callable or list of callable
         The reduce function
     apply_func: callable
         The apply node function
+    inplace: bool
+        If True, the update will be done in place
     """
     src, dst, mid = graph._msg_graph.in_edges(recv_nodes)
     if len(mid) == 0:
         # All recv nodes are 0-degree nodes; downgrade to apply nodes.
         if apply_func is not None:
-            schedule_apply_nodes(graph, recv_nodes, apply_func)
+            schedule_apply_nodes(graph, recv_nodes, apply_func, inplace)
     else:
         var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
         # sort and unique the argument
@@ -83,13 +89,35 @@ def schedule_recv(graph, recv_nodes, reduce_func, apply_func):
         reduced_feat = _gen_reduce(graph, reduce_func, (src, dst, mid), recv_nodes)
         # apply
         final_feat = _apply_with_accum(graph, var_recv_nodes, var_nf, reduced_feat, apply_func)
-        ir.WRITE_ROW_(var_nf, var_recv_nodes, final_feat)
+        if inplace:
+            ir.WRITE_ROW_INPLACE_(var_nf, var_recv_nodes, final_feat)
+        else:
+            ir.WRITE_ROW_(var_nf, var_recv_nodes, final_feat)
 
 def schedule_snr(graph,
                  edge_tuples,
                  message_func,
                  reduce_func,
-                 apply_func):
+                 apply_func,
+                 inplace):
+    """Schedule send_and_recv.
+
+    Parameters
+    ----------
+    graph: DGLGraph
+        The DGLGraph to use
+    edge_tuple: tuple
+        A tuple of (src ids, dst ids, edge ids) representing edges to perform
+        send_and_recv
+    message_func: callable or list of callable
+        The message function
+    reduce_func: callable or list of callable
+        The reduce function
+    apply_func: callable
+        The apply node function
+    inplace: bool
+        If True, the update will be done in place
+    """
     call_type = 'send_and_recv'
     u, v, eid = edge_tuples
     recv_nodes, _ = F.sort_1d(F.unique(v.tousertensor()))
@@ -110,9 +138,15 @@ def schedule_snr(graph,
             uv_getter, adj_creator, inc_creator)
     # generate apply schedule
     final_feat = _apply_with_accum(graph, var_recv_nodes, var_nf, reduced_feat, apply_func)
-    ir.WRITE_ROW_(var_nf, var_recv_nodes, final_feat)
+    if inplace:
+        ir.WRITE_ROW_INPLACE_(var_nf, var_recv_nodes, final_feat)
+    else:
+        ir.WRITE_ROW_(var_nf, var_recv_nodes, final_feat)
 
-def schedule_update_all(graph, message_func, reduce_func, apply_func):
+def schedule_update_all(graph,
+                        message_func,
+                        reduce_func,
+                        apply_func):
     """get send and recv schedule
 
     Parameters
@@ -130,7 +164,7 @@ def schedule_update_all(graph, message_func, reduce_func, apply_func):
         # All the nodes are zero degree; downgrade to apply nodes
         if apply_func is not None:
             nodes = utils.toindex(slice(0, graph.number_of_nodes()))
-            schedule_apply_nodes(graph, nodes, apply_func)
+            schedule_apply_nodes(graph, nodes, apply_func, inplace=False)
     else:
         call_type = 'update_all'
         eid = utils.toindex(slice(0, graph.number_of_edges()))  # shortcut for ALL
@@ -153,7 +187,10 @@ def schedule_update_all(graph, message_func, reduce_func, apply_func):
         final_feat = _apply_with_accum(graph, var_recv_nodes, var_nf, reduced_feat, apply_func)
         ir.WRITE_DICT_(var_nf, final_feat)
 
-def schedule_apply_nodes(graph, v, apply_func):
+def schedule_apply_nodes(graph,
+                         v,
+                         apply_func,
+                         inplace):
     """get apply nodes schedule
 
     Parameters
@@ -164,6 +201,8 @@ def schedule_apply_nodes(graph, v, apply_func):
         Nodes to apply
     apply_func: callable
         The apply node function
+    inplace: bool
+        If True, the update will be done in place
 
     Returns
     -------
@@ -177,9 +216,15 @@ def schedule_apply_nodes(graph, v, apply_func):
         return apply_func(nb)
     afunc = var.FUNC(_afunc_wrapper)
     applied_feat = ir.NODE_UDF(afunc, v_nf)
-    ir.WRITE_ROW_(var_nf, var_v, applied_feat)
+    if inplace:
+        ir.WRITE_ROW_INPLACE_(var_nf, var_v, applied_feat)
+    else:
+        ir.WRITE_ROW_(var_nf, var_v, applied_feat)
 
-def schedule_apply_edges(graph, u, v, eid, apply_func):
+def schedule_apply_edges(graph,
+                         u, v, eid,
+                         apply_func,
+                         inplace):
     """get apply edges schedule
 
     Parameters
@@ -194,6 +239,8 @@ def schedule_apply_edges(graph, u, v, eid, apply_func):
         Ids of sending edges
     apply_func: callable
         The apply edge function
+    inplace: bool
+        If True, the update will be done in place
 
     Returns
     -------
@@ -215,9 +262,17 @@ def schedule_apply_edges(graph, u, v, eid, apply_func):
         return apply_func(eb)
     _efunc = var.FUNC(_efunc_wrapper)
     new_fdedge = ir.EDGE_UDF(_efunc, fdsrc, fdedge, fddst)
-    ir.WRITE_ROW_(var_ef, var_eid, new_fdedge)
+    if inplace:
+        ir.WRITE_ROW_INPLACE_(var_ef, var_eid, new_fdedge)
+    else:
+        ir.WRITE_ROW_(var_ef, var_eid, new_fdedge)
 
-def schedule_push(graph, u, message_func, reduce_func, apply_func):
+def schedule_push(graph,
+                  u,
+                  message_func,
+                  reduce_func,
+                  apply_func,
+                  inplace):
     """get push schedule
 
     Parameters
@@ -232,14 +287,22 @@ def schedule_push(graph, u, message_func, reduce_func, apply_func):
         The reduce function
     apply_func: callable
         The apply node function
+    inplace: bool
+        If True, the update will be done in place
     """
     u, v, eid = graph._graph.out_edges(u)
     if len(eid) == 0:
         # All the pushing nodes have no out edges. No computation is scheduled.
         return
-    schedule_snr(graph, (u, v, eid), message_func, reduce_func, apply_func)
+    schedule_snr(graph, (u, v, eid),
+                 message_func, reduce_func, apply_func, inplace)
 
-def schedule_pull(graph, pull_nodes, message_func, reduce_func, apply_func):
+def schedule_pull(graph,
+                  pull_nodes,
+                  message_func,
+                  reduce_func,
+                  apply_func,
+                  inplace):
     """get pull schedule
 
     Parameters
@@ -254,6 +317,8 @@ def schedule_pull(graph, pull_nodes, message_func, reduce_func, apply_func):
         The reduce function
     apply_func: callable
         The apply node function
+    inplace: bool
+        If True, the update will be done in place
     """
     # TODO(minjie): `in_edges` can be omitted if message and reduce func pairs
     #   can be specialized to SPMV. This needs support for creating adjmat
@@ -262,7 +327,7 @@ def schedule_pull(graph, pull_nodes, message_func, reduce_func, apply_func):
     if len(eid) == 0:
         # All the nodes are 0deg; downgrades to apply.
         if apply_func is not None:
-            schedule_apply_nodes(graph, pull_nodes, apply_func)
+            schedule_apply_nodes(graph, pull_nodes, apply_func, inplace)
     else:
         call_type = 'send_and_recv'
         pull_nodes, _ = F.sort_1d(F.unique(pull_nodes.tousertensor()))
@@ -283,7 +348,10 @@ def schedule_pull(graph, pull_nodes, message_func, reduce_func, apply_func):
                 uv_getter, adj_creator, inc_creator)
         # generate optional apply
         final_feat = _apply_with_accum(graph, var_pull_nodes, var_nf, reduced_feat, apply_func)
-        ir.WRITE_ROW_(var_nf, var_pull_nodes, final_feat)
+        if inplace:
+            ir.WRITE_ROW_INPLACE_(var_nf, var_pull_nodes, final_feat)
+        else:
+            ir.WRITE_ROW_(var_nf, var_pull_nodes, final_feat)
 
 def _check_builtin_func_list(func_list):
     """Check whether func_list only contains builtin functions."""
@@ -370,7 +438,7 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
     # vars
     msg = var.FEAT_DICT(graph._msg_frame, 'msg')
     nf = var.FEAT_DICT(graph._node_frame, 'nf')
-    out = var.FEAT_DICT(data=tmpframe) 
+    out = var.FEAT_DICT(data=tmpframe)
 
     if rfunc_is_list:
         # UDF message + builtin reducer
@@ -469,7 +537,7 @@ def _gen_send_reduce(
         #    fall through from the v2v spmv analysis.
         # In both cases, convert the mfunc to UDF.
         mfunc = BundledFunction(mfunc)
-    
+
     # generate UDF send schedule
     var_u, var_v = uv_getter()
     var_mf = _gen_send(graph, var_nf, var_ef, var_u, var_v, var_eid, mfunc)

@@ -11,12 +11,12 @@ import networkx as nx
 import scipy.sparse as sp
 import os, sys
 
-from .utils import download, extract_archive, get_download_dir
+from .utils import download, extract_archive, get_download_dir, _get_dgl_url
 
 _urls = {
-    'cora' : 'https://www.dropbox.com/s/3ggdpkj7ou8svoc/cora.zip?dl=1',
-    'citeseer' : 'https://www.dropbox.com/s/cr4m05shgp8advz/citeseer.zip?dl=1',
-    'pubmed' : 'https://www.dropbox.com/s/fj5q6pi66xhymcm/pubmed.zip?dl=1',
+    'cora' : 'dataset/cora.zip',
+    'citeseer' : 'dataset/citeseer.zip',
+    'pubmed' : 'dataset/pubmed.zip',
 }
 
 class CitationGraphDataset(object):
@@ -24,7 +24,7 @@ class CitationGraphDataset(object):
         self.name = name
         self.dir = get_download_dir()
         self.zip_file_path='{}/{}.zip'.format(self.dir, name)
-        download(_urls[name], path=self.zip_file_path)
+        download(_get_dgl_url(_urls[name]), path=self.zip_file_path)
         extract_archive(self.zip_file_path, '{}/{}'.format(self.dir, name))
         self._load()
 
