@@ -1160,11 +1160,7 @@ class DGLGraph(object):
         Note
         -----
         User defined initializer must follow the signature of
-        dgl.init.base_initializer
-
-        See Also
-        --------
-        dgl.init.base_initializer
+        :func:`dgl.init.base_initializer() <dgl.init.base_initializer>`
 
         """
         self._node_frame.set_initializer(initializer, field)
@@ -1206,12 +1202,7 @@ class DGLGraph(object):
         Note
         -----
         User defined initializer must follow the signature of
-        dgl.init.base_initializer
-
-        See Also
-        --------
-        dgl.init.base_initializer
-
+        :func:`dgl.init.base_initializer() <dgl.init.base_initializer>`
         """
         self._edge_frame.set_initializer(initializer, field)
 
