@@ -13,11 +13,11 @@ import rdflib as rdf
 import pandas as pd
 from collections import Counter
 
-from dgl.data.utils import download, extract_archive, get_download_dir
+from dgl.data.utils import download, extract_archive, get_download_dir, _get_dgl_url
 
 np.random.seed(123)
 
-_downlaod_prefix = 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/'
+_downlaod_prefix = _get_dgl_url('dataset/')
 
 class RGCNEntityDataset(object):
     """RGCN Entity Classification dataset

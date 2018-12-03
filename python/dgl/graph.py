@@ -901,15 +901,15 @@ class DGLGraph(object):
         """
         return self._graph.in_degree(v)
 
-    def in_degrees(self, v):
+    def in_degrees(self, v=ALL):
         """Return the array `d` of in-degrees of the node array `v`.
 
         `d[i]` is the in-degree of node `v[i]`.
 
         Parameters
         ----------
-        v : list, tensor
-            The node ID array.
+        v : list, tensor, optional.
+            The node ID array. Default is to return the degrees of all the nodes.
 
         Returns
         -------
@@ -929,7 +929,10 @@ class DGLGraph(object):
         --------
         in_degree
         """
-        v = utils.toindex(v)
+        if is_all(v):
+            v  = utils.toindex(slice(0, self.number_of_nodes()))
+        else:
+            v = utils.toindex(v)
         return self._graph.in_degrees(v).tousertensor()
 
     def out_degree(self, v):
@@ -959,7 +962,7 @@ class DGLGraph(object):
         """
         return self._graph.out_degree(v)
 
-    def out_degrees(self, v):
+    def out_degrees(self, v=ALL):
         """Return the array `d` of out-degrees of the node array `v`.
 
         `d[i]` is the out-degree of node `v[i]`.
@@ -967,7 +970,7 @@ class DGLGraph(object):
         Parameters
         ----------
         v : list, tensor
-            The node ID array.
+            The node ID array. Default is to return the degrees of all the nodes.
 
         Returns
         -------
@@ -987,7 +990,10 @@ class DGLGraph(object):
         --------
         out_degree
         """
-        v = utils.toindex(v)
+        if is_all(v):
+            v  = utils.toindex(slice(0, self.number_of_nodes()))
+        else:
+            v = utils.toindex(v)
         return self._graph.out_degrees(v).tousertensor()
 
     def to_networkx(self, node_attrs=None, edge_attrs=None):
@@ -1157,8 +1163,8 @@ class DGLGraph(object):
         and (D1, D2, ...) be the shape of the node representation tensor. The
         length of the given node ids must match B (i.e, len(u) == B).
 
-        All update will be done out-placely to work with autograd unless the inplace
-        flag is true.
+        All update will be done out of place to work with autograd unless the
+        inplace flag is true.
 
         Parameters
         ----------
@@ -1167,7 +1173,7 @@ class DGLGraph(object):
         u : node, container or tensor
             The node(s).
         inplace : bool
-            True if the update is done inplacely
+            If True, update will be done in place, but autograd will break.
         """
         # sanity check
         if not utils.is_dict_like(hu):
@@ -1235,8 +1241,8 @@ class DGLGraph(object):
         is of shape (B, D1, D2, ...), where B is the number of edges to be updated,
         and (D1, D2, ...) be the shape of the edge representation tensor.
 
-        All update will be done out-placely to work with autograd unless the inplace
-        flag is true.
+        All update will be done out of place to work with autograd unless the
+        inplace flag is true.
 
         Parameters
         ----------
@@ -1246,7 +1252,7 @@ class DGLGraph(object):
             Edges can be a pair of endpoint nodes (u, v), or a
             tensor of edge ids. The default value is all the edges.
         inplace : bool
-            True if the update is done inplacely
+            If True, update will be done in place, but autograd will break.
         """
         # parse argument
         if is_all(edges):
@@ -1384,6 +1390,8 @@ class DGLGraph(object):
             The UDF applied on the node features.
         v : int, iterable of int, tensor, optional
             The node id(s).
+        inplace: bool, optional
+            If True, update will be done in place, but autograd will break.
         """
         if func == "default":
             func = self._apply_node_func
@@ -1392,10 +1400,13 @@ class DGLGraph(object):
         else:
             v = utils.toindex(v)
         with ir.prog() as prog:
-            scheduler.schedule_apply_nodes(graph=self, v=v, apply_func=func)
+            scheduler.schedule_apply_nodes(graph=self,
+                                           v=v,
+                                           apply_func=func,
+                                           inplace=inplace)
             Runtime.run(prog)
 
-    def apply_edges(self, func="default", edges=ALL):
+    def apply_edges(self, func="default", edges=ALL, inplace=False):
         """Apply the function on the edge features.
 
         Parameters
@@ -1405,6 +1416,8 @@ class DGLGraph(object):
         edges : edges, optional
             Edges can be a pair of endpoint nodes (u, v), or a
             tensor of edge ids. The default value is all the edges.
+        inplace: bool, optional
+            If True, update will be done in place, but autograd will break.
 
         Notes
         -----
@@ -1416,7 +1429,8 @@ class DGLGraph(object):
         assert func is not None
 
         if is_all(edges):
-            u, v, eid = self._graph.edges()
+            u, v, _ = self._graph.edges()
+            eid = utils.toindex(slice(0, self.number_of_edges()))
         elif isinstance(edges, tuple):
             u, v = edges
             u = utils.toindex(u)
@@ -1428,8 +1442,12 @@ class DGLGraph(object):
             u, v, _ = self._graph.find_edges(eid)
 
         with ir.prog() as prog:
-            scheduler.schedule_apply_edges(graph=self, u=u, v=v,
-                    eid=eid, apply_func=func)
+            scheduler.schedule_apply_edges(graph=self,
+                                           u=u,
+                                           v=v,
+                                           eid=eid,
+                                           apply_func=func,
+                                           inplace=inplace)
             Runtime.run(prog)
 
     def send(self, edges, message_func="default"):
@@ -1475,7 +1493,8 @@ class DGLGraph(object):
     def recv(self,
              v,
              reduce_func="default",
-             apply_node_func="default"):
+             apply_node_func="default",
+             inplace=False):
         """Receive and reduce in-coming messages and update representation on node v.
 
         TODO(minjie): document on zero-in-degree case
@@ -1490,6 +1509,8 @@ class DGLGraph(object):
           The reduce function.
         apply_node_func : callable, optional
           The update function.
+        inplace: bool, optional
+          If True, update will be done in place, but autograd will break.
         """
         if reduce_func == "default":
             reduce_func = self._reduce_func
@@ -1512,8 +1533,11 @@ class DGLGraph(object):
             return
 
         with ir.prog() as prog:
-            scheduler.schedule_recv(graph=self, recv_nodes=v,
-                    reduce_func=reduce_func, apply_func=apply_node_func)
+            scheduler.schedule_recv(graph=self,
+                                    recv_nodes=v,
+                                    reduce_func=reduce_func,
+                                    apply_func=apply_node_func,
+                                    inplace=inplace)
             Runtime.run(prog)
 
         # FIXME(minjie): multi send bug
@@ -1523,7 +1547,8 @@ class DGLGraph(object):
                       edges,
                       message_func="default",
                       reduce_func="default",
-                      apply_node_func="default"):
+                      apply_node_func="default",
+                      inplace=False):
         """Send messages along edges and receive them on the targets.
 
         Parameters
@@ -1540,6 +1565,8 @@ class DGLGraph(object):
         apply_node_func : callable, optional
             The update function. Registered function will be used if not
             specified.
+        inplace: bool, optional
+            If True, update will be done in place, but autograd will break.
 
         Notes
         -----
@@ -1571,15 +1598,20 @@ class DGLGraph(object):
             return
 
         with ir.prog() as prog:
-            scheduler.schedule_snr(self, (u, v, eid),
-                    message_func, reduce_func, apply_node_func)
+            scheduler.schedule_snr(graph=self,
+                                   edge_tuples=(u, v, eid),
+                                   message_func=message_func,
+                                   reduce_func=reduce_func,
+                                   apply_func=apply_node_func,
+                                   inplace=inplace)
             Runtime.run(prog)
 
     def pull(self,
              v,
              message_func="default",
              reduce_func="default",
-             apply_node_func="default"):
+             apply_node_func="default",
+             inplace=False):
         """Pull messages from the node's predecessors and then update it.
 
         Parameters
@@ -1592,6 +1624,8 @@ class DGLGraph(object):
           The reduce function.
         apply_node_func : callable, optional
           The update function.
+        inplace: bool, optional
+          If True, update will be done in place, but autograd will break.
         """
         if message_func == "default":
             message_func = self._message_func
@@ -1607,16 +1641,20 @@ class DGLGraph(object):
         if len(v) == 0:
             return
         with ir.prog() as prog:
-            scheduler.schedule_pull(graph=self, pull_nodes=v,
-                    message_func=message_func, reduce_func=reduce_func,
-                    apply_func=apply_node_func)
+            scheduler.schedule_pull(graph=self,
+                                    pull_nodes=v,
+                                    message_func=message_func,
+                                    reduce_func=reduce_func,
+                                    apply_func=apply_node_func,
+                                    inplace=inplace)
             Runtime.run(prog)
 
     def push(self,
              u,
              message_func="default",
              reduce_func="default",
-             apply_node_func="default"):
+             apply_node_func="default",
+             inplace=False):
         """Send message from the node to its successors and update them.
 
         Parameters
@@ -1629,6 +1667,8 @@ class DGLGraph(object):
           The reduce function.
         apply_node_func : callable
           The update function.
+        inplace: bool, optional
+          If True, update will be done in place, but autograd will break.
         """
         if message_func == "default":
             message_func = self._message_func
@@ -1644,9 +1684,12 @@ class DGLGraph(object):
         if len(u) == 0:
             return
         with ir.prog() as prog:
-            scheduler.schedule_push(graph=self, u=u,
-                    message_func=message_func, reduce_func=reduce_func,
-                    apply_func=apply_node_func)
+            scheduler.schedule_push(graph=self,
+                                    u=u,
+                                    message_func=message_func,
+                                    reduce_func=reduce_func,
+                                    apply_func=apply_node_func,
+                                    inplace=inplace)
             Runtime.run(prog)
 
     def update_all(self,
@@ -1674,8 +1717,10 @@ class DGLGraph(object):
         assert reduce_func is not None
 
         with ir.prog() as prog:
-            scheduler.schedule_update_all(graph=self, message_func=message_func,
-                    reduce_func=reduce_func, apply_func=apply_node_func)
+            scheduler.schedule_update_all(graph=self,
+                                          message_func=message_func,
+                                          reduce_func=reduce_func,
+                                          apply_func=apply_node_func)
             Runtime.run(prog)
 
     def prop_nodes(self,
@@ -1777,8 +1822,7 @@ class DGLGraph(object):
         """
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
-        return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
-                sgi, readonly=self._readonly)
+        return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
 
     def subgraphs(self, nodes):
         """Return a list of subgraphs, each induced in the corresponding given
@@ -1806,7 +1850,7 @@ class DGLGraph(object):
         induced_nodes = [utils.toindex(n) for n in nodes]
         sgis = self._graph.node_subgraphs(induced_nodes)
         return [dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
-            sgi, readonly=self._readonly) for sgi in sgis]
+            sgi) for sgi in sgis]
 
     def edge_subgraph(self, edges):
         """Return the subgraph induced on given edges.
