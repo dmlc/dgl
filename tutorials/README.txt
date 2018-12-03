@@ -1,4 +1,4 @@
-Tutorials
-=========
+Basic Tutorials
+===============
 
-DGL tutorials and examples
+These tutorials conver the basics of DGL.
