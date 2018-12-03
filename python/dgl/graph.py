@@ -1163,8 +1163,8 @@ class DGLGraph(object):
         and (D1, D2, ...) be the shape of the node representation tensor. The
         length of the given node ids must match B (i.e, len(u) == B).
 
-        All update will be done out-placely to work with autograd unless the inplace
-        flag is true.
+        All update will be done out of place to work with autograd unless the
+        inplace flag is true.
 
         Parameters
         ----------
@@ -1173,7 +1173,7 @@ class DGLGraph(object):
         u : node, container or tensor
             The node(s).
         inplace : bool
-            True if the update is done inplacely
+            If True, update will be done in place, but autograd will break.
         """
         # sanity check
         if not utils.is_dict_like(hu):
@@ -1241,8 +1241,8 @@ class DGLGraph(object):
         is of shape (B, D1, D2, ...), where B is the number of edges to be updated,
         and (D1, D2, ...) be the shape of the edge representation tensor.
 
-        All update will be done out-placely to work with autograd unless the inplace
-        flag is true.
+        All update will be done out of place to work with autograd unless the
+        inplace flag is true.
 
         Parameters
         ----------
@@ -1252,7 +1252,7 @@ class DGLGraph(object):
             Edges can be a pair of endpoint nodes (u, v), or a
             tensor of edge ids. The default value is all the edges.
         inplace : bool
-            True if the update is done inplacely
+            If True, update will be done in place, but autograd will break.
         """
         # parse argument
         if is_all(edges):
@@ -1391,7 +1391,7 @@ class DGLGraph(object):
         v : int, iterable of int, tensor, optional
             The node id(s).
         inplace: bool, optional
-            If True, update will happen in place.
+            If True, update will be done in place, but autograd will break.
         """
         if func == "default":
             func = self._apply_node_func
@@ -1417,7 +1417,7 @@ class DGLGraph(object):
             Edges can be a pair of endpoint nodes (u, v), or a
             tensor of edge ids. The default value is all the edges.
         inplace: bool, optional
-            If True, update will happen in place.
+            If True, update will be done in place, but autograd will break.
 
         Notes
         -----
@@ -1510,7 +1510,7 @@ class DGLGraph(object):
         apply_node_func : callable, optional
           The update function.
         inplace: bool, optional
-          If True, update will happen in place.
+          If True, update will be done in place, but autograd will break.
         """
         if reduce_func == "default":
             reduce_func = self._reduce_func
@@ -1566,7 +1566,7 @@ class DGLGraph(object):
             The update function. Registered function will be used if not
             specified.
         inplace: bool, optional
-            If True, update will happen in place.
+            If True, update will be done in place, but autograd will break.
 
         Notes
         -----
@@ -1625,7 +1625,7 @@ class DGLGraph(object):
         apply_node_func : callable, optional
           The update function.
         inplace: bool, optional
-          If True, update will happen in place.
+          If True, update will be done in place, but autograd will break.
         """
         if message_func == "default":
             message_func = self._message_func
@@ -1668,7 +1668,7 @@ class DGLGraph(object):
         apply_node_func : callable
           The update function.
         inplace: bool, optional
-          If True, update will happen in place.
+          If True, update will be done in place, but autograd will break.
         """
         if message_func == "default":
             message_func = self._message_func
