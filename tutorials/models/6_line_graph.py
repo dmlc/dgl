@@ -304,7 +304,7 @@ visualize(label1, nx_G1)
 # The important point is we are to use different strategies for these terms.
 # 
 # .. note::
-#    For a detailed explanation of :math:`\{Pm, Pd\}`, please go to `Advanced Topic <adv2>`_.
+#    For a detailed explanation of :math:`\{Pm, Pd\}`, please go to `Advanced Topic`_.
 #
 # Implementing :math:`\text{prev}` and :math:`\text{deg}` as tensor operation
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -608,7 +608,8 @@ def collate_fn(batch):
     return batched_graphs, batched_pmpds, batched_labels
 
 ######################################################################################
-# You can check out the complete code `here <>`.
+# You can check out the complete code
+# `here <https://github.com/jermainewang/dgl/blob/master/python/dgl/data/citation_graph.py>`_.
 # 
 # What's the business with :math:`\{Pm, Pd\}`?
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
