@@ -125,8 +125,8 @@ def src_mul_edge(src, edge, out):
     out : str
         The output message field.
 
-    Example
-    -------
+    Examples
+    --------
     >>> import dgl
     >>> message_func = dgl.function.src_mul_edge(src='h', edge='w', out='m')
 
@@ -147,8 +147,8 @@ def copy_src(src, out):
     out : str
         The output message field.
 
-    Example
-    -------
+    Examples
+    --------
     >>> import dgl
     >>> message_func = dgl.function.copy_src(src='h', out='m')
 
@@ -169,8 +169,8 @@ def copy_edge(edge, out):
     out : str
         The output message field.
 
-    Example
-    -------
+    Examples
+    --------
     >>> import dgl
     >>> message_func = dgl.function.copy_edge(edge='h', out='m')
 

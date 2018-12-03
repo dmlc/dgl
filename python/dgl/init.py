@@ -25,8 +25,8 @@ def base_initializer(shape, dtype, ctx, range):
         The id could be node or edge id depending on the scenario.
         Note that the step is always None.
 
-    Example
-    -------
+    Examples
+    --------
     If PyTorch is used as backend, the following code defines an feature
     initializer that initializes tensor value to 1
 
@@ -47,8 +47,8 @@ def base_initializer(shape, dtype, ctx, range):
 def zero_initializer(shape, dtype, ctx, range):
     """Zero feature initializer
 
-    Example
-    -------
+    Examples
+    --------
     >>> import dgl
     >>> g = dgl.DGLGraph()
     >>> g.set_n_initializer(dgl.init.zero_initializer)

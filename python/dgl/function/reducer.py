@@ -55,8 +55,8 @@ def sum(msg, out):
         The message field.
     out : str
         The output node feature field.
-    Example
-    -------
+    Examples
+    --------
     >>> import dgl
     >>> reduce_func = dgl.function.sum(msg='m', out='h')
 
@@ -79,8 +79,8 @@ def max(msg, out):
     out : str
         The output node feature field.
 
-    Example
-    -------
+    Examples
+    --------
     >>> import dgl
     >>> reduce_func = dgl.function.max(msg='m', out='h')
 
