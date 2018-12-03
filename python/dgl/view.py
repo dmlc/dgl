@@ -12,18 +12,11 @@ NodeSpace = namedtuple('NodeSpace', ['data'])
 class NodeView(object):
     """A NodeView class to act as G.nodes for a DGLGraph.
 
-    Compared with networkx's NodeView, DGL's NodeView is not
-    a map. DGL's NodeView supports creating data view from
-    a given list of nodes.
+    Can be used to get a list of current nodes and get and set node data.
 
-    Parameters
-    ----------
-    graph : DGLGraph
-        The graph.
-
-    Examples
+    See Also
     --------
-    TBD
+    dgl.graph.nodes
     """
     __slot__ = '_graph'
 
@@ -79,6 +72,14 @@ class NodeDataView(MutableMapping):
 EdgeSpace = namedtuple('EdgeSpace', ['data'])
 
 class EdgeView(object):
+    """A EdgeView class to act as G.edges for a DGLGraph.
+
+    Can be used to get a list of current edges and get and set edge data.
+
+    See Also
+    --------
+    dgl.graph.edges
+    """
     __slot__ = ['_graph']
 
     def __init__(self, graph):
