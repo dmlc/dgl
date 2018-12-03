@@ -1,7 +1,6 @@
 import numpy as np
 import torch as th
 import os
-from tqdm import tqdm
 from dgl.data.utils import *
 
 _urls = {
