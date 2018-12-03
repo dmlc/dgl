@@ -18,7 +18,7 @@ class NodeView(object):
     --------
     dgl.graph.nodes
     """
-    __slot__ = '_graph'
+    __slots__ = ['_graph']
 
     def __init__(self, graph):
         self._graph = graph
@@ -41,7 +41,7 @@ class NodeView(object):
         return F.arange(0, len(self))
 
 class NodeDataView(MutableMapping):
-    __slot__ = ['_graph', '_nodes']
+    __slots__ = ['_graph', '_nodes']
 
     def __init__(self, graph, nodes):
         self._graph = graph
@@ -80,7 +80,7 @@ class EdgeView(object):
     --------
     dgl.graph.edges
     """
-    __slot__ = ['_graph']
+    __slots__ = ['_graph']
 
     def __init__(self, graph):
         self._graph = graph
@@ -103,7 +103,7 @@ class EdgeView(object):
         return self._graph.all_edges(*args, **kwargs)
 
 class EdgeDataView(MutableMapping):
-    __slot__ = ['_graph', '_edges']
+    __slots__ = ['_graph', '_edges']
 
     def __init__(self, graph, edges):
         self._graph = graph
