@@ -6,38 +6,35 @@
 Overview of DGL
 ===============
 
-Deep Graph Library (DGL) is a Python package that integrates existing DL
-frameworks (e.g. Pytorch, MXNet, Gluon etc.) with learning on structural data
-expressed as graphs.
+Deep Graph Library (DGL) is a Python package built for easy implementation of
+graph neural network model family, on top of existing DL frameworks (e.g.
+Pytorch, MXNet, Gluon etc.).
 
-DGL provides:
+DGL reduces the implementation of graph neural networks into declaring a set
+of _functions_ (or _modules_ in PyTorch terminology).  In addition, DGL
+provides:
 
-* Various levels of controls over message-passing, starting from the familiar
-  mataphor of socket with send and recv among a pair of nodes, to update_all for
-  a graph-wide update.
-* A friendly, dictionary-like API to access feature tensors, using
-  the mataphor of mailbox to collect and process messages.
-* Convinent interfaces for querying and modifying graph structures.
-* Seemless integration with existing DL frameworks in the form of user-defined functions (UDFs)
-  for expressiveness and flexibility.
-* Automatic batching of graphs (or sampled subgraphs) to explore and exploit
-  maximum parallelism.
-* Build-in operation to accelerate UDFs using sparse-matrix
-  operation when possible.
+* Versatile controls over message passing, ranging from low-level operations
+  such as sending along selected edges and receiving on specific nodes, to
+  high-level control such as graph-wide feature updates.
+* Transparent speed optimization with automatic batching of computations and
+  sparse matrix multiplication.
+* Seamless integration with existing deep learning frameworks.
+* Easy and friendly interfaces for node/edge feature access and graph
+  structure manipulation.
 
-We have prototyped altogether 10 different models,
-all of them are ready to run out-of-box. The tasks range from semi-supervised
-learning on graphs, scaling them with sampling techniques, generative models of
-graphs, (previously) hard-to-parallelize tree-structured algorithms, and our
-attempts to cast some classical models in light of graphs. Note that some of
-the models are very new graph-based algorithms -- DGL’s goal is to facilitate
-further growth of research in this area.
+To begin with, we have prototyped 10 models across various domains:
+semi-supervised learning on graphs (with potentially billions of nodes/edges),
+generative models on graphs, (previously) difficult-to-parallelize tree-based
+models like TreeLSTM, etc. We also implement some conventional models in DGL
+from a new graphical perspective yielding simplicity.
 
 Relationship of DGL to other frameworks
 ---------------------------------------
-DGL aims to be agnostic to existing-framework. It provides a narrow API that
-can be ported on top of other tensor-based, autograd-enabled frameworks. Our
-prototype works with MXNet, Gluon and Pytorch.
+DGL is designed to be compatible and agnostic to the existing tensor
+frameworks. It provides a backend adapter interface that allows easy porting
+to other tensor-based, autograd-enabled frameworks. Currently, our prototype
+works with MXNet/Gluon and PyTorch.
 
 Free software
 -------------
@@ -53,8 +50,8 @@ Jinyang Li from NYU's system group joined, flanked by a team of student
 volunteers at NYU Shanghai, Fudan and other universities (Yu, Zihao, Murphy,
 Allen, Qipeng, Qi, Hao), as well as early adopters at the CILVR lab (Jake
 Zhao). Development accelerated when AWS MXNet Science team joined force, with
-Da Zheng, Alex Smola, Haibin, Chao and a number of others. For full credit, see
-[here](https://www.dgl.ai/ack)
+Da Zheng, Alex Smola, Haibin Lin, Chao Ma and a number of others. For full
+credit, see `here <https://www.dgl.ai/ack>`_.
 
 .. toctree::
    :maxdepth: 1

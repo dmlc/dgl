@@ -7,6 +7,10 @@ DGL at a Glance
 **Author**: `Minjie Wang <https://jermainewang.github.io/>`_, Quan Gan, `Jake
 Zhao <https://cs.nyu.edu/~jakezhao/>`_, Zheng Zhang
 
+DGL is a Python package dedicated to deep learning on graphs, built atop
+existing tensor DL frameworks (e.g. Pytorch, MXNet) and simplifying the
+implementation of graph-based neural networks.
+
 The goal of this tutorial:
 
 - Understand how DGL enables computation on graph from a high level.
@@ -16,17 +20,6 @@ At the end of this tutorial, we hope you get a brief feeling of how DGL works.
 
 *This tutorial assumes basic familiarity with pytorch.*
 """
-
-###############################################################################
-# What is DGL?
-# ----------------
-# DGL is a Python package dedicated to deep learning
-# on graphs. It is built atop existing tensor DL frameworks (e.g. Pytorch, MXNet)
-# that provides:
-#
-# * convinent interfaces on manipulating graph structures and data on graphs;
-# * flexible and efficient storage of tensor data on graph;
-# * various controls over message-passing for expressing deep learning models on graphs.
 
 ###############################################################################
 # Step 0: Problem description
