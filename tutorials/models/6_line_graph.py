@@ -75,19 +75,23 @@ Line Graph Neural Network
 # The following code snippet verifies that there are more intra-class edges
 # than inter-class:
 
+import torch
+import torch as th
+import torch.nn as nn
+import torch.nn.functional as F
+
 import dgl
 from dgl.data import citation_graph as citegrh
-import torch
 
 data = citegrh.load_cora()
 
 G = dgl.DGLGraph(data.graph)
-labels = torch.tensor(data.labels)
+labels = th.tensor(data.labels)
 
-label0_nodes = torch.nonzero(labels == 0).squeeze()
+label0_nodes = th.nonzero(labels == 0).squeeze()
 src, _ = G.in_edges(label0_nodes)
 src_labels = labels[src]
-intra_src = torch.nonzero(src_labels == 0)
+intra_src = th.nonzero(src_labels == 0)
 print('Intra-class edges percent: %.4f' % (len(intra_src) / len(src_labels)))
 
 ###########################################################################################
@@ -106,17 +110,13 @@ print('Intra-class edges percent: %.4f' % (len(intra_src) / len(src_labels)))
 #    Nodes in blue belong to one community, nodes in red belong to another.
 #
 # Here is an example:
-
-from dgl.data import binary_sub_graph as bsg
-from dgl import DGLGraph
-from dgl import tutorial_utils as utils
-train_set = bsg.CORABinary(DGLGraph(data.graph), data.features, data.labels, num_classes=7)
-num_train = len(train_set)
-[g, lg, g_deg, lg_deg, pm_pd, subfeature, label, equi_label] = train_set[1]
-
-# g, pm_pd, label
 import networkx as nx
 import matplotlib.pyplot as plt
+
+train_set = dgl.data.CoraBinary()
+G1, pmpd1, label1 = train_set[1]
+nx_G1 = G1.to_networkx()
+
 def visualize(labels, g):
     pos = nx.spring_layout(g, seed=1)
     plt.figure(figsize=(8, 8))
@@ -124,7 +124,7 @@ def visualize(labels, g):
     nx.draw_networkx(g, pos=pos, node_size=50, cmap=plt.get_cmap('coolwarm'),
                      node_color=labels, edge_color='k',
                      arrows=False, width=0.5, style='dotted', with_labels=False)
-visualize(label, g.to_networkx())
+visualize(label1, nx_G1)
 
 ###########################################################################################
 # Interested readers can go to the original paper to see how to generalize
@@ -401,10 +401,7 @@ def aggregate_radius(radius, g, z):
 # 
 #
 # Below is the complete code for one LGNN layer's abstraction :math:`f(x,y)`
-import torch.nn as nn
 import dgl.function as fn
-import torch as th
-import torch.nn.functional as F
 
 class LGNNCore(nn.Module):
     def __init__(self, in_feats, out_feats, radius):
@@ -485,8 +482,11 @@ class LGNN(nn.Module):
         self.layer3 = LGNNLayer(16, 16, radius)
         self.linear = nn.Linear(16, 2)  # predice two classes
 
-    def forward(self, g, lg, deg_g, deg_lg, pm_pd):
-        # use degree as the initial feature
+    def forward(self, g, lg, pm_pd):
+        # compute the degrees
+        deg_g = g.in_degrees().float().unsqueeze(1)
+        deg_lg = lg.in_degrees().float().unsqueeze(1)
+        # use degree as the input feature
         x, lg_x = deg_g, deg_lg
         x, lg_x = self.layer1(g, lg, x, lg_x, deg_g, deg_lg, pm_pd)
         x, lg_x = self.layer2(g, lg, x, lg_x, deg_g, deg_lg, pm_pd)
@@ -497,9 +497,8 @@ class LGNN(nn.Module):
 # -----------------------
 # We first load the data
 from torch.utils.data import DataLoader
-batch_size = 1
 training_loader = DataLoader(train_set,
-                             batch_size,
+                             batch_size=1,
                              collate_fn=train_set.collate_fn,
                              drop_last=True)
 ##############################################################
@@ -519,33 +518,47 @@ training_loader = DataLoader(train_set,
 
 #######################################################################################
 # initialize the model
-import torch.optim as optim
-inference_idx = 1
 model = LGNN(radius=3)
+optimizer = th.optim.Adam(model.parameters(), lr=1e-2)
 
-optimizer = optim.Adam(model.parameters(), lr=1e-2)
+# a util function to convert a scipy.coo_matrix to torch.SparseFloat
+def sparse2th(mat):
+    value = mat.data
+    indices = th.LongTensor([mat.row, mat.col])
+    tensor = th.sparse.FloatTensor(indices, th.from_numpy(value).float(), mat.shape)
+    return tensor
+
 #######################################################################################
 # Below is the main training loop
 for i in range(20):
     all_loss = []
     all_acc = []
-    for [g, lg, g_deg, lg_deg, pmpd, subfeature, label, equivariant_label] in training_loader:
-        # TODO: convert to pytorch tensor
-        # TODO: create lg
-        # TODO: create degree tensor
-        pmpd = utils.sparse2th(pmpd)
-        g_deg = torch.from_numpy(g_deg)
-        lg_deg = torch.from_numpy(lg_deg)
-        label = torch.from_numpy(label)
-        equivariant_label = torch.from_numpy(equivariant_label)
+    for [g, pmpd, label] in training_loader:
+        # Generate the line graph.
+        # NOTE: in practice, it is better to move this out of the loop as the
+        #       graph in this example is static
+        lg = g.line_graph(backtracking=False)
+        # Create torch tensors
+        pmpd = sparse2th(pmpd)
+        label = th.from_numpy(label)
+        
+        # Forward
+        z = model(g, lg, pmpd)
 
-        z = model(g, lg, g_deg, lg_deg, pmpd)
+        # Calculate loss:
+        # Since there are only two communities, there are only two permutations
+        #  of the community labels.
         loss_perm1 = F.cross_entropy(z, label)
-        loss_perm2 = F.cross_entropy(z, equivariant_label)
-        loss = torch.min(loss_perm1, loss_perm2)
-        acc = utils.linegraph_accuracy([z], [label, equivariant_label])
+        loss_perm2 = F.cross_entropy(z, 1 - label)
+        loss = th.min(loss_perm1, loss_perm2)
+
+        # Calculate accuracy:
+        _, pred = th.max(z, 1)
+        acc_perm1 = (pred == label).float().mean()
+        acc_perm2 = (pred == 1 - label).float().mean()
+        acc = th.max(acc_perm1, acc_perm2)
         all_loss.append(loss.item())
-        all_acc.append(acc)
+        all_acc.append(acc.item())
 
         optimizer.zero_grad()
         loss.backward()
@@ -562,20 +575,21 @@ for i in range(20):
 # we visualize the network's community prediction on one training example,
 # together with the ground truth.
 # TODO: visualize result (no code required)
-[g, lg, g_deg, lg_deg, pmpd, subfeature, label, equi_label] = train_set[inference_idx]
-pmpd = utils.sparse2th(pmpd)
-z = model(g, lg, g_deg, lg_deg, pmpd)
-pred = torch.max(z, 1)[1]
-visualize(pred, g.to_networkx())
+pmpd1 = sparse2th(pmpd1)
+LG1 = G1.line_graph(backtracking=False)
+z = model(G1, LG1, pmpd1)
+pred = th.max(z, 1)[1]
+visualize(pred, nx_G1)
 
 #######################################################################################
 # Below is ground truth.
-visualize(label, g.to_networkx())
+visualize(label1, nx_G1)
 
 #########################################
 # We then provide an animation to better understand the process. (40 epochs)
+#
 # .. figure:: https://i.imgur.com/KDUyE1S.gif 
-#    :alt:
+#    :alt: lgnn-anim
 #
 # Advanced topic #1: batching
 # ---------------------------
@@ -592,23 +606,12 @@ visualize(label, g.to_networkx())
 # along the diagonal of the large graph's adjacency matrix.  We concatentate
 # :math`\{Pm,Pd\}` as block diagonal matrix in corespondance to DGL batched
 # graph API.
-def collate_fn(self, x):
-    subgraph, line_graph, deg_g, deg_lg, pmpd, subfeature, sublabel, equi_label = zip(*x)
-    subgraph_batch = dgl.batch(subgraph)
-    line_graph_batch = dgl.batch(line_graph)
-    deg_g_batch = np.concatenate(deg_g, axis=0)
-    deg_lg_batch = np.concatenate(deg_lg, axis=0)
-
-    self.total = 0
-
-    subfeature_batch = np.concatenate(subfeature, axis=0)
-    sublabel_batch = np.concatenate(sublabel, axis=0)
-    equilabel_batch = np.concatenate(equi_label, axis=0)
-
-    pmpd_batch = sp.sparse.block_diag(pmpd)
-
-    return subgraph_batch, line_graph_batch, deg_g_batch, deg_lg_batch, \
-           pmpd_batch, subfeature_batch, sublabel_batch, equilabel_batch
+def collate_fn(batch):
+    graphs, pmpds, labels = zip(*batch)
+    batched_graphs = dgl.batch(graphs)
+    batched_pmpds = sp.block_diag(pmpds)
+    batched_labels = np.concatenate(labels, axis=0)
+    return batched_graphs, batched_pmpds, batched_labels
 
 ######################################################################################
 # You can check out the complete code here (link to dataloader).
