@@ -12,22 +12,6 @@ from dgl import DGLGraph
 """
 # This should be ignored.
 """
-def graph_viz(labels,subgraph):
-    value = [labels[node] for node in subgraph.nodes()]
-    pos = nx.spring_layout(subgraph, seed=1)
-    plt.figure(figsize=(10,10))
-    plt.axis('off')
-    nx.draw_networkx(subgraph,
-                     pos=pos,
-                     k=1/800,
-                     edge_color='k',
-                     node_size=50,
-                     cmap=plt.get_cmap('coolwarm'),
-                     node_color=value,
-                     arrows=False,
-                     width=0.05,
-                     style='dotted',
-                     with_labels=False)
 
 def linegraph_accuracy(z_list, labels):
     accu = []

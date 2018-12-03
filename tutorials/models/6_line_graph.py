@@ -4,7 +4,8 @@
 Line Graph Neural Network
 =====================================
 
-**Author**: `Qi Huang <https://github.com/HQ01>`_, Yu Gai, Zheng Zhang
+**Author**: `Qi Huang <https://github.com/HQ01>`_, Yu Gai,
+`Minjie Wang <https://jermainewang.github.io/>`_, Zheng Zhang
 """
 
 ###########################################################################################
@@ -70,19 +71,24 @@ Line Graph Neural Network
 #
 # CORA naturally contains 7 "classes", and statistics below show that each
 # "class" does satisfy our assumption of community, i.e. nodes of same class
-# class have higher connection probability among them than with nodes of diferent class.
+# class have higher connection probability among them than with nodes of different class.
 # The following code snippet verifies that there are more intra-class edges
 # than inter-class:
 
 import dgl
 from dgl.data import citation_graph as citegrh
-
+import torch
 
 data = citegrh.load_cora()
-num_classes = 7
 
-import dgl.tutorial_utils as utils
-utils.check_intra_prob(data.graph, data.labels, num_classes)
+G = dgl.DGLGraph(data.graph)
+labels = torch.tensor(data.labels)
+
+label0_nodes = torch.nonzero(labels == 0).squeeze()
+src, _ = G.in_edges(label0_nodes)
+src_labels = labels[src]
+intra_src = torch.nonzero(src_labels == 0)
+print('Intra-class edges percent: %.4f' % (len(intra_src) / len(src_labels)))
 
 ###########################################################################################
 # Binary Community Subgraph from CORA -- a Toy Dataset
@@ -100,14 +106,26 @@ utils.check_intra_prob(data.graph, data.labels, num_classes)
 #    Nodes in blue belong to one community, nodes in red belong to another.
 #
 # Here is an example:
-#
 
 from dgl.data import binary_sub_graph as bsg
 from dgl import DGLGraph
+from dgl import tutorial_utils as utils
 train_set = bsg.CORABinary(DGLGraph(data.graph), data.features, data.labels, num_classes=7)
 num_train = len(train_set)
 [g, lg, g_deg, lg_deg, pm_pd, subfeature, label, equi_label] = train_set[1]
-utils.graph_viz(label, g.to_networkx())
+
+# g, pm_pd, label
+import networkx as nx
+import matplotlib.pyplot as plt
+def visualize(labels, g):
+    pos = nx.spring_layout(g, seed=1)
+    plt.figure(figsize=(8, 8))
+    plt.axis('off')
+    nx.draw_networkx(g, pos=pos, node_size=50, cmap=plt.get_cmap('coolwarm'),
+                     node_color=labels, edge_color='k',
+                     arrows=False, width=0.5, style='dotted', with_labels=False)
+visualize(label, g.to_networkx())
+
 ###########################################################################################
 # Interested readers can go to the original paper to see how to generalize
 # to multi communities case.
@@ -151,8 +169,9 @@ utils.graph_viz(label, g.to_networkx())
 # Line Graph Neural network: key ideas
 # ------------------------------------
 # An key innovation in this paper is the use of line-graph.
-# Unlike models in previous tutorials, message passing happens not only on the original graph,
-# e.g. the binary community subgraph from CORA, but also on the line-graph associated with the original graph.
+# Unlike models in previous tutorials, message passing happens not only on the
+# original graph, e.g. the binary community subgraph from CORA, but also on the
+# line-graph associated with the original graph.
 #
 # What's a line-graph ?
 # ~~~~~~~~~~~~~~~~~~~~~
@@ -247,15 +266,17 @@ utils.graph_viz(label, g.to_networkx())
 #   companion line graph, respectively.
 #
 # - Each equation consists of 4 terms: (take the first as example):
-#        - :math:`x^{(k)}\theta^{(k)}_{1,l}`, a linear projection of previous layer's output :math:`x^{(k)}`, denote as
-#          :math:`\text{prev}(x)`.
-#        - :math:`(Dx^{(k)})\theta^{(k)}_{2,l}`, a linear projection of degree operator on :math:`x^{(k)}`, denote as
-#          :math:`\text{deg}(x)`.
-#        - :math:`\sum^{J-1}_{j=0}(A^{2^{j}}x^{(k)})\theta^{(k)}_{3+j,l}`, a summation of :math:`2^{j}` adjacency operator on
-#          :math:`x^{(k)}`, denote as :math:`\text{sum}(x)`
-#        - :math:`[\{Pm,Pd\}y^{(k)}]\theta^{(k)}_{3+J,l}`, fusing another graph's embedding information using incidence matrix
-#          :math:`\{Pm, Pd\}`, followed with a linear porjection, denote as :math:`\text{fuse}(y)`.
-#
+#   - :math:`x^{(k)}\theta^{(k)}_{1,l}`, a linear projection of previous
+#     layer's output :math:`x^{(k)}`, denote as :math:`\text{prev}(x)`.
+#   - :math:`(Dx^{(k)})\theta^{(k)}_{2,l}`, a linear projection of degree
+#     operator on :math:`x^{(k)}`, denote as :math:`\text{deg}(x)`.
+#   - :math:`\sum^{J-1}_{j=0}(A^{2^{j}}x^{(k)})\theta^{(k)}_{3+j,l}`,
+#     a summation of :math:`2^{j}` adjacency operator on :math:`x^{(k)}`,
+#     denote as :math:`\text{sum}(x)`
+#   - :math:`[\{Pm,Pd\}y^{(k)}]\theta^{(k)}_{3+J,l}`, fusing another
+#     graph's embedding information using incidence matrix
+#     :math:`\{Pm, Pd\}`, followed with a linear porjection,
+#     denote as :math:`\text{fuse}(y)`.
 #
 # - In addition, each of the terms are performed again with different
 #   parameters, and without the nonlinearity after the sum.
@@ -320,30 +341,24 @@ utils.graph_viz(label, g.to_networkx())
 # 
 #   self.new_linear_list = lambda: nn.ModuleList([self.new_linear() for i in range(radius)])
 # 
-#   self.linear_aggregate = self.new_linear_list()
-# 
+#   self.linear_radius = self.new_linear_list()
 #
-#
-# In ``__forward__``, we define the ``sum`` operation as ``aggregate()``:
-def aggregate(g, z):
-            # initializing list to collect message passing result
-            z_list = []
-            g.ndata['z'] = z
-            # pulling message from 1-hop neighbourhood
+# In ``__forward__``, we define the ``sum`` operation as ``aggregate_radius()``:
+def aggregate_radius(radius, g, z):
+    # initializing list to collect message passing result
+    z_list = []
+    g.ndata['z'] = z
+    # pulling message from 1-hop neighbourhood
+    g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
+    z_list.append(g.ndata['z'])
+    for i in range(radius - 1):
+        for j in range(2 ** i):
+            #pulling message from 2^j neighborhood
             g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
-            z_list.append(g.ndata['z'])
-            for i in range(self.radius - 1):
-                for j in range(2 ** i):
-                    #pulling message from 2^j neighborhood
-                    g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
-                z_list.append(g.ndata['z'])
-            return z_list
+        z_list.append(g.ndata['z'])
+    return z_list
+
 #########################################################################
-def twoj_hop(feat):
-    return sum(linear(z) for linear, z in zip(self.linear_aggregate,
-                                              aggregate(g,feat)))
-#########################################################################
-# 
 # Then 
 # ::
 # 
@@ -352,7 +367,8 @@ def twoj_hop(feat):
 # Implementing :math:`\text{fuse}` as sparse matrix multiplication
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # :math:`\{Pm, Pd\}` is a sparse matrix with only two non-zero entries on
-# each column. Therefore, we construct it as a sparse matrix in the dataset, # and implement :math:`\text{fuse}` as a sparse matrix multiplication.
+# each column. Therefore, we construct it as a sparse matrix in the dataset,
+# and implement :math:`\text{fuse}` as a sparse matrix multiplication.
 #
 # in ``__forward__``:
 # 
@@ -389,62 +405,42 @@ import torch.nn as nn
 import dgl.function as fn
 import torch as th
 import torch.nn.functional as F
+
 class LGNNCore(nn.Module):
-    def __init__(self, feats, out_feats, radius, mode='g'):
+    def __init__(self, in_feats, out_feats, radius):
         super(LGNNCore, self).__init__()
-        self.mode = mode
         self.out_feats = out_feats
         self.radius = radius
 
-
-        self.new_linear = lambda: nn.Linear(feats, out_feats)
-        self.new_linear_other = lambda: nn.Linear(out_feats, out_feats)
-
-        self.new_linear_list = lambda: nn.ModuleList([self.new_linear() for i in range(radius)])
-        self.linear_prev, self.linear_deg = self.new_linear(), self.new_linear()
-        self.linear_aggregate = self.new_linear_list()
-
-
-        if (mode == 'g'):
-            self.linear_fuse = self.new_linear()
-        else:
-            self.linear_fuse = self.new_linear_other()
-
-
+        self.linear_prev = nn.Linear(in_feats, out_feats)
+        self.linear_deg = nn.Linear(in_feats, out_feats)
+        self.linear_radius = nn.ModuleList(
+                [nn.Linear(in_feats, out_feats) for i in range(radius)])
+        self.linear_fuse = nn.Linear(in_feats, out_feats)
         self.bn = nn.BatchNorm1d(out_feats)
 
-
     def forward(self, g, feat_a, feat_b, deg, pm_pd):
-
-        def aggregate(g, z):
-            z_list = []
-            g.ndata['z'] = z
-            g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
-            z_list.append(g.ndata['z'])
-            for i in range(self.radius - 1):
-                for j in range(2 ** i):
-                    g.update_all(fn.copy_src(src='z', out='m'), fn.sum(msg='m', out='z'))
-                z_list.append(g.ndata['z'])
-            return z_list
-
+        # equation term ?
         prev_proj = self.linear_prev(feat_a)
+        # equation term ?
         deg_proj = self.linear_deg(deg * feat_a)
 
-        twoj_hop = lambda feat : sum(linear(z)
-                                     for linear, z in zip(self.linear_aggregate, aggregate(g, feat)))
+        # equation term ?
+        # aggregate 2^j-hop features
+        hop2j_list = aggregate_radius(self.radius, g, feat_a)
+        # apply linear transformation
+        hop2j_list = [linear(x) for linear, x in zip(self.linear_radius, hop2j_list)]
+        sum_a = sum(hop2j_list)
 
-        pmpd_exp = lambda feat : th.matmul(pm_pd, feat)
+        # equation term ?
+        fuse = self.linear_fuse(th.mm(pm_pd, feat_b))
 
-
-        sum_a = twoj_hop(feat_a)
-        fuse = self.linear_fuse(pmpd_exp(feat_b))
-
-
+        # sum them together
         result = prev_proj + deg_proj + sum_a + fuse
 
+        # skip connection and batch norm
         n = self.out_feats // 2
-
-        result = th.cat([result[:, :n], F.relu(result[:, n:])], 1) #skip connection
+        result = th.cat([result[:, :n], F.relu(result[:, n:])], 1)
         result = self.bn(result)
 
         return result
@@ -461,54 +457,49 @@ class LGNNCore(nn.Module):
 #    \end{split}
 # We chain up 2 ``LGNNCore`` instances with different parameter in the forward pass.
 class LGNNLayer(nn.Module):
-    def __init__(self, feats, out_feats, radius):
+    def __init__(self, in_feats, out_feats, radius):
         super(LGNNLayer, self).__init__()
-
-        self.g_layer = LGNNCore(feats, out_feats, radius, mode='g')
-        self.lg_layer = LGNNCore(feats, out_feats, radius, mode='lg')
+        self.g_layer = LGNNCore(in_feats, out_feats, radius)
+        self.lg_layer = LGNNCore(in_feats, out_feats, radius)
 
     def forward(self, g, lg, x, lg_x, deg_g, deg_lg, pm_pd):
-        x = self.g_layer(g, x, lg_x, deg_g, pm_pd)
+        next_x = self.g_layer(g, x, lg_x, deg_g, pm_pd)
         pm_pd_y = th.transpose(pm_pd, 0, 1)
-        lg_x = self.lg_layer(lg, lg_x, x, deg_lg, pm_pd_y) # Here we can add pm_pd_y
+        next_lg_x = self.lg_layer(lg, lg_x, x, deg_lg, pm_pd_y) # Here we can add pm_pd_y
+        return next_x, next_lg_x
 
-        return x, lg_x
 ########################################################################################
 # Chain up LGNN layers
 # ~~~~~~~~~~~~~~~~~~~~
-# The final LGNN class is defined by chaining up arbitrary number of LGNN layers.
-from dgl.tutorial_utils import from_npsp
+# We then define an LGNN with three hidden layers.
 class LGNN(nn.Module):
-    def __init__(self, feats, radius, n_classes):
+    def __init__(self, radius):
         """
         Parameters
         ----------
-        feats : dimension of intermediate layers
         radius : radius of neighborhood message passing
-        n_classes : number of predicted communities, i.e. dimension of last layer
         """
         super(LGNN, self).__init__()
-        self.linear = nn.Linear(feats[-1], n_classes)
+        self.layer1 = LGNNLayer(1, 16, radius)  # input is scalar feature
+        self.layer2 = LGNNLayer(16, 16, radius)  # hidden size is 16
+        self.layer3 = LGNNLayer(16, 16, radius)
+        self.linear = nn.Linear(16, 2)  # predice two classes
 
-        self.module_list = nn.ModuleList([LGNNLayer(in_feat, out_feat, radius)
-                                          for in_feat, out_feat in zip(
-                                              feats[:-1], feats[1:])])
-    @from_npsp
     def forward(self, g, lg, deg_g, deg_lg, pm_pd):
+        # use degree as the initial feature
         x, lg_x = deg_g, deg_lg
-        for module in self.module_list:
-            x, lg_x = module(g, lg, x, lg_x, deg_g, deg_lg, pm_pd)
+        x, lg_x = self.layer1(g, lg, x, lg_x, deg_g, deg_lg, pm_pd)
+        x, lg_x = self.layer2(g, lg, x, lg_x, deg_g, deg_lg, pm_pd)
+        x, lg_x = self.layer3(g, lg, x, lg_x, deg_g, deg_lg, pm_pd)
         return self.linear(x)
 #########################################################################################
 # Training and Inference
 # -----------------------
 # We first load the data
 from torch.utils.data import DataLoader
-n_batch_size = 1
-
-indices = list(range(num_train))
+batch_size = 1
 training_loader = DataLoader(train_set,
-                             n_batch_size,
+                             batch_size,
                              collate_fn=train_set.collate_fn,
                              drop_last=True)
 ##############################################################
@@ -524,83 +515,62 @@ training_loader = DataLoader(train_set,
 # See code link at here (link to data/binary-sub-grph).
 # Here we define a main loop to train a 3 layers LGNN for 20 epochs on the toy-datset.
 # We first define a ``step()`` function to describe each step of training:
-import time
-@from_npsp
-def step(i, j, g, lg, deg_g, deg_lg, pmpd, feature, label, equi_label, n_batchsize):
-    """ One step of training. """
-    t0 = time.time()
-    z = model(g, lg, deg_g, deg_lg, pmpd)
-    time_forward = time.time() - t0
 
-    z_list = [z]
-    equi_labels = [label, equi_label]
-    loss = sum(min(F.cross_entropy(z, y) for y in equi_labels) for z in z_list) / n_batchsize
 
-    accu = utils.linegraph_accuracy(z_list, equi_labels)
-
-    optimizer.zero_grad()
-    t0 = time.time()
-    loss.backward()
-    time_backward = time.time() - t0
-    optimizer.step()
-
-    return loss, accu, time_forward, time_backward
-####################################################################################################
+#######################################################################################
 # initialize the model
 import torch.optim as optim
-n_features = 16
-n_layers = 3
-radius = 3
-lr = 1e-3
-K = 2 # num_of_classes
 inference_idx = 1
-feats = [1] + [n_features]*n_layers + [K]
-model = LGNN(feats, radius, K)
+model = LGNN(radius=3)
 
-optimizer = optim.Adam(model.parameters(), lr=lr)
-######################################################################################################
+optimizer = optim.Adam(model.parameters(), lr=1e-2)
+#######################################################################################
 # Below is the main training loop
-n_iterations = 20 #main loop
-n_epochs = 20
-vali_label_change = [] # This is probably not the best practice
-total_time = 0
-for i in range(n_epochs):
-    total_loss, total_accu, s_forward, s_backward = 0, 0, 0, 0
-    for j, [g, lg, g_deg, lg_deg, pmpd, subfeature, label, equivariant_label] in enumerate(training_loader):
-        loss, accu, t_forward, t_backward = step(i, j, g, lg, g_deg,
-                                                 lg_deg, pmpd,
-                                                 subfeature, label,
-                                                 equivariant_label,
-                                                 n_batch_size)
-        total_loss += loss
-        s_forward += t_forward
-        s_backward += t_backward
-        total_accu += accu
-    total_time += (s_forward + s_backward)
+for i in range(20):
+    all_loss = []
+    all_acc = []
+    for [g, lg, g_deg, lg_deg, pmpd, subfeature, label, equivariant_label] in training_loader:
+        # TODO: convert to pytorch tensor
+        # TODO: create lg
+        # TODO: create degree tensor
+        pmpd = utils.sparse2th(pmpd)
+        g_deg = torch.from_numpy(g_deg)
+        lg_deg = torch.from_numpy(lg_deg)
+        label = torch.from_numpy(label)
+        equivariant_label = torch.from_numpy(equivariant_label)
 
-    print("average loss for epoch {} is {}, with avg accu {}, forward time {}, backward time {}".format(i, total_loss/len(training_loader), total_accu/len(training_loader), s_forward, s_backward))
-    [g, lg, g_deg, lg_deg, pmpd, subfeature, label, equi_label] = train_set[inference_idx]
-    z = model(g, lg, g_deg, lg_deg, pmpd)
-    vali_label_change.append(th.max(z, 1)[1])
-print("total time {} s, average {}".format(total_time, total_time/n_iterations))
-vali_label_change.append(equi_label)
-####################################################################################################################
+        z = model(g, lg, g_deg, lg_deg, pmpd)
+        loss_perm1 = F.cross_entropy(z, label)
+        loss_perm2 = F.cross_entropy(z, equivariant_label)
+        loss = torch.min(loss_perm1, loss_perm2)
+        acc = utils.linegraph_accuracy([z], [label, equivariant_label])
+        all_loss.append(loss.item())
+        all_acc.append(acc)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+    niters = len(all_loss)
+    print("Epoch %d | loss %.4f | accuracy %.4f" % (i,
+        sum(all_loss) / niters, sum(all_acc) / niters))
+
+#######################################################################################
 # Visualizing training progress
 # -----------------------------
 # To intuitively understand the training progress of a LGNN,
 # we visualize the network's community prediction on one training example,
 # together with the ground truth.
-import matplotlib.pyplot as plt
-
+# TODO: visualize result (no code required)
 [g, lg, g_deg, lg_deg, pmpd, subfeature, label, equi_label] = train_set[inference_idx]
-utils.linegraph_inference_viz(g, lg, g_deg, lg_deg, pmpd,
-                                  subfeature, model)
-plt.show()
+pmpd = utils.sparse2th(pmpd)
+z = model(g, lg, g_deg, lg_deg, pmpd)
+pred = torch.max(z, 1)[1]
+visualize(pred, g.to_networkx())
 
 #######################################################################################
 # Below is ground truth.
-utils.graph_viz(label, g.to_networkx())
-plt.show()
+visualize(label, g.to_networkx())
 
 #########################################
 # We then provide an animation to better understand the process. (40 epochs)
@@ -615,32 +585,33 @@ plt.show()
 #
 # As it turned out, we moved batching into the dataloader itself.
 #
-# In the ``collate_fn`` for PyTorch Dataloader, we batch graphs using DGL's batched_graph API.
-# Degree matrices are simply numpy arrays, thus we concatenate them.
-# To refresh our memory, DGL batches graphs by merging them into a large graph,
-# with each smaller graph's adjacency matrix being a block along the diagonal of the large graph's adjacency matrix.
-# We concatentate :math`\{Pm,Pd\}` as block diagonal matrix in corespondance to DGL batched graph API.
-from dgl.batched_graph import batch
+# In the ``collate_fn`` for PyTorch Dataloader, we batch graphs using DGL's
+# batched_graph API.  Degree matrices are simply numpy arrays, thus we
+# concatenate them.  To refresh our memory, DGL batches graphs by merging them
+# into a large graph, with each smaller graph's adjacency matrix being a block
+# along the diagonal of the large graph's adjacency matrix.  We concatentate
+# :math`\{Pm,Pd\}` as block diagonal matrix in corespondance to DGL batched
+# graph API.
 def collate_fn(self, x):
-        subgraph, line_graph, deg_g, deg_lg, pmpd, subfeature, sublabel, equi_label = zip(*x)
-        subgraph_batch = batch(subgraph)
-        line_graph_batch = batch(line_graph)
-        deg_g_batch = np.concatenate(deg_g, axis=0)
-        deg_lg_batch = np.concatenate(deg_lg, axis=0)
+    subgraph, line_graph, deg_g, deg_lg, pmpd, subfeature, sublabel, equi_label = zip(*x)
+    subgraph_batch = dgl.batch(subgraph)
+    line_graph_batch = dgl.batch(line_graph)
+    deg_g_batch = np.concatenate(deg_g, axis=0)
+    deg_lg_batch = np.concatenate(deg_lg, axis=0)
 
-        self.total = 0
+    self.total = 0
 
-        subfeature_batch = np.concatenate(subfeature, axis=0)
-        sublabel_batch = np.concatenate(sublabel, axis=0)
-        equilabel_batch = np.concatenate(equi_label, axis=0)
+    subfeature_batch = np.concatenate(subfeature, axis=0)
+    sublabel_batch = np.concatenate(sublabel, axis=0)
+    equilabel_batch = np.concatenate(equi_label, axis=0)
 
-        pmpd_batch = sp.sparse.block_diag(pmpd)
+    pmpd_batch = sp.sparse.block_diag(pmpd)
 
-        return subgraph_batch, line_graph_batch, deg_g_batch, deg_lg_batch, pmpd_batch, subfeature_batch, sublabel_batch, equilabel_batch
+    return subgraph_batch, line_graph_batch, deg_g_batch, deg_lg_batch, \
+           pmpd_batch, subfeature_batch, sublabel_batch, equilabel_batch
 
-##########################################################################################################################
+######################################################################################
 # You can check out the complete code here (link to dataloader).
-# 
 # 
 # Advanced topic #2: what's the business with :math:`\{Pm, Pd\}`?
 # ----------------------------------------------------------------
