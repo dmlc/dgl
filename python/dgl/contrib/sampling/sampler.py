@@ -102,7 +102,8 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
     node_prob: the probability that a neighbor node is sampled.
         1D Tensor. None means uniform sampling. Otherwise, the number of elements
         should be the same as the number of vertices in the graph.
-    seed_nodes: a list of nodes where we sample subgraphs from. If it's None, the seed vertices are all vertices in the graph.
+    seed_nodes: a list of nodes where we sample subgraphs from.
+        If it's None, the seed vertices are all vertices in the graph.
     shuffle: indicates the sampled subgraphs are shuffled.
     num_workers: the number of worker threads that sample subgraphs in parallel.
     max_subgraph_size: the maximal subgraph size in terms of the number of nodes.
@@ -110,7 +111,8 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
     
     Returns
     -------
-    A subgraph generator.
+    A subgraph loader that returns a batch of subgraphs and
+        the Ids of the seed vertices used in the batch.
     '''
     return NSSubgraphLoader(g, batch_size, expand_factor, num_hops, neighbor_type, node_prob,
                             seed_nodes, shuffle, num_workers, max_subgraph_size)

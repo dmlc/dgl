@@ -29,7 +29,7 @@ class DGLSubGraph(DGLGraph):
 
     The "shared" mode is currently not supported.
 
-    The subgraph is read-only so mutation is not allowed.
+    The subgraph is read-only on structure; graph mutation is not allowed.
 
     Parameters
     ----------

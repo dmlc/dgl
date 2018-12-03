@@ -10,4 +10,5 @@ API Reference
    traversal
    propagate
    udf
+   sampler
    data
