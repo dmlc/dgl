@@ -70,6 +70,8 @@ class LinkPredict(nn.Module):
         return torch.mean(embedding.pow(2)) + torch.mean(self.w_relation.pow(2))
 
     def get_loss(self, g, triplets, labels):
+        # triplets is a list of data samples (positive and negative)
+        # each row in the triplets is a 3-tuple of (source, relation, destination)
         embedding = self.forward(g)
         score = self.calc_score(embedding, triplets)
         predict_loss = F.binary_cross_entropy_with_logits(score, labels)
@@ -184,7 +186,7 @@ def main(args):
                                  hits=[1, 3, 10], eval_bz=args.eval_batch_size)
             # save best model
             if mrr < best_mrr:
-                if epoch > args.n_epochs:
+                if epoch >= args.n_epochs:
                     break
             else:
                 best_mrr = mrr

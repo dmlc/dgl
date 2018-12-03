@@ -2,8 +2,9 @@
 
 ### Prerequisites
 Two extra python packages are needed for this example: 
-rdflib
-pandas
+
+- rdflib
+- pandas
 
 ### Entity Classification
 AIFB:
