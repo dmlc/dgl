@@ -46,13 +46,6 @@ Working with different backends
 
 Currently DGL supports PyTorch and MXNet.
 
-Backend requirements
-````````````````````
-
-* `PyTorch <https://pytorch.org>`_: requires 0.4.1 or later.
-* `MXNet <https://mxnet.apache.org/>`_: requires the nightly build.
-  (TODO: add instructions for how to install nightly build).
-
 Switching backend
 `````````````````
 
@@ -62,7 +55,8 @@ The backend is controlled by ``DGLBACKEND`` environment variable, which defaults
 +---------+---------+--------------------------------------------------+
 | Value   | Backend | Memo                                             |
 +=========+=========+==================================================+
-| pytorch | PyTorch | Requires 0.4.1 or later                          |
+| pytorch | PyTorch | Requires 0.4.1 or later; see                     |
+|         |         | `official website <https://pytorch.org>`_        |
 +---------+---------+--------------------------------------------------+
 | mxnet   | MXNet   | Requires nightly build; run the following        |
 |         |         | command to install (TODO):                       |
