@@ -574,11 +574,10 @@ for i in range(20):
 # To intuitively understand the training progress of a LGNN,
 # we visualize the network's community prediction on one training example,
 # together with the ground truth.
-# TODO: visualize result (no code required)
 pmpd1 = sparse2th(pmpd1)
 LG1 = G1.line_graph(backtracking=False)
 z = model(G1, LG1, pmpd1)
-pred = th.max(z, 1)[1]
+_, pred = th.max(z, 1)
 visualize(pred, nx_G1)
 
 #######################################################################################
