@@ -14,10 +14,10 @@ import numpy as np
 import os
 import dgl
 import dgl.backend as F
-from dgl.data.utils import download, extract_archive, get_download_dir
+from dgl.data.utils import download, extract_archive, get_download_dir, _get_dgl_url
 
 _urls = {
-    'sst': 'https://www.dropbox.com/s/aqejdgrs3jkrmc7/sst.zip?dl=1',
+    'sst' : 'dataset/sst.zip',
 }
 
 SSTBatch = namedtuple('SSTBatch', ['graph', 'mask', 'wordid', 'label'])
@@ -26,14 +26,14 @@ class SST(object):
     """Stanford Sentiment Treebank dataset.
 
     Each sample is the constituency tree of a sentence. The leaf nodes
-    represent words. The word is a int value stored in the "x" feature field.
-    The non-leaf node has a special value PAD_WORD.
+    represent words. The word is a int value stored in the ``x`` feature field.
+    The non-leaf node has a special value ``PAD_WORD`` in the ``x`` field.
     Each node also has a sentiment annotation: 5 classes (very negative,
     negative, neutral, positive and very positive). The sentiment label is a
-    int value stored in the "y" feature field.
+    int value stored in the ``y`` feature field.
 
     .. note::
-        This dataset class is compatible with pytorch's Dataset class.
+        This dataset class is compatible with pytorch's :class:`Dataset` class.
 
     .. note::
         All the samples will be loaded and preprocessed in the memory first.
@@ -41,7 +41,7 @@ class SST(object):
     Parameters
     ----------
     mode : str, optional
-        Can be 'train', 'val', 'test'. Which data file to use.
+        Can be ``'train'``, ``'val'``, ``'test'`` and specifies which data file to use.
     vocab_file : str, optional
         Optional vocabulary file.
     """
@@ -54,7 +54,7 @@ class SST(object):
         self.pretrained_file = 'glove.840B.300d.txt' if mode == 'train' else ''
         self.pretrained_emb = None
         self.vocab_file = '{}/sst/vocab.txt'.format(self.dir) if vocab_file is None else vocab_file
-        download(_urls['sst'], path=self.zip_file_path)
+        download(_get_dgl_url(_urls['sst']), path=self.zip_file_path)
         extract_archive(self.zip_file_path, '{}/sst'.format(self.dir))
         self.trees = []
         self.num_classes = 5
@@ -120,9 +120,28 @@ class SST(object):
         return ret
 
     def __getitem__(self, idx):
+        """Get the tree with index idx.
+
+        Parameters
+        ----------
+        idx : int
+            Tree index.
+
+        Returns
+        -------
+        dgl.DGLGraph
+            Tree.
+        """
         return self.trees[idx]
 
     def __len__(self):
+        """Get the number of trees in the dataset.
+
+        Returns
+        -------
+        int
+            Number of trees.
+        """
         return len(self.trees)
 
     @property

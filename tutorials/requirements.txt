@@ -5,3 +5,5 @@ seaborn
 matplotlib
 pygraphviz
 graphviz
+pandas
+rdflib
