@@ -86,40 +86,29 @@ class Transformer(nn.Module):
         self.d_k = d_k
         self.att_weight_map = None
 
-    def _register_att_map(self, g, enc_ids, dec_ids):
-        self.att_weight_map = [
-            get_attention_map(g, enc_ids, enc_ids),
-            get_attention_map(g, enc_ids, dec_ids),
-            get_attention_map(g, dec_ids, dec_ids),
-        ]
-
     def update_graph(self, g, eids, pre_pairs, post_pairs):
         "Update the node states and edge states of the graph."
 
         # Pre-compute queries and key-value pairs.
         for pre_func, nids in pre_pairs:
             g.apply_nodes(pre_func, nids)
-
-        # Compute attention score
-        g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)
-        g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)))
-
-        # Update node state
-        g.send_and_recv(eids,
-                        [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score') ],
-                        [fn.sum('v', 'wv'), fn.sum('score', 'z')])
-
+        self.propagate_attention(g, eids)
+        # Further calculation after attention mechanism
         for post_func, nids in post_pairs:
             g.apply_nodes(post_func, nids)
 
+    def propagate_attention(self, g, eids):
+        # Compute attention score
+        g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)
+        g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)))
+        # Update node state
+        g.send_and_recv(eids,
+                        [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
+                        [fn.sum('v', 'wv'), fn.sum('score', 'z')])
+
     def forward(self, graph):
         g = graph.g
-        N = graph.n_nodes
-        E = graph.n_edges
-        h = self.h
-        d_k = self.d_k
-        nids = graph.nids
-        eids = graph.eids
+        nids, eids = graph.nids, graph.eids
 
         # embed
         src_embed, src_pos = self.src_embed(graph.src[0]), self.pos_enc(graph.src[1])
@@ -128,7 +117,8 @@ class Transformer(nn.Module):
         g.nodes[nids['dec']].data['x'] = self.pos_enc.dropout(tgt_embed + tgt_pos)
 
         for i in range(self.encoder.N):
-            pre_func, post_func, ff = self.encoder.pre_func(i, 'qkv'), self.encoder.post_func(i), self.encoder.ff_func(i)
+            pre_func = self.encoder.pre_func(i, 'qkv')
+            post_func, ff = self.encoder.post_func(i), self.encoder.ff_func(i)
             nodes, edges = nids['enc'], eids['ee']
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes), (ff, nodes)])
 
@@ -136,7 +126,8 @@ class Transformer(nn.Module):
             pre_func, post_func = self.decoder.pre_func(i, 'qkv'), self.decoder.post_func(i)
             nodes, edges = nids['dec'], eids['dd']
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
-            pre_q, pre_kv, post_func, ff = self.decoder.pre_func(i, 'q', 1), self.decoder.pre_func(i, 'kv', 1), self.decoder.post_func(i, 1), self.decoder.ff_func(i)
+            pre_q, pre_kv = self.decoder.pre_func(i, 'q', 1), self.decoder.pre_func(i, 'kv', 1)
+            post_func, ff = self.decoder.post_func(i, 1), self.decoder.ff_func(i)
             nodes_e, nodes_d, edges = nids['enc'], nids['dec'], eids['ed']
             self.update_graph(g, edges, [(pre_q, nodes_d), (pre_kv, nodes_e)], [(post_func, nodes_d), (ff, nodes_d)])
 
@@ -160,12 +151,8 @@ class Transformer(nn.Module):
             ret: a list of index array correspond to the input sequence specified by `graph``.
         '''
         g = graph.g
-        N = graph.n_nodes
-        E = graph.n_edges
-        h = self.h
-        d_k = self.d_k
-        nids = graph.nids
-        eids = graph.eids
+        N, E = graph.n_nodes, graph.n_edges
+        nids, eids = graph.nids, graph.eids
 
         # embed & pos
         src_embed = self.src_embed(graph.src[0])
@@ -181,7 +168,8 @@ class Transformer(nn.Module):
 
         # encode
         for i in range(self.encoder.N):
-            pre_func, post_func, ff = self.encoder.pre_func(i, 'qkv'), self.encoder.post_func(i), self.encoder.ff_func(i)
+            pre_func = self.encoder.pre_func(i, 'qkv')
+            post_func, ff = self.encoder.post_func(i), self.encoder.ff_func(i)
             nodes, edges = nids['enc'], eids['ee']
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes), (ff, nodes)])
 
@@ -199,7 +187,8 @@ class Transformer(nn.Module):
                 pre_func, post_func = self.decoder.pre_func(i, 'qkv'), self.decoder.post_func(i)
                 nodes, edges = nodes_d, edges_dd
                 self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
-                pre_q, pre_kv, post_func, ff = self.decoder.pre_func(i, 'q', 1), self.decoder.pre_func(i, 'kv', 1), self.decoder.post_func(i, 1), self.decoder.ff_func(i)
+                pre_q, pre_kv = self.decoder.pre_func(i, 'q', 1), self.decoder.pre_func(i, 'kv', 1)
+                post_func, ff = self.decoder.post_func(i, 1), self.decoder.ff_func(i)
                 nodes_e, nodes_d, edges = nids['enc'], nodes_d, edges_ed
                 self.update_graph(g, edges, [(pre_q, nodes_d), (pre_kv, nodes_e)], [(post_func, nodes_d), (ff, nodes_d)])
 
@@ -220,8 +209,8 @@ class Transformer(nn.Module):
                     for j in range(k):
                         _j = pos[i, j].item() // vocab_size
                         token = pos[i, j].item() % vocab_size
-                        y[i*k+j,:] = _y[i*k+_j, :]
-                        y[i*k+j, step] = token
+                        y[i * k + j, :] = _y[i * k + _j, :]
+                        y[i * k + j, step] = token
                         if j == 0:
                             eos[i] = eos[i] | (token == eos_id)
                 else:
@@ -232,6 +221,13 @@ class Transformer(nn.Module):
             else:
                 g.ndata['mask'][nids['dec']] = eos.unsqueeze(-1).repeat(1, k * max_len).view(-1).to(device)
         return y.view(batch_size, k, -1)[:, 0, :].tolist()
+
+    def _register_att_map(self, g, enc_ids, dec_ids):
+        self.att_weight_map = [
+            get_attention_map(g, enc_ids, enc_ids),
+            get_attention_map(g, enc_ids, dec_ids),
+            get_attention_map(g, dec_ids, dec_ids),
+        ]
 
 
 from .attention import *
