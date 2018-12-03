@@ -7,7 +7,7 @@ import scipy
 
 from ._ffi.base import c_array
 from ._ffi.function import _init_api
-from .base import DGLError
+from .base import DGLError, is_all
 from . import backend as F
 from . import utils
 from .immutable_graph_index import create_immutable_graph_index
@@ -83,6 +83,16 @@ class GraphIndex(object):
             True if it is a multigraph, False otherwise.
         """
         return bool(_CAPI_DGLGraphIsMultigraph(self._handle))
+
+    def is_readonly(self):
+        """Indicate whether the graph index is read-only.
+
+        Returns
+        -------
+        bool
+            True if it is a read-only graph, False otherwise.
+        """
+        return False
 
     def number_of_nodes(self):
         """Return the number of nodes.

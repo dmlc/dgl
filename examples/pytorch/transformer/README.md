@@ -1,21 +1,30 @@
-# (Universal) Transformer DGL/PyTorch
+# Transformer in DGL
+In this example we implement the [Transformer](https://arxiv.org/pdf/1706.03762.pdf) and [Universal Transformer](https://arxiv.org/abs/1807.03819) in DGL.
 
-Reproduction of (Universal) Transformer in DGL.
+## Requirements
+
+- PyTorch 0.4.1+
+- tqdm
 
 ## Usage
 
-    python translation_train.py [--gpus id1,id2,...] [--N #layers] [--dataset DATASET] [--batch BATCHSIZE]
+For training:
+
+    python translation_train.py [--gpus id1,id2,...] [--N #layers] [--dataset DATASET] [--batch BATCHSIZE] [--universal]
+
+For testing:
+
     python translation_test.py [--gpu id] [--N #layers] [--dataset DATASET] [--batch BATCHSIZE] [--checkpoint CHECKPOINT] [--print]
 
 ## Results
 
-Multi30k: we achieve BLEU score 35.10 on Multi30k dataset, without using pre-trained embeddings.
+Multi30k: we achieve BLEU score 35.15 on Multi30k dataset, without using pre-trained embeddings.
 
-## TODOs
+## Notes
 
-- [ ] MultiGPU support (lack of scheduling lock)
+- Currently we do not support Multi-GPU training(this will be fixed soon), you should only specifiy only one gpu\_id when running the training script.
 
 ## Reference
 
 - [The Annotated Transformer](http://nlp.seas.harvard.edu/2018/04/03/attention.html)
-- [universal\_transformer.py](https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/research/universal_transformer.py)
+- [Tensor2Tensor](https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/)

@@ -10,6 +10,9 @@ def src_dot_dst(src_field, dst_field, out_field):
     return func
 
 def scaled_exp(field, c):
+    """
+    This function applies $exp(x / c)$ for input $x$, which is required by *Scaled Dot-Product Attention* mentioned in the paper.
+    """
     def func(edges):
-        return {field: th.exp((edges.data[field] / c).clamp(-5, 5))}
+        return {field: th.exp((edges.data[field] / c).clamp(-10, 10))}
     return func

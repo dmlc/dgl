@@ -11,7 +11,7 @@ class ImmutableGraphIndex(object):
     We can use a CSR matrix to represent a graph structure. For functionality,
     one CSR matrix is sufficient. However, for efficient access
     to in-edges and out-edges of a directed graph, we need to use two CSR matrices.
-    In these CSR matrices, both rows and columns represents vertices. In one CSR
+    In these CSR matrices, both rows and columns represent vertices. In one CSR
     matrix, a row stores in-edges of a vertex (whose source vertex is a neighbor
     and destination vertex is the vertex itself). Thus, a non-zero entry is
     the neighbor Id and the value is the corresponding edge Id.
@@ -27,6 +27,7 @@ class ImmutableGraphIndex(object):
     def __init__(self, in_csr, out_csr):
         self._in_csr = in_csr
         self._out_csr = out_csr
+        self._cached_adj = {}
 
     def number_of_nodes(self):
         """Return the number of nodes.
@@ -232,7 +233,7 @@ class ImmutableGraphIndex(object):
         # stores the edge Ids of the original graph.
         csr = mx.nd.contrib.dgl_subgraph(self._in_csr, v, return_mapping=True)
         induced_nodes = v
-        induced_edges = csr[1].data
+        induced_edges = lambda: csr[1].data
         return ImmutableGraphIndex(csr[0], None), induced_nodes, induced_edges
 
     def node_subgraphs(self, vs_arr):
@@ -256,7 +257,7 @@ class ImmutableGraphIndex(object):
         res = mx.nd.contrib.dgl_subgraph(self._in_csr, *vs_arr, return_mapping=True)
         in_csrs = res[0:len(vs_arr)]
         induced_nodes = vs_arr
-        induced_edges = [e.data for e in res[len(vs_arr):]]
+        induced_edges = [lambda: e.data for e in res[len(vs_arr):]]
         assert len(in_csrs) == len(induced_nodes)
         assert len(in_csrs) == len(induced_edges)
         gis = []
@@ -279,11 +280,11 @@ class ImmutableGraphIndex(object):
             raise NotImplementedError
         num_nodes = []
         num_subgs = len(seed_ids)
-        res = mx.nd.contrib.neighbor_sample(g, *seed_ids, num_hops=num_hops,
-                                            num_neighbor=expand_factor,
-                                            max_num_vertices=max_subgraph_size)
+        res = mx.nd.contrib.dgl_csr_neighbor_uniform_sample(g, *seed_ids, num_hops=num_hops,
+                                                            num_neighbor=expand_factor,
+                                                            max_num_vertices=max_subgraph_size)
 
-        vertices, subgraphs = res[0:num_subgs], res[num_subgs:len(res)]
+        vertices, subgraphs = res[0:num_subgs], res[num_subgs:(2*num_subgs)]
         num_nodes = [subg_v[-1].asnumpy()[0] for subg_v in vertices]
 
         inputs = []
@@ -298,7 +299,7 @@ class ImmutableGraphIndex(object):
         elif neighbor_type == 'out':
             gis = [ImmutableGraphIndex(None, csr) for csr in compacts]
         parent_nodes = [v[0:size] for v, size in zip(vertices, num_nodes)]
-        parent_edges = [e.data for e in subgraphs]
+        parent_edges = [lambda: e.data for e in subgraphs]
         return gis, parent_nodes, parent_edges
 
     def adjacency_matrix(self, transpose, ctx):
@@ -326,11 +327,7 @@ class ImmutableGraphIndex(object):
             mat = self._out_csr
         else:
             mat = self._in_csr
-
-        indices = mat.indices
-        indptr = mat.indptr
-        data = mx.nd.ones(indices.shape, dtype=np.float32, ctx=ctx)
-        return mx.nd.sparse.csr_matrix((data, indices, indptr), shape=mat.shape)
+        return mx.nd.contrib.dgl_adjacency(mat.as_in_context(ctx))
 
     def from_coo_matrix(self, out_coo):
         """construct the graph index from a SciPy coo matrix.

@@ -1,8 +1,7 @@
 # Beam Search Module
 
 from modules import *
-from modules.utils import *
-from dataset import *
+from dgl.contrib.transformer import *
 from tqdm import tqdm
 import numpy as n
 import argparse
@@ -35,7 +34,7 @@ if __name__ == '__main__':
         model.load_state_dict(th.load(f, map_location=lambda storage, loc: storage))
     model = model.to(device)
     model.eval()
-    test_iter = dataset(graph_pool, mode='test', batch_size=args.batch, device=device, k=k)
+    test_iter = dataset(graph_pool, mode='test', batch_size=args.batch, devices=[device], k=k)
     for i, g in enumerate(test_iter):
         with th.no_grad():
             output = model.infer(g, dataset.MAX_LENGTH, dataset.eos_id, k)

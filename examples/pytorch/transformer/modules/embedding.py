@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 
 class PositionalEncoding(nn.Module):
+    "Position Encoding module"
     def __init__(self, dim_model, dropout, max_len=5000):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
@@ -19,7 +20,9 @@ class PositionalEncoding(nn.Module):
     def forward(self, pos):
         return T.index_select(self.pe, 1, pos).squeeze(0)
 
+
 class Embeddings(nn.Module):
+    "Word Embedding module"
     def __init__(self, vocab_size, dim_model):
         super(Embeddings, self).__init__()
         self.lut = nn.Embedding(vocab_size, dim_model)

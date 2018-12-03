@@ -4,10 +4,11 @@ Multi-GPU support is required to train the model on WMT14.
 """
 from modules import *
 from parallel import *
-from modules.utils import * 
+from modules.viz import *
+from modules.config import *
 from loss import * 
 from optims import *
-from dataset import *
+from dgl.contrib.transformer import *
 from tqdm import tqdm
 import numpy as np
 import argparse
@@ -30,12 +31,14 @@ if __name__ == '__main__':
     argparser.add_argument('--N', default=6, type=int, help='enc/dec layers')
     argparser.add_argument('--dataset', default='multi30k', help='dataset')
     argparser.add_argument('--batch', default=128, type=int, help='batch size')
+    argparser.add_argument('--viz', action='store_true', help='visualize attention')
     args = argparser.parse_args()
-    args_filter = ['batch', 'gpus']
+    args_filter = ['batch', 'gpus', 'viz']
     exp_setting = '-'.join('{}'.format(v) for k, v in vars(args).items() if k not in args_filter)
     devices = ['cpu'] if args.gpus == '-1' else [int(gpu_id) for gpu_id in args.gpus.split(',')]
 
     dataset = get_dataset(args.dataset)
+
     V = dataset.vocab_size
     criterion = LabelSmoothing(V, padding_idx=dataset.pad_id, smoothing=0.1)
     dim_model = 512
@@ -44,8 +47,8 @@ if __name__ == '__main__':
     model = make_model(V, V, N=args.N, dim_model=dim_model)
 
     # Sharing weights between Encoder & Decoder
-    model.src_embed[0].lut.weight = model.tgt_embed[0].lut.weight
-    model.generator.proj.weight = model.tgt_embed[0].lut.weight
+    model.src_embed.lut.weight = model.tgt_embed.lut.weight
+    model.generator.proj.weight = model.tgt_embed.lut.weight
 
     model, criterion = model.to(devices[0]), criterion.to(devices[0])
     model_opt = NoamOpt(dim_model, 1, 400,
@@ -64,9 +67,17 @@ if __name__ == '__main__':
         run_epoch(train_iter, models,
                       loss_compute(criterions, model_opt), is_train=True)
         print('Epoch: {} Evaluating...'.format(epoch))
+        model.att_weight_map = None
         model.eval()
         run_epoch(valid_iter, models,
                       loss_compute(criterions, None), is_train=False)
+        # Visualize attention
+        if args.viz:
+            src_seq = dataset.get_seq_by_id(VIZ_IDX, mode='valid', field='src')
+            tgt_seq = dataset.get_seq_by_id(VIZ_IDX, mode='valid', field='tgt')[:-1]
+            draw_atts(model.att_weight_map, src_seq, tgt_seq, exp_setting, 'epoch_{}'.format(epoch))
+
+        print('----------------------------------')
         with open('checkpoints/{}-{}.pkl'.format(exp_setting, epoch), 'wb') as f:
             th.save(model.state_dict(), f)
 
