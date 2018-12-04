@@ -1014,9 +1014,14 @@ class DGLGraph(object):
             The nx graph
         """
         nx_graph = self._graph.to_networkx()
-        #TODO(minjie): attributes
-        dgl_warning('to_networkx currently does not support converting'
-                    ' node/edge features automatically.')
+        if node_attrs is not None:
+            for n in nx_graph.nodes:
+                nf = self.get_n_repr(n)
+                nx_graph.nodes[n].update({key: nf[key] for key in node_attrs})
+        if edge_attrs is not None:
+            for u, v, id in nx_graph.data('id'):
+                ef = self.get_e_repr(id)
+                nx_graph.edges[u, v].update({key: ef[key] for key in edge_attrs})
         return nx_graph
 
     def from_networkx(self, nx_graph, node_attrs=None, edge_attrs=None):
