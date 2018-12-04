@@ -128,6 +128,11 @@ def sort_1d(input):
 def arange(start, stop):
     return np.arange(start, stop, dtype=np.int64)
 
+def rand_shuffle(arr):
+    copy = np.copy(arr)
+    np.random.shuffle(copy)
+    return copy
+
 # zerocopy_to_dlpack not enabled
 
 # zerocopy_from_dlpack not enabled
