@@ -14,14 +14,13 @@ class RGCNLayer(gluon.Block):
         self.self_loop = self_loop
 
         if self.bias == True:
-            self.bias = self.params.get('bias', shape=(out_feat,), init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
-            # self.bias.initialize()
+            self.bias = self.params.get('bias', shape=(out_feat,),
+                                        init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
+
         # weight for self loop
         if self.self_loop:
             self.loop_weight = self.params.get('loop_weight', shape=(in_feat, out_feat),
                                                init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
-            # self.loop_weight.initialize()
-
         if dropout:
             self.dropout = gluon.nn.Dropout(dropout)
         else:
@@ -33,10 +32,10 @@ class RGCNLayer(gluon.Block):
 
     def forward(self, g):
         assert not self.self_loop
-        # if self.self_loop:
-        #     loop_message = torch.mm(g.ndata['h'], self.loop_weight)
-        #     if self.dropout is not None:
-        #         loop_message = self.dropout(loop_message)
+        if self.self_loop:
+            loop_message = F.dot(g.ndata['h'], self.loop_weight)
+            if self.dropout is not None:
+                loop_message = self.dropout(loop_message)
 
         self.propagate(g)
 
@@ -44,8 +43,8 @@ class RGCNLayer(gluon.Block):
         node_repr = g.ndata['h']
         if self.bias:
             node_repr = node_repr + self.bias
-        # if self.self_loop:
-        #     node_repr = node_repr + loop_message
+        if self.self_loop:
+            node_repr = node_repr + loop_message
         if self.activation:
             node_repr = self.activation(node_repr)
 
@@ -91,8 +90,7 @@ class RGCNBasisLayer(RGCNLayer):
         else:
             def msg_func(edges):
                 w = weight[edges.data['type']]
-                print(edges.src['h'].shape, w.shape)
-                msg = F.batch_dot(edges.src['h'].expand_dims(1), w).squeeze()
+                msg = F.batch_dot(edges.src['h'].reshape(-1, 1, self.in_feat), w).reshape(-1, self.out_feat)
                 msg = msg * edges.data['norm']
                 return {'msg': msg}
 
