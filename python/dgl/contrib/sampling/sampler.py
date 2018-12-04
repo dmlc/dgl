@@ -1,7 +1,6 @@
 # This file contains subgraph samplers.
 
 import numpy as np
-import mxnet as mx
 
 from ... import utils
 from ...subgraph import DGLSubGraph
