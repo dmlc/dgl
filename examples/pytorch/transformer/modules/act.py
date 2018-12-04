@@ -1,62 +1,73 @@
+from .attention import *
 from dgl.contrib.transformer.layers import *
 from dgl.contrib.transformer.functions import *
 from dgl.contrib.transformer.embedding import *
 import torch as th
+import dgl.function as fn
+import torch.nn.init as INIT
 
 class UEncoder(nn.Module):
     def __init__(self, layer):
         super(UEncoder, self).__init__()
-        self.N = N
         self.layer = layer
         self.norm = LayerNorm(layer.size)
 
     def pre_func(self, fields='qkv'):
         layer = self.layer
         def func(nodes):
-            x = nodes.data['x']
-            norm_x = layer.sublayer[0].norm(x)
-            return layer.self_attn.get(norm_x, fields=fields)
+            x_p = nodes.data['x_p']
+            norm_xp = layer.sublayer[0].norm(x_p)
+            return layer.self_attn.get(norm_xp, fields=fields)
         return func
 
     def post_func(self):
         layer = self.layer
         def func(nodes):
-            pass
+            x, wv, z = nodes.data['x'], nodes.data['wv'], nodes.data['z']
+            o = layer.self_attn.get_o(wv / z)
+            x = x + layer.sublayer[0].dropout(o)
+            x = layer.sublayer[1](x, layer.feed_forward)
+            return {'x': x}
         return func
 
 
 class UDecoder(nn.Module):
     def __init__(self, layer):
         super(UDecoder, self).__init__()
-        self.N = N
         self.layer = layer
         self.norm = LayerNorm(layer.size)
 
     def pre_func(self, fields='qkv', l=0):
         layer = self.layer
         def func(nodes):
-            x = nodes.data['x']
+            x_p = nodes.data['x_p']
             if fields == 'kv':
-                norm_x = x
+                norm_xp = x_p
             else:
-                norm_x = layer.sublayer[l].norm(x)
-            return layer.self_attn.get(norm_x, fields)
+                norm_xp = layer.sublayer[l].norm(x_p)
+            return layer.self_attn.get(norm_xp, fields)
         return func
 
     def post_func(self, l=0):
         layer = self.layer
         def func(nodes):
-            pass
+            x, wv, z = nodes.data['x'], nodes.data['wv'], nodes.data['z']
+            o = layer.self_attn.get_o(wv / z)
+            x = x + layer.sublayer[l].dropout(o)
+            if l == 1:
+                x = layer.sublayer[2](x, layer.feed_forward)
+            return {'x': x}
         return func
 
 
 class HaltingUnit(nn.Module):
     halting_bias_init = 1.0
-    def __init___(self, dim_model):
+    def __init__(self, dim_model):
+        super(HaltingUnit, self).__init__()
         self.linear = nn.Linear(dim_model, 1)
-        INIT.constant_(self.linear, self.halting_bias_init)
+        INIT.constant_(self.linear.bias, self.halting_bias_init)
 
-    def forward(x):
+    def forward(self, x):
         return th.sigmoid(self.linear(x))
 
 class UTransformer(nn.Module):
@@ -67,87 +78,134 @@ class UTransformer(nn.Module):
     thres = 0.99
     act_loss_weight = 0.01
     def __init__(self, encoder, decoder, src_embed, tgt_embed, pos_enc, time_enc, generator, h, d_k):
-        # TODO
-        self.time_enc = time_enc
-        self.pos_enc = pos_enc
+        super(UTransformer, self).__init__()
+        self.encoder,  self.decoder = encoder, decoder
+        self.src_embed, self.tgt_embed = src_embed, tgt_embed
+        self.pos_enc, self.time_enc = pos_enc, time_enc
         self.halt_enc = HaltingUnit(h * d_k)
         self.halt_dec = HaltingUnit(h * d_k)
+        self.generator = generator
+        self.h, self.d_k = h, d_k
 
-    def add_time_pos_enc(self, nodes):
-        x = nodes['x']
-        step = nodes['step']
-        pos = nodes['pos']
-        return {'x_p': x + self.pos_enc(pos) + self.time_enc(step)}
+    def step_forward(self, nodes):
+        x = nodes.data['x']
+        step = nodes.data['step']
+        pos = nodes.data['pos']
+        return {'x_p': self.pos_enc.dropout(x + self.pos_enc(pos.view(-1)) + self.time_enc(step.view(-1))),
+                'step': step + 1}
 
-    def update_graph(self, g, pre_pairs, post_pair):
-        "Update the node status and edge status of the graph."
+    def halt_and_accum(self, name):
+        "field: 'enc' or 'dec'"
+        if name == 'enc':
+            halt = self.halt_enc
+        else: # dec
+            halt = self.halt_dec
+        thres = self.thres
+        def func(nodes):
+            p = halt(nodes.data['x'])
+            sum_p = nodes.data['sum_p'] + p
+            _continue = (sum_p < thres).float()
+            r = nodes.data['r'] * (1 - _continue) + (1 - sum_p) * _continue
+            s = nodes.data['s'] + ((1 - _continue) * r + _continue * p) * nodes.data['x']
+            return {'p': p, 'sum_p': sum_p, 'r': r, 's': s}
+        return func
 
-        # Pre-compute queries and key-value pairs and add time encoding.
-        for pre_func, nodes in pre_pairs:
-            g.apply_nodes(pre_func, nodes)
-
-        post_func, edges = post_pair[0]
+    def propagate_attention(self, g, eids):
         # Compute attention score
-        g.apply_edges(src_dot_dst('k', 'q', 'score'), edges)
-        g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)))
+        g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)
+        g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)), eids)
+        # Send weighted values to target nodes
+        g.send_and_recv(eids,
+                        [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
+                        [fn.sum('v', 'wv'), fn.sum('score', 'z')])
 
-        # Update node state
-        g.send_and_recv(edges,
-                        [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score') ],
-                        [fn.sum('v', 'wv'), fn.sum('score', 'z')],
-                        post_func)
-
-        # Compute halting prob
-        # TODO: some other issues
+    def update_graph(self, g, eids, pre_pairs, post_pairs):
+        "Update the node states and edge states of the graph."
+        # Pre-compute queries and key-value pairs.
+        for pre_func, nids in pre_pairs:
+            g.apply_nodes(pre_func, nids)
+        self.propagate_attention(g, eids)
+        # Further calculation after attention mechanism
+        for post_func, nids in post_pairs:
+            g.apply_nodes(post_func, nids)
 
     def forward(self, graph):
         g = graph.g
-        N = graph.n_nodes
-        E = graph.n_edges
-        h = self.h
-        d_k = self.d_k
-        nids = graph.nids
-        eids = graph.eids
+        N, E = graph.n_nodes, graph.n_edges
+        nids, eids = graph.nids, graph.eids
 
-        # embed
-        src_embed, src_pos = self.src_embed[0](graph.src[0]), self.src_embed[1](graph.src[1])
-        tgt_embed, tgt_pos = self.tgt_embed[0](graph.tgt[0]), self.tgt_embed[1](graph.tgt[1])
-        g.nodes[nids['enc']].data['x'] = self.src_embed[1].dropout(src_embed + src_pos)
-        g.nodes[nids['dec']].data['x'] = self.tgt_embed[1].dropout(tgt_embed + tgt_pos)
+        # embed & pos
+        g.nodes[nids['enc']].data['x'] = self.src_embed(graph.src[0])
+        g.nodes[nids['dec']].data['x'] = self.tgt_embed(graph.tgt[0])
+        g.nodes[nids['enc']].data['pos'] = graph.src[1]
+        g.nodes[nids['dec']].data['pos'] = graph.tgt[1]
 
-        # init ponder value
+        # init step
         device = next(self.parameters()).device
-        g.ndata['ponder'] = th.zeros(N, dtype=th.float, device=device)
-        g.ndata['step'] = th.zeros(N, dtype=th.long, device=device)
+        g.ndata['s'] = th.zeros(N, self.h * self.d_k, dtype=th.float, device=device)  # accumulated state
+        g.ndata['p'] = th.zeros(N, 1, dtype=th.float, device=device) # pondering value
+        g.ndata['r'] = th.ones(N, 1, dtype=th.float, device=device) # remainder
+        g.ndata['sum_p'] = th.zeros(N, 1, dtype=th.float, device=device) # sum of pondering values
+        g.ndata['step'] = th.zeros(N, 1, dtype=th.long, device=device) # step
+        g.ndata['active'] = th.ones(N, 1, dtype=th.uint8, device=device) # active
 
-        for i in range(self.MAX_DEPTH):
-            pre_func, post_func = self.encoder.pre_func('qkv'), self.encoder.post_func()
-            nodes, edges = nids['enc'], eids['ee']
-            self.update_graph(g, [(pre_func, nodes)], (post_func, edges))
+        for _ in range(self.MAX_DEPTH):
+            pre_func = self.encoder.pre_func('qkv')
+            post_func = self.encoder.post_func()
+            nodes = g.filter_nodes(lambda v: v.data['active'].view(-1), nids['enc'])
+            if len(nodes) == 0: break
+            edges = g.filter_edges(lambda e: e.dst['active'].view(-1), eids['ee'])
+            self.update_graph(g, edges,
+                              [(self.step_forward, nodes), (pre_func, nodes)],
+                              [(post_func, nodes), (self.halt_and_accum('enc'), nodes)])
+            halt_nodes = g.filter_nodes(lambda v: (v.data['p'] >= self.thres).view(-1), nodes)
+            g.ndata['active'][halt_nodes] = th.zeros(len(halt_nodes), 1, dtype=th.uint8, device=device)
+            #print(th.sum(g.ndata['active']))
 
-        for i in range(self.MAX_DEPTH):
-            pre_func, post_func = self.decoder.pre_func('qkv'), self.decoder.post_func()
-            nodes, edges = nids['dec'], eids['dd']
-            self.update_graph(g, [(pre_func, nodes)], (post_func, edges))
-            pre_q, pre_kv, post_func = self.decoder.pre_func('q', 1), self.decoder.pre_func('kv', 1)
-            nodes_e, nodes_d, edges = nids['enc'], nids['dec'], eids['ed']
-            self.update_graph(g, [(pre_q, nodes_d), (pre_kv, nodes_e)], (post_func, edges))
+        g.ndata['x'] = self.encoder.norm(g.ndata['s'])
 
-        return self.generator(g.ndata['x'][nids['dec']])
+        for _ in range(self.MAX_DEPTH):
+            pre_func = self.decoder.pre_func('qkv')
+            post_func = self.decoder.post_func()
+            nodes = g.filter_nodes(lambda v: v.data['active'].view(-1), nids['dec'])
+            if len(nodes) == 0: break
+            edges = g.filter_edges(lambda e: e.dst['active'].view(-1), eids['dd'])
+            self.update_graph(g, edges,
+                              [(self.step_forward, nodes), (pre_func, nodes)],
+                              [(post_func, nodes)])
+
+            pre_q = self.decoder.pre_func('q', 1)
+            pre_kv = self.decoder.pre_func('kv', 1)
+            post_func = self.decoder.post_func(1)
+
+            nodes_e = nids['enc']
+            edges = g.filter_edges(lambda e: e.dst['active'].view(-1), eids['ed'])
+
+            self.update_graph(g, edges,
+                              [(pre_q, nodes), (pre_kv, nodes_e)],
+                              [(post_func, nodes), (self.halt_and_accum('dec'), nodes)])
+            halt_nodes = g.filter_nodes(lambda v: (v.data['p'] >= self.thres).view(-1), nodes)
+            g.ndata['active'][halt_nodes] = th.zeros(len(halt_nodes), 1, dtype=th.uint8, device=device)
+
+        g.ndata['x'] = self.decoder.norm(g.ndata['s'])
+        act_loss = self.act_loss_weight * th.sum(g.ndata['r'])
+
+        return self.generator(g.ndata['x'][nids['dec']]), act_loss
 
 
 def make_universal_model(src_vocab, tgt_vocab, dim_model=512, dim_ff=2048, h=8, dropout=0.1):
     c = copy.deepcopy
-    attn = MultiHeadAttention(h, dim_model, dropout)
-    ff = PositionwiseFeedForward(dim_model, dim_ff, dropout)
+    attn = MultiHeadAttention(h, dim_model)
+    ff = PositionwiseFeedForward(dim_model, dim_ff)
     pos_enc = PositionalEncoding(dim_model, dropout)
-    encoder = UEncoder(EncoderLayer(dim_model), c(attn), c(ff), dropout)
-    decoder = UDecoder(DecoderLayer(dim_model), c(attn), c(attn), c(ff), dropout)
-    src_embed = nn.ModuleList([Embeddings(src_vocab, dim_model), c(pos_enc)])
-    tgt_embed = nn.ModuleList([Embeddings(tgt_vocab, dim_model), c(pos_enc)])
+    time_enc = PositionalEncoding(dim_model, dropout)
+    encoder = UEncoder(EncoderLayer((dim_model), c(attn), c(ff), dropout))
+    decoder = UDecoder(DecoderLayer((dim_model), c(attn), c(attn), c(ff), dropout))
+    src_embed = Embeddings(src_vocab, dim_model)
+    tgt_embed = Embeddings(tgt_vocab, dim_model)
     generator = Generator(dim_model, tgt_vocab)
     model = UTransformer(
-        encoder, decoder, src_embed, tgt_embed, generator, h, dim_model // h)
+        encoder, decoder, src_embed, tgt_embed, pos_enc, time_enc, generator, h, dim_model // h)
     # xavier init
     for p in model.parameters():
         if p.dim() > 1:

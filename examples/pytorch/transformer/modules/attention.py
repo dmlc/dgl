@@ -5,21 +5,15 @@ from dgl.contrib.transformer.layers import clones
 
 class MultiHeadAttention(nn.Module):
     "Multi-Head Attention"
-    def __init__(self, h, dim_model, dropout=0.1):
-        '''
-        h: number of heads
-        dim_model: hidden dimension
-        '''
+    def __init__(self, h, dim_model):
+        "h: number of heads; dim_model: hidden dimension"
         super(MultiHeadAttention, self).__init__()
-        assert dim_model % h == 0
         self.d_k = dim_model // h
         self.h = h
-
         # W_q, W_k, W_v, W_o
         self.linears = clones(
             nn.Linear(dim_model, dim_model), 4
         )
-        self.dropout = nn.Dropout(dropout)
 
     def get(self, x, fields='qkv'):
         "Return a dict of queries / keys / values."

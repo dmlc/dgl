@@ -14,6 +14,7 @@ import numpy as np
 import argparse
 
 def run_epoch(data_iter, model, loss_compute, is_train=True):
+    universal = isinstance(model, UTransformer)
     for i, g in tqdm(enumerate(data_iter)):
         with T.set_grad_enabled(is_train):
             if isinstance(model, list):
@@ -22,7 +23,11 @@ def run_epoch(data_iter, model, loss_compute, is_train=True):
                 tgt_y = [g.tgt_y for g in gs]
                 n_tokens = [g.n_tokens for g in gs]
             else:
-                output = model(g)
+                if universal:
+                    output, loss_act = model(g)
+                    if is_train: loss_act.backward(retain_graph=True)
+                else:
+                    output = model(g)
                 tgt_y = g.tgt_y
                 n_tokens = g.n_tokens
             loss = loss_compute(output, tgt_y, n_tokens)
@@ -39,6 +44,7 @@ if __name__ == '__main__':
     argparser.add_argument('--dataset', default='multi30k', help='dataset')
     argparser.add_argument('--batch', default=128, type=int, help='batch size')
     argparser.add_argument('--viz', action='store_true', help='visualize attention')
+    argparser.add_argument('--universal', action='store_true', help='whether use universal transformer or not')
     args = argparser.parse_args()
     args_filter = ['batch', 'gpus', 'viz']
     exp_setting = '-'.join('{}'.format(v) for k, v in vars(args).items() if k not in args_filter)
@@ -51,7 +57,7 @@ if __name__ == '__main__':
     dim_model = 512
 
     graph_pool = GraphPool()
-    model = make_model(V, V, N=args.N, dim_model=dim_model)
+    model = make_model(V, V, N=args.N, dim_model=dim_model, universal=args.universal)
 
     # Sharing weights between Encoder & Decoder
     model.src_embed.lut.weight = model.tgt_embed.lut.weight

@@ -18,7 +18,8 @@ For testing:
 
 ## Results
 
-Multi30k: we achieve BLEU score 35.82 on Multi30k dataset, without using pre-trained embeddings.
+- Multi30k: we achieve BLEU score 35.41 with default setting on Multi30k dataset, without using pre-trained embeddings. (if we set the number of layers to 2, the BLEU score could reach 36.45).
+- WMT14: TODO
 
 ## Notes
 

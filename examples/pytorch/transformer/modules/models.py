@@ -33,7 +33,6 @@ class Encoder(nn.Module):
             x = x + layer.sublayer[0].dropout(o)
             x = layer.sublayer[1](x, layer.feed_forward)
             return {'x': x if i < self.N - 1 else self.norm(x)}
-            # return {'x': x}
         return func
 
 class Decoder(nn.Module):
@@ -114,13 +113,15 @@ class Transformer(nn.Module):
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
 
         for i in range(self.decoder.N):
-            pre_func, post_func = self.decoder.pre_func(i, 'qkv'), self.decoder.post_func(i)
+            pre_func = self.decoder.pre_func(i, 'qkv')
+            post_func = self.decoder.post_func(i)
             nodes, edges = nids['dec'], eids['dd']
             self.update_graph(g, edges, [(pre_func, nodes)], [(post_func, nodes)])
-            pre_q, pre_kv = self.decoder.pre_func(i, 'q', 1), self.decoder.pre_func(i, 'kv', 1)
+            pre_q = self.decoder.pre_func(i, 'q', 1)
+            pre_kv = self.decoder.pre_func(i, 'kv', 1)
             post_func = self.decoder.post_func(i, 1)
-            nodes_e, nodes_d, edges = nids['enc'], nids['dec'], eids['ed']
-            self.update_graph(g, edges, [(pre_q, nodes_d), (pre_kv, nodes_e)], [(post_func, nodes_d)])
+            nodes_e, edges = nids['enc'], eids['ed']
+            self.update_graph(g, edges, [(pre_q, nodes), (pre_kv, nodes_e)], [(post_func, nodes)])
 
         # visualize attention
         with lock:
@@ -226,8 +227,8 @@ def make_model(src_vocab, tgt_vocab, N=6,
     if universal:
         return make_universal_model(src_vocab, tgt_vocab, dim_model, dim_ff, h, dropout)
     c = copy.deepcopy
-    attn = MultiHeadAttention(h, dim_model, dropout)
-    ff = PositionwiseFeedForward(dim_model, dim_ff, dropout)
+    attn = MultiHeadAttention(h, dim_model)
+    ff = PositionwiseFeedForward(dim_model, dim_ff)
     pos_enc = PositionalEncoding(dim_model, dropout)
 
     encoder = Encoder(EncoderLayer(dim_model, c(attn), c(ff), dropout), N)
