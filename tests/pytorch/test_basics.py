@@ -146,10 +146,10 @@ def test_nx_conversion():
         num_edges = nxg.size()
         if num_nodes > 0:
             node_feat = ddict(list)
-            for n, attr in nxg.nodes(data=True):
+            for nid, attr in nxg.nodes(data=True):
                 assert len(attr) == len(nf)
-                for k in nxg.nodes[n]:
-                    node_feat[k].append(nxg.nodes[n][k].unsqueeze(0))
+                for k in nxg.nodes[nid]:
+                    node_feat[k].append(attr[k].unsqueeze(0))
             for k in node_feat:
                 feat = th.cat(node_feat[k], dim=0)
                 assert U.allclose(feat, nf[k])
@@ -192,7 +192,7 @@ def test_nx_conversion():
     assert g.number_of_edges() == 4
     assert U.allclose(g.get_n_repr()['n1'], n1)
     assert U.allclose(g.get_e_repr()['e1'], e1)
-    assert U.allclose(g.get_e_repr()['id'], torch.arange(4))
+    assert th.equal(g.get_e_repr()['id'], th.arange(4))
 
     g.pop_e_repr('id')
 
@@ -202,8 +202,8 @@ def test_nx_conversion():
     g.add_nodes(2, data={'n1': new_n})
     # add three edges, one is a multi-edge
     g.add_edges([3, 6, 0], [4, 5, 2], data={'e1': new_e})
-    n1 = torch.cat((n1, new_n), dim=0)
-    e1 = torch.cat((e1, new_e), dim=0)
+    n1 = th.cat((n1, new_n), dim=0)
+    e1 = th.cat((e1, new_e), dim=0)
     # convert to networkx again
     nxg = g.to_networkx(node_attrs=['n1'], edge_attrs=['e1'])
     assert len(nxg) == 7
