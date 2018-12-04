@@ -65,7 +65,8 @@ credit, see `here <https://www.dgl.ai/ack>`_.
    :caption: Tutorials
    :glob:
 
-   tutorials/index
+   tutorials/basics/index
+   tutorials/models/index
 
 .. toctree::
    :maxdepth: 2
