@@ -79,7 +79,11 @@ class DGLGraph(object):
 
     >>> G.add_edges([2, 6, 8], 5)  # three edges: 2->5, 6->5, 8->5
 
-    or multiple edges using tensor type (demo in pytorch syntax).
+    or multiple edges using tensor type
+ 
+    .. note:: Here we use pytorch syntax for demo. The general idea applies
+        to other frameworks with minor syntax change (e.g. replace
+        ``torch.tensor`` with ``mxnet.ndarray``).
 
     >>> import torch as th
     >>> G.add_edges(th.tensor([3, 4, 5]), 1)  # three edges: 3->1, 4->1, 5->1
@@ -162,6 +166,7 @@ class DGLGraph(object):
                   [0., 0., 0., 0., 0.],
                   [3., 3., 3., 3., 3.]])} # 3 = (1 + 1) + (0 + 1)
 
+    For more examples about message passing, please read our tutorials.
     """
     def __init__(self,
                  graph_data=None,
@@ -218,7 +223,12 @@ class DGLGraph(object):
         >>> g.number_of_nodes()
         5
 
-        Adding new nodes with features (using PyTorch as example):
+        Adding new nodes with features:
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
         >>> import torch as th
         >>> g.add_nodes(2, {'x': th.ones(2, 4)})    # default zero initializer
         >>> g.ndata['x']
@@ -265,6 +275,11 @@ class DGLGraph(object):
         >>> G.add_edge(0, 1)
 
         Adding new edge with features
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
         >>> import torch as th
         >>> G.add_edge(0, 2, {'x': th.ones(1, 4)})
         >>> G.edges()
@@ -314,6 +329,11 @@ class DGLGraph(object):
         >>> G.add_edges([0, 2], [1, 3]) # add edges (0, 1) and (2, 3)
 
         Adding new edges with features
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
         >>> import torch as th
         >>> G.add_edges([1, 3], [2, 0], {'x': th.ones(2, 4)}) # (1, 2), (3, 0)
         >>> G.edata['x']
@@ -1382,9 +1402,16 @@ class DGLGraph(object):
         Parameters
         ----------
         func : callable
-            Message function on the edge. ``func(edges) -> dict``. ``dict`` has
-            ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
-            objects as in :mod:`~dgl.udf`.
+            Message function on the edge. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
+
+        See Also
+        --------
+        send
+        send_and_recv
+        pull
+        push
+        update_all
         """
         self._message_func = func
 
@@ -1399,9 +1426,16 @@ class DGLGraph(object):
         Parameters
         ----------
         func : callable
-            Reduce function on incoming edges. ``func(nodes) -> dict``. ``dict``
-            has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
-            objects as in :mod:`~dgl.udf`.
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+
+        See Also
+        --------
+        recv
+        send_and_recv
+        push
+        pull
+        update_all
         """
         self._reduce_func = func
 
@@ -1416,12 +1450,12 @@ class DGLGraph(object):
         Parameters
         ----------
         func : callable
-            Apply function on the nodes. ``func(nodes) -> dict``. ``dict``
-            has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
-            objects as in :mod:`~dgl.udf`.
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
 
         See Also
         --------
+        apply_nodes
         register_apply_edge_func
         """
         self._apply_node_func = func
@@ -1435,12 +1469,12 @@ class DGLGraph(object):
         Parameters
         ----------
         func : callable
-            Apply function on the edges. ``func(edges) -> dict``. ``dict``
-            has ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
-            objects as in :mod:`~dgl.udf`.
+            Apply function on the edge. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
 
         See Also
         --------
+        apply_edges
         register_apply_node_func
         """
         self._apply_edge_func = func
@@ -1448,13 +1482,14 @@ class DGLGraph(object):
     def apply_nodes(self, func="default", v=ALL, inplace=False):
         """Apply the function on the node features.
 
+        If None is provided for :attr:`func`, nothing will happen.
+        The node features will be updated by the UDF results.
+
         Parameters
         ----------
         func : callable or None, optional
-            The user defined applied function on the node features. If
-            None, nothing will happen. A callable function takes the form
-            ``func(nodes) -> dict``. ``dict`` has ``str`` keys and ``tensor``
-            values. nodes are :class:`NodeBatch` objects as in :mod:`~dgl.udf`.
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
         v : int, iterable of int, tensor, optional
             The node (ids) on which to apply :attr:`func`. The default
             value is all the nodes.
@@ -1463,6 +1498,10 @@ class DGLGraph(object):
 
         Examples
         --------
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
 
         >>> import dgl
         >>> import torch as th
@@ -1481,6 +1520,7 @@ class DGLGraph(object):
 
         See Also
         --------
+        register_apply_node_func
         apply_edges
         """
         if func == "default":
@@ -1502,10 +1542,8 @@ class DGLGraph(object):
         Parameters
         ----------
         func : callable, optional
-            The user defined applied function on the edge features. A
-            callable function takes the form ``func(edges) -> dict``. ``dict``
-            has ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
-            objects as in :mod:`~dgl.udf`.
+            Apply function on the edge. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
         edges : tuple of 2 tensors, tuple of 2 iterable of int, int, iterable of int, or tensor, optional
             Edges on which to apply :attr:`func`. The default value is all the
             edges. :attr:`edges` can be pair(s) of endpoint nodes :math:`(u, v)`
@@ -1522,6 +1560,10 @@ class DGLGraph(object):
 
         Examples
         --------
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
 
         >>> import dgl
         >>> import torch as th
@@ -1659,6 +1701,10 @@ class DGLGraph(object):
         --------
         Create a graph object for demo.
 
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
         >>> import dgl
         >>> import torch as th
         >>> g = dgl.DGLGraph()
@@ -1768,6 +1814,11 @@ class DGLGraph(object):
 
         Examples
         --------
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
         >>> import dgl
         >>> import torch as th
         >>> g = dgl.DGLGraph()
@@ -1879,6 +1930,10 @@ class DGLGraph(object):
 
         Examples
         --------
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
         Create a graph for demo.
 
         >>> import dgl
@@ -1977,6 +2032,10 @@ class DGLGraph(object):
 
         Examples
         --------
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
         Create a graph for demo.
 
         >>> import dgl
@@ -2128,6 +2187,10 @@ class DGLGraph(object):
 
         Examples
         --------
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
         Create a graph for demo.
 
         >>> import dgl
@@ -2213,6 +2276,9 @@ class DGLGraph(object):
 
         Examples
         --------
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
 
         Create a graph for demo.
 
@@ -2313,7 +2379,9 @@ class DGLGraph(object):
         nodes in the list.
 
         Equivalent to
+        ``
         [self.subgraph(nodes_list) for nodes_list in nodes]
+        ``
 
         Parameters
         ----------
@@ -2486,6 +2554,10 @@ class DGLGraph(object):
 
         Examples
         --------
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
         Construct a graph object for demo.
 
         >>> import dgl
@@ -2546,7 +2618,11 @@ class DGLGraph(object):
 
         Examples
         --------
-        Construct a graph object for demo.
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+            Construct a graph object for demo.
 
         >>> import dgl
         >>> import torch as th
