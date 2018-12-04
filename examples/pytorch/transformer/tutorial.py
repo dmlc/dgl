@@ -8,12 +8,12 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 
-from loss import LabelSmoothing, SimpleLossCompute
 from modules import make_model
-from modules.viz import att_animation
 from modules.config import VIZ_IDX
-from optims import NoamOpt
-from dgl.contrib.transformer import get_dataset, GraphPool
+from dgl.contrib.transformer.viz import att_animation
+from dgl.contrib.transformer.optims import NoamOpt
+from dgl.contrib.transformer.loss import LabelSmoothing, SimpleLossCompute
+from dgl.contrib.transformer.dataset import get_dataset, GraphPool
 
 
 def run_epoch(data_iter, model, loss_compute, is_train=True):

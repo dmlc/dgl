@@ -1,7 +1,7 @@
 # Beam Search Module
 
 from modules import *
-from dgl.contrib.transformer import *
+from dgl.contrib.transformer.dataset import *
 from tqdm import tqdm
 import numpy as n
 import argparse

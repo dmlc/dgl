@@ -1,4 +1,4 @@
-# Mostly copied from PyTorch
+# Mostly then same with PyTorch 
 import threading
 import torch
 
