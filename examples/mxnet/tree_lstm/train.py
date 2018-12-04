@@ -62,6 +62,7 @@ def main(args):
         p.lr_mult = 0.1
 
     model.initialize(mx.init.Xavier(magnitude=1), ctx=ctx)
+    model.hybridize()
     trainer = gluon.Trainer(model.collect_params('^(?!embedding).*$'), 'adagrad',
                             {'learning_rate': args.lr, 'wd': args.weight_decay})
     trainer_emb = gluon.Trainer(model.collect_params('^embedding.*$'), 'adagrad',
