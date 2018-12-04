@@ -175,17 +175,6 @@ class Embeddings(nn.Module):
         return self.lut(x) * np.sqrt(self.dim_model)
 
 
-class Embeddings(nn.Module):
-    "Word Embedding module"
-    def __init__(self, vocab_size, dim_model):
-        super(Embeddings, self).__init__()
-        self.lut = nn.Embedding(vocab_size, dim_model)
-        self.dim_model = dim_model
-
-    def forward(self, x):
-        return self.lut(x) * np.sqrt(self.dim_model)
-
-
 class Encoder(nn.Module):
     def __init__(self, layer, N):
         super(Encoder, self).__init__()
