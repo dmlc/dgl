@@ -128,4 +128,16 @@ class DGLSubGraph(DGLGraph):
                 self._parent._edge_frame[self._get_parent_eid()]))
 
     def map_to_subgraph_nid(self, parent_vids):
-        return map_to_subgraph_nid(self._graph, utils.toindex(parent_vids))
+        """Map the node Ids in the parent graph to the node Ids in the subgraph.
+
+        Parameters
+        ----------
+        parent_vids : list, tensor
+            The node ID array in the parent graph.
+
+        Returns
+        -------
+        tensor
+            The node ID array in the subgraph.
+        """
+        return map_to_subgraph_nid(self._graph, utils.toindex(parent_vids)).tousertensor()
