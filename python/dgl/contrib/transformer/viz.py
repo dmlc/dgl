@@ -81,8 +81,7 @@ def att_animation(maps_array, mode, src, tgt, head_id):
         graph_att_head(src, tgt, weight, axes[1], 'graph')
 
     ani = animation.FuncAnimation(fig, weight_animate, frames=len(weights), interval=500)
-    plt.show()
-    plt.close()
+    return ani
 
 def graph_att_head(M, N, weight, ax, title):
     "credit: Jinjing Zhou"
