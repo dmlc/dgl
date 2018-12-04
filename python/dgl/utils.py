@@ -21,7 +21,8 @@ class Index(object):
         self._dispatch(data)
 
     def __iter__(self):
-        return iter(self.tolist())
+        for i in self.tolist():
+            yield int(i)
 
     def __len__(self):
         if self._list_data is not None and isinstance(self._list_data, slice):
@@ -39,7 +40,7 @@ class Index(object):
             return len(self._dgl_tensor_data)
 
     def __getitem__(self, i):
-        return self.tolist()[i]
+        return int(self.tolist()[i])
 
     def _dispatch(self, data):
         """Store data based on its type."""
