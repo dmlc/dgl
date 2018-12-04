@@ -228,7 +228,7 @@ def dfs_labeled_edges_generator(
 
     >>> g = dgl.DGLGraph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
     >>> list(dgl.dfs_labeled_edges_generator(g, 0, has_nontree_edge=True))
-    (tensor([0]), tensor([1]), tensor([3]), tensor([5]), tensor([4]), tensor([2]))
+    (tensor([0]), tensor([1]), tensor([3]), tensor([5]), tensor([4]), tensor([2])),
     (tensor([0]), tensor([0]), tensor([0]), tensor([0]), tensor([0]), tensor([2]))
     """
     ghandle = graph._graph._handle
