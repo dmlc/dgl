@@ -1071,7 +1071,10 @@ class DGLGraph(object):
 
         Examples
         --------
-        The following example assumes PyTorch is used
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
 
         >>> import torch as th
         >>> g = DGLGraph()
@@ -1108,11 +1111,13 @@ class DGLGraph(object):
 
         Examples
         --------
-        The following example assumes PyTorch is used
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
 
         >>> import torch as th
         >>> import networkx as nx
-        >>> import dgl
         >>> nxg = nx.DiGraph()
         >>> nxg.add_edge(0, 1, id=0, e1=5, e2=th.zeros(4))
         >>> nxg.add_edge(2, 3, id=2, e1=6, e2=th.ones(4))
@@ -1207,6 +1212,12 @@ class DGLGraph(object):
 
         Examples
         --------
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
         >>> G.add_edges([0, 1], 2)  # 0->2, 1->2
@@ -1235,6 +1246,12 @@ class DGLGraph(object):
 
         Examples
         --------
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
 
@@ -1277,6 +1294,12 @@ class DGLGraph(object):
 
         Examples
         --------
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
         >>> G.add_edges([0, 1], 2)  # 0->2, 1->2
@@ -1305,6 +1328,7 @@ class DGLGraph(object):
 
         Examples
         --------
+
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
 
@@ -1325,6 +1349,11 @@ class DGLGraph(object):
 
         Init all 3 nodes with zero vector(len=5)
 
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
         >>> G.ndata['x'] = th.zeros((3, 5))
         >>> G.ndata['x']
         {'x' : tensor([[0., 0., 0., 0., 0.],
@@ -1383,6 +1412,11 @@ class DGLGraph(object):
 
         Init 2 edges with zero vector(len=4)
 
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
         >>> G.edata['y'] = th.zeros((2, 4))
         >>> G.edata
         {'y' : tensor([[0., 0., 0., 0.],
@@ -1708,9 +1742,7 @@ class DGLGraph(object):
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
 
-        >>> import dgl
         >>> import torch as th
-
         >>> g = dgl.DGLGraph()
         >>> g.add_nodes(3)
         >>> g.ndata['x'] = th.ones(3, 1)
@@ -1769,7 +1801,6 @@ class DGLGraph(object):
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
 
-        >>> import dgl
         >>> import torch as th
 
         >>> g = dgl.DGLGraph()
@@ -1917,7 +1948,6 @@ class DGLGraph(object):
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
 
-        >>> import dgl
         >>> import torch as th
         >>> g = dgl.DGLGraph()
         >>> g.add_nodes(3)
@@ -2023,7 +2053,6 @@ class DGLGraph(object):
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
 
-        >>> import dgl
         >>> import torch as th
         >>> g = dgl.DGLGraph()
         >>> g.add_nodes(3)
@@ -2128,13 +2157,12 @@ class DGLGraph(object):
 
         Examples
         --------
+        Create a graph for demo.
+
         .. note:: Here we use pytorch syntax for demo. The general idea applies
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
 
-        Create a graph for demo.
-
-        >>> import dgl
         >>> import torch as th
         >>> g = dgl.DGLGraph()
         >>> g.add_nodes(3)
@@ -2226,13 +2254,12 @@ class DGLGraph(object):
 
         Examples
         --------
+        Create a graph for demo.
+
         .. note:: Here we use pytorch syntax for demo. The general idea applies
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
 
-        Create a graph for demo.
-
-        >>> import dgl
         >>> import torch as th
         >>> g = dgl.DGLGraph()
         >>> g.add_nodes(3)
@@ -2371,13 +2398,12 @@ class DGLGraph(object):
 
         Examples
         --------
+        Create a graph for demo.
+
         .. note:: Here we use pytorch syntax for demo. The general idea applies
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
 
-        Create a graph for demo.
-
-        >>> import dgl
         >>> import torch as th
         >>> g = dgl.DGLGraph()
         >>> g.add_nodes(4)
@@ -2450,13 +2476,12 @@ class DGLGraph(object):
 
         Examples
         --------
+        Create a graph for demo.
+
         .. note:: Here we use pytorch syntax for demo. The general idea applies
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
 
-        Create a graph for demo.
-
-        >>> import dgl
         >>> import torch as th
         >>> g = dgl.DGLGraph()
         >>> g.add_nodes(4)
@@ -2729,13 +2754,12 @@ class DGLGraph(object):
 
         Examples
         --------
+        Construct a graph object for demo.
+
         .. note:: Here we use pytorch syntax for demo. The general idea applies
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
 
-        Construct a graph object for demo.
-
-        >>> import dgl
         >>> import torch as th
         >>> g = dgl.DGLGraph()
         >>> g.add_nodes(3)
@@ -2791,13 +2815,12 @@ class DGLGraph(object):
 
         Examples
         --------
+        Construct a graph object for demo.
 
         .. note:: Here we use pytorch syntax for demo. The general idea applies
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
-            Construct a graph object for demo.
 
-        >>> import dgl
         >>> import torch as th
         >>> g = dgl.DGLGraph()
         >>> g.add_nodes(3)
