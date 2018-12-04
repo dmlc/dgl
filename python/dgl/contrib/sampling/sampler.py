@@ -24,7 +24,7 @@ class NSSubgraphLoader(object):
             assert self._node_prob.shape[0] == g.number_of_nodes(), \
                     "We need to know the sampling probability of every node"
         if seed_nodes is None:
-            self._seed_nodes = F.arange(0, g.number_of_nodes(), dtype=np.int64)
+            self._seed_nodes = F.arange(0, g.number_of_nodes())
         else:
             self._seed_nodes = seed_nodes
         if shuffle:
