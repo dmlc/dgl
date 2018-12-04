@@ -1,6 +1,6 @@
-from .layers import *
-from .functions import *
-from .embedding import *
+from dgl.contrib.transformer.layers import *
+from dgl.contrib.transformer.functions import *
+from dgl.contrib.transformer.embedding import *
 import torch as th
 
 class UEncoder(nn.Module):

@@ -8,9 +8,9 @@ class PositionalEncoding(nn.Module):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
         # Compute the positional encodings once in log space.
-        pe = th.zeros(max_len, dim_model, dtype=T.float)
-        position = th.arange(0, max_len, dtype=T.float).unsqueeze(1)
-        div_term = th.exp(T.arange(0, dim_model, 2, dtype=T.float) *
+        pe = th.zeros(max_len, dim_model, dtype=th.float)
+        position = th.arange(0, max_len, dtype=th.float).unsqueeze(1)
+        div_term = th.exp(th.arange(0, dim_model, 2, dtype=th.float) *
                              -(np.log(10000.0) / dim_model))
         pe[:, 0::2] = th.sin(position * div_term)
         pe[:, 1::2] = th.cos(position * div_term)

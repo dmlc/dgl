@@ -1,10 +1,14 @@
-from .layers import *
-from .functions import *
 from .config import *
 from .act import *
+from .attention import *
 from dgl.contrib.transformer.viz import *
-import torch as th
+from dgl.contrib.transformer.layers import *
+from dgl.contrib.transformer.functions import *
+from dgl.contrib.transformer.embedding import *
 import threading
+import torch as th
+import dgl.function as fn
+import torch.nn.init as INIT
 
 class Encoder(nn.Module):
     def __init__(self, layer, N):
@@ -76,7 +80,7 @@ class Transformer(nn.Module):
     def propagate_attention(self, g, eids):
         # Compute attention score
         g.apply_edges(src_dot_dst('k', 'q', 'score'), eids)
-        g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)))
+        g.apply_edges(scaled_exp('score', np.sqrt(self.d_k)), eids)
         # Send weighted values to target nodes
         g.send_and_recv(eids,
                         [fn.src_mul_edge('v', 'score', 'v'), fn.copy_edge('score', 'score')],
@@ -216,10 +220,6 @@ class Transformer(nn.Module):
             get_attention_map(g, dec_ids, dec_ids, self.h),
         ]
 
-
-from .attention import *
-from .embedding import *
-import torch.nn.init as INIT
 
 def make_model(src_vocab, tgt_vocab, N=6,
                    dim_model=512, dim_ff=2048, h=8, dropout=0.1, universal=False):

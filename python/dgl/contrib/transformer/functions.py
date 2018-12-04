@@ -1,5 +1,4 @@
 import torch as th
-import dgl.function as fn
 
 def src_dot_dst(src_field, dst_field, out_field):
     """

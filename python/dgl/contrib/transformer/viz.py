@@ -18,7 +18,7 @@ def get_attention_map(g, src_nodes, dst_nodes, h):
             if not g.has_edge_between(src, dst):
                 continue
             eid = g.edge_id(src, dst)
-            weight[i][j] = g.edata['score'][eid].cpu().detach().view(-1)
+            weight[i][j] = g.edata['score'][eid].squeeze(-1).cpu().detach()
 
     weight = weight.transpose(0, 2)
     att = th.softmax(weight, -2)
@@ -80,7 +80,7 @@ def att_animation(maps_array, mode, src, tgt, head_id):
         axes[1].axis("off")
         graph_att_head(src, tgt, weight, axes[1], 'graph')
 
-    ani = animation.FuncAnimation(fig, weight_animate, frames=len(weights), interval=500)
+    ani = animation.FuncAnimation(fig, weight_animate, frames=len(weights), interval=500, repeat_delay=2000)
     return ani
 
 def graph_att_head(M, N, weight, ax, title):
@@ -91,7 +91,7 @@ def graph_att_head(M, N, weight, ax, title):
     g = nx.bipartite.generators.complete_bipartite_graph(in_nodes,out_nodes)
     X, Y = bipartite.sets(g)
     height_in = 10
-    height_out = height_in * 0.8
+    height_out = height_in 
     height_in_y = np.linspace(0, height_in, in_nodes)
     height_out_y = np.linspace((height_in - height_out) / 2, height_out, out_nodes)
     pos = dict()
@@ -104,5 +104,5 @@ def graph_att_head(M, N, weight, ax, title):
     nx.draw_networkx_nodes(g, pos, nodelist=range(in_nodes, in_nodes + out_nodes), node_color='b', node_size=50, ax=ax)
     for edge in g.edges():
         nx.draw_networkx_edges(g, pos, edgelist=[edge], width=weight[edge[0], edge[1] - in_nodes] * 1.5, ax=ax)
-    nx.draw_networkx_labels(g, pos, {i:label for i,label in enumerate(M)},horizontalalignment='right', font_size=8, ax=ax)
-    nx.draw_networkx_labels(g, pos, {i+in_nodes:label for i,label in enumerate(N)},horizontalalignment='left', font_size=8, ax=ax)
+    nx.draw_networkx_labels(g, pos, {i:label + '  ' for i,label in enumerate(M)},horizontalalignment='right', font_size=8, ax=ax)
+    nx.draw_networkx_labels(g, pos, {i+in_nodes:'  ' + label for i,label in enumerate(N)},horizontalalignment='left', font_size=8, ax=ax)
