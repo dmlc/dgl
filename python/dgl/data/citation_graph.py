@@ -11,20 +11,28 @@ import networkx as nx
 import scipy.sparse as sp
 import os, sys
 
-from .utils import download, extract_archive, get_download_dir
+import dgl
+from .utils import download, extract_archive, get_download_dir, _get_dgl_url
 
 _urls = {
-    'cora' : 'https://www.dropbox.com/s/3ggdpkj7ou8svoc/cora.zip?dl=1',
-    'citeseer' : 'https://www.dropbox.com/s/cr4m05shgp8advz/citeseer.zip?dl=1',
-    'pubmed' : 'https://www.dropbox.com/s/fj5q6pi66xhymcm/pubmed.zip?dl=1',
+    'cora' : 'dataset/cora.zip',
+    'citeseer' : 'dataset/citeseer.zip',
+    'pubmed' : 'dataset/pubmed.zip',
+    'cora_binary' : 'dataset/cora_binary.zip',
 }
+
+def _pickle_load(pkl_file):
+    if sys.version_info > (3, 0):
+        return pkl.load(pkl_file, encoding='latin1')
+    else:
+        return pkl.load(pkl_file)
 
 class CitationGraphDataset(object):
     def __init__(self, name):
         self.name = name
         self.dir = get_download_dir()
         self.zip_file_path='{}/{}.zip'.format(self.dir, name)
-        download(_urls[name], path=self.zip_file_path)
+        download(_get_dgl_url(_urls[name]), path=self.zip_file_path)
         extract_archive(self.zip_file_path, '{}/{}'.format(self.dir, name))
         self._load()
 
@@ -52,10 +60,7 @@ class CitationGraphDataset(object):
         objects = []
         for i in range(len(objnames)):
             with open("{}/ind.{}.{}".format(root, self.name, objnames[i]), 'rb') as f:
-                if sys.version_info > (3, 0):
-                    objects.append(pkl.load(f, encoding='latin1'))
-                else:
-                    objects.append(pkl.load(f))
+                objects.append(_pickle_load(f))
 
         x, y, tx, ty, allx, ally, graph = tuple(objects)
         test_idx_reorder = _parse_index_file("{}/ind.{}.test.index".format(root, self.name))
@@ -265,3 +270,68 @@ def register_args(parser):
             help='p in gnp random graph')
     parser.add_argument('--syn-seed', type=int, default=42,
             help='random seed')
+
+class CoraBinary(object):
+    """A mini-dataset for binary classification task using Cora.
+
+    After loaded, it has following members:
+
+    graphs : list of :class:`~dgl.DGLGraph`
+    pmpds : list of :class:`scipy.sparse.coo_matrix`
+    labels : list of :class:`numpy.ndarray`
+    """
+    def __init__(self):
+        self.dir = get_download_dir()
+        self.name = 'cora_binary'
+        self.zip_file_path='{}/{}.zip'.format(self.dir, self.name)
+        download(_get_dgl_url(_urls[self.name]), path=self.zip_file_path)
+        extract_archive(self.zip_file_path, '{}/{}'.format(self.dir, self.name))
+        self._load()
+
+    def _load(self):
+        root = '{}/{}'.format(self.dir, self.name)
+        # load graphs
+        self.graphs = []
+        with open("{}/graphs.txt".format(root), 'r') as f:
+            elist = []
+            for line in f.readlines():
+                if line.startswith('graph'):
+                    if len(elist) != 0:
+                        self.graphs.append(dgl.DGLGraph(elist))
+                    elist = []
+                else:
+                    u, v = line.strip().split(' ')
+                    elist.append((int(u), int(v)))
+            if len(elist) != 0:
+                self.graphs.append(dgl.DGLGraph(elist))
+        with open("{}/pmpds.pkl".format(root), 'rb') as f:
+            self.pmpds = _pickle_load(f)
+        self.labels = []
+        with open("{}/labels.txt".format(root), 'r') as f:
+            cur = []
+            for line in f.readlines():
+                if line.startswith('graph'):
+                    if len(cur) != 0:
+                        self.labels.append(np.array(cur))
+                    cur = []
+                else:
+                    cur.append(int(line.strip()))
+            if len(cur) != 0:
+                self.labels.append(np.array(cur))
+        # sanity check
+        assert len(self.graphs) == len(self.pmpds)
+        assert len(self.graphs) == len(self.labels)
+
+    def __len__(self):
+        return len(self.graphs)
+
+    def __getitem__(self, i):
+        return (self.graphs[i], self.pmpds[i], self.labels[i])
+
+    @staticmethod
+    def collate_fn(batch):
+        graphs, pmpds, labels = zip(*batch)
+        batched_graphs = dgl.batch(graphs)
+        batched_pmpds = sp.block_diag(pmpds)
+        batched_labels = np.concatenate(labels, axis=0)
+        return batched_graphs, batched_pmpds, batched_labels

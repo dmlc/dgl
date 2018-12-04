@@ -31,7 +31,7 @@ class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
         def __reduce__(self):
             state = (self.shape, F.reverse_data_type_dict[self.dtype])
             return self._reconstruct_scheme, state
-                   
+
 
         @classmethod
         def _reconstruct_scheme(cls, shape, dtype_str):
@@ -219,7 +219,7 @@ class Frame(MutableMapping):
         callable
             The initializer
         """
-        return self._initializers.get(column, self._default_initializer) 
+        return self._initializers.get(column, self._default_initializer)
 
     def set_initializer(self, initializer, column=None):
         """Set the initializer for empty values, for a given column or all future
@@ -287,7 +287,7 @@ class Frame(MutableMapping):
 
     def __delitem__(self, name):
         """Delete the whole column.
-        
+
         Parameters
         ----------
         name : str
@@ -435,7 +435,7 @@ class FrameRef(MutableMapping):
     @property
     def schemes(self):
         """Return the frame schemes.
-        
+
         Returns
         -------
         dict of str to Scheme
@@ -541,7 +541,7 @@ class FrameRef(MutableMapping):
         If the provided key is an index or a slice, the corresponding rows will be selected.
         The returned rows are saved in a lazy dictionary so only the real selection happens
         when the explicit column name is provided.
-        
+
         Examples (using pytorch)
         ------------------------
         >>> # create a frame of two columns and five rows
@@ -550,7 +550,7 @@ class FrameRef(MutableMapping):
         >>> # select the row 1 and 2, the returned `rows` is a lazy dictionary.
         >>> rows = fr[Index([1, 2])]
         >>> rows['c1']  # only select rows for 'c1' column; 'c2' column is not sliced.
-        
+
         Parameters
         ----------
         key : str or utils.Index or slice
@@ -611,6 +611,9 @@ class FrameRef(MutableMapping):
         return utils.LazyDict(lambda key: self._frame[key][rows], keys=self.keys())
 
     def __setitem__(self, key, val):
+        self.set_item_inplace(key, val, inplace=False)
+
+    def set_item_inplace(self, key, val, inplace):
         """Update the data in the frame.
 
         If the provided key is string, the corresponding column data will be updated.
@@ -629,9 +632,11 @@ class FrameRef(MutableMapping):
             The key.
         val : Tensor or dict of tensors
             The value.
+        inplace: bool
+            If True, update will be done in place
         """
         if isinstance(key, str):
-            self.update_column(key, val, inplace=False)
+            self.update_column(key, val, inplace=inplace)
         elif isinstance(key, slice) and key == slice(0, self.num_rows):
             # shortcut for updating all the rows
             return self.update(val)
@@ -639,7 +644,7 @@ class FrameRef(MutableMapping):
             # shortcut for selecting all the rows
             return self.update(val)
         else:
-            self.update_rows(key, val, inplace=False)
+            self.update_rows(key, val, inplace=inplace)
 
     def update_column(self, name, data, inplace):
         """Update the column.

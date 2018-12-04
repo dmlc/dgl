@@ -8,6 +8,7 @@ import scipy.sparse as sp
 from ._ffi.function import _init_api
 from . import backend as F
 from . import utils
+from .base import ALL, is_all
 
 class ImmutableGraphIndex(object):
     """Graph index object on immutable graphs.
@@ -72,6 +73,16 @@ class ImmutableGraphIndex(object):
         """
         # Immutable graph doesn't support multi-edge.
         return False
+
+    def is_readonly(self):
+        """Indicate whether the graph index is read-only.
+
+        Returns
+        -------
+        bool
+            True if it is a read-only graph, False otherwise.
+        """
+        return True
 
     def number_of_nodes(self):
         """Return the number of nodes.
@@ -353,9 +364,12 @@ class ImmutableGraphIndex(object):
         int
             The in degree array.
         """
-        v_array = v.tousertensor()
         deg = self._get_in_degree()
-        return utils.toindex(F.gather_row(deg, v_array))
+        if v.is_slice(0, self.number_of_nodes()):
+            return utils.toindex(deg)
+        else:
+            v_array = v.tousertensor()
+            return utils.toindex(F.gather_row(deg, v_array))
 
     def out_degree(self, v):
         """Return the out degree of the node.
@@ -386,9 +400,12 @@ class ImmutableGraphIndex(object):
         int
             The out degree array.
         """
-        v_array = v.tousertensor()
         deg = self._get_out_degree()
-        return utils.toindex(F.gather_row(deg, v_array))
+        if v.is_slice(0, self.number_of_nodes()):
+            return utils.toindex(deg)
+        else:
+            v_array = v.tousertensor()
+            return utils.toindex(F.gather_row(deg, v_array))
 
     def node_subgraph(self, v):
         """Return the induced node subgraph.
@@ -405,9 +422,7 @@ class ImmutableGraphIndex(object):
         """
         v = v.tousertensor()
         gi, induced_n, induced_e = self._sparse.node_subgraph(v)
-        induced_nodes = utils.toindex(induced_n)
-        induced_edges = utils.toindex(induced_e)
-        return ImmutableSubgraphIndex(gi, self, induced_nodes, induced_edges)
+        return ImmutableSubgraphIndex(gi, self, induced_n, induced_e)
 
     def node_subgraphs(self, vs_arr):
         """Return the induced node subgraphs.
@@ -424,8 +439,6 @@ class ImmutableGraphIndex(object):
         """
         vs_arr = [v.tousertensor() for v in vs_arr]
         gis, induced_nodes, induced_edges = self._sparse.node_subgraphs(vs_arr)
-        induced_nodes = [utils.toindex(v) for v in induced_nodes]
-        induced_edges = [utils.toindex(e) for e in induced_edges]
         return [ImmutableSubgraphIndex(gi, self, induced_n,
             induced_e) for gi, induced_n, induced_e in zip(gis, induced_nodes, induced_edges)]
 
@@ -439,7 +452,6 @@ class ImmutableGraphIndex(object):
                                                                            node_prob,
                                                                            max_subgraph_size)
         induced_nodes = [utils.toindex(v) for v in induced_nodes]
-        induced_edges = [utils.toindex(e) for e in induced_edges]
         return [ImmutableSubgraphIndex(gi, self, induced_n,
             induced_e) for gi, induced_n, induced_e in zip(gis, induced_nodes, induced_edges)]
 
@@ -467,18 +479,37 @@ class ImmutableGraphIndex(object):
             return F.copy_to(new_mat, ctx)
         return self._sparse.adjacency_matrix(transpose, ctx)
 
-    def incidence_matrix(self, oriented=False):
+    def incidence_matrix(self, type, ctx):
         """Return the incidence matrix representation of this graph.
-        
+
+        An incidence matrix is an n x m sparse matrix, where n is
+        the number of nodes and m is the number of edges. Each nnz
+        value indicating whether the edge is incident to the node
+        or not.
+
+        There are three types of an incidence matrix `I`:
+        * "in":
+          - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
+          - I[v, e] = 0 otherwise.
+        * "out":
+          - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
+          - I[v, e] = 0 otherwise.
+        * "both":
+          - I[v, e] = 1 if e is the in-edge of v;
+          - I[v, e] = -1 if e is the out-edge of v;
+          - I[v, e] = 0 otherwise (including self-loop).
+
         Parameters
         ----------
-        oriented : bool, optional (default=False)
-          Whether the returned incidence matrix is oriented.
+        type : str
+            Can be either "in", "out" or "both"
+        ctx : context
+            The context of returned incidence matrix.
 
         Returns
         -------
-        utils.CtxCachedObject
-            An object that returns tensor given context.
+        SparseTensor
+            The incidence matrix.
         """
         raise Exception('immutable graph doesn\'t support incidence_matrix for now.')
 
@@ -543,6 +574,19 @@ class ImmutableGraphIndex(object):
         raise Exception('immutable graph doesn\'t support line_graph')
 
 class ImmutableSubgraphIndex(ImmutableGraphIndex):
+    """Graph index for an immutable subgraph.
+
+    Parameters
+    ----------
+    backend_sparse : a sparse matrix from the backend framework.
+        The sparse matrix that represents a subgraph.
+    paranet : GraphIndex
+        The parent graph index.
+    induced_nodes : tensor
+        The parent node ids in this subgraph.
+    induced_edges : a lambda function that returns a tensor
+        The parent edge ids in this subgraph.
+    """
     def __init__(self, backend_sparse, parent, induced_nodes, induced_edges):
         super(ImmutableSubgraphIndex, self).__init__(backend_sparse)
 
@@ -552,11 +596,25 @@ class ImmutableSubgraphIndex(ImmutableGraphIndex):
 
     @property
     def induced_edges(self):
-        return self._induced_edges
+        """Return parent edge ids.
+
+        Returns
+        -------
+        A lambda function that returns utils.Index
+            The parent edge ids.
+        """
+        return lambda: utils.toindex(self._induced_edges())
 
     @property
     def induced_nodes(self):
-        return self._induced_nodes
+        """Return parent node ids.
+
+        Returns
+        -------
+        utils.Index
+            The parent node ids.
+        """
+        return utils.toindex(self._induced_nodes)
 
 def create_immutable_graph_index(graph_data=None):
     """Create a graph index object.
