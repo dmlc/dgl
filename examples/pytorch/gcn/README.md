@@ -3,7 +3,7 @@ Graph Convolutional Networks (GCN)
 
 - Paper link: [https://arxiv.org/abs/1609.02907](https://arxiv.org/abs/1609.02907)
 - Author's code repo: [https://github.com/tkipf/gcn](https://github.com/tkipf/gcn). Note that the original code is 
-implemented with Tensorflow for the paper. 
+implemented with Tensorflow and Pytorch  for the paper. 
 
 The folder contains two different implementations using DGL.
 
@@ -41,3 +41,41 @@ Batched computation is much more efficient than naive vertex-centric approach, b
 self.g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='h'), layer)
 ```
 Here, `'fn.copy_src'` and `'fn.sum'` are the builtin message and reduce functions that perform the same operations as `gcn_msg` and `gcn_reduce` in gcn.py.
+
+Usage
+----------
+
+```
+python gcn.py  --dropout 0.5 --lr 0.01
+```
+
+```
+python gcn_spmv.py --dropout 0.5 --lr 0.01
+
+```
+
+Accuracy
+-----------
+
+
+| Dataset                | GPU    |  DGL  |   Paper      | 
+| ----------------------- |:--------:|:--------: | :--------: |
+|  Cora      | 1 Tesla v100  | 82.6%   |  81.5%   |
+
+
+Credit
+-----------
+
+```
+@article{GCN,
+  title={Semi-Supervised Classification with Graph Convolutional Networks},
+  author={Thomas N. Kipf, Max Welling},
+  journal = {ICLR 2017},
+  year={2017}
+  code={https://github.com/tkipf/pygcn}
+}
+```
+
+
+
+
