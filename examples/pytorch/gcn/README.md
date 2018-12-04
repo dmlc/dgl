@@ -13,23 +13,36 @@ Defining the model on only one node and edge makes it hard to fully utilize GPUs
 
 * The message function `gcn_msg` computes the message for a batch of edges. Here, the `src` argument is the batched representation of the source endpoints of the edges. The function simply returns the source node representations.
   ```python
-  def gcn_msg(src, edge):
-    # src is a tensor of shape (B, D). B is the number of edges being batched.
-    return {'m' : src['h']}
+  def gcn_msg(edge):
+    # edge.src contains the node data on the source node.
+    # It's a dictionary. edge.src['h'] is a tensor of shape (B, D).
+    # B is the number of edges being batched.
+    return {'m': edge.src['h']}
   ```
 * The reduce function `gcn_reduce` also accumulates messages for a batch of nodes. We batch the messages on the second dimension for the `msgs` argument, 
 which for example can correspond to the neighbors of the nodes:
   ```python
-  def gcn_reduce(node, msgs):
-    # The msgs is a tensor of shape (B, deg, D). B is the number of nodes in the batch;
+  def gcn_reduce(node):
+    # node.mailbox contains messages from `gcn_msg`.
+    # node.mailbox['m'] is a tensor of shape (B, deg, D). B is the number of nodes in the batch;
     #  deg is the number of messages; D is the message tensor dimension. DGL gaurantees
     #  that all the nodes in a batch have the same in-degrees (through "degree-bucketing").
     # Reduce on the second dimension is equal to sum up all the in-coming messages.
-    return {'h' : torch.sum(msgs['m'], 1)}
+    return {'accum': mx.nd.sum(node.mailbox['m'], 1)}
   ```
-* The update module is similar. The first dimension of each tensor is the batch dimension. Since PyTorch operation is usually aware of the batch dimension, the code is the same as the naive GCN.
+* The update function `NodeUpdateModule` computes the new new node representation `h` using non-linear transformation on the reduced messages.
+  ```python
+  class NodeUpdateModule(gluon.Block):
+    def __init__(self, out_feats, activation=None):
+      super(NodeUpdateModule, self).__init__()
+      self.linear = gluon.nn.Dense(out_feats, activation=activation)
 
-Triggering message passing is also similar. 
+    def forward(self, node):
+      accum = self.linear(node.data['accum'])
+      return {'h': mx.nd.concat(node.data['h'], accum, dim=1)}
+  ```
+
+After defining the functions on each node/edge, the message passing is triggered by calling `update_all` on the DGLGraph object (in GCN module).
 ```python
 self.g.update_all(gcn_msg, gcn_reduce, layer)`
 ```
