@@ -4,7 +4,7 @@
 Graph Convolutional Network
 ====================================
 
-**Author:** Qi Huang, `Minjie Wang  <https://jermainewang.github.io/>`_,
+**Author:** `Qi Huang <https://github.com/HQ01>`_, `Minjie Wang  <https://jermainewang.github.io/>`_,
 Yu Gai, Quan Gan, Zheng Zhang
 
 This is a gentle introduction of using DGL to implement Graph Convolutional

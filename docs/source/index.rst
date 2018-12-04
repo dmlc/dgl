@@ -3,25 +3,74 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to DGL's documentation!
-===============================
+Overview of DGL
+===============
+
+Deep Graph Library (DGL) is a Python package built for easy implementation of
+graph neural network model family, on top of existing DL frameworks (e.g.
+Pytorch, MXNet, Gluon etc.).
+
+DGL reduces the implementation of graph neural networks into declaring a set
+of _functions_ (or _modules_ in PyTorch terminology).  In addition, DGL
+provides:
+
+* Versatile controls over message passing, ranging from low-level operations
+  such as sending along selected edges and receiving on specific nodes, to
+  high-level control such as graph-wide feature updates.
+* Transparent speed optimization with automatic batching of computations and
+  sparse matrix multiplication.
+* Seamless integration with existing deep learning frameworks.
+* Easy and friendly interfaces for node/edge feature access and graph
+  structure manipulation.
+
+To begin with, we have prototyped 10 models across various domains:
+semi-supervised learning on graphs (with potentially billions of nodes/edges),
+generative models on graphs, (previously) difficult-to-parallelize tree-based
+models like TreeLSTM, etc. We also implement some conventional models in DGL
+from a new graphical perspective yielding simplicity.
+
+Relationship of DGL to other frameworks
+---------------------------------------
+DGL is designed to be compatible and agnostic to the existing tensor
+frameworks. It provides a backend adapter interface that allows easy porting
+to other tensor-based, autograd-enabled frameworks. Currently, our prototype
+works with MXNet/Gluon and PyTorch.
+
+Free software
+-------------
+DGL is free software; you can redistribute it and/or modify it under the terms
+of the Apache License 2.0. We welcome contributions.
+Join us on `GitHub <https://github.com/jermainewang/dgl>`_.
+
+History
+-------
+Prototype of DGL started in early Spring, 2018, at NYU Shanghai by Prof. Zheng
+Zhang and Quan Gan. Serious development began when Minjie, Lingfan and Prof
+Jinyang Li from NYU's system group joined, flanked by a team of student
+volunteers at NYU Shanghai, Fudan and other universities (Yu, Zihao, Murphy,
+Allen, Qipeng, Qi, Hao), as well as early adopters at the CILVR lab (Jake
+Zhao). Development accelerated when AWS MXNet Science team joined force, with
+Da Zheng, Alex Smola, Haibin Lin, Chao Ma and a number of others. For full
+credit, see `here <https://www.dgl.ai/ack>`_.
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-
-Get Started
------------
-.. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
+   :caption: Get Started
+   :glob:
 
    install/index
-   tutorials/index
 
-API Reference
--------------
 .. toctree::
    :maxdepth: 2
+   :caption: Tutorials
+   :glob:
+
+   tutorials/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API Reference
+   :glob:
 
    api/python/index
 
