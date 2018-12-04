@@ -64,11 +64,12 @@ class HaltingUnit(nn.Module):
     halting_bias_init = 1.0
     def __init__(self, dim_model):
         super(HaltingUnit, self).__init__()
+        self.norm = LayerNorm(dim_model)
         self.linear = nn.Linear(dim_model, 1)
         INIT.constant_(self.linear.bias, self.halting_bias_init)
 
     def forward(self, x):
-        return th.sigmoid(self.linear(x))
+        return th.sigmoid(self.linear(self.norm(x)))
 
 class UTransformer(nn.Module):
     '''
