@@ -179,6 +179,9 @@ def sort_1d(input):
 def arange(start, stop):
     return nd.arange(start, stop, dtype=np.int64)
 
+def rand_shuffle(arr):
+    return mx.nd.random.shuffle(arr)
+
 def zerocopy_to_dlpack(arr):
     return arr.to_dlpack_for_read()
 
