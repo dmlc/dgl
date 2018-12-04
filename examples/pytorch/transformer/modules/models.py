@@ -1,8 +1,8 @@
 from .layers import *
 from .functions import *
-from .viz import *
 from .config import *
 from .act import *
+from dgl.contrib.transformer.viz import *
 import torch as th
 import threading
 

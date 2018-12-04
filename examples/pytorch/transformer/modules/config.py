@@ -1,2 +1,2 @@
 # Define some global constants/variables
-VIZ_IDX = 10
+VIZ_IDX = 3
