@@ -282,7 +282,7 @@ def main(args, data):
                 copy_to_gpu(subg, ctx)
 
             with mx.autograd.record():
-                logits = model_train(subg, subg_seeds.tousertensor())
+                logits = model_train(subg, subg_seeds)
                 batch_labels = mx.nd.take(labels, seeds).as_in_context(logits.context)
                 loss = mx.nd.softmax_cross_entropy(logits, batch_labels)
             loss.backward()
