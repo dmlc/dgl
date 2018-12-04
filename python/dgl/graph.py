@@ -1171,6 +1171,16 @@ class DGLGraph(object):
         ----------
         a : scipy sparse matrix
             The graph's adjacency matrix
+
+        Examples
+        --------
+        >>> from scipy.sparse import coo_matrix
+        >>> row = np.array([0, 3, 1, 0])
+        >>> col = np.array([0, 3, 1, 2])
+        >>> data = np.array([4, 5, 7, 9])
+        >>> a = coo_matrix((data, (row, col)), shape=(4, 4))
+        >>> g = dgl.DGLGraph()
+        >>> g.from_scipy_sparse_matrix(a)
         """
         self.clear()
         self._graph.from_scipy_sparse_matrix(a)
@@ -2651,16 +2661,16 @@ class DGLGraph(object):
     def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
 
-        By default, a row of returned adjacency matrix represents the destination
-        of an edge and the column represents the source.
+        By default, a row of returned adjacency matrix represents the
+        destination of an edge and the column represents the source.
 
-        When transpose is True, a row represents the source and a column represents
-        a destination.
+        When transpose is True, a row represents the source and a column
+        represents a destination.
 
         Parameters
         ----------
         transpose : bool, optional (default=False)
-            A flag to tranpose the returned adjacency matrix.
+            A flag to transpose the returned adjacency matrix.
         ctx : context, optional (default=cpu)
             The context of returned adjacency matrix.
 
