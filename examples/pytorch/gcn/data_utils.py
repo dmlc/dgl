@@ -10,10 +10,10 @@ def encode_onehot(labels):
                     enumerate(classes)}
     labels_onehot = np.array(list(map(classes_dict.get, labels)),
                              dtype=np.int32)
-    return labels_onehot
+    return labels_onehot 
 
 
-def load_dataset(path="cora/", dataset="cora"):
+def load_dataset(path="./cora/", dataset="cora"):
     """Load citation network dataset (cora only for now)"""
     print('Loading {} dataset...'.format(dataset))
 
