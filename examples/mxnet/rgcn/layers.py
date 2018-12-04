@@ -31,7 +31,6 @@ class RGCNLayer(gluon.Block):
         raise NotImplementedError
 
     def forward(self, g):
-        assert not self.self_loop
         if self.self_loop:
             loop_message = F.dot(g.ndata['h'], self.loop_weight)
             if self.dropout is not None:
@@ -66,7 +65,6 @@ class RGCNBasisLayer(RGCNLayer):
         # add basis weights
         self.weight = self.params.get('weight', shape=(self.num_bases, self.in_feat, self.out_feat),
                                       init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
-        # self.weight.initialize()
         if self.num_bases < self.num_rels:
             # linear combination coefficients
             self.w_comp = self.params.get('w_comp', shape=(self.num_rels, self.num_bases),
