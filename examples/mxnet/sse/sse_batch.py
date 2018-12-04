@@ -158,13 +158,12 @@ def copy_to_gpu(subg, ctx):
         subg.ndata[key] = frame[key].as_in_context(ctx)
 
 class CachedSubgraph(object):
-    def __init__(self, subg, seeds, subg_seeds):
+    def __init__(self, subg, seeds):
         # We can't cache the input subgraph because it contains node frames
         # and data frames.
         self.subg = dgl.DGLSubGraph(subg._parent, subg._parent_nid, subg._parent_eid,
                                 subg._graph)
         self.seeds = seeds
-        self.subg_seeds = subg_seeds
 
 class CachedSubgraphLoader(object):
     def __init__(self, loader, shuffle):
@@ -184,14 +183,13 @@ class CachedSubgraphLoader(object):
     def __next__(self):
         if len(self._subgraphs) > 0:
             s = self._subgraphs.pop(0)
-            subg, seeds, subg_seeds = s.subg, s.seeds, s.subg_seeds
+            subg, seeds = s.subg, s.seeds
         elif self._gen_subgraph:
             subg, seeds = self._loader.__next__()
-            subg_seeds = subg.map_to_subgraph_nid(seeds)
         else:
             raise StopIteration
-        self._cached.append(CachedSubgraph(subg, seeds, subg_seeds))
-        return subg, seeds, subg_seeds
+        self._cached.append(CachedSubgraph(subg, seeds))
+        return subg, seeds
 
 def main(args, data):
     if isinstance(data.features, mx.nd.NDArray):
@@ -266,15 +264,16 @@ def main(args, data):
     sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, neigh_expand,
             neighbor_type='in', num_workers=args.num_parallel_subgraphs, seed_nodes=train_vs,
             shuffle=True)
-    sampler = CachedSubgraphLoader(sampler, shuffle=True)
+    if args.cache_subgraph:
+        sampler = CachedSubgraphLoader(sampler, shuffle=True)
     for epoch in range(args.n_epochs):
         t0 = time.time()
         train_loss = 0
         i = 0
         num_batches = len(train_vs) / args.batch_size
         start1 = time.time()
-        sampler.restart()
-        for subg, seeds, subg_seeds in sampler:
+        for subg, seeds in sampler:
+            subg_seeds = subg.map_to_subgraph_nid(seeds)
             subg.copy_from_parent()
 
             losses = []
@@ -283,7 +282,7 @@ def main(args, data):
                 copy_to_gpu(subg, ctx)
 
             with mx.autograd.record():
-                logits = model_train(subg, subg_seeds.tousertensor())
+                logits = model_train(subg, subg_seeds)
                 batch_labels = mx.nd.take(labels, seeds).as_in_context(logits.context)
                 loss = mx.nd.softmax_cross_entropy(logits, batch_labels)
             loss.backward()
@@ -307,6 +306,14 @@ def main(args, data):
 
             if i > num_batches / 3:
                 break
+
+        if args.cache_subgraph:
+            sampler.restart()
+        else:
+            sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, neigh_expand,
+                                                           neighbor_type='in',
+                                                           num_workers=args.num_parallel_subgraphs,
+                                                           seed_nodes=train_vs, shuffle=True)
 
         # prediction.
         logits = model_infer(g, eval_vs)
@@ -381,11 +388,13 @@ if __name__ == '__main__':
     parser.add_argument("--use-spmv", action="store_true",
             help="use SpMV for faster speed.")
     parser.add_argument("--dgl", action="store_true")
+    parser.add_argument("--cache-subgraph", default=False, action="store_false")
     parser.add_argument("--num-parallel-subgraphs", type=int, default=1,
             help="the number of subgraphs to construct in parallel.")
     parser.add_argument("--neigh-expand", type=int, default=16,
             help="the number of neighbors to sample.")
     args = parser.parse_args()
+    print("cache: " + str(args.cache_subgraph))
 
     # load and preprocess dataset
     if args.graph_file != '':

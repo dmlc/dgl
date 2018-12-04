@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 import networkx as nx
 import numpy as np
+from collections import defaultdict
 
 import dgl
 from .base import ALL, is_all, DGLError, dgl_warning
@@ -13,6 +14,7 @@ from .runtime import ir, scheduler, Runtime
 from . import utils
 from .view import NodeView, EdgeView
 from .udf import NodeBatch, EdgeBatch
+
 
 __all__ = ['DGLGraph']
 
@@ -1029,9 +1031,15 @@ class DGLGraph(object):
         >>> nxg = g.to_networkx(node_attrs=['n1'], edge_attrs=['e1'])
         """
         nx_graph = self._graph.to_networkx()
-        #TODO(minjie): attributes
-        dgl_warning('to_networkx currently does not support converting'
-                    ' node/edge features automatically.')
+        if node_attrs is not None:
+            for nid, attr in nx_graph.nodes(data=True):
+                nf = self.get_n_repr(nid)
+                attr.update({key: nf[key].squeeze(0) for key in node_attrs})
+        if edge_attrs is not None:
+            for u, v, attr in nx_graph.edges(data=True):
+                eid = attr['id']
+                ef = self.get_e_repr(eid)
+                attr.update({key: ef[key].squeeze(0) for key in edge_attrs})
         return nx_graph
 
     def from_networkx(self, nx_graph, node_attrs=None, edge_attrs=None):
@@ -1081,18 +1089,24 @@ class DGLGraph(object):
             else:
                 return F.tensor(lst)
         if node_attrs is not None:
-            attr_dict = {attr : [] for attr in node_attrs}
+            attr_dict = defaultdict(list)
             for nid in range(self.number_of_nodes()):
                 for attr in node_attrs:
                     attr_dict[attr].append(nx_graph.nodes[nid][attr])
             for attr in node_attrs:
                 self._node_frame[attr] = _batcher(attr_dict[attr])
         if edge_attrs is not None:
-            attr_dict = {attr : [] for attr in edge_attrs}
-            src, dst, _ = self._graph.edges()
-            for u, v in zip(src.tolist(), dst.tolist()):
-                for attr in edge_attrs:
-                    attr_dict[attr].append(nx_graph.edges[u, v][attr])
+            has_edge_id = 'id' in next(iter(nx_graph.edges(data=True)))[-1]
+            attr_dict = defaultdict(lambda: [None] * self.number_of_edges())
+            if has_edge_id:
+                for u, v, attrs in nx_graph.edges(data=True):
+                    for key in edge_attrs:
+                        attr_dict[key][attrs['id']] = attrs[key]
+            else:
+                # XXX: assuming networkx iteration order is deterministic
+                for eid, (_, _, attr) in enumerate(nx_graph.edges(data=True)):
+                    for key in edge_attrs:
+                        attr_dict[key][eid] = attrs[key]
             for attr in edge_attrs:
                 self._edge_frame[attr] = _batcher(attr_dict[attr])
 
