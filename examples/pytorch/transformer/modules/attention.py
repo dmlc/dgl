@@ -1,4 +1,4 @@
-import torch as T
+import torch as th
 import torch.nn as nn
 import numpy as np
 from .layers import clones

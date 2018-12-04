@@ -1,4 +1,4 @@
-import torch as T
+import torch as th
 import torch.nn as nn
 from torch.nn import LayerNorm
 
@@ -12,7 +12,7 @@ class Generator(nn.Module):
         self.proj = nn.Linear(dim_model, vocab_size)
 
     def forward(self, x):
-        return T.log_softmax(
+        return th.log_softmax(
             self.proj(x), dim=-1
         )
 
@@ -43,7 +43,7 @@ class PositionwiseFeedForward(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-        return self.w_2(self.dropout(T.relu(self.w_1(x))))
+        return self.w_2(self.dropout(th.relu(self.w_1(x))))
 
 
 import copy
