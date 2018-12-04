@@ -1394,7 +1394,7 @@ class DGLGraph(object):
     def register_message_func(self, func):
         """Register global message function.
 
-        Once registered, :attr:`func` will be used as the default
+        Once registered, ``func`` will be used as the default
         message function in message passing operations, including
         :func:`send`, :func:`send_and_recv`, :func:`pull`,
         :func:`push`, :func:`update_all`.
@@ -1418,7 +1418,7 @@ class DGLGraph(object):
     def register_reduce_func(self, func):
         """Register global message reduce function.
 
-        Once registered, :attr:`func` will be used as the default
+        Once registered, ``func`` will be used as the default
         message reduce function in message passing operations, including
         :func:`recv`, :func:`send_and_recv`, :func:`push`, :func:`pull`,
         :func:`update_all`.
@@ -1442,7 +1442,7 @@ class DGLGraph(object):
     def register_apply_node_func(self, func):
         """Register global node apply function.
 
-        Once registered, :attr:`func` will be used as the default apply
+        Once registered, ``func`` will be used as the default apply
         node function. Related operations include :func:`apply_nodes`,
         :func:`recv`, :func:`send_and_recv`, :func:`push`, :func:`pull`,
         :func:`update_all`.
@@ -1463,7 +1463,7 @@ class DGLGraph(object):
     def register_apply_edge_func(self, func):
         """Register global edge apply function.
 
-        Once registered, :attr:`func` will be used as the default apply
+        Once registered, ``func`` will be used as the default apply
         edge function in :func:`apply_edges`.
 
         Parameters
@@ -1480,10 +1480,9 @@ class DGLGraph(object):
         self._apply_edge_func = func
 
     def apply_nodes(self, func="default", v=ALL, inplace=False):
-        """Apply the function on the node features.
+        """Apply the function on the nodes to update their features.
 
-        If None is provided for :attr:`func`, nothing will happen.
-        The node features will be updated by the UDF results.
+        If None is provided for ``func``, nothing will happen.
 
         Parameters
         ----------
@@ -1491,7 +1490,7 @@ class DGLGraph(object):
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
         v : int, iterable of int, tensor, optional
-            The node (ids) on which to apply :attr:`func`. The default
+            The node (ids) on which to apply ``func``. The default
             value is all the nodes.
         inplace : bool, optional
             If True, update will be done in place, but autograd will break.
@@ -1537,19 +1536,18 @@ class DGLGraph(object):
             Runtime.run(prog)
 
     def apply_edges(self, func="default", edges=ALL, inplace=False):
-        """Apply the function on the edge features.
+        """Apply the function on the edges to update their features.
+
+        If None is provided for ``func``, nothing will happen.
 
         Parameters
         ----------
         func : callable, optional
             Apply function on the edge. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
-        edges : tuple of 2 tensors, tuple of 2 iterable of int, int, iterable of int, or tensor, optional
-            Edges on which to apply :attr:`func`. The default value is all the
-            edges. :attr:`edges` can be pair(s) of endpoint nodes :math:`(u, v)`
-            represented as a ``tuple of 2 tensors`` or a
-            ``tuple of 2 iterable of int``. It can also be specified with edge ids,
-            using a ``tensor`` of edge ids, an ``int``, an ``iterable of int``.
+        edges : valid edges type, optional
+            Edges on which to apply ``func``. See :func:`send` for valid
+            edges type. Default is all the edges.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
 
@@ -1610,20 +1608,32 @@ class DGLGraph(object):
                                            inplace=inplace)
             Runtime.run(prog)
 
-    def send(self, edges, message_func="default"):
+    def send(self, edges=ALL, message_func="default"):
         """Send messages along the given edges.
+
+        ``edges`` can be any of the following types:
+
+        * ``int`` : Specify one edge using its edge id.
+        * ``pair of int`` : Specify one edge using its endpoints.
+        * ``int iterable`` / ``tensor`` : Specify multiple edges using their edge ids.
+        * ``pair of int iterable`` / ``pair of tensors`` :
+          Specify multiple edges using their endpoints.
+
+        The UDF returns messages on the edges and can be later fetched in
+        the destination node's ``mailbox``. Receiving will consume the messages.
+        See :func:`recv` for example.
+
+        If multiple ``send`` are triggered on the same edge without ``recv``. Messages
+        generated by the later ``send`` will overwrite previous messages.
 
         Parameters
         ----------
-        edges : tuple of 2 tensors, tuple of 2 iterable of int, int, iterable of int, or tensor
-            Edges on which to apply :attr:`message_func`. :attr:`edges` can be pair(s) of
-            endpoint nodes :math:`(u, v)` represented as a ``tuple of 2 tensors``
-            or a ``tuple of 2 iterable of int``. It can also be specified with
-            edge ids, using a ``tensor`` of edge ids, an ``int``, an ``iterable of int``.
+        edges : valid edges type, optional
+            Edges on which to apply ``message_func``. Default is sending along all
+            the edges.
         message_func : callable
-            Message function on the edges. ``func(edges) -> dict``. ``dict``
-            has ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
-            objects as in :mod:`~dgl.udf`.
+            Message function on the edges. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
 
         Notes
         -----
@@ -1632,7 +1642,6 @@ class DGLGraph(object):
 
         Examples
         --------
-
         See the *message passing* example in :class:`DGLGraph` or :func:`recv`.
         """
         if message_func == "default":
@@ -1664,36 +1673,33 @@ class DGLGraph(object):
              reduce_func="default",
              apply_node_func="default",
              inplace=False):
-        """Receive and reduce incoming messages and update representation on node(s) :math:`v`.
+        """Receive and reduce incoming messages and update the features of node(s) :math:`v`.
 
-        * When all the nodes have zero-in-degrees, nothing will happen.
-        * :attr:`reduce_func` returns a dictionary with ``str`` keys and ``tensor`` values, specifying
-          different node features. If a type of node feature, specified by the key, already exists,
-          the old features will be replaced, otherwise a new type of node feature is added.
-        * When some but not all nodes have zero-in-degrees, a placeholder for that attribute will be
-          used, by default a zero tensor. See :func:`set_n_initializer` about how to configure
-          the placeholder setting for node features. If you do not want to re-initialize those nodes,
-          you should not include them in :attr:`v`.
+        Optionally, apply a function to update the node features after receive.
 
-        Once the messages are received (and used to update related features), one needs to perform
-        :func:`send` again before another :func:`recv` trial. Otherwise, nothing will happen.
+        * `reduce_func` will be skipped for nodes with no incoming message.
+        * If all ``v`` have no incoming message, this will downgrade to an :func:`apply_nodes`.
+        * If some ``v`` have no incoming message, their new feature value will be calculated
+          by the column initializer (see :func:`set_n_initializer`). The feature shapes and
+          dtypes will be inferred.
 
-        TODO(minjie): document on zero-in-degree case
-        TODO(minjie): document on how returned new features are merged with the old features
-        TODO(minjie): document on how many times UDFs will be called
+        The node features will be updated by the result of the ``reduce_func``.
+
+        Messages are consumed once received.
+
+        The provided UDF maybe called multiple times so it is recommended to provide
+        function with no side effect.
 
         Parameters
         ----------
-        v : node, container or tensor
-            The node to be updated.
+        v : node, container or tensor, optional
+            The node to be updated. Default is receiving all the nodes.
         reduce_func : callable, optional
-            Reduce function on incoming edges. ``func(nodes) -> dict``.
-            ``dict`` has ``str`` keys and ``tensor`` values. nodes are
-            :class:`NodeBatch` objects as in :mod:`~dgl.udf`.
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
         apply_node_func : callable
-            Apply function on the nodes. ``func(nodes) -> dict``. ``dict``
-            has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
-            objects as in :mod:`~dgl.udf`.
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
 
@@ -1752,8 +1758,7 @@ class DGLGraph(object):
             # no message has ever been sent
             return
 
-        v_is_all = is_all(v)
-        if v_is_all:
+        if is_all(v):
             v = F.arange(0, self.number_of_nodes())
         elif isinstance(v, int):
             v = [v]
@@ -1780,35 +1785,28 @@ class DGLGraph(object):
                       apply_node_func="default",
                       inplace=False):
         """Send messages along edges and let destinations receive them.
-        Optionally, apply a function to update the node features.
 
-        This is a convenient combination of performing in order
+        Optionally, apply a function to update the node features after receive.
+
+        This is a convenient combination for performing
         ``send(self, self.edges, message_func)`` and
-        ``recv(self, dst, reduce_func, apply_node_func)``, where :attr:`dst`
-        are the destinations of the :attr:`edges`.
+        ``recv(self, dst, reduce_func, apply_node_func)``, where ``dst``
+        are the destinations of the ``edges``.
 
         Parameters
         ----------
-        edges : tuple of 2 tensors, tuple of 2 iterable of int, int, iterable of int, or tensor
-            Edges on which to apply :attr:`message_func`. :attr:`edges` can be pair(s) of
-            endpoint nodes :math:`(u, v)` represented as a ``tuple of 2 tensors``
-            or a ``tuple of 2 iterable of int``. It can also be specified with
-            edge ids, using a ``tensor`` of edge ids, an ``int``, an ``iterable of int``.
+        edges : valid edges type
+            Edges on which to apply ``func``. See :func:`send` for valid
+            edges type.
         message_func : callable, optional
-            Message function on the edges. ``func(edges) -> dict``. ``dict``
-            has ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
-            objects as in :mod:`~dgl.udf`. Registered function will be used if not
-            specified.
+            Message function on the edges. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
         reduce_func : callable, optional
-            Reduce function on incoming edges. ``func(nodes) -> dict``. ``dict``
-            has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
-            objects as in :mod:`~dgl.udf`. Registered function will be used
-            if not specified.
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
         apply_node_func : callable, optional
-            Apply function on the nodes. ``func(nodes) -> dict``. ``dict`` has
-            ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
-            objects as in :mod:`~dgl.udf`. Registered function will be
-            used if not specified.
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
 
@@ -1896,35 +1894,29 @@ class DGLGraph(object):
              reduce_func="default",
              apply_node_func="default",
              inplace=False):
-        """Pull messages from the node's predecessors and then update its feature.
+        """Pull messages from the node(s)' predecessors and then update their features.
 
-        * If all nodes have no incoming edges, nothing will happen.
-        * If some nodes have incoming edges and some do not, the features for nodes
-          with no incoming edges will be re-initialized with a placeholder. By default
-          the placeholder is a zero tensor. See :func:`set_n_initializer` about how to
-          configure the placeholder setting for node features. Be careful about that
-          and do not include these nodes in :attr:`v` if you do not want to re-initialize
-          their features.
+        Optionally, apply a function to update the node features after receive.
+
+        * `reduce_func` will be skipped for nodes with no incoming message.
+        * If all ``v`` have no incoming message, this will downgrade to an :func:`apply_nodes`.
+        * If some ``v`` have no incoming message, their new feature value will be calculated
+          by the column initializer (see :func:`set_n_initializer`). The feature shapes and
+          dtypes will be inferred.
 
         Parameters
         ----------
         v : int, iterable of int, or tensor
-            The node to be updated.
+            The node(s) to be updated.
         message_func : callable, optional
-            Message function on the edges. ``func(edges) -> dict``. ``dict``
-            has ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
-            objects as in :mod:`~dgl.udf`. Registered function will be used if not
-            specified.
+            Message function on the edges. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
         reduce_func : callable, optional
-            Reduce function on incoming edges. ``func(nodes) -> dict``. ``dict``
-            has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
-            objects as in :mod:`~dgl.udf`. Registered function will be used
-            if not specified.
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
         apply_node_func : callable, optional
-            Apply function on the nodes. ``func(nodes) -> dict``. ``dict`` has
-            ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
-            objects as in :mod:`~dgl.udf`. Registered function will be
-            used if not specified.
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
 
@@ -2006,27 +1998,23 @@ class DGLGraph(object):
              reduce_func="default",
              apply_node_func="default",
              inplace=False):
-        """Send message from the node to its successors and update them.
+        """Send message from the node(s) to their successors and update them.
+
+        Optionally, apply a function to update the node features after receive.
 
         Parameters
         ----------
         u : int, iterable of int, or tensor
-            The node to be updated.
+            The node(s) to push messages out.
         message_func : callable, optional
-            Message function on the edges. ``func(edges) -> dict``. ``dict``
-            has ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
-            objects as in :mod:`~dgl.udf`. Registered function will be used if not
-            specified.
+            Message function on the edges. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
         reduce_func : callable, optional
-            Reduce function on incoming edges. ``func(nodes) -> dict``. ``dict``
-            has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
-            objects as in :mod:`~dgl.udf`. Registered function will be used
-            if not specified.
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
         apply_node_func : callable, optional
-            Apply function on the nodes. ``func(nodes) -> dict``. ``dict`` has
-            ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
-            objects as in :mod:`~dgl.udf`. Registered function will be
-            used if not specified.
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
 
@@ -2108,27 +2096,23 @@ class DGLGraph(object):
                    apply_node_func="default"):
         """Send messages through all edges and update all nodes.
 
-        This is a convenient combination of performing in order
+        Optionally, apply a function to update the node features after receive.
+
+        This is a convenient combination for performing
         ``send(self, self.edges(), message_func)`` and
         ``recv(self, self.nodes(), reduce_func, apply_node_func)``.
 
         Parameters
         ----------
         message_func : callable, optional
-            Message function on the edges. ``func(edges) -> dict``. ``dict``
-            has ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
-            objects as in :mod:`~dgl.udf`. Registered function will be used if not
-            specified.
+            Message function on the edges. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
         reduce_func : callable, optional
-            Reduce function on incoming edges. ``func(nodes) -> dict``. ``dict``
-            has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
-            objects as in :mod:`~dgl.udf`. Registered function will be used
-            if not specified.
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
         apply_node_func : callable, optional
-            Apply function on the nodes. ``func(nodes) -> dict``. ``dict`` has
-            ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
-            objects as in :mod:`~dgl.udf`. Registered function will be
-            used if not specified.
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
 
         See Also
         --------
@@ -2170,20 +2154,14 @@ class DGLGraph(object):
             The generator of node frontiers. It specifies which nodes perform
             :func:`pull` at each timestep.
         message_func : callable, optional
-            Message function on the edges. ``func(edges) -> dict``. ``dict``
-            has ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
-            objects as in :mod:`~dgl.udf`. Registered function will be used if not
-            specified.
+            Message function on the edges. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
         reduce_func : callable, optional
-            Reduce function on incoming edges. ``func(nodes) -> dict``. ``dict``
-            has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
-            objects as in :mod:`~dgl.udf`. Registered function will be used
-            if not specified.
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
         apply_node_func : callable, optional
-            Apply function on the nodes. ``func(nodes) -> dict``. ``dict`` has
-            ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
-            objects as in :mod:`~dgl.udf`. Registered function will be
-            used if not specified.
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
 
         Examples
         --------
@@ -2244,12 +2222,8 @@ class DGLGraph(object):
         :func:`send_and_recv()` on edges.
 
         The traversal order is specified by the ``edges_generator``. It generates
-        edge frontiers, which is an iterable of edge ids or edge end points.
-
-        edge ids can be represented as an int, or an iterable or tensor of ints. Edge
-        end points can be represented by a tuple consisting of two tensors/iterables
-        of ints. The first tensor/iterable specifies the source nodes and the second
-        tensor/iterable specifies the dest nodes.
+        edge frontiers. The edge frontiers should be of *valid edges type*.
+        See :func:`send` for more details.
 
         Edges in the same frontier will be triggered together, while edges in
         different frontiers will be triggered according to the generating order.
@@ -2259,20 +2233,14 @@ class DGLGraph(object):
         edges_generator : generator
             The generator of edge frontiers.
         message_func : callable, optional
-            Message function on the edges. ``func(edges) -> dict``. ``dict``
-            has ``str`` keys and ``tensor`` values. edges are :class:`EdgeBatch`
-            objects as in :mod:`~dgl.udf`. Registered function will be used if not
-            specified.
+            Message function on the edges. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
         reduce_func : callable, optional
-            Reduce function on incoming edges. ``func(nodes) -> dict``. ``dict``
-            has ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
-            objects as in :mod:`~dgl.udf`. Registered function will be used
-            if not specified.
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
         apply_node_func : callable, optional
-            Apply function on the nodes. ``func(nodes) -> dict``. ``dict`` has
-            ``str`` keys and ``tensor`` values. nodes are :class:`NodeBatch`
-            objects as in :mod:`~dgl.udf`. Registered function will be
-            used if not specified.
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
 
         Examples
         --------
@@ -2540,12 +2508,13 @@ class DGLGraph(object):
         Parameters
         ----------
         predicate : callable
-            ``func(nodes) -> tensor``. ``nodes`` are :class:`NodeBatch`
-            objects as in :mod:`~dgl.udf`. The ``tensor`` returned should
-            be a 1-D boolean tensor with :func:`~dgl.udf.NodeBatch.batch_size`
-            elements indicating which nodes satisfy the predicate.
+            A function of signature ``func(nodes) -> tensor``.
+            ``nodes`` are :class:`NodeBatch` objects as in :mod:`~dgl.udf`.
+            The ``tensor`` returned should be a 1-D boolean tensor with
+            each element indicating whether the corresponding node in
+            the batch satisfies the predicate.
         nodes : int, iterable or tensor of ints
-            The nodes to filter on.
+            The nodes to filter on. Default value is all the nodes.
 
         Returns
         -------
@@ -2600,16 +2569,14 @@ class DGLGraph(object):
         Parameters
         ----------
         predicate : callable
-            ``func(edges) -> tensor``. ``edges`` are :class:`EdgeBatch`
-            objects as in :mod:`~dgl.udf`. The ``tensor`` returned should
-            be a 1-D boolean tensor with :func:`~dgl.udf.EdgeBatch.batch_size`
-            elements indicating which edges satisfy the predicate.
-        edges : edges
-            Edges can be pair(s) of endpoint nodes (u, v), or a
-            tensor/iterable of edge ids. If the edges are pair(s) of endpoint
-            nodes, they will be represented as a tuple of two iterable/tensors
-            of nodes. The first one is for the source nodes while the second one
-            is for the destinations. The default value is all the edges.
+            A function of signature ``func(edges) -> tensor``.
+            ``edges`` are :class:`EdgeBatch` objects as in :mod:`~dgl.udf`.
+            The ``tensor`` returned should be a 1-D boolean tensor with
+            each element indicating whether the corresponding edge in
+            the batch satisfies the predicate.
+        edges : valid edges type
+            Edges on which to apply ``func``. See :func:`send` for valid
+            edges type. Default value is all the edges.
 
         Returns
         -------
