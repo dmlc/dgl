@@ -10,42 +10,63 @@ import mxnet as mx
 from mxnet import gluon
 import dgl
 
+class _TreeLSTMCellNodeFunc(gluon.HybridBlock):
+    def hybrid_forward(self, F, iou, b_iou, c):
+        iou = F.broadcast_add(iou, b_iou)
+        i, o, u = iou.split(num_outputs=3, axis=1)
+        i, o, u = i.sigmoid(), o.sigmoid(), u.tanh()
+        c = i * u + c
+        h = o * c.tanh()
+
+        return h, c
+
+class _TreeLSTMCellReduceFunc(gluon.HybridBlock):
+    def __init__(self, U_iou, U_f):
+        super(_TreeLSTMCellReduceFunc, self).__init__()
+        self.U_iou = U_iou
+        self.U_f = U_f
+
+    def hybrid_forward(self, F, h, c):
+        h_cat = h.reshape((0, -1))
+        f = self.U_f(h_cat).sigmoid().reshape_like(h)
+        c = (f * c).sum(axis=1)
+        iou = self.U_iou(h_cat)
+        return iou, c
+
 class _TreeLSTMCell(gluon.HybridBlock):
+    def __init__(self, h_size):
+        super(_TreeLSTMCell, self).__init__()
+        self._apply_node_func = _TreeLSTMCellNodeFunc()
+        self.b_iou = self.params.get('bias', shape=(1, 3 * h_size),
+                                     init='zeros')
+
     def message_func(self, edges):
         return {'h': edges.src['h'], 'c': edges.src['c']}
 
     def apply_node_func(self, nodes):
         iou = nodes.data['iou']
-        iou = iou + self.b_iou.data(iou.context)
-        i, o, u = iou.split(num_outputs=3, axis=1)
-        i, o, u = i.sigmoid(), o.sigmoid(), u.tanh()
-        c = i * u + nodes.data['c']
-        h = o * c.tanh()
+        b_iou, c = self.b_iou.data(iou.context), nodes.data['c']
+        h, c = self._apply_node_func(iou, b_iou, c)
         return {'h' : h, 'c' : c}
 
 class TreeLSTMCell(_TreeLSTMCell):
     def __init__(self, x_size, h_size):
-        super(TreeLSTMCell, self).__init__()
+        super(TreeLSTMCell, self).__init__(h_size)
+        self._reduce_func = _TreeLSTMCellReduceFunc(
+                gluon.nn.Dense(3 * h_size, use_bias=False),
+                gluon.nn.Dense(2 * h_size))
         self.W_iou = gluon.nn.Dense(3 * h_size, use_bias=False)
-        self.U_iou = gluon.nn.Dense(3 * h_size, use_bias=False)
-        self.b_iou = self.params.get('bias', shape=(1, 3 * h_size),
-                                     init='zeros')
-        self.U_f = gluon.nn.Dense(2 * h_size)
 
     def reduce_func(self, nodes):
-        h_cat = nodes.mailbox['h'].reshape((nodes.mailbox['h'].shape[0], -1))
-        # TODO check if more intelligent way for the above
-        f = self.U_f(h_cat).sigmoid().reshape_like(nodes.mailbox['h'])
-        c = (f * nodes.mailbox['c']).sum(axis=1)
-        return {'iou': self.U_iou(h_cat), 'c': c}
+        h, c = nodes.mailbox['h'], nodes.mailbox['c']
+        iou, c = self._reduce_func(h, c)
+        return {'iou': iou, 'c': c}
 
 class ChildSumTreeLSTMCell(_TreeLSTMCell):
     def __init__(self, x_size, h_size):
         super(ChildSumTreeLSTMCell, self).__init__()
         self.W_iou = gluon.nn.Dense(3 * h_size, use_bias=False)
         self.U_iou = gluon.nn.Dense(3 * h_size, use_bias=False)
-        self.b_iou = self.params.get('bias', shape=(1, 3 * h_size),
-                                     init='zeros')
         self.U_f = gluon.nn.Dense(h_size)
 
     def reduce_func(self, nodes):
