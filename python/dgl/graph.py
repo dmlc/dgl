@@ -1015,13 +1015,14 @@ class DGLGraph(object):
         """
         nx_graph = self._graph.to_networkx()
         if node_attrs is not None:
-            for n in nx_graph.nodes:
+            for n, attr in nx_graph.nodes(data=True):
                 nf = self.get_n_repr(n)
-                nx_graph.nodes[n].update({key: nf[key] for key in node_attrs})
+                attr.update({key: nf[key].squeeze(0) for key in node_attrs})
         if edge_attrs is not None:
-            for u, v, id in nx_graph.data('id'):
-                ef = self.get_e_repr(id)
-                nx_graph.edges[u, v].update({key: ef[key] for key in edge_attrs})
+            for u, v, attr in nx_graph.edges(data=True):
+                eid = attr['id']
+                ef = self.get_e_repr(eid)
+                attr.update({key: ef[key].squeeze(0) for key in edge_attrs})
         return nx_graph
 
     def from_networkx(self, nx_graph, node_attrs=None, edge_attrs=None):
