@@ -4,62 +4,62 @@
 Capsule Network Tutorial
 ===========================
 
-**Author**: Jinjing Zhou, `Jake
-Zhao <https://cs.nyu.edu/~jakezhao/>`_, Zheng Zhang
+**Author**: Jinjing Zhou, `Jake Zhao <https://cs.nyu.edu/~jakezhao/>`_, Zheng Zhang, Jinyang Li
 
-It is perhaps a little surprising that some of the more classical models can
-also be described in terms of graphs, offering a different perspective.
-This tutorial describes how this is done for the `capsule network <http://arxiv.org/abs/1710.09829>`__.
+It is perhaps a little surprising that some of the more classical models
+can also be described in terms of graphs, offering a different
+perspective. This tutorial describes how this can be done for the
+`capsule network <http://arxiv.org/abs/1710.09829>`__.
 """
 #######################################################################################
 # Key ideas of Capsule
 # --------------------
 #
-# There are two key ideas that the Capsule model offers.
+# The Capsule model offers two key ideas.
 #
-# **Richer representations** In classic convolutional network, a scalar
-# value represents the activation of a given feature. Instead, a capsule
-# outputs a vector, whose norm represents the probability of a feature,
-# and the orientation its properties.
+# **Richer representation** In classic convolutional networks, a scalar
+# value represents the activation of a given feature. By contrast, a
+# capsule outputs a vector. The vector's length represents the probability
+# of a feature being present. The vector's orientation represents the
+# various properties of the feature (such as pose, deformation, texture
+# etc.).
 #
-# .. figure:: https://i.imgur.com/55Ovkdh.png
-#    :alt:
+# |image0|
 #
-# **Dynamic routing** To generalize max-pooling, there is another
-# interesting proposed by the authors, as a representational more powerful
-# way to construct higher level feature from its low levels. Consider a
-# capsule :math:`u_i`. The way :math:`u_i` is integrated to the next level
-# capsules take two steps:
+# **Dynamic routing** The output of a capsule is preferentially sent to
+# certain parents in the layer above based on how well the capsule's
+# prediction agrees with that of a parent. Such dynamic
+# "routing-by-agreement" generalizes the static routing of max-pooling.
 #
-# 1. :math:`u_i` projects differently to different higher level capsules
-#    via a linear transformation: :math:`\hat{u}_{j|i} = W_{ij}u_i`.
-# 2. :math:`\hat{u}_{j|i}` routes to the higher level capsules by
-#    spreading itself with a weighted sum, and the weight is dynamically
-#    determined by iteratively modify the and checking against the
-#    "consistency" between :math:`\hat{u}_{j|i}` and :math:`v_j`, for any
-#    :math:`v_j`. Note that this is similar to a k-means algorithm or
-#    `competive
-#    learning <https://en.wikipedia.org/wiki/Competitive_learning>`__ in
-#    spirit. At the end of iterations, :math:`v_j` now integrates the
-#    lower level capsules.
+# During training, routing is done iteratively; each iteration adjusts
+# "routing weights" between capsules based on their observed agreements,
+# in a manner similar to a k-means algorithm or `competitive
+# learning <https://en.wikipedia.org/wiki/Competitive_learning>`__.
 #
-# The full algorithm is the following: |image0|
-#
-# The dynamic routing step can be naturally expressed as a graph
-# algorithm. This is the focus of this tutorial. Our implementation is
-# adapted from `Cedric
+# In this tutorial, we show how capsule's dynamic routing algorithm can be
+# naturally expressed as a graph algorithm. Our implementation is adapted
+# from `Cedric
 # Chee <https://github.com/cedrickchee/capsule-net-pytorch>`__, replacing
-# only the routing layer, and achieving similar speed and accuracy.
+# only the routing layer. Our version achieves similar speed and accuracy.
 #
 # Model Implementation
-# -----------------------------------
-# Step 1: Setup and Graph Initialiation
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ----------------------
+# Step 1: Setup and Graph Initialization
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
-# The below figure shows the directed bipartitie graph built for capsules
-# network. We denote :math:`b_{ij}`, :math:`\hat{u}_{j|i}` as edge
-# features and :math:`v_j` as node features. |image1|
+# The connectivity between two layers of capsules form a directed,
+# bipartite graph, as shown in the Figure below.
 #
+# |image1|
+#
+# Each node :math:`j` is associated with feature :math:`v_j`,
+# representing its capsule’s output. Each edge is associated with
+# features :math:`b_{ij}` and :math:`\hat{u}_{j|i}`. :math:`b_{ij}`
+# determines routing weights, and :math:`\hat{u}_{j|i}` represents the
+# prediction of capsule :math:`i` for :math:`j`.
+#
+# Here's how we set up the graph and initialize node and edge features.
+
 import torch.nn as nn
 import torch as th
 import torch.nn.functional as F
@@ -88,32 +88,33 @@ def init_graph(in_nodes, out_nodes, f_size):
 #########################################################################################
 # Step 2: Define message passing functions
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Recall the following steps, and they are implemented in the class
-# ``DGLRoutingLayer`` as the followings:
 #
-# 1. Normalize over out edges
+# This is the pseudo code for Capsule's routing algorithm as given in the
+# paper:
 #
-#    -  Softmax over all out-edge of in-capsules
-#       :math:`\textbf{c}_i = \text{softmax}(\textbf{b}_i)`.
+# |image2|
+# We implement pseudo code lines 4-7 in the class `DGLRoutingLayer` as the following steps:
 #
-# 2. Weighted sum over all in-capsules
+# 1. Calculate coupling coefficients:
 #
-#    -  Out-capsules equals weighted sum of in-capsules
+#    -  Coefficients are the softmax over all out-edge of in-capsules:
+#       :math:`\textbf{c}_{i,j} = \text{softmax}(\textbf{b}_{i,j})`.
+#
+# 2. Calculate weighted sum over all in-capsules:
+#
+#    -  Output of a capsule is equal to the weighted sum of its in-capsules
 #       :math:`s_j=\sum_i c_{ij}\hat{u}_{j|i}`
 #
-# 3. Squash Operation
+# 3. Squash outputs:
 #
-#    -  Squashing function is to ensure that short capsule vectors get
-#       shrunk to almost zero length while the long capsule vectors get
-#       shrunk to a length slightly below 1. Its norm is expected to
-#       represents probabilities at some levels.
+#    -  Squash the length of a capsule's output vector to range (0,1), so it can represent the probability (of some feature being present).
 #    -  :math:`v_j=\text{squash}(s_j)=\frac{||s_j||^2}{1+||s_j||^2}\frac{s_j}{||s_j||}`
 #
-# 4. Update weights by agreement
+# 4. Update weights by the amount of agreement:
 #
-#    -  :math:`\hat{u}_{j|i}\cdot v_j` can be considered as agreement
-#       between current capsule and updated capsule,
+#    -  The scalar product :math:`\hat{u}_{j|i}\cdot v_j` can be considered as how well capsule :math:`i` agrees with :math:`j`. It is used to update
 #       :math:`b_{ij}=b_{ij}+\hat{u}_{j|i}\cdot v_j`
+
 class DGLRoutingLayer(nn.Module):
     def __init__(self, in_nodes, out_nodes, f_size):
         super(DGLRoutingLayer, self).__init__()
@@ -172,9 +173,9 @@ u_hat = th.randn(in_nodes * out_nodes, f_size)
 routing = DGLRoutingLayer(in_nodes, out_nodes, f_size)
 
 ############################################################################################################
-# We can visualize the behavior by monitoring the entropy of outgoing
-# weights, they should start high and then drop, as the assignment
-# gradually concentrate:
+# We can visualize a capsule network's behavior by monitoring the entropy
+# of coupling coefficients. They should start high and then drop, as the
+# weights gradually concentrate on fewer edges:
 entropy_list = []
 dist_list = []
 
@@ -193,9 +194,9 @@ plt.xlabel("Number of Routing")
 plt.xticks(np.arange(len(entropy_list)))
 plt.close()
 ############################################################################################################
+# |image3|
 #
-# .. figure:: https://i.imgur.com/dMvu7p3.png
-#    :alt:
+# Alternatively, we can also watch the evolution of histograms:
 
 import seaborn as sns
 import matplotlib.animation as animation
@@ -216,8 +217,10 @@ ani = animation.FuncAnimation(fig, dist_animate, frames=len(entropy_list), inter
 plt.close()
 
 ############################################################################################################
-# Alternatively, we can also watch the evolution of histograms: |image2|
-# Or monitor the how lower level capcules gradually attach to one of the higher level ones:
+# |image4|
+#
+# Or monitor the how lower level capsules gradually attach to one of the
+# higher level ones:
 import networkx as nx
 from networkx.algorithms import bipartite
 
@@ -251,14 +254,16 @@ ani2 = animation.FuncAnimation(fig2, weight_animate, frames=len(dist_list), inte
 plt.close()
 
 ############################################################################################################
-# |image3|
+# |image5|
 #
-# The full code of this visulization is provided at
+# The full code of this visualization is provided at
 # `link <https://github.com/jermainewang/dgl/blob/master/examples/pytorch/capsule/simple_routing.py>`__; the complete
 # code that trains on MNIST is at `link <https://github.com/jermainewang/dgl/tree/tutorial/examples/pytorch/capsule>`__.
 #
-# .. |image0| image:: https://i.imgur.com/mv1W9Rv.png
+# .. |image0| image:: https://i.imgur.com/55Ovkdh.png
 # .. |image1| image:: https://i.imgur.com/9tc6GLl.png
-# .. |image2| image:: https://github.com/VoVAllen/DGL_Capsule/raw/master/routing_dist.gif
-# .. |image3| image:: https://github.com/VoVAllen/DGL_Capsule/raw/master/routing_vis.gif
-#
+# .. |image2| image:: https://i.imgur.com/mv1W9Rv.png
+# .. |image3| image:: https://i.imgur.com/dMvu7p3.png
+# .. |image4| image:: https://github.com/VoVAllen/DGL_Capsule/raw/master/routing_dist.gif
+# .. |image5| image:: https://github.com/VoVAllen/DGL_Capsule/raw/master/routing_vis.gif
+
