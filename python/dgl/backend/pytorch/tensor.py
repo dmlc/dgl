@@ -136,6 +136,10 @@ def sort_1d(input):
 def arange(start, stop):
     return th.arange(start, stop, dtype=th.int64)
 
+def rand_shuffle(arr):
+    idx = th.randperm(len(arr))
+    return arr[idx]
+
 def zerocopy_to_dlpack(input):
     return dlpack.to_dlpack(input.contiguous())
 
