@@ -5,6 +5,7 @@ import mxnet as mx
 
 from ... import utils
 from ...subgraph import DGLSubGraph
+from ... import backend as F
 
 __all__ = ['NeighborSampler']
 
@@ -23,11 +24,11 @@ class NSSubgraphLoader(object):
             assert self._node_prob.shape[0] == g.number_of_nodes(), \
                     "We need to know the sampling probability of every node"
         if seed_nodes is None:
-            self._seed_nodes = mx.nd.arange(0, g.number_of_nodes(), dtype=np.int64)
+            self._seed_nodes = F.arange(0, g.number_of_nodes(), dtype=np.int64)
         else:
             self._seed_nodes = seed_nodes
         if shuffle:
-            self._seed_nodes = mx.nd.random.shuffle(self._seed_nodes)
+            self._seed_nodes = F.rand_shuffle(self._seed_nodes)
         self._num_workers = num_workers
         if max_subgraph_size is None:
             # This size is set temporarily.
