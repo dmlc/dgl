@@ -127,6 +127,17 @@ def main(args):
         print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
             epoch, loss.item(), np.mean(dur), n_edges / np.mean(dur) / 1000))
 
+    with torch.no_grad():
+        model.eval()
+        test_mask = torch.ByteTensor(data.test_mask)
+        label = labels[test_mask]
+        prediction = model(features)
+        prediction = prediction.data.cpu().numpy()
+        label = label.data.cpu().numpy()
+        pred = np.argmax(prediction, axis=1)
+        accur = np.where(pred[test_mask] == label, 1, 0)
+        print("The accuracy: " + str(sum(accur)/len(accur)))
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
     register_data_args(parser)
