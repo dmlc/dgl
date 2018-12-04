@@ -1017,6 +1017,16 @@ class DGLGraph(object):
         -------
         networkx.DiGraph
             The nx graph
+
+        Examples
+        --------
+        The following example assumes PyTorch is used
+
+        >>> import torch as th
+        >>> g = DGLGraph()
+        >>> g.add_nodes(5, {'n1': th.randn(5, 10)})
+        >>> g.add_edges([0,1,3,4], [2,4,0,3], {'e1': th.randn(4, 6)})
+        >>> nxg = g.to_networkx(node_attrs=['n1'], edge_attrs=['e1'])
         """
         nx_graph = self._graph.to_networkx()
         #TODO(minjie): attributes
@@ -1038,6 +1048,26 @@ class DGLGraph(object):
             The node attributes needs to be copied.
         edge_attrs : iterable of str, optional
             The edge attributes needs to be copied.
+
+        Examples
+        --------
+        The following example assumes PyTorch is used
+
+        >>> import torch as th
+        >>> import networkx as nx
+        >>> import dgl
+        >>> nxg = nx.DiGraph()
+        >>> nxg.add_edge(0, 1, id=0, e1=5, e2=th.zeros(4))
+        >>> nxg.add_edge(2, 3, id=2, e1=6, e2=th.ones(4))
+        >>> nxg.add_edge(1, 2, id=1, e1=2, e2=th.full((4,), 2))
+        >>> g = dgl.DGLGraph()
+        >>> g.from_networkx(nxg, edge_attrs=['e1', 'e2'])
+        >>> g.edata['e1']
+        tensor([5, 2, 6])
+        >>> g.edata['e2']
+        tensor([[0., 0., 0., 0.],
+                [2., 2., 2., 2.],
+                [1., 1., 1., 1.]])
         """
         self.clear()
         self._graph.from_networkx(nx_graph)
