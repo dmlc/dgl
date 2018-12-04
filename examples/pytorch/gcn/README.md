@@ -71,7 +71,7 @@ Credit
   title={Semi-Supervised Classification with Graph Convolutional Networks},
   author={Thomas N. Kipf, Max Welling},
   journal = {ICLR 2017},
-  year={2017}
+  year={2017},
   code={https://github.com/tkipf/pygcn}
 }
 ```
