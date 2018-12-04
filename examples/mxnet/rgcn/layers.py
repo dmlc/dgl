@@ -63,18 +63,19 @@ class RGCNBasisLayer(RGCNLayer):
             self.num_bases = self.num_rels
 
         # add basis weights
-        self.weight = self.params.get('weight', shape=(self.num_bases, self.in_feat, self.out_feat),
-                                      init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
         if self.num_bases < self.num_rels:
             # linear combination coefficients
+            self.weight = self.params.get('weight', shape=(self.num_bases, self.in_feat * self.out_feat))
             self.w_comp = self.params.get('w_comp', shape=(self.num_rels, self.num_bases),
+                                          init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
+        else:
+            self.weight = self.params.get('weight', shape=(self.num_bases, self.in_feat, self.out_feat),
                                           init=mx.init.Xavier(magnitude=math.sqrt(2.0)))
 
     def propagate(self, g):
         if self.num_bases < self.num_rels:
             # generate all weights from bases
-            weight = F.reshape(self.weight.data(), (self.num_bases, self.in_feat * self.out_feat))
-            weight = F.dot(self.w_comp.data(), weight).reshape((self.num_rels, self.in_feat, self.out_feat))
+            weight = F.dot(self.w_comp.data(), self.weight.data()).reshape((self.num_rels, self.in_feat, self.out_feat))
         else:
             weight = self.weight.data()
 
