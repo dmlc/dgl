@@ -479,18 +479,37 @@ class ImmutableGraphIndex(object):
             return F.copy_to(new_mat, ctx)
         return self._sparse.adjacency_matrix(transpose, ctx)
 
-    def incidence_matrix(self, oriented=False):
+    def incidence_matrix(self, type, ctx):
         """Return the incidence matrix representation of this graph.
-        
+
+        An incidence matrix is an n x m sparse matrix, where n is
+        the number of nodes and m is the number of edges. Each nnz
+        value indicating whether the edge is incident to the node
+        or not.
+
+        There are three types of an incidence matrix `I`:
+        * "in":
+          - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
+          - I[v, e] = 0 otherwise.
+        * "out":
+          - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
+          - I[v, e] = 0 otherwise.
+        * "both":
+          - I[v, e] = 1 if e is the in-edge of v;
+          - I[v, e] = -1 if e is the out-edge of v;
+          - I[v, e] = 0 otherwise (including self-loop).
+
         Parameters
         ----------
-        oriented : bool, optional (default=False)
-          Whether the returned incidence matrix is oriented.
+        type : str
+            Can be either "in", "out" or "both"
+        ctx : context
+            The context of returned incidence matrix.
 
         Returns
         -------
-        utils.CtxCachedObject
-            An object that returns tensor given context.
+        SparseTensor
+            The incidence matrix.
         """
         raise Exception('immutable graph doesn\'t support incidence_matrix for now.')
 
