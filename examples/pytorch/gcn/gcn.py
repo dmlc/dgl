@@ -130,12 +130,13 @@ def main(args):
     with torch.no_grad():
         model.eval()
         test_mask = torch.ByteTensor(data.test_mask)
-        label = labels[test_mask]
+        test_label = labels[test_mask]
         prediction = model(features)
         prediction = prediction.data.cpu().numpy()
-        label = label.data.cpu().numpy()
-        pred = np.argmax(prediction, axis=1)
-        accur = np.where(pred[test_mask] == label, 1, 0)
+        test_label = test_label.data.cpu().numpy()
+        prediction = np.argmax(prediction, axis=1)
+        test_index = np.where(test_mask.data.cpu().numpy()==1)
+        accur = np.where(prediction[test_index] == test_label, 1, 0)
         print("The accuracy: " + str(sum(accur)/len(accur)))
 
 if __name__ == '__main__':
