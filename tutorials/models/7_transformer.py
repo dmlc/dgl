@@ -1,7 +1,12 @@
 """
-In current version we use multi30k as the training and validation set.
-Multi-GPU support is required to train the model on WMT14.
+.. _model-transformer:
+
+Transformer DGL Tutorial
+=========================
+
+**Author**: aaa, bbb, ccc, ddd
 """
+
 from tqdm import tqdm
 import torch as th
 import numpy as np
@@ -353,7 +358,6 @@ for graph in data_iter:
     print(graph.nids['dec'])
     nx_g = graph.g.to_networkx()
     nx.draw(nx_g)
-    plt.show()
     break
 
 # Create model
