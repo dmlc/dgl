@@ -73,7 +73,8 @@ class NSSubgraphLoader(object):
 
 def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
                     neighbor_type='in', node_prob=None, seed_nodes=None,
-                    shuffle=False, num_workers=1, max_subgraph_size=None):
+                    shuffle=False, num_workers=1, max_subgraph_size=None,
+                    return_seed_id=False):
     '''
     This creates a subgraph data loader that samples subgraphs from the input graph
     with neighbor sampling. This simpling method is implemented in C and can perform
@@ -109,6 +110,8 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
     num_workers: the number of worker threads that sample subgraphs in parallel.
     max_subgraph_size: the maximal subgraph size in terms of the number of nodes.
         GPU doesn't support very large subgraphs.
+    return_seed_id: indicates whether to return seed ids along with the subgraphs.
+        The seed Ids are in the parent graph.
     
     Returns
     -------
