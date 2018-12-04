@@ -208,7 +208,7 @@ def test_row3():
     assert f.is_contiguous()
     assert f.is_span_whole_column()
     assert f.num_rows == N
-    del f[th.tensor([2, 3])]
+    del f[toindex(th.tensor([2, 3]))]
     assert not f.is_contiguous()
     assert not f.is_span_whole_column()
     # delete is lazy: only reflect on the ref while the

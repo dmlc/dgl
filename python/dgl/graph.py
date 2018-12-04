@@ -7,7 +7,7 @@ import numpy as np
 import dgl
 from .base import ALL, is_all, DGLError, dgl_warning
 from . import backend as F
-from .frame import FrameRef, Frame, merge_frames
+from .frame import FrameRef, Frame
 from .graph_index import GraphIndex, create_graph_index
 from .runtime import ir, scheduler, Runtime
 from . import utils
@@ -1055,7 +1055,7 @@ class DGLGraph(object):
         if edge_attrs is not None:
             attr_dict = {attr : [] for attr in edge_attrs}
             src, dst, _ = self._graph.edges()
-            for u, v in zip(src.tolist(), dst.tolist()):
+            for u, v in zip(src.tonumpy(), dst.tonumpy()):
                 for attr in edge_attrs:
                     attr_dict[attr].append(nx_graph.edges[u, v][attr])
             for attr in edge_attrs:
