@@ -82,7 +82,7 @@ class DGLGraph(object):
     >>> G.add_edges([2, 6, 8], 5)  # three edges: 2->5, 6->5, 8->5
 
     or multiple edges using tensor type
- 
+
     .. note:: Here we use pytorch syntax for demo. The general idea applies
         to other frameworks with minor syntax change (e.g. replace
         ``torch.tensor`` with ``mxnet.ndarray``).
@@ -272,6 +272,7 @@ class DGLGraph(object):
         Examples
         --------
         The following example uses PyTorch backend.
+
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
         >>> G.add_edge(0, 1)
@@ -326,6 +327,7 @@ class DGLGraph(object):
         Examples
         --------
         The following example uses PyTorch backend.
+
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(4)
         >>> G.add_edges([0, 2], [1, 3]) # add edges (0, 1) and (2, 3)
@@ -444,6 +446,7 @@ class DGLGraph(object):
         False
 
         Equivalently,
+
         >>> 0 in G
         True
 
@@ -466,9 +469,9 @@ class DGLGraph(object):
         return self._graph.has_node(vid)
 
     def has_nodes(self, vids):
-        """Return a 0-1 array `a` given the node ID array `vids`.
+        """Return a 0-1 array ``a`` given the node ID array ``vids``.
 
-        `a[i]` is 1 if the graph contains node `vids[i]`, 0 otherwise.
+        ``a[i]`` is 1 if the graph contains node ``vids[i]``, 0 otherwise.
 
         Parameters
         ----------
@@ -483,6 +486,7 @@ class DGLGraph(object):
         Examples
         --------
         The following example uses PyTorch backend.
+
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
         >>> G.has_nodes([0, 1, 2, 3, 4])
@@ -548,11 +552,13 @@ class DGLGraph(object):
         Examples
         --------
         The following example uses PyTorch backend.
+
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
         >>> G.add_edges([0, 0], [1, 2]) # (0, 1), (0, 2)
 
         Check if (0, 1), (0, 2), (1, 0), (2, 0) exist in the graph above:
+
         >>> G.has_edges_between([0, 0, 1, 2], [1, 2, 0, 0])
         tensor([1, 1, 0, 0])
 
@@ -584,6 +590,7 @@ class DGLGraph(object):
         Examples
         --------
         The following example uses PyTorch backend.
+
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
         >>> G.add_edges([1, 2], [0, 0]) # (1, 0), (2, 0)
@@ -615,6 +622,7 @@ class DGLGraph(object):
         Examples
         --------
         The following example uses PyTorch backend.
+
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
         >>> G.add_edges([0, 0], [1, 2]) # (0, 1), (0, 2)
@@ -652,6 +660,7 @@ class DGLGraph(object):
         The following example uses PyTorch backend.
 
         For simple graphs:
+
         >>> G = dgl.DGLGraph()
         >>> G.add_node(3)
         >>> G.add_edges([0, 0], [1, 2]) # (0, 1), (0, 2)
@@ -661,11 +670,13 @@ class DGLGraph(object):
         0
 
         For multigraphs:
+
         >>> G = dgl.DGLGraph(multigraph=True)
         >>> G.add_nodes(3)
 
         Adding edges (0, 1), (0, 2), (0, 1), (0, 2), so edge ID 0 and 2 both
         connect from 0 and 1, while edge ID 1 and 3 both connect from 0 and 2.
+
         >>> G.add_edges([0, 0, 0, 0], [1, 2, 1, 2])
         >>> G.edge_id(0, 1)
         tensor([0, 2])
@@ -710,6 +721,7 @@ class DGLGraph(object):
         The following example uses PyTorch backend.
 
         For simple graphs:
+
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
         >>> G.add_edges([0, 0], [1, 2]) # (0, 1), (0, 2)
@@ -718,12 +730,14 @@ class DGLGraph(object):
         tensor([1, 0])
 
         For multigraphs
+
         >>> G = dgl.DGLGraph(multigraph=True)
         >>> G.add_nodes(4)
         >>> G.add_edges([0, 0, 0], [1, 1, 2])   # (0, 1), (0, 1), (0, 2)
 
         Get all edges between (0, 1), (0, 2), (0, 3).  Note that there is no
         edge between 0 and 3:
+
         >>> G.edge_ids([0, 0, 0], [1, 2, 3])
         (tensor([0, 0, 0]), tensor([1, 1, 2]), tensor([0, 1, 2]))
 
@@ -779,29 +793,32 @@ class DGLGraph(object):
             The node(s).
         form : str, optional
             The return form. Currently support:
+
             - 'all' : a tuple (u, v, eid)
             - 'uv'  : a pair (u, v), default
             - 'eid' : one eid tensor
 
         Returns
         -------
-        A tuple of Tensors `(eu, ev, eid)` if `form == 'all'`.
-            `eid[i]` is the ID of an inbound edge to `ev[i]` from `eu[i]`.
-            All inbound edges to `v` are returned.
+        A tuple of Tensors ``(eu, ev, eid)`` if ``form == 'all'``.
+            ``eid[i]`` is the ID of an inbound edge to ``ev[i]`` from ``eu[i]``.
+            All inbound edges to ``v`` are returned.
         A pair of Tensors (eu, ev) if form == 'uv'
-            `eu[i]` is the source node of an inbound edge to `ev[i]`.
-            All inbound edges to `v` are returned.
+            ``eu[i]`` is the source node of an inbound edge to ``ev[i]``.
+            All inbound edges to ``v`` are returned.
         One Tensor if form == 'eid'
-            `eid[i]` is ID of an inbound edge to any of the nodes in `v`.
+            ``eid[i]`` is ID of an inbound edge to any of the nodes in ``v``.
 
         Examples
         --------
         The following example uses PyTorch backend.
+
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
         >>> G.add_edges([0, 0, 1], [1, 2, 2])   # (0, 1), (0, 2), (1, 2)
 
         For a single node:
+
         >>> G.in_edges(2)
         (tensor([0, 1]), tensor([2, 2]))
         >>> G.in_edges(2, 'all')
@@ -810,6 +827,7 @@ class DGLGraph(object):
         tensor([1, 2])
 
         For multiple nodes:
+
         >>> G.in_edges([1, 2])
         (tensor([0, 0, 1]), tensor([1, 2, 2]))
         >>> G.in_edges([1, 2], 'all')
@@ -835,29 +853,32 @@ class DGLGraph(object):
             The node(s).
         form : str, optional
             The return form. Currently support:
+
             - 'all' : a tuple (u, v, eid)
             - 'uv'  : a pair (u, v), default
             - 'eid' : one eid tensor
 
         Returns
         -------
-        A tuple of Tensors `(eu, ev, eid)` if `form == 'all'`.
-            `eid[i]` is the ID of an outbound edge from `eu[i]` from `ev[i]`.
-            All outbound edges from `v` are returned.
+        A tuple of Tensors ``(eu, ev, eid)`` if ``form == 'all'``.
+            ``eid[i]`` is the ID of an outbound edge from ``eu[i]`` from ``ev[i]``.
+            All outbound edges from ``v`` are returned.
         A pair of Tensors (eu, ev) if form == 'uv'
-            `ev[i]` is the destination node of an outbound edge from `eu[i]`.
-            All outbound edges from `v` are returned.
+            ``ev[i]`` is the destination node of an outbound edge from ``eu[i]``.
+            All outbound edges from ``v`` are returned.
         One Tensor if form == 'eid'
-            `eid[i]` is ID of an outbound edge from any of the nodes in `v`.
+            ``eid[i]`` is ID of an outbound edge from any of the nodes in ``v``.
 
         Examples
         --------
         The following example uses PyTorch backend.
+
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
         >>> G.add_edges([0, 0, 1], [1, 2, 2])   # (0, 1), (0, 2), (1, 2)
 
         For a single node:
+
         >>> G.out_edges(0)
         (tensor([0, 0]), tensor([1, 2]))
         >>> G.out_edges(0, 'all')
@@ -866,6 +887,7 @@ class DGLGraph(object):
         tensor([0, 1])
 
         For multiple nodes:
+
         >>> G.out_edges([0, 1])
         (tensor([0, 0, 1]), tensor([1, 2, 2]))
         >>> G.out_edges([0, 1], 'all')
@@ -889,6 +911,7 @@ class DGLGraph(object):
         ----------
         form : str, optional
             The return form. Currently support:
+
             - 'all' : a tuple (u, v, eid)
             - 'uv'  : a pair (u, v), default
             - 'eid' : one eid tensor
@@ -898,18 +921,19 @@ class DGLGraph(object):
         Returns
         -------
         A tuple of Tensors (u, v, eid) if form == 'all'
-            `eid[i]` is the ID of an edge between `u[i]` and `v[i]`.
+            ``eid[i]`` is the ID of an edge between ``u[i]`` and ``v[i]``.
             All edges are returned.
         A pair of Tensors (u, v) if form == 'uv'
-            An edge exists between `u[i]` and `v[i]`.
-            If `n` edges exist between `u` and `v`, then `u` and `v` as a pair
-            will appear `n` times.
+            An edge exists between ``u[i]`` and ``v[i]``.
+            If ``n`` edges exist between ``u`` and ``v``, then ``u`` and ``v`` as a pair
+            will appear ``n`` times.
         One Tensor if form == 'eid'
-            `eid[i]` is the ID of an edge in the graph.
+            ``eid[i]`` is the ID of an edge in the graph.
 
         Examples
         --------
         The following example uses PyTorch backend.
+
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
         >>> G.add_edges([0, 0, 1], [1, 2, 2])   # (0, 1), (0, 2), (1, 2)
@@ -929,7 +953,7 @@ class DGLGraph(object):
             raise DGLError('Invalid form:', form)
 
     def in_degree(self, v):
-        """Return the in-degree of node `v`.
+        """Return the in-degree of node ``v``.
 
         Parameters
         ----------
@@ -973,6 +997,7 @@ class DGLGraph(object):
         Examples
         --------
         The following example uses PyTorch backend.
+
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
         >>> G.add_edges([0, 0, 1], [1, 2, 2])   # (0, 1), (0, 2), (1, 2)
@@ -1034,6 +1059,7 @@ class DGLGraph(object):
         Examples
         --------
         The following example uses PyTorch backend.
+
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
         >>> G.add_edges([0, 0, 1], [1, 2, 2])   # (0, 1), (0, 2), (1, 2)
@@ -1066,6 +1092,19 @@ class DGLGraph(object):
         -------
         networkx.DiGraph
             The nx graph
+
+        Examples
+        --------
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
+        >>> g = DGLGraph()
+        >>> g.add_nodes(5, {'n1': th.randn(5, 10)})
+        >>> g.add_edges([0,1,3,4], [2,4,0,3], {'e1': th.randn(4, 6)})
+        >>> nxg = g.to_networkx(node_attrs=['n1'], edge_attrs=['e1'])
         """
         nx_graph = self._graph.to_networkx()
         if node_attrs is not None:
@@ -1093,6 +1132,28 @@ class DGLGraph(object):
             The node attributes needs to be copied.
         edge_attrs : iterable of str, optional
             The edge attributes needs to be copied.
+
+        Examples
+        --------
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
+        >>> import networkx as nx
+        >>> nxg = nx.DiGraph()
+        >>> nxg.add_edge(0, 1, id=0, e1=5, e2=th.zeros(4))
+        >>> nxg.add_edge(2, 3, id=2, e1=6, e2=th.ones(4))
+        >>> nxg.add_edge(1, 2, id=1, e1=2, e2=th.full((4,), 2))
+        >>> g = dgl.DGLGraph()
+        >>> g.from_networkx(nxg, edge_attrs=['e1', 'e2'])
+        >>> g.edata['e1']
+        tensor([5, 2, 6])
+        >>> g.edata['e2']
+        tensor([[0., 0., 0., 0.],
+                [2., 2., 2., 2.],
+                [1., 1., 1., 1.]])
         """
         self.clear()
         self._graph.from_networkx(nx_graph)
@@ -1116,7 +1177,7 @@ class DGLGraph(object):
             has_edge_id = 'id' in next(iter(nx_graph.edges(data=True)))[-1]
             attr_dict = defaultdict(lambda: [None] * self.number_of_edges())
             if has_edge_id:
-                for u, v, attrs in nx_graph.edges(data=True):
+                for _, _, attrs in nx_graph.edges(data=True):
                     for key in edge_attrs:
                         attr_dict[key][attrs['id']] = attrs[key]
             else:
@@ -1134,6 +1195,16 @@ class DGLGraph(object):
         ----------
         a : scipy sparse matrix
             The graph's adjacency matrix
+
+        Examples
+        --------
+        >>> from scipy.sparse import coo_matrix
+        >>> row = np.array([0, 3, 1, 0])
+        >>> col = np.array([0, 3, 1, 2])
+        >>> data = np.array([4, 5, 7, 9])
+        >>> a = coo_matrix((data, (row, col)), shape=(4, 4))
+        >>> g = dgl.DGLGraph()
+        >>> g.from_scipy_sparse_matrix(a)
         """
         self.clear()
         self._graph.from_scipy_sparse_matrix(a)
@@ -1144,20 +1215,49 @@ class DGLGraph(object):
     def node_attr_schemes(self):
         """Return the node feature schemes.
 
+        Each feature scheme is a named tuple that stores the shape and data type
+        of the node feature
+
         Returns
         -------
         dict of str to schemes
             The schemes of node feature columns.
+
+        Examples
+        --------
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.ndata['x'] = torch.zeros((3,5))
+        >>> G.node_attr_schemes()
+        {'x': Scheme(shape=(5,), dtype=torch.float32)}
         """
         return self._node_frame.schemes
 
     def edge_attr_schemes(self):
         """Return the edge feature schemes.
 
+        Each feature scheme is a named tuple that stores the shape and data type
+        of the node feature
+
         Returns
         -------
         dict of str to schemes
             The schemes of edge feature columns.
+
+        Examples
+        --------
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([0, 1], 2)  # 0->2, 1->2
+        >>> G.edata['y'] = th.zeros((2, 4))
+        >>> G.edge_attr_schemes()
+        {'y': Scheme(shape=(4,), dtype=torch.float32)}
         """
         return self._edge_frame.schemes
 
@@ -1167,6 +1267,9 @@ class DGLGraph(object):
         Initializer is a callable that returns a tensor given the shape, data type
         and device context.
 
+        When a subset of the nodes are assigned a new feature, initializer is
+        used to create feature for rest of the nodes.
+
         Parameters
         ----------
         initializer : callable
@@ -1175,17 +1278,45 @@ class DGLGraph(object):
             The feature field name. Default is set an initializer for all the
             feature fields.
 
-        See Also
+        Examples
         --------
-        dgl.init.base_initializer
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+
+        Set initializer for all node features
+
+        >>> G.set_n_initializer(dgl.init.zero_initializer)
+
+        Set feature for partial nodes
+
+        >>> G.nodes[[0, 2]].data['x'] = th.ones((2, 5))
+        >>> G.ndata
+        {'x' : tensor([[1., 1., 1., 1., 1.],
+                       [0., 0., 0., 0., 0.],
+                       [1., 1., 1., 1., 1.]])}
+
+        Note
+        -----
+        User defined initializer must follow the signature of
+        :func:`dgl.init.base_initializer() <dgl.init.base_initializer>`
+
         """
         self._node_frame.set_initializer(initializer, field)
 
     def set_e_initializer(self, initializer, field=None):
         """Set the initializer for empty edge features.
 
-        Initializer is a callable that returns a tensor given the shape, data type
-        and device context.
+        Initializer is a callable that returns a tensor given the shape, data
+        type and device context.
+
+        When a subset of the edges are assigned a new feature, initializer is
+        used to create feature for rest of the edges.
 
         Parameters
         ----------
@@ -1195,30 +1326,159 @@ class DGLGraph(object):
             The feature field name. Default is set an initializer for all the
             feature fields.
 
-        See Also
+        Examples
         --------
-        dgl.init.base_initializer
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([0, 1], 2)  # 0->2, 1->2
+
+        Set initializer for edge features
+
+        >>> G.set_e_initializer(dgl.init.zero_initializer)
+
+        Set feature for partial edges
+
+        >>> G.edges[1, 2].data['y'] = th.ones((1, 4))
+        >>> G.edata
+        {'y' : tensor([[0., 0., 0., 0.],
+                       [1., 1., 1., 1.]])}
+
+        Note
+        -----
+        User defined initializer must follow the signature of
+        :func:`dgl.init.base_initializer() <dgl.init.base_initializer>`
         """
         self._edge_frame.set_initializer(initializer, field)
 
     @property
     def nodes(self):
-        """Return a node view that can used to set/get feature data."""
+        """Return a node view that can used to set/get feature data.
+
+        Examples
+        --------
+
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+
+        Get nodes in graph G:
+
+        >>> G.nodes()
+        tensor([0, 1, 2])
+
+        Get feature dictionary of all nodes:
+
+        >>> G.nodes[:].data
+        {}
+
+        The above can be abbreviated as
+
+        >>> G.ndata
+        {}
+
+        Init all 3 nodes with zero vector(len=5)
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
+        >>> G.ndata['x'] = th.zeros((3, 5))
+        >>> G.ndata['x']
+        {'x' : tensor([[0., 0., 0., 0., 0.],
+                       [0., 0., 0., 0., 0.],
+                       [0., 0., 0., 0., 0.]])}
+
+        Use G.nodes to get/set features for some nodes.
+
+        >>> G.nodes[[0, 2]].data['x'] = th.ones((2, 5))
+        >>> G.ndata
+        {'x' : tensor([[1., 1., 1., 1., 1.],
+                       [0., 0., 0., 0., 0.],
+                       [1., 1., 1., 1., 1.]])}
+
+        See Also
+        --------
+        dgl.DGLGraph.ndata
+
+        """
         return NodeView(self)
 
     @property
     def ndata(self):
-        """Return the data view of all the nodes."""
+        """Return the data view of all the nodes.
+
+        DGLGraph.ndata is an abbreviation of DGLGraph.nodes[:].data
+
+        See Also
+        --------
+        dgl.DGLGraph.nodes
+        """
         return self.nodes[:].data
 
     @property
     def edges(self):
-        """Return a edges view that can used to set/get feature data."""
+        """Return a edges view that can used to set/get feature data.
+
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edges([0, 1], 2)  # 0->2, 1->2
+
+        Get edges in graph G:
+
+        >>> G.edges()
+        (tensor([0, 1]), tensor([2, 2]))
+
+        Get feature dictionary of all edges:
+
+        >>> G.edges[:].data
+        {}
+
+        The above can be abbreviated as
+
+        >>> G.edata
+        {}
+
+        Init 2 edges with zero vector(len=4)
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
+        >>> G.edata['y'] = th.zeros((2, 4))
+        >>> G.edata
+        {'y' : tensor([[0., 0., 0., 0.],
+                       [0., 0., 0., 0.]])}
+
+        Use G.edges to get/set features for some edges.
+
+        >>> G.edges[1, 2].data['y'] = th.ones((1, 4))
+        >>> G.edata
+        {'y' : tensor([[0., 0., 0., 0.],
+                       [1., 1., 1., 1.]])}
+
+        See Also
+        --------
+        dgl.DGLGraph.edata
+        """
         return EdgeView(self)
 
     @property
     def edata(self):
-        """Return the data view of all the edges."""
+        """Return the data view of all the edges.
+
+        DGLGraph.data is an abbreviation of DGLGraph.edges[:].data
+
+        See Also
+        --------
+        dgl.DGLGraph.edges
+        """
         return self.edges[:].data
 
     def set_n_repr(self, hu, u=ALL, inplace=False):
@@ -1516,9 +1776,7 @@ class DGLGraph(object):
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
 
-        >>> import dgl
         >>> import torch as th
-
         >>> g = dgl.DGLGraph()
         >>> g.add_nodes(3)
         >>> g.ndata['x'] = th.ones(3, 1)
@@ -1577,7 +1835,6 @@ class DGLGraph(object):
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
 
-        >>> import dgl
         >>> import torch as th
 
         >>> g = dgl.DGLGraph()
@@ -1725,7 +1982,6 @@ class DGLGraph(object):
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
 
-        >>> import dgl
         >>> import torch as th
         >>> g = dgl.DGLGraph()
         >>> g.add_nodes(3)
@@ -1831,7 +2087,6 @@ class DGLGraph(object):
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
 
-        >>> import dgl
         >>> import torch as th
         >>> g = dgl.DGLGraph()
         >>> g.add_nodes(3)
@@ -1936,13 +2191,12 @@ class DGLGraph(object):
 
         Examples
         --------
+        Create a graph for demo.
+
         .. note:: Here we use pytorch syntax for demo. The general idea applies
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
 
-        Create a graph for demo.
-
-        >>> import dgl
         >>> import torch as th
         >>> g = dgl.DGLGraph()
         >>> g.add_nodes(3)
@@ -2034,13 +2288,12 @@ class DGLGraph(object):
 
         Examples
         --------
+        Create a graph for demo.
+
         .. note:: Here we use pytorch syntax for demo. The general idea applies
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
 
-        Create a graph for demo.
-
-        >>> import dgl
         >>> import torch as th
         >>> g = dgl.DGLGraph()
         >>> g.add_nodes(3)
@@ -2179,13 +2432,12 @@ class DGLGraph(object):
 
         Examples
         --------
+        Create a graph for demo.
+
         .. note:: Here we use pytorch syntax for demo. The general idea applies
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
 
-        Create a graph for demo.
-
-        >>> import dgl
         >>> import torch as th
         >>> g = dgl.DGLGraph()
         >>> g.add_nodes(4)
@@ -2258,13 +2510,12 @@ class DGLGraph(object):
 
         Examples
         --------
+        Create a graph for demo.
+
         .. note:: Here we use pytorch syntax for demo. The general idea applies
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
 
-        Create a graph for demo.
-
-        >>> import dgl
         >>> import torch as th
         >>> g = dgl.DGLGraph()
         >>> g.add_nodes(4)
@@ -2333,6 +2584,7 @@ class DGLGraph(object):
         Examples
         --------
         The following example uses PyTorch backend.
+
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(5)
         >>> G.add_edges([0, 1, 2, 3, 4], [1, 2, 3, 4, 0])   # 5-node cycle
@@ -2361,9 +2613,7 @@ class DGLGraph(object):
         nodes in the list.
 
         Equivalent to
-        ``
-        [self.subgraph(nodes_list) for nodes_list in nodes]
-        ``
+        ``[self.subgraph(nodes_list) for nodes_list in nodes]``
 
         Parameters
         ----------
@@ -2409,6 +2659,7 @@ class DGLGraph(object):
         Examples
         --------
         The following example uses PyTorch backend.
+
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(5)
         >>> G.add_edges([0, 1, 2, 3, 4], [1, 2, 3, 4, 0])   # 5-node cycle
@@ -2434,16 +2685,16 @@ class DGLGraph(object):
     def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
 
-        By default, a row of returned adjacency matrix represents the destination
-        of an edge and the column represents the source.
+        By default, a row of returned adjacency matrix represents the
+        destination of an edge and the column represents the source.
 
-        When transpose is True, a row represents the source and a column represents
-        a destination.
+        When transpose is True, a row represents the source and a column
+        represents a destination.
 
         Parameters
         ----------
         transpose : bool, optional (default=False)
-            A flag to tranpose the returned adjacency matrix.
+            A flag to transpose the returned adjacency matrix.
         ctx : context, optional (default=cpu)
             The context of returned adjacency matrix.
 
@@ -2463,21 +2714,21 @@ class DGLGraph(object):
         or not.
 
         There are three types of an incidence matrix :math:`I`:
-        
+
         * ``in``:
-        
+
             - :math:`I[v, e] = 1` if :math:`e` is the in-edge of :math:`v`
               (or :math:`v` is the dst node of :math:`e`);
             - :math:`I[v, e] = 0` otherwise.
-            
+
         * ``out``:
-        
+
             - :math:`I[v, e] = 1` if :math:`e` is the out-edge of :math:`v`
               (or :math:`v` is the src node of :math:`e`);
             - :math:`I[v, e] = 0` otherwise.
-            
+
         * ``both``:
-        
+
             - :math:`I[v, e] = 1` if :math:`e` is the in-edge of :math:`v`;
             - :math:`I[v, e] = -1` if :math:`e` is the out-edge of :math:`v`;
             - :math:`I[v, e] = 0` otherwise (including self-loop).
@@ -2537,13 +2788,12 @@ class DGLGraph(object):
 
         Examples
         --------
+        Construct a graph object for demo.
+
         .. note:: Here we use pytorch syntax for demo. The general idea applies
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
 
-        Construct a graph object for demo.
-
-        >>> import dgl
         >>> import torch as th
         >>> g = dgl.DGLGraph()
         >>> g.add_nodes(3)
@@ -2599,13 +2849,12 @@ class DGLGraph(object):
 
         Examples
         --------
+        Construct a graph object for demo.
 
         .. note:: Here we use pytorch syntax for demo. The general idea applies
             to other frameworks with minor syntax change (e.g. replace
             ``torch.tensor`` with ``mxnet.ndarray``).
-            Construct a graph object for demo.
 
-        >>> import dgl
         >>> import torch as th
         >>> g = dgl.DGLGraph()
         >>> g.add_nodes(3)

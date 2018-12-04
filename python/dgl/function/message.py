@@ -113,17 +113,27 @@ class CopyEdgeMessageFunction(MessageFunction):
 
 
 def src_mul_edge(src, edge, out):
-    """Builtin message function that computes message by multiplying source node features
-    with edge features.
+    """Builtin message function that computes message by multiplying source
+    node features with edge features.
 
     Parameters
     ----------
     src : str
-        The source feature name.
+        The source feature field.
     edge : str
-        The edge feature name.
+        The edge feature field.
     out : str
-        The output message name.
+        The output message field.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> message_func = dgl.function.src_mul_edge(src='h', edge='w', out='m')
+
+    The above example is equivalent to the following user defined function:
+
+    >>> def message_func(edges):
+    >>>   return {'m': edges.src['h'] * edges.data['w']}
     """
     return SrcMulEdgeMessageFunction(operator.mul, src, edge, out)
 
@@ -133,9 +143,19 @@ def copy_src(src, out):
     Parameters
     ----------
     src : str
-        The source feature name.
+        The source feature field.
     out : str
-        The output message name.
+        The output message field.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> message_func = dgl.function.copy_src(src='h', out='m')
+
+    The above example is equivalent to the following user defined function:
+
+    >>> def message_func(edges):
+    >>>     return {'m': edges.src['h']}
     """
     return CopySrcMessageFunction(src, out)
 
@@ -145,8 +165,18 @@ def copy_edge(edge, out):
     Parameters
     ----------
     edge : str
-        The edge feature name.
+        The edge feature field.
     out : str
-        The output message name.
+        The output message field.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> message_func = dgl.function.copy_edge(edge='h', out='m')
+
+    The above example is equivalent to the following user defined function:
+
+    >>> def message_func(edges):
+    >>>     return {'m': edges.data['h']}
     """
     return CopyEdgeMessageFunction(edge, out)
