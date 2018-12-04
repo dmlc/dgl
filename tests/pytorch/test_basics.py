@@ -4,6 +4,7 @@ import numpy as np
 import dgl
 from dgl.graph import DGLGraph
 import utils as U
+from collections import defaultdict as ddict
 
 D = 5
 reduce_msg_shapes = set()
@@ -136,6 +137,78 @@ def test_batch_setter_autograd():
     h2.backward(th.ones((10, D)) * 2)
     check_eq(h1.grad[:,0], th.tensor([2., 0., 0., 2., 2., 2., 2., 2., 0., 2.]))
     check_eq(hh.grad[:,0], th.tensor([2., 2., 2.]))
+
+def test_nx_conversion():
+    # check conversion between networkx and DGLGraph
+
+    def _check_nx_feature(nxg, nf, ef):
+        num_nodes = len(nxg)
+        num_edges = nxg.size()
+        if num_nodes > 0:
+            node_feat = ddict(list)
+            for n, attr in nxg.nodes(data=True):
+                assert len(attr) == len(nf)
+                for k in nxg.nodes[n]:
+                    node_feat[k].append(nxg.nodes[n][k].unsqueeze(0))
+            for k in node_feat:
+                feat = th.cat(node_feat[k], dim=0)
+                assert U.allclose(feat, nf[k])
+        else:
+            assert len(nf) == 0
+        if num_edges > 0:
+            edge_feat = ddict(lambda: [0] * num_edges)
+            for u, v, attr in nxg.edges(data=True):
+                assert len(attr) == len(ef) + 1 # extra id
+                eid = attr['id']
+                for k in ef:
+                    edge_feat[k][eid] = attr[k].unsqueeze(0)
+            for k in edge_feat:
+                feat = th.cat(edge_feat[k], dim=0)
+                assert U.allclose(feat, ef[k])
+        else:
+            assert len(ef) == 0
+
+    n1 = th.randn(5, 3)
+    n2 = th.randn(5, 10)
+    n3 = th.randn(5, 4)
+    e1 = th.randn(4, 5)
+    e2 = th.randn(4, 7)
+    g = DGLGraph(multigraph=True)
+    g.add_nodes(5)
+    g.add_edges([0,1,3,4], [2,4,0,3])
+    g.ndata.update({'n1': n1, 'n2': n2, 'n3': n3})
+    g.edata.update({'e1': e1, 'e2': e2})
+
+    # convert to networkx
+    nxg = g.to_networkx(node_attrs=['n1', 'n3'], edge_attrs=['e1', 'e2'])
+    assert len(nxg) == 5
+    assert nxg.size() == 4
+    _check_nx_feature(nxg, {'n1': n1, 'n3': n3}, {'e1': e1, 'e2': e2})
+
+    # convert to DGLGraph
+    # use id feature to test non-tensor copy
+    g.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1', 'id'])
+    assert g.number_of_nodes() == 5
+    assert g.number_of_edges() == 4
+    assert U.allclose(g.get_n_repr()['n1'], n1)
+    assert U.allclose(g.get_e_repr()['e1'], e1)
+    assert U.allclose(g.get_e_repr()['id'], torch.arange(4))
+
+    g.pop_e_repr('id')
+
+    # test modifying DGLGraph
+    new_n = th.randn(2, 3)
+    new_e = th.randn(3, 5)
+    g.add_nodes(2, data={'n1': new_n})
+    # add three edges, one is a multi-edge
+    g.add_edges([3, 6, 0], [4, 5, 2], data={'e1': new_e})
+    n1 = torch.cat((n1, new_n), dim=0)
+    e1 = torch.cat((e1, new_e), dim=0)
+    # convert to networkx again
+    nxg = g.to_networkx(node_attrs=['n1'], edge_attrs=['e1'])
+    assert len(nxg) == 7
+    assert nxg.size() == 7
+    _check_nx_feature(nxg, {'n1': n1}, {'e1': e1})
 
 def test_batch_send():
     g = generate_graph()
@@ -340,7 +413,7 @@ def test_update_all_0deg():
     # initializer and applied with UDF.
     assert U.allclose(new_repr[1:], 2*(2+th.zeros((4,5))))
     assert U.allclose(new_repr[0], 2 * old_repr.sum(0))
-    
+
     # test#2: graph with no edge
     g = DGLGraph()
     g.add_nodes(5)
@@ -513,6 +586,7 @@ def test_dynamic_addition():
 
 
 if __name__ == '__main__':
+    test_nx_conversion()
     test_batch_setter_getter()
     test_batch_setter_autograd()
     test_batch_send()
