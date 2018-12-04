@@ -1,4 +1,4 @@
-.. _apifunction:
+.. _apiinit:
 
 Feature Initializer
 ===================
