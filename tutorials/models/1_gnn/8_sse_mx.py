@@ -510,7 +510,7 @@ trainer = gluon.Trainer(params, 'adam', {'learning_rate' : lr})
 # Now let’s train it! As before, nodes reachable from :math:`s` are
 # gradually “infected”, except that behind the scene is a neural network!
 #
-n_epochs = 50
+n_epochs = 35
 n_embedding_updates = 8
 n_parameter_updates = 5
 alpha = 0.1
@@ -537,4 +537,3 @@ for i in range(n_epochs):
 # .. |image0| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/img/floodfill-paths.gif
 # .. |image1| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/img/neighbor-sampling.gif
 # .. |image2| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/img/sse.gif
-#
