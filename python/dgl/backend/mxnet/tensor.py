@@ -93,7 +93,7 @@ def stack(seq, dim):
     return nd.stack(*seq, dim=dim)
 
 def split(x, sizes_or_sections, dim):
-    if isinstance(sizes_or_sections, list):
+    if isinstance(sizes_or_sections, list) or isinstance(sizes_or_sections, np.ndarray):
         # TODO: fallback to numpy is unfortunate
         np_arr = x.asnumpy()
         indices = np.cumsum(sizes_or_sections)[:-1]

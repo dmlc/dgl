@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2017 by Contributors
  * \file pack_args.h
- * \brief Utility to pack TVMArgs to other type-erased fution calling convention.
+ * \brief Utility to pack DGLArgs to other type-erased fution calling convention.
  *
  *  Two type erased function signatures are supported.
  *   - cuda_style(void** args, int num_args);
@@ -17,7 +17,7 @@
 #include <vector>
 #include <cstring>
 
-namespace tvm {
+namespace dgl {
 namespace runtime {
 /*!
  * \brief argument union type of 32bit.
@@ -31,42 +31,42 @@ union ArgUnion {
 /*!
  * \brief Create a packed function from void addr types.
  *
- * \param f with signiture (TVMArgs args, TVMRetValue* rv, void* void_args)
+ * \param f with signiture (DGLArgs args, DGLRetValue* rv, void* void_args)
  * \param arg_types The arguments type information.
  * \tparam F the function type
  *
  * \return The wrapped packed function.
  */
 template<typename F>
-inline PackedFunc PackFuncVoidAddr(F f, const std::vector<TVMType>& arg_types);
+inline PackedFunc PackFuncVoidAddr(F f, const std::vector<DGLType>& arg_types);
 /*!
  * \brief Create a packed function that from function only packs buffer arguments.
  *
- * \param f with signiture (TVMArgs args, TVMRetValue* rv, ArgUnion* pack_args)
+ * \param f with signiture (DGLArgs args, DGLRetValue* rv, ArgUnion* pack_args)
  * \param arg_types The arguments type information.
  * \tparam F the function type
  *
  * \return The wrapped packed function.
  */
 template<typename F>
-inline PackedFunc PackFuncNonBufferArg(F f, const std::vector<TVMType>& arg_types);
+inline PackedFunc PackFuncNonBufferArg(F f, const std::vector<DGLType>& arg_types);
 /*!
  * \brief Create a packed function that from function that takes a packed arguments.
  *
- * \param f with signature (TVMArgs args, TVMRetValue* rv, void* pack_args, size_t nbytes)
+ * \param f with signature (DGLArgs args, DGLRetValue* rv, void* pack_args, size_t nbytes)
  * \param arg_types The arguments that wish to get from
  * \tparam F the function type
  *
  * \return The wrapped packed function.
  */
 template<typename F>
-inline PackedFunc PackFuncPackedArg(F f, const std::vector<TVMType>& arg_types);
+inline PackedFunc PackFuncPackedArg(F f, const std::vector<DGLType>& arg_types);
 /*!
  * \brief Extract number of buffer argument from the argument types.
  * \param arg_types The argument types.
  * \return number of buffer arguments
  */
-inline size_t NumBufferArgs(const std::vector<TVMType>& arg_types);
+inline size_t NumBufferArgs(const std::vector<DGLType>& arg_types);
 
 // implementations details
 namespace detail {
@@ -101,7 +101,7 @@ enum ArgConvertCode {
   HANDLE_TO_HANDLE
 };
 
-inline ArgConvertCode GetArgConvertCode(TVMType t) {
+inline ArgConvertCode GetArgConvertCode(DGLType t) {
   CHECK_EQ(t.lanes, 1U)
       << "Cannot pass vector type argument to devic function for now";
   if (t.code == kDLInt) {
@@ -122,7 +122,7 @@ inline ArgConvertCode GetArgConvertCode(TVMType t) {
 template<int N, typename F>
 inline PackedFunc PackFuncVoidAddr_(F f, const std::vector<ArgConvertCode>& codes) {
   int num_args = static_cast<int>(codes.size());
-  auto ret = [f, codes, num_args](TVMArgs args, TVMRetValue* ret) {
+  auto ret = [f, codes, num_args](DGLArgs args, DGLRetValue* ret) {
     TempArray<void*, N> addr_(num_args);
     TempArray<ArgUnion, N> holder_(num_args);
     void** addr = addr_.data();
@@ -161,7 +161,7 @@ template<int N, typename F>
 inline PackedFunc PackFuncNonBufferArg_(
     F f, int base, const std::vector<ArgConvertCode>& codes) {
   int num_args = static_cast<int>(codes.size());
-  auto ret = [f, codes, base, num_args](TVMArgs args, TVMRetValue* ret) {
+  auto ret = [f, codes, base, num_args](DGLArgs args, DGLRetValue* ret) {
     TempArray<ArgUnion, N> holder_(num_args);
     ArgUnion* holder = holder_.data();
     for (int i = 0; i < num_args; ++i) {
@@ -196,11 +196,11 @@ template<int N, typename F>
 inline PackedFunc PackFuncPackedArg_(
     F f, const std::vector<ArgConvertCode>& codes) {
   int num_args = static_cast<int>(codes.size());
-  auto ret = [f, codes, num_args](TVMArgs args, TVMRetValue* ret) {
+  auto ret = [f, codes, num_args](DGLArgs args, DGLRetValue* ret) {
     TempArray<uint64_t, N> pack_(num_args);
     int32_t* pack = reinterpret_cast<int32_t*>(pack_.data());
     int32_t* ptr = pack;
-    static_assert(sizeof(TVMValue) == 8, "invariant");
+    static_assert(sizeof(DGLValue) == 8, "invariant");
     static_assert(sizeof(void*) % sizeof(int32_t) == 0, "invariant");
     for (int i = 0; i < num_args; ++i) {
       switch (codes[i]) {
@@ -211,7 +211,7 @@ inline PackedFunc PackFuncPackedArg_(
         }
         case INT64_TO_INT64:
         case FLOAT64_TO_FLOAT64: {
-          std::memcpy(ptr, &args.values[i], sizeof(TVMValue));
+          std::memcpy(ptr, &args.values[i], sizeof(DGLValue));
           ptr += 2;
           break;
         }
@@ -244,7 +244,7 @@ inline PackedFunc PackFuncPackedArg_(
 }  // namespace detail
 
 template<typename F>
-inline PackedFunc PackFuncVoidAddr(F f, const std::vector<TVMType>& arg_types) {
+inline PackedFunc PackFuncVoidAddr(F f, const std::vector<DGLType>& arg_types) {
   std::vector<detail::ArgConvertCode> codes(arg_types.size());
   for (size_t i = 0; i < arg_types.size(); ++i) {
     codes[i] = detail::GetArgConvertCode(arg_types[i]);
@@ -260,7 +260,7 @@ inline PackedFunc PackFuncVoidAddr(F f, const std::vector<TVMType>& arg_types) {
   }
 }
 
-inline size_t NumBufferArgs(const std::vector<TVMType>& arg_types) {
+inline size_t NumBufferArgs(const std::vector<DGLType>& arg_types) {
   size_t base = arg_types.size();
   for (size_t i = 0; i < arg_types.size(); ++i) {
     if (arg_types[i].code != kHandle) {
@@ -275,7 +275,7 @@ inline size_t NumBufferArgs(const std::vector<TVMType>& arg_types) {
 }
 
 template<typename F>
-inline PackedFunc PackFuncNonBufferArg(F f, const std::vector<TVMType>& arg_types) {
+inline PackedFunc PackFuncNonBufferArg(F f, const std::vector<DGLType>& arg_types) {
   size_t num_buffer = NumBufferArgs(arg_types);
   std::vector<detail::ArgConvertCode> codes;
   for (size_t i = num_buffer; i < arg_types.size(); ++i) {
@@ -292,7 +292,7 @@ inline PackedFunc PackFuncNonBufferArg(F f, const std::vector<TVMType>& arg_type
 }
 
 template<typename F>
-inline PackedFunc PackFuncPackedArg(F f, const std::vector<TVMType>& arg_types) {
+inline PackedFunc PackFuncPackedArg(F f, const std::vector<DGLType>& arg_types) {
   std::vector<detail::ArgConvertCode> codes;
   for (size_t i = 0; i < arg_types.size(); ++i) {
     codes.push_back(detail::GetArgConvertCode(arg_types[i]));
@@ -306,5 +306,5 @@ inline PackedFunc PackFuncPackedArg(F f, const std::vector<TVMType>& arg_types) 
   }
 }
 }  // namespace runtime
-}  // namespace tvm
+}  // namespace dgl
 #endif  // DGL_RUNTIME_PACK_ARGS_H_

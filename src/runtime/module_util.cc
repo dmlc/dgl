@@ -11,7 +11,7 @@
 #include <string>
 #include "module_util.h"
 
-namespace tvm {
+namespace dgl {
 namespace runtime {
 
 void ImportModuleBlob(const char* mblob, std::vector<Module>* mlist) {
@@ -45,14 +45,14 @@ void ImportModuleBlob(const char* mblob, std::vector<Module>* mlist) {
 
 PackedFunc WrapPackedFunc(BackendPackedCFunc faddr,
                           const std::shared_ptr<ModuleNode>& sptr_to_self) {
-  return PackedFunc([faddr, sptr_to_self](TVMArgs args, TVMRetValue* rv) {
+  return PackedFunc([faddr, sptr_to_self](DGLArgs args, DGLRetValue* rv) {
       int ret = (*faddr)(
-          const_cast<TVMValue*>(args.values),
+          const_cast<DGLValue*>(args.values),
           const_cast<int*>(args.type_codes),
           args.num_args);
-      CHECK_EQ(ret, 0) << TVMGetLastError();
+      CHECK_EQ(ret, 0) << DGLGetLastError();
     });
 }
 
 }  // namespace runtime
-}  // namespace tvm
+}  // namespace dgl

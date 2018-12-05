@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2017 by Contributors
  * \file dgl/runtime/packed_func.h
- * \brief Type-erased function used across TVM API.
+ * \brief Type-erased function used across DGL API.
  */
 #ifndef DGL_RUNTIME_PACKED_FUNC_H_
 #define DGL_RUNTIME_PACKED_FUNC_H_
@@ -18,12 +18,12 @@
 #include "module.h"
 #include "ndarray.h"
 
-// Whether use TVM runtime in header only mode.
-#ifndef TVM_RUNTIME_HEADER_ONLY
-#define TVM_RUNTIME_HEADER_ONLY 0
+// Whether use DGL runtime in header only mode.
+#ifndef DGL_RUNTIME_HEADER_ONLY
+#define DGL_RUNTIME_HEADER_ONLY 0
 #endif
 
-namespace tvm {
+namespace dgl {
 // Forward declare NodeRef and Node for extensions.
 // This header works fine without depend on NodeRef
 // as long as it is not used.
@@ -32,18 +32,18 @@ class NodeRef;
 
 namespace runtime {
 // forward declarations
-class TVMArgs;
-class TVMArgValue;
-class TVMRetValue;
-class TVMArgsSetter;
+class DGLArgs;
+class DGLArgValue;
+class DGLRetValue;
+class DGLArgsSetter;
 
 /*!
  * \brief Packed function is a type-erased function.
  *  The arguments are passed by packed format.
  *
  *  This is an useful unified interface to call generated functions,
- *  It is the unified function function type of TVM.
- *  It corresponds to TVMFunctionHandle in C runtime API.
+ *  It is the unified function function type of DGL.
+ *  It corresponds to DGLFunctionHandle in C runtime API.
  */
 class PackedFunc {
  public:
@@ -54,7 +54,7 @@ class PackedFunc {
    *
    * \code
    *   // Example code on how to implemented FType
-   *   void MyPackedFunc(TVMArgs args, TVMRetValue* rv) {
+   *   void MyPackedFunc(DGLArgs args, DGLRetValue* rv) {
    *     // automatically convert arguments to desired type.
    *     int a0 = args[0];
    *     float a1 = args[1];
@@ -65,7 +65,7 @@ class PackedFunc {
    *   }
    * \endcode
    */
-  using FType = std::function<void (TVMArgs args, TVMRetValue* rv)>;
+  using FType = std::function<void (DGLArgs args, DGLRetValue* rv)>;
   /*! \brief default constructor */
   PackedFunc() {}
   /*!
@@ -88,13 +88,13 @@ class PackedFunc {
    * \endcode
    */
   template<typename... Args>
-  inline TVMRetValue operator()(Args&& ...args) const;
+  inline DGLRetValue operator()(Args&& ...args) const;
   /*!
    * \brief Call the function in packed format.
    * \param args The arguments
    * \param rv The return value.
    */
-  inline void CallPacked(TVMArgs args, TVMRetValue* rv) const;
+  inline void CallPacked(DGLArgs args, DGLRetValue* rv) const;
   /*! \return the internal body function */
   inline FType body() const;
   /*! \return Whether the packed function is nullptr */
@@ -125,7 +125,7 @@ class TypedPackedFunc;
  * TypedPackedFunc enables compile time type checking.
  * TypedPackedFunc works with the runtime system:
  * - It can be passed as an argument of PackedFunc.
- * - It can be assigned to TVMRetValue.
+ * - It can be assigned to DGLRetValue.
  * - It can be directly converted to a type-erased PackedFunc.
  *
  * Developers should prefer TypedPackedFunc over PackedFunc in C++ code
@@ -161,7 +161,7 @@ class TypedPackedFunc<R(Args...)> {
    *
    * Example usage:
    * \code
-   * PackedFunc packed([](TVMArgs args, TVMRetValue *rv) {
+   * PackedFunc packed([](DGLArgs args, DGLRetValue *rv) {
    *   int x = args[0];
    *   *rv = x + 1;
    *  });
@@ -252,7 +252,7 @@ class TypedPackedFunc<R(Args...)> {
   }
 
  private:
-  friend class TVMRetValue;
+  friend class DGLRetValue;
   /*! \brief The internal packed function */
   PackedFunc packed_;
   /*!
@@ -266,10 +266,10 @@ class TypedPackedFunc<R(Args...)> {
   inline void AssignTypedLambda(FLambda flambda);
 };
 
-/*! \brief Arguments into TVM functions. */
-class TVMArgs {
+/*! \brief Arguments into DGL functions. */
+class DGLArgs {
  public:
-  const TVMValue* values;
+  const DGLValue* values;
   const int* type_codes;
   int num_args;
   /*!
@@ -278,7 +278,7 @@ class TVMArgs {
    * \param type_codes The argument type codes
    * \param num_args number of arguments.
    */
-  TVMArgs(const TVMValue* values,
+  DGLArgs(const DGLValue* values,
           const int* type_codes,
           int num_args)
       : values(values),
@@ -291,7 +291,7 @@ class TVMArgs {
    * \param i the index.
    * \return the ith argument.
    */
-  inline TVMArgValue operator[](int i) const;
+  inline DGLArgValue operator[](int i) const;
 };
 
 /*!
@@ -302,31 +302,31 @@ class TVMArgs {
 inline const char* TypeCode2Str(int type_code);
 
 /*!
- * \brief convert a string to TVM type.
+ * \brief convert a string to DGL type.
  * \param s The string to be converted.
- * \return The corresponding tvm type.
+ * \return The corresponding dgl type.
  */
-inline TVMType String2TVMType(std::string s);
+inline DGLType String2DGLType(std::string s);
 
 /*!
- * \brief convert a TVM type to string.
+ * \brief convert a DGL type to string.
  * \param t The type to be converted.
- * \return The corresponding tvm type in string.
+ * \return The corresponding dgl type in string.
  */
-inline std::string TVMType2String(TVMType t);
+inline std::string DGLType2String(DGLType t);
 
 // macro to check type code.
-#define TVM_CHECK_TYPE_CODE(CODE, T)                           \
+#define DGL_CHECK_TYPE_CODE(CODE, T)                           \
   CHECK_EQ(CODE, T) << " expected "                            \
   << TypeCode2Str(T) << " but get " << TypeCode2Str(CODE)      \
 
 /*!
- * \brief Type traits to mark if a class is tvm extension type.
+ * \brief Type traits to mark if a class is dgl extension type.
  *
  * To enable extension type in C++ must be register () ed via marco.
- * TVM_REGISTER_EXT_TYPE(TypeName) after defining this with this traits.
+ * DGL_REGISTER_EXT_TYPE(TypeName) after defining this with this traits.
  *
- * Extension class can be passed and returned via PackedFunc in all tvm runtime.
+ * Extension class can be passed and returned via PackedFunc in all dgl runtime.
  * Internally extension class is stored as T*.
  *
  * \tparam T the typename
@@ -357,18 +357,18 @@ class ExtTypeVTable {
    * \param type_code The type code
    * \return The registered vtable.
    */
-  TVM_DLL static ExtTypeVTable* Get(int type_code);
+  DGL_DLL static ExtTypeVTable* Get(int type_code);
 
  private:
   // Internal registration function.
-  TVM_DLL static ExtTypeVTable* RegisterInternal(int type_code, const ExtTypeVTable& vt);
+  DGL_DLL static ExtTypeVTable* RegisterInternal(int type_code, const ExtTypeVTable& vt);
 };
 
 /*!
  * \brief Internal base class to
  *  handle conversion to POD values.
  */
-class TVMPODValue_ {
+class DGLPODValue_ {
  public:
   operator double() const {
     // Allow automatic conversion from int to float
@@ -377,31 +377,31 @@ class TVMPODValue_ {
     if (type_code_ == kDLInt) {
       return static_cast<double>(value_.v_int64);
     }
-    TVM_CHECK_TYPE_CODE(type_code_, kDLFloat);
+    DGL_CHECK_TYPE_CODE(type_code_, kDLFloat);
     return value_.v_float64;
   }
   operator int64_t() const {
-    TVM_CHECK_TYPE_CODE(type_code_, kDLInt);
+    DGL_CHECK_TYPE_CODE(type_code_, kDLInt);
     return value_.v_int64;
   }
   operator uint64_t() const {
-    TVM_CHECK_TYPE_CODE(type_code_, kDLInt);
+    DGL_CHECK_TYPE_CODE(type_code_, kDLInt);
     return value_.v_int64;
   }
   operator int() const {
-    TVM_CHECK_TYPE_CODE(type_code_, kDLInt);
+    DGL_CHECK_TYPE_CODE(type_code_, kDLInt);
     CHECK_LE(value_.v_int64,
              std::numeric_limits<int>::max());
     return static_cast<int>(value_.v_int64);
   }
   operator bool() const {
-    TVM_CHECK_TYPE_CODE(type_code_, kDLInt);
+    DGL_CHECK_TYPE_CODE(type_code_, kDLInt);
     return value_.v_int64 != 0;
   }
   operator void*() const {
     if (type_code_ == kNull) return nullptr;
     if (type_code_ == kArrayHandle) return value_.v_handle;
-    TVM_CHECK_TYPE_CODE(type_code_, kHandle);
+    DGL_CHECK_TYPE_CODE(type_code_, kHandle);
     return value_.v_handle;
   }
   operator DLTensor*() const {
@@ -418,11 +418,11 @@ class TVMPODValue_ {
   }
   operator NDArray() const {
     if (type_code_ == kNull) return NDArray();
-    TVM_CHECK_TYPE_CODE(type_code_, kNDArrayContainer);
+    DGL_CHECK_TYPE_CODE(type_code_, kNDArrayContainer);
     return NDArray(static_cast<NDArray::Container*>(value_.v_handle));
   }
-  operator TVMContext() const {
-    TVM_CHECK_TYPE_CODE(type_code_, kTVMContext);
+  operator DGLContext() const {
+    DGL_CHECK_TYPE_CODE(type_code_, kDGLContext);
     return value_.v_ctx;
   }
   template<typename TExtension>
@@ -444,69 +444,69 @@ class TVMPODValue_ {
   }
 
  protected:
-  friend class TVMArgsSetter;
-  friend class TVMRetValue;
-  TVMPODValue_() : type_code_(kNull) {}
-  TVMPODValue_(TVMValue value, int type_code)
+  friend class DGLArgsSetter;
+  friend class DGLRetValue;
+  DGLPODValue_() : type_code_(kNull) {}
+  DGLPODValue_(DGLValue value, int type_code)
       : value_(value), type_code_(type_code) {}
 
   /*! \brief The value */
-  TVMValue value_;
+  DGLValue value_;
   /*! \brief the type code */
   int type_code_;
 };
 
 /*!
  * \brief A single argument value to PackedFunc.
- *  Containing both type_code and TVMValue
+ *  Containing both type_code and DGLValue
  *
  *  Provides utilities to do type cast into other types.
  */
-class TVMArgValue : public TVMPODValue_ {
+class DGLArgValue : public DGLPODValue_ {
  public:
   /*! \brief default constructor */
-  TVMArgValue() {}
+  DGLArgValue() {}
   /*!
    * \brief constructor
    * \param value of the function
    * \param type_code The type code.
    */
-  TVMArgValue(TVMValue value, int type_code)
-      : TVMPODValue_(value, type_code) {
+  DGLArgValue(DGLValue value, int type_code)
+      : DGLPODValue_(value, type_code) {
   }
   // reuse converter from parent
-  using TVMPODValue_::operator double;
-  using TVMPODValue_::operator int64_t;
-  using TVMPODValue_::operator uint64_t;
-  using TVMPODValue_::operator int;
-  using TVMPODValue_::operator bool;
-  using TVMPODValue_::operator void*;
-  using TVMPODValue_::operator DLTensor*;
-  using TVMPODValue_::operator NDArray;
-  using TVMPODValue_::operator TVMContext;
+  using DGLPODValue_::operator double;
+  using DGLPODValue_::operator int64_t;
+  using DGLPODValue_::operator uint64_t;
+  using DGLPODValue_::operator int;
+  using DGLPODValue_::operator bool;
+  using DGLPODValue_::operator void*;
+  using DGLPODValue_::operator DLTensor*;
+  using DGLPODValue_::operator NDArray;
+  using DGLPODValue_::operator DGLContext;
 
   // conversion operator.
   operator std::string() const {
-    if (type_code_ == kTVMType) {
-      return TVMType2String(operator TVMType());
+    if (type_code_ == kDGLType) {
+      return DGLType2String(operator DGLType());
     } else if (type_code_ == kBytes) {
-      TVMByteArray* arr = static_cast<TVMByteArray*>(value_.v_handle);
+      DGLByteArray* arr = static_cast<DGLByteArray*>(value_.v_handle);
       return std::string(arr->data, arr->size);
     } else {
-      TVM_CHECK_TYPE_CODE(type_code_, kStr);
+      DGL_CHECK_TYPE_CODE(type_code_, kStr);
       return std::string(value_.v_str);
     }
   }
-  operator TVMType() const {
+  operator DGLType() const {
     if (type_code_ == kStr) {
-      return String2TVMType(operator std::string());
+      return String2DGLType(operator std::string());
     }
-    TVM_CHECK_TYPE_CODE(type_code_, kTVMType);
+    DGL_CHECK_TYPE_CODE(type_code_, kDGLType);
     return value_.v_type;
   }
   operator PackedFunc() const {
     if (type_code_ == kNull) return PackedFunc();
-    TVM_CHECK_TYPE_CODE(type_code_, kFuncHandle);
+    DGL_CHECK_TYPE_CODE(type_code_, kFuncHandle);
     return *ptr<PackedFunc>();
   }
   template<typename FType>
@@ -514,10 +514,10 @@ class TVMArgValue : public TVMPODValue_ {
     return TypedPackedFunc<FType>(operator PackedFunc());
   }
   operator Module() const {
-    TVM_CHECK_TYPE_CODE(type_code_, kModuleHandle);
+    DGL_CHECK_TYPE_CODE(type_code_, kModuleHandle);
     return *ptr<Module>();
   }
-  const TVMValue& value() const {
+  const DGLValue& value() const {
     return value_;
   }
   // Deferred extension handler.
@@ -537,63 +537,63 @@ class TVMArgValue : public TVMPODValue_ {
 
 /*!
  * \brief Return Value container,
- *  Unlike TVMArgValue, which only holds reference and do not delete
+ *  Unlike DGLArgValue, which only holds reference and do not delete
  *  the underlying container during destruction.
  *
- *  TVMRetValue holds value and will manage the underlying containers
+ *  DGLRetValue holds value and will manage the underlying containers
  *  when it stores a complicated data type.
  */
-class TVMRetValue : public TVMPODValue_ {
+class DGLRetValue : public DGLPODValue_ {
  public:
   /*! \brief default constructor */
-  TVMRetValue() {}
+  DGLRetValue() {}
   /*!
    * \brief move constructor from anoter return value.
    * \param other The other return value.
    */
-  TVMRetValue(TVMRetValue&& other)
-      : TVMPODValue_(other.value_, other.type_code_) {
+  DGLRetValue(DGLRetValue&& other)
+      : DGLPODValue_(other.value_, other.type_code_) {
     other.value_.v_handle = nullptr;
     other.type_code_ = kNull;
   }
   /*! \brief destructor */
-  ~TVMRetValue() {
+  ~DGLRetValue() {
     this->Clear();
   }
   // reuse converter from parent
-  using TVMPODValue_::operator double;
-  using TVMPODValue_::operator int64_t;
-  using TVMPODValue_::operator uint64_t;
-  using TVMPODValue_::operator int;
-  using TVMPODValue_::operator bool;
-  using TVMPODValue_::operator void*;
-  using TVMPODValue_::operator DLTensor*;
-  using TVMPODValue_::operator TVMContext;
-  using TVMPODValue_::operator NDArray;
+  using DGLPODValue_::operator double;
+  using DGLPODValue_::operator int64_t;
+  using DGLPODValue_::operator uint64_t;
+  using DGLPODValue_::operator int;
+  using DGLPODValue_::operator bool;
+  using DGLPODValue_::operator void*;
+  using DGLPODValue_::operator DLTensor*;
+  using DGLPODValue_::operator DGLContext;
+  using DGLPODValue_::operator NDArray;
   // Disable copy and assign from another value, but allow move.
-  TVMRetValue(const TVMRetValue& other) {
+  DGLRetValue(const DGLRetValue& other) {
     this->Assign(other);
   }
   // conversion operators
   operator std::string() const {
-    if (type_code_ == kTVMType) {
-      return TVMType2String(operator TVMType());
+    if (type_code_ == kDGLType) {
+      return DGLType2String(operator DGLType());
     } else if (type_code_ == kBytes) {
       return *ptr<std::string>();
     }
-    TVM_CHECK_TYPE_CODE(type_code_, kStr);
+    DGL_CHECK_TYPE_CODE(type_code_, kStr);
     return *ptr<std::string>();
   }
-  operator TVMType() const {
+  operator DGLType() const {
     if (type_code_ == kStr) {
-      return String2TVMType(operator std::string());
+      return String2DGLType(operator std::string());
     }
-    TVM_CHECK_TYPE_CODE(type_code_, kTVMType);
+    DGL_CHECK_TYPE_CODE(type_code_, kDGLType);
     return value_.v_type;
   }
   operator PackedFunc() const {
     if (type_code_ == kNull) return PackedFunc();
-    TVM_CHECK_TYPE_CODE(type_code_, kFuncHandle);
+    DGL_CHECK_TYPE_CODE(type_code_, kFuncHandle);
     return *ptr<PackedFunc>();
   }
   template<typename FType>
@@ -601,91 +601,91 @@ class TVMRetValue : public TVMPODValue_ {
     return TypedPackedFunc<FType>(operator PackedFunc());
   }
   operator Module() const {
-    TVM_CHECK_TYPE_CODE(type_code_, kModuleHandle);
+    DGL_CHECK_TYPE_CODE(type_code_, kModuleHandle);
     return *ptr<Module>();
   }
   // Assign operators
-  TVMRetValue& operator=(TVMRetValue&& other) {
+  DGLRetValue& operator=(DGLRetValue&& other) {
     this->Clear();
     value_ = other.value_;
     type_code_ = other.type_code_;
     other.type_code_ = kNull;
     return *this;
   }
-  TVMRetValue& operator=(double value) {
+  DGLRetValue& operator=(double value) {
     this->SwitchToPOD(kDLFloat);
     value_.v_float64 = value;
     return *this;
   }
-  TVMRetValue& operator=(std::nullptr_t value) {
+  DGLRetValue& operator=(std::nullptr_t value) {
     this->SwitchToPOD(kNull);
     value_.v_handle = value;
     return *this;
   }
-  TVMRetValue& operator=(void* value) {
+  DGLRetValue& operator=(void* value) {
     this->SwitchToPOD(kHandle);
     value_.v_handle = value;
     return *this;
   }
-  TVMRetValue& operator=(int64_t value) {
+  DGLRetValue& operator=(int64_t value) {
     this->SwitchToPOD(kDLInt);
     value_.v_int64 = value;
     return *this;
   }
-  TVMRetValue& operator=(int value) {
+  DGLRetValue& operator=(int value) {
     this->SwitchToPOD(kDLInt);
     value_.v_int64 = value;
     return *this;
   }
-  TVMRetValue& operator=(TVMType t) {
-    this->SwitchToPOD(kTVMType);
+  DGLRetValue& operator=(DGLType t) {
+    this->SwitchToPOD(kDGLType);
     value_.v_type = t;
     return *this;
   }
-  TVMRetValue& operator=(bool value) {
+  DGLRetValue& operator=(bool value) {
     this->SwitchToPOD(kDLInt);
     value_.v_int64 = value;
     return *this;
   }
-  TVMRetValue& operator=(std::string value) {
+  DGLRetValue& operator=(std::string value) {
     this->SwitchToClass(kStr, value);
     return *this;
   }
-  TVMRetValue& operator=(TVMByteArray value) {
+  DGLRetValue& operator=(DGLByteArray value) {
     this->SwitchToClass(kBytes, std::string(value.data, value.size));
     return *this;
   }
-  TVMRetValue& operator=(NDArray other) {
+  DGLRetValue& operator=(NDArray other) {
     this->Clear();
     type_code_ = kNDArrayContainer;
     value_.v_handle = other.data_;
     other.data_ = nullptr;
     return *this;
   }
-  TVMRetValue& operator=(PackedFunc f) {
+  DGLRetValue& operator=(PackedFunc f) {
     this->SwitchToClass(kFuncHandle, f);
     return *this;
   }
   template<typename FType>
-  TVMRetValue& operator=(const TypedPackedFunc<FType>& f) {
+  DGLRetValue& operator=(const TypedPackedFunc<FType>& f) {
     return operator=(f.packed());
   }
-  TVMRetValue& operator=(Module m) {
+  DGLRetValue& operator=(Module m) {
     this->SwitchToClass(kModuleHandle, m);
     return *this;
   }
-  TVMRetValue& operator=(const TVMRetValue& other) {  // NOLINT(*0
+  DGLRetValue& operator=(const DGLRetValue& other) {  // NOLINT(*0
     this->Assign(other);
     return *this;
   }
-  TVMRetValue& operator=(const TVMArgValue& other) {
+  DGLRetValue& operator=(const DGLArgValue& other) {
     this->Assign(other);
     return *this;
   }
   template<typename T,
            typename = typename std::enable_if<
              extension_class_info<T>::code != 0>::type>
-  TVMRetValue& operator=(const T& other) {
+  DGLRetValue& operator=(const T& other) {
     this->SwitchToClass<T>(
         extension_class_info<T>::code, other);
     return *this;
@@ -699,7 +699,7 @@ class TVMRetValue : public TVMPODValue_ {
    * \param ret_value The return value.
    * \param ret_type_code The return type code.
    */
-  void MoveToCHost(TVMValue* ret_value,
+  void MoveToCHost(DGLValue* ret_value,
                    int* ret_type_code) {
     // cannot move str; need specially handle.
     CHECK(type_code_ != kStr && type_code_ != kBytes);
@@ -708,22 +708,22 @@ class TVMRetValue : public TVMPODValue_ {
     type_code_ = kNull;
   }
   /*! \return The value field, if the data is POD */
-  const TVMValue& value() const {
+  const DGLValue& value() const {
     CHECK(type_code_ != kNodeHandle &&
           type_code_ != kFuncHandle &&
           type_code_ != kModuleHandle &&
-          type_code_ != kStr) << "TVMRetValue.value can only be used for POD data";
+          type_code_ != kStr) << "DGLRetValue.value can only be used for POD data";
     return value_;
   }
-  // NodeRef related extenstions: in tvm/packed_func_ext.h
+  // NodeRef related extenstions: in dgl/packed_func_ext.h
   template<typename T,
            typename = typename std::enable_if<
              std::is_class<T>::value>::type>
   inline operator T() const;
   template<typename TNodeRef>
   inline TNodeRef AsNodeRef() const;
-  inline TVMRetValue& operator=(const NodeRef& other);
-  inline TVMRetValue& operator=(const std::shared_ptr<Node>& other);
+  inline DGLRetValue& operator=(const NodeRef& other);
+  inline DGLRetValue& operator=(const std::shared_ptr<Node>& other);
 
  private:
   template<typename T>
@@ -759,7 +759,7 @@ class TVMRetValue : public TVMPODValue_ {
           SwitchToPOD(other.type_code());
           value_ = other.value_;
         } else {
-#if TVM_RUNTIME_HEADER_ONLY
+#if DGL_RUNTIME_HEADER_ONLY
           LOG(FATAL) << "Header only mode do not support ext type";
 #else
           this->Clear();
@@ -803,7 +803,7 @@ class TVMRetValue : public TVMPODValue_ {
       }
     }
     if (type_code_ > kExtBegin) {
-#if TVM_RUNTIME_HEADER_ONLY
+#if DGL_RUNTIME_HEADER_ONLY
           LOG(FATAL) << "Header only mode do not support ext type";
 #else
       (*(ExtTypeVTable::Get(type_code_)->destroy))(value_.v_handle);
@@ -825,8 +825,8 @@ inline const char* TypeCode2Str(int type_code) {
     case kNull: return "NULL";
     case kNodeHandle: return "NodeHandle";
     case kArrayHandle: return "ArrayHandle";
-    case kTVMType: return "TVMType";
-    case kTVMContext: return "TVMContext";
+    case kDGLType: return "DGLType";
+    case kDGLContext: return "DGLContext";
     case kFuncHandle: return "FunctionHandle";
     case kModuleHandle: return "ModuleHandle";
     case kNDArrayContainer: return "NDArrayContainer";
@@ -836,7 +836,7 @@ inline const char* TypeCode2Str(int type_code) {
 }
 
 #ifndef _LIBCPP_SGX_NO_IOSTREAMS
-inline std::ostream& operator<<(std::ostream& os, TVMType t) {  // NOLINT(*)
+inline std::ostream& operator<<(std::ostream& os, DGLType t) {  // NOLINT(*)
   os << TypeCode2Str(t.code);
   if (t.code == kHandle) return os;
   os << static_cast<int>(t.bits);
@@ -847,7 +847,7 @@ inline std::ostream& operator<<(std::ostream& os, TVMType t) {  // NOLINT(*)
 }
 #endif
 
-inline std::string TVMType2String(TVMType t) {
+inline std::string DGLType2String(DGLType t) {
 #ifndef _LIBCPP_SGX_NO_IOSTREAMS
   std::ostringstream os;
   os << t;
@@ -864,8 +864,8 @@ inline std::string TVMType2String(TVMType t) {
 #endif
 }
 
-inline TVMType String2TVMType(std::string s) {
-  TVMType t;
+inline DGLType String2DGLType(std::string s) {
+  DGLType t;
   t.bits = 32; t.lanes = 1;
   const char* scan;
   if (s.substr(0, 3) == "int") {
@@ -891,19 +891,19 @@ inline TVMType String2TVMType(std::string s) {
   return t;
 }
 
-inline TVMArgValue TVMArgs::operator[](int i) const {
+inline DGLArgValue DGLArgs::operator[](int i) const {
   CHECK_LT(i, num_args)
       << "not enough argument passed, "
       << num_args << " passed"
       << " but request arg[" << i << "].";
-  return TVMArgValue(values[i], type_codes[i]);
+  return DGLArgValue(values[i], type_codes[i]);
 }
 
-inline int TVMArgs::size() const {
+inline int DGLArgs::size() const {
   return num_args;
 }
 
-inline void PackedFunc::CallPacked(TVMArgs args, TVMRetValue* rv) const {
+inline void PackedFunc::CallPacked(DGLArgs args, DGLRetValue* rv) const {
   body_(args, rv);
 }
 
@@ -939,9 +939,9 @@ inline void for_each(const F& f, Args&&... args) {  // NOLINT(*)
 }  // namespace detail
 
 /* \brief argument settter to PackedFunc */
-class TVMArgsSetter {
+class DGLArgsSetter {
  public:
-  TVMArgsSetter(TVMValue* values, int* type_codes)
+  DGLArgsSetter(DGLValue* values, int* type_codes)
       : values_(values), type_codes_(type_codes) {}
   // setters for POD types
   template<typename T,
@@ -965,7 +965,7 @@ class TVMArgsSetter {
     values_[i].v_handle = value;
     type_codes_[i] = kNull;
   }
-  void operator()(size_t i, const TVMArgValue& value) const {
+  void operator()(size_t i, const DGLArgValue& value) const {
     values_[i] = value.value_;
     type_codes_[i] = value.type_code_;
   }
@@ -977,13 +977,13 @@ class TVMArgsSetter {
     values_[i].v_handle = value;
     type_codes_[i] = kArrayHandle;
   }
-  void operator()(size_t i, TVMContext value) const {
+  void operator()(size_t i, DGLContext value) const {
     values_[i].v_ctx = value;
-    type_codes_[i] = kTVMContext;
+    type_codes_[i] = kDGLContext;
   }
-  void operator()(size_t i, TVMType value) const {
+  void operator()(size_t i, DGLType value) const {
     values_[i].v_type = value;
-    type_codes_[i] = kTVMType;
+    type_codes_[i] = kDGLType;
   }
   void operator()(size_t i, const char* value) const {
     values_[i].v_str = value;
@@ -996,8 +996,8 @@ class TVMArgsSetter {
     values_[i].v_str = value.c_str();
     type_codes_[i] = kStr;
   }
-  void operator()(size_t i, const TVMByteArray& value) const {  // NOLINT(*)
-    values_[i].v_handle = const_cast<TVMByteArray*>(&value);
+  void operator()(size_t i, const DGLByteArray& value) const {  // NOLINT(*)
+    values_[i].v_handle = const_cast<DGLByteArray*>(&value);
     type_codes_[i] = kBytes;
   }
   void operator()(size_t i, const PackedFunc& value) const {  // NOLINT(*)
@@ -1016,7 +1016,7 @@ class TVMArgsSetter {
     values_[i].v_handle = value.data_;
     type_codes_[i] = kNDArrayContainer;
   }
-  void operator()(size_t i, const TVMRetValue& value) const {  // NOLINT(*)
+  void operator()(size_t i, const DGLRetValue& value) const {  // NOLINT(*)
     if (value.type_code() == kStr) {
       values_[i].v_str = value.ptr<std::string>()->c_str();
       type_codes_[i] = kStr;
@@ -1031,26 +1031,26 @@ class TVMArgsSetter {
            typename = typename std::enable_if<
              extension_class_info<T>::code != 0>::type>
   inline void operator()(size_t i, const T& value) const;
-  // NodeRef related extenstions: in tvm/packed_func_ext.h
+  // NodeRef related extenstions: in dgl/packed_func_ext.h
   inline void operator()(size_t i, const NodeRef& other) const;  // NOLINT(*)
 
  private:
   /*! \brief The values fields */
-  TVMValue* values_;
+  DGLValue* values_;
   /*! \brief The type code fields */
   int* type_codes_;
 };
 
 template<typename... Args>
-inline TVMRetValue PackedFunc::operator()(Args&& ...args) const {
+inline DGLRetValue PackedFunc::operator()(Args&& ...args) const {
   const int kNumArgs = sizeof...(Args);
   const int kArraySize = kNumArgs > 0 ? kNumArgs : 1;
-  TVMValue values[kArraySize];
+  DGLValue values[kArraySize];
   int type_codes[kArraySize];
-  detail::for_each(TVMArgsSetter(values, type_codes),
+  detail::for_each(DGLArgsSetter(values, type_codes),
                    std::forward<Args>(args)...);
-  TVMRetValue rv;
-  body_(TVMArgs(values, type_codes, kNumArgs), &rv);
+  DGLRetValue rv;
+  body_(DGLArgs(values, type_codes, kNumArgs), &rv);
   return rv;
 }
 
@@ -1059,8 +1059,8 @@ template<typename R, int nleft, int index, typename F>
 struct unpack_call_dispatcher {
   template<typename ...Args>
   static void run(const F& f,
-                  const TVMArgs& args_pack,
-                  TVMRetValue* rv,
+                  const DGLArgs& args_pack,
+                  DGLRetValue* rv,
                   Args&&... unpacked_args) {
     unpack_call_dispatcher<R, nleft - 1, index + 1, F>
         ::run(f, args_pack, rv,
@@ -1073,8 +1073,8 @@ template<typename R, int index, typename F>
 struct unpack_call_dispatcher<R, 0, index, F> {
   template<typename ...Args>
   static void run(const F& f,
-                  const TVMArgs& args_pack,
-                  TVMRetValue* rv,
+                  const DGLArgs& args_pack,
+                  DGLRetValue* rv,
                   Args&&... unpacked_args) {
     *rv = R(f(std::forward<Args>(unpacked_args)...));
   }
@@ -1084,15 +1084,15 @@ template<int index, typename F>
 struct unpack_call_dispatcher<void, 0, index, F> {
   template<typename ...Args>
   static void run(const F& f,
-                  const TVMArgs& args_pack,
-                  TVMRetValue* rv,
+                  const DGLArgs& args_pack,
+                  DGLRetValue* rv,
                   Args&&... unpacked_args) {
     f(std::forward<Args>(unpacked_args)...);
   }
 };
 
 template<typename R, int nargs, typename F>
-inline void unpack_call(const F& f, const TVMArgs& args, TVMRetValue* rv) {
+inline void unpack_call(const F& f, const DGLArgs& args, DGLRetValue* rv) {
   unpack_call_dispatcher<R, nargs, 0, F>::run(f, args, rv);
 }
 
@@ -1125,7 +1125,7 @@ TypedPackedFunc<R(Args...)>::TypedPackedFunc(PackedFunc packed)
 template<typename R, typename ...Args>
 template<typename FType>
 inline void TypedPackedFunc<R(Args...)>::AssignTypedLambda(FType flambda) {
-  packed_ = PackedFunc([flambda](const TVMArgs& args, TVMRetValue* rv) {
+  packed_ = PackedFunc([flambda](const DGLArgs& args, DGLRetValue* rv) {
       detail::unpack_call<R, sizeof...(Args)>(flambda, args, rv);
     });
 }
@@ -1139,14 +1139,14 @@ inline R TypedPackedFunc<R(Args...)>::operator()(Args... args) const {
 // extension and node type handling
 namespace detail {
 template<typename T, typename TSrc, bool is_ext>
-struct TVMValueCast {
+struct DGLValueCast {
   static T Apply(const TSrc* self) {
     return self->template AsNodeRef<T>();
   }
 };
 
 template<typename T, typename TSrc>
-struct TVMValueCast<T, TSrc, true> {
+struct DGLValueCast<T, TSrc, true> {
   static T Apply(const TSrc* self) {
     return self->template AsExtension<T>();
   }
@@ -1154,21 +1154,21 @@ struct TVMValueCast<T, TSrc, true> {
 }  // namespace detail
 
 template<typename T, typename>
-inline TVMArgValue::operator T() const {
+inline DGLArgValue::operator T() const {
   return detail::
-      TVMValueCast<T, TVMArgValue, extension_class_info<T>::code != 0>
+      DGLValueCast<T, DGLArgValue, extension_class_info<T>::code != 0>
       ::Apply(this);
 }
 
 template<typename T, typename>
-inline TVMRetValue::operator T() const {
+inline DGLRetValue::operator T() const {
   return detail::
-      TVMValueCast<T, TVMRetValue, extension_class_info<T>::code != 0>
+      DGLValueCast<T, DGLRetValue, extension_class_info<T>::code != 0>
       ::Apply(this);
 }
 
 template<typename T, typename>
-inline void TVMArgsSetter::operator()(size_t i, const T& value) const {
+inline void DGLArgsSetter::operator()(size_t i, const T& value) const {
   static_assert(extension_class_info<T>::code != 0,
                 "Need to have extesion code");
   type_codes_[i] = extension_class_info<T>::code;
@@ -1211,5 +1211,5 @@ inline PackedFunc Module::GetFunction(const std::string& name, bool query_import
   return pf;
 }
 }  // namespace runtime
-}  // namespace tvm
+}  // namespace dgl
 #endif  // DGL_RUNTIME_PACKED_FUNC_H_

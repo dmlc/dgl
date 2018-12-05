@@ -23,16 +23,16 @@ typedef void* GraphHandle;
  * Return a temporary DLManagedTensor that does not own memory.
  */
 DLManagedTensor* CreateTmpDLManagedTensor(
-    const tvm::runtime::TVMArgValue& arg);
+    const dgl::runtime::DGLArgValue& arg);
 
 /*!
  * \brief Convert a vector of NDArray to PackedFunc.
  */
-tvm::runtime::PackedFunc ConvertNDArrayVectorToPackedFunc(
-    const std::vector<tvm::runtime::NDArray>& vec);
+dgl::runtime::PackedFunc ConvertNDArrayVectorToPackedFunc(
+    const std::vector<dgl::runtime::NDArray>& vec);
 
 /*!\brief Return whether the array is a valid 1D int array*/
-inline bool IsValidIdArray(const tvm::runtime::NDArray& arr) {
+inline bool IsValidIdArray(const dgl::runtime::NDArray& arr) {
   return arr->ctx.device_type == kDLCPU && arr->ndim == 1
     && arr->dtype.code == kDLInt && arr->dtype.bits == 64;
 }
@@ -43,9 +43,9 @@ inline bool IsValidIdArray(const tvm::runtime::NDArray& arr) {
  * The element type of the vector must be convertible to int64_t.
  */
 template<typename DType>
-tvm::runtime::NDArray CopyVectorToNDArray(
+dgl::runtime::NDArray CopyVectorToNDArray(
     const std::vector<DType>& vec) {
-  using tvm::runtime::NDArray;
+  using dgl::runtime::NDArray;
   const int64_t len = vec.size();
   NDArray a = NDArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   std::copy(vec.begin(), vec.end(), static_cast<int64_t*>(a->data));

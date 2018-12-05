@@ -13,21 +13,21 @@
 #define API_BEGIN() try {
 /*! \brief every function starts with API_BEGIN();
      and finishes with API_END() or API_END_HANDLE_ERROR */
-#define API_END() } catch(std::runtime_error &_except_) { return TVMAPIHandleException(_except_); } return 0;  // NOLINT(*)
+#define API_END() } catch(std::runtime_error &_except_) { return DGLAPIHandleException(_except_); } return 0;  // NOLINT(*)
 /*!
  * \brief every function starts with API_BEGIN();
  *   and finishes with API_END() or API_END_HANDLE_ERROR
  *   The finally clause contains procedure to cleanup states when an error happens.
  */
-#define API_END_HANDLE_ERROR(Finalize) } catch(std::runtime_error &_except_) { Finalize; return TVMAPIHandleException(_except_); } return 0; // NOLINT(*)
+#define API_END_HANDLE_ERROR(Finalize) } catch(std::runtime_error &_except_) { Finalize; return DGLAPIHandleException(_except_); } return 0; // NOLINT(*)
 
 /*!
  * \brief handle exception throwed out
  * \param e the exception
  * \return the return value of API after exception is handled
  */
-inline int TVMAPIHandleException(const std::runtime_error &e) {
-  TVMAPISetLastError(e.what());
+inline int DGLAPIHandleException(const std::runtime_error &e) {
+  DGLAPISetLastError(e.what());
   return -1;
 }
 

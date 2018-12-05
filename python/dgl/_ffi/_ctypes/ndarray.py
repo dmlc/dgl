@@ -4,11 +4,11 @@ from __future__ import absolute_import
 
 import ctypes
 from ..base import _LIB, check_call, c_str
-from ..runtime_ctypes import TVMArrayHandle
+from ..runtime_ctypes import DGLArrayHandle
 from .types import RETURN_SWITCH, C_TO_PY_ARG_SWITCH, _wrap_arg_func, _return_handle
 
 
-TVMPyCapsuleDestructor = ctypes.CFUNCTYPE(None, ctypes.c_void_p)
+DGLPyCapsuleDestructor = ctypes.CFUNCTYPE(None, ctypes.c_void_p)
 _c_str_dltensor = c_str('dltensor')
 _c_str_used_dltensor = c_str('used_dltensor')
 
@@ -28,10 +28,10 @@ def _from_dlpack(dltensor):
         #   set restype of PyCapsule calls. But weirdly, this does not
         #   work out always.
         ptr = ctypes.cast(ptr, ctypes.c_void_p)
-        handle = TVMArrayHandle()
-        check_call(_LIB.TVMArrayFromDLPack(ptr, ctypes.byref(handle)))
+        handle = DGLArrayHandle()
+        check_call(_LIB.DGLArrayFromDLPack(ptr, ctypes.byref(handle)))
         ctypes.pythonapi.PyCapsule_SetName(dltensor, _c_str_used_dltensor)
-        ctypes.pythonapi.PyCapsule_SetDestructor(dltensor, TVMPyCapsuleDestructor(0))
+        ctypes.pythonapi.PyCapsule_SetDestructor(dltensor, DGLPyCapsuleDestructor(0))
         return _make_array(handle, False)
     raise ValueError("Expect a dltensor field, PyCapsule can only be consumed once")
 
@@ -44,10 +44,10 @@ def _dlpack_deleter(pycapsule):
         #   set restype of PyCapsule calls. But weirdly, this does not
         #   work out always.
         ptr = ctypes.cast(ptr, ctypes.c_void_p)
-        _LIB.TVMDLManagedTensorCallDeleter(ptr)
-        ctypes.pythonapi.PyCapsule_SetDestructor(pycapsule, TVMPyCapsuleDestructor(0))
+        _LIB.DGLDLManagedTensorCallDeleter(ptr)
+        ctypes.pythonapi.PyCapsule_SetDestructor(pycapsule, DGLPyCapsuleDestructor(0))
 
-_c_dlpack_deleter = TVMPyCapsuleDestructor(_dlpack_deleter)
+_c_dlpack_deleter = DGLPyCapsuleDestructor(_dlpack_deleter)
 
 
 class NDArrayBase(object):
@@ -59,18 +59,18 @@ class NDArrayBase(object):
 
         Parameters
         ----------
-        handle : TVMArrayHandle
-            the handle to the underlying C++ TVMArray
+        handle : DGLArrayHandle
+            the handle to the underlying C++ DGLArray
         """
         self.handle = handle
         self.is_view = is_view
 
     def __del__(self):
         if not self.is_view and _LIB:
-            check_call(_LIB.TVMArrayFree(self.handle))
+            check_call(_LIB.DGLArrayFree(self.handle))
 
     @property
-    def _tvm_handle(self):
+    def _dgl_handle(self):
         return ctypes.cast(self.handle, ctypes.c_void_p).value
 
     def to_dlpack(self):
@@ -81,23 +81,23 @@ class NDArrayBase(object):
         dlpack : DLPack tensor view of the array data
         """
         ptr = ctypes.c_void_p()
-        check_call(_LIB.TVMArrayToDLPack(self.handle, ctypes.byref(ptr)))
+        check_call(_LIB.DGLArrayToDLPack(self.handle, ctypes.byref(ptr)))
         return ctypes.pythonapi.PyCapsule_New(ptr, _c_str_dltensor, _c_dlpack_deleter)
 
 
 def _make_array(handle, is_view):
-    handle = ctypes.cast(handle, TVMArrayHandle)
+    handle = ctypes.cast(handle, DGLArrayHandle)
     return _CLASS_NDARRAY(handle, is_view)
 
-_TVM_COMPATS = ()
+_DGL_COMPATS = ()
 
 def _reg_extension(cls, fcreate):
-    global _TVM_COMPATS
-    _TVM_COMPATS += (cls,)
+    global _DGL_COMPATS
+    _DGL_COMPATS += (cls,)
     if fcreate:
         fret = lambda x: fcreate(_return_handle(x))
-        RETURN_SWITCH[cls._tvm_tcode] = fret
-        C_TO_PY_ARG_SWITCH[cls._tvm_tcode] = _wrap_arg_func(fret, cls._tvm_tcode)
+        RETURN_SWITCH[cls._dgl_tcode] = fret
+        C_TO_PY_ARG_SWITCH[cls._dgl_tcode] = _wrap_arg_func(fret, cls._dgl_tcode)
 
 
 _CLASS_NDARRAY = None
