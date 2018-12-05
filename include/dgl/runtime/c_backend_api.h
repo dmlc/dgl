@@ -1,10 +1,10 @@
 /*!
  *  Copyright (c) 2017 by Contributors
- * \file tvm/runtime/c_backend_api.h
- * \brief TVM runtime backend API.
+ * \file dgl/runtime/c_backend_api.h
+ * \brief DGL runtime backend API.
  *
  *  The functions defined in this header are intended to be
- *  used by compiled tvm operators, usually user do not need to use these
+ *  used by compiled dgl operators, usually user do not need to use these
  *  function directly.
  */
 #ifndef DGL_RUNTIME_C_BACKEND_API_H_
@@ -20,16 +20,16 @@ extern "C" {
 /*!
  * \brief Backend function for modules to get function
  *  from its environment mod_node (its imports and global function).
- *  The user do should not call TVMFuncFree on func.
+ *  The user do should not call DGLFuncFree on func.
  *
  * \param mod_node The module handle.
  * \param func_name The name of the function.
  * \param out The result function.
  * \return 0 when no error is thrown, -1 when failure happens
  */
-TVM_DLL int TVMBackendGetFuncFromEnv(void* mod_node,
+DGL_DLL int DGLBackendGetFuncFromEnv(void* mod_node,
                                      const char* func_name,
-                                     TVMFunctionHandle *out);
+                                     DGLFunctionHandle *out);
 /*!
  * \brief Backend function to register system-wide library symbol.
  *
@@ -37,7 +37,7 @@ TVM_DLL int TVMBackendGetFuncFromEnv(void* mod_node,
  * \param ptr The symbol address.
  * \return 0 when no error is thrown, -1 when failure happens
  */
-TVM_DLL int TVMBackendRegisterSystemLibSymbol(const char* name, void* ptr);
+DGL_DLL int DGLBackendRegisterSystemLibSymbol(const char* name, void* ptr);
 
 /*!
  * \brief Backend function to allocate temporal workspace.
@@ -53,7 +53,7 @@ TVM_DLL int TVMBackendRegisterSystemLibSymbol(const char* name, void* ptr);
  * certain backends such as OpenGL.
  * \return nullptr when error is thrown, a valid ptr if success
  */
-TVM_DLL void* TVMBackendAllocWorkspace(int device_type,
+DGL_DLL void* DGLBackendAllocWorkspace(int device_type,
                                        int device_id,
                                        uint64_t nbytes,
                                        int dtype_code_hint,
@@ -67,14 +67,14 @@ TVM_DLL void* TVMBackendAllocWorkspace(int device_type,
  * \param device_id The device id which the space will be allocated.
  * \return 0 when no error is thrown, -1 when failure happens
  *
- * \sa TVMBackendAllocWorkspace
+ * \sa DGLBackendAllocWorkspace
  */
-TVM_DLL int TVMBackendFreeWorkspace(int device_type,
+DGL_DLL int DGLBackendFreeWorkspace(int device_type,
                                     int device_id,
                                     void* ptr);
 
 /*!
- * \brief Environment for TVM parallel task.
+ * \brief Environment for DGL parallel task.
  */
 typedef struct {
   /*!
@@ -83,7 +83,7 @@ typedef struct {
   void* sync_handle;
   /*! \brief total amount of task */
   int32_t num_task;
-} TVMParallelGroupEnv;
+} DGLParallelGroupEnv;
 
 /*!
  * \brief The callback function to execute a parallel lambda
@@ -91,8 +91,8 @@ typedef struct {
  * \param penv The parallel environment backs the execution.
  * \param cdata The supporting closure data.
  */
-typedef int (*FTVMParallelLambda)(
-    int task_id, TVMParallelGroupEnv* penv, void* cdata);
+typedef int (*FDGLParallelLambda)(
+    int task_id, DGLParallelGroupEnv* penv, void* cdata);
 
 /*!
  * \brief Backend function for running parallel jobs.
@@ -104,7 +104,7 @@ typedef int (*FTVMParallelLambda)(
  *
  * \return 0 when no error is thrown, -1 when failure happens
  */
-TVM_DLL int TVMBackendParallelLaunch(FTVMParallelLambda flambda,
+DGL_DLL int DGLBackendParallelLaunch(FDGLParallelLambda flambda,
                                      void* cdata,
                                      int num_task);
 
@@ -114,7 +114,7 @@ TVM_DLL int TVMBackendParallelLaunch(FTVMParallelLambda flambda,
  * \param penv The parallel environment backs the execution.
  * \return 0 when no error is thrown, -1 when failure happens
  */
-TVM_DLL int TVMBackendParallelBarrier(int task_id, TVMParallelGroupEnv* penv);
+DGL_DLL int DGLBackendParallelBarrier(int task_id, DGLParallelGroupEnv* penv);
 
 
 /*!
@@ -128,12 +128,12 @@ TVM_DLL int TVMBackendParallelBarrier(int task_id, TVMParallelGroupEnv* penv);
  * \param nbytes Number of bytes in the closure data.
  * \return 0 when no error is thrown, -1 when failure happens
  */
-TVM_DLL int TVMBackendRunOnce(void** handle,
+DGL_DLL int DGLBackendRunOnce(void** handle,
                               int (*f)(void*),
                               void *cdata,
                               int nbytes);
 
 #ifdef __cplusplus
-}  // TVM_EXTERN_C
+}  // DGL_EXTERN_C
 #endif
 #endif  // DGL_RUNTIME_C_BACKEND_API_H_
