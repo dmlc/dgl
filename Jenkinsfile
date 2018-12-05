@@ -34,6 +34,7 @@ def pytorch_unit_test(dev) {
 def mxnet_unit_test(dev) {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
     sh "python3 -m nose -v --with-xunit tests/mxnet"
+    sh "python3 -m nose -v --with-xunit tests/graph_index"
   }
 }
 

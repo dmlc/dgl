@@ -8,7 +8,7 @@ import scipy.sparse as sp
 from ._ffi.function import _init_api
 from . import backend as F
 from . import utils
-from .base import ALL, is_all, dgl_warning
+from .base import ALL, is_all, dgl_warning, DGLError
 
 class ImmutableGraphIndex(object):
     """Graph index object on immutable graphs.
@@ -33,7 +33,7 @@ class ImmutableGraphIndex(object):
         num : int
             Number of nodes to be added.
         """
-        raise Exception('Immutable graph doesn\'t support adding nodes')
+        raise DGLError('Immutable graph doesn\'t support adding nodes')
 
     def add_edge(self, u, v):
         """Add one edge.
@@ -45,7 +45,7 @@ class ImmutableGraphIndex(object):
         v : int
             The dst node.
         """
-        raise Exception('Immutable graph doesn\'t support adding an edge')
+        raise DGLError('Immutable graph doesn\'t support adding an edge')
 
     def add_edges(self, u, v):
         """Add many edges.
@@ -57,11 +57,11 @@ class ImmutableGraphIndex(object):
         v : utils.Index
             The dst nodes.
         """
-        raise Exception('Immutable graph doesn\'t support adding edges')
+        raise DGLError('Immutable graph doesn\'t support adding edges')
 
     def clear(self):
         """Clear the graph."""
-        raise Exception('Immutable graph doesn\'t support clearing up')
+        raise DGLError('Immutable graph doesn\'t support clearing up')
 
     def is_multigraph(self):
         """Return whether the graph is a multigraph
@@ -592,6 +592,8 @@ class ImmutableGraphIndex(object):
     def from_scipy_sparse_matrix(self, adj):
         """Convert from scipy sparse matrix.
 
+        NOTE: we assume the row is src nodes and the col is dst nodes.
+
         Parameters
         ----------
         adj : scipy sparse matrix
@@ -600,6 +602,26 @@ class ImmutableGraphIndex(object):
                 "The input matrix has to be a SciPy sparse matrix."
         out_mat = adj.tocoo()
         self._sparse.from_coo_matrix(out_mat)
+
+    def from_edge_list(self, elist):
+        """Convert from an edge list.
+
+        Paramters
+        ---------
+        elist : list
+            List of (u, v) edge tuple.
+        """
+        self.clear()
+        src, dst = zip(*elist)
+        src = np.array(src)
+        dst = np.array(dst)
+        num_nodes = max(src.max(), dst.max()) + 1
+        min_nodes = min(src.min(), dst.min())
+        if min_nodes != 0:
+            raise DGLError('Invalid edge list. Nodes must start from 0.')
+        data = np.ones((len(src),), dtype=np.int32)
+        spmat = sp.coo_matrix((data, (src, dst)), shape=(num_nodes, num_nodes))
+        self._sparse.from_coo_matrix(spmat)
 
     def line_graph(self, backtracking=True):
         """Return the line graph of this graph.
@@ -728,19 +750,27 @@ def create_immutable_graph_index(graph_data=None):
     # Let's create an empty graph index first.
     gi = ImmutableGraphIndex(F.create_immutable_graph_index())
 
+    # edge list
+    if isinstance(graph_data, (list, tuple)):
+        try:
+            gi.from_edge_list(graph_data)
+            return gi
+        except:
+            raise DGLError('Graph data is not a valid edge list.')
+
     # scipy format
     if isinstance(graph_data, sp.spmatrix):
         try:
             gi.from_scipy_sparse_matrix(graph_data)
             return gi
         except:
-            raise Exception('Graph data is not a valid scipy sparse matrix.')
+            raise DGLError('Graph data is not a valid scipy sparse matrix.')
 
     # networkx - any format
     try:
         gi.from_networkx(graph_data)
     except:
-        raise Exception('Error while creating graph from input of type "%s".'
+        raise DGLError('Error while creating graph from input of type "%s".'
                          % type(graph_data))
 
     return gi
