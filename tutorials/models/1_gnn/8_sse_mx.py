@@ -27,7 +27,7 @@ Stochastic Steady-state Embedding (SSE)
 # -  Training with subgraph sampling.
 #
 # Subgraph sampling is a generic technique to scale up learning to
-# gigantic graphs (e.g. with billions of nodes and edges). It can apply to
+# gigantic graphs (e.g. with billions of nodes and edges). It can apply to
 # other algorithms, such as :doc:`Graph convolution
 # network <1_gcn>`
 # and :doc:`Relational graph convolution
@@ -66,7 +66,7 @@ Stochastic Steady-state Embedding (SSE)
 #
 # The flood-fill algorithm first marks the source node :math:`s`, and then
 # repeatedly marks nodes with one or more marked neighbors until no node
-# needs to be marked, i.e. the steady state is reached.
+# needs to be marked, i.e. the steady state is reached.
 #
 # Flood-fill algorithm and steady-state operator
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -79,7 +79,7 @@ Stochastic Steady-state Embedding (SSE)
 # In the case of the flood-fill algorithm, :math:`\hat\calt = \max`. The
 # condition “:math:`\until \bfy^{(t + 1)} = \bfy^{(t)}`” in :math:`(3)`
 # implies that :math:`\bfy^*` is the solution to the problem if and only
-# if :math:`\bfy^* = \calt (\bfy^*)`, i.e. \ :math:`\bfy^*` is steady
+# if :math:`\bfy^* = \calt (\bfy^*)`, i.e. \ :math:`\bfy^*` is steady
 # under :math:`\calt`. Thus we call :math:`\calt` the *steady-state
 # operator*.
 #
@@ -187,7 +187,7 @@ while True:
 #    = W_1 \sigma \left(W_2 \left[x_v, \sum_{u \in \caln (v)} \left[h_v, x_v\right]\right]\right)
 #
 # where :math:`[\cdot, \cdot]` denotes the concatenation of vectors, and
-# :math:`\sigma` is a nonlinearity, e.g. ReLU. Essentially, for every
+# :math:`\sigma` is a nonlinearity, e.g. ReLU. Essentially, for every
 # node, :math:`\calt_\Theta` repeatedly gathers its neighbors’ feature
 # vectors and embeddings, sums them up, and feeds the result along with
 # the node’s own feature vector to a two layer neural network.
@@ -374,7 +374,7 @@ def train(g, label_nodes, steady_state_operator, predictor, trainer):
    # second phase
    for i in range(n_parameter_updates):
        loss = update_parameters(g, label_nodes, steady_state_operator, predictor, trainer)
-       return loss
+   return loss
 ##############################################################################
 # Scaling up with Stochastic Subgraph Training
 # --------------------------------------------
