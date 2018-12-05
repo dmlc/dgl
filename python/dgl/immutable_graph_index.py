@@ -256,6 +256,25 @@ class ImmutableGraphIndex(object):
         u, v, ids = self._sparse.edge_ids(u, v)
         return utils.toindex(u), utils.toindex(v), utils.toindex(ids)
 
+    def find_edges(self, eid):
+        """Return a triplet of arrays that contains the edge IDs.
+
+        Parameters
+        ----------
+        eid : utils.Index
+            The edge ids.
+
+        Returns
+        -------
+        utils.Index
+            The src nodes.
+        utils.Index
+            The dst nodes.
+        utils.Index
+            The edge ids.
+        """
+        raise NotImplementedError('immutable graph doesn\'t implement find_edges for now.')
+
     def in_edges(self, v):
         """Return the in edges of the node(s).
 
@@ -442,6 +461,21 @@ class ImmutableGraphIndex(object):
         return [ImmutableSubgraphIndex(gi, self, induced_n,
             induced_e) for gi, induced_n, induced_e in zip(gis, induced_nodes, induced_edges)]
 
+    def edge_subgraph(self, e):
+        """Return the induced edge subgraph.
+
+        Parameters
+        ----------
+        e : utils.Index
+            The edges.
+
+        Returns
+        -------
+        SubgraphIndex
+            The subgraph index.
+        """
+        raise NotImplementedError('immutable graph doesn\'t implement edge_subgraph for now.')
+
     def neighbor_sampling(self, seed_ids, expand_factor, num_hops, neighbor_type,
                           node_prob, max_subgraph_size):
         if len(seed_ids) == 0:
@@ -519,7 +553,7 @@ class ImmutableGraphIndex(object):
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
-        raise Exception('immutable graph doesn\'t support incidence_matrix for now.')
+        raise NotImplementedError('immutable graph doesn\'t implement incidence_matrix for now.')
 
     def to_networkx(self):
         """Convert to networkx graph.
@@ -581,7 +615,7 @@ class ImmutableGraphIndex(object):
         ImmutableGraphIndex
             The line graph of this graph.
         """
-        raise Exception('immutable graph doesn\'t support line_graph')
+        raise NotImplementedError('immutable graph doesn\'t implement line_graph')
 
 class ImmutableSubgraphIndex(ImmutableGraphIndex):
     """Graph index for an immutable subgraph.
@@ -625,6 +659,49 @@ class ImmutableSubgraphIndex(ImmutableGraphIndex):
             The parent node ids.
         """
         return utils.toindex(self._induced_nodes)
+
+def disjoint_union(graphs):
+    """Return a disjoint union of the input graphs.
+
+    The new graph will include all the nodes/edges in the given graphs.
+    Nodes/Edges will be relabled by adding the cumsum of the previous graph sizes
+    in the given sequence order. For example, giving input [g1, g2, g3], where
+    they have 5, 6, 7 nodes respectively. Then node#2 of g2 will become node#7
+    in the result graph. Edge ids are re-assigned similarly.
+
+    Parameters
+    ----------
+    graphs : iterable of GraphIndex
+        The input graphs
+
+    Returns
+    -------
+    GraphIndex
+        The disjoint union
+    """
+    raise NotImplementedError('immutable graph doesn\'t implement disjoint_union for now.')
+
+def disjoint_partition(graph, num_or_size_splits):
+    """Partition the graph disjointly.
+
+    This is a reverse operation of DisjointUnion. The graph will be partitioned
+    into num graphs. This requires the given number of partitions to evenly
+    divides the number of nodes in the graph. If the a size list is given,
+    the sum of the given sizes is equal.
+
+    Parameters
+    ----------
+    graph : GraphIndex
+        The graph to be partitioned
+    num_or_size_splits : int or utils.Index
+        The partition number of size splits
+
+    Returns
+    -------
+    list of GraphIndex
+        The partitioned graphs
+    """
+    raise NotImplementedError('immutable graph doesn\'t implement disjoint_partition for now.')
 
 def create_immutable_graph_index(graph_data=None):
     """Create a graph index object.
