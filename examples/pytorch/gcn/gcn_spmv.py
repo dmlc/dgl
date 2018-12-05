@@ -14,6 +14,7 @@ import torch.nn.functional as F
 import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
+from data_utils import load_dataset
 
 class NodeApplyModule(nn.Module):
     def __init__(self, in_feats, out_feats, activation=None):
@@ -64,9 +65,9 @@ class GCN(nn.Module):
         for idx, layer in enumerate(self.layers):
             # apply dropout
             if idx > 0 and self.dropout:
-                self.g.apply_nodes(lambda nodes:
-                                        {'h': self.dropout(nodes.data['h'])})
-            self.g.apply_nodes(lambda nodes: {'h': nodes.data['h'] * nodes.data['norm']})
+                self.g.ndata['h'] = self.dropout(self.g.ndata['h'])
+            # normalization
+            self.g.ndata['h'] = self.g.ndata['h'] * self.g.ndata['norm']
             self.g.update_all(fn.copy_src(src='h', out='m'),
                               fn.sum(msg='m', out='h'),
                               layer)
@@ -84,9 +85,7 @@ def evaluate(model, features, labels, mask):
 
 def main(args):
     # load and preprocess dataset
-    # Todo: adjacency normalization
     data = load_data(args)
-
     features = torch.FloatTensor(data.features)
     labels = torch.LongTensor(data.labels)
     train_mask = torch.ByteTensor(data.train_mask)
@@ -109,6 +108,7 @@ def main(args):
 
     # graph preprocess and calculate normalization factor
     g = DGLGraph(data.graph)
+    n_edges = g.number_of_edges()
     # add self loop
     g.add_edges(g.nodes(), g.nodes())
     # normalization
@@ -155,12 +155,14 @@ def main(args):
             dur.append(time.time() - t0)
 
         acc = evaluate(model, features, labels, val_mask)
-        print(acc)
-        print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
-            epoch, loss.item(), np.mean(dur), n_edges / np.mean(dur) / 1000))
+        print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f}"
+              " | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".
+              format(epoch, loss.item(), acc, np.mean(dur),
+                     n_edges / np.mean(dur) / 1000))
 
+    print()
     acc = evaluate(model, features, labels, test_mask)
-    print(acc)
+    print("Test Accuracy {:.4f}".format(acc))
 
 
 if __name__ == '__main__':
