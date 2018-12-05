@@ -76,6 +76,13 @@ credit, see `here <https://www.dgl.ai/ack>`_.
 
    api/python/index
 
+.. toctree::
+   :maxdepth: 1
+   :glob:
+
+   faq
+   env_var
+
 Index
 -----
 * :ref:`genindex`
