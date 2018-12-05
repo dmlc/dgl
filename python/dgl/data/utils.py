@@ -13,6 +13,8 @@ except ImportError:
         pass
     requests = requests_failed_to_import
 
+__all__ = ['download', 'check_sha1', 'extract_archive', 'get_download_dir']
+
 def _get_dgl_url(file_url):
     """Get DGL online url for download."""
     dgl_repo_url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/'

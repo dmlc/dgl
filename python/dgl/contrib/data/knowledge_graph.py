@@ -56,13 +56,13 @@ class RGCNEntityDataset(object):
     test_idx: numpy.array
         ids of entities used for testing
 
-    Usage
-    -----
-    Usually, user don't need to directly use this class. Instead, DGL provides
+    Usually, users don't need to directly use this class. Instead, DGL provides
     wrapper function to load data (see example below).
     When loading data, besides specifying dataset name, user can provide two
     optional arguments:
 
+    Parameters
+    ----------
     bfs_level: int
         prune out nodes that are more than ``bfs_level`` hops away from
         labeled nodes, i.e., nodes won't be touched during propagation. If set
@@ -71,8 +71,8 @@ class RGCNEntityDataset(object):
         After pruning, whether or not to relabel all nodes with consecutive
         node ids
 
-    Example
-    -------
+    Examples
+    --------
     Load aifb dataset, prune out nodes that are more than 3 hops away from
     labeled nodes, and relabel the remaining nodes with consecutive ids
 
@@ -157,13 +157,11 @@ class RGCNLinkDataset(object):
     test: numpy.array
         all relation triplets (src, rel, dst) for testing
 
-    Usage
-    -----
     Usually, user don't need to directly use this class. Instead, DGL provides
     wrapper function to load data (see example below).
 
-    Example
-    -------
+    Examples
+    --------
     Load FB15k-237 dataset
 
     >>> from dgl.contrib.data import load_data
