@@ -26,6 +26,7 @@ def generate_graph2(n):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
     g1 = dgl.DGLGraph(arr, readonly=True)
     g2 = dgl.DGLGraph(arr, readonly=True)
+
     num_nodes = g1.number_of_nodes()
     g1.set_n_repr({'f1' : mx.nd.random.normal(shape=(num_nodes,)),
         'f2' : mx.nd.random.normal(shape=(num_nodes, D))})
@@ -308,9 +309,116 @@ def test_send_and_recv_multi_fn():
     v2 = g.ndata['v2']
     assert np.allclose(v1.asnumpy(), v2.asnumpy(), rtol=1e-05, atol=1e-05)
 
+############################ Copy from torch
+D = 5
+def simple_graph():
+    g = dgl.DGLGraph()
+    g.add_nodes(10)
+    # create a graph where 0 is the source and 9 is the sink
+    for i in range(1, 9):
+        g.add_edge(0, i)
+        g.add_edge(i, 9)
+    # add a back flow from 9 to 0
+    g.add_edge(9, 0)
+    g.set_n_repr({'f1' : mx.nd.random.normal(shape=(10,)), 'f2' : mx.nd.random.normal(shape=(10, D))})
+    weights = mx.nd.random.normal(shape=(17,))
+    g.set_e_repr({'e1': weights, 'e2': mx.nd.expand_dims(weights, 1)})
+    return g
+
+def test_v2v_update_all_sum():
+    def _test(fld):
+        def message_func(edges):
+            return {'m' : edges.src[fld]}
+
+        def message_func_edge(edges):
+            if len(edges.src[fld].shape) == 1:
+                return {'m' : edges.src[fld] * edges.data['e1']}
+            else:
+                return {'m' : edges.src[fld] * edges.data['e2']}
+
+        def reduce_func(nodes):
+            return {fld : mx.nd.sum(nodes.mailbox['m'], axis=1)}
+
+        def apply_func(nodes):
+            return {fld : 2 * nodes.data[fld]}
+        g = simple_graph()
+        # update all
+        v1 = g.ndata[fld]
+        g.update_all(fn.copy_src(src=fld, out='m'), fn.sum(msg='m', out=fld), apply_func)
+        v2 = g.ndata[fld]
+        g.set_n_repr({fld : v1})
+        g.update_all(message_func, reduce_func, apply_func)
+        v3 = g.ndata[fld]
+        assert np.allclose(v2.asnumpy(), v3.asnumpy(), rtol=1e-05, atol=1e-05)
+        # update all with edge weights
+        v1 = g.ndata[fld]
+        g.update_all(fn.src_mul_edge(src=fld, edge='e1', out='m'),
+                fn.sum(msg='m', out=fld), apply_func)
+        v2 = g.ndata[fld]
+        g.set_n_repr({fld : v1})
+        g.update_all(fn.src_mul_edge(src=fld, edge='e2', out='m'),
+                fn.sum(msg='m', out=fld), apply_func)
+        v3 = g.ndata[fld].squeeze()
+        g.set_n_repr({fld : v1})
+        g.update_all(message_func_edge, reduce_func, apply_func)
+        v4 = g.ndata[fld]
+        assert np.allclose(v2.asnumpy(), v3.asnumpy(), rtol=1e-05, atol=1e-05)
+        assert np.allclose(v3.asnumpy(), v4.asnumpy(), rtol=1e-05, atol=1e-05)
+    # test 1d node features
+    _test('f1')
+    # test 2d node features
+    _test('f2')
+
+def test_v2v_update_all_max():
+    def _test(fld):
+        def message_func(edges):
+            return {'m' : edges.src[fld]}
+
+        def message_func_edge(edges):
+            if len(edges.src[fld].shape) == 1:
+                return {'m' : edges.src[fld] * edges.data['e1']}
+            else:
+                return {'m' : edges.src[fld] * edges.data['e2']}
+
+        def reduce_func(nodes):
+            return {fld : mx.nd.max(nodes.mailbox['m'], axis=1)}
+
+        def apply_func(nodes):
+            return {fld : 2 * nodes.data[fld]}
+        g = simple_graph()
+        # update all
+        v1 = g.ndata[fld]
+        g.update_all(fn.copy_src(src=fld, out='m'), fn.max(msg='m', out=fld), apply_func)
+        v2 = g.ndata[fld]
+        g.set_n_repr({fld : v1})
+        g.update_all(message_func, reduce_func, apply_func)
+        v3 = g.ndata[fld]
+        assert np.allclose(v2.asnumpy(), v3.asnumpy(), rtol=1e-05, atol=1e-05)
+        # update all with edge weights
+        v1 = g.ndata[fld]
+        g.update_all(fn.src_mul_edge(src=fld, edge='e1', out='m'),
+                fn.max(msg='m', out=fld), apply_func)
+        v2 = g.ndata[fld]
+        g.set_n_repr({fld : v1})
+        g.update_all(fn.src_mul_edge(src=fld, edge='e2', out='m'),
+                fn.max(msg='m', out=fld), apply_func)
+        v3 = g.ndata[fld].squeeze()
+        g.set_n_repr({fld : v1})
+        g.update_all(message_func_edge, reduce_func, apply_func)
+        v4 = g.ndata[fld]
+        assert np.allclose(v2.asnumpy(), v3.asnumpy(), rtol=1e-05, atol=1e-05)
+        assert np.allclose(v3.asnumpy(), v4.asnumpy(), rtol=1e-05, atol=1e-05)
+    # test 1d node features
+    _test('f1')
+    # test 2d node features
+    _test('f2')
+############################ Copy from torch
+
 if __name__ == '__main__':
     test_update_all()
     test_pull()
     test_send_and_recv()
     test_update_all_multi_fn()
     test_send_and_recv_multi_fn()
+    test_v2v_update_all_sum()
+    test_v2v_update_all_max()

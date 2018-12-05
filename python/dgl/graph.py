@@ -2703,7 +2703,7 @@ class DGLGraph(object):
         SparseTensor
             The adjacency matrix.
         """
-        return self._graph.adjacency_matrix(transpose, ctx)
+        return self._graph.adjacency_matrix(transpose, ctx)[0]
 
     def incidence_matrix(self, type, ctx=F.cpu()):
         """Return the incidence matrix representation of this graph.
@@ -2745,7 +2745,7 @@ class DGLGraph(object):
         SparseTensor
             The incidence matrix.
         """
-        return self._graph.incidence_matrix(type, ctx)
+        return self._graph.incidence_matrix(type, ctx)[0]
 
     def line_graph(self, backtracking=True, shared=False):
         """Return the line graph of this graph.

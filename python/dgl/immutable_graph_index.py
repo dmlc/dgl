@@ -8,7 +8,7 @@ import scipy.sparse as sp
 from ._ffi.function import _init_api
 from . import backend as F
 from . import utils
-from .base import ALL, is_all
+from .base import ALL, is_all, dgl_warning
 
 class ImmutableGraphIndex(object):
     """Graph index object on immutable graphs.
@@ -473,11 +473,16 @@ class ImmutableGraphIndex(object):
         -------
         utils.CtxCachedObject
             An object that returns tensor given context.
+        utils.Index
+            A index for data shuffling due to sparse format change. Return None
+            if shuffle is not required.
         """
         def get_adj(ctx):
             new_mat = self._sparse.adjacency_matrix(transpose)
             return F.copy_to(new_mat, ctx)
-        return self._sparse.adjacency_matrix(transpose, ctx)
+        # FIXME(minjie): calculate the shuffle index
+        dgl_warning('Shuffle index is not correctly computed. SPMV with edge feature might fail!!')
+        return self._sparse.adjacency_matrix(transpose, ctx), None
 
     def incidence_matrix(self, type, ctx):
         """Return the incidence matrix representation of this graph.
@@ -510,6 +515,9 @@ class ImmutableGraphIndex(object):
         -------
         SparseTensor
             The incidence matrix.
+        utils.Index
+            A index for data shuffling due to sparse format change. Return None
+            if shuffle is not required.
         """
         raise Exception('immutable graph doesn\'t support incidence_matrix for now.')
 
@@ -540,9 +548,11 @@ class ImmutableGraphIndex(object):
         nx_graph : networkx.DiGraph
             The nx graph
         """
-        assert isinstance(nx_graph, nx.DiGraph), "The input graph has to be a NetworkX DiGraph."
+        if not isinstance(nx_graph, nx.DiGraph):
+            nx_graph = nx.DiGraph(nx_graph)
         # We store edge Ids as an edge attribute.
-        out_mat = nx.convert_matrix.to_scipy_sparse_matrix(nx_graph, format='coo')
+        nodelist = list(range(nx_graph.number_of_nodes()))
+        out_mat = nx.convert_matrix.to_scipy_sparse_matrix(nx_graph, nodelist=nodelist, format='coo')
         self._sparse.from_coo_matrix(out_mat)
 
     def from_scipy_sparse_matrix(self, adj):
