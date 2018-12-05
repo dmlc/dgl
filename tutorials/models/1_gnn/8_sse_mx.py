@@ -510,7 +510,7 @@ trainer = gluon.Trainer(params, 'adam', {'learning_rate' : lr})
 # Now let’s train it! As before, nodes reachable from :math:`s` are
 # gradually “infected”, except that behind the scene is a neural network!
 #
-n_epochs = 100
+n_epochs = 50
 n_embedding_updates = 8
 n_parameter_updates = 5
 alpha = 0.1
@@ -522,7 +522,7 @@ for i in range(n_epochs):
 
    accuracy_train = test(g, nodes_train, steady_state_operator, predictor)
    accuracy_test = test(g, nodes_test, steady_state_operator, predictor)
-   print("iteration: " + str(i) + ", " + str(accuracy_test))
+   print("Iter {:05d} | Train acc {:.4} | Test acc {:.4f}".format(i, accuracy_train, accuracy_test))
    y_bar = mx.nd.argmax(g.ndata['z'], axis=1)
    y_bars.append(y_bar)
 ##############################################################################
