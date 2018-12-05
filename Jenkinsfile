@@ -48,7 +48,7 @@ def example_test(dev) {
 def pytorch_tutorials() {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
     dir ("tests/scripts") {
-      sh "./task_tutorial_test.sh"
+      sh "./task_pytorch_tutorial_test.sh"
     }
   }
 }
@@ -154,15 +154,15 @@ pipeline {
       parallel {
         stage("Pytorch Tutorial") {
           agent { docker { image "dgllib/dgl-ci-cpu" } }
-            steps {
-              pytorch_tutorials()
-            }
+          steps {
+            pytorch_tutorials()
+          }
         }
         stage("MXNet Tutorial") {
           agent { docker { image "dgllib/dgl-mxnet-cpu" } }
-            steps {
-              mxnet_tutorials()
-            }
+          steps {
+            mxnet_tutorials()
+          }
         }
       }
     }
