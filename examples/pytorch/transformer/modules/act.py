@@ -76,8 +76,8 @@ class UTransformer(nn.Module):
     The Basic Universal Transformer(https://arxiv.org/pdf/1807.03819.pdf) with ACT based on remainder-distribution ACT(https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/research/universal_transformer_util.py).
     '''
     MAX_DEPTH = 8
-    thres = 0.99
-    act_loss_weight = 0.01
+    thres = 0.98
+    act_loss_weight = 1e-4
     def __init__(self, encoder, decoder, src_embed, tgt_embed, pos_enc, time_enc, generator, h, d_k):
         super(UTransformer, self).__init__()
         self.encoder,  self.decoder = encoder, decoder
@@ -161,10 +161,9 @@ class UTransformer(nn.Module):
                               [(post_func, nodes), (self.halt_and_accum('enc'), nodes)])
             halt_nodes = g.filter_nodes(lambda v: (v.data['p'] >= self.thres).view(-1), nodes)
             g.ndata['active'][halt_nodes] = th.zeros(len(halt_nodes), 1, dtype=th.uint8, device=device)
-            #print(th.sum(g.ndata['active']))
 
-        g.ndata['x'] = self.encoder.norm(g.ndata['s'])
-
+        g.nodes[nids['enc']].data['x'] = self.encoder.norm(g.nodes[nids['enc']].data['s'])
+        
         for _ in range(self.MAX_DEPTH):
             pre_func = self.decoder.pre_func('qkv')
             post_func = self.decoder.post_func()
@@ -188,7 +187,7 @@ class UTransformer(nn.Module):
             halt_nodes = g.filter_nodes(lambda v: (v.data['p'] >= self.thres).view(-1), nodes)
             g.ndata['active'][halt_nodes] = th.zeros(len(halt_nodes), 1, dtype=th.uint8, device=device)
 
-        g.ndata['x'] = self.decoder.norm(g.ndata['s'])
+        g.nodes[nids['dec']].data['x'] = self.encoder.norm(g.nodes[nids['dec']].data['s'])
         act_loss = self.act_loss_weight * th.sum(g.ndata['r'])
 
         return self.generator(g.ndata['x'][nids['dec']]), act_loss
