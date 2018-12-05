@@ -5,14 +5,14 @@ from cpython cimport pycapsule
 from libc.stdint cimport int64_t, uint64_t, uint8_t, uint16_t
 import ctypes
 
-cdef enum TVMTypeCode:
+cdef enum DGLTypeCode:
     kInt = 0
     kUInt = 1
     kFloat = 2
     kHandle = 3
     kNull = 4
-    kTVMType = 5
-    kTVMContext = 6
+    kDGLType = 5
+    kDGLContext = 6
     kArrayHandle = 7
     kNodeHandle = 8
     kModuleHandle = 9
@@ -22,7 +22,7 @@ cdef enum TVMTypeCode:
     kNDArrayContainer = 13
     kExtBegin = 15
 
-cdef extern from "tvm/runtime/c_runtime_api.h":
+cdef extern from "dgl/runtime/c_runtime_api.h":
     ctypedef struct DLDataType:
         uint8_t code
         uint8_t bits
@@ -46,7 +46,7 @@ cdef extern from "tvm/runtime/c_runtime_api.h":
         void* manager_ctx
         void (*deleter)(DLManagedTensor* self)
 
-    ctypedef struct TVMValue:
+    ctypedef struct DGLValue:
         int64_t v_int64
         double v_float64
         void* v_handle
@@ -54,65 +54,65 @@ cdef extern from "tvm/runtime/c_runtime_api.h":
         DLDataType v_type
         DLContext v_ctx
 
-ctypedef int64_t tvm_index_t
+ctypedef int64_t dgl_index_t
 ctypedef DLTensor* DLTensorHandle
-ctypedef void* TVMStreamHandle
-ctypedef void* TVMRetValueHandle
-ctypedef void* TVMFunctionHandle
+ctypedef void* DGLStreamHandle
+ctypedef void* DGLRetValueHandle
+ctypedef void* DGLFunctionHandle
 ctypedef void* NodeHandle
 
-ctypedef int (*TVMPackedCFunc)(
-    TVMValue* args,
+ctypedef int (*DGLPackedCFunc)(
+    DGLValue* args,
     int* type_codes,
     int num_args,
-    TVMRetValueHandle ret,
+    DGLRetValueHandle ret,
     void* resource_handle)
 
-ctypedef void (*TVMPackedCFuncFinalizer)(void* resource_handle)
+ctypedef void (*DGLPackedCFuncFinalizer)(void* resource_handle)
 
-cdef extern from "tvm/runtime/c_runtime_api.h":
-    void TVMAPISetLastError(const char* msg)
-    const char *TVMGetLastError()
-    int TVMFuncCall(TVMFunctionHandle func,
-                    TVMValue* arg_values,
+cdef extern from "dgl/runtime/c_runtime_api.h":
+    void DGLAPISetLastError(const char* msg)
+    const char *DGLGetLastError()
+    int DGLFuncCall(DGLFunctionHandle func,
+                    DGLValue* arg_values,
                     int* type_codes,
                     int num_args,
-                    TVMValue* ret_val,
+                    DGLValue* ret_val,
                     int* ret_type_code)
-    int TVMFuncFree(TVMFunctionHandle func)
-    int TVMCFuncSetReturn(TVMRetValueHandle ret,
-                          TVMValue* value,
+    int DGLFuncFree(DGLFunctionHandle func)
+    int DGLCFuncSetReturn(DGLRetValueHandle ret,
+                          DGLValue* value,
                           int* type_code,
                           int num_ret)
-    int TVMFuncCreateFromCFunc(TVMPackedCFunc func,
+    int DGLFuncCreateFromCFunc(DGLPackedCFunc func,
                                void* resource_handle,
-                               TVMPackedCFuncFinalizer fin,
-                               TVMFunctionHandle *out)
-    int TVMCbArgToReturn(TVMValue* value, int code)
-    int TVMArrayAlloc(tvm_index_t* shape,
-                      tvm_index_t ndim,
+                               DGLPackedCFuncFinalizer fin,
+                               DGLFunctionHandle *out)
+    int DGLCbArgToReturn(DGLValue* value, int code)
+    int DGLArrayAlloc(dgl_index_t* shape,
+                      dgl_index_t ndim,
                       DLDataType dtype,
                       DLContext ctx,
                       DLTensorHandle* out)
-    int TVMArrayFree(DLTensorHandle handle)
-    int TVMArrayCopyFromTo(DLTensorHandle src,
+    int DGLArrayFree(DLTensorHandle handle)
+    int DGLArrayCopyFromTo(DLTensorHandle src,
                            DLTensorHandle to,
-                           TVMStreamHandle stream)
-    int TVMArrayFromDLPack(DLManagedTensor* arr_from,
+                           DGLStreamHandle stream)
+    int DGLArrayFromDLPack(DLManagedTensor* arr_from,
                            DLTensorHandle* out)
-    int TVMArrayToDLPack(DLTensorHandle arr_from,
+    int DGLArrayToDLPack(DLTensorHandle arr_from,
                          DLManagedTensor** out)
-    void TVMDLManagedTensorCallDeleter(DLManagedTensor* dltensor)
+    void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor)
 
-cdef extern from "tvm/c_dsl_api.h":
-    int TVMNodeFree(NodeHandle handle)
-    int TVMNodeTypeKey2Index(const char* type_key,
+cdef extern from "dgl/c_dsl_api.h":
+    int DGLNodeFree(NodeHandle handle)
+    int DGLNodeTypeKey2Index(const char* type_key,
                              int* out_index)
-    int TVMNodeGetTypeIndex(NodeHandle handle,
+    int DGLNodeGetTypeIndex(NodeHandle handle,
                             int* out_index)
-    int TVMNodeGetAttr(NodeHandle handle,
+    int DGLNodeGetAttr(NodeHandle handle,
                        const char* key,
-                       TVMValue* out_value,
+                       DGLValue* out_value,
                        int* out_type_code,
                        int* out_success)
 
@@ -140,7 +140,7 @@ cdef inline c_str(pystr):
 
 cdef inline CALL(int ret):
     if ret != 0:
-        raise DGLError(py_str(TVMGetLastError()))
+        raise DGLError(py_str(DGLGetLastError()))
 
 
 cdef inline object ctypes_handle(void* chandle):
