@@ -15,9 +15,9 @@ class UEncoder(nn.Module):
     def pre_func(self, fields='qkv'):
         layer = self.layer
         def func(nodes):
-            x_p = nodes.data['x_p']
-            norm_xp = layer.sublayer[0].norm(x_p)
-            return layer.self_attn.get(norm_xp, fields=fields)
+            x = nodes.data['x']
+            norm_x = layer.sublayer[0].norm(x)
+            return layer.self_attn.get(norm_x, fields=fields)
         return func
 
     def post_func(self):
@@ -40,12 +40,12 @@ class UDecoder(nn.Module):
     def pre_func(self, fields='qkv', l=0):
         layer = self.layer
         def func(nodes):
-            x_p = nodes.data['x_p']
+            x = nodes.data['x']
             if fields == 'kv':
-                norm_xp = x_p
+                norm_x = x
             else:
-                norm_xp = layer.sublayer[l].norm(x_p)
-            return layer.self_attn.get(norm_xp, fields)
+                norm_x = layer.sublayer[l].norm(x)
+            return layer.self_attn.get(norm_x, fields)
         return func
 
     def post_func(self, l=0):
@@ -64,20 +64,18 @@ class HaltingUnit(nn.Module):
     halting_bias_init = 1.0
     def __init__(self, dim_model):
         super(HaltingUnit, self).__init__()
-        self.norm = LayerNorm(dim_model)
         self.linear = nn.Linear(dim_model, 1)
+        self.norm = LayerNorm(dim_model)
         INIT.constant_(self.linear.bias, self.halting_bias_init)
 
     def forward(self, x):
         return th.sigmoid(self.linear(self.norm(x)))
 
 class UTransformer(nn.Module):
-    '''
-    The Basic Universal Transformer(https://arxiv.org/pdf/1807.03819.pdf) with ACT based on remainder-distribution ACT(https://github.com/tensorflow/tensor2tensor/blob/master/tensor2tensor/models/research/universal_transformer_util.py).
-    '''
+    "Universal Transformer(https://arxiv.org/pdf/1807.03819.pdf) with ACT."
     MAX_DEPTH = 8
-    thres = 0.98
-    act_loss_weight = 1e-4
+    thres = 0.99
+    act_loss_weight = 0.01 
     def __init__(self, encoder, decoder, src_embed, tgt_embed, pos_enc, time_enc, generator, h, d_k):
         super(UTransformer, self).__init__()
         self.encoder,  self.decoder = encoder, decoder
@@ -87,28 +85,30 @@ class UTransformer(nn.Module):
         self.halt_dec = HaltingUnit(h * d_k)
         self.generator = generator
         self.h, self.d_k = h, d_k
+        self.reset_stat()
+
+    def reset_stat(self):
+        self.stat = [0] * (self.MAX_DEPTH + 1)
 
     def step_forward(self, nodes):
         x = nodes.data['x']
         step = nodes.data['step']
         pos = nodes.data['pos']
-        return {'x_p': self.pos_enc.dropout(x + self.pos_enc(pos.view(-1)) + self.time_enc(step.view(-1))),
+        return {'x': self.pos_enc.dropout(x + self.pos_enc(pos.view(-1)) + self.time_enc(step.view(-1))),
                 'step': step + 1}
 
-    def halt_and_accum(self, name):
+    def halt_and_accum(self, name, end=False):
         "field: 'enc' or 'dec'"
-        if name == 'enc':
-            halt = self.halt_enc
-        else: # dec
-            halt = self.halt_dec
+        halt = self.halt_enc if name == 'enc' else self.halt_dec
         thres = self.thres
         def func(nodes):
             p = halt(nodes.data['x'])
             sum_p = nodes.data['sum_p'] + p
-            _continue = (sum_p < thres).float()
+            active = (sum_p < thres) & (1 - end)
+            _continue = active.float()
             r = nodes.data['r'] * (1 - _continue) + (1 - sum_p) * _continue
             s = nodes.data['s'] + ((1 - _continue) * r + _continue * p) * nodes.data['x']
-            return {'p': p, 'sum_p': sum_p, 'r': r, 's': s}
+            return {'p': p, 'sum_p': sum_p, 'r': r, 's': s, 'active': active}
         return func
 
     def propagate_attention(self, g, eids):
@@ -143,28 +143,27 @@ class UTransformer(nn.Module):
 
         # init step
         device = next(self.parameters()).device
-        g.ndata['s'] = th.zeros(N, self.h * self.d_k, dtype=th.float, device=device)  # accumulated state
-        g.ndata['p'] = th.zeros(N, 1, dtype=th.float, device=device) # pondering value
-        g.ndata['r'] = th.ones(N, 1, dtype=th.float, device=device) # remainder
-        g.ndata['sum_p'] = th.zeros(N, 1, dtype=th.float, device=device) # sum of pondering values
-        g.ndata['step'] = th.zeros(N, 1, dtype=th.long, device=device) # step
-        g.ndata['active'] = th.ones(N, 1, dtype=th.uint8, device=device) # active
+        g.ndata['s'] = th.zeros(N, self.h * self.d_k, dtype=th.float, device=device)    # accumulated state
+        g.ndata['p'] = th.zeros(N, 1, dtype=th.float, device=device)                    # halting prob 
+        g.ndata['r'] = th.ones(N, 1, dtype=th.float, device=device)                     # remainder
+        g.ndata['sum_p'] = th.zeros(N, 1, dtype=th.float, device=device)                # sum of pondering values
+        g.ndata['step'] = th.zeros(N, 1, dtype=th.long, device=device)                  # step
+        g.ndata['active'] = th.ones(N, 1, dtype=th.uint8, device=device)                # active
 
-        for _ in range(self.MAX_DEPTH):
+        for step in range(self.MAX_DEPTH):
             pre_func = self.encoder.pre_func('qkv')
             post_func = self.encoder.post_func()
             nodes = g.filter_nodes(lambda v: v.data['active'].view(-1), nids['enc'])
             if len(nodes) == 0: break
             edges = g.filter_edges(lambda e: e.dst['active'].view(-1), eids['ee'])
+            end = step == self.MAX_DEPTH - 1
             self.update_graph(g, edges,
                               [(self.step_forward, nodes), (pre_func, nodes)],
-                              [(post_func, nodes), (self.halt_and_accum('enc'), nodes)])
-            halt_nodes = g.filter_nodes(lambda v: (v.data['p'] >= self.thres).view(-1), nodes)
-            g.ndata['active'][halt_nodes] = th.zeros(len(halt_nodes), 1, dtype=th.uint8, device=device)
+                              [(post_func, nodes), (self.halt_and_accum('enc', end), nodes)])
 
         g.nodes[nids['enc']].data['x'] = self.encoder.norm(g.nodes[nids['enc']].data['s'])
-        
-        for _ in range(self.MAX_DEPTH):
+
+        for step in range(self.MAX_DEPTH):
             pre_func = self.decoder.pre_func('qkv')
             post_func = self.decoder.post_func()
             nodes = g.filter_nodes(lambda v: v.data['active'].view(-1), nids['dec'])
@@ -177,20 +176,24 @@ class UTransformer(nn.Module):
             pre_q = self.decoder.pre_func('q', 1)
             pre_kv = self.decoder.pre_func('kv', 1)
             post_func = self.decoder.post_func(1)
-
             nodes_e = nids['enc']
             edges = g.filter_edges(lambda e: e.dst['active'].view(-1), eids['ed'])
-
+            end = step == self.MAX_DEPTH - 1
             self.update_graph(g, edges,
                               [(pre_q, nodes), (pre_kv, nodes_e)],
-                              [(post_func, nodes), (self.halt_and_accum('dec'), nodes)])
-            halt_nodes = g.filter_nodes(lambda v: (v.data['p'] >= self.thres).view(-1), nodes)
-            g.ndata['active'][halt_nodes] = th.zeros(len(halt_nodes), 1, dtype=th.uint8, device=device)
+                              [(post_func, nodes), (self.halt_and_accum('dec', end), nodes)])
 
-        g.nodes[nids['dec']].data['x'] = self.encoder.norm(g.nodes[nids['dec']].data['s'])
-        act_loss = self.act_loss_weight * th.sum(g.ndata['r'])
+        g.nodes[nids['dec']].data['x'] = self.decoder.norm(g.nodes[nids['dec']].data['s'])
+        act_loss = th.mean(g.ndata['r']) # ACT loss
 
-        return self.generator(g.ndata['x'][nids['dec']]), act_loss
+        self.stat[0] += N
+        for step in range(1, self.MAX_DEPTH + 1):
+            self.stat[step] += th.sum(g.ndata['step'] >= step).item()
+
+        return self.generator(g.ndata['x'][nids['dec']]), act_loss * self.act_loss_weight
+
+    def infer(self, *args, **kwargs):
+        raise NotImplementedError
 
 
 def make_universal_model(src_vocab, tgt_vocab, dim_model=512, dim_ff=2048, h=8, dropout=0.1):

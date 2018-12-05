@@ -279,5 +279,4 @@ tgt_seq = dataset.get_seq_by_id(VIZ_IDX, mode='valid', field='tgt')[:-1]
 print(src_seq, '\n', tgt_seq)
 # visualize head 0 of encoder-decoder attention
 anim = att_animation(att_maps, 'e2d', src_seq, tgt_seq, 0)
-plt.show()
 #anim.save('att.gif', dpi=150, writer='imagemagick')

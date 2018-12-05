@@ -1,5 +1,5 @@
 """
-In current version we use multi30k as the training and validation set.
+In current version we use multi30k as the default training and validation set.
 Multi-GPU support is required to train the model on WMT14.
 """
 from modules import *
@@ -31,6 +31,11 @@ def run_epoch(data_iter, model, loss_compute, is_train=True):
                 tgt_y = g.tgt_y
                 n_tokens = g.n_tokens
             loss = loss_compute(output, tgt_y, n_tokens)
+
+    if universal:
+        for step in range(1, model.MAX_DEPTH + 1):
+            print("nodes entering step {}: {:.2f}%".format(step, (1.0 * model.stat[step] / model.stat[0])))
+        model.reset_stat()
     print('average loss: {}'.format(loss_compute.avg_loss))
     print('accuracy: {}'.format(loss_compute.accuracy))
 
@@ -44,7 +49,7 @@ if __name__ == '__main__':
     argparser.add_argument('--dataset', default='multi30k', help='dataset')
     argparser.add_argument('--batch', default=128, type=int, help='batch size')
     argparser.add_argument('--viz', action='store_true', help='visualize attention')
-    argparser.add_argument('--universal', action='store_true', help='whether use universal transformer or not')
+    argparser.add_argument('--universal', action='store_true', help='use universal transformer')
     args = argparser.parse_args()
     args_filter = ['batch', 'gpus', 'viz']
     exp_setting = '-'.join('{}'.format(v) for k, v in vars(args).items() if k not in args_filter)

@@ -114,6 +114,7 @@ def graph_att_head(M, N, weight, ax, title):
 import networkx as nx
 from networkx.utils import is_string_like
 from matplotlib.patches import ConnectionStyle,FancyArrowPatch
+"The following function was modified from the source code of networkx"
 def draw_networkx_edges(G, pos,
                         edgelist=None,
                         width=1.0,
