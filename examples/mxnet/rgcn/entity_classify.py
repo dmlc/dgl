@@ -95,7 +95,7 @@ def main(args):
 
     # optimizer
     trainer = gluon.Trainer(model.collect_params(), 'adam', {'learning_rate': args.lr, 'wd': args.l2norm})
-    loss_fcn = gluon.loss.SoftmaxCELoss()
+    loss_fcn = gluon.loss.SoftmaxCELoss(from_logits=False)
 
     # training loop
     print("start training...")
@@ -118,8 +118,7 @@ def main(args):
         train_acc = F.sum(pred[train_idx].argmax(axis=1) == labels[train_idx]).asscalar() / train_idx.shape[0]
         val_loss = F.softmax_cross_entropy(pred[val_idx], labels[val_idx])
         val_acc = F.sum(pred[val_idx].argmax(axis=1) == labels[val_idx]).asscalar() / len(val_idx)
-        print("Train Accuracy: {:.4f} | Train Loss: {:.4f} | Validation Accuracy: {:.4f} | Validation loss: {:.4f}".
-              format(train_acc, loss.asnumpy().item(0), val_acc, val_loss.asscalar()))
+        print("Train Accuracy: {:.4f} | Validation Accuracy: {:.4f}".format(train_acc, val_acc))
     print()
 
     logits = model(g)

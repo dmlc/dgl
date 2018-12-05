@@ -89,7 +89,7 @@ class RGCNBasisLayer(RGCNLayer):
         else:
             def msg_func(edges):
                 w = weight[edges.data['type']]
-                msg = F.batch_dot(edges.src['h'].reshape(-1, 1, self.in_feat), w).reshape(-1, self.out_feat)
+                msg = F.batch_dot(edges.src['h'].expand_dims(1), w).reshape(-1, self.out_feat)
                 msg = msg * edges.data['norm']
                 return {'msg': msg}
 
