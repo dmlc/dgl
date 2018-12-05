@@ -11,7 +11,7 @@
 
 namespace dgl {
 
-typedef tvm::runtime::NDArray IdArray;
+typedef dgl::runtime::NDArray IdArray;
 
 namespace sched {
 

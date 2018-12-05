@@ -12,7 +12,7 @@
 #include "c_runtime_api.h"
 #include "serializer.h"
 
-namespace tvm {
+namespace dgl {
 namespace runtime {
 /*!
  * \brief Managed NDArray.
@@ -94,7 +94,7 @@ class NDArray {
    * \brief Copy data content from another array.
    * \param other The source array to be copied from.
    * \note The copy may happen asynchrously if it involves a GPU context.
-   *       TVMSynchronize is necessary.
+   *       DGLSynchronize is necessary.
    */
   inline void CopyFrom(DLTensor* other);
   inline void CopyFrom(const NDArray& other);
@@ -102,7 +102,7 @@ class NDArray {
    * \brief Copy data content into another array.
    * \param other The source array to be copied from.
    * \note The copy may happen asynchrously if it involves a GPU context.
-   *       TVMSynchronize is necessary.
+   *       DGLSynchronize is necessary.
    */
   inline void CopyTo(DLTensor* other) const;
   inline void CopyTo(const NDArray& other) const;
@@ -129,14 +129,14 @@ class NDArray {
    * \param dtype The data type of the new array.
    * \note The memory size of new array must be smaller than the current one.
    */
-  TVM_DLL NDArray CreateView(
+  DGL_DLL NDArray CreateView(
       std::vector<int64_t> shape, DLDataType dtype);
   /*!
    * \brief Create a reference view of NDArray that
    *  represents as DLManagedTensor.
    * \return A DLManagedTensor
    */
-  TVM_DLL DLManagedTensor* ToDLPack() const;
+  DGL_DLL DLManagedTensor* ToDLPack() const;
   /*!
    * \brief Create an empty NDArray.
    * \param shape The shape of the new array.
@@ -144,7 +144,7 @@ class NDArray {
    * \param ctx The context of the Array.
    * \return The created Array
    */
-  TVM_DLL static NDArray Empty(std::vector<int64_t> shape,
+  DGL_DLL static NDArray Empty(std::vector<int64_t> shape,
                                DLDataType dtype,
                                DLContext ctx);
   /*!
@@ -158,15 +158,15 @@ class NDArray {
    * \param tensor The DLPack tensor to copy from.
    * \return The created NDArray view.
    */
-  TVM_DLL static NDArray FromDLPack(DLManagedTensor* tensor);
+  DGL_DLL static NDArray FromDLPack(DLManagedTensor* tensor);
   /*!
    * \brief Function to copy data from one array to another.
    * \param from The source array.
    * \param to The target array.
    * \param stream The stream used in copy.
    */
-  TVM_DLL static void CopyFromTo(
-      DLTensor* from, DLTensor* to, TVMStreamHandle stream = nullptr);
+  DGL_DLL static void CopyFromTo(
+      DLTensor* from, DLTensor* to, DGLStreamHandle stream = nullptr);
 
   // internal namespace
   struct Internal;
@@ -175,8 +175,8 @@ class NDArray {
   Container* data_{nullptr};
   // enable internal functions
   friend struct Internal;
-  friend class TVMRetValue;
-  friend class TVMArgsSetter;
+  friend class DGLRetValue;
+  friend class DGLArgsSetter;
 };
 
 /*!
@@ -321,11 +321,11 @@ inline const DLTensor* NDArray::operator->() const {
 }
 
 /*! \brief Magic number for NDArray file */
-constexpr uint64_t kTVMNDArrayMagic = 0xDD5E40F096B4A13F;
+constexpr uint64_t kDGLNDArrayMagic = 0xDD5E40F096B4A13F;
 
 inline bool SaveDLTensor(dmlc::Stream* strm,
                          DLTensor* tensor) {
-  uint64_t header = kTVMNDArrayMagic, reserved = 0;
+  uint64_t header = kDGLNDArrayMagic, reserved = 0;
   strm->Write(header);
   strm->Write(reserved);
   // Always save data as CPU context
@@ -361,9 +361,9 @@ inline bool SaveDLTensor(dmlc::Stream* strm,
     strm->Write(tensor->data, data_byte_size);
   } else {
     std::vector<uint8_t> bytes(data_byte_size);
-    CHECK_EQ(TVMArrayCopyToBytes(
+    CHECK_EQ(DGLArrayCopyToBytes(
         tensor, dmlc::BeginPtr(bytes), data_byte_size), 0)
-        << TVMGetLastError();
+        << DGLGetLastError();
     if (!DMLC_IO_NO_ENDIAN_SWAP) {
       dmlc::ByteSwap(dmlc::BeginPtr(bytes), type_bytes, num_elems);
     }
@@ -382,7 +382,7 @@ inline bool NDArray::Load(dmlc::Stream* strm) {
       << "Invalid DLTensor file format";
   CHECK(strm->Read(&reserved))
       << "Invalid DLTensor file format";
-  CHECK(header == kTVMNDArrayMagic)
+  CHECK(header == kDGLNDArrayMagic)
       << "Invalid DLTensor file format";
   DLContext ctx;
   int ndim;
@@ -421,5 +421,5 @@ inline bool NDArray::Load(dmlc::Stream* strm) {
 }
 
 }  // namespace runtime
-}  // namespace tvm
+}  // namespace dgl
 #endif  // DGL_RUNTIME_NDARRAY_H_

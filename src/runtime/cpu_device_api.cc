@@ -10,20 +10,20 @@
 #include <cstring>
 #include "workspace_pool.h"
 
-namespace tvm {
+namespace dgl {
 namespace runtime {
 class CPUDeviceAPI final : public DeviceAPI {
  public:
-  void SetDevice(TVMContext ctx) final {}
-  void GetAttr(TVMContext ctx, DeviceAttrKind kind, TVMRetValue* rv) final {
+  void SetDevice(DGLContext ctx) final {}
+  void GetAttr(DGLContext ctx, DeviceAttrKind kind, DGLRetValue* rv) final {
     if (kind == kExist) {
       *rv = 1;
     }
   }
-  void* AllocDataSpace(TVMContext ctx,
+  void* AllocDataSpace(DGLContext ctx,
                        size_t nbytes,
                        size_t alignment,
-                       TVMType type_hint) final {
+                       DGLType type_hint) final {
     void* ptr;
 #if _MSC_VER || defined(__MINGW32__)
     ptr = _aligned_malloc(nbytes, alignment);
@@ -38,7 +38,7 @@ class CPUDeviceAPI final : public DeviceAPI {
     return ptr;
   }
 
-  void FreeDataSpace(TVMContext ctx, void* ptr) final {
+  void FreeDataSpace(DGLContext ctx, void* ptr) final {
 #if _MSC_VER || defined(__MINGW32__)
     _aligned_free(ptr);
 #else
@@ -51,20 +51,20 @@ class CPUDeviceAPI final : public DeviceAPI {
                       void* to,
                       size_t to_offset,
                       size_t size,
-                      TVMContext ctx_from,
-                      TVMContext ctx_to,
-                      TVMType type_hint,
-                      TVMStreamHandle stream) final {
+                      DGLContext ctx_from,
+                      DGLContext ctx_to,
+                      DGLType type_hint,
+                      DGLStreamHandle stream) final {
     memcpy(static_cast<char*>(to) + to_offset,
            static_cast<const char*>(from) + from_offset,
            size);
   }
 
-  void StreamSync(TVMContext ctx, TVMStreamHandle stream) final {
+  void StreamSync(DGLContext ctx, DGLStreamHandle stream) final {
   }
 
-  void* AllocWorkspace(TVMContext ctx, size_t size, TVMType type_hint) final;
-  void FreeWorkspace(TVMContext ctx, void* data) final;
+  void* AllocWorkspace(DGLContext ctx, size_t size, DGLType type_hint) final;
+  void FreeWorkspace(DGLContext ctx, void* data) final;
 
   static const std::shared_ptr<CPUDeviceAPI>& Global() {
     static std::shared_ptr<CPUDeviceAPI> inst =
@@ -78,21 +78,21 @@ struct CPUWorkspacePool : public WorkspacePool {
       WorkspacePool(kDLCPU, CPUDeviceAPI::Global()) {}
 };
 
-void* CPUDeviceAPI::AllocWorkspace(TVMContext ctx,
+void* CPUDeviceAPI::AllocWorkspace(DGLContext ctx,
                                    size_t size,
-                                   TVMType type_hint) {
+                                   DGLType type_hint) {
   return dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()
       ->AllocWorkspace(ctx, size);
 }
 
-void CPUDeviceAPI::FreeWorkspace(TVMContext ctx, void* data) {
+void CPUDeviceAPI::FreeWorkspace(DGLContext ctx, void* data) {
   dmlc::ThreadLocalStore<CPUWorkspacePool>::Get()->FreeWorkspace(ctx, data);
 }
 
-TVM_REGISTER_GLOBAL("device_api.cpu")
-.set_body([](TVMArgs args, TVMRetValue* rv) {
+DGL_REGISTER_GLOBAL("device_api.cpu")
+.set_body([](DGLArgs args, DGLRetValue* rv) {
     DeviceAPI* ptr = CPUDeviceAPI::Global().get();
     *rv = static_cast<void*>(ptr);
   });
 }  // namespace runtime
-}  // namespace tvm
+}  // namespace dgl

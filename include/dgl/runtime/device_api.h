@@ -10,7 +10,7 @@
 #include "packed_func.h"
 #include "c_runtime_api.h"
 
-namespace tvm {
+namespace dgl {
 namespace runtime {
 /*!
  * \brief the query type into GetAttr
@@ -37,7 +37,7 @@ constexpr int kTempAllocaAlignment = 64;
 constexpr int kMaxStackAlloca = 1024;
 
 /*!
- * \brief TVM Runtime Device API, abstracts the device
+ * \brief DGL Runtime Device API, abstracts the device
  *  specific interface for memory management.
  */
 class DeviceAPI {
@@ -48,7 +48,7 @@ class DeviceAPI {
    * \brief Set the environment device id to ctx
    * \param ctx The context to be set.
    */
-  virtual void SetDevice(TVMContext ctx) = 0;
+  virtual void SetDevice(DGLContext ctx) = 0;
   /*!
    * \brief Get attribute of specified device.
    * \param ctx The device context
@@ -56,7 +56,7 @@ class DeviceAPI {
    * \param rv The return value.
    * \sa DeviceAttrKind
    */
-  virtual void GetAttr(TVMContext ctx, DeviceAttrKind kind, TVMRetValue* rv) = 0;
+  virtual void GetAttr(DGLContext ctx, DeviceAttrKind kind, DGLRetValue* rv) = 0;
   /*!
    * \brief Allocate a data space on device.
    * \param ctx The device context to perform operation.
@@ -66,16 +66,16 @@ class DeviceAPI {
    * as OpenGL, as nbytes & alignment are sufficient for most backends.
    * \return The allocated device pointer.
    */
-  virtual void* AllocDataSpace(TVMContext ctx,
+  virtual void* AllocDataSpace(DGLContext ctx,
                                size_t nbytes,
                                size_t alignment,
-                               TVMType type_hint) = 0;
+                               DGLType type_hint) = 0;
   /*!
    * \brief Free a data space on device.
    * \param ctx The device context to perform operation.
    * \param ptr The data space.
    */
-  virtual void FreeDataSpace(TVMContext ctx, void* ptr) = 0;
+  virtual void FreeDataSpace(DGLContext ctx, void* ptr) = 0;
   /*!
    * \brief copy data from one place to another
    * \param from The source array.
@@ -94,16 +94,16 @@ class DeviceAPI {
                               void* to,
                               size_t to_offset,
                               size_t num_bytes,
-                              TVMContext ctx_from,
-                              TVMContext ctx_to,
-                              TVMType type_hint,
-                              TVMStreamHandle stream) = 0;
+                              DGLContext ctx_from,
+                              DGLContext ctx_to,
+                              DGLType type_hint,
+                              DGLStreamHandle stream) = 0;
     /*!
    * \brief Create a new stream of execution.
    *
    * \param ctx The context of allocation.
    */
-  TVM_DLL virtual TVMStreamHandle CreateStream(TVMContext ctx);
+  DGL_DLL virtual DGLStreamHandle CreateStream(DGLContext ctx);
 
   /*!
    * \brief Free a stream of execution
@@ -111,20 +111,20 @@ class DeviceAPI {
    * \param ctx The context of the stream
    * \param stream The pointer to be freed.
    */
-  TVM_DLL virtual void FreeStream(TVMContext ctx, TVMStreamHandle stream);
+  DGL_DLL virtual void FreeStream(DGLContext ctx, DGLStreamHandle stream);
 
   /*!
    * \brief Synchronize the stream
    * \param ctx The context to perform operation.
    * \param stream The stream to be sync.
    */
-  virtual void StreamSync(TVMContext ctx, TVMStreamHandle stream) = 0;
+  virtual void StreamSync(DGLContext ctx, DGLStreamHandle stream) = 0;
   /*!
    * \brief Set the stream
    * \param ctx The context to set stream.
    * \param stream The stream to be set.
    */
-  virtual void SetStream(TVMContext ctx, TVMStreamHandle stream) {}
+  virtual void SetStream(DGLContext ctx, DGLStreamHandle stream) {}
   /*!
    * \brief Synchronize 2 streams of execution.
    *
@@ -137,9 +137,9 @@ class DeviceAPI {
    * \param event_src The source stream to synchronize.
    * \param event_dst The destination stream to synchronize.
    */
-  TVM_DLL virtual void SyncStreamFromTo(TVMContext ctx,
-                                        TVMStreamHandle event_src,
-                                        TVMStreamHandle event_dst);
+  DGL_DLL virtual void SyncStreamFromTo(DGLContext ctx,
+                                        DGLStreamHandle event_src,
+                                        DGLStreamHandle event_dst);
   /*!
    * \brief Allocate temporal workspace for backend execution.
    *
@@ -156,16 +156,16 @@ class DeviceAPI {
    * \param type_hint The type of elements. Only needed by certain backends such
    * as OpenGL, as nbytes is sufficient for most backends.
    */
-  TVM_DLL virtual void* AllocWorkspace(TVMContext ctx,
+  DGL_DLL virtual void* AllocWorkspace(DGLContext ctx,
                                        size_t nbytes,
-                                       TVMType type_hint = {});
+                                       DGLType type_hint = {});
   /*!
    * \brief Free temporal workspace in backend execution.
    *
    * \param ctx The context of allocation.
    * \param ptr The pointer to be freed.
    */
-  TVM_DLL virtual void FreeWorkspace(TVMContext ctx, void* ptr);
+  DGL_DLL virtual void FreeWorkspace(DGLContext ctx, void* ptr);
 
   /*!
    * \brief Get device API base don context.
@@ -173,11 +173,11 @@ class DeviceAPI {
    * \param allow_missing Whether allow missing
    * \return The corresponding device API.
    */
-  TVM_DLL static DeviceAPI* Get(TVMContext ctx, bool allow_missing = false);
+  DGL_DLL static DeviceAPI* Get(DGLContext ctx, bool allow_missing = false);
 };
 
 /*! \brief The device type bigger than this is RPC device */
 constexpr int kRPCSessMask = 128;
 }  // namespace runtime
-}  // namespace tvm
+}  // namespace dgl
 #endif  // DGL_RUNTIME_DEVICE_API_H_

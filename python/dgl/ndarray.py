@@ -11,7 +11,7 @@ import functools
 import operator
 import numpy as _np
 
-from ._ffi.ndarray import TVMContext, TVMType, NDArrayBase
+from ._ffi.ndarray import DGLContext, DGLType, NDArrayBase
 from ._ffi.ndarray import context, empty, from_dlpack, numpyasarray
 from ._ffi.ndarray import _set_class_ndarray
 from . import backend as F
@@ -31,10 +31,10 @@ def cpu(dev_id=0):
 
     Returns
     -------
-    ctx : TVMContext
+    ctx : DGLContext
         The created context
     """
-    return TVMContext(1, dev_id)
+    return DGLContext(1, dev_id)
 
 def gpu(dev_id=0):
     """Construct a CPU device
@@ -46,10 +46,10 @@ def gpu(dev_id=0):
 
     Returns
     -------
-    ctx : TVMContext
+    ctx : DGLContext
         The created context
     """
-    return TVMContext(2, dev_id)
+    return DGLContext(2, dev_id)
 
 def array(arr, ctx=cpu(0)):
     """Create an array from source arr.
@@ -59,7 +59,7 @@ def array(arr, ctx=cpu(0)):
     arr : numpy.ndarray
         The array to be copied from
 
-    ctx : TVMContext, optional
+    ctx : DGLContext, optional
         The device context to create the array
 
     Returns

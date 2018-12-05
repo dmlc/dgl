@@ -1,4 +1,4 @@
-from ..runtime_ctypes import TVMArrayHandle
+from ..runtime_ctypes import DGLArrayHandle
 
 cdef const char* _c_str_dltensor = "dltensor"
 cdef const char* _c_str_used_dltensor = "used_dltensor"
@@ -8,7 +8,7 @@ cdef void _c_dlpack_deleter(object pycaps):
     cdef DLManagedTensor* dltensor
     if pycapsule.PyCapsule_IsValid(pycaps, _c_str_dltensor):
         dltensor = <DLManagedTensor*>pycapsule.PyCapsule_GetPointer(pycaps, _c_str_dltensor)
-        TVMDLManagedTensorCallDeleter(dltensor)
+        DGLDLManagedTensorCallDeleter(dltensor)
 
 
 def _from_dlpack(object dltensor):
@@ -16,7 +16,7 @@ def _from_dlpack(object dltensor):
     cdef DLTensorHandle chandle
     if pycapsule.PyCapsule_IsValid(dltensor, _c_str_dltensor):
         ptr = <DLManagedTensor*>pycapsule.PyCapsule_GetPointer(dltensor, _c_str_dltensor)
-        CALL(TVMArrayFromDLPack(ptr, &chandle))
+        CALL(DGLArrayFromDLPack(ptr, &chandle))
         # set name and destructor to be empty
         pycapsule.PyCapsule_SetDestructor(dltensor, NULL)
         pycapsule.PyCapsule_SetName(dltensor, _c_str_used_dltensor)
@@ -36,7 +36,7 @@ cdef class NDArrayBase:
             ptr = ctypes.cast(handle, ctypes.c_void_p).value
             self.chandle = <DLTensor*>(ptr)
 
-    property _tvm_handle:
+    property _dgl_handle:
         def __get__(self):
             return <unsigned long long>self.chandle
 
@@ -46,7 +46,7 @@ cdef class NDArrayBase:
                 return None
             else:
                 return ctypes.cast(
-                    <unsigned long long>self.chandle, TVMArrayHandle)
+                    <unsigned long long>self.chandle, DGLArrayHandle)
 
         def __set__(self, value):
             self._set_handle(value)
@@ -57,7 +57,7 @@ cdef class NDArrayBase:
 
     def __dealloc__(self):
         if self.c_is_view == 0:
-            CALL(TVMArrayFree(self.chandle))
+            CALL(DGLArrayFree(self.chandle))
 
     def to_dlpack(self):
         """Produce an array from a DLPack Tensor without copying memory
@@ -69,7 +69,7 @@ cdef class NDArrayBase:
         cdef DLManagedTensor* dltensor
         if self.c_is_view != 0:
             raise ValueError("to_dlpack do not work with memory views")
-        CALL(TVMArrayToDLPack(self.chandle, &dltensor))
+        CALL(DGLArrayToDLPack(self.chandle, &dltensor))
         return pycapsule.PyCapsule_New(dltensor, _c_str_dltensor, _c_dlpack_deleter)
 
 
@@ -79,15 +79,15 @@ cdef c_make_array(void* chandle, is_view):
     return ret
 
 
-cdef _TVM_COMPATS = ()
+cdef _DGL_COMPATS = ()
 
-cdef _TVM_EXT_RET = {}
+cdef _DGL_EXT_RET = {}
 
 def _reg_extension(cls, fcreate):
-    global _TVM_COMPATS
-    _TVM_COMPATS += (cls,)
+    global _DGL_COMPATS
+    _DGL_COMPATS += (cls,)
     if fcreate:
-        _TVM_EXT_RET[cls._tvm_tcode] = fcreate
+        _DGL_EXT_RET[cls._dgl_tcode] = fcreate
 
 
 def _make_array(handle, is_view):

@@ -15,7 +15,7 @@
 #include <sched.h>
 #endif
 
-namespace tvm {
+namespace dgl {
 namespace runtime {
 namespace threading {
 
@@ -60,7 +60,7 @@ class ThreadGroup::Impl {
     // ones.
     num_workers_used = std::min(num_workers_, num_workers_used);
 
-    const char *val = getenv("TVM_BIND_THREADS");
+    const char *val = getenv("DGL_BIND_THREADS");
     if (val == nullptr || atoi(val) == 1) {
       // Do not set affinity if there are more workers than found cores
       if (sorted_order_.size() >= static_cast<unsigned int>(num_workers_)) {
@@ -197,7 +197,7 @@ void Yield() {
 
 int MaxConcurrency() {
   int max_concurrency = 1;
-  const char *val = getenv("TVM_NUM_THREADS");
+  const char *val = getenv("DGL_NUM_THREADS");
   if (val == nullptr) {
     val = getenv("OMP_NUM_THREADS");
   }
@@ -215,4 +215,4 @@ int MaxConcurrency() {
 
 }  // namespace threading
 }  // namespace runtime
-}  // namespace tvm
+}  // namespace dgl

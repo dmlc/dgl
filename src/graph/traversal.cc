@@ -8,11 +8,11 @@
 #include "./traversal.h"
 #include "../c_api_common.h"
 
-using tvm::runtime::TVMArgs;
-using tvm::runtime::TVMArgValue;
-using tvm::runtime::TVMRetValue;
-using tvm::runtime::PackedFunc;
-using tvm::runtime::NDArray;
+using dgl::runtime::DGLArgs;
+using dgl::runtime::DGLArgValue;
+using dgl::runtime::DGLRetValue;
+using dgl::runtime::PackedFunc;
+using dgl::runtime::NDArray;
 
 namespace dgl {
 namespace traverse {
@@ -129,8 +129,8 @@ Frontiers BFSNodesFrontiers(const Graph& graph, IdArray source, bool reversed) {
   return front;
 }
 
-TVM_REGISTER_GLOBAL("traversal._CAPI_DGLBFSNodes")
-.set_body([] (TVMArgs args, TVMRetValue* rv) {
+DGL_REGISTER_GLOBAL("traversal._CAPI_DGLBFSNodes")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
@@ -160,8 +160,8 @@ Frontiers BFSEdgesFrontiers(const Graph& graph, IdArray source, bool reversed) {
   return front;
 }
 
-TVM_REGISTER_GLOBAL("traversal._CAPI_DGLBFSEdges")
-.set_body([] (TVMArgs args, TVMRetValue* rv) {
+DGL_REGISTER_GLOBAL("traversal._CAPI_DGLBFSEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
@@ -186,8 +186,8 @@ Frontiers TopologicalNodesFrontiers(const Graph& graph, bool reversed) {
   return front;
 }
 
-TVM_REGISTER_GLOBAL("traversal._CAPI_DGLTopologicalNodes")
-.set_body([] (TVMArgs args, TVMRetValue* rv) {
+DGL_REGISTER_GLOBAL("traversal._CAPI_DGLTopologicalNodes")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
     bool reversed = args[1];
@@ -198,8 +198,8 @@ TVM_REGISTER_GLOBAL("traversal._CAPI_DGLTopologicalNodes")
   });
 
 
-TVM_REGISTER_GLOBAL("traversal._CAPI_DGLDFSEdges")
-.set_body([] (TVMArgs args, TVMRetValue* rv) {
+DGL_REGISTER_GLOBAL("traversal._CAPI_DGLDFSEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const IdArray source = args[1];
@@ -217,8 +217,8 @@ TVM_REGISTER_GLOBAL("traversal._CAPI_DGLDFSEdges")
     *rv = ConvertNDArrayVectorToPackedFunc({ids, sections});
   });
 
-TVM_REGISTER_GLOBAL("traversal._CAPI_DGLDFSLabeledEdges")
-.set_body([] (TVMArgs args, TVMRetValue* rv) {
+DGL_REGISTER_GLOBAL("traversal._CAPI_DGLDFSLabeledEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
     const IdArray source = args[1];
