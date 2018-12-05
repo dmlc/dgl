@@ -27,13 +27,23 @@ def sparse_matrix(data, index, shape, force_format=False):
             raise TypeError('MXNet backend only supports CSR format,'
                             ' but COO format is forced.')
         coord = index[1]
-        return nd.sparse.csr_matrix((data, (coord[0], coord[1])),
+        spmat = nd.sparse.csr_matrix((data, (coord[0], coord[1])),
                 tuple(shape), ctx=data.context)
+        # generate convert idx
+        # FIXME: create another csr_matrix for this; not efficient
+        # FIXME: cannot use int64
+        data = nd.arange(len(coord[0]), dtype=data.dtype, ctx=coord[0].context)
+        tmp_spmat = nd.sparse.csr_matrix((data, (coord[0], coord[1])),
+                tuple(shape), ctx=data.context)
+        convert_idx = nd.cast(tmp_spmat.data, dtype='int64')
+        return spmat, convert_idx
     elif fmt == 'csr':
         indices = index[1]
         indptr = index[2]
-        return nd.sparse.csr_matrix((data, indices, indptr),
+        spmat = nd.sparse.csr_matrix((data, indices, indptr),
                 tuple(shape), ctx=data.context)
+        # No conversion is required.
+        return spmat, None
     else:
         raise TypeError('Invalid format: %s.' % fmt)
 
@@ -73,7 +83,7 @@ def mean(input, dim):
     return nd.mean(input, axis=dim)
 
 def max(input, dim):
-    return nd.max(input, axis=dim).asnumpy()[0]
+    return nd.max(input, axis=dim)
 
 def cat(seq, dim):
     return nd.concat(*seq, dim=dim)

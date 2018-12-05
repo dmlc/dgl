@@ -489,9 +489,9 @@ def _gen_send_reduce(
     uv_getter : callable
         A function that returns a pair of var.IDX (u, v) for the triggered edges.
     adj_creator : callable
-        A function that returns var.SPMAT that represents the adjmat.
+        A function that returns the adjmat and the shuffle index.
     inc_creator : callable
-        A function that returns var.SPMAT that represents the incmat.
+        A function that returns the incmat and the shuffle index.
 
     Returns
     -------
