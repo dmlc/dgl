@@ -8,7 +8,7 @@ import scipy.sparse as sp
 from ._ffi.function import _init_api
 from . import backend as F
 from . import utils
-from .base import ALL, is_all
+from .base import ALL, is_all, dgl_warning
 
 class ImmutableGraphIndex(object):
     """Graph index object on immutable graphs.
@@ -473,24 +473,51 @@ class ImmutableGraphIndex(object):
         -------
         utils.CtxCachedObject
             An object that returns tensor given context.
+        utils.Index
+            A index for data shuffling due to sparse format change. Return None
+            if shuffle is not required.
         """
         def get_adj(ctx):
             new_mat = self._sparse.adjacency_matrix(transpose)
             return F.copy_to(new_mat, ctx)
-        return self._sparse.adjacency_matrix(transpose, ctx)
+        # FIXME(minjie): calculate the shuffle index
+        dgl_warning('Shuffle index is not correctly computed. SPMV with edge feature might fail!!')
+        return self._sparse.adjacency_matrix(transpose, ctx), None
 
-    def incidence_matrix(self, oriented=False):
+    def incidence_matrix(self, type, ctx):
         """Return the incidence matrix representation of this graph.
-        
+
+        An incidence matrix is an n x m sparse matrix, where n is
+        the number of nodes and m is the number of edges. Each nnz
+        value indicating whether the edge is incident to the node
+        or not.
+
+        There are three types of an incidence matrix `I`:
+        * "in":
+          - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
+          - I[v, e] = 0 otherwise.
+        * "out":
+          - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
+          - I[v, e] = 0 otherwise.
+        * "both":
+          - I[v, e] = 1 if e is the in-edge of v;
+          - I[v, e] = -1 if e is the out-edge of v;
+          - I[v, e] = 0 otherwise (including self-loop).
+
         Parameters
         ----------
-        oriented : bool, optional (default=False)
-          Whether the returned incidence matrix is oriented.
+        type : str
+            Can be either "in", "out" or "both"
+        ctx : context
+            The context of returned incidence matrix.
 
         Returns
         -------
-        utils.CtxCachedObject
-            An object that returns tensor given context.
+        SparseTensor
+            The incidence matrix.
+        utils.Index
+            A index for data shuffling due to sparse format change. Return None
+            if shuffle is not required.
         """
         raise Exception('immutable graph doesn\'t support incidence_matrix for now.')
 
@@ -521,9 +548,11 @@ class ImmutableGraphIndex(object):
         nx_graph : networkx.DiGraph
             The nx graph
         """
-        assert isinstance(nx_graph, nx.DiGraph), "The input graph has to be a NetworkX DiGraph."
+        if not isinstance(nx_graph, nx.DiGraph):
+            nx_graph = nx.DiGraph(nx_graph)
         # We store edge Ids as an edge attribute.
-        out_mat = nx.convert_matrix.to_scipy_sparse_matrix(nx_graph, format='coo')
+        nodelist = list(range(nx_graph.number_of_nodes()))
+        out_mat = nx.convert_matrix.to_scipy_sparse_matrix(nx_graph, nodelist=nodelist, format='coo')
         self._sparse.from_coo_matrix(out_mat)
 
     def from_scipy_sparse_matrix(self, adj):

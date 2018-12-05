@@ -11,7 +11,7 @@ graph neural network model family, on top of existing DL frameworks (e.g.
 Pytorch, MXNet, Gluon etc.).
 
 DGL reduces the implementation of graph neural networks into declaring a set
-of _functions_ (or _modules_ in PyTorch terminology).  In addition, DGL
+of *functions* (or *modules* in PyTorch terminology).  In addition, DGL
 provides:
 
 * Versatile controls over message passing, ranging from low-level operations
@@ -66,7 +66,8 @@ credit, see `here <https://www.dgl.ai/ack>`_.
    :caption: Tutorials
    :glob:
 
-   tutorials/index
+   tutorials/basics/index
+   tutorials/models/index
 
 .. toctree::
    :maxdepth: 2

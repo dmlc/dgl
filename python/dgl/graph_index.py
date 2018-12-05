@@ -484,28 +484,6 @@ class GraphIndex(object):
         induced_nodes = utils.toindex(rst(1))
         return SubgraphIndex(rst(0), self, induced_nodes, e)
 
-    def adjacency_matrix_indices_and_shape(self, transpose=False):
-        """Return the indices and dense shape of adjacency matrix representation of
-        this graph.
-
-        utils.CtxCachedObject
-            An object that returns indices tensor given context.
-        tuple
-            Dense shape of the adjacency matrix
-        """
-        if not 'adj_ind_shape' in self._cache:
-            src, dst, _ = self.edges(sorted=False)
-            src = F.unsqueeze(src.tousertensor(), 0)
-            dst = F.unsqueeze(dst.tousertensor(), 0)
-            n = self.number_of_nodes()
-            if transpose:
-                idx = F.cat([src, dst], dim=0)
-            else:
-                idx = F.cat([dst, src], dim=0)
-            cached_idx = utils.CtxCachedObject(lambda ctx: F.copy_to(idx, ctx))
-            self._cache['adj_ind_shape'] = (cached_idx, (n, n))
-        return self._cache['adj_ind_shape']
-
     def adjacency_matrix(self, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
 
@@ -526,6 +504,9 @@ class GraphIndex(object):
         -------
         SparseTensor
             The adjacency matrix.
+        utils.Index
+            A index for data shuffling due to sparse format change. Return None
+            if shuffle is not required.
         """
         if not isinstance(transpose, bool):
             raise DGLError('Expect bool value for "transpose" arg,'
@@ -543,8 +524,9 @@ class GraphIndex(object):
         m = self.number_of_edges()
         # FIXME(minjie): data type
         dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-        adj = F.sparse_matrix(dat, ('coo', idx), (n, n))
-        return adj
+        adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, n))
+        shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+        return adj, shuffle_idx
 
     def incidence_matrix(self, type, ctx):
         """Return the incidence matrix representation of this graph.
@@ -577,6 +559,9 @@ class GraphIndex(object):
         -------
         SparseTensor
             The incidence matrix.
+        utils.Index
+            A index for data shuffling due to sparse format change. Return None
+            if shuffle is not required.
         """
         src, dst, eid = self.edges(sorted=False)
         src = src.tousertensor(ctx)  # the index of the ctx will be cached
@@ -590,14 +575,14 @@ class GraphIndex(object):
             idx = F.cat([row, col], dim=0)
             # FIXME(minjie): data type
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-            inc = F.sparse_matrix(dat, ('coo', idx), (n, m))
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
         elif type == 'out':
             row = F.unsqueeze(src, 0)
             col = F.unsqueeze(eid, 0)
             idx = F.cat([row, col], dim=0)
             # FIXME(minjie): data type
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-            inc = F.sparse_matrix(dat, ('coo', idx), (n, m))
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
         elif type == 'both':
             # create index
             row = F.unsqueeze(F.cat([src, dst], dim=0), 0)
@@ -611,10 +596,11 @@ class GraphIndex(object):
             x[diagonal] = 0
             y[diagonal] = 0
             dat = F.cat([x, y], dim=0)
-            inc = F.sparse_matrix(dat, ('coo', idx), (n, m))
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
         else:
             raise DGLError('Invalid incidence matrix type: %s' % str(type))
-        return inc
+        shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+        return inc, shuffle_idx
 
     def to_networkx(self):
         """Convert to networkx graph.
