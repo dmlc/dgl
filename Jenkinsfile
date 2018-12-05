@@ -152,13 +152,19 @@ pipeline {
       }
     }
     stage("Doc") {
-      agent { docker { image "dgllib/dgl-ci-cpu" } }
-      steps {
-        pytorch_tutorials()
-      }
-      agent { docker { image "dgllib/dgl-mxnet-cpu" } }
-      steps {
-        mxnet_tutorials()
+      parallel{
+        stage("Pytorch Tutorial"){
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          steps {
+            pytorch_tutorials()
+          }
+        }
+        stage("MXNet Tutorial"){
+          agent { docker { image "dgllib/dgl-mxnet-cpu" } }
+          steps {
+            mxnet_tutorials()
+          }
+        }
       }
     }
   }
