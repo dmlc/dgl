@@ -15,23 +15,24 @@ class Index(object):
         self._initialize_data(data)
 
     def _initialize_data(self, data):
-        self._list_data = None   # a numpy type data or a slice
+        self._pydata = None   # a numpy type data or a slice
         self._user_tensor_data = dict()  # dictionary of user tensors
         self._dgl_tensor_data = None  # a dgl ndarray
         self._dispatch(data)
 
     def __iter__(self):
-        return iter(self.tolist())
+        for i in self.tonumpy():
+            yield int(i)
 
     def __len__(self):
-        if self._list_data is not None and isinstance(self._list_data, slice):
-            slc = self._list_data
+        if self._pydata is not None and isinstance(self._pydata, slice):
+            slc = self._pydata
             if slc.step is None:
                 return slc.stop - slc.start
             else:
                 return (slc.stop - slc.start) // slc.step
-        elif self._list_data is not None:
-            return len(self._list_data)
+        elif self._pydata is not None:
+            return len(self._pydata)
         elif len(self._user_tensor_data) > 0:
             data = next(iter(self._user_tensor_data.values()))
             return len(data)
@@ -39,7 +40,7 @@ class Index(object):
             return len(self._dgl_tensor_data)
 
     def __getitem__(self, i):
-        return self.tolist()[i]
+        return int(self.tonumpy()[i])
 
     def _dispatch(self, data):
         """Store data based on its type."""
@@ -58,35 +59,35 @@ class Index(object):
                 raise DGLError('Index data must be 1D int64 vector, but got: %s' % str(data))
             self._dgl_tensor_data = data
         elif isinstance(data, slice):
-            # save it in the _list_data temporarily; materialize it if `tolist` is called
-            self._list_data = data
+            # save it in the _pydata temporarily; materialize it if `tonumpy` is called
+            self._pydata = data
         else:
             try:
-                self._list_data = np.array([int(data)]).astype(np.int64)
+                self._pydata = np.array([int(data)]).astype(np.int64)
             except:
                 try:
                     data = np.array(data).astype(np.int64)
                     if data.ndim != 1:
                         raise DGLError('Index data must be 1D int64 vector,'
                                        ' but got: %s' % str(data))
-                    self._list_data = data
+                    self._pydata = data
                 except:
                     raise DGLError('Error index data: %s' % str(data))
-            self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self._list_data)
+            self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self._pydata)
 
-    def tolist(self):
-        """Convert to a python-list compatible object."""
-        if self._list_data is None:
+    def tonumpy(self):
+        """Convert to a numpy ndarray."""
+        if self._pydata is None:
             if self._dgl_tensor_data is not None:
-                self._list_data = self._dgl_tensor_data.asnumpy()
+                self._pydata = self._dgl_tensor_data.asnumpy()
             else:
                 data = self.tousertensor()
-                self._list_data = F.zerocopy_to_numpy(data)
-        elif isinstance(self._list_data, slice):
+                self._pydata = F.zerocopy_to_numpy(data)
+        elif isinstance(self._pydata, slice):
             # convert it to numpy array
-            slc = self._list_data
-            self._list_data = np.arange(slc.start, slc.stop, slc.step).astype(np.int64)
-        return self._list_data
+            slc = self._pydata
+            self._pydata = np.arange(slc.start, slc.stop, slc.step).astype(np.int64)
+        return self._pydata
 
     def tousertensor(self, ctx=None):
         """Convert to user tensor (defined in `backend`)."""
@@ -99,7 +100,7 @@ class Index(object):
                 self._user_tensor_data[F.cpu()] = F.zerocopy_from_dlpack(dl)
             else:
                 # zero copy from numpy array
-                self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self.tolist())
+                self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self.tonumpy())
         if ctx not in self._user_tensor_data:
             # copy from cpu to another device
             data = next(iter(self._user_tensor_data.values()))
@@ -116,8 +117,8 @@ class Index(object):
         return self._dgl_tensor_data
 
     def is_slice(self, start, stop, step=None):
-        return (isinstance(self._list_data, slice)
-                and self._list_data == slice(start, stop, step))
+        return (isinstance(self._pydata, slice)
+                and self._pydata == slice(start, stop, step))
 
     def __getstate__(self):
         return self.tousertensor()
@@ -236,8 +237,8 @@ def build_relabel_map(x, sorted=False):
         unique_x, _ = F.sort_1d(F.unique(x))
     else:
         unique_x = x
-    map_len = int(F.max(unique_x, dim=0)) + 1
-    old_to_new = F.zeros(map_len, dtype=F.int64, ctx=F.cpu())
+    map_len = int(F.asnumpy(F.max(unique_x, dim=0))) + 1
+    old_to_new = F.zeros((map_len,), dtype=F.int64, ctx=F.cpu())
     F.scatter_row_inplace(old_to_new, unique_x, F.arange(0, len(unique_x)))
     return unique_x, old_to_new
 
@@ -333,30 +334,20 @@ def reorder(dict_like, index):
         new_dict[key] = F.gather_row(val, idx_ctx)
     return new_dict
 
-def build_coo_sparse_matrix(dat, row, col, dense_shape):
-    """Build coo sparse matrix
+def reorder_index(idx, order):
+    """Reorder the idx according to the given order
 
     Parameters
     ----------
-    dat: Tensor
-        Data.
-    row: Tensor
-        Row index.
-    col: Tensor
-        Column index.
-    dense_shape: list or tuple of two integer
-        Dense shape of the sparse matrix
-
-    Returns
-    -------
-    SparseTensor
-        The sparse matrix.
+    idx : utils.Index
+        The index to be reordered.
+    order : utils.Index
+        The order to follow.
     """
-    nnz = len(row)
-    row = F.unsqueeze(row, 0)
-    col = F.unsqueeze(col, 0)
-    idx = F.cat([row, col], dim=0)
-    return F.sparse_matrix(dat, ('coo', idx), dense_shape)
+    idx = idx.tousertensor()
+    order = order.tousertensor()
+    new_idx = F.gather_row(idx, order)
+    return toindex(new_idx)
 
 def is_iterable(obj):
     """Return true if the object is an iterable."""
