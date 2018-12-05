@@ -263,7 +263,7 @@ def main(args, data):
     dur = []
     sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, neigh_expand,
             neighbor_type='in', num_workers=args.num_parallel_subgraphs, seed_nodes=train_vs,
-            shuffle=True)
+            shuffle=True, return_seed_id=True)
     if args.cache_subgraph:
         sampler = CachedSubgraphLoader(sampler, shuffle=True)
     for epoch in range(args.n_epochs):
@@ -272,7 +272,8 @@ def main(args, data):
         i = 0
         num_batches = len(train_vs) / args.batch_size
         start1 = time.time()
-        for subg, seeds in sampler:
+        for subg, aux_infos in sampler:
+            seeds = aux_infos['seeds']
             subg_seeds = subg.map_to_subgraph_nid(seeds)
             subg.copy_from_parent()
 
@@ -313,7 +314,8 @@ def main(args, data):
             sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, neigh_expand,
                                                            neighbor_type='in',
                                                            num_workers=args.num_parallel_subgraphs,
-                                                           seed_nodes=train_vs, shuffle=True)
+                                                           seed_nodes=train_vs, shuffle=True,
+                                                           return_seed_id=True)
 
         # prediction.
         logits = model_infer(g, eval_vs)
