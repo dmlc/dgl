@@ -67,7 +67,7 @@ pipeline {
       agent { docker { image "dgllib/dgl-ci-lint" } }
       steps {
         init_git_submodule()
-        sh "tests/scripts/task_lint.sh"
+        sh "bash tests/scripts/task_lint.sh"
       }
     }
     stage("Build") {
