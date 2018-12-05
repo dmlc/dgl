@@ -10,7 +10,7 @@
 #include <memory>
 #include <vector>
 
-namespace tvm {
+namespace dgl {
 namespace runtime {
 namespace threading {
 
@@ -80,6 +80,6 @@ int MaxConcurrency();
 
 }  // namespace threading
 }  // namespace runtime
-}  // namespace tvm
+}  // namespace dgl
 
 #endif  // DGL_RUNTIME_THREADING_BACKEND_H_

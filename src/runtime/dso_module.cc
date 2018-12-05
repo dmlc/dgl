@@ -14,11 +14,11 @@
 #include <dlfcn.h>
 #endif
 
-namespace tvm {
+namespace dgl {
 namespace runtime {
 
 // Module to load from dynamic shared libary.
-// This is the default module TVM used for host-side AOT
+// This is the default module DGL used for host-side AOT
 class DSOModuleNode final : public ModuleNode {
  public:
   ~DSOModuleNode() {
@@ -33,11 +33,11 @@ class DSOModuleNode final : public ModuleNode {
       const std::string& name,
       const std::shared_ptr<ModuleNode>& sptr_to_self) final {
     BackendPackedCFunc faddr;
-    if (name == runtime::symbol::tvm_module_main) {
+    if (name == runtime::symbol::dgl_module_main) {
       const char* entry_name = reinterpret_cast<const char*>(
-          GetSymbol(runtime::symbol::tvm_module_main));
+          GetSymbol(runtime::symbol::dgl_module_main));
       CHECK(entry_name!= nullptr)
-          << "Symbol " << runtime::symbol::tvm_module_main << " is not presented";
+          << "Symbol " << runtime::symbol::dgl_module_main << " is not presented";
       faddr = reinterpret_cast<BackendPackedCFunc>(GetSymbol(entry_name));
     } else {
       faddr = reinterpret_cast<BackendPackedCFunc>(GetSymbol(name.c_str()));
@@ -49,7 +49,7 @@ class DSOModuleNode final : public ModuleNode {
   void Init(const std::string& name) {
     Load(name);
     if (auto *ctx_addr =
-        reinterpret_cast<void**>(GetSymbol(runtime::symbol::tvm_module_ctx))) {
+        reinterpret_cast<void**>(GetSymbol(runtime::symbol::dgl_module_ctx))) {
       *ctx_addr = this;
     }
     InitContextFunctions([this](const char* fname) {
@@ -58,7 +58,7 @@ class DSOModuleNode final : public ModuleNode {
     // Load the imported modules
     const char* dev_mblob =
         reinterpret_cast<const char*>(
-            GetSymbol(runtime::symbol::tvm_dev_mblob));
+            GetSymbol(runtime::symbol::dgl_dev_mblob));
     if (dev_mblob != nullptr) {
       ImportModuleBlob(dev_mblob, &imports_);
     }
@@ -103,11 +103,11 @@ class DSOModuleNode final : public ModuleNode {
 #endif
 };
 
-TVM_REGISTER_GLOBAL("module.loadfile_so")
-.set_body([](TVMArgs args, TVMRetValue* rv) {
+DGL_REGISTER_GLOBAL("module.loadfile_so")
+.set_body([](DGLArgs args, DGLRetValue* rv) {
     std::shared_ptr<DSOModuleNode> n = std::make_shared<DSOModuleNode>();
     n->Init(args[0]);
     *rv = runtime::Module(n);
   });
 }  // namespace runtime
-}  // namespace tvm
+}  // namespace dgl

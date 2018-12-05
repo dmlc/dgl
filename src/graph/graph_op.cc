@@ -116,6 +116,7 @@ IdArray GraphOp::MapParentIdToSubgraphId(IdArray parent_vids, IdArray query) {
 
   const bool is_sorted = std::is_sorted(parent_data, parent_data + parent_len);
   if (is_sorted) {
+#pragma omp parallel for
     for (int64_t i = 0; i < query_len; i++) {
       const dgl_id_t id = query_data[i];
       const auto it = std::find(parent_data, parent_data + parent_len, id);
@@ -132,6 +133,7 @@ IdArray GraphOp::MapParentIdToSubgraphId(IdArray parent_vids, IdArray query) {
       const dgl_id_t id = parent_data[i];
       parent_map[id] = i;
     }
+#pragma omp parallel for
     for (int64_t i = 0; i < query_len; i++) {
       const dgl_id_t id = query_data[i];
       auto it = parent_map.find(id);

@@ -4,27 +4,32 @@ import numpy as np
 
 from ... import utils
 from ...subgraph import DGLSubGraph
+from ... import backend as F
 
 __all__ = ['NeighborSampler']
 
 class NSSubgraphLoader(object):
     def __init__(self, g, batch_size, expand_factor, num_hops=1,
                  neighbor_type='in', node_prob=None, seed_nodes=None,
-                 shuffle=False, num_workers=1, max_subgraph_size=None):
+                 shuffle=False, num_workers=1, max_subgraph_size=None,
+                 return_seed_id=False):
         self._g = g
+        if not g._graph.is_readonly():
+            raise NotImplementedError("subgraph loader only support read-only graphs.")
         self._batch_size = batch_size
         self._expand_factor = expand_factor
         self._num_hops = num_hops
         self._node_prob = node_prob
+        self._return_seed_id = return_seed_id
         if self._node_prob is not None:
             assert self._node_prob.shape[0] == g.number_of_nodes(), \
                     "We need to know the sampling probability of every node"
         if seed_nodes is None:
-            self._seed_nodes = np.arange(0, g.number_of_nodes(), dtype=np.int64)
+            self._seed_nodes = F.arange(0, g.number_of_nodes())
         else:
             self._seed_nodes = seed_nodes
         if shuffle:
-            np.random.shuffle(self._seed_nodes)
+            self._seed_nodes = F.rand_shuffle(self._seed_nodes)
         self._num_workers = num_workers
         if max_subgraph_size is None:
             # This size is set temporarily.
@@ -51,9 +56,10 @@ class NSSubgraphLoader(object):
                                                self._num_hops, self._neighbor_type,
                                                self._node_prob, self._max_subgraph_size)
         subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
-                i, readonly=self._g._readonly) for i in sgi]
+                i) for i in sgi]
         self._subgraphs.extend(subgraphs)
-        self._seed_ids.extend(seed_ids)
+        if self._return_seed_id:
+            self._seed_ids.extend(seed_ids)
 
     def __iter__(self):
         return self
@@ -66,12 +72,20 @@ class NSSubgraphLoader(object):
         # iterate all subgraphs and we should stop the iterator now.
         if len(self._subgraphs) == 0:
             raise StopIteration
-        return self._subgraphs.pop(0), self._seed_ids.pop(0).tousertensor()
+        aux_infos = {}
+        if self._return_seed_id:
+            aux_infos['seeds'] = self._seed_ids.pop(0).tousertensor()
+        return self._subgraphs.pop(0), aux_infos
 
 def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
                     neighbor_type='in', node_prob=None, seed_nodes=None,
-                    shuffle=False, num_workers=1, max_subgraph_size=None):
-    '''
+                    shuffle=False, num_workers=1, max_subgraph_size=None,
+                    return_seed_id=False):
+    '''Create a sampler that samples neighborhood.
+
+    .. note:: This method currently only supports MXNet backend. Set
+        "DGLBACKEND" environment variable to "mxnet".
+
     This creates a subgraph data loader that samples subgraphs from the input graph
     with neighbor sampling. This simpling method is implemented in C and can perform
     sampling very efficiently.
@@ -82,6 +96,11 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
     from the k-hop neighborhood. In this case, the sampled edges are the ones
     that connect the source nodes and the sampled neighbor nodes of the source
     nodes.
+
+    The subgraph loader returns a list of subgraphs and a dictionary of additional
+    information about the subgraphs. The size of the subgraph list is the number of workers.
+    The dictionary contains:
+        'seeds': a list of 1D tensors of seed Ids, if return_seed_id is True.
 
     Parameters
     ----------
@@ -100,15 +119,19 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
     node_prob: the probability that a neighbor node is sampled.
         1D Tensor. None means uniform sampling. Otherwise, the number of elements
         should be the same as the number of vertices in the graph.
-    seed_nodes: a list of nodes where we sample subgraphs from. If it's None, the seed vertices are all vertices in the graph.
+    seed_nodes: a list of nodes where we sample subgraphs from.
+        If it's None, the seed vertices are all vertices in the graph.
     shuffle: indicates the sampled subgraphs are shuffled.
     num_workers: the number of worker threads that sample subgraphs in parallel.
     max_subgraph_size: the maximal subgraph size in terms of the number of nodes.
         GPU doesn't support very large subgraphs.
+    return_seed_id: indicates whether to return seed ids along with the subgraphs.
+        The seed Ids are in the parent graph.
     
     Returns
     -------
-    A subgraph generator.
+    A subgraph loader that returns a list of batched subgraphs and a dictionary of
+        additional information about the subgraphs.
     '''
     return NSSubgraphLoader(g, batch_size, expand_factor, num_hops, neighbor_type, node_prob,
-                            seed_nodes, shuffle, num_workers, max_subgraph_size)
+                            seed_nodes, shuffle, num_workers, max_subgraph_size, return_seed_id)

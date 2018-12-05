@@ -29,7 +29,7 @@ class DGLSubGraph(DGLGraph):
 
     The "shared" mode is currently not supported.
 
-    The subgraph is read-only so mutation is not allowed.
+    The subgraph is read-only on structure; graph mutation is not allowed.
 
     Parameters
     ----------
@@ -43,11 +43,10 @@ class DGLSubGraph(DGLGraph):
         The graph index.
     shared : bool, optional
         Whether the subgraph shares node/edge features with the parent graph.
-    readonly : bool, optional
-        Whether the graph structure is read-only (default: False).
     """
-    def __init__(self, parent, parent_nid, parent_eid, graph_idx, shared=False, readonly=False):
-        super(DGLSubGraph, self).__init__(graph_data=graph_idx, readonly=readonly)
+    def __init__(self, parent, parent_nid, parent_eid, graph_idx, shared=False):
+        super(DGLSubGraph, self).__init__(graph_data=graph_idx,
+                                          readonly=graph_idx.is_readonly())
         self._parent = parent
         self._parent_nid = parent_nid
         self._parent_eid = parent_eid
@@ -79,6 +78,15 @@ class DGLSubGraph(DGLGraph):
         """
         return self._parent_nid.tousertensor()
 
+    def _get_parent_eid(self):
+        # The parent eid might be lazily evaluated and thus may not
+        # be an index. Instead, it's a lambda function that returns
+        # an index.
+        if isinstance(self._parent_eid, utils.Index):
+            return self._parent_eid
+        else:
+            return self._parent_eid()
+
     @property
     def parent_eid(self):
         """Get the parent edge ids.
@@ -91,7 +99,7 @@ class DGLSubGraph(DGLGraph):
         Tensor
             The parent edge id array.
         """
-        return self._parent_eid.tousertensor()
+        return self._get_parent_eid().tousertensor()
 
     def copy_to_parent(self, inplace=False):
         """Write node/edge features to the parent graph.
@@ -103,8 +111,9 @@ class DGLSubGraph(DGLGraph):
         """
         self._parent._node_frame.update_rows(
                 self._parent_nid, self._node_frame, inplace=inplace)
-        self._parent._edge_frame.update_rows(
-                self._parent_eid, self._edge_frame, inplace=inplace)
+        if self._parent._edge_frame.num_rows != 0:
+            self._parent._edge_frame.update_rows(
+                    self._get_parent_eid(), self._edge_frame, inplace=inplace)
 
     def copy_from_parent(self):
         """Copy node/edge features from the parent graph.
@@ -116,7 +125,19 @@ class DGLSubGraph(DGLGraph):
                 self._parent._node_frame[self._parent_nid]))
         if self._parent._edge_frame.num_rows != 0:
             self._edge_frame = FrameRef(Frame(
-                self._parent._edge_frame[self._parent_eid]))
+                self._parent._edge_frame[self._get_parent_eid()]))
 
     def map_to_subgraph_nid(self, parent_vids):
-        return map_to_subgraph_nid(self._graph, utils.toindex(parent_vids))
+        """Map the node Ids in the parent graph to the node Ids in the subgraph.
+
+        Parameters
+        ----------
+        parent_vids : list, tensor
+            The node ID array in the parent graph.
+
+        Returns
+        -------
+        tensor
+            The node ID array in the subgraph.
+        """
+        return map_to_subgraph_nid(self._graph, utils.toindex(parent_vids)).tousertensor()

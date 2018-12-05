@@ -3,6 +3,7 @@ os.environ['DGLBACKEND'] = 'mxnet'
 import mxnet as mx
 import numpy as np
 import scipy as sp
+import dgl
 from dgl.graph import GraphIndex, create_graph_index
 from dgl.graph_index import map_to_subgraph_nid
 from dgl import utils
@@ -14,8 +15,8 @@ def generate_rand_graph(n):
     return g, ig
 
 def check_graph_equal(g1, g2):
-    adj1 = g1.adjacency_matrix(transpose=False, ctx=mx.cpu()) != 0
-    adj2 = g2.adjacency_matrix(transpose=False, ctx=mx.cpu()) != 0
+    adj1 = g1.adjacency_matrix(transpose=False, ctx=mx.cpu())[0] != 0
+    adj2 = g2.adjacency_matrix(transpose=False, ctx=mx.cpu())[0] != 0
     assert mx.nd.sum(adj1 - adj2).asnumpy() == 0
 
 def test_graph_gen():
@@ -62,13 +63,13 @@ def check_basics(g, ig):
 
     for u in randv.asnumpy():
         for v in randv.asnumpy():
-            if len(g.edge_id(u, v).tolist()) == 1:
-                assert g.edge_id(u, v).tolist() == ig.edge_id(u, v).tolist()
+            if len(g.edge_id(u, v)) == 1:
+                assert g.edge_id(u, v).tonumpy() == ig.edge_id(u, v).tonumpy()
             assert g.has_edge_between(u, v) == ig.has_edge_between(u, v)
     randv = utils.toindex(randv)
-    ids = g.edge_ids(randv, randv)[2].tolist()
-    assert sum(ig.edge_ids(randv, randv)[2].tolist() == ids) == len(ids)
-    assert sum(g.has_edges_between(randv, randv).tolist() == ig.has_edges_between(randv, randv).tolist()) == len(randv)
+    ids = g.edge_ids(randv, randv)[2].tonumpy()
+    assert sum(ig.edge_ids(randv, randv)[2].tonumpy() == ids) == len(ids)
+    assert sum(g.has_edges_between(randv, randv).tonumpy() == ig.has_edges_between(randv, randv).tonumpy()) == len(randv)
 
 
 def test_basics():
@@ -99,8 +100,23 @@ def test_node_subgraph():
     for i in range(4):
         check_graph_equal(subgs[i], subigs[i])
 
+def test_create_graph():
+    elist = [(1, 2), (0, 1), (0, 2)]
+    ig = dgl.DGLGraph(elist, readonly=True)
+    g = dgl.DGLGraph(elist, readonly=False)
+    for edge in elist:
+        assert g.edge_id(edge[0], edge[1]) == ig.edge_id(edge[0], edge[1])
+
+    data = [1, 2, 3]
+    rows = [1, 0, 0]
+    cols = [2, 1, 2]
+    mat = sp.sparse.coo_matrix((data, (rows, cols)))
+    ig = dgl.DGLGraph(mat, readonly=True)
+    for edge in elist:
+        assert g.edge_id(edge[0], edge[1]) == ig.edge_id(edge[0], edge[1])
 
 if __name__ == '__main__':
     test_basics()
     test_graph_gen()
     test_node_subgraph()
+    test_create_graph()

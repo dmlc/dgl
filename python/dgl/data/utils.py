@@ -13,25 +13,36 @@ except ImportError:
         pass
     requests = requests_failed_to_import
 
+__all__ = ['download', 'check_sha1', 'extract_archive', 'get_download_dir']
+
+def _get_dgl_url(file_url):
+    """Get DGL online url for download."""
+    dgl_repo_url = 'https://s3.us-east-2.amazonaws.com/dgl.ai/'
+    repo_url = os.environ.get('DGL_REPO', dgl_repo_url)
+    if repo_url[-1] != '/':
+        repo_url = repo_url + '/'
+    return repo_url + file_url
+
+
 def download(url, path=None, overwrite=False, sha1_hash=None, retries=5, verify_ssl=True):
-    """Download an given URL
+    """Download a given URL.
 
     Codes borrowed from mxnet/gluon/utils.py
 
     Parameters
     ----------
     url : str
-        URL to download
+        URL to download.
     path : str, optional
         Destination path to store downloaded file. By default stores to the
-        current directory with same name as in url.
+        current directory with the same name as in url.
     overwrite : bool, optional
-        Whether to overwrite destination file if already exists.
+        Whether to overwrite the destination file if it already exists.
     sha1_hash : str, optional
         Expected sha1 hash in hexadecimal digits. Will ignore existing file when hash is specified
         but doesn't match.
     retries : integer, default 5
-        The number of times to attempt the download in case of failure or non 200 return codes
+        The number of times to attempt downloading in case of failure or non 200 return codes.
     verify_ssl : bool, default True
         Verify SSL certificates.
 
@@ -101,6 +112,7 @@ def check_sha1(filename, sha1_hash):
         Path to the file.
     sha1_hash : str
         Expected sha1 hash in hexadecimal digits.
+
     Returns
     -------
     bool
@@ -117,14 +129,14 @@ def check_sha1(filename, sha1_hash):
     return sha1.hexdigest() == sha1_hash
 
 def extract_archive(file, target_dir):
-    """Extract archive file
+    """Extract archive file.
 
     Parameters
     ----------
     file : str
         Absolute path of the archive file.
     target_dir : str
-        Target directory of the archive to be uncompressed
+        Target directory of the archive to be uncompressed.
     """
     if os.path.exists(target_dir):
         return
@@ -139,7 +151,13 @@ def extract_archive(file, target_dir):
     archive.close()
 
 def get_download_dir():
-    """Get the absolute path to the download directory."""
+    """Get the absolute path to the download directory.
+
+    Returns
+    -------
+    dirname : str
+        Path to the download directory
+    """
     curr_path = os.path.dirname(os.path.abspath(os.path.expanduser(__file__)))
     dirname = os.path.join(curr_path, '../../../_download')
     if not os.path.exists(dirname):

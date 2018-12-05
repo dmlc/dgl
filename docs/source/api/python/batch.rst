@@ -1,14 +1,36 @@
-BatchedDGLGraph
-===============
+.. _apibatch:
 
-.. automodule:: dgl.batched_graph
+BatchedDGLGraph -- Enable batched graph operations
+==================================================
+
+.. currentmodule:: dgl
 .. autoclass:: BatchedDGLGraph
+
+Merge and decompose
+-------------------
 
 .. autosummary::
     :toctree: ../../generated/
 
     batch
     unbatch
+
+Query batch summary
+----------------------
+
+.. autosummary::
+    :toctree: ../../generated/
+
+    BatchedDGLGraph.batch_size
+    BatchedDGLGraph.batch_num_nodes
+    BatchedDGLGraph.batch_num_edges
+
+Graph Readout
+-------------
+
+.. autosummary::
+    :toctree: ../../generated/
+
     sum_nodes
     sum_edges
     mean_nodes

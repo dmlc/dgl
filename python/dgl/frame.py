@@ -31,7 +31,7 @@ class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
         def __reduce__(self):
             state = (self.shape, F.reverse_data_type_dict[self.dtype])
             return self._reconstruct_scheme, state
-                   
+
 
         @classmethod
         def _reconstruct_scheme(cls, shape, dtype_str):
@@ -219,7 +219,7 @@ class Frame(MutableMapping):
         callable
             The initializer
         """
-        return self._initializers.get(column, self._default_initializer) 
+        return self._initializers.get(column, self._default_initializer)
 
     def set_initializer(self, initializer, column=None):
         """Set the initializer for empty values, for a given column or all future
@@ -287,7 +287,7 @@ class Frame(MutableMapping):
 
     def __delitem__(self, name):
         """Delete the whole column.
-        
+
         Parameters
         ----------
         name : str
@@ -306,7 +306,7 @@ class Frame(MutableMapping):
             The column name.
         scheme : Scheme
             The column scheme.
-        ctx : TVMContext
+        ctx : DGLContext
             The column context.
         """
         if name in self:
@@ -435,7 +435,7 @@ class FrameRef(MutableMapping):
     @property
     def schemes(self):
         """Return the frame schemes.
-        
+
         Returns
         -------
         dict of str to Scheme
@@ -541,7 +541,7 @@ class FrameRef(MutableMapping):
         If the provided key is an index or a slice, the corresponding rows will be selected.
         The returned rows are saved in a lazy dictionary so only the real selection happens
         when the explicit column name is provided.
-        
+
         Examples (using pytorch)
         ------------------------
         >>> # create a frame of two columns and five rows
@@ -550,7 +550,7 @@ class FrameRef(MutableMapping):
         >>> # select the row 1 and 2, the returned `rows` is a lazy dictionary.
         >>> rows = fr[Index([1, 2])]
         >>> rows['c1']  # only select rows for 'c1' column; 'c2' column is not sliced.
-        
+
         Parameters
         ----------
         key : str or utils.Index or slice
@@ -611,6 +611,9 @@ class FrameRef(MutableMapping):
         return utils.LazyDict(lambda key: self._frame[key][rows], keys=self.keys())
 
     def __setitem__(self, key, val):
+        self.set_item_inplace(key, val, inplace=False)
+
+    def set_item_inplace(self, key, val, inplace):
         """Update the data in the frame.
 
         If the provided key is string, the corresponding column data will be updated.
@@ -629,9 +632,11 @@ class FrameRef(MutableMapping):
             The key.
         val : Tensor or dict of tensors
             The value.
+        inplace: bool
+            If True, update will be done in place
         """
         if isinstance(key, str):
-            self.update_column(key, val, inplace=False)
+            self.update_column(key, val, inplace=inplace)
         elif isinstance(key, slice) and key == slice(0, self.num_rows):
             # shortcut for updating all the rows
             return self.update(val)
@@ -639,7 +644,7 @@ class FrameRef(MutableMapping):
             # shortcut for selecting all the rows
             return self.update(val)
         else:
-            self.update_rows(key, val, inplace=False)
+            self.update_rows(key, val, inplace=inplace)
 
     def update_column(self, name, data, inplace):
         """Update the column.
@@ -760,7 +765,7 @@ class FrameRef(MutableMapping):
         if isinstance(query, slice):
             query = range(query.start, query.stop)
         else:
-            query = query.tolist()
+            query = query.tonumpy()
 
         if isinstance(self._index_data, slice):
             self._index_data = range(self._index_data.start, self._index_data.stop)
@@ -856,51 +861,3 @@ def frame_like(other, num_rows):
     #   now supports non-exist columns.
     newf._initializers = other._initializers
     return newf
-
-def merge_frames(frames, indices, max_index, reduce_func):
-    """Merge a list of frames.
-
-    The result frame contains `max_index` number of rows. For each frame in
-    the given list, its row is merged as follows:
-
-        merged[indices[i][row]] += frames[i][row]
-
-    Parameters
-    ----------
-    frames : iterator of dgl.frame.FrameRef
-        A list of frames to be merged.
-    indices : iterator of dgl.utils.Index
-        The indices of the frame rows.
-    reduce_func : str
-        The reduce function (only 'sum' is supported currently)
-
-    Returns
-    -------
-    merged : FrameRef
-        The merged frame.
-    """
-    # TODO(minjie)
-    assert False, 'Buggy code, disabled for now.'
-    assert reduce_func == 'sum'
-    assert len(frames) > 0
-    schemes = frames[0].schemes
-    # create an adj to merge
-    # row index is equal to the concatenation of all the indices.
-    row = sum([idx.tolist() for idx in indices], [])
-    col = list(range(len(row)))
-    n = max_index
-    m = len(row)
-    row = F.unsqueeze(F.tensor(row, dtype=F.int64), 0)
-    col = F.unsqueeze(F.tensor(col, dtype=F.int64), 0)
-    idx = F.cat([row, col], dim=0)
-    dat = F.ones((m,))
-    adjmat = F.sparse_tensor(idx, dat, [n, m])
-    ctx_adjmat = utils.CtxCachedObject(lambda ctx: F.to_context(adjmat, ctx))
-    merged = {}
-    for key in schemes:
-        # the rhs of the spmv is the concatenation of all the frame columns
-        feats = F.pack([fr[key] for fr in frames])
-        merged_feats = F.spmm(ctx_adjmat.get(F.get_context(feats)), feats)
-        merged[key] = merged_feats
-    merged = FrameRef(Frame(merged))
-    return merged

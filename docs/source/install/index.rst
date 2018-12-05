@@ -1,94 +1,172 @@
 Install DGL
 ============
 
-At this stage, we recommend installing DGL from source. To quickly try out DGL and its demo/tutorials, checkout `Install from docker`_.
+At this stage, we recommend installing DGL from ``conda`` or ``pip``.
 
-Get source codes
-----------------
-First, download the source files from github. Note you need to use the ``--recursive`` option to
-also clone the submodules.
-
-.. code:: bash
-
-    git clone --recursive https://github.com/jermainewang/dgl.git
-
-You can also clone the repository first and type following commands:
-
-.. code:: bash
-
-    git submodule init
-    git submodule update
-
-
-Build shared library
---------------------
-Before building the library, please make sure the following dependencies are installed
-(use ubuntu as an example):
-
-.. code:: bash
-
-    sudo apt-get update
-    sudo apt-get install -y python
-
-We use cmake (minimal version 2.8) to build the library.
-
-.. code:: bash
-
-    mkdir build
-    cd build
-    cmake ..
-    make -j4
-
-Build python binding
---------------------
-DGL's python binding depends on following packages (tested version):
-
-* numpy (>= 1.14.0)
-* scipy (>= 1.1.0)
-* networkx (>= 2.1)
-
-To install them, use following command:
-
-.. code:: bash
-
-    pip install --user numpy scipy networkx
-
-There are several ways to setup DGL's python binding. We recommend developers at the current stage
-use environment variables to find python packages.
-
-.. code:: bash
-
-    export DGL_HOME=/path/to/dgl
-    export PYTHONPATH=${DGL_HOME}/python:${PYTHONPATH}
-    export DGL_LIBRARY_PATH=${DGL_HOME}/build
-
-The ``DGL_LIBRARY_PATH`` variable is used for our python package to locate the shared library
-built above. Use following command to test whether the installation is successful or not.
-
-.. code:: bash
-
-    python -c 'import dgl'
-
-Install from docker
+System requirements
 -------------------
-TBD
+Currently DGL is tested on
 
-Install on Windows/MinGW
-------------------------
-Make sure you have the following installed:
+* Ubuntu 16.04
+* macOS X
+* Windows 7
 
-* CMake
-* MinGW/GCC (G++)
-* MinGW/Make
+DGL is expected to work on all Linux distributions later than Ubuntu 16.04, macOS X, and
+Windows 7 or later.
 
-You can grab them from Anaconda.
+DGL also requires the Python version to be 3.5 or later.  Python 3.4 or less is not
+tested, and Python 2 support is coming.
 
-In the command line prompt, run:
+DGL supports multiple tensor libraries (e.g. PyTorch, MXNet) as backends; refer
+`Working with different backends`_ for requirements on backends and how to select a
+backend.
+
+Install from conda
+----------------------
+One can either grab `miniconda <https://conda.io/miniconda.html>`_ or
+the full `anaconda <https://www.anaconda.com/download/>`_ if ``conda``
+has not been installed.
+
+Once the conda environment is activated, run
 
 .. code:: bash
 
-    md build
-    cd build
-    cmake -DCMAKE_CXX_FLAGS="-DDMLC_LOG_STACK_TRACE=0 -DTVM_EXPORTS" -DCMAKE_MAKE_PROGRAM=mingw32-make .. -G "MSYS Makefiles"
-    mingw32-make
-    set DGL_LIBRARY_PATH=%CD%
+   conda install -c dglteam dgl
+
+Install from pip
+----------------
+One can simply run the following command to install via ``pip``:
+
+.. code:: bash
+
+   pip install dgl
+
+Working with different backends
+-------------------------------
+
+Currently DGL supports PyTorch and MXNet.
+
+Switching backend
+`````````````````
+
+The backend is controlled by ``DGLBACKEND`` environment variable, which defaults to
+``pytorch``.  Currently it supports the following values:
+
++---------+---------+--------------------------------------------------+
+| Value   | Backend | Memo                                             |
++=========+=========+==================================================+
+| pytorch | PyTorch | Requires 0.4.1 or later; see                     |
+|         |         | `official website <https://pytorch.org>`_        |
++---------+---------+--------------------------------------------------+
+| mxnet   | MXNet   | Requires nightly build; run the following        |
+|         |         | command to install (TODO):                       |
+|         |         |                                                  |
+|         |         | .. code:: bash                                   |
+|         |         |                                                  |
+|         |         |    pip install --pre mxnet                       |
++---------+---------+--------------------------------------------------+
+| numpy   | NumPy   | Does not support gradient computation            |
++---------+---------+--------------------------------------------------+
+
+Install from source
+-------------------
+First, download the source files from GitHub:
+
+.. code:: bash
+
+   git clone --recursive https://github.com/jermainewang/dgl.git
+
+One can also clone the repository first and run the following:
+
+.. code:: bash
+
+   git submodule init
+   git submodule update
+
+Linux
+`````
+
+Install the system packages for building the shared library, for Debian/Ubuntu
+users, run:
+
+.. code:: bash
+
+   sudo apt-get update
+   sudo apt-get install -y build-essential build-dep python3-dev make cmake
+
+For Fedora/RHEL/CentOS users, run:
+
+.. code:: bash
+
+   sudo yum install -y gcc-c++ python3-devel make cmake
+
+Build the shared library and install the Python binding afterwards:
+
+.. code:: bash
+
+   mkdir build
+   cd build
+   cmake ..
+   make -j4
+   cd ../python
+   python setup.py install
+
+macOS
+`````
+
+Installation on macOS is similar to Linux. But macOS users need to install
+building tools like clang, GNU Make, cmake first.
+
+Tools like clang and GNU Make are packaged in **Command Line Tools** for macOS. To
+install:
+
+.. code:: bash
+
+   xcode-select --install
+
+To install other needed packages like cmake, we recommend first installing
+**Homebrew**, which is a popular package manager for macOS. Detailed
+instructions can be found on its `homepage <https://brew.sh/>`_.
+
+After installation of Homebrew, install cmake by:
+
+.. code:: bash
+
+   brew install cmake
+
+Then go to root directory of DGL repository, build shared library and
+install Python binding for DGL:
+
+.. code:: bash
+
+   mkdir build
+   cd build
+   cmake ..
+   make -j4
+   cd ../python
+   python setup.py install
+
+We tested installation on macOS X with clang 10.0.0, GNU Make 3.81, and cmake
+3.13.1.
+
+Windows
+```````
+
+Currently Windows source build is tested with CMake and MinGW/GCC.  We highly recommend
+using CMake and GCC from `conda installations <https://conda.io/miniconda.html>`_.  To
+do so, run
+
+.. code:: bash
+
+   conda install cmake m2w64-gcc m2w64-make
+
+Then build the shared library and install the Python binding:
+
+.. code::
+
+   md build
+   cd build
+   cmake -DCMAKE_CXX_FLAGS="-DDMLC_LOG_STACK_TRACE=0 -DDGL_EXPORTS" -DCMAKE_MAKE_PROGRAM=mingw32-make .. -G "MSYS Makefiles"
+   mingw32-make
+   cd ..\python
+   python setup.py install

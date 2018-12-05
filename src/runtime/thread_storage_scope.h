@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2017 by Contributors
  * \file thread_storage_scope.h
- * \brief Extract thread axis configuration from TVMArgs.
+ * \brief Extract thread axis configuration from DGLArgs.
  */
 #ifndef DGL_RUNTIME_THREAD_STORAGE_SCOPE_H_
 #define DGL_RUNTIME_THREAD_STORAGE_SCOPE_H_
@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-namespace tvm {
+namespace dgl {
 namespace runtime {
 
 /*!
@@ -170,7 +170,7 @@ class ThreadAxisConfig {
     }
   }
   // extract workload from arguments.
-  ThreadWorkLoad Extract(TVMArgs x) const {
+  ThreadWorkLoad Extract(DGLArgs x) const {
     ThreadWorkLoad w;
     std::fill(w.work_size, w.work_size + 6, 1);
     for (size_t i = 0; i < arg_index_map_.size(); ++i) {
@@ -194,12 +194,12 @@ class ThreadAxisConfig {
 };
 
 }  // namespace runtime
-}  // namespace tvm
+}  // namespace dgl
 
 namespace std {
 template <>
-struct hash<::tvm::runtime::StorageScope> {
-  std::size_t operator()(const ::tvm::runtime::StorageScope& k) const {
+struct hash<::dgl::runtime::StorageScope> {
+  std::size_t operator()(const ::dgl::runtime::StorageScope& k) const {
     return static_cast<size_t>(k.rank);
   }
 };

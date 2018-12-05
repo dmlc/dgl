@@ -33,6 +33,7 @@ class OpCode(object):
     WRITE_ROW_ = 23
     WRITE_DICT_ = 24
     APPEND_ROW_ = 25
+    WRITE_ROW_INPLACE_ = 26
 
 class Executor(object):
     @abstractmethod
@@ -306,7 +307,8 @@ class SPMVWithDataExecutor(Executor):
         spA = spA_ctxobj.get(ctx)
         spidx = F.sparse_matrix_indices(spA)
         shape = F.shape(spA)
-        spA = F.sparse_matrix(A_data, spidx, shape)
+        # shuffle index is not used
+        spA, _ = F.sparse_matrix(A_data, spidx, shape)
 
         if F.ndim(B) == 1:
             # B is a vector, append a (1,) dim at the end
@@ -551,6 +553,38 @@ IR_REGISTRY[OpCode.WRITE_ROW_] = {
 }
 def WRITE_ROW_(fd, row, val):
     reg = IR_REGISTRY[OpCode.WRITE_ROW_]
+    get_current_prog().issue(reg['executor_cls'](fd, row, val))
+
+class WriteRowInplace_Executor(Executor):
+    def __init__(self, fd, row, val):
+        self.fd = fd
+        self.row = row
+        self.val = val
+
+    def opcode(self):
+        return OpCode.WRITE_ROW_INPLACE_
+
+    def arg_vars(self):
+        return [self.fd, self.row, self.val]
+
+    def ret_var(self):
+        return None
+
+    def run(self):
+        fd_data = self.fd.data  # feature dict
+        row_data = self.row.data  # idx
+        val_data = self.val.data
+        fd_data.set_item_inplace(row_data, val_data, inplace=True)
+
+IR_REGISTRY[OpCode.WRITE_ROW_INPLACE_] = {
+    'name' : 'WRITE_ROW_INPLACE_',
+    'args_type' : [VarType.FEAT_DICT, VarType.IDX, VarType.FEAT_DICT],
+    'ret_type' : None,
+    'executor_cls' : WriteRowInplace_Executor,
+}
+
+def WRITE_ROW_INPLACE_(fd, row, val):
+    reg = IR_REGISTRY[OpCode.WRITE_ROW_INPLACE_]
     get_current_prog().issue(reg['executor_cls'](fd, row, val))
 
 class WriteDict_Executor(Executor):

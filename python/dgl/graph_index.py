@@ -7,7 +7,7 @@ import scipy
 
 from ._ffi.base import c_array
 from ._ffi.function import _init_api
-from .base import DGLError
+from .base import DGLError, is_all
 from . import backend as F
 from . import utils
 from .immutable_graph_index import create_immutable_graph_index
@@ -83,6 +83,16 @@ class GraphIndex(object):
             True if it is a multigraph, False otherwise.
         """
         return bool(_CAPI_DGLGraphIsMultigraph(self._handle))
+
+    def is_readonly(self):
+        """Indicate whether the graph index is read-only.
+
+        Returns
+        -------
+        bool
+            True if it is a read-only graph, False otherwise.
+        """
+        return False
 
     def number_of_nodes(self):
         """Return the number of nodes.
@@ -474,28 +484,6 @@ class GraphIndex(object):
         induced_nodes = utils.toindex(rst(1))
         return SubgraphIndex(rst(0), self, induced_nodes, e)
 
-    def adjacency_matrix_indices_and_shape(self, transpose=False):
-        """Return the indices and dense shape of adjacency matrix representation of
-        this graph.
-
-        utils.CtxCachedObject
-            An object that returns indices tensor given context.
-        tuple
-            Dense shape of the adjacency matrix
-        """
-        if not 'adj_ind_shape' in self._cache:
-            src, dst, _ = self.edges(sorted=False)
-            src = F.unsqueeze(src.tousertensor(), 0)
-            dst = F.unsqueeze(dst.tousertensor(), 0)
-            n = self.number_of_nodes()
-            if transpose:
-                idx = F.cat([src, dst], dim=0)
-            else:
-                idx = F.cat([dst, src], dim=0)
-            cached_idx = utils.CtxCachedObject(lambda ctx: F.copy_to(idx, ctx))
-            self._cache['adj_ind_shape'] = (cached_idx, (n, n))
-        return self._cache['adj_ind_shape']
-
     def adjacency_matrix(self, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
 
@@ -516,6 +504,9 @@ class GraphIndex(object):
         -------
         SparseTensor
             The adjacency matrix.
+        utils.Index
+            A index for data shuffling due to sparse format change. Return None
+            if shuffle is not required.
         """
         if not isinstance(transpose, bool):
             raise DGLError('Expect bool value for "transpose" arg,'
@@ -533,8 +524,9 @@ class GraphIndex(object):
         m = self.number_of_edges()
         # FIXME(minjie): data type
         dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-        adj = F.sparse_matrix(dat, ('coo', idx), (n, n))
-        return adj
+        adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, n))
+        shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+        return adj, shuffle_idx
 
     def incidence_matrix(self, type, ctx):
         """Return the incidence matrix representation of this graph.
@@ -567,6 +559,9 @@ class GraphIndex(object):
         -------
         SparseTensor
             The incidence matrix.
+        utils.Index
+            A index for data shuffling due to sparse format change. Return None
+            if shuffle is not required.
         """
         src, dst, eid = self.edges(sorted=False)
         src = src.tousertensor(ctx)  # the index of the ctx will be cached
@@ -580,14 +575,14 @@ class GraphIndex(object):
             idx = F.cat([row, col], dim=0)
             # FIXME(minjie): data type
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-            inc = F.sparse_matrix(dat, ('coo', idx), (n, m))
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
         elif type == 'out':
             row = F.unsqueeze(src, 0)
             col = F.unsqueeze(eid, 0)
             idx = F.cat([row, col], dim=0)
             # FIXME(minjie): data type
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-            inc = F.sparse_matrix(dat, ('coo', idx), (n, m))
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
         elif type == 'both':
             # create index
             row = F.unsqueeze(F.cat([src, dst], dim=0), 0)
@@ -601,10 +596,11 @@ class GraphIndex(object):
             x[diagonal] = 0
             y[diagonal] = 0
             dat = F.cat([x, y], dim=0)
-            inc = F.sparse_matrix(dat, ('coo', idx), (n, m))
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
         else:
             raise DGLError('Invalid incidence matrix type: %s' % str(type))
-        return inc
+        shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+        return inc, shuffle_idx
 
     def to_networkx(self):
         """Convert to networkx graph.
@@ -681,6 +677,25 @@ class GraphIndex(object):
         src = utils.toindex(adj_coo.row)
         dst = utils.toindex(adj_coo.col)
         self.add_edges(src, dst)
+
+    def from_edge_list(self, elist):
+        """Convert from an edge list.
+
+        Paramters
+        ---------
+        elist : list
+            List of (u, v) edge tuple.
+        """
+        self.clear()
+        src, dst = zip(*elist)
+        src = np.array(src)
+        dst = np.array(dst)
+        num_nodes = max(src.max(), dst.max()) + 1
+        min_nodes = min(src.min(), dst.min())
+        if min_nodes != 0:
+            raise DGLError('Invalid edge list. Nodes must start from 0.')
+        self.add_nodes(num_nodes)
+        self.add_edges(utils.toindex(src), utils.toindex(dst))
 
     def line_graph(self, backtracking=True):
         """Return the line graph of this graph.
@@ -872,7 +887,10 @@ def create_graph_index(graph_data=None, multigraph=False, readonly=False):
         return graph_data
 
     if readonly and graph_data is not None:
-        gi = create_immutable_graph_index(graph_data)
+        try:
+            gi = create_immutable_graph_index(graph_data)
+        except:
+            gi = None
         # If we can't create an immutable graph index, we'll have to fall back.
         if gi is not None:
             return gi
@@ -883,19 +901,27 @@ def create_graph_index(graph_data=None, multigraph=False, readonly=False):
     if graph_data is None:
         return gi
 
+    # edge list
+    if isinstance(graph_data, (list, tuple)):
+        try:
+            gi.from_edge_list(graph_data)
+            return gi
+        except:
+            raise DGLError('Graph data is not a valid edge list.')
+
     # scipy format
     if isinstance(graph_data, scipy.sparse.spmatrix):
         try:
             gi.from_scipy_sparse_matrix(graph_data)
             return gi
         except:
-            raise Exception('Graph data is not a valid scipy sparse matrix.')
+            raise DGLError('Graph data is not a valid scipy sparse matrix.')
 
     # networkx - any format
     try:
         gi.from_networkx(graph_data)
     except:
-        raise Exception('Error while creating graph from input of type "%s".'
+        raise DGLError('Error while creating graph from input of type "%s".'
                          % type(graph_data))
 
     return gi

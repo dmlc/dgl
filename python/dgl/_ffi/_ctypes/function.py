@@ -9,16 +9,16 @@ from numbers import Number, Integral
 
 from ..base import _LIB, check_call
 from ..base import c_str, string_types
-from ..runtime_ctypes import TVMType, TVMByteArray, TVMContext
+from ..runtime_ctypes import DGLType, DGLByteArray, DGLContext
 from . import ndarray as _nd
 from .ndarray import NDArrayBase, _make_array
-from .types import TVMValue, TypeCode
-from .types import TVMPackedCFunc, TVMCFuncFinalizer
+from .types import DGLValue, TypeCode
+from .types import DGLPackedCFunc, DGLCFuncFinalizer
 from .types import RETURN_SWITCH, C_TO_PY_ARG_SWITCH, _wrap_arg_func
 
 FunctionHandle = ctypes.c_void_p
 ModuleHandle = ctypes.c_void_p
-TVMRetValueHandle = ctypes.c_void_p
+DGLRetValueHandle = ctypes.c_void_p
 
 def _ctypes_free_resource(rhandle):
     """callback to free resources when it it not needed."""
@@ -26,11 +26,11 @@ def _ctypes_free_resource(rhandle):
     ctypes.pythonapi.Py_DecRef(pyobj)
 
 # Global callback that is always alive
-TVM_FREE_PYOBJ = TVMCFuncFinalizer(_ctypes_free_resource)
-ctypes.pythonapi.Py_IncRef(ctypes.py_object(TVM_FREE_PYOBJ))
+DGL_FREE_PYOBJ = DGLCFuncFinalizer(_ctypes_free_resource)
+ctypes.pythonapi.Py_IncRef(ctypes.py_object(DGL_FREE_PYOBJ))
 
-def convert_to_tvm_func(pyfunc):
-    """Convert a python function to TVM function
+def convert_to_dgl_func(pyfunc):
+    """Convert a python function to DGL function
 
     Parameters
     ----------
@@ -39,8 +39,8 @@ def convert_to_tvm_func(pyfunc):
 
     Returns
     -------
-    tvmfunc: tvm.nd.Function
-        The converted tvm function.
+    dglfunc: dgl.nd.Function
+        The converted dgl function.
     """
     local_pyfunc = pyfunc
     def cfun(args, type_codes, num_args, ret, _):
@@ -52,36 +52,36 @@ def convert_to_tvm_func(pyfunc):
             rv = local_pyfunc(*pyargs)
         except Exception:
             msg = traceback.format_exc()
-            _LIB.TVMAPISetLastError(c_str(msg))
+            _LIB.DGLAPISetLastError(c_str(msg))
             return -1
 
         if rv is not None:
             if isinstance(rv, tuple):
                 raise ValueError("PackedFunction can only support one return value")
             temp_args = []
-            values, tcodes, _ = _make_tvm_args((rv,), temp_args)
-            if not isinstance(ret, TVMRetValueHandle):
-                ret = TVMRetValueHandle(ret)
-            check_call(_LIB.TVMCFuncSetReturn(ret, values, tcodes, ctypes.c_int(1)))
+            values, tcodes, _ = _make_dgl_args((rv,), temp_args)
+            if not isinstance(ret, DGLRetValueHandle):
+                ret = DGLRetValueHandle(ret)
+            check_call(_LIB.DGLCFuncSetReturn(ret, values, tcodes, ctypes.c_int(1)))
             _ = temp_args
             _ = rv
         return 0
 
     handle = FunctionHandle()
-    f = TVMPackedCFunc(cfun)
+    f = DGLPackedCFunc(cfun)
     # NOTE: We will need to use python-api to increase ref count of the f
-    # TVM_FREE_PYOBJ will be called after it is no longer needed.
+    # DGL_FREE_PYOBJ will be called after it is no longer needed.
     pyobj = ctypes.py_object(f)
     ctypes.pythonapi.Py_IncRef(pyobj)
-    check_call(_LIB.TVMFuncCreateFromCFunc(
-        f, pyobj, TVM_FREE_PYOBJ, ctypes.byref(handle)))
+    check_call(_LIB.DGLFuncCreateFromCFunc(
+        f, pyobj, DGL_FREE_PYOBJ, ctypes.byref(handle)))
     return _CLASS_FUNCTION(handle, False)
 
 
-def _make_tvm_args(args, temp_args):
-    """Pack arguments into c args tvm call accept"""
+def _make_dgl_args(args, temp_args):
+    """Pack arguments into c args dgl call accept"""
     num_args = len(args)
-    values = (TVMValue * num_args)()
+    values = (DGLValue * num_args)()
     type_codes = (ctypes.c_int * num_args)()
     for i, arg in enumerate(args):
         if arg is None:
@@ -91,23 +91,23 @@ def _make_tvm_args(args, temp_args):
             values[i].v_handle = ctypes.cast(arg.handle, ctypes.c_void_p)
             type_codes[i] = (TypeCode.NDARRAY_CONTAINER
                              if not arg.is_view else TypeCode.ARRAY_HANDLE)
-        elif isinstance(arg, _nd._TVM_COMPATS):
-            values[i].v_handle = ctypes.c_void_p(arg._tvm_handle)
-            type_codes[i] = arg.__class__._tvm_tcode
+        elif isinstance(arg, _nd._DGL_COMPATS):
+            values[i].v_handle = ctypes.c_void_p(arg._dgl_handle)
+            type_codes[i] = arg.__class__._dgl_tcode
         elif isinstance(arg, Integral):
             values[i].v_int64 = arg
             type_codes[i] = TypeCode.INT
         elif isinstance(arg, Number):
             values[i].v_float64 = arg
             type_codes[i] = TypeCode.FLOAT
-        elif isinstance(arg, TVMType):
+        elif isinstance(arg, DGLType):
             values[i].v_str = c_str(str(arg))
             type_codes[i] = TypeCode.STR
-        elif isinstance(arg, TVMContext):
+        elif isinstance(arg, DGLContext):
             values[i].v_ctx = arg
-            type_codes[i] = TypeCode.TVM_CONTEXT
+            type_codes[i] = TypeCode.DGL_CONTEXT
         elif isinstance(arg, bytearray):
-            arr = TVMByteArray()
+            arr = DGLByteArray()
             arr.data = ctypes.cast(
                 (ctypes.c_byte * len(arg)).from_buffer(arg),
                 ctypes.POINTER(ctypes.c_byte))
@@ -129,7 +129,7 @@ def _make_tvm_args(args, temp_args):
             values[i].v_handle = arg
             type_codes[i] = TypeCode.HANDLE
         elif callable(arg):
-            arg = convert_to_tvm_func(arg)
+            arg = convert_to_dgl_func(arg)
             values[i].v_handle = arg.handle
             type_codes[i] = TypeCode.FUNC_HANDLE
             temp_args.append(arg)
@@ -158,7 +158,7 @@ class FunctionBase(object):
 
     def __del__(self):
         if not self.is_global and _LIB is not None:
-            check_call(_LIB.TVMFuncFree(self.handle))
+            check_call(_LIB.DGLFuncFree(self.handle))
 
     def __call__(self, *args):
         """Call the function with positional arguments
@@ -167,10 +167,10 @@ class FunctionBase(object):
            The positional arguments to the function call.
         """
         temp_args = []
-        values, tcodes, num_args = _make_tvm_args(args, temp_args)
-        ret_val = TVMValue()
+        values, tcodes, num_args = _make_dgl_args(args, temp_args)
+        ret_val = DGLValue()
         ret_tcode = ctypes.c_int()
-        check_call(_LIB.TVMFuncCall(
+        check_call(_LIB.DGLFuncCall(
             self.handle, values, tcodes, ctypes.c_int(num_args),
             ctypes.byref(ret_val), ctypes.byref(ret_tcode)))
         _ = temp_args
@@ -181,10 +181,10 @@ class FunctionBase(object):
 def __init_handle_by_constructor__(fconstructor, args):
     """Initialize handle by constructor"""
     temp_args = []
-    values, tcodes, num_args = _make_tvm_args(args, temp_args)
-    ret_val = TVMValue()
+    values, tcodes, num_args = _make_dgl_args(args, temp_args)
+    ret_val = DGLValue()
     ret_tcode = ctypes.c_int()
-    check_call(_LIB.TVMFuncCall(
+    check_call(_LIB.DGLFuncCall(
         fconstructor.handle, values, tcodes, ctypes.c_int(num_args),
         ctypes.byref(ret_val), ctypes.byref(ret_tcode)))
     _ = temp_args

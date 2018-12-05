@@ -189,6 +189,8 @@ Graph::EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
 
   for (i = 0, j = 0; i < srclen && j < dstlen; i += src_stride, j += dst_stride) {
     const dgl_id_t src_id = src_data[i], dst_id = dst_data[j];
+    CHECK(HasVertex(src_id) && HasVertex(dst_id)) <<
+        "invalid edge: " << src_id << " -> " << dst_id;
     const auto& succ = adjlist_[src_id].succ;
     for (size_t k = 0; k < succ.size(); ++k) {
       if (succ[k] == dst_id) {

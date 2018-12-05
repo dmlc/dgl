@@ -11,6 +11,7 @@ def setup() {
 
 def build_dgl() {
   sh "if [ -d build ]; then rm -rf build; fi; mkdir build"
+  sh "rm -rf _download"
   dir ("build") {
     sh "cmake .."
     sh "make -j4"
@@ -33,13 +34,14 @@ def pytorch_unit_test(dev) {
 def mxnet_unit_test(dev) {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
     sh "python3 -m nose -v --with-xunit tests/mxnet"
+    sh "python3 -m nose -v --with-xunit tests/graph_index"
   }
 }
 
 def example_test(dev) {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
     dir ("tests/scripts") {
-      sh "./task_example_test.sh ${dev}"
+      sh "bash task_example_test.sh ${dev}"
     }
   }
 }
@@ -47,11 +49,18 @@ def example_test(dev) {
 def pytorch_tutorials() {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
     dir ("tests/scripts") {
-      sh "./task_tutorial_test.sh"
+      sh "bash task_pytorch_tutorial_test.sh"
     }
   }
 }
 
+def mxnet_tutorials() {
+  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
+    dir("tests/scripts") {
+      sh "bash task_mxnet_tutorial_test.sh"
+    }
+  }
+}
 pipeline {
   agent none
   stages {
@@ -59,7 +68,7 @@ pipeline {
       agent { docker { image "dgllib/dgl-ci-lint" } }
       steps {
         init_git_submodule()
-        sh "tests/scripts/task_lint.sh"
+        sh "bash tests/scripts/task_lint.sh"
       }
     }
     stage("Build") {
@@ -143,9 +152,19 @@ pipeline {
       }
     }
     stage("Doc") {
-      agent { docker { image "dgllib/dgl-ci-cpu" } }
-      steps {
-        pytorch_tutorials()
+      parallel {
+        stage("TH Tutorial") {
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          steps {
+            pytorch_tutorials()
+          }
+        }
+        stage("MX Tutorial") {
+          agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
+          steps {
+            mxnet_tutorials()
+          }
+        }
       }
     }
   }

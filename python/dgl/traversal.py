@@ -19,12 +19,12 @@ def bfs_nodes_generator(graph, source, reversed=False):
     source : list, tensor of nodes
         Source nodes.
     reversed : bool, default False
-        If true, traverse following the in-edge direction.
+        If True, traverse following the in-edge direction.
 
     Returns
     -------
     list of node frontiers
-        Each node frontier is a list, tensor of nodes.
+        Each node frontier is a list or tensor of node ids.
 
     Examples
     --------
@@ -32,10 +32,10 @@ def bfs_nodes_generator(graph, source, reversed=False):
     ::
 
               2 - 4
-             / \ 
+             / \\
         0 - 1 - 3 - 5
 
-    >>> g = ... # the graph above
+    >>> g = dgl.DGLGraph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
     >>> list(dgl.bfs_nodes_generator(g, 0))
     [tensor([0]), tensor([1]), tensor([2, 3]), tensor([4, 5])]
     """
@@ -44,7 +44,7 @@ def bfs_nodes_generator(graph, source, reversed=False):
     ret = _CAPI_DGLBFSNodes(ghandle, source, reversed)
     all_nodes = utils.toindex(ret(0)).tousertensor()
     # TODO(minjie): how to support directly creating python list
-    sections = utils.toindex(ret(1)).tousertensor().tolist()
+    sections = utils.toindex(ret(1)).tonumpy().tolist()
     node_frontiers = F.split(all_nodes, sections, dim=0)
     return node_frontiers
 
@@ -58,12 +58,12 @@ def bfs_edges_generator(graph, source, reversed=False):
     source : list, tensor of nodes
         Source nodes.
     reversed : bool, default False
-        If true, traverse following the in-edge direction.
+        If True, traverse following the in-edge direction.
 
     Returns
     -------
     list of edge frontiers
-        Each edge frontier is a list, tensor of edges.
+        Each edge frontier is a list or tensor of edge ids.
 
     Examples
     --------
@@ -72,10 +72,10 @@ def bfs_edges_generator(graph, source, reversed=False):
     ::
 
               2 - 4
-             / \ 
+             / \\
         0 - 1 - 3 - 5
 
-    >>> g = ... # the graph above
+    >>> g = dgl.DGLGraph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
     >>> list(dgl.bfs_edges_generator(g, 0))
     [tensor([0]), tensor([1, 2]), tensor([4, 5])]
     """
@@ -84,7 +84,7 @@ def bfs_edges_generator(graph, source, reversed=False):
     ret = _CAPI_DGLBFSEdges(ghandle, source, reversed)
     all_edges = utils.toindex(ret(0)).tousertensor()
     # TODO(minjie): how to support directly creating python list
-    sections = utils.toindex(ret(1)).tousertensor().tolist()
+    sections = utils.toindex(ret(1)).tonumpy().tolist()
     edge_frontiers = F.split(all_edges, sections, dim=0)
     return edge_frontiers
 
@@ -96,12 +96,12 @@ def topological_nodes_generator(graph, reversed=False):
     graph : DGLGraph
         The graph object.
     reversed : bool, optional
-        If true, traverse following the in-edge direction.
+        If True, traverse following the in-edge direction.
 
     Returns
     -------
     list of node frontiers
-        Each node frontier is a list, tensor of nodes.
+        Each node frontier is a list or tensor of node ids.
 
     Examples
     --------
@@ -109,10 +109,10 @@ def topological_nodes_generator(graph, reversed=False):
     ::
 
               2 - 4
-             / \ 
+             / \\
         0 - 1 - 3 - 5
 
-    >>> g = ... # the graph above
+    >>> g = dgl.DGLGraph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
     >>> list(dgl.topological_nodes_generator(g))
     [tensor([0]), tensor([1]), tensor([2]), tensor([3, 4]), tensor([5])]
     """
@@ -120,7 +120,7 @@ def topological_nodes_generator(graph, reversed=False):
     ret = _CAPI_DGLTopologicalNodes(ghandle, reversed)
     all_nodes = utils.toindex(ret(0)).tousertensor()
     # TODO(minjie): how to support directly creating python list
-    sections = utils.toindex(ret(1)).tousertensor().tolist()
+    sections = utils.toindex(ret(1)).tonumpy().tolist()
     return F.split(all_nodes, sections, dim=0)
 
 def dfs_edges_generator(graph, source, reversed=False):
@@ -138,12 +138,12 @@ def dfs_edges_generator(graph, source, reversed=False):
     source : list, tensor of nodes
         Source nodes.
     reversed : bool, optional
-        If true, traverse following the in-edge direction.
+        If True, traverse following the in-edge direction.
 
     Returns
     -------
     list of edge frontiers
-        Each edge frontier is a list, tensor of edges.
+        Each edge frontier is a list or tensor of edge ids.
 
     Examples
     --------
@@ -151,21 +151,21 @@ def dfs_edges_generator(graph, source, reversed=False):
     ::
 
               2 - 4
-             / \ 
+             / \\
         0 - 1 - 3 - 5
 
     Edge addition order [(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)]
 
-    >>> g = ... # the graph above
-    >>> list(dgl.dfs_edges_generator(g))
-    [tensor([0]), tensor([1]), tensor([4]), tensor([3]), tensor([5]), tensor([2])]
+    >>> g = dgl.DGLGraph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
+    >>> list(dgl.dfs_edges_generator(g, 0))
+    [tensor([0]), tensor([1]), tensor([3]), tensor([5]), tensor([4])]
     """
     ghandle = graph._graph._handle
     source = utils.toindex(source).todgltensor()
     ret = _CAPI_DGLDFSEdges(ghandle, source, reversed)
     all_edges = utils.toindex(ret(0)).tousertensor()
     # TODO(minjie): how to support directly creating python list
-    sections = utils.toindex(ret(1)).tousertensor().tolist()
+    sections = utils.toindex(ret(1)).tonumpy().tolist()
     return F.split(all_edges, sections, dim=0)
 
 def dfs_labeled_edges_generator(
@@ -179,10 +179,10 @@ def dfs_labeled_edges_generator(
 
     There are three labels: FORWARD(0), REVERSE(1), NONTREE(2)
 
-    A FORWARD edge is one in which `u` has been visisted but `v` has not. A
-    REVERSE edge is one in which both `u` and `v` have been visisted and the
+    A FORWARD edge is one in which `u` has been visised but `v` has not. A
+    REVERSE edge is one in which both `u` and `v` have been visited and the
     edge is in the DFS tree. A NONTREE edge is one in which both `u` and `v`
-    have been visisted but the edge is NOT in the DFS tree.
+    have been visited but the edge is NOT in the DFS tree.
 
     See ``networkx``'s :func:`dfs_labeled_edges
     <networkx.algorithms.traversal.depth_first_search.dfs_labeled_edges>`
@@ -211,9 +211,25 @@ def dfs_labeled_edges_generator(
     Returns
     -------
     list of edge frontiers
-        Each edge frontier is a list, tensor of edges.
+        Each edge frontier is a list or tensor of edge ids.
     list of list of int
-        Label of each edge, organized in the same as the edge frontiers.
+        Label of each edge, organized in the same order as the edge frontiers.
+
+    Examples
+    --------
+    Given a graph (directed, edges from small node id to large):
+    ::
+
+              2 - 4
+             / \\
+        0 - 1 - 3 - 5
+
+    Edge addition order [(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)]
+
+    >>> g = dgl.DGLGraph([(0, 1), (1, 2), (1, 3), (2, 3), (2, 4), (3, 5)])
+    >>> list(dgl.dfs_labeled_edges_generator(g, 0, has_nontree_edge=True))
+    (tensor([0]), tensor([1]), tensor([3]), tensor([5]), tensor([4]), tensor([2])),
+    (tensor([0]), tensor([0]), tensor([0]), tensor([0]), tensor([0]), tensor([2]))
     """
     ghandle = graph._graph._handle
     source = utils.toindex(source).todgltensor()
@@ -228,11 +244,11 @@ def dfs_labeled_edges_generator(
     # TODO(minjie): how to support directly creating python list
     if return_labels:
         all_labels = utils.toindex(ret(1)).tousertensor()
-        sections = utils.toindex(ret(2)).tousertensor().tolist()
+        sections = utils.toindex(ret(2)).tonumpy().tolist()
         return (F.split(all_edges, sections, dim=0),
                 F.split(all_labels, sections, dim=0))
     else:
-        sections = utils.toindex(ret(1)).tousertensor().tolist()
+        sections = utils.toindex(ret(1)).tonumpy().tolist()
         return F.split(all_edges, sections, dim=0)
 
 _init_api("dgl.traversal")

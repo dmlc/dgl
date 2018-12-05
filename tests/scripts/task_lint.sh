@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # cpplint
 echo 'Checking code style of C++ codes...'

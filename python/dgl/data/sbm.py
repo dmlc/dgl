@@ -1,3 +1,4 @@
+"""Dataset for stochastic block model."""
 import math
 import os
 import pickle

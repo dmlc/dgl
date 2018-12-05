@@ -6,8 +6,8 @@ import sys
 import ctypes
 import numpy as np
 from .base import _LIB, check_call, c_array, string_types, _FFI_MODE, c_str
-from .runtime_ctypes import TVMType, TVMContext, TVMArray, TVMArrayHandle
-from .runtime_ctypes import TypeCode, tvm_shape_index_t
+from .runtime_ctypes import DGLType, DGLContext, DGLArray, DGLArrayHandle
+from .runtime_ctypes import TypeCode, dgl_shape_index_t
 
 
 IMPORT_EXCEPT = RuntimeError if _FFI_MODE == "cython" else ImportError
@@ -28,7 +28,7 @@ except IMPORT_EXCEPT:
     from ._ctypes.ndarray import NDArrayBase as _NDArrayBase
 
 def context(dev_type, dev_id=0):
-    """Construct a TVM context with given device type and id.
+    """Construct a DGL context with given device type and id.
 
     Parameters
     ----------
@@ -40,7 +40,7 @@ def context(dev_type, dev_id=0):
 
     Returns
     -------
-    ctx: TVMContext
+    ctx: DGLContext
         The corresponding context.
 
     Examples
@@ -50,29 +50,29 @@ def context(dev_type, dev_id=0):
 
     .. code-block:: python
 
-      assert tvm.context("cpu", 1) == tvm.cpu(1)
-      assert tvm.context("gpu", 0) == tvm.gpu(0)
-      assert tvm.context("cuda", 0) == tvm.gpu(0)
+      assert dgl.context("cpu", 1) == dgl.cpu(1)
+      assert dgl.context("gpu", 0) == dgl.gpu(0)
+      assert dgl.context("cuda", 0) == dgl.gpu(0)
     """
     if isinstance(dev_type, string_types):
         dev_type = dev_type.split()[0]
-        if dev_type not in TVMContext.STR2MASK:
+        if dev_type not in DGLContext.STR2MASK:
             raise ValueError("Unknown device type %s" % dev_type)
-        dev_type = TVMContext.STR2MASK[dev_type]
-    return TVMContext(dev_type, dev_id)
+        dev_type = DGLContext.STR2MASK[dev_type]
+    return DGLContext(dev_type, dev_id)
 
 
 def numpyasarray(np_data):
-    """Return a TVMArray representation of a numpy array.
+    """Return a DGLArray representation of a numpy array.
     """
     data = np_data
     assert data.flags['C_CONTIGUOUS']
-    arr = TVMArray()
-    shape = c_array(tvm_shape_index_t, data.shape)
+    arr = DGLArray()
+    shape = c_array(dgl_shape_index_t, data.shape)
     arr.data = data.ctypes.data_as(ctypes.c_void_p)
     arr.shape = shape
     arr.strides = None
-    arr.dtype = TVMType(np.dtype(data.dtype).name)
+    arr.dtype = DGLType(np.dtype(data.dtype).name)
     arr.ndim = data.ndim
     # CPU device
     arr.ctx = context(1, 0)
@@ -90,19 +90,19 @@ def empty(shape, dtype="float32", ctx=context(1, 0)):
     dtype : type or str
         The data type of the array.
 
-    ctx : TVMContext
+    ctx : DGLContext
         The context of the array
 
     Returns
     -------
-    arr : tvm.nd.NDArray
-        The array tvm supported.
+    arr : dgl.nd.NDArray
+        The array dgl supported.
     """
-    shape = c_array(tvm_shape_index_t, shape)
+    shape = c_array(dgl_shape_index_t, shape)
     ndim = ctypes.c_int(len(shape))
-    handle = TVMArrayHandle()
-    dtype = TVMType(dtype)
-    check_call(_LIB.TVMArrayAlloc(
+    handle = DGLArrayHandle()
+    dtype = DGLType(dtype)
+    check_call(_LIB.DGLArrayAlloc(
         shape, ndim,
         ctypes.c_int(dtype.type_code),
         ctypes.c_int(dtype.bits),
@@ -126,7 +126,7 @@ def from_dlpack(dltensor):
 
     Returns
     -------
-    arr: tvm.nd.NDArray
+    arr: dgl.nd.NDArray
         The array view of the tensor data.
     """
     return _from_dlpack(dltensor)
@@ -217,7 +217,7 @@ class NDArrayBase(_NDArrayBase):
             except:
                 raise TypeError('array must be an array_like data,' +
                                 'type %s is not supported' % str(type(source_array)))
-        t = TVMType(self.dtype)
+        t = DGLType(self.dtype)
         shape, dtype = self.shape, self.dtype
         if t.lanes > 1:
             shape = shape + (t.lanes,)
@@ -231,11 +231,11 @@ class NDArrayBase(_NDArrayBase):
         assert source_array.flags['C_CONTIGUOUS']
         data = source_array.ctypes.data_as(ctypes.c_void_p)
         nbytes = ctypes.c_size_t(source_array.size * source_array.dtype.itemsize)
-        check_call(_LIB.TVMArrayCopyFromBytes(self.handle, data, nbytes))
+        check_call(_LIB.DGLArrayCopyFromBytes(self.handle, data, nbytes))
         return self
 
     def __repr__(self):
-        res = "<tvm.NDArray shape={0}, {1}>\n".format(self.shape, self.context)
+        res = "<dgl.NDArray shape={0}, {1}>\n".format(self.shape, self.context)
         res += self.asnumpy().__repr__()
         return res
 
@@ -250,7 +250,7 @@ class NDArrayBase(_NDArrayBase):
         np_arr : numpy.ndarray
             The corresponding numpy array.
         """
-        t = TVMType(self.dtype)
+        t = DGLType(self.dtype)
         shape, dtype = self.shape, self.dtype
         if t.lanes > 1:
             shape = shape + (t.lanes,)
@@ -260,7 +260,7 @@ class NDArrayBase(_NDArrayBase):
         assert np_arr.flags['C_CONTIGUOUS']
         data = np_arr.ctypes.data_as(ctypes.c_void_p)
         nbytes = ctypes.c_size_t(np_arr.size * np_arr.dtype.itemsize)
-        check_call(_LIB.TVMArrayCopyToBytes(self.handle, data, nbytes))
+        check_call(_LIB.DGLArrayCopyToBytes(self.handle, data, nbytes))
         return np_arr
 
     def copyto(self, target):
@@ -271,10 +271,10 @@ class NDArrayBase(_NDArrayBase):
         target : NDArray
             The target array to be copied, must have same shape as this array.
         """
-        if isinstance(target, TVMContext):
+        if isinstance(target, DGLContext):
             target = empty(self.shape, self.dtype, target)
         if isinstance(target, NDArrayBase):
-            check_call(_LIB.TVMArrayCopyFromTo(
+            check_call(_LIB.DGLArrayCopyFromTo(
                 self.handle, target.handle, None))
         else:
             raise ValueError("Unsupported target type %s" % str(type(target)))
@@ -292,13 +292,13 @@ def free_extension_handle(handle, type_code):
     type_code : int
          The tyoe code
     """
-    check_call(_LIB.TVMExtTypeFree(handle, ctypes.c_int(type_code)))
+    check_call(_LIB.DGLExtTypeFree(handle, ctypes.c_int(type_code)))
 
 def register_extension(cls, fcreate=None):
-    """Register a extension class to TVM.
+    """Register a extension class to DGL.
 
     After the class is registered, the class will be able
-    to directly pass as Function argument generated by TVM.
+    to directly pass as Function argument generated by DGL.
 
     Parameters
     ----------
@@ -307,10 +307,10 @@ def register_extension(cls, fcreate=None):
 
     Note
     ----
-    The registered class is requires one property: _tvm_handle and a class attribute _tvm_tcode.
+    The registered class is requires one property: _dgl_handle and a class attribute _dgl_tcode.
 
-    - ```_tvm_handle``` returns integer represents the address of the handle.
-    - ```_tvm_tcode``` gives integer represents type code of the class.
+    - ```_dgl_handle``` returns integer represents the address of the handle.
+    - ```_dgl_tcode``` gives integer represents type code of the class.
 
     Returns
     -------
@@ -327,18 +327,18 @@ def register_extension(cls, fcreate=None):
 
     .. code-block:: python
 
-       @tvm.register_extension
+       @dgl.register_extension
        class MyTensor(object):
-           _tvm_tcode = tvm.TypeCode.ARRAY_HANDLE
+           _dgl_tcode = dgl.TypeCode.ARRAY_HANDLE
 
            def __init__(self):
                self.handle = _LIB.NewDLTensor()
 
            @property
-           def _tvm_handle(self):
+           def _dgl_handle(self):
                return self.handle.value
     """
-    if fcreate and cls._tvm_tcode < TypeCode.EXT_BEGIN:
+    if fcreate and cls._dgl_tcode < TypeCode.EXT_BEGIN:
         raise ValueError("Cannot register create when extension tcode is same as buildin")
     _reg_extension(cls, fcreate)
     return cls
