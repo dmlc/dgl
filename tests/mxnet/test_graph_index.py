@@ -3,6 +3,7 @@ os.environ['DGLBACKEND'] = 'mxnet'
 import mxnet as mx
 import numpy as np
 import scipy as sp
+import dgl
 from dgl.graph import GraphIndex, create_graph_index
 from dgl.graph_index import map_to_subgraph_nid
 from dgl import utils
@@ -99,8 +100,23 @@ def test_node_subgraph():
     for i in range(4):
         check_graph_equal(subgs[i], subigs[i])
 
+def test_create_graph():
+    elist = [(1, 2), (0, 1), (0, 2)]
+    ig = dgl.DGLGraph(elist, readonly=True)
+    g = dgl.DGLGraph(elist, readonly=False)
+    for edge in elist:
+        assert g.edge_id(edge[0], edge[1]) == ig.edge_id(edge[0], edge[1])
+
+    data = [1, 2, 3]
+    rows = [1, 0, 0]
+    cols = [2, 1, 2]
+    mat = sp.sparse.coo_matrix((data, (rows, cols)))
+    ig = dgl.DGLGraph(mat, readonly=True)
+    for edge in elist:
+        assert g.edge_id(edge[0], edge[1]) == ig.edge_id(edge[0], edge[1])
 
 if __name__ == '__main__':
     test_basics()
     test_graph_gen()
     test_node_subgraph()
+    test_create_graph()
