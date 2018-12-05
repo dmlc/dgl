@@ -577,8 +577,12 @@ class ImmutableGraphIndex(object):
         num_nodes = nx_graph.number_of_nodes()
         # We store edge Ids as an edge attribute.
         eid = F.tensor(eid, dtype=np.int32)
-        out_csr = F.sparse_matrix(eid, ('coo', (src, dst)), (num_nodes, num_nodes)).astype(np.int64)
-        in_csr = F.sparse_matrix(eid, ('coo', (dst, src)), (num_nodes, num_nodes)).astype(np.int64)
+        src = F.tensor(src, dtype=np.int64)
+        dst = F.tensor(dst, dtype=np.int64)
+        out_csr, _ = F.sparse_matrix(eid, ('coo', (src, dst)), (num_nodes, num_nodes))
+        in_csr, _ = F.sparse_matrix(eid, ('coo', (dst, src)), (num_nodes, num_nodes))
+        out_csr = out_csr.astype(np.int64)
+        in_csr = in_csr.astype(np.int64)
         self._sparse = F.create_immutable_graph_index(in_csr, out_csr)
 
     def from_scipy_sparse_matrix(self, adj):
