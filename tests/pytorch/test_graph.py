@@ -2,6 +2,7 @@ import time
 import math
 import numpy as np
 import scipy.sparse as sp
+import networkx as nx
 import torch as th
 import dgl
 import utils as U
@@ -25,6 +26,16 @@ def test_graph_creation():
     g.add_nodes(5)
     g.ndata['h'] = 3 * th.ones((5, 2))
     assert U.allclose(3 * th.ones((5, 2)), g.ndata['h'])
+
+def test_create_from_elist():
+    elist = [(2, 1), (1, 0), (2, 0), (3, 0), (0, 2)]
+    g = dgl.DGLGraph(elist)
+    for i, (u, v) in enumerate(elist):
+        assert g.edge_id(u, v) == i
+    # immutable graph
+    g = dgl.DGLGraph(elist, readonly=True)
+    for i, (u, v) in enumerate(elist):
+        assert g.edge_id(u, v) == i
 
 def test_adjmat_speed():
     n = 1000
@@ -87,6 +98,7 @@ def test_incmat_speed():
 
 if __name__ == '__main__':
     test_graph_creation()
+    test_create_from_elist()
     test_adjmat_speed()
     test_incmat()
     test_incmat_speed()
