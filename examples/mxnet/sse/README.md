@@ -1,5 +1,12 @@
-# Benchmark SSE on multi-GPUs
-### Use a small embedding.
+Benchmark SSE on multi-GPUs
+=======================
+
+Paper link:
+[http://proceedings.mlr.press/v80/dai18a/dai18a.pdf](http://proceedings.mlr.press/v80/dai18a/dai18a.pdf)
+
+Use a small embedding
+---------------------
+
 ```bash
 DGLBACKEND=mxnet python3 sse_batch.py --graph-file ../../data/5_5_csr.nd \
                                       --n-epochs 1 \
@@ -13,7 +20,9 @@ DGLBACKEND=mxnet python3 sse_batch.py --graph-file ../../data/5_5_csr.nd \
                                       --n-hidden 100
 ```
 
-### test convergence
+Test convergence
+----------------
+
 ```bash
 DGLBACKEND=mxnet python3 sse_batch.py --dataset "pubmed" \
                                       --n-epochs 100 \
