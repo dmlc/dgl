@@ -12,7 +12,6 @@ Adding nodes and edges
 .. autosummary::
     :toctree: ../../generated/
 
-    DGLGraph.__init__
     DGLGraph.add_nodes
     DGLGraph.add_edge
     DGLGraph.add_edges

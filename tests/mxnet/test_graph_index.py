@@ -14,8 +14,8 @@ def generate_rand_graph(n):
     return g, ig
 
 def check_graph_equal(g1, g2):
-    adj1 = g1.adjacency_matrix(transpose=False, ctx=mx.cpu()) != 0
-    adj2 = g2.adjacency_matrix(transpose=False, ctx=mx.cpu()) != 0
+    adj1 = g1.adjacency_matrix(transpose=False, ctx=mx.cpu())[0] != 0
+    adj2 = g2.adjacency_matrix(transpose=False, ctx=mx.cpu())[0] != 0
     assert mx.nd.sum(adj1 - adj2).asnumpy() == 0
 
 def test_graph_gen():

@@ -24,7 +24,9 @@ def sparse_matrix(data, index, shape, force_format=False):
     if fmt != 'coo':
         raise TypeError('Pytorch backend only supports COO format. But got %s.' % fmt)
     # NOTE: use _sparse_coo_tensor_unsafe to avoid unnecessary boundary check
-    return th._sparse_coo_tensor_unsafe(index[1], data, shape)
+    spmat = th._sparse_coo_tensor_unsafe(index[1], data, shape)
+    # No conversion is required.
+    return spmat, None
 
 def sparse_matrix_indices(spmat):
     return ('coo', spmat._indices())
@@ -135,6 +137,10 @@ def sort_1d(input):
 
 def arange(start, stop):
     return th.arange(start, stop, dtype=th.int64)
+
+def rand_shuffle(arr):
+    idx = th.randperm(len(arr))
+    return arr[idx]
 
 def zerocopy_to_dlpack(input):
     return dlpack.to_dlpack(input.contiguous())
