@@ -1,4 +1,8 @@
 /*!
+ *  Copyright (c) 2016 by Contributors
+ * \file dgl/runtime/c_runtime_api.h
+ * \brief DGL runtime library.
+ *
  * This runtime is adapted from TVM project
  */
 #ifndef DGL_RUNTIME_C_RUNTIME_API_H_
