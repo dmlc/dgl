@@ -4,9 +4,6 @@
 cmake_minimum_required(VERSION 2.8)
 project(dgl C CXX)
 
-# Utility functions
-include(cmake/util/Util.cmake)
-
 if(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
   include(${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
 else()
@@ -52,48 +49,10 @@ else(MSVC)
   endif()
 endif(MSVC)
 
-# add source group
-#FILE(GLOB_RECURSE GROUP_SOURCE "src/*.cc")
-#FILE(GLOB_RECURSE GROUP_INCLUDE "src/*.h" "include/*.h")
-#assign_source_group("Source" ${GROUP_SOURCE})
-#assign_source_group("Include" ${GROUP_INCLUDE})
-
 # Source file lists
 file(GLOB CORE_SRCS src/graph/*.cc src/*.cc src/scheduler/*.cc)
 
 file(GLOB RUNTIME_SRCS src/runtime/*.cc)
-
-# Package runtime rules
-#if(NOT USE_RTTI)
-#  add_definitions(-DDMLC_ENABLE_RTTI=0)
-#endif()
-#
-#if(USE_RPC)
-#  message(STATUS "Build with RPC support...")
-#  file(GLOB RUNTIME_RPC_SRCS src/runtime/rpc/*.cc)
-#  list(APPEND RUNTIME_SRCS ${RUNTIME_RPC_SRCS})
-#endif(USE_RPC)
-#
-#file(GLOB STACKVM_RUNTIME_SRCS src/runtime/stackvm/*.cc)
-#file(GLOB STACKVM_CODEGEN_SRCS src/codegen/stackvm/*.cc)
-#list(APPEND COMPILER_SRCS ${STACKVM_CODEGEN_SRCS})
-#if(USE_STACKVM_RUNTIME)
-#  message(STATUS "Build with stackvm support in runtime...")
-#  list(APPEND RUNTIME_SRCS ${STACKVM_RUNTIME_SRCS})
-#else()
-#  list(APPEND COMPILER_SRCS ${STACKVM_RUNTIME_SRCS})
-#endif(USE_STACKVM_RUNTIME)
-#
-#if(USE_GRAPH_RUNTIME)
-#  message(STATUS "Build with Graph runtime support...")
-#  file(GLOB RUNTIME_GRAPH_SRCS src/runtime/graph/*.cc)
-#  list(APPEND RUNTIME_SRCS ${RUNTIME_GRAPH_SRCS})
-#
-#  if(USE_GRAPH_RUNTIME_DEBUG)
-#    set_source_files_properties(${RUNTIME_GRAPH_SRCS}
-#      PROPERTIES COMPILE_DEFINITIONS "TVM_GRAPH_RUNTIME_DEBUG")
-#  endif(USE_GRAPH_RUNTIME_DEBUG)
-#endif(USE_GRAPH_RUNTIME)
 
 
 add_library(dgl SHARED ${CORE_SRCS} ${RUNTIME_SRCS})
