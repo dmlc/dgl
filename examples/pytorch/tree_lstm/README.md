@@ -17,7 +17,3 @@ unzip glove.840B.300d.zip
 ```
 python train.py --gpu 0
 ```
-
-## Speed Test
-
-See https://docs.google.com/spreadsheets/d/1eCQrVn7g0uWriz63EbEDdes2ksMdKdlbWMyT8PSU4rc .

@@ -1,7 +1,7 @@
 /*!
  *  Copyright (c) 2017 by Contributors
  * \file module.cc
- * \brief TVM module system
+ * \brief DGL module system
  */
 #include <dgl/runtime/module.h>
 #include <dgl/runtime/registry.h>
@@ -12,7 +12,7 @@
 #include "file_util.h"
 #endif
 
-namespace tvm {
+namespace dgl {
 namespace runtime {
 
 void Module::Import(Module other) {
@@ -134,42 +134,42 @@ bool RuntimeEnabled(const std::string& target) {
   return runtime::Registry::Get(f_name) != nullptr;
 }
 
-TVM_REGISTER_GLOBAL("module._Enabled")
-.set_body([](TVMArgs args, TVMRetValue *ret) {
+DGL_REGISTER_GLOBAL("module._Enabled")
+.set_body([](DGLArgs args, DGLRetValue *ret) {
     *ret = RuntimeEnabled(args[0]);
     });
 
-TVM_REGISTER_GLOBAL("module._GetSource")
-.set_body([](TVMArgs args, TVMRetValue *ret) {
+DGL_REGISTER_GLOBAL("module._GetSource")
+.set_body([](DGLArgs args, DGLRetValue *ret) {
     *ret = args[0].operator Module()->GetSource(args[1]);
     });
 
-TVM_REGISTER_GLOBAL("module._ImportsSize")
-.set_body([](TVMArgs args, TVMRetValue *ret) {
+DGL_REGISTER_GLOBAL("module._ImportsSize")
+.set_body([](DGLArgs args, DGLRetValue *ret) {
     *ret = static_cast<int64_t>(
         args[0].operator Module()->imports().size());
     });
 
-TVM_REGISTER_GLOBAL("module._GetImport")
-.set_body([](TVMArgs args, TVMRetValue *ret) {
+DGL_REGISTER_GLOBAL("module._GetImport")
+.set_body([](DGLArgs args, DGLRetValue *ret) {
     *ret = args[0].operator Module()->
         imports().at(args[1].operator int());
     });
 
-TVM_REGISTER_GLOBAL("module._GetTypeKey")
-.set_body([](TVMArgs args, TVMRetValue *ret) {
+DGL_REGISTER_GLOBAL("module._GetTypeKey")
+.set_body([](DGLArgs args, DGLRetValue *ret) {
     *ret = std::string(args[0].operator Module()->type_key());
     });
 
-TVM_REGISTER_GLOBAL("module._LoadFromFile")
-.set_body([](TVMArgs args, TVMRetValue *ret) {
+DGL_REGISTER_GLOBAL("module._LoadFromFile")
+.set_body([](DGLArgs args, DGLRetValue *ret) {
     *ret = Module::LoadFromFile(args[0], args[1]);
     });
 
-TVM_REGISTER_GLOBAL("module._SaveToFile")
-.set_body([](TVMArgs args, TVMRetValue *ret) {
+DGL_REGISTER_GLOBAL("module._SaveToFile")
+.set_body([](DGLArgs args, DGLRetValue *ret) {
     args[0].operator Module()->
         SaveToFile(args[1], args[2]);
     });
 }  // namespace runtime
-}  // namespace tvm
+}  // namespace dgl

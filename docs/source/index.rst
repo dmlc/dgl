@@ -22,6 +22,7 @@ provides:
 * Seamless integration with existing deep learning frameworks.
 * Easy and friendly interfaces for node/edge feature access and graph
   structure manipulation.
+* Good scalability to graphs with tens of millions of vertices.
 
 To begin with, we have prototyped 10 models across various domains:
 semi-supervised learning on graphs (with potentially billions of nodes/edges),
