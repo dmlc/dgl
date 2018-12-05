@@ -122,12 +122,7 @@ def main(args):
 
     logits = model(g)
     test_acc = F.sum(logits[test_idx].argmax(axis=1) == labels[test_idx]).asscalar() / len(test_idx)
-    # calculate MRR
-    indices = F.argsort(logits[test_idx], axis=1, is_ascend=False)
-    matched = indices == labels[test_idx].reshape(-1, 1)
-    rank = np.nonzero(matched.asnumpy())[1] + 1.0
-    mrr = np.mean(1.0 / rank)
-    print("Test Accuracy: {:.4f} | MRR: {:.4f}".format(test_acc, mrr))
+    print("Test Accuracy: {:.4f}".format(test_acc))
     print()
 
     print("Mean forward time: {:4f}".format(np.mean(forward_time[len(forward_time) // 4:])))
