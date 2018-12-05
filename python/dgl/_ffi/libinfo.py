@@ -17,7 +17,7 @@ def find_lib_path(name=None, search_path=None, optional=False):
     lib_path : list(string)
         List of all found path to the libraries
     """
-    # See https://github.com/dmlc/dgl/issues/281 for some background.
+    # See https://github.com/dmlc/tvm/issues/281 for some background.
 
     # NB: This will either be the source directory (if DGL is run
     # inplace) or the install directory (if DGL is installed).

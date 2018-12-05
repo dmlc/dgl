@@ -1,19 +1,5 @@
 /*!
- *  Copyright (c) 2016 by Contributors
- * \file dgl/runtime/c_runtime_api.h
- * \brief DGL runtime library.
- *
- *  The philosophy of DGL project is to customize the compilation
- *  stage to generate code that can used by other projects transparently.
- *  So this is a minimum runtime code gluing, and some limited
- *  memory management code to enable quick testing.
- *
- *  The runtime API is independent from DGL compilation stack and can
- *  be linked via libdgl_runtime.
- *
- *  The common flow is:
- *   - Use DGLFuncListGlobalNames to get global function name
- *   - Use DGLFuncCall to call these functions.
+ * This runtime is adapted from TVM project
  */
 #ifndef DGL_RUNTIME_C_RUNTIME_API_H_
 #define DGL_RUNTIME_C_RUNTIME_API_H_
