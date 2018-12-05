@@ -127,7 +127,7 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
     Returns
     -------
     A subgraph loader that returns a list of batched subgraphs and a dictionary of
-        additional infomration about the subgraphs.
+        additional information about the subgraphs.
     '''
     return NSSubgraphLoader(g, batch_size, expand_factor, num_hops, neighbor_type, node_prob,
                             seed_nodes, shuffle, num_workers, max_subgraph_size, return_seed_id)

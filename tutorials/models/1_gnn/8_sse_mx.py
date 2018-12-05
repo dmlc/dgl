@@ -430,10 +430,10 @@ sampler = dgl.contrib.sampling.NeighborSampler(
 nid = []
 eid = []
 seed_list = []
-for subg, seeds in sampler:
+for subg, aux_info in sampler:
     nid.append(subg.parent_nid.asnumpy())
     eid.append(subg.parent_eid.asnumpy())
-    seed_list.append(seeds.asnumpy())
+    seed_list.append(aux_info['seeds'].asnumpy())
 ##############################################################################
 # Sampler with DGL
 # ~~~~~~~~~~~~~~~~
