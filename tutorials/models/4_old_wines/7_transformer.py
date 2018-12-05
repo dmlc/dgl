@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from dgl.contrib.transformer.layers import * 
 from dgl.contrib.transformer.functions import *
 from dgl.contrib.transformer.embedding import *
-from dgl.contrib.transformer.viz import att_animation, get_attention_map
+from dgl.contrib.transformer.viz import att_animation, get_attention_map, draw_g
 from dgl.contrib.transformer.optims import NoamOpt
 from dgl.contrib.transformer.loss import LabelSmoothing, SimpleLossCompute
 from dgl.contrib.transformer.dataset import get_dataset, GraphPool
@@ -244,8 +244,7 @@ data_iter = dataset(graph_pool, mode='train', batch_size=1, devices=devices)
 for graph in data_iter:
     print(graph.nids['enc'])
     print(graph.nids['dec'])
-    nx_g = graph.g.to_networkx()
-    nx.draw(nx_g)
+    draw_g(graph)
     break
 
 # Create model
