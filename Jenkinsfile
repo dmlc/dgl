@@ -40,7 +40,7 @@ def mxnet_unit_test(dev) {
 def example_test(dev) {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
     dir ("tests/scripts") {
-      sh "./task_example_test.sh ${dev}"
+      sh "bash task_example_test.sh ${dev}"
     }
   }
 }
@@ -48,7 +48,7 @@ def example_test(dev) {
 def pytorch_tutorials() {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
     dir ("tests/scripts") {
-      sh "./task_pytorch_tutorial_test.sh"
+      sh "bash task_pytorch_tutorial_test.sh"
     }
   }
 }
@@ -56,7 +56,7 @@ def pytorch_tutorials() {
 def mxnet_tutorials() {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
     dir("tests/scripts") {
-      sh "./task_mxnet_tutorial_test.sh"
+      sh "bash task_mxnet_tutorial_test.sh"
     }
   }
 }
@@ -152,13 +152,13 @@ pipeline {
     }
     stage("Doc") {
       parallel {
-        stage("Pytorch Tutorial") {
+        stage("TH Tutorial") {
           agent { docker { image "dgllib/dgl-ci-cpu" } }
           steps {
             pytorch_tutorials()
           }
         }
-        stage("MXNet Tutorial") {
+        stage("MX Tutorial") {
           agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
           steps {
             mxnet_tutorials()
