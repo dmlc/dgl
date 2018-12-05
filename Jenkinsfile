@@ -159,11 +159,11 @@ pipeline {
             pytorch_tutorials()
           }
         }
-        stage("MXNet Tutorial"){
-          agent { docker { image "dgllib/dgl-mxnet-cpu" } }
-          steps {
-            mxnet_tutorials()
-          }
+        //stage("MXNet Tutorial"){
+        //  agent { docker { image "dgllib/dgl-mxnet-cpu" } }
+        //  steps {
+        //    mxnet_tutorials()
+        //  }
         }
       }
     }
