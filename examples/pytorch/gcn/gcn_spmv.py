@@ -18,9 +18,8 @@ from dgl.data import register_data_args, load_data
 class NodeApplyModule(nn.Module):
     def __init__(self, in_feats, out_feats, activation=None):
         super(NodeApplyModule, self).__init__()
-        self.linear = nn.Linear(in_feats, out_feats, bias=False)
-        nn.init.xavier_uniform_(self.linear.weight,
-                               gain=nn.init.calculate_gain('relu'))
+        self.linear = nn.Linear(in_feats, out_feats)
+        nn.init.xavier_normal_(self.linear.weight)
         self.activation = activation
 
     def forward(self, nodes):
@@ -67,8 +66,7 @@ class GCN(nn.Module):
             if idx > 0 and self.dropout:
                 self.g.apply_nodes(lambda nodes:
                                         {'h': self.dropout(nodes.data['h'])})
-            self.g.apply_nodes(lambda nodes:
-                                {'h': nodes.data['h'] * nodes.data['norm']})
+            self.g.apply_nodes(lambda nodes: {'h': nodes.data['h'] * nodes.data['norm']})
             self.g.update_all(fn.copy_src(src='h', out='m'),
                               fn.sum(msg='m', out='h'),
                               layer)
@@ -111,11 +109,10 @@ def main(args):
 
     # graph preprocess and calculate normalization factor
     g = DGLGraph(data.graph)
-    num_nodes = g.number_of_nodes()
     # add self loop
-    g.add_edges(range(num_nodes), range(num_nodes))
+    g.add_edges(g.nodes(), g.nodes())
     # normalization
-    degs = g.in_degrees(range(num_nodes)).float()
+    degs = g.in_degrees().float()
     norm = torch.pow(degs, -0.5)
     norm[torch.isinf(norm)] = 0
     if cuda:
@@ -173,7 +170,7 @@ if __name__ == '__main__':
             help="dropout probability")
     parser.add_argument("--gpu", type=int, default=-1,
             help="gpu")
-    parser.add_argument("--lr", type=float, default=1e-3,
+    parser.add_argument("--lr", type=float, default=1e-2,
             help="learning rate")
     parser.add_argument("--n-epochs", type=int, default=200,
             help="number of training epochs")
