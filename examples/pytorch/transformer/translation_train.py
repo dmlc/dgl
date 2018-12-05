@@ -4,11 +4,11 @@ Multi-GPU support is required to train the model on WMT14.
 """
 from modules import *
 from parallel import *
+from loss import * 
+from optims import *
+from dataset import *
 from modules.config import *
-from dgl.contrib.transformer.viz import *
-from dgl.contrib.transformer.loss import * 
-from dgl.contrib.transformer.optims import *
-from dgl.contrib.transformer.dataset import *
+from modules.viz import *
 from tqdm import tqdm
 import numpy as np
 import argparse

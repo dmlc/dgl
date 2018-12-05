@@ -1,10 +1,10 @@
 from .config import *
 from .act import *
 from .attention import *
-from dgl.contrib.transformer.viz import *
-from dgl.contrib.transformer.layers import *
-from dgl.contrib.transformer.functions import *
-from dgl.contrib.transformer.embedding import *
+from .viz import *
+from .layers import *
+from .functions import *
+from .embedding import *
 import threading
 import torch as th
 import dgl.function as fn

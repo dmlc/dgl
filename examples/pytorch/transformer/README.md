@@ -1,25 +1,37 @@
 # Transformer in DGL
-In this example we implement the [Transformer](https://arxiv.org/pdf/1706.03762.pdf) and [Universal Transformer](https://arxiv.org/abs/1807.03819) in DGL.
+In this example we implement the [Transformer](https://arxiv.org/pdf/1706.03762.pdf) and [Universal Transformer](https://arxiv.org/abs/1807.03819) with ACT in DGL.
+
+The folder contains training module and inferencing module (beam decoder) for Transformer and training module for Universal Transformer
 
 ## Requirements
 
 - PyTorch 0.4.1+
+- dgl
+- networkx
 - tqdm
 
 ## Usage
 
-For training:
+- For training:
 
     python translation_train.py [--gpus id1,id2,...] [--N #layers] [--dataset DATASET] [--batch BATCHSIZE] [--universal]
 
-For testing:
+- For evaluating BLEU score on test set(by enabling `--print` to see translated text):
 
-    python translation_test.py [--gpu id] [--N #layers] [--dataset DATASET] [--batch BATCHSIZE] [--checkpoint CHECKPOINT] [--print]
+    python translation_test.py [--gpu id] [--N #layers] [--dataset DATASET] [--batch BATCHSIZE] [--checkpoint CHECKPOINT] [--print] [--universal]
 
-## Results
+Available datasets: `copy`, `sort`, `wmt14`, `multi30k`(default).
+
+## Test Results
+
+### Transfomer
 
 - Multi30k: we achieve BLEU score 35.41 with default setting on Multi30k dataset, without using pre-trained embeddings. (if we set the number of layers to 2, the BLEU score could reach 36.45).
-- WMT14: TODO
+- WMT14: work in progress 
+
+### Universal Transformer
+
+- work in progress 
 
 ## Notes
 

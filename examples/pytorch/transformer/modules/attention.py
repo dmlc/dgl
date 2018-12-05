@@ -1,7 +1,7 @@
 import torch as th
 import torch.nn as nn
 import numpy as np
-from dgl.contrib.transformer.layers import clones
+from .layers import clones
 
 class MultiHeadAttention(nn.Module):
     "Multi-Head Attention"

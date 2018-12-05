@@ -1,7 +1,7 @@
 from .attention import *
-from dgl.contrib.transformer.layers import *
-from dgl.contrib.transformer.functions import *
-from dgl.contrib.transformer.embedding import *
+from .layers import *
+from .functions import *
+from .embedding import *
 import torch as th
 import dgl.function as fn
 import torch.nn.init as INIT
@@ -72,7 +72,7 @@ class HaltingUnit(nn.Module):
         return th.sigmoid(self.linear(self.norm(x)))
 
 class UTransformer(nn.Module):
-    "Universal Transformer(https://arxiv.org/pdf/1807.03819.pdf) with ACT."
+    "Universal Transformer(https://arxiv.org/pdf/1807.03819.pdf) with ACT(https://arxiv.org/pdf/1603.08983.pdf)."
     MAX_DEPTH = 8
     thres = 0.99
     act_loss_weight = 0.01 
