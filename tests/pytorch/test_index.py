@@ -49,7 +49,7 @@ def test_index():
     # from np data
     data = np.ones((10,), dtype=np.int64) * 10
     idx = toindex(data)
-    y1 = idx.tolist()
+    y1 = idx.tonumpy()
     y2 = idx.tousertensor().numpy()
     y3 = idx.todgltensor().asnumpy()
     assert np.allclose(ans, y1)
@@ -59,7 +59,7 @@ def test_index():
     # from list
     data = [10] * 10
     idx = toindex(data)
-    y1 = idx.tolist()
+    y1 = idx.tonumpy()
     y2 = idx.tousertensor().numpy()
     y3 = idx.todgltensor().asnumpy()
     assert np.allclose(ans, y1)
@@ -69,7 +69,7 @@ def test_index():
     # from torch
     data = th.ones((10,), dtype=th.int64) * 10
     idx = toindex(data)
-    y1 = idx.tolist()
+    y1 = idx.tonumpy()
     y2 = idx.tousertensor().numpy()
     y3 = idx.todgltensor().asnumpy()
     assert np.allclose(ans, y1)
@@ -79,7 +79,7 @@ def test_index():
     # from dgl.NDArray
     data = dgl.ndarray.array(np.ones((10,), dtype=np.int64) * 10)
     idx = toindex(data)
-    y1 = idx.tolist()
+    y1 = idx.tonumpy()
     y2 = idx.tousertensor().numpy()
     y3 = idx.todgltensor().asnumpy()
     assert np.allclose(ans, y1)

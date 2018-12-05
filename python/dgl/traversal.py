@@ -44,7 +44,7 @@ def bfs_nodes_generator(graph, source, reversed=False):
     ret = _CAPI_DGLBFSNodes(ghandle, source, reversed)
     all_nodes = utils.toindex(ret(0)).tousertensor()
     # TODO(minjie): how to support directly creating python list
-    sections = utils.toindex(ret(1)).tousertensor().tolist()
+    sections = utils.toindex(ret(1)).tonumpy().tolist()
     node_frontiers = F.split(all_nodes, sections, dim=0)
     return node_frontiers
 
@@ -84,7 +84,7 @@ def bfs_edges_generator(graph, source, reversed=False):
     ret = _CAPI_DGLBFSEdges(ghandle, source, reversed)
     all_edges = utils.toindex(ret(0)).tousertensor()
     # TODO(minjie): how to support directly creating python list
-    sections = utils.toindex(ret(1)).tousertensor().tolist()
+    sections = utils.toindex(ret(1)).tonumpy().tolist()
     edge_frontiers = F.split(all_edges, sections, dim=0)
     return edge_frontiers
 
@@ -120,7 +120,7 @@ def topological_nodes_generator(graph, reversed=False):
     ret = _CAPI_DGLTopologicalNodes(ghandle, reversed)
     all_nodes = utils.toindex(ret(0)).tousertensor()
     # TODO(minjie): how to support directly creating python list
-    sections = utils.toindex(ret(1)).tousertensor().tolist()
+    sections = utils.toindex(ret(1)).tonumpy().tolist()
     return F.split(all_nodes, sections, dim=0)
 
 def dfs_edges_generator(graph, source, reversed=False):
@@ -165,7 +165,7 @@ def dfs_edges_generator(graph, source, reversed=False):
     ret = _CAPI_DGLDFSEdges(ghandle, source, reversed)
     all_edges = utils.toindex(ret(0)).tousertensor()
     # TODO(minjie): how to support directly creating python list
-    sections = utils.toindex(ret(1)).tousertensor().tolist()
+    sections = utils.toindex(ret(1)).tonumpy().tolist()
     return F.split(all_edges, sections, dim=0)
 
 def dfs_labeled_edges_generator(
@@ -244,11 +244,11 @@ def dfs_labeled_edges_generator(
     # TODO(minjie): how to support directly creating python list
     if return_labels:
         all_labels = utils.toindex(ret(1)).tousertensor()
-        sections = utils.toindex(ret(2)).tousertensor().tolist()
+        sections = utils.toindex(ret(2)).tonumpy().tolist()
         return (F.split(all_edges, sections, dim=0),
                 F.split(all_labels, sections, dim=0))
     else:
-        sections = utils.toindex(ret(1)).tousertensor().tolist()
+        sections = utils.toindex(ret(1)).tonumpy().tolist()
         return F.split(all_edges, sections, dim=0)
 
 _init_api("dgl.traversal")
