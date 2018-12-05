@@ -21,6 +21,7 @@ Stochastic Steady-state Embedding (SSE)
 #    \newcommand{\until}{\text{until}\ }
 #
 # In this tutorial we implement in DGL with MXNet
+#
 # -  Simple steady-state algorithms with `stochastic steady-state
 #    embedding <https://www.cc.gatech.edu/~hdai8/pdf/equilibrium_embedding.pdf>`__
 #    (SSE), and
@@ -87,13 +88,13 @@ Stochastic Steady-state Embedding (SSE)
 # ~~~~~~~~~~~~~~
 #
 # We can easily implement flood-fill in DGL:
-#
+
 import mxnet as mx
 import os
+import dgl
 # DGL backend defaults to PyTorch, so we need to switch backend.
 # One can also set the environment variable outside Python.
-os.environ['DGLBACKEND'] = 'mxnet'
-import dgl
+dgl.load_backend('mxnet')
 
 def T(g):
     def message_func(edges):
@@ -134,6 +135,7 @@ g = dgl.DGLGraph(disjoint_chains(N, L), readonly=True)
 y = mx.nd.zeros([g.number_of_nodes(), 1])
 y[s] = 1
 g.ndata['y'] = y
+
 ##############################################################################
 # Now let’s apply ``T`` to ``g`` until convergence. You can see that nodes
 # reachable from ``s`` are gradually “infected” (marked).
@@ -143,6 +145,7 @@ while True:
     next_y = T(g)
     if all(prev_y == next_y):
         break
+
 ##############################################################################
 # The update procedure is visualized as follows:
 #
@@ -264,22 +267,18 @@ class Predictor(gluon.Block):
 # where the predictor is denoted by :math:`g_\Phi` and :math:`\hat{y}_v`
 # indicates whether the node :math:`v` is marked or not.
 #
-# Our implementation can be further accelerated using `DGL built-in
-# functions <https://doc.dgl.ai/api/python/function.html>`__, which maps
-# the computation to more more efficient sparse operators in the backend
-# framework (e.g., MXNet/Gluon, PyTorch). Please see `the Graph
-# convolution Network (GCN)
-# tutorial <https://doc.dgl.ai/tutorials/models/1_gcn.html#sphx-glr-tutorials-models-1-gcn-py>`__
+# Our implementation can be further accelerated using DGL's :mod:`built-in
+# functions <dgl.function>`, which maps
+# the computation to more efficient sparse operators in the backend
+# framework (e.g., MXNet/Gluon, PyTorch). Please see
+# the :doc:`Graph convolution network <1_gcn>` tutorial
 # for more details.
 #
 # Efficient semi-supervised learning on graph
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
-# `The GCN
-# tutorial <https://doc.dgl.ai/tutorials/models/1_gcn.html#sphx-glr-tutorials-models-1-gcn-py>`__
-# introduces *semi-supervised* learning on graph. During training in this
-# setting, we can observe the entire structure of one fixed graph as well
-# as the feature vector of each node, but we only have access to the
+# In our setting, we can observe the entire structure of one fixed graph as well
+# as the feature vector of each node. However, we only have access to the
 # labels of some (very few) of the nodes. We will train the neural
 # flood-fill algorithm in this setting as well.
 #
@@ -416,7 +415,7 @@ def train(g, label_nodes, steady_state_operator, predictor, trainer):
 #
 # DGL supports very efficient subgraph sampling natively to help users
 # scale algorithms to large graphs. Currently, DGL provides the
-# ```NeighborSampler()`` <https://doc.dgl.ai/api/python/sampler.html#neighborsampler>`__
+# :func:`~dgl.contrib.sampling.sampler.NeighborSampler`
 # API, which returns a subgraph iterator that samples multiple subgraphs
 # at a time with neighbor sampling.
 #
@@ -484,6 +483,7 @@ def train_on_subgraphs(g, label_nodes, batch_size,
                                  steady_state_operator, predictor, trainer)
         # We don't need to copy the features back to parent graph.
     return loss
+
 ##############################################################################
 # We also define a helper function that reports prediction accuracy:
 
@@ -493,6 +493,7 @@ def test(g, test_nodes, steady_state_operator, predictor):
     y = g.ndata['y'].reshape(n)[test_nodes]
     accuracy = mx.nd.sum(y_bar == y) / len(test_nodes)
     return accuracy.asnumpy()[0]
+
 ##############################################################################
 # Some routine preparations for training:
 #
@@ -506,6 +507,7 @@ predictor.initialize()
 params = steady_state_operator.collect_params()
 params.update(predictor.collect_params())
 trainer = gluon.Trainer(params, 'adam', {'learning_rate' : lr})
+
 ##############################################################################
 # Now let’s train it! As before, nodes reachable from :math:`s` are
 # gradually “infected”, except that behind the scene is a neural network!
@@ -525,14 +527,17 @@ for i in range(n_epochs):
     print("Iter {:05d} | Train acc {:.4} | Test acc {:.4f}".format(i, accuracy_train, accuracy_test))
     y_bar = mx.nd.argmax(g.ndata['z'], axis=1)
     y_bars.append(y_bar)
+
 ##############################################################################
 # |image2|
 #
 # In this tutorial, we use a very small toy graph to demonstrate the
 # subgraph training for easy visualization. Subgraph training actually
-# helps us scale to gigant graphs. For instance, we have successfully
+# helps us scale to gigantic graphs. For instance, we have successfully
 # scaled SSE to a graph with 50 million nodes and 150 million edges in a
 # single P3.8x large instance and one epoch only takes about 160 seconds.
+#
+# See full examples `here <https://github.com/jermainewang/dgl/tree/master/examples/mxnet/sse>`_.
 #
 # .. |image0| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/img/floodfill-paths.gif
 # .. |image1| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/img/neighbor-sampling.gif
