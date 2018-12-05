@@ -1,6 +1,6 @@
 # Benchmark SSE on multi-GPUs
-# Use a small embedding.
-'''bash
+### Use a small embedding.
+```bash
 DGLBACKEND=mxnet python3 sse_batch.py --graph-file ../../data/5_5_csr.nd \
                                       --n-epochs 1 \
                                       --lr 0.0005 \
@@ -11,10 +11,10 @@ DGLBACKEND=mxnet python3 sse_batch.py --graph-file ../../data/5_5_csr.nd \
                                       --gpu 1 \
                                       --num-feats 100 \
                                       --n-hidden 100
-'''
+```
 
-# test convergence
-'''bash
+### test convergence
+```bash
 DGLBACKEND=mxnet python3 sse_batch.py --dataset "pubmed" \
                                       --n-epochs 100 \
                                       --lr 0.001 \
@@ -22,4 +22,4 @@ DGLBACKEND=mxnet python3 sse_batch.py --dataset "pubmed" \
                                       --dgl \
                                       --use-spmv \
                                       --neigh-expand 4
-'''
+```
