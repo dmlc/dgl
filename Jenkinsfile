@@ -53,6 +53,13 @@ def pytorch_tutorials() {
   }
 }
 
+def mxnet_tutorials() {
+  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
+    dir("tests/scripts") {
+      sh "./task_mxnet_tutorial_test.sh"
+    }
+  }
+}
 pipeline {
   agent none
   stages {
