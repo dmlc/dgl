@@ -11,14 +11,14 @@ def test_edge_id():
 
     gi.add_nodes(4)
     gi.add_edge(0, 1)
-    eid = gi.edge_id(0, 1).tolist()
+    eid = gi.edge_id(0, 1).tonumpy()
     assert len(eid) == 1
     assert eid[0] == 0
     assert gi.is_multigraph()
 
     # multiedges
     gi.add_edge(0, 1)
-    eid = gi.edge_id(0, 1).tolist()
+    eid = gi.edge_id(0, 1).tonumpy()
     assert len(eid) == 2
     assert eid[0] == 0
     assert eid[1] == 1
@@ -60,7 +60,7 @@ def test_edge_id():
 
     gi.add_nodes(4)
     gi.add_edge(0, 1)
-    eid = gi.edge_id(0, 1).tolist()
+    eid = gi.edge_id(0, 1).tonumpy()
     assert len(eid) == 1
     assert eid[0] == 0
 

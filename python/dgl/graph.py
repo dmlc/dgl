@@ -8,7 +8,7 @@ from collections import defaultdict
 import dgl
 from .base import ALL, is_all, DGLError, dgl_warning
 from . import backend as F
-from .frame import FrameRef, Frame, merge_frames
+from .frame import FrameRef, Frame
 from .graph_index import GraphIndex, create_graph_index
 from .runtime import ir, scheduler, Runtime
 from . import utils
