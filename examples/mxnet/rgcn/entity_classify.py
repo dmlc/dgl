@@ -25,8 +25,8 @@ from layers import RGCNBasisLayer as RGCNLayer
 class EntityClassify(BaseRGCN):
     def create_features(self):
         features = mx.nd.arange(self.num_nodes)
-        if self.use_cuda:
-            features = features.as_in_context(mx.gpu(0))
+        if self.gpu_id >= 0:
+            features = features.as_in_context(mx.gpu(self.gpu_id))
         return features
 
     def build_input_layer(self):
@@ -68,7 +68,7 @@ def main(args):
     # check cuda
     use_cuda = args.gpu >= 0
     if use_cuda:
-        ctx = mx.gpu(0)
+        ctx = mx.gpu(args.gpu)
         edge_type = edge_type.as_in_context(ctx)
         edge_norm = edge_norm.as_in_context(ctx)
         labels = labels.as_in_context(ctx)
@@ -90,7 +90,7 @@ def main(args):
                            num_bases=args.n_bases,
                            num_hidden_layers=args.n_layers - 2,
                            dropout=args.dropout,
-                           use_cuda=use_cuda)
+                           gpu_id=args.gpu)
     model.initialize(ctx=ctx)
 
     # optimizer
@@ -116,14 +116,18 @@ def main(args):
         print("Epoch {:05d} | Train Forward Time(s) {:.4f} | Backward Time(s) {:.4f}".
               format(epoch, forward_time[-1], backward_time[-1]))
         train_acc = F.sum(pred[train_idx].argmax(axis=1) == labels[train_idx]).asscalar() / train_idx.shape[0]
-        val_loss = F.softmax_cross_entropy(pred[val_idx], labels[val_idx])
         val_acc = F.sum(pred[val_idx].argmax(axis=1) == labels[val_idx]).asscalar() / len(val_idx)
         print("Train Accuracy: {:.4f} | Validation Accuracy: {:.4f}".format(train_acc, val_acc))
     print()
 
     logits = model(g)
     test_acc = F.sum(logits[test_idx].argmax(axis=1) == labels[test_idx]).asscalar() / len(test_idx)
-    print("Test Accuracy: {:.4f}".format(test_acc))
+    # calculate MRR
+    indices = F.argsort(logits[test_idx], axis=1, is_ascend=False)
+    matched = indices == labels[test_idx].reshape(-1, 1)
+    rank = np.nonzero(matched.asnumpy())[1] + 1.0
+    mrr = np.mean(1.0 / rank)
+    print("Test Accuracy: {:.4f} | MRR: {:.4f}".format(test_acc, mrr))
     print()
 
     print("Mean forward time: {:4f}".format(np.mean(forward_time[len(forward_time) // 4:])))

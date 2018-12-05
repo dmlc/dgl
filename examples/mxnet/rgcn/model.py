@@ -3,7 +3,7 @@ from mxnet import gluon
 
 class BaseRGCN(gluon.Block):
     def __init__(self, num_nodes, h_dim, out_dim, num_rels, num_bases=-1,
-                 num_hidden_layers=1, dropout=0, use_cuda=False):
+                 num_hidden_layers=1, dropout=0, gpu_id=-1):
         super(BaseRGCN, self).__init__()
         self.num_nodes = num_nodes
         self.h_dim = h_dim
@@ -12,7 +12,7 @@ class BaseRGCN(gluon.Block):
         self.num_bases = num_bases
         self.num_hidden_layers = num_hidden_layers
         self.dropout = dropout
-        self.use_cuda = use_cuda
+        self.gpu_id = gpu_id
 
         # create rgcn layers
         self.build_model()
