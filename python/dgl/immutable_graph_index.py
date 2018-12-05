@@ -548,12 +548,38 @@ class ImmutableGraphIndex(object):
         nx_graph : networkx.DiGraph
             The nx graph
         """
-        if not isinstance(nx_graph, nx.DiGraph):
-            nx_graph = nx.DiGraph(nx_graph)
+        if not isinstance(nx_graph, nx.Graph):
+            nx_graph = (nx.MultiDiGraph(nx_graph) if self.is_multigraph()
+                    else nx.DiGraph(nx_graph))
+        else:
+            nx_graph = nx_graph.to_directed()
+
+        assert nx_graph.number_of_edges() > 0, "can't create an empty immutable graph"
+
+        # nx_graph.edges(data=True) returns src, dst, attr_dict
+        has_edge_id = 'id' in next(iter(nx_graph.edges(data=True)))[-1]
+        if has_edge_id:
+            num_edges = nx_graph.number_of_edges()
+            src = np.zeros((num_edges,), dtype=np.int64)
+            dst = np.zeros((num_edges,), dtype=np.int64)
+            for u, v, attr in nx_graph.edges(data=True):
+                eid = attr['id']
+                src[eid] = u
+                dst[eid] = v
+        else:
+            src = []
+            dst = []
+            for e in nx_graph.edges:
+                src.append(e[0])
+                dst.append(e[1])
+            eid = np.arange(0, len(src), dtype=np.int64)
+
+        num_nodes = nx_graph.number_of_nodes()
         # We store edge Ids as an edge attribute.
-        nodelist = list(range(nx_graph.number_of_nodes()))
-        out_mat = nx.convert_matrix.to_scipy_sparse_matrix(nx_graph, nodelist=nodelist, format='coo')
-        self._sparse.from_coo_matrix(out_mat)
+        eid = F.tensor(eid, dtype=np.int32)
+        out_csr = F.sparse_matrix(eid, ('coo', (src, dst)), (num_nodes, num_nodes)).astype(np.int64)
+        in_csr = F.sparse_matrix(eid, ('coo', (dst, src)), (num_nodes, num_nodes)).astype(np.int64)
+        self._sparse = F.create_immutable_graph_index(in_csr, out_csr)
 
     def from_scipy_sparse_matrix(self, adj):
         """Convert from scipy sparse matrix.
