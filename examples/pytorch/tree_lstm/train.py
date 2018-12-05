@@ -8,7 +8,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 import dgl
-import dgl.data as data
+from dgl.data.tree import SST
 
 from tree_lstm import TreeLSTM
 
@@ -25,22 +25,22 @@ def main(args):
     if cuda:
         th.cuda.set_device(args.gpu)
 
-    trainset = data.SST()
+    trainset = SST()
     train_loader = DataLoader(dataset=trainset,
                               batch_size=args.batch_size,
-                              collate_fn=data.SST.batcher(device),
+                              collate_fn=SST.batcher(device),
                               shuffle=True,
                               num_workers=0)
-    devset = data.SST(mode='dev')
+    devset = SST(mode='dev')
     dev_loader = DataLoader(dataset=devset,
                             batch_size=100,
-                            collate_fn=data.SST.batcher(device),
+                            collate_fn=SST.batcher(device),
                             shuffle=False,
                             num_workers=0)
 
-    testset = data.SST(mode='test')
+    testset = SST(mode='test')
     test_loader = DataLoader(dataset=testset,
-                             batch_size=100, collate_fn=data.SST.batcher(device), shuffle=False, num_workers=0)
+                             batch_size=100, collate_fn=SST.batcher(device), shuffle=False, num_workers=0)
 
     model = TreeLSTM(trainset.num_vocabs,
                      args.x_size,

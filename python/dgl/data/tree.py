@@ -6,8 +6,6 @@ Including:
 from __future__ import absolute_import
 
 from collections import namedtuple, OrderedDict
-from nltk.tree import Tree
-from nltk.corpus.reader import BracketParseCorpusReader
 import networkx as nx
 
 import numpy as np
@@ -15,6 +13,8 @@ import os
 import dgl
 import dgl.backend as F
 from dgl.data.utils import download, extract_archive, get_download_dir, _get_dgl_url
+
+__all__ = ['SSTBatch', 'SST']
 
 _urls = {
     'sst' : 'dataset/sst.zip',
@@ -63,6 +63,7 @@ class SST(object):
         print('Dataset creation finished. #Trees:', len(self.trees))
 
     def _load(self):
+        from nltk.corpus.reader import BracketParseCorpusReader
         # load vocab file
         self.vocab = OrderedDict()
         with open(self.vocab_file, encoding='utf-8') as vf:
