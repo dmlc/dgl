@@ -53,14 +53,16 @@ class SrcMulEdgeMessageFunction(MessageFunction):
         return _is_spmv_supported_edge_feat(g, self.edge_field)
 
     def __call__(self, edges):
-        src_data = edges.src[self.src_field]
+        sdata = edges.src[self.src_field]
         edata = edges.data[self.edge_field]
-        if F.ndim(edata) == 1:
-            # edge feature is a scalar, unsqueeze dims of len 1
-            src_dim = F.ndim(src_data)
-            new_eshape = (F.shape(edata)[0],) + (1,) * (src_dim - 1)
-            edata = F.reshape(edata, new_eshape)
-        ret = self.mul_op(src_data, edata)
+        # Due to the different broadcasting semantics of different backends,
+        #   we need to broadcast the sdata and edata to be of the same rank.
+        rank = max(F.ndim(sdata), F.ndim(edata))
+        sshape = F.shape(sdata)
+        eshape = F.shape(edata)
+        sdata = F.reshape(sdata, sshape + (1,) * (rank - F.ndim(sdata)))
+        edata = F.reshape(edata, eshape + (1,) * (rank - F.ndim(edata)))
+        ret = self.mul_op(sdata, edata)
         return {self.out_field : ret}
 
     @property
