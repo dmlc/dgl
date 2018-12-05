@@ -237,8 +237,8 @@ def build_relabel_map(x, sorted=False):
         unique_x, _ = F.sort_1d(F.unique(x))
     else:
         unique_x = x
-    map_len = int(F.max(unique_x, dim=0)) + 1
-    old_to_new = F.zeros(map_len, dtype=F.int64, ctx=F.cpu())
+    map_len = int(F.asnumpy(F.max(unique_x, dim=0))) + 1
+    old_to_new = F.zeros((map_len,), dtype=F.int64, ctx=F.cpu())
     F.scatter_row_inplace(old_to_new, unique_x, F.arange(0, len(unique_x)))
     return unique_x, old_to_new
 
@@ -334,30 +334,20 @@ def reorder(dict_like, index):
         new_dict[key] = F.gather_row(val, idx_ctx)
     return new_dict
 
-def build_coo_sparse_matrix(dat, row, col, dense_shape):
-    """Build coo sparse matrix
+def reorder_index(idx, order):
+    """Reorder the idx according to the given order
 
     Parameters
     ----------
-    dat: Tensor
-        Data.
-    row: Tensor
-        Row index.
-    col: Tensor
-        Column index.
-    dense_shape: list or tuple of two integer
-        Dense shape of the sparse matrix
-
-    Returns
-    -------
-    SparseTensor
-        The sparse matrix.
+    idx : utils.Index
+        The index to be reordered.
+    order : utils.Index
+        The order to follow.
     """
-    nnz = len(row)
-    row = F.unsqueeze(row, 0)
-    col = F.unsqueeze(col, 0)
-    idx = F.cat([row, col], dim=0)
-    return F.sparse_matrix(dat, ('coo', idx), dense_shape)
+    idx = idx.tousertensor()
+    order = order.tousertensor()
+    new_idx = F.gather_row(idx, order)
+    return toindex(new_idx)
 
 def is_iterable(obj):
     """Return true if the object is an iterable."""
