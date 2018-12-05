@@ -14,7 +14,6 @@ import torch.nn.functional as F
 import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
-from data_utils import load_dataset
 
 class NodeApplyModule(nn.Module):
     def __init__(self, in_feats, out_feats, activation=None):
@@ -24,10 +23,11 @@ class NodeApplyModule(nn.Module):
         self.activation = activation
 
     def forward(self, nodes):
-        h = self.linear(nodes.data['h'] * nodes.data['norm'])
+        # normalization by square root of dst degree
+        h = nodes.data['h'] * nodes.data['norm']
+        h = self.linear(h)
         if self.activation:
             h = self.activation(h)
-
         return {'h': h}
 
 class GCN(nn.Module):
@@ -66,7 +66,7 @@ class GCN(nn.Module):
             # apply dropout
             if idx > 0 and self.dropout:
                 self.g.ndata['h'] = self.dropout(self.g.ndata['h'])
-            # normalization
+            # normalization by square root of src degree
             self.g.ndata['h'] = self.g.ndata['h'] * self.g.ndata['norm']
             self.g.update_all(fn.copy_src(src='h', out='m'),
                               fn.sum(msg='m', out='h'),
@@ -155,10 +155,9 @@ def main(args):
             dur.append(time.time() - t0)
 
         acc = evaluate(model, features, labels, val_mask)
-        print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f}"
-              " | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".
-              format(epoch, loss.item(), acc, np.mean(dur),
-                     n_edges / np.mean(dur) / 1000))
+        print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
+              "ETputs(KTEPS) {:.2f}". format(epoch, np.mean(dur), loss.item(),
+                                             acc, n_edges / np.mean(dur) / 1000))
 
     print()
     acc = evaluate(model, features, labels, test_mask)
