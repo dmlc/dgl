@@ -307,7 +307,8 @@ class SPMVWithDataExecutor(Executor):
         spA = spA_ctxobj.get(ctx)
         spidx = F.sparse_matrix_indices(spA)
         shape = F.shape(spA)
-        spA = F.sparse_matrix(A_data, spidx, shape)
+        # shuffle index is not used
+        spA, _ = F.sparse_matrix(A_data, spidx, shape)
 
         if F.ndim(B) == 1:
             # B is a vector, append a (1,) dim at the end

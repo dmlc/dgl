@@ -105,6 +105,9 @@ def sparse_matrix(data, index, shape, force_format=False):
     SparseMatrix
         The framework-specific sparse matrix. It can be stored in any format
         unless force_format is True.
+    Tensor
+        The data convert index due to sparse format change.
+        None if no conversion is needed.
     """
     pass
 

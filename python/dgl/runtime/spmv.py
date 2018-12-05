@@ -80,9 +80,9 @@ def analyze_e2v_spmv(graph, rfunc):
             rfunc_left.append(rfn)
     return spmv_rfunc, rfunc_left
 
-def gen_v2v_spmv_schedule(adjmat, spmv_pairs, nf, ef, eid, out):
+def gen_v2v_spmv_schedule(adj, spmv_pairs, nf, ef, eid, out):
     """
-    adjmat : sparse matrix
+    adj : tuple (sparse matrix, utils.Index)
     spmv_pairs : list of pair
     nf : var.Var
         input node features
@@ -93,9 +93,12 @@ def gen_v2v_spmv_schedule(adjmat, spmv_pairs, nf, ef, eid, out):
     out : var.Var
         output node features
     """
+    adjmat, shuffle_idx = adj
     adj_var = var.SPMAT(adjmat)
+    if shuffle_idx is not None:
+        new_eid = utils.reorder_index(eid.data, shuffle_idx)
+        eid = var.IDX(new_eid)
     for mfn, rfn in spmv_pairs:
-        #print('v2v mfn=%s rfn=%s' % (mfn.name, rfn.name))
         if mfn.use_edge_feature:
             ftedge = ir.READ(ef, eid, var.STR(mfn.edge_field))
             ftsrc = ir.READ_COL(nf, var.STR(mfn.src_field))
@@ -108,15 +111,15 @@ def gen_v2v_spmv_schedule(adjmat, spmv_pairs, nf, ef, eid, out):
 
 def gen_e2v_spmv_schedule(inc, spmv_rfunc, mf, out):
     """
-    inc : sparse matrix
-        The incidence matrix
+    inc : tuple (sparse matrix, utils.Index)
     spmv_rfunc : list of builtin reducers
     mf : var.Var
         Variable for message frame.
     out : var.Var
         Variable for output reduced features.
     """
-    inc_var = var.SPMAT(inc)
+    incmat, _ = inc
+    inc_var = var.SPMAT(incmat)
     for rfn in spmv_rfunc:
         ftmsg = ir.READ_COL(mf, var.STR(rfn.msg_field))
         ftdst = ir.SPMV(inc_var, ftmsg)
@@ -134,10 +137,14 @@ def build_adj_matrix_graph(graph):
     -------
     utils.CtxCachedObject
         Get be used to get adjacency matrix on the provided ctx.
+    utils.Index
+        A index for data shuffling due to sparse format change. Return None
+        if shuffle is not required.
     """
-    return utils.CtxCachedObject(lambda ctx : graph.adjacency_matrix(ctx=ctx))
+    adjmat, shuffle_idx = graph._graph.adjacency_matrix(transpose=False, ctx=F.cpu())
+    return utils.CtxCachedObject(lambda ctx : F.copy_to(adjmat, ctx)), shuffle_idx
 
-def build_adj_matrix_index_uv(graph, edges, reduce_nodes):
+def _build_adj_matrix_index_uv(graph, edges, reduce_nodes):
     """Build adj matrix index and shape using the given (u, v) edges.
 
     The matrix is of shape (len(reduce_nodes), n), where n is the number of nodes
@@ -198,15 +205,19 @@ def build_adj_matrix_uv(graph, edges, reduce_nodes):
     Returns
     -------
     utils.CtxCachedObject
-        Get be used to get adjacency matrix on the provided ctx.
+        Get be used to get adjacency matrix and on the provided ctx.
+    utils.Index
+        A index for data shuffling due to sparse format change. Return None
+        if shuffle is not required.
     """
-    sp_idx, shape = build_adj_matrix_index_uv(graph, edges, reduce_nodes)
+    sp_idx, shape = _build_adj_matrix_index_uv(graph, edges, reduce_nodes)
     u, v = edges
     nnz = len(u)
     # FIXME(minjie): data type
     dat = F.ones((nnz,), dtype=F.float32, ctx=F.cpu())
-    mat = F.sparse_matrix(dat, sp_idx, shape)
-    return utils.CtxCachedObject(lambda ctx : F.copy_to(mat, ctx))
+    mat, shuffle_idx = F.sparse_matrix(dat, sp_idx, shape)
+    shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+    return utils.CtxCachedObject(lambda ctx : F.copy_to(mat, ctx)), shuffle_idx
 
 def build_inc_matrix_graph(graph):
     """Build incidence matrix.
@@ -220,8 +231,13 @@ def build_inc_matrix_graph(graph):
     -------
     utils.CtxCachedObject
         Get be used to get incidence matrix on the provided ctx.
+    utils.Index
+        A index for data shuffling due to sparse format change. Return None
+        if shuffle is not required.
     """
-    return utils.CtxCachedObject(lambda ctx : graph.incidence_matrix(type='in', ctx=ctx))
+    incmat, _ = graph._graph.incidence_matrix(type='in', ctx=F.cpu())
+    # inc mat will not use data tensor so conversion index is not needed
+    return utils.CtxCachedObject(lambda ctx : F.copy_to(incmat, ctx)), None
 
 def build_inc_matrix_eid(m, eid, dst, reduce_nodes):
     """Build incidence matrix using edge id and edge dst nodes.
@@ -269,6 +285,9 @@ def build_inc_matrix_eid(m, eid, dst, reduce_nodes):
     -------
     utils.CtxCachedObject
         Get be used to get incidence matrix on the provided ctx.
+    utils.Index
+        A index for data shuffling due to sparse format change. Return None
+        if shuffle is not required.
     """
     new2old, old2new = utils.build_relabel_map(reduce_nodes, sorted=True)
     dst = dst.tousertensor()
@@ -283,8 +302,9 @@ def build_inc_matrix_eid(m, eid, dst, reduce_nodes):
     # create dat tensor
     nnz = len(eid)
     dat = F.ones((nnz,), dtype=F.float32, ctx=F.cpu())
-    mat = F.sparse_matrix(dat, ('coo', idx), (n, m))
-    return utils.CtxCachedObject(lambda ctx : F.copy_to(mat, ctx))
+    mat, _ = F.sparse_matrix(dat, ('coo', idx), (n, m))
+    # inc mat will not use data tensor so conversion index is not needed
+    return utils.CtxCachedObject(lambda ctx : F.copy_to(mat, ctx)), None
 
 def build_inc_matrix_dst(dst, reduce_nodes):
     """Build incidence matrix using only edge destinations.
@@ -318,6 +338,9 @@ def build_inc_matrix_dst(dst, reduce_nodes):
     -------
     utils.CtxCachedObject
         Get be used to get incidence matrix on the provided ctx.
+    utils.Index
+        A index for data shuffling due to sparse format change. Return None
+        if shuffle is not required.
     """
     eid = utils.toindex(F.arange(0, len(dst)))
     return build_inc_matrix_eid(len(eid), eid, dst, reduce_nodes)
