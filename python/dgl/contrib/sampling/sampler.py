@@ -69,6 +69,7 @@ class NSSubgraphLoader(object):
         # iterate all subgraphs and we should stop the iterator now.
         if len(self._subgraphs) == 0:
             raise StopIteration
+        print(self._seed_ids[0].tousertensor())
         return self._subgraphs.pop(0), self._seed_ids.pop(0).tousertensor()
 
 def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
