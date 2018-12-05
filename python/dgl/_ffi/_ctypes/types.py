@@ -4,26 +4,26 @@ from __future__ import absolute_import as _abs
 
 import ctypes
 from ..base import py_str, check_call, _LIB
-from ..runtime_ctypes import TVMByteArray, TypeCode
+from ..runtime_ctypes import DGLByteArray, TypeCode
 
-class TVMValue(ctypes.Union):
-    """TVMValue in C API"""
+class DGLValue(ctypes.Union):
+    """DGLValue in C API"""
     _fields_ = [("v_int64", ctypes.c_int64),
                 ("v_float64", ctypes.c_double),
                 ("v_handle", ctypes.c_void_p),
                 ("v_str", ctypes.c_char_p)]
 
 
-TVMPackedCFunc = ctypes.CFUNCTYPE(
+DGLPackedCFunc = ctypes.CFUNCTYPE(
     ctypes.c_int,
-    ctypes.POINTER(TVMValue),
+    ctypes.POINTER(DGLValue),
     ctypes.POINTER(ctypes.c_int),
     ctypes.c_int,
     ctypes.c_void_p,
     ctypes.c_void_p)
 
 
-TVMCFuncFinalizer = ctypes.CFUNCTYPE(
+DGLCFuncFinalizer = ctypes.CFUNCTYPE(
     None,
     ctypes.c_void_p)
 
@@ -40,7 +40,7 @@ def _return_bytes(x):
     handle = x.v_handle
     if not isinstance(handle, ctypes.c_void_p):
         handle = ctypes.c_void_p(handle)
-    arr = ctypes.cast(handle, ctypes.POINTER(TVMByteArray))[0]
+    arr = ctypes.cast(handle, ctypes.POINTER(DGLByteArray))[0]
     size = arr.size
     res = bytearray(size)
     rptr = (ctypes.c_byte * size).from_buffer(res)
@@ -51,7 +51,7 @@ def _return_bytes(x):
 def _wrap_arg_func(return_f, type_code):
     tcode = ctypes.c_int(type_code)
     def _wrap_func(x):
-        check_call(_LIB.TVMCbArgToReturn(ctypes.byref(x), tcode))
+        check_call(_LIB.DGLCbArgToReturn(ctypes.byref(x), tcode))
         return return_f(x)
     return _wrap_func
 

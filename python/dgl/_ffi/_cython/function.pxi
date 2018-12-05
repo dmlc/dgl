@@ -4,20 +4,20 @@ from cpython cimport Py_INCREF, Py_DECREF
 from numbers import Number, Integral
 from ..base import string_types
 from ..node_generic import convert_to_node, NodeGeneric
-from ..runtime_ctypes import TVMType, TVMContext, TVMByteArray
+from ..runtime_ctypes import DGLType, DGLContext, DGLByteArray
 
 
-cdef void tvm_callback_finalize(void* fhandle):
+cdef void dgl_callback_finalize(void* fhandle):
     local_pyfunc = <object>(fhandle)
     Py_DECREF(local_pyfunc)
 
-cdef int tvm_callback(TVMValue* args,
+cdef int dgl_callback(DGLValue* args,
                       int* type_codes,
                       int num_args,
-                      TVMRetValueHandle ret,
+                      DGLRetValueHandle ret,
                       void* fhandle) with gil:
     cdef list pyargs
-    cdef TVMValue value
+    cdef DGLValue value
     cdef int tcode
     local_pyfunc = <object>(fhandle)
     pyargs = []
@@ -28,7 +28,7 @@ cdef int tvm_callback(TVMValue* args,
             tcode == kFuncHandle or
             tcode == kModuleHandle or
             tcode > kExtBegin):
-            CALL(TVMCbArgToReturn(&value, tcode))
+            CALL(DGLCbArgToReturn(&value, tcode))
 
         if tcode != kArrayHandle:
             pyargs.append(make_ret(value, tcode))
@@ -38,19 +38,19 @@ cdef int tvm_callback(TVMValue* args,
         rv = local_pyfunc(*pyargs)
     except Exception:
         msg = traceback.format_exc()
-        TVMAPISetLastError(c_str(msg))
+        DGLAPISetLastError(c_str(msg))
         return -1
     if rv is not None:
         if isinstance(rv, tuple):
             raise ValueError("PackedFunction can only support one return value")
         temp_args = []
         make_arg(rv, &value, &tcode, temp_args)
-        CALL(TVMCFuncSetReturn(ret, &value, &tcode, 1))
+        CALL(DGLCFuncSetReturn(ret, &value, &tcode, 1))
     return 0
 
 
-def convert_to_tvm_func(object pyfunc):
-    """Convert a python function to TVM function
+def convert_to_dgl_func(object pyfunc):
+    """Convert a python function to DGL function
 
     Parameters
     ----------
@@ -59,14 +59,14 @@ def convert_to_tvm_func(object pyfunc):
 
     Returns
     -------
-    tvmfunc: tvm.Function
-        The converted tvm function.
+    dglfunc: dgl.Function
+        The converted dgl function.
     """
-    cdef TVMFunctionHandle chandle
+    cdef DGLFunctionHandle chandle
     Py_INCREF(pyfunc)
-    CALL(TVMFuncCreateFromCFunc(tvm_callback,
+    CALL(DGLFuncCreateFromCFunc(dgl_callback,
                                 <void*>(pyfunc),
-                                tvm_callback_finalize,
+                                dgl_callback_finalize,
                                 &chandle))
     ret = _CLASS_FUNCTION(None, False)
     (<FunctionBase>ret).chandle = chandle
@@ -74,10 +74,10 @@ def convert_to_tvm_func(object pyfunc):
 
 
 cdef inline int make_arg(object arg,
-                         TVMValue* value,
+                         DGLValue* value,
                          int* tcode,
                          list temp_args) except -1:
-    """Pack arguments into c args tvm call accept"""
+    """Pack arguments into c args dgl call accept"""
     cdef unsigned long long ptr
     if isinstance(arg, NodeBase):
         value[0].v_handle = (<NodeBase>arg).chandle
@@ -86,10 +86,10 @@ cdef inline int make_arg(object arg,
         value[0].v_handle = (<NDArrayBase>arg).chandle
         tcode[0] = (kNDArrayContainer if
                     not (<NDArrayBase>arg).c_is_view else kArrayHandle)
-    elif isinstance(arg, _TVM_COMPATS):
-        ptr = arg._tvm_handle
+    elif isinstance(arg, _DGL_COMPATS):
+        ptr = arg._dgl_handle
         value[0].v_handle = (<void*>ptr)
-        tcode[0] = arg.__class__._tvm_tcode
+        tcode[0] = arg.__class__._dgl_tcode
     elif isinstance(arg, (int, long)):
         value[0].v_int64 = arg
         tcode[0] = kInt
@@ -107,17 +107,17 @@ cdef inline int make_arg(object arg,
     elif isinstance(arg, Number):
         value[0].v_float64 = arg
         tcode[0] = kFloat
-    elif isinstance(arg, TVMType):
+    elif isinstance(arg, DGLType):
         tstr = c_str(str(arg))
         value[0].v_str = tstr
         tcode[0] = kStr
         temp_args.append(tstr)
-    elif isinstance(arg, TVMContext):
+    elif isinstance(arg, DGLContext):
         value[0].v_ctx = (<DLContext*>(
             <unsigned long long>ctypes.addressof(arg)))[0]
-        tcode[0] = kTVMContext
+        tcode[0] = kDGLContext
     elif isinstance(arg, bytearray):
-        arr = TVMByteArray()
+        arr = DGLByteArray()
         arr.data = ctypes.cast(
             (ctypes.c_byte * len(arg)).from_buffer(arg),
             ctypes.POINTER(ctypes.c_byte))
@@ -146,7 +146,7 @@ cdef inline int make_arg(object arg,
         value[0].v_handle = c_handle(arg)
         tcode[0] = kHandle
     elif callable(arg):
-        arg = convert_to_tvm_func(arg)
+        arg = convert_to_dgl_func(arg)
         value[0].v_handle = (<FunctionBase>arg).chandle
         tcode[0] = kFuncHandle
         temp_args.append(arg)
@@ -156,7 +156,7 @@ cdef inline int make_arg(object arg,
 
 cdef inline bytearray make_ret_bytes(void* chandle):
     handle = ctypes_handle(chandle)
-    arr = ctypes.cast(handle, ctypes.POINTER(TVMByteArray))[0]
+    arr = ctypes.cast(handle, ctypes.POINTER(DGLByteArray))[0]
     size = arr.size
     res = bytearray(size)
     rptr = (ctypes.c_byte * size).from_buffer(res)
@@ -164,7 +164,7 @@ cdef inline bytearray make_ret_bytes(void* chandle):
         raise RuntimeError('memmove failed')
     return res
 
-cdef inline object make_ret(TVMValue value, int tcode):
+cdef inline object make_ret(DGLValue value, int tcode):
     """convert result to return value."""
     if tcode == kNodeHandle:
         return make_ret_node(value.v_handle)
@@ -182,16 +182,16 @@ cdef inline object make_ret(TVMValue value, int tcode):
         return make_ret_bytes(value.v_handle)
     elif tcode == kHandle:
         return ctypes_handle(value.v_handle)
-    elif tcode == kTVMContext:
-        return TVMContext(value.v_ctx.device_type, value.v_ctx.device_id)
+    elif tcode == kDGLContext:
+        return DGLContext(value.v_ctx.device_type, value.v_ctx.device_id)
     elif tcode == kModuleHandle:
         return _CLASS_MODULE(ctypes_handle(value.v_handle))
     elif tcode == kFuncHandle:
         fobj = _CLASS_FUNCTION(None, False)
         (<FunctionBase>fobj).chandle = value.v_handle
         return fobj
-    elif tcode in _TVM_EXT_RET:
-        return _TVM_EXT_RET[tcode](ctypes_handle(value.v_handle))
+    elif tcode in _DGL_EXT_RET:
+        return _DGL_EXT_RET[tcode](ctypes_handle(value.v_handle))
 
     raise ValueError("Unhandled type code %d" % tcode)
 
@@ -199,21 +199,21 @@ cdef inline object make_ret(TVMValue value, int tcode):
 cdef inline int FuncCall3(void* chandle,
                           tuple args,
                           int nargs,
-                          TVMValue* ret_val,
+                          DGLValue* ret_val,
                           int* ret_tcode) except -1:
-    cdef TVMValue[3] values
+    cdef DGLValue[3] values
     cdef int[3] tcodes
     nargs = len(args)
     temp_args = []
     for i in range(nargs):
         make_arg(args[i], &values[i], &tcodes[i], temp_args)
-    CALL(TVMFuncCall(chandle, &values[0], &tcodes[0],
+    CALL(DGLFuncCall(chandle, &values[0], &tcodes[0],
                      nargs, ret_val, ret_tcode))
     return 0
 
 cdef inline int FuncCall(void* chandle,
                          tuple args,
-                         TVMValue* ret_val,
+                         DGLValue* ret_val,
                          int* ret_tcode) except -1:
     cdef int nargs
     nargs = len(args)
@@ -221,14 +221,14 @@ cdef inline int FuncCall(void* chandle,
         FuncCall3(chandle, args, nargs, ret_val, ret_tcode)
         return 0
 
-    cdef vector[TVMValue] values
+    cdef vector[DGLValue] values
     cdef vector[int] tcodes
     values.resize(max(nargs, 1))
     tcodes.resize(max(nargs, 1))
     temp_args = []
     for i in range(nargs):
         make_arg(args[i], &values[i], &tcodes[i], temp_args)
-    CALL(TVMFuncCall(chandle, &values[0], &tcodes[0],
+    CALL(DGLFuncCall(chandle, &values[0], &tcodes[0],
                      nargs, ret_val, ret_tcode))
     return 0
 
@@ -238,7 +238,7 @@ cdef inline int ConstructorCall(void* constructor_handle,
                                 tuple args,
                                 void** handle) except -1:
     """Call contructor of a handle function"""
-    cdef TVMValue ret_val
+    cdef DGLValue ret_val
     cdef int ret_tcode
     FuncCall(constructor_handle, args, &ret_val, &ret_tcode)
     assert ret_tcode == type_code
@@ -247,7 +247,7 @@ cdef inline int ConstructorCall(void* constructor_handle,
 
 
 cdef class FunctionBase:
-    cdef TVMFunctionHandle chandle
+    cdef DGLFunctionHandle chandle
     cdef int is_global
 
     cdef inline _set_handle(self, handle):
@@ -278,10 +278,10 @@ cdef class FunctionBase:
 
     def __dealloc__(self):
         if self.is_global == 0:
-            CALL(TVMFuncFree(self.chandle))
+            CALL(DGLFuncFree(self.chandle))
 
     def __call__(self, *args):
-        cdef TVMValue ret_val
+        cdef DGLValue ret_val
         cdef int ret_tcode
         FuncCall(self.chandle, args, &ret_val, &ret_tcode)
         return make_ret(ret_val, ret_tcode)

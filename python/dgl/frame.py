@@ -306,7 +306,7 @@ class Frame(MutableMapping):
             The column name.
         scheme : Scheme
             The column scheme.
-        ctx : TVMContext
+        ctx : DGLContext
             The column context.
         """
         if name in self:

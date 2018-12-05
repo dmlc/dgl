@@ -12,7 +12,7 @@
 #include <array>
 #include "runtime_base.h"
 
-namespace tvm {
+namespace dgl {
 namespace runtime {
 
 struct Registry::Manager {
@@ -107,10 +107,10 @@ ExtTypeVTable* ExtTypeVTable::RegisterInternal(
   return pvt;
 }
 }  // namespace runtime
-}  // namespace tvm
+}  // namespace dgl
 
 /*! \brief entry to to easily hold returning information */
-struct TVMFuncThreadLocalEntry {
+struct DGLFuncThreadLocalEntry {
   /*! \brief result holder for returning strings */
   std::vector<std::string> ret_vec_str;
   /*! \brief result holder for returning string pointers */
@@ -118,39 +118,39 @@ struct TVMFuncThreadLocalEntry {
 };
 
 /*! \brief Thread local store that can be used to hold return values. */
-typedef dmlc::ThreadLocalStore<TVMFuncThreadLocalEntry> TVMFuncThreadLocalStore;
+typedef dmlc::ThreadLocalStore<DGLFuncThreadLocalEntry> DGLFuncThreadLocalStore;
 
-int TVMExtTypeFree(void* handle, int type_code) {
+int DGLExtTypeFree(void* handle, int type_code) {
   API_BEGIN();
-  tvm::runtime::ExtTypeVTable::Get(type_code)->destroy(handle);
+  dgl::runtime::ExtTypeVTable::Get(type_code)->destroy(handle);
   API_END();
 }
 
-int TVMFuncRegisterGlobal(
-    const char* name, TVMFunctionHandle f, int override) {
+int DGLFuncRegisterGlobal(
+    const char* name, DGLFunctionHandle f, int override) {
   API_BEGIN();
-  tvm::runtime::Registry::Register(name, override != 0)
-      .set_body(*static_cast<tvm::runtime::PackedFunc*>(f));
+  dgl::runtime::Registry::Register(name, override != 0)
+      .set_body(*static_cast<dgl::runtime::PackedFunc*>(f));
   API_END();
 }
 
-int TVMFuncGetGlobal(const char* name, TVMFunctionHandle* out) {
+int DGLFuncGetGlobal(const char* name, DGLFunctionHandle* out) {
   API_BEGIN();
-  const tvm::runtime::PackedFunc* fp =
-      tvm::runtime::Registry::Get(name);
+  const dgl::runtime::PackedFunc* fp =
+      dgl::runtime::Registry::Get(name);
   if (fp != nullptr) {
-    *out = new tvm::runtime::PackedFunc(*fp);  // NOLINT(*)
+    *out = new dgl::runtime::PackedFunc(*fp);  // NOLINT(*)
   } else {
     *out = nullptr;
   }
   API_END();
 }
 
-int TVMFuncListGlobalNames(int *out_size,
+int DGLFuncListGlobalNames(int *out_size,
                            const char*** out_array) {
   API_BEGIN();
-  TVMFuncThreadLocalEntry *ret = TVMFuncThreadLocalStore::Get();
-  ret->ret_vec_str = tvm::runtime::Registry::ListNames();
+  DGLFuncThreadLocalEntry *ret = DGLFuncThreadLocalStore::Get();
+  ret->ret_vec_str = dgl::runtime::Registry::ListNames();
   ret->ret_vec_charp.clear();
   for (size_t i = 0; i < ret->ret_vec_str.size(); ++i) {
     ret->ret_vec_charp.push_back(ret->ret_vec_str[i].c_str());

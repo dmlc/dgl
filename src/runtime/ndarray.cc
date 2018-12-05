@@ -12,7 +12,7 @@
 // deleter for arrays used by DLPack exporter
 extern "C" void NDArrayDLPackDeleter(DLManagedTensor* tensor);
 
-namespace tvm {
+namespace dgl {
 namespace runtime {
 
 inline void VerifyDataType(DLDataType dtype) {
@@ -27,7 +27,7 @@ inline void VerifyDataType(DLDataType dtype) {
 
 inline size_t GetDataSize(const DLTensor& arr) {
   size_t size = 1;
-  for (tvm_index_t i = 0; i < arr.ndim; ++i) {
+  for (dgl_index_t i = 0; i < arr.ndim; ++i) {
     size *= arr.shape[i];
   }
   size *= (arr.dtype.bits * arr.dtype.lanes + 7) / 8;
@@ -43,18 +43,18 @@ inline size_t GetDataAlignment(const DLTensor& arr) {
 struct NDArray::Internal {
   // Default deleter for the container
   static void DefaultDeleter(NDArray::Container* ptr) {
-    using tvm::runtime::NDArray;
+    using dgl::runtime::NDArray;
     if (ptr->manager_ctx != nullptr) {
       static_cast<NDArray::Container*>(ptr->manager_ctx)->DecRef();
     } else if (ptr->dl_tensor.data != nullptr) {
-      tvm::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
+      dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
           ptr->dl_tensor.ctx, ptr->dl_tensor.data);
     }
     delete ptr;
   }
   // Deleter for NDArray converted from DLPack
   // This is used from data which is passed from external DLPack(DLManagedTensor)
-  // that are not allocated inside of TVM.
+  // that are not allocated inside of DGL.
   // This enables us to create NDArray from memory allocated by other
   // frameworks that are DLPack compatible
   static void DLPackDeleter(NDArray::Container* ptr) {
@@ -158,11 +158,11 @@ NDArray NDArray::FromDLPack(DLManagedTensor* tensor) {
 
 void NDArray::CopyFromTo(DLTensor* from,
                          DLTensor* to,
-                         TVMStreamHandle stream) {
+                         DGLStreamHandle stream) {
   size_t from_size = GetDataSize(*from);
   size_t to_size = GetDataSize(*to);
   CHECK_EQ(from_size, to_size)
-    << "TVMArrayCopyFromTo: The size must exactly match";
+    << "DGLArrayCopyFromTo: The size must exactly match";
 
   CHECK(from->ctx.device_type == to->ctx.device_type
         || from->ctx.device_type == kDLCPU
@@ -171,7 +171,7 @@ void NDArray::CopyFromTo(DLTensor* from,
 
   // Use the context that is *not* a cpu context to get the correct device
   // api manager.
-  TVMContext ctx = from->ctx.device_type != kDLCPU ? from->ctx : to->ctx;
+  DGLContext ctx = from->ctx.device_type != kDLCPU ? from->ctx : to->ctx;
 
   DeviceAPI::Get(ctx)->CopyDataFromTo(
     from->data, static_cast<size_t>(from->byte_offset),
@@ -180,23 +180,23 @@ void NDArray::CopyFromTo(DLTensor* from,
 }
 
 }  // namespace runtime
-}  // namespace tvm
+}  // namespace dgl
 
-using namespace tvm::runtime;
+using namespace dgl::runtime;
 
 void NDArrayDLPackDeleter(DLManagedTensor* tensor) {
   static_cast<NDArray::Container*>(tensor->manager_ctx)->DecRef();
   delete tensor;
 }
 
-int TVMArrayAlloc(const tvm_index_t* shape,
+int DGLArrayAlloc(const dgl_index_t* shape,
                   int ndim,
                   int dtype_code,
                   int dtype_bits,
                   int dtype_lanes,
                   int device_type,
                   int device_id,
-                  TVMArrayHandle* out) {
+                  DGLArrayHandle* out) {
   API_BEGIN();
   DLDataType dtype;
   dtype.code = static_cast<uint8_t>(dtype_code);
@@ -210,48 +210,48 @@ int TVMArrayAlloc(const tvm_index_t* shape,
   API_END();
 }
 
-int TVMArrayFree(TVMArrayHandle handle) {
+int DGLArrayFree(DGLArrayHandle handle) {
   API_BEGIN();
   reinterpret_cast<NDArray::Container*>(handle)->DecRef();
   API_END();
 }
 
-int TVMArrayCopyFromTo(TVMArrayHandle from,
-                       TVMArrayHandle to,
-                       TVMStreamHandle stream) {
+int DGLArrayCopyFromTo(DGLArrayHandle from,
+                       DGLArrayHandle to,
+                       DGLStreamHandle stream) {
   API_BEGIN();
   NDArray::CopyFromTo(from, to, stream);
   API_END();
 }
 
-int TVMArrayFromDLPack(DLManagedTensor* from,
-                       TVMArrayHandle* out) {
+int DGLArrayFromDLPack(DLManagedTensor* from,
+                       DGLArrayHandle* out) {
   API_BEGIN();
   *out = NDArray::Internal::MoveAsDLTensor(NDArray::FromDLPack(from));
   API_END();
 }
 
-int TVMArrayToDLPack(TVMArrayHandle from,
+int DGLArrayToDLPack(DGLArrayHandle from,
                      DLManagedTensor** out) {
   API_BEGIN();
   *out = NDArray::Internal::ToDLPack(reinterpret_cast<NDArray::Container*>(from));
   API_END();
 }
 
-void TVMDLManagedTensorCallDeleter(DLManagedTensor* dltensor) {
+void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor) {
   (*(dltensor->deleter))(dltensor);
 }
 
-int TVMArrayCopyFromBytes(TVMArrayHandle handle,
+int DGLArrayCopyFromBytes(DGLArrayHandle handle,
                           void* data,
                           size_t nbytes) {
   API_BEGIN();
-  TVMContext cpu_ctx;
+  DGLContext cpu_ctx;
   cpu_ctx.device_type = kDLCPU;
   cpu_ctx.device_id = 0;
   size_t arr_size = GetDataSize(*handle);
   CHECK_EQ(arr_size, nbytes)
-      << "TVMArrayCopyFromBytes: size mismatch";
+      << "DGLArrayCopyFromBytes: size mismatch";
   DeviceAPI::Get(handle->ctx)->CopyDataFromTo(
       data, 0,
       handle->data, static_cast<size_t>(handle->byte_offset),
@@ -259,16 +259,16 @@ int TVMArrayCopyFromBytes(TVMArrayHandle handle,
   API_END();
 }
 
-int TVMArrayCopyToBytes(TVMArrayHandle handle,
+int DGLArrayCopyToBytes(DGLArrayHandle handle,
                         void* data,
                         size_t nbytes) {
   API_BEGIN();
-  TVMContext cpu_ctx;
+  DGLContext cpu_ctx;
   cpu_ctx.device_type = kDLCPU;
   cpu_ctx.device_id = 0;
   size_t arr_size = GetDataSize(*handle);
   CHECK_EQ(arr_size, nbytes)
-      << "TVMArrayCopyToBytes: size mismatch";
+      << "DGLArrayCopyToBytes: size mismatch";
   DeviceAPI::Get(handle->ctx)->CopyDataFromTo(
       handle->data, static_cast<size_t>(handle->byte_offset),
       data, 0,
