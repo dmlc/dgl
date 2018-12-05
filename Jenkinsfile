@@ -164,7 +164,7 @@ pipeline {
         //  steps {
         //    mxnet_tutorials()
         //  }
-        }
+        //}
       }
     }
   }
