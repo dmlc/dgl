@@ -96,18 +96,18 @@ os.environ['DGLBACKEND'] = 'mxnet'
 import dgl
 
 def T(g):
-   def message_func(edges):
-       return {'m': edges.src['y']}
-   def reduce_func(nodes):
-       # First compute the maximum of all neighbors...
-       m = mx.nd.max(nodes.mailbox['m'], axis=1)
-       # Then compare the maximum with the node itself.
-       # One can also add a self-loop to each node to avoid this
-       # additional max computation.
-       m = mx.nd.maximum(m, nodes.data['y'])
-       return {'y': m.reshape(m.shape[0], 1)}
-   g.update_all(message_func, reduce_func)
-   return g.ndata['y']
+    def message_func(edges):
+        return {'m': edges.src['y']}
+    def reduce_func(nodes):
+        # First compute the maximum of all neighbors...
+        m = mx.nd.max(nodes.mailbox['m'], axis=1)
+        # Then compare the maximum with the node itself.
+        # One can also add a self-loop to each node to avoid this
+        # additional max computation.
+        m = mx.nd.maximum(m, nodes.data['y'])
+        return {'y': m.reshape(m.shape[0], 1)}
+    g.update_all(message_func, reduce_func)
+    return g.ndata['y']
 
 ##############################################################################
 # To run the algorithm, let’s create a ``DGLGraph`` consisting of two
@@ -117,13 +117,13 @@ def T(g):
 import networkx as nx
 
 def disjoint_chains(n_chains, length):
-   path_graph = nx.path_graph(n_chains * length).to_directed()
-   for i in range(n_chains - 1):  # break the path graph into N chains
-       path_graph.remove_edge((i + 1) * length - 1, (i + 1) * length)
-       path_graph.remove_edge((i + 1) * length, (i + 1) * length - 1)
-   for n in path_graph.nodes:
-       path_graph.add_edge(n, n)  # add self connections
-   return path_graph
+    path_graph = nx.path_graph(n_chains * length).to_directed()
+    for i in range(n_chains - 1):  # break the path graph into N chains
+        path_graph.remove_edge((i + 1) * length - 1, (i + 1) * length)
+        path_graph.remove_edge((i + 1) * length, (i + 1) * length - 1)
+    for n in path_graph.nodes:
+        path_graph.add_edge(n, n)  # add self connections
+    return path_graph
 
 N = 2    # the number of chains
 L = 500 # the length of a chain
@@ -139,10 +139,10 @@ g.ndata['y'] = y
 # reachable from ``s`` are gradually “infected” (marked).
 #
 while True:
-   prev_y = g.ndata['y']
-   next_y = T(g)
-   if all(prev_y == next_y):
-       break
+    prev_y = g.ndata['y']
+    next_y = T(g)
+    if all(prev_y == next_y):
+        break
 ##############################################################################
 # The update procedure is visualized as follows:
 #
@@ -203,25 +203,25 @@ while True:
 import mxnet.gluon as gluon
 
 class SteadyStateOperator(gluon.Block):
-   def __init__(self, n_hidden, activation, **kwargs):
-       super(SteadyStateOperator, self).__init__(**kwargs)
-       with self.name_scope():
-           self.dense1 = gluon.nn.Dense(n_hidden, activation=activation)
-           self.dense2 = gluon.nn.Dense(n_hidden)
-
-   def forward(self, g):
-       def message_func(edges):
-           x = edges.src['x']
-           h = edges.src['h']
-           return {'m' : mx.nd.concat(x, h, dim=1)}
-
-       def reduce_func(nodes):
-           m = mx.nd.sum(nodes.mailbox['m'], axis=1)
-           z = mx.nd.concat(nodes.data['x'], m, dim=1)
-           return {'h' : self.dense2(self.dense1(z))}
-
-       g.update_all(message_func, reduce_func)
-       return g.ndata['h']
+    def __init__(self, n_hidden, activation, **kwargs):
+        super(SteadyStateOperator, self).__init__(**kwargs)
+        with self.name_scope():
+            self.dense1 = gluon.nn.Dense(n_hidden, activation=activation)
+            self.dense2 = gluon.nn.Dense(n_hidden)
+ 
+    def forward(self, g):
+        def message_func(edges):
+            x = edges.src['x']
+            h = edges.src['h']
+            return {'m' : mx.nd.concat(x, h, dim=1)}
+ 
+        def reduce_func(nodes):
+            m = mx.nd.sum(nodes.mailbox['m'], axis=1)
+            z = mx.nd.concat(nodes.data['x'], m, dim=1)
+            return {'h' : self.dense2(self.dense1(z))}
+ 
+        g.update_all(message_func, reduce_func)
+        return g.ndata['h']
 
 ##############################################################################
 # In practice, Eq. :math:`(4)` may cause numerical instability. One
@@ -236,22 +236,22 @@ class SteadyStateOperator(gluon.Block):
 #
 
 def update_embeddings(g, steady_state_operator):
-   prev_h = g.ndata['h']
-   next_h = steady_state_operator(g)
-   g.ndata['h'] = (1 - alpha) * prev_h + alpha * next_h
+    prev_h = g.ndata['h']
+    next_h = steady_state_operator(g)
+    g.ndata['h'] = (1 - alpha) * prev_h + alpha * next_h
 ##############################################################################
 # The last step involves implementing the predictor:
 #
 class Predictor(gluon.Block):
-   def __init__(self, n_hidden, activation, **kwargs):
-       super(Predictor, self).__init__(**kwargs)
-       with self.name_scope():
-           self.dense1 = gluon.nn.Dense(n_hidden, activation=activation)
-           self.dense2 = gluon.nn.Dense(2)  ## binary classifier
-
-   def forward(self, g):
-       g.ndata['z'] = self.dense2(self.dense1(g.ndata['h']))
-       return g.ndata['z']
+    def __init__(self, n_hidden, activation, **kwargs):
+        super(Predictor, self).__init__(**kwargs)
+        with self.name_scope():
+            self.dense1 = gluon.nn.Dense(n_hidden, activation=activation)
+            self.dense2 = gluon.nn.Dense(2)  ## binary classifier
+ 
+    def forward(self, g):
+        g.ndata['z'] = self.dense2(self.dense1(g.ndata['h']))
+        return g.ndata['z']
 ##############################################################################
 # The predictor’s decision rule is just a decision rule for binary
 # classification:
@@ -344,15 +344,15 @@ nodes_test = np.where(test_bitmap)[0]
 # :math:`\calg_y` instead of :math:`\calg`.
 #
 def update_parameters(g, label_nodes, steady_state_operator, predictor, trainer):
-   n = g.number_of_nodes()
-   with mx.autograd.record():
-       steady_state_operator(g)
-       z = predictor(g)[label_nodes]
-       y = g.ndata['y'].reshape(n)[label_nodes]  # label
-       loss = mx.nd.softmax_cross_entropy(z, y)
-   loss.backward()
-   trainer.step(n)  # divide gradients by the number of labelled nodes
-   return loss.asnumpy()[0]
+    n = g.number_of_nodes()
+    with mx.autograd.record():
+        steady_state_operator(g)
+        z = predictor(g)[label_nodes]
+        y = g.ndata['y'].reshape(n)[label_nodes]  # label
+        loss = mx.nd.softmax_cross_entropy(z, y)
+    loss.backward()
+    trainer.step(n)  # divide gradients by the number of labelled nodes
+    return loss.asnumpy()[0]
 ##############################################################################
 # We are now ready to implement the training procedure, which is in two
 # phases:
@@ -368,13 +368,13 @@ def update_parameters(g, label_nodes, steady_state_operator, predictor, trainer)
 # :math:`\calg` instead of on :math:`\calg_y` only.
 #
 def train(g, label_nodes, steady_state_operator, predictor, trainer):
-   # first phase
-   for i in range(n_embedding_updates):
-       update_embeddings(g, steady_state_operator)
-   # second phase
-   for i in range(n_parameter_updates):
-       loss = update_parameters(g, label_nodes, steady_state_operator, predictor, trainer)
-   return loss
+     # first phase
+    for i in range(n_embedding_updates):
+        update_embeddings(g, steady_state_operator)
+    # second phase
+    for i in range(n_parameter_updates):
+        loss = update_parameters(g, label_nodes, steady_state_operator, predictor, trainer)
+    return loss
 ##############################################################################
 # Scaling up with Stochastic Subgraph Training
 # --------------------------------------------
@@ -432,9 +432,9 @@ nid = []
 eid = []
 seed_list = []
 for subg, seeds in sampler:
-   nid.append(subg.parent_nid.asnumpy())
-   eid.append(subg.parent_eid.asnumpy())
-   seed_list.append(seeds.asnumpy())
+    nid.append(subg.parent_nid.asnumpy())
+    eid.append(subg.parent_eid.asnumpy())
+    seed_list.append(seeds.asnumpy())
 ##############################################################################
 # Sampler with DGL
 # ~~~~~~~~~~~~~~~~
@@ -442,57 +442,57 @@ for subg, seeds in sampler:
 # The code illustrates the training process in mini-batches.
 #
 def update_embeddings_subgraph(g, seed_nodes, steady_state_operator):
-   # Note that we are only updating the embeddings of seed nodes here.
-   # The reason is that only the seed nodes have ample information
-   # from neighbors, especially if the subgraph is small (e.g. 1-hops)
-   prev_h = g.ndata['h'][seed_nodes]
-   next_h = steady_state_operator(g)[seed_nodes]
-   g.ndata['h'][seed_nodes] = (1 - alpha) * prev_h + alpha * next_h
+    # Note that we are only updating the embeddings of seed nodes here.
+    # The reason is that only the seed nodes have ample information
+    # from neighbors, especially if the subgraph is small (e.g. 1-hops)
+    prev_h = g.ndata['h'][seed_nodes]
+    next_h = steady_state_operator(g)[seed_nodes]
+    g.ndata['h'][seed_nodes] = (1 - alpha) * prev_h + alpha * next_h
 
 def train_on_subgraphs(g, label_nodes, batch_size,
-                      steady_state_operator, predictor, trainer):
-   # To train SSE, we create two subgraph samplers with the
-   # `NeighborSampler` API for each phase.
-
-   # The first phase samples from all vertices in the graph.
-   sampler = dgl.contrib.sampling.NeighborSampler(g, batch_size, g.number_of_nodes(), num_hops=1)
-
-   # The second phase only samples from labeled vertices.
-   sampler_train = dgl.contrib.sampling.NeighborSampler(g, batch_size, g.number_of_nodes(),
-                                                        seed_nodes=label_nodes, num_hops=1)
-   for i in range(n_embedding_updates):
-       subg, seeds = next(sampler)
-       # Currently, subgraphing does not copy or share features
-       # automatically.  Therefore, we need to copy the node
-       # embeddings of the subgraph from the parent graph with
-       # `copy_from_parent()` before computing...
-       subg.copy_from_parent()
-       subg_seeds = subg.map_to_subgraph_nid(seeds)
-       update_embeddings_subgraph(subg, subg_seeds, steady_state_operator)
-       # ... and copy them back to the parent graph with
-       # `copy_to_parent()` afterwards.
-       subg.copy_to_parent()
-   for i in range(n_parameter_updates):
-       try:
-           subg, seeds = next(sampler_train)
-       except:
-           break
-       # Again we need to copy features from parent graph
-       subg.copy_from_parent()
-       subg_seeds = subg.map_to_subgraph_nid(seeds)
-       loss = update_parameters(subg, subg_seeds,
-                                steady_state_operator, predictor, trainer)
-       # We don't need to copy the features back to parent graph.
-   return loss
+                       steady_state_operator, predictor, trainer):
+    # To train SSE, we create two subgraph samplers with the
+    # `NeighborSampler` API for each phase.
+ 
+    # The first phase samples from all vertices in the graph.
+    sampler = dgl.contrib.sampling.NeighborSampler(g, batch_size, g.number_of_nodes(), num_hops=1)
+ 
+    # The second phase only samples from labeled vertices.
+    sampler_train = dgl.contrib.sampling.NeighborSampler(g, batch_size, g.number_of_nodes(),
+                                                         seed_nodes=label_nodes, num_hops=1)
+    for i in range(n_embedding_updates):
+        subg, seeds = next(sampler)
+        # Currently, subgraphing does not copy or share features
+        # automatically.  Therefore, we need to copy the node
+        # embeddings of the subgraph from the parent graph with
+        # `copy_from_parent()` before computing...
+        subg.copy_from_parent()
+        subg_seeds = subg.map_to_subgraph_nid(seeds)
+        update_embeddings_subgraph(subg, subg_seeds, steady_state_operator)
+        # ... and copy them back to the parent graph with
+        # `copy_to_parent()` afterwards.
+        subg.copy_to_parent()
+    for i in range(n_parameter_updates):
+        try:
+            subg, seeds = next(sampler_train)
+        except:
+            break
+        # Again we need to copy features from parent graph
+        subg.copy_from_parent()
+        subg_seeds = subg.map_to_subgraph_nid(seeds)
+        loss = update_parameters(subg, subg_seeds,
+                                 steady_state_operator, predictor, trainer)
+        # We don't need to copy the features back to parent graph.
+    return loss
 ##############################################################################
 # We also define a helper function that reports prediction accuracy:
 
 def test(g, test_nodes, steady_state_operator, predictor):
-   predictor(g)
-   y_bar = mx.nd.argmax(g.ndata['z'], axis=1)[test_nodes]
-   y = g.ndata['y'].reshape(n)[test_nodes]
-   accuracy = mx.nd.sum(y_bar == y) / len(test_nodes)
-   return accuracy.asnumpy()[0]
+    predictor(g)
+    y_bar = mx.nd.argmax(g.ndata['z'], axis=1)[test_nodes]
+    y = g.ndata['y'].reshape(n)[test_nodes]
+    accuracy = mx.nd.sum(y_bar == y) / len(test_nodes)
+    return accuracy.asnumpy()[0]
 ##############################################################################
 # Some routine preparations for training:
 #
@@ -518,13 +518,13 @@ batch_size = 64
 
 y_bars = []
 for i in range(n_epochs):
-   loss = train_on_subgraphs(g, nodes_train, batch_size, steady_state_operator, predictor, trainer)
-
-   accuracy_train = test(g, nodes_train, steady_state_operator, predictor)
-   accuracy_test = test(g, nodes_test, steady_state_operator, predictor)
-   print("Iter {:05d} | Train acc {:.4} | Test acc {:.4f}".format(i, accuracy_train, accuracy_test))
-   y_bar = mx.nd.argmax(g.ndata['z'], axis=1)
-   y_bars.append(y_bar)
+    loss = train_on_subgraphs(g, nodes_train, batch_size, steady_state_operator, predictor, trainer)
+ 
+    accuracy_train = test(g, nodes_train, steady_state_operator, predictor)
+    accuracy_test = test(g, nodes_test, steady_state_operator, predictor)
+    print("Iter {:05d} | Train acc {:.4} | Test acc {:.4f}".format(i, accuracy_train, accuracy_test))
+    y_bar = mx.nd.argmax(g.ndata['z'], axis=1)
+    y_bars.append(y_bar)
 ##############################################################################
 # |image2|
 #
