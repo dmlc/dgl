@@ -168,7 +168,7 @@ def _process_buckets(buckets):
     msg_ids = [utils.toindex(msg_id) for msg_id in msg_ids]
 
     # handle zero deg
-    degs = degs.tolist()
+    degs = degs.tonumpy()
     if degs[-1] == 0:
         degs = degs[:-1]
         zero_deg_nodes = dsts[-1]

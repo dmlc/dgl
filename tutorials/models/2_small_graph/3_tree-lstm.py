@@ -46,13 +46,13 @@ Tree LSTM DGL Tutorial
 #
 
 import dgl
-import dgl.data as data
+from dgl.data.tree import SST
 
 # Each sample in the dataset is a constituency tree. The leaf nodes
 # represent words. The word is a int value stored in the "x" field.
 # The non-leaf nodes has a special word PAD_WORD. The sentiment
 # label is stored in the "y" feature field.
-trainset = data.SST(mode='tiny')  # the "tiny" set has only 5 trees
+trainset = SST(mode='tiny')  # the "tiny" set has only 5 trees
 tiny_sst = trainset.trees
 num_vocabs = trainset.num_vocabs
 num_classes = trainset.num_classes
@@ -337,7 +337,7 @@ optimizer = th.optim.Adagrad(model.parameters(),
                           
 train_loader = DataLoader(dataset=tiny_sst,
                           batch_size=5,
-                          collate_fn=data.SST.batcher(device),
+                          collate_fn=SST.batcher(device),
                           shuffle=False,
                           num_workers=0)
 

@@ -63,13 +63,13 @@ def check_basics(g, ig):
 
     for u in randv.asnumpy():
         for v in randv.asnumpy():
-            if len(g.edge_id(u, v).tolist()) == 1:
-                assert g.edge_id(u, v).tolist() == ig.edge_id(u, v).tolist()
+            if len(g.edge_id(u, v)) == 1:
+                assert g.edge_id(u, v).tonumpy() == ig.edge_id(u, v).tonumpy()
             assert g.has_edge_between(u, v) == ig.has_edge_between(u, v)
     randv = utils.toindex(randv)
-    ids = g.edge_ids(randv, randv)[2].tolist()
-    assert sum(ig.edge_ids(randv, randv)[2].tolist() == ids) == len(ids)
-    assert sum(g.has_edges_between(randv, randv).tolist() == ig.has_edges_between(randv, randv).tolist()) == len(randv)
+    ids = g.edge_ids(randv, randv)[2].tonumpy()
+    assert sum(ig.edge_ids(randv, randv)[2].tonumpy() == ids) == len(ids)
+    assert sum(g.has_edges_between(randv, randv).tonumpy() == ig.has_edges_between(randv, randv).tonumpy()) == len(randv)
 
 
 def test_basics():
