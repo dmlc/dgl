@@ -6,7 +6,6 @@ The folder contains training module and inferencing module (beam decoder) for Tr
 ## Requirements
 
 - PyTorch 0.4.1+
-- dgl
 - networkx
 - tqdm
 
@@ -14,11 +13,15 @@ The folder contains training module and inferencing module (beam decoder) for Tr
 
 - For training:
 
+    ```
     python translation_train.py [--gpus id1,id2,...] [--N #layers] [--dataset DATASET] [--batch BATCHSIZE] [--universal]
+    ```
 
 - For evaluating BLEU score on test set(by enabling `--print` to see translated text):
 
+    ```
     python translation_test.py [--gpu id] [--N #layers] [--dataset DATASET] [--batch BATCHSIZE] [--checkpoint CHECKPOINT] [--print] [--universal]
+    ```
 
 Available datasets: `copy`, `sort`, `wmt14`, `multi30k`(default).
 
