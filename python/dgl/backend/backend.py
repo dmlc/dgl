@@ -681,6 +681,23 @@ def arange(start, stop):
     """
     pass
 
+def rand_shuffle(arr):
+    """Random shuffle the data in the first dimension of the array.
+
+    The shuffled data is stored in a new array.
+
+    Parameters
+    ----------
+    arr : Tensor
+        The data tensor
+
+    Returns
+    -------
+    Tensor
+        The result tensor
+    """
+    pass
+
 def zerocopy_to_dlpack(input):
     """Create a dlpack tensor that shares the input memory.
 
