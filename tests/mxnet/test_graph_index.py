@@ -107,6 +107,14 @@ def test_create_graph():
     for edge in elist:
         assert g.edge_id(edge[0], edge[1]) == ig.edge_id(edge[0], edge[1])
 
+    data = [1, 2, 3]
+    rows = [1, 0, 0]
+    cols = [2, 1, 2]
+    mat = sp.sparse.coo_matrix((data, (rows, cols)))
+    ig = dgl.DGLGraph(mat, readonly=True)
+    for edge in elist:
+        assert g.edge_id(edge[0], edge[1]) == ig.edge_id(edge[0], edge[1])
+
 if __name__ == '__main__':
     test_basics()
     test_graph_gen()

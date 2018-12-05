@@ -345,8 +345,9 @@ class ImmutableGraphIndex(object):
         src = mx.nd.array(out_coo.row, dtype=np.int64)
         dst = mx.nd.array(out_coo.col, dtype=np.int64)
         # TODO we can't generate a csr_matrix with np.int64 directly.
-        self.__init__(mx.nd.sparse.csr_matrix((edge_ids, (dst, src)), shape=out_coo.shape).astype(np.int64),
-                mx.nd.sparse.csr_matrix((edge_ids, (src, dst)), shape=out_coo.shape).astype(np.int64))
+        size = max(out_coo.shape)
+        self.__init__(mx.nd.sparse.csr_matrix((edge_ids, (dst, src)), shape=(size, size)).astype(np.int64),
+                mx.nd.sparse.csr_matrix((edge_ids, (src, dst)), shape=(size, size)).astype(np.int64))
 
 def create_immutable_graph_index(in_csr=None, out_csr=None):
     """ Create an empty backend-specific immutable graph index.
