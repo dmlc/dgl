@@ -23,7 +23,7 @@
 
 const constexpr int kL1CacheBytes = 64;
 
-namespace tvm {
+namespace dgl {
 namespace runtime {
 
 // stride in the page, fit to cache line.
@@ -35,7 +35,7 @@ constexpr int kSyncStride = 64 / sizeof(std::atomic<int>);
 class ParallelLauncher {
  public:
   // Reset the the task request.
-  void Init(FTVMParallelLambda flambda,
+  void Init(FDGLParallelLambda flambda,
             void* cdata,
             int num_task,
             bool need_sync) {
@@ -68,7 +68,7 @@ class ParallelLauncher {
   // Wait n jobs to finish
   int WaitForJobs() {
     while (num_pending_.load() != 0) {
-      tvm::runtime::threading::Yield();
+      dgl::runtime::threading::Yield();
     }
     if (!has_error_.load()) return 0;
     // the following is intended to use string due to
@@ -80,13 +80,13 @@ class ParallelLauncher {
         par_errors_[i].clear();
       }
     }
-    TVMAPISetLastError(err.c_str());
+    DGLAPISetLastError(err.c_str());
     return -1;
   }
   // Signal that one job has finished.
   void SignalJobError(int task_id) {
     num_pending_.fetch_sub(1);
-    par_errors_[task_id] = TVMGetLastError();
+    par_errors_[task_id] = DGLGetLastError();
     has_error_.store(true);
   }
   // Signal that one job has finished.
@@ -98,11 +98,11 @@ class ParallelLauncher {
     return dmlc::ThreadLocalStore<ParallelLauncher>::Get();
   }
   // The parallel lambda
-  FTVMParallelLambda flambda;
+  FDGLParallelLambda flambda;
   // The closure data
   void* cdata;
   // Local env
-  TVMParallelGroupEnv env;
+  DGLParallelGroupEnv env;
   // Whether this thread is worker of the pool.
   // used to prevent recursive launch.
   bool is_worker{false};
@@ -143,7 +143,7 @@ class SpscTaskQueue {
    */
   void Push(const Task& input) {
     while (!Enqueue(input)) {
-      tvm::runtime::threading::Yield();
+      dgl::runtime::threading::Yield();
     }
     if (pending_.fetch_add(1) == -1) {
       std::unique_lock<std::mutex> lock(mutex_);
@@ -162,7 +162,7 @@ class SpscTaskQueue {
     // If a new task comes to the queue quickly, this wait avoid the worker from sleeping.
     // The default spin count is set by following the typical omp convention
     for (uint32_t i = 0; i < spin_count && pending_.load() == 0; ++i) {
-      tvm::runtime::threading::Yield();
+      dgl::runtime::threading::Yield();
     }
     if (pending_.fetch_sub(1) == 0) {
       std::unique_lock<std::mutex> lock(mutex_);
@@ -243,13 +243,13 @@ class SpscTaskQueue {
 // The thread pool
 class ThreadPool {
  public:
-  ThreadPool(): num_workers_(tvm::runtime::threading::MaxConcurrency()) {
+  ThreadPool(): num_workers_(dgl::runtime::threading::MaxConcurrency()) {
     for (int i = 0; i < num_workers_; ++i) {
       // The SpscTaskQueue only hosts ONE item at a time
       queues_.emplace_back(std::unique_ptr<SpscTaskQueue>(new SpscTaskQueue()));
     }
-    threads_ = std::unique_ptr<tvm::runtime::threading::ThreadGroup>(
-        new tvm::runtime::threading::ThreadGroup(
+    threads_ = std::unique_ptr<dgl::runtime::threading::ThreadGroup>(
+        new dgl::runtime::threading::ThreadGroup(
           num_workers_, [this](int worker_id) { this->RunWorker(worker_id); },
           exclude_worker0_ /* include_main_thread */));
     num_workers_used_ = threads_->Configure(threading::ThreadGroup::kBig, 0, exclude_worker0_);
@@ -260,7 +260,7 @@ class ThreadPool {
     }
     threads_.reset();
   }
-  int Launch(FTVMParallelLambda flambda,
+  int Launch(FDGLParallelLambda flambda,
              void* cdata,
              int num_task,
              int need_sync) {
@@ -285,7 +285,7 @@ class ThreadPool {
     }
     // use the master thread to run task 0
     if (exclude_worker0_) {
-      TVMParallelGroupEnv* penv = &(tsk.launcher->env);
+      DGLParallelGroupEnv* penv = &(tsk.launcher->env);
       if ((*tsk.launcher->flambda)(0, penv, cdata) == 0) {
         tsk.launcher->SignalJobFinish();
       } else {
@@ -318,7 +318,7 @@ class ThreadPool {
     ParallelLauncher::ThreadLocal()->is_worker = true;
     while (queue->Pop(&task)) {
       CHECK(task.launcher != nullptr);
-      TVMParallelGroupEnv* penv = &(task.launcher->env);
+      DGLParallelGroupEnv* penv = &(task.launcher->env);
       void* cdata = task.launcher->cdata;
       if ((*task.launcher->flambda)(task.task_id, penv, cdata) == 0) {
         task.launcher->SignalJobFinish();
@@ -337,11 +337,11 @@ class ThreadPool {
   bool exclude_worker0_{false};
 #endif
   std::vector<std::unique_ptr<SpscTaskQueue> > queues_;
-  std::unique_ptr<tvm::runtime::threading::ThreadGroup> threads_;
+  std::unique_ptr<dgl::runtime::threading::ThreadGroup> threads_;
 };
 
-TVM_REGISTER_GLOBAL("runtime.config_threadpool")
-.set_body([](TVMArgs args, TVMRetValue* rv) {
+DGL_REGISTER_GLOBAL("runtime.config_threadpool")
+.set_body([](DGLArgs args, DGLRetValue* rv) {
     threading::ThreadGroup::AffinityMode mode =\
     static_cast<threading::ThreadGroup::AffinityMode>(\
     static_cast<int>(args[0]));
@@ -351,20 +351,20 @@ TVM_REGISTER_GLOBAL("runtime.config_threadpool")
 
 
 }  // namespace runtime
-}  // namespace tvm
+}  // namespace dgl
 
 
-int TVMBackendParallelLaunch(
-    FTVMParallelLambda flambda,
+int DGLBackendParallelLaunch(
+    FDGLParallelLambda flambda,
     void* cdata,
     int num_task) {
-  int res = tvm::runtime::ThreadPool::ThreadLocal()->Launch(
+  int res = dgl::runtime::ThreadPool::ThreadLocal()->Launch(
       flambda, cdata, num_task, 1);
   return res;
 }
 
-int TVMBackendParallelBarrier(int task_id, TVMParallelGroupEnv* penv) {
-  using tvm::runtime::kSyncStride;
+int DGLBackendParallelBarrier(int task_id, DGLParallelGroupEnv* penv) {
+  using dgl::runtime::kSyncStride;
   int num_task = penv->num_task;
   std::atomic<int>* sync_counter =
       reinterpret_cast<std::atomic<int>*>(penv->sync_handle);
@@ -374,7 +374,7 @@ int TVMBackendParallelBarrier(int task_id, TVMParallelGroupEnv* penv) {
     if (i != task_id) {
       while (sync_counter[i * kSyncStride].load(
                  std::memory_order_relaxed) <= old_counter) {
-        tvm::runtime::threading::Yield();
+        dgl::runtime::threading::Yield();
       }
     }
   }
