@@ -1,6 +1,6 @@
 package:
   name: dgl
-  version: "0.0.1"
+  version: "0.1.0"
 
 source:
   git_url: https://github.com/jermainewang/dgl.git
