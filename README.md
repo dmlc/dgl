@@ -20,7 +20,9 @@ A summary of the model accuracy and training speed with the Pytorch backend (on 
 | LGNN | 94% | 94% | n/a | 1.45s | n/a |
 | DGMG | 84% | 90% | n/a | 1 hr | n/a |
 
-For scalability, with the MXNet backend (on a P3.8xlarge instance), we have successfully scaled [Stochastic Steady-state Embedding (SSE)](https://www.cc.gatech.edu/~hdai8/pdf/equilibrium_embedding.pdf), a model similar to Graph convolution network (GCN) to a graph with 50 million nodes and 150 million edges. One epoch only takes about 160 seconds.
+For scalability, with the MXNet backend on a P3.8xlarge instance, we scaled 
+[Stochastic Steady-state Embedding (SSE)](https://www.cc.gatech.edu/~hdai8/pdf/equilibrium_embedding.pdf) to 
+a graph of 50M nodes and 150M edges, with 160s an epoch (the model is similar to GCN).
 
 We are currently in Beta stage.  More features and improvements are coming.
 
