@@ -12,7 +12,7 @@ class NSSubgraphLoader(object):
     def __init__(self, g, batch_size, expand_factor, num_hops=1,
                  neighbor_type='in', node_prob=None, seed_nodes=None,
                  shuffle=False, num_workers=1, max_subgraph_size=None,
-                 return_seed_id=False):
+                 return_seed_id=False, return_num_layers=0):
         self._g = g
         if not g._graph.is_readonly():
             raise NotImplementedError("subgraph loader only support read-only graphs.")
@@ -21,6 +21,7 @@ class NSSubgraphLoader(object):
         self._num_hops = num_hops
         self._node_prob = node_prob
         self._return_seed_id = return_seed_id
+        self._return_num_layers = return_num_layers
         if self._node_prob is not None:
             assert self._node_prob.shape[0] == g.number_of_nodes(), \
                     "We need to know the sampling probability of every node"
@@ -39,6 +40,7 @@ class NSSubgraphLoader(object):
         self._neighbor_type = neighbor_type
         self._subgraphs = []
         self._seed_ids = []
+        self._layers = []
         self._subgraph_idx = 0
 
     def _prefetch(self):
@@ -52,14 +54,17 @@ class NSSubgraphLoader(object):
             end = min((self._subgraph_idx + 1) * self._batch_size, num_nodes)
             seed_ids.append(utils.toindex(self._seed_nodes[start:end]))
             self._subgraph_idx += 1
-        sgi = self._g._graph.neighbor_sampling(seed_ids, self._expand_factor,
+        sgi, aux_infos = self._g._graph.neighbor_sampling(seed_ids, self._expand_factor,
                                                self._num_hops, self._neighbor_type,
-                                               self._node_prob, self._max_subgraph_size)
+                                               self._node_prob, self._max_subgraph_size,
+                                               self._return_num_layers)
         subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
                 i) for i in sgi]
         self._subgraphs.extend(subgraphs)
         if self._return_seed_id:
             self._seed_ids.extend(seed_ids)
+        if self._return_num_layers:
+            self._layers.extend(aux_infos['layers'])
 
     def __iter__(self):
         return self
@@ -75,12 +80,14 @@ class NSSubgraphLoader(object):
         aux_infos = {}
         if self._return_seed_id:
             aux_infos['seeds'] = self._seed_ids.pop(0).tousertensor()
+        if self._return_num_layers:
+            aux_infos['layers'] = self._layers.pop(0)
         return self._subgraphs.pop(0), aux_infos
 
 def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
                     neighbor_type='in', node_prob=None, seed_nodes=None,
                     shuffle=False, num_workers=1, max_subgraph_size=None,
-                    return_seed_id=False):
+                    return_seed_id=False, return_num_layers=0):
     '''Create a sampler that samples neighborhood.
 
     .. note:: This method currently only supports MXNet backend. Set
@@ -134,4 +141,5 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
         additional information about the subgraphs.
     '''
     return NSSubgraphLoader(g, batch_size, expand_factor, num_hops, neighbor_type, node_prob,
-                            seed_nodes, shuffle, num_workers, max_subgraph_size, return_seed_id)
+                            seed_nodes, shuffle, num_workers, max_subgraph_size, return_seed_id,
+                            return_num_layers)

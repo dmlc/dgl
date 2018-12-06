@@ -270,7 +270,7 @@ class ImmutableGraphIndex(object):
         return gis, induced_ns, induced_es
 
     def neighbor_sampling(self, seed_ids, expand_factor, num_hops, neighbor_type,
-                          node_prob, max_subgraph_size):
+                          node_prob, max_subgraph_size, return_num_layers):
         if neighbor_type == 'in':
             g = self._in_csr
         elif neighbor_type == 'out':
@@ -283,13 +283,32 @@ class ImmutableGraphIndex(object):
             res = mx.nd.contrib.dgl_csr_neighbor_uniform_sample(g, *seed_ids, num_hops=num_hops,
                                                                 num_neighbor=expand_factor,
                                                                 max_num_vertices=max_subgraph_size)
+            layer_ids = res[(2*num_subgs):(3*num_subgs)]
         else:
             res = mx.nd.contrib.dgl_csr_neighbor_non_uniform_sample(g, node_prob, *seed_ids, num_hops=num_hops,
                                                                     num_neighbor=expand_factor,
                                                                     max_num_vertices=max_subgraph_size)
+            probs = res[(2*num_subgs):(3*num_subgs)]
+            layer_ids = res[(3*num_subgs):(4*num_subgs)]
 
         vertices, subgraphs = res[0:num_subgs], res[num_subgs:(2*num_subgs)]
         num_nodes = [subg_v[-1].asnumpy()[0] for subg_v in vertices]
+
+        aux_infos = {}
+        if return_num_layers > 0:
+            layer_ids = [ids[0:num] for num, ids in zip(num_nodes, layer_ids)]
+            num_layers = [return_num_layers]*len(layer_ids)
+            outs = mx.nd.contrib.dgl_layer_vid(*layer_ids, num_layers=num_layers)
+            layer_mats = outs[0:num_subgs]
+            layer_sizes = outs[num_subgs:(2*num_subgs)]
+            layer_lists = []
+            for lset, lsize in zip(layer_mats, layer_sizes):
+                lsize = lsize.asnumpy()
+                layers = []
+                for i in range(lset.shape[0]):
+                    layers.append(lset[i, 0:lsize[i]])
+                layer_lists.append(layers)
+            aux_infos['layers'] = layer_lists
 
         inputs = []
         inputs.extend(subgraphs)
@@ -304,7 +323,7 @@ class ImmutableGraphIndex(object):
             gis = [ImmutableGraphIndex(None, csr) for csr in compacts]
         parent_nodes = [v[0:size] for v, size in zip(vertices, num_nodes)]
         parent_edges = [lambda: e.data for e in subgraphs]
-        return gis, parent_nodes, parent_edges
+        return gis, parent_nodes, parent_edges, aux_infos
 
     def adjacency_matrix(self, transpose, ctx):
         """Return the adjacency matrix representation of this graph.

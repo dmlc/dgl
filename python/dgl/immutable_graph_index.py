@@ -477,17 +477,18 @@ class ImmutableGraphIndex(object):
         raise NotImplementedError('immutable graph doesn\'t implement edge_subgraph for now.')
 
     def neighbor_sampling(self, seed_ids, expand_factor, num_hops, neighbor_type,
-                          node_prob, max_subgraph_size):
+                          node_prob, max_subgraph_size, return_num_layers):
         if len(seed_ids) == 0:
             return []
         seed_ids = [v.tousertensor() for v in seed_ids]
-        gis, induced_nodes, induced_edges = self._sparse.neighbor_sampling(seed_ids, expand_factor,
+        gis, induced_nodes, induced_edges, aux_infos = self._sparse.neighbor_sampling(seed_ids, expand_factor,
                                                                            num_hops, neighbor_type,
                                                                            node_prob,
-                                                                           max_subgraph_size)
+                                                                           max_subgraph_size,
+                                                                           return_num_layers)
         induced_nodes = [utils.toindex(v) for v in induced_nodes]
         return [ImmutableSubgraphIndex(gi, self, induced_n,
-            induced_e) for gi, induced_n, induced_e in zip(gis, induced_nodes, induced_edges)]
+            induced_e) for gi, induced_n, induced_e in zip(gis, induced_nodes, induced_edges)], aux_infos
 
     def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
