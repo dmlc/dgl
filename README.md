@@ -8,7 +8,7 @@ graphs.
 It makes implementing graph neural networks (including Graph Convolution Networks, TreeLSTM, and many others) easy while
 maintaining high computation efficiency.
 
-A summary of the model accuracy and training speed with the Pytorch backend (on Amazon EC2 p3.2x instance (w/ V100 GPU)), as compared with the best open-source implementations.
+A summary of the model accuracy and training speed with the Pytorch backend (on Amazon EC2 p3.2x instance (w/ V100 GPU)), as compared with the best open-source implementations:
 
 | Model | Reported <br> Accuracy | DGL <br> Accuracy | Author's training speed (epoch time) | DGL speed (epoch time) | Improvement |
 | ----- | ----------------- | ------------ | ------------------------------------ | ---------------------- | ----------- |
@@ -20,11 +20,9 @@ A summary of the model accuracy and training speed with the Pytorch backend (on 
 | [LGNN](https://arxiv.org/abs/1705.08415) | 94% | 94% | n/a | 1.45s | n/a |
 | [DGMG](https://arxiv.org/pdf/1803.03324.pdf) | 84% | 90% | n/a | 1 hr | n/a |
 
-For scalability, with the MXNet/Gluon backend (on a P3.8xlarge instance), we have
-successfully scaled [Stochastic Steady-state Embedding
-(SSE)](https://www.cc.gatech.edu/~hdai8/pdf/equilibrium_embedding.pdf), a model
-similar to Graph convolution network (GCN) to a graph with 50 million nodes and
-150 million edges. One epoch only takes about 160 seconds.
+With the MXNet/Gluon backend , we scaled a graph of 50M nodes and 150 edges on a P3.8xlarge instance, 
+with 160s per epoch, on SSE ([Stochastic Steady-state Embedding](https://www.cc.gatech.edu/~hdai8/pdf/equilibrium_embedding.pdf)), 
+a model similar to GCN. 
 
 
 We are currently in Beta stage.  More features and improvements are coming.
