@@ -654,7 +654,7 @@ class ImmutableGraphIndex(object):
         in_csr = mx.nd.sparse.csr_matrix((edge_ids, (dst, src)),
                                          shape=(num_nodes, num_nodes)).astype(np.int64)
         out_csr = mx.nd.sparse.csr_matrix((edge_ids, (src, dst)),
-                                          shape=(size, size)).astype(np.int64)
+                                          shape=(num_nodes, num_nodes)).astype(np.int64)
         self.__init__(in_csr, out_csr)
 
     def line_graph(self, backtracking=True):
