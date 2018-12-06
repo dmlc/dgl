@@ -15,6 +15,10 @@ There are two types of user-defined functions in DGL:
   a batch of edges. The returned dictionary should have ``str`` type key and ``tensor``
   type values.
 
+Note: the size of the batch dimension is determined by the DGL framework
+for good efficiency and small memory footprint. Users should not make
+assumption in the batch dimension.
+
 EdgeBatch
 ---------
 
