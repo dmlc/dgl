@@ -5,15 +5,15 @@
  */
 #include "c_api_common.h"
 
-using tvm::runtime::TVMArgs;
-using tvm::runtime::TVMArgValue;
-using tvm::runtime::TVMRetValue;
-using tvm::runtime::PackedFunc;
-using tvm::runtime::NDArray;
+using dgl::runtime::DGLArgs;
+using dgl::runtime::DGLArgValue;
+using dgl::runtime::DGLRetValue;
+using dgl::runtime::PackedFunc;
+using dgl::runtime::NDArray;
 
 namespace dgl {
 
-DLManagedTensor* CreateTmpDLManagedTensor(const TVMArgValue& arg) {
+DLManagedTensor* CreateTmpDLManagedTensor(const DGLArgValue& arg) {
   const DLTensor* dl_tensor = arg;
   DLManagedTensor* ret = new DLManagedTensor();
   ret->deleter = [] (DLManagedTensor* self) { delete self; };
@@ -23,7 +23,7 @@ DLManagedTensor* CreateTmpDLManagedTensor(const TVMArgValue& arg) {
 }
 
 PackedFunc ConvertNDArrayVectorToPackedFunc(const std::vector<NDArray>& vec) {
-    auto body = [vec](TVMArgs args, TVMRetValue* rv) {
+    auto body = [vec](DGLArgs args, DGLRetValue* rv) {
         const int which = args[0];
         if (which >= vec.size()) {
             LOG(FATAL) << "invalid choice";

@@ -306,7 +306,7 @@ class Frame(MutableMapping):
             The column name.
         scheme : Scheme
             The column scheme.
-        ctx : TVMContext
+        ctx : DGLContext
             The column context.
         """
         if name in self:
@@ -765,7 +765,7 @@ class FrameRef(MutableMapping):
         if isinstance(query, slice):
             query = range(query.start, query.stop)
         else:
-            query = query.tolist()
+            query = query.tonumpy()
 
         if isinstance(self._index_data, slice):
             self._index_data = range(self._index_data.start, self._index_data.stop)
@@ -861,51 +861,3 @@ def frame_like(other, num_rows):
     #   now supports non-exist columns.
     newf._initializers = other._initializers
     return newf
-
-def merge_frames(frames, indices, max_index, reduce_func):
-    """Merge a list of frames.
-
-    The result frame contains `max_index` number of rows. For each frame in
-    the given list, its row is merged as follows:
-
-        merged[indices[i][row]] += frames[i][row]
-
-    Parameters
-    ----------
-    frames : iterator of dgl.frame.FrameRef
-        A list of frames to be merged.
-    indices : iterator of dgl.utils.Index
-        The indices of the frame rows.
-    reduce_func : str
-        The reduce function (only 'sum' is supported currently)
-
-    Returns
-    -------
-    merged : FrameRef
-        The merged frame.
-    """
-    # TODO(minjie)
-    assert False, 'Buggy code, disabled for now.'
-    assert reduce_func == 'sum'
-    assert len(frames) > 0
-    schemes = frames[0].schemes
-    # create an adj to merge
-    # row index is equal to the concatenation of all the indices.
-    row = sum([idx.tolist() for idx in indices], [])
-    col = list(range(len(row)))
-    n = max_index
-    m = len(row)
-    row = F.unsqueeze(F.tensor(row, dtype=F.int64), 0)
-    col = F.unsqueeze(F.tensor(col, dtype=F.int64), 0)
-    idx = F.cat([row, col], dim=0)
-    dat = F.ones((m,))
-    adjmat = F.sparse_tensor(idx, dat, [n, m])
-    ctx_adjmat = utils.CtxCachedObject(lambda ctx: F.to_context(adjmat, ctx))
-    merged = {}
-    for key in schemes:
-        # the rhs of the spmv is the concatenation of all the frame columns
-        feats = F.pack([fr[key] for fr in frames])
-        merged_feats = F.spmm(ctx_adjmat.get(F.get_context(feats)), feats)
-        merged[key] = merged_feats
-    merged = FrameRef(Frame(merged))
-    return merged

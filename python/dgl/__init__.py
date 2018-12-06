@@ -1,4 +1,3 @@
-from . import backend
 # One has to manually import dgl.data; fixes #125
 #from . import data
 from . import function
@@ -10,6 +9,7 @@ from ._ffi.function import register_func, get_global_func, list_global_func_name
 from ._ffi.base import DGLError, __version__
 
 from .base import ALL
+from .backend import load_backend
 from .batched_graph import *
 from .graph import DGLGraph
 from .subgraph import DGLSubGraph

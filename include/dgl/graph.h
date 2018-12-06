@@ -15,10 +15,10 @@
 namespace dgl {
 
 typedef uint64_t dgl_id_t;
-typedef tvm::runtime::NDArray IdArray;
-typedef tvm::runtime::NDArray DegreeArray;
-typedef tvm::runtime::NDArray BoolArray;
-typedef tvm::runtime::NDArray IntArray;
+typedef dgl::runtime::NDArray IdArray;
+typedef dgl::runtime::NDArray DegreeArray;
+typedef dgl::runtime::NDArray BoolArray;
+typedef dgl::runtime::NDArray IntArray;
 
 class Graph;
 class GraphOp;
@@ -386,12 +386,12 @@ class Graph {
 struct Subgraph {
   /*! \brief The graph. */
   Graph graph;
-  /*! 
+  /*!
    * \brief The induced vertex ids.
    * \note This is also a map from the new vertex id to the vertex id in the parent graph.
    */
   IdArray induced_vertices;
-  /*! 
+  /*!
    * \brief The induced edge ids.
    * \note This is also a map from the new edge id to the edge id in the parent graph.
    */

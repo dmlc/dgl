@@ -10,13 +10,13 @@
 
 #include "file_util.h"
 
-namespace tvm {
+namespace dgl {
 namespace runtime {
 
 void FunctionInfo::Save(dmlc::JSONWriter* writer) const {
   std::vector<std::string> sarg_types(arg_types.size());
   for (size_t i = 0; i < arg_types.size(); ++i) {
-    sarg_types[i] = TVMType2String(arg_types[i]);
+    sarg_types[i] = DGLType2String(arg_types[i]);
   }
   writer->BeginObject();
   writer->WriteObjectKeyValue("name", name);
@@ -34,7 +34,7 @@ void FunctionInfo::Load(dmlc::JSONReader* reader) {
   helper.ReadAllFields(reader);
   arg_types.resize(sarg_types.size());
   for (size_t i = 0; i < arg_types.size(); ++i) {
-    arg_types[i] = String2TVMType(sarg_types[i]);
+    arg_types[i] = String2DGLType(sarg_types[i]);
   }
 }
 
@@ -69,12 +69,12 @@ std::string GetFileFormat(const std::string& file_name,
 
 std::string GetCacheDir() {
   char* env_cache_dir;
-  if ((env_cache_dir = getenv("TVM_CACHE_DIR"))) return env_cache_dir;
+  if ((env_cache_dir = getenv("DGL_CACHE_DIR"))) return env_cache_dir;
   if ((env_cache_dir = getenv("XDG_CACHE_HOME"))) {
-    return std::string(env_cache_dir) + "/tvm";
+    return std::string(env_cache_dir) + "/dgl";
   }
   if ((env_cache_dir = getenv("HOME"))) {
-    return std::string(env_cache_dir) + "/.cache/tvm";
+    return std::string(env_cache_dir) + "/.cache/dgl";
   }
   return ".";
 }
@@ -88,9 +88,9 @@ std::string GetFileBasename(const std::string& file_name) {
 std::string GetMetaFilePath(const std::string& file_name) {
   size_t pos  = file_name.find_last_of(".");
   if (pos != std::string::npos) {
-    return file_name.substr(0, pos) + ".tvm_meta.json";
+    return file_name.substr(0, pos) + ".dgl_meta.json";
   } else {
-    return file_name + ".tvm_meta.json";
+    return file_name + ".dgl_meta.json";
   }
 }
 
@@ -122,7 +122,7 @@ void SaveMetaDataToFile(
   CHECK(!fs.fail()) << "Cannot open file " << file_name;
   dmlc::JSONWriter writer(&fs);
   writer.BeginObject();
-  writer.WriteObjectKeyValue("tvm_version", version);
+  writer.WriteObjectKeyValue("dgl_version", version);
   writer.WriteObjectKeyValue("func_info", fmap);
   writer.EndObject();
   fs.close();
@@ -136,11 +136,11 @@ void LoadMetaDataFromFile(
   std::string version;
   dmlc::JSONReader reader(&fs);
   dmlc::JSONObjectReadHelper helper;
-  helper.DeclareField("tvm_version", &version);
+  helper.DeclareField("dgl_version", &version);
   helper.DeclareField("func_info", fmap);
   helper.ReadAllFields(&reader);
   fs.close();
 }
 
 }  // namespace runtime
-}  // namespace tvm
+}  // namespace dgl

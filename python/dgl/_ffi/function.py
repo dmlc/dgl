@@ -15,31 +15,31 @@ try:
     if sys.version_info >= (3, 0):
         from ._cy3.core import _set_class_function, _set_class_module
         from ._cy3.core import FunctionBase as _FunctionBase
-        from ._cy3.core import convert_to_tvm_func
+        from ._cy3.core import convert_to_dgl_func
     else:
         from ._cy2.core import _set_class_function, _set_class_module
         from ._cy2.core import FunctionBase as _FunctionBase
-        from ._cy2.core import convert_to_tvm_func
+        from ._cy2.core import convert_to_dgl_func
 except IMPORT_EXCEPT:
     # pylint: disable=wrong-import-position
     from ._ctypes.function import _set_class_function, _set_class_module
     from ._ctypes.function import FunctionBase as _FunctionBase
-    from ._ctypes.function import convert_to_tvm_func
+    from ._ctypes.function import convert_to_dgl_func
 
 FunctionHandle = ctypes.c_void_p
 
 class Function(_FunctionBase):
     """The PackedFunc object.
 
-    Function plays an key role to bridge front and backend in TVM.
+    Function plays an key role to bridge front and backend in DGL.
     Function provide a type-erased interface, you can call function with positional arguments.
 
     The compiled module returns Function.
-    TVM backend also registers and exposes its API as Functions.
-    For example, the developer function exposed in tvm.ir_pass are actually
+    DGL backend also registers and exposes its API as Functions.
+    For example, the developer function exposed in dgl.ir_pass are actually
     C++ functions that are registered as PackedFunc
 
-    The following are list of common usage scenario of tvm.Function.
+    The following are list of common usage scenario of dgl.Function.
 
     - Automatic exposure of C++ API into python
     - To call PackedFunc from python side
@@ -48,8 +48,8 @@ class Function(_FunctionBase):
 
     See Also
     --------
-    tvm.register_func: How to register global function.
-    tvm.get_global_func: How to get global function.
+    dgl.register_func: How to register global function.
+    dgl.get_global_func: How to get global function.
     """
     pass
 
@@ -61,10 +61,10 @@ class ModuleBase(object):
     def __init__(self, handle):
         self.handle = handle
         self._entry = None
-        self.entry_name = "__tvm_main__"
+        self.entry_name = "__dgl_main__"
 
     def __del__(self):
-        check_call(_LIB.TVMModFree(self.handle))
+        check_call(_LIB.DGLModFree(self.handle))
 
     @property
     def entry_func(self):
@@ -97,7 +97,7 @@ class ModuleBase(object):
             The result function.
         """
         ret_handle = FunctionHandle()
-        check_call(_LIB.TVMModGetFunction(
+        check_call(_LIB.DGLModGetFunction(
             self.handle, c_str(name),
             ctypes.c_int(query_imports),
             ctypes.byref(ret_handle)))
@@ -114,7 +114,7 @@ class ModuleBase(object):
         module : Module
             The other module.
         """
-        check_call(_LIB.TVMModImport(self.handle, module.handle))
+        check_call(_LIB.DGLModImport(self.handle, module.handle))
 
     def __getitem__(self, name):
         if not isinstance(name, string_types):
@@ -152,18 +152,18 @@ def register_func(func_name, f=None, override=False):
     The following code registers my_packed_func as global function.
     Note that we simply get it back from global function table to invoke
     it from python side. However, we can also invoke the same function
-    from C++ backend, or in the compiled TVM code.
+    from C++ backend, or in the compiled DGL code.
 
     .. code-block:: python
 
       targs = (10, 10.0, "hello")
-      @tvm.register_func
+      @dgl.register_func
       def my_packed_func(*args):
           assert(tuple(args) == targs)
           return 10
       # Get it out from global function table
-      f = tvm.get_global_func("my_packed_func")
-      assert isinstance(f, tvm.nd.Function)
+      f = dgl.get_global_func("my_packed_func")
+      assert isinstance(f, dgl.nd.Function)
       y = f(*targs)
       assert y == 10
     """
@@ -178,8 +178,8 @@ def register_func(func_name, f=None, override=False):
     def register(myf):
         """internal register function"""
         if not isinstance(myf, Function):
-            myf = convert_to_tvm_func(myf)
-        check_call(_LIB.TVMFuncRegisterGlobal(
+            myf = convert_to_dgl_func(myf)
+        check_call(_LIB.DGLFuncRegisterGlobal(
             c_str(func_name), myf.handle, ioverride))
         return myf
     if f:
@@ -200,11 +200,11 @@ def get_global_func(name, allow_missing=False):
 
     Returns
     -------
-    func : tvm.Function
+    func : dgl.Function
         The function to be returned, None if function is missing.
     """
     handle = FunctionHandle()
-    check_call(_LIB.TVMFuncGetGlobal(c_str(name), ctypes.byref(handle)))
+    check_call(_LIB.DGLFuncGetGlobal(c_str(name), ctypes.byref(handle)))
     if handle.value:
         return Function(handle, False)
     else:
@@ -226,7 +226,7 @@ def list_global_func_names():
     plist = ctypes.POINTER(ctypes.c_char_p)()
     size = ctypes.c_uint()
 
-    check_call(_LIB.TVMFuncListGlobalNames(ctypes.byref(size),
+    check_call(_LIB.DGLFuncListGlobalNames(ctypes.byref(size),
                                            ctypes.byref(plist)))
     fnames = []
     for i in range(size.value):
@@ -241,7 +241,7 @@ def extract_ext_funcs(finit):
     Parameters
     ----------
     finit : ctypes function
-        a ctypes that takes signature of TVMExtensionDeclarer
+        a ctypes that takes signature of DGLExtensionDeclarer
 
     Returns
     -------
@@ -251,7 +251,7 @@ def extract_ext_funcs(finit):
     fdict = {}
     def _list(name, func):
         fdict[name] = func
-    myf = convert_to_tvm_func(_list)
+    myf = convert_to_dgl_func(_list)
     ret = finit(myf.handle)
     _ = myf
     if ret != 0:

@@ -8,7 +8,7 @@
 
 #include "c_runtime_api.h"
 
-namespace tvm {
+namespace dgl {
 namespace runtime {
 
 /*!
@@ -18,18 +18,18 @@ namespace runtime {
  * \param bits The number of bits to be matched.
  * \param lanes The number of lanes sin the type.
  */
-inline bool TypeMatch(TVMType t, int code, int bits, int lanes = 1) {
+inline bool TypeMatch(DGLType t, int code, int bits, int lanes = 1) {
   return t.code == code && t.bits == bits && t.lanes == lanes;
 }
 }  // namespace runtime
-}  // namespace tvm
+}  // namespace dgl
 // Forward declare the intrinsic id we need
 // in structure fetch to enable stackvm in runtime
-namespace tvm {
+namespace dgl {
 namespace ir {
 namespace intrinsic {
 /*! \brief The kind of structure field info used in intrinsic */
-enum TVMStructFieldKind : int {
+enum DGLStructFieldKind : int {
   // array head address
   kArrAddr,
   kArrData,
@@ -43,11 +43,11 @@ enum TVMStructFieldKind : int {
   kArrDeviceId,
   kArrDeviceType,
   kArrKindBound_,
-  // TVMValue field
-  kTVMValueContent,
-  kTVMValueKindBound_
+  // DGLValue field
+  kDGLValueContent,
+  kDGLValueKindBound_
 };
 }  // namespace intrinsic
 }  // namespace ir
-}  // namespace tvm
+}  // namespace dgl
 #endif  // DGL_RUNTIME_UTIL_H_

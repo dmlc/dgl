@@ -11,14 +11,14 @@ def test_edge_id():
 
     gi.add_nodes(4)
     gi.add_edge(0, 1)
-    eid = gi.edge_id(0, 1).tolist()
+    eid = gi.edge_id(0, 1).tonumpy()
     assert len(eid) == 1
     assert eid[0] == 0
     assert gi.is_multigraph()
 
     # multiedges
     gi.add_edge(0, 1)
-    eid = gi.edge_id(0, 1).tolist()
+    eid = gi.edge_id(0, 1).tonumpy()
     assert len(eid) == 2
     assert eid[0] == 0
     assert eid[1] == 1
@@ -60,7 +60,7 @@ def test_edge_id():
 
     gi.add_nodes(4)
     gi.add_edge(0, 1)
-    eid = gi.edge_id(0, 1).tolist()
+    eid = gi.edge_id(0, 1).tonumpy()
     assert len(eid) == 1
     assert eid[0] == 0
 
@@ -139,8 +139,19 @@ def test_predsucc():
     assert 2 in succ
     assert 0 in succ
 
+def test_create_from_elist():
+    elist = [(2, 1), (1, 0), (2, 0), (3, 0), (0, 2)]
+    g = create_graph_index(elist)
+    for i, (u, v) in enumerate(elist):
+        assert g.edge_id(u, v)[0] == i
+    # immutable graph
+    g = create_graph_index(elist, readonly=True)
+    for i, (u, v) in enumerate(elist):
+        print(u, v, g.edge_id(u, v)[0])
+        assert g.edge_id(u, v)[0] == i
 
 if __name__ == '__main__':
     test_edge_id()
     test_nx()
     test_predsucc()
+    test_create_from_elist()

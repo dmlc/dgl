@@ -16,7 +16,7 @@
 #include <cstdlib>
 #include "runtime_base.h"
 
-namespace tvm {
+namespace dgl {
 namespace runtime {
 
 /*!
@@ -44,7 +44,7 @@ class DeviceAPIManager {
  public:
   static const int kMaxDeviceAPI = 32;
   // Get API
-  static DeviceAPI* Get(const TVMContext& ctx) {
+  static DeviceAPI* Get(const DGLContext& ctx) {
     return Get(ctx.device_type);
   }
   static DeviceAPI* Get(int dev_type, bool allow_missing = false) {
@@ -93,81 +93,81 @@ class DeviceAPIManager {
   }
 };
 
-DeviceAPI* DeviceAPI::Get(TVMContext ctx, bool allow_missing) {
+DeviceAPI* DeviceAPI::Get(DGLContext ctx, bool allow_missing) {
   return DeviceAPIManager::Get(
       static_cast<int>(ctx.device_type), allow_missing);
 }
 
-void* DeviceAPI::AllocWorkspace(TVMContext ctx,
+void* DeviceAPI::AllocWorkspace(DGLContext ctx,
                                 size_t size,
-                                TVMType type_hint) {
+                                DGLType type_hint) {
   return AllocDataSpace(ctx, size, kTempAllocaAlignment, type_hint);
 }
 
-void DeviceAPI::FreeWorkspace(TVMContext ctx, void* ptr) {
+void DeviceAPI::FreeWorkspace(DGLContext ctx, void* ptr) {
   FreeDataSpace(ctx, ptr);
 }
 
-TVMStreamHandle DeviceAPI::CreateStream(TVMContext ctx) {
+DGLStreamHandle DeviceAPI::CreateStream(DGLContext ctx) {
   LOG(FATAL) << "Device does not support stream api.";
   return 0;
 }
 
-void DeviceAPI::FreeStream(TVMContext ctx, TVMStreamHandle stream) {
+void DeviceAPI::FreeStream(DGLContext ctx, DGLStreamHandle stream) {
   LOG(FATAL) << "Device does not support stream api.";
 }
 
-void DeviceAPI::SyncStreamFromTo(TVMContext ctx,
-                                 TVMStreamHandle event_src,
-                                 TVMStreamHandle event_dst) {
+void DeviceAPI::SyncStreamFromTo(DGLContext ctx,
+                                 DGLStreamHandle event_src,
+                                 DGLStreamHandle event_dst) {
   LOG(FATAL) << "Device does not support stream api.";
 }
 }  // namespace runtime
-}  // namespace tvm
+}  // namespace dgl
 
-using namespace tvm::runtime;
+using namespace dgl::runtime;
 
-struct TVMRuntimeEntry {
+struct DGLRuntimeEntry {
   std::string ret_str;
   std::string last_error;
-  TVMByteArray ret_bytes;
+  DGLByteArray ret_bytes;
 };
 
-typedef dmlc::ThreadLocalStore<TVMRuntimeEntry> TVMAPIRuntimeStore;
+typedef dmlc::ThreadLocalStore<DGLRuntimeEntry> DGLAPIRuntimeStore;
 
-const char *TVMGetLastError() {
-  return TVMAPIRuntimeStore::Get()->last_error.c_str();
+const char *DGLGetLastError() {
+  return DGLAPIRuntimeStore::Get()->last_error.c_str();
 }
 
-void TVMAPISetLastError(const char* msg) {
+void DGLAPISetLastError(const char* msg) {
 #ifndef _LIBCPP_SGX_CONFIG
-  TVMAPIRuntimeStore::Get()->last_error = msg;
+  DGLAPIRuntimeStore::Get()->last_error = msg;
 #else
   sgx::OCallPackedFunc("__sgx_set_last_error__", msg);
 #endif
 }
 
-int TVMModLoadFromFile(const char* file_name,
+int DGLModLoadFromFile(const char* file_name,
                        const char* format,
-                       TVMModuleHandle* out) {
+                       DGLModuleHandle* out) {
   API_BEGIN();
   Module m = Module::LoadFromFile(file_name, format);
   *out = new Module(m);
   API_END();
 }
 
-int TVMModImport(TVMModuleHandle mod,
-                 TVMModuleHandle dep) {
+int DGLModImport(DGLModuleHandle mod,
+                 DGLModuleHandle dep) {
   API_BEGIN();
   static_cast<Module*>(mod)->Import(
       *static_cast<Module*>(dep));
   API_END();
 }
 
-int TVMModGetFunction(TVMModuleHandle mod,
+int DGLModGetFunction(DGLModuleHandle mod,
                       const char* func_name,
                       int query_imports,
-                      TVMFunctionHandle *func) {
+                      DGLFunctionHandle *func) {
   API_BEGIN();
   PackedFunc pf = static_cast<Module*>(mod)->GetFunction(
       func_name, query_imports != 0);
@@ -179,31 +179,31 @@ int TVMModGetFunction(TVMModuleHandle mod,
   API_END();
 }
 
-int TVMModFree(TVMModuleHandle mod) {
+int DGLModFree(DGLModuleHandle mod) {
   API_BEGIN();
   delete static_cast<Module*>(mod);
   API_END();
 }
 
-int TVMBackendGetFuncFromEnv(void* mod_node,
+int DGLBackendGetFuncFromEnv(void* mod_node,
                              const char* func_name,
-                             TVMFunctionHandle *func) {
+                             DGLFunctionHandle *func) {
   API_BEGIN();
-  *func = (TVMFunctionHandle)(
+  *func = (DGLFunctionHandle)(
       static_cast<ModuleNode*>(mod_node)->GetFuncFromEnv(func_name));
   API_END();
 }
 
-void* TVMBackendAllocWorkspace(int device_type,
+void* DGLBackendAllocWorkspace(int device_type,
                                int device_id,
                                uint64_t size,
                                int dtype_code_hint,
                                int dtype_bits_hint) {
-  TVMContext ctx;
+  DGLContext ctx;
   ctx.device_type = static_cast<DLDeviceType>(device_type);
   ctx.device_id = device_id;
 
-  TVMType type_hint;
+  DGLType type_hint;
   type_hint.code = static_cast<decltype(type_hint.code)>(dtype_code_hint);
   type_hint.bits = static_cast<decltype(type_hint.bits)>(dtype_bits_hint);
   type_hint.lanes = 1;
@@ -213,17 +213,17 @@ void* TVMBackendAllocWorkspace(int device_type,
                                                     type_hint);
 }
 
-int TVMBackendFreeWorkspace(int device_type,
+int DGLBackendFreeWorkspace(int device_type,
                             int device_id,
                             void* ptr) {
-  TVMContext ctx;
+  DGLContext ctx;
   ctx.device_type = static_cast<DLDeviceType>(device_type);
   ctx.device_id = device_id;
   DeviceAPIManager::Get(ctx)->FreeWorkspace(ctx, ptr);
   return 0;
 }
 
-int TVMBackendRunOnce(void** handle,
+int DGLBackendRunOnce(void** handle,
                       int (*f)(void*),
                       void* cdata,
                       int nbytes) {
@@ -234,28 +234,28 @@ int TVMBackendRunOnce(void** handle,
   return 0;
 }
 
-int TVMFuncFree(TVMFunctionHandle func) {
+int DGLFuncFree(DGLFunctionHandle func) {
   API_BEGIN();
   delete static_cast<PackedFunc*>(func);
   API_END();
 }
 
-int TVMFuncCall(TVMFunctionHandle func,
-                TVMValue* args,
+int DGLFuncCall(DGLFunctionHandle func,
+                DGLValue* args,
                 int* arg_type_codes,
                 int num_args,
-                TVMValue* ret_val,
+                DGLValue* ret_val,
                 int* ret_type_code) {
   API_BEGIN();
-  TVMRetValue rv;
+  DGLRetValue rv;
   (*static_cast<const PackedFunc*>(func)).CallPacked(
-      TVMArgs(args, arg_type_codes, num_args), &rv);
+      DGLArgs(args, arg_type_codes, num_args), &rv);
   // handle return string.
   if (rv.type_code() == kStr ||
-     rv.type_code() == kTVMType ||
+     rv.type_code() == kDGLType ||
       rv.type_code() == kBytes) {
-    TVMRuntimeEntry* e = TVMAPIRuntimeStore::Get();
-    if (rv.type_code() != kTVMType) {
+    DGLRuntimeEntry* e = DGLAPIRuntimeStore::Get();
+    if (rv.type_code() != kDGLType) {
       e->ret_str = *rv.ptr<std::string>();
     } else {
       e->ret_str = rv.operator std::string();
@@ -275,30 +275,30 @@ int TVMFuncCall(TVMFunctionHandle func,
   API_END();
 }
 
-int TVMCFuncSetReturn(TVMRetValueHandle ret,
-                      TVMValue* value,
+int DGLCFuncSetReturn(DGLRetValueHandle ret,
+                      DGLValue* value,
                       int* type_code,
                       int num_ret) {
   API_BEGIN();
   CHECK_EQ(num_ret, 1);
-  TVMRetValue* rv = static_cast<TVMRetValue*>(ret);
-  *rv = TVMArgValue(value[0], type_code[0]);
+  DGLRetValue* rv = static_cast<DGLRetValue*>(ret);
+  *rv = DGLArgValue(value[0], type_code[0]);
   API_END();
 }
 
-int TVMFuncCreateFromCFunc(TVMPackedCFunc func,
+int DGLFuncCreateFromCFunc(DGLPackedCFunc func,
                            void* resource_handle,
-                           TVMPackedCFuncFinalizer fin,
-                           TVMFunctionHandle *out) {
+                           DGLPackedCFuncFinalizer fin,
+                           DGLFunctionHandle *out) {
   API_BEGIN();
   if (fin == nullptr) {
     *out = new PackedFunc(
-        [func, resource_handle](TVMArgs args, TVMRetValue* rv) {
-          int ret = func((TVMValue*)args.values, (int*)args.type_codes, // NOLINT(*)
+        [func, resource_handle](DGLArgs args, DGLRetValue* rv) {
+          int ret = func((DGLValue*)args.values, (int*)args.type_codes, // NOLINT(*)
                          args.num_args, rv, resource_handle);
           if (ret != 0) {
-            std::string err = "TVMCall CFunc Error:\n";
-            err += TVMGetLastError();
+            std::string err = "DGLCall CFunc Error:\n";
+            err += DGLGetLastError();
             throw dmlc::Error(err);
           }
         });
@@ -307,12 +307,12 @@ int TVMFuncCreateFromCFunc(TVMPackedCFunc func,
     // so fin will be called when the lambda went out of scope.
     std::shared_ptr<void> rpack(resource_handle, fin);
     *out = new PackedFunc(
-        [func, rpack](TVMArgs args, TVMRetValue* rv) {
-          int ret = func((TVMValue*)args.values, (int*)args.type_codes, // NOLINT(*)
+        [func, rpack](DGLArgs args, DGLRetValue* rv) {
+          int ret = func((DGLValue*)args.values, (int*)args.type_codes, // NOLINT(*)
                          args.num_args, rv, rpack.get());
           if (ret != 0) {
-            std::string err = "TVMCall CFunc Error:\n";
-            err += TVMGetLastError();
+            std::string err = "DGLCall CFunc Error:\n";
+            err += DGLGetLastError();
             throw dmlc::Error(err);
           }
       });
@@ -320,58 +320,58 @@ int TVMFuncCreateFromCFunc(TVMPackedCFunc func,
   API_END();
 }
 
-int TVMStreamCreate(int device_type, int device_id, TVMStreamHandle* out) {
+int DGLStreamCreate(int device_type, int device_id, DGLStreamHandle* out) {
   API_BEGIN();
-  TVMContext ctx;
+  DGLContext ctx;
   ctx.device_type = static_cast<DLDeviceType>(device_type);
   ctx.device_id = device_id;
   *out = DeviceAPIManager::Get(ctx)->CreateStream(ctx);
   API_END();
 }
 
-int TVMStreamFree(int device_type, int device_id, TVMStreamHandle stream) {
+int DGLStreamFree(int device_type, int device_id, DGLStreamHandle stream) {
   API_BEGIN();
-  TVMContext ctx;
+  DGLContext ctx;
   ctx.device_type = static_cast<DLDeviceType>(device_type);
   ctx.device_id = device_id;
   DeviceAPIManager::Get(ctx)->FreeStream(ctx, stream);
   API_END();
 }
 
-int TVMSetStream(int device_type, int device_id, TVMStreamHandle stream) {
+int DGLSetStream(int device_type, int device_id, DGLStreamHandle stream) {
   API_BEGIN();
-  TVMContext ctx;
+  DGLContext ctx;
   ctx.device_type = static_cast<DLDeviceType>(device_type);
   ctx.device_id = device_id;
   DeviceAPIManager::Get(ctx)->SetStream(ctx, stream);
   API_END();
 }
 
-int TVMSynchronize(int device_type, int device_id, TVMStreamHandle stream) {
+int DGLSynchronize(int device_type, int device_id, DGLStreamHandle stream) {
   API_BEGIN();
-  TVMContext ctx;
+  DGLContext ctx;
   ctx.device_type = static_cast<DLDeviceType>(device_type);
   ctx.device_id = device_id;
   DeviceAPIManager::Get(ctx)->StreamSync(ctx, stream);
   API_END();
 }
 
-int TVMStreamStreamSynchronize(int device_type,
+int DGLStreamStreamSynchronize(int device_type,
                                int device_id,
-                               TVMStreamHandle src,
-                               TVMStreamHandle dst) {
+                               DGLStreamHandle src,
+                               DGLStreamHandle dst) {
   API_BEGIN();
-  TVMContext ctx;
+  DGLContext ctx;
   ctx.device_type = static_cast<DLDeviceType>(device_type);
   ctx.device_id = device_id;
   DeviceAPIManager::Get(ctx)->SyncStreamFromTo(ctx, src, dst);
   API_END();
 }
 
-int TVMCbArgToReturn(TVMValue* value, int code) {
+int DGLCbArgToReturn(DGLValue* value, int code) {
   API_BEGIN();
-  tvm::runtime::TVMRetValue rv;
-  rv = tvm::runtime::TVMArgValue(*value, code);
+  dgl::runtime::DGLRetValue rv;
+  rv = dgl::runtime::DGLArgValue(*value, code);
   int tcode;
   rv.MoveToCHost(value, &tcode);
   CHECK_EQ(tcode, code);
@@ -379,18 +379,18 @@ int TVMCbArgToReturn(TVMValue* value, int code) {
 }
 
 // set device api
-TVM_REGISTER_GLOBAL(tvm::runtime::symbol::tvm_set_device)
-.set_body([](TVMArgs args, TVMRetValue *ret) {
-    TVMContext ctx;
+DGL_REGISTER_GLOBAL(dgl::runtime::symbol::dgl_set_device)
+.set_body([](DGLArgs args, DGLRetValue *ret) {
+    DGLContext ctx;
     ctx.device_type = static_cast<DLDeviceType>(args[0].operator int());
     ctx.device_id = args[1];
     DeviceAPIManager::Get(ctx)->SetDevice(ctx);
   });
 
 // set device api
-TVM_REGISTER_GLOBAL("_GetDeviceAttr")
-.set_body([](TVMArgs args, TVMRetValue *ret) {
-    TVMContext ctx;
+DGL_REGISTER_GLOBAL("_GetDeviceAttr")
+.set_body([](DGLArgs args, DGLRetValue *ret) {
+    DGLContext ctx;
     ctx.device_type = static_cast<DLDeviceType>(args[0].operator int());
     ctx.device_id = args[1];
 

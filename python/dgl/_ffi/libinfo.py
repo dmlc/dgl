@@ -19,10 +19,10 @@ def find_lib_path(name=None, search_path=None, optional=False):
     """
     # See https://github.com/dmlc/tvm/issues/281 for some background.
 
-    # NB: This will either be the source directory (if TVM is run
-    # inplace) or the install directory (if TVM is installed).
-    # An installed TVM's curr_path will look something like:
-    #   $PREFIX/lib/python3.6/site-packages/tvm/_ffi
+    # NB: This will either be the source directory (if DGL is run
+    # inplace) or the install directory (if DGL is installed).
+    # An installed DGL's curr_path will look something like:
+    #   $PREFIX/lib/python3.6/site-packages/dgl/_ffi
     ffi_dir = os.path.dirname(os.path.abspath(os.path.expanduser(__file__)))
     source_dir = os.path.join(ffi_dir, "..", "..", "..")
     install_lib_dir = os.path.join(ffi_dir, "..", "..", "..", "..")
@@ -71,7 +71,7 @@ def find_lib_path(name=None, search_path=None, optional=False):
 
     # try to find lib_dll_path
     lib_found = [p for p in lib_dll_path if os.path.exists(p) and os.path.isfile(p)]
-    
+
     if not lib_found:
         message = ('Cannot find the files.\n' +
                    'List of candidates:\n' +
@@ -86,5 +86,5 @@ def find_lib_path(name=None, search_path=None, optional=False):
 # current version
 # We use the version of the incoming release for code
 # that is under development.
-# The following line is set by tvm/python/update_version.py
-__version__ = "0.0.1"
+# The following line is set by dgl/python/update_version.py
+__version__ = "0.1.0"
