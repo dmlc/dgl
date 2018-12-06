@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import sys,os
+import sys, os, platform
 import shutil
 import glob
 
@@ -10,10 +10,7 @@ from setuptools import setup
 
 class BinaryDistribution(Distribution):
     def has_ext_modules(self):
-        return True
-
-    def is_pure(self):
-        return False
+        return platform.system() == 'Darwin'
 
 CURRENT_DIR = os.path.dirname(__file__)
 
