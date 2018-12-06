@@ -47,6 +47,7 @@ Tree LSTM DGL Tutorial
 
 import dgl
 from dgl.data.tree import SST
+from dgl.data import SSTBatch
 
 # Each sample in the dataset is a constituency tree. The leaf nodes
 # represent words. The word is a int value stored in the "x" field.
