@@ -18,4 +18,4 @@ Here is a summary of the model accuracy and training speed. Our testbed is Amazo
 | R-GCN <br> (link prediction) | 0.158 | 0.151 | 2.204s (TF) | 0.633s | 3.5x |
 | JTNN | 96.44% | 96.44% | 1826s (Pytorch) | 743s | 2.5x |
 | LGNN | 94% | 94% | n/a | 1.45s | n/a |
-| DGMG | 84% | 90% | n/a | 1 hr | n/a |
+| DGMG | 84% | 90% | n/a | 526s (batch size 1) / 238s (batch size 10) | n/a |
