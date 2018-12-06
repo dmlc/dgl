@@ -25,10 +25,11 @@ Test convergence
 
 ```bash
 DGLBACKEND=mxnet python3 sse_batch.py --dataset "pubmed" \
-                                      --n-epochs 100 \
+                                      --n-epochs 1000 \
                                       --lr 0.001 \
-                                      --batch-size 1024 \
+                                      --batch-size 50 \
                                       --dgl \
                                       --use-spmv \
-                                      --neigh-expand 4
+                                      --neigh-expand 1000 \
+                                      --n-hidden 16
 ```
