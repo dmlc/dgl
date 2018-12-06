@@ -2,11 +2,11 @@
 [![Build Status](http://ci.dgl.ai:80/buildStatus/icon?job=DGL/master)](http://ci.dgl.ai:80/job/DGL/job/master/)
 [![GitHub license](https://dmlc.github.io/img/apache2.svg)](./LICENSE)
 
-DGL is a Python package that interfaces between multiple existing tensor libraries and data being expressed as
+DGL is a Python package that interfaces between existing tensor libraries and data being expressed as
 graphs.
 
-It makes implementing graph neural networks (including Graph Convolution Networks, TreeLSTM, etc.) much easier,
-without losing much computation efficiency.
+It makes implementing graph neural networks (including Graph Convolution Networks, TreeLSTM, and many others) easy while
+maintaining high computation efficiency.
 
 We are currently in Beta stage.  More features and improvements are coming.
 
