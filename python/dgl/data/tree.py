@@ -148,13 +148,3 @@ class SST(object):
     @property
     def num_vocabs(self):
         return len(self.vocab)
-
-    @staticmethod
-    def batcher(device):
-        def batcher_dev(batch):
-            batch_trees = dgl.batch(batch)
-            return SSTBatch(graph=batch_trees,
-                            mask=batch_trees.ndata['mask'].to(device),
-                            wordid=batch_trees.ndata['x'].to(device),
-                            label=batch_trees.ndata['y'].to(device))
-        return batcher_dev

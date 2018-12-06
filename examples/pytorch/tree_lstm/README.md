@@ -17,3 +17,7 @@ unzip glove.840B.300d.zip
 ```
 python train.py --gpu 0
 ```
+
+## Speed
+
+On AWS p3.2x instance, it can achieve 3.18s per epoch when setting batch size to 256.

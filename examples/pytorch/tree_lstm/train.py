@@ -12,6 +12,15 @@ from dgl.data.tree import SST
 
 from tree_lstm import TreeLSTM
 
+def batcher(dev):
+    def batcher_dev(batch):
+        batch_trees = dgl.batch(batch)
+        return SSTBatch(graph=batch_trees,
+                        mask=batch_trees.ndata['mask'].to(device),
+                        wordid=batch_trees.ndata['x'].to(device),
+                        label=batch_trees.ndata['y'].to(device))
+    return batcher_dev
+
 def main(args):
     np.random.seed(args.seed)
     th.manual_seed(args.seed)
@@ -28,19 +37,19 @@ def main(args):
     trainset = SST()
     train_loader = DataLoader(dataset=trainset,
                               batch_size=args.batch_size,
-                              collate_fn=SST.batcher(device),
+                              collate_fn=batcher(device),
                               shuffle=True,
                               num_workers=0)
     devset = SST(mode='dev')
     dev_loader = DataLoader(dataset=devset,
                             batch_size=100,
-                            collate_fn=SST.batcher(device),
+                            collate_fn=batcher(device),
                             shuffle=False,
                             num_workers=0)
 
     testset = SST(mode='test')
     test_loader = DataLoader(dataset=testset,
-                             batch_size=100, collate_fn=SST.batcher(device), shuffle=False, num_workers=0)
+                             batch_size=100, collate_fn=batcher(device), shuffle=False, num_workers=0)
 
     model = TreeLSTM(trainset.num_vocabs,
                      args.x_size,

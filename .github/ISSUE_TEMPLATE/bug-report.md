@@ -25,13 +25,13 @@ Steps to reproduce the behavior:
 ## Environment
 
  - DGL Version (e.g., 1.0):
- - Backend Library & Version (e.g., PyTorch 0.4.1):
+ - Backend Library & Version (e.g., PyTorch 0.4.1, MXNet/Gluon 1.3):
  - OS (e.g., Linux):
  - How you installed DGL (`conda`, `pip`, source):
  - Build command you used (if compiling from source):
  - Python version:
- - CUDA/cuDNN version:
- - GPU models and configuration:
+ - CUDA/cuDNN version (if applicable):
+ - GPU models and configuration (e.g. V100):
  - Any other relevant information:
 
 ## Additional context
