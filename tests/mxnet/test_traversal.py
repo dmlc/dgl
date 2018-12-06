@@ -123,4 +123,5 @@ def test_dfs_labeled_edges(n=1000, example=False):
 if __name__ == '__main__':
     test_bfs()
     test_topological_nodes()
-    test_dfs_labeled_edges()
+    #TODO(zhengda): the test leads to segfault in MXNet on Ubuntu 16.04.
+    #test_dfs_labeled_edges()
