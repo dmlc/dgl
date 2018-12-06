@@ -69,5 +69,6 @@ def test_prop_nodes_topo():
 
 if __name__ == '__main__':
     test_prop_nodes_bfs()
-    test_prop_edges_dfs()
+    #TODO(zhengda): the test leads to segfault in MXNet on Ubuntu 16.04.
+    #test_prop_edges_dfs()
     test_prop_nodes_topo()
