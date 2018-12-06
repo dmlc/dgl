@@ -3,7 +3,7 @@ Environment Variables
 
 Backend Options
 ---------------
-* DGLBACKEND
+* ``DGLBACKEND``
     * Values: String (default='pytorch')
     * The backend deep lerarning framework for DGL.
     * Choices:
@@ -12,7 +12,7 @@ Backend Options
 
 Data Repository
 ---------------
-* DGL_REPO
+* ``DGL_REPO``
     * Values: String (default='https://s3.us-east-2.amazonaws.com/dgl.ai/')
     * The repository url to be used for DGL datasets and pre-trained models.
     * Suggested values:
