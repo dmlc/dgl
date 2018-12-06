@@ -8,6 +8,20 @@ graphs.
 It makes implementing graph neural networks (including Graph Convolution Networks, TreeLSTM, and many others) easy while
 maintaining high computation efficiency.
 
+A summary of the model accuracy and training speed with the Pytorch backend (on Amazon EC2 p3.2x instance (w/ V100 GPU)).
+
+| Model | Reported <br> Accuracy | DGL <br> Accuracy | Author's training speed (epoch time) | DGL speed (epoch time) | Improvement |
+| ----- | ----------------- | ------------ | ------------------------------------ | ---------------------- | ----------- |
+| [GCN]()   | [81.5%]() | 81.0% | 0.0051s (TF) | 0.0042s | 1.17x |
+| TreeLSTM | 51.0% | 51.72% | 14.02s (DyNet) | 3.18s | 4.3x |
+| R-GCN <br> (classification) | 73.23% | 73.53% | 0.2853s (Theano) | 0.0273s | 10.4x |
+| R-GCN <br> (link prediction) | 0.158 | 0.151 | 2.204s (TF) | 0.633s | 3.5x |
+| JTNN | 96.44% | 96.44% | 1826s (Pytorch) | 743s | 2.5x |
+| LGNN | 94% | 94% | n/a | 1.45s | n/a |
+| DGMG | 84% | 90% | n/a | 1 hr | n/a |
+
+Scalability, with the MXNet backend (on XXX)
+
 We are currently in Beta stage.  More features and improvements are coming.
 
 ## System requirements
