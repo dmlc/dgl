@@ -8,7 +8,7 @@ graphs.
 It makes implementing graph neural networks (including Graph Convolution Networks, TreeLSTM, and many others) easy while
 maintaining high computation efficiency.
 
-A summary of the model accuracy and training speed with the Pytorch backend (on Amazon EC2 p3.2x instance (w/ V100 GPU)).
+A summary of the model accuracy and training speed with the Pytorch backend (on Amazon EC2 p3.2x instance (w/ V100 GPU)), as compared with the best open-source implementations.
 
 | Model | Reported <br> Accuracy | DGL <br> Accuracy | Author's training speed (epoch time) | DGL speed (epoch time) | Improvement |
 | ----- | ----------------- | ------------ | ------------------------------------ | ---------------------- | ----------- |
