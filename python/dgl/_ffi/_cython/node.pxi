@@ -18,7 +18,7 @@ cdef inline object make_ret_node(void* chandle):
     cdef list node_type
     cdef object cls
     node_type = NODE_TYPE
-    CALL(TVMNodeGetTypeIndex(chandle, &tindex))
+    CALL(DGLNodeGetTypeIndex(chandle, &tindex))
     if tindex < len(node_type):
         cls = node_type[tindex]
         if cls is not None:
@@ -53,12 +53,12 @@ cdef class NodeBase:
             self._set_handle(value)
 
     def __dealloc__(self):
-        CALL(TVMNodeFree(self.chandle))
+        CALL(DGLNodeFree(self.chandle))
 
     def __getattr__(self, name):
-        cdef TVMValue ret_val
+        cdef DGLValue ret_val
         cdef int ret_type_code, ret_succ
-        CALL(TVMNodeGetAttr(self.chandle, c_str(name),
+        CALL(DGLNodeGetAttr(self.chandle, c_str(name),
                             &ret_val, &ret_type_code, &ret_succ))
         if ret_succ == 0:
             raise AttributeError(

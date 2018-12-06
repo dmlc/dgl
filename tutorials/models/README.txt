@@ -15,4 +15,3 @@ We categorize the models below, providing links to the original code and
 tutorial when appropriate. As will become apparent, these models stress the use
 of different DGL APIs.
 
-

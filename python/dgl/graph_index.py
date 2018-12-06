@@ -678,6 +678,25 @@ class GraphIndex(object):
         dst = utils.toindex(adj_coo.col)
         self.add_edges(src, dst)
 
+    def from_edge_list(self, elist):
+        """Convert from an edge list.
+
+        Paramters
+        ---------
+        elist : list
+            List of (u, v) edge tuple.
+        """
+        self.clear()
+        src, dst = zip(*elist)
+        src = np.array(src)
+        dst = np.array(dst)
+        num_nodes = max(src.max(), dst.max()) + 1
+        min_nodes = min(src.min(), dst.min())
+        if min_nodes != 0:
+            raise DGLError('Invalid edge list. Nodes must start from 0.')
+        self.add_nodes(num_nodes)
+        self.add_edges(utils.toindex(src), utils.toindex(dst))
+
     def line_graph(self, backtracking=True):
         """Return the line graph of this graph.
 
@@ -868,7 +887,10 @@ def create_graph_index(graph_data=None, multigraph=False, readonly=False):
         return graph_data
 
     if readonly and graph_data is not None:
-        gi = create_immutable_graph_index(graph_data)
+        try:
+            gi = create_immutable_graph_index(graph_data)
+        except:
+            gi = None
         # If we can't create an immutable graph index, we'll have to fall back.
         if gi is not None:
             return gi
@@ -879,19 +901,27 @@ def create_graph_index(graph_data=None, multigraph=False, readonly=False):
     if graph_data is None:
         return gi
 
+    # edge list
+    if isinstance(graph_data, (list, tuple)):
+        try:
+            gi.from_edge_list(graph_data)
+            return gi
+        except:
+            raise DGLError('Graph data is not a valid edge list.')
+
     # scipy format
     if isinstance(graph_data, scipy.sparse.spmatrix):
         try:
             gi.from_scipy_sparse_matrix(graph_data)
             return gi
         except:
-            raise Exception('Graph data is not a valid scipy sparse matrix.')
+            raise DGLError('Graph data is not a valid scipy sparse matrix.')
 
     # networkx - any format
     try:
         gi.from_networkx(graph_data)
     except:
-        raise Exception('Error while creating graph from input of type "%s".'
+        raise DGLError('Error while creating graph from input of type "%s".'
                          % type(graph_data))
 
     return gi

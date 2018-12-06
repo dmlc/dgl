@@ -18,7 +18,7 @@ typedef int (*BackendPackedCFunc)(void* args,
                                   int num_args);
 }  // extern "C"
 
-namespace tvm {
+namespace dgl {
 namespace runtime {
 /*!
  * \brief Wrap a BackendPackedCFunc to packed function.
@@ -40,22 +40,22 @@ void ImportModuleBlob(const char* mblob, std::vector<Module>* module_list);
  */
 template<typename FLookup>
 void InitContextFunctions(FLookup flookup) {
-  #define TVM_INIT_CONTEXT_FUNC(FuncName)                     \
+  #define DGL_INIT_CONTEXT_FUNC(FuncName)                     \
     if (auto *fp = reinterpret_cast<decltype(&FuncName)*>     \
       (flookup("__" #FuncName))) {                            \
       *fp = FuncName;                                         \
     }
   // Initialize the functions
-  TVM_INIT_CONTEXT_FUNC(TVMFuncCall);
-  TVM_INIT_CONTEXT_FUNC(TVMAPISetLastError);
-  TVM_INIT_CONTEXT_FUNC(TVMBackendGetFuncFromEnv);
-  TVM_INIT_CONTEXT_FUNC(TVMBackendAllocWorkspace);
-  TVM_INIT_CONTEXT_FUNC(TVMBackendFreeWorkspace);
-  TVM_INIT_CONTEXT_FUNC(TVMBackendParallelLaunch);
-  TVM_INIT_CONTEXT_FUNC(TVMBackendParallelBarrier);
+  DGL_INIT_CONTEXT_FUNC(DGLFuncCall);
+  DGL_INIT_CONTEXT_FUNC(DGLAPISetLastError);
+  DGL_INIT_CONTEXT_FUNC(DGLBackendGetFuncFromEnv);
+  DGL_INIT_CONTEXT_FUNC(DGLBackendAllocWorkspace);
+  DGL_INIT_CONTEXT_FUNC(DGLBackendFreeWorkspace);
+  DGL_INIT_CONTEXT_FUNC(DGLBackendParallelLaunch);
+  DGL_INIT_CONTEXT_FUNC(DGLBackendParallelBarrier);
 
-  #undef TVM_INIT_CONTEXT_FUNC
+  #undef DGL_INIT_CONTEXT_FUNC
 }
 }  // namespace runtime
-}  // namespace tvm
+}  // namespace dgl
 #endif   // DGL_RUNTIME_MODULE_UTIL_H_

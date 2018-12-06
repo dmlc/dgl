@@ -14,11 +14,13 @@ def _gen_missing_api(api, mod_name):
                           ' the DGLBACKEND environment.' % (api, mod_name))
     return _missing_api
 
-def _load_backend():
-    mod_name = os.environ.get('DGLBACKEND', 'pytorch').lower()
+def load_backend(mod_name):
     mod = importlib.import_module('.%s' % mod_name, __name__)
     thismod = sys.modules[__name__]
     for api in backend.__dict__.keys():
+        if api.startswith('__'):
+            # ignore python builtin attributes
+            continue
         if api == 'data_type_dict':
             # load data type
             if api not in mod.__dict__:
@@ -41,7 +43,7 @@ def _load_backend():
             else:
                 setattr(thismod, api, _gen_missing_api(api, mod_name))
 
-_load_backend()
+load_backend(os.environ.get('DGLBACKEND', 'pytorch').lower())
 
 def is_enabled(api):
     """Return true if the api is enabled by the current backend.

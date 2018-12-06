@@ -8,7 +8,7 @@ import numpy as np
 from .base import _LIB, check_call
 from .. import _api_internal
 
-tvm_shape_index_t = ctypes.c_int64
+dgl_shape_index_t = ctypes.c_int64
 
 class TypeCode(object):
     """Type code used in API calls"""
@@ -17,8 +17,8 @@ class TypeCode(object):
     FLOAT = 2
     HANDLE = 3
     NULL = 4
-    TVM_TYPE = 5
-    TVM_CONTEXT = 6
+    DGL_TYPE = 5
+    DGL_CONTEXT = 6
     ARRAY_HANDLE = 7
     NODE_HANDLE = 8
     MODULE_HANDLE = 9
@@ -28,13 +28,13 @@ class TypeCode(object):
     NDARRAY_CONTAINER = 13
     EXT_BEGIN = 15
 
-class TVMByteArray(ctypes.Structure):
+class DGLByteArray(ctypes.Structure):
     """Temp data structure for byte array."""
     _fields_ = [("data", ctypes.POINTER(ctypes.c_byte)),
                 ("size", ctypes.c_size_t)]
 
-class TVMType(ctypes.Structure):
-    """TVM datatype structure"""
+class DGLType(ctypes.Structure):
+    """DGL datatype structure"""
     _fields_ = [("type_code", ctypes.c_uint8),
                 ("bits", ctypes.c_uint8),
                 ("lanes", ctypes.c_uint16)]
@@ -50,7 +50,7 @@ class TVMType(ctypes.Structure):
         if type_str in cls._cache:
             return cls._cache[type_str]
 
-        inst = super(TVMType, cls).__new__(TVMType)
+        inst = super(DGLType, cls).__new__(DGLType)
 
         if isinstance(type_str, np.dtype):
             type_str = str(type_str)
@@ -84,7 +84,7 @@ class TVMType(ctypes.Structure):
         pass
 
     def __repr__(self):
-        x = "%s%d" % (TVMType.CODE2STR[self.type_code], self.bits)
+        x = "%s%d" % (DGLType.CODE2STR[self.type_code], self.bits)
         if self.lanes != 1:
             x += "x%d" % self.lanes
         return x
@@ -99,8 +99,8 @@ class TVMType(ctypes.Structure):
 
 RPC_SESS_MASK = 128
 
-class TVMContext(ctypes.Structure):
-    """TVM context strucure."""
+class DGLContext(ctypes.Structure):
+    """DGL context strucure."""
     _fields_ = [("device_type", ctypes.c_int),
                 ("device_id", ctypes.c_int)]
     MASK2STR = {
@@ -141,7 +141,7 @@ class TVMContext(ctypes.Structure):
         if (device_type, device_id) in cls._cache:
             return cls._cache[(device_type, device_id)]
 
-        inst = super(TVMContext, cls).__new__(TVMContext)
+        inst = super(DGLContext, cls).__new__(DGLContext)
 
         inst.device_type = device_type
         inst.device_id = device_id
@@ -222,10 +222,10 @@ class TVMContext(ctypes.Structure):
 
     def sync(self):
         """Synchronize until jobs finished at the context."""
-        check_call(_LIB.TVMSynchronize(self.device_type, self.device_id, None))
+        check_call(_LIB.DGLSynchronize(self.device_type, self.device_id, None))
 
     def __eq__(self, other):
-        return (isinstance(other, TVMContext) and
+        return (isinstance(other, DGLContext) and
                 self.device_id == other.device_id and
                 self.device_type == other.device_type)
 
@@ -237,22 +237,22 @@ class TVMContext(ctypes.Structure):
             tbl_id = self.device_type / RPC_SESS_MASK - 1
             dev_type = self.device_type % RPC_SESS_MASK
             return "remote[%d]:%s(%d)" % (
-                tbl_id, TVMContext.MASK2STR[dev_type], self.device_id)
+                tbl_id, DGLContext.MASK2STR[dev_type], self.device_id)
         return "%s(%d)" % (
-            TVMContext.MASK2STR[self.device_type], self.device_id)
+            DGLContext.MASK2STR[self.device_type], self.device_id)
 
     def __hash__(self):
         return hash((self.device_type, self.device_id))
 
 
-class TVMArray(ctypes.Structure):
-    """TVMValue in C API"""
+class DGLArray(ctypes.Structure):
+    """DGLValue in C API"""
     _fields_ = [("data", ctypes.c_void_p),
-                ("ctx", TVMContext),
+                ("ctx", DGLContext),
                 ("ndim", ctypes.c_int),
-                ("dtype", TVMType),
-                ("shape", ctypes.POINTER(tvm_shape_index_t)),
-                ("strides", ctypes.POINTER(tvm_shape_index_t)),
+                ("dtype", DGLType),
+                ("shape", ctypes.POINTER(dgl_shape_index_t)),
+                ("strides", ctypes.POINTER(dgl_shape_index_t)),
                 ("byte_offset", ctypes.c_uint64)]
 
-TVMArrayHandle = ctypes.POINTER(TVMArray)
+DGLArrayHandle = ctypes.POINTER(DGLArray)

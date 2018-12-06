@@ -1,52 +1,42 @@
 /*!
  *  Copyright (c) 2016 by Contributors
  * \file dgl/runtime/c_runtime_api.h
- * \brief TVM runtime library.
+ * \brief DGL runtime library.
  *
- *  The philosophy of TVM project is to customize the compilation
- *  stage to generate code that can used by other projects transparently.
- *  So this is a minimum runtime code gluing, and some limited
- *  memory management code to enable quick testing.
- *
- *  The runtime API is independent from TVM compilation stack and can
- *  be linked via libtvm_runtime.
- *
- *  The common flow is:
- *   - Use TVMFuncListGlobalNames to get global function name
- *   - Use TVMFuncCall to call these functions.
+ * This runtime is adapted from TVM project
  */
 #ifndef DGL_RUNTIME_C_RUNTIME_API_H_
 #define DGL_RUNTIME_C_RUNTIME_API_H_
 
 // Macros to do weak linking
 #ifdef _MSC_VER
-#define TVM_WEAK __declspec(selectany)
+#define DGL_WEAK __declspec(selectany)
 #else
-#define TVM_WEAK __attribute__((weak))
+#define DGL_WEAK __attribute__((weak))
 #endif
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
-#define TVM_DLL EMSCRIPTEN_KEEPALIVE
+#define DGL_DLL EMSCRIPTEN_KEEPALIVE
 #endif
 
-#ifndef TVM_DLL
+#ifndef DGL_DLL
 #ifdef _WIN32
-#ifdef TVM_EXPORTS
-#define TVM_DLL __declspec(dllexport)
+#ifdef DGL_EXPORTS
+#define DGL_DLL __declspec(dllexport)
 #else
-#define TVM_DLL __declspec(dllimport)
+#define DGL_DLL __declspec(dllimport)
 #endif
 #else
-#define TVM_DLL
+#define DGL_DLL
 #endif
 #endif
 
-// TVM version
-#define TVM_VERSION "0.5.dev"
+// DGL version
+#define DGL_VERSION "0.1.0"
 
 
-// TVM Runtime is DLPack compatible.
+// DGL Runtime is DLPack compatible.
 #include <dlpack/dlpack.h>
 
 #ifdef __cplusplus
@@ -56,9 +46,9 @@ extern "C" {
 #include <stddef.h>
 
 /*! \brief type of array index. */
-typedef int64_t tvm_index_t;
+typedef int64_t dgl_index_t;
 
-/*! \brief Extension device types in TVM */
+/*! \brief Extension device types in DGL */
 typedef enum {
   kDLAOCL = 5,
   kDLSDAccel = 6,
@@ -66,21 +56,21 @@ typedef enum {
   // Extension DRAM type, used for quickly test extension device
   // The device api can differ depending on the xpu driver registered.
   kExtDev = 12,
-  // AddExtraTVMType which is not in DLPack here
-} TVMDeviceExtType;
+  // AddExtraDGLType which is not in DLPack here
+} DGLDeviceExtType;
 
 /*!
- * \brief The type code in TVMType
- * \note TVMType is used in two places.
+ * \brief The type code in DGLType
+ * \note DGLType is used in two places.
  */
 typedef enum {
   // The type code of other types are compatible with DLPack.
   // The next few fields are extension types
-  // that is used by TVM API calls.
+  // that is used by DGL API calls.
   kHandle = 3U,
   kNull = 4U,
-  kTVMType = 5U,
-  kTVMContext = 6U,
+  kDGLType = 5U,
+  kDGLContext = 6U,
   kArrayHandle = 7U,
   kNodeHandle = 8U,
   kModuleHandle = 9U,
@@ -88,7 +78,7 @@ typedef enum {
   kStr = 11U,
   kBytes = 12U,
   kNDArrayContainer = 13U,
-  // Extension codes for other frameworks to integrate TVM PackedFunc.
+  // Extension codes for other frameworks to integrate DGL PackedFunc.
   // To make sure each framework's id do not conflict, use first and
   // last sections to mark ranges.
   // Open an issue at the repo if you need a section of code.
@@ -98,32 +88,32 @@ typedef enum {
   // The following section of code is used for non-reserved types.
   kExtReserveEnd = 64U,
   kExtEnd = 128U
-} TVMTypeCode;
+} DGLTypeCode;
 
 /*!
- * \brief The data type used in TVM Runtime.
+ * \brief The data type used in DGL Runtime.
  *
  *  Examples
  *   - float: type_code = 2, bits = 32, lanes=1
  *   - float4(vectorized 4 float): type_code = 2, bits = 32, lanes=4
  *   - int8: type_code = 0, bits = 8, lanes=1
  *
- * \note Arguments TVM API function always takes bits=64 and lanes=1
+ * \note Arguments DGL API function always takes bits=64 and lanes=1
  */
-typedef DLDataType TVMType;
+typedef DLDataType DGLType;
 
 /*!
  * \brief The Device information, abstract away common device types.
  */
-typedef DLContext TVMContext;
+typedef DLContext DGLContext;
 
 /*!
- * \brief The tensor array stucture to TVM API.
+ * \brief The tensor array stucture to DGL API.
  */
-typedef DLTensor TVMArray;
+typedef DLTensor DGLArray;
 
 /*! \brief the array handle */
-typedef TVMArray* TVMArrayHandle;
+typedef DGLArray* DGLArrayHandle;
 
 /*!
  * \brief Union type of values
@@ -134,9 +124,9 @@ typedef union {
   double v_float64;
   void* v_handle;
   const char* v_str;
-  TVMType v_type;
-  TVMContext v_ctx;
-} TVMValue;
+  DGLType v_type;
+  DGLContext v_ctx;
+} DGLValue;
 
 /*!
  * \brief Byte array type used to pass in byte array
@@ -145,37 +135,37 @@ typedef union {
 typedef struct {
   const char* data;
   size_t size;
-} TVMByteArray;
+} DGLByteArray;
 
-/*! \brief Handle to TVM runtime modules. */
-typedef void* TVMModuleHandle;
+/*! \brief Handle to DGL runtime modules. */
+typedef void* DGLModuleHandle;
 /*! \brief Handle to packed function handle. */
-typedef void* TVMFunctionHandle;
+typedef void* DGLFunctionHandle;
 /*! \brief Handle to hold return value. */
-typedef void* TVMRetValueHandle;
+typedef void* DGLRetValueHandle;
 /*!
  * \brief The stream that is specific to device
  * can be NULL, which indicates the default one.
  */
-typedef void* TVMStreamHandle;
+typedef void* DGLStreamHandle;
 
 /*!
  * \brief Used for implementing C API function.
  *  Set last error message before return.
  * \param msg The error message to be set.
  */
-TVM_DLL void TVMAPISetLastError(const char* msg);
+DGL_DLL void DGLAPISetLastError(const char* msg);
 
 /*!
  * \brief return str message of the last error
  *  all function in this file will return 0 when success
  *  and -1 when an error occured,
- *  TVMGetLastError can be called to retrieve the error
+ *  DGLGetLastError can be called to retrieve the error
  *
  *  this function is threadsafe and can be called by different thread
  *  \return error info
  */
-TVM_DLL const char *TVMGetLastError(void);
+DGL_DLL const char *DGLGetLastError(void);
 /*!
  * \brief Load module from file.
  * \param file_name The file name to load the module from.
@@ -184,11 +174,11 @@ TVM_DLL const char *TVMGetLastError(void);
  *
  * \return 0 when success, -1 when failure happens
  * \note The resulting module do not contain import relation.
- *  It can be reconstructed by TVMModImport.
+ *  It can be reconstructed by DGLModImport.
  */
-TVM_DLL int TVMModLoadFromFile(const char* file_name,
+DGL_DLL int DGLModLoadFromFile(const char* file_name,
                                const char* format,
-                               TVMModuleHandle* out);
+                               DGLModuleHandle* out);
 
 /*!
  * \brief Add dep to mod's dependency.
@@ -198,8 +188,8 @@ TVM_DLL int TVMModLoadFromFile(const char* file_name,
  * \param dep The dependent module to be imported.
  * \return 0 when success, -1 when failure happens
  */
-TVM_DLL int TVMModImport(TVMModuleHandle mod,
-                         TVMModuleHandle dep);
+DGL_DLL int DGLModImport(DGLModuleHandle mod,
+                         DGLModuleHandle dep);
 
 /*!
  * \brief Get function from the module.
@@ -209,10 +199,10 @@ TVM_DLL int TVMModImport(TVMModuleHandle mod,
  * \param out The result function, can be NULL if it is not available.
  * \return 0 when no error is thrown, -1 when failure happens
  */
-TVM_DLL int TVMModGetFunction(TVMModuleHandle mod,
+DGL_DLL int DGLModGetFunction(DGLModuleHandle mod,
                               const char* func_name,
                               int query_imports,
-                              TVMFunctionHandle *out);
+                              DGLFunctionHandle *out);
 
 /*!
  * \brief Free front-end extension type resource.
@@ -220,30 +210,30 @@ TVM_DLL int TVMModGetFunction(TVMModuleHandle mod,
  * \param type_code The type of of the extension type.
  * \return 0 when success, -1 when failure happens
  */
-TVM_DLL int TVMExtTypeFree(void* handle, int type_code);
+DGL_DLL int DGLExtTypeFree(void* handle, int type_code);
 
 /*!
  * \brief Free the Module
  * \param mod The module to be freed.
  *
  * \note This may not free up the module's resources.
- *  If there is active TVMFunctionHandle uses the module
+ *  If there is active DGLFunctionHandle uses the module
  *  Or if this module is imported by another active module.
  *
- *  The all functions remains valid until TVMFuncFree is called.
+ *  The all functions remains valid until DGLFuncFree is called.
  * \return 0 when success, -1 when failure happens
  */
-TVM_DLL int TVMModFree(TVMModuleHandle mod);
+DGL_DLL int DGLModFree(DGLModuleHandle mod);
 
 /*!
  * \brief Free the function when it is no longer needed.
  * \param func The function handle
  * \return 0 when success, -1 when failure happens
  */
-TVM_DLL int TVMFuncFree(TVMFunctionHandle func);
+DGL_DLL int DGLFuncFree(DGLFunctionHandle func);
 
 /*!
- * \brief Call a Packed TVM Function.
+ * \brief Call a Packed DGL Function.
  *
  * \param func node handle of the function.
  * \param arg_values The arguments
@@ -254,34 +244,34 @@ TVM_DLL int TVMFuncFree(TVMFunctionHandle func);
  * \param ret_type_code the type code of return value.
  *
  * \return 0 when success, -1 when failure happens
- * \note TVM calls always exchanges with type bits=64, lanes=1
+ * \note DGL calls always exchanges with type bits=64, lanes=1
  *
  * \note API calls always exchanges with type bits=64, lanes=1
  *   If API call returns container handles (e.g. FunctionHandle)
  *   these handles should be managed by the front-end.
- *   The front-end need to call free function (e.g. TVMFuncFree)
+ *   The front-end need to call free function (e.g. DGLFuncFree)
  *   to free these handles.
  */
-TVM_DLL int TVMFuncCall(TVMFunctionHandle func,
-                        TVMValue* arg_values,
+DGL_DLL int DGLFuncCall(DGLFunctionHandle func,
+                        DGLValue* arg_values,
                         int* type_codes,
                         int num_args,
-                        TVMValue* ret_val,
+                        DGLValue* ret_val,
                         int* ret_type_code);
 
 /*!
- * \brief Set the return value of TVMPackedCFunc.
+ * \brief Set the return value of DGLPackedCFunc.
  *
- *  This function is called by TVMPackedCFunc to set the return value.
+ *  This function is called by DGLPackedCFunc to set the return value.
  *  When this function is not called, the function returns null by default.
  *
- * \param ret The return value handle, pass by ret in TVMPackedCFunc
+ * \param ret The return value handle, pass by ret in DGLPackedCFunc
  * \param value The value to be returned.
  * \param type_code The type of the value to be returned.
  * \param num_ret Number of return values, for now only 1 is supported.
  */
-TVM_DLL int TVMCFuncSetReturn(TVMRetValueHandle ret,
-                              TVMValue* value,
+DGL_DLL int DGLCFuncSetReturn(DGLRetValueHandle ret,
+                              DGLValue* value,
                               int* type_code,
                               int num_ret);
 
@@ -295,7 +285,7 @@ TVM_DLL int TVMCFuncSetReturn(TVMRetValueHandle ret,
  *
  * \return 0 when success, -1 when failure happens.
  */
-TVM_DLL int TVMCbArgToReturn(TVMValue* value, int code);
+DGL_DLL int DGLCbArgToReturn(DGLValue* value, int code);
 
 /*!
  * \brief C type of packed function.
@@ -305,37 +295,37 @@ TVM_DLL int TVMCbArgToReturn(TVMValue* value, int code);
  * \param num_args Number of arguments.
  * \param ret The return value handle.
  * \param resource_handle The handle additional resouce handle from fron-end.
- * \return 0 if success, -1 if failure happens, set error via TVMAPISetLastError.
- * \sa TVMCFuncSetReturn
+ * \return 0 if success, -1 if failure happens, set error via DGLAPISetLastError.
+ * \sa DGLCFuncSetReturn
  */
-typedef int (*TVMPackedCFunc)(
-    TVMValue* args,
+typedef int (*DGLPackedCFunc)(
+    DGLValue* args,
     int* type_codes,
     int num_args,
-    TVMRetValueHandle ret,
+    DGLRetValueHandle ret,
     void* resource_handle);
 
 /*!
  * \brief C callback to free the resource handle in C packed function.
  * \param resource_handle The handle additional resouce handle from fron-end.
  */
-typedef void (*TVMPackedCFuncFinalizer)(void* resource_handle);
+typedef void (*DGLPackedCFuncFinalizer)(void* resource_handle);
 
 /*!
  * \brief Signature for extension function declarer.
  *
- *  TVM call this function to get the extension functions
+ *  DGL call this function to get the extension functions
  *  The declarer will call register_func to register function and their name.
  *
  * \param register_func_handle The register function
  * \return 0 if success, -1 if failure happens
  */
-typedef int (*TVMExtensionFuncDeclarer)(TVMFunctionHandle register_func_handle);
+typedef int (*DGLExtensionFuncDeclarer)(DGLFunctionHandle register_func_handle);
 
 /*!
- * \brief Wrap a TVMPackedCFunc to become a FunctionHandle.
+ * \brief Wrap a DGLPackedCFunc to become a FunctionHandle.
  *
- * The resource_handle will be managed by TVM API, until the function is no longer used.
+ * The resource_handle will be managed by DGL API, until the function is no longer used.
  *
  * \param func The packed C function.
  * \param resource_handle The resource handle from front-end, can be NULL.
@@ -343,10 +333,10 @@ typedef int (*TVMExtensionFuncDeclarer)(TVMFunctionHandle register_func_handle);
  * \param out the result function handle.
  * \return 0 when success, -1 when failure happens
  */
-TVM_DLL int TVMFuncCreateFromCFunc(TVMPackedCFunc func,
+DGL_DLL int DGLFuncCreateFromCFunc(DGLPackedCFunc func,
                                    void* resource_handle,
-                                   TVMPackedCFuncFinalizer fin,
-                                   TVMFunctionHandle *out);
+                                   DGLPackedCFuncFinalizer fin,
+                                   DGLFunctionHandle *out);
 
 /*!
  * \brief Register the function to runtime's global table.
@@ -357,8 +347,8 @@ TVM_DLL int TVMFuncCreateFromCFunc(TVMPackedCFunc func,
  * \param f The function to be registered.
  * \param override Whether allow override already registered function.
  */
-TVM_DLL int TVMFuncRegisterGlobal(
-    const char* name, TVMFunctionHandle f, int override);
+DGL_DLL int DGLFuncRegisterGlobal(
+    const char* name, DGLFunctionHandle f, int override);
 
 /*!
  * \brief Get a global function.
@@ -366,10 +356,10 @@ TVM_DLL int TVMFuncRegisterGlobal(
  * \param name The name of the function.
  * \param out the result function pointer, NULL if it does not exist.
  *
- * \note The function handle of global function is managed by TVM runtime,
- *  So TVMFuncFree is should not be called when it get deleted.
+ * \note The function handle of global function is managed by DGL runtime,
+ *  So DGLFuncFree is should not be called when it get deleted.
  */
-TVM_DLL int TVMFuncGetGlobal(const char* name, TVMFunctionHandle* out);
+DGL_DLL int DGLFuncGetGlobal(const char* name, DGLFunctionHandle* out);
 
 /*!
  * \brief List all the globally registered function name
@@ -377,7 +367,7 @@ TVM_DLL int TVMFuncGetGlobal(const char* name, TVMFunctionHandle* out);
  * \param out_array The array of function names.
  * \return 0 when success, -1 when failure happens
  */
-TVM_DLL int TVMFuncListGlobalNames(int* out_size,
+DGL_DLL int DGLFuncListGlobalNames(int* out_size,
                                    const char*** out_array);
 
 // Array related apis for quick proptyping
@@ -395,21 +385,21 @@ TVM_DLL int TVMFuncListGlobalNames(int* out_size,
  * \param out The output handle.
  * \return 0 when success, -1 when failure happens
  */
-TVM_DLL int TVMArrayAlloc(const tvm_index_t* shape,
+DGL_DLL int DGLArrayAlloc(const dgl_index_t* shape,
                           int ndim,
                           int dtype_code,
                           int dtype_bits,
                           int dtype_lanes,
                           int device_type,
                           int device_id,
-                          TVMArrayHandle* out);
+                          DGLArrayHandle* out);
 
 /*!
- * \brief Free the TVM Array.
+ * \brief Free the DGL Array.
  * \param handle The array handle to be freed.
  * \return 0 when success, -1 when failure happens
  */
-TVM_DLL int TVMArrayFree(TVMArrayHandle handle);
+DGL_DLL int DGLArrayFree(DGLArrayHandle handle);
 
 /*!
  * \brief Copy array data from CPU byte array.
@@ -418,7 +408,7 @@ TVM_DLL int TVMArrayFree(TVMArrayHandle handle);
  * \param nbytes The number of bytes to copy.
  * \return 0 when success, -1 when failure happens
  */
-TVM_DLL int TVMArrayCopyFromBytes(TVMArrayHandle handle,
+DGL_DLL int DGLArrayCopyFromBytes(DGLArrayHandle handle,
                                   void* data,
                                   size_t nbytes);
 
@@ -429,7 +419,7 @@ TVM_DLL int TVMArrayCopyFromBytes(TVMArrayHandle handle,
  * \param nbytes The number of bytes to copy.
  * \return 0 when success, -1 when failure happens
  */
-TVM_DLL int TVMArrayCopyToBytes(TVMArrayHandle handle,
+DGL_DLL int DGLArrayCopyToBytes(DGLArrayHandle handle,
                                 void* data,
                                 size_t nbytes);
 
@@ -440,9 +430,9 @@ TVM_DLL int TVMArrayCopyToBytes(TVMArrayHandle handle,
  * \param stream The stream where the copy happens, can be NULL.
  * \return 0 when success, -1 when failure happens
  */
-TVM_DLL int TVMArrayCopyFromTo(TVMArrayHandle from,
-                               TVMArrayHandle to,
-                               TVMStreamHandle stream);
+DGL_DLL int DGLArrayCopyFromTo(DGLArrayHandle from,
+                               DGLArrayHandle to,
+                               DGLStreamHandle stream);
 
 /*!
  * \brief Produce an array from the DLManagedTensor that shares data memory
@@ -451,8 +441,8 @@ TVM_DLL int TVMArrayCopyFromTo(TVMArrayHandle from,
  * \param out The output array handle.
  * \return 0 when success, -1 when failure happens
  */
-TVM_DLL int TVMArrayFromDLPack(DLManagedTensor* from,
-                               TVMArrayHandle* out);
+DGL_DLL int DGLArrayFromDLPack(DLManagedTensor* from,
+                               DGLArrayHandle* out);
 
 /*!
  * \brief Produce a DLMangedTensor from the array that shares data memory with
@@ -461,14 +451,14 @@ TVM_DLL int TVMArrayFromDLPack(DLManagedTensor* from,
  * \param out The DLManagedTensor handle.
  * \return 0 when success, -1 when failure happens
  */
-TVM_DLL int TVMArrayToDLPack(TVMArrayHandle from,
+DGL_DLL int DGLArrayToDLPack(DGLArrayHandle from,
                              DLManagedTensor** out);
 
 /*!
  * \brief Delete (free) a DLManagedTensor's data.
  * \param dltensor Pointer to the DLManagedTensor.
  */
-TVM_DLL void TVMDLManagedTensorCallDeleter(DLManagedTensor* dltensor);
+DGL_DLL void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor);
 
 /*!
  * \brief Create a new runtime stream.
@@ -478,7 +468,7 @@ TVM_DLL void TVMDLManagedTensorCallDeleter(DLManagedTensor* dltensor);
  * \param out The new stream handle
  * \return 0 when success, -1 when failure happens
  */
-TVM_DLL int TVMStreamCreate(int device_type, int device_id, TVMStreamHandle* out);
+DGL_DLL int DGLStreamCreate(int device_type, int device_id, DGLStreamHandle* out);
 
 /*!
  * \brief Free a created stream handle.
@@ -488,7 +478,7 @@ TVM_DLL int TVMStreamCreate(int device_type, int device_id, TVMStreamHandle* out
  * \param stream The stream to be freed
  * \return 0 when success, -1 when failure happens
  */
-TVM_DLL int TVMStreamFree(int device_type, int device_id, TVMStreamHandle stream);
+DGL_DLL int DGLStreamFree(int device_type, int device_id, DGLStreamHandle stream);
 
 /*!
  * \brief Set the runtime stream of current thread to be stream.
@@ -501,7 +491,7 @@ TVM_DLL int TVMStreamFree(int device_type, int device_id, TVMStreamHandle stream
  * \param handle The stream handle.
  * \return 0 when success, -1 when failure happens
  */
-TVM_DLL int TVMSetStream(int device_type, int device_id, TVMStreamHandle handle);
+DGL_DLL int DGLSetStream(int device_type, int device_id, DGLStreamHandle handle);
 
 /*!
  * \brief Wait until all computations on stream completes.
@@ -511,7 +501,7 @@ TVM_DLL int TVMSetStream(int device_type, int device_id, TVMStreamHandle handle)
  * \param stream The stream to be synchronized.
  * \return 0 when success, -1 when failure happens
  */
-TVM_DLL int TVMSynchronize(int device_type, int device_id, TVMStreamHandle stream);
+DGL_DLL int DGLSynchronize(int device_type, int device_id, DGLStreamHandle stream);
 
 /*!
  * \brief Synchronize two streams of execution.
@@ -522,12 +512,12 @@ TVM_DLL int TVMSynchronize(int device_type, int device_id, TVMStreamHandle strea
  * \param dst The destination stream to synchronize.
  * \return 0 when success, -1 when failure happens
  */
-TVM_DLL int TVMStreamStreamSynchronize(int device_type,
+DGL_DLL int DGLStreamStreamSynchronize(int device_type,
                                        int device_id,
-                                       TVMStreamHandle src,
-                                       TVMStreamHandle dst);
+                                       DGLStreamHandle src,
+                                       DGLStreamHandle dst);
 
 #ifdef __cplusplus
-}  // TVM_EXTERN_C
+}  // DGL_EXTERN_C
 #endif
 #endif  // DGL_RUNTIME_C_RUNTIME_API_H_

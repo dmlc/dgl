@@ -8,10 +8,6 @@ from setuptools import find_packages
 from setuptools.dist import Distribution
 from setuptools import setup
 
-with open(os.path.join(os.path.dirname(__file__), 'VERSION')) as f:
-    version = f.readline().strip()
-
-
 class BinaryDistribution(Distribution):
     def has_ext_modules(self):
         return True
@@ -68,7 +64,7 @@ if include_libs:
 
 setup(
     name='dgl',
-    version=version,
+    version=VERSION,
     description='Deep Graph Library',
     zip_safe=False,
     maintainer='DGL Team',

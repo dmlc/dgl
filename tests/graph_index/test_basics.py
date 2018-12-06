@@ -139,8 +139,19 @@ def test_predsucc():
     assert 2 in succ
     assert 0 in succ
 
+def test_create_from_elist():
+    elist = [(2, 1), (1, 0), (2, 0), (3, 0), (0, 2)]
+    g = create_graph_index(elist)
+    for i, (u, v) in enumerate(elist):
+        assert g.edge_id(u, v)[0] == i
+    # immutable graph
+    g = create_graph_index(elist, readonly=True)
+    for i, (u, v) in enumerate(elist):
+        print(u, v, g.edge_id(u, v)[0])
+        assert g.edge_id(u, v)[0] == i
 
 if __name__ == '__main__':
     test_edge_id()
     test_nx()
     test_predsucc()
+    test_create_from_elist()
