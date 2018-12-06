@@ -60,27 +60,33 @@ def draw_atts(maps, src, tgt, dirname, prefix):
 
 mode2id = {'e2e': 0, 'e2d': 1, 'd2d': 2}
 
+colorbar = None
+
 def att_animation(maps_array, mode, src, tgt, head_id):
     weights = [maps[mode2id[mode]][head_id] for maps in maps_array]
     fig, axes = plt.subplots(1, 2)
-    axes[0].set_yticks(np.arange(len(src)))
-    axes[0].set_xticks(np.arange(len(tgt)))
-    axes[0].set_yticklabels(src)
-    axes[0].set_xticklabels(tgt)
-    plt.setp(axes[0].get_xticklabels(), rotation=45, ha="right",
-             rotation_mode="anchor")
 
     def weight_animate(i):
-        axes[0].cla()
+        global colorbar
+        if colorbar:
+            colorbar.remove()
+        plt.cla()
         axes[0].set_title('heatmap')
+        axes[0].set_yticks(np.arange(len(src)))
+        axes[0].set_xticks(np.arange(len(tgt)))
+        axes[0].set_yticklabels(src)
+        axes[0].set_xticklabels(tgt)
+        plt.setp(axes[0].get_xticklabels(), rotation=45, ha="right",
+                 rotation_mode="anchor")
+
         fig.suptitle('epoch {}'.format(i))
         weight = weights[i].transpose(-1, -2)
         heatmap = axes[0].pcolor(weight, vmin=0, vmax=1, cmap=plt.cm.Blues)
-        plt.colorbar(heatmap, ax=axes[0], fraction=0.046, pad=0.04)
+        colorbar = plt.colorbar(heatmap, ax=axes[0], fraction=0.046, pad=0.04)
         axes[0].set_aspect('equal')
-        axes[1].cla()
         axes[1].axis("off")
         graph_att_head(src, tgt, weight, axes[1], 'graph')
+
 
     ani = animation.FuncAnimation(fig, weight_animate, frames=len(weights), interval=500, repeat_delay=2000)
     return ani
