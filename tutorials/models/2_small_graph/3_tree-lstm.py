@@ -334,10 +334,17 @@ print(model)
 optimizer = th.optim.Adagrad(model.parameters(),
                           lr=lr,
                           weight_decay=weight_decay)
-                          
+
+def batcher_dev(batch):
+    batch_trees = dgl.batch(batch)
+    return SSTBatch(graph=batch_trees,
+                    mask=batch_trees.ndata['mask'].to(device),
+                    wordid=batch_trees.ndata['x'].to(device),
+                    label=batch_trees.ndata['y'].to(device))
+
 train_loader = DataLoader(dataset=tiny_sst,
                           batch_size=5,
-                          collate_fn=SST.batcher(device),
+                          collate_fn=batcher_dev(device),
                           shuffle=False,
                           num_workers=0)
 
