@@ -32,6 +32,7 @@ The class that can represent a batch of edges.
     EdgeBatch.data
     EdgeBatch.edges
     EdgeBatch.batch_size
+    EdgeBatch.__len__
 
 NodeBatch
 ---------
@@ -45,3 +46,4 @@ The class that can represent a batch of nodes.
     NodeBatch.mailbox
     NodeBatch.nodes
     NodeBatch.batch_size
+    NodeBatch.__len__
