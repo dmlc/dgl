@@ -47,6 +47,7 @@ Tree LSTM DGL Tutorial
 
 import dgl
 from dgl.data.tree import SST
+from dgl.data import SSTBatch
 
 # Each sample in the dataset is a constituency tree. The leaf nodes
 # represent words. The word is a int value stored in the "x" field.
@@ -334,10 +335,19 @@ print(model)
 optimizer = th.optim.Adagrad(model.parameters(),
                           lr=lr,
                           weight_decay=weight_decay)
-                          
+
+def batcher(dev):
+    def batcher_dev(batch):
+        batch_trees = dgl.batch(batch)
+        return SSTBatch(graph=batch_trees,
+                        mask=batch_trees.ndata['mask'].to(device),
+                        wordid=batch_trees.ndata['x'].to(device),
+                        label=batch_trees.ndata['y'].to(device))
+    return batcher_dev
+
 train_loader = DataLoader(dataset=tiny_sst,
                           batch_size=5,
-                          collate_fn=SST.batcher(device),
+                          collate_fn=batcher(device),
                           shuffle=False,
                           num_workers=0)
 
