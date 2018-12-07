@@ -13,9 +13,11 @@ Old (new) wines in new bottle
   with non-parametric message-passing. We show how the later can be nicely
   implemented with DGL APIs.
 
-* **Transformer** `[paper] <https://arxiv.org/abs/1706.03762>`__ `[tutorial
-  (wip)]` `[code (wip)]` and **Universal Transformer** `[paper]
-  <https://arxiv.org/abs/1807.03819>`__ `[tutorial (wip)]` `[code (wip)]`:
+
+* **Transformer** `[paper] <https://arxiv.org/abs/1706.03762>`__ `[tutorial] <4_old_wines/7_transformer.html>`__ 
+  `[code] <https://github.com/jermainewang/dgl/tree/master/examples/pytorch/transformer>`__ and **Universal Transformer** 
+  `[paper] <https://arxiv.org/abs/1807.03819>`__ `[tutorial] <4_old_wines/7_transformer.html>`__
+  `[code] <https://github.com/jermainewang/dgl/tree/master/examples/pytorch/transformer/modules/act.py>`__:
   these two models replace RNN with several layers of multi-head attention to
   encode and discover structures among tokens of a sentence. These attention
   mechanisms can similarly formulated as graph operations with

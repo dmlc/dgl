@@ -1,0 +1,12 @@
+*~
+data/
+scripts/
+checkpoints/
+log/
+*__pycache__*
+*.pdf
+*.tar.gz
+*.zip
+*.pyc
+*.lprof
+*.swp
