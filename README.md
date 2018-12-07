@@ -33,7 +33,7 @@ DGL should work on
 
 * all Linux distributions no earlier than Ubuntu 16.04
 * macOS X
-* Windows 7 or later
+* Windows 10
 
 DGL also requires Python 3.5 or later.  Python 2 support is coming.
 
