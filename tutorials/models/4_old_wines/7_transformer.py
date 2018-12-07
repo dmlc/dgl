@@ -216,13 +216,15 @@ Transformer Tutorial
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
 # To speed up the message passing process, we utilize DGL’s builtin
-# function, including: -
-# ``fn.src_mul_egdes(src_field, edges_field, out_field)`` multiplies
+# function, including:
+#
+# - ``fn.src_mul_egdes(src_field, edges_field, out_field)`` multiplies
 # source’s attribute and edges attribute, and send the result to the
-# destination node’s mailbox keyed by ``out_field``. -
-# ``fn.copy_edge(edges_field, out_field)`` copies edge’s attribute to
-# destination node’s mailbox. - ``fn.sum(edges_field, out_field)`` sums up
-# edge’s attribute and sends aggregation to destination node’s mailbox
+# destination node’s mailbox keyed by ``out_field``.
+# - ``fn.copy_edge(edges_field, out_field)`` copies edge’s attribute to
+# destination node’s mailbox.
+# - ``fn.sum(edges_field, out_field)`` sums up
+# edge’s attribute and sends aggregation to destination node’s mailbox.
 #
 # Here we assemble those built-in function into ``propagate_attention``,
 # which is also the main graph operation function in our final
