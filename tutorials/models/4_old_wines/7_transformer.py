@@ -7,9 +7,6 @@ Transformer Tutorial
 **Author**: Zihao Ye, Jinjing Zhou, Qipeng Guo, Quan Gan, Zheng Zhang
 """
 ################################################################################################
-# Transformer Tutorial
-# ====================
-#
 # The Transformer model, as a replacement of CNN/RNN architecture for
 # sequence modeling, was introduced in Google’s paper: `Attention is All
 # You Need <https://arxiv.org/pdf/1706.03762.pdf>`__. It improved the
