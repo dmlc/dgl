@@ -311,7 +311,7 @@ Transformer Tutorial
 #    \textrm{wv} \leftarrow \frac{\textrm{wv}}{z} \\
 #    o \leftarrow W_o\cdot \textrm{wv} + b_o
 #
-#    add residual connection:
+# add residual connection:
 #
 # .. math::
 #
@@ -816,10 +816,10 @@ Transformer Tutorial
 #
 # .. note::
 # 
-#    - ``dgl.DGLGraph.filter_nodes`` takes a predicate and a node
+#    - :func:`~dgl.DGLGraph.filter_nodes` takes a predicate and a node
 #      ID list/tensor as input, then returns a tensor of node IDs that satisfy
 #      the given predicate.     
-#    - ``dgl.DGLGraph.filter_edges`` takes a predicate
+#    - :func:`~dgl.DGLGraph.filter_edges` takes a predicate
 #      and an edge ID list/tensor as input, then returns a tensor of edge IDs
 #      that satisfy the given predicate.
 #
