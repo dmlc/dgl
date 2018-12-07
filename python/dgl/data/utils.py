@@ -158,8 +158,8 @@ def get_download_dir():
     dirname : str
         Path to the download directory
     """
-    curr_path = os.path.dirname(os.path.abspath(os.path.expanduser(__file__)))
-    dirname = os.path.join(curr_path, '../../../_download')
+    default_dir = os.path.join(os.path.expanduser('~'), '.dgl')
+    dirname = os.environ.get('DGL_DOWNLOAD_DIR', default_dir)
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     return dirname
