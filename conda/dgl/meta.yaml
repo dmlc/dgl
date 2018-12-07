@@ -3,6 +3,7 @@ package:
   version: "0.1.2"
 
 source:
+  git_rev: 0.1.2
   git_url: https://github.com/jermainewang/dgl.git
 
 requirements:
