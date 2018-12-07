@@ -8,7 +8,7 @@ import scipy.sparse as sp
 from ._ffi.function import _init_api
 from . import backend as F
 from . import utils
-from .base import ALL, is_all, dgl_warning, DGLError
+from .base import ALL, is_all, DGLError
 
 class ImmutableGraphIndex(object):
     """Graph index object on immutable graphs.
@@ -514,8 +514,6 @@ class ImmutableGraphIndex(object):
         def get_adj(ctx):
             new_mat = self._sparse.adjacency_matrix(transpose)
             return F.copy_to(new_mat, ctx)
-        # FIXME(minjie): calculate the shuffle index
-        dgl_warning('Shuffle index is not correctly computed. SPMV with edge feature might fail!!')
         return self._sparse.adjacency_matrix(transpose, ctx), None
 
     def incidence_matrix(self, type, ctx):
@@ -649,9 +647,15 @@ class ImmutableGraphIndex(object):
         min_nodes = min(src.min(), dst.min())
         if min_nodes != 0:
             raise DGLError('Invalid edge list. Nodes must start from 0.')
-        data = np.ones((len(src),), dtype=np.int32)
-        spmat = sp.coo_matrix((data, (src, dst)), shape=(num_nodes, num_nodes))
-        self._sparse.from_coo_matrix(spmat)
+        edge_ids = mx.nd.arange(0, len(src), step=1, repeat=1, dtype=np.int32)
+        src = mx.nd.array(src, dtype=np.int64)
+        dst = mx.nd.array(dst, dtype=np.int64)
+        # TODO we can't generate a csr_matrix with np.int64 directly.
+        in_csr = mx.nd.sparse.csr_matrix((edge_ids, (dst, src)),
+                                         shape=(num_nodes, num_nodes)).astype(np.int64)
+        out_csr = mx.nd.sparse.csr_matrix((edge_ids, (src, dst)),
+                                          shape=(num_nodes, num_nodes)).astype(np.int64)
+        self.__init__(in_csr, out_csr)
 
     def line_graph(self, backtracking=True):
         """Return the line graph of this graph.
