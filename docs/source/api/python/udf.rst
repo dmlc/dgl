@@ -15,6 +15,10 @@ There are two types of user-defined functions in DGL:
   a batch of edges. The returned dictionary should have ``str`` type key and ``tensor``
   type values.
 
+Note: the size of the batch dimension is determined by the DGL framework
+for good efficiency and small memory footprint. Users should not make
+assumption in the batch dimension.
+
 EdgeBatch
 ---------
 
@@ -28,6 +32,7 @@ The class that can represent a batch of edges.
     EdgeBatch.data
     EdgeBatch.edges
     EdgeBatch.batch_size
+    EdgeBatch.__len__
 
 NodeBatch
 ---------
@@ -41,3 +46,4 @@ The class that can represent a batch of nodes.
     NodeBatch.mailbox
     NodeBatch.nodes
     NodeBatch.batch_size
+    NodeBatch.__len__

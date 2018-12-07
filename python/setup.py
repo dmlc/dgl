@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import sys,os
+import sys, os, platform
 import shutil
 import glob
 
@@ -8,16 +8,9 @@ from setuptools import find_packages
 from setuptools.dist import Distribution
 from setuptools import setup
 
-with open(os.path.join(os.path.dirname(__file__), 'VERSION')) as f:
-    version = f.readline().strip()
-
-
 class BinaryDistribution(Distribution):
     def has_ext_modules(self):
-        return True
-
-    def is_pure(self):
-        return False
+        return platform.system() == 'Darwin'
 
 CURRENT_DIR = os.path.dirname(__file__)
 
@@ -68,7 +61,7 @@ if include_libs:
 
 setup(
     name='dgl',
-    version=version,
+    version=VERSION,
     description='Deep Graph Library',
     zip_safe=False,
     maintainer='DGL Team',

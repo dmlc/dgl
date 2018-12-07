@@ -91,7 +91,12 @@ class EdgeBatch(object):
         return len(self._edges[0])
 
     def __len__(self):
-        """Return the number of edges in this edge batch."""
+        """Return the number of edges in this edge batch.
+
+        Returns
+        -------
+        int
+        """
         return self.batch_size()
 
 class NodeBatch(object):
@@ -167,5 +172,10 @@ class NodeBatch(object):
             return len(self._nodes)
 
     def __len__(self):
-        """Return the number of nodes in this node batch."""
+        """Return the number of nodes in this node batch.
+
+        Returns
+        -------
+        int
+        """
         return self.batch_size()

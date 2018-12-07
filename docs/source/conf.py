@@ -23,10 +23,9 @@ project = 'DGL'
 copyright = '2018, DGL Team'
 author = 'DGL Team'
 
-# The short X.Y version
-version = '0.0.1'
-# The full version, including alpha/beta/rc tags
-release = '0.0.1'
+import dgl
+version = dgl.__version__
+release = dgl.__version__
 
 
 # -- General configuration ---------------------------------------------------
