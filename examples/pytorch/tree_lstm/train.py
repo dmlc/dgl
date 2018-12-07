@@ -1,4 +1,5 @@
 import argparse
+import collections
 import time
 import numpy as np
 import torch as th
@@ -12,7 +13,8 @@ from dgl.data.tree import SST
 
 from tree_lstm import TreeLSTM
 
-def batcher(dev):
+SSTBatch = collections.namedtuple('SSTBatch', ['graph', 'mask', 'wordid', 'label'])
+def batcher(device):
     def batcher_dev(batch):
         batch_trees = dgl.batch(batch)
         return SSTBatch(graph=batch_trees,
