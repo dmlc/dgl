@@ -23,7 +23,7 @@ def test_prop_nodes_bfs():
     assert np.allclose(g.ndata['x'].asnumpy(),
             np.array([[2., 2.], [4., 4.], [6., 6.], [8., 8.], [9., 9.]]))
 
-def test_prop_edges_dfs():
+def _test_prop_edges_dfs():
     g = dgl.DGLGraph(nx.path_graph(5))
     g.register_message_func(mfunc)
     g.register_reduce_func(rfunc)
@@ -70,5 +70,5 @@ def test_prop_nodes_topo():
 if __name__ == '__main__':
     test_prop_nodes_bfs()
     #TODO(zhengda): the test leads to segfault in MXNet on Ubuntu 16.04.
-    #test_prop_edges_dfs()
+    #_test_prop_edges_dfs()
     test_prop_nodes_topo()
