@@ -20,7 +20,7 @@ A summary of the model accuracy and training speed with the Pytorch backend (on 
 | [LGNN](https://arxiv.org/abs/1705.08415) | 94% | 94% | n/a | 1.45s | n/a |
 | [DGMG](https://arxiv.org/pdf/1803.03324.pdf) | 84% | 90% | n/a | 238s | n/a |
 
-With the MXNet/Gluon backend , we scaled a graph of 50M nodes and 150 edges on a P3.8xlarge instance, 
+With the MXNet/Gluon backend , we scaled a graph of 50M nodes and 150M edges on a P3.8xlarge instance, 
 with 160s per epoch, on SSE ([Stochastic Steady-state Embedding](https://www.cc.gatech.edu/~hdai8/pdf/equilibrium_embedding.pdf)), 
 a model similar to GCN. 
 
