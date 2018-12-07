@@ -1,8 +1,9 @@
 package:
   name: dgl
-  version: "0.1.0"
+  version: "0.1.2"
 
 source:
+  git_rev: 0.1.2
   git_url: https://github.com/jermainewang/dgl.git
 
 requirements:
@@ -10,6 +11,7 @@ requirements:
     - python {{ python }}
     - setuptools
     - cmake
+    - git
     - m2w64-gcc         # [win]
     - m2w64-make        # [win]
   run:
