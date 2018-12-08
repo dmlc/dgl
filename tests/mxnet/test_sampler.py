@@ -75,22 +75,28 @@ def test_10neighbor_sampler_all():
         child_src1 = subg.map_to_subgraph_nid(src)
         assert mx.nd.sum(child_src1 == child_src).asnumpy() == len(src)
 
-def check_10neighbor_sampler(g, seeds):
+def check_10neighbor_sampler(g, seeds, num_hops):
     # In this case, NeighborSampling simply gets the neighborhood of a single vertex.
-    for subg, aux in dgl.contrib.sampling.NeighborSampler(g, 10, 5, neighbor_type='in',
+    for subg, aux in dgl.contrib.sampling.NeighborSampler(g, 10, 5, neighbor_type='in', num_hops=num_hops,
                                                           num_workers=4, seed_nodes=seeds,
-                                                          return_seed_id=True):
+                                                          return_seed_id=True, return_num_layers=num_hops):
         seed_ids = aux['seeds']
-        assert subg.number_of_nodes() <= 6 * len(seed_ids)
-        assert subg.number_of_edges() <= 5 * len(seed_ids)
-        for seed_id in seed_ids:
-            verify_subgraph(g, subg, seed_id)
+        seed_ids = subg.map_to_subgraph_nid(seed_ids)
+        seed_ids = mx.nd.sort(seed_ids)
+        layers = aux['layers']
+        assert np.all(seed_ids.asnumpy() == layers[0].asnumpy())
+        for layer in range(num_hops - 1):
+            for vid in layers[layer]:
+                verify_subgraph(g, subg, subg.parent_nid[vid])
 
 def test_10neighbor_sampler():
     g = generate_rand_graph(100)
-    check_10neighbor_sampler(g, None)
+    check_10neighbor_sampler(g, None, 1)
+    check_10neighbor_sampler(g, None, 2)
     check_10neighbor_sampler(g, seeds=np.unique(np.random.randint(0, g.number_of_nodes(),
-                                                                  size=int(g.number_of_nodes() / 10))))
+                                                                  size=int(g.number_of_nodes() / 10))), num_hops=1)
+    check_10neighbor_sampler(g, seeds=np.unique(np.random.randint(0, g.number_of_nodes(),
+                                                                  size=int(g.number_of_nodes() / 10))), num_hops=2)
 
 if __name__ == '__main__':
     test_1neighbor_sampler_all()
