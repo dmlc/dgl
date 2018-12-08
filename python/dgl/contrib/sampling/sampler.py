@@ -52,6 +52,8 @@ class NSSubgraphLoader(object):
             end = min((self._subgraph_idx + 1) * self._batch_size, num_nodes)
             seed_ids.append(utils.toindex(self._seed_nodes[start:end]))
             self._subgraph_idx += 1
+        if len(seed_ids) == 0:
+            return
         sgi = self._g._graph.neighbor_sampling(seed_ids, self._expand_factor,
                                                self._num_hops, self._neighbor_type,
                                                self._node_prob, self._max_subgraph_size)
