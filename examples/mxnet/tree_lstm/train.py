@@ -1,5 +1,7 @@
 import argparse
 import time
+import warnings
+import zipfile
 import numpy as np
 import mxnet as mx
 from mxnet import gluon
@@ -18,6 +20,18 @@ def batcher(ctx):
                              label=batch_trees.ndata['y'].as_in_context(ctx))
     return batcher_dev
 
+def prepare_glove():
+    if not data.utils.check_sha1('glove.840B.300d.txt',
+                                 sha1_hash='294b9f37fa64cce31f9ebb409c266fc379527708'):
+        zip_path = data.utils.download('http://nlp.stanford.edu/data/glove.840B.300d.zip',
+                                       sha1_hash='8084fbacc2dee3b1fd1ca4cc534cbfff3519ed0d')
+        with zipfile.ZipFile(zip_path, 'r') as zf:
+            zf.extractall()
+        if not data.utils.check_sha1('glove.840B.300d.txt',
+                                     sha1_hash=TODO1):
+            warnings.warn('The downloaded glove embedding file checksum mismatch. File content '
+                          'may be corrupted.')
+
 def main(args):
     np.random.seed(args.seed)
     mx.random.seed(args.seed)
@@ -27,6 +41,9 @@ def main(args):
 
     cuda = args.gpu >= 0
     ctx = mx.gpu(args.gpu) if cuda else mx.cpu()
+
+    if args.use_glove:
+        prepare_glove()
 
     trainset = data.SST()
     train_loader = gluon.data.DataLoader(dataset=trainset,
@@ -173,6 +190,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=0.05)
     parser.add_argument('--weight-decay', type=float, default=1e-4)
     parser.add_argument('--dropout', type=float, default=0.5)
+    parser.add_argument('--use-glove', action='store_true')
     args = parser.parse_args()
     print(args)
     main(args)
