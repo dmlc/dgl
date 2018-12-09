@@ -5,11 +5,11 @@ from torch.utils import dlpack
 
 def _parse_th_version():
     ver = th.__version__
-    major, minor, patch = ver.split('.')
-    # NOTE: version could be "0.4.1rc"
-    return int(major), int(minor), patch
+    major, minor, *rest = ver.split('.')
+    # NOTE: version could be "0.4.1rc" or "0.4.1.post2"
+    return int(major), int(minor)
 
-TH_MAJOR, TH_MINOR, TH_PATCH = _parse_th_version()
+TH_MAJOR, TH_MINOR = _parse_th_version()
 
 def data_type_dict():
     return {'float16' : th.float16,
