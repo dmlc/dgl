@@ -1,15 +1,11 @@
 from __future__ import absolute_import
 
+from distutils.version import LooseVersion
+
 import torch as th
 from torch.utils import dlpack
 
-def _parse_th_version():
-    ver = th.__version__
-    major, minor, *rest = ver.split('.')
-    # NOTE: version could be "0.4.1rc" or "0.4.1.post2"
-    return int(major), int(minor)
-
-TH_MAJOR, TH_MINOR = _parse_th_version()
+TH_VERSION = LooseVersion(th.__version__)
 
 def data_type_dict():
     return {'float16' : th.float16,
@@ -27,7 +23,7 @@ def cpu():
 def tensor(data, dtype=None):
     return th.tensor(data, dtype=dtype)
 
-if TH_MAJOR == 0:
+if TH_VERSION.version[0] == 0:
     def sparse_matrix(data, index, shape, force_format=False):
         fmt = index[0]
         if fmt != 'coo':
