@@ -1182,7 +1182,7 @@ class DGLGraph(object):
                         attr_dict[key][attrs['id']] = attrs[key]
             else:
                 # XXX: assuming networkx iteration order is deterministic
-                for eid, (_, _, attr) in enumerate(nx_graph.edges(data=True)):
+                for eid, (_, _, attrs) in enumerate(nx_graph.edges(data=True)):
                     for key in edge_attrs:
                         attr_dict[key][eid] = attrs[key]
             for attr in edge_attrs:
