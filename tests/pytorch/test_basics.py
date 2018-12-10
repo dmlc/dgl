@@ -185,7 +185,7 @@ def test_nx_conversion():
     assert nxg.size() == 4
     _check_nx_feature(nxg, {'n1': n1, 'n3': n3}, {'e1': e1, 'e2': e2})
 
-    # convert to DGLGraph
+    # convert to DGLGraph, nx graph has id in edge feature
     # use id feature to test non-tensor copy
     g.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1', 'id'])
     assert g.number_of_nodes() == 5
@@ -209,6 +209,22 @@ def test_nx_conversion():
     assert len(nxg) == 7
     assert nxg.size() == 7
     _check_nx_feature(nxg, {'n1': n1}, {'e1': e1})
+
+    # now test convert from networkx without id in edge feature
+    # first pop id in edge feature
+    for _, _, attr in nxg.edges(data=True):
+        attr.pop('id')
+    g = DGLGraph(multigraph=True)
+    g.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1'])
+    assert g.number_of_nodes() == 7
+    assert g.number_of_edges() == 7
+    assert U.allclose(g.get_n_repr()['n1'], n1)
+    # edge feature order follows nxg.edges()
+    edge_feat = []
+    for _, _, attr in nxg.edges(data=True):
+        edge_feat.append(attr['e1'].unsqueeze(0))
+    edge_feat = th.cat(edge_feat, dim=0)
+    assert U.allclose(g.get_e_repr()['e1'], edge_feat)
 
 def test_batch_send():
     g = generate_graph()
