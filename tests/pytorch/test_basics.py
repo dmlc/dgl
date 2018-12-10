@@ -142,6 +142,8 @@ def test_nx_conversion():
     # check conversion between networkx and DGLGraph
 
     def _check_nx_feature(nxg, nf, ef):
+        # check node and edge feature of nxg
+        # this is used to check to_networkx
         num_nodes = len(nxg)
         num_edges = nxg.size()
         if num_nodes > 0:
@@ -185,18 +187,24 @@ def test_nx_conversion():
     assert nxg.size() == 4
     _check_nx_feature(nxg, {'n1': n1, 'n3': n3}, {'e1': e1, 'e2': e2})
 
-    # convert to DGLGraph
+    # convert to DGLGraph, nx graph has id in edge feature
     # use id feature to test non-tensor copy
     g.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1', 'id'])
+    # check graph size
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 4
-    assert U.allclose(g.get_n_repr()['n1'], n1)
-    assert U.allclose(g.get_e_repr()['e1'], e1)
+    # check number of features
+    # test with existing dglgraph (so existing features should be cleared)
+    assert len(g.ndata) == 1
+    assert len(g.edata) == 2
+    # check feature values
+    assert U.allclose(g.ndata['n1'], n1)
+    # with id in nx edge feature, e1 should follow original order
+    assert U.allclose(g.edata['e1'], e1)
     assert th.equal(g.get_e_repr()['id'], th.arange(4))
 
-    g.pop_e_repr('id')
-
-    # test modifying DGLGraph
+    # test conversion after modifying DGLGraph
+    g.pop_e_repr('id') # pop id so we don't need to provide id when adding edges
     new_n = th.randn(2, 3)
     new_e = th.randn(3, 5)
     g.add_nodes(2, data={'n1': new_n})
@@ -209,6 +217,28 @@ def test_nx_conversion():
     assert len(nxg) == 7
     assert nxg.size() == 7
     _check_nx_feature(nxg, {'n1': n1}, {'e1': e1})
+
+    # now test convert from networkx without id in edge feature
+    # first pop id in edge feature
+    for _, _, attr in nxg.edges(data=True):
+        attr.pop('id')
+    # test with a new graph
+    g = DGLGraph(multigraph=True)
+    g.from_networkx(nxg, node_attrs=['n1'], edge_attrs=['e1'])
+    # check graph size
+    assert g.number_of_nodes() == 7
+    assert g.number_of_edges() == 7
+    # check number of features
+    assert len(g.ndata) == 1
+    assert len(g.edata) == 1
+    # check feature values
+    assert U.allclose(g.ndata['n1'], n1)
+    # edge feature order follows nxg.edges()
+    edge_feat = []
+    for _, _, attr in nxg.edges(data=True):
+        edge_feat.append(attr['e1'].unsqueeze(0))
+    edge_feat = th.cat(edge_feat, dim=0)
+    assert U.allclose(g.edata['e1'], edge_feat)
 
 def test_batch_send():
     g = generate_graph()
