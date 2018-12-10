@@ -32,8 +32,8 @@ Graph Neural Network and its variant
   operation, sparse-matrix tensor operations, along with message-passing with
   DGL.
 
-* **SSE** `[paper] <http://proceedings.mlr.press/v80/dai18a/dai18a.pdf>`__
-  `[tutorial <1_gnn/8_sse_mx.html>]` `[code]
+* **SSE** `[paper] <http://proceedings.mlr.press/v80/dai18a/dai18a.pdf>`__ `[tutorial]
+  <1_gnn/8_sse_mx.html>`__ `[code]
   <https://github.com/jermainewang/dgl/blob/master/examples/mxnet/sse>`__:
   the emphasize here is *giant* graph that cannot fit comfortably on one GPU
   card. SSE is an example to illustrate the co-design of both algorithm and
