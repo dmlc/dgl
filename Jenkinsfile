@@ -213,8 +213,8 @@ pipeline {
         }
       }
       steps{
-        withCredentials([sshUserPrivateKey(credentialsId: "yourkeyid", keyFileVariable: 'keyfile')]) {
-          sh 'echo $yourkeyid'
+        withCredentials([sshUserPrivateKey(credentialsId: "doc_server", keyFileVariable: 'keyfile')]) {
+          // sh 'echo $yourkeyid'
           sh 'echo $keyfile'
           // sh "scp -i ${keyfile} do sth here"
         }
