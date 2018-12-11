@@ -216,7 +216,8 @@ pipeline {
         withCredentials([sshUserPrivateKey(credentialsId: "doc_server", keyFileVariable: 'keyfile'),
                          string(credentialsId: 'doc_target', variable: 'target')]) {
           // sh 'echo $yourkeyid'
-          sh "scp -r -i ${keyfile} ./ $target"
+          sh 'apt-get install -y openssh-client'
+          sh 'scp -r -i ${keyfile} ./ $target'
         }
       }
     }
