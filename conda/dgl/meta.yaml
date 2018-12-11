@@ -4,7 +4,7 @@ package:
 
 source:
   git_rev: 0.1.x
-  git_url: https://github.com/jermainewang/dgl.git
+  git_url: https://github.com/dmlc/dgl.git
 
 requirements:
   build:
@@ -21,5 +21,5 @@ requirements:
     - networkx
 
 about:
-  home: https://github.com/jermainewang/dgl.git
+  home: https://github.com/dmlc/dgl.git
   license_file: ../../LICENSE

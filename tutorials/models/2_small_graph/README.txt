@@ -6,7 +6,7 @@ Dealing with many small graphs
 
 * **Tree-LSTM** `[paper] <https://arxiv.org/abs/1503.00075>`__ `[tutorial]
   <2_small_graph/3_tree-lstm.html>`__ `[code]
-  <https://github.com/jermainewang/dgl/blob/master/examples/pytorch/tree_lstm>`__:
+  <https://github.com/dmlc/dgl/blob/master/examples/pytorch/tree_lstm>`__:
   sentences of natural languages have inherent structures, which are thrown
   away by treating them simply as sequences. Tree-LSTM is a powerful model
   that learns the representation by leveraging prior syntactic structures

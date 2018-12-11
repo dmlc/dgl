@@ -56,7 +56,7 @@ base. This tutorial shows how to implement R-GCN with DGL.
 #
 # This tutorial will focus on the first task to show how to generate entity
 # representation. `Complete
-# code <https://github.com/jermainewang/dgl/tree/rgcn/examples/pytorch/rgcn>`_
+# code <https://github.com/dmlc/dgl/tree/rgcn/examples/pytorch/rgcn>`_
 # for both tasks can be found in DGL's github repository.
 #
 # Key ideas of R-GCN
@@ -356,4 +356,4 @@ for epoch in range(n_epochs):
 # The implementation is similar to the above but with an extra DistMult layer
 # stacked on top of the R-GCN layers. You may find the complete
 # implementation of link prediction with R-GCN in our `example
-# code <https://github.com/jermainewang/dgl/blob/master/examples/pytorch/rgcn/link_predict.py>`_.
+# code <https://github.com/dmlc/dgl/blob/master/examples/pytorch/rgcn/link_predict.py>`_.
