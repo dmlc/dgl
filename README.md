@@ -144,7 +144,7 @@ For more realistic, end-to-end examples, please see [model tutorials](https://do
 
 ## Contributing
 
-Please let us know if you encounter a bug or have any suggestions by [filing an issue](https://github.com/jermainewang/dgl/issues).
+Please let us know if you encounter a bug or have any suggestions by [filing an issue](https://github.com/dmlc/dgl/issues).
 
 We welcome all contributions from bug fixes to new features and extensions.
 We expect all contributions discussed in the issue tracker and going through PRs.  Please refer to the PR guide.
