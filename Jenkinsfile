@@ -205,7 +205,13 @@ pipeline {
       }
     }
   */
-    stage("Build Docs"){
+    stage("Build Docs"){ 
+      agent { 
+        docker { 
+          image "dgllib/dgl-ci-cpu"
+          reuseNode true
+        }
+      }
       steps{
         withCredentials([sshUserPrivateKey(credentialsId: "yourkeyid", keyFileVariable: 'keyfile')]) {
           sh 'echo $yourkeyid'
