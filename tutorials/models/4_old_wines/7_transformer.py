@@ -44,7 +44,7 @@ Transformer Tutorial
 #    v_i = W_v\cdot x_i\\
 #    \textrm{score} = q_j^T k_i
 #
-# where :math:`W_q, W_k, W_v \in \mathbb{R}^{n\times n}` map the
+# where :math:`W_q, W_k, W_v \in \mathbb{R}^{n\times d_k}` map the
 # representations :math:`x` to “query”, “key”, and “value” space
 # respectively.
 #
@@ -472,8 +472,8 @@ Transformer Tutorial
 #
 #    By calling ``update_graph`` function, we can “DIY our own
 #    Transformer” on any subgraphs with nearly the same code. This
-#    flexibility enables us to discover new, sparse structures (c.f.
-#    `here <https://arxiv.org/pdf/1508.04025.pdf>`__). Note in our
+#    flexibility enables us to discover new, sparse structures (c.f. local attention
+#    mentioned `here <https://arxiv.org/pdf/1508.04025.pdf>`__). Note in our
 #    implementation we does not use mask or padding, which makes the logic
 #    more clear and saves memory. The trade-off is that the implementation is
 #    slower; we will improve with future DGL optimizations.
@@ -874,3 +874,8 @@ Transformer Tutorial
 # .. |image9| image:: https://s1.ax1x.com/2018/12/06/F1sGod.png
 # .. |image10| image:: https://s1.ax1x.com/2018/12/06/F1r8Cq.gif
 #
+# .. note::
+#     We apologize that this notebook itself is not runnable due to many dependencies,
+#     please download the `7_transformer.py <https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/7_transformer.py>`__, 
+#     and copy the python script to directory ``examples/pytorch/transformer`` 
+#     then run ``python 7_transformer.py`` to see how it works.
