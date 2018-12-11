@@ -73,14 +73,14 @@ pipeline {
                         }
                     }
                 }
-                stage("Pytorch GPU") {
-                    agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
-                    stages {
-                        stage("TH GPU example test") {
-                            steps { example_test("GPU") }
-                        }
-                    }
-                }
+//                stage("Pytorch GPU") {
+//                    agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
+//                    stages {
+//                        stage("TH GPU example test") {
+//                            steps { example_test("GPU") }
+//                        }
+//                    }
+//                }
                 stage("MXNet CPU") {
                     agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
                     stages {
