@@ -73,9 +73,6 @@ pipeline {
                             steps { example_test("CPU") }
                         }
                     }
-//                    post {
-//                        always { junit "*.xml" }
-//                    }
                 }
                 stage("TH GPU") {
                     agent {
@@ -85,18 +82,10 @@ pipeline {
                         }
                     }
                     stages {
-                        // TODO: have GPU unittest
-                        //stage("TH GPU unittest") {
-                        //  steps { pytorch_unit_test("GPU") }
-                        //}
                         stage("TH GPU example test") {
                             steps { example_test("GPU") }
                         }
                     }
-                    // TODO: have GPU unittest
-                    //post {
-                    //  always { junit "*.xml" }
-                    //}
                 }
                 stage("MXNet CPU") {
                     agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
@@ -105,9 +94,6 @@ pipeline {
                             steps { mxnet_unit_test("CPU") }
                         }
                     }
-//                    post {
-//                        always { junit "*.xml" }
-//                    }
                 }
             }
         }
