@@ -10,7 +10,7 @@ def setup() {
 }
 
 def build_dgl() {
-  sh "if [ -d build ]; then rm -rf build; fi; mkdir build"
+  // sh "if [ -d build ]; then rm -rf build; fi; mkdir build"
   sh "rm -rf _download"
   dir ("build") {
     sh "cmake .."
