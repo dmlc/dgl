@@ -37,7 +37,7 @@ DGL should work on
 
 DGL also requires Python 3.5 or later.  Python 2 support is coming.
 
-Right now, DGL works on [PyTorch](https://pytorch.org) 0.4.1+ and [MXNet](mxnet.apache.org) nightly
+Right now, DGL works on [PyTorch](https://pytorch.org) 0.4.1+ and [MXNet](https://mxnet.apache.org) nightly
 build.
 
 ## Installation
