@@ -74,7 +74,12 @@ pipeline {
     stage("Build") {
       parallel {
         stage("CPU Build") {
-          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          agent { 
+            docker { 
+              image "dgllib/dgl-ci-cpu"
+              reuseNode True
+            }
+          }
           steps {
             setup()
             build_dgl()
@@ -84,6 +89,7 @@ pipeline {
           agent {
             docker {
               image "dgllib/dgl-ci-gpu"
+              reuseNode True
               args "--runtime nvidia"
             }
           }
@@ -93,7 +99,12 @@ pipeline {
           }
         }
         stage("MXNet CPU Build (temp)") {
-          agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
+          agent { 
+            docker { 
+              image "dgllib/dgl-ci-mxnet-cpu"
+              reuseNode True
+            }
+          }          
           steps {
             setup()
             build_dgl()
@@ -104,7 +115,12 @@ pipeline {
     stage("Test") {
       parallel {
         stage("Pytorch CPU") {
-          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          agent { 
+            docker { 
+              image "dgllib/dgl-ci-cpu"
+              reuseNode True
+            }
+          }
           stages {
             stage("TH CPU unittest") {
               steps { pytorch_unit_test("CPU") }
@@ -121,6 +137,7 @@ pipeline {
           agent {
             docker {
               image "dgllib/dgl-ci-gpu"
+              reuseNode True
               args "--runtime nvidia"
             }
           }
@@ -139,7 +156,12 @@ pipeline {
           //}
         }
         stage("MXNet CPU") {
-          agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
+          agent { 
+            docker { 
+              image "dgllib/dgl-ci-mxnet-cpu"
+              reuseNode True
+            }
+          }
           stages {
             stage("MX Unittest") {
               steps { mxnet_unit_test("CPU") }
@@ -154,13 +176,23 @@ pipeline {
     stage("Doc") {
       parallel {
         stage("TH Tutorial") {
-          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          agent { 
+            docker { 
+              image "dgllib/dgl-ci-cpu"
+              reuseNode True
+            }
+          }
           steps {
             pytorch_tutorials()
           }
         }
         stage("MX Tutorial") {
-          agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
+          agent { 
+            docker { 
+              image "dgllib/dgl-ci-mxnet-cpu"
+              reuseNode True
+            }
+          }
           steps {
             mxnet_tutorials()
           }
