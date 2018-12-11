@@ -1,63 +1,25 @@
 def init_git_submodule() {
-  sh "git submodule init"
-  sh "git submodule update"
 }
 
 def setup() {
-  init_git_submodule()
 }
 
 def build_dgl() {
-  sh "if [ -d build ]; then rm -rf build; fi; mkdir build"
-  sh "rm -rf _download"
-  dir ("build") {
-    sh "cmake .."
-    sh "make -j4"
-  }
-  dir("python") {
-    sh "rm -rf build *.egg-info dist"
-    sh "pip3 uninstall -y dgl"
-    sh "python3 setup.py install"
-  }
 }
 
 def pytorch_unit_test(dev) {
-  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
-    sh "python3 -m nose -v --with-xunit tests"
-    sh "python3 -m nose -v --with-xunit tests/pytorch"
-    sh "python3 -m nose -v --with-xunit tests/graph_index"
-  }
 }
 
 def mxnet_unit_test(dev) {
-  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
-    sh "python3 -m nose -v --with-xunit tests/mxnet"
-    sh "python3 -m nose -v --with-xunit tests/graph_index"
-  }
 }
 
 def example_test(dev) {
-  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
-    dir ("tests/scripts") {
-      sh "bash task_example_test.sh ${dev}"
-    }
-  }
 }
 
 def pytorch_tutorials() {
-  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
-    dir ("tests/scripts") {
-      sh "bash task_pytorch_tutorial_test.sh"
-    }
-  }
 }
 
 def mxnet_tutorials() {
-  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
-    dir("tests/scripts") {
-      sh "bash task_mxnet_tutorial_test.sh"
-    }
-  }
 }
 pipeline {
   agent none
@@ -65,8 +27,6 @@ pipeline {
     stage("Lint Check") {
       agent { docker { image "dgllib/dgl-ci-lint" } }
       steps {
-        init_git_submodule()
-        sh "bash tests/scripts/task_lint.sh"
       }
     }
     stage("Build") {
@@ -74,8 +34,6 @@ pipeline {
         stage("CPU Build") {
           agent { docker { image "dgllib/dgl-ci-cpu" } }
           steps {
-            setup()
-            build_dgl()
           }
         }
         stage("GPU Build") {
@@ -142,9 +100,6 @@ pipeline {
             stage("MX Unittest") {
               steps { mxnet_unit_test("CPU") }
             }
-          }
-          post {
-            always { junit "*.xml" }
           }
         }
       }
