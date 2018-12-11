@@ -77,7 +77,7 @@ pipeline {
           agent { 
             docker { 
               image "dgllib/dgl-ci-cpu"
-              reuseNode True
+              reuseNode true
             }
           }
           steps {
@@ -89,7 +89,7 @@ pipeline {
           agent {
             docker {
               image "dgllib/dgl-ci-gpu"
-              reuseNode True
+              reuseNode true
               args "--runtime nvidia"
             }
           }
@@ -102,7 +102,7 @@ pipeline {
           agent { 
             docker { 
               image "dgllib/dgl-ci-mxnet-cpu"
-              reuseNode True
+              reuseNode true
             }
           }          
           steps {
@@ -118,7 +118,7 @@ pipeline {
           agent { 
             docker { 
               image "dgllib/dgl-ci-cpu"
-              reuseNode True
+              reuseNode true
             }
           }
           stages {
@@ -137,7 +137,7 @@ pipeline {
           agent {
             docker {
               image "dgllib/dgl-ci-gpu"
-              reuseNode True
+              reuseNode true
               args "--runtime nvidia"
             }
           }
@@ -159,7 +159,7 @@ pipeline {
           agent { 
             docker { 
               image "dgllib/dgl-ci-mxnet-cpu"
-              reuseNode True
+              reuseNode true
             }
           }
           stages {
@@ -179,7 +179,7 @@ pipeline {
           agent { 
             docker { 
               image "dgllib/dgl-ci-cpu"
-              reuseNode True
+              reuseNode true
             }
           }
           steps {
@@ -190,7 +190,7 @@ pipeline {
           agent { 
             docker { 
               image "dgllib/dgl-ci-mxnet-cpu"
-              reuseNode True
+              reuseNode true
             }
           }
           steps {
