@@ -27,6 +27,7 @@ pipeline {
     stage("Lint Check") {
       agent { docker { image "dgllib/dgl-ci-lint" } }
       steps {
+        setup()
       }
     }
     stage("Build") {
@@ -34,6 +35,7 @@ pipeline {
         stage("CPU Build") {
           agent { docker { image "dgllib/dgl-ci-cpu" } }
           steps {
+            setup()
           }
         }
         stage("GPU Build") {
@@ -68,9 +70,6 @@ pipeline {
             stage("TH CPU example test") {
               steps { example_test("CPU") }
             }
-          }
-          post {
-            always { junit "*.xml" }
           }
         }
         stage("Pytorch GPU") {
