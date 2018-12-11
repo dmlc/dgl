@@ -10,15 +10,15 @@ def setup() {
 }
 
 def build_dgl() {
-  // sh "if [ -d build ]; then rm -rf build; fi; mkdir build"
+  sh "if [ -d build ]; then rm -rf build; fi; mkdir build"
   sh "rm -rf _download"
   dir ("build") {
     sh "cmake .."
     sh "make -j4"
   }
   dir("python") {
-    // sh "rm -rf build *.egg-info dist"
-    // sh "pip3 uninstall -y dgl"
+    sh "rm -rf build *.egg-info dist"
+    sh "pip3 uninstall -y dgl"
     sh "python3 setup.py install"
   }
 }
@@ -74,12 +74,7 @@ pipeline {
     stage("Build") {
       parallel {
         stage("CPU Build") {
-          agent { 
-            docker { 
-              image "dgllib/dgl-ci-cpu"
-              reuseNode true
-            }
-          }
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
           steps {
             setup()
             build_dgl()
@@ -89,7 +84,6 @@ pipeline {
           agent {
             docker {
               image "dgllib/dgl-ci-gpu"
-              reuseNode true
               args "--runtime nvidia"
             }
           }
@@ -99,12 +93,7 @@ pipeline {
           }
         }
         stage("MXNet CPU Build (temp)") {
-          agent { 
-            docker { 
-              image "dgllib/dgl-ci-mxnet-cpu"
-              reuseNode true
-            }
-          }          
+          agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
           steps {
             setup()
             build_dgl()
@@ -115,19 +104,10 @@ pipeline {
     stage("Test") {
       parallel {
         stage("Pytorch CPU") {
-          agent { 
-            docker { 
-              image "dgllib/dgl-ci-cpu"
-              reuseNode true
-            }
-          }
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
           stages {
             stage("TH CPU unittest") {
-              steps { 
-                sh "ls"
-                sh "pwd"
-                pytorch_unit_test("CPU") 
-              }
+              steps { pytorch_unit_test("CPU") }
             }
             stage("TH CPU example test") {
               steps { example_test("CPU") }
@@ -141,7 +121,6 @@ pipeline {
           agent {
             docker {
               image "dgllib/dgl-ci-gpu"
-              reuseNode true
               args "--runtime nvidia"
             }
           }
@@ -160,12 +139,7 @@ pipeline {
           //}
         }
         stage("MXNet CPU") {
-          agent { 
-            docker { 
-              image "dgllib/dgl-ci-mxnet-cpu"
-              reuseNode true
-            }
-          }
+          agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
           stages {
             stage("MX Unittest") {
               steps { mxnet_unit_test("CPU") }
@@ -177,49 +151,21 @@ pipeline {
         }
       }
     }
-    /*
     stage("Doc") {
       parallel {
         stage("TH Tutorial") {
-          agent { 
-            docker { 
-              image "dgllib/dgl-ci-cpu"
-              reuseNode true
-            }
-          }
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
           steps {
             pytorch_tutorials()
           }
         }
         stage("MX Tutorial") {
-          agent { 
-            docker { 
-              image "dgllib/dgl-ci-mxnet-cpu"
-              reuseNode true
-            }
-          }
+          agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
           steps {
             mxnet_tutorials()
           }
         }
       }
     }
-  */
-    stage("Build Docs"){ 
-      agent { 
-        docker { 
-          image "dgllib/dgl-ci-cpu"
-          reuseNode true
-        }
-      }
-      steps{
-        withCredentials([sshUserPrivateKey(credentialsId: "doc_server", keyFileVariable: 'keyfile'),
-                         string(credentialsId: 'doc_target', variable: 'target')]) {
-          // sh 'echo $yourkeyid'
-          sh 'apt-get install -y openssh-client'
-          sh 'scp -r -o StrictHostKeyChecking=no -i ${keyfile} ./ $target'
-        }
-      }
-    }
-  }  
+  }
 }
