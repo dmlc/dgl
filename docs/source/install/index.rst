@@ -74,7 +74,7 @@ First, download the source files from GitHub:
 
 .. code:: bash
 
-   git clone --recursive https://github.com/jermainewang/dgl.git
+   git clone --recursive https://github.com/dmlc/dgl.git
 
 One can also clone the repository first and run the following:
 
