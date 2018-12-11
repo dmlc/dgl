@@ -73,9 +73,9 @@ pipeline {
                             steps { example_test("CPU") }
                         }
                     }
-                    post {
-                        always { junit "*.xml" }
-                    }
+//                    post {
+//                        always { junit "*.xml" }
+//                    }
                 }
                 stage("TH GPU") {
                     agent {
@@ -105,9 +105,9 @@ pipeline {
                             steps { mxnet_unit_test("CPU") }
                         }
                     }
-                    post {
-                        always { junit "*.xml" }
-                    }
+//                    post {
+//                        always { junit "*.xml" }
+//                    }
                 }
             }
         }
