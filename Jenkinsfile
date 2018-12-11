@@ -76,8 +76,8 @@ pipeline {
                 stage("Pytorch GPU") {
                     agent {
                         docker {
-                            image "dgllib/dgl-ci-gpu"
-                            args "--runtime nvidia"
+                            image 'dgllib/dgl-ci-gpu'
+                            args '--runtime nvidia'
                         }
                     }
                     stages {
@@ -86,14 +86,14 @@ pipeline {
                         }
                     }
                 }
-//                stage("MXNet CPU") {
-//                    agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
-//                    stages {
-//                        stage("MX Unittest") {
-//                            steps { mxnet_unit_test("CPU") }
-//                        }
-//                    }
-//                }
+                stage("MXNet CPU") {
+                    agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
+                    stages {
+                        stage("MX Unittest") {
+                            steps { mxnet_unit_test("CPU") }
+                        }
+                    }
+                }
             }
         }
         stage("Doc") {
