@@ -62,7 +62,7 @@ def mxnet_tutorials() {
   }
 }
 pipeline {
-  agent none
+  agent {label 'whatever'}
   stages {
     stage("Lint Check") {
       agent { docker { image "dgllib/dgl-ci-lint" } }
