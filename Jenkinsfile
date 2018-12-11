@@ -63,7 +63,7 @@ pipeline {
         }
         stage("Test") {
             parallel {
-                stage("TH CPU") {
+                stage("Pytorch CPU") {
                     agent { docker { image "dgllib/dgl-ci-cpu" } }
                     stages {
                         stage("TH CPU unittest") {
