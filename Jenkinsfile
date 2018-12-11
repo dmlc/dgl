@@ -217,7 +217,7 @@ pipeline {
                          string(credentialsId: 'doc_target', variable: 'target')]) {
           // sh 'echo $yourkeyid'
           sh 'apt-get install -y openssh-client'
-          sh 'scp -r -i ${keyfile} ./ $target'
+          sh 'scp -r -o StrictHostKeyChecking=no -i ${keyfile} ./ $target'
         }
       }
     }
