@@ -17,8 +17,8 @@ def build_dgl() {
     sh "make -j4"
   }
   dir("python") {
-    sh "rm -rf build *.egg-info dist"
-    sh "pip3 uninstall -y dgl"
+    // sh "rm -rf build *.egg-info dist"
+    // sh "pip3 uninstall -y dgl"
     sh "python3 setup.py install"
   }
 }
