@@ -204,17 +204,17 @@ pipeline {
         }
       }
     }
-  }
   */
-  stage("Build Docs"){
-    steps{
-      withCredentials([sshUserPrivateKey(credentialsId: "yourkeyid", keyFileVariable: 'keyfile')]) {
-       stage('scp-f/b') {
-         sh 'echo $yourkeyid'
-         sh 'echo $keyfile'
-         // sh "scp -i ${keyfile} do sth here"
-       }
+    stage("Build Docs"){
+      steps{
+        withCredentials([sshUserPrivateKey(credentialsId: "yourkeyid", keyFileVariable: 'keyfile')]) {
+         stage('scp-f/b') {
+           sh 'echo $yourkeyid'
+           sh 'echo $keyfile'
+           // sh "scp -i ${keyfile} do sth here"
+         }
+        }
       }
     }
-  }
+  }  
 }
