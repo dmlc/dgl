@@ -1,3 +1,4 @@
+
 def init_git_submodule() {
 }
 
@@ -21,48 +22,48 @@ def pytorch_tutorials() {
 
 def mxnet_tutorials() {
 }
-
 pipeline {
     agent none
     stages {
         stage("Lint Check") {
             agent { docker { image "dgllib/dgl-ci-lint" } }
             steps {
-                setup()
+                init_git_submodule()
             }
         }
-//        stage("Build") {
-//            parallel {
-//                stage("CPU Build") {
-//                    agent { docker { image "dgllib/dgl-ci-cpu" } }
-//                    steps {
-//                        setup()
-//                    }
-//                }
-//                stage("GPU Build") {
-//                    agent {
-//                        docker {
-//                            image "dgllib/dgl-ci-gpu"
-//                            args '--runtime nvidia'
-//                        }
-//                    }
-//                    steps {
-//                        setup()
-//                        build_dgl()
-//                    }
-//                }
-//                stage("MXNet CPU Build (temp)") {
-//                    agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
-//                    steps {
-//                        setup()
-//                        build_dgl()
-//                    }
-//                }
-//            }
-//        }
+        stage("Build") {
+            parallel {
+                stage("CPU Build") {
+                    agent { docker { image "dgllib/dgl-ci-cpu" } }
+                    steps {
+                        setup()
+                        build_dgl()
+                    }
+                }
+                stage("GPU Build") {
+                    agent {
+                        docker {
+                            image "dgllib/dgl-ci-gpu"
+                            args "--runtime nvidia"
+                        }
+                    }
+                    steps {
+                        setup()
+                        build_dgl()
+                    }
+                }
+                stage("MXNet CPU Build (temp)") {
+                    agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
+                    steps {
+                        setup()
+                        build_dgl()
+                    }
+                }
+            }
+        }
         stage("Test") {
             parallel {
-                stage("Pytorch CPU") {
+                stage("TH CPU") {
                     agent { docker { image "dgllib/dgl-ci-cpu" } }
                     stages {
                         stage("TH CPU unittest") {
@@ -72,14 +73,30 @@ pipeline {
                             steps { example_test("CPU") }
                         }
                     }
+                    post {
+                        always { junit "*.xml" }
+                    }
                 }
-                stage("Ptorch GPU") {
-                    agent { docker { image "dgllib/dgl-ci-cpu" } }
+                stage("TH GPU") {
+                    agent {
+                        docker {
+                            image "dgllib/dgl-ci-gpu"
+                            args "--runtime nvidia"
+                        }
+                    }
                     stages {
+                        // TODO: have GPU unittest
+                        //stage("TH GPU unittest") {
+                        //  steps { pytorch_unit_test("GPU") }
+                        //}
                         stage("TH GPU example test") {
                             steps { example_test("GPU") }
                         }
                     }
+                    // TODO: have GPU unittest
+                    //post {
+                    //  always { junit "*.xml" }
+                    //}
                 }
                 stage("MXNet CPU") {
                     agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
@@ -87,6 +104,9 @@ pipeline {
                         stage("MX Unittest") {
                             steps { mxnet_unit_test("CPU") }
                         }
+                    }
+                    post {
+                        always { junit "*.xml" }
                     }
                 }
             }
