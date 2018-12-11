@@ -1,5 +1,3 @@
-#!/usr/bin/env groovy
-
 def init_git_submodule() {
   sh "git submodule init"
   sh "git submodule update"
