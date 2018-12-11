@@ -123,7 +123,11 @@ pipeline {
           }
           stages {
             stage("TH CPU unittest") {
-              steps { pytorch_unit_test("CPU") }
+              steps { 
+                sh "ls"
+                sh "pwd"
+                pytorch_unit_test("CPU") 
+              }
             }
             stage("TH CPU example test") {
               steps { example_test("CPU") }
