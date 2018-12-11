@@ -60,50 +60,50 @@ pipeline {
                 }
             }
         }
-        stage("Test") {
-            parallel {
-                stage("Pytorch CPU") {
-                    agent { docker { image "dgllib/dgl-ci-cpu" } }
-                    stages {
-                        stage("TH CPU unittest") {
-                            steps { pytorch_unit_test("CPU") }
-                        }
-                        stage("TH CPU example test") {
-                            steps { example_test("CPU") }
-                        }
-                    }
-                }
-                stage("Pytorch GPU") {
-                    agent {
-                        docker {
-                            image "dgllib/dgl-ci-gpu"
-                            args "--runtime nvidia"
-                        }
-                    }
-                    stages {
-                        // TODO: have GPU unittest
-                        //stage("TH GPU unittest") {
-                        //  steps { pytorch_unit_test("GPU") }
-                        //}
-                        stage("TH GPU example test") {
-                            steps { example_test("GPU") }
-                        }
-                    }
-                    // TODO: have GPU unittest
-                    //post {
-                    //  always { junit "*.xml" }
-                    //}
-                }
-                stage("MXNet CPU") {
-                    agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
-                    stages {
-                        stage("MX Unittest") {
-                            steps { mxnet_unit_test("CPU") }
-                        }
-                    }
-                }
-            }
-        }
+//        stage("Test") {
+//            parallel {
+//                stage("Pytorch CPU") {
+//                    agent { docker { image "dgllib/dgl-ci-cpu" } }
+//                    stages {
+//                        stage("TH CPU unittest") {
+//                            steps { pytorch_unit_test("CPU") }
+//                        }
+//                        stage("TH CPU example test") {
+//                            steps { example_test("CPU") }
+//                        }
+//                    }
+//                }
+//                stage("Pytorch GPU") {
+//                    agent {
+//                        docker {
+//                            image "dgllib/dgl-ci-gpu"
+//                            args "--runtime nvidia"
+//                        }
+//                    }
+//                    stages {
+//                        // TODO: have GPU unittest
+//                        //stage("TH GPU unittest") {
+//                        //  steps { pytorch_unit_test("GPU") }
+//                        //}
+//                        stage("TH GPU example test") {
+//                            steps { example_test("GPU") }
+//                        }
+//                    }
+//                    // TODO: have GPU unittest
+//                    //post {
+//                    //  always { junit "*.xml" }
+//                    //}
+//                }
+//                stage("MXNet CPU") {
+//                    agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
+//                    stages {
+//                        stage("MX Unittest") {
+//                            steps { mxnet_unit_test("CPU") }
+//                        }
+//                    }
+//                }
+//            }
+//        }
         stage("Doc") {
             parallel {
                 stage("TH Tutorial") {
