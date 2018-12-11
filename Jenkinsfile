@@ -75,12 +75,7 @@ pipeline {
                     }
                 }
                 stage("TH GPU") {
-                    agent {
-                        docker {
-                            image "dgllib/dgl-ci-gpu"
-                            args "--runtime nvidia"
-                        }
-                    }
+                    agent { docker { image "dgllib/dgl-ci-cpu" } }
                     stages {
                         stage("TH GPU example test") {
                             steps { example_test("GPU") }
