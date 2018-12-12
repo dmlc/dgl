@@ -257,8 +257,8 @@ plt.close()
 # |image5|
 #
 # The full code of this visualization is provided at
-# `link <https://github.com/jermainewang/dgl/blob/master/examples/pytorch/capsule/simple_routing.py>`__; the complete
-# code that trains on MNIST is at `link <https://github.com/jermainewang/dgl/tree/tutorial/examples/pytorch/capsule>`__.
+# `link <https://github.com/dmlc/dgl/blob/master/examples/pytorch/capsule/simple_routing.py>`__; the complete
+# code that trains on MNIST is at `link <https://github.com/dmlc/dgl/tree/tutorial/examples/pytorch/capsule>`__.
 #
 # .. |image0| image:: https://i.imgur.com/55Ovkdh.png
 # .. |image1| image:: https://i.imgur.com/9tc6GLl.png

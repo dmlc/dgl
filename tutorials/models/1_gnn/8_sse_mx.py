@@ -537,7 +537,7 @@ for i in range(n_epochs):
 # scaled SSE to a graph with 50 million nodes and 150 million edges in a
 # single P3.8x large instance and one epoch only takes about 160 seconds.
 #
-# See full examples `here <https://github.com/jermainewang/dgl/tree/master/examples/mxnet/sse>`_.
+# See full examples `here <https://github.com/dmlc/dgl/tree/master/examples/mxnet/sse>`_.
 #
 # .. |image0| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/img/floodfill-paths.gif
 # .. |image1| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/img/neighbor-sampling.gif

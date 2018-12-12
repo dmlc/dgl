@@ -120,7 +120,7 @@ Transformer Tutorial
 # In this tutorial, we show a simplified version of the implementation in
 # order to highlight the most important design points (for instance we
 # only show single-head attention); the complete code can be found
-# `here <https://github.com/jermainewang/dgl/tree/master/examples/pytorch/transformer>`__.
+# `here <https://github.com/dmlc/dgl/tree/master/examples/pytorch/transformer>`__.
 # The overall structure is similar to the one from `The Annotated
 # Transformer <http://nlp.seas.harvard.edu/2018/04/03/attention.html>`__.
 #
@@ -577,7 +577,7 @@ Transformer Tutorial
 #
 # Note that we do not involve inference module in this tutorial (which
 # requires beam search), please refer to the `Github
-# Repo <https://github.com/jermainewang/dgl/tree/master/examples/pytorch/transformer>`__
+# Repo <https://github.com/dmlc/dgl/tree/master/examples/pytorch/transformer>`__
 # for full implementation.
 #
 # .. code:: python
@@ -852,7 +852,7 @@ Transformer Tutorial
 #      that satisfy the given predicate.
 #
 # for the full implementation, please refer to our `Github
-# Repo <https://github.com/jermainewang/dgl/tree/master/examples/pytorch/transformer/modules/act.py>`__.
+# Repo <https://github.com/dmlc/dgl/tree/master/examples/pytorch/transformer/modules/act.py>`__.
 #
 # The figure below shows the effect of Adaptive Computational
 # Time(different positions of a sentence were revised different times):

@@ -610,7 +610,7 @@ def collate_fn(batch):
 
 ######################################################################################
 # You can check out the complete code
-# `here <https://github.com/jermainewang/dgl/tree/master/examples/pytorch/line_graph>`_.
+# `here <https://github.com/dmlc/dgl/tree/master/examples/pytorch/line_graph>`_.
 # 
 # What's the business with :math:`\{Pm, Pd\}`?
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
