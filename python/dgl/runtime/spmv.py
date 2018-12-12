@@ -141,7 +141,7 @@ def build_adj_matrix_graph(graph):
         A index for data shuffling due to sparse format change. Return None
         if shuffle is not required.
     """
-    adjmat, shuffle_idx = graph._graph.adjacency_matrix(transpose=False, ctx=F.cpu())
+    adjmat, shuffle_idx = graph._graph.adjacency_matrix(False, F.cpu())
     return utils.CtxCachedObject(lambda ctx : F.copy_to(adjmat, ctx)), shuffle_idx
 
 def _build_adj_matrix_index_uv(graph, edges, reduce_nodes):
@@ -235,7 +235,7 @@ def build_inc_matrix_graph(graph):
         A index for data shuffling due to sparse format change. Return None
         if shuffle is not required.
     """
-    incmat, _ = graph._graph.incidence_matrix(type='in', ctx=F.cpu())
+    incmat, _ = graph._graph.incidence_matrix('in', F.cpu())
     # inc mat will not use data tensor so conversion index is not needed
     return utils.CtxCachedObject(lambda ctx : F.copy_to(incmat, ctx)), None
 
