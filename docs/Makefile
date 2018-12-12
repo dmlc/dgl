@@ -18,10 +18,17 @@ html-noexec:
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
+pytorch: Makefile
+	@DGLBACKEND=pytorch $(SPHINXBUILD) "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) \
+						 -D sphinx_gallery_conf.ignore_pattern="/*(?<=mx)\.py"
+
+mxnet: Makefile
+	@DGLBACKEND=mxnet $(SPHINXBUILD) "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) \
+						 -D sphinx_gallery_conf.ignore_pattern="/*(?<!mx)\.py"
+
+html: Makefile mxnet pytorch html-noexec
+
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
 %: Makefile
-	@DGLBACKEND=pytorch $(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) \
-						 -D sphinx_gallery_conf.ignore_pattern="/*(?<=mx)\.py"
-	@DGLBACKEND=mxnet $(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) \
-						 -D sphinx_gallery_conf.ignore_pattern="/*(?<!mx)\.py"
+	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) 
