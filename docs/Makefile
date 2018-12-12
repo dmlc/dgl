@@ -20,7 +20,7 @@ mxnet:
 	@echo "#                                                                #"
 	@echo "##################################################################"
 	@DGLBACKEND=mxnet $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) \
-						 -D sphinx_gallery_conf.ignore_pattern="/*(?<!mx)\.py"
+						 -D sphinx_gallery_conf.filename_pattern="/*(?<=mx)\.py"
 
 pytorch:
 	@echo "##################################################################"
@@ -29,7 +29,7 @@ pytorch:
 	@echo "#                                                                #"
 	@echo "##################################################################"
 	@DGLBACKEND=pytorch $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) \
-						 -D sphinx_gallery_conf.ignore_pattern="/*(?<=mx)\.py"
+						 -D sphinx_gallery_conf.filename_pattern="/*(?<!mx)\.py"
 
 html-noexec:
 	@echo "##################################################################"
