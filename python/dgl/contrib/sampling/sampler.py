@@ -99,8 +99,10 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
 
     The subgraph loader returns a list of subgraphs and a dictionary of additional
     information about the subgraphs. The size of the subgraph list is the number of workers.
+
     The dictionary contains:
-        'seeds': a list of 1D tensors of seed Ids, if return_seed_id is True.
+
+    - seeds: a list of 1D tensors of seed Ids, if return_seed_id is True.
 
     Parameters
     ----------
