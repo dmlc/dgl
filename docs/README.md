@@ -13,13 +13,9 @@ Then build:
 make html
 ```
 
-Note: due to the backend loading issue, it actually takes 3 rounds to build:
+Note: due to the backend loading issue, it actually takes 2 rounds to build:
 1. build tutorials that uses MXNet as backend
 2. build tutorials that uses PyTorch as backend
-3. build all documents without running code
-
-Step 1 and 2 will generate warnings which can be safely ignored. Warnings
-generated in Step 3 should be fixed.
 
 Render locally
 --------------

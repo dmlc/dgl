@@ -32,16 +32,11 @@ pytorch:
 						 -D sphinx_gallery_conf.filename_pattern="/*(?<!mx)\.py"
 
 html-noexec:
-	@echo "##################################################################"
-	@echo "#                                                                #"
-	@echo "#                Step 3: Building documents                      #"
-	@echo "#                                                                #"
-	@echo "##################################################################"
 	$(SPHINXBUILD) -D plot_gallery=0 -b html "$(SOURCEDIR)" "$(BUILDDIR)/html" 
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
-html: Makefile mxnet pytorch html-noexec
+html: Makefile mxnet pytorch
 
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
