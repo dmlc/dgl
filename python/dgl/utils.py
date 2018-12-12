@@ -276,7 +276,7 @@ class CtxCachedObject(object):
         self._generator = generator
         self._ctx_dict = {}
 
-    def get(self, ctx):
+    def __call__(self, ctx):
         if not ctx in self._ctx_dict:
             self._ctx_dict[ctx] = self._generator(ctx)
         return self._ctx_dict[ctx]
