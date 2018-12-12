@@ -13,18 +13,33 @@ help:
 
 .PHONY: help Makefile
 
+mxnet:
+	@echo "##################################################################"
+	@echo "#                                                                #"
+	@echo "#                Step 1: Building MXNet tutorials                #"
+	@echo "#                                                                #"
+	@echo "##################################################################"
+	@DGLBACKEND=mxnet $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) \
+						 -D sphinx_gallery_conf.ignore_pattern="/*(?<!mx)\.py"
+
+pytorch:
+	@echo "##################################################################"
+	@echo "#                                                                #"
+	@echo "#                Step 2: Building PyTorch tutorials              #"
+	@echo "#                                                                #"
+	@echo "##################################################################"
+	@DGLBACKEND=pytorch $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) \
+						 -D sphinx_gallery_conf.ignore_pattern="/*(?<=mx)\.py"
+
 html-noexec:
+	@echo "##################################################################"
+	@echo "#                                                                #"
+	@echo "#                Step 3: Building documents                      #"
+	@echo "#                                                                #"
+	@echo "##################################################################"
 	$(SPHINXBUILD) -D plot_gallery=0 -b html "$(SOURCEDIR)" "$(BUILDDIR)/html" 
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
-
-pytorch: Makefile
-	@DGLBACKEND=pytorch $(SPHINXBUILD) "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) \
-						 -D sphinx_gallery_conf.ignore_pattern="/*(?<=mx)\.py"
-
-mxnet: Makefile
-	@DGLBACKEND=mxnet $(SPHINXBUILD) "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) \
-						 -D sphinx_gallery_conf.ignore_pattern="/*(?<!mx)\.py"
 
 html: Makefile mxnet pytorch html-noexec
 
