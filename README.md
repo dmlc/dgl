@@ -3,7 +3,7 @@
 [![GitHub license](https://dmlc.github.io/img/apache2.svg)](./LICENSE)
 
 [Documentation](https://docs.dgl.ai) | [DGL at a glance](https://docs.dgl.ai/tutorials/basics/1_first.html#sphx-glr-tutorials-basics-1-first-py) |
-[Model Tutorials](https://docs.dgl.ai/tutorials/models/index.html) | [Discussion forum](https://discuss.dgl.ai)
+[Model Tutorials](https://docs.dgl.ai/tutorials/models/index.html) | [Discussion Forum](https://discuss.dgl.ai)
 
 DGL is a Python package that interfaces between existing tensor libraries and data being expressed as
 graphs.
