@@ -1,4 +1,4 @@
-# DGL
+# Deep Graph Library (DGL)
 [![Build Status](http://ci.dgl.ai:80/buildStatus/icon?job=DGL/master)](http://ci.dgl.ai:80/job/DGL/job/master/)
 [![GitHub license](https://dmlc.github.io/img/apache2.svg)](./LICENSE)
 
