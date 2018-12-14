@@ -55,7 +55,8 @@ class GCNLayer(nn.Module):
         # normalization by square root of dst degree
         h = h * self.g.ndata['norm']
         # bias
-        h = h + self.bias
+        if self.bias is not None:
+            h = h + self.bias
         if self.activation:
             h = self.activation(h)
         return h
