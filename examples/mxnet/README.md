@@ -1,5 +1,8 @@
 # Model Examples using DGL (w/ MXNet backend)
+```
 use DGLBACKEND=mxnet to convert DGLBACKEND to mxnet.
+```
+
 Each model is hosted in their own folders. Please read their README.md to see how to
 run them.
 
