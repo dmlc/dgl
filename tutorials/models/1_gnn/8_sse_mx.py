@@ -92,9 +92,6 @@ Stochastic Steady-state Embedding (SSE)
 import mxnet as mx
 import os
 import dgl
-# DGL backend defaults to PyTorch, so we need to switch backend.
-# One can also set the environment variable outside Python.
-dgl.load_backend('mxnet')
 
 def T(g):
     def message_func(edges):
