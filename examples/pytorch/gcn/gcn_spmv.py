@@ -155,8 +155,6 @@ def main(args):
     loss_fcn = torch.nn.CrossEntropyLoss()
 
     # use optimizer
-    for param in model.parameters():
-        print(type(param.data), param.size())
     optimizer = torch.optim.Adam(model.parameters(),
                                  lr=args.lr,
                                  weight_decay=args.weight_decay)
