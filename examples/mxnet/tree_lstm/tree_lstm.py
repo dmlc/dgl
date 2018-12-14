@@ -83,14 +83,15 @@ class TreeLSTM(gluon.nn.Block):
                  num_classes,
                  dropout,
                  cell_type='nary',
-                 pretrained_emb=None):
+                 pretrained_emb=None,
+                 ctx=None):
         super(TreeLSTM, self).__init__()
         self.x_size = x_size
         self.embedding = gluon.nn.Embedding(num_vocabs, x_size)
         if pretrained_emb is not None:
             print('Using glove')
-            self.embedding.initialize()
-            self.embedding.weight.data.set_data(pretrained_emb)
+            self.embedding.initialize(ctx=ctx)
+            self.embedding.weight.set_data(pretrained_emb)
         self.dropout = gluon.nn.Dropout(dropout)
         self.linear = gluon.nn.Dense(num_classes)
         cell = TreeLSTMCell if cell_type == 'nary' else ChildSumTreeLSTMCell

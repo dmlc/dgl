@@ -2,6 +2,11 @@ import argparse
 import time
 import warnings
 import zipfile
+import os
+
+os.environ['DGLBACKEND'] = 'mxnet'
+os.environ['MXNET_GPU_MEM_POOL_TYPE'] = 'Round'
+
 import numpy as np
 import mxnet as mx
 from mxnet import gluon
@@ -21,14 +26,15 @@ def batcher(ctx):
     return batcher_dev
 
 def prepare_glove():
-    if not data.utils.check_sha1('glove.840B.300d.txt',
-                                 sha1_hash='294b9f37fa64cce31f9ebb409c266fc379527708'):
+    if not (os.path.exists('glove.840B.300d.txt')
+            and data.utils.check_sha1('glove.840B.300d.txt',
+                                      sha1_hash='294b9f37fa64cce31f9ebb409c266fc379527708')):
         zip_path = data.utils.download('http://nlp.stanford.edu/data/glove.840B.300d.zip',
                                        sha1_hash='8084fbacc2dee3b1fd1ca4cc534cbfff3519ed0d')
         with zipfile.ZipFile(zip_path, 'r') as zf:
             zf.extractall()
         if not data.utils.check_sha1('glove.840B.300d.txt',
-                                     sha1_hash=TODO1):
+                                     sha1_hash='294b9f37fa64cce31f9ebb409c266fc379527708'):
             warnings.warn('The downloaded glove embedding file checksum mismatch. File content '
                           'may be corrupted.')
 
@@ -40,7 +46,12 @@ def main(args):
     best_dev_acc = 0
 
     cuda = args.gpu >= 0
-    ctx = mx.gpu(args.gpu) if cuda else mx.cpu()
+    if cuda:
+        if args.gpu in mx.test_utils.list_gpus():
+            ctx = mx.gpu(args.gpu)
+        else:
+            print('Requested GPU id {} was not found. Defaulting to CPU implementation'.format(args.gpu))
+            ctx = mx.cpu()
 
     if args.use_glove:
         prepare_glove()
@@ -70,7 +81,8 @@ def main(args):
                      trainset.num_classes,
                      args.dropout,
                      cell_type='childsum' if args.child_sum else 'nary',
-                     pretrained_emb = trainset.pretrained_emb)
+                     pretrained_emb = trainset.pretrained_emb,
+                     ctx=ctx)
     print(model)
     params_ex_emb =[x for x in model.collect_params().values()
                     if x.grad_req != 'null' and x.shape[0] != trainset.num_vocabs]
@@ -179,9 +191,9 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--gpu', type=int, default=-1)
+    parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--seed', type=int, default=41)
-    parser.add_argument('--batch-size', type=int, default=25)
+    parser.add_argument('--batch-size', type=int, default=256)
     parser.add_argument('--child-sum', action='store_true')
     parser.add_argument('--x-size', type=int, default=300)
     parser.add_argument('--h-size', type=int, default=150)
