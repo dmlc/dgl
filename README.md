@@ -1,6 +1,9 @@
-# DGL
+# Deep Graph Library (DGL)
 [![Build Status](http://ci.dgl.ai:80/buildStatus/icon?job=DGL/master)](http://ci.dgl.ai:80/job/DGL/job/master/)
 [![GitHub license](https://dmlc.github.io/img/apache2.svg)](./LICENSE)
+
+[Documentation](https://docs.dgl.ai) | [DGL at a glance](https://docs.dgl.ai/tutorials/basics/1_first.html#sphx-glr-tutorials-basics-1-first-py) |
+[Model Tutorials](https://docs.dgl.ai/tutorials/models/index.html) | [Discussion Forum](https://discuss.dgl.ai)
 
 DGL is a Python package that interfaces between existing tensor libraries and data being expressed as
 graphs.
