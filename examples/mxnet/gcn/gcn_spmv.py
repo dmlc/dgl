@@ -25,7 +25,8 @@ class GCNLayer(gluon.Block):
         super(GCNLayer, self).__init__()
         self.g = g
         with self.name_scope():
-            self.dense = gluon.nn.Dense(out_feats, use_bias=bias)
+            self.dense = gluon.nn.Dense(out_feats, use_bias=bias,
+                    weight_initializer=mx.init.Xavier())
         self.activation = activation
         self.dropout = dropout
 
@@ -72,6 +73,11 @@ class GCN(gluon.Block):
             h = layer(h)
         return h
 
+def evaluate(model, features, labels, mask):
+    pred = model(features).argmax(axis=1)
+    accuracy = ((pred == labels) * mask).sum() / mask.sum().asscalar()
+    return accuracy.asscalar()
+
 def main(args):
     # load and preprocess dataset
     data = load_data(args)
@@ -81,12 +87,22 @@ def main(args):
 
     features = mx.nd.array(data.features)
     labels = mx.nd.array(data.labels)
-    mask = mx.nd.array(data.train_mask)
-
+    train_mask = mx.nd.array(data.train_mask)
+    val_mask = mx.nd.array(data.val_mask)
+    test_mask = mx.nd.array(data.test_mask)
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
-    print('#Edges %d, #Classes %d' % (n_edges, n_classes))
+    print("""----Data statistics------'
+      #Edges %d
+      #Classes %d
+      #Train samples %d
+      #Val samples %d
+      #Test samples %d""" %
+          (n_edges, n_classes,
+              train_mask.sum().asscalar(),
+              val_mask.sum().asscalar(),
+              test_mask.sum().asscalar()))
 
     if args.gpu < 0:
         cuda = False
@@ -97,7 +113,9 @@ def main(args):
 
     features = features.as_in_context(ctx)
     labels = labels.as_in_context(ctx)
-    mask = mask.as_in_context(ctx)
+    train_mask = train_mask.as_in_context(ctx)
+    val_mask = val_mask.as_in_context(ctx)
+    test_mask = test_mask.as_in_context(ctx)
 
     # create GCN model
     g = DGLGraph(data.graph)
@@ -117,6 +135,7 @@ def main(args):
                 args.dropout,
                 args.normalization)
     model.initialize(ctx=ctx)
+    n_train_samples = train_mask.sum().asscalar()
     loss_fcn = gluon.loss.SoftmaxCELoss()
 
     # use optimizer
@@ -132,23 +151,22 @@ def main(args):
         # forward
         with mx.autograd.record():
             pred = model(features)
-            loss = loss_fcn(pred, labels, mask)
+            loss = loss_fcn(pred, labels, mx.nd.expand_dims(train_mask, 1))
+            loss = loss.sum() / n_train_samples
 
-        #optimizer.zero_grad()
         loss.backward()
-        trainer.step(features.shape[0])
+        trainer.step(batch_size=1)
 
         if epoch >= 3:
             dur.append(time.time() - t0)
-            print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
-                epoch, loss.asnumpy()[0], np.mean(dur), n_edges / np.mean(dur) / 1000))
+            acc = evaluate(model, features, labels, val_mask)
+            print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
+                  "ETputs(KTEPS) {:.2f}". format(
+                epoch, np.mean(dur), loss.asscalar(), acc, n_edges / np.mean(dur) / 1000))
 
     # test set accuracy
-    pred = model(features)
-    accuracy = (pred*100).softmax().pick(labels).mean()
-    print("Final accuracy {:.2%}".format(accuracy.mean().asscalar()))
-    return accuracy.mean().asscalar()
-
+    acc = evaluate(model, features, labels, test_mask)
+    print("Test accuracy {:.2%}".format(acc))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')

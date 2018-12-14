@@ -106,6 +106,16 @@ def main(args):
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
+    print("""----Data statistics------'
+      #Edges %d
+      #Classes %d
+      #Train samples %d
+      #Val samples %d
+      #Test samples %d""" %
+          (n_edges, n_classes,
+              train_mask.sum().item(),
+              val_mask.sum().item(),
+              test_mask.sum().item()))
 
     if args.gpu < 0:
         cuda = False
@@ -142,6 +152,7 @@ def main(args):
 
     if cuda:
         model.cuda()
+    loss_fcn = torch.nn.CrossEntropyLoss()
 
     # use optimizer
     for param in model.parameters():
@@ -158,8 +169,7 @@ def main(args):
             t0 = time.time()
         # forward
         logits = model(features)
-        logp = F.log_softmax(logits, 1)
-        loss = F.nll_loss(logp[train_mask], labels[train_mask])
+        loss = loss_fcn(logits[train_mask], labels[train_mask])
 
         optimizer.zero_grad()
         loss.backward()
