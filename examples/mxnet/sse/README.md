@@ -27,9 +27,9 @@ Test convergence
 DGLBACKEND=mxnet python3 sse_batch.py --dataset "pubmed" \
                                       --n-epochs 1000 \
                                       --lr 0.001 \
-                                      --batch-size 50 \
+                                      --batch-size 30 \
                                       --dgl \
                                       --use-spmv \
-                                      --neigh-expand 1000 \
+                                      --neigh-expand 8 \
                                       --n-hidden 16
 ```
