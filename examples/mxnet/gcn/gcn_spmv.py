@@ -68,7 +68,7 @@ class GCN(gluon.Block):
         super(GCN, self).__init__()
         self.layers = gluon.nn.Sequential()
         # input layer
-        self.layers.add(GCNLayer(g, in_feats, n_hidden, activation, dropout))
+        self.layers.add(GCNLayer(g, in_feats, n_hidden, activation, 0.))
         # hidden layers
         for i in range(n_layers - 1):
             self.layers.add(GCNLayer(g, n_hidden, n_hidden, activation, dropout))

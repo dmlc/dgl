@@ -73,7 +73,7 @@ class GCN(nn.Module):
         super(GCN, self).__init__()
         self.layers = nn.ModuleList()
         # input layer
-        self.layers.append(GCNLayer(g, in_feats, n_hidden, activation, dropout))
+        self.layers.append(GCNLayer(g, in_feats, n_hidden, activation, 0.))
         # hidden layers
         for i in range(n_layers - 1):
             self.layers.append(GCNLayer(g, n_hidden, n_hidden, activation, dropout))
