@@ -6,14 +6,12 @@ Author's code repo: [https://github.com/tkipf/gcn](https://github.com/tkipf/gcn)
 
 Codes
 -----
-The folder contains two implementations of GCN. `gcn_batch.py` uses user-defined
+The folder contains two implementations of GCN. `gcn.py` uses user-defined
 message and reduce functions. `gcn_spmv.py` uses DGL's builtin functions so
 SPMV optimization could be applied.
 
-The provided implementation is a bit different from the original paper for better performance.
-For example, the current node vector and the accumulated messages are concatenated together
-as the input for next GCN layer
-([line](https://github.com/dmlc/dgl/blob/master/examples/mxnet/gcn/gcn_batch.py#L46)).
+The provided implementation in `gcn_concat.py` is a bit different from the
+original paper for better performance, credit to @yifeim.
 
 Results
 -------
