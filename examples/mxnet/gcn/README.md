@@ -11,7 +11,7 @@ message and reduce functions. `gcn_spmv.py` uses DGL's builtin functions so
 SPMV optimization could be applied.
 
 The provided implementation in `gcn_concat.py` is a bit different from the
-original paper for better performance, credit to @yifeim.
+original paper for better performance, credit to @yifeim and @ZiyueHuang.
 
 Results
 -------
