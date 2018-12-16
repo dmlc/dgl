@@ -55,7 +55,7 @@ def pytorch_tutorials() {
 }
 
 def mxnet_tutorials() {
-  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
+  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python", "DGLBACKEND=mxnet"]) {
     dir("tests/scripts") {
       sh "bash task_mxnet_tutorial_test.sh"
     }

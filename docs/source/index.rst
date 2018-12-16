@@ -41,7 +41,7 @@ Free software
 -------------
 DGL is free software; you can redistribute it and/or modify it under the terms
 of the Apache License 2.0. We welcome contributions.
-Join us on `GitHub <https://github.com/jermainewang/dgl>`_.
+Join us on `GitHub <https://github.com/dmlc/dgl>`_ and checkout our `contribution guidelines <https://github.com/dmlc/dgl/blob/master/CONTRIBUTING.md>`_.
 
 History
 -------

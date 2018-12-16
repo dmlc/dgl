@@ -44,7 +44,7 @@ Transformer Tutorial
 #    v_i = W_v\cdot x_i\\
 #    \textrm{score} = q_j^T k_i
 #
-# where :math:`W_q, W_k, W_v \in \mathbb{R}^{n\times n}` map the
+# where :math:`W_q, W_k, W_v \in \mathbb{R}^{n\times d_k}` map the
 # representations :math:`x` to “query”, “key”, and “value” space
 # respectively.
 #
@@ -120,7 +120,7 @@ Transformer Tutorial
 # In this tutorial, we show a simplified version of the implementation in
 # order to highlight the most important design points (for instance we
 # only show single-head attention); the complete code can be found
-# `here <https://github.com/jermainewang/dgl/tree/master/examples/pytorch/transformer>`__.
+# `here <https://github.com/dmlc/dgl/tree/master/examples/pytorch/transformer>`__.
 # The overall structure is similar to the one from `The Annotated
 # Transformer <http://nlp.seas.harvard.edu/2018/04/03/attention.html>`__.
 #
@@ -219,12 +219,12 @@ Transformer Tutorial
 # function, including:
 #
 # - ``fn.src_mul_egdes(src_field, edges_field, out_field)`` multiplies
-# source’s attribute and edges attribute, and send the result to the
-# destination node’s mailbox keyed by ``out_field``.
+#   source’s attribute and edges attribute, and send the result to the
+#   destination node’s mailbox keyed by ``out_field``.
 # - ``fn.copy_edge(edges_field, out_field)`` copies edge’s attribute to
-# destination node’s mailbox.
+#   destination node’s mailbox.
 # - ``fn.sum(edges_field, out_field)`` sums up
-# edge’s attribute and sends aggregation to destination node’s mailbox.
+#   edge’s attribute and sends aggregation to destination node’s mailbox.
 #
 # Here we assemble those built-in function into ``propagate_attention``,
 # which is also the main graph operation function in our final
@@ -472,8 +472,8 @@ Transformer Tutorial
 #
 #    By calling ``update_graph`` function, we can “DIY our own
 #    Transformer” on any subgraphs with nearly the same code. This
-#    flexibility enables us to discover new, sparse structures (c.f.
-#    `here <https://arxiv.org/pdf/1508.04025.pdf>`__). Note in our
+#    flexibility enables us to discover new, sparse structures (c.f. local attention
+#    mentioned `here <https://arxiv.org/pdf/1508.04025.pdf>`__). Note in our
 #    implementation we does not use mask or padding, which makes the logic
 #    more clear and saves memory. The trade-off is that the implementation is
 #    slower; we will improve with future DGL optimizations.
@@ -540,6 +540,7 @@ Transformer Tutorial
 #        print(graph.tgt[0]) # Output word index list
 #        print(graph.tgt[1]) # Ouptut positions
 #        break
+#
 # Output:
 #
 # .. code::
@@ -576,7 +577,7 @@ Transformer Tutorial
 #
 # Note that we do not involve inference module in this tutorial (which
 # requires beam search), please refer to the `Github
-# Repo <https://github.com/jermainewang/dgl/tree/master/examples/pytorch/transformer>`__
+# Repo <https://github.com/dmlc/dgl/tree/master/examples/pytorch/transformer>`__
 # for full implementation.
 #
 # .. code:: python
@@ -851,7 +852,7 @@ Transformer Tutorial
 #      that satisfy the given predicate.
 #
 # for the full implementation, please refer to our `Github
-# Repo <https://github.com/jermainewang/dgl/tree/master/examples/pytorch/transformer/modules/act.py>`__.
+# Repo <https://github.com/dmlc/dgl/tree/master/examples/pytorch/transformer/modules/act.py>`__.
 #
 # The figure below shows the effect of Adaptive Computational
 # Time(different positions of a sentence were revised different times):
@@ -874,3 +875,8 @@ Transformer Tutorial
 # .. |image9| image:: https://s1.ax1x.com/2018/12/06/F1sGod.png
 # .. |image10| image:: https://s1.ax1x.com/2018/12/06/F1r8Cq.gif
 #
+# .. note::
+#     We apologize that this notebook itself is not runnable due to many dependencies,
+#     please download the `7_transformer.py <https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/7_transformer.py>`__, 
+#     and copy the python script to directory ``examples/pytorch/transformer`` 
+#     then run ``python 7_transformer.py`` to see how it works.

@@ -1,7 +1,11 @@
 from __future__ import absolute_import
 
+from distutils.version import LooseVersion
+
 import torch as th
 from torch.utils import dlpack
+
+TH_VERSION = LooseVersion(th.__version__)
 
 def data_type_dict():
     return {'float16' : th.float16,
@@ -19,14 +23,24 @@ def cpu():
 def tensor(data, dtype=None):
     return th.tensor(data, dtype=dtype)
 
-def sparse_matrix(data, index, shape, force_format=False):
-    fmt = index[0]
-    if fmt != 'coo':
-        raise TypeError('Pytorch backend only supports COO format. But got %s.' % fmt)
-    # NOTE: use _sparse_coo_tensor_unsafe to avoid unnecessary boundary check
-    spmat = th._sparse_coo_tensor_unsafe(index[1], data, shape)
-    # No conversion is required.
-    return spmat, None
+if TH_VERSION.version[0] == 0:
+    def sparse_matrix(data, index, shape, force_format=False):
+        fmt = index[0]
+        if fmt != 'coo':
+            raise TypeError('Pytorch backend only supports COO format. But got %s.' % fmt)
+        # NOTE: use _sparse_coo_tensor_unsafe to avoid unnecessary boundary check
+        spmat = th._sparse_coo_tensor_unsafe(index[1], data, shape)
+        # No conversion is required.
+        return spmat, None
+else:
+    # VERSION 1.0+
+    def sparse_matrix(data, index, shape, force_format=False):
+        fmt = index[0]
+        if fmt != 'coo':
+            raise TypeError('Pytorch backend only supports COO format. But got %s.' % fmt)
+        spmat = th.sparse_coo_tensor(index[1], data, shape)
+        # No conversion is required.
+        return spmat, None
 
 def sparse_matrix_indices(spmat):
     return ('coo', spmat._indices())

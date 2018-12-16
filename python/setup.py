@@ -72,7 +72,7 @@ setup(
         'scipy>=1.1.0',
         'networkx>=2.1',
     ],
-    url='https://github.com/jermainewang/dgl',
+    url='https://github.com/dmlc/dgl',
     distclass=BinaryDistribution,
     classifiers=[
         'Development Status :: 3 - Alpha',

@@ -762,7 +762,7 @@ print('Among 100 graphs generated, {}% are valid.'.format(num_valid))
 
 #######################################################################################
 # For the complete implementation, see `dgl DGMG example
-# <https://github.com/jermainewang/dgl/tree/master/examples/pytorch/dgmg>`__.
+# <https://github.com/dmlc/dgl/tree/master/examples/pytorch/dgmg>`__.
 #
 # Batched Graph Generation
 # ---------------------------
