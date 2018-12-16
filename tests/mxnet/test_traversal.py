@@ -84,7 +84,7 @@ def test_topological_nodes(n=1000):
     assert all(toset(x) == toset(y) for x, y in zip(layers_dgl, layers_spmv))
 
 DFS_LABEL_NAMES = ['forward', 'reverse', 'nontree']
-def _test_dfs_labeled_edges(n=1000, example=False):
+def test_dfs_labeled_edges(n=1000, example=False):
     dgl_g = dgl.DGLGraph()
     dgl_g.add_nodes(6)
     dgl_g.add_edges([0, 1, 0, 3, 3], [1, 2, 2, 4, 5])
@@ -121,7 +121,6 @@ def _test_dfs_labeled_edges(n=1000, example=False):
 
 
 if __name__ == '__main__':
-    #test_bfs()
-    #test_topological_nodes()
-    #TODO(zhengda): the test leads to segfault in MXNet on Ubuntu 16.04.
-    _test_dfs_labeled_edges()
+    test_bfs()
+    test_topological_nodes()
+    test_dfs_labeled_edges()
