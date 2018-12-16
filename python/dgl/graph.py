@@ -2907,3 +2907,9 @@ class DGLGraph(object):
         else:
             edges = F.tensor(edges)
             return edges[e_mask]
+
+    def __repr__(self):
+        s = 'DGLGraph with {node} nodes and {edge} edges.\nNode data: {ndata}\nEdge data: {edata}'
+        return s.format(node=self.number_of_nodes(), edge=self.number_of_edges(),
+                        ndata=str(self.node_attr_schemes()),
+                        edata=str(self.edge_attr_schemes()))
