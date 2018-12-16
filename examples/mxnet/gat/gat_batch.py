@@ -148,10 +148,10 @@ def main(args):
     if args.gpu < 0:
         ctx = mx.cpu(0)
     else:
-        features = features.as_in_context(mx.gpu(0))
-        labels = labels.as_in_context(mx.gpu(0))
-        mask = mask.as_in_context(mx.gpu(0))
-        ctx = mx.gpu(0)
+        ctx = mx.gpu(args.gpu)
+        features = features.as_in_context(ctx)
+        labels = labels.as_in_context(ctx)
+        mask = mask.as_in_context(ctx)
 
     # create GCN model
     g = DGLGraph(data.graph)
