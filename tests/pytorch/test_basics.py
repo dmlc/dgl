@@ -615,6 +615,17 @@ def test_dynamic_addition():
     assert g.edata['h1'].shape[0] == g.edata['h2'].shape[0] == 5
 
 
+def test_repr():
+    G = dgl.DGLGraph()
+    G.add_nodes(10)
+    G.add_edge(0, 1)
+    repr_string = G.__repr__()
+    G.ndata['x'] = th.zeros((10, 5))
+    G.add_edges([0, 1], 2)
+    G.edata['y'] = th.zeros((3, 4))
+    repr_string = G.__repr__()
+
+
 if __name__ == '__main__':
     test_nx_conversion()
     test_batch_setter_getter()
@@ -630,3 +641,4 @@ if __name__ == '__main__':
     test_pull_0deg()
     test_send_multigraph()
     test_dynamic_addition()
+    test_repr()
