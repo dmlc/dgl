@@ -188,10 +188,11 @@ class DGLGraph(object):
             self._edge_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
         else:
             self._edge_frame = edge_frame
-        # msg graph & frame
-        self._msg_graph = create_graph_index(multigraph=multigraph)
+        # msg frame
         self._msg_frame = FrameRef()
-        self.reset_messages()
+        # set initializer for message frame
+        # all fields including message indicator should use zero_initializer
+        self._msg_frame.set_initializer(dgl.init.zero_initializer)
         # registered functions
         self._message_func = None
         self._reduce_func = None
@@ -243,7 +244,6 @@ class DGLGraph(object):
                 [1., 1., 1., 1.]])
         """
         self._graph.add_nodes(num)
-        self._msg_graph.add_nodes(num)
         if data is None:
             # Initialize feature placeholders if there are features existing
             self._node_frame.add_rows(num)
@@ -303,6 +303,8 @@ class DGLGraph(object):
             self._edge_frame.add_rows(1)
         else:
             self._edge_frame.append(data)
+        # initialize feature placeholder for messages
+        self._msg_frame.add_rows(1)
 
     def add_edges(self, u, v, data=None):
         """Add multiple edges for list of source nodes u and destination nodes
@@ -359,6 +361,8 @@ class DGLGraph(object):
             self._edge_frame.add_rows(max(len(u), len(v)))
         else:
             self._edge_frame.append(data)
+        # initialize feature placeholder for messages
+        self._msg_frame.add_rows(max(len(u), len(v)))
 
     def clear(self):
         """Remove all nodes and edges, as well as their features, from the
@@ -382,14 +386,7 @@ class DGLGraph(object):
         self._graph.clear()
         self._node_frame.clear()
         self._edge_frame.clear()
-        self._msg_graph.clear()
         self._msg_frame.clear()
-
-    def reset_messages(self):
-        """Clear all messages."""
-        self._msg_graph.clear()
-        self._msg_frame.clear()
-        self._msg_graph.add_nodes(self.number_of_nodes())
 
     def number_of_nodes(self):
         """Return the number of nodes in the graph.
@@ -1159,7 +1156,7 @@ class DGLGraph(object):
         self._graph.from_networkx(nx_graph)
         self._node_frame.add_rows(self.number_of_nodes())
         self._edge_frame.add_rows(self.number_of_edges())
-        self._msg_graph.add_nodes(self._graph.number_of_nodes())
+
         # copy attributes
         def _batcher(lst):
             if F.is_tensor(lst[0]):
@@ -1216,7 +1213,6 @@ class DGLGraph(object):
         self._graph.from_scipy_sparse_matrix(a)
         self._node_frame.add_rows(self.number_of_nodes())
         self._edge_frame.add_rows(self.number_of_edges())
-        self._msg_graph.add_nodes(self._graph.number_of_nodes())
 
     def node_attr_schemes(self):
         """Return the node feature schemes.
@@ -1925,7 +1921,7 @@ class DGLGraph(object):
             message_func = self._message_func
 
         if is_all(edges):
-            eid = ALL
+            eid = utils.toindex(slice(0, self.number_of_edges()))
             u, v, _ = self._graph.edges()
         elif isinstance(edges, tuple):
             u, v = edges
@@ -1941,9 +1937,6 @@ class DGLGraph(object):
             scheduler.schedule_send(graph=self, u=u, v=v, eid=eid,
                                     message_func=message_func)
             Runtime.run(prog)
-
-        # update message graph and frame
-        self._msg_graph.add_edges(u, v)
 
     def recv(self,
              v=ALL,
@@ -2050,9 +2043,6 @@ class DGLGraph(object):
                                     apply_func=apply_node_func,
                                     inplace=inplace)
             Runtime.run(prog)
-
-        # FIXME(minjie): multi send bug
-        self.reset_messages()
 
     def send_and_recv(self,
                       edges,
