@@ -30,6 +30,26 @@ class GraphIndex(object):
         """Free this graph index object."""
         _CAPI_DGLGraphFree(self._handle)
 
+    def __getstate__(self):
+        src, dst, _ = self.edges()
+        n_nodes = self.number_of_nodes()
+        multigraph = self.is_multigraph()
+
+        return n_nodes, multigraph, src, dst
+
+    def __setstate__(self, state):
+        """The pickle state of GraphIndex is defined as a triplet
+        (number_of_nodes, multigraph, src_nodes, dst_nodes)
+        """
+        n_nodes, multigraph, src, dst = state
+
+        self._handle = _CAPI_DGLGraphCreate(multigraph)
+        self._cache = {}
+
+        self.clear()
+        self.add_nodes(n_nodes)
+        self.add_edges(src, dst)
+
     def add_nodes(self, num):
         """Add nodes.
 
@@ -39,7 +59,7 @@ class GraphIndex(object):
             Number of nodes to be added.
         """
         _CAPI_DGLGraphAddVertices(self._handle, num);
-        self._cache.clear()
+        self.clear_cache()
 
     def add_edge(self, u, v):
         """Add one edge.
@@ -52,7 +72,7 @@ class GraphIndex(object):
             The dst node.
         """
         _CAPI_DGLGraphAddEdge(self._handle, u, v);
-        self._cache.clear()
+        self.clear_cache()
 
     def add_edges(self, u, v):
         """Add many edges.
@@ -67,11 +87,15 @@ class GraphIndex(object):
         u_array = u.todgltensor()
         v_array = v.todgltensor()
         _CAPI_DGLGraphAddEdges(self._handle, u_array, v_array)
-        self._cache.clear()
+        self.clear_cache()
 
     def clear(self):
         """Clear the graph."""
         _CAPI_DGLGraphClear(self._handle)
+        self.clear_cache()
+
+    def clear_cache(self):
+        """Clear the cached graph structures."""
         self._cache.clear()
 
     def is_multigraph(self):
@@ -341,6 +365,7 @@ class GraphIndex(object):
         eid = utils.toindex(edge_array(2))
         return src, dst, eid
 
+    @utils.cached_member(cache='_cache', prefix='edges')
     def edges(self, sorted=False):
         """Return all the edges
 
@@ -484,6 +509,7 @@ class GraphIndex(object):
         induced_nodes = utils.toindex(rst(1))
         return SubgraphIndex(rst(0), self, induced_nodes, e)
 
+    @utils.cached_member(cache='_cache', prefix='adj')
     def adjacency_matrix(self, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
 
@@ -511,7 +537,7 @@ class GraphIndex(object):
         if not isinstance(transpose, bool):
             raise DGLError('Expect bool value for "transpose" arg,'
                            ' but got %s.' % (type(transpose)))
-        src, dst, _ = self.edges(sorted=False)
+        src, dst, _ = self.edges(False)
         src = src.tousertensor(ctx)  # the index of the ctx will be cached
         dst = dst.tousertensor(ctx)  # the index of the ctx will be cached
         src = F.unsqueeze(src, dim=0)
@@ -528,6 +554,7 @@ class GraphIndex(object):
         shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
         return adj, shuffle_idx
 
+    @utils.cached_member(cache='_cache', prefix='inc')
     def incidence_matrix(self, type, ctx):
         """Return the incidence matrix representation of this graph.
 
@@ -563,7 +590,7 @@ class GraphIndex(object):
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
-        src, dst, eid = self.edges(sorted=False)
+        src, dst, eid = self.edges(False)
         src = src.tousertensor(ctx)  # the index of the ctx will be cached
         dst = dst.tousertensor(ctx)  # the index of the ctx will be cached
         eid = eid.tousertensor(ctx)  # the index of the ctx will be cached
@@ -713,26 +740,6 @@ class GraphIndex(object):
         """
         handle = _CAPI_DGLGraphLineGraph(self._handle, backtracking)
         return GraphIndex(handle)
-
-    def __getstate__(self):
-        src, dst, _ = self.edges()
-        n_nodes = self.number_of_nodes()
-        multigraph = self.is_multigraph()
-
-        return n_nodes, multigraph, src, dst
-
-    def __setstate__(self, state):
-        """The pickle state of GraphIndex is defined as a triplet
-        (number_of_nodes, multigraph, src_nodes, dst_nodes)
-        """
-        n_nodes, multigraph, src, dst = state
-
-        self._handle = _CAPI_DGLGraphCreate(multigraph)
-        self._cache = {}
-
-        self.clear()
-        self.add_nodes(n_nodes)
-        self.add_edges(src, dst)
 
 class SubgraphIndex(GraphIndex):
     """Graph index for subgraph.

@@ -244,10 +244,10 @@ class SPMVExecutor(Executor):
         return self.ret
 
     def run(self):
-        spA_ctxobj = self.spA.data
+        spA_ctx_fn = self.spA.data
         B = self.B.data
         ctx = F.context(B)
-        spA = spA_ctxobj.get(ctx)
+        spA = spA_ctx_fn(ctx)
         if F.ndim(B) == 1:
             # B is a vector, append a (1,) dim at the end
             B = F.unsqueeze(B, 1)
@@ -296,7 +296,7 @@ class SPMVWithDataExecutor(Executor):
         return self.ret
 
     def run(self):
-        spA_ctxobj = self.spA.data
+        spA_ctx_fn = self.spA.data
         A_data = self.A_data.data
         if F.ndim(A_data) > 1:
             # A_data is of shape (E, 1). Squeeze the last dim.
@@ -304,7 +304,7 @@ class SPMVWithDataExecutor(Executor):
         B = self.B.data
 
         ctx = F.context(B)
-        spA = spA_ctxobj.get(ctx)
+        spA = spA_ctx_fn(ctx)
         spidx = F.sparse_matrix_indices(spA)
         shape = F.shape(spA)
         # shuffle index is not used
