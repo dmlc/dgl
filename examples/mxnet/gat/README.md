@@ -7,7 +7,6 @@ Graph Attention Networks (GAT)
 
 Note that the original code is implemented with Tensorflow for the paper.
 
-[[Paper]](https://arxiv.org/abs/1710.10903) [[Original Implementation]](https://github.com/PetarV-/GAT)
 
 ## Usage (make sure that DGLBACKEND is changed into mxnet)
 ```bash
