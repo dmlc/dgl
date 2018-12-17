@@ -179,7 +179,9 @@ class DGLGraph(object):
         # graph
         self._readonly=readonly
         self._graph = create_graph_index(graph_data, multigraph, readonly)
-        # frame
+        # msg frame
+        self._msg_frame = FrameRef()
+        # node and edge frame
         if node_frame is None:
             self._node_frame = FrameRef(Frame(num_rows=self.number_of_nodes()))
         else:
@@ -188,8 +190,7 @@ class DGLGraph(object):
             self._edge_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
         else:
             self._edge_frame = edge_frame
-        # msg frame
-        self._msg_frame = FrameRef()
+            self._msg_frame.add_rows(edge_frame.num_rows)
         # set initializer for message frame
         # all fields including message indicator should use zero_initializer
         self._msg_frame.set_initializer(dgl.init.zero_initializer)
