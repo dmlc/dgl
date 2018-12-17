@@ -614,6 +614,10 @@ def test_dynamic_addition():
     g.edges[4].data['h1'] = th.randn(1, D)
     assert g.edata['h1'].shape[0] == g.edata['h2'].shape[0] == 5
 
+    # test add edge with part of the features
+    g.add_edge(2, 1, {'h1': th.randn(1, D)})
+    assert len(g.edata['h1']) == len(g.edata['h2'])
+
 
 def test_repr():
     G = dgl.DGLGraph()
