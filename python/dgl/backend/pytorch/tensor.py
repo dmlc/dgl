@@ -23,6 +23,9 @@ def cpu():
 def tensor(data, dtype=None):
     return th.tensor(data, dtype=dtype)
 
+def empty(shape, dtype, ctx):
+    return th.empty(*shape, dtype=dtype, device=ctx)
+
 if TH_VERSION.version[0] == 0:
     def sparse_matrix(data, index, shape, force_format=False):
         fmt = index[0]

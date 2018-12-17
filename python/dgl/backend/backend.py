@@ -74,6 +74,25 @@ def tensor(data, dtype=None):
     """
     pass
 
+def empty(shape, dtype, ctx):
+    """Create an empty tensor given the shape, data type and context.
+
+    Parameters
+    ----------
+    shape : tuple
+        The shape of the new tensor.
+    dtype : data type
+        It should be one of the values in the data type dict.
+    ctx :
+        A framework-specific context object.
+
+    Returns
+    -------
+    Tensor
+        A framework-specific tensor.
+    """
+    pass
+
 def sparse_matrix(data, index, shape, force_format=False):
     """Create a sparse matrix.
 

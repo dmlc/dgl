@@ -1,6 +1,5 @@
 """Cache for frames in DGLGraph."""
 import numpy as np
-import mxnet as mx
 
 from . import backend as F
 from . import utils
@@ -36,7 +35,7 @@ class FrameRowCache:
         for key in self._cache:
             col = self._cache[key]
             shape = (len(ids),) + col.shape[1:]
-            data = mx.nd.empty(shape=shape, dtype=col.dtype, ctx=self._ctx)
+            data = F.empty(shape=shape, dtype=col.dtype, ctx=self._ctx)
             data[cached_out_idx] = col[cache_idx]
             ret.update({key: (data, global_uncached_ids, uncached_out_idx)})
         return ret

@@ -20,6 +20,9 @@ def cpu():
 def tensor(data, dtype=None):
     return nd.array(data, dtype=dtype)
 
+def empty(shape, dtype, ctx):
+    return nd.empty(shape=shape, dtype=dtype, ctx=ctx)
+
 def sparse_matrix(data, index, shape, force_format=False):
     fmt = index[0]
     if fmt == 'coo':

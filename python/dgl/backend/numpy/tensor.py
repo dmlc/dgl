@@ -22,6 +22,9 @@ def cpu():
 def tensor(data, dtype=None):
     return np.array(data, dtype)
 
+def empty(shape, dtype, ctx):
+    return np.empty(shape=shape, dtype=dtype)
+
 def sparse_matrix(data, index, shape, force_format=False):
     fmt = index[0]
     if fmt == 'coo':
