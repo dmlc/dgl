@@ -25,13 +25,10 @@ class FrameRowCache:
     def cache_lookup(self, ids):
         ids = utils.toindex(ids)
         lids = search_nids(self._cached_ids, ids)
-        print(lids.tonumpy())
         lids = lids.tonumpy()
         ids = ids.tonumpy()
         cached_out_idx = np.nonzero(lids != -1)[0]
-        print("cached output idx: " + str(cached_out_idx))
         cache_idx = lids[cached_out_idx]
-        print("cache idx: " + str(cache_idx))
         uncached_out_idx = np.nonzero(lids == -1)[0]
         global_uncached_ids = ids[uncached_out_idx]
 

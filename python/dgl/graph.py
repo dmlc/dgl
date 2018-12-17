@@ -218,14 +218,12 @@ class DGLGraph(object):
         self._vertex_cache = FrameRowCache(self._node_frame, vids, ctx)
 
     def _node_cache_lookup(self, nid, ctx):
-        print("cache lookup")
         assert self._vertex_cache is not None
         cached_data = self._vertex_cache.cache_lookup(nid)
         ret = {}
         for key in self._node_frame:
             if key in cached_data:
                 data, gids, lids = cached_data[key]
-                print("copy " + str(gids) + " from global frame")
                 data[lids] = F.copy_to(self._node_frame[key][gids], ctx)
                 ret.update({key: data})
             else:

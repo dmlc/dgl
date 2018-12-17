@@ -25,17 +25,14 @@ def generate_graph():
 
 def test_node_cache():
     g = generate_graph()
-    g.cache_node_data([1, 0, 5, 9, 7, 8])
+    g.cache_node_data([1, 0, 5, 9, 7, 8], mx.cpu())
     subg_ids = [0, 1, 2, 4, 5, 9]
     subg = g.subgraph(subg_ids)
     subg.copy_from_parent()
     assert subg.ndata.keys() == g.ndata.keys()
     for key in subg.ndata:
-        print(key)
         assert key in g.ndata
         data = g.ndata[key][subg_ids]
-        print(data.asnumpy())
-        print(subg.ndata[key].asnumpy())
         assert np.all(data.asnumpy() == subg.ndata[key].asnumpy())
 
 if __name__ == '__main__':
