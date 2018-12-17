@@ -81,7 +81,10 @@ def analyze_e2v_spmv(graph, rfunc):
     return spmv_rfunc, rfunc_left
 
 def gen_v2v_spmv_schedule(adj, spmv_pairs, nf, ef, eid, out):
-    """
+    """Generate v2v spmv schedule.
+
+    Parameters
+    ----------
     adj : tuple (sparse matrix, utils.Index)
     spmv_pairs : list of pair
     nf : var.Var
@@ -110,7 +113,10 @@ def gen_v2v_spmv_schedule(adj, spmv_pairs, nf, ef, eid, out):
         ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
 def gen_e2v_spmv_schedule(inc, spmv_rfunc, mf, out):
-    """
+    """Generate e2v SPMV schedule.
+
+    Parameters
+    ----------
     inc : tuple (sparse matrix, utils.Index)
     spmv_rfunc : list of builtin reducers
     mf : var.Var
@@ -141,8 +147,9 @@ def build_adj_matrix_graph(graph):
         A index for data shuffling due to sparse format change. Return None
         if shuffle is not required.
     """
-    adjmat, shuffle_idx = graph._graph.adjacency_matrix(transpose=False, ctx=F.cpu())
-    return utils.CtxCachedObject(lambda ctx : F.copy_to(adjmat, ctx)), shuffle_idx
+    gi = graph._graph
+    _, shuffle_idx = gi.adjacency_matrix(False, F.cpu())
+    return lambda ctx : gi.adjacency_matrix(False, ctx)[0], shuffle_idx
 
 def _build_adj_matrix_index_uv(graph, edges, reduce_nodes):
     """Build adj matrix index and shape using the given (u, v) edges.
@@ -235,9 +242,9 @@ def build_inc_matrix_graph(graph):
         A index for data shuffling due to sparse format change. Return None
         if shuffle is not required.
     """
-    incmat, _ = graph._graph.incidence_matrix(type='in', ctx=F.cpu())
+    gi = graph._graph
     # inc mat will not use data tensor so conversion index is not needed
-    return utils.CtxCachedObject(lambda ctx : F.copy_to(incmat, ctx)), None
+    return lambda ctx : gi.incidence_matrix('in', ctx)[0], None
 
 def build_inc_matrix_eid(m, eid, dst, reduce_nodes):
     """Build incidence matrix using edge id and edge dst nodes.
