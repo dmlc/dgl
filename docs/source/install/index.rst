@@ -9,10 +9,10 @@ Currently DGL is tested on
 
 * Ubuntu 16.04
 * macOS X
-* Windows 7
+* Windows 10
 
 DGL is expected to work on all Linux distributions later than Ubuntu 16.04, macOS X, and
-Windows 7 or later.
+Windows 10.
 
 DGL also requires the Python version to be 3.5 or later.  Python 3.4 or less is not
 tested, and Python 2 support is coming.
@@ -74,7 +74,7 @@ First, download the source files from GitHub:
 
 .. code:: bash
 
-   git clone --recursive https://github.com/jermainewang/dgl.git
+   git clone --recursive https://github.com/dmlc/dgl.git
 
 One can also clone the repository first and run the following:
 

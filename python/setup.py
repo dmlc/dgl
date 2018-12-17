@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import sys,os
+import sys, os, platform
 import shutil
 import glob
 
@@ -10,10 +10,7 @@ from setuptools import setup
 
 class BinaryDistribution(Distribution):
     def has_ext_modules(self):
-        return True
-
-    def is_pure(self):
-        return False
+        return platform.system() == 'Darwin'
 
 CURRENT_DIR = os.path.dirname(__file__)
 
@@ -75,7 +72,7 @@ setup(
         'scipy>=1.1.0',
         'networkx>=2.1',
     ],
-    url='https://github.com/jermainewang/dgl',
+    url='https://github.com/dmlc/dgl',
     distclass=BinaryDistribution,
     classifiers=[
         'Development Status :: 3 - Alpha',

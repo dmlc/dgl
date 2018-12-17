@@ -1,6 +1,9 @@
-# DGL
+# Deep Graph Library (DGL)
 [![Build Status](http://ci.dgl.ai:80/buildStatus/icon?job=DGL/master)](http://ci.dgl.ai:80/job/DGL/job/master/)
 [![GitHub license](https://dmlc.github.io/img/apache2.svg)](./LICENSE)
+
+[Documentation](https://docs.dgl.ai) | [DGL at a glance](https://docs.dgl.ai/tutorials/basics/1_first.html#sphx-glr-tutorials-basics-1-first-py) |
+[Model Tutorials](https://docs.dgl.ai/tutorials/models/index.html) | [Discussion Forum](https://discuss.dgl.ai)
 
 DGL is a Python package that interfaces between existing tensor libraries and data being expressed as
 graphs.
@@ -20,7 +23,7 @@ A summary of the model accuracy and training speed with the Pytorch backend (on 
 | [LGNN](https://arxiv.org/abs/1705.08415) | 94% | 94% | n/a | 1.45s | n/a |
 | [DGMG](https://arxiv.org/pdf/1803.03324.pdf) | 84% | 90% | n/a | 238s | n/a |
 
-With the MXNet/Gluon backend , we scaled a graph of 50M nodes and 150 edges on a P3.8xlarge instance, 
+With the MXNet/Gluon backend , we scaled a graph of 50M nodes and 150M edges on a P3.8xlarge instance, 
 with 160s per epoch, on SSE ([Stochastic Steady-state Embedding](https://www.cc.gatech.edu/~hdai8/pdf/equilibrium_embedding.pdf)), 
 a model similar to GCN. 
 
@@ -33,11 +36,11 @@ DGL should work on
 
 * all Linux distributions no earlier than Ubuntu 16.04
 * macOS X
-* Windows 7 or later
+* Windows 10
 
 DGL also requires Python 3.5 or later.  Python 2 support is coming.
 
-Right now, DGL works on [PyTorch](https://pytorch.org) 0.4.1+ and [MXNet](mxnet.apache.org) nightly
+Right now, DGL works on [PyTorch](https://pytorch.org) 0.4.1+ and [MXNet](https://mxnet.apache.org) nightly
 build.
 
 ## Installation
@@ -144,7 +147,7 @@ For more realistic, end-to-end examples, please see [model tutorials](https://do
 
 ## Contributing
 
-Please let us know if you encounter a bug or have any suggestions by [filing an issue](https://github.com/jermainewang/dgl/issues).
+Please let us know if you encounter a bug or have any suggestions by [filing an issue](https://github.com/dmlc/dgl/issues).
 
 We welcome all contributions from bug fixes to new features and extensions.
 We expect all contributions discussed in the issue tracker and going through PRs.  Please refer to the PR guide.

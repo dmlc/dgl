@@ -439,6 +439,16 @@ def test_pull_0deg():
     check_pull_0deg(True)
     check_pull_0deg(False)
 
+def test_repr():
+    G = dgl.DGLGraph()
+    G.add_nodes(10)
+    G.add_edge(0, 1)
+    repr_string = G.__repr__()
+    G.ndata['x'] = mx.nd.zeros((10, 5))
+    G.add_edges([0, 1], 2)
+    G.edata['y'] = mx.nd.zeros((3, 4))
+    repr_string = G.__repr__()
+
 if __name__ == '__main__':
     test_batch_setter_getter()
     test_batch_setter_autograd()
@@ -451,3 +461,4 @@ if __name__ == '__main__':
     test_recv_0deg_newfld()
     test_update_all_0deg()
     test_pull_0deg()
+    test_repr()

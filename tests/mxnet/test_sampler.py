@@ -61,6 +61,17 @@ def test_1neighbor_sampler():
         assert subg.number_of_edges() <= 5
         verify_subgraph(g, subg, seed_ids)
 
+def test_prefetch_neighbor_sampler():
+    g = generate_rand_graph(100)
+    # In this case, NeighborSampling simply gets the neighborhood of a single vertex.
+    for subg, aux in dgl.contrib.sampling.NeighborSampler(g, 1, 5, neighbor_type='in',
+                                                          num_workers=4, return_seed_id=True, prefetch=True):
+        seed_ids = aux['seeds']
+        assert len(seed_ids) == 1
+        assert subg.number_of_nodes() <= 6
+        assert subg.number_of_edges() <= 5
+        verify_subgraph(g, subg, seed_ids)
+
 def test_10neighbor_sampler_all():
     g = generate_rand_graph(100)
     # In this case, NeighborSampling simply gets the neighborhood of a single vertex.

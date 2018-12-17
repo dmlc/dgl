@@ -385,6 +385,15 @@ class DGLGraph(object):
         self._msg_graph.clear()
         self._msg_frame.clear()
 
+    def clear_cache(self):
+        """Clear all cached graph structures such as adjmat.
+
+        By default, all graph structure related sparse matrices (e.g. adjmat, incmat)
+        are cached so they could be reused with the cost of extra memory consumption.
+        This function can be used to clear the cached matrices if memory is an issue.
+        """
+        self._graph.clear_cache()
+
     def reset_messages(self):
         """Clear all messages."""
         self._msg_graph.clear()
@@ -1167,6 +1176,7 @@ class DGLGraph(object):
             else:
                 return F.tensor(lst)
         if node_attrs is not None:
+            # mapping from feature name to a list of tensors to be concatenated
             attr_dict = defaultdict(list)
             for nid in range(self.number_of_nodes()):
                 for attr in node_attrs:
@@ -1175,14 +1185,19 @@ class DGLGraph(object):
                 self._node_frame[attr] = _batcher(attr_dict[attr])
         if edge_attrs is not None:
             has_edge_id = 'id' in next(iter(nx_graph.edges(data=True)))[-1]
+            # mapping from feature name to a list of tensors to be concatenated
             attr_dict = defaultdict(lambda: [None] * self.number_of_edges())
+            # each defaultdict value is initialized to be a list of None
+            # None here serves as placeholder to be replaced by feature with
+            # corresponding edge id
             if has_edge_id:
                 for _, _, attrs in nx_graph.edges(data=True):
                     for key in edge_attrs:
                         attr_dict[key][attrs['id']] = attrs[key]
             else:
                 # XXX: assuming networkx iteration order is deterministic
-                for eid, (_, _, attr) in enumerate(nx_graph.edges(data=True)):
+                #      so the order is the same as graph_index.from_networkx
+                for eid, (_, _, attrs) in enumerate(nx_graph.edges(data=True)):
                     for key in edge_attrs:
                         attr_dict[key][eid] = attrs[key]
             for attr in edge_attrs:
@@ -2901,3 +2916,9 @@ class DGLGraph(object):
         else:
             edges = F.tensor(edges)
             return edges[e_mask]
+
+    def __repr__(self):
+        s = 'DGLGraph with {node} nodes and {edge} edges.\nNode data: {ndata}\nEdge data: {edata}'
+        return s.format(node=self.number_of_nodes(), edge=self.number_of_edges(),
+                        ndata=str(self.node_attr_schemes()),
+                        edata=str(self.edge_attr_schemes()))
