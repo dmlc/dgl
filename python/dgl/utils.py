@@ -276,44 +276,35 @@ class CtxCachedObject(object):
         self._generator = generator
         self._ctx_dict = {}
 
-    def get(self, ctx):
+    def __call__(self, ctx):
         if not ctx in self._ctx_dict:
             self._ctx_dict[ctx] = self._generator(ctx)
         return self._ctx_dict[ctx]
 
-def ctx_cached_member(func):
-    """Convenient class member function wrapper to cache the function result.
+def cached_member(cache, prefix):
+    """A member function decorator to memorize the result.
 
-    The wrapped function must only have two arguments: `self` and `ctx`. The former is the
-    class object and the later is the context. It will check whether the class object is
-    freezed (by checking the `_freeze` member). If yes, it caches the function result in
-    the field prefixed by '_CACHED_' before the function name.
+    Note that the member function cannot support kwargs after being decorated.
+    The member function must be functional. Otherwise, the behavior is undefined.
+
+    Parameters
+    ----------
+    cache : str
+        The cache name. The cache should be a dictionary attribute
+        in the class object.
+    prefix : str
+        The key prefix to save the result of the function.
     """
-    cache_name = '_CACHED_' + func.__name__
-    @wraps(func)
-    def wrapper(self, ctx):
-        if self._freeze:
-            # cache
-            if getattr(self, cache_name, None) is None:
-                bind_func = lambda _ctx : func(self, _ctx)
-                setattr(self, cache_name, CtxCachedObject(bind_func))
-            return getattr(self, cache_name).get(ctx)
-        else:
-            return func(self, ctx)
-    return wrapper
-
-def cached_member(func):
-    cache_name = '_CACHED_' + func.__name__
-    @wraps(func)
-    def wrapper(self):
-        if self._freeze:
-            # cache
-            if getattr(self, cache_name, None) is None:
-                setattr(self, cache_name, func(self))
-            return getattr(self, cache_name)
-        else:
-            return func(self)
-    return wrapper
+    def _creator(func):
+        @wraps(func)
+        def wrapper(self, *args):
+            dic = getattr(self, cache)
+            key = '%s-%s' % (prefix, '-'.join([str(a) for a in args]))
+            if not key in dic:
+                dic[key] = func(self, *args)
+            return dic[key]
+        return wrapper
+    return _creator
 
 def is_dict_like(obj):
     return isinstance(obj, Mapping)
