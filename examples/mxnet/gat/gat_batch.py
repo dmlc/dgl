@@ -146,13 +146,12 @@ def main(args):
     n_edges = data.graph.number_of_edges()
 
     if args.gpu < 0:
-        cuda = False
+        ctx = mx.cpu(0)
     else:
-        cuda = True
-        torch.cuda.set_device(args.gpu)
-        features = features.cuda()
-        labels = labels.cuda()
-        mask = mask.cuda()
+        ctx = mx.gpu(args.gpu)
+        features = features.as_in_context(ctx)
+        labels = labels.as_in_context(ctx)
+        mask = mask.as_in_context(ctx)
 
     # create GCN model
     g = DGLGraph(data.graph)
@@ -169,9 +168,7 @@ def main(args):
                 args.attn_drop,
                 args.residual)
 
-    if cuda:
-        model.cuda()
-    model.initialize()
+    model.initialize(ctx=ctx)
 
     # use optimizer
     trainer = gluon.Trainer(model.collect_params(), 'adam', {'learning_rate': args.lr})
@@ -189,6 +186,7 @@ def main(args):
         #optimizer.zero_grad()
         loss.backward()
         trainer.step(features.shape[0])
+        loss.wait_to_read()
 
         if epoch >= 3:
             dur.append(time.time() - t0)

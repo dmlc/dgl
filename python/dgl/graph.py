@@ -388,6 +388,15 @@ class DGLGraph(object):
         self._edge_frame.clear()
         self._msg_frame.clear()
 
+    def clear_cache(self):
+        """Clear all cached graph structures such as adjmat.
+
+        By default, all graph structure related sparse matrices (e.g. adjmat, incmat)
+        are cached so they could be reused with the cost of extra memory consumption.
+        This function can be used to clear the cached matrices if memory is an issue.
+        """
+        self._graph.clear_cache()
+
     def number_of_nodes(self):
         """Return the number of nodes in the graph.
 
