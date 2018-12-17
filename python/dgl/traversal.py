@@ -40,8 +40,8 @@ def bfs_nodes_generator(graph, source, reversed=False):
     [tensor([0]), tensor([1]), tensor([2, 3]), tensor([4, 5])]
     """
     ghandle = graph._graph._handle
-    source = utils.toindex(source).todgltensor()
-    ret = _CAPI_DGLBFSNodes(ghandle, source, reversed)
+    source = utils.toindex(source)
+    ret = _CAPI_DGLBFSNodes(ghandle, source.todgltensor(), reversed)
     all_nodes = utils.toindex(ret(0)).tousertensor()
     # TODO(minjie): how to support directly creating python list
     sections = utils.toindex(ret(1)).tonumpy().tolist()
@@ -80,8 +80,8 @@ def bfs_edges_generator(graph, source, reversed=False):
     [tensor([0]), tensor([1, 2]), tensor([4, 5])]
     """
     ghandle = graph._graph._handle
-    source = utils.toindex(source).todgltensor()
-    ret = _CAPI_DGLBFSEdges(ghandle, source, reversed)
+    source = utils.toindex(source)
+    ret = _CAPI_DGLBFSEdges(ghandle, source.todgltensor(), reversed)
     all_edges = utils.toindex(ret(0)).tousertensor()
     # TODO(minjie): how to support directly creating python list
     sections = utils.toindex(ret(1)).tonumpy().tolist()
@@ -161,8 +161,8 @@ def dfs_edges_generator(graph, source, reversed=False):
     [tensor([0]), tensor([1]), tensor([3]), tensor([5]), tensor([4])]
     """
     ghandle = graph._graph._handle
-    source = utils.toindex(source).todgltensor()
-    ret = _CAPI_DGLDFSEdges(ghandle, source, reversed)
+    source = utils.toindex(source)
+    ret = _CAPI_DGLDFSEdges(ghandle, source.todgltensor(), reversed)
     all_edges = utils.toindex(ret(0)).tousertensor()
     # TODO(minjie): how to support directly creating python list
     sections = utils.toindex(ret(1)).tonumpy().tolist()
@@ -232,10 +232,10 @@ def dfs_labeled_edges_generator(
     (tensor([0]), tensor([0]), tensor([0]), tensor([0]), tensor([0]), tensor([2]))
     """
     ghandle = graph._graph._handle
-    source = utils.toindex(source).todgltensor()
+    source = utils.toindex(source)
     ret = _CAPI_DGLDFSLabeledEdges(
             ghandle,
-            source,
+            source.todgltensor(),
             reversed,
             has_reverse_edge,
             has_nontree_edge,
