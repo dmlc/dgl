@@ -1,6 +1,6 @@
 # Model Examples using DGL (w/ MXNet backend)
 
-use DGLBACKEND=mxnet to use MXNet as DGL's backend
+use `DGLBACKEND=mxnet` to use MXNet as DGL's backend
 
 ## Examples:
 
