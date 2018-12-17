@@ -366,6 +366,20 @@ class Frame(MutableMapping):
             # directly updating columns.
             self._columns = {key: Column.create(data) for key, data in other.items()}
         else:
+            # pad columns that no new were provided
+            for key, col in self.items():
+                if key not in other:
+                    scheme = col.scheme
+                    ctx = F.context(col.data)
+                    if self.get_initializer(key) is None:
+                        self._warn_and_set_initializer()
+                    new_data = self.get_initializer(key)(
+                            (other.num_rows,) + scheme.shape, scheme.dtype,
+                            ctx, slice(self._num_rows,
+                                       self._num_rows + other.num_rows)
+                    )
+                    other[key] = new_data
+            # append other to self
             for key, col in other.items():
                 if key not in self._columns:
                     # the column does not exist; init a new column
