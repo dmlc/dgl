@@ -34,7 +34,7 @@ class GATReduce(nn.Module):
         a = a1 + a2  # shape (B, deg, 1)
         e = F.softmax(F.leaky_relu(a), dim=1)
         if self.attn_drop != 0.0:
-            e = F.dropout(e, self.attn_drop, training=self.training)
+            e = F.dropout(e, self.attn_drop)
         return {'accum': torch.sum(e * ft, dim=1)}  # shape (B, D)
 
 
@@ -48,7 +48,7 @@ class GATFinalize(nn.Module):
         if residual:
             if indim != hiddendim:
                 self.residual_fc = nn.Linear(indim, hiddendim, bias=False)
-                nn.init.xavier_normal_(self.residual_fc.weight.data, gain=1.414)
+                nn.init.xavier_normal_(self.residual_fc.weight.data, gain=nn.init.calculate_gain('relu'))
 
     def forward(self, nodes):
         ret = nodes.data['accum']
@@ -57,8 +57,7 @@ class GATFinalize(nn.Module):
                 ret = self.residual_fc(nodes.data['h']) + ret
             else:
                 ret = nodes.data['h'] + ret
-        return {'head%d' % self.headid
-                : self.activation(ret)}
+        return {'head%d' % self.headid: self.activation(ret)}
 
 
 class GATPrepare(nn.Module):
@@ -68,15 +67,15 @@ class GATPrepare(nn.Module):
         self.drop = drop
         self.attn_l = nn.Linear(hiddendim, 1, bias=False)
         self.attn_r = nn.Linear(hiddendim, 1, bias=False)
-        nn.init.xavier_normal_(self.fc.weight.data, gain=1.414)
-        nn.init.xavier_normal_(self.attn_l.weight.data, gain=1.414)
-        nn.init.xavier_normal_(self.attn_r.weight.data, gain=1.414)
+        nn.init.xavier_normal_(self.fc.weight.data, gain=nn.init.calculate_gain('relu'))
+        nn.init.xavier_normal_(self.attn_l.weight.data, gain=nn.init.calculate_gain('relu'))
+        nn.init.xavier_normal_(self.attn_r.weight.data, gain=nn.init.calculate_gain('relu'))
 
     def forward(self, feats):
         h = feats
 
         if self.drop != 0.0:
-            h = F.dropout(h, self.drop, training=self.training)
+            h = F.dropout(h, self.drop)
 
         ft = self.fc(h)
         a1 = self.attn_l(ft)
@@ -165,6 +164,7 @@ def main(args):
     labels = torch.LongTensor(data.labels)
     mask = torch.ByteTensor(data.train_mask)
     test_mask = torch.ByteTensor(data.test_mask)
+    val_mask = torch.ByteTensor(data.val_mask)
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
@@ -177,6 +177,8 @@ def main(args):
         features = features.cuda()
         labels = labels.cuda()
         mask = mask.cuda()
+        test_mask =test_mask.cuda()
+        val_mask = val_mask.cuda()
 
     # create GCN model
     g = DGLGraph(data.graph)
@@ -222,9 +224,9 @@ def main(args):
             dur.append(time.time() - t0)
 
         if epoch%100 == 0:
-            acc = evaluate(model, features, labels, test_mask)
+            acc = evaluate(model, features, labels, val_mask)
             model.train()
-            print("Test Accuracy {:.4f}".format(acc))
+            print("Validation Accuracy {:.4f}".format(acc))
 
         print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
             epoch, loss.item(), np.mean(dur), n_edges / np.mean(dur) / 1000))
@@ -262,3 +264,4 @@ if __name__ == '__main__':
     print(args)
 
     main(args)
+
