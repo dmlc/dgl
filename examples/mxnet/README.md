@@ -1,7 +1,7 @@
 # Model Examples using DGL (w/ MXNet backend)
-```
-use DGLBACKEND=mxnet to convert DGLBACKEND to mxnet.
-```
+
+use DGLBACKEND=mxnet to use MXNet as DGL's backend
+
 ## Examples:
 
 ```
