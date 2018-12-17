@@ -66,6 +66,10 @@ class Column(object):
     def shape(self):
         return self.scheme.shape
 
+    @property
+    def dtype(self):
+        return self.scheme.dtype
+
     def __getitem__(self, idx):
         """Return the feature data given the index.
 

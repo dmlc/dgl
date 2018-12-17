@@ -115,14 +115,27 @@ class DGLSubGraph(DGLGraph):
             self._parent._edge_frame.update_rows(
                     self._get_parent_eid(), self._edge_frame, inplace=inplace)
 
-    def copy_from_parent(self):
+    def copy_from_parent(self, ctx=F.cpu()):
         """Copy node/edge features from the parent graph.
 
         All old features will be removed.
+
+        Parameters
+        ----------
+        ctx : context, optional (default=cpu)
+            The context of node data and edge data.
+
         """
         if self._parent._node_frame.num_rows != 0:
-            self._node_frame = FrameRef(Frame(
-                self._parent._node_frame[self._parent_nid]))
+            # if the cache doesn't exist, or the cache isn't in the specified context.
+            if self._parent._vertex_cache is None or self._parent._vertex_cache.context != ctx:
+                # TODO move data to the specified context
+                self._node_frame = FrameRef(Frame(
+                    self._parent._node_frame[self._parent_nid]))
+            else:
+                self._node_frame = FrameRef(Frame(
+                    self._parent._node_cache_lookup(self._parent_nid, ctx)))
+        # TODO move data to the specified context.
         if self._parent._edge_frame.num_rows != 0:
             self._edge_frame = FrameRef(Frame(
                 self._parent._edge_frame[self._get_parent_eid()]))

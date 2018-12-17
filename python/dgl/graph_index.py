@@ -815,6 +815,24 @@ def map_to_subgraph_nid(subgraph, parent_nids):
     return utils.toindex(_CAPI_DGLMapSubgraphNID(subgraph.induced_nodes.todgltensor(),
         parent_nids.todgltensor()))
 
+def search_nids(all_nodes, nids):
+    """Search node Ids.
+
+    Parameters
+    ----------
+    all_nodes: utils.Index
+        A list that contains all nodes.
+
+    nids: utils.Index
+        The nodes to search.
+
+    Returns
+    -------
+    utils.Index
+        The location of `nids` in `all_nodes`. If the node Id doesn't, the location is -1.
+    """
+    return utils.toindex(_CAPI_DGLMapSubgraphNID(all_nodes.todgltensor(), nids.todgltensor()))
+
 def disjoint_union(graphs):
     """Return a disjoint union of the input graphs.
 

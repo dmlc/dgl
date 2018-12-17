@@ -9,6 +9,7 @@ import dgl
 from .base import ALL, is_all, DGLError, dgl_warning
 from . import backend as F
 from .frame import FrameRef, Frame
+from .frame_cache import FrameRowCache
 from .graph_index import GraphIndex, create_graph_index
 from .runtime import ir, scheduler, Runtime
 from . import utils
@@ -197,6 +198,39 @@ class DGLGraph(object):
         self._reduce_func = None
         self._apply_node_func = None
         self._apply_edge_func = None
+        self._vertex_cache = None
+
+    def cache_node_data(self, vids, ctx):
+        """Cache node data.
+
+        This function caches all data in the specified nodes in the specified context.
+        Users can use this function to cache data in GPU.
+
+        Parameters
+        ----------
+        vids : list or tensor
+            nodes whose data is cached.
+        ctx : context
+            The context where data is cached.
+        """
+        vids = utils.toindex(vids).tousertensor()
+        vids = utils.toindex(F.sort_1d(vids)[0])
+        self._vertex_cache = FrameRowCache(self._node_frame, vids, ctx)
+
+    def _node_cache_lookup(self, nid, ctx):
+        print("cache lookup")
+        assert self._vertex_cache is not None
+        cached_data = self._vertex_cache.cache_lookup(nid)
+        ret = {}
+        for key in self._node_frame:
+            if key in cached_data:
+                data, gids, lids = cached_data[key]
+                print("copy " + str(gids) + " from global frame")
+                data[lids] = F.copy_to(self._node_frame[key][gids], ctx)
+                ret.update({key: data})
+            else:
+                ret.update({key: self._node_frame[key][nid]})
+        return ret
 
     def add_nodes(self, num, data=None):
         """Add multiple new nodes.

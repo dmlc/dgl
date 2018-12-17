@@ -1,0 +1,42 @@
+import os
+os.environ['DGLBACKEND'] = 'mxnet'
+import mxnet as mx
+import numpy as np
+from dgl.graph import DGLGraph
+import dgl
+
+D = 5
+
+def generate_graph():
+    g = DGLGraph()
+    g.add_nodes(10) # 10 nodes.
+    # create a graph where 0 is the source and 9 is the sink
+    for i in range(1, 9):
+        g.add_edge(0, i)
+        g.add_edge(i, 9)
+    # add a back flow from 9 to 0
+    g.add_edge(9, 0)
+    g.ndata['h1'] = mx.nd.arange(10 * D).reshape((10, D))
+    g.ndata['h2'] = mx.nd.arange(10 * D).reshape((10, D))
+    g.edata['w'] = mx.nd.arange(17 * D).reshape((17, D))
+    g.set_n_initializer(dgl.init.zero_initializer)
+    g.set_e_initializer(dgl.init.zero_initializer)
+    return g
+
+def test_node_cache():
+    g = generate_graph()
+    g.cache_node_data([1, 0, 5, 9, 7, 8])
+    subg_ids = [0, 1, 2, 4, 5, 9]
+    subg = g.subgraph(subg_ids)
+    subg.copy_from_parent()
+    assert subg.ndata.keys() == g.ndata.keys()
+    for key in subg.ndata:
+        print(key)
+        assert key in g.ndata
+        data = g.ndata[key][subg_ids]
+        print(data.asnumpy())
+        print(subg.ndata[key].asnumpy())
+        assert np.all(data.asnumpy() == subg.ndata[key].asnumpy())
+
+if __name__ == '__main__':
+    test_node_cache()
