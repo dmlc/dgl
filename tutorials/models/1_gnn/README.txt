@@ -6,7 +6,7 @@ Graph Neural Network and its variant
 * **GCN** `[paper] <https://arxiv.org/abs/1609.02907>`__ `[tutorial]
   <1_gnn/1_gcn.html>`__ `[Pytorch code]
   <https://github.com/dmlc/dgl/blob/master/examples/pytorch/gcn>`__
-  `[MXNesst code]
+  `[MXNet code]
   <https://github.com/dmlc/dgl/tree/master/examples/mxnet/gcn>`__:
   this is the vanilla GCN. The tutorial covers the basic uses of DGL APIs.
 
