@@ -490,34 +490,6 @@ def test_pull_0deg():
     # non-0deg check: not touched
     assert U.allclose(new[1], old[1])
 
-def _disabled_test_send_twice():
-    # TODO(minjie): please re-enable this unittest after the send code problem is fixed.
-    g = DGLGraph()
-    g.add_nodes(3)
-    g.add_edge(0, 1)
-    g.add_edge(2, 1)
-    def _message_a(edges):
-        return {'a': edges.src['a']}
-    def _message_b(edges):
-        return {'a': edges.src['a'] * 3}
-    def _reduce(nodes):
-        return {'a': nodes.mailbox['a'].max(1)[0]}
-
-    old_repr = th.randn(3, 5)
-    g.ndata['a'] = old_repr
-    g.send((0, 1), _message_a)
-    g.send((0, 1), _message_b)
-    g.recv(1, _reduce)
-    new_repr = g.ndata['a']
-    assert U.allclose(new_repr[1], old_repr[0] * 3)
-
-    g.ndata['a'] = old_repr
-    g.send((0, 1), _message_a)
-    g.send((2, 1), _message_b)
-    g.recv(1, _reduce)
-    new_repr = g.ndata['a']
-    assert U.allclose(new_repr[1], th.stack([old_repr[0], old_repr[2] * 3], 0).max(0)[0])
-
 def test_send_multigraph():
     g = DGLGraph(multigraph=True)
     g.add_nodes(3)
