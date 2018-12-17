@@ -15,6 +15,17 @@ original paper for better performance, credit to @yifeim and @ZiyueHuang.
 
 Results
 -------
+Run with following (available dataset: "cora", "citeseer", "pubmed")
+```bash
+DGLBACKEND=mxnet python gcn_spmv.py --dataset cora --gpu 0
+```
+
+* cora: ~0.810 (paper: 0.815)
+* citeseer: ~0.702 (paper: 0.703)
+* pubmed: ~0.780 (paper: 0.790)
+
+Results (`gcn_concat.py`)
+-------------------------
 These results are based on single-run training to minimize the cross-entropy
 loss of the first 20 examples in each class. We can see clear improvements of
 graph convolution networks (GCNs) over multi-layer perceptron (MLP) baselines.

@@ -25,11 +25,12 @@ class GCNLayer(gluon.Block):
         super(GCNLayer, self).__init__()
         self.g = g
         with self.name_scope():
+            stdv = 1. / math.sqrt(out_feats)
             self.weight = self.params.get('weight', shape=(in_feats, out_feats),
-                    init=mx.init.Xavier())
+                    init=mx.init.Uniform(stdv))
             if bias:
                 self.bias = self.params.get('bias', shape=(out_feats,),
-                    init=mx.init.Zero())
+                    init=mx.init.Uniform(stdv))
             else:
                 self.bias = None
         self.activation = activation
@@ -38,7 +39,6 @@ class GCNLayer(gluon.Block):
     def forward(self, h):
         if self.dropout:
             h = mx.nd.Dropout(h, p=self.dropout)
-        #h = self.dense(h)
         h = mx.nd.dot(h, self.weight.data(h.context))
         # normalization by square root of src degree
         h = h * self.g.ndata['norm']
@@ -184,7 +184,7 @@ if __name__ == '__main__':
             help="dropout probability")
     parser.add_argument("--gpu", type=int, default=-1,
             help="gpu")
-    parser.add_argument("--lr", type=float, default=1e-2,
+    parser.add_argument("--lr", type=float, default=3e-2,
             help="learning rate")
     parser.add_argument("--n-epochs", type=int, default=200,
             help="number of training epochs")

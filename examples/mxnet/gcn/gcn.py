@@ -42,7 +42,6 @@ class NodeUpdate(gluon.Block):
             h = self.activation(h)
         return {'h': h}
 
-
 class GCNLayer(gluon.Block):
     def __init__(self,
                  g,
@@ -198,7 +197,7 @@ if __name__ == '__main__':
             help="dropout probability")
     parser.add_argument("--gpu", type=int, default=-1,
             help="gpu")
-    parser.add_argument("--lr", type=float, default=1e-2,
+    parser.add_argument("--lr", type=float, default=3e-2,
             help="learning rate")
     parser.add_argument("--n-epochs", type=int, default=200,
             help="number of training epochs")
