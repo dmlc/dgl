@@ -185,6 +185,27 @@ def test_send_twice_different_msg():
     new_repr = g.ndata['a']
     assert U.allclose(new_repr[1], th.stack([old_repr[0], old_repr[2] * 3], 0).max(0)[0])
 
+def test_send_twice_different_field():
+    g = DGLGraph()
+    g.set_n_initializer(dgl.init.zero_initializer)
+    g.add_nodes(2)
+    g.add_edge(0, 1)
+    def _message_a(edges):
+        return {'a': edges.src['a']}
+    def _message_b(edges):
+        return {'b': edges.src['b']}
+    def _reduce(nodes):
+        return {'a': nodes.mailbox['a'].sum(1), 'b': nodes.mailbox['b'].sum(1)}
+    old_a = th.randn(2, 5)
+    old_b = th.randn(2, 5)
+    g.set_n_repr({'a': old_a, 'b': old_b})
+    g.send((0, 1), _message_a)
+    g.send((0, 1), _message_b)
+    g.recv([1], _reduce)
+    new_repr = g.get_n_repr()
+    assert th.allclose(new_repr['a'][1], old_a[0])
+    assert th.allclose(new_repr['b'][1], old_b[0])
+
 def test_dynamic_addition():
     N = 3
     D = 1
@@ -246,10 +267,12 @@ def test_recv_no_send():
     g.clear()
     g.recv(1, reduce_func)
 
+
 if __name__ == '__main__':
     test_multi_send()
     test_multi_recv()
     test_multi_recv_0deg()
     test_dynamic_addition()
     test_send_twice_different_msg()
+    test_send_twice_different_field()
     test_recv_no_send()
