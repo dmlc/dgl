@@ -418,11 +418,16 @@ class DGLGraph(object):
         self._msg_frame.clear()
 
     def clear_cache(self, type):
-        """Clear all cached graph structures such as adjmat.
+        """Clear cached data in DGLGraph.
 
-        By default, all graph structure related sparse matrices (e.g. adjmat, incmat)
-        are cached so they could be reused with the cost of extra memory consumption.
-        This function can be used to clear the cached matrices if memory is an issue.
+        DGL can cache different data to accelerate computation, including
+        * graph structures (type='graph'): DGL, by default, caches all graph structure
+        related sparse matrices (e.g. adjmat, incmat) at the cost of extra memory consumption.
+        * node data (type='node'): Node data (e.g., node features and embeddings) can be
+        cached in different contexts (e.g., GPUs) by `cache_node_data`.
+
+        This function can be used to clear the cached matrices when necessary. For example,
+        when memory is an issue or node data has been updated, etc.
         """
         if type == "graph":
             self._graph.clear_cache()
