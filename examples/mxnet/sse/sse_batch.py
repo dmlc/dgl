@@ -152,11 +152,6 @@ class SSEPredict(gluon.Block):
             hidden = mx.nd.Dropout(hidden, p=self.dropout)
         return self.linear2(self.linear1(hidden))
 
-def copy_to_gpu(subg, ctx):
-    frame = subg.ndata
-    for key in frame:
-        subg.ndata[key] = frame[key].as_in_context(ctx)
-
 class CachedSubgraph(object):
     def __init__(self, subg, seeds):
         # We can't cache the input subgraph because it contains node frames
@@ -257,6 +252,15 @@ def main(args, data):
     # compute vertex embedding.
     all_hidden = update_hidden_infer(g, None)
     g.ndata['h'] = all_hidden
+    if args.gpu > 0 and args.cache_percent > 0:
+        # We should cache the nodes with the highest out-degree because the embeddings of
+        # these nodes are most likely to be read.
+        degs = g.in_degrees()
+        idx = mx.nd.argsort(degs, is_ascend=False).astype(np.int64)
+        num_cached = int(g.number_of_nodes() * args.cache_percent / 100)
+        high_deg_vs = idx[0:num_cached]
+        high_degs = degs[high_deg_vs]
+        g.cache_node_data(high_deg_vs, ctx=mx.gpu(0))
     rets = []
     rets.append(all_hidden)
 
@@ -280,13 +284,12 @@ def main(args, data):
         for subg, aux_infos in sampler:
             seeds = aux_infos['seeds']
             subg_seeds = subg.map_to_subgraph_nid(seeds)
-            subg.copy_from_parent()
+            if args.gpu > 0:
+                subg.copy_from_parent(ctx=mx.gpu(i % args.gpu))
+            else:
+                subg.copy_from_parent()
 
             losses = []
-            if args.gpu > 0:
-                ctx = mx.gpu(i % args.gpu)
-                copy_to_gpu(subg, ctx)
-
             with mx.autograd.record():
                 logits = model_train(subg, subg_seeds)
                 batch_labels = mx.nd.take(labels, seeds).as_in_context(logits.context)
@@ -335,6 +338,8 @@ def main(args, data):
         # Update node embeddings.
         all_hidden = update_hidden_infer(g, None)
         g.ndata['h'] = all_hidden
+        if args.gpu > 0:
+            g.cache_node_data(high_deg_vs, ctx=mx.gpu(0))
         rets.append(all_hidden)
 
         dur.append(time.time() - t0)
@@ -400,6 +405,8 @@ if __name__ == '__main__':
             help="the number of subgraphs to construct in parallel.")
     parser.add_argument("--neigh-expand", type=int, default=16,
             help="the number of neighbors to sample.")
+    parser.add_argument("--cache-percent", type=int, default=0,
+            help="the percentage of nodes being cached in GPU.")
     args = parser.parse_args()
     print("cache: " + str(args.cache_subgraph))
 
