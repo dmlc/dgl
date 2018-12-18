@@ -179,8 +179,6 @@ class DGLGraph(object):
         # graph
         self._readonly=readonly
         self._graph = create_graph_index(graph_data, multigraph, readonly)
-        # msg frame
-        self._msg_frame = FrameRef()
         # node and edge frame
         if node_frame is None:
             self._node_frame = FrameRef(Frame(num_rows=self.number_of_nodes()))
@@ -188,6 +186,7 @@ class DGLGraph(object):
             self._node_frame = node_frame
         if edge_frame is None:
             self._edge_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
+            self._msg_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
         else:
             self._edge_frame = edge_frame
             self._msg_frame.add_rows(edge_frame.num_rows)
@@ -1166,6 +1165,7 @@ class DGLGraph(object):
         self._graph.from_networkx(nx_graph)
         self._node_frame.add_rows(self.number_of_nodes())
         self._edge_frame.add_rows(self.number_of_edges())
+        self._msg_frame.add_rows(self.number_of_edges())
 
         # copy attributes
         def _batcher(lst):
@@ -1223,6 +1223,7 @@ class DGLGraph(object):
         self._graph.from_scipy_sparse_matrix(a)
         self._node_frame.add_rows(self.number_of_nodes())
         self._edge_frame.add_rows(self.number_of_edges())
+        self._msg_frame.add_rows(self.number_of_edges())
 
     def node_attr_schemes(self):
         """Return the node feature schemes.
