@@ -126,19 +126,18 @@ class DGLSubGraph(DGLGraph):
             The context of node data and edge data.
 
         """
-        if self._parent._node_frame.num_rows != 0:
+        if not self._parent._node_frame.is_empty():
             # if the cache doesn't exist, or the cache isn't in the specified context.
             if self._parent._vertex_cache is None or self._parent._vertex_cache.context != ctx:
-                # TODO move data to the specified context
                 self._node_frame = FrameRef(Frame(
-                    self._parent._node_frame[self._parent_nid]))
+                    self._parent._node_frame.select_rows(self._parent_nid, ctx)))
             else:
                 self._node_frame = FrameRef(Frame(
                     self._parent._node_cache_lookup(self._parent_nid, ctx)))
-        # TODO move data to the specified context.
-        if self._parent._edge_frame.num_rows != 0:
+        if not self._parent._edge_frame.is_empty():
+            # We probably don't need to cache edge data. An edge usually exists in one subgraph.
             self._edge_frame = FrameRef(Frame(
-                self._parent._edge_frame[self._get_parent_eid()]))
+                self._parent._edge_frame.select_rows(self._get_parent_eid(), ctx)))
 
     def map_to_subgraph_nid(self, parent_vids):
         """Map the node Ids in the parent graph to the node Ids in the subgraph.

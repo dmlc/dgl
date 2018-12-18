@@ -243,6 +243,10 @@ class Frame(MutableMapping):
         else:
             self._initializers[column] = initializer
 
+    def is_empty(self):
+        """Return whether the frame is empty."""
+        return self.num_rows == 0 or self.num_columns == 0
+
     @property
     def schemes(self):
         """Return a dictionary of column name to column schemes."""
@@ -436,6 +440,10 @@ class FrameRef(MutableMapping):
         self._index = None
         self._index_or_slice = None
 
+    def is_empty(self):
+        """Return whether the frame is empty."""
+        return self._frame.is_empty()
+
     @property
     def schemes(self):
         """Return the frame schemes.
@@ -576,7 +584,7 @@ class FrameRef(MutableMapping):
         else:
             return self.select_rows(key)
 
-    def select_column(self, name):
+    def select_column(self, name, ctx=None):
         """Return the column of the given name.
 
         If only part of the rows are referenced, the fetching the whole column will
@@ -587,6 +595,9 @@ class FrameRef(MutableMapping):
         name : str
             The column name.
 
+        ctx : DGLContext
+            The column context.
+
         Returns
         -------
         Tensor
@@ -594,11 +605,15 @@ class FrameRef(MutableMapping):
         """
         col = self._frame[name]
         if self.is_span_whole_column():
-            return col.data
+            ret = col.data
         else:
-            return col[self.index_or_slice()]
+            ret = col[self.index_or_slice()]
+        if ctx is None:
+            return ret
+        else:
+            return F.copy_to(ret, ctx)
 
-    def select_rows(self, query):
+    def select_rows(self, query, ctx=None):
         """Return the rows given the query.
 
         Parameters
@@ -606,13 +621,21 @@ class FrameRef(MutableMapping):
         query : utils.Index or slice
             The rows to be selected.
 
+        ctx : DGLContext
+            The context of returned rows.
+
         Returns
         -------
         utils.LazyDict
             The lazy dictionary from str to the selected data.
         """
         rows = self._getrows(query)
-        return utils.LazyDict(lambda key: self._frame[key][rows], keys=self.keys())
+        def fn(key):
+            if ctx is None:
+                return self._frame[key][rows]
+            else:
+                return F.copy_to(self._frame[key][rows], ctx)
+        return utils.LazyDict(fn, keys=self.keys())
 
     def __setitem__(self, key, val):
         self.set_item_inplace(key, val, inplace=False)
