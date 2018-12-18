@@ -186,10 +186,10 @@ class DGLGraph(object):
             self._node_frame = node_frame
         if edge_frame is None:
             self._edge_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
-            self._msg_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
         else:
             self._edge_frame = edge_frame
-            self._msg_frame.add_rows(edge_frame.num_rows)
+        # message frame
+        self._msg_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
         # set initializer for message frame
         # all fields including message indicator should use zero_initializer
         self._msg_frame.set_initializer(dgl.init.zero_initializer)
