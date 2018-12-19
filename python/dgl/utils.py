@@ -75,6 +75,7 @@ class Index(object):
                     raise DGLError('Error index data: %s' % str(data))
             self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self._pydata)
 
+
     def tonumpy(self):
         """Convert to a numpy ndarray."""
         if self._pydata is None:
@@ -126,8 +127,41 @@ class Index(object):
     def __setstate__(self, state):
         self._initialize_data(state)
 
+    def get_items(self, index):
+        tensor = self.tousertensor()
+        if isinstance(index, Index):
+            index = index.tousertensor()
+        return Index(tensor[index])
+
+    def set_items(self, index, value):
+        tensor = self.tousertensor()
+        if isinstance(index, Index):
+            index = index.tousertensor()
+        if isinstance(value, Index):
+            value = value.tousertensor()
+        tensor[index] = value
+        return Index(tensor)
+
+    def add_elements(self, num):
+        tensor = self.tousertensor()
+        new_items = F.zeros((num,), dtype=F.int64, ctx=F.cpu())
+        tensor = F.cat((tensor, new_items), dim=0)
+        return Index(tensor)
+
+    def nonzero(self):
+        tensor = self.tousertensor()
+        mask = F.nonzero_1d(tensor != 0)
+        return Index(mask)
+
+    def has_nonzero(self):
+        tensor = self.tousertensor()
+        return F.sum(tensor, 0) > 0
+
 def toindex(x):
     return x if isinstance(x, Index) else Index(x)
+
+def zero_index(size):
+    return Index(F.zeros((size,), dtype=F.int64, ctx=F.cpu()))
 
 class LazyDict(Mapping):
     """A readonly dictionary that does not materialize the storage."""
