@@ -44,12 +44,14 @@ class DGLSubGraph(DGLGraph):
     shared : bool, optional
         Whether the subgraph shares node/edge features with the parent graph.
     """
-    def __init__(self, parent, parent_nid, parent_eid, graph_idx, shared=False):
+    def __init__(self, parent, parent_nid, parent_eid, graph_idx, shared=False,
+                 vertex_cache=None):
         super(DGLSubGraph, self).__init__(graph_data=graph_idx,
                                           readonly=graph_idx.is_readonly())
         self._parent = parent
         self._parent_nid = parent_nid
         self._parent_eid = parent_eid
+        self._vertex_cache = vertex_cache
 
     # override APIs
     def add_nodes(self, num, reprs=None):
@@ -128,12 +130,12 @@ class DGLSubGraph(DGLGraph):
         """
         if not self._parent._node_frame.is_empty():
             # if the cache doesn't exist, or the cache isn't in the specified context.
-            if self._parent._vertex_cache is None or self._parent._vertex_cache.context != ctx:
+            if self._vertex_cache is None or self._vertex_cache.context != ctx:
                 self._node_frame = FrameRef(Frame(
                     self._parent._node_frame.select_rows(self._parent_nid, ctx)))
             else:
-                self._node_frame = FrameRef(Frame(
-                    self._parent._node_cache_lookup(self._parent_nid, ctx)))
+                #TODO if cached data doesn't contain everything, we can read from frame directly.
+                self._node_frame = FrameRef(Frame(self._vertex_cache.merge()))
         if not self._parent._edge_frame.is_empty():
             # We probably don't need to cache edge data. An edge usually exists in one subgraph.
             self._edge_frame = FrameRef(Frame(

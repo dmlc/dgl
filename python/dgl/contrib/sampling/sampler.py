@@ -62,8 +62,14 @@ class NSSubgraphLoader(object):
         sgi = self._g._graph.neighbor_sampling(seed_ids, self._expand_factor,
                                                self._num_hops, self._neighbor_type,
                                                self._node_prob, self._max_subgraph_size)
-        subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
-                i) for i in sgi]
+        sg_nodes = [i.induced_nodes for i in sgi]
+        if self._g._vertex_cache is not None:
+            caches = self._g._vertex_cache.cache_lookup(sg_nodes)
+            subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
+                                     i, cache) for i, cache in zip(sgi, caches)]
+        else:
+            subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
+                                     i) for i in sgi]
         self._subgraphs.extend(subgraphs)
         if self._return_seed_id:
             self._seed_ids.extend(seed_ids)

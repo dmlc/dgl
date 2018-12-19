@@ -200,35 +200,10 @@ class DGLGraph(object):
         self._apply_edge_func = None
         self._vertex_cache = None
 
-    def cache_node_data(self, vids, ctx):
-        """Cache node data.
-
-        This function caches all data in the specified nodes in the specified context.
-        Users can use this function to cache data in GPU.
-
-        Parameters
-        ----------
-        vids : list or tensor
-            nodes whose data is cached.
-        ctx : context
-            The context where data is cached.
-        """
+    def _cache_node_data(self, vids, ctx):
         vids = utils.toindex(vids).tousertensor()
         vids = utils.toindex(F.sort_1d(vids)[0])
         self._vertex_cache = FrameRowCache(self._node_frame, vids, ctx)
-
-    def _node_cache_lookup(self, nid, ctx):
-        assert self._vertex_cache is not None
-        cached_data = self._vertex_cache.cache_lookup(nid)
-        ret = {}
-        for key in self._node_frame:
-            if key in cached_data:
-                data, gids, lids = cached_data[key]
-                data[lids] = F.copy_to(self._node_frame[key][gids], ctx)
-                ret.update({key: data})
-            else:
-                ret.update({key: self._node_frame[key][nid]})
-        return ret
 
     def add_nodes(self, num, data=None):
         """Add multiple new nodes.
@@ -2663,7 +2638,12 @@ class DGLGraph(object):
         """
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
-        return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
+        if self._vertex_cache is not None:
+            cache = self._vertex_cache.cache_lookup([sgi.induced_nodes])[0]
+        else:
+            cache = None
+        return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi,
+                               vertex_cache=cache)
 
     def subgraphs(self, nodes):
         """Return a list of subgraphs, each induced in the corresponding given
@@ -2690,8 +2670,14 @@ class DGLGraph(object):
         """
         induced_nodes = [utils.toindex(n) for n in nodes]
         sgis = self._graph.node_subgraphs(induced_nodes)
-        return [dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
-            sgi) for sgi in sgis]
+        sg_nodes = [i.induced_nodes for i in sgis]
+        if self._vertex_cache is not None:
+            caches = self._vertex_cache.cache_lookup(sg_nodes)
+            return [dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
+                                    sgi, vertex_cache=cache) for sgi, cache in zip(sgis, caches)]
+        else:
+            return [dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
+                                    sgi) for sgi in sgis]
 
     def edge_subgraph(self, edges):
         """Return the subgraph induced on given edges.
