@@ -30,7 +30,6 @@ def generate_graph(grad=False):
     for i in range(1, 9):
         g.add_edge(0, i)
         g.add_edge(i, 9)
-    # add a back flow from 9 to 0
     ncol = Variable(th.randn(10, D), requires_grad=grad)
     ecol = Variable(th.randn(16, D), requires_grad=grad)
     g.set_n_initializer(dgl.init.zero_initializer)
@@ -155,6 +154,15 @@ def test_multi_recv_0deg():
     # recv again on node with no incoming message
     g.recv([1])
     assert U.allclose(g.nodes[1].data['h'], th.sum(old, 0) * 4)
+
+def test_send_twice_different_shape():
+    g = generate_graph()
+    def _message_1(edges):
+        return {'h': edges.src['h']}
+    def _message_2(edges):
+        return {'h': th.cat((edges.src['h'], edges.data['w']), dim=1)}
+    g.send(message_func=_message_1)
+    g.send(message_func=_message_2)
 
 def test_send_twice_different_msg():
     g = DGLGraph()
@@ -282,6 +290,7 @@ if __name__ == '__main__':
     test_multi_recv()
     test_multi_recv_0deg()
     test_dynamic_addition()
+    test_send_twice_different_shape()
     test_send_twice_different_msg()
     test_send_twice_different_field()
     test_recv_no_send()

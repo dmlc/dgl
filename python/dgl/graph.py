@@ -188,6 +188,8 @@ class DGLGraph(object):
             self._edge_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
         else:
             self._edge_frame = edge_frame
+        # message indicator:
+        # if self._msg_index[eid] == 1, then edge eid has message
         self._msg_index = utils.zero_index(size=self.number_of_edges())
         # message frame
         self._msg_frame = FrameRef(Frame(num_rows=self.number_of_edges()))

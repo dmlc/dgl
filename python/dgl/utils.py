@@ -130,13 +130,27 @@ class Index(object):
     def get_items(self, index):
         tensor = self.tousertensor()
         if isinstance(index, Index):
-            index = index.tousertensor()
+            if isinstance(index._pydata, slice):
+                # XXX: assuming tensor supports index using slices
+                #      cannot call tousertensor because for slice type it would
+                #      further call tonumpy, which overwrites _pydata and causes
+                #      future bugs...
+                index = index._pydata
+            else:
+                index = index.tousertensor()
         return Index(tensor[index])
 
     def set_items(self, index, value):
         tensor = self.tousertensor()
         if isinstance(index, Index):
-            index = index.tousertensor()
+            if isinstance(index._pydata, slice):
+                # XXX: assuming tensor supports index using slices
+                #      cannot call tousertensor because for slice type it would
+                #      further call tonumpy, which overwrites _pydata and causes
+                #      future bugs...
+                index = index._pydata
+            else:
+                index = index.tousertensor()
         if isinstance(value, Index):
             value = value.tousertensor()
         tensor[index] = value
