@@ -25,8 +25,6 @@ __all__ = [
             "schedule_pull"
           ]
 
-HAS_MSG= "__has_msg__"
-
 def schedule_send(graph, u, v, eid, message_func):
     """get send schedule
 
@@ -55,10 +53,7 @@ def schedule_send(graph, u, v, eid, message_func):
     msg = _gen_send(graph, var_nf, var_ef, var_u, var_v, var_eid, message_func)
     ir.WRITE_ROW_(var_mf, var_eid, msg)
     # set message indicator to 1
-    var_has_msg = var.FEAT_DICT({HAS_MSG: F.ones(shape=(len(eid),),
-                                                 dtype=F.int8,
-                                                 ctx=F.cpu())})
-    ir.WRITE_ROW_INPLACE_(var_mf, var_eid, var_has_msg)
+    graph._msg_index = graph._msg_index.set_items(eid, 1)
 
 def schedule_recv(graph,
                   recv_nodes,
@@ -81,11 +76,10 @@ def schedule_recv(graph,
         If True, the update will be done in place
     """
     _, _, eid = graph._graph.in_edges(recv_nodes)
-    if len(eid) > 0 and HAS_MSG in graph._msg_frame:
-        # check message indicator
-        e_mask = F.nonzero_1d(graph._msg_frame.select_rows(eid)[HAS_MSG] == 1)
-        eid = utils.Index(eid.tousertensor()[e_mask])
-    if len(eid) == 0 or not HAS_MSG in graph._msg_frame:
+    if len(eid) > 0:
+        e_mask = graph._msg_index.get_items(eid).nonzero()
+        eid = eid.get_items(e_mask)
+    if len(eid) == 0:
         # Downgrade to apply nodes if
         #   1) all recv nodes are 0-degree nodes
         #   2) no send has been called
@@ -109,12 +103,9 @@ def schedule_recv(graph,
         else:
             ir.WRITE_ROW_(var_nf, var_recv_nodes, final_feat)
         # set message indicator to 0
-        var_has_msg = var.FEAT_DICT({HAS_MSG: F.zeros(shape=(len(eid),),
-                                                      dtype=F.int8,
-                                                      ctx=F.cpu())})
-        var_mf = var.FEAT_DICT(graph._msg_frame)
-        var_eid = var.IDX(eid)
-        ir.WRITE_ROW_INPLACE_(var_mf, var_eid, var_has_msg)
+        graph._msg_index = graph._msg_index.set_items(eid, 0)
+        if not graph._msg_index.has_nonzero():
+            ir.CLEAR_FRAME_(var.FEAT_DICT(graph._msg_frame, name='mf'))
 
 def schedule_snr(graph,
                  edge_tuples,

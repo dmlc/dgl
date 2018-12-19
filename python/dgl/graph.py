@@ -188,6 +188,7 @@ class DGLGraph(object):
             self._edge_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
         else:
             self._edge_frame = edge_frame
+        self._msg_index = utils.zero_index(size=self.number_of_edges())
         # message frame
         self._msg_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
         # set initializer for message frame
@@ -303,7 +304,8 @@ class DGLGraph(object):
             self._edge_frame.add_rows(1)
         else:
             self._edge_frame.append(data)
-        # initialize feature placeholder for messages
+        # resize msg_index and msg_frame
+        self._msg_index = self._msg_index.add_elements(1)
         self._msg_frame.add_rows(1)
 
     def add_edges(self, u, v, data=None):
@@ -362,7 +364,9 @@ class DGLGraph(object):
         else:
             self._edge_frame.append(data)
         # initialize feature placeholder for messages
-        self._msg_frame.add_rows(max(len(u), len(v)))
+        num = max(len(u), len(v))
+        self._msg_index = self._msg_index.add_elements(num)
+        self._msg_frame.add_rows(num)
 
     def clear(self):
         """Remove all nodes and edges, as well as their features, from the
@@ -386,6 +390,7 @@ class DGLGraph(object):
         self._graph.clear()
         self._node_frame.clear()
         self._edge_frame.clear()
+        self._msg_index = utils.zero_index(0)
         self._msg_frame.clear()
 
     def clear_cache(self):
@@ -1165,6 +1170,7 @@ class DGLGraph(object):
         self._graph.from_networkx(nx_graph)
         self._node_frame.add_rows(self.number_of_nodes())
         self._edge_frame.add_rows(self.number_of_edges())
+        self._msg_index = utils.zero_index(self.number_of_edges())
         self._msg_frame.add_rows(self.number_of_edges())
 
         # copy attributes
@@ -1223,6 +1229,7 @@ class DGLGraph(object):
         self._graph.from_scipy_sparse_matrix(a)
         self._node_frame.add_rows(self.number_of_nodes())
         self._edge_frame.add_rows(self.number_of_edges())
+        self._msg_index = utils.zero_index(self.number_of_edges())
         self._msg_frame.add_rows(self.number_of_edges())
 
     def node_attr_schemes(self):
@@ -2033,10 +2040,6 @@ class DGLGraph(object):
         if apply_node_func == "default":
             apply_node_func = self._apply_node_func
         assert reduce_func is not None
-
-        if self._msg_frame.num_rows == 0:
-            # no message has ever been sent
-            return
 
         if is_all(v):
             v = F.arange(0, self.number_of_nodes())
