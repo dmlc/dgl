@@ -60,8 +60,7 @@ class GATFinalize(nn.Module):
                 ret = self.residual_fc(nodes.data['h']) + ret
             else:
                 ret = nodes.data['h'] + ret
-        return {'head%d' % self.headid
-                : self.activation(ret)}
+        return {'head%d' % self.headid: self.activation(ret)}
 
 
 class GATPrepare(nn.Module):
