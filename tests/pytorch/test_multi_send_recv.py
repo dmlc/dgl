@@ -7,7 +7,6 @@ import utils as U
 from collections import defaultdict as ddict
 
 D = 5
-HAS_MSG = "__has_msg__"
 
 def message_func(edges):
     assert len(edges.src['h'].shape) == 2
@@ -60,11 +59,11 @@ def test_multi_send():
     g.send((u, v))
 
     # check if message indicator is as expected
-    expected = th.zeros((g.number_of_edges(),), dtype=th.int8)
+    expected = th.zeros((g.number_of_edges(),), dtype=th.int64)
     eid = g.edge_ids([0, 0, 0, 0, 0, 1, 2, 3, 4, 5],
                      [1, 2, 3, 4, 5, 9, 9, 9, 9, 9])
     expected[eid] = 1
-    assert th.equal(g._msg_frame[HAS_MSG], expected)
+    assert th.equal(g._msg_index.tousertensor(), expected)
 
 def test_multi_recv():
     # basic recv test
@@ -73,27 +72,27 @@ def test_multi_recv():
     g.register_message_func(message_func)
     g.register_reduce_func(reduce_func)
     g.register_apply_node_func(apply_node_func)
-    expected = th.zeros((g.number_of_edges(),), dtype=th.int8)
+    expected = th.zeros((g.number_of_edges(),), dtype=th.int64)
     # two separate round of send and recv
     u = [4, 5, 6]
     v = [9]
     g.send((u, v))
     eid = g.edge_ids(u, v)
     expected[eid] = 1
-    assert th.equal(g._msg_frame[HAS_MSG], expected)
+    assert th.equal(g._msg_index.tousertensor(), expected)
     g.recv(v)
     expected[eid] = 0
-    assert th.equal(g._msg_frame[HAS_MSG], expected)
+    assert th.equal(g._msg_index.tousertensor(), expected)
 
     u = [0]
     v = [1, 2, 3]
     g.send((u, v))
     eid = g.edge_ids(u, v)
     expected[eid] = 1
-    assert th.equal(g._msg_frame[HAS_MSG], expected)
+    assert th.equal(g._msg_index.tousertensor(), expected)
     g.recv(v)
     expected[eid] = 0
-    assert th.equal(g._msg_frame[HAS_MSG], expected)
+    assert th.equal(g._msg_index.tousertensor(), expected)
 
     h1 = g.ndata['h']
 
@@ -104,19 +103,19 @@ def test_multi_recv():
     g.send((u, v))
     eid = g.edge_ids(u, v)
     expected[eid] = 1
-    assert th.equal(g._msg_frame[HAS_MSG], expected)
+    assert th.equal(g._msg_index.tousertensor(), expected)
     u = [4, 5, 6]
     v = [9]
     g.recv(v)
     eid = g.edge_ids(u, v)
     expected[eid] = 0
-    assert th.equal(g._msg_frame[HAS_MSG], expected)
+    assert th.equal(g._msg_index.tousertensor(), expected)
     u = [0]
     v = [1, 2, 3]
     g.recv(v)
     eid = g.edge_ids(u, v)
     expected[eid] = 0
-    assert th.equal(g._msg_frame[HAS_MSG], expected)
+    assert th.equal(g._msg_index.tousertensor(), expected)
 
     h2 = g.ndata['h']
     assert U.allclose(h1, h2)
@@ -240,8 +239,8 @@ def test_dynamic_addition():
     g.edata.update({'h1': th.randn(2, D),
                     'h2': th.randn(2, D)})
     g.send()
-    expected = th.ones((g.number_of_edges(),), dtype=th.int8)
-    assert th.equal(g._msg_frame[HAS_MSG], expected)
+    expected = th.ones((g.number_of_edges(),), dtype=th.int64)
+    assert th.equal(g._msg_index.tousertensor(), expected)
 
     # add more edges
     g.add_edges([0, 2], [2, 0], {'h1': th.randn(2, D)})
@@ -265,7 +264,17 @@ def test_recv_no_send():
     g.recv(1, reduce_func)
     # test recv after clear
     g.clear()
-    g.recv(1, reduce_func)
+    g.add_nodes(3)
+    g.add_edges([0, 1], [1, 2])
+    g.set_n_initializer(dgl.init.zero_initializer)
+    g.ndata['h'] = th.randn(3, D)
+    g.send((1, 2), message_func)
+    expected = th.zeros((2,), dtype=th.int64)
+    expected[1] = 1
+    assert th.equal(g._msg_index.tousertensor(), expected)
+    g.recv(2, reduce_func)
+    expected[1] = 0
+    assert th.equal(g._msg_index.tousertensor(), expected)
 
 
 if __name__ == '__main__':
