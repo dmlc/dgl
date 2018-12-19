@@ -34,6 +34,7 @@ class OpCode(object):
     WRITE_DICT_ = 24
     APPEND_ROW_ = 25
     WRITE_ROW_INPLACE_ = 26
+    CLEAR_FRAME_ = 27
 
 class Executor(object):
     @abstractmethod
@@ -645,3 +646,32 @@ IR_REGISTRY[OpCode.APPEND_ROW_] = {
 def APPEND_ROW_(fd1, fd2):
     reg = IR_REGISTRY[OpCode.APPEND_ROW_]
     get_current_prog().issue(reg['executor_cls'](fd1, fd2))
+
+class ClearFrame_Executor(Executor):
+    def __init__(self, fd):
+        self.fd = fd
+
+    def opcode(self):
+        return OpCode.CLEAR_FRAME_
+
+    def arg_vars(self):
+        return []
+
+    def ret_var(self):
+        return None
+
+    def run(self):
+        frame = self.fd.data
+        num_rows = frame.num_rows
+        frame.clear()
+        frame.add_rows(num_rows)
+
+IR_REGISTRY[OpCode.CLEAR_FRAME_] = {
+    'name': 'CLEAR_FRAME_',
+    'args_type': [],
+    'ret_type': None,
+    'executor_cls': ClearFrame_Executor,
+}
+def CLEAR_FRAME_(fd):
+    reg = IR_REGISTRY[OpCode.CLEAR_FRAME_]
+    get_current_prog().issue(reg['executor_cls'](fd))
