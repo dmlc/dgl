@@ -5,6 +5,7 @@ import dgl
 from dgl.graph import DGLGraph
 import utils as U
 from collections import defaultdict as ddict
+import scipy.sparse as sp
 
 D = 5
 
@@ -284,6 +285,57 @@ def test_recv_no_send():
     expected[1] = 0
     assert th.equal(g._msg_index.tousertensor(), expected)
 
+def test_send_recv_after_conversion():
+    # test send and recv after converting from a graph with edges
+
+    g = generate_graph()
+
+    # nx graph
+    nxg = g.to_networkx(node_attrs=['h'])
+    g1 = DGLGraph()
+    # some random node and edges
+    g1.add_nodes(4)
+    g1.add_edges([1, 2], [2, 3])
+    g1.set_n_initializer(dgl.init.zero_initializer)
+    g1.from_networkx(nxg, node_attrs=['h'])
+
+    # sparse matrix
+    row, col= g.all_edges()
+    data = range(len(row))
+    n = g.number_of_nodes()
+    a = sp.coo_matrix((data, (row, col)), shape=(n, n))
+    g2 = DGLGraph()
+    # some random node and edges
+    g2.add_nodes(5)
+    g2.add_edges([1, 2, 4], [2, 3, 0])
+    g2.set_n_initializer(dgl.init.zero_initializer)
+    g2.from_scipy_sparse_matrix(a)
+    g2.ndata['h'] = g.ndata['h']
+
+    # on dgl graph
+    g.send(message_func=message_func)
+    g.recv([0, 1, 3, 5], reduce_func=reduce_func,
+           apply_node_func=apply_node_func)
+    g.recv([0, 2, 4, 8], reduce_func=reduce_func,
+           apply_node_func=apply_node_func)
+
+    # nx
+    g1.send(message_func=message_func)
+    g1.recv([0, 1, 3, 5], reduce_func=reduce_func,
+            apply_node_func=apply_node_func)
+    g1.recv([0, 2, 4, 8], reduce_func=reduce_func,
+            apply_node_func=apply_node_func)
+
+    # sparse matrix
+    g2.send(message_func=message_func)
+    g2.recv([0, 1, 3, 5], reduce_func=reduce_func,
+            apply_node_func=apply_node_func)
+    g2.recv([0, 2, 4, 8], reduce_func=reduce_func,
+            apply_node_func=apply_node_func)
+
+    assert U.allclose(g.ndata['h'], g1.ndata['h'])
+    assert U.allclose(g.ndata['h'], g2.ndata['h'])
+
 
 if __name__ == '__main__':
     test_multi_send()
@@ -294,3 +346,4 @@ if __name__ == '__main__':
     test_send_twice_different_msg()
     test_send_twice_different_field()
     test_recv_no_send()
+    test_send_recv_after_conversion()
