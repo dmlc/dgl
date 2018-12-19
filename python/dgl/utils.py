@@ -143,10 +143,15 @@ class Index(object):
         return Index(tensor)
 
     def add_elements(self, num):
-        tensor = self.tousertensor()
+        if num == 0:
+            return self
         new_items = F.zeros((num,), dtype=F.int64, ctx=F.cpu())
-        tensor = F.cat((tensor, new_items), dim=0)
-        return Index(tensor)
+        if len(self) == 0:
+            return Index(new_items)
+        else:
+            tensor = self.tousertensor()
+            tensor = F.cat((tensor, new_items), dim=0)
+            return Index(tensor)
 
     def nonzero(self):
         tensor = self.tousertensor()

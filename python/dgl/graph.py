@@ -1951,6 +1951,10 @@ class DGLGraph(object):
             eid = utils.toindex(edges)
             u, v, _ = self._graph.find_edges(eid)
 
+        if len(eid) == 0:
+            # no edge to be triggered
+            return
+
         with ir.prog() as prog:
             scheduler.schedule_send(graph=self, u=u, v=v, eid=eid,
                                     message_func=message_func)
