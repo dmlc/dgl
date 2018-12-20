@@ -655,7 +655,7 @@ class ClearFrame_Executor(Executor):
         return OpCode.CLEAR_FRAME_
 
     def arg_vars(self):
-        return []
+        return [self.fd]
 
     def ret_var(self):
         return None
@@ -668,7 +668,7 @@ class ClearFrame_Executor(Executor):
 
 IR_REGISTRY[OpCode.CLEAR_FRAME_] = {
     'name': 'CLEAR_FRAME_',
-    'args_type': [],
+    'args_type': [VarType.FEAT_DICT],
     'ret_type': None,
     'executor_cls': ClearFrame_Executor,
 }

@@ -194,7 +194,6 @@ class DGLGraph(object):
         # message frame
         self._msg_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
         # set initializer for message frame
-        # all fields including message indicator should use zero_initializer
         self._msg_frame.set_initializer(dgl.init.zero_initializer)
         # registered functions
         self._message_func = None
@@ -359,14 +358,14 @@ class DGLGraph(object):
         u = utils.toindex(u)
         v = utils.toindex(v)
         self._graph.add_edges(u, v)
+        num = max(len(u), len(v))
         if data is None:
             # Initialize feature placeholders if there are features existing
             # NOTE: use max due to edge broadcasting syntax
-            self._edge_frame.add_rows(max(len(u), len(v)))
+            self._edge_frame.add_rows(num)
         else:
             self._edge_frame.append(data)
         # initialize feature placeholder for messages
-        num = max(len(u), len(v))
         self._msg_index = self._msg_index.add_elements(num)
         self._msg_frame.add_rows(num)
 

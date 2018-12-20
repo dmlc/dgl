@@ -77,8 +77,8 @@ def schedule_recv(graph,
     """
     _, _, eid = graph._graph.in_edges(recv_nodes)
     if len(eid) > 0:
-        e_mask = graph._msg_index.get_items(eid).nonzero()
-        eid = eid.get_items(e_mask)
+        nonzero_idx = graph._msg_index.get_items(eid).nonzero()
+        eid = eid.get_items(nonzero_idx)
     if len(eid) == 0:
         # Downgrade to apply nodes if
         #   1) all recv nodes are 0-degree nodes

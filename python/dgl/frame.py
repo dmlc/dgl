@@ -366,7 +366,7 @@ class Frame(MutableMapping):
             # directly updating columns.
             self._columns = {key: Column.create(data) for key, data in other.items()}
         else:
-            # pad columns that no new were provided
+            # pad columns that are not provided in the other frame with initial values
             for key, col in self.items():
                 if key not in other:
                     scheme = col.scheme
