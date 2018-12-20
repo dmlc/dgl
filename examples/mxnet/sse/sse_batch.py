@@ -260,7 +260,7 @@ def main(args, data):
         num_cached = int(g.number_of_nodes() * args.cache_percent / 100)
         high_deg_vs = idx[0:num_cached]
         high_degs = degs[high_deg_vs]
-        g.cache_node_data(high_deg_vs, ctx=mx.gpu(0))
+        g._cache_node_data(high_deg_vs, ctx=mx.gpu(0))
     rets = []
     rets.append(all_hidden)
 
@@ -338,8 +338,8 @@ def main(args, data):
         # Update node embeddings.
         all_hidden = update_hidden_infer(g, None)
         g.ndata['h'] = all_hidden
-        if args.gpu > 0:
-            g.cache_node_data(high_deg_vs, ctx=mx.gpu(0))
+        if args.gpu > 0 and args.cache_percent > 0:
+            g._cache_node_data(high_deg_vs, ctx=mx.gpu(0))
         rets.append(all_hidden)
 
         dur.append(time.time() - t0)

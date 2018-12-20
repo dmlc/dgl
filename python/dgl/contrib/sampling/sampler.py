@@ -68,9 +68,9 @@ class NSSubgraphLoader(object):
         sgi = self._g._graph.neighbor_sampling(seed_ids, self._expand_factor,
                                                self._num_hops, self._neighbor_type,
                                                self._node_prob, self._max_subgraph_size)
-        sg_nodes = [i.induced_nodes for i in sgi]
-        if self._vertex_cache is not None:
-            caches = self._vertex_cache.cache_lookup(sg_nodes)
+        if self._g._vertex_cache is not None and len(sgi) > 0:
+            sg_nodes = [i.induced_nodes for i in sgi]
+            caches = self._g._vertex_cache.cache_lookup(sg_nodes)
             # TODO(zhengda) we need to handle multiple contexts.
             subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
                                      i, vertex_cache=cache, \
