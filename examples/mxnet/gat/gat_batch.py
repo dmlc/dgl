@@ -11,31 +11,38 @@ import numpy as np
 import time
 import mxnet as mx
 from mxnet import gluon
-import dgl
+from mxnet.gluon import nn
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
+
 
 def elu(data):
     return mx.nd.LeakyReLU(data, act_type='elu')
 
+
 def gat_message(edges):
-    return {'ft' : edges.src['ft'], 'a2' : edges.src['a2']}
+    return {'ft': edges.src['ft'], 'a2': edges.src['a2']}
+
 
 class GATReduce(gluon.Block):
     def __init__(self, attn_drop):
         super(GATReduce, self).__init__()
-        self.attn_drop = attn_drop
+        if attn_drop:
+            self.attn_drop = nn.Dropout(attn_drop)
+        else:
+            self.attn_drop = 0
 
     def forward(self, nodes):
         a1 = mx.nd.expand_dims(nodes.data['a1'], 1)  # shape (B, 1, 1)
-        a2 = nodes.mailbox['a2'] # shape (B, deg, 1)
-        ft = nodes.mailbox['ft'] # shape (B, deg, D)
+        a2 = nodes.mailbox['a2']  # shape (B, deg, 1)
+        ft = nodes.mailbox['ft']  # shape (B, deg, D)
         # attention
         a = a1 + a2  # shape (B, deg, 1)
         e = mx.nd.softmax(mx.nd.LeakyReLU(a))
         if self.attn_drop != 0.0:
-            e = mx.nd.Dropout(e, self.attn_drop)
-        return {'accum' : mx.nd.sum(e * ft, axis=1)} # shape (B, D)
+            e = self.attn_drop(e)
+        return {'accum': mx.nd.sum(e * ft, axis=1)}  # shape (B, D)
+
 
 class GATFinalize(gluon.Block):
     def __init__(self, headid, indim, hiddendim, activation, residual):
@@ -46,7 +53,7 @@ class GATFinalize(gluon.Block):
         self.residual_fc = None
         if residual:
             if indim != hiddendim:
-                self.residual_fc = gluon.nn.Dense(hiddendim)
+                self.residual_fc = gluon.nn.Dense(hiddendim, use_bias=False)
 
     def forward(self, nodes):
         ret = nodes.data['accum']
@@ -57,22 +64,27 @@ class GATFinalize(gluon.Block):
                 ret = nodes.data['h'] + ret
         return {'head%d' % self.headid : self.activation(ret)}
 
+
 class GATPrepare(gluon.Block):
     def __init__(self, indim, hiddendim, drop):
         super(GATPrepare, self).__init__()
         self.fc = gluon.nn.Dense(hiddendim)
-        self.drop = drop
-        self.attn_l = gluon.nn.Dense(1)
-        self.attn_r = gluon.nn.Dense(1)
+        if drop:
+            self.drop = nn.Dropout(drop)
+        else:
+            self.drop = 0
+        self.attn_l = gluon.nn.Dense(1, use_bias=False)
+        self.attn_r = gluon.nn.Dense(1, use_bias=False)
 
     def forward(self, feats):
         h = feats
         if self.drop != 0.0:
-            h = mx.nd.Dropout(h, self.drop)
+            h = self.drop(h)
         ft = self.fc(h)
         a1 = self.attn_l(ft)
         a2 = self.attn_r(ft)
-        return {'h' : h, 'ft' : ft, 'a1' : a1, 'a2' : a2}
+        return {'h': h, 'ft': ft, 'a1': a1, 'a2': a2}
+
 
 class GAT(gluon.Block):
     def __init__(self,
@@ -134,27 +146,34 @@ class GAT(gluon.Block):
         self.g.update_all(gat_message, self.red[-1], self.fnl[-1])
         return self.g.pop_n_repr('head0')
 
+
 def main(args):
     # load and preprocess dataset
     data = load_data(args)
 
     features = mx.nd.array(data.features)
     labels = mx.nd.array(data.labels)
-    mask = mx.nd.array(data.train_mask)
+    mask = mx.nd.array(np.where(data.train_mask == 1))
+    test_mask = mx.nd.array(np.where(data.test_mask == 1))
+    val_mask = mx.nd.array(np.where(data.val_mask == 1))
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
 
     if args.gpu < 0:
-        ctx = mx.cpu(0)
+        cuda = False
     else:
+        cuda = True
         ctx = mx.gpu(args.gpu)
         features = features.as_in_context(ctx)
         labels = labels.as_in_context(ctx)
         mask = mask.as_in_context(ctx)
-
-    # create GCN model
+        test_mask = test_mask.as_in_context(ctx)
+        val_mask = val_mask.as_in_context(ctx)
+    # create graph
     g = DGLGraph(data.graph)
+    # add self-loop
+    g.add_edges(g.nodes(), g.nodes())
 
     # create model
     model = GAT(g,
@@ -168,12 +187,14 @@ def main(args):
                 args.attn_drop,
                 args.residual)
 
-    model.initialize(ctx=ctx)
+    model.initialize()
+
+    if cuda:
+        model.collect_params().reset_ctx(ctx)
 
     # use optimizer
     trainer = gluon.Trainer(model.collect_params(), 'adam', {'learning_rate': args.lr})
 
-    # initialize graph
     dur = []
     for epoch in range(args.epochs):
         if epoch >= 3:
@@ -181,26 +202,40 @@ def main(args):
         # forward
         with mx.autograd.record():
             logits = model(features)
-            loss = mx.nd.softmax_cross_entropy(logits, labels)
-
-        #optimizer.zero_grad()
-        loss.backward()
-        trainer.step(features.shape[0])
-        loss.wait_to_read()
+            loss = mx.nd.softmax_cross_entropy(logits[mask].squeeze(), labels[mask].squeeze())
+            loss.backward()
+        trainer.step(mask.shape[0])
 
         if epoch >= 3:
             dur.append(time.time() - t0)
-            print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
-                epoch, loss.asnumpy()[0], np.mean(dur), n_edges / np.mean(dur) / 1000))
+        if epoch % 100 == 0:
+            val = logits[val_mask]
+            val = val.asnumpy().squeeze()
+            val_labels = labels[val_mask].asnumpy().squeeze()
+            max_index = np.argmax(val, axis=1)
+            accuracy = np.sum(np.where(max_index == val_labels, 1, 0))/len(val_labels)
+            print("Validation accuracy: {:.2f}".format(accuracy))
+
+        print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
+            epoch, loss.asnumpy()[0], np.mean(dur), n_edges / np.mean(dur) / 1000))
+
+
+
+    pred = model(features)[test_mask]
+    pred = pred.asnumpy().squeeze()
+    test_labels = labels[test_mask].asnumpy().squeeze()
+    max_index = np.argmax(pred, axis=1)
+    accuracy = np.sum(np.where(max_index == test_labels, 1, 0))/len(test_labels)
+    print("Test accuracy: {:.2%}".format(accuracy))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GAT')
     register_data_args(parser)
     parser.add_argument("--gpu", type=int, default=-1,
             help="Which GPU to use. Set -1 to use CPU.")
-    parser.add_argument("--epochs", type=int, default=20,
+    parser.add_argument("--epochs", type=int, default=1000,
             help="number of training epochs")
-    parser.add_argument("--num-heads", type=int, default=3,
+    parser.add_argument("--num-heads", type=int, default=8,
             help="number of attentional heads to use")
     parser.add_argument("--num-layers", type=int, default=1,
             help="number of hidden layers")
@@ -212,9 +247,10 @@ if __name__ == '__main__':
             help="input feature dropout")
     parser.add_argument("--attn-drop", type=float, default=.6,
             help="attention dropout")
-    parser.add_argument("--lr", type=float, default=0.005,
+    parser.add_argument("--lr", type=float, default=0.01,
             help="learning rate")
     args = parser.parse_args()
     print(args)
 
     main(args)
+
