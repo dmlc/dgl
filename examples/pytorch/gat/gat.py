@@ -185,7 +185,7 @@ def main(args):
         mask = mask.cuda()
         val_mask = val_mask.cuda()
 
-    # create GCN model
+
     g = DGLGraph(data.graph)
     # add self loop
     g.add_edges(g.nodes(), g.nodes())
@@ -210,7 +210,7 @@ def main(args):
     # use optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
-    # initialize graph
+
     dur = []
     begin_time = time.time()
     for epoch in range(args.epochs):
