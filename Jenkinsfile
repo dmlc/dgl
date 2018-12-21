@@ -47,7 +47,7 @@ def build_dgl_win64() {
   dir ("python") {
     bat "DEL /S /Q build *.egg-info dist"
     bat "pip3 uninstall -y dgl"
-    bat "python setup.py install"
+    bat "python setup.py install --user"
   }
 }
 
