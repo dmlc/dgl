@@ -94,7 +94,7 @@ def test_incmat():
 
 def test_incmat_cache():
     n = 1000
-    p = 2 * math.log(n) / n
+    p = 10 * math.log(n) / n
     a = sp.random(n, n, p, data_rvs=lambda n: np.ones(n))
     g = dgl.DGLGraph(a)
     # the first call should contruct the inc
