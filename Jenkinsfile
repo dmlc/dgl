@@ -98,7 +98,10 @@ pipeline {
   agent none
   stages {
     stage("Lint Check") {
-      agent { docker { image "dgllib/dgl-ci-lint" } }
+      agent {
+        label "linux"
+        docker { image "dgllib/dgl-ci-lint" }
+      }
       steps {
         init_git_submodule()
         sh "bash tests/scripts/task_lint.sh"
@@ -107,7 +110,10 @@ pipeline {
     stage("Build") {
       parallel {
         stage("CPU Build") {
-          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          agent {
+            label "linux"
+            docker { image "dgllib/dgl-ci-cpu" }
+          }
           steps {
             setup()
             build_dgl()
@@ -115,6 +121,7 @@ pipeline {
         }
         stage("GPU Build") {
           agent {
+            label "linux"
             docker {
               image "dgllib/dgl-ci-gpu"
               args "--runtime nvidia"
@@ -126,14 +133,19 @@ pipeline {
           }
         }
         stage("MXNet CPU Build (temp)") {
-          agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
+          agent {
+            label "linux"
+            docker { image "dgllib/dgl-ci-mxnet-cpu" }
+          }
           steps {
             setup()
             build_dgl()
           }
         }
 	stage("CPU Build (Win64/PyTorch)") {
-	  agent { label "windows" }
+	  agent {
+            label "windows"
+          }
 	  steps {
 	    setup()
 	    build_dgl_win64()
@@ -144,7 +156,10 @@ pipeline {
     stage("Test") {
       parallel {
         stage("Pytorch CPU") {
-          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          agent {
+            label "linux"
+            docker { image "dgllib/dgl-ci-cpu" }
+          }
           stages {
             stage("TH CPU unittest") {
               steps { pytorch_unit_test("CPU") }
@@ -173,6 +188,7 @@ pipeline {
         }
         stage("Pytorch GPU") {
           agent {
+            label "linux"
             docker {
               image "dgllib/dgl-ci-gpu"
               args "--runtime nvidia"
@@ -193,7 +209,10 @@ pipeline {
           //}
         }
         stage("MXNet CPU") {
-          agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
+          agent {
+            label "linux"
+            docker { image "dgllib/dgl-ci-mxnet-cpu" }
+          }
           stages {
             stage("MX Unittest") {
               steps { mxnet_unit_test("CPU") }
@@ -208,13 +227,19 @@ pipeline {
     stage("Doc") {
       parallel {
         stage("TH Tutorial") {
-          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          agent {
+            label "linux"
+            docker { image "dgllib/dgl-ci-cpu" }
+          }
           steps {
             pytorch_tutorials()
           }
         }
         stage("MX Tutorial") {
-          agent { docker { image "dgllib/dgl-ci-mxnet-cpu" } }
+          agent {
+            label "linux"
+            docker { image "dgllib/dgl-ci-mxnet-cpu" }
+          }
           steps {
             mxnet_tutorials()
           }
