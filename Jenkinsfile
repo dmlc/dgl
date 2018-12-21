@@ -5,8 +5,17 @@ def init_git_submodule() {
   sh "git submodule update"
 }
 
+def init_git_submodule_win64() {
+  bat "git submodule init"
+  bat "git submodule update"
+}
+
 def setup() {
   init_git_submodule()
+}
+
+def setup_win64() {
+  init_git_submodule_win64()
 }
 
 def build_dgl() {
@@ -99,7 +108,6 @@ pipeline {
   stages {
     stage("Lint Check") {
       agent {
-        label "linux"
         docker { image "dgllib/dgl-ci-lint" }
       }
       steps {
@@ -111,7 +119,6 @@ pipeline {
       parallel {
         stage("CPU Build") {
           agent {
-            label "linux"
             docker { image "dgllib/dgl-ci-cpu" }
           }
           steps {
@@ -121,7 +128,6 @@ pipeline {
         }
         stage("GPU Build") {
           agent {
-            label "linux"
             docker {
               image "dgllib/dgl-ci-gpu"
               args "--runtime nvidia"
@@ -134,7 +140,6 @@ pipeline {
         }
         stage("MXNet CPU Build (temp)") {
           agent {
-            label "linux"
             docker { image "dgllib/dgl-ci-mxnet-cpu" }
           }
           steps {
@@ -147,7 +152,7 @@ pipeline {
             label "windows"
           }
 	  steps {
-	    setup()
+	    setup_win64()
 	    build_dgl_win64()
 	  }
 	}
@@ -157,7 +162,6 @@ pipeline {
       parallel {
         stage("Pytorch CPU") {
           agent {
-            label "linux"
             docker { image "dgllib/dgl-ci-cpu" }
           }
           stages {
@@ -188,7 +192,6 @@ pipeline {
         }
         stage("Pytorch GPU") {
           agent {
-            label "linux"
             docker {
               image "dgllib/dgl-ci-gpu"
               args "--runtime nvidia"
@@ -210,7 +213,6 @@ pipeline {
         }
         stage("MXNet CPU") {
           agent {
-            label "linux"
             docker { image "dgllib/dgl-ci-mxnet-cpu" }
           }
           stages {
@@ -228,7 +230,6 @@ pipeline {
       parallel {
         stage("TH Tutorial") {
           agent {
-            label "linux"
             docker { image "dgllib/dgl-ci-cpu" }
           }
           steps {
@@ -237,7 +238,6 @@ pipeline {
         }
         stage("MX Tutorial") {
           agent {
-            label "linux"
             docker { image "dgllib/dgl-ci-mxnet-cpu" }
           }
           steps {
