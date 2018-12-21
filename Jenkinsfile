@@ -149,10 +149,6 @@ pipeline {
             build_dgl()
           }
         }
-      }
-    }
-    stage("Build (Win64)") {
-      parallel {
 	stage("CPU Build (Win64/PyTorch)") {
 	  agent {
             label "windows"
@@ -177,6 +173,20 @@ pipeline {
             stage("TH CPU example test") {
               steps { example_test("CPU") }
             }
+          }
+          post {
+            always { junit "*.xml" }
+          }
+        }
+        stage("Pytorch CPU (Windows)") {
+          agent { label "windows" }
+          stages {
+            stage("TH CPU Win64 unittest") {
+              steps { pytorch_unit_test_win64("CPU") }
+            }
+	    stage("TH CPU Win64 example test") {
+	      steps { example_test_win64("CPU") }
+	    }
           }
           post {
             always { junit "*.xml" }
@@ -211,24 +221,6 @@ pipeline {
             stage("MX Unittest") {
               steps { mxnet_unit_test("CPU") }
             }
-          }
-          post {
-            always { junit "*.xml" }
-          }
-        }
-      }
-    }
-    stage("Test (Win64)") {
-      parallel {
-        stage("Pytorch CPU (Windows)") {
-          agent { label "windows" }
-          stages {
-            stage("TH CPU Win64 unittest") {
-              steps { pytorch_unit_test_win64("CPU") }
-            }
-	    stage("TH CPU Win64 example test") {
-	      steps { example_test_win64("CPU") }
-	    }
           }
           post {
             always { junit "*.xml" }
