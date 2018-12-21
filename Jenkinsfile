@@ -23,11 +23,36 @@ def build_dgl() {
   }
 }
 
+def build_dgl_win64() {
+  /* Assuming that Windows slaves are already configured with MSBuild VS2017,
+   * CMake and Python/pip/setuptools etc. */
+  bat "DEL /S /Q build"
+  bat "DEL /S /Q _download"
+  bat 'CALL "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat"'
+  dir ("build") {
+    bat 'cmake -DCMAKE_CXX_FLAGS="/DDGL_EXPORTS" -DCMAKE_BUILD_TYPE=Release .. -G "NMake Makefiles"'
+    bat "nmake"
+  }
+  dir ("python") {
+    bat "DEL /S /Q build *.egg-info dist"
+    bat "pip3 uninstall -y dgl"
+    bat "python setup.py install"
+  }
+}
+
 def pytorch_unit_test(dev) {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
     sh "python3 -m nose -v --with-xunit tests"
     sh "python3 -m nose -v --with-xunit tests/pytorch"
     sh "python3 -m nose -v --with-xunit tests/graph_index"
+  }
+}
+
+def pytorch_unit_test_win64(dev) {
+  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}\\build", "PYTHONPATH=${env.WORKSPACE}\\python"]) {
+    bat "python -m nose -v --with-xunit tests"
+    bat "python -m nose -v --with-xunit tests\\pytorch"
+    bat "python -m nose -v --with-xunit tests\\graph_index"
   }
 }
 
@@ -42,6 +67,14 @@ def example_test(dev) {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
     dir ("tests/scripts") {
       sh "bash task_example_test.sh ${dev}"
+    }
+  }
+}
+
+def example_test_win64(dev) {
+  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}\\build", "PYTHONPATH=${env.WORKSPACE}\\python"]) {
+    dir ("tests\\scripts") {
+      sh "CALL task_example_test ${dev}"
     }
   }
 }
@@ -99,6 +132,13 @@ pipeline {
             build_dgl()
           }
         }
+	stage("CPU Build (Win64/PyTorch)") {
+	  agent { label "windows" }
+	  steps {
+	    setup()
+	    build_dgl_win64()
+	  }
+	}
       }
     }
     stage("Test") {
@@ -112,6 +152,20 @@ pipeline {
             stage("TH CPU example test") {
               steps { example_test("CPU") }
             }
+          }
+          post {
+            always { junit "*.xml" }
+          }
+        }
+        stage("Pytorch CPU (Windows)") {
+          agent { label "windows" }
+          stages {
+            stage("TH CPU Win64 unittest") {
+              steps { pytorch_unit_test_win64("CPU") }
+            }
+	    stage("TH CPU Win64 example test") {
+	      steps { example_test_win64("CPU") }
+	    }
           }
           post {
             always { junit "*.xml" }
