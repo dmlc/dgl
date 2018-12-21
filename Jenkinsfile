@@ -74,7 +74,7 @@ def example_test(dev) {
 def example_test_win64(dev) {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}\\build", "PYTHONPATH=${env.WORKSPACE}\\python"]) {
     dir ("tests\\scripts") {
-      sh "CALL task_example_test ${dev}"
+      bat "CALL task_example_test ${dev}"
     }
   }
 }
