@@ -77,14 +77,21 @@ class GCNLayer(gluon.Block):
         if self.dropout:
             h = mx.nd.Dropout(h, p=self.dropout)
         h = mx.nd.dot(h, self.weight.data(h.context))
-        # normalization by square root of src degree
-        h = h * subg.ndata['norm']
+        # TODO: the normalization term need to be tuned.
+        # temporarilly normalized by sqrt(num_neighbors).
+        # for an unbiased estimator, it should be normalized by n(v)/D(v),
+        # but might be bad in practice
+        h = h / math.sqrt(3.)
         subg.ndata['h'] = h
-        subg.send_and_recv(subg_edges, fn.copy_src(src='h', out='m'),
-                           fn.sum(msg='m', out='h'))
+        if subg_edges is not None:
+            subg.send_and_recv(subg_edges, fn.copy_src(src='h', out='m'),
+                               fn.sum(msg='m', out='h'))
+        else:
+            subg.update_all(fn.copy_src(src='h', out='m'),
+                            fn.sum(msg='m', out='h'))
         h = subg.ndata.pop('h')
-        # normalization by square root of dst degree
-        h = h * subg.ndata['norm']
+        # same as TODO above
+        h = h / math.sqrt(3.)
         # bias
         if self.bias is not None:
             h = h + self.bias.data(h.context)
@@ -123,8 +130,8 @@ class GCN(gluon.Block):
         return h
 
 
-def evaluate(model, features, labels, mask):
-    pred = model(features).argmax(axis=1)
+def evaluate(model, g, num_hops, labels, mask):
+    pred = model(g, [None for i in range(num_hops)]).argmax(axis=1)
     accuracy = ((pred == labels) * mask).sum() / mask.sum().asscalar()
     return accuracy.asscalar()
 
@@ -143,14 +150,16 @@ def main(args):
     test_mask = mx.nd.array(data.test_mask)
     in_feats = features.shape[1]
     n_classes = data.num_labels
+    n_nodes = data.graph.number_of_nodes()
     n_edges = data.graph.number_of_edges()
     print("""----Data statistics------'
+      #Nodes %d
       #Edges %d
       #Classes %d
       #Train samples %d
       #Val samples %d
       #Test samples %d""" %
-          (n_edges, n_classes,
+          (n_nodes, n_edges, n_classes,
               train_mask.sum().asscalar(),
               val_mask.sum().asscalar(),
               test_mask.sum().asscalar()))
@@ -182,6 +191,10 @@ def main(args):
     full_idx = np.arange(0, num_data)
     train_idx = full_idx[train_mask.asnumpy() == 1]
 
+    seed_nodes = list(train_idx)
+    num_hops = args.n_layers + 1
+    num_neighbors = 3
+
     model = GCN(in_feats,
                 args.n_hidden,
                 n_classes,
@@ -204,9 +217,6 @@ def main(args):
         if epoch >= 3:
             t0 = time.time()
 
-        seed_nodes = list(train_idx)
-        num_hops = args.n_layers + 1
-        num_neighbors = 3
         subg, subg_edges_per_hop = sample_subgraph(g, seed_nodes, num_hops, num_neighbors)
         subg_train_mask = subg.map_to_subgraph_nid(train_idx)
         subg.copy_from_parent()
@@ -224,6 +234,15 @@ def main(args):
         loss.backward()
         trainer.step(batch_size=1)
 
+        if epoch >= 3:
+            dur.append(time.time() - t0)
+            acc = evaluate(model, g, num_hops, labels, val_mask)
+            print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
+                  "ETputs(KTEPS) {:.2f}". format(
+                epoch, np.mean(dur), loss.asscalar(), acc, n_edges / np.mean(dur) / 1000))
+
+    acc = evaluate(model, g, num_hops, labels, test_mask)
+    print("Test accuracy {:.2%}".format(acc))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
