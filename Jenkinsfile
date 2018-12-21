@@ -40,13 +40,14 @@ def build_dgl_win64() {
   dir ("build") {
     bat """
     CALL "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat"
-    cmake -DCMAKE_CXX_FLAGS="/DDGL_EXPORTS" -DCMAKE_BUILD_TYPE=Release .. -G "NMake Makefiles"
-    nmake
+    cmake -DCMAKE_CXX_FLAGS="/DDGL_EXPORTS" -DCMAKE_CONFIGURATION_TYPES="Release" .. -G "Visual Studio 15 2017 Win64"
+    msbuild dgl.sln
+    COPY Release\\dgl.dll .
     """
   }
   dir ("python") {
     bat "DEL /S /Q build *.egg-info dist"
-    bat "pip3 uninstall -y dgl"
+    bat "pip3 uninstall -y dgl || (call )"  // ignore error
     bat "python setup.py install --user"
   }
 }
