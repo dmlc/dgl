@@ -37,10 +37,12 @@ def build_dgl_win64() {
    * CMake and Python/pip/setuptools etc. */
   bat "DEL /S /Q build"
   bat "DEL /S /Q _download"
-  bat 'CALL "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat"'
   dir ("build") {
-    bat 'cmake -DCMAKE_CXX_FLAGS="/DDGL_EXPORTS" -DCMAKE_BUILD_TYPE=Release .. -G "NMake Makefiles"'
-    bat "nmake"
+    bat """
+    CALL "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat"'
+    cmake -DCMAKE_CXX_FLAGS="/DDGL_EXPORTS" -DCMAKE_BUILD_TYPE=Release .. -G "NMake Makefiles"
+    nmake
+    """
   }
   dir ("python") {
     bat "DEL /S /Q build *.egg-info dist"
