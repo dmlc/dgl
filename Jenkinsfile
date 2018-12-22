@@ -10,81 +10,38 @@ def init_git_submodule_win64() {
   bat "git submodule update"
 }
 
-def setup() {
-  init_git_submodule()
-}
-
-def setup_win64() {
-  init_git_submodule_win64()
-}
-
 def build_dgl() {
-  sh "if [ -d build ]; then rm -rf build; fi; mkdir build"
-  sh "rm -rf _download"
-  dir ("build") {
-    sh "cmake .."
-    sh "make -j4"
-  }
-  dir("python") {
-    sh "rm -rf build *.egg-info dist"
-    sh "pip3 uninstall -y dgl"
-    sh "python3 setup.py install"
-  }
+  sh "bash tests/scripts/build_dgl.sh"
 }
 
 def build_dgl_win64() {
   /* Assuming that Windows slaves are already configured with MSBuild VS2017,
    * CMake and Python/pip/setuptools etc. */
-  bat "DEL /S /Q build"
-  bat "DEL /S /Q _download"
-  dir ("build") {
-    bat """
-    CALL "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat"
-    cmake -DCMAKE_CXX_FLAGS="/DDGL_EXPORTS" -DCMAKE_CONFIGURATION_TYPES="Release" .. -G "Visual Studio 15 2017 Win64"
-    msbuild dgl.sln
-    COPY Release\\dgl.dll .
-    """
-  }
-  dir ("python") {
-    bat "DEL /S /Q build *.egg-info dist"
-    bat "pip3 uninstall -y dgl || (call )"  // ignore error
-    bat "python setup.py install --user"
+  bat "CALL tests\\scripts\\build_dgl.bat"
+}
+
+def unit_test(backend, dev) {
+  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python", "DGLBACKEND=${backend}"]) {
+    sh "bash tests/scripts/task_unit_test.sh ${backend}"
   }
 }
 
-def pytorch_unit_test(dev) {
-  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
-    sh "python3 -m nose -v --with-xunit tests"
-    sh "python3 -m nose -v --with-xunit tests/pytorch"
-    sh "python3 -m nose -v --with-xunit tests/graph_index"
+def unit_test_win64(backend, dev) {
+  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}\\build", "PYTHONPATH=${env.WORKSPACE}\\python", "DGLBACKEND=${backend}"]) {
+    bat "CALL tests\\scripts\\task_unit_test.bat ${backend}"
   }
 }
 
-def pytorch_unit_test_win64(dev) {
-  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}\\build", "PYTHONPATH=${env.WORKSPACE}\\python"]) {
-    bat "python -m nose -v --with-xunit tests"
-    bat "python -m nose -v --with-xunit tests\\pytorch"
-    bat "python -m nose -v --with-xunit tests\\graph_index"
-  }
-}
-
-def mxnet_unit_test(dev) {
-  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
-    sh "python3 -m nose -v --with-xunit tests/mxnet"
-    sh "python3 -m nose -v --with-xunit tests/graph_index"
-  }
-}
-
-def example_test(dev) {
-  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python"]) {
+def example_test(backend, dev) {
+  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python", "DGLBACKEND=${backend}"]) {
     dir ("tests/scripts") {
       sh "bash task_example_test.sh ${dev}"
     }
   }
 }
 
-def example_test_win64(dev) {
-  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}\\build", "PYTHONPATH=${env.WORKSPACE}\\python"]) {
+def example_test_win64(backend, dev) {
+  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}\\build", "PYTHONPATH=${env.WORKSPACE}\\python", "DGLBACKEND=${backend}"]) {
     dir ("tests\\scripts") {
       bat "CALL task_example_test ${dev}"
     }
@@ -125,7 +82,7 @@ pipeline {
             docker { image "dgllib/dgl-ci-cpu" }
           }
           steps {
-            setup()
+            init_git_submodule()
             build_dgl()
           }
         }
@@ -137,7 +94,7 @@ pipeline {
             }
           }
           steps {
-            setup()
+            init_git_submodule()
             build_dgl()
           }
         }
@@ -146,19 +103,19 @@ pipeline {
             docker { image "dgllib/dgl-ci-mxnet-cpu" }
           }
           steps {
-            setup()
+            init_git_submodule()
             build_dgl()
           }
         }
-	stage("CPU Build (Win64/PyTorch)") {
-	  agent {
+        stage("CPU Build (Win64/PyTorch)") {
+          agent {
             label "windows"
           }
-	  steps {
-	    setup_win64()
-	    build_dgl_win64()
-	  }
-	}
+          steps {
+            init_git_submodule_win64()
+            build_dgl_win64()
+          }
+        }
       }
     }
     stage("Test") {
@@ -169,10 +126,10 @@ pipeline {
           }
           stages {
             stage("TH CPU unittest") {
-              steps { pytorch_unit_test("CPU") }
+              steps { unit_test("pytorch", "CPU") }
             }
             stage("TH CPU example test") {
-              steps { example_test("CPU") }
+              steps { example_test("pytorch", "CPU") }
             }
           }
           post {
@@ -183,11 +140,11 @@ pipeline {
           agent { label "windows" }
           stages {
             stage("TH CPU Win64 unittest") {
-              steps { pytorch_unit_test_win64("CPU") }
+              steps { unit_test_win64("pytorch", "CPU") }
             }
-	    stage("TH CPU Win64 example test") {
-	      steps { example_test_win64("CPU") }
-	    }
+            stage("TH CPU Win64 example test") {
+              steps { example_test_win64("pytorch", "CPU") }
+            }
           }
           post {
             always { junit "*.xml" }
@@ -206,7 +163,7 @@ pipeline {
             //  steps { pytorch_unit_test("GPU") }
             //}
             stage("TH GPU example test") {
-              steps { example_test("GPU") }
+              steps { example_test("pytorch", "GPU") }
             }
           }
           // TODO: have GPU unittest
@@ -220,7 +177,7 @@ pipeline {
           }
           stages {
             stage("MX Unittest") {
-              steps { mxnet_unit_test("CPU") }
+              steps { unit_test("mxnet", "CPU") }
             }
           }
           post {
