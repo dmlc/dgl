@@ -11,7 +11,6 @@ import numpy as np
 import time
 import mxnet as mx
 from mxnet import gluon
-from mxnet.gluon import nn
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 
@@ -28,7 +27,7 @@ class GATReduce(gluon.Block):
     def __init__(self, attn_drop):
         super(GATReduce, self).__init__()
         if attn_drop:
-            self.attn_drop = nn.Dropout(attn_drop)
+            self.attn_drop = gluon.nn.Dropout(attn_drop)
         else:
             self.attn_drop = 0
 
@@ -70,7 +69,7 @@ class GATPrepare(gluon.Block):
         super(GATPrepare, self).__init__()
         self.fc = gluon.nn.Dense(hiddendim)
         if drop:
-            self.drop = nn.Dropout(drop)
+            self.drop = gluon.nn.Dropout(drop)
         else:
             self.drop = 0
         self.attn_l = gluon.nn.Dense(1, use_bias=False)
@@ -147,6 +146,15 @@ class GAT(gluon.Block):
         return self.g.pop_n_repr('head0')
 
 
+def evaluate(model, features, labels, mask):
+    logits = model(features)
+    logits = logits[mask].asnumpy().squeeze()
+    val_labels = labels[mask].asnumpy().squeeze()
+    max_index = np.argmax(logits, axis=1)
+    accuracy = np.sum(np.where(max_index == val_labels, 1, 0)) / len(val_labels)
+    return accuracy
+
+
 def main(args):
     # load and preprocess dataset
     data = load_data(args)
@@ -161,9 +169,8 @@ def main(args):
     n_edges = data.graph.number_of_edges()
 
     if args.gpu < 0:
-        cuda = False
+        ctx = mx.cpu()
     else:
-        cuda = True
         ctx = mx.gpu(args.gpu)
         features = features.as_in_context(ctx)
         labels = labels.as_in_context(ctx)
@@ -187,10 +194,7 @@ def main(args):
                 args.attn_drop,
                 args.residual)
 
-    model.initialize()
-
-    if cuda:
-        model.collect_params().reset_ctx(ctx)
+    model.initialize(ctx=ctx)
 
     # use optimizer
     trainer = gluon.Trainer(model.collect_params(), 'adam', {'learning_rate': args.lr})
@@ -209,31 +213,22 @@ def main(args):
         if epoch >= 3:
             dur.append(time.time() - t0)
         if epoch % 100 == 0:
-            val = logits[val_mask]
-            val = val.asnumpy().squeeze()
-            val_labels = labels[val_mask].asnumpy().squeeze()
-            max_index = np.argmax(val, axis=1)
-            accuracy = np.sum(np.where(max_index == val_labels, 1, 0))/len(val_labels)
-            print("Validation accuracy: {:.2f}".format(accuracy))
+            val_accuracy = evaluate(model, features, labels, val_mask)
+            print("Validation Accuracy {:.4f}".format(val_accuracy))
 
         print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
             epoch, loss.asnumpy()[0], np.mean(dur), n_edges / np.mean(dur) / 1000))
 
+    test_accuracy = evaluate(model, features, labels, test_mask)
+    print("Test Accuracy {:.4f}".format(test_accuracy))
 
-
-    pred = model(features)[test_mask]
-    pred = pred.asnumpy().squeeze()
-    test_labels = labels[test_mask].asnumpy().squeeze()
-    max_index = np.argmax(pred, axis=1)
-    accuracy = np.sum(np.where(max_index == test_labels, 1, 0))/len(test_labels)
-    print("Test accuracy: {:.2%}".format(accuracy))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GAT')
     register_data_args(parser)
     parser.add_argument("--gpu", type=int, default=-1,
             help="Which GPU to use. Set -1 to use CPU.")
-    parser.add_argument("--epochs", type=int, default=1000,
+    parser.add_argument("--epochs", type=int, default=200,
             help="number of training epochs")
     parser.add_argument("--num-heads", type=int, default=8,
             help="number of attentional heads to use")
@@ -247,10 +242,11 @@ if __name__ == '__main__':
             help="input feature dropout")
     parser.add_argument("--attn-drop", type=float, default=.6,
             help="attention dropout")
-    parser.add_argument("--lr", type=float, default=0.01,
+    parser.add_argument("--lr", type=float, default=0.005,
             help="learning rate")
     args = parser.parse_args()
     print(args)
 
     main(args)
+
 
