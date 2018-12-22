@@ -14,7 +14,7 @@ POPD
 
 PUSHD python
 DEL /S /Q build *.egg-info dist
-pip install -e . --force-reinstall || EXIT /B 1
+pip install -e . --force-reinstall --user || EXIT /B 1
 POPD
 
 ENDLOCAL
