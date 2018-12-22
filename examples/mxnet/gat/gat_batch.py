@@ -228,7 +228,7 @@ if __name__ == '__main__':
     register_data_args(parser)
     parser.add_argument("--gpu", type=int, default=-1,
             help="Which GPU to use. Set -1 to use CPU.")
-    parser.add_argument("--epochs", type=int, default=200,
+    parser.add_argument("--epochs", type=int, default=1000,
             help="number of training epochs")
     parser.add_argument("--num-heads", type=int, default=8,
             help="number of attentional heads to use")
