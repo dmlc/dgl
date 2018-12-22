@@ -212,6 +212,7 @@ def main(args):
     dur = []
     begin_time = time.time()
     for epoch in range(args.epochs):
+        model.train()
         if epoch >= 3:
             t0 = time.time()
         # forward
@@ -228,7 +229,6 @@ def main(args):
 
         if epoch % 100 == 0:
             acc = evaluate(model, features, labels, val_mask)
-            model.train()
             print("Validation Accuracy {:.4f}".format(acc))
 
         print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
