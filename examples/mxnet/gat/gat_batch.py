@@ -1,3 +1,4 @@
+
 """
 Graph Attention Networks
 Paper: https://arxiv.org/abs/1710.10903
@@ -212,12 +213,11 @@ def main(args):
 
         if epoch >= 3:
             dur.append(time.time() - t0)
+        print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
+            epoch, loss.asnumpy()[0], np.mean(dur), n_edges / np.mean(dur) / 1000))
         if epoch % 100 == 0:
             val_accuracy = evaluate(model, features, labels, val_mask)
             print("Validation Accuracy {:.4f}".format(val_accuracy))
-
-        print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
-            epoch, loss.asnumpy()[0], np.mean(dur), n_edges / np.mean(dur) / 1000))
 
     test_accuracy = evaluate(model, features, labels, test_mask)
     print("Test Accuracy {:.4f}".format(test_accuracy))
@@ -248,5 +248,3 @@ if __name__ == '__main__':
     print(args)
 
     main(args)
-
-
