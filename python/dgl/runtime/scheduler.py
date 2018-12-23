@@ -75,10 +75,12 @@ def schedule_recv(graph,
     inplace: bool
         If True, the update will be done in place
     """
-    _, _, eid = graph._graph.in_edges(recv_nodes)
+    src, dst, eid = graph._graph.in_edges(recv_nodes)
     if len(eid) > 0:
         nonzero_idx = graph._msg_index.get_items(eid).nonzero()
         eid = eid.get_items(nonzero_idx)
+        src = src.get_items(nonzero_idx)
+        dst = dst.get_items(nonzero_idx)
     if len(eid) == 0:
         # Downgrade to apply nodes if
         #   1) all recv nodes are 0-degree nodes
@@ -86,7 +88,6 @@ def schedule_recv(graph,
         if apply_func is not None:
             schedule_apply_nodes(graph, recv_nodes, apply_func, inplace)
     else:
-        src, dst, _ = graph._graph.find_edges(eid)
         var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
         # sort and unique the argument
         recv_nodes, _ = F.sort_1d(F.unique(recv_nodes.tousertensor()))

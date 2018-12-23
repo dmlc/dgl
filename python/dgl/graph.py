@@ -306,7 +306,7 @@ class DGLGraph(object):
         else:
             self._edge_frame.append(data)
         # resize msg_index and msg_frame
-        self._msg_index = self._msg_index.add_elements(1)
+        self._msg_index = self._msg_index.append_zeros(1)
         self._msg_frame.add_rows(1)
 
     def add_edges(self, u, v, data=None):
@@ -366,7 +366,7 @@ class DGLGraph(object):
         else:
             self._edge_frame.append(data)
         # initialize feature placeholder for messages
-        self._msg_index = self._msg_index.add_elements(num)
+        self._msg_index = self._msg_index.append_zeros(num)
         self._msg_frame.add_rows(num)
 
     def clear(self):
