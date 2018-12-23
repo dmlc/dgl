@@ -77,10 +77,8 @@ class GATPrepare(nn.Module):
 
     def forward(self, feats):
         h = feats
-
         if self.drop:
             h = self.drop(h)
-
         ft = self.fc(h)
         a1 = self.attn_l(ft)
         a2 = self.attn_r(ft)
@@ -137,7 +135,6 @@ class GAT(nn.Module):
                 # prepare
                 self.g.ndata.update(self.prp[i](last))
                 # message passing
-
                 self.g.update_all(gat_message, self.red[i], self.fnl[i])
             # merge all the heads
             last = torch.cat(
@@ -183,14 +180,10 @@ def main(args):
         mask = mask.cuda()
         val_mask = val_mask.cuda()
 
-    # create GCN model
+    # create DGL graph
     g = DGLGraph(data.graph)
     # add self loop
     g.add_edges(g.nodes(), g.nodes())
-
-
-
-
     # create model
     model = GAT(g,
                 args.num_layers,
@@ -226,13 +219,12 @@ def main(args):
 
         if epoch >= 3:
             dur.append(time.time() - t0)
-
+        print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
+            epoch, loss.item(), np.mean(dur), n_edges / np.mean(dur) / 1000))
         if epoch % 100 == 0:
             acc = evaluate(model, features, labels, val_mask)
             print("Validation Accuracy {:.4f}".format(acc))
 
-        print("Epoch {:05d} | Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
-            epoch, loss.item(), np.mean(dur), n_edges / np.mean(dur) / 1000))
 
     end_time = time.time()
     print((end_time-begin_time)/args.epochs)
