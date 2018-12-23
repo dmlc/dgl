@@ -180,7 +180,13 @@ class Index(object):
         return Index(F.scatter_row(tensor, index, value))
 
     def append_zeros(self, num):
-        """Append zeros to an Index """
+        """Append zeros to an Index
+
+        Parameters
+        ----------
+        num: int
+            number of zeros to append
+        """
         if num == 0:
             return self
         new_items = F.zeros((num,), dtype=F.int64, ctx=F.cpu())
@@ -206,6 +212,12 @@ def toindex(x):
     return x if isinstance(x, Index) else Index(x)
 
 def zero_index(size):
+    """Create a index with provided size initialized to zero
+
+    Parameters
+    ----------
+    size: int
+    """
     return Index(F.zeros((size,), dtype=F.int64, ctx=F.cpu()))
 
 class LazyDict(Mapping):
