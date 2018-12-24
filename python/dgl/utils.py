@@ -142,17 +142,16 @@ class Index(object):
             tensor = self.tousertensor()
             index = index.tousertensor()
             return Index(F.gather_row(tensor, index))
+        elif self._slice_data is None:
+            tensor = self.tousertensor()
+            index = index._slice_data
+            return Index(F.narrow_row(tensor, index.start, index.stop))
         else:
-            if self._slice_data is None:
-                tensor = self.tousertensor()
-                index = index._slice_data
-                return Index(F.narrow_row(tensor, index.start, index.stop))
-            else:
-                # both self and index wrap a slice object, then return another
-                # Index wrapping a slice
-                start = self._slicedata.start
-                index = index._slice_data
-                return Index(slice(start + index.start, start + index.stop))
+            # both self and index wrap a slice object, then return another
+            # Index wrapping a slice
+            start = self._slicedata.start
+            index = index._slice_data
+            return Index(slice(start + index.start, start + index.stop))
 
     def set_items(self, index, value):
         """Set values at given positions of an Index. Set is not done in place,
