@@ -618,7 +618,7 @@ def unique(input):
     """
     pass
 
-def full_1d(length, fill_value):
+def full_1d(length, fill_value, dtype, ctx):
     """Create a 1D tensor full of the fill_value.
 
     Parameters
@@ -627,6 +627,10 @@ def full_1d(length, fill_value):
         The length of the vector.
     fill_value : int
         The filled value.
+    dtype : data type
+        It should be one of the values in the data type dict.
+    ctx : context
+        The device of the result tensor.
 
     Returns
     -------

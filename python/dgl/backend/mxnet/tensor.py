@@ -171,8 +171,8 @@ def unique(input):
     tmp = np.unique(tmp)
     return nd.array(tmp, ctx=input.context, dtype=input.dtype)
 
-def full_1d(length, fill_value):
-    return nd.full((length,), fill_value)
+def full_1d(length, fill_value, dtype, ctx):
+    return nd.full((length,), fill_value, dtype=dtype, ctx=ctx)
 
 def nonzero_1d(input):
     # TODO: fallback to numpy is unfortunate
