@@ -5,6 +5,7 @@ from . import backend as F
 from . import utils
 from .frame import Frame, FrameRef
 from .graph_index import search_nids
+from ._ffi.function import _init_api
 
 class FrameRowCache:
     def __init__(self, frame, ids, ctx):
@@ -17,32 +18,41 @@ class FrameRowCache:
             cols.update({key: F.copy_to(col[ids], ctx)})
         self._cache = FrameRef(Frame(cols))
         self._ctx = ctx
+        self._opt_lookup = {
+            2: _CAPI_DGLCacheLookup2,
+            4: _CAPI_DGLCacheLookup4,
+            8: _CAPI_DGLCacheLookup8,
+            16: _CAPI_DGLCacheLookup16,
+            32: _CAPI_DGLCacheLookup32,
+        }
 
     @property
     def context(self):
         return self._ctx
 
     def cache_lookup(self, ids):
-        orig_ids = [i.tousertensor() for i in ids]
-        sizes = [len(i) for i in ids]
-        offs = np.cumsum(sizes)
-        ids = F.cat(orig_ids, 0)
-        ids = utils.toindex(ids)
-        lids = search_nids(self._cached_ids, ids)
-        lids = lids.tonumpy()
-        ids = ids.tonumpy()
-        lids = np.split(lids, offs[0:(len(offs) - 1)])
-        ids = np.split(ids, offs[0:(len(offs) - 1)])
-
         ret = []
-        for lid, id in zip(lids, ids):
-            cached_out_idx = np.nonzero(lid != -1)[0]
-            cache_idx = lid[cached_out_idx]
-            uncached_out_idx = np.nonzero(lid == -1)[0]
-            global_uncached_ids = id[uncached_out_idx]
-            ret.append(SubgraphFrameCache(self._frame, self._cache, self._ctx,
-                                          cached_out_idx, cache_idx,
-                                          uncached_out_idx, global_uncached_ids))
+        dgl_ids = [i.todgltensor() for i in ids]
+        if len(dgl_ids) in self._opt_lookup.keys():
+            res = self._opt_lookup[len(dgl_ids)](self._cached_ids.todgltensor(), *dgl_ids)
+            for i, id in enumerate(ids):
+                cached_out_idx = utils.toindex(res(i * 4))
+                uncached_out_idx = utils.toindex(res(i * 4 + 1))
+                cache_idx = utils.toindex(res(i * 4 + 2))
+                global_uncached_ids = utils.toindex(res(i * 4 + 3))
+                ret.append(SubgraphFrameCache(self._frame, self._cache, self._ctx,
+                                              cached_out_idx, cache_idx,
+                                              uncached_out_idx, global_uncached_ids))
+        else:
+            for i, dgl_id in enumerate(dgl_ids):
+                res = _CAPI_DGLCacheLookup(self._cached_ids.todgltensor(), dgl_id)
+                cached_out_idx = utils.toindex(res(0))
+                uncached_out_idx = utils.toindex(res(1))
+                cache_idx = utils.toindex(res(2))
+                global_uncached_ids = utils.toindex(res(3))
+                ret.append(SubgraphFrameCache(self._frame, self._cache, self._ctx,
+                                              cached_out_idx, cache_idx,
+                                              uncached_out_idx, global_uncached_ids))
         return ret
 
 class SubgraphFrameCache:
@@ -52,13 +62,13 @@ class SubgraphFrameCache:
         self._cache = cache
         self._ctx = ctx
         # The index where cached data should be written to.
-        self._cached_out_idx = cached_out_idx
+        self._cached_out_idx = cached_out_idx.tousertensor()
         # The index where cached data should be read from the cache.
-        self._cache_idx = cache_idx
+        self._cache_idx = cache_idx.tousertensor()
         # The index of uncached data. It'll be read from the global frame.
-        self._global_uncached_ids = global_uncached_ids
+        self._global_uncached_ids = global_uncached_ids.tousertensor()
         # The index of uncached data should be written to.
-        self._uncached_out_idx = uncached_out_idx
+        self._uncached_out_idx = uncached_out_idx.tousertensor()
 
     @property
     def context(self):
@@ -77,3 +87,5 @@ class SubgraphFrameCache:
             data[self._uncached_out_idx] = F.copy_to(col[self._global_uncached_ids], self._ctx)
             ret.update({key: data})
         return ret
+
+_init_api("dgl.frame_cache")
