@@ -136,7 +136,7 @@ class DGLSubGraph(DGLGraph):
             else:
                 #TODO if cached data doesn't contain everything, we can read from frame directly.
                 self._node_frame = FrameRef(Frame(self._vertex_cache.merge()))
-        if not self._parent._edge_frame.is_empty():
+        if not self._parent._edge_frame.is_empty() and self.number_of_edges() > 0:
             # We probably don't need to cache edge data. An edge usually exists in one subgraph.
             self._edge_frame = FrameRef(Frame(
                 self._parent._edge_frame.select_rows(self._get_parent_eid(), ctx)))
