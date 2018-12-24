@@ -1,4 +1,5 @@
 """Cache for frames in DGLGraph."""
+import math
 import numpy as np
 
 from . import backend as F
@@ -33,8 +34,16 @@ class FrameRowCache:
     def cache_lookup(self, ids):
         ret = []
         dgl_ids = [i.todgltensor() for i in ids]
-        if len(dgl_ids) in self._opt_lookup.keys():
-            res = self._opt_lookup[len(dgl_ids)](self._cached_ids.todgltensor(), *dgl_ids)
+        empty_ids = []
+        if len(dgl_ids) > 1 and len(dgl_ids) not in self._opt_lookup.keys():
+            remain = 2**int(math.ceil(math.log2(len(dgl_ids)))) - len(dgl_ids)
+            for _ in range(remain):
+                empty = utils.toindex(F.empty(shape=(0), dtype=F.dtype(dgl_ids[0]), ctx=F.cpu()))
+                empty_ids.append(empty)
+                dgl_ids.append(empty.todgltensor())
+
+        if len(dgl_ids) > 1:
+            res = self._opt_lookup[len(dgl_ids)](self._cached_ids.todgltensor(), len(ids), *dgl_ids)
             for i, id in enumerate(ids):
                 cached_out_idx = utils.toindex(res(i * 4))
                 uncached_out_idx = utils.toindex(res(i * 4 + 1))
@@ -44,15 +53,14 @@ class FrameRowCache:
                                               cached_out_idx, cache_idx,
                                               uncached_out_idx, global_uncached_ids))
         else:
-            for i, dgl_id in enumerate(dgl_ids):
-                res = _CAPI_DGLCacheLookup(self._cached_ids.todgltensor(), dgl_id)
-                cached_out_idx = utils.toindex(res(0))
-                uncached_out_idx = utils.toindex(res(1))
-                cache_idx = utils.toindex(res(2))
-                global_uncached_ids = utils.toindex(res(3))
-                ret.append(SubgraphFrameCache(self._frame, self._cache, self._ctx,
-                                              cached_out_idx, cache_idx,
-                                              uncached_out_idx, global_uncached_ids))
+            res = _CAPI_DGLCacheLookup(self._cached_ids.todgltensor(), dgl_ids[0])
+            cached_out_idx = utils.toindex(res(0))
+            uncached_out_idx = utils.toindex(res(1))
+            cache_idx = utils.toindex(res(2))
+            global_uncached_ids = utils.toindex(res(3))
+            ret.append(SubgraphFrameCache(self._frame, self._cache, self._ctx,
+                                          cached_out_idx, cache_idx,
+                                          uncached_out_idx, global_uncached_ids))
         return ret
 
 class SubgraphFrameCache:

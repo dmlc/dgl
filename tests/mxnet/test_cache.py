@@ -35,15 +35,16 @@ def test_node_cache():
         data = g.ndata[key][subg_ids]
         assert np.all(data.asnumpy() == subg.ndata[key].asnumpy())
 
-    subg_ids = [[0, 1, 2, 4, 5, 9], [0, 2, 3, 7]]
-    subgs = g.subgraphs(subg_ids)
-    for subg, subg_id in zip(subgs, subg_ids):
-        subg.copy_from_parent()
-        assert subg.ndata.keys() == g.ndata.keys()
-        for key in subg.ndata:
-            assert key in g.ndata
-            data = g.ndata[key][subg_id]
-            assert np.all(data.asnumpy() == subg.ndata[key].asnumpy())
+    subg_ids = [[0, 1, 2, 4, 5, 9], [0, 2, 3, 7], [3, 4, 5]]
+    for i in range(2, 4):
+        subgs = g.subgraphs(subg_ids[:i])
+        for subg, subg_id in zip(subgs, subg_ids):
+            subg.copy_from_parent()
+            assert subg.ndata.keys() == g.ndata.keys()
+            for key in subg.ndata:
+                assert key in g.ndata
+                data = g.ndata[key][subg_id]
+                assert np.all(data.asnumpy() == subg.ndata[key].asnumpy())
 
 if __name__ == '__main__':
     test_node_cache()

@@ -26,9 +26,11 @@ DGL_REGISTER_GLOBAL("frame_cache._CAPI_DGLCacheLookup")
     std::string("frame_cache._CAPI_DGLCacheLookup") + std::to_string(num_inputs))       \
     .set_body([] (DGLArgs args, DGLRetValue* rv) {                                      \
       const IdArray cached_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));\
+      int num_valids = args[1];                                                     \
+      assert(num_valids <= num_inputs);                                                 \
       std::vector<IdArray> arrs;                                                        \
-      for (int i = 0; i < num_inputs; i++) {                                            \
-        arrs.push_back(IdArray::FromDLPack(CreateTmpDLManagedTensor(args[i + 1])));     \
+      for (int i = 0; i < num_valids; i++) {                                            \
+        arrs.push_back(IdArray::FromDLPack(CreateTmpDLManagedTensor(args[i + 2])));     \
       }                                                                                 \
       *rv = ConvertNDArrayVectorToPackedFunc(cache::SearchCachedIds(cached_ids, arrs)); \
     })
@@ -38,5 +40,7 @@ DEF_CACHE_LOOKUP(4);
 DEF_CACHE_LOOKUP(8);
 DEF_CACHE_LOOKUP(16);
 DEF_CACHE_LOOKUP(32);
+DEF_CACHE_LOOKUP(64);
+DEF_CACHE_LOOKUP(128);
 
 }  // namespace dgl
