@@ -19,7 +19,7 @@ class NSSubgraphLoader(object):
     def __init__(self, g, batch_size, expand_factor, num_hops=1,
                  neighbor_type='in', node_prob=None, seed_nodes=None,
                  shuffle=False, num_workers=1, max_subgraph_size=None,
-                 return_seed_id=False):
+                 return_seed_id=False, cache_nodes=None, subgraph_ctx=F.cpu()):
         self._g = g
         if not g._graph.is_readonly():
             raise NotImplementedError("subgraph loader only support read-only graphs.")
@@ -47,6 +47,12 @@ class NSSubgraphLoader(object):
         self._subgraphs = []
         self._seed_ids = []
         self._subgraph_idx = 0
+        self._subgraph_ctx = subgraph_ctx
+
+        # We only cache node data in GPUs.
+        if cache_nodes is not None and subgraph_ctx != F.cpu():
+            cache_nodes = utils.toindex(F.sort_1d(cache_nodes)[0])
+            self._vertex_cache = FrameRowCache(self._node_frame, cache_nodes, subgraph_ctx)
 
     def _prefetch(self):
         seed_ids = []
@@ -63,13 +69,15 @@ class NSSubgraphLoader(object):
                                                self._num_hops, self._neighbor_type,
                                                self._node_prob, self._max_subgraph_size)
         sg_nodes = [i.induced_nodes for i in sgi]
-        if self._g._vertex_cache is not None:
-            caches = self._g._vertex_cache.cache_lookup(sg_nodes)
+        if self._vertex_cache is not None:
+            caches = self._vertex_cache.cache_lookup(sg_nodes)
+            # TODO(zhengda) we need to handle multiple contexts.
             subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
-                                     i, cache) for i, cache in zip(sgi, caches)]
+                                     i, vertex_cache=cache, \
+                                     ctx=self._subgraph_ctx) for i, cache in zip(sgi, caches)]
         else:
             subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
-                                     i) for i in sgi]
+                                     i, ctx=self._subgraph_ctx) for i in sgi]
         self._subgraphs.extend(subgraphs)
         if self._return_seed_id:
             self._seed_ids.extend(seed_ids)
@@ -207,7 +215,8 @@ class _PrefetchingLoader(object):
 def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
                     neighbor_type='in', node_prob=None, seed_nodes=None,
                     shuffle=False, num_workers=1, max_subgraph_size=None,
-                    return_seed_id=False, prefetch=False):
+                    return_seed_id=False, prefetch=False, cache_nodes=None,
+                    subgraph_ctx=F.cpu()):
     '''Create a sampler that samples neighborhood.
 
     .. note:: This method currently only supports MXNet backend. Set
@@ -266,7 +275,8 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
         information about the subgraphs.
     '''
     loader = NSSubgraphLoader(g, batch_size, expand_factor, num_hops, neighbor_type, node_prob,
-                              seed_nodes, shuffle, num_workers, max_subgraph_size, return_seed_id)
+                              seed_nodes, shuffle, num_workers, max_subgraph_size, return_seed_id,
+                              cache_nodes, subgraph_ctx)
     if not prefetch:
         return loader
     else:

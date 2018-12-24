@@ -45,13 +45,14 @@ class DGLSubGraph(DGLGraph):
         Whether the subgraph shares node/edge features with the parent graph.
     """
     def __init__(self, parent, parent_nid, parent_eid, graph_idx, shared=False,
-                 vertex_cache=None):
+                 vertex_cache=None, ctx=F.cpu()):
         super(DGLSubGraph, self).__init__(graph_data=graph_idx,
                                           readonly=graph_idx.is_readonly())
         self._parent = parent
         self._parent_nid = parent_nid
         self._parent_eid = parent_eid
         self._vertex_cache = vertex_cache
+        self._ctx = ctx
 
     # override APIs
     def add_nodes(self, num, reprs=None):
@@ -111,35 +112,31 @@ class DGLSubGraph(DGLGraph):
         inplace : bool
             If true, use inplace write (no gradient but faster)
         """
+        # TODO(zhengda) we need to copy to the right context.
         self._parent._node_frame.update_rows(
                 self._parent_nid, self._node_frame, inplace=inplace)
         if self._parent._edge_frame.num_rows != 0:
             self._parent._edge_frame.update_rows(
                     self._get_parent_eid(), self._edge_frame, inplace=inplace)
 
-    def copy_from_parent(self, ctx=F.cpu()):
+    def copy_from_parent(self):
         """Copy node/edge features from the parent graph.
 
         All old features will be removed.
 
-        Parameters
-        ----------
-        ctx : context, optional (default=cpu)
-            The context of node data and edge data.
-
         """
         if not self._parent._node_frame.is_empty():
             # if the cache doesn't exist, or the cache isn't in the specified context.
-            if self._vertex_cache is None or self._vertex_cache.context != ctx:
+            if self._vertex_cache is None or self._vertex_cache.context != self._ctx:
                 self._node_frame = FrameRef(Frame(
-                    self._parent._node_frame.select_rows(self._parent_nid, ctx)))
+                    self._parent._node_frame.select_rows(self._parent_nid, self._ctx)))
             else:
                 #TODO if cached data doesn't contain everything, we can read from frame directly.
                 self._node_frame = FrameRef(Frame(self._vertex_cache.merge()))
         if not self._parent._edge_frame.is_empty() and self.number_of_edges() > 0:
             # We probably don't need to cache edge data. An edge usually exists in one subgraph.
             self._edge_frame = FrameRef(Frame(
-                self._parent._edge_frame.select_rows(self._get_parent_eid(), ctx)))
+                self._parent._edge_frame.select_rows(self._get_parent_eid(), self._ctx)))
 
     def map_to_subgraph_nid(self, parent_vids):
         """Map the node Ids in the parent graph to the node Ids in the subgraph.
