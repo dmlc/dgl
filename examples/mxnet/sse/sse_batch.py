@@ -259,8 +259,8 @@ def main(args, data):
         idx = mx.nd.argsort(degs, is_ascend=False).astype(np.int64)
         num_cached = int(g.number_of_nodes() * args.cache_percent / 100)
         high_deg_vs = idx[0:num_cached]
-        high_degs = degs[high_deg_vs]
-        g._cache_node_data(high_deg_vs, ctx=mx.gpu(0))
+    else:
+        high_deg_vs = None
     rets = []
     rets.append(all_hidden)
 
@@ -272,7 +272,7 @@ def main(args, data):
     dur = []
     sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, neigh_expand,
             neighbor_type='in', num_workers=args.num_parallel_subgraphs, seed_nodes=train_vs,
-            shuffle=True, return_seed_id=True)
+            shuffle=True, return_seed_id=True, cache_nodes=high_deg_vs, subgraph_ctx=mx.gpu(0))
     if args.cache_subgraph:
         sampler = CachedSubgraphLoader(sampler, shuffle=True)
     for epoch in range(args.n_epochs):
@@ -284,10 +284,7 @@ def main(args, data):
         for subg, aux_infos in sampler:
             seeds = aux_infos['seeds']
             subg_seeds = subg.map_to_subgraph_nid(seeds)
-            if args.gpu > 0:
-                subg.copy_from_parent(ctx=mx.gpu(i % args.gpu))
-            else:
-                subg.copy_from_parent()
+            subg.copy_from_parent()
 
             losses = []
             with mx.autograd.record():

@@ -88,15 +88,18 @@ class SubgraphFrameCache:
 
     def merge(self):
         ret = {}
+        cache_idx = F.copy_to(self._cache_idx, ctx=self._ctx)
+        cached_out_idx = F.copy_to(self._cached_out_idx, self._ctx)
+        uncached_out_idx = F.copy_to(self._uncached_out_idx, self._ctx)
         for key in self._cache:
             col = self._cache[key]
             shape = (len(self._cache_idx) + len(self._global_uncached_ids),) + col.shape[1:]
             data = F.empty(shape=shape, dtype=col.dtype, ctx=self._ctx)
             # fill cached data.
-            data[self._cached_out_idx] = col[self._cache_idx]
+            data[cached_out_idx] = F.gather_row(col, cache_idx)
             # fill uncached data
             col = self._frame[key]
-            data[self._uncached_out_idx] = F.copy_to(col[self._global_uncached_ids], self._ctx)
+            data[uncached_out_idx] = F.copy_to(F.gather_row(col, self._global_uncached_ids), self._ctx)
             ret.update({key: data})
         return ret
 

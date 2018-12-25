@@ -8,6 +8,7 @@ import traceback
 from ... import utils
 from ...subgraph import DGLSubGraph
 from ... import backend as F
+from ...frame_cache import FrameRowCache
 try:
     import Queue as queue
 except ImportError:
@@ -52,7 +53,9 @@ class NSSubgraphLoader(object):
         # We only cache node data in GPUs.
         if cache_nodes is not None and subgraph_ctx != F.cpu():
             cache_nodes = utils.toindex(F.sort_1d(cache_nodes)[0])
-            self._vertex_cache = FrameRowCache(self._node_frame, cache_nodes, subgraph_ctx)
+            self._vertex_cache = FrameRowCache(self._g._node_frame, cache_nodes, subgraph_ctx)
+        else:
+            self._vertex_cache = None
 
     def _prefetch(self):
         seed_ids = []
@@ -68,9 +71,9 @@ class NSSubgraphLoader(object):
         sgi = self._g._graph.neighbor_sampling(seed_ids, self._expand_factor,
                                                self._num_hops, self._neighbor_type,
                                                self._node_prob, self._max_subgraph_size)
-        if self._g._vertex_cache is not None and len(sgi) > 0:
+        if self._vertex_cache is not None and len(sgi) > 0:
             sg_nodes = [i.induced_nodes for i in sgi]
-            caches = self._g._vertex_cache.cache_lookup(sg_nodes)
+            caches = self._vertex_cache.cache_lookup(sg_nodes)
             # TODO(zhengda) we need to handle multiple contexts.
             subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
                                      i, vertex_cache=cache, \
