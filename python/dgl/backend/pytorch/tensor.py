@@ -149,8 +149,14 @@ def full_1d(length, fill_value):
 def nonzero_1d(input):
     return th.nonzero(input).squeeze()
 
-def sort_1d(input):
-    return th.sort(input)
+def sort_1d(input, return_type):
+    if return_type == "data":
+        return th.sort(input)[0]
+    elif return_type == "index":
+        return th.sort(input)[1]
+    else:
+        assert return_type == "both"
+        return th.sort(input)
 
 def arange(start, stop):
     return th.arange(start, stop, dtype=th.int64)

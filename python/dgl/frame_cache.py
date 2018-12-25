@@ -9,8 +9,7 @@ from ._ffi.function import _init_api
 
 class FrameRowCache:
     def __init__(self, frame, ids, ctx):
-        # TODO(zhengeda) we don't need to the sorted index.
-        ids = F.sort_1d(ids.tousertensor())[0]
+        ids = F.sort_1d(ids.tousertensor(), return_type="data")
         self._cached_ids = utils.toindex(ids)
         self._frame = frame
         cols = {}

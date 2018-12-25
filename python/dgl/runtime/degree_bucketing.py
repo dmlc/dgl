@@ -79,7 +79,7 @@ def gen_degree_bucketing_schedule(
         fd_list.append(zero_feat)
     # merge buckets according to the ascending order of the node ids.
     all_idx = F.cat([idx.data.tousertensor() for idx in idx_list], dim=0)
-    _, order = F.sort_1d(all_idx)
+    order = F.sort_1d(all_idx, return_type="index")
     var_order = var.IDX(utils.toindex(order))
     reduced_feat = ir.MERGE_ROW(var_order, fd_list)
     ir.WRITE_DICT_(var_out, reduced_feat)

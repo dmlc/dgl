@@ -234,7 +234,7 @@ def build_relabel_map(x, sorted=False):
     """
     x = x.tousertensor()
     if not sorted:
-        unique_x, _ = F.sort_1d(F.unique(x))
+        unique_x = F.sort_1d(F.unique(x), return_type="data")
     else:
         unique_x = x
     map_len = int(F.asnumpy(F.max(unique_x, dim=0))) + 1

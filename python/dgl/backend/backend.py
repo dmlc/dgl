@@ -669,20 +669,22 @@ def nonzero_1d(input):
     """
     pass
 
-def sort_1d(input):
+def sort_1d(input, return_type):
     """Sort a 1D tensor (in ascending order) and also return the original index.
 
     Parameters
     ----------
     input : Tensor
         The tensor to be sorted.
+    return_type : string ("data", "index", "both")
+        Indicate the returned data.
 
     Returns
     -------
-    Tensor
-        Sorted tensor.
-    Tensor
-        Index tensor of the elements in the original input.
+    Tensor (optional)
+        Sorted tensor if return_type is "data" or "both".
+    Tensor (optional)
+        Index tensor of the elements in the original input if return_type is "index" or "both".
     """
     pass
 

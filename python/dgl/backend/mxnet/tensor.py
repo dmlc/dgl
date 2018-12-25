@@ -183,12 +183,18 @@ def nonzero_1d(input):
     tmp = np.nonzero(tmp)[0]
     return nd.array(tmp, ctx=input.context, dtype=input.dtype)
 
-def sort_1d(input):
-    # TODO: this isn't an ideal implementation.
-    val = nd.sort(input, axis=None, is_ascend=True)
-    idx = nd.argsort(input, is_ascend=True)
-    idx = nd.cast(idx, dtype='int64')
-    return val, idx
+def sort_1d(input, return_type):
+    if return_type == "data":
+        return nd.sort(input, axis=None, is_ascend=True)
+    elif return_type == "index":
+        idx = nd.argsort(input, is_ascend=True)
+        return nd.cast(idx, dtype='int64')
+    else:
+        assert return_type == "both"
+        val = nd.sort(input, axis=None, is_ascend=True)
+        idx = nd.argsort(input, is_ascend=True)
+        idx = nd.cast(idx, dtype='int64')
+        return val, idx
 
 def arange(start, stop):
     return nd.arange(start, stop, dtype=np.int64)

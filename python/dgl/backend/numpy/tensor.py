@@ -125,8 +125,14 @@ def full_1d(length, fill_value):
 def nonzero_1d(input):
     return np.nonzero(input)[0]
 
-def sort_1d(input):
-    return np.sort(input), np.argsort(input)
+def sort_1d(input, return_type):
+    if return_type == "data":
+        return np.sort(input)
+    elif return_type == "index":
+        return np.argsort(input)
+    else:
+        assert return_type == "both"
+        return np.sort(input), np.argsort(input)
 
 def arange(start, stop):
     return np.arange(start, stop, dtype=np.int64)

@@ -82,7 +82,7 @@ def schedule_recv(graph,
     else:
         var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
         # sort and unique the argument
-        recv_nodes, _ = F.sort_1d(F.unique(recv_nodes.tousertensor()))
+        recv_nodes = F.sort_1d(F.unique(recv_nodes.tousertensor()), return_type="data")
         recv_nodes = utils.toindex(recv_nodes)
         var_recv_nodes = var.IDX(recv_nodes, name='recv_nodes')
         # reduce
@@ -120,7 +120,7 @@ def schedule_snr(graph,
     """
     call_type = 'send_and_recv'
     u, v, eid = edge_tuples
-    recv_nodes, _ = F.sort_1d(F.unique(v.tousertensor()))
+    recv_nodes = F.sort_1d(F.unique(v.tousertensor()), return_type="data")
     recv_nodes = utils.toindex(recv_nodes)
     # create vars
     var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
@@ -330,7 +330,7 @@ def schedule_pull(graph,
             schedule_apply_nodes(graph, pull_nodes, apply_func, inplace)
     else:
         call_type = 'send_and_recv'
-        pull_nodes, _ = F.sort_1d(F.unique(pull_nodes.tousertensor()))
+        pull_nodes = F.sort_1d(F.unique(pull_nodes.tousertensor()), return_type="data")
         pull_nodes = utils.toindex(pull_nodes)
         # create vars
         var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
