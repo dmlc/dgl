@@ -45,8 +45,8 @@ std::vector<IdArray> SearchCachedIds(IdArray cached_ids, const std::vector<IdArr
     std::vector<dgl_id_t> cache_idx;
     // If a queries data isn't in the cache, its original id.
     std::vector<dgl_id_t> global_uncached_ids;
-    for (size_t j = 0; j < query_len; j++) {
-      auto id = find_id(cached_data, cached_data + cached_len, query_data[j]);
+    for (int64_t j = 0; j < query_len; j++) {
+      dgl_id_t id = find_id(cached_data, cached_data + cached_len, query_data[j]);
       if (id == -1) {
         global_uncached_ids.push_back(query_data[j]);
         uncached_query_idx.push_back(j);
