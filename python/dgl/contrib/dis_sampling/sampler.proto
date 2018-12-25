@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package sampler;
+
+// The sampler service definition.
+service Sampler {
+  // Sends a list of ndarray from sampler to trainer
+  rpc SendSubGraph (SamplerRequest) returns (SamplerReply) {}
+
+  // Ask arguments from trainer
+  rpc AskArgs (ArgsRequest) returns (SamplerReply) {}
+}
+
+// The sampler request message
+message SamplerRequest {
+  bytes vertices_id = 1;
+  bytes layer = 2;
+  bytes csr_data = 3;
+  bytes csr_indices = 4;
+  bytes csr_indptr = 5;
+  int32 csr_shape_0 = 6;
+  int32 csr_shape_1 = 7;
+}
+
+// The response message
+message SamplerReply {
+  bytes seeds = 1;
+  int32 num_args = 2;
+  int32 num_hops = 3;
+  int32 num_neighbor = 4;
+  int32 max_num_vertices = 5;
+  bool update = 6;
+}
+
+// The sampler ip address
+message ArgsRequest {
+  string ip = 1;
+}
