@@ -5,7 +5,6 @@ import numpy as np
 from . import backend as F
 from . import utils
 from .frame import Frame, FrameRef
-from .graph_index import search_nids
 from ._ffi.function import _init_api
 
 class FrameRowCache:
