@@ -54,6 +54,8 @@ class FrameRowCache:
                 ret.append(SubgraphFrameCache(self._frame, self._cache, self._ctx,
                                               cached_out_idx, cache_idx,
                                               uncached_out_idx, global_uncached_ids))
+                self._num_access += len(id)
+                self._num_hits += len(cached_out_idx)
         else:
             res = _CAPI_DGLCacheLookup(self._cached_ids.todgltensor(), dgl_ids[0])
             cached_out_idx = utils.toindex(res(0))
@@ -63,7 +65,7 @@ class FrameRowCache:
             ret.append(SubgraphFrameCache(self._frame, self._cache, self._ctx,
                                           cached_out_idx, cache_idx,
                                           uncached_out_idx, global_uncached_ids))
-            self._num_access += len(lid)
+            self._num_access += len(ids[0])
             self._num_hits += len(cached_out_idx)
         return ret
 
