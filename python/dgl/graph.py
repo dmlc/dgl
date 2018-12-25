@@ -9,7 +9,6 @@ import dgl
 from .base import ALL, is_all, DGLError, dgl_warning
 from . import backend as F
 from .frame import FrameRef, Frame
-from .frame_cache import FrameRowCache
 from .graph_index import GraphIndex, create_graph_index
 from .runtime import ir, scheduler, Runtime
 from . import utils
@@ -200,11 +199,6 @@ class DGLGraph(object):
         self._apply_edge_func = None
         self._vertex_cache = None
 
-    def _cache_node_data(self, vids, ctx):
-        vids = utils.toindex(vids).tousertensor()
-        vids = utils.toindex(F.sort_1d(vids)[0])
-        self._vertex_cache = FrameRowCache(self._node_frame, vids, ctx)
-
     def add_nodes(self, num, data=None):
         """Add multiple new nodes.
 
@@ -393,23 +387,13 @@ class DGLGraph(object):
         self._msg_frame.clear()
 
     def clear_cache(self, type):
-        """Clear cached data in DGLGraph.
+        """Clear all cached graph structures such as adjmat.
 
-        DGL can cache different data to accelerate computation, including
-        * graph structures (type='graph'): DGL, by default, caches all graph structure
-        related sparse matrices (e.g. adjmat, incmat) at the cost of extra memory consumption.
-        * node data (type='node'): Node data (e.g., node features and embeddings) can be
-        cached in different contexts (e.g., GPUs) by `cache_node_data`.
-
-        This function can be used to clear the cached matrices when necessary. For example,
-        when memory is an issue or node data has been updated, etc.
+        By default, all graph structure related sparse matrices (e.g. adjmat, incmat)
+        are cached so they could be reused with the cost of extra memory consumption.
+        This function can be used to clear the cached matrices if memory is an issue.
         """
-        if type == "graph":
-            self._graph.clear_cache()
-        elif type == "node":
-            self._vertex_cache = None
-        else:
-            raise ValueError("unsupported cache type: " + type)
+        self._graph.clear_cache()
 
     def reset_messages(self):
         """Clear all messages."""
@@ -2638,12 +2622,7 @@ class DGLGraph(object):
         """
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
-        if self._vertex_cache is not None:
-            cache = self._vertex_cache.cache_lookup([sgi.induced_nodes])[0]
-        else:
-            cache = None
-        return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi,
-                               vertex_cache=cache)
+        return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
 
     def subgraphs(self, nodes):
         """Return a list of subgraphs, each induced in the corresponding given
@@ -2671,13 +2650,8 @@ class DGLGraph(object):
         induced_nodes = [utils.toindex(n) for n in nodes]
         sgis = self._graph.node_subgraphs(induced_nodes)
         sg_nodes = [i.induced_nodes for i in sgis]
-        if self._vertex_cache is not None:
-            caches = self._vertex_cache.cache_lookup(sg_nodes)
-            return [dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
-                                    sgi, vertex_cache=cache) for sgi, cache in zip(sgis, caches)]
-        else:
-            return [dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
-                                    sgi) for sgi in sgis]
+        return [dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
+                                sgi) for sgi in sgis]
 
     def edge_subgraph(self, edges):
         """Return the subgraph induced on given edges.

@@ -10,9 +10,10 @@ from ._ffi.function import _init_api
 
 class FrameRowCache:
     def __init__(self, frame, ids, ctx):
-        self._cached_ids = ids
+        # TODO(zhengeda) we don't need to the sorted index.
+        ids = F.sort_1d(ids.tousertensor())[0]
+        self._cached_ids = utils.toindex(ids)
         self._frame = frame
-        ids = ids.tousertensor()
         cols = {}
         for key in frame:
             col = frame[key]
@@ -34,6 +35,7 @@ class FrameRowCache:
         return self._ctx
 
     def cache_lookup(self, ids):
+        # TODO(zhengda) if the cache isn't ready, we shouldn't read the cache.
         ret = []
         dgl_ids = [i.todgltensor() for i in ids]
         empty_ids = []

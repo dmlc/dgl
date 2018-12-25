@@ -317,7 +317,8 @@ def main(args, data):
                                                            neighbor_type='in',
                                                            num_workers=args.num_parallel_subgraphs,
                                                            seed_nodes=train_vs, shuffle=True,
-                                                           return_seed_id=True)
+                                                           return_seed_id=True, cache_nodes=high_deg_vs,
+                                                           subgraph_ctx=mx.gpu(0))
 
         # test set accuracy
         logits = model_infer(g, eval_vs)
@@ -335,8 +336,6 @@ def main(args, data):
         # Update node embeddings.
         all_hidden = update_hidden_infer(g, None)
         g.ndata['h'] = all_hidden
-        if args.gpu > 0 and args.cache_percent > 0:
-            g._cache_node_data(high_deg_vs, ctx=mx.gpu(0))
         rets.append(all_hidden)
 
         dur.append(time.time() - t0)

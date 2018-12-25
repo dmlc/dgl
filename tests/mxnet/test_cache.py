@@ -3,6 +3,7 @@ os.environ['DGLBACKEND'] = 'mxnet'
 import mxnet as mx
 import numpy as np
 from dgl.graph import DGLGraph
+from dgl import utils
 import dgl
 
 D = 5
@@ -23,11 +24,28 @@ def generate_graph():
     g.set_e_initializer(dgl.init.zero_initializer)
     return g
 
+def subgraph(g, nodes, vertex_cache):
+    induced_nodes = utils.toindex(nodes)
+    sgi = g._graph.node_subgraph(induced_nodes)
+    cache = vertex_cache.cache_lookup([sgi.induced_nodes])[0]
+    return dgl.DGLSubGraph(g, sgi.induced_nodes, sgi.induced_edges, sgi,
+                           vertex_cache=cache)
+
+def subgraphs(g, nodes, vertex_cache):
+    induced_nodes = [utils.toindex(n) for n in nodes]
+    sgis = g._graph.node_subgraphs(induced_nodes)
+    sg_nodes = [i.induced_nodes for i in sgis]
+    caches = vertex_cache.cache_lookup(sg_nodes)
+    return [dgl.DGLSubGraph(g, sgi.induced_nodes, sgi.induced_edges,
+                            sgi, vertex_cache=cache) for sgi, cache in zip(sgis, caches)]
+
 def test_node_cache():
     g = generate_graph()
-    g._cache_node_data([1, 0, 5, 9, 7, 8], mx.cpu())
+    vids = mx.nd.array([1, 0, 5, 9, 7, 8], dtype=np.int64)
+    vertex_cache = dgl.frame_cache.FrameRowCache(g._node_frame, utils.toindex(vids), mx.cpu())
+
     subg_ids = [0, 1, 2, 4, 5, 9]
-    subg = g.subgraph(subg_ids)
+    subg = subgraph(g, subg_ids, vertex_cache)
     subg.copy_from_parent()
     assert subg.ndata.keys() == g.ndata.keys()
     for key in subg.ndata:
@@ -37,7 +55,7 @@ def test_node_cache():
 
     subg_ids = [[0, 1, 2, 4, 5, 9], [0, 2, 3, 7], [3, 4, 5]]
     for i in range(2, 4):
-        subgs = g.subgraphs(subg_ids[:i])
+        subgs = subgraphs(g, subg_ids[:i], vertex_cache)
         for subg, subg_id in zip(subgs, subg_ids):
             subg.copy_from_parent()
             assert subg.ndata.keys() == g.ndata.keys()
