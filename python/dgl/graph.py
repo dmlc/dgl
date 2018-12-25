@@ -197,7 +197,6 @@ class DGLGraph(object):
         self._reduce_func = None
         self._apply_node_func = None
         self._apply_edge_func = None
-        self._vertex_cache = None
 
     def add_nodes(self, num, data=None):
         """Add multiple new nodes.
@@ -386,7 +385,7 @@ class DGLGraph(object):
         self._msg_graph.clear()
         self._msg_frame.clear()
 
-    def clear_cache(self, type):
+    def clear_cache(self):
         """Clear all cached graph structures such as adjmat.
 
         By default, all graph structure related sparse matrices (e.g. adjmat, incmat)
@@ -2649,7 +2648,6 @@ class DGLGraph(object):
         """
         induced_nodes = [utils.toindex(n) for n in nodes]
         sgis = self._graph.node_subgraphs(induced_nodes)
-        sg_nodes = [i.induced_nodes for i in sgis]
         return [dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
                                 sgi) for sgi in sgis]
 
