@@ -5,8 +5,8 @@
  */
 
 #include <dgl/cache.h>
-#include <vector>
 #include <dgl/graph.h>
+#include <vector>
 #include "../c_api_common.h"
 
 namespace dgl {
