@@ -4,9 +4,9 @@
  * \brief DGL cache implementation
  */
 
+#include <dgl/cache.h>
 #include <vector>
 #include <dgl/graph.h>
-#include <dgl/cache.h>
 #include "../c_api_common.h"
 
 namespace dgl {
