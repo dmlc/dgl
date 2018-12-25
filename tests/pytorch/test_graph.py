@@ -57,7 +57,7 @@ def test_adjmat_cache():
     adj3 = g.adjacency_matrix(transpose=True)
     assert id(adj3) != id(adj2)
     # manually clear the cache
-    g.clear_cache(type='graph')
+    g.clear_cache()
     adj35 = g.adjacency_matrix()
     assert id(adj35) != id(adj2)
     # mutating the graph should invalidate the cache
@@ -112,7 +112,7 @@ def test_incmat_cache():
     inc3 = g.incidence_matrix(type="both")
     assert id(inc3) != id(inc2)
     # manually clear the cache
-    g.clear_cache(type='graph')
+    g.clear_cache()
     inc35 = g.incidence_matrix("in")
     assert id(inc35) != id(inc2)
     # mutating the graph should invalidate the cache
