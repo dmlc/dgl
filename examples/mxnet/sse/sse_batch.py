@@ -152,40 +152,6 @@ class SSEPredict(gluon.Block):
             hidden = mx.nd.Dropout(hidden, p=self.dropout)
         return self.linear2(self.linear1(hidden))
 
-class CachedSubgraph(object):
-    def __init__(self, subg, seeds):
-        # We can't cache the input subgraph because it contains node frames
-        # and data frames.
-        self.subg = dgl.DGLSubGraph(subg._parent, subg._parent_nid, subg._parent_eid,
-                                subg._graph)
-        self.seeds = seeds
-
-class CachedSubgraphLoader(object):
-    def __init__(self, loader, shuffle):
-        self._loader = loader
-        self._cached = []
-        self._shuffle = shuffle
-
-    def restart(self):
-        self._subgraphs = self._cached
-        self._gen_subgraph = len(self._subgraphs) == 0
-        random.shuffle(self._subgraphs)
-        self._cached = []
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        if len(self._subgraphs) > 0:
-            s = self._subgraphs.pop(0)
-            subg, seeds = s.subg, s.seeds
-        elif self._gen_subgraph:
-            subg, seeds = self._loader.__next__()
-        else:
-            raise StopIteration
-        self._cached.append(CachedSubgraph(subg, seeds))
-        return subg, seeds
-
 def main(args, data):
     if isinstance(data.features, mx.nd.NDArray):
         features = data.features
@@ -273,8 +239,6 @@ def main(args, data):
     sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, neigh_expand,
             neighbor_type='in', num_workers=args.num_parallel_subgraphs, seed_nodes=train_vs,
             shuffle=True, return_seed_id=True, cache_nodes=high_deg_vs, subgraph_ctx=mx.gpu(0))
-    if args.cache_subgraph:
-        sampler = CachedSubgraphLoader(sampler, shuffle=True)
     for epoch in range(args.n_epochs):
         t0 = time.time()
         train_loss = 0
@@ -310,16 +274,7 @@ def main(args, data):
                         + " subgraphs takes " + str(end1 - start1))
                 start1 = end1
 
-        if args.cache_subgraph:
-            sampler.restart()
-        else:
-            sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, neigh_expand,
-                                                           neighbor_type='in',
-                                                           num_workers=args.num_parallel_subgraphs,
-                                                           seed_nodes=train_vs, shuffle=True,
-                                                           return_seed_id=True, cache_nodes=high_deg_vs,
-                                                           subgraph_ctx=mx.gpu(0))
-
+        sampler.reset(pin_cache_keys="in")
         # test set accuracy
         logits = model_infer(g, eval_vs)
         y_bar = mx.nd.argmax(logits, axis=1)
@@ -396,7 +351,6 @@ if __name__ == '__main__':
     parser.add_argument("--use-spmv", action="store_true",
             help="use SpMV for faster speed.")
     parser.add_argument("--dgl", action="store_true")
-    parser.add_argument("--cache-subgraph", default=False, action="store_false")
     parser.add_argument("--num-parallel-subgraphs", type=int, default=1,
             help="the number of subgraphs to construct in parallel.")
     parser.add_argument("--neigh-expand", type=int, default=16,
@@ -404,7 +358,6 @@ if __name__ == '__main__':
     parser.add_argument("--cache-percent", type=int, default=0,
             help="the percentage of nodes being cached in GPU.")
     args = parser.parse_args()
-    print("cache: " + str(args.cache_subgraph))
 
     # load and preprocess dataset
     if args.graph_file != '':
