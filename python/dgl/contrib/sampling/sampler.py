@@ -56,9 +56,9 @@ class NSSubgraphLoader(object):
             self._subgraph_ctx = [subgraph_ctx]
 
         if cache_nodes is not None:
-            assert len(subgraph_ctx) == 1, "caching doesn't support multiple contexts"
+            assert len(self._subgraph_ctx) == 1, "caching doesn't support multiple contexts"
             cache_nodes = utils.toindex(cache_nodes)
-            self._vertex_cache = CachedFrame(self._g._node_frame, cache_nodes, subgraph_ctx[0])
+            self._vertex_cache = CachedFrame(self._g._node_frame, cache_nodes, self._subgraph_ctx[0])
         else:
             self._vertex_cache = None
 
