@@ -200,10 +200,11 @@ def main(args, data):
     model_train = SSEPredict(update_hidden_train, args.n_hidden, args.predict_dropout, prefix='app')
     model_infer = SSEPredict(update_hidden_infer, args.n_hidden, args.predict_dropout, prefix='app')
     model_infer.initialize(ctx=mx.cpu(0))
+    train_ctxs = []
     if args.gpu <= 0:
         model_train.initialize(ctx=mx.cpu(0))
+        train_ctxs.append(mx.cpu(0))
     else:
-        train_ctxs = []
         for i in range(args.gpu):
             train_ctxs.append(mx.gpu(i))
         model_train.initialize(ctx=train_ctxs)
@@ -238,7 +239,7 @@ def main(args, data):
     dur = []
     sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, neigh_expand,
             neighbor_type='in', num_workers=args.num_parallel_subgraphs, seed_nodes=train_vs,
-            shuffle=True, return_seed_id=True, cache_nodes=high_deg_vs, subgraph_ctx=mx.gpu(0))
+            shuffle=True, return_seed_id=True, cache_nodes=high_deg_vs, subgraph_ctx=train_ctxs)
     for epoch in range(args.n_epochs):
         t0 = time.time()
         train_loss = 0

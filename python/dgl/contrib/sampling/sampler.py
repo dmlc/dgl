@@ -52,6 +52,7 @@ class NSSubgraphLoader(object):
         self._subgraph_ctx = subgraph_ctx
 
         if cache_nodes is not None:
+            assert not isinstance(subgraph_ctx, list), "caching doesn't support multiple contexts"
             cache_nodes = utils.toindex(cache_nodes)
             self._vertex_cache = CachedFrame(self._g._node_frame, cache_nodes, subgraph_ctx)
         else:
@@ -71,16 +72,19 @@ class NSSubgraphLoader(object):
         sgi = self._g._graph.neighbor_sampling(seed_ids, self._expand_factor,
                                                self._num_hops, self._neighbor_type,
                                                self._node_prob, self._max_subgraph_size)
+
+        select = lambda data, i : data[i % len(data)]
         if self._vertex_cache is not None and len(sgi) > 0:
-            sg_nodes = [i.induced_nodes for i in sgi]
+            assert not isinstance(self._subgraph_ctx, list), "caching doesn't support multiple contexts"
+            sg_nodes = [idx.induced_nodes for idx in sgi]
             caches = self._vertex_cache.cache_lookup(sg_nodes)
             # TODO(zhengda) we need to handle multiple contexts.
-            subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
-                                     i, vertex_cache=cache, \
-                                     ctx=self._subgraph_ctx) for i, cache in zip(sgi, caches)]
+            subgraphs = [DGLSubGraph(self._g, idx.induced_nodes, idx.induced_edges, \
+                                     idx, vertex_cache=cache, \
+                                     ctx=self._subgraph_ctx) for idx, cache in zip(sgi, caches)]
         else:
-            subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
-                                     i, ctx=self._subgraph_ctx) for i in sgi]
+            subgraphs = [DGLSubGraph(self._g, idx.induced_nodes, idx.induced_edges, \
+                                     idx, ctx=select(self._subgraph_ctx, i)]) for i, idx in enumerate(sgi)]
         self._subgraphs.extend(subgraphs)
         if self._return_seed_id:
             self._seed_ids.extend(seed_ids)
@@ -301,8 +305,9 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
         Whether to prefetch the samples in the next batch.
     cache_nodes : list or Tensor
         The cached node Ids in the sampler.
-    subgraph_ctx : context
-        The context that the subgraph and its data are stored.
+    subgraph_ctx : context or a list of contexts.
+        The context that the subgraph and its data are stored. If multiple contexts are provided,
+        subgraphs are assigned to the contexts in a round-robin fashion.
 
     Returns
     -------
