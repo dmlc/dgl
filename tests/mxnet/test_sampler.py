@@ -6,9 +6,13 @@ import scipy as sp
 import dgl
 from dgl import utils
 
-def generate_rand_graph(n):
+def generate_rand_graph(n, with_data=False):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
-    return dgl.DGLGraph(arr, readonly=True)
+    g = dgl.DGLGraph(arr, readonly=True)
+    if with_data:
+        g.ndata['h'] = mx.nd.random.normal(shape=(g.number_of_nodes(), 10))
+        g.edata['w'] = mx.nd.random.normal(shape=(g.number_of_edges(), 5))
+    return g
 
 def test_1neighbor_sampler_all():
     g = generate_rand_graph(100)
@@ -103,8 +107,21 @@ def test_10neighbor_sampler():
     check_10neighbor_sampler(g, seeds=np.unique(np.random.randint(0, g.number_of_nodes(),
                                                                   size=int(g.number_of_nodes() / 10))))
 
+
+def test_cached_sampler():
+    g = generate_rand_graph(100, True)
+    for subg, aux in dgl.contrib.sampling.NeighborSampler(g, 10, 5, neighbor_type='in',
+                                                          num_workers=4, return_seed_id=True,
+                                                          cache_nodes=range(0, 100, 3)):
+        assert subg._vertex_cache is not None
+        subg.copy_from_parent()
+        assert np.all(subg.ndata['h'].asnumpy() == g.ndata['h'][subg.parent_nid].asnumpy())
+        assert np.all(subg.edata['w'].asnumpy() == g.edata['w'][subg.parent_eid].asnumpy())
+
+
 if __name__ == '__main__':
     test_1neighbor_sampler_all()
     test_10neighbor_sampler_all()
     test_1neighbor_sampler()
     test_10neighbor_sampler()
+    test_cached_sampler()

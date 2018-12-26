@@ -50,8 +50,8 @@ class NSSubgraphLoader(object):
         self._subgraph_idx = 0
         self._subgraph_ctx = subgraph_ctx
 
-        # We only cache node data in GPUs.
-        if cache_nodes is not None and subgraph_ctx != F.cpu():
+        if cache_nodes is not None:
+            cache_nodes = utils.toindex(cache_nodes)
             self._vertex_cache = FrameRowCache(self._g._node_frame, cache_nodes, subgraph_ctx)
         else:
             self._vertex_cache = None
