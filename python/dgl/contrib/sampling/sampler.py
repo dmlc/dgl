@@ -84,7 +84,7 @@ class NSSubgraphLoader(object):
                                      ctx=self._subgraph_ctx) for idx, cache in zip(sgi, caches)]
         else:
             subgraphs = [DGLSubGraph(self._g, idx.induced_nodes, idx.induced_edges, \
-                                     idx, ctx=select(self._subgraph_ctx, i)]) for i, idx in enumerate(sgi)]
+                                     idx, ctx=select(self._subgraph_ctx, i)) for i, idx in enumerate(sgi)]
         self._subgraphs.extend(subgraphs)
         if self._return_seed_id:
             self._seed_ids.extend(seed_ids)
