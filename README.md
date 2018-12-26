@@ -156,6 +156,10 @@ We expect all contributions discussed in the issue tracker and going through PRs
 
 DGL is developed and maintained by [NYU, NYU Shanghai, AWS Shanghai AI Lab, and AWS MXNet Science Team](https://www.dgl.ai/about).
 
+## New to Deep Learning?
+
+Check out the open source book [*Dive into Deep Learning*](http://en.diveintodeeplearning.org/).
+
 ## License
 
 DGL uses Apache License 2.0.
