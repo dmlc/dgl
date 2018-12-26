@@ -10,7 +10,8 @@ def generate_rand_graph(n, with_data=False):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
     g = dgl.DGLGraph(arr, readonly=True)
     if with_data:
-        g.ndata['h'] = mx.nd.random.normal(shape=(g.number_of_nodes(), 10))
+        g.ndata['h1'] = mx.nd.random.normal(shape=(g.number_of_nodes(), 10))
+        g.ndata['h2'] = mx.nd.random.normal(shape=(g.number_of_nodes(), 9))
         g.edata['w'] = mx.nd.random.normal(shape=(g.number_of_edges(), 5))
     return g
 
@@ -110,13 +111,53 @@ def test_10neighbor_sampler():
 
 def test_cached_sampler():
     g = generate_rand_graph(100, True)
-    for subg, aux in dgl.contrib.sampling.NeighborSampler(g, 10, 5, neighbor_type='in',
-                                                          num_workers=4, return_seed_id=True,
-                                                          cache_nodes=range(0, 100, 3)):
+    batch_size = 10
+    sampler = dgl.contrib.sampling.NeighborSampler(g, batch_size, 5, neighbor_type='in',
+                                                   num_workers=4, return_seed_id=True,
+                                                   cache_nodes=range(0, 100, 3))
+    num_iters = 0
+    for subg, aux in sampler:
         assert subg._vertex_cache is not None
         subg.copy_from_parent()
-        assert np.all(subg.ndata['h'].asnumpy() == g.ndata['h'][subg.parent_nid].asnumpy())
+        assert np.all(subg.ndata['h1'].asnumpy() == g.ndata['h1'][subg.parent_nid].asnumpy())
+        assert np.all(subg.ndata['h2'].asnumpy() == g.ndata['h2'][subg.parent_nid].asnumpy())
         assert np.all(subg.edata['w'].asnumpy() == g.edata['w'][subg.parent_eid].asnumpy())
+        num_iters += 1
+    assert num_iters == g.number_of_nodes() / batch_size
+
+    g.ndata['h2'] = mx.nd.random.normal(shape=(g.number_of_nodes(), 9))
+    # We refresh everything in the cache.
+    sampler.reset()
+    for subg, aux in sampler:
+        assert subg._vertex_cache is not None
+        subg.copy_from_parent()
+        assert np.all(subg.ndata['h1'].asnumpy() == g.ndata['h1'][subg.parent_nid].asnumpy())
+        assert np.all(subg.ndata['h2'].asnumpy() == g.ndata['h2'][subg.parent_nid].asnumpy())
+        assert np.all(subg.edata['w'].asnumpy() == g.edata['w'][subg.parent_eid].asnumpy())
+    assert num_iters == g.number_of_nodes() / batch_size
+
+    g.ndata['h2'] = mx.nd.random.normal(shape=(g.number_of_nodes(), 9))
+    # We refresh h2
+    sampler.reset(pin_cache_keys=['h1'])
+    for subg, aux in sampler:
+        assert subg._vertex_cache is not None
+        subg.copy_from_parent()
+        assert np.all(subg.ndata['h1'].asnumpy() == g.ndata['h1'][subg.parent_nid].asnumpy())
+        assert np.all(subg.ndata['h2'].asnumpy() == g.ndata['h2'][subg.parent_nid].asnumpy())
+        assert np.all(subg.edata['w'].asnumpy() == g.edata['w'][subg.parent_eid].asnumpy())
+    assert num_iters == g.number_of_nodes() / batch_size
+
+    g.ndata['h2'] = mx.nd.random.normal(shape=(g.number_of_nodes(), 9))
+    # We update h2 but don't refresh h2, then h2 in subgraph shouldn't match h2
+    # in the original graph.
+    sampler.reset(pin_cache_keys=['h1', 'h2'])
+    for subg, aux in sampler:
+        assert subg._vertex_cache is not None
+        subg.copy_from_parent()
+        assert np.all(subg.ndata['h1'].asnumpy() == g.ndata['h1'][subg.parent_nid].asnumpy())
+        assert np.any(subg.ndata['h2'].asnumpy() != g.ndata['h2'][subg.parent_nid].asnumpy())
+        assert np.all(subg.edata['w'].asnumpy() == g.edata['w'][subg.parent_eid].asnumpy())
+    assert num_iters == g.number_of_nodes() / batch_size
 
 
 if __name__ == '__main__':

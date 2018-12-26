@@ -100,6 +100,21 @@ class NSSubgraphLoader(object):
             aux_infos['seeds'] = self._seed_ids.pop(0).tousertensor()
         return self._subgraphs.pop(0), aux_infos
 
+    def reset(self, pin_cache_keys=[]):
+        """Reset the iterator.
+
+        By default, it restarts the iterator and refresh all cached data.
+
+        Parameters
+        ----------
+        pin_cache_keys : list of strings
+            The data in the cached isn't refreshed.
+        """
+        self._subgraph_idx = 0
+        if self._vertex_cache is not None:
+            refresh_keys = self._vertex_cache.keys - pin_cache_keys
+            self._vertex_cache.refresh(refresh_keys)
+
 class _Prefetcher(object):
     """Internal shared prefetcher logic. It can be sub-classed by a Thread-based implementation
     or Process-based implementation."""

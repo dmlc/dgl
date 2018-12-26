@@ -30,7 +30,7 @@ class CachedFrame:
         for key in frame:
             col = frame[key]
             cols.update({key: F.copy_to(col[ids], ctx)})
-        self._cache = FrameRef(Frame(cols))
+        self._cache = cols
         self._ctx = ctx
         self._opt_lookup = {
             2: _CAPI_DGLCacheLookup2,
@@ -43,10 +43,29 @@ class CachedFrame:
         self._num_hits = 0
 
     @property
+    def keys(self):
+        """The names of the cached columns.
+        """
+        return self._cache.keys()
+
+    @property
     def context(self):
         """The context where the cache is stored.
         """
         return self._ctx
+
+    def refresh(self, keys):
+        """Refresh cached data of the specified columns.
+
+        Parameters
+        ----------
+        keys : list of string
+            The names of the columns to be freshed.
+        """
+        ids = self._cached_ids.tousertensor()
+        for key in keys:
+            col = self._frame[key]
+            self._cache.update({key: F.copy_to(col[ids], self._ctx)})
 
     def cache_lookup(self, ids):
         """Lookup in the cached frame.
