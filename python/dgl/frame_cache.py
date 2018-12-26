@@ -7,7 +7,21 @@ from . import utils
 from .frame import Frame, FrameRef
 from ._ffi.function import _init_api
 
-class FrameRowCache:
+class CachedFrame:
+    """The cached frame.
+
+    It contains both the frame and cached part of the frame,
+    so we can fetch any data from it.
+
+    Parameters
+    ----------
+    frame : FrameRef
+        The frame that we want to create cache on.
+    ids : utils.Index
+        The row Ids whose are stored in the cache.
+    ctx : context
+        The context where the cache is stored.
+    """
     def __init__(self, frame, ids, ctx):
         ids = F.sort_1d(ids.tousertensor(), return_type="data")
         self._cached_ids = utils.toindex(ids)
@@ -30,9 +44,25 @@ class FrameRowCache:
 
     @property
     def context(self):
+        """The context where the cache is stored.
+        """
         return self._ctx
 
     def cache_lookup(self, ids):
+        """Lookup in the cached frame.
+
+        For performance, it is a batched version.
+
+        Parameters
+        ----------
+        ids : list of utils.Index
+            The row Ids in the frame.
+
+        Returns
+        -------
+        List of SubgraphCachedFrame
+            The cached frames for the subsets.
+        """
         # TODO(zhengda) if the cache isn't ready, we shouldn't read the cache.
         ret = []
         dgl_ids = [i.todgltensor() for i in ids]
@@ -51,9 +81,9 @@ class FrameRowCache:
                 uncached_out_idx = utils.toindex(res(i * 4 + 1))
                 cache_idx = utils.toindex(res(i * 4 + 2))
                 global_uncached_ids = utils.toindex(res(i * 4 + 3))
-                ret.append(SubgraphFrameCache(self._frame, self._cache, self._ctx,
-                                              cached_out_idx, cache_idx,
-                                              uncached_out_idx, global_uncached_ids))
+                ret.append(SubgraphCachedFrame(self._frame, self._cache, self._ctx,
+                                               cached_out_idx, cache_idx,
+                                               uncached_out_idx, global_uncached_ids))
                 self._num_access += len(id)
                 self._num_hits += len(cached_out_idx)
         else:
@@ -62,14 +92,34 @@ class FrameRowCache:
             uncached_out_idx = utils.toindex(res(1))
             cache_idx = utils.toindex(res(2))
             global_uncached_ids = utils.toindex(res(3))
-            ret.append(SubgraphFrameCache(self._frame, self._cache, self._ctx,
-                                          cached_out_idx, cache_idx,
-                                          uncached_out_idx, global_uncached_ids))
+            ret.append(SubgraphCachedFrame(self._frame, self._cache, self._ctx,
+                                           cached_out_idx, cache_idx,
+                                           uncached_out_idx, global_uncached_ids))
             self._num_access += len(ids[0])
             self._num_hits += len(cached_out_idx)
         return ret
 
-class SubgraphFrameCache:
+class SubgraphCachedFrame:
+    """The cached frame for the subgraph.
+
+    It contains all the parts to reconstruct the frame for the subgraph.
+
+
+    Parameters
+    ----------
+    frame : FrameRef
+        The original frame.
+    cache : dict of Tensor.
+        The cached data
+    cached_out_idx : utils.Index
+        The index of the cached data in the reconstructed frame.
+    cache_idx : utils.Index
+        The index of the cached data in the cache.
+    uncached_out_idx : utils.Index
+        The index of the uncached data in the reconstructed frame.
+    global_uncached_ids : utils.Index
+        The index of the uncached data in the original frame.
+    """
     def __init__(self, frame, cache, ctx, cached_out_idx, cache_idx,
                  uncached_out_idx, global_uncached_ids):
         self._frame = frame
@@ -86,9 +136,18 @@ class SubgraphFrameCache:
 
     @property
     def context(self):
+        """The context where the cache is stored.
+        """
         return self._ctx
 
     def merge(self):
+        """Merge all parts of data.
+
+        Returns
+        -------
+        Dict of Tensors
+            The reconstructed data.
+        """
         ret = {}
         cache_idx = F.copy_to(self._cache_idx, ctx=self._ctx)
         cached_out_idx = F.copy_to(self._cached_out_idx, self._ctx)

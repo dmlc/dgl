@@ -8,7 +8,7 @@ import traceback
 from ... import utils
 from ...subgraph import DGLSubGraph
 from ... import backend as F
-from ...frame_cache import FrameRowCache
+from ...frame_cache import CachedFrame
 try:
     import Queue as queue
 except ImportError:
@@ -52,7 +52,7 @@ class NSSubgraphLoader(object):
 
         if cache_nodes is not None:
             cache_nodes = utils.toindex(cache_nodes)
-            self._vertex_cache = FrameRowCache(self._g._node_frame, cache_nodes, subgraph_ctx)
+            self._vertex_cache = CachedFrame(self._g._node_frame, cache_nodes, subgraph_ctx)
         else:
             self._vertex_cache = None
 
@@ -269,6 +269,10 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
         The seed Ids are in the parent graph.
     prefetch : bool, default False
         Whether to prefetch the samples in the next batch.
+    cache_nodes : list or Tensor
+        The cached node Ids in the sampler.
+    subgraph_ctx : context
+        The context that the subgraph and its data are stored.
 
     Returns
     -------

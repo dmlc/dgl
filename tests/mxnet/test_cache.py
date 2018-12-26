@@ -42,7 +42,7 @@ def subgraphs(g, nodes, vertex_cache):
 def test_node_cache():
     g = generate_graph()
     vids = mx.nd.array([1, 0, 5, 9, 7, 8], dtype=np.int64)
-    vertex_cache = dgl.frame_cache.FrameRowCache(g._node_frame, utils.toindex(vids), mx.cpu())
+    vertex_cache = dgl.frame_cache.CachedFrame(g._node_frame, utils.toindex(vids), mx.cpu())
 
     subg_ids = [0, 1, 2, 4, 5, 9]
     subg = subgraph(g, subg_ids, vertex_cache)

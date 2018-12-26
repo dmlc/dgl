@@ -43,6 +43,10 @@ class DGLSubGraph(DGLGraph):
         The graph index.
     shared : bool, optional
         Whether the subgraph shares node/edge features with the parent graph.
+    vertex_cache : SubgraphCachedFrame
+        Its provides data to reconstruct the node data of the subgraph.
+    ctx : context
+        The context where the subgraph and its data are stored.
     """
     def __init__(self, parent, parent_nid, parent_eid, graph_idx, shared=False,
                  vertex_cache=None, ctx=F.cpu()):
@@ -131,7 +135,6 @@ class DGLSubGraph(DGLGraph):
                 self._node_frame = FrameRef(Frame(
                     self._parent._node_frame.select_rows(self._parent_nid, self._ctx)))
             else:
-                #TODO if cached data doesn't contain everything, we can read from frame directly.
                 self._node_frame = FrameRef(Frame(self._vertex_cache.merge()))
         if not self._parent._edge_frame.is_empty() and self.number_of_edges() > 0:
             # We probably don't need to cache edge data. An edge usually exists in one subgraph.
