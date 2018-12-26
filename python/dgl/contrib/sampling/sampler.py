@@ -1,5 +1,6 @@
 # This file contains subgraph samplers.
 
+import sys
 import numpy as np
 import threading
 import random
@@ -49,12 +50,15 @@ class NSSubgraphLoader(object):
         self._subgraphs = []
         self._seed_ids = []
         self._subgraph_idx = 0
-        self._subgraph_ctx = subgraph_ctx
+        if isinstance(subgraph_ctx, list):
+            self._subgraph_ctx = subgraph_ctx
+        else:
+            self._subgraph_ctx = [subgraph_ctx]
 
         if cache_nodes is not None:
-            assert not isinstance(subgraph_ctx, list), "caching doesn't support multiple contexts"
+            assert len(subgraph_ctx) == 1, "caching doesn't support multiple contexts"
             cache_nodes = utils.toindex(cache_nodes)
-            self._vertex_cache = CachedFrame(self._g._node_frame, cache_nodes, subgraph_ctx)
+            self._vertex_cache = CachedFrame(self._g._node_frame, cache_nodes, subgraph_ctx[0])
         else:
             self._vertex_cache = None
 
@@ -75,13 +79,13 @@ class NSSubgraphLoader(object):
 
         select = lambda data, i : data[i % len(data)]
         if self._vertex_cache is not None and len(sgi) > 0:
-            assert not isinstance(self._subgraph_ctx, list), "caching doesn't support multiple contexts"
+            assert len(self._subgraph_ctx) == 1, "caching doesn't support multiple contexts"
             sg_nodes = [idx.induced_nodes for idx in sgi]
             caches = self._vertex_cache.cache_lookup(sg_nodes)
             # TODO(zhengda) we need to handle multiple contexts.
             subgraphs = [DGLSubGraph(self._g, idx.induced_nodes, idx.induced_edges, \
                                      idx, vertex_cache=cache, \
-                                     ctx=self._subgraph_ctx) for idx, cache in zip(sgi, caches)]
+                                     ctx=self._subgraph_ctx[0]) for idx, cache in zip(sgi, caches)]
         else:
             subgraphs = [DGLSubGraph(self._g, idx.induced_nodes, idx.induced_edges, \
                                      idx, ctx=select(self._subgraph_ctx, i)) for i, idx in enumerate(sgi)]
