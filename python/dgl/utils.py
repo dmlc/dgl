@@ -15,9 +15,10 @@ class Index(object):
         self._initialize_data(data)
 
     def _initialize_data(self, data):
-        self._pydata = None   # a numpy type data or a slice
+        self._pydata = None   # a numpy type data
         self._user_tensor_data = dict()  # dictionary of user tensors
         self._dgl_tensor_data = None  # a dgl ndarray
+        self._slice_data = None # a slice type data
         self._dispatch(data)
 
     def __iter__(self):
@@ -25,12 +26,9 @@ class Index(object):
             yield int(i)
 
     def __len__(self):
-        if self._pydata is not None and isinstance(self._pydata, slice):
-            slc = self._pydata
-            if slc.step is None:
-                return slc.stop - slc.start
-            else:
-                return (slc.stop - slc.start) // slc.step
+        if self._slice_data is not None:
+            slc = self._slice_data
+            return slc.stop - slc.start
         elif self._pydata is not None:
             return len(self._pydata)
         elif len(self._user_tensor_data) > 0:
@@ -60,7 +58,9 @@ class Index(object):
             self._dgl_tensor_data = data
         elif isinstance(data, slice):
             # save it in the _pydata temporarily; materialize it if `tonumpy` is called
-            self._pydata = data
+            assert data.step == 1 or data.step is None, \
+                "step for slice type must be 1"
+            self._slice_data = slice(data.start, data.stop)
         else:
             try:
                 self._pydata = np.array([int(data)]).astype(np.int64)
@@ -75,18 +75,18 @@ class Index(object):
                     raise DGLError('Error index data: %s' % str(data))
             self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self._pydata)
 
+
     def tonumpy(self):
         """Convert to a numpy ndarray."""
         if self._pydata is None:
-            if self._dgl_tensor_data is not None:
+            if self._slice_data is not None:
+                slc = self._slice_data
+                self._pydata = np.arange(slc.start, slc.stop).astype(np.int64)
+            elif self._dgl_tensor_data is not None:
                 self._pydata = self._dgl_tensor_data.asnumpy()
             else:
                 data = self.tousertensor()
                 self._pydata = F.zerocopy_to_numpy(data)
-        elif isinstance(self._pydata, slice):
-            # convert it to numpy array
-            slc = self._pydata
-            self._pydata = np.arange(slc.start, slc.stop, slc.step).astype(np.int64)
         return self._pydata
 
     def tousertensor(self, ctx=None):
@@ -116,9 +116,9 @@ class Index(object):
             self._dgl_tensor_data = nd.from_dlpack(dl)
         return self._dgl_tensor_data
 
-    def is_slice(self, start, stop, step=None):
-        return (isinstance(self._pydata, slice)
-                and self._pydata == slice(start, stop, step))
+    def is_slice(self, start, stop):
+        """Check if Index wraps a slice data with given start and stop"""
+        return self._slice_data == slice(start, stop)
 
     def __getstate__(self):
         return self.tousertensor()
@@ -126,8 +126,98 @@ class Index(object):
     def __setstate__(self, state):
         self._initialize_data(state)
 
+    def get_items(self, index):
+        """Return values at given positions of an Index
+
+        Parameters
+        ----------
+        index: utils.Index
+
+        Returns
+        -------
+        utils.Index
+
+        """
+        if index._slice_data is None:
+            tensor = self.tousertensor()
+            index = index.tousertensor()
+            return Index(F.gather_row(tensor, index))
+        elif self._slice_data is None:
+            tensor = self.tousertensor()
+            index = index._slice_data
+            return Index(F.narrow_row(tensor, index.start, index.stop))
+        else:
+            # both self and index wrap a slice object, then return another
+            # Index wrapping a slice
+            start = self._slicedata.start
+            index = index._slice_data
+            return Index(slice(start + index.start, start + index.stop))
+
+    def set_items(self, index, value):
+        """Set values at given positions of an Index. Set is not done in place,
+        instead, a new Index object will be returned.
+
+        Parameters
+        ----------
+        index: utils.Index
+            Positions to set values
+        value: int or utils.Index
+            Values to set. If value is an integer, then all positions are set
+            to the same value
+
+        Returns
+        -------
+        utils.Index
+
+        """
+        tensor = self.tousertensor()
+        index = index.tousertensor()
+        if isinstance(value, int):
+            value = F.full_1d(len(index), value, dtype=F.int64, ctx=F.cpu())
+        else:
+            value = value.tousertensor()
+        return Index(F.scatter_row(tensor, index, value))
+
+    def append_zeros(self, num):
+        """Append zeros to an Index
+
+        Parameters
+        ----------
+        num: int
+            number of zeros to append
+        """
+        if num == 0:
+            return self
+        new_items = F.zeros((num,), dtype=F.int64, ctx=F.cpu())
+        if len(self) == 0:
+            return Index(new_items)
+        else:
+            tensor = self.tousertensor()
+            tensor = F.cat((tensor, new_items), dim=0)
+            return Index(tensor)
+
+    def nonzero(self):
+        """Return the nonzero positions"""
+        tensor = self.tousertensor()
+        mask = F.nonzero_1d(tensor != 0)
+        return Index(mask)
+
+    def has_nonzero(self):
+        """Check if there is any nonzero value in this Index"""
+        tensor = self.tousertensor()
+        return F.sum(tensor, 0) > 0
+
 def toindex(x):
     return x if isinstance(x, Index) else Index(x)
+
+def zero_index(size):
+    """Create a index with provided size initialized to zero
+
+    Parameters
+    ----------
+    size: int
+    """
+    return Index(F.zeros((size,), dtype=F.int64, ctx=F.cpu()))
 
 class LazyDict(Mapping):
     """A readonly dictionary that does not materialize the storage."""

@@ -44,15 +44,16 @@ def schedule_send(graph, u, v, eid, message_func):
     # TODO(minjie): support builtin message func
     message_func = _standardize_func_usage(message_func, 'message')
     # vars
-    nf = var.FEAT_DICT(graph._node_frame)
-    ef = var.FEAT_DICT(graph._edge_frame)
-    mf = var.FEAT_DICT(graph._msg_frame)
-    u = var.IDX(u)
-    v = var.IDX(v)
-    eid = var.IDX(eid)
-    msg = _gen_send(graph, nf, ef, u, v, eid, message_func)
-    # TODO: handle duplicate messages
-    ir.APPEND_ROW_(mf, msg)
+    var_nf = var.FEAT_DICT(graph._node_frame)
+    var_ef = var.FEAT_DICT(graph._edge_frame)
+    var_mf = var.FEAT_DICT(graph._msg_frame)
+    var_u = var.IDX(u)
+    var_v = var.IDX(v)
+    var_eid = var.IDX(eid)
+    msg = _gen_send(graph, var_nf, var_ef, var_u, var_v, var_eid, message_func)
+    ir.WRITE_ROW_(var_mf, var_eid, msg)
+    # set message indicator to 1
+    graph._msg_index = graph._msg_index.set_items(eid, 1)
 
 def schedule_recv(graph,
                   recv_nodes,
@@ -74,9 +75,16 @@ def schedule_recv(graph,
     inplace: bool
         If True, the update will be done in place
     """
-    src, dst, mid = graph._msg_graph.in_edges(recv_nodes)
-    if len(mid) == 0:
-        # All recv nodes are 0-degree nodes; downgrade to apply nodes.
+    src, dst, eid = graph._graph.in_edges(recv_nodes)
+    if len(eid) > 0:
+        nonzero_idx = graph._msg_index.get_items(eid).nonzero()
+        eid = eid.get_items(nonzero_idx)
+        src = src.get_items(nonzero_idx)
+        dst = dst.get_items(nonzero_idx)
+    if len(eid) == 0:
+        # Downgrade to apply nodes if
+        #   1) all recv nodes are 0-degree nodes
+        #   2) no send has been called
         if apply_func is not None:
             schedule_apply_nodes(graph, recv_nodes, apply_func, inplace)
     else:
@@ -86,13 +94,19 @@ def schedule_recv(graph,
         recv_nodes = utils.toindex(recv_nodes)
         var_recv_nodes = var.IDX(recv_nodes, name='recv_nodes')
         # reduce
-        reduced_feat = _gen_reduce(graph, reduce_func, (src, dst, mid), recv_nodes)
+        reduced_feat = _gen_reduce(graph, reduce_func, (src, dst, eid),
+                                   recv_nodes)
         # apply
-        final_feat = _apply_with_accum(graph, var_recv_nodes, var_nf, reduced_feat, apply_func)
+        final_feat = _apply_with_accum(graph, var_recv_nodes, var_nf,
+                                       reduced_feat, apply_func)
         if inplace:
             ir.WRITE_ROW_INPLACE_(var_nf, var_recv_nodes, final_feat)
         else:
             ir.WRITE_ROW_(var_nf, var_recv_nodes, final_feat)
+        # set message indicator to 0
+        graph._msg_index = graph._msg_index.set_items(eid, 0)
+        if not graph._msg_index.has_nonzero():
+            ir.CLEAR_FRAME_(var.FEAT_DICT(graph._msg_frame, name='mf'))
 
 def schedule_snr(graph,
                  edge_tuples,
@@ -426,13 +440,14 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
     recv_nodes : utils.Index
     """
     call_type = "recv"
-    _, dst, mid = edge_tuples
+    _, dst, eid = edge_tuples
     rfunc = _standardize_func_usage(reduce_func, 'reduce')
     rfunc_is_list = utils.is_iterable(rfunc)
     # Create a tmp frame to hold the feature data.
     # The frame has the same size and schemes of the
     # node frame.
-    # TODO(minjie): should replace this with an IR call to make the program stateless.
+    # TODO(minjie): should replace this with an IR call to make the program
+    # stateless.
     tmpframe = FrameRef(frame_like(graph._node_frame._frame, len(recv_nodes)))
 
     # vars
@@ -444,8 +459,8 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
         # UDF message + builtin reducer
         # analyze e2v spmv
         spmv_rfunc, rfunc = spmv.analyze_e2v_spmv(graph, rfunc)
-        # FIXME: refactor this when fixing the multi-recv bug
-        inc = spmv.build_inc_matrix_eid(graph._msg_frame.num_rows, mid, dst, recv_nodes)
+        inc = spmv.build_inc_matrix_eid(graph._msg_frame.num_rows, eid, dst,
+                                        recv_nodes)
         spmv.gen_e2v_spmv_schedule(inc, spmv_rfunc, msg, out)
 
         if len(rfunc) == 0:
@@ -456,7 +471,7 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
         rfunc = BundledFunction(rfunc)
 
     # gen degree bucketing schedule for UDF recv
-    db.gen_degree_bucketing_schedule(graph, rfunc, mid, dst,
+    db.gen_degree_bucketing_schedule(graph, rfunc, eid, dst,
             recv_nodes, nf, msg, out)
     return out
 

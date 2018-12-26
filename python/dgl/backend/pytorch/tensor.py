@@ -143,8 +143,8 @@ def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
 def unique(input):
     return th.unique(input)
 
-def full_1d(length, fill_value):
-    return th.full((length,), fill_value)
+def full_1d(length, fill_value, dtype, ctx):
+    return th.full((length,), fill_value, dtype=dtype, device=ctx)
 
 def nonzero_1d(input):
     return th.nonzero(input).squeeze()
