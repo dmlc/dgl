@@ -69,13 +69,16 @@ def test_1neighbor_sampler():
 def test_prefetch_neighbor_sampler():
     g = generate_rand_graph(100)
     # In this case, NeighborSampling simply gets the neighborhood of a single vertex.
-    for subg, aux in dgl.contrib.sampling.NeighborSampler(g, 1, 5, neighbor_type='in',
-                                                          num_workers=4, return_seed_id=True, prefetch=True):
-        seed_ids = aux['seeds']
-        assert len(seed_ids) == 1
-        assert subg.number_of_nodes() <= 6
-        assert subg.number_of_edges() <= 5
-        verify_subgraph(g, subg, seed_ids)
+    sampler = dgl.contrib.sampling.NeighborSampler(g, 1, 5, neighbor_type='in',
+                                                   num_workers=4, return_seed_id=True, prefetch=True)
+    for _ in range(2):
+        for subg, aux in sampler:
+            seed_ids = aux['seeds']
+            assert len(seed_ids) == 1
+            assert subg.number_of_nodes() <= 6
+            assert subg.number_of_edges() <= 5
+            verify_subgraph(g, subg, seed_ids)
+        sampler.reset()
 
 def test_10neighbor_sampler_all():
     g = generate_rand_graph(100)
@@ -114,7 +117,7 @@ def test_cached_sampler():
     batch_size = 10
     sampler = dgl.contrib.sampling.NeighborSampler(g, batch_size, 5, neighbor_type='in',
                                                    num_workers=4, return_seed_id=True,
-                                                   cache_nodes=range(0, 100, 3))
+                                                   cache_nodes=range(0, 100, 3), prefetch=True)
     num_iters = 0
     for subg, aux in sampler:
         assert subg._vertex_cache is not None
@@ -165,4 +168,5 @@ if __name__ == '__main__':
     test_10neighbor_sampler_all()
     test_1neighbor_sampler()
     test_10neighbor_sampler()
+    test_prefetch_neighbor_sampler()
     test_cached_sampler()

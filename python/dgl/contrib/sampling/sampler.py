@@ -36,6 +36,7 @@ class NSSubgraphLoader(object):
             self._seed_nodes = F.arange(0, g.number_of_nodes())
         else:
             self._seed_nodes = seed_nodes
+        self._shuffle = shuffle
         if shuffle:
             self._seed_nodes = F.rand_shuffle(self._seed_nodes)
         self._num_workers = num_workers
@@ -114,6 +115,8 @@ class NSSubgraphLoader(object):
         if self._vertex_cache is not None:
             refresh_keys = self._vertex_cache.keys - pin_cache_keys
             self._vertex_cache.refresh(refresh_keys)
+        if self._shuffle:
+            self._seed_nodes = F.rand_shuffle(self._seed_nodes)
 
 class _Prefetcher(object):
     """Internal shared prefetcher logic. It can be sub-classed by a Thread-based implementation
@@ -228,6 +231,18 @@ class _PrefetchingLoader(object):
 
     def __iter__(self):
         return _ThreadPrefetcher(self._loader, self._num_prefetch)
+
+    def reset(self, pin_cache_keys=[]):
+        """Reset the iterator.
+
+        By default, it restarts the iterator and refresh all cached data.
+
+        Parameters
+        ----------
+        pin_cache_keys : list of strings
+            The data in the cached isn't refreshed.
+        """
+        self._loader.reset(pin_cache_keys)
 
 def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
                     neighbor_type='in', node_prob=None, seed_nodes=None,
