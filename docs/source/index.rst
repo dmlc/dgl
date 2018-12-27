@@ -8,7 +8,7 @@ Overview of DGL
 
 Deep Graph Library (DGL) is a Python package built for easy implementation of
 graph neural network model family, on top of existing DL frameworks (e.g.
-Pytorch, MXNet, Gluon etc.).
+PyTorch, MXNet, Gluon etc.).
 
 DGL reduces the implementation of graph neural networks into declaring a set
 of *functions* (or *modules* in PyTorch terminology).  In addition, DGL
@@ -41,7 +41,7 @@ Free software
 -------------
 DGL is free software; you can redistribute it and/or modify it under the terms
 of the Apache License 2.0. We welcome contributions.
-Join us on `GitHub <https://github.com/dmlc/dgl>`_ and checkout our `contribution guidelines <https://github.com/dmlc/dgl/blob/master/CONTRIBUTING.md>`_.
+Join us on `GitHub <https://github.com/dmlc/dgl>`_ and check out our `contribution guidelines <https://github.com/dmlc/dgl/blob/master/CONTRIBUTING.md>`_.
 
 History
 -------
