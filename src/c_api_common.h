@@ -52,6 +52,11 @@ dgl::runtime::NDArray CopyVectorToNDArray(
   return a;
 }
 
+template<class T>
+inline void grow(std::vector<T> v, size_t len) {
+  v.resize(v.size() + len);
+}
+
 }  // namespace dgl
 
 #endif  // DGL_C_API_COMMON_H_

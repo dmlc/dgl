@@ -351,7 +351,10 @@ class Graph {
 
  protected:
   friend class GraphOp;
-  /*! \brief Internal edge list type */
+  /*!
+   * \brief Internal edge list type
+   * \note The edges are sorted by `succ`.
+   */
   struct EdgeList {
     /*! \brief successor vertex list */
     std::vector<dgl_id_t> succ;
@@ -374,12 +377,29 @@ class Graph {
   bool read_only_ = false;
   /*!
    * \brief Whether if this is a multigraph.
-   *
-   * When a multiedge is added, this flag switches to true.
    */
   bool is_multigraph_ = false;
   /*! \brief number of edges */
   uint64_t num_edges_ = 0;
+
+ private:
+  std::vector<size_t> src_count_buffer_;
+  std::vector<size_t> dst_count_buffer_;
+  std::vector<size_t> offset_buffer_;
+  std::vector<dgl_id_t> eid_buffer_;
+  std::vector<dgl_id_t> eid_buffer2_;
+
+  /*!
+   * \brief helper function to insert dst and eid into sorted succ list
+   */
+  void InsertEdgeId_(EdgeList& el, dgl_id_t dst, dgl_id_t eid);
+  bool CheckDuplicates_(const EdgeList& el, const dgl_id_t* dst,
+      const std::vector<dgl_id_t>& eid, size_t begin, size_t end) const;
+  void MergeSorted_(EdgeList& el, const dgl_id_t* dst,
+      const std::vector<dgl_id_t>& eid, ssize_t begin, ssize_t end);
+  void InsertEdges_(AdjacencyList& adjlist, dgl_id_t* lo, dgl_id_t* hi,
+      size_t len, const std::vector<dgl_id_t>& lo_count_buffer,
+      const std::vector<dgl_id_t>& hi_count_buffer, bool check_duplicates);
 };
 
 /*! \brief Subgraph data structure */
