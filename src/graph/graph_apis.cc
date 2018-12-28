@@ -4,6 +4,7 @@
  * \brief DGL graph index APIs
  */
 #include <dgl/graph.h>
+#include <dgl/immutable_graph.h>
 #include <dgl/graph_op.h>
 #include "../c_api_common.h"
 
@@ -17,7 +18,8 @@ namespace dgl {
 
 namespace {
 // Convert EdgeArray structure to PackedFunc.
-PackedFunc ConvertEdgeArrayToPackedFunc(const Graph::EdgeArray& ea) {
+template<class EdgeArray>
+PackedFunc ConvertEdgeArrayToPackedFunc(const EdgeArray& ea) {
   auto body = [ea] (DGLArgs args, DGLRetValue* rv) {
       const int which = args[0];
       if (which == 0) {
@@ -53,7 +55,29 @@ PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
   return PackedFunc(body);
 }
 
+// Convert Subgraph structure to PackedFunc.
+PackedFunc ConvertSubgraphToPackedFunc(const ImmutableSubgraph& sg) {
+  auto body = [sg] (DGLArgs args, DGLRetValue* rv) {
+      const int which = args[0];
+      if (which == 0) {
+        ImmutableGraph* gptr = new ImmutableGraph();
+        *gptr = std::move(sg.graph);
+        GraphHandle ghandle = gptr;
+        *rv = ghandle;
+      } else if (which == 1) {
+        *rv = std::move(sg.induced_vertices);
+      } else if (which == 2) {
+        *rv = std::move(sg.induced_edges);
+      } else {
+        LOG(FATAL) << "invalid choice";
+      }
+    };
+  return PackedFunc(body);
+}
+
 }  // namespace
+
+///////////////////////////// Graph API ///////////////////////////////////
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
@@ -145,13 +169,6 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLMapSubgraphNID")
     const IdArray parent_vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
     const IdArray query = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     *rv = GraphOp::MapParentIdToSubgraphId(parent_vids, query);
-  });
-
-DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLExpandIds")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    const IdArray ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
-    const IdArray offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
-    *rv = GraphOp::ExpandIds(ids, offsets);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasEdgeBetween")
@@ -365,6 +382,212 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLineGraph")
     *lgptr = GraphOp::LineGraph(gptr, backtracking);
     GraphHandle lghandle = lgptr;
     *rv = lghandle;
+  });
+
+///////////////////////////// Immutable Graph API ///////////////////////////////////
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphCreate")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const IdArray src_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
+    const IdArray dst_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray edge_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
+    bool multigraph = static_cast<bool>(args[3]);
+    GraphHandle ghandle = new ImmutableGraph(src_ids, dst_ids, edge_ids, multigraph);
+    *rv = ghandle;
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphFree")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    delete gptr;
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphIsMultigraph")
+.set_body([] (DGLArgs args, DGLRetValue *rv) {
+    GraphHandle ghandle = args[0];
+    // NOTE: not const since we have caches
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    *rv = gptr->IsMultigraph();
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphNumVertices")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    *rv = static_cast<int64_t>(gptr->NumVertices());
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphNumEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    *rv = static_cast<int64_t>(gptr->NumEdges());
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphHasVertex")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    const dgl_id_t vid = args[1];
+    *rv = gptr->HasVertex(vid);
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphHasVertices")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    *rv = gptr->HasVertices(vids);
+  });
+
+DGL_REGISTER_GLOBAL("immutable_immutable_graph_index._CAPI_DGLExpandIds")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const IdArray ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
+    const IdArray offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    *rv = GraphOp::ExpandIds(ids, offsets);
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphHasEdgeBetween")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    const dgl_id_t src = args[1];
+    const dgl_id_t dst = args[2];
+    *rv = gptr->HasEdgeBetween(src, dst);
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphHasEdgesBetween")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray dst = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
+    *rv = gptr->HasEdgesBetween(src, dst);
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphPredecessors")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    const dgl_id_t vid = args[1];
+    const uint64_t radius = args[2];
+    *rv = gptr->Predecessors(vid, radius);
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphSuccessors")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    const dgl_id_t vid = args[1];
+    const uint64_t radius = args[2];
+    *rv = gptr->Successors(vid, radius);
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphEdgeId")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    const dgl_id_t src = args[1];
+    const dgl_id_t dst = args[2];
+    *rv = gptr->EdgeId(src, dst);
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphEdgeIds")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray dst = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
+    *rv = ConvertEdgeArrayToPackedFunc(gptr->EdgeIds(src, dst));
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphInEdges_1")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    const dgl_id_t vid = args[1];
+    *rv = ConvertEdgeArrayToPackedFunc(gptr->InEdges(vid));
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphInEdges_2")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    *rv = ConvertEdgeArrayToPackedFunc(gptr->InEdges(vids));
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphOutEdges_1")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    const dgl_id_t vid = args[1];
+    *rv = ConvertEdgeArrayToPackedFunc(gptr->OutEdges(vid));
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphOutEdges_2")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    *rv = ConvertEdgeArrayToPackedFunc(gptr->OutEdges(vids));
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphEdges")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    const bool sorted = args[1];
+    *rv = ConvertEdgeArrayToPackedFunc(gptr->Edges(sorted));
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphInDegree")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    const dgl_id_t vid = args[1];
+    *rv = static_cast<int64_t>(gptr->InDegree(vid));
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphInDegrees")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    *rv = gptr->InDegrees(vids);
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphOutDegree")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    const dgl_id_t vid = args[1];
+    *rv = static_cast<int64_t>(gptr->OutDegree(vid));
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphOutDegrees")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    *rv = gptr->OutDegrees(vids);
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphVertexSubgraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph* gptr = static_cast<ImmutableGraph*>(ghandle);
+    const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    *rv = ConvertSubgraphToPackedFunc(gptr->VertexSubgraph(vids));
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphEdgeSubgraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const ImmutableGraph *gptr = static_cast<ImmutableGraph*>(ghandle);
+    const IdArray eids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    *rv = ConvertSubgraphToPackedFunc(gptr->EdgeSubgraph(eids));
   });
 
 }  // namespace dgl
