@@ -290,7 +290,7 @@ class ReadOnlyDict(Mapping):
     def __len__(self):
         return len(self._dict_like)
 
-def build_relabel_map(x, sorted=False):
+def build_relabel_map(x, is_sorted=False):
     """Relabel the input ids to continuous ids that starts from zero.
 
     Ids are assigned new ids according to their ascending order.
@@ -310,7 +310,7 @@ def build_relabel_map(x, sorted=False):
     ----------
     x : Index
         The input ids.
-    sorted : bool, default=False
+    is_sorted : bool, default=False
         Whether the input has already been unique and sorted.
 
     Returns
@@ -323,7 +323,7 @@ def build_relabel_map(x, sorted=False):
         new id tensor: new_id = old_to_new[old_id]
     """
     x = x.tousertensor()
-    if not sorted:
+    if not is_sorted:
         unique_x, _ = F.sort_1d(F.unique(x))
     else:
         unique_x = x

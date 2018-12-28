@@ -1,3 +1,4 @@
+"""Module for graph index class definition."""
 from __future__ import absolute_import
 
 import ctypes
@@ -7,7 +8,7 @@ import scipy
 
 from ._ffi.base import c_array
 from ._ffi.function import _init_api
-from .base import DGLError, is_all
+from .base import DGLError
 from . import backend as F
 from . import utils
 from .immutable_graph_index import create_immutable_graph_index
@@ -58,7 +59,7 @@ class GraphIndex(object):
         num : int
             Number of nodes to be added.
         """
-        _CAPI_DGLGraphAddVertices(self._handle, num);
+        _CAPI_DGLGraphAddVertices(self._handle, num)
         self.clear_cache()
 
     def add_edge(self, u, v):
@@ -71,7 +72,7 @@ class GraphIndex(object):
         v : int
             The dst node.
         """
-        _CAPI_DGLGraphAddEdge(self._handle, u, v);
+        _CAPI_DGLGraphAddEdge(self._handle, u, v)
         self.clear_cache()
 
     def add_edges(self, u, v):
@@ -366,12 +367,12 @@ class GraphIndex(object):
         return src, dst, eid
 
     @utils.cached_member(cache='_cache', prefix='edges')
-    def edges(self, sorted=False):
+    def edges(self, is_sorted=False):
         """Return all the edges
 
         Parameters
         ----------
-        sorted : bool
+        is_sorted : bool
             True if the returned edges are sorted by their src and dst ids.
 
         Returns
@@ -383,9 +384,9 @@ class GraphIndex(object):
         utils.Index
             The edge ids.
         """
-        key = 'edges_s%d' % sorted
+        key = 'edges_s%d' % is_sorted
         if key not in self._cache:
-            edge_array = _CAPI_DGLGraphEdges(self._handle, sorted)
+            edge_array = _CAPI_DGLGraphEdges(self._handle, is_sorted)
             src = utils.toindex(edge_array(0))
             dst = utils.toindex(edge_array(1))
             eid = utils.toindex(edge_array(2))
@@ -505,7 +506,6 @@ class GraphIndex(object):
         """
         e_array = e.todgltensor()
         rst = _CAPI_DGLGraphEdgeSubgraph(self._handle, e_array)
-        gi = GraphIndex(rst(0))
         induced_nodes = utils.toindex(rst(1))
         return SubgraphIndex(rst(0), self, induced_nodes, e)
 
@@ -555,7 +555,7 @@ class GraphIndex(object):
         return adj, shuffle_idx
 
     @utils.cached_member(cache='_cache', prefix='inc')
-    def incidence_matrix(self, type, ctx):
+    def incidence_matrix(self, typestr, ctx):
         """Return the incidence matrix representation of this graph.
 
         An incidence matrix is an n x m sparse matrix, where n is
@@ -577,7 +577,7 @@ class GraphIndex(object):
 
         Parameters
         ----------
-        type : str
+        typestr : str
             Can be either "in", "out" or "both"
         ctx : context
             The context of returned incidence matrix.
@@ -596,21 +596,21 @@ class GraphIndex(object):
         eid = eid.tousertensor(ctx)  # the index of the ctx will be cached
         n = self.number_of_nodes()
         m = self.number_of_edges()
-        if type == 'in':
+        if typestr == 'in':
             row = F.unsqueeze(dst, 0)
             col = F.unsqueeze(eid, 0)
             idx = F.cat([row, col], dim=0)
             # FIXME(minjie): data type
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
             inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
-        elif type == 'out':
+        elif typestr == 'out':
             row = F.unsqueeze(src, 0)
             col = F.unsqueeze(eid, 0)
             idx = F.cat([row, col], dim=0)
             # FIXME(minjie): data type
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
             inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
-        elif type == 'both':
+        elif typestr == 'both':
             # create index
             row = F.unsqueeze(F.cat([src, dst], dim=0), 0)
             col = F.unsqueeze(F.cat([eid, eid], dim=0), 0)
@@ -625,7 +625,7 @@ class GraphIndex(object):
             dat = F.cat([x, y], dim=0)
             inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
         else:
-            raise DGLError('Invalid incidence matrix type: %s' % str(type))
+            raise DGLError('Invalid incidence matrix type: %s' % str(typestr))
         shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
         return inc, shuffle_idx
 
@@ -642,8 +642,8 @@ class GraphIndex(object):
         src, dst, eid = self.edges()
         ret = nx.MultiDiGraph() if self.is_multigraph() else nx.DiGraph()
         ret.add_nodes_from(range(self.number_of_nodes()))
-        for u, v, id in zip(src, dst, eid):
-            ret.add_edge(u, v, id=id)
+        for u, v, e in zip(src, dst, eid):
+            ret.add_edge(u, v, id=e)
         return ret
 
     def from_networkx(self, nx_graph):
@@ -661,7 +661,7 @@ class GraphIndex(object):
 
         if not isinstance(nx_graph, nx.Graph):
             nx_graph = (nx.MultiDiGraph(nx_graph) if self.is_multigraph()
-                    else nx.DiGraph(nx_graph))
+                        else nx.DiGraph(nx_graph))
         else:
             nx_graph = nx_graph.to_directed()
 
@@ -797,11 +797,11 @@ class SubgraphIndex(GraphIndex):
 
     def __getstate__(self):
         raise NotImplementedError(
-                "SubgraphIndex pickling is not supported yet.")
+            "SubgraphIndex pickling is not supported yet.")
 
     def __setstate__(self, state):
         raise NotImplementedError(
-                "SubgraphIndex unpickling is not supported yet.")
+            "SubgraphIndex unpickling is not supported yet.")
 
 def map_to_subgraph_nid(subgraph, parent_nids):
     """Map parent node Ids to the subgraph node Ids.
@@ -820,7 +820,7 @@ def map_to_subgraph_nid(subgraph, parent_nids):
         Node Ids in the subgraph.
     """
     return utils.toindex(_CAPI_DGLMapSubgraphNID(subgraph.induced_nodes.todgltensor(),
-        parent_nids.todgltensor()))
+                                                 parent_nids.todgltensor()))
 
 def disjoint_union(graphs):
     """Return a disjoint union of the input graphs.
@@ -868,12 +868,12 @@ def disjoint_partition(graph, num_or_size_splits):
     """
     if isinstance(num_or_size_splits, utils.Index):
         rst = _CAPI_DGLDisjointPartitionBySizes(
-                graph._handle,
-                num_or_size_splits.todgltensor())
+            graph._handle,
+            num_or_size_splits.todgltensor())
     else:
         rst = _CAPI_DGLDisjointPartitionByNum(
-                graph._handle,
-                int(num_or_size_splits))
+            graph._handle,
+            int(num_or_size_splits))
     graphs = []
     for val in rst.asnumpy():
         handle = ctypes.cast(int(val), ctypes.c_void_p)
@@ -891,46 +891,41 @@ def create_graph_index(graph_data=None, multigraph=False, readonly=False):
         Whether the graph is multigraph (default is False)
     """
     if isinstance(graph_data, GraphIndex):
+        # FIXME(minjie): this return is not correct for mutable graph index
         return graph_data
 
-    if readonly and graph_data is not None:
-        try:
-            gi = create_immutable_graph_index(graph_data)
-        except:
-            gi = None
-        # If we can't create an immutable graph index, we'll have to fall back.
-        if gi is not None:
-            return gi
+    if readonly:
+        return create_immutable_graph_index(graph_data)
 
     handle = _CAPI_DGLGraphCreate(multigraph)
-    gi = GraphIndex(handle)
+    gidx = GraphIndex(handle)
 
     if graph_data is None:
-        return gi
+        return gidx
 
     # edge list
     if isinstance(graph_data, (list, tuple)):
         try:
-            gi.from_edge_list(graph_data)
-            return gi
-        except:
+            gidx.from_edge_list(graph_data)
+            return gidx
+        except Exception:  # pylint: disable=broad-except
             raise DGLError('Graph data is not a valid edge list.')
 
     # scipy format
     if isinstance(graph_data, scipy.sparse.spmatrix):
         try:
-            gi.from_scipy_sparse_matrix(graph_data)
-            return gi
-        except:
+            gidx.from_scipy_sparse_matrix(graph_data)
+            return gidx
+        except Exception:  # pylint: disable=broad-except
             raise DGLError('Graph data is not a valid scipy sparse matrix.')
 
     # networkx - any format
     try:
-        gi.from_networkx(graph_data)
-    except:
+        gidx.from_networkx(graph_data)
+    except Exception:  # pylint: disable=broad-except
         raise DGLError('Error while creating graph from input of type "%s".'
-                         % type(graph_data))
+                       % type(graph_data))
 
-    return gi
+    return gidx
 
 _init_api("dgl.graph_index")

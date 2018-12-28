@@ -16,40 +16,15 @@ that returns whether the interface is supported by the framework or not.
 ###############################################################################
 # Tensor, data type and context interfaces
 
-def data_type_dict():
-    """Returns a dictionary from data type string to the data type.
-
-    The dictionary should include at least:
-    float16
-    float32
-    float64
-    uint8
-    int8
-    int16
-    int32
-    int64
-
-    This function will be called only *once* during the initialization fo the
-    backend module. The returned dictionary will become the attributes of the
-    backend module.
-
-    Examples
-    --------
-    >>> import torch as th
-    >>> def data_type_dict():
-    >>>   return { 'float16' : th.float16, 'float32' : th.float32, ... }
-
-    After the module is initialized.
-
-    >>> import backend as F
-    >>> F.float16  # this will point to torch.float16
-
-    Returns
-    -------
-    dict of str to data type
-        The data type dict.
-    """
-    pass
+# tensor data types
+float16 = None
+float32 = None
+float64 = None
+uint8 = None
+int8 = None
+int16 = None
+int32 = None
+int64 = None
 
 def cpu():
     """Return a context object for CPU device."""

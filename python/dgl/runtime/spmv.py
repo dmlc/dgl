@@ -180,7 +180,7 @@ def _build_adj_matrix_index_uv(graph, edges, reduce_nodes):
         The dense shape.
     """
     # TODO(minjie): add node frontier for this
-    new2old, old2new = utils.build_relabel_map(reduce_nodes, sorted=True)
+    new2old, old2new = utils.build_relabel_map(reduce_nodes, is_sorted=True)
     u, v = edges
     u = u.tousertensor()
     v = v.tousertensor()
@@ -296,7 +296,7 @@ def build_inc_matrix_eid(m, eid, dst, reduce_nodes):
         A index for data shuffling due to sparse format change. Return None
         if shuffle is not required.
     """
-    new2old, old2new = utils.build_relabel_map(reduce_nodes, sorted=True)
+    new2old, old2new = utils.build_relabel_map(reduce_nodes, is_sorted=True)
     dst = dst.tousertensor()
     eid = eid.tousertensor()
     # relabel edges dsts

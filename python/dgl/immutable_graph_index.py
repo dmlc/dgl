@@ -321,12 +321,12 @@ class ImmutableGraphIndex(object):
         src = _CAPI_DGLExpandIds(v.todgltensor(), off.todgltensor())
         return utils.toindex(src), utils.toindex(dst), utils.toindex(edges)
 
-    def edges(self, sorted=False):
+    def edges(self, is_sorted=False):
         """Return all the edges
 
         Parameters
         ----------
-        sorted : bool
+        is_sorted : bool
             True if the returned edges are sorted by their src and dst ids.
         
         Returns
@@ -340,7 +340,7 @@ class ImmutableGraphIndex(object):
         """
         if "all_edges" in self._cache:
             return self._cache["all_edges"]
-        src, dst, edges = self._sparse.edges(sorted)
+        src, dst, edges = self._sparse.edges(is_sorted)
         self._cache["all_edges"] = (utils.toindex(src), utils.toindex(dst), utils.toindex(edges))
         return self._cache["all_edges"]
 
