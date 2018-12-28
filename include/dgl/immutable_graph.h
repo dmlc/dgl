@@ -15,6 +15,8 @@
 
 namespace dgl {
 
+struct ImmutableSubgraph;
+
 /*!
  * \brief Base dgl immutable graph index class.
  *
@@ -22,10 +24,47 @@ namespace dgl {
 class ImmutableGraph {
  public:
   typedef struct {
+    /* \brief the two endpoints and the id of the edge */
+    IdArray src, dst, id;
+  } EdgeArray;
+
+  struct csr {
     std::vector<int64_t> indptr;
-    std::vector<int64_t> indices;
-    std::vector<int64_t> edge_ids;
-  } csr;
+    std::vector<dgl_id_t> indices;
+    std::vector<dgl_id_t> edge_ids;
+
+    csr(int64_t num_vertices, int64_t expected_num_edges) {
+      indptr.resize(num_vertices + 1);
+      indices.reserve(expected_num_edges);
+      edge_ids.reserve(expected_num_edges);
+    }
+
+    bool HasVertex(dgl_id_t vid) const {
+      return vid < NumVertices();
+    }
+
+    uint64_t NumVertices() const {
+      return indptr.size() - 1;
+    }
+
+    uint64_t NumEdges() const {
+      return indices.size();
+    }
+
+    int64_t GetDegree(dgl_id_t vid) const {
+      return indptr[vid + 1] - indptr[vid];
+    }
+    DegreeArray GetDegrees(IdArray vids) const;
+    EdgeArray GetEdges(dgl_id_t vid) const;
+    EdgeArray GetEdges(IdArray vids) const;
+    std::pair<const dgl_id_t *, const dgl_id_t *> GetIndexRef(dgl_id_t v) const {
+      int64_t start = indptr[v];
+      int64_t end = indptr[v + 1];
+      return std::pair<const dgl_id_t *, const dgl_id_t *>(&indices[start], &indices[end]);
+    }
+    std::shared_ptr<csr> Transpose() const;
+    std::pair<std::shared_ptr<csr>, IdArray> VertexSubgraph(IdArray vids) const;
+  };
 
   ImmutableGraph(std::shared_ptr<csr> in_csr, std::shared_ptr<csr> out_csr,
       bool multigraph = false) : is_multigraph_(multigraph) {
@@ -64,12 +103,18 @@ class ImmutableGraph {
 
   /*! \return the number of vertices in the graph.*/
   uint64_t NumVertices() const {
-    return in_csr_->indptr.size() - 1;
+    if (in_csr_)
+      return in_csr_->NumVertices();
+    else
+      return out_csr_->NumVertices();
   }
 
   /*! \return the number of edges in the graph.*/
   uint64_t NumEdges() const {
-    return in_csr_->indices.size();
+    if (in_csr_)
+      return in_csr_->NumEdges();
+    else
+      return out_csr_->NumEdges();
   }
 
   /*! \return true if the given vertex is in the graph.*/
@@ -81,7 +126,17 @@ class ImmutableGraph {
   BoolArray HasVertices(IdArray vids) const;
 
   /*! \return true if the given edge is in the graph.*/
-  bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const;
+  bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
+    if (!HasVertex(src) || !HasVertex(dst)) return false;
+    if (this->in_csr_) {
+      auto pred = this->in_csr_->GetIndexRef(dst);
+      return std::binary_search(pred.first, pred.second, src);
+    } else {
+      assert(this->out_csr_);
+      auto succ = this->out_csr_->GetIndexRef(src);
+      return std::binary_search(succ.first, succ.second, dst);
+    }
+  }
 
   /*! \return a 0-1 array indicating whether the given edges are in the graph.*/
   BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const;
@@ -124,45 +179,23 @@ class ImmutableGraph {
   EdgeArray EdgeIds(IdArray src, IdArray dst) const;
 
   /*!
-   * \brief Find the edge ID and return the pair of endpoints
-   * \param eid The edge ID
-   * \return a pair whose first element is the source and the second the destination.
-   */
-  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const {
-    dgl_id_t src_id = in_csr_->indices[eid];
-    auto it = std::lower_bound(in_csr-->indptr.begin(), in_csr_->indptr.end(), eid);
-    assert(it != in_csr_->indptr.end());
-    dgl_id_t dst_id;
-    if (*it == eid)
-      dst_id = it - in_csr_->indptr.begin();
-    else
-      dst_id = it - in_csr_->indptr.begin() - 1;
-    assert(in_csr_->edge_ids[in_csr_->indptr[dst_id]] <= eid);
-    assert(dst_id >= 0);
-    return std::make_pair(src_id, dst_id);
-  }
-
-  /*!
-   * \brief Find the edge IDs and return their source and target node IDs.
-   * \param eids The edge ID array.
-   * \return EdgeArray containing all edges with id in eid.  The order is preserved.
-   */
-  EdgeArray FindEdges(IdArray eids) const;
-
-  /*!
    * \brief Get the in edges of the vertex.
    * \note The returned dst id array is filled with vid.
    * \param vid The vertex id.
    * \return the edges
    */
-  EdgeArray InEdges(dgl_id_t vid) const;
+  EdgeArray InEdges(dgl_id_t vid) const {
+    return this->GetInCSR()->GetEdges(vid);
+  }
 
   /*!
    * \brief Get the in edges of the vertices.
    * \param vids The vertex id array.
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray InEdges(IdArray vids) const;
+  EdgeArray InEdges(IdArray vids) const {
+    return this->GetInCSR()->GetEdges(vids);
+  }
 
   /*!
    * \brief Get the out edges of the vertex.
@@ -170,14 +203,18 @@ class ImmutableGraph {
    * \param vid The vertex id.
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray OutEdges(dgl_id_t vid) const;
+  EdgeArray OutEdges(dgl_id_t vid) const {
+    return this->GetOutCSR()->GetEdges(vid);
+  }
 
   /*!
    * \brief Get the out edges of the vertices.
    * \param vids The vertex id array.
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray OutEdges(IdArray vids) const;
+  EdgeArray OutEdges(IdArray vids) const {
+    return this->GetOutCSR()->GetEdges(vids);
+  }
 
   /*!
    * \brief Get all the edges in the graph.
@@ -195,7 +232,7 @@ class ImmutableGraph {
    */
   uint64_t InDegree(dgl_id_t vid) const {
     CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
-    return in_csr_->indptr[vid + 1] - in_csr_->indptr[vid];
+    return this->GetInCSR()->GetDegree(vid);
   }
 
   /*!
@@ -203,7 +240,9 @@ class ImmutableGraph {
    * \param vid The vertex id array.
    * \return the in degree array
    */
-  DegreeArray InDegrees(IdArray vids) const;
+  DegreeArray InDegrees(IdArray vids) const {
+    return this->GetInCSR()->GetDegrees(vids);
+  }
 
   /*!
    * \brief Get the out degree of the given vertex.
@@ -212,7 +251,7 @@ class ImmutableGraph {
    */
   uint64_t OutDegree(dgl_id_t vid) const {
     CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
-    return out_csr_->indptr[vid + 1] - out_csr_->indptr[vid];
+    return this->GetOutCSR()->GetDegree(vid);
   }
 
   /*!
@@ -220,7 +259,9 @@ class ImmutableGraph {
    * \param vid The vertex id array.
    * \return the out degree array
    */
-  DegreeArray OutDegrees(IdArray vids) const;
+  DegreeArray OutDegrees(IdArray vids) const {
+    return this->GetOutCSR()->GetDegrees(vids);
+  }
 
   /*!
    * \brief Construct the induced subgraph of the given vertices.
@@ -238,7 +279,9 @@ class ImmutableGraph {
    * \param vids The vertices in the subgraph.
    * \return the induced subgraph
    */
-  Subgraph VertexSubgraph(IdArray vids) const;
+  ImmutableSubgraph VertexSubgraph(IdArray vids) const;
+
+  std::vector<ImmutableSubgraph> VertexSubgraphs(const std::vector<IdArray> &vids) const;
 
   /*!
    * \brief Construct the induced edge subgraph of the given edges.
@@ -256,7 +299,9 @@ class ImmutableGraph {
    * \param eids The edges in the subgraph.
    * \return the induced edge subgraph
    */
-  Subgraph EdgeSubgraph(IdArray eids) const;
+  ImmutableSubgraph EdgeSubgraph(IdArray eids) const;
+
+  std::vector<ImmutableSubgraph> EdgeSubgraphs(std::vector<IdArray> eids) const;
 
   /*!
    * \brief Return a new graph with all the edges reversed.
@@ -266,7 +311,7 @@ class ImmutableGraph {
    * \return the reversed graph
    */
   ImmutableGraph Reverse() const {
-    return ImmutableGraph(out_csr, in_csr, is_multigraph_);
+    return ImmutableGraph(out_csr_, in_csr_, is_multigraph_);
   }
 
   /*!
@@ -274,8 +319,9 @@ class ImmutableGraph {
    * \param vid The vertex id.
    * \return the successor vector
    */
-  const std::vector<dgl_id_t>& SuccVec(dgl_id_t vid) const {
-    return adjlist_[vid].succ;
+  std::vector<dgl_id_t> SuccVec(dgl_id_t vid) const {
+    return std::vector<dgl_id_t>(out_csr_->indices.begin() + out_csr_->indptr[vid],
+                                 out_csr_->indices.begin() + out_csr_->indptr[vid + 1]);
   }
 
   /*!
@@ -283,8 +329,9 @@ class ImmutableGraph {
    * \param vid The vertex id.
    * \return the out edge id vector
    */
-  const std::vector<dgl_id_t>& OutEdgeVec(dgl_id_t vid) const {
-    return adjlist_[vid].edge_id;
+  std::vector<dgl_id_t> OutEdgeVec(dgl_id_t vid) const {
+    return std::vector<dgl_id_t>(out_csr_->edge_ids.begin() + out_csr_->indptr[vid],
+                                 out_csr_->edge_ids.begin() + out_csr_->indptr[vid + 1]);
   }
 
   /*!
@@ -292,8 +339,9 @@ class ImmutableGraph {
    * \param vid The vertex id.
    * \return the predecessor vector
    */
-  const std::vector<dgl_id_t>& PredVec(dgl_id_t vid) const {
-    return reverse_adjlist_[vid].succ;
+  std::vector<dgl_id_t> PredVec(dgl_id_t vid) const {
+    return std::vector<dgl_id_t>(in_csr_->indices.begin() + in_csr_->indptr[vid],
+                                 in_csr_->indices.begin() + in_csr_->indptr[vid + 1]);
   }
 
   /*!
@@ -301,12 +349,38 @@ class ImmutableGraph {
    * \param vid The vertex id.
    * \return the in edge id vector
    */
-  const std::vector<dgl_id_t>& InEdgeVec(dgl_id_t vid) const {
-    return reverse_adjlist_[vid].edge_id;
+  std::vector<dgl_id_t> InEdgeVec(dgl_id_t vid) const {
+    return std::vector<dgl_id_t>(in_csr_->edge_ids.begin() + in_csr_->indptr[vid],
+                                 in_csr_->edge_ids.begin() + in_csr_->indptr[vid + 1]);
   }
 
  protected:
-  friend class GraphOp;
+  std::pair<const dgl_id_t *, const dgl_id_t *> GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
+  std::pair<const dgl_id_t *, const dgl_id_t *> GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
+
+  /*
+   * When we get in csr or out csr, we try to get the one cached in the structure.
+   * If not, we transpose the other one to get the one we need.
+   */
+  std::shared_ptr<csr> GetInCSR() const {
+    if (in_csr_) {
+      return in_csr_;
+    } else {
+      assert(out_csr_ != nullptr);
+      const_cast<ImmutableGraph *>(this)->in_csr_ = out_csr_->Transpose();
+      return in_csr_;
+    }
+  }
+  std::shared_ptr<csr> GetOutCSR() const {
+    if (out_csr_) {
+      return out_csr_;
+    } else {
+      assert(in_csr_ != nullptr);
+      const_cast<ImmutableGraph *>(this)->out_csr_ = in_csr_->Transpose();
+      return out_csr_;
+    }
+  }
+
   // Store the in-edges.
   std::shared_ptr<csr> in_csr_;
   // Store the out-edges.
@@ -320,9 +394,9 @@ class ImmutableGraph {
 };
 
 /*! \brief Subgraph data structure */
-struct Subgraph {
+struct ImmutableSubgraph {
   /*! \brief The graph. */
-  Graph graph;
+  ImmutableGraph graph;
   /*!
    * \brief The induced vertex ids.
    * \note This is also a map from the new vertex id to the vertex id in the parent graph.
