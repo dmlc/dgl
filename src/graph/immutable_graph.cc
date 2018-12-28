@@ -172,38 +172,34 @@ std::pair<std::shared_ptr<ImmutableGraph::csr>, IdArray> ImmutableGraph::csr::Ve
   return std::pair<std::shared_ptr<ImmutableGraph::csr>, IdArray>(sub_csr, rst_eids);
 }
 
-struct coo {
-  dgl_id_t end_point1;
-  dgl_id_t end_point2;
-  dgl_id_t edge_id;
-};
-
-std::shared_ptr<ImmutableGraph::csr> ImmutableGraph::csr::Transpose() const {
-  std::vector<coo> edges(NumEdges());
-  for (size_t i = 0; i < NumVertices(); i++) {
-    const dgl_id_t *indices_begin = &indices[indptr[i]];
-    const dgl_id_t *eid_begin = &edge_ids[indptr[i]];
-    for (size_t j = 0; j < GetDegree(i); j++) {
-      coo e{i, indices_begin[j], eid_begin[j]};
-      edges[indptr[i] + j] = e;
-    }
-  }
+std::shared_ptr<ImmutableGraph::csr> ImmutableGraph::csr::from_edges(std::vector<edge> &edges,
+                                                                     int sort_on) {
+  assert(sort_on == 0 || sort_on == 1);
+  int other_end = sort_on == 1 ? 0 : 1;
   // TODO(zhengda) we should sort in parallel.
-  std::sort(edges.begin(), edges.end(), [](const coo &e1, const coo &e2) {
-    if (e1.end_point2 == e2.end_point2)
-      return e1.end_point1 < e2.end_point1;
-    else
-      return e2.end_point2 < e2.end_point2;
-  });
+  struct compare {
+    int sort_on;
+    int other_end;
+    compare(int sort_on, int other_end) {
+      this->sort_on = sort_on;
+      this->other_end = other_end;
+    }
+    bool operator()(const edge &e1, const edge &e2) {
+      if (e1.end_points[sort_on] == e2.end_points[sort_on])
+        return e1.end_points[other_end] < e2.end_points[other_end];
+      else
+        return e1.end_points[sort_on] < e2.end_points[sort_on];
+    }
+  };
+  std::sort(edges.begin(), edges.end(), compare(sort_on, other_end));
   std::shared_ptr<csr> t = std::make_shared<csr>(0, 0);
-  t->indices.resize(NumEdges());
-  t->edge_ids.resize(NumEdges());
-  t->indptr.reserve(NumVertices());
+  t->indices.resize(edges.size());
+  t->edge_ids.resize(edges.size());
   t->indptr.push_back(0);
-  for (size_t i = 0; i < NumEdges(); i++) {
-    t->indices[i] = edges[i].end_point1;
+  for (size_t i = 0; i < edges.size(); i++) {
+    t->indices[i] = edges[i].end_points[other_end];
     t->edge_ids[i] = edges[i].edge_id;
-    dgl_id_t vid = edges[i].end_point2;
+    dgl_id_t vid = edges[i].end_points[sort_on];
     int64_t off;
     if (t->indptr.empty())
       off = 0;
@@ -215,8 +211,44 @@ std::shared_ptr<ImmutableGraph::csr> ImmutableGraph::csr::Transpose() const {
       t->indptr.push_back(i);
     assert(t->indptr.size() == vid + 1);
   }
-  t->indptr.push_back(NumEdges());
+  t->indptr.push_back(edges.size());
   return t;
+}
+
+std::shared_ptr<ImmutableGraph::csr> ImmutableGraph::csr::Transpose() const {
+  std::vector<edge> edges(NumEdges());
+  for (size_t i = 0; i < NumVertices(); i++) {
+    const dgl_id_t *indices_begin = &indices[indptr[i]];
+    const dgl_id_t *eid_begin = &edge_ids[indptr[i]];
+    for (size_t j = 0; j < GetDegree(i); j++) {
+      edge e;
+      e.end_points[0] = i;
+      e.end_points[1] = indices_begin[j];
+      e.edge_id = eid_begin[j];
+      edges[indptr[i] + j] = e;
+    }
+  }
+  return from_edges(edges, 1);
+}
+
+ImmutableGraph::ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids,
+                               bool multigraph) : is_multigraph_(multigraph) {
+  int64_t len = src_ids->shape[0];
+  assert(len == dst_ids->shape[0]);
+  assert(len == edge_ids->shape[0]);
+  const dgl_id_t *src_data = static_cast<dgl_id_t*>(src_ids->data);
+  const dgl_id_t *dst_data = static_cast<dgl_id_t*>(dst_ids->data);
+  const dgl_id_t *edge_data = static_cast<dgl_id_t*>(edge_ids->data);
+  std::vector<edge> edges(len);
+  for (size_t i = 0; i < edges.size(); i++) {
+    edge e;
+    e.end_points[0] = src_data[i];
+    e.end_points[1] = dst_data[i];
+    e.edge_id = edge_data[i];
+    edges[i] = e;
+  }
+  in_csr_ = csr::from_edges(edges, 1);
+  out_csr_ = csr::from_edges(edges, 0);
 }
 
 BoolArray ImmutableGraph::HasVertices(IdArray vids) const {

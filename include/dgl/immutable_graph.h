@@ -28,6 +28,11 @@ class ImmutableGraph {
     IdArray src, dst, id;
   } EdgeArray;
 
+  struct edge {
+    dgl_id_t end_points[2];
+    dgl_id_t edge_id;
+  };
+
   struct csr {
     std::vector<int64_t> indptr;
     std::vector<dgl_id_t> indices;
@@ -64,7 +69,10 @@ class ImmutableGraph {
     }
     std::shared_ptr<csr> Transpose() const;
     std::pair<std::shared_ptr<csr>, IdArray> VertexSubgraph(IdArray vids) const;
+    static std::shared_ptr<csr> from_edges(std::vector<edge> &edges, int sort_on);
   };
+
+  ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, bool multigraph = false);
 
   ImmutableGraph(std::shared_ptr<csr> in_csr, std::shared_ptr<csr> out_csr,
       bool multigraph = false) : is_multigraph_(multigraph) {
