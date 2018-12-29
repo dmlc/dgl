@@ -405,6 +405,8 @@ class Graph {
       bool lo_broadcast, bool hi_broadcast,
       size_t len, const std::vector<dgl_id_t>& lo_count_buffer,
       const std::vector<dgl_id_t>& hi_count_buffer, bool check_duplicates);
+  void EdgeIdRange_(dgl_id_t src, dgl_id_t dst, size_t* begin, size_t* end,
+                    bool* reverse) const;
 };
 
 /*! \brief Subgraph data structure */

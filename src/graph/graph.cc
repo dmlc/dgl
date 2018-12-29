@@ -293,17 +293,35 @@ IdArray Graph::Successors(dgl_id_t vid, uint64_t radius) const {
   return rst;
 }
 
+void Graph::EdgeIdRange_(dgl_id_t src, dgl_id_t dst, size_t* begin, size_t* end,
+    bool* reverse) const {
+  const auto& succ = adjlist_[src].succ;
+  const auto& reverse_succ = reverse_adjlist_[dst].succ;
+  if (succ.size() > reverse_succ.size()) {
+    const auto& bounds = std::equal_range(
+        reverse_succ.begin(), reverse_succ.end(), src);
+    *begin = bounds.first - reverse_succ.begin();
+    *end = bounds.second - reverse_succ.begin();
+    *reverse = true;
+  } else {
+    const auto& bounds = std::equal_range(succ.begin(), succ.end(), dst);
+    *begin = bounds.first - succ.begin();
+    *end = bounds.second - succ.begin();
+    *reverse = false;
+  }
+}
+
 // O(logE)
 IdArray Graph::EdgeId(dgl_id_t src, dgl_id_t dst) const {
   CHECK(HasVertex(src) && HasVertex(dst)) << "invalid edge: " << src << " -> " << dst;
+  size_t begin, end;
+  bool reverse;
 
-  const auto& succ = adjlist_[src].succ;
-  const auto& edge_id = adjlist_[src].edge_id;
-  const auto& bounds = std::equal_range(succ.begin(), succ.end(), dst);
-  const size_t begin = bounds.first - succ.begin(), end = bounds.second - succ.begin();
+  EdgeIdRange_(src, dst, &begin, &end, &reverse);
   const int64_t len = end - begin;
   IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   int64_t* rst_data = static_cast<int64_t*>(rst->data);
+  const auto& edge_id = !reverse ? adjlist_[src].edge_id : reverse_adjlist_[dst].edge_id;
   std::copy(edge_id.begin() + begin, edge_id.begin() + end, rst_data);
 
   return rst;
@@ -331,11 +349,13 @@ Graph::EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
     const dgl_id_t src_id = src_data[i], dst_id = dst_data[j];
     CHECK(HasVertex(src_id) && HasVertex(dst_id)) <<
         "invalid edge: " << src_id << " -> " << dst_id;
-    const auto& succ = adjlist_[src_id].succ;
-    const auto& edge_id = adjlist_[src_id].edge_id;
-    const auto& bounds = std::equal_range(succ.begin(), succ.end(), dst_id);
-    const size_t begin = bounds.first - succ.begin(), end = bounds.second - succ.begin();
+    size_t begin, end;
+    bool reverse;
+
+    EdgeIdRange_(src_id, dst_id, &begin, &end, &reverse);
     const int64_t len = end - begin;
+    const auto& edge_id = !reverse ? adjlist_[src_id].edge_id :
+      reverse_adjlist_[dst_id].edge_id;
 
     src.resize(src.size() + len);
     dst.resize(dst.size() + len);
