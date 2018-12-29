@@ -367,12 +367,12 @@ class GraphIndex(object):
         return src, dst, eid
 
     @utils.cached_member(cache='_cache', prefix='edges')
-    def edges(self, is_sorted=False):
+    def edges(self, return_sorted=False):
         """Return all the edges
 
         Parameters
         ----------
-        is_sorted : bool
+        return_sorted : bool
             True if the returned edges are sorted by their src and dst ids.
 
         Returns
@@ -384,9 +384,9 @@ class GraphIndex(object):
         utils.Index
             The edge ids.
         """
-        key = 'edges_s%d' % is_sorted
+        key = 'edges_s%d' % return_sorted
         if key not in self._cache:
-            edge_array = _CAPI_DGLGraphEdges(self._handle, is_sorted)
+            edge_array = _CAPI_DGLGraphEdges(self._handle, return_sorted)
             src = utils.toindex(edge_array(0))
             dst = utils.toindex(edge_array(1))
             eid = utils.toindex(edge_array(2))
