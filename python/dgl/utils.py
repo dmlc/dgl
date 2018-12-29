@@ -116,6 +116,13 @@ class Index(object):
             self._dgl_tensor_data = nd.from_dlpack(dl)
         return self._dgl_tensor_data
 
+    def slice_data(self):
+        """Return the internal slice data.
+        
+        If this index is not initialized from slice, the return will be None.
+        """
+        return self._slice_data
+
     def is_slice(self, start, stop):
         """Check if Index wraps a slice data with given start and stop"""
         return self._slice_data == slice(start, stop)
@@ -136,20 +143,26 @@ class Index(object):
         Returns
         -------
         utils.Index
-
+            The values at the given position.
         """
-        if index._slice_data is None:
+        if self._slice_data is not None and self._slice_data.start == 0:
+            # short-cut for identical mapping
+            # NOTE: we don't check for out-of-bound error
+            return index
+        elif index._slice_data is None:
+            # the provided index is not a slice
             tensor = self.tousertensor()
             index = index.tousertensor()
             return Index(F.gather_row(tensor, index))
         elif self._slice_data is None:
+            # the current index is not a slice but the provided is a slice
             tensor = self.tousertensor()
             index = index._slice_data
             return Index(F.narrow_row(tensor, index.start, index.stop))
         else:
             # both self and index wrap a slice object, then return another
             # Index wrapping a slice
-            start = self._slicedata.start
+            start = self._slice_data.start
             index = index._slice_data
             return Index(slice(start + index.start, start + index.stop))
 
@@ -168,7 +181,7 @@ class Index(object):
         Returns
         -------
         utils.Index
-
+            The new values.
         """
         tensor = self.tousertensor()
         index = index.tousertensor()
