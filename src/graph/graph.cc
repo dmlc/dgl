@@ -191,16 +191,10 @@ void Graph::AddEdges(IdArray src_ids, IdArray dst_ids) {
         dst_count_buffer_, src_count_buffer_, false);
   }
 
-  all_edges_src_.resize(num_edges_ + len);
-  all_edges_dst_.resize(num_edges_ + len);
-  if (src_broadcast)
-    std::fill(all_edges_src_.begin() + num_edges_, all_edges_src_.end(), src_data[0]);
-  else
-    std::copy(src_data, src_data + len, all_edges_src_.begin() + num_edges_);
-  if (dst_broadcast)
-    std::fill(all_edges_dst_.begin() + num_edges_, all_edges_dst_.end(), dst_data[0]);
-  else
-    std::copy(dst_data, dst_data + len, all_edges_dst_.begin() + num_edges_);
+  for (size_t i = 0; i < len; ++i) {
+    all_edges_src_.push_back(src_data[src_broadcast ? 0 : i]);
+    all_edges_dst_.push_back(dst_data[dst_broadcast ? 0 : i]);
+  }
 
   num_edges_ += len;
 
@@ -357,13 +351,11 @@ Graph::EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
     const auto& edge_id = !reverse ? adjlist_[src_id].edge_id :
       reverse_adjlist_[dst_id].edge_id;
 
-    src.resize(src.size() + len);
-    dst.resize(dst.size() + len);
-    eid.resize(eid.size() + len);
-
-    std::fill(src.end() - len, src.end(), src_id);
-    std::fill(dst.end() - len, dst.end(), dst_id);
-    std::copy(edge_id.begin() + begin, edge_id.begin() + end, eid.end() - len);
+    for (int64_t k = 0; k < len; ++k) {
+      src.push_back(src_id);
+      dst.push_back(dst_id);
+      eid.push_back(edge_id[begin + k]);
+    }
   }
 
   int64_t rstlen = src.size();
