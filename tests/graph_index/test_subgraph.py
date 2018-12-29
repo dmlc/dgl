@@ -3,7 +3,7 @@ from dgl.utils import toindex
 from dgl.graph_index import create_graph_index
 
 def test_node_subgraph():
-    gi = create_graph_index()
+    gi = create_graph_index(multigraph=True)
     gi.add_nodes(4)
     gi.add_edge(0, 1)
     gi.add_edge(0, 2)
@@ -18,7 +18,7 @@ def test_node_subgraph():
                 sgi.induced_nodes[s], sgi.induced_nodes[d])
 
 def test_edge_subgraph():
-    gi = create_graph_index()
+    gi = create_graph_index(multigraph=True)
     gi.add_nodes(4)
     gi.add_edge(0, 1)
     gi.add_edge(0, 1)

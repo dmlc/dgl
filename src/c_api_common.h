@@ -53,7 +53,7 @@ dgl::runtime::NDArray CopyVectorToNDArray(
 }
 
 template<class T>
-inline void grow(std::vector<T> v, size_t len) {
+inline void grow(std::vector<T>& v, size_t len) {
   v.resize(v.size() + len);
 }
 

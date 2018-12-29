@@ -108,6 +108,10 @@ class Graph {
     all_edges_dst_.clear();
     read_only_ = false;
     num_edges_ = 0;
+
+    src_count_buffer_.clear();
+    dst_count_buffer_.clear();
+    offset_buffer_.clear();
   }
 
   /*!
@@ -393,11 +397,12 @@ class Graph {
    * \brief helper function to insert dst and eid into sorted succ list
    */
   void InsertEdgeId_(EdgeList& el, dgl_id_t dst, dgl_id_t eid);
-  bool CheckDuplicates_(const EdgeList& el, const dgl_id_t* dst,
+  bool CheckDuplicates_(const EdgeList& el, const dgl_id_t* dst, bool broadcast,
       const std::vector<dgl_id_t>& eid, size_t begin, size_t end) const;
-  void MergeSorted_(EdgeList& el, const dgl_id_t* dst,
+  void MergeSorted_(EdgeList& el, const dgl_id_t* dst, bool broadcast,
       const std::vector<dgl_id_t>& eid, ssize_t begin, ssize_t end);
-  void InsertEdges_(AdjacencyList& adjlist, dgl_id_t* lo, dgl_id_t* hi,
+  bool InsertEdges_(AdjacencyList& adjlist, dgl_id_t* lo, dgl_id_t* hi,
+      bool lo_broadcast, bool hi_broadcast,
       size_t len, const std::vector<dgl_id_t>& lo_count_buffer,
       const std::vector<dgl_id_t>& hi_count_buffer, bool check_duplicates);
 };
