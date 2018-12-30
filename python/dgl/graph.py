@@ -3,13 +3,13 @@ from __future__ import absolute_import
 
 from collections import defaultdict
 
-import dgl
 from .base import ALL, is_all, DGLError
 from . import backend as F
 from . import init
 from .frame import FrameRef, Frame
 from .graph_index import create_graph_index
 from .runtime import ir, scheduler, Runtime
+from . import subgraph
 from . import utils
 from .view import NodeView, EdgeView
 from .udf import NodeBatch, EdgeBatch
@@ -2616,7 +2616,7 @@ class DGLGraph(object):
         """
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
-        return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
+        return subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
 
     def subgraphs(self, nodes):
         """Return a list of subgraphs, each induced in the corresponding given
@@ -2643,7 +2643,7 @@ class DGLGraph(object):
         """
         induced_nodes = [utils.toindex(n) for n in nodes]
         sgis = self._graph.node_subgraphs(induced_nodes)
-        return [dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
+        return [subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
                 for sgi in sgis]
 
     def edge_subgraph(self, edges):
@@ -2690,7 +2690,7 @@ class DGLGraph(object):
         """
         induced_edges = utils.toindex(edges)
         sgi = self._graph.edge_subgraph(induced_edges)
-        return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
+        return subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
 
     def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
