@@ -110,7 +110,7 @@ def test_incmat_cache():
     assert dur2 < dur1
     assert id(inc1) == id(inc2)
     # different arg should result in different cache
-    inc3 = g.incidence_matrix(type="both")
+    inc3 = g.incidence_matrix("both")
     assert id(inc3) != id(inc2)
     # manually clear the cache
     g.clear_cache()

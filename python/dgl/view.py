@@ -1,11 +1,11 @@
 """Views of DGLGraph."""
 from __future__ import absolute_import
 
-from collections import MutableMapping, namedtuple
+from collections import namedtuple
+from collections.abc import MutableMapping
 
 from .base import ALL, is_all, DGLError
 from . import backend as F
-from . import utils
 
 NodeSpace = namedtuple('NodeSpace', ['data'])
 
@@ -41,6 +41,12 @@ class NodeView(object):
         return F.arange(0, len(self))
 
 class NodeDataView(MutableMapping):
+    """The data view class when G.nodes[...].data is called.
+
+    See Also
+    --------
+    dgl.DGLGraph.nodes
+    """
     __slots__ = ['_graph', '_nodes']
 
     def __init__(self, graph, nodes):
@@ -103,6 +109,12 @@ class EdgeView(object):
         return self._graph.all_edges(*args, **kwargs)
 
 class EdgeDataView(MutableMapping):
+    """The data view class when G.edges[...].data is called.
+
+    See Also
+    --------
+    dgl.DGLGraph.edges
+    """
     __slots__ = ['_graph', '_edges']
 
     def __init__(self, graph, edges):

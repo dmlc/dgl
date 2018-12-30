@@ -1,5 +1,4 @@
-# One has to manually import dgl.data; fixes #125
-#from . import data
+"""DGL root package."""
 from . import function
 from . import nn
 from . import contrib

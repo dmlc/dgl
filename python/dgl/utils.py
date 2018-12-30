@@ -1,7 +1,7 @@
 """Utility module."""
 from __future__ import absolute_import, division
 
-from collections import Mapping, Iterable
+from collections.abc import Mapping, Iterable
 from functools import wraps
 import numpy as np
 
@@ -43,7 +43,7 @@ class Index(object):
     def _dispatch(self, data):
         """Store data based on its type."""
         if F.is_tensor(data):
-            if not (F.dtype(data) == F.int64):
+            if F.dtype(data) != F.int64:
                 raise DGLError('Index data must be an int64 vector, but got: %s' % str(data))
             if len(F.shape(data)) > 1:
                 raise DGLError('Index data must be 1D int64 vector, but got: %s' % str(data))
@@ -63,18 +63,16 @@ class Index(object):
             self._slice_data = slice(data.start, data.stop)
         else:
             try:
-                self._pydata = np.array([int(data)]).astype(np.int64)
-            except:
-                try:
-                    data = np.array(data).astype(np.int64)
-                    if data.ndim != 1:
-                        raise DGLError('Index data must be 1D int64 vector,'
-                                       ' but got: %s' % str(data))
-                    self._pydata = data
-                except:
-                    raise DGLError('Error index data: %s' % str(data))
+                data = np.array(data).astype(np.int64)
+            except Exception:  # pylint: disable=broad-except
+                raise DGLError('Error index data: %s' % str(data))
+            if data.ndim == 0:  # scalar array
+                data = np.expand_dims(data, 0)
+            elif data.ndim != 1:
+                raise DGLError('Index data must be 1D int64 vector,'
+                               ' but got: %s' % str(data))
+            self._pydata = data
             self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self._pydata)
-
 
     def tonumpy(self):
         """Convert to a numpy ndarray."""
@@ -96,8 +94,8 @@ class Index(object):
         if len(self._user_tensor_data) == 0:
             if self._dgl_tensor_data is not None:
                 # zero copy from dgl tensor
-                dl = self._dgl_tensor_data.to_dlpack()
-                self._user_tensor_data[F.cpu()] = F.zerocopy_from_dlpack(dl)
+                dlpack = self._dgl_tensor_data.to_dlpack()
+                self._user_tensor_data[F.cpu()] = F.zerocopy_from_dlpack(dlpack)
             else:
                 # zero copy from numpy array
                 self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self.tonumpy())
@@ -112,13 +110,13 @@ class Index(object):
         if self._dgl_tensor_data is None:
             # zero copy from user tensor
             tsor = self.tousertensor()
-            dl = F.zerocopy_to_dlpack(tsor)
-            self._dgl_tensor_data = nd.from_dlpack(dl)
+            dlpack = F.zerocopy_to_dlpack(tsor)
+            self._dgl_tensor_data = nd.from_dlpack(dlpack)
         return self._dgl_tensor_data
 
     def slice_data(self):
         """Return the internal slice data.
-        
+
         If this index is not initialized from slice, the return will be None.
         """
         return self._slice_data
@@ -220,8 +218,24 @@ class Index(object):
         tensor = self.tousertensor()
         return F.sum(tensor, 0) > 0
 
-def toindex(x):
-    return x if isinstance(x, Index) else Index(x)
+def toindex(data):
+    """Convert the given data to Index object.
+
+    Parameters
+    ----------
+    data : index data
+        Data to create the index.
+
+    Returns
+    -------
+    Index
+        The index object.
+
+    See Also
+    --------
+    Index
+    """
+    return data if isinstance(data, Index) else Index(data)
 
 def zero_index(size):
     """Create a index with provided size initialized to zero
@@ -257,21 +271,22 @@ class LazyDict(Mapping):
 
 class HybridDict(Mapping):
     """A readonly dictonary that merges several dict-like (python dict, LazyDict).
-       If there are duplicate keys, early keys have priority over latter ones
+
+    If there are duplicate keys, early keys have priority over latter ones.
     """
     def __init__(self, *dict_like_list):
         self._dict_like_list = dict_like_list
         self._keys = set()
-        for d in dict_like_list:
-            self._keys.update(d.keys())
+        for obj in dict_like_list:
+            self._keys.update(obj.keys())
 
     def keys(self):
         return self._keys
 
     def __getitem__(self, key):
-        for d in self._dict_like_list:
-            if key in d:
-                return d[key]
+        for obj in self._dict_like_list:
+            if key in obj:
+                return obj[key]
         raise KeyError(key)
 
     def __contains__(self, key):
@@ -410,6 +425,7 @@ def cached_member(cache, prefix):
     return _creator
 
 def is_dict_like(obj):
+    """Return true if the object can be treated as a dictionary."""
     return isinstance(obj, Mapping)
 
 def reorder(dict_like, index):
