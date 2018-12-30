@@ -6,13 +6,13 @@ from collections import defaultdict
 import dgl
 from .base import ALL, is_all, DGLError
 from . import backend as F
+from . import init
 from .frame import FrameRef, Frame
 from .graph_index import create_graph_index
 from .runtime import ir, scheduler, Runtime
 from . import utils
 from .view import NodeView, EdgeView
 from .udf import NodeBatch, EdgeBatch
-
 
 __all__ = ['DGLGraph']
 
@@ -191,7 +191,7 @@ class DGLGraph(object):
         # message frame
         self._msg_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
         # set initializer for message frame
-        self._msg_frame.set_initializer(dgl.init.zero_initializer)
+        self._msg_frame.set_initializer(init.zero_initializer)
         # registered functions
         self._message_func = None
         self._reduce_func = None
