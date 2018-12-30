@@ -80,9 +80,6 @@ class DGLType(ctypes.Structure):
         cls._cache[type_str] = inst
         return inst
 
-    def __init__(self, type_str):
-        pass
-
     def __repr__(self):
         x = "%s%d" % (DGLType.CODE2STR[self.type_code], self.bits)
         if self.lanes != 1:
@@ -148,9 +145,6 @@ class DGLContext(ctypes.Structure):
 
         cls._cache[(device_type, device_id)] = inst
         return inst
-
-    def __init__(self, device_type, device_id):
-        pass
 
     @property
     def exist(self):
