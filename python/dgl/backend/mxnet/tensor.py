@@ -90,7 +90,7 @@ def cat(seq, dim):
     return nd.concat(*seq, dim=dim)
 
 def stack(seq, dim):
-    return nd.stack(*seq, dim=dim)
+    return nd.stack(*seq, axis=dim)
 
 def split(x, sizes_or_sections, dim):
     if isinstance(sizes_or_sections, list) or isinstance(sizes_or_sections, np.ndarray):

@@ -1122,12 +1122,12 @@ class DGLGraph(object):
         if node_attrs is not None:
             for nid, attr in nx_graph.nodes(data=True):
                 nf = self.get_n_repr(nid)
-                attr.update({key: nf[key].squeeze(0) for key in node_attrs})
+                attr.update({key: F.squeeze(nf[key], 0) for key in node_attrs})
         if edge_attrs is not None:
             for u, v, attr in nx_graph.edges(data=True):
                 eid = attr['id']
                 ef = self.get_e_repr(eid)
-                attr.update({key: ef[key].squeeze(0) for key in edge_attrs})
+                attr.update({key: F.squeeze(ef[key], 0) for key in edge_attrs})
         return nx_graph
 
     def from_networkx(self, nx_graph, node_attrs=None, edge_attrs=None):

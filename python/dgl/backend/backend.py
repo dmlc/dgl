@@ -9,7 +9,7 @@ The principles of this interface:
 * Argument type should be easier to understand.
 
 It is recommended the frameworks implement all the interfaces. However, it is
-also OK to skip some. The generated backend module has an ``is_enbaled`` function
+also OK to skip some. The generated backend module has an ``is_enabled`` function
 that returns whether the interface is supported by the framework or not.
 """
 
