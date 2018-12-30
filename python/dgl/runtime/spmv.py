@@ -6,7 +6,7 @@ from .. import backend as F
 from .. import utils
 
 from . import ir
-from .ir import var as var
+from .ir import var
 
 def analyze_v2v_spmv(graph, mfunc, rfunc):
     """Analyze if SPMV from node space to node space can be applied.
@@ -54,7 +54,7 @@ def analyze_v2v_spmv(graph, mfunc, rfunc):
 
     return spmv_pairs, mfunc_left, rfunc_left
 
-def analyze_e2v_spmv(graph, rfunc):
+def analyze_e2v_spmv(graph, rfunc):  # pylint: disable=unused-argument
     """Analyze if SPMV from edge space to node space can be applied.
 
     Parameters
@@ -80,16 +80,16 @@ def analyze_e2v_spmv(graph, rfunc):
             rfunc_left.append(rfn)
     return spmv_rfunc, rfunc_left
 
-def gen_v2v_spmv_schedule(adj, spmv_pairs, nf, ef, eid, out):
+def gen_v2v_spmv_schedule(adj, spmv_pairs, nft, eft, eid, out):
     """Generate v2v spmv schedule.
 
     Parameters
     ----------
     adj : tuple (sparse matrix, utils.Index)
     spmv_pairs : list of pair
-    nf : var.Var
+    nft : var.Var
         input node features
-    ef : var.Var
+    eft : var.Var
         input edge features
     eid : var.Var
         eid index
@@ -103,16 +103,16 @@ def gen_v2v_spmv_schedule(adj, spmv_pairs, nf, ef, eid, out):
         eid = var.IDX(new_eid)
     for mfn, rfn in spmv_pairs:
         if mfn.use_edge_feature:
-            ftedge = ir.READ(ef, eid, var.STR(mfn.edge_field))
-            ftsrc = ir.READ_COL(nf, var.STR(mfn.src_field))
+            ftedge = ir.READ(eft, eid, var.STR(mfn.edge_field))
+            ftsrc = ir.READ_COL(nft, var.STR(mfn.src_field))
             ftdst = ir.SPMV_WITH_DATA(adj_var, ftedge, ftsrc)
         else:
-            ftsrc = ir.READ_COL(nf, var.STR(mfn.src_field))
+            ftsrc = ir.READ_COL(nft, var.STR(mfn.src_field))
             ftdst = ir.SPMV(adj_var, ftsrc)
         # save for merge
         ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
-def gen_e2v_spmv_schedule(inc, spmv_rfunc, mf, out):
+def gen_e2v_spmv_schedule(inc, spmv_rfunc, mfr, out):
     """Generate e2v SPMV schedule.
 
     Parameters
@@ -127,7 +127,7 @@ def gen_e2v_spmv_schedule(inc, spmv_rfunc, mf, out):
     incmat, _ = inc
     inc_var = var.SPMAT(incmat)
     for rfn in spmv_rfunc:
-        ftmsg = ir.READ_COL(mf, var.STR(rfn.msg_field))
+        ftmsg = ir.READ_COL(mfr, var.STR(rfn.msg_field))
         ftdst = ir.SPMV(inc_var, ftmsg)
         ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
@@ -147,9 +147,9 @@ def build_adj_matrix_graph(graph):
         A index for data shuffling due to sparse format change. Return None
         if shuffle is not required.
     """
-    gi = graph._graph
-    _, shuffle_idx = gi.adjacency_matrix(False, F.cpu())
-    return lambda ctx : gi.adjacency_matrix(False, ctx)[0], shuffle_idx
+    gidx = graph._graph
+    _, shuffle_idx = gidx.adjacency_matrix(False, F.cpu())
+    return lambda ctx: gidx.adjacency_matrix(False, ctx)[0], shuffle_idx
 
 def _build_adj_matrix_index_uv(graph, edges, reduce_nodes):
     """Build adj matrix index and shape using the given (u, v) edges.
@@ -180,7 +180,7 @@ def _build_adj_matrix_index_uv(graph, edges, reduce_nodes):
         The dense shape.
     """
     # TODO(minjie): add node frontier for this
-    new2old, old2new = utils.build_relabel_map(reduce_nodes, is_sorted=True)
+    _, old2new = utils.build_relabel_map(reduce_nodes, is_sorted=True)
     u, v = edges
     u = u.tousertensor()
     v = v.tousertensor()
@@ -218,13 +218,13 @@ def build_adj_matrix_uv(graph, edges, reduce_nodes):
         if shuffle is not required.
     """
     sp_idx, shape = _build_adj_matrix_index_uv(graph, edges, reduce_nodes)
-    u, v = edges
+    u, _ = edges
     nnz = len(u)
     # FIXME(minjie): data type
     dat = F.ones((nnz,), dtype=F.float32, ctx=F.cpu())
     mat, shuffle_idx = F.sparse_matrix(dat, sp_idx, shape)
     shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
-    return utils.CtxCachedObject(lambda ctx : F.copy_to(mat, ctx)), shuffle_idx
+    return utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx)), shuffle_idx
 
 def build_inc_matrix_graph(graph):
     """Build incidence matrix.
@@ -242,16 +242,16 @@ def build_inc_matrix_graph(graph):
         A index for data shuffling due to sparse format change. Return None
         if shuffle is not required.
     """
-    gi = graph._graph
+    gidx = graph._graph
     # inc mat will not use data tensor so conversion index is not needed
-    return lambda ctx : gi.incidence_matrix('in', ctx)[0], None
+    return lambda ctx: gidx.incidence_matrix('in', ctx)[0], None
 
 def build_inc_matrix_eid(m, eid, dst, reduce_nodes):
     """Build incidence matrix using edge id and edge dst nodes.
 
     The incidence matrix is of shape (n, m), where n=len(reduce_nodes).
     The nnz is equal to len(eid).
-    
+
     Invariant: len(eid) == len(dst)
 
     The dst nodes will be sorted in the *unique-ascending* order of
@@ -296,7 +296,7 @@ def build_inc_matrix_eid(m, eid, dst, reduce_nodes):
         A index for data shuffling due to sparse format change. Return None
         if shuffle is not required.
     """
-    new2old, old2new = utils.build_relabel_map(reduce_nodes, is_sorted=True)
+    _, old2new = utils.build_relabel_map(reduce_nodes, is_sorted=True)
     dst = dst.tousertensor()
     eid = eid.tousertensor()
     # relabel edges dsts
@@ -311,7 +311,7 @@ def build_inc_matrix_eid(m, eid, dst, reduce_nodes):
     dat = F.ones((nnz,), dtype=F.float32, ctx=F.cpu())
     mat, _ = F.sparse_matrix(dat, ('coo', idx), (n, m))
     # inc mat will not use data tensor so conversion index is not needed
-    return utils.CtxCachedObject(lambda ctx : F.copy_to(mat, ctx)), None
+    return utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx)), None
 
 def build_inc_matrix_dst(dst, reduce_nodes):
     """Build incidence matrix using only edge destinations.
@@ -332,7 +332,7 @@ def build_inc_matrix_dst(dst, reduce_nodes):
             [0, 0, 0, 0, 0],
             [0, 0, 1, 0, 0],
             [0, 0, 0, 1, 1]], shape=(5, 5))
-    
+
     Parameters
     ----------
     dst : utils.Index
