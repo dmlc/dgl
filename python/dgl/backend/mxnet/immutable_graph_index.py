@@ -357,7 +357,6 @@ class ImmutableGraphIndex(object):
         elist : list
             List of (u, v) edge tuple.
         """
-        self.clear()
         src, dst = zip(*elist)
         src = np.array(src)
         dst = np.array(dst)
