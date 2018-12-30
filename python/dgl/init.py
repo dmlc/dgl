@@ -5,7 +5,7 @@ from . import backend as F
 
 __all__ = ['base_initializer', 'zero_initializer']
 
-def base_initializer(shape, dtype, ctx, id_range):
+def base_initializer(shape, dtype, ctx, id_range):  # pylint: disable=unused-argument
     """The function signature for feature initializer.
 
     Any customized feature initializer should follow this signature (see

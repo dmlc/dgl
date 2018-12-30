@@ -2,7 +2,7 @@
 
 NOTE: this is currently a temporary solution.
 """
-# pylint: disable=abstract-method
+# pylint: disable=abstract-method,unused-argument
 
 from __future__ import absolute_import
 

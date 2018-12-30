@@ -15,6 +15,27 @@ from . import var
 from .var import VarType
 from .registry import IR_REGISTRY
 
+__all__ = [
+    'OpCode', 'Executor',
+    'NodeUDFExecutor', 'NODE_UDF',
+    'EdgeUDFExecutor', 'EDGE_UDF',
+    'SPMVExecutor', 'SPMV',
+    'SPMVWithDataExecutor', 'SPMV_WITH_DATA',
+    'ReadExecutor', 'READ',
+    'ReadColExecutor', 'READ_COL',
+    'ReadRowExecutor', 'READ_ROW',
+    'MergeRowExecutor', 'MERGE_ROW',
+    'UpdateDictExecutor', 'UPDATE_DICT',
+    'NewDictExecutor', 'NEW_DICT',
+    'Write_Executor', 'WRITE_',
+    'WriteCol_Executor', 'WRITE_COL_',
+    'WriteRow_Executor', 'WRITE_ROW_',
+    'WriteDict_Executor', 'WRITE_DICT_',
+    'AppendRow_Executor', 'APPEND_ROW_',
+    'WriteRowInplace_Executor', 'WRITE_ROW_INPLACE_',
+    'ClearFrame_Executor', 'CLEAR_FRAME_',
+]
+
 class OpCode(object):
     """Opcode for all the executor types."""
     # immutable op

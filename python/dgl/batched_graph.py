@@ -273,7 +273,7 @@ class BatchedDGLGraph(DGLGraph):
         # TODO
         raise NotImplementedError
 
-def split(graph_batch, num_or_size_splits):
+def split(graph_batch, num_or_size_splits):  # pylint: disable=unused-argument
     """Split the batch."""
     # TODO(minjie): could follow torch.split syntax
     raise NotImplementedError
@@ -355,9 +355,9 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
 
 
 READOUT_ON_ATTRS = {
-        'nodes': ('ndata', 'batch_num_nodes', 'number_of_nodes'),
-        'edges': ('edata', 'batch_num_edges', 'number_of_edges'),
-        }
+    'nodes': ('ndata', 'batch_num_nodes', 'number_of_nodes'),
+    'edges': ('edata', 'batch_num_edges', 'number_of_edges'),
+}
 
 def _sum_on(graph, typestr, feat, weight):
     """Internal function to sum node or edge features.
