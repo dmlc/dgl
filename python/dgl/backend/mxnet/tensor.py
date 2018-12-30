@@ -4,14 +4,15 @@ import numpy as np
 import mxnet as mx
 import mxnet.ndarray as nd
 
-float16 = np.float16
-float32 = np.float32
-float64 = np.float64
-uint8 = np.uint8
-int8 = np.int8
-int16 = np.int16
-int32 = np.int32
-int64 = np.int64
+def data_type_dict():
+    return {'float16' : np.float16,
+            'float32' : np.float32,
+            'float64' : np.float64,
+            'uint8'   : np.uint8,
+            'int8'    : np.int8,
+            'int16'   : np.int16,
+            'int32'   : np.int32,
+            'int64'   : np.int64}
 
 def cpu():
     return mx.cpu()

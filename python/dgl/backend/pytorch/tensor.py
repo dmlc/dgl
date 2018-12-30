@@ -7,14 +7,15 @@ from torch.utils import dlpack
 
 TH_VERSION = LooseVersion(th.__version__)
 
-float16 = th.float16
-float32 = th.float32
-float64 = th.float64
-uint8 = th.uint8
-int8 = th.int8
-int16 = th.int16
-int32 = th.int32
-int64 = th.int64
+def data_type_dict():
+    return {'float16' : th.float16,
+            'float32' : th.float32,
+            'float64' : th.float64,
+            'uint8'   : th.uint8,
+            'int8'    : th.int8,
+            'int16'   : th.int16,
+            'int32'   : th.int32,
+            'int64'   : th.int64}
 
 def cpu():
     return th.device('cpu')
