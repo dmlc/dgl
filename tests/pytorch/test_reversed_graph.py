@@ -17,7 +17,7 @@ def test_graph_structure():
     assert U.allclose(rg.has_nodes(g.nodes()), th.ones(3, dtype=th.long))
 
     assert g.number_of_edges() == rg.number_of_edges()
-    assert U.allclose(rg.has_edges_between([1, 2, 1], [0, 1, 2]), th.ones(3, dtype=th.long))
+    assert U.allclose(rg.has_edges_between([1, 2, 1], [0, 1, 2]).float(), th.ones(3))
     assert g.edge_id(0, 1) == rg.edge_id(1, 0)
     assert g.edge_id(1, 2) == rg.edge_id(2, 1)
     assert g.edge_id(2, 1) == rg.edge_id(1, 2)
@@ -67,7 +67,7 @@ def test_shared_frames():
     g.add_edges([3, 4], [4, 5])
     g.edges[[3, 4], [4, 5]].data['h'] = th.tensor([[6.], [7.]])
     assert g.number_of_edges() == rg.number_of_edges()
-    assert U.allclose(rg.has_edges_between([4, 5], [3, 4]), th.ones(2, dtype=th.long))
+    assert U.allclose(rg.has_edges_between([4, 5], [3, 4]).float(), th.ones(2))
     assert U.allclose(g.edata['h'], rg.edata['h'])
     rg.add_edge(0, 5)
     rg.edges[[0], [5]].data['h'] = th.tensor([[8.]])
