@@ -137,6 +137,9 @@ def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
     y /= w.view((-1,) + (1,) * (y.dim() - 1))
     return y
 
+def boolean_mask(input, mask):
+    return input[mask]
+
 def unique(input):
     return th.unique(input)
 

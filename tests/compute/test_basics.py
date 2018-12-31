@@ -203,7 +203,7 @@ def test_nx_conversion():
     assert F.allclose(g.ndata['n1'], n1)
     # with id in nx edge feature, e1 should follow original order
     assert F.allclose(g.edata['e1'], e1)
-    assert F.equal(g.get_e_repr()['id'], F.astype(F.arange(0, 4), F.float32))
+    assert F.equal(g.get_e_repr()['id'], F.arange(0, 4))
 
     # test conversion after modifying DGLGraph
     g.pop_e_repr('id') # pop id so we don't need to provide id when adding edges

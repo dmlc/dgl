@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import numpy as np
 import mxnet as mx
 import mxnet.ndarray as nd
+import numbers
 
 def data_type_dict():
     return {'float16' : np.float16,
@@ -18,6 +19,13 @@ def cpu():
     return mx.cpu()
 
 def tensor(data, dtype=None):
+    # MXNet always returns a float tensor regardless of type inside data.
+    # This is a workaround.
+    if dtype is None:
+        if isinstance(data[0], numbers.Integral):
+            dtype = np.int64
+        else:
+            dtype = np.float32
     return nd.array(data, dtype=dtype)
 
 def sparse_matrix(data, index, shape, force_format=False):
@@ -164,6 +172,9 @@ def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
     y = unsorted_1d_segment_sum(input, seg_id, n_segs, dim)
     y /= w.reshape((-1,) + (1,) * (y.ndim - 1))
     return y
+
+def boolean_mask(input, mask):
+    return mx.contrib.nd.boolean_mask(input, mask)
 
 def unique(input):
     # TODO: fallback to numpy is unfortunate

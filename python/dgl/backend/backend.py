@@ -595,6 +595,24 @@ def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
     """
     pass
 
+def boolean_mask(input, mask):
+    """Selects elements in x according to the given mask from the first
+    dimension.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor
+    mask : Boolean Tensor
+        The mask
+
+    Returns
+    -------
+    Tensor
+        The result
+    """
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------

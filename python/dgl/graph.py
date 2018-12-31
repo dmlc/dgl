@@ -2840,7 +2840,7 @@ class DGLGraph(object):
             return F.nonzero_1d(n_mask)
         else:
             nodes = F.tensor(nodes)
-            return nodes[n_mask]
+            return F.boolean_mask(nodes, n_mask)
 
     def filter_edges(self, predicate, edges=ALL):
         """Return a tensor of edge IDs that satisfy the given predicate.
@@ -2915,7 +2915,7 @@ class DGLGraph(object):
             return F.nonzero_1d(e_mask)
         else:
             edges = F.tensor(edges)
-            return edges[e_mask]
+            return F.boolean_mask(edges, e_mask)
 
     def __repr__(self):
         s = 'DGLGraph with {node} nodes and {edge} edges.\nNode data: {ndata}\nEdge data: {edata}'
