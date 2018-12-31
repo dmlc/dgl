@@ -11,8 +11,9 @@ from ._ffi.base import DGLError, __version__
 from .base import ALL
 from .backend import load_backend
 from .batched_graph import *
-from .graph import DGLGraph
+from .graph import *
 from .subgraph import DGLSubGraph
 from .traversal import *
 from .propagate import *
 from .udf import NodeBatch, EdgeBatch
+from .reverse import reverse

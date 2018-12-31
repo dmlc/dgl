@@ -55,6 +55,7 @@ Transforming graph
     DGLGraph.subgraphs
     DGLGraph.edge_subgraph
     DGLGraph.line_graph
+    reverse
 
 Converting from/to other format
 -------------------------------
