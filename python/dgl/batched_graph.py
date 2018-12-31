@@ -6,7 +6,7 @@ from collections import Iterable
 
 from .base import ALL, is_all
 from .frame import FrameRef, Frame
-from .graph import DGLGraph
+from .graph import DGLGraph, reverse
 from . import graph_index as gi
 from . import backend as F
 from . import utils

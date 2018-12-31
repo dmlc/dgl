@@ -4,6 +4,7 @@ from __future__ import absolute_import
 import networkx as nx
 import numpy as np
 from collections import defaultdict
+from copy import deepcopy
 
 import dgl
 from .base import ALL, is_all, DGLError, dgl_warning
@@ -200,7 +201,6 @@ class DGLGraph(object):
         self._reduce_func = None
         self._apply_node_func = None
         self._apply_edge_func = None
-        self._reverse = None
 
     def add_nodes(self, num, data=None):
         """Add multiple new nodes.
@@ -252,9 +252,6 @@ class DGLGraph(object):
             self._node_frame.add_rows(num)
         else:
             self._node_frame.append(data)
-
-        if self._reverse:
-            self._reverse._graph.add_nodes(num)
 
     def add_edge(self, u, v, data=None):
         """Add one new edge between u and v.
@@ -312,9 +309,6 @@ class DGLGraph(object):
         # resize msg_index and msg_frame
         self._msg_index = self._msg_index.append_zeros(1)
         self._msg_frame.add_rows(1)
-
-        if self._reverse:
-            self._reverse._graph.add_edge(v, u)
 
     def add_edges(self, u, v, data=None):
         """Add multiple edges for list of source nodes u and destination nodes
@@ -375,9 +369,6 @@ class DGLGraph(object):
         # initialize feature placeholder for messages
         self._msg_index = self._msg_index.append_zeros(num)
         self._msg_frame.add_rows(num)
-
-        if self._reverse:
-            self._reverse._graph.add_edges(v, u)
 
     def clear(self):
         """Remove all nodes and edges, as well as their features, from the
@@ -2927,36 +2918,13 @@ class DGLGraph(object):
             edges = F.tensor(edges)
             return edges[e_mask]
 
-    def set_reverse(self, rg):
-        self._reverse = rg
-
     def __repr__(self):
         s = 'DGLGraph with {node} nodes and {edge} edges.\nNode data: {ndata}\nEdge data: {edata}'
         return s.format(node=self.number_of_nodes(), edge=self.number_of_edges(),
                         ndata=str(self.node_attr_schemes()),
                         edata=str(self.edge_attr_schemes()))
 
-class ReversedGraph(DGLGraph):
-    """See :func:`reverse` for the description.
-    """
-    def __init__(self, g):
-        g_edge_list = g.edges()
-        rg_edge_list = list(zip(g_edge_list[1], g_edge_list[0]))
-
-        super(ReversedGraph, self).__init__(graph_data=rg_edge_list,
-                                            node_frame=g._node_frame,
-                                            edge_frame=g._edge_frame,
-                                            multigraph=g.is_multigraph,
-                                            readonly=g._readonly)
-
-        self.register_apply_edge_func(g._apply_edge_func)
-        self.register_apply_node_func(g._apply_node_func)
-        self.register_message_func(g._message_func)
-        self.register_reduce_func(g._reduce_func)
-
-        self.set_reverse(g)
-
-def reverse(g):
+def reverse(g, shared_node_attrs=True, shared_edge_attrs=True):
     """Return the reverse of a graph
 
     The reverse (also called converse, transpose) of a directed graph is
@@ -2964,78 +2932,49 @@ def reverse(g):
     direction.
 
     Given a :class:`DGLGraph` object, we return another :class:`DGLGraph` object
-    representing its reverse. This method is useful when dealing with undirected graphs.
+    representing its reverse. The reverse will be readonly, i.e. its topology is
+    fixed. This method is useful when dealing with undirected static graphs.
 
     If the original graph has node features, its reverse will have the same features.
     If the original graph has edge features, a reversed edge will have the same feature
-    as the original one. The features of the original graph and the reversed graph share
-    memory.
+    as the original one. We allow the option to share memory for the features of the
+    original graph and the reversed one.
 
     If the original graph has registered `apply_edge_func`, `apply_node_func`,
     `message_func` or `reduce_func`, the reverse will have the same.
 
-    Note this function does not support :class:`~dgl.BatchedDGLGraph` objects.
-
-    Examples
-    --------
-    Create a graph to reverse.
-
-    >>> import dgl
-    >>> import torch as th
-    >>> g = dgl.DGLGraph()
-    >>> g.add_nodes(3)
-    >>> g.add_edges([0, 1, 2], [1, 2, 0])
-    >>> g.ndata['h'] = th.tensor([[0.], [1.], [2.]])
-    >>> g.edata['h'] = th.tensor([[3.], [4.], [5.]])
-
-    Reverse the graph and examine its structure.
-
-    >>> rg = dgl.reverse(g)
-    >>> print(rg)
-    DGLGraph with 3 nodes and 3 edges.
-    Node data: {'h': Scheme(shape=(1,), dtype=torch.float32)}
-    Edge data: {'h': Scheme(shape=(1,), dtype=torch.float32)}
-
-    The edges are reversed now.
-
-    >>> rg.has_edges_between([1, 2, 0], [0, 1, 2])
-    tensor([1, 1, 1])
-
-    Reversed edges have the same feature as the original.
-
-    >>> g.edges[[0, 2], [1, 0]].data['h'] == rg.edges[[1, 0], [0, 2]].data['h']
-    tensor([[1],
-            [1]], dtype=torch.uint8)
-
-    The node/edge features of the reversed graph share memory with the original
-    graph, which is helpful for both forward computation and back propagation.
-
-    >>> g.ndata['h'] = g.ndata['h'] + 1
-    >>> rg.ndata['h']
-    tensor([[1.],
-            [2.],
-            [3.]])
-
-    Once created, modify the topology and features of one graph will also affect
-    those of its reverse.
-
-    >>> rg.add_nodes(3, {'h': th.tensor([[6.], [7.], [8.]])})
-    >>> g.number_of_nodes()
-    6
-    >>> g.ndata['h']
-    tensor([[1.],
-            [2.],
-            [3.],
-            [6.],
-            [7.],
-            [8.]])
-
     Parameters
     ----------
     g : dgl.DGLGraph
+    shared_node_attrs: bool, optional
+        Whether the original graph and the reversed one share memory for node features.
+        This is ``True`` by default.
+    shared_edge_attrs: bool, optional
+        Whether the original graph and the reversed one share memory for edge features.
+        This is ``True`` by default.
     """
-    if g._reverse:
-        return g._reverse
-    rg = ReversedGraph(g)
-    g.set_reverse(rg)
+    if shared_node_attrs:
+        node_frame = g._node_frame
+    else:
+        node_frame = deepcopy(g._node_frame)
+
+    if shared_edge_attrs:
+        edge_frame = g._edge_frame
+    else:
+        edge_frame = deepcopy(g._edge_frame)
+
+    g_edge_list = g.edges()
+    rg_edge_list = zip(g_edge_list[1], g_edge_list[0])
+
+    rg = DGLGraph(graph_data=rg_edge_list,
+                  node_frame=node_frame,
+                  edge_frame=edge_frame,
+                  multigraph=g.is_multigraph,
+                  readonly=True)
+
+    rg.register_apply_edge_func(g._apply_edge_func)
+    rg.register_apply_node_func(g._apply_node_func)
+    rg.register_message_func(g._message_func)
+    rg.register_reduce_func(g._reduce_func)
+
     return rg
