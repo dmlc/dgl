@@ -4,6 +4,7 @@ from __future__ import absolute_import
 import networkx as nx
 import numpy as np
 from collections import defaultdict
+from copy import deepcopy
 
 import dgl
 from .base import ALL, is_all, DGLError, dgl_warning
@@ -16,7 +17,7 @@ from .view import NodeView, EdgeView
 from .udf import NodeBatch, EdgeBatch
 
 
-__all__ = ['DGLGraph']
+__all__ = ['DGLGraph', 'reverse']
 
 class DGLGraph(object):
     """Base graph class.
@@ -2922,3 +2923,58 @@ class DGLGraph(object):
         return s.format(node=self.number_of_nodes(), edge=self.number_of_edges(),
                         ndata=str(self.node_attr_schemes()),
                         edata=str(self.edge_attr_schemes()))
+
+def reverse(g, shared_node_attrs=True, shared_edge_attrs=True):
+    """Return the reverse of a graph
+
+    The reverse (also called converse, transpose) of a directed graph is
+    another directed graph on the same nodes with edges reversed in terms of
+    direction.
+
+    Given a :class:`DGLGraph` object, we return another :class:`DGLGraph` object
+    representing its reverse. The reverse will be readonly, i.e. its topology is
+    fixed. This method is useful when dealing with undirected static graphs.
+
+    If the original graph has node features, its reverse will have the same features.
+    If the original graph has edge features, a reversed edge will have the same feature
+    as the original one. We allow the option to share memory for the features of the
+    original graph and the reversed one.
+
+    If the original graph has registered `apply_edge_func`, `apply_node_func`,
+    `message_func` or `reduce_func`, the reverse will have the same.
+
+    Parameters
+    ----------
+    g : dgl.DGLGraph
+    shared_node_attrs: bool, optional
+        Whether the original graph and the reversed one share memory for node features.
+        This is ``True`` by default.
+    shared_edge_attrs: bool, optional
+        Whether the original graph and the reversed one share memory for edge features.
+        This is ``True`` by default.
+    """
+    if shared_node_attrs:
+        node_frame = g._node_frame
+    else:
+        node_frame = deepcopy(g._node_frame)
+
+    if shared_edge_attrs:
+        edge_frame = g._edge_frame
+    else:
+        edge_frame = deepcopy(g._edge_frame)
+
+    g_edge_list = g.edges()
+    rg_edge_list = zip(g_edge_list[1], g_edge_list[0])
+
+    rg = DGLGraph(graph_data=rg_edge_list,
+                  node_frame=node_frame,
+                  edge_frame=edge_frame,
+                  multigraph=g.is_multigraph,
+                  readonly=True)
+
+    rg.register_apply_edge_func(g._apply_edge_func)
+    rg.register_apply_node_func(g._apply_node_func)
+    rg.register_message_func(g._message_func)
+    rg.register_reduce_func(g._reduce_func)
+
+    return rg
