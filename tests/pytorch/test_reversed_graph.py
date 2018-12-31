@@ -14,7 +14,7 @@ def test_graph_structure():
 
     assert g.number_of_nodes() == rg.number_of_nodes()
     assert len(g) == len(rg)
-    assert U.allclose(rg.has_nodes(g.nodes()), th.ones(3, dtype=th.long))
+    assert U.allclose(rg.has_nodes(g.nodes()).float(), th.ones(3))
 
     assert g.number_of_edges() == rg.number_of_edges()
     assert U.allclose(rg.has_edges_between([1, 2, 1], [0, 1, 2]).float(), th.ones(3))
