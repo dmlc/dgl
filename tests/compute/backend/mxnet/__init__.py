@@ -12,7 +12,7 @@ def equal(a, b):
     return nd.equal(a, b).asnumpy().all()
 
 def allclose(a, b):
-    return np.allclose(a.asnumpy(), b.asnumpy())
+    return np.allclose(a.asnumpy(), b.asnumpy(), rtol=1e-4, atol=1e-4)
 
 def randn(shape):
     return nd.random.randn(*shape)
@@ -42,6 +42,9 @@ def sparse_to_dense(x):
 
 def clone(x):
     return x.copy()
+
+def reduce_sum(x):
+    return x.sum()
 
 
 record_grad = autograd.record

@@ -9,7 +9,7 @@ def equal(a, b):
     return th.equal(a, b)
 
 def allclose(a, b):
-    return th.allclose(a, b)
+    return th.allclose(a, b, rtol=1e-4, atol=1e-4)
 
 def randn(shape):
     return th.randn(*shape)
@@ -41,6 +41,9 @@ def sparse_to_dense(x):
 
 def clone(x):
     return x.clone()
+
+def reduce_sum(x):
+    return x.sum()
 
 
 class record_grad(object):

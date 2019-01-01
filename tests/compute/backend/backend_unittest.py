@@ -62,6 +62,10 @@ def sparse_to_dense(x):
 def clone(x):
     pass
 
+def reduce_sum(x):
+    """Sums all the elements into a single scalar."""
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------
