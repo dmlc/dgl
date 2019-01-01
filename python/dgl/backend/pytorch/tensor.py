@@ -153,7 +153,8 @@ def full_1d(length, fill_value, dtype, ctx):
     return th.full((length,), fill_value, dtype=dtype, device=ctx)
 
 def nonzero_1d(input):
-    return th.nonzero(input).squeeze(1)
+    x = th.nonzero(input).squeeze()
+    return x if x.dim() == 1 else x.view(-1)
 
 def sort_1d(input):
     return th.sort(input)

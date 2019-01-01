@@ -9,7 +9,7 @@ def equal(a, b):
     return th.equal(a, b)
 
 def allclose(a, b):
-    return th.allclose(a, b, rtol=1e-4, atol=1e-4)
+    return th.allclose(a.float(), b.float(), rtol=1e-4, atol=1e-4)
 
 def randn(shape):
     return th.randn(*shape)
