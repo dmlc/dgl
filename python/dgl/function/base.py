@@ -34,4 +34,5 @@ class BundledFunction(object):
 
     @property
     def name(self):
+        """Return the name."""
         return "bundled"
