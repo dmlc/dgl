@@ -111,13 +111,17 @@ def split(x, sizes_or_sections, dim):
         return nd.split(x, sizes_or_sections, axis=dim)
 
 def gather_row(data, row_index):
+    # MXNet workaround for empty row index
+    if len(row_index) == 0:
+        return data[0:0]
+
     if isinstance(row_index, nd.NDArray):
         return nd.take(data, row_index)
     else:
         return data[row_index,]
 
 def narrow_row(data, start, stop):
-    return nd.slice(data, begin=start, end=stop)
+    return data[start:stop]
 
 def scatter_row(data, row_index, value):
     return mx.nd.contrib.index_copy(data, row_index, value)
