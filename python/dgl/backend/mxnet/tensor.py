@@ -138,6 +138,9 @@ def reshape(input, shape):
 def zeros(shape, dtype, ctx):
     return nd.zeros(shape, dtype=dtype, ctx=ctx)
 
+def zeros_like(input):
+    return nd.zeros_like(input)
+
 def ones(shape, dtype, ctx):
     return nd.ones(shape, dtype=dtype, ctx=ctx)
 
@@ -175,6 +178,9 @@ def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
 
 def boolean_mask(input, mask):
     return mx.contrib.nd.boolean_mask(input, mask)
+
+def where(cond, x, y):
+    return nd.where(cond, x, y)
 
 def unique(input):
     # TODO: fallback to numpy is unfortunate

@@ -507,6 +507,22 @@ def zeros(shape, dtype, ctx):
     """
     pass
 
+def zeros_like(input):
+    """Create a zero tensor with the same shape, dtype and context of the
+    given tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input
+
+    Returns
+    -------
+    Tensor
+        The result
+    """
+    pass
+
 def ones(shape, dtype, ctx):
     """Create a one tensor.
 
@@ -605,6 +621,25 @@ def boolean_mask(input, mask):
         The input tensor
     mask : Boolean Tensor
         The mask
+
+    Returns
+    -------
+    Tensor
+        The result
+    """
+    pass
+
+def where(cond, x, y):
+    """Select elements from either x or y according to condition.
+
+    Parameters
+    ----------
+    cond : (Boolean) Tensor
+        The condition
+    x : Tensor or scalar
+        The value to be selected if cond evaluates to True
+    y : Tensor or scalar
+        The value to be selected if cond evaluates to False
 
     Returns
     -------

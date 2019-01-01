@@ -118,6 +118,9 @@ def reshape(input, shape):
 def zeros(shape, dtype, ctx):
     return th.zeros(shape, dtype=dtype, device=ctx)
 
+def zeros_like(input):
+    return th.zeros_like(input)
+
 def ones(shape, dtype, ctx):
     return th.ones(shape, dtype=dtype, device=ctx)
 
@@ -139,6 +142,9 @@ def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
 
 def boolean_mask(input, mask):
     return input[mask]
+
+def where(cond, x, y):
+    return th.where(cond, x, y)
 
 def unique(input):
     return th.unique(input)

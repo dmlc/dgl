@@ -36,6 +36,10 @@ def full(shape, fill_value, dtype, ctx):
 def narrow_row_set(x, start, stop, new):
     x[start:stop] = new
 
+def sparse_to_dense(x):
+    y = nd.zeros(x.shape).as_in_context(x.context)
+    return x.copyto(y)
+
 
 record_grad = autograd.record
 

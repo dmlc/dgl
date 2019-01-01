@@ -620,8 +620,8 @@ class GraphIndex(object):
             # FIXME(minjie): data type
             x = -F.ones((m,), dtype=F.float32, ctx=ctx)
             y = F.ones((m,), dtype=F.float32, ctx=ctx)
-            x[diagonal] = 0
-            y[diagonal] = 0
+            x = F.where(diagonal, F.zeros_like(x), x)
+            y = F.where(diagonal, F.zeros_like(y), y)
             dat = F.cat([x, y], dim=0)
             inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
         else:
