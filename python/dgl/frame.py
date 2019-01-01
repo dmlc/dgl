@@ -125,7 +125,9 @@ class Column(object):
         else:
             if isinstance(idx, slice):
                 # for contiguous indices pack is usually faster than scatter row
-                parts = [F.narrow_row(self.data, 0, idx.start), feats]
+                parts = [feats]
+                if idx.start > 0:
+                    parts.insert(0, F.narrow_row(self.data, 0, idx.start))
                 if idx.stop < len(self):
                     parts.append(F.narrow_row(self.data, idx.stop, len(self)))
                 self.data = F.cat(parts, dim=0)
