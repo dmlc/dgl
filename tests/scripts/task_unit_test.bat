@@ -11,4 +11,5 @@ IF x%1x==xx (
 python -m nose -v --with-xunit tests || EXIT /B 1
 python -m nose -v --with-xunit tests\!BACKEND! || EXIT /B 1
 python -m nose -v --with-xunit tests\graph_index || EXIT /B 1
+python -m nose -v --with-xunit tests\compute || EXIT /B 1
 EXIT /B
