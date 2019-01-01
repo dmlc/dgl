@@ -59,6 +59,9 @@ def narrow_row_set(x, start, stop, new):
 def sparse_to_dense(x):
     pass
 
+def clone(x):
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------

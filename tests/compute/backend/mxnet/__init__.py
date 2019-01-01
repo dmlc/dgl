@@ -40,6 +40,9 @@ def sparse_to_dense(x):
     y = nd.zeros(x.shape).as_in_context(x.context)
     return x.copyto(y)
 
+def clone(x):
+    return x.copy()
+
 
 record_grad = autograd.record
 

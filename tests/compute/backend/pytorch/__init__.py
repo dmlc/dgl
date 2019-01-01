@@ -39,6 +39,9 @@ def narrow_row_set(x, start, stop, new):
 def sparse_to_dense(x):
     return x.to_dense()
 
+def clone(x):
+    return x.clone()
+
 
 class record_grad(object):
     def __init__(self):
