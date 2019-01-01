@@ -10,8 +10,8 @@ class BuiltinFunction(object):
         """Return the name of this builtin function."""
         raise NotImplementedError
 
-class BundledFunction(BuiltinFunction):
-    """A builtin function that bundles multiple functions.
+class BundledFunction(object):
+    """A utility class that bundles multiple functions.
 
     Parameters
     ----------

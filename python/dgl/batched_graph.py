@@ -153,7 +153,6 @@ class BatchedDGLGraph(DGLGraph):
                 attrs = set()
                 # Check if at least a graph has mode items and associated features.
                 for i, g in enumerate(graph_list):
-                    g = graph_list[i]
                     g_num_items, g_attrs = _get_num_item_and_attr_types(g, mode)
                     if g_num_items > 0 and len(g_attrs) > 0:
                         attrs = g_attrs
