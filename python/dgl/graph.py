@@ -1,20 +1,18 @@
 """Base graph class specialized for neural networks on graphs."""
 from __future__ import absolute_import
 
-import networkx as nx
-import numpy as np
 from collections import defaultdict
 
-import dgl
-from .base import ALL, is_all, DGLError, dgl_warning
+from .base import ALL, is_all, DGLError
 from . import backend as F
+from . import init
 from .frame import FrameRef, Frame
-from .graph_index import GraphIndex, create_graph_index
+from .graph_index import create_graph_index
 from .runtime import ir, scheduler, Runtime
+from . import subgraph
 from . import utils
 from .view import NodeView, EdgeView
 from .udf import NodeBatch, EdgeBatch
-
 
 __all__ = ['DGLGraph']
 
@@ -177,7 +175,6 @@ class DGLGraph(object):
                  multigraph=False,
                  readonly=False):
         # graph
-        self._readonly=readonly
         self._graph = create_graph_index(graph_data, multigraph, readonly)
         # node and edge frame
         if node_frame is None:
@@ -194,7 +191,7 @@ class DGLGraph(object):
         # message frame
         self._msg_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
         # set initializer for message frame
-        self._msg_frame.set_initializer(dgl.init.zero_initializer)
+        self._msg_frame.set_initializer(init.zero_initializer)
         # registered functions
         self._message_func = None
         self._reduce_func = None
@@ -916,7 +913,7 @@ class DGLGraph(object):
         else:
             raise DGLError('Invalid form:', form)
 
-    def all_edges(self, form='uv', sorted=False):
+    def all_edges(self, form='uv', return_sorted=False):
         """Return all the edges.
 
         Parameters
@@ -927,7 +924,7 @@ class DGLGraph(object):
             - 'all' : a tuple (u, v, eid)
             - 'uv'  : a pair (u, v), default
             - 'eid' : one eid tensor
-        sorted : bool
+        return_sorted : bool
             True if the returned edges are sorted by their src and dst ids.
 
         Returns
@@ -954,7 +951,7 @@ class DGLGraph(object):
         >>> G.all_edges('all')
         (tensor([0, 0, 1]), tensor([1, 2, 2]), tensor([0, 1, 2]))
         """
-        src, dst, eid = self._graph.edges(sorted)
+        src, dst, eid = self._graph.edges(return_sorted)
         if form == 'all':
             return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
         elif form == 'uv':
@@ -1021,7 +1018,7 @@ class DGLGraph(object):
         in_degree
         """
         if is_all(v):
-            v  = utils.toindex(slice(0, self.number_of_nodes()))
+            v = utils.toindex(slice(0, self.number_of_nodes()))
         else:
             v = utils.toindex(v)
         return self._graph.in_degrees(v).tousertensor()
@@ -1083,7 +1080,7 @@ class DGLGraph(object):
         out_degree
         """
         if is_all(v):
-            v  = utils.toindex(slice(0, self.number_of_nodes()))
+            v = utils.toindex(slice(0, self.number_of_nodes()))
         else:
             v = utils.toindex(v)
         return self._graph.out_degrees(v).tousertensor()
@@ -1121,13 +1118,13 @@ class DGLGraph(object):
         nx_graph = self._graph.to_networkx()
         if node_attrs is not None:
             for nid, attr in nx_graph.nodes(data=True):
-                nf = self.get_n_repr(nid)
-                attr.update({key: F.squeeze(nf[key], 0) for key in node_attrs})
+                feat_dict = self.get_n_repr(nid)
+                attr.update({key: F.squeeze(feat_dict[key], 0) for key in node_attrs})
         if edge_attrs is not None:
-            for u, v, attr in nx_graph.edges(data=True):
+            for _, _, attr in nx_graph.edges(data=True):
                 eid = attr['id']
-                ef = self.get_e_repr(eid)
-                attr.update({key: F.squeeze(ef[key], 0) for key in edge_attrs})
+                feat_dict = self.get_e_repr(eid)
+                attr.update({key: F.squeeze(feat_dict[key], 0) for key in edge_attrs})
         return nx_graph
 
     def from_networkx(self, nx_graph, node_attrs=None, edge_attrs=None):
@@ -1208,12 +1205,12 @@ class DGLGraph(object):
             for attr in edge_attrs:
                 self._edge_frame[attr] = _batcher(attr_dict[attr])
 
-    def from_scipy_sparse_matrix(self, a):
+    def from_scipy_sparse_matrix(self, spmat):
         """ Convert from scipy sparse matrix.
 
         Parameters
         ----------
-        a : scipy sparse matrix
+        spmat : scipy sparse matrix
             The graph's adjacency matrix
 
         Examples
@@ -1227,7 +1224,7 @@ class DGLGraph(object):
         >>> g.from_scipy_sparse_matrix(a)
         """
         self.clear()
-        self._graph.from_scipy_sparse_matrix(a)
+        self._graph.from_scipy_sparse_matrix(spmat)
         self._node_frame.add_rows(self.number_of_nodes())
         self._edge_frame.add_rows(self.number_of_edges())
         self._msg_index = utils.zero_index(self.number_of_edges())
@@ -1502,10 +1499,10 @@ class DGLGraph(object):
         """
         return self.edges[:].data
 
-    def set_n_repr(self, hu, u=ALL, inplace=False):
+    def set_n_repr(self, data, u=ALL, inplace=False):
         """Set node(s) representation.
 
-        `hu` is a dictionary from the feature name to feature tensor. Each tensor
+        `data` is a dictionary from the feature name to feature tensor. Each tensor
         is of shape (B, D1, D2, ...), where B is the number of nodes to be updated,
         and (D1, D2, ...) be the shape of the node representation tensor. The
         length of the given node ids must match B (i.e, len(u) == B).
@@ -1515,7 +1512,7 @@ class DGLGraph(object):
 
         Parameters
         ----------
-        hu : dict of tensor
+        data : dict of tensor
             Node representation.
         u : node, container or tensor
             The node(s).
@@ -1523,25 +1520,25 @@ class DGLGraph(object):
             If True, update will be done in place, but autograd will break.
         """
         # sanity check
-        if not utils.is_dict_like(hu):
+        if not utils.is_dict_like(data):
             raise DGLError('Expect dictionary type for feature data.'
-                           ' Got "%s" instead.' % type(hu))
+                           ' Got "%s" instead.' % type(data))
         if is_all(u):
             num_nodes = self.number_of_nodes()
         else:
             u = utils.toindex(u)
             num_nodes = len(u)
-        for key, val in hu.items():
+        for key, val in data.items():
             nfeats = F.shape(val)[0]
             if nfeats != num_nodes:
                 raise DGLError('Expect number of features to match number of nodes (len(u)).'
                                ' Got %d and %d instead.' % (nfeats, num_nodes))
         # set
         if is_all(u):
-            for key, val in hu.items():
+            for key, val in data.items():
                 self._node_frame[key] = val
         else:
-            self._node_frame.update_rows(u, hu, inplace=inplace)
+            self._node_frame.update_rows(u, data, inplace=inplace)
 
     def get_n_repr(self, u=ALL):
         """Get node(s) representation.
@@ -1581,10 +1578,10 @@ class DGLGraph(object):
         """
         return self._node_frame.pop(key)
 
-    def set_e_repr(self, he, edges=ALL, inplace=False):
+    def set_e_repr(self, data, edges=ALL, inplace=False):
         """Set edge(s) representation.
 
-        `he` is a dictionary from the feature name to feature tensor. Each tensor
+        `data` is a dictionary from the feature name to feature tensor. Each tensor
         is of shape (B, D1, D2, ...), where B is the number of edges to be updated,
         and (D1, D2, ...) be the shape of the edge representation tensor.
 
@@ -1593,7 +1590,7 @@ class DGLGraph(object):
 
         Parameters
         ----------
-        he : tensor or dict of tensor
+        data : tensor or dict of tensor
             Edge representation.
         edges : edges
             Edges can be a pair of endpoint nodes (u, v), or a
@@ -1614,16 +1611,16 @@ class DGLGraph(object):
             eid = utils.toindex(edges)
 
         # sanity check
-        if not utils.is_dict_like(he):
+        if not utils.is_dict_like(data):
             raise DGLError('Expect dictionary type for feature data.'
-                           ' Got "%s" instead.' % type(he))
+                           ' Got "%s" instead.' % type(data))
 
         if is_all(eid):
             num_edges = self.number_of_edges()
         else:
             eid = utils.toindex(eid)
             num_edges = len(eid)
-        for key, val in he.items():
+        for key, val in data.items():
             nfeats = F.shape(val)[0]
             if nfeats != num_edges:
                 raise DGLError('Expect number of features to match number of edges.'
@@ -1631,11 +1628,11 @@ class DGLGraph(object):
         # set
         if is_all(eid):
             # update column
-            for key, val in he.items():
+            for key, val in data.items():
                 self._edge_frame[key] = val
         else:
             # update row
-            self._edge_frame.update_rows(eid, he, inplace=inplace)
+            self._edge_frame.update_rows(eid, data, inplace=inplace)
 
     def get_e_repr(self, edges=ALL):
         """Get node(s) representation.
@@ -2491,8 +2488,7 @@ class DGLGraph(object):
         prop_edges
         """
         for node_frontier in nodes_generator:
-            self.pull(node_frontier,
-                    message_func, reduce_func, apply_node_func)
+            self.pull(node_frontier, message_func, reduce_func, apply_node_func)
 
     def prop_edges(self,
                    edges_generator,
@@ -2573,8 +2569,7 @@ class DGLGraph(object):
         prop_nodes
         """
         for edge_frontier in edges_generator:
-            self.send_and_recv(edge_frontier,
-                    message_func, reduce_func, apply_node_func)
+            self.send_and_recv(edge_frontier, message_func, reduce_func, apply_node_func)
 
     def subgraph(self, nodes):
         """Return the subgraph induced on given nodes.
@@ -2621,7 +2616,7 @@ class DGLGraph(object):
         """
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
-        return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
+        return subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
 
     def subgraphs(self, nodes):
         """Return a list of subgraphs, each induced in the corresponding given
@@ -2648,8 +2643,8 @@ class DGLGraph(object):
         """
         induced_nodes = [utils.toindex(n) for n in nodes]
         sgis = self._graph.node_subgraphs(induced_nodes)
-        return [dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges,
-            sgi) for sgi in sgis]
+        return [subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
+                for sgi in sgis]
 
     def edge_subgraph(self, edges):
         """Return the subgraph induced on given edges.
@@ -2695,7 +2690,7 @@ class DGLGraph(object):
         """
         induced_edges = utils.toindex(edges)
         sgi = self._graph.edge_subgraph(induced_edges)
-        return dgl.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
+        return subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
 
     def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
@@ -2720,7 +2715,7 @@ class DGLGraph(object):
         """
         return self._graph.adjacency_matrix(transpose, ctx)[0]
 
-    def incidence_matrix(self, type, ctx=F.cpu()):
+    def incidence_matrix(self, typestr, ctx=F.cpu()):
         """Return the incidence matrix representation of this graph.
 
         An incidence matrix is an n x m sparse matrix, where n is
@@ -2750,7 +2745,7 @@ class DGLGraph(object):
 
         Parameters
         ----------
-        type : str
+        typestr : str
             Can be either ``in``, ``out`` or ``both``
         ctx : context, optional (default=cpu)
             The context of returned incidence matrix.
@@ -2760,7 +2755,7 @@ class DGLGraph(object):
         SparseTensor
             The incidence matrix.
         """
-        return self._graph.incidence_matrix(type, ctx)[0]
+        return self._graph.incidence_matrix(typestr, ctx)[0]
 
     def line_graph(self, backtracking=True, shared=False):
         """Return the line graph of this graph.
@@ -2833,8 +2828,8 @@ class DGLGraph(object):
             v = utils.toindex(nodes)
 
         n_repr = self.get_n_repr(v)
-        nb = NodeBatch(self, v, n_repr)
-        n_mask = predicate(nb)
+        nbatch = NodeBatch(self, v, n_repr)
+        n_mask = predicate(nbatch)
 
         if is_all(nodes):
             return F.nonzero_1d(n_mask)
@@ -2906,10 +2901,8 @@ class DGLGraph(object):
         src_data = self.get_n_repr(u)
         edge_data = self.get_e_repr(eid)
         dst_data = self.get_n_repr(v)
-        eb = EdgeBatch(self, (u, v, eid),
-                src_data, edge_data, dst_data)
-
-        e_mask = predicate(eb)
+        ebatch = EdgeBatch(self, (u, v, eid), src_data, edge_data, dst_data)
+        e_mask = predicate(ebatch)
 
         if is_all(edges):
             return F.nonzero_1d(e_mask)
@@ -2918,7 +2911,9 @@ class DGLGraph(object):
             return F.boolean_mask(edges, e_mask)
 
     def __repr__(self):
-        s = 'DGLGraph with {node} nodes and {edge} edges.\nNode data: {ndata}\nEdge data: {edata}'
-        return s.format(node=self.number_of_nodes(), edge=self.number_of_edges(),
-                        ndata=str(self.node_attr_schemes()),
-                        edata=str(self.edge_attr_schemes()))
+        ret = ('DGLGraph(num_nodes={node}, num_edges={edge},\n'
+               '         ndata_schemes={ndata}\n'
+               '         edata_schemes={edata})')
+        return ret.format(node=self.number_of_nodes(), edge=self.number_of_edges(),
+                          ndata=str(self.node_attr_schemes()),
+                          edata=str(self.edge_attr_schemes()))

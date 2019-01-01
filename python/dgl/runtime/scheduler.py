@@ -3,27 +3,27 @@ from __future__ import absolute_import
 
 from .. import utils
 from .._ffi.function import _init_api
-from ..base import ALL, DGLError, is_all
+from ..base import DGLError
 from .. import backend as F
 from ..frame import frame_like, FrameRef
 from ..function.base import BuiltinFunction, BundledFunction
 from ..udf import EdgeBatch, NodeBatch
 
 from . import ir
-from .ir import var as var
+from .ir import var
 from . import degree_bucketing as db
 from . import spmv
 
 __all__ = [
-            "schedule_send",
-            "schedule_recv",
-            "schedule_update_all",
-            "schedule_snr",
-            "schedule_apply_nodes",
-            "schedule_apply_edges",
-            "schedule_push",
-            "schedule_pull"
-          ]
+    "schedule_send",
+    "schedule_recv",
+    "schedule_update_all",
+    "schedule_snr",
+    "schedule_apply_nodes",
+    "schedule_apply_edges",
+    "schedule_push",
+    "schedule_pull"
+]
 
 def schedule_send(graph, u, v, eid, message_func):
     """get send schedule
@@ -132,7 +132,6 @@ def schedule_snr(graph,
     inplace: bool
         If True, the update will be done in place
     """
-    call_type = 'send_and_recv'
     u, v, eid = edge_tuples
     recv_nodes, _ = F.sort_1d(F.unique(v.tousertensor()))
     recv_nodes = utils.toindex(recv_nodes)
@@ -143,13 +142,12 @@ def schedule_snr(graph,
     var_eid = var.IDX(eid)
     var_recv_nodes = var.IDX(recv_nodes, name='recv_nodes')
     # generate send and reduce schedule
-    uv_getter = lambda : (var_u, var_v)
-    adj_creator = lambda : spmv.build_adj_matrix_uv(graph, (u, v), recv_nodes)
-    inc_creator = lambda : spmv.build_inc_matrix_dst(v, recv_nodes)
-    reduced_feat = _gen_send_reduce(
-            graph, message_func, reduce_func,
-            var_eid, var_recv_nodes,
-            uv_getter, adj_creator, inc_creator)
+    uv_getter = lambda: (var_u, var_v)
+    adj_creator = lambda: spmv.build_adj_matrix_uv(graph, (u, v), recv_nodes)
+    inc_creator = lambda: spmv.build_inc_matrix_dst(v, recv_nodes)
+    reduced_feat = _gen_send_reduce(graph, message_func, reduce_func,
+                                    var_eid, var_recv_nodes,
+                                    uv_getter, adj_creator, inc_creator)
     # generate apply schedule
     final_feat = _apply_with_accum(graph, var_recv_nodes, var_nf, reduced_feat, apply_func)
     if inplace:
@@ -180,7 +178,6 @@ def schedule_update_all(graph,
             nodes = utils.toindex(slice(0, graph.number_of_nodes()))
             schedule_apply_nodes(graph, nodes, apply_func, inplace=False)
     else:
-        call_type = 'update_all'
         eid = utils.toindex(slice(0, graph.number_of_edges()))  # shortcut for ALL
         recv_nodes = utils.toindex(slice(0, graph.number_of_nodes()))  # shortcut for ALL
         # create vars
@@ -191,12 +188,11 @@ def schedule_update_all(graph,
         def uv_getter():
             src, dst, _ = graph._graph.edges()
             return var.IDX(src), var.IDX(dst)
-        adj_creator = lambda : spmv.build_adj_matrix_graph(graph)
-        inc_creator = lambda : spmv.build_inc_matrix_graph(graph)
-        reduced_feat = _gen_send_reduce(
-                graph, message_func, reduce_func,
-                var_eid, var_recv_nodes,
-                uv_getter, adj_creator, inc_creator)
+        adj_creator = lambda: spmv.build_adj_matrix_graph(graph)
+        inc_creator = lambda: spmv.build_inc_matrix_graph(graph)
+        reduced_feat = _gen_send_reduce(graph, message_func, reduce_func,
+                                        var_eid, var_recv_nodes,
+                                        uv_getter, adj_creator, inc_creator)
         # generate optional apply
         final_feat = _apply_with_accum(graph, var_recv_nodes, var_nf, reduced_feat, apply_func)
         ir.WRITE_DICT_(var_nf, final_feat)
@@ -226,8 +222,8 @@ def schedule_apply_nodes(graph,
     var_v = var.IDX(v)
     v_nf = ir.READ_ROW(var_nf, var_v)
     def _afunc_wrapper(node_data):
-        nb = NodeBatch(graph, v, node_data)
-        return apply_func(nb)
+        nbatch = NodeBatch(graph, v, node_data)
+        return apply_func(nbatch)
     afunc = var.FUNC(_afunc_wrapper)
     applied_feat = ir.NODE_UDF(afunc, v_nf)
     if inplace:
@@ -271,9 +267,8 @@ def schedule_apply_edges(graph,
     fddst = ir.READ_ROW(var_nf, var_v)
     fdedge = ir.READ_ROW(var_ef, var_eid)
     def _efunc_wrapper(src_data, edge_data, dst_data):
-        eb = EdgeBatch(graph, (u, v, eid),
-                src_data, edge_data, dst_data)
-        return apply_func(eb)
+        ebatch = EdgeBatch(graph, (u, v, eid), src_data, edge_data, dst_data)
+        return apply_func(ebatch)
     _efunc = var.FUNC(_efunc_wrapper)
     new_fdedge = ir.EDGE_UDF(_efunc, fdsrc, fdedge, fddst)
     if inplace:
@@ -343,7 +338,6 @@ def schedule_pull(graph,
         if apply_func is not None:
             schedule_apply_nodes(graph, pull_nodes, apply_func, inplace)
     else:
-        call_type = 'send_and_recv'
         pull_nodes, _ = F.sort_1d(F.unique(pull_nodes.tousertensor()))
         pull_nodes = utils.toindex(pull_nodes)
         # create vars
@@ -353,13 +347,12 @@ def schedule_pull(graph,
         var_v = var.IDX(v)
         var_eid = var.IDX(eid)
         # generate send and reduce schedule
-        uv_getter = lambda : (var_u, var_v)
-        adj_creator = lambda : spmv.build_adj_matrix_uv(graph, (u, v), pull_nodes)
-        inc_creator = lambda : spmv.build_inc_matrix_dst(v, pull_nodes)
-        reduced_feat = _gen_send_reduce(
-                graph, message_func, reduce_func,
-                var_eid, var_pull_nodes,
-                uv_getter, adj_creator, inc_creator)
+        uv_getter = lambda: (var_u, var_v)
+        adj_creator = lambda: spmv.build_adj_matrix_uv(graph, (u, v), pull_nodes)
+        inc_creator = lambda: spmv.build_inc_matrix_dst(v, pull_nodes)
+        reduced_feat = _gen_send_reduce(graph, message_func, reduce_func,
+                                        var_eid, var_pull_nodes,
+                                        uv_getter, adj_creator, inc_creator)
         # generate optional apply
         final_feat = _apply_with_accum(graph, var_pull_nodes, var_nf, reduced_feat, apply_func)
         if inplace:
@@ -423,8 +416,8 @@ def _apply_with_accum(graph, var_nodes, var_nf, var_accum, apply_func):
         v_nf = ir.READ_ROW(var_nf, var_nodes)
         v_nf = ir.UPDATE_DICT(v_nf, var_accum)
         def _afunc_wrapper(node_data):
-            nb = NodeBatch(graph, var_nodes.data, node_data)
-            return apply_func(nb)
+            nbatch = NodeBatch(graph, var_nodes.data, node_data)
+            return apply_func(nbatch)
         afunc = var.FUNC(_afunc_wrapper)
         applied_feat = ir.NODE_UDF(afunc, v_nf)
         final_feat = ir.UPDATE_DICT(var_accum, applied_feat)
@@ -439,7 +432,6 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
     edge_tuples : tuple of utils.Index
     recv_nodes : utils.Index
     """
-    call_type = "recv"
     _, dst, eid = edge_tuples
     rfunc = _standardize_func_usage(reduce_func, 'reduce')
     rfunc_is_list = utils.is_iterable(rfunc)
@@ -451,9 +443,9 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
     tmpframe = FrameRef(frame_like(graph._node_frame._frame, len(recv_nodes)))
 
     # vars
-    msg = var.FEAT_DICT(graph._msg_frame, 'msg')
-    nf = var.FEAT_DICT(graph._node_frame, 'nf')
-    out = var.FEAT_DICT(data=tmpframe)
+    var_msg = var.FEAT_DICT(graph._msg_frame, 'msg')
+    var_nf = var.FEAT_DICT(graph._node_frame, 'nf')
+    var_out = var.FEAT_DICT(data=tmpframe)
 
     if rfunc_is_list:
         # UDF message + builtin reducer
@@ -461,19 +453,19 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
         spmv_rfunc, rfunc = spmv.analyze_e2v_spmv(graph, rfunc)
         inc = spmv.build_inc_matrix_eid(graph._msg_frame.num_rows, eid, dst,
                                         recv_nodes)
-        spmv.gen_e2v_spmv_schedule(inc, spmv_rfunc, msg, out)
+        spmv.gen_e2v_spmv_schedule(inc, spmv_rfunc, var_msg, var_out)
 
         if len(rfunc) == 0:
             # All mfunc and rfunc has been processed.
-            return out
+            return var_out
 
         # convert the remaining rfunc to UDFs
         rfunc = BundledFunction(rfunc)
 
     # gen degree bucketing schedule for UDF recv
     db.gen_degree_bucketing_schedule(graph, rfunc, eid, dst,
-            recv_nodes, nf, msg, out)
-    return out
+                                     recv_nodes, var_nf, var_msg, var_out)
+    return var_out
 
 def _gen_send_reduce(
         graph,
@@ -573,19 +565,19 @@ def _gen_send_reduce(
 
     # gen degree bucketing schedule for UDF recv
     mid = utils.toindex(slice(0, len(var_v.data)))  # message id is from 0~|dst|
-    db.gen_degree_bucketing_schedule(graph, rfunc,
-            mid, var_v.data, reduce_nodes,
-            var_nf, var_mf, var_out)
+    db.gen_degree_bucketing_schedule(
+        graph, rfunc, mid, var_v.data, reduce_nodes, var_nf, var_mf, var_out)
     return var_out
 
-def _gen_send(graph, nf, ef, u, v, eid, mfunc):
-    fdsrc = ir.READ_ROW(nf, u)
-    fddst = ir.READ_ROW(nf, v)
-    fdedge = ir.READ_ROW(ef, eid)
+def _gen_send(graph, nfr, efr, u, v, eid, mfunc):
+    """Internal function to generate send schedule."""
+    fdsrc = ir.READ_ROW(nfr, u)
+    fddst = ir.READ_ROW(nfr, v)
+    fdedge = ir.READ_ROW(efr, eid)
     def _mfunc_wrapper(src_data, edge_data, dst_data):
-        eb = EdgeBatch(graph, (u.data, v.data, eid.data),
-                src_data, edge_data, dst_data)
-        return mfunc(eb)
+        ebatch = EdgeBatch(graph, (u.data, v.data, eid.data),
+                           src_data, edge_data, dst_data)
+        return mfunc(ebatch)
     _mfunc_wrapper = var.FUNC(_mfunc_wrapper)
     msg = ir.EDGE_UDF(_mfunc_wrapper, fdsrc, fdedge, fddst)
     return msg

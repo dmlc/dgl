@@ -598,11 +598,12 @@ def test_repr():
     G.add_nodes(10)
     G.add_edge(0, 1)
     repr_string = G.__repr__()
+    print(repr_string)
     G.ndata['x'] = F.zeros((10, 5))
     G.add_edges([0, 1], 2)
     G.edata['y'] = F.zeros((3, 4))
     repr_string = G.__repr__()
-
+    print(repr_string)
 
 if __name__ == '__main__':
     test_nx_conversion()

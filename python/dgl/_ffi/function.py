@@ -51,7 +51,7 @@ class Function(_FunctionBase):
     dgl.register_func: How to register global function.
     dgl.get_global_func: How to get global function.
     """
-    pass
+    pass  # pylint: disable=unnecessary-pass
 
 
 class ModuleBase(object):
