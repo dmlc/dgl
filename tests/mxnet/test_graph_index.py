@@ -4,8 +4,7 @@ import mxnet as mx
 import numpy as np
 import scipy as sp
 import dgl
-from dgl.graph import GraphIndex, create_graph_index
-from dgl.graph_index import map_to_subgraph_nid
+from dgl.graph_index import map_to_subgraph_nid, GraphIndex, create_graph_index
 from dgl import utils
 
 def generate_rand_graph(n):

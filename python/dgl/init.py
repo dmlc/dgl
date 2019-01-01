@@ -5,7 +5,7 @@ from . import backend as F
 
 __all__ = ['base_initializer', 'zero_initializer']
 
-def base_initializer(shape, dtype, ctx, range):
+def base_initializer(shape, dtype, ctx, id_range):  # pylint: disable=unused-argument
     """The function signature for feature initializer.
 
     Any customized feature initializer should follow this signature (see
@@ -20,7 +20,7 @@ def base_initializer(shape, dtype, ctx, range):
         The data type of the returned features.
     ctx : context object
         The device context of the returned features.
-    range : slice
+    id_range : slice
         The start id and the end id of the features to be initialized.
         The id could be node or edge id depending on the scenario.
         Note that the step is always None.
@@ -32,7 +32,7 @@ def base_initializer(shape, dtype, ctx, range):
 
     >>> import torch
     >>> import dgl
-    >>> def initializer(shape, dtype, ctx, range):
+    >>> def initializer(shape, dtype, ctx, id_range):
     >>>     return torch.ones(shape, dtype=dtype, device=ctx)
     >>> g = dgl.DGLGraph()
     >>> g.set_n_initializer(initializer)
@@ -44,7 +44,7 @@ def base_initializer(shape, dtype, ctx, range):
     """
     raise NotImplementedError
 
-def zero_initializer(shape, dtype, ctx, range):
+def zero_initializer(shape, dtype, ctx, id_range):  # pylint: disable=unused-argument
     """Zero feature initializer
 
     Examples
