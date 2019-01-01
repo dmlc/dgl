@@ -15,7 +15,11 @@ def randn(shape):
     return th.randn(*shape)
 
 def attach_grad(x):
-    return x.requires_grad_()
+    if x.grad is not None:
+        x.grad.zero_()
+        return x
+    else:
+        return x.requires_grad_()
 
 def backward(x, head_gradient=None):
     x.backward(head_gradient)
@@ -23,8 +27,14 @@ def backward(x, head_gradient=None):
 def grad(x):
     return x.grad
 
+def is_no_grad(x):
+    return x.grad is None or (x.grad == 0).all()
+
 def full(shape, fill_value, dtype, ctx):
     return th.full(shape, fill_value, dtype=dtype, device=ctx)
+
+def narrow_row_set(x, start, stop, new):
+    x[start:stop] = new
 
 
 class record_grad(object):

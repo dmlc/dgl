@@ -29,7 +29,10 @@ def randn(shape):
 
 def attach_grad(x):
     """Flag the tensor *in-place* to have its gradient computed in backward
-    pass."""
+    pass.
+
+    If the flag is already set, reset the gradient buffer as well.
+    """
     pass
 
 def backward(x, head_gradient=None):
@@ -42,7 +45,15 @@ def grad(x):
     """Fetches the gradient from the tensor after backward computation."""
     pass
 
+def is_no_grad(x):
+    """Check whether a tensor has its gradient computed."""
+    pass
+
 def full(shape, fill_value, dtype, ctx):
+    pass
+
+def narrow_row_set(x, start, stop, new):
+    """Set a slice of the given tensor to a new value."""
     pass
 
 ###############################################################################

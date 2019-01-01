@@ -27,8 +27,14 @@ def backward(x, head_gradient=None):
 def grad(x):
     return x.grad
 
+def is_no_grad(x):
+    return (x != 0).sum() == 0
+
 def full(shape, fill_value, dtype, ctx):
     return nd.full(shape, fill_value, dtype=dtype, ctx=ctx)
+
+def narrow_row_set(x, start, stop, new):
+    x[start:stop] = new
 
 
 record_grad = autograd.record
