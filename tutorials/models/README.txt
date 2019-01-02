@@ -1,5 +1,5 @@
-Graph-based Neural Network Models
-=================================
+Model overview
+==============
 
 We developed DGL with a broad range of applications in mind. Building
 state-of-art models forces us to think hard on the most common and useful APIs,
@@ -14,4 +14,3 @@ directions.
 We categorize the models below, providing links to the original code and
 tutorial when appropriate. As will become apparent, these models stress the use
 of different DGL APIs.
-
