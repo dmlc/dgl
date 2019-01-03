@@ -4,6 +4,8 @@ from copy import deepcopy
 from .graph import DGLGraph
 from .batched_graph import BatchedDGLGraph
 
+__all__ = ['line_graph', 'reverse']
+
 
 def line_graph(g, backtracking=True, shared=False):
     """Return the line graph of this graph.
