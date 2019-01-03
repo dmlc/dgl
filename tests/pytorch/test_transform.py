@@ -51,7 +51,6 @@ def test_reverse_no_share():
     g.edata['h'] = th.tensor([[5.], [6.], [7.]])
     rg = g.reverse(share_node_attrs=False, share_edge_attrs=False)
 
-    assert g._readonly == rg._readonly
     assert g.is_multigraph == rg.is_multigraph
 
     assert g.number_of_nodes() == rg.number_of_nodes()
