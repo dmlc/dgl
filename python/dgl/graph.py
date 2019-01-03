@@ -200,8 +200,6 @@ class DGLGraph(object):
         self._reduce_func = None
         self._apply_node_func = None
         self._apply_edge_func = None
-        # The reverse of the graph
-        self._reverse = None
 
     def add_nodes(self, num, data=None):
         """Add multiple new nodes.
@@ -253,9 +251,6 @@ class DGLGraph(object):
             self._node_frame.add_rows(num)
         else:
             self._node_frame.append(data)
-
-        if self._reverse:
-            self._reverse._graph.add_nodes(num)
 
     def add_edge(self, u, v, data=None):
         """Add one new edge between u and v.
@@ -313,9 +308,6 @@ class DGLGraph(object):
         # resize msg_index and msg_frame
         self._msg_index = self._msg_index.append_zeros(1)
         self._msg_frame.add_rows(1)
-
-        if self._reverse:
-            self._reverse._graph.add_edge(v, u)
 
     def add_edges(self, u, v, data=None):
         """Add multiple edges for list of source nodes u and destination nodes
@@ -376,9 +368,6 @@ class DGLGraph(object):
         # initialize feature placeholder for messages
         self._msg_index = self._msg_index.append_zeros(num)
         self._msg_frame.add_rows(num)
-
-        if self._reverse:
-            self._reverse._graph.add_edges(v, u)
 
     def clear(self):
         """Remove all nodes and edges, as well as their features, from the
@@ -2776,22 +2765,16 @@ class DGLGraph(object):
     def line_graph(self, backtracking=True, shared=False):
         """Return the line graph of this graph.
 
-        Parameters
-        ----------
-        backtracking : bool, optional
-            Whether the returned line graph is backtracking.
-
-        shared : bool, optional
-            Whether the returned line graph shares representations with `self`.
-
-        Returns
-        -------
-        DGLGraph
-            The line graph of this graph.
+        See :func:`~dgl.transform.line_graph`.
         """
-        graph_data = self._graph.line_graph(backtracking)
-        node_frame = self._edge_frame if shared else None
-        return DGLGraph(graph_data, node_frame)
+        return dgl.line_graph(self, backtracking, shared)
+
+    def reverse(self, share_node_attrs=True, share_edge_attrs=True):
+        """Return the reverse of this graph.
+
+        See :func:`~dgl.transform.reverse`.
+        """
+        return dgl.reverse(self, share_node_attrs, share_edge_attrs)
 
     def filter_nodes(self, predicate, nodes=ALL):
         """Return a tensor of node IDs that satisfy the given predicate.
@@ -2927,9 +2910,6 @@ class DGLGraph(object):
         else:
             edges = F.tensor(edges)
             return edges[e_mask]
-
-    def set_reverse(self, rg):
-        self._reverse = rg
 
     def __repr__(self):
         s = 'DGLGraph with {node} nodes and {edge} edges.\nNode data: {ndata}\nEdge data: {edata}'

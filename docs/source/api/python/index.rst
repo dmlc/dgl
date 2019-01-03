@@ -13,3 +13,4 @@ API Reference
    udf
    sampler
    data
+   transform
