@@ -14,4 +14,3 @@ from .graph import DGLGraph
 from .traversal import *
 from .propagate import *
 from .udf import NodeBatch, EdgeBatch
-from .reverse import reverse
