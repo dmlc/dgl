@@ -115,5 +115,4 @@ def reverse(g, share_node_attrs=True, share_edge_attrs=True):
         g_reversed._edge_frame = g._edge_frame
     else:
         g_reversed._edge_frame = deepcopy(g._edge_frame)
-    g_reversed._readonly = g._readonly
     return g_reversed
