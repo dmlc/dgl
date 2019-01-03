@@ -61,7 +61,7 @@ def test_column1():
 def test_column2():
     # Test frameref column getter/setter
     data = Frame(create_test_data())
-    f = FrameRef(data, [3, 4, 5, 6, 7])
+    f = FrameRef(data, toindex([3, 4, 5, 6, 7]))
     assert f.num_rows == 5
     assert len(f) == 3
     assert U.allclose(f['a1'], data['a1'].data[3:8])
@@ -111,7 +111,7 @@ def test_append2():
     assert not f.is_span_whole_column()
     assert f.num_rows == 3 * N
     new_idx = list(range(N)) + list(range(2*N, 4*N))
-    assert th.all(f.index().tousertensor() == th.tensor(new_idx, dtype=th.int64))
+    assert th.all(f._index.tousertensor() == th.tensor(new_idx, dtype=th.int64))
     assert data.num_rows == 4 * N
 
 def test_append3():
@@ -233,8 +233,8 @@ def test_row4():
 
 def test_sharing():
     data = Frame(create_test_data())
-    f1 = FrameRef(data, index=[0, 1, 2, 3])
-    f2 = FrameRef(data, index=[2, 3, 4, 5, 6])
+    f1 = FrameRef(data, index=toindex([0, 1, 2, 3]))
+    f2 = FrameRef(data, index=toindex([2, 3, 4, 5, 6]))
     # test read
     for k, v in f1.items():
         assert U.allclose(data[k].data[0:4], v)
@@ -260,8 +260,8 @@ def test_sharing():
 
 def test_slicing():
     data = Frame(create_test_data(grad=True))
-    f1 = FrameRef(data, index=slice(1, 5))
-    f2 = FrameRef(data, index=slice(3, 8))
+    f1 = FrameRef(data, index=toindex(slice(1, 5)))
+    f2 = FrameRef(data, index=toindex(slice(3, 8)))
     # test read
     for k, v in f1.items():
         assert U.allclose(data[k].data[1:5], v)
@@ -279,15 +279,15 @@ def test_slicing():
             'a2': th.ones([2, D]),
             'a3': th.ones([2, D]),
             }
-    f2_a1[0:2] = 1
+    f2_a1[toindex(slice(0,2))] = 1
     assert U.allclose(f2['a1'], f2_a1)
 
-    f1[2:4] = {
+    f1[toindex(slice(2,4))] = {
             'a1': th.zeros([2, D]),
             'a2': th.zeros([2, D]),
             'a3': th.zeros([2, D]),
             }
-    f2_a1[0:2] = 0
+    f2_a1[toindex(slice(0,2))] = 0
     assert U.allclose(f2['a1'], f2_a1)
 
 def test_add_rows():
@@ -299,11 +299,47 @@ def test_add_rows():
     ans = th.cat([x, th.zeros(3, 4)])
     assert U.allclose(f1['x'], ans)
     f1.add_rows(4)
-    f1[4:8] = {'x': th.ones(4, 4), 'y': th.ones(4, 5)}
+    f1[toindex(slice(4,8))] = {'x': th.ones(4, 4), 'y': th.ones(4, 5)}
     ans = th.cat([ans, th.ones(4, 4)])
     assert U.allclose(f1['x'], ans)
     ans = th.cat([th.zeros(4, 5), th.ones(4, 5)])
     assert U.allclose(f1['y'], ans)
+
+def test_inplace():
+    f = FrameRef(Frame(create_test_data()))
+    print(f.schemes)
+    a1addr = f['a1'].data.data_ptr()
+    a2addr = f['a2'].data.data_ptr()
+    a3addr = f['a3'].data.data_ptr()
+
+    # column updates are always out-of-place
+    f['a1'] = th.ones((N, D))
+    newa1addr = f['a1'].data.data_ptr()
+    assert a1addr != newa1addr
+    a1addr = newa1addr
+    # full row update that becomes column update
+    f[toindex(slice(0, N))] = {'a1' : th.ones((N, D))}
+    assert f['a1'].data.data_ptr() != a1addr
+
+    # row update (outplace) w/ slice
+    f[toindex(slice(1, 4))] = {'a2' : th.ones((3, D))}
+    newa2addr = f['a2'].data.data_ptr()
+    assert a2addr != newa2addr
+    a2addr = newa2addr
+    # row update (outplace) w/ list
+    f[toindex([1, 3, 5])] = {'a2' : th.ones((3, D))}
+    newa2addr = f['a2'].data.data_ptr()
+    assert a2addr != newa2addr
+    a2addr = newa2addr
+
+    # row update (inplace) w/ slice
+    f.update_data(toindex(slice(1, 4)), {'a2' : th.ones((3, D))}, True)
+    newa2addr = f['a2'].data.data_ptr()
+    assert a2addr == newa2addr
+    # row update (inplace) w/ list
+    f.update_data(toindex([1, 3, 5]), {'a2' : th.ones((3, D))}, True)
+    newa2addr = f['a2'].data.data_ptr()
+    assert a2addr == newa2addr
 
 if __name__ == '__main__':
     test_create()
@@ -319,3 +355,4 @@ if __name__ == '__main__':
     test_sharing()
     test_slicing()
     test_add_rows()
+    test_inplace()

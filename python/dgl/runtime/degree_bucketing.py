@@ -1,15 +1,14 @@
-"""Module for degree bucketing schedulers"""
+"""Module for degree bucketing schedulers."""
 from __future__ import absolute_import
 
 from .._ffi.function import _init_api
-from ..base import is_all, ALL
+from ..base import is_all
 from .. import backend as F
-from ..immutable_graph_index import ImmutableGraphIndex
-from ..udf import EdgeBatch, NodeBatch
+from ..udf import NodeBatch
 from .. import utils
 
 from . import ir
-from .ir import var as var
+from .ir import var
 
 def gen_degree_bucketing_schedule(
         graph,
@@ -52,23 +51,23 @@ def gen_degree_bucketing_schedule(
     """
     buckets = _degree_bucketing_schedule(message_ids, dst_nodes, recv_nodes)
     # generate schedule
-    unique_dst, degs, buckets, msg_ids, zero_deg_nodes = buckets
+    _, degs, buckets, msg_ids, zero_deg_nodes = buckets
     # loop over each bucket
     idx_list = []
     fd_list = []
-    for deg, vb, mid in zip(degs, buckets, msg_ids):
+    for deg, vbkt, mid in zip(degs, buckets, msg_ids):
         # create per-bkt rfunc
-        rfunc = _create_per_bkt_rfunc(graph, reduce_udf, deg, vb)
+        rfunc = _create_per_bkt_rfunc(graph, reduce_udf, deg, vbkt)
         # vars
-        vb = var.IDX(vb)
+        vbkt = var.IDX(vbkt)
         mid = var.IDX(mid)
         rfunc = var.FUNC(rfunc)
         # recv on each bucket
-        fdvb = ir.READ_ROW(var_nf, vb)
+        fdvb = ir.READ_ROW(var_nf, vbkt)
         fdmail = ir.READ_ROW(var_mf, mid)
         fdvb = ir.NODE_UDF(rfunc, fdvb, fdmail, ret=fdvb)  # reuse var
         # save for merge
-        idx_list.append(vb)
+        idx_list.append(vbkt)
         fd_list.append(fdvb)
     if zero_deg_nodes is not None:
         # NOTE: there must be at least one non-zero-deg node; otherwise,
@@ -178,15 +177,16 @@ def _process_buckets(buckets):
 
     return v, degs, dsts, msg_ids, zero_deg_nodes
 
-def _create_per_bkt_rfunc(graph, reduce_udf, deg, vb):
+def _create_per_bkt_rfunc(graph, reduce_udf, deg, vbkt):
+    """Internal function to generate the per degree bucket node UDF."""
     def _rfunc_wrapper(node_data, mail_data):
         def _reshaped_getter(key):
             msg = mail_data[key]
-            new_shape = (len(vb), deg) + F.shape(msg)[1:]
+            new_shape = (len(vbkt), deg) + F.shape(msg)[1:]
             return F.reshape(msg, new_shape)
         reshaped_mail_data = utils.LazyDict(_reshaped_getter, mail_data.keys())
-        nb = NodeBatch(graph, vb, node_data, reshaped_mail_data)
-        return reduce_udf(nb)
+        nbatch = NodeBatch(graph, vbkt, node_data, reshaped_mail_data)
+        return reduce_udf(nbatch)
     return _rfunc_wrapper
 
 _init_api("dgl.runtime.degree_bucketing")

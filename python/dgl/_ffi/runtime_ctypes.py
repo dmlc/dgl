@@ -1,5 +1,5 @@
 """Common runtime ctypes."""
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name, super-init-not-called
 from __future__ import absolute_import
 
 import ctypes

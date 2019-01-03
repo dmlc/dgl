@@ -349,6 +349,31 @@ class ImmutableGraphIndex(object):
         self.__init__(mx.nd.sparse.csr_matrix((edge_ids, (dst, src)), shape=(size, size)).astype(np.int64),
                 mx.nd.sparse.csr_matrix((edge_ids, (src, dst)), shape=(size, size)).astype(np.int64))
 
+    def from_edge_list(self, elist):
+        """Convert from an edge list.
+
+        Paramters
+        ---------
+        elist : list
+            List of (u, v) edge tuple.
+        """
+        src, dst = zip(*elist)
+        src = np.array(src)
+        dst = np.array(dst)
+        num_nodes = max(src.max(), dst.max()) + 1
+        min_nodes = min(src.min(), dst.min())
+        if min_nodes != 0:
+            raise DGLError('Invalid edge list. Nodes must start from 0.')
+        edge_ids = mx.nd.arange(0, len(src), step=1, repeat=1, dtype=np.int32)
+        src = mx.nd.array(src, dtype=np.int64)
+        dst = mx.nd.array(dst, dtype=np.int64)
+        # TODO we can't generate a csr_matrix with np.int64 directly.
+        in_csr = mx.nd.sparse.csr_matrix((edge_ids, (dst, src)),
+                                         shape=(num_nodes, num_nodes)).astype(np.int64)
+        out_csr = mx.nd.sparse.csr_matrix((edge_ids, (src, dst)),
+                                          shape=(num_nodes, num_nodes)).astype(np.int64)
+        self.__init__(in_csr, out_csr)
+
 def create_immutable_graph_index(in_csr=None, out_csr=None):
     """ Create an empty backend-specific immutable graph index.
 

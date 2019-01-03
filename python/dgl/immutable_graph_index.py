@@ -1,6 +1,11 @@
+"""Module for immutable graph index.
+
+NOTE: this is currently a temporary solution.
+"""
+# pylint: disable=abstract-method,unused-argument
+
 from __future__ import absolute_import
 
-import ctypes
 import numpy as np
 import networkx as nx
 import scipy.sparse as sp
@@ -8,7 +13,7 @@ import scipy.sparse as sp
 from ._ffi.function import _init_api
 from . import backend as F
 from . import utils
-from .base import ALL, is_all, DGLError
+from .base import DGLError
 
 class ImmutableGraphIndex(object):
     """Graph index object on immutable graphs.
@@ -27,7 +32,7 @@ class ImmutableGraphIndex(object):
 
     def add_nodes(self, num):
         """Add nodes.
-        
+
         Parameters
         ----------
         num : int
@@ -37,7 +42,7 @@ class ImmutableGraphIndex(object):
 
     def add_edge(self, u, v):
         """Add one edge.
-        
+
         Parameters
         ----------
         u : int
@@ -49,7 +54,7 @@ class ImmutableGraphIndex(object):
 
     def add_edges(self, u, v):
         """Add many edges.
-        
+
         Parameters
         ----------
         u : utils.Index
@@ -229,8 +234,8 @@ class ImmutableGraphIndex(object):
         """
         u = F.tensor([u], dtype=F.int64)
         v = F.tensor([v], dtype=F.int64)
-        _, _, id = self._sparse.edge_ids(u, v)
-        return utils.toindex(id)
+        _, _, eid = self._sparse.edge_ids(u, v)
+        return utils.toindex(eid)
 
     def edge_ids(self, u, v):
         """Return the edge ids.
@@ -282,7 +287,7 @@ class ImmutableGraphIndex(object):
         ----------
         v : utils.Index
             The node(s).
-        
+
         Returns
         -------
         utils.Index
@@ -305,7 +310,7 @@ class ImmutableGraphIndex(object):
         ----------
         v : utils.Index
             The node(s).
-        
+
         Returns
         -------
         utils.Index
@@ -321,14 +326,14 @@ class ImmutableGraphIndex(object):
         src = _CAPI_DGLExpandIds(v.todgltensor(), off.todgltensor())
         return utils.toindex(src), utils.toindex(dst), utils.toindex(edges)
 
-    def edges(self, sorted=False):
+    def edges(self, return_sorted=False):
         """Return all the edges
 
         Parameters
         ----------
-        sorted : bool
+        return_sorted : bool
             True if the returned edges are sorted by their src and dst ids.
-        
+
         Returns
         -------
         utils.Index
@@ -340,7 +345,7 @@ class ImmutableGraphIndex(object):
         """
         if "all_edges" in self._cache:
             return self._cache["all_edges"]
-        src, dst, edges = self._sparse.edges(sorted)
+        src, dst, edges = self._sparse.edges(return_sorted)
         self._cache["all_edges"] = (utils.toindex(src), utils.toindex(dst), utils.toindex(edges))
         return self._cache["all_edges"]
 
@@ -440,8 +445,8 @@ class ImmutableGraphIndex(object):
             The subgraph index.
         """
         v = v.tousertensor()
-        gi, induced_n, induced_e = self._sparse.node_subgraph(v)
-        return ImmutableSubgraphIndex(gi, self, induced_n, induced_e)
+        gidx, induced_n, induced_e = self._sparse.node_subgraph(v)
+        return ImmutableSubgraphIndex(gidx, self, induced_n, induced_e)
 
     def node_subgraphs(self, vs_arr):
         """Return the induced node subgraphs.
@@ -458,8 +463,8 @@ class ImmutableGraphIndex(object):
         """
         vs_arr = [v.tousertensor() for v in vs_arr]
         gis, induced_nodes, induced_edges = self._sparse.node_subgraphs(vs_arr)
-        return [ImmutableSubgraphIndex(gi, self, induced_n,
-            induced_e) for gi, induced_n, induced_e in zip(gis, induced_nodes, induced_edges)]
+        return [ImmutableSubgraphIndex(gidx, self, induced_n, induced_e)
+                for gidx, induced_n, induced_e in zip(gis, induced_nodes, induced_edges)]
 
     def edge_subgraph(self, e):
         """Return the induced edge subgraph.
@@ -478,6 +483,7 @@ class ImmutableGraphIndex(object):
 
     def neighbor_sampling(self, seed_ids, expand_factor, num_hops, neighbor_type,
                           node_prob, max_subgraph_size):
+        """Neighborhood sampling"""
         if len(seed_ids) == 0:
             return []
         seed_ids = [v.tousertensor() for v in seed_ids]
@@ -486,8 +492,8 @@ class ImmutableGraphIndex(object):
                                                                            node_prob,
                                                                            max_subgraph_size)
         induced_nodes = [utils.toindex(v) for v in induced_nodes]
-        return [ImmutableSubgraphIndex(gi, self, induced_n,
-            induced_e) for gi, induced_n, induced_e in zip(gis, induced_nodes, induced_edges)]
+        return [ImmutableSubgraphIndex(gidx, self, induced_n, induced_e)
+                for gidx, induced_n, induced_e in zip(gis, induced_nodes, induced_edges)]
 
     def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
@@ -511,12 +517,9 @@ class ImmutableGraphIndex(object):
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
-        def get_adj(ctx):
-            new_mat = self._sparse.adjacency_matrix(transpose)
-            return F.copy_to(new_mat, ctx)
         return self._sparse.adjacency_matrix(transpose, ctx), None
 
-    def incidence_matrix(self, type, ctx):
+    def incidence_matrix(self, typestr, ctx):
         """Return the incidence matrix representation of this graph.
 
         An incidence matrix is an n x m sparse matrix, where n is
@@ -538,7 +541,7 @@ class ImmutableGraphIndex(object):
 
         Parameters
         ----------
-        type : str
+        typestr : str
             Can be either "in", "out" or "both"
         ctx : context
             The context of returned incidence matrix.
@@ -565,8 +568,8 @@ class ImmutableGraphIndex(object):
         """
         src, dst, eid = self.edges()
         ret = nx.DiGraph()
-        for u, v, id in zip(src, dst, eid):
-            ret.add_edge(u, v, id=id)
+        for u, v, e in zip(src, dst, eid):
+            ret.add_edge(u, v, id=e)
         return ret
 
     def from_networkx(self, nx_graph):
@@ -574,7 +577,7 @@ class ImmutableGraphIndex(object):
 
         If 'id' edge attribute exists, the edge will be added follows
         the edge id order. Otherwise, order is undefined.
-        
+
         Parameters
         ----------
         nx_graph : networkx.DiGraph
@@ -582,7 +585,7 @@ class ImmutableGraphIndex(object):
         """
         if not isinstance(nx_graph, nx.Graph):
             nx_graph = (nx.MultiDiGraph(nx_graph) if self.is_multigraph()
-                    else nx.DiGraph(nx_graph))
+                        else nx.DiGraph(nx_graph))
         else:
             nx_graph = nx_graph.to_directed()
 
@@ -626,8 +629,8 @@ class ImmutableGraphIndex(object):
         ----------
         adj : scipy sparse matrix
         """
-        assert isinstance(adj, sp.csr_matrix) or isinstance(adj, sp.coo_matrix), \
-                "The input matrix has to be a SciPy sparse matrix."
+        if not isinstance(adj, (sp.csr_matrix, sp.coo_matrix)):
+            raise DGLError("The input matrix has to be a SciPy sparse matrix.")
         out_mat = adj.tocoo()
         self._sparse.from_coo_matrix(out_mat)
 
@@ -639,23 +642,7 @@ class ImmutableGraphIndex(object):
         elist : list
             List of (u, v) edge tuple.
         """
-        self.clear()
-        src, dst = zip(*elist)
-        src = np.array(src)
-        dst = np.array(dst)
-        num_nodes = max(src.max(), dst.max()) + 1
-        min_nodes = min(src.min(), dst.min())
-        if min_nodes != 0:
-            raise DGLError('Invalid edge list. Nodes must start from 0.')
-        edge_ids = mx.nd.arange(0, len(src), step=1, repeat=1, dtype=np.int32)
-        src = mx.nd.array(src, dtype=np.int64)
-        dst = mx.nd.array(dst, dtype=np.int64)
-        # TODO we can't generate a csr_matrix with np.int64 directly.
-        in_csr = mx.nd.sparse.csr_matrix((edge_ids, (dst, src)),
-                                         shape=(num_nodes, num_nodes)).astype(np.int64)
-        out_csr = mx.nd.sparse.csr_matrix((edge_ids, (src, dst)),
-                                          shape=(num_nodes, num_nodes)).astype(np.int64)
-        self.__init__(in_csr, out_csr)
+        self._sparse.from_edge_list(elist)
 
     def line_graph(self, backtracking=True):
         """Return the line graph of this graph.
@@ -778,35 +765,35 @@ def create_immutable_graph_index(graph_data=None):
         # If graph_data is None, we return an empty graph index.
         # If we can't create a graph index, we'll use the code below to handle the graph.
         return ImmutableGraphIndex(F.create_immutable_graph_index(graph_data))
-    except:
+    except Exception:  # pylint: disable=broad-except
         pass
 
     # Let's create an empty graph index first.
-    gi = ImmutableGraphIndex(F.create_immutable_graph_index())
+    gidx = ImmutableGraphIndex(F.create_immutable_graph_index())
 
     # edge list
     if isinstance(graph_data, (list, tuple)):
         try:
-            gi.from_edge_list(graph_data)
-            return gi
-        except:
+            gidx.from_edge_list(graph_data)
+            return gidx
+        except Exception:  # pylint: disable=broad-except
             raise DGLError('Graph data is not a valid edge list.')
 
     # scipy format
     if isinstance(graph_data, sp.spmatrix):
         try:
-            gi.from_scipy_sparse_matrix(graph_data)
-            return gi
-        except:
+            gidx.from_scipy_sparse_matrix(graph_data)
+            return gidx
+        except Exception:  # pylint: disable=broad-except
             raise DGLError('Graph data is not a valid scipy sparse matrix.')
 
     # networkx - any format
     try:
-        gi.from_networkx(graph_data)
-    except:
+        gidx.from_networkx(graph_data)
+    except Exception:  # pylint: disable=broad-except
         raise DGLError('Error while creating graph from input of type "%s".'
-                         % type(graph_data))
+                       % type(graph_data))
 
-    return gi
+    return gidx
 
 _init_api("dgl.immutable_graph_index")
