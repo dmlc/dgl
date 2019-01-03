@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 from collections import defaultdict
 
+import dgl
 from .base import ALL, is_all, DGLError
 from . import backend as F
 from . import init
@@ -13,7 +14,6 @@ from . import subgraph
 from . import utils
 from .view import NodeView, EdgeView
 from .udf import NodeBatch, EdgeBatch
-from .transform import reverse, line_graph
 
 __all__ = ['DGLGraph']
 
@@ -2763,14 +2763,14 @@ class DGLGraph(object):
 
         See :func:`~dgl.transform.line_graph`.
         """
-        return line_graph(self, backtracking, shared)
+        return dgl.line_graph(self, backtracking, shared)
 
     def reverse(self, share_node_attrs=True, share_edge_attrs=True):
         """Return the reverse of this graph.
 
         See :func:`~dgl.transform.reverse`.
         """
-        return reverse(self, share_node_attrs, share_edge_attrs)
+        return dgl.reverse(self, share_node_attrs, share_edge_attrs)
 
     def filter_nodes(self, predicate, nodes=ALL):
         """Return a tensor of node IDs that satisfy the given predicate.
