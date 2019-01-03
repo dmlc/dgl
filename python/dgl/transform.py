@@ -1,3 +1,4 @@
+"""Module for graph transformation methods."""
 from copy import deepcopy
 
 from .graph import DGLGraph
@@ -99,17 +100,18 @@ def reverse(g, share_node_attrs=True, share_edge_attrs=True):
         If True, the original graph and the reversed graph share memory for edge
         attributes.
     """
-    assert not isinstance(g, BatchedDGLGraph), 'reverse is not supported for a BatchedDGLGraph object'
-    rg = DGLGraph(multigraph=g.is_multigraph)
-    rg.add_nodes(g.number_of_nodes())
-    rg.add_edges(g.edges()[1], g.edges()[0])
+    assert not isinstance(g, BatchedDGLGraph), \
+        'reverse is not supported for a BatchedDGLGraph object'
+    g_reversed = DGLGraph(multigraph=g.is_multigraph)
+    g_reversed.add_nodes(g.number_of_nodes())
+    g_reversed.add_edges(g.edges()[1], g.edges()[0])
     if share_node_attrs:
-        rg._node_frame = g._node_frame
+        g_reversed._node_frame = g._node_frame
     else:
-        rg._node_frame = deepcopy(g._node_frame)
+        g_reversed._node_frame = deepcopy(g._node_frame)
     if share_edge_attrs:
-        rg._edge_frame = g._edge_frame
+        g_reversed._edge_frame = g._edge_frame
     else:
-        rg._edge_frame = deepcopy(g._edge_frame)
-    rg._readonly = g._readonly
-    return rg
+        g_reversed._edge_frame = deepcopy(g._edge_frame)
+    g_reversed._readonly = g._readonly
+    return g_reversed
