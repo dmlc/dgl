@@ -56,7 +56,8 @@ def narrow_row_set(x, start, stop, new):
     """Set a slice of the given tensor to a new value."""
     pass
 
-def sparse_to_dense(x):
+def sparse_to_numpy(x):
+    """Convert a sparse tensor to a numpy array."""
     pass
 
 def clone(x):

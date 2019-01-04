@@ -36,9 +36,8 @@ def full(shape, fill_value, dtype, ctx):
 def narrow_row_set(x, start, stop, new):
     x[start:stop] = new
 
-def sparse_to_dense(x):
-    y = nd.zeros(x.shape).as_in_context(x.context)
-    return x.copyto(y)
+def sparse_to_numpy(x):
+    return x.asscipy().todense().A
 
 def clone(x):
     return x.copy()

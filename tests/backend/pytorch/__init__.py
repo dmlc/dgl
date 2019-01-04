@@ -37,7 +37,7 @@ def narrow_row_set(x, start, stop, new):
     x[start:stop] = new
 
 def sparse_to_dense(x):
-    return x.to_dense()
+    return x.to_dense().numpy()
 
 def clone(x):
     return x.clone()

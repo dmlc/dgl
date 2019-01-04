@@ -73,21 +73,21 @@ def test_incmat():
     g.add_edge(0, 3) # 2
     g.add_edge(2, 3) # 3
     g.add_edge(1, 1) # 4
-    assert F.allclose(
-            F.sparse_to_dense(g.incidence_matrix('in')),
-            F.tensor([[0., 0., 0., 0., 0.],
+    assert np.allclose(
+            F.sparse_to_numpy(g.incidence_matrix('in')),
+            np.array([[0., 0., 0., 0., 0.],
                       [1., 0., 0., 0., 1.],
                       [0., 1., 0., 0., 0.],
                       [0., 0., 1., 1., 0.]]))
-    assert F.allclose(
-            F.sparse_to_dense(g.incidence_matrix('out')),
-            F.tensor([[1., 1., 1., 0., 0.],
+    assert np.allclose(
+            F.sparse_to_numpy(g.incidence_matrix('out')),
+            np.array([[1., 1., 1., 0., 0.],
                       [0., 0., 0., 0., 1.],
                       [0., 0., 0., 1., 0.],
                       [0., 0., 0., 0., 0.]]))
-    assert F.allclose(
-            F.sparse_to_dense(g.incidence_matrix('both')),
-            F.tensor([[-1., -1., -1., 0., 0.],
+    assert np.allclose(
+            F.sparse_to_numpy(g.incidence_matrix('both')),
+            np.array([[-1., -1., -1., 0., 0.],
                       [1., 0., 0., 0., 0.],
                       [0., 1., 0., -1., 0.],
                       [0., 0., 1., 1., 0.]]))
