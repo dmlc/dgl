@@ -22,8 +22,8 @@ class ImmutableGraphIndex(object):
     ----------
     backend_csr: a csr array provided by the backend framework.
     """
-    def __init__(self):
-        self._handle = None
+    def __init__(self, handle):
+        self._handle = handle
         self._num_nodes = None
         self._num_edges = None
         self._cache = {}
@@ -446,7 +446,7 @@ class ImmutableGraphIndex(object):
         v_array = v.todgltensor()
         rst = _CAPI_DGLGraphVertexSubgraph(self._handle, v_array)
         induced_edges = utils.toindex(rst(2))
-        return SubgraphIndex(rst(0), self, v, induced_edges)
+        return ImmutableSubgraphIndex(rst(0), self, v, induced_edges)
 
     def node_subgraphs(self, vs_arr):
         """Return the induced node subgraphs.
@@ -461,8 +461,8 @@ class ImmutableGraphIndex(object):
         a vector of ImmutableSubgraphIndex
             The subgraph index.
         """
-        #TODO
-        pass
+        # TODO(zhengda) we should parallelize the computation here in CAPI.
+        return [self.node_subgraph(v) for v in vs_arr]
 
     def edge_subgraph(self, e):
         """Return the induced edge subgraph.
@@ -632,13 +632,12 @@ class ImmutableGraphIndex(object):
         """
         assert isinstance(adj, sp.csr_matrix) or isinstance(adj, sp.coo_matrix), \
                 "The input matrix has to be a SciPy sparse matrix."
-        assert adj.shape[0] == adj.shape[1], \
-                "We only support symmetric matrices"
+        num_nodes = max(adj.shape[0], adj.shape[1])
         out_mat = adj.tocoo()
         src_ids = utils.toindex(out_mat.row)
         dst_ids = utils.toindex(out_mat.col)
         edge_ids = utils.toindex(F.arange(0, len(out_mat.row)))
-        self.init(src_ids, dst_ids, edge_ids, adj.shape[0])
+        self.init(src_ids, dst_ids, edge_ids, num_nodes)
 
     def from_edge_list(self, elist):
         """Convert from an edge list.
@@ -688,8 +687,8 @@ class ImmutableSubgraphIndex(ImmutableGraphIndex):
     induced_edges : a lambda function that returns a tensor
         The parent edge ids in this subgraph.
     """
-    def __init__(self, backend_sparse, parent, induced_nodes, induced_edges):
-        super(ImmutableSubgraphIndex, self).__init__(backend_sparse)
+    def __init__(self, handle, parent, induced_nodes, induced_edges):
+        super(ImmutableSubgraphIndex, self).__init__(handle)
 
         self._parent = parent
         self._induced_nodes = induced_nodes
@@ -774,7 +773,7 @@ def create_immutable_graph_index(graph_data=None):
             "The selected backend doesn't support read-only graph!"
 
     # Let's create an empty graph index first.
-    gi = ImmutableGraphIndex()
+    gi = ImmutableGraphIndex(None)
 
     # edge list
     if isinstance(graph_data, (list, tuple)):

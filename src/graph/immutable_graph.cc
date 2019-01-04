@@ -446,16 +446,16 @@ ImmutableGraph::EdgeArray ImmutableGraph::Edges(bool sorted) const {
 ImmutableSubgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
   ImmutableSubgraph subg;
   std::pair<std::shared_ptr<csr>, IdArray> ret;
-  // We prefer to generate a subgraph for in-csr first.
-  if (in_csr_) {
+  // We prefer to generate a subgraph for out-csr first.
+  if (out_csr_) {
+    ret = out_csr_->VertexSubgraph(vids);
+    subg.graph = ImmutableGraph(nullptr, ret.first, IsMultigraph());
+  } else {
+    assert(in_csr_);
     ret = in_csr_->VertexSubgraph(vids);
     // When we generate a subgraph, it may be used by only accessing in-edges or out-edges.
     // We don't need to generate both.
     subg.graph = ImmutableGraph(ret.first, nullptr, IsMultigraph());
-  } else {
-    assert(out_csr_);
-    ret = out_csr_->VertexSubgraph(vids);
-    subg.graph = ImmutableGraph(nullptr, ret.first, IsMultigraph());
   }
   subg.induced_vertices = vids;
   subg.induced_edges = ret.second;

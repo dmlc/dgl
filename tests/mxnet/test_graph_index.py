@@ -7,6 +7,12 @@ import dgl
 from dgl.graph_index import map_to_subgraph_nid, GraphIndex, create_graph_index
 from dgl import utils
 
+def generate_from_edgelist():
+    edges = [[2, 3], [2, 5], [3, 0], [6, 10], [10, 3], [10, 15]]
+    g = create_graph_index(edges)
+    ig = create_graph_index(edges, readonly=True)
+    return g, ig
+
 def generate_rand_graph(n):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
     g = create_graph_index(arr)
@@ -19,6 +25,8 @@ def check_graph_equal(g1, g2):
     assert mx.nd.sum(adj1 - adj2).asnumpy() == 0
 
 def test_graph_gen():
+    g, ig = generate_from_edgelist()
+    check_graph_equal(g, ig)
     g, ig = generate_rand_graph(10)
     check_graph_equal(g, ig)
 
@@ -28,6 +36,9 @@ def check_basics(g, ig):
 
     edges = g.edges()
     iedges = ig.edges()
+    assert np.all(edges[0].tousertensor().asnumpy() == iedges[0].tousertensor().asnumpy())
+    assert np.all(edges[1].tousertensor().asnumpy() == iedges[1].tousertensor().asnumpy())
+    assert np.all(edges[2].tousertensor().asnumpy() == iedges[2].tousertensor().asnumpy())
 
     for i in range(g.number_of_nodes()):
         assert g.has_node(i) == ig.has_node(i)
@@ -72,6 +83,8 @@ def check_basics(g, ig):
 
 
 def test_basics():
+    g, ig = generate_from_edgelist()
+    check_basics(g, ig)
     g, ig = generate_rand_graph(100)
     check_basics(g, ig)
 
@@ -84,6 +97,7 @@ def test_node_subgraph():
     randv = np.unique(randv1)
     subg = g.node_subgraph(utils.toindex(randv))
     subig = ig.node_subgraph(utils.toindex(randv))
+    check_basics(subg, subig)
     check_graph_equal(subg, subig)
     assert mx.nd.sum(map_to_subgraph_nid(subg, utils.toindex(randv1[0:10])).tousertensor()
             == map_to_subgraph_nid(subig, utils.toindex(randv1[0:10])).tousertensor()) == 10
@@ -97,6 +111,7 @@ def test_node_subgraph():
         subgs.append(g.node_subgraph(utils.toindex(randv)))
     subigs= ig.node_subgraphs(randvs)
     for i in range(4):
+        check_basics(subg, subig)
         check_graph_equal(subgs[i], subigs[i])
 
 def test_create_graph():
@@ -110,6 +125,7 @@ def test_create_graph():
     rows = [1, 0, 0]
     cols = [2, 1, 2]
     mat = sp.sparse.coo_matrix((data, (rows, cols)))
+    g = dgl.DGLGraph(mat, readonly=False)
     ig = dgl.DGLGraph(mat, readonly=True)
     for edge in elist:
         assert g.edge_id(edge[0], edge[1]) == ig.edge_id(edge[0], edge[1])
