@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 from collections import defaultdict
 
+import dgl
 from .base import ALL, is_all, DGLError
 from . import backend as F
 from . import init
@@ -2760,22 +2761,16 @@ class DGLGraph(object):
     def line_graph(self, backtracking=True, shared=False):
         """Return the line graph of this graph.
 
-        Parameters
-        ----------
-        backtracking : bool, optional
-            Whether the returned line graph is backtracking.
-
-        shared : bool, optional
-            Whether the returned line graph shares representations with `self`.
-
-        Returns
-        -------
-        DGLGraph
-            The line graph of this graph.
+        See :func:`~dgl.transform.line_graph`.
         """
-        graph_data = self._graph.line_graph(backtracking)
-        node_frame = self._edge_frame if shared else None
-        return DGLGraph(graph_data, node_frame)
+        return dgl.line_graph(self, backtracking, shared)
+
+    def reverse(self, share_ndata=False, share_edata=False):
+        """Return the reverse of this graph.
+
+        See :func:`~dgl.transform.reverse`.
+        """
+        return dgl.reverse(self, share_ndata, share_edata)
 
     def filter_nodes(self, predicate, nodes=ALL):
         """Return a tensor of node IDs that satisfy the given predicate.
