@@ -211,4 +211,5 @@ sphinx_gallery_conf = {
     'gallery_dirs' : gallery_dirs,
     'within_subsection_order' : FileNameSortKey,
     'filename_pattern' : '.py',
+    'download_all_examples' : False,
 }
