@@ -69,10 +69,11 @@ class ImmutableGraph {
     }
     std::shared_ptr<csr> Transpose() const;
     std::pair<std::shared_ptr<csr>, IdArray> VertexSubgraph(IdArray vids) const;
-    static std::shared_ptr<csr> from_edges(std::vector<edge> &edges, int sort_on);
+    static std::shared_ptr<csr> from_edges(std::vector<edge> &edges, int sort_on, int64_t num_nodes);
   };
 
-  ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, bool multigraph = false);
+  ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
+                 bool multigraph = false);
 
   ImmutableGraph(std::shared_ptr<csr> in_csr, std::shared_ptr<csr> out_csr,
       bool multigraph = false) : is_multigraph_(multigraph) {
@@ -212,7 +213,9 @@ class ImmutableGraph {
    * \return the id arrays of the two endpoints of the edges.
    */
   EdgeArray OutEdges(dgl_id_t vid) const {
-    return this->GetOutCSR()->GetEdges(vid);
+    auto ret = this->GetOutCSR()->GetEdges(vid);
+    // We should reverse the source and destination in the edge array.
+    return ImmutableGraph::EdgeArray{ret.dst, ret.src, ret.id};
   }
 
   /*!
@@ -221,7 +224,8 @@ class ImmutableGraph {
    * \return the id arrays of the two endpoints of the edges.
    */
   EdgeArray OutEdges(IdArray vids) const {
-    return this->GetOutCSR()->GetEdges(vids);
+    auto ret = this->GetOutCSR()->GetEdges(vids);
+    return ImmutableGraph::EdgeArray{ret.dst, ret.src, ret.id};
   }
 
   /*!

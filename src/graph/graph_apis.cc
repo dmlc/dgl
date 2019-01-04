@@ -392,7 +392,8 @@ DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphCreate")
     const IdArray dst_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     const IdArray edge_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
     bool multigraph = static_cast<bool>(args[3]);
-    GraphHandle ghandle = new ImmutableGraph(src_ids, dst_ids, edge_ids, multigraph);
+    int64_t num_nodes = static_cast<int64_t>(args[4]);
+    GraphHandle ghandle = new ImmutableGraph(src_ids, dst_ids, edge_ids, num_nodes, multigraph);
     *rv = ghandle;
   });
 

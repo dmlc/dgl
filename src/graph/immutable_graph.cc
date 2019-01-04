@@ -173,7 +173,7 @@ std::pair<std::shared_ptr<ImmutableGraph::csr>, IdArray> ImmutableGraph::csr::Ve
 }
 
 std::shared_ptr<ImmutableGraph::csr> ImmutableGraph::csr::from_edges(std::vector<edge> &edges,
-                                                                     int sort_on) {
+                                                                     int sort_on, int64_t num_nodes) {
   assert(sort_on == 0 || sort_on == 1);
   int other_end = sort_on == 1 ? 0 : 1;
   // TODO(zhengda) we should sort in parallel.
@@ -195,23 +195,18 @@ std::shared_ptr<ImmutableGraph::csr> ImmutableGraph::csr::from_edges(std::vector
   std::shared_ptr<csr> t = std::make_shared<csr>(0, 0);
   t->indices.resize(edges.size());
   t->edge_ids.resize(edges.size());
-  t->indptr.push_back(0);
   for (size_t i = 0; i < edges.size(); i++) {
     t->indices[i] = edges[i].end_points[other_end];
+    assert(t->indices[i] < num_nodes);
     t->edge_ids[i] = edges[i].edge_id;
     dgl_id_t vid = edges[i].end_points[sort_on];
-    int64_t off;
-    if (t->indptr.empty())
-      off = 0;
-    else
-      off = t->indptr.back();
-    while (vid > 0 && t->indptr.size() < static_cast<size_t>(vid - 1))
-      t->indptr.push_back(off);
-    if (t->indptr.size() < vid)
+    assert(vid < num_nodes);
+    while (vid > 0 && t->indptr.size() <= static_cast<size_t>(vid))
       t->indptr.push_back(i);
     assert(t->indptr.size() == vid + 1);
   }
-  t->indptr.push_back(edges.size());
+  while (t->indptr.size() < num_nodes + 1)
+    t->indptr.push_back(edges.size());
   return t;
 }
 
@@ -228,10 +223,10 @@ std::shared_ptr<ImmutableGraph::csr> ImmutableGraph::csr::Transpose() const {
       edges[indptr[i] + j] = e;
     }
   }
-  return from_edges(edges, 1);
+  return from_edges(edges, 1, NumVertices());
 }
 
-ImmutableGraph::ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids,
+ImmutableGraph::ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
                                bool multigraph) : is_multigraph_(multigraph) {
   int64_t len = src_ids->shape[0];
   assert(len == dst_ids->shape[0]);
@@ -247,8 +242,8 @@ ImmutableGraph::ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_id
     e.edge_id = edge_data[i];
     edges[i] = e;
   }
-  in_csr_ = csr::from_edges(edges, 1);
-  out_csr_ = csr::from_edges(edges, 0);
+  in_csr_ = csr::from_edges(edges, 1, num_nodes);
+  out_csr_ = csr::from_edges(edges, 0, num_nodes);
 }
 
 BoolArray ImmutableGraph::HasVertices(IdArray vids) const {
@@ -450,8 +445,11 @@ ImmutableGraph::EdgeArray ImmutableGraph::Edges(bool sorted) const {
 ImmutableSubgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
   ImmutableSubgraph subg;
   std::pair<std::shared_ptr<csr>, IdArray> ret;
+  // We prefer to generate a subgraph for in-csr first.
   if (in_csr_) {
     ret = in_csr_->VertexSubgraph(vids);
+    // When we generate a subgraph, it may be used by only accessing in-edges or out-edges.
+    // We don't need to generate both.
     subg.graph = ImmutableGraph(ret.first, nullptr, IsMultigraph());
   } else {
     assert(out_csr_);

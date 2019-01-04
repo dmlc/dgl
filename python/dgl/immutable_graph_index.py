@@ -22,13 +22,22 @@ class ImmutableGraphIndex(object):
     ----------
     backend_csr: a csr array provided by the backend framework.
     """
-    def __init__(self, backend_sparse):
-        self._sparse = backend_sparse
+    def __init__(self):
+        self._handle = None
         self._num_nodes = None
         self._num_edges = None
-        self._in_deg = None
-        self._out_deg = None
         self._cache = {}
+
+    def init(self, src_ids, dst_ids, edge_ids, num_nodes):
+        self._handle = _CAPI_DGLGraphCreate(src_ids.todgltensor(), dst_ids.todgltensor(),
+                                            edge_ids.todgltensor(), False, num_nodes)
+        self._num_nodes = num_nodes
+        self._num_edges = None
+
+    def __del__(self):
+        """Free this graph index object."""
+        if self._handle is not None:
+            _CAPI_DGLGraphFree(self._handle)
 
     def add_nodes(self, num):
         """Add nodes.
@@ -76,8 +85,7 @@ class ImmutableGraphIndex(object):
         bool
             True if it is a multigraph, False otherwise.
         """
-        # Immutable graph doesn't support multi-edge.
-        return False
+        return bool(_CAPI_DGLGraphIsMultigraph(self._handle))
 
     def is_readonly(self):
         """Indicate whether the graph index is read-only.
@@ -98,7 +106,7 @@ class ImmutableGraphIndex(object):
             The number of nodes
         """
         if self._num_nodes is None:
-            self._num_nodes = self._sparse.number_of_nodes()
+            self._num_nodes = _CAPI_DGLGraphNumVertices(self._handle)
         return self._num_nodes
 
     def number_of_edges(self):
@@ -110,7 +118,7 @@ class ImmutableGraphIndex(object):
             The number of edges
         """
         if self._num_edges is None:
-            self._num_edges = self._sparse.number_of_edges()
+            self._num_edges = _CAPI_DGLGraphNumEdges(self._handle)
         return self._num_edges
 
     def has_node(self, vid):
@@ -126,7 +134,7 @@ class ImmutableGraphIndex(object):
         bool
             True if the node exists
         """
-        return vid < self.number_of_nodes()
+        return bool(_CAPI_DGLGraphHasVertex(self._handle, vid))
 
     def has_nodes(self, vids):
         """Return true if the nodes exist.
@@ -141,8 +149,8 @@ class ImmutableGraphIndex(object):
         utils.Index
             0-1 array indicating existence
         """
-        vid_array = vids.tousertensor()
-        return utils.toindex(vid_array < self.number_of_nodes())
+        vid_array = vids.todgltensor()
+        return utils.toindex(_CAPI_DGLGraphHasVertices(self._handle, vid_array))
 
     def has_edge_between(self, u, v):
         """Return true if the edge exists.
@@ -159,9 +167,7 @@ class ImmutableGraphIndex(object):
         bool
             True if the edge exists
         """
-        u = F.tensor([u], dtype=F.int64)
-        v = F.tensor([v], dtype=F.int64)
-        return self._sparse.has_edges(u, v).asnumpy()[0]
+        return bool(_CAPI_DGLGraphHasEdgeBetween(self._handle, u, v))
 
     def has_edges_between(self, u, v):
         """Return true if the edge exists.
@@ -178,8 +184,9 @@ class ImmutableGraphIndex(object):
         utils.Index
             0-1 array indicating existence
         """
-        ret = self._sparse.has_edges(u.tousertensor(), v.tousertensor())
-        return utils.toindex(ret)
+        u_array = u.todgltensor()
+        v_array = v.todgltensor()
+        return utils.toindex(_CAPI_DGLGraphHasEdgesBetween(self._handle, u_array, v_array))
 
     def predecessors(self, v, radius=1):
         """Return the predecessors of the node.
@@ -196,8 +203,7 @@ class ImmutableGraphIndex(object):
         utils.Index
             Array of predecessors
         """
-        pred = self._sparse.predecessors(v, radius)
-        return utils.toindex(pred)
+        return utils.toindex(_CAPI_DGLGraphPredecessors(self._handle, v, radius))
 
     def successors(self, v, radius=1):
         """Return the successors of the node.
@@ -214,8 +220,7 @@ class ImmutableGraphIndex(object):
         utils.Index
             Array of successors
         """
-        succ = self._sparse.successors(v, radius)
-        return utils.toindex(succ)
+        return utils.toindex(_CAPI_DGLGraphSuccessors(self._handle, v, radius))
 
     def edge_id(self, u, v):
         """Return the id of the edge.
@@ -232,10 +237,7 @@ class ImmutableGraphIndex(object):
         int
             The edge id.
         """
-        u = F.tensor([u], dtype=F.int64)
-        v = F.tensor([v], dtype=F.int64)
-        _, _, eid = self._sparse.edge_ids(u, v)
-        return utils.toindex(eid)
+        return utils.toindex(_CAPI_DGLGraphEdgeId(self._handle, u, v))
 
     def edge_ids(self, u, v):
         """Return the edge ids.
@@ -256,10 +258,15 @@ class ImmutableGraphIndex(object):
         utils.Index
             The edge ids.
         """
-        u = u.tousertensor()
-        v = v.tousertensor()
-        u, v, ids = self._sparse.edge_ids(u, v)
-        return utils.toindex(u), utils.toindex(v), utils.toindex(ids)
+        u_array = u.todgltensor()
+        v_array = v.todgltensor()
+        edge_array = _CAPI_DGLGraphEdgeIds(self._handle, u_array, v_array)
+
+        src = utils.toindex(edge_array(0))
+        dst = utils.toindex(edge_array(1))
+        eid = utils.toindex(edge_array(2))
+
+        return src, dst, eid
 
     def find_edges(self, eid):
         """Return a triplet of arrays that contains the edge IDs.
@@ -297,11 +304,15 @@ class ImmutableGraphIndex(object):
         utils.Index
             The edge ids.
         """
-        dst = v.tousertensor()
-        indptr, src, edges = self._sparse.in_edges(dst)
-        off = utils.toindex(indptr)
-        dst = _CAPI_DGLExpandIds(v.todgltensor(), off.todgltensor())
-        return utils.toindex(src), utils.toindex(dst), utils.toindex(edges)
+        if len(v) == 1:
+            edge_array = _CAPI_DGLGraphInEdges_1(self._handle, v[0])
+        else:
+            v_array = v.todgltensor()
+            edge_array = _CAPI_DGLGraphInEdges_2(self._handle, v_array)
+        src = utils.toindex(edge_array(0))
+        dst = utils.toindex(edge_array(1))
+        eid = utils.toindex(edge_array(2))
+        return src, dst, eid
 
     def out_edges(self, v):
         """Return the out edges of the node(s).
@@ -320,13 +331,18 @@ class ImmutableGraphIndex(object):
         utils.Index
             The edge ids.
         """
-        src = v.tousertensor()
-        indptr, dst, edges = self._sparse.out_edges(src)
-        off = utils.toindex(indptr)
-        src = _CAPI_DGLExpandIds(v.todgltensor(), off.todgltensor())
-        return utils.toindex(src), utils.toindex(dst), utils.toindex(edges)
+        if len(v) == 1:
+            edge_array = _CAPI_DGLGraphOutEdges_1(self._handle, v[0])
+        else:
+            v_array = v.todgltensor()
+            edge_array = _CAPI_DGLGraphOutEdges_2(self._handle, v_array)
+        src = utils.toindex(edge_array(0))
+        dst = utils.toindex(edge_array(1))
+        eid = utils.toindex(edge_array(2))
+        return src, dst, eid
 
-    def edges(self, return_sorted=False):
+    @utils.cached_member(cache='_cache', prefix='edges')
+    def edges(self, sorted=False):
         """Return all the edges
 
         Parameters
@@ -343,21 +359,14 @@ class ImmutableGraphIndex(object):
         utils.Index
             The edge ids.
         """
-        if "all_edges" in self._cache:
-            return self._cache["all_edges"]
-        src, dst, edges = self._sparse.edges(return_sorted)
-        self._cache["all_edges"] = (utils.toindex(src), utils.toindex(dst), utils.toindex(edges))
-        return self._cache["all_edges"]
-
-    def _get_in_degree(self):
-        if 'in_deg' not in self._cache:
-            self._cache['in_deg'] = self._sparse.get_in_degree()
-        return self._cache['in_deg']
-
-    def _get_out_degree(self):
-        if 'out_deg' not in self._cache:
-            self._cache['out_deg'] = self._sparse.get_out_degree()
-        return self._cache['out_deg']
+        key = 'edges_s%d' % sorted
+        if key not in self._cache:
+            edge_array = _CAPI_DGLGraphEdges(self._handle, sorted)
+            src = utils.toindex(edge_array(0))
+            dst = utils.toindex(edge_array(1))
+            eid = utils.toindex(edge_array(2))
+            self._cache[key] = (src, dst, eid)
+        return self._cache[key]
 
     def in_degree(self, v):
         """Return the in degree of the node.
@@ -372,8 +381,7 @@ class ImmutableGraphIndex(object):
         int
             The in degree.
         """
-        deg = self._get_in_degree()
-        return deg[v]
+        return _CAPI_DGLGraphInDegree(self._handle, v)
 
     def in_degrees(self, v):
         """Return the in degrees of the nodes.
@@ -388,12 +396,8 @@ class ImmutableGraphIndex(object):
         int
             The in degree array.
         """
-        deg = self._get_in_degree()
-        if v.is_slice(0, self.number_of_nodes()):
-            return utils.toindex(deg)
-        else:
-            v_array = v.tousertensor()
-            return utils.toindex(F.gather_row(deg, v_array))
+        v_array = v.todgltensor()
+        return utils.toindex(_CAPI_DGLGraphInDegrees(self._handle, v_array))
 
     def out_degree(self, v):
         """Return the out degree of the node.
@@ -408,8 +412,7 @@ class ImmutableGraphIndex(object):
         int
             The out degree.
         """
-        deg = self._get_out_degree()
-        return deg[v]
+        return _CAPI_DGLGraphOutDegree(self._handle, v)
 
     def out_degrees(self, v):
         """Return the out degrees of the nodes.
@@ -424,12 +427,8 @@ class ImmutableGraphIndex(object):
         int
             The out degree array.
         """
-        deg = self._get_out_degree()
-        if v.is_slice(0, self.number_of_nodes()):
-            return utils.toindex(deg)
-        else:
-            v_array = v.tousertensor()
-            return utils.toindex(F.gather_row(deg, v_array))
+        v_array = v.todgltensor()
+        return utils.toindex(_CAPI_DGLGraphOutDegrees(self._handle, v_array))
 
     def node_subgraph(self, v):
         """Return the induced node subgraph.
@@ -444,9 +443,10 @@ class ImmutableGraphIndex(object):
         ImmutableSubgraphIndex
             The subgraph index.
         """
-        v = v.tousertensor()
-        gidx, induced_n, induced_e = self._sparse.node_subgraph(v)
-        return ImmutableSubgraphIndex(gidx, self, induced_n, induced_e)
+        v_array = v.todgltensor()
+        rst = _CAPI_DGLGraphVertexSubgraph(self._handle, v_array)
+        induced_edges = utils.toindex(rst(2))
+        return SubgraphIndex(rst(0), self, v, induced_edges)
 
     def node_subgraphs(self, vs_arr):
         """Return the induced node subgraphs.
@@ -461,10 +461,8 @@ class ImmutableGraphIndex(object):
         a vector of ImmutableSubgraphIndex
             The subgraph index.
         """
-        vs_arr = [v.tousertensor() for v in vs_arr]
-        gis, induced_nodes, induced_edges = self._sparse.node_subgraphs(vs_arr)
-        return [ImmutableSubgraphIndex(gidx, self, induced_n, induced_e)
-                for gidx, induced_n, induced_e in zip(gis, induced_nodes, induced_edges)]
+        #TODO
+        pass
 
     def edge_subgraph(self, e):
         """Return the induced edge subgraph.
@@ -584,8 +582,7 @@ class ImmutableGraphIndex(object):
             The nx graph
         """
         if not isinstance(nx_graph, nx.Graph):
-            nx_graph = (nx.MultiDiGraph(nx_graph) if self.is_multigraph()
-                        else nx.DiGraph(nx_graph))
+            nx_graph = nx.DiGraph(nx_graph)
         else:
             if not nx_graph.is_directed():
                 # to_directed creates a deep copy of the networkx graph even if
@@ -614,14 +611,10 @@ class ImmutableGraphIndex(object):
 
         num_nodes = nx_graph.number_of_nodes()
         # We store edge Ids as an edge attribute.
-        eid = F.tensor(eid, dtype=np.int32)
-        src = F.tensor(src, dtype=np.int64)
-        dst = F.tensor(dst, dtype=np.int64)
-        out_csr, _ = F.sparse_matrix(eid, ('coo', (src, dst)), (num_nodes, num_nodes))
-        in_csr, _ = F.sparse_matrix(eid, ('coo', (dst, src)), (num_nodes, num_nodes))
-        out_csr = out_csr.astype(np.int64)
-        in_csr = in_csr.astype(np.int64)
-        self._sparse = F.create_immutable_graph_index(in_csr, out_csr)
+        eid = utils.toindex(eid)
+        src = utils.toindex(src)
+        dst = utils.toindex(dst)
+        self.init(src_ids, dst_ids, edge_ids, num_nodes)
 
     def from_scipy_sparse_matrix(self, adj):
         """Convert from scipy sparse matrix.
@@ -632,10 +625,15 @@ class ImmutableGraphIndex(object):
         ----------
         adj : scipy sparse matrix
         """
-        if not isinstance(adj, (sp.csr_matrix, sp.coo_matrix)):
-            raise DGLError("The input matrix has to be a SciPy sparse matrix.")
+        assert isinstance(adj, sp.csr_matrix) or isinstance(adj, sp.coo_matrix), \
+                "The input matrix has to be a SciPy sparse matrix."
+        assert adj.shape[0] == adj.shape[1], \
+                "We only support symmetric matrices"
         out_mat = adj.tocoo()
-        self._sparse.from_coo_matrix(out_mat)
+        src_ids = utils.toindex(out_mat.row)
+        dst_ids = utils.toindex(out_mat.col)
+        edge_ids = utils.toindex(F.arange(0, len(out_mat.row)))
+        self.init(src_ids, dst_ids, edge_ids, adj.shape[0])
 
     def from_edge_list(self, elist):
         """Convert from an edge list.
@@ -645,7 +643,15 @@ class ImmutableGraphIndex(object):
         elist : list
             List of (u, v) edge tuple.
         """
-        self._sparse.from_edge_list(elist)
+        src, dst = zip(*elist)
+        src = np.array(src)
+        dst = np.array(dst)
+        src_ids = utils.toindex(src)
+        dst_ids = utils.toindex(dst)
+        num_nodes = max(src.max(), dst.max()) + 1
+        edge_ids = utils.toindex(F.arange(0, len(src)))
+        # TODO we need to detect multigraph automatically.
+        self.init(src_ids, dst_ids, edge_ids, num_nodes)
 
     def line_graph(self, backtracking=True):
         """Return the line graph of this graph.
@@ -762,25 +768,16 @@ def create_immutable_graph_index(graph_data=None):
     assert F.create_immutable_graph_index is not None, \
             "The selected backend doesn't support read-only graph!"
 
-    try:
-        # Let's try using the graph data to generate an immutable graph index.
-        # If we are successful, we can return the immutable graph index immediately.
-        # If graph_data is None, we return an empty graph index.
-        # If we can't create a graph index, we'll use the code below to handle the graph.
-        return ImmutableGraphIndex(F.create_immutable_graph_index(graph_data))
-    except Exception:  # pylint: disable=broad-except
-        pass
-
     # Let's create an empty graph index first.
-    gidx = ImmutableGraphIndex(F.create_immutable_graph_index())
+    gi = ImmutableGraphIndex()
 
     # edge list
     if isinstance(graph_data, (list, tuple)):
         try:
-            gidx.from_edge_list(graph_data)
-            return gidx
+            gi.from_edge_list(graph_data)
+            return gi
         except Exception:  # pylint: disable=broad-except
-            raise DGLError('Graph data is not a valid edge list.')
+            raise DGLError('Graph data is not a valid edge list for immutable_graph_index.')
 
     # scipy format
     if isinstance(graph_data, sp.spmatrix):
