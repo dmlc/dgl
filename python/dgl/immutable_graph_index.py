@@ -509,13 +509,18 @@ class ImmutableGraphIndex(object):
 
         Returns
         -------
-        utils.CtxCachedObject
-            An object that returns tensor given context.
+        SparseTensor
+            The adjacency matrix.
         utils.Index
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
-        return self._sparse.adjacency_matrix(transpose, ctx), None
+        rst = _CAPI_DGLGraphGetCSR(self._handle, transpose)
+        indptr = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
+        indices = F.copy_to(utils.toindex(rst(1)).tousertensor(), ctx)
+        dat = F.ones(indices.shape, dtype=F.float32, ctx=ctx)
+        return F.sparse_matrix(dat, ('csr', indices, indptr),
+                               (self.number_of_nodes(), self.number_of_nodes()))
 
     def incidence_matrix(self, typestr, ctx):
         """Return the incidence matrix representation of this graph.

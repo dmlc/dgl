@@ -35,6 +35,24 @@ PackedFunc ConvertEdgeArrayToPackedFunc(const EdgeArray& ea) {
   return PackedFunc(body);
 }
 
+// Convert CSRArray structure to PackedFunc.
+template<class CSRArray>
+PackedFunc ConvertCSRArrayToPackedFunc(const CSRArray& ea) {
+  auto body = [ea] (DGLArgs args, DGLRetValue* rv) {
+      const int which = args[0];
+      if (which == 0) {
+        *rv = std::move(ea.indptr);
+      } else if (which == 1) {
+        *rv = std::move(ea.indices);
+      } else if (which == 2) {
+        *rv = std::move(ea.id);
+      } else {
+        LOG(FATAL) << "invalid choice";
+      }
+    };
+  return PackedFunc(body);
+}
+
 // Convert Subgraph structure to PackedFunc.
 PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
   auto body = [sg] (DGLArgs args, DGLRetValue* rv) {
@@ -589,6 +607,20 @@ DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphEdgeSubgraph")
     const ImmutableGraph *gptr = static_cast<ImmutableGraph*>(ghandle);
     const IdArray eids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     *rv = ConvertSubgraphToPackedFunc(gptr->EdgeSubgraph(eids));
+  });
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphGetCSR")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    bool transpose = args[1];
+    const ImmutableGraph *gptr = static_cast<ImmutableGraph*>(ghandle);
+    ImmutableGraph::CSRArray csr;
+    if (transpose) {
+      csr = gptr->GetOutCSRArray();
+    } else {
+      csr = gptr->GetInCSRArray();
+    }
+    *rv = ConvertCSRArrayToPackedFunc(csr);
   });
 
 }  // namespace dgl

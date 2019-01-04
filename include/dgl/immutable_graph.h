@@ -28,6 +28,10 @@ class ImmutableGraph {
     IdArray src, dst, id;
   } EdgeArray;
 
+  typedef struct {
+    IdArray indptr, indices, id;
+  } CSRArray;
+
   struct edge {
     dgl_id_t end_points[2];
     dgl_id_t edge_id;
@@ -365,6 +369,9 @@ class ImmutableGraph {
     return std::vector<dgl_id_t>(in_csr_->edge_ids.begin() + in_csr_->indptr[vid],
                                  in_csr_->edge_ids.begin() + in_csr_->indptr[vid + 1]);
   }
+
+  CSRArray GetInCSRArray() const;
+  CSRArray GetOutCSRArray() const;
 
  protected:
   std::pair<const dgl_id_t *, const dgl_id_t *> GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;

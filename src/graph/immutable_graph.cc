@@ -207,6 +207,7 @@ std::shared_ptr<ImmutableGraph::csr> ImmutableGraph::csr::from_edges(std::vector
   }
   while (t->indptr.size() < num_nodes + 1)
     t->indptr.push_back(edges.size());
+  assert(t->indptr.size() == num_nodes + 1);
   return t;
 }
 
@@ -463,6 +464,40 @@ ImmutableSubgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
 
 ImmutableSubgraph ImmutableGraph::EdgeSubgraph(IdArray eids) const {
   return ImmutableSubgraph();
+}
+
+ImmutableGraph::CSRArray ImmutableGraph::GetInCSRArray() const {
+  auto in_csr = GetInCSR();
+  IdArray indptr = IdArray::Empty({static_cast<int64_t>(in_csr->indptr.size())},
+                                  DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  IdArray indices = IdArray::Empty({static_cast<int64_t>(in_csr->NumEdges())},
+                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  IdArray eids = IdArray::Empty({static_cast<int64_t>(in_csr->NumEdges())},
+                                DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  int64_t *indptr_data = static_cast<int64_t*>(indptr->data);
+  dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices->data);
+  dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
+  std::copy(in_csr->indptr.begin(), in_csr->indptr.end(), indptr_data);
+  std::copy(in_csr->indices.begin(), in_csr->indices.end(), indices_data);
+  std::copy(in_csr->edge_ids.begin(), in_csr->edge_ids.end(), eid_data);
+  return CSRArray{indptr, indices, eids};
+}
+
+ImmutableGraph::CSRArray ImmutableGraph::GetOutCSRArray() const {
+  auto out_csr = GetOutCSR();
+  IdArray indptr = IdArray::Empty({static_cast<int64_t>(out_csr->indptr.size())},
+                                  DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  IdArray indices = IdArray::Empty({static_cast<int64_t>(out_csr->NumEdges())},
+                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  IdArray eids = IdArray::Empty({static_cast<int64_t>(out_csr->NumEdges())},
+                                DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  int64_t *indptr_data = static_cast<int64_t*>(indptr->data);
+  dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices->data);
+  dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
+  std::copy(out_csr->indptr.begin(), out_csr->indptr.end(), indptr_data);
+  std::copy(out_csr->indices.begin(), out_csr->indices.end(), indices_data);
+  std::copy(out_csr->edge_ids.begin(), out_csr->edge_ids.end(), eid_data);
+  return CSRArray{indptr, indices, eids};
 }
 
 }  // namespace dgl
