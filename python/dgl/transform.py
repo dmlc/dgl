@@ -1,6 +1,4 @@
 """Module for graph transformation methods."""
-from copy import deepcopy
-
 from .graph import DGLGraph
 from .batched_graph import BatchedDGLGraph
 
