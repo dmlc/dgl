@@ -68,6 +68,8 @@ The backend is controlled by ``DGLBACKEND`` environment variable, which defaults
 | numpy   | NumPy   | Does not support gradient computation            |
 +---------+---------+--------------------------------------------------+
 
+.. _install-from-source:
+
 Install from source
 -------------------
 First, download the source files from GitHub:

@@ -159,6 +159,7 @@ Or go through all of them :doc:`here <tutorials/models/index>`.
    :hidden:
    :glob:
 
+   contribute
    faq
    env_var
    resources
