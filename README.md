@@ -156,7 +156,7 @@ Check out the open source book [*Dive into Deep Learning*](http://en.diveintodee
 Please let us know if you encounter a bug or have any suggestions by [filing an issue](https://github.com/dmlc/dgl/issues).
 
 We welcome all contributions from bug fixes to new features and extensions.
-We expect all contributions discussed in the issue tracker and going through PRs.  Please refer to the PR guide.
+We expect all contributions discussed in the issue tracker and going through PRs.  Please refer to our [contribution guide](https://docs.dgl.ai/contribute.html).
 
 
 ## The Team

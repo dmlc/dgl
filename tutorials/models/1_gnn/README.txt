@@ -1,7 +1,7 @@
 .. _tutorials1-index:
 
 Graph Neural Network and its variant
-------------------------------------
+====================================
 
 * **GCN** `[paper] <https://arxiv.org/abs/1609.02907>`__ `[tutorial]
   <1_gnn/1_gcn.html>`__ `[Pytorch code]

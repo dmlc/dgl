@@ -1,6 +1,12 @@
 DGL document and tutorial folder
 ================================
 
+Requirements
+------------
+* sphinx
+* sphinx-gallery
+* Both pytorch and mxnet installed.
+
 Build documents
 ---------------
 First, clean up existing files:
