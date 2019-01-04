@@ -27,7 +27,7 @@ def line_graph(g, backtracking=True, shared=False):
     node_frame = g._edge_frame if shared else None
     return DGLGraph(graph_data, node_frame)
 
-def reverse(g, share_node_attrs=True, share_edge_attrs=True):
+def reverse(g, share_ndata=False, share_edata=False):
     """Return the reverse of a graph
 
     The reverse (also called converse, transpose) of a directed graph is another directed
@@ -36,14 +36,6 @@ def reverse(g, share_node_attrs=True, share_edge_attrs=True):
     Given a :class:`DGLGraph` object, we return another :class:`DGLGraph` object
     representing its reverse.
 
-    If the original graph has node features, its reverse will have the same features.
-    If the original graph has edge features, a reversed edge will have the same feature
-    as the original one. We allow the option for the two graphs to share memory for their
-    node/edge features.
-
-    If the original graph has registered `apply_edge_func`, `apply_node_func`, `message_func`
-    or `reduce_func`, the reverse will have the same.
-
     Notes
     -----
     * This function does not support :class:`~dgl.BatchedDGLGraph` objects.
@@ -51,6 +43,16 @@ def reverse(g, share_node_attrs=True, share_edge_attrs=True):
       This can be particularly problematic when the node/edge attrs are shared. For example,
       if the topology of both the original graph and its reverse get changed independently,
       you can get a mismatched node/edge feature.
+
+    Parameters
+    ----------
+    g : dgl.DGLGraph
+    share_ndata: bool, optional
+        If True, the original graph and the reversed graph share memory for node attributes.
+        Otherwise the reversed graph will not be initialized with node attributes.
+    share_edata: bool, optional
+        If True, the original graph and the reversed graph share memory for edge attributes.
+        Otherwise the reversed graph will not have edge attributes.
 
     Examples
     --------
@@ -66,7 +68,7 @@ def reverse(g, share_node_attrs=True, share_edge_attrs=True):
 
     Reverse the graph and examine its structure.
 
-    >>> rg = dgl.reverse(g)
+    >>> rg = g.reverse(share_ndata=True, share_edata=True)
     >>> print(rg)
     DGLGraph with 3 nodes and 3 edges.
     Node data: {'h': Scheme(shape=(1,), dtype=torch.float32)}
@@ -91,28 +93,15 @@ def reverse(g, share_node_attrs=True, share_edge_attrs=True):
     tensor([[1.],
             [2.],
             [3.]])
-
-    Parameters
-    ----------
-    g : dgl.DGLGraph
-    share_node_attrs: bool, optional
-        If True, the original graph and the reversed graph share memory for node
-        attributes.
-    share_edge_attrs: bool, optional
-        If True, the original graph and the reversed graph share memory for edge
-        attributes.
     """
     assert not isinstance(g, BatchedDGLGraph), \
         'reverse is not supported for a BatchedDGLGraph object'
     g_reversed = DGLGraph(multigraph=g.is_multigraph)
     g_reversed.add_nodes(g.number_of_nodes())
-    g_reversed.add_edges(g.edges()[1], g.edges()[0])
-    if share_node_attrs:
+    g_edges = g.edges()
+    g_reversed.add_edges(g_edges[1], g_edges[0])
+    if share_ndata:
         g_reversed._node_frame = g._node_frame
-    else:
-        g_reversed._node_frame = deepcopy(g._node_frame)
-    if share_edge_attrs:
+    if share_edata:
         g_reversed._edge_frame = g._edge_frame
-    else:
-        g_reversed._edge_frame = deepcopy(g._edge_frame)
     return g_reversed

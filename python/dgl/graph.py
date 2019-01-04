@@ -2765,12 +2765,12 @@ class DGLGraph(object):
         """
         return dgl.line_graph(self, backtracking, shared)
 
-    def reverse(self, share_node_attrs=True, share_edge_attrs=True):
+    def reverse(self, share_ndata=True, share_edata=True):
         """Return the reverse of this graph.
 
         See :func:`~dgl.transform.reverse`.
         """
-        return dgl.reverse(self, share_node_attrs, share_edge_attrs)
+        return dgl.reverse(self, share_ndata, share_edata)
 
     def filter_nodes(self, predicate, nodes=ALL):
         """Return a tensor of node IDs that satisfy the given predicate.

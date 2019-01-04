@@ -42,14 +42,14 @@ def test_no_backtracking():
         assert not L.has_edge_between(e2, e1)
 
 # reverse graph related
-def test_reverse_no_share():
+def test_reverse():
     g = dgl.DGLGraph()
     g.add_nodes(5)
     # The graph need not to be completely connected.
     g.add_edges([0, 1, 2], [1, 2, 1])
     g.ndata['h'] = th.tensor([[0.], [1.], [2.], [3.], [4.]])
     g.edata['h'] = th.tensor([[5.], [6.], [7.]])
-    rg = g.reverse(share_node_attrs=False, share_edge_attrs=False)
+    rg = g.reverse()
 
     assert g.is_multigraph == rg.is_multigraph
 
@@ -60,11 +60,6 @@ def test_reverse_no_share():
     assert g.edge_id(1, 2) == rg.edge_id(2, 1)
     assert g.edge_id(2, 1) == rg.edge_id(1, 2)
 
-    g.ndata['h'] = g.ndata['h'] + 1
-    assert not U.allclose(g.ndata['h'], rg.ndata['h'])
-    rg.edata['h'] = rg.edata['h'] + 1
-    assert not U.allclose(g.edata['h'], rg.edata['h'])
-
 def test_reverse_shared_frames():
     g = dgl.DGLGraph()
     g.add_nodes(3)
@@ -72,7 +67,7 @@ def test_reverse_shared_frames():
     g.ndata['h'] = th.tensor([[0.], [1.], [2.]], requires_grad=True)
     g.edata['h'] = th.tensor([[3.], [4.], [5.]], requires_grad=True)
 
-    rg = g.reverse()
+    rg = g.reverse(share_ndata=True, share_edata=True)
     assert U.allclose(g.ndata['h'], rg.ndata['h'])
     assert U.allclose(g.edata['h'], rg.edata['h'])
     assert U.allclose(g.edges[[0, 2], [1, 1]].data['h'],
@@ -102,5 +97,5 @@ def test_reverse_shared_frames():
 if __name__ == '__main__':
     test_line_graph()
     test_no_backtracking()
-    test_reverse_no_share()
+    test_reverse()
     test_reverse_shared_frames()
