@@ -99,7 +99,7 @@ def reverse(g, share_ndata=False, share_edata=False):
     g_edges = g.edges()
     g_reversed.add_edges(g_edges[1], g_edges[0])
     if share_ndata:
-        g_reversed._node_frame = g._node_frame
+        g_reversed.set_n_repr(g.ndata)
     if share_edata:
-        g_reversed._edge_frame = g._edge_frame
+        g_reversed.set_e_repr(g.edata)
     return g_reversed
