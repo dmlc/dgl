@@ -2765,7 +2765,7 @@ class DGLGraph(object):
         """
         return dgl.line_graph(self, backtracking, shared)
 
-    def reverse(self, share_ndata=True, share_edata=True):
+    def reverse(self, share_ndata=False, share_edata=False):
         """Return the reverse of this graph.
 
         See :func:`~dgl.transform.reverse`.
