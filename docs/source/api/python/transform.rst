@@ -1,4 +1,4 @@
-.. _apigraph:
+.. _api-transform:
 
 Transform -- Graph Transformation
 =================================
