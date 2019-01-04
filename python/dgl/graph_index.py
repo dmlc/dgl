@@ -706,7 +706,8 @@ class GraphIndex(object):
         adj : scipy sparse matrix
         """
         self.clear()
-        self.add_nodes(adj.shape[0])
+        # what if the adj matrix isn't symmetric.
+        self.add_nodes(max(adj.shape[0], adj.shape[1]))
         adj_coo = adj.tocoo()
         src = utils.toindex(adj_coo.row)
         dst = utils.toindex(adj_coo.col)
