@@ -5,7 +5,7 @@ import torch as th
 def cuda():
     return th.device('cuda')
 
-def equal(a, b):
+def array_equal(a, b):
     return th.equal(a, b)
 
 def allclose(a, b):

@@ -612,7 +612,7 @@ class GraphIndex(object):
             inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
         elif typestr == 'both':
             # first remove entries for self loops
-            mask = F.logical_not(src == dst)
+            mask = F.logical_not(F.equal(src, dst))
             src = F.boolean_mask(src, mask)
             dst = F.boolean_mask(dst, mask)
             eid = F.boolean_mask(eid, mask)

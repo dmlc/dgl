@@ -164,7 +164,7 @@ def test_batched_edge_ordering():
     g = dgl.batch([g1, g2])
     r1 = g.edata['h'][g.edge_id(4, 5)]
     r2 = g1.edata['h'][g1.edge_id(4, 5)]
-    assert F.equal(r1, r2)
+    assert F.array_equal(r1, r2)
 
 def test_batch_no_edge():
     g1 = dgl.DGLGraph()

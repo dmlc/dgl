@@ -629,6 +629,21 @@ def boolean_mask(input, mask):
     """
     pass
 
+def equal(x, y):
+    """Compares whether the elements are equal.
+
+    Parameters
+    ----------
+    x, y : Tensor
+        The two tensors
+
+    Returns
+    -------
+    Boolean tensor
+        The result, with the same shape as input.
+    """
+    pass
+
 def logical_not(input):
     """Perform a logical not operation.  Equivalent to np.logical_not
 

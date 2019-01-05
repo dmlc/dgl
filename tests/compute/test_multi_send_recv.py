@@ -64,7 +64,7 @@ def test_multi_send():
     eid = g.edge_ids([0, 0, 0, 0, 0, 1, 2, 3, 4, 5],
                      [1, 2, 3, 4, 5, 9, 9, 9, 9, 9])
     expected[eid] = 1
-    assert F.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
 
 def test_multi_recv():
     # basic recv test
@@ -80,20 +80,20 @@ def test_multi_recv():
     g.send((u, v))
     eid = g.edge_ids(u, v)
     expected[eid] = 1
-    assert F.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
     g.recv(v)
     expected[eid] = 0
-    assert F.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
 
     u = [0]
     v = [1, 2, 3]
     g.send((u, v))
     eid = g.edge_ids(u, v)
     expected[eid] = 1
-    assert F.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
     g.recv(v)
     expected[eid] = 0
-    assert F.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
 
     h1 = g.ndata['h']
 
@@ -104,19 +104,19 @@ def test_multi_recv():
     g.send((u, v))
     eid = g.edge_ids(u, v)
     expected[eid] = 1
-    assert F.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
     u = [4, 5, 6]
     v = [9]
     g.recv(v)
     eid = g.edge_ids(u, v)
     expected[eid] = 0
-    assert F.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
     u = [0]
     v = [1, 2, 3]
     g.recv(v)
     eid = g.edge_ids(u, v)
     expected[eid] = 0
-    assert F.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
 
     h2 = g.ndata['h']
     assert F.allclose(h1, h2)
@@ -250,7 +250,7 @@ def test_dynamic_addition():
                     'h2': F.randn((2, D))})
     g.send()
     expected = F.ones((g.number_of_edges(),), dtype=F.int64)
-    assert F.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
 
     # add more edges
     g.add_edges([0, 2], [2, 0], {'h1': F.randn((2, D))})
@@ -281,10 +281,10 @@ def test_recv_no_send():
     g.send((1, 2), message_func)
     expected = F.zeros((2,), dtype=F.int64)
     expected[1] = 1
-    assert F.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
     g.recv(2, reduce_func)
     expected[1] = 0
-    assert F.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
 
 def test_send_recv_after_conversion():
     # test send and recv after converting from a graph with edges

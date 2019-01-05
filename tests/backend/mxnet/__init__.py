@@ -8,7 +8,7 @@ import mxnet.autograd as autograd
 def cuda():
     return mx.gpu()
 
-def equal(a, b):
+def array_equal(a, b):
     return nd.equal(a, b).asnumpy().all()
 
 def allclose(a, b):

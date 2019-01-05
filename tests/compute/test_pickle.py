@@ -23,7 +23,7 @@ def test_pickling_index():
 
     i2 = _reconstruct_pickle(i)
 
-    assert F.equal(i2.tousertensor(), i.tousertensor())
+    assert F.array_equal(i2.tousertensor(), i.tousertensor())
 
 
 def test_pickling_graph_index():
@@ -37,8 +37,8 @@ def test_pickling_graph_index():
 
     assert gi2.number_of_nodes() == gi.number_of_nodes()
     src_idx2, dst_idx2, _ = gi2.edges()
-    assert F.equal(src_idx.tousertensor(), src_idx2.tousertensor())
-    assert F.equal(dst_idx.tousertensor(), dst_idx2.tousertensor())
+    assert F.array_equal(src_idx.tousertensor(), src_idx2.tousertensor())
+    assert F.array_equal(dst_idx.tousertensor(), dst_idx2.tousertensor())
 
 
 def test_pickling_frame():
@@ -63,8 +63,8 @@ def _assert_is_identical(g, g2):
     assert g.number_of_nodes() == g2.number_of_nodes()
     src, dst = g.all_edges()
     src2, dst2 = g2.all_edges()
-    assert F.equal(src, src2)
-    assert F.equal(dst, dst2)
+    assert F.array_equal(src, src2)
+    assert F.array_equal(dst, dst2)
 
     assert len(g.ndata) == len(g2.ndata)
     assert len(g.edata) == len(g2.edata)

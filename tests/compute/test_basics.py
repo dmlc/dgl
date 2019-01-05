@@ -137,8 +137,8 @@ def test_batch_setter_autograd():
         g.nodes[v].data['h'] = hh
         h2 = g.ndata['h']
     F.backward(h2, F.ones((10, D)) * 2)
-    assert F.equal(F.grad(h1)[:,0], F.tensor([2., 0., 0., 2., 2., 2., 2., 2., 0., 2.]))
-    assert F.equal(F.grad(hh)[:,0], F.tensor([2., 2., 2.]))
+    assert F.array_equal(F.grad(h1)[:,0], F.tensor([2., 0., 0., 2., 2., 2., 2., 2., 0., 2.]))
+    assert F.array_equal(F.grad(hh)[:,0], F.tensor([2., 2., 2.]))
 
 def test_nx_conversion():
     # check conversion between networkx and DGLGraph
@@ -203,7 +203,7 @@ def test_nx_conversion():
     assert F.allclose(g.ndata['n1'], n1)
     # with id in nx edge feature, e1 should follow original order
     assert F.allclose(g.edata['e1'], e1)
-    assert F.equal(g.get_e_repr()['id'], F.arange(0, 4))
+    assert F.array_equal(g.get_e_repr()['id'], F.arange(0, 4))
 
     # test conversion after modifying DGLGraph
     g.pop_e_repr('id') # pop id so we don't need to provide id when adding edges

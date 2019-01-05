@@ -15,7 +15,7 @@ def cuda():
 # These functions are performance critical, so it's better to have efficient
 # implementation in each framework.
 
-def equal(a, b):
+def array_equal(a, b):
     """Check whether the two tensors are *exactly* equal."""
     pass
 

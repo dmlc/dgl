@@ -183,6 +183,9 @@ def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
 def boolean_mask(input, mask):
     return mx.contrib.nd.boolean_mask(input, mask)
 
+def equal(x, y):
+    return x == y
+
 def logical_not(input):
     return nd.logical_not(input)
 
