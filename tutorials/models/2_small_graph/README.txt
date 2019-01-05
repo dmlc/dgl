@@ -1,8 +1,7 @@
 .. _tutorials2-index:
 
-
 Dealing with many small graphs
-------------------------------
+==============================
 
 * **Tree-LSTM** `[paper] <https://arxiv.org/abs/1503.00075>`__ `[tutorial]
   <2_small_graph/3_tree-lstm.html>`__ `[code]
