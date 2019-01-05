@@ -14,6 +14,8 @@ def test_dlpack():
         dl = x.to_dlpack()
         y = F.zerocopy_from_dlpack(dl)
         y[0] = 1
+        print(x)
+        print(y)
         assert np.allclose(x.asnumpy(), ans)
 
     def th2nd():
@@ -24,11 +26,11 @@ def test_dlpack():
         dl = F.zerocopy_to_dlpack(x)
         y = nd.from_dlpack(dl)
         x[0] = 1
+        print(x)
+        print(y)
         assert np.allclose(y.asnumpy(), ans)
 
     def th2nd_incontiguous():
-        import dgl.backend as F
-
         x = F.astype(F.tensor([[0, 1], [2, 3]]), F.int64)
         ans = np.array([0, 2])
         y = x[:2, 0]
@@ -36,6 +38,9 @@ def test_dlpack():
         #dl = dlpack.to_dlpack(y)
         dl = F.zerocopy_to_dlpack(y)
         z = nd.from_dlpack(dl)
+        print(x)
+        print(y)
+        print(z)
         assert np.allclose(z.asnumpy(), ans)
 
     nd2th()
