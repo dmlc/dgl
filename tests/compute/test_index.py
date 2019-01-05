@@ -39,7 +39,6 @@ def test_dlpack():
         dl = F.zerocopy_to_dlpack(y)
         z = nd.from_dlpack(dl)
         print(x)
-        print(y)
         print(z)
         assert np.allclose(z.asnumpy(), ans)
 
