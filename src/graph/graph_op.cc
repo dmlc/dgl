@@ -32,9 +32,9 @@ Graph GraphOp::LineGraph(const Graph* g, bool backtracking) {
 
 Graph GraphOp::DisjointUnion(std::vector<const Graph*> graphs) {
   Graph rst;
-  rst.is_multigraph_ = graphs[0]->is_multigraph_;
   uint64_t cumsum = 0;
   for (const Graph* gr : graphs) {
+    rst.is_multigraph_ |= gr->is_multigraph_;
     rst.AddVertices(gr->NumVertices());
     for (uint64_t i = 0; i < gr->NumEdges(); ++i) {
       rst.AddEdge(gr->all_edges_src_[i] + cumsum, gr->all_edges_dst_[i] + cumsum);
