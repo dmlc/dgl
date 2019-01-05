@@ -32,6 +32,7 @@ Graph GraphOp::LineGraph(const Graph* g, bool backtracking) {
 
 Graph GraphOp::DisjointUnion(std::vector<const Graph*> graphs) {
   Graph rst;
+  rst.is_multigraph_ = graphs[0]->is_multigraph_;
   uint64_t cumsum = 0;
   for (const Graph* gr : graphs) {
     rst.AddVertices(gr->NumVertices());
@@ -66,6 +67,7 @@ std::vector<Graph> GraphOp::DisjointPartitionBySizes(const Graph* graph, IdArray
   std::vector<Graph> rst(len);
   for (int64_t i = 0; i < len; ++i) {
     // copy adj
+    rst[i].is_multigraph_ = graph->is_multigraph_;
     rst[i].adjlist_.insert(rst[i].adjlist_.end(),
         graph->adjlist_.begin() + node_offset,
         graph->adjlist_.begin() + node_offset + sizes_data[i]);
