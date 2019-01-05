@@ -46,15 +46,17 @@ class Prog(object):
             self.pprint_exe(exe)
 
 class CurrentProgram(threading.local):
-
+    """Thread local storage to keep the reference of current thread's program"""
     def __init__(self):
         super(CurrentProgram, self).__init__()
         self.prog = None
 
     def get_prog(self):
+        """Get program"""
         return self.prog
 
     def set_prog(self, program):
+        """Set program"""
         self.prog = program
 
 # current program
