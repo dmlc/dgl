@@ -73,20 +73,26 @@ def test_incmat():
     g.add_edge(0, 3) # 2
     g.add_edge(2, 3) # 3
     g.add_edge(1, 1) # 4
+    inc_in = F.sparse_to_numpy(g.incidence_matrix('in'))
+    inc_out = F.sparse_to_numpy(g.incidence_matrix('out'))
+    inc_both = F.sparse_to_numpy(g.incidence_matrix('both'))
+    print(inc_in)
+    print(inc_out)
+    print(inc_both)
     assert np.allclose(
-            F.sparse_to_numpy(g.incidence_matrix('in')),
+            inc_in,
             np.array([[0., 0., 0., 0., 0.],
                       [1., 0., 0., 0., 1.],
                       [0., 1., 0., 0., 0.],
                       [0., 0., 1., 1., 0.]]))
     assert np.allclose(
-            F.sparse_to_numpy(g.incidence_matrix('out')),
+            inc_out,
             np.array([[1., 1., 1., 0., 0.],
                       [0., 0., 0., 0., 1.],
                       [0., 0., 0., 1., 0.],
                       [0., 0., 0., 0., 0.]]))
     assert np.allclose(
-            F.sparse_to_numpy(g.incidence_matrix('both')),
+            inc_both,
             np.array([[-1., -1., -1., 0., 0.],
                       [1., 0., 0., 0., 0.],
                       [0., 1., 0., -1., 0.],
