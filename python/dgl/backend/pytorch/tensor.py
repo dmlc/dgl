@@ -143,8 +143,8 @@ def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
 def boolean_mask(input, mask):
     return input[mask]
 
-def where(cond, x, y):
-    return th.where(cond, x, y)
+def logical_not(input):
+    return ~input
 
 def unique(input):
     return th.unique(input)

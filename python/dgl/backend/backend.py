@@ -629,17 +629,13 @@ def boolean_mask(input, mask):
     """
     pass
 
-def where(cond, x, y):
-    """Select elements from either x or y according to condition.
+def logical_not(input):
+    """Perform a logical not operation.  Equivalent to np.logical_not
 
     Parameters
     ----------
-    cond : (Boolean) Tensor
-        The condition
-    x : Tensor or scalar
-        The value to be selected if cond evaluates to True
-    y : Tensor or scalar
-        The value to be selected if cond evaluates to False
+    input : Tensor
+        The input
 
     Returns
     -------

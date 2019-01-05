@@ -611,18 +611,22 @@ class GraphIndex(object):
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
             inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
         elif typestr == 'both':
+            # first remove entries for self loops
+            mask = F.logical_not(src == dst)
+            src = F.boolean_mask(src, mask)
+            dst = F.boolean_mask(dst, mask)
+            eid = F.boolean_mask(eid, mask)
+            n_entries = F.shape(src)[0]
             # create index
             row = F.unsqueeze(F.cat([src, dst], dim=0), 0)
             col = F.unsqueeze(F.cat([eid, eid], dim=0), 0)
             idx = F.cat([row, col], dim=0)
-            # create data
-            diagonal = (src == dst)
             # FIXME(minjie): data type
-            x = -F.ones((m,), dtype=F.float32, ctx=ctx)
-            y = F.ones((m,), dtype=F.float32, ctx=ctx)
-            x = F.where(diagonal, F.zeros_like(x), x)
-            y = F.where(diagonal, F.zeros_like(y), y)
+            x = -F.ones((n_entries,), dtype=F.float32, ctx=ctx)
+            y = F.ones((n_entries,), dtype=F.float32, ctx=ctx)
             dat = F.cat([x, y], dim=0)
+            print(idx)
+            print(dat)
             inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
         else:
             raise DGLError('Invalid incidence matrix type: %s' % str(typestr))
