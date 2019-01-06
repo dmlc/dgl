@@ -1144,13 +1144,9 @@ class DGLGraph(object):
             If the node labels of ``nx_graph`` are not consecutive
             integers, its nodes will be relabeled using consecutive integers.
         node_attrs : iterable of str, optional
-            The node attributes needs to be copied. If the nodes of
-            ``nx_graph`` are not indexed with consecutive integers,
-            make sure ``node_attrs`` will match the relabeled nodes.
+            The node attributes needs to be copied.
         edge_attrs : iterable of str, optional
-            The edge attributes needs to be copied. If the nodes of
-            ``nx_graph`` are not indexed with consecutive integers,
-            make sure ``edge_attrs`` will match the relabeled nodes.
+            The edge attributes needs to be copied.
 
         Examples
         --------
@@ -1174,6 +1170,7 @@ class DGLGraph(object):
                 [2., 2., 2., 2.],
                 [1., 1., 1., 1.]])
         """
+        nx_graph = nx_graph.to_directed()
         # Relabel nodes using consecutive integers
         nx_graph = nx.convert_node_labels_to_integers(nx_graph)
 

@@ -4,6 +4,7 @@
 # readonly graph support.
 import backend as F
 import dgl
+import networkx as nx
 from dgl import DGLGraph
 from collections import defaultdict as ddict
 
@@ -241,6 +242,25 @@ def test_nx_conversion():
         edge_feat.append(F.unsqueeze(attr['e1'], 0))
     edge_feat = F.cat(edge_feat, 0)
     assert F.allclose(g.edata['e1'], edge_feat)
+
+    # Test converting from a networkx graph whose nodes are
+    # not labeled with consecutive-integers.
+    nxg = nx.cycle_graph(5)
+    nxg.remove_nodes_from([0, 4])
+    for u in nxg.nodes():
+        nxg.node[u]['h'] = F.tensor([u])
+    for u, v, d in nxg.edges(data=True):
+        d['h'] = F.tensor([u, v])
+
+    g = dgl.DGLGraph()
+    g.from_networkx(nxg, node_attrs=['h'], edge_attrs=['h'])
+    assert g.number_of_nodes() == 3
+    assert g.number_of_edges() == 2
+    assert g.has_edge_between(0, 1)
+    assert g.has_edge_between(1, 2)
+    assert F.allclose(g.ndata['h'], F.tensor([[1.], [2.], [3.]]))
+    assert F.allclose(g.edata['h'], F.tensor([[1., 2.], [1., 2.],
+                                              [2., 3.], [2., 3.]]))
 
 def test_batch_send():
     g = generate_graph()
