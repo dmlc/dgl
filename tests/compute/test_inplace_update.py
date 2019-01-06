@@ -1,10 +1,8 @@
-import os
-os.environ['DGLBACKEND'] = 'mxnet'
-import mxnet as mx
 import numpy as np
 import scipy.sparse as sp
 import dgl
 import dgl.function as fn
+import backend as F
 
 D = 5
 
@@ -17,19 +15,19 @@ def generate_graph():
         g.add_edge(i, 9)
     # add a back flow from 9 to 0
     g.add_edge(9, 0)
-    g.ndata['f'] = mx.nd.random.normal(shape=(10, D))
-    g.edata['e'] = mx.nd.random.normal(shape=(17, D))
+    g.ndata['f'] = F.randn((10, D))
+    g.edata['e'] = F.randn((17, D))
     return g
 
 def test_inplace_recv():
-    u = mx.nd.array([0, 0, 0, 3, 4, 9], dtype=np.int64)
-    v = mx.nd.array([1, 2, 3, 9, 9, 0], dtype=np.int64)
+    u = F.tensor([0, 0, 0, 3, 4, 9])
+    v = F.tensor([1, 2, 3, 9, 9, 0])
 
     def message_func(edges):
         return {'m' : edges.src['f'] + edges.dst['f']}
 
     def reduce_func(nodes):
-        return {'f' : mx.nd.sum(nodes.mailbox['m'], 1)}
+        return {'f' : F.sum(nodes.mailbox['m'], 1)}
 
     def apply_func(nodes):
         return {'f' : 2 * nodes.data['f']}
@@ -40,33 +38,30 @@ def test_inplace_recv():
 
         # one out place run to get result
         g.send((u, v), message_func)
-        g.recv(mx.nd.array([0,1,2,3,9], dtype=np.int64),
-               reduce_func, apply_func)
+        g.recv([0,1,2,3,9], reduce_func, apply_func)
         result = g.get_n_repr()['f']
 
         # inplace deg bucket run
-        v1 = f.copy()
+        v1 = F.clone(f)
         g.ndata['f'] = v1
         g.send((u, v), message_func)
-        g.recv(mx.nd.array([0,1,2,3,9], dtype=np.int64),
-               reduce_func, apply_func, inplace=True)
+        g.recv([0,1,2,3,9], reduce_func, apply_func, inplace=True)
         r1 = g.get_n_repr()['f']
         # check result
-        assert np.allclose(r1.asnumpy(), result.asnumpy())
+        assert F.allclose(r1, result)
         # check inplace
-        assert np.allclose(v1.asnumpy(), r1.asnumpy())
+        assert F.allclose(v1, r1)
 
         # inplace e2v
-        v1 = f.copy()
+        v1 = F.clone(f)
         g.ndata['f'] = v1
         g.send((u, v), message_func)
-        g.recv(mx.nd.array([0,1,2,3,9], dtype=np.int64),
-               fn.sum(msg='m', out='f'), apply_func, inplace=True)
+        g.recv([0,1,2,3,9], fn.sum(msg='m', out='f'), apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert np.allclose(r1.asnumpy(), result.asnumpy())
+        assert F.allclose(r1, result)
         # check inplace
-        assert np.allclose(v1.asnumpy(), r1.asnumpy())
+        assert F.allclose(v1, r1)
 
     # test send_and_recv with apply_func
     _test(apply_func)
@@ -74,14 +69,14 @@ def test_inplace_recv():
     _test(None)
 
 def test_inplace_snr():
-    u = mx.nd.array([0, 0, 0, 3, 4, 9], dtype=np.int64)
-    v = mx.nd.array([1, 2, 3, 9, 9, 0], dtype=np.int64)
+    u = F.tensor([0, 0, 0, 3, 4, 9])
+    v = F.tensor([1, 2, 3, 9, 9, 0])
 
     def message_func(edges):
         return {'m' : edges.src['f']}
 
     def reduce_func(nodes):
-        return {'f' : mx.nd.sum(nodes.mailbox['m'], 1)}
+        return {'f' : F.sum(nodes.mailbox['m'], 1)}
 
     def apply_func(nodes):
         return {'f' : 2 * nodes.data['f']}
@@ -96,36 +91,36 @@ def test_inplace_snr():
         result = g.ndata['f']
 
         # inplace deg bucket
-        v1 = f.copy()
+        v1 = F.clone(f)
         g.ndata['f'] = v1
         g.send_and_recv((u, v), message_func, reduce_func, apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert np.allclose(r1.asnumpy(), result.asnumpy())
+        assert F.allclose(r1, result)
         # check inplace
-        assert np.allclose(v1.asnumpy(), r1.asnumpy())
+        assert F.allclose(v1, r1)
 
         # inplace v2v spmv
-        v1 = f.copy()
+        v1 = F.clone(f)
         g.ndata['f'] = v1
         g.send_and_recv((u, v), fn.copy_src(src='f', out='m'),
                         fn.sum(msg='m', out='f'), apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert np.allclose(r1.asnumpy(), result.asnumpy())
+        assert F.allclose(r1, result)
         # check inplace
-        assert np.allclose(v1.asnumpy(), r1.asnumpy())
+        assert F.allclose(v1, r1)
 
         # inplace e2v spmv
-        v1 = f.copy()
+        v1 = F.clone(f)
         g.ndata['f'] = v1
         g.send_and_recv((u, v), message_func,
                         fn.sum(msg='m', out='f'), apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert np.allclose(r1.asnumpy(), result.asnumpy())
+        assert F.allclose(r1, result)
         # check inplace
-        assert np.allclose(v1.asnumpy(), r1.asnumpy())
+        assert F.allclose(v1, r1)
 
     # test send_and_recv with apply_func
     _test(apply_func)
@@ -133,13 +128,13 @@ def test_inplace_snr():
     _test(None)
 
 def test_inplace_push():
-    nodes = mx.nd.array([0, 3, 4, 9], dtype=np.int64)
+    nodes = F.tensor([0, 3, 4, 9])
 
     def message_func(edges):
         return {'m' : edges.src['f']}
 
     def reduce_func(nodes):
-        return {'f' : mx.nd.sum(nodes.mailbox['m'], 1)}
+        return {'f' : F.sum(nodes.mailbox['m'], 1)}
 
     def apply_func(nodes):
         return {'f' : 2 * nodes.data['f']}
@@ -154,36 +149,36 @@ def test_inplace_push():
         result = g.ndata['f']
 
         # inplace deg bucket
-        v1 = f.copy()
+        v1 = F.clone(f)
         g.ndata['f'] = v1
         g.push(nodes, message_func, reduce_func, apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert np.allclose(r1.asnumpy(), result.asnumpy())
+        assert F.allclose(r1, result)
         # check inplace
-        assert np.allclose(v1.asnumpy(), r1.asnumpy())
+        assert F.allclose(v1, r1)
 
         # inplace v2v spmv
-        v1 = f.copy()
+        v1 = F.clone(f)
         g.ndata['f'] = v1
         g.push(nodes, fn.copy_src(src='f', out='m'),
                fn.sum(msg='m', out='f'), apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert np.allclose(r1.asnumpy(), result.asnumpy())
+        assert F.allclose(r1, result)
         # check inplace
-        assert np.allclose(v1.asnumpy(), r1.asnumpy())
+        assert F.allclose(v1, r1)
 
         # inplace e2v spmv
-        v1 = f.copy()
+        v1 = F.clone(f)
         g.ndata['f'] = v1
         g.push(nodes,
                message_func, fn.sum(msg='m', out='f'), apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert np.allclose(r1.asnumpy(), result.asnumpy())
+        assert F.allclose(r1, result)
         # check inplace
-        assert np.allclose(v1.asnumpy(), r1.asnumpy())
+        assert F.allclose(v1, r1)
 
     # test send_and_recv with apply_func
     _test(apply_func)
@@ -191,13 +186,13 @@ def test_inplace_push():
     _test(None)
 
 def test_inplace_pull():
-    nodes = mx.nd.array([1, 2, 3, 9], dtype=np.int64)
+    nodes = F.tensor([1, 2, 3, 9])
 
     def message_func(edges):
         return {'m' : edges.src['f']}
 
     def reduce_func(nodes):
-        return {'f' : mx.nd.sum(nodes.mailbox['m'], 1)}
+        return {'f' : F.sum(nodes.mailbox['m'], 1)}
 
     def apply_func(nodes):
         return {'f' : 2 * nodes.data['f']}
@@ -212,36 +207,36 @@ def test_inplace_pull():
         result = g.ndata['f']
 
         # inplace deg bucket
-        v1 = f.copy()
+        v1 = F.clone(f)
         g.ndata['f'] = v1
         g.pull(nodes, message_func, reduce_func, apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert np.allclose(r1.asnumpy(), result.asnumpy())
+        assert F.allclose(r1, result)
         # check inplace
-        assert np.allclose(v1.asnumpy(), r1.asnumpy())
+        assert F.allclose(v1, r1)
 
         # inplace v2v spmv
-        v1 = f.copy()
+        v1 = F.clone(f)
         g.ndata['f'] = v1
         g.pull(nodes, fn.copy_src(src='f', out='m'),
                fn.sum(msg='m', out='f'), apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert np.allclose(r1.asnumpy(), result.asnumpy())
+        assert F.allclose(r1, result)
         # check inplace
-        assert np.allclose(v1.asnumpy(), r1.asnumpy())
+        assert F.allclose(v1, r1)
 
         # inplace e2v spmv
-        v1 = f.copy()
+        v1 = F.clone(f)
         g.ndata['f'] = v1
         g.pull(nodes,
                message_func, fn.sum(msg='m', out='f'), apply_func, inplace=True)
         r1 = g.ndata['f']
         # check result
-        assert np.allclose(r1.asnumpy(), result.asnumpy())
+        assert F.allclose(r1, result)
         # check inplace
-        assert np.allclose(v1.asnumpy(), r1.asnumpy())
+        assert F.allclose(v1, r1)
 
     # test send_and_recv with apply_func
     _test(apply_func)
@@ -265,11 +260,11 @@ def test_inplace_apply():
     g.ndata['f'] = nf
     g.apply_nodes(apply_node_func, nodes, inplace=True)
     # check results correct and in place
-    assert np.allclose(nf.asnumpy(), new_nf.asnumpy())
+    assert F.allclose(nf, new_nf)
     # test apply all nodes, should not be done in place
     g.ndata['f'] = nf
     g.apply_nodes(apply_node_func, inplace=True)
-    assert np.allclose(nf.asnumpy(), g.ndata['f'].asnumpy()) == False
+    assert F.allclose(nf, g.ndata['f']) == False
 
     edges = [3, 5, 7, 10]
     ef = g.edata['e']
@@ -280,11 +275,11 @@ def test_inplace_apply():
     g.edata['e'] = ef
     g.apply_edges(apply_edge_func, edges, inplace=True)
     g.edata['e'] = ef
-    assert np.allclose(ef.asnumpy(), new_ef.asnumpy())
+    assert F.allclose(ef, new_ef)
     # test apply all edges, should not be done in place
     g.edata['e'] == ef
     g.apply_edges(apply_edge_func, inplace=True)
-    assert np.allclose(ef.asnumpy(), g.edata['e'].asnumpy()) == False
+    assert F.allclose(ef, g.edata['e']) == False
 
 if __name__ == '__main__':
     test_inplace_recv()

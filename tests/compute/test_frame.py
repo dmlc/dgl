@@ -1,9 +1,7 @@
-import torch as th
-from torch.autograd import Variable
 import numpy as np
 from dgl.frame import Frame, FrameRef
 from dgl.utils import Index, toindex
-import utils as U
+import backend as F
 
 N = 10
 D = 5
@@ -16,9 +14,13 @@ def check_fail(fn):
         return True
 
 def create_test_data(grad=False):
-    c1 = Variable(th.randn(N, D), requires_grad=grad)
-    c2 = Variable(th.randn(N, D), requires_grad=grad)
-    c3 = Variable(th.randn(N, D), requires_grad=grad)
+    c1 = F.randn((N, D))
+    c2 = F.randn((N, D))
+    c3 = F.randn((N, D))
+    if grad:
+        c1 = F.attach_grad(c1)
+        c2 = F.attach_grad(c2)
+        c3 = F.attach_grad(c3)
     return {'a1' : c1, 'a2' : c2, 'a3' : c3}
 
 def test_create():
@@ -44,12 +46,12 @@ def test_column1():
     f = Frame(data)
     assert f.num_rows == N
     assert len(f) == 3
-    assert U.allclose(f['a1'].data, data['a1'].data)
+    assert F.allclose(f['a1'].data, data['a1'])
     f['a1'] = data['a2']
-    assert U.allclose(f['a2'].data, data['a2'].data)
+    assert F.allclose(f['a2'].data, data['a2'])
     # add a different length column should fail
     def failed_add_col():
-        f['a4'] = th.zeros([N+1, D])
+        f['a4'] = F.zeros([N+1, D])
     assert check_fail(failed_add_col)
     # delete all the columns
     del f['a1']
@@ -64,14 +66,14 @@ def test_column2():
     f = FrameRef(data, toindex([3, 4, 5, 6, 7]))
     assert f.num_rows == 5
     assert len(f) == 3
-    assert U.allclose(f['a1'], data['a1'].data[3:8])
+    assert F.allclose(f['a1'], F.narrow_row(data['a1'].data, 3, 8))
     # set column should reflect on the referenced data
-    f['a1'] = th.zeros([5, D])
-    assert U.allclose(data['a1'].data[3:8], th.zeros([5, D]))
+    f['a1'] = F.zeros([5, D])
+    assert F.allclose(F.narrow_row(data['a1'].data, 3, 8), F.zeros([5, D]))
     # add new partial column should fail with error initializer
     f.set_initializer(lambda shape, dtype : assert_(False))
     def failed_add_col():
-        f['a4'] = th.ones([5, D])
+        f['a4'] = F.ones([5, D])
     assert check_fail(failed_add_col)
 
 def test_append1():
@@ -84,11 +86,11 @@ def test_append1():
     f1.append(f2)
     assert f1.num_rows == 2 * N
     c1 = f1['a1']
-    assert c1.data.shape == (2 * N, D)
-    truth = th.cat([data['a1'], data['a1']])
-    assert U.allclose(truth, c1.data)
+    assert tuple(F.shape(c1.data)) == (2 * N, D)
+    truth = F.cat([data['a1'], data['a1']], 0)
+    assert F.allclose(truth, c1.data)
     # append dict of different length columns should fail
-    f3 = {'a1' : th.zeros((3, D)), 'a2' : th.zeros((3, D)), 'a3' : th.zeros((2, D))}
+    f3 = {'a1' : F.zeros((3, D)), 'a2' : F.zeros((3, D)), 'a3' : F.zeros((2, D))}
     def failed_append():
         f1.append(f3)
     assert check_fail(failed_append)
@@ -111,25 +113,25 @@ def test_append2():
     assert not f.is_span_whole_column()
     assert f.num_rows == 3 * N
     new_idx = list(range(N)) + list(range(2*N, 4*N))
-    assert th.all(f._index.tousertensor() == th.tensor(new_idx, dtype=th.int64))
+    assert F.array_equal(f._index.tousertensor(), F.tensor(new_idx, dtype=F.int64))
     assert data.num_rows == 4 * N
 
 def test_append3():
     # test append on empty frame
     f = Frame(num_rows=5)
-    data = {'h' : th.ones((3, 2))}
+    data = {'h' : F.ones((3, 2))}
     f.append(data)
     assert f.num_rows == 8
-    ans = th.cat([th.zeros((5, 2)), th.ones((3, 2))], dim=0)
-    assert U.allclose(f['h'].data, ans)
+    ans = F.cat([F.zeros((5, 2)), F.ones((3, 2))], 0)
+    assert F.allclose(f['h'].data, ans)
     # test append with new column
-    data = {'h' : 2 * th.ones((3, 2)), 'w' : 2 * th.ones((3, 2))}
+    data = {'h' : 2 * F.ones((3, 2)), 'w' : 2 * F.ones((3, 2))}
     f.append(data)
     assert f.num_rows == 11
-    ans1 = th.cat([ans, 2 * th.ones((3, 2))], 0)
-    ans2 = th.cat([th.zeros((8, 2)), 2 * th.ones((3, 2))], 0)
-    assert U.allclose(f['h'].data, ans1)
-    assert U.allclose(f['w'].data, ans2)
+    ans1 = F.cat([ans, 2 * F.ones((3, 2))], 0)
+    ans2 = F.cat([F.zeros((8, 2)), 2 * F.ones((3, 2))], 0)
+    assert F.allclose(f['h'].data, ans1)
+    assert F.allclose(f['w'].data, ans2)
 
 def test_row1():
     # test row getter/setter
@@ -138,32 +140,32 @@ def test_row1():
 
     # getter
     # test non-duplicate keys
-    rowid = Index(th.tensor([0, 2]))
+    rowid = Index(F.tensor([0, 2]))
     rows = f[rowid]
     for k, v in rows.items():
-        assert v.shape == (len(rowid), D)
-        assert U.allclose(v, data[k][rowid])
+        assert tuple(F.shape(v)) == (len(rowid), D)
+        assert F.allclose(v, F.gather_row(data[k], rowid.tousertensor()))
     # test duplicate keys
-    rowid = Index(th.tensor([8, 2, 2, 1]))
+    rowid = Index(F.tensor([8, 2, 2, 1]))
     rows = f[rowid]
     for k, v in rows.items():
-        assert v.shape == (len(rowid), D)
-        assert U.allclose(v, data[k][rowid])
+        assert tuple(F.shape(v)) == (len(rowid), D)
+        assert F.allclose(v, F.gather_row(data[k], rowid.tousertensor()))
 
     # setter
-    rowid = Index(th.tensor([0, 2, 4]))
-    vals = {'a1' : th.zeros((len(rowid), D)),
-            'a2' : th.zeros((len(rowid), D)),
-            'a3' : th.zeros((len(rowid), D)),
+    rowid = Index(F.tensor([0, 2, 4]))
+    vals = {'a1' : F.zeros((len(rowid), D)),
+            'a2' : F.zeros((len(rowid), D)),
+            'a3' : F.zeros((len(rowid), D)),
             }
     f[rowid] = vals
     for k, v in f[rowid].items():
-        assert U.allclose(v, th.zeros((len(rowid), D)))
+        assert F.allclose(v, F.zeros((len(rowid), D)))
 
     # setting rows with new column should raise error with error initializer
     f.set_initializer(lambda shape, dtype : assert_(False))
     def failed_update_rows():
-        vals['a4'] = th.ones((len(rowid), D))
+        vals['a4'] = F.ones((len(rowid), D))
         f[rowid] = vals
     assert check_fail(failed_update_rows)
 
@@ -172,34 +174,41 @@ def test_row2():
     data = create_test_data(grad=True)
     f = FrameRef(Frame(data))
 
-    # getter
-    c1 = f['a1']
-    # test non-duplicate keys
-    rowid = Index(th.tensor([0, 2]))
-    rows = f[rowid]
-    rows['a1'].backward(th.ones((len(rowid), D)))
-    assert U.allclose(c1.grad[:,0], th.tensor([1., 0., 1., 0., 0., 0., 0., 0., 0., 0.]))
-    c1.grad.data.zero_()
-    # test duplicate keys
-    rowid = Index(th.tensor([8, 2, 2, 1]))
-    rows = f[rowid]
-    rows['a1'].backward(th.ones((len(rowid), D)))
-    assert U.allclose(c1.grad[:,0], th.tensor([0., 1., 2., 0., 0., 0., 0., 0., 1., 0.]))
-    c1.grad.data.zero_()
+    with F.record_grad():
+        # getter
+        c1 = f['a1']
+        # test non-duplicate keys
+        rowid = Index(F.tensor([0, 2]))
+        rows = f[rowid]
+        y = rows['a1']
+    F.backward(y, F.ones((len(rowid), D)))
+    assert F.allclose(F.grad(c1)[:,0], F.tensor([1., 0., 1., 0., 0., 0., 0., 0., 0., 0.]))
 
-    # setter
-    c1 = f['a1']
-    rowid = Index(th.tensor([0, 2, 4]))
-    vals = {'a1' : Variable(th.zeros((len(rowid), D)), requires_grad=True),
-            'a2' : Variable(th.zeros((len(rowid), D)), requires_grad=True),
-            'a3' : Variable(th.zeros((len(rowid), D)), requires_grad=True),
-            }
-    f[rowid] = vals
-    c11 = f['a1']
-    c11.backward(th.ones((N, D)))
-    assert U.allclose(c1.grad[:,0], th.tensor([0., 1., 0., 1., 0., 1., 1., 1., 1., 1.]))
-    assert U.allclose(vals['a1'].grad, th.ones((len(rowid), D)))
-    assert vals['a2'].grad is None
+    f['a1'] = F.attach_grad(f['a1'])
+    with F.record_grad():
+        c1 = f['a1']
+        # test duplicate keys
+        rowid = Index(F.tensor([8, 2, 2, 1]))
+        rows = f[rowid]
+        y = rows['a1']
+    F.backward(y, F.ones((len(rowid), D)))
+    assert F.allclose(F.grad(c1)[:,0], F.tensor([0., 1., 2., 0., 0., 0., 0., 0., 1., 0.]))
+
+    f['a1'] = F.attach_grad(f['a1'])
+    with F.record_grad():
+        # setter
+        c1 = f['a1']
+        rowid = Index(F.tensor([0, 2, 4]))
+        vals = {'a1' : F.attach_grad(F.zeros((len(rowid), D))),
+                'a2' : F.attach_grad(F.zeros((len(rowid), D))),
+                'a3' : F.attach_grad(F.zeros((len(rowid), D))),
+                }
+        f[rowid] = vals
+        c11 = f['a1']
+    F.backward(c11, F.ones((N, D)))
+    assert F.allclose(F.grad(c1)[:,0], F.tensor([0., 1., 0., 1., 0., 1., 1., 1., 1., 1.]))
+    assert F.allclose(F.grad(vals['a1']), F.ones((len(rowid), D)))
+    assert F.is_no_grad(vals['a2'])
 
 def test_row3():
     # test row delete
@@ -208,7 +217,7 @@ def test_row3():
     assert f.is_contiguous()
     assert f.is_span_whole_column()
     assert f.num_rows == N
-    del f[toindex(th.tensor([2, 3]))]
+    del f[toindex(F.tensor([2, 3]))]
     assert not f.is_contiguous()
     assert not f.is_span_whole_column()
     # delete is lazy: only reflect on the ref while the
@@ -220,16 +229,16 @@ def test_row3():
     newidx.pop(2)
     newidx = toindex(newidx)
     for k, v in f.items():
-        assert U.allclose(v, data[k][newidx])
+        assert F.allclose(v, data[k][newidx])
 
 def test_row4():
     # test updating row with empty frame but has preset num_rows
     f = FrameRef(Frame(num_rows=5))
-    rowid = Index(th.tensor([0, 2, 4]))
-    f[rowid] = {'h' : th.ones((3, 2))}
-    ans = th.zeros((5, 2))
-    ans[th.tensor([0, 2, 4])] = th.ones((3, 2))
-    assert U.allclose(f['h'], ans)
+    rowid = Index(F.tensor([0, 2, 4]))
+    f[rowid] = {'h' : F.ones((3, 2))}
+    ans = F.zeros((5, 2))
+    ans[F.tensor([0, 2, 4])] = F.ones((3, 2))
+    assert F.allclose(f['h'], ans)
 
 def test_sharing():
     data = Frame(create_test_data())
@@ -237,26 +246,26 @@ def test_sharing():
     f2 = FrameRef(data, index=toindex([2, 3, 4, 5, 6]))
     # test read
     for k, v in f1.items():
-        assert U.allclose(data[k].data[0:4], v)
+        assert F.allclose(F.narrow_row(data[k].data, 0, 4), v)
     for k, v in f2.items():
-        assert U.allclose(data[k].data[2:7], v)
-    f2_a1 = f2['a1'].data
+        assert F.allclose(F.narrow_row(data[k].data, 2, 7), v)
+    f2_a1 = f2['a1']
     # test write
     # update own ref should not been seen by the other.
-    f1[Index(th.tensor([0, 1]))] = {
-            'a1' : th.zeros([2, D]),
-            'a2' : th.zeros([2, D]),
-            'a3' : th.zeros([2, D]),
+    f1[Index(F.tensor([0, 1]))] = {
+            'a1' : F.zeros([2, D]),
+            'a2' : F.zeros([2, D]),
+            'a3' : F.zeros([2, D]),
             }
-    assert U.allclose(f2['a1'], f2_a1)
+    assert F.allclose(f2['a1'], f2_a1)
     # update shared space should been seen by the other.
-    f1[Index(th.tensor([2, 3]))] = {
-            'a1' : th.ones([2, D]),
-            'a2' : th.ones([2, D]),
-            'a3' : th.ones([2, D]),
+    f1[Index(F.tensor([2, 3]))] = {
+            'a1' : F.ones([2, D]),
+            'a2' : F.ones([2, D]),
+            'a3' : F.ones([2, D]),
             }
-    f2_a1[0:2] = th.ones([2, D])
-    assert U.allclose(f2['a1'], f2_a1)
+    F.narrow_row_set(f2_a1, 0, 2, F.ones([2, D]))
+    assert F.allclose(f2['a1'], f2_a1)
 
 def test_slicing():
     data = Frame(create_test_data(grad=True))
@@ -264,81 +273,81 @@ def test_slicing():
     f2 = FrameRef(data, index=toindex(slice(3, 8)))
     # test read
     for k, v in f1.items():
-        assert U.allclose(data[k].data[1:5], v)
-    f2_a1 = f2['a1'].data
+        assert F.allclose(F.narrow_row(data[k].data, 1, 5), v)
+    f2_a1 = f2['a1']    # is a tensor
     # test write
-    f1[Index(th.tensor([0, 1]))] = {
-            'a1': th.zeros([2, D]),
-            'a2': th.zeros([2, D]),
-            'a3': th.zeros([2, D]),
+    f1[Index(F.tensor([0, 1]))] = {
+            'a1': F.zeros([2, D]),
+            'a2': F.zeros([2, D]),
+            'a3': F.zeros([2, D]),
             }
-    assert U.allclose(f2['a1'], f2_a1)
+    assert F.allclose(f2['a1'], f2_a1)
     
-    f1[Index(th.tensor([2, 3]))] = {
-            'a1': th.ones([2, D]),
-            'a2': th.ones([2, D]),
-            'a3': th.ones([2, D]),
+    f1[Index(F.tensor([2, 3]))] = {
+            'a1': F.ones([2, D]),
+            'a2': F.ones([2, D]),
+            'a3': F.ones([2, D]),
             }
-    f2_a1[toindex(slice(0,2))] = 1
-    assert U.allclose(f2['a1'], f2_a1)
+    F.narrow_row_set(f2_a1, 0, 2, 1)
+    assert F.allclose(f2['a1'], f2_a1)
 
-    f1[toindex(slice(2,4))] = {
-            'a1': th.zeros([2, D]),
-            'a2': th.zeros([2, D]),
-            'a3': th.zeros([2, D]),
+    f1[toindex(slice(2, 4))] = {
+            'a1': F.zeros([2, D]),
+            'a2': F.zeros([2, D]),
+            'a3': F.zeros([2, D]),
             }
-    f2_a1[toindex(slice(0,2))] = 0
-    assert U.allclose(f2['a1'], f2_a1)
+    F.narrow_row_set(f2_a1, 0, 2, 0)
+    assert F.allclose(f2['a1'], f2_a1)
 
 def test_add_rows():
     data = Frame()
     f1 = FrameRef(data)
     f1.add_rows(4)
-    x = th.randn(1, 4)
-    f1[Index(th.tensor([0]))] = {'x': x}
-    ans = th.cat([x, th.zeros(3, 4)])
-    assert U.allclose(f1['x'], ans)
+    x = F.randn((1, 4))
+    f1[Index(F.tensor([0]))] = {'x': x}
+    ans = F.cat([x, F.zeros((3, 4))], 0)
+    assert F.allclose(f1['x'], ans)
     f1.add_rows(4)
-    f1[toindex(slice(4,8))] = {'x': th.ones(4, 4), 'y': th.ones(4, 5)}
-    ans = th.cat([ans, th.ones(4, 4)])
-    assert U.allclose(f1['x'], ans)
-    ans = th.cat([th.zeros(4, 5), th.ones(4, 5)])
-    assert U.allclose(f1['y'], ans)
+    f1[toindex(slice(4, 8))] = {'x': F.ones((4, 4)), 'y': F.ones((4, 5))}
+    ans = F.cat([ans, F.ones((4, 4))], 0)
+    assert F.allclose(f1['x'], ans)
+    ans = F.cat([F.zeros((4, 5)), F.ones((4, 5))], 0)
+    assert F.allclose(f1['y'], ans)
 
 def test_inplace():
     f = FrameRef(Frame(create_test_data()))
     print(f.schemes)
-    a1addr = f['a1'].data.data_ptr()
-    a2addr = f['a2'].data.data_ptr()
-    a3addr = f['a3'].data.data_ptr()
+    a1addr = id(f['a1'])
+    a2addr = id(f['a2'])
+    a3addr = id(f['a3'])
 
     # column updates are always out-of-place
-    f['a1'] = th.ones((N, D))
-    newa1addr = f['a1'].data.data_ptr()
+    f['a1'] = F.ones((N, D))
+    newa1addr = id(f['a1'])
     assert a1addr != newa1addr
     a1addr = newa1addr
     # full row update that becomes column update
-    f[toindex(slice(0, N))] = {'a1' : th.ones((N, D))}
-    assert f['a1'].data.data_ptr() != a1addr
+    f[toindex(slice(0, N))] = {'a1' : F.ones((N, D))}
+    assert id(f['a1']) != a1addr
 
     # row update (outplace) w/ slice
-    f[toindex(slice(1, 4))] = {'a2' : th.ones((3, D))}
-    newa2addr = f['a2'].data.data_ptr()
+    f[toindex(slice(1, 4))] = {'a2' : F.ones((3, D))}
+    newa2addr = id(f['a2'])
     assert a2addr != newa2addr
     a2addr = newa2addr
     # row update (outplace) w/ list
-    f[toindex([1, 3, 5])] = {'a2' : th.ones((3, D))}
-    newa2addr = f['a2'].data.data_ptr()
+    f[toindex([1, 3, 5])] = {'a2' : F.ones((3, D))}
+    newa2addr = id(f['a2'])
     assert a2addr != newa2addr
     a2addr = newa2addr
 
     # row update (inplace) w/ slice
-    f.update_data(toindex(slice(1, 4)), {'a2' : th.ones((3, D))}, True)
-    newa2addr = f['a2'].data.data_ptr()
+    f.update_data(toindex(slice(1, 4)), {'a2' : F.ones((3, D))}, True)
+    newa2addr = id(f['a2'])
     assert a2addr == newa2addr
     # row update (inplace) w/ list
-    f.update_data(toindex([1, 3, 5]), {'a2' : th.ones((3, D))}, True)
-    newa2addr = f['a2'].data.data_ptr()
+    f.update_data(toindex([1, 3, 5]), {'a2' : F.ones((3, D))}, True)
+    newa2addr = id(f['a2'])
     assert a2addr == newa2addr
 
 if __name__ == '__main__':

@@ -9,7 +9,7 @@ The principles of this interface:
 * Argument type should be easier to understand.
 
 It is recommended the frameworks implement all the interfaces. However, it is
-also OK to skip some. The generated backend module has an ``is_enbaled`` function
+also OK to skip some. The generated backend module has an ``is_enabled`` function
 that returns whether the interface is supported by the framework or not.
 """
 
@@ -507,6 +507,22 @@ def zeros(shape, dtype, ctx):
     """
     pass
 
+def zeros_like(input):
+    """Create a zero tensor with the same shape, dtype and context of the
+    given tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input
+
+    Returns
+    -------
+    Tensor
+        The result
+    """
+    pass
+
 def ones(shape, dtype, ctx):
     """Create a one tensor.
 
@@ -587,6 +603,54 @@ def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
         Number of distinct segments
     dim : int
         Dimension to average on
+
+    Returns
+    -------
+    Tensor
+        The result
+    """
+    pass
+
+def boolean_mask(input, mask):
+    """Selects elements in x according to the given mask from the first
+    dimension.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor
+    mask : Boolean Tensor
+        The mask
+
+    Returns
+    -------
+    Tensor
+        The result
+    """
+    pass
+
+def equal(x, y):
+    """Compares whether the elements are equal.
+
+    Parameters
+    ----------
+    x, y : Tensor
+        The two tensors
+
+    Returns
+    -------
+    Boolean tensor
+        The result, with the same shape as input.
+    """
+    pass
+
+def logical_not(input):
+    """Perform a logical not operation.  Equivalent to np.logical_not
+
+    Parameters
+    ----------
+    input : Tensor
+        The input
 
     Returns
     -------
