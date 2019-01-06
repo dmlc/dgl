@@ -6,15 +6,14 @@ import dgl
 import networkx as nx
 import numpy as np
 import scipy.sparse as sp
-import torch as th
-import utils as U
+import backend as F
 
 import itertools
 
 np.random.seed(42)
 
 def toset(x):
-    return set(x.tolist())
+    return set(F.zerocopy_to_numpy(x).tolist())
 
 def test_bfs(n=1000):
     def _bfs_nx(g_nx, src):
@@ -66,15 +65,15 @@ def test_topological_nodes(n=1000):
     adjmat = g.adjacency_matrix()
     def tensor_topo_traverse():
         n = g.number_of_nodes()
-        mask = th.ones((n, 1))
-        degree = th.spmm(adjmat, mask)
-        while th.sum(mask) != 0.:
-            v = (degree == 0.).float()
+        mask = F.ones((n, 1))
+        degree = F.spmm(adjmat, mask)
+        while F.reduce_sum(mask) != 0.:
+            v = F.astype((degree == 0.), F.float32)
             v = v * mask
             mask = mask - v
-            frontier = th.squeeze(th.squeeze(v).nonzero(), 1)
+            frontier = F.nonzero_1d(F.squeeze(v, 1))
             yield frontier
-            degree -= th.spmm(adjmat, v)
+            degree -= F.spmm(adjmat, v)
 
     layers_spmv = list(tensor_topo_traverse())
 

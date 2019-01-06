@@ -3,29 +3,28 @@ import math
 import numpy as np
 import scipy.sparse as sp
 import networkx as nx
-import torch as th
 import dgl
-import utils as U
+import backend as F
 
 def test_graph_creation():
     g = dgl.DGLGraph()
     # test add nodes with data
     g.add_nodes(5)
-    g.add_nodes(5, {'h' : th.ones((5, 2))})
-    ans = th.cat([th.zeros(5, 2), th.ones(5, 2)], 0)
-    U.allclose(ans, g.ndata['h'])
-    g.ndata['w'] = 2 * th.ones((10, 2))
-    assert U.allclose(2 * th.ones((10, 2)), g.ndata['w'])
+    g.add_nodes(5, {'h' : F.ones((5, 2))})
+    ans = F.cat([F.zeros((5, 2)), F.ones((5, 2))], 0)
+    assert F.allclose(ans, g.ndata['h'])
+    g.ndata['w'] = 2 * F.ones((10, 2))
+    assert F.allclose(2 * F.ones((10, 2)), g.ndata['w'])
     # test add edges with data
     g.add_edges([2, 3], [3, 4])
-    g.add_edges([0, 1], [1, 2], {'m' : th.ones((2, 2))})
-    ans = th.cat([th.zeros(2, 2), th.ones(2, 2)], 0)
-    assert U.allclose(ans, g.edata['m'])
+    g.add_edges([0, 1], [1, 2], {'m' : F.ones((2, 2))})
+    ans = F.cat([F.zeros((2, 2)), F.ones((2, 2))], 0)
+    assert F.allclose(ans, g.edata['m'])
     # test clear and add again
     g.clear()
     g.add_nodes(5)
-    g.ndata['h'] = 3 * th.ones((5, 2))
-    assert U.allclose(3 * th.ones((5, 2)), g.ndata['h'])
+    g.ndata['h'] = 3 * F.ones((5, 2))
+    assert F.allclose(3 * F.ones((5, 2)), g.ndata['h'])
 
 def test_create_from_elist():
     elist = [(2, 1), (1, 0), (2, 0), (3, 0), (0, 2)]
@@ -74,24 +73,30 @@ def test_incmat():
     g.add_edge(0, 3) # 2
     g.add_edge(2, 3) # 3
     g.add_edge(1, 1) # 4
-    assert U.allclose(
-            g.incidence_matrix('in').to_dense(),
-            th.tensor([[0., 0., 0., 0., 0.],
-                       [1., 0., 0., 0., 1.],
-                       [0., 1., 0., 0., 0.],
-                       [0., 0., 1., 1., 0.]]))
-    assert U.allclose(
-            g.incidence_matrix('out').to_dense(),
-            th.tensor([[1., 1., 1., 0., 0.],
-                       [0., 0., 0., 0., 1.],
-                       [0., 0., 0., 1., 0.],
-                       [0., 0., 0., 0., 0.]]))
-    assert U.allclose(
-            g.incidence_matrix('both').to_dense(),
-            th.tensor([[-1., -1., -1., 0., 0.],
-                       [1., 0., 0., 0., 0.],
-                       [0., 1., 0., -1., 0.],
-                       [0., 0., 1., 1., 0.]]))
+    inc_in = F.sparse_to_numpy(g.incidence_matrix('in'))
+    inc_out = F.sparse_to_numpy(g.incidence_matrix('out'))
+    inc_both = F.sparse_to_numpy(g.incidence_matrix('both'))
+    print(inc_in)
+    print(inc_out)
+    print(inc_both)
+    assert np.allclose(
+            inc_in,
+            np.array([[0., 0., 0., 0., 0.],
+                      [1., 0., 0., 0., 1.],
+                      [0., 1., 0., 0., 0.],
+                      [0., 0., 1., 1., 0.]]))
+    assert np.allclose(
+            inc_out,
+            np.array([[1., 1., 1., 0., 0.],
+                      [0., 0., 0., 0., 1.],
+                      [0., 0., 0., 1., 0.],
+                      [0., 0., 0., 0., 0.]]))
+    assert np.allclose(
+            inc_both,
+            np.array([[-1., -1., -1., 0., 0.],
+                      [1., 0., 0., 0., 0.],
+                      [0., 1., 0., -1., 0.],
+                      [0., 0., 1., 1., 0.]]))
 
 def test_incmat_cache():
     n = 1000
