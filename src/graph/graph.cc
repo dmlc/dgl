@@ -9,7 +9,6 @@
 #include <set>
 #include <functional>
 #include <tuple>
-#include <cstdint>
 #include "../c_api_common.h"
 
 namespace dgl {
@@ -63,9 +62,9 @@ bool Graph::CheckDuplicates_(const EdgeList& el, const dgl_id_t* dst, bool broad
 }
 
 void Graph::MergeSorted_(EdgeList& el, const dgl_id_t* dst, bool broadcast,
-    const std::vector<dgl_id_t>& eid, ssize_t begin, ssize_t end) {
-  ssize_t i, j, p;
-  ssize_t n_edges = end - begin, oldsize = el.succ.size(), newsize = oldsize + n_edges;
+    const std::vector<dgl_id_t>& eid, int64_t begin, int64_t end) {
+  int64_t i, j, p;
+  int64_t n_edges = end - begin, oldsize = el.succ.size(), newsize = oldsize + n_edges;
 
   el.succ.resize(newsize);
   el.edge_id.resize(newsize);

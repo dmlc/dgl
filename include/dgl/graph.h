@@ -400,7 +400,7 @@ class Graph {
   bool CheckDuplicates_(const EdgeList& el, const dgl_id_t* dst, bool broadcast,
       const std::vector<dgl_id_t>& eid, size_t begin, size_t end) const;
   void MergeSorted_(EdgeList& el, const dgl_id_t* dst, bool broadcast,
-      const std::vector<dgl_id_t>& eid, ssize_t begin, ssize_t end);
+      const std::vector<dgl_id_t>& eid, int64_t begin, int64_t end);
   bool InsertEdges_(AdjacencyList& adjlist, dgl_id_t* lo, dgl_id_t* hi,
       bool lo_broadcast, bool hi_broadcast,
       size_t len, const std::vector<dgl_id_t>& lo_count_buffer,
