@@ -118,7 +118,51 @@ You could test the build by running the following command and see the path of yo
 
    python -c 'import dgl; print(dgl.__path__)'
 
-TBD by Quan about how to run and write unittests.
+Unit tests
+``````````
+
+Currently, we use ``nose`` for unit tests.  The organization goes as follows:
+
+* ``backend``: Additional unified tensor interface for supported frameworks.
+  The functions there are only used in unit tests, not DGL itself.  Note that
+  the code there are not unit tests by themselves.  The additional backend can
+  be imported with
+  
+  .. code-block:: python
+
+     import backend
+
+  The additional backend contains the following files:
+
+  - ``backend/backend_unittest.py``: stub file for all additional tensor
+    functions.
+  - ``backend/${DGLBACKEND}/__init__.py``: implementations of the stubs
+    for the backend ``${DGLBACKEND}``.
+  - ``backend/__init__.py``: when imported, it replaces the stub implementations
+    with the framework-specific code, depending on the selected backend.  It
+    also changes the signature of some existing backend functions to automatically
+    select dtypes and contexts.
+
+* ``compute``: All framework-agnostic computation-related unit tests go there.
+  Anything inside should not depend on a specific tensor library.  Tensor
+  functions not provided in DGL unified tensor interface (i.e. ``dgl.backend``)
+  should go into ``backend`` directory.
+* ``${DGLBACKEND}`` (e.g. ``pytorch`` and ``mxnet``): All framework-specific
+  computation-related unit tests go there.
+* ``graph_index``: All unit tests for C++ graph structure implementation go
+  there.  The Python API being tested in this directory, if any, should be
+  as minimal as possible (usually simple wrappers of corresponding C++
+  functions).
+* ``lint``: Pylint-related files.
+* ``scripts``: Automated test scripts for CI.
+
+To run unit tests, run
+
+.. code-block:: bash
+
+   sh tests/scripts/task_unit_test.sh <your-backend>
+
+where ``<your-backend>`` can be any supported backends (i.e. ``pytorch`` or ``mxnet``).
 
 Building documents
 ------------------

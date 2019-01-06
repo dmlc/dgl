@@ -1124,12 +1124,12 @@ class DGLGraph(object):
         if node_attrs is not None:
             for nid, attr in nx_graph.nodes(data=True):
                 feat_dict = self.get_n_repr(nid)
-                attr.update({key: feat_dict[key].squeeze(0) for key in node_attrs})
+                attr.update({key: F.squeeze(feat_dict[key], 0) for key in node_attrs})
         if edge_attrs is not None:
             for _, _, attr in nx_graph.edges(data=True):
                 eid = attr['id']
                 feat_dict = self.get_e_repr(eid)
-                attr.update({key: feat_dict[key].squeeze(0) for key in edge_attrs})
+                attr.update({key: F.squeeze(feat_dict[key], 0) for key in edge_attrs})
         return nx_graph
 
     def from_networkx(self, nx_graph, node_attrs=None, edge_attrs=None):
@@ -2842,7 +2842,7 @@ class DGLGraph(object):
             return F.nonzero_1d(n_mask)
         else:
             nodes = F.tensor(nodes)
-            return nodes[n_mask]
+            return F.boolean_mask(nodes, n_mask)
 
     def filter_edges(self, predicate, edges=ALL):
         """Return a tensor of edge IDs that satisfy the given predicate.
@@ -2915,7 +2915,7 @@ class DGLGraph(object):
             return F.nonzero_1d(e_mask)
         else:
             edges = F.tensor(edges)
-            return edges[e_mask]
+            return F.boolean_mask(edges, e_mask)
 
     def __repr__(self):
         ret = ('DGLGraph(num_nodes={node}, num_edges={edge},\n'

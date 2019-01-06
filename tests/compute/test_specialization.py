@@ -1,9 +1,8 @@
-import torch as th
 import numpy as np
 import scipy.sparse as sp
 import dgl
 import dgl.function as fn
-import utils as U
+import backend as F
 
 D = 5
 
@@ -16,9 +15,9 @@ def generate_graph():
         g.add_edge(i, 9)
     # add a back flow from 9 to 0
     g.add_edge(9, 0)
-    g.set_n_repr({'f1' : th.randn(10,), 'f2' : th.randn(10, D)})
-    weights = th.randn(17,)
-    g.set_e_repr({'e1': weights, 'e2': th.unsqueeze(weights, 1)})
+    g.set_n_repr({'f1' : F.randn((10,)), 'f2' : F.randn((10, D))})
+    weights = F.randn((17,))
+    g.set_e_repr({'e1': weights, 'e2': F.unsqueeze(weights, 1)})
     return g
 
 def test_v2v_update_all():
@@ -33,7 +32,7 @@ def test_v2v_update_all():
                 return {'m' : edges.src[fld] * edges.data['e2']}
 
         def reduce_func(nodes):
-            return {fld : th.sum(nodes.mailbox['m'], 1)}
+            return {fld : F.sum(nodes.mailbox['m'], 1)}
 
         def apply_func(nodes):
             return {fld : 2 * nodes.data[fld]}
@@ -45,7 +44,7 @@ def test_v2v_update_all():
         g.set_n_repr({fld : v1})
         g.update_all(message_func, reduce_func, apply_func)
         v3 = g.ndata[fld]
-        assert U.allclose(v2, v3)
+        assert F.allclose(v2, v3)
         # update all with edge weights
         v1 = g.ndata[fld]
         g.update_all(fn.src_mul_edge(src=fld, edge='e1', out='m'),
@@ -58,16 +57,16 @@ def test_v2v_update_all():
         g.set_n_repr({fld : v1})
         g.update_all(message_func_edge, reduce_func, apply_func)
         v4 = g.ndata[fld]
-        assert U.allclose(v2, v3)
-        assert U.allclose(v3, v4)
+        assert F.allclose(v2, v3)
+        assert F.allclose(v3, v4)
     # test 1d node features
     _test('f1')
     # test 2d node features
     _test('f2')
 
 def test_v2v_snr():
-    u = th.tensor([0, 0, 0, 3, 4, 9])
-    v = th.tensor([1, 2, 3, 9, 9, 0])
+    u = F.tensor([0, 0, 0, 3, 4, 9])
+    v = F.tensor([1, 2, 3, 9, 9, 0])
     def _test(fld):
         def message_func(edges):
             return {'m' : edges.src[fld]}
@@ -79,7 +78,7 @@ def test_v2v_snr():
                 return {'m' : edges.src[fld] * edges.data['e2']}
 
         def reduce_func(nodes):
-            return {fld : th.sum(nodes.mailbox['m'], 1)}
+            return {fld : F.sum(nodes.mailbox['m'], 1)}
 
         def apply_func(nodes):
             return {fld : 2 * nodes.data[fld]}
@@ -92,7 +91,7 @@ def test_v2v_snr():
         g.set_n_repr({fld : v1})
         g.send_and_recv((u, v), message_func, reduce_func, apply_func)
         v3 = g.ndata[fld]
-        assert U.allclose(v2, v3)
+        assert F.allclose(v2, v3)
         # send and recv with edge weights
         v1 = g.ndata[fld]
         g.send_and_recv((u, v), fn.src_mul_edge(src=fld, edge='e1', out='m'),
@@ -105,8 +104,8 @@ def test_v2v_snr():
         g.set_n_repr({fld : v1})
         g.send_and_recv((u, v), message_func_edge, reduce_func, apply_func)
         v4 = g.ndata[fld]
-        assert U.allclose(v2, v3)
-        assert U.allclose(v3, v4)
+        assert F.allclose(v2, v3)
+        assert F.allclose(v3, v4)
     # test 1d node features
     _test('f1')
     # test 2d node features
@@ -114,7 +113,7 @@ def test_v2v_snr():
 
 
 def test_v2v_pull():
-    nodes = th.tensor([1, 2, 3, 9])
+    nodes = F.tensor([1, 2, 3, 9])
     def _test(fld):
         def message_func(edges):
             return {'m' : edges.src[fld]}
@@ -126,7 +125,7 @@ def test_v2v_pull():
                 return {'m' : edges.src[fld] * edges.data['e2']}
 
         def reduce_func(nodes):
-            return {fld : th.sum(nodes.mailbox['m'], 1)}
+            return {fld : F.sum(nodes.mailbox['m'], 1)}
 
         def apply_func(nodes):
             return {fld : 2 * nodes.data[fld]}
@@ -138,7 +137,7 @@ def test_v2v_pull():
         g.ndata[fld] = v1
         g.pull(nodes, message_func, reduce_func, apply_func)
         v3 = g.ndata[fld]
-        assert U.allclose(v2, v3)
+        assert F.allclose(v2, v3)
         # send and recv with edge weights
         v1 = g.ndata[fld]
         g.pull(nodes, fn.src_mul_edge(src=fld, edge='e1', out='m'),
@@ -151,8 +150,8 @@ def test_v2v_pull():
         g.ndata[fld] = v1
         g.pull(nodes, message_func_edge, reduce_func, apply_func)
         v4 = g.ndata[fld]
-        assert U.allclose(v2, v3)
-        assert U.allclose(v3, v4)
+        assert F.allclose(v2, v3)
+        assert F.allclose(v3, v4)
     # test 1d node features
     _test('f1')
     # test 2d node features
@@ -166,10 +165,10 @@ def test_v2v_update_all_multi_fn():
         return {'m2': edges.src['f2'] * edges.data['e2']}
 
     def reduce_func(nodes):
-        return {'v1': th.sum(nodes.mailbox['m2'], 1)}
+        return {'v1': F.sum(nodes.mailbox['m2'], 1)}
 
     g = generate_graph()
-    g.set_n_repr({'v1' : th.zeros((10,)), 'v2' : th.zeros((10,))})
+    g.set_n_repr({'v1' : F.zeros((10,)), 'v2' : F.zeros((10,))})
     fld = 'f2'
 
     g.update_all(message_func, reduce_func)
@@ -179,8 +178,8 @@ def test_v2v_update_all_multi_fn():
     g.update_all(fn.copy_src(src=fld, out='m'), [fn.sum(msg='m', out='v2'), fn.sum(msg='m', out='v3')])
     v2 = g.ndata['v2']
     v3 = g.ndata['v3']
-    assert U.allclose(v1, v2)
-    assert U.allclose(v1, v3)
+    assert F.allclose(v1, v2)
+    assert F.allclose(v1, v3)
 
     # update all with edge weights, 2 message, 3 reduces
     g.update_all([fn.src_mul_edge(src=fld, edge='e1', out='m1'), fn.src_mul_edge(src=fld, edge='e2', out='m2')],
@@ -189,17 +188,17 @@ def test_v2v_update_all_multi_fn():
     v1 = g.ndata['v1']
     v2 = g.ndata['v2']
     v3 = g.ndata['v3']
-    assert U.allclose(v1, v2)
-    assert U.allclose(v1, v3)
+    assert F.allclose(v1, v2)
+    assert F.allclose(v1, v3)
 
     # run UDF with single message and reduce
     g.update_all(message_func_edge, reduce_func, None)
     v2 = g.ndata['v2']
-    assert U.allclose(v1, v2)
+    assert F.allclose(v1, v2)
 
 def test_v2v_snr_multi_fn():
-    u = th.tensor([0, 0, 0, 3, 4, 9])
-    v = th.tensor([1, 2, 3, 9, 9, 0])
+    u = F.tensor([0, 0, 0, 3, 4, 9])
+    v = F.tensor([1, 2, 3, 9, 9, 0])
 
     def message_func(edges):
         return {'m2': edges.src['f2']}
@@ -208,11 +207,11 @@ def test_v2v_snr_multi_fn():
         return {'m2': edges.src['f2'] * edges.data['e2']}
 
     def reduce_func(nodes):
-        return {'v1' : th.sum(nodes.mailbox['m2'], 1)}
+        return {'v1' : F.sum(nodes.mailbox['m2'], 1)}
 
     g = generate_graph()
-    g.set_n_repr({'v1' : th.zeros((10, D)), 'v2' : th.zeros((10, D)),
-        'v3' : th.zeros((10, D))})
+    g.set_n_repr({'v1' : F.zeros((10, D)), 'v2' : F.zeros((10, D)),
+        'v3' : F.zeros((10, D))})
     fld = 'f2'
 
     g.send_and_recv((u, v), message_func, reduce_func)
@@ -225,8 +224,8 @@ def test_v2v_snr_multi_fn():
             None)
     v2 = g.ndata['v2']
     v3 = g.ndata['v3']
-    assert U.allclose(v1, v2)
-    assert U.allclose(v1, v3)
+    assert F.allclose(v1, v2)
+    assert F.allclose(v1, v3)
 
     # send and recv with edge weights, 2 message, 3 reduces
     g.send_and_recv((u, v),
@@ -236,14 +235,14 @@ def test_v2v_snr_multi_fn():
     v1 = g.ndata['v1']
     v2 = g.ndata['v2']
     v3 = g.ndata['v3']
-    assert U.allclose(v1, v2)
-    assert U.allclose(v1, v3)
+    assert F.allclose(v1, v2)
+    assert F.allclose(v1, v3)
 
     # run UDF with single message and reduce
     g.send_and_recv((u, v), message_func_edge,
             reduce_func, None)
     v2 = g.ndata['v2']
-    assert U.allclose(v1, v2)
+    assert F.allclose(v1, v2)
 
 def test_e2v_update_all_multi_fn():
     def _test(fld):
@@ -252,7 +251,7 @@ def test_e2v_update_all_multi_fn():
                     'm2' : edges.src[fld] * edges.dst[fld]}
 
         def reduce_func(nodes):
-            return {fld : th.sum(nodes.mailbox['m1'] + nodes.mailbox['m2'], 1)}
+            return {fld : F.sum(nodes.mailbox['m1'] + nodes.mailbox['m2'], 1)}
 
         def apply_func(nodes):
             return {fld : 2 * nodes.data[fld]}
@@ -274,7 +273,7 @@ def test_e2v_update_all_multi_fn():
                      apply_func_2)
         v3 = g.get_n_repr()[fld]
 
-        assert U.allclose(v2, v3)
+        assert F.allclose(v2, v3)
 
     # test 1d node features
     _test('f1')
@@ -282,15 +281,15 @@ def test_e2v_update_all_multi_fn():
     _test('f2')
 
 def test_e2v_snr_multi_fn():
-    u = th.tensor([0, 0, 0, 3, 4, 9])
-    v = th.tensor([1, 2, 3, 9, 9, 0])
+    u = F.tensor([0, 0, 0, 3, 4, 9])
+    v = F.tensor([1, 2, 3, 9, 9, 0])
     def _test(fld):
         def message_func(edges):
             return {'m1' : edges.src[fld] + edges.dst[fld],
                     'm2' : edges.src[fld] * edges.dst[fld]}
 
         def reduce_func(nodes):
-            return {fld : th.sum(nodes.mailbox['m1'] + nodes.mailbox['m2'], 1)}
+            return {fld : F.sum(nodes.mailbox['m1'] + nodes.mailbox['m2'], 1)}
 
         def apply_func(nodes):
             return {fld : 2 * nodes.data[fld]}
@@ -312,7 +311,7 @@ def test_e2v_snr_multi_fn():
                         apply_func_2)
         v3 = g.get_n_repr()[fld]
 
-        assert U.allclose(v2, v3)
+        assert F.allclose(v2, v3)
 
     # test 1d node features
     _test('f1')
@@ -320,15 +319,15 @@ def test_e2v_snr_multi_fn():
     _test('f2')
 
 def test_e2v_recv_multi_fn():
-    u = th.tensor([0, 0, 0, 3, 4, 9])
-    v = th.tensor([1, 2, 3, 9, 9, 0])
+    u = F.tensor([0, 0, 0, 3, 4, 9])
+    v = F.tensor([1, 2, 3, 9, 9, 0])
     def _test(fld):
         def message_func(edges):
             return {'m1' : edges.src[fld] + edges.dst[fld],
                     'm2' : edges.src[fld] * edges.dst[fld]}
 
         def reduce_func(nodes):
-            return {fld : th.sum(nodes.mailbox['m1'] + nodes.mailbox['m2'], 1)}
+            return {fld : F.sum(nodes.mailbox['m1'] + nodes.mailbox['m2'], 1)}
 
         def apply_func(nodes):
             return {fld : 2 * nodes.data[fld]}
@@ -352,7 +351,7 @@ def test_e2v_recv_multi_fn():
                apply_func_2)
         v3 = g.get_n_repr()[fld]
 
-        assert U.allclose(v2, v3)
+        assert F.allclose(v2, v3)
 
     # test 1d node features
     _test('f1')
@@ -366,19 +365,19 @@ def test_update_all_multi_fallback():
     for i in range(1, 9):
         g.add_edge(0, i)
         g.add_edge(i, 9)
-    g.ndata['h'] = th.randn(10, D)
-    g.edata['w1'] = th.randn(16,)
-    g.edata['w2'] = th.randn(16, D)
+    g.ndata['h'] = F.randn((10, D))
+    g.edata['w1'] = F.randn((16,))
+    g.edata['w2'] = F.randn((16, D))
     def _mfunc_hxw1(edges):
-        return {'m1' : edges.src['h'] * th.unsqueeze(edges.data['w1'], 1)}
+        return {'m1' : edges.src['h'] * F.unsqueeze(edges.data['w1'], 1)}
     def _mfunc_hxw2(edges):
         return {'m2' : edges.src['h'] * edges.data['w2']}
     def _rfunc_m1(nodes):
-        return {'o1' : th.sum(nodes.mailbox['m1'], 1)}
+        return {'o1' : F.sum(nodes.mailbox['m1'], 1)}
     def _rfunc_m2(nodes):
-        return {'o2' : th.sum(nodes.mailbox['m2'], 1)}
+        return {'o2' : F.sum(nodes.mailbox['m2'], 1)}
     def _rfunc_m1max(nodes):
-        return {'o3' : th.max(nodes.mailbox['m1'], 1)[0]}
+        return {'o3' : F.max(nodes.mailbox['m1'], 1)}
     def _afunc(nodes):
         ret = {}
         for k, v in nodes.data.items():
@@ -396,29 +395,29 @@ def test_update_all_multi_fallback():
     g.update_all(fn.src_mul_edge(src='h', edge='w1', out='m1'),
                  fn.sum(msg='m1', out='o1'),
                  _afunc)
-    assert U.allclose(o1, g.ndata.pop('o1'))
+    assert F.allclose(o1, g.ndata.pop('o1'))
     # v2v fallback to e2v
     g.update_all(fn.src_mul_edge(src='h', edge='w2', out='m2'),
                  fn.sum(msg='m2', out='o2'),
                  _afunc)
-    assert U.allclose(o2, g.ndata.pop('o2'))
+    assert F.allclose(o2, g.ndata.pop('o2'))
     # v2v fallback to degree bucketing
     g.update_all(fn.src_mul_edge(src='h', edge='w1', out='m1'),
                  fn.max(msg='m1', out='o3'),
                  _afunc)
-    assert U.allclose(o3, g.ndata.pop('o3'))
+    assert F.allclose(o3, g.ndata.pop('o3'))
     # multi builtins, both v2v spmv
     g.update_all([fn.src_mul_edge(src='h', edge='w1', out='m1'), fn.src_mul_edge(src='h', edge='w1', out='m2')],
                  [fn.sum(msg='m1', out='o1'), fn.sum(msg='m2', out='o2')],
                  _afunc)
-    assert U.allclose(o1, g.ndata.pop('o1'))
-    assert U.allclose(o1, g.ndata.pop('o2'))
+    assert F.allclose(o1, g.ndata.pop('o1'))
+    assert F.allclose(o1, g.ndata.pop('o2'))
     # multi builtins, one v2v spmv, one fallback to e2v
     g.update_all([fn.src_mul_edge(src='h', edge='w1', out='m1'), fn.src_mul_edge(src='h', edge='w2', out='m2')],
                  [fn.sum(msg='m1', out='o1'), fn.sum(msg='m2', out='o2')],
                  _afunc)
-    assert U.allclose(o1, g.ndata.pop('o1'))
-    assert U.allclose(o2, g.ndata.pop('o2'))
+    assert F.allclose(o1, g.ndata.pop('o1'))
+    assert F.allclose(o2, g.ndata.pop('o2'))
     # multi builtins, one v2v spmv, one fallback to e2v, one fallback to degree-bucketing
     g.update_all([fn.src_mul_edge(src='h', edge='w1', out='m1'),
                   fn.src_mul_edge(src='h', edge='w2', out='m2'),
@@ -427,9 +426,9 @@ def test_update_all_multi_fallback():
                   fn.sum(msg='m2', out='o2'),
                   fn.max(msg='m3', out='o3')],
                  _afunc)
-    assert U.allclose(o1, g.ndata.pop('o1'))
-    assert U.allclose(o2, g.ndata.pop('o2'))
-    assert U.allclose(o3, g.ndata.pop('o3'))
+    assert F.allclose(o1, g.ndata.pop('o1'))
+    assert F.allclose(o2, g.ndata.pop('o2'))
+    assert F.allclose(o3, g.ndata.pop('o3'))
 
 
 def test_pull_multi_fallback():
@@ -439,19 +438,19 @@ def test_pull_multi_fallback():
     for i in range(1, 9):
         g.add_edge(0, i)
         g.add_edge(i, 9)
-    g.ndata['h'] = th.randn(10, D)
-    g.edata['w1'] = th.randn(16,)
-    g.edata['w2'] = th.randn(16, D)
+    g.ndata['h'] = F.randn((10, D))
+    g.edata['w1'] = F.randn((16,))
+    g.edata['w2'] = F.randn((16, D))
     def _mfunc_hxw1(edges):
-        return {'m1' : edges.src['h'] * th.unsqueeze(edges.data['w1'], 1)}
+        return {'m1' : edges.src['h'] * F.unsqueeze(edges.data['w1'], 1)}
     def _mfunc_hxw2(edges):
         return {'m2' : edges.src['h'] * edges.data['w2']}
     def _rfunc_m1(nodes):
-        return {'o1' : th.sum(nodes.mailbox['m1'], 1)}
+        return {'o1' : F.sum(nodes.mailbox['m1'], 1)}
     def _rfunc_m2(nodes):
-        return {'o2' : th.sum(nodes.mailbox['m2'], 1)}
+        return {'o2' : F.sum(nodes.mailbox['m2'], 1)}
     def _rfunc_m1max(nodes):
-        return {'o3' : th.max(nodes.mailbox['m1'], 1)[0]}
+        return {'o3' : F.max(nodes.mailbox['m1'], 1)}
     def _afunc(nodes):
         ret = {}
         for k, v in nodes.data.items():
@@ -471,31 +470,31 @@ def test_pull_multi_fallback():
         g.pull(nodes, fn.src_mul_edge(src='h', edge='w1', out='m1'),
                      fn.sum(msg='m1', out='o1'),
                      _afunc)
-        assert U.allclose(o1, g.ndata.pop('o1'))
+        assert F.allclose(o1, g.ndata.pop('o1'))
         # v2v fallback to e2v
         g.pull(nodes, fn.src_mul_edge(src='h', edge='w2', out='m2'),
                      fn.sum(msg='m2', out='o2'),
                      _afunc)
-        assert U.allclose(o2, g.ndata.pop('o2'))
+        assert F.allclose(o2, g.ndata.pop('o2'))
         # v2v fallback to degree bucketing
         g.pull(nodes, fn.src_mul_edge(src='h', edge='w1', out='m1'),
                      fn.max(msg='m1', out='o3'),
                      _afunc)
-        assert U.allclose(o3, g.ndata.pop('o3'))
+        assert F.allclose(o3, g.ndata.pop('o3'))
         # multi builtins, both v2v spmv
         g.pull(nodes,
                [fn.src_mul_edge(src='h', edge='w1', out='m1'), fn.src_mul_edge(src='h', edge='w1', out='m2')],
                [fn.sum(msg='m1', out='o1'), fn.sum(msg='m2', out='o2')],
                _afunc)
-        assert U.allclose(o1, g.ndata.pop('o1'))
-        assert U.allclose(o1, g.ndata.pop('o2'))
+        assert F.allclose(o1, g.ndata.pop('o1'))
+        assert F.allclose(o1, g.ndata.pop('o2'))
         # multi builtins, one v2v spmv, one fallback to e2v
         g.pull(nodes,
                [fn.src_mul_edge(src='h', edge='w1', out='m1'), fn.src_mul_edge(src='h', edge='w2', out='m2')],
                [fn.sum(msg='m1', out='o1'), fn.sum(msg='m2', out='o2')],
                _afunc)
-        assert U.allclose(o1, g.ndata.pop('o1'))
-        assert U.allclose(o2, g.ndata.pop('o2'))
+        assert F.allclose(o1, g.ndata.pop('o1'))
+        assert F.allclose(o2, g.ndata.pop('o2'))
         # multi builtins, one v2v spmv, one fallback to e2v, one fallback to degree-bucketing
         g.pull(nodes,
                [fn.src_mul_edge(src='h', edge='w1', out='m1'),
@@ -505,9 +504,9 @@ def test_pull_multi_fallback():
                 fn.sum(msg='m2', out='o2'),
                 fn.max(msg='m3', out='o3')],
                _afunc)
-        assert U.allclose(o1, g.ndata.pop('o1'))
-        assert U.allclose(o2, g.ndata.pop('o2'))
-        assert U.allclose(o3, g.ndata.pop('o3'))
+        assert F.allclose(o1, g.ndata.pop('o1'))
+        assert F.allclose(o2, g.ndata.pop('o2'))
+        assert F.allclose(o3, g.ndata.pop('o3'))
     # test#1: non-0deg nodes
     nodes = [1, 2, 9]
     _pull_nodes(nodes)
@@ -517,10 +516,10 @@ def test_pull_multi_fallback():
 
 def test_spmv_3d_feat():
     def src_mul_edge_udf(edges):
-        return {'sum': edges.src['h'] * edges.data['h'].unsqueeze(1).unsqueeze(1)}
+        return {'sum': edges.src['h'] * F.unsqueeze(F.unsqueeze(edges.data['h'], 1), 1)}
 
     def sum_udf(nodes):
-        return {'h': nodes.mailbox['sum'].sum(1)}
+        return {'h': F.sum(nodes.mailbox['sum'], 1)}
 
     n = 100
     p = 0.1
@@ -529,8 +528,8 @@ def test_spmv_3d_feat():
     m = g.number_of_edges()
 
     # test#1: v2v with adj data
-    h = th.randn((n, 5, 5))
-    e = th.randn((m,))
+    h = F.randn((n, 5, 5))
+    e = F.randn((m,))
 
     g.ndata['h'] = h
     g.edata['h'] = e
@@ -540,19 +539,19 @@ def test_spmv_3d_feat():
     g.ndata['h'] = h
     g.edata['h'] = e
     g.update_all(message_func=src_mul_edge_udf, reduce_func=fn.sum('sum', 'h')) # 2
-    assert U.allclose(g.ndata['h'], ans)
+    assert F.allclose(g.ndata['h'], ans)
 
     g.ndata['h'] = h
     g.edata['h'] = e
     g.update_all(message_func=src_mul_edge_udf, reduce_func=sum_udf) # 3
-    assert U.allclose(g.ndata['h'], ans)
+    assert F.allclose(g.ndata['h'], ans)
 
     # test#2: e2v
     def src_mul_edge_udf(edges):
         return {'sum': edges.src['h'] * edges.data['h']}
 
-    h = th.randn((n, 5, 5))
-    e = th.randn((m, 5, 5))
+    h = F.randn((n, 5, 5))
+    e = F.randn((m, 5, 5))
 
     g.ndata['h'] = h
     g.edata['h'] = e
@@ -562,12 +561,12 @@ def test_spmv_3d_feat():
     g.ndata['h'] = h
     g.edata['h'] = e
     g.update_all(message_func=src_mul_edge_udf, reduce_func=fn.sum('sum', 'h')) # 2
-    assert U.allclose(g.ndata['h'], ans)
+    assert F.allclose(g.ndata['h'], ans)
 
     g.ndata['h'] = h
     g.edata['h'] = e
     g.update_all(message_func=src_mul_edge_udf, reduce_func=sum_udf) # 3
-    assert U.allclose(g.ndata['h'], ans)
+    assert F.allclose(g.ndata['h'], ans)
 
 if __name__ == '__main__':
     test_v2v_update_all()
