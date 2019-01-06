@@ -1,10 +1,10 @@
 """Base graph class specialized for neural networks on graphs."""
 from __future__ import absolute_import
 
-import networkx as nx
 from collections import defaultdict
 
 import dgl
+import networkx as nx
 from .base import ALL, is_all, DGLError
 from . import backend as F
 from . import init
