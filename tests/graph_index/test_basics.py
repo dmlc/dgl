@@ -1,4 +1,4 @@
-from dgl import DGLError
+from dgl import DGLError, DGLGraph
 from dgl.utils import toindex
 from dgl.graph_index import create_graph_index
 import networkx as nx
@@ -114,6 +114,24 @@ def test_nx():
     assert 1 in gi.edge_id(1, 2)
     assert gi.number_of_edges() == 2
     assert gi.number_of_nodes() == 3
+
+    # Networkx graph whose nodes are not
+    # labeled with consecutive integers
+    nxg = nx.cycle_graph(10)
+    nxg.remove_nodes_from([0, 1, 3, 8, 9])
+
+    gi = create_graph_index(nxg)
+    assert gi.number_of_nodes() == 5
+    assert gi.number_of_edges() == 6
+    assert gi.has_edges_between(toindex([1, 2, 3]), toindex([2, 3, 4]))
+
+    g = DGLGraph()
+    g.from_networkx(nxg)
+    assert g.number_of_nodes() == 5
+    assert g.number_of_edges() == 6
+    assert g.has_edge_between(1, 2)
+    assert g.has_edge_between(2, 3)
+    assert g.has_edge_between(3, 4)
 
 def test_predsucc():
     gi = create_graph_index(multigraph=True)

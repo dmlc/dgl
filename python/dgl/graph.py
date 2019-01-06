@@ -1,6 +1,7 @@
 """Base graph class specialized for neural networks on graphs."""
 from __future__ import absolute_import
 
+import networkx as nx
 from collections import defaultdict
 
 import dgl
@@ -39,6 +40,9 @@ class DGLGraph(object):
     ----------
     graph_data : graph data, optional
         Data to initialize graph. Same as networkx's semantics.
+        If ``graph_data`` is a networkx object whose node labels
+        are not consecutive integers, its nodes will be relabeled
+        using consecutive integers.
     node_frame : FrameRef, optional
         Node feature storage.
     edge_frame : FrameRef, optional
@@ -1137,11 +1141,16 @@ class DGLGraph(object):
         Parameters
         ----------
         nx_graph : networkx.DiGraph
-            The nx graph
+            If the node labels of ``nx_graph`` are not consecutive
+            integers, its nodes will be relabeled using consecutive integers.
         node_attrs : iterable of str, optional
-            The node attributes needs to be copied.
+            The node attributes needs to be copied. If the nodes of
+            ``nx_graph`` are not indexed with consecutive integers,
+            make sure ``node_attrs`` will match the relabeled nodes.
         edge_attrs : iterable of str, optional
-            The edge attributes needs to be copied.
+            The edge attributes needs to be copied. If the nodes of
+            ``nx_graph`` are not indexed with consecutive integers,
+            make sure ``edge_attrs`` will match the relabeled nodes.
 
         Examples
         --------
@@ -1165,6 +1174,9 @@ class DGLGraph(object):
                 [2., 2., 2., 2.],
                 [1., 1., 1., 1.]])
         """
+        # Relabel nodes using consecutive integers
+        nx_graph = nx.convert_node_labels_to_integers(nx_graph)
+
         self.clear()
         self._graph.from_networkx(nx_graph)
         self._node_frame.add_rows(self.number_of_nodes())

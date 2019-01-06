@@ -20,6 +20,9 @@ def test_simple_readout():
     me1 = e1.mean(0)    # edge means
     w1 = th.randn(3)
     w2 = th.randn(4)
+    max1 = th.max(n1, 0)[0]
+    max2 = th.max(n2, 0)[0]
+    maxe1 = th.max(e1, 0)[0]
     ws1 = (n1 * w1[:, None]).sum(0)                         # weighted node sums
     ws2 = (n2 * w2[:, None]).sum(0)
     wm1 = (n1 * w1[:, None]).sum(0) / w1[:, None].sum(0)    # weighted node means
@@ -36,20 +39,26 @@ def test_simple_readout():
     assert U.allclose(dgl.mean_nodes(g1, 'x'), m1)
     assert U.allclose(dgl.mean_nodes(g1, 'x', 'w'), wm1)
     assert U.allclose(dgl.mean_edges(g1, 'x'), me1)
+    assert U.allclose(dgl.max_nodes(g1, 'x'), max1)
+    assert U.allclose(dgl.max_edges(g1, 'x'), maxe1)
 
     g = dgl.batch([g1, g2])
     s = dgl.sum_nodes(g, 'x')
     m = dgl.mean_nodes(g, 'x')
+    max = dgl.max_nodes(g, 'x')
     assert U.allclose(s, th.stack([s1, s2], 0))
     assert U.allclose(m, th.stack([m1, m2], 0))
+    assert U.allclose(max, th.stack([max1, max2], 0))
     ws = dgl.sum_nodes(g, 'x', 'w')
     wm = dgl.mean_nodes(g, 'x', 'w')
     assert U.allclose(ws, th.stack([ws1, ws2], 0))
     assert U.allclose(wm, th.stack([wm1, wm2], 0))
     s = dgl.sum_edges(g, 'x')
     m = dgl.mean_edges(g, 'x')
+    max = dgl.max_edges(g, 'x')
     assert U.allclose(s, th.stack([se1, th.zeros(5)], 0))
     assert U.allclose(m, th.stack([me1, th.zeros(5)], 0))
+    assert U.allclose(max, th.stack([maxe1, th.zeros(5)], 0))
 
 
 if __name__ == '__main__':
