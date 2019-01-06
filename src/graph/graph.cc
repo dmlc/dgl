@@ -9,6 +9,7 @@
 #include <set>
 #include <functional>
 #include <tuple>
+#include <cstdint>
 #include "../c_api_common.h"
 
 namespace dgl {
