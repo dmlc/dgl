@@ -371,10 +371,24 @@ class ImmutableGraph {
                                  in_csr_->edge_ids.begin() + in_csr_->indptr[vid + 1]);
   }
 
+  /*!
+   * \brief Sample a subgraph from the seed vertices with neighbor sampling.
+   * The neighbors are sampled with a uniformly distribution.
+   * \return a subgraph
+   */
   SampledSubgraph NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
                                         int num_hops, int expand_factor) const;
 
+  /*!
+   * \brief Get the CSR array that represents the in-edges.
+   * \return the CSR array.
+   */
   CSRArray GetInCSRArray() const;
+
+  /*!
+   * \brief Get the CSR array that represents the out-edges.
+   * \return the CSR array.
+   */
   CSRArray GetOutCSRArray() const;
 
  protected:
