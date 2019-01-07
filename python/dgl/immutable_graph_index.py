@@ -479,19 +479,21 @@ class ImmutableGraphIndex(object):
         """
         raise NotImplementedError('immutable graph doesn\'t implement edge_subgraph for now.')
 
-    def neighbor_sampling(self, seed_ids, expand_factor, num_hops, neighbor_type,
-                          node_prob, max_subgraph_size):
+    def neighbor_sampling(self, seed_ids, expand_factor, num_hops, neighbor_type, node_prob):
         """Neighborhood sampling"""
         if len(seed_ids) == 0:
             return []
-        seed_ids = [v.tousertensor() for v in seed_ids]
-        gis, induced_nodes, induced_edges = self._sparse.neighbor_sampling(seed_ids, expand_factor,
-                                                                           num_hops, neighbor_type,
-                                                                           node_prob,
-                                                                           max_subgraph_size)
-        induced_nodes = [utils.toindex(v) for v in induced_nodes]
-        return [ImmutableSubgraphIndex(gidx, self, induced_n, induced_e)
-                for gidx, induced_n, induced_e in zip(gis, induced_nodes, induced_edges)]
+
+        seed_ids = [v.todgltensor() for v in seed_ids]
+        num_subgs = len(seed_ids)
+        if node_prob is None:
+            rst = _DGLGraphUniformSampling(self, seed_ids, neighbor_type, num_hops, expand_factor)
+        else:
+            rst = _DGLGraphNonUniformSampling(self, node_prob, seed_ids, neighbor_type, num_hops,
+                                              expand_factor)
+
+        return [ImmutableSubgraphIndex(rst(i), self, rst(num_subgs + i),
+                                       rst(num_subgs * 2 + i)) for i in range(num_subgs)]
 
     def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
@@ -703,7 +705,7 @@ class ImmutableSubgraphIndex(ImmutableGraphIndex):
         A lambda function that returns utils.Index
             The parent edge ids.
         """
-        return lambda: utils.toindex(self._induced_edges())
+        return utils.toindex(self._induced_edges)
 
     @property
     def induced_nodes(self):
@@ -801,3 +803,26 @@ def create_immutable_graph_index(graph_data=None):
     return gidx
 
 _init_api("dgl.immutable_graph_index")
+
+_NeighborSamplingAPIs = {
+    1: _CAPI_DGLGraphUniformSampling,
+    2: _CAPI_DGLGraphUniformSampling2,
+    4: _CAPI_DGLGraphUniformSampling4,
+    8: _CAPI_DGLGraphUniformSampling8,
+    16: _CAPI_DGLGraphUniformSampling16,
+    32: _CAPI_DGLGraphUniformSampling32,
+    64: _CAPI_DGLGraphUniformSampling64,
+    128: _CAPI_DGLGraphUniformSampling128,
+}
+
+_EmptyArrays = [utils.toindex(F.ones(shape=(0), dtype=F.int64, ctx=F.cpu()))]
+
+def _DGLGraphUniformSampling(gi, seed_ids, neigh_type, num_hops, expand_factor):
+    num_seeds = len(seed_ids)
+    empty_ids = []
+    if len(seed_ids) > 1 and len(seed_ids) not in _NeighborSamplingAPIs.keys():
+        remain = 2**int(math.ceil(math.log2(len(dgl_ids)))) - len(dgl_ids)
+        empty_ids = _EmptyArrays[0:remain]
+        seed_ids.extend([empty.todgltensor() for empty in empty_ids])
+    assert len(seed_ids) in _NeighborSamplingAPIs.keys()
+    return _NeighborSamplingAPIs[len(seed_ids)](gi._handle, *seed_ids, neigh_type, num_hops, expand_factor, num_seeds)

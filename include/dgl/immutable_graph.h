@@ -16,6 +16,7 @@
 namespace dgl {
 
 struct ImmutableSubgraph;
+struct SampledSubgraph;
 
 /*!
  * \brief Base dgl immutable graph index class.
@@ -370,6 +371,9 @@ class ImmutableGraph {
                                  in_csr_->edge_ids.begin() + in_csr_->indptr[vid + 1]);
   }
 
+  SampledSubgraph NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
+                                        int num_hops, int expand_factor) const;
+
   CSRArray GetInCSRArray() const;
   CSRArray GetOutCSRArray() const;
 
@@ -400,6 +404,10 @@ class ImmutableGraph {
     }
   }
 
+  SampledSubgraph SampleSubgraph(IdArray seed_arr, const float* probability,
+                                 const std::string &neigh_type,
+                                 int num_hops, size_t num_neighbor) const;
+
   // Store the in-edges.
   std::shared_ptr<csr> in_csr_;
   // Store the out-edges.
@@ -426,6 +434,21 @@ struct ImmutableSubgraph {
    * \note This is also a map from the new edge id to the edge id in the parent graph.
    */
   IdArray induced_edges;
+};
+
+/*!
+ * \brief When we sample a subgraph, we need to store extra information,
+ * such as the layer Ids of the vertices and the sampling probability.
+ */
+struct SampledSubgraph: public ImmutableSubgraph {
+  /*!
+   * \brief the layer of a sampled vertex in the subgraph.
+   */
+  IdArray layer_ids;
+  /*!
+   * \brief the probability that a vertex is sampled.
+   */
+  runtime::NDArray sample_prob;
 };
 
 }  // namespace dgl

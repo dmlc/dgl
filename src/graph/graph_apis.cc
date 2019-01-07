@@ -93,6 +93,30 @@ PackedFunc ConvertSubgraphToPackedFunc(const ImmutableSubgraph& sg) {
   return PackedFunc(body);
 }
 
+// Convert Sampled Subgraph structures to PackedFunc.
+PackedFunc ConvertSubgraphToPackedFunc(const std::vector<SampledSubgraph>& sg) {
+  auto body = [sg] (DGLArgs args, DGLRetValue* rv) {
+      const int which = args[0];
+      if (which < sg.size()) {
+        ImmutableGraph* gptr = new ImmutableGraph();
+        *gptr = std::move(sg[which].graph);
+        GraphHandle ghandle = gptr;
+        *rv = ghandle;
+      } else if (which >= sg.size() && which < sg.size() * 2) {
+        *rv = std::move(sg[which - sg.size()].induced_vertices);
+      } else if (which >= sg.size() * 2 && which < sg.size() * 3) {
+        *rv = std::move(sg[which - sg.size() * 2].induced_edges);
+      } else if (which >= sg.size() * 3 && which < sg.size() * 4) {
+        *rv = std::move(sg[which - sg.size() * 3].layer_ids);
+      } else if (which >= sg.size() * 4 && which < sg.size() * 5) {
+        *rv = std::move(sg[which - sg.size() * 4].sample_prob);
+      } else {
+        LOG(FATAL) << "invalid choice";
+      }
+    };
+  return PackedFunc(body);
+}
+
 }  // namespace
 
 ///////////////////////////// Graph API ///////////////////////////////////
@@ -622,5 +646,42 @@ DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphGetCSR")
     }
     *rv = ConvertCSRArrayToPackedFunc(csr);
   });
+
+template<int num_seeds>
+void CAPI_NeighborUniformSample(DGLArgs args, DGLRetValue* rv) {
+  GraphHandle ghandle = args[0];
+  std::vector<IdArray> seeds(num_seeds);
+  for (size_t i = 0; i < seeds.size(); i++)
+    seeds[i] = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[i + 1]));
+  std::string neigh_type = args[num_seeds + 1];
+  int num_hops = args[num_seeds + 2];
+  int num_neighbors = args[num_seeds + 3];
+  int num_valid_seeds = args[num_seeds + 4];
+  const ImmutableGraph *gptr = static_cast<ImmutableGraph*>(ghandle);
+  assert(num_valid_seeds <= num_seeds);
+  std::vector<SampledSubgraph> subgs(seeds.size());
+#pragma omp parallel for
+  for (int i = 0; i < num_valid_seeds; i++) {
+    subgs[i] = gptr->NeighborUniformSample(seeds[i], neigh_type, num_hops, num_neighbors);
+  }
+  *rv = ConvertSubgraphToPackedFunc(subgs);
+}
+
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphUniformSampling")
+.set_body(CAPI_NeighborUniformSample<1>);
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphUniformSampling2")
+.set_body(CAPI_NeighborUniformSample<2>);
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphUniformSampling4")
+.set_body(CAPI_NeighborUniformSample<4>);
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphUniformSampling8")
+.set_body(CAPI_NeighborUniformSample<8>);
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphUniformSampling16")
+.set_body(CAPI_NeighborUniformSample<16>);
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphUniformSampling32")
+.set_body(CAPI_NeighborUniformSample<32>);
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphUniformSampling64")
+.set_body(CAPI_NeighborUniformSample<64>);
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphUniformSampling128")
+.set_body(CAPI_NeighborUniformSample<128>);
 
 }  // namespace dgl
