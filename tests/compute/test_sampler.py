@@ -1,6 +1,4 @@
-import os
-os.environ['DGLBACKEND'] = 'mxnet'
-import mxnet as mx
+import backend as F
 import numpy as np
 import scipy as sp
 import dgl
@@ -19,7 +17,7 @@ def test_1neighbor_sampler_all():
         assert len(seed_ids) == 1
         src, dst, eid = g.in_edges(seed_ids, form='all')
         # Test if there is a self loop
-        self_loop = mx.nd.sum(src == dst).asnumpy() == 1
+        self_loop = F.asnumpy(F.sum(src == dst, 0)) == 1
         if self_loop:
             assert subg.number_of_nodes() == len(src)
         else:
@@ -30,22 +28,22 @@ def test_1neighbor_sampler_all():
         child_src, child_dst, child_eid = subg.in_edges(child_ids, form='all')
 
         child_src1 = subg.map_to_subgraph_nid(src)
-        assert mx.nd.sum(child_src1 == child_src).asnumpy() == len(src)
+        assert F.asnumpy(F.sum(child_src1 == child_src, 0)) == len(src)
 
 def is_sorted(arr):
-    return np.sum(np.sort(arr) == arr) == len(arr)
+    return np.sum(np.sort(arr) == arr, 0) == len(arr)
 
 def verify_subgraph(g, subg, seed_id):
     src, dst, eid = g.in_edges(seed_id, form='all')
     child_id = subg.map_to_subgraph_nid(seed_id)
     child_src, child_dst, child_eid = subg.in_edges(child_id, form='all')
-    child_src = child_src.asnumpy()
+    child_src = F.asnumpy(child_src)
     # We don't allow duplicate elements in the neighbor list.
     assert(len(np.unique(child_src)) == len(child_src))
     # The neighbor list also needs to be sorted.
     assert(is_sorted(child_src))
 
-    child_src1 = subg.map_to_subgraph_nid(src).asnumpy()
+    child_src1 = F.asnumpy(subg.map_to_subgraph_nid(src))
     child_src1 = child_src1[child_src1 >= 0]
     for i in child_src:
         assert i in child_src1
@@ -84,7 +82,7 @@ def test_10neighbor_sampler_all():
         child_src, child_dst, child_eid = subg.in_edges(child_ids, form='all')
 
         child_src1 = subg.map_to_subgraph_nid(src)
-        assert mx.nd.sum(child_src1 == child_src).asnumpy() == len(src)
+        assert F.asnumpy(F.sum(child_src1 == child_src, 0)) == len(src)
 
 def check_10neighbor_sampler(g, seeds):
     # In this case, NeighborSampling simply gets the neighborhood of a single vertex.
