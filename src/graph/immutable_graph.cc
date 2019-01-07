@@ -4,6 +4,7 @@
  * \brief DGL immutable graph index implementation
  */
 
+#include <stdlib.h>
 #include <dgl/immutable_graph.h>
 
 #include "../c_api_common.h"

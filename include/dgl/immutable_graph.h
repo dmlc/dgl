@@ -19,6 +19,12 @@ namespace dgl {
 struct ImmutableSubgraph;
 struct SampledSubgraph;
 
+template<class ForwardIt, class T>
+bool binary_search(ForwardIt first, ForwardIt last, const T& value) {
+  first = std::lower_bound(first, last, value);
+  return (!(first == last) && !(value < *first));
+}
+
 /*!
  * \brief Base dgl immutable graph index class.
  *
@@ -145,11 +151,11 @@ class ImmutableGraph {
     if (!HasVertex(src) || !HasVertex(dst)) return false;
     if (this->in_csr_) {
       auto pred = this->in_csr_->GetIndexRef(dst);
-      return std::binary_search(pred.first, pred.second, src);
+      return binary_search(pred.first, pred.second, src);
     } else {
       assert(this->out_csr_);
       auto succ = this->out_csr_->GetIndexRef(src);
-      return std::binary_search(succ.first, succ.second, dst);
+      return binary_search(succ.first, succ.second, dst);
     }
   }
 
