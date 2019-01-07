@@ -775,13 +775,13 @@ def create_immutable_graph_index(graph_data=None):
             "The selected backend doesn't support read-only graph!"
 
     # Let's create an empty graph index first.
-    gi = ImmutableGraphIndex(None)
+    gidx = ImmutableGraphIndex(None)
 
     # edge list
     if isinstance(graph_data, (list, tuple)):
         try:
-            gi.from_edge_list(graph_data)
-            return gi
+            gidx.from_edge_list(graph_data)
+            return gidx
         except Exception:  # pylint: disable=broad-except
             raise DGLError('Graph data is not a valid edge list for immutable_graph_index.')
 
@@ -790,7 +790,7 @@ def create_immutable_graph_index(graph_data=None):
         try:
             gidx.from_scipy_sparse_matrix(graph_data)
             return gidx
-        except Exception:  # pylint: disable=broad-except
+        except Exception as e:  # pylint: disable=broad-except
             raise DGLError('Graph data is not a valid scipy sparse matrix.')
 
     # networkx - any format
