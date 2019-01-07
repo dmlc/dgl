@@ -92,7 +92,6 @@ Stochastic Steady-state Embedding (SSE)
 import mxnet as mx
 import os
 import dgl
-dgl.load_backend("mxnet")
 
 def T(g):
     def message_func(edges):
