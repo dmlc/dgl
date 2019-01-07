@@ -7,6 +7,7 @@
 #define DGL_IMMUTABLE_GRAPH_H_
 
 #include <vector>
+#include <string>
 #include <cstdint>
 #include <utility>
 #include <tuple>
@@ -39,6 +40,7 @@ class ImmutableGraph {
   };
 
   struct csr {
+    typedef std::shared_ptr<csr> ptr;
     std::vector<int64_t> indptr;
     std::vector<dgl_id_t> indices;
     std::vector<dgl_id_t> edge_ids;
@@ -72,16 +74,16 @@ class ImmutableGraph {
       int64_t end = indptr[v + 1];
       return std::pair<const dgl_id_t *, const dgl_id_t *>(&indices[start], &indices[end]);
     }
-    std::shared_ptr<csr> Transpose() const;
-    std::pair<std::shared_ptr<csr>, IdArray> VertexSubgraph(IdArray vids) const;
-    static std::shared_ptr<csr> from_edges(std::vector<edge> &edges, int sort_on, int64_t num_nodes);
+    csr::ptr Transpose() const;
+    std::pair<csr::ptr, IdArray> VertexSubgraph(IdArray vids) const;
+    static csr::ptr from_edges(std::vector<edge> *edges, int sort_on, int64_t num_nodes);
   };
 
   ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
                  bool multigraph = false);
 
-  ImmutableGraph(std::shared_ptr<csr> in_csr, std::shared_ptr<csr> out_csr,
-      bool multigraph = false) : is_multigraph_(multigraph) {
+  ImmutableGraph(csr::ptr in_csr, csr::ptr out_csr,
+                 bool multigraph = false) : is_multigraph_(multigraph) {
     this->in_csr_ = in_csr;
     this->out_csr_ = out_csr;
   }
@@ -97,7 +99,6 @@ class ImmutableGraph {
   ImmutableGraph(ImmutableGraph&& other) = default;
 #else
   ImmutableGraph(ImmutableGraph&& other) {
-    // TODO
   }
 #endif  // _MSC_VER
 
@@ -399,7 +400,7 @@ class ImmutableGraph {
    * When we get in csr or out csr, we try to get the one cached in the structure.
    * If not, we transpose the other one to get the one we need.
    */
-  std::shared_ptr<csr> GetInCSR() const {
+  csr::ptr GetInCSR() const {
     if (in_csr_) {
       return in_csr_;
     } else {
@@ -408,7 +409,7 @@ class ImmutableGraph {
       return in_csr_;
     }
   }
-  std::shared_ptr<csr> GetOutCSR() const {
+  csr::ptr GetOutCSR() const {
     if (out_csr_) {
       return out_csr_;
     } else {
@@ -425,9 +426,9 @@ class ImmutableGraph {
   void CompactSubgraph(IdArray induced_vertices);
 
   // Store the in-edges.
-  std::shared_ptr<csr> in_csr_;
+  csr::ptr in_csr_;
   // Store the out-edges.
-  std::shared_ptr<csr> out_csr_;
+  csr::ptr out_csr_;
   /*!
    * \brief Whether if this is a multigraph.
    *

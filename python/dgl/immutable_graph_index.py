@@ -29,6 +29,7 @@ class ImmutableGraphIndex(object):
         self._cache = {}
 
     def init(self, src_ids, dst_ids, edge_ids, num_nodes):
+        """The actual init function"""
         self._handle = _CAPI_DGLGraphCreate(src_ids.todgltensor(), dst_ids.todgltensor(),
                                             edge_ids.todgltensor(), False, num_nodes)
         self._num_nodes = num_nodes
@@ -342,7 +343,7 @@ class ImmutableGraphIndex(object):
         return src, dst, eid
 
     @utils.cached_member(cache='_cache', prefix='edges')
-    def edges(self, sorted=False):
+    def edges(self, return_sorted=False):
         """Return all the edges
 
         Parameters
@@ -359,9 +360,9 @@ class ImmutableGraphIndex(object):
         utils.Index
             The edge ids.
         """
-        key = 'edges_s%d' % sorted
+        key = 'edges_s%d' % return_sorted
         if key not in self._cache:
-            edge_array = _CAPI_DGLGraphEdges(self._handle, sorted)
+            edge_array = _CAPI_DGLGraphEdges(self._handle, return_sorted)
             src = utils.toindex(edge_array(0))
             dst = utils.toindex(edge_array(1))
             eid = utils.toindex(edge_array(2))
@@ -487,10 +488,10 @@ class ImmutableGraphIndex(object):
         seed_ids = [v.todgltensor() for v in seed_ids]
         num_subgs = len(seed_ids)
         if node_prob is None:
-            rst = _DGLGraphUniformSampling(self, seed_ids, neighbor_type, num_hops, expand_factor)
+            rst = _uniform_sampling(self, seed_ids, neighbor_type, num_hops, expand_factor)
         else:
-            rst = _DGLGraphNonUniformSampling(self, node_prob, seed_ids, neighbor_type, num_hops,
-                                              expand_factor)
+            rst = _nonuniform_sampling(self, node_prob, seed_ids, neighbor_type, num_hops,
+                                       expand_factor)
 
         return [ImmutableSubgraphIndex(rst(i), self, rst(num_subgs + i),
                                        rst(num_subgs * 2 + i)) for i in range(num_subgs)]
@@ -632,7 +633,7 @@ class ImmutableGraphIndex(object):
         ----------
         adj : scipy sparse matrix
         """
-        assert isinstance(adj, sp.csr_matrix) or isinstance(adj, sp.coo_matrix), \
+        assert isinstance(adj, (sp.csr_matrix, sp.coo_matrix)), \
                 "The input matrix has to be a SciPy sparse matrix."
         num_nodes = max(adj.shape[0], adj.shape[1])
         out_mat = adj.tocoo()
@@ -788,7 +789,7 @@ def create_immutable_graph_index(graph_data=None):
         try:
             gidx.from_scipy_sparse_matrix(graph_data)
             return gidx
-        except Exception as e:  # pylint: disable=broad-except
+        except Exception:  # pylint: disable=broad-except
             raise DGLError('Graph data is not a valid scipy sparse matrix.')
 
     # networkx - any format
@@ -802,7 +803,7 @@ def create_immutable_graph_index(graph_data=None):
 
 _init_api("dgl.immutable_graph_index")
 
-_NeighborSamplingAPIs = {
+_NEIGHBOR_SAMPLING_APIS = {
     1: _CAPI_DGLGraphUniformSampling,
     2: _CAPI_DGLGraphUniformSampling2,
     4: _CAPI_DGLGraphUniformSampling4,
@@ -813,14 +814,15 @@ _NeighborSamplingAPIs = {
     128: _CAPI_DGLGraphUniformSampling128,
 }
 
-_EmptyArrays = [utils.toindex(F.ones(shape=(0), dtype=F.int64, ctx=F.cpu()))]
+_EMPTY_ARRAYS = [utils.toindex(F.ones(shape=(0), dtype=F.int64, ctx=F.cpu()))]
 
-def _DGLGraphUniformSampling(gi, seed_ids, neigh_type, num_hops, expand_factor):
+def _uniform_sampling(gidx, seed_ids, neigh_type, num_hops, expand_factor):
     num_seeds = len(seed_ids)
     empty_ids = []
-    if len(seed_ids) > 1 and len(seed_ids) not in _NeighborSamplingAPIs.keys():
+    if len(seed_ids) > 1 and len(seed_ids) not in _NEIGHBOR_SAMPLING_APIS.keys():
         remain = 2**int(math.ceil(math.log2(len(dgl_ids)))) - len(dgl_ids)
-        empty_ids = _EmptyArrays[0:remain]
+        empty_ids = _EMPTY_ARRAYS[0:remain]
         seed_ids.extend([empty.todgltensor() for empty in empty_ids])
-    assert len(seed_ids) in _NeighborSamplingAPIs.keys()
-    return _NeighborSamplingAPIs[len(seed_ids)](gi._handle, *seed_ids, neigh_type, num_hops, expand_factor, num_seeds)
+    assert len(seed_ids) in _NEIGHBOR_SAMPLING_APIS.keys()
+    return _NEIGHBOR_SAMPLING_APIS[len(seed_ids)](gidx._handle, *seed_ids, neigh_type,
+                                                  num_hops, expand_factor, num_seeds)
