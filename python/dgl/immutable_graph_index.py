@@ -771,8 +771,6 @@ def create_immutable_graph_index(graph_data=None):
     """
     if isinstance(graph_data, ImmutableGraphIndex):
         return graph_data
-    assert F.create_immutable_graph_index is not None, \
-            "The selected backend doesn't support read-only graph!"
 
     # Let's create an empty graph index first.
     gidx = ImmutableGraphIndex(None)

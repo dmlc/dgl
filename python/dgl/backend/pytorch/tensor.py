@@ -188,5 +188,3 @@ def zerocopy_to_numpy(input):
 
 def zerocopy_from_numpy(np_array):
     return th.from_numpy(np_array)
-
-# create_immutable_graph_index not enabled

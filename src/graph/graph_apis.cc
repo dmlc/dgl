@@ -484,7 +484,7 @@ DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphHasVertices")
     *rv = gptr->HasVertices(vids);
   });
 
-DGL_REGISTER_GLOBAL("immutable_immutable_graph_index._CAPI_DGLExpandIds")
+DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLExpandIds")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const IdArray ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
     const IdArray offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));

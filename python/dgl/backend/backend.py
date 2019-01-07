@@ -834,7 +834,3 @@ def zerocopy_from_numpy(np_array):
 # ----------------
 # These are not related to tensors. Some of them are temporary workarounds that
 # should be included in DGL in the future.
-
-def create_immutable_graph_index():
-    """Create an immutable graph index object."""
-    pass
