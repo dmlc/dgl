@@ -408,6 +408,8 @@ class ImmutableGraph {
                                  const std::string &neigh_type,
                                  int num_hops, size_t num_neighbor) const;
 
+  void CompactSubgraph(IdArray induced_vertices);
+
   // Store the in-edges.
   std::shared_ptr<csr> in_csr_;
   // Store the out-edges.

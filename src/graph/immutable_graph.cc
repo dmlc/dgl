@@ -891,14 +891,38 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   return subg;
 }
 
+void CompactSubgraph(ImmutableGraph::csr &subg,
+                     const std::unordered_map<dgl_id_t, dgl_id_t> &id_map) {
+  for (size_t i = 0; i < subg.indices.size(); i++) {
+    auto it = id_map.find(subg.indices[i]);
+    assert(it != id_map.end());
+    subg.indices[i] = it->second;
+  }
+}
+
+void ImmutableGraph::CompactSubgraph(IdArray induced_vertices) {
+  // The key is the old id, the value is the id in the subgraph.
+  std::unordered_map<dgl_id_t, dgl_id_t> id_map;
+  const dgl_id_t *vdata = static_cast<dgl_id_t *>(induced_vertices->data);
+  size_t len = induced_vertices->shape[0];
+  for (size_t i = 0; i < len; i++)
+    id_map.insert(std::pair<dgl_id_t, dgl_id_t>(vdata[i], i));
+  if (in_csr_)
+    dgl::CompactSubgraph(*in_csr_, id_map);
+  if (out_csr_)
+    dgl::CompactSubgraph(*out_csr_, id_map);
+}
+
 SampledSubgraph ImmutableGraph::NeighborUniformSample(IdArray seeds,
                                                       const std::string &neigh_type,
                                                       int num_hops, int expand_factor) const {
-  return SampleSubgraph(seeds,                 // seed vector
-                        nullptr,               // sample_id_probability
-                        neigh_type,
-                        num_hops,
-                        expand_factor);
+  auto ret = SampleSubgraph(seeds,                 // seed vector
+                            nullptr,               // sample_id_probability
+                            neigh_type,
+                            num_hops,
+                            expand_factor);
+  ret.graph.CompactSubgraph(ret.induced_vertices);
+  return ret;
 }
 
 }  // namespace dgl
