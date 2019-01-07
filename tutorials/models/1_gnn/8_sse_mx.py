@@ -91,6 +91,7 @@ Stochastic Steady-state Embedding (SSE)
 
 import mxnet as mx
 import os
+os.environ['DGLBACKEND'] = 'mxnet'
 import dgl
 
 def T(g):
