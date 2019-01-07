@@ -7,6 +7,16 @@
 #include <stdlib.h>
 #include <dgl/immutable_graph.h>
 
+#ifdef _MSC_VER
+// TODO(zhengda) it seems MS compiler doesn't have rand_r. Let's
+// use rand for now. This may not have good performance because rand has
+// a global variable shared by all threads.
+int rand_r(unsigned *seed) {
+  return rand();
+}
+#define _CRT_RAND_S
+#endif
+
 #include "../c_api_common.h"
 
 namespace dgl {
