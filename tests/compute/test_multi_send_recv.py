@@ -1,11 +1,9 @@
-import torch as th
-from torch.autograd import Variable
 import numpy as np
 import dgl
 from dgl.graph import DGLGraph
-import utils as U
 from collections import defaultdict as ddict
 import scipy.sparse as sp
+import backend as F
 
 D = 5
 
@@ -18,7 +16,7 @@ def reduce_func(nodes):
     msgs = nodes.mailbox['m']
     assert len(msgs.shape) == 3
     assert msgs.shape[2] == D
-    return {'accum' : th.sum(msgs, 1)}
+    return {'accum' : F.sum(msgs, 1)}
 
 def apply_node_func(nodes):
     return {'h' : nodes.data['h'] + nodes.data['accum']}
@@ -31,8 +29,11 @@ def generate_graph(grad=False):
     for i in range(1, 9):
         g.add_edge(0, i)
         g.add_edge(i, 9)
-    ncol = Variable(th.randn(10, D), requires_grad=grad)
-    ecol = Variable(th.randn(16, D), requires_grad=grad)
+    ncol = F.randn((10, D))
+    ecol = F.randn((16, D))
+    if grad:
+        ncol = F.attach_grad(ncol)
+        ecol = F.attach_grad(ecol)
     g.set_n_initializer(dgl.init.zero_initializer)
     g.set_e_initializer(dgl.init.zero_initializer)
     g.ndata['h'] = ncol
@@ -46,24 +47,24 @@ def test_multi_send():
         return {'m' : edges.src['h']}
     g.register_message_func(_fmsg)
     # many-many send
-    u = th.tensor([0, 0, 0, 0, 0])
-    v = th.tensor([1, 2, 3, 4, 5])
+    u = F.tensor([0, 0, 0, 0, 0])
+    v = F.tensor([1, 2, 3, 4, 5])
     g.send((u, v))
     # duplicate send
-    u = th.tensor([0])
-    v = th.tensor([1, 2, 3, 4, 5])
+    u = F.tensor([0])
+    v = F.tensor([1, 2, 3, 4, 5])
     g.send((u, v))
     # send more
-    u = th.tensor([1, 2, 3, 4, 5])
-    v = th.tensor([9])
+    u = F.tensor([1, 2, 3, 4, 5])
+    v = F.tensor([9])
     g.send((u, v))
 
     # check if message indicator is as expected
-    expected = th.zeros((g.number_of_edges(),), dtype=th.int64)
+    expected = F.zeros((g.number_of_edges(),), dtype=F.int64)
     eid = g.edge_ids([0, 0, 0, 0, 0, 1, 2, 3, 4, 5],
                      [1, 2, 3, 4, 5, 9, 9, 9, 9, 9])
     expected[eid] = 1
-    assert th.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
 
 def test_multi_recv():
     # basic recv test
@@ -72,53 +73,53 @@ def test_multi_recv():
     g.register_message_func(message_func)
     g.register_reduce_func(reduce_func)
     g.register_apply_node_func(apply_node_func)
-    expected = th.zeros((g.number_of_edges(),), dtype=th.int64)
+    expected = F.zeros((g.number_of_edges(),), dtype=F.int64)
     # two separate round of send and recv
     u = [4, 5, 6]
     v = [9]
     g.send((u, v))
     eid = g.edge_ids(u, v)
     expected[eid] = 1
-    assert th.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
     g.recv(v)
     expected[eid] = 0
-    assert th.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
 
     u = [0]
     v = [1, 2, 3]
     g.send((u, v))
     eid = g.edge_ids(u, v)
     expected[eid] = 1
-    assert th.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
     g.recv(v)
     expected[eid] = 0
-    assert th.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
 
     h1 = g.ndata['h']
 
     # one send, two recv
     g.ndata['h'] = h
-    u = th.tensor([0, 0, 0, 4, 5, 6])
-    v = th.tensor([1, 2, 3, 9, 9, 9])
+    u = F.tensor([0, 0, 0, 4, 5, 6])
+    v = F.tensor([1, 2, 3, 9, 9, 9])
     g.send((u, v))
     eid = g.edge_ids(u, v)
     expected[eid] = 1
-    assert th.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
     u = [4, 5, 6]
     v = [9]
     g.recv(v)
     eid = g.edge_ids(u, v)
     expected[eid] = 0
-    assert th.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
     u = [0]
     v = [1, 2, 3]
     g.recv(v)
     eid = g.edge_ids(u, v)
     expected[eid] = 0
-    assert th.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
 
     h2 = g.ndata['h']
-    assert U.allclose(h1, h2)
+    assert F.allclose(h1, h2)
 
 def test_multi_recv_0deg():
     # test recv with 0deg nodes;
@@ -130,7 +131,7 @@ def test_multi_recv_0deg():
     def _apply(nodes):
         return {'h' : nodes.data['h'] * 2}
     def _init2(shape, dtype, ctx, ids):
-        return 2 + th.zeros(shape, dtype=dtype, device=ctx)
+        return 2 + F.zeros(shape, dtype=dtype, ctx=ctx)
     g.register_message_func(_message)
     g.register_reduce_func(_reduce)
     g.register_apply_node_func(_apply)
@@ -138,30 +139,30 @@ def test_multi_recv_0deg():
     g.add_nodes(2)
     g.add_edge(0, 1)
     # recv both 0deg and non-0deg nodes
-    old = th.randn((2, 5))
+    old = F.randn((2, 5))
     g.ndata['h'] = old
     g.send((0, 1))
     g.recv([0, 1])
     new = g.ndata['h']
     # 0deg check: initialized with the func and got applied
-    assert U.allclose(new[0], th.full((5,), 4))
+    assert F.allclose(new[0], F.full((5,), 4, F.float32))
     # non-0deg check
-    assert U.allclose(new[1], th.sum(old, 0) * 2)
+    assert F.allclose(new[1], F.sum(old, 0) * 2)
 
     # recv again on zero degree node
     g.recv([0])
-    assert U.allclose(g.nodes[0].data['h'], th.full((5,), 8))
+    assert F.allclose(g.nodes[0].data['h'], F.full((5,), 8, F.float32))
 
     # recv again on node with no incoming message
     g.recv([1])
-    assert U.allclose(g.nodes[1].data['h'], th.sum(old, 0) * 4)
+    assert F.allclose(g.nodes[1].data['h'], F.sum(old, 0) * 4)
 
 def test_send_twice_different_shape():
     g = generate_graph()
     def _message_1(edges):
         return {'h': edges.src['h']}
     def _message_2(edges):
-        return {'h': th.cat((edges.src['h'], edges.data['w']), dim=1)}
+        return {'h': F.cat((edges.src['h'], edges.data['w']), dim=1)}
     g.send(message_func=_message_1)
     g.send(message_func=_message_2)
 
@@ -176,22 +177,22 @@ def test_send_twice_different_msg():
     def _message_b(edges):
         return {'a': edges.src['a'] * 3}
     def _reduce(nodes):
-        return {'a': nodes.mailbox['a'].max(1)[0]}
+        return {'a': F.max(nodes.mailbox['a'], 1)}
 
-    old_repr = th.randn(3, 5)
+    old_repr = F.randn((3, 5))
     g.ndata['a'] = old_repr
     g.send((0, 1), _message_a)
     g.send((0, 1), _message_b)
     g.recv(1, _reduce)
     new_repr = g.ndata['a']
-    assert U.allclose(new_repr[1], old_repr[0] * 3)
+    assert F.allclose(new_repr[1], old_repr[0] * 3)
 
     g.ndata['a'] = old_repr
     g.send((0, 1), _message_a)
     g.send((2, 1), _message_b)
     g.recv(1, _reduce)
     new_repr = g.ndata['a']
-    assert U.allclose(new_repr[1], th.stack([old_repr[0], old_repr[2] * 3], 0).max(0)[0])
+    assert F.allclose(new_repr[1], F.max(F.stack([old_repr[0], old_repr[2] * 3], 0), 0))
 
 def test_send_twice_different_field():
     g = DGLGraph()
@@ -203,16 +204,16 @@ def test_send_twice_different_field():
     def _message_b(edges):
         return {'b': edges.src['b']}
     def _reduce(nodes):
-        return {'a': nodes.mailbox['a'].sum(1), 'b': nodes.mailbox['b'].sum(1)}
-    old_a = th.randn(2, 5)
-    old_b = th.randn(2, 5)
+        return {'a': F.sum(nodes.mailbox['a'], 1), 'b': F.sum(nodes.mailbox['b'], 1)}
+    old_a = F.randn((2, 5))
+    old_b = F.randn((2, 5))
     g.set_n_repr({'a': old_a, 'b': old_b})
     g.send((0, 1), _message_a)
     g.send((0, 1), _message_b)
     g.recv([1], _reduce)
     new_repr = g.get_n_repr()
-    assert th.allclose(new_repr['a'][1], old_a[0])
-    assert th.allclose(new_repr['b'][1], old_b[0])
+    assert F.allclose(new_repr['a'][1], old_a[0])
+    assert F.allclose(new_repr['b'][1], old_b[0])
 
 def test_dynamic_addition():
     N = 3
@@ -220,7 +221,7 @@ def test_dynamic_addition():
 
     g = DGLGraph()
     def _init(shape, dtype, ctx, ids):
-        return th.randn(shape, dtype=dtype, device=ctx)
+        return F.copy_to(F.astype(F.randn(shape), dtype), ctx)
     g.set_n_initializer(_init)
     g.set_e_initializer(_init)
 
@@ -228,7 +229,7 @@ def test_dynamic_addition():
         return {'m' : edges.src['h1'] + edges.dst['h2'] + edges.data['h1'] +
                 edges.data['h2']}
     def _reduce(nodes):
-        return {'h' : nodes.mailbox['m'].sum(1)}
+        return {'h' : F.sum(nodes.mailbox['m'], 1)}
     def _apply(nodes):
         return {'h' : nodes.data['h']}
 
@@ -240,24 +241,24 @@ def test_dynamic_addition():
 
     # add nodes and edges
     g.add_nodes(N)
-    g.ndata.update({'h1': th.randn(N, D),
-                    'h2': th.randn(N, D)})
+    g.ndata.update({'h1': F.randn((N, D)),
+                    'h2': F.randn((N, D))})
     g.add_nodes(3)
     g.add_edge(0, 1)
     g.add_edge(1, 0)
-    g.edata.update({'h1': th.randn(2, D),
-                    'h2': th.randn(2, D)})
+    g.edata.update({'h1': F.randn((2, D)),
+                    'h2': F.randn((2, D))})
     g.send()
-    expected = th.ones((g.number_of_edges(),), dtype=th.int64)
-    assert th.equal(g._msg_index.tousertensor(), expected)
+    expected = F.ones((g.number_of_edges(),), dtype=F.int64)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
 
     # add more edges
-    g.add_edges([0, 2], [2, 0], {'h1': th.randn(2, D)})
+    g.add_edges([0, 2], [2, 0], {'h1': F.randn((2, D))})
     g.send(([0, 2], [2, 0]))
     g.recv(0)
 
     g.add_edge(1, 2)
-    g.edges[4].data['h1'] = th.randn(1, D)
+    g.edges[4].data['h1'] = F.randn((1, D))
     g.send((1, 2))
     g.recv([1, 2])
 
@@ -266,7 +267,7 @@ def test_dynamic_addition():
     # a complete round of send and recv
     g.send()
     g.recv()
-    assert U.allclose(h, g.ndata['h'])
+    assert F.allclose(h, g.ndata['h'])
 
 def test_recv_no_send():
     g = generate_graph()
@@ -276,14 +277,14 @@ def test_recv_no_send():
     g.add_nodes(3)
     g.add_edges([0, 1], [1, 2])
     g.set_n_initializer(dgl.init.zero_initializer)
-    g.ndata['h'] = th.randn(3, D)
+    g.ndata['h'] = F.randn((3, D))
     g.send((1, 2), message_func)
-    expected = th.zeros((2,), dtype=th.int64)
+    expected = F.zeros((2,), dtype=F.int64)
     expected[1] = 1
-    assert th.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
     g.recv(2, reduce_func)
     expected[1] = 0
-    assert th.equal(g._msg_index.tousertensor(), expected)
+    assert F.array_equal(g._msg_index.tousertensor(), expected)
 
 def test_send_recv_after_conversion():
     # test send and recv after converting from a graph with edges
@@ -303,7 +304,9 @@ def test_send_recv_after_conversion():
     row, col= g.all_edges()
     data = range(len(row))
     n = g.number_of_nodes()
-    a = sp.coo_matrix((data, (row, col)), shape=(n, n))
+    a = sp.coo_matrix(
+            (data, (F.zerocopy_to_numpy(row), F.zerocopy_to_numpy(col))),
+            shape=(n, n))
     g2 = DGLGraph()
     # some random node and edges
     g2.add_nodes(5)
@@ -333,8 +336,8 @@ def test_send_recv_after_conversion():
     g2.recv([0, 2, 4, 8], reduce_func=reduce_func,
             apply_node_func=apply_node_func)
 
-    assert U.allclose(g.ndata['h'], g1.ndata['h'])
-    assert U.allclose(g.ndata['h'], g2.ndata['h'])
+    assert F.allclose(g.ndata['h'], g1.ndata['h'])
+    assert F.allclose(g.ndata['h'], g2.ndata['h'])
 
 
 if __name__ == '__main__':
