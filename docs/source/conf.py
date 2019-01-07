@@ -212,4 +212,5 @@ sphinx_gallery_conf = {
     'within_subsection_order' : FileNameSortKey,
     'filename_pattern' : '.py',
     'download_all_examples' : False,
+    'expected_failing_examples': ['../../tutorials/models/1_gnn/8_sse_mx.py']
 }
