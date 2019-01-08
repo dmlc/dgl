@@ -521,9 +521,10 @@ class ImmutableGraphIndex(object):
         rst = _CAPI_DGLGraphGetCSR(self._handle, transpose)
         indptr = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
         indices = F.copy_to(utils.toindex(rst(1)).tousertensor(), ctx)
+        shuffle = utils.toindex(rst(2))
         dat = F.ones(indices.shape, dtype=F.float32, ctx=ctx)
         return F.sparse_matrix(dat, ('csr', indices, indptr),
-                               (self.number_of_nodes(), self.number_of_nodes()))
+                               (self.number_of_nodes(), self.number_of_nodes()))[0], shuffle
 
     def incidence_matrix(self, typestr, ctx):
         """Return the incidence matrix representation of this graph.
