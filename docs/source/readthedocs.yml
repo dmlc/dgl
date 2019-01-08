@@ -1,6 +1,3 @@
-build:
-  image: latest
-
 formats: []
 
 python:
