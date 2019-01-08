@@ -213,3 +213,9 @@ sphinx_gallery_conf = {
     'filename_pattern' : '.py',
     'download_all_examples' : False,
 }
+
+import os
+if os.environ['DGLBACKEND'] == 'mxnet':
+    sphinx_gallery_conf['filename_pattern'] = "/*(?<=mx)\.py"
+if os.environ['DGLBACKEND'] == 'pytorch':
+    sphinx_gallery_conf['filename_pattern'] = "/*(?<!mx)\.py"
