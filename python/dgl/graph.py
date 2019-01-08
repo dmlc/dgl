@@ -4,7 +4,6 @@ from __future__ import absolute_import
 from collections import defaultdict
 
 import dgl
-import networkx as nx
 from .base import ALL, is_all, DGLError
 from . import backend as F
 from . import init
