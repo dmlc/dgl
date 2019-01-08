@@ -584,7 +584,7 @@ class ImmutableGraphIndex(object):
             The nx graph
         """
         # Relabel nodes using consecutive integers
-        nx_graph = nx.convert_node_labels_to_integers(nx_graph)
+        nx_graph = nx.convert_node_labels_to_integers(nx_graph, ordering='sorted')
 
         if not isinstance(nx_graph, nx.Graph):
             nx_graph = (nx.MultiDiGraph(nx_graph) if self.is_multigraph()

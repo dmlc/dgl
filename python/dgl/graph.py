@@ -1143,6 +1143,7 @@ class DGLGraph(object):
         nx_graph : networkx.DiGraph
             If the node labels of ``nx_graph`` are not consecutive
             integers, its nodes will be relabeled using consecutive integers.
+            The new node ordering will inherit that of ``sorted(nx_graph.nodes())``
         node_attrs : iterable of str, optional
             The node attributes needs to be copied.
         edge_attrs : iterable of str, optional
@@ -1170,9 +1171,8 @@ class DGLGraph(object):
                 [2., 2., 2., 2.],
                 [1., 1., 1., 1.]])
         """
-        nx_graph = nx_graph.to_directed()
-        # Relabel nodes using consecutive integers
-        nx_graph = nx.convert_node_labels_to_integers(nx_graph)
+        if not nx_graph.is_directed():
+            nx_graph = nx_graph.to_directed()
 
         self.clear()
         self._graph.from_networkx(nx_graph)
@@ -1190,7 +1190,7 @@ class DGLGraph(object):
         if node_attrs is not None:
             # mapping from feature name to a list of tensors to be concatenated
             attr_dict = defaultdict(list)
-            for nid in range(self.number_of_nodes()):
+            for nid in nx_graph.nodes():
                 for attr in node_attrs:
                     attr_dict[attr].append(nx_graph.nodes[nid][attr])
             for attr in node_attrs:
