@@ -1,11 +1,20 @@
 import os
 os.environ['DGLBACKEND'] = 'mxnet'
+import networkx as nx
 import mxnet as mx
 import numpy as np
 import scipy as sp
 import dgl
 from dgl.graph_index import map_to_subgraph_nid, GraphIndex, create_graph_index
 from dgl import utils
+
+def generate_from_networkx():
+    edges = [[2, 3], [2, 5], [3, 0], [1, 0], [4, 3], [4, 5]]
+    nx_graph = nx.DiGraph()
+    nx_graph.add_edges_from(edges)
+    g = create_graph_index(nx_graph)
+    ig = create_graph_index(nx_graph, readonly=True)
+    return g, ig
 
 def generate_from_edgelist():
     edges = [[2, 3], [2, 5], [3, 0], [6, 10], [10, 3], [10, 15]]
@@ -30,12 +39,17 @@ def test_graph_gen():
     g, ig = generate_rand_graph(10)
     check_graph_equal(g, ig)
 
+def sort_edges(edges):
+    edges = [e.tousertensor() for e in edges]
+    idx = mx.nd.argsort(edges[2])
+    return (edges[0][idx], edges[1][idx], edges[2][idx])
+
 def check_basics(g, ig):
     assert g.number_of_nodes() == ig.number_of_nodes()
     assert g.number_of_edges() == ig.number_of_edges()
 
-    edges = g.edges()
-    iedges = ig.edges()
+    edges = g.edges(True)
+    iedges = ig.edges(True)
     assert np.all(edges[0].tousertensor().asnumpy() == iedges[0].tousertensor().asnumpy())
     assert np.all(edges[1].tousertensor().asnumpy() == iedges[1].tousertensor().asnumpy())
     assert np.all(edges[2].tousertensor().asnumpy() == iedges[2].tousertensor().asnumpy())
@@ -49,19 +63,19 @@ def check_basics(g, ig):
 
     randv = np.random.randint(0, g.number_of_nodes(), 10)
     randv = utils.toindex(randv)
-    in_src1, in_dst1, in_eids1 = g.in_edges(randv)
-    in_src2, in_dst2, in_eids2 = ig.in_edges(randv)
-    nnz = in_src2.tousertensor().shape[0]
-    assert mx.nd.sum(in_src1.tousertensor() == in_src2.tousertensor()).asnumpy() == nnz
-    assert mx.nd.sum(in_dst1.tousertensor() == in_dst2.tousertensor()).asnumpy() == nnz
-    assert mx.nd.sum(in_eids1.tousertensor() == in_eids2.tousertensor()).asnumpy() == nnz
+    in_src1, in_dst1, in_eids1 = sort_edges(g.in_edges(randv))
+    in_src2, in_dst2, in_eids2 = sort_edges(ig.in_edges(randv))
+    nnz = in_src2.shape[0]
+    assert mx.nd.sum(in_src1 == in_src2).asnumpy() == nnz
+    assert mx.nd.sum(in_dst1 == in_dst2).asnumpy() == nnz
+    assert mx.nd.sum(in_eids1 == in_eids2).asnumpy() == nnz
 
-    out_src1, out_dst1, out_eids1 = g.out_edges(randv)
-    out_src2, out_dst2, out_eids2 = ig.out_edges(randv)
-    nnz = out_dst2.tousertensor().shape[0]
-    assert mx.nd.sum(out_dst1.tousertensor() == out_dst2.tousertensor()).asnumpy() == nnz
-    assert mx.nd.sum(out_src1.tousertensor() == out_src2.tousertensor()).asnumpy() == nnz
-    assert mx.nd.sum(out_eids1.tousertensor() == out_eids2.tousertensor()).asnumpy() == nnz
+    out_src1, out_dst1, out_eids1 = sort_edges(g.out_edges(randv))
+    out_src2, out_dst2, out_eids2 = sort_edges(ig.out_edges(randv))
+    nnz = out_dst2.shape[0]
+    assert mx.nd.sum(out_dst1 == out_dst2).asnumpy() == nnz
+    assert mx.nd.sum(out_src1 == out_src2).asnumpy() == nnz
+    assert mx.nd.sum(out_eids1 == out_eids2).asnumpy() == nnz
 
     num_v = len(randv)
     assert mx.nd.sum(g.in_degrees(randv).tousertensor() == ig.in_degrees(randv).tousertensor()).asnumpy() == num_v
@@ -84,6 +98,8 @@ def check_basics(g, ig):
 
 def test_basics():
     g, ig = generate_from_edgelist()
+    check_basics(g, ig)
+    g, ig = generate_from_networkx()
     check_basics(g, ig)
     g, ig = generate_rand_graph(100)
     check_basics(g, ig)
