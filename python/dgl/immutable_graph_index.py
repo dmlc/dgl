@@ -623,7 +623,7 @@ class ImmutableGraphIndex(object):
         eid = utils.toindex(eid)
         src = utils.toindex(src)
         dst = utils.toindex(dst)
-        self.init(src_ids, dst_ids, edge_ids, num_nodes)
+        self.init(src, dst, eid, num_nodes)
 
     def from_scipy_sparse_matrix(self, adj):
         """Convert from scipy sparse matrix.
