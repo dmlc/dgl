@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='sampler',
   syntax='proto3',
   serialized_options=None,
-  serialized_pb=_b('\n\rsampler.proto\x12\x07sampler\"\x99\x01\n\x0eSamplerRequest\x12\x13\n\x0bvertices_id\x18\x01 \x01(\x0c\x12\r\n\x05layer\x18\x02 \x01(\x0c\x12\x10\n\x08\x63sr_data\x18\x03 \x01(\x0c\x12\x13\n\x0b\x63sr_indices\x18\x04 \x01(\x0c\x12\x12\n\ncsr_indptr\x18\x05 \x01(\x0c\x12\x13\n\x0b\x63sr_shape_0\x18\x06 \x01(\x05\x12\x13\n\x0b\x63sr_shape_1\x18\x07 \x01(\x05\"\x81\x01\n\x0cSamplerReply\x12\r\n\x05seeds\x18\x01 \x01(\x0c\x12\x10\n\x08num_args\x18\x02 \x01(\x05\x12\x10\n\x08num_hops\x18\x03 \x01(\x05\x12\x14\n\x0cnum_neighbor\x18\x04 \x01(\x05\x12\x18\n\x10max_num_vertices\x18\x05 \x01(\x05\x12\x0e\n\x06update\x18\x06 \x01(\x08\"\x19\n\x0b\x41rgsRequest\x12\n\n\x02ip\x18\x01 \x01(\t2\x85\x01\n\x07Sampler\x12@\n\x0cSendSubGraph\x12\x17.sampler.SamplerRequest\x1a\x15.sampler.SamplerReply\"\x00\x12\x38\n\x07\x41skArgs\x12\x14.sampler.ArgsRequest\x1a\x15.sampler.SamplerReply\"\x00\x62\x06proto3')
+  serialized_pb=_b('\n\rsampler.proto\x12\x07sampler\"\x99\x01\n\x0eSamplerRequest\x12\x13\n\x0bvertices_id\x18\x01 \x01(\x0c\x12\r\n\x05layer\x18\x02 \x01(\x0c\x12\x10\n\x08\x63sr_data\x18\x03 \x01(\x0c\x12\x13\n\x0b\x63sr_indices\x18\x04 \x01(\x0c\x12\x12\n\ncsr_indptr\x18\x05 \x01(\x0c\x12\x13\n\x0b\x63sr_shape_0\x18\x06 \x01(\x05\x12\x13\n\x0b\x63sr_shape_1\x18\x07 \x01(\x05\" \n\x0cSamplerReply\x12\x10\n\x08response\x18\x01 \x01(\t2K\n\x07Sampler\x12@\n\x0cSendSubGraph\x12\x17.sampler.SamplerRequest\x1a\x15.sampler.SamplerReply\"\x00\x62\x06proto3')
 )
 
 
@@ -106,73 +106,7 @@ _SAMPLERREPLY = _descriptor.Descriptor(
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='seeds', full_name='sampler.SamplerReply.seeds', index=0,
-      number=1, type=12, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b(""),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
-    _descriptor.FieldDescriptor(
-      name='num_args', full_name='sampler.SamplerReply.num_args', index=1,
-      number=2, type=5, cpp_type=1, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
-    _descriptor.FieldDescriptor(
-      name='num_hops', full_name='sampler.SamplerReply.num_hops', index=2,
-      number=3, type=5, cpp_type=1, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
-    _descriptor.FieldDescriptor(
-      name='num_neighbor', full_name='sampler.SamplerReply.num_neighbor', index=3,
-      number=4, type=5, cpp_type=1, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
-    _descriptor.FieldDescriptor(
-      name='max_num_vertices', full_name='sampler.SamplerReply.max_num_vertices', index=4,
-      number=5, type=5, cpp_type=1, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
-    _descriptor.FieldDescriptor(
-      name='update', full_name='sampler.SamplerReply.update', index=5,
-      number=6, type=8, cpp_type=7, label=1,
-      has_default_value=False, default_value=False,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  serialized_options=None,
-  is_extendable=False,
-  syntax='proto3',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=183,
-  serialized_end=312,
-)
-
-
-_ARGSREQUEST = _descriptor.Descriptor(
-  name='ArgsRequest',
-  full_name='sampler.ArgsRequest',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='ip', full_name='sampler.ArgsRequest.ip', index=0,
+      name='response', full_name='sampler.SamplerReply.response', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -190,13 +124,12 @@ _ARGSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=314,
-  serialized_end=339,
+  serialized_start=182,
+  serialized_end=214,
 )
 
 DESCRIPTOR.message_types_by_name['SamplerRequest'] = _SAMPLERREQUEST
 DESCRIPTOR.message_types_by_name['SamplerReply'] = _SAMPLERREPLY
-DESCRIPTOR.message_types_by_name['ArgsRequest'] = _ARGSREQUEST
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 SamplerRequest = _reflection.GeneratedProtocolMessageType('SamplerRequest', (_message.Message,), dict(
@@ -213,13 +146,6 @@ SamplerReply = _reflection.GeneratedProtocolMessageType('SamplerReply', (_messag
   ))
 _sym_db.RegisterMessage(SamplerReply)
 
-ArgsRequest = _reflection.GeneratedProtocolMessageType('ArgsRequest', (_message.Message,), dict(
-  DESCRIPTOR = _ARGSREQUEST,
-  __module__ = 'sampler_pb2'
-  # @@protoc_insertion_point(class_scope:sampler.ArgsRequest)
-  ))
-_sym_db.RegisterMessage(ArgsRequest)
-
 
 
 _SAMPLER = _descriptor.ServiceDescriptor(
@@ -228,8 +154,8 @@ _SAMPLER = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=0,
   serialized_options=None,
-  serialized_start=342,
-  serialized_end=475,
+  serialized_start=216,
+  serialized_end=291,
   methods=[
   _descriptor.MethodDescriptor(
     name='SendSubGraph',
@@ -237,15 +163,6 @@ _SAMPLER = _descriptor.ServiceDescriptor(
     index=0,
     containing_service=None,
     input_type=_SAMPLERREQUEST,
-    output_type=_SAMPLERREPLY,
-    serialized_options=None,
-  ),
-  _descriptor.MethodDescriptor(
-    name='AskArgs',
-    full_name='sampler.Sampler.AskArgs',
-    index=1,
-    containing_service=None,
-    input_type=_ARGSREQUEST,
     output_type=_SAMPLERREPLY,
     serialized_options=None,
   ),

@@ -4,11 +4,8 @@ package sampler;
 
 // The sampler service definition.
 service Sampler {
-  // Sends a list of ndarray from sampler to trainer
+  // Sends sub-graph from sampler to trainer
   rpc SendSubGraph (SamplerRequest) returns (SamplerReply) {}
-
-  // Ask arguments from trainer
-  rpc AskArgs (ArgsRequest) returns (SamplerReply) {}
 }
 
 // The sampler request message
@@ -24,15 +21,5 @@ message SamplerRequest {
 
 // The response message
 message SamplerReply {
-  bytes seeds = 1;
-  int32 num_args = 2;
-  int32 num_hops = 3;
-  int32 num_neighbor = 4;
-  int32 max_num_vertices = 5;
-  bool update = 6;
-}
-
-// The sampler ip address
-message ArgsRequest {
-  string ip = 1;
+  string response = 1;
 }

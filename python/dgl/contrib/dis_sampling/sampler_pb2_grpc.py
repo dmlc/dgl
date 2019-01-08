@@ -19,11 +19,6 @@ class SamplerStub(object):
         request_serializer=sampler__pb2.SamplerRequest.SerializeToString,
         response_deserializer=sampler__pb2.SamplerReply.FromString,
         )
-    self.AskArgs = channel.unary_unary(
-        '/sampler.Sampler/AskArgs',
-        request_serializer=sampler__pb2.ArgsRequest.SerializeToString,
-        response_deserializer=sampler__pb2.SamplerReply.FromString,
-        )
 
 
 class SamplerServicer(object):
@@ -31,14 +26,7 @@ class SamplerServicer(object):
   """
 
   def SendSubGraph(self, request, context):
-    """Sends a list of ndarray from sampler to trainer
-    """
-    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-    context.set_details('Method not implemented!')
-    raise NotImplementedError('Method not implemented!')
-
-  def AskArgs(self, request, context):
-    """Ask arguments from trainer
+    """Sends sub-graph from sampler to trainer
     """
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
     context.set_details('Method not implemented!')
@@ -50,11 +38,6 @@ def add_SamplerServicer_to_server(servicer, server):
       'SendSubGraph': grpc.unary_unary_rpc_method_handler(
           servicer.SendSubGraph,
           request_deserializer=sampler__pb2.SamplerRequest.FromString,
-          response_serializer=sampler__pb2.SamplerReply.SerializeToString,
-      ),
-      'AskArgs': grpc.unary_unary_rpc_method_handler(
-          servicer.AskArgs,
-          request_deserializer=sampler__pb2.ArgsRequest.FromString,
           response_serializer=sampler__pb2.SamplerReply.SerializeToString,
       ),
   }
