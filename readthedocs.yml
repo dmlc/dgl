@@ -1,9 +1,9 @@
 build:
-  image: latest
+  image: dgl-doc-build:latest
 
 formats: []
 
 python:
-  version: 3.6
+  version: 3.5
   use_system_site_packages: true
   setup_py_install: false
