@@ -1,5 +1,9 @@
 """
 Graph Attention Networks in DGL using SPMV optimization.
+Multiple heads are also batched together for faster training.
+
+Compared with the original paper, this code does not implement
+multiple output attention heads.
 
 References
 ----------
@@ -23,13 +27,15 @@ class GraphAttention(nn.Module):
                  g,
                  in_dim,
                  out_dim,
+                 num_heads,
                  feat_drop,
                  attn_drop,
                  alpha,
                  residual=False):
         super(GraphAttention, self).__init__()
         self.g = g
-        self.fc = nn.Linear(in_dim, out_dim, bias=False)
+        self.num_heads = num_heads
+        self.fc = nn.Linear(in_dim, num_heads * out_dim, bias=False)
         if feat_drop:
             self.feat_drop = nn.Dropout(feat_drop)
         else:
@@ -38,16 +44,16 @@ class GraphAttention(nn.Module):
             self.attn_drop = nn.Dropout(attn_drop)
         else:
             self.attn_drop = None
-        self.attn_l = nn.Linear(out_dim, 1, bias=False)
-        self.attn_r = nn.Linear(out_dim, 1, bias=False)
+        self.attn_l = nn.Parameter(torch.Tensor(size=(num_heads, out_dim, 1)))
+        self.attn_r = nn.Parameter(torch.Tensor(size=(num_heads, out_dim, 1)))
         nn.init.xavier_normal_(self.fc.weight.data, gain=1.414)
-        nn.init.xavier_normal_(self.attn_l.weight.data, gain=1.414)
-        nn.init.xavier_normal_(self.attn_r.weight.data, gain=1.414)
+        nn.init.xavier_normal_(self.attn_l.data, gain=1.414)
+        nn.init.xavier_normal_(self.attn_r.data, gain=1.414)
         self.leaky_relu = nn.LeakyReLU(alpha)
         self.residual = residual
         if residual:
             if in_dim != out_dim:
-                self.residual_fc = nn.Linear(in_dim, out_dim, bias=False)
+                self.residual_fc = nn.Linear(in_dim, num_heads * out_dim, bias=False)
                 nn.init.xavier_normal_(self.fc.weight.data, gain=1.414)
             else:
                 self.residual_fc = None
@@ -57,9 +63,10 @@ class GraphAttention(nn.Module):
         h = inputs
         if self.feat_drop:
             h = self.feat_drop(h)
-        ft = self.fc(h)
-        a1 = self.attn_l(ft)
-        a2 = self.attn_r(ft)
+        ft = self.fc(h).reshape((h.shape[0], self.num_heads, -1))
+        head_ft = ft.transpose(0, 1)
+        a1 = torch.bmm(head_ft, self.attn_l).transpose(0, 1)
+        a2 = torch.bmm(head_ft, self.attn_r).transpose(0, 1)
         self.g.ndata.update({'ft' : ft, 'a1' : a1, 'a2' : a2})
         # 1. compute edge attention
         self.g.apply_edges(self.edge_attention)
@@ -101,35 +108,29 @@ class GAT(nn.Module):
         super(GAT, self).__init__()
         self.g = g
         self.num_layers = num_layers
-        self.num_heads = num_heads
-        self.gat_heads = nn.ModuleList()
+        self.gat_layers = nn.ModuleList()
         self.activation = activation
         # input projection (no residual)
-        for hid in range(num_heads):
-            self.gat_heads.append(GraphAttention(
-                g, in_dim, num_hidden, feat_drop, attn_drop, alpha, False))
+        self.gat_layers.append(GraphAttention(
+            g, in_dim, num_hidden, num_heads, feat_drop, attn_drop, alpha, False))
         # hidden layers
         for l in range(num_layers - 1):
-            for hid in range(num_heads):
-                # due to multi-head, the in_dim = num_hidden * num_heads
-                self.gat_heads.append(GraphAttention(
-                    g, num_hidden * num_heads, num_hidden, feat_drop, attn_drop, alpha, residual))
+            # due to multi-head, the in_dim = num_hidden * num_heads
+            self.gat_layers.append(GraphAttention(
+                g, num_hidden * num_heads, num_hidden, num_heads,
+                feat_drop, attn_drop, alpha, residual))
         # output projection
-        self.gat_heads.append(GraphAttention(
-            g, num_hidden * num_heads, num_classes, feat_drop, attn_drop, alpha, residual))
+        self.gat_layers.append(GraphAttention(
+            g, num_hidden * num_heads, num_classes, 1,
+            feat_drop, attn_drop, alpha, residual))
 
     def forward(self, inputs):
-        last = inputs
+        h = inputs
         for l in range(self.num_layers):
-            heads = []
-            for hid in range(self.num_heads):
-                i = l * self.num_heads + hid
-                heads.append(self.gat_heads[i](last))
-            # merge all the heads
-            last = torch.cat(heads, dim=1)
-            last = self.activation(last)
+            h = self.gat_layers[l](h).flatten(1)
+            h = self.activation(h)
         # output projection
-        logits = self.gat_heads[-1](last)
+        logits = self.gat_layers[-1](h).flatten(1)
         return logits
 
 def accuracy(logits, labels):
