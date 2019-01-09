@@ -17,6 +17,7 @@ COPY install/ubuntu_install_mxnet_cpu.sh /install/ubuntu_install_mxnet_cpu.sh
 RUN bash /install/ubuntu_install_mxnet_cpu.sh
 
 COPY install/ubuntu_install_dgl.sh /install/ubuntu_install_dgl.sh
+RUN chmod +x /install/ubuntu_install_dgl.sh
 
 # Environment variables
 ENV PATH=/usr/local/nvidia/bin:${PATH}
@@ -26,4 +27,4 @@ ENV C_INCLUDE_PATH=/usr/local/cuda/include:${C_INCLUDE_PATH}
 ENV LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/nvidia/lib64:${LIBRARY_PATH}
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}
 
-ENTRYPOINT ["sh /install/ubuntu_install_dgl.sh"]
+ENTRYPOINT ["/install/ubuntu_install_dgl.sh"]
