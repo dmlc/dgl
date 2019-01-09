@@ -125,7 +125,7 @@ def ones(shape, dtype, ctx):
     return th.ones(shape, dtype=dtype, device=ctx)
 
 def spmm(x, y):
-    return th.spmm(x, y)
+    return th.sparse.mm(x, y)
 
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     y = th.zeros(n_segs, *input.shape[1:]).to(input)

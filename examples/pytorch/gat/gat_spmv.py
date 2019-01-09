@@ -1,8 +1,11 @@
 """
-Graph Attention Networks
+Graph Attention Networks in DGL using SPMV optimization.
+
+References
+----------
 Paper: https://arxiv.org/abs/1710.10903
-Code: https://github.com/PetarV-/GAT
-GAT with batch processing
+Author's code: https://github.com/PetarV-/GAT
+Pytorch implementation: https://github.com/Diego999/pyGAT
 """
 
 import argparse
@@ -13,78 +16,74 @@ import torch.nn as nn
 import torch.nn.functional as F
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
+import dgl.function as fn
 
-
-def gat_message(edges):
-    return {'ft': edges.src['ft'], 'a2': edges.src['a2']}
-
-
-class GATReduce(nn.Module):
-    def __init__(self, attn_drop, alpha):
-        super(GATReduce, self).__init__()
+class GraphAttention(nn.Module):
+    def __init__(self,
+                 g,
+                 in_dim,
+                 out_dim,
+                 feat_drop,
+                 attn_drop,
+                 alpha,
+                 residual=False):
+        super(GraphAttention, self).__init__()
+        self.g = g
+        self.fc = nn.Linear(in_dim, out_dim, bias=False)
+        if feat_drop:
+            self.feat_drop = nn.Dropout(feat_drop)
+        else:
+            self.feat_drop = None
         if attn_drop:
-            self.attn_drop = nn.Dropout(p=attn_drop)
+            self.attn_drop = nn.Dropout(attn_drop)
         else:
-            self.attn_drop = 0
-        self.leaky_relu = nn.LeakyReLU(alpha)
-
-    def forward(self, nodes):
-        a1 = torch.unsqueeze(nodes.data['a1'], 1)  # shape (B, 1, 1)
-        a2 = nodes.mailbox['a2']  # shape (B, deg, 1)
-        ft = nodes.mailbox['ft']  # shape (B, deg, D)
-        # attention
-        a = a1 + a2  # shape (B, deg, 1)
-        e = F.softmax(self.leaky_relu(a), dim=1)
-        if self.attn_drop:
-            e = self.attn_drop(e)
-        return {'accum': torch.sum(e * ft, dim=1)}  # shape (B, D)
-
-
-class GATFinalize(nn.Module):
-    def __init__(self, headid, indim, hiddendim, activation, residual):
-        super(GATFinalize, self).__init__()
-        self.headid = headid
-        self.activation = activation
-        self.residual = residual
-        self.residual_fc = None
-        if residual:
-            if indim != hiddendim:
-                self.residual_fc = nn.Linear(indim, hiddendim, bias=False)
-                nn.init.xavier_normal_(self.residual_fc.weight.data, gain=1.414)
-
-    def forward(self, nodes):
-        ret = nodes.data['accum']
-        if self.residual:
-            if self.residual_fc is not None:
-                ret = self.residual_fc(nodes.data['h']) + ret
-            else:
-                ret = nodes.data['h'] + ret
-        return {'head%d' % self.headid: self.activation(ret)}
-
-
-class GATPrepare(nn.Module):
-    def __init__(self, indim, hiddendim, drop):
-        super(GATPrepare, self).__init__()
-        self.fc = nn.Linear(indim, hiddendim, bias=False)
-        if drop:
-            self.drop = nn.Dropout(drop)
-        else:
-            self.drop = 0
-        self.attn_l = nn.Linear(hiddendim, 1, bias=False)
-        self.attn_r = nn.Linear(hiddendim, 1, bias=False)
+            self.attn_drop = None
+        self.attn_l = nn.Linear(out_dim, 1, bias=False)
+        self.attn_r = nn.Linear(out_dim, 1, bias=False)
         nn.init.xavier_normal_(self.fc.weight.data, gain=1.414)
         nn.init.xavier_normal_(self.attn_l.weight.data, gain=1.414)
         nn.init.xavier_normal_(self.attn_r.weight.data, gain=1.414)
+        self.leaky_relu = nn.LeakyReLU(alpha)
+        self.residual = residual
+        if residual:
+            if in_dim != out_dim:
+                self.residual_fc = nn.Linear(in_dim, out_dim, bias=False)
+                nn.init.xavier_normal_(self.fc.weight.data, gain=1.414)
+            else:
+                self.residual_fc = None
 
-    def forward(self, feats):
-        h = feats
-        if self.drop:
-            h = self.drop(h)
+    def forward(self, inputs):
+        # prepare
+        h = inputs
+        if self.feat_drop:
+            h = self.feat_drop(h)
         ft = self.fc(h)
         a1 = self.attn_l(ft)
         a2 = self.attn_r(ft)
-        return {'h': h, 'ft': ft, 'a1': a1, 'a2': a2}
+        self.g.ndata.update({'ft' : ft, 'a1' : a1, 'a2' : a2})
+        # 1. compute edge attention
+        self.g.apply_edges(self.edge_attention)
+        # 2. compute two results, one is the node features scaled by the dropped,
+        # unnormalized attention values. Another is the normalizer of the attention values.
+        self.g.update_all([fn.src_mul_edge('ft', 'a_drop', 'ft'), fn.copy_edge('a', 'a')],
+                          [fn.sum('ft', 'ft'), fn.sum('a', 'z')])
+        # 3. apply normalizer
+        ret = self.g.ndata['ft'] / self.g.ndata['z']
+        # 4. residual
+        if self.residual:
+            if self.residual_fc:
+                ret = self.residual_fc(h) + ret
+            else:
+                ret = h + ret
+        return ret
 
+    def edge_attention(self, edges):
+        # an edge UDF to compute unnormalized attention values from src and dst
+        a = self.leaky_relu(edges.src['a1'] + edges.dst['a2'])
+        a = torch.exp(a).clamp(-10, 10)  # use clamp to avoid overflow
+        if self.attn_drop:
+            a_drop = self.attn_drop(a)
+        return {'a' : a, 'a_drop' : a_drop}
 
 class GAT(nn.Module):
     def __init__(self,
@@ -95,7 +94,7 @@ class GAT(nn.Module):
                  num_classes,
                  num_heads,
                  activation,
-                 in_drop,
+                 feat_drop,
                  attn_drop,
                  alpha,
                  residual):
@@ -103,50 +102,35 @@ class GAT(nn.Module):
         self.g = g
         self.num_layers = num_layers
         self.num_heads = num_heads
-        self.prp = nn.ModuleList()
-        self.red = nn.ModuleList()
-        self.fnl = nn.ModuleList()
+        self.gat_heads = nn.ModuleList()
+        self.activation = activation
         # input projection (no residual)
         for hid in range(num_heads):
-            self.prp.append(GATPrepare(in_dim, num_hidden, in_drop))
-            self.red.append(GATReduce(attn_drop, alpha))
-            self.fnl.append(GATFinalize(hid, in_dim, num_hidden, activation, False))
+            self.gat_heads.append(GraphAttention(
+                g, in_dim, num_hidden, feat_drop, attn_drop, alpha, False))
         # hidden layers
         for l in range(num_layers - 1):
             for hid in range(num_heads):
                 # due to multi-head, the in_dim = num_hidden * num_heads
-                self.prp.append(GATPrepare(num_hidden * num_heads, num_hidden, in_drop))
-                self.red.append(GATReduce(attn_drop, alpha))
-                self.fnl.append(GATFinalize(hid, num_hidden * num_heads,
-                                            num_hidden, activation, residual))
+                self.gat_heads.append(GraphAttention(
+                    g, num_hidden * num_heads, num_hidden, feat_drop, attn_drop, alpha, residual))
         # output projection
-        self.prp.append(GATPrepare(num_hidden * num_heads, num_classes, in_drop))
-        self.red.append(GATReduce(attn_drop, alpha))
-        self.fnl.append(GATFinalize(0, num_hidden * num_heads,
-                                    num_classes, activation, residual))
-        # sanity check
-        assert len(self.prp) == self.num_layers * self.num_heads + 1
-        assert len(self.red) == self.num_layers * self.num_heads + 1
-        assert len(self.fnl) == self.num_layers * self.num_heads + 1
+        self.gat_heads.append(GraphAttention(
+            g, num_hidden * num_heads, num_classes, feat_drop, attn_drop, alpha, residual))
 
-    def forward(self, features):
-        last = features
+    def forward(self, inputs):
+        last = inputs
         for l in range(self.num_layers):
+            heads = []
             for hid in range(self.num_heads):
                 i = l * self.num_heads + hid
-                # prepare
-                self.g.ndata.update(self.prp[i](last))
-                # message passing
-                self.g.update_all(gat_message, self.red[i], self.fnl[i])
+                heads.append(self.gat_heads[i](last))
             # merge all the heads
-            last = torch.cat(
-                    [self.g.pop_n_repr('head%d' % hid) for hid in range(self.num_heads)],
-                    dim=1)
+            last = torch.cat(heads, dim=1)
+            last = self.activation(last)
         # output projection
-        self.g.ndata.update(self.prp[-1](last))
-        self.g.update_all(gat_message, self.red[-1], self.fnl[-1])
-        return self.g.pop_n_repr('head0')
-
+        logits = self.gat_heads[-1](last)
+        return logits
 
 def accuracy(logits, labels):
     _, indices = torch.max(logits, dim=1)
