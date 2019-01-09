@@ -1194,7 +1194,7 @@ class DGLGraph(object):
         if node_attrs is not None:
             # mapping from feature name to a list of tensors to be concatenated
             attr_dict = defaultdict(list)
-            for nid in nx_graph.nodes():
+            for nid in range(self.number_of_nodes()):
                 for attr in node_attrs:
                     attr_dict[attr].append(nx_graph.nodes[nid][attr])
             for attr in node_attrs:
