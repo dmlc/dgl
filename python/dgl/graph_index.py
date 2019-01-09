@@ -670,7 +670,10 @@ class GraphIndex(object):
             nx_graph = (nx.MultiDiGraph(nx_graph) if self.is_multigraph()
                         else nx.DiGraph(nx_graph))
         else:
-            nx_graph = nx_graph.to_directed()
+            if not nx_graph.is_directed():
+                # to_directed creates a deep copy of the networkx graph even if
+                # the original graph is already directed and we do not want to do it.
+                nx_graph = nx_graph.to_directed()
 
         num_nodes = nx_graph.number_of_nodes()
         self.add_nodes(num_nodes)

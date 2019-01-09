@@ -1170,6 +1170,11 @@ class DGLGraph(object):
                 [2., 2., 2., 2.],
                 [1., 1., 1., 1.]])
         """
+        # With to_directed we will get a directed version of the original networkx
+        # graph, with the original nodes, edges and their attributes preserved.
+        # This is particularly helpful when we are also converting the edge attributes
+        # as the reversed edges (u, v) will be created with the same attributes as the
+        # original edges (v, u).
         if not nx_graph.is_directed():
             nx_graph = nx_graph.to_directed()
 
