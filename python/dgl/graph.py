@@ -1,6 +1,7 @@
 """Base graph class specialized for neural networks on graphs."""
 from __future__ import absolute_import
 
+import networkx as nx
 from collections import defaultdict
 
 import dgl
@@ -39,9 +40,6 @@ class DGLGraph(object):
     ----------
     graph_data : graph data, optional
         Data to initialize graph. Same as networkx's semantics.
-        If ``graph_data`` is a networkx object whose node labels
-        are not consecutive integers, its nodes will be relabeled
-        using consecutive integers.
     node_frame : FrameRef, optional
         Node feature storage.
     edge_frame : FrameRef, optional
@@ -1170,6 +1168,8 @@ class DGLGraph(object):
                 [2., 2., 2., 2.],
                 [1., 1., 1., 1.]])
         """
+        # Relabel nodes using consecutive integers
+        nx_graph = nx.convert_node_labels_to_integers(nx_graph, ordering='sorted')
         # With to_directed we will get a directed version of the original networkx
         # graph, with the original nodes, edges and their attributes preserved.
         # This is particularly helpful when we are also converting the edge attributes
