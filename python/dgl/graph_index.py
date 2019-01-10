@@ -938,14 +938,7 @@ def create_graph_index(graph_data=None, multigraph=False, readonly=False):
 
 class ImmutableGraphIndex(GraphIndex):
     """Graph index object on immutable graphs.
-
-    Parameters
-    ----------
-    backend_csr: a csr array provided by the backend framework.
     """
-    def __init__(self, handle):
-        pass
-
     def init(self, src_ids, dst_ids, edge_ids, num_nodes):
         """The actual init function"""
         self._handle = _CAPI_DGLGraphCreateImmutable(src_ids.todgltensor(), dst_ids.todgltensor(),
