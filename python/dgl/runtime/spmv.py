@@ -199,7 +199,7 @@ def build_adj_matrix_uv(graph, edges, reduce_nodes):
     in the graph. Therefore, when doing SPMV, the src node data
     should be all the node features.
 
-    Paramters
+    Parameters
     ---------
     graph : DGLGraph
         The graph
@@ -276,7 +276,7 @@ def build_inc_matrix_eid(m, eid, dst, reduce_nodes):
             [0, 0, 0, 1, 0, 0, 0],
             [0, 0, 0, 0, 0, 1, 1]], shape=(5, 7))
 
-    Paramters
+    Parameters
     ---------
     m : int
         The source dimension size of the incidence matrix.

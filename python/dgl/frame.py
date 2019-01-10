@@ -42,7 +42,7 @@ class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
 def infer_scheme(tensor):
     """Infer column scheme from the given tensor data.
 
-    Paramters
+    Parameters
     ---------
     tensor : Tensor
         The tensor data.
@@ -723,7 +723,7 @@ class FrameRef(MutableMapping):
         data : dict-like
             The row data.
         inplace : bool
-            True if the update is performed inplacely.
+            True if the update is performed inplace.
         """
         rows = self._getrows(query)
         for key, col in data.items():
@@ -743,7 +743,7 @@ class FrameRef(MutableMapping):
 
         Please note that "deleted" rows are not really deleted, but simply removed
         in the reference. As a result, if two FrameRefs point to the same Frame, deleting
-        from one ref will not relect on the other. However, deleting columns is real.
+        from one ref will not reflect on the other. However, deleting columns is real.
 
         Parameters
         ----------
