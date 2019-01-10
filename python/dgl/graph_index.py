@@ -944,8 +944,7 @@ class ImmutableGraphIndex(GraphIndex):
     backend_csr: a csr array provided by the backend framework.
     """
     def __init__(self, handle):
-        self._handle = handle
-        self._cache = {}
+        super(ImmutableGraphIndex, self).__init__(handle)
 
     def init(self, src_ids, dst_ids, edge_ids, num_nodes):
         """The actual init function"""
