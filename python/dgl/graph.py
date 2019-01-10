@@ -1207,7 +1207,12 @@ class DGLGraph(object):
             # None here serves as placeholder to be replaced by feature with
             # corresponding edge id
             if has_edge_id:
+                num_edges = self.number_of_edges()
                 for _, _, attrs in nx_graph.edges(data=True):
+                    if attrs['id'] >= num_edges:
+                        raise DGLError('Expect the pre-specified edge ids to be smaller than the'
+                                       ' number of edges -- {}, got {}.'.format(
+                            num_edges, attrs['id']))
                     for key in edge_attrs:
                         attr_dict[key][attrs['id']] = attrs[key]
             else:
@@ -1217,6 +1222,8 @@ class DGLGraph(object):
                     for key in edge_attrs:
                         attr_dict[key][eid] = attrs[key]
             for attr in edge_attrs:
+                if None in attr_dict[attr]:
+                    raise DGLError('Not all edges have attribute {}.'.format(attr))
                 self._edge_frame[attr] = _batcher(attr_dict[attr])
 
     def from_scipy_sparse_matrix(self, spmat):
