@@ -1210,9 +1210,9 @@ class DGLGraph(object):
                 num_edges = self.number_of_edges()
                 for _, _, attrs in nx_graph.edges(data=True):
                     if attrs['id'] >= num_edges:
-                        raise DGLError('Expect the pre-specified edge ids to be smaller than the'
-                                       ' number of edges -- {}, got {}.'.format(
-                            num_edges, attrs['id']))
+                        raise DGLError('Expect the pre-specified edge ids to be'
+                                       ' smaller than the number of edges --'
+                                       ' {}, got {}.'.format(num_edges, attrs['id']))
                     for key in edge_attrs:
                         attr_dict[key][attrs['id']] = attrs[key]
             else:
