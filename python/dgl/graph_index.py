@@ -522,7 +522,7 @@ class GraphIndex(object):
         Parameters
         ----------
         transpose : bool
-            A flag to tranpose the returned adjacency matrix.
+            A flag to transpose the returned adjacency matrix.
         ctx : context
             The context of the returned matrix.
 
@@ -715,7 +715,7 @@ class GraphIndex(object):
     def from_edge_list(self, elist):
         """Convert from an edge list.
 
-        Paramters
+        Parameters
         ---------
         elist : list
             List of (u, v) edge tuple.
@@ -833,7 +833,7 @@ def disjoint_union(graphs):
     """Return a disjoint union of the input graphs.
 
     The new graph will include all the nodes/edges in the given graphs.
-    Nodes/Edges will be relabled by adding the cumsum of the previous graph sizes
+    Nodes/Edges will be relabeled by adding the cumsum of the previous graph sizes
     in the given sequence order. For example, giving input [g1, g2, g3], where
     they have 5, 6, 7 nodes respectively. Then node#2 of g2 will become node#7
     in the result graph. Edge ids are re-assigned similarly.

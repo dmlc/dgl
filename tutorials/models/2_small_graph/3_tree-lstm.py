@@ -204,7 +204,7 @@ class TreeLSTMCell(nn.Module):
 # *simultaneously*.
 #
 # In the case of Tree-LSTM, messages start from leaves of the tree, and
-# propogate/processed upwards until they reach the roots. A visulization
+# propagate/processed upwards until they reach the roots. A visualization
 # is as follows:
 #
 # .. figure:: https://i.loli.net/2018/11/09/5be4b5d2df54d.gif
