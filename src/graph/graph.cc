@@ -417,7 +417,7 @@ Subgraph Graph::VertexSubgraph(IdArray vids) const {
   }
   Subgraph rst;
   rst.induced_vertices = vids;
-  rst.graph.AddVertices(len);
+  rst.graph->AddVertices(len);
   for (int64_t i = 0; i < len; ++i) {
     const dgl_id_t oldvid = vid_data[i];
     const dgl_id_t newvid = i;
@@ -426,7 +426,7 @@ Subgraph Graph::VertexSubgraph(IdArray vids) const {
       if (oldv2newv.count(oldsucc)) {
         const dgl_id_t newsucc = oldv2newv[oldsucc];
         edges.push_back(adjlist_[oldvid].edge_id[j]);
-        rst.graph.AddEdge(newvid, newsucc);
+        rst.graph->AddEdge(newvid, newsucc);
       }
     }
   }
@@ -454,12 +454,12 @@ Subgraph Graph::EdgeSubgraph(IdArray eids) const {
 
   Subgraph rst;
   rst.induced_edges = eids;
-  rst.graph.AddVertices(nodes.size());
+  rst.graph->AddVertices(nodes.size());
 
   for (int64_t i = 0; i < len; ++i) {
     dgl_id_t src_id = all_edges_src_[eid_data[i]];
     dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
-    rst.graph.AddEdge(oldv2newv[src_id], oldv2newv[dst_id]);
+    rst.graph->AddEdge(oldv2newv[src_id], oldv2newv[dst_id]);
   }
 
   rst.induced_vertices = IdArray::Empty(
@@ -469,9 +469,9 @@ Subgraph Graph::EdgeSubgraph(IdArray eids) const {
   return rst;
 }
 
-Graph Graph::Reverse() const {
+GraphInterface::ptr Graph::Reverse() const {
   LOG(FATAL) << "not implemented";
-  return *this;
+  return nullptr;
 }
 
 }  // namespace dgl

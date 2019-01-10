@@ -1,6 +1,6 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file dgl/graph.h
+ * \file dgl/immutable_graph.h
  * \brief DGL immutable graph index class.
  */
 #ifndef DGL_IMMUTABLE_GRAPH_H_
@@ -12,11 +12,10 @@
 #include <utility>
 #include <tuple>
 #include "runtime/ndarray.h"
-#include "graph.h"
+#include "graph_interface.h"
 
 namespace dgl {
 
-struct ImmutableSubgraph;
 struct SampledSubgraph;
 
 template<class ForwardIt, class T>
@@ -29,13 +28,8 @@ bool binary_search(ForwardIt first, ForwardIt last, const T& value) {
  * \brief Base dgl immutable graph index class.
  *
  */
-class ImmutableGraph {
+class ImmutableGraph: public GraphInterface {
  public:
-  typedef struct {
-    /* \brief the two endpoints and the id of the edge */
-    IdArray src, dst, id;
-  } EdgeArray;
-
   typedef struct {
     IdArray indptr, indices, id;
   } CSRArray;
@@ -113,6 +107,41 @@ class ImmutableGraph {
 
   /*! \brief default destructor */
   ~ImmutableGraph() = default;
+
+  /*!
+   * \brief Add vertices to the graph.
+   * \note Since vertices are integers enumerated from zero, only the number of
+   *       vertices to be added needs to be specified.
+   * \param num_vertices The number of vertices to be added.
+   */
+  void AddVertices(uint64_t num_vertices) {
+    LOG(FATAL) << "Immutable graph doesn't support adding vertices";
+  }
+
+  /*!
+   * \brief Add one edge to the graph.
+   * \param src The source vertex.
+   * \param dst The destination vertex.
+   */
+  void AddEdge(dgl_id_t src, dgl_id_t dst) {
+    LOG(FATAL) << "Immutable graph doesn't support adding edge";
+  }
+
+  /*!
+   * \brief Add edges to the graph.
+   * \param src_ids The source vertex id array.
+   * \param dst_ids The destination vertex id array.
+   */
+  void AddEdges(IdArray src_ids, IdArray dst_ids) {
+    LOG(FATAL) << "Immutable graph doesn't support adding edges";
+  }
+
+  /*!
+   * \brief Clear the graph. Remove all vertices/edges.
+   */
+  void Clear() {
+    LOG(FATAL) << "Immutable graph doesn't support clearing vertices and edges";
+  }
 
   /*!
    * \note not const since we have caches
@@ -198,6 +227,26 @@ class ImmutableGraph {
    * \return EdgeArray containing all edges between all pairs.
    */
   EdgeArray EdgeIds(IdArray src, IdArray dst) const;
+
+  /*!
+   * \brief Find the edge ID and return the pair of endpoints
+   * \param eid The edge ID
+   * \return a pair whose first element is the source and the second the destination.
+   */
+  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const {
+    LOG(FATAL) << "not implemented";
+    return std::pair<dgl_id_t, dgl_id_t>();
+  }
+
+  /*!
+   * \brief Find the edge IDs and return their source and target node IDs.
+   * \param eids The edge ID array.
+   * \return EdgeArray containing all edges with id in eid.  The order is preserved.
+   */
+  EdgeArray FindEdges(IdArray eids) const {
+    LOG(FATAL) << "not implemented";
+    return EdgeArray();
+  }
 
   /*!
    * \brief Get the in edges of the vertex.
@@ -303,9 +352,9 @@ class ImmutableGraph {
    * \param vids The vertices in the subgraph.
    * \return the induced subgraph
    */
-  ImmutableSubgraph VertexSubgraph(IdArray vids) const;
+  Subgraph VertexSubgraph(IdArray vids) const;
 
-  std::vector<ImmutableSubgraph> VertexSubgraphs(const std::vector<IdArray> &vids) const;
+  std::vector<Subgraph> VertexSubgraphs(const std::vector<IdArray> &vids) const;
 
   /*!
    * \brief Construct the induced edge subgraph of the given edges.
@@ -323,9 +372,9 @@ class ImmutableGraph {
    * \param eids The edges in the subgraph.
    * \return the induced edge subgraph
    */
-  ImmutableSubgraph EdgeSubgraph(IdArray eids) const;
+  Subgraph EdgeSubgraph(IdArray eids) const;
 
-  std::vector<ImmutableSubgraph> EdgeSubgraphs(std::vector<IdArray> eids) const;
+  std::vector<Subgraph> EdgeSubgraphs(std::vector<IdArray> eids) const;
 
   /*!
    * \brief Return a new graph with all the edges reversed.
@@ -334,8 +383,8 @@ class ImmutableGraph {
    *
    * \return the reversed graph
    */
-  ImmutableGraph Reverse() const {
-    return ImmutableGraph(out_csr_, in_csr_, is_multigraph_);
+  GraphInterface::ptr Reverse() const {
+    return GraphInterface::ptr(new ImmutableGraph(out_csr_, in_csr_, is_multigraph_));
   }
 
   /*!
@@ -343,9 +392,9 @@ class ImmutableGraph {
    * \param vid The vertex id.
    * \return the successor vector
    */
-  std::vector<dgl_id_t> SuccVec(dgl_id_t vid) const {
-    return std::vector<dgl_id_t>(out_csr_->indices.begin() + out_csr_->indptr[vid],
-                                 out_csr_->indices.begin() + out_csr_->indptr[vid + 1]);
+  dgl_id_iters SuccVec(dgl_id_t vid) const {
+    return dgl_id_iters(out_csr_->indices.begin() + out_csr_->indptr[vid],
+                        out_csr_->indices.begin() + out_csr_->indptr[vid + 1]);
   }
 
   /*!
@@ -353,9 +402,9 @@ class ImmutableGraph {
    * \param vid The vertex id.
    * \return the out edge id vector
    */
-  std::vector<dgl_id_t> OutEdgeVec(dgl_id_t vid) const {
-    return std::vector<dgl_id_t>(out_csr_->edge_ids.begin() + out_csr_->indptr[vid],
-                                 out_csr_->edge_ids.begin() + out_csr_->indptr[vid + 1]);
+  dgl_id_iters OutEdgeVec(dgl_id_t vid) const {
+    return dgl_id_iters(out_csr_->edge_ids.begin() + out_csr_->indptr[vid],
+                        out_csr_->edge_ids.begin() + out_csr_->indptr[vid + 1]);
   }
 
   /*!
@@ -363,9 +412,9 @@ class ImmutableGraph {
    * \param vid The vertex id.
    * \return the predecessor vector
    */
-  std::vector<dgl_id_t> PredVec(dgl_id_t vid) const {
-    return std::vector<dgl_id_t>(in_csr_->indices.begin() + in_csr_->indptr[vid],
-                                 in_csr_->indices.begin() + in_csr_->indptr[vid + 1]);
+  dgl_id_iters PredVec(dgl_id_t vid) const {
+    return dgl_id_iters(in_csr_->indices.begin() + in_csr_->indptr[vid],
+                        in_csr_->indices.begin() + in_csr_->indptr[vid + 1]);
   }
 
   /*!
@@ -373,9 +422,19 @@ class ImmutableGraph {
    * \param vid The vertex id.
    * \return the in edge id vector
    */
-  std::vector<dgl_id_t> InEdgeVec(dgl_id_t vid) const {
-    return std::vector<dgl_id_t>(in_csr_->edge_ids.begin() + in_csr_->indptr[vid],
-                                 in_csr_->edge_ids.begin() + in_csr_->indptr[vid + 1]);
+  dgl_id_iters InEdgeVec(dgl_id_t vid) const {
+    return dgl_id_iters(in_csr_->edge_ids.begin() + in_csr_->indptr[vid],
+                        in_csr_->edge_ids.begin() + in_csr_->indptr[vid + 1]);
+  }
+
+  /*!
+   * \brief Reset the data in the graph and move its data to the returned graph object.
+   * \return a raw pointer to the graph object.
+   */
+  virtual GraphInterface *Reset() {
+    ImmutableGraph* gptr = new ImmutableGraph();
+    *gptr = std::move(this);
+    return gptr;
   }
 
   /*!
@@ -443,27 +502,11 @@ class ImmutableGraph {
   bool is_multigraph_ = false;
 };
 
-/*! \brief Subgraph data structure */
-struct ImmutableSubgraph {
-  /*! \brief The graph. */
-  ImmutableGraph graph;
-  /*!
-   * \brief The induced vertex ids.
-   * \note This is also a map from the new vertex id to the vertex id in the parent graph.
-   */
-  IdArray induced_vertices;
-  /*!
-   * \brief The induced edge ids.
-   * \note This is also a map from the new edge id to the edge id in the parent graph.
-   */
-  IdArray induced_edges;
-};
-
 /*!
  * \brief When we sample a subgraph, we need to store extra information,
  * such as the layer Ids of the vertices and the sampling probability.
  */
-struct SampledSubgraph: public ImmutableSubgraph {
+struct SampledSubgraph: public Subgraph {
   /*!
    * \brief the layer of a sampled vertex in the subgraph.
    */

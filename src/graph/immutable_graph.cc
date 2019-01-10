@@ -455,27 +455,28 @@ ImmutableGraph::EdgeArray ImmutableGraph::Edges(bool sorted) const {
   return ImmutableGraph::EdgeArray{rst_src, rst_dst, rst_eid};
 }
 
-ImmutableSubgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
-  ImmutableSubgraph subg;
+Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
+  Subgraph subg;
   std::pair<csr::ptr, IdArray> ret;
   // We prefer to generate a subgraph for out-csr first.
   if (out_csr_) {
     ret = out_csr_->VertexSubgraph(vids);
-    subg.graph = ImmutableGraph(nullptr, ret.first, IsMultigraph());
+    subg.graph = GraphInterface::ptr(new ImmutableGraph(nullptr, ret.first, IsMultigraph()));
   } else {
     assert(in_csr_);
     ret = in_csr_->VertexSubgraph(vids);
     // When we generate a subgraph, it may be used by only accessing in-edges or out-edges.
     // We don't need to generate both.
-    subg.graph = ImmutableGraph(ret.first, nullptr, IsMultigraph());
+    subg.graph = GraphInterface::ptr(new ImmutableGraph(ret.first, nullptr, IsMultigraph()));
   }
   subg.induced_vertices = vids;
   subg.induced_edges = ret.second;
   return subg;
 }
 
-ImmutableSubgraph ImmutableGraph::EdgeSubgraph(IdArray eids) const {
-  return ImmutableSubgraph();
+Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids) const {
+  LOG(FATAL) << "not implemented";
+  return Subgraph();
 }
 
 ImmutableGraph::CSRArray ImmutableGraph::GetInCSRArray() const {

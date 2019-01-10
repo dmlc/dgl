@@ -58,28 +58,7 @@ PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
   auto body = [sg] (DGLArgs args, DGLRetValue* rv) {
       const int which = args[0];
       if (which == 0) {
-        Graph* gptr = new Graph();
-        *gptr = std::move(sg.graph);
-        GraphHandle ghandle = gptr;
-        *rv = ghandle;
-      } else if (which == 1) {
-        *rv = std::move(sg.induced_vertices);
-      } else if (which == 2) {
-        *rv = std::move(sg.induced_edges);
-      } else {
-        LOG(FATAL) << "invalid choice";
-      }
-    };
-  return PackedFunc(body);
-}
-
-// Convert Subgraph structure to PackedFunc.
-PackedFunc ConvertSubgraphToPackedFunc(const ImmutableSubgraph& sg) {
-  auto body = [sg] (DGLArgs args, DGLRetValue* rv) {
-      const int which = args[0];
-      if (which == 0) {
-        ImmutableGraph* gptr = new ImmutableGraph();
-        *gptr = std::move(sg.graph);
+        Graph* gptr = sg.graph->reset();
         GraphHandle ghandle = gptr;
         *rv = ghandle;
       } else if (which == 1) {
@@ -98,8 +77,8 @@ PackedFunc ConvertSubgraphToPackedFunc(const std::vector<SampledSubgraph>& sg) {
   auto body = [sg] (DGLArgs args, DGLRetValue* rv) {
       const int which = args[0];
       if (which < sg.size()) {
-        ImmutableGraph* gptr = new ImmutableGraph();
-        *gptr = std::move(sg[which].graph);
+        Graph* gptr = sg[which].graph->reset();
+        *gptr = std::move();
         GraphHandle ghandle = gptr;
         *rv = ghandle;
       } else if (which >= sg.size() && which < sg.size() * 2) {
