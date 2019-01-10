@@ -1222,8 +1222,9 @@ class DGLGraph(object):
                     for key in edge_attrs:
                         attr_dict[key][eid] = attrs[key]
             for attr in edge_attrs:
-                if None in attr_dict[attr]:
-                    raise DGLError('Not all edges have attribute {}.'.format(attr))
+                for val in attr_dict[attr]:
+                    if val is None:
+                        raise DGLError('Not all edges have attribute {}.'.format(attr))
                 self._edge_frame[attr] = _batcher(attr_dict[attr])
 
     def from_scipy_sparse_matrix(self, spmat):
