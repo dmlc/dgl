@@ -348,8 +348,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")
     int list_size = args[1];
     std::vector<const Graph*> graphs;
     for (int i = 0; i < list_size; ++i) {
-//      const GraphInterface *ptr = static_cast<const GraphInterface *>(inhandles[i]);
-      const Graph* gr = static_cast<const Graph*>(inhandles[i]);
+      const GraphInterface *ptr = static_cast<const GraphInterface *>(inhandles[i]);
+      const Graph* gr = dynamic_cast<const Graph*>(ptr);
       graphs.push_back(gr);
     }
     Graph* gptr = new Graph();
@@ -361,8 +361,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointPartitionByNum")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
-//    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    const Graph* gptr = static_cast<const Graph*>(ghandle);
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+    const Graph* gptr = dynamic_cast<const Graph*>(ptr);
     int64_t num = args[1];
     std::vector<Graph>&& rst = GraphOp::DisjointPartitionByNum(gptr, num);
     // return the pointer array as an integer array
@@ -380,8 +380,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointPartitionByNum")
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointPartitionBySizes")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
-//    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    const Graph* gptr = static_cast<const Graph*>(ghandle);
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+    const Graph* gptr = dynamic_cast<const Graph*>(ptr);
     const IdArray sizes = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     std::vector<Graph>&& rst = GraphOp::DisjointPartitionBySizes(gptr, sizes);
     // return the pointer array as an integer array
@@ -400,8 +400,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLineGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     bool backtracking = args[1];
-//    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    const Graph* gptr = static_cast<const Graph*>(ghandle);
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+    const Graph* gptr = dynamic_cast<const Graph*>(ptr);
     Graph* lgptr = new Graph();
     *lgptr = GraphOp::LineGraph(gptr, backtracking);
     GraphHandle lghandle = lgptr;
@@ -425,8 +425,8 @@ DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphGetCSR")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     bool transpose = args[1];
-//    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    const ImmutableGraph *gptr = static_cast<const ImmutableGraph*>(ghandle);
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+    const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
     ImmutableGraph::CSRArray csr;
     if (transpose) {
       csr = gptr->GetOutCSRArray();
@@ -446,8 +446,8 @@ void CAPI_NeighborUniformSample(DGLArgs args, DGLRetValue* rv) {
   int num_hops = args[num_seeds + 2];
   int num_neighbors = args[num_seeds + 3];
   int num_valid_seeds = args[num_seeds + 4];
-//  const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-  const ImmutableGraph *gptr = static_cast<const ImmutableGraph*>(ghandle);
+  const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+  const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
   assert(num_valid_seeds <= num_seeds);
   std::vector<SampledSubgraph> subgs(seeds.size());
 #pragma omp parallel for

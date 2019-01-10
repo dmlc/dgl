@@ -16,6 +16,28 @@ typedef dgl::runtime::NDArray IntArray;
 
 struct Subgraph;
 
+class dgl_id_iters {
+  std::vector<dgl_id_t>::const_iterator b, e;
+ public:
+  dgl_id_iters(std::vector<dgl_id_t>::const_iterator begin,
+               std::vector<dgl_id_t>::const_iterator end) {
+    this->b = begin;
+    this->e = end;
+  }
+  std::vector<dgl_id_t>::const_iterator begin() const {
+    return this->b;
+  }
+  std::vector<dgl_id_t>::const_iterator end() const {
+    return this->e;
+  }
+  dgl_id_t operator[](int64_t i) const {
+    return *(this->b + i);
+  }
+  size_t size() const {
+    return this->e - this->b;
+  }
+};
+
 /*!
  * \brief dgl graph index interface.
  *
@@ -30,28 +52,6 @@ class GraphInterface {
   } EdgeArray;
 
   typedef std::shared_ptr<GraphInterface> ptr;
-
-  class dgl_id_iters {
-    std::vector<dgl_id_t>::const_iterator b, e;
-   public:
-    dgl_id_iters(std::vector<dgl_id_t>::const_iterator begin,
-                 std::vector<dgl_id_t>::const_iterator end) {
-      this->b = begin;
-      this->e = end;
-    }
-    std::vector<dgl_id_t>::const_iterator begin() const {
-      return this->b;
-    }
-    std::vector<dgl_id_t>::const_iterator end() const {
-      return this->e;
-    }
-    dgl_id_t operator[](int64_t i) const {
-      return *(this->b + i);
-    }
-    size_t size() const {
-      return this->e - this->b;
-    }
-  };
 
   virtual ~GraphInterface() {
   }
@@ -90,7 +90,7 @@ class GraphInterface {
   virtual bool IsMultigraph() const = 0;
 
   /*! \return the number of vertices in the graph.*/
-  virtual uint64_t NumVertices() const;
+  virtual uint64_t NumVertices() const = 0;
 
   /*! \return the number of edges in the graph.*/
   virtual uint64_t NumEdges() const = 0;
