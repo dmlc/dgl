@@ -410,7 +410,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLineGraph")
 
 ///////////////////////////// Immutable Graph API ///////////////////////////////////
 
-DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphCreate")
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreateImmutable")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const IdArray src_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
     const IdArray dst_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
@@ -421,7 +421,7 @@ DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphCreate")
     *rv = ghandle;
   });
 
-DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphGetCSR")
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetCSR")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     bool transpose = args[1];
@@ -457,21 +457,21 @@ void CAPI_NeighborUniformSample(DGLArgs args, DGLRetValue* rv) {
   *rv = ConvertSubgraphToPackedFunc(subgs);
 }
 
-DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphUniformSampling")
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling")
 .set_body(CAPI_NeighborUniformSample<1>);
-DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphUniformSampling2")
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling2")
 .set_body(CAPI_NeighborUniformSample<2>);
-DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphUniformSampling4")
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling4")
 .set_body(CAPI_NeighborUniformSample<4>);
-DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphUniformSampling8")
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling8")
 .set_body(CAPI_NeighborUniformSample<8>);
-DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphUniformSampling16")
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling16")
 .set_body(CAPI_NeighborUniformSample<16>);
-DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphUniformSampling32")
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling32")
 .set_body(CAPI_NeighborUniformSample<32>);
-DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphUniformSampling64")
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling64")
 .set_body(CAPI_NeighborUniformSample<64>);
-DGL_REGISTER_GLOBAL("immutable_graph_index._CAPI_DGLGraphUniformSampling128")
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling128")
 .set_body(CAPI_NeighborUniformSample<128>);
 
 }  // namespace dgl
