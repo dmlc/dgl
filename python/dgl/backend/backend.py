@@ -422,7 +422,7 @@ def scatter_row(data, row_index, value):
     pass
 
 def scatter_row_inplace(data, row_index, value):
-    """Write the value into the data tensor using the row index inplacely.
+    """Write the value into the data tensor using the row index inplace.
 
     This is an inplace write so it will break the autograd.
 

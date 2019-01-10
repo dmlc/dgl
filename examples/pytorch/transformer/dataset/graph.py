@@ -9,7 +9,7 @@ Graph = namedtuple('Graph',
                    ['g', 'src', 'tgt', 'tgt_y', 'nids', 'eids', 'nid_arr', 'n_nodes', 'n_edges', 'n_tokens'])
 
 class GraphPool:
-    "Create a graph pool in advance to accelerate graph buildling phase in Transformer."
+    "Create a graph pool in advance to accelerate graph building phase in Transformer."
     def __init__(self, n=50, m=50):
         '''
         args:
