@@ -343,7 +343,7 @@ class Graph: public GraphInterface {
    */
   virtual GraphInterface *Reset() {
     Graph* gptr = new Graph();
-    *gptr = std::move(this);
+    *gptr = std::move(*this);
     return gptr;
   }
 

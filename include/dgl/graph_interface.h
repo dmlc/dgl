@@ -31,8 +31,27 @@ class GraphInterface {
 
   typedef std::shared_ptr<GraphInterface> ptr;
 
-  typedef std::pair<std::vector<dgl_id_t>::const_iterator,
-          std::vector<dgl_id_t>::const_iterator> dgl_id_iters;
+  class dgl_id_iters {
+    std::vector<dgl_id_t>::const_iterator b, e;
+   public:
+    dgl_id_iters(std::vector<dgl_id_t>::const_iterator begin,
+                 std::vector<dgl_id_t>::const_iterator end) {
+      this->b = begin;
+      this->e = end;
+    }
+    std::vector<dgl_id_t>::const_iterator begin() const {
+      return this->b;
+    }
+    std::vector<dgl_id_t>::const_iterator end() const {
+      return this->e;
+    }
+    dgl_id_t operator[](int64_t i) const {
+      return *(this->b + i);
+    }
+    size_t size() const {
+      return this->e - this->b;
+    }
+  };
 
   virtual ~GraphInterface() {
   }

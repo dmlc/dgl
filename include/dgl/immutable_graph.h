@@ -433,7 +433,7 @@ class ImmutableGraph: public GraphInterface {
    */
   virtual GraphInterface *Reset() {
     ImmutableGraph* gptr = new ImmutableGraph();
-    *gptr = std::move(this);
+    *gptr = std::move(*this);
     return gptr;
   }
 

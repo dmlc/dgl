@@ -901,9 +901,9 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
     subg_csr->edge_ids[i] = i;
 
   if (neigh_type == "in")
-    subg.graph = ImmutableGraph(subg_csr, nullptr, IsMultigraph());
+    subg.graph = GraphInterface::ptr(new ImmutableGraph(subg_csr, nullptr, IsMultigraph()));
   else
-    subg.graph = ImmutableGraph(nullptr, subg_csr, IsMultigraph());
+    subg.graph = GraphInterface::ptr(new ImmutableGraph(nullptr, subg_csr, IsMultigraph()));
 
   return subg;
 }
@@ -938,7 +938,7 @@ SampledSubgraph ImmutableGraph::NeighborUniformSample(IdArray seeds,
                             neigh_type,
                             num_hops,
                             expand_factor);
-  ret.graph.CompactSubgraph(ret.induced_vertices);
+  std::static_pointer_cast<ImmutableGraph>(ret.graph)->CompactSubgraph(ret.induced_vertices);
   return ret;
 }
 
