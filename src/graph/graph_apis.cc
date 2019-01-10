@@ -412,6 +412,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLineGraph")
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreateImmutable")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
+    printf("create immutable\n");
     const IdArray src_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
     const IdArray dst_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     const IdArray edge_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
@@ -419,6 +420,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreateImmutable")
     int64_t num_nodes = static_cast<int64_t>(args[4]);
     GraphHandle ghandle = new ImmutableGraph(src_ids, dst_ids, edge_ids, num_nodes, multigraph);
     *rv = ghandle;
+    printf("create immutable1\n");
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetCSR")

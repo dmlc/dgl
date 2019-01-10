@@ -416,6 +416,7 @@ Subgraph Graph::VertexSubgraph(IdArray vids) const {
     oldv2newv[vid_data[i]] = i;
   }
   Subgraph rst;
+  rst.graph = std::make_shared<Graph>(IsMultigraph());
   rst.induced_vertices = vids;
   rst.graph->AddVertices(len);
   for (int64_t i = 0; i < len; ++i) {
@@ -453,6 +454,7 @@ Subgraph Graph::EdgeSubgraph(IdArray eids) const {
   }
 
   Subgraph rst;
+  rst.graph = std::make_shared<Graph>(IsMultigraph());
   rst.induced_edges = eids;
   rst.graph->AddVertices(nodes.size());
 
