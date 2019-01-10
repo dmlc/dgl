@@ -944,7 +944,7 @@ class ImmutableGraphIndex(GraphIndex):
     backend_csr: a csr array provided by the backend framework.
     """
     def __init__(self, handle):
-        super(ImmutableGraphIndex, self).__init__(handle)
+        pass
 
     def init(self, src_ids, dst_ids, edge_ids, num_nodes):
         """The actual init function"""
@@ -1247,6 +1247,15 @@ class ImmutableSubgraphIndex(ImmutableGraphIndex):
         self._parent = parent
         self._induced_nodes = induced_nodes
         self._induced_edges = induced_edges
+
+    def edge_subgraph(self, e):
+        raise NotImplementedError('immutable graph doesn\'t implement edge_subgraph for now.')
+
+    def line_graph(self, backtracking=True):
+        raise NotImplementedError('immutable graph doesn\'t implement line_graph')
+
+    def incidence_matrix(self, typestr, ctx):
+        raise NotImplementedError('immutable graph doesn\'t implement incidence_matrix for now.')
 
     @property
     def induced_edges(self):
