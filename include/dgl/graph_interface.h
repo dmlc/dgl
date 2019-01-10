@@ -6,6 +6,10 @@
 #ifndef DGL_GRAPH_INTERFACE_H_
 #define DGL_GRAPH_INTERFACE_H_
 
+#include <vector>
+#include <utility>
+#include "runtime/ndarray.h"
+
 namespace dgl {
 
 typedef uint64_t dgl_id_t;
@@ -268,7 +272,7 @@ class GraphInterface {
    *
    * \return the reversed graph
    */
-   virtual GraphInterface::ptr Reverse() const = 0;
+  virtual GraphInterface::ptr Reverse() const = 0;
 
   /*!
    * \brief Return the successor vector

@@ -10,7 +10,6 @@
 #include <cstdint>
 #include <utility>
 #include <tuple>
-#include "runtime/ndarray.h"
 
 #include "graph_interface.h"
 
