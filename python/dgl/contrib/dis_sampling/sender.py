@@ -105,7 +105,7 @@ class Sender(object):
                         csr_indptr = str_csr_indptr,
                         csr_shape_0 = self.max_num_vertices,
                         csr_shape_1 = self.graph.shape[1]))
-                    print(response)
+                    #print(response)
 
         except KeyboardInterrupt:
             self.stop()

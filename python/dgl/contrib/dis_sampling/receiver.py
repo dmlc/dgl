@@ -47,7 +47,7 @@ class Receiver(sampler_pb2_grpc.SamplerServicer):
         # This action can be blocked if the queue if full.
         self.queue.put(sub_graph)
 
-        return sampler_pb2.SamplerReply(response='Get sub-graph !')
+        return sampler_pb2.SamplerReply(response='Get sub-graph!')
 
     def start(self):
         """ Start gRPC server in back-end thread
