@@ -73,7 +73,7 @@ class DGLType(ctypes.Structure):
             bits = 64
             head = ""
         else:
-            raise ValueError("Donot know how to handle type %s" % type_str)
+            raise ValueError("Do not know how to handle type %s" % type_str)
         bits = int(head) if head else bits
         inst.bits = bits
 
