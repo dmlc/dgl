@@ -13,3 +13,4 @@ Contributors
 [Yifei Ma](https://github.com/yifeim)
 Hao Jin
 [Sheng Zha](https://github.com/szha)
+[Brett Koonce](https://github.com/brettkoonce)
