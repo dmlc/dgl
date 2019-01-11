@@ -133,7 +133,7 @@ class GAT(nn.Module):
             h = self.gat_layers[l](h).flatten(1)
             h = self.activation(h)
         # output projection
-        logits = self.gat_layers[-1](h).sum(1)
+        logits = self.gat_layers[-1](h).mean(1)
         return logits
 
 def accuracy(logits, labels):
