@@ -67,6 +67,8 @@ class GraphAttention(nn.Module):
         head_ft = ft.transpose(0, 1)
         a1 = torch.bmm(head_ft, self.attn_l).transpose(0, 1)
         a2 = torch.bmm(head_ft, self.attn_r).transpose(0, 1)
+        if self.feat_drop:
+            ft = self.feat_drop(ft)
         self.g.ndata.update({'ft' : ft, 'a1' : a1, 'a2' : a2})
         # 1. compute edge attention
         self.g.apply_edges(self.edge_attention)
@@ -121,7 +123,7 @@ class GAT(nn.Module):
                 feat_drop, attn_drop, alpha, residual))
         # output projection
         self.gat_layers.append(GraphAttention(
-            g, num_hidden * num_heads, num_classes, 1,
+            g, num_hidden * num_heads, num_classes, 8,
             feat_drop, attn_drop, alpha, residual))
 
     def forward(self, inputs):
@@ -130,7 +132,7 @@ class GAT(nn.Module):
             h = self.gat_layers[l](h).flatten(1)
             h = self.activation(h)
         # output projection
-        logits = self.gat_layers[-1](h).flatten(1)
+        logits = self.gat_layers[-1](h).sum(1)
         return logits
 
 def accuracy(logits, labels):
@@ -243,10 +245,12 @@ if __name__ == '__main__':
     register_data_args(parser)
     parser.add_argument("--gpu", type=int, default=-1,
                         help="which GPU to use. Set -1 to use CPU.")
-    parser.add_argument("--epochs", type=int, default=200,
+    parser.add_argument("--epochs", type=int, default=300,
                         help="number of training epochs")
     parser.add_argument("--num-heads", type=int, default=8,
-                        help="number of attentional heads to use")
+                        help="number of hidden attention heads")
+    parser.add_argument("--num-out-heads", type=int, default=1,
+                        help="number of output attention heads")
     parser.add_argument("--num-layers", type=int, default=1,
                         help="number of hidden layers")
     parser.add_argument("--num-hidden", type=int, default=8,

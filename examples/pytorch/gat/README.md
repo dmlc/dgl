@@ -19,9 +19,18 @@ pip install torch==1.0.0 requests
 How to run
 ----------
 
-Run with following (available dataset: "cora", "citeseer", "pubmed")
+Run with following:
+
 ```bash
 python train.py --dataset=cora --gpu=0
+```
+
+```bash
+python train.py --dataset=citeseer --gpu=0
+```
+
+```bash
+python train.py --dataset=pubmed --gpu=0 --num-out-heads=8 --weight-decay=0.001
 ```
 
 Results
@@ -30,10 +39,10 @@ Results
 | Dataset | Test Accuracy | Time(s) | Baseline#1 times(s) | Baseline#2 times(s) |
 | ------- | ------------- | ------- | ------------------- | ------------------- |
 | Cora | 84.0% | 0.0127 | 0.0982 (**7.7x**) | 0.0424 (**3.3x**) |
-| Citeseer | 70.5% | 0.0123 | n/a | n/a |
-| Pubmed | 77.3% | 0.0302 | n/a | n/a |
+| Citeseer | 70.7% | 0.0123 | n/a | n/a |
+| Pubmed | 78.1% | 0.0302 | n/a | n/a |
 
-* All the accuracy numbers are obtained after 200 epochs.
+* All the accuracy numbers are obtained after 300 epochs.
 * The time measures how long it takes to train one epoch.
 * All time is measured on EC2 p3.2xlarge instance w/ V100 GPU.
 * Baseline#1: [https://github.com/PetarV-/GAT](https://github.com/PetarV-/GAT).
