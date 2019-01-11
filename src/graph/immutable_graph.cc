@@ -8,9 +8,7 @@
 #include <dgl/immutable_graph.h>
 
 #ifdef _MSC_VER
-// TODO(zhengda) it seems MS compiler doesn't have rand_r. Let's
-// use rand for now. This may not have good performance because rand has
-// a global variable shared by all threads.
+// rand in MS compiler works well in multi-threading.
 int rand_r(unsigned *seed) {
   return rand();
 }
