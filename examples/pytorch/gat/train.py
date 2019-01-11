@@ -53,10 +53,10 @@ class GraphAttention(nn.Module):
         self.residual = residual
         if residual:
             if in_dim != out_dim:
-                self.res_w = nn.Linear(in_dim, num_heads * out_dim, bias=False)
-                nn.init.xavier_normal_(self.res_w.weight.data, gain=1.414)
+                self.res_fc = nn.Linear(in_dim, num_heads * out_dim, bias=False)
+                nn.init.xavier_normal_(self.res_fc.weight.data, gain=1.414)
             else:
-                self.res_w = None
+                self.res_fc = None
 
     def forward(self, inputs):
         # prepare
@@ -80,8 +80,8 @@ class GraphAttention(nn.Module):
         ret = self.g.ndata['ft'] / self.g.ndata['z']  # NxHxD'
         # 4. residual
         if self.residual:
-            if self.res_w is not None:
-                resval = self.res_w(h).reshape((h.shape[0], self.num_heads, -1))  # NxHxD'
+            if self.res_fc is not None:
+                resval = self.res_fc(h).reshape((h.shape[0], self.num_heads, -1))  # NxHxD'
             else:
                 resval = torch.unsqueeze(h, 1)  # Nx1xD'
             ret = resval + ret
