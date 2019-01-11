@@ -8,7 +8,9 @@ IF x%1x==xx (
 	SET BACKEND=%1
 )
 
-python -m nose -v --with-xunit tests || EXIT /B 1
+SET PYTHONPATH=tests;!PYTHONPATH!
+
 python -m nose -v --with-xunit tests\!BACKEND! || EXIT /B 1
 python -m nose -v --with-xunit tests\graph_index || EXIT /B 1
+python -m nose -v --with-xunit tests\compute || EXIT /B 1
 EXIT /B

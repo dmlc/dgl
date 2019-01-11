@@ -42,7 +42,7 @@ class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
 def infer_scheme(tensor):
     """Infer column scheme from the given tensor data.
 
-    Paramters
+    Parameters
     ---------
     tensor : Tensor
         The tensor data.
@@ -138,10 +138,12 @@ class Column(object):
         elif idx.slice_data() is not None:
             # for contiguous indices narrow+concat is usually faster than scatter row
             slc = idx.slice_data()
-            part1 = F.narrow_row(self.data, 0, slc.start)
-            part2 = feats
-            part3 = F.narrow_row(self.data, slc.stop, len(self))
-            self.data = F.cat([part1, part2, part3], dim=0)
+            parts = [feats]
+            if slc.start > 0:
+                parts.insert(0, F.narrow_row(self.data, 0, slc.start))
+            if slc.stop < len(self):
+                parts.append(F.narrow_row(self.data, slc.stop, len(self)))
+            self.data = F.cat(parts, dim=0)
         else:
             idx = idx.tousertensor(F.context(self.data))
             self.data = F.scatter_row(self.data, idx, feats)
@@ -721,7 +723,7 @@ class FrameRef(MutableMapping):
         data : dict-like
             The row data.
         inplace : bool
-            True if the update is performed inplacely.
+            True if the update is performed inplace.
         """
         rows = self._getrows(query)
         for key, col in data.items():
@@ -741,7 +743,7 @@ class FrameRef(MutableMapping):
 
         Please note that "deleted" rows are not really deleted, but simply removed
         in the reference. As a result, if two FrameRefs point to the same Frame, deleting
-        from one ref will not relect on the other. However, deleting columns is real.
+        from one ref will not reflect on the other. However, deleting columns is real.
 
         Parameters
         ----------

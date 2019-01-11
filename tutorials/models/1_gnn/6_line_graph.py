@@ -23,7 +23,7 @@ Line Graph Neural Network
 # `Supervised Community Detection with Line Graph Neural Networks <https://arxiv.org/abs/1705.08415>`__. 
 # One of the highlight of their model is
 # to augment the vanilla graph neural network(GNN) architecture to operate on
-# the line graph of edge adajcencies, defined with non-backtracking operator.
+# the line graph of edge adjacencies, defined with non-backtracking operator.
 #
 # In addition to its high performance, LGNN offers an opportunity to
 # illustrate how DGL can implement an advanced graph algorithm by flexibly
@@ -44,7 +44,7 @@ Line Graph Neural Network
 # What's the difference between community detection and node classification？
 # Comparing to node classification, community detection focuses on retrieving
 # cluster information in the graph, rather than assigning a specific label to
-# a node. For example, as long as a node is clusetered with its community
+# a node. For example, as long as a node is clustered with its community
 # members, it doesn't matter whether the node is assigned as "community A",
 # or "community B", while assigning all "great movies" to label "bad movies"
 # will be a disaster in a movie network classification task.
@@ -61,7 +61,7 @@ Line Graph Neural Network
 # we use `CORA <https://linqs.soe.ucsc.edu/data>`__ 
 # to illustrate a simple community detection task. To refresh our memory, 
 # CORA is a scientific publication dataset, with 2708 papers belonging to 7 
-# different mahcine learning sub-fields. Here, we formulate CORA as a 
+# different machine learning sub-fields. Here, we formulate CORA as a 
 # directed graph, with each node being a paper, and each edge being a 
 # citation link (A->B means A cites B). Here is a visualization of the whole 
 # CORA dataset.
@@ -155,8 +155,8 @@ visualize(label1, nx_G1)
 #
 #    In this supervised setting, the model naturally predicts a "label" for
 #    each community. However, community assignment should be equivariant to
-#    label permutations. To acheive this, in each forward process, we take
-#    the minimum among losses calcuated from all possible permutations of
+#    label permutations. To achieve this, in each forward process, we take
+#    the minimum among losses calculated from all possible permutations of
 #    labels.
 #
 #    Mathematically, this means
@@ -180,7 +180,7 @@ visualize(label1, nx_G1)
 # What's a line-graph ?
 # ~~~~~~~~~~~~~~~~~~~~~
 # In graph theory, line graph is a graph representation that encodes the
-# edge adjacency sturcutre in the original graph.
+# edge adjacency structure in the original graph.
 #
 # Specifically, a line-graph :math:`L(G)` turns an edge of the original graph `G`
 # into a node. This is illustrated with the graph below (taken from the
@@ -214,11 +214,11 @@ visualize(label1, nx_G1)
 #    where an edge is formed if :math:`B_{node1, node2} = 1`.
 #
 #
-# One layer in LGNN -- algorithm sturcture
+# One layer in LGNN -- algorithm structure
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
 # LGNN chains up a series of line-graph neural network layers. The graph
-# reprentation :math:`x` and its line-graph companion :math:`y` evolve with
+# representation :math:`x` and its line-graph companion :math:`y` evolve with
 # the dataflow as follows,
 # 
 # .. figure:: https://i.imgur.com/bZGGIGp.png
@@ -282,7 +282,7 @@ visualize(label1, nx_G1)
 #     denote as :math:`\text{radius}(x)`
 #   - :math:`[\{Pm,Pd\}y^{(k)}]\theta^{(k)}_{3+J,l}`, fusing another
 #     graph's embedding information using incidence matrix
-#     :math:`\{Pm, Pd\}`, followed with a linear porjection,
+#     :math:`\{Pm, Pd\}`, followed with a linear projection,
 #     denote as :math:`\text{fuse}(y)`.
 #
 # - In addition, each of the terms are performed again with different
@@ -337,7 +337,7 @@ visualize(label1, nx_G1)
 # doing one step message passing. As a generalization, :math:`2^j` adjacency
 # operations can be formulated as performing :math:`2^j` step of message
 # passing. Therefore, the summation is equivalent to summing nodes'
-# representation of :math:`2^j, j=0, 1, 2..` step messsage passing, i.e.
+# representation of :math:`2^j, j=0, 1, 2..` step message passing, i.e.
 # gathering information in :math:`2^{j}` neighbourhood of each node.
 #
 # In ``__init__``, we define the projection variables used in each
@@ -597,8 +597,8 @@ visualize(label1, nx_G1)
 # In the ``collate_fn`` for PyTorch Dataloader, we batch graphs using DGL's
 # batched_graph API. To refresh our memory, DGL batches graphs by merging them
 # into a large graph, with each smaller graph's adjacency matrix being a block
-# along the diagonal of the large graph's adjacency matrix.  We concatentate
-# :math`\{Pm,Pd\}` as block diagonal matrix in corespondance to DGL batched
+# along the diagonal of the large graph's adjacency matrix.  We concatenate
+# :math`\{Pm,Pd\}` as block diagonal matrix in correspondence to DGL batched
 # graph API.
 
 def collate_fn(batch):
@@ -614,9 +614,9 @@ def collate_fn(batch):
 # 
 # What's the business with :math:`\{Pm, Pd\}`?
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Rougly speaking, there is a relationship between how :math:`g` and
+# Roughly speaking, there is a relationship between how :math:`g` and
 # :math:`lg` (the line graph) working together with loopy brief propagation.
-# Here, we implement :math:`\{Pm, Pd\}` as scipy coo sparse matrix in the datset,
+# Here, we implement :math:`\{Pm, Pd\}` as scipy coo sparse matrix in the dataset,
 # and stack them as tensors when batching. Another batching solution is to
-# treat :math:`\{Pm, Pd\}` as the adjacency matrix of a bipartie graph, which maps
+# treat :math:`\{Pm, Pd\}` as the adjacency matrix of a bipartite graph, which maps
 # line graph's feature to graph's, and vice versa.

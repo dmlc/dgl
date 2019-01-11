@@ -1,8 +1,6 @@
-import torch as th
-from torch.autograd import Variable
 import numpy as np
 from dgl.graph import DGLGraph
-import utils as U
+import backend as F
 
 D = 5
 
@@ -15,8 +13,11 @@ def generate_graph(grad=False):
         g.add_edge(i, 9)
     # add a back flow from 9 to 0
     g.add_edge(9, 0)
-    ncol = Variable(th.randn(10, D), requires_grad=grad)
-    ecol = Variable(th.randn(17, D), requires_grad=grad)
+    ncol = F.randn((10, D))
+    ecol = F.randn((17, D))
+    if grad:
+        ncol = F.attach_grad(ncol)
+        ecol = F.attach_grad(ecol)
     g.ndata['h'] = ncol
     g.edata['l'] = ecol
     return g
@@ -28,7 +29,7 @@ def test_basics():
     nid = [0, 2, 3, 6, 7, 9]
     sg = g.subgraph(nid)
     eid = {2, 3, 4, 5, 10, 11, 12, 13, 16}
-    assert set(sg.parent_eid.numpy()) == eid
+    assert set(F.zerocopy_to_numpy(sg.parent_eid)) == eid
     eid = sg.parent_eid
     # the subgraph is empty initially
     assert len(sg.ndata) == 0
@@ -38,7 +39,7 @@ def test_basics():
     assert len(sg.ndata) == 1
     assert len(sg.edata) == 1
     sh = sg.ndata['h']
-    assert U.allclose(h[nid], sh)
+    assert F.allclose(h[nid], sh)
     '''
     s, d, eid
     0, 1, 0
@@ -59,11 +60,11 @@ def test_basics():
     8, 9, 15      3
     9, 0, 16   1
     '''
-    assert U.allclose(l[eid], sg.edata['l'])
+    assert F.allclose(F.gather_row(l, eid), sg.edata['l'])
     # update the node/edge features on the subgraph should NOT
     # reflect to the parent graph.
-    sg.ndata['h'] = th.zeros((6, D))
-    assert U.allclose(h, g.ndata['h'])
+    sg.ndata['h'] = F.zeros((6, D))
+    assert F.allclose(h, g.ndata['h'])
 
 def test_merge():
     # FIXME: current impl cannot handle this case!!!

@@ -4,6 +4,7 @@ from __future__ import absolute_import
 from collections import defaultdict
 
 import dgl
+import networkx as nx
 from .base import ALL, is_all, DGLError
 from . import backend as F
 from . import init
@@ -1120,12 +1121,12 @@ class DGLGraph(object):
         if node_attrs is not None:
             for nid, attr in nx_graph.nodes(data=True):
                 feat_dict = self.get_n_repr(nid)
-                attr.update({key: feat_dict[key].squeeze(0) for key in node_attrs})
+                attr.update({key: F.squeeze(feat_dict[key], 0) for key in node_attrs})
         if edge_attrs is not None:
             for _, _, attr in nx_graph.edges(data=True):
                 eid = attr['id']
                 feat_dict = self.get_e_repr(eid)
-                attr.update({key: feat_dict[key].squeeze(0) for key in edge_attrs})
+                attr.update({key: F.squeeze(feat_dict[key], 0) for key in edge_attrs})
         return nx_graph
 
     def from_networkx(self, nx_graph, node_attrs=None, edge_attrs=None):
@@ -1137,7 +1138,9 @@ class DGLGraph(object):
         Parameters
         ----------
         nx_graph : networkx.DiGraph
-            The nx graph
+            If the node labels of ``nx_graph`` are not consecutive
+            integers, its nodes will be relabeled using consecutive integers.
+            The new node ordering will inherit that of ``sorted(nx_graph.nodes())``
         node_attrs : iterable of str, optional
             The node attributes needs to be copied.
         edge_attrs : iterable of str, optional
@@ -1165,6 +1168,16 @@ class DGLGraph(object):
                 [2., 2., 2., 2.],
                 [1., 1., 1., 1.]])
         """
+        # Relabel nodes using consecutive integers
+        nx_graph = nx.convert_node_labels_to_integers(nx_graph, ordering='sorted')
+        # With to_directed we will get a directed version of the original networkx
+        # graph, with the original nodes, edges and their attributes preserved.
+        # This is particularly helpful when we are also converting the edge attributes
+        # as the reversed edges (u, v) will be created with the same attributes as the
+        # original edges (v, u).
+        if not nx_graph.is_directed():
+            nx_graph = nx_graph.to_directed()
+
         self.clear()
         self._graph.from_networkx(nx_graph)
         self._node_frame.add_rows(self.number_of_nodes())
@@ -1194,7 +1207,12 @@ class DGLGraph(object):
             # None here serves as placeholder to be replaced by feature with
             # corresponding edge id
             if has_edge_id:
+                num_edges = self.number_of_edges()
                 for _, _, attrs in nx_graph.edges(data=True):
+                    if attrs['id'] >= num_edges:
+                        raise DGLError('Expect the pre-specified edge ids to be'
+                                       ' smaller than the number of edges --'
+                                       ' {}, got {}.'.format(num_edges, attrs['id']))
                     for key in edge_attrs:
                         attr_dict[key][attrs['id']] = attrs[key]
             else:
@@ -1204,6 +1222,9 @@ class DGLGraph(object):
                     for key in edge_attrs:
                         attr_dict[key][eid] = attrs[key]
             for attr in edge_attrs:
+                for val in attr_dict[attr]:
+                    if val is None:
+                        raise DGLError('Not all edges have attribute {}.'.format(attr))
                 self._edge_frame[attr] = _batcher(attr_dict[attr])
 
     def from_scipy_sparse_matrix(self, spmat):
@@ -2830,7 +2851,7 @@ class DGLGraph(object):
             return F.nonzero_1d(n_mask)
         else:
             nodes = F.tensor(nodes)
-            return nodes[n_mask]
+            return F.boolean_mask(nodes, n_mask)
 
     def filter_edges(self, predicate, edges=ALL):
         """Return a tensor of edge IDs that satisfy the given predicate.
@@ -2903,7 +2924,7 @@ class DGLGraph(object):
             return F.nonzero_1d(e_mask)
         else:
             edges = F.tensor(edges)
-            return edges[e_mask]
+            return F.boolean_mask(edges, e_mask)
 
     def __repr__(self):
         ret = ('DGLGraph(num_nodes={node}, num_edges={edge},\n'

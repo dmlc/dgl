@@ -179,7 +179,7 @@ def dfs_labeled_edges_generator(
 
     There are three labels: FORWARD(0), REVERSE(1), NONTREE(2)
 
-    A FORWARD edge is one in which `u` has been visised but `v` has not. A
+    A FORWARD edge is one in which `u` has been visited but `v` has not. A
     REVERSE edge is one in which both `u` and `v` have been visited and the
     edge is in the DFS tree. A NONTREE edge is one in which both `u` and `v`
     have been visited but the edge is NOT in the DFS tree.

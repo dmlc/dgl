@@ -318,7 +318,7 @@ class ImmutableGraphIndex(object):
         Parameters
         ----------
         transpose : bool
-            A flag to tranpose the returned adjacency matrix.
+            A flag to transpose the returned adjacency matrix.
         ctx : context
             The device context of the returned matrix.
 
@@ -352,7 +352,7 @@ class ImmutableGraphIndex(object):
     def from_edge_list(self, elist):
         """Convert from an edge list.
 
-        Paramters
+        Parameters
         ---------
         elist : list
             List of (u, v) edge tuple.

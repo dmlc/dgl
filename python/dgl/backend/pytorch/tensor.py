@@ -118,11 +118,21 @@ def reshape(input, shape):
 def zeros(shape, dtype, ctx):
     return th.zeros(shape, dtype=dtype, device=ctx)
 
+def zeros_like(input):
+    return th.zeros_like(input)
+
 def ones(shape, dtype, ctx):
     return th.ones(shape, dtype=dtype, device=ctx)
 
-def spmm(x, y):
-    return th.spmm(x, y)
+if TH_VERSION.version[0] == 0:
+    # TODO(minjie): note this does not support autograd on the `x` tensor.
+    #               should adopt a workaround using custom op.
+    def spmm(x, y):
+        return th.spmm(x, y)
+else:
+    # torch v1.0+
+    def spmm(x, y):
+        return th.sparse.mm(x, y)
 
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     y = th.zeros(n_segs, *input.shape[1:]).to(input)
@@ -137,6 +147,15 @@ def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
     y /= w.view((-1,) + (1,) * (y.dim() - 1))
     return y
 
+def boolean_mask(input, mask):
+    return input[mask]
+
+def equal(x, y):
+    return x == y
+
+def logical_not(input):
+    return ~input
+
 def unique(input):
     return th.unique(input)
 
@@ -144,7 +163,8 @@ def full_1d(length, fill_value, dtype, ctx):
     return th.full((length,), fill_value, dtype=dtype, device=ctx)
 
 def nonzero_1d(input):
-    return th.nonzero(input).squeeze()
+    x = th.nonzero(input).squeeze()
+    return x if x.dim() == 1 else x.view(-1)
 
 def sort_1d(input):
     return th.sort(input)
