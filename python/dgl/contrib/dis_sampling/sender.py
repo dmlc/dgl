@@ -10,6 +10,8 @@ import grpc
 import sampler_pb2
 import sampler_pb2_grpc
 
+_MAX_MESSAGE_LENGTH = 1024 ** 3  # Gigabyte
+
 def serilize(mx_ndarray):
     """ This method serilizes a mxnet ndarray to memory.
     It will first convert mxnet ndarray to numpy ndarray,
@@ -95,7 +97,9 @@ class Sender(object):
                 str_csr_indices = serilize(sub_graph[1].indices)
                 str_csr_indptr = serilize(sub_graph[1].indptr)
                 # Send sub-graphs to reciver
-                with grpc.insecure_channel(self.addr) as channel:
+                with grpc.insecure_channel(self.addr, options=[
+                    ('grpc.max_send_message_length', _MAX_MESSAGE_LENGTH), 
+                    ('grpc.max_receive_message_length', _MAX_MESSAGE_LENGTH)]) as channel:
                     stub = sampler_pb2_grpc.SamplerStub(channel)
                     response = stub.SendSubGraph(sampler_pb2.SamplerRequest(
                         vertices_id = str_ver_id,

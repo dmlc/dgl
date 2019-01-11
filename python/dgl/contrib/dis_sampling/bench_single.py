@@ -4,10 +4,12 @@ import numpy as np
 import random
 import time
 
+import sender
+
 _SEED_SIZE = 8000
 _VERTEX_NUM = 5000000
 _NEIGHBOR_NUM = 16
-_MAX_VERTICES = 100000
+_MAX_VERTICES = 1000000
 
 _ITER = 1000
 
@@ -34,7 +36,19 @@ def start_single():
             num_hops=1, 
             num_neighbor=_NEIGHBOR_NUM, 
             max_num_vertices=_MAX_VERTICES)
-        out[0].wait_to_read()
+
+        str_ver_id = sender.serilize(out[0])
+        str_layer = sender.serilize(out[2])
+        str_csr_data = sender.serilize(out[1].data)
+        str_csr_indices = sender.serilize(out[1].indices)
+        str_csr_indptr = sender.serilize(out[1].indptr)
+
+        ver_id = sender.deserilize(str_ver_id, np.int64)
+        layer = sender.deserilize(str_layer, np.int64)
+        csr_data = sender.deserilize(str_csr_data, np.int64)
+        csr_indices = sender.deserilize(str_csr_indices, np.int64)
+        csr_indptr = sender.deserilize(str_csr_indptr, np.int64)
+
     elapsed = (time.time() - start)    
     print("time: " + str(elapsed))
 

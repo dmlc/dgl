@@ -12,6 +12,8 @@ import sender
 import sampler_pb2
 import sampler_pb2_grpc
 
+_MAX_MESSAGE_LENGTH = 1024 ** 3  # Gigabyte
+
 class Receiver(sampler_pb2_grpc.SamplerServicer):
     """ Reciever is called by trainer and it uses back-end thread
         to receive sub-graph samples from remote sampler.
@@ -56,7 +58,9 @@ class Receiver(sampler_pb2_grpc.SamplerServicer):
             port: local network port
             buffer_size: buffer size for message queue
         """
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10), options=[
+            ('grpc.max_send_message_length', _MAX_MESSAGE_LENGTH),
+            ('grpc.max_receive_message_length', _MAX_MESSAGE_LENGTH)])
         sampler_pb2_grpc.add_SamplerServicer_to_server(self, server)
         server.add_insecure_port('[::]:%d' % self.port)
         server.start()
