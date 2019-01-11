@@ -53,37 +53,37 @@ class GraphAttention(nn.Module):
         self.residual = residual
         if residual:
             if in_dim != out_dim:
-                self.residual_fc = nn.Linear(in_dim, num_heads * out_dim, bias=False)
-                nn.init.xavier_normal_(self.fc.weight.data, gain=1.414)
+                self.res_w = nn.Linear(in_dim, num_heads * out_dim, bias=False)
+                nn.init.xavier_normal_(self.res_w.weight.data, gain=1.414)
             else:
-                self.residual_fc = None
+                self.res_w = None
 
     def forward(self, inputs):
         # prepare
-        h = inputs
+        h = inputs  # NxD
         if self.feat_drop:
             h = self.feat_drop(h)
-        ft = self.fc(h).reshape((h.shape[0], self.num_heads, -1))
-        head_ft = ft.transpose(0, 1)
-        a1 = torch.bmm(head_ft, self.attn_l).transpose(0, 1)
-        a2 = torch.bmm(head_ft, self.attn_r).transpose(0, 1)
+        ft = self.fc(h).reshape((h.shape[0], self.num_heads, -1))  # NxHxD'
+        head_ft = ft.transpose(0, 1)  # HxNxD'
+        a1 = torch.bmm(head_ft, self.attn_l).transpose(0, 1)  # NxHx1
+        a2 = torch.bmm(head_ft, self.attn_r).transpose(0, 1)  # NxHx1
         if self.feat_drop:
             ft = self.feat_drop(ft)
         self.g.ndata.update({'ft' : ft, 'a1' : a1, 'a2' : a2})
         # 1. compute edge attention
         self.g.apply_edges(self.edge_attention)
-        # 2. compute two results, one is the node features scaled by the dropped,
-        # unnormalized attention values. Another is the normalizer of the attention values.
+        # 2. compute two results: one is the node features scaled by the dropped,
+        # unnormalized attention values; another is the normalizer of the attention values.
         self.g.update_all([fn.src_mul_edge('ft', 'a_drop', 'ft'), fn.copy_edge('a', 'a')],
                           [fn.sum('ft', 'ft'), fn.sum('a', 'z')])
         # 3. apply normalizer
-        ret = self.g.ndata['ft'] / self.g.ndata['z']
+        ret = self.g.ndata['ft'] / self.g.ndata['z']  # NxHxD'
         # 4. residual
         if self.residual:
-            if self.residual_fc:
-                resval = self.residual_fc(h).reshape((h.shape[0], self.num_heads, -1))
+            if self.res_w is not None:
+                resval = self.res_w(h).reshape((h.shape[0], self.num_heads, -1))  # NxHxD'
             else:
-                resval = h.reshape((h.shape[0], self.num_heads, -1))
+                resval = torch.unsqueeze(h, 1)  # Nx1xD'
             ret = resval + ret
         return ret
 
@@ -102,7 +102,7 @@ class GAT(nn.Module):
                  in_dim,
                  num_hidden,
                  num_classes,
-                 num_heads,
+                 heads,
                  activation,
                  feat_drop,
                  attn_drop,
@@ -115,16 +115,16 @@ class GAT(nn.Module):
         self.activation = activation
         # input projection (no residual)
         self.gat_layers.append(GraphAttention(
-            g, in_dim, num_hidden, num_heads, feat_drop, attn_drop, alpha, False))
+            g, in_dim, num_hidden, heads[0], feat_drop, attn_drop, alpha, False))
         # hidden layers
-        for l in range(num_layers - 1):
+        for l in range(1, num_layers):
             # due to multi-head, the in_dim = num_hidden * num_heads
             self.gat_layers.append(GraphAttention(
-                g, num_hidden * num_heads, num_hidden, num_heads,
+                g, num_hidden * heads[l-1], num_hidden, heads[l],
                 feat_drop, attn_drop, alpha, residual))
         # output projection
         self.gat_layers.append(GraphAttention(
-            g, num_hidden * num_heads, num_classes, 8,
+            g, num_hidden * heads[-2], num_classes, heads[-1],
             feat_drop, attn_drop, alpha, residual))
 
     def forward(self, inputs):
@@ -188,12 +188,13 @@ def main(args):
     # add self loop
     g.add_edges(g.nodes(), g.nodes())
     # create model
+    heads = ([args.num_heads] * args.num_layers) + [args.num_out_heads]
     model = GAT(g,
                 args.num_layers,
                 num_feats,
                 args.num_hidden,
                 n_classes,
-                args.num_heads,
+                heads,
                 F.elu,
                 args.in_drop,
                 args.attn_drop,
