@@ -3,7 +3,7 @@ Graph Attention Networks in DGL using SPMV optimization.
 Multiple heads are also batched together for faster training.
 
 Compared with the original paper, this code does not implement
-multiple output attention heads.
+early stopping.
 
 References
 ----------
@@ -81,9 +81,10 @@ class GraphAttention(nn.Module):
         # 4. residual
         if self.residual:
             if self.residual_fc:
-                ret = self.residual_fc(h) + ret
+                resval = self.residual_fc(h).reshape((h.shape[0], self.num_heads, -1))
             else:
-                ret = h + ret
+                resval = h.reshape((h.shape[0], self.num_heads, -1))
+            ret = resval + ret
         return ret
 
     def edge_attention(self, edges):
