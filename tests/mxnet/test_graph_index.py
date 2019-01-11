@@ -41,8 +41,11 @@ def test_graph_gen():
 
 def sort_edges(edges):
     edges = [e.tousertensor() for e in edges]
-    idx = mx.nd.argsort(edges[2])
-    return (edges[0][idx], edges[1][idx], edges[2][idx])
+    if np.prod(edges[2].shape) > 0:
+        idx = mx.nd.argsort(edges[2])
+        return (edges[0][idx], edges[1][idx], edges[2][idx])
+    else:
+        return (edges[0], edges[1], edges[2])
 
 def check_basics(g, ig):
     assert g.number_of_nodes() == ig.number_of_nodes()
