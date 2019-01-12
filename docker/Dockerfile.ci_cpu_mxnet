@@ -1,5 +1,5 @@
-# CI docker GPU env
-FROM nvidia/cuda:9.0-cudnn7-devel
+# CI docker CPU env
+FROM ubuntu:16.04
 
 # Base scripts
 RUN apt-get update --fix-missing
@@ -15,11 +15,3 @@ RUN bash /install/ubuntu_install_python_package.sh
 
 COPY install/ubuntu_install_mxnet_cpu.sh /install/ubuntu_install_mxnet_cpu.sh
 RUN bash /install/ubuntu_install_mxnet_cpu.sh
-
-# Environment variables
-ENV PATH=/usr/local/nvidia/bin:${PATH}
-ENV PATH=/usr/local/cuda/bin:${PATH}
-ENV CPLUS_INCLUDE_PATH=/usr/local/cuda/include:${CPLUS_INCLUDE_PATH}
-ENV C_INCLUDE_PATH=/usr/local/cuda/include:${C_INCLUDE_PATH}
-ENV LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/nvidia/lib64:${LIBRARY_PATH}
-ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/nvidia/lib64:${LD_LIBRARY_PATH}

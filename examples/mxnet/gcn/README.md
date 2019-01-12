@@ -4,6 +4,14 @@ Graph Convolutional Networks (GCN)
 Paper link: [https://arxiv.org/abs/1609.02907](https://arxiv.org/abs/1609.02907)
 Author's code repo: [https://github.com/tkipf/gcn](https://github.com/tkipf/gcn)
 
+Requirements
+------------
+- requests
+
+``bash
+pip install requests
+``
+
 Codes
 -----
 The folder contains two implementations of GCN. `gcn.py` uses user-defined
@@ -47,33 +55,33 @@ new information in the concatenations.
 
 ```
 # Final accuracy 75.34% MLP without GCN
-DGLBACKEND=mxnet python examples/mxnet/gcn/gcn_batch.py --dataset "citeseer" --n-epochs 200 --gpu 1 --n-layers 0
+DGLBACKEND=mxnet python examples/mxnet/gcn/gcn_concat.py --dataset "citeseer" --n-epochs 200 --gpu 1 --n-layers 0
 
 # Final accuracy 86.57% with 10-layer GCN (symmetric normalization)
-DGLBACKEND=mxnet python examples/mxnet/gcn/gcn_batch.py --dataset "citeseer" --n-epochs 200 --gpu 1 --n-layers 10 --normalization 'sym' --self-loop
+DGLBACKEND=mxnet python examples/mxnet/gcn/gcn_concat.py --dataset "citeseer" --n-epochs 200 --gpu 1 --n-layers 10 --normalization 'sym' --self-loop
 
 # Final accuracy 84.42% with 10-layer GCN (unnormalized)
-DGLBACKEND=mxnet python examples/mxnet/gcn/gcn_batch.py --dataset "citeseer" --n-epochs 200 --gpu 1 --n-layers 10
+DGLBACKEND=mxnet python examples/mxnet/gcn/gcn_concat.py --dataset "citeseer" --n-epochs 200 --gpu 1 --n-layers 10
 ```
 
 ```
 # Final accuracy 40.62% MLP without GCN
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "cora" --n-epochs 200 --gpu 1 --n-layers 0
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "cora" --n-epochs 200 --gpu 1 --n-layers 0
 
 # Final accuracy 92.63% with 10-layer GCN (symmetric normalization)
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "cora" --n-epochs 200 --gpu 1 --n-layers 10 --normalization 'sym' --self-loop
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "cora" --n-epochs 200 --gpu 1 --n-layers 10 --normalization 'sym' --self-loop
 
 # Final accuracy 86.60% with 10-layer GCN (unnormalized)
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "cora" --n-epochs 200 --gpu 1 --n-layers 10
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "cora" --n-epochs 200 --gpu 1 --n-layers 10
 ```
 
 ```
 # Final accuracy 72.97% MLP without GCN
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "pubmed" --n-epochs 200 --gpu 1 --n-layers 0
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "pubmed" --n-epochs 200 --gpu 1 --n-layers 0
 
 # Final accuracy 88.33% with 10-layer GCN (symmetric normalization)
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "pubmed" --n-epochs 200 --gpu 1 --n-layers 10 --normalization 'sym' --self-loop
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "pubmed" --n-epochs 200 --gpu 1 --n-layers 10 --normalization 'sym' --self-loop
 
 # Final accuracy 83.80% with 10-layer GCN (unnormalized)
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_batch.py --dataset "pubmed" --n-epochs 200 --gpu 1 --n-layers 10
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "pubmed" --n-epochs 200 --gpu 1 --n-layers 10
 ```

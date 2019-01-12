@@ -522,7 +522,7 @@ class GraphIndex(object):
         Parameters
         ----------
         transpose : bool
-            A flag to tranpose the returned adjacency matrix.
+            A flag to transpose the returned adjacency matrix.
         ctx : context
             The context of the returned matrix.
 
@@ -625,8 +625,6 @@ class GraphIndex(object):
             x = -F.ones((n_entries,), dtype=F.float32, ctx=ctx)
             y = F.ones((n_entries,), dtype=F.float32, ctx=ctx)
             dat = F.cat([x, y], dim=0)
-            print(idx)
-            print(dat)
             inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
         else:
             raise DGLError('Invalid incidence matrix type: %s' % str(typestr))
@@ -667,7 +665,10 @@ class GraphIndex(object):
             nx_graph = (nx.MultiDiGraph(nx_graph) if self.is_multigraph()
                         else nx.DiGraph(nx_graph))
         else:
-            nx_graph = nx_graph.to_directed()
+            if not nx_graph.is_directed():
+                # to_directed creates a deep copy of the networkx graph even if
+                # the original graph is already directed and we do not want to do it.
+                nx_graph = nx_graph.to_directed()
 
         num_nodes = nx_graph.number_of_nodes()
         self.add_nodes(num_nodes)
@@ -712,7 +713,7 @@ class GraphIndex(object):
     def from_edge_list(self, elist):
         """Convert from an edge list.
 
-        Paramters
+        Parameters
         ---------
         elist : list
             List of (u, v) edge tuple.
@@ -830,7 +831,7 @@ def disjoint_union(graphs):
     """Return a disjoint union of the input graphs.
 
     The new graph will include all the nodes/edges in the given graphs.
-    Nodes/Edges will be relabled by adding the cumsum of the previous graph sizes
+    Nodes/Edges will be relabeled by adding the cumsum of the previous graph sizes
     in the given sequence order. For example, giving input [g1, g2, g3], where
     they have 5, 6, 7 nodes respectively. Then node#2 of g2 will become node#7
     in the result graph. Edge ids are re-assigned similarly.
