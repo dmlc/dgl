@@ -13,12 +13,30 @@ help:
 
 .PHONY: help Makefile
 
+mxnet:
+	@echo "##################################################################"
+	@echo "#                                                                #"
+	@echo "#                Step 1: Building MXNet tutorials                #"
+	@echo "#                                                                #"
+	@echo "##################################################################"
+	@DGLBACKEND=mxnet $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+
+pytorch:
+	@echo "##################################################################"
+	@echo "#                                                                #"
+	@echo "#                Step 2: Building PyTorch tutorials              #"
+	@echo "#                                                                #"
+	@echo "##################################################################"
+	@DGLBACKEND=pytorch $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) 
+
 html-noexec:
 	$(SPHINXBUILD) -D plot_gallery=0 -b html "$(SOURCEDIR)" "$(BUILDDIR)/html" 
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
+html: Makefile mxnet pytorch
+
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
 %: Makefile
-	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) 
