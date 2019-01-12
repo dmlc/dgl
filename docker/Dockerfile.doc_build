@@ -18,6 +18,7 @@ RUN bash /install/ubuntu_install_mxnet_cpu.sh
 
 COPY install/ubuntu_install_dgl.sh /install/ubuntu_install_dgl.sh
 RUN chmod +x /install/ubuntu_install_dgl.sh
+RUN pip install virtualenv
 
 # Environment variables
 ENV PATH=/usr/local/nvidia/bin:${PATH}
