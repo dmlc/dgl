@@ -37,6 +37,9 @@ class Graph: public GraphInterface {
   /*! \brief default constructor */
   explicit Graph(bool multigraph = false) : is_multigraph_(multigraph) {}
 
+  Graph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
+      bool multigraph = false);
+
   /*! \brief default copy constructor */
   Graph(const Graph& other) = default;
 
@@ -102,6 +105,13 @@ class Graph: public GraphInterface {
    */
   bool IsMultigraph() const {
     return is_multigraph_;
+  }
+
+  /*!
+   * \return whether the graph is read-only
+   */
+  virtual bool IsReadonly() const {
+    return false;
   }
 
   /*! \return the number of vertices in the graph.*/
@@ -344,6 +354,27 @@ class Graph: public GraphInterface {
     Graph* gptr = new Graph();
     *gptr = std::move(*this);
     return gptr;
+  }
+
+  /*!
+   * \brief Get the adjacency matrix of the graph.
+   *
+   * By default, a row of returned adjacency matrix represents the destination
+   * of an edge and the column represents the source.
+   * \param transpose A flag to transpose the returned adjacency matrix.
+   * \param fmt the format of the returned adjacency matrix.
+   * \return a vector of three IdArray.
+   */
+  virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const;
+
+  /*!
+   * \brief Sample a subgraph from the seed vertices with neighbor sampling.
+   * The neighbors are sampled with a uniformly distribution.
+   * \return a subgraph
+   */
+  virtual SampledSubgraph NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
+                                                int num_hops, int expand_factor) const {
+    throw NotImplemented("NeighborUniformSample");
   }
 
  protected:

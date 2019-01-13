@@ -473,8 +473,7 @@ Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
 }
 
 Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids) const {
-  LOG(FATAL) << "not implemented";
-  return Subgraph();
+  throw NotImplemented("EdgeSubgraph");
 }
 
 ImmutableGraph::CSRArray ImmutableGraph::GetInCSRArray() const {

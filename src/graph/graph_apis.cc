@@ -99,10 +99,26 @@ PackedFunc ConvertSubgraphToPackedFunc(const std::vector<SampledSubgraph>& sg) {
 
 ///////////////////////////// Graph API ///////////////////////////////////
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreateMutable")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     bool multigraph = static_cast<bool>(args[0]);
     GraphHandle ghandle = new Graph(multigraph);
+    *rv = ghandle;
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const IdArray src_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
+    const IdArray dst_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray edge_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
+    bool multigraph = static_cast<bool>(args[3]);
+    int64_t num_nodes = static_cast<int64_t>(args[4]);
+    bool readonly = static_cast<bool>(args[5]);
+    GraphHandle ghandle;
+    if (readonly)
+      ghandle = new ImmutableGraph(src_ids, dst_ids, edge_ids, num_nodes, multigraph);
+    else
+      ghandle = new Graph(src_ids, dst_ids, edge_ids, num_nodes, multigraph);
     *rv = ghandle;
   });
 
@@ -152,6 +168,14 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphIsMultigraph")
     // NOTE: not const since we have caches
     const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
     *rv = gptr->IsMultigraph();
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphIsReadonly")
+.set_body([] (DGLArgs args, DGLRetValue *rv) {
+    GraphHandle ghandle = args[0];
+    // NOTE: not const since we have caches
+    const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
+    *rv = gptr->IsReadonly();
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphNumVertices")
@@ -408,34 +432,6 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLineGraph")
     *rv = lghandle;
   });
 
-///////////////////////////// Immutable Graph API ///////////////////////////////////
-
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreateImmutable")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    const IdArray src_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
-    const IdArray dst_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
-    const IdArray edge_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
-    bool multigraph = static_cast<bool>(args[3]);
-    int64_t num_nodes = static_cast<int64_t>(args[4]);
-    GraphHandle ghandle = new ImmutableGraph(src_ids, dst_ids, edge_ids, num_nodes, multigraph);
-    *rv = ghandle;
-  });
-
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetCSR")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    bool transpose = args[1];
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
-    ImmutableGraph::CSRArray csr;
-    if (transpose) {
-      csr = gptr->GetOutCSRArray();
-    } else {
-      csr = gptr->GetInCSRArray();
-    }
-    *rv = ConvertCSRArrayToPackedFunc(csr);
-  });
-
 template<int num_seeds>
 void CAPI_NeighborUniformSample(DGLArgs args, DGLRetValue* rv) {
   GraphHandle ghandle = args[0];
@@ -473,5 +469,23 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling64")
 .set_body(CAPI_NeighborUniformSample<64>);
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling128")
 .set_body(CAPI_NeighborUniformSample<128>);
+
+///////////////////////////// Immutable Graph API ///////////////////////////////////
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetAdj")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    bool transpose = args[1];
+    std::string format = args[2];
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+    const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
+    ImmutableGraph::CSRArray csr;
+    if (transpose) {
+      csr = gptr->GetOutCSRArray();
+    } else {
+      csr = gptr->GetInCSRArray();
+    }
+    *rv = ConvertCSRArrayToPackedFunc(csr);
+  });
 
 }  // namespace dgl

@@ -74,6 +74,14 @@ def tensor(data, dtype=None):
     """
     pass
 
+def get_preferred_sparse_format():
+    """Get the preferred sparse matrix format supported by the backend.
+
+    Different backends have their preferred backend. This info is useful when
+    constructing a sparse matrix.
+    """
+    pass
+
 def sparse_matrix(data, index, shape, force_format=False):
     """Create a sparse matrix.
 

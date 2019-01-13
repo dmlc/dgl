@@ -16,8 +16,6 @@
 
 namespace dgl {
 
-struct SampledSubgraph;
-
 template<class ForwardIt, class T>
 bool binary_search(ForwardIt first, ForwardIt last, const T& value) {
   first = std::lower_bound(first, last, value);
@@ -115,7 +113,7 @@ class ImmutableGraph: public GraphInterface {
    * \param num_vertices The number of vertices to be added.
    */
   void AddVertices(uint64_t num_vertices) {
-    LOG(FATAL) << "Immutable graph doesn't support adding vertices";
+    throw NotImplemented("AddVertices");
   }
 
   /*!
@@ -124,7 +122,7 @@ class ImmutableGraph: public GraphInterface {
    * \param dst The destination vertex.
    */
   void AddEdge(dgl_id_t src, dgl_id_t dst) {
-    LOG(FATAL) << "Immutable graph doesn't support adding edge";
+    throw NotImplemented("AddEdge");
   }
 
   /*!
@@ -133,14 +131,14 @@ class ImmutableGraph: public GraphInterface {
    * \param dst_ids The destination vertex id array.
    */
   void AddEdges(IdArray src_ids, IdArray dst_ids) {
-    LOG(FATAL) << "Immutable graph doesn't support adding edges";
+    throw NotImplemented("AddEdges");
   }
 
   /*!
    * \brief Clear the graph. Remove all vertices/edges.
    */
   void Clear() {
-    LOG(FATAL) << "Immutable graph doesn't support clearing vertices and edges";
+    throw NotImplemented("Clear");
   }
 
   /*!
@@ -149,6 +147,13 @@ class ImmutableGraph: public GraphInterface {
    */
   bool IsMultigraph() const {
     return is_multigraph_;
+  }
+
+  /*!
+   * \return whether the graph is read-only
+   */
+  virtual bool IsReadonly() const {
+    return true;
   }
 
   /*! \return the number of vertices in the graph.*/
@@ -234,8 +239,7 @@ class ImmutableGraph: public GraphInterface {
    * \return a pair whose first element is the source and the second the destination.
    */
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const {
-    LOG(FATAL) << "not implemented";
-    return std::pair<dgl_id_t, dgl_id_t>();
+    throw NotImplemented("FindEdge");
   }
 
   /*!
@@ -244,8 +248,7 @@ class ImmutableGraph: public GraphInterface {
    * \return EdgeArray containing all edges with id in eid.  The order is preserved.
    */
   EdgeArray FindEdges(IdArray eids) const {
-    LOG(FATAL) << "not implemented";
-    return EdgeArray();
+    throw NotImplemented("FindEdges");
   }
 
   /*!
@@ -457,6 +460,21 @@ class ImmutableGraph: public GraphInterface {
    */
   CSRArray GetOutCSRArray() const;
 
+  /*!
+   * \brief Get the adjacency matrix of the graph.
+   *
+   * By default, a row of returned adjacency matrix represents the destination
+   * of an edge and the column represents the source.
+   * \param transpose A flag to transpose the returned adjacency matrix.
+   * \param fmt the format of the returned adjacency matrix.
+   * \return a vector of three IdArray.
+   */
+  virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const {
+    assert(fmt == "csr");
+    CSRArray arrs = transpose ? this->GetOutCSRArray() : this->GetOutCSRArray();
+    return std::vector<IdArray>{arrs.indptr, arrs.indices, arrs.id};
+  }
+
  protected:
   std::pair<const dgl_id_t *, const dgl_id_t *> GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
   std::pair<const dgl_id_t *, const dgl_id_t *> GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
@@ -500,21 +518,6 @@ class ImmutableGraph: public GraphInterface {
    * When a multiedge is added, this flag switches to true.
    */
   bool is_multigraph_ = false;
-};
-
-/*!
- * \brief When we sample a subgraph, we need to store extra information,
- * such as the layer Ids of the vertices and the sampling probability.
- */
-struct SampledSubgraph: public Subgraph {
-  /*!
-   * \brief the layer of a sampled vertex in the subgraph.
-   */
-  IdArray layer_ids;
-  /*!
-   * \brief the probability that a vertex is sampled.
-   */
-  runtime::NDArray sample_prob;
 };
 
 }  // namespace dgl

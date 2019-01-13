@@ -12,6 +12,18 @@
 
 namespace dgl {
 
+class NotImplemented: public std::exception {
+  std::string msg;
+ public:
+  NotImplemented(const std::string &name) {
+    this->msg = name + " isn't implemented";
+  }
+
+  virtual const char* what() const noexcept {
+    return msg.c_str();
+  }
+};
+
 typedef uint64_t dgl_id_t;
 typedef dgl::runtime::NDArray IdArray;
 typedef dgl::runtime::NDArray DegreeArray;
@@ -19,6 +31,7 @@ typedef dgl::runtime::NDArray BoolArray;
 typedef dgl::runtime::NDArray IntArray;
 
 struct Subgraph;
+struct SampledSubgraph;
 
 class dgl_id_iters {
   std::vector<dgl_id_t>::const_iterator b, e;
@@ -92,6 +105,11 @@ class GraphInterface {
    * \return whether the graph is a multigraph
    */
   virtual bool IsMultigraph() const = 0;
+
+  /*!
+   * \return whether the graph is read-only
+   */
+  virtual bool IsReadonly() const = 0;
 
   /*! \return the number of vertices in the graph.*/
   virtual uint64_t NumVertices() const = 0;
@@ -307,6 +325,25 @@ class GraphInterface {
    * \return a raw pointer to the graph object.
    */
   virtual GraphInterface *Reset() = 0;
+
+  /*!
+   * \brief Get the adjacency matrix of the graph.
+   *
+   * By default, a row of returned adjacency matrix represents the destination
+   * of an edge and the column represents the source.
+   * \param transpose A flag to transpose the returned adjacency matrix.
+   * \param fmt the format of the returned adjacency matrix.
+   * \return a vector of three IdArray.
+   */
+  virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const = 0;
+
+  /*!
+   * \brief Sample a subgraph from the seed vertices with neighbor sampling.
+   * The neighbors are sampled with a uniformly distribution.
+   * \return a subgraph
+   */
+  virtual SampledSubgraph NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
+                                                int num_hops, int expand_factor) const = 0;
 };
 
 /*! \brief Subgraph data structure */
@@ -323,6 +360,21 @@ struct Subgraph {
    * \note This is also a map from the new edge id to the edge id in the parent graph.
    */
   IdArray induced_edges;
+};
+
+/*!
+ * \brief When we sample a subgraph, we need to store extra information,
+ * such as the layer Ids of the vertices and the sampling probability.
+ */
+struct SampledSubgraph: public Subgraph {
+  /*!
+   * \brief the layer of a sampled vertex in the subgraph.
+   */
+  IdArray layer_ids;
+  /*!
+   * \brief the probability that a vertex is sampled.
+   */
+  runtime::NDArray sample_prob;
 };
 
 }  // namespace dgl

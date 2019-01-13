@@ -12,6 +12,33 @@
 #include "../c_api_common.h"
 
 namespace dgl {
+
+Graph::Graph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
+    bool multigraph): is_multigraph_(multigraph) {
+  this->AddVertices(num_nodes);
+  num_edges_ = src_ids->shape[0];
+  assert(num_edges_ == dst_ids->shape[0]);
+  assert(num_edges_ == edge_ids->shape[0]);
+  const dgl_id_t *src_data = static_cast<dgl_id_t*>(src_ids->data);
+  const dgl_id_t *dst_data = static_cast<dgl_id_t*>(dst_ids->data);
+  const dgl_id_t *edge_data = static_cast<dgl_id_t*>(edge_ids->data);
+  for (int64_t i = 0; i < num_edges_; i++) {
+    auto src = src_data[i];
+    auto dst = dst_data[i];
+    auto eid = edge_data[i];
+    CHECK(HasVertex(src) && HasVertex(dst))
+      << "Invalid vertices: src=" << src << " dst=" << dst;
+
+    adjlist_[src].succ.push_back(dst);
+    adjlist_[src].edge_id.push_back(eid);
+    reverse_adjlist_[dst].succ.push_back(src);
+    reverse_adjlist_[dst].edge_id.push_back(eid);
+
+    all_edges_src_.push_back(src);
+    all_edges_dst_.push_back(dst);
+  }
+}
+
 void Graph::AddVertices(uint64_t num_vertices) {
   CHECK(!read_only_) << "Graph is read-only. Mutations are not allowed.";
   adjlist_.resize(adjlist_.size() + num_vertices);
@@ -469,6 +496,9 @@ Subgraph Graph::EdgeSubgraph(IdArray eids) const {
   std::copy(nodes.begin(), nodes.end(), static_cast<int64_t*>(rst.induced_vertices->data));
 
   return rst;
+}
+
+std::vector<IdArray> Graph::GetAdj(bool transpose, const std::string &fmt) const {
 }
 
 GraphInterface::ptr Graph::Reverse() const {
