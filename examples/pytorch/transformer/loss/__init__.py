@@ -77,11 +77,11 @@ class SimpleLossCompute(nn.Module):
         return self.loss.item() * norm
 
 class MultiGPULossCompute(SimpleLossCompute):
-    def __init__(self, criterion, dev_id, ndev, accum_count, model, opt=None):
+    def __init__(self, criterion, dev_id, ndev, grad_accum, model, opt=None):
         super(MultiGPULossCompute, self).__init__(criterion, opt)
         self.dev_id = dev_id
         self.ndev = ndev
-        self.accum_count = accum_count
+        self.grad_accum = grad_accum
         self.model = model
         self.count = 0
 
@@ -89,8 +89,8 @@ class MultiGPULossCompute(SimpleLossCompute):
         # multi-gpu synchronous backward
         self.loss.backward()
         self.count += 1
-        # accumulate self.accum_count times then synchronize and update
-        if self.count == self.accum_count:
+        # accumulate self.grad_accum times then synchronize and update
+        if self.count == self.grad_accum:
             for param in self.model.parameters():
                 if param.requires_grad and param.grad is not None:
                     dist.all_reduce(param.grad.data, op=dist.ReduceOp.SUM)

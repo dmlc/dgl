@@ -2,7 +2,7 @@ from .graph import *
 from .fields import *
 from .utils import prepare_dataset
 import os
-import numpy as np
+import random
 
 class ClassificationDataset(object):
     "Dataset class for classification task."
@@ -106,9 +106,10 @@ class TranslationDataset(object):
         # make sure all devices have the same number of batches
         n = n // ndev * ndev
 
-        #order = np.random.permutation(n) if mode == 'train' else range(n)
-        # FIXME: do not shuffle for mgpu
-        order = range(dev_rank, n, ndev)
+        # XXX: is partition then shuffle equivalent to shuffle then partition?
+        order = list(range(dev_rank, n, ndev))
+        if mode == 'train':
+            random.shuffle(order)
 
         src_buf, tgt_buf = [], []
 

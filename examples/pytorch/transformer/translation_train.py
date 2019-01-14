@@ -39,15 +39,13 @@ def run_epoch(data_iter, dev_rank, ndev, model, loss_compute, is_train=True):
         for step in range(1, model.MAX_DEPTH + 1):
             print("nodes entering step {}: {:.2f}%".format(step, (1.0 * model.stat[step] / model.stat[0])))
         model.reset_stat()
-    print('Dev {} average loss: {}'.format(dev_rank, loss_compute.avg_loss))
-    print('Dev {} accuracy: {}'.format(dev_rank, loss_compute.accuracy))
+    print('{}: Dev {} average loss: {}, accuracy {}'.format(
+        "Training" if is_train else "Evaluting",
+        dev_rank, loss_compute.avg_loss, loss_compute.accuracy))
 
 def run(dev_id, args):
-    # FIXME: make ip and port configurable
-    master_ip = "127.0.0.1"
-    master_port = "12321"
     dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
-        master_ip=master_ip, master_port=master_port)
+        master_ip=args.master_ip, master_port=args.master_port)
     world_size = args.ngpu
     torch.distributed.init_process_group(backend="nccl",
                                          init_method=dist_init_method,
@@ -69,7 +67,8 @@ def main(dev_id, args):
     dim_model = 512
 
     graph_pool = GraphPool()
-    model = make_model(V, V, N=args.N, dim_model=dim_model, universal=args.universal)
+    model = make_model(V, V, N=args.N, dim_model=dim_model,
+                       universal=args.universal)
 
     # Sharing weights between Encoder & Decoder
     model.src_embed.lut.weight = model.tgt_embed.lut.weight
@@ -77,17 +76,18 @@ def main(dev_id, args):
 
     model, criterion = model.to(device), criterion.to(device)
     model_opt = NoamOpt(dim_model, 1, 400,
-                        T.optim.Adam(model.parameters(), lr=1e-3, betas=(0.9, 0.98), eps=1e-9))
+                        T.optim.Adam(model.parameters(), lr=1e-3,
+                                     betas=(0.9, 0.98), eps=1e-9))
 
     if args.ngpu > 1:
+        dev_rank = dev_id # current device id
+        ndev = args.ngpu # number of devices (including cpu)
         loss_compute = partial(MultiGPULossCompute, criterion, dev_id,
-                               args.ngpu, args.accum, model)
-        dev_rank = dev_id
-        ndev = args.ngpu
-    else:
-        loss_compute = partial(SimpleLossCompute, criterion)
+                               args.ngpu, args.grad_accum, model)
+    else: # cpu or single gpu case
         dev_rank = 0
         ndev = 1
+        loss_compute = partial(SimpleLossCompute, criterion)
 
     for epoch in range(100):
         start = time.time()
@@ -95,13 +95,13 @@ def main(dev_id, args):
                              device=device, dev_rank=dev_rank, ndev=ndev)
         valid_iter = dataset(graph_pool, mode='valid', batch_size=args.batch,
                              device=device, dev_rank=dev_rank, ndev=ndev)
-        print('Dev {} Epoch: {} Training...'.format(dev_rank, epoch))
         model.train(True)
-        run_epoch(train_iter, dev_rank, ndev, model, loss_compute(opt=model_opt))
-        print('Dev {} Epoch: {} Evaluating...'.format(dev_rank, epoch))
+        run_epoch(train_iter, dev_rank, ndev, model,
+                  loss_compute(opt=model_opt), is_train=True)
         model.att_weight_map = None
         model.eval()
-        run_epoch(valid_iter, dev_rank, ndev, model, loss_compute(opt=None))
+        run_epoch(valid_iter, dev_rank, ndev, model,
+                  loss_compute(opt=None), is_train=False)
         end = time.time()
         if dev_rank == 0:
             print("epoch time: {}".format(end - start))
@@ -127,9 +127,15 @@ if __name__ == '__main__':
     argparser.add_argument('--N', default=6, type=int, help='enc/dec layers')
     argparser.add_argument('--dataset', default='multi30k', help='dataset')
     argparser.add_argument('--batch', default=128, type=int, help='batch size')
-    argparser.add_argument('--viz', action='store_true', help='visualize attention')
-    argparser.add_argument('--universal', action='store_true', help='use universal transformer')
-    argparser.add_argument('--accum', type=int, default=1,
+    argparser.add_argument('--viz', action='store_true',
+                           help='visualize attention')
+    argparser.add_argument('--universal', action='store_true',
+                           help='use universal transformer')
+    argparser.add_argument('--master-ip', type=str, default='127.0.0.1',
+                           help='master ip address')
+    argparser.add_argument('--master-port', type=str, default='12345',
+                           help='master port')
+    argparser.add_argument('--grad-accum', type=int, default=1,
                            help='accumulate gradients for this many times '
                                 'then update weights')
     args = argparser.parse_args()
