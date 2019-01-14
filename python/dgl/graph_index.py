@@ -561,16 +561,6 @@ class GraphIndex(object):
             return F.sparse_matrix(dat, ('csr', indices, indptr),
                                    (self.number_of_nodes(), self.number_of_nodes()))[0], shuffle
         elif fmt == "coo":
-            #src, dst, _ = self.edges(False)
-            #src = src.tousertensor(ctx)  # the index of the ctx will be cached
-            #dst = dst.tousertensor(ctx)  # the index of the ctx will be cached
-            #src = F.unsqueeze(src, dim=0)
-            #dst = F.unsqueeze(dst, dim=0)
-            #if transpose:
-            #    idx = F.cat([src, dst], dim=0)
-            #else:
-            #    idx = F.cat([dst, src], dim=0)
-            #print(idx.shape)
             ## FIXME(minjie): data type
             idx = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
             m = self.number_of_edges()
