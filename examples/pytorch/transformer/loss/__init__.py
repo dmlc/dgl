@@ -61,13 +61,13 @@ class SimpleLossCompute(nn.Module):
     def backward(self):
         self.loss.backward()
 
-    def __call__(self, y_pred, y, norm):
+    def __call__(self, y_pred, y, norm, is_train=True):
         y_pred = y_pred.contiguous().view(-1, y_pred.shape[-1])
         y = y.contiguous().view(-1)
         self.loss = self.criterion(
             y_pred, y
         ) / norm
-        if self.opt is not None:
+        if is_train:
             self.backward()
             self.opt.step()
             self.opt.optimizer.zero_grad()
@@ -77,15 +77,16 @@ class SimpleLossCompute(nn.Module):
         return self.loss.item() * norm
 
 class MultiGPULossCompute(SimpleLossCompute):
-    def __init__(self, criterion, dev_id, ndev, params, opt=None):
+    def __init__(self, criterion, dev_id, ndev, model, opt=None):
         super(MultiGPULossCompute, self).__init__(criterion, opt)
         self.dev_id = dev_id
         self.ndev = ndev
-        self.params = params
+        self.model = model
 
     def backward(self):
         # multi-gpu synchronous backward
         self.loss.backward()
-        for param in self.params:
-            dist.all_reduce(param.grad.data, op=dist.reduce_op.SUM)
-            prarm.grad.data /= size
+        for param in self.model.parameters():
+            if param.requires_grad and param.grad is not None:
+                dist.all_reduce(param.grad.data, op=dist.ReduceOp.SUM)
+                param.grad.data /= self.ndev

@@ -33,7 +33,7 @@ def run_epoch(data_iter, dev_rank, ndev, model, loss_compute, is_train=True):
                     output = model(g)
                 tgt_y = g.tgt_y
                 n_tokens = g.n_tokens
-            loss = loss_compute(output, tgt_y, n_tokens)
+            loss = loss_compute(output, tgt_y, n_tokens, is_train=is_train)
 
     if universal:
         for step in range(1, model.MAX_DEPTH + 1):
@@ -42,44 +42,16 @@ def run_epoch(data_iter, dev_rank, ndev, model, loss_compute, is_train=True):
     print('average loss: {}'.format(loss_compute.avg_loss))
     print('accuracy: {}'.format(loss_compute.accuracy))
 
-if __name__ == '__main__':
-    if not os.path.exists('checkpoints'):
-        os.makedirs('checkpoints')
-    np.random.seed(1111)
-    argparser = argparse.ArgumentParser('training translation model')
-    argparser.add_argument('--gpus', default='-1', type=str, help='gpu id')
-    argparser.add_argument('--N', default=6, type=int, help='enc/dec layers')
-    argparser.add_argument('--dataset', default='multi30k', help='dataset')
-    argparser.add_argument('--batch', default=128, type=int, help='batch size')
-    argparser.add_argument('--viz', action='store_true', help='visualize attention')
-    argparser.add_argument('--universal', action='store_true', help='use universal transformer')
-    args = argparser.parse_args()
-    #args_filter = ['batch', 'gpus', 'viz']
-    #exp_setting = '-'.join('{}'.format(v) for k, v in vars(args).items() if k not in args_filter)
-    #devices = ['cpu'] if args.gpus == '-1' else [int(gpu_id) for gpu_id in args.gpus.split(',')]
-    devices = list(map(int, args.gpus.split(',')))
-    if len(devices) == 1:
-        args.ngpu = 0 if devices[0] < 0 else 1
-        main(devices[0], args)
-    else:
-        args.ngpu = len(devices)
-        mp = torch.multiprocessing.get_context('spawn')
-        procs = []
-        for dev_id in devices:
-            procs.append(mp.Proces(target=run, args=(dev_id, args), daemon=True))
-            procs[-1].start()
-        for p in procs:
-            p.join()
-
 def run(dev_id, args):
     # FIXME: make ip and port configurable
-    ip = "127.0.0.1"
-    port = "12321"
-    dist_init_method = 'tcp://{master_ip}:{master_port}'.format(ip, port)
-    world_size = len(devices)
+    master_ip = "127.0.0.1"
+    master_port = "12321"
+    dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
+        master_ip=master_ip, master_port=master_port)
+    world_size = args.ngpu
     torch.distributed.init_process_group(backend="nccl",
                                          init_method=dist_init_method,
-                                         world_size=world_size
+                                         world_size=world_size,
                                          rank=dev_id)
     gpu_rank = torch.distributed.get_rank()
     assert gpu_rank == dev_id
@@ -109,14 +81,17 @@ def main(dev_id, args):
 
     if args.ngpu > 1:
         loss_compute = MultiGPULossCompute(criterion, dev_id, args.ngpu,
-                                           model.parameters(), opt=model_opt)
+                                           model, opt=model_opt)
         dev_rank = dev_id
         ndev = args.ngpu
     else:
         loss_compute = SimpleLossCompute(criterion, opt=model_opt)
+        dev_rank = 0
+        ndev = 0
+
     for epoch in range(100):
-        train_iter = dataset(graph_pool, mode='train', batch_size=args.batch, devices=device)
-        valid_iter = dataset(graph_pool, mode='valid', batch_size=args.batch, devices=device)
+        train_iter = dataset(graph_pool, mode='train', batch_size=args.batch, device=device, ndev=ndev)
+        valid_iter = dataset(graph_pool, mode='valid', batch_size=args.batch, device=device, ndev=ndev)
         print('Epoch: {} Training...'.format(epoch))
         model.train(True)
         run_epoch(train_iter, dev_rank, ndev, model, loss_compute, is_train=True)
@@ -135,4 +110,34 @@ def main(dev_id, args):
         with open('checkpoints/{}-{}.pkl'.format(exp_setting, epoch), 'wb') as f:
             th.save(model.state_dict(), f)
         """
+
+if __name__ == '__main__':
+    if not os.path.exists('checkpoints'):
+        os.makedirs('checkpoints')
+    np.random.seed(1111)
+    argparser = argparse.ArgumentParser('training translation model')
+    argparser.add_argument('--gpus', default='-1', type=str, help='gpu id')
+    argparser.add_argument('--N', default=6, type=int, help='enc/dec layers')
+    argparser.add_argument('--dataset', default='multi30k', help='dataset')
+    argparser.add_argument('--batch', default=128, type=int, help='batch size')
+    argparser.add_argument('--viz', action='store_true', help='visualize attention')
+    argparser.add_argument('--universal', action='store_true', help='use universal transformer')
+    args = argparser.parse_args()
+    #args_filter = ['batch', 'gpus', 'viz']
+    #exp_setting = '-'.join('{}'.format(v) for k, v in vars(args).items() if k not in args_filter)
+    #devices = ['cpu'] if args.gpus == '-1' else [int(gpu_id) for gpu_id in args.gpus.split(',')]
+    devices = list(map(int, args.gpus.split(',')))
+    if len(devices) == 1:
+        args.ngpu = 0 if devices[0] < 0 else 1
+        main(devices[0], args)
+    else:
+        args.ngpu = len(devices)
+        mp = torch.multiprocessing.get_context('spawn')
+        procs = []
+        for dev_id in devices:
+            procs.append(mp.Process(target=run, args=(dev_id, args),
+                                    daemon=True))
+            procs[-1].start()
+        for p in procs:
+            p.join()
 

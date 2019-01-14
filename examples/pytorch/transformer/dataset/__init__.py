@@ -91,7 +91,7 @@ class TranslationDataset:
         return self.vocab[self.EOS_TOKEN]
 
     def __call__(self, graph_pool, mode='train', batch_size=32, k=1,
-                 device='cpu'):
+                 device='cpu', ndev=1):
         '''
         Create a batched graph correspond to the mini-batch of the dataset.
         args:
@@ -103,6 +103,11 @@ class TranslationDataset:
         '''
         src_data, tgt_data = self.src[mode], self.tgt[mode]
         n = len(src_data)
+        # make sure all devices have the same number of batches
+        n_ceil = (n + batch_size - 1) // batch_size * batch_size
+        sample_per_dev = batch_size * ndev
+        n = min(n, n_ceil // sample_per_dev * sample_per_dev)
+
         order = np.random.permutation(n) if mode == 'train' else range(n)
         src_buf, tgt_buf = [], []
 
@@ -117,14 +122,14 @@ class TranslationDataset:
                 if mode == 'test':
                     yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device)
                 else:
-                    yield graph_pool(src_buf, tgt_buf, device=device))
+                    yield graph_pool(src_buf, tgt_buf, device=device)
                 src_buf, tgt_buf = [], []
 
         if len(src_buf) != 0:
             if mode == 'test':
                 yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device)
             else:
-                yield graph_pool(src_buf, tgt_buf, device=device))
+                yield graph_pool(src_buf, tgt_buf, device=device)
 
     def get_sequence(self, batch):
         "return a list of sequence from a list of index arrays"
