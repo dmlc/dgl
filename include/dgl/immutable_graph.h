@@ -97,6 +97,11 @@ class ImmutableGraph: public GraphInterface {
   ImmutableGraph(ImmutableGraph&& other) = default;
 #else
   ImmutableGraph(ImmutableGraph&& other) {
+    this->in_csr_ = other.in_csr_;
+    this->out_csr_ = other.out_csr_;
+    this->is_multigraph_ = other.is_multigraph_;
+    other.in_csr_ = nullptr;
+    other.out_csr_ = nullptr;
   }
 #endif  // _MSC_VER
 
