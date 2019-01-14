@@ -54,8 +54,8 @@ class GraphIndex(object):
 
     def init(self, src_ids, dst_ids, edge_ids, num_nodes):
         """The actual init function"""
-        assert(len(src_ids) == len(dst_ids))
-        assert(len(src_ids) == len(edge_ids))
+        assert len(src_ids) == len(dst_ids)
+        assert len(src_ids) == len(edge_ids)
         self._handle = _CAPI_DGLGraphCreate(src_ids.todgltensor(), dst_ids.todgltensor(),
                                             edge_ids.todgltensor(), self._multigraph, num_nodes,
                                             self._readonly)
