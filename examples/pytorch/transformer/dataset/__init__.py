@@ -4,12 +4,12 @@ from .utils import prepare_dataset
 import os
 import numpy as np
 
-class ClassificationDataset:
+class ClassificationDataset(object):
     "Dataset class for classification task."
     def __init__(self):
         raise NotImplementedError
 
-class TranslationDataset:
+class TranslationDataset(object):
     '''
     Dataset class for translation task.
     By default, the source language shares the same vocabulary with the target language.
@@ -91,7 +91,7 @@ class TranslationDataset:
         return self.vocab[self.EOS_TOKEN]
 
     def __call__(self, graph_pool, mode='train', batch_size=32, k=1,
-                 device='cpu', ndev=1):
+                 device='cpu', dev_rank=0, ndev=1):
         '''
         Create a batched graph correspond to the mini-batch of the dataset.
         args:
@@ -104,11 +104,12 @@ class TranslationDataset:
         src_data, tgt_data = self.src[mode], self.tgt[mode]
         n = len(src_data)
         # make sure all devices have the same number of batches
-        n_ceil = (n + batch_size - 1) // batch_size * batch_size
-        sample_per_dev = batch_size * ndev
-        n = min(n, n_ceil // sample_per_dev * sample_per_dev)
+        n = n // ndev * ndev
 
-        order = np.random.permutation(n) if mode == 'train' else range(n)
+        #order = np.random.permutation(n) if mode == 'train' else range(n)
+        # FIXME: do not shuffle for mgpu
+        order = range(dev_rank, n, ndev)
+
         src_buf, tgt_buf = [], []
 
         for idx in order:

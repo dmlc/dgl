@@ -58,35 +58,43 @@ class SimpleLossCompute(nn.Module):
     def accuracy(self):
         return (self.n_correct + self.eps) / (self.norm_term + self.eps)
 
-    def backward(self):
+    def backward_and_step(self):
         self.loss.backward()
+        self.opt.step()
+        self.opt.optimizer.zero_grad()
 
-    def __call__(self, y_pred, y, norm, is_train=True):
+    def __call__(self, y_pred, y, norm):
         y_pred = y_pred.contiguous().view(-1, y_pred.shape[-1])
         y = y.contiguous().view(-1)
         self.loss = self.criterion(
             y_pred, y
         ) / norm
-        if is_train:
-            self.backward()
-            self.opt.step()
-            self.opt.optimizer.zero_grad()
+        if self.opt is not None:
+            self.backward_and_step()
         self.n_correct += ((y_pred.max(dim=-1)[1] == y) & (y != self.criterion.padding_idx)).sum().item()
         self.acc_loss += self.loss.item() * norm
         self.norm_term += norm
         return self.loss.item() * norm
 
 class MultiGPULossCompute(SimpleLossCompute):
-    def __init__(self, criterion, dev_id, ndev, model, opt=None):
+    def __init__(self, criterion, dev_id, ndev, accum_count, model, opt=None):
         super(MultiGPULossCompute, self).__init__(criterion, opt)
         self.dev_id = dev_id
         self.ndev = ndev
+        self.accum_count = accum_count
         self.model = model
+        self.count = 0
 
-    def backward(self):
+    def backward_and_step(self):
         # multi-gpu synchronous backward
         self.loss.backward()
-        for param in self.model.parameters():
-            if param.requires_grad and param.grad is not None:
-                dist.all_reduce(param.grad.data, op=dist.ReduceOp.SUM)
-                param.grad.data /= self.ndev
+        self.count += 1
+        # accumulate self.accum_count times then synchronize and update
+        if self.count == self.accum_count:
+            for param in self.model.parameters():
+                if param.requires_grad and param.grad is not None:
+                    dist.all_reduce(param.grad.data, op=dist.ReduceOp.SUM)
+                    param.grad.data /= self.ndev
+            self.opt.step()
+            self.opt.optimizer.zero_grad()
+            self.count = 0
