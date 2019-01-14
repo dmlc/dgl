@@ -505,11 +505,11 @@ std::vector<IdArray> Graph::GetAdj(bool transpose, const std::string &fmt) const
     IdArray idx = IdArray::Empty({2 * num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
     int64_t *idx_data = static_cast<int64_t*>(idx->data);
     if (transpose) {
-      std::copy(all_edges_dst_.begin(), all_edges_dst_.end(), idx_data);
-      std::copy(all_edges_src_.begin(), all_edges_src_.end(), idx_data + num_edges);
-    } else {
       std::copy(all_edges_src_.begin(), all_edges_src_.end(), idx_data);
       std::copy(all_edges_dst_.begin(), all_edges_dst_.end(), idx_data + num_edges);
+    } else {
+      std::copy(all_edges_dst_.begin(), all_edges_dst_.end(), idx_data);
+      std::copy(all_edges_src_.begin(), all_edges_src_.end(), idx_data + num_edges);
     }
     IdArray eid = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
     int64_t *eid_data = static_cast<int64_t*>(eid->data);
