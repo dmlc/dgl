@@ -499,22 +499,51 @@ Subgraph Graph::EdgeSubgraph(IdArray eids) const {
 }
 
 std::vector<IdArray> Graph::GetAdj(bool transpose, const std::string &fmt) const {
+  int64_t num_edges = num_edges_;
+  int64_t num_nodes = NumVertices();
   if (fmt == "coo") {
-    int64_t num_edges = num_edges_;
     IdArray idx = IdArray::Empty({2 * num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
     int64_t *idx_data = static_cast<int64_t*>(idx->data);
-    std::copy(all_edges_src_.begin(), all_edges_src_.end(), idx_data);
-    std::copy(all_edges_dst_.begin(), all_edges_dst_.end(), idx_data + num_edges);
+    if (transpose) {
+      std::copy(all_edges_dst_.begin(), all_edges_dst_.end(), idx_data);
+      std::copy(all_edges_src_.begin(), all_edges_src_.end(), idx_data + num_edges);
+    } else {
+      std::copy(all_edges_src_.begin(), all_edges_src_.end(), idx_data);
+      std::copy(all_edges_dst_.begin(), all_edges_dst_.end(), idx_data + num_edges);
+    }
     IdArray eid = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
     int64_t *eid_data = static_cast<int64_t*>(eid->data);
-    for (uint64_t eid = 0; eid < num_edges; ++eid) {
+    for (uint64_t eid = 0; eid < num_edges; ++eid)
       eid_data[eid] = eid;
-    }
     return std::vector<IdArray>{idx, eid};
+  } else if (fmt == "csr") {
+    IdArray indptr = IdArray::Empty({num_nodes + 1}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    IdArray indices = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    IdArray eid = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    int64_t *indptr_data = static_cast<int64_t*>(indptr->data);
+    int64_t *indices_data = static_cast<int64_t*>(indices->data);
+    int64_t *eid_data = static_cast<int64_t*>(eid->data);
+    const AdjacencyList *adjlist;
+    if (transpose) {
+      // Out-edges.
+      adjlist = &adjlist_;
+    } else {
+      // In-edges.
+      adjlist = &reverse_adjlist_;
+    }
+    indptr_data[0] = 0;
+    for (size_t i = 0; i < adjlist->size(); i++) {
+      indptr_data[i + 1] = indptr_data[i] + adjlist->at(i).succ.size();
+      std::copy(adjlist->at(i).succ.begin(), adjlist->at(i).succ.end(),
+                indices_data + indptr_data[i]);
+      std::copy(adjlist->at(i).edge_id.begin(), adjlist->at(i).edge_id.end(),
+                eid_data + indptr_data[i]);
+    }
+    return std::vector<IdArray>{indptr, indices, eid};
   } else {
-
+    LOG(FATAL) << "unsupported format";
+    return std::vector<IdArray>();
   }
-  return std::vector<IdArray>();
 }
 
 GraphInterface::ptr Graph::Reverse() const {

@@ -546,18 +546,16 @@ class GraphIndex(object):
         if not isinstance(transpose, bool):
             raise DGLError('Expect bool value for "transpose" arg,'
                            ' but got %s.' % (type(transpose)))
-        if self.is_readonly():
-        #if fmt == "csr":
-            fmt = F.get_preferred_sparse_format()
-            rst = _CAPI_DGLGraphGetAdj(self._handle, transpose, fmt)
+        fmt = F.get_preferred_sparse_format()
+        rst = _CAPI_DGLGraphGetAdj(self._handle, transpose, fmt)
+        if fmt == "csr":
             indptr = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
             indices = F.copy_to(utils.toindex(rst(1)).tousertensor(), ctx)
             shuffle = utils.toindex(rst(2))
             dat = F.ones(indices.shape, dtype=F.float32, ctx=ctx)
             return F.sparse_matrix(dat, ('csr', indices, indptr),
                                    (self.number_of_nodes(), self.number_of_nodes()))[0], shuffle
-        else:
-        #elif fmt == "coo":
+        elif fmt == "coo":
             #src, dst, _ = self.edges(False)
             #src = src.tousertensor(ctx)  # the index of the ctx will be cached
             #dst = dst.tousertensor(ctx)  # the index of the ctx will be cached
@@ -569,7 +567,6 @@ class GraphIndex(object):
             #    idx = F.cat([dst, src], dim=0)
             #print(idx.shape)
             ## FIXME(minjie): data type
-            rst = _CAPI_DGLGraphGetAdj(self._handle, transpose, "coo")
             idx = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
             m = self.number_of_edges()
             idx = F.reshape(idx, (2, m))
@@ -578,6 +575,8 @@ class GraphIndex(object):
             adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, n))
             shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
             return adj, shuffle_idx
+        else:
+            raise Exception("unknown format")
 
     @utils.cached_member(cache='_cache', prefix='inc')
     def incidence_matrix(self, typestr, ctx):
