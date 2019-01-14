@@ -214,7 +214,7 @@ sphinx_gallery_conf = {
     'download_all_examples' : False,
 }
 
-import os
+# Compatibility for different backend when builds tutorials
 if os.environ['DGLBACKEND'] == 'mxnet':
     sphinx_gallery_conf['filename_pattern'] = "/*(?<=mx)\.py"
 if os.environ['DGLBACKEND'] == 'pytorch':

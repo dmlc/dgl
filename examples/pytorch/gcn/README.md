@@ -5,9 +5,17 @@ Graph Convolutional Networks (GCN)
 - Author's code repo: [https://github.com/tkipf/gcn](https://github.com/tkipf/gcn). Note that the original code is 
 implemented with Tensorflow for the paper. 
 
+Requirements
+------------
+- requests
+
+``bash
+pip install requests
+``
+
 Codes
 -----
-The folder contains two implementations of GCN. `gcn_batch.py` uses user-defined
+The folder contains two implementations of GCN. `gcn.py` uses user-defined
 message and reduce functions. `gcn_spmv.py` uses DGL's builtin functions so
 SPMV optimization could be applied.
 

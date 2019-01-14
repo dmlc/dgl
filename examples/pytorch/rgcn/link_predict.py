@@ -242,7 +242,7 @@ if __name__ == '__main__':
     parser.add_argument("--negative-sample", type=int, default=10,
             help="number of negative samples per positive sample")
     parser.add_argument("--evaluate-every", type=int, default=500,
-            help="perform evalution every n epochs")
+            help="perform evaluation every n epochs")
 
     args = parser.parse_args()
     print(args)

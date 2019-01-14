@@ -208,7 +208,7 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
         "DGLBACKEND" environment variable to "mxnet".
 
     This creates a subgraph data loader that samples subgraphs from the input graph
-    with neighbor sampling. This simpling method is implemented in C and can perform
+    with neighbor sampling. This sampling method is implemented in C and can perform
     sampling very efficiently.
     
     A subgraph grows from a seed vertex. It contains sampled neighbors

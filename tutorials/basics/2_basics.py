@@ -172,7 +172,7 @@ print(g_multi.edata['w'])
 #
 #    * Nodes and edges can be added but not removed; we will support removal in
 #      the future.
-#    * Updating a feature of different schemes raise error on indivdual node (or
+#    * Updating a feature of different schemes raise error on individual node (or
 #      node subset).
 
 
