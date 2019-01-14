@@ -34,10 +34,10 @@ typedef dgl::runtime::NDArray IntArray;
 struct Subgraph;
 struct SampledSubgraph;
 
-class dgl_id_iters {
+class DGLIdIters {
   std::vector<dgl_id_t>::const_iterator b, e;
  public:
-  dgl_id_iters(std::vector<dgl_id_t>::const_iterator begin,
+  DGLIdIters(std::vector<dgl_id_t>::const_iterator begin,
                std::vector<dgl_id_t>::const_iterator end) {
     this->b = begin;
     this->e = end;
@@ -298,28 +298,28 @@ class GraphInterface {
    * \param vid The vertex id.
    * \return the successor vector iterator pair.
    */
-  virtual dgl_id_iters SuccVec(dgl_id_t vid) const = 0;
+  virtual DGLIdIters SuccVec(dgl_id_t vid) const = 0;
 
   /*!
    * \brief Return the out edge id vector
    * \param vid The vertex id.
    * \return the out edge id vector iterator pair.
    */
-  virtual dgl_id_iters OutEdgeVec(dgl_id_t vid) const = 0;
+  virtual DGLIdIters OutEdgeVec(dgl_id_t vid) const = 0;
 
   /*!
    * \brief Return the predecessor vector
    * \param vid The vertex id.
    * \return the predecessor vector iterator pair.
    */
-  virtual dgl_id_iters PredVec(dgl_id_t vid) const = 0;
+  virtual DGLIdIters PredVec(dgl_id_t vid) const = 0;
 
   /*!
    * \brief Return the in edge id vector
    * \param vid The vertex id.
    * \return the in edge id vector iterator pair.
    */
-  virtual dgl_id_iters InEdgeVec(dgl_id_t vid) const = 0;
+  virtual DGLIdIters InEdgeVec(dgl_id_t vid) const = 0;
 
   /*!
    * \brief Reset the data in the graph and move its data to the returned graph object.

@@ -395,9 +395,9 @@ class ImmutableGraph: public GraphInterface {
    * \param vid The vertex id.
    * \return the successor vector
    */
-  dgl_id_iters SuccVec(dgl_id_t vid) const {
-    return dgl_id_iters(out_csr_->indices.begin() + out_csr_->indptr[vid],
-                        out_csr_->indices.begin() + out_csr_->indptr[vid + 1]);
+  DGLIdIters SuccVec(dgl_id_t vid) const {
+    return DGLIdIters(out_csr_->indices.begin() + out_csr_->indptr[vid],
+                      out_csr_->indices.begin() + out_csr_->indptr[vid + 1]);
   }
 
   /*!
@@ -405,9 +405,9 @@ class ImmutableGraph: public GraphInterface {
    * \param vid The vertex id.
    * \return the out edge id vector
    */
-  dgl_id_iters OutEdgeVec(dgl_id_t vid) const {
-    return dgl_id_iters(out_csr_->edge_ids.begin() + out_csr_->indptr[vid],
-                        out_csr_->edge_ids.begin() + out_csr_->indptr[vid + 1]);
+  DGLIdIters OutEdgeVec(dgl_id_t vid) const {
+    return DGLIdIters(out_csr_->edge_ids.begin() + out_csr_->indptr[vid],
+                      out_csr_->edge_ids.begin() + out_csr_->indptr[vid + 1]);
   }
 
   /*!
@@ -415,9 +415,9 @@ class ImmutableGraph: public GraphInterface {
    * \param vid The vertex id.
    * \return the predecessor vector
    */
-  dgl_id_iters PredVec(dgl_id_t vid) const {
-    return dgl_id_iters(in_csr_->indices.begin() + in_csr_->indptr[vid],
-                        in_csr_->indices.begin() + in_csr_->indptr[vid + 1]);
+  DGLIdIters PredVec(dgl_id_t vid) const {
+    return DGLIdIters(in_csr_->indices.begin() + in_csr_->indptr[vid],
+                      in_csr_->indices.begin() + in_csr_->indptr[vid + 1]);
   }
 
   /*!
@@ -425,9 +425,9 @@ class ImmutableGraph: public GraphInterface {
    * \param vid The vertex id.
    * \return the in edge id vector
    */
-  dgl_id_iters InEdgeVec(dgl_id_t vid) const {
-    return dgl_id_iters(in_csr_->edge_ids.begin() + in_csr_->indptr[vid],
-                        in_csr_->edge_ids.begin() + in_csr_->indptr[vid + 1]);
+  DGLIdIters InEdgeVec(dgl_id_t vid) const {
+    return DGLIdIters(in_csr_->edge_ids.begin() + in_csr_->indptr[vid],
+                      in_csr_->edge_ids.begin() + in_csr_->indptr[vid + 1]);
   }
 
   /*!
