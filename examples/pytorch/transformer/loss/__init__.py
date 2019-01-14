@@ -1,6 +1,7 @@
 import torch as T
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.distributed as dist
 
 class LabelSmoothing(nn.Module):
     """
@@ -44,7 +45,10 @@ class SimpleLossCompute(nn.Module):
         super(SimpleLossCompute, self).__init__()
         self.criterion = criterion
         self.opt = opt
-        self.reset()
+        self.acc_loss = 0
+        self.n_correct = 0
+        self.norm_term = 0
+        self.loss = 0
 
     @property
     def avg_loss(self):
@@ -54,32 +58,34 @@ class SimpleLossCompute(nn.Module):
     def accuracy(self):
         return (self.n_correct + self.eps) / (self.norm_term + self.eps)
 
-    def reset(self):
-        self.acc_loss = 0
-        self.n_correct = 0
-        self.norm_term = 0
+    def backward(self):
+        self.loss.backward()
 
     def __call__(self, y_pred, y, norm):
         y_pred = y_pred.contiguous().view(-1, y_pred.shape[-1])
         y = y.contiguous().view(-1)
-        loss = self.criterion(
+        self.loss = self.criterion(
             y_pred, y
         ) / norm
         if self.opt is not None:
-            loss.backward()
+            self.backward()
             self.opt.step()
             self.opt.optimizer.zero_grad()
         self.n_correct += ((y_pred.max(dim=-1)[1] == y) & (y != self.criterion.padding_idx)).sum().item()
-        self.acc_loss += loss.item() * norm
+        self.acc_loss += self.loss.item() * norm
         self.norm_term += norm
-        return loss.item() * norm
+        return self.loss.item() * norm
 
 class MultiGPULossCompute(SimpleLossCompute):
-    def __init__(self, criterion, devices, opt=None, chunk_size=5):
-        self.criterion = criterion
-        self.opt = opt
-        self.devices = devices
-        self.chunk_size = chunk_size
+    def __init__(self, criterion, dev_id, ndev, params, opt=None):
+        super(MultiGPULossCompute, self).__init__(criterion, opt)
+        self.dev_id = dev_id
+        self.ndev = ndev
+        self.params = params
 
-    def __call__(self, y_preds, ys, norms):
-        pass
+    def backward(self):
+        # multi-gpu synchronous backward
+        self.loss.backward()
+        for param in self.params:
+            dist.all_reduce(param.grad.data, op=dist.reduce_op.SUM)
+            prarm.grad.data /= size

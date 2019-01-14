@@ -90,17 +90,17 @@ class TranslationDataset:
     def eos_id(self):
         return self.vocab[self.EOS_TOKEN]
 
-    def __call__(self, graph_pool, mode='train', batch_size=32, k=1, devices=['cpu']):
+    def __call__(self, graph_pool, mode='train', batch_size=32, k=1,
+                 device='cpu'):
         '''
         Create a batched graph correspond to the mini-batch of the dataset.
         args:
             graph_pool: a GraphPool object for accelerating.
             mode: train/valid/test
             batch_size: batch size
-            devices: ['cpu'] or a list of gpu ids.
-            k: beam size(only required for test) 
+            device: torch.device
+            k: beam size(only required for test)
         '''
-        dev_id, gs = 0, []
         src_data, tgt_data = self.src[mode], self.tgt[mode]
         n = len(src_data)
         order = np.random.permutation(n) if mode == 'train' else range(n)
@@ -115,22 +115,16 @@ class TranslationDataset:
             tgt_buf.append(tgt_sample)
             if len(src_buf) == batch_size:
                 if mode == 'test':
-                    assert len(devices) == 1 # we only allow single gpu for inference
-                    yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=devices[0])
+                    yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device)
                 else:
-                    gs.append(graph_pool(src_buf, tgt_buf, device=devices[dev_id]))
-                    dev_id += 1
-                    if dev_id == len(devices):
-                        yield gs if len(devices) > 1 else gs[0]
-                        dev_id, gs = 0, []
+                    yield graph_pool(src_buf, tgt_buf, device=device))
                 src_buf, tgt_buf = [], []
 
         if len(src_buf) != 0:
             if mode == 'test':
-                yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=devices[0])
+                yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device)
             else:
-                gs.append(graph_pool(src_buf, tgt_buf, device=devices[dev_id]))
-                yield gs if len(devices) > 1 else gs[0]
+                yield graph_pool(src_buf, tgt_buf, device=device))
 
     def get_sequence(self, batch):
         "return a list of sequence from a list of index arrays"
@@ -151,8 +145,8 @@ def get_dataset(dataset):
         raise NotImplementedError
     elif dataset == 'copy' or dataset == 'sort':
         return TranslationDataset(
-            'data/{}'.format(dataset), 
-            ('in', 'out'), 
+            'data/{}'.format(dataset),
+            ('in', 'out'),
             train='train',
             valid='valid',
             test='test',
