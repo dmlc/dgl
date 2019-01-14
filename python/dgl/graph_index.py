@@ -696,9 +696,6 @@ class GraphIndex(object):
         nx_graph : networkx.DiGraph
             The nx graph
         """
-        if not self.is_readonly():
-            self.clear()
-
         if not isinstance(nx_graph, nx.Graph):
             nx_graph = (nx.MultiDiGraph(nx_graph) if self.is_multigraph()
                         else nx.DiGraph(nx_graph))
@@ -709,6 +706,9 @@ class GraphIndex(object):
                 nx_graph = nx_graph.to_directed()
 
         num_nodes = nx_graph.number_of_nodes()
+        if not self.is_readonly():
+            self.clear()
+            self.add_nodes(num_nodes)
 
         if nx_graph.number_of_edges() == 0:
             if self.is_readonly():
