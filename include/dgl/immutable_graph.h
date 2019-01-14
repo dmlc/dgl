@@ -471,7 +471,7 @@ class ImmutableGraph: public GraphInterface {
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const {
     assert(fmt == "csr");
-    CSRArray arrs = transpose ? this->GetOutCSRArray() : this->GetOutCSRArray();
+    CSRArray arrs = transpose ? this->GetOutCSRArray() : this->GetInCSRArray();
     return std::vector<IdArray>{arrs.indptr, arrs.indices, arrs.id};
   }
 
