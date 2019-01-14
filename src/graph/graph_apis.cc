@@ -36,16 +36,11 @@ PackedFunc ConvertEdgeArrayToPackedFunc(const EdgeArray& ea) {
 }
 
 // Convert CSRArray structure to PackedFunc.
-template<class CSRArray>
-PackedFunc ConvertCSRArrayToPackedFunc(const CSRArray& ea) {
+PackedFunc ConvertAdjToPackedFunc(const std::vector<IdArray>& ea) {
   auto body = [ea] (DGLArgs args, DGLRetValue* rv) {
       const int which = args[0];
-      if (which == 0) {
-        *rv = std::move(ea.indptr);
-      } else if (which == 1) {
-        *rv = std::move(ea.indices);
-      } else if (which == 2) {
-        *rv = std::move(ea.id);
+      if ((size_t) which < ea.size()) {
+        *rv = std::move(ea[which]);
       } else {
         LOG(FATAL) << "invalid choice";
       }
@@ -470,22 +465,14 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling64")
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling128")
 .set_body(CAPI_NeighborUniformSample<128>);
 
-///////////////////////////// Immutable Graph API ///////////////////////////////////
-
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetAdj")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     bool transpose = args[1];
     std::string format = args[2];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
-    ImmutableGraph::CSRArray csr;
-    if (transpose) {
-      csr = gptr->GetOutCSRArray();
-    } else {
-      csr = gptr->GetInCSRArray();
-    }
-    *rv = ConvertCSRArrayToPackedFunc(csr);
+    auto res = ptr->GetAdj(transpose, format);
+    *rv = ConvertAdjToPackedFunc(res);
   });
 
 }  // namespace dgl

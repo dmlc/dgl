@@ -543,40 +543,41 @@ class GraphIndex(object):
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
-        #if not isinstance(transpose, bool):
-        #    raise DGLError('Expect bool value for "transpose" arg,'
-        #                   ' but got %s.' % (type(transpose)))
-        #src, dst, _ = self.edges(False)
-        #src = src.tousertensor(ctx)  # the index of the ctx will be cached
-        #dst = dst.tousertensor(ctx)  # the index of the ctx will be cached
-        #src = F.unsqueeze(src, dim=0)
-        #dst = F.unsqueeze(dst, dim=0)
-        #if transpose:
-        #    idx = F.cat([src, dst], dim=0)
-        #else:
-        #    idx = F.cat([dst, src], dim=0)
-        #n = self.number_of_nodes()
-        #m = self.number_of_edges()
-        ## FIXME(minjie): data type
-        #dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-        #adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, n))
-        #shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
-        #return adj, shuffle_idx
-        fmt = F.get_preferred_sparse_format()
-        rst = _CAPI_DGLGraphGetAdj(self._handle, transpose, fmt)
-        if fmt == "csr":
+        if not isinstance(transpose, bool):
+            raise DGLError('Expect bool value for "transpose" arg,'
+                           ' but got %s.' % (type(transpose)))
+        if self.is_readonly():
+        #if fmt == "csr":
+            fmt = F.get_preferred_sparse_format()
+            rst = _CAPI_DGLGraphGetAdj(self._handle, transpose, fmt)
             indptr = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
             indices = F.copy_to(utils.toindex(rst(1)).tousertensor(), ctx)
             shuffle = utils.toindex(rst(2))
             dat = F.ones(indices.shape, dtype=F.float32, ctx=ctx)
             return F.sparse_matrix(dat, ('csr', indices, indptr),
                                    (self.number_of_nodes(), self.number_of_nodes()))[0], shuffle
-        elif fmt == "coo":
-            rows = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
-            cols = F.copy_to(utils.toindex(rst(1)).tousertensor(), ctx)
-            dat = F.ones(rows.shape, dtype=F.float32, ctx=ctx)
-            return F.sparse_matrix(dat, ('coo', rows, cols),
-                                   (self.number_of_nodes(), self.number_of_nodes()))[0], None
+        else:
+        #elif fmt == "coo":
+            #src, dst, _ = self.edges(False)
+            #src = src.tousertensor(ctx)  # the index of the ctx will be cached
+            #dst = dst.tousertensor(ctx)  # the index of the ctx will be cached
+            #src = F.unsqueeze(src, dim=0)
+            #dst = F.unsqueeze(dst, dim=0)
+            #if transpose:
+            #    idx = F.cat([src, dst], dim=0)
+            #else:
+            #    idx = F.cat([dst, src], dim=0)
+            #print(idx.shape)
+            ## FIXME(minjie): data type
+            rst = _CAPI_DGLGraphGetAdj(self._handle, transpose, "coo")
+            idx = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
+            m = self.number_of_edges()
+            idx = F.reshape(idx, (2, m))
+            dat = F.ones((m,), dtype=F.float32, ctx=ctx)
+            n = self.number_of_nodes()
+            adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, n))
+            shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+            return adj, shuffle_idx
 
     @utils.cached_member(cache='_cache', prefix='inc')
     def incidence_matrix(self, typestr, ctx):
@@ -819,7 +820,8 @@ class SubgraphIndex(GraphIndex):
         The parent edge ids in this subgraph.
     """
     def __init__(self, handle, parent, induced_nodes, induced_edges):
-        super(SubgraphIndex, self).__init__(handle)
+        super(SubgraphIndex, self).__init__(parent.is_multigraph(), parent.is_readonly())
+        self._handle = handle
         self._parent = parent
         self._induced_nodes = induced_nodes
         self._induced_edges = induced_edges

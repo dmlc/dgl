@@ -499,6 +499,22 @@ Subgraph Graph::EdgeSubgraph(IdArray eids) const {
 }
 
 std::vector<IdArray> Graph::GetAdj(bool transpose, const std::string &fmt) const {
+  if (fmt == "coo") {
+    int64_t num_edges = num_edges_;
+    IdArray idx = IdArray::Empty({2 * num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    int64_t *idx_data = static_cast<int64_t*>(idx->data);
+    std::copy(all_edges_src_.begin(), all_edges_src_.end(), idx_data);
+    std::copy(all_edges_dst_.begin(), all_edges_dst_.end(), idx_data + num_edges);
+    IdArray eid = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    int64_t *eid_data = static_cast<int64_t*>(eid->data);
+    for (uint64_t eid = 0; eid < num_edges; ++eid) {
+      eid_data[eid] = eid;
+    }
+    return std::vector<IdArray>{idx, eid};
+  } else {
+
+  }
+  return std::vector<IdArray>();
 }
 
 GraphInterface::ptr Graph::Reverse() const {
