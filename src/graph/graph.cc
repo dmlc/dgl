@@ -517,7 +517,8 @@ std::vector<IdArray> Graph::GetAdj(bool transpose, const std::string &fmt) const
       eid_data[eid] = eid;
     return std::vector<IdArray>{idx, eid};
   } else if (fmt == "csr") {
-    IdArray indptr = IdArray::Empty({num_nodes + 1}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    IdArray indptr = IdArray::Empty({num_nodes + 1}, DLDataType{kDLInt, 64, 1},
+                                    DLContext{kDLCPU, 0});
     IdArray indices = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
     IdArray eid = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
     int64_t *indptr_data = static_cast<int64_t*>(indptr->data);

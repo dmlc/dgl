@@ -22,10 +22,8 @@ class GraphIndex(object):
     handle : GraphIndexHandle
         Handler
     """
-    def __init__(self, multigraph, readonly):
-        # if the graph is readonly, we'll init later.
-        if not readonly:
-            self._handle = _CAPI_DGLGraphCreateMutable(multigraph)
+    def __init__(self, handle=None, multigraph=None, readonly=None):
+        self._handle = handle
         self._multigraph = multigraph
         self._readonly = readonly
         self._cache = {}
@@ -116,7 +114,9 @@ class GraphIndex(object):
         bool
             True if it is a multigraph, False otherwise.
         """
-        return bool(_CAPI_DGLGraphIsMultigraph(self._handle))
+        if self._multigraph is None:
+            self._multigraph = bool(_CAPI_DGLGraphIsMultigraph(self._handle))
+        return self._multigraph
 
     def is_readonly(self):
         """Indicate whether the graph index is read-only.
@@ -126,6 +126,8 @@ class GraphIndex(object):
         bool
             True if it is a read-only graph, False otherwise.
         """
+        if self._readonly is None:
+            self._readonly = bool(_CAPI_DGLGraphIsReadonly(self._handle))
         return self._readonly
 
     def number_of_nodes(self):
@@ -958,7 +960,7 @@ def create_graph_index(graph_data=None, multigraph=False, readonly=False):
         # FIXME(minjie): this return is not correct for mutable graph index
         return graph_data
 
-    gidx = GraphIndex(multigraph, readonly)
+    gidx = GraphIndex(None, multigraph, readonly)
     if graph_data is None and readonly:
         raise Exception("can't create an empty immutable graph")
     elif graph_data is None:

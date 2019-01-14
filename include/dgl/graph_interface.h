@@ -6,6 +6,7 @@
 #ifndef DGL_GRAPH_INTERFACE_H_
 #define DGL_GRAPH_INTERFACE_H_
 
+#include <string>
 #include <vector>
 #include <utility>
 #include "runtime/ndarray.h"
@@ -15,7 +16,7 @@ namespace dgl {
 class NotImplemented: public std::exception {
   std::string msg;
  public:
-  NotImplemented(const std::string &name) {
+  explicit NotImplemented(const std::string &name) {
     this->msg = name + " isn't implemented";
   }
 
