@@ -127,20 +127,20 @@ class GCN(gluon.Block):
 
     def forward(self, subg, subg_edges_per_hop, nodes_per_hop):
         h = subg.ndata['in']
-        new_history = None
+        new_history = []
         for i, layer in enumerate(self.layers):
             h = layer(h, subg, subg_edges_per_hop[self.n_layers-i])
             # new history to be updated after one SGD iteration
             if i < self.n_layers and subg_edges_per_hop[0] is not None:
                 indexes = subg.map_to_subgraph_nid(nodes_per_hop[self.n_layers-i])
-                new_history = h.detach().copy()[indexes]
+                new_history.append(h.detach().copy()[indexes])
         return h, new_history
 
 
 def update_history(g, n_layers, new_history, nodes_per_hop):
     for i in range(n_layers):
         indexes = mx.nd.array(nodes_per_hop[n_layers-i]).astype('int64')
-        hu = {'h_%d' % (i+1) : new_history}
+        hu = {'h_%d' % (i+1) : new_history[i]}
         g.set_n_repr(hu, indexes, inplace=True)
 
 
@@ -195,7 +195,7 @@ def main(args):
     val_mask = val_mask.as_in_context(ctx)
     test_mask = test_mask.as_in_context(ctx)
 
-    num_neighbors = 2
+    num_neighbors = args.num_neighbors
 
     # create GCN model
     g = DGLGraph(data.graph, readonly=True)
@@ -277,6 +277,8 @@ if __name__ == '__main__':
             help="number of hidden gcn units")
     parser.add_argument("--n-layers", type=int, default=1,
             help="number of hidden gcn layers")
+    parser.add_argument("--num-neighbors", type=int, default=2,
+            help="number of neighbors to be sampled")
     parser.add_argument("--self-loop", action='store_true',
             help="graph self-loop (default=False)")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
