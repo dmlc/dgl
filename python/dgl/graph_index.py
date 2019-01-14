@@ -54,6 +54,8 @@ class GraphIndex(object):
 
     def init(self, src_ids, dst_ids, edge_ids, num_nodes):
         """The actual init function"""
+        assert(len(src_ids) == len(dst_ids))
+        assert(len(src_ids) == len(edge_ids))
         self._handle = _CAPI_DGLGraphCreate(src_ids.todgltensor(), dst_ids.todgltensor(),
                                             edge_ids.todgltensor(), self._multigraph, num_nodes,
                                             self._readonly)
@@ -138,6 +140,7 @@ class GraphIndex(object):
         int
             The number of nodes
         """
+        assert self._handle is not None
         return _CAPI_DGLGraphNumVertices(self._handle)
 
     def number_of_edges(self):
@@ -738,7 +741,7 @@ class GraphIndex(object):
             for e in nx_graph.edges:
                 src.append(e[0])
                 dst.append(e[1])
-            eid = np.arange(0, len(src), dtype=np.int64)
+        eid = np.arange(0, len(src), dtype=np.int64)
         num_nodes = nx_graph.number_of_nodes()
         # We store edge Ids as an edge attribute.
         eid = utils.toindex(eid)
@@ -964,6 +967,9 @@ def create_graph_index(graph_data=None, multigraph=False, readonly=False):
     if graph_data is None and readonly:
         raise Exception("can't create an empty immutable graph")
     elif graph_data is None:
+        # This is a mutable graph.
+        handle = _CAPI_DGLGraphCreateMutable(multigraph)
+        gidx = GraphIndex(handle, multigraph, readonly)
         return gidx
 
     # edge list
