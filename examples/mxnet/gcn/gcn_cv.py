@@ -14,6 +14,7 @@ from functools import partial
 def sample_subgraph(g, seed_nodes, num_hops, num_neighbors):
     seeds = seed_nodes
     subgraph = None
+    # fully expand a subgraph from the seeds
     for subg, aux in dgl.contrib.sampling.NeighborSampler(g, 1000000, 1000000,
                                                           neighbor_type='in', num_hops=num_hops,
                                                           seed_nodes=np.array(seeds)):
@@ -21,7 +22,7 @@ def sample_subgraph(g, seed_nodes, num_hops, num_neighbors):
 
     parent_uv_edges_per_hop = []
     nodes_per_hop = [seeds]
-
+    # neighbor sampling
     for _ in range(num_hops):
         for subg, aux in dgl.contrib.sampling.NeighborSampler(g, 1000000, num_neighbors,
                                                               neighbor_type='in',
@@ -49,18 +50,17 @@ def gcn_msg(edge, ind, test=False):
     return {'m': msg}
 
 
-def gcn_reduce(node, ind):
-    if 'agg_h_%d' % ind in node.data:
-        accum = mx.nd.sum(node.mailbox['m'], 1) * node.data['norm'] + node.data['agg_h_%d' % ind] * node.data['deg_norm']
-    else:
+def gcn_reduce(node, ind, test=False):
+    if test:
         accum = mx.nd.sum(node.mailbox['m'], 1) * node.data['deg_norm']
+    else:
+        accum = mx.nd.sum(node.mailbox['m'], 1) * node.data['norm'] + node.data['agg_h_%d' % ind] * node.data['deg_norm']
     return {'h': accum}
 
 
 class NodeUpdate(gluon.Block):
-    def __init__(self, ind, out_feats, activation=None, dropout=0):
+    def __init__(self, out_feats, activation=None, dropout=0):
         super(NodeUpdate, self).__init__()
-        self.ind = ind + 1
         self.linear = gluon.nn.Dense(out_feats, activation=activation)
         self.dropout = dropout
 
@@ -69,7 +69,7 @@ class NodeUpdate(gluon.Block):
         if self.dropout:
             accum = mx.nd.Dropout(accum, p=self.dropout)
         accum = self.linear(accum)
-        return {'accum': accum, 'tmp_h_%d' % self.ind: accum.detach()}
+        return {'accum': accum}
 
 
 class GCNLayer(gluon.Block):
@@ -82,16 +82,16 @@ class GCNLayer(gluon.Block):
                  bias=True):
         super(GCNLayer, self).__init__()
         self.ind = ind
-        self.node_update = NodeUpdate(ind, out_feats, activation, dropout)
+        self.node_update = NodeUpdate(out_feats, activation, dropout)
 
     def forward(self, h, subg, subg_edges):
         subg.ndata['h'] = h
-        if self.ind == 0:
-            # first layer
+        if self.ind == 0 or subg_edges is None:
+            # first layer or test
             subg.update_all(partial(gcn_msg, ind=self.ind, test=True),
-                            partial(gcn_reduce, ind=self.ind),
+                            partial(gcn_reduce, ind=self.ind, test=True),
                             self.node_update)
-        elif subg_edges is not None:
+        else:
             # aggregate history
             subg.update_all(fn.copy_src(src='h_%d' % self.ind, out='m'),
                             fn.sum(msg='m', out='agg_h_%d' % self.ind))
@@ -99,11 +99,7 @@ class GCNLayer(gluon.Block):
             subg.send_and_recv(subg_edges, partial(gcn_msg, ind=self.ind),
                                partial(gcn_reduce, ind=self.ind),
                                self.node_update)
-        else:
-            # test
-            subg.update_all(partial(gcn_msg, ind=self.ind, test=True),
-                            partial(gcn_reduce, ind=self.ind),
-                            self.node_update)
+
         h = subg.ndata.pop('accum')
         return h
 
@@ -121,40 +117,37 @@ class GCN(gluon.Block):
         #self.linear = gluon.nn.Dense(n_hidden, activation)
         self.layers = gluon.nn.Sequential()
         # input layer
-        self.layers.add(GCNLayer(0, in_feats, n_hidden, activation, 0.))
+        self.layers.add(GCNLayer(0, in_feats, n_hidden, activation, dropout))
         # hidden layers
-        for i in range(n_layers - 1):
-            self.layers.add(GCNLayer(i+1, n_hidden, n_hidden, activation, dropout))
+        for i in range(1, n_layers):
+            self.layers.add(GCNLayer(i, n_hidden, n_hidden, activation, dropout))
         # output layer
-        self.layers.add(GCNLayer(n_layers, n_hidden, n_classes, None, 0))
+        self.layers.add(GCNLayer(n_layers, n_hidden, n_classes, None, dropout))
 
 
-    def forward(self, subg, subg_edges_per_hop):
+    def forward(self, subg, subg_edges_per_hop, nodes_per_hop):
         h = subg.ndata['in']
-        #h = self.linear(h)
+        new_history = None
         for i, layer in enumerate(self.layers):
             h = layer(h, subg, subg_edges_per_hop[self.n_layers-i])
-        return h
+            # new history to be updated after one SGD iteration
+            if i < self.n_layers and subg_edges_per_hop[0] is not None:
+                indexes = subg.map_to_subgraph_nid(nodes_per_hop[self.n_layers-i])
+                new_history = h.detach().copy()[indexes]
+        return h, new_history
 
 
-def copy_to_graph(g, subg, n_layers):
-    hu = {'h_%d' % i : subg.ndata['h_%d' % i] for i in range(1, n_layers+1)}
-    g.set_n_repr(hu, subg.parent_nid, inplace=True)
+def update_history(g, n_layers, new_history, nodes_per_hop):
+    for i in range(n_layers):
+        indexes = mx.nd.array(nodes_per_hop[n_layers-i]).astype('int64')
+        hu = {'h_%d' % (i+1) : new_history}
+        g.set_n_repr(hu, indexes, inplace=True)
 
 
-def update_history(subg, n_layers, nodes_per_hop):
-    for i in range(1, n_layers+1):
-        indexes = subg.map_to_subgraph_nid(nodes_per_hop[n_layers-i+1])
-        hu = {'h_%d' % i : subg.ndata['tmp_h_%d' % i][indexes]}
-        subg.set_n_repr(hu, mx.nd.array(indexes), inplace=True)
-
-
-def evaluate(model, g, num_hops, labels, mask, norm):
-    #degs = g.in_degrees().astype('float32')
-    #g.ndata['norm'] = mx.nd.expand_dims(1. / degs, 1)
-    pred = model(g, [None for i in range(num_hops)]).argmax(axis=1)
+def evaluate(model, g, num_hops, labels, mask, nodes_per_hop):
+    pred, _ = model(g, [None for i in range(num_hops)], nodes_per_hop)
+    pred = pred.argmax(axis=1)
     accuracy = ((pred == labels) * mask).sum() / mask.sum().asscalar()
-    #g.ndata['norm'] = norm
     acc = accuracy.asscalar()
     print(acc)
     #print("Accuracy {:.4f}". format(acc))
@@ -209,14 +202,11 @@ def main(args):
     # normalization
     degs = g.in_degrees().astype('float32')
     degs[degs > num_neighbors] = num_neighbors
-    #norm = g.in_degrees().astype('float32') / degs
     norm = mx.nd.expand_dims(1./degs, 1)
     if cuda:
         norm = norm.as_in_context(ctx)
     g.ndata['norm'] = norm
-
     g.ndata['deg_norm'] = mx.nd.expand_dims(1./g.in_degrees().astype('float32'), 1)
-
     g.ndata['in'] = features
 
     num_data = len(train_mask.asnumpy())
@@ -225,14 +215,11 @@ def main(args):
 
     seed_nodes = list(train_idx)
     num_hops = args.n_layers + 1
-
     n_layers = args.n_layers
     n_hidden = args.n_hidden
 
-    g.ndata['h_%d' % 0] = mx.nd.zeros((features.shape[0], features.shape[1]))
-    for i in range(1, n_layers+1):
-        g.ndata['h_%d' % i] = mx.nd.zeros((features.shape[0], n_hidden))
-    g.ndata['h_%d' % (n_layers+1)] = mx.nd.zeros((features.shape[0], n_classes))
+    for i in range(n_layers):
+        g.ndata['h_%d' % (i+1)] = mx.nd.zeros((features.shape[0], n_hidden))
 
     model = GCN(in_feats,
                 n_hidden,
@@ -259,35 +246,26 @@ def main(args):
         subg, subg_edges_per_hop, nodes_per_hop = sample_subgraph(g, seed_nodes, num_hops, num_neighbors)
         subg_train_mask = subg.map_to_subgraph_nid(train_idx)
         subg.copy_from_parent()
-
-        for i in range(n_layers):
-            subg.ndata['tmp_h_%d' % i] = mx.nd.zeros((len(subg.parent_nid), n_hidden))
-        subg.ndata['tmp_h_%d' % (n_layers+1)] = mx.nd.zeros((len(subg.parent_nid), n_classes))
-
         # forward
         smask = np.zeros((len(subg.parent_nid),))
         smask[subg_train_mask.asnumpy()] = 1
 
         with mx.autograd.record():
-            pred = model(subg, subg_edges_per_hop)
+            pred, uh = model(subg, subg_edges_per_hop, nodes_per_hop)
             loss = loss_fcn(pred, labels[subg.parent_nid], mx.nd.expand_dims(mx.nd.array(smask), 1))
             loss = loss.sum() / n_train_samples
 
         #print(loss.asnumpy())
-        update_history(subg, n_layers, nodes_per_hop)
         loss.backward()
         trainer.step(batch_size=1)
-        copy_to_graph(g, subg, n_layers)
-        test_acc_list.append(evaluate(model, g, num_hops, labels, test_mask, norm))
-
-    #evaluate(model, g, num_hops, labels, test_mask, norm)
-    print("===== " + str(max(test_acc_list)))
+        update_history(g, n_layers, uh, nodes_per_hop)
+        test_acc_list.append(evaluate(model, g, num_hops, labels, test_mask, nodes_per_hop))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
     register_data_args(parser)
-    parser.add_argument("--dropout", type=float, default=0.3,
+    parser.add_argument("--dropout", type=float, default=0.5,
             help="dropout probability")
     parser.add_argument("--gpu", type=int, default=-1,
             help="gpu")
