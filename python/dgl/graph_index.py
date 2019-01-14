@@ -665,8 +665,8 @@ class GraphIndex(object):
             rst = _nonuniform_sampling(self, node_prob, seed_ids, neighbor_type, num_hops,
                                        expand_factor)
 
-        return [ImmutableSubgraphIndex(rst(i), self, rst(num_subgs + i),
-                                       rst(num_subgs * 2 + i)) for i in range(num_subgs)]
+        return [SubgraphIndex(rst(i), self, rst(num_subgs + i),
+                              rst(num_subgs * 2 + i)) for i in range(num_subgs)]
 
     def to_networkx(self):
         """Convert to networkx graph.
@@ -867,7 +867,7 @@ def map_to_subgraph_nid(subgraph, parent_nids):
 
     Parameters
     ----------
-    subgraph: SubgraphIndex or ImmutableSubgraphIndex
+    subgraph: SubgraphIndex
         the graph index of a subgraph
 
     parent_nids: utils.Index
