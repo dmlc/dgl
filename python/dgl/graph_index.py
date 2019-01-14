@@ -644,8 +644,6 @@ class GraphIndex(object):
             x = -F.ones((n_entries,), dtype=F.float32, ctx=ctx)
             y = F.ones((n_entries,), dtype=F.float32, ctx=ctx)
             dat = F.cat([x, y], dim=0)
-            print(idx)
-            print(dat)
             inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
         else:
             raise DGLError('Invalid incidence matrix type: %s' % str(typestr))
