@@ -77,9 +77,8 @@ class SimpleLossCompute(nn.Module):
         return self.loss.item() * norm
 
 class MultiGPULossCompute(SimpleLossCompute):
-    def __init__(self, criterion, dev_id, ndev, grad_accum, model, opt=None):
+    def __init__(self, criterion, ndev, grad_accum, model, opt=None):
         super(MultiGPULossCompute, self).__init__(criterion, opt)
-        self.dev_id = dev_id
         self.ndev = ndev
         self.grad_accum = grad_accum
         self.model = model
