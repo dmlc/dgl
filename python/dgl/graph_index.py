@@ -963,13 +963,15 @@ def create_graph_index(graph_data=None, multigraph=False, readonly=False):
         # FIXME(minjie): this return is not correct for mutable graph index
         return graph_data
 
-    gidx = GraphIndex(None, multigraph, readonly)
+    if readonly:
+        gidx = GraphIndex(None, multigraph, readonly)
+    else:
+        handle = _CAPI_DGLGraphCreateMutable(multigraph)
+        gidx = GraphIndex(handle, multigraph, readonly)
+
     if graph_data is None and readonly:
         raise Exception("can't create an empty immutable graph")
     elif graph_data is None:
-        # This is a mutable graph.
-        handle = _CAPI_DGLGraphCreateMutable(multigraph)
-        gidx = GraphIndex(handle, multigraph, readonly)
         return gidx
 
     # edge list
