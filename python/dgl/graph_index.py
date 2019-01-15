@@ -36,21 +36,27 @@ class GraphIndex(object):
         src, dst, _ = self.edges()
         n_nodes = self.number_of_nodes()
         multigraph = self.is_multigraph()
+        readonly = self.is_readonly()
 
-        return n_nodes, multigraph, src, dst
+        return n_nodes, multigraph, readonly, src, dst
 
     def __setstate__(self, state):
         """The pickle state of GraphIndex is defined as a triplet
-        (number_of_nodes, multigraph, src_nodes, dst_nodes)
+        (number_of_nodes, multigraph, readonly, src_nodes, dst_nodes)
         """
-        n_nodes, multigraph, src, dst = state
+        n_nodes, multigraph, readonly, src, dst = state
 
-        self._handle = _CAPI_DGLGraphCreateMutable(multigraph)
-        self._cache = {}
+        if readonly:
+            self._readonly = readonly
+            self._multigraph = multigraph
+            self.init(src, dst, F.arange(0, len(src)), n_nodes)
+        else:
+            self._handle = _CAPI_DGLGraphCreateMutable(multigraph)
+            self._cache = {}
 
-        self.clear()
-        self.add_nodes(n_nodes)
-        self.add_edges(src, dst)
+            self.clear()
+            self.add_nodes(n_nodes)
+            self.add_edges(src, dst)
 
     def init(self, src_ids, dst_ids, edge_ids, num_nodes):
         """The actual init function"""
@@ -140,7 +146,6 @@ class GraphIndex(object):
         int
             The number of nodes
         """
-        assert self._handle is not None
         return _CAPI_DGLGraphNumVertices(self._handle)
 
     def number_of_edges(self):
@@ -749,8 +754,9 @@ class GraphIndex(object):
                 "The input matrix has to be a SciPy sparse matrix."
         if not self.is_readonly():
             self.clear()
-        # what if the adj matrix isn't symmetric.
-        num_nodes = max(adj.shape[0], adj.shape[1])
+        if adj.shape[0] != adj.shape[1]:
+            raise ValueError("we don't support a rectangle matrix")
+        num_nodes = adj.shape[0]
         adj_coo = adj.tocoo()
         src = utils.toindex(adj_coo.row)
         dst = utils.toindex(adj_coo.col)
@@ -952,6 +958,7 @@ def create_graph_index(graph_data=None, multigraph=False, readonly=False):
         return graph_data
 
     if readonly:
+        # FIXME(zhengda): we should construct a C graph index before constructing GraphIndex.
         gidx = GraphIndex(None, multigraph, readonly)
     else:
         handle = _CAPI_DGLGraphCreateMutable(multigraph)
@@ -990,6 +997,7 @@ def create_graph_index(graph_data=None, multigraph=False, readonly=False):
 
 _init_api("dgl.graph_index")
 
+# TODO(zhengda): we'll support variable-length inputs.
 _NEIGHBOR_SAMPLING_APIS = {
     1: _CAPI_DGLGraphUniformSampling,
     2: _CAPI_DGLGraphUniformSampling2,

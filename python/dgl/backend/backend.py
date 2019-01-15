@@ -79,6 +79,11 @@ def get_preferred_sparse_format():
 
     Different backends have their preferred backend. This info is useful when
     constructing a sparse matrix.
+
+    Returns
+    -------
+    string
+        the name of the preferred sparse matrix format.
     """
     pass
 

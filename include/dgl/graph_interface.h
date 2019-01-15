@@ -78,8 +78,7 @@ class GraphInterface {
     IdArray src, dst, id;
   } EdgeArray;
 
-  virtual ~GraphInterface() {
-  }
+  virtual ~GraphInterface() = default;
 
   /*!
    * \brief Add vertices to the graph.
@@ -341,7 +340,7 @@ class GraphInterface {
    * of an edge and the column represents the source.
    * \param transpose A flag to transpose the returned adjacency matrix.
    * \param fmt the format of the returned adjacency matrix.
-   * \return a vector of three IdArray.
+   * \return a vector of IdArrays.
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const = 0;
 

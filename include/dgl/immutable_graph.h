@@ -23,8 +23,9 @@ bool binary_search(ForwardIt first, ForwardIt last, const T& value) {
 }
 
 /*!
- * \brief Base dgl immutable graph index class.
+ * \brief DGL immutable graph index class.
  *
+ * DGL's graph is directed. Vertices are integers enumerated from zero.
  */
 class ImmutableGraph: public GraphInterface {
  public:
@@ -32,18 +33,18 @@ class ImmutableGraph: public GraphInterface {
     IdArray indptr, indices, id;
   } CSRArray;
 
-  struct edge {
+  struct Edge {
     dgl_id_t end_points[2];
     dgl_id_t edge_id;
   };
 
-  struct csr {
-    typedef std::shared_ptr<csr> ptr;
+  struct CSR {
+    typedef std::shared_ptr<CSR> Ptr;
     std::vector<int64_t> indptr;
     std::vector<dgl_id_t> indices;
     std::vector<dgl_id_t> edge_ids;
 
-    csr(int64_t num_vertices, int64_t expected_num_edges) {
+    CSR(int64_t num_vertices, int64_t expected_num_edges) {
       indptr.resize(num_vertices + 1);
       indices.reserve(expected_num_edges);
       edge_ids.reserve(expected_num_edges);
@@ -68,19 +69,19 @@ class ImmutableGraph: public GraphInterface {
     EdgeArray GetEdges(dgl_id_t vid) const;
     EdgeArray GetEdges(IdArray vids) const;
     std::pair<const dgl_id_t *, const dgl_id_t *> GetIndexRef(dgl_id_t v) const {
-      int64_t start = indptr[v];
-      int64_t end = indptr[v + 1];
+      const int64_t start = indptr[v];
+      const int64_t end = indptr[v + 1];
       return std::pair<const dgl_id_t *, const dgl_id_t *>(&indices[start], &indices[end]);
     }
-    csr::ptr Transpose() const;
-    std::pair<csr::ptr, IdArray> VertexSubgraph(IdArray vids) const;
-    static csr::ptr from_edges(std::vector<edge> *edges, int sort_on, int64_t num_nodes);
+    CSR::Ptr Transpose() const;
+    std::pair<CSR::Ptr, IdArray> VertexSubgraph(IdArray vids) const;
+    static CSR::Ptr FromEdges(std::vector<Edge> *edges, int sort_on, int64_t num_nodes);
   };
 
   ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
                  bool multigraph = false);
 
-  ImmutableGraph(csr::ptr in_csr, csr::ptr out_csr,
+  ImmutableGraph(CSR::Ptr in_csr, CSR::Ptr out_csr,
                  bool multigraph = false) : is_multigraph_(multigraph) {
     this->in_csr_ = in_csr;
     this->out_csr_ = out_csr;
@@ -362,8 +363,6 @@ class ImmutableGraph: public GraphInterface {
    */
   Subgraph VertexSubgraph(IdArray vids) const;
 
-  std::vector<Subgraph> VertexSubgraphs(const std::vector<IdArray> &vids) const;
-
   /*!
    * \brief Construct the induced edge subgraph of the given edges.
    *
@@ -381,8 +380,6 @@ class ImmutableGraph: public GraphInterface {
    * \return the induced edge subgraph
    */
   Subgraph EdgeSubgraph(IdArray eids) const;
-
-  std::vector<Subgraph> EdgeSubgraphs(std::vector<IdArray> eids) const;
 
   /*!
    * \brief Return a new graph with all the edges reversed.
@@ -454,18 +451,6 @@ class ImmutableGraph: public GraphInterface {
                                         int num_hops, int expand_factor) const;
 
   /*!
-   * \brief Get the CSR array that represents the in-edges.
-   * \return the CSR array.
-   */
-  CSRArray GetInCSRArray() const;
-
-  /*!
-   * \brief Get the CSR array that represents the out-edges.
-   * \return the CSR array.
-   */
-  CSRArray GetOutCSRArray() const;
-
-  /*!
    * \brief Get the adjacency matrix of the graph.
    *
    * By default, a row of returned adjacency matrix represents the destination
@@ -488,7 +473,7 @@ class ImmutableGraph: public GraphInterface {
    * When we get in csr or out csr, we try to get the one cached in the structure.
    * If not, we transpose the other one to get the one we need.
    */
-  csr::ptr GetInCSR() const {
+  CSR::Ptr GetInCSR() const {
     if (in_csr_) {
       return in_csr_;
     } else {
@@ -497,7 +482,7 @@ class ImmutableGraph: public GraphInterface {
       return in_csr_;
     }
   }
-  csr::ptr GetOutCSR() const {
+  CSR::Ptr GetOutCSR() const {
     if (out_csr_) {
       return out_csr_;
     } else {
@@ -507,16 +492,35 @@ class ImmutableGraph: public GraphInterface {
     }
   }
 
+  /*!
+   * \brief Get the CSR array that represents the in-edges.
+   * This method copies data from std::vector to IdArray.
+   * \return the CSR array.
+   */
+  CSRArray GetInCSRArray() const;
+
+  /*!
+   * \brief Get the CSR array that represents the out-edges.
+   * This method copies data from std::vector to IdArray.
+   * \return the CSR array.
+   */
+  CSRArray GetOutCSRArray() const;
+
   SampledSubgraph SampleSubgraph(IdArray seed_arr, const float* probability,
                                  const std::string &neigh_type,
                                  int num_hops, size_t num_neighbor) const;
 
+  /*!
+   * \brief Compact a subgraph.
+   * In a sampled subgraph, the vertex Id is still in the ones in the original graph.
+   * We want to convert them to the subgraph Ids.
+   */
   void CompactSubgraph(IdArray induced_vertices);
 
   // Store the in-edges.
-  csr::ptr in_csr_;
+  CSR::Ptr in_csr_;
   // Store the out-edges.
-  csr::ptr out_csr_;
+  CSR::Ptr out_csr_;
   /*!
    * \brief Whether if this is a multigraph.
    *

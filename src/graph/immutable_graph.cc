@@ -19,7 +19,7 @@ int rand_r(unsigned *seed) {
 
 namespace dgl {
 
-ImmutableGraph::EdgeArray ImmutableGraph::csr::GetEdges(dgl_id_t vid) const {
+ImmutableGraph::EdgeArray ImmutableGraph::CSR::GetEdges(dgl_id_t vid) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
   int64_t off = this->indptr[vid];
   const int64_t len = this->GetDegree(vid);
@@ -37,7 +37,7 @@ ImmutableGraph::EdgeArray ImmutableGraph::csr::GetEdges(dgl_id_t vid) const {
   return ImmutableGraph::EdgeArray{src, dst, eid};
 }
 
-ImmutableGraph::EdgeArray ImmutableGraph::csr::GetEdges(IdArray vids) const {
+ImmutableGraph::EdgeArray ImmutableGraph::CSR::GetEdges(IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
   const auto len = vids->shape[0];
   const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
@@ -68,7 +68,7 @@ ImmutableGraph::EdgeArray ImmutableGraph::csr::GetEdges(IdArray vids) const {
   return ImmutableGraph::EdgeArray{src, dst, eid};
 }
 
-DegreeArray ImmutableGraph::csr::GetDegrees(IdArray vids) const {
+DegreeArray ImmutableGraph::CSR::GetDegrees(IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
   const auto len = vids->shape[0];
   const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
@@ -144,7 +144,7 @@ class HashTableChecker {
   }
 };
 
-std::pair<ImmutableGraph::csr::ptr, IdArray> ImmutableGraph::csr::VertexSubgraph(
+std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::VertexSubgraph(
     IdArray vids) const {
   const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
   const int64_t len = vids->shape[0];
@@ -156,7 +156,7 @@ std::pair<ImmutableGraph::csr::ptr, IdArray> ImmutableGraph::csr::VertexSubgraph
   // Collect the non-zero entries in from the original graph.
   std::vector<dgl_id_t> orig_edge_ids;
   orig_edge_ids.reserve(len * 50);
-  auto sub_csr = std::make_shared<csr>(len, len * 50);
+  auto sub_csr = std::make_shared<CSR>(len, len * 50);
   sub_csr->indptr[0] = 0;
   for (int64_t i = 0; i < len; ++i) {
     const dgl_id_t oldvid = vid_data[i];
@@ -179,11 +179,11 @@ std::pair<ImmutableGraph::csr::ptr, IdArray> ImmutableGraph::csr::VertexSubgraph
   dgl_id_t* eid_data = static_cast<dgl_id_t*>(rst_eids->data);
   std::copy(orig_edge_ids.begin(), orig_edge_ids.end(), eid_data);
 
-  return std::pair<std::shared_ptr<ImmutableGraph::csr>, IdArray>(sub_csr, rst_eids);
+  return std::pair<ImmutableGraph::CSR::Ptr, IdArray>(sub_csr, rst_eids);
 }
 
-ImmutableGraph::csr::ptr ImmutableGraph::csr::from_edges(std::vector<edge> *edges,
-                                                         int sort_on, int64_t num_nodes) {
+ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::FromEdges(std::vector<Edge> *edges,
+                                                        int sort_on, int64_t num_nodes) {
   assert(sort_on == 0 || sort_on == 1);
   int other_end = sort_on == 1 ? 0 : 1;
   // TODO(zhengda) we should sort in parallel.
@@ -194,7 +194,7 @@ ImmutableGraph::csr::ptr ImmutableGraph::csr::from_edges(std::vector<edge> *edge
       this->sort_on = sort_on;
       this->other_end = other_end;
     }
-    bool operator()(const edge &e1, const edge &e2) {
+    bool operator()(const Edge &e1, const Edge &e2) {
       if (e1.end_points[sort_on] == e2.end_points[sort_on])
         return e1.end_points[other_end] < e2.end_points[other_end];
       else
@@ -202,7 +202,7 @@ ImmutableGraph::csr::ptr ImmutableGraph::csr::from_edges(std::vector<edge> *edge
     }
   };
   std::sort(edges->begin(), edges->end(), compare(sort_on, other_end));
-  auto t = std::make_shared<csr>(0, 0);
+  auto t = std::make_shared<CSR>(0, 0);
   t->indices.resize(edges->size());
   t->edge_ids.resize(edges->size());
   for (size_t i = 0; i < edges->size(); i++) {
@@ -221,20 +221,20 @@ ImmutableGraph::csr::ptr ImmutableGraph::csr::from_edges(std::vector<edge> *edge
   return t;
 }
 
-std::shared_ptr<ImmutableGraph::csr> ImmutableGraph::csr::Transpose() const {
-  std::vector<edge> edges(NumEdges());
+ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::Transpose() const {
+  std::vector<Edge> edges(NumEdges());
   for (size_t i = 0; i < NumVertices(); i++) {
     const dgl_id_t *indices_begin = &indices[indptr[i]];
     const dgl_id_t *eid_begin = &edge_ids[indptr[i]];
     for (size_t j = 0; j < GetDegree(i); j++) {
-      edge e;
+      Edge e;
       e.end_points[0] = i;
       e.end_points[1] = indices_begin[j];
       e.edge_id = eid_begin[j];
       edges[indptr[i] + j] = e;
     }
   }
-  return from_edges(&edges, 1, NumVertices());
+  return FromEdges(&edges, 1, NumVertices());
 }
 
 ImmutableGraph::ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
@@ -245,16 +245,16 @@ ImmutableGraph::ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_id
   const dgl_id_t *src_data = static_cast<dgl_id_t*>(src_ids->data);
   const dgl_id_t *dst_data = static_cast<dgl_id_t*>(dst_ids->data);
   const dgl_id_t *edge_data = static_cast<dgl_id_t*>(edge_ids->data);
-  std::vector<edge> edges(len);
+  std::vector<Edge> edges(len);
   for (size_t i = 0; i < edges.size(); i++) {
-    edge e;
+    Edge e;
     e.end_points[0] = src_data[i];
     e.end_points[1] = dst_data[i];
     e.edge_id = edge_data[i];
     edges[i] = e;
   }
-  in_csr_ = csr::from_edges(&edges, 1, num_nodes);
-  out_csr_ = csr::from_edges(&edges, 0, num_nodes);
+  in_csr_ = CSR::FromEdges(&edges, 1, num_nodes);
+  out_csr_ = CSR::FromEdges(&edges, 0, num_nodes);
 }
 
 BoolArray ImmutableGraph::HasVertices(IdArray vids) const {
@@ -455,7 +455,7 @@ ImmutableGraph::EdgeArray ImmutableGraph::Edges(bool sorted) const {
 
 Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
   Subgraph subg;
-  std::pair<csr::ptr, IdArray> ret;
+  std::pair<CSR::Ptr, IdArray> ret;
   // We prefer to generate a subgraph for out-csr first.
   if (out_csr_) {
     ret = out_csr_->VertexSubgraph(vids);
@@ -856,7 +856,7 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   }
 
   // Construct sub_csr_graph
-  auto subg_csr = std::make_shared<csr>(num_vertices, num_edges);
+  auto subg_csr = std::make_shared<CSR>(num_vertices, num_edges);
   subg_csr->indices.resize(num_edges);
   subg_csr->edge_ids.resize(num_edges);
   dgl_id_t* val_list_out = static_cast<dgl_id_t *>(subg.induced_edges->data);
@@ -905,7 +905,7 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   return subg;
 }
 
-void CompactSubgraph(ImmutableGraph::csr *subg,
+void CompactSubgraph(ImmutableGraph::CSR *subg,
                      const std::unordered_map<dgl_id_t, dgl_id_t> &id_map) {
   for (size_t i = 0; i < subg->indices.size(); i++) {
     auto it = id_map.find(subg->indices[i]);
