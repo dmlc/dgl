@@ -459,13 +459,13 @@ Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
   // We prefer to generate a subgraph for out-csr first.
   if (out_csr_) {
     ret = out_csr_->VertexSubgraph(vids);
-    subg.graph = GraphInterface::ptr(new ImmutableGraph(nullptr, ret.first, IsMultigraph()));
+    subg.graph = GraphPtr(new ImmutableGraph(nullptr, ret.first, IsMultigraph()));
   } else {
     assert(in_csr_);
     ret = in_csr_->VertexSubgraph(vids);
     // When we generate a subgraph, it may be used by only accessing in-edges or out-edges.
     // We don't need to generate both.
-    subg.graph = GraphInterface::ptr(new ImmutableGraph(ret.first, nullptr, IsMultigraph()));
+    subg.graph = GraphPtr(new ImmutableGraph(ret.first, nullptr, IsMultigraph()));
   }
   subg.induced_vertices = vids;
   subg.induced_edges = ret.second;
@@ -898,9 +898,9 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
     subg_csr->edge_ids[i] = i;
 
   if (neigh_type == "in")
-    subg.graph = GraphInterface::ptr(new ImmutableGraph(subg_csr, nullptr, IsMultigraph()));
+    subg.graph = GraphPtr(new ImmutableGraph(subg_csr, nullptr, IsMultigraph()));
   else
-    subg.graph = GraphInterface::ptr(new ImmutableGraph(nullptr, subg_csr, IsMultigraph()));
+    subg.graph = GraphPtr(new ImmutableGraph(nullptr, subg_csr, IsMultigraph()));
 
   return subg;
 }

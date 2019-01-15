@@ -34,27 +34,36 @@ typedef dgl::runtime::NDArray IntArray;
 struct Subgraph;
 struct SampledSubgraph;
 
+/*!
+ * \brief This class references data in std::vector.
+ *
+ * This isn't a STL-style iterator. It provides a STL data container interface.
+ * but it doesn't own data itself. instead, it only references data in std::vector.
+ */
 class DGLIdIters {
-  std::vector<dgl_id_t>::const_iterator b, e;
+  std::vector<dgl_id_t>::const_iterator begin_, end_;
  public:
   DGLIdIters(std::vector<dgl_id_t>::const_iterator begin,
-               std::vector<dgl_id_t>::const_iterator end) {
-    this->b = begin;
-    this->e = end;
+             std::vector<dgl_id_t>::const_iterator end) {
+    this->begin_ = begin;
+    this->end_ = end;
   }
   std::vector<dgl_id_t>::const_iterator begin() const {
-    return this->b;
+    return this->begin_;
   }
   std::vector<dgl_id_t>::const_iterator end() const {
-    return this->e;
+    return this->end_;
   }
   dgl_id_t operator[](int64_t i) const {
-    return *(this->b + i);
+    return *(this->begin_ + i);
   }
   size_t size() const {
-    return this->e - this->b;
+    return this->end_ - this->begin_;
   }
 };
+
+class GraphInterface;
+typedef std::shared_ptr<GraphInterface> GraphPtr;
 
 /*!
  * \brief dgl graph index interface.
@@ -68,8 +77,6 @@ class GraphInterface {
     /* \brief the two endpoints and the id of the edge */
     IdArray src, dst, id;
   } EdgeArray;
-
-  typedef std::shared_ptr<GraphInterface> ptr;
 
   virtual ~GraphInterface() {
   }
@@ -291,7 +298,7 @@ class GraphInterface {
    *
    * \return the reversed graph
    */
-  virtual GraphInterface::ptr Reverse() const = 0;
+  virtual GraphPtr Reverse() const = 0;
 
   /*!
    * \brief Return the successor vector
@@ -350,7 +357,7 @@ class GraphInterface {
 /*! \brief Subgraph data structure */
 struct Subgraph {
   /*! \brief The graph. */
-  GraphInterface::ptr graph;
+  GraphPtr graph;
   /*!
    * \brief The induced vertex ids.
    * \note This is also a map from the new vertex id to the vertex id in the parent graph.

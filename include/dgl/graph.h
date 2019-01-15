@@ -37,6 +37,7 @@ class Graph: public GraphInterface {
   /*! \brief default constructor */
   explicit Graph(bool multigraph = false) : is_multigraph_(multigraph) {}
 
+  /*! \brief construct a graph from the coo format. */
   Graph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
       bool multigraph = false);
 
@@ -307,7 +308,7 @@ class Graph: public GraphInterface {
    *
    * \return the reversed graph
    */
-  GraphInterface::ptr Reverse() const;
+  GraphPtr Reverse() const;
 
   /*!
    * \brief Return the successor vector

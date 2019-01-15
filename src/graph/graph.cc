@@ -547,7 +547,7 @@ std::vector<IdArray> Graph::GetAdj(bool transpose, const std::string &fmt) const
   }
 }
 
-GraphInterface::ptr Graph::Reverse() const {
+GraphPtr Graph::Reverse() const {
   LOG(FATAL) << "not implemented";
   return nullptr;
 }

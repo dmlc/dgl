@@ -391,8 +391,8 @@ class ImmutableGraph: public GraphInterface {
    *
    * \return the reversed graph
    */
-  GraphInterface::ptr Reverse() const {
-    return GraphInterface::ptr(new ImmutableGraph(out_csr_, in_csr_, is_multigraph_));
+  GraphPtr Reverse() const {
+    return GraphPtr(new ImmutableGraph(out_csr_, in_csr_, is_multigraph_));
   }
 
   /*!
