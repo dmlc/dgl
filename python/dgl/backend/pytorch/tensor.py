@@ -72,7 +72,10 @@ def astype(input, ty):
     return input.type(ty)
 
 def asnumpy(input):
-    return input.cpu().numpy()
+    if isinstance(input, th.sparse.FloatTensor):
+        return input.to_dense().cpu().numpy()
+    else:
+        return input.cpu().numpy()
 
 def copy_to(input, ctx):
     if ctx.type == 'cpu':
