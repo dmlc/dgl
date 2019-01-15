@@ -29,7 +29,7 @@ def generate_rand_graph(n):
 def check_graph_equal(g1, g2):
     adj1 = g1.adjacency_matrix(False, F.cpu())[0]
     adj2 = g2.adjacency_matrix(False, F.cpu())[0]
-    assert F.allclose(adj1, adj2)
+    assert F.array_equal(adj1, adj2)
 
 def test_graph_gen():
     g, ig = generate_from_edgelist()
@@ -51,36 +51,36 @@ def check_basics(g, ig):
 
     edges = g.edges(True)
     iedges = ig.edges(True)
-    assert F.allclose(edges[0].tousertensor(), iedges[0].tousertensor())
-    assert F.allclose(edges[1].tousertensor(), iedges[1].tousertensor())
-    assert F.allclose(edges[2].tousertensor(), iedges[2].tousertensor())
+    assert F.array_equal(edges[0].tousertensor(), iedges[0].tousertensor())
+    assert F.array_equal(edges[1].tousertensor(), iedges[1].tousertensor())
+    assert F.array_equal(edges[2].tousertensor(), iedges[2].tousertensor())
 
     for i in range(g.number_of_nodes()):
         assert g.has_node(i) == ig.has_node(i)
 
     for i in range(g.number_of_nodes()):
-        assert F.allclose(g.predecessors(i).tousertensor(), ig.predecessors(i).tousertensor())
-        assert F.allclose(g.successors(i).tousertensor(), ig.successors(i).tousertensor())
+        assert F.array_equal(g.predecessors(i).tousertensor(), ig.predecessors(i).tousertensor())
+        assert F.array_equal(g.successors(i).tousertensor(), ig.successors(i).tousertensor())
 
     randv = np.random.randint(0, g.number_of_nodes(), 10)
     randv = utils.toindex(randv)
     in_src1, in_dst1, in_eids1 = sort_edges(g.in_edges(randv))
     in_src2, in_dst2, in_eids2 = sort_edges(ig.in_edges(randv))
     nnz = in_src2.shape[0]
-    assert F.allclose(in_src1, in_src2)
-    assert F.allclose(in_dst1, in_dst2)
-    assert F.allclose(in_eids1, in_eids2)
+    assert F.array_equal(in_src1, in_src2)
+    assert F.array_equal(in_dst1, in_dst2)
+    assert F.array_equal(in_eids1, in_eids2)
 
     out_src1, out_dst1, out_eids1 = sort_edges(g.out_edges(randv))
     out_src2, out_dst2, out_eids2 = sort_edges(ig.out_edges(randv))
     nnz = out_dst2.shape[0]
-    assert F.allclose(out_dst1, out_dst2)
-    assert F.allclose(out_src1, out_src2)
-    assert F.allclose(out_eids1, out_eids2)
+    assert F.array_equal(out_dst1, out_dst2)
+    assert F.array_equal(out_src1, out_src2)
+    assert F.array_equal(out_eids1, out_eids2)
 
     num_v = len(randv)
-    assert F.allclose(g.in_degrees(randv).tousertensor(), ig.in_degrees(randv).tousertensor())
-    assert F.allclose(g.out_degrees(randv).tousertensor(), ig.out_degrees(randv).tousertensor())
+    assert F.array_equal(g.in_degrees(randv).tousertensor(), ig.in_degrees(randv).tousertensor())
+    assert F.array_equal(g.out_degrees(randv).tousertensor(), ig.out_degrees(randv).tousertensor())
     randv = randv.tousertensor()
     for v in F.asnumpy(randv):
         assert g.in_degree(v) == ig.in_degree(v)
