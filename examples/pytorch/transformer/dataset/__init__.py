@@ -22,17 +22,17 @@ class TranslationDataset(object):
         vocab_path = os.path.join(path, vocab)
         self.src = {}
         self.tgt = {}
-        with open(os.path.join(path, train + '.' + exts[0]), 'r') as f:
+        with open(os.path.join(path, train + '.' + exts[0]), 'r', encoding='utf-8') as f:
             self.src['train'] = f.readlines()
-        with open(os.path.join(path, train + '.' + exts[1]), 'r') as f:
+        with open(os.path.join(path, train + '.' + exts[1]), 'r', encoding='utf-8') as f:
             self.tgt['train'] = f.readlines()
-        with open(os.path.join(path, valid + '.' + exts[0]), 'r') as f:
+        with open(os.path.join(path, valid + '.' + exts[0]), 'r', encoding='utf-8') as f:
             self.src['valid'] = f.readlines()
-        with open(os.path.join(path, valid + '.' + exts[1]), 'r') as f:
+        with open(os.path.join(path, valid + '.' + exts[1]), 'r', encoding='utf-8') as f:
             self.tgt['valid'] = f.readlines()
-        with open(os.path.join(path, test + '.' + exts[0]), 'r') as f:
+        with open(os.path.join(path, test + '.' + exts[0]), 'r', encoding='utf-8') as f:
             self.src['test'] = f.readlines()
-        with open(os.path.join(path, test + '.' + exts[1]), 'r') as f:
+        with open(os.path.join(path, test + '.' + exts[1]), 'r', encoding='utf-8') as f:
             self.tgt['test'] = f.readlines()
 
         if not os.path.exists(vocab_path):
@@ -103,7 +103,7 @@ class TranslationDataset(object):
         '''
         src_data, tgt_data = self.src[mode], self.tgt[mode]
         n = len(src_data)
-        # make sure all devices have the same number of batches
+        # make sure all devices have the same number of batch
         n = n // ndev * ndev
 
         # XXX: is partition then shuffle equivalent to shuffle then partition?

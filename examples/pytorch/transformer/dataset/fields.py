@@ -16,7 +16,7 @@ class Vocab:
             self.vocab_lst.append(self.pad_token)
         if self.unk_token is not None:
             self.vocab_lst.append(self.unk_token)
-        with open(path, 'r') as f:
+        with open(path, 'r', encoding='utf-8') as f:
             for token in f.readlines():
                 token = token.strip()
                 self.vocab_lst.append(token)

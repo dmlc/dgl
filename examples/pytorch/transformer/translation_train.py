@@ -3,7 +3,6 @@ In current version we use multi30k as the default training and validation set.
 Multi-GPU support is required to train the model on WMT14.
 """
 from modules import *
-from parallel import *
 from loss import *
 from optims import *
 from dataset import *
@@ -20,19 +19,13 @@ def run_epoch(epoch, data_iter, dev_rank, ndev, model, loss_compute, is_train=Tr
     for i, g in enumerate(data_iter):
         #print("Dev {} start batch {}".format(dev_rank, i))
         with T.set_grad_enabled(is_train):
-            if isinstance(model, list):
-                model = model[:len(gs)]
-                output = parallel_apply(model, g)
-                tgt_y = [g.tgt_y for g in gs]
-                n_tokens = [g.n_tokens for g in gs]
+            if universal:
+                output, loss_act = model(g)
+                if is_train: loss_act.backward(retain_graph=True)
             else:
-                if universal:
-                    output, loss_act = model(g)
-                    if is_train: loss_act.backward(retain_graph=True)
-                else:
-                    output = model(g)
-                tgt_y = g.tgt_y
-                n_tokens = g.n_tokens
+                output = model(g)
+            tgt_y = g.tgt_y
+            n_tokens = g.n_tokens
             loss = loss_compute(output, tgt_y, n_tokens)
 
     if universal:
@@ -75,7 +68,7 @@ def main(dev_id, args):
     model.generator.proj.weight = model.tgt_embed.lut.weight
 
     model, criterion = model.to(device), criterion.to(device)
-    model_opt = NoamOpt(dim_model, 1, 400,
+    model_opt = NoamOpt(dim_model, 1, 4000 * 1300 / (args.batch * max(1, args.ngpu)),
                         T.optim.Adam(model.parameters(), lr=1e-3,
                                      betas=(0.9, 0.98), eps=1e-9))
 
@@ -98,12 +91,13 @@ def main(dev_id, args):
         model.train(True)
         run_epoch(epoch, train_iter, dev_rank, ndev, model,
                   loss_compute(opt=model_opt), is_train=True)
-        model.att_weight_map = None
-        model.eval()
-        run_epoch(epoch, valid_iter, dev_rank, ndev, model,
-                  loss_compute(opt=None), is_train=False)
-        end = time.time()
         if dev_rank == 0:
+            model.att_weight_map = None
+            model.eval()
+            run_epoch(epoch, valid_iter, dev_rank, 1, model,
+                      loss_compute(opt=None), is_train=False)
+            end = time.time()
+            time.sleep(1)
             print("epoch time: {}".format(end - start))
 
             """
