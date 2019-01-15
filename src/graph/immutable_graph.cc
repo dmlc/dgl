@@ -619,6 +619,9 @@ class ArrayHeap {
   std::vector<float> heap_;
 };
 
+/*
+ * Uniformly sample integers from [0, set_size) without replacement.
+ */
 static void RandomSample(size_t set_size,
                          size_t num,
                          std::vector<size_t>* out,
@@ -633,30 +636,34 @@ static void RandomSample(size_t set_size,
   }
 }
 
-static void NegateSet(const std::vector<size_t> &idxs,
-                      size_t set_size,
-                      std::vector<size_t>* out) {
-  // idxs must have been sorted.
-  auto it = idxs.begin();
+/*
+ * For a sparse array whose non-zeros are represented by nz_idxs,
+ * negate the sparse array and outputs the non-zeros in the negated array.
+ */
+static void NegateArray(const std::vector<size_t> &nz_idxs,
+                        size_t arr_size,
+                        std::vector<size_t>* out) {
+  // nz_idxs must have been sorted.
+  auto it = nz_idxs.begin();
   size_t i = 0;
-  CHECK_GT(set_size, idxs.back());
-  for (; i < set_size && it != idxs.end(); i++) {
+  CHECK_GT(arr_size, nz_idxs.back());
+  for (; i < arr_size && it != nz_idxs.end(); i++) {
     if (*it == i) {
       it++;
       continue;
     }
     out->push_back(i);
   }
-  for (; i < set_size; i++) {
+  for (; i < arr_size; i++) {
     out->push_back(i);
   }
 }
 
 /*
- * Uniform sample
+ * Uniform sample vertices from a list of vertices.
  */
 static void GetUniformSample(const dgl_id_t* val_list,
-                             const dgl_id_t* col_list,
+                             const dgl_id_t* ver_list,
                              const size_t ver_len,
                              const size_t max_num_neighbor,
                              std::vector<dgl_id_t>* out_ver,
@@ -665,7 +672,7 @@ static void GetUniformSample(const dgl_id_t* val_list,
   // Copy ver_list to output
   if (ver_len <= max_num_neighbor) {
     for (size_t i = 0; i < ver_len; ++i) {
-      out_ver->push_back(col_list[i]);
+      out_ver->push_back(ver_list[i]);
       out_edge->push_back(val_list[i]);
     }
     return;
@@ -682,7 +689,7 @@ static void GetUniformSample(const dgl_id_t* val_list,
     RandomSample(ver_len, ver_len - max_num_neighbor,
                  &negate, seed);
     std::sort(negate.begin(), negate.end());
-    NegateSet(negate, ver_len, &sorted_idxs);
+    NegateArray(negate, ver_len, &sorted_idxs);
   }
   // verify the result.
   CHECK_EQ(sorted_idxs.size(), max_num_neighbor);
@@ -690,7 +697,7 @@ static void GetUniformSample(const dgl_id_t* val_list,
     CHECK_GT(sorted_idxs[i], sorted_idxs[i - 1]);
   }
   for (auto idx : sorted_idxs) {
-    out_ver->push_back(col_list[idx]);
+    out_ver->push_back(ver_list[idx]);
     out_edge->push_back(val_list[idx]);
   }
 }
@@ -700,7 +707,7 @@ static void GetUniformSample(const dgl_id_t* val_list,
  */
 static void GetNonUniformSample(const float* probability,
                                 const dgl_id_t* val_list,
-                                const dgl_id_t* col_list,
+                                const dgl_id_t* ver_list,
                                 const size_t ver_len,
                                 const size_t max_num_neighbor,
                                 std::vector<dgl_id_t>* out_ver,
@@ -709,7 +716,7 @@ static void GetNonUniformSample(const float* probability,
   // Copy ver_list to output
   if (ver_len <= max_num_neighbor) {
     for (size_t i = 0; i < ver_len; ++i) {
-      out_ver->push_back(col_list[i]);
+      out_ver->push_back(ver_list[i]);
       out_edge->push_back(val_list[i]);
     }
     return;
@@ -718,7 +725,7 @@ static void GetNonUniformSample(const float* probability,
   std::vector<size_t> sp_index(max_num_neighbor);
   std::vector<float> sp_prob(ver_len);
   for (size_t i = 0; i < ver_len; ++i) {
-    sp_prob[i] = probability[col_list[i]];
+    sp_prob[i] = probability[ver_list[i]];
   }
   ArrayHeap arrayHeap(sp_prob);
   arrayHeap.SampleWithoutReplacement(max_num_neighbor, &sp_index, seed);
@@ -726,7 +733,7 @@ static void GetNonUniformSample(const float* probability,
   out_edge->resize(max_num_neighbor);
   for (size_t i = 0; i < max_num_neighbor; ++i) {
     size_t idx = sp_index[i];
-    out_ver->at(i) = col_list[idx];
+    out_ver->at(i) = ver_list[idx];
     out_edge->at(i) = val_list[idx];
   }
   sort(out_ver->begin(), out_ver->end());
@@ -759,12 +766,12 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
 
   // BFS traverse the graph and sample vertices
   // <vertex_id, layer_id>
-  std::unordered_set<dgl_id_t> sub_ver_mp;
+  std::unordered_set<dgl_id_t> sub_ver_map;
   std::vector<std::pair<dgl_id_t, dgl_id_t> > sub_vers;
   sub_vers.reserve(num_seeds * 10);
   // add seed vertices
   for (size_t i = 0; i < num_seeds; ++i) {
-    auto ret = sub_ver_mp.insert(seed[i]);
+    auto ret = sub_ver_map.insert(seed[i]);
     // If the vertex is inserted successfully.
     if (ret.second) {
       sub_vers.emplace_back(seed[i], 0);
@@ -831,7 +838,7 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
       // We need to add the neighbor in the hashtable here. This ensures that
       // the vertex in the queue is unique. If we see a vertex before, we don't
       // need to add it to the queue again.
-      auto ret = sub_ver_mp.insert(tmp_sampled_src_list[i]);
+      auto ret = sub_ver_map.insert(tmp_sampled_src_list[i]);
       // If the sampled neighbor is inserted to the map successfully.
       if (ret.second)
         sub_vers.emplace_back(tmp_sampled_src_list[i], cur_node_level + 1);
@@ -847,9 +854,9 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
     }
   }
 
-  // Copy sub_ver_mp to output[0]
+  // Copy sub_ver_map to output[0]
   // Copy layer
-  int64_t num_vertices = sub_ver_mp.size();
+  int64_t num_vertices = sub_ver_map.size();
   std::sort(sub_vers.begin(), sub_vers.end(),
             [](const std::pair<dgl_id_t, dgl_id_t> &a1, const std::pair<dgl_id_t, dgl_id_t> &a2) {
     return a1.first < a2.first;
@@ -875,7 +882,7 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   // Copy sub_probability
   float *sub_prob = static_cast<float *>(subg.sample_prob->data);
   if (probability != nullptr) {
-    for (size_t i = 0; i < sub_ver_mp.size(); ++i) {
+    for (size_t i = 0; i < sub_ver_map.size(); ++i) {
       dgl_id_t idx = out[i];
       sub_prob[i] = probability[idx];
     }
@@ -899,7 +906,7 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   size_t idx_with_neigh = 0;
   for (size_t i = 0; i < num_vertices; i++) {
     dgl_id_t dst_id = *(out + i);
-    // If a vertex is in sub_ver_mp but not in neigh_pos, this vertex must not
+    // If a vertex is in sub_ver_map but not in neigh_pos, this vertex must not
     // have edges.
     size_t edge_size = 0;
     if (idx_with_neigh < neigh_pos.size() && dst_id == neigh_pos[idx_with_neigh].first) {
