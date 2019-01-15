@@ -754,9 +754,7 @@ class GraphIndex(object):
                 "The input matrix has to be a SciPy sparse matrix."
         if not self.is_readonly():
             self.clear()
-        if adj.shape[0] != adj.shape[1]:
-            raise ValueError("we don't support a rectangle matrix")
-        num_nodes = adj.shape[0]
+        num_nodes = max(adj.shape[0], adj.shape[1])
         adj_coo = adj.tocoo()
         src = utils.toindex(adj_coo.row)
         dst = utils.toindex(adj_coo.col)
