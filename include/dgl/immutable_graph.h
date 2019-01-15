@@ -444,7 +444,7 @@ class ImmutableGraph: public GraphInterface {
 
   /*!
    * \brief Sample a subgraph from the seed vertices with neighbor sampling.
-   * The neighbors are sampled with a uniformly distribution.
+   * The neighbors are sampled with a uniform distribution.
    * \return a subgraph
    */
   SampledSubgraph NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
