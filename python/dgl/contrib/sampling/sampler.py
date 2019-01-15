@@ -199,9 +199,6 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
                     return_seed_id=False, prefetch=False):
     '''Create a sampler that samples neighborhood.
 
-    .. note:: This method currently only supports MXNet backend. Set
-        "DGLBACKEND" environment variable to "mxnet".
-
     This creates a subgraph data loader that samples subgraphs from the input graph
     with neighbor sampling. This sampling method is implemented in C and can perform
     sampling very efficiently.
