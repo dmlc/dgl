@@ -439,7 +439,7 @@ void CAPI_NeighborUniformSample(DGLArgs args, DGLRetValue* rv) {
   int num_valid_seeds = args[num_seeds + 4];
   const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
   const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
-  assert(num_valid_seeds <= num_seeds);
+  CHECK(num_valid_seeds <= num_seeds);
   std::vector<SampledSubgraph> subgs(seeds.size());
 #pragma omp parallel for
   for (int i = 0; i < num_valid_seeds; i++) {

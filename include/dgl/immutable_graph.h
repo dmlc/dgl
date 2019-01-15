@@ -193,7 +193,7 @@ class ImmutableGraph: public GraphInterface {
       auto pred = this->in_csr_->GetIndexRef(dst);
       return binary_search(pred.first, pred.second, src);
     } else {
-      assert(this->out_csr_);
+      CHECK(this->out_csr_) << "one of the CSRs must exist";
       auto succ = this->out_csr_->GetIndexRef(src);
       return binary_search(succ.first, succ.second, dst);
     }
@@ -473,7 +473,7 @@ class ImmutableGraph: public GraphInterface {
     if (in_csr_) {
       return in_csr_;
     } else {
-      assert(out_csr_ != nullptr);
+      CHECK(out_csr_ != nullptr) << "one of the CSRs must exist";
       const_cast<ImmutableGraph *>(this)->in_csr_ = out_csr_->Transpose();
       return in_csr_;
     }
@@ -482,7 +482,7 @@ class ImmutableGraph: public GraphInterface {
     if (out_csr_) {
       return out_csr_;
     } else {
-      assert(in_csr_ != nullptr);
+      CHECK(in_csr_ != nullptr) << "one of the CSRs must exist";
       const_cast<ImmutableGraph *>(this)->out_csr_ = in_csr_->Transpose();
       return out_csr_;
     }

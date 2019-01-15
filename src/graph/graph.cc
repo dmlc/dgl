@@ -17,8 +17,8 @@ Graph::Graph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_node
     bool multigraph): is_multigraph_(multigraph) {
   this->AddVertices(num_nodes);
   num_edges_ = src_ids->shape[0];
-  assert(num_edges_ == dst_ids->shape[0]);
-  assert(num_edges_ == edge_ids->shape[0]);
+  CHECK(num_edges_ == dst_ids->shape[0]) << "vectors in COO must have the same length";
+  CHECK(num_edges_ == edge_ids->shape[0]) << "vectors in COO must have the same length";
   const dgl_id_t *src_data = static_cast<dgl_id_t*>(src_ids->data);
   const dgl_id_t *dst_data = static_cast<dgl_id_t*>(dst_ids->data);
   const dgl_id_t *edge_data = static_cast<dgl_id_t*>(edge_ids->data);

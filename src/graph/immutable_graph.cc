@@ -186,7 +186,7 @@ std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::VertexSubgraph
 
 ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::FromEdges(std::vector<Edge> *edges,
                                                         int sort_on, int64_t num_nodes) {
-  assert(sort_on == 0 || sort_on == 1);
+  CHECK(sort_on == 0 || sort_on == 1) << "we must sort on the first or the second vector";
   int other_end = sort_on == 1 ? 0 : 1;
   // TODO(zhengda) we should sort in parallel.
   struct compare {
@@ -209,17 +209,17 @@ ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::FromEdges(std::vector<Edge> *edges
   t->edge_ids.resize(edges->size());
   for (size_t i = 0; i < edges->size(); i++) {
     t->indices[i] = edges->at(i).end_points[other_end];
-    assert(t->indices[i] < num_nodes);
+    CHECK(t->indices[i] < num_nodes);
     t->edge_ids[i] = edges->at(i).edge_id;
     dgl_id_t vid = edges->at(i).end_points[sort_on];
-    assert(vid < num_nodes);
+    CHECK(vid < num_nodes);
     while (vid > 0 && t->indptr.size() <= static_cast<size_t>(vid))
       t->indptr.push_back(i);
-    assert(t->indptr.size() == vid + 1);
+    CHECK(t->indptr.size() == vid + 1);
   }
   while (t->indptr.size() < num_nodes + 1)
     t->indptr.push_back(edges->size());
-  assert(t->indptr.size() == num_nodes + 1);
+  CHECK(t->indptr.size() == num_nodes + 1);
   return t;
 }
 
@@ -242,8 +242,8 @@ ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::Transpose() const {
 ImmutableGraph::ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
                                bool multigraph) : is_multigraph_(multigraph) {
   int64_t len = src_ids->shape[0];
-  assert(len == dst_ids->shape[0]);
-  assert(len == edge_ids->shape[0]);
+  CHECK(len == dst_ids->shape[0]);
+  CHECK(len == edge_ids->shape[0]);
   const dgl_id_t *src_data = static_cast<dgl_id_t*>(src_ids->data);
   const dgl_id_t *dst_data = static_cast<dgl_id_t*>(dst_ids->data);
   const dgl_id_t *edge_data = static_cast<dgl_id_t*>(edge_ids->data);
@@ -330,7 +330,7 @@ IdArray ImmutableGraph::Successors(dgl_id_t vid, uint64_t radius) const {
 
 std::pair<const dgl_id_t *, const dgl_id_t *> ImmutableGraph::GetInEdgeIdRef(dgl_id_t src,
                                                                          dgl_id_t dst) const {
-  assert(this->in_csr_);
+  CHECK(this->in_csr_);
   auto pred = this->in_csr_->GetIndexRef(dst);
   auto it = std::lower_bound(pred.first, pred.second, src);
   // If there doesn't exist edges between the two nodes.
@@ -338,7 +338,7 @@ std::pair<const dgl_id_t *, const dgl_id_t *> ImmutableGraph::GetInEdgeIdRef(dgl
     return std::pair<const dgl_id_t *, const dgl_id_t *>(nullptr, nullptr);
 
   size_t off = it - in_csr_->indices.data();
-  assert(off < in_csr_->indices.size());
+  CHECK(off < in_csr_->indices.size());
   const dgl_id_t *start = &in_csr_->edge_ids[off];
   int64_t len = 0;
   // There are edges between the source and the destination.
@@ -348,7 +348,7 @@ std::pair<const dgl_id_t *, const dgl_id_t *> ImmutableGraph::GetInEdgeIdRef(dgl
 
 std::pair<const dgl_id_t *, const dgl_id_t *> ImmutableGraph::GetOutEdgeIdRef(dgl_id_t src,
                                                                               dgl_id_t dst) const {
-  assert(this->out_csr_);
+  CHECK(this->out_csr_);
   auto succ = this->out_csr_->GetIndexRef(src);
   auto it = std::lower_bound(succ.first, succ.second, dst);
   // If there doesn't exist edges between the two nodes.
@@ -356,7 +356,7 @@ std::pair<const dgl_id_t *, const dgl_id_t *> ImmutableGraph::GetOutEdgeIdRef(dg
     return std::pair<const dgl_id_t *, const dgl_id_t *>(nullptr, nullptr);
 
   size_t off = it - out_csr_->indices.data();
-  assert(off < out_csr_->indices.size());
+  CHECK(off < out_csr_->indices.size());
   const dgl_id_t *start = &out_csr_->edge_ids[off];
   int64_t len = 0;
   // There are edges between the source and the destination.
@@ -463,7 +463,7 @@ Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
     ret = out_csr_->VertexSubgraph(vids);
     subg.graph = GraphPtr(new ImmutableGraph(nullptr, ret.first, IsMultigraph()));
   } else {
-    assert(in_csr_);
+    CHECK(in_csr_);
     ret = in_csr_->VertexSubgraph(vids);
     // When we generate a subgraph, it may be used by only accessing in-edges or out-edges.
     // We don't need to generate both.
@@ -942,7 +942,7 @@ void CompactSubgraph(ImmutableGraph::CSR *subg,
                      const std::unordered_map<dgl_id_t, dgl_id_t> &id_map) {
   for (size_t i = 0; i < subg->indices.size(); i++) {
     auto it = id_map.find(subg->indices[i]);
-    assert(it != id_map.end());
+    CHECK(it != id_map.end());
     subg->indices[i] = it->second;
   }
 }
