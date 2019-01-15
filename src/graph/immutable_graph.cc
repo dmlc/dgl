@@ -107,26 +107,9 @@ class Bitmap {
  */
 class HashTableChecker {
   std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
+  // This bitmap is used as a bloom filter to remove some lookups.
+  // Hashtable is very slow. Using bloom filter can significantly speed up lookups.
   Bitmap map;
-
- public:
-  HashTableChecker(const dgl_id_t *vid_data, int64_t len): map(vid_data, len) {
-    oldv2newv.reserve(len);
-    for (int64_t i = 0; i < len; ++i) {
-      oldv2newv[vid_data[i]] = i;
-    }
-  }
-
-  void CollectOnRow(const dgl_id_t col_idx[], const dgl_id_t eids[], size_t row_len,
-                    std::vector<dgl_id_t> *new_col_idx,
-                    std::vector<dgl_id_t> *orig_eids) {
-    // TODO(zhengda) I need to make sure the column index in each row is sorted.
-    for (size_t j = 0; j < row_len; ++j) {
-      const dgl_id_t oldsucc = col_idx[j];
-      const dgl_id_t eid = eids[j];
-      Collect(oldsucc, eid, new_col_idx, orig_eids);
-    }
-  }
 
   void Collect(const dgl_id_t old_id, const dgl_id_t old_eid,
                std::vector<dgl_id_t> *col_idx,
@@ -140,6 +123,25 @@ class HashTableChecker {
       col_idx->push_back(new_id);
       if (orig_eids)
         orig_eids->push_back(old_eid);
+    }
+  }
+
+ public:
+  HashTableChecker(const dgl_id_t *vid_data, int64_t len): map(vid_data, len) {
+    oldv2newv.reserve(len);
+    for (int64_t i = 0; i < len; ++i) {
+      oldv2newv[vid_data[i]] = i;
+    }
+  }
+
+  void CollectOnRow(const dgl_id_t neigh_idx[], const dgl_id_t eids[], size_t row_len,
+                    std::vector<dgl_id_t> *new_neigh_idx,
+                    std::vector<dgl_id_t> *orig_eids) {
+    // TODO(zhengda) I need to make sure the column index in each row is sorted.
+    for (size_t j = 0; j < row_len; ++j) {
+      const dgl_id_t oldsucc = neigh_idx[j];
+      const dgl_id_t eid = eids[j];
+      Collect(oldsucc, eid, new_neigh_idx, orig_eids);
     }
   }
 };
@@ -508,6 +510,30 @@ ImmutableGraph::CSRArray ImmutableGraph::GetOutCSRArray() const {
   std::copy(out_csr->indices.begin(), out_csr->indices.end(), indices_data);
   std::copy(out_csr->edge_ids.begin(), out_csr->edge_ids.end(), eid_data);
   return CSRArray{indptr, indices, eids};
+}
+
+std::vector<IdArray> ImmutableGraph::GetAdj(bool transpose, const std::string &fmt) const {
+  if (fmt == "csr") {
+    CSRArray arrs = transpose ? this->GetOutCSRArray() : this->GetInCSRArray();
+    return std::vector<IdArray>{arrs.indptr, arrs.indices, arrs.id};
+  } else if (fmt == "coo") {
+    int64_t num_edges = this->NumEdges();
+    IdArray idx = IdArray::Empty({2 * num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    IdArray eid = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    CSR::Ptr csr = transpose ? GetOutCSR() : GetInCSR();
+    int64_t *idx_data = static_cast<int64_t*>(idx->data);
+    dgl_id_t *eid_data = static_cast<dgl_id_t*>(eid->data);
+    for (size_t i = 0; i < csr->indptr.size() - 1; i++) {
+      for (int64_t j = csr->indptr[i]; j < csr->indptr[i + 1]; j++)
+        idx_data[j] = i;
+    }
+    std::copy(csr->indices.begin(), csr->indices.end(), idx_data + num_edges);
+    std::copy(csr->edge_ids.begin(), csr->edge_ids.end(), eid_data);
+    return std::vector<IdArray>{idx, eid};
+  } else {
+    LOG(FATAL) << "unsupported adjacency matrix format";
+    return std::vector<IdArray>();
+  }
 }
 
 ////////////////////////////// Graph Sampling ///////////////////////////////

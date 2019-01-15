@@ -459,11 +459,7 @@ class ImmutableGraph: public GraphInterface {
    * \param fmt the format of the returned adjacency matrix.
    * \return a vector of three IdArray.
    */
-  virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const {
-    assert(fmt == "csr");
-    CSRArray arrs = transpose ? this->GetOutCSRArray() : this->GetInCSRArray();
-    return std::vector<IdArray>{arrs.indptr, arrs.indices, arrs.id};
-  }
+  virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const;
 
  protected:
   std::pair<const dgl_id_t *, const dgl_id_t *> GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
