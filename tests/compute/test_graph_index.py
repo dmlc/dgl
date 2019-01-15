@@ -27,8 +27,8 @@ def generate_rand_graph(n):
     return g, ig
 
 def check_graph_equal(g1, g2):
-    adj1 = g1.adjacency_matrix(False, F.cpu())[0] != 0
-    adj2 = g2.adjacency_matrix(False, F.cpu())[0] != 0
+    adj1 = g1.adjacency_matrix(False, F.cpu())[0]
+    adj2 = g2.adjacency_matrix(False, F.cpu())[0]
     assert F.allclose(adj1, adj2)
 
 def test_graph_gen():
