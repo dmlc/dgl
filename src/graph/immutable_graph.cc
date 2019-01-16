@@ -207,22 +207,13 @@ ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::FromEdges(std::vector<Edge> *edges
   CHECK(sort_on == 0 || sort_on == 1) << "we must sort on the first or the second vector";
   int other_end = sort_on == 1 ? 0 : 1;
   // TODO(zhengda) we should sort in parallel.
-  struct compare {
-    int sort_on;
-    int other_end;
-    compare(int sort_on, int other_end) {
-      this->sort_on = sort_on;
-      this->other_end = other_end;
+  std::sort(edges->begin(), edges->end(), [sort_on, other_end](const Edge &e1, const Edge &e2) {
+    if (e1.end_points[sort_on] == e2.end_points[sort_on]) {
+      return e1.end_points[other_end] < e2.end_points[other_end];
+    } else {
+      return e1.end_points[sort_on] < e2.end_points[sort_on];
     }
-    bool operator()(const Edge &e1, const Edge &e2) {
-      if (e1.end_points[sort_on] == e2.end_points[sort_on]) {
-        return e1.end_points[other_end] < e2.end_points[other_end];
-      } else {
-        return e1.end_points[sort_on] < e2.end_points[sort_on];
-      }
-    }
-  };
-  std::sort(edges->begin(), edges->end(), compare(sort_on, other_end));
+  });
   auto t = std::make_shared<CSR>(0, 0);
   t->indices.resize(edges->size());
   t->edge_ids.resize(edges->size());
