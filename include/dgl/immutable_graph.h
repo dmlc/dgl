@@ -63,10 +63,10 @@ class ImmutableGraph: public GraphInterface {
     EdgeArray GetEdges(dgl_id_t vid) const;
     EdgeArray GetEdges(IdArray vids) const;
     /* \brief this returns the start and end position of the column indices corresponding v. */
-    std::pair<const dgl_id_t *, const dgl_id_t *> GetIndexRef(dgl_id_t v) const {
+    DGLIdIters GetIndexRef(dgl_id_t v) const {
       const int64_t start = indptr[v];
       const int64_t end = indptr[v + 1];
-      return std::pair<const dgl_id_t *, const dgl_id_t *>(&indices[start], &indices[end]);
+      return DGLIdIters(indices.begin() + start, indices.begin() + end);
     }
     /*
      * Read all edges and store them in the vector.
@@ -474,8 +474,8 @@ class ImmutableGraph: public GraphInterface {
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const;
 
  protected:
-  std::pair<const dgl_id_t *, const dgl_id_t *> GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
-  std::pair<const dgl_id_t *, const dgl_id_t *> GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
+  DGLIdIters GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
+  DGLIdIters GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
 
   /*
    * The immutable graph may only contain one of the CSRs (e.g., the sampled subgraphs).

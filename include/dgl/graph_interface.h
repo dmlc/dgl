@@ -43,6 +43,8 @@ struct SampledSubgraph;
 class DGLIdIters {
   std::vector<dgl_id_t>::const_iterator begin_, end_;
  public:
+  DGLIdIters() {
+  }
   DGLIdIters(std::vector<dgl_id_t>::const_iterator begin,
              std::vector<dgl_id_t>::const_iterator end) {
     this->begin_ = begin;

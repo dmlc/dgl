@@ -296,11 +296,11 @@ bool ImmutableGraph::HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
   if (!HasVertex(src) || !HasVertex(dst)) return false;
   if (this->in_csr_) {
     auto pred = this->in_csr_->GetIndexRef(dst);
-    return binary_search(pred.first, pred.second, src);
+    return dgl::binary_search(pred.begin(), pred.end(), src);
   } else {
     CHECK(this->out_csr_) << "one of the CSRs must exist";
     auto succ = this->out_csr_->GetIndexRef(src);
-    return binary_search(succ.first, succ.second, dst);
+    return dgl::binary_search(succ.begin(), succ.end(), dst);
   }
 }
 
@@ -339,11 +339,11 @@ IdArray ImmutableGraph::Predecessors(dgl_id_t vid, uint64_t radius) const {
   CHECK(radius >= 1) << "invalid radius: " << radius;
 
   auto pred = this->GetInCSR()->GetIndexRef(vid);
-  const int64_t len = pred.second - pred.first;
+  const int64_t len = pred.size();
   IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
 
-  std::copy(pred.first, pred.second, rst_data);
+  std::copy(pred.begin(), pred.end(), rst_data);
   return rst;
 }
 
@@ -352,66 +352,59 @@ IdArray ImmutableGraph::Successors(dgl_id_t vid, uint64_t radius) const {
   CHECK(radius >= 1) << "invalid radius: " << radius;
 
   auto succ = this->GetOutCSR()->GetIndexRef(vid);
-  const int64_t len = succ.second - succ.first;
+  const int64_t len = succ.size();
   IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
 
-  std::copy(succ.first, succ.second, rst_data);
+  std::copy(succ.begin(), succ.end(), rst_data);
   return rst;
 }
 
-std::pair<const dgl_id_t *, const dgl_id_t *> ImmutableGraph::GetInEdgeIdRef(dgl_id_t src,
-                                                                         dgl_id_t dst) const {
+DGLIdIters ImmutableGraph::GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const {
   CHECK(this->in_csr_);
   auto pred = this->in_csr_->GetIndexRef(dst);
-  auto it = std::lower_bound(pred.first, pred.second, src);
+  auto it = std::lower_bound(pred.begin(), pred.end(), src);
   // If there doesn't exist edges between the two nodes.
-  if (it == pred.second || *it != src) {
-    return std::pair<const dgl_id_t *, const dgl_id_t *>(nullptr, nullptr);
+  if (it == pred.end() || *it != src) {
+    return DGLIdIters();
   }
 
-  size_t off = it - in_csr_->indices.data();
+  size_t off = it - in_csr_->indices.begin();
   CHECK(off < in_csr_->indices.size());
-  const dgl_id_t *start = &in_csr_->edge_ids[off];
+  auto start = in_csr_->edge_ids.begin() + off;
   int64_t len = 0;
   // There are edges between the source and the destination.
-  for (auto it1 = it; it1 != pred.second && *it1 == src; it1++, len++) {}
-  return std::pair<const dgl_id_t *, const dgl_id_t *>(start, start + len);
+  for (auto it1 = it; it1 != pred.end() && *it1 == src; it1++, len++) {}
+  return DGLIdIters(start, start + len);
 }
 
-std::pair<const dgl_id_t *, const dgl_id_t *> ImmutableGraph::GetOutEdgeIdRef(dgl_id_t src,
-                                                                              dgl_id_t dst) const {
+DGLIdIters ImmutableGraph::GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const {
   CHECK(this->out_csr_);
   auto succ = this->out_csr_->GetIndexRef(src);
-  auto it = std::lower_bound(succ.first, succ.second, dst);
+  auto it = std::lower_bound(succ.begin(), succ.end(), dst);
   // If there doesn't exist edges between the two nodes.
-  if (it == succ.second || *it != dst) {
-    return std::pair<const dgl_id_t *, const dgl_id_t *>(nullptr, nullptr);
+  if (it == succ.end() || *it != dst) {
+    return DGLIdIters();
   }
 
-  size_t off = it - out_csr_->indices.data();
+  size_t off = it - out_csr_->indices.begin();
   CHECK(off < out_csr_->indices.size());
-  const dgl_id_t *start = &out_csr_->edge_ids[off];
+  auto start = out_csr_->edge_ids.begin() + off;
   int64_t len = 0;
   // There are edges between the source and the destination.
-  for (auto it1 = it; it1 != succ.second && *it1 == dst; it1++, len++) {}
-  return std::pair<const dgl_id_t *, const dgl_id_t *>(start, start + len);
+  for (auto it1 = it; it1 != succ.end() && *it1 == dst; it1++, len++) {}
+  return DGLIdIters(start, start + len);
 }
 
 IdArray ImmutableGraph::EdgeId(dgl_id_t src, dgl_id_t dst) const {
   CHECK(HasVertex(src) && HasVertex(dst)) << "invalid edge: " << src << " -> " << dst;
 
-  std::pair<const dgl_id_t *, const dgl_id_t *> edge_ids;
-  if (in_csr_) {
-    edge_ids = GetInEdgeIdRef(src, dst);
-  } else {
-    edge_ids = GetOutEdgeIdRef(src, dst);
-  }
-  int64_t len = edge_ids.second - edge_ids.first;
+  auto edge_ids = in_csr_ ? GetInEdgeIdRef(src, dst) : GetOutEdgeIdRef(src, dst);
+  int64_t len = edge_ids.size();
   IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
   if (len > 0) {
-    std::copy(edge_ids.first, edge_ids.second, rst_data);
+    std::copy(edge_ids.begin(), edge_ids.end(), rst_data);
   }
 
   return rst;
@@ -442,7 +435,7 @@ ImmutableGraph::EdgeArray ImmutableGraph::EdgeIds(IdArray src_ids, IdArray dst_i
     for (size_t k = 0; k < edges.size(); k++) {
         src.push_back(src_id);
         dst.push_back(dst_id);
-        eid.push_back(edges.first[k]);
+        eid.push_back(edges[k]);
     }
   }
 
