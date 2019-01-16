@@ -175,8 +175,8 @@ std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::VertexSubgraph
 
   // Collect the non-zero entries in from the original graph.
   std::vector<dgl_id_t> orig_edge_ids;
-  orig_edge_ids.reserve(len * 50);
-  auto sub_csr = std::make_shared<CSR>(len, len * 50);
+  orig_edge_ids.reserve(len);
+  auto sub_csr = std::make_shared<CSR>(len, len);
   sub_csr->indptr[0] = 0;
   for (int64_t i = 0; i < len; ++i) {
     const dgl_id_t oldvid = vid_data[i];
