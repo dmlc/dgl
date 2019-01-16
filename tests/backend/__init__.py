@@ -26,6 +26,7 @@ _tensor = tensor
 _arange = arange
 _full = full
 _full_1d = full_1d
+_softmax = softmax
 _default_context_str = os.getenv('DGLTESTDEV', 'cpu')
 _context_dict = {
         'cpu': cpu(),
@@ -56,3 +57,6 @@ def full(shape, fill_value, dtype, ctx=_default_context):
 
 def full_1d(length, fill_value, dtype, ctx=_default_context):
     return _full_1d(length, fill_value, dtype, ctx)
+
+def softmax(x, dim):
+    return _softmax(x, dim)
