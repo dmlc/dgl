@@ -102,11 +102,7 @@ class GraphIndex(object):
         """
         u_array = u.todgltensor()
         v_array = v.todgltensor()
-        try:
-            _CAPI_DGLGraphAddEdges(self._handle, u_array, v_array)
-        except Exception as e:
-            print(e)
-            pass
+        _CAPI_DGLGraphAddEdges(self._handle, u_array, v_array)
         self.clear_cache()
 
     def clear(self):
