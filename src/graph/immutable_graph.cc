@@ -433,14 +433,8 @@ ImmutableGraph::EdgeArray ImmutableGraph::EdgeIds(IdArray src_ids, IdArray dst_i
     CHECK(HasVertex(src_id) && HasVertex(dst_id)) <<
         "invalid edge: " << src_id << " -> " << dst_id;
 
-    std::pair<const dgl_id_t *, const dgl_id_t *> edges;
-    if (this->in_csr_)
-      edges = this->GetInEdgeIdRef(src_id, dst_id);
-    else
-      edges = this->GetOutEdgeIdRef(src_id, dst_id);
-
-    size_t len = edges.second - edges.first;
-    for (size_t k = 0; k < len; k++) {
+    auto edges = this->in_csr_ ? GetInEdgeIdRef(src_id, dst_id) : GetOutEdgeIdRef(src_id, dst_id);
+    for (size_t k = 0; k < edges.size(); k++) {
         src.push_back(src_id);
         dst.push_back(dst_id);
         eid.push_back(edges.first[k]);
