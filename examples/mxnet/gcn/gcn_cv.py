@@ -12,21 +12,15 @@ from functools import partial
 
 
 def sample_subgraph(g, seed_nodes, num_hops, num_neighbors):
+    induced_nodes = []
     seeds = seed_nodes
-    subgraph = None
-    # fully expand a subgraph from the seeds
-    for subg, aux in dgl.contrib.sampling.NeighborSampler(g, 1000000, 1000000,
-                                                          neighbor_type='in', num_hops=num_hops,
-                                                          seed_nodes=np.array(seeds)):
-        subgraph = subg
-
-    parent_uv_edges_per_hop = []
     nodes_per_hop = [seeds]
-    # neighbor sampling
+    parent_uv_edges_per_hop = []
     for _ in range(num_hops):
         for subg, aux in dgl.contrib.sampling.NeighborSampler(g, 1000000, num_neighbors,
                                                               neighbor_type='in',
-                                                              seed_nodes=np.array(seeds)):
+                                                              seed_nodes=np.array(seeds),
+                                                              return_seed_id=True):
             subg_src, subg_dst = subg.edges()
             parent_nid = subg.parent_nid
             src = parent_nid[subg_src]
@@ -34,11 +28,12 @@ def sample_subgraph(g, seed_nodes, num_hops, num_neighbors):
             parent_uv_edges_per_hop.append((src.asnumpy(), dst.asnumpy()))
             seeds = list(np.unique(src.asnumpy()))
             nodes_per_hop.append(seeds)
+            induced_nodes.extend(list(parent_nid.asnumpy()))
 
+    subgraph = g.subgraph(list(np.unique(np.array(induced_nodes))))
     subg_uv_edges_per_hop = [(subgraph.map_to_subgraph_nid(src).asnumpy(),
                               subgraph.map_to_subgraph_nid(dst).asnumpy())
                              for src, dst in parent_uv_edges_per_hop]
-
     return subgraph, subg_uv_edges_per_hop, nodes_per_hop
 
 
@@ -92,9 +87,6 @@ class GCNLayer(gluon.Block):
                             partial(gcn_reduce, ind=self.ind, test=True),
                             self.node_update)
         else:
-            # aggregate history
-            subg.update_all(fn.copy_src(src='h_%d' % self.ind, out='m'),
-                            fn.sum(msg='m', out='agg_h_%d' % self.ind))
             # control variate
             subg.send_and_recv(subg_edges, partial(gcn_msg, ind=self.ind),
                                partial(gcn_reduce, ind=self.ind),
@@ -137,15 +129,24 @@ class GCN(gluon.Block):
         return h, new_history
 
 
+def update_reduce(node, ind):
+    accum = mx.nd.sum(node.mailbox['m'], 1) + node.data['agg_h_%d' % ind]
+    return {'agg_h_%d' % ind: accum}
+
+
 def update_history(g, n_layers, new_history, nodes_per_hop):
     for i in range(n_layers):
         indexes = mx.nd.array(nodes_per_hop[n_layers-i]).astype('int64')
+        hu = {'h_%d' % (i+1) : new_history[i] - g.ndata['h_%d' % (i+1)][indexes]}
+        g.set_n_repr(hu, indexes, inplace=True)
+        g.push(indexes, fn.copy_src(src='h_%d' % (i+1), out='m'),
+               partial(update_reduce, ind=i+1), inplace=True)
         hu = {'h_%d' % (i+1) : new_history[i]}
         g.set_n_repr(hu, indexes, inplace=True)
 
 
-def evaluate(model, g, num_hops, labels, mask, nodes_per_hop):
-    pred, _ = model(g, [None for i in range(num_hops)], nodes_per_hop)
+def evaluate(model, g, num_hops, labels, mask):
+    pred, _ = model(g, [None for i in range(num_hops)], [None for i in range(num_hops)])
     pred = pred.argmax(axis=1)
     accuracy = ((pred == labels) * mask).sum() / mask.sum().asscalar()
     acc = accuracy.asscalar()
@@ -209,7 +210,7 @@ def main(args):
     g.ndata['deg_norm'] = mx.nd.expand_dims(1./g.in_degrees().astype('float32'), 1)
     g.ndata['in'] = features
 
-    num_data = len(train_mask.asnumpy())
+    num_data = len(train_mask)
     full_idx = np.arange(0, num_data)
     train_idx = full_idx[train_mask.asnumpy() == 1]
 
@@ -220,6 +221,7 @@ def main(args):
 
     for i in range(n_layers):
         g.ndata['h_%d' % (i+1)] = mx.nd.zeros((features.shape[0], n_hidden))
+        g.ndata['agg_h_%d' % (i+1)] = mx.nd.zeros((features.shape[0], n_hidden))
 
     model = GCN(in_feats,
                 n_hidden,
@@ -244,22 +246,23 @@ def main(args):
             t0 = time.time()
 
         subg, subg_edges_per_hop, nodes_per_hop = sample_subgraph(g, seed_nodes, num_hops, num_neighbors)
-        subg_train_mask = subg.map_to_subgraph_nid(train_idx)
+        subg_train_idx = subg.map_to_subgraph_nid(train_idx).asnumpy()
         subg.copy_from_parent()
         # forward
-        smask = np.zeros((len(subg.parent_nid),))
-        smask[subg_train_mask.asnumpy()] = 1
+        subg_train_mask = np.zeros((len(subg.parent_nid),))
+        subg_train_mask[subg_train_idx] = 1
+        subg_train_mask = mx.nd.array(subg_train_mask)
 
         with mx.autograd.record():
             pred, uh = model(subg, subg_edges_per_hop, nodes_per_hop)
-            loss = loss_fcn(pred, labels[subg.parent_nid], mx.nd.expand_dims(mx.nd.array(smask), 1))
+            loss = loss_fcn(pred, labels[subg.parent_nid], mx.nd.expand_dims(subg_train_mask, 1))
             loss = loss.sum() / n_train_samples
 
         #print(loss.asnumpy())
         loss.backward()
         trainer.step(batch_size=1)
         update_history(g, n_layers, uh, nodes_per_hop)
-        test_acc_list.append(evaluate(model, g, num_hops, labels, test_mask, nodes_per_hop))
+        test_acc_list.append(evaluate(model, g, num_hops, labels, test_mask))
 
 
 if __name__ == '__main__':
