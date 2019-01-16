@@ -386,13 +386,17 @@ class GraphIndex(object):
         return src, dst, eid
 
     @utils.cached_member(cache='_cache', prefix='edges')
-    def edges(self, return_sorted=False):
+    def edges(self, order=None):
         """Return all the edges
 
         Parameters
         ----------
-        return_sorted : bool
-            True if the returned edges are sorted by their src and dst ids.
+        order : string
+            The order of the returned edges. Currently support:
+
+            - 'srcdst' : sorted by their src and dst ids.
+            - 'eid'    : sorted by edge Ids.
+            - None     : the arbitrary order.
 
         Returns
         -------
@@ -403,9 +407,9 @@ class GraphIndex(object):
         utils.Index
             The edge ids.
         """
-        key = 'edges_s%d' % return_sorted
+        key = 'edges_s%s' % order
         if key not in self._cache:
-            edge_array = _CAPI_DGLGraphEdges(self._handle, return_sorted)
+            edge_array = _CAPI_DGLGraphEdges(self._handle, order)
             src = utils.toindex(edge_array(0))
             dst = utils.toindex(edge_array(1))
             eid = utils.toindex(edge_array(2))
@@ -614,7 +618,7 @@ class GraphIndex(object):
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
-        src, dst, eid = self.edges(False)
+        src, dst, eid = self.edges()
         src = src.tousertensor(ctx)  # the index of the ctx will be cached
         dst = dst.tousertensor(ctx)  # the index of the ctx will be cached
         eid = eid.tousertensor(ctx)  # the index of the ctx will be cached

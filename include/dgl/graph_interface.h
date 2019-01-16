@@ -219,12 +219,13 @@ class GraphInterface {
 
   /*!
    * \brief Get all the edges in the graph.
-   * \note If sorted is true, the returned edges list is sorted by their src and
-   *       dst ids. Otherwise, they are in their edge id order.
-   * \param sorted Whether the returned edge list is sorted by their src and dst ids
+   * \note If order is "srcdst", the returned edges list is sorted by their src and
+   *       dst ids. If order is "eid", they are in their edge id order.
+   *       Otherwise, in the arbitrary order.
+   * \param order The order of the returned edge list.
    * \return the id arrays of the two endpoints of the edges.
    */
-  virtual EdgeArray Edges(bool sorted = false) const = 0;
+  virtual EdgeArray Edges(const std::string &order = "") const = 0;
 
   /*!
    * \brief Get the in degree of the given vertex.

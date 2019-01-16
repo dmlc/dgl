@@ -68,6 +68,10 @@ class ImmutableGraph: public GraphInterface {
       const int64_t end = indptr[v + 1];
       return std::pair<const dgl_id_t *, const dgl_id_t *>(&indices[start], &indices[end]);
     }
+    /*
+     * Read all edges and store them in the vector.
+     */
+    void ReadAllEdges(std::vector<Edge> *edges) const;
     CSR::Ptr Transpose() const;
     std::pair<CSR::Ptr, IdArray> VertexSubgraph(IdArray vids) const;
     /*
@@ -313,7 +317,7 @@ class ImmutableGraph: public GraphInterface {
    * \param sorted Whether the returned edge list is sorted by their src and dst ids
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray Edges(bool sorted = false) const;
+  EdgeArray Edges(const std::string &order = "") const;
 
   /*!
    * \brief Get the in degree of the given vertex.

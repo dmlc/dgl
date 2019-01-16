@@ -4,7 +4,7 @@
  * \brief DGL immutable graph index implementation
  */
 
-#include <stdlib.h>
+#include <cstdlib>
 #include <dgl/immutable_graph.h>
 
 #ifdef _MSC_VER
@@ -235,8 +235,8 @@ ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::FromEdges(std::vector<Edge> *edges
   return t;
 }
 
-ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::Transpose() const {
-  std::vector<Edge> edges(NumEdges());
+void ImmutableGraph::CSR::ReadAllEdges(std::vector<Edge> *edges) const {
+  edges->resize(NumEdges());
   for (size_t i = 0; i < NumVertices(); i++) {
     const dgl_id_t *indices_begin = &indices[indptr[i]];
     const dgl_id_t *eid_begin = &edge_ids[indptr[i]];
@@ -245,9 +245,14 @@ ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::Transpose() const {
       e.end_points[0] = i;
       e.end_points[1] = indices_begin[j];
       e.edge_id = eid_begin[j];
-      edges[indptr[i] + j] = e;
+      (*edges)[indptr[i] + j] = e;
     }
   }
+}
+
+ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::Transpose() const {
+  std::vector<Edge> edges;
+  ReadAllEdges(&edges);
   return FromEdges(&edges, 1, NumVertices());
 }
 
@@ -456,7 +461,7 @@ ImmutableGraph::EdgeArray ImmutableGraph::EdgeIds(IdArray src_ids, IdArray dst_i
   return ImmutableGraph::EdgeArray{rst_src, rst_dst, rst_eid};
 }
 
-ImmutableGraph::EdgeArray ImmutableGraph::Edges(bool sorted) const {
+ImmutableGraph::EdgeArray ImmutableGraph::Edges(const std::string &order) const {
   int64_t rstlen = NumEdges();
   IdArray rst_src = IdArray::Empty({rstlen}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   IdArray rst_dst = IdArray::Empty({rstlen}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
@@ -465,16 +470,30 @@ ImmutableGraph::EdgeArray ImmutableGraph::Edges(bool sorted) const {
   dgl_id_t* rst_dst_data = static_cast<dgl_id_t*>(rst_dst->data);
   dgl_id_t* rst_eid_data = static_cast<dgl_id_t*>(rst_eid->data);
 
-  auto out_csr = GetOutCSR();
-  // If sorted, the returned edges are sorted by the source Id and dest Id.
-  for (size_t i = 0; i < out_csr->indptr.size() - 1; i++) {
-    std::fill(rst_src_data + out_csr->indptr[i], rst_src_data + out_csr->indptr[i + 1],
-              static_cast<dgl_id_t>(i));
+  if (order.empty() || order == "srcdst") {
+    auto out_csr = GetOutCSR();
+    // If sorted, the returned edges are sorted by the source Id and dest Id.
+    for (size_t i = 0; i < out_csr->indptr.size() - 1; i++) {
+      std::fill(rst_src_data + out_csr->indptr[i], rst_src_data + out_csr->indptr[i + 1],
+          static_cast<dgl_id_t>(i));
+    }
+    std::copy(out_csr->indices.begin(), out_csr->indices.end(), rst_dst_data);
+    std::copy(out_csr->edge_ids.begin(), out_csr->edge_ids.end(), rst_eid_data);
+  } else if (order == "eid") {
+    std::vector<Edge> edges;
+    auto out_csr = GetOutCSR();
+    out_csr->ReadAllEdges(&edges);
+    std::sort(edges.begin(), edges.end(), [](const Edge &e1, const Edge &e2) {
+      return e1.edge_id < e2.edge_id;
+    });
+    for (size_t i = 0; i < edges.size(); i++) {
+      rst_src_data[i] = edges[i].end_points[0];
+      rst_dst_data[i] = edges[i].end_points[1];
+      rst_eid_data[i] = edges[i].edge_id;
+    }
+  } else {
+    LOG(FATAL) << "unsupported order " << order;
   }
-  std::copy(out_csr->indices.begin(), out_csr->indices.end(), rst_dst_data);
-  std::copy(out_csr->edge_ids.begin(), out_csr->edge_ids.end(), rst_eid_data);
-
-  // TODO(zhengda) do I need to sort the edges if sorted = false?
 
   return ImmutableGraph::EdgeArray{rst_src, rst_dst, rst_eid};
 }

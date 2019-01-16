@@ -309,8 +309,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
-    const bool sorted = args[1];
-    *rv = ConvertEdgeArrayToPackedFunc(gptr->Edges(sorted));
+    std::string order = args[1];
+    *rv = ConvertEdgeArrayToPackedFunc(gptr->Edges(order));
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphInDegree")

@@ -49,8 +49,14 @@ def check_basics(g, ig):
     assert g.number_of_nodes() == ig.number_of_nodes()
     assert g.number_of_edges() == ig.number_of_edges()
 
-    edges = g.edges(True)
-    iedges = ig.edges(True)
+    edges = g.edges("srcdst")
+    iedges = ig.edges("srcdst")
+    assert F.array_equal(edges[0].tousertensor(), iedges[0].tousertensor())
+    assert F.array_equal(edges[1].tousertensor(), iedges[1].tousertensor())
+    assert F.array_equal(edges[2].tousertensor(), iedges[2].tousertensor())
+
+    edges = g.edges("eid")
+    iedges = ig.edges("eid")
     assert F.array_equal(edges[0].tousertensor(), iedges[0].tousertensor())
     assert F.array_equal(edges[1].tousertensor(), iedges[1].tousertensor())
     assert F.array_equal(edges[2].tousertensor(), iedges[2].tousertensor())

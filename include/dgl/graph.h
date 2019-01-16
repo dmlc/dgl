@@ -229,7 +229,7 @@ class Graph: public GraphInterface {
    * \param sorted Whether the returned edge list is sorted by their src and dst ids
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray Edges(bool sorted = false) const;
+  EdgeArray Edges(const std::string &order = "") const;
 
   /*!
    * \brief Get the in degree of the given vertex.

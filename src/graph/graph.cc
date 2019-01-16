@@ -365,13 +365,13 @@ Graph::EdgeArray Graph::OutEdges(IdArray vids) const {
 }
 
 // O(E*log(E)) if sort is required; otherwise, O(E)
-Graph::EdgeArray Graph::Edges(bool sorted) const {
+Graph::EdgeArray Graph::Edges(const std::string &order) const {
   const int64_t len = num_edges_;
   IdArray src = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   IdArray dst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   IdArray eid = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
 
-  if (sorted) {
+  if (order == "srcdst") {
     typedef std::tuple<int64_t, int64_t, int64_t> Tuple;
     std::vector<Tuple> tuples;
     tuples.reserve(len);
