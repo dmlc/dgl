@@ -409,6 +409,8 @@ class GraphIndex(object):
         """
         key = 'edges_s%s' % order
         if key not in self._cache:
+            if order is None:
+                order = ""
             edge_array = _CAPI_DGLGraphEdges(self._handle, order)
             src = utils.toindex(edge_array(0))
             dst = utils.toindex(edge_array(1))
