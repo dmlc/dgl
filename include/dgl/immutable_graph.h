@@ -16,12 +16,6 @@
 
 namespace dgl {
 
-template<class ForwardIt, class T>
-bool binary_search(ForwardIt first, ForwardIt last, const T& value) {
-  first = std::lower_bound(first, last, value);
-  return (!(first == last) && !(value < *first));
-}
-
 /*!
  * \brief DGL immutable graph index class.
  *
@@ -68,6 +62,7 @@ class ImmutableGraph: public GraphInterface {
     DegreeArray GetDegrees(IdArray vids) const;
     EdgeArray GetEdges(dgl_id_t vid) const;
     EdgeArray GetEdges(IdArray vids) const;
+    /* \brief this returns the start and end position of the column indices corresponding v. */
     std::pair<const dgl_id_t *, const dgl_id_t *> GetIndexRef(dgl_id_t v) const {
       const int64_t start = indptr[v];
       const int64_t end = indptr[v + 1];
@@ -75,16 +70,39 @@ class ImmutableGraph: public GraphInterface {
     }
     CSR::Ptr Transpose() const;
     std::pair<CSR::Ptr, IdArray> VertexSubgraph(IdArray vids) const;
+    /*
+     * Construct a CSR from a list of edges.
+     *
+     * When constructing a CSR, we need to sort the edge list. To reduce the overhead,
+     * we simply sort on the input edge list. We allow sorting on both end points of an edge,
+     * which is specified by `sort_on`.
+     */
     static CSR::Ptr FromEdges(std::vector<Edge> *edges, int sort_on, int64_t num_nodes);
   };
 
+  /*! \brief Construct an immutable graph from the COO format. */
   ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
                  bool multigraph = false);
 
+  /*!
+   * \brief Construct an immutable graph from the CSR format.
+   *
+   * For a single graph, we need two CSRs, one stores the in-edges of vertices and
+   * the other stores the out-edges of vertices. These two CSRs stores the same edges.
+   * The reason we need both is that some operators are faster on in-edge CSR and
+   * the other operators are faster on out-edge CSR.
+   *
+   * However, not both CSRs are required. Technically, one CSR contains all information.
+   * Thus, when we construct a temporary graphs (e.g., the sampled subgraphs), we only
+   * construct one of the CSRs that runs fast for some operations we expect and construct
+   * the other CSR on demand.
+   */
   ImmutableGraph(CSR::Ptr in_csr, CSR::Ptr out_csr,
                  bool multigraph = false) : is_multigraph_(multigraph) {
     this->in_csr_ = in_csr;
     this->out_csr_ = out_csr;
+    CHECK(this->in_csr_ != nullptr || this->out_csr_ != nullptr)
+                   << "there must exist one of the CSRs";
   }
 
   /*! \brief default constructor */
@@ -187,17 +205,7 @@ class ImmutableGraph: public GraphInterface {
   BoolArray HasVertices(IdArray vids) const;
 
   /*! \return true if the given edge is in the graph.*/
-  bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
-    if (!HasVertex(src) || !HasVertex(dst)) return false;
-    if (this->in_csr_) {
-      auto pred = this->in_csr_->GetIndexRef(dst);
-      return binary_search(pred.first, pred.second, src);
-    } else {
-      CHECK(this->out_csr_) << "one of the CSRs must exist";
-      auto succ = this->out_csr_->GetIndexRef(src);
-      return binary_search(succ.first, succ.second, dst);
-    }
-  }
+  bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const;
 
   /*! \return a 0-1 array indicating whether the given edges are in the graph.*/
   BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const;
@@ -466,6 +474,7 @@ class ImmutableGraph: public GraphInterface {
   std::pair<const dgl_id_t *, const dgl_id_t *> GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
 
   /*
+   * The immutable graph may only contain one of the CSRs (e.g., the sampled subgraphs).
    * When we get in csr or out csr, we try to get the one cached in the structure.
    * If not, we transpose the other one to get the one we need.
    */

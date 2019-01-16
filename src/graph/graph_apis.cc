@@ -87,6 +87,7 @@ PackedFunc ConvertSubgraphToPackedFunc(const std::vector<SampledSubgraph>& sg) {
         LOG(FATAL) << "invalid choice";
       }
     };
+  // TODO(minjie): figure out a better way of returning a complex results.
   return PackedFunc(body);
 }
 
@@ -106,9 +107,9 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
     const IdArray src_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
     const IdArray dst_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     const IdArray edge_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
-    bool multigraph = static_cast<bool>(args[3]);
-    int64_t num_nodes = static_cast<int64_t>(args[4]);
-    bool readonly = static_cast<bool>(args[5]);
+    const bool multigraph = static_cast<bool>(args[3]);
+    const int64_t num_nodes = static_cast<int64_t>(args[4]);
+    const bool readonly = static_cast<bool>(args[5]);
     GraphHandle ghandle;
     if (readonly)
       ghandle = new ImmutableGraph(src_ids, dst_ids, edge_ids, num_nodes, multigraph);
@@ -369,6 +370,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")
     for (int i = 0; i < list_size; ++i) {
       const GraphInterface *ptr = static_cast<const GraphInterface *>(inhandles[i]);
       const Graph* gr = dynamic_cast<const Graph*>(ptr);
+      if (gr == nullptr)
+        throw NotImplemented("_CAPI_DGLDisjointUnion for immutable graph");
       graphs.push_back(gr);
     }
     Graph* gptr = new Graph();
@@ -382,6 +385,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointPartitionByNum")
     GraphHandle ghandle = args[0];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
     const Graph* gptr = dynamic_cast<const Graph*>(ptr);
+    if (gptr == nullptr)
+      throw NotImplemented("_CAPI_DGLDisjointPartitionByNum for immutable graph");
     int64_t num = args[1];
     std::vector<Graph>&& rst = GraphOp::DisjointPartitionByNum(gptr, num);
     // return the pointer array as an integer array
@@ -401,6 +406,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointPartitionBySizes")
     GraphHandle ghandle = args[0];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
     const Graph* gptr = dynamic_cast<const Graph*>(ptr);
+    if (gptr == nullptr)
+      throw NotImplemented("_CAPI_DGLDisjointPartitionBySizes for immutable graph");
     const IdArray sizes = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     std::vector<Graph>&& rst = GraphOp::DisjointPartitionBySizes(gptr, sizes);
     // return the pointer array as an integer array
@@ -421,6 +428,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLineGraph")
     bool backtracking = args[1];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
     const Graph* gptr = dynamic_cast<const Graph*>(ptr);
+    if (gptr == nullptr)
+      throw NotImplemented("_CAPI_DGLGraphLineGraph for immutable graph");
     Graph* lgptr = new Graph();
     *lgptr = GraphOp::LineGraph(gptr, backtracking);
     GraphHandle lghandle = lgptr;
@@ -434,11 +443,13 @@ void CAPI_NeighborUniformSample(DGLArgs args, DGLRetValue* rv) {
   for (size_t i = 0; i < seeds.size(); i++)
     seeds[i] = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[i + 1]));
   std::string neigh_type = args[num_seeds + 1];
-  int num_hops = args[num_seeds + 2];
-  int num_neighbors = args[num_seeds + 3];
-  int num_valid_seeds = args[num_seeds + 4];
+  const int num_hops = args[num_seeds + 2];
+  const int num_neighbors = args[num_seeds + 3];
+  const int num_valid_seeds = args[num_seeds + 4];
   const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
   const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
+  if (gptr == nullptr)
+    throw NotImplemented("sampling isn't supported in mutable graph");
   CHECK(num_valid_seeds <= num_seeds);
   std::vector<SampledSubgraph> subgs(seeds.size());
 #pragma omp parallel for

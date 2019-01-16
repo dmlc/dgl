@@ -19,9 +19,15 @@ int rand_r(unsigned *seed) {
 
 namespace dgl {
 
+template<class ForwardIt, class T>
+bool binary_search(ForwardIt first, ForwardIt last, const T& value) {
+  first = std::lower_bound(first, last, value);
+  return (!(first == last) && !(value < *first));
+}
+
 ImmutableGraph::EdgeArray ImmutableGraph::CSR::GetEdges(dgl_id_t vid) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
-  int64_t off = this->indptr[vid];
+  const int64_t off = this->indptr[vid];
   const int64_t len = this->GetDegree(vid);
   IdArray src = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   IdArray dst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
@@ -111,6 +117,12 @@ class HashTableChecker {
   // Hashtable is very slow. Using bloom filter can significantly speed up lookups.
   Bitmap map;
 
+  /*
+   * This is to test if a vertex is in the induced subgraph.
+   * If it is, the edge on this vertex and the source vertex will be collected.
+   * `old_id` is the vertex we test, `old_eid` is the edge Id between the `old_id`
+   * and the source vertex. `col_idx` and `orig_eids` store the collected edges.
+   */
   void Collect(const dgl_id_t old_id, const dgl_id_t old_eid,
                std::vector<dgl_id_t> *col_idx,
                std::vector<dgl_id_t> *orig_eids) {
@@ -134,6 +146,11 @@ class HashTableChecker {
     }
   }
 
+  /*
+   * This is to collect edges from the neighborhood of a vertex.
+   * `neigh_idx`, `eids` and `row_len` indicates the neighbor list of the vertex.
+   * The collected edges are stored in `new_neigh_idx` and `orig_eids`.
+   */
   void CollectOnRow(const dgl_id_t neigh_idx[], const dgl_id_t eids[], size_t row_len,
                     std::vector<dgl_id_t> *new_neigh_idx,
                     std::vector<dgl_id_t> *orig_eids) {
@@ -148,6 +165,7 @@ class HashTableChecker {
 
 std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::VertexSubgraph(
     IdArray vids) const {
+  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
   const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
   const int64_t len = vids->shape[0];
 
@@ -197,10 +215,11 @@ ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::FromEdges(std::vector<Edge> *edges
       this->other_end = other_end;
     }
     bool operator()(const Edge &e1, const Edge &e2) {
-      if (e1.end_points[sort_on] == e2.end_points[sort_on])
+      if (e1.end_points[sort_on] == e2.end_points[sort_on]) {
         return e1.end_points[other_end] < e2.end_points[other_end];
-      else
+      } else {
         return e1.end_points[sort_on] < e2.end_points[sort_on];
+      }
     }
   };
   std::sort(edges->begin(), edges->end(), compare(sort_on, other_end));
@@ -213,12 +232,14 @@ ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::FromEdges(std::vector<Edge> *edges
     t->edge_ids[i] = edges->at(i).edge_id;
     dgl_id_t vid = edges->at(i).end_points[sort_on];
     CHECK(vid < num_nodes);
-    while (vid > 0 && t->indptr.size() <= static_cast<size_t>(vid))
+    while (vid > 0 && t->indptr.size() <= static_cast<size_t>(vid)) {
       t->indptr.push_back(i);
+    }
     CHECK(t->indptr.size() == vid + 1);
   }
-  while (t->indptr.size() < num_nodes + 1)
+  while (t->indptr.size() < num_nodes + 1) {
     t->indptr.push_back(edges->size());
+  }
   CHECK(t->indptr.size() == num_nodes + 1);
   return t;
 }
@@ -241,7 +262,10 @@ ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::Transpose() const {
 
 ImmutableGraph::ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
                                bool multigraph) : is_multigraph_(multigraph) {
-  int64_t len = src_ids->shape[0];
+  CHECK(IsValidIdArray(src_ids)) << "Invalid vertex id array.";
+  CHECK(IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
+  CHECK(IsValidIdArray(edge_ids)) << "Invalid vertex id array.";
+  const int64_t len = src_ids->shape[0];
   CHECK(len == dst_ids->shape[0]);
   CHECK(len == edge_ids->shape[0]);
   const dgl_id_t *src_data = static_cast<dgl_id_t*>(src_ids->data);
@@ -270,6 +294,18 @@ BoolArray ImmutableGraph::HasVertices(IdArray vids) const {
     rst_data[i] = (vid_data[i] < nverts)? 1 : 0;
   }
   return rst;
+}
+
+bool ImmutableGraph::HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
+  if (!HasVertex(src) || !HasVertex(dst)) return false;
+  if (this->in_csr_) {
+    auto pred = this->in_csr_->GetIndexRef(dst);
+    return binary_search(pred.first, pred.second, src);
+  } else {
+    CHECK(this->out_csr_) << "one of the CSRs must exist";
+    auto succ = this->out_csr_->GetIndexRef(src);
+    return binary_search(succ.first, succ.second, dst);
+  }
 }
 
 BoolArray ImmutableGraph::HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const {
@@ -334,8 +370,9 @@ std::pair<const dgl_id_t *, const dgl_id_t *> ImmutableGraph::GetInEdgeIdRef(dgl
   auto pred = this->in_csr_->GetIndexRef(dst);
   auto it = std::lower_bound(pred.first, pred.second, src);
   // If there doesn't exist edges between the two nodes.
-  if (it == pred.second || *it != src)
+  if (it == pred.second || *it != src) {
     return std::pair<const dgl_id_t *, const dgl_id_t *>(nullptr, nullptr);
+  }
 
   size_t off = it - in_csr_->indices.data();
   CHECK(off < in_csr_->indices.size());
@@ -352,8 +389,9 @@ std::pair<const dgl_id_t *, const dgl_id_t *> ImmutableGraph::GetOutEdgeIdRef(dg
   auto succ = this->out_csr_->GetIndexRef(src);
   auto it = std::lower_bound(succ.first, succ.second, dst);
   // If there doesn't exist edges between the two nodes.
-  if (it == succ.second || *it != dst)
+  if (it == succ.second || *it != dst) {
     return std::pair<const dgl_id_t *, const dgl_id_t *>(nullptr, nullptr);
+  }
 
   size_t off = it - out_csr_->indices.data();
   CHECK(off < out_csr_->indices.size());
@@ -368,15 +406,17 @@ IdArray ImmutableGraph::EdgeId(dgl_id_t src, dgl_id_t dst) const {
   CHECK(HasVertex(src) && HasVertex(dst)) << "invalid edge: " << src << " -> " << dst;
 
   std::pair<const dgl_id_t *, const dgl_id_t *> edge_ids;
-  if (in_csr_)
+  if (in_csr_) {
     edge_ids = GetInEdgeIdRef(src, dst);
-  else
+  } else {
     edge_ids = GetOutEdgeIdRef(src, dst);
+  }
   int64_t len = edge_ids.second - edge_ids.first;
   IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-  if (len > 0)
+  if (len > 0) {
     std::copy(edge_ids.first, edge_ids.second, rst_data);
+  }
 
   return rst;
 }
@@ -386,7 +426,6 @@ ImmutableGraph::EdgeArray ImmutableGraph::EdgeIds(IdArray src_ids, IdArray dst_i
   CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
   const auto srclen = src_ids->shape[0];
   const auto dstlen = dst_ids->shape[0];
-  int64_t i, j;
 
   CHECK((srclen == dstlen) || (srclen == 1) || (dstlen == 1))
     << "Invalid src and dst id array.";
@@ -398,7 +437,7 @@ ImmutableGraph::EdgeArray ImmutableGraph::EdgeIds(IdArray src_ids, IdArray dst_i
 
   std::vector<dgl_id_t> src, dst, eid;
 
-  for (i = 0, j = 0; i < srclen && j < dstlen; i += src_stride, j += dst_stride) {
+  for (int64_t i = 0, j = 0; i < srclen && j < dstlen; i += src_stride, j += dst_stride) {
     const dgl_id_t src_id = src_data[i], dst_id = dst_data[j];
     CHECK(HasVertex(src_id) && HasVertex(dst_id)) <<
         "invalid edge: " << src_id << " -> " << dst_id;
@@ -410,14 +449,14 @@ ImmutableGraph::EdgeArray ImmutableGraph::EdgeIds(IdArray src_ids, IdArray dst_i
       edges = this->GetOutEdgeIdRef(src_id, dst_id);
 
     size_t len = edges.second - edges.first;
-    for (size_t i = 0; i < len; i++) {
+    for (size_t k = 0; k < len; k++) {
         src.push_back(src_id);
         dst.push_back(dst_id);
-        eid.push_back(edges.first[i]);
+        eid.push_back(edges.first[k]);
     }
   }
 
-  int64_t rstlen = src.size();
+  const int64_t rstlen = src.size();
   IdArray rst_src = IdArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
   IdArray rst_dst = IdArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
   IdArray rst_eid = IdArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
