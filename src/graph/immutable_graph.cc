@@ -511,7 +511,8 @@ Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
 }
 
 Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids) const {
-  throw NotImplemented("EdgeSubgraph");
+  LOG(FATAL) << "EdgeSubgraph isn't implemented in immutable graph";
+  return Subgraph();
 }
 
 ImmutableGraph::CSRArray ImmutableGraph::GetInCSRArray() const {

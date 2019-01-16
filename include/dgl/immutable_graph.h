@@ -141,7 +141,7 @@ class ImmutableGraph: public GraphInterface {
    * \param num_vertices The number of vertices to be added.
    */
   void AddVertices(uint64_t num_vertices) {
-    throw NotImplemented("AddVertices");
+    LOG(FATAL) << "AddVertices isn't supported in ImmutableGraph";
   }
 
   /*!
@@ -150,7 +150,7 @@ class ImmutableGraph: public GraphInterface {
    * \param dst The destination vertex.
    */
   void AddEdge(dgl_id_t src, dgl_id_t dst) {
-    throw NotImplemented("AddEdge");
+    LOG(FATAL) << "AddEdge isn't supported in ImmutableGraph";
   }
 
   /*!
@@ -159,14 +159,14 @@ class ImmutableGraph: public GraphInterface {
    * \param dst_ids The destination vertex id array.
    */
   void AddEdges(IdArray src_ids, IdArray dst_ids) {
-    throw NotImplemented("AddEdges");
+    LOG(FATAL) << "AddEdges isn't supported in ImmutableGraph";
   }
 
   /*!
    * \brief Clear the graph. Remove all vertices/edges.
    */
   void Clear() {
-    throw NotImplemented("Clear");
+    LOG(FATAL) << "Clear isn't supported in ImmutableGraph";
   }
 
   /*!
@@ -257,7 +257,8 @@ class ImmutableGraph: public GraphInterface {
    * \return a pair whose first element is the source and the second the destination.
    */
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const {
-    throw NotImplemented("FindEdge");
+    LOG(FATAL) << "FindEdge isn't supported in ImmutableGraph";
+    return std::pair<dgl_id_t, dgl_id_t>();
   }
 
   /*!
@@ -266,7 +267,8 @@ class ImmutableGraph: public GraphInterface {
    * \return EdgeArray containing all edges with id in eid.  The order is preserved.
    */
   EdgeArray FindEdges(IdArray eids) const {
-    throw NotImplemented("FindEdges");
+    LOG(FATAL) << "FindEdges isn't supported in ImmutableGraph";
+    return EdgeArray();
   }
 
   /*!

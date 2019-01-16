@@ -13,18 +13,6 @@
 
 namespace dgl {
 
-class NotImplemented: public std::exception {
-  std::string msg;
- public:
-  explicit NotImplemented(const std::string &name) {
-    this->msg = name + " isn't implemented";
-  }
-
-  virtual const char* what() const noexcept {
-    return msg.c_str();
-  }
-};
-
 typedef uint64_t dgl_id_t;
 typedef dgl::runtime::NDArray IdArray;
 typedef dgl::runtime::NDArray DegreeArray;

@@ -375,7 +375,8 @@ class Graph: public GraphInterface {
    */
   virtual SampledSubgraph NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
                                                 int num_hops, int expand_factor) const {
-    throw NotImplemented("NeighborUniformSample");
+    LOG(FATAL) << "NeighborUniformSample isn't supported in mutable graph";
+    return SampledSubgraph();
   }
 
  protected:
