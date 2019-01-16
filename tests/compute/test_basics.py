@@ -625,6 +625,29 @@ def test_repr():
     repr_string = G.__repr__()
     print(repr_string)
 
+
+def test_group_apply_edges():
+    def edge_udf(edges):
+        normalized_feat = F.softmax(edges.data['feat'], 1)
+        return {"norm_feat": normalized_feat}
+
+    g = DGLGraph()
+    g.add_nodes(10)
+    g.add_edges(0, [1, 2, 3, 4, 5, 6, 7, 8])
+    g.add_edges(1, [2, 3, 4, 5, 6, 7, 8])
+    g.add_edges(2, [2, 3, 4, 5, 6, 7, 8])
+
+    g.edata['feat'] = F.randn((g.number_of_edges(), 1))
+    g.group_apply_edges(group_by='src', func=edge_udf)
+    u, v, eid = g.out_edges(1, form='all')
+    out_feat = g.edata['norm_feat'][eid]
+    assert F.allclose(out_feat.sum(dim=0), F.tensor(1))
+    # def reduce(nodes):
+    #     return {'h': nodes.data['h']}
+    #
+    # g = generate_graph()
+    # g.update_all(lambda edges: {'w': edges.data['w']}, reduce)
+
 if __name__ == '__main__':
     test_nx_conversion()
     test_batch_setter_getter()
@@ -641,3 +664,4 @@ if __name__ == '__main__':
     test_send_multigraph()
     test_dynamic_addition()
     test_repr()
+    test_group_apply_edges()

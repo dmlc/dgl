@@ -1919,6 +1919,83 @@ class DGLGraph(object):
                                            inplace=inplace)
             Runtime.run(prog)
 
+    def group_apply_edges(self, group_by, func, edges=ALL, inplace=False):
+        """Apply the function on the edges to update their features.
+
+        If None is provided for ``func``, nothing will happen.
+
+        Parameters
+        ----------
+        group_by : str
+            Specify how to group edges. Expected to be either 'src' or 'dst'
+        func : callable, optional
+            Apply function on the edge. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
+        edges : valid edges type, optional
+            Edges on which to apply ``func``. See :func:`send` for valid
+            edges type. Default is all the edges.
+        inplace: bool, optional
+            If True, update will be done in place, but autograd will break.
+
+        Notes
+        -----
+        On multigraphs, if :math:`u` and :math:`v` are specified, then all the edges
+        between :math:`u` and :math:`v` will be updated.
+
+        Examples
+        --------
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
+
+        >>> g = dgl.DGLGraph()
+        >>> g.add_nodes(3)
+        >>> g.add_edges([0, 1], [1, 2])   # 0 -> 1, 1 -> 2
+        >>> g.edata['y'] = th.ones(2, 1)
+
+        >>> # Doubles the edge feature.
+        >>> def double_feature(edges): return {'y': edges.data['y'] * 2}
+        >>> g.apply_edges(func=double_feature, edges=0) # Apply func to the first edge.
+        >>> g.edata
+        {'y': tensor([[2.],   # 2 * 1
+                      [1.]])}
+
+        See Also
+        --------
+        apply_nodes
+        """
+        assert func is not None
+
+        if group_by not in ('src', 'dst'):
+            raise DGLError("Group_by should be either src or dst")
+
+        if is_all(edges):
+            u, v, _ = self._graph.edges()
+            eid = utils.toindex(slice(0, self.number_of_edges()))
+        elif isinstance(edges, tuple):
+            u, v = edges
+            u = utils.toindex(u)
+            v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            u, v, eid = self._graph.edge_ids(u, v)
+        else:
+            eid = utils.toindex(edges)
+            u, v, _ = self._graph.find_edges(eid)
+
+        with ir.prog() as prog:
+            scheduler.schedule_group_apply(graph=self,
+                                           u=u,
+                                           v=v,
+                                           eids=eid,
+                                           apply_func=func,
+                                           group_by=group_by,
+                                           inplace=inplace)
+            Runtime.run(prog)
+
+
     def send(self, edges=ALL, message_func="default"):
         """Send messages along the given edges.
 
