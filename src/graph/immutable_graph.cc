@@ -366,7 +366,7 @@ DGLIdIters ImmutableGraph::GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const {
   auto it = std::lower_bound(pred.begin(), pred.end(), src);
   // If there doesn't exist edges between the two nodes.
   if (it == pred.end() || *it != src) {
-    return DGLIdIters();
+    return DGLIdIters(it, it);
   }
 
   size_t off = it - in_csr_->indices.begin();
@@ -384,7 +384,7 @@ DGLIdIters ImmutableGraph::GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const {
   auto it = std::lower_bound(succ.begin(), succ.end(), dst);
   // If there doesn't exist edges between the two nodes.
   if (it == succ.end() || *it != dst) {
-    return DGLIdIters();
+    return DGLIdIters(it, it);
   }
 
   size_t off = it - out_csr_->indices.begin();
