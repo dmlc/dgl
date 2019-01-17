@@ -10,26 +10,18 @@
 #include <cstdint>
 #include <utility>
 #include <tuple>
-#include "runtime/ndarray.h"
+
+#include "graph_interface.h"
 
 namespace dgl {
 
-typedef uint64_t dgl_id_t;
-typedef dgl::runtime::NDArray IdArray;
-typedef dgl::runtime::NDArray DegreeArray;
-typedef dgl::runtime::NDArray BoolArray;
-typedef dgl::runtime::NDArray IntArray;
-
 class Graph;
 class GraphOp;
-struct Subgraph;
 
 /*!
  * \brief Base dgl graph index class.
  *
- * DGL's graph is directed. Vertices are integers enumerated from zero. Edges
- * are uniquely identified by the two endpoints. Multi-edge is currently not
- * supported.
+ * DGL's graph is directed. Vertices are integers enumerated from zero.
  *
  * Removal of vertices/edges is not allowed. Instead, the graph can only be "cleared"
  * by removing all the vertices and edges.
@@ -40,16 +32,14 @@ struct Subgraph;
  * If the length of src id array is one, it represents one-many connections.
  * If the length of dst id array is one, it represents many-one connections.
  */
-class Graph {
+class Graph: public GraphInterface {
  public:
-  /* \brief structure used to represent a list of edges */
-  typedef struct {
-    /* \brief the two endpoints and the id of the edge */
-    IdArray src, dst, id;
-  } EdgeArray;
-
   /*! \brief default constructor */
   explicit Graph(bool multigraph = false) : is_multigraph_(multigraph) {}
+
+  /*! \brief construct a graph from the coo format. */
+  Graph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
+      bool multigraph = false);
 
   /*! \brief default copy constructor */
   Graph(const Graph& other) = default;
@@ -116,6 +106,13 @@ class Graph {
    */
   bool IsMultigraph() const {
     return is_multigraph_;
+  }
+
+  /*!
+   * \return whether the graph is read-only
+   */
+  virtual bool IsReadonly() const {
+    return false;
   }
 
   /*! \return the number of vertices in the graph.*/
@@ -232,7 +229,7 @@ class Graph {
    * \param sorted Whether the returned edge list is sorted by their src and dst ids
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray Edges(bool sorted = false) const;
+  EdgeArray Edges(const std::string &order = "") const;
 
   /*!
    * \brief Get the in degree of the given vertex.
@@ -311,15 +308,15 @@ class Graph {
    *
    * \return the reversed graph
    */
-  Graph Reverse() const;
+  GraphPtr Reverse() const;
 
   /*!
    * \brief Return the successor vector
    * \param vid The vertex id.
    * \return the successor vector
    */
-  const std::vector<dgl_id_t>& SuccVec(dgl_id_t vid) const {
-    return adjlist_[vid].succ;
+  DGLIdIters SuccVec(dgl_id_t vid) const {
+    return DGLIdIters(adjlist_[vid].succ.begin(), adjlist_[vid].succ.end());
   }
 
   /*!
@@ -327,8 +324,8 @@ class Graph {
    * \param vid The vertex id.
    * \return the out edge id vector
    */
-  const std::vector<dgl_id_t>& OutEdgeVec(dgl_id_t vid) const {
-    return adjlist_[vid].edge_id;
+  DGLIdIters OutEdgeVec(dgl_id_t vid) const {
+    return DGLIdIters(adjlist_[vid].edge_id.begin(), adjlist_[vid].edge_id.end());
   }
 
   /*!
@@ -336,8 +333,8 @@ class Graph {
    * \param vid The vertex id.
    * \return the predecessor vector
    */
-  const std::vector<dgl_id_t>& PredVec(dgl_id_t vid) const {
-    return reverse_adjlist_[vid].succ;
+  DGLIdIters PredVec(dgl_id_t vid) const {
+    return DGLIdIters(reverse_adjlist_[vid].succ.begin(), reverse_adjlist_[vid].succ.end());
   }
 
   /*!
@@ -345,8 +342,41 @@ class Graph {
    * \param vid The vertex id.
    * \return the in edge id vector
    */
-  const std::vector<dgl_id_t>& InEdgeVec(dgl_id_t vid) const {
-    return reverse_adjlist_[vid].edge_id;
+  DGLIdIters InEdgeVec(dgl_id_t vid) const {
+    return DGLIdIters(reverse_adjlist_[vid].edge_id.begin(),
+                      reverse_adjlist_[vid].edge_id.end());
+  }
+
+  /*!
+   * \brief Reset the data in the graph and move its data to the returned graph object.
+   * \return a raw pointer to the graph object.
+   */
+  virtual GraphInterface *Reset() {
+    Graph* gptr = new Graph();
+    *gptr = std::move(*this);
+    return gptr;
+  }
+
+  /*!
+   * \brief Get the adjacency matrix of the graph.
+   *
+   * By default, a row of returned adjacency matrix represents the destination
+   * of an edge and the column represents the source.
+   * \param transpose A flag to transpose the returned adjacency matrix.
+   * \param fmt the format of the returned adjacency matrix.
+   * \return a vector of three IdArray.
+   */
+  virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const;
+
+  /*!
+   * \brief Sample a subgraph from the seed vertices with neighbor sampling.
+   * The neighbors are sampled with a uniform distribution.
+   * \return a subgraph
+   */
+  virtual SampledSubgraph NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
+                                                int num_hops, int expand_factor) const {
+    LOG(FATAL) << "NeighborUniformSample isn't supported in mutable graph";
+    return SampledSubgraph();
   }
 
  protected:
@@ -380,22 +410,6 @@ class Graph {
   bool is_multigraph_ = false;
   /*! \brief number of edges */
   uint64_t num_edges_ = 0;
-};
-
-/*! \brief Subgraph data structure */
-struct Subgraph {
-  /*! \brief The graph. */
-  Graph graph;
-  /*!
-   * \brief The induced vertex ids.
-   * \note This is also a map from the new vertex id to the vertex id in the parent graph.
-   */
-  IdArray induced_vertices;
-  /*!
-   * \brief The induced edge ids.
-   * \note This is also a map from the new edge id to the edge id in the parent graph.
-   */
-  IdArray induced_edges;
 };
 
 }  // namespace dgl

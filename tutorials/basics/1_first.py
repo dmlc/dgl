@@ -122,7 +122,7 @@ print(G.nodes[[10, 11]].data['feat'])
 # --------------------------------------------------
 # To perform node classification, we use the Graph Convolutional Network
 # (GCN) developed by `Kipf and Welling <https://arxiv.org/abs/1609.02907>`_. Here
-# we provide the simpliest definition of a GCN framework, but we recommend the
+# we provide the simplest definition of a GCN framework, but we recommend the
 # reader to read the original paper for more details.
 #
 # - At layer :math:`l`, each node :math:`v_i^l` carries a feature vector :math:`h_i^l`.

@@ -19,8 +19,7 @@ mxnet:
 	@echo "#                Step 1: Building MXNet tutorials                #"
 	@echo "#                                                                #"
 	@echo "##################################################################"
-	@DGLBACKEND=mxnet $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) \
-						 -D sphinx_gallery_conf.filename_pattern="/*(?<=mx)\.py"
+	@DGLBACKEND=mxnet $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 pytorch:
 	@echo "##################################################################"
@@ -28,8 +27,7 @@ pytorch:
 	@echo "#                Step 2: Building PyTorch tutorials              #"
 	@echo "#                                                                #"
 	@echo "##################################################################"
-	@DGLBACKEND=pytorch $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) \
-						 -D sphinx_gallery_conf.filename_pattern="/*(?<!mx)\.py"
+	@DGLBACKEND=pytorch $(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O) 
 
 html-noexec:
 	$(SPHINXBUILD) -D plot_gallery=0 -b html "$(SOURCEDIR)" "$(BUILDDIR)/html" 

@@ -1,8 +1,11 @@
+"""Module for variables."""
+# pylint: disable=invalid-name
 from __future__ import absolute_import
 
 from .program import get_current_prog
 
 class VarType(object):
+    """Variable types."""
     # Types for symbolic objects (i.e, they might not be
     #  concretized before evaluation.
     FEAT = 0
@@ -23,47 +26,65 @@ VAR_TYPE_NAME_MAP = [
 ]
 
 class Var(object):
-    """Variable
+    """Class for variables in IR.
+
+    Variables represent data in the IR. A variable can contain concrete values.
+    Otherwise, it can act as a "symbol", whose values are not materialized at the
+    moment, but later.
+
+    Parameters
+    ----------
     name : str
+        The variable name.
     type : int
+        The type code.
     data : any, default=None (not concretized)
+        The data.
     """
-    __slots__ = ['name', 'type', 'data']
-    def __init__(self, name, type, data):
+    __slots__ = ['name', 'typecode', 'data']
+    def __init__(self, name, typecode, data):
         self.name = name
-        self.type = type
+        self.typecode = typecode
         self.data = data
 
     def __str__(self):
-        if self.type == VarType.STR:
+        if self.typecode == VarType.STR:
             return '"%s"' % self.data
         else:
             return self.name
 
     def typestr(self):
-        return VAR_TYPE_NAME_MAP[self.type]
+        """Return the type string of this variable."""
+        return VAR_TYPE_NAME_MAP[self.typecode]
 
-def new(type, data=None, name=None):
+def new(typecode, data=None, name=None):
+    """Create a new variable."""
     if name is None:
         cur_prog = get_current_prog()
         name = '_z%d' % cur_prog.varcount
         cur_prog.varcount += 1
-    return Var(name, type, data)
+    return Var(name, typecode, data)
 
 def FEAT(data=None, name=None):
+    """Create a variable for feature tensor."""
     return new(VarType.FEAT, data, name)
 
 def FEAT_DICT(data=None, name=None):
+    """Create a variable for feature dict."""
     return new(VarType.FEAT_DICT, data, name)
 
 def SPMAT(data=None, name=None):
+    """Create a variable for sparse matrix lambda."""
     return new(VarType.SPMAT, data, name)
 
 def IDX(data=None, name=None):
+    """Create a variable for index."""
     return new(VarType.IDX, data, name)
 
 def STR(data=None, name=None):
+    """Create a variable for string value."""
     return new(VarType.STR, data, name)
 
 def FUNC(data=None, name=None):
+    """Create a variable for function."""
     return new(VarType.FUNC, data, name)

@@ -241,5 +241,17 @@ print(g.ndata['pv'])
 ###############################################################################
 # Next steps
 # ----------
-# Check out :doc:`GCN <../models/1_gnn/1_gcn>` and :doc:`Capsule <../models/4_old_wines/2_capsule>`
-# for more model implemenetations in DGL.
+# 
+# It is time to move on to some real models in DGL.
+#
+# * Check out the :doc:`overview page<../models/index>`
+#   of all the model tutorials.
+# * Would like to know more about Graph Neural Networks? Start with the
+#   :doc:`GCN tutorial<../models/1_gnn/1_gcn>`.
+# * Would like to know how DGL batches multiple graphs? Start with the
+#   :doc:`TreeLSTM tutorial<../models/2_small_graph/3_tree-lstm>`.
+# * Would like to play with some graph generative models? Start with our tutorial
+#   on the :doc:`Deep Generative Model of Graphs<../models/3_generative_model/5_dgmg>`.
+# * Would like to see how traditional models are interpreted in a view of graph?
+#   Check out our tutorials on :doc:`CapsuleNet<../models/4_old_wines/2_capsule>` and
+#   :doc:`Transformer<../models/4_old_wines/7_transformer>`.

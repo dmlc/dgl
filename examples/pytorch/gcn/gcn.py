@@ -2,37 +2,80 @@
 Semi-Supervised Classification with Graph Convolutional Networks
 Paper: https://arxiv.org/abs/1609.02907
 Code: https://github.com/tkipf/gcn
-
-GCN with batch processing
+GCN with SPMV specialization.
 """
-import argparse
+import argparse, time, math
 import numpy as np
-import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 
-def gcn_msg(edges):
-    return {'m' : edges.src['h']}
 
-def gcn_reduce(nodes):
-    return {'h' : torch.sum(nodes.mailbox['m'], 1)}
+def gcn_msg(edge):
+    msg = edge.src['h'] * edge.src['norm']
+    return {'m': msg}
+
+
+def gcn_reduce(node):
+    accum = torch.sum(node.mailbox['m'], 1) * node.data['norm']
+    return {'h': accum}
+
 
 class NodeApplyModule(nn.Module):
-    def __init__(self, in_feats, out_feats, activation=None):
+    def __init__(self, out_feats, activation=None, bias=True):
         super(NodeApplyModule, self).__init__()
-        self.linear = nn.Linear(in_feats, out_feats)
+        if bias:
+            self.bias = nn.Parameter(torch.Tensor(out_feats))
+        else:
+            self.bias = None
         self.activation = activation
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        if self.bias is not None:
+            stdv = 1. / math.sqrt(self.bias.size(0))
+            self.bias.data.uniform_(-stdv, stdv)
 
     def forward(self, nodes):
-        # normalization by square root of dst degree
-        h = nodes.data['h'] * nodes.data['norm']
-        h = self.linear(h)
+        h = nodes.data['h']
+        if self.bias is not None:
+            h = h + self.bias
         if self.activation:
             h = self.activation(h)
-        return {'h' : h}
+        return {'h': h}
+
+
+class GCNLayer(nn.Module):
+    def __init__(self,
+                 g,
+                 in_feats,
+                 out_feats,
+                 activation,
+                 dropout,
+                 bias=True):
+        super(GCNLayer, self).__init__()
+        self.g = g
+        self.weight = nn.Parameter(torch.Tensor(in_feats, out_feats))
+        if dropout:
+            self.dropout = nn.Dropout(p=dropout)
+        else:
+            self.dropout = 0.
+        self.node_update = NodeApplyModule(out_feats, activation, bias)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        stdv = 1. / math.sqrt(self.weight.size(1))
+        self.weight.data.uniform_(-stdv, stdv)
+
+    def forward(self, h):
+        if self.dropout:
+            h = self.dropout(h)
+        self.g.ndata['h'] = torch.mm(h, self.weight)
+        self.g.update_all(gcn_msg, gcn_reduce, self.node_update)
+        h = self.g.ndata.pop('h')
+        return h
 
 class GCN(nn.Module):
     def __init__(self,
@@ -44,36 +87,20 @@ class GCN(nn.Module):
                  activation,
                  dropout):
         super(GCN, self).__init__()
-        self.g = g
-
-        if dropout:
-            self.dropout = nn.Dropout(p=dropout)
-        else:
-            self.dropout = 0.
-
         self.layers = nn.ModuleList()
-
         # input layer
-        self.layers.append(NodeApplyModule(in_feats, n_hidden, activation))
-
+        self.layers.append(GCNLayer(g, in_feats, n_hidden, activation, dropout))
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.append(NodeApplyModule(n_hidden, n_hidden, activation))
-
+            self.layers.append(GCNLayer(g, n_hidden, n_hidden, activation, dropout))
         # output layer
-        self.layers.append(NodeApplyModule(n_hidden, n_classes))
+        self.layers.append(GCNLayer(g, n_hidden, n_classes, None, dropout))
 
     def forward(self, features):
-        self.g.ndata['h'] = features
-
-        for idx, layer in enumerate(self.layers):
-            # apply dropout
-            if idx > 0 and self.dropout:
-                self.g.ndata['h'] = self.dropout(self.g.ndata['h'])
-            # normalization by square root of src degree
-            self.g.ndata['h'] = self.g.ndata['h'] * self.g.ndata['norm']
-            self.g.update_all(gcn_msg, gcn_reduce, layer)
-        return self.g.ndata.pop('h')
+        h = features
+        for layer in self.layers:
+            h = layer(h)
+        return h
 
 def evaluate(model, features, labels, mask):
     model.eval()
@@ -88,7 +115,6 @@ def evaluate(model, features, labels, mask):
 def main(args):
     # load and preprocess dataset
     data = load_data(args)
-
     features = torch.FloatTensor(data.features)
     labels = torch.LongTensor(data.labels)
     train_mask = torch.ByteTensor(data.train_mask)
@@ -97,6 +123,16 @@ def main(args):
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
+    print("""----Data statistics------'
+      #Edges %d
+      #Classes %d
+      #Train samples %d
+      #Val samples %d
+      #Test samples %d""" %
+          (n_edges, n_classes,
+              train_mask.sum().item(),
+              val_mask.sum().item(),
+              test_mask.sum().item()))
 
     if args.gpu < 0:
         cuda = False
@@ -133,6 +169,7 @@ def main(args):
 
     if cuda:
         model.cuda()
+    loss_fcn = torch.nn.CrossEntropyLoss()
 
     # use optimizer
     optimizer = torch.optim.Adam(model.parameters(),
@@ -147,8 +184,7 @@ def main(args):
             t0 = time.time()
         # forward
         logits = model(features)
-        logp = F.log_softmax(logits, 1)
-        loss = F.nll_loss(logp[train_mask], labels[train_mask])
+        loss = loss_fcn(logits[train_mask], labels[train_mask])
 
         optimizer.zero_grad()
         loss.backward()
@@ -159,8 +195,8 @@ def main(args):
 
         acc = evaluate(model, features, labels, val_mask)
         print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-              "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
-                                            acc, n_edges / np.mean(dur) / 1000))
+              "ETputs(KTEPS) {:.2f}". format(epoch, np.mean(dur), loss.item(),
+                                             acc, n_edges / np.mean(dur) / 1000))
 
     print()
     acc = evaluate(model, features, labels, test_mask)

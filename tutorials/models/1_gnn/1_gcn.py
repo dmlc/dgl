@@ -8,7 +8,7 @@ Graph Convolutional Network
 Yu Gai, Quan Gan, Zheng Zhang
 
 This is a gentle introduction of using DGL to implement Graph Convolutional
-Networks (Kipf & Welling et al., `Semi-Supervised Classificaton with Graph
+Networks (Kipf & Welling et al., `Semi-Supervised Classification with Graph
 Convolutional Networks <https://arxiv.org/pdf/1609.02907.pdf>`_). We build upon
 the :doc:`earlier tutorial <../../basics/3_pagerank>` on DGLGraph and demonstrate
 how DGL combines graph with deep neural network and learn structural representations.

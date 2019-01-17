@@ -115,7 +115,7 @@ def empty(shape, dtype="float32", ctx=context(1, 0)):
 
 def from_dlpack(dltensor):
     """Produce an array from a DLPack tensor without memory copy.
-    Retreives the underlying DLPack tensor's pointer to create an array from the
+    Retrieves the underlying DLPack tensor's pointer to create an array from the
     data. Removes the original DLPack tensor's destructor as now the array is
     responsible for destruction.
 
@@ -195,7 +195,7 @@ class NDArrayBase(_NDArrayBase):
             raise TypeError('type %s not supported' % str(type(value)))
 
     def copyfrom(self, source_array):
-        """Peform an synchronize copy from the array.
+        """Perform a synchronized copy from the array.
 
         Parameters
         ----------

@@ -1,7 +1,7 @@
 """User-defined function related data structures."""
 from __future__ import absolute_import
 
-from .base import ALL, is_all
+from .base import is_all
 from . import backend as F
 from . import utils
 
