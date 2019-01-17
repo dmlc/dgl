@@ -22,6 +22,14 @@ def cpu():
 def tensor(data, dtype=None):
     return np.array(data, dtype)
 
+def get_preferred_sparse_format():
+    """Get the preferred sparse matrix format supported by the backend.
+
+    Different backends have their preferred backend. This info is useful when
+    constructing a sparse matrix.
+    """
+    return "csr"
+
 def sparse_matrix(data, index, shape, force_format=False):
     fmt = index[0]
     if fmt == 'coo':
@@ -142,5 +150,3 @@ def zerocopy_to_numpy(input):
 
 def zerocopy_from_numpy(np_array):
     return np_array
-
-# create_immutable_graph_index not enabled

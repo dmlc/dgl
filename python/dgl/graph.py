@@ -915,7 +915,7 @@ class DGLGraph(object):
         else:
             raise DGLError('Invalid form:', form)
 
-    def all_edges(self, form='uv', return_sorted=False):
+    def all_edges(self, form='uv', order=None):
         """Return all the edges.
 
         Parameters
@@ -926,8 +926,12 @@ class DGLGraph(object):
             - 'all' : a tuple (u, v, eid)
             - 'uv'  : a pair (u, v), default
             - 'eid' : one eid tensor
-        return_sorted : bool
-            True if the returned edges are sorted by their src and dst ids.
+        order : string
+            The order of the returned edges. Currently support:
+
+            - 'srcdst' : sorted by their src and dst ids.
+            - 'eid'    : sorted by edge Ids.
+            - None     : the arbitrary order.
 
         Returns
         -------
@@ -953,7 +957,7 @@ class DGLGraph(object):
         >>> G.all_edges('all')
         (tensor([0, 0, 1]), tensor([1, 2, 2]), tensor([0, 1, 2]))
         """
-        src, dst, eid = self._graph.edges(return_sorted)
+        src, dst, eid = self._graph.edges(order)
         if form == 'all':
             return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
         elif form == 'uv':
