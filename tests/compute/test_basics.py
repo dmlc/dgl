@@ -628,7 +628,7 @@ def test_repr():
 
 def test_group_apply_edges():
     def edge_udf(edges):
-        normalized_feat = F.softmax(edges.data['feat'], 1)
+        normalized_feat = F.softmax(edges.data['feat'], dim=1)
         return {"norm_feat": normalized_feat}
 
     g = DGLGraph()
@@ -639,14 +639,11 @@ def test_group_apply_edges():
 
     g.edata['feat'] = F.randn((g.number_of_edges(), 1))
     g.group_apply_edges(group_by='src', func=edge_udf)
+
     u, v, eid = g.out_edges(1, form='all')
+    in_feat = g.edata['feat'][eid]
     out_feat = g.edata['norm_feat'][eid]
-    assert F.allclose(out_feat.sum(dim=0), F.tensor(1))
-    # def reduce(nodes):
-    #     return {'h': nodes.data['h']}
-    #
-    # g = generate_graph()
-    # g.update_all(lambda edges: {'w': edges.data['w']}, reduce)
+    assert F.allclose(out_feat, F.softmax(in_feat, 0))
 
 if __name__ == '__main__':
     test_nx_conversion()

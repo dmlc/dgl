@@ -1920,19 +1920,18 @@ class DGLGraph(object):
             Runtime.run(prog)
 
     def group_apply_edges(self, group_by, func, edges=ALL, inplace=False):
-        """Apply the function on the edges to update their features.
-
-        If None is provided for ``func``, nothing will happen.
+        """Group the edges by nodes and apply the function on the grouped edges to update their features.
 
         Parameters
         ----------
         group_by : str
             Specify how to group edges. Expected to be either 'src' or 'dst'
-        func : callable, optional
+        func : callable
             Apply function on the edge. The function should be
-            an :mod:`Edge UDF <dgl.udf>`.
+            an :mod:`Edge UDF <dgl.udf>`. The input of `Edge UDF` should be (bucket_size, degrees, *feature_shape), and
+            return the dict with values of the same shapes.
         edges : valid edges type, optional
-            Edges on which to apply ``func``. See :func:`send` for valid
+            Edges on which to group and apply ``func``. See :func:`send` for valid
             edges type. Default is all the edges.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
@@ -1952,20 +1951,26 @@ class DGLGraph(object):
         >>> import torch as th
 
         >>> g = dgl.DGLGraph()
-        >>> g.add_nodes(3)
-        >>> g.add_edges([0, 1], [1, 2])   # 0 -> 1, 1 -> 2
-        >>> g.edata['y'] = th.ones(2, 1)
+        >>> g.add_nodes(4)
+        >>> g.add_edges(0, [1, 2, 3])
+        >>> g.add_edges(1, [2, 3])
+        >>> g.add_edges(2, [2, 3])
+        >>> g.edata['feat'] = th.randn((g.number_of_edges(), 1))
 
-        >>> # Doubles the edge feature.
-        >>> def double_feature(edges): return {'y': edges.data['y'] * 2}
-        >>> g.apply_edges(func=double_feature, edges=0) # Apply func to the first edge.
-        >>> g.edata
-        {'y': tensor([[2.],   # 2 * 1
-                      [1.]])}
+        >>> # Softmax over the out edges of each node
+        >>> # Second dimension of edges.data is the degree dimension
+        >>> def softmax_feat(edges): return {'norm_feat': th.softmax(edges.data['feat'], dim=1)}
+        >>> g.group_apply_edges(func=softmax_feat, group_by='src') # Apply func to the first edge.
+        >>> u, v, eid = g.out_edges(1, form='all')
+        >>> in_feat = g.edata['feat'][eid]
+        >>> out_feat = g.edata['norm_feat'][eid]
+        >>> print(out_feat - th.softmax(in_feat, 0))
+            tensor([[0.],
+            [0.]])
 
         See Also
         --------
-        apply_nodes
+        apply_edges
         """
         assert func is not None
 

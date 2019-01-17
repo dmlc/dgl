@@ -365,7 +365,7 @@ def schedule_group_apply(graph,
                          u, v, eids,
                          apply_func, group_by,
                          inplace):
-    """get apply edges schedule
+    """group apply edges schedule
 
     Parameters
     ----------
@@ -388,52 +388,11 @@ def schedule_group_apply(graph,
     -------
     A list of executors for DGL Runtime
     """
+    # For bucketing schedule
     unique_u, _ = F.sort_1d(F.unique(u.tousertensor()))
     unique_v, _ = F.sort_1d(F.unique(v.tousertensor()))
     unique_u = utils.toindex(unique_u)
     unique_v = utils.toindex(unique_v)
-
-    # vars
-    var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
-    var_ef = var.FEAT_DICT(graph._edge_frame, name='ef')
-    var_u = var.IDX(u, name='var_u')
-    var_v = var.IDX(v, name='var_v')
-    var_eids = var.IDX(eids, name='var_eids')
-
-    # schedule apply edges
-    # Expand the src and dst feature as the same length of edge feature
-    # Not sure whether should copy the source and destination features here
-
-    graph._src_frame = FrameRef(Frame(num_rows=graph.number_of_edges()))
-    graph._dst_frame = FrameRef(Frame(num_rows=graph.number_of_edges()))
-    src_frame = var.FEAT_DICT(graph._src_frame, 'src_frame')
-    dst_frame = var.FEAT_DICT(graph._dst_frame, 'dst_frame')
-    fdsrc = ir.READ_ROW(var_nf, var_u)
-    fddst = ir.READ_ROW(var_nf, var_v)
-    ir.WRITE_ROW_(src_frame, var_eids, fdsrc)
-    ir.WRITE_ROW_(dst_frame, var_eids, fddst)
-
-    def _per_bkt_efunc(graph, apply_func, deg, vbkt):
-        def _efunc_wrapper(src_data, edge_data, dst_data):
-            def _reshape_func(edge_shape_data):
-                def _reshaped_getter(key):
-                    _edge_shape_data = edge_shape_data[key]
-                    new_shape = (len(vbkt), deg) + F.shape(_edge_shape_data)[1:]
-                    return F.reshape(_edge_shape_data, new_shape)
-
-                return _reshaped_getter
-
-            # def _reshape_back(key):
-
-
-
-            reshaped_src_data = utils.LazyDict(_reshape_func(src_data), src_data.keys())
-            reshaped_dst_data = utils.LazyDict(_reshape_func(dst_data), dst_data.keys())
-            reshaped_edge_data = utils.LazyDict(_reshape_func(edge_data), edge_data.keys())
-            ebatch = EdgeBatch(graph, (u, v, eids), reshaped_src_data, reshaped_edge_data, reshaped_dst_data)
-            return apply_func(ebatch)
-
-        return _efunc_wrapper
 
     if group_by == 'src':
         buckets = db._degree_bucketing_schedule(eids, u, unique_u)
@@ -442,22 +401,61 @@ def schedule_group_apply(graph,
     else:
         raise DGLError("Group_by should be either src or dst")
 
+    # vars
+    var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
+    var_ef = var.FEAT_DICT(graph._edge_frame, name='ef')
+    var_u = var.IDX(u, name='var_u')
+    var_v = var.IDX(v, name='var_v')
+    var_eids = var.IDX(eids, name='var_eids')
+
+    # Expand the src and dst feature to the same length of edge feature
+    # Not sure whether should copy the source and destination features here
+    _src_frame = FrameRef(Frame(num_rows=graph.number_of_edges()))
+    _dst_frame = FrameRef(Frame(num_rows=graph.number_of_edges()))
+    src_frame = var.FEAT_DICT(_src_frame, name='src_frame')
+    dst_frame = var.FEAT_DICT(_dst_frame, name='dst_frame')
+    fdsrc = ir.READ_ROW(var_nf, var_u)
+    fddst = ir.READ_ROW(var_nf, var_v)
+    ir.WRITE_ROW_(src_frame, var_eids, fdsrc)
+    ir.WRITE_ROW_(dst_frame, var_eids, fddst)
+
+    # Wrap edge UDF to reshape and reshape back features
+    def _per_bkt_efunc(graph, apply_func, deg, vbkt):
+        def _efunc_wrapper(src_data, edge_data, dst_data):
+            def _reshape_func(edge_shape_data):
+                def _reshaped_getter(key):
+                    _edge_shape_data = edge_shape_data[key]
+                    new_shape = (len(vbkt), deg) + F.shape(_edge_shape_data)[1:]
+                    return F.reshape(_edge_shape_data, new_shape)
+                return _reshaped_getter
+
+            # Should this be Lazy Dict?
+            def _reshape_back(data):
+                original_shape = F.shape(data)[2:]
+                reshape_back_shape = (len(vbkt) * deg,) + original_shape
+                return F.reshape(data, reshape_back_shape)
+
+            reshaped_src_data = utils.LazyDict(_reshape_func(src_data), src_data.keys())
+            reshaped_dst_data = utils.LazyDict(_reshape_func(dst_data), dst_data.keys())
+            reshaped_edge_data = utils.LazyDict(_reshape_func(edge_data), edge_data.keys())
+            ebatch = EdgeBatch(graph, (u, v, eids), reshaped_src_data, reshaped_edge_data, reshaped_dst_data)
+            return {k: _reshape_back(v) for k, v in apply_func(ebatch).items()}
+        return _efunc_wrapper
+
     _, degs, buckets, e_ids, zero_deg_nodes = buckets
 
     # loop over each bucket
     idx_list = []
     fd_list = []
-    count = 0
     for deg, vbkt, eid in zip(degs, buckets, e_ids):
         _efunc = var.FUNC(_per_bkt_efunc(graph, apply_func, deg, vbkt))
-        eid = var.IDX(eid, 'eid_{}'.format(count))
+        eid = var.IDX(eid)
         b_fdsrc = ir.READ_ROW(src_frame, eid)
         b_fddst = ir.READ_ROW(dst_frame, eid)
         b_fdedge = ir.READ_ROW(var_ef, eid)
         b_fdedge = ir.EDGE_UDF(_efunc, b_fdsrc, b_fdedge, b_fddst, ret=b_fdedge)
         idx_list.append(eid)
         fd_list.append(b_fdedge)
-        count += 1
 
     # merge buckets according to the ascending order of the node ids.
     all_idx = F.cat([idx.data.tousertensor() for idx in idx_list], dim=0)
@@ -465,13 +463,14 @@ def schedule_group_apply(graph,
     var_order = var.IDX(utils.toindex(order))
     new_fdedge = ir.MERGE_ROW(var_order, fd_list)
 
+    ir.CLEAR_FRAME_(src_frame)
+    ir.CLEAR_FRAME_(dst_frame)
+
     if inplace:
         ir.WRITE_ROW_INPLACE_(var_ef, var_eids, new_fdedge)
     else:
         ir.WRITE_ROW_(var_ef, var_eids, new_fdedge)
 
-    ir.CLEAR_FRAME_(src_frame)
-    ir.CLEAR_FRAME_(dst_frame)
 
 def _check_builtin_func_list(func_list):
     """Check whether func_list only contains builtin functions."""
