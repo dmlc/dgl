@@ -23,6 +23,14 @@ def cpu():
 def tensor(data, dtype=None):
     return th.tensor(data, dtype=dtype)
 
+def get_preferred_sparse_format():
+    """Get the preferred sparse matrix format supported by the backend.
+
+    Different backends have their preferred backend. This info is useful when
+    constructing a sparse matrix.
+    """
+    return "coo"
+
 if TH_VERSION.version[0] == 0:
     def sparse_matrix(data, index, shape, force_format=False):
         fmt = index[0]
@@ -64,7 +72,10 @@ def astype(input, ty):
     return input.type(ty)
 
 def asnumpy(input):
-    return input.cpu().numpy()
+    if isinstance(input, th.sparse.FloatTensor):
+        return input.to_dense().cpu().numpy()
+    else:
+        return input.cpu().numpy()
 
 def copy_to(input, ctx):
     if ctx.type == 'cpu':
@@ -188,5 +199,3 @@ def zerocopy_to_numpy(input):
 
 def zerocopy_from_numpy(np_array):
     return th.from_numpy(np_array)
-
-# create_immutable_graph_index not enabled

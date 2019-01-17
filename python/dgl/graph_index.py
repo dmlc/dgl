@@ -11,7 +11,6 @@ from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
 from . import utils
-from .immutable_graph_index import create_immutable_graph_index
 
 GraphIndexHandle = ctypes.c_void_p
 
@@ -23,8 +22,10 @@ class GraphIndex(object):
     handle : GraphIndexHandle
         Handler
     """
-    def __init__(self, handle):
+    def __init__(self, handle=None, multigraph=None, readonly=None):
         self._handle = handle
+        self._multigraph = multigraph
+        self._readonly = readonly
         self._cache = {}
 
     def __del__(self):
@@ -35,21 +36,35 @@ class GraphIndex(object):
         src, dst, _ = self.edges()
         n_nodes = self.number_of_nodes()
         multigraph = self.is_multigraph()
+        readonly = self.is_readonly()
 
-        return n_nodes, multigraph, src, dst
+        return n_nodes, multigraph, readonly, src, dst
 
     def __setstate__(self, state):
         """The pickle state of GraphIndex is defined as a triplet
-        (number_of_nodes, multigraph, src_nodes, dst_nodes)
+        (number_of_nodes, multigraph, readonly, src_nodes, dst_nodes)
         """
-        n_nodes, multigraph, src, dst = state
+        n_nodes, multigraph, readonly, src, dst = state
 
-        self._handle = _CAPI_DGLGraphCreate(multigraph)
-        self._cache = {}
+        if readonly:
+            self._readonly = readonly
+            self._multigraph = multigraph
+            self.init(src, dst, F.arange(0, len(src)), n_nodes)
+        else:
+            self._handle = _CAPI_DGLGraphCreateMutable(multigraph)
+            self._cache = {}
 
-        self.clear()
-        self.add_nodes(n_nodes)
-        self.add_edges(src, dst)
+            self.clear()
+            self.add_nodes(n_nodes)
+            self.add_edges(src, dst)
+
+    def init(self, src_ids, dst_ids, edge_ids, num_nodes):
+        """The actual init function"""
+        assert len(src_ids) == len(dst_ids)
+        assert len(src_ids) == len(edge_ids)
+        self._handle = _CAPI_DGLGraphCreate(src_ids.todgltensor(), dst_ids.todgltensor(),
+                                            edge_ids.todgltensor(), self._multigraph, num_nodes,
+                                            self._readonly)
 
     def add_nodes(self, num):
         """Add nodes.
@@ -107,7 +122,9 @@ class GraphIndex(object):
         bool
             True if it is a multigraph, False otherwise.
         """
-        return bool(_CAPI_DGLGraphIsMultigraph(self._handle))
+        if self._multigraph is None:
+            self._multigraph = bool(_CAPI_DGLGraphIsMultigraph(self._handle))
+        return self._multigraph
 
     def is_readonly(self):
         """Indicate whether the graph index is read-only.
@@ -117,7 +134,9 @@ class GraphIndex(object):
         bool
             True if it is a read-only graph, False otherwise.
         """
-        return False
+        if self._readonly is None:
+            self._readonly = bool(_CAPI_DGLGraphIsReadonly(self._handle))
+        return self._readonly
 
     def number_of_nodes(self):
         """Return the number of nodes.
@@ -367,13 +386,17 @@ class GraphIndex(object):
         return src, dst, eid
 
     @utils.cached_member(cache='_cache', prefix='edges')
-    def edges(self, return_sorted=False):
+    def edges(self, order=None):
         """Return all the edges
 
         Parameters
         ----------
-        return_sorted : bool
-            True if the returned edges are sorted by their src and dst ids.
+        order : string
+            The order of the returned edges. Currently support:
+
+            - 'srcdst' : sorted by their src and dst ids.
+            - 'eid'    : sorted by edge Ids.
+            - None     : the arbitrary order.
 
         Returns
         -------
@@ -384,9 +407,11 @@ class GraphIndex(object):
         utils.Index
             The edge ids.
         """
-        key = 'edges_s%d' % return_sorted
+        key = 'edges_s%s' % order
         if key not in self._cache:
-            edge_array = _CAPI_DGLGraphEdges(self._handle, return_sorted)
+            if order is None:
+                order = ""
+            edge_array = _CAPI_DGLGraphEdges(self._handle, order)
             src = utils.toindex(edge_array(0))
             dst = utils.toindex(edge_array(1))
             eid = utils.toindex(edge_array(2))
@@ -537,22 +562,27 @@ class GraphIndex(object):
         if not isinstance(transpose, bool):
             raise DGLError('Expect bool value for "transpose" arg,'
                            ' but got %s.' % (type(transpose)))
-        src, dst, _ = self.edges(False)
-        src = src.tousertensor(ctx)  # the index of the ctx will be cached
-        dst = dst.tousertensor(ctx)  # the index of the ctx will be cached
-        src = F.unsqueeze(src, dim=0)
-        dst = F.unsqueeze(dst, dim=0)
-        if transpose:
-            idx = F.cat([src, dst], dim=0)
+        fmt = F.get_preferred_sparse_format()
+        rst = _CAPI_DGLGraphGetAdj(self._handle, transpose, fmt)
+        if fmt == "csr":
+            indptr = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
+            indices = F.copy_to(utils.toindex(rst(1)).tousertensor(), ctx)
+            shuffle = utils.toindex(rst(2))
+            dat = F.ones(indices.shape, dtype=F.float32, ctx=ctx)
+            return F.sparse_matrix(dat, ('csr', indices, indptr),
+                                   (self.number_of_nodes(), self.number_of_nodes()))[0], shuffle
+        elif fmt == "coo":
+            ## FIXME(minjie): data type
+            idx = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
+            m = self.number_of_edges()
+            idx = F.reshape(idx, (2, m))
+            dat = F.ones((m,), dtype=F.float32, ctx=ctx)
+            n = self.number_of_nodes()
+            adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, n))
+            shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+            return adj, shuffle_idx
         else:
-            idx = F.cat([dst, src], dim=0)
-        n = self.number_of_nodes()
-        m = self.number_of_edges()
-        # FIXME(minjie): data type
-        dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-        adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, n))
-        shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
-        return adj, shuffle_idx
+            raise Exception("unknown format")
 
     @utils.cached_member(cache='_cache', prefix='inc')
     def incidence_matrix(self, typestr, ctx):
@@ -590,7 +620,7 @@ class GraphIndex(object):
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
-        src, dst, eid = self.edges(False)
+        src, dst, eid = self.edges()
         src = src.tousertensor(ctx)  # the index of the ctx will be cached
         dst = dst.tousertensor(ctx)  # the index of the ctx will be cached
         eid = eid.tousertensor(ctx)  # the index of the ctx will be cached
@@ -631,6 +661,22 @@ class GraphIndex(object):
         shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
         return inc, shuffle_idx
 
+    def neighbor_sampling(self, seed_ids, expand_factor, num_hops, neighbor_type, node_prob):
+        """Neighborhood sampling"""
+        if len(seed_ids) == 0:
+            return []
+
+        seed_ids = [v.todgltensor() for v in seed_ids]
+        num_subgs = len(seed_ids)
+        if node_prob is None:
+            rst = _uniform_sampling(self, seed_ids, neighbor_type, num_hops, expand_factor)
+        else:
+            rst = _nonuniform_sampling(self, node_prob, seed_ids, neighbor_type, num_hops,
+                                       expand_factor)
+
+        return [SubgraphIndex(rst(i), self, utils.toindex(rst(num_subgs + i)),
+                              utils.toindex(rst(num_subgs * 2 + i))) for i in range(num_subgs)]
+
     def to_networkx(self):
         """Convert to networkx graph.
 
@@ -659,8 +705,6 @@ class GraphIndex(object):
         nx_graph : networkx.DiGraph
             The nx graph
         """
-        self.clear()
-
         if not isinstance(nx_graph, nx.Graph):
             nx_graph = (nx.MultiDiGraph(nx_graph) if self.is_multigraph()
                         else nx.DiGraph(nx_graph))
@@ -671,9 +715,13 @@ class GraphIndex(object):
                 nx_graph = nx_graph.to_directed()
 
         num_nodes = nx_graph.number_of_nodes()
-        self.add_nodes(num_nodes)
+        if not self.is_readonly():
+            self.clear()
+            self.add_nodes(num_nodes)
 
         if nx_graph.number_of_edges() == 0:
+            if self.is_readonly():
+                raise Exception("can't create an empty immutable graph")
             return
 
         # nx_graph.edges(data=True) returns src, dst, attr_dict
@@ -692,9 +740,14 @@ class GraphIndex(object):
             for e in nx_graph.edges:
                 src.append(e[0])
                 dst.append(e[1])
+        eid = np.arange(0, len(src), dtype=np.int64)
+        num_nodes = nx_graph.number_of_nodes()
+        # We store edge Ids as an edge attribute.
+        eid = utils.toindex(eid)
         src = utils.toindex(src)
         dst = utils.toindex(dst)
-        self.add_edges(src, dst)
+        self.init(src, dst, eid, num_nodes)
+
 
     def from_scipy_sparse_matrix(self, adj):
         """Convert from scipy sparse matrix.
@@ -703,12 +756,17 @@ class GraphIndex(object):
         ----------
         adj : scipy sparse matrix
         """
-        self.clear()
-        self.add_nodes(adj.shape[0])
+        assert isinstance(adj, (scipy.sparse.csr_matrix, scipy.sparse.coo_matrix)), \
+                "The input matrix has to be a SciPy sparse matrix."
+        if not self.is_readonly():
+            self.clear()
+        num_nodes = max(adj.shape[0], adj.shape[1])
         adj_coo = adj.tocoo()
         src = utils.toindex(adj_coo.row)
         dst = utils.toindex(adj_coo.col)
-        self.add_edges(src, dst)
+        edge_ids = utils.toindex(F.arange(0, len(adj_coo.row)))
+        self.init(src, dst, edge_ids, num_nodes)
+
 
     def from_edge_list(self, elist):
         """Convert from an edge list.
@@ -718,16 +776,19 @@ class GraphIndex(object):
         elist : list
             List of (u, v) edge tuple.
         """
-        self.clear()
+        if not self.is_readonly():
+            self.clear()
         src, dst = zip(*elist)
         src = np.array(src)
         dst = np.array(dst)
+        src_ids = utils.toindex(src)
+        dst_ids = utils.toindex(dst)
         num_nodes = max(src.max(), dst.max()) + 1
         min_nodes = min(src.min(), dst.min())
         if min_nodes != 0:
             raise DGLError('Invalid edge list. Nodes must start from 0.')
-        self.add_nodes(num_nodes)
-        self.add_edges(utils.toindex(src), utils.toindex(dst))
+        edge_ids = utils.toindex(F.arange(0, len(src)))
+        self.init(src_ids, dst_ids, edge_ids, num_nodes)
 
     def line_graph(self, backtracking=True):
         """Return the line graph of this graph.
@@ -761,7 +822,8 @@ class SubgraphIndex(GraphIndex):
         The parent edge ids in this subgraph.
     """
     def __init__(self, handle, parent, induced_nodes, induced_edges):
-        super(SubgraphIndex, self).__init__(handle)
+        super(SubgraphIndex, self).__init__(parent.is_multigraph(), parent.is_readonly())
+        self._handle = handle
         self._parent = parent
         self._induced_nodes = induced_nodes
         self._induced_edges = induced_edges
@@ -813,7 +875,7 @@ def map_to_subgraph_nid(subgraph, parent_nids):
 
     Parameters
     ----------
-    subgraph: SubgraphIndex or ImmutableSubgraphIndex
+    subgraph: SubgraphIndex
         the graph index of a subgraph
 
     parent_nids: utils.Index
@@ -900,12 +962,15 @@ def create_graph_index(graph_data=None, multigraph=False, readonly=False):
         return graph_data
 
     if readonly:
-        return create_immutable_graph_index(graph_data)
+        # FIXME(zhengda): we should construct a C graph index before constructing GraphIndex.
+        gidx = GraphIndex(None, multigraph, readonly)
+    else:
+        handle = _CAPI_DGLGraphCreateMutable(multigraph)
+        gidx = GraphIndex(handle, multigraph, readonly)
 
-    handle = _CAPI_DGLGraphCreate(multigraph)
-    gidx = GraphIndex(handle)
-
-    if graph_data is None:
+    if graph_data is None and readonly:
+        raise Exception("can't create an empty immutable graph")
+    elif graph_data is None:
         return gidx
 
     # edge list
@@ -933,4 +998,30 @@ def create_graph_index(graph_data=None, multigraph=False, readonly=False):
 
     return gidx
 
+
 _init_api("dgl.graph_index")
+
+# TODO(zhengda): we'll support variable-length inputs.
+_NEIGHBOR_SAMPLING_APIS = {
+    1: _CAPI_DGLGraphUniformSampling,
+    2: _CAPI_DGLGraphUniformSampling2,
+    4: _CAPI_DGLGraphUniformSampling4,
+    8: _CAPI_DGLGraphUniformSampling8,
+    16: _CAPI_DGLGraphUniformSampling16,
+    32: _CAPI_DGLGraphUniformSampling32,
+    64: _CAPI_DGLGraphUniformSampling64,
+    128: _CAPI_DGLGraphUniformSampling128,
+}
+
+_EMPTY_ARRAYS = [utils.toindex(F.ones(shape=(0), dtype=F.int64, ctx=F.cpu()))]
+
+def _uniform_sampling(gidx, seed_ids, neigh_type, num_hops, expand_factor):
+    num_seeds = len(seed_ids)
+    empty_ids = []
+    if len(seed_ids) > 1 and len(seed_ids) not in _NEIGHBOR_SAMPLING_APIS.keys():
+        remain = 2**int(math.ceil(math.log2(len(dgl_ids)))) - len(dgl_ids)
+        empty_ids = _EMPTY_ARRAYS[0:remain]
+        seed_ids.extend([empty.todgltensor() for empty in empty_ids])
+    assert len(seed_ids) in _NEIGHBOR_SAMPLING_APIS.keys()
+    return _NEIGHBOR_SAMPLING_APIS[len(seed_ids)](gidx._handle, *seed_ids, neigh_type,
+                                                  num_hops, expand_factor, num_seeds)

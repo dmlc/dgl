@@ -1,70 +1,138 @@
 /*!
  *  Copyright (c) 2018 by Contributors
- * \file dgl/graph.h
- * \brief DGL graph index class.
+ * \file dgl/immutable_graph.h
+ * \brief DGL immutable graph index class.
  */
-#ifndef DGL_GRAPH_H_
-#define DGL_GRAPH_H_
+#ifndef DGL_IMMUTABLE_GRAPH_H_
+#define DGL_IMMUTABLE_GRAPH_H_
 
 #include <vector>
+#include <string>
 #include <cstdint>
 #include <utility>
 #include <tuple>
-
+#include "runtime/ndarray.h"
 #include "graph_interface.h"
 
 namespace dgl {
 
-class Graph;
-class GraphOp;
-
 /*!
- * \brief Base dgl graph index class.
+ * \brief DGL immutable graph index class.
  *
  * DGL's graph is directed. Vertices are integers enumerated from zero.
- *
- * Removal of vertices/edges is not allowed. Instead, the graph can only be "cleared"
- * by removing all the vertices and edges.
- *
- * When calling functions supporing multiple edges (e.g. AddEdges, HasEdges),
- * the input edges are represented by two id arrays for source and destination
- * vertex ids. In the general case, the two arrays should have the same length.
- * If the length of src id array is one, it represents one-many connections.
- * If the length of dst id array is one, it represents many-one connections.
  */
-class Graph: public GraphInterface {
+class ImmutableGraph: public GraphInterface {
  public:
-  /*! \brief default constructor */
-  explicit Graph(bool multigraph = false) : is_multigraph_(multigraph) {}
+  typedef struct {
+    IdArray indptr, indices, id;
+  } CSRArray;
 
-  /*! \brief construct a graph from the coo format. */
-  Graph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
-      bool multigraph = false);
+  struct Edge {
+    dgl_id_t end_points[2];
+    dgl_id_t edge_id;
+  };
+
+  struct CSR {
+    typedef std::shared_ptr<CSR> Ptr;
+    std::vector<int64_t> indptr;
+    std::vector<dgl_id_t> indices;
+    std::vector<dgl_id_t> edge_ids;
+
+    CSR(int64_t num_vertices, int64_t expected_num_edges) {
+      indptr.resize(num_vertices + 1);
+      indices.reserve(expected_num_edges);
+      edge_ids.reserve(expected_num_edges);
+    }
+
+    bool HasVertex(dgl_id_t vid) const {
+      return vid < NumVertices();
+    }
+
+    uint64_t NumVertices() const {
+      return indptr.size() - 1;
+    }
+
+    uint64_t NumEdges() const {
+      return indices.size();
+    }
+
+    int64_t GetDegree(dgl_id_t vid) const {
+      return indptr[vid + 1] - indptr[vid];
+    }
+    DegreeArray GetDegrees(IdArray vids) const;
+    EdgeArray GetEdges(dgl_id_t vid) const;
+    EdgeArray GetEdges(IdArray vids) const;
+    /* \brief this returns the start and end position of the column indices corresponding v. */
+    DGLIdIters GetIndexRef(dgl_id_t v) const {
+      const int64_t start = indptr[v];
+      const int64_t end = indptr[v + 1];
+      return DGLIdIters(indices.begin() + start, indices.begin() + end);
+    }
+    /*
+     * Read all edges and store them in the vector.
+     */
+    void ReadAllEdges(std::vector<Edge> *edges) const;
+    CSR::Ptr Transpose() const;
+    std::pair<CSR::Ptr, IdArray> VertexSubgraph(IdArray vids) const;
+    /*
+     * Construct a CSR from a list of edges.
+     *
+     * When constructing a CSR, we need to sort the edge list. To reduce the overhead,
+     * we simply sort on the input edge list. We allow sorting on both end points of an edge,
+     * which is specified by `sort_on`.
+     */
+    static CSR::Ptr FromEdges(std::vector<Edge> *edges, int sort_on, int64_t num_nodes);
+  };
+
+  /*! \brief Construct an immutable graph from the COO format. */
+  ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
+                 bool multigraph = false);
+
+  /*!
+   * \brief Construct an immutable graph from the CSR format.
+   *
+   * For a single graph, we need two CSRs, one stores the in-edges of vertices and
+   * the other stores the out-edges of vertices. These two CSRs stores the same edges.
+   * The reason we need both is that some operators are faster on in-edge CSR and
+   * the other operators are faster on out-edge CSR.
+   *
+   * However, not both CSRs are required. Technically, one CSR contains all information.
+   * Thus, when we construct a temporary graphs (e.g., the sampled subgraphs), we only
+   * construct one of the CSRs that runs fast for some operations we expect and construct
+   * the other CSR on demand.
+   */
+  ImmutableGraph(CSR::Ptr in_csr, CSR::Ptr out_csr,
+                 bool multigraph = false) : is_multigraph_(multigraph) {
+    this->in_csr_ = in_csr;
+    this->out_csr_ = out_csr;
+    CHECK(this->in_csr_ != nullptr || this->out_csr_ != nullptr)
+                   << "there must exist one of the CSRs";
+  }
+
+  /*! \brief default constructor */
+  explicit ImmutableGraph(bool multigraph = false) : is_multigraph_(multigraph) {}
 
   /*! \brief default copy constructor */
-  Graph(const Graph& other) = default;
+  ImmutableGraph(const ImmutableGraph& other) = default;
 
 #ifndef _MSC_VER
   /*! \brief default move constructor */
-  Graph(Graph&& other) = default;
+  ImmutableGraph(ImmutableGraph&& other) = default;
 #else
-  Graph(Graph&& other) {
-    adjlist_ = other.adjlist_;
-    reverse_adjlist_ = other.reverse_adjlist_;
-    all_edges_src_ = other.all_edges_src_;
-    all_edges_dst_ = other.all_edges_dst_;
-    read_only_ = other.read_only_;
-    is_multigraph_ = other.is_multigraph_;
-    num_edges_ = other.num_edges_;
-    other.Clear();
+  ImmutableGraph(ImmutableGraph&& other) {
+    this->in_csr_ = other.in_csr_;
+    this->out_csr_ = other.out_csr_;
+    this->is_multigraph_ = other.is_multigraph_;
+    other.in_csr_ = nullptr;
+    other.out_csr_ = nullptr;
   }
 #endif  // _MSC_VER
 
   /*! \brief default assign constructor */
-  Graph& operator=(const Graph& other) = default;
+  ImmutableGraph& operator=(const ImmutableGraph& other) = default;
 
   /*! \brief default destructor */
-  ~Graph() = default;
+  ~ImmutableGraph() = default;
 
   /*!
    * \brief Add vertices to the graph.
@@ -72,32 +140,33 @@ class Graph: public GraphInterface {
    *       vertices to be added needs to be specified.
    * \param num_vertices The number of vertices to be added.
    */
-  void AddVertices(uint64_t num_vertices);
+  void AddVertices(uint64_t num_vertices) {
+    LOG(FATAL) << "AddVertices isn't supported in ImmutableGraph";
+  }
 
   /*!
    * \brief Add one edge to the graph.
    * \param src The source vertex.
    * \param dst The destination vertex.
    */
-  void AddEdge(dgl_id_t src, dgl_id_t dst);
+  void AddEdge(dgl_id_t src, dgl_id_t dst) {
+    LOG(FATAL) << "AddEdge isn't supported in ImmutableGraph";
+  }
 
   /*!
    * \brief Add edges to the graph.
    * \param src_ids The source vertex id array.
    * \param dst_ids The destination vertex id array.
    */
-  void AddEdges(IdArray src_ids, IdArray dst_ids);
+  void AddEdges(IdArray src_ids, IdArray dst_ids) {
+    LOG(FATAL) << "AddEdges isn't supported in ImmutableGraph";
+  }
 
   /*!
    * \brief Clear the graph. Remove all vertices/edges.
    */
   void Clear() {
-    adjlist_.clear();
-    reverse_adjlist_.clear();
-    all_edges_src_.clear();
-    all_edges_dst_.clear();
-    read_only_ = false;
-    num_edges_ = 0;
+    LOG(FATAL) << "Clear isn't supported in ImmutableGraph";
   }
 
   /*!
@@ -112,17 +181,23 @@ class Graph: public GraphInterface {
    * \return whether the graph is read-only
    */
   virtual bool IsReadonly() const {
-    return false;
+    return true;
   }
 
   /*! \return the number of vertices in the graph.*/
   uint64_t NumVertices() const {
-    return adjlist_.size();
+    if (in_csr_)
+      return in_csr_->NumVertices();
+    else
+      return out_csr_->NumVertices();
   }
 
   /*! \return the number of edges in the graph.*/
   uint64_t NumEdges() const {
-    return num_edges_;
+    if (in_csr_)
+      return in_csr_->NumEdges();
+    else
+      return out_csr_->NumEdges();
   }
 
   /*! \return true if the given vertex is in the graph.*/
@@ -182,7 +257,8 @@ class Graph: public GraphInterface {
    * \return a pair whose first element is the source and the second the destination.
    */
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const {
-    return std::make_pair(all_edges_src_[eid], all_edges_dst_[eid]);
+    LOG(FATAL) << "FindEdge isn't supported in ImmutableGraph";
+    return std::pair<dgl_id_t, dgl_id_t>();
   }
 
   /*!
@@ -190,7 +266,10 @@ class Graph: public GraphInterface {
    * \param eids The edge ID array.
    * \return EdgeArray containing all edges with id in eid.  The order is preserved.
    */
-  EdgeArray FindEdges(IdArray eids) const;
+  EdgeArray FindEdges(IdArray eids) const {
+    LOG(FATAL) << "FindEdges isn't supported in ImmutableGraph";
+    return EdgeArray();
+  }
 
   /*!
    * \brief Get the in edges of the vertex.
@@ -198,14 +277,18 @@ class Graph: public GraphInterface {
    * \param vid The vertex id.
    * \return the edges
    */
-  EdgeArray InEdges(dgl_id_t vid) const;
+  EdgeArray InEdges(dgl_id_t vid) const {
+    return this->GetInCSR()->GetEdges(vid);
+  }
 
   /*!
    * \brief Get the in edges of the vertices.
    * \param vids The vertex id array.
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray InEdges(IdArray vids) const;
+  EdgeArray InEdges(IdArray vids) const {
+    return this->GetInCSR()->GetEdges(vids);
+  }
 
   /*!
    * \brief Get the out edges of the vertex.
@@ -213,14 +296,21 @@ class Graph: public GraphInterface {
    * \param vid The vertex id.
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray OutEdges(dgl_id_t vid) const;
+  EdgeArray OutEdges(dgl_id_t vid) const {
+    auto ret = this->GetOutCSR()->GetEdges(vid);
+    // We should reverse the source and destination in the edge array.
+    return ImmutableGraph::EdgeArray{ret.dst, ret.src, ret.id};
+  }
 
   /*!
    * \brief Get the out edges of the vertices.
    * \param vids The vertex id array.
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray OutEdges(IdArray vids) const;
+  EdgeArray OutEdges(IdArray vids) const {
+    auto ret = this->GetOutCSR()->GetEdges(vids);
+    return ImmutableGraph::EdgeArray{ret.dst, ret.src, ret.id};
+  }
 
   /*!
    * \brief Get all the edges in the graph.
@@ -238,7 +328,7 @@ class Graph: public GraphInterface {
    */
   uint64_t InDegree(dgl_id_t vid) const {
     CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
-    return reverse_adjlist_[vid].succ.size();
+    return this->GetInCSR()->GetDegree(vid);
   }
 
   /*!
@@ -246,7 +336,9 @@ class Graph: public GraphInterface {
    * \param vid The vertex id array.
    * \return the in degree array
    */
-  DegreeArray InDegrees(IdArray vids) const;
+  DegreeArray InDegrees(IdArray vids) const {
+    return this->GetInCSR()->GetDegrees(vids);
+  }
 
   /*!
    * \brief Get the out degree of the given vertex.
@@ -255,7 +347,7 @@ class Graph: public GraphInterface {
    */
   uint64_t OutDegree(dgl_id_t vid) const {
     CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
-    return adjlist_[vid].succ.size();
+    return this->GetOutCSR()->GetDegree(vid);
   }
 
   /*!
@@ -263,7 +355,9 @@ class Graph: public GraphInterface {
    * \param vid The vertex id array.
    * \return the out degree array
    */
-  DegreeArray OutDegrees(IdArray vids) const;
+  DegreeArray OutDegrees(IdArray vids) const {
+    return this->GetOutCSR()->GetDegrees(vids);
+  }
 
   /*!
    * \brief Construct the induced subgraph of the given vertices.
@@ -308,7 +402,9 @@ class Graph: public GraphInterface {
    *
    * \return the reversed graph
    */
-  GraphPtr Reverse() const;
+  GraphPtr Reverse() const {
+    return GraphPtr(new ImmutableGraph(out_csr_, in_csr_, is_multigraph_));
+  }
 
   /*!
    * \brief Return the successor vector
@@ -316,7 +412,8 @@ class Graph: public GraphInterface {
    * \return the successor vector
    */
   DGLIdIters SuccVec(dgl_id_t vid) const {
-    return DGLIdIters(adjlist_[vid].succ.begin(), adjlist_[vid].succ.end());
+    return DGLIdIters(out_csr_->indices.begin() + out_csr_->indptr[vid],
+                      out_csr_->indices.begin() + out_csr_->indptr[vid + 1]);
   }
 
   /*!
@@ -325,7 +422,8 @@ class Graph: public GraphInterface {
    * \return the out edge id vector
    */
   DGLIdIters OutEdgeVec(dgl_id_t vid) const {
-    return DGLIdIters(adjlist_[vid].edge_id.begin(), adjlist_[vid].edge_id.end());
+    return DGLIdIters(out_csr_->edge_ids.begin() + out_csr_->indptr[vid],
+                      out_csr_->edge_ids.begin() + out_csr_->indptr[vid + 1]);
   }
 
   /*!
@@ -334,7 +432,8 @@ class Graph: public GraphInterface {
    * \return the predecessor vector
    */
   DGLIdIters PredVec(dgl_id_t vid) const {
-    return DGLIdIters(reverse_adjlist_[vid].succ.begin(), reverse_adjlist_[vid].succ.end());
+    return DGLIdIters(in_csr_->indices.begin() + in_csr_->indptr[vid],
+                      in_csr_->indices.begin() + in_csr_->indptr[vid + 1]);
   }
 
   /*!
@@ -343,8 +442,8 @@ class Graph: public GraphInterface {
    * \return the in edge id vector
    */
   DGLIdIters InEdgeVec(dgl_id_t vid) const {
-    return DGLIdIters(reverse_adjlist_[vid].edge_id.begin(),
-                      reverse_adjlist_[vid].edge_id.end());
+    return DGLIdIters(in_csr_->edge_ids.begin() + in_csr_->indptr[vid],
+                      in_csr_->edge_ids.begin() + in_csr_->indptr[vid + 1]);
   }
 
   /*!
@@ -352,10 +451,18 @@ class Graph: public GraphInterface {
    * \return a raw pointer to the graph object.
    */
   virtual GraphInterface *Reset() {
-    Graph* gptr = new Graph();
+    ImmutableGraph* gptr = new ImmutableGraph();
     *gptr = std::move(*this);
     return gptr;
   }
+
+  /*!
+   * \brief Sample a subgraph from the seed vertices with neighbor sampling.
+   * The neighbors are sampled with a uniform distribution.
+   * \return a subgraph
+   */
+  SampledSubgraph NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
+                                        int num_hops, int expand_factor) const;
 
   /*!
    * \brief Get the adjacency matrix of the graph.
@@ -368,50 +475,72 @@ class Graph: public GraphInterface {
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const;
 
-  /*!
-   * \brief Sample a subgraph from the seed vertices with neighbor sampling.
-   * The neighbors are sampled with a uniform distribution.
-   * \return a subgraph
+ protected:
+  DGLIdIters GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
+  DGLIdIters GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
+
+  /*
+   * The immutable graph may only contain one of the CSRs (e.g., the sampled subgraphs).
+   * When we get in csr or out csr, we try to get the one cached in the structure.
+   * If not, we transpose the other one to get the one we need.
    */
-  virtual SampledSubgraph NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
-                                                int num_hops, int expand_factor) const {
-    LOG(FATAL) << "NeighborUniformSample isn't supported in mutable graph";
-    return SampledSubgraph();
+  CSR::Ptr GetInCSR() const {
+    if (in_csr_) {
+      return in_csr_;
+    } else {
+      CHECK(out_csr_ != nullptr) << "one of the CSRs must exist";
+      const_cast<ImmutableGraph *>(this)->in_csr_ = out_csr_->Transpose();
+      return in_csr_;
+    }
+  }
+  CSR::Ptr GetOutCSR() const {
+    if (out_csr_) {
+      return out_csr_;
+    } else {
+      CHECK(in_csr_ != nullptr) << "one of the CSRs must exist";
+      const_cast<ImmutableGraph *>(this)->out_csr_ = in_csr_->Transpose();
+      return out_csr_;
+    }
   }
 
- protected:
-  friend class GraphOp;
-  /*! \brief Internal edge list type */
-  struct EdgeList {
-    /*! \brief successor vertex list */
-    std::vector<dgl_id_t> succ;
-    /*! \brief predecessor vertex list */
-    std::vector<dgl_id_t> edge_id;
-  };
-  typedef std::vector<EdgeList> AdjacencyList;
+  /*!
+   * \brief Get the CSR array that represents the in-edges.
+   * This method copies data from std::vector to IdArray.
+   * \return the CSR array.
+   */
+  CSRArray GetInCSRArray() const;
 
-  /*! \brief adjacency list using vector storage */
-  AdjacencyList adjlist_;
-  /*! \brief reverse adjacency list using vector storage */
-  AdjacencyList reverse_adjlist_;
+  /*!
+   * \brief Get the CSR array that represents the out-edges.
+   * This method copies data from std::vector to IdArray.
+   * \return the CSR array.
+   */
+  CSRArray GetOutCSRArray() const;
 
-  /*! \brief all edges' src endpoints in their edge id order */
-  std::vector<dgl_id_t> all_edges_src_;
-  /*! \brief all edges' dst endpoints in their edge id order */
-  std::vector<dgl_id_t> all_edges_dst_;
+  SampledSubgraph SampleSubgraph(IdArray seed_arr, const float* probability,
+                                 const std::string &neigh_type,
+                                 int num_hops, size_t num_neighbor) const;
 
-  /*! \brief read only flag */
-  bool read_only_ = false;
+  /*!
+   * \brief Compact a subgraph.
+   * In a sampled subgraph, the vertex Id is still in the ones in the original graph.
+   * We want to convert them to the subgraph Ids.
+   */
+  void CompactSubgraph(IdArray induced_vertices);
+
+  // Store the in-edges.
+  CSR::Ptr in_csr_;
+  // Store the out-edges.
+  CSR::Ptr out_csr_;
   /*!
    * \brief Whether if this is a multigraph.
    *
    * When a multiedge is added, this flag switches to true.
    */
   bool is_multigraph_ = false;
-  /*! \brief number of edges */
-  uint64_t num_edges_ = 0;
 };
 
 }  // namespace dgl
 
-#endif  // DGL_GRAPH_H_
+#endif  // DGL_IMMUTABLE_GRAPH_H_
+

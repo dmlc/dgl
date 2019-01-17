@@ -12,6 +12,38 @@
 #include "../c_api_common.h"
 
 namespace dgl {
+
+Graph::Graph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
+    bool multigraph): is_multigraph_(multigraph) {
+  CHECK(IsValidIdArray(src_ids));
+  CHECK(IsValidIdArray(dst_ids));
+  CHECK(IsValidIdArray(edge_ids));
+  this->AddVertices(num_nodes);
+  num_edges_ = src_ids->shape[0];
+  CHECK(num_edges_ == dst_ids->shape[0]) << "vectors in COO must have the same length";
+  CHECK(num_edges_ == edge_ids->shape[0]) << "vectors in COO must have the same length";
+  const dgl_id_t *src_data = static_cast<dgl_id_t*>(src_ids->data);
+  const dgl_id_t *dst_data = static_cast<dgl_id_t*>(dst_ids->data);
+  const dgl_id_t *edge_data = static_cast<dgl_id_t*>(edge_ids->data);
+  all_edges_src_.reserve(num_edges_);
+  all_edges_dst_.reserve(num_edges_);
+  for (int64_t i = 0; i < num_edges_; i++) {
+    auto src = src_data[i];
+    auto dst = dst_data[i];
+    auto eid = edge_data[i];
+    CHECK(HasVertex(src) && HasVertex(dst))
+      << "Invalid vertices: src=" << src << " dst=" << dst;
+
+    adjlist_[src].succ.push_back(dst);
+    adjlist_[src].edge_id.push_back(eid);
+    reverse_adjlist_[dst].succ.push_back(src);
+    reverse_adjlist_[dst].edge_id.push_back(eid);
+
+    all_edges_src_.push_back(src);
+    all_edges_dst_.push_back(dst);
+  }
+}
+
 void Graph::AddVertices(uint64_t num_vertices) {
   CHECK(!read_only_) << "Graph is read-only. Mutations are not allowed.";
   adjlist_.resize(adjlist_.size() + num_vertices);
@@ -333,13 +365,13 @@ Graph::EdgeArray Graph::OutEdges(IdArray vids) const {
 }
 
 // O(E*log(E)) if sort is required; otherwise, O(E)
-Graph::EdgeArray Graph::Edges(bool sorted) const {
+Graph::EdgeArray Graph::Edges(const std::string &order) const {
   const int64_t len = num_edges_;
   IdArray src = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   IdArray dst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   IdArray eid = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
 
-  if (sorted) {
+  if (order == "srcdst") {
     typedef std::tuple<int64_t, int64_t, int64_t> Tuple;
     std::vector<Tuple> tuples;
     tuples.reserve(len);
@@ -416,8 +448,9 @@ Subgraph Graph::VertexSubgraph(IdArray vids) const {
     oldv2newv[vid_data[i]] = i;
   }
   Subgraph rst;
+  rst.graph = std::make_shared<Graph>(IsMultigraph());
   rst.induced_vertices = vids;
-  rst.graph.AddVertices(len);
+  rst.graph->AddVertices(len);
   for (int64_t i = 0; i < len; ++i) {
     const dgl_id_t oldvid = vid_data[i];
     const dgl_id_t newvid = i;
@@ -426,7 +459,7 @@ Subgraph Graph::VertexSubgraph(IdArray vids) const {
       if (oldv2newv.count(oldsucc)) {
         const dgl_id_t newsucc = oldv2newv[oldsucc];
         edges.push_back(adjlist_[oldvid].edge_id[j]);
-        rst.graph.AddEdge(newvid, newsucc);
+        rst.graph->AddEdge(newvid, newsucc);
       }
     }
   }
@@ -453,13 +486,14 @@ Subgraph Graph::EdgeSubgraph(IdArray eids) const {
   }
 
   Subgraph rst;
+  rst.graph = std::make_shared<Graph>(IsMultigraph());
   rst.induced_edges = eids;
-  rst.graph.AddVertices(nodes.size());
+  rst.graph->AddVertices(nodes.size());
 
   for (int64_t i = 0; i < len; ++i) {
     dgl_id_t src_id = all_edges_src_[eid_data[i]];
     dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
-    rst.graph.AddEdge(oldv2newv[src_id], oldv2newv[dst_id]);
+    rst.graph->AddEdge(oldv2newv[src_id], oldv2newv[dst_id]);
   }
 
   rst.induced_vertices = IdArray::Empty(
@@ -469,9 +503,59 @@ Subgraph Graph::EdgeSubgraph(IdArray eids) const {
   return rst;
 }
 
-Graph Graph::Reverse() const {
+std::vector<IdArray> Graph::GetAdj(bool transpose, const std::string &fmt) const {
+  int64_t num_edges = NumEdges();
+  int64_t num_nodes = NumVertices();
+  if (fmt == "coo") {
+    IdArray idx = IdArray::Empty({2 * num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    int64_t *idx_data = static_cast<int64_t*>(idx->data);
+    if (transpose) {
+      std::copy(all_edges_src_.begin(), all_edges_src_.end(), idx_data);
+      std::copy(all_edges_dst_.begin(), all_edges_dst_.end(), idx_data + num_edges);
+    } else {
+      std::copy(all_edges_dst_.begin(), all_edges_dst_.end(), idx_data);
+      std::copy(all_edges_src_.begin(), all_edges_src_.end(), idx_data + num_edges);
+    }
+    IdArray eid = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    int64_t *eid_data = static_cast<int64_t*>(eid->data);
+    for (uint64_t eid = 0; eid < num_edges; ++eid) {
+      eid_data[eid] = eid;
+    }
+    return std::vector<IdArray>{idx, eid};
+  } else if (fmt == "csr") {
+    IdArray indptr = IdArray::Empty({num_nodes + 1}, DLDataType{kDLInt, 64, 1},
+                                    DLContext{kDLCPU, 0});
+    IdArray indices = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    IdArray eid = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    int64_t *indptr_data = static_cast<int64_t*>(indptr->data);
+    int64_t *indices_data = static_cast<int64_t*>(indices->data);
+    int64_t *eid_data = static_cast<int64_t*>(eid->data);
+    const AdjacencyList *adjlist;
+    if (transpose) {
+      // Out-edges.
+      adjlist = &adjlist_;
+    } else {
+      // In-edges.
+      adjlist = &reverse_adjlist_;
+    }
+    indptr_data[0] = 0;
+    for (size_t i = 0; i < adjlist->size(); i++) {
+      indptr_data[i + 1] = indptr_data[i] + adjlist->at(i).succ.size();
+      std::copy(adjlist->at(i).succ.begin(), adjlist->at(i).succ.end(),
+                indices_data + indptr_data[i]);
+      std::copy(adjlist->at(i).edge_id.begin(), adjlist->at(i).edge_id.end(),
+                eid_data + indptr_data[i]);
+    }
+    return std::vector<IdArray>{indptr, indices, eid};
+  } else {
+    LOG(FATAL) << "unsupported format";
+    return std::vector<IdArray>();
+  }
+}
+
+GraphPtr Graph::Reverse() const {
   LOG(FATAL) << "not implemented";
-  return *this;
+  return nullptr;
 }
 
 }  // namespace dgl
