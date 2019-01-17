@@ -1920,7 +1920,8 @@ class DGLGraph(object):
             Runtime.run(prog)
 
     def group_apply_edges(self, group_by, func, edges=ALL, inplace=False):
-        """Group the edges by nodes and apply the function on the grouped edges to update their features.
+        """Group the edges by nodes and apply the function on the grouped edges to
+         update their features.
 
         Parameters
         ----------
@@ -1928,7 +1929,8 @@ class DGLGraph(object):
             Specify how to group edges. Expected to be either 'src' or 'dst'
         func : callable
             Apply function on the edge. The function should be
-            an :mod:`Edge UDF <dgl.udf>`. The input of `Edge UDF` should be (bucket_size, degrees, *feature_shape), and
+            an :mod:`Edge UDF <dgl.udf>`. The input of `Edge UDF` should
+            be (bucket_size, degrees, *feature_shape), and
             return the dict with values of the same shapes.
         edges : valid edges type, optional
             Edges on which to group and apply ``func``. See :func:`send` for valid

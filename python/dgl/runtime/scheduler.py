@@ -438,11 +438,12 @@ def schedule_group_apply(graph,
             reshaped_src_data = utils.LazyDict(_reshape_func(src_data), src_data.keys())
             reshaped_dst_data = utils.LazyDict(_reshape_func(dst_data), dst_data.keys())
             reshaped_edge_data = utils.LazyDict(_reshape_func(edge_data), edge_data.keys())
-            ebatch = EdgeBatch(graph, (u, v, eids), reshaped_src_data, reshaped_edge_data, reshaped_dst_data)
+            ebatch = EdgeBatch(graph, (u, v, eids), reshaped_src_data, reshaped_edge_data,
+                               reshaped_dst_data)
             return {k: _reshape_back(v) for k, v in apply_func(ebatch).items()}
         return _efunc_wrapper
 
-    _, degs, buckets, e_ids, zero_deg_nodes = buckets
+    _, degs, buckets, e_ids, _ = buckets
 
     # loop over each bucket
     idx_list = []
