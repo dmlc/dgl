@@ -202,7 +202,7 @@ def main(args):
     train_idx = full_idx[train_mask.asnumpy() == 1]
 
     seed_nodes = list(train_idx)
-    num_hops = args.n_layers + 1
+    num_hops = args.n_layers
     n_layers = args.n_layers
     n_hidden = args.n_hidden
 
