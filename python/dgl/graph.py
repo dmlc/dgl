@@ -4,6 +4,7 @@ from __future__ import absolute_import
 from collections import defaultdict
 
 import dgl
+import networkx as nx
 from .base import ALL, is_all, DGLError
 from . import backend as F
 from . import init
@@ -914,7 +915,7 @@ class DGLGraph(object):
         else:
             raise DGLError('Invalid form:', form)
 
-    def all_edges(self, form='uv', return_sorted=False):
+    def all_edges(self, form='uv', order=None):
         """Return all the edges.
 
         Parameters
@@ -925,8 +926,12 @@ class DGLGraph(object):
             - 'all' : a tuple (u, v, eid)
             - 'uv'  : a pair (u, v), default
             - 'eid' : one eid tensor
-        return_sorted : bool
-            True if the returned edges are sorted by their src and dst ids.
+        order : string
+            The order of the returned edges. Currently support:
+
+            - 'srcdst' : sorted by their src and dst ids.
+            - 'eid'    : sorted by edge Ids.
+            - None     : the arbitrary order.
 
         Returns
         -------
@@ -952,7 +957,7 @@ class DGLGraph(object):
         >>> G.all_edges('all')
         (tensor([0, 0, 1]), tensor([1, 2, 2]), tensor([0, 1, 2]))
         """
-        src, dst, eid = self._graph.edges(return_sorted)
+        src, dst, eid = self._graph.edges(order)
         if form == 'all':
             return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
         elif form == 'uv':
@@ -1137,7 +1142,9 @@ class DGLGraph(object):
         Parameters
         ----------
         nx_graph : networkx.DiGraph
-            The nx graph
+            If the node labels of ``nx_graph`` are not consecutive
+            integers, its nodes will be relabeled using consecutive integers.
+            The new node ordering will inherit that of ``sorted(nx_graph.nodes())``
         node_attrs : iterable of str, optional
             The node attributes needs to be copied.
         edge_attrs : iterable of str, optional
@@ -1165,6 +1172,16 @@ class DGLGraph(object):
                 [2., 2., 2., 2.],
                 [1., 1., 1., 1.]])
         """
+        # Relabel nodes using consecutive integers
+        nx_graph = nx.convert_node_labels_to_integers(nx_graph, ordering='sorted')
+        # With to_directed we will get a directed version of the original networkx
+        # graph, with the original nodes, edges and their attributes preserved.
+        # This is particularly helpful when we are also converting the edge attributes
+        # as the reversed edges (u, v) will be created with the same attributes as the
+        # original edges (v, u).
+        if not nx_graph.is_directed():
+            nx_graph = nx_graph.to_directed()
+
         self.clear()
         self._graph.from_networkx(nx_graph)
         self._node_frame.add_rows(self.number_of_nodes())
@@ -1194,7 +1211,12 @@ class DGLGraph(object):
             # None here serves as placeholder to be replaced by feature with
             # corresponding edge id
             if has_edge_id:
+                num_edges = self.number_of_edges()
                 for _, _, attrs in nx_graph.edges(data=True):
+                    if attrs['id'] >= num_edges:
+                        raise DGLError('Expect the pre-specified edge ids to be'
+                                       ' smaller than the number of edges --'
+                                       ' {}, got {}.'.format(num_edges, attrs['id']))
                     for key in edge_attrs:
                         attr_dict[key][attrs['id']] = attrs[key]
             else:
@@ -1204,6 +1226,9 @@ class DGLGraph(object):
                     for key in edge_attrs:
                         attr_dict[key][eid] = attrs[key]
             for attr in edge_attrs:
+                for val in attr_dict[attr]:
+                    if val is None:
+                        raise DGLError('Not all edges have attribute {}.'.format(attr))
                 self._edge_frame[attr] = _batcher(attr_dict[attr])
 
     def from_scipy_sparse_matrix(self, spmat):

@@ -12,7 +12,8 @@ from . import backend as F
 from . import utils
 
 __all__ = ['BatchedDGLGraph', 'batch', 'unbatch', 'split',
-           'sum_nodes', 'sum_edges', 'mean_nodes', 'mean_edges']
+           'sum_nodes', 'sum_edges', 'mean_nodes', 'mean_edges',
+           'max_nodes', 'max_edges']
 
 class BatchedDGLGraph(DGLGraph):
     """Class for batched DGL graphs.
@@ -725,3 +726,93 @@ def mean_edges(graph, feat, weight=None):
     sum_edges
     """
     return _mean_on(graph, 'edges', feat, weight)
+
+def _max_on(graph, typestr, feat):
+    """Internal function to take elementwise maximum
+    over node or edge features.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph.
+    typestr : str
+        'nodes' or 'edges'
+    feat : str
+        The feature field name.
+
+    Returns
+    -------
+    Tensor
+        The (weighted) summed node or edge features.
+    """
+    data_attr, batch_num_objs_attr, _ = READOUT_ON_ATTRS[typestr]
+    data = getattr(graph, data_attr)
+    feat = data[feat]
+
+    if isinstance(graph, BatchedDGLGraph):
+        batch_num_objs = getattr(graph, batch_num_objs_attr)
+        max_readout_list = []
+        first = 0
+        for num_obj in batch_num_objs:
+            if num_obj == 0:
+                max_readout_list.append(F.zeros(F.shape(feat)[1:],
+                                                F.dtype(feat),
+                                                F.context(feat)))
+                continue
+            max_readout_list.append(F.max(feat[first:first+num_obj], 0))
+            first += num_obj
+        return F.stack(max_readout_list, 0)
+    else:
+        return F.max(feat, 0)
+
+def max_nodes(graph, feat):
+    """Take elementwise maximum over all the values of node field
+    :attr:`feat` in :attr:`graph`
+
+    Parameters
+    ----------
+    graph : DGLGraph or BatchedDGLGraph
+        The graph.
+    feat : str
+        The feature field.
+
+    Returns
+    -------
+    tensor
+        The tensor obtained.
+
+    Notes
+    -----
+    If graph is a :class:`BatchedDGLGraph` object, a stacked tensor is
+    returned instead, i.e. having an extra first dimension.
+    Each row of the stacked tensor contains the readout result of
+    corresponding example in the batch. If an example has no nodes,
+    a zero tensor with the same shape is returned at the corresponding row.
+    """
+    return _max_on(graph, 'nodes', feat)
+
+def max_edges(graph, feat):
+    """Take elementwise maximum over all the values of edge field
+    :attr:`feat` in :attr:`graph`
+
+    Parameters
+    ----------
+    graph : DGLGraph or BatchedDGLGraph
+        The graph.
+    feat : str
+        The feature field.
+
+    Returns
+    -------
+    tensor
+        The tensor obtained.
+
+    Notes
+    -----
+    If graph is a :class:`BatchedDGLGraph` object, a stacked tensor is
+    returned instead, i.e. having an extra first dimension.
+    Each row of the stacked tensor contains the readout result of
+    corresponding example in the batch. If an example has no edges,
+    a zero tensor with the same shape is returned at the corresponding row.
+    """
+    return _max_on(graph, 'edges', feat)

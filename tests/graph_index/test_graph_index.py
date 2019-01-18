@@ -1,6 +1,6 @@
 from dgl import DGLError
 from dgl.utils import toindex
-from dgl.graph_index import create_graph_index
+from dgl.graph_index import create_graph_index, GraphIndex
 import networkx as nx
 
 def test_edge_id():
@@ -150,6 +150,17 @@ def test_create_from_elist():
     #for i, (u, v) in enumerate(elist):
     #    print(u, v, g.edge_id(u, v)[0])
     #    assert g.edge_id(u, v)[0] == i
+
+def test_direct_init():
+    gi = GraphIndex(multigraph=False, readonly=False)
+    src = toindex([2, 1, 0])
+    dst = toindex([1, 0, 3])
+    eid = toindex([1, 0, 2])
+    gi.init(src, dst, eid, 4)
+    newsrc, newdst, neweid = gi.edges('eid')
+    assert newsrc.tonumpy().tolist() == [1, 2, 0]
+    assert newdst.tonumpy().tolist() == [0, 1, 3]
+    assert neweid.tonumpy().tolist() == [0, 1, 2]
 
 if __name__ == '__main__':
     test_edge_id()
