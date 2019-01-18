@@ -56,7 +56,7 @@ class ImmutableGraph: public GraphInterface {
       return indices.size();
     }
 
-    int64_t GetDegree(dgl_id_t vid) const {
+    uint64_t GetDegree(dgl_id_t vid) const {
       return indptr[vid + 1] - indptr[vid];
     }
     DegreeArray GetDegrees(IdArray vids) const;
@@ -81,7 +81,7 @@ class ImmutableGraph: public GraphInterface {
      * we simply sort on the input edge list. We allow sorting on both end points of an edge,
      * which is specified by `sort_on`.
      */
-    static CSR::Ptr FromEdges(std::vector<Edge> *edges, int sort_on, int64_t num_nodes);
+    static CSR::Ptr FromEdges(std::vector<Edge> *edges, int sort_on, uint64_t num_nodes);
   };
 
   /*! \brief Construct an immutable graph from the COO format. */

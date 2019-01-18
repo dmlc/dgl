@@ -70,7 +70,7 @@ PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
 // Convert Sampled Subgraph structures to PackedFunc.
 PackedFunc ConvertSubgraphToPackedFunc(const std::vector<SampledSubgraph>& sg) {
   auto body = [sg] (DGLArgs args, DGLRetValue* rv) {
-      const int which = args[0];
+      const size_t which = args[0];
       if (which < sg.size()) {
         GraphInterface* gptr = sg[which].graph->Reset();
         GraphHandle ghandle = gptr;
