@@ -20,12 +20,6 @@ int rand_r(unsigned *seed) {
 
 namespace dgl {
 
-template<class ForwardIt, class T>
-bool binary_search(ForwardIt first, ForwardIt last, const T& value) {
-  first = std::lower_bound(first, last, value);
-  return (!(first == last) && !(value < *first));
-}
-
 ImmutableGraph::EdgeArray ImmutableGraph::CSR::GetEdges(dgl_id_t vid) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
   const int64_t off = this->indptr[vid];
@@ -297,11 +291,11 @@ bool ImmutableGraph::HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
   if (!HasVertex(src) || !HasVertex(dst)) return false;
   if (this->in_csr_) {
     auto pred = this->in_csr_->GetIndexRef(dst);
-    return dgl::binary_search(pred.begin(), pred.end(), src);
+    return std::binary_search(pred.begin(), pred.end(), src);
   } else {
     CHECK(this->out_csr_) << "one of the CSRs must exist";
     auto succ = this->out_csr_->GetIndexRef(src);
-    return dgl::binary_search(succ.begin(), succ.end(), dst);
+    return std::binary_search(succ.begin(), succ.end(), dst);
   }
 }
 
