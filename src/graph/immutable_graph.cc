@@ -900,13 +900,13 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   });
 
   SampledSubgraph subg;
-  subg.induced_vertices = IdArray::Empty({static_cast<uint64_t>(num_vertices)},
+  subg.induced_vertices = IdArray::Empty({static_cast<int64_t>(num_vertices)},
                                          DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  subg.induced_edges = IdArray::Empty({static_cast<uint64_t>(num_edges)},
+  subg.induced_edges = IdArray::Empty({static_cast<int64_t>(num_edges)},
                                       DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  subg.layer_ids = IdArray::Empty({static_cast<uint64_t>(num_vertices)},
+  subg.layer_ids = IdArray::Empty({static_cast<int64_t>(num_vertices)},
                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  subg.sample_prob = runtime::NDArray::Empty({static_cast<uint64_t>(num_vertices)},
+  subg.sample_prob = runtime::NDArray::Empty({static_cast<int64_t>(num_vertices)},
                                              DLDataType{kDLFloat, 32, 1}, DLContext{kDLCPU, 0});
 
   dgl_id_t *out = static_cast<dgl_id_t *>(subg.induced_vertices->data);
