@@ -23,16 +23,13 @@ struct Subgraph;
 struct SampledSubgraph;
 
 /*!
- * \brief This class references data in std::vector.
- *
- * This isn't a STL-style iterator. It provides a STL data container interface.
- * but it doesn't own data itself. instead, it only references data in std::vector.
+ * \brief This class references a slice in std::vector
  */
-class DGLIdIters {
+class DGLIdVectorSlice {
   std::vector<dgl_id_t>::const_iterator begin_, end_;
  public:
-  DGLIdIters(std::vector<dgl_id_t>::const_iterator begin,
-             std::vector<dgl_id_t>::const_iterator end) {
+  DGLIdVectorSlice(std::vector<dgl_id_t>::const_iterator begin,
+                   std::vector<dgl_id_t>::const_iterator end) {
     this->begin_ = begin;
     this->end_ = end;
   }
@@ -293,28 +290,28 @@ class GraphInterface {
    * \param vid The vertex id.
    * \return the successor vector iterator pair.
    */
-  virtual DGLIdIters SuccVec(dgl_id_t vid) const = 0;
+  virtual DGLIdVectorSlice SuccVec(dgl_id_t vid) const = 0;
 
   /*!
    * \brief Return the out edge id vector
    * \param vid The vertex id.
    * \return the out edge id vector iterator pair.
    */
-  virtual DGLIdIters OutEdgeVec(dgl_id_t vid) const = 0;
+  virtual DGLIdVectorSlice OutEdgeVec(dgl_id_t vid) const = 0;
 
   /*!
    * \brief Return the predecessor vector
    * \param vid The vertex id.
    * \return the predecessor vector iterator pair.
    */
-  virtual DGLIdIters PredVec(dgl_id_t vid) const = 0;
+  virtual DGLIdVectorSlice PredVec(dgl_id_t vid) const = 0;
 
   /*!
    * \brief Return the in edge id vector
    * \param vid The vertex id.
    * \return the in edge id vector iterator pair.
    */
-  virtual DGLIdIters InEdgeVec(dgl_id_t vid) const = 0;
+  virtual DGLIdVectorSlice InEdgeVec(dgl_id_t vid) const = 0;
 
   /*!
    * \brief Reset the data in the graph and move its data to the returned graph object.

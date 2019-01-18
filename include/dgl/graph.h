@@ -319,8 +319,9 @@ class Graph: public GraphInterface {
    * \param vid The vertex id.
    * \return the successor vector
    */
-  DGLIdIters SuccVec(dgl_id_t vid) const {
-    return DGLIdIters(adjlist_[vid].succ.begin(), adjlist_[vid].succ.end());
+  DGLIdVectorSlice SuccVec(dgl_id_t vid) const {
+    return DGLIdVectorSlice(adjlist_[vid].succ.begin(),
+                            adjlist_[vid].succ.end());
   }
 
   /*!
@@ -328,8 +329,9 @@ class Graph: public GraphInterface {
    * \param vid The vertex id.
    * \return the out edge id vector
    */
-  DGLIdIters OutEdgeVec(dgl_id_t vid) const {
-    return DGLIdIters(adjlist_[vid].edge_id.begin(), adjlist_[vid].edge_id.end());
+  DGLIdVectorSlice OutEdgeVec(dgl_id_t vid) const {
+    return DGLIdVectorSlice(adjlist_[vid].edge_id.begin(),
+                            adjlist_[vid].edge_id.end());
   }
 
   /*!
@@ -337,8 +339,9 @@ class Graph: public GraphInterface {
    * \param vid The vertex id.
    * \return the predecessor vector
    */
-  DGLIdIters PredVec(dgl_id_t vid) const {
-    return DGLIdIters(reverse_adjlist_[vid].succ.begin(), reverse_adjlist_[vid].succ.end());
+  DGLIdVectorSlice PredVec(dgl_id_t vid) const {
+    return DGLIdVectorSlice(reverse_adjlist_[vid].succ.begin(),
+                            reverse_adjlist_[vid].succ.end());
   }
 
   /*!
@@ -346,9 +349,9 @@ class Graph: public GraphInterface {
    * \param vid The vertex id.
    * \return the in edge id vector
    */
-  DGLIdIters InEdgeVec(dgl_id_t vid) const {
-    return DGLIdIters(reverse_adjlist_[vid].edge_id.begin(),
-                      reverse_adjlist_[vid].edge_id.end());
+  DGLIdVectorSlice InEdgeVec(dgl_id_t vid) const {
+    return DGLIdVectorSlice(reverse_adjlist_[vid].edge_id.begin(),
+                            reverse_adjlist_[vid].edge_id.end());
   }
 
   /*!

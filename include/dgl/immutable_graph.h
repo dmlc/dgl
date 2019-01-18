@@ -63,10 +63,10 @@ class ImmutableGraph: public GraphInterface {
     EdgeArray GetEdges(dgl_id_t vid) const;
     EdgeArray GetEdges(IdArray vids) const;
     /* \brief this returns the start and end position of the column indices corresponding v. */
-    DGLIdIters GetIndexRef(dgl_id_t v) const {
+    DGLIdVectorSlice GetIndexRef(dgl_id_t v) const {
       const int64_t start = indptr[v];
       const int64_t end = indptr[v + 1];
-      return DGLIdIters(indices.begin() + start, indices.begin() + end);
+      return DGLIdVectorSlice(indices.begin() + start, indices.begin() + end);
     }
     /*
      * Read all edges and store them in the vector.
@@ -411,9 +411,9 @@ class ImmutableGraph: public GraphInterface {
    * \param vid The vertex id.
    * \return the successor vector
    */
-  DGLIdIters SuccVec(dgl_id_t vid) const {
-    return DGLIdIters(out_csr_->indices.begin() + out_csr_->indptr[vid],
-                      out_csr_->indices.begin() + out_csr_->indptr[vid + 1]);
+  DGLIdVectorSlice SuccVec(dgl_id_t vid) const {
+    return DGLIdVectorSlice(out_csr_->indices.begin() + out_csr_->indptr[vid],
+                            out_csr_->indices.begin() + out_csr_->indptr[vid + 1]);
   }
 
   /*!
@@ -421,9 +421,9 @@ class ImmutableGraph: public GraphInterface {
    * \param vid The vertex id.
    * \return the out edge id vector
    */
-  DGLIdIters OutEdgeVec(dgl_id_t vid) const {
-    return DGLIdIters(out_csr_->edge_ids.begin() + out_csr_->indptr[vid],
-                      out_csr_->edge_ids.begin() + out_csr_->indptr[vid + 1]);
+  DGLIdVectorSlice OutEdgeVec(dgl_id_t vid) const {
+    return DGLIdVectorSlice(out_csr_->edge_ids.begin() + out_csr_->indptr[vid],
+                            out_csr_->edge_ids.begin() + out_csr_->indptr[vid + 1]);
   }
 
   /*!
@@ -431,9 +431,9 @@ class ImmutableGraph: public GraphInterface {
    * \param vid The vertex id.
    * \return the predecessor vector
    */
-  DGLIdIters PredVec(dgl_id_t vid) const {
-    return DGLIdIters(in_csr_->indices.begin() + in_csr_->indptr[vid],
-                      in_csr_->indices.begin() + in_csr_->indptr[vid + 1]);
+  DGLIdVectorSlice PredVec(dgl_id_t vid) const {
+    return DGLIdVectorSlice(in_csr_->indices.begin() + in_csr_->indptr[vid],
+                            in_csr_->indices.begin() + in_csr_->indptr[vid + 1]);
   }
 
   /*!
@@ -441,9 +441,9 @@ class ImmutableGraph: public GraphInterface {
    * \param vid The vertex id.
    * \return the in edge id vector
    */
-  DGLIdIters InEdgeVec(dgl_id_t vid) const {
-    return DGLIdIters(in_csr_->edge_ids.begin() + in_csr_->indptr[vid],
-                      in_csr_->edge_ids.begin() + in_csr_->indptr[vid + 1]);
+  DGLIdVectorSlice InEdgeVec(dgl_id_t vid) const {
+    return DGLIdVectorSlice(in_csr_->edge_ids.begin() + in_csr_->indptr[vid],
+                            in_csr_->edge_ids.begin() + in_csr_->indptr[vid + 1]);
   }
 
   /*!
@@ -476,8 +476,8 @@ class ImmutableGraph: public GraphInterface {
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const;
 
  protected:
-  DGLIdIters GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
-  DGLIdIters GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
+  DGLIdVectorSlice GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
+  DGLIdVectorSlice GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
 
   /*
    * The immutable graph may only contain one of the CSRs (e.g., the sampled subgraphs).

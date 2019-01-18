@@ -355,13 +355,13 @@ IdArray ImmutableGraph::Successors(dgl_id_t vid, uint64_t radius) const {
   return rst;
 }
 
-DGLIdIters ImmutableGraph::GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const {
+DGLIdVectorSlice ImmutableGraph::GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const {
   CHECK(this->in_csr_);
   auto pred = this->in_csr_->GetIndexRef(dst);
   auto it = std::lower_bound(pred.begin(), pred.end(), src);
   // If there doesn't exist edges between the two nodes.
   if (it == pred.end() || *it != src) {
-    return DGLIdIters(it, it);
+    return DGLIdVectorSlice(it, it);
   }
 
   size_t off = it - in_csr_->indices.begin();
@@ -370,16 +370,16 @@ DGLIdIters ImmutableGraph::GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const {
   int64_t len = 0;
   // There are edges between the source and the destination.
   for (auto it1 = it; it1 != pred.end() && *it1 == src; it1++, len++) {}
-  return DGLIdIters(start, start + len);
+  return DGLIdVectorSlice(start, start + len);
 }
 
-DGLIdIters ImmutableGraph::GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const {
+DGLIdVectorSlice ImmutableGraph::GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const {
   CHECK(this->out_csr_);
   auto succ = this->out_csr_->GetIndexRef(src);
   auto it = std::lower_bound(succ.begin(), succ.end(), dst);
   // If there doesn't exist edges between the two nodes.
   if (it == succ.end() || *it != dst) {
-    return DGLIdIters(it, it);
+    return DGLIdVectorSlice(it, it);
   }
 
   size_t off = it - out_csr_->indices.begin();
@@ -388,7 +388,7 @@ DGLIdIters ImmutableGraph::GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const {
   int64_t len = 0;
   // There are edges between the source and the destination.
   for (auto it1 = it; it1 != succ.end() && *it1 == dst; it1++, len++) {}
-  return DGLIdIters(start, start + len);
+  return DGLIdVectorSlice(start, start + len);
 }
 
 IdArray ImmutableGraph::EdgeId(dgl_id_t src, dgl_id_t dst) const {
