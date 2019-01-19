@@ -104,7 +104,7 @@ std::vector<IdArray> GroupEdgeByNode(const IdArray& uids, const IdArray& vids,
     std::unordered_map<int64_t,
         std::vector<std::pair<int64_t, int64_t>>> node2edge;
     for (int64_t i = 0; i < n_edge; ++i) {
-        node2edge[uid_data[i]].emplace_back(eid_data[i], vid_data[i])
+        node2edge[uid_data[i]].emplace_back(eid_data[i], vid_data[i]);
     }
 
     // bkt: deg -> nodes

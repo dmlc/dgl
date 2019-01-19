@@ -32,6 +32,9 @@ namespace sched {
 std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids,
         const IdArray& recv_ids);
 
+std::vector<IdArray> GroupEdgeByNode(const IdArray& uids, const IdArray& vids,
+        const IdArray& eids);
+
 }  // namespace sched
 
 }  // namespace dgl
