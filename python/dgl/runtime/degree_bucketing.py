@@ -212,7 +212,7 @@ def gen_group_apply_edge_schedule(
         var_u = var.IDX(u_bkt)
         var_v = var.IDX(v_bkt)
         var_eid = var.IDX(eid_bkt)
-        # recv on each bucket
+        # apply edge UDF on each bucket
         fdsrc = ir.READ_ROW(var_nf, var_u)
         fddst = ir.READ_ROW(var_nf, var_v)
         fdedge = ir.READ_ROW(var_ef, var_eid)
@@ -221,7 +221,7 @@ def gen_group_apply_edge_schedule(
         idx_list.append(var_eid)
         fd_list.append(fdedge)
 
-    # merge buckets according to the ascending order of the node ids.
+    # merge buckets according to the ascending order of the edge ids.
     all_idx = F.cat([idx.data.tousertensor() for idx in idx_list], dim=0)
     _, order = F.sort_1d(all_idx)
     var_order = var.IDX(utils.toindex(order))
@@ -275,7 +275,6 @@ def _process_edge_buckets(buckets):
     uids = split(uids)
     vids = split(vids)
     eids = split(eids)
-
     return degs, uids, vids, eids
 
 def _create_per_bkt_efunc(graph, apply_func, deg, u, v, eid):
