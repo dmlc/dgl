@@ -21,4 +21,12 @@ DGL_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLDegreeBucketing")
     *rv = ConvertNDArrayVectorToPackedFunc(sched::DegreeBucketing(msg_ids, vids, nids));
   });
 
+DGL_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLGroupEdgeByNodeDegree")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const IdArray uids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
+    const IdArray eids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
+    *rv = ConvertNDArrayVectorToPackedFunc(sched::GroupEdgeByNode(uids, vids, eids));
+  });
+
 }  // namespace dgl
