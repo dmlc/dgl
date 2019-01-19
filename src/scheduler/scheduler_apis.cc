@@ -23,9 +23,9 @@ DGL_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLDegreeBucketing")
 
 DGL_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLGroupEdgeByNodeDegree")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    const IdArray uids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
-    const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
-    const IdArray eids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
+    const IdArray uids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
+    const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray eids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
     *rv = ConvertNDArrayVectorToPackedFunc(sched::GroupEdgeByNode(uids, vids, eids));
   });
 

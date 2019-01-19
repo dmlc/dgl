@@ -5,7 +5,7 @@ from .. import utils
 from .._ffi.function import _init_api
 from ..base import DGLError
 from .. import backend as F
-from ..frame import frame_like, FrameRef, Frame
+from ..frame import frame_like, FrameRef
 from ..function.base import BuiltinFunction, BundledFunction
 from ..udf import EdgeBatch, NodeBatch
 
@@ -395,7 +395,7 @@ def schedule_group_apply_edge(graph,
     var_ef = var.FEAT_DICT(graph._edge_frame, name='ef')
     var_out = var.FEAT_DICT(name='new_ef')
     # TODO (lingfan): check if apply_func is a DGL builtin
-    db.gen_group_apply_edge_schedule(graph, apply_func, u, v, eid,
+    db.gen_group_apply_edge_schedule(graph, apply_func, u, v, eid, group_by,
                                      var_nf, var_ef, var_out)
     var_eid = var.IDX(eid)
     if inplace:

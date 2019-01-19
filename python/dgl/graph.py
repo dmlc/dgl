@@ -1997,13 +1997,13 @@ class DGLGraph(object):
             u, v, _ = self._graph.find_edges(eid)
 
         with ir.prog() as prog:
-            scheduler.schedule_group_apply(graph=self,
-                                           u=u,
-                                           v=v,
-                                           eid=eid,
-                                           apply_func=func,
-                                           group_by=group_by,
-                                           inplace=inplace)
+            scheduler.schedule_group_apply_edge(graph=self,
+                                                u=u,
+                                                v=v,
+                                                eid=eid,
+                                                apply_func=func,
+                                                group_by=group_by,
+                                                inplace=inplace)
             Runtime.run(prog)
 
 

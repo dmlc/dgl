@@ -4,7 +4,7 @@ from __future__ import absolute_import
 from .._ffi.function import _init_api
 from ..base import is_all
 from .. import backend as F
-from ..udf import NodeBatch
+from ..udf import NodeBatch, EdgeBatch
 from .. import utils
 
 from . import ir
@@ -207,7 +207,7 @@ def gen_group_apply_edge_schedule(
     fd_list = []
     for deg, u, v, eid in zip(degs, uids, vids, eids):
         # create per-bkt efunc
-        _efunc = var.FUNC(graph, apply_func, deg, u, v, eid)
+        _efunc = var.FUNC(_create_per_bkt_efunc(graph, apply_func, deg, u, v, eid))
         # vars
         var_u = var.IDX(u)
         var_v = var.IDX(v)
@@ -216,7 +216,7 @@ def gen_group_apply_edge_schedule(
         fdsrc = ir.READ_ROW(var_nf, var_u)
         fddst = ir.READ_ROW(var_nf, var_v)
         fdedge = ir.READ_ROW(var_ef, var_eid)
-        fdedge = ir.EDGE_UDF(_efunc, fdsrc, fddst, fdedge, ret=fdedge)  # reuse var
+        fdedge = ir.EDGE_UDF(_efunc, fdsrc, fdedge, fddst, ret=fdedge)  # reuse var
         # save for merge
         idx_list.append(var_eid)
         fd_list.append(fdedge)
@@ -227,7 +227,7 @@ def gen_group_apply_edge_schedule(
     var_order = var.IDX(utils.toindex(order))
     ir.MERGE_ROW(var_order, fd_list, ret=var_out)
 
-def _degree_bucketing_for_edge_grouping()
+def _degree_bucketing_for_edge_grouping(uids, vids, eids):
     """Return the edge buckets by degree and grouped nodes for group_apply_edge
 
     Parameters
@@ -269,11 +269,11 @@ def _process_edge_buckets(buckets):
 
     # split buckets and convert to index
     def split(to_split):
-        res = F.split(to_split.todgltensor(), sections, 0)
+        res = F.split(to_split.tousertensor(), sections, 0)
         return map(utils.toindex, res)
 
     uids = split(uids)
-    vids = split(uids)
+    vids = split(vids)
     eids = split(eids)
 
     return degs, uids, vids, eids
@@ -294,11 +294,11 @@ def _create_per_bkt_efunc(graph, apply_func, deg, u, v, eid):
             new_shape = (batch_size * deg,) + shape
             return F.reshape(data, new_shape)
 
-        reshaped_src_data = utils.LazyDict(_reshaped_func(src_data),
+        reshaped_src_data = utils.LazyDict(_reshape_func(src_data),
                                            src_data.keys())
-        reshaped_edge_data = utils.LazyDict(_reshaped_func(edge_data),
+        reshaped_edge_data = utils.LazyDict(_reshape_func(edge_data),
                                             edge_data.keys())
-        reshaped_dst_data = utils.LazyDict(_reshaped_func(dst_data),
+        reshaped_dst_data = utils.LazyDict(_reshape_func(dst_data),
                                            dst_data.keys())
         ebatch = EdgeBatch(graph, (u, v, eid), reshaped_src_data,
                            reshaped_edge_data, reshaped_dst_data)
