@@ -204,14 +204,14 @@ def gen_group_apply_edge_schedule(
 
     idx_list = []
     fd_list = []
-    for deg, uu, vv, ee in zip(degs, uids, vids, eids):
+    for deg, u_bkt, v_bkt, eid_bkt in zip(degs, uids, vids, eids):
         # create per-bkt efunc
-        _efunc = var.FUNC(_create_per_bkt_efunc( graph, apply_func,
-                                                deg, uu, vv, ee))
+        _efunc = var.FUNC(_create_per_bkt_efunc(graph, apply_func, deg,
+                                                u_bkt, v_bkt, eid_bkt))
         # vars
-        var_u = var.IDX(u)
-        var_v = var.IDX(v)
-        var_eid = var.IDX(eid)
+        var_u = var.IDX(u_bkt)
+        var_v = var.IDX(v_bkt)
+        var_eid = var.IDX(eid_bkt)
         # recv on each bucket
         fdsrc = ir.READ_ROW(var_nf, var_u)
         fddst = ir.READ_ROW(var_nf, var_v)
