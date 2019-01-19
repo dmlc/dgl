@@ -628,22 +628,36 @@ def test_repr():
 
 def test_group_apply_edges():
     def edge_udf(edges):
-        normalized_feat = F.softmax(edges.data['feat'], dim=1)
+        h = F.sum(edges.data['feat'] * (edges.src['h'] + edges.dst['h']), dim=2)
+        normalized_feat = F.softmax(h, dim=1)
         return {"norm_feat": normalized_feat}
 
     g = DGLGraph()
     g.add_nodes(10)
     g.add_edges(0, [1, 2, 3, 4, 5, 6, 7, 8])
-    g.add_edges(1, [2, 3, 4, 5, 6, 7, 8])
+    g.add_edges(1, [2, 3, 4, 6, 7, 8])
     g.add_edges(2, [2, 3, 4, 5, 6, 7, 8])
 
-    g.edata['feat'] = F.randn((g.number_of_edges(), 1))
-    g.group_apply_edges(group_by='src', func=edge_udf)
+    g.ndata['h'] = F.randn((g.number_of_nodes(), D))
+    g.edata['feat'] = F.randn((g.number_of_edges(), D))
 
-    u, v, eid = g.out_edges(1, form='all')
-    in_feat = g.edata['feat'][eid]
-    out_feat = g.edata['norm_feat'][eid]
-    assert F.allclose(out_feat, F.softmax(in_feat, 0))
+    def _test(group_by):
+        g.group_apply_edges(group_by=group_by, func=edge_udf)
+        if group_by == 'src':
+            u, v, eid = g.out_edges(1, form='all')
+        else:
+            u, v, eid = g.in_edges(5, form='all')
+        out_feat = g.edata['norm_feat'][eid]
+        result = (g.ndata['h'][u] + g.ndata['h'][v]) * g.edata['feat'][eid]
+        result = F.softmax(F.sum(result, dim=1), dim=0)
+        assert F.allclose(out_feat, result)
+
+    # test group by source nodes
+    _test('src')
+
+    # test group by destination nodes
+    _test('dst')
+
 
 if __name__ == '__main__':
     test_nx_conversion()
