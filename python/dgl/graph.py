@@ -2000,7 +2000,7 @@ class DGLGraph(object):
             scheduler.schedule_group_apply(graph=self,
                                            u=u,
                                            v=v,
-                                           eids=eid,
+                                           eid=eid,
                                            apply_func=func,
                                            group_by=group_by,
                                            inplace=inplace)

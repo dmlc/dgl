@@ -21,6 +21,7 @@ __all__ = [
     "schedule_snr",
     "schedule_apply_nodes",
     "schedule_apply_edges",
+    "schedule_group_apply_edge",
     "schedule_push",
     "schedule_pull"
 ]
@@ -361,10 +362,11 @@ def schedule_pull(graph,
             ir.WRITE_ROW_(var_nf, var_pull_nodes, final_feat)
 
 
-def schedule_group_apply(graph,
-                         u, v, eids,
-                         apply_func, group_by,
-                         inplace):
+def schedule_group_apply_edge(graph,
+                              u, v, eid,
+                              apply_func,
+                              group_by,
+                              inplace):
     """group apply edges schedule
 
     Parameters
@@ -375,7 +377,7 @@ def schedule_group_apply(graph,
         Source nodes of edges to apply
     v : utils.Index
         Destination nodes of edges to apply
-    eids : utils.Index
+    eid : utils.Index
         Ids of sending edges
     apply_func: callable
         The apply edge function
@@ -388,89 +390,18 @@ def schedule_group_apply(graph,
     -------
     A list of executors for DGL Runtime
     """
-    # For bucketing schedule
-    unique_u, _ = F.sort_1d(F.unique(u.tousertensor()))
-    unique_v, _ = F.sort_1d(F.unique(v.tousertensor()))
-    unique_u = utils.toindex(unique_u)
-    unique_v = utils.toindex(unique_v)
-
-    if group_by == 'src':
-        buckets = db._degree_bucketing_schedule(eids, u, unique_u)
-    elif group_by == 'dst':
-        buckets = db._degree_bucketing_schedule(eids, v, unique_v)
-    else:
-        raise DGLError("Group_by should be either src or dst")
-
     # vars
     var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
     var_ef = var.FEAT_DICT(graph._edge_frame, name='ef')
-    var_u = var.IDX(u, name='var_u')
-    var_v = var.IDX(v, name='var_v')
-    var_eids = var.IDX(eids, name='var_eids')
-
-    # Expand the src and dst feature to the same length of edge feature
-    # Not sure whether should copy the source and destination features here
-    _src_frame = FrameRef(Frame(num_rows=graph.number_of_edges()))
-    _dst_frame = FrameRef(Frame(num_rows=graph.number_of_edges()))
-    src_frame = var.FEAT_DICT(_src_frame, name='src_frame')
-    dst_frame = var.FEAT_DICT(_dst_frame, name='dst_frame')
-    fdsrc = ir.READ_ROW(var_nf, var_u)
-    fddst = ir.READ_ROW(var_nf, var_v)
-    ir.WRITE_ROW_(src_frame, var_eids, fdsrc)
-    ir.WRITE_ROW_(dst_frame, var_eids, fddst)
-
-    # Wrap edge UDF to reshape and reshape back features
-    def _per_bkt_efunc(graph, apply_func, deg, vbkt):
-        def _efunc_wrapper(src_data, edge_data, dst_data):
-            def _reshape_func(edge_shape_data):
-                def _reshaped_getter(key):
-                    _edge_shape_data = edge_shape_data[key]
-                    new_shape = (len(vbkt), deg) + F.shape(_edge_shape_data)[1:]
-                    return F.reshape(_edge_shape_data, new_shape)
-                return _reshaped_getter
-
-            # Should this be Lazy Dict?
-            def _reshape_back(data):
-                original_shape = F.shape(data)[2:]
-                reshape_back_shape = (len(vbkt) * deg,) + original_shape
-                return F.reshape(data, reshape_back_shape)
-
-            reshaped_src_data = utils.LazyDict(_reshape_func(src_data), src_data.keys())
-            reshaped_dst_data = utils.LazyDict(_reshape_func(dst_data), dst_data.keys())
-            reshaped_edge_data = utils.LazyDict(_reshape_func(edge_data), edge_data.keys())
-            ebatch = EdgeBatch(graph, (u, v, eids), reshaped_src_data, reshaped_edge_data,
-                               reshaped_dst_data)
-            return {k: _reshape_back(v) for k, v in apply_func(ebatch).items()}
-        return _efunc_wrapper
-
-    _, degs, buckets, e_ids, _ = buckets
-
-    # loop over each bucket
-    idx_list = []
-    fd_list = []
-    for deg, vbkt, eid in zip(degs, buckets, e_ids):
-        _efunc = var.FUNC(_per_bkt_efunc(graph, apply_func, deg, vbkt))
-        eid = var.IDX(eid)
-        b_fdsrc = ir.READ_ROW(src_frame, eid)
-        b_fddst = ir.READ_ROW(dst_frame, eid)
-        b_fdedge = ir.READ_ROW(var_ef, eid)
-        b_fdedge = ir.EDGE_UDF(_efunc, b_fdsrc, b_fdedge, b_fddst, ret=b_fdedge)
-        idx_list.append(eid)
-        fd_list.append(b_fdedge)
-
-    # merge buckets according to the ascending order of the node ids.
-    all_idx = F.cat([idx.data.tousertensor() for idx in idx_list], dim=0)
-    _, order = F.sort_1d(all_idx)
-    var_order = var.IDX(utils.toindex(order))
-    new_fdedge = ir.MERGE_ROW(var_order, fd_list)
-
-    ir.CLEAR_FRAME_(src_frame)
-    ir.CLEAR_FRAME_(dst_frame)
-
+    var_out = var.FEAT_DICT(name='new_ef')
+    # TODO (lingfan): check if apply_func is a DGL builtin
+    db.gen_group_apply_edge_schedule(graph, apply_func, u, v, eid,
+                                     var_nf, var_ef, var_out)
+    var_eid = var.IDX(eid)
     if inplace:
-        ir.WRITE_ROW_INPLACE_(var_ef, var_eids, new_fdedge)
+        ir.WRITE_ROW_INPLACE_(var_ef, var_eid, var_out)
     else:
-        ir.WRITE_ROW_(var_ef, var_eids, new_fdedge)
+        ir.WRITE_ROW_(var_ef, var_eid, var_out)
 
 
 def _check_builtin_func_list(func_list):
