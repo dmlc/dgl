@@ -2,7 +2,6 @@
 from __future__ import absolute_import
 
 from .._ffi.function import _init_api
-from ..base import is_all
 from .. import backend as F
 from ..udf import NodeBatch, EdgeBatch
 from .. import utils
@@ -205,9 +204,10 @@ def gen_group_apply_edge_schedule(
 
     idx_list = []
     fd_list = []
-    for deg, u, v, eid in zip(degs, uids, vids, eids):
+    for deg, uu, vv, ee in zip(degs, uids, vids, eids):
         # create per-bkt efunc
-        _efunc = var.FUNC(_create_per_bkt_efunc(graph, apply_func, deg, u, v, eid))
+        _efunc = var.FUNC(_create_per_bkt_efunc( graph, apply_func,
+                                                deg, uu, vv, ee))
         # vars
         var_u = var.IDX(u)
         var_v = var.IDX(v)

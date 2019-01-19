@@ -7,6 +7,7 @@
 #define DGL_GRAPH_H_
 
 #include <vector>
+#include <string>
 #include <cstdint>
 #include <utility>
 #include <tuple>

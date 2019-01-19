@@ -94,7 +94,6 @@ std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids
 
 std::vector<IdArray> GroupEdgeByNode(const IdArray& uids, const IdArray& vids,
         const IdArray& eids) {
-
     auto n_edge = eids->shape[0];
     const int64_t* eid_data = static_cast<int64_t*>(eids->data);
     const int64_t* uid_data = static_cast<int64_t*>(uids->data);
