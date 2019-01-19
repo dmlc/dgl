@@ -100,38 +100,6 @@ def _degree_bucketing_schedule(mids, dsts, v):
                                        v.todgltensor())
     return _process_buckets(buckets)
 
-def _degree_bucketing_for_edges(dsts):
-    """Return the bucketing by degree scheduling for destination nodes of
-    messages
-
-    Parameters
-    ----------
-    dsts: utils.Index
-        destination node for each message
-    """
-
-    buckets = _CAPI_DGLDegreeBucketingForEdges(dsts.todgltensor())
-    return _process_buckets(buckets)
-
-def _degree_bucketing_for_graph(graph, v):
-    """Return the bucketing by degree scheduling given graph index and optional
-    dst nodes
-
-    Parameters:
-    -----------
-    graph: GraphIndex
-        DGLGraph Index (update all case) or message graph index (recv cases)
-    v: utils.Index
-        Destination nodes (recv cases)
-    """
-
-    if is_all(v):
-        buckets = _CAPI_DGLDegreeBucketingForFullGraph(graph._handle)
-    else:
-        buckets = _CAPI_DGLDegreeBucketingForRecvNodes(graph._handle,
-                                                       v.todgltensor())
-    return _process_buckets(buckets)
-
 def _process_buckets(buckets):
     """read bucketing auxiliary data
 
