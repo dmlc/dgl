@@ -98,9 +98,9 @@ def _degree_bucketing_schedule(mids, dsts, v):
     """
     buckets = _CAPI_DGLDegreeBucketing(mids.todgltensor(), dsts.todgltensor(),
                                        v.todgltensor())
-    return _process_buckets(buckets)
+    return _process_node_buckets(buckets)
 
-def _process_buckets(buckets):
+def _process_node_buckets(buckets):
     """read bucketing auxiliary data
 
     Returns
@@ -156,5 +156,153 @@ def _create_per_bkt_rfunc(graph, reduce_udf, deg, vbkt):
         nbatch = NodeBatch(graph, vbkt, node_data, reshaped_mail_data)
         return reduce_udf(nbatch)
     return _rfunc_wrapper
+
+def gen_group_apply_edge_schedule(
+        graph,
+        apply_func,
+        u, v, eid,
+        group_by,
+        var_nf,
+        var_ef,
+        var_out):
+    """Create degree bucketing schedule for group_apply_edge
+
+    Edges will be grouped by either its source node or destination node
+    specified by 'group_by', and will be divided into buckets in which
+    'group_by' nodes have the same degree. The apply_func UDF will be applied
+    to each bucket. The per-bucket result will be merged according to the
+    *unique-ascending order* of the edge ids.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        DGLGraph to use
+    apply_func: callable
+        The edge_apply_func UDF
+    u: utils.Index
+        Source nodes of edges to apply
+    v: utils.Index
+        Destination nodes of edges to apply
+    eid: utils.Index
+        Edges to apply
+    group_by: str
+        If "src", group by u. If "dst", group by v
+    var_nf : var.FEAT_DICT
+        The variable for node feature frame.
+    var_ef : var.FEAT_DICT
+        The variable for edge frame.
+    var_out : var.FEAT_DICT
+        The variable for output feature dicts.
+    """
+    if group_by == "src":
+        buckets = _degree_bucketing_for_edge_grouping(u, v, eid)
+        degs, uids, vids, eids = buckets
+    elif group_by == "dst":
+        buckets = _degree_bucketing_for_edge_grouping(v, u, eid)
+        degs, vids, uids, eids = buckets
+    else:
+        raise DGLError("group_apply_edge must be grouped by either src or dst")
+
+    idx_list = []
+    fd_list = []
+    for deg, u, v, eid in zip(degs, uids, vids, eids):
+        # create per-bkt efunc
+        _efunc = var.FUNC(graph, apply_func, deg, u, v, eid)
+        # vars
+        var_u = var.IDX(u)
+        var_v = var.IDX(v)
+        var_eid = var.IDX(eid)
+        # recv on each bucket
+        fdsrc = ir.READ_ROW(var_nf, var_u)
+        fddst = ir.READ_ROW(var_nf, var_v)
+        fdedge = ir.READ_ROW(var_ef, var_eid)
+        fdedge = ir.EDGE_UDF(_efunc, fdsrc, fddst, fdedge, ret=fdedge)  # reuse var
+        # save for merge
+        idx_list.append(var_eid)
+        fd_list.append(fdedge)
+
+    # merge buckets according to the ascending order of the node ids.
+    all_idx = F.cat([idx.data.tousertensor() for idx in idx_list], dim=0)
+    _, order = F.sort_1d(all_idx)
+    var_order = var.IDX(utils.toindex(order))
+    ir.MERGE_ROW(var_order, fd_list, ret=var_out)
+
+def _degree_bucketing_for_edge_grouping()
+    """Return the edge buckets by degree and grouped nodes for group_apply_edge
+
+    Parameters
+    ----------
+    degree
+    uids: utils.Index
+        node id of one end of eids, based on which edges are grouped
+    vids: utils.Index
+        node id of the other end of eids
+    eids: utils.Index
+        edge id for each edge
+    """
+    buckets = _CAPI_DGLGroupEdgeByNodeDegree(uids.todgltensor(),
+                                             vids.todgltensor(),
+                                             eids.todgltensor())
+    return _process_edge_buckets(buckets)
+
+def _process_edge_buckets(buckets):
+    """read bucketing auxiliary data for group_apply_edge buckets
+
+    Returns
+    -------
+    degrees: numpy.ndarray
+        A list of degree for each bucket
+    uids: list of utils.Index
+        A list of node id buckets, nodes in each bucket have the same degree
+    vids: list of utils.Index
+        A list of node id buckets
+    eids: list of utils.Index
+        A list of edge id buckets
+    """
+    # get back results
+    degs = buckets(0).asnumpy()
+    uids = utils.toindex(buckets(1))
+    vids = utils.toindex(buckets(2))
+    eids = utils.toindex(buckets(3))
+    # XXX: convert directly from ndarary to python list?
+    sections = buckets(4).asnumpy().tolist()
+
+    # split buckets and convert to index
+    def split(to_split):
+        res = F.split(to_split.todgltensor(), sections, 0)
+        return map(utils.toindex, res)
+
+    uids = split(uids)
+    vids = split(uids)
+    eids = split(eids)
+
+    return degs, uids, vids, eids
+
+def _create_per_bkt_efunc(graph, apply_func, deg, u, v, eid):
+    """Internal function to generate the per degree bucket edge UDF."""
+    batch_size = len(u) // deg
+    def _efunc_wrapper(src_data, edge_data, dst_data):
+        def _reshape_func(data):
+            def _reshaped_getter(key):
+                feat = data[key]
+                new_shape = (batch_size, deg) + F.shape(feat)[1:]
+                return F.reshape(feat, new_shape)
+            return _reshaped_getter
+
+        def _reshape_back(data):
+            shape = F.shape(data)[2:]
+            new_shape = (batch_size * deg,) + shape
+            return F.reshape(data, new_shape)
+
+        reshaped_src_data = utils.LazyDict(_reshaped_func(src_data),
+                                           src_data.keys())
+        reshaped_edge_data = utils.LazyDict(_reshaped_func(edge_data),
+                                            edge_data.keys())
+        reshaped_dst_data = utils.LazyDict(_reshaped_func(dst_data),
+                                           dst_data.keys())
+        ebatch = EdgeBatch(graph, (u, v, eid), reshaped_src_data,
+                           reshaped_edge_data, reshaped_dst_data)
+        return {k: _reshape_back(v) for k, v in apply_func(ebatch).items()}
+    return _efunc_wrapper
 
 _init_api("dgl.runtime.degree_bucketing")
