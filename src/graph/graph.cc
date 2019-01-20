@@ -174,7 +174,6 @@ void Graph::AddEdges(IdArray src_ids, IdArray dst_ids) {
   const size_t len = (size_t)std::max(srclen, dstlen);
   const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_ids->data);
   const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_ids->data);
-  bool duplicate = false;
   bool src_broadcast = false, dst_broadcast = false;
 
   std::fill(src_count_buffer_.begin(), src_count_buffer_.end(), 0);
@@ -203,16 +202,16 @@ void Graph::AddEdges(IdArray src_ids, IdArray dst_ids) {
   if (src_nonzeros < dst_nonzeros) {
     if (!InsertEdges_(&adjlist_, dst_data, src_data, dst_broadcast, src_broadcast, len,
           dst_count_buffer_, src_count_buffer_, true)) {
-      duplicate = true;
-      goto complete;
+      LOG(FATAL) << "duplicate edges to be added in simple graph";
+      return;
     }
     InsertEdges_(&reverse_adjlist_, src_data, dst_data, src_broadcast, dst_broadcast, len,
         src_count_buffer_, dst_count_buffer_, false);
   } else {
     if (!InsertEdges_(&reverse_adjlist_, src_data, dst_data, src_broadcast, dst_broadcast,
           len, src_count_buffer_, dst_count_buffer_, true)) {
-      duplicate = true;
-      goto complete;
+      LOG(FATAL) << "duplicate edges to be added in simple graph";
+      return;
     }
     InsertEdges_(&adjlist_, dst_data, src_data, dst_broadcast, src_broadcast, len,
         dst_count_buffer_, src_count_buffer_, false);
@@ -224,9 +223,6 @@ void Graph::AddEdges(IdArray src_ids, IdArray dst_ids) {
   }
 
   num_edges_ += len;
-
-complete:
-  CHECK(!duplicate) << "duplicate edges to be added in simple graph";
 }
 
 BoolArray Graph::HasVertices(IdArray vids) const {
