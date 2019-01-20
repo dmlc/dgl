@@ -802,9 +802,7 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   const int64_t* indptr = orig_csr->indptr.data();
   const dgl_id_t* seed = static_cast<dgl_id_t*>(seed_arr->data);
 
-  // BFS traverse the graph and sample vertices
-  // <vertex_id, layer_id>
-  std::unordered_set<dgl_id_t> sub_ver_map;
+  std::unordered_set<dgl_id_t> sub_ver_map; // The vertex Ids in a layer.
   std::vector<std::pair<dgl_id_t, int> > sub_vers;
   sub_vers.reserve(num_seeds * 10);
   // add seed vertices
@@ -821,85 +819,73 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   std::vector<std::pair<dgl_id_t, size_t> > neigh_pos;
   neigh_pos.reserve(num_seeds);
   std::vector<dgl_id_t> neighbor_list;
+  std::vector<size_t> layer_offsets(num_hops + 1);
   int64_t num_edges = 0;
 
-  // sub_vers is used both as a node collection and a queue.
-  // In the while loop, we iterate over sub_vers and new nodes are added to the vector.
-  // A vertex in the vector only needs to be accessed once. If there is a vertex behind idx
-  // isn't in the last level, we will sample its neighbors. If not, the while loop terminates.
+  layer_offsets[0] = 0;
+  layer_offsets[1] = sub_vers.size();
   size_t idx = 0;
-  while (idx < sub_vers.size()) {
-    dgl_id_t dst_id = sub_vers[idx].first;
-    int cur_node_level = sub_vers[idx].second;
-    idx++;
-    // If the node is in the last level, we don't need to sample neighbors
-    // from this node.
-    if (cur_node_level >= num_hops)
-      continue;
+  for (size_t layer_id = 1; layer_id < num_hops; layer_id++) {
+    sub_ver_map.clear();
+    // sub_vers is used both as a node collection and a queue.
+    // In the while loop, we iterate over sub_vers and new nodes are added to the vector.
+    // A vertex in the vector only needs to be accessed once. If there is a vertex behind idx
+    // isn't in the last level, we will sample its neighbors. If not, the while loop terminates.
+    while (idx < sub_vers.size() && layer_id - 1 == sub_vers[idx].second) {
+      dgl_id_t dst_id = sub_vers[idx].first;
+      int cur_node_level = sub_vers[idx].second;
+      idx++;
 
-    tmp_sampled_src_list.clear();
-    tmp_sampled_edge_list.clear();
-    dgl_id_t ver_len = *(indptr+dst_id+1) - *(indptr+dst_id);
-    if (probability == nullptr) {  // uniform-sample
-      GetUniformSample(val_list + *(indptr + dst_id),
-                       col_list + *(indptr + dst_id),
-                       ver_len,
-                       num_neighbor,
-                       &tmp_sampled_src_list,
-                       &tmp_sampled_edge_list,
-                       &time_seed);
-    } else {  // non-uniform-sample
-      GetNonUniformSample(probability,
-                       val_list + *(indptr + dst_id),
-                       col_list + *(indptr + dst_id),
-                       ver_len,
-                       num_neighbor,
-                       &tmp_sampled_src_list,
-                       &tmp_sampled_edge_list,
-                       &time_seed);
+      tmp_sampled_src_list.clear();
+      tmp_sampled_edge_list.clear();
+      dgl_id_t ver_len = *(indptr+dst_id+1) - *(indptr+dst_id);
+      if (probability == nullptr) {  // uniform-sample
+        GetUniformSample(val_list + *(indptr + dst_id),
+                         col_list + *(indptr + dst_id),
+                         ver_len,
+                         num_neighbor,
+                         &tmp_sampled_src_list,
+                         &tmp_sampled_edge_list,
+                         &time_seed);
+      } else {  // non-uniform-sample
+        GetNonUniformSample(probability,
+                            val_list + *(indptr + dst_id),
+                            col_list + *(indptr + dst_id),
+                            ver_len,
+                            num_neighbor,
+                            &tmp_sampled_src_list,
+                            &tmp_sampled_edge_list,
+                            &time_seed);
+      }
+      CHECK_EQ(tmp_sampled_src_list.size(), tmp_sampled_edge_list.size());
+      size_t pos = neighbor_list.size();
+      neigh_pos.emplace_back(dst_id, pos);
+      // First we push the size of neighbor vector
+      neighbor_list.push_back(tmp_sampled_edge_list.size());
+      // Then push the vertices
+      for (size_t i = 0; i < tmp_sampled_src_list.size(); ++i) {
+        neighbor_list.push_back(tmp_sampled_src_list[i]);
+      }
+      // Finally we push the edge list
+      for (size_t i = 0; i < tmp_sampled_edge_list.size(); ++i) {
+        neighbor_list.push_back(tmp_sampled_edge_list[i]);
+      }
+      num_edges += tmp_sampled_src_list.size();
+      for (size_t i = 0; i < tmp_sampled_src_list.size(); ++i) {
+        // We need to add the neighbor in the hashtable here. This ensures that
+        // the vertex in the queue is unique. If we see a vertex before, we don't
+        // need to add it to the queue again.
+        auto ret = sub_ver_map.insert(tmp_sampled_src_list[i]);
+        // If the sampled neighbor is inserted to the map successfully.
+        if (ret.second) {
+          sub_vers.emplace_back(tmp_sampled_src_list[i], cur_node_level + 1);
+        }
+      }
     }
-    CHECK_EQ(tmp_sampled_src_list.size(), tmp_sampled_edge_list.size());
-    size_t pos = neighbor_list.size();
-    neigh_pos.emplace_back(dst_id, pos);
-    // First we push the size of neighbor vector
-    neighbor_list.push_back(tmp_sampled_edge_list.size());
-    // Then push the vertices
-    for (size_t i = 0; i < tmp_sampled_src_list.size(); ++i) {
-      neighbor_list.push_back(tmp_sampled_src_list[i]);
-    }
-    // Finally we push the edge list
-    for (size_t i = 0; i < tmp_sampled_edge_list.size(); ++i) {
-      neighbor_list.push_back(tmp_sampled_edge_list[i]);
-    }
-    num_edges += tmp_sampled_src_list.size();
-    for (size_t i = 0; i < tmp_sampled_src_list.size(); ++i) {
-      // We need to add the neighbor in the hashtable here. This ensures that
-      // the vertex in the queue is unique. If we see a vertex before, we don't
-      // need to add it to the queue again.
-      auto ret = sub_ver_map.insert(tmp_sampled_src_list[i]);
-      // If the sampled neighbor is inserted to the map successfully.
-      if (ret.second)
-        sub_vers.emplace_back(tmp_sampled_src_list[i], cur_node_level + 1);
-    }
-  }
-  // Let's check if there is a vertex that we haven't sampled its neighbors.
-  for (; idx < sub_vers.size(); idx++) {
-    if (sub_vers[idx].second < num_hops) {
-      LOG(WARNING)
-        << "The sampling is truncated because we have reached the max number of vertices\n"
-        << "Please use a smaller number of seeds or a small neighborhood";
-      break;
-    }
+    layer_offsets[layer_id + 1] = layer_offsets[layer_id] + sub_ver_map.size();
   }
 
-  // Copy sub_ver_map to output[0]
-  // Copy layer
-  uint64_t num_vertices = sub_ver_map.size();
-  std::sort(sub_vers.begin(), sub_vers.end(),
-            [](const std::pair<dgl_id_t, dgl_id_t> &a1, const std::pair<dgl_id_t, dgl_id_t> &a2) {
-    return a1.first < a2.first;
-  });
-
+  uint64_t num_vertices = sub_vers.size();
   SampledSubgraph subg;
   subg.induced_vertices = IdArray::Empty({static_cast<int64_t>(num_vertices)},
                                          DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
@@ -912,58 +898,83 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
 
   dgl_id_t *out = static_cast<dgl_id_t *>(subg.induced_vertices->data);
   dgl_id_t *out_layer = static_cast<dgl_id_t *>(subg.layer_ids->data);
-  for (size_t i = 0; i < sub_vers.size(); i++) {
-    out[i] = sub_vers[i].first;
-    out_layer[i] = sub_vers[i].second;
-  }
-
-  // Copy sub_probability
-  float *sub_prob = static_cast<float *>(subg.sample_prob->data);
-  if (probability != nullptr) {
-    for (size_t i = 0; i < sub_ver_map.size(); ++i) {
-      dgl_id_t idx = out[i];
-      sub_prob[i] = probability[idx];
-    }
-  }
+  dgl_id_t* val_list_out = static_cast<dgl_id_t *>(subg.induced_edges->data);
 
   // Construct sub_csr_graph
   auto subg_csr = std::make_shared<CSR>(num_vertices, num_edges);
   subg_csr->indices.resize(num_edges);
   subg_csr->edge_ids.resize(num_edges);
-  dgl_id_t* val_list_out = static_cast<dgl_id_t *>(subg.induced_edges->data);
   dgl_id_t* col_list_out = subg_csr->indices.data();
   int64_t* indptr_out = subg_csr->indptr.data();
   size_t collected_nedges = 0;
 
-  // Both the out array and neigh_pos are sorted. By scanning the two arrays, we can see
-  // which vertices have neighbors and which don't.
-  std::sort(neigh_pos.begin(), neigh_pos.end(),
-            [](const std::pair<dgl_id_t, size_t> &a1, const std::pair<dgl_id_t, size_t> &a2) {
-    return a1.first < a2.first;
-  });
-  size_t idx_with_neigh = 0;
-  for (size_t i = 0; i < num_vertices; i++) {
-    dgl_id_t dst_id = *(out + i);
-    // If a vertex is in sub_ver_map but not in neigh_pos, this vertex must not
-    // have edges.
-    size_t edge_size = 0;
-    if (idx_with_neigh < neigh_pos.size() && dst_id == neigh_pos[idx_with_neigh].first) {
-      size_t pos = neigh_pos[idx_with_neigh].second;
-      CHECK_LT(pos, neighbor_list.size());
-      edge_size = neighbor_list[pos];
-      CHECK_LE(pos + edge_size * 2 + 1, neighbor_list.size());
+  // The data from the previous steps:
+  // * node data: sub_vers (vid, layer), neigh_pos,
+  // * edge data: neighbor_list, probability.
+  // * layer_offsets: the offset in sub_vers.
+  dgl_id_t ver_id = 0;
+  std::unordered_map<dgl_id_t, dgl_id_t> layer_ver_maps[num_hops + 1];
+  for (size_t layer_id = 0; layer_id < num_hops; layer_id++) {
+    // We sort the vertices in a layer so that we don't need to sort the neighbor Ids
+    // after remap to a subgraph.
+    std::sort(sub_vers.begin() + layer_offsets[layer_id],
+              sub_vers.begin() + layer_offsets[layer_id + 1],
+              [](const std::pair<dgl_id_t, dgl_id_t> &a1,
+                 const std::pair<dgl_id_t, dgl_id_t> &a2) {
+      return a1.first < a2.first;
+    });
 
-      std::copy_n(neighbor_list.begin() + pos + 1,
-                  edge_size,
-                  col_list_out + collected_nedges);
-      std::copy_n(neighbor_list.begin() + pos + edge_size + 1,
-                  edge_size,
-                  val_list_out + collected_nedges);
-      collected_nedges += edge_size;
-      idx_with_neigh++;
+    // Save the sampled vertices and its layer Id.
+    for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
+      out[i] = sub_vers[i].first;
+      out_layer[i] = sub_vers[i].second;
+      layer_ver_maps[layer_id].insert(std::pair<dgl_id_t, dgl_id_t>(sub_vers[i].first, ver_id++));
+      assert(sub_vers[i].second == layer_id);
     }
-    indptr_out[i+1] = indptr_out[i] + edge_size;
   }
+
+  // Remap the neighbors.
+  for (size_t layer_id = 0; layer_id < num_hops - 1; layer_id++) {
+    std::sort(neigh_pos.begin() + layer_offsets[layer_id],
+              neigh_pos.begin() + layer_offsets[layer_id + 1],
+              [](const std::pair<dgl_id_t, size_t> &a1, const std::pair<dgl_id_t, size_t> &a2) {
+                return a1.first < a2.first;
+              });
+
+    for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
+      dgl_id_t dst_id = *(out + i);
+      assert(dst_id == neigh_pos[i].first);
+      size_t pos = neigh_pos[i].second;
+      CHECK_LT(pos, neighbor_list.size());
+      size_t num_edges = neighbor_list[pos];
+      CHECK_LE(pos + num_edges * 2 + 1, neighbor_list.size());
+
+      // We need to map the Ids of the neighbors to the subgraph.
+      auto neigh_it = neighbor_list.begin() + pos + 1;
+      for (size_t i = 0; i < num_edges; i++) {
+        dgl_id_t neigh = *(neigh_it + i);
+        col_list_out[collected_nedges + i] = layer_ver_maps[layer_id + 1][neigh];
+      }
+      // We can simply copy the edge Ids.
+      std::copy_n(neighbor_list.begin() + pos + num_edges + 1,
+                  num_edges,
+                  val_list_out + collected_nedges);
+      collected_nedges += num_edges;
+      indptr_out[i+1] = indptr_out[i] + num_edges;
+    }
+  }
+
+#if 0
+  // Copy sub_probability
+  float *sub_prob = static_cast<float *>(subg.sample_prob->data);
+  if (probability != nullptr) {
+    for (size_t i = 0; i < sub_ver_mp.size(); ++i) {
+      dgl_id_t idx = out[i];
+      sub_prob[i] = probability[idx];
+    }
+  }
+#endif
+
 
   for (size_t i = 0; i < subg_csr->edge_ids.size(); i++)
     subg_csr->edge_ids[i] = i;
@@ -976,38 +987,14 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   return subg;
 }
 
-void CompactSubgraph(ImmutableGraph::CSR *subg,
-                     const std::unordered_map<dgl_id_t, dgl_id_t> &id_map) {
-  for (size_t i = 0; i < subg->indices.size(); i++) {
-    auto it = id_map.find(subg->indices[i]);
-    CHECK(it != id_map.end());
-    subg->indices[i] = it->second;
-  }
-}
-
-void ImmutableGraph::CompactSubgraph(IdArray induced_vertices) {
-  // The key is the old id, the value is the id in the subgraph.
-  std::unordered_map<dgl_id_t, dgl_id_t> id_map;
-  const dgl_id_t *vdata = static_cast<dgl_id_t *>(induced_vertices->data);
-  size_t len = induced_vertices->shape[0];
-  for (size_t i = 0; i < len; i++)
-    id_map.insert(std::pair<dgl_id_t, dgl_id_t>(vdata[i], i));
-  if (in_csr_)
-    dgl::CompactSubgraph(in_csr_.get(), id_map);
-  if (out_csr_)
-    dgl::CompactSubgraph(out_csr_.get(), id_map);
-}
-
 SampledSubgraph ImmutableGraph::NeighborUniformSample(IdArray seeds,
                                                       const std::string &neigh_type,
                                                       int num_hops, int expand_factor) const {
-  auto ret = SampleSubgraph(seeds,                 // seed vector
-                            nullptr,               // sample_id_probability
-                            neigh_type,
-                            num_hops,
-                            expand_factor);
-  std::static_pointer_cast<ImmutableGraph>(ret.graph)->CompactSubgraph(ret.induced_vertices);
-  return ret;
+  return SampleSubgraph(seeds,                 // seed vector
+                        nullptr,               // sample_id_probability
+                        neigh_type,
+                        num_hops + 1,
+                        expand_factor);
 }
 
 }  // namespace dgl

@@ -16,13 +16,8 @@ def test_1neighbor_sampler_all():
         seed_ids = aux['seeds']
         assert len(seed_ids) == 1
         src, dst, eid = g.in_edges(seed_ids, form='all')
-        # Test if there is a self loop
-        self_loop = F.asnumpy(F.sum(src == dst, 0)) == 1
-        if self_loop:
-            assert subg.number_of_nodes() == len(src)
-        else:
-            assert subg.number_of_nodes() == len(src) + 1
-        assert subg.number_of_edges() >= len(src)
+        assert subg.number_of_nodes() == len(src) + 1
+        assert subg.number_of_edges() == len(src)
 
         child_ids = subg.map_to_subgraph_nid(seed_ids)
         child_src, child_dst, child_eid = subg.in_edges(child_ids, form='all')
