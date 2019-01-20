@@ -7,14 +7,32 @@ Batched Graph Classification with DGL
 **Author**: `Mufei Li <https://github.com/mufeili>`_,
 `Minjie Wang <https://jermainewang.github.io/>`_
 
-In this tutorial, we will learn how to perform batched graph classification
-with dgl via a toy example of distinguishing cycles from stars. From a synthetic
-dataset, we want to learn a binary classifier like below:
+Graph classification, namely the prediction of graph labels, is an important problem
+with applications across many fields -- bioinformatics, chemoinformatics, social
+network analysis, urban computing and cyber-security. Recently there has been an
+arising trend of applying graph neural networks to graph classification (
+`Ying et al., 2018 <https://arxiv.org/pdf/1806.08804.pdf>`_,
+`Cangea et al., 2018 <https://arxiv.org/pdf/1811.01287.pdf>`_,
+`Knyazev et al., 2018 <https://arxiv.org/pdf/1811.09595.pdf>`_,
+`Bianchi et al., 2019 <https://arxiv.org/pdf/1901.01343.pdf>`_,
+`Liao et al., 2019 <https://arxiv.org/pdf/1901.01484.pdf>`_,
+`Gao et al., 2019 <https://openreview.net/pdf?id=HJePRoAct7>`_).
+
+This tutorial is a demonstration for
+ * batching multiple graphs of variable size and shape with DGL
+ * training a graph neural network for a simple graph classification task
 """
 
 ###############################################################################
+# Simple Graph Classification Task
+# --------------------------------
+# In this tutorial, we will learn how to perform batched graph classification
+# with dgl via a toy example of distinguishing cycles from stars. From a synthetic
+# dataset, we want to learn a binary classifier like below:
 #
-# .. image:: https://i.imgur.com/ZYaSoqO.png
+# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/classifier.png
+#     :width: 400pt
+#     :align: center
 #
 # Dataset
 # -------
@@ -26,7 +44,9 @@ dataset, we want to learn a binary classifier like below:
 # across graphs except that our graphs may have different sizes. Below is a
 # visualization that hopefully gives a general idea:
 #
-# .. image:: https://i.imgur.com/0cNkhn6.png
+# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/batch.png
+#     :width: 400pt
+#     :align: center
 #
 # Basically with ``dgl.batch([g_1,...,g_n])``, we can merge :math:`n` small
 # graphs into a large graph with :math:`n` connected components. This allows
@@ -98,7 +118,7 @@ class SynDataset(Dataset):
 # ----------------
 # The graph classification can be proceeded as follows:
 #
-# .. image:: https://i.imgur.com/s3y8hVM.png
+# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/graph_classifier.png
 #
 # From a batch of graphs, we first perform message passing/graph convolution
 # for nodes to "communicate" with others. After message passing, we compute a
@@ -134,15 +154,15 @@ import torch
 import torch.nn as nn
 
 
-def msg(edge):
+def msg(edges):
     """Sends a message of node feature hv."""
-    msg = edge.src['h']
+    msg = edges.src['h']
     return {'m': msg}
 
-def reduce(node):
+def reduce(nodes):
     """Take an average over all neighbor node features hu and use it to
     overwrite the original node feature."""
-    accum = torch.mean(node.mailbox['m'], 1)
+    accum = torch.mean(nodes.mailbox['m'], 1)
     return {'h': accum}
 
 class NodeUpdate(nn.Module):
@@ -266,7 +286,7 @@ print('Accuracy of sampled predictions on the test set: {:.4f}%'.format(
 # test set by one model we trained. Recall that we have label :math:`0` for
 # cycle graph and label :math:`1` for star graph.
 #
-# .. image:: https://user-images.githubusercontent.com/19576924/51403773-6f687980-1b8c-11e9-8de8-17cea9db734a.gif
+# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/test_eval.gif
 #
 # What's Next?
 # ------------
