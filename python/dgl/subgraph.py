@@ -246,4 +246,4 @@ class LayerDGLSubGraph(DGLGraph):
         assert layer_id + 1 < len(self._layers)
         start = self._layers[layer_id]
         end = self._layers[layer_id + 1]
-        return self._parent_nid[start:end]
+        return self._parent_nid.tousertensor()[start:end]
