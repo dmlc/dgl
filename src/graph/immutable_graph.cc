@@ -6,6 +6,7 @@
 
 #include <dgl/immutable_graph.h>
 #include <cstdlib>
+#include <cmath>
 
 #ifdef _MSC_VER
 // rand in MS compiler works well in multi-threading.
