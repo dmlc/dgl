@@ -908,7 +908,8 @@ SampledSubgraph ImmutableGraph::NeighborSample(IdArray seed_arr,
   subg.layer_ids = IdArray::Empty({static_cast<int64_t>(num_vertices)},
                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   subg.sample_prob = runtime::NDArray::Empty({static_cast<int64_t>(num_vertices)},
-                                             DLDataType{kDLFloat, 8 * sizeof(float), 1}, DLContext{kDLCPU, 0});
+                                             DLDataType{kDLFloat, 8 * sizeof(float), 1},
+                                             DLContext{kDLCPU, 0});
 
   dgl_id_t *out = static_cast<dgl_id_t *>(subg.induced_vertices->data);
   dgl_id_t *out_layer = static_cast<dgl_id_t *>(subg.layer_ids->data);
@@ -1074,8 +1075,8 @@ SampledSubgraph ImmutableGraph::LayerSample(IdArray seed_array,
     }
   }
 
-  long n_nodes = nodes.size();
-  long n_edges = new_eids.size();
+  int64_t n_nodes = nodes.size();
+  int64_t n_edges = new_eids.size();
   auto subg_csr = std::make_shared<CSR>(n_nodes, n_edges);
   subg_csr->indptr.resize(n_nodes + 1);
   subg_csr->indices.resize(n_edges);
@@ -1092,10 +1093,14 @@ SampledSubgraph ImmutableGraph::LayerSample(IdArray seed_array,
   subg.layer_ids = IdArray::Empty({n_nodes},
                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   subg.sample_prob = runtime::NDArray::Empty({n_nodes},
-                                             DLDataType{kDLFloat, 8 * sizeof(float), 1}, DLContext{kDLCPU, 0});
-  std::copy(nodes.begin(), nodes.end(), static_cast<dgl_id_t*>(subg.induced_vertices->data));
-  std::copy(layer_ids.begin(), layer_ids.end(), static_cast<dgl_id_t*>(subg.layer_ids->data));
-  std::copy(probabilities.begin(), probabilities.end(), static_cast<float*>(subg.sample_prob->data));
+                                             DLDataType{kDLFloat, 8 * sizeof(float), 1},
+                                             DLContext{kDLCPU, 0});
+  std::copy(nodes.begin(), nodes.end(),
+            static_cast<dgl_id_t*>(subg.induced_vertices->data));
+  std::copy(layer_ids.begin(), layer_ids.end(),
+            static_cast<dgl_id_t*>(subg.layer_ids->data));
+  std::copy(probabilities.begin(), probabilities.end(),
+            static_cast<float*>(subg.sample_prob->data));
 
   if (neigh_type == "in")
     subg.graph = GraphPtr(new ImmutableGraph(subg_csr, nullptr, IsMultigraph()));

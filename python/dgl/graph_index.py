@@ -672,7 +672,8 @@ class GraphIndex(object):
             rst = _uniform_neighbor_sampling(self, seed_ids, neighbor_type, num_hops,
                                              expand_factor)
         else:
-            rst = _nonuniform_neighbor_sampling(self, node_prob, seed_ids, neighbor_type, num_hops, expand_factor)
+            rst = _nonuniform_neighbor_sampling(self, node_prob, seed_ids, neighbor_type,
+                                                num_hops, expand_factor)
 
         return [SubgraphIndex(rst(i), self, utils.toindex(rst(num_subgs + i)),
                               utils.toindex(rst(num_subgs * 2 + i))) for i in range(num_subgs)]
@@ -687,7 +688,8 @@ class GraphIndex(object):
         if node_prob is None:
             rst = _uniform_layer_sampling(self, seed_ids, layer_type, n_layers, layer_size)
         else:
-            rst = _nonuniform_layer_sampling(self, node_prob, seed_ids, layer_type, n_layers, layer_size)
+            rst = _nonuniform_layer_sampling(self, node_prob, seed_ids, layer_type,
+                                             n_layers, layer_size)
 
         return [SubgraphIndex(rst(i), self, utils.toindex(rst(num_subgs + i)),
                               utils.toindex(rst(num_subgs * 2 + i))) for i in range(num_subgs)]

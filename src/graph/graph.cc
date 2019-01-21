@@ -20,8 +20,10 @@ Graph::Graph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_node
   CHECK(IsValidIdArray(edge_ids));
   this->AddVertices(num_nodes);
   num_edges_ = src_ids->shape[0];
-  CHECK(static_cast<int64_t>(num_edges_) == dst_ids->shape[0]) << "vectors in COO must have the same length";
-  CHECK(static_cast<int64_t>(num_edges_) == edge_ids->shape[0]) << "vectors in COO must have the same length";
+  CHECK(static_cast<int64_t>(num_edges_) == dst_ids->shape[0])
+    << "vectors in COO must have the same length";
+  CHECK(static_cast<int64_t>(num_edges_) == edge_ids->shape[0])
+    << "vectors in COO must have the same length";
   const dgl_id_t *src_data = static_cast<dgl_id_t*>(src_ids->data);
   const dgl_id_t *dst_data = static_cast<dgl_id_t*>(dst_ids->data);
   const dgl_id_t *edge_data = static_cast<dgl_id_t*>(edge_ids->data);
@@ -507,7 +509,8 @@ std::vector<IdArray> Graph::GetAdj(bool transpose, const std::string &fmt) const
   uint64_t num_edges = NumEdges();
   uint64_t num_nodes = NumVertices();
   if (fmt == "coo") {
-    IdArray idx = IdArray::Empty({2 * static_cast<int64_t>(num_edges)}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    IdArray idx = IdArray::Empty({2 * static_cast<int64_t>(num_edges)},
+                                 DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
     int64_t *idx_data = static_cast<int64_t*>(idx->data);
     if (transpose) {
       std::copy(all_edges_src_.begin(), all_edges_src_.end(), idx_data);
@@ -516,17 +519,20 @@ std::vector<IdArray> Graph::GetAdj(bool transpose, const std::string &fmt) const
       std::copy(all_edges_dst_.begin(), all_edges_dst_.end(), idx_data);
       std::copy(all_edges_src_.begin(), all_edges_src_.end(), idx_data + num_edges);
     }
-    IdArray eid = IdArray::Empty({static_cast<int64_t>(num_edges)}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    IdArray eid = IdArray::Empty({static_cast<int64_t>(num_edges)},
+                                 DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
     int64_t *eid_data = static_cast<int64_t*>(eid->data);
     for (uint64_t eid = 0; eid < num_edges; ++eid) {
       eid_data[eid] = eid;
     }
     return std::vector<IdArray>{idx, eid};
   } else if (fmt == "csr") {
-    IdArray indptr = IdArray::Empty({static_cast<int64_t>(num_nodes) + 1}, DLDataType{kDLInt, 64, 1},
-                                    DLContext{kDLCPU, 0});
-    IdArray indices = IdArray::Empty({static_cast<int64_t>(num_edges)}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-    IdArray eid = IdArray::Empty({static_cast<int64_t>(num_edges)}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    IdArray indptr = IdArray::Empty({static_cast<int64_t>(num_nodes) + 1},
+                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    IdArray indices = IdArray::Empty({static_cast<int64_t>(num_edges)},
+                                     DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    IdArray eid = IdArray::Empty({static_cast<int64_t>(num_edges)},
+                                 DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
     int64_t *indptr_data = static_cast<int64_t*>(indptr->data);
     int64_t *indices_data = static_cast<int64_t*>(indices->data);
     int64_t *eid_data = static_cast<int64_t*>(eid->data);
