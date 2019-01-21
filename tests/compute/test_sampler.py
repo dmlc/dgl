@@ -21,6 +21,7 @@ def test_1neighbor_sampler_all():
 
         child_ids = subg.map_to_subgraph_nid(seed_ids)
         child_src, child_dst, child_eid = subg.in_edges(child_ids, form='all')
+        assert(len(child_src) > 0)
 
         child_src1 = subg.map_to_subgraph_nid(src)
         assert F.asnumpy(F.sum(child_src1 == child_src, 0)) == len(src)

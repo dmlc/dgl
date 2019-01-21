@@ -935,6 +935,7 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   }
 
   // Remap the neighbors.
+  int64_t last_off = 0;
   for (size_t layer_id = 0; layer_id < num_hops - 1; layer_id++) {
     std::sort(neigh_pos.begin() + layer_offsets[layer_id],
               neigh_pos.begin() + layer_offsets[layer_id + 1],
@@ -962,8 +963,12 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
                   val_list_out + collected_nedges);
       collected_nedges += num_edges;
       indptr_out[i+1] = indptr_out[i] + num_edges;
+      last_off = indptr_out[i+1];
     }
   }
+
+  for (size_t i = layer_offsets[num_hops - 1]; i < subg_csr->indptr.size(); i++)
+    indptr_out[i] = last_off;
 
 #if 0
   // Copy sub_probability
