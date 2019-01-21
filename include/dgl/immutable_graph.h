@@ -465,6 +465,14 @@ class ImmutableGraph: public GraphInterface {
                                         int num_hops, int expand_factor) const;
 
   /*!
+   * \brief Sample a subgraph from the seed vertices with layer sampling.
+   * The layers are sampled with a uniform distribution.
+   * \return a subgraph
+   */
+  SampledSubgraph LayerUniformSample(IdArray seeds, const std::string &neigh_type,
+                                     int n_layers, size_t layer_size) const;
+
+  /*!
    * \brief Get the adjacency matrix of the graph.
    *
    * By default, a row of returned adjacency matrix represents the destination
@@ -517,9 +525,13 @@ class ImmutableGraph: public GraphInterface {
    */
   CSRArray GetOutCSRArray() const;
 
-  SampledSubgraph SampleSubgraph(IdArray seed_arr, const float* probability,
+  SampledSubgraph NeighborSample(IdArray seed_arr, const float* probability,
                                  const std::string &neigh_type,
                                  int num_hops, size_t num_neighbor) const;
+
+  SampledSubgraph LayerSample(IdArray seed_arr, const float* probability,
+                              const std::string &neigh_type,
+                              int n_layers, size_t layer_size) const;
 
   /*!
    * \brief Compact a subgraph.

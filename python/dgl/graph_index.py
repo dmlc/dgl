@@ -669,10 +669,25 @@ class GraphIndex(object):
         seed_ids = [v.todgltensor() for v in seed_ids]
         num_subgs = len(seed_ids)
         if node_prob is None:
-            rst = _uniform_sampling(self, seed_ids, neighbor_type, num_hops, expand_factor)
+            rst = _uniform_neighbor_sampling(self, seed_ids, neighbor_type, num_hops,
+                                             expand_factor)
         else:
-            rst = _nonuniform_sampling(self, node_prob, seed_ids, neighbor_type, num_hops,
-                                       expand_factor)
+            rst = _nonuniform_neighbor_sampling(self, node_prob, seed_ids, neighbor_type, num_hops, expand_factor)
+
+        return [SubgraphIndex(rst(i), self, utils.toindex(rst(num_subgs + i)),
+                              utils.toindex(rst(num_subgs * 2 + i))) for i in range(num_subgs)]
+
+    def layer_sampling(self, seed_ids, layer_size, n_layers, layer_type, node_prob):
+        """Neighborhood sampling"""
+        if len(seed_ids) == 0:
+            return []
+
+        seed_ids = [v.todgltensor() for v in seed_ids]
+        num_subgs = len(seed_ids)
+        if node_prob is None:
+            rst = _uniform_layer_sampling(self, seed_ids, layer_type, n_layers, layer_size)
+        else:
+            rst = _nonuniform_layer_sampling(self, node_prob, seed_ids, layer_type, n_layers, layer_size)
 
         return [SubgraphIndex(rst(i), self, utils.toindex(rst(num_subgs + i)),
                               utils.toindex(rst(num_subgs * 2 + i))) for i in range(num_subgs)]
@@ -1003,19 +1018,19 @@ _init_api("dgl.graph_index")
 
 # TODO(zhengda): we'll support variable-length inputs.
 _NEIGHBOR_SAMPLING_APIS = {
-    1: _CAPI_DGLGraphUniformSampling,
-    2: _CAPI_DGLGraphUniformSampling2,
-    4: _CAPI_DGLGraphUniformSampling4,
-    8: _CAPI_DGLGraphUniformSampling8,
-    16: _CAPI_DGLGraphUniformSampling16,
-    32: _CAPI_DGLGraphUniformSampling32,
-    64: _CAPI_DGLGraphUniformSampling64,
-    128: _CAPI_DGLGraphUniformSampling128,
+    1: _CAPI_DGLGraphNeighborUniformSampling,
+    2: _CAPI_DGLGraphNeighborUniformSampling2,
+    4: _CAPI_DGLGraphNeighborUniformSampling4,
+    8: _CAPI_DGLGraphNeighborUniformSampling8,
+    16: _CAPI_DGLGraphNeighborUniformSampling16,
+    32: _CAPI_DGLGraphNeighborUniformSampling32,
+    64: _CAPI_DGLGraphNeighborUniformSampling64,
+    128: _CAPI_DGLGraphNeighborUniformSampling128,
 }
 
 _EMPTY_ARRAYS = [utils.toindex(F.ones(shape=(0), dtype=F.int64, ctx=F.cpu()))]
 
-def _uniform_sampling(gidx, seed_ids, neigh_type, num_hops, expand_factor):
+def _uniform_neighbor_sampling(gidx, seed_ids, neigh_type, num_hops, expand_factor):
     num_seeds = len(seed_ids)
     empty_ids = []
     if len(seed_ids) > 1 and len(seed_ids) not in _NEIGHBOR_SAMPLING_APIS.keys():
@@ -1025,3 +1040,25 @@ def _uniform_sampling(gidx, seed_ids, neigh_type, num_hops, expand_factor):
     assert len(seed_ids) in _NEIGHBOR_SAMPLING_APIS.keys()
     return _NEIGHBOR_SAMPLING_APIS[len(seed_ids)](gidx._handle, *seed_ids, neigh_type,
                                                   num_hops, expand_factor, num_seeds)
+
+_LAYER_SAMPLING_APIS = {
+    1: _CAPI_DGLGraphLayerUniformSampling,
+    2: _CAPI_DGLGraphLayerUniformSampling2,
+    4: _CAPI_DGLGraphLayerUniformSampling4,
+    8: _CAPI_DGLGraphLayerUniformSampling8,
+    16: _CAPI_DGLGraphLayerUniformSampling16,
+    32: _CAPI_DGLGraphLayerUniformSampling32,
+    64: _CAPI_DGLGraphLayerUniformSampling64,
+    128: _CAPI_DGLGraphLayerUniformSampling128,
+}
+
+def _uniform_layer_sampling(gidx, seed_ids, neigh_type, n_layers, layer_size):
+    num_seeds = len(seed_ids)
+    empty_ids = []
+    if len(seed_ids) > 1 and len(seed_ids) not in _LAYER_SAMPLING_APIS.keys():
+        remain = 2**int(math.ceil(math.log2(len(dgl_ids)))) - len(dgl_ids)
+        empty_ids = _EMPTY_ARRAYS[0:remain]
+        seed_ids.extend([empty.todgltensor() for empty in empty_ids])
+    assert len(seed_ids) in _LAYER_SAMPLING_APIS.keys()
+    return _LAYER_SAMPLING_APIS[len(seed_ids)](gidx._handle, *seed_ids, neigh_type,
+                                               n_layers, layer_size, num_seeds)
