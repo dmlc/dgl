@@ -891,13 +891,13 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
                                          DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   subg.induced_edges = IdArray::Empty({static_cast<int64_t>(num_edges)},
                                       DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  subg.layer_ids = IdArray::Empty({static_cast<int64_t>(num_vertices)},
-                                  DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  subg.layer_offsets = IdArray::Empty({static_cast<int64_t>(num_hops + 1)},
+                                      DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   subg.sample_prob = runtime::NDArray::Empty({static_cast<int64_t>(num_vertices)},
                                              DLDataType{kDLFloat, 32, 1}, DLContext{kDLCPU, 0});
 
   dgl_id_t *out = static_cast<dgl_id_t *>(subg.induced_vertices->data);
-  dgl_id_t *out_layer = static_cast<dgl_id_t *>(subg.layer_ids->data);
+  dgl_id_t *out_layer = static_cast<dgl_id_t *>(subg.layer_offsets->data);
   dgl_id_t* val_list_out = static_cast<dgl_id_t *>(subg.induced_edges->data);
 
   // Construct sub_csr_graph
@@ -928,11 +928,11 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
     // Save the sampled vertices and its layer Id.
     for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
       out[i] = sub_vers[i].first;
-      out_layer[i] = sub_vers[i].second;
       layer_ver_maps[layer_id].insert(std::pair<dgl_id_t, dgl_id_t>(sub_vers[i].first, ver_id++));
       assert(sub_vers[i].second == layer_id);
     }
   }
+  std::copy(layer_offsets.begin(), layer_offsets.end(), out_layer);
 
   // Remap the neighbors.
   int64_t last_off = 0;

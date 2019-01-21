@@ -1,6 +1,7 @@
 """Class for subgraph data structure."""
 from __future__ import absolute_import
 
+from . import backend as F
 from .frame import Frame, FrameRef
 from .graph import DGLGraph
 from . import utils
@@ -140,3 +141,109 @@ class DGLSubGraph(DGLGraph):
             The node ID array in the subgraph.
         """
         return map_to_subgraph_nid(self._graph, utils.toindex(parent_vids)).tousertensor()
+
+
+class LayerDGLSubGraph(DGLGraph):
+    """The layered subgraph class.
+
+    The subgraph is read-only on structure; graph mutation is not allowed.
+
+    Parameters
+    ----------
+    parent : DGLGraph
+        The parent graph
+    parent_nid : utils.Index
+        The induced parent node ids in this subgraph.
+    parent_eid : utils.Index
+        The induced parent edge ids in this subgraph.
+    layers : utils.Index
+        The offsets of each layer.
+    graph_idx : GraphIndex
+        The graph index.
+    """
+    def __init__(self, parent, parent_nid, parent_eid, layers, graph_idx):
+        super(LayerDGLSubGraph, self).__init__(graph_data=graph_idx,
+                                               readonly=graph_idx.is_readonly())
+        self._parent = parent
+        self._parent_nid = parent_nid
+        self._parent_eid = parent_eid
+        self._layers = layers
+
+    # override APIs
+    def add_nodes(self, num, data=None):
+        """Add nodes. Disabled because BatchedDGLGraph is read-only."""
+        raise DGLError('Readonly graph. Mutation is not allowed.')
+
+    def add_edge(self, u, v, data=None):
+        """Add one edge. Disabled because BatchedDGLGraph is read-only."""
+        raise DGLError('Readonly graph. Mutation is not allowed.')
+
+    def add_edges(self, u, v, data=None):
+        """Add many edges. Disabled because BatchedDGLGraph is read-only."""
+        raise DGLError('Readonly graph. Mutation is not allowed.')
+
+    @property
+    def parent_nid(self):
+        """Get the parent node ids.
+
+        The returned tensor can be used as a map from the node id
+        in this subgraph to the node id in the parent graph.
+
+        Returns
+        -------
+        Tensor
+            The parent node id array.
+        """
+        return self._parent_nid.tousertensor()
+
+    @property
+    def parent_eid(self):
+        """Get the parent edge ids.
+
+        The returned tensor can be used as a map from the edge id
+        in this subgraph to the edge id in the parent graph.
+
+        Returns
+        -------
+        Tensor
+            The parent edge id array.
+        """
+        return self._parent_eid.tousertensor()
+
+    def copy_from_parent(self):
+        """Copy node/edge features from the parent graph.
+
+        All old features will be removed.
+        """
+        if self._parent._node_frame.num_rows != 0:
+            self._node_frame = FrameRef(Frame(
+                self._parent._node_frame[self._parent_nid]))
+        if self._parent._edge_frame.num_rows != 0:
+            self._edge_frame = FrameRef(Frame(
+                self._parent._edge_frame[self._get_parent_eid()]))
+
+    def layer_nid(self, layer_id):
+        """Get the node Ids in the specified layer.
+
+        Returns
+        -------
+        Tensor
+            The node id array.
+        """
+        assert layer_id + 1 < len(self._layers)
+        start = self._layers[layer_id]
+        end = self._layers[layer_id + 1]
+        return F.arange(start, end)
+
+    def layer_parent_nid(self, layer_id):
+        """Get the node Ids of the parent graph in the specified layer
+
+        Returns
+        -------
+        Tensor
+            The parent node id array.
+        """
+        assert layer_id + 1 < len(self._layers)
+        start = self._layers[layer_id]
+        end = self._layers[layer_id + 1]
+        return self._parent_nid[start:end]

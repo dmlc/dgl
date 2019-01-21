@@ -364,9 +364,9 @@ struct Subgraph {
  */
 struct SampledSubgraph: public Subgraph {
   /*!
-   * \brief the layer of a sampled vertex in the subgraph.
+   * \brief the offsets of the layers in the subgraph.
    */
-  IdArray layer_ids;
+  IdArray layer_offsets;
   /*!
    * \brief the probability that a vertex is sampled.
    */

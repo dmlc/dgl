@@ -675,8 +675,9 @@ class GraphIndex(object):
             rst = _nonuniform_sampling(self, node_prob, seed_ids, neighbor_type, num_hops,
                                        expand_factor)
 
-        return [SubgraphIndex(rst(i), self, utils.toindex(rst(num_subgs + i)),
-                              utils.toindex(rst(num_subgs * 2 + i))) for i in range(num_subgs)]
+        return [LayerSubgraphIndex(rst(i), self, utils.toindex(rst(num_subgs + i)),
+                                   utils.toindex(rst(num_subgs * 2 + i)),
+                                   utils.toindex(rst(num_subgs * 3 + i))) for i in range(num_subgs)]
 
     def to_networkx(self):
         """Convert to networkx graph.
@@ -868,6 +869,33 @@ class SubgraphIndex(GraphIndex):
     def __setstate__(self, state):
         raise NotImplementedError(
             "SubgraphIndex unpickling is not supported yet.")
+
+class LayerSubgraphIndex(SubgraphIndex):
+    """Graph index for a layered subgraph.
+
+    Parameters
+    ----------
+    handle : GraphIndexHandle
+        The capi handle.
+    paranet : GraphIndex
+        The parent graph index.
+    induced_nodes : utils.Index
+        The parent node ids in this subgraph.
+    induced_edges : utils.Index
+        The parent edge ids in this subgraph.
+    layers: utils.Index
+        The offsets of the layers.
+    """
+    def __init__(self, handle, parent, induced_nodes, induced_edges, layers):
+        super(LayerSubgraphIndex, self).__init__(handle, parent, induced_nodes, induced_edges)
+        self._layers = layers
+
+    @property
+    def layers(self):
+        """Return layers.
+        """
+        return self._layers
+
 
 def map_to_subgraph_nid(subgraph, parent_nids):
     """Map parent node Ids to the subgraph node Ids.
