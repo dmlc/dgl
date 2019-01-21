@@ -465,7 +465,7 @@ def train_on_subgraphs(g, label_nodes, batch_size,
         # embeddings of the subgraph from the parent graph with
         # `copy_from_parent()` before computing...
         subg.copy_from_parent()
-        subg_seeds = subg.map_to_subgraph_nid(seeds)
+        subg_seeds = subg.layer_nid(0)
         update_embeddings_subgraph(subg, subg_seeds, steady_state_operator)
         # ... and copy them back to the parent graph with
         # `copy_to_parent()` afterwards.
@@ -478,7 +478,7 @@ def train_on_subgraphs(g, label_nodes, batch_size,
             break
         # Again we need to copy features from parent graph
         subg.copy_from_parent()
-        subg_seeds = subg.map_to_subgraph_nid(seeds)
+        subg_seeds = subg.layer_nid(0)
         loss = update_parameters(subg, subg_seeds,
                                  steady_state_operator, predictor, trainer)
         # We don't need to copy the features back to parent graph.
