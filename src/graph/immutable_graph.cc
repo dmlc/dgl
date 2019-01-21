@@ -913,7 +913,8 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   // * edge data: neighbor_list, probability.
   // * layer_offsets: the offset in sub_vers.
   dgl_id_t ver_id = 0;
-  std::unordered_map<dgl_id_t, dgl_id_t> layer_ver_maps[num_hops + 1];
+  std::vector<std::unordered_map<dgl_id_t, dgl_id_t>> layer_ver_maps;
+  layer_ver_maps.resize(num_hops + 1);
   for (size_t layer_id = 0; layer_id < num_hops; layer_id++) {
     // We sort the vertices in a layer so that we don't need to sort the neighbor Ids
     // after remap to a subgraph.
