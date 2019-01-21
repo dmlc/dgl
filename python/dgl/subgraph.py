@@ -210,6 +210,17 @@ class LayerDGLSubGraph(DGLGraph):
         """
         return self._parent_eid.tousertensor()
 
+    @property
+    def num_layers(self):
+        """Get the number of layers.
+
+        Returns
+        -------
+        int
+            the number of layers
+        """
+        return len(self._layers) - 1
+
     def copy_from_parent(self):
         """Copy node/edge features from the parent graph.
 
