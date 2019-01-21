@@ -220,7 +220,7 @@ class LayerDGLSubGraph(DGLGraph):
                 self._parent._node_frame[self._parent_nid]))
         if self._parent._edge_frame.num_rows != 0:
             self._edge_frame = FrameRef(Frame(
-                self._parent._edge_frame[self._get_parent_eid()]))
+                self._parent._edge_frame[self._parent_eid]))
 
     def layer_nid(self, layer_id):
         """Get the node Ids in the specified layer.

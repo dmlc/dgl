@@ -6,6 +6,7 @@
 #ifndef DGL_GRAPH_H_
 #define DGL_GRAPH_H_
 
+#include <string>
 #include <vector>
 #include <string>
 #include <cstdint>

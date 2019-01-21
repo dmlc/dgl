@@ -802,7 +802,7 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   const int64_t* indptr = orig_csr->indptr.data();
   const dgl_id_t* seed = static_cast<dgl_id_t*>(seed_arr->data);
 
-  std::unordered_set<dgl_id_t> sub_ver_map; // The vertex Ids in a layer.
+  std::unordered_set<dgl_id_t> sub_ver_map;  // The vertex Ids in a layer.
   std::vector<std::pair<dgl_id_t, int> > sub_vers;
   sub_vers.reserve(num_seeds * 10);
   // add seed vertices

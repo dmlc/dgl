@@ -896,6 +896,14 @@ class LayerSubgraphIndex(SubgraphIndex):
         """
         return self._layers
 
+    def __getstate__(self):
+        raise NotImplementedError(
+            "SubgraphIndex pickling is not supported yet.")
+
+    def __setstate__(self, state):
+        raise NotImplementedError(
+            "SubgraphIndex unpickling is not supported yet.")
+
 
 def map_to_subgraph_nid(subgraph, parent_nids):
     """Map parent node Ids to the subgraph node Ids.
