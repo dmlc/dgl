@@ -19,7 +19,7 @@ def test_1neighbor_sampler_all():
         assert subg.number_of_nodes() == len(src) + 1
         assert subg.number_of_edges() == len(src)
 
-        assert F.array_equal(seed_ids, subg.layer_parent_nid(0))
+        assert seed_ids == subg.layer_parent_nid(0)
         child_src, child_dst, child_eid = subg.in_edges(subg.layer_nid(0), form='all')
         assert F.array_equal(child_src, subg.layer_nid(1))
 
@@ -78,9 +78,7 @@ def test_10neighbor_sampler_all():
         assert F.array_equal(seed_ids, subg.parent_nid[subg.layer_nid(0)])
 
         src, dst, eid = g.in_edges(seed_ids, form='all')
-
         child_src, child_dst, child_eid = subg.in_edges(subg.layer_nid(0), form='all')
-
         src1 = subg.parent_nid[child_src]
         assert F.array_equal(src1, src)
 
