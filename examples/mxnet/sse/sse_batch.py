@@ -266,9 +266,16 @@ def main(args, data):
         neigh_expand = args.neigh_expand
     # initialize graph
     dur = []
-    sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, neigh_expand,
-            neighbor_type='in', num_workers=args.num_parallel_subgraphs, seed_nodes=train_vs,
-            shuffle=True, return_seed_id=True)
+    if args.sampler == 'neighbor':
+        sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, neigh_expand,
+                neighbor_type='in', num_workers=args.num_parallel_subgraphs, seed_nodes=train_vs,
+                shuffle=True, return_seed_id=True)
+    elif args.sampler == 'layer':
+        sampler = dgl.contrib.sampling.LayerSampler(g, args.batch_size, neigh_expand,
+                neighbor_type='in', num_workers=args.num_parallel_subgraphs, seed_nodes=train_vs,
+                shuffle=True, return_seed_id=True)
+    else:
+        raise RuntimeError("Unsupported sampler!")
     if args.cache_subgraph:
         sampler = CachedSubgraphLoader(sampler, shuffle=True)
     for epoch in range(args.n_epochs):
@@ -313,11 +320,20 @@ def main(args, data):
         if args.cache_subgraph:
             sampler.restart()
         else:
-            sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, neigh_expand,
-                                                           neighbor_type='in',
-                                                           num_workers=args.num_parallel_subgraphs,
-                                                           seed_nodes=train_vs, shuffle=True,
-                                                           return_seed_id=True)
+            if args.sampler == 'neighbor':
+                sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, neigh_expand,
+                                                               neighbor_type='in',
+                                                               num_workers=args.num_parallel_subgraphs,
+                                                               seed_nodes=train_vs, shuffle=True,
+                                                               return_seed_id=True)
+            elif args.sampler == 'layer':
+                sampler = dgl.contrib.sampling.LayerSampler(g, args.batch_size, neigh_expand,
+                                                               neighbor_type='in',
+                                                               num_workers=args.num_parallel_subgraphs,
+                                                               seed_nodes=train_vs, shuffle=True,
+                                                               return_seed_id=True)
+            else:
+                raise RuntimeError("Unsupported sampler!")
 
         # test set accuracy
         logits = model_infer(g, eval_vs)
@@ -368,7 +384,7 @@ class GraphData:
         self.train_mask = None
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='GCN')
+    parser = argparse.ArgumentParser(description='SSE')
     register_data_args(parser)
     parser.add_argument("--graph-file", type=str, default="",
             help="graph file")
@@ -400,6 +416,8 @@ if __name__ == '__main__':
             help="the number of subgraphs to construct in parallel.")
     parser.add_argument("--neigh-expand", type=int, default=16,
             help="the number of neighbors to sample.")
+    parser.add_argument("--sampler", type=str, default="neighbor",
+            help="neighbor/layer sampler")
     args = parser.parse_args()
     print("cache: " + str(args.cache_subgraph))
 

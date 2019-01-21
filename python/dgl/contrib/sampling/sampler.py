@@ -319,10 +319,10 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
     else:
         return _PrefetchingLoader(loader, num_prefetch=num_workers*2)
 
-def NeighborSampler(g, batch_size, layer_size, n_layers=1,
-                    neighbor_type='in', node_prob=None, seed_nodes=None,
-                    shuffle=False, num_workers=1,
-                    return_seed_id=False, prefetch=False):
+def LayerSampler(g, batch_size, layer_size, n_layers=1,
+                 neighbor_type='in', node_prob=None, seed_nodes=None,
+                 shuffle=False, num_workers=1,
+                 return_seed_id=False, prefetch=False):
     '''Create a sampler that samples neighborhood.
 
     This creates a subgraph data loader that samples subgraphs from the input graph
