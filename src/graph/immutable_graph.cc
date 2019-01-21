@@ -788,7 +788,7 @@ struct neigh_list {
     : neighs(_neighs), edges(_edges) {}
 };
 
-SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
+SampledSubgraph ImmutableGraph::NeighborSample(IdArray seed_arr,
                                                const float* probability,
                                                const std::string &neigh_type,
                                                int num_hops,
@@ -907,7 +907,7 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   subg.layer_ids = IdArray::Empty({static_cast<int64_t>(num_vertices)},
                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   subg.sample_prob = runtime::NDArray::Empty({static_cast<int64_t>(num_vertices)},
-                                             DLDataType{kDLFloat, 32, 1}, DLContext{kDLCPU, 0});
+                                             DLDataType{kDLFloat, 8 * sizeof(float), 1}, DLContext{kDLCPU, 0});
 
   dgl_id_t *out = static_cast<dgl_id_t *>(subg.induced_vertices->data);
   dgl_id_t *out_layer = static_cast<dgl_id_t *>(subg.layer_ids->data);
@@ -975,6 +975,134 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   return subg;
 }
 
+SampledSubgraph ImmutableGraph::LayerSample(IdArray seed_array,
+                                            const float* probability,
+                                            const std::string &neigh_type,
+                                            int n_layers, size_t layer_size) const {
+  unsigned int rand_seed = time(nullptr);
+  auto g_csr = neigh_type == "in" ? GetInCSR() : GetOutCSR();
+  const int64_t* indptr = g_csr->indptr.data();
+  const dgl_id_t* indices = g_csr->indices.data();
+  const dgl_id_t* eids = g_csr->edge_ids.data();
+
+  std::vector<dgl_id_t> nodes;
+  std::vector<int> layer_ids;
+  std::vector<float> probabilities;
+  std::vector<dgl_id_t> edges;
+
+  std::unordered_set<dgl_id_t> candidate_set;
+  std::vector<dgl_id_t> candidates;
+  std::map<dgl_id_t, size_t> n_times;
+
+  size_t n_seeds = seed_array->shape[0];
+  const dgl_id_t* seed_data = static_cast<dgl_id_t*>(seed_array->data);
+  candidate_set.insert(seed_data, seed_data + n_seeds);
+  std::copy(candidate_set.begin(), candidate_set.end(), nodes.begin());
+  layer_ids.insert(layer_ids.end(), nodes.size(), 0);
+  probabilities.insert(probabilities.end(), nodes.size(), 0);
+
+  std::vector<size_t> positions {0, nodes.size()};
+  for (int i = 0; i != n_layers; i++) {
+    candidate_set.clear();
+    for (auto j = positions.end()[-2]; j != positions.back(); ++j) {
+      auto src = nodes[j];
+      candidate_set.insert(indices + indptr[src], indices + indptr[src + 1]);
+    }
+
+    candidates.clear();
+    std::copy(candidate_set.begin(), candidate_set.end(), candidates.begin());
+
+    auto n_candidates = candidates.size();
+    n_times.clear();
+    for (size_t j = 0; j != layer_size; ++j) {
+      auto dst = rand_r(&rand_seed) % n_candidates;
+      if (!n_times.insert(std::make_pair(dst, 1)).second) {
+        ++n_times[dst];
+      }
+    }
+
+    auto n_nodes = static_cast<float>(NumVertices());
+    for (auto const &pair : n_times) {
+      nodes.push_back(pair.first);
+      layer_ids.push_back(i + 1);
+      probabilities.push_back(pair.second / n_nodes);
+    }
+
+    positions.push_back(nodes.size());
+  }
+
+  /*
+  std::vector<size_t> idx(nodes.size());
+  iota(idx.begin(), idx.end(), 0);
+  auto less = [&nodes](size_t i, size_t j) {
+    return nodes[i] < nodes[j];
+  };
+  sort(idx.begin(), idx.end(), less);
+
+  for (size_t i = 0; i < n_nodes; i++) {
+    subg.induced_vertices[i] = nodes[idx[i]];
+    subg.layer_ids[i] = node_info[i].first;
+    subg.sample_prob[i] = node_info[i].second;
+  }
+  */
+
+  std::vector<dgl_id_t> ret_indices;
+  std::vector<dgl_id_t> ret_eids;
+  std::vector<size_t> new_indptr;
+  std::vector<dgl_id_t> new_indices;
+  std::vector<dgl_id_t> new_eids;
+  new_indptr.push_back(0);
+  for (size_t i = 0; i < positions.size() - 2; ++i) {
+    auto curr_begin = positions[i];
+    auto curr_end = positions[i + 1];
+    // auto curr_len = curr_end - curr_begin;
+    auto next_begin = curr_end;
+    auto next_end = positions[i + 2];
+    auto next_len = next_end - next_begin;
+    HashTableChecker checker(&nodes[next_begin], next_len);
+    for (size_t j = curr_begin; j != curr_end; ++j) {
+      ret_indices.clear();
+      ret_eids.clear();
+      auto src = nodes[j];
+      auto dis = indptr[src];
+      auto len = indptr[src + 1] - indptr[src];
+      checker.CollectOnRow(indices + dis, eids + dis, len, &ret_indices, &ret_eids);
+      new_indptr.push_back(ret_indices.size());
+      new_indices.insert(new_indices.end(), ret_indices.begin(), ret_indices.end());
+      new_eids.insert(new_eids.end(), ret_eids.begin(), ret_eids.end());
+    }
+  }
+
+  long n_nodes = nodes.size();
+  long n_edges = new_eids.size();
+  auto subg_csr = std::make_shared<CSR>(n_nodes, n_edges);
+  subg_csr->indptr.resize(n_nodes + 1);
+  subg_csr->indices.resize(n_edges);
+  subg_csr->edge_ids.resize(n_edges);
+  std::copy(new_indptr.begin(), new_indptr.end(), subg_csr->indptr.data());
+  std::copy(new_indices.begin(), new_indices.end(), subg_csr->indices.data());
+  std::copy(new_eids.begin(), new_eids.end(), subg_csr->edge_ids.data());
+
+  SampledSubgraph subg;
+  subg.induced_vertices = IdArray::Empty({n_nodes},
+                                         DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  subg.induced_edges = IdArray::Empty({n_edges},
+                                      DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  subg.layer_ids = IdArray::Empty({n_nodes},
+                                  DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  subg.sample_prob = runtime::NDArray::Empty({n_nodes},
+                                             DLDataType{kDLFloat, 8 * sizeof(float), 1}, DLContext{kDLCPU, 0});
+  std::copy(nodes.begin(), nodes.end(), static_cast<dgl_id_t*>(subg.induced_vertices->data));
+  std::copy(layer_ids.begin(), layer_ids.end(), static_cast<dgl_id_t*>(subg.layer_ids->data));
+  std::copy(probabilities.begin(), probabilities.end(), static_cast<float*>(subg.sample_prob->data));
+
+  if (neigh_type == "in")
+    subg.graph = GraphPtr(new ImmutableGraph(subg_csr, nullptr, IsMultigraph()));
+  else
+    subg.graph = GraphPtr(new ImmutableGraph(nullptr, subg_csr, IsMultigraph()));
+
+  return subg;
+}
 void CompactSubgraph(ImmutableGraph::CSR *subg,
                      const std::unordered_map<dgl_id_t, dgl_id_t> &id_map) {
   for (size_t i = 0; i < subg->indices.size(); i++) {
@@ -1000,11 +1128,23 @@ void ImmutableGraph::CompactSubgraph(IdArray induced_vertices) {
 SampledSubgraph ImmutableGraph::NeighborUniformSample(IdArray seeds,
                                                       const std::string &neigh_type,
                                                       int num_hops, int expand_factor) const {
-  auto ret = SampleSubgraph(seeds,                 // seed vector
+  auto ret = NeighborSample(seeds,                 // seed vector
                             nullptr,               // sample_id_probability
                             neigh_type,
                             num_hops,
                             expand_factor);
+  std::static_pointer_cast<ImmutableGraph>(ret.graph)->CompactSubgraph(ret.induced_vertices);
+  return ret;
+}
+
+SampledSubgraph ImmutableGraph::LayerUniformSample(IdArray seeds,
+                                                   const std::string &neigh_type,
+                                                   int n_layers, size_t layer_size) const {
+  auto ret = LayerSample(seeds,
+                         nullptr,
+                         neigh_type,
+                         n_layers,
+                         layer_size);
   std::static_pointer_cast<ImmutableGraph>(ret.graph)->CompactSubgraph(ret.induced_vertices);
   return ret;
 }

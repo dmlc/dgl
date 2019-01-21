@@ -340,6 +340,14 @@ class GraphInterface {
    */
   virtual SampledSubgraph NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
                                                 int num_hops, int expand_factor) const = 0;
+
+  /*!
+   * \brief Sample a subgraph from the seed vertices with layer sampling.
+   * The layers are sampled with a uniform distribution.
+   * \return a subgraph
+   */
+  /* virtual SampledSubgraph LayerUniformSample(IdArray seeds, const std::string &neigh_type,
+                                             int n_layers, size_t layer_size) const = 0; */
 };
 
 /*! \brief Subgraph data structure */
