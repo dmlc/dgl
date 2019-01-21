@@ -467,9 +467,8 @@ def train_on_subgraphs(g, label_nodes, batch_size,
         subg.copy_from_parent()
         subg_seeds = subg.layer_nid(0)
         update_embeddings_subgraph(subg, subg_seeds, steady_state_operator)
-        # ... and copy them back to the parent graph with
-        # `copy_to_parent()` afterwards.
-        subg.copy_to_parent()
+        # ... and copy them back to the parent graph.
+        g.ndata['h'][seeds] = subg.ndata['h'][subg_seeds]
     for i in range(n_parameter_updates):
         try:
             subg, aux_info = next(sampler_train)
