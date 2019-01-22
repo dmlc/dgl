@@ -9,10 +9,6 @@
 #include <cmath>
 
 #ifdef _MSC_VER
-// rand in MS compiler works well in multi-threading.
-int rand_r(unsigned *seed) {
-  return rand();
-}
 #define _CRT_RAND_S
 #endif
 

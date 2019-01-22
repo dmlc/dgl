@@ -6,6 +6,14 @@
 
 #include <dgl/sampler.h>
 #include <dgl/immutable_graph.h>
+#include <algorithm>
+
+#ifdef _MSC_VER
+// rand in MS compiler works well in multi-threading.
+int rand_r(unsigned *seed) {
+  return rand();
+}
+#endif
 
 namespace dgl {
 
