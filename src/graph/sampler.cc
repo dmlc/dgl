@@ -220,15 +220,116 @@ static void GetNonUniformSample(const float* probability,
 }
 
 /*
- * Used for subgraph sampling
+ * This constructs a subgraph from the sampled result.
  */
-struct neigh_list {
-  std::vector<dgl_id_t> neighs;
-  std::vector<dgl_id_t> edges;
-  neigh_list(const std::vector<dgl_id_t> &_neighs,
-             const std::vector<dgl_id_t> &_edges)
-    : neighs(_neighs), edges(_edges) {}
-};
+SampledSubgraph ConstructSubgraph(const std::vector<std::pair<dgl_id_t, int>> &sub_vers,
+                                  const std::vector<size_t> &layer_offsets,
+                                  const std::vector<std::pair<dgl_id_t, size_t>> &neigh_pos,
+                                  const std::vector<dgl_id_t> &neighbor_list,
+                                  size_t num_edges) {
+  uint64_t num_vertices = sub_vers.size();
+  size_t num_hops = layer_offsets.size() - 1;
+  SampledSubgraph subg;
+  subg.induced_vertices = IdArray::Empty({static_cast<int64_t>(num_vertices)},
+                                         DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  subg.induced_edges = IdArray::Empty({static_cast<int64_t>(num_edges)},
+                                      DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  subg.layer_offsets = IdArray::Empty({static_cast<int64_t>(num_hops + 1)},
+                                      DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  subg.sample_prob = runtime::NDArray::Empty({static_cast<int64_t>(num_vertices)},
+                                             DLDataType{kDLFloat, 32, 1}, DLContext{kDLCPU, 0});
+
+  dgl_id_t *out = static_cast<dgl_id_t *>(subg.induced_vertices->data);
+  dgl_id_t *out_layer = static_cast<dgl_id_t *>(subg.layer_offsets->data);
+  dgl_id_t* val_list_out = static_cast<dgl_id_t *>(subg.induced_edges->data);
+
+  // Construct sub_csr_graph
+  auto subg_csr = std::make_shared<ImmutableGraph::CSR>(num_vertices, num_edges);
+  subg_csr->indices.resize(num_edges);
+  subg_csr->edge_ids.resize(num_edges);
+  dgl_id_t* col_list_out = subg_csr->indices.data();
+  int64_t* indptr_out = subg_csr->indptr.data();
+  size_t collected_nedges = 0;
+
+  dgl_id_t ver_id = 0;
+  std::vector<std::unordered_map<dgl_id_t, dgl_id_t>> layer_ver_maps;
+  layer_ver_maps.resize(num_hops + 1);
+  for (size_t layer_id = 0; layer_id < num_hops; layer_id++) {
+    // We sort the vertices in a layer so that we don't need to sort the neighbor Ids
+    // after remap to a subgraph.
+    std::sort(sub_vers.begin() + layer_offsets[layer_id],
+              sub_vers.begin() + layer_offsets[layer_id + 1],
+              [](const std::pair<dgl_id_t, int> &a1, const std::pair<dgl_id_t, int> &a2) {
+      return a1.first < a2.first;
+    });
+
+    // Save the sampled vertices and its layer Id.
+    for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
+      out[i] = sub_vers[i].first;
+      layer_ver_maps[layer_id].insert(std::pair<dgl_id_t, dgl_id_t>(sub_vers[i].first, ver_id++));
+      assert(sub_vers[i].second == layer_id);
+    }
+  }
+  std::copy(layer_offsets.begin(), layer_offsets.end(), out_layer);
+
+  // Remap the neighbors.
+  int64_t last_off = 0;
+  for (size_t layer_id = 0; layer_id < num_hops - 1; layer_id++) {
+    std::sort(neigh_pos.begin() + layer_offsets[layer_id],
+              neigh_pos.begin() + layer_offsets[layer_id + 1],
+              [](const std::pair<dgl_id_t, size_t> &a1, const std::pair<dgl_id_t, size_t> &a2) {
+                return a1.first < a2.first;
+              });
+
+    for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
+      dgl_id_t dst_id = *(out + i);
+      assert(dst_id == neigh_pos[i].first);
+      size_t pos = neigh_pos[i].second;
+      CHECK_LT(pos, neighbor_list.size());
+      size_t num_edges = neighbor_list[pos];
+      CHECK_LE(pos + num_edges * 2 + 1, neighbor_list.size());
+
+      // We need to map the Ids of the neighbors to the subgraph.
+      auto neigh_it = neighbor_list.begin() + pos + 1;
+      for (size_t i = 0; i < num_edges; i++) {
+        dgl_id_t neigh = *(neigh_it + i);
+        col_list_out[collected_nedges + i] = layer_ver_maps[layer_id + 1][neigh];
+      }
+      // We can simply copy the edge Ids.
+      std::copy_n(neighbor_list.begin() + pos + num_edges + 1,
+                  num_edges,
+                  val_list_out + collected_nedges);
+      collected_nedges += num_edges;
+      indptr_out[i+1] = indptr_out[i] + num_edges;
+      last_off = indptr_out[i+1];
+    }
+  }
+
+  for (size_t i = layer_offsets[num_hops - 1]; i < subg_csr->indptr.size(); i++)
+    indptr_out[i] = last_off;
+
+#if 0
+  // Copy sub_probability
+  float *sub_prob = static_cast<float *>(subg.sample_prob->data);
+  if (probability != nullptr) {
+    for (size_t i = 0; i < sub_ver_mp.size(); ++i) {
+      dgl_id_t idx = out[i];
+      sub_prob[i] = probability[idx];
+    }
+  }
+#endif
+
+
+  for (size_t i = 0; i < subg_csr->edge_ids.size(); i++)
+    subg_csr->edge_ids[i] = i;
+
+  if (neigh_type == "in")
+    subg.graph = GraphPtr(new ImmutableGraph(subg_csr, nullptr, IsMultigraph()));
+  else
+    subg.graph = GraphPtr(new ImmutableGraph(nullptr, subg_csr, IsMultigraph()));
+
+  return subg;
+}
 
 SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
                                                const float* probability,
@@ -328,113 +429,7 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
     }
     layer_offsets[layer_id + 1] = layer_offsets[layer_id] + sub_ver_map.size();
   }
-
-  uint64_t num_vertices = sub_vers.size();
-  SampledSubgraph subg;
-  subg.induced_vertices = IdArray::Empty({static_cast<int64_t>(num_vertices)},
-                                         DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  subg.induced_edges = IdArray::Empty({static_cast<int64_t>(num_edges)},
-                                      DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  subg.layer_offsets = IdArray::Empty({static_cast<int64_t>(num_hops + 1)},
-                                      DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  subg.sample_prob = runtime::NDArray::Empty({static_cast<int64_t>(num_vertices)},
-                                             DLDataType{kDLFloat, 32, 1}, DLContext{kDLCPU, 0});
-
-  dgl_id_t *out = static_cast<dgl_id_t *>(subg.induced_vertices->data);
-  dgl_id_t *out_layer = static_cast<dgl_id_t *>(subg.layer_offsets->data);
-  dgl_id_t* val_list_out = static_cast<dgl_id_t *>(subg.induced_edges->data);
-
-  // Construct sub_csr_graph
-  auto subg_csr = std::make_shared<CSR>(num_vertices, num_edges);
-  subg_csr->indices.resize(num_edges);
-  subg_csr->edge_ids.resize(num_edges);
-  dgl_id_t* col_list_out = subg_csr->indices.data();
-  int64_t* indptr_out = subg_csr->indptr.data();
-  size_t collected_nedges = 0;
-
-  // The data from the previous steps:
-  // * node data: sub_vers (vid, layer), neigh_pos,
-  // * edge data: neighbor_list, probability.
-  // * layer_offsets: the offset in sub_vers.
-  dgl_id_t ver_id = 0;
-  std::vector<std::unordered_map<dgl_id_t, dgl_id_t>> layer_ver_maps;
-  layer_ver_maps.resize(num_hops + 1);
-  for (size_t layer_id = 0; layer_id < num_hops; layer_id++) {
-    // We sort the vertices in a layer so that we don't need to sort the neighbor Ids
-    // after remap to a subgraph.
-    std::sort(sub_vers.begin() + layer_offsets[layer_id],
-              sub_vers.begin() + layer_offsets[layer_id + 1],
-              [](const std::pair<dgl_id_t, dgl_id_t> &a1,
-                 const std::pair<dgl_id_t, dgl_id_t> &a2) {
-      return a1.first < a2.first;
-    });
-
-    // Save the sampled vertices and its layer Id.
-    for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
-      out[i] = sub_vers[i].first;
-      layer_ver_maps[layer_id].insert(std::pair<dgl_id_t, dgl_id_t>(sub_vers[i].first, ver_id++));
-      assert(sub_vers[i].second == layer_id);
-    }
-  }
-  std::copy(layer_offsets.begin(), layer_offsets.end(), out_layer);
-
-  // Remap the neighbors.
-  int64_t last_off = 0;
-  for (size_t layer_id = 0; layer_id < num_hops - 1; layer_id++) {
-    std::sort(neigh_pos.begin() + layer_offsets[layer_id],
-              neigh_pos.begin() + layer_offsets[layer_id + 1],
-              [](const std::pair<dgl_id_t, size_t> &a1, const std::pair<dgl_id_t, size_t> &a2) {
-                return a1.first < a2.first;
-              });
-
-    for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
-      dgl_id_t dst_id = *(out + i);
-      assert(dst_id == neigh_pos[i].first);
-      size_t pos = neigh_pos[i].second;
-      CHECK_LT(pos, neighbor_list.size());
-      size_t num_edges = neighbor_list[pos];
-      CHECK_LE(pos + num_edges * 2 + 1, neighbor_list.size());
-
-      // We need to map the Ids of the neighbors to the subgraph.
-      auto neigh_it = neighbor_list.begin() + pos + 1;
-      for (size_t i = 0; i < num_edges; i++) {
-        dgl_id_t neigh = *(neigh_it + i);
-        col_list_out[collected_nedges + i] = layer_ver_maps[layer_id + 1][neigh];
-      }
-      // We can simply copy the edge Ids.
-      std::copy_n(neighbor_list.begin() + pos + num_edges + 1,
-                  num_edges,
-                  val_list_out + collected_nedges);
-      collected_nedges += num_edges;
-      indptr_out[i+1] = indptr_out[i] + num_edges;
-      last_off = indptr_out[i+1];
-    }
-  }
-
-  for (size_t i = layer_offsets[num_hops - 1]; i < subg_csr->indptr.size(); i++)
-    indptr_out[i] = last_off;
-
-#if 0
-  // Copy sub_probability
-  float *sub_prob = static_cast<float *>(subg.sample_prob->data);
-  if (probability != nullptr) {
-    for (size_t i = 0; i < sub_ver_mp.size(); ++i) {
-      dgl_id_t idx = out[i];
-      sub_prob[i] = probability[idx];
-    }
-  }
-#endif
-
-
-  for (size_t i = 0; i < subg_csr->edge_ids.size(); i++)
-    subg_csr->edge_ids[i] = i;
-
-  if (neigh_type == "in")
-    subg.graph = GraphPtr(new ImmutableGraph(subg_csr, nullptr, IsMultigraph()));
-  else
-    subg.graph = GraphPtr(new ImmutableGraph(nullptr, subg_csr, IsMultigraph()));
-
-  return subg;
+  return ConstructSubgraph(sub_vers, layer_offsets, neigh_pos, neighbor_list, num_edges);
 }
 
 SampledSubgraph ImmutableGraph::NeighborUniformSample(IdArray seeds,
