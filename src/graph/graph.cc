@@ -9,6 +9,7 @@
 #include <set>
 #include <functional>
 #include <tuple>
+#include <dgl/sampler.h>
 #include "../c_api_common.h"
 
 namespace dgl {
@@ -567,6 +568,12 @@ std::vector<IdArray> Graph::GetAdj(bool transpose, const std::string &fmt) const
     LOG(FATAL) << "unsupported format";
     return std::vector<IdArray>();
   }
+}
+
+SampledSubgraph Graph::NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
+                                             int num_hops, int expand_factor) const {
+  LOG(FATAL) << "NeighborUniformSample isn't supported in mutable graph";
+  return SampledSubgraph();
 }
 
 GraphPtr Graph::Reverse() const {

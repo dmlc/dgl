@@ -358,21 +358,6 @@ struct Subgraph {
   IdArray induced_edges;
 };
 
-/*!
- * \brief When we sample a subgraph, we need to store extra information,
- * such as the layer Ids of the vertices and the sampling probability.
- */
-struct SampledSubgraph: public Subgraph {
-  /*!
-   * \brief the offsets of the layers in the subgraph.
-   */
-  IdArray layer_offsets;
-  /*!
-   * \brief the probability that a vertex is sampled.
-   */
-  runtime::NDArray sample_prob;
-};
-
 }  // namespace dgl
 
 #endif  // DGL_GRAPH_INTERFACE_H_
