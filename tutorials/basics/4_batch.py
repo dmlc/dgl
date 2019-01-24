@@ -91,14 +91,14 @@ class SynDataset(Dataset):
             # Add self edges which we will explain later
             dgl_cycle.add_edges(dgl_cycle.nodes(), dgl_cycle.nodes())
             # Label 0 for cycle graph
-            ds.append((dgl.DGLGraph(nx_cycle), 0))
+            ds.append((dgl_cycle, 0))
             # nx.star_graph(N) gives a star graph with N+1 nodes
             nx_star = nx.star_graph(random.randint(min_num_v - 1,
                                                    max_num_v - 1))
             dgl_star = dgl.DGLGraph(nx_star)
             dgl_star.add_edges(dgl_star.nodes(), dgl_star.nodes())
             # Label 1 for star graph
-            ds.append((dgl.DGLGraph(nx_star), 1))
+            ds.append((dgl_star, 1))
         random.shuffle(ds)
         return ds
 
