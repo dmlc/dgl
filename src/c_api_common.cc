@@ -24,7 +24,7 @@ DLManagedTensor* CreateTmpDLManagedTensor(const DGLArgValue& arg) {
 
 PackedFunc ConvertNDArrayVectorToPackedFunc(const std::vector<NDArray>& vec) {
     auto body = [vec](DGLArgs args, DGLRetValue* rv) {
-        const size_t which = args[0];
+        const int which = args[0];
         if (which >= vec.size()) {
             LOG(FATAL) << "invalid choice";
         } else {
