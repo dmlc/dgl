@@ -10,6 +10,18 @@ from ..graph import DGLGraph
 __all__ = ['MiniGCDataset']
 
 class MiniGCDataset(object):
+    """The dataset class.
+
+    The datset contains 8 different types of graphs.
+    - class 0 : cycle graph
+    - class 1 : star graph
+    - class 2 : wheel graph
+    - class 3 : lollipop graph
+    - class 4 : hypercube graph
+    - class 5 : grid graph
+    - class 6 : clique graph
+    - class 7 : circular ladder graph
+    """
     def __init__(self, num_graphs, min_num_v, max_num_v):
         """
         Parameters
