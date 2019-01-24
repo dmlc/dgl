@@ -58,60 +58,11 @@ import networkx as nx
 import random
 from torch.utils.data import Dataset, DataLoader
 
-
-class SynDataset(Dataset):
-    """A synthetic dataset for graph classification consisting
-    of cycle graphs and star graphs."""
-    def __init__(self, ds_size, min_num_v, max_num_v, num_train):
-        """
-        Parameters
-        ----------
-        ds_size: int
-            Number of graphs in the synthetic dataset
-        min_num_v: int
-            Minimum number of nodes for graphs
-        max_num_v: int
-            Maximum number of nodes for graphs
-        num_train: int
-            Number of training samples
-        """
-        super(SynDataset, self).__init__()
-
-        self.dataset = self.gen_syn_dataset(ds_size, min_num_v, max_num_v)
-        self.split(num_train)
-
-    def gen_syn_dataset(self, n_graph, min_num_v, max_num_v):
-        """Generate a synthetic dataset of n_graph graphs with half of
-        cycles and half of stars. All graphs have min_num_v to max_num_v
-        nodes."""
-        ds = []
-        for _ in range(n_graph // 2):
-            nx_cycle = nx.cycle_graph(random.randint(min_num_v, max_num_v))
-            dgl_cycle = dgl.DGLGraph(nx_cycle)
-            # Add self edges which we will explain later
-            dgl_cycle.add_edges(dgl_cycle.nodes(), dgl_cycle.nodes())
-            # Label 0 for cycle graph
-            ds.append((dgl_cycle, 0))
-            # nx.star_graph(N) gives a star graph with N+1 nodes
-            nx_star = nx.star_graph(random.randint(min_num_v - 1,
-                                                   max_num_v - 1))
-            dgl_star = dgl.DGLGraph(nx_star)
-            dgl_star.add_edges(dgl_star.nodes(), dgl_star.nodes())
-            # Label 1 for star graph
-            ds.append((dgl_star, 1))
-        random.shuffle(ds)
-        return ds
-
-    def split(self, num_train):
-        """Split the dataset into training and test datasets."""
-        self.train = self.dataset[:num_train]
-        self.test = self.dataset[num_train:]
-
-    def collate(self, batch):
-        # Convert a list of tuples to two lists
-        batch_X, batch_Y = map(list, zip(*batch))
-        batched_graph = dgl.batch(batch_X)
-        return batched_graph, torch.tensor(batch_Y).float().view(-1, 1)
+def collate(samples):
+    # Convert a list of tuples to two lists.
+    graphs, labels = map(list, zip(*samples))
+    batched_graph = dgl.batch(graphs)
+    return batched_graph, torch.tensor(labels)
 
 ###############################################################################
 # Graph Classifier
@@ -204,22 +155,17 @@ class GraphConvolution(nn.Module):
 # classifier with one linear layer followed by :math:`\text{sigmoid}`.
 
 class Classifier(nn.Module):
-    def __init__(self, in_dim, hidden_dim):
+    def __init__(self, in_dim, hidden_dim, n_classes):
         super(Classifier, self).__init__()
 
         self.layers = nn.ModuleList([
             GraphConvolution('h', in_dim, hidden_dim),
             GraphConvolution('h', hidden_dim, hidden_dim)])
-        self.classify = nn.Sequential(
-            nn.Linear(hidden_dim, 1),
-            nn.Sigmoid())
+        self.classify = nn.Linear(hidden_dim, n_classes)
 
     def forward(self, g):
         # For undirected graphs, in_degree is the same as
-        # out_degree. For graph convolution we need node
-        # features. As our synthetic graphs do not have
-        # node features, we use node degrees instead. You
-        # can try some alternatives like one-hot vectors.
+        # out_degree.
         h = g.in_degrees().view(-1, 1).float()
         for conv in self.layers:
             h = conv(g, h)
@@ -234,13 +180,15 @@ class Classifier(nn.Module):
 # :math:`20` nodes.
 
 import torch.optim as optim
+from dgl.data import MiniGCDataset
 
 # We use a 80:20 split for the training set and the test set.
-dataset = SynDataset(1000, 10, 20, 800)
-data_loader = DataLoader(dataset.train, batch_size=16, shuffle=True,
-                         collate_fn=dataset.collate)
-model = Classifier(1, 8)
-loss_func = nn.BCELoss()
+trainset = MiniGCDataset(1000, 10, 20)
+testset = MiniGCDataset(200, 10, 20)
+data_loader = DataLoader(trainset, batch_size=32, shuffle=True,
+                         collate_fn=collate)
+model = Classifier(1, 32, 8)
+loss_func = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 model.train()
 
@@ -253,9 +201,8 @@ for epoch in range(50):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        print('Epoch {}, iteration {}: loss {:.4f}'.format(
-            epoch, iter, loss))
         epoch_loss += loss.detach().item()
+    print('Epoch {}, loss {:.4f}'.format(epoch, loss))
     epoch_losses.append(epoch_loss / (iter + 1))
 
 ###############################################################################
@@ -274,12 +221,12 @@ plt.show()
 
 # Convert a list of tuples to two lists
 model.eval()
-test_X, test_Y = map(list, zip(*dataset.test))
+test_X, test_Y = map(list, zip(*testset))
 test_bg = dgl.batch(test_X)
 test_Y = torch.tensor(test_Y).float().view(-1, 1)
-sampled_Y = torch.bernoulli(model(test_bg))
+sampled_Y = torch.multinomial(torch.softmax(model(test_bg), 1), 1)
 print('Accuracy of sampled predictions on the test set: {:.4f}%'.format(
-    (test_Y == sampled_Y).sum().float() / len(test_Y) * 100))
+    (test_Y == sampled_Y.float()).sum().item() / len(test_Y) * 100))
 
 ###############################################################################
 # We also created an animation for the soft classification performed on the
