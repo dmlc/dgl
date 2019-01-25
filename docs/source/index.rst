@@ -117,6 +117,29 @@ python script and jupyter notebook that can be downloaded.
 
 .. raw:: html
 
+    </div>
+
+.. raw:: html
+
+    <div class="sphx-glr-thumbcontainer">
+
+.. only:: html
+
+    .. figure:: /tutorials/basics/images/thumb/sphx_glr_4_batch_thumb.png
+
+        :ref:`sphx_glr_tutorials_basics_4_batch.py`
+
+.. raw:: html
+
+    </div>
+
+.. toctree::
+   :hidden:
+
+   /tutorials/basics/4_batch
+
+.. raw:: html
+
     <div style='clear:both'></div>
 
 .. ================================================================================================

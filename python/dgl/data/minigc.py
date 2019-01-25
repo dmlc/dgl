@@ -1,6 +1,4 @@
 """A mini synthetic dataset for graph classification benchmark."""
-
-from collections.abc import Sequence
 import math
 import networkx as nx
 import numpy as np
@@ -13,26 +11,29 @@ class MiniGCDataset(object):
     """The dataset class.
 
     The datset contains 8 different types of graphs.
-    - class 0 : cycle graph
-    - class 1 : star graph
-    - class 2 : wheel graph
-    - class 3 : lollipop graph
-    - class 4 : hypercube graph
-    - class 5 : grid graph
-    - class 6 : clique graph
-    - class 7 : circular ladder graph
+
+    * class 0 : cycle graph
+    * class 1 : star graph
+    * class 2 : wheel graph
+    * class 3 : lollipop graph
+    * class 4 : hypercube graph
+    * class 5 : grid graph
+    * class 6 : clique graph
+    * class 7 : circular ladder graph
+
+    .. note::
+        This dataset class is compatible with pytorch's :class:`Dataset` class.
+
+    Parameters
+    ----------
+    num_graphs: int
+        Number of graphs in this dataset.
+    min_num_v: int
+        Minimum number of nodes for graphs
+    max_num_v: int
+        Maximum number of nodes for graphs
     """
     def __init__(self, num_graphs, min_num_v, max_num_v):
-        """
-        Parameters
-        ----------
-        num_graphs: int
-            Number of graphs in this dataset.
-        min_num_v: int
-            Minimum number of nodes for graphs
-        max_num_v: int
-            Maximum number of nodes for graphs
-        """
         super(MiniGCDataset, self).__init__()
         self.num_graphs = num_graphs
         self.min_num_v = min_num_v
@@ -42,9 +43,22 @@ class MiniGCDataset(object):
         self._generate()
 
     def __len__(self):
+        """Return the number of graphs in the dataset."""
         return len(self.graphs)
 
     def __getitem__(self, idx):
+        """Get the i^th sample.
+
+        Paramters
+        ---------
+        idx : int
+            The sample index.
+
+        Returns
+        -------
+        (dgl.DGLGraph, int)
+            The graph and its label.
+        """
         return self.graphs[idx], self.labels[idx]
 
     @property
