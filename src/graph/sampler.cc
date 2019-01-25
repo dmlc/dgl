@@ -230,11 +230,11 @@ struct neigh_list {
     : neighs(_neighs), edges(_edges) {}
 };
 
-SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
-                                               const float* probability,
-                                               const std::string &neigh_type,
-                                               int num_hops,
-                                               size_t num_neighbor) const {
+NodeFlow ImmutableGraph::SampleSubgraph(IdArray seed_arr,
+                                        const float* probability,
+                                        const std::string &neigh_type,
+                                        int num_hops,
+                                        size_t num_neighbor) const {
   unsigned int time_seed = time(nullptr);
   size_t num_seeds = seed_arr->shape[0];
   auto orig_csr = neigh_type == "in" ? GetInCSR() : GetOutCSR();
@@ -330,19 +330,17 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   }
 
   uint64_t num_vertices = sub_vers.size();
-  SampledSubgraph subg;
-  subg.induced_vertices = IdArray::Empty({static_cast<int64_t>(num_vertices)},
-                                         DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  subg.induced_edges = IdArray::Empty({static_cast<int64_t>(num_edges)},
-                                      DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  subg.layer_offsets = IdArray::Empty({static_cast<int64_t>(num_hops + 1)},
-                                      DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  subg.sample_prob = runtime::NDArray::Empty({static_cast<int64_t>(num_vertices)},
-                                             DLDataType{kDLFloat, 32, 1}, DLContext{kDLCPU, 0});
+  NodeFlow nf;
+  nf.node_mapping = IdArray::Empty({static_cast<int64_t>(num_vertices)},
+                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  nf.edge_mapping = IdArray::Empty({static_cast<int64_t>(num_edges)},
+                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  nf.layer_offsets = IdArray::Empty({static_cast<int64_t>(num_hops + 1)},
+                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
 
-  dgl_id_t *out = static_cast<dgl_id_t *>(subg.induced_vertices->data);
-  dgl_id_t *out_layer = static_cast<dgl_id_t *>(subg.layer_offsets->data);
-  dgl_id_t* val_list_out = static_cast<dgl_id_t *>(subg.induced_edges->data);
+  dgl_id_t *out = static_cast<dgl_id_t *>(nf.node_mapping->data);
+  dgl_id_t *out_layer = static_cast<dgl_id_t *>(nf.layer_offsets->data);
+  dgl_id_t* val_list_out = static_cast<dgl_id_t *>(nf.edge_mapping->data);
 
   // Construct sub_csr_graph
   auto subg_csr = std::make_shared<CSR>(num_vertices, num_edges);
@@ -414,32 +412,21 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   for (size_t i = layer_offsets[num_hops - 1]; i < subg_csr->indptr.size(); i++)
     indptr_out[i] = last_off;
 
-#if 0
-  // Copy sub_probability
-  float *sub_prob = static_cast<float *>(subg.sample_prob->data);
-  if (probability != nullptr) {
-    for (size_t i = 0; i < sub_ver_mp.size(); ++i) {
-      dgl_id_t idx = out[i];
-      sub_prob[i] = probability[idx];
-    }
-  }
-#endif
-
 
   for (size_t i = 0; i < subg_csr->edge_ids.size(); i++)
     subg_csr->edge_ids[i] = i;
 
   if (neigh_type == "in")
-    subg.graph = GraphPtr(new ImmutableGraph(subg_csr, nullptr, IsMultigraph()));
+    nf.graph = GraphPtr(new ImmutableGraph(subg_csr, nullptr, IsMultigraph()));
   else
-    subg.graph = GraphPtr(new ImmutableGraph(nullptr, subg_csr, IsMultigraph()));
+    nf.graph = GraphPtr(new ImmutableGraph(nullptr, subg_csr, IsMultigraph()));
 
-  return subg;
+  return nf;
 }
 
-SampledSubgraph ImmutableGraph::NeighborUniformSample(IdArray seeds,
-                                                      const std::string &neigh_type,
-                                                      int num_hops, int expand_factor) const {
+NodeFlow ImmutableGraph::NeighborUniformSample(IdArray seeds,
+                                               const std::string &neigh_type,
+                                               int num_hops, int expand_factor) const {
   return SampleSubgraph(seeds,                 // seed vector
                         nullptr,               // sample_id_probability
                         neigh_type,

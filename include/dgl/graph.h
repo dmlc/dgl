@@ -375,8 +375,8 @@ class Graph: public GraphInterface {
    * The neighbors are sampled with a uniform distribution.
    * \return a subgraph
    */
-  virtual SampledSubgraph NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
-                                                int num_hops, int expand_factor) const;
+  virtual NodeFlow NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
+                                         int num_hops, int expand_factor) const;
 
  protected:
   friend class GraphOp;

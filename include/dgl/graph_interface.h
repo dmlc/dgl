@@ -20,7 +20,7 @@ typedef dgl::runtime::NDArray BoolArray;
 typedef dgl::runtime::NDArray IntArray;
 
 struct Subgraph;
-struct SampledSubgraph;
+struct NodeFlow;
 
 /*!
  * \brief This class references data in std::vector.
@@ -334,12 +334,12 @@ class GraphInterface {
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const = 0;
 
   /*!
-   * \brief Sample a subgraph from the seed vertices with neighbor sampling.
+   * \brief Sample a graph from the seed vertices with neighbor sampling.
    * The neighbors are sampled with a uniform distribution.
-   * \return a subgraph
+   * \return a NodeFlow graph.
    */
-  virtual SampledSubgraph NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
-                                                int num_hops, int expand_factor) const = 0;
+  virtual NodeFlow NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
+                                         int num_hops, int expand_factor) const = 0;
 };
 
 /*! \brief Subgraph data structure */

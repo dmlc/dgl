@@ -69,7 +69,7 @@ PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
 }
 
 // Convert Sampled Subgraph structures to PackedFunc.
-PackedFunc ConvertSubgraphToPackedFunc(const std::vector<SampledSubgraph>& sg) {
+PackedFunc ConvertSubgraphToPackedFunc(const std::vector<NodeFlow>& sg) {
   auto body = [sg] (DGLArgs args, DGLRetValue* rv) {
       const int which = args[0];
       if (which < static_cast<int>(sg.size())) {
@@ -77,16 +77,13 @@ PackedFunc ConvertSubgraphToPackedFunc(const std::vector<SampledSubgraph>& sg) {
         GraphHandle ghandle = gptr;
         *rv = ghandle;
       } else if (which >= static_cast<int>(sg.size()) && which < static_cast<int>(sg.size()) * 2) {
-        *rv = std::move(sg[which - sg.size()].induced_vertices);
+        *rv = std::move(sg[which - sg.size()].node_mapping);
       } else if (which >= static_cast<int>(sg.size()) * 2
                  && which < static_cast<int>(sg.size()) * 3) {
-        *rv = std::move(sg[which - sg.size() * 2].induced_edges);
+        *rv = std::move(sg[which - sg.size() * 2].edge_mapping);
       } else if (which >= static_cast<int>(sg.size()) * 3
                  && which < static_cast<int>(sg.size()) * 4) {
         *rv = std::move(sg[which - sg.size() * 3].layer_offsets);
-      } else if (which >= static_cast<int>(sg.size()) * 4
-                 && which < static_cast<int>(sg.size()) * 5) {
-        *rv = std::move(sg[which - sg.size() * 4].sample_prob);
       } else {
         LOG(FATAL) << "invalid choice";
       }
@@ -450,7 +447,7 @@ void CAPI_NeighborUniformSample(DGLArgs args, DGLRetValue* rv) {
   const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
   CHECK(gptr) << "sampling isn't implemented in mutable graph";
   CHECK(num_valid_seeds <= num_seeds);
-  std::vector<SampledSubgraph> subgs(seeds.size());
+  std::vector<NodeFlow> subgs(seeds.size());
 #pragma omp parallel for
   for (int i = 0; i < num_valid_seeds; i++) {
     subgs[i] = gptr->NeighborUniformSample(seeds[i], neigh_type, num_hops, num_neighbors);
