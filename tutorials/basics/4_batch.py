@@ -5,12 +5,13 @@ Batched Graph Classification with DGL
 =====================================
 
 **Author**: `Mufei Li <https://github.com/mufeili>`_,
-`Minjie Wang <https://jermainewang.github.io/>`_
+`Minjie Wang <https://jermainewang.github.io/>`_,
+`Zheng Zhang <https://shanghai.nyu.edu/academics/faculty/directory/zheng-zhang>`_.
 
-Graph classification, namely the prediction of graph labels, is an important problem
+Graph classification is an important problem
 with applications across many fields -- bioinformatics, chemoinformatics, social
-network analysis, urban computing and cyber-security. Recently there has been an
-arising trend of applying graph neural networks to graph classification (
+network analysis, urban computing and cyber-security. Applying graph neural
+networks to this problem has been a popular approach recently (
 `Ying et al., 2018 <https://arxiv.org/pdf/1806.08804.pdf>`_,
 `Cangea et al., 2018 <https://arxiv.org/pdf/1811.01287.pdf>`_,
 `Knyazev et al., 2018 <https://arxiv.org/pdf/1811.09595.pdf>`_,
@@ -18,7 +19,7 @@ arising trend of applying graph neural networks to graph classification (
 `Liao et al., 2019 <https://arxiv.org/pdf/1901.01484.pdf>`_,
 `Gao et al., 2019 <https://openreview.net/pdf?id=HJePRoAct7>`_).
 
-This tutorial is a demonstration for
+This tutorial demonstrates:
  * batching multiple graphs of variable size and shape with DGL
  * training a graph neural network for a simple graph classification task
 """
@@ -27,44 +28,65 @@ This tutorial is a demonstration for
 # Simple Graph Classification Task
 # --------------------------------
 # In this tutorial, we will learn how to perform batched graph classification
-# with dgl via a toy example of distinguishing cycles from stars. From a synthetic
-# dataset, we want to learn a binary classifier like below:
+# with dgl via a toy example of classifying 8 types of regular graphs as below:
 #
-# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/classifier.png
-#     :width: 400pt
+# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/dataset_overview.png
 #     :align: center
 #
-# Dataset
-# -------
-# We implement a dataset class for our synthetic dataset as usual in PyTorch.
-# This will be a balanced dataset with half of cycles and half of stars. In
-# particular for the ``collate`` function, we perform a ``dgl.batch`` operation.
-# Normally in ``collate`` function we batch across a set of tensors with same
-# shape to make a minibatch, here our ``dgl.batch`` performs a similar operation
-# across graphs except that our graphs may have different sizes. Below is a
-# visualization that hopefully gives a general idea:
+# We implement a synthetic dataset :class:`data.MiniGCDataset` in DGL. The dataset has 8
+# different types of graphs and each class has the same number of graph samples.
+
+from dgl.data import MiniGCDataset
+import matplotlib.pyplot as plt
+import networkx as nx
+# A dataset with 80 samples, each graph is
+# of size [10, 20]
+dataset = MiniGCDataset(80, 10, 20)
+graph, label = dataset[0]
+fig, ax = plt.subplots()
+nx.draw(graph.to_networkx(), ax=ax)
+ax.set_title('Class: {:d}'.format(label))
+plt.show()
+
+###############################################################################
+# Form a graph mini-batch
+# -----------------------
+# To train neural networks more efficiently, a common practice is to **batch**
+# multiple samples together to form a mini-batch. Batching fixed-shaped tensor
+# inputs is quite easy (for example, batching two images of size :math:`28\times 28`
+# gives a tensor of shape :math:`2\times 28\times 28`). By contrast, batching graph inputs
+# has two challenges:
+#
+# * Graphs are sparse.
+# * Graphs can have various length (e.g. number of nodes and edges).
+#
+# To address this, DGL provides a ``dgl.batch`` API. It leverages the trick that
+# a batch of graphs can be viewed as a large graph that have many disjoint
+# connected components. Below is a visualization that gives the general idea:
 #
 # .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/batch.png
 #     :width: 400pt
 #     :align: center
 #
-# Basically with ``dgl.batch([g_1,...,g_n])``, we can merge :math:`n` small
-# graphs into a large graph with :math:`n` connected components. This allows
-# many possibilities of parallelization. To learn more, check
-# :class:`BatchedDGLGraph`.
+# We define the following ``collate`` function to form a mini-batch from a given
+# list of graph and label pairs.
 
 import dgl
-import networkx as nx
-import random
-from torch.utils.data import Dataset, DataLoader
 
 def collate(samples):
-    # Convert a list of tuples to two lists.
+    # The input `samples` is a list of pairs
+    #  (graph, label).
     graphs, labels = map(list, zip(*samples))
     batched_graph = dgl.batch(graphs)
     return batched_graph, torch.tensor(labels)
 
 ###############################################################################
+# The return type of ``dgl.batch`` is still a graph (similar to the fact that
+# a batch of tensors is still a tensor). This means that any code that works
+# for one graph immediately works for a batch of graphs. More importantly,
+# since DGL processes messages on all nodes and edges in parallel, this greatly
+# improves efficiency.
+#
 # Graph Classifier
 # ----------------
 # The graph classification can be proceeded as follows:
@@ -75,40 +97,27 @@ def collate(samples):
 # for nodes to "communicate" with others. After message passing, we compute a
 # tensor for graph representation from node (and edge) attributes. This step may
 # be called "readout/aggregation" interchangeably. Finally, the graph
-# representations can be fed into a classifier :math:`g` for classification.
+# representations can be fed into a classifier :math:`g` to predict the graph labels.
 #
 # Graph Convolution
 # -----------------
-# Here we employ the rule below for message passing and update node features:
-#
-# .. math::
-#
-#    h_{v}^{(l+1)} = \text{ReLU}\left(b^{(l)}+\frac{1}{|\mathcal{N}(v)|+1}\sum_{u\in\mathcal{N}(v)\bigcup\{v\}}h_{u}^{(l)}W^{(l)}\right),
-#
-# where :math:`h_{v}^{(0)}` is the initial feature of node :math:`v`,
-# :math:`\mathcal{N}(v)` is the collection of neighbors of node :math:`v`,
-# :math:`b^{(l)}` and :math:`W^{(l)}` are trainable parameters.
-#
-# Our main class for this stage is ``GraphConvolution``, where simultaneously
-# each node :math:`v` sends a message of its feature :math:`h_{v}^{(l)}` to
-# all their neighbors with ``msg``, and then based on the messages received,
-# each node performs
-# :math:`\frac{1}{|\mathcal{N}(v)|+1}\sum_{u\in\mathcal{N}(v)\bigcup\{v\}}h_{u}^{(l)}`
-# in ``reduce``. Finally ``update_func`` takes in
-# :math:`\frac{1}{|\mathcal{N}(v)|+1}\sum_{u\in\mathcal{N}(v)\bigcup\{v\}}h_{u}^{(l)}`
-# and returns :math:`h_{v}^{(l+1)}`.
+# Our graph convolution operation is basically the same as that for GCN; see our earlier
+# `tutorial <https://docs.dgl.ai/tutorials/models/1_gnn/1_gcn.html>`_. The only difference is
+# that we replace :math:`h_{v}^{(l+1)} = \text{ReLU}\left(b^{(l)}+\sum_{u\in\mathcal{N}(v)}h_{u}^{(l)}W^{(l)}\right)` by
+# :math:`h_{v}^{(l+1)} = \text{ReLU}\left(b^{(l)}+\frac{1}{|\mathcal{N}(v)|}\sum_{u\in\mathcal{N}(v)}h_{u}^{(l)}W^{(l)}\right)`.
+# The replacement of summation by average is to balance nodes with different
+# degrees, which gives a better performance for this experiment.
 #
 # Note that the self edges added in the dataset initialization allows us to
 # include the original node feature :math:`h_{v}^{(l)}` when taking the average.
 
+import dgl.function as fn
 import torch
 import torch.nn as nn
 
 
-def msg(edges):
-    """Sends a message of node feature hv."""
-    msg = edges.src['h']
-    return {'m': msg}
+# Sends a message of node feature h.
+msg = fn.copy_src(src='h', out='m')
 
 def reduce(nodes):
     """Take an average over all neighbor node features hu and use it to
@@ -116,51 +125,55 @@ def reduce(nodes):
     accum = torch.mean(nodes.mailbox['m'], 1)
     return {'h': accum}
 
-class NodeUpdate(nn.Module):
+class NodeApplyModule(nn.Module):
     """Update the node feature hv with ReLU(Whv+b)."""
-    def __init__(self, node_field, in_dim, out_dim):
-        super(NodeUpdate, self).__init__()
-
-        self.node_field = node_field
-        self.update_func = nn.Sequential(
-            nn.Linear(in_dim, out_dim),
-            nn.ReLU())
+    def __init__(self, in_feats, out_feats, activation):
+        super(NodeApplyModule, self).__init__()
+        self.linear = nn.Linear(in_feats, out_feats)
+        self.activation = activation
 
     def forward(self, node):
-        return {self.node_field:
-                    self.update_func(node.data[self.node_field])}
+        h = self.linear(node.data['h'])
+        h = self.activation(h)
+        return {'h' : h}
 
-class GraphConvolution(nn.Module):
-    def __init__(self, node_field, in_dim, out_dim):
-        super(GraphConvolution, self).__init__()
+class GCN(nn.Module):
+    def __init__(self, in_feats, out_feats, activation):
+        super(GCN, self).__init__()
+        self.apply_mod = NodeApplyModule(in_feats, out_feats, activation)
 
-        self.node_field = node_field
-        self.update_func = NodeUpdate(node_field, in_dim, out_dim)
-
-    def forward(self, g, h):
+    def forward(self, g, feature):
         # Initialize the node features with h.
-        g.ndata[self.node_field] = h
-        g.update_all(msg, reduce, self.update_func)
-        h = g.ndata.pop(self.node_field)
-        return h
+        g.ndata['h'] = feature
+        g.update_all(msg, reduce)
+        g.apply_nodes(func=self.apply_mod)
+        return g.ndata.pop('h')
 
 ###############################################################################
 # Readout and Classification
 # --------------------------
 # For this demonstration, we consider initial node features to be their degrees.
 # After two rounds of graph convolution, we perform a graph readout by averaging
-# over all node features :math:`\frac{1}{|\mathcal{V}|}\sum_{v\in\mathcal{V}}h_{v}`
-# for each graph in the batch. ``dgl.mean(g)`` handles this task for a batch of
+# over all node features for each graph in the batch
+#
+# .. math::
+#
+#    h_g=\frac{1}{|\mathcal{V}|}\sum_{v\in\mathcal{V}}h_{v}
+#
+# In DGL, ``dgl.mean_nodes(g)`` handles this task for a batch of
 # graphs with variable size. We then feed our graph representations into a
 # classifier with one linear layer followed by :math:`\text{sigmoid}`.
+
+import torch.nn.functional as F
+
 
 class Classifier(nn.Module):
     def __init__(self, in_dim, hidden_dim, n_classes):
         super(Classifier, self).__init__()
 
         self.layers = nn.ModuleList([
-            GraphConvolution('h', in_dim, hidden_dim),
-            GraphConvolution('h', hidden_dim, hidden_dim)])
+            GCN(in_dim, hidden_dim, F.relu),
+            GCN(hidden_dim, hidden_dim, F.relu)])
         self.classify = nn.Linear(hidden_dim, n_classes)
 
     def forward(self, g):
@@ -176,24 +189,29 @@ class Classifier(nn.Module):
 ###############################################################################
 # Setup and Training
 # ------------------
-# We create a synthetic dataset of :math:`1000` graphs with :math:`10` ~
-# :math:`20` nodes.
+# We create a synthetic dataset of :math:`400` graphs with :math:`10` ~
+# :math:`20` nodes. :math:`320` graphs constitute a training set and
+# :math:`80` graphs constitute a test set.
 
 import torch.optim as optim
-from dgl.data import MiniGCDataset
+from torch.utils.data import DataLoader
 
-# We use a 80:20 split for the training set and the test set.
-trainset = MiniGCDataset(1000, 10, 20)
-testset = MiniGCDataset(200, 10, 20)
+# Create training and test sets.
+trainset = MiniGCDataset(320, 10, 20)
+testset = MiniGCDataset(80, 10, 20)
+# Use PyTorch's DataLoader and the collate function
+# defined before.
 data_loader = DataLoader(trainset, batch_size=32, shuffle=True,
                          collate_fn=collate)
-model = Classifier(1, 32, 8)
+
+# Create model
+model = Classifier(1, 256, trainset.num_classes)
 loss_func = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 model.train()
 
 epoch_losses = []
-for epoch in range(50):
+for epoch in range(80):
     epoch_loss = 0
     for iter, (bg, label) in enumerate(data_loader):
         prediction = model(bg)
@@ -202,38 +220,58 @@ for epoch in range(50):
         loss.backward()
         optimizer.step()
         epoch_loss += loss.detach().item()
-    print('Epoch {}, loss {:.4f}'.format(epoch, loss))
-    epoch_losses.append(epoch_loss / (iter + 1))
+    epoch_loss /= (iter + 1)
+    print('Epoch {}, loss {:.4f}'.format(epoch, epoch_loss))
+    epoch_losses.append(epoch_loss)
 
 ###############################################################################
 # The learning curve of a run is presented below:
-
-import matplotlib.pyplot as plt
 
 plt.title('cross entropy averaged over minibatches')
 plt.plot(epoch_losses)
 plt.show()
 
 ###############################################################################
-# On our test set with the trained classifier, the accuracy of sampled
-# predictions varies across :math:`10` random runs between :math:`90.5` % ~
-# :math:`100` % with the code below:
+# The trained model is evaluated on the test set created. Note that for deployment
+# of the tutorial, we restrict our running time and you are likely to get a higher
+# accuracy (:math:`80` % ~ :math:`90` %) than the ones printed below.
 
 # Convert a list of tuples to two lists
 model.eval()
 test_X, test_Y = map(list, zip(*testset))
 test_bg = dgl.batch(test_X)
 test_Y = torch.tensor(test_Y).float().view(-1, 1)
-sampled_Y = torch.multinomial(torch.softmax(model(test_bg), 1), 1)
+probs_Y = torch.softmax(model(test_bg), 1)
+sampled_Y = torch.multinomial(probs_Y, 1)
+argmax_Y = torch.max(probs_Y, 1)[1].view(-1, 1)
 print('Accuracy of sampled predictions on the test set: {:.4f}%'.format(
     (test_Y == sampled_Y.float()).sum().item() / len(test_Y) * 100))
+print('Accuracy of argmax predictions on the test set: {:4f}%'.format(
+    (test_Y == argmax_Y.float()).sum().item() / len(test_Y) * 100))
 
 ###############################################################################
-# We also created an animation for the soft classification performed on the
-# test set by one model we trained. Recall that we have label :math:`0` for
-# cycle graph and label :math:`1` for star graph.
+# Below is an animation where we plot graphs with the probability a trained model
+# assigns its ground truth label to it:
 #
-# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/test_eval.gif
+# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/test_eval4.gif
+#
+# To understand how the node/graph features change over layers with a trained model,
+# we use `t-SNE, <https://lvdmaaten.github.io/tsne/>`_ for dimensionality reduction
+# and visualization.
+#
+# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/tsne_node2.png
+#     :align: center
+#
+# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/tsne_graph2.png
+#     :align: center
+#
+# The two small figures on the top separately visualize node features after :math:`1`,
+# :math:`2` layers of graph convolution and the figure on the bottom visualizes
+# the pre-softmax logits for graphs.
+#
+# While the visualization does suggest some clustering effects of the node features,
+# it is expected not to be a perfect result as node degrees are deterministic for
+# our node features. Meanwhile, the graph features are way better separated.
 #
 # What's Next?
 # ------------

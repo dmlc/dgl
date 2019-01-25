@@ -30,5 +30,5 @@ For more information about the dataset, see `Sentiment Analysis <https://nlp.sta
 Mini graph classification dataset
 `````````````````````````````````
 
-.. autoclass:: MiniGC
+.. autoclass:: MiniGCDataset
     :members: __getitem__, __len__, num_classes
