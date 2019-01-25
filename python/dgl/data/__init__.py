@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 from . import citation_graph as citegrh
 from .citation_graph import CoraBinary
+from .minigc import *
 from .tree import *
 from .utils import *
 from .sbm import SBMMixture
