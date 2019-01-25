@@ -60,7 +60,7 @@ plt.show()
 # * Graphs are sparse.
 # * Graphs can have various length (e.g. number of nodes and edges).
 #
-# To address this, DGL provides a ``dgl.batch`` API. It leverages the trick that
+# To address this, DGL provides a :func:`dgl.batch` API. It leverages the trick that
 # a batch of graphs can be viewed as a large graph that have many disjoint
 # connected components. Below is a visualization that gives the general idea:
 #
@@ -81,7 +81,7 @@ def collate(samples):
     return batched_graph, torch.tensor(labels)
 
 ###############################################################################
-# The return type of ``dgl.batch`` is still a graph (similar to the fact that
+# The return type of :func:`dgl.batch` is still a graph (similar to the fact that
 # a batch of tensors is still a tensor). This means that any code that works
 # for one graph immediately works for a batch of graphs. More importantly,
 # since DGL processes messages on all nodes and edges in parallel, this greatly
@@ -101,8 +101,8 @@ def collate(samples):
 #
 # Graph Convolution
 # -----------------
-# Our graph convolution operation is basically the same as that for GCN; see our earlier
-# `tutorial <https://docs.dgl.ai/tutorials/models/1_gnn/1_gcn.html>`_. The only difference is
+# Our graph convolution operation is basically the same as that for GCN (checkout our 
+# `tutorial <https://docs.dgl.ai/tutorials/models/1_gnn/1_gcn.html>`_). The only difference is
 # that we replace :math:`h_{v}^{(l+1)} = \text{ReLU}\left(b^{(l)}+\sum_{u\in\mathcal{N}(v)}h_{u}^{(l)}W^{(l)}\right)` by
 # :math:`h_{v}^{(l+1)} = \text{ReLU}\left(b^{(l)}+\frac{1}{|\mathcal{N}(v)|}\sum_{u\in\mathcal{N}(v)}h_{u}^{(l)}W^{(l)}\right)`.
 # The replacement of summation by average is to balance nodes with different
@@ -160,7 +160,7 @@ class GCN(nn.Module):
 #
 #    h_g=\frac{1}{|\mathcal{V}|}\sum_{v\in\mathcal{V}}h_{v}
 #
-# In DGL, ``dgl.mean_nodes(g)`` handles this task for a batch of
+# In DGL, :func:`dgl.mean_nodes` handles this task for a batch of
 # graphs with variable size. We then feed our graph representations into a
 # classifier with one linear layer followed by :math:`\text{sigmoid}`.
 
@@ -183,8 +183,8 @@ class Classifier(nn.Module):
         for conv in self.layers:
             h = conv(g, h)
         g.ndata['h'] = h
-        graph_repr = dgl.mean_nodes(g, 'h')
-        return self.classify(graph_repr)
+        hg = dgl.mean_nodes(g, 'h')
+        return self.classify(hg)
 
 ###############################################################################
 # Setup and Training
