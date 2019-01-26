@@ -417,18 +417,15 @@ def train(g, label_nodes, steady_state_operator, predictor, trainer):
 # at a time with neighbor sampling.
 #
 # The following code demonstrates how to use the ``NeighborSampler`` to
-# sample subgraphs, and stores the nodes and edges of the subgraph, as
-# well as seed nodes in each iteration:
+# sample subgraphs, and stores the seed nodes of the subgraph in each iteration:
 #
 nx_G = nx.erdos_renyi_graph(36, 0.06)
 G = dgl.DGLGraph(nx_G.to_directed(), readonly=True)
 sampler = dgl.contrib.sampling.NeighborSampler(
        G, 2, 3, num_hops=2, shuffle=True)
-nid = []
-eid = []
+seeds = []
 for subg, aux_info in sampler:
-    nid.append(subg.parent_nid.asnumpy())
-    eid.append(subg.parent_eid.asnumpy())
+    seeds.append(subg.layer_parent_nid(0))
 
 ##############################################################################
 # Sampler with DGL
