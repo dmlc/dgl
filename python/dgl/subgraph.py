@@ -143,7 +143,7 @@ class DGLSubGraph(DGLGraph):
         return map_to_subgraph_nid(self._graph, utils.toindex(parent_vids)).tousertensor()
 
 
-class LayerDGLSubGraph(DGLGraph):
+class NodeFlow(DGLGraph):
     """The layered subgraph class.
 
     The subgraph is read-only on structure; graph mutation is not allowed.
@@ -162,8 +162,8 @@ class LayerDGLSubGraph(DGLGraph):
         The graph index.
     """
     def __init__(self, parent, parent_nid, parent_eid, layers, graph_idx):
-        super(LayerDGLSubGraph, self).__init__(graph_data=graph_idx,
-                                               readonly=graph_idx.is_readonly())
+        super(NodeFlow, self).__init__(graph_data=graph_idx,
+                                       readonly=graph_idx.is_readonly())
         self._parent = parent
         self._parent_nid = parent_nid
         self._parent_eid = parent_eid

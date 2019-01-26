@@ -7,7 +7,7 @@ import random
 import traceback
 
 from ... import utils
-from ...subgraph import LayerDGLSubGraph
+from ...subgraph import NodeFlow
 from ... import backend as F
 try:
     import Queue as queue
@@ -57,8 +57,7 @@ class NSSubgraphLoader(object):
         sgi = self._g._graph.neighbor_sampling(seed_ids, self._expand_factor,
                                                self._num_hops, self._neighbor_type,
                                                self._node_prob)
-        subgraphs = [LayerDGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
-                                      i.layers, i) for i in sgi]
+        subgraphs = [NodeFlow(self._g, i.induced_nodes, i.induced_edges, i.layers, i) for i in sgi]
         self._subgraphs.extend(subgraphs)
         if self._return_seed_id:
             self._seed_ids.extend(seed_ids)
