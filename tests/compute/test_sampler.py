@@ -23,7 +23,7 @@ def test_1neighbor_sampler_all():
         child_src, child_dst, child_eid = subg.in_edges(subg.layer_nid(0), form='all')
         assert F.array_equal(child_src, subg.layer_nid(1))
 
-        src1 = subg.parent_nid[child_src]
+        src1 = subg.map_to_parent_nid(child_src)
         assert F.array_equal(src1, src)
 
 def is_sorted(arr):
@@ -31,7 +31,7 @@ def is_sorted(arr):
 
 def verify_subgraph(g, subg, seed_id):
     seed_id = F.asnumpy(seed_id)
-    seeds = F.asnumpy(subg.parent_nid[subg.layer_nid(0)])
+    seeds = F.asnumpy(subg.map_to_parent_nid(subg.layer_nid(0)))
     assert seed_id in seeds
     child_seed = F.asnumpy(subg.layer_nid(0))[seeds == seed_id]
     src, dst, eid = g.in_edges(seed_id, form='all')
@@ -44,7 +44,7 @@ def verify_subgraph(g, subg, seed_id):
     assert(is_sorted(child_src))
 
     # a neighbor in the subgraph must also exist in parent graph.
-    for i in subg.parent_nid[child_src]:
+    for i in subg.map_to_parent_nid(child_src):
         assert i in src
 
 def test_1neighbor_sampler():
@@ -75,11 +75,11 @@ def test_10neighbor_sampler_all():
     for subg, aux in dgl.contrib.sampling.NeighborSampler(g, 10, 100, neighbor_type='in',
                                                           num_workers=4, return_seed_id=True):
         seed_ids = aux['seeds']
-        assert F.array_equal(seed_ids, subg.parent_nid[subg.layer_nid(0)])
+        assert F.array_equal(seed_ids, subg.map_to_parent_nid(subg.layer_nid(0)))
 
         src, dst, eid = g.in_edges(seed_ids, form='all')
         child_src, child_dst, child_eid = subg.in_edges(subg.layer_nid(0), form='all')
-        src1 = subg.parent_nid[child_src]
+        src1 = subg.map_to_parent_nid(child_src)
         assert F.array_equal(src1, src)
 
 def check_10neighbor_sampler(g, seeds):

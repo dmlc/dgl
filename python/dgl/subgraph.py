@@ -156,22 +156,17 @@ class NodeFlow(DGLGraph):
     ----------
     parent : DGLGraph
         The parent graph
-    parent_nid : utils.Index
-        The induced parent node ids in this subgraph.
-    parent_eid : utils.Index
-        The induced parent edge ids in this subgraph.
-    layers : utils.Index
-        The offsets of each layer.
-    graph_idx : GraphIndex
-        The graph index.
+    graph_index : NodeFlowIndex
+        The graph index of the NodeFlow graph.
     """
-    def __init__(self, parent, parent_nid, parent_eid, layers, graph_idx):
+    def __init__(self, parent, graph_idx):
         super(NodeFlow, self).__init__(graph_data=graph_idx,
                                        readonly=graph_idx.is_readonly())
         self._parent = parent
-        self._parent_nid = parent_nid
-        self._parent_eid = parent_eid
-        self._layers = layers
+        self._index = graph_idx
+        self._node_mapping = graph_idx.node_mapping
+        self._edge_mapping = graph_idx.edge_mapping
+        self._layers = graph_idx.layers
 
     # override APIs
     def add_nodes(self, num, data=None):
@@ -185,34 +180,6 @@ class NodeFlow(DGLGraph):
     def add_edges(self, u, v, data=None):
         """Add many edges. Disabled because BatchedDGLGraph is read-only."""
         raise DGLError('Readonly graph. Mutation is not allowed.')
-
-    @property
-    def parent_nid(self):
-        """Get the parent node ids.
-
-        The returned tensor can be used as a map from the node id
-        in this subgraph to the node id in the parent graph.
-
-        Returns
-        -------
-        Tensor
-            The parent node id array.
-        """
-        return self._parent_nid.tousertensor()
-
-    @property
-    def parent_eid(self):
-        """Get the parent edge ids.
-
-        The returned tensor can be used as a map from the edge id
-        in this subgraph to the edge id in the parent graph.
-
-        Returns
-        -------
-        Tensor
-            The parent edge id array.
-        """
-        return self._parent_eid.tousertensor()
 
     @property
     def num_layers(self):
@@ -232,10 +199,40 @@ class NodeFlow(DGLGraph):
         """
         if self._parent._node_frame.num_rows != 0:
             self._node_frame = FrameRef(Frame(
-                self._parent._node_frame[self._parent_nid]))
+                self._parent._node_frame[self._node_mapping]))
         if self._parent._edge_frame.num_rows != 0:
             self._edge_frame = FrameRef(Frame(
-                self._parent._edge_frame[self._parent_eid]))
+                self._parent._edge_frame[self._edge_mapping]))
+
+    def map_to_parent_nid(self, nid):
+        """This maps the child node Ids to the parent Ids.
+
+        Parameters
+        ----------
+        nid : tensor
+            The node ID array in the NodeFlow graph.
+
+        Returns
+        -------
+        Tensor
+            The parent node id array.
+        """
+        return self._node_mapping.tousertensor()[nid]
+
+    def map_to_parent_eid(self, eid):
+        """This maps the child edge Ids to the parent Ids.
+
+        Parameters
+        ----------
+        nid : tensor
+            The edge ID array in the NodeFlow graph.
+
+        Returns
+        -------
+        Tensor
+            The parent edge id array.
+        """
+        return self._edge_mapping.tousertensor()[eid]
 
     def layer_nid(self, layer_id):
         """Get the node Ids in the specified layer.
@@ -261,4 +258,4 @@ class NodeFlow(DGLGraph):
         assert layer_id + 1 < len(self._layers)
         start = self._layers[layer_id]
         end = self._layers[layer_id + 1]
-        return self._parent_nid.tousertensor()[start:end]
+        return self._node_mapping.tousertensor()[start:end]

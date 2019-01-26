@@ -822,8 +822,7 @@ class SubgraphIndex(GraphIndex):
         The parent edge ids in this subgraph.
     """
     def __init__(self, handle, parent, induced_nodes, induced_edges):
-        super(SubgraphIndex, self).__init__(parent.is_multigraph(), parent.is_readonly())
-        self._handle = handle
+        super(SubgraphIndex, self).__init__(handle, parent.is_multigraph(), parent.is_readonly())
         self._parent = parent
         self._induced_nodes = induced_nodes
         self._induced_edges = induced_edges
@@ -879,16 +878,41 @@ class NodeFlowIndex(GraphIndex):
         The capi handle.
     paranet : GraphIndex
         The parent graph index.
-    induced_nodes : utils.Index
-        The parent node ids in this subgraph.
-    induced_edges : utils.Index
-        The parent edge ids in this subgraph.
+    node_mapping : utils.Index
+        This maps nodes to the parent graph.
+    edge_mapping : utils.Index
+        The maps edges to the parent graph.
     layers: utils.Index
         The offsets of the layers.
     """
-    def __init__(self, handle, parent, induced_nodes, induced_edges, layers):
-        super(NodeFlowIndex, self).__init__(handle, parent, induced_nodes, induced_edges)
+    def __init__(self, handle, parent, node_mapping, edge_mapping, layers):
+        super(NodeFlowIndex, self).__init__(handle, parent.is_multigraph(), parent.is_readonly())
+        self._parent = parent
+        self._node_mapping = node_mapping
+        self._edge_mapping = edge_mapping
         self._layers = layers
+
+    @property
+    def node_mapping(self):
+        """Return the node mapping to the parent graph.
+
+        Returns
+        -------
+        utils.Index
+            The node mapping.
+        """
+        return self._node_mapping
+
+    @property
+    def edge_mapping(self):
+        """Return the edge mapping to the parent graph.
+
+        Returns
+        -------
+        utils.Index
+            The edge mapping.
+        """
+        return self._edge_mapping
 
     @property
     def layers(self):
