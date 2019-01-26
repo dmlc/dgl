@@ -144,9 +144,13 @@ class DGLSubGraph(DGLGraph):
 
 
 class NodeFlow(DGLGraph):
-    """The layered subgraph class.
+    """The NodeFlow class stores the sampling results of Neighbor sampling and Layer-wise sampling.
 
-    The subgraph is read-only on structure; graph mutation is not allowed.
+    These sampling algorithms generate graphs with multiple layers. The edges connect the nodes
+    between two layers while there don't exist edges between the nodes in the same layer.
+
+    We store multiple layers of the sampling results in a single graph. We store extra information,
+    such as the node and edge mapping from the NodeFlow graph to the parent graph.
 
     Parameters
     ----------

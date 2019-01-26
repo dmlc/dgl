@@ -675,9 +675,9 @@ class GraphIndex(object):
             rst = _nonuniform_sampling(self, node_prob, seed_ids, neighbor_type, num_hops,
                                        expand_factor)
 
-        return [LayerSubgraphIndex(rst(i), self, utils.toindex(rst(num_subgs + i)),
-                                   utils.toindex(rst(num_subgs * 2 + i)),
-                                   utils.toindex(rst(num_subgs * 3 + i))) for i in range(num_subgs)]
+        return [NodeFlowIndex(rst(i), self, utils.toindex(rst(num_subgs + i)),
+                              utils.toindex(rst(num_subgs * 2 + i)),
+                              utils.toindex(rst(num_subgs * 3 + i))) for i in range(num_subgs)]
 
     def to_networkx(self):
         """Convert to networkx graph.
@@ -870,8 +870,8 @@ class SubgraphIndex(GraphIndex):
         raise NotImplementedError(
             "SubgraphIndex unpickling is not supported yet.")
 
-class LayerSubgraphIndex(SubgraphIndex):
-    """Graph index for a layered subgraph.
+class NodeFlowIndex(GraphIndex):
+    """Graph index for a NodeFlow graph.
 
     Parameters
     ----------
@@ -887,7 +887,7 @@ class LayerSubgraphIndex(SubgraphIndex):
         The offsets of the layers.
     """
     def __init__(self, handle, parent, induced_nodes, induced_edges, layers):
-        super(LayerSubgraphIndex, self).__init__(handle, parent, induced_nodes, induced_edges)
+        super(NodeFlowIndex, self).__init__(handle, parent, induced_nodes, induced_edges)
         self._layers = layers
 
     @property
