@@ -422,13 +422,6 @@ def train(g, label_nodes, steady_state_operator, predictor, trainer):
 #
 nx_G = nx.erdos_renyi_graph(36, 0.06)
 G = dgl.DGLGraph(nx_G.to_directed(), readonly=True)
-sampler = dgl.contrib.sampling.NeighborSampler(
-       G, 2, 3, num_hops=2, shuffle=True)
-nid = []
-eid = []
-for subg, aux_info in sampler:
-    nid.append(subg.parent_nid.asnumpy())
-    eid.append(subg.parent_eid.asnumpy())
 
 ##############################################################################
 # Sampler with DGL
