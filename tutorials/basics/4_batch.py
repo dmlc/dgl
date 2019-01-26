@@ -12,12 +12,12 @@ Graph classification is an important problem
 with applications across many fields -- bioinformatics, chemoinformatics, social
 network analysis, urban computing and cyber-security. Applying graph neural
 networks to this problem has been a popular approach recently (
-`Ying et al., 2018 <https://arxiv.org/pdf/1806.08804.pdf>`_,
-`Cangea et al., 2018 <https://arxiv.org/pdf/1811.01287.pdf>`_,
-`Knyazev et al., 2018 <https://arxiv.org/pdf/1811.09595.pdf>`_,
-`Bianchi et al., 2019 <https://arxiv.org/pdf/1901.01343.pdf>`_,
-`Liao et al., 2019 <https://arxiv.org/pdf/1901.01484.pdf>`_,
-`Gao et al., 2019 <https://openreview.net/pdf?id=HJePRoAct7>`_).
+`Ying et al., 2018 <https://arxiv.org/abs/1806.08804>`_,
+`Cangea et al., 2018 <https://arxiv.org/abs/1811.01287>`_,
+`Knyazev et al., 2018 <https://arxiv.org/abs/1811.09595>`_,
+`Bianchi et al., 2019 <https://arxiv.org/abs/1901.01343>`_,
+`Liao et al., 2019 <https://arxiv.org/abs/1901.01484>`_,
+`Gao et al., 2019 <https://openreview.net/forum?id=HJePRoAct7>`_).
 
 This tutorial demonstrates:
  * batching multiple graphs of variable size and shape with DGL
@@ -162,7 +162,7 @@ class GCN(nn.Module):
 #
 # In DGL, :func:`dgl.mean_nodes` handles this task for a batch of
 # graphs with variable size. We then feed our graph representations into a
-# classifier with one linear layer followed by :math:`\text{sigmoid}`.
+# classifier with one linear layer to obtain pre-softmax logits.
 
 import torch.nn.functional as F
 
@@ -236,8 +236,8 @@ plt.show()
 # of the tutorial, we restrict our running time and you are likely to get a higher
 # accuracy (:math:`80` % ~ :math:`90` %) than the ones printed below.
 
-# Convert a list of tuples to two lists
 model.eval()
+# Convert a list of tuples to two lists
 test_X, test_Y = map(list, zip(*testset))
 test_bg = dgl.batch(test_X)
 test_Y = torch.tensor(test_Y).float().view(-1, 1)
@@ -255,7 +255,7 @@ print('Accuracy of argmax predictions on the test set: {:4f}%'.format(
 #
 # .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/test_eval4.gif
 #
-# To understand how the node/graph features change over layers with a trained model,
+# To understand the node/graph representations a trained model learnt,
 # we use `t-SNE, <https://lvdmaaten.github.io/tsne/>`_ for dimensionality reduction
 # and visualization.
 #
@@ -265,9 +265,9 @@ print('Accuracy of argmax predictions on the test set: {:4f}%'.format(
 # .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/batch/tsne_graph2.png
 #     :align: center
 #
-# The two small figures on the top separately visualize node features after :math:`1`,
+# The two small figures on the top separately visualize node representations after :math:`1`,
 # :math:`2` layers of graph convolution and the figure on the bottom visualizes
-# the pre-softmax logits for graphs.
+# the pre-softmax logits for graphs as graph representations.
 #
 # While the visualization does suggest some clustering effects of the node features,
 # it is expected not to be a perfect result as node degrees are deterministic for
@@ -279,7 +279,7 @@ print('Accuracy of argmax predictions on the test set: {:4f}%'.format(
 # waiting for folks to bring more exciting discoveries! It is not easy as it
 # requires mapping different graphs to different embeddings while preserving
 # their structural similarity in the embedding space. To learn more about it,
-# `"How Powerful Are Graph Neural Networks?" <https://arxiv.org/pdf/1810.00826.pdf>`_
+# `"How Powerful Are Graph Neural Networks?" <https://arxiv.org/abs/1810.00826>`_
 # in ICLR 2019 might be a good starting point.
 #
 # With regards to more examples on batched graph processing, see
