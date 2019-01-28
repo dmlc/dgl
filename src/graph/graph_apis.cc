@@ -7,6 +7,7 @@
 #include <dgl/immutable_graph.h>
 #include <dgl/graph_op.h>
 #include "../c_api_common.h"
+#include <stdio.h>
 
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;

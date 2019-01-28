@@ -82,7 +82,7 @@ class NSSubgraphLoader(object):
 class LSSubgraphLoader(object):
     def __init__(self, g, batch_size, layer_size, n_layers=1,
                  neighbor_type='in', node_prob=None, seed_nodes=None,
-                 shuffle=False, num_workers=1, return_seed_id=False):
+                 shuffle=False, num_workers=1, return_seed_id=False, return_prob=False):
         self._g = g
         if not g._graph.is_readonly():
             raise NotImplementedError("subgraph loader only support read-only graphs.")
@@ -91,6 +91,7 @@ class LSSubgraphLoader(object):
         self._n_layers = n_layers
         self._node_prob = node_prob
         self._return_seed_id = return_seed_id
+        self._return_prob = return_prob
         if self._node_prob is not None:
             assert self._node_prob.shape[0] == g.number_of_nodes(), \
                     "We need to know the sampling probability of every node"
@@ -117,11 +118,14 @@ class LSSubgraphLoader(object):
             end = min((self._subgraph_idx + 1) * self._batch_size, num_nodes)
             seed_ids.append(utils.toindex(self._seed_nodes[start:end]))
             self._subgraph_idx += 1
-        sgi = self._g._graph.neighbor_sampling(seed_ids, self._layer_size,
-                                               self._n_layers, self._neighbor_type,
-                                               self._node_prob)
-        subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
-                i) for i in sgi]
+        sgi = self._g._graph.layer_sampling(seed_ids, self._layer_size,
+                                            self._n_layers, self._neighbor_type,
+                                            self._node_prob, self._return_prob)
+        subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, i) for i in sgi]
+        if self._return_prob:
+            for sg, i in zip(subgraphs, sgi):
+                setattr(sg, 'layer_ids', i.layer_ids)
+                setattr(sg, 'sample_prob', i.sample_prob)
         self._subgraphs.extend(subgraphs)
         if self._return_seed_id:
             self._seed_ids.extend(seed_ids)
@@ -322,7 +326,7 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
 def LayerSampler(g, batch_size, layer_size, n_layers=1,
                  neighbor_type='in', node_prob=None, seed_nodes=None,
                  shuffle=False, num_workers=1,
-                 return_seed_id=False, prefetch=False):
+                 return_seed_id=False, prefetch=False, return_prob=False):
     '''Create a sampler that samples neighborhood.
 
     This creates a subgraph data loader that samples subgraphs from the input graph
@@ -376,7 +380,7 @@ def LayerSampler(g, batch_size, layer_size, n_layers=1,
         information about the subgraphs.
     '''
     loader = LSSubgraphLoader(g, batch_size, layer_size, n_layers, neighbor_type, node_prob,
-                              seed_nodes, shuffle, num_workers, return_seed_id)
+                              seed_nodes, shuffle, num_workers, return_seed_id, return_prob)
     if not prefetch:
         return loader
     else:

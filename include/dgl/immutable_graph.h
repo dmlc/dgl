@@ -14,6 +14,10 @@
 #include "runtime/ndarray.h"
 #include "graph_interface.h"
 
+// TODO remove
+#include <stdio.h>
+#include <iostream>
+
 namespace dgl {
 
 /*!

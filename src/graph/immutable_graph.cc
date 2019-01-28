@@ -7,6 +7,8 @@
 #include <dgl/immutable_graph.h>
 #include <cstdlib>
 #include <cmath>
+#include <iterator>
+#include <queue>
 
 #ifdef _MSC_VER
 // rand in MS compiler works well in multi-threading.
@@ -249,6 +251,7 @@ void ImmutableGraph::CSR::ReadAllEdges(std::vector<Edge> *edges) const {
       (*edges)[indptr[i] + j] = e;
     }
   }
+  edges->resize(NumEdges());
 }
 
 ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::Transpose() const {
@@ -992,6 +995,7 @@ SampledSubgraph ImmutableGraph::LayerSample(IdArray seed_array,
   std::vector<float> probabilities;
   std::vector<dgl_id_t> edges;
 
+  std::queue<size_t> sizes;
   std::unordered_set<dgl_id_t> candidate_set;
   std::vector<dgl_id_t> candidates;
   std::map<dgl_id_t, size_t> n_times;
@@ -999,116 +1003,102 @@ SampledSubgraph ImmutableGraph::LayerSample(IdArray seed_array,
   size_t n_seeds = seed_array->shape[0];
   const dgl_id_t* seed_data = static_cast<dgl_id_t*>(seed_array->data);
   candidate_set.insert(seed_data, seed_data + n_seeds);
-  std::copy(candidate_set.begin(), candidate_set.end(), nodes.begin());
-  layer_ids.insert(layer_ids.end(), nodes.size(), 0);
-  probabilities.insert(probabilities.end(), nodes.size(), 0);
+  std::copy(candidate_set.begin(), candidate_set.end(), std::back_inserter(nodes));
+  sizes.push(nodes.size());
 
-  std::vector<size_t> positions {0, nodes.size()};
+  size_t curr = 0;
   for (int i = 0; i != n_layers; i++) {
     candidate_set.clear();
-    for (auto j = positions.end()[-2]; j != positions.back(); ++j) {
+    for (auto j = curr; j != sizes.back(); ++j) {
       auto src = nodes[j];
       candidate_set.insert(indices + indptr[src], indices + indptr[src + 1]);
     }
 
     candidates.clear();
-    std::copy(candidate_set.begin(), candidate_set.end(), candidates.begin());
+    std::copy(candidate_set.begin(), candidate_set.end(), std::back_inserter(candidates));
 
-    auto n_candidates = candidates.size();
     n_times.clear();
+    auto n_candidates = candidates.size();
     for (size_t j = 0; j != layer_size; ++j) {
-      auto dst = rand_r(&rand_seed) % n_candidates;
+      auto dst = candidates[rand_r(&rand_seed) % n_candidates];
       if (!n_times.insert(std::make_pair(dst, 1)).second) {
         ++n_times[dst];
       }
     }
 
-    auto n_nodes = static_cast<float>(NumVertices());
     for (auto const &pair : n_times) {
       nodes.push_back(pair.first);
-      layer_ids.push_back(i + 1);
-      probabilities.push_back(pair.second / n_nodes);
+      probabilities.push_back(pair.second * n_candidates / static_cast<float>(layer_size));
     }
 
-    positions.push_back(nodes.size());
+    curr = sizes.back();
+    sizes.push(nodes.size());
   }
 
-  /*
-  std::vector<size_t> idx(nodes.size());
-  iota(idx.begin(), idx.end(), 0);
-  auto less = [&nodes](size_t i, size_t j) {
-    return nodes[i] < nodes[j];
-  };
-  sort(idx.begin(), idx.end(), less);
+  std::vector<dgl_id_t> ret_idx;
+  std::vector<dgl_id_t> ret_eid;
+  std::vector<size_t> sub_indptr;
+  std::vector<dgl_id_t> sub_indices;
+  std::vector<dgl_id_t> sub_eids;
+  sub_indptr.push_back(0);
+  curr = 0;
+  int i = n_layers - 1;
+  while (sizes.size() > 1) {
+    auto next = sizes.front();
+    sizes.pop();
+    auto next_size = sizes.front() - next;
 
-  for (size_t i = 0; i < n_nodes; i++) {
-    subg.induced_vertices[i] = nodes[idx[i]];
-    subg.layer_ids[i] = node_info[i].first;
-    subg.sample_prob[i] = node_info[i].second;
-  }
-  */
-
-  std::vector<dgl_id_t> ret_indices;
-  std::vector<dgl_id_t> ret_eids;
-  std::vector<size_t> new_indptr;
-  std::vector<dgl_id_t> new_indices;
-  std::vector<dgl_id_t> new_eids;
-  new_indptr.push_back(0);
-  for (size_t i = 0; i < positions.size() - 2; ++i) {
-    auto curr_begin = positions[i];
-    auto curr_end = positions[i + 1];
-    // auto curr_len = curr_end - curr_begin;
-    auto next_begin = curr_end;
-    auto next_end = positions[i + 2];
-    auto next_len = next_end - next_begin;
-    HashTableChecker checker(&nodes[next_begin], next_len);
-    for (size_t j = curr_begin; j != curr_end; ++j) {
-      ret_indices.clear();
-      ret_eids.clear();
+    HashTableChecker checker(nodes.data() + next, next_size);
+    for (size_t j = curr; j != next; ++j) {
+      ret_idx.clear();
+      ret_eid.clear();
       auto src = nodes[j];
-      auto dis = indptr[src];
+      auto d = indptr[src];
       auto len = indptr[src + 1] - indptr[src];
-      checker.CollectOnRow(indices + dis, eids + dis, len, &ret_indices, &ret_eids);
-      new_indptr.push_back(ret_indices.size());
-      new_indices.insert(new_indices.end(), ret_indices.begin(), ret_indices.end());
-      new_eids.insert(new_eids.end(), ret_eids.begin(), ret_eids.end());
+      checker.CollectOnRow(indices + d, eids + d, len, &ret_idx, &ret_eid);
+      sub_indptr.push_back(sub_indptr.back() + ret_idx.size());
+      for (auto k : ret_idx) {
+        sub_indices.push_back(nodes[next + k]);
+        layer_ids.push_back();
+      }
+      std::copy(ret_eid.begin(), ret_eid.end(), std::back_inserter(sub_eids));
     }
+    curr = next;
   }
+  sub_indptr.insert(sub_indptr.end(), nodes.size() - sub_indptr.size() + 1, sub_indptr.back());
 
   int64_t n_nodes = nodes.size();
-  int64_t n_edges = new_eids.size();
-  auto subg_csr = std::make_shared<CSR>(n_nodes, n_edges);
-  subg_csr->indptr.resize(n_nodes + 1);
-  subg_csr->indices.resize(n_edges);
-  subg_csr->edge_ids.resize(n_edges);
-  std::copy(new_indptr.begin(), new_indptr.end(), subg_csr->indptr.data());
-  std::copy(new_indices.begin(), new_indices.end(), subg_csr->indices.data());
-  std::copy(new_eids.begin(), new_eids.end(), subg_csr->edge_ids.data());
+  int64_t n_edges = sub_eids.size();
+  auto sub_csr = std::make_shared<CSR>(n_nodes, n_edges);
+  std::copy(sub_indptr.begin(), sub_indptr.end(), sub_csr->indptr.begin());
+  std::copy(sub_indices.begin(), sub_indices.end(), std::back_inserter(sub_csr->indices));
+  std::copy(sub_eids.begin(), sub_eids.end(), std::back_inserter(sub_csr->edge_ids));
 
-  SampledSubgraph subg;
-  subg.induced_vertices = IdArray::Empty({n_nodes},
-                                         DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  subg.induced_edges = IdArray::Empty({n_edges},
-                                      DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  subg.layer_ids = IdArray::Empty({n_nodes},
-                                  DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  subg.sample_prob = runtime::NDArray::Empty({n_nodes},
-                                             DLDataType{kDLFloat, 8 * sizeof(float), 1},
-                                             DLContext{kDLCPU, 0});
+  SampledSubgraph sub_g;
+  sub_g.induced_vertices = IdArray::Empty({n_nodes},
+                                          DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  sub_g.induced_edges = IdArray::Empty({n_edges},
+                                       DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  sub_g.layer_ids = IdArray::Empty({n_nodes},
+                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  sub_g.sample_prob = runtime::NDArray::Empty({n_nodes},
+                                              DLDataType{kDLFloat, 8 * sizeof(float), 1},
+                                              DLContext{kDLCPU, 0});
   std::copy(nodes.begin(), nodes.end(),
-            static_cast<dgl_id_t*>(subg.induced_vertices->data));
+            static_cast<dgl_id_t*>(sub_g.induced_vertices->data));
   std::copy(layer_ids.begin(), layer_ids.end(),
-            static_cast<dgl_id_t*>(subg.layer_ids->data));
+            static_cast<dgl_id_t*>(sub_g.layer_ids->data));
   std::copy(probabilities.begin(), probabilities.end(),
-            static_cast<float*>(subg.sample_prob->data));
+            static_cast<float*>(sub_g.sample_prob->data));
 
   if (neigh_type == "in")
-    subg.graph = GraphPtr(new ImmutableGraph(subg_csr, nullptr, IsMultigraph()));
+    sub_g.graph = GraphPtr(new ImmutableGraph(sub_csr, nullptr, IsMultigraph()));
   else
-    subg.graph = GraphPtr(new ImmutableGraph(nullptr, subg_csr, IsMultigraph()));
+    sub_g.graph = GraphPtr(new ImmutableGraph(nullptr, sub_csr, IsMultigraph()));
 
-  return subg;
+  return sub_g;
 }
+
 void CompactSubgraph(ImmutableGraph::CSR *subg,
                      const std::unordered_map<dgl_id_t, dgl_id_t> &id_map) {
   for (size_t i = 0; i < subg->indices.size(); i++) {
