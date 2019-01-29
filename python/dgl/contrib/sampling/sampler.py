@@ -1,5 +1,6 @@
 # This file contains subgraph samplers.
 
+import sys
 import numpy as np
 import threading
 import random
@@ -18,8 +19,7 @@ __all__ = ['NeighborSampler']
 class NSSubgraphLoader(object):
     def __init__(self, g, batch_size, expand_factor, num_hops=1,
                  neighbor_type='in', node_prob=None, seed_nodes=None,
-                 shuffle=False, num_workers=1, max_subgraph_size=None,
-                 return_seed_id=False):
+                 shuffle=False, num_workers=1, return_seed_id=False):
         self._g = g
         if not g._graph.is_readonly():
             raise NotImplementedError("subgraph loader only support read-only graphs.")
@@ -38,11 +38,6 @@ class NSSubgraphLoader(object):
         if shuffle:
             self._seed_nodes = F.rand_shuffle(self._seed_nodes)
         self._num_workers = num_workers
-        if max_subgraph_size is None:
-            # This size is set temporarily.
-            self._max_subgraph_size = 1000000
-        else:
-            self._max_subgraph_size = max_subgraph_size
         self._neighbor_type = neighbor_type
         self._subgraphs = []
         self._seed_ids = []
@@ -61,7 +56,7 @@ class NSSubgraphLoader(object):
             self._subgraph_idx += 1
         sgi = self._g._graph.neighbor_sampling(seed_ids, self._expand_factor,
                                                self._num_hops, self._neighbor_type,
-                                               self._node_prob, self._max_subgraph_size)
+                                               self._node_prob)
         subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
                 i) for i in sgi]
         self._subgraphs.extend(subgraphs)
@@ -200,12 +195,9 @@ class _PrefetchingLoader(object):
 
 def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
                     neighbor_type='in', node_prob=None, seed_nodes=None,
-                    shuffle=False, num_workers=1, max_subgraph_size=None,
+                    shuffle=False, num_workers=1,
                     return_seed_id=False, prefetch=False):
     '''Create a sampler that samples neighborhood.
-
-    .. note:: This method currently only supports MXNet backend. Set
-        "DGLBACKEND" environment variable to "mxnet".
 
     This creates a subgraph data loader that samples subgraphs from the input graph
     with neighbor sampling. This sampling method is implemented in C and can perform
@@ -246,8 +238,6 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
         If it's None, the seed vertices are all vertices in the graph.
     shuffle: indicates the sampled subgraphs are shuffled.
     num_workers: the number of worker threads that sample subgraphs in parallel.
-    max_subgraph_size: the maximal subgraph size in terms of the number of nodes.
-        GPU doesn't support very large subgraphs.
     return_seed_id: indicates whether to return seed ids along with the subgraphs.
         The seed Ids are in the parent graph.
     prefetch : bool, default False
@@ -260,7 +250,7 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
         information about the subgraphs.
     '''
     loader = NSSubgraphLoader(g, batch_size, expand_factor, num_hops, neighbor_type, node_prob,
-                              seed_nodes, shuffle, num_workers, max_subgraph_size, return_seed_id)
+                              seed_nodes, shuffle, num_workers, return_seed_id)
     if not prefetch:
         return loader
     else:

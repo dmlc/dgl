@@ -161,7 +161,7 @@ We expect all contributions discussed in the issue tracker and going through PRs
 
 ## The Team
 
-DGL is developed and maintained by [NYU, NYU Shanghai, AWS Shanghai AI Lab, and AWS MXNet Science Team](https://www.dgl.ai/about).
+DGL is developed and maintained by [NYU, NYU Shanghai, AWS Shanghai AI Lab, and AWS MXNet Science Team](https://www.dgl.ai/pages/about.html).
 
 
 ## License
