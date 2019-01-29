@@ -11,7 +11,6 @@ from . import init
 from .frame import FrameRef, Frame
 from .graph_index import create_graph_index
 from .runtime import ir, scheduler, Runtime
-from . import subgraph
 from . import utils
 from .view import NodeView, EdgeView
 from .udf import NodeBatch, EdgeBatch
@@ -2730,6 +2729,7 @@ class DGLGraph(object):
         subgraphs
         edge_subgraph
         """
+        from . import subgraph
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
         return subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
@@ -2757,6 +2757,7 @@ class DGLGraph(object):
         DGLSubGraph
         subgraph
         """
+        from . import subgraph
         induced_nodes = [utils.toindex(n) for n in nodes]
         sgis = self._graph.node_subgraphs(induced_nodes)
         return [subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
@@ -2804,6 +2805,7 @@ class DGLGraph(object):
         DGLSubGraph
         subgraph
         """
+        from . import subgraph
         induced_edges = utils.toindex(edges)
         sgi = self._graph.edge_subgraph(induced_edges)
         return subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)

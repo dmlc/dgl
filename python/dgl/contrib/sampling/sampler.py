@@ -7,7 +7,7 @@ import random
 import traceback
 
 from ... import utils
-from ...subgraph import NodeFlow
+from ...node_flow import NodeFlow
 from ... import backend as F
 try:
     import Queue as queue

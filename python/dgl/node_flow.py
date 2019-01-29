@@ -1,9 +1,13 @@
 """Class for NodeFlow data structure."""
 from __future__ import absolute_import
 
+from collections import namedtuple
 from . import backend as F
 from .frame import Frame, FrameRef
 from .graph import DGLGraph
+from .view import NodeDataView
+from .view import EdgeDataView
+from . import utils
 
 NodeSpace = namedtuple('NodeSpace', ['data'])
 
@@ -55,7 +59,7 @@ class LayerEdgeView(object):
     def __getitem__(self, layer):
         if not isinstance(layer, int):
             raise DGLError('Currently we only support the view of one layer')
-        return EdgeSpace(data=EdgeDataView(self._graph, self._graph.layer_eid(layer)))
+        return EdgeSpace(data=EdgeDataView(self._graph, self._graph.flow_eid(layer)))
 
     def __call__(self, *args, **kwargs):
         """Return all the edges."""
@@ -190,16 +194,26 @@ class NodeFlow(DGLGraph):
         end = self._layers[layer_id + 1]
         return self._node_mapping.tousertensor()[start:end]
 
-    def layer_eid(self, layer_id):
-        pass
+    def flow_eid(self, flow_id):
+        start = self._layers[flow_id]
+        end = self._layers[flow_id + 1]
+        vids = F.arange(start, end)
+        _, _, eids = self._index.in_edges(utils.toindex(vids))
+        return eids
 
-    def layer_parent_eid(self, layer_id):
-        pass
+    def flow_parent_eid(self, flow_id):
+        start = self._layers[flow_id]
+        end = self._layers[flow_id + 1]
+        if start == 0:
+            prev_num_edges = 0
+        else:
+            vids = utils.toindex(F.arange(0, start))
+            prev_num_edges = F.asnumpy(F.sum(self._index.in_degrees(vids).tousertensor(), 0))
+        vids = utils.toindex(F.arange(start, end))
+        num_edges = F.asnumpy(F.sum(self._index.in_degrees(vids).tousertensor(), 0))
+        return self._edge_mapping.tousertensor()[prev_num_edges:(prev_num_edges + num_edges)]
 
-    def register_layer_computation(layerid, mfunc, rfunc, afunc):
-        """Register UDFs for the give layer."""
-        pass
-
-    def compute(self):
-        """Compute each layer one-by-one using the registered UDFs."""
-        pass
+def create_full_node_flow(g, num_layers):
+    seeds = [utils.toindex(F.arange(0, g.number_of_nodes()))]
+    nfi = g._graph.neighbor_sampling(seeds, g.number_of_nodes(), num_layers, 'in', None)
+    return NodeFlow(g, nfi[0])
