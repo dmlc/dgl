@@ -1,14 +1,9 @@
-"""
-In current version we use multi30k as the default training and validation set.
-Multi-GPU support is required to train the model on WMT14.
-"""
 from modules import *
 from loss import *
 from optims import *
 from dataset import *
 from modules.config import *
 #from modules.viz import *
-#from tqdm import tqdm
 import numpy as np
 import argparse
 import torch
@@ -53,25 +48,28 @@ def main(dev_id, args):
         device = torch.device('cpu')
     else:
         device = torch.device('cuda:{}'.format(dev_id))
+    # Set current device
+    th.cuda.set_device(device) 
+    # Prepare dataset
     dataset = get_dataset(args.dataset)
-
     V = dataset.vocab_size
     criterion = LabelSmoothing(V, padding_idx=dataset.pad_id, smoothing=0.1)
     dim_model = 512
-
+    # Build graph pool
     graph_pool = GraphPool()
+    # Create model
     model = make_model(V, V, N=args.N, dim_model=dim_model,
                        universal=args.universal)
-
     # Sharing weights between Encoder & Decoder
     model.src_embed.lut.weight = model.tgt_embed.lut.weight
     model.generator.proj.weight = model.tgt_embed.lut.weight
-
+    # Move model to corresponding device
     model, criterion = model.to(device), criterion.to(device)
-    model_opt = NoamOpt(dim_model, 1, 4000 * 1300 / (args.batch * max(1, args.ngpu)),
+    # Optimizer
+    model_opt = NoamOpt(dim_model, 1, 4000,
                         T.optim.Adam(model.parameters(), lr=1e-3,
                                      betas=(0.9, 0.98), eps=1e-9))
-
+    # Loss function
     if args.ngpu > 1:
         dev_rank = dev_id # current device id
         ndev = args.ngpu # number of devices (including cpu)
@@ -82,6 +80,7 @@ def main(dev_id, args):
         ndev = 1
         loss_compute = partial(SimpleLossCompute, criterion)
 
+    # Train & evaluate
     for epoch in range(100):
         start = time.time()
         train_iter = dataset(graph_pool, mode='train', batch_size=args.batch,
@@ -97,7 +96,6 @@ def main(dev_id, args):
             run_epoch(epoch, valid_iter, dev_rank, 1, model,
                       loss_compute(opt=None), is_train=False)
             end = time.time()
-            time.sleep(1)
             print("epoch time: {}".format(end - start))
 
             """
@@ -106,11 +104,11 @@ def main(dev_id, args):
                 src_seq = dataset.get_seq_by_id(VIZ_IDX, mode='valid', field='src')
                 tgt_seq = dataset.get_seq_by_id(VIZ_IDX, mode='valid', field='tgt')[:-1]
                 draw_atts(model.att_weight_map, src_seq, tgt_seq, exp_setting, 'epoch_{}'.format(epoch))
-
-            print('----------------------------------')
+            """
+            args_filter = ['batch', 'gpus', 'viz', 'master_ip', 'master_port', 'grad_accum', 'ngpu']
+            exp_setting = '-'.join('{}'.format(v) for k, v in vars(args).items() if k not in args_filter)
             with open('checkpoints/{}-{}.pkl'.format(exp_setting, epoch), 'wb') as f:
                 torch.save(model.state_dict(), f)
-            """
 
 if __name__ == '__main__':
     if not os.path.exists('checkpoints'):
@@ -134,9 +132,7 @@ if __name__ == '__main__':
                                 'then update weights')
     args = argparser.parse_args()
     print(args)
-    #args_filter = ['batch', 'gpus', 'viz']
-    #exp_setting = '-'.join('{}'.format(v) for k, v in vars(args).items() if k not in args_filter)
-    #devices = ['cpu'] if args.gpus == '-1' else [int(gpu_id) for gpu_id in args.gpus.split(',')]
+
     devices = list(map(int, args.gpus.split(',')))
     if len(devices) == 1:
         args.ngpu = 0 if devices[0] < 0 else 1

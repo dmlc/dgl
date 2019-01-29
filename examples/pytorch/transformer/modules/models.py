@@ -46,11 +46,11 @@ class Decoder(nn.Module):
         layer = self.layers[i]
         def func(nodes):
             x = nodes.data['x']
-            if fields == 'kv':
-                norm_x = x # In enc-dec attention, x has already been normalized.
+            norm_x = layer.sublayer[l].norm(x) if fields.startswith('q') else x
+            if fields != 'qkv':
+                return layer.src_attn.get(norm_x, fields)
             else:
-                norm_x = layer.sublayer[l].norm(x)
-            return layer.self_attn.get(norm_x, fields)
+                return layer.self_attn.get(norm_x, fields)
         return func
 
     def post_func(self, i, l=0):
@@ -63,8 +63,6 @@ class Decoder(nn.Module):
                 x = layer.sublayer[2](x, layer.feed_forward)
             return {'x': x if i < self.N - 1 else self.norm(x)}
         return func
-
-lock = threading.Lock()
 
 class Transformer(nn.Module):
     def __init__(self, encoder, decoder, src_embed, tgt_embed, pos_enc, generator, h, d_k):
@@ -124,9 +122,10 @@ class Transformer(nn.Module):
             self.update_graph(g, edges, [(pre_q, nodes), (pre_kv, nodes_e)], [(post_func, nodes)])
 
         # visualize attention
-        with lock:
+        """
             if self.att_weight_map is None:
                 self._register_att_map(g, graph.nid_arr['enc'][VIZ_IDX], graph.nid_arr['dec'][VIZ_IDX])
+        """
 
         return self.generator(g.ndata['x'][nids['dec']])
 
