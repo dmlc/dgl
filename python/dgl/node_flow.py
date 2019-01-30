@@ -103,6 +103,12 @@ class NodeFlow(DGLGraph):
         """Add many edges. Disabled because BatchedDGLGraph is read-only."""
         raise DGLError('Readonly graph. Mutation is not allowed.')
 
+    def _reverse_flow(self, flow_id):
+        return self.num_layers - flow_id - 2
+
+    def _reverse_layer(self, layer_id):
+        return self.num_layers - layer_id - 1
+
     @property
     def num_layers(self):
         """Get the number of layers.
@@ -124,6 +130,7 @@ class NodeFlow(DGLGraph):
 
     def layer_size(self, layer_id):
         """Return the number of nodes in a specified layer."""
+        layer_id = self._reverse_layer(layer_id)
         return self._layers[layer_id + 1] - self._layers[layer_id]
 
     def copy_from_parent(self):
@@ -176,6 +183,7 @@ class NodeFlow(DGLGraph):
         Tensor
             The node id array.
         """
+        layer_id = self._reverse_layer(layer_id)
         assert layer_id + 1 < len(self._layers)
         start = self._layers[layer_id]
         end = self._layers[layer_id + 1]
@@ -189,12 +197,14 @@ class NodeFlow(DGLGraph):
         Tensor
             The parent node id array.
         """
+        layer_id = self._reverse_layer(layer_id)
         assert layer_id + 1 < len(self._layers)
         start = self._layers[layer_id]
         end = self._layers[layer_id + 1]
         return self._node_mapping.tousertensor()[start:end]
 
     def flow_eid(self, flow_id):
+        flow_id = self._reverse_flow(flow_id)
         start = self._layers[flow_id]
         end = self._layers[flow_id + 1]
         vids = F.arange(start, end)
@@ -202,6 +212,7 @@ class NodeFlow(DGLGraph):
         return eids
 
     def flow_parent_eid(self, flow_id):
+        flow_id = self._reverse_flow(flow_id)
         start = self._layers[flow_id]
         end = self._layers[flow_id + 1]
         if start == 0:
@@ -212,6 +223,9 @@ class NodeFlow(DGLGraph):
         vids = utils.toindex(F.arange(start, end))
         num_edges = F.asnumpy(F.sum(self._index.in_degrees(vids).tousertensor(), 0))
         return self._edge_mapping.tousertensor()[prev_num_edges:(prev_num_edges + num_edges)]
+
+    def flow_compute(self, flow_id, msg_func, red_func, update_func):
+        return self.pull(self.layer_nid(flow_id + 1), msg_func, red_func, update_func)
 
 def create_full_node_flow(g, num_layers):
     seeds = [utils.toindex(F.arange(0, g.number_of_nodes()))]

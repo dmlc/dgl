@@ -39,7 +39,7 @@ class NodeUpdate(gluon.Block):
             accum = mx.nd.Dropout(accum, p=self.dropout)
         accum = self.linear(accum)
         #accum = mx.nd.concat(self.linear(accum), node.data['h'], dim=1)
-        return {'accum': accum}
+        return {'h': accum}
 
 
 class GCNLayer(gluon.Block):
@@ -55,23 +55,18 @@ class GCNLayer(gluon.Block):
         self.in_feats = in_feats
         self.node_update = NodeUpdate(out_feats, activation, dropout)
 
-    def forward(self, h, subg, layer_nodes):
-        subg.ndata['h'] = h
-        if layer_nodes is None:
-            # test
-            subg.update_all(partial(gcn_msg, ind=self.ind, test=True),
-                            partial(gcn_reduce, ind=self.ind, test=True),
-                            self.node_update)
-        elif self.ind == 0:
-            subg.ndata['h'] = subg.ndata['agg_h_0']
-            assert subg.ndata['h'].shape[1] == self.in_feats
+    def forward(self, subg, h):
+        if self.ind == 0:
+            subg.layers[1].data['h'] = subg.layers[1].data['agg_h_0']
+            assert subg.layers[1].data['h'].shape[1] == self.in_feats
+            #subg.apply_nodes(self.node_update, v=subg.layer_nid(1))
             subg.apply_nodes(self.node_update)
         else:
+            subg.layers[self.ind].data['h'] = h
             # control variate
-            subg.pull(layer_nodes, partial(gcn_msg, ind=self.ind),
-                      partial(gcn_reduce, ind=self.ind), self.node_update)
-        h = subg.ndata.pop('accum')
-        return h
+            subg.flow_compute(self.ind, partial(gcn_msg, ind=self.ind),
+                              partial(gcn_reduce, ind=self.ind), self.node_update)
+        return subg.layers[self.ind + 1].data['h']
 
 
 class GCNForwardLayer(gluon.Block):
@@ -90,10 +85,9 @@ class GCNForwardLayer(gluon.Block):
         g.ndata['h'] = h
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='h'))
         g.ndata['h'] = g.ndata['h'] * g.ndata['deg_norm']
+        agg_h = g.ndata['h']
         g.apply_nodes(self.node_update)
-        agg_h = g.ndata.pop('h')
-        h = g.ndata.pop('accum')
-        return agg_h, h
+        return agg_h, g.ndata.pop('h')
 
 
 class GCN(gluon.Block):
@@ -119,17 +113,12 @@ class GCN(gluon.Block):
             self.layers.add(GCNLayer(n_layers-1, n_hidden, n_classes, None, dropout))
 
 
-    def forward(self, subg, is_train):
-        h = subg.ndata['in']
-        if is_train:
-            for i, layer in enumerate(self.layers):
-                indexes = subg.layer_nid(self.n_layers-i-1)
-                h = layer(h, subg, indexes)
-            return h[indexes]
-        else:
-            for i, layer in enumerate(self.layers):
-                h = layer(h, subg, None)
-            return h, None
+    def forward(self, subg):
+        subg.copy_from_parent()
+        h = None
+        for i, layer in enumerate(self.layers):
+            h = layer(subg, h)
+        return h
 
 
 class GCNUpdate(gluon.Block):
@@ -245,7 +234,6 @@ def main(args):
                 args.dropout, prefix='app')
     model.initialize(ctx=ctx)
     loss_fcn = gluon.loss.SoftmaxCELoss()
-    model(g, False)
 
     update_model = GCNUpdate(in_feats,
                             n_hidden,
@@ -255,6 +243,13 @@ def main(args):
                             args.dropout, prefix='app')
     update_model.initialize(ctx=ctx)
     update_model(g)
+
+    sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, num_neighbors,
+                                                   neighbor_type='in', num_hops=args.n_layers,
+                                                   seed_nodes=np.array(seed_nodes))
+    sampler = iter(sampler)
+    subg, _ = next(sampler)
+    model(subg)
 
     # use optimizer
     print(model.collect_params())
