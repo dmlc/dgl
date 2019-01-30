@@ -38,7 +38,7 @@ class LabelSmoothing(nn.Module):
 
 class SimpleLossCompute(nn.Module):
     eps=1e-8
-    def __init__(self, criterion, opt=None):
+    def __init__(self, criterion, grad_accum, opt=None):
         """
         opt is required during training
         """
@@ -49,6 +49,17 @@ class SimpleLossCompute(nn.Module):
         self.n_correct = 0
         self.norm_term = 0
         self.loss = 0
+        self.batch_count = 0
+        self.grad_accum = grad_accum
+
+    def __enter__(self):
+        self.batch_count = 0
+
+    def __exit__(self, type, value, traceback):
+        # if not enough batches accumulated and there are gradients not applied,
+        # do one more step
+        if self.batch_count > 0:
+            self.step()
 
     @property
     def avg_loss(self):
@@ -58,10 +69,17 @@ class SimpleLossCompute(nn.Module):
     def accuracy(self):
         return (self.n_correct + self.eps) / (self.norm_term + self.eps)
 
-    def backward_and_step(self):
-        self.loss.backward()
+    def step(self):
         self.opt.step()
         self.opt.optimizer.zero_grad()
+
+
+    def backward_and_step(self):
+        self.loss.backward()
+        self.batch_count += 1
+        if self.batch_count == self.grad_accum:
+            self.step()
+            self.batch_count = 0
 
     def __call__(self, y_pred, y, norm):
         y_pred = y_pred.contiguous().view(-1, y_pred.shape[-1])
@@ -78,22 +96,23 @@ class SimpleLossCompute(nn.Module):
 
 class MultiGPULossCompute(SimpleLossCompute):
     def __init__(self, criterion, ndev, grad_accum, model, opt=None):
-        super(MultiGPULossCompute, self).__init__(criterion, opt)
+        super(MultiGPULossCompute, self).__init__(criterion, grad_accum, opt=opt)
         self.ndev = ndev
-        self.grad_accum = grad_accum
         self.model = model
-        self.count = 0
 
     def backward_and_step(self):
         # multi-gpu synchronous backward
         self.loss.backward()
-        self.count += 1
+        self.batch_count += 1
         # accumulate self.grad_accum times then synchronize and update
-        if self.count == self.grad_accum:
-            for param in self.model.parameters():
-                if param.requires_grad and param.grad is not None:
-                    dist.all_reduce(param.grad.data, op=dist.ReduceOp.SUM)
-                    param.grad.data /= self.ndev
-            self.opt.step()
-            self.opt.optimizer.zero_grad()
-            self.count = 0
+        if self.batch_count == self.grad_accum:
+            self.step()
+            self.batch_count = 0
+
+    def step(self):
+        for param in self.model.parameters():
+            if param.requires_grad and param.grad is not None:
+                dist.all_reduce(param.grad.data, op=dist.ReduceOp.SUM)
+                param.grad.data /= self.ndev
+        self.opt.step()
+        self.opt.optimizer.zero_grad()

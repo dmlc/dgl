@@ -8,20 +8,22 @@ import numpy as np
 import argparse
 import torch
 from functools import partial
+import torch.distributed as dist
 
 def run_epoch(epoch, data_iter, dev_rank, ndev, model, loss_compute, is_train=True):
     universal = isinstance(model, UTransformer)
-    for i, g in enumerate(data_iter):
-        #print("Dev {} start batch {}".format(dev_rank, i))
-        with T.set_grad_enabled(is_train):
-            if universal:
-                output, loss_act = model(g)
-                if is_train: loss_act.backward(retain_graph=True)
-            else:
-                output = model(g)
-            tgt_y = g.tgt_y
-            n_tokens = g.n_tokens
-            loss = loss_compute(output, tgt_y, n_tokens)
+    with loss_compute:
+        for i, g in enumerate(data_iter):
+            #print("Dev {} start batch {}".format(dev_rank, i))
+            with T.set_grad_enabled(is_train):
+                if universal:
+                    output, loss_act = model(g)
+                    if is_train: loss_act.backward(retain_graph=True)
+                else:
+                    output = model(g)
+                tgt_y = g.tgt_y
+                n_tokens = g.n_tokens
+                loss = loss_compute(output, tgt_y, n_tokens)
 
     if universal:
         for step in range(1, model.MAX_DEPTH + 1):
@@ -49,7 +51,7 @@ def main(dev_id, args):
     else:
         device = torch.device('cuda:{}'.format(dev_id))
     # Set current device
-    th.cuda.set_device(device) 
+    th.cuda.set_device(device)
     # Prepare dataset
     dataset = get_dataset(args.dataset)
     V = dataset.vocab_size
@@ -65,10 +67,6 @@ def main(dev_id, args):
     model.generator.proj.weight = model.tgt_embed.lut.weight
     # Move model to corresponding device
     model, criterion = model.to(device), criterion.to(device)
-    # Optimizer
-    model_opt = NoamOpt(dim_model, 1, 4000,
-                        T.optim.Adam(model.parameters(), lr=1e-3,
-                                     betas=(0.9, 0.98), eps=1e-9))
     # Loss function
     if args.ngpu > 1:
         dev_rank = dev_id # current device id
@@ -78,7 +76,17 @@ def main(dev_id, args):
     else: # cpu or single gpu case
         dev_rank = 0
         ndev = 1
-        loss_compute = partial(SimpleLossCompute, criterion)
+        loss_compute = partial(SimpleLossCompute, criterion, args.grad_accum)
+
+    if ndev > 1:
+        for param in model.parameters():
+            dist.all_reduce(param.data, op=dist.ReduceOp.SUM)
+            param.data /= ndev
+
+    # Optimizer
+    model_opt = NoamOpt(dim_model, 1, 4000,
+                        T.optim.Adam(model.parameters(), lr=1e-3,
+                                     betas=(0.9, 0.98), eps=1e-9))
 
     # Train & evaluate
     for epoch in range(100):
