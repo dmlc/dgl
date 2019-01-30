@@ -11,19 +11,13 @@ from dgl import utils
 from functools import partial
 
 
-def gcn_msg(edge, ind, test=False):
-    if test:
-        msg = edge.src['h']
-    else:
-        msg = edge.src['h'] - edge.src['h_%d' % ind]
+def gcn_cv_msg(edge, ind):
+    msg = edge.src['h'] - edge.src['h_%d' % ind]
     return {'m': msg}
 
 
-def gcn_reduce(node, ind, test=False):
-    if test:
-        accum = mx.nd.sum(node.mailbox['m'], 1) * node.data['deg_norm']
-    else:
-        accum = mx.nd.sum(node.mailbox['m'], 1) * node.data['norm'] + node.data['agg_h_%d' % ind]
+def gcn_cv_reduce(node, ind):
+    accum = mx.nd.sum(node.mailbox['m'], 1) * node.data['norm'] + node.data['agg_h_%d' % ind]
     return {'h': accum}
 
 
@@ -38,7 +32,6 @@ class NodeUpdate(gluon.Block):
         if self.dropout:
             accum = mx.nd.Dropout(accum, p=self.dropout)
         accum = self.linear(accum)
-        #accum = mx.nd.concat(self.linear(accum), node.data['h'], dim=1)
         return {'h': accum}
 
 
@@ -59,7 +52,7 @@ class GCNLayer(gluon.Block):
         subg.flow_compute(self.ind, fn.copy_src(src='h_%d' % ind, out='m'), fn.sum(msg='m', out='agg_h'),
                           lambda node : {'agg_h_%d' %ind : node.data['agg_h'] * node.data['deg_norm']})
         # TODO how to get the active edges.
-        subg.flow_send_and_recv(self.ind, gcn_msg, gcn_reduce, self.node_update, active_edges)
+        subg.flow_send_and_recv(self.ind, gcn_cv_msg, gcn_cv_reduce, self.node_update, active_edges)
         return subg.layers[self.ind + 1].data['h']
 
 
