@@ -14,7 +14,6 @@ def run_epoch(epoch, data_iter, dev_rank, ndev, model, loss_compute, is_train=Tr
     universal = isinstance(model, UTransformer)
     with loss_compute:
         for i, g in enumerate(data_iter):
-            #print("Dev {} start batch {}".format(dev_rank, i))
             with T.set_grad_enabled(is_train):
                 if universal:
                     output, loss_act = model(g)
@@ -93,14 +92,14 @@ def main(dev_id, args):
         start = time.time()
         train_iter = dataset(graph_pool, mode='train', batch_size=args.batch,
                              device=device, dev_rank=dev_rank, ndev=ndev)
-        valid_iter = dataset(graph_pool, mode='valid', batch_size=args.batch,
-                             device=device, dev_rank=dev_rank, ndev=ndev)
         model.train(True)
         run_epoch(epoch, train_iter, dev_rank, ndev, model,
                   loss_compute(opt=model_opt), is_train=True)
         if dev_rank == 0:
             model.att_weight_map = None
             model.eval()
+            valid_iter = dataset(graph_pool, mode='valid', batch_size=args.batch,
+                                 device=device, dev_rank=dev_rank, ndev=1)
             run_epoch(epoch, valid_iter, dev_rank, 1, model,
                       loss_compute(opt=None), is_train=False)
             end = time.time()

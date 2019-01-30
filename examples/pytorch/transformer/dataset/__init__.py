@@ -98,8 +98,10 @@ class TranslationDataset(object):
             graph_pool: a GraphPool object for accelerating.
             mode: train/valid/test
             batch_size: batch size
-            device: torch.device
             k: beam size(only required for test)
+            device: torch.device
+            dev_rank: rank (id) of current device
+            ndev: number of devices
         '''
         src_data, tgt_data = self.src[mode], self.tgt[mode]
         n = len(src_data)
