@@ -11,19 +11,13 @@ from dgl import utils
 from functools import partial
 
 
-def gcn_msg(edge, ind, test=False):
-    if test:
-        msg = edge.src['h']
-    else:
-        msg = edge.src['h'] - edge.src['h_%d' % ind]
+def gcn_cv_msg(edge, ind):
+    msg = edge.src['h'] - edge.src['h_%d' % ind]
     return {'m': msg}
 
 
-def gcn_reduce(node, ind, test=False):
-    if test:
-        accum = mx.nd.sum(node.mailbox['m'], 1) * node.data['deg_norm']
-    else:
-        accum = mx.nd.sum(node.mailbox['m'], 1) * node.data['norm'] + node.data['agg_h_%d' % ind]
+def gcn_cv_reduce(node, ind):
+    accum = mx.nd.sum(node.mailbox['m'], 1) * node.data['norm'] + node.data['agg_h_%d' % ind]
     return {'h': accum}
 
 
@@ -38,7 +32,6 @@ class NodeUpdate(gluon.Block):
         if self.dropout:
             accum = mx.nd.Dropout(accum, p=self.dropout)
         accum = self.linear(accum)
-        #accum = mx.nd.concat(self.linear(accum), node.data['h'], dim=1)
         return {'h': accum}
 
 
@@ -59,13 +52,12 @@ class GCNLayer(gluon.Block):
         if self.ind == 0:
             subg.layers[1].data['h'] = subg.layers[1].data['agg_h_0']
             assert subg.layers[1].data['h'].shape[1] == self.in_feats
-            #subg.apply_nodes(self.node_update, v=subg.layer_nid(1))
             subg.apply_nodes(self.node_update)
         else:
             subg.layers[self.ind].data['h'] = h
             # control variate
-            subg.flow_compute(self.ind, partial(gcn_msg, ind=self.ind),
-                              partial(gcn_reduce, ind=self.ind), self.node_update)
+            subg.flow_compute(self.ind, partial(gcn_cv_msg, ind=self.ind),
+                              partial(gcn_cv_reduce, ind=self.ind), self.node_update)
         return subg.layers[self.ind + 1].data['h']
 
 
