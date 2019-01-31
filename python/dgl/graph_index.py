@@ -677,7 +677,8 @@ class GraphIndex(object):
 
         return [NodeFlowIndex(rst(i), self, utils.toindex(rst(num_subgs + i)),
                               utils.toindex(rst(num_subgs * 2 + i)),
-                              utils.toindex(rst(num_subgs * 3 + i))) for i in range(num_subgs)]
+                              utils.toindex(rst(num_subgs * 3 + i)),
+                              utils.toindex(rst(num_subgs * 4 + i))) for i in range(num_subgs)]
 
     def to_networkx(self):
         """Convert to networkx graph.
@@ -884,13 +885,16 @@ class NodeFlowIndex(GraphIndex):
         The maps edges to the parent graph.
     layers: utils.Index
         The offsets of the layers.
+    flows: utils.Index
+        The offsets of the flows.
     """
-    def __init__(self, handle, parent, node_mapping, edge_mapping, layers):
+    def __init__(self, handle, parent, node_mapping, edge_mapping, layers, flows):
         super(NodeFlowIndex, self).__init__(handle, parent.is_multigraph(), parent.is_readonly())
         self._parent = parent
         self._node_mapping = node_mapping
         self._edge_mapping = edge_mapping
         self._layers = layers
+        self._flows = flows
 
     @property
     def node_mapping(self):

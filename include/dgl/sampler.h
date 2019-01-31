@@ -26,6 +26,10 @@ struct NodeFlow {
    */
   IdArray layer_offsets;
   /*!
+   * \brief the offsets of each flow.
+   */
+  IdArray flow_offsets;
+  /*!
    * \brief The node mapping from the NodeFlow graph to the parent graph.
    */
   IdArray node_mapping;

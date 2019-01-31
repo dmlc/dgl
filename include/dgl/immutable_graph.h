@@ -56,6 +56,11 @@ class ImmutableGraph: public GraphInterface {
       return indices.size();
     }
 
+    /* This gets the sum of vertex degrees in the range. */
+    uint64_t GetDegree(dgl_id_t start, dgl_id_t end) const {
+      return indptr[end] - indptr[start];
+    }
+
     uint64_t GetDegree(dgl_id_t vid) const {
       return indptr[vid + 1] - indptr[vid];
     }

@@ -84,6 +84,9 @@ PackedFunc ConvertSubgraphToPackedFunc(const std::vector<NodeFlow>& sg) {
       } else if (which >= static_cast<int>(sg.size()) * 3
                  && which < static_cast<int>(sg.size()) * 4) {
         *rv = std::move(sg[which - sg.size() * 3].layer_offsets);
+      } else if (which >= static_cast<int>(sg.size()) * 4
+                 && which < static_cast<int>(sg.size()) * 5) {
+        *rv = std::move(sg[which - sg.size() * 4].flow_offsets);
       } else {
         LOG(FATAL) << "invalid choice";
       }

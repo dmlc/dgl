@@ -337,9 +337,12 @@ NodeFlow ImmutableGraph::SampleSubgraph(IdArray seed_arr,
                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   nf.layer_offsets = IdArray::Empty({static_cast<int64_t>(num_hops + 1)},
                                     DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  nf.flow_offsets = IdArray::Empty({static_cast<int64_t>(num_hops)},
+                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
 
   dgl_id_t *out = static_cast<dgl_id_t *>(nf.node_mapping->data);
   dgl_id_t *out_layer = static_cast<dgl_id_t *>(nf.layer_offsets->data);
+  dgl_id_t *out_flow = static_cast<dgl_id_t *>(nf.flow_offsets->data);
   dgl_id_t* val_list_out = static_cast<dgl_id_t *>(nf.edge_mapping->data);
 
   // Construct sub_csr_graph
@@ -412,6 +415,13 @@ NodeFlow ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   for (size_t i = layer_offsets[num_hops - 1]; i < subg_csr->indptr.size(); i++)
     indptr_out[i] = last_off;
 
+  // Copy flow offsets.
+  out_flow = 0;
+  for (size_t i = 0; i < layer_offsets.size() - 2; i++) {
+    size_t num_edges = subg_csr->GetDegree(layer_offsets[i + 1], layer_offsets[i]);
+    assert(i + 1 < num_hops);
+    out_flow[i + 1] = out_flow[i] + num_edges;
+  }
 
   for (size_t i = 0; i < subg_csr->edge_ids.size(); i++)
     subg_csr->edge_ids[i] = i;
