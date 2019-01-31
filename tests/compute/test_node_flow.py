@@ -54,12 +54,25 @@ def test_apply_nodes():
         nf.copy_from_parent()
         new_feats = F.randn((nf.layer_size(i), 5))
         def update_func(nodes):
-            print("update func")
             return {'h1' : new_feats}
         nf.apply_layer(i, update_func)
         assert F.array_equal(nf.layers[i].data['h1'], new_feats)
 
 
+def test_apply_edges():
+    num_layers = 2
+    for i in range(num_layers):
+        g = generate_rand_graph(100)
+        nf = create_full_node_flow(g, num_layers)
+        nf.copy_from_parent()
+        new_feats = F.randn((nf.flow_size(i), 5))
+        def update_func(nodes):
+            return {'h2' : new_feats}
+        nf.apply_flow(i, update_func)
+        assert F.array_equal(nf.flows[i].data['h2'], new_feats)
+
+
 if __name__ == '__main__':
     test_basic()
     test_apply_nodes()
+    test_apply_edges()

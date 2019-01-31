@@ -314,13 +314,10 @@ class NodeFlow(DGLGraph):
         num_edges = F.asnumpy(F.sum(self._index.in_degrees(vids).tousertensor(), 0))
         return self._edge_mapping.tousertensor()[prev_num_edges:(prev_num_edges + num_edges)]
 
-    def apply_layer(self, layer_id, func, v=ALL, inplace=False):
+    def apply_layer(self, layer_id, func, inplace=False):
         if func == "default":
             func = self._apply_node_func
-        if is_all(v):
-            v = utils.toindex(slice(0, self.layer_size(layer_id)))
-        else:
-            v = utils.toindex(v)
+        v = utils.toindex(slice(0, self.layer_size(layer_id)))
         with ir.prog() as prog:
             scheduler.schedule_nodeflow_apply_nodes(graph=self,
                                                     layer_id=layer_id,
@@ -329,26 +326,19 @@ class NodeFlow(DGLGraph):
                                                     inplace=inplace)
             Runtime.run(prog)
 
-    def apply_flow(self, flow_id, func, edges, inplace):
+    def _conv_layer_nid(self, u, flow_id):
+        return u - self._layer_offsets[flow_id]
+
+    def apply_flow(self, flow_id, func, inplace=False):
         if func == "default":
             func = self._apply_edge_func
         assert func is not None
 
-        if is_all(edges):
-            u = self._graph.layer_nid(flow_id)
-            v = self._graph.layer_nid(flow_id + 1)
-            eid = utils.toindex(slice(0, self.flow_size(flow_id)))
-        elif isinstance(edges, tuple):
-            u, v = edges
-            u, v, eid = self._graph.edge_ids(u, v)
-            u = utils.toindex(self._conv_layer_nid(u, flow_id))
-            v = utils.toindex(self._conv_layer_nid(v, flow_id + 1))
-            eid = self._conv_flow_eid(eid, flow_id)
-        else:
-            u, v, _ = self._graph.find_edges(eid)
-            eid = utils.toindex(self._conv_flow_eid(edges, flow_id))
-            u = self._conv_layer_nid(u, flow_id)
-            v = self._conv_layer_nid(v, flow_id + 1)
+        u = self.layer_nid(flow_id)
+        v = self.layer_nid(flow_id + 1)
+        u = utils.toindex(self._conv_layer_nid(u, flow_id))
+        v = utils.toindex(self._conv_layer_nid(v, flow_id + 1))
+        eid = utils.toindex(slice(0, self.flow_size(flow_id)))
 
         with ir.prog() as prog:
             scheduler.schedule_nodeflow_apply_edges(graph=self,

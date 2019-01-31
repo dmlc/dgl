@@ -347,8 +347,8 @@ def schedule_nodeflow_apply_edges(graph, flow_id,
     var_v = var.IDX(v)
     var_eid = var.IDX(eid)
     # schedule apply edges
-    fdsrc = ir.READ_ROW(var_nf, var_u)
-    fddst = ir.READ_ROW(var_nf, var_v)
+    fdsrc = ir.READ_ROW(in_var_nf, var_u)
+    fddst = ir.READ_ROW(out_var_nf, var_v)
     fdedge = ir.READ_ROW(var_ef, var_eid)
     def _efunc_wrapper(src_data, edge_data, dst_data):
         ebatch = EdgeBatch(graph, (u, v, eid), src_data, edge_data, dst_data)
