@@ -418,7 +418,7 @@ NodeFlow ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   // Copy flow offsets.
   out_flow[0] = 0;
   for (size_t i = 0; i < layer_offsets.size() - 2; i++) {
-    size_t num_edges = subg_csr->GetDegree(layer_offsets[i + 1], layer_offsets[i]);
+    size_t num_edges = subg_csr->GetDegree(layer_offsets[i], layer_offsets[i + 1]);
     out_flow[i + 1] = out_flow[i] + num_edges;
   }
 
