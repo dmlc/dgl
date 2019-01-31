@@ -1,6 +1,8 @@
 """Class for NodeFlow data structure."""
 from __future__ import absolute_import
 
+import numpy as np
+
 from collections import namedtuple
 from .base import ALL, is_all, DGLError
 from . import backend as F
@@ -153,8 +155,8 @@ class NodeFlow(DGLGraph):
         self._index = graph_idx
         self._node_mapping = graph_idx.node_mapping
         self._edge_mapping = graph_idx.edge_mapping
-        self._layer_offsets = graph_idx.layers
-        self._flow_offsets = graph_idx.flows
+        self._layer_offsets = graph_idx.layers.tonumpy()
+        self._flow_offsets = graph_idx.flows.tonumpy()
         self._node_frames = [FrameRef(Frame(num_rows=self.layer_size(i))) for i in range(self.num_layers)]
         self._edge_frames = [FrameRef(Frame(num_rows=self.flow_size(i))) for i in range(self.num_flows)]
 
@@ -254,10 +256,14 @@ class NodeFlow(DGLGraph):
         return self._edge_mapping.tousertensor()[eid]
 
     def map_to_layer_nid(self, nid):
-        pass
+        layer_id = np.sum(self._layer_offsets <= nid) - 1
+        # TODO do I need to reverse here?
+        return int(layer_id), nid - self._layer_offsets[layer_id]
 
     def map_to_flow_eid(self, eid):
-        pass
+        flow_id = np.sum(self._flow_offsets <= eid) - 1
+        # TODO do I need to reverse here?
+        return int(flow_id), eid - self._flow_offsets[flow_id]
 
     def layer_nid(self, layer_id):
         """Get the node Ids in the specified layer.

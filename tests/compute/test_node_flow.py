@@ -33,15 +33,17 @@ def test_basic():
     assert F.array_equal(nf.flows[0].data['h2'], g.edata['h2'][nf.flow_parent_eid(0)])
     assert F.array_equal(nf.flows[1].data['h2'], g.edata['h2'][nf.flow_parent_eid(1)])
 
-    #for i in range(nf.number_of_nodes()):
-    #    layer_id, local_nid = nf.map_to_layer_nid(i)
-    #    parent_id = nf.map_to_parent_nid(i)
-    #    assert F.array_equal(nf.layers[layer_id].data['h1'][local_nid], g.ndata['h1'][parent_id])
+    for i in range(nf.number_of_nodes()):
+        layer_id, local_nid = nf.map_to_layer_nid(i)
+        assert(layer_id >= 0)
+        parent_id = nf.map_to_parent_nid(i)
+        assert F.array_equal(nf.layers[layer_id].data['h1'][local_nid], g.ndata['h1'][parent_id])
 
-    #for i in range(nf.number_of_edges()):
-    #    flow_id, local_eid = nf.map_to_flow_eid(i)
-    #    parent_id = nf.map_to_parent_eid(i)
-    #    assert F.array_equal(nf.flows[flow_id].data['h2'][local_eid], g.edata['h2'][parent_id])
+    for i in range(nf.number_of_edges()):
+        flow_id, local_eid = nf.map_to_flow_eid(i)
+        assert(flow_id >= 0)
+        parent_id = nf.map_to_parent_eid(i)
+        assert F.array_equal(nf.flows[flow_id].data['h2'][local_eid], g.edata['h2'][parent_id])
 
 
 def test_apply_nodes():
