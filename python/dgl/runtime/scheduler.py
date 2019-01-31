@@ -232,6 +232,43 @@ def schedule_apply_nodes(graph,
     else:
         ir.WRITE_ROW_(var_nf, var_v, applied_feat)
 
+def schedule_nodeflow_apply_nodes(graph,
+                                  layer_id,
+                                  v,
+                                  apply_func,
+                                  inplace):
+    """get apply nodes schedule
+
+    Parameters
+    ----------
+    graph: DGLGraph
+        The DGLGraph to use
+    v : utils.Index
+        Nodes to apply
+    apply_func: callable
+        The apply node function
+    inplace: bool
+        If True, the update will be done in place
+
+    Returns
+    -------
+    A list of executors for DGL Runtime
+    """
+    print("schedule nodeflow apply")
+    var_nf = var.FEAT_DICT(graph._node_frames[layer_id], name='nf')
+    var_v = var.IDX(v)
+    v_nf = ir.READ_ROW(var_nf, var_v)
+    # TODO what is node_data?
+    def _afunc_wrapper(node_data):
+        nbatch = NodeBatch(graph, v, node_data)
+        return apply_func(nbatch)
+    afunc = var.FUNC(_afunc_wrapper)
+    applied_feat = ir.NODE_UDF(afunc, v_nf)
+    if inplace:
+        ir.WRITE_ROW_INPLACE_(var_nf, var_v, applied_feat)
+    else:
+        ir.WRITE_ROW_(var_nf, var_v, applied_feat)
+
 def schedule_apply_edges(graph,
                          u, v, eid,
                          apply_func,
@@ -260,6 +297,52 @@ def schedule_apply_edges(graph,
     # vars
     var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
     var_ef = var.FEAT_DICT(graph._edge_frame, name='ef')
+    var_u = var.IDX(u)
+    var_v = var.IDX(v)
+    var_eid = var.IDX(eid)
+    # schedule apply edges
+    fdsrc = ir.READ_ROW(var_nf, var_u)
+    fddst = ir.READ_ROW(var_nf, var_v)
+    fdedge = ir.READ_ROW(var_ef, var_eid)
+    def _efunc_wrapper(src_data, edge_data, dst_data):
+        ebatch = EdgeBatch(graph, (u, v, eid), src_data, edge_data, dst_data)
+        return apply_func(ebatch)
+    _efunc = var.FUNC(_efunc_wrapper)
+    new_fdedge = ir.EDGE_UDF(_efunc, fdsrc, fdedge, fddst)
+    if inplace:
+        ir.WRITE_ROW_INPLACE_(var_ef, var_eid, new_fdedge)
+    else:
+        ir.WRITE_ROW_(var_ef, var_eid, new_fdedge)
+
+def schedule_nodeflow_apply_edges(graph, flow_id,
+                                  u, v, eid,
+                                  apply_func,
+                                  inplace):
+    """get apply edges schedule
+
+    Parameters
+    ----------
+    graph: DGLGraph
+        The DGLGraph to use
+    u : utils.Index
+        Source nodes of edges to apply
+    v : utils.Index
+        Destination nodes of edges to apply
+    eid : utils.Index
+        Ids of sending edges
+    apply_func: callable
+        The apply edge function
+    inplace: bool
+        If True, the update will be done in place
+
+    Returns
+    -------
+    A list of executors for DGL Runtime
+    """
+    # vars
+    in_var_nf = var.FEAT_DICT(graph._node_frames[flow_id], name='in_nf')
+    out_var_nf = var.FEAT_DICT(graph._node_frames[flow_id + 1], name='out_nf')
+    var_ef = var.FEAT_DICT(graph._edge_frames[flow_id], name='ef')
     var_u = var.IDX(u)
     var_v = var.IDX(v)
     var_eid = var.IDX(eid)
@@ -361,7 +444,6 @@ def schedule_pull(graph,
         else:
             ir.WRITE_ROW_(var_nf, var_pull_nodes, final_feat)
 
-
 def schedule_group_apply_edge(graph,
                               u, v, eid,
                               apply_func,
@@ -403,6 +485,59 @@ def schedule_group_apply_edge(graph,
     else:
         ir.WRITE_ROW_(var_ef, var_eid, var_out)
 
+def schedule_nodeflow_compute(graph,
+                              flow_id,
+                              message_func,
+                              reduce_func,
+                              apply_func,
+                              inplace):
+    """get pull schedule
+
+    Parameters
+    ----------
+    graph: DGLGraph
+        The DGLGraph to use
+    pull_nodes : utils.Index
+        Destination nodes for pull
+    message_func: callable or list of callable
+        The message function
+    reduce_func: callable or list of callable
+        The reduce function
+    apply_func: callable
+        The apply node function
+    inplace: bool
+        If True, the update will be done in place
+    """
+    # TODO(minjie): `in_edges` can be omitted if message and reduce func pairs
+    #   can be specialized to SPMV. This needs support for creating adjmat
+    #   directly from pull node frontier.
+    u, v, eid = graph._graph.in_edges(pull_nodes)
+    if len(eid) == 0:
+        # All the nodes are 0deg; downgrades to apply.
+        if apply_func is not None:
+            schedule_apply_nodes(graph, pull_nodes, apply_func, inplace)
+    else:
+        pull_nodes, _ = F.sort_1d(F.unique(pull_nodes.tousertensor()))
+        pull_nodes = utils.toindex(pull_nodes)
+        # create vars
+        var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
+        var_pull_nodes = var.IDX(pull_nodes, name='pull_nodes')
+        var_u = var.IDX(u)
+        var_v = var.IDX(v)
+        var_eid = var.IDX(eid)
+        # generate send and reduce schedule
+        uv_getter = lambda: (var_u, var_v)
+        adj_creator = lambda: spmv.build_adj_matrix_uv(graph, (u, v), pull_nodes)
+        inc_creator = lambda: spmv.build_inc_matrix_dst(v, pull_nodes)
+        reduced_feat = _gen_send_reduce(graph, message_func, reduce_func,
+                                        var_eid, var_pull_nodes,
+                                        uv_getter, adj_creator, inc_creator)
+        # generate optional apply
+        final_feat = _apply_with_accum(graph, var_pull_nodes, var_nf, reduced_feat, apply_func)
+        if inplace:
+            ir.WRITE_ROW_INPLACE_(var_nf, var_pull_nodes, final_feat)
+        else:
+            ir.WRITE_ROW_(var_nf, var_pull_nodes, final_feat)
 
 def _check_builtin_func_list(func_list):
     """Check whether func_list only contains builtin functions."""

@@ -2,11 +2,12 @@
 from __future__ import absolute_import
 
 from collections import namedtuple
+from .base import ALL, is_all, DGLError
 from . import backend as F
 from .frame import Frame, FrameRef
 from .graph import DGLGraph
-from .view import NodeDataView
-from .view import EdgeDataView
+from .runtime import ir, scheduler, Runtime
+from collections.abc import MutableMapping
 from . import utils
 
 NodeSpace = namedtuple('NodeSpace', ['data'])
@@ -31,15 +32,47 @@ class LayerView(object):
     def __getitem__(self, layer):
         if not isinstance(layer, int):
             raise DGLError('Currently we only support the view of one layer')
-        return NodeSpace(data=NodeDataView(self._graph, self._graph.layer_nid(layer)))
+        return NodeSpace(data=LayerDataView(self._graph, layer))
 
     def __call__(self):
         """Return the nodes."""
         return F.arange(0, len(self))
 
+class LayerDataView(MutableMapping):
+    """The data view class when G.nodes[...].data is called.
+
+    See Also
+    --------
+    dgl.DGLGraph.nodes
+    """
+    __slots__ = ['_graph', '_layer']
+
+    def __init__(self, graph, layer):
+        self._graph = graph
+        self._layer = layer
+
+    def __getitem__(self, key):
+        return self._graph._node_frames[self._layer][key]
+
+    def __setitem__(self, key, val):
+        self._graph._node_frames[self._layer][key] = val
+
+    def __delitem__(self, key):
+        del self._graph._node_frames[self._layer][key]
+
+    def __len__(self):
+        return len(self._graph._node_frames[self._layer])
+
+    def __iter__(self):
+        return iter(self._graph._node_frames[self._layer])
+
+    def __repr__(self):
+        data = self._graph._node_frames[self._layer]
+        return repr({key : data[key] for key in data})
+
 EdgeSpace = namedtuple('EdgeSpace', ['data'])
 
-class LayerEdgeView(object):
+class FlowView(object):
     """A EdgeView class to act as G.edges for a DGLGraph.
 
     Can be used to get a list of current edges and get and set edge data.
@@ -54,16 +87,48 @@ class LayerEdgeView(object):
         self._graph = graph
 
     def __len__(self):
-        return self._graph.number_of_edges()
+        return self._graph.num_flows
 
-    def __getitem__(self, layer):
-        if not isinstance(layer, int):
-            raise DGLError('Currently we only support the view of one layer')
-        return EdgeSpace(data=EdgeDataView(self._graph, self._graph.flow_eid(layer)))
+    def __getitem__(self, flow):
+        if not isinstance(flow, int):
+            raise DGLError('Currently we only support the view of one flow')
+        return EdgeSpace(data=FlowDataView(self._graph, flow))
 
     def __call__(self, *args, **kwargs):
         """Return all the edges."""
         return self._graph.all_edges(*args, **kwargs)
+
+class FlowDataView(MutableMapping):
+    """The data view class when G.edges[...].data is called.
+
+    See Also
+    --------
+    dgl.DGLGraph.edges
+    """
+    __slots__ = ['_graph', '_flow']
+
+    def __init__(self, graph, flow):
+        self._graph = graph
+        self._flow = flow
+
+    def __getitem__(self, key):
+        return self._graph._edge_frames[self._flow][key]
+
+    def __setitem__(self, key, val):
+        self._graph._edge_frames[self._flow][key] = val
+
+    def __delitem__(self, key):
+        del self._graph._edge_frames[self._flow][key]
+
+    def __len__(self):
+        return len(self._graph._edge_frames[self._flow])
+
+    def __iter__(self):
+        return iter(self._graph._edge_frames[self._flow])
+
+    def __repr__(self):
+        data = self._graph._edge_frames[self._flow]
+        return repr({key : data[key] for key in data})
 
 class NodeFlow(DGLGraph):
     """The NodeFlow class stores the sampling results of Neighbor sampling and Layer-wise sampling.
@@ -88,7 +153,10 @@ class NodeFlow(DGLGraph):
         self._index = graph_idx
         self._node_mapping = graph_idx.node_mapping
         self._edge_mapping = graph_idx.edge_mapping
-        self._layers = graph_idx.layers
+        self._layer_offsets = graph_idx.layers
+        self._flow_offsets = graph_idx.flows
+        self._node_frames = [FrameRef(Frame(num_rows=self.layer_size(i))) for i in range(self.num_layers)]
+        self._edge_frames = [FrameRef(Frame(num_rows=self.flow_size(i))) for i in range(self.num_flows)]
 
     # override APIs
     def add_nodes(self, num, data=None):
@@ -118,7 +186,11 @@ class NodeFlow(DGLGraph):
         int
             the number of layers
         """
-        return len(self._layers) - 1
+        return len(self._layer_offsets) - 1
+
+    @property
+    def num_flows(self):
+        return self.num_layers - 1
 
     @property
     def layers(self):
@@ -126,12 +198,16 @@ class NodeFlow(DGLGraph):
 
     @property
     def flows(self):
-        return LayerEdgeView(self)
+        return FlowView(self)
 
     def layer_size(self, layer_id):
         """Return the number of nodes in a specified layer."""
         layer_id = self._reverse_layer(layer_id)
-        return self._layers[layer_id + 1] - self._layers[layer_id]
+        return self._layer_offsets[layer_id + 1] - self._layer_offsets[layer_id]
+
+    def flow_size(self, flow_id):
+        flow_id = self._reverse_flow(flow_id)
+        return self._flow_offsets[flow_id + 1] - self._flow_offsets[flow_id]
 
     def copy_from_parent(self):
         """Copy node/edge features from the parent graph.
@@ -139,11 +215,13 @@ class NodeFlow(DGLGraph):
         All old features will be removed.
         """
         if self._parent._node_frame.num_rows != 0:
-            self._node_frame = FrameRef(Frame(
-                self._parent._node_frame[self._node_mapping]))
+            for i in range(self.num_layers):
+                nid = utils.toindex(self.layer_parent_nid(i))
+                self._node_frames[i] = FrameRef(Frame(self._parent._node_frame[nid]))
         if self._parent._edge_frame.num_rows != 0:
-            self._edge_frame = FrameRef(Frame(
-                self._parent._edge_frame[self._edge_mapping]))
+            for i in range(self.num_flows):
+                eid = utils.toindex(self.flow_parent_eid(i))
+                self._edge_frames[i] = FrameRef(Frame(self._parent._edge_frame[eid]))
 
     def map_to_parent_nid(self, nid):
         """This maps the child node Ids to the parent Ids.
@@ -175,6 +253,12 @@ class NodeFlow(DGLGraph):
         """
         return self._edge_mapping.tousertensor()[eid]
 
+    def map_to_layer_nid(self, nid):
+        pass
+
+    def map_to_flow_eid(self, eid):
+        pass
+
     def layer_nid(self, layer_id):
         """Get the node Ids in the specified layer.
 
@@ -184,9 +268,9 @@ class NodeFlow(DGLGraph):
             The node id array.
         """
         layer_id = self._reverse_layer(layer_id)
-        assert layer_id + 1 < len(self._layers)
-        start = self._layers[layer_id]
-        end = self._layers[layer_id + 1]
+        assert layer_id + 1 < len(self._layer_offsets)
+        start = self._layer_offsets[layer_id]
+        end = self._layer_offsets[layer_id + 1]
         return F.arange(start, end)
 
     def layer_parent_nid(self, layer_id):
@@ -198,23 +282,23 @@ class NodeFlow(DGLGraph):
             The parent node id array.
         """
         layer_id = self._reverse_layer(layer_id)
-        assert layer_id + 1 < len(self._layers)
-        start = self._layers[layer_id]
-        end = self._layers[layer_id + 1]
+        assert layer_id + 1 < len(self._layer_offsets)
+        start = self._layer_offsets[layer_id]
+        end = self._layer_offsets[layer_id + 1]
         return self._node_mapping.tousertensor()[start:end]
 
     def flow_eid(self, flow_id):
         flow_id = self._reverse_flow(flow_id)
-        start = self._layers[flow_id]
-        end = self._layers[flow_id + 1]
+        start = self._layer_offsets[flow_id]
+        end = self._layer_offsets[flow_id + 1]
         vids = F.arange(start, end)
         _, _, eids = self._index.in_edges(utils.toindex(vids))
         return eids
 
     def flow_parent_eid(self, flow_id):
         flow_id = self._reverse_flow(flow_id)
-        start = self._layers[flow_id]
-        end = self._layers[flow_id + 1]
+        start = self._layer_offsets[flow_id]
+        end = self._layer_offsets[flow_id + 1]
         if start == 0:
             prev_num_edges = 0
         else:
@@ -223,6 +307,52 @@ class NodeFlow(DGLGraph):
         vids = utils.toindex(F.arange(start, end))
         num_edges = F.asnumpy(F.sum(self._index.in_degrees(vids).tousertensor(), 0))
         return self._edge_mapping.tousertensor()[prev_num_edges:(prev_num_edges + num_edges)]
+
+    def apply_layer(self, layer_id, func, v=ALL, inplace=False):
+        if func == "default":
+            func = self._apply_node_func
+        if is_all(v):
+            v = utils.toindex(slice(0, self.layer_size(layer_id)))
+        else:
+            v = utils.toindex(v)
+        with ir.prog() as prog:
+            scheduler.schedule_nodeflow_apply_nodes(graph=self,
+                                                    layer_id=layer_id,
+                                                    v=v,
+                                                    apply_func=func,
+                                                    inplace=inplace)
+            Runtime.run(prog)
+
+    def apply_flow(self, flow_id, func, edges, inplace):
+        if func == "default":
+            func = self._apply_edge_func
+        assert func is not None
+
+        if is_all(edges):
+            u = self._graph.layer_nid(flow_id)
+            v = self._graph.layer_nid(flow_id + 1)
+            eid = utils.toindex(slice(0, self.flow_size(flow_id)))
+        elif isinstance(edges, tuple):
+            u, v = edges
+            u, v, eid = self._graph.edge_ids(u, v)
+            u = utils.toindex(self._conv_layer_nid(u, flow_id))
+            v = utils.toindex(self._conv_layer_nid(v, flow_id + 1))
+            eid = self._conv_flow_eid(eid, flow_id)
+        else:
+            u, v, _ = self._graph.find_edges(eid)
+            eid = utils.toindex(self._conv_flow_eid(edges, flow_id))
+            u = self._conv_layer_nid(u, flow_id)
+            v = self._conv_layer_nid(v, flow_id + 1)
+
+        with ir.prog() as prog:
+            scheduler.schedule_nodeflow_apply_edges(graph=self,
+                                                    flow_id=flow_id,
+                                                    u=u,
+                                                    v=v,
+                                                    eid=eid,
+                                                    apply_func=func,
+                                                    inplace=inplace)
+            Runtime.run(prog)
 
     def flow_compute(self, flow_id, msg_func, red_func, update_func):
         return self.pull(self.layer_nid(flow_id + 1), msg_func, red_func, update_func)
