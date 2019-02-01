@@ -379,6 +379,8 @@ class NodeFlow(DGLGraph):
         u, v, eid = self._graph.in_edges(dest_nodes)
         u = utils.toindex(self._conv_local_nid(u.tousertensor(), flow_id))
         v = utils.toindex(self._conv_local_nid(v.tousertensor(), flow_id + 1))
+        dest_nodes = utils.toindex(self._conv_local_nid(dest_nodes.tousertensor(),
+                                                        flow_id + 1))
         # TODO
         #eid = utils.toindex(self._conv_local_eid(eid.tousertensor(), flow_id))
         eid = utils.toindex(F.arange(0, self.flow_size(flow_id)))
