@@ -151,7 +151,7 @@ def build_adj_matrix_graph(graph):
     _, shuffle_idx = gidx.adjacency_matrix(False, F.cpu())
     return lambda ctx: gidx.adjacency_matrix(False, ctx)[0], shuffle_idx
 
-def _build_adj_matrix_index_uv(graph, edges, reduce_nodes):
+def _build_adj_matrix_index_uv(edges, reduce_nodes, num_sources):
     """Build adj matrix index and shape using the given (u, v) edges.
 
     The matrix is of shape (len(reduce_nodes), n), where n is the number of nodes
@@ -164,8 +164,6 @@ def _build_adj_matrix_index_uv(graph, edges, reduce_nodes):
 
     Paramters
     ---------
-    graph : DGLGraph
-        The graph
     edges : tuple of utils.Index
         (u, v)
     reduce_nodes : utils.Index
@@ -185,14 +183,14 @@ def _build_adj_matrix_index_uv(graph, edges, reduce_nodes):
     u = u.tousertensor()
     v = v.tousertensor()
     new_v = old2new[v]  # FIXME(minjie): no use []
-    n = graph.number_of_nodes()
+    n = num_sources
     m = len(reduce_nodes)
     row = F.unsqueeze(new_v, 0)
     col = F.unsqueeze(u, 0)
     idx = F.cat([row, col], dim=0)
     return ('coo', idx), (m, n)
 
-def build_adj_matrix_uv(graph, edges, reduce_nodes):
+def build_adj_matrix_uv(edges, reduce_nodes, num_sources):
     """Build adj matrix using the given (u, v) edges and target nodes.
 
     The matrix is of shape (len(reduce_nodes), n), where n is the number of nodes
@@ -201,8 +199,6 @@ def build_adj_matrix_uv(graph, edges, reduce_nodes):
 
     Parameters
     ---------
-    graph : DGLGraph
-        The graph
     edges : tuple of utils.Index
         (u, v)
     reduce_nodes : utils.Index
@@ -217,7 +213,7 @@ def build_adj_matrix_uv(graph, edges, reduce_nodes):
         A index for data shuffling due to sparse format change. Return None
         if shuffle is not required.
     """
-    sp_idx, shape = _build_adj_matrix_index_uv(graph, edges, reduce_nodes)
+    sp_idx, shape = _build_adj_matrix_index_uv(edges, reduce_nodes, num_sources)
     u, _ = edges
     nnz = len(u)
     # FIXME(minjie): data type

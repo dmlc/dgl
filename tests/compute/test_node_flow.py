@@ -4,6 +4,7 @@ import scipy as sp
 import dgl
 from dgl.node_flow import create_full_node_flow
 from dgl import utils
+import dgl.function as fn
 
 def generate_rand_graph(n):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
@@ -72,7 +73,31 @@ def test_apply_edges():
         assert F.array_equal(nf.flows[i].data['h2'], new_feats)
 
 
+def test_flow_compute():
+    num_layers = 2
+    g = generate_rand_graph(100)
+    nf1 = create_full_node_flow(g, num_layers)
+    nf1.copy_from_parent()
+    nf2 = create_full_node_flow(g, num_layers)
+    nf2.copy_from_parent()
+    g.ndata['h'] = g.ndata['h1']
+    nf1.layers[0].data['h'] = nf1.layers[0].data['h1']
+    # Test the computation on a layer at a time.
+    for i in range(num_layers):
+        nf1.flow_compute(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
+                         lambda nodes: {'h' : nodes.data['t'] + 1}, range=i)
+        g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
+                     lambda nodes: {'h' : nodes.data['t'] + 1})
+        assert F.array_equal(nf1.layers[i + 1].data['h'], g.ndata['h'])
+        
+    # Test the computation on all layers.
+    nf2.flow_compute(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
+                     lambda nodes: {'h' : nodes.data['t'] + 1})
+    assert F.array_equal(nf2.layers[-1].data['h'], g.ndata['h'])
+
+
 if __name__ == '__main__':
     test_basic()
     test_apply_nodes()
     test_apply_edges()
+    test_flow_compute()

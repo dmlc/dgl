@@ -34,6 +34,7 @@ class LayerView(object):
     def __getitem__(self, layer):
         if not isinstance(layer, int):
             raise DGLError('Currently we only support the view of one layer')
+        layer = self._graph._reverse_layer(layer)
         return NodeSpace(data=LayerDataView(self._graph, layer))
 
     def __call__(self):
@@ -94,6 +95,7 @@ class FlowView(object):
     def __getitem__(self, flow):
         if not isinstance(flow, int):
             raise DGLError('Currently we only support the view of one flow')
+        flow = self._graph._reverse_flow(flow)
         return EdgeSpace(data=FlowDataView(self._graph, flow))
 
     def __call__(self, *args, **kwargs):
@@ -178,6 +180,14 @@ class NodeFlow(DGLGraph):
 
     def _reverse_layer(self, layer_id):
         return self.num_layers - layer_id - 1
+
+    def _get_node_frame(self, layer_id):
+        layer_id = self._reverse_layer(layer_id)
+        return self._node_frames[layer_id]
+
+    def _get_edge_frame(self, flow_id):
+        flow_id = self._reverse_flow(flow_id)
+        return self._edge_frames[flow_id]
 
     @property
     def num_layers(self):
@@ -314,7 +324,7 @@ class NodeFlow(DGLGraph):
         num_edges = F.asnumpy(F.sum(self._index.in_degrees(vids).tousertensor(), 0))
         return self._edge_mapping.tousertensor()[prev_num_edges:(prev_num_edges + num_edges)]
 
-    def apply_layer(self, layer_id, func, inplace=False):
+    def apply_layer(self, layer_id, func="default", inplace=False):
         if func == "default":
             func = self._apply_node_func
         v = utils.toindex(slice(0, self.layer_size(layer_id)))
@@ -326,18 +336,16 @@ class NodeFlow(DGLGraph):
                                                     inplace=inplace)
             Runtime.run(prog)
 
-    def _conv_layer_nid(self, u, flow_id):
-        return u - self._layer_offsets[flow_id]
+    def _layer_local_nid(self, layer_id):
+        return F.arange(0, self.layer_size(layer_id))
 
-    def apply_flow(self, flow_id, func, inplace=False):
+    def apply_flow(self, flow_id, func="default", inplace=False):
         if func == "default":
             func = self._apply_edge_func
         assert func is not None
 
-        u = self.layer_nid(flow_id)
-        v = self.layer_nid(flow_id + 1)
-        u = utils.toindex(self._conv_layer_nid(u, flow_id))
-        v = utils.toindex(self._conv_layer_nid(v, flow_id + 1))
+        u = utils.toindex(self._layer_local_nid(flow_id))
+        v = utils.toindex(self._layer_local_nid(flow_id + 1))
         eid = utils.toindex(slice(0, self.flow_size(flow_id)))
 
         with ir.prog() as prog:
@@ -350,8 +358,43 @@ class NodeFlow(DGLGraph):
                                                     inplace=inplace)
             Runtime.run(prog)
 
-    def flow_compute(self, flow_id, msg_func, red_func, update_func):
-        return self.pull(self.layer_nid(flow_id + 1), msg_func, red_func, update_func)
+    def _conv_local_nid(self, nid, layer_id):
+        layer_id = self._reverse_layer(layer_id)
+        return nid - self._layer_offsets[layer_id]
+
+    def flow_compute(self, message_func="default", reduce_func="default",
+                     apply_node_func="default", range=ALL, inplace=False):
+        if message_func == "default":
+            message_func = self._message_func
+        if reduce_func == "default":
+            reduce_func = self._reduce_func
+        if apply_node_func == "default":
+            apply_node_func = self._apply_node_func
+
+        assert message_func is not None
+        assert reduce_func is not None
+
+        flow_id = range
+        dest_nodes = utils.toindex(self.layer_nid(flow_id + 1))
+        u, v, eid = self._graph.in_edges(dest_nodes)
+        u = utils.toindex(self._conv_local_nid(u.tousertensor(), flow_id))
+        v = utils.toindex(self._conv_local_nid(v.tousertensor(), flow_id + 1))
+        # TODO
+        #eid = utils.toindex(self._conv_local_eid(eid.tousertensor(), flow_id))
+        eid = utils.toindex(F.arange(0, self.flow_size(flow_id)))
+
+        with ir.prog() as prog:
+            scheduler.schedule_nodeflow_compute(graph=self,
+                                                flow_id=flow_id,
+                                                u=u,
+                                                v=v,
+                                                eid=eid,
+                                                dest_nodes = dest_nodes,
+                                                message_func=message_func,
+                                                reduce_func=reduce_func,
+                                                apply_func=apply_node_func,
+                                                inplace=inplace)
+            Runtime.run(prog)
 
 def create_full_node_flow(g, num_layers):
     seeds = [utils.toindex(F.arange(0, g.number_of_nodes()))]
