@@ -199,8 +199,12 @@ class DGLJTNNDecoder(nn.Module):
             p_inputs.append(torch.cat([x, h, tree_vec_set], 1))
             # Only newly generated nodes are needed for label prediction
             # NOTE: The following works since the uncomputed messages are zeros.
-            q_inputs.append(torch.cat([h, tree_vec_set], 1)[is_new])
-            q_targets.append(wid[is_new])
+
+            q_input = torch.cat([h, tree_vec_set], 1)[is_new]
+            q_target = wid[is_new]
+            if q_input.shape[0] > 0:
+                q_inputs.append(q_input)
+                q_targets.append(q_target)
         p_targets.append(torch.zeros((root_out_degrees == 0).sum()).long())
 
         # Batch compute the stop/label prediction losses
