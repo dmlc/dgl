@@ -49,8 +49,8 @@ std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids
  *         sections: number of edges in each degree bucket (used to partition
  *                   new_uids, new_vids, and new_eids)
  */
-std::vector<IdArray> GroupEdgeByNode(const IdArray& uids, const IdArray& vids,
-        const IdArray& eids);
+std::vector<IdArray> GroupEdgeByNodeDegree(const IdArray& uids,
+        const IdArray& vids, const IdArray& eids);
 
 }  // namespace sched
 
