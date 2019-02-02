@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import numpy as np
 import mxnet as mx
 import mxnet.ndarray as nd
+import numbers
 
 def data_type_dict():
     return {'float16' : np.float16,
@@ -18,7 +19,22 @@ def cpu():
     return mx.cpu()
 
 def tensor(data, dtype=None):
+    # MXNet always returns a float tensor regardless of type inside data.
+    # This is a workaround.
+    if dtype is None:
+        if isinstance(data[0], numbers.Integral):
+            dtype = np.int64
+        else:
+            dtype = np.float32
     return nd.array(data, dtype=dtype)
+
+def get_preferred_sparse_format():
+    """Get the preferred sparse matrix format supported by the backend.
+
+    Different backends have their preferred backend. This info is useful when
+    constructing a sparse matrix.
+    """
+    return "csr"
 
 def sparse_matrix(data, index, shape, force_format=False):
     fmt = index[0]
@@ -90,7 +106,7 @@ def cat(seq, dim):
     return nd.concat(*seq, dim=dim)
 
 def stack(seq, dim):
-    return nd.stack(*seq, dim=dim)
+    return nd.stack(*seq, axis=dim)
 
 def split(x, sizes_or_sections, dim):
     if isinstance(sizes_or_sections, list) or isinstance(sizes_or_sections, np.ndarray):
@@ -103,13 +119,17 @@ def split(x, sizes_or_sections, dim):
         return nd.split(x, sizes_or_sections, axis=dim)
 
 def gather_row(data, row_index):
+    # MXNet workaround for empty row index
+    if len(row_index) == 0:
+        return data[0:0]
+
     if isinstance(row_index, nd.NDArray):
         return nd.take(data, row_index)
     else:
         return data[row_index,]
 
 def narrow_row(data, start, stop):
-    return nd.slice(data, begin=start, end=stop)
+    return data[start:stop]
 
 def scatter_row(data, row_index, value):
     return mx.nd.contrib.index_copy(data, row_index, value)
@@ -129,6 +149,9 @@ def reshape(input, shape):
 
 def zeros(shape, dtype, ctx):
     return nd.zeros(shape, dtype=dtype, ctx=ctx)
+
+def zeros_like(input):
+    return nd.zeros_like(input)
 
 def ones(shape, dtype, ctx):
     return nd.ones(shape, dtype=dtype, ctx=ctx)
@@ -165,14 +188,23 @@ def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
     y /= w.reshape((-1,) + (1,) * (y.ndim - 1))
     return y
 
+def boolean_mask(input, mask):
+    return mx.contrib.nd.boolean_mask(input, mask)
+
+def equal(x, y):
+    return x == y
+
+def logical_not(input):
+    return nd.logical_not(input)
+
 def unique(input):
     # TODO: fallback to numpy is unfortunate
     tmp = input.asnumpy()
     tmp = np.unique(tmp)
     return nd.array(tmp, ctx=input.context, dtype=input.dtype)
 
-def full_1d(length, fill_value):
-    return nd.full((length,), fill_value)
+def full_1d(length, fill_value, dtype, ctx):
+    return nd.full((length,), fill_value, dtype=dtype, ctx=ctx)
 
 def nonzero_1d(input):
     # TODO: fallback to numpy is unfortunate

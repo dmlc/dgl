@@ -1,10 +1,10 @@
 """Classes and functions for batching multiple graphs together."""
 from __future__ import absolute_import
 
+from collections.abc import Iterable
 import numpy as np
-from collections import Iterable
 
-from .base import ALL, is_all
+from .base import ALL, is_all, DGLError
 from .frame import FrameRef, Frame
 from .graph import DGLGraph
 from . import graph_index as gi
@@ -12,7 +12,8 @@ from . import backend as F
 from . import utils
 
 __all__ = ['BatchedDGLGraph', 'batch', 'unbatch', 'split',
-           'sum_nodes', 'sum_edges', 'mean_nodes', 'mean_edges']
+           'sum_nodes', 'sum_edges', 'mean_nodes', 'mean_edges',
+           'max_nodes', 'max_edges']
 
 class BatchedDGLGraph(DGLGraph):
     """Class for batched DGL graphs.
@@ -152,8 +153,7 @@ class BatchedDGLGraph(DGLGraph):
             elif is_all(attrs):
                 attrs = set()
                 # Check if at least a graph has mode items and associated features.
-                for i in range(len(graph_list)):
-                    g = graph_list[i]
+                for i, g in enumerate(graph_list):
                     g_num_items, g_attrs = _get_num_item_and_attr_types(g, mode)
                     if g_num_items > 0 and len(g_attrs) > 0:
                         attrs = g_attrs
@@ -161,13 +161,13 @@ class BatchedDGLGraph(DGLGraph):
                         break
                 # Check if all the graphs with mode items have the same associated features.
                 if len(attrs) > 0:
-                    for i in range(len(graph_list)):
+                    for i, g in enumerate(graph_list):
                         g = graph_list[i]
                         g_num_items, g_attrs = _get_num_item_and_attr_types(g, mode)
                         if g_attrs != attrs and g_num_items > 0:
-                            raise ValueError('Expect graph {} and {} to have the same {} '
-                                             'attributes when {}_attrs=ALL, got {} and '
-                                             '{}'.format(ref_g_index, i, mode, mode, attrs, g_attrs))
+                            raise ValueError('Expect graph {0} and {1} to have the same {2} '
+                                             'attributes when {2}_attrs=ALL, got {3} and {4}.'
+                                             .format(ref_g_index, i, mode, attrs, g_attrs))
                 return attrs
             elif isinstance(attrs, str):
                 return [attrs]
@@ -200,25 +200,24 @@ class BatchedDGLGraph(DGLGraph):
                     for key in edge_attrs}
             batched_edge_frame = FrameRef(Frame(cols))
 
-        super(BatchedDGLGraph, self).__init__(
-                graph_data=batched_index,
-                node_frame=batched_node_frame,
-                edge_frame=batched_edge_frame)
+        super(BatchedDGLGraph, self).__init__(graph_data=batched_index,
+                                              node_frame=batched_node_frame,
+                                              edge_frame=batched_edge_frame)
 
         # extra members
         self._batch_size = 0
         self._batch_num_nodes = []
         self._batch_num_edges = []
-        for gr in graph_list:
-            if isinstance(gr, BatchedDGLGraph):
+        for grh in graph_list:
+            if isinstance(grh, BatchedDGLGraph):
                 # handle the input is again a batched graph.
-                self._batch_size += gr._batch_size
-                self._batch_num_nodes += gr._batch_num_nodes
-                self._batch_num_edges += gr._batch_num_edges
+                self._batch_size += grh._batch_size
+                self._batch_num_nodes += grh._batch_num_nodes
+                self._batch_num_edges += grh._batch_num_edges
             else:
                 self._batch_size += 1
-                self._batch_num_nodes.append(gr.number_of_nodes())
-                self._batch_num_edges.append(gr.number_of_edges())
+                self._batch_num_nodes.append(grh.number_of_nodes())
+                self._batch_num_edges.append(grh.number_of_edges())
 
     @property
     def batch_size(self):
@@ -251,33 +250,33 @@ class BatchedDGLGraph(DGLGraph):
         return self._batch_num_edges
 
     # override APIs
-    def add_nodes(self, num, reprs=None):
+    def add_nodes(self, num, data=None):
         """Add nodes. Disabled because BatchedDGLGraph is read-only."""
-        raise RuntimeError('Readonly graph. Mutation is not allowed.')
+        raise DGLError('Readonly graph. Mutation is not allowed.')
 
-    def add_edge(self, u, v, reprs=None):
+    def add_edge(self, u, v, data=None):
         """Add one edge. Disabled because BatchedDGLGraph is read-only."""
-        raise RuntimeError('Readonly graph. Mutation is not allowed.')
+        raise DGLError('Readonly graph. Mutation is not allowed.')
 
-    def add_edges(self, u, v, reprs=None):
+    def add_edges(self, u, v, data=None):
         """Add many edges. Disabled because BatchedDGLGraph is read-only."""
-        raise RuntimeError('Readonly graph. Mutation is not allowed.')
+        raise DGLError('Readonly graph. Mutation is not allowed.')
 
     # new APIs
     def __getitem__(self, idx):
         """Slice the batch and return the batch of graphs specified by the idx."""
         # TODO
-        pass
+        raise NotImplementedError
 
     def __setitem__(self, idx, val):
         """Set the value of the slice. The graph size cannot be changed."""
         # TODO
-        pass
+        raise NotImplementedError
 
-def split(graph_batch, num_or_size_splits):
+def split(graph_batch, num_or_size_splits):  # pylint: disable=unused-argument
     """Split the batch."""
     # TODO(minjie): could follow torch.split syntax
-    pass
+    raise NotImplementedError
 
 def unbatch(graph):
     """Return the list of graphs in this batch.
@@ -308,18 +307,18 @@ def unbatch(graph):
     """
     assert isinstance(graph, BatchedDGLGraph)
     bsize = graph.batch_size
-    bn = graph.batch_num_nodes
-    be = graph.batch_num_edges
-    pttns = gi.disjoint_partition(graph._graph, utils.toindex(bn))
+    bnn = graph.batch_num_nodes
+    bne = graph.batch_num_edges
+    pttns = gi.disjoint_partition(graph._graph, utils.toindex(bnn))
     # split the frames
-    node_frames = [FrameRef(Frame(num_rows=n)) for n in bn]
-    edge_frames = [FrameRef(Frame(num_rows=n)) for n in be]
+    node_frames = [FrameRef(Frame(num_rows=n)) for n in bnn]
+    edge_frames = [FrameRef(Frame(num_rows=n)) for n in bne]
     for attr, col in graph._node_frame.items():
-        col_splits = F.split(col, bn, dim=0)
+        col_splits = F.split(col, bnn, dim=0)
         for i in range(bsize):
             node_frames[i][attr] = col_splits[i]
     for attr, col in graph._edge_frame.items():
-        col_splits = F.split(col, be, dim=0)
+        col_splits = F.split(col, bne, dim=0)
         for i in range(bsize):
             edge_frames[i][attr] = col_splits[i]
     return [DGLGraph(graph_data=pttns[i],
@@ -355,47 +354,63 @@ def batch(graph_list, node_attrs=ALL, edge_attrs=ALL):
     return BatchedDGLGraph(graph_list, node_attrs, edge_attrs)
 
 
-_readout_on_attrs = {
-        'nodes': ('ndata', 'batch_num_nodes', 'number_of_nodes'),
-        'edges': ('edata', 'batch_num_edges', 'number_of_edges'),
-        }
+READOUT_ON_ATTRS = {
+    'nodes': ('ndata', 'batch_num_nodes', 'number_of_nodes'),
+    'edges': ('edata', 'batch_num_edges', 'number_of_edges'),
+}
 
-def _sum_on(graph, on, input, weight):
-    data_attr, batch_num_objs_attr, num_objs_attr = _readout_on_attrs[on]
+def _sum_on(graph, typestr, feat, weight):
+    """Internal function to sum node or edge features.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph.
+    typestr : str
+        'nodes' or 'edges'
+    feat : str
+        The feature field name.
+    weight : str
+        The weight field name.
+
+    Returns
+    -------
+    Tensor
+        The (weighted) summed node or edge features.
+    """
+    data_attr, batch_num_objs_attr, _ = READOUT_ON_ATTRS[typestr]
     data = getattr(graph, data_attr)
-    input = data[input]
+    feat = data[feat]
 
     if weight is not None:
         weight = data[weight]
-        weight = F.reshape(weight, (-1,) + (1,) * (F.ndim(input) - 1))
-        input = weight * input
+        weight = F.reshape(weight, (-1,) + (1,) * (F.ndim(feat) - 1))
+        feat = weight * feat
 
     if isinstance(graph, BatchedDGLGraph):
         n_graphs = graph.batch_size
         batch_num_objs = getattr(graph, batch_num_objs_attr)
-        n_objs = getattr(graph, num_objs_attr)()
 
-        seg_id = F.zerocopy_from_numpy(
-                np.arange(n_graphs, dtype='int64').repeat(batch_num_objs))
-        seg_id = F.copy_to(seg_id, F.context(input))
-        y = F.unsorted_1d_segment_sum(input, seg_id, n_graphs, 0)
+        seg_id = F.zerocopy_from_numpy(np.arange(n_graphs, dtype='int64').repeat(batch_num_objs))
+        seg_id = F.copy_to(seg_id, F.context(feat))
+        y = F.unsorted_1d_segment_sum(feat, seg_id, n_graphs, 0)
         return y
     else:
-        return F.sum(input, 0)
+        return F.sum(feat, 0)
 
-def sum_nodes(graph, input, weight=None):
-    """Sums all the values of node field :attr:`input` in :attr:`graph`, optionally
+def sum_nodes(graph, feat, weight=None):
+    """Sums all the values of node field :attr:`feat` in :attr:`graph`, optionally
     multiplies the field by a scalar node field :attr:`weight`.
 
     Parameters
     ----------
-    graph : DGLGraph or BatchedDGLGraph
-        The graph
-    input : str
-        The input field
+    graph : DGLGraph.
+        The graph.
+    feat : str
+        The feature field.
     weight : str, optional
         The weight field. If None, no weighting will be performed,
-        otherwise, weight each node feature with field :attr:`input`.
+        otherwise, weight each node feature with field :attr:`feat`.
         for summation. The weight feature associated in the :attr:`graph`
         should be a tensor of shape ``[graph.number_of_nodes(), 1]``.
 
@@ -450,21 +465,21 @@ def sum_nodes(graph, input, weight=None):
     sum_edges
     mean_edges
     """
-    return _sum_on(graph, 'nodes', input, weight)
+    return _sum_on(graph, 'nodes', feat, weight)
 
-def sum_edges(graph, input, weight=None):
-    """Sums all the values of edge field :attr:`input` in :attr:`graph`,
+def sum_edges(graph, feat, weight=None):
+    """Sums all the values of edge field :attr:`feat` in :attr:`graph`,
     optionally multiplies the field by a scalar edge field :attr:`weight`.
 
     Parameters
     ----------
-    graph : DGLGraph or BatchedDGLGraph
-        The graph
-    input : str
-        The input field
+    graph : DGLGraph
+        The graph.
+    feat : str
+        The feature field.
     weight : str, optional
         The weight field. If None, no weighting will be performed,
-        otherwise, weight each edge feature with field :attr:`input`.
+        otherwise, weight each edge feature with field :attr:`feat`.
         for summation. The weight feature associated in the :attr:`graph`
         should be a tensor of shape ``[graph.number_of_edges(), 1]``.
 
@@ -521,54 +536,70 @@ def sum_edges(graph, input, weight=None):
     mean_nodes
     mean_edges
     """
-    return _sum_on(graph, 'edges', input, weight)
+    return _sum_on(graph, 'edges', feat, weight)
 
 
-def _mean_on(graph, on, input, weight):
-    data_attr, batch_num_objs_attr, num_objs_attr = _readout_on_attrs[on]
+def _mean_on(graph, typestr, feat, weight):
+    """Internal function to sum node or edge features.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph.
+    typestr : str
+        'nodes' or 'edges'
+    feat : str
+        The feature field name.
+    weight : str
+        The weight field name.
+
+    Returns
+    -------
+    Tensor
+        The (weighted) summed node or edge features.
+    """
+    data_attr, batch_num_objs_attr, _ = READOUT_ON_ATTRS[typestr]
     data = getattr(graph, data_attr)
-    input = data[input]
+    feat = data[feat]
 
     if weight is not None:
         weight = data[weight]
-        weight = F.reshape(weight, (-1,) + (1,) * (F.ndim(input) - 1))
-        input = weight * input
+        weight = F.reshape(weight, (-1,) + (1,) * (F.ndim(feat) - 1))
+        feat = weight * feat
 
     if isinstance(graph, BatchedDGLGraph):
         n_graphs = graph.batch_size
         batch_num_objs = getattr(graph, batch_num_objs_attr)
-        n_objs = getattr(graph, num_objs_attr)()
 
-        seg_id = F.zerocopy_from_numpy(
-                np.arange(n_graphs, dtype='int64').repeat(batch_num_objs))
-        seg_id = F.copy_to(seg_id, F.context(input))
+        seg_id = F.zerocopy_from_numpy(np.arange(n_graphs, dtype='int64').repeat(batch_num_objs))
+        seg_id = F.copy_to(seg_id, F.context(feat))
         if weight is not None:
             w = F.unsorted_1d_segment_sum(weight, seg_id, n_graphs, 0)
-            y = F.unsorted_1d_segment_sum(input, seg_id, n_graphs, 0)
+            y = F.unsorted_1d_segment_sum(feat, seg_id, n_graphs, 0)
             y = y / w
         else:
-            y = F.unsorted_1d_segment_mean(input, seg_id, n_graphs, 0)
+            y = F.unsorted_1d_segment_mean(feat, seg_id, n_graphs, 0)
         return y
     else:
         if weight is None:
-            return F.mean(input, 0)
+            return F.mean(feat, 0)
         else:
-            y = F.sum(input, 0) / F.sum(weight, 0)
+            y = F.sum(feat, 0) / F.sum(weight, 0)
             return y
 
-def mean_nodes(graph, input, weight=None):
-    """Averages all the values of node field :attr:`input` in :attr:`graph`,
+def mean_nodes(graph, feat, weight=None):
+    """Averages all the values of node field :attr:`feat` in :attr:`graph`,
     optionally multiplies the field by a scalar node field :attr:`weight`.
 
     Parameters
     ----------
     graph : DGLGraph or BatchedDGLGraph
-        The graph
-    input : str
-        The input field
+        The graph.
+    feat : str
+        The feature field.
     weight : str, optional
         The weight field. If None, no weighting will be performed,
-        otherwise, weight each node feature with field :attr:`input`.
+        otherwise, weight each node feature with field :attr:`feat`.
         for calculating mean. The weight feature associated in the :attr:`graph`
         should be a tensor of shape ``[graph.number_of_nodes(), 1]``.
 
@@ -623,21 +654,21 @@ def mean_nodes(graph, input, weight=None):
     sum_edges
     mean_edges
     """
-    return _mean_on(graph, 'nodes', input, weight)
+    return _mean_on(graph, 'nodes', feat, weight)
 
-def mean_edges(graph, input, weight=None):
-    """Averages all the values of edge field :attr:`input` in :attr:`graph`,
+def mean_edges(graph, feat, weight=None):
+    """Averages all the values of edge field :attr:`feat` in :attr:`graph`,
     optionally multiplies the field by a scalar edge field :attr:`weight`.
 
     Parameters
     ----------
-    graph : DGLGraph or BatchedDGLGraph
-        The graph
-    input : str
-        The input field
+    graph : DGLGraph
+        The graph.
+    feat : str
+        The feature field.
     weight : optional, str
         The weight field. If None, no weighting will be performed,
-        otherwise, weight each edge feature with field :attr:`input`.
+        otherwise, weight each edge feature with field :attr:`feat`.
         for calculating mean. The weight feature associated in the :attr:`graph`
         should be a tensor of shape ``[graph.number_of_edges(), 1]``.
 
@@ -694,4 +725,94 @@ def mean_edges(graph, input, weight=None):
     mean_nodes
     sum_edges
     """
-    return _mean_on(graph, 'edges', input, weight)
+    return _mean_on(graph, 'edges', feat, weight)
+
+def _max_on(graph, typestr, feat):
+    """Internal function to take elementwise maximum
+    over node or edge features.
+
+    Parameters
+    ----------
+    graph : DGLGraph
+        The graph.
+    typestr : str
+        'nodes' or 'edges'
+    feat : str
+        The feature field name.
+
+    Returns
+    -------
+    Tensor
+        The (weighted) summed node or edge features.
+    """
+    data_attr, batch_num_objs_attr, _ = READOUT_ON_ATTRS[typestr]
+    data = getattr(graph, data_attr)
+    feat = data[feat]
+
+    if isinstance(graph, BatchedDGLGraph):
+        batch_num_objs = getattr(graph, batch_num_objs_attr)
+        max_readout_list = []
+        first = 0
+        for num_obj in batch_num_objs:
+            if num_obj == 0:
+                max_readout_list.append(F.zeros(F.shape(feat)[1:],
+                                                F.dtype(feat),
+                                                F.context(feat)))
+                continue
+            max_readout_list.append(F.max(feat[first:first+num_obj], 0))
+            first += num_obj
+        return F.stack(max_readout_list, 0)
+    else:
+        return F.max(feat, 0)
+
+def max_nodes(graph, feat):
+    """Take elementwise maximum over all the values of node field
+    :attr:`feat` in :attr:`graph`
+
+    Parameters
+    ----------
+    graph : DGLGraph or BatchedDGLGraph
+        The graph.
+    feat : str
+        The feature field.
+
+    Returns
+    -------
+    tensor
+        The tensor obtained.
+
+    Notes
+    -----
+    If graph is a :class:`BatchedDGLGraph` object, a stacked tensor is
+    returned instead, i.e. having an extra first dimension.
+    Each row of the stacked tensor contains the readout result of
+    corresponding example in the batch. If an example has no nodes,
+    a zero tensor with the same shape is returned at the corresponding row.
+    """
+    return _max_on(graph, 'nodes', feat)
+
+def max_edges(graph, feat):
+    """Take elementwise maximum over all the values of edge field
+    :attr:`feat` in :attr:`graph`
+
+    Parameters
+    ----------
+    graph : DGLGraph or BatchedDGLGraph
+        The graph.
+    feat : str
+        The feature field.
+
+    Returns
+    -------
+    tensor
+        The tensor obtained.
+
+    Notes
+    -----
+    If graph is a :class:`BatchedDGLGraph` object, a stacked tensor is
+    returned instead, i.e. having an extra first dimension.
+    Each row of the stacked tensor contains the readout result of
+    corresponding example in the batch. If an example has no edges,
+    a zero tensor with the same shape is returned at the corresponding row.
+    """
+    return _max_on(graph, 'edges', feat)

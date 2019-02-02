@@ -26,8 +26,7 @@ else:
 
 class DGLError(Exception):
     """Error thrown by DGL function"""
-    pass
-
+    pass  # pylint: disable=unnecessary-pass
 
 def _load_lib():
     """Load libary by searching possible path."""
