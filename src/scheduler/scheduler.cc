@@ -99,14 +99,14 @@ std::vector<IdArray> GroupEdgeByNode(const IdArray& uids, const IdArray& vids,
     const int64_t* uid_data = static_cast<int64_t*>(uids->data);
     const int64_t* vid_data = static_cast<int64_t*>(vids->data);
 
-    // node2edge: group_by nodes -> (eid, the other end)
+    // node2edge: group_by nodes uid -> (eid, the other end vid)
     std::unordered_map<int64_t,
         std::vector<std::pair<int64_t, int64_t>>> node2edge;
     for (int64_t i = 0; i < n_edge; ++i) {
         node2edge[uid_data[i]].emplace_back(eid_data[i], vid_data[i]);
     }
 
-    // bkt: deg -> nodes
+    // bkt: deg -> group_by node uid
     std::unordered_map<int64_t, std::vector<int64_t>> bkt;
     for (const auto& it : node2edge) {
         bkt[it.second.size()].push_back(it.first);
@@ -129,12 +129,14 @@ std::vector<IdArray> GroupEdgeByNode(const IdArray& uids, const IdArray& vids,
 
     // fill in bucketing ordering
     for (const auto& it : bkt) {  // for each bucket
+        // degree of this bucket
         const int64_t deg = it.first;
+        // number of edges in this bucket
         const int64_t bucket_size = it.second.size();
         *deg_ptr++ = deg;
         *sec_ptr++ = deg * bucket_size;
-        for (const auto u : it.second) {  // for each dst in this bucket
-            for (const auto& pair : node2edge[u]) {  // for each in edge of dst
+        for (const auto u : it.second) {  // for uid in this bucket
+            for (const auto& pair : node2edge[u]) {  // for each edge of uid
                 *uid_ptr++ = u;
                 *vid_ptr++ = pair.second;
                 *eid_ptr++ = pair.first;
