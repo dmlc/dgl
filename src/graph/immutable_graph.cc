@@ -6,6 +6,7 @@
 
 #include <dgl/immutable_graph.h>
 #include <cstdlib>
+#include <cmath>
 
 #ifdef _MSC_VER
 // rand in MS compiler works well in multi-threading.
@@ -191,7 +192,7 @@ std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::VertexSubgraph
 
   // Store the non-zeros in a subgraph with edge attributes of new edge ids.
   sub_csr->edge_ids.resize(sub_csr->indices.size());
-  for (int64_t i = 0; i < sub_csr->edge_ids.size(); i++)
+  for (size_t i = 0; i < sub_csr->edge_ids.size(); i++)
     sub_csr->edge_ids[i] = i;
 
   IdArray rst_eids = IdArray::Empty({static_cast<int64_t>(orig_edge_ids.size())},
@@ -203,7 +204,7 @@ std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::VertexSubgraph
 }
 
 ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::FromEdges(std::vector<Edge> *edges,
-                                                        int sort_on, int64_t num_nodes) {
+                                                        int sort_on, uint64_t num_nodes) {
   CHECK(sort_on == 0 || sort_on == 1) << "we must sort on the first or the second vector";
   int other_end = sort_on == 1 ? 0 : 1;
   // TODO(zhengda) we should sort in parallel.
@@ -285,7 +286,7 @@ BoolArray ImmutableGraph::HasVertices(IdArray vids) const {
   BoolArray rst = BoolArray::Empty({len}, vids->dtype, vids->ctx);
   const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
   dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-  const int64_t nverts = NumVertices();
+  const uint64_t nverts = NumVertices();
   for (int64_t i = 0; i < len; ++i) {
     rst_data[i] = (vid_data[i] < nverts)? 1 : 0;
   }
@@ -804,7 +805,7 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   // BFS traverse the graph and sample vertices
   // <vertex_id, layer_id>
   std::unordered_set<dgl_id_t> sub_ver_map;
-  std::vector<std::pair<dgl_id_t, dgl_id_t> > sub_vers;
+  std::vector<std::pair<dgl_id_t, int> > sub_vers;
   sub_vers.reserve(num_seeds * 10);
   // add seed vertices
   for (size_t i = 0; i < num_seeds; ++i) {
@@ -893,20 +894,20 @@ SampledSubgraph ImmutableGraph::SampleSubgraph(IdArray seed_arr,
 
   // Copy sub_ver_map to output[0]
   // Copy layer
-  int64_t num_vertices = sub_ver_map.size();
+  uint64_t num_vertices = sub_ver_map.size();
   std::sort(sub_vers.begin(), sub_vers.end(),
             [](const std::pair<dgl_id_t, dgl_id_t> &a1, const std::pair<dgl_id_t, dgl_id_t> &a2) {
     return a1.first < a2.first;
   });
 
   SampledSubgraph subg;
-  subg.induced_vertices = IdArray::Empty({num_vertices},
+  subg.induced_vertices = IdArray::Empty({static_cast<int64_t>(num_vertices)},
                                          DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  subg.induced_edges = IdArray::Empty({num_edges},
+  subg.induced_edges = IdArray::Empty({static_cast<int64_t>(num_edges)},
                                       DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  subg.layer_ids = IdArray::Empty({num_vertices},
+  subg.layer_ids = IdArray::Empty({static_cast<int64_t>(num_vertices)},
                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  subg.sample_prob = runtime::NDArray::Empty({num_vertices},
+  subg.sample_prob = runtime::NDArray::Empty({static_cast<int64_t>(num_vertices)},
                                              DLDataType{kDLFloat, 32, 1}, DLContext{kDLCPU, 0});
 
   dgl_id_t *out = static_cast<dgl_id_t *>(subg.induced_vertices->data);

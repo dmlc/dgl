@@ -872,7 +872,7 @@ class DGLGraph(object):
         Returns
         -------
         A tuple of Tensors ``(eu, ev, eid)`` if ``form == 'all'``.
-            ``eid[i]`` is the ID of an outbound edge from ``eu[i]`` from ``ev[i]``.
+            ``eid[i]`` is the ID of an outbound edge from ``eu[i]`` to ``ev[i]``.
             All outbound edges from ``v`` are returned.
         A pair of Tensors (eu, ev) if form == 'uv'
             ``ev[i]`` is the destination node of an outbound edge from ``eu[i]``.
