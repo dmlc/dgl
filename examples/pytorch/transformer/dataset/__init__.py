@@ -99,7 +99,7 @@ class TranslationDataset(object):
             mode: train/valid/test
             batch_size: batch size
             k: beam size(only required for test)
-            device: torch.device
+            device: str or torch.device
             dev_rank: rank (id) of current device
             ndev: number of devices
         '''
@@ -108,7 +108,8 @@ class TranslationDataset(object):
         # make sure all devices have the same number of batch
         n = n // ndev * ndev
 
-        # XXX: is partition then shuffle equivalent to shuffle then partition?
+        # XXX: partition then shuffle may not be equivalent to shuffle then
+        # partition
         order = list(range(dev_rank, n, ndev))
         if mode == 'train':
             random.shuffle(order)

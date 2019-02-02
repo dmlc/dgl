@@ -39,8 +39,17 @@ class LabelSmoothing(nn.Module):
 class SimpleLossCompute(nn.Module):
     eps=1e-8
     def __init__(self, criterion, grad_accum, opt=None):
-        """
-        opt is required during training
+        """Loss function and optimizer for single device
+
+        Parameters
+        ----------
+        criterion: torch.nn.Module
+            criterion to compute loss
+        grad_accum: int
+            number of batches to accumulate gradients
+        opt: Optimizer
+            Model optimizer to use. If None, then no backward and update will be
+            performed
         """
         super(SimpleLossCompute, self).__init__()
         self.criterion = criterion
@@ -73,10 +82,10 @@ class SimpleLossCompute(nn.Module):
         self.opt.step()
         self.opt.optimizer.zero_grad()
 
-
     def backward_and_step(self):
         self.loss.backward()
         self.batch_count += 1
+        # accumulate self.grad_accum times then synchronize and update
         if self.batch_count == self.grad_accum:
             self.step()
             self.batch_count = 0
@@ -84,9 +93,7 @@ class SimpleLossCompute(nn.Module):
     def __call__(self, y_pred, y, norm):
         y_pred = y_pred.contiguous().view(-1, y_pred.shape[-1])
         y = y.contiguous().view(-1)
-        self.loss = self.criterion(
-            y_pred, y
-        ) / norm
+        self.loss = self.criterion(y_pred, y) / norm
         if self.opt is not None:
             self.backward_and_step()
         self.n_correct += ((y_pred.max(dim=-1)[1] == y) & (y != self.criterion.padding_idx)).sum().item()
@@ -96,20 +103,28 @@ class SimpleLossCompute(nn.Module):
 
 class MultiGPULossCompute(SimpleLossCompute):
     def __init__(self, criterion, ndev, grad_accum, model, opt=None):
+        """Loss function and optimizer for multiple devices
+
+        Parameters
+        ----------
+        criterion: torch.nn.Module
+            criterion to compute loss
+        ndev: int
+            number of devices used
+        grad_accum: int
+            number of batches to accumulate gradients
+        model: torch.nn.Module
+            model to optimizer (needed to iterate and synchronize all parameters)
+        opt: Optimizer
+            Model optimizer to use. If None, then no backward and update will be
+            performed
+        """
         super(MultiGPULossCompute, self).__init__(criterion, grad_accum, opt=opt)
         self.ndev = ndev
         self.model = model
 
-    def backward_and_step(self):
-        # multi-gpu synchronous backward
-        self.loss.backward()
-        self.batch_count += 1
-        # accumulate self.grad_accum times then synchronize and update
-        if self.batch_count == self.grad_accum:
-            self.step()
-            self.batch_count = 0
-
     def step(self):
+        # multi-gpu synchronize gradients
         for param in self.model.parameters():
             if param.requires_grad and param.grad is not None:
                 dist.all_reduce(param.grad.data, op=dist.ReduceOp.SUM)
