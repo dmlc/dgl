@@ -25,63 +25,77 @@ Results
 -------
 Run with following (available dataset: "cora", "citeseer", "pubmed")
 ```bash
-DGLBACKEND=mxnet python gcn_spmv.py --dataset cora --gpu 0
+DGLBACKEND=mxnet python3 gcn_spmv.py --dataset cora --gpu 0
 ```
 
 * cora: ~0.810 (paper: 0.815)
 * citeseer: ~0.702 (paper: 0.703)
 * pubmed: ~0.780 (paper: 0.790)
 
-Results (`gcn_concat.py`)
+Results (`gcn_concat.py vs. gcn_spmv.py`)
 -------------------------
-These results are based on single-run training to minimize the cross-entropy
-loss of the first 20 examples in each class. We can see clear improvements of
-graph convolution networks (GCNs) over multi-layer perceptron (MLP) baselines.
-There are also some slight modifications from the original paper:
-
-* We used more (up to 10) layers to demonstrate monotonic improvements as more
-  neighbor information is used. Using GCN with more layers improves accuracy
-but can also increase the computational complexity. The original paper
-recommends n-layers=2 to balance speed and accuracy.
-* We used concatenation of hidden units to account for multi-hop
-  skip-connections. The original implementation used simple additions (while
-the original paper omitted this detail). We feel concatenation is superior
+`gcn_concat.py` uses concatenation of hidden units to account for multi-hop
+  skip-connections, while `gcn_spmv.py` uses simple additions (the original paper
+omitted this detail). We feel concatenation is superior
 because all neighboring information is presented without additional modeling
 assumptions.
-* After the concatenation, we used a recursive model such that the (k+1)-th
-  layer, storing information up to the (k+1)-distant neighbor, depends on the
-concatenation of all 1-to-k layers. However, activation is only applied to the
-new information in the concatenations.
+These results are based on single-run training to minimize the cross-entropy
+loss. We can see clear skip connection can help train a GCN with many layers.
+
+The experiments show that adding depth may or may not improve accuracy.
+While adding depth is a clear way to mimic power iterations of matrix factorizations,
+training multiple epochs to obtain stationary points could equivalently solve matrix
+factorization. Given the small datasets, we can't draw such conclusions from these experiments.
 
 ```
-# Final accuracy 75.34% MLP without GCN
-DGLBACKEND=mxnet python examples/mxnet/gcn/gcn_concat.py --dataset "citeseer" --n-epochs 200 --gpu 1 --n-layers 0
+# Final accuracy 57.70% MLP without GCN
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "citeseer" --n-epochs 200 --n-layers 0
 
-# Final accuracy 86.57% with 10-layer GCN (symmetric normalization)
-DGLBACKEND=mxnet python examples/mxnet/gcn/gcn_concat.py --dataset "citeseer" --n-epochs 200 --gpu 1 --n-layers 10 --normalization 'sym' --self-loop
+# Final accuracy 68.20% with 2-layer GCN
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_spmv.py --dataset "citeseer" --n-epochs 200 --n-layers 1
 
-# Final accuracy 84.42% with 10-layer GCN (unnormalized)
-DGLBACKEND=mxnet python examples/mxnet/gcn/gcn_concat.py --dataset "citeseer" --n-epochs 200 --gpu 1 --n-layers 10
-```
+# Final accuracy 18.40% with 10-layer GCN
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_spmv.py --dataset "citeseer" --n-epochs 200 --n-layers 9
 
-```
-# Final accuracy 40.62% MLP without GCN
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "cora" --n-epochs 200 --gpu 1 --n-layers 0
+# Final accuracy 65.70% with 10-layer GCN with skip connection
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "citeseer" --n-epochs 200 --n-layers 2 --normalization 'sym' --self-loop
 
-# Final accuracy 92.63% with 10-layer GCN (symmetric normalization)
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "cora" --n-epochs 200 --gpu 1 --n-layers 10 --normalization 'sym' --self-loop
+# Final accuracy 64.70% with 10-layer GCN with skip connection
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "citeseer" --n-epochs 200 --n-layers 10 --normalization 'sym' --self-loop
 
-# Final accuracy 86.60% with 10-layer GCN (unnormalized)
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "cora" --n-epochs 200 --gpu 1 --n-layers 10
 ```
 
 ```
-# Final accuracy 72.97% MLP without GCN
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "pubmed" --n-epochs 200 --gpu 1 --n-layers 0
+# Final accuracy 53.20% MLP without GCN
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "cora" --n-epochs 200 --n-layers 0
 
-# Final accuracy 88.33% with 10-layer GCN (symmetric normalization)
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "pubmed" --n-epochs 200 --gpu 1 --n-layers 10 --normalization 'sym' --self-loop
+# Final accuracy 81.40% with 2-layer GCN
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_spmv.py --dataset "cora" --n-epochs 200 --n-layers 1
 
-# Final accuracy 83.80% with 10-layer GCN (unnormalized)
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "pubmed" --n-epochs 200 --gpu 1 --n-layers 10
+# Final accuracy 27.60% with 10-layer GCN
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_spmv.py --dataset "cora" --n-epochs 200 --n-layers 9
+
+# Final accuracy 72.60% with 2-layer GCN with skip connection
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "cora" --n-epochs 200 --n-layers 2 --normalization 'sym' --self-loop
+
+# Final accuracy 78.90% with 10-layer GCN with skip connection
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "cora" --n-epochs 200 --n-layers 10 --normalization 'sym' --self-loop
+
+```
+
+```
+# Final accuracy 70.30% MLP without GCN
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "pubmed" --n-epochs 200 --n-layers 0
+
+# Final accuracy 77.40% with 2-layer GCN
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_spmv.py --dataset "cora" --n-epochs 200 --n-layers 1
+
+# Final accuracy 36.20% with 10-layer GCN
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_spmv.py --dataset "cora" --n-epochs 200 --n-layers 9
+
+# Final accuracy 78.30% with 2-layer GCN with skip connection
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "pubmed" --n-epochs 200 --n-layers 2 --normalization 'sym' --self-loop
+
+# Final accuracy 76.30% with 10-layer GCN with skip connection
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "pubmed" --n-epochs 200 --n-layers 10 --normalization 'sym' --self-loop
 ```
