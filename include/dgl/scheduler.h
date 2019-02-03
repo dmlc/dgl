@@ -23,7 +23,7 @@ namespace sched {
  * \note If there are multiple messages going into the same destination vertex, then
  *       there will be multiple copies of the destination vertex in vids
  * \return a vector of 5 IdArrays for degree bucketing. The 5 arrays are:
- *         degrees: of degrees for each bucket
+ *         degrees: degrees for each bucket
  *         nids: destination node ids
  *         nid_section: number of nodes in each bucket (used to split nids)
  *         mids: message ids
@@ -31,6 +31,26 @@ namespace sched {
  */
 std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids,
         const IdArray& recv_ids);
+
+/*!
+ * \brief Generate degree bucketing schedule for group_apply edge
+ * \param uids One end vertex of edge by which edges are grouped
+ * \param vids The other end vertex of edge
+ * \param eids Edge ids
+ * \note This function always generate group_apply schedule based on degrees of
+ *       nodes in uids. Therefore, if group_apply by source nodes, then uids
+ *       should be source. If group_apply by destination nodes, then uids
+ *       should be destination.
+ * \return a vector of 5 IdArrays for degree bucketing. The 5 arrays are:
+ *         degrees: degrees for each bucket
+ *         new_uids: uids reordered by degree bucket
+ *         new_vids: vids reordered by degree bucket
+ *         new_edis: eids reordered by degree bucket
+ *         sections: number of edges in each degree bucket (used to partition
+ *                   new_uids, new_vids, and new_eids)
+ */
+std::vector<IdArray> GroupEdgeByNodeDegree(const IdArray& uids,
+        const IdArray& vids, const IdArray& eids);
 
 }  // namespace sched
 
