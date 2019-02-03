@@ -625,6 +625,40 @@ def test_repr():
     repr_string = G.__repr__()
     print(repr_string)
 
+
+def test_group_apply_edges():
+    def edge_udf(edges):
+        h = F.sum(edges.data['feat'] * (edges.src['h'] + edges.dst['h']), dim=2)
+        normalized_feat = F.softmax(h, dim=1)
+        return {"norm_feat": normalized_feat}
+
+    g = DGLGraph()
+    g.add_nodes(10)
+    g.add_edges(0, [1, 2, 3, 4, 5, 6, 7, 8])
+    g.add_edges(1, [2, 3, 4, 6, 7, 8])
+    g.add_edges(2, [2, 3, 4, 5, 6, 7, 8])
+
+    g.ndata['h'] = F.randn((g.number_of_nodes(), D))
+    g.edata['feat'] = F.randn((g.number_of_edges(), D))
+
+    def _test(group_by):
+        g.group_apply_edges(group_by=group_by, func=edge_udf)
+        if group_by == 'src':
+            u, v, eid = g.out_edges(1, form='all')
+        else:
+            u, v, eid = g.in_edges(5, form='all')
+        out_feat = g.edata['norm_feat'][eid]
+        result = (g.ndata['h'][u] + g.ndata['h'][v]) * g.edata['feat'][eid]
+        result = F.softmax(F.sum(result, dim=1), dim=0)
+        assert F.allclose(out_feat, result)
+
+    # test group by source nodes
+    _test('src')
+
+    # test group by destination nodes
+    _test('dst')
+
+
 if __name__ == '__main__':
     test_nx_conversion()
     test_batch_setter_getter()
@@ -641,3 +675,4 @@ if __name__ == '__main__':
     test_send_multigraph()
     test_dynamic_addition()
     test_repr()
+    test_group_apply_edges()
