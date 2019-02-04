@@ -359,8 +359,9 @@ NodeFlow ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   // * layer_offsets: the offset in sub_vers.
   dgl_id_t ver_id = 0;
   std::vector<std::unordered_map<dgl_id_t, dgl_id_t>> layer_ver_maps;
-  layer_ver_maps.resize(num_hops + 1);
-  for (size_t layer_id = 0; layer_id < num_hops; layer_id++) {
+  layer_ver_maps.resize(num_hops);
+  size_t out_node_idx = 0;
+  for (int layer_id = num_hops - 1; layer_id >= 0; layer_id--) {
     // We sort the vertices in a layer so that we don't need to sort the neighbor Ids
     // after remap to a subgraph.
     std::sort(sub_vers.begin() + layer_offsets[layer_id],
@@ -372,16 +373,23 @@ NodeFlow ImmutableGraph::SampleSubgraph(IdArray seed_arr,
 
     // Save the sampled vertices and its layer Id.
     for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
-      out[i] = sub_vers[i].first;
+      out[out_node_idx++] = sub_vers[i].first;
       layer_ver_maps[layer_id].insert(std::pair<dgl_id_t, dgl_id_t>(sub_vers[i].first, ver_id++));
       assert(sub_vers[i].second == layer_id);
     }
   }
-  std::copy(layer_offsets.begin(), layer_offsets.end(), out_layer);
+  CHECK(out_node_idx == num_vertices);
 
-  // Remap the neighbors.
-  int64_t last_off = 0;
-  for (size_t layer_id = 0; layer_id < num_hops - 1; layer_id++) {
+  // Copy sampled results to a CSR.
+  // When we copy data, we need to move the last layer to the first layer
+  // because we consider the layer with the leaf nodes as layer 0.
+  size_t row_idx = 0;
+  for (size_t i = layer_offsets[num_hops - 1]; i < layer_offsets[num_hops]; i++)
+    indptr_out[row_idx++] = 0;
+  out_layer[0] = 0;
+  out_layer[1] = layer_offsets[num_hops] - layer_offsets[num_hops - 1];
+  size_t out_layer_idx = 1;
+  for (int layer_id = num_hops - 2; layer_id >= 0; layer_id--) {
     std::sort(neigh_pos.begin() + layer_offsets[layer_id],
               neigh_pos.begin() + layer_offsets[layer_id + 1],
               [](const std::pair<dgl_id_t, size_t> &a1, const std::pair<dgl_id_t, size_t> &a2) {
@@ -389,7 +397,7 @@ NodeFlow ImmutableGraph::SampleSubgraph(IdArray seed_arr,
               });
 
     for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
-      dgl_id_t dst_id = *(out + i);
+      dgl_id_t dst_id = sub_vers[i].first;
       assert(dst_id == neigh_pos[i].first);
       size_t pos = neigh_pos[i].second;
       CHECK_LT(pos, neighbor_list.size());
@@ -407,20 +415,28 @@ NodeFlow ImmutableGraph::SampleSubgraph(IdArray seed_arr,
                   num_edges,
                   val_list_out + collected_nedges);
       collected_nedges += num_edges;
-      indptr_out[i+1] = indptr_out[i] + num_edges;
-      last_off = indptr_out[i+1];
+      indptr_out[row_idx+1] = indptr_out[row_idx] + num_edges;
+      row_idx++;
     }
+    out_layer[out_layer_idx + 1] = out_layer[out_layer_idx]
+        + layer_offsets[layer_id + 1] - layer_offsets[layer_id];
+    out_layer_idx++;
   }
-
-  for (size_t i = layer_offsets[num_hops - 1]; i < subg_csr->indptr.size(); i++)
-    indptr_out[i] = last_off;
+  CHECK(row_idx == num_vertices);
+  CHECK(indptr_out[row_idx] == num_edges);
+  CHECK(out_layer_idx == num_hops);
+  CHECK(out_layer[out_layer_idx] == num_vertices);
 
   // Copy flow offsets.
   out_flow[0] = 0;
-  for (size_t i = 0; i < layer_offsets.size() - 2; i++) {
-    size_t num_edges = subg_csr->GetDegree(layer_offsets[i], layer_offsets[i + 1]);
-    out_flow[i + 1] = out_flow[i] + num_edges;
+  size_t out_flow_idx = 0;
+  for (int i = 0; i < layer_offsets.size() - 2; i++) {
+    size_t num_edges = subg_csr->GetDegree(out_layer[i + 1], out_layer[i + 2]);
+    out_flow[out_flow_idx + 1] = out_flow[out_flow_idx] + num_edges;
+    out_flow_idx++;
   }
+  CHECK(out_flow_idx == num_hops - 1);
+  CHECK(out_flow[num_hops - 1] == num_edges);
 
   for (size_t i = 0; i < subg_csr->edge_ids.size(); i++)
     subg_csr->edge_ids[i] = i;

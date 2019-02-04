@@ -34,7 +34,6 @@ class LayerView(object):
     def __getitem__(self, layer):
         if not isinstance(layer, int):
             raise DGLError('Currently we only support the view of one layer')
-        layer = self._graph._reverse_layer(layer)
         return NodeSpace(data=LayerDataView(self._graph, layer))
 
     def __call__(self):
@@ -95,7 +94,6 @@ class FlowView(object):
     def __getitem__(self, flow):
         if not isinstance(flow, int):
             raise DGLError('Currently we only support the view of one flow')
-        flow = self._graph._reverse_flow(flow)
         return EdgeSpace(data=FlowDataView(self._graph, flow))
 
     def __call__(self, *args, **kwargs):
@@ -175,18 +173,22 @@ class NodeFlow(DGLGraph):
         """Add many edges. Disabled because BatchedDGLGraph is read-only."""
         raise DGLError('Readonly graph. Mutation is not allowed.')
 
-    def _reverse_flow(self, flow_id):
-        return self.num_layers - flow_id - 2
+    def _get_layer_id(self, layer_id):
+        if layer_id >= 0:
+            return layer_id
+        else:
+            return self.num_layers + layer_id
 
-    def _reverse_layer(self, layer_id):
-        return self.num_layers - layer_id - 1
+    def _get_flow_id(self, flow_id):
+        if flow_id >= 0:
+            return flow_id
+        else:
+            return self.num_flows + flow_id
 
     def _get_node_frame(self, layer_id):
-        layer_id = self._reverse_layer(layer_id)
         return self._node_frames[layer_id]
 
     def _get_edge_frame(self, flow_id):
-        flow_id = self._reverse_flow(flow_id)
         return self._edge_frames[flow_id]
 
     @property
@@ -214,11 +216,11 @@ class NodeFlow(DGLGraph):
 
     def layer_size(self, layer_id):
         """Return the number of nodes in a specified layer."""
-        layer_id = self._reverse_layer(layer_id)
+        layer_id = self._get_layer_id(layer_id)
         return self._layer_offsets[layer_id + 1] - self._layer_offsets[layer_id]
 
     def flow_size(self, flow_id):
-        flow_id = self._reverse_flow(flow_id)
+        flow_id = self._get_flow_id(flow_id)
         return self._flow_offsets[flow_id + 1] - self._flow_offsets[flow_id]
 
     def copy_from_parent(self):
@@ -226,6 +228,7 @@ class NodeFlow(DGLGraph):
 
         All old features will be removed.
         """
+        # TODO we need to avoid copying the same node embedding to all layers.
         if self._parent._node_frame.num_rows != 0:
             for i in range(self.num_layers):
                 nid = utils.toindex(self.layer_parent_nid(i))
@@ -234,6 +237,16 @@ class NodeFlow(DGLGraph):
             for i in range(self.num_flows):
                 eid = utils.toindex(self.flow_parent_eid(i))
                 self._edge_frames[i] = FrameRef(Frame(self._parent._edge_frame[eid]))
+
+    def copy_to_parent(self):
+        """Copy node/edge embeddings to the parent graph.
+        """
+        #TODO We need to take care of the following things:
+        #    * copy right node embeddings back. For instance, we should copy temporary
+        #      node embeddings back; we don't need to copy read-only node embeddings back.
+        #    * When nodes in different layers have the same node embedding, we need
+        #      to avoid conflicts.
+        pass
 
     def map_to_parent_nid(self, nid):
         """This maps the child node Ids to the parent Ids.
@@ -283,7 +296,7 @@ class NodeFlow(DGLGraph):
         Tensor
             The node id array.
         """
-        layer_id = self._reverse_layer(layer_id)
+        layer_id = self._get_layer_id(layer_id)
         assert layer_id + 1 < len(self._layer_offsets)
         start = self._layer_offsets[layer_id]
         end = self._layer_offsets[layer_id + 1]
@@ -297,14 +310,14 @@ class NodeFlow(DGLGraph):
         Tensor
             The parent node id array.
         """
-        layer_id = self._reverse_layer(layer_id)
+        layer_id = self._get_layer_id(layer_id)
         assert layer_id + 1 < len(self._layer_offsets)
         start = self._layer_offsets[layer_id]
         end = self._layer_offsets[layer_id + 1]
         return self._node_mapping.tousertensor()[start:end]
 
     def flow_eid(self, flow_id):
-        flow_id = self._reverse_flow(flow_id)
+        flow_id = self._get_flow_id(flow_id)
         start = self._layer_offsets[flow_id]
         end = self._layer_offsets[flow_id + 1]
         vids = F.arange(start, end)
@@ -312,7 +325,7 @@ class NodeFlow(DGLGraph):
         return eids
 
     def flow_parent_eid(self, flow_id):
-        flow_id = self._reverse_flow(flow_id)
+        flow_id = self._get_flow_id(flow_id)
         start = self._layer_offsets[flow_id]
         end = self._layer_offsets[flow_id + 1]
         if start == 0:
@@ -359,7 +372,7 @@ class NodeFlow(DGLGraph):
             Runtime.run(prog)
 
     def _conv_local_nid(self, nid, layer_id):
-        layer_id = self._reverse_layer(layer_id)
+        layer_id = self._get_layer_id(layer_id)
         return nid - self._layer_offsets[layer_id]
 
     def flow_compute(self, message_func="default", reduce_func="default",
