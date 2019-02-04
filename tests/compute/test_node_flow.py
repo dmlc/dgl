@@ -18,7 +18,8 @@ def generate_rand_graph(n, connect_more=False):
     return g
 
 
-def create_mini_batch(g, seed_ids, num_hops):
+def create_mini_batch(g, num_hops):
+    seed_ids = np.array([0, 1, 2, 3])
     seed_ids = utils.toindex(seed_ids)
     sgi = g._graph.neighbor_sampling([seed_ids], g.number_of_nodes(), num_hops, "in", None)
     assert len(sgi) == 1
@@ -67,18 +68,16 @@ def test_basic():
     check_basic(g, nf)
 
     g = generate_rand_graph(100)
-    seed_ids = np.array([0, 1, 2, 3])
-    nf = create_mini_batch(g, seed_ids, num_layers)
+    nf = create_mini_batch(g, num_layers)
     assert nf.num_layers == num_layers + 1
-    assert nf.layer_size(-1) == len(seed_ids)
     check_basic(g, nf)
 
 
-def test_apply_nodes():
+def check_apply_nodes(create_node_flow):
     num_layers = 2
     for i in range(num_layers):
         g = generate_rand_graph(100)
-        nf = create_full_node_flow(g, num_layers)
+        nf = create_node_flow(g, num_layers)
         nf.copy_from_parent()
         new_feats = F.randn((nf.layer_size(i), 5))
         def update_func(nodes):
@@ -87,11 +86,16 @@ def test_apply_nodes():
         assert F.array_equal(nf.layers[i].data['h1'], new_feats)
 
 
-def test_apply_edges():
+def test_apply_nodes():
+    check_apply_nodes(create_full_node_flow)
+    check_apply_nodes(create_mini_batch)
+
+
+def check_apply_edges(create_node_flow):
     num_layers = 2
     for i in range(num_layers):
         g = generate_rand_graph(100)
-        nf = create_full_node_flow(g, num_layers)
+        nf = create_node_flow(g, num_layers)
         nf.copy_from_parent()
         new_feats = F.randn((nf.flow_size(i), 5))
         def update_func(nodes):
@@ -100,13 +104,16 @@ def test_apply_edges():
         assert F.array_equal(nf.flows[i].data['h2'], new_feats)
 
 
-def test_flow_compute():
+def test_apply_edges():
+    check_apply_edges(create_full_node_flow)
+    check_apply_edges(create_mini_batch)
+
+
+def check_flow_compute(create_node_flow):
     num_layers = 2
     g = generate_rand_graph(100)
-    nf1 = create_full_node_flow(g, num_layers)
+    nf1 = create_node_flow(g, num_layers)
     nf1.copy_from_parent()
-    nf2 = create_full_node_flow(g, num_layers)
-    nf2.copy_from_parent()
     g.ndata['h'] = g.ndata['h1']
     nf1.layers[0].data['h'] = nf1.layers[0].data['h1']
     # Test the computation on a layer at a time.
@@ -115,12 +122,12 @@ def test_flow_compute():
                          lambda nodes: {'h' : nodes.data['t'] + 1}, range=i)
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                      lambda nodes: {'h' : nodes.data['t'] + 1})
-        assert F.array_equal(nf1.layers[i + 1].data['h'], g.ndata['h'])
-        
-    # Test the computation on all layers.
-    #nf2.flow_compute(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
-    #                 lambda nodes: {'h' : nodes.data['t'] + 1})
-    #assert F.array_equal(nf2.layers[-1].data['h'], g.ndata['h'])
+        assert F.array_equal(nf1.layers[i + 1].data['h'], g.ndata['h'][nf1.layer_parent_nid(i + 1)])
+
+
+def test_flow_compute():
+    check_flow_compute(create_full_node_flow)
+    check_flow_compute(create_mini_batch)
 
 
 if __name__ == '__main__':
