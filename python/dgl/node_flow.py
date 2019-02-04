@@ -366,8 +366,8 @@ class NodeFlow(DGLGraph):
         layer_id = self._get_layer_id(layer_id)
         return nid - self._layer_offsets[layer_id]
 
-    def flow_compute(self, message_func="default", reduce_func="default",
-                     apply_node_func="default", range=ALL, inplace=False):
+    def flow_compute(self, flow_id, message_func="default", reduce_func="default",
+                     apply_node_func="default", inplace=False):
         if message_func == "default":
             message_func = self._message_func
         if reduce_func == "default":
@@ -378,15 +378,12 @@ class NodeFlow(DGLGraph):
         assert message_func is not None
         assert reduce_func is not None
 
-        flow_id = range
         dest_nodes = utils.toindex(self.layer_nid(flow_id + 1))
         u, v, eid = self._graph.in_edges(dest_nodes)
         u = utils.toindex(self._conv_local_nid(u.tousertensor(), flow_id))
         v = utils.toindex(self._conv_local_nid(v.tousertensor(), flow_id + 1))
         dest_nodes = utils.toindex(self._conv_local_nid(dest_nodes.tousertensor(),
                                                         flow_id + 1))
-        # TODO
-        #eid = utils.toindex(self._conv_local_eid(eid.tousertensor(), flow_id))
         eid = utils.toindex(F.arange(0, self.flow_size(flow_id)))
 
         with ir.prog() as prog:

@@ -118,8 +118,8 @@ def check_flow_compute(create_node_flow):
     nf1.layers[0].data['h'] = nf1.layers[0].data['h1']
     # Test the computation on a layer at a time.
     for i in range(num_layers):
-        nf1.flow_compute(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
-                         lambda nodes: {'h' : nodes.data['t'] + 1}, range=i)
+        nf1.flow_compute(i, fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
+                         lambda nodes: {'h' : nodes.data['t'] + 1})
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                      lambda nodes: {'h' : nodes.data['t'] + 1})
         assert F.array_equal(nf1.layers[i + 1].data['h'], g.ndata['h'][nf1.layer_parent_nid(i + 1)])
