@@ -318,24 +318,15 @@ class NodeFlow(DGLGraph):
 
     def flow_eid(self, flow_id):
         flow_id = self._get_flow_id(flow_id)
-        start = self._layer_offsets[flow_id]
-        end = self._layer_offsets[flow_id + 1]
-        vids = F.arange(start, end)
-        _, _, eids = self._index.in_edges(utils.toindex(vids))
-        return eids
+        start = self._flow_offsets[flow_id]
+        end = self._flow_offsets[flow_id + 1]
+        return F.arange(start, end)
 
     def flow_parent_eid(self, flow_id):
         flow_id = self._get_flow_id(flow_id)
-        start = self._layer_offsets[flow_id]
-        end = self._layer_offsets[flow_id + 1]
-        if start == 0:
-            prev_num_edges = 0
-        else:
-            vids = utils.toindex(F.arange(0, start))
-            prev_num_edges = F.asnumpy(F.sum(self._index.in_degrees(vids).tousertensor(), 0))
-        vids = utils.toindex(F.arange(start, end))
-        num_edges = F.asnumpy(F.sum(self._index.in_degrees(vids).tousertensor(), 0))
-        return self._edge_mapping.tousertensor()[prev_num_edges:(prev_num_edges + num_edges)]
+        start = self._flow_offsets[flow_id]
+        end = self._flow_offsets[flow_id + 1]
+        return self._edge_mapping.tousertensor()[start:end]
 
     def apply_layer(self, layer_id, func="default", inplace=False):
         if func == "default":
