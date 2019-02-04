@@ -1,18 +1,25 @@
 # This file contains subgraph samplers.
 
+import sys
 import numpy as np
+import threading
+import random
+import traceback
 
 from ... import utils
 from ...subgraph import DGLSubGraph
 from ... import backend as F
+try:
+    import Queue as queue
+except ImportError:
+    import queue
 
 __all__ = ['NeighborSampler']
 
 class NSSubgraphLoader(object):
     def __init__(self, g, batch_size, expand_factor, num_hops=1,
                  neighbor_type='in', node_prob=None, seed_nodes=None,
-                 shuffle=False, num_workers=1, max_subgraph_size=None,
-                 return_seed_id=False):
+                 shuffle=False, num_workers=1, return_seed_id=False):
         self._g = g
         if not g._graph.is_readonly():
             raise NotImplementedError("subgraph loader only support read-only graphs.")
@@ -31,11 +38,6 @@ class NSSubgraphLoader(object):
         if shuffle:
             self._seed_nodes = F.rand_shuffle(self._seed_nodes)
         self._num_workers = num_workers
-        if max_subgraph_size is None:
-            # This size is set temporarily.
-            self._max_subgraph_size = 1000000
-        else:
-            self._max_subgraph_size = max_subgraph_size
         self._neighbor_type = neighbor_type
         self._subgraphs = []
         self._seed_ids = []
@@ -54,7 +56,7 @@ class NSSubgraphLoader(object):
             self._subgraph_idx += 1
         sgi = self._g._graph.neighbor_sampling(seed_ids, self._expand_factor,
                                                self._num_hops, self._neighbor_type,
-                                               self._node_prob, self._max_subgraph_size)
+                                               self._node_prob)
         subgraphs = [DGLSubGraph(self._g, i.induced_nodes, i.induced_edges, \
                 i) for i in sgi]
         self._subgraphs.extend(subgraphs)
@@ -77,17 +79,128 @@ class NSSubgraphLoader(object):
             aux_infos['seeds'] = self._seed_ids.pop(0).tousertensor()
         return self._subgraphs.pop(0), aux_infos
 
+class _Prefetcher(object):
+    """Internal shared prefetcher logic. It can be sub-classed by a Thread-based implementation
+    or Process-based implementation."""
+    _dataq = None  # Data queue transmits prefetched elements
+    _controlq = None  # Control queue to instruct thread / process shutdown
+    _errorq = None  # Error queue to transmit exceptions from worker to master
+
+    _checked_start = False  # True once startup has been checkd by _check_start
+
+    def __init__(self, loader, num_prefetch):
+        super(_Prefetcher, self).__init__()
+        self.loader = loader
+        assert num_prefetch > 0, 'Unbounded Prefetcher is unsupported.'
+        self.num_prefetch = num_prefetch
+
+    def run(self):
+        """Method representing the process’s activity."""
+        # Startup - Master waits for this
+        try:
+            loader_iter = iter(self.loader)
+            self._errorq.put(None)
+        except Exception as e:  # pylint: disable=broad-except
+            tb = traceback.format_exc()
+            self._errorq.put((e, tb))
+
+        while True:
+            try:  # Check control queue
+                c = self._controlq.get(False)
+                if c is None:
+                    break
+                else:
+                    raise RuntimeError('Got unexpected control code {}'.format(repr(c)))
+            except queue.Empty:
+                pass
+            except RuntimeError as e:
+                tb = traceback.format_exc()
+                self._errorq.put((e, tb))
+                self._dataq.put(None)
+
+            try:
+                data = next(loader_iter)
+                error = None
+            except Exception as e:  # pylint: disable=broad-except
+                tb = traceback.format_exc()
+                error = (e, tb)
+                data = None
+            finally:
+                self._errorq.put(error)
+                self._dataq.put(data)
+
+    def __next__(self):
+        next_item = self._dataq.get()
+        next_error = self._errorq.get()
+
+        if next_error is None:
+            return next_item
+        else:
+            self._controlq.put(None)
+            if isinstance(next_error[0], StopIteration):
+                raise StopIteration
+            else:
+                return self._reraise(*next_error)
+
+    def _reraise(self, e, tb):
+        print('Reraising exception from Prefetcher', file=sys.stderr)
+        print(tb, file=sys.stderr)
+        raise e
+
+    def _check_start(self):
+        assert not self._checked_start
+        self._checked_start = True
+        next_error = self._errorq.get(block=True)
+        if next_error is not None:
+            self._reraise(*next_error)
+
+    def next(self):
+        return self.__next__()
+
+
+class _ThreadPrefetcher(_Prefetcher, threading.Thread):
+    """Internal threaded prefetcher."""
+
+    def __init__(self, *args, **kwargs):
+        super(_ThreadPrefetcher, self).__init__(*args, **kwargs)
+        self._dataq = queue.Queue(self.num_prefetch)
+        self._controlq = queue.Queue()
+        self._errorq = queue.Queue(self.num_prefetch)
+        self.daemon = True
+        self.start()
+        self._check_start()
+
+class _PrefetchingLoader(object):
+    """Prefetcher for a Loader in a separate Thread or Process.
+    This iterator will create another thread or process to perform
+    ``iter_next`` and then store the data in memory. It potentially accelerates
+    the data read, at the cost of more memory usage.
+
+    Parameters
+    ----------
+    loader : an iterator
+        Source loader.
+    num_prefetch : int, default 1
+        Number of elements to prefetch from the loader. Must be greater 0.
+    """
+
+    def __init__(self, loader, num_prefetch=1):
+        self._loader = loader
+        self._num_prefetch = num_prefetch
+        if num_prefetch < 1:
+            raise ValueError('num_prefetch must be greater 0.')
+
+    def __iter__(self):
+        return _ThreadPrefetcher(self._loader, self._num_prefetch)
+
 def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
                     neighbor_type='in', node_prob=None, seed_nodes=None,
-                    shuffle=False, num_workers=1, max_subgraph_size=None,
-                    return_seed_id=False):
+                    shuffle=False, num_workers=1,
+                    return_seed_id=False, prefetch=False):
     '''Create a sampler that samples neighborhood.
 
-    .. note:: This method currently only supports MXNet backend. Set
-        "DGLBACKEND" environment variable to "mxnet".
-
     This creates a subgraph data loader that samples subgraphs from the input graph
-    with neighbor sampling. This simpling method is implemented in C and can perform
+    with neighbor sampling. This sampling method is implemented in C and can perform
     sampling very efficiently.
     
     A subgraph grows from a seed vertex. It contains sampled neighbors
@@ -125,16 +238,20 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
         If it's None, the seed vertices are all vertices in the graph.
     shuffle: indicates the sampled subgraphs are shuffled.
     num_workers: the number of worker threads that sample subgraphs in parallel.
-    max_subgraph_size: the maximal subgraph size in terms of the number of nodes.
-        GPU doesn't support very large subgraphs.
     return_seed_id: indicates whether to return seed ids along with the subgraphs.
         The seed Ids are in the parent graph.
-    
+    prefetch : bool, default False
+        Whether to prefetch the samples in the next batch.
+
     Returns
     -------
     A subgraph iterator
         The iterator returns a list of batched subgraphs and a dictionary of additional
         information about the subgraphs.
     '''
-    return NSSubgraphLoader(g, batch_size, expand_factor, num_hops, neighbor_type, node_prob,
-                            seed_nodes, shuffle, num_workers, max_subgraph_size, return_seed_id)
+    loader = NSSubgraphLoader(g, batch_size, expand_factor, num_hops, neighbor_type, node_prob,
+                              seed_nodes, shuffle, num_workers, return_seed_id)
+    if not prefetch:
+        return loader
+    else:
+        return _PrefetchingLoader(loader, num_prefetch=num_workers*2)

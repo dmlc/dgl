@@ -48,7 +48,7 @@ DGL_REGISTER_GLOBAL("runtime.degree_bucketing._CAPI_DGLDegreeBucketingForFullGra
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
-    const auto& edges = gptr->Edges(false);
+    const auto& edges = gptr->Edges("");
     int64_t n_vertices = gptr->NumVertices();
     IdArray nids = IdArray::Empty({n_vertices}, edges.dst->dtype, edges.dst->ctx);
     int64_t* nid_data = static_cast<int64_t*>(nids->data);

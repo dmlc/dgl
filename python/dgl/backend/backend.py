@@ -9,7 +9,7 @@ The principles of this interface:
 * Argument type should be easier to understand.
 
 It is recommended the frameworks implement all the interfaces. However, it is
-also OK to skip some. The generated backend module has an ``is_enbaled`` function
+also OK to skip some. The generated backend module has an ``is_enabled`` function
 that returns whether the interface is supported by the framework or not.
 """
 
@@ -71,6 +71,19 @@ def tensor(data, dtype=None):
     -------
     Tensor
         A framework-specific tensor.
+    """
+    pass
+
+def get_preferred_sparse_format():
+    """Get the preferred sparse matrix format supported by the backend.
+
+    Different backends have their preferred backend. This info is useful when
+    constructing a sparse matrix.
+
+    Returns
+    -------
+    string
+        the name of the preferred sparse matrix format.
     """
     pass
 
@@ -422,7 +435,7 @@ def scatter_row(data, row_index, value):
     pass
 
 def scatter_row_inplace(data, row_index, value):
-    """Write the value into the data tensor using the row index inplacely.
+    """Write the value into the data tensor using the row index inplace.
 
     This is an inplace write so it will break the autograd.
 
@@ -504,6 +517,22 @@ def zeros(shape, dtype, ctx):
     -------
     Tensor
         The zero tensor.
+    """
+    pass
+
+def zeros_like(input):
+    """Create a zero tensor with the same shape, dtype and context of the
+    given tensor.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input
+
+    Returns
+    -------
+    Tensor
+        The result
     """
     pass
 
@@ -595,6 +624,54 @@ def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
     """
     pass
 
+def boolean_mask(input, mask):
+    """Selects elements in x according to the given mask from the first
+    dimension.
+
+    Parameters
+    ----------
+    input : Tensor
+        The input tensor
+    mask : Boolean Tensor
+        The mask
+
+    Returns
+    -------
+    Tensor
+        The result
+    """
+    pass
+
+def equal(x, y):
+    """Compares whether the elements are equal.
+
+    Parameters
+    ----------
+    x, y : Tensor
+        The two tensors
+
+    Returns
+    -------
+    Boolean tensor
+        The result, with the same shape as input.
+    """
+    pass
+
+def logical_not(input):
+    """Perform a logical not operation.  Equivalent to np.logical_not
+
+    Parameters
+    ----------
+    input : Tensor
+        The input
+
+    Returns
+    -------
+    Tensor
+        The result
+    """
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------
@@ -618,7 +695,7 @@ def unique(input):
     """
     pass
 
-def full_1d(length, fill_value):
+def full_1d(length, fill_value, dtype, ctx):
     """Create a 1D tensor full of the fill_value.
 
     Parameters
@@ -627,6 +704,10 @@ def full_1d(length, fill_value):
         The length of the vector.
     fill_value : int
         The filled value.
+    dtype : data type
+        It should be one of the values in the data type dict.
+    ctx : context
+        The device of the result tensor.
 
     Returns
     -------
@@ -766,7 +847,3 @@ def zerocopy_from_numpy(np_array):
 # ----------------
 # These are not related to tensors. Some of them are temporary workarounds that
 # should be included in DGL in the future.
-
-def create_immutable_graph_index():
-    """Create an immutable graph index object."""
-    pass

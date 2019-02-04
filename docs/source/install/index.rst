@@ -59,7 +59,7 @@ The backend is controlled by ``DGLBACKEND`` environment variable, which defaults
 |         |         | `official website <https://pytorch.org>`_        |
 +---------+---------+--------------------------------------------------+
 | mxnet   | MXNet   | Requires nightly build; run the following        |
-|         |         | command to install (TODO):                       |
+|         |         | command to install:                              |
 |         |         |                                                  |
 |         |         | .. code:: bash                                   |
 |         |         |                                                  |
@@ -67,6 +67,8 @@ The backend is controlled by ``DGLBACKEND`` environment variable, which defaults
 +---------+---------+--------------------------------------------------+
 | numpy   | NumPy   | Does not support gradient computation            |
 +---------+---------+--------------------------------------------------+
+
+.. _install-from-source:
 
 Install from source
 -------------------

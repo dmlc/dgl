@@ -145,16 +145,24 @@ For the basics of coding with DGL, please see [DGL basics](https://docs.dgl.ai/t
 
 For more realistic, end-to-end examples, please see [model tutorials](https://docs.dgl.ai/tutorials/models/index.html).
 
+
+## New to Deep Learning?
+
+Check out the open source book [*Dive into Deep Learning*](http://en.diveintodeeplearning.org/).
+
+
 ## Contributing
 
 Please let us know if you encounter a bug or have any suggestions by [filing an issue](https://github.com/dmlc/dgl/issues).
 
 We welcome all contributions from bug fixes to new features and extensions.
-We expect all contributions discussed in the issue tracker and going through PRs.  Please refer to the PR guide.
+We expect all contributions discussed in the issue tracker and going through PRs.  Please refer to our [contribution guide](https://docs.dgl.ai/contribute.html).
+
 
 ## The Team
 
-DGL is developed and maintained by [NYU, NYU Shanghai, AWS Shanghai AI Lab, and AWS MXNet Science Team](https://www.dgl.ai/about).
+DGL is developed and maintained by [NYU, NYU Shanghai, AWS Shanghai AI Lab, and AWS MXNet Science Team](https://www.dgl.ai/pages/about.html).
+
 
 ## License
 
