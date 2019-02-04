@@ -399,6 +399,19 @@ class NodeFlow(DGLGraph):
                                                 inplace=inplace)
             Runtime.run(prog)
 
+    def prop_flows(self, message_func="default", reduce_func="default",
+                   apply_node_func="default", flow_range=ALL, inplace=False):
+        if isinstance(flow_range, int):
+            self.flow_compute(flow_range, message_func, reduce_func, apply_node_func,
+                              inplace=inplace)
+        else:
+            if is_all(flow_range):
+                flow_range=range(0, self.num_flows)
+            for i in flow_range:
+                self.flow_compute(i, message_func, reduce_func, apply_node_func,
+                                  inplace=inplace)
+
+
 def create_full_node_flow(g, num_layers):
     seeds = [utils.toindex(F.arange(0, g.number_of_nodes()))]
     nfi = g._graph.neighbor_sampling(seeds, g.number_of_nodes(), num_layers, 'in', None)
