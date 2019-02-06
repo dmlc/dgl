@@ -4,19 +4,23 @@ import scipy.sparse as sp
 import numpy as np
 import dgl
 import os, sys
+from ..graph_index import create_graph_index
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
 
 
 class RedditDataset(object):
-    def __init__(self):
+    def __init__(self, self_loop=False):
         download_dir = get_download_dir()
-        zip_file_path = os.path.join(download_dir, "reddit.zip")
-        download(_get_dgl_url("dataset/reddit.zip"), path=zip_file_path)
-        extract_dir = os.path.join(download_dir, "reddit")
+        self_loop_str = ""
+        if self_loop:
+            self_loop_str = "_self_loop"
+        zip_file_path = os.path.join(download_dir, "reddit{}.zip".format(self_loop_str))
+        download(_get_dgl_url("dataset/reddit{}.zip".format(self_loop_str)), path=zip_file_path)
+        extract_dir = os.path.join(download_dir, "reddit{}".format(self_loop_str))
         extract_archive(zip_file_path, extract_dir)
         # graph
-        coo_adj = sp.load_npz(os.path.join(extract_dir, "reddit_graph.npz"))
-        self.graph = coo_adj
+        coo_adj = sp.load_npz(os.path.join(extract_dir, "reddit{}_graph.npz".format(self_loop_str)))
+        self.graph = create_graph_index(coo_adj, readonly=True)
         # features and labels
         reddit_data = np.load(os.path.join(extract_dir, "reddit_data.npz"))
         self.features = reddit_data["feature"]
