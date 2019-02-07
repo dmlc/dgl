@@ -240,7 +240,7 @@ class NodeFlow(DGLGraph):
 
         All old features will be removed.
         """
-        if self._parent._node_frame.num_rows != 0:
+        if self._parent._node_frame.num_rows != 0 and self._parent._node_frame.num_columns != 0:
             if is_all(node_embed_names):
                 for i in range(self.num_layers):
                     nid = utils.toindex(self.layer_parent_nid(i))
@@ -254,7 +254,7 @@ class NodeFlow(DGLGraph):
                     self._node_frames[i] = _get_frame(self._parent._node_frame,
                                                       node_embed_names[i], nid)
 
-        if self._parent._edge_frame.num_rows != 0:
+        if self._parent._edge_frame.num_rows != 0 and self._parent._edge_frame.num_columns != 0:
             if is_all(edge_embed_names):
                 for i in range(self.num_flows):
                     eid = utils.toindex(self.flow_parent_eid(i))
@@ -276,7 +276,7 @@ class NodeFlow(DGLGraph):
         #      node embeddings back; we don't need to copy read-only node embeddings back.
         #    * When nodes in different layers have the same node embedding, we need
         #      to avoid conflicts.
-        if self._parent._node_frame.num_rows != 0:
+        if self._parent._node_frame.num_rows != 0 and self._parent._node_frame.num_columns != 0:
             if is_all(node_embed_names):
                 for i in range(self.num_layers):
                     nid = utils.toindex(self.layer_parent_nid(i))
@@ -291,7 +291,7 @@ class NodeFlow(DGLGraph):
                     _update_frame(self._parent._node_frame, node_embed_names[i], nid,
                                   self._node_frames[i])
 
-        if self._parent._edge_frame.num_rows != 0:
+        if self._parent._edge_frame.num_rows != 0 and self._parent._edge_frame.num_columns != 0:
             if is_all(edge_embed_names):
                 for i in range(self.num_flows):
                     eid = utils.toindex(self.flow_parent_eid(i))
