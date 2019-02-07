@@ -134,7 +134,10 @@ class FlowDataView(MutableMapping):
 
 def _get_frame(frame, names, ids):
     kv = {name: frame[name][ids] for name in names}
-    return FrameRef(Frame(kv))
+    if len(kv) == 0:
+        return FrameRef(Frame(num_rows=len(ids)))
+    else:
+        return FrameRef(Frame(kv))
 
 
 def _update_frame(frame, names, ids, new_frame):
@@ -248,8 +251,8 @@ class NodeFlow(DGLGraph):
                         "The specified embedding names should be the same as the number of layers."
                 for i in range(self.num_layers):
                     nid = self.layer_parent_nid(i)
-                    self._node_frames[i] = FrameRef(Frame(_get_frame(self._parent._node_frame,
-                                                                     node_embed_names[i], nid)))
+                    self._node_frames[i] = _get_frame(self._parent._node_frame,
+                                                      node_embed_names[i], nid)
 
         if self._parent._edge_frame.num_rows != 0:
             if is_all(edge_embed_names):
@@ -262,8 +265,8 @@ class NodeFlow(DGLGraph):
                         "The specified embedding names should be the same as the number of flows."
                 for i in range(self.num_flows):
                     eid = self.flow_parent_eid(i)
-                    self._edge_frames[i] = FrameRef(Frame(_get_frame(self._parent._edge_frame,
-                                                                     edge_embed_names[i], eid)))
+                    self._edge_frames[i] = _get_frame(self._parent._edge_frame,
+                                                      edge_embed_names[i], eid)
 
     def copy_to_parent(self, node_embed_names=ALL, edge_embed_names=ALL):
         """Copy node/edge embeddings to the parent graph.

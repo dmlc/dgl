@@ -204,9 +204,7 @@ def test_copy():
 
     nf = create_mini_batch(g, num_layers)
     g.ndata['h0'] = g.ndata['h'].copy()
-    g.ndata['h1'] = g.ndata['h'].copy()
-    g.ndata['h2'] = g.ndata['h'].copy()
-    node_embed_names = [['h0'], ['h1'], ['h2']]
+    node_embed_names = [['h0'], [], []]
     nf.copy_from_parent(node_embed_names=node_embed_names, edge_embed_names=None)
     for i in range(num_layers):
         nf.flow_compute(i, fn.copy_src(src='h%d' % i, out='m'), fn.sum(msg='m', out='t'),
