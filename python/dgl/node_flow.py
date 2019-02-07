@@ -152,7 +152,6 @@ class NodeFlow(DGLGraph):
         super(NodeFlow, self).__init__(graph_data=graph_idx,
                                        readonly=graph_idx.is_readonly())
         self._parent = parent
-        self._index = graph_idx
         self._node_mapping = graph_idx.node_mapping
         self._edge_mapping = graph_idx.edge_mapping
         self._layer_offsets = graph_idx.layers.tonumpy()
@@ -328,10 +327,15 @@ class NodeFlow(DGLGraph):
         end = self._flow_offsets[flow_id + 1]
         return self._edge_mapping.tousertensor()[start:end]
 
-    def apply_layer(self, layer_id, func="default", inplace=False):
+    def apply_layer(self, layer_id, func="default", v=ALL, inplace=False):
         if func == "default":
             func = self._apply_node_func
-        v = utils.toindex(slice(0, self.layer_size(layer_id)))
+        if is_all(v):
+            v = utils.toindex(slice(0, self.layer_size(layer_id)))
+        else:
+            v = v - self._layer_offsets[layer_id]
+            #assert F.all(v >= 0), "All vertices have to be in layer " + str(layer_id)
+            v = utils.toindex(v)
         with ir.prog() as prog:
             scheduler.schedule_nodeflow_apply_nodes(graph=self,
                                                     layer_id=layer_id,
@@ -343,14 +347,28 @@ class NodeFlow(DGLGraph):
     def _layer_local_nid(self, layer_id):
         return F.arange(0, self.layer_size(layer_id))
 
-    def apply_flow(self, flow_id, func="default", inplace=False):
+    def apply_flow(self, flow_id, func="default", edges=ALL, inplace=False):
         if func == "default":
             func = self._apply_edge_func
         assert func is not None
 
-        u = utils.toindex(self._layer_local_nid(flow_id))
-        v = utils.toindex(self._layer_local_nid(flow_id + 1))
-        eid = utils.toindex(slice(0, self.flow_size(flow_id)))
+        if is_all(edges):
+            u = utils.toindex(self._layer_local_nid(flow_id))
+            v = utils.toindex(self._layer_local_nid(flow_id + 1))
+            eid = utils.toindex(slice(0, self.flow_size(flow_id)))
+        elif isinstance(edges, tuple):
+            u, v = edges
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            u, v, eid = self._graph.edge_ids(utils.toindex(u), utils.toindex(v))
+            u = utils.toindex(u.tousertensor() - self._layer_offsets[flow_id])
+            v = utils.toindex(v.tousertensor() - self._layer_offsets[flow_id + 1])
+            eid = utils.toindex(eid.tousertensor() - self._flow_offsets[flow_id])
+        else:
+            eid = utils.toindex(edges)
+            u, v, _ = self._graph.find_edges(eid)
+            u = utils.toindex(u.tousertensor() - self._layer_offsets[flow_id])
+            v = utils.toindex(v.tousertensor() - self._layer_offsets[flow_id + 1])
+            eid = utils.toindex(edges - self._flow_offsets[flow_id])
 
         with ir.prog() as prog:
             scheduler.schedule_nodeflow_apply_edges(graph=self,
@@ -366,8 +384,12 @@ class NodeFlow(DGLGraph):
         layer_id = self._get_layer_id(layer_id)
         return nid - self._layer_offsets[layer_id]
 
+    def _conv_local_eid(self, eid, flow_id):
+        flow_id = self._get_flow_id(flow_id)
+        return eid - self._flow_offsets[flow_id]
+
     def flow_compute(self, flow_id, message_func="default", reduce_func="default",
-                     apply_node_func="default", inplace=False):
+                     apply_node_func="default", v=ALL, inplace=False):
         if message_func == "default":
             message_func = self._message_func
         if reduce_func == "default":
@@ -378,13 +400,22 @@ class NodeFlow(DGLGraph):
         assert message_func is not None
         assert reduce_func is not None
 
-        dest_nodes = utils.toindex(self.layer_nid(flow_id + 1))
-        u, v, eid = self._graph.in_edges(dest_nodes)
-        u = utils.toindex(self._conv_local_nid(u.tousertensor(), flow_id))
-        v = utils.toindex(self._conv_local_nid(v.tousertensor(), flow_id + 1))
-        dest_nodes = utils.toindex(self._conv_local_nid(dest_nodes.tousertensor(),
-                                                        flow_id + 1))
-        eid = utils.toindex(F.arange(0, self.flow_size(flow_id)))
+        if is_all(v):
+            dest_nodes = utils.toindex(self.layer_nid(flow_id + 1))
+            u, v, _ = self._graph.in_edges(dest_nodes)
+            u = utils.toindex(self._conv_local_nid(u.tousertensor(), flow_id))
+            v = utils.toindex(self._conv_local_nid(v.tousertensor(), flow_id + 1))
+            dest_nodes = utils.toindex(F.arange(0, self.layer_size(flow_id + 1)))
+            eid = utils.toindex(F.arange(0, self.flow_size(flow_id)))
+        else:
+            dest_nodes = utils.toindex(v)
+            u, v, eid = self._graph.in_edges(dest_nodes)
+            assert len(u) > 0, "flow_compute must run on edges"
+            u = utils.toindex(self._conv_local_nid(u.tousertensor(), flow_id))
+            v = utils.toindex(self._conv_local_nid(v.tousertensor(), flow_id + 1))
+            dest_nodes = utils.toindex(self._conv_local_nid(dest_nodes.tousertensor(),
+                                                            flow_id + 1))
+            eid = utils.toindex(self._conv_local_eid(eid, flow_id))
 
         with ir.prog() as prog:
             scheduler.schedule_nodeflow_compute(graph=self,
@@ -407,6 +438,13 @@ class NodeFlow(DGLGraph):
         else:
             if is_all(flow_range):
                 flow_range=range(0, self.num_flows)
+            elif isinstance(flow_range, slice):
+                if slice.step is not 1:
+                    raise DGLError("We can't propogate flows and skip some of them")
+                flow_range=range(flow_range.start, flow_range.stop)
+            else:
+                raise DGLError("unknown flow range")
+
             for i in flow_range:
                 self.flow_compute(i, message_func, reduce_func, apply_node_func,
                                   inplace=inplace)

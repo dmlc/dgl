@@ -85,6 +85,12 @@ def check_apply_nodes(create_node_flow):
         nf.apply_layer(i, update_func)
         assert F.array_equal(nf.layers[i].data['h1'], new_feats)
 
+        new_feats = F.randn((4, 5))
+        def update_func1(nodes):
+            return {'h1' : new_feats}
+        nf.apply_layer(i, update_func1, v=nf.layer_nid(i)[0:4])
+        assert F.array_equal(nf.layers[i].data['h1'][0:4], new_feats)
+
 
 def test_apply_nodes():
     check_apply_nodes(create_full_node_flow)
@@ -112,24 +118,29 @@ def test_apply_edges():
 def check_flow_compute(create_node_flow):
     num_layers = 2
     g = generate_rand_graph(100)
-    nf1 = create_node_flow(g, num_layers)
-    nf1.copy_from_parent()
+    nf = create_node_flow(g, num_layers)
+    nf.copy_from_parent()
     g.ndata['h'] = g.ndata['h1']
-    nf1.layers[0].data['h'] = nf1.layers[0].data['h1']
-    nf2 = create_node_flow(g, num_layers)
-    nf2.copy_from_parent()
+    nf.layers[0].data['h'] = nf.layers[0].data['h1']
     # Test the computation on a layer at a time.
     for i in range(num_layers):
-        nf1.flow_compute(i, fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
+        nf.flow_compute(i, fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                          lambda nodes: {'h' : nodes.data['t'] + 1})
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                      lambda nodes: {'h' : nodes.data['t'] + 1})
-        assert F.array_equal(nf1.layers[i + 1].data['h'], g.ndata['h'][nf1.layer_parent_nid(i + 1)])
+        assert F.array_equal(nf.layers[i + 1].data['h'], g.ndata['h'][nf.layer_parent_nid(i + 1)])
 
-    # Test the computation on all layers.
-    nf2.prop_flows(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
-                   lambda nodes: {'h' : nodes.data['t'] + 1})
-    assert F.array_equal(nf2.layers[-1].data['h'], g.ndata['h'][nf2.layer_parent_nid(-1)])
+    # Test the computation when only a few nodes are active in a layer.
+    g.ndata['h'] = g.ndata['h1']
+    for i in range(num_layers):
+        vs = nf.layer_nid(i+1)[0:4]
+        nf.flow_compute(i, fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
+                        lambda nodes: {'h' : nodes.data['t'] + 1}, v=vs)
+        g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
+                     lambda nodes: {'h' : nodes.data['t'] + 1})
+        data1 = nf.layers[i + 1].data['h'][0:4]
+        data2 = g.ndata['h'][nf.map_to_parent_nid(vs)]
+        assert F.array_equal(data1, data2)
 
 
 def test_flow_compute():
@@ -137,8 +148,31 @@ def test_flow_compute():
     check_flow_compute(create_mini_batch)
 
 
+def check_prop_flows(create_node_flow):
+    num_layers = 2
+    g = generate_rand_graph(100)
+    g.ndata['h'] = g.ndata['h1']
+    nf2 = create_node_flow(g, num_layers)
+    nf2.copy_from_parent()
+    # Test the computation on a layer at a time.
+    for i in range(num_layers):
+        g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
+                     lambda nodes: {'h' : nodes.data['t'] + 1})
+
+    # Test the computation on all layers.
+    nf2.prop_flows(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
+                   lambda nodes: {'h' : nodes.data['t'] + 1})
+    assert F.array_equal(nf2.layers[-1].data['h'], g.ndata['h'][nf2.layer_parent_nid(-1)])
+
+
+def test_prop_flows():
+    check_prop_flows(create_full_node_flow)
+    check_prop_flows(create_mini_batch)
+
+
 if __name__ == '__main__':
     test_basic()
     test_apply_nodes()
     test_apply_edges()
     test_flow_compute()
+    test_prop_flows()
