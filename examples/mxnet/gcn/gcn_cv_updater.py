@@ -55,22 +55,17 @@ class GCNLayer(gluon.Block):
         self.in_feats = in_feats
         self.node_update = NodeUpdate(out_feats, activation, dropout)
 
-    def forward(self, h, subg, layer_nodes):
-        subg.ndata['h'] = h
-        if layer_nodes is None:
-            # test
-            subg.update_all(partial(gcn_msg, ind=self.ind, test=True),
-                            partial(gcn_reduce, ind=self.ind, test=True),
-                            self.node_update)
-        elif self.ind == 0:
-            subg.ndata['h'] = subg.ndata['agg_h_0']
-            assert subg.ndata['h'].shape[1] == self.in_feats
-            subg.apply_nodes(self.node_update)
+    def forward(self, subg, h):
+        subg.layers[self.ind].data['h'] = h
+        if self.ind == 0:
+            subg.layers[self.ind + 1].data['h'] = subg.layers[self.ind + 1].data['agg_h_0']
+            assert subg.layers[self.ind + 1].data['h'].shape[1] == self.in_feats
+            subg.apply_layer(self.ind + 1, self.node_update)
         else:
             # control variate
-            subg.pull(layer_nodes, partial(gcn_msg, ind=self.ind),
-                      partial(gcn_reduce, ind=self.ind), self.node_update)
-        h = subg.ndata.pop('accum')
+            subg.flow_compute(self.ind, partial(gcn_msg, ind=self.ind),
+                              partial(gcn_reduce, ind=self.ind), self.node_update)
+        h = subg.layers[self.ind + 1].data.pop('accum')
         return h
 
 
@@ -119,17 +114,11 @@ class GCN(gluon.Block):
             self.layers.add(GCNLayer(n_layers-1, n_hidden, n_classes, None, dropout))
 
 
-    def forward(self, subg, is_train):
-        h = subg.ndata['in']
-        if is_train:
-            for i, layer in enumerate(self.layers):
-                indexes = subg.layer_nid(self.n_layers-i-1)
-                h = layer(h, subg, indexes)
-            return h[indexes]
-        else:
-            for i, layer in enumerate(self.layers):
-                h = layer(h, subg, None)
-            return h, None
+    def forward(self, subg):
+        h = subg.layers[0].data['in']
+        for i, layer in enumerate(self.layers):
+            h = layer(subg, h)
+        return h
 
 
 class GCNUpdate(gluon.Block):
@@ -245,7 +234,6 @@ def main(args):
                 args.dropout, prefix='app')
     model.initialize(ctx=ctx)
     loss_fcn = gluon.loss.SoftmaxCELoss()
-    model(g, False)
 
     update_model = GCNUpdate(in_feats,
                             n_hidden,
@@ -256,8 +244,16 @@ def main(args):
     update_model.initialize(ctx=ctx)
     update_model(g)
 
+    # Initialize the training model.
+    sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, num_neighbors,
+                                                   neighbor_type='in', num_hops=args.n_layers,
+                                                   seed_nodes=np.array(seed_nodes))
+    sampler = iter(sampler)
+    subg, _ = next(sampler)
+    subg.copy_from_parent()
+    model(subg)
+
     # use optimizer
-    print(model.collect_params())
     trainer = gluon.Trainer(model.collect_params(), 'adam',
             {'learning_rate': args.lr, 'wd': args.weight_decay}, kvstore=mx.kv.create('local'))
 
@@ -273,12 +269,14 @@ def main(args):
                                                               neighbor_type='in', num_hops=args.n_layers,
                                                               seed_nodes=np.array(seed_nodes),
                                                               return_seed_id=True):
-            subg.copy_from_parent()
+            subg.copy_from_parent(node_embed_names=[['in'], ['agg_h_0', 'h_1', 'norm', 'deg_norm'],
+                                                    ['agg_h_1', 'h_2', 'norm', 'deg_norm']],
+                                  edge_embed_names=None)
             # forward
             with mx.autograd.record():
-                pred = model(subg, True)
-                loss = loss_fcn(pred, labels[subg.layer_parent_nid(0)])
-                loss = loss.sum() / len(subg.layer_nid(0))
+                pred = model(subg)
+                loss = loss_fcn(pred, labels[subg.layer_parent_nid(-1)])
+                loss = loss.sum() / len(subg.layer_nid(-1))
 
             #print(loss.asnumpy())
             loss.backward()
