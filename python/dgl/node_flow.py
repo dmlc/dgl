@@ -132,6 +132,16 @@ class FlowDataView(MutableMapping):
         data = self._graph._edge_frames[self._flow]
         return repr({key : data[key] for key in data})
 
+def _get_frame(frame, names, ids):
+    kv = {name: frame[name][ids] for name in names}
+    return FrameRef(Frame(kv))
+
+
+def _update_frame(frame, names, ids, new_frame):
+    kv = {name: new_frame[name] for name in names}
+    frame.update_rows(ids, FrameRef(Frame(kv)), inplace=True)
+
+
 class NodeFlow(DGLGraph):
     """The NodeFlow class stores the sampling results of Neighbor sampling and Layer-wise sampling.
 
@@ -222,22 +232,40 @@ class NodeFlow(DGLGraph):
         flow_id = self._get_flow_id(flow_id)
         return self._flow_offsets[flow_id + 1] - self._flow_offsets[flow_id]
 
-    def copy_from_parent(self):
+    def copy_from_parent(self, node_embed_names=ALL, edge_embed_names=ALL):
         """Copy node/edge features from the parent graph.
 
         All old features will be removed.
         """
-        # TODO we need to avoid copying the same node embedding to all layers.
         if self._parent._node_frame.num_rows != 0:
-            for i in range(self.num_layers):
-                nid = utils.toindex(self.layer_parent_nid(i))
-                self._node_frames[i] = FrameRef(Frame(self._parent._node_frame[nid]))
-        if self._parent._edge_frame.num_rows != 0:
-            for i in range(self.num_flows):
-                eid = utils.toindex(self.flow_parent_eid(i))
-                self._edge_frames[i] = FrameRef(Frame(self._parent._edge_frame[eid]))
+            if is_all(node_embed_names):
+                for i in range(self.num_layers):
+                    nid = utils.toindex(self.layer_parent_nid(i))
+                    self._node_frames[i] = FrameRef(Frame(self._parent._node_frame[nid]))
+            elif node_embed_names is not None:
+                assert isinstance(node_embed_names, list) \
+                        and len(node_embed_names) == self.num_layers, \
+                        "The specified embedding names should be the same as the number of layers."
+                for i in range(self.num_layers):
+                    nid = self.layer_parent_nid(i)
+                    self._node_frames[i] = FrameRef(Frame(_get_frame(self._parent._node_frame,
+                                                                     node_embed_names[i], nid)))
 
-    def copy_to_parent(self):
+        if self._parent._edge_frame.num_rows != 0:
+            if is_all(edge_embed_names):
+                for i in range(self.num_flows):
+                    eid = utils.toindex(self.flow_parent_eid(i))
+                    self._edge_frames[i] = FrameRef(Frame(self._parent._edge_frame[eid]))
+            elif edge_embed_names is not None:
+                assert isinstance(edge_embed_names, list) \
+                        and len(edge_embed_names) == self.num_flows, \
+                        "The specified embedding names should be the same as the number of flows."
+                for i in range(self.num_flows):
+                    eid = self.flow_parent_eid(i)
+                    self._edge_frames[i] = FrameRef(Frame(_get_frame(self._parent._edge_frame,
+                                                                     edge_embed_names[i], eid)))
+
+    def copy_to_parent(self, node_embed_names=ALL, edge_embed_names=ALL):
         """Copy node/edge embeddings to the parent graph.
         """
         #TODO We need to take care of the following things:
@@ -245,7 +273,34 @@ class NodeFlow(DGLGraph):
         #      node embeddings back; we don't need to copy read-only node embeddings back.
         #    * When nodes in different layers have the same node embedding, we need
         #      to avoid conflicts.
-        pass
+        if self._parent._node_frame.num_rows != 0:
+            if is_all(node_embed_names):
+                for i in range(self.num_layers):
+                    nid = utils.toindex(self.layer_parent_nid(i))
+                    # We should write data back directly.
+                    self._parent._node_frame.update_rows(nid, self._node_frames[i], inplace=True)
+            elif node_embed_names is not None:
+                assert isinstance(node_embed_names, list) \
+                        and len(node_embed_names) == self.num_layers, \
+                        "The specified embedding names should be the same as the number of layers."
+                for i in range(self.num_layers):
+                    nid = utils.toindex(self.layer_parent_nid(i))
+                    _update_frame(self._parent._node_frame, node_embed_names[i], nid,
+                                  self._node_frames[i])
+
+        if self._parent._edge_frame.num_rows != 0:
+            if is_all(edge_embed_names):
+                for i in range(self.num_flows):
+                    eid = utils.toindex(self.flow_parent_eid(i))
+                    self._parent._edge_frame.update_rows(eid, self._edge_frames[i], inplace=True)
+            elif edge_embed_names is not None:
+                assert isinstance(edge_embed_names, list) \
+                        and len(edge_embed_names) == self.num_flows, \
+                        "The specified embedding names should be the same as the number of flows."
+                for i in range(self.num_flows):
+                    eid = utils.toindex(self.flow_parent_eid(i))
+                    _update_frame(self._parent._edge_frame, edge_embed_names[i], eid,
+                                  self._edge_frames[i])
 
     def map_to_parent_nid(self, nid):
         """This maps the child node Ids to the parent Ids.

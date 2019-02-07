@@ -170,8 +170,60 @@ def test_prop_flows():
     check_prop_flows(create_mini_batch)
 
 
+def test_copy():
+    num_layers = 2
+    g = generate_rand_graph(100)
+    g.ndata['h'] = g.ndata['h1']
+    nf = create_mini_batch(g, num_layers)
+    nf.copy_from_parent()
+    for i in range(nf.num_layers):
+        assert len(g.ndata.keys()) == len(nf.layers[i].data.keys())
+        for key in g.ndata.keys():
+            assert key in nf.layers[i].data.keys()
+            assert F.array_equal(nf.layers[i].data[key], g.ndata[key][nf.layer_parent_nid(i)])
+    for i in range(nf.num_flows):
+        assert len(g.edata.keys()) == len(nf.flows[i].data.keys())
+        for key in g.edata.keys():
+            assert key in nf.flows[i].data.keys()
+            assert F.array_equal(nf.flows[i].data[key], g.edata[key][nf.flow_parent_eid(i)])
+
+    nf = create_mini_batch(g, num_layers)
+    node_embed_names = [['h'], ['h1'], ['h']]
+    edge_embed_names = [['h2'], ['h2']]
+    nf.copy_from_parent(node_embed_names=node_embed_names, edge_embed_names=edge_embed_names)
+    for i in range(nf.num_layers):
+        assert len(node_embed_names[i]) == len(nf.layers[i].data.keys())
+        for key in node_embed_names[i]:
+            assert key in nf.layers[i].data.keys()
+            assert F.array_equal(nf.layers[i].data[key], g.ndata[key][nf.layer_parent_nid(i)])
+    for i in range(nf.num_flows):
+        assert len(edge_embed_names[i]) == len(nf.flows[i].data.keys())
+        for key in edge_embed_names[i]:
+            assert key in nf.flows[i].data.keys()
+            assert F.array_equal(nf.flows[i].data[key], g.edata[key][nf.flow_parent_eid(i)])
+
+    nf = create_mini_batch(g, num_layers)
+    g.ndata['h0'] = g.ndata['h'].copy()
+    g.ndata['h1'] = g.ndata['h'].copy()
+    g.ndata['h2'] = g.ndata['h'].copy()
+    node_embed_names = [['h0'], ['h1'], ['h2']]
+    nf.copy_from_parent(node_embed_names=node_embed_names, edge_embed_names=None)
+    for i in range(num_layers):
+        nf.flow_compute(i, fn.copy_src(src='h%d' % i, out='m'), fn.sum(msg='m', out='t'),
+                         lambda nodes: {'h%d' % (i+1) : nodes.data['t'] + 1})
+        g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
+                     lambda nodes: {'h' : nodes.data['t'] + 1})
+        assert F.array_equal(nf.layers[i + 1].data['h%d' % (i+1)],
+                             g.ndata['h'][nf.layer_parent_nid(i + 1)])
+    nf.copy_to_parent(node_embed_names=[['h0'], ['h1'], ['h2']])
+    for i in range(num_layers + 1):
+        assert F.array_equal(nf.layers[i].data['h%d' % i],
+                             g.ndata['h%d' % i][nf.layer_parent_nid(i)])
+
+
 if __name__ == '__main__':
     test_basic()
+    test_copy()
     test_apply_nodes()
     test_apply_edges()
     test_flow_compute()
