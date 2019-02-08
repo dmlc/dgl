@@ -991,81 +991,108 @@ SampledSubgraph ImmutableGraph::LayerSample(IdArray seed_array,
   const dgl_id_t* eids = g_csr->edge_ids.data();
 
   std::vector<dgl_id_t> nodes;
-  std::vector<int> layer_ids;
-  std::vector<float> probabilities;
   std::vector<dgl_id_t> edges;
+  std::vector<int> layer_ids;
+  std::vector<float> sample_prob;
 
-  std::queue<size_t> sizes;
+  std::queue<size_t> size_queue;
   std::unordered_set<dgl_id_t> candidate_set;
-  std::vector<dgl_id_t> candidates;
-  std::map<dgl_id_t, size_t> n_times;
+  std::vector<dgl_id_t> candidate_vector;
+  std::unordered_map<dgl_id_t, size_t> n_map;
 
   size_t n_seeds = seed_array->shape[0];
   const dgl_id_t* seed_data = static_cast<dgl_id_t*>(seed_array->data);
   candidate_set.insert(seed_data, seed_data + n_seeds);
   std::copy(candidate_set.begin(), candidate_set.end(), std::back_inserter(nodes));
-  sizes.push(nodes.size());
+  layer_ids.insert(layer_ids.end(), nodes.size(), n_layers);
+  size_queue.push(nodes.size());
 
   size_t curr = 0;
-  for (int i = 0; i != n_layers; i++) {
+  for (int i = 0; i != n_layers; ++i) {
     candidate_set.clear();
-    for (auto j = curr; j != sizes.back(); ++j) {
+    for (auto j = curr; j != size_queue.back(); ++j) {
       auto src = nodes[j];
       candidate_set.insert(indices + indptr[src], indices + indptr[src + 1]);
     }
 
-    candidates.clear();
-    std::copy(candidate_set.begin(), candidate_set.end(), std::back_inserter(candidates));
+    candidate_vector.clear();
+    std::copy(candidate_set.begin(), candidate_set.end(), std::back_inserter(candidate_vector));
 
-    n_times.clear();
-    auto n_candidates = candidates.size();
+    n_map.clear();
+    auto n_candidates = candidate_vector.size();
     for (size_t j = 0; j != layer_size; ++j) {
-      auto dst = candidates[rand_r(&rand_seed) % n_candidates];
-      if (!n_times.insert(std::make_pair(dst, 1)).second) {
-        ++n_times[dst];
+      auto dst = candidate_vector[rand_r(&rand_seed) % n_candidates];
+      if (!n_map.insert(std::make_pair(dst, 1)).second) {
+        ++n_map[dst];
       }
     }
 
-    for (auto const &pair : n_times) {
+    layer_ids.insert(layer_ids.end(), n_map.size(), n_layers - i - 1);
+    for (auto const &pair : n_map) {
       nodes.push_back(pair.first);
-      probabilities.push_back(pair.second * n_candidates / static_cast<float>(layer_size));
+      float sp = pair.second * n_candidates / static_cast<float>(layer_size);
+      sample_prob.push_back(sp);
     }
 
-    curr = sizes.back();
-    sizes.push(nodes.size());
+    curr = size_queue.back();
+    size_queue.push(nodes.size());
   }
 
-  std::vector<dgl_id_t> ret_idx;
-  std::vector<dgl_id_t> ret_eid;
-  std::vector<size_t> sub_indptr;
+  std::vector<size_t> sub_indptr = {0};
   std::vector<dgl_id_t> sub_indices;
   std::vector<dgl_id_t> sub_eids;
-  sub_indptr.push_back(0);
   curr = 0;
-  int i = n_layers - 1;
-  while (sizes.size() > 1) {
-    auto next = sizes.front();
-    sizes.pop();
-    auto next_size = sizes.front() - next;
+  while (size_queue.size() > 1) {
+    auto next = size_queue.front();
+    size_queue.pop();
+    auto next_size = size_queue.front() - next;
 
-    HashTableChecker checker(nodes.data() + next, next_size);
-    for (size_t j = curr; j != next; ++j) {
-      ret_idx.clear();
-      ret_eid.clear();
+    // HashTableChecker checker(nodes.data() + next, next_size);
+    std::unordered_map<dgl_id_t, dgl_id_t> checker;
+    for (dgl_id_t j = next; j < size_queue.front(); ++j) {
+      checker.insert(std::make_pair(nodes[j], j));
+    }
+    // std::cout << __FILE__ << ' ' << __LINE__ << ' ' << checker.size() << std::endl;
+    for (size_t j = curr; j < next; ++j) {
+      auto src = nodes[j];
+      for (int64_t k = indptr[src]; k < indptr[src + 1]; ++k) {
+        auto iterator = checker.find(indices[k]);
+        if (iterator != checker.end()) {
+          // std::cout << __FILE__ << ' ' << __LINE__ << ' ' << indices[k] << std::endl;
+          sub_indices.push_back(iterator->second);
+          sub_eids.push_back(eids[k]);
+        }
+      }
+      sub_indptr.push_back(sub_indices.size());
+      /*
       auto src = nodes[j];
       auto d = indptr[src];
       auto len = indptr[src + 1] - indptr[src];
+      std::vector<dgl_id_t> ret_idx;
+      std::vector<dgl_id_t> ret_eid;
       checker.CollectOnRow(indices + d, eids + d, len, &ret_idx, &ret_eid);
       sub_indptr.push_back(sub_indptr.back() + ret_idx.size());
-      for (auto k : ret_idx) {
+      for (const auto &k : ret_idx) {
         sub_indices.push_back(nodes[next + k]);
-        layer_ids.push_back();
       }
       std::copy(ret_eid.begin(), ret_eid.end(), std::back_inserter(sub_eids));
+
+      // CHECK
+      for (const auto &k : ret_idx) {
+        CHECK(layer_ids[next + k] + 1 == layer_ids[j])
+          << layer_ids[next + k] << ' ' << layer_ids[j];
+      }
+      */
     }
     curr = next;
   }
   sub_indptr.insert(sub_indptr.end(), nodes.size() - sub_indptr.size() + 1, sub_indptr.back());
+
+  /*
+  std::cout << __FILE__ << ' ' << __LINE__ << ' '
+            << *std::min_element(sub_indptr.begin(), sub_indptr.end()) << ' '
+            << *std::max_element(sub_indptr.begin(), sub_indptr.end()) << std::endl;
+  */
 
   int64_t n_nodes = nodes.size();
   int64_t n_edges = sub_eids.size();
@@ -1088,13 +1115,29 @@ SampledSubgraph ImmutableGraph::LayerSample(IdArray seed_array,
             static_cast<dgl_id_t*>(sub_g.induced_vertices->data));
   std::copy(layer_ids.begin(), layer_ids.end(),
             static_cast<dgl_id_t*>(sub_g.layer_ids->data));
-  std::copy(probabilities.begin(), probabilities.end(),
+  std::copy(sample_prob.begin(), sample_prob.end(),
             static_cast<float*>(sub_g.sample_prob->data));
 
   if (neigh_type == "in")
     sub_g.graph = GraphPtr(new ImmutableGraph(sub_csr, nullptr, IsMultigraph()));
   else
     sub_g.graph = GraphPtr(new ImmutableGraph(nullptr, sub_csr, IsMultigraph()));
+
+  // CHECK
+  for (size_t i = 0; i < sub_indptr.size() - 1; ++i) {
+    for (size_t j = sub_indptr[i]; j < sub_indptr[i + 1]; ++j) {
+      /*
+      CHECK(layer_ids[i] - 1 == layer_ids[old_nid2new_nid[sub_indices[j]]])
+        << layer_ids[i] << ' ' << layer_ids[old_nid2new_nid[sub_indices[j]]];
+      */
+    }
+  }
+
+  auto p = static_cast<float*>(sub_g.sample_prob->data);
+  std::cout << __FILE__ << ' ' << __LINE__ << ' '
+            << *std::min_element(p, p + sample_prob.size()) << ' '
+            << *std::max_element(p, p + sample_prob.size()) << ' '
+            << n_nodes << ' ' << sub_g.sample_prob->shape[0] << std::endl;
 
   return sub_g;
 }
@@ -1141,7 +1184,7 @@ SampledSubgraph ImmutableGraph::LayerUniformSample(IdArray seeds,
                          neigh_type,
                          n_layers,
                          layer_size);
-  std::static_pointer_cast<ImmutableGraph>(ret.graph)->CompactSubgraph(ret.induced_vertices);
+  // std::static_pointer_cast<ImmutableGraph>(ret.graph)->CompactSubgraph(ret.induced_vertices);
   return ret;
 }
 

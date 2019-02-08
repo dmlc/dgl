@@ -679,7 +679,6 @@ class GraphIndex(object):
                               utils.toindex(rst(num_subgs * 2 + i))) for i in range(num_subgs)]
 
     def layer_sampling(self, seed_ids, layer_size, n_layers, layer_type, node_prob, return_prob=False):
-        """Neighborhood sampling"""
         if len(seed_ids) == 0:
             return []
 
@@ -696,7 +695,7 @@ class GraphIndex(object):
         if return_prob:
             for i, si in enumerate(ret):
                 l = rst(num_subgs * 3 + i).to_dlpack()
-                setattr(si, 'layer_ids', F.unsqueeze(F.zerocopy_from_dlpack(l), 1))
+                setattr(si, 'layer_ids', F.zerocopy_from_dlpack(l))
                 p = rst(num_subgs * 4 + i).to_dlpack()
                 setattr(si, 'sample_prob', F.zerocopy_from_dlpack(p))
         return ret

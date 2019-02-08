@@ -1,5 +1,6 @@
 import argparse, time
 import numpy as np
+import numpy.random as npr
 import mxnet as mx
 import mxnet.ndarray as nd
 from mxnet import gluon
@@ -10,6 +11,33 @@ from dgl.data import register_data_args, load_data
 import dgl.function as fn
 from dgl.subgraph import DGLSubGraph
 
+def check(g, sub_g, n_layers, layer_size, train_nid):
+    n = sub_g.number_of_nodes()
+    m = sub_g.number_of_edges()
+#   print('# nodes: %d, # edges: %d, # seeds: %d' % (n, m, len(train_nid)))
+    nid = np.arange(n)
+    src, dst = sub_g.edges()
+    src = src.asnumpy()
+    dst = dst.asnumpy()
+    lid = sub_g.layer_ids.asnumpy()
+#   print('np.unique(lid)', np.unique(lid))
+    for i in range(n_layers + 1):
+        nmask = lid == i
+        src_mask = np.isin(src, nid[nmask])
+        dst_mask = np.isin(dst, nid[nmask])
+        nn = np.sum(nmask)
+        mm_src = np.sum(src_mask)
+        mm_dst = np.sum(dst_mask)
+        assert nn <= layer_size
+        if i == 0:
+            assert mm_dst == 0
+        if i == n_layers + 1:
+            assert mm_src == 0
+#       print('[layer %d]# nodes: %d, # src: %d, # dst: %d' % (i, nn, mm_src, mm_dst))
+    src_lid = lid[src]
+    dst_lid = lid[dst]
+    assert np.all(dst_lid - src_lid == 1)
+
 class GCNLayer(gluon.Block):
     def __init__(self, in_feats, out_feats, activation, dropout=0):
         super(GCNLayer, self).__init__()
@@ -19,16 +47,18 @@ class GCNLayer(gluon.Block):
 
     def forward(self, sub_g, src, dst):
         if self.dropout > 0:
-            sub_g.apply_nodes(lambda nodes: {'h' : nd.Dropout(nodes.data['h'],
-                                                             p=self.dropout)})
-        # TODO normalization
+            dropout = lambda nodes: {'h' : nd.Dropout(nodes.data['h'], p=self.dropout)}
+            sub_g.apply_nodes(dropout)
+        # normalize = lambda nodes : {'h' : nodes.data['h'] * nodes.data['normalizer']}
+        # sub_g.apply_nodes(normalize)
         if src is None:
             sub_g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='h'))
         else:
             sub_g.send_and_recv((src, dst),
                                 fn.copy_src(src='h', out='m'),
                                 fn.sum(msg='m', out='h'))
-        sub_g.ndata['h'] = self.dense(sub_g.ndata['h'])
+        # sub_g.apply_nodes(normalize)
+        sub_g.apply_nodes(lambda nodes : {'h' : self.dense(nodes.data['h'])}) 
 
 class GCN(gluon.Block):
     def __init__(self, in_feats, n_hidden, n_classes, n_layers,
@@ -49,28 +79,30 @@ class GCN(gluon.Block):
         if isinstance(sub_g, DGLSubGraph):
             n = sub_g.number_of_nodes()
             nid = np.arange(n)
-            src, dst, eid = sub_g.edge_ids(nid, nid)
+            src, dst = sub_g.edges()
             src = src.asnumpy()
             dst = dst.asnumpy()
-            eid = eid.asnumpy()
+            layer_ids = sub_g.layer_ids.asnumpy()
+            sample_prob = sub_g.sample_prob.asnumpy()
             for i, layer in enumerate(self.layers):
-                mask = eid == i
-                src = src[mask]
-                dst = dst[mask]
+                nmask = layer_ids == i
+                emask = np.isin(src, nid[nmask])
+                src = src[emask]
+                dst = dst[emask]
                 h = sub_g.ndata['h']
-                sample_prob = sub_g.sample_prob.asnumpy()
-                p = np.expand_dims(np.where(np.isin(nid, src), sample_prob, np.ones(n)), axis=1)
-                sub_g.ndata['h'] = h * nd.array(p).as_in_context(h.context)
+                p = np.expand_dims(np.where(nmask, sample_prob, np.ones(n)), axis=1)
+                sub_g.ndata['h'] = h
+#               sub_g.ndata['h'] = h * nd.array(p).as_in_context(h.context)
                 layer(sub_g, src, dst)
         else:
             for layer in self.layers:
                 layer(sub_g, None, None)
         return self.dense(sub_g.pop_n_repr('h'))
 
-def evaluate(model, g):
+def evaluate(model, g, val=False):
     y = g.ndata['y']
     y_bar = nd.argmax(model(g), axis=1)
-    mask = g.ndata['val_mask']
+    mask = g.ndata['val_mask'] if val else g.ndata['test_mask']
     accuracy = nd.sum(mask * (y == y_bar)) / nd.sum(mask)
     return accuracy.asscalar()
 
@@ -128,8 +160,9 @@ def main(args):
                             {'learning_rate': args.lr, 'wd': args.weight_decay})
 
     def sampler():
+        seed_nodes = npr.choice(train_nid, 32, replace=False)
         for x in LayerSampler(g, 1000000, args.layer_size, args.n_layers,
-                              neighbor_type='in', seed_nodes=train_nid,
+                              neighbor_type='in', seed_nodes=seed_nodes,
                               return_prob=True):
             yield x
 
@@ -139,19 +172,19 @@ def main(args):
 
         sub_g, _ = next(sampler())
         sub_g.copy_from_parent()
-
-#       print(sub_g.number_of_nodes(), sub_g.number_of_edges())
+        # check(g, sub_g, args.n_layers, args.layer_size, train_nid)
 
         with mx.autograd.record():
             y = sub_g.ndata['y']
             y_bar = model(sub_g)
-            loss = nd.mean(gluon.loss.SoftmaxCELoss()(y_bar, y))
+            mask = sub_g.layer_ids.as_in_context(y) == args.n_layers
+            loss = nd.sum(mask * gluon.loss.SoftmaxCELoss()(y_bar, y)) / nd.sum(mask)
 
         loss.backward()
         trainer.step(batch_size=1)
 
         dur.append(time.time() - t0)
-        acc = evaluate(model, g)
+        acc = evaluate(model, g, val=True)
         print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
               "ETputs(KTEPS) {:.2f}".format(
               epoch, np.mean(dur), loss.asscalar(), acc, n_edges / np.mean(dur) / 1000))

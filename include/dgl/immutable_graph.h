@@ -16,6 +16,7 @@
 
 // TODO remove
 #include <stdio.h>
+#include <algorithm>
 #include <iostream>
 
 namespace dgl {
