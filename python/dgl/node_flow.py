@@ -142,7 +142,8 @@ def _get_frame(frame, names, ids):
 
 def _update_frame(frame, names, ids, new_frame):
     kv = {name: new_frame[name] for name in names}
-    frame.update_rows(ids, FrameRef(Frame(kv)), inplace=True)
+    if len(kv) > 0:
+        frame.update_rows(ids, FrameRef(Frame(kv)), inplace=True)
 
 
 class NodeFlow(DGLGraph):
