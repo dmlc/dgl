@@ -215,7 +215,7 @@ def main(args):
     if cuda:
         norm = norm.as_in_context(ctx)
     g.ndata['norm'] = norm
-    g.ndata['deg_norm'] = mx.nd.expand_dims(1./g.in_degrees().astype('float32'), 1)
+    g.ndata['deg_norm'] = mx.nd.expand_dims(1./g.in_degrees().astype('float32'), 1).as_in_context(ctx)
     g.ndata['in'] = features
 
     num_data = len(train_mask)
@@ -281,7 +281,7 @@ def main(args):
             # forward
             with mx.autograd.record():
                 pred = model(subg)
-                loss = loss_fcn(pred, labels[subg.layer_parent_nid(-1)])
+                loss = loss_fcn(pred, labels[subg.layer_parent_nid(-1).as_in_context(labels.context)])
                 loss = loss.sum() / len(subg.layer_nid(-1))
 
             for i in range(1, subg.num_layers):
