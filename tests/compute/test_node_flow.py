@@ -37,6 +37,15 @@ def check_basic(g, nf):
         num_edges += nf.flow_size(i)
     assert nf.number_of_edges() == num_edges
 
+    deg = nf.layer_in_degree(0)
+    assert F.array_equal(deg, F.zeros((nf.layer_size(0)), 'int64'))
+    deg = nf.layer_out_degree(-1)
+    assert F.array_equal(deg, F.zeros((nf.layer_size(-1)), 'int64'))
+    for i in range(1, nf.num_layers):
+        in_deg = nf.layer_in_degree(i)
+        out_deg = nf.layer_out_degree(i - 1)
+        assert F.asnumpy(F.sum(in_deg, 0) == F.sum(out_deg, 0))
+
     nf.copy_from_parent()
     assert F.array_equal(nf.layers[0].data['h1'], g.ndata['h1'][nf.layer_parent_nid(0)])
     assert F.array_equal(nf.layers[1].data['h1'], g.ndata['h1'][nf.layer_parent_nid(1)])

@@ -346,6 +346,12 @@ class NodeFlow(DGLGraph):
         # TODO do I need to reverse here?
         return int(flow_id), eid - self._flow_offsets[flow_id]
 
+    def layer_in_degree(self, layer_id):
+        return self._graph.in_degrees(utils.toindex(self.layer_nid(layer_id))).tousertensor()
+
+    def layer_out_degree(self, layer_id):
+        return self._graph.out_degrees(utils.toindex(self.layer_nid(layer_id))).tousertensor()
+
     def layer_nid(self, layer_id):
         """Get the node Ids in the specified layer.
 
