@@ -5,6 +5,7 @@ import dgl
 from dgl.node_flow import create_full_node_flow
 from dgl import utils
 import dgl.function as fn
+from functools import partial
 
 def generate_rand_graph(n, connect_more=False):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
@@ -217,6 +218,23 @@ def test_copy():
     for i in range(num_layers + 1):
         assert F.array_equal(nf.layers[i].data['h%d' % i],
                              g.ndata['h%d' % i][nf.layer_parent_nid(i)])
+
+    nf = create_mini_batch(g, num_layers)
+    g.ndata['h0'] = g.ndata['h'].copy()
+    g.ndata['h1'] = g.ndata['h'].copy()
+    g.ndata['h2'] = g.ndata['h'].copy()
+    node_embed_names = [['h0'], ['h1'], ['h2']]
+    nf.copy_from_parent(node_embed_names=node_embed_names, edge_embed_names=None)
+
+    def msg_func(edge, ind):
+        assert 'h%d' % ind in edge.src.keys()
+        return {'m' : edge.src['h%d' % ind]}
+    def reduce_func(node, ind):
+        assert 'h%d' % (ind + 1) in node.data.keys()
+        return {'h' : F.sum(node.mailbox['m'], 1) + node.data['h%d' % (ind + 1)]}
+
+    for i in range(num_layers):
+        nf.flow_compute(i, partial(msg_func, ind=i), partial(reduce_func, ind=i))
 
 
 if __name__ == '__main__':
