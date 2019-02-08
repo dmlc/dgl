@@ -270,11 +270,14 @@ def main(args):
                                                               neighbor_type='in', num_hops=args.n_layers,
                                                               seed_nodes=np.array(seed_nodes),
                                                               return_seed_id=True):
-            g.pull(subg.layer_parent_nid(2),
-                   fn.copy_src(src='h_1', out='m'),
-                   fn.sum(msg='m', out='tmp'),
-                   lambda node: {'agg_h_1' : node.data['tmp'] * node.data['deg_norm']},
-                   inplace=True)
+            # If we copy the new node embedding back in the training, we should recompute
+            # aggregation of history.
+            if args.copy_back:
+                g.pull(subg.layer_parent_nid(2),
+                       fn.copy_src(src='h_1', out='m'),
+                       fn.sum(msg='m', out='tmp'),
+                       lambda node: {'agg_h_1' : node.data['tmp'] * node.data['deg_norm']},
+                       inplace=True)
             subg.copy_from_parent(node_embed_names=[['in'], ['agg_h_0', 'h_1', 'norm', 'deg_norm'],
                                                     ['agg_h_1', 'norm', 'deg_norm']],
                                   edge_embed_names=None)
@@ -286,8 +289,9 @@ def main(args):
 
             for i in range(1, subg.num_layers):
                 subg.layers[i].data['h_%d' % i] = subg.layers[i].data['new_h_%d' % i]
-            subg.copy_to_parent(node_embed_names=[[], ['h_1'], ['h_2']],
-                                edge_embed_names=None)
+            if args.copy_back:
+                subg.copy_to_parent(node_embed_names=[[], ['h_1'], ['h_2']],
+                                    edge_embed_names=None)
 
             #print(loss.asnumpy())
             loss.backward()
@@ -323,6 +327,8 @@ if __name__ == '__main__':
             help="number of neighbors to be sampled")
     parser.add_argument("--self-loop", action='store_true',
             help="graph self-loop (default=False)")
+    parser.add_argument("--copy-back", action='store_true',
+            help="copy node embedding back (default=False)")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
             help="Weight for L2 loss")
     args = parser.parse_args()
