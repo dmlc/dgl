@@ -132,8 +132,11 @@ class FlowDataView(MutableMapping):
         data = self._graph._edge_frames[self._flow]
         return repr({key : data[key] for key in data})
 
+def _copy_to_like(arr1, arr2):
+    return F.copy_to(arr1, F.context(arr2))
+
 def _get_frame(frame, names, ids):
-    kv = {name: frame[name][ids] for name in names}
+    kv = {name: frame[name][_copy_to_like(ids, frame[name])] for name in names}
     if len(kv) == 0:
         return FrameRef(Frame(num_rows=len(ids)))
     else:
