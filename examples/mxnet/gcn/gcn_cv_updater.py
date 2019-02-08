@@ -66,6 +66,7 @@ class GCNLayer(gluon.Block):
             subg.flow_compute(self.ind, partial(gcn_msg, ind=self.ind),
                               partial(gcn_reduce, ind=self.ind), self.node_update)
         h = subg.layers[self.ind + 1].data.pop('accum')
+        subg.layers[self.ind + 1].data['new_h_%d' % (self.ind + 1)] = h
         return h
 
 
@@ -269,14 +270,24 @@ def main(args):
                                                               neighbor_type='in', num_hops=args.n_layers,
                                                               seed_nodes=np.array(seed_nodes),
                                                               return_seed_id=True):
+            g.pull(subg.layer_parent_nid(2),
+                   fn.copy_src(src='h_1', out='m'),
+                   fn.sum(msg='m', out='tmp'),
+                   lambda node: {'agg_h_1' : node.data['tmp'] * node.data['deg_norm']},
+                   inplace=True)
             subg.copy_from_parent(node_embed_names=[['in'], ['agg_h_0', 'h_1', 'norm', 'deg_norm'],
-                                                    ['agg_h_1', 'h_2', 'norm', 'deg_norm']],
+                                                    ['agg_h_1', 'norm', 'deg_norm']],
                                   edge_embed_names=None)
             # forward
             with mx.autograd.record():
                 pred = model(subg)
                 loss = loss_fcn(pred, labels[subg.layer_parent_nid(-1)])
                 loss = loss.sum() / len(subg.layer_nid(-1))
+
+            for i in range(1, subg.num_layers):
+                subg.layers[i].data['h_%d' % i] = subg.layers[i].data['new_h_%d' % i]
+            subg.copy_to_parent(node_embed_names=[[], ['h_1'], ['h_2']],
+                                edge_embed_names=None)
 
             #print(loss.asnumpy())
             loss.backward()
