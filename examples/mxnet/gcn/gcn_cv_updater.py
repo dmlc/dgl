@@ -211,7 +211,9 @@ def main(args):
     g = DGLGraph(data.graph, readonly=True)
     # normalization
     degs = g.in_degrees().astype('float32')
+    degs = degs.asnumpy()
     degs[degs > num_neighbors] = num_neighbors
+    degs = mx.nd.array(degs, dtype=degs.dtype)
     norm = mx.nd.expand_dims(1./degs, 1)
     if cuda:
         norm = norm.as_in_context(ctx)
