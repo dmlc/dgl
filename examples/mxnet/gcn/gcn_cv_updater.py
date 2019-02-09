@@ -11,17 +11,17 @@ from dgl import utils
 from functools import partial
 
 
-def gcn_msg(edge, ind, test=False):
-    if test:
+def gcn_msg(edge, ind, cv):
+    if not cv:
         msg = edge.src['h']
     else:
         msg = edge.src['h'] - edge.src['h_%d' % ind]
     return {'m': msg}
 
 
-def gcn_reduce(node, ind, test=False):
-    if test:
-        accum = mx.nd.sum(node.mailbox['m'], 1) * node.data['deg_norm']
+def gcn_reduce(node, ind, cv):
+    if not cv:
+        accum = mx.nd.sum(node.mailbox['m'], 1) * node.data['norm']
     else:
         accum = mx.nd.sum(node.mailbox['m'], 1) * node.data['norm'] + node.data['agg_h_%d' % ind]
     return {'h': accum}
@@ -55,7 +55,7 @@ class GCNLayer(gluon.Block):
         self.in_feats = in_feats
         self.node_update = NodeUpdate(out_feats, activation, dropout)
 
-    def forward(self, subg, h):
+    def forward(self, subg, h, cv):
         subg.layers[self.ind].data['h'] = h
         if self.ind == 0:
             subg.layers[self.ind + 1].data['h'] = subg.layers[self.ind + 1].data['agg_h_0']
@@ -63,8 +63,8 @@ class GCNLayer(gluon.Block):
             subg.apply_layer(self.ind + 1, self.node_update)
         else:
             # control variate
-            subg.flow_compute(self.ind, partial(gcn_msg, ind=self.ind),
-                              partial(gcn_reduce, ind=self.ind), self.node_update)
+            subg.flow_compute(self.ind, partial(gcn_msg, ind=self.ind, cv=cv),
+                              partial(gcn_reduce, ind=self.ind, cv=cv), self.node_update)
         h = subg.layers[self.ind + 1].data.pop('accum')
         subg.layers[self.ind + 1].data['new_h_%d' % (self.ind + 1)] = h
         return h
@@ -115,10 +115,10 @@ class GCN(gluon.Block):
             self.layers.add(GCNLayer(n_layers-1, n_hidden, n_classes, None, dropout))
 
 
-    def forward(self, subg):
+    def forward(self, subg, cv):
         h = subg.layers[0].data['in']
         for i, layer in enumerate(self.layers):
-            h = layer(subg, h)
+            h = layer(subg, h, cv)
         return h
 
 
@@ -255,7 +255,7 @@ def main(args):
     sampler = iter(sampler)
     subg, _ = next(sampler)
     subg.copy_from_parent()
-    model(subg)
+    model(subg, args.use_cv)
 
     # use optimizer
     trainer = gluon.Trainer(model.collect_params(), 'adam',
@@ -281,12 +281,17 @@ def main(args):
                        fn.sum(msg='m', out='tmp'),
                        lambda node: {'agg_h_1' : node.data['tmp'] * node.data['deg_norm']},
                        inplace=True)
-            subg.copy_from_parent(node_embed_names=[['in'], ['agg_h_0', 'h_1', 'norm', 'deg_norm'],
-                                                    ['agg_h_1', 'norm', 'deg_norm']],
-                                  edge_embed_names=None)
+            if args.use_cv:
+                subg.copy_from_parent(node_embed_names=[['in'], ['agg_h_0', 'h_1', 'norm', 'deg_norm'],
+                                                        ['agg_h_1', 'norm', 'deg_norm']],
+                                      edge_embed_names=None)
+            else:
+                subg.copy_from_parent(node_embed_names=[['in'], ['agg_h_0', 'norm', 'deg_norm'],
+                                                        ['norm', 'deg_norm']],
+                                      edge_embed_names=None)
             # forward
             with mx.autograd.record():
-                pred = model(subg)
+                pred = model(subg, args.use_cv)
                 loss = loss_fcn(pred, labels[subg.layer_parent_nid(-1).as_in_context(labels.context)])
                 loss = loss.sum() / len(subg.layer_nid(-1))
 
@@ -334,6 +339,8 @@ if __name__ == '__main__':
             help="copy node embedding back (default=False)")
     parser.add_argument("--with-updater", action='store_true',
             help="update node embeddings with updater (default=False)")
+    parser.add_argument("--use-cv", action='store_true',
+            help="copy node embedding back (default=False)")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
             help="Weight for L2 loss")
     args = parser.parse_args()
