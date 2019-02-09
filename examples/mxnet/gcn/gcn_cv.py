@@ -187,9 +187,9 @@ def main(args):
     # create GCN model
     g = DGLGraph(data.graph, readonly=True)
     # normalization
-    degs = g.in_degrees().astype('float32')
+    degs = g.in_degrees().astype('float32').asnumpy()
     degs[degs > num_neighbors] = num_neighbors
-    g.ndata['norm'] = mx.nd.expand_dims(1./degs, 1)
+    g.ndata['norm'] = mx.nd.expand_dims(mx.nd.array(1./degs), 1)
     deg_norm = mx.nd.expand_dims(1./g.in_degrees().astype('float32'), 1)
     g.ndata['deg_norm'] = deg_norm
     g.ndata['in'] = features
