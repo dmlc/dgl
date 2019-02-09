@@ -145,12 +145,13 @@ class GCNUpdate(gluon.Block):
             self.layers.add(GCNForwardLayer(n_layers-1, n_hidden, n_classes, None, dropout))
 
 
-    def forward(self, g):
+    def forward(self, g, save_embed):
         h = g.ndata['in']
         for i, layer in enumerate(self.layers):
             agg_h, h = layer(h, g)
-            g.ndata['h_%d' % (i + 1)] = h
-            g.ndata['agg_h_%d' % i] = agg_h
+            if save_embed:
+                g.ndata['h_%d' % (i + 1)] = h
+                g.ndata['agg_h_%d' % i] = agg_h
         return h
 
 
@@ -243,7 +244,7 @@ def main(args):
                             'relu',
                             args.dropout, prefix='app')
     update_model.initialize(ctx=ctx)
-    update_model(g)
+    update_model(g, True)
 
     # Initialize the training model.
     sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, num_neighbors,
@@ -301,7 +302,7 @@ def main(args):
         for key in infer_params:
             idx = trainer._param2idx[key]
             trainer._kvstore.pull(idx, out=infer_params[key].data())
-        pred = update_model(g)
+        pred = update_model(g, args.with_updater)
 
         test_acc_list.append(evaluate(pred, num_hops, labels, test_mask))
 
@@ -329,6 +330,8 @@ if __name__ == '__main__':
             help="graph self-loop (default=False)")
     parser.add_argument("--copy-back", action='store_true',
             help="copy node embedding back (default=False)")
+    parser.add_argument("--with-updater", action='store_true',
+            help="update node embeddings with updater (default=False)")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
             help="Weight for L2 loss")
     args = parser.parse_args()
