@@ -5,12 +5,18 @@
 * Author's code for link prediction: [https://github.com/MichSchli/RelationPrediction](https://github.com/MichSchli/RelationPrediction)
 
 ### Prerequisites
-Two extra python packages are needed for this example: 
+This example requires PyTorch 0.4.1+.
 
-- rdflib
-- pandas
+You need to install the following module to download the data:
 
-Example code was tested with rdflib 4.2.2 and pandas 0.23.4
+* requests (tested with 2.21.0)
+
+Two extra python packages are needed for this example:
+
+* rdflib
+* pandas
+
+Example code was tested with rdflib 4.2.2 and pandas 0.23.4.
 
 ### Entity Classification
 AIFB: accuracy 97.22% (DGL), 95.83% (paper)
