@@ -7,6 +7,7 @@ from .minigc import *
 from .tree import *
 from .utils import *
 from .sbm import SBMMixture
+from .reddit import RedditDataset
 
 def register_data_args(parser):
     parser.add_argument("--dataset", type=str, required=False,
@@ -22,5 +23,7 @@ def load_data(args):
         return citegrh.load_pubmed()
     elif args.dataset == 'syn':
         return citegrh.load_synthetic(args)
+    elif args.dataset.startswith('reddit'):
+        return RedditDataset(self_loop=('self-loop' in args.dataset))
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
