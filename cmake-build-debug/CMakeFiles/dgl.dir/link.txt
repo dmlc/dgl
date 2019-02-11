@@ -1,0 +1,3 @@
+"C:\Program Files\JetBrains\CLion 2018.3.4\bin\cmake\win\bin\cmake.exe" -E remove -f CMakeFiles\dgl.dir/objects.a
+C:\MinGW\bin\ar.exe cr CMakeFiles\dgl.dir/objects.a @CMakeFiles\dgl.dir\objects1.rsp
+C:\MinGW\bin\g++.exe  -O2 -Wall -fPIC -std=c++11  -g  -shared -o libdgl.dll -Wl,--out-implib,libdgl.dll.a -Wl,--major-image-version,0,--minor-image-version,0 -Wl,--whole-archive CMakeFiles\dgl.dir/objects.a -Wl,--no-whole-archive @CMakeFiles\dgl.dir\linklibs.rsp

@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6"/>
+	<Project>
+		<Option title="dgl"/>
+		<Option makefile_is_custom="1"/>
+		<Option compiler="gcc"/>
+		<Option virtualFolders="CMake Files\;"/>
+		<Build>
+			<Target title="all">
+				<Option working_dir="D:/dgl/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 all"/>
+					<CompileFile command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="install/local">
+				<Option working_dir="D:/dgl/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 install/local"/>
+					<CompileFile command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="install">
+				<Option working_dir="D:/dgl/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 install"/>
+					<CompileFile command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="edit_cache">
+				<Option working_dir="D:/dgl/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 edit_cache"/>
+					<CompileFile command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="dgl">
+				<Option output="D:/dgl/cmake-build-debug/libdgl.dll" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="D:/dgl/cmake-build-debug"/>
+				<Option object_output="./"/>
+				<Option type="3"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="D:/dgl/include"/>
+					<Add directory="D:/dgl/third_party/dlpack/include"/>
+					<Add directory="D:/dgl/third_party/dmlc-core/include"/>
+					<Add directory="c:\mingw\bin\../lib/gcc/mingw32/8.2.0/include/c++"/>
+					<Add directory="c:\mingw\bin\../lib/gcc/mingw32/8.2.0/include/c++/mingw32"/>
+					<Add directory="c:\mingw\bin\../lib/gcc/mingw32/8.2.0/include/c++/backward"/>
+					<Add directory="c:\mingw\bin\../lib/gcc/mingw32/8.2.0/include"/>
+					<Add directory="c:\mingw\bin\../lib/gcc/mingw32/8.2.0/../../../../include"/>
+					<Add directory="c:\mingw\bin\../lib/gcc/mingw32/8.2.0/include-fixed"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 dgl"/>
+					<CompileFile command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="dgl/fast">
+				<Option output="D:/dgl/cmake-build-debug/libdgl.dll" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="D:/dgl/cmake-build-debug"/>
+				<Option object_output="./"/>
+				<Option type="3"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="D:/dgl/include"/>
+					<Add directory="D:/dgl/third_party/dlpack/include"/>
+					<Add directory="D:/dgl/third_party/dmlc-core/include"/>
+					<Add directory="c:\mingw\bin\../lib/gcc/mingw32/8.2.0/include/c++"/>
+					<Add directory="c:\mingw\bin\../lib/gcc/mingw32/8.2.0/include/c++/mingw32"/>
+					<Add directory="c:\mingw\bin\../lib/gcc/mingw32/8.2.0/include/c++/backward"/>
+					<Add directory="c:\mingw\bin\../lib/gcc/mingw32/8.2.0/include"/>
+					<Add directory="c:\mingw\bin\../lib/gcc/mingw32/8.2.0/../../../../include"/>
+					<Add directory="c:\mingw\bin\../lib/gcc/mingw32/8.2.0/include-fixed"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 dgl/fast"/>
+					<CompileFile command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="rebuild_cache">
+				<Option working_dir="D:/dgl/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 rebuild_cache"/>
+					<CompileFile command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="list_install_components">
+				<Option working_dir="D:/dgl/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 list_install_components"/>
+					<CompileFile command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="install/strip">
+				<Option working_dir="D:/dgl/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 install/strip"/>
+					<CompileFile command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="C:/MinGW/bin/mingw32-make.exe -f &quot;D:/dgl/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+		</Build>
+		<Unit filename="D:/dgl/src/c_api_common.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/c_api_common.h">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/graph/graph.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/graph/graph_apis.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/graph/graph_op.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/graph/immutable_graph.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/graph/traversal.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/graph/traversal.h">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/runtime/c_runtime_api.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/runtime/cpu_device_api.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/runtime/dso_module.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/runtime/file_util.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/runtime/file_util.h">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/runtime/module.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/runtime/module_util.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/runtime/module_util.h">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/runtime/ndarray.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/runtime/registry.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/runtime/system_lib_module.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/runtime/thread_pool.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/runtime/threading_backend.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/runtime/workspace_pool.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/runtime/workspace_pool.h">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/scheduler/scheduler.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/src/scheduler/scheduler_apis.cc">
+			<Option target="dgl"/>
+		</Unit>
+		<Unit filename="D:/dgl/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\"/>
+		</Unit>
+	</Project>
+</CodeBlocks_project_file>
