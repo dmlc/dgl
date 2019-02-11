@@ -5,6 +5,7 @@ import numpy as np
 import tqdm
 from rec.model.pinsage import PinSage
 from rec.datasets.movielens import MovieLens
+from rec.utils import cuda
 
 import pickle
 import os
@@ -38,7 +39,7 @@ g_prior = g.edge_subgraph(g_prior_edges)
 g_prior_nid = g_prior.parent_nid
 g_prior_nid_np = g_prior_nid.numpy()
 
-model = PinSage(g_prior, [n_hidden] * n_layers, 10, 5, 5)
+model = cuda(PinSage(g_prior, [n_hidden] * n_layers, 10, 5, 5))
 opt = torch.optim.Adam(model.parameters())
 
 def forward(model, nodeset, train=True):
@@ -78,7 +79,7 @@ def run(edge_set, train=True):
             dst_prior = g_prior.map_to_subgraph_nid(dst)
             dst_neg_prior = g_prior.map_to_subgraph_nid(dst_neg)
 
-            nodeset = torch.cat([src_prior, dst_prior, dst_neg_prior])
+            nodeset = cuda(torch.cat([src_prior, dst_prior, dst_neg_prior]))
             src_size, dst_size, dst_neg_size = \
                     src.shape[0], dst.shape[0], dst_neg.shape[0]
             h_src, h_dst, h_dst_neg = (

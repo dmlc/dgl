@@ -1,5 +1,6 @@
 import torch
 import dgl
+from ..utils import cuda
 
 def random_walk_sampler(G, nodeset, n_traces, n_hops):
     '''
@@ -52,11 +53,13 @@ def random_walk_nodeflow(G, nodeset, n_layers, n_traces, n_hops, top_T):
         neighboring node IDs for each "active" node on the i-th layer (num_nodes, top_T)
     )
     '''
+    dev = nodeset.device
+    nodeset = nodeset.cpu()
     nodeflow = []
     cur_nodeset = nodeset
     for i in reversed(range(n_layers)):
         nb_weights, nb_nodes = random_walk_distribution_topt(G, cur_nodeset, n_traces, n_hops, top_T)
-        nodeflow.insert(0, (cur_nodeset, nb_weights, nb_nodes))
+        nodeflow.insert(0, (cur_nodeset.to(dev), nb_weights.to(dev), nb_nodes.to(dev)))
         cur_nodeset = torch.cat([nb_nodes.view(-1), cur_nodeset]).unique()
 
     return nodeflow

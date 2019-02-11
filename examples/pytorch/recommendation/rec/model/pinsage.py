@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import dgl
 from .. import randomwalk
+from ..utils import cuda
 
 def create_embeddings(n_nodes, n_features):
     return nn.Parameter(torch.randn(n_nodes, n_features))
