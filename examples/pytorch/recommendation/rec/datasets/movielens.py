@@ -61,7 +61,7 @@ class MovieLens(object):
 
         self.data_split()
         self.build_graph()
-        self.find_neighbors()
+        self.find_neighbors(100, 20, 50)
 
     def data_split(self):
         test_set = self.ratings.sample(frac=0.02, random_state=1).index
@@ -108,21 +108,20 @@ class MovieLens(object):
         self.user_ids = user_ids
         self.movie_ids = movie_ids
 
-    def find_neighbors(self):
-        neighbors = randomwalk.random_walk_distribution_topt(
-                self.g, self.g.nodes(), 100, 10, 20)
+    def find_neighbors(self, n_traces, n_hops, top_T):
+        neighbor_probs, neighbors = randomwalk.random_walk_distribution_topt(
+                self.g, self.g.nodes(), n_traces, n_hops, top_T)
+        self.neighbor_probs = neighbor_probs
+        self.neighbors = neighbors
 
-        user_neighbors = []
+        self.user_neighbors = []
         for i in range(len(self.user_ids)):
             user_neighbor = neighbors[i].numpy()
             user_neighbor = user_neighbor[user_neighbor < len(self.user_ids)]
-            user_neighbors.append(user_neighbor)
+            self.user_neighbors.append(user_neighbor)
 
-        movie_neighbors = []
+        self.movie_neighbors = []
         for i in range(len(self.user_ids), len(self.user_ids) + len(self.movie_ids)):
             movie_neighbor = neighbors[i].numpy()
             movie_neighbor = movie_neighbor[movie_neighbor >= len(self.user_ids)]
-            movie_neighbors.append(movie_neighbor)
-
-        self.user_neighbors = user_neighbors
-        self.movie_neighbors = movie_neighbors
+            self.movie_neighbors.append(movie_neighbor)

@@ -42,7 +42,7 @@ def random_walk_distribution_topt(G, nodeset, n_traces, n_hops, top_T):
     the weights of the neighbors.
     '''
     visited_prob = random_walk_distribution(G, nodeset, n_traces, n_hops)
-    return visited_prob.topk(1, top_T)
+    return visited_prob.topk(top_T, 1)
 
 def random_walk_nodeflow(G, nodeset, n_layers, n_traces, n_hops, top_T):
     '''
@@ -55,8 +55,8 @@ def random_walk_nodeflow(G, nodeset, n_layers, n_traces, n_hops, top_T):
     nodeflow = []
     cur_nodeset = nodeset
     for i in reversed(range(n_layers)):
-        nb_weights, nb_nodes = random_walk_distribution_topt(G, nodeset, n_traces, n_hops, top_T)
-        nodeflow.insert((cur_nodeset, nb_weights, nb_nodes))
+        nb_weights, nb_nodes = random_walk_distribution_topt(G, cur_nodeset, n_traces, n_hops, top_T)
+        nodeflow.insert(0, (cur_nodeset, nb_weights, nb_nodes))
         cur_nodeset = torch.cat([nb_nodes.view(-1), cur_nodeset]).unique()
 
     return nodeflow

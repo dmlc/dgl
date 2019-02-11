@@ -4,6 +4,9 @@ import torch.nn.functional as F
 import dgl
 from .. import randomwalk
 
+def create_embeddings(n_nodes, n_features):
+    return nn.Parameter(torch.randn(n_nodes, n_features))
+
 def get_embeddings(h, nodeset):
     return h[nodeset]
 
@@ -11,6 +14,10 @@ def put_embeddings(h, nodeset, new_embeddings):
     n_nodes = nodeset.shape[0]
     n_features = h.shape[1]
     return h.scatter(0, nodeset[:, None].expand(n_nodes, n_features), new_embeddings)
+
+def safediv(a, b):
+    b = torch.where(b == 0, torch.ones_like(b), b)
+    return a / b
 
 class PinSageConv(nn.Module):
     def __init__(self, in_features, out_features, hidden_features):
@@ -32,17 +39,19 @@ class PinSageConv(nn.Module):
         nb_weights: weight of each neighbor node (num_nodes, num_neighbors)
         return: new node embeddings (num_nodes, out_features)
         '''
-        n_nodes, T = nb_nodes.shape[0]
+        n_nodes, T = nb_nodes.shape
 
         h_nodeset = get_embeddings(h, nodeset)  # (n_nodes, in_features)
         h_neighbors = get_embeddings(h, nb_nodes.view(-1)).view(n_nodes, T, self.in_features)
 
         h_neighbors = F.relu(self.Q(h_neighbors))
-        h_agg = (nb_weights[:, :, None] * h_neighbors).sum(1) / nb_weights.sum(1, keepdim=True)
+        h_agg = safediv(
+                (nb_weights[:, :, None] * h_neighbors).sum(1),
+                nb_weights.sum(1, keepdim=True))
 
         h_concat = torch.cat([h_nodeset, h_agg], 1)
         h_new = F.relu(self.W(h_concat))
-        h_new /= h_new.norm(dim=1, keepdim=True)
+        h_new = safediv(h_new, h_new.norm(dim=1, keepdim=True))
 
         return h_new
 
@@ -72,16 +81,17 @@ class PinSage(nn.Module):
             self.convs.append(PinSageConv(
                 feature_sizes[i], feature_sizes[i+1], feature_sizes[i+1]))
 
-    def forward(self, h, nodeset):
+        self.h = create_embeddings(G.number_of_nodes(), self.in_features)
+
+    def forward(self, nodeset):
         '''
         Given a complete embedding matrix h and a list of node IDs, return
         the output embeddings of these node IDs.
 
-        h: node embeddings (num_total_nodes, in_features), or a container
-           of the node embeddings (for distributed computing)
         nodeset: node IDs in this minibatch (num_nodes,)
         return: new node embeddings (num_nodes, out_features)
         '''
+        h = self.h
         nodeflow = randomwalk.random_walk_nodeflow(
                 self.G, nodeset, self.n_layers, self.n_traces, self.n_hops, self.T)
 
