@@ -4,7 +4,7 @@
 * Author's code for entity classification: [https://github.com/tkipf/relational-gcn](https://github.com/tkipf/relational-gcn)
 * Author's code for link prediction: [https://github.com/MichSchli/RelationPrediction](https://github.com/MichSchli/RelationPrediction)
 
-### Prerequisites
+### Dependencies
 Two extra python packages are needed for this example: 
 
 - MXNet nightly build

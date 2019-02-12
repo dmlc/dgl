@@ -7,7 +7,7 @@ Graph Attention Networks (GAT)
 
 Note that the original code is implemented with Tensorflow for the paper.
 
-### Prerequisites
+### Dependencies
 * MXNet nightly build
 * requests
 

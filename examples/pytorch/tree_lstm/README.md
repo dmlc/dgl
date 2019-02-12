@@ -13,7 +13,7 @@ wget http://nlp.stanford.edu/data/glove.840B.300d.zip
 unzip glove.840B.300d.zip
 ```
 
-## Prerequisites
+## Dependencies
 * PyTorch 0.4.1+
 * requests
 * nltk

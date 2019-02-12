@@ -4,10 +4,14 @@ DGL implementation of Capsule Network
 This repo implements Hinton and his team's [Capsule Network](https://arxiv.org/abs/1710.09829).
 Only margin loss is implemented, for simplicity to understand the DGL.
 
-Prerequisites
+Dependencies
 --------------
 * PyTorch 0.4.1+
 * torchvision
+
+```bash
+pip install torch torchvision
+```
 
 Training & Evaluation
 ----------------------

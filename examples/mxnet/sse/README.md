@@ -4,7 +4,7 @@ Benchmark SSE on multi-GPUs
 Paper link:
 [http://proceedings.mlr.press/v80/dai18a/dai18a.pdf](http://proceedings.mlr.press/v80/dai18a/dai18a.pdf)
 
-Prerequisites
+Dependencies
 -------------
 * MXNet nightly build
 * requests

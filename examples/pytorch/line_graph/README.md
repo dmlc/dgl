@@ -7,7 +7,7 @@ Author's code repo: [https://github.com/joanbruna/GNN_community](https://github.
 
 This folder contains a DGL implementation of the CDGNN model.
 
-Prerequisites
+Dependencies
 --------------
 * PyTorch 0.4.1+
 * requests

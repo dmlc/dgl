@@ -4,7 +4,7 @@
 * Author's code for entity classification: [https://github.com/tkipf/relational-gcn](https://github.com/tkipf/relational-gcn)
 * Author's code for link prediction: [https://github.com/MichSchli/RelationPrediction](https://github.com/MichSchli/RelationPrediction)
 
-### Prerequisites
+### Dependencies
 * PyTorch 0.4.1+
 * requests
 * rdflib

@@ -3,7 +3,7 @@ Junction Tree VAE - example for training
 
 This is a direct modification from https://github.com/wengong-jin/icml18-jtnn
 
-Prerequisites
+Dependencies
 --------------
 * PyTorch 0.4.1+
 * RDKit
