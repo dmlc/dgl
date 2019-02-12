@@ -6,6 +6,16 @@ This is a re-implementation of the following paper:
 
 The provided implementation can achieve a test accuracy of 51.72 which is comparable with the result reported in the original paper: 51.0(±0.5).
 
+## Prerequisites
+* MXNet nightly build
+* requests
+* nltk
+
+```bash
+pip install mxnet --pre
+pip install requests nltk
+```
+
 ## Data
 The script will download the [SST dataset] (http://nlp.stanford.edu/sentiment/index.html) and the GloVe 840B.300d embedding automatically if `--use-glove` is specified (note: download may take a while).
 

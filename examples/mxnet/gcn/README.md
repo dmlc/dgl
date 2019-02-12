@@ -7,9 +7,11 @@ Author's code repo: [https://github.com/tkipf/gcn](https://github.com/tkipf/gcn)
 Requirements
 ------------
 - requests
+- MXNet nightly build
 
 ``bash
 pip install requests
+pip install mxnet --pre
 ``
 
 Codes

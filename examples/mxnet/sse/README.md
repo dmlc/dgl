@@ -4,6 +4,16 @@ Benchmark SSE on multi-GPUs
 Paper link:
 [http://proceedings.mlr.press/v80/dai18a/dai18a.pdf](http://proceedings.mlr.press/v80/dai18a/dai18a.pdf)
 
+Prerequisites
+-------------
+* MXNet nightly build
+* requests
+
+```bash
+pip install mxnet --pre
+pip install requests
+```
+
 Use a small embedding
 ---------------------
 
