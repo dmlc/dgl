@@ -3,7 +3,7 @@
 This is an implementation of [Learning Deep Generative Models of Graphs](https://arxiv.org/pdf/1803.03324.pdf) by 
 Yujia Li, Oriol Vinyals, Chris Dyer, Razvan Pascanu, Peter Battaglia. 
 
-## Dependency
+## Dependencies
 - Python 3.5.2
 - [Pytorch 0.4.1](https://pytorch.org/)
 - [Matplotlib 2.2.2](https://matplotlib.org/)
