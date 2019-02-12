@@ -8,6 +8,7 @@ The folder contains training module and inferencing module (beam decoder) for Tr
 - PyTorch 0.4.1+
 - networkx
 - tqdm
+- requests
 
 ## Usage
 

@@ -7,10 +7,11 @@ implemented with Tensorflow for the paper.
 
 Requirements
 ------------
+- PyTorch 0.4.1+
 - requests
 
 ``bash
-pip install requests
+pip install torch requests
 ``
 
 Codes
