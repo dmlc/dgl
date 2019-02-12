@@ -386,7 +386,7 @@ class Graph: public GraphInterface {
   struct EdgeList {
     /*! \brief successor vertex list */
     std::vector<dgl_id_t> succ;
-    /*! \brief predecessor vertex list */
+    /*! \brief out edge list */
     std::vector<dgl_id_t> edge_id;
   };
   typedef std::vector<EdgeList> AdjacencyList;
