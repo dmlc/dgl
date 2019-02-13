@@ -219,13 +219,13 @@ class DGLGraph(object):
         >>>     fail = False
         >>> except:
         >>>     fail = True
-        >>> 
+        >>>
         >>> fail
-        True 
+        True
         >>> G.switch_mode(readonly=False)
         >>> G.add_nodes(5)
         >>> G.number_of_nodes()
-        8 
+        8
         """
         if readonly == self._graph.is_readonly():
             return
