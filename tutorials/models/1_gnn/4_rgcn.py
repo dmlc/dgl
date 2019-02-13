@@ -232,8 +232,8 @@ class Model(nn.Module):
         i2h = self.build_input_layer()
         self.layers.append(i2h)
         # hidden to hidden
-        for idx in range(self.num_hidden_layers):
-            h2h = self.build_hidden_layer(idx)
+        for _ in range(self.num_hidden_layers):
+            h2h = self.build_hidden_layer()
             self.layers.append(h2h)
         # hidden to output
         h2o = self.build_output_layer()
@@ -294,7 +294,7 @@ labels = torch.from_numpy(labels).view(-1)
 # configurations
 n_hidden = 16 # number of hidden units
 n_bases = -1 # use number of relations as number of bases
-n_hidden_layers = 0 # use 1 input layer, 1 output layer, no hidden layer
+n_hidden_layers = 1 # use 1 input layer, 1 output layer, 1 hidden layer
 n_epochs = 25 # epochs to train
 lr = 0.01 # learning rate
 l2norm = 0 # L2 norm coefficient
