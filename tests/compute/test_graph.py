@@ -180,9 +180,9 @@ def test_switch_readonly():
     finally:
         assert not fail
         assert g.number_of_nodes() == 15
-        assert g.ndata['x'].shape() == (15, 3)
+        assert F.shape(g.ndata['x']) == (15, 3)
         assert g.number_of_edges() == 14
-        assert g.edata['x'].shape() == (14, 4)
+        assert F.shape(g.edata['x']) == (14, 4)
 
 if __name__ == '__main__':
     test_graph_creation()
