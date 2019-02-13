@@ -41,7 +41,7 @@ class BaseRGCN(nn.Module):
     def build_input_layer(self):
         return None
 
-    def build_hidden_layer(self):
+    def build_hidden_layer(self, idx):
         raise NotImplementedError
 
     def build_output_layer(self):
