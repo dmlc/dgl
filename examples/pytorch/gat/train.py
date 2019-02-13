@@ -24,7 +24,6 @@ import dgl.function as fn
 
 class GraphAttention(nn.Module):
     def __init__(self,
-                 id,
                  g,
                  in_dim,
                  out_dim,
@@ -34,7 +33,6 @@ class GraphAttention(nn.Module):
                  alpha,
                  residual=False):
         super(GraphAttention, self).__init__()
-        self.id = id
         self.g = g
         self.num_heads = num_heads
         self.fc = nn.Linear(in_dim, num_heads * out_dim, bias=False)
@@ -120,16 +118,16 @@ class GAT(nn.Module):
         self.gat_layers = nn.ModuleList()
         self.activation = activation
         # input projection (no residual)
-        self.gat_layers.append(GraphAttention(0,
+        self.gat_layers.append(GraphAttention(
             g, in_dim, num_hidden, heads[0], feat_drop, attn_drop, alpha, False))
         # hidden layers
         for l in range(1, num_layers):
             # due to multi-head, the in_dim = num_hidden * num_heads
-            self.gat_layers.append(GraphAttention(l,
+            self.gat_layers.append(GraphAttention(
                 g, num_hidden * heads[l-1], num_hidden, heads[l],
                 feat_drop, attn_drop, alpha, residual))
         # output projection
-        self.gat_layers.append(GraphAttention(num_layers,
+        self.gat_layers.append(GraphAttention(
             g, num_hidden * heads[-2], num_classes, heads[-1],
             feat_drop, attn_drop, alpha, residual))
 
