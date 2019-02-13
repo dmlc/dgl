@@ -200,6 +200,37 @@ class DGLGraph(object):
         self._apply_node_func = None
         self._apply_edge_func = None
 
+    def switch_mode(self, readonly=True):
+        """Switch readonly state of the graph.
+
+        Parameters
+        ----------
+        readonly : bool, optional
+            New readonly state of the graph, the default value is True.
+
+        Examples
+        --------
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edge(0, 1)
+        >>> G.switch_mode(readonly=True)
+        >>> try:
+        >>>     G.add_nodes(5)
+        >>>     fail = False
+        >>> except:
+        >>>     fail = True
+        >>> 
+        >>> fail
+        True 
+        >>> G.switch_mode(readonly=False)
+        >>> G.add_nodes(5)
+        >>> G.number_of_nodes()
+        8 
+        """
+        if readonly == self._graph.is_readonly():
+            return
+        self._graph.switch_mode(readonly)
+
     def add_nodes(self, num, data=None):
         """Add multiple new nodes.
 
