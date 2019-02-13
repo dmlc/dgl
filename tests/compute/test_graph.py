@@ -5,6 +5,7 @@ import scipy.sparse as sp
 import networkx as nx
 import dgl
 import backend as F
+from dgl import DGLError
 
 def test_graph_creation():
     g = dgl.DGLGraph()
