@@ -4,11 +4,13 @@ Graph Convolutional Networks (GCN)
 Paper link: [https://arxiv.org/abs/1609.02907](https://arxiv.org/abs/1609.02907)
 Author's code repo: [https://github.com/tkipf/gcn](https://github.com/tkipf/gcn)
 
-Requirements
+Dependencies
 ------------
+- MXNet nightly build
 - requests
 
 ``bash
+pip install mxnet --pre
 pip install requests
 ``
 
