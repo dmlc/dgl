@@ -92,6 +92,68 @@ std::vector<IdArray> DegreeBucketing(const IdArray& msg_ids, const IdArray& vids
     return std::move(ret);
 }
 
+std::vector<IdArray> GroupEdgeByNodeDegree(const IdArray& uids, const IdArray& vids,
+        const IdArray& eids) {
+    auto n_edge = eids->shape[0];
+    const int64_t* eid_data = static_cast<int64_t*>(eids->data);
+    const int64_t* uid_data = static_cast<int64_t*>(uids->data);
+    const int64_t* vid_data = static_cast<int64_t*>(vids->data);
+
+    // node2edge: group_by nodes uid -> (eid, the other end vid)
+    std::unordered_map<int64_t,
+        std::vector<std::pair<int64_t, int64_t>>> node2edge;
+    for (int64_t i = 0; i < n_edge; ++i) {
+        node2edge[uid_data[i]].emplace_back(eid_data[i], vid_data[i]);
+    }
+
+    // bkt: deg -> group_by node uid
+    std::unordered_map<int64_t, std::vector<int64_t>> bkt;
+    for (const auto& it : node2edge) {
+        bkt[it.second.size()].push_back(it.first);
+    }
+
+    // number of unique degree
+    int64_t n_deg = bkt.size();
+
+    // initialize output
+    IdArray degs = IdArray::Empty({n_deg}, eids->dtype, eids->ctx);
+    IdArray new_uids = IdArray::Empty({n_edge}, uids->dtype, uids->ctx);
+    IdArray new_vids = IdArray::Empty({n_edge}, vids->dtype, vids->ctx);
+    IdArray new_eids = IdArray::Empty({n_edge}, eids->dtype, eids->ctx);
+    IdArray sections = IdArray::Empty({n_deg}, eids->dtype, eids->ctx);
+    int64_t* deg_ptr = static_cast<int64_t*>(degs->data);
+    int64_t* uid_ptr = static_cast<int64_t*>(new_uids->data);
+    int64_t* vid_ptr = static_cast<int64_t*>(new_vids->data);
+    int64_t* eid_ptr = static_cast<int64_t*>(new_eids->data);
+    int64_t* sec_ptr = static_cast<int64_t*>(sections->data);
+
+    // fill in bucketing ordering
+    for (const auto& it : bkt) {  // for each bucket
+        // degree of this bucket
+        const int64_t deg = it.first;
+        // number of edges in this bucket
+        const int64_t bucket_size = it.second.size();
+        *deg_ptr++ = deg;
+        *sec_ptr++ = deg * bucket_size;
+        for (const auto u : it.second) {  // for uid in this bucket
+            for (const auto& pair : node2edge[u]) {  // for each edge of uid
+                *uid_ptr++ = u;
+                *vid_ptr++ = pair.second;
+                *eid_ptr++ = pair.first;
+            }
+        }
+    }
+
+    std::vector<IdArray> ret;
+    ret.push_back(std::move(degs));
+    ret.push_back(std::move(new_uids));
+    ret.push_back(std::move(new_vids));
+    ret.push_back(std::move(new_eids));
+    ret.push_back(std::move(sections));
+
+    return std::move(ret);
+}
+
 }  // namespace sched
 
 }  // namespace dgl

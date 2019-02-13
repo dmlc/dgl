@@ -67,6 +67,10 @@ def reduce_sum(x):
     """Sums all the elements into a single scalar."""
     pass
 
+def softmax(x, dim):
+    """Softmax Operation on Tensors"""
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------

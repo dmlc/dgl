@@ -5,12 +5,13 @@ Graph Convolutional Networks (GCN)
 - Author's code repo: [https://github.com/tkipf/gcn](https://github.com/tkipf/gcn). Note that the original code is 
 implemented with Tensorflow for the paper. 
 
-Requirements
+Dependencies
 ------------
+- PyTorch 0.4.1+
 - requests
 
 ``bash
-pip install requests
+pip install torch requests
 ``
 
 Codes

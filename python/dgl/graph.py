@@ -872,7 +872,7 @@ class DGLGraph(object):
         Returns
         -------
         A tuple of Tensors ``(eu, ev, eid)`` if ``form == 'all'``.
-            ``eid[i]`` is the ID of an outbound edge from ``eu[i]`` from ``ev[i]``.
+            ``eid[i]`` is the ID of an outbound edge from ``eu[i]`` to ``ev[i]``.
             All outbound edges from ``v`` are returned.
         A pair of Tensors (eu, ev) if form == 'uv'
             ``ev[i]`` is the destination node of an outbound edge from ``eu[i]``.
@@ -915,7 +915,7 @@ class DGLGraph(object):
         else:
             raise DGLError('Invalid form:', form)
 
-    def all_edges(self, form='uv', return_sorted=False):
+    def all_edges(self, form='uv', order=None):
         """Return all the edges.
 
         Parameters
@@ -926,8 +926,12 @@ class DGLGraph(object):
             - 'all' : a tuple (u, v, eid)
             - 'uv'  : a pair (u, v), default
             - 'eid' : one eid tensor
-        return_sorted : bool
-            True if the returned edges are sorted by their src and dst ids.
+        order : string
+            The order of the returned edges. Currently support:
+
+            - 'srcdst' : sorted by their src and dst ids.
+            - 'eid'    : sorted by edge Ids.
+            - None     : the arbitrary order.
 
         Returns
         -------
@@ -953,7 +957,7 @@ class DGLGraph(object):
         >>> G.all_edges('all')
         (tensor([0, 0, 1]), tensor([1, 2, 2]), tensor([0, 1, 2]))
         """
-        src, dst, eid = self._graph.edges(return_sorted)
+        src, dst, eid = self._graph.edges(order)
         if form == 'all':
             return (src.tousertensor(), dst.tousertensor(), eid.tousertensor())
         elif form == 'uv':
@@ -1918,6 +1922,90 @@ class DGLGraph(object):
                                            apply_func=func,
                                            inplace=inplace)
             Runtime.run(prog)
+
+    def group_apply_edges(self, group_by, func, edges=ALL, inplace=False):
+        """Group the edges by nodes and apply the function on the grouped edges to
+         update their features.
+
+        Parameters
+        ----------
+        group_by : str
+            Specify how to group edges. Expected to be either 'src' or 'dst'
+        func : callable
+            Apply function on the edge. The function should be
+            an :mod:`Edge UDF <dgl.udf>`. The input of `Edge UDF` should
+            be (bucket_size, degrees, *feature_shape), and
+            return the dict with values of the same shapes.
+        edges : valid edges type, optional
+            Edges on which to group and apply ``func``. See :func:`send` for valid
+            edges type. Default is all the edges.
+        inplace: bool, optional
+            If True, update will be done in place, but autograd will break.
+
+        Notes
+        -----
+        On multigraphs, if :math:`u` and :math:`v` are specified, then all the edges
+        between :math:`u` and :math:`v` will be updated.
+
+        Examples
+        --------
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
+
+        >>> g = dgl.DGLGraph()
+        >>> g.add_nodes(4)
+        >>> g.add_edges(0, [1, 2, 3])
+        >>> g.add_edges(1, [2, 3])
+        >>> g.add_edges(2, [2, 3])
+        >>> g.edata['feat'] = th.randn((g.number_of_edges(), 1))
+
+        >>> # Softmax over the out edges of each node
+        >>> # Second dimension of edges.data is the degree dimension
+        >>> def softmax_feat(edges): return {'norm_feat': th.softmax(edges.data['feat'], dim=1)}
+        >>> g.group_apply_edges(func=softmax_feat, group_by='src') # Apply func to the first edge.
+        >>> u, v, eid = g.out_edges(1, form='all')
+        >>> in_feat = g.edata['feat'][eid]
+        >>> out_feat = g.edata['norm_feat'][eid]
+        >>> print(out_feat - th.softmax(in_feat, 0))
+            tensor([[0.],
+            [0.]])
+
+        See Also
+        --------
+        apply_edges
+        """
+        assert func is not None
+
+        if group_by not in ('src', 'dst'):
+            raise DGLError("Group_by should be either src or dst")
+
+        if is_all(edges):
+            u, v, _ = self._graph.edges()
+            eid = utils.toindex(slice(0, self.number_of_edges()))
+        elif isinstance(edges, tuple):
+            u, v = edges
+            u = utils.toindex(u)
+            v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            u, v, eid = self._graph.edge_ids(u, v)
+        else:
+            eid = utils.toindex(edges)
+            u, v, _ = self._graph.find_edges(eid)
+
+        with ir.prog() as prog:
+            scheduler.schedule_group_apply_edge(graph=self,
+                                                u=u,
+                                                v=v,
+                                                eid=eid,
+                                                apply_func=func,
+                                                group_by=group_by,
+                                                inplace=inplace)
+            Runtime.run(prog)
+
 
     def send(self, edges=ALL, message_func="default"):
         """Send messages along the given edges.

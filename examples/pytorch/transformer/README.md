@@ -3,11 +3,12 @@ In this example we implement the [Transformer](https://arxiv.org/pdf/1706.03762.
 
 The folder contains training module and inferencing module (beam decoder) for Transformer and training module for Universal Transformer
 
-## Requirements
+## Dependencies
 
 - PyTorch 0.4.1+
 - networkx
 - tqdm
+- requests
 
 ## Usage
 

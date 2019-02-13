@@ -4,11 +4,18 @@
 * Author's code for entity classification: [https://github.com/tkipf/relational-gcn](https://github.com/tkipf/relational-gcn)
 * Author's code for link prediction: [https://github.com/MichSchli/RelationPrediction](https://github.com/MichSchli/RelationPrediction)
 
-### Prerequisites
+### Dependencies
 Two extra python packages are needed for this example: 
 
+- MXNet nightly build
+- requests
 - rdflib
 - pandas
+
+```bash
+pip install mxnet --pre
+pip install requests rdflib pandas
+```
 
 Example code was tested with rdflib 4.2.2 and pandas 0.23.4
 

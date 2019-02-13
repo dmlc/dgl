@@ -21,6 +21,7 @@ __all__ = [
     "schedule_snr",
     "schedule_apply_nodes",
     "schedule_apply_edges",
+    "schedule_group_apply_edge",
     "schedule_push",
     "schedule_pull"
 ]
@@ -359,6 +360,49 @@ def schedule_pull(graph,
             ir.WRITE_ROW_INPLACE_(var_nf, var_pull_nodes, final_feat)
         else:
             ir.WRITE_ROW_(var_nf, var_pull_nodes, final_feat)
+
+
+def schedule_group_apply_edge(graph,
+                              u, v, eid,
+                              apply_func,
+                              group_by,
+                              inplace):
+    """group apply edges schedule
+
+    Parameters
+    ----------
+    graph: DGLGraph
+        The DGLGraph to use
+    u : utils.Index
+        Source nodes of edges to apply
+    v : utils.Index
+        Destination nodes of edges to apply
+    eid : utils.Index
+        Ids of sending edges
+    apply_func: callable
+        The apply edge function
+    group_by : str
+        Specify how to group edges. Expected to be either 'src' or 'dst'
+    inplace: bool
+        If True, the update will be done in place
+
+    Returns
+    -------
+    A list of executors for DGL Runtime
+    """
+    # vars
+    var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
+    var_ef = var.FEAT_DICT(graph._edge_frame, name='ef')
+    var_out = var.FEAT_DICT(name='new_ef')
+    # TODO (lingfan): check if apply_func is a DGL builtin
+    db.gen_group_apply_edge_schedule(graph, apply_func, u, v, eid, group_by,
+                                     var_nf, var_ef, var_out)
+    var_eid = var.IDX(eid)
+    if inplace:
+        ir.WRITE_ROW_INPLACE_(var_ef, var_eid, var_out)
+    else:
+        ir.WRITE_ROW_(var_ef, var_eid, var_out)
+
 
 def _check_builtin_func_list(func_list):
     """Check whether func_list only contains builtin functions."""

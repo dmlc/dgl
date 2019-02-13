@@ -74,6 +74,19 @@ def tensor(data, dtype=None):
     """
     pass
 
+def get_preferred_sparse_format():
+    """Get the preferred sparse matrix format supported by the backend.
+
+    Different backends have their preferred backend. This info is useful when
+    constructing a sparse matrix.
+
+    Returns
+    -------
+    string
+        the name of the preferred sparse matrix format.
+    """
+    pass
+
 def sparse_matrix(data, index, shape, force_format=False):
     """Create a sparse matrix.
 
@@ -834,7 +847,3 @@ def zerocopy_from_numpy(np_array):
 # ----------------
 # These are not related to tensors. Some of them are temporary workarounds that
 # should be included in DGL in the future.
-
-def create_immutable_graph_index():
-    """Create an immutable graph index object."""
-    pass

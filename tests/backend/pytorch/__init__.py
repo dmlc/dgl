@@ -45,6 +45,8 @@ def clone(x):
 def reduce_sum(x):
     return x.sum()
 
+def softmax(x, dim):
+    return th.softmax(x, dim)
 
 class record_grad(object):
     def __init__(self):

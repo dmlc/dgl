@@ -9,6 +9,8 @@ from .mol_tree import Vocab
 
 from .mpn import mol2dgl_single as mol2dgl_enc
 from .jtmpn import mol2dgl_single as mol2dgl_dec
+from .jtmpn import ATOM_FDIM as ATOM_FDIM_DEC
+from .jtmpn import BOND_FDIM as BOND_FDIM_DEC
 
 _url = 'https://www.dropbox.com/s/4ypr0e0abcbsvoh/jtnn.zip?dl=1'
 
@@ -82,11 +84,11 @@ class JTNNDataset(Dataset):
                     tree_mess_tgt_e, tree_mess_tgt_n = mol2dgl_dec(cands)
         else:
             cand_graphs = []
-            atom_x_dec = torch.zeros(0, atom_x_enc.shape[1])
-            bond_x_dec = torch.zeros(0, bond_x_enc.shape[1])
+            atom_x_dec = torch.zeros(0, ATOM_FDIM_DEC)
+            bond_x_dec = torch.zeros(0, BOND_FDIM_DEC)
             tree_mess_src_e = torch.zeros(0, 2).long()
             tree_mess_tgt_e = torch.zeros(0, 2).long()
-            tree_mess_tgt_n = torch.zeros(0, 2).long()
+            tree_mess_tgt_n = torch.zeros(0).long()
 
         # prebuild the stereoisomers
         cands = mol_tree.stereo_cands

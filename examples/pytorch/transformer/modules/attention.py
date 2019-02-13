@@ -12,7 +12,7 @@ class MultiHeadAttention(nn.Module):
         self.h = h
         # W_q, W_k, W_v, W_o
         self.linears = clones(
-            nn.Linear(dim_model, dim_model), 4
+            nn.Linear(dim_model, dim_model, bias=False), 4
         )
 
     def get(self, x, fields='qkv'):

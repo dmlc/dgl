@@ -45,6 +45,8 @@ def clone(x):
 def reduce_sum(x):
     return x.sum()
 
+def softmax(x, dim):
+    return nd.softmax(x, dim)
 
 record_grad = autograd.record
 
