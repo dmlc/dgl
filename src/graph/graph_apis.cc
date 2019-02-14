@@ -481,4 +481,17 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetAdj")
     *rv = ConvertAdjToPackedFunc(res);
   });
 
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphRandomWalk")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const IdArray seeds = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const int num_traces = args[2];
+    const int num_hops = args[3];
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+    const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
+    CHECK(gptr) << "sampling isn't implemented in mutable graph";
+
+    *rv = gptr->RandomWalk(seeds, num_traces, num_hops);
+  });
+
 }  // namespace dgl

@@ -101,8 +101,29 @@ def test_10neighbor_sampler():
     check_10neighbor_sampler(g, seeds=np.unique(np.random.randint(0, g.number_of_nodes(),
                                                                   size=int(g.number_of_nodes() / 10))))
 
+def test_random_walk():
+    edge_list = [(0, 1), (1, 2), (2, 3), (3, 4),
+                 (4, 3), (3, 2), (2, 1), (1, 0)]
+    seeds = [0, 1]
+    n_traces = 3
+    n_hops = 4
+
+    g = dgl.DGLGraph(edge_list, readonly=True)
+    traces = dgl.contrib.sampling.random_walk(g, seeds, n_traces, n_hops)
+    traces = F.zerocopy_to_numpy(traces)
+
+    assert traces.shape == (len(seeds), n_traces, n_hops + 1)
+
+    for i, seed in enumerate(seeds):
+        assert (traces[i, :, 0] == seeds[i]).all()
+
+    trace_diff = np.diff(traces, axis=-1)
+    # only nodes with adjacent IDs are connected
+    assert (np.abs(trace_diff) == 1).all()
+
 if __name__ == '__main__':
     test_1neighbor_sampler_all()
     test_10neighbor_sampler_all()
     test_1neighbor_sampler()
     test_10neighbor_sampler()
+    test_random_walk()
