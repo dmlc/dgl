@@ -198,7 +198,6 @@ class Frame(MutableMapping):
             self._columns = dict()
             self._num_rows = num_rows
         else:
-            assert len(data.items()) > 0
             # Note that we always create a new column for the given data.
             # This avoids two frames accidentally sharing the same column.
             self._columns = {k : Column.create(v) for k, v in data.items()}
