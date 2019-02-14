@@ -52,6 +52,7 @@ class GraphIndex(object):
             self.init(src, dst, utils.toindex(F.arange(0, len(src))), n_nodes)
         else:
             self._handle = _CAPI_DGLGraphCreateMutable(multigraph)
+            self._readonly = readonly
             self._cache = {}
 
             self.clear()
@@ -138,12 +139,11 @@ class GraphIndex(object):
             self._readonly = bool(_CAPI_DGLGraphIsReadonly(self._handle))
         return self._readonly
 
-    def switch_mode(self, readonly=True):
+    def switch_readonly(self, readonly):
         """Switch the readonly state of graph index."""
         n_nodes, multigraph, _, src, dst = self.__getstate__()
         self.clear_cache()
         state = (n_nodes, multigraph, readonly, src, dst)
-        self._readonly = readonly
         self.__setstate__(state)
 
     def number_of_nodes(self):

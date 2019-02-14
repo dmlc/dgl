@@ -134,26 +134,13 @@ def test_switch_readonly():
     g.ndata['x'] = F.zeros((5, 3))
     g.edata['x'] = F.zeros((4, 4))
 
-    g.switch_mode(readonly=False)
-    assert g._graph._readonly == False
+    g.switch_readonly(False)
+    assert g._graph.is_readonly() == False
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 4
 
-    g.switch_mode(readonly=True)
-    assert g._graph._readonly == True 
-    assert g.number_of_nodes() == 5
-    assert g.number_of_edges() == 4
-
-    try:
-        g.add_nodes(5)
-        fail = False
-    except DGLError:
-        fail = True
-    finally:
-        assert fail
-
-    g.switch_mode(readonly=True)
-    assert g._graph._readonly == True 
+    g.switch_readonly(True)
+    assert g._graph.is_readonly() == True 
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 4
 
@@ -165,8 +152,21 @@ def test_switch_readonly():
     finally:
         assert fail
 
-    g.switch_mode(readonly=False)
-    assert g._graph._readonly == False
+    g.switch_readonly(True)
+    assert g._graph.is_readonly() == True 
+    assert g.number_of_nodes() == 5
+    assert g.number_of_edges() == 4
+
+    try:
+        g.add_nodes(5)
+        fail = False
+    except DGLError:
+        fail = True
+    finally:
+        assert fail
+
+    g.switch_readonly(False)
+    assert g._graph.is_readonly() == False
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 4
 
