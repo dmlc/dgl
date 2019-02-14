@@ -8,7 +8,7 @@ import numpy as np
 from .base import ALL, is_all, DGLError
 from . import backend as F
 from .frame import Frame, FrameRef
-from .graph import DGLGraph
+from .graph import DGLBaseGraph
 from .runtime import ir, scheduler, Runtime
 from . import utils
 
@@ -149,7 +149,7 @@ def _update_frame(frame, names, ids, new_frame):
         frame.update_rows(ids, FrameRef(Frame(col_dict)), inplace=True)
 
 
-class NodeFlow(DGLGraph):
+class NodeFlow(DGLBaseGraph):
     """The NodeFlow class stores the sampling results of Neighbor sampling and Layer-wise sampling.
 
     These sampling algorithms generate graphs with multiple layers. The edges connect the nodes
@@ -166,8 +166,7 @@ class NodeFlow(DGLGraph):
         The graph index of the NodeFlow graph.
     """
     def __init__(self, parent, graph_idx):
-        super(NodeFlow, self).__init__(graph_data=graph_idx,
-                                       readonly=graph_idx.is_readonly())
+        super(NodeFlow, self).__init__(graph_idx)
         self._parent = parent
         self._node_mapping = graph_idx.node_mapping
         self._edge_mapping = graph_idx.edge_mapping
@@ -177,19 +176,11 @@ class NodeFlow(DGLGraph):
                              for i in range(self.num_layers)]
         self._edge_frames = [FrameRef(Frame(num_rows=self.block_size(i))) \
                              for i in range(self.num_blocks)]
-
-    # override APIs
-    def add_nodes(self, num, data=None):
-        """Add nodes. Disabled because BatchedDGLGraph is read-only."""
-        raise DGLError('Readonly graph. Mutation is not allowed.')
-
-    def add_edge(self, u, v, data=None):
-        """Add one edge. Disabled because BatchedDGLGraph is read-only."""
-        raise DGLError('Readonly graph. Mutation is not allowed.')
-
-    def add_edges(self, u, v, data=None):
-        """Add many edges. Disabled because BatchedDGLGraph is read-only."""
-        raise DGLError('Readonly graph. Mutation is not allowed.')
+        # registered functions
+        self._message_funcs = [None] * self.num_blocks
+        self._reduce_funcs = [None] * self.num_blocks
+        self._apply_node_funcs = [None] * self.num_blocks
+        self._apply_edge_funcs = [None] * self.num_blocks
 
     def _get_layer_id(self, layer_id):
         if layer_id >= 0:
@@ -465,6 +456,136 @@ class NodeFlow(DGLGraph):
         end = self._block_offsets[block_id + 1]
         return self._edge_mapping.tousertensor()[start:end]
 
+    def set_n_initializer(self, initializer, layer_id=ALL, field=None):
+        """Set the initializer for empty node features.
+
+        Initializer is a callable that returns a tensor given the shape, data type
+        and device context.
+
+        When a subset of the nodes are assigned a new feature, initializer is
+        used to create feature for rest of the nodes.
+
+        Parameters
+        ----------
+        initializer : callable
+            The initializer.
+        layer_id : int
+            the layer to set the initializer.
+        field : str, optional
+            The feature field name. Default is set an initializer for all the
+            feature fields.
+        """
+        if is_all(block_id):
+            for i in range(self.num_blocks):
+                self._node_frames[i].set_initializer(initializer, field)
+        else:
+            self._node_frames[i].set_initializer(initializer, field)
+
+    def set_e_initializer(self, initializer, block_id=ALL, field=None):
+        """Set the initializer for empty edge features.
+
+        Initializer is a callable that returns a tensor given the shape, data
+        type and device context.
+
+        When a subset of the edges are assigned a new feature, initializer is
+        used to create feature for rest of the edges.
+
+        Parameters
+        ----------
+        initializer : callable
+            The initializer.
+        block_id : int
+            the block to set the initializer.
+        field : str, optional
+            The feature field name. Default is set an initializer for all the
+            feature fields.
+        """
+        if is_all(block_id):
+            for i in range(self.num_blocks):
+                self._edge_frames[i].set_initializer(initializer, field)
+        else:
+            self._edge_frames[block_id].set_initializer(initializer, field)
+
+
+    def register_message_func(self, func, block_id=ALL):
+        """Register global message function for a block.
+
+        Once registered, ``func`` will be used as the default
+        message function in message passing operations, including
+        :func:`block_compute`, :func:`prop_flow`.
+
+        Parameters
+        ----------
+        func : callable
+            Message function on the edge. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
+        block_id : int or ALL
+            the block to register the message function.
+        """
+        if is_all(block_id):
+            self._message_funcs = [func] * self.num_blocks
+        else:
+            self._message_funcs[block_id] = func
+
+    def register_reduce_func(self, func, block_id=ALL):
+        """Register global message reduce function for a block.
+
+        Once registered, ``func`` will be used as the default
+        message reduce function in message passing operations, including
+        :func:`block_compute`, :func:`prop_flow`.
+
+        Parameters
+        ----------
+        func : callable
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        block_id : int or ALL
+            the block to register the reduce function.
+        """
+        if is_all(block_id):
+            self._reduce_funcs = [func] * self.num_blocks
+        else:
+            self._reduce_funcs[block_id] = func
+
+    def register_apply_node_func(self, func, block_id=ALL):
+        """Register global node apply function for a block.
+
+        Once registered, ``func`` will be used as the default apply
+        node function. Related operations include :func:`apply_layer`,
+        :func:`block_compute`, :func:`prop_flow`.
+
+        Parameters
+        ----------
+        func : callable
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        block_id : int or ALL
+            the block to register the apply node function.
+        """
+        if is_all(block_id):
+            self._apply_node_funcs = [func] * self.num_blocks
+        else:
+            self._apply_node_funcs[block_id] = func
+
+    def register_apply_edge_func(self, func, block_id=ALL):
+        """Register global edge apply function for a block.
+
+        Once registered, ``func`` will be used as the default apply
+        edge function in :func:`apply_block`.
+
+        Parameters
+        ----------
+        func : callable
+            Apply function on the edge. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
+        block_id : int or ALL
+            the block to register the apply edge function.
+        """
+        if is_all(block_id):
+            self._apply_edge_funcs = [func] * self.num_blocks
+        else:
+            self._apply_edge_funcs[block_id] = func
+
     def apply_layer(self, layer_id, func="default", v=ALL, inplace=False):
         """Apply node update function on the node embeddings in the specified layer.
 
@@ -481,7 +602,7 @@ class NodeFlow(DGLGraph):
             If True, update will be done in place, but autograd will break.
         """
         if func == "default":
-            func = self._apply_node_func
+            func = self._apply_node_funcs[block_id]
         if is_all(v):
             v = utils.toindex(slice(0, self.layer_size(layer_id)))
         else:
@@ -514,7 +635,7 @@ class NodeFlow(DGLGraph):
             If True, update will be done in place, but autograd will break.
         """
         if func == "default":
-            func = self._apply_edge_func
+            func = self._apply_edge_funcs[block_id]
         assert func is not None
 
         if is_all(edges):
@@ -580,11 +701,11 @@ class NodeFlow(DGLGraph):
             If True, update will be done in place, but autograd will break.
         """
         if message_func == "default":
-            message_func = self._message_func
+            message_func = self._message_funcs[block_id]
         if reduce_func == "default":
-            reduce_func = self._reduce_func
+            reduce_func = self._reduce_funcs[block_id]
         if apply_node_func == "default":
-            apply_node_func = self._apply_node_func
+            apply_node_func = self._apply_node_funcs[block_id]
 
         assert message_func is not None
         assert reduce_func is not None
@@ -619,8 +740,8 @@ class NodeFlow(DGLGraph):
                                                 inplace=inplace)
             Runtime.run(prog)
 
-    def prop_flow(self, message_func="default", reduce_func="default",
-                  apply_node_func="default", flow_range=ALL, inplace=False):
+    def prop_flow(self, message_funcs="default", reduce_funcs="default",
+                  apply_node_funcs="default", flow_range=ALL, inplace=False):
         """Perform the computation on flows. By default, it runs on all blocks, one-by-one.
         On block i, it runs `pull` on nodes in layer i+1, which generates
         messages on edges in block i, runs the reduce function and node update
@@ -632,13 +753,13 @@ class NodeFlow(DGLGraph):
 
         Parameters
         ----------
-        message_funcs : a list of callable, optional
+        message_funcs : a callable, a list of callable, optional
             Message functions on the edges. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
-        reduce_funcs : a list of callable, optional
+        reduce_funcs : a callable, a list of callable, optional
             Reduce functions on the node. The function should be
             a :mod:`Node UDF <dgl.udf>`.
-        apply_node_funcs : a list of callable, optional
+        apply_node_funcs : a callable, a list of callable, optional
             Apply functions on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
         range : int or a slice or ALL.
@@ -646,22 +767,39 @@ class NodeFlow(DGLGraph):
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
         """
-        if isinstance(flow_range, int):
-            self.block_compute(flow_range, message_func, reduce_func, apply_node_func,
-                               inplace=inplace)
+        if is_all(flow_range):
+            flow_range = range(0, self.num_blocks)
+        elif isinstance(flow_range, slice):
+            if slice.step is not 1:
+                raise DGLError("We can't propogate flows and skip some of them")
+            flow_range = range(flow_range.start, flow_range.stop)
         else:
-            if is_all(flow_range):
-                flow_range = range(0, self.num_blocks)
-            elif isinstance(flow_range, slice):
-                if slice.step is not 1:
-                    raise DGLError("We can't propogate flows and skip some of them")
-                flow_range = range(flow_range.start, flow_range.stop)
-            else:
-                raise DGLError("unknown flow range")
+            raise DGLError("unknown flow range")
 
-            for i in flow_range:
-                self.block_compute(i, message_func, reduce_func, apply_node_func,
-                                   inplace=inplace)
+        for i in flow_range:
+            if message_funcs == "default":
+                message_func = self._message_funcs[i]
+            elif isinstance(message_funcs, list):
+                message_func = message_funcs[i]
+            else:
+                message_func = message_funcs
+
+            if reduce_funcs == "default":
+                reduce_func = self._reduce_funcs[i]
+            elif isinstance(reduce_funcs, list):
+                reduce_func = reduce_funcs[i]
+            else:
+                reduce_func = reduce_funcs
+
+            if apply_node_funcs == "default":
+                apply_node_func = self._apply_node_funcs[i]
+            elif isinstance(apply_node_funcs, list):
+                apply_node_func = apply_node_funcs[i]
+            else:
+                apply_node_func = apply_node_funcs
+
+            self.block_compute(i, message_func, reduce_func, apply_node_func,
+                               inplace=inplace)
 
 
 def create_full_node_flow(g, num_layers):
