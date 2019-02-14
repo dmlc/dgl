@@ -549,7 +549,11 @@ class ImmutableGraph: public GraphInterface {
   bool is_multigraph_ = false;
  private:
   /*! \brief Get a random successor given the current node.  Changes the seed */
-  dgl_id_t GetRandomSuccessor(dgl_id_t vid, unsigned int *seed) const;
+  inline dgl_id_t GetRandomSuccessor(dgl_id_t vid, unsigned int *seed) const {
+    const DGLIdIters &succ = this->GetOutCSR()->GetIndexRef(vid);
+    const size_t size = succ.size();
+    return succ[rand_r(seed) % size];
+  }
 };
 
 }  // namespace dgl

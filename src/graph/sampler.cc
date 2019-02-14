@@ -447,13 +447,6 @@ SampledSubgraph ImmutableGraph::NeighborUniformSample(IdArray seeds,
   return ret;
 }
 
-dgl_id_t ImmutableGraph::GetRandomSuccessor(dgl_id_t vid,
-                                            unsigned int *seed) const {
-  const DGLIdIters &succ = this->GetOutCSR()->GetIndexRef(vid);
-  const size_t size = succ.size();
-  return succ[rand_r(seed) % size];
-}
-
 IdArray ImmutableGraph::RandomWalk(IdArray seeds,
                                    int num_traces,
                                    int num_hops) const {
