@@ -136,17 +136,17 @@ def _copy_to_like(arr1, arr2):
     return F.copy_to(arr1, F.context(arr2))
 
 def _get_frame(frame, names, ids):
-    kv = {name: frame[name][_copy_to_like(ids, frame[name])] for name in names}
-    if len(kv) == 0:
+    col_dict = {name: frame[name][_copy_to_like(ids, frame[name])] for name in names}
+    if len(col_dict) == 0:
         return FrameRef(Frame(num_rows=len(ids)))
     else:
-        return FrameRef(Frame(kv))
+        return FrameRef(Frame(col_dict))
 
 
 def _update_frame(frame, names, ids, new_frame):
-    kv = {name: new_frame[name] for name in names}
-    if len(kv) > 0:
-        frame.update_rows(ids, FrameRef(Frame(kv)), inplace=True)
+    col_dict = {name: new_frame[name] for name in names}
+    if len(col_dict) > 0:
+        frame.update_rows(ids, FrameRef(Frame(col_dict)), inplace=True)
 
 
 class NodeFlow(DGLGraph):
