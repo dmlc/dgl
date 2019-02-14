@@ -202,9 +202,9 @@ while True:
 #
 import mxnet.gluon as gluon
 
-class SteadyStateOperator(gluon.Block):
+class FullGraphSteadyStateOperator(gluon.Block):
     def __init__(self, n_hidden, activation, **kwargs):
-        super(SteadyStateOperator, self).__init__(**kwargs)
+        super(FullGraphSteadyStateOperator, self).__init__(**kwargs)
         with self.name_scope():
             self.dense1 = gluon.nn.Dense(n_hidden, activation=activation)
             self.dense2 = gluon.nn.Dense(n_hidden)
@@ -249,9 +249,9 @@ class Predictor(gluon.Block):
             self.dense1 = gluon.nn.Dense(n_hidden, activation=activation)
             self.dense2 = gluon.nn.Dense(2)  ## binary classifier
  
-    def forward(self, g):
-        g.ndata['z'] = self.dense2(self.dense1(g.ndata['h']))
-        return g.ndata['z']
+    def forward(self, h):
+        return self.dense2(self.dense1(h))
+
 ##############################################################################
 # The predictor’s decision rule is just a decision rule for binary
 # classification:
@@ -339,11 +339,11 @@ nodes_test = np.where(test_bitmap)[0]
 # :math:`\call_\text{SteadyState}`. Note that ``g`` in the following is
 # :math:`\calg_y` instead of :math:`\calg`.
 #
-def update_parameters(g, label_nodes, steady_state_operator, predictor, trainer):
+def fullgraph_update_parameters(g, label_nodes, steady_state_operator, predictor, trainer):
     n = g.number_of_nodes()
     with mx.autograd.record():
         steady_state_operator(g)
-        z = predictor(g)[label_nodes]
+        z = predictor(g.ndata['h'][label_nodes])
         y = g.ndata['y'].reshape(n)[label_nodes]  # label
         loss = mx.nd.softmax_cross_entropy(z, y)
     loss.backward()
@@ -369,7 +369,8 @@ def train(g, label_nodes, steady_state_operator, predictor, trainer):
         update_embeddings(g, steady_state_operator)
     # second phase
     for i in range(n_parameter_updates):
-        loss = update_parameters(g, label_nodes, steady_state_operator, predictor, trainer)
+        loss = fullgraph_update_parameters(g, label_nodes, steady_state_operator,
+                                           predictor, trainer)
     return loss
 ##############################################################################
 # Scaling up with Stochastic Subgraph Training
@@ -425,7 +426,7 @@ sampler = dgl.contrib.sampling.NeighborSampler(
        G, 2, 3, num_hops=2, shuffle=True)
 seeds = []
 for subg, aux_info in sampler:
-    seeds.append(subg.layer_parent_nid(0))
+    seeds.append(subg.layer_parent_nid(-1))
 
 ##############################################################################
 # Sampler with DGL
@@ -433,13 +434,46 @@ for subg, aux_info in sampler:
 #
 # The code illustrates the training process in mini-batches.
 #
-def update_embeddings_subgraph(g, seed_nodes, steady_state_operator):
+
+class SubgraphSteadyStateOperator(gluon.Block):
+    def __init__(self, n_hidden, activation, **kwargs):
+        super(SubgraphSteadyStateOperator, self).__init__(**kwargs)
+        with self.name_scope():
+            self.dense1 = gluon.nn.Dense(n_hidden, activation=activation)
+            self.dense2 = gluon.nn.Dense(n_hidden)
+
+    def forward(self, subg):
+        def message_func(edges):
+            x = edges.src['x']
+            h = edges.src['h']
+            return {'m' : mx.nd.concat(x, h, dim=1)}
+
+        def reduce_func(nodes):
+            m = mx.nd.sum(nodes.mailbox['m'], axis=1)
+            z = mx.nd.concat(nodes.data['x'], m, dim=1)
+            return {'h' : self.dense2(self.dense1(z))}
+
+        subg.block_compute(0, message_func, reduce_func)
+        return subg.layers[-1].data['h']
+
+def update_parameters_subgraph(subg, steady_state_operator, predictor, trainer):
+    n = subg.layer_size(-1)
+    with mx.autograd.record():
+        steady_state_operator(subg)
+        z = predictor(subg.layers[-1].data['h'])
+        y = subg.layers[-1].data['y'].reshape(n)  # label
+        loss = mx.nd.softmax_cross_entropy(z, y)
+    loss.backward()
+    trainer.step(n)  # divide gradients by the number of labelled nodes
+    return loss.asnumpy()[0]
+
+def update_embeddings_subgraph(g, steady_state_operator):
     # Note that we are only updating the embeddings of seed nodes here.
     # The reason is that only the seed nodes have ample information
     # from neighbors, especially if the subgraph is small (e.g. 1-hops)
-    prev_h = g.ndata['h'][seed_nodes]
-    next_h = steady_state_operator(g)[seed_nodes]
-    g.ndata['h'][seed_nodes] = (1 - alpha) * prev_h + alpha * next_h
+    prev_h = g.layers[-1].data['h']
+    next_h = steady_state_operator(g)
+    g.layers[-1].data['h'] = (1 - alpha) * prev_h + alpha * next_h
 
 def train_on_subgraphs(g, label_nodes, batch_size,
                        steady_state_operator, predictor, trainer):
@@ -456,39 +490,34 @@ def train_on_subgraphs(g, label_nodes, batch_size,
             return_seed_id=True)
     for i in range(n_embedding_updates):
         subg, aux_info = next(sampler)
-        seeds = aux_info['seeds']
         # Currently, subgraphing does not copy or share features
         # automatically.  Therefore, we need to copy the node
         # embeddings of the subgraph from the parent graph with
         # `copy_from_parent()` before computing...
         subg.copy_from_parent()
-        subg_seeds = subg.layer_nid(0)
-        update_embeddings_subgraph(subg, subg_seeds, steady_state_operator)
+        update_embeddings_subgraph(subg, steady_state_operator)
         # ... and copy them back to the parent graph.
-        g.ndata['h'][seeds] = subg.ndata['h'][subg_seeds]
+        g.ndata['h'][subg.layer_parent_nid(-1)] = subg.layers[-1].data['h']
     for i in range(n_parameter_updates):
         try:
             subg, aux_info = next(sampler_train)
-            seeds = aux_info['seeds']
         except:
             break
         # Again we need to copy features from parent graph
         subg.copy_from_parent()
-        subg_seeds = subg.layer_nid(0)
-        loss = update_parameters(subg, subg_seeds,
-                                 steady_state_operator, predictor, trainer)
+        loss = update_parameters_subgraph(subg, steady_state_operator, predictor, trainer)
         # We don't need to copy the features back to parent graph.
     return loss
 
 ##############################################################################
 # We also define a helper function that reports prediction accuracy:
 
-def test(g, test_nodes, steady_state_operator, predictor):
-    predictor(g)
-    y_bar = mx.nd.argmax(g.ndata['z'], axis=1)[test_nodes]
+def test(g, test_nodes, predictor):
+    z = predictor(g.ndata['h'][test_nodes])
+    y_bar = mx.nd.argmax(z, axis=1)
     y = g.ndata['y'].reshape(n)[test_nodes]
     accuracy = mx.nd.sum(y_bar == y) / len(test_nodes)
-    return accuracy.asnumpy()[0]
+    return accuracy.asnumpy()[0], z
 
 ##############################################################################
 # Some routine preparations for training:
@@ -496,11 +525,11 @@ def test(g, test_nodes, steady_state_operator, predictor):
 lr = 1e-3
 activation = 'relu'
 
-steady_state_operator = SteadyStateOperator(n_hidden, activation)
+subgraph_steady_state_operator = SubgraphSteadyStateOperator(n_hidden, activation)
 predictor = Predictor(n_hidden, activation)
-steady_state_operator.initialize()
+subgraph_steady_state_operator.initialize()
 predictor.initialize()
-params = steady_state_operator.collect_params()
+params = subgraph_steady_state_operator.collect_params()
 params.update(predictor.collect_params())
 trainer = gluon.Trainer(params, 'adam', {'learning_rate' : lr})
 
@@ -516,12 +545,13 @@ batch_size = 64
 
 y_bars = []
 for i in range(n_epochs):
-    loss = train_on_subgraphs(g, nodes_train, batch_size, steady_state_operator, predictor, trainer)
+    loss = train_on_subgraphs(g, nodes_train, batch_size, subgraph_steady_state_operator,
+                              predictor, trainer)
  
-    accuracy_train = test(g, nodes_train, steady_state_operator, predictor)
-    accuracy_test = test(g, nodes_test, steady_state_operator, predictor)
+    accuracy_train, _ = test(g, nodes_train, predictor)
+    accuracy_test, z = test(g, nodes_test, predictor)
     print("Iter {:05d} | Train acc {:.4} | Test acc {:.4f}".format(i, accuracy_train, accuracy_test))
-    y_bar = mx.nd.argmax(g.ndata['z'], axis=1)
+    y_bar = mx.nd.argmax(z, axis=1)
     y_bars.append(y_bar)
 
 ##############################################################################
