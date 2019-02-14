@@ -3014,20 +3014,25 @@ class DGLGraph(object):
             edges = F.tensor(edges)
             return F.boolean_mask(edges, e_mask)
 
-    def switch_readonly(self, readonly):
-        """Switch readonly state of the graph.
+    def readonly_(self, readonly=True):
+        """Set this graph's readonly state in-place. Return this graph.
 
         Parameters
         ----------
         readonly : bool, optional
-            New readonly state of the graph.
+            New readonly state of the graph, defaults to True.
+
+        Returns
+        -------
+        DGLGraph 
+            The graph itself.
 
         Examples
         --------
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
         >>> G.add_edge(0, 1)
-        >>> G.switch_readonly(True)
+        >>> G.readonly_()
         >>> try:
         >>>     G.add_nodes(5)
         >>>     fail = False
@@ -3036,14 +3041,15 @@ class DGLGraph(object):
         >>>
         >>> fail
         True
-        >>> G.switch_readonly(False)
+        >>> G.readonly_(False)
         >>> G.add_nodes(5)
         >>> G.number_of_nodes()
         8
         """
         if readonly == self._graph.is_readonly():
-            return
-        self._graph.switch_readonly(readonly)
+            return self
+        self._graph.readonly_(readonly)
+        return self
 
     def __repr__(self):
         ret = ('DGLGraph(num_nodes={node}, num_edges={edge},\n'
