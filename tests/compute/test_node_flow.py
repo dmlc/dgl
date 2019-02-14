@@ -38,9 +38,9 @@ def check_basic(g, nf):
     assert nf.number_of_edges() == num_edges
 
     deg = nf.layer_in_degree(0)
-    assert F.array_equal(deg, F.zeros((nf.layer_size(0)), 'int64'))
+    assert F.array_equal(deg, F.zeros((nf.layer_size(0)), F.int64))
     deg = nf.layer_out_degree(-1)
-    assert F.array_equal(deg, F.zeros((nf.layer_size(-1)), 'int64'))
+    assert F.array_equal(deg, F.zeros((nf.layer_size(-1)), F.int64))
     for i in range(1, nf.num_layers):
         in_deg = nf.layer_in_degree(i)
         out_deg = nf.layer_out_degree(i - 1)
@@ -229,9 +229,9 @@ def test_copy():
                              g.ndata['h%d' % i][nf.layer_parent_nid(i)])
 
     nf = create_mini_batch(g, num_layers)
-    g.ndata['h0'] = g.ndata['h'].copy()
-    g.ndata['h1'] = g.ndata['h'].copy()
-    g.ndata['h2'] = g.ndata['h'].copy()
+    g.ndata['h0'] = F.clone(g.ndata['h'])
+    g.ndata['h1'] = F.clone(g.ndata['h'])
+    g.ndata['h2'] = F.clone(g.ndata['h'])
     node_embed_names = [['h0'], ['h1'], ['h2']]
     nf.copy_from_parent(node_embed_names=node_embed_names, edge_embed_names=None)
 
