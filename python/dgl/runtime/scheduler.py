@@ -245,6 +245,8 @@ def schedule_nodeflow_apply_nodes(graph,
     ----------
     graph: DGLGraph
         The DGLGraph to use
+    layer_id : int
+        The layer where we apply node update function.
     v : utils.Index
         Nodes to apply
     apply_func: callable
@@ -325,6 +327,8 @@ def schedule_nodeflow_apply_edges(graph, block_id,
     ----------
     graph: DGLGraph
         The DGLGraph to use
+    block_id : int
+        The block whose edges we apply edge update function.
     u : utils.Index
         Source nodes of edges to apply
     v : utils.Index
@@ -501,8 +505,14 @@ def schedule_nodeflow_compute(graph,
     ----------
     graph: DGLGraph
         The DGLGraph to use
-    pull_nodes : utils.Index
-        Destination nodes for pull
+    block_id : int
+        The block where we perform computation.
+    u : utils.Index
+        Source nodes of edges to apply
+    v : utils.Index
+        Destination nodes of edges to apply
+    eid : utils.Index
+        Ids of sending edges
     message_func: callable or list of callable
         The message function
     reduce_func: callable or list of callable
