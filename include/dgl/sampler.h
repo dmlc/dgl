@@ -39,6 +39,6 @@ struct NodeFlow {
   IdArray edge_mapping;
 };
 
-}  // dgl
+}  // namespace dgl
 
 #endif  // DGL_SAMPLER_H_

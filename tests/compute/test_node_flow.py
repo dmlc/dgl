@@ -54,13 +54,13 @@ def check_basic(g, nf):
     assert F.array_equal(nf.blocks[1].data['h2'], g.edata['h2'][nf.block_parent_eid(1)])
 
     for i in range(nf.number_of_nodes()):
-        layer_id, local_nid = nf.map_to_layer_nid(i)
+        layer_id, local_nid = nf._map_to_layer_nid(i)
         assert(layer_id >= 0)
         parent_id = nf.map_to_parent_nid(i)
         assert F.array_equal(nf.layers[layer_id].data['h1'][local_nid], g.ndata['h1'][parent_id])
 
     for i in range(nf.number_of_edges()):
-        block_id, local_eid = nf.map_to_block_eid(i)
+        block_id, local_eid = nf._map_to_block_eid(i)
         assert(block_id >= 0)
         parent_id = nf.map_to_parent_eid(i)
         assert F.array_equal(nf.blocks[block_id].data['h2'][local_eid], g.edata['h2'][parent_id])

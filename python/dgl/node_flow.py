@@ -1,15 +1,15 @@
 """Class for NodeFlow data structure."""
 from __future__ import absolute_import
 
+from collections import namedtuple
+from collections.abc import MutableMapping
 import numpy as np
 
-from collections import namedtuple
 from .base import ALL, is_all, DGLError
 from . import backend as F
 from .frame import Frame, FrameRef
 from .graph import DGLGraph
 from .runtime import ir, scheduler, Runtime
-from collections.abc import MutableMapping
 from . import utils
 
 NodeSpace = namedtuple('NodeSpace', ['data'])
@@ -173,8 +173,10 @@ class NodeFlow(DGLGraph):
         self._edge_mapping = graph_idx.edge_mapping
         self._layer_offsets = graph_idx.layers.tonumpy()
         self._block_offsets = graph_idx.flows.tonumpy()
-        self._node_frames = [FrameRef(Frame(num_rows=self.layer_size(i))) for i in range(self.num_layers)]
-        self._edge_frames = [FrameRef(Frame(num_rows=self.block_size(i))) for i in range(self.num_blocks)]
+        self._node_frames = [FrameRef(Frame(num_rows=self.layer_size(i))) \
+                             for i in range(self.num_layers)]
+        self._edge_frames = [FrameRef(Frame(num_rows=self.block_size(i))) \
+                             for i in range(self.num_blocks)]
 
     # override APIs
     def add_nodes(self, num, data=None):
@@ -369,12 +371,12 @@ class NodeFlow(DGLGraph):
         """
         return self._edge_mapping.tousertensor()[eid]
 
-    def map_to_layer_nid(self, nid):
+    def _map_to_layer_nid(self, nid):
         layer_id = np.sum(self._layer_offsets <= nid) - 1
         # TODO do I need to reverse here?
         return int(layer_id), nid - self._layer_offsets[layer_id]
 
-    def map_to_block_eid(self, eid):
+    def _map_to_block_eid(self, eid):
         block_id = np.sum(self._block_offsets <= eid) - 1
         # TODO do I need to reverse here?
         return int(block_id), eid - self._block_offsets[block_id]
@@ -553,7 +555,7 @@ class NodeFlow(DGLGraph):
         return eid - self._block_offsets[block_id]
 
     def block_compute(self, block_id, message_func="default", reduce_func="default",
-                     apply_node_func="default", v=ALL, inplace=False):
+                      apply_node_func="default", v=ALL, inplace=False):
         """Perform the computation on the specified block. It's similar to `pull`
         in DGLGraph.
         On the given block i, it runs `pull` on nodes in layer i+1, which generates
@@ -611,7 +613,7 @@ class NodeFlow(DGLGraph):
                                                 u=u,
                                                 v=v,
                                                 eid=eid,
-                                                dest_nodes = dest_nodes,
+                                                dest_nodes=dest_nodes,
                                                 message_func=message_func,
                                                 reduce_func=reduce_func,
                                                 apply_func=apply_node_func,
@@ -647,23 +649,37 @@ class NodeFlow(DGLGraph):
         """
         if isinstance(flow_range, int):
             self.block_compute(flow_range, message_func, reduce_func, apply_node_func,
-                              inplace=inplace)
+                               inplace=inplace)
         else:
             if is_all(flow_range):
-                flow_range=range(0, self.num_blocks)
+                flow_range = range(0, self.num_blocks)
             elif isinstance(flow_range, slice):
                 if slice.step is not 1:
                     raise DGLError("We can't propogate flows and skip some of them")
-                flow_range=range(flow_range.start, flow_range.stop)
+                flow_range = range(flow_range.start, flow_range.stop)
             else:
                 raise DGLError("unknown flow range")
 
             for i in flow_range:
                 self.block_compute(i, message_func, reduce_func, apply_node_func,
-                                  inplace=inplace)
+                                   inplace=inplace)
 
 
 def create_full_node_flow(g, num_layers):
+    """Convert a full graph to NodeFlow to run a L-layer GNN model.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        a DGL graph
+    num_layers : int
+        The number of layers
+
+    Returns
+    -------
+    NodeFlow
+        a NodeFlow with a specified number of layers.
+    """
     seeds = [utils.toindex(F.arange(0, g.number_of_nodes()))]
     nfi = g._graph.neighbor_sampling(seeds, g.number_of_nodes(), num_layers, 'in', None)
     return NodeFlow(g, nfi[0])

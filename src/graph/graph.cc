@@ -4,12 +4,12 @@
  * \brief DGL graph index implementation
  */
 #include <dgl/graph.h>
+#include <dgl/sampler.h>
 #include <algorithm>
 #include <unordered_map>
 #include <set>
 #include <functional>
 #include <tuple>
-#include <dgl/sampler.h>
 #include "../c_api_common.h"
 
 namespace dgl {

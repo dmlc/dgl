@@ -528,7 +528,8 @@ def schedule_nodeflow_compute(graph,
         var_eid = var.IDX(eid)
         # generate send and reduce schedule
         uv_getter = lambda: (var_u, var_v)
-        adj_creator = lambda: spmv.build_adj_matrix_uv((u, v), dest_nodes, graph.layer_size(block_id))
+        adj_creator = lambda: spmv.build_adj_matrix_uv((u, v), dest_nodes,
+                                                       graph.layer_size(block_id))
         inc_creator = lambda: spmv.build_inc_matrix_dst(v, dest_nodes)
         reduced_feat = _gen_send_reduce(graph, graph._get_node_frame(block_id),
                                         graph._get_node_frame(block_id + 1),

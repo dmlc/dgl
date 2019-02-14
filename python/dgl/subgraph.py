@@ -1,7 +1,6 @@
 """Class for subgraph data structure."""
 from __future__ import absolute_import
 
-from . import backend as F
 from .frame import Frame, FrameRef
 from .graph import DGLGraph
 from . import utils
