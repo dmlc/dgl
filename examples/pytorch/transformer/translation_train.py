@@ -83,7 +83,7 @@ def main(dev_id, args):
             param.data /= ndev
 
     # Optimizer
-    model_opt = NoamOpt(dim_model, 1, 4000,
+    model_opt = NoamOpt(dim_model, 0.1, 4000,
                         T.optim.Adam(model.parameters(), lr=1e-3,
                                      betas=(0.9, 0.98), eps=1e-9))
 
