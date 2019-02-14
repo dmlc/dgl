@@ -459,7 +459,6 @@ IdArray ImmutableGraph::RandomWalk(IdArray seeds,
                                    int num_hops) const {
   const int num_nodes = seeds->shape[0];
   const dgl_id_t *seed_ids = static_cast<dgl_id_t *>(seeds->data);
-  // TODO: any ways getting rid of these sign casting?
   IdArray traces = IdArray::Empty(
       {num_nodes, num_traces, num_hops + 1},
       DLDataType{kDLInt, 64, 1},
