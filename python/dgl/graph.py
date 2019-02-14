@@ -18,6 +18,23 @@ from .udf import NodeBatch, EdgeBatch
 __all__ = ['DGLGraph']
 
 class DGLBaseGraph(object):
+    """Base graph class.
+
+    DGL graph is always directional. Undirected graph can be represented using
+    two bi-directional edges.
+
+    Nodes are identified by consecutive integers starting from zero.
+
+    Edges can be specified by two end points (u, v) or the integer id assigned
+    when the edges are added.  Edge IDs are automatically assigned by the order
+    of addition, i.e. the first edge being added has an ID of 0, the second
+    being 1, so on so forth.
+
+    Parameters
+    ----------
+    graph : graph index, optional
+        Data to initialize graph.
+    """
     def __init__(self, graph):
         self._graph = graph
 

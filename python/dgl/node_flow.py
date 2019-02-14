@@ -475,8 +475,8 @@ class NodeFlow(DGLBaseGraph):
             The feature field name. Default is set an initializer for all the
             feature fields.
         """
-        if is_all(block_id):
-            for i in range(self.num_blocks):
+        if is_all(layer_id):
+            for i in range(self.num_layers):
                 self._node_frames[i].set_initializer(initializer, field)
         else:
             self._node_frames[i].set_initializer(initializer, field)
