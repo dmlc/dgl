@@ -5,14 +5,6 @@
  */
 #include "c_api_common.h"
 
-#ifdef _MSC_VER
-// rand in MS compiler works well in multi-threading.
-static inline int rand_r(unsigned *seed) {
-  return rand();
-}
-#define _CRT_RAND_S
-#endif
-
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;
 using dgl::runtime::DGLRetValue;
