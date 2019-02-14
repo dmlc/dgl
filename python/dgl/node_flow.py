@@ -259,7 +259,7 @@ class NodeFlow(DGLGraph):
             the specified layer to return the number of nodes.
         """
         layer_id = self._get_layer_id(layer_id)
-        return self._layer_offsets[layer_id + 1] - self._layer_offsets[layer_id]
+        return int(self._layer_offsets[layer_id + 1]) - int(self._layer_offsets[layer_id])
 
     def block_size(self, block_id):
         """Return the number of edges in a specified block.
@@ -269,7 +269,7 @@ class NodeFlow(DGLGraph):
             the specified block to return the number of edges.
         """
         block_id = self._get_block_id(block_id)
-        return self._block_offsets[block_id + 1] - self._block_offsets[block_id]
+        return int(self._block_offsets[block_id + 1]) - int(self._block_offsets[block_id])
 
     def copy_from_parent(self, node_embed_names=ALL, edge_embed_names=ALL):
         """Copy node/edge features from the parent graph.
@@ -374,12 +374,12 @@ class NodeFlow(DGLGraph):
     def _map_to_layer_nid(self, nid):
         layer_id = np.sum(self._layer_offsets <= nid) - 1
         # TODO do I need to reverse here?
-        return int(layer_id), nid - self._layer_offsets[layer_id]
+        return int(layer_id), nid - int(self._layer_offsets[layer_id])
 
     def _map_to_block_eid(self, eid):
         block_id = np.sum(self._block_offsets <= eid) - 1
         # TODO do I need to reverse here?
-        return int(block_id), eid - self._block_offsets[block_id]
+        return int(block_id), eid - int(self._block_offsets[block_id])
 
     def layer_in_degree(self, layer_id):
         """Return the in-degree of the nodes in the specified layer.
@@ -485,8 +485,7 @@ class NodeFlow(DGLGraph):
         if is_all(v):
             v = utils.toindex(slice(0, self.layer_size(layer_id)))
         else:
-            v = v - self._layer_offsets[layer_id]
-            #assert F.all(v >= 0), "All vertices have to be in layer " + str(layer_id)
+            v = v - int(self._layer_offsets[layer_id])
             v = utils.toindex(v)
         with ir.prog() as prog:
             scheduler.schedule_nodeflow_apply_nodes(graph=self,
@@ -526,15 +525,15 @@ class NodeFlow(DGLGraph):
             u, v = edges
             # Rewrite u, v to handle edge broadcasting and multigraph.
             u, v, eid = self._graph.edge_ids(utils.toindex(u), utils.toindex(v))
-            u = utils.toindex(u.tousertensor() - self._layer_offsets[block_id])
-            v = utils.toindex(v.tousertensor() - self._layer_offsets[block_id + 1])
-            eid = utils.toindex(eid.tousertensor() - self._block_offsets[block_id])
+            u = utils.toindex(u.tousertensor() - int(self._layer_offsets[block_id]))
+            v = utils.toindex(v.tousertensor() - int(self._layer_offsets[block_id + 1]))
+            eid = utils.toindex(eid.tousertensor() - int(self._block_offsets[block_id]))
         else:
             eid = utils.toindex(edges)
             u, v, _ = self._graph.find_edges(eid)
-            u = utils.toindex(u.tousertensor() - self._layer_offsets[block_id])
-            v = utils.toindex(v.tousertensor() - self._layer_offsets[block_id + 1])
-            eid = utils.toindex(edges - self._block_offsets[block_id])
+            u = utils.toindex(u.tousertensor() - int(self._layer_offsets[block_id]))
+            v = utils.toindex(v.tousertensor() - int(self._layer_offsets[block_id + 1]))
+            eid = utils.toindex(edges - int(self._block_offsets[block_id]))
 
         with ir.prog() as prog:
             scheduler.schedule_nodeflow_apply_edges(graph=self,
@@ -548,11 +547,11 @@ class NodeFlow(DGLGraph):
 
     def _conv_local_nid(self, nid, layer_id):
         layer_id = self._get_layer_id(layer_id)
-        return nid - self._layer_offsets[layer_id]
+        return nid - int(self._layer_offsets[layer_id])
 
     def _conv_local_eid(self, eid, block_id):
         block_id = self._get_block_id(block_id)
-        return eid - self._block_offsets[block_id]
+        return eid - int(self._block_offsets[block_id])
 
     def block_compute(self, block_id, message_func="default", reduce_func="default",
                       apply_node_func="default", v=ALL, inplace=False):
