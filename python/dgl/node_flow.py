@@ -408,7 +408,7 @@ class NodeFlow(DGLGraph):
         assert layer_id + 1 < len(self._layer_offsets)
         start = self._layer_offsets[layer_id]
         end = self._layer_offsets[layer_id + 1]
-        return F.arange(start, end)
+        return F.arange(int(start), int(end))
 
     def layer_parent_nid(self, layer_id):
         """Get the node Ids of the parent graph in the specified layer
@@ -445,7 +445,7 @@ class NodeFlow(DGLGraph):
         block_id = self._get_block_id(block_id)
         start = self._block_offsets[block_id]
         end = self._block_offsets[block_id + 1]
-        return F.arange(start, end)
+        return F.arange(int(start), int(end))
 
     def block_parent_eid(self, block_id):
         """Get the edge Ids of the parent graph in the specified block.
