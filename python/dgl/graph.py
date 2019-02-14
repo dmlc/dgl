@@ -3024,7 +3024,7 @@ class DGLGraph(object):
 
         Returns
         -------
-        DGLGraph 
+        DGLGraph
             The graph itself.
 
         Examples
