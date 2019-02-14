@@ -33,8 +33,8 @@ def check_basic(g, nf):
         num_nodes += nf.layer_size(i)
     assert nf.number_of_nodes() == num_nodes
     num_edges = 0
-    for i in range(nf.num_flows):
-        num_edges += nf.flow_size(i)
+    for i in range(nf.num_blocks):
+        num_edges += nf.block_size(i)
     assert nf.number_of_edges() == num_edges
 
     deg = nf.layer_in_degree(0)
@@ -50,8 +50,8 @@ def check_basic(g, nf):
     assert F.array_equal(nf.layers[0].data['h1'], g.ndata['h1'][nf.layer_parent_nid(0)])
     assert F.array_equal(nf.layers[1].data['h1'], g.ndata['h1'][nf.layer_parent_nid(1)])
     assert F.array_equal(nf.layers[2].data['h1'], g.ndata['h1'][nf.layer_parent_nid(2)])
-    assert F.array_equal(nf.flows[0].data['h2'], g.edata['h2'][nf.flow_parent_eid(0)])
-    assert F.array_equal(nf.flows[1].data['h2'], g.edata['h2'][nf.flow_parent_eid(1)])
+    assert F.array_equal(nf.blocks[0].data['h2'], g.edata['h2'][nf.block_parent_eid(0)])
+    assert F.array_equal(nf.blocks[1].data['h2'], g.edata['h2'][nf.block_parent_eid(1)])
 
     for i in range(nf.number_of_nodes()):
         layer_id, local_nid = nf.map_to_layer_nid(i)
@@ -60,10 +60,10 @@ def check_basic(g, nf):
         assert F.array_equal(nf.layers[layer_id].data['h1'][local_nid], g.ndata['h1'][parent_id])
 
     for i in range(nf.number_of_edges()):
-        flow_id, local_eid = nf.map_to_flow_eid(i)
-        assert(flow_id >= 0)
+        block_id, local_eid = nf.map_to_block_eid(i)
+        assert(block_id >= 0)
         parent_id = nf.map_to_parent_eid(i)
-        assert F.array_equal(nf.flows[flow_id].data['h2'][local_eid], g.edata['h2'][parent_id])
+        assert F.array_equal(nf.blocks[block_id].data['h2'][local_eid], g.edata['h2'][parent_id])
 
 
 def test_basic():
@@ -113,11 +113,11 @@ def check_apply_edges(create_node_flow):
         g = generate_rand_graph(100)
         nf = create_node_flow(g, num_layers)
         nf.copy_from_parent()
-        new_feats = F.randn((nf.flow_size(i), 5))
+        new_feats = F.randn((nf.block_size(i), 5))
         def update_func(nodes):
             return {'h2' : new_feats}
-        nf.apply_flow(i, update_func)
-        assert F.array_equal(nf.flows[i].data['h2'], new_feats)
+        nf.apply_block(i, update_func)
+        assert F.array_equal(nf.blocks[i].data['h2'], new_feats)
 
 
 def test_apply_edges():
@@ -134,7 +134,7 @@ def check_flow_compute(create_node_flow):
     nf.layers[0].data['h'] = nf.layers[0].data['h1']
     # Test the computation on a layer at a time.
     for i in range(num_layers):
-        nf.flow_compute(i, fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
+        nf.block_compute(i, fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                          lambda nodes: {'h' : nodes.data['t'] + 1})
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                      lambda nodes: {'h' : nodes.data['t'] + 1})
@@ -144,7 +144,7 @@ def check_flow_compute(create_node_flow):
     g.ndata['h'] = g.ndata['h1']
     for i in range(num_layers):
         vs = nf.layer_nid(i+1)[0:4]
-        nf.flow_compute(i, fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
+        nf.block_compute(i, fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                         lambda nodes: {'h' : nodes.data['t'] + 1}, v=vs)
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                      lambda nodes: {'h' : nodes.data['t'] + 1})
@@ -170,8 +170,8 @@ def check_prop_flows(create_node_flow):
                      lambda nodes: {'h' : nodes.data['t'] + 1})
 
     # Test the computation on all layers.
-    nf2.prop_flows(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
-                   lambda nodes: {'h' : nodes.data['t'] + 1})
+    nf2.prop_flow(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
+                  lambda nodes: {'h' : nodes.data['t'] + 1})
     assert F.array_equal(nf2.layers[-1].data['h'], g.ndata['h'][nf2.layer_parent_nid(-1)])
 
 
@@ -191,11 +191,11 @@ def test_copy():
         for key in g.ndata.keys():
             assert key in nf.layers[i].data.keys()
             assert F.array_equal(nf.layers[i].data[key], g.ndata[key][nf.layer_parent_nid(i)])
-    for i in range(nf.num_flows):
-        assert len(g.edata.keys()) == len(nf.flows[i].data.keys())
+    for i in range(nf.num_blocks):
+        assert len(g.edata.keys()) == len(nf.blocks[i].data.keys())
         for key in g.edata.keys():
-            assert key in nf.flows[i].data.keys()
-            assert F.array_equal(nf.flows[i].data[key], g.edata[key][nf.flow_parent_eid(i)])
+            assert key in nf.blocks[i].data.keys()
+            assert F.array_equal(nf.blocks[i].data[key], g.edata[key][nf.block_parent_eid(i)])
 
     nf = create_mini_batch(g, num_layers)
     node_embed_names = [['h'], ['h1'], ['h']]
@@ -206,18 +206,18 @@ def test_copy():
         for key in node_embed_names[i]:
             assert key in nf.layers[i].data.keys()
             assert F.array_equal(nf.layers[i].data[key], g.ndata[key][nf.layer_parent_nid(i)])
-    for i in range(nf.num_flows):
-        assert len(edge_embed_names[i]) == len(nf.flows[i].data.keys())
+    for i in range(nf.num_blocks):
+        assert len(edge_embed_names[i]) == len(nf.blocks[i].data.keys())
         for key in edge_embed_names[i]:
-            assert key in nf.flows[i].data.keys()
-            assert F.array_equal(nf.flows[i].data[key], g.edata[key][nf.flow_parent_eid(i)])
+            assert key in nf.blocks[i].data.keys()
+            assert F.array_equal(nf.blocks[i].data[key], g.edata[key][nf.block_parent_eid(i)])
 
     nf = create_mini_batch(g, num_layers)
     g.ndata['h0'] = g.ndata['h'].copy()
     node_embed_names = [['h0'], [], []]
     nf.copy_from_parent(node_embed_names=node_embed_names, edge_embed_names=None)
     for i in range(num_layers):
-        nf.flow_compute(i, fn.copy_src(src='h%d' % i, out='m'), fn.sum(msg='m', out='t'),
+        nf.block_compute(i, fn.copy_src(src='h%d' % i, out='m'), fn.sum(msg='m', out='t'),
                          lambda nodes: {'h%d' % (i+1) : nodes.data['t'] + 1})
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                      lambda nodes: {'h' : nodes.data['t'] + 1})
@@ -243,7 +243,7 @@ def test_copy():
         return {'h' : F.sum(node.mailbox['m'], 1) + node.data['h%d' % (ind + 1)]}
 
     for i in range(num_layers):
-        nf.flow_compute(i, partial(msg_func, ind=i), partial(reduce_func, ind=i))
+        nf.block_compute(i, partial(msg_func, ind=i), partial(reduce_func, ind=i))
 
 
 if __name__ == '__main__':

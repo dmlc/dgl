@@ -315,7 +315,7 @@ def schedule_apply_edges(graph,
     else:
         ir.WRITE_ROW_(var_ef, var_eid, new_fdedge)
 
-def schedule_nodeflow_apply_edges(graph, flow_id,
+def schedule_nodeflow_apply_edges(graph, block_id,
                                   u, v, eid,
                                   apply_func,
                                   inplace):
@@ -341,9 +341,9 @@ def schedule_nodeflow_apply_edges(graph, flow_id,
     A list of executors for DGL Runtime
     """
     # vars
-    in_var_nf = var.FEAT_DICT(graph._get_node_frame(flow_id), name='in_nf')
-    out_var_nf = var.FEAT_DICT(graph._get_node_frame(flow_id + 1), name='out_nf')
-    var_ef = var.FEAT_DICT(graph._get_edge_frame(flow_id), name='ef')
+    in_var_nf = var.FEAT_DICT(graph._get_node_frame(block_id), name='in_nf')
+    out_var_nf = var.FEAT_DICT(graph._get_node_frame(block_id + 1), name='out_nf')
+    var_ef = var.FEAT_DICT(graph._get_edge_frame(block_id), name='ef')
     var_u = var.IDX(u)
     var_v = var.IDX(v)
     var_eid = var.IDX(eid)
@@ -488,7 +488,7 @@ def schedule_group_apply_edge(graph,
         ir.WRITE_ROW_(var_ef, var_eid, var_out)
 
 def schedule_nodeflow_compute(graph,
-                              flow_id,
+                              block_id,
                               u, v, eid,
                               dest_nodes,
                               message_func,
@@ -518,21 +518,21 @@ def schedule_nodeflow_compute(graph,
     if len(eid) == 0:
         # All the nodes are 0deg; downgrades to apply.
         if apply_func is not None:
-            schedule_nodeflow_apply_nodes(graph, flow_id + 1, v, apply_func, inplace)
+            schedule_nodeflow_apply_nodes(graph, block_id + 1, v, apply_func, inplace)
     else:
         # create vars
-        var_nf = var.FEAT_DICT(graph._get_node_frame(flow_id + 1), name='out_nf')
+        var_nf = var.FEAT_DICT(graph._get_node_frame(block_id + 1), name='out_nf')
         var_dest_nodes = var.IDX(dest_nodes, name='dest_nodes')
         var_u = var.IDX(u)
         var_v = var.IDX(v)
         var_eid = var.IDX(eid)
         # generate send and reduce schedule
         uv_getter = lambda: (var_u, var_v)
-        adj_creator = lambda: spmv.build_adj_matrix_uv((u, v), dest_nodes, graph.layer_size(flow_id))
+        adj_creator = lambda: spmv.build_adj_matrix_uv((u, v), dest_nodes, graph.layer_size(block_id))
         inc_creator = lambda: spmv.build_inc_matrix_dst(v, dest_nodes)
-        reduced_feat = _gen_send_reduce(graph, graph._get_node_frame(flow_id),
-                                        graph._get_node_frame(flow_id + 1),
-                                        graph._get_edge_frame(flow_id),
+        reduced_feat = _gen_send_reduce(graph, graph._get_node_frame(block_id),
+                                        graph._get_node_frame(block_id + 1),
+                                        graph._get_edge_frame(block_id),
                                         message_func, reduce_func,
                                         var_eid, var_dest_nodes,
                                         uv_getter, adj_creator, inc_creator)

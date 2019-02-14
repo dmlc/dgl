@@ -74,7 +74,7 @@ class LayerDataView(MutableMapping):
 
 EdgeSpace = namedtuple('EdgeSpace', ['data'])
 
-class FlowView(object):
+class BlockView(object):
     """A EdgeView class to act as G.edges for a DGLGraph.
 
     Can be used to get a list of current edges and get and set edge data.
@@ -89,18 +89,18 @@ class FlowView(object):
         self._graph = graph
 
     def __len__(self):
-        return self._graph.num_flows
+        return self._graph.num_blocks
 
     def __getitem__(self, flow):
         if not isinstance(flow, int):
             raise DGLError('Currently we only support the view of one flow')
-        return EdgeSpace(data=FlowDataView(self._graph, flow))
+        return EdgeSpace(data=BlockDataView(self._graph, flow))
 
     def __call__(self, *args, **kwargs):
         """Return all the edges."""
         return self._graph.all_edges(*args, **kwargs)
 
-class FlowDataView(MutableMapping):
+class BlockDataView(MutableMapping):
     """The data view class when G.edges[...].data is called.
 
     See Also
@@ -172,9 +172,9 @@ class NodeFlow(DGLGraph):
         self._node_mapping = graph_idx.node_mapping
         self._edge_mapping = graph_idx.edge_mapping
         self._layer_offsets = graph_idx.layers.tonumpy()
-        self._flow_offsets = graph_idx.flows.tonumpy()
+        self._block_offsets = graph_idx.flows.tonumpy()
         self._node_frames = [FrameRef(Frame(num_rows=self.layer_size(i))) for i in range(self.num_layers)]
-        self._edge_frames = [FrameRef(Frame(num_rows=self.flow_size(i))) for i in range(self.num_flows)]
+        self._edge_frames = [FrameRef(Frame(num_rows=self.block_size(i))) for i in range(self.num_blocks)]
 
     # override APIs
     def add_nodes(self, num, data=None):
@@ -195,11 +195,11 @@ class NodeFlow(DGLGraph):
         else:
             return self.num_layers + layer_id
 
-    def _get_flow_id(self, flow_id):
-        if flow_id >= 0:
-            return flow_id
+    def _get_block_id(self, block_id):
+        if block_id >= 0:
+            return block_id
         else:
-            return self.num_flows + flow_id
+            return self.num_blocks + block_id
 
     def _get_node_frame(self, layer_id):
         return self._node_frames[layer_id]
@@ -219,25 +219,55 @@ class NodeFlow(DGLGraph):
         return len(self._layer_offsets) - 1
 
     @property
-    def num_flows(self):
+    def num_blocks(self):
+        """Get the number of blocks.
+        Returns
+        -------
+        int
+            the number of blocks
+        """
         return self.num_layers - 1
 
     @property
     def layers(self):
+        """Return a LayerView of this NodeFlow.
+
+        This is mainly for usage like:
+        * `g.layers[2].data['h']` to get the node features of layer#2.
+        * `g.layers(2)` to get the nodes of layer#2.
+        """
         return LayerView(self)
 
     @property
-    def flows(self):
-        return FlowView(self)
+    def blocks(self):
+        """Return a BlockView of this NodeFlow.
+
+        This is mainly for usage like:
+        * `g.blocks[1,2].data['h']` to get the edge features of blocks from layer#1 to layer#2.
+        * `g.blocks(1, 2)` to get the edge ids of blocks #1->#2.
+        """
+        return BlockView(self)
 
     def layer_size(self, layer_id):
-        """Return the number of nodes in a specified layer."""
+        """Return the number of nodes in a specified layer.
+
+        Parameters
+        ----------
+        layer_id : int
+            the specified layer to return the number of nodes.
+        """
         layer_id = self._get_layer_id(layer_id)
         return self._layer_offsets[layer_id + 1] - self._layer_offsets[layer_id]
 
-    def flow_size(self, flow_id):
-        flow_id = self._get_flow_id(flow_id)
-        return self._flow_offsets[flow_id + 1] - self._flow_offsets[flow_id]
+    def block_size(self, block_id):
+        """Return the number of edges in a specified block.
+        Parameters
+        ----------
+        block_id : int
+            the specified block to return the number of edges.
+        """
+        block_id = self._get_block_id(block_id)
+        return self._block_offsets[block_id + 1] - self._block_offsets[block_id]
 
     def copy_from_parent(self, node_embed_names=ALL, edge_embed_names=ALL):
         """Copy node/edge features from the parent graph.
@@ -260,15 +290,15 @@ class NodeFlow(DGLGraph):
 
         if self._parent._edge_frame.num_rows != 0 and self._parent._edge_frame.num_columns != 0:
             if is_all(edge_embed_names):
-                for i in range(self.num_flows):
-                    eid = utils.toindex(self.flow_parent_eid(i))
+                for i in range(self.num_blocks):
+                    eid = utils.toindex(self.block_parent_eid(i))
                     self._edge_frames[i] = FrameRef(Frame(self._parent._edge_frame[eid]))
             elif edge_embed_names is not None:
                 assert isinstance(edge_embed_names, list) \
-                        and len(edge_embed_names) == self.num_flows, \
+                        and len(edge_embed_names) == self.num_blocks, \
                         "The specified embedding names should be the same as the number of flows."
-                for i in range(self.num_flows):
-                    eid = self.flow_parent_eid(i)
+                for i in range(self.num_blocks):
+                    eid = self.block_parent_eid(i)
                     self._edge_frames[i] = _get_frame(self._parent._edge_frame,
                                                       edge_embed_names[i], eid)
 
@@ -297,15 +327,15 @@ class NodeFlow(DGLGraph):
 
         if self._parent._edge_frame.num_rows != 0 and self._parent._edge_frame.num_columns != 0:
             if is_all(edge_embed_names):
-                for i in range(self.num_flows):
-                    eid = utils.toindex(self.flow_parent_eid(i))
+                for i in range(self.num_blocks):
+                    eid = utils.toindex(self.block_parent_eid(i))
                     self._parent._edge_frame.update_rows(eid, self._edge_frames[i], inplace=True)
             elif edge_embed_names is not None:
                 assert isinstance(edge_embed_names, list) \
-                        and len(edge_embed_names) == self.num_flows, \
+                        and len(edge_embed_names) == self.num_blocks, \
                         "The specified embedding names should be the same as the number of flows."
-                for i in range(self.num_flows):
-                    eid = utils.toindex(self.flow_parent_eid(i))
+                for i in range(self.num_blocks):
+                    eid = utils.toindex(self.block_parent_eid(i))
                     _update_frame(self._parent._edge_frame, edge_embed_names[i], eid,
                                   self._edge_frames[i])
 
@@ -344,19 +374,28 @@ class NodeFlow(DGLGraph):
         # TODO do I need to reverse here?
         return int(layer_id), nid - self._layer_offsets[layer_id]
 
-    def map_to_flow_eid(self, eid):
-        flow_id = np.sum(self._flow_offsets <= eid) - 1
+    def map_to_block_eid(self, eid):
+        block_id = np.sum(self._block_offsets <= eid) - 1
         # TODO do I need to reverse here?
-        return int(flow_id), eid - self._flow_offsets[flow_id]
+        return int(block_id), eid - self._block_offsets[block_id]
 
     def layer_in_degree(self, layer_id):
+        """Return the in-degree of the nodes in the specified layer.
+        """
         return self._graph.in_degrees(utils.toindex(self.layer_nid(layer_id))).tousertensor()
 
     def layer_out_degree(self, layer_id):
+        """Return the out-degree of the nodes in the specified layer.
+        """
         return self._graph.out_degrees(utils.toindex(self.layer_nid(layer_id))).tousertensor()
 
     def layer_nid(self, layer_id):
         """Get the node Ids in the specified layer.
+
+        Parameters
+        ----------
+        layer_id : int
+            The layer to get the node Ids.
 
         Returns
         -------
@@ -372,6 +411,11 @@ class NodeFlow(DGLGraph):
     def layer_parent_nid(self, layer_id):
         """Get the node Ids of the parent graph in the specified layer
 
+        Parameters
+        ----------
+        layer_id : int
+            The layer to get the node Ids.
+
         Returns
         -------
         Tensor
@@ -383,19 +427,57 @@ class NodeFlow(DGLGraph):
         end = self._layer_offsets[layer_id + 1]
         return self._node_mapping.tousertensor()[start:end]
 
-    def flow_eid(self, flow_id):
-        flow_id = self._get_flow_id(flow_id)
-        start = self._flow_offsets[flow_id]
-        end = self._flow_offsets[flow_id + 1]
+    def block_eid(self, block_id):
+        """Get the edge Ids in the specified block.
+
+        Parameters
+        ----------
+        block_id : int
+            the specified block to get edge Ids.
+
+        Returns
+        -------
+        Tensor
+            The edge id array.
+        """
+        block_id = self._get_block_id(block_id)
+        start = self._block_offsets[block_id]
+        end = self._block_offsets[block_id + 1]
         return F.arange(start, end)
 
-    def flow_parent_eid(self, flow_id):
-        flow_id = self._get_flow_id(flow_id)
-        start = self._flow_offsets[flow_id]
-        end = self._flow_offsets[flow_id + 1]
+    def block_parent_eid(self, block_id):
+        """Get the edge Ids of the parent graph in the specified block.
+
+        Parameters
+        ----------
+        block_id : int
+            the specified block to get edge Ids.
+
+        Returns
+        -------
+        Tensor
+            The parent edge id array.
+        """
+        block_id = self._get_block_id(block_id)
+        start = self._block_offsets[block_id]
+        end = self._block_offsets[block_id + 1]
         return self._edge_mapping.tousertensor()[start:end]
 
     def apply_layer(self, layer_id, func="default", v=ALL, inplace=False):
+        """Apply node update function on the node embeddings in the specified layer.
+
+        Parameters
+        ----------
+        layer_id : int
+            The specified layer to update node embeddings.
+        func : callable or None, optional
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        v : a list of vertex Ids or ALL.
+            The vertices to run the node update function.
+        inplace : bool, optional
+            If True, update will be done in place, but autograd will break.
+        """
         if func == "default":
             func = self._apply_node_func
         if is_all(v):
@@ -415,32 +497,46 @@ class NodeFlow(DGLGraph):
     def _layer_local_nid(self, layer_id):
         return F.arange(0, self.layer_size(layer_id))
 
-    def apply_flow(self, flow_id, func="default", edges=ALL, inplace=False):
+    def apply_block(self, block_id, func="default", edges=ALL, inplace=False):
+        """Apply edge update function on the edge embeddings in the specified layer.
+
+        Parameters
+        ----------
+        block_id : int
+            The specified block to update edge embeddings.
+        func : callable or None, optional
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        e : a list of edge Ids or ALL.
+            The edges to run the edge update function.
+        inplace : bool, optional
+            If True, update will be done in place, but autograd will break.
+        """
         if func == "default":
             func = self._apply_edge_func
         assert func is not None
 
         if is_all(edges):
-            u = utils.toindex(self._layer_local_nid(flow_id))
-            v = utils.toindex(self._layer_local_nid(flow_id + 1))
-            eid = utils.toindex(slice(0, self.flow_size(flow_id)))
+            u = utils.toindex(self._layer_local_nid(block_id))
+            v = utils.toindex(self._layer_local_nid(block_id + 1))
+            eid = utils.toindex(slice(0, self.block_size(block_id)))
         elif isinstance(edges, tuple):
             u, v = edges
             # Rewrite u, v to handle edge broadcasting and multigraph.
             u, v, eid = self._graph.edge_ids(utils.toindex(u), utils.toindex(v))
-            u = utils.toindex(u.tousertensor() - self._layer_offsets[flow_id])
-            v = utils.toindex(v.tousertensor() - self._layer_offsets[flow_id + 1])
-            eid = utils.toindex(eid.tousertensor() - self._flow_offsets[flow_id])
+            u = utils.toindex(u.tousertensor() - self._layer_offsets[block_id])
+            v = utils.toindex(v.tousertensor() - self._layer_offsets[block_id + 1])
+            eid = utils.toindex(eid.tousertensor() - self._block_offsets[block_id])
         else:
             eid = utils.toindex(edges)
             u, v, _ = self._graph.find_edges(eid)
-            u = utils.toindex(u.tousertensor() - self._layer_offsets[flow_id])
-            v = utils.toindex(v.tousertensor() - self._layer_offsets[flow_id + 1])
-            eid = utils.toindex(edges - self._flow_offsets[flow_id])
+            u = utils.toindex(u.tousertensor() - self._layer_offsets[block_id])
+            v = utils.toindex(v.tousertensor() - self._layer_offsets[block_id + 1])
+            eid = utils.toindex(edges - self._block_offsets[block_id])
 
         with ir.prog() as prog:
             scheduler.schedule_nodeflow_apply_edges(graph=self,
-                                                    flow_id=flow_id,
+                                                    block_id=block_id,
                                                     u=u,
                                                     v=v,
                                                     eid=eid,
@@ -452,12 +548,36 @@ class NodeFlow(DGLGraph):
         layer_id = self._get_layer_id(layer_id)
         return nid - self._layer_offsets[layer_id]
 
-    def _conv_local_eid(self, eid, flow_id):
-        flow_id = self._get_flow_id(flow_id)
-        return eid - self._flow_offsets[flow_id]
+    def _conv_local_eid(self, eid, block_id):
+        block_id = self._get_block_id(block_id)
+        return eid - self._block_offsets[block_id]
 
-    def flow_compute(self, flow_id, message_func="default", reduce_func="default",
+    def block_compute(self, block_id, message_func="default", reduce_func="default",
                      apply_node_func="default", v=ALL, inplace=False):
+        """Perform the computation on the specified block. It's similar to `pull`
+        in DGLGraph.
+        On the given block i, it runs `pull` on nodes in layer i+1, which generates
+        messages on edges in block i, runs the reduce function and node update
+        function on nodes in layer i+1.
+
+        Parameters
+        ----------
+        block_id : int
+            The block to run the computation.
+        message_func : callable, optional
+            Message function on the edges. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
+        reduce_func : callable, optional
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        apply_node_func : callable, optional
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        v : a list of vertex Ids or ALL.
+            The specified nodes in layer i+1 to run the computation.
+        inplace: bool, optional
+            If True, update will be done in place, but autograd will break.
+        """
         if message_func == "default":
             message_func = self._message_func
         if reduce_func == "default":
@@ -469,25 +589,25 @@ class NodeFlow(DGLGraph):
         assert reduce_func is not None
 
         if is_all(v):
-            dest_nodes = utils.toindex(self.layer_nid(flow_id + 1))
+            dest_nodes = utils.toindex(self.layer_nid(block_id + 1))
             u, v, _ = self._graph.in_edges(dest_nodes)
-            u = utils.toindex(self._conv_local_nid(u.tousertensor(), flow_id))
-            v = utils.toindex(self._conv_local_nid(v.tousertensor(), flow_id + 1))
-            dest_nodes = utils.toindex(F.arange(0, self.layer_size(flow_id + 1)))
-            eid = utils.toindex(F.arange(0, self.flow_size(flow_id)))
+            u = utils.toindex(self._conv_local_nid(u.tousertensor(), block_id))
+            v = utils.toindex(self._conv_local_nid(v.tousertensor(), block_id + 1))
+            dest_nodes = utils.toindex(F.arange(0, self.layer_size(block_id + 1)))
+            eid = utils.toindex(F.arange(0, self.block_size(block_id)))
         else:
             dest_nodes = utils.toindex(v)
             u, v, eid = self._graph.in_edges(dest_nodes)
-            assert len(u) > 0, "flow_compute must run on edges"
-            u = utils.toindex(self._conv_local_nid(u.tousertensor(), flow_id))
-            v = utils.toindex(self._conv_local_nid(v.tousertensor(), flow_id + 1))
+            assert len(u) > 0, "block_compute must run on edges"
+            u = utils.toindex(self._conv_local_nid(u.tousertensor(), block_id))
+            v = utils.toindex(self._conv_local_nid(v.tousertensor(), block_id + 1))
             dest_nodes = utils.toindex(self._conv_local_nid(dest_nodes.tousertensor(),
-                                                            flow_id + 1))
-            eid = utils.toindex(self._conv_local_eid(eid, flow_id))
+                                                            block_id + 1))
+            eid = utils.toindex(self._conv_local_eid(eid, block_id))
 
         with ir.prog() as prog:
             scheduler.schedule_nodeflow_compute(graph=self,
-                                                flow_id=flow_id,
+                                                block_id=block_id,
                                                 u=u,
                                                 v=v,
                                                 eid=eid,
@@ -498,14 +618,39 @@ class NodeFlow(DGLGraph):
                                                 inplace=inplace)
             Runtime.run(prog)
 
-    def prop_flows(self, message_func="default", reduce_func="default",
-                   apply_node_func="default", flow_range=ALL, inplace=False):
+    def prop_flow(self, message_func="default", reduce_func="default",
+                  apply_node_func="default", flow_range=ALL, inplace=False):
+        """Perform the computation on flows. By default, it runs on all blocks, one-by-one.
+        On block i, it runs `pull` on nodes in layer i+1, which generates
+        messages on edges in block i, runs the reduce function and node update
+        function on nodes in layer i+1.
+
+        Users can specify a list of message functions, reduce functions and
+        node apply functions, one for each block. Thus, when a list is given,
+        the length of the list should be the same as the number of blocks.
+
+        Parameters
+        ----------
+        message_funcs : a list of callable, optional
+            Message functions on the edges. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
+        reduce_funcs : a list of callable, optional
+            Reduce functions on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        apply_node_funcs : a list of callable, optional
+            Apply functions on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        range : int or a slice or ALL.
+            The specified blocks to run the computation.
+        inplace: bool, optional
+            If True, update will be done in place, but autograd will break.
+        """
         if isinstance(flow_range, int):
-            self.flow_compute(flow_range, message_func, reduce_func, apply_node_func,
+            self.block_compute(flow_range, message_func, reduce_func, apply_node_func,
                               inplace=inplace)
         else:
             if is_all(flow_range):
-                flow_range=range(0, self.num_flows)
+                flow_range=range(0, self.num_blocks)
             elif isinstance(flow_range, slice):
                 if slice.step is not 1:
                     raise DGLError("We can't propogate flows and skip some of them")
@@ -514,7 +659,7 @@ class NodeFlow(DGLGraph):
                 raise DGLError("unknown flow range")
 
             for i in flow_range:
-                self.flow_compute(i, message_func, reduce_func, apply_node_func,
+                self.block_compute(i, message_func, reduce_func, apply_node_func,
                                   inplace=inplace)
 
 
