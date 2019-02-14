@@ -213,7 +213,7 @@ def test_copy():
             assert F.array_equal(nf.blocks[i].data[key], g.edata[key][nf.block_parent_eid(i)])
 
     nf = create_mini_batch(g, num_layers)
-    g.ndata['h0'] = g.ndata['h'].copy()
+    g.ndata['h0'] = F.clone(g.ndata['h'])
     node_embed_names = [['h0'], [], []]
     nf.copy_from_parent(node_embed_names=node_embed_names, edge_embed_names=None)
     for i in range(num_layers):

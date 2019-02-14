@@ -604,7 +604,7 @@ class NodeFlow(DGLGraph):
             v = utils.toindex(self._conv_local_nid(v.tousertensor(), block_id + 1))
             dest_nodes = utils.toindex(self._conv_local_nid(dest_nodes.tousertensor(),
                                                             block_id + 1))
-            eid = utils.toindex(self._conv_local_eid(eid, block_id))
+            eid = utils.toindex(self._conv_local_eid(eid.tousertensor(), block_id))
 
         with ir.prog() as prog:
             scheduler.schedule_nodeflow_compute(graph=self,
