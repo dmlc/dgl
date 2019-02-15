@@ -77,6 +77,11 @@ def test_basic():
     assert nf.layer_size(1) == g.number_of_nodes()
     check_basic(g, nf)
 
+    parent_nids = F.arange(0, g.number_of_nodes())
+    nids = dgl.graph_index.map_to_nodeflow_nid(nf._graph, 0,
+                                               utils.toindex(parent_nids)).tousertensor()
+    assert F.array_equal(nids, parent_nids)
+
     g = generate_rand_graph(100)
     nf = create_mini_batch(g, num_layers)
     assert nf.num_layers == num_layers + 1

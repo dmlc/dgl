@@ -958,6 +958,34 @@ def map_to_subgraph_nid(subgraph, parent_nids):
     return utils.toindex(_CAPI_DGLMapSubgraphNID(subgraph.induced_nodes.todgltensor(),
                                                  parent_nids.todgltensor()))
 
+def map_to_nodeflow_nid(nflow, layer_id, parent_nids):
+    """Map parent node Ids to NodeFlow node Ids in a certain layer.
+
+    Parameters
+    ----------
+    nflow : NodeFlowIndex
+        The graph index of a NodeFlow.
+
+    layer_id : int
+        The layer Id
+
+    parent_nids: utils.Index
+        Node Ids in the parent graph.
+
+    Returns
+    -------
+    utils.Index
+        Node Ids in the NodeFlow.
+    """
+    mapping = nflow.node_mapping.tousertensor()
+    layers = nflow.layers.tonumpy()
+    start = int(layers[layer_id])
+    end = int(layers[layer_id + 1])
+    mapping = mapping[start:end]
+    mapping = utils.toindex(mapping)
+    return utils.toindex(_CAPI_DGLMapSubgraphNID(mapping.todgltensor(),
+                                                 parent_nids.todgltensor()))
+
 def disjoint_union(graphs):
     """Return a disjoint union of the input graphs.
 
