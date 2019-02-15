@@ -214,6 +214,7 @@ class NodeFlow(DGLBaseGraph):
     @property
     def num_blocks(self):
         """Get the number of blocks.
+
         Returns
         -------
         int
@@ -254,6 +255,7 @@ class NodeFlow(DGLBaseGraph):
 
     def block_size(self, block_id):
         """Return the number of edges in a specified block.
+
         Parameters
         ----------
         block_id : int
@@ -265,7 +267,12 @@ class NodeFlow(DGLBaseGraph):
     def copy_from_parent(self, node_embed_names=ALL, edge_embed_names=ALL):
         """Copy node/edge features from the parent graph.
 
-        All old features will be removed.
+        Parameters
+        ----------
+        node_embed_names : a list of lists of strings, optional
+            The names of embeddings in each layer.
+        edge_embed_names : a list of lists of strings, optional
+            The names of embeddings in each block.
         """
         if self._parent._node_frame.num_rows != 0 and self._parent._node_frame.num_columns != 0:
             if is_all(node_embed_names):
@@ -297,6 +304,13 @@ class NodeFlow(DGLBaseGraph):
 
     def copy_to_parent(self, node_embed_names=ALL, edge_embed_names=ALL):
         """Copy node/edge embeddings to the parent graph.
+
+        Parameters
+        ----------
+        node_embed_names : a list of lists of strings, optional
+            The names of embeddings in each layer.
+        edge_embed_names : a list of lists of strings, optional
+            The names of embeddings in each block.
         """
         #TODO We need to take care of the following things:
         #    * copy right node embeddings back. For instance, we should copy temporary
@@ -374,11 +388,31 @@ class NodeFlow(DGLBaseGraph):
 
     def layer_in_degree(self, layer_id):
         """Return the in-degree of the nodes in the specified layer.
+
+        Parameters
+        ----------
+        layer_id : int
+            The layer Id.
+
+        Returns
+        -------
+        Tensor
+            The degree of the nodes in the specified layer.
         """
         return self._graph.in_degrees(utils.toindex(self.layer_nid(layer_id))).tousertensor()
 
     def layer_out_degree(self, layer_id):
         """Return the out-degree of the nodes in the specified layer.
+
+        Parameters
+        ----------
+        layer_id : int
+            The layer Id.
+
+        Returns
+        -------
+        Tensor
+            The degree of the nodes in the specified layer.
         """
         return self._graph.out_degrees(utils.toindex(self.layer_nid(layer_id))).tousertensor()
 
