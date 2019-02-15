@@ -340,10 +340,10 @@ NodeFlow ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   nf.flow_offsets = IdArray::Empty({static_cast<int64_t>(num_hops)},
                                     DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
 
-  dgl_id_t *out = static_cast<dgl_id_t *>(nf.node_mapping->data);
-  dgl_id_t *out_layer = static_cast<dgl_id_t *>(nf.layer_offsets->data);
-  dgl_id_t *out_flow = static_cast<dgl_id_t *>(nf.flow_offsets->data);
-  dgl_id_t* val_list_out = static_cast<dgl_id_t *>(nf.edge_mapping->data);
+  dgl_id_t *node_map_data = static_cast<dgl_id_t *>(nf.node_mapping->data);
+  dgl_id_t *layer_off_data = static_cast<dgl_id_t *>(nf.layer_offsets->data);
+  dgl_id_t *flow_off_data = static_cast<dgl_id_t *>(nf.flow_offsets->data);
+  dgl_id_t *edge_map_data = static_cast<dgl_id_t *>(nf.edge_mapping->data);
 
   // Construct sub_csr_graph
   auto subg_csr = std::make_shared<CSR>(num_vertices, num_edges);
@@ -373,7 +373,7 @@ NodeFlow ImmutableGraph::SampleSubgraph(IdArray seed_arr,
 
     // Save the sampled vertices and its layer Id.
     for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
-      out[out_node_idx++] = sub_vers[i].first;
+      node_map_data[out_node_idx++] = sub_vers[i].first;
       layer_ver_maps[layer_id].insert(std::pair<dgl_id_t, dgl_id_t>(sub_vers[i].first, ver_id++));
       assert(sub_vers[i].second == layer_id);
     }
@@ -386,8 +386,8 @@ NodeFlow ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   size_t row_idx = 0;
   for (size_t i = layer_offsets[num_hops - 1]; i < layer_offsets[num_hops]; i++)
     indptr_out[row_idx++] = 0;
-  out_layer[0] = 0;
-  out_layer[1] = layer_offsets[num_hops] - layer_offsets[num_hops - 1];
+  layer_off_data[0] = 0;
+  layer_off_data[1] = layer_offsets[num_hops] - layer_offsets[num_hops - 1];
   size_t out_layer_idx = 1;
   for (int layer_id = num_hops - 2; layer_id >= 0; layer_id--) {
     std::sort(neigh_pos.begin() + layer_offsets[layer_id],
@@ -412,31 +412,30 @@ NodeFlow ImmutableGraph::SampleSubgraph(IdArray seed_arr,
       }
       // We can simply copy the edge Ids.
       std::copy_n(neighbor_list.begin() + pos + num_edges + 1,
-                  num_edges,
-                  val_list_out + collected_nedges);
+                  num_edges, edge_map_data + collected_nedges);
       collected_nedges += num_edges;
       indptr_out[row_idx+1] = indptr_out[row_idx] + num_edges;
       row_idx++;
     }
-    out_layer[out_layer_idx + 1] = out_layer[out_layer_idx]
+    layer_off_data[out_layer_idx + 1] = layer_off_data[out_layer_idx]
         + layer_offsets[layer_id + 1] - layer_offsets[layer_id];
     out_layer_idx++;
   }
   CHECK(row_idx == num_vertices);
   CHECK(indptr_out[row_idx] == num_edges);
   CHECK(out_layer_idx == num_hops);
-  CHECK(out_layer[out_layer_idx] == num_vertices);
+  CHECK(layer_off_data[out_layer_idx] == num_vertices);
 
   // Copy flow offsets.
-  out_flow[0] = 0;
+  flow_off_data[0] = 0;
   size_t out_flow_idx = 0;
   for (int i = 0; i < layer_offsets.size() - 2; i++) {
-    size_t num_edges = subg_csr->GetDegree(out_layer[i + 1], out_layer[i + 2]);
-    out_flow[out_flow_idx + 1] = out_flow[out_flow_idx] + num_edges;
+    size_t num_edges = subg_csr->GetDegree(layer_off_data[i + 1], layer_off_data[i + 2]);
+    flow_off_data[out_flow_idx + 1] = flow_off_data[out_flow_idx] + num_edges;
     out_flow_idx++;
   }
   CHECK(out_flow_idx == num_hops - 1);
-  CHECK(out_flow[num_hops - 1] == num_edges);
+  CHECK(flow_off_data[num_hops - 1] == num_edges);
 
   for (size_t i = 0; i < subg_csr->edge_ids.size(); i++)
     subg_csr->edge_ids[i] = i;
