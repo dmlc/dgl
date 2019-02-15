@@ -137,7 +137,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GAT')
     parser.add_argument("--gpu", type=int, default=-1,
                         help="which GPU to use. Set -1 to use CPU.")
-    parser.add_argument("--epochs", type=int, default=1,
+    parser.add_argument("--epochs", type=int, default=400,
                         help="number of training epochs")
     parser.add_argument("--num-heads", type=int, default=4,
                         help="number of hidden attention heads")
