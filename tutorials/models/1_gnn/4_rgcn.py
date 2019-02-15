@@ -232,8 +232,8 @@ class Model(nn.Module):
         i2h = self.build_input_layer()
         self.layers.append(i2h)
         # hidden to hidden
-        for idx in range(self.num_hidden_layers):
-            h2h = self.build_hidden_layer(idx)
+        for _ in range(self.num_hidden_layers):
+            h2h = self.build_hidden_layer()
             self.layers.append(h2h)
         # hidden to output
         h2o = self.build_output_layer()
