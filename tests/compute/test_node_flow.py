@@ -46,25 +46,6 @@ def check_basic(g, nf):
         out_deg = nf.layer_out_degree(i - 1)
         assert F.asnumpy(F.sum(in_deg, 0) == F.sum(out_deg, 0))
 
-    nf.copy_from_parent()
-    assert F.array_equal(nf.layers[0].data['h1'], g.ndata['h1'][nf.layer_parent_nid(0)])
-    assert F.array_equal(nf.layers[1].data['h1'], g.ndata['h1'][nf.layer_parent_nid(1)])
-    assert F.array_equal(nf.layers[2].data['h1'], g.ndata['h1'][nf.layer_parent_nid(2)])
-    assert F.array_equal(nf.blocks[0].data['h2'], g.edata['h2'][nf.block_parent_eid(0)])
-    assert F.array_equal(nf.blocks[1].data['h2'], g.edata['h2'][nf.block_parent_eid(1)])
-
-    for i in range(nf.number_of_nodes()):
-        layer_id, local_nid = nf._map_to_layer_nid(i)
-        assert(layer_id >= 0)
-        parent_id = nf.map_to_parent_nid(i)
-        assert F.array_equal(nf.layers[layer_id].data['h1'][local_nid], g.ndata['h1'][parent_id])
-
-    for i in range(nf.number_of_edges()):
-        block_id, local_eid = nf._map_to_block_eid(i)
-        assert(block_id >= 0)
-        parent_id = nf.map_to_parent_eid(i)
-        assert F.array_equal(nf.blocks[block_id].data['h2'][local_eid], g.edata['h2'][parent_id])
-
 
 def test_basic():
     num_layers = 2

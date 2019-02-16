@@ -376,16 +376,6 @@ class NodeFlow(DGLBaseGraph):
         """
         return self._edge_mapping.tousertensor()[eid]
 
-    def _map_to_layer_nid(self, nid):
-        layer_id = np.sum(self._layer_offsets <= nid) - 1
-        # TODO do I need to reverse here?
-        return int(layer_id), nid - int(self._layer_offsets[layer_id])
-
-    def _map_to_block_eid(self, eid):
-        block_id = np.sum(self._block_offsets <= eid) - 1
-        # TODO do I need to reverse here?
-        return int(block_id), eid - int(self._block_offsets[block_id])
-
     def layer_in_degree(self, layer_id):
         """Return the in-degree of the nodes in the specified layer.
 
