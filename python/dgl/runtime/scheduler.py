@@ -682,6 +682,12 @@ def _gen_send_reduce(
     ----------
     graph : DGLGraph
         The graph
+    src_node_frame : NodeFrame
+        The node frame of the source nodes.
+    dst_node_frame : NodeFrame
+        The node frame of the destination nodes.
+    edge_frame : NodeFrame
+        The frame for the edges between the source and destination nodes.
     message_func : callable, list of builtins
         The message func(s).
     reduce_func : callable, list of builtins

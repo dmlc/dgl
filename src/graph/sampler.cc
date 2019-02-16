@@ -380,9 +380,11 @@ NodeFlow ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   }
   CHECK(out_node_idx == num_vertices);
 
-  // Copy sampled results to a CSR.
-  // When we copy data, we need to move the last layer to the first layer
-  // because we consider the layer with the leaf nodes as layer 0.
+  // sampling algorithms have to start from the seed nodes, so the seed nodes are
+  // in the first layer and the input nodes are in the last layer.
+  // When we expose the sampled graph to a Python user, we say the input nodes
+  // are in the first layer and the seed nodes are in the last layer.
+  // Thus, when we copy sampled results to a CSR, we need to reverse the order of layers.
   size_t row_idx = 0;
   for (size_t i = layer_offsets[num_hops - 1]; i < layer_offsets[num_hops]; i++)
     indptr_out[row_idx++] = 0;
