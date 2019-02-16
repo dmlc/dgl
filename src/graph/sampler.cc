@@ -5,6 +5,7 @@
  */
 
 #include <dgl/immutable_graph.h>
+#include <dgl/runtime/util.h>
 #include <vector>
 #include <cstdlib>
 #include <cmath>

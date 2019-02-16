@@ -13,6 +13,7 @@
 #include <tuple>
 #include "runtime/ndarray.h"
 #include "graph_interface.h"
+#include "runtime/util.h"
 
 namespace dgl {
 
