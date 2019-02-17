@@ -55,6 +55,7 @@ class PPIDataset(object):
         self.mode = mode
         self._preprocess()
         self._normalize()
+        
     def _preprocess(self):
         self.train_mask_list = []
         self.train_graphs = []
@@ -83,6 +84,7 @@ class PPIDataset(object):
                 self.test_mask_list.append(test_graph_mask)
                 self.test_graphs.append(self.graph.subgraph(test_graph_mask))
                 self.test_labels.append(self.labels[test_graph_mask])
+                
     def _normalize(self):
         """
         Normalize the features
@@ -92,6 +94,7 @@ class PPIDataset(object):
         scaler = StandardScaler()
         scaler.fit(train_feats)
         self.features = scaler.transform(self.features)
+        
     def __len__(self):
         if self.mode == 'train':
             return len(self.train_mask_list)
