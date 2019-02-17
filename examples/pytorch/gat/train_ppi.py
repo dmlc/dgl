@@ -17,7 +17,7 @@ import dgl
 import torch.nn.functional as F
 import argparse
 from sklearn.metrics import f1_score
-from train import GAT
+from gat import GAT
 from dgl.data.ppi import PPIDataset
 from torch.utils.data import DataLoader
 
