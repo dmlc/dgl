@@ -72,7 +72,7 @@ PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
 PackedFunc ConvertSubgraphToPackedFunc(const std::vector<NodeFlow>& sg) {
   auto body = [sg] (DGLArgs args, DGLRetValue* rv) {
       const uint64_t which = args[0];
-      if (which < static_cast<int>(sg.size())) {
+      if (which < sg.size()) {
         GraphInterface* gptr = sg[which].graph->Reset();
         GraphHandle ghandle = gptr;
         *rv = ghandle;
