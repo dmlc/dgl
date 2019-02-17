@@ -12,7 +12,7 @@ import json
 
 _url = 'dataset/ppi.zip'
 
-class PPIDataset(object):
+def load_ppi():
     """Loads input data
     ppi_G.json => the graph data used for training, test and validation as json format;
     ppi-feats.npy => the feature vectors of nodes as numpy.ndarry object, it's shape is [n, v],
@@ -43,16 +43,23 @@ class PPIDataset(object):
     labels = np.concatenate(label_list)
     graph = DGLGraph(nx.DiGraph(json_graph.node_link_graph(g_data)))
     graph_id = np.load('{}/ppi/graph_id.npy'.format(dir))
+    return (features, labels, graph, graph_id)
 
-    def __init__(self, mode):
+class PPIDataset(object):
+    
+    def __init__(self, mode, data):
         """Initialize the dataset.
 
         Paramters
         ---------
         mode : str
             ('train', 'valid', 'test').
-        """
+        data : tuple()
+            (features, labels, graph, graph_id)
+          
+        """ 
         self.mode = mode
+        self.features, self.labels, self.graph, self.graph_id = data
         self._preprocess()
         self._normalize()
         
@@ -74,7 +81,6 @@ class PPIDataset(object):
                 self.valid_mask_list.append(valid_graph_mask)
                 self.valid_graphs.append(self.graph.subgraph(valid_graph_mask))
                 self.valid_labels.append(self.labels[valid_graph_mask])
-
         if self.mode == 'test':
             self.test_mask_list = []
             self.test_graphs = []
