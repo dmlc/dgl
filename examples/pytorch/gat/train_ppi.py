@@ -10,7 +10,6 @@ Author's code: https://github.com/PetarV-/GAT
 Pytorch implementation: https://github.com/Diego999/pyGAT
 """
 
-
 import numpy as np
 import torch
 import dgl
@@ -21,14 +20,12 @@ from gat import GAT
 from dgl.data.ppi import PPIDataset
 from torch.utils.data import DataLoader
 
-
 def collate(sample):
     graphs, feats, labels =map(list, zip(*sample))
     graph = dgl.batch(graphs)
     feats = torch.from_numpy(np.concatenate(feats))
     labels = torch.from_numpy(np.concatenate(labels))
     return graph, feats, labels
-
 
 def evaluate(feats, model, subgraph, labels, loss_fcn):
     with torch.no_grad():
