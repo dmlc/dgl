@@ -1,20 +1,26 @@
 """PPI Dataset.
 (zhang hao): Used for inductive learning.
 """
-
+import json
 import numpy as np
-from .utils import download, extract_archive, get_download_dir, _get_dgl_url
-from dgl import DGLGraph
 import networkx as nx
 from networkx.readwrite import json_graph
-import json
+
+from .utils import download, extract_archive, get_download_dir, _get_dgl_url
+from ..graph import DGLGraph
 
 _url = 'dataset/ppi.zip'
 
-
-
 class PPIDataset(object):
+    """A toy Protein-Protein Interaction network dataset.
 
+    Adapted from https://github.com/williamleif/GraphSAGE/tree/master/example_data.
+
+    The dataset contains 24 graphs. The average number of nodes per graph
+    is 2372. Each node has 50 features and 121 labels.
+
+    We use 20 graphs for training, 2 for validation and 2 for testing.
+    """
     def __init__(self, mode):
         """Initialize the dataset.
 
@@ -28,15 +34,21 @@ class PPIDataset(object):
         self._preprocess()
 
     def _load(self):
-        """Loads input data
-        train/test/valid_graph.json => the graph data used for training, test and validation as json format;
-        train/test/valid_feats.npy => the feature vectors of nodes as numpy.ndarry object, it's shape is [n, v],
-        n is the number of nodes, v is the feature's dimension;
-        train/test/valid_labels.npy=> the labels of the input nodes, it is a numpy ndarry, it's like[[0, 0, 1, ... 0], 
-        [0, 1, 1, 0 ...1]], shape of it is n*h, n is the number of nodes, h is the label's dimension;
-        train/test/valid/_graph_id.npy => the element in it indicates which graph the nodes belong to,
-        it is a one dimensional numpy.ndarray object and the length of it is equal the number of nodes,
-        it's like [1, 1, 2, 1...20]. 
+        """Loads input data.
+
+        train/test/valid_graph.json => the graph data used for training,
+          test and validation as json format;
+        train/test/valid_feats.npy => the feature vectors of nodes as
+          numpy.ndarry object, it's shape is [n, v],
+          n is the number of nodes, v is the feature's dimension;
+        train/test/valid_labels.npy=> the labels of the input nodes, it
+          is a numpy ndarry, it's like[[0, 0, 1, ... 0], 
+          [0, 1, 1, 0 ...1]], shape of it is n*h, n is the number of nodes,
+          h is the label's dimension;
+        train/test/valid/_graph_id.npy => the element in it indicates which
+          graph the nodes belong to, it is a one dimensional numpy.ndarray
+          object and the length of it is equal the number of nodes,
+          it's like [1, 1, 2, 1...20]. 
         """
         name = 'ppi'
         dir = get_download_dir()
@@ -97,6 +109,7 @@ class PPIDataset(object):
                 self.test_labels.append(self.labels[test_graph_mask])
 
     def __len__(self):
+        """Return number of samples in this dataset."""
         if self.mode == 'train':
             return len(self.train_mask_list)
         if self.mode == 'valid':
