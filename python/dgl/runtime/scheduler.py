@@ -261,7 +261,6 @@ def schedule_nodeflow_apply_nodes(graph,
     var_nf = var.FEAT_DICT(graph._get_node_frame(layer_id), name='nf')
     var_v = var.IDX(v)
     v_nf = ir.READ_ROW(var_nf, var_v)
-    # TODO what is node_data?
     def _afunc_wrapper(node_data):
         nbatch = NodeBatch(graph, v, node_data)
         return apply_func(nbatch)

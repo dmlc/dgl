@@ -169,6 +169,8 @@ def _build_adj_matrix_index_uv(edges, reduce_nodes, num_sources):
     reduce_nodes : utils.Index
         The nodes to reduce messages, which will be target dimension
         of the adjmat. The nodes include unique(v) and zero-degree-nodes.
+    num_sources : int
+        The number of source nodes.
 
     Returns
     -------
@@ -204,6 +206,8 @@ def build_adj_matrix_uv(edges, reduce_nodes, num_sources):
     reduce_nodes : utils.Index
         The nodes to reduce messages, which will be target dimension
         of the adjmat. The nodes include unique(v) and zero-degree-nodes.
+    num_sources : int
+        The number of source nodes.
 
     Returns
     -------
