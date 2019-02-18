@@ -630,7 +630,7 @@ class NodeFlow(DGLBaseGraph):
             u = utils.toindex(self._glb2lcl_nid(u.tousertensor(), block_id))
             v = utils.toindex(self._glb2lcl_nid(v.tousertensor(), block_id + 1))
             dest_nodes = utils.toindex(self._glb2lcl_nid(dest_nodes.tousertensor(),
-                                                            block_id + 1))
+                                                         block_id + 1))
             eid = utils.toindex(self._glb2lcl_eid(eid.tousertensor(), block_id))
 
         with ir.prog() as prog:
