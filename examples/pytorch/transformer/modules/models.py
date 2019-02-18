@@ -128,16 +128,15 @@ class Transformer(nn.Module):
         """
 
         return self.generator(g.ndata['x'][nids['dec']])
-
-    def infer(self, graph, max_len, eos_id, k):
+    def infer(self, graph, max_len, eos_id, k, alpha=1.0):
         '''
         This function implements Beam Search in DGL, which is required in inference phase.
+        Length normalization is given by (5 + len) ^ alpha / 6 ^ alpha. Please refer to https://arxiv.org/pdf/1609.08144.pdf.
         args:
             graph: a `Graph` object defined in `dgl.contrib.transformer.graph`.
             max_len: the maximum length of decoding.
             eos_id: the index of end-of-sequence symbol.
             k: beam size
-
         return:
             ret: a list of index array correspond to the input sequence specified by `graph``.
         '''
@@ -187,30 +186,35 @@ class Transformer(nn.Module):
             out = self.generator(g.ndata['x'][frontiers])
             batch_size = frontiers.shape[0] // k
             vocab_size = out.shape[-1]
+            # Mask output for complete sequence
+            one_hot = th.zeros(vocab_size).fill_(-1e9).to(device)
+            one_hot[eos_id] = 0
+            mask = g.ndata['mask'][frontiers].unsqueeze(-1).float()
+            out = out * (1 - mask) + one_hot.unsqueeze(0) * mask
+
             if log_prob is None:
                 log_prob, pos = out.view(batch_size, k, -1)[:, 0, :].topk(k, dim=-1)
-                eos = th.zeros(batch_size).byte()
+                eos = th.zeros(batch_size, k).byte()
             else:
-                log_prob, pos = (out.view(batch_size, k, -1) + log_prob.unsqueeze(-1)).view(batch_size, -1).topk(k, dim=-1)
+                norm_old = eos.float().to(device) + (1 - eos.float().to(device)) * np.power((4. + step) / 6, alpha)
+                norm_new = eos.float().to(device) + (1 - eos.float().to(device)) * np.power((5. + step) / 6, alpha)
+                log_prob, pos = ((out.view(batch_size, k, -1) + (log_prob * norm_old).unsqueeze(-1)) / norm_new.unsqueeze(-1)).view(batch_size, -1).topk(k, dim=-1)
 
             _y = y.view(batch_size * k, -1)
             y = th.zeros_like(_y)
+            _eos = eos.clone()
             for i in range(batch_size):
-                if not eos[i]:
-                    for j in range(k):
-                        _j = pos[i, j].item() // vocab_size
-                        token = pos[i, j].item() % vocab_size
-                        y[i * k + j, :] = _y[i * k + _j, :]
-                        y[i * k + j, step] = token
-                        if j == 0:
-                            eos[i] = eos[i] | (token == eos_id)
-                else:
-                    y[i*k:(i+1)*k, :] = _y[i*k:(i+1)*k, :]
+                for j in range(k):
+                    _j = pos[i, j].item() // vocab_size
+                    token = pos[i, j].item() % vocab_size
+                    y[i*k+j, :] = _y[i*k+_j, :]
+                    y[i*k+j, step] = token
+                    eos[i, j] = _eos[i, _j] | (token == eos_id)
 
             if eos.all():
                 break
             else:
-                g.ndata['mask'][nids['dec']] = eos.unsqueeze(-1).repeat(1, k * max_len).view(-1).to(device)
+                g.ndata['mask'][nids['dec']] = eos.unsqueeze(-1).repeat(1, 1, max_len).view(-1).to(device)
         return y.view(batch_size, k, -1)[:, 0, :].tolist()
 
     def _register_att_map(self, g, enc_ids, dec_ids):
