@@ -239,7 +239,7 @@ def schedule_nodeflow_apply_nodes(graph,
                                   v,
                                   apply_func,
                                   inplace):
-    """get apply nodes schedule
+    """get apply nodes schedule in NodeFlow.
 
     Parameters
     ----------
@@ -321,7 +321,7 @@ def schedule_nodeflow_apply_edges(graph, block_id,
                                   u, v, eid,
                                   apply_func,
                                   inplace):
-    """get apply edges schedule
+    """get apply edges schedule in NodeFlow.
 
     Parameters
     ----------
@@ -499,7 +499,7 @@ def schedule_nodeflow_compute(graph,
                               reduce_func,
                               apply_func,
                               inplace):
-    """get pull schedule
+    """get flow compute schedule in NodeFlow
 
     Parameters
     ----------
