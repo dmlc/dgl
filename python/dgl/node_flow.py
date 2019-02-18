@@ -63,12 +63,16 @@ class NodeFlow(DGLBaseGraph):
         self._apply_edge_funcs = [None] * self.num_blocks
 
     def _get_layer_id(self, layer_id):
+        """The layer Id might be negative. We need to convert it to the actual layer Id.
+        """
         if layer_id >= 0:
             return layer_id
         else:
             return self.num_layers + layer_id
 
     def _get_block_id(self, block_id):
+        """The block Id might be negative. We need to convert it to the actual block Id.
+        """
         if block_id >= 0:
             return block_id
         else:
@@ -506,7 +510,7 @@ class NodeFlow(DGLBaseGraph):
             If True, update will be done in place, but autograd will break.
         """
         if func == "default":
-            func = self._apply_node_funcs[block_id]
+            func = self._apply_node_funcs[layer_id]
         if is_all(v):
             v = utils.toindex(slice(0, self.layer_size(layer_id)))
         else:
@@ -520,8 +524,6 @@ class NodeFlow(DGLBaseGraph):
                                                     inplace=inplace)
             Runtime.run(prog)
 
-    def _layer_local_nid(self, layer_id):
-        return F.arange(0, self.layer_size(layer_id))
 
     def apply_block(self, block_id, func="default", edges=ALL, inplace=False):
         """Apply edge update function on the edge embeddings in the specified layer.
@@ -533,7 +535,7 @@ class NodeFlow(DGLBaseGraph):
         func : callable or None, optional
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
-        e : a list of edge Ids or ALL.
+        edges : a list of edge Ids or ALL.
             The edges to run the edge update function.
         inplace : bool, optional
             If True, update will be done in place, but autograd will break.
@@ -542,9 +544,12 @@ class NodeFlow(DGLBaseGraph):
             func = self._apply_edge_funcs[block_id]
         assert func is not None
 
+        def _layer_local_nid(layer_id):
+            return F.arange(0, self.layer_size(layer_id))
+
         if is_all(edges):
-            u = utils.toindex(self._layer_local_nid(block_id))
-            v = utils.toindex(self._layer_local_nid(block_id + 1))
+            u = utils.toindex(_layer_local_nid(block_id))
+            v = utils.toindex(_layer_local_nid(block_id + 1))
             eid = utils.toindex(slice(0, self.block_size(block_id)))
         elif isinstance(edges, tuple):
             u, v = edges
@@ -570,11 +575,11 @@ class NodeFlow(DGLBaseGraph):
                                                     inplace=inplace)
             Runtime.run(prog)
 
-    def _conv_local_nid(self, nid, layer_id):
+    def _glb2lcl_nid(self, nid, layer_id):
         layer_id = self._get_layer_id(layer_id)
         return nid - int(self._layer_offsets[layer_id])
 
-    def _conv_local_eid(self, eid, block_id):
+    def _glb2lcl_eid(self, eid, block_id):
         block_id = self._get_block_id(block_id)
         return eid - int(self._block_offsets[block_id])
 
@@ -617,19 +622,19 @@ class NodeFlow(DGLBaseGraph):
         if is_all(v):
             dest_nodes = utils.toindex(self.layer_nid(block_id + 1))
             u, v, _ = self._graph.in_edges(dest_nodes)
-            u = utils.toindex(self._conv_local_nid(u.tousertensor(), block_id))
-            v = utils.toindex(self._conv_local_nid(v.tousertensor(), block_id + 1))
+            u = utils.toindex(self._glb2lcl_nid(u.tousertensor(), block_id))
+            v = utils.toindex(self._glb2lcl_nid(v.tousertensor(), block_id + 1))
             dest_nodes = utils.toindex(F.arange(0, self.layer_size(block_id + 1)))
             eid = utils.toindex(F.arange(0, self.block_size(block_id)))
         else:
             dest_nodes = utils.toindex(v)
             u, v, eid = self._graph.in_edges(dest_nodes)
             assert len(u) > 0, "block_compute must run on edges"
-            u = utils.toindex(self._conv_local_nid(u.tousertensor(), block_id))
-            v = utils.toindex(self._conv_local_nid(v.tousertensor(), block_id + 1))
-            dest_nodes = utils.toindex(self._conv_local_nid(dest_nodes.tousertensor(),
+            u = utils.toindex(self._glb2lcl_nid(u.tousertensor(), block_id))
+            v = utils.toindex(self._glb2lcl_nid(v.tousertensor(), block_id + 1))
+            dest_nodes = utils.toindex(self._glb2lcl_nid(dest_nodes.tousertensor(),
                                                             block_id + 1))
-            eid = utils.toindex(self._conv_local_eid(eid.tousertensor(), block_id))
+            eid = utils.toindex(self._glb2lcl_eid(eid.tousertensor(), block_id))
 
         with ir.prog() as prog:
             scheduler.schedule_nodeflow_compute(graph=self,
@@ -666,7 +671,7 @@ class NodeFlow(DGLBaseGraph):
         apply_node_funcs : a callable, a list of callable, optional
             Apply functions on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
-        range : int or a slice or ALL.
+        flow_range : int or a slice or ALL.
             The specified blocks to run the computation.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
