@@ -1,9 +1,6 @@
 """Class for NodeFlow data structure."""
 from __future__ import absolute_import
 
-from collections import namedtuple
-from collections.abc import MutableMapping
-
 from .base import ALL, is_all, DGLError
 from . import backend as F
 from .frame import Frame, FrameRef
