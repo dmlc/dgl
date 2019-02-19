@@ -42,6 +42,7 @@ g_prior_nid_np = g_prior_nid.numpy()
 model = cuda(PinSage(g_prior, [n_hidden] * n_layers, 10, 5, 5))
 opt = torch.optim.Adam(model.parameters())
 
+@profile
 def forward(model, nodeset, train=True):
     if train:
         return model(nodeset)
@@ -49,6 +50,7 @@ def forward(model, nodeset, train=True):
         with torch.no_grad():
             return model(nodeset)
 
+@profile
 def run(edge_set, train=True):
     if train:
         model.train()
