@@ -30,7 +30,8 @@ class GraphIndex(object):
 
     def __del__(self):
         """Free this graph index object."""
-        _CAPI_DGLGraphFree(self._handle)
+        if hasattr(self, '_handle'):
+            _CAPI_DGLGraphFree(self._handle)
 
     def __getstate__(self):
         src, dst, _ = self.edges()
@@ -46,19 +47,19 @@ class GraphIndex(object):
         """
         n_nodes, multigraph, readonly, src, dst = state
 
+        self._cache = {}
+        self._multigraph = multigraph
+        self._readonly = readonly
         if readonly:
-            self._readonly = readonly
-            self._multigraph = multigraph
-            self.init(src, dst, F.arange(0, len(src)), n_nodes)
+            self._init(src, dst, utils.toindex(F.arange(0, len(src))), n_nodes)
         else:
             self._handle = _CAPI_DGLGraphCreateMutable(multigraph)
-            self._cache = {}
 
             self.clear()
-            self.add_nodes(n_nodes)
+            self.add_nodes(n_nodes  )
             self.add_edges(src, dst)
 
-    def init(self, src_ids, dst_ids, edge_ids, num_nodes):
+    def _init(self, src_ids, dst_ids, edge_ids, num_nodes):
         """The actual init function"""
         assert len(src_ids) == len(dst_ids)
         assert len(src_ids) == len(edge_ids)
@@ -746,7 +747,7 @@ class GraphIndex(object):
         eid = utils.toindex(eid)
         src = utils.toindex(src)
         dst = utils.toindex(dst)
-        self.init(src, dst, eid, num_nodes)
+        self._init(src, dst, eid, num_nodes)
 
 
     def from_scipy_sparse_matrix(self, adj):
@@ -763,7 +764,7 @@ class GraphIndex(object):
         src = utils.toindex(adj_coo.row)
         dst = utils.toindex(adj_coo.col)
         edge_ids = utils.toindex(F.arange(0, len(adj_coo.row)))
-        self.init(src, dst, edge_ids, num_nodes)
+        self._init(src, dst, edge_ids, num_nodes)
 
 
     def from_edge_list(self, elist):
@@ -786,7 +787,7 @@ class GraphIndex(object):
         if min_nodes != 0:
             raise DGLError('Invalid edge list. Nodes must start from 0.')
         edge_ids = utils.toindex(F.arange(0, len(src)))
-        self.init(src_ids, dst_ids, edge_ids, num_nodes)
+        self._init(src_ids, dst_ids, edge_ids, num_nodes)
 
     def line_graph(self, backtracking=True):
         """Return the line graph of this graph.
