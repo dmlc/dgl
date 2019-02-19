@@ -56,7 +56,7 @@ class GraphIndex(object):
             self._handle = _CAPI_DGLGraphCreateMutable(multigraph)
 
             self.clear()
-            self.add_nodes(n_nodes  )
+            self.add_nodes(n_nodes)
             self.add_edges(src, dst)
 
     def _init(self, src_ids, dst_ids, edge_ids, num_nodes):
