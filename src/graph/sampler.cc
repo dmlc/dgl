@@ -393,20 +393,16 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
 
   layer_offsets[0] = 0;
   layer_offsets[1] = sub_vers.size();
-  size_t idx = 0;
   for (size_t layer_id = 1; layer_id < num_hops; layer_id++) {
     // We need to avoid resampling the same node in a layer, but we allow a node
     // to be resampled in multiple layers. We use `sub_ver_map` to keep track of
     // sampled nodes in a layer, and clear it when entering a new layer.
     sub_ver_map.clear();
-    // sub_vers is used both as a node collection and a queue.
-    // In the while loop, we iterate over sub_vers and new nodes are added to the vector.
-    // A vertex in the vector only needs to be accessed once. If there is a vertex behind idx
-    // isn't in the last level, we will sample its neighbors. If not, the while loop terminates.
-    while (idx < sub_vers.size() && layer_id - 1 == sub_vers[idx].second) {
+    // Previous iteration collects all nodes in sub_vers, which are collected
+    // in the previous layer. sub_vers is used both as a node collection and a queue.
+    for (size_t idx = layer_offsets[layer_id - 1]; idx < layer_offsets[layer_id]; idx++) {
       dgl_id_t dst_id = sub_vers[idx].first;
       const int cur_node_level = sub_vers[idx].second;
-      idx++;
 
       tmp_sampled_src_list.clear();
       tmp_sampled_edge_list.clear();
@@ -452,6 +448,7 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
       }
     }
     layer_offsets[layer_id + 1] = layer_offsets[layer_id] + sub_ver_map.size();
+    CHECK_EQ(layer_offsets[layer_id + 1], sub_vers.size());
   }
 
   neigh_pos.emplace_back(-1, neighbor_list.size());
