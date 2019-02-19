@@ -422,6 +422,12 @@ class DGLGraph(object):
         """
         return self._graph.is_multigraph()
 
+    @property
+    def is_readonly(self):
+        """True if the graph is readonly, False otherwise.
+        """
+        return self._graph.is_readonly()
+
     def number_of_edges(self):
         """Return the number of edges in the graph.
 
