@@ -61,7 +61,7 @@ def test_pickling_frame():
 
 def _assert_is_identical(g, g2):
     assert g.is_multigraph == g2.is_multigraph
-    assert g._graph.is_readonly() == g2._graph.is_readonly()    # TODO: is_readonly interface
+    assert g.is_readonly == g2.is_readonly
     assert g.number_of_nodes() == g2.number_of_nodes()
     src, dst = g.all_edges()
     src2, dst2 = g2.all_edges()
