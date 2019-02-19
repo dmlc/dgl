@@ -17,6 +17,8 @@ int rand_r(unsigned *seed) {
 
 namespace dgl {
 
+namespace {
+
 /*
  * ArrayHeap is used to sample elements from vector
  */
@@ -101,27 +103,22 @@ class ArrayHeap {
 /*
  * Uniformly sample integers from [0, set_size) without replacement.
  */
-static void RandomSample(size_t set_size,
-                         size_t num,
-                         std::vector<size_t>* out,
-                         unsigned int* seed) {
+void RandomSample(size_t set_size, size_t num, std::vector<size_t>* out, unsigned int* seed) {
   std::unordered_set<size_t> sampled_idxs;
   while (sampled_idxs.size() < num) {
     sampled_idxs.insert(rand_r(seed) % set_size);
   }
   out->clear();
-  for (auto it = sampled_idxs.begin(); it != sampled_idxs.end(); it++) {
-    out->push_back(*it);
-  }
+  out->insert(out->end(), sampled_idxs.begin(), sampled_idxs.end());
 }
 
 /*
  * For a sparse array whose non-zeros are represented by nz_idxs,
  * negate the sparse array and outputs the non-zeros in the negated array.
  */
-static void NegateArray(const std::vector<size_t> &nz_idxs,
-                        size_t arr_size,
-                        std::vector<size_t>* out) {
+void NegateArray(const std::vector<size_t> &nz_idxs,
+                 size_t arr_size,
+                 std::vector<size_t>* out) {
   // nz_idxs must have been sorted.
   auto it = nz_idxs.begin();
   size_t i = 0;
@@ -141,19 +138,17 @@ static void NegateArray(const std::vector<size_t> &nz_idxs,
 /*
  * Uniform sample vertices from a list of vertices.
  */
-static void GetUniformSample(const dgl_id_t* val_list,
-                             const dgl_id_t* ver_list,
-                             const size_t ver_len,
-                             const size_t max_num_neighbor,
-                             std::vector<dgl_id_t>* out_ver,
-                             std::vector<dgl_id_t>* out_edge,
-                             unsigned int* seed) {
+void GetUniformSample(const dgl_id_t* val_list,
+                      const dgl_id_t* ver_list,
+                      const size_t ver_len,
+                      const size_t max_num_neighbor,
+                      std::vector<dgl_id_t>* out_ver,
+                      std::vector<dgl_id_t>* out_edge,
+                      unsigned int* seed) {
   // Copy ver_list to output
   if (ver_len <= max_num_neighbor) {
-    for (size_t i = 0; i < ver_len; ++i) {
-      out_ver->push_back(ver_list[i]);
-      out_edge->push_back(val_list[i]);
-    }
+    out_ver->insert(out_ver->end(), ver_list, ver_list + ver_len);
+    out_edge->insert(out_edge->end(), val_list, val_list + ver_len);
     return;
   }
   // If we just sample a small number of elements from a large neighbor list.
@@ -184,20 +179,18 @@ static void GetUniformSample(const dgl_id_t* val_list,
 /*
  * Non-uniform sample via ArrayHeap
  */
-static void GetNonUniformSample(const float* probability,
-                                const dgl_id_t* val_list,
-                                const dgl_id_t* ver_list,
-                                const size_t ver_len,
-                                const size_t max_num_neighbor,
-                                std::vector<dgl_id_t>* out_ver,
-                                std::vector<dgl_id_t>* out_edge,
-                                unsigned int* seed) {
+void GetNonUniformSample(const float* probability,
+                         const dgl_id_t* val_list,
+                         const dgl_id_t* ver_list,
+                         const size_t ver_len,
+                         const size_t max_num_neighbor,
+                         std::vector<dgl_id_t>* out_ver,
+                         std::vector<dgl_id_t>* out_edge,
+                         unsigned int* seed) {
   // Copy ver_list to output
   if (ver_len <= max_num_neighbor) {
-    for (size_t i = 0; i < ver_len; ++i) {
-      out_ver->push_back(ver_list[i]);
-      out_edge->push_back(val_list[i]);
-    }
+    out_ver->insert(out_ver->end(), ver_list, ver_list + ver_len);
+    out_edge->insert(out_edge->end(), val_list, val_list + ver_len);
     return;
   }
   // Make sample
@@ -234,7 +227,7 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
                            std::vector<size_t> layer_offsets,
                            std::vector<std::pair<dgl_id_t, int> > *sub_vers,
                            std::vector<std::pair<dgl_id_t, size_t> > *neigh_pos,
-                           const std::string &neigh_type,
+                           const std::string &edge_type,
                            int64_t num_edges, int num_hops, bool is_multigraph) {
   NodeFlow nf;
   uint64_t num_vertices = sub_vers->size();
@@ -294,8 +287,9 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   // are in the first layer and the seed nodes are in the last layer.
   // Thus, when we copy sampled results to a CSR, we need to reverse the order of layers.
   size_t row_idx = 0;
-  for (size_t i = layer_offsets[num_hops - 1]; i < layer_offsets[num_hops]; i++)
+  for (size_t i = layer_offsets[num_hops - 1]; i < layer_offsets[num_hops]; i++) {
     indptr_out[row_idx++] = 0;
+  }
   layer_off_data[0] = 0;
   layer_off_data[1] = layer_offsets[num_hops] - layer_offsets[num_hops - 1];
   size_t out_layer_idx = 1;
@@ -347,13 +341,15 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   CHECK(out_flow_idx == num_hops - 1);
   CHECK(flow_off_data[num_hops - 1] == num_edges);
 
-  for (size_t i = 0; i < subg_csr->edge_ids.size(); i++)
+  for (size_t i = 0; i < subg_csr->edge_ids.size(); i++) {
     subg_csr->edge_ids[i] = i;
+  }
 
-  if (neigh_type == "in")
+  if (edge_type == "in") {
     nf.graph = GraphPtr(new ImmutableGraph(subg_csr, nullptr, is_multigraph));
-  else
+  } else {
     nf.graph = GraphPtr(new ImmutableGraph(nullptr, subg_csr, is_multigraph));
+  }
 
   return nf;
 }
@@ -361,12 +357,12 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
 NodeFlow SampleSubgraph(const ImmutableGraph *graph,
                         IdArray seed_arr,
                         const float* probability,
-                        const std::string &neigh_type,
+                        const std::string &edge_type,
                         int num_hops,
                         size_t num_neighbor) {
   unsigned int time_seed = time(nullptr);
   size_t num_seeds = seed_arr->shape[0];
-  auto orig_csr = neigh_type == "in" ? graph->GetInCSR() : graph->GetOutCSR();
+  auto orig_csr = edge_type == "in" ? graph->GetInCSR() : graph->GetOutCSR();
   const dgl_id_t* val_list = orig_csr->edge_ids.data();
   const dgl_id_t* col_list = orig_csr->indices.data();
   const int64_t* indptr = orig_csr->indptr.data();
@@ -406,7 +402,7 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
     // isn't in the last level, we will sample its neighbors. If not, the while loop terminates.
     while (idx < sub_vers.size() && layer_id - 1 == sub_vers[idx].second) {
       dgl_id_t dst_id = sub_vers[idx].first;
-      int cur_node_level = sub_vers[idx].second;
+      const int cur_node_level = sub_vers[idx].second;
       idx++;
 
       tmp_sampled_src_list.clear();
@@ -431,8 +427,7 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
                             &time_seed);
       }
       CHECK_EQ(tmp_sampled_src_list.size(), tmp_sampled_edge_list.size());
-      size_t pos = neighbor_list.size();
-      neigh_pos.emplace_back(dst_id, pos);
+      neigh_pos.emplace_back(dst_id, neighbor_list.size());
       // First we push the size of neighbor vector
       neighbor_list.push_back(tmp_sampled_edge_list.size());
       // Then push the vertices
@@ -459,16 +454,18 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
   }
 
   return ConstructNodeFlow(neighbor_list, layer_offsets, &sub_vers, &neigh_pos,
-                           neigh_type, num_edges, num_hops, graph->IsMultigraph());
+                           edge_type, num_edges, num_hops, graph->IsMultigraph());
 }
 
+}  // namespace anonymous
+
 NodeFlow SamplerOp::NeighborUniformSample(const ImmutableGraph *graph, IdArray seeds,
-                                          const std::string &neigh_type,
+                                          const std::string &edge_type,
                                           int num_hops, int expand_factor) {
   return SampleSubgraph(graph,
                         seeds,                 // seed vector
                         nullptr,               // sample_id_probability
-                        neigh_type,
+                        edge_type,
                         num_hops + 1,
                         expand_factor);
 }

@@ -46,10 +46,16 @@ class SamplerOp {
   /*!
    * \brief Sample a graph from the seed vertices with neighbor sampling.
    * The neighbors are sampled with a uniform distribution.
+   *
+   * \param graphs A graph for sampling.
+   * \param seeds the nodes where we should start to sample.
+   * \param edge_type the type of edges we should sample neighbors.
+   * \param num_hops the number of hops to sample neighbors.
+   * \param expand_factor the max number of neighbors to sample.
    * \return a NodeFlow graph.
    */
   static NodeFlow NeighborUniformSample(const ImmutableGraph *graph, IdArray seeds,
-                                        const std::string &neigh_type,
+                                        const std::string &edge_type,
                                         int num_hops, int expand_factor);
 };
 
