@@ -193,11 +193,6 @@ class NodeFlow(DGLBaseGraph):
         edge_embed_names : a list of lists of strings, optional
             The names of embeddings in each block.
         """
-        #TODO We need to take care of the following things:
-        #    * copy right node embeddings back. For instance, we should copy temporary
-        #      node embeddings back; we don't need to copy read-only node embeddings back.
-        #    * When nodes in different layers have the same node embedding, we need
-        #      to avoid conflicts.
         if self._parent._node_frame.num_rows != 0 and self._parent._node_frame.num_columns != 0:
             if is_all(node_embed_names):
                 for i in range(self.num_layers):
