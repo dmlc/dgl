@@ -138,17 +138,17 @@ void NegateArray(const std::vector<size_t> &nz_idxs,
 /*
  * Uniform sample vertices from a list of vertices.
  */
-void GetUniformSample(const dgl_id_t* val_list,
-                      const dgl_id_t* ver_list,
+void GetUniformSample(const dgl_id_t* edge_id_list,
+                      const dgl_id_t* vid_list,
                       const size_t ver_len,
                       const size_t max_num_neighbor,
                       std::vector<dgl_id_t>* out_ver,
                       std::vector<dgl_id_t>* out_edge,
                       unsigned int* seed) {
-  // Copy ver_list to output
+  // Copy vid_list to output
   if (ver_len <= max_num_neighbor) {
-    out_ver->insert(out_ver->end(), ver_list, ver_list + ver_len);
-    out_edge->insert(out_edge->end(), val_list, val_list + ver_len);
+    out_ver->insert(out_ver->end(), vid_list, vid_list + ver_len);
+    out_edge->insert(out_edge->end(), edge_id_list, edge_id_list + ver_len);
     return;
   }
   // If we just sample a small number of elements from a large neighbor list.
@@ -171,8 +171,8 @@ void GetUniformSample(const dgl_id_t* val_list,
     CHECK_GT(sorted_idxs[i], sorted_idxs[i - 1]);
   }
   for (auto idx : sorted_idxs) {
-    out_ver->push_back(ver_list[idx]);
-    out_edge->push_back(val_list[idx]);
+    out_ver->push_back(vid_list[idx]);
+    out_edge->push_back(edge_id_list[idx]);
   }
 }
 
@@ -180,24 +180,24 @@ void GetUniformSample(const dgl_id_t* val_list,
  * Non-uniform sample via ArrayHeap
  */
 void GetNonUniformSample(const float* probability,
-                         const dgl_id_t* val_list,
-                         const dgl_id_t* ver_list,
+                         const dgl_id_t* edge_id_list,
+                         const dgl_id_t* vid_list,
                          const size_t ver_len,
                          const size_t max_num_neighbor,
                          std::vector<dgl_id_t>* out_ver,
                          std::vector<dgl_id_t>* out_edge,
                          unsigned int* seed) {
-  // Copy ver_list to output
+  // Copy vid_list to output
   if (ver_len <= max_num_neighbor) {
-    out_ver->insert(out_ver->end(), ver_list, ver_list + ver_len);
-    out_edge->insert(out_edge->end(), val_list, val_list + ver_len);
+    out_ver->insert(out_ver->end(), vid_list, vid_list + ver_len);
+    out_edge->insert(out_edge->end(), edge_id_list, edge_id_list + ver_len);
     return;
   }
   // Make sample
   std::vector<size_t> sp_index(max_num_neighbor);
   std::vector<float> sp_prob(ver_len);
   for (size_t i = 0; i < ver_len; ++i) {
-    sp_prob[i] = probability[ver_list[i]];
+    sp_prob[i] = probability[vid_list[i]];
   }
   ArrayHeap arrayHeap(sp_prob);
   arrayHeap.SampleWithoutReplacement(max_num_neighbor, &sp_index, seed);
@@ -205,8 +205,8 @@ void GetNonUniformSample(const float* probability,
   out_edge->resize(max_num_neighbor);
   for (size_t i = 0; i < max_num_neighbor; ++i) {
     size_t idx = sp_index[i];
-    out_ver->at(i) = ver_list[idx];
-    out_edge->at(i) = val_list[idx];
+    out_ver->at(i) = vid_list[idx];
+    out_edge->at(i) = edge_id_list[idx];
   }
   sort(out_ver->begin(), out_ver->end());
   sort(out_edge->begin(), out_edge->end());
