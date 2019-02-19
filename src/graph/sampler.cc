@@ -224,6 +224,7 @@ struct neigh_list {
 };
 
 NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
+                           std::vector<dgl_id_t> edge_list,
                            std::vector<size_t> layer_offsets,
                            std::vector<std::pair<dgl_id_t, int> > *sub_vers,
                            std::vector<std::pair<dgl_id_t, size_t> > *neigh_pos,
@@ -255,7 +256,7 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
 
   // The data from the previous steps:
   // * node data: sub_vers (vid, layer), neigh_pos,
-  // * edge data: neighbor_list, probability.
+  // * edge data: neighbor_list, edge_list, probability.
   // * layer_offsets: the offset in sub_vers.
   dgl_id_t ver_id = 0;
   std::vector<std::unordered_map<dgl_id_t, dgl_id_t>> layer_ver_maps;
@@ -303,19 +304,20 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
     for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
       dgl_id_t dst_id = sub_vers->at(i).first;
       assert(dst_id == neigh_pos->at(i).first);
-      size_t pos = neigh_pos->at(i).second;
-      CHECK_LT(pos, neighbor_list.size());
-      size_t num_edges = neighbor_list[pos];
-      CHECK_LE(pos + num_edges * 2 + 1, neighbor_list.size());
+      size_t start_pos = neigh_pos->at(i).second;
+      size_t end_pos = neigh_pos->at(i + 1).second;
+      CHECK_LT(start_pos, neighbor_list.size());
+      CHECK_LE(end_pos, neighbor_list.size());
+      size_t num_edges = end_pos - start_pos;
 
       // We need to map the Ids of the neighbors to the subgraph.
-      auto neigh_it = neighbor_list.begin() + pos + 1;
+      auto neigh_it = neighbor_list.begin() + start_pos;
       for (size_t i = 0; i < num_edges; i++) {
         dgl_id_t neigh = *(neigh_it + i);
         col_list_out[collected_nedges + i] = layer_ver_maps[layer_id + 1][neigh];
       }
       // We can simply copy the edge Ids.
-      std::copy_n(neighbor_list.begin() + pos + num_edges + 1,
+      std::copy_n(edge_list.begin() + start_pos,
                   num_edges, edge_map_data + collected_nedges);
       collected_nedges += num_edges;
       indptr_out[row_idx+1] = indptr_out[row_idx] + num_edges;
@@ -385,6 +387,7 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
   std::vector<std::pair<dgl_id_t, size_t> > neigh_pos;
   neigh_pos.reserve(num_seeds);
   std::vector<dgl_id_t> neighbor_list;
+  std::vector<dgl_id_t> edge_list;
   std::vector<size_t> layer_offsets(num_hops + 1);
   int64_t num_edges = 0;
 
@@ -428,15 +431,13 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
       }
       CHECK_EQ(tmp_sampled_src_list.size(), tmp_sampled_edge_list.size());
       neigh_pos.emplace_back(dst_id, neighbor_list.size());
-      // First we push the size of neighbor vector
-      neighbor_list.push_back(tmp_sampled_edge_list.size());
       // Then push the vertices
       for (size_t i = 0; i < tmp_sampled_src_list.size(); ++i) {
         neighbor_list.push_back(tmp_sampled_src_list[i]);
       }
       // Finally we push the edge list
       for (size_t i = 0; i < tmp_sampled_edge_list.size(); ++i) {
-        neighbor_list.push_back(tmp_sampled_edge_list[i]);
+        edge_list.push_back(tmp_sampled_edge_list[i]);
       }
       num_edges += tmp_sampled_src_list.size();
       for (size_t i = 0; i < tmp_sampled_src_list.size(); ++i) {
@@ -453,7 +454,8 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
     layer_offsets[layer_id + 1] = layer_offsets[layer_id] + sub_ver_map.size();
   }
 
-  return ConstructNodeFlow(neighbor_list, layer_offsets, &sub_vers, &neigh_pos,
+  neigh_pos.emplace_back(-1, neighbor_list.size());
+  return ConstructNodeFlow(neighbor_list, edge_list, layer_offsets, &sub_vers, &neigh_pos,
                            edge_type, num_edges, num_hops, graph->IsMultigraph());
 }
 
