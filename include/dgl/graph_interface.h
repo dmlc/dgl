@@ -20,7 +20,7 @@ typedef dgl::runtime::NDArray BoolArray;
 typedef dgl::runtime::NDArray IntArray;
 
 struct Subgraph;
-struct SampledSubgraph;
+struct NodeFlow;
 
 /*!
  * \brief This class references data in std::vector.
@@ -332,14 +332,6 @@ class GraphInterface {
    * \return a vector of IdArrays.
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const = 0;
-
-  /*!
-   * \brief Sample a subgraph from the seed vertices with neighbor sampling.
-   * The neighbors are sampled with a uniform distribution.
-   * \return a subgraph
-   */
-  virtual SampledSubgraph NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
-                                                int num_hops, int expand_factor) const = 0;
 };
 
 /*! \brief Subgraph data structure */
@@ -356,21 +348,6 @@ struct Subgraph {
    * \note This is also a map from the new edge id to the edge id in the parent graph.
    */
   IdArray induced_edges;
-};
-
-/*!
- * \brief When we sample a subgraph, we need to store extra information,
- * such as the layer Ids of the vertices and the sampling probability.
- */
-struct SampledSubgraph: public Subgraph {
-  /*!
-   * \brief the layer of a sampled vertex in the subgraph.
-   */
-  IdArray layer_ids;
-  /*!
-   * \brief the probability that a vertex is sampled.
-   */
-  runtime::NDArray sample_prob;
 };
 
 }  // namespace dgl

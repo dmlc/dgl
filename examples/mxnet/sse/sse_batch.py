@@ -268,7 +268,7 @@ def main(args, data):
     dur = []
     sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, neigh_expand,
             neighbor_type='in', num_workers=args.num_parallel_subgraphs, seed_nodes=train_vs,
-            shuffle=True, return_seed_id=True)
+            shuffle=True)
     if args.cache_subgraph:
         sampler = CachedSubgraphLoader(sampler, shuffle=True)
     for epoch in range(args.n_epochs):
@@ -279,7 +279,7 @@ def main(args, data):
         start1 = time.time()
         for subg, aux_infos in sampler:
             seeds = aux_infos['seeds']
-            subg_seeds = subg.map_to_subgraph_nid(seeds)
+            subg_seeds = subg.layer_nid(0)
             subg.copy_from_parent()
 
             losses = []
