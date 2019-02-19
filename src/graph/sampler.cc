@@ -223,11 +223,23 @@ struct neigh_list {
     : neighs(_neighs), edges(_edges) {}
 };
 
+struct neighbor_info {
+  dgl_id_t id;
+  size_t pos;
+  size_t num_edges;
+
+  neighbor_info(dgl_id_t id, size_t pos, size_t num_edges) {
+    this->id = id;
+    this->pos = pos;
+    this->num_edges = num_edges;
+  }
+};
+
 NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
                            std::vector<dgl_id_t> edge_list,
                            std::vector<size_t> layer_offsets,
                            std::vector<std::pair<dgl_id_t, int> > *sub_vers,
-                           std::vector<std::pair<dgl_id_t, size_t> > *neigh_pos,
+                           std::vector<neighbor_info> *neigh_pos,
                            const std::string &edge_type,
                            int64_t num_edges, int num_hops, bool is_multigraph) {
   NodeFlow nf;
@@ -297,27 +309,26 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   for (int layer_id = num_hops - 2; layer_id >= 0; layer_id--) {
     std::sort(neigh_pos->begin() + layer_offsets[layer_id],
               neigh_pos->begin() + layer_offsets[layer_id + 1],
-              [](const std::pair<dgl_id_t, size_t> &a1, const std::pair<dgl_id_t, size_t> &a2) {
-                return a1.first < a2.first;
+              [](const neighbor_info &a1, const neighbor_info &a2) {
+                return a1.id < a2.id;
               });
 
     for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
       dgl_id_t dst_id = sub_vers->at(i).first;
-      assert(dst_id == neigh_pos->at(i).first);
-      size_t start_pos = neigh_pos->at(i).second;
-      size_t end_pos = neigh_pos->at(i + 1).second;
-      CHECK_LT(start_pos, neighbor_list.size());
-      CHECK_LE(end_pos, neighbor_list.size());
-      size_t num_edges = end_pos - start_pos;
+      assert(dst_id == neigh_pos->at(i).id);
+      size_t pos = neigh_pos->at(i).pos;
+      CHECK_LT(pos, neighbor_list.size());
+      size_t num_edges = neigh_pos->at(i).num_edges;
 
       // We need to map the Ids of the neighbors to the subgraph.
-      auto neigh_it = neighbor_list.begin() + start_pos;
+      auto neigh_it = neighbor_list.begin() + pos;
       for (size_t i = 0; i < num_edges; i++) {
         dgl_id_t neigh = *(neigh_it + i);
+        assert(layer_ver_maps[layer_id + 1].find(neigh) != layer_ver_maps[layer_id + 1].end());
         col_list_out[collected_nedges + i] = layer_ver_maps[layer_id + 1][neigh];
       }
       // We can simply copy the edge Ids.
-      std::copy_n(edge_list.begin() + start_pos,
+      std::copy_n(edge_list.begin() + pos,
                   num_edges, edge_map_data + collected_nedges);
       collected_nedges += num_edges;
       indptr_out[row_idx+1] = indptr_out[row_idx] + num_edges;
@@ -384,7 +395,7 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
   std::vector<dgl_id_t> tmp_sampled_src_list;
   std::vector<dgl_id_t> tmp_sampled_edge_list;
   // ver_id, position
-  std::vector<std::pair<dgl_id_t, size_t> > neigh_pos;
+  std::vector<neighbor_info> neigh_pos;
   neigh_pos.reserve(num_seeds);
   std::vector<dgl_id_t> neighbor_list;
   std::vector<dgl_id_t> edge_list;
@@ -426,7 +437,7 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
                             &time_seed);
       }
       CHECK_EQ(tmp_sampled_src_list.size(), tmp_sampled_edge_list.size());
-      neigh_pos.emplace_back(dst_id, neighbor_list.size());
+      neigh_pos.emplace_back(dst_id, neighbor_list.size(), tmp_sampled_src_list.size());
       // Then push the vertices
       for (size_t i = 0; i < tmp_sampled_src_list.size(); ++i) {
         neighbor_list.push_back(tmp_sampled_src_list[i]);
@@ -451,7 +462,6 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
     CHECK_EQ(layer_offsets[layer_id + 1], sub_vers.size());
   }
 
-  neigh_pos.emplace_back(-1, neighbor_list.size());
   return ConstructNodeFlow(neighbor_list, edge_list, layer_offsets, &sub_vers, &neigh_pos,
                            edge_type, num_edges, num_hops, graph->IsMultigraph());
 }
