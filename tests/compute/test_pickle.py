@@ -142,8 +142,18 @@ def test_pickling_graph():
     _assert_is_identical(g, new_g)
     _assert_is_identical(g2, new_g2)
 
-    # check readonly graph
+    # readonly graph
     g = dgl.DGLGraph([(0, 1), (1, 2)], readonly=True)
+    new_g = _reconstruct_pickle(g)
+    _assert_is_identical(g, new_g)
+
+    # multigraph
+    g = dgl.DGLGraph([(0, 1), (0, 1), (1, 2)], multigraph=True)
+    new_g = _reconstruct_pickle(g)
+    _assert_is_identical(g, new_g)
+
+    # readonly multigraph
+    g = dgl.DGLGraph([(0, 1), (0, 1), (1, 2)], multigraph=True, readonly=True)
     new_g = _reconstruct_pickle(g)
     _assert_is_identical(g, new_g)
 
