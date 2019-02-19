@@ -450,7 +450,8 @@ void CAPI_NeighborUniformSample(DGLArgs args, DGLRetValue* rv) {
   std::vector<NodeFlow> subgs(seeds.size());
 #pragma omp parallel for
   for (int i = 0; i < num_valid_seeds; i++) {
-    subgs[i] = gptr->NeighborUniformSample(seeds[i], neigh_type, num_hops, num_neighbors);
+    subgs[i] = SamplerOp::NeighborUniformSample(gptr, seeds[i],
+                                                neigh_type, num_hops, num_neighbors);
   }
   *rv = ConvertSubgraphToPackedFunc(subgs);
 }

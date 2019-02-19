@@ -10,6 +10,8 @@
 
 namespace dgl {
 
+class ImmutableGraph;
+
 /*!
  * \brief A NodeFlow graph stores the sampling results for a sampler that samples
  * nodes/edges in layers.
@@ -37,6 +39,18 @@ struct NodeFlow {
    * \brief The edge mapping from the NodeFlow graph to the parent graph.
    */
   IdArray edge_mapping;
+};
+
+class SamplerOp {
+ public:
+  /*!
+   * \brief Sample a graph from the seed vertices with neighbor sampling.
+   * The neighbors are sampled with a uniform distribution.
+   * \return a NodeFlow graph.
+   */
+  static NodeFlow NeighborUniformSample(const ImmutableGraph *graph, IdArray seeds,
+                                        const std::string &neigh_type,
+                                        int num_hops, int expand_factor);
 };
 
 }  // namespace dgl

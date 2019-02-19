@@ -462,14 +462,6 @@ class ImmutableGraph: public GraphInterface {
   }
 
   /*!
-   * \brief Sample a subgraph from the seed vertices with neighbor sampling.
-   * The neighbors are sampled with a uniform distribution.
-   * \return a subgraph
-   */
-  NodeFlow NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
-                                 int num_hops, int expand_factor) const;
-
-  /*!
    * \brief Get the adjacency matrix of the graph.
    *
    * By default, a row of returned adjacency matrix represents the destination
@@ -479,10 +471,6 @@ class ImmutableGraph: public GraphInterface {
    * \return a vector of three IdArray.
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const;
-
- protected:
-  DGLIdIters GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
-  DGLIdIters GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
 
   /*
    * The immutable graph may only contain one of the CSRs (e.g., the sampled subgraphs).
@@ -508,6 +496,10 @@ class ImmutableGraph: public GraphInterface {
     }
   }
 
+ protected:
+  DGLIdIters GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
+  DGLIdIters GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
+
   /*!
    * \brief Get the CSR array that represents the in-edges.
    * This method copies data from std::vector to IdArray.
@@ -521,10 +513,6 @@ class ImmutableGraph: public GraphInterface {
    * \return the CSR array.
    */
   CSRArray GetOutCSRArray() const;
-
-  NodeFlow SampleSubgraph(IdArray seed_arr, const float* probability,
-                          const std::string &neigh_type,
-                          int num_hops, size_t num_neighbor) const;
 
   /*!
    * \brief Compact a subgraph.

@@ -570,12 +570,6 @@ std::vector<IdArray> Graph::GetAdj(bool transpose, const std::string &fmt) const
   }
 }
 
-NodeFlow Graph::NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
-                                      int num_hops, int expand_factor) const {
-  LOG(FATAL) << "NeighborUniformSample isn't supported in mutable graph";
-  return NodeFlow();
-}
-
 GraphPtr Graph::Reverse() const {
   LOG(FATAL) << "not implemented";
   return nullptr;

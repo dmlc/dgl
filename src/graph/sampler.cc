@@ -358,14 +358,15 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   return nf;
 }
 
-NodeFlow ImmutableGraph::SampleSubgraph(IdArray seed_arr,
-                                        const float* probability,
-                                        const std::string &neigh_type,
-                                        int num_hops,
-                                        size_t num_neighbor) const {
+NodeFlow SampleSubgraph(const ImmutableGraph *graph,
+                        IdArray seed_arr,
+                        const float* probability,
+                        const std::string &neigh_type,
+                        int num_hops,
+                        size_t num_neighbor) {
   unsigned int time_seed = time(nullptr);
   size_t num_seeds = seed_arr->shape[0];
-  auto orig_csr = neigh_type == "in" ? GetInCSR() : GetOutCSR();
+  auto orig_csr = neigh_type == "in" ? graph->GetInCSR() : graph->GetOutCSR();
   const dgl_id_t* val_list = orig_csr->edge_ids.data();
   const dgl_id_t* col_list = orig_csr->indices.data();
   const int64_t* indptr = orig_csr->indptr.data();
@@ -458,13 +459,14 @@ NodeFlow ImmutableGraph::SampleSubgraph(IdArray seed_arr,
   }
 
   return ConstructNodeFlow(neighbor_list, layer_offsets, &sub_vers, &neigh_pos,
-                           neigh_type, num_edges, num_hops, IsMultigraph());
+                           neigh_type, num_edges, num_hops, graph->IsMultigraph());
 }
 
-NodeFlow ImmutableGraph::NeighborUniformSample(IdArray seeds,
-                                               const std::string &neigh_type,
-                                               int num_hops, int expand_factor) const {
-  return SampleSubgraph(seeds,                 // seed vector
+NodeFlow SamplerOp::NeighborUniformSample(const ImmutableGraph *graph, IdArray seeds,
+                                          const std::string &neigh_type,
+                                          int num_hops, int expand_factor) {
+  return SampleSubgraph(graph,
+                        seeds,                 // seed vector
                         nullptr,               // sample_id_probability
                         neigh_type,
                         num_hops + 1,
