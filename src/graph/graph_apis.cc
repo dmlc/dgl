@@ -488,10 +488,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphRandomWalk")
     const int num_traces = args[2];
     const int num_hops = args[3];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
-    CHECK(gptr) << "sampling isn't implemented in mutable graph";
 
-    *rv = gptr->RandomWalk(seeds, num_traces, num_hops);
+    *rv = RandomWalk(ptr, seeds, num_traces, num_hops);
   });
 
 }  // namespace dgl

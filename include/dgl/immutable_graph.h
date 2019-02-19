@@ -13,7 +13,6 @@
 #include <tuple>
 #include "runtime/ndarray.h"
 #include "graph_interface.h"
-#include "runtime/util.h"
 
 namespace dgl {
 
@@ -476,15 +475,6 @@ class ImmutableGraph: public GraphInterface {
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const;
 
-  /*!
-   * \brief Batch-generate random walk traces
-   * \param seeds The array of starting vertex IDs
-   * \param num_traces The number of traces to generate for each seed
-   * \param num_hops The number of hops for each trace
-   * \return a flat ID array with shape (num_seeds, num_traces, num_hops + 1)
-   */
-  IdArray RandomWalk(IdArray seeds, int num_traces, int num_hops) const;
-
  protected:
   DGLIdIters GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
   DGLIdIters GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
@@ -548,14 +538,17 @@ class ImmutableGraph: public GraphInterface {
    * When a multiedge is added, this flag switches to true.
    */
   bool is_multigraph_ = false;
- private:
-  /*! \brief Get a random successor given the current node.  Changes the seed */
-  inline dgl_id_t GetRandomSuccessor(dgl_id_t vid, unsigned int *seed) const {
-    const DGLIdIters &succ = this->GetOutCSR()->GetIndexRef(vid);
-    const size_t size = succ.size();
-    return succ[rand_r(seed) % size];
-  }
 };
+
+/*!
+ * \brief Batch-generate random walk traces
+ * \param seeds The array of starting vertex IDs
+ * \param num_traces The number of traces to generate for each seed
+ * \param num_hops The number of hops for each trace
+ * \return a flat ID array with shape (num_seeds, num_traces, num_hops + 1)
+ */
+// TODO: move to sampler.cc
+IdArray RandomWalk(const GraphInterface *gptr, IdArray seeds, int num_traces, int num_hops);
 
 }  // namespace dgl
 

@@ -448,9 +448,11 @@ SampledSubgraph ImmutableGraph::NeighborUniformSample(IdArray seeds,
   return ret;
 }
 
-IdArray ImmutableGraph::RandomWalk(IdArray seeds,
-                                   int num_traces,
-                                   int num_hops) const {
+IdArray RandomWalk(
+    const GraphInterface *gptr,
+    IdArray seeds,
+    int num_traces,
+    int num_hops) {
   const int num_nodes = seeds->shape[0];
   const dgl_id_t *seed_ids = static_cast<dgl_id_t *>(seeds->data);
   IdArray traces = IdArray::Empty(
@@ -469,10 +471,12 @@ IdArray ImmutableGraph::RandomWalk(IdArray seeds,
       const int kmax = num_hops + 1;
 
       for (int k = 0; k < kmax; ++k) {
-        size_t offset = ((size_t)i * num_traces + j) * kmax + k;
-
+        const size_t offset = ((size_t)i * num_traces + j) * kmax + k;
         trace_data[offset] = cur;
-        cur = GetRandomSuccessor(cur, &random_seed);
+
+        const auto succ = gptr->SuccVec(cur);
+        const size_t size = succ.size();
+        cur = succ[rand_r(&random_seed) % size];
       }
     }
   }
