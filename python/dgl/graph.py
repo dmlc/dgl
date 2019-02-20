@@ -6,7 +6,8 @@ import networkx as nx
 
 import dgl
 from .base import ALL, is_all, DGLError
-from . import backend as F from . import init
+from . import backend as F 
+from . import init
 from .frame import FrameRef, Frame
 from .graph_index import create_graph_index
 from .runtime import ir, scheduler, Runtime
