@@ -2,7 +2,7 @@ import torch
 import dgl
 from ..utils import cuda
 
-@profile
+
 def random_walk_sampler(G, nodeset, n_traces, n_hops):
     '''
     G: DGLGraph
@@ -17,7 +17,7 @@ def random_walk_sampler(G, nodeset, n_traces, n_hops):
 
 # Note: this function is not friendly to giant graphs since we use a matrix
 # with size (num_nodes_in_nodeset, num_nodes_in_graph).
-@profile
+
 def random_walk_distribution(G, nodeset, n_traces, n_hops):
     n_nodes = nodeset.shape[0]
     n_available_nodes = G.number_of_nodes()
@@ -29,7 +29,7 @@ def random_walk_distribution(G, nodeset, n_traces, n_hops):
     visited_prob = visited_counts / visited_counts.sum(1, keepdim=True)
     return visited_prob
 
-@profile
+
 def random_walk_distribution_topt(G, nodeset, n_traces, n_hops, top_T):
     '''
     returns the top T important neighbors of each node in nodeset, as well as
@@ -38,7 +38,7 @@ def random_walk_distribution_topt(G, nodeset, n_traces, n_hops, top_T):
     visited_prob = random_walk_distribution(G, nodeset, n_traces, n_hops)
     return visited_prob.topk(top_T, 1)
 
-@profile
+
 def random_walk_nodeflow(G, nodeset, n_layers, n_traces, n_hops, top_T):
     '''
     returns a list of triplets (

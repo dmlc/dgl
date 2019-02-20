@@ -84,7 +84,6 @@ class PinSage(nn.Module):
 
         self.h = create_embeddings(G.number_of_nodes(), self.in_features)
 
-    @profile
     def forward(self, nodeset):
         '''
         Given a complete embedding matrix h and a list of node IDs, return
