@@ -5,6 +5,7 @@ import scipy.sparse as sp
 import networkx as nx
 import dgl
 import backend as F
+from dgl import DGLError
 
 def test_graph_creation():
     g = dgl.DGLGraph()
@@ -126,9 +127,67 @@ def test_incmat_cache():
     inc4 = g.incidence_matrix("in")
     assert id(inc4) != id(inc35)
 
+def test_readonly():
+    g = dgl.DGLGraph()
+    g.add_nodes(5)
+    g.add_edges([0, 1, 2, 3], [1, 2, 3, 4])
+    g.ndata['x'] = F.zeros((5, 3))
+    g.edata['x'] = F.zeros((4, 4))
+
+    g.readonly(False)
+    assert g._graph.is_readonly() == False
+    assert g.number_of_nodes() == 5
+    assert g.number_of_edges() == 4
+
+    g.readonly()
+    assert g._graph.is_readonly() == True 
+    assert g.number_of_nodes() == 5
+    assert g.number_of_edges() == 4
+
+    try:
+        g.add_nodes(5)
+        fail = False
+    except DGLError:
+        fail = True
+    finally:
+        assert fail
+
+    g.readonly()
+    assert g._graph.is_readonly() == True 
+    assert g.number_of_nodes() == 5
+    assert g.number_of_edges() == 4
+
+    try:
+        g.add_nodes(5)
+        fail = False
+    except DGLError:
+        fail = True
+    finally:
+        assert fail
+
+    g.readonly(False)
+    assert g._graph.is_readonly() == False
+    assert g.number_of_nodes() == 5
+    assert g.number_of_edges() == 4
+
+    try:
+        g.add_nodes(10)
+        g.add_edges([4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+                    [5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
+        fail = False
+    except DGLError:
+        fail = True
+    finally:
+        assert not fail
+        assert g.number_of_nodes() == 15
+        assert F.shape(g.ndata['x']) == (15, 3)
+        assert g.number_of_edges() == 14
+        assert F.shape(g.edata['x']) == (14, 4)
+
 if __name__ == '__main__':
     test_graph_creation()
     test_create_from_elist()
     test_adjmat_cache()
     test_incmat()
     test_incmat_cache()
+    test_readonly()
