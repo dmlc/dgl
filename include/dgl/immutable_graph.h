@@ -32,6 +32,7 @@ class ImmutableGraph: public GraphInterface {
     dgl_id_t edge_id;
   };
 
+
   struct CSR {
     typedef std::shared_ptr<CSR> Ptr;
     std::vector<int64_t> indptr;
@@ -91,7 +92,7 @@ class ImmutableGraph: public GraphInterface {
 
   /*! \brief Construct an immutable graph from the COO format. */
   ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
-                 bool multigraph = false);
+                 bool multigraph = false, bool store_map = false);
 
   /*!
    * \brief Construct an immutable graph from the CSR format.
@@ -261,20 +262,14 @@ class ImmutableGraph: public GraphInterface {
    * \param eid The edge ID
    * \return a pair whose first element is the source and the second the destination.
    */
-  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const {
-    LOG(FATAL) << "FindEdge isn't supported in ImmutableGraph";
-    return std::pair<dgl_id_t, dgl_id_t>();
-  }
+  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const;
 
   /*!
    * \brief Find the edge IDs and return their source and target node IDs.
    * \param eids The edge ID array.
    * \return EdgeArray containing all edges with id in eid.  The order is preserved.
    */
-  EdgeArray FindEdges(IdArray eids) const {
-    LOG(FATAL) << "FindEdges isn't supported in ImmutableGraph";
-    return EdgeArray();
-  }
+  EdgeArray FindEdges(IdArray eids) const;
 
   /*!
    * \brief Get the in edges of the vertex.
@@ -531,6 +526,8 @@ class ImmutableGraph: public GraphInterface {
    * When a multiedge is added, this flag switches to true.
    */
   bool is_multigraph_ = false;
+  // Store the eid to (start, end) mapping.
+  std::shared_ptr<std::vector<dgl_id_t> > eid_start, eid_end;
 };
 
 }  // namespace dgl

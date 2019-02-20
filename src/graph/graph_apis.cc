@@ -111,9 +111,10 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
     const bool multigraph = static_cast<bool>(args[3]);
     const int64_t num_nodes = static_cast<int64_t>(args[4]);
     const bool readonly = static_cast<bool>(args[5]);
+    const bool store_map = static_cast<bool>(args[6]);
     GraphHandle ghandle;
     if (readonly)
-      ghandle = new ImmutableGraph(src_ids, dst_ids, edge_ids, num_nodes, multigraph);
+      ghandle = new ImmutableGraph(src_ids, dst_ids, edge_ids, num_nodes, multigraph, store_map);
     else
       ghandle = new Graph(src_ids, dst_ids, edge_ids, num_nodes, multigraph);
     *rv = ghandle;

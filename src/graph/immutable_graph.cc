@@ -252,7 +252,7 @@ ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::Transpose() const {
 }
 
 ImmutableGraph::ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
-                               bool multigraph) : is_multigraph_(multigraph) {
+                               bool multigraph, bool store_map) : is_multigraph_(multigraph) {
   CHECK(IsValidIdArray(src_ids)) << "Invalid vertex id array.";
   CHECK(IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
   CHECK(IsValidIdArray(edge_ids)) << "Invalid vertex id array.";
@@ -262,12 +262,20 @@ ImmutableGraph::ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_id
   const dgl_id_t *src_data = static_cast<dgl_id_t*>(src_ids->data);
   const dgl_id_t *dst_data = static_cast<dgl_id_t*>(dst_ids->data);
   const dgl_id_t *edge_data = static_cast<dgl_id_t*>(edge_ids->data);
+  if (store_map) {
+    this->eid_start = std::make_shared<std::vector<dgl_id_t> >(len, -1);
+    this->eid_end = std::make_shared<std::vector<dgl_id_t> >(len, -1);
+  }
   std::vector<Edge> edges(len);
   for (size_t i = 0; i < edges.size(); i++) {
     Edge e;
     e.end_points[0] = src_data[i];
     e.end_points[1] = dst_data[i];
     e.edge_id = edge_data[i];
+    if (store_map) {
+      this->eid_start->at(e.edge_id) = e.end_points[0];
+      this->eid_end->at(e.edge_id) = e.end_points[1];
+    }
     edges[i] = e;
   }
   in_csr_ = CSR::FromEdges(&edges, 1, num_nodes);
@@ -447,6 +455,41 @@ ImmutableGraph::EdgeArray ImmutableGraph::EdgeIds(IdArray src_ids, IdArray dst_i
   std::copy(eid.begin(), eid.end(), rst_eid_data);
 
   return ImmutableGraph::EdgeArray{rst_src, rst_dst, rst_eid};
+}
+
+std::pair<dgl_id_t, dgl_id_t> ImmutableGraph::FindEdge(dgl_id_t eid) const {
+  dgl_id_t row, col;
+  if (this->eid_start) {
+    row = this->eid_start->at(eid);
+    col = this->eid_end->at(eid);
+  } else {
+    auto out_csr = GetOutCSR();
+    auto ptr = std::find(out_csr->edge_ids.begin(), out_csr->edge_ids.end(), eid);
+    CHECK(eid == *ptr);
+    const int64_t idx = ptr - out_csr->edge_ids.begin();
+    col = out_csr->indices[idx];
+    row = std::lower_bound(out_csr->indptr.begin(), out_csr->indptr.end(), idx) - out_csr->indptr.begin();
+  }
+  return std::pair<dgl_id_t, dgl_id_t>(row, col);
+}
+
+ImmutableGraph::EdgeArray ImmutableGraph::FindEdges(IdArray eids) const {
+  dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
+  const auto len = eids->shape[0];
+  std::vector<dgl_id_t> src, dst;
+  for (size_t k = 0; k < len; k++) {
+    auto edge = ImmutableGraph::FindEdge(eid_data[k]);
+    src.push_back(edge.first);
+    dst.push_back(edge.second);
+  }
+
+  IdArray rst_src = IdArray::Empty({len}, eids->dtype, eids->ctx);
+  IdArray rst_dst = IdArray::Empty({len}, eids->dtype, eids->ctx);
+  dgl_id_t* rst_src_data = static_cast<dgl_id_t*>(rst_src->data);
+  dgl_id_t* rst_dst_data = static_cast<dgl_id_t*>(rst_dst->data);
+  std::copy(src.begin(), src.end(), rst_src_data);
+  std::copy(dst.begin(), dst.end(), rst_dst_data);
+  return ImmutableGraph::EdgeArray{rst_src, rst_dst, eids};
 }
 
 ImmutableGraph::EdgeArray ImmutableGraph::Edges(const std::string &order) const {
