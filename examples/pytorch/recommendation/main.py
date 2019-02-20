@@ -40,7 +40,7 @@ g_prior_nid = g_prior.parent_nid
 g_prior_nid_np = g_prior_nid.numpy()
 
 model = cuda(PinSage(g_prior, [n_hidden] * n_layers, 10, 5, 5))
-opt = torch.optim.Adam(model.parameters())
+opt = torch.optim.Adam(model.parameters(), lr=1e-3)
 
 
 def forward(model, nodeset, train=True):
@@ -93,7 +93,7 @@ def run(edge_set, train=True):
             assert loss.item() == loss.item()
 
             if train:
-                model.zero_grad()
+                opt.zero_grad()
                 loss.backward()
                 for name, p in model.named_parameters():
                     assert (p.grad != p.grad).sum() == 0
@@ -105,4 +105,5 @@ def run(edge_set, train=True):
 
 for epoch in range(500):
     run(g_train_edges, True)
-    run(g_valid_edges, False)
+    with torch.no_grad():
+        run(g_valid_edges, False)
