@@ -3070,7 +3070,7 @@ class DGLGraph(DGLBaseGraph):
         >>> G.number_of_nodes()
         8
         """
-        if readonly == self._graph.is_readonly():
+        if readonly_state == self._graph.is_readonly():
             return self
         self._graph.readonly(readonly_state)
         return self
