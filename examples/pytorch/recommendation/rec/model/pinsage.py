@@ -37,8 +37,8 @@ class PinSageConv(nn.Module):
         self.Q = nn.Linear(in_features, hidden_features)
         self.W = nn.Linear(in_features + hidden_features, out_features)
 
-        init_weight(self.Q.weight, 'xavier_uniform_', 'relu')
-        init_weight(self.W.weight, 'xavier_uniform_', 'relu')
+        init_weight(self.Q.weight, 'xavier_uniform_', 'leaky_relu')
+        init_weight(self.W.weight, 'xavier_uniform_', 'leaky_relu')
         init_bias(self.Q.bias)
         init_bias(self.W.bias)
 
@@ -57,13 +57,13 @@ class PinSageConv(nn.Module):
         h_nodeset = get_embeddings(h, nodeset)  # (n_nodes, in_features)
         h_neighbors = get_embeddings(h, nb_nodes.view(-1)).view(n_nodes, T, self.in_features)
 
-        h_neighbors = F.relu(self.Q(h_neighbors))
+        h_neighbors = F.leaky_relu(self.Q(h_neighbors))
         h_agg = safediv(
                 (nb_weights[:, :, None] * h_neighbors).sum(1),
                 nb_weights.sum(1, keepdim=True))
 
         h_concat = torch.cat([h_nodeset, h_agg], 1)
-        h_new = F.relu(self.W(h_concat))
+        h_new = F.leaky_relu(self.W(h_concat))
         h_new = safediv(h_new, h_new.norm(dim=1, keepdim=True))
 
         return h_new
