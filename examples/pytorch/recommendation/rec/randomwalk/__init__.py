@@ -11,17 +11,7 @@ def random_walk_sampler(G, nodeset, n_traces, n_hops):
     n_hops: int
     return: 3D CPU Tensor or node IDs (n_nodes, n_traces, n_hops + 1)
     '''
-    n_nodes = nodeset.shape[0]
-    traces = torch.zeros(n_nodes, n_traces, n_hops + 1, dtype=torch.int64)
-
-    for i in range(n_nodes):
-        for j in range(n_traces):
-            cur = nodeset[i]
-            for k in range(n_hops + 1):
-                traces[i, j, k] = cur
-                neighbors = G.successors(cur.item())
-                assert neighbors.shape[0] > 0
-                cur = neighbors[torch.randint(len(neighbors), ())]
+    traces = dgl.contrib.sampling.random_walk(G, nodeset, n_traces, n_hops)
 
     return traces
 

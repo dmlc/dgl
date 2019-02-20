@@ -3,6 +3,7 @@ import dgl
 import os
 import torch
 import scipy.sparse as sp
+import time
 from .. import randomwalk
 
 class MovieLens(object):
@@ -105,17 +106,22 @@ class MovieLens(object):
         g.add_edges(rating_user_vertices, rating_movie_vertices)
         g.add_edges(rating_movie_vertices, rating_user_vertices)
 
-        g_mat = sp.coo_matrix(g.adjacency_matrix().to_dense().numpy())
+        #g_mat = sp.coo_matrix(g.adjacency_matrix().to_dense().numpy())
+        #self.g = dgl.DGLGraph(g_mat, readonly=True)
+        self.g = g
 
-        self.g = dgl.DGLGraph(g_mat, readonly=True)
         self.g.edges[rating_user_vertices, rating_movie_vertices].data.update(edge_data)
         self.g.edges[rating_movie_vertices, rating_user_vertices].data.update(edge_data)
         self.user_ids = user_ids
         self.movie_ids = movie_ids
 
     def find_neighbors(self, n_traces, n_hops, top_T):
+        t0 = time.time()
         neighbor_probs, neighbors = randomwalk.random_walk_distribution_topt(
                 self.g, self.g.nodes(), n_traces, n_hops, top_T)
+        tt = time.time()
+
+        print('Pre-generating neighbors took %.4f seconds' % (tt - t0))
         self.neighbor_probs = neighbor_probs
         self.neighbors = neighbors
 
