@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cmath>
-#include <omp.h>
+#include <dmlc/omp.h>
 
 #ifdef _MSC_VER
 // rand in MS compiler works well in multi-threading.
