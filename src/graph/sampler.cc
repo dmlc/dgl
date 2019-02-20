@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cmath>
+#include <omp.h>
 
 #ifdef _MSC_VER
 // rand in MS compiler works well in multi-threading.
@@ -493,23 +494,28 @@ IdArray SamplerOp::RandomWalk(
       DLDataType{kDLInt, 64, 1},
       DLContext{kDLCPU, 0});
   dgl_id_t *trace_data = static_cast<dgl_id_t *>(traces->data);
-  unsigned int random_seed = time(nullptr);
 
-  // TODO: openmp support
-  for (int i = 0; i < num_nodes; ++i) {
-    const dgl_id_t seed_id = seed_ids[i];
+#pragma omp parallel
+  {
+    // get per-thread seed
+    unsigned int random_seed = time(nullptr) ^ omp_get_thread_num();
 
-    for (int j = 0; j < num_traces; ++j) {
-      dgl_id_t cur = seed_id;
-      const int kmax = num_hops + 1;
+#pragma omp for
+    for (int i = 0; i < num_nodes; ++i) {
+      const dgl_id_t seed_id = seed_ids[i];
 
-      for (int k = 0; k < kmax; ++k) {
-        const size_t offset = ((size_t)i * num_traces + j) * kmax + k;
-        trace_data[offset] = cur;
+      for (int j = 0; j < num_traces; ++j) {
+        dgl_id_t cur = seed_id;
+        const int kmax = num_hops + 1;
 
-        const auto succ = gptr->SuccVec(cur);
-        const size_t size = succ.size();
-        cur = succ[rand_r(&random_seed) % size];
+        for (int k = 0; k < kmax; ++k) {
+          const size_t offset = ((size_t)i * num_traces + j) * kmax + k;
+          trace_data[offset] = cur;
+
+          const auto succ = gptr->SuccVec(cur);
+          const size_t size = succ.size();
+          cur = succ[rand_r(&random_seed) % size];
+        }
       }
     }
   }
