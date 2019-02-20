@@ -7,6 +7,9 @@
 #include <dgl/sampler.h>
 #include <dgl/immutable_graph.h>
 #include <algorithm>
+#include <cstdlib>
+#include <cmath>
+#include <omp.h>
 
 #ifdef _MSC_VER
 // rand in MS compiler works well in multi-threading.
@@ -305,7 +308,7 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   }
   layer_off_data[0] = 0;
   layer_off_data[1] = layer_offsets[num_hops] - layer_offsets[num_hops - 1];
-  size_t out_layer_idx = 1;
+  int out_layer_idx = 1;
   for (int layer_id = num_hops - 2; layer_id >= 0; layer_id--) {
     std::sort(neigh_pos->begin() + layer_offsets[layer_id],
               neigh_pos->begin() + layer_offsets[layer_id + 1],
@@ -345,14 +348,14 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
 
   // Copy flow offsets.
   flow_off_data[0] = 0;
-  size_t out_flow_idx = 0;
-  for (int i = 0; i < layer_offsets.size() - 2; i++) {
+  int out_flow_idx = 0;
+  for (size_t i = 0; i < layer_offsets.size() - 2; i++) {
     size_t num_edges = subg_csr->GetDegree(layer_off_data[i + 1], layer_off_data[i + 2]);
     flow_off_data[out_flow_idx + 1] = flow_off_data[out_flow_idx] + num_edges;
     out_flow_idx++;
   }
   CHECK(out_flow_idx == num_hops - 1);
-  CHECK(flow_off_data[num_hops - 1] == num_edges);
+  CHECK(flow_off_data[num_hops - 1] == static_cast<uint64_t>(num_edges));
 
   for (size_t i = 0; i < subg_csr->edge_ids.size(); i++) {
     subg_csr->edge_ids[i] = i;
@@ -404,7 +407,7 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
 
   layer_offsets[0] = 0;
   layer_offsets[1] = sub_vers.size();
-  for (size_t layer_id = 1; layer_id < num_hops; layer_id++) {
+  for (int layer_id = 1; layer_id < num_hops; layer_id++) {
     // We need to avoid resampling the same node in a layer, but we allow a node
     // to be resampled in multiple layers. We use `sub_ver_map` to keep track of
     // sampled nodes in a layer, and clear it when entering a new layer.
@@ -477,6 +480,47 @@ NodeFlow SamplerOp::NeighborUniformSample(const ImmutableGraph *graph, IdArray s
                         edge_type,
                         num_hops + 1,
                         expand_factor);
+}
+
+IdArray SamplerOp::RandomWalk(
+    const GraphInterface *gptr,
+    IdArray seeds,
+    int num_traces,
+    int num_hops) {
+  const int num_nodes = seeds->shape[0];
+  const dgl_id_t *seed_ids = static_cast<dgl_id_t *>(seeds->data);
+  IdArray traces = IdArray::Empty(
+      {num_nodes, num_traces, num_hops + 1},
+      DLDataType{kDLInt, 64, 1},
+      DLContext{kDLCPU, 0});
+  dgl_id_t *trace_data = static_cast<dgl_id_t *>(traces->data);
+
+#pragma omp parallel
+  {
+    // get per-thread seed
+    unsigned int random_seed = time(nullptr) ^ omp_get_thread_num();
+
+#pragma omp for
+    for (int i = 0; i < num_nodes; ++i) {
+      const dgl_id_t seed_id = seed_ids[i];
+
+      for (int j = 0; j < num_traces; ++j) {
+        dgl_id_t cur = seed_id;
+        const int kmax = num_hops + 1;
+
+        for (int k = 0; k < kmax; ++k) {
+          const size_t offset = ((size_t)i * num_traces + j) * kmax + k;
+          trace_data[offset] = cur;
+
+          const auto succ = gptr->SuccVec(cur);
+          const size_t size = succ.size();
+          cur = succ[rand_r(&random_seed) % size];
+        }
+      }
+    }
+  }
+
+  return traces;
 }
 
 }  // namespace dgl
