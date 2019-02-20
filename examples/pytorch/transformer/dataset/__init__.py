@@ -176,7 +176,7 @@ def get_dataset(dataset):
             ('en', 'de'),
             train='train.tok.clean.bpe.32000',
             valid='newstest2013.tok.bpe.32000',
-            test='newstest2014.tok.bpe.32000',
+            test='newstest2014.tok.bpe.32000.ende',
             vocab='vocab.bpe.32000')
     else:
         raise KeyError()
