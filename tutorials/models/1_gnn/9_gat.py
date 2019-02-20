@@ -355,7 +355,7 @@ for epoch in range(30):
 #
 # The table above is the result of this experiment, where we use micro `F1 score <https://en.wikipedia.org/wiki/F1_score>`_ to evaluate the model performance.
 #
-# :::info
+#
 # Below is the calculation process of F1 score:
 #
 #
