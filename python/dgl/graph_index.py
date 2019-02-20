@@ -90,7 +90,8 @@ class GraphIndex(object):
         _CAPI_DGLGraphAddEdge(self._handle, u, v)
         self.clear_cache()
 
-    def add_edges(self, u, v): """Add many edges.
+    def add_edges(self, u, v): 
+        """Add many edges.
 
         Parameters
         ----------
