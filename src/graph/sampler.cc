@@ -320,7 +320,7 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
       dgl_id_t dst_id = sub_vers->at(i).first;
       assert(dst_id == neigh_pos->at(i).id);
       size_t pos = neigh_pos->at(i).pos;
-      CHECK_LT(pos, neighbor_list.size());
+      CHECK_LE(pos, neighbor_list.size());
       size_t num_edges = neigh_pos->at(i).num_edges;
 
       // We need to map the Ids of the neighbors to the subgraph.
