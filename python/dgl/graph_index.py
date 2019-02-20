@@ -90,7 +90,7 @@ class GraphIndex(object):
         _CAPI_DGLGraphAddEdge(self._handle, u, v)
         self.clear_cache()
 
-    def add_edges(self, u, v): 
+    def add_edges(self, u, v):
         """Add many edges.
 
         Parameters
@@ -144,7 +144,7 @@ class GraphIndex(object):
         Parameters
         ----------
         readonly_state : bool
-            New readonly state of current graph index. 
+            New readonly state of current graph index.
         """
         n_nodes, multigraph, _, src, dst = self.__getstate__()
         self.clear_cache()
