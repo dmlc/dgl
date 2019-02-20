@@ -5,8 +5,10 @@
  */
 
 #include <dgl/immutable_graph.h>
-#include <cstdlib>
-#include <cmath>
+
+#ifdef _MSC_VER
+#define _CRT_RAND_S
+#endif
 
 #include "../c_api_common.h"
 

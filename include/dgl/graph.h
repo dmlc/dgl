@@ -6,6 +6,7 @@
 #ifndef DGL_GRAPH_H_
 #define DGL_GRAPH_H_
 
+#include <string>
 #include <vector>
 #include <string>
 #include <cstdint>
@@ -368,17 +369,6 @@ class Graph: public GraphInterface {
    * \return a vector of three IdArray.
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const;
-
-  /*!
-   * \brief Sample a subgraph from the seed vertices with neighbor sampling.
-   * The neighbors are sampled with a uniform distribution.
-   * \return a subgraph
-   */
-  virtual SampledSubgraph NeighborUniformSample(IdArray seeds, const std::string &neigh_type,
-                                                int num_hops, int expand_factor) const {
-    LOG(FATAL) << "NeighborUniformSample isn't supported in mutable graph";
-    return SampledSubgraph();
-  }
 
  protected:
   friend class GraphOp;

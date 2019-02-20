@@ -6,6 +6,7 @@
 #include <dgl/graph.h>
 #include <dgl/immutable_graph.h>
 #include <dgl/graph_op.h>
+#include <dgl/sampler.h>
 #include "../c_api_common.h"
 
 using dgl::runtime::DGLArgs;
@@ -68,21 +69,21 @@ PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
 }
 
 // Convert Sampled Subgraph structures to PackedFunc.
-PackedFunc ConvertSubgraphToPackedFunc(const std::vector<SampledSubgraph>& sg) {
+PackedFunc ConvertSubgraphToPackedFunc(const std::vector<NodeFlow>& sg) {
   auto body = [sg] (DGLArgs args, DGLRetValue* rv) {
-      const int which = args[0];
+      const uint64_t which = args[0];
       if (which < sg.size()) {
         GraphInterface* gptr = sg[which].graph->Reset();
         GraphHandle ghandle = gptr;
         *rv = ghandle;
       } else if (which >= sg.size() && which < sg.size() * 2) {
-        *rv = std::move(sg[which - sg.size()].induced_vertices);
+        *rv = std::move(sg[which - sg.size()].node_mapping);
       } else if (which >= sg.size() * 2 && which < sg.size() * 3) {
-        *rv = std::move(sg[which - sg.size() * 2].induced_edges);
+        *rv = std::move(sg[which - sg.size() * 2].edge_mapping);
       } else if (which >= sg.size() * 3 && which < sg.size() * 4) {
-        *rv = std::move(sg[which - sg.size() * 3].layer_ids);
+        *rv = std::move(sg[which - sg.size() * 3].layer_offsets);
       } else if (which >= sg.size() * 4 && which < sg.size() * 5) {
-        *rv = std::move(sg[which - sg.size() * 4].sample_prob);
+        *rv = std::move(sg[which - sg.size() * 4].flow_offsets);
       } else {
         LOG(FATAL) << "invalid choice";
       }
@@ -446,10 +447,11 @@ void CAPI_NeighborUniformSample(DGLArgs args, DGLRetValue* rv) {
   const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
   CHECK(gptr) << "sampling isn't implemented in mutable graph";
   CHECK(num_valid_seeds <= num_seeds);
-  std::vector<SampledSubgraph> subgs(seeds.size());
+  std::vector<NodeFlow> subgs(seeds.size());
 #pragma omp parallel for
   for (int i = 0; i < num_valid_seeds; i++) {
-    subgs[i] = gptr->NeighborUniformSample(seeds[i], neigh_type, num_hops, num_neighbors);
+    subgs[i] = SamplerOp::NeighborUniformSample(gptr, seeds[i],
+                                                neigh_type, num_hops, num_neighbors);
   }
   *rv = ConvertSubgraphToPackedFunc(subgs);
 }
@@ -489,7 +491,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphRandomWalk")
     const int num_hops = args[3];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
 
-    *rv = RandomWalk(ptr, seeds, num_traces, num_hops);
+    *rv = SamplerOp::RandomWalk(ptr, seeds, num_traces, num_hops);
   });
 
 }  // namespace dgl
