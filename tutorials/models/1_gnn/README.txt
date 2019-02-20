@@ -10,7 +10,8 @@ Graph Neural Network and its variant
   <https://github.com/dmlc/dgl/tree/master/examples/mxnet/gcn>`__:
   this is the vanilla GCN. The tutorial covers the basic uses of DGL APIs.
 
-* **GAT** `[paper] <https://arxiv.org/abs/1710.10903>`__ `[Pytorch code]
+* **GAT** `[paper] <https://arxiv.org/abs/1710.10903>`__ `[tutorial]
+  <1_gnn/9_gat.html>`__ `[Pytorch code]
   <https://github.com/dmlc/dgl/blob/master/examples/pytorch/gat>`__
   `[MXNet code]
   <https://github.com/dmlc/dgl/tree/master/examples/mxnet/gat>`__:
