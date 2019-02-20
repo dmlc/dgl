@@ -771,8 +771,6 @@ class GraphIndex(object):
         ----------
         adj : scipy sparse matrix
         """
-        assert isinstance(adj, (scipy.sparse.csr_matrix, scipy.sparse.coo_matrix)), \
-                "The input matrix has to be a SciPy sparse matrix."
         if not self.is_readonly():
             self.clear()
         num_nodes = max(adj.shape[0], adj.shape[1])
