@@ -6,8 +6,7 @@ from collections import defaultdict
 import dgl
 import networkx as nx
 from .base import ALL, is_all, DGLError
-from . import backend as F
-from . import init
+from . import backend as F from . import init
 from .frame import FrameRef, Frame
 from .graph_index import create_graph_index
 from .runtime import ir, scheduler, Runtime
@@ -3014,25 +3013,20 @@ class DGLGraph(object):
             edges = F.tensor(edges)
             return F.boolean_mask(edges, e_mask)
 
-    def readonly_(self, readonly=True):
-        """Set this graph's readonly state in-place. Return this graph.
+    def readonly(self, readonly_state=True):
+        """Set this graph's readonly state in-place.
 
         Parameters
         ----------
-        readonly : bool, optional
+        readonly_state : bool, optional
             New readonly state of the graph, defaults to True.
-
-        Returns
-        -------
-        DGLGraph
-            The graph itself.
 
         Examples
         --------
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(3)
         >>> G.add_edge(0, 1)
-        >>> G.readonly_()
+        >>> G.readonly()
         >>> try:
         >>>     G.add_nodes(5)
         >>>     fail = False
@@ -3041,14 +3035,14 @@ class DGLGraph(object):
         >>>
         >>> fail
         True
-        >>> G.readonly_(False)
+        >>> G.readonly(False)
         >>> G.add_nodes(5)
         >>> G.number_of_nodes()
         8
         """
         if readonly == self._graph.is_readonly():
             return self
-        self._graph.readonly_(readonly)
+        self._graph.readonly(readonly_state)
         return self
 
     def __repr__(self):

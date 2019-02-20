@@ -127,19 +127,19 @@ def test_incmat_cache():
     inc4 = g.incidence_matrix("in")
     assert id(inc4) != id(inc35)
 
-def test_readonly_():
+def test_readonly():
     g = dgl.DGLGraph()
     g.add_nodes(5)
     g.add_edges([0, 1, 2, 3], [1, 2, 3, 4])
     g.ndata['x'] = F.zeros((5, 3))
     g.edata['x'] = F.zeros((4, 4))
 
-    g.readonly_(False)
+    g.readonly(False)
     assert g._graph.is_readonly() == False
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 4
 
-    g.readonly_()
+    g.readonly()
     assert g._graph.is_readonly() == True 
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 4
@@ -152,7 +152,7 @@ def test_readonly_():
     finally:
         assert fail
 
-    g.readonly_()
+    g.readonly()
     assert g._graph.is_readonly() == True 
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 4
@@ -165,7 +165,7 @@ def test_readonly_():
     finally:
         assert fail
 
-    g.readonly_(False)
+    g.readonly(False)
     assert g._graph.is_readonly() == False
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 4
@@ -190,4 +190,4 @@ if __name__ == '__main__':
     test_adjmat_cache()
     test_incmat()
     test_incmat_cache()
-    test_readonly_()
+    test_readonly()

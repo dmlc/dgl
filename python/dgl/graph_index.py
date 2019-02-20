@@ -139,19 +139,18 @@ class GraphIndex(object):
             self._readonly = bool(_CAPI_DGLGraphIsReadonly(self._handle))
         return self._readonly
 
-    def readonly_(self, readonly=True):
+    def readonly(self, readonly_state=True):
         """Set the readonly state of graph index in-place.
 
-        Returns
-        -------
-        GraphIndex
-            The graph index itself.
+        Parameters
+        ----------
+        readonly_state : bool
+            New readonly state of current graph index. 
         """
         n_nodes, multigraph, _, src, dst = self.__getstate__()
         self.clear_cache()
-        state = (n_nodes, multigraph, readonly, src, dst)
+        state = (n_nodes, multigraph, readonly_state, src, dst)
         self.__setstate__(state)
-        return self
 
     def number_of_nodes(self):
         """Return the number of nodes.
