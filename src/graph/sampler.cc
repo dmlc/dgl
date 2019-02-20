@@ -349,13 +349,13 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   // Copy flow offsets.
   flow_off_data[0] = 0;
   int out_flow_idx = 0;
-  for (int i = 0; i < (int)layer_offsets.size() - 2; i++) {
+  for (size_t i = 0; i < layer_offsets.size() - 2; i++) {
     size_t num_edges = subg_csr->GetDegree(layer_off_data[i + 1], layer_off_data[i + 2]);
     flow_off_data[out_flow_idx + 1] = flow_off_data[out_flow_idx] + num_edges;
     out_flow_idx++;
   }
   CHECK(out_flow_idx == num_hops - 1);
-  CHECK(flow_off_data[num_hops - 1] == (uint64_t)num_edges);
+  CHECK(flow_off_data[num_hops - 1] == static_cast<uint64_t>(num_edges));
 
   for (size_t i = 0; i < subg_csr->edge_ids.size(); i++) {
     subg_csr->edge_ids[i] = i;
