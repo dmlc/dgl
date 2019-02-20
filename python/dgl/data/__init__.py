@@ -8,6 +8,7 @@ from .tree import *
 from .utils import *
 from .sbm import SBMMixture
 from .reddit import RedditDataset
+from .ppi import PPIDataset
 
 def register_data_args(parser):
     parser.add_argument("--dataset", type=str, required=False,

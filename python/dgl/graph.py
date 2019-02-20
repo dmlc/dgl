@@ -2,26 +2,23 @@
 from __future__ import absolute_import
 
 from collections import defaultdict
+import networkx as nx
 
 import dgl
-import networkx as nx
 from .base import ALL, is_all, DGLError
 from . import backend as F
 from . import init
 from .frame import FrameRef, Frame
 from .graph_index import create_graph_index
 from .runtime import ir, scheduler, Runtime
-from . import subgraph
 from . import utils
 from .view import NodeView, EdgeView
 from .udf import NodeBatch, EdgeBatch
 
 __all__ = ['DGLGraph']
 
-class DGLGraph(object):
+class DGLBaseGraph(object):
     """Base graph class.
-
-    The graph stores nodes, edges and also their features.
 
     DGL graph is always directional. Undirected graph can be represented using
     two bi-directional edges.
@@ -33,374 +30,13 @@ class DGLGraph(object):
     of addition, i.e. the first edge being added has an ID of 0, the second
     being 1, so on so forth.
 
-    Node and edge features are stored as a dictionary from the feature name
-    to the feature data (in tensor).
-
     Parameters
     ----------
-    graph_data : graph data, optional
-        Data to initialize graph. Same as networkx's semantics.
-    node_frame : FrameRef, optional
-        Node feature storage.
-    edge_frame : FrameRef, optional
-        Edge feature storage.
-    multigraph : bool, optional
-        Whether the graph would be a multigraph (default: False)
-    readonly : bool, optional
-        Whether the graph structure is read-only (default: False).
-
-    Examples
-    --------
-    Create an empty graph with no nodes and edges.
-
-    >>> G = dgl.DGLGraph()
-
-    G can be grown in several ways.
-
-    **Nodes:**
-
-    Add N nodes:
-
-    >>> G.add_nodes(10)  # 10 isolated nodes are added
-
-    **Edges:**
-
-    Add one edge at a time,
-
-    >>> G.add_edge(0, 1)
-
-    or multiple edges,
-
-    >>> G.add_edges([1, 2, 3], [3, 4, 5])  # three edges: 1->3, 2->4, 3->5
-
-    or multiple edges starting from the same node,
-
-    >>> G.add_edges(4, [7, 8, 9])  # three edges: 4->7, 4->8, 4->9
-
-    or multiple edges pointing to the same node,
-
-    >>> G.add_edges([2, 6, 8], 5)  # three edges: 2->5, 6->5, 8->5
-
-    or multiple edges using tensor type
-
-    .. note:: Here we use pytorch syntax for demo. The general idea applies
-        to other frameworks with minor syntax change (e.g. replace
-        ``torch.tensor`` with ``mxnet.ndarray``).
-
-    >>> import torch as th
-    >>> G.add_edges(th.tensor([3, 4, 5]), 1)  # three edges: 3->1, 4->1, 5->1
-
-    NOTE: Removing nodes and edges is not supported by DGLGraph.
-
-    **Features:**
-
-    Both nodes and edges can have feature data. Features are stored as
-    key/value pair. The key must be hashable while the value must be tensor
-    type. Features are batched on the first dimension.
-
-    Use G.ndata to get/set features for all nodes.
-
-    >>> G = dgl.DGLGraph()
-    >>> G.add_nodes(3)
-    >>> G.ndata['x'] = th.zeros((3, 5))  # init 3 nodes with zero vector(len=5)
-    >>> G.ndata
-    {'x' : tensor([[0., 0., 0., 0., 0.],
-                   [0., 0., 0., 0., 0.],
-                   [0., 0., 0., 0., 0.]])}
-
-    Use G.nodes to get/set features for some nodes.
-
-    >>> G.nodes[[0, 2]].data['x'] = th.ones((2, 5))
-    >>> G.ndata
-    {'x' : tensor([[1., 1., 1., 1., 1.],
-                   [0., 0., 0., 0., 0.],
-                   [1., 1., 1., 1., 1.]])}
-
-    Similarly, use G.edata and G.edges to get/set features for edges.
-
-    >>> G.add_edges([0, 1], 2)  # 0->2, 1->2
-    >>> G.edata['y'] = th.zeros((2, 4))  # init 2 edges with zero vector(len=4)
-    >>> G.edata
-    {'y' : tensor([[0., 0., 0., 0.],
-                   [0., 0., 0., 0.]])}
-    >>> G.edges[1, 2].data['y'] = th.ones((1, 4))
-    >>> G.edata
-    {'y' : tensor([[0., 0., 0., 0.],
-                   [1., 1., 1., 1.]])}
-
-    Note that each edge is assigned a unique id equal to its adding
-    order. So edge 1->2 has id=1. DGL supports directly use edge id
-    to access edge features.
-
-    >>> G.edges[0].data['y'] += 2.
-    >>> G.edata
-    {'y' : tensor([[2., 2., 2., 2.],
-                   [1., 1., 1., 1.]])}
-
-    **Message Passing:**
-
-    One common operation for updating node features is message passing,
-    where the source nodes send messages through edges to the destinations.
-    With :class:`DGLGraph`, we can do this with :func:`send` and :func:`recv`.
-
-    In the example below, the source nodes add 1 to their node features as
-    the messages and send the messages to the destinations.
-
-    >>> # Define the function for sending messages.
-    >>> def send_source(edges): return {'m': edges.src['x'] + 1}
-    >>> # Set the function defined to be the default message function.
-    >>> G.register_message_func(send_source)
-    >>> # Send messages through all edges.
-    >>> G.send(G.edges())
-
-    Just like you need to go to your mailbox for retrieving mails, the destination
-    nodes also need to receive the messages and potentially update their features.
-
-    >>> # Define a function for summing messages received and replacing the original feature.
-    >>> def simple_reduce(nodes): return {'x': nodes.mailbox['m'].sum(1)}
-    >>> # Set the function defined to be the default message reduce function.
-    >>> G.register_reduce_func(simple_reduce)
-    >>> # All existing edges have node 2 as the destination.
-    >>> # Receive the messages for node 2 and update its feature.
-    >>> G.recv(v=2)
-    >>> G.ndata
-    {'x': tensor([[1., 1., 1., 1., 1.],
-                  [0., 0., 0., 0., 0.],
-                  [3., 3., 3., 3., 3.]])} # 3 = (1 + 1) + (0 + 1)
-
-    For more examples about message passing, please read our tutorials.
+    graph : graph index, optional
+        Data to initialize graph.
     """
-    def __init__(self,
-                 graph_data=None,
-                 node_frame=None,
-                 edge_frame=None,
-                 multigraph=False,
-                 readonly=False):
-        # graph
-        self._graph = create_graph_index(graph_data, multigraph, readonly)
-        # node and edge frame
-        if node_frame is None:
-            self._node_frame = FrameRef(Frame(num_rows=self.number_of_nodes()))
-        else:
-            self._node_frame = node_frame
-        if edge_frame is None:
-            self._edge_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
-        else:
-            self._edge_frame = edge_frame
-        # message indicator:
-        # if self._msg_index[eid] == 1, then edge eid has message
-        self._msg_index = utils.zero_index(size=self.number_of_edges())
-        # message frame
-        self._msg_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
-        # set initializer for message frame
-        self._msg_frame.set_initializer(init.zero_initializer)
-        # registered functions
-        self._message_func = None
-        self._reduce_func = None
-        self._apply_node_func = None
-        self._apply_edge_func = None
-
-    def add_nodes(self, num, data=None):
-        """Add multiple new nodes.
-
-        Parameters
-        ----------
-        num : int
-            Number of nodes to be added.
-        data : dict, optional
-            Feature data of the added nodes.
-
-        Notes
-        -----
-        If new nodes are added with features, and any of the old nodes
-        do not have some of the feature fields, those fields are filled
-        by initializers defined with ``set_n_initializer`` (default filling
-        with zeros).
-
-        Examples
-        --------
-        >>> G = dgl.DGLGraph()
-        >>> g.add_nodes(2)
-        >>> g.number_of_nodes()
-        2
-        >>> g.add_nodes(3)
-        >>> g.number_of_nodes()
-        5
-
-        Adding new nodes with features:
-
-        .. note:: Here we use pytorch syntax for demo. The general idea applies
-            to other frameworks with minor syntax change (e.g. replace
-            ``torch.tensor`` with ``mxnet.ndarray``).
-
-        >>> import torch as th
-        >>> g.add_nodes(2, {'x': th.ones(2, 4)})    # default zero initializer
-        >>> g.ndata['x']
-        tensor([[0., 0., 0., 0.],
-                [0., 0., 0., 0.],
-                [0., 0., 0., 0.],
-                [0., 0., 0., 0.],
-                [0., 0., 0., 0.],
-                [1., 1., 1., 1.],
-                [1., 1., 1., 1.]])
-        """
-        self._graph.add_nodes(num)
-        if data is None:
-            # Initialize feature placeholders if there are features existing
-            self._node_frame.add_rows(num)
-        else:
-            self._node_frame.append(data)
-
-    def add_edge(self, u, v, data=None):
-        """Add one new edge between u and v.
-
-        Parameters
-        ----------
-        u : int
-            The source node ID.  Must exist in the graph.
-        v : int
-            The destination node ID.  Must exist in the graph.
-        data : dict, optional
-            Feature data of the added edges.
-
-        Notes
-        -----
-        If new edges are added with features, and any of the old edges
-        do not have some of the feature fields, those fields are filled
-        by initializers defined with ``set_e_initializer`` (default filling
-        with zeros).
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        >>> G = dgl.DGLGraph()
-        >>> G.add_nodes(3)
-        >>> G.add_edge(0, 1)
-
-        Adding new edge with features
-
-        .. note:: Here we use pytorch syntax for demo. The general idea applies
-            to other frameworks with minor syntax change (e.g. replace
-            ``torch.tensor`` with ``mxnet.ndarray``).
-
-        >>> import torch as th
-        >>> G.add_edge(0, 2, {'x': th.ones(1, 4)})
-        >>> G.edges()
-        (tensor([0, 0]), tensor([1, 2]))
-        >>> G.edata['x']
-        tensor([[0., 0., 0., 0.],
-                [1., 1., 1., 1.]])
-        >>> G.edges[0, 2].data['x']
-        tensor([[1., 1., 1., 1.]])
-
-        See Also
-        --------
-        add_edges
-        """
-        self._graph.add_edge(u, v)
-        if data is None:
-            # Initialize feature placeholders if there are features existing
-            self._edge_frame.add_rows(1)
-        else:
-            self._edge_frame.append(data)
-        # resize msg_index and msg_frame
-        self._msg_index = self._msg_index.append_zeros(1)
-        self._msg_frame.add_rows(1)
-
-    def add_edges(self, u, v, data=None):
-        """Add multiple edges for list of source nodes u and destination nodes
-        v.  A single edge is added between every pair of ``u[i]`` and ``v[i]``.
-
-        Parameters
-        ----------
-        u : list, tensor
-            The source node IDs.  All nodes must exist in the graph.
-        v : list, tensor
-            The destination node IDs.  All nodes must exist in the graph.
-        data : dict, optional
-            Feature data of the added edges.
-
-        Notes
-        -----
-        If new edges are added with features, and any of the old edges
-        do not have some of the feature fields, those fields are filled
-        by initializers defined with ``set_e_initializer`` (default filling
-        with zeros).
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        >>> G = dgl.DGLGraph()
-        >>> G.add_nodes(4)
-        >>> G.add_edges([0, 2], [1, 3]) # add edges (0, 1) and (2, 3)
-
-        Adding new edges with features
-
-        .. note:: Here we use pytorch syntax for demo. The general idea applies
-            to other frameworks with minor syntax change (e.g. replace
-            ``torch.tensor`` with ``mxnet.ndarray``).
-
-        >>> import torch as th
-        >>> G.add_edges([1, 3], [2, 0], {'x': th.ones(2, 4)}) # (1, 2), (3, 0)
-        >>> G.edata['x']
-        tensor([[0., 0., 0., 0.],
-                [0., 0., 0., 0.],
-                [1., 1., 1., 1.],
-                [1., 1., 1., 1.]])
-
-        See Also
-        --------
-        add_edge
-        """
-        u = utils.toindex(u)
-        v = utils.toindex(v)
-        self._graph.add_edges(u, v)
-        num = max(len(u), len(v))
-        if data is None:
-            # Initialize feature placeholders if there are features existing
-            # NOTE: use max due to edge broadcasting syntax
-            self._edge_frame.add_rows(num)
-        else:
-            self._edge_frame.append(data)
-        # initialize feature placeholder for messages
-        self._msg_index = self._msg_index.append_zeros(num)
-        self._msg_frame.add_rows(num)
-
-    def clear(self):
-        """Remove all nodes and edges, as well as their features, from the
-        graph.
-
-        Examples
-        --------
-        >>> G = dgl.DGLGraph()
-        >>> G.add_nodes(4)
-        >>> G.add_edges([0, 1, 2, 3], [1, 2, 3, 0])
-        >>> G.number_of_nodes()
-        4
-        >>> G.number_of_edges()
-        4
-        >>> G.clear()
-        >>> G.number_of_nodes()
-        0
-        >>> G.number_of_edges()
-        0
-        """
-        self._graph.clear()
-        self._node_frame.clear()
-        self._edge_frame.clear()
-        self._msg_index = utils.zero_index(0)
-        self._msg_frame.clear()
-
-    def clear_cache(self):
-        """Clear all cached graph structures such as adjmat.
-
-        By default, all graph structure related sparse matrices (e.g. adjmat, incmat)
-        are cached so they could be reused with the cost of extra memory consumption.
-        This function can be used to clear the cached matrices if memory is an issue.
-        """
-        self._graph.clear_cache()
+    def __init__(self, graph):
+        self._graph = graph
 
     def number_of_nodes(self):
         """Return the number of nodes in the graph.
@@ -421,6 +57,12 @@ class DGLGraph(object):
         """True if the graph is a multigraph, False otherwise.
         """
         return self._graph.is_multigraph()
+
+    @property
+    def is_readonly(self):
+        """True if the graph is readonly, False otherwise.
+        """
+        return self._graph.is_readonly()
 
     def number_of_edges(self):
         """Return the number of edges in the graph.
@@ -1090,6 +732,390 @@ class DGLGraph(object):
         else:
             v = utils.toindex(v)
         return self._graph.out_degrees(v).tousertensor()
+
+class DGLGraph(DGLBaseGraph):
+    """Base graph class.
+
+    The graph stores nodes, edges and also their features.
+
+    DGL graph is always directional. Undirected graph can be represented using
+    two bi-directional edges.
+
+    Nodes are identified by consecutive integers starting from zero.
+
+    Edges can be specified by two end points (u, v) or the integer id assigned
+    when the edges are added.  Edge IDs are automatically assigned by the order
+    of addition, i.e. the first edge being added has an ID of 0, the second
+    being 1, so on so forth.
+
+    Node and edge features are stored as a dictionary from the feature name
+    to the feature data (in tensor).
+
+    Parameters
+    ----------
+    graph_data : graph data, optional
+        Data to initialize graph. Same as networkx's semantics.
+    node_frame : FrameRef, optional
+        Node feature storage.
+    edge_frame : FrameRef, optional
+        Edge feature storage.
+    multigraph : bool, optional
+        Whether the graph would be a multigraph (default: False)
+    readonly : bool, optional
+        Whether the graph structure is read-only (default: False).
+
+    Examples
+    --------
+    Create an empty graph with no nodes and edges.
+
+    >>> G = dgl.DGLGraph()
+
+    G can be grown in several ways.
+
+    **Nodes:**
+
+    Add N nodes:
+
+    >>> G.add_nodes(10)  # 10 isolated nodes are added
+
+    **Edges:**
+
+    Add one edge at a time,
+
+    >>> G.add_edge(0, 1)
+
+    or multiple edges,
+
+    >>> G.add_edges([1, 2, 3], [3, 4, 5])  # three edges: 1->3, 2->4, 3->5
+
+    or multiple edges starting from the same node,
+
+    >>> G.add_edges(4, [7, 8, 9])  # three edges: 4->7, 4->8, 4->9
+
+    or multiple edges pointing to the same node,
+
+    >>> G.add_edges([2, 6, 8], 5)  # three edges: 2->5, 6->5, 8->5
+
+    or multiple edges using tensor type
+
+    .. note:: Here we use pytorch syntax for demo. The general idea applies
+        to other frameworks with minor syntax change (e.g. replace
+        ``torch.tensor`` with ``mxnet.ndarray``).
+
+    >>> import torch as th
+    >>> G.add_edges(th.tensor([3, 4, 5]), 1)  # three edges: 3->1, 4->1, 5->1
+
+    NOTE: Removing nodes and edges is not supported by DGLGraph.
+
+    **Features:**
+
+    Both nodes and edges can have feature data. Features are stored as
+    key/value pair. The key must be hashable while the value must be tensor
+    type. Features are batched on the first dimension.
+
+    Use G.ndata to get/set features for all nodes.
+
+    >>> G = dgl.DGLGraph()
+    >>> G.add_nodes(3)
+    >>> G.ndata['x'] = th.zeros((3, 5))  # init 3 nodes with zero vector(len=5)
+    >>> G.ndata
+    {'x' : tensor([[0., 0., 0., 0., 0.],
+                   [0., 0., 0., 0., 0.],
+                   [0., 0., 0., 0., 0.]])}
+
+    Use G.nodes to get/set features for some nodes.
+
+    >>> G.nodes[[0, 2]].data['x'] = th.ones((2, 5))
+    >>> G.ndata
+    {'x' : tensor([[1., 1., 1., 1., 1.],
+                   [0., 0., 0., 0., 0.],
+                   [1., 1., 1., 1., 1.]])}
+
+    Similarly, use G.edata and G.edges to get/set features for edges.
+
+    >>> G.add_edges([0, 1], 2)  # 0->2, 1->2
+    >>> G.edata['y'] = th.zeros((2, 4))  # init 2 edges with zero vector(len=4)
+    >>> G.edata
+    {'y' : tensor([[0., 0., 0., 0.],
+                   [0., 0., 0., 0.]])}
+    >>> G.edges[1, 2].data['y'] = th.ones((1, 4))
+    >>> G.edata
+    {'y' : tensor([[0., 0., 0., 0.],
+                   [1., 1., 1., 1.]])}
+
+    Note that each edge is assigned a unique id equal to its adding
+    order. So edge 1->2 has id=1. DGL supports directly use edge id
+    to access edge features.
+
+    >>> G.edges[0].data['y'] += 2.
+    >>> G.edata
+    {'y' : tensor([[2., 2., 2., 2.],
+                   [1., 1., 1., 1.]])}
+
+    **Message Passing:**
+
+    One common operation for updating node features is message passing,
+    where the source nodes send messages through edges to the destinations.
+    With :class:`DGLGraph`, we can do this with :func:`send` and :func:`recv`.
+
+    In the example below, the source nodes add 1 to their node features as
+    the messages and send the messages to the destinations.
+
+    >>> # Define the function for sending messages.
+    >>> def send_source(edges): return {'m': edges.src['x'] + 1}
+    >>> # Set the function defined to be the default message function.
+    >>> G.register_message_func(send_source)
+    >>> # Send messages through all edges.
+    >>> G.send(G.edges())
+
+    Just like you need to go to your mailbox for retrieving mails, the destination
+    nodes also need to receive the messages and potentially update their features.
+
+    >>> # Define a function for summing messages received and replacing the original feature.
+    >>> def simple_reduce(nodes): return {'x': nodes.mailbox['m'].sum(1)}
+    >>> # Set the function defined to be the default message reduce function.
+    >>> G.register_reduce_func(simple_reduce)
+    >>> # All existing edges have node 2 as the destination.
+    >>> # Receive the messages for node 2 and update its feature.
+    >>> G.recv(v=2)
+    >>> G.ndata
+    {'x': tensor([[1., 1., 1., 1., 1.],
+                  [0., 0., 0., 0., 0.],
+                  [3., 3., 3., 3., 3.]])} # 3 = (1 + 1) + (0 + 1)
+
+    For more examples about message passing, please read our tutorials.
+    """
+    def __init__(self,
+                 graph_data=None,
+                 node_frame=None,
+                 edge_frame=None,
+                 multigraph=False,
+                 readonly=False):
+        # graph
+        super(DGLGraph, self).__init__(create_graph_index(graph_data, multigraph, readonly))
+        # node and edge frame
+        if node_frame is None:
+            self._node_frame = FrameRef(Frame(num_rows=self.number_of_nodes()))
+        else:
+            self._node_frame = node_frame
+        if edge_frame is None:
+            self._edge_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
+        else:
+            self._edge_frame = edge_frame
+        # message indicator:
+        # if self._msg_index[eid] == 1, then edge eid has message
+        self._msg_index = utils.zero_index(size=self.number_of_edges())
+        # message frame
+        self._msg_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
+        # set initializer for message frame
+        self._msg_frame.set_initializer(init.zero_initializer)
+        # registered functions
+        self._message_func = None
+        self._reduce_func = None
+        self._apply_node_func = None
+        self._apply_edge_func = None
+
+    def add_nodes(self, num, data=None):
+        """Add multiple new nodes.
+
+        Parameters
+        ----------
+        num : int
+            Number of nodes to be added.
+        data : dict, optional
+            Feature data of the added nodes.
+
+        Notes
+        -----
+        If new nodes are added with features, and any of the old nodes
+        do not have some of the feature fields, those fields are filled
+        by initializers defined with ``set_n_initializer`` (default filling
+        with zeros).
+
+        Examples
+        --------
+        >>> G = dgl.DGLGraph()
+        >>> g.add_nodes(2)
+        >>> g.number_of_nodes()
+        2
+        >>> g.add_nodes(3)
+        >>> g.number_of_nodes()
+        5
+
+        Adding new nodes with features:
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
+        >>> g.add_nodes(2, {'x': th.ones(2, 4)})    # default zero initializer
+        >>> g.ndata['x']
+        tensor([[0., 0., 0., 0.],
+                [0., 0., 0., 0.],
+                [0., 0., 0., 0.],
+                [0., 0., 0., 0.],
+                [0., 0., 0., 0.],
+                [1., 1., 1., 1.],
+                [1., 1., 1., 1.]])
+        """
+        self._graph.add_nodes(num)
+        if data is None:
+            # Initialize feature placeholders if there are features existing
+            self._node_frame.add_rows(num)
+        else:
+            self._node_frame.append(data)
+
+    def add_edge(self, u, v, data=None):
+        """Add one new edge between u and v.
+
+        Parameters
+        ----------
+        u : int
+            The source node ID.  Must exist in the graph.
+        v : int
+            The destination node ID.  Must exist in the graph.
+        data : dict, optional
+            Feature data of the added edges.
+
+        Notes
+        -----
+        If new edges are added with features, and any of the old edges
+        do not have some of the feature fields, those fields are filled
+        by initializers defined with ``set_e_initializer`` (default filling
+        with zeros).
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edge(0, 1)
+
+        Adding new edge with features
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
+        >>> G.add_edge(0, 2, {'x': th.ones(1, 4)})
+        >>> G.edges()
+        (tensor([0, 0]), tensor([1, 2]))
+        >>> G.edata['x']
+        tensor([[0., 0., 0., 0.],
+                [1., 1., 1., 1.]])
+        >>> G.edges[0, 2].data['x']
+        tensor([[1., 1., 1., 1.]])
+
+        See Also
+        --------
+        add_edges
+        """
+        self._graph.add_edge(u, v)
+        if data is None:
+            # Initialize feature placeholders if there are features existing
+            self._edge_frame.add_rows(1)
+        else:
+            self._edge_frame.append(data)
+        # resize msg_index and msg_frame
+        self._msg_index = self._msg_index.append_zeros(1)
+        self._msg_frame.add_rows(1)
+
+    def add_edges(self, u, v, data=None):
+        """Add multiple edges for list of source nodes u and destination nodes
+        v.  A single edge is added between every pair of ``u[i]`` and ``v[i]``.
+
+        Parameters
+        ----------
+        u : list, tensor
+            The source node IDs.  All nodes must exist in the graph.
+        v : list, tensor
+            The destination node IDs.  All nodes must exist in the graph.
+        data : dict, optional
+            Feature data of the added edges.
+
+        Notes
+        -----
+        If new edges are added with features, and any of the old edges
+        do not have some of the feature fields, those fields are filled
+        by initializers defined with ``set_e_initializer`` (default filling
+        with zeros).
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(4)
+        >>> G.add_edges([0, 2], [1, 3]) # add edges (0, 1) and (2, 3)
+
+        Adding new edges with features
+
+        .. note:: Here we use pytorch syntax for demo. The general idea applies
+            to other frameworks with minor syntax change (e.g. replace
+            ``torch.tensor`` with ``mxnet.ndarray``).
+
+        >>> import torch as th
+        >>> G.add_edges([1, 3], [2, 0], {'x': th.ones(2, 4)}) # (1, 2), (3, 0)
+        >>> G.edata['x']
+        tensor([[0., 0., 0., 0.],
+                [0., 0., 0., 0.],
+                [1., 1., 1., 1.],
+                [1., 1., 1., 1.]])
+
+        See Also
+        --------
+        add_edge
+        """
+        u = utils.toindex(u)
+        v = utils.toindex(v)
+        self._graph.add_edges(u, v)
+        num = max(len(u), len(v))
+        if data is None:
+            # Initialize feature placeholders if there are features existing
+            # NOTE: use max due to edge broadcasting syntax
+            self._edge_frame.add_rows(num)
+        else:
+            self._edge_frame.append(data)
+        # initialize feature placeholder for messages
+        self._msg_index = self._msg_index.append_zeros(num)
+        self._msg_frame.add_rows(num)
+
+    def clear(self):
+        """Remove all nodes and edges, as well as their features, from the
+        graph.
+
+        Examples
+        --------
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(4)
+        >>> G.add_edges([0, 1, 2, 3], [1, 2, 3, 0])
+        >>> G.number_of_nodes()
+        4
+        >>> G.number_of_edges()
+        4
+        >>> G.clear()
+        >>> G.number_of_nodes()
+        0
+        >>> G.number_of_edges()
+        0
+        """
+        self._graph.clear()
+        self._node_frame.clear()
+        self._edge_frame.clear()
+        self._msg_index = utils.zero_index(0)
+        self._msg_frame.clear()
+
+    def clear_cache(self):
+        """Clear all cached graph structures such as adjmat.
+
+        By default, all graph structure related sparse matrices (e.g. adjmat, incmat)
+        are cached so they could be reused with the cost of extra memory consumption.
+        This function can be used to clear the cached matrices if memory is an issue.
+        """
+        self._graph.clear_cache()
 
     def to_networkx(self, node_attrs=None, edge_attrs=None):
         """Convert to networkx graph.
@@ -2724,6 +2750,7 @@ class DGLGraph(object):
         subgraphs
         edge_subgraph
         """
+        from . import subgraph
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
         return subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
@@ -2751,6 +2778,7 @@ class DGLGraph(object):
         DGLSubGraph
         subgraph
         """
+        from . import subgraph
         induced_nodes = [utils.toindex(n) for n in nodes]
         sgis = self._graph.node_subgraphs(induced_nodes)
         return [subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
@@ -2798,6 +2826,7 @@ class DGLGraph(object):
         DGLSubGraph
         subgraph
         """
+        from . import subgraph
         induced_edges = utils.toindex(edges)
         sgi = self._graph.edge_subgraph(induced_edges)
         return subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
