@@ -20,6 +20,12 @@ def safediv(a, b):
     b = torch.where(b == 0, torch.ones_like(b), b)
     return a / b
 
+def init_weight(w, func_name, nonlinearity):
+    getattr(nn.init, func_name)(w, gain=nn.init.calculate_gain(nonlinearity))
+
+def init_bias(w):
+    nn.init.constant_(w, 0)
+
 class PinSageConv(nn.Module):
     def __init__(self, in_features, out_features, hidden_features):
         super(PinSageConv, self).__init__()
@@ -30,6 +36,12 @@ class PinSageConv(nn.Module):
 
         self.Q = nn.Linear(in_features, hidden_features)
         self.W = nn.Linear(in_features + hidden_features, out_features)
+
+        init_weight(self.Q.weight, 'xavier_uniform_', 'relu')
+        init_weight(self.W.weight, 'xavier_uniform_', 'relu')
+        init_bias(self.Q.bias)
+        init_bias(self.W.bias)
+
 
     def forward(self, h, nodeset, nb_nodes, nb_weights):
         '''
