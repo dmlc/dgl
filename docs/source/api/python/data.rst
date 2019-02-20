@@ -26,3 +26,15 @@ For more information about the dataset, see `Sentiment Analysis <https://nlp.sta
 
 .. autoclass:: SST
     :members: __getitem__, __len__
+
+Mini graph classification dataset
+`````````````````````````````````
+
+.. autoclass:: MiniGCDataset
+    :members: __getitem__, __len__, num_classes
+
+Protein-Protein Interaction dataset
+```````````````````````````````````
+
+.. autoclass:: PPIDataset
+    :members: __getitem__, __len__

@@ -4,11 +4,15 @@
 * Author's code for entity classification: [https://github.com/tkipf/relational-gcn](https://github.com/tkipf/relational-gcn)
 * Author's code for link prediction: [https://github.com/MichSchli/RelationPrediction](https://github.com/MichSchli/RelationPrediction)
 
-### Prerequisites
-Two extra python packages are needed for this example: 
+### Dependencies
+* PyTorch 0.4.1+
+* requests
+* rdflib
+* pandas
 
-- rdflib
-- pandas
+```
+pip install requests torch rdflib pandas
+```
 
 Example code was tested with rdflib 4.2.2 and pandas 0.23.4
 

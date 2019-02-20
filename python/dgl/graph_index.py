@@ -30,7 +30,8 @@ class GraphIndex(object):
 
     def __del__(self):
         """Free this graph index object."""
-        _CAPI_DGLGraphFree(self._handle)
+        if hasattr(self, '_handle'):
+            _CAPI_DGLGraphFree(self._handle)
 
     def __getstate__(self):
         src, dst, _ = self.edges()
@@ -46,19 +47,19 @@ class GraphIndex(object):
         """
         n_nodes, multigraph, readonly, src, dst = state
 
+        self._cache = {}
+        self._multigraph = multigraph
+        self._readonly = readonly
         if readonly:
-            self._readonly = readonly
-            self._multigraph = multigraph
-            self.init(src, dst, F.arange(0, len(src)), n_nodes)
+            self._init(src, dst, utils.toindex(F.arange(0, len(src))), n_nodes)
         else:
             self._handle = _CAPI_DGLGraphCreateMutable(multigraph)
-            self._cache = {}
 
             self.clear()
             self.add_nodes(n_nodes)
             self.add_edges(src, dst)
 
-    def init(self, src_ids, dst_ids, edge_ids, num_nodes):
+    def _init(self, src_ids, dst_ids, edge_ids, num_nodes):
         """The actual init function"""
         assert len(src_ids) == len(dst_ids)
         assert len(src_ids) == len(edge_ids)
@@ -674,8 +675,10 @@ class GraphIndex(object):
             rst = _nonuniform_sampling(self, node_prob, seed_ids, neighbor_type, num_hops,
                                        expand_factor)
 
-        return [SubgraphIndex(rst(i), self, utils.toindex(rst(num_subgs + i)),
-                              utils.toindex(rst(num_subgs * 2 + i))) for i in range(num_subgs)]
+        return [NodeFlowIndex(rst(i), self, utils.toindex(rst(num_subgs + i)),
+                              utils.toindex(rst(num_subgs * 2 + i)),
+                              utils.toindex(rst(num_subgs * 3 + i)),
+                              utils.toindex(rst(num_subgs * 4 + i))) for i in range(num_subgs)]
 
     def to_networkx(self):
         """Convert to networkx graph.
@@ -746,7 +749,7 @@ class GraphIndex(object):
         eid = utils.toindex(eid)
         src = utils.toindex(src)
         dst = utils.toindex(dst)
-        self.init(src, dst, eid, num_nodes)
+        self._init(src, dst, eid, num_nodes)
 
 
     def from_scipy_sparse_matrix(self, adj):
@@ -756,8 +759,6 @@ class GraphIndex(object):
         ----------
         adj : scipy sparse matrix
         """
-        assert isinstance(adj, (scipy.sparse.csr_matrix, scipy.sparse.coo_matrix)), \
-                "The input matrix has to be a SciPy sparse matrix."
         if not self.is_readonly():
             self.clear()
         num_nodes = max(adj.shape[0], adj.shape[1])
@@ -765,7 +766,7 @@ class GraphIndex(object):
         src = utils.toindex(adj_coo.row)
         dst = utils.toindex(adj_coo.col)
         edge_ids = utils.toindex(F.arange(0, len(adj_coo.row)))
-        self.init(src, dst, edge_ids, num_nodes)
+        self._init(src, dst, edge_ids, num_nodes)
 
 
     def from_edge_list(self, elist):
@@ -788,7 +789,7 @@ class GraphIndex(object):
         if min_nodes != 0:
             raise DGLError('Invalid edge list. Nodes must start from 0.')
         edge_ids = utils.toindex(F.arange(0, len(src)))
-        self.init(src_ids, dst_ids, edge_ids, num_nodes)
+        self._init(src_ids, dst_ids, edge_ids, num_nodes)
 
     def line_graph(self, backtracking=True):
         """Return the line graph of this graph.
@@ -822,8 +823,7 @@ class SubgraphIndex(GraphIndex):
         The parent edge ids in this subgraph.
     """
     def __init__(self, handle, parent, induced_nodes, induced_edges):
-        super(SubgraphIndex, self).__init__(parent.is_multigraph(), parent.is_readonly())
-        self._handle = handle
+        super(SubgraphIndex, self).__init__(handle, parent.is_multigraph(), parent.is_readonly())
         self._parent = parent
         self._induced_nodes = induced_nodes
         self._induced_edges = induced_edges
@@ -870,6 +870,75 @@ class SubgraphIndex(GraphIndex):
         raise NotImplementedError(
             "SubgraphIndex unpickling is not supported yet.")
 
+class NodeFlowIndex(GraphIndex):
+    """Graph index for a NodeFlow graph.
+
+    Parameters
+    ----------
+    handle : GraphIndexHandle
+        The capi handle.
+    paranet : GraphIndex
+        The parent graph index.
+    node_mapping : utils.Index
+        This maps nodes to the parent graph.
+    edge_mapping : utils.Index
+        The maps edges to the parent graph.
+    layers: utils.Index
+        The offsets of the layers.
+    flows: utils.Index
+        The offsets of the flows.
+    """
+    def __init__(self, handle, parent, node_mapping, edge_mapping, layers, flows):
+        super(NodeFlowIndex, self).__init__(handle, parent.is_multigraph(), parent.is_readonly())
+        self._parent = parent
+        self._node_mapping = node_mapping
+        self._edge_mapping = edge_mapping
+        self._layers = layers
+        self._flows = flows
+
+    @property
+    def node_mapping(self):
+        """Return the node mapping to the parent graph.
+
+        Returns
+        -------
+        utils.Index
+            The node mapping.
+        """
+        return self._node_mapping
+
+    @property
+    def edge_mapping(self):
+        """Return the edge mapping to the parent graph.
+
+        Returns
+        -------
+        utils.Index
+            The edge mapping.
+        """
+        return self._edge_mapping
+
+    @property
+    def layers(self):
+        """Return layer offsets.
+        """
+        return self._layers
+
+    @property
+    def flows(self):
+        """Return flow offsets.
+        """
+        return self._flows
+
+    def __getstate__(self):
+        raise NotImplementedError(
+            "SubgraphIndex pickling is not supported yet.")
+
+    def __setstate__(self, state):
+        raise NotImplementedError(
+            "SubgraphIndex unpickling is not supported yet.")
+
+
 def map_to_subgraph_nid(subgraph, parent_nids):
     """Map parent node Ids to the subgraph node Ids.
 
@@ -887,6 +956,34 @@ def map_to_subgraph_nid(subgraph, parent_nids):
         Node Ids in the subgraph.
     """
     return utils.toindex(_CAPI_DGLMapSubgraphNID(subgraph.induced_nodes.todgltensor(),
+                                                 parent_nids.todgltensor()))
+
+def map_to_nodeflow_nid(nflow, layer_id, parent_nids):
+    """Map parent node Ids to NodeFlow node Ids in a certain layer.
+
+    Parameters
+    ----------
+    nflow : NodeFlowIndex
+        The graph index of a NodeFlow.
+
+    layer_id : int
+        The layer Id
+
+    parent_nids: utils.Index
+        Node Ids in the parent graph.
+
+    Returns
+    -------
+    utils.Index
+        Node Ids in the NodeFlow.
+    """
+    mapping = nflow.node_mapping.tousertensor()
+    layers = nflow.layers.tonumpy()
+    start = int(layers[layer_id])
+    end = int(layers[layer_id + 1])
+    mapping = mapping[start:end]
+    mapping = utils.toindex(mapping)
+    return utils.toindex(_CAPI_DGLMapSubgraphNID(mapping.todgltensor(),
                                                  parent_nids.todgltensor()))
 
 def disjoint_union(graphs):

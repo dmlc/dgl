@@ -38,7 +38,7 @@ if __name__ == '__main__':
     test_iter = dataset(graph_pool, mode='test', batch_size=args.batch, devices=[device], k=k)
     for i, g in enumerate(test_iter):
         with th.no_grad():
-            output = model.infer(g, dataset.MAX_LENGTH, dataset.eos_id, k)
+            output = model.infer(g, dataset.MAX_LENGTH, dataset.eos_id, k, alpha=0.6)
         for line in dataset.get_sequence(output):
             if args.print:
                 print(line)

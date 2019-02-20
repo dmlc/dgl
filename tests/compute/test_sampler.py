@@ -16,37 +16,36 @@ def test_1neighbor_sampler_all():
         seed_ids = aux['seeds']
         assert len(seed_ids) == 1
         src, dst, eid = g.in_edges(seed_ids, form='all')
-        # Test if there is a self loop
-        self_loop = F.asnumpy(F.sum(src == dst, 0)) == 1
-        if self_loop:
-            assert subg.number_of_nodes() == len(src)
-        else:
-            assert subg.number_of_nodes() == len(src) + 1
-        assert subg.number_of_edges() >= len(src)
+        assert subg.number_of_nodes() == len(src) + 1
+        assert subg.number_of_edges() == len(src)
 
-        child_ids = subg.map_to_subgraph_nid(seed_ids)
-        child_src, child_dst, child_eid = subg.in_edges(child_ids, form='all')
+        assert seed_ids == subg.layer_parent_nid(-1)
+        child_src, child_dst, child_eid = subg.in_edges(subg.layer_nid(-1), form='all')
+        assert F.array_equal(child_src, subg.layer_nid(0))
 
-        child_src1 = subg.map_to_subgraph_nid(src)
-        assert F.asnumpy(F.sum(child_src1 == child_src, 0)) == len(src)
+        src1 = subg.map_to_parent_nid(child_src)
+        assert F.array_equal(src1, src)
 
 def is_sorted(arr):
     return np.sum(np.sort(arr) == arr, 0) == len(arr)
 
 def verify_subgraph(g, subg, seed_id):
+    seed_id = F.asnumpy(seed_id)
+    seeds = F.asnumpy(subg.map_to_parent_nid(subg.layer_nid(-1)))
+    assert seed_id in seeds
+    child_seed = F.asnumpy(subg.layer_nid(-1))[seeds == seed_id]
     src, dst, eid = g.in_edges(seed_id, form='all')
-    child_id = subg.map_to_subgraph_nid(seed_id)
-    child_src, child_dst, child_eid = subg.in_edges(child_id, form='all')
+    child_src, child_dst, child_eid = subg.in_edges(child_seed, form='all')
+
     child_src = F.asnumpy(child_src)
     # We don't allow duplicate elements in the neighbor list.
     assert(len(np.unique(child_src)) == len(child_src))
     # The neighbor list also needs to be sorted.
     assert(is_sorted(child_src))
 
-    child_src1 = F.asnumpy(subg.map_to_subgraph_nid(src))
-    child_src1 = child_src1[child_src1 >= 0]
-    for i in child_src:
-        assert i in child_src1
+    # a neighbor in the subgraph must also exist in parent graph.
+    for i in subg.map_to_parent_nid(child_src):
+        assert i in src
 
 def test_1neighbor_sampler():
     g = generate_rand_graph(100)
@@ -76,13 +75,12 @@ def test_10neighbor_sampler_all():
     for subg, aux in dgl.contrib.sampling.NeighborSampler(g, 10, 100, neighbor_type='in',
                                                           num_workers=4, return_seed_id=True):
         seed_ids = aux['seeds']
+        assert F.array_equal(seed_ids, subg.map_to_parent_nid(subg.layer_nid(-1)))
+
         src, dst, eid = g.in_edges(seed_ids, form='all')
-
-        child_ids = subg.map_to_subgraph_nid(seed_ids)
-        child_src, child_dst, child_eid = subg.in_edges(child_ids, form='all')
-
-        child_src1 = subg.map_to_subgraph_nid(src)
-        assert F.asnumpy(F.sum(child_src1 == child_src, 0)) == len(src)
+        child_src, child_dst, child_eid = subg.in_edges(subg.layer_nid(-1), form='all')
+        src1 = subg.map_to_parent_nid(child_src)
+        assert F.array_equal(src1, src)
 
 def check_10neighbor_sampler(g, seeds):
     # In this case, NeighborSampling simply gets the neighborhood of a single vertex.

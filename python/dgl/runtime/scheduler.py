@@ -21,6 +21,7 @@ __all__ = [
     "schedule_snr",
     "schedule_apply_nodes",
     "schedule_apply_edges",
+    "schedule_group_apply_edge",
     "schedule_push",
     "schedule_pull"
 ]
@@ -50,7 +51,7 @@ def schedule_send(graph, u, v, eid, message_func):
     var_u = var.IDX(u)
     var_v = var.IDX(v)
     var_eid = var.IDX(eid)
-    msg = _gen_send(graph, var_nf, var_ef, var_u, var_v, var_eid, message_func)
+    msg = _gen_send(graph, var_nf, var_nf, var_ef, var_u, var_v, var_eid, message_func)
     ir.WRITE_ROW_(var_mf, var_eid, msg)
     # set message indicator to 1
     graph._msg_index = graph._msg_index.set_items(eid, 1)
@@ -143,9 +144,10 @@ def schedule_snr(graph,
     var_recv_nodes = var.IDX(recv_nodes, name='recv_nodes')
     # generate send and reduce schedule
     uv_getter = lambda: (var_u, var_v)
-    adj_creator = lambda: spmv.build_adj_matrix_uv(graph, (u, v), recv_nodes)
+    adj_creator = lambda: spmv.build_adj_matrix_uv((u, v), recv_nodes, graph.number_of_nodes())
     inc_creator = lambda: spmv.build_inc_matrix_dst(v, recv_nodes)
-    reduced_feat = _gen_send_reduce(graph, message_func, reduce_func,
+    reduced_feat = _gen_send_reduce(graph, graph._node_frame, graph._node_frame,
+                                    graph._edge_frame, message_func, reduce_func,
                                     var_eid, var_recv_nodes,
                                     uv_getter, adj_creator, inc_creator)
     # generate apply schedule
@@ -190,7 +192,8 @@ def schedule_update_all(graph,
             return var.IDX(src), var.IDX(dst)
         adj_creator = lambda: spmv.build_adj_matrix_graph(graph)
         inc_creator = lambda: spmv.build_inc_matrix_graph(graph)
-        reduced_feat = _gen_send_reduce(graph, message_func, reduce_func,
+        reduced_feat = _gen_send_reduce(graph, graph._node_frame, graph._node_frame,
+                                        graph._edge_frame, message_func, reduce_func,
                                         var_eid, var_recv_nodes,
                                         uv_getter, adj_creator, inc_creator)
         # generate optional apply
@@ -219,6 +222,43 @@ def schedule_apply_nodes(graph,
     A list of executors for DGL Runtime
     """
     var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
+    var_v = var.IDX(v)
+    v_nf = ir.READ_ROW(var_nf, var_v)
+    def _afunc_wrapper(node_data):
+        nbatch = NodeBatch(graph, v, node_data)
+        return apply_func(nbatch)
+    afunc = var.FUNC(_afunc_wrapper)
+    applied_feat = ir.NODE_UDF(afunc, v_nf)
+    if inplace:
+        ir.WRITE_ROW_INPLACE_(var_nf, var_v, applied_feat)
+    else:
+        ir.WRITE_ROW_(var_nf, var_v, applied_feat)
+
+def schedule_nodeflow_apply_nodes(graph,
+                                  layer_id,
+                                  v,
+                                  apply_func,
+                                  inplace):
+    """get apply nodes schedule in NodeFlow.
+
+    Parameters
+    ----------
+    graph: DGLGraph
+        The DGLGraph to use
+    layer_id : int
+        The layer where we apply node update function.
+    v : utils.Index
+        Nodes to apply
+    apply_func: callable
+        The apply node function
+    inplace: bool
+        If True, the update will be done in place
+
+    Returns
+    -------
+    A list of executors for DGL Runtime
+    """
+    var_nf = var.FEAT_DICT(graph._get_node_frame(layer_id), name='nf')
     var_v = var.IDX(v)
     v_nf = ir.READ_ROW(var_nf, var_v)
     def _afunc_wrapper(node_data):
@@ -265,6 +305,54 @@ def schedule_apply_edges(graph,
     # schedule apply edges
     fdsrc = ir.READ_ROW(var_nf, var_u)
     fddst = ir.READ_ROW(var_nf, var_v)
+    fdedge = ir.READ_ROW(var_ef, var_eid)
+    def _efunc_wrapper(src_data, edge_data, dst_data):
+        ebatch = EdgeBatch(graph, (u, v, eid), src_data, edge_data, dst_data)
+        return apply_func(ebatch)
+    _efunc = var.FUNC(_efunc_wrapper)
+    new_fdedge = ir.EDGE_UDF(_efunc, fdsrc, fdedge, fddst)
+    if inplace:
+        ir.WRITE_ROW_INPLACE_(var_ef, var_eid, new_fdedge)
+    else:
+        ir.WRITE_ROW_(var_ef, var_eid, new_fdedge)
+
+def schedule_nodeflow_apply_edges(graph, block_id,
+                                  u, v, eid,
+                                  apply_func,
+                                  inplace):
+    """get apply edges schedule in NodeFlow.
+
+    Parameters
+    ----------
+    graph: DGLGraph
+        The DGLGraph to use
+    block_id : int
+        The block whose edges we apply edge update function.
+    u : utils.Index
+        Source nodes of edges to apply
+    v : utils.Index
+        Destination nodes of edges to apply
+    eid : utils.Index
+        Ids of sending edges
+    apply_func: callable
+        The apply edge function
+    inplace: bool
+        If True, the update will be done in place
+
+    Returns
+    -------
+    A list of executors for DGL Runtime
+    """
+    # vars
+    in_var_nf = var.FEAT_DICT(graph._get_node_frame(block_id), name='in_nf')
+    out_var_nf = var.FEAT_DICT(graph._get_node_frame(block_id + 1), name='out_nf')
+    var_ef = var.FEAT_DICT(graph._get_edge_frame(block_id), name='ef')
+    var_u = var.IDX(u)
+    var_v = var.IDX(v)
+    var_eid = var.IDX(eid)
+    # schedule apply edges
+    fdsrc = ir.READ_ROW(in_var_nf, var_u)
+    fddst = ir.READ_ROW(out_var_nf, var_v)
     fdedge = ir.READ_ROW(var_ef, var_eid)
     def _efunc_wrapper(src_data, edge_data, dst_data):
         ebatch = EdgeBatch(graph, (u, v, eid), src_data, edge_data, dst_data)
@@ -348,9 +436,10 @@ def schedule_pull(graph,
         var_eid = var.IDX(eid)
         # generate send and reduce schedule
         uv_getter = lambda: (var_u, var_v)
-        adj_creator = lambda: spmv.build_adj_matrix_uv(graph, (u, v), pull_nodes)
+        adj_creator = lambda: spmv.build_adj_matrix_uv((u, v), pull_nodes, graph.number_of_nodes())
         inc_creator = lambda: spmv.build_inc_matrix_dst(v, pull_nodes)
-        reduced_feat = _gen_send_reduce(graph, message_func, reduce_func,
+        reduced_feat = _gen_send_reduce(graph, graph._node_frame, graph._node_frame,
+                                        graph._edge_frame, message_func, reduce_func,
                                         var_eid, var_pull_nodes,
                                         uv_getter, adj_creator, inc_creator)
         # generate optional apply
@@ -359,6 +448,110 @@ def schedule_pull(graph,
             ir.WRITE_ROW_INPLACE_(var_nf, var_pull_nodes, final_feat)
         else:
             ir.WRITE_ROW_(var_nf, var_pull_nodes, final_feat)
+
+def schedule_group_apply_edge(graph,
+                              u, v, eid,
+                              apply_func,
+                              group_by,
+                              inplace):
+    """group apply edges schedule
+
+    Parameters
+    ----------
+    graph: DGLGraph
+        The DGLGraph to use
+    u : utils.Index
+        Source nodes of edges to apply
+    v : utils.Index
+        Destination nodes of edges to apply
+    eid : utils.Index
+        Ids of sending edges
+    apply_func: callable
+        The apply edge function
+    group_by : str
+        Specify how to group edges. Expected to be either 'src' or 'dst'
+    inplace: bool
+        If True, the update will be done in place
+
+    Returns
+    -------
+    A list of executors for DGL Runtime
+    """
+    # vars
+    var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
+    var_ef = var.FEAT_DICT(graph._edge_frame, name='ef')
+    var_out = var.FEAT_DICT(name='new_ef')
+    # TODO (lingfan): check if apply_func is a DGL builtin
+    db.gen_group_apply_edge_schedule(graph, apply_func, u, v, eid, group_by,
+                                     var_nf, var_ef, var_out)
+    var_eid = var.IDX(eid)
+    if inplace:
+        ir.WRITE_ROW_INPLACE_(var_ef, var_eid, var_out)
+    else:
+        ir.WRITE_ROW_(var_ef, var_eid, var_out)
+
+def schedule_nodeflow_compute(graph,
+                              block_id,
+                              u, v, eid,
+                              dest_nodes,
+                              message_func,
+                              reduce_func,
+                              apply_func,
+                              inplace):
+    """get flow compute schedule in NodeFlow
+
+    Parameters
+    ----------
+    graph: DGLGraph
+        The DGLGraph to use
+    block_id : int
+        The block where we perform computation.
+    u : utils.Index
+        Source nodes of edges to apply
+    v : utils.Index
+        Destination nodes of edges to apply
+    eid : utils.Index
+        Ids of sending edges
+    message_func: callable or list of callable
+        The message function
+    reduce_func: callable or list of callable
+        The reduce function
+    apply_func: callable
+        The apply node function
+    inplace: bool
+        If True, the update will be done in place
+    """
+    # TODO(minjie): `in_edges` can be omitted if message and reduce func pairs
+    #   can be specialized to SPMV. This needs support for creating adjmat
+    #   directly from pull node frontier.
+    if len(eid) == 0:
+        # All the nodes are 0deg; downgrades to apply.
+        if apply_func is not None:
+            schedule_nodeflow_apply_nodes(graph, block_id + 1, v, apply_func, inplace)
+    else:
+        # create vars
+        var_nf = var.FEAT_DICT(graph._get_node_frame(block_id + 1), name='out_nf')
+        var_dest_nodes = var.IDX(dest_nodes, name='dest_nodes')
+        var_u = var.IDX(u)
+        var_v = var.IDX(v)
+        var_eid = var.IDX(eid)
+        # generate send and reduce schedule
+        uv_getter = lambda: (var_u, var_v)
+        adj_creator = lambda: spmv.build_adj_matrix_uv((u, v), dest_nodes,
+                                                       graph.layer_size(block_id))
+        inc_creator = lambda: spmv.build_inc_matrix_dst(v, dest_nodes)
+        reduced_feat = _gen_send_reduce(graph, graph._get_node_frame(block_id),
+                                        graph._get_node_frame(block_id + 1),
+                                        graph._get_edge_frame(block_id),
+                                        message_func, reduce_func,
+                                        var_eid, var_dest_nodes,
+                                        uv_getter, adj_creator, inc_creator)
+        # generate optional apply
+        final_feat = _apply_with_accum(graph, var_dest_nodes, var_nf, reduced_feat, apply_func)
+        if inplace:
+            ir.WRITE_ROW_INPLACE_(var_nf, var_dest_nodes, final_feat)
+        else:
+            ir.WRITE_ROW_(var_nf, var_dest_nodes, final_feat)
 
 def _check_builtin_func_list(func_list):
     """Check whether func_list only contains builtin functions."""
@@ -469,6 +662,9 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
 
 def _gen_send_reduce(
         graph,
+        src_node_frame,
+        dst_node_frame,
+        edge_frame,
         message_func,
         reduce_func,
         var_send_edges,
@@ -485,6 +681,12 @@ def _gen_send_reduce(
     ----------
     graph : DGLGraph
         The graph
+    src_node_frame : NodeFrame
+        The node frame of the source nodes.
+    dst_node_frame : NodeFrame
+        The node frame of the destination nodes.
+    edge_frame : NodeFrame
+        The frame for the edges between the source and destination nodes.
     message_func : callable, list of builtins
         The message func(s).
     reduce_func : callable, list of builtins
@@ -509,8 +711,9 @@ def _gen_send_reduce(
     reduce_nodes = var_reduce_nodes.data
 
     # arg vars
-    var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
-    var_ef = var.FEAT_DICT(graph._edge_frame, name='ef')
+    var_src_nf = var.FEAT_DICT(src_node_frame, name='nf')
+    var_dst_nf = var.FEAT_DICT(dst_node_frame, name='nf')
+    var_ef = var.FEAT_DICT(edge_frame, name='ef')
     var_eid = var_send_edges
 
     # format the input functions
@@ -523,7 +726,7 @@ def _gen_send_reduce(
     # The frame has the same size and schemes of the
     # node frame.
     # TODO(minjie): should replace this with an IR call to make the program stateless.
-    tmpframe = FrameRef(frame_like(graph._node_frame._frame, len(reduce_nodes)))
+    tmpframe = FrameRef(frame_like(dst_node_frame._frame, len(reduce_nodes)))
     var_out = var.FEAT_DICT(data=tmpframe)
 
     if mfunc_is_list and rfunc_is_list:
@@ -531,7 +734,7 @@ def _gen_send_reduce(
         # analyze v2v spmv
         spmv_pairs, mfunc, rfunc = spmv.analyze_v2v_spmv(graph, mfunc, rfunc)
         adj = adj_creator()
-        spmv.gen_v2v_spmv_schedule(adj, spmv_pairs, var_nf, var_ef, var_eid, var_out)
+        spmv.gen_v2v_spmv_schedule(adj, spmv_pairs, var_src_nf, var_ef, var_eid, var_out)
 
         if len(mfunc) == 0:
             # All mfunc and rfunc have been converted to v2v spmv.
@@ -547,7 +750,7 @@ def _gen_send_reduce(
 
     # generate UDF send schedule
     var_u, var_v = uv_getter()
-    var_mf = _gen_send(graph, var_nf, var_ef, var_u, var_v, var_eid, mfunc)
+    var_mf = _gen_send(graph, var_src_nf, var_dst_nf, var_ef, var_u, var_v, var_eid, mfunc)
 
     if rfunc_is_list:
         # UDF message + builtin reducer
@@ -566,13 +769,13 @@ def _gen_send_reduce(
     # gen degree bucketing schedule for UDF recv
     mid = utils.toindex(slice(0, len(var_v.data)))  # message id is from 0~|dst|
     db.gen_degree_bucketing_schedule(
-        graph, rfunc, mid, var_v.data, reduce_nodes, var_nf, var_mf, var_out)
+        graph, rfunc, mid, var_v.data, reduce_nodes, var_dst_nf, var_mf, var_out)
     return var_out
 
-def _gen_send(graph, nfr, efr, u, v, eid, mfunc):
+def _gen_send(graph, src_nfr, dst_nfr, efr, u, v, eid, mfunc):
     """Internal function to generate send schedule."""
-    fdsrc = ir.READ_ROW(nfr, u)
-    fddst = ir.READ_ROW(nfr, v)
+    fdsrc = ir.READ_ROW(src_nfr, u)
+    fddst = ir.READ_ROW(dst_nfr, v)
     fdedge = ir.READ_ROW(efr, eid)
     def _mfunc_wrapper(src_data, edge_data, dst_data):
         ebatch = EdgeBatch(graph, (u.data, v.data, eid.data),

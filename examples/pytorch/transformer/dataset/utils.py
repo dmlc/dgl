@@ -4,7 +4,7 @@ import os
 from dgl.data.utils import *
 
 _urls = {
-    'wmt': 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/wmt16_en_de.tar.gz',
+    'wmt': 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/wmt14bpe_de_en.zip',
     'scripts': 'https://s3.us-east-2.amazonaws.com/dgl.ai/dataset/transformer_scripts.zip',
 }
 
@@ -23,7 +23,7 @@ def prepare_dataset(dataset_name):
     if dataset_name == 'multi30k':
         os.system('bash scripts/prepare-multi30k.sh')
     elif dataset_name == 'wmt14':
-        download(_urls['wmt'], path='wmt16_en_de.tar.gz')
+        download(_urls['wmt'], path='wmt14.zip')
         os.system('bash scripts/prepare-wmt14.sh')
     elif dataset_name == 'copy' or dataset_name == 'tiny_copy':
         train_size = 9000

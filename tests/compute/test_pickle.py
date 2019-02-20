@@ -60,6 +60,8 @@ def test_pickling_frame():
 
 
 def _assert_is_identical(g, g2):
+    assert g.is_multigraph == g2.is_multigraph
+    assert g.is_readonly == g2.is_readonly
     assert g.number_of_nodes() == g2.number_of_nodes()
     src, dst = g.all_edges()
     src2, dst2 = g2.all_edges()
@@ -139,6 +141,21 @@ def test_pickling_graph():
     new_g, new_g2 = dgl.unbatch(bg2)
     _assert_is_identical(g, new_g)
     _assert_is_identical(g2, new_g2)
+
+    # readonly graph
+    g = dgl.DGLGraph([(0, 1), (1, 2)], readonly=True)
+    new_g = _reconstruct_pickle(g)
+    _assert_is_identical(g, new_g)
+
+    # multigraph
+    g = dgl.DGLGraph([(0, 1), (0, 1), (1, 2)], multigraph=True)
+    new_g = _reconstruct_pickle(g)
+    _assert_is_identical(g, new_g)
+
+    # readonly multigraph
+    g = dgl.DGLGraph([(0, 1), (0, 1), (1, 2)], multigraph=True, readonly=True)
+    new_g = _reconstruct_pickle(g)
+    _assert_is_identical(g, new_g)
 
 
 if __name__ == '__main__':

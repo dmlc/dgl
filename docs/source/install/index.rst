@@ -172,3 +172,16 @@ Then build the shared library and install the Python binding:
    mingw32-make
    cd ..\python
    python setup.py install
+
+We also support building DGL with MSBuild.  With `MS Build Tools <https://go.microsoft.com/fwlink/?linkid=840931>`_
+and `CMake on Windows <https://cmake.org/download/>`_ installed, run the following
+in VS2017 x64 Native tools command prompt:
+
+.. code::
+
+   MD build
+   CD build
+   cmake -DCMAKE_CXX_FLAGS="/DDGL_EXPORTS" -DCMAKE_CONFIGURATION_TYPES="Release" .. -G "Visual Studio 15 2017 Win64"
+   msbuild dgl.sln
+   cd ..\python
+   python setup.py install

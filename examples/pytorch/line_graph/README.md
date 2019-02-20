@@ -7,6 +7,18 @@ Author's code repo: [https://github.com/joanbruna/GNN_community](https://github.
 
 This folder contains a DGL implementation of the CDGNN model.
 
+Dependencies
+--------------
+* PyTorch 0.4.1+
+* requests
+
+```bash
+pip install torch requests
+```
+
+How to run
+----------
+
 An experiment on the Stochastic Block Model in default settings can be run with
 
 ```bash

@@ -7,10 +7,11 @@ Graph Attention Networks (GAT)
 - Popular pytorch implementation:
   [https://github.com/Diego999/pyGAT](https://github.com/Diego999/pyGAT).
 
-Requirements
+Dependencies
 ------------
 - torch v1.0: the autograd support for sparse mm is only available in v1.0.
 - requests
+- sklearn
 
 ```bash
 pip install torch==1.0.0 requests
@@ -31,6 +32,10 @@ python train.py --dataset=citeseer --gpu=0
 
 ```bash
 python train.py --dataset=pubmed --gpu=0 --num-out-heads=8 --weight-decay=0.001
+```
+
+```bash
+python train_ppi.py --gpu=0
 ```
 
 Results
