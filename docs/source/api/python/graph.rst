@@ -96,6 +96,7 @@ Computing with DGLGraph
     DGLGraph.register_apply_edge_func
     DGLGraph.apply_nodes
     DGLGraph.apply_edges
+    DGLGraph.group_apply_edges
     DGLGraph.send
     DGLGraph.recv
     DGLGraph.send_and_recv
