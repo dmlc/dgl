@@ -100,10 +100,22 @@ def run(edge_set, train=True):
                 opt.step()
 
             sum_loss += loss.item()
+            avg_loss = sum_loss / (batch_id + 1)
             tq.set_postfix({'loss': '%.6f' % loss.item(),
-                            'avg_loss': sum_loss / (batch_id + 1)})
+                            'avg_loss': avg_loss})
 
-for epoch in range(500):
-    run(g_train_edges, True)
-    with torch.no_grad():
-        run(g_valid_edges, False)
+    return avg_loss
+
+
+def train():
+    best_loss = 1e5
+    for epoch in range(500):
+        run(g_train_edges, True)
+        with torch.no_grad():
+            valid_loss = run(g_valid_edges, False)
+            if best_loss > valid_loss:
+                best_loss = valid_loss
+                torch.save(model.state_dict(), 'model.pt')
+
+if __name__ == '__main__':
+    train()
