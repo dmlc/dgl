@@ -375,7 +375,7 @@ for epoch in range(30):
 #
 # * :math:`TP_{t}` represents for number of nodes that both have and are predicted to have label :math:`t`
 # * :math:`FP_{t}` represents for number of nodes that do not have but are predicted to have label :math:`t`
-# * :math:`FN_{t}` represents for number of output classes labeled as $t$ but predicted as others.
+# * :math:`FN_{t}` represents for number of output classes labeled as :math:`t` but predicted as others.
 # * :math:`n` is the number of labels, i.e. :math:`121` in our case.
 #
 #
