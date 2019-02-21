@@ -39,11 +39,11 @@ class ImmutableGraph: public GraphInterface {
     std::vector<dgl_id_t> src_points;
     std::vector<dgl_id_t> dst_points;
 
-    EdgeList(int64_t len) {
+    EdgeList(int64_t len, const dgl_id_t &val) {
       src_points.reserve(len);
       dst_points.reserve(len);
-      std::fill(src_points.begin(), src_points.end(), -1);
-      std::fill(dst_points.begin(), dst_points.end(), -1);
+      std::fill(src_points.begin(), src_points.end(), val);
+      std::fill(dst_points.begin(), dst_points.end(), val);
     }
 
     void register_edge(dgl_id_t eid, dgl_id_t *end_points) {
@@ -51,7 +51,7 @@ class ImmutableGraph: public GraphInterface {
       dst_points[eid] = end_points[1];
     }
 
-    static EdgeList::Ptr FromEdges(std::vector<Edge> *edges);
+    static EdgeList::Ptr FromEdges(std::vector<Edge> *edges, uint64_t num_nodes);
   };
 
   struct CSR {

@@ -3073,7 +3073,6 @@ class DGLGraph(DGLBaseGraph):
         if readonly_state == self._graph.is_readonly():
             return self
         self._graph.readonly(readonly_state)
-        return self
 
     def __repr__(self):
         ret = ('DGLGraph(num_nodes={node}, num_edges={edge},\n'

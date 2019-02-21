@@ -158,9 +158,9 @@ class HashTableChecker {
   }
 };
 
-ImmutableGraph::EdgeList::Ptr ImmutableGraph::EdgeList::FromEdges(std::vector<Edge> *edges) {
+ImmutableGraph::EdgeList::Ptr ImmutableGraph::EdgeList::FromEdges(std::vector<Edge> *edges, uint64_t num_nodes) {
   const auto len = edges->size();
-  auto t = std::make_shared<EdgeList>(len);
+  auto t = std::make_shared<EdgeList>(len, num_nodes);
   for (size_t i = 0; i < len; i++)
     t->register_edge(edges->at(i).edge_id, edges->at(i).end_points);
   return t;
@@ -280,7 +280,7 @@ ImmutableGraph::ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_id
   }
   in_csr_ = CSR::FromEdges(&edges, 1, num_nodes);
   out_csr_ = CSR::FromEdges(&edges, 0, num_nodes);
-  edge_list_ = EdgeList::FromEdges(&edges);
+  edge_list_ = EdgeList::FromEdges(&edges, num_nodes);
 }
 
 BoolArray ImmutableGraph::HasVertices(IdArray vids) const {
@@ -459,21 +459,23 @@ ImmutableGraph::EdgeArray ImmutableGraph::EdgeIds(IdArray src_ids, IdArray dst_i
 }
 
 std::pair<dgl_id_t, dgl_id_t> ImmutableGraph::FindEdge(dgl_id_t eid) const {
-  dgl_id_t row, col;
+  dgl_id_t row = 0, col = 0;
   if (this->edge_list_) {
+    CHECK(eid < NumEdges()) << "Edge " << eid << " not exists";
     row = this->edge_list_->src_points[eid];
     col = this->edge_list_->dst_points[eid];
+    CHECK(row < NumVertices() && col < NumVertices()) << "Edge " << eid << " not exists";
   } else if (this->out_csr_) {
     auto out_csr = GetOutCSR();
     auto ptr = std::find(out_csr->edge_ids.begin(), out_csr->edge_ids.end(), eid);
-    CHECK(eid == *ptr);
+    CHECK(eid == *ptr) << "Edge " << eid << " not exists";
     const int64_t idx = ptr - out_csr->edge_ids.begin();
     col = out_csr->indices[idx];
     row = std::lower_bound(out_csr->indptr.begin(), out_csr->indptr.end(), idx) - out_csr->indptr.begin();
   } else if (this->in_csr_) {
     auto in_csr = GetInCSR();
     auto ptr = std::find(in_csr->edge_ids.begin(), in_csr->edge_ids.end(), eid);
-    CHECK(eid == *ptr);
+    CHECK(eid == *ptr) << "Edge " << eid << " not exists";
     const int64_t idx = ptr - in_csr->edge_ids.begin();
     row = in_csr->indices[idx];
     col = std::lower_bound(in_csr->indptr.begin(), in_csr->indptr.end(), idx) - in_csr->indptr.begin();
@@ -485,7 +487,7 @@ ImmutableGraph::EdgeArray ImmutableGraph::FindEdges(IdArray eids) const {
   dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
   const auto len = eids->shape[0];
   std::vector<dgl_id_t> src, dst;
-  for (size_t k = 0; k < len; k++) {
+  for (int64_t k = 0; k < len; k++) {
     auto edge = ImmutableGraph::FindEdge(eid_data[k]);
     src.push_back(edge.first);
     dst.push_back(edge.second);
