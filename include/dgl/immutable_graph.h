@@ -510,6 +510,22 @@ class ImmutableGraph: public GraphInterface {
     }
   }
 
+  /*
+   * The edge list is required for FindEdge/FindEdges/EdgeSubgraph, if no such function is called, we would not create edge list.
+   * if such function is called the first time, we create a edge list from one of the graph's csr representations,
+   * if we have called such function before, we get the one cached in the structure.
+   */
+  EdgeList::Ptr GetEdgeList() const {
+    if (edge_list_)
+      return edge_list_;
+    if (in_csr_) {
+      const_cast<ImmutableGraph *>(this)->edge_list_ = EdgeList::FromCSR(&in_csr_->indptr, &in_csr_->indices, &in_csr_->edge_ids, 1);
+    } else {
+      CHECK(out_csr_ != nullptr) << "one of the CSRs must exist";
+      const_cast<ImmutableGraph *>(this)->edge_list_ = EdgeList::FromCSR(&out_csr_->indptr, &out_csr_->indices, &out_csr_->edge_ids, 0);
+    }
+  }
+
  protected:
   DGLIdIters GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
   DGLIdIters GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
@@ -539,8 +555,8 @@ class ImmutableGraph: public GraphInterface {
   CSR::Ptr in_csr_;
   // Store the out-edges.
   CSR::Ptr out_csr_;
-  // Store the edge list indexed by edge id, mutable allows edge_list_ to be created in const function.
-  mutable EdgeList::Ptr edge_list_;
+  // Store the edge list indexed by edge id
+  EdgeList::Ptr edge_list_;
   /*!
    * \brief Whether if this is a multigraph.
    *

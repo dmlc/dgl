@@ -469,17 +469,10 @@ ImmutableGraph::EdgeArray ImmutableGraph::EdgeIds(IdArray src_ids, IdArray dst_i
 
 std::pair<dgl_id_t, dgl_id_t> ImmutableGraph::FindEdge(dgl_id_t eid) const {
   dgl_id_t row = 0, col = 0;
-  if (!edge_list_) {
-    if (out_csr_) {
-      edge_list_ = EdgeList::FromCSR(&out_csr_->indptr, &out_csr_->indices, &out_csr_->edge_ids, 0);
-    } else {
-      CHECK(in_csr_);
-      edge_list_ = EdgeList::FromCSR(&in_csr_->indptr, &in_csr_->indices, &in_csr_->edge_ids, 1);
-    }
-  }
+  auto edge_list = GetEdgeList();
   CHECK(eid < NumEdges()) << "Invalid edge id " << eid;
-  row = edge_list_->src_points[eid];
-  col = edge_list_->dst_points[eid];
+  row = edge_list->src_points[eid];
+  col = edge_list->dst_points[eid];
   CHECK(row < NumVertices() && col < NumVertices()) << "Invalid edge id " << eid;
   return std::pair<dgl_id_t, dgl_id_t>(row, col);
 }
