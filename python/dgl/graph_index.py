@@ -27,8 +27,6 @@ class GraphIndex(object):
         self._multigraph = multigraph
         self._readonly = readonly
         self._cache = {}
-        if self.number_of_nodes() < 1e5:
-            self._store_map = True
 
     def __del__(self):
         """Free this graph index object."""
@@ -66,8 +64,7 @@ class GraphIndex(object):
         assert len(src_ids) == len(edge_ids)
         self._handle = _CAPI_DGLGraphCreate(src_ids.todgltensor(), dst_ids.todgltensor(),
                                             edge_ids.todgltensor(), self._multigraph, num_nodes,
-                                            self._readonly,
-                                            self._store_map)
+                                            self._readonly)
 
     def add_nodes(self, num):
         """Add nodes.
