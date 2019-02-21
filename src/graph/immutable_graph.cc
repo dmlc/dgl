@@ -558,14 +558,8 @@ Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
 }
 
 Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids) const {
-  Subgraph subg;
-  std::pair<CSR::Ptr, IdArray> ret;
-  if (out_csr_) {
-    // TODO
-  } else {
-    CHECK(in_csr_);
-  }
-  return subg;
+  LOG(FATAL) << "EdgeSubgraph isn't implemented in immutable graph";
+  return Subgraph();
 }
 
 ImmutableGraph::CSRArray ImmutableGraph::GetInCSRArray() const {
