@@ -20,12 +20,12 @@ class SGCLayer(nn.Module):
                  h,
                  in_feats,
                  out_feats,
+                 bias=False,
                  K=2):
         super(SGCLayer, self).__init__()
         self.g = g
-        self.weight = nn.Parameter(torch.Tensor(in_feats, out_feats))
+        self.weight = nn.Linear(in_feats, out_feats, bias=bias)
         self.K = K
-        self.reset_parameters()
         # precomputing message passing
         for _ in range(self.K):
             # normalization by square root of src degree
@@ -39,12 +39,8 @@ class SGCLayer(nn.Module):
         # store precomputed result into a cached variable
         self.cached_h = h
 
-    def reset_parameters(self):
-        stdv = 1. / math.sqrt(self.weight.size(1))
-        self.weight.data.uniform_(-stdv, stdv)
-
     def forward(self, mask):
-        h = torch.mm(self.cached_h[mask], self.weight)
+        h = self.weight(self.cached_h[mask])
         return h
 
 def evaluate(model, features, labels, mask):
@@ -107,6 +103,7 @@ def main(args):
                      features,
                      in_feats,
                      n_classes,
+                     args.bias,
                      K=2)
 
     if cuda: model.cuda()
@@ -151,6 +148,8 @@ if __name__ == '__main__':
             help="gpu")
     parser.add_argument("--lr", type=float, default=0.2,
             help="learning rate")
+    parser.add_argument("--bias", action='store_true', default=False,
+            help="flag to use bias")
     parser.add_argument("--n-epochs", type=int, default=100,
             help="number of training epochs")
     parser.add_argument("--weight-decay", type=float, default=5e-6,

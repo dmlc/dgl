@@ -23,12 +23,12 @@ Results
 Run with following (available dataset: "cora", "citeseer", "pubmed")
 ```bash
 python sgc.py --dataset cora --gpu 0
-python sgc.py --dataset citeseer --weight-decay 5e-5 --n-epochs 150 --gpu 0
-python sgc.py --dataset pubmed --weight-decay 5e-5 --gpu 0
+python sgc.py --dataset citeseer --weight-decay 5e-5 --n-epochs 150 --bias --gpu 0
+python sgc.py --dataset pubmed --weight-decay 5e-5 --bias --gpu 0
 ```
 
 On NVIDIA V100
 
 * cora: 0.819 (paper: 0.810), 0.0008s/epoch
-* citeseer: 0.715 (paper: 0.719), 0.0008s/epoch
-* pubmed: 0.787 (paper: 0.789), 0.0007s/epoch
+* citeseer: 0.725 (paper: 0.719), 0.0008s/epoch
+* pubmed: 0.788 (paper: 0.789), 0.0007s/epoch
