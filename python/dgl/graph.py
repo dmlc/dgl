@@ -3043,6 +3043,38 @@ class DGLGraph(DGLBaseGraph):
             edges = F.tensor(edges)
             return F.boolean_mask(edges, e_mask)
 
+    def readonly(self, readonly_state=True):
+        """Set this graph's readonly state in-place.
+
+        Parameters
+        ----------
+        readonly_state : bool, optional
+            New readonly state of the graph, defaults to True.
+
+        Examples
+        --------
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(3)
+        >>> G.add_edge(0, 1)
+        >>> G.readonly()
+        >>> try:
+        >>>     G.add_nodes(5)
+        >>>     fail = False
+        >>> except:
+        >>>     fail = True
+        >>>
+        >>> fail
+        True
+        >>> G.readonly(False)
+        >>> G.add_nodes(5)
+        >>> G.number_of_nodes()
+        8
+        """
+        if readonly_state == self._graph.is_readonly():
+            return self
+        self._graph.readonly(readonly_state)
+        return self
+
     def __repr__(self):
         ret = ('DGLGraph(num_nodes={node}, num_edges={edge},\n'
                '         ndata_schemes={ndata}\n'

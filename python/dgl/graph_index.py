@@ -54,7 +54,6 @@ class GraphIndex(object):
             self._init(src, dst, utils.toindex(F.arange(0, len(src))), n_nodes)
         else:
             self._handle = _CAPI_DGLGraphCreateMutable(multigraph)
-
             self.clear()
             self.add_nodes(n_nodes)
             self.add_edges(src, dst)
@@ -138,6 +137,19 @@ class GraphIndex(object):
         if self._readonly is None:
             self._readonly = bool(_CAPI_DGLGraphIsReadonly(self._handle))
         return self._readonly
+
+    def readonly(self, readonly_state=True):
+        """Set the readonly state of graph index in-place.
+
+        Parameters
+        ----------
+        readonly_state : bool
+            New readonly state of current graph index.
+        """
+        n_nodes, multigraph, _, src, dst = self.__getstate__()
+        self.clear_cache()
+        state = (n_nodes, multigraph, readonly_state, src, dst)
+        self.__setstate__(state)
 
     def number_of_nodes(self):
         """Return the number of nodes.
@@ -681,6 +693,20 @@ class GraphIndex(object):
                               utils.toindex(rst(num_subgs * 2 + i)),
                               utils.toindex(rst(num_subgs * 3 + i)),
                               utils.toindex(rst(num_subgs * 4 + i))) for i in range(num_subgs)]
+
+    def random_walk(self, seeds, num_traces, num_hops):
+        """Random walk sampling.
+
+        Returns a user Tensor of random walk traces with shape
+        (num_seeds, num_traces, num_hops + 1)
+        """
+        if len(seeds) == 0:
+            return utils.toindex([])
+
+        seeds = seeds.todgltensor()
+        traces = _CAPI_DGLGraphRandomWalk(self._handle, seeds, num_traces, num_hops)
+
+        return F.zerocopy_from_dlpack(traces.to_dlpack())
 
     def to_networkx(self):
         """Convert to networkx graph.
