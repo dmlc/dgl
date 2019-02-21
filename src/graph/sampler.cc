@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cmath>
-#include <omp.h>
+#include <dmlc/omp.h>
 
 #ifdef _MSC_VER
 // rand in MS compiler works well in multi-threading.
@@ -292,7 +292,7 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
       node_map_data[out_node_idx++] = sub_vers->at(i).first;
       layer_ver_maps[layer_id].insert(std::pair<dgl_id_t, dgl_id_t>(sub_vers->at(i).first,
                                                                     ver_id++));
-      assert(sub_vers->at(i).second == layer_id);
+      CHECK_EQ(sub_vers->at(i).second, layer_id);
     }
   }
   CHECK(out_node_idx == num_vertices);
@@ -318,16 +318,17 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
 
     for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
       dgl_id_t dst_id = sub_vers->at(i).first;
-      assert(dst_id == neigh_pos->at(i).id);
+      CHECK_EQ(dst_id, neigh_pos->at(i).id);
       size_t pos = neigh_pos->at(i).pos;
-      CHECK_LT(pos, neighbor_list.size());
+      CHECK_LE(pos, neighbor_list.size());
       size_t num_edges = neigh_pos->at(i).num_edges;
+      if (neighbor_list.empty()) CHECK(num_edges == 0);
 
       // We need to map the Ids of the neighbors to the subgraph.
       auto neigh_it = neighbor_list.begin() + pos;
       for (size_t i = 0; i < num_edges; i++) {
         dgl_id_t neigh = *(neigh_it + i);
-        assert(layer_ver_maps[layer_id + 1].find(neigh) != layer_ver_maps[layer_id + 1].end());
+        CHECK(layer_ver_maps[layer_id + 1].find(neigh) != layer_ver_maps[layer_id + 1].end());
         col_list_out[collected_nedges + i] = layer_ver_maps[layer_id + 1][neigh];
       }
       // We can simply copy the edge Ids.
