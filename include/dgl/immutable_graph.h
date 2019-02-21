@@ -524,6 +524,7 @@ class ImmutableGraph: public GraphInterface {
       CHECK(out_csr_ != nullptr) << "one of the CSRs must exist";
       const_cast<ImmutableGraph *>(this)->edge_list_ = EdgeList::FromCSR(&out_csr_->indptr, &out_csr_->indices, &out_csr_->edge_ids, 0);
     }
+    return edge_list_;
   }
 
  protected:
