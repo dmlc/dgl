@@ -1,1 +1,1 @@
-from .gcn import GraphConvolutionLayer
+from .conv import *
