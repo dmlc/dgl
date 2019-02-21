@@ -1,12 +1,8 @@
 .. _apinn:
 
-DGL NN Package
-==============
+dgl.nn
+======
 
-PyTorch Backend
----------------
-.. automodule:: dgl.nn.pytorch
+.. toctree::
 
-
-MXNet Backend
--------------
+   nn.pytorch
