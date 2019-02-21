@@ -14,29 +14,37 @@ from dgl.graph_index import map_to_nodeflow_nid
 
 
 class NodeUpdate(gluon.Block):
-    def __init__(self, layer_id, in_feats, out_feats, hidden, dropout, activation=None, test=False):
+    def __init__(self, layer_id, in_feats, out_feats, hidden, dropout,
+                 test=False, last=False):
         super(NodeUpdate, self).__init__()
         self.layer_id = layer_id
         self.dropout = dropout
         self.test = test
+        self.last = last
         with self.name_scope():
-            self.dense1 = gluon.nn.Dense(hidden, in_units=2*in_feats)
+            self.dense1 = gluon.nn.Dense(hidden, in_units=in_feats)
             self.layer_norm1 = gluon.nn.LayerNorm(in_channels=hidden)
             self.dense2 = gluon.nn.Dense(out_feats, in_units=hidden)
+            if not self.last:
+                self.layer_norm2 = gluon.nn.LayerNorm(in_channels=out_feats)
 
     def forward(self, node):
         h = node.data['h']
-        prev_h = node.data['prev_h']
+        norm = node.data['norm']
+        self_h = node.data['self_h']
         if self.test:
-            norm = node.data['norm']
-            h = (h - prev_h) * norm
-            h = mx.nd.concat(h, prev_h)
+            h = (h - self_h) * norm
+            # graphsage
+            h = mx.nd.concat(h, self_h)
         else:
             agg_history_str = 'agg_h_{}'.format(self.layer_id-1)
             agg_history = node.data[agg_history_str]
+            subg_norm = node.data['subg_norm']
+            self_delta_h = node.data['self_delta_h']
             # control variate
-            h = (h - node.data['h0']) * node.data['subg_norm'] + agg_history * node.data['norm']
-            h = mx.nd.concat(h, prev_h)
+            h = (h - self_delta_h) * subg_norm + agg_history * norm
+            # graphsage
+            h = mx.nd.concat(h, self_h)
             if self.dropout:
                 h = mx.nd.Dropout(h, p=self.dropout)
 
@@ -46,6 +54,9 @@ class NodeUpdate(gluon.Block):
         if self.dropout and not self.test:
             h = mx.nd.Dropout(h, p=self.dropout)
         h = self.dense2(h)
+        if not self.last:
+            h = self.layer_norm2(h)
+            h = mx.nd.relu(h)
         return {'activation': h}
 
 
@@ -56,7 +67,6 @@ class GCNSampling(gluon.Block):
                  n_hidden,
                  n_classes,
                  n_layers,
-                 activation,
                  dropout,
                  **kwargs):
         super(GCNSampling, self).__init__(**kwargs)
@@ -70,9 +80,9 @@ class GCNSampling(gluon.Block):
             self.layer_norm2 = gluon.nn.LayerNorm(in_channels=n_hidden)
             # hidden layers
             for i in range(1, n_layers):
-                self.layers.add(NodeUpdate(i, n_hidden, n_hidden, n_hidden, dropout, activation))
+                self.layers.add(NodeUpdate(i, 2*n_hidden, n_hidden, n_hidden, dropout))
             # output layer
-            self.layers.add(NodeUpdate(n_layers, n_hidden, n_classes, n_hidden, dropout))
+            self.layers.add(NodeUpdate(n_layers, 2*n_hidden, n_classes, n_hidden, dropout, last=True))
 
     def forward(self, nf):
         h = nf.layers[0].data['preprocess']
@@ -82,34 +92,30 @@ class GCNSampling(gluon.Block):
             h = mx.nd.Dropout(h, p=self.dropout)
         h = self.dense1(h)
         h = self.layer_norm1(h)
-        #h = mx.nd.L2Normalization(h, mode='instance')
         h = mx.nd.relu(h)
         if self.dropout:
             h = mx.nd.Dropout(h, p=self.dropout)
         h = self.dense2(h)
         h = self.layer_norm2(h)
-        #h = mx.nd.L2Normalization(h, mode='instance')
         h = mx.nd.relu(h)
 
         for i, layer in enumerate(self.layers):
-
-            layer_nid = map_to_nodeflow_nid(nf, i, dgl.utils.toindex(nf.layer_parent_nid(i+1))).tousertensor()
-            prev_h = h[layer_nid]
-            nf.layers[i+1].data['prev_h'] = prev_h
+            parent_nid = dgl.utils.toindex(nf.layer_parent_nid(i+1))
+            layer_nid = map_to_nodeflow_nid(nf._graph, i, parent_nid).tousertensor()
+            self_h = h[layer_nid]
+            nf.layers[i+1].data['self_h'] = self_h
 
             new_history = h.copy().detach()
             history_str = 'h_{}'.format(i)
             history = nf.layers[i].data[history_str]
             h = h - history
-
-            nf.layers[i+1].data['h0'] = h[layer_nid]
+            nf.layers[i+1].data['self_delta_h'] = h[layer_nid]
 
             nf.layers[i].data['h'] = h
             nf.block_compute(i,
-                            fn.copy_src(src='h', out='m'),
-                            #lambda node : {'h': node.mailbox['m'].mean(axis=1)},
-                            fn.sum(msg='m', out='h'),
-                            layer)
+                             fn.copy_src(src='h', out='m'),
+                             fn.sum(msg='m', out='h'),
+                             layer)
             h = nf.layers[i+1].data.pop('activation')
             # update history
             if i < nf.num_layers-1:
@@ -124,7 +130,6 @@ class GCNInfer(gluon.Block):
                  n_hidden,
                  n_classes,
                  n_layers,
-                 activation,
                  **kwargs):
         super(GCNInfer, self).__init__(**kwargs)
         with self.name_scope():
@@ -136,9 +141,9 @@ class GCNInfer(gluon.Block):
             self.layer_norm2 = gluon.nn.LayerNorm(in_channels=n_hidden)
             # hidden layers
             for i in range(1, n_layers):
-                self.layers.add(NodeUpdate(i, n_hidden, n_hidden, n_hidden, 0, activation, True))
+                self.layers.add(NodeUpdate(i, 2*n_hidden, n_hidden, n_hidden, 0, True))
             # output layer
-            self.layers.add(NodeUpdate(n_layers, n_hidden, n_classes, n_hidden, 0, None, True))
+            self.layers.add(NodeUpdate(n_layers, 2*n_hidden, n_classes, n_hidden, 0, True, last=True))
 
 
     def forward(self, nf):
@@ -147,31 +152,30 @@ class GCNInfer(gluon.Block):
         h = mx.nd.concat(h, features)
         h = self.dense1(h)
         h = self.layer_norm1(h)
-        #h = mx.nd.L2Normalization(h, mode='instance')
         h = mx.nd.relu(h)
         h = self.dense2(h)
         h = self.layer_norm2(h)
-        #h = mx.nd.L2Normalization(h, mode='instance')
         h = mx.nd.relu(h)
 
-        nf.layers[0].data['h'] = h
         for i, layer in enumerate(self.layers):
-            layer_nid = map_to_nodeflow_nid(nf, i, dgl.utils.toindex(nf.layer_parent_nid(i+1))).tousertensor()
-            prev_h = h[layer_nid]
-            nf.layers[i+1].data['prev_h'] = prev_h
-
+            nf.layers[i].data['h'] = h
+            parent_nid = dgl.utils.toindex(nf.layer_parent_nid(i+1))
+            layer_nid = map_to_nodeflow_nid(nf._graph, i, parent_nid).tousertensor()
+            self_h = h[layer_nid]
+            nf.layers[i+1].data['self_h'] = self_h
             nf.block_compute(i,
-                            fn.copy_src(src='h', out='m'),
-                            fn.sum(msg='m', out='h'),
-                            layer)
-        h = nf.layers[i+1].data.pop('activation')
+                             fn.copy_src(src='h', out='m'),
+                             fn.sum(msg='m', out='h'),
+                             layer)
+            h = nf.layers[i+1].data.pop('activation')
+
         return h
 
 
 def main(args):
     # load and preprocess dataset
     data = load_data(args)
-    ctx = mx.cpu(0)
+    ctx = mx.cpu()
 
     if args.self_loop and not args.dataset.startswith('reddit'):
         data.graph.add_edges_from([(i,i) for i in range(len(data.graph))])
@@ -216,7 +220,7 @@ def main(args):
 
     degs = g.in_degrees().astype('float32').asnumpy()
     degs[degs > num_neighbors] = num_neighbors
-    g.ndata['subg_norm'] = mx.nd.expand_dims(mx.nd.array(1./degs), 1)
+    g.ndata['subg_norm'] = mx.nd.expand_dims(mx.nd.array(1./degs, ctx=ctx), 1)
 
 
     g.update_all(fn.copy_src(src='features', out='m'),
@@ -230,7 +234,6 @@ def main(args):
                         args.n_hidden,
                         n_classes,
                         n_layers,
-                        mx.nd.relu,
                         args.dropout,
                         prefix='GCN')
 
@@ -242,7 +245,6 @@ def main(args):
                            args.n_hidden,
                            n_classes,
                            n_layers,
-                           mx.nd.relu,
                            prefix='GCN')
 
     infer_model.initialize(ctx=ctx)
@@ -256,16 +258,24 @@ def main(args):
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
-        for nf, aux in dgl.contrib.sampling.NeighborSampler(g, args.batch_size, num_neighbors,
-                                                            neighbor_type='in', shuffle=True,
-                                                            num_hops=n_layers, add_self_loop=True,
+        for nf, aux in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
+                                                            num_neighbors,
+                                                            neighbor_type='in',
+                                                            shuffle=True,
+                                                            num_hops=n_layers,
+                                                            add_self_loop=True,
                                                             seed_nodes=train_nid):
             for i in range(n_layers):
                 agg_history_str = 'agg_h_{}'.format(i)
                 g.pull(nf.layer_parent_nid(i+1), fn.copy_src(src='h_{}'.format(i), out='m'),
                        fn.sum(msg='m', out=agg_history_str))
 
-            nf.copy_from_parent(node_embed_names=[['preprocess', 'features', 'h_0'], ['agg_h_0', 'subg_norm', 'norm']])
+            node_embed_names = [['preprocess', 'features', 'h_0']]
+            for i in range(1, n_layers):
+                node_embed_names.append(['h_{}'.format(i), 'agg_h_{}'.format(i-1), 'subg_norm', 'norm'])
+            node_embed_names.append(['agg_h_{}'.format(n_layers-1), 'subg_norm', 'norm'])
+
+            nf.copy_from_parent(node_embed_names=node_embed_names)
             # forward
             with mx.autograd.record():
                 pred = model(nf)
@@ -277,7 +287,10 @@ def main(args):
             loss.backward()
             trainer.step(batch_size=1)
 
-            nf.copy_to_parent(node_embed_names=[['h_0'], []])
+            node_embed_names = [['h_{}'.format(i)] for i in range(n_layers)]
+            node_embed_names.append([])
+
+            nf.copy_to_parent(node_embed_names=node_embed_names)
 
         infer_params = infer_model.collect_params()
 
@@ -287,10 +300,17 @@ def main(args):
 
         num_acc = 0.
 
-        for nf, aux in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size, g.number_of_nodes(),
-                                                            neighbor_type='in', num_hops=n_layers,
-                                                            seed_nodes=test_nid, add_self_loop=True):
-            nf.copy_from_parent(node_embed_names=[['preprocess', 'features'], ['norm', 'subg_norm']])
+        for nf, aux in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
+                                                            g.number_of_nodes(),
+                                                            neighbor_type='in',
+                                                            num_hops=n_layers,
+                                                            seed_nodes=test_nid,
+                                                            add_self_loop=True):
+            node_embed_names = [['preprocess', 'features']]
+            for i in range(n_layers):
+                node_embed_names.append(['norm', 'subg_norm'])
+            nf.copy_from_parent(node_embed_names=node_embed_names)
+
             pred = infer_model(nf)
             batch_nids = nf.layer_parent_nid(-1).as_in_context(ctx)
             batch_labels = labels[batch_nids]
