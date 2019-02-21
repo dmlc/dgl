@@ -1,20 +1,21 @@
 """Torch modules for graph convolutions."""
+# pylint: disable= no-member, arguments-differ, missing-docstring
 import torch as th
-import torch.nn as nn
-import torch.nn.init as init
+from torch import nn
+from torch.nn import init
 
 from ... import function as fn
 
 __all__ = ['GraphConv']
 
 class GraphConv(nn.Module):
-    """Apply graph convolution over an input signal.
+    r"""Apply graph convolution over an input signal.
 
     Graph convolution is introduced in `<https://arxiv.org/abs/1609.02907>`__
     and can be described as below:
 
     .. math::
-      h_i^{(l+1)} = b^{(l)} + \sum_{j\in\mathcal{N}(i)}\\frac{1}{c_{ij}}W^{(l)}h_j^{(l)}
+      h_i^{(l+1)} = b^{(l)} + \sum_{j\in\mathcal{N}(i)}\frac{1}{c_{ij}}W^{(l)}h_j^{(l)}
 
     where :math:`\mathcal{N}(i)` is the neighbor set of node :math:`i`. :math:`c_{ij}` is equal
     to the produce of the square root of node degrees:
@@ -76,13 +77,13 @@ class GraphConv(nn.Module):
             init.zeros_(self.bias)
 
     def forward(self, feat, graph):
-        """Compute graph convolution.
+        r"""Compute graph convolution.
 
         Notes
         -----
-            * Input shape: :math:`(N, *, \\text{in_feats})` where * means any number of additional
+            * Input shape: :math:`(N, *, \text{in_feats})` where * means any number of additional
               dimensions, :math:`N` is the number of nodes.
-            * Output shape: :math:`(N, *, \\text{in_feats})` where all but the last dimension are
+            * Output shape: :math:`(N, *, \text{in_feats})` where all but the last dimension are
               the same shape as the input.
 
         Parameters
