@@ -158,11 +158,19 @@ class HashTableChecker {
   }
 };
 
-ImmutableGraph::EdgeList::Ptr ImmutableGraph::EdgeList::FromEdges(std::vector<Edge> *edges, uint64_t num_nodes) {
-  const auto len = edges->size();
-  auto t = std::make_shared<EdgeList>(len, num_nodes);
-  for (size_t i = 0; i < len; i++)
-    t->register_edge(edges->at(i).edge_id, edges->at(i).end_points);
+ImmutableGraph::EdgeList::Ptr ImmutableGraph::EdgeList::FromCSR(std::vector<int64_t> *indptr, std::vector<dgl_id_t> *indices, std::vector<dgl_id_t> *edge_ids, int sort_on) {
+  CHECK(sort_on == 0 || sort_on == 1) << "we must sort on the first or the second vector";
+  const auto n = indptr->size() - 1;
+  const auto len = edge_ids->size();
+  auto t = std::make_shared<EdgeList>(len, n);
+  for (size_t i = 0; i < indptr->size() - 1; i++) {
+    for (int64_t j = indptr->at(i); j < indptr->at(i + 1); j++) {
+      dgl_id_t row = i, col = indices->at(j);
+      if (sort_on == 1)
+        std::swap(row, col);
+      t->register_edge(edge_ids->at(j), row, col);
+    }
+  }
   return t;
 }
 
@@ -280,7 +288,6 @@ ImmutableGraph::ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_id
   }
   in_csr_ = CSR::FromEdges(&edges, 1, num_nodes);
   out_csr_ = CSR::FromEdges(&edges, 0, num_nodes);
-  edge_list_ = EdgeList::FromEdges(&edges, num_nodes);
 }
 
 BoolArray ImmutableGraph::HasVertices(IdArray vids) const {
@@ -460,26 +467,18 @@ ImmutableGraph::EdgeArray ImmutableGraph::EdgeIds(IdArray src_ids, IdArray dst_i
 
 std::pair<dgl_id_t, dgl_id_t> ImmutableGraph::FindEdge(dgl_id_t eid) const {
   dgl_id_t row = 0, col = 0;
-  if (this->edge_list_) {
-    CHECK(eid < NumEdges()) << "Edge " << eid << " not exists";
-    row = this->edge_list_->src_points[eid];
-    col = this->edge_list_->dst_points[eid];
-    CHECK(row < NumVertices() && col < NumVertices()) << "Edge " << eid << " not exists";
-  } else if (this->out_csr_) {
-    auto out_csr = GetOutCSR();
-    auto ptr = std::find(out_csr->edge_ids.begin(), out_csr->edge_ids.end(), eid);
-    CHECK(eid == *ptr) << "Edge " << eid << " not exists";
-    const int64_t idx = ptr - out_csr->edge_ids.begin();
-    col = out_csr->indices[idx];
-    row = std::lower_bound(out_csr->indptr.begin(), out_csr->indptr.end(), idx) - out_csr->indptr.begin();
-  } else if (this->in_csr_) {
-    auto in_csr = GetInCSR();
-    auto ptr = std::find(in_csr->edge_ids.begin(), in_csr->edge_ids.end(), eid);
-    CHECK(eid == *ptr) << "Edge " << eid << " not exists";
-    const int64_t idx = ptr - in_csr->edge_ids.begin();
-    row = in_csr->indices[idx];
-    col = std::lower_bound(in_csr->indptr.begin(), in_csr->indptr.end(), idx) - in_csr->indptr.begin();
+  if (!edge_list_) {
+    if (out_csr_) {
+      edge_list_ = EdgeList::FromCSR(&out_csr_->indptr, &out_csr_->indices, &out_csr_->edge_ids, 0);
+    } else {
+      CHECK(in_csr_);
+      edge_list_ = EdgeList::FromCSR(&in_csr_->indptr, &in_csr_->indices, &in_csr_->edge_ids, 1);
+    }
   }
+  CHECK(eid < NumEdges()) << "Invalid edge id " << eid;
+  row = edge_list_->src_points[eid];
+  col = edge_list_->dst_points[eid];
+  CHECK(row < NumVertices() && col < NumVertices()) << "Invalid edge id " << eid;
   return std::pair<dgl_id_t, dgl_id_t>(row, col);
 }
 
@@ -559,8 +558,14 @@ Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
 }
 
 Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids) const {
-  LOG(FATAL) << "EdgeSubgraph isn't implemented in immutable graph";
-  return Subgraph();
+  Subgraph subg;
+  std::pair<CSR::Ptr, IdArray> ret;
+  if (out_csr_) {
+    // TODO
+  } else {
+    CHECK(in_csr_);
+  }
+  return subg;
 }
 
 ImmutableGraph::CSRArray ImmutableGraph::GetInCSRArray() const {

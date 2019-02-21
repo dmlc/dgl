@@ -40,18 +40,17 @@ class ImmutableGraph: public GraphInterface {
     std::vector<dgl_id_t> dst_points;
 
     EdgeList(int64_t len, const dgl_id_t &val) {
-      src_points.reserve(len);
-      dst_points.reserve(len);
-      std::fill(src_points.begin(), src_points.end(), val);
-      std::fill(dst_points.begin(), dst_points.end(), val);
+      src_points.resize(len, val);
+      dst_points.resize(len, val);
     }
 
-    void register_edge(dgl_id_t eid, dgl_id_t *end_points) {
-      src_points[eid] = end_points[0];
-      dst_points[eid] = end_points[1];
+    void register_edge(dgl_id_t eid, dgl_id_t src, dgl_id_t dst) {
+      CHECK(eid < src_points.size()) << "Invalid edge id " << eid << " (exceed the number of edges)";
+      src_points[eid] = src;
+      dst_points[eid] = dst;
     }
 
-    static EdgeList::Ptr FromEdges(std::vector<Edge> *edges, uint64_t num_nodes);
+    static EdgeList::Ptr FromCSR(std::vector<int64_t> *indptr, std::vector<dgl_id_t> *indices, std::vector<dgl_id_t> *edge_ids, int sort_on);
   };
 
   struct CSR {
@@ -541,8 +540,8 @@ class ImmutableGraph: public GraphInterface {
   CSR::Ptr in_csr_;
   // Store the out-edges.
   CSR::Ptr out_csr_;
-  // Store the edge list indexed by edge id.
-  EdgeList::Ptr edge_list_;
+  // Store the edge list indexed by edge id, mutable allows edge_list_ to be created in const function.
+  mutable EdgeList::Ptr edge_list_;
   /*!
    * \brief Whether if this is a multigraph.
    *
