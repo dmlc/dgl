@@ -372,7 +372,8 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
                         const float* probability,
                         const std::string &edge_type,
                         int num_hops,
-                        size_t num_neighbor) {
+                        size_t num_neighbor,
+                        const bool add_self_loop) {
   unsigned int time_seed = time(nullptr);
   size_t num_seeds = seed_arr->shape[0];
   auto orig_csr = edge_type == "in" ? graph->GetInCSR() : graph->GetOutCSR();
@@ -436,6 +437,10 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
                             &tmp_sampled_edge_list,
                             &time_seed);
       }
+      if (add_self_loop) {
+        tmp_sampled_src_list.push_back(dst_id);
+        tmp_sampled_edge_list.push_back(-1);
+      }
       CHECK_EQ(tmp_sampled_src_list.size(), tmp_sampled_edge_list.size());
       neigh_pos.emplace_back(dst_id, neighbor_list.size(), tmp_sampled_src_list.size());
       // Then push the vertices
@@ -470,13 +475,15 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
 
 NodeFlow SamplerOp::NeighborUniformSample(const ImmutableGraph *graph, IdArray seeds,
                                           const std::string &edge_type,
-                                          int num_hops, int expand_factor) {
+                                          int num_hops, int expand_factor,
+                                          const bool add_self_loop) {
   return SampleSubgraph(graph,
                         seeds,                 // seed vector
                         nullptr,               // sample_id_probability
                         edge_type,
                         num_hops + 1,
-                        expand_factor);
+                        expand_factor,
+                        add_self_loop);
 }
 
 }  // namespace dgl
