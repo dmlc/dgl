@@ -7,6 +7,7 @@
 #define DGL_IMMUTABLE_GRAPH_H_
 
 #include <vector>
+
 #include <string>
 #include <cstdint>
 #include <utility>
@@ -32,6 +33,26 @@ class ImmutableGraph: public GraphInterface {
     dgl_id_t edge_id;
   };
 
+  // Edge list indexed by edge id;
+  struct EdgeList {
+    typedef std::shared_ptr<EdgeList> Ptr;
+    std::vector<dgl_id_t> src_points;
+    std::vector<dgl_id_t> dst_points;
+
+    EdgeList(int64_t len) {
+      src_points.reserve(len);
+      dst_points.reserve(len);
+      std::fill(src_points.begin(), src_points.end(), -1);
+      std::fill(dst_points.begin(), dst_points.end(), -1);
+    }
+
+    void register_edge(eid, dgl_id_t *end_points) {
+      src_points[eid] = end_points[0];
+      dst_points[eid] = end_points[1];
+    }
+
+    static EdgeList::Ptr FromEdges(std::vector<Edge> *edges);
+  };
 
   struct CSR {
     typedef std::shared_ptr<CSR> Ptr;
@@ -520,14 +541,14 @@ class ImmutableGraph: public GraphInterface {
   CSR::Ptr in_csr_;
   // Store the out-edges.
   CSR::Ptr out_csr_;
+  // Store the edge list indexed by edge id.
+  EdgeList::Ptr edge_list_;
   /*!
    * \brief Whether if this is a multigraph.
    *
    * When a multiedge is added, this flag switches to true.
    */
   bool is_multigraph_ = false;
-  // Store the eid to (start, end) mapping.
-  std::shared_ptr<std::vector<dgl_id_t> > eid_start, eid_end;
 };
 
 }  // namespace dgl
