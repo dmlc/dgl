@@ -276,10 +276,6 @@ ImmutableGraph::ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_id
     e.end_points[0] = src_data[i];
     e.end_points[1] = dst_data[i];
     e.edge_id = edge_data[i];
-    if (store_map) {
-      this->eid_start->at(e.edge_id) = e.end_points[0];
-      this->eid_end->at(e.edge_id) = e.end_points[1];
-    }
     edges[i] = e;
   }
   in_csr_ = CSR::FromEdges(&edges, 1, num_nodes);

@@ -46,7 +46,7 @@ class ImmutableGraph: public GraphInterface {
       std::fill(dst_points.begin(), dst_points.end(), -1);
     }
 
-    void register_edge(eid, dgl_id_t *end_points) {
+    void register_edge(dgl_id_t eid, dgl_id_t *end_points) {
       src_points[eid] = end_points[0];
       dst_points[eid] = end_points[1];
     }
@@ -113,7 +113,7 @@ class ImmutableGraph: public GraphInterface {
 
   /*! \brief Construct an immutable graph from the COO format. */
   ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
-                 bool multigraph = false, bool store_map = false);
+                 bool multigraph = false);
 
   /*!
    * \brief Construct an immutable graph from the CSR format.
