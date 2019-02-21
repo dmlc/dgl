@@ -7,7 +7,6 @@
 #define DGL_IMMUTABLE_GRAPH_H_
 
 #include <vector>
-
 #include <string>
 #include <cstdint>
 #include <utility>

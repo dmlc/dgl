@@ -158,7 +158,9 @@ class HashTableChecker {
   }
 };
 
-ImmutableGraph::EdgeList::Ptr ImmutableGraph::EdgeList::FromCSR(std::vector<int64_t> *indptr, std::vector<dgl_id_t> *indices, std::vector<dgl_id_t> *edge_ids, int sort_on) {
+ImmutableGraph::EdgeList::Ptr ImmutableGraph::EdgeList::FromCSR(
+    std::vector<int64_t> *indptr, std::vector<dgl_id_t> *indices, std::vector<dgl_id_t> *edge_ids,
+    int sort_on) {
   CHECK(sort_on == 0 || sort_on == 1) << "we must sort on the first or the second vector";
   const auto n = indptr->size() - 1;
   const auto len = edge_ids->size();

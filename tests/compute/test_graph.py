@@ -191,10 +191,27 @@ def test_find_edges():
     e = g.find_edges([1, 3, 2, 4])
     assert e[0][0] == 1 and e[0][1] == 3 and e[0][2] == 2 and e[0][3] == 4
     assert e[1][0] == 2 and e[1][1] == 4 and e[1][2] == 3 and e[1][3] == 5
+
+    try:
+        g.find_edges([10])
+        fail = False
+    except DGLError:
+        fail = True
+    finally:
+        assert fail
+
     g.readonly()
     e = g.find_edges([1, 3, 2, 4])
     assert e[0][0] == 1 and e[0][1] == 3 and e[0][2] == 2 and e[0][3] == 4
     assert e[1][0] == 2 and e[1][1] == 4 and e[1][2] == 3 and e[1][3] == 5
+
+    try:
+        g.find_edges([10])
+        fail = False
+    except DGLError:
+        fail = True
+    finally:
+        assert fail
 
 if __name__ == '__main__':
     test_graph_creation()
