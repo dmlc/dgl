@@ -1,5 +1,5 @@
 """Torch modules for graph convolutions."""
-# pylint: disable= no-member, arguments-differ, missing-docstring
+# pylint: disable= no-member, arguments-differ
 import torch as th
 from torch import nn
 from torch.nn import init
@@ -72,6 +72,7 @@ class GraphConv(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Reset learnable parameters."""
         init.xavier_uniform_(self.weight)
         if self.bias is not None:
             init.zeros_(self.bias)
