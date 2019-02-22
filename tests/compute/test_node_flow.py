@@ -35,7 +35,7 @@ def test_self_loop():
     nf = create_mini_batch(g, num_hops, add_self_loop=True)
     for i in range(1, nf.num_layers):
         in_deg = nf.layer_in_degree(i)
-        deg = F.ones(in_deg.shape, dtype='int64') * n
+        deg = F.ones(in_deg.shape, dtype=F.int64) * n
         assert F.array_equal(in_deg, deg)
 
 
