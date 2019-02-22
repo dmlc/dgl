@@ -39,6 +39,10 @@ struct NodeFlow {
    * \brief The edge mapping from the NodeFlow graph to the parent graph.
    */
   IdArray edge_mapping;
+  /*!
+   * \brief
+   */
+  FloatArray probabilities;
 };
 
 class SamplerOp {
@@ -57,6 +61,10 @@ class SamplerOp {
   static NodeFlow NeighborUniformSample(const ImmutableGraph *graph, IdArray seeds,
                                         const std::string &edge_type,
                                         int num_hops, int expand_factor);
+
+  static NodeFlow LayerUniformSample(const ImmutableGraph *graph, IdArray seed_array,
+                                     const std::string &neigh_type,
+                                     const std::vector<size_t> &layer_sizes);
 
   /*!
    * \brief Batch-generate random walk traces

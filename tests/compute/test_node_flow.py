@@ -50,17 +50,21 @@ def check_basic(g, nf):
 def test_basic():
     num_layers = 2
     g = generate_rand_graph(100, connect_more=True)
+    print(0, 0)
     nf = create_full_node_flow(g, num_layers)
+    print(0, 1)
     assert nf.number_of_nodes() == g.number_of_nodes() * (num_layers + 1)
     assert nf.number_of_edges() == g.number_of_edges() * num_layers
     assert nf.num_layers == num_layers + 1
     assert nf.layer_size(0) == g.number_of_nodes()
     assert nf.layer_size(1) == g.number_of_nodes()
     check_basic(g, nf)
+    print(0, 2)
 
     parent_nids = F.arange(0, g.number_of_nodes())
     nids = dgl.graph_index.map_to_nodeflow_nid(nf._graph, 0,
                                                utils.toindex(parent_nids)).tousertensor()
+    print(0, 3)
     assert F.array_equal(nids, parent_nids)
 
     g = generate_rand_graph(100)
@@ -233,9 +237,15 @@ def test_copy():
 
 
 if __name__ == '__main__':
+    print(0)
     test_basic()
+    print(1)
     test_copy()
+    print(2)
     test_apply_nodes()
+    print(3)
     test_apply_edges()
+    print(4)
     test_flow_compute()
+    print(5)
     test_prop_flows()

@@ -18,6 +18,7 @@ typedef dgl::runtime::NDArray IdArray;
 typedef dgl::runtime::NDArray DegreeArray;
 typedef dgl::runtime::NDArray BoolArray;
 typedef dgl::runtime::NDArray IntArray;
+typedef dgl::runtime::NDArray FloatArray;
 
 struct Subgraph;
 struct NodeFlow;
