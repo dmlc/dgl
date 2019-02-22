@@ -13,6 +13,37 @@ from dgl.data import register_data_args, load_data
 from dgl.graph_index import map_to_nodeflow_nid
 
 
+class GraphSAGELayer(gluon.Block):
+    def __init__(self,
+                 in_feats,
+                 hidden,
+                 out_feats,
+                 dropout,
+                 last=False,
+                 **kwargs):
+        super(GraphSAGELayer, self).__init__(**kwargs)
+        self.last = last
+        self.dropout = dropout
+        with self.name_scope():
+            self.dense1 = gluon.nn.Dense(hidden, in_units=in_feats)
+            self.layer_norm1 = gluon.nn.LayerNorm(in_channels=hidden)
+            self.dense2 = gluon.nn.Dense(out_feats, in_units=hidden)
+            if not self.last:
+                self.layer_norm2 = gluon.nn.LayerNorm(in_channels=out_feats)
+
+    def forward(self, h):
+        h = self.dense1(h)
+        h = self.layer_norm1(h)
+        h = mx.nd.relu(h)
+        if self.dropout:
+            h = mx.nd.Dropout(h, p=self.dropout)
+        h = self.dense2(h)
+        if not self.last:
+            h = self.layer_norm2(h)
+            h = mx.nd.relu(h)
+        return h
+
+
 class NodeUpdate(gluon.Block):
     def __init__(self, layer_id, in_feats, out_feats, hidden, dropout,
                  test=False, last=False):
@@ -22,16 +53,14 @@ class NodeUpdate(gluon.Block):
         self.test = test
         self.last = last
         with self.name_scope():
-            self.dense1 = gluon.nn.Dense(hidden, in_units=in_feats)
-            self.layer_norm1 = gluon.nn.LayerNorm(in_channels=hidden)
-            self.dense2 = gluon.nn.Dense(out_feats, in_units=hidden)
-            if not self.last:
-                self.layer_norm2 = gluon.nn.LayerNorm(in_channels=out_feats)
+            self.layer = GraphSAGELayer(in_feats, hidden, out_feats, dropout, last)
 
     def forward(self, node):
         h = node.data['h']
         norm = node.data['norm']
+        # activation from previous layer of myself
         self_h = node.data['self_h']
+
         if self.test:
             h = (h - self_h) * norm
             # graphsage
@@ -39,7 +68,9 @@ class NodeUpdate(gluon.Block):
         else:
             agg_history_str = 'agg_h_{}'.format(self.layer_id-1)
             agg_history = node.data[agg_history_str]
+            # normalization constant
             subg_norm = node.data['subg_norm']
+            # delta_h (h - history) from previous layer of myself
             self_delta_h = node.data['self_delta_h']
             # control variate
             h = (h - self_delta_h) * subg_norm + agg_history * norm
@@ -48,20 +79,13 @@ class NodeUpdate(gluon.Block):
             if self.dropout:
                 h = mx.nd.Dropout(h, p=self.dropout)
 
-        h = self.dense1(h)
-        h = self.layer_norm1(h)
-        h = mx.nd.relu(h)
-        if self.dropout and not self.test:
-            h = mx.nd.Dropout(h, p=self.dropout)
-        h = self.dense2(h)
-        if not self.last:
-            h = self.layer_norm2(h)
-            h = mx.nd.relu(h)
+        h = self.layer(h)
+
         return {'activation': h}
 
 
 
-class GCNSampling(gluon.Block):
+class GraphSAGETrain(gluon.Block):
     def __init__(self,
                  in_feats,
                  n_hidden,
@@ -69,15 +93,12 @@ class GCNSampling(gluon.Block):
                  n_layers,
                  dropout,
                  **kwargs):
-        super(GCNSampling, self).__init__(**kwargs)
+        super(GraphSAGETrain, self).__init__(**kwargs)
         self.dropout = dropout
         with self.name_scope():
             self.layers = gluon.nn.Sequential()
             # input layer
-            self.dense1 = gluon.nn.Dense(n_hidden, in_units=2*in_feats)
-            self.layer_norm1 = gluon.nn.LayerNorm(in_channels=n_hidden)
-            self.dense2 = gluon.nn.Dense(n_hidden, in_units=n_hidden)
-            self.layer_norm2 = gluon.nn.LayerNorm(in_channels=n_hidden)
+            self.input_layer = GraphSAGELayer(2*in_feats, n_hidden, n_hidden, dropout)
             # hidden layers
             for i in range(1, n_layers):
                 self.layers.add(NodeUpdate(i, 2*n_hidden, n_hidden, n_hidden, dropout))
@@ -90,28 +111,25 @@ class GCNSampling(gluon.Block):
         h = mx.nd.concat(h, features)
         if self.dropout:
             h = mx.nd.Dropout(h, p=self.dropout)
-        h = self.dense1(h)
-        h = self.layer_norm1(h)
-        h = mx.nd.relu(h)
-        if self.dropout:
-            h = mx.nd.Dropout(h, p=self.dropout)
-        h = self.dense2(h)
-        h = self.layer_norm2(h)
-        h = mx.nd.relu(h)
+
+        h = self.input_layer(h)
 
         for i, layer in enumerate(self.layers):
             parent_nid = dgl.utils.toindex(nf.layer_parent_nid(i+1))
             layer_nid = map_to_nodeflow_nid(nf._graph, i, parent_nid).tousertensor()
             self_h = h[layer_nid]
+            # activation from previous layer of myself, used in graphSAGE
             nf.layers[i+1].data['self_h'] = self_h
 
             new_history = h.copy().detach()
             history_str = 'h_{}'.format(i)
             history = nf.layers[i].data[history_str]
-            h = h - history
-            nf.layers[i+1].data['self_delta_h'] = h[layer_nid]
+            # delta_h used in control variate
+            delta_h = h - history
+            # delta_h from previous layer of the nodes in (i+1)-th layer, used in control variate
+            nf.layers[i+1].data['self_delta_h'] = delta_h[layer_nid]
 
-            nf.layers[i].data['h'] = h
+            nf.layers[i].data['h'] = delta_h
             nf.block_compute(i,
                              fn.copy_src(src='h', out='m'),
                              fn.sum(msg='m', out='h'),
@@ -124,21 +142,18 @@ class GCNSampling(gluon.Block):
         return h
 
 
-class GCNInfer(gluon.Block):
+class GraphSAGEInfer(gluon.Block):
     def __init__(self,
                  in_feats,
                  n_hidden,
                  n_classes,
                  n_layers,
                  **kwargs):
-        super(GCNInfer, self).__init__(**kwargs)
+        super(GraphSAGEInfer, self).__init__(**kwargs)
         with self.name_scope():
             self.layers = gluon.nn.Sequential()
             # input layer
-            self.dense1 = gluon.nn.Dense(n_hidden, in_units=2*in_feats)
-            self.layer_norm1 = gluon.nn.LayerNorm(in_channels=n_hidden)
-            self.dense2 = gluon.nn.Dense(n_hidden, in_units=n_hidden)
-            self.layer_norm2 = gluon.nn.LayerNorm(in_channels=n_hidden)
+            self.input_layer = GraphSAGELayer(2*in_feats, n_hidden, n_hidden, 0)
             # hidden layers
             for i in range(1, n_layers):
                 self.layers.add(NodeUpdate(i, 2*n_hidden, n_hidden, n_hidden, 0, True))
@@ -150,17 +165,13 @@ class GCNInfer(gluon.Block):
         h = nf.layers[0].data['preprocess']
         features = nf.layers[0].data['features']
         h = mx.nd.concat(h, features)
-        h = self.dense1(h)
-        h = self.layer_norm1(h)
-        h = mx.nd.relu(h)
-        h = self.dense2(h)
-        h = self.layer_norm2(h)
-        h = mx.nd.relu(h)
+        h = self.input_layer(h)
 
         for i, layer in enumerate(self.layers):
             nf.layers[i].data['h'] = h
             parent_nid = dgl.utils.toindex(nf.layer_parent_nid(i+1))
             layer_nid = map_to_nodeflow_nid(nf._graph, i, parent_nid).tousertensor()
+            # activation from previous layer of the nodes in (i+1)-th layer, used in graphSAGE
             self_h = h[layer_nid]
             nf.layers[i+1].data['self_h'] = self_h
             nf.block_compute(i,
@@ -175,7 +186,11 @@ class GCNInfer(gluon.Block):
 def main(args):
     # load and preprocess dataset
     data = load_data(args)
-    ctx = mx.cpu()
+
+    if args.gpu >= 0:
+        ctx = mx.gpu(args.gpu)
+    else:
+        ctx = mx.cpu()
 
     if args.self_loop and not args.dataset.startswith('reddit'):
         data.graph.add_edges_from([(i,i) for i in range(len(data.graph))])
@@ -210,7 +225,6 @@ def main(args):
               n_val_samples,
               n_test_samples))
 
-    # create GCN model
     g = DGLGraph(data.graph, readonly=True)
 
     g.ndata['features'] = features
@@ -230,22 +244,22 @@ def main(args):
     for i in range(n_layers):
         g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
 
-    model = GCNSampling(in_feats,
-                        args.n_hidden,
-                        n_classes,
-                        n_layers,
-                        args.dropout,
-                        prefix='GCN')
+    model = GraphSAGETrain(in_feats,
+                           args.n_hidden,
+                           n_classes,
+                           n_layers,
+                           args.dropout,
+                           prefix='GraphSAGE')
 
     model.initialize(ctx=ctx)
 
     loss_fcn = gluon.loss.SoftmaxCELoss()
 
-    infer_model = GCNInfer(in_feats,
-                           args.n_hidden,
-                           n_classes,
-                           n_layers,
-                           prefix='GCN')
+    infer_model = GraphSAGEInfer(in_feats,
+                                 args.n_hidden,
+                                 n_classes,
+                                 n_layers,
+                                 prefix='GraphSAGE')
 
     infer_model.initialize(ctx=ctx)
 
@@ -320,7 +334,7 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='GCN')
+    parser = argparse.ArgumentParser(description='GraphSAGE with Control Variate')
     register_data_args(parser)
     parser.add_argument("--dropout", type=float, default=0.5,
             help="dropout probability")
@@ -337,9 +351,9 @@ if __name__ == '__main__':
     parser.add_argument("--num-neighbors", type=int, default=3,
             help="number of neighbors to be sampled")
     parser.add_argument("--n-hidden", type=int, default=16,
-            help="number of hidden gcn units")
+            help="number of hidden GraphSAGE units")
     parser.add_argument("--n-layers", type=int, default=1,
-            help="number of hidden gcn layers")
+            help="number of hidden GraphSAGE layers")
     parser.add_argument("--self-loop", action='store_true',
             help="graph self-loop (default=False)")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
