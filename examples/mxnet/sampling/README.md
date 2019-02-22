@@ -62,6 +62,6 @@ normalization per graph convolution layer.
 
 reddit: test accuracy 96.1% with `--num-neighbors 1` and `--batch-size 1000`, ~96.2% in [Control Variate](https://arxiv.org/abs/1710.10568) with `--num-neighbors 2` and `--batch-size 1000`
 ```
-DGLBACKEND=mxnet python gcn_cv_gs_reddit.py --batch-size 1000 --test-batch-size 500 --n-epochs 50 --dataset reddit --num-neighbors 1 --n-hidden 128 --dropout 0.2 --weight-decay 0
+DGLBACKEND=mxnet python graphsage_cv.py --batch-size 1000 --test-batch-size 500 --n-epochs 50 --dataset reddit --num-neighbors 1 --n-hidden 128 --dropout 0.2 --weight-decay 0
 ```
 
