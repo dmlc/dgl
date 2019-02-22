@@ -4,53 +4,43 @@ Paper: http://papers.nips.cc/paper/6703-inductive-representation-learning-on-lar
 Code: https://github.com/williamleif/graphsage-simple
 Simple reference implementation of GraphSAGE.
 """
-import argparse, time, math
+import argparse
+import time
+import abc
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
-
-
-def graphsage_msg(edge):
-    msg = edge.src['h']
-    return {'m': msg}
+import dgl.function as fn
 
 
 class Aggregator(nn.Module):
     def __init__(self, g, in_feats, out_feats, activation=None, bias=True):
         super(Aggregator, self).__init__()
         self.g = g
-        self.weight = nn.Parameter(torch.Tensor(in_feats, out_feats))  # (F,EF)
-        if bias:
-            self.bias = nn.Parameter(torch.Tensor(out_feats))  # (EF,1)
-        else:
-            self.bias = None
+        self.linear = nn.Linear(in_feats, out_feats, bias=bias)  # (F, EF) or (2F, EF)
         self.activation = activation
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        weight_stdv = 1. / math.sqrt(self.weight.size(1))
-        self.weight.data.uniform_(-weight_stdv, weight_stdv)
-        if self.bias is not None:
-            bias_stdv = 1. / math.sqrt(self.bias.size(0))
-            self.bias.data.uniform_(-bias_stdv, bias_stdv)
+        nn.init.xavier_uniform_(self.linear.weight, gain=nn.init.calculate_gain('relu'))
 
     def forward(self, node):
         nei = node.mailbox['m']  # (B, N, F)
         h = node.data['h']  # (B, F)
-        h = self.concat(h, nei, node)  # (B, F)
-        h = torch.mm(h, self.weight)  # (B, EF)
-        if self.bias is not None:
-            h = h + self.bias
+        h = self.concat(h, nei, node)  # (B, F) or (B, 2F)
+        h = self.linear(h)   # (B, EF)
         if self.activation:
             h = self.activation(h)
+        norm = torch.pow(h, 2)
+        norm = torch.sum(norm, 1, keepdim=True)
+        norm = torch.pow(norm, -0.5)
+        norm[torch.isinf(norm)] = 0
+        # h = h * norm
         return {'h': h}
 
+    @abc.abstractmethod
     def concat(self, h, nei, nodes):
-        print('no implementation !')
-        pass
+        raise NotImplementedError
 
 
 class MeanAggregator(Aggregator):
@@ -63,7 +53,7 @@ class MeanAggregator(Aggregator):
             degs = degs.cuda(h.device)
         concatenate = torch.cat((nei, h.unsqueeze(1)), 1)
         concatenate = torch.sum(concatenate, 1) / degs.unsqueeze(1)
-        return concatenate
+        return concatenate  # (B, F)
 
 
 class PoolingAggregator(Aggregator):
@@ -72,41 +62,24 @@ class PoolingAggregator(Aggregator):
         self.mlp = PoolingAggregator.MLP(in_feats, in_feats, F.relu, False, True)
 
     def concat(self, h, nei, nodes):
-        nei = self.mlp(nei)
-        concatenate = torch.cat((nei, h), 1)
+        nei = self.mlp(nei)  # (B, F)
+        concatenate = torch.cat((nei, h), 1)  # (B, 2F)
         return concatenate
 
     class MLP(nn.Module):
         def __init__(self, in_feats, out_feats, activation, dropout, bias):  # (F, F)
             super(PoolingAggregator.MLP, self).__init__()
-            self.weight = nn.Parameter(torch.Tensor(in_feats, out_feats))  # (F,EF)
-            if dropout:
-                self.dropout = nn.Dropout(p=dropout)
-            else:
-                self.dropout = 0.
-            if bias:
-                self.bias = nn.Parameter(torch.Tensor(out_feats))  # (EF)
-            else:
-                self.bias = None
+            self.linear = nn.Linear(in_feats, out_feats, bias=bias)  # (F, F)
+            self.dropout = nn.Dropout(p=dropout)
             self.activation = activation
-            self.reset_parameters()
+            nn.init.xavier_uniform_(self.linear.weight, gain=nn.init.calculate_gain('relu'))
 
-        def reset_parameters(self):
-            weight_stdv = 1. / math.sqrt(self.weight.size(1))
-            self.weight.data.uniform_(-weight_stdv, weight_stdv)
-            if self.bias is not None:
-                bias_stdv = 1. / math.sqrt(self.bias.size(0))
-                self.bias.data.uniform_(-bias_stdv, bias_stdv)
-
-        def forward(self, nei):  # (B, N, F)
-            if self.dropout:
-                nei = self.dropout(nei)
-            nei = torch.matmul(nei, self.weight)  # (B, N, EF)
-            if self.bias is not None:
-                nei = nei + self.bias
+        def forward(self, nei):
+            nei = self.dropout(nei)  # (B, N, F)
+            nei = self.linear(nei)
             if self.activation:
                 nei = self.activation(nei)
-            max_value = torch.max(nei, dim=1)[0]  # (B, EF)
+            max_value = torch.max(nei, dim=1)[0]  # (B, F)
             return max_value
 
 
@@ -122,20 +95,16 @@ class GraphSAGELayer(nn.Module):
                  ):
         super(GraphSAGELayer, self).__init__()
         self.g = g
-        if dropout:
-            self.dropout = nn.Dropout(p=dropout)
-        else:
-            self.dropout = 0.
+        self.dropout = nn.Dropout(p=dropout)
         if aggregator_type == "pooling":
             self.aggregator = PoolingAggregator(g, in_feats, out_feats, activation, bias)
         else:
             self.aggregator = MeanAggregator(g, in_feats, out_feats, activation, bias)
 
     def forward(self, h):
-        if self.dropout:
-            h = self.dropout(h)
+        h = self.dropout(h)
         self.g.ndata['h'] = h
-        self.g.update_all(graphsage_msg, self.aggregator)
+        self.g.update_all(fn.copy_src(src='h', out='m'), self.aggregator)
         h = self.g.ndata.pop('h')
         return h
 
@@ -215,17 +184,8 @@ def main(args):
     # graph preprocess and calculate normalization factor
     g = DGLGraph(data.graph)
     n_edges = g.number_of_edges()
-    # add self loop
-    # g.add_edges(g.nodes(), g.nodes())
-    # normalization
-    degs = g.in_degrees().float()
-    norm = torch.pow(degs, -0.5)
-    norm[torch.isinf(norm)] = 0
-    if cuda:
-        norm = norm.cuda()
-    g.ndata['norm'] = norm.unsqueeze(1)
 
-    # create GCN model
+    # create GraphSAGE model
     model = GraphSAGE(g,
                       in_feats,
                       args.n_hidden,
