@@ -57,8 +57,7 @@ DGLBACKEND=mxnet python gcn_cv_sc.py --dataset reddit-self-loop --num-neighbors 
 
 ### Control Variate & GraphSAGE-mean
 
-Following [Control Variate](https://arxiv.org/abs/1710.10568), we use the mean pooling architecture GraphSAGE-mean, two linear layers and layer
-normalization per graph convolution layer.
+Following [Control Variate](https://arxiv.org/abs/1710.10568), we use the mean pooling architecture GraphSAGE-mean, two linear layers and layer normalization per graph convolution layer.
 
 reddit: test accuracy 96.1% with `--num-neighbors 1` and `--batch-size 1000`, ~96.2% in [Control Variate](https://arxiv.org/abs/1710.10568) with `--num-neighbors 2` and `--batch-size 1000`
 ```
