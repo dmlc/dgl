@@ -12,7 +12,8 @@ Here is a summary of the model accuracy and training speed. Our testbed is Amazo
 
 | Model | Reported <br> Accuracy | DGL <br> Accuracy | Author's training speed (epoch time) | DGL speed (epoch time) | Improvement |
 | ----- | ----------------- | ------------ | ------------------------------------ | ---------------------- | ----------- |
-| [GCN](https://arxiv.org/abs/1609.02907)   | 81.5% | 81.0% | [0.0051s (TF)](https://github.com/tkipf/gcn) | 0.0042s | 1.17x |
+| [GCN](https://arxiv.org/abs/1609.02907)  | 81.5% | 81.0% | [0.0051s (TF)](https://github.com/tkipf/gcn) | 0.0042s | 1.17x |
+| [SGC](https://arxiv.org/abs/1902.07153) | 81.0% | 81.9% | n/a | 0.0008s | n/a |
 | [TreeLSTM](http://arxiv.org/abs/1503.00075) | 51.0% | 51.72% | [14.02s (DyNet)](https://github.com/clab/dynet/tree/master/examples/treelstm) | 3.18s | 4.3x |
 | [R-GCN <br> (classification)](https://arxiv.org/abs/1703.06103) | 73.23% | 73.53% | [0.2853s (Theano)](https://github.com/tkipf/relational-gcn) | 0.0273s | 10.4x |
 | [R-GCN <br> (link prediction)](https://arxiv.org/abs/1703.06103) | 0.158 | 0.151 | [2.204s (TF)](https://github.com/MichSchli/RelationPrediction) | 0.633s | 3.5x |
