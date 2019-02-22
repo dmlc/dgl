@@ -703,7 +703,7 @@ class NodeFlow(DGLBaseGraph):
                                inplace=inplace)
 
 
-def create_full_node_flow(g, num_layers):
+def create_full_node_flow(g, num_layers, add_self_loop=False):
     """Convert a full graph to NodeFlow to run a L-layer GNN model.
 
     Parameters
@@ -712,6 +712,9 @@ def create_full_node_flow(g, num_layers):
         a DGL graph
     num_layers : int
         The number of layers
+    add_self_loop : bool, default False
+        Whether to add self loop to the sampled NodeFlow.
+        If True, the edge IDs of the self loop edges are -1.
 
     Returns
     -------
@@ -719,5 +722,6 @@ def create_full_node_flow(g, num_layers):
         a NodeFlow with a specified number of layers.
     """
     seeds = [utils.toindex(F.arange(0, g.number_of_nodes()))]
-    nfi = g._graph.neighbor_sampling(seeds, g.number_of_nodes(), num_layers, 'in', None)
+    nfi = g._graph.neighbor_sampling(seeds, g.number_of_nodes(), num_layers,
+                                     'in', None, add_self_loop)
     return NodeFlow(g, nfi[0])

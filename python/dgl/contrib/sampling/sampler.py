@@ -243,6 +243,9 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
         The seed Ids are in the parent graph.
     prefetch : bool, default False
         Whether to prefetch the samples in the next batch.
+    add_self_loop : bool, default False
+        Whether to add self loop to the sampled NodeFlow.
+        If True, the edge IDs of the self loop edges are -1.
 
     Returns
     -------
