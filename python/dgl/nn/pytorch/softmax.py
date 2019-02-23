@@ -13,9 +13,9 @@ class EdgeSoftmax(nn.Module):
     For a node :math:`i`, edgesoftmax is an operation of computing
 
     .. math::
-      a_ij = \frac{\exp^{z_ij}}{\sum_{j\in\mathcal{N}(i)}\exp^{z_ij}}
+      a_{ij} = \frac{\exp(z_{ij})}{\sum_{j\in\mathcal{N}(i)}\exp(z_{ij})}
 
-    where :math:`z_ij` is a signal of edge :math:`j\rightarrow i`, also
+    where :math:`z_{ij}` is a signal of edge :math:`j\rightarrow i`, also
     called logits in the context of softmax. :math:`\mathcal{N}(i)` is
     the set of nodes that have an edge to :math:`i`.
 
@@ -26,14 +26,14 @@ class EdgeSoftmax(nn.Module):
     Parameters
     ----------
     logits_name : str
-        A field name such that g.edata[logits_name] gives the logits :math:`z_ij`'s,
+        A field name such that g.edata[logits_name] gives the logits :math:`z_{ij}`.
         based on which edgesoftmax will be computed.
     max_logits_name : str
         A field name such that g.ndata[max_logits_name] will store
         :math:`\max_{j\in\mathcal{N}(i)}z_{ij}`.
     normalizer_name : str
         A field name such that g.ndata[normalizer_name] will store
-        :math:`\sum_{j\in\mathcal{N}(i)}\exp^{z_{ij}}`
+        :math:`\sum_{j\in\mathcal{N}(i)}exp(z_{ij})`
     """
     def __init__(self,
                  logits_name,
@@ -58,9 +58,9 @@ class EdgeSoftmax(nn.Module):
         Returns
         -------
         Unnormalized scores : torch.Tensor
-            This part gives :math:`\exp^{z_{ij}'s`
+            This part gives :math:`\exp(z_{ij})`'s
         Normalizer : torch.Tensor
-            This part gives :math:`\sum_{j\in\mathcal{N}(i)}\exp^{z_{ij}}`
+            This part gives :math:`\sum_{j\in\mathcal{N}(i)}\exp(z_{ij})`
 
         Notes
         -----

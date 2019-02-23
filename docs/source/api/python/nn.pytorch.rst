@@ -16,4 +16,7 @@ dgl.nn.pytorch.softmax
 ----------------------
 
 .. automodule:: dgl.nn.pytorch.softmax
-    :members: forward
+
+.. autoclass:: dgl.nn.pytorch.softmax.EdgeSoftmax
+    :members:
+    :show-inheritance:
