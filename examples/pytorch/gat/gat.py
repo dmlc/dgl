@@ -10,6 +10,7 @@ Pytorch implementation: https://github.com/Diego999/pyGAT
 import torch
 import torch.nn as nn
 import dgl.function as fn
+from dgl.nn.pytorch import EdgeSoftmax
 
 class GraphAttention(nn.Module):
     def __init__(self,
@@ -39,6 +40,7 @@ class GraphAttention(nn.Module):
         nn.init.xavier_normal_(self.attn_l.data, gain=1.414)
         nn.init.xavier_normal_(self.attn_r.data, gain=1.414)
         self.leaky_relu = nn.LeakyReLU(alpha)
+        self.softmax = EdgeSoftmax('a', 'a_max', 'z')
         self.residual = residual
         if residual:
             if in_dim != out_dim:
@@ -79,14 +81,11 @@ class GraphAttention(nn.Module):
         return {'a' : a}
 
     def edge_softmax(self):
-        # compute the max
-        self.g.update_all(fn.copy_edge('a', 'a'), fn.max('a', 'a_max'))
-        # minus the max and exp
-        self.g.apply_edges(lambda edges : {'a' : torch.exp(edges.data['a'] - edges.dst['a_max'])})
-        # compute dropout
-        self.g.apply_edges(lambda edges : {'a_drop' : self.attn_drop(edges.data['a'])})
-        # compute normalizer
-        self.g.update_all(fn.copy_edge('a', 'a'), fn.sum('a', 'z'))
+        scores, normalizer = self.softmax(self.g.edata['a'], self.g)
+        # Save normalizer
+        self.g.ndata['z'] = normalizer
+        # Dropout attention scores and save them
+        self.g.edata['a_drop'] = self.attn_drop(scores)
 
 class GAT(nn.Module):
     def __init__(self,

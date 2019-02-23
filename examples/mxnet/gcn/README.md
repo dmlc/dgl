@@ -90,10 +90,10 @@ DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "cora" --n-e
 DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "pubmed" --n-epochs 200 --n-layers 0
 
 # Final accuracy 77.40% with 2-layer GCN
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_spmv.py --dataset "cora" --n-epochs 200 --n-layers 1
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_spmv.py --dataset "pubmed" --n-epochs 200 --n-layers 1
 
 # Final accuracy 36.20% with 10-layer GCN
-DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_spmv.py --dataset "cora" --n-epochs 200 --n-layers 9
+DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_spmv.py --dataset "pubmed" --n-epochs 200 --n-layers 9
 
 # Final accuracy 78.30% with 2-layer GCN with skip connection
 DGLBACKEND=mxnet python3 examples/mxnet/gcn/gcn_concat.py --dataset "pubmed" --n-epochs 200 --n-layers 2 --normalization 'sym' --self-loop

@@ -7,6 +7,13 @@ dgl.nn.pytorch.conv
 -------------------
 
 .. automodule:: dgl.nn.pytorch.conv
-    :members:
-    :undoc-members:
+
+.. autoclass:: dgl.nn.pytorch.conv.GraphConv
+    :members: weight, bias, forward, reset_parameters
     :show-inheritance:
+
+dgl.nn.pytorch.softmax
+----------------------
+
+.. automodule:: dgl.nn.pytorch.softmax
+    :members: forward

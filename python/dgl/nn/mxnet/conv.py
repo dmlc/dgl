@@ -1,15 +1,13 @@
-"""Torch modules for graph convolutions."""
+"""MXNet modules for graph convolutions."""
 # pylint: disable= no-member, arguments-differ
-import torch as th
-from torch import nn
-from torch.nn import init
-from torch.nn import functional as F
+import mxnet as mx
+from mxnet import gluon
 
 from ... import function as fn
 
 __all__ = ['GraphConv']
 
-class GraphConv(nn.Module):
+class GraphConv(gluon.Block):
     r"""Apply graph convolution over an input signal.
 
     Graph convolution is introduced in `GCN <https://arxiv.org/abs/1609.02907>`__
@@ -53,15 +51,15 @@ class GraphConv(nn.Module):
         If True, adds a learnable bias to the output. Default: ``True``.
     activation: callable activation function/layer or None, optional
         If not None, applies an activation function to the updated node features.
-        Default: ``torch.nn.functional.relu``.
+        Default: ``mxnet.nd.relu``.
     feat_name : str, optional
         The temporary feature name used to compute message passing. Default: ``"_gconv_feat"``.
 
     Attributes
     ----------
-    weight : torch.Tensor
+    weight : mxnet.gluon.parameter.Parameter
         The learnable weight tensor.
-    bias : torch.Tensor
+    bias : mxnet.gluon.parameter.Parameter
         The learnable bias tensor.
     """
     def __init__(self,
@@ -70,30 +68,27 @@ class GraphConv(nn.Module):
                  norm=True,
                  dropout=0.,
                  bias=False,
-                 activation=F.relu,
+                 activation=mx.nd.relu,
                  feat_name="_gconv_feat"):
         super(GraphConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm
-        self._dropout = nn.Dropout(p=dropout)
+        self._dropout = gluon.nn.Dropout(rate=dropout)
         self._feat_name = feat_name
         self._msg_name = "_gconv_msg"
+        self.bias = bias
 
-        self.weight = nn.Parameter(th.Tensor(in_feats, out_feats))
-        if bias:
-            self.bias = nn.Parameter(th.Tensor(out_feats))
-        else:
-            self.register_parameter('bias', None)
-        self.reset_parameters()
+        with self.name_scope():
+            self.weight = self.params.get('weight', shape=(in_feats, out_feats),
+                    init=mx.init.Xavier())
+            if bias:
+                self.bias = self.params.get('bias', shape=(out_feats,),
+                    init=mx.init.Zero())
+            else:
+                self.bias = None
 
         self._activation = activation
-
-    def reset_parameters(self):
-        """Reinitialize learnable parameters."""
-        init.xavier_uniform_(self.weight)
-        if self.bias is not None:
-            init.zeros_(self.bias)
 
     def forward(self, feat, graph):
         r"""Compute graph convolution.
@@ -107,27 +102,28 @@ class GraphConv(nn.Module):
 
         Parameters
         ----------
-        feat : torch.Tensor
+        feat : mxnet.NDArray
             The input feature
         graph : DGLGraph
             The graph.
 
         Returns
         -------
-        torch.Tensor
+        mxnet.NDArray
             The output feature
         """
         if self._norm:
-            norm = 1 / th.sqrt(graph.in_degrees().float())
-            shp = norm.shape + (1,) * (feat.dim() - 1)
-            norm = th.reshape(norm, shp)
+            degs = graph.in_degrees().astype('float32')
+            norm = mx.nd.power(degs, -0.5)
+            shp = norm.shape + (1,) * (feat.ndim - 1)
+            norm = norm.reshape(shp)
             feat = feat * norm
 
         feat = self._dropout(feat)
 
         if self._in_feats > self._out_feats:
             # mult W first to reduce the feature size for aggregation.
-            feat = th.matmul(feat, self.weight)
+            feat = mx.nd.dot(feat, self.weight.data(feat.context))
             graph.ndata[self._feat_name] = feat
             graph.update_all(fn.copy_src(src=self._feat_name, out=self._msg_name),
                              fn.sum(msg=self._msg_name, out=self._feat_name))
@@ -138,25 +134,23 @@ class GraphConv(nn.Module):
             graph.update_all(fn.copy_src(src=self._feat_name, out=self._msg_name),
                              fn.sum(msg=self._msg_name, out=self._feat_name))
             rst = graph.ndata.pop(self._feat_name)
-            rst = th.matmul(rst, self.weight)
+            rst = mx.nd.dot(rst, self.weight.data(feat.context))
 
         if self._norm:
             rst = rst * norm
 
         if self.bias is not None:
-            rst = rst + self.bias
+            rst = rst + self.bias.data(rst.context)
 
         if self._activation is not None:
             rst = self._activation(rst)
 
         return rst
 
-    def extra_repr(self):
-        """Set the extra representation of the module,
-        which will come into effect when printing the model.
-        """
-        s = 'in={_in_feats}, out={_out_feats}'
-        s += ', normalization={_norm}'
-        s += ', feat_name={_feat_name}, msg_name={_msg_name}'
-        s += ', activation={_activation}'
-        return s.format(**self.__dict__)
+    def __repr__(self):
+        s = 'GraphConv('
+        s += 'in={:d}, out={:d}, normalization={}, feat_name={}, msg_name={}, activation={}'.format(
+            self._in_feats, self._out_feats, self._norm, self._feat_name, self._msg_name, self._activation)
+        s += '\n\t(_dropout): {}'.format(self._dropout)
+        s += '\n)'
+        return s

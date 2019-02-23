@@ -2,6 +2,7 @@ import torch as th
 import networkx as nx
 import dgl
 import dgl.nn.pytorch as nn
+from copy import deepcopy
 
 def _AXWb(A, X, W, b):
     X = th.matmul(X, W)
@@ -12,7 +13,7 @@ def test_graph_conv():
     g = dgl.DGLGraph(nx.path_graph(3))
     adj = g.adjacency_matrix()
 
-    conv = nn.GraphConv(5, 2, norm=False)
+    conv = nn.GraphConv(5, 2, norm=False, bias=True, activation=None)
     # test#1: basic
     h0 = th.ones((3, 5))
     h1 = conv(h0, g)
@@ -22,14 +23,6 @@ def test_graph_conv():
     h1 = conv(h0, g)
     assert th.allclose(h1, _AXWb(adj, h0, conv.weight, conv.bias))
 
-    conv = nn.GraphConv(5, 2, bias=False)
-    # test#3: basic
-    h0 = th.ones((3, 5))
-    h1 = conv(h0, g)
-    # test#4: basic
-    h0 = th.ones((3, 5, 5))
-    h1 = conv(h0, g)
-
     conv = nn.GraphConv(5, 2)
     # test#3: basic
     h0 = th.ones((3, 5))
@@ -38,5 +31,43 @@ def test_graph_conv():
     h0 = th.ones((3, 5, 5))
     h1 = conv(h0, g)
 
+    conv = nn.GraphConv(5, 2, dropout=0.5)
+    # test#3: basic
+    h0 = th.ones((3, 5))
+    h1 = conv(h0, g)
+    # test#4: basic
+    h0 = th.ones((3, 5, 5))
+    h1 = conv(h0, g)
+
+    # test rest_parameters
+    old_weight = deepcopy(conv.weight.data)
+    conv.reset_parameters()
+    new_weight = conv.weight.data
+    assert not th.allclose(old_weight, new_weight)
+
+def uniform_attention(g, shape):
+    a = th.ones(shape)
+    target_shape = (g.number_of_edges(),) + (1,) * (len(shape) - 1)
+    return a / g.in_degrees(g.edges()[1]).view(target_shape).float()
+
+def test_edge_softmax():
+    edge_softmax = nn.EdgeSoftmax('a', 'max_a', 'sum_a')
+
+    g = dgl.DGLGraph(nx.path_graph(3))
+    edata = th.ones(g.number_of_edges(), 1)
+    unnormalized, normalizer = edge_softmax(edata, g)
+    g.edata['a'] = unnormalized
+    g.ndata['a_sum'] = normalizer
+    g.apply_edges(lambda edges : {'a': edges.data['a'] / edges.dst['a_sum']})
+    assert th.allclose(g.edata['a'], uniform_attention(g, unnormalized.shape))
+
+    edata = th.ones(g.number_of_edges(), 3, 1)
+    unnormalized, normalizer = edge_softmax(edata, g)
+    g.edata['a'] = unnormalized
+    g.ndata['a_sum'] = normalizer
+    g.apply_edges(lambda edges : {'a': edges.data['a'] / edges.dst['a_sum']})
+    assert th.allclose(g.edata['a'], uniform_attention(g, unnormalized.shape))
+
 if __name__ == '__main__':
     test_graph_conv()
+    test_edge_softmax()
