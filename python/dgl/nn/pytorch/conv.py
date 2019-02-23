@@ -120,7 +120,7 @@ class GraphConv(nn.Module):
         if self._norm:
             norm = 1 / th.sqrt(graph.in_degrees().float())
             shp = norm.shape + (1,) * (feat.dim() - 1)
-            norm = th.reshape(norm, shp)
+            norm = th.reshape(norm, shp).to(feat.device)
             feat = feat * norm
 
         feat = self._dropout(feat)
