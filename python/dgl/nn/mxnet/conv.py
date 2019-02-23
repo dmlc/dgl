@@ -116,7 +116,7 @@ class GraphConv(gluon.Block):
             degs = graph.in_degrees().astype('float32')
             norm = mx.nd.power(degs, -0.5)
             shp = norm.shape + (1,) * (feat.ndim - 1)
-            norm = norm.reshape(shp)
+            norm = norm.reshape(shp).to(feat.device)
             feat = feat * norm
 
         feat = self._dropout(feat)
