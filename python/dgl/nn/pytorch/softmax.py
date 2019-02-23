@@ -1,5 +1,7 @@
+"""Torch modules for graph related softmax."""
+# pylint: disable= no-member, arguments-differ
 import torch as th
-import torch.nn as nn
+from torch import nn
 
 from ... import function as fn
 
@@ -14,9 +16,9 @@ class EdgeSoftmax(nn.Module):
       a_ij = \frac{\exp^{z_ij}}{\sum_{j\in\mathcal{N}(i)}\exp^{z_ij}}
 
     where :math:`z_ij` is a signal of edge :math:`j\rightarrow i`, also
-    called logits in the context of softmax. :math:`\mathcal{N}(i)` is 
+    called logits in the context of softmax. :math:`\mathcal{N}(i)` is
     the set of nodes that have an edge to :math:`i`.
-    
+
     An example of using edgesoftmax is in
     `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__ where
     the attention weights are computed with such an edgesoftmax operation.
@@ -89,14 +91,14 @@ class EdgeSoftmax(nn.Module):
         graph.update_all(fn.copy_edge(self._logits_name, self._logits_name),
                          fn.max(self._logits_name, self._max_logits_name))
         # minus the max and exp
-        graph.apply_edges(lambda edges : {self._logits_name : th.exp(edges.data[self._logits_name] -
-                                                                     edges.dst[self._max_logits_name])})
+        graph.apply_edges(
+            lambda edges: {self._logits_name : th.exp(edges.data[self._logits_name] -
+                                                      edges.dst[self._max_logits_name])})
         # compute normalizer
         graph.update_all(fn.copy_edge(self._logits_name, self._logits_name),
                          fn.sum(self._logits_name, self._normalizer_name))
         return graph.edata.pop(self._logits_name), graph.ndata.pop(self._normalizer_name)
 
     def __repr__(self):
-        s = 'EdgeSoftmax(logits_name={}, max_logits_name={}, normalizer_name={})'.format(
+        return 'EdgeSoftmax(logits_name={}, max_logits_name={}, normalizer_name={})'.format(
             self._logits_name, self._max_logits_name, self._normalizer_name)
-        return s

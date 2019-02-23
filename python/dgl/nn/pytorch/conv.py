@@ -155,8 +155,8 @@ class GraphConv(nn.Module):
         """Set the extra representation of the module,
         which will come into effect when printing the model.
         """
-        s = 'in={_in_feats}, out={_out_feats}'
-        s += ', normalization={_norm}'
-        s += ', feat_name={_feat_name}, msg_name={_msg_name}'
-        s += ', activation={_activation}'
-        return s.format(**self.__dict__)
+        summary = 'in={_in_feats}, out={_out_feats}'
+        summary += ', normalization={_norm}'
+        summary += ', feat_name={_feat_name}, msg_name={_msg_name}'
+        summary += ', activation={_activation}'
+        return summary.format(**self.__dict__)

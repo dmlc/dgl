@@ -81,10 +81,10 @@ class GraphConv(gluon.Block):
 
         with self.name_scope():
             self.weight = self.params.get('weight', shape=(in_feats, out_feats),
-                    init=mx.init.Xavier())
+                                          init=mx.init.Xavier())
             if bias:
                 self.bias = self.params.get('bias', shape=(out_feats,),
-                    init=mx.init.Zero())
+                                            init=mx.init.Zero())
             else:
                 self.bias = None
 
@@ -148,9 +148,11 @@ class GraphConv(gluon.Block):
         return rst
 
     def __repr__(self):
-        s = 'GraphConv('
-        s += 'in={:d}, out={:d}, normalization={}, feat_name={}, msg_name={}, activation={}'.format(
-            self._in_feats, self._out_feats, self._norm, self._feat_name, self._msg_name, self._activation)
-        s += '\n\t(_dropout): {}'.format(self._dropout)
-        s += '\n)'
-        return s
+        summary = 'GraphConv('
+        summary += 'in={:d}, out={:d}, normalization={}, feat_name={}, ' \
+                   'msg_name={}, activation={}'.format(
+            self._in_feats, self._out_feats, self._norm,
+            self._feat_name, self._msg_name, self._activation)
+        summary += '\n\t(_dropout): {}'.format(self._dropout)
+        summary += '\n)'
+        return summary
