@@ -14,6 +14,7 @@ def test_graph_conv():
     adj = g.adjacency_matrix()
 
     conv = nn.GraphConv(5, 2, norm=False, bias=True)
+    print(conv)
     # test#1: basic
     h0 = th.ones((3, 5))
     h1 = conv(h0, g)
@@ -52,6 +53,7 @@ def uniform_attention(g, shape):
 
 def test_edge_softmax():
     edge_softmax = nn.EdgeSoftmax()
+    print(edge_softmax)
 
     # Basic
     g = dgl.DGLGraph(nx.path_graph(3))

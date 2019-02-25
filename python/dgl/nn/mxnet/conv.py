@@ -4,8 +4,9 @@ import mxnet as mx
 from mxnet import gluon
 
 from ... import function as fn
+from ...utils import get_ndata_name
 
-__all__ = ['GraphConv']
+__all__ = ['GraphConv', 'GCNSPMV']
 
 class GraphConv(gluon.Block):
     r"""Apply graph convolution over an input signal.
@@ -49,8 +50,6 @@ class GraphConv(gluon.Block):
     activation: callable activation function/layer or None, optional
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
-    feat_name : str, optional
-        The temporary feature name used to compute message passing. Default: ``"_gconv_feat"``.
 
     Attributes
     ----------
@@ -63,16 +62,14 @@ class GraphConv(gluon.Block):
                  in_feats,
                  out_feats,
                  norm=True,
-                 bias=False,
-                 activation=None,
-                 feat_name="_gconv_feat"):
+                 bias=True,
+                 activation=None):
         super(GraphConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm
-        self._feat_name = feat_name
+        self._feat_name = "_gconv_feat"
         self._msg_name = "_gconv_msg"
-        self.bias = bias
 
         with self.name_scope():
             self.weight = self.params.get('weight', shape=(in_feats, out_feats),
@@ -84,17 +81,6 @@ class GraphConv(gluon.Block):
                 self.bias = None
 
         self._activation = activation
-
-    def check_repeated_features(self, g):
-        r"""Rename taken field names.
-
-        Parameters
-        ----------
-        graph : DGLGraph
-            The graph.
-        """
-        while self._feat_name in g.ndata:
-            self._feat_name += '0'
 
     def forward(self, feat, graph):
         r"""Compute graph convolution.
@@ -118,7 +104,7 @@ class GraphConv(gluon.Block):
         mxnet.NDArray
             The output feature
         """
-        self.check_repeated_features(graph)
+        self._feat_name = get_ndata_name(graph, self._feat_name)
 
         if self._norm:
             degs = graph.in_degrees().astype('float32')
@@ -155,9 +141,77 @@ class GraphConv(gluon.Block):
 
     def __repr__(self):
         summary = 'GraphConv('
-        summary += 'in={:d}, out={:d}, normalization={}, feat_name={}, ' \
-                   'msg_name={}, activation={}'.format(self._in_feats, self._out_feats,
-                                                       self._norm, self._feat_name,
-                                                       self._msg_name, self._activation)
+        summary += 'in={:d}, out={:d}, normalization={}, activation={}'.format(
+                self._in_feats, self._out_feats,
+                self._norm, self._activation)
         summary += '\n)'
         return summary
+
+
+import math
+class GCNLayer(gluon.Block):
+    def __init__(self,
+                 g,
+                 in_feats,
+                 out_feats,
+                 activation,
+                 dropout,
+                 bias=True):
+        super(GCNLayer, self).__init__()
+        self.g = g
+        with self.name_scope():
+            stdv = 1. / math.sqrt(out_feats)
+            self.weight = self.params.get('weight', shape=(in_feats, out_feats),
+                    init=mx.init.Uniform(stdv))
+            if bias:
+                self.bias = self.params.get('bias', shape=(out_feats,),
+                    init=mx.init.Uniform(stdv))
+            else:
+                self.bias = None
+        self.activation = activation
+        self.dropout = dropout
+
+    def forward(self, h):
+        if self.dropout:
+            h = mx.nd.Dropout(h, p=self.dropout)
+        h = mx.nd.dot(h, self.weight.data(h.context))
+        # normalization by square root of src degree
+        h = h * self.g.ndata['norm']
+        self.g.ndata['h'] = h
+        self.g.update_all(fn.copy_src(src='h', out='m'),
+                          fn.sum(msg='m', out='h'))
+        h = self.g.ndata.pop('h')
+        # normalization by square root of dst degree
+        h = h * self.g.ndata['norm']
+        # bias
+        if self.bias is not None:
+            h = h + self.bias.data(h.context)
+        if self.activation:
+            h = self.activation(h)
+        return h
+
+class GCNSPMV(gluon.Block):
+    def __init__(self,
+                 g,
+                 in_feats,
+                 n_hidden,
+                 n_classes,
+                 n_layers,
+                 activation,
+                 dropout):
+        super(GCNSPMV, self).__init__()
+        self.layers = gluon.nn.Sequential()
+        # input layer
+        self.layers.add(GCNLayer(g, in_feats, n_hidden, activation, 0.))
+        # hidden layers
+        for i in range(n_layers - 1):
+            self.layers.add(GCNLayer(g, n_hidden, n_hidden, activation, dropout))
+        # output layer
+        self.layers.add(GCNLayer(g, n_hidden, n_classes, None, dropout))
+
+
+    def forward(self, features):
+        h = features
+        for layer in self.layers:
+            h = layer(h)
+        return h

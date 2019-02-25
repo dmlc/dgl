@@ -63,7 +63,7 @@ class GraphConv(nn.Module):
                  in_feats,
                  out_feats,
                  norm=True,
-                 bias=False,
+                 bias=True,
                  activation=None):
         super(GraphConv, self).__init__()
         self._in_feats = in_feats
@@ -112,7 +112,7 @@ class GraphConv(nn.Module):
         self._feat_name = get_ndata_name(graph, self._feat_name)
 
         if self._norm:
-            norm = 1 / th.sqrt(graph.in_degrees().float())
+            norm = th.pow(graph.in_degrees().float(), -0.5)
             shp = norm.shape + (1,) * (feat.dim() - 1)
             norm = th.reshape(norm, shp).to(feat.device)
             feat = feat * norm
