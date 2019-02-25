@@ -239,7 +239,7 @@ std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::EdgeSubgraph(
   for (int64_t i = 0; i < len; i++) {
     dgl_id_t src_id = oldv2newv.find(edge_list->src_points[eid_data[i]])->second;
     dgl_id_t dst_id = oldv2newv.find(edge_list->dst_points[eid_data[i]])->second;
-    edges.push_back(Edge{src_id, dst_id, i});
+    edges.push_back(Edge{src_id, dst_id, static_cast<dgl_id_t>(i)});
   }
 
   auto sub_csr = CSR::FromEdges(&edges, 0, n);
