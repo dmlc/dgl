@@ -3,7 +3,6 @@
 import torch as th
 from torch import nn
 from torch.nn import init
-from torch.nn import functional as F
 
 from ... import function as fn
 

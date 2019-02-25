@@ -1,6 +1,3 @@
-import os
-os.environ['DGLBACKEND'] = 'mxnet'
-
 """
 Semi-Supervised Classification with Graph Convolutional Networks
 Paper: https://arxiv.org/abs/1609.02907
