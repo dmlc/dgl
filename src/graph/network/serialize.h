@@ -23,11 +23,11 @@ namespace network {
  * \return the total size of the serialized binary data
  */
 int64_t SerializeSampledSubgraph(char* &data,
-	                             const ImmutableGraph::CSR::Ptr csr,
-	                             const IdArray& node_mapping,
-	                             const IdArray& edge_mapping,
-	                             const IdArray& layer_offsets,
-	                             const IdArray& flow_offsets);
+                                 const ImmutableGraph::CSR::Ptr csr,
+                                 const IdArray& node_mapping,
+                                 const IdArray& edge_mapping,
+                                 const IdArray& layer_offsets,
+                                 const IdArray& flow_offsets);
 
 /*!
  * \brief Deserialize sampled subgraph from binary data

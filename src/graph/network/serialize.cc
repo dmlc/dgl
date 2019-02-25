@@ -5,9 +5,10 @@
  */
 #include "serialize.h"
 
-#include <cstring>
 #include <dmlc/logging.h>
 #include <dgl/immutable_graph.h>
+
+#include <cstring>
 
 namespace dgl {
 namespace network {

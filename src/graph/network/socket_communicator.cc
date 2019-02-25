@@ -135,7 +135,7 @@ void SocketCommunicator::FinalizeSender() {
     while (sent_bytes < sizeof(int)) {
       int max_len = sizeof(int) - sent_bytes;
       int tmp = socket_[0]->Send(
-        reinterpret_cast<char*>(&size)+sent_bytes, 
+        reinterpret_cast<char*>(&size)+sent_bytes,
         max_len);
       sent_bytes += tmp;
     }
@@ -169,7 +169,7 @@ int SocketCommunicator::Send(char* src, int size) {
   while (sent_bytes < sizeof(int)) {
     int max_len = sizeof(int) - sent_bytes;
     int tmp = client->Send(
-      reinterpret_cast<char*>(&size)+sent_bytes, 
+      reinterpret_cast<char*>(&size)+sent_bytes,
       max_len);
     sent_bytes += tmp;
   }

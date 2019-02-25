@@ -8,12 +8,12 @@
 
 #include "communicator.h"
 
-#include "msg_queue.h"
-#include "tcp_socket.h"
-
+#include <thread>
 #include <vector>
 #include <string>
-#include <thread>
+
+#include "msg_queue.h"
+#include "tcp_socket.h"
 
 namespace dgl {
 namespace network {
