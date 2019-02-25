@@ -13,7 +13,7 @@ def test_graph_conv():
     g = dgl.DGLGraph(nx.path_graph(3))
     adj = g.adjacency_matrix()
 
-    conv = nn.GraphConv(5, 2, norm=False, bias=True, activation=None)
+    conv = nn.GraphConv(5, 2, norm=False, bias=True)
     # test#1: basic
     h0 = th.ones((3, 5))
     h1 = conv(h0, g)
@@ -31,7 +31,7 @@ def test_graph_conv():
     h0 = th.ones((3, 5, 5))
     h1 = conv(h0, g)
 
-    conv = nn.GraphConv(5, 2, dropout=0.5)
+    conv = nn.GraphConv(5, 2)
     # test#3: basic
     h0 = th.ones((3, 5))
     h1 = conv(h0, g)

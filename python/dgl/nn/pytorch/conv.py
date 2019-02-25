@@ -46,14 +46,11 @@ class GraphConv(nn.Module):
         Number of output features.
     norm : bool, optional
         If True, the normalizer :math:`c_{ij}` is applied. Default: ``True``.
-    dropout: float, optional
-        The probability of setting an element in node feature to be zero before performing
-        graph convolution during training. When it is 0, no dropout is performed. Default: ``0``.
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
     activation: callable activation function/layer or None, optional
         If not None, applies an activation function to the updated node features.
-        Default: ``torch.nn.functional.relu``.
+        Default: ``None``.
     feat_name : str, optional
         The temporary feature name used to compute message passing. Default: ``"_gconv_feat"``.
 
@@ -68,15 +65,13 @@ class GraphConv(nn.Module):
                  in_feats,
                  out_feats,
                  norm=True,
-                 dropout=0.,
                  bias=False,
-                 activation=F.relu,
+                 activation=None,
                  feat_name="_gconv_feat"):
         super(GraphConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm
-        self._dropout = nn.Dropout(p=dropout)
         self._feat_name = feat_name
         self._msg_name = "_gconv_msg"
 
@@ -135,8 +130,6 @@ class GraphConv(nn.Module):
             shp = norm.shape + (1,) * (feat.dim() - 1)
             norm = th.reshape(norm, shp).to(feat.device)
             feat = feat * norm
-
-        feat = self._dropout(feat)
 
         if self._in_feats > self._out_feats:
             # mult W first to reduce the feature size for aggregation.

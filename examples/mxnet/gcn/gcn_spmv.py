@@ -1,3 +1,6 @@
+import os
+os.environ['DGLBACKEND'] = 'mxnet'
+
 """
 Semi-Supervised Classification with Graph Convolutional Networks
 Paper: https://arxiv.org/abs/1609.02907
@@ -14,6 +17,20 @@ from dgl import DGLGraph
 from dgl.nn.mxnet import GraphConv
 from dgl.data import register_data_args, load_data
 
+class GCNLayer(gluon.Block):
+    def __init__(self,
+                 in_feats,
+                 out_feats,
+                 activation,
+                 dropout=0.):
+        super(GCNLayer, self).__init__()
+        self.graph_conv = GraphConv(in_feats=in_feats, out_feats=out_feats, activation=activation)
+        self.dropout = gluon.nn.Dropout(rate=dropout)
+
+    def forward(self, h, g):
+        if self.dropout:
+            h = self.dropout(h)
+        return self.graph_conv(h, g)
 
 class GCN(gluon.Block):
     def __init__(self,
@@ -28,12 +45,12 @@ class GCN(gluon.Block):
         self.g = g
         self.layers = gluon.nn.Sequential()
         # input layer
-        self.layers.add(GraphConv(in_feats, n_hidden, bias=True, activation=activation))
+        self.layers.add(GCNLayer(in_feats, n_hidden, activation=activation))
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.add(GraphConv(n_hidden, n_hidden, dropout=dropout, bias=True, activation=activation))
+            self.layers.add(GCNLayer(n_hidden, n_hidden, activation=activation, dropout=dropout))
         # output layer
-        self.layers.add(GraphConv(n_hidden, n_classes, dropout=dropout, bias=True, activation=None))
+        self.layers.add(GCNLayer(n_hidden, n_classes, activation=None, dropout=dropout))
 
     def forward(self, features):
         h = features

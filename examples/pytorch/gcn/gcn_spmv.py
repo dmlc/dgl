@@ -14,6 +14,23 @@ import torch.nn.functional as F
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 
+class GCNLayer(nn.Module):
+    def __init__(self,
+                 in_feats,
+                 out_feats,
+                 activation,
+                 dropout=0.):
+        super(GCNLayer, self).__init__()
+        self.graph_conv = GraphConv(in_feats=in_feats, out_feats=out_feats, activation=activation)
+        if dropout:
+            self.dropout = nn.Dropout(p=dropout)
+        else:
+            self.dropout = 0.
+
+    def forward(self, h, g):
+        if self.dropout:
+            h = self.dropout(h)
+        return self.graph_conv(h, g)
 
 class GCN(nn.Module):
     def __init__(self,
@@ -28,14 +45,14 @@ class GCN(nn.Module):
         self.g = g
         self.layers = nn.ModuleList()
         # input layer
-        self.layers.append(GraphConv(in_feats=in_feats, out_feats=n_hidden, activation=activation))
+        self.layers.append(GCNLayer(in_feats=in_feats, out_feats=n_hidden, activation=activation))
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.append(GraphConv(in_feats=n_hidden, out_feats=n_hidden,
-                                         dropout=dropout, activation=activation))
+            self.layers.append(GCNLayer(in_feats=n_hidden, out_feats=n_hidden,
+                                        activation=activation, dropout=dropout))
         # output layer
-        self.layers.append(GraphConv(in_feats=n_hidden, out_feats=n_classes,
-                                     dropout=dropout, activation=None))
+        self.layers.append(GCNLayer(in_feats=n_hidden, out_feats=n_classes,
+                                    activation=None, dropout=dropout))
 
     def forward(self, features):
         h = features

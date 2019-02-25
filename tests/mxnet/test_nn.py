@@ -19,7 +19,7 @@ def test_graph_conv():
     adj = g.adjacency_matrix()
     ctx = mx.cpu(0)
 
-    conv = nn.GraphConv(5, 2, norm=False, bias=True, activation=None)
+    conv = nn.GraphConv(5, 2, norm=False, bias=True)
     conv.initialize(ctx=ctx)
     # test#1: basic
     h0 = mx.nd.ones((3, 5))
@@ -40,7 +40,7 @@ def test_graph_conv():
     h0 = mx.nd.ones((3, 5, 5))
     h1 = conv(h0, g)
 
-    conv = nn.GraphConv(5, 2, dropout=0.5)
+    conv = nn.GraphConv(5, 2)
     conv.initialize(ctx=ctx)
 
     with autograd.train_mode():

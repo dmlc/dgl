@@ -44,14 +44,11 @@ class GraphConv(gluon.Block):
         Number of output features.
     norm : bool, optional
         If True, the normalizer :math:`c_{ij}` is applied. Default: ``True``.
-    dropout: float, optional
-        The probability of setting an element in node feature to be zero before performing
-        graph convolution during training. When it is 0, no dropout is performed. Default: ``0``.
     bias : bool, optional
         If True, adds a learnable bias to the output. Default: ``True``.
     activation: callable activation function/layer or None, optional
         If not None, applies an activation function to the updated node features.
-        Default: ``mxnet.nd.relu``.
+        Default: ``None``.
     feat_name : str, optional
         The temporary feature name used to compute message passing. Default: ``"_gconv_feat"``.
 
@@ -66,15 +63,13 @@ class GraphConv(gluon.Block):
                  in_feats,
                  out_feats,
                  norm=True,
-                 dropout=0.,
                  bias=False,
-                 activation=mx.nd.relu,
+                 activation=None,
                  feat_name="_gconv_feat"):
         super(GraphConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm
-        self._dropout = gluon.nn.Dropout(rate=dropout)
         self._feat_name = feat_name
         self._msg_name = "_gconv_msg"
         self.bias = bias
@@ -132,8 +127,6 @@ class GraphConv(gluon.Block):
             norm = norm.reshape(shp).as_in_context(feat.context)
             feat = feat * norm
 
-        feat = self._dropout(feat)
-
         if self._in_feats > self._out_feats:
             # mult W first to reduce the feature size for aggregation.
             feat = mx.nd.dot(feat, self.weight.data(feat.context))
@@ -166,6 +159,5 @@ class GraphConv(gluon.Block):
                    'msg_name={}, activation={}'.format(self._in_feats, self._out_feats,
                                                        self._norm, self._feat_name,
                                                        self._msg_name, self._activation)
-        summary += '\n\t(_dropout): {}'.format(self._dropout)
         summary += '\n)'
         return summary
