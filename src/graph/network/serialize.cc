@@ -15,7 +15,7 @@ namespace network {
 
 const int kNumTensor = 7;  // We need to serialize 7 conponents (tensor) here
 
-int64_t SerializeSampledSubgraph(char* &data,
+int64_t SerializeSampledSubgraph(char** data,
                                const ImmutableGraph::CSR::Ptr csr,
                                const IdArray& node_mapping,
                                const IdArray& edge_mapping,
@@ -39,9 +39,9 @@ int64_t SerializeSampledSubgraph(char* &data,
   total_size += indices_size;
   total_size += edge_ids_size;
   total_size += kNumTensor * sizeof(int64_t);
-  data = new char[total_size];
+  *data = new char[total_size];
   // Write binary data to buffer
-  char* data_ptr = data;
+  char* data_ptr = *data;
   dgl_id_t* node_map_data = static_cast<dgl_id_t*>(node_mapping->data);
   dgl_id_t* edge_map_data = static_cast<dgl_id_t*>(edge_mapping->data);
   dgl_id_t* layer_off_data = static_cast<dgl_id_t*>(layer_offsets->data);

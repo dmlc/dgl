@@ -522,7 +522,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_SenderSendSubgraph")
     const IdArray flow_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[5]));
     char* data_buffer = nullptr;
     int64_t data_size = network::SerializeSampledSubgraph(
-                             data_buffer,
+                             &data_buffer,
                              csr,
                              node_mapping,
                              edge_mapping,
