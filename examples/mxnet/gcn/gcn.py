@@ -2,71 +2,32 @@
 Semi-Supervised Classification with Graph Convolutional Networks
 Paper: https://arxiv.org/abs/1609.02907
 Code: https://github.com/tkipf/gcn
+
 GCN with SPMV optimization
 """
-import argparse, time, math
+import argparse, time
 import numpy as np
 import mxnet as mx
 from mxnet import gluon
-import dgl
+
 from dgl import DGLGraph
+from dgl.nn.mxnet import GraphConv
 from dgl.data import register_data_args, load_data
-
-
-def gcn_msg(edge):
-    msg = edge.src['h'] * edge.src['norm']
-    return {'m': msg}
-
-
-def gcn_reduce(node):
-    accum = mx.nd.sum(node.mailbox['m'], 1) * node.data['norm']
-    return {'h': accum}
-
-
-class NodeUpdate(gluon.Block):
-    def __init__(self, out_feats, activation=None, bias=True):
-        super(NodeUpdate, self).__init__()
-        with self.name_scope():
-            if bias:
-                self.bias = self.params.get('bias', shape=(out_feats,),
-                    init=mx.init.Zero())
-            else:
-                self.bias = None
-        self.activation = activation
-
-    def forward(self, node):
-        h = node.data['h']
-        if self.bias is not None:
-            h = h + self.bias.data(h.context)
-        if self.activation:
-            h = self.activation(h)
-        return {'h': h}
 
 class GCNLayer(gluon.Block):
     def __init__(self,
-                 g,
                  in_feats,
                  out_feats,
                  activation,
-                 dropout,
-                 bias=True):
+                 dropout=0.):
         super(GCNLayer, self).__init__()
-        self.g = g
-        self.dropout = dropout
-        with self.name_scope():
-            self.weight = self.params.get('weight', shape=(in_feats, out_feats),
-                    init=mx.init.Xavier())
-            self.node_update = NodeUpdate(out_feats, activation, bias)
+        self.graph_conv = GraphConv(in_feats=in_feats, out_feats=out_feats, activation=activation)
+        self.dropout = gluon.nn.Dropout(rate=dropout)
 
-    def forward(self, h):
+    def forward(self, h, g):
         if self.dropout:
-            h = mx.nd.Dropout(h, p=self.dropout)
-        h = mx.nd.dot(h, self.weight.data(h.context))
-        self.g.ndata['h'] = h
-        self.g.update_all(gcn_msg, gcn_reduce, self.node_update)
-        h = self.g.ndata.pop('h')
-        return h
-
+            h = self.dropout(h)
+        return self.graph_conv(h, g)
 
 class GCN(gluon.Block):
     def __init__(self,
@@ -76,23 +37,22 @@ class GCN(gluon.Block):
                  n_classes,
                  n_layers,
                  activation,
-                 dropout,
-                 normalization):
+                 dropout):
         super(GCN, self).__init__()
+        self.g = g
         self.layers = gluon.nn.Sequential()
         # input layer
-        self.layers.add(GCNLayer(g, in_feats, n_hidden, activation, 0))
+        self.layers.add(GCNLayer(in_feats, n_hidden, activation=activation))
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.add(GCNLayer(g, n_hidden, n_hidden, activation, dropout))
+            self.layers.add(GCNLayer(n_hidden, n_hidden, activation=activation, dropout=dropout))
         # output layer
-        self.layers.add(GCNLayer(g, n_hidden, n_classes, None, dropout))
-
+        self.layers.add(GCNLayer(n_hidden, n_classes, activation=None, dropout=dropout))
 
     def forward(self, features):
         h = features
         for layer in self.layers:
-            h = layer(h)
+            h = layer(h, self.g)
         return h
 
 def evaluate(model, features, labels, mask):
@@ -154,8 +114,7 @@ def main(args):
                 n_classes,
                 args.n_layers,
                 mx.nd.relu,
-                args.dropout,
-                args.normalization)
+                args.dropout)
     model.initialize(ctx=ctx)
     n_train_samples = train_mask.sum().asscalar()
     loss_fcn = gluon.loss.SoftmaxCELoss()
@@ -205,9 +164,6 @@ if __name__ == '__main__':
             help="number of hidden gcn units")
     parser.add_argument("--n-layers", type=int, default=1,
             help="number of hidden gcn layers")
-    parser.add_argument("--normalization",
-            choices=['sym','left'], default=None,
-            help="graph normalization types (default=None)")
     parser.add_argument("--self-loop", action='store_true',
             help="graph self-loop (default=False)")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
