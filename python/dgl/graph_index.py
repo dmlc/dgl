@@ -915,10 +915,13 @@ class NodeFlowIndex(GraphIndex):
         The offsets of the flows.
     """
     def __init__(self, handle, parent, node_mapping, edge_mapping, layers, flows):
-        if isinstance(parent, type(None)) == True:
+        if parent is None:
             super(NodeFlowIndex, self).__init__(handle, False, True)
         else:
-            super(NodeFlowIndex, self).__init__(handle, parent.is_multigraph(), parent.is_readonly())
+            super(NodeFlowIndex, self).__init__(
+                handle, 
+                parent.is_multigraph(), 
+                parent.is_readonly())
         self._parent = parent
         self._node_mapping = node_mapping
         self._edge_mapping = edge_mapping
@@ -1154,7 +1157,7 @@ def _uniform_sampling(gidx, seed_ids, neigh_type, num_hops, expand_factor):
 
 ##### Distributed sampler infrastructure #####
 
-def CreateSender(ip, port):
+def _create_sender(ip, port):
     """ Create a sender communicator via C socket
 
     Parameter:
@@ -1164,7 +1167,7 @@ def CreateSender(ip, port):
     """
     return _CAPI_DGLSenderCreate(ip, port)
 
-def CreateReceiver(ip, port, num_sender, queue_size):
+def _create_receiver(ip, port, num_sender, queue_size):
     """ Create a receiver communicator via C socket
 
     Parameter:
@@ -1172,11 +1175,11 @@ def CreateReceiver(ip, port, num_sender, queue_size):
     ip : ip address of remote machine
     port : port of remote machine
     num_sender : total number of sender nodes
-    queue_size : size (bytes) of message queue buffer 
+    queue_size : size (bytes) of message queue buffer
     """
     return _CAPI_DGLReceiverCreate(ip, port, num_sender, queue_size)
 
-def SendSubgraph(sender, nodeflow):
+def _send_subgraph(sender, nodeflow):
     """ Send sampled subgraph to remote trainer
 
     Parameter:
@@ -1189,14 +1192,14 @@ def SendSubgraph(sender, nodeflow):
     edge_mapping = nodeflow._edge_mapping.todgltensor()
     layers_offsets = nodeflow._graph._layers.todgltensor()
     flows_offsets = nodeflow._graph._flows.todgltensor()
-    _CAPI_SenderSendSubgraph(sender, 
-                             graph_index, 
+    _CAPI_SenderSendSubgraph(sender,
+                             graph_index,
                              node_mapping,
-                             edge_mapping, 
-                             layers_offsets, 
+                             edge_mapping,
+                             layers_offsets,
                              flows_offsets)
 
-def RecvSubgraph(receiver):
+def _recv_subgraph(receiver):
     """ Receive sampled subgraph from remote sampler
 
     Parameter
@@ -1210,10 +1213,10 @@ def RecvSubgraph(receiver):
     rst = _CAPI_ReceiverRecvSubgraph(receiver)
     # Note that, for distributed sampler
     # we should set parent graph to None
-    nfIdx = NodeFlowIndex(rst(0),   # graph index handle
-                        None,       # parent graph index
-                        utils.toindex(rst(1)),  # node_mapping
-                        utils.toindex(rst(2)),  # edge_mapping
-                        utils.toindex(rst(3)),  # layers_offsets
-                        utils.toindex(rst(4)))  # flows_offsets
-    return nfIdx
+    nodeflow_idx = NodeFlowIndex(rst(0),   # graph index handle
+                                 None,     # parent graph index
+                                 utils.toindex(rst(1)),  # node_mapping
+                                 utils.toindex(rst(2)),  # edge_mapping
+                                 utils.toindex(rst(3)),  # layers_offsets
+                                 utils.toindex(rst(4)))  # flows_offsets
+    return nodeflow_idx

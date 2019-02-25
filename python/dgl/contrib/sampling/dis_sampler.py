@@ -1,6 +1,6 @@
 # This file contains distributed samplers.
 from ...node_flow import NodeFlow
-from ...graph_index import CreateSender, CreateReceiver, SendSubgraph, RecvSubgraph
+from ...graph_index import _create_sender, _create_receiver, _send_subgraph, _recv_subgraph
 
 class Sender(object):
     """The Sender class for distributed sampler.
@@ -16,7 +16,7 @@ class Sender(object):
     def __init__(self, ip, port):
         self._ip = ip
         self._port = port
-        self._sender = CreateSender(ip, port)
+        self._sender = _create_sender(ip, port)
 
     def Send(self, nodeflow):
         """ Send nodeflow to remote receiver
@@ -25,7 +25,7 @@ class Sender(object):
         ---------
         nodeflow : a NodeFlow object
         """
-        SendSubgraph(self._sender, nodeflow)
+        _send_subgraph(self._sender, nodeflow)
 
 class Receiver(object):
     """The Receiver class for distributed sampler.
@@ -45,12 +45,12 @@ class Receiver(object):
         self._port = port
         self._num_sender = num_sender
         self._queue_size = queue_size
-        self._receiver = CreateReceiver(ip, port, num_sender, queue_size)
+        self._receiver = _create_receiver(ip, port, num_sender, queue_size)
 
     def Receive(self):
         """ Receive data from sender and construct sampled subgraph.
         Note that, in distributed sampler, the parent graph of NodeFlow 
         in will be set to None object.
         """
-        sgi = RecvSubgraph(self._receiver)
+        sgi = _recv_subgraph(self._receiver)
         return NodeFlow(None, sgi)
