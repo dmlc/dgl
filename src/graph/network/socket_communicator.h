@@ -6,12 +6,11 @@
 #ifndef DGL_GRAPH_NETWORK_SOCKET_COMMUNICATOR_H_
 #define DGL_GRAPH_NETWORK_SOCKET_COMMUNICATOR_H_
 
-#include "communicator.h"
-
 #include <thread>
 #include <vector>
 #include <string>
 
+#include "communicator.h"
 #include "msg_queue.h"
 #include "tcp_socket.h"
 
