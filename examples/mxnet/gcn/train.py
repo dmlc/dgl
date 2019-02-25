@@ -7,8 +7,7 @@ from mxnet import gluon
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 
-#from gcn import GCN
-from dgl.nn.mxnet import GCNSPMV as GCN
+from gcn import GCN
 #from gcn_mp import GCN
 #from gcn_spmv import GCN
 
@@ -20,10 +19,6 @@ def evaluate(model, features, labels, mask):
 def main(args):
     # load and preprocess dataset
     data = load_data(args)
-
-    if args.self_loop:
-        data.graph.add_edges_from([(i,i) for i in range(len(data.graph))])
-
     features = mx.nd.array(data.features)
     labels = mx.nd.array(data.labels)
     train_mask = mx.nd.array(data.train_mask)
@@ -58,6 +53,7 @@ def main(args):
 
     # create GCN model
     g = DGLGraph(data.graph)
+    g.add_edges(g.nodes(), g.nodes())
     # normalization
     degs = g.in_degrees().astype('float32')
     norm = mx.nd.power(degs, -0.5)
@@ -122,8 +118,6 @@ if __name__ == '__main__':
             help="number of hidden gcn units")
     parser.add_argument("--n-layers", type=int, default=1,
             help="number of hidden gcn layers")
-    parser.add_argument("--self-loop", action='store_true',
-            help="graph self-loop (default=False)")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
             help="Weight for L2 loss")
     args = parser.parse_args()
