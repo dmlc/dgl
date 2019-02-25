@@ -95,6 +95,17 @@ class GraphConv(nn.Module):
         if self.bias is not None:
             init.zeros_(self.bias)
 
+    def check_repeated_features(self, g):
+        r"""Rename taken field names.
+
+        Parameters
+        ----------
+        graph : DGLGraph
+            The graph.
+        """
+        while self._feat_name in g.ndata:
+            self._feat_name += '0'
+
     def forward(self, feat, graph):
         r"""Compute graph convolution.
 
@@ -117,6 +128,8 @@ class GraphConv(nn.Module):
         torch.Tensor
             The output feature
         """
+        self.check_repeated_features(graph)
+
         if self._norm:
             norm = 1 / th.sqrt(graph.in_degrees().float())
             shp = norm.shape + (1,) * (feat.dim() - 1)

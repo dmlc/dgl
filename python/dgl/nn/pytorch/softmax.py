@@ -25,20 +25,20 @@ class EdgeSoftmax(nn.Module):
 
     Parameters
     ----------
-    logits_name : str
+    logits_name : str, optional
         A field name such that g.edata[logits_name] gives the logits :math:`z_{ij}`.
-        based on which edgesoftmax will be computed.
+        based on which edgesoftmax will be computed. Default: ``"a"``.
     max_logits_name : str
         A field name such that g.ndata[max_logits_name] will store
-        :math:`\max_{j\in\mathcal{N}(i)}z_{ij}`.
+        :math:`\max_{j\in\mathcal{N}(i)}z_{ij}`. Default: ``"max_a"``.
     normalizer_name : str
         A field name such that g.ndata[normalizer_name] will store
-        :math:`\sum_{j\in\mathcal{N}(i)}exp(z_{ij})`
+        :math:`\sum_{j\in\mathcal{N}(i)}exp(z_{ij})`. Default: ``"sum_a"``.
     """
     def __init__(self,
-                 logits_name,
-                 max_logits_name,
-                 normalizer_name):
+                 logits_name="a",
+                 max_logits_name="max_a",
+                 normalizer_name="sum_a"):
         super(EdgeSoftmax, self).__init__()
         # compute the softmax
         self._logits_name = logits_name

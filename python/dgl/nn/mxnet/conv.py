@@ -90,6 +90,17 @@ class GraphConv(gluon.Block):
 
         self._activation = activation
 
+    def check_repeated_features(self, g):
+        r"""Rename taken field names.
+
+        Parameters
+        ----------
+        graph : DGLGraph
+            The graph.
+        """
+        while self._feat_name in g.ndata:
+            self._feat_name += '0'
+
     def forward(self, feat, graph):
         r"""Compute graph convolution.
 
@@ -112,6 +123,8 @@ class GraphConv(gluon.Block):
         mxnet.NDArray
             The output feature
         """
+        self.check_repeated_features(graph)
+
         if self._norm:
             degs = graph.in_degrees().astype('float32')
             norm = mx.nd.power(degs, -0.5)

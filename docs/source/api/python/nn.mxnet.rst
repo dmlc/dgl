@@ -7,6 +7,7 @@ dgl.nn.mxnet.conv
 -----------------
 
 .. automodule:: dgl.nn.mxnet.conv
-    :members:
-    :undoc-members:
+
+.. autoclass:: dgl.nn.mxnet.conv.GraphConv
+    :members: weight, bias, forward
     :show-inheritance:

@@ -51,5 +51,10 @@ def test_graph_conv():
         h0 = mx.nd.ones((3, 5, 5))
         h1 = conv(h0, g)
 
+    # test repeated features
+    g.ndata["_gconv_feat"] = 2 * mx.nd.ones((3, 1))
+    h1 = conv(h0, g)
+    assert "_gconv_feat" in g.ndata
+
 if __name__ == '__main__':
     test_graph_conv()
