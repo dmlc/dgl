@@ -19,7 +19,8 @@ Codes
 The folder contains three implementations of GCN:
 - `gcn.py` uses DGL's predefined graph convolution module.
 - `gcn_mp.py` uses user-defined message and reduce functions.
-- `gcn_spmv.py` uses DGL's builtin functions so SPMV optimization could be applied.
+- `gcn_spmv.py` improves from `gcn_mp.py` by using DGL's builtin functions
+   so SPMV optimization could be applied.
 
 Results
 -------
