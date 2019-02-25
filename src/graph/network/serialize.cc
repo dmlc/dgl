@@ -3,25 +3,25 @@
  * \file serialize.cc
  * \brief Serialization for DGL distributed training.
  */
+#include "serialize.h"
+
 #include <cstring>
 #include <dmlc/logging.h>
 #include <dgl/immutable_graph.h>
-
-#include "serialize.h"
 
 namespace dgl {
 namespace network {
 
 const int kNumTensor = 7;  // We need to serialize 7 conponents (tensor) here
 
-int64_t SerializeSampledSubgraph(char* &data, 
-                               const ImmutableGraph::CSR::Ptr csr, 
+int64_t SerializeSampledSubgraph(char* &data,
+                               const ImmutableGraph::CSR::Ptr csr,
                                const IdArray& node_mapping,
                                const IdArray& edge_mapping,
                                const IdArray& layer_offsets,
                                const IdArray& flow_offsets) {
   int64_t total_size = 0;
-  // For each component, we first write its size at the 
+  // For each component, we first write its size at the
   // begining of the buffer and then write its binary data
   int64_t node_mapping_size = node_mapping->shape[0] * sizeof(dgl_id_t);
   int64_t edge_mapping_size = edge_mapping->shape[0] * sizeof(dgl_id_t);
@@ -89,7 +89,7 @@ int64_t SerializeSampledSubgraph(char* &data,
 void DeserializeSampledSubgraph(NodeFlow* nf, char* data) {
   CHECK_NOTNULL(nf);
   CHECK_NOTNULL(data);
-  // For each component, we first write its size at the 
+  // For each component, we first write its size at the
   // begining of the buffer and then write its binary data
   char* data_ptr = data;
   // node_mapping
@@ -153,5 +153,5 @@ void DeserializeSampledSubgraph(NodeFlow* nf, char* data) {
   nf->graph = GraphPtr(new ImmutableGraph(subg_csr, nullptr, false));
 }
 
-}  // network
-}  // dgl
+}  // namespace network
+}  // namespace dgl

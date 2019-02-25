@@ -44,12 +44,12 @@ bool SocketCommunicator::InitSender(const char* ip, int port) {
   }
 }
 
-bool SocketCommunicator::InitReceiver(const char* ip, 
-                                      int port, 
-                                      int num_sender, 
+bool SocketCommunicator::InitReceiver(const char* ip,
+                                      int port,
+                                      int num_sender,
                                       int queue_size) {
-  CHECK(num_sender >= 1);
-  CHECK(queue_size > 0);
+  CHECK_GE(num_sender, 1);
+  CHECK_GT(queue_size, 0);
   // Init message queue
   num_sender_ = num_sender;
   queue_size_ = queue_size;
@@ -92,12 +92,14 @@ bool SocketCommunicator::InitReceiver(const char* ip,
 void SocketCommunicator::MsgHandler(TCPSocket* socket, MessageQueue* queue) {
   char* buffer = new char[kMaxBuffer];
   for (;;) {
-    // First recv the size 
+    // First recv the size
     int received_bytes = 0;
     int data_size = 0;
     while (received_bytes < sizeof(int)) {
       int max_len = sizeof(int) - received_bytes;
-      int tmp = socket->Receive((char*)(&data_size)+received_bytes, max_len);
+      int tmp = socket->Receive(
+        reinterpret_cast<char*>(&data_size)+received_bytes,
+        max_len);
       received_bytes += tmp;
     }
     if (data_size == -1) {
@@ -132,7 +134,9 @@ void SocketCommunicator::FinalizeSender() {
     int sent_bytes = 0;
     while (sent_bytes < sizeof(int)) {
       int max_len = sizeof(int) - sent_bytes;
-      int tmp = socket_[0]->Send((char*)(&size)+sent_bytes, max_len);
+      int tmp = socket_[0]->Send(
+        reinterpret_cast<char*>(&size)+sent_bytes, 
+        max_len);
       sent_bytes += tmp;
     }
     socket_[0]->Close();
@@ -164,7 +168,9 @@ int SocketCommunicator::Send(char* src, int size) {
   int sent_bytes = 0;
   while (sent_bytes < sizeof(int)) {
     int max_len = sizeof(int) - sent_bytes;
-    int tmp = client->Send((char*)(&size)+sent_bytes, max_len);
+    int tmp = client->Send(
+      reinterpret_cast<char*>(&size)+sent_bytes, 
+      max_len);
     sent_bytes += tmp;
   }
   // Then send the data

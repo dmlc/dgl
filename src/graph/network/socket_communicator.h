@@ -11,6 +11,7 @@
 #include "msg_queue.h"
 #include "tcp_socket.h"
 
+#include <vector>
 #include <string>
 #include <thread>
 
@@ -114,8 +115,8 @@ class SocketCommunicator : public Communicator {
    * \param queue_size size of message queue
    * \return true for success and false for error
    */ 
-  bool InitReceiver(const char* ip, 
-                    int port, 
+  bool InitReceiver(const char* ip,
+                    int port,
                     int num_sender,
                     int queue_size);
 

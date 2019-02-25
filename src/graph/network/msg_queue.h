@@ -167,7 +167,7 @@ class MessageQueue {
   mutable std::mutex mutex_;
 };
 
-}  // namesapce network
+}  // namespace network
 }  // namespace dgl
 
 #endif  // DGL_GRAPH_NETWORK_MSG_QUEUE_H_

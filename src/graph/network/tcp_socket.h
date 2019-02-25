@@ -117,7 +117,7 @@ class TCPSocket {
   /*!
    * \brief socket's file descriptor
    */ 
-  int socket_;  
+  int socket_;
 };
 
 }  // namespace network

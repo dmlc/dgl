@@ -3,6 +3,8 @@
  * \file tcp_socket.cc
  * \brief TCP socket for DGL distributed training.
  */
+#include "tcp_socket.h"
+
 #include <dmlc/logging.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
@@ -10,8 +12,6 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
-
-#include "tcp_socket.h"
 
 namespace dgl {
 namespace network {
@@ -117,7 +117,7 @@ bool TCPSocket::SetBlocking(bool flag) {
 }
 
 void TCPSocket::SetTimeout(int timeout) {
-  setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO, 
+  setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO,
     reinterpret_cast<char*>(&timeout), sizeof(timeout));
 }
 
@@ -127,7 +127,7 @@ bool TCPSocket::ShutDown(int ways) {
 
 void TCPSocket::Close() {
   if (socket_ >= 0) {
-    CHECK(0 == close(socket_));
+    CHECK_EQ(0, close(socket_));
     socket_ = -1;
   }
 }

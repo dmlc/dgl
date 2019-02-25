@@ -74,7 +74,7 @@ int MessageQueue::Add(const char* src, int size, bool is_blocking) {
     memcpy(queue_, &src[size_partial], size - size_partial);
     write_pointer_ = size - size_partial;
   }
-  
+
   // not empty signal
   cond_not_empty_.notify_one();
 
@@ -171,7 +171,7 @@ int MessageQueue::Remove(string *dest, bool is_blocking) {
 void MessageQueue::Signal(int producer_id) {
   std::lock_guard<std::mutex> lock(mutex_);
   finished_producers_.insert(producer_id);
-  // if all producers have finished, consumers should be 
+  // if all producers have finished, consumers should be
   // waken up to get this signal
   if (finished_producers_.size() >= num_producers_) {
     exit_flag_.store(true);

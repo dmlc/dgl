@@ -523,10 +523,10 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_SenderSendSubgraph")
     char* data_buffer = nullptr;
     int64_t data_size = network::SerializeSampledSubgraph(
                              data_buffer,
-                             csr, 
-                             node_mapping, 
-                             edge_mapping, 
-                             layer_offsets, 
+                             csr,
+                             node_mapping,
+                             edge_mapping,
+                             layer_offsets,
                              flow_offsets);
     // Send msg via network
     int size = comm->Send(data_buffer, data_size);
@@ -552,7 +552,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLReceiverCreate")
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_ReceiverRecvSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    // The data buffer will be allocated just once 
+    // The data buffer will be allocated just once
     static char* data_buffer = new char[kMaxBufferSize];
     CommunicatorHandle chandle = args[0];
     network::Communicator* comm = static_cast<network::Communicator*>(chandle);

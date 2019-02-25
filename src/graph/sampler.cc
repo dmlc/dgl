@@ -322,7 +322,7 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
       size_t pos = neigh_pos->at(i).pos;
       CHECK_LE(pos, neighbor_list.size());
       size_t num_edges = neigh_pos->at(i).num_edges;
-      if (neighbor_list.empty()) CHECK(num_edges == 0);
+      if (neighbor_list.empty()) CHECK_EQ(num_edges, 0);
 
       // We need to map the Ids of the neighbors to the subgraph.
       auto neigh_it = neighbor_list.begin() + pos;
@@ -470,7 +470,7 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
                            edge_type, num_edges, num_hops, graph->IsMultigraph());
 }
 
-}  // namespace anonymous
+}  // namespace
 
 NodeFlow SamplerOp::NeighborUniformSample(const ImmutableGraph *graph, IdArray seeds,
                                           const std::string &edge_type,

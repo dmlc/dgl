@@ -22,8 +22,8 @@ namespace network {
  * \param flow_offsets flow offsets in NodeFlowIndex
  * \return the total size of the serialized binary data
  */
-int64_t SerializeSampledSubgraph(char* &data, 
-	                             const ImmutableGraph::CSR::Ptr csr, 
+int64_t SerializeSampledSubgraph(char* &data,
+	                             const ImmutableGraph::CSR::Ptr csr,
 	                             const IdArray& node_mapping,
 	                             const IdArray& edge_mapping,
 	                             const IdArray& layer_offsets,
