@@ -5,6 +5,7 @@ from torch import nn
 from torch.nn import init
 
 from ... import function as fn
+from ...utils import get_ndata_name
 
 __all__ = ['GraphConv']
 
@@ -50,8 +51,6 @@ class GraphConv(nn.Module):
     activation: callable activation function/layer or None, optional
         If not None, applies an activation function to the updated node features.
         Default: ``None``.
-    feat_name : str, optional
-        The temporary feature name used to compute message passing. Default: ``"_gconv_feat"``.
 
     Attributes
     ----------
@@ -65,13 +64,12 @@ class GraphConv(nn.Module):
                  out_feats,
                  norm=True,
                  bias=False,
-                 activation=None,
-                 feat_name="_gconv_feat"):
+                 activation=None):
         super(GraphConv, self).__init__()
         self._in_feats = in_feats
         self._out_feats = out_feats
         self._norm = norm
-        self._feat_name = feat_name
+        self._feat_name = "_gconv_feat"
         self._msg_name = "_gconv_msg"
 
         self.weight = nn.Parameter(th.Tensor(in_feats, out_feats))
@@ -88,17 +86,6 @@ class GraphConv(nn.Module):
         init.xavier_uniform_(self.weight)
         if self.bias is not None:
             init.zeros_(self.bias)
-
-    def check_repeated_features(self, g):
-        r"""Rename taken field names.
-
-        Parameters
-        ----------
-        graph : DGLGraph
-            The graph.
-        """
-        while self._feat_name in g.ndata:
-            self._feat_name += '0'
 
     def forward(self, feat, graph):
         r"""Compute graph convolution.
@@ -122,7 +109,7 @@ class GraphConv(nn.Module):
         torch.Tensor
             The output feature
         """
-        self.check_repeated_features(graph)
+        self._feat_name = get_ndata_name(graph, self._feat_name)
 
         if self._norm:
             norm = 1 / th.sqrt(graph.in_degrees().float())
@@ -162,6 +149,5 @@ class GraphConv(nn.Module):
         """
         summary = 'in={_in_feats}, out={_out_feats}'
         summary += ', normalization={_norm}'
-        summary += ', feat_name={_feat_name}, msg_name={_msg_name}'
         summary += ', activation={_activation}'
         return summary.format(**self.__dict__)

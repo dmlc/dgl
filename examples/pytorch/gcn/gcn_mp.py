@@ -1,12 +1,11 @@
-"""
-Semi-Supervised Classification with Graph Convolutional Networks
-Paper: https://arxiv.org/abs/1609.02907
-Code: https://github.com/tkipf/gcn
+"""GCN using basic message passing
 
-GCN with SPMV specialization.
+References:
+- Semi-Supervised Classification with Graph Convolutional Networks
+- Paper: https://arxiv.org/abs/1609.02907
+- Code: https://github.com/tkipf/gcn
 """
-import argparse, time
-from dgl.nn.pytorch import GraphConv
+import argparse, time, math
 import numpy as np
 import torch
 import torch.nn as nn
@@ -14,23 +13,70 @@ import torch.nn.functional as F
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 
+
+def gcn_msg(edge):
+    msg = edge.src['h'] * edge.src['norm']
+    return {'m': msg}
+
+
+def gcn_reduce(node):
+    accum = torch.sum(node.mailbox['m'], 1) * node.data['norm']
+    return {'h': accum}
+
+
+class NodeApplyModule(nn.Module):
+    def __init__(self, out_feats, activation=None, bias=True):
+        super(NodeApplyModule, self).__init__()
+        if bias:
+            self.bias = nn.Parameter(torch.Tensor(out_feats))
+        else:
+            self.bias = None
+        self.activation = activation
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        if self.bias is not None:
+            stdv = 1. / math.sqrt(self.bias.size(0))
+            self.bias.data.uniform_(-stdv, stdv)
+
+    def forward(self, nodes):
+        h = nodes.data['h']
+        if self.bias is not None:
+            h = h + self.bias
+        if self.activation:
+            h = self.activation(h)
+        return {'h': h}
+
+
 class GCNLayer(nn.Module):
     def __init__(self,
+                 g,
                  in_feats,
                  out_feats,
                  activation,
-                 dropout=0.):
+                 dropout,
+                 bias=True):
         super(GCNLayer, self).__init__()
-        self.graph_conv = GraphConv(in_feats=in_feats, out_feats=out_feats, activation=activation)
+        self.g = g
+        self.weight = nn.Parameter(torch.Tensor(in_feats, out_feats))
         if dropout:
             self.dropout = nn.Dropout(p=dropout)
         else:
             self.dropout = 0.
+        self.node_update = NodeApplyModule(out_feats, activation, bias)
+        self.reset_parameters()
 
-    def forward(self, h, g):
+    def reset_parameters(self):
+        stdv = 1. / math.sqrt(self.weight.size(1))
+        self.weight.data.uniform_(-stdv, stdv)
+
+    def forward(self, h):
         if self.dropout:
             h = self.dropout(h)
-        return self.graph_conv(h, g)
+        self.g.ndata['h'] = torch.mm(h, self.weight)
+        self.g.update_all(gcn_msg, gcn_reduce, self.node_update)
+        h = self.g.ndata.pop('h')
+        return h
 
 class GCN(nn.Module):
     def __init__(self,
@@ -42,22 +88,19 @@ class GCN(nn.Module):
                  activation,
                  dropout):
         super(GCN, self).__init__()
-        self.g = g
         self.layers = nn.ModuleList()
         # input layer
-        self.layers.append(GCNLayer(in_feats=in_feats, out_feats=n_hidden, activation=activation))
+        self.layers.append(GCNLayer(g, in_feats, n_hidden, activation, dropout))
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.append(GCNLayer(in_feats=n_hidden, out_feats=n_hidden,
-                                        activation=activation, dropout=dropout))
+            self.layers.append(GCNLayer(g, n_hidden, n_hidden, activation, dropout))
         # output layer
-        self.layers.append(GCNLayer(in_feats=n_hidden, out_feats=n_classes,
-                                    activation=None, dropout=dropout))
+        self.layers.append(GCNLayer(g, n_hidden, n_classes, None, dropout))
 
     def forward(self, features):
         h = features
         for layer in self.layers:
-            h = layer(h, self.g)
+            h = layer(h)
         return h
 
 def evaluate(model, features, labels, mask):
@@ -108,6 +151,13 @@ def main(args):
     n_edges = g.number_of_edges()
     # add self loop
     g.add_edges(g.nodes(), g.nodes())
+    # normalization
+    degs = g.in_degrees().float()
+    norm = torch.pow(degs, -0.5)
+    norm[torch.isinf(norm)] = 0
+    if cuda:
+        norm = norm.cuda()
+    g.ndata['norm'] = norm.unsqueeze(1)
 
     # create GCN model
     model = GCN(g,

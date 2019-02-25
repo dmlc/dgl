@@ -4,6 +4,7 @@ import torch as th
 from torch import nn
 
 from ... import function as fn
+from ...utils import get_ndata_name
 
 __all__ = ['EdgeSoftmax']
 
@@ -22,43 +23,13 @@ class EdgeSoftmax(nn.Module):
     An example of using edgesoftmax is in
     `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__ where
     the attention weights are computed with such an edgesoftmax operation.
-
-    Parameters
-    ----------
-    logits_name : str, optional
-        A field name such that g.edata[logits_name] gives the logits :math:`z_{ij}`.
-        based on which edgesoftmax will be computed. Default: ``"a"``.
-    max_logits_name : str
-        A field name such that g.ndata[max_logits_name] will store
-        :math:`\max_{j\in\mathcal{N}(i)}z_{ij}`. Default: ``"max_a"``.
-    normalizer_name : str
-        A field name such that g.ndata[normalizer_name] will store
-        :math:`\sum_{j\in\mathcal{N}(i)}exp(z_{ij})`. Default: ``"sum_a"``.
     """
-    def __init__(self,
-                 logits_name="a",
-                 max_logits_name="max_a",
-                 normalizer_name="sum_a"):
+    def __init__(self):
         super(EdgeSoftmax, self).__init__()
         # compute the softmax
-        self._logits_name = logits_name
-        self._max_logits_name = max_logits_name
-        self._normalizer_name = normalizer_name
-
-    def check_repeated_features(self, g):
-        r"""Rename taken field names.
-
-        Parameters
-        ----------
-        graph : DGLGraph
-            The graph.
-        """
-        while self._logits_name in g.edata:
-            self._logits_name += '0'
-        while self._max_logits_name in g.ndata:
-            self._max_logits_name += '0'
-        while self._normalizer_name in g.ndata:
-            self._normalizer_name += '0'
+        self._logits_name = "_logits"
+        self._max_logits_name = "_max_logits"
+        self._normalizer_name = "_norm"
 
     def forward(self, logits, graph):
         r"""Compute edge softmax.
@@ -100,7 +71,9 @@ class EdgeSoftmax(nn.Module):
         We left this last step to users as depending on the particular use case,
         this step can be combined with other computation at once.
         """
-        self.check_repeated_features(graph)
+        self._logits_name = get_ndata_name(graph, self._logits_name)
+        self._max_logits_name = get_ndata_name(graph, self._max_logits_name)
+        self._normalizer_name = get_ndata_name(graph, self._normalizer_name)
 
         graph.edata[self._logits_name] = logits
 
@@ -117,5 +90,4 @@ class EdgeSoftmax(nn.Module):
         return graph.edata.pop(self._logits_name), graph.ndata.pop(self._normalizer_name)
 
     def __repr__(self):
-        return 'EdgeSoftmax(logits_name={}, max_logits_name={}, normalizer_name={})'.format(
-            self._logits_name, self._max_logits_name, self._normalizer_name)
+        return 'EdgeSoftmax()'

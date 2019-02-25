@@ -40,7 +40,7 @@ class GraphAttention(nn.Module):
         nn.init.xavier_normal_(self.attn_l.data, gain=1.414)
         nn.init.xavier_normal_(self.attn_r.data, gain=1.414)
         self.leaky_relu = nn.LeakyReLU(alpha)
-        self.softmax = EdgeSoftmax('a', 'a_max', 'z')
+        self.softmax = EdgeSoftmax()
         self.residual = residual
         if residual:
             if in_dim != out_dim:

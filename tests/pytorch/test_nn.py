@@ -45,18 +45,13 @@ def test_graph_conv():
     new_weight = conv.weight.data
     assert not th.allclose(old_weight, new_weight)
 
-    # test repeated features
-    g.ndata["_gconv_feat"] = 2 * th.ones(3, 1)
-    h1 = conv(h0, g)
-    assert "_gconv_feat" in g.ndata
-
 def uniform_attention(g, shape):
     a = th.ones(shape)
     target_shape = (g.number_of_edges(),) + (1,) * (len(shape) - 1)
     return a / g.in_degrees(g.edges()[1]).view(target_shape).float()
 
 def test_edge_softmax():
-    edge_softmax = nn.EdgeSoftmax("a", "max_a", "sum_a")
+    edge_softmax = nn.EdgeSoftmax()
 
     # Basic
     g = dgl.DGLGraph(nx.path_graph(3))
@@ -66,16 +61,6 @@ def test_edge_softmax():
     g.ndata["a_sum"] = normalizer
     g.apply_edges(lambda edges : {"a": edges.data["a"] / edges.dst["a_sum"]})
     assert th.allclose(g.edata["a"], uniform_attention(g, unnormalized.shape))
-
-    # Test repeated features
-    g.edata["a"] = 2 * th.ones(4, 1)
-    g.ndata["max_a"] = 3 * th.ones(3, 1)
-    g.ndata["sum_a"] = 4 * th.ones(3, 1)
-    _, _ = edge_softmax(edata, g)
-    assert "a" in g.edata
-    assert "max_a" in g.ndata
-    assert "max_a0" in g.ndata
-    assert "sum_a" in g.ndata
 
     # Test higher dimension case
     edata = th.ones(g.number_of_edges(), 3, 1)
