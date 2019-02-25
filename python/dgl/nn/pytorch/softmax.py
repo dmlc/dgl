@@ -45,6 +45,14 @@ class EdgeSoftmax(nn.Module):
         self._max_logits_name = max_logits_name
         self._normalizer_name = normalizer_name
 
+    def check_repeated_features(self, g):
+        while self._logits_name in g.edata:
+            self._logits_name += '0'
+        while self._max_logits_name in g.ndata:
+            self._max_logits_name += '0'
+        while self._normalizer_name in g.ndata:
+            self._normalizer_name += '0'
+
     def forward(self, logits, graph):
         r"""Compute edge softmax.
 
@@ -85,6 +93,8 @@ class EdgeSoftmax(nn.Module):
         We left this last step to users as depending on the particular use case,
         this step can be combined with other computation at once.
         """
+        self.check_repeated_features(graph)
+
         graph.edata[self._logits_name] = logits
 
         # compute the softmax

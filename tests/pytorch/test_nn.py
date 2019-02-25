@@ -53,6 +53,7 @@ def uniform_attention(g, shape):
 def test_edge_softmax():
     edge_softmax = nn.EdgeSoftmax('a', 'max_a', 'sum_a')
 
+    # Basic
     g = dgl.DGLGraph(nx.path_graph(3))
     edata = th.ones(g.number_of_edges(), 1)
     unnormalized, normalizer = edge_softmax(edata, g)
@@ -61,6 +62,17 @@ def test_edge_softmax():
     g.apply_edges(lambda edges : {'a': edges.data['a'] / edges.dst['a_sum']})
     assert th.allclose(g.edata['a'], uniform_attention(g, unnormalized.shape))
 
+    # Test repeated features
+    g.edata['a'] = 2 * th.ones(4, 1)
+    g.ndata['max_a'] = 3 * th.ones(3, 1)
+    g.ndata['sum_a'] = 4 * th.ones(3, 1)
+    _, _ = edge_softmax(edata, g)
+    assert 'a' in g.edata
+    assert 'max_a' in g.ndata
+    assert 'max_a0' in g.ndata
+    assert 'sum_a' in g.ndata
+
+    # Test higher dimension case
     edata = th.ones(g.number_of_edges(), 3, 1)
     unnormalized, normalizer = edge_softmax(edata, g)
     g.edata['a'] = unnormalized
