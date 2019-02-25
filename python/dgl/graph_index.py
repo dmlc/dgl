@@ -919,8 +919,8 @@ class NodeFlowIndex(GraphIndex):
             super(NodeFlowIndex, self).__init__(handle, False, True)
         else:
             super(NodeFlowIndex, self).__init__(
-                handle, 
-                parent.is_multigraph(), 
+                handle,
+                parent.is_multigraph(),
                 parent.is_readonly())
         self._parent = parent
         self._node_mapping = node_mapping
@@ -1157,7 +1157,7 @@ def _uniform_sampling(gidx, seed_ids, neigh_type, num_hops, expand_factor):
 
 ##### Distributed sampler infrastructure #####
 
-def _create_sender(ip, port):
+def _create_sender(ip_addr, port):
     """ Create a sender communicator via C socket
 
     Parameter:
@@ -1165,9 +1165,9 @@ def _create_sender(ip, port):
     ip : ip address of remote machine
     port : port of remote machine
     """
-    return _CAPI_DGLSenderCreate(ip, port)
+    return _CAPI_DGLSenderCreate(ip_addr, port)
 
-def _create_receiver(ip, port, num_sender, queue_size):
+def _create_receiver(ip_addr, port, num_sender, queue_size):
     """ Create a receiver communicator via C socket
 
     Parameter:
@@ -1177,7 +1177,7 @@ def _create_receiver(ip, port, num_sender, queue_size):
     num_sender : total number of sender nodes
     queue_size : size (bytes) of message queue buffer
     """
-    return _CAPI_DGLReceiverCreate(ip, port, num_sender, queue_size)
+    return _CAPI_DGLReceiverCreate(ip_addr, port, num_sender, queue_size)
 
 def _send_subgraph(sender, nodeflow):
     """ Send sampled subgraph to remote trainer
