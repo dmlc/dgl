@@ -99,6 +99,7 @@ class ImmutableGraph: public GraphInterface {
     void ReadAllEdges(std::vector<Edge> *edges) const;
     CSR::Ptr Transpose() const;
     std::pair<CSR::Ptr, IdArray> VertexSubgraph(IdArray vids) const;
+    std::pair<CSR::Ptr, IdArray> EdgeSubgraph(IdArray eids, EdgeList::Ptr edge_list) const;
     /*
      * Construct a CSR from a list of edges.
      *

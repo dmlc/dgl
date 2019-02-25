@@ -183,7 +183,7 @@ std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::VertexSubgraph
   const int64_t len = vids->shape[0];
 
   HashTableChecker def_check(vid_data, len);
-  // check if varr is sorted.
+  // check if vid_data is sorted.
   CHECK(std::is_sorted(vid_data, vid_data + len)) << "The input vertex list has to be sorted";
 
   // Collect the non-zero entries in from the original graph.
@@ -214,6 +214,44 @@ std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::VertexSubgraph
 
   return std::pair<ImmutableGraph::CSR::Ptr, IdArray>(sub_csr, rst_eids);
 }
+
+std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::EdgeSubgraph(
+    IdArray eids, EdgeList::Ptr edge_list) const {
+  // Return sub_csr and vids array.
+  CHECK(IsValidIdArray(eids)) << "Invalid edge id array.";
+  const dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
+  const int64_t len = eids->shape[0];
+  std::vector<dgl_id_t> nodes;
+  std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
+
+  for (int64_t i = 0; i < len; i++) {
+    dgl_id_t src_id = edge_list->src_points[eid_data[i]];
+    dgl_id_t dst_id = edge_list->dst_points[eid_data[i]];
+    if (oldv2newv.insert(std::make_pair(src_id, oldv2newv.size())).second)
+      nodes.push_back(src_id);
+    if (oldv2newv.insert(std::make_pair(dst_id, oldv2newv.size())).second)
+      nodes.push_back(dst_id);
+  }
+
+  const size_t n = oldv2newv.size();
+
+  std::vector<Edge> edges;
+  for (int64_t i = 0; i < len; i++) {
+    dgl_id_t src_id = oldv2newv.find(edge_list->src_points[eid_data[i]])->second;
+    dgl_id_t dst_id = oldv2newv.find(edge_list->dst_points[eid_data[i]])->second;
+    edges.push_back(Edge{src_id, dst_id, i});
+  }
+
+  auto sub_csr = CSR::FromEdges(&edges, 0, n);
+
+  IdArray rst_vids = IdArray::Empty({static_cast<int64_t>(nodes.size())},
+      DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  dgl_id_t* vid_data = static_cast<dgl_id_t*>(rst_vids->data);
+  std::copy(nodes.begin(), nodes.end(), vid_data);
+
+  return std::make_pair(sub_csr, rst_vids);
+}
+
 
 ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::FromEdges(std::vector<Edge> *edges,
                                                         int sort_on, uint64_t num_nodes) {
@@ -478,6 +516,7 @@ std::pair<dgl_id_t, dgl_id_t> ImmutableGraph::FindEdge(dgl_id_t eid) const {
 }
 
 ImmutableGraph::EdgeArray ImmutableGraph::FindEdges(IdArray eids) const {
+  CHECK(IsValidIdArray(eids)) << "Invalid edge id array";
   dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
   const auto len = eids->shape[0];
   std::vector<dgl_id_t> src, dst;
@@ -553,8 +592,19 @@ Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
 }
 
 Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids) const {
-  LOG(FATAL) << "EdgeSubgraph isn't implemented in immutable graph";
-  return Subgraph();
+  Subgraph subg;
+  std::pair<CSR::Ptr, IdArray> ret;
+  auto edge_list = GetEdgeList();
+  if (out_csr_) {
+    ret = out_csr_->EdgeSubgraph(eids, edge_list);
+    subg.graph = GraphPtr(new ImmutableGraph(nullptr, ret.first, IsMultigraph()));
+  } else {
+    ret = in_csr_->EdgeSubgraph(eids, edge_list);
+    subg.graph = GraphPtr(new ImmutableGraph(ret.first, nullptr, IsMultigraph()));
+  }
+  subg.induced_edges = eids;
+  subg.induced_vertices = ret.second;
+  return subg;
 }
 
 ImmutableGraph::CSRArray ImmutableGraph::GetInCSRArray() const {
