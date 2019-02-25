@@ -46,6 +46,13 @@ class EdgeSoftmax(nn.Module):
         self._normalizer_name = normalizer_name
 
     def check_repeated_features(self, g):
+        r"""Rename taken field names.
+
+        Parameters
+        ----------
+        graph : DGLGraph
+            The graph.
+        """
         while self._logits_name in g.edata:
             self._logits_name += '0'
         while self._max_logits_name in g.ndata:
