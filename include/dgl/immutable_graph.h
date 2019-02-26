@@ -49,8 +49,11 @@ class ImmutableGraph: public GraphInterface {
       dst_points[eid] = dst;
     }
 
-    static EdgeList::Ptr FromCSR(std::vector<int64_t> *indptr, std::vector<dgl_id_t> *indices, std::vector<dgl_id_t> *edge_ids,
-                                 int in_csr);
+    static EdgeList::Ptr FromCSR(
+        std::vector<int64_t> *indptr,
+        std::vector<dgl_id_t> *indices,
+        std::vector<dgl_id_t> *edge_ids,
+        int in_csr);
   };
 
   struct CSR {

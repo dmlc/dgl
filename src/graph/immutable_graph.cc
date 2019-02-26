@@ -159,16 +159,17 @@ class HashTableChecker {
 };
 
 ImmutableGraph::EdgeList::Ptr ImmutableGraph::EdgeList::FromCSR(
-    std::vector<int64_t> *indptr, std::vector<dgl_id_t> *indices, std::vector<dgl_id_t> *edge_ids,
-    int row_dim) {
-  CHECK(row_dim == 0 || row_dim == 1) << "row_dim must be 0 or 1";
+    std::vector<int64_t> *indptr,
+    std::vector<dgl_id_t> *indices,
+    std::vector<dgl_id_t> *edge_ids,
+    bool in_csr) {
   const auto n = indptr->size() - 1;
   const auto len = edge_ids->size();
   auto t = std::make_shared<EdgeList>(len, n);
   for (size_t i = 0; i < indptr->size() - 1; i++) {
     for (int64_t j = indptr->at(i); j < indptr->at(i + 1); j++) {
       dgl_id_t row = i, col = indices->at(j);
-      if (row_dim == 1)
+      if (in_csr)
         std::swap(row, col);
       t->register_edge(edge_ids->at(j), row, col);
     }
