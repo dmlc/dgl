@@ -7,6 +7,7 @@
 #define DGL_SAMPLER_H_
 
 #include "graph_interface.h"
+#include <vector>
 
 namespace dgl {
 
