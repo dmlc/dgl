@@ -112,5 +112,5 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
     *rv = ConvertSubgraphToPackedFunc(subgs);
   });
 
-}  // namespace network 
+}  // namespace network
 }  // namespace dgl
