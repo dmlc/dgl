@@ -6,8 +6,8 @@
 #ifndef DGL_SAMPLER_H_
 #define DGL_SAMPLER_H_
 
-#include "graph_interface.h"
 #include <vector>
+#include "graph_interface.h"
 
 namespace dgl {
 
