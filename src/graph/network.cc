@@ -19,6 +19,7 @@ using dgl::runtime::NDArray;
 namespace dgl {
 namespace network {
 
+static char* global_data_buffer = nullptr;
 const int kMaxBufferSize = 200 * 1024 * 1024;  // 200 MB
 
 // Convert Sampled Subgraph structures to PackedFunc.
@@ -92,21 +93,20 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
     network::Communicator* comm = new network::SocketCommunicator();
     comm->Initialize(false, ip.c_str(), port, num_sender, queue_size);
     CommunicatorHandle chandle = static_cast<CommunicatorHandle>(comm);
+    global_data_buffer = new char[kMaxBufferSize];
     *rv = chandle;
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    // The data buffer will be allocated just once
-    static char* data_buffer = new char[kMaxBufferSize];
     CommunicatorHandle chandle = args[0];
     network::Communicator* comm = static_cast<network::Communicator*>(chandle);
-    int size = comm->Receive(data_buffer, kMaxBufferSize);
+    int size = comm->Receive(global_data_buffer, kMaxBufferSize);
     if (size <= 0) {
       LOG(ERROR) << "Receive error: (size: " << size << ")";
     }
     NodeFlow nf;
-    network::DeserializeSampledSubgraph(&nf, data_buffer);
+    network::DeserializeSampledSubgraph(&nf, global_data_buffer);
     std::vector<NodeFlow> subgs(1);
     subgs[0] = nf;
     *rv = ConvertSubgraphToPackedFunc(subgs);
