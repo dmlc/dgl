@@ -160,15 +160,15 @@ class HashTableChecker {
 
 ImmutableGraph::EdgeList::Ptr ImmutableGraph::EdgeList::FromCSR(
     std::vector<int64_t> *indptr, std::vector<dgl_id_t> *indices, std::vector<dgl_id_t> *edge_ids,
-    int sort_on) {
-  CHECK(sort_on == 0 || sort_on == 1) << "we must sort on the first or the second vector";
+    int row_dim) {
+  CHECK(row_dim == 0 || row_dim == 1) << "row_dim must be 0 or 1";
   const auto n = indptr->size() - 1;
   const auto len = edge_ids->size();
   auto t = std::make_shared<EdgeList>(len, n);
   for (size_t i = 0; i < indptr->size() - 1; i++) {
     for (int64_t j = indptr->at(i); j < indptr->at(i + 1); j++) {
       dgl_id_t row = i, col = indices->at(j);
-      if (sort_on == 1)
+      if (row_dim == 1)
         std::swap(row, col);
       t->register_edge(edge_ids->at(j), row, col);
     }
@@ -223,25 +223,23 @@ std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::EdgeSubgraph(
   const int64_t len = eids->shape[0];
   std::vector<dgl_id_t> nodes;
   std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
+  std::vector<Edge> edges;
 
   for (int64_t i = 0; i < len; i++) {
     dgl_id_t src_id = edge_list->src_points[eid_data[i]];
     dgl_id_t dst_id = edge_list->dst_points[eid_data[i]];
-    if (oldv2newv.insert(std::make_pair(src_id, oldv2newv.size())).second)
+
+    // pair<iterator, bool>, the second indicates whether the insertion is successful or not.
+    auto src_pair = oldv2newv.insert(std::make_pair(src_id, oldv2newv.size()));
+    auto dst_pair = oldv2newv.insert(std::make_pair(dst_id, oldv2newv.size()));
+    if (src_pair.second)
       nodes.push_back(src_id);
-    if (oldv2newv.insert(std::make_pair(dst_id, oldv2newv.size())).second)
+    if (dst_pair.second)
       nodes.push_back(dst_id);
+    edges.push_back(Edge{src_pair.first->second, dst_pair.first->second, static_cast<dgl_id_t>(i)});
   }
 
   const size_t n = oldv2newv.size();
-
-  std::vector<Edge> edges;
-  for (int64_t i = 0; i < len; i++) {
-    dgl_id_t src_id = oldv2newv.find(edge_list->src_points[eid_data[i]])->second;
-    dgl_id_t dst_id = oldv2newv.find(edge_list->dst_points[eid_data[i]])->second;
-    edges.push_back(Edge{src_id, dst_id, static_cast<dgl_id_t>(i)});
-  }
-
   auto sub_csr = CSR::FromEdges(&edges, 0, n);
 
   IdArray rst_vids = IdArray::Empty({static_cast<int64_t>(nodes.size())},
@@ -518,20 +516,18 @@ std::pair<dgl_id_t, dgl_id_t> ImmutableGraph::FindEdge(dgl_id_t eid) const {
 ImmutableGraph::EdgeArray ImmutableGraph::FindEdges(IdArray eids) const {
   CHECK(IsValidIdArray(eids)) << "Invalid edge id array";
   dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
-  const auto len = eids->shape[0];
-  std::vector<dgl_id_t> src, dst;
-  for (int64_t k = 0; k < len; k++) {
-    auto edge = ImmutableGraph::FindEdge(eid_data[k]);
-    src.push_back(edge.first);
-    dst.push_back(edge.second);
-  }
-
+  int64_t len = eids->shape[0];
   IdArray rst_src = IdArray::Empty({len}, eids->dtype, eids->ctx);
   IdArray rst_dst = IdArray::Empty({len}, eids->dtype, eids->ctx);
   dgl_id_t* rst_src_data = static_cast<dgl_id_t*>(rst_src->data);
   dgl_id_t* rst_dst_data = static_cast<dgl_id_t*>(rst_dst->data);
-  std::copy(src.begin(), src.end(), rst_src_data);
-  std::copy(dst.begin(), dst.end(), rst_dst_data);
+
+  for (int64_t i = 0; i < len; i++) {
+    auto edge = ImmutableGraph::FindEdge(eid_data[i]);
+    rst_src_data[i] = edge.first;
+    rst_dst_data[i] = edge.second;
+  }
+
   return ImmutableGraph::EdgeArray{rst_src, rst_dst, eids};
 }
 
