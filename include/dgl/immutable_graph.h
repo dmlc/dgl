@@ -44,12 +44,13 @@ class ImmutableGraph: public GraphInterface {
     }
 
     void register_edge(dgl_id_t eid, dgl_id_t src, dgl_id_t dst) {
-      CHECK(eid < src_points.size()) << "Invalid edge id " << eid << " (exceed the number of edges)";
+      CHECK_LT(eid, src_points.size()) << "Invalid edge id " << eid;
       src_points[eid] = src;
       dst_points[eid] = dst;
     }
 
-    static EdgeList::Ptr FromCSR(std::vector<int64_t> *indptr, std::vector<dgl_id_t> *indices, std::vector<dgl_id_t> *edge_ids, int in_csr);
+    static EdgeList::Ptr FromCSR(std::vector<int64_t> *indptr, std::vector<dgl_id_t> *indices, std::vector<dgl_id_t> *edge_ids,
+                                 int in_csr);
   };
 
   struct CSR {
@@ -520,10 +521,12 @@ class ImmutableGraph: public GraphInterface {
     if (edge_list_)
       return edge_list_;
     if (in_csr_) {
-      const_cast<ImmutableGraph *>(this)->edge_list_ = EdgeList::FromCSR(&in_csr_->indptr, &in_csr_->indices, &in_csr_->edge_ids, true);
+      const_cast<ImmutableGraph *>(this)->edge_list_ =\
+        EdgeList::FromCSR(&in_csr_->indptr, &in_csr_->indices, &in_csr_->edge_ids, true);
     } else {
       CHECK(out_csr_ != nullptr) << "one of the CSRs must exist";
-      const_cast<ImmutableGraph *>(this)->edge_list_ = EdgeList::FromCSR(&out_csr_->indptr, &out_csr_->indices, &out_csr_->edge_ids, false);
+      const_cast<ImmutableGraph *>(this)->edge_list_ =\
+        EdgeList::FromCSR(&out_csr_->indptr, &out_csr_->indices, &out_csr_->edge_ids, false);
     }
     return edge_list_;
   }
