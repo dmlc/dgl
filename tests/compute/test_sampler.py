@@ -135,7 +135,7 @@ def test_layer_sampler(prefetch=False):
             block_parent_src = src[block_parent_eid]
             block_parent_dst = dst[block_parent_eid]
 
-            assert np.all(block_src == block_parent_src)
+            assert np.all(F.asnumpy(block_src == block_parent_src))
 
         n_layers = sub_g.num_layers
         sub_n = sub_g.number_of_nodes()
