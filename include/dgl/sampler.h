@@ -7,6 +7,7 @@
 #define DGL_SAMPLER_H_
 
 #include <vector>
+#include <string>
 #include "graph_interface.h"
 
 namespace dgl {
@@ -84,7 +85,6 @@ class SamplerOp {
    * \param num_hops The number of hops for each trace
    * \return a flat ID array with shape (num_seeds, num_traces, num_hops + 1)
    */
-  // TODO: move to sampler.cc
   static IdArray RandomWalk(const GraphInterface *gptr,
                             IdArray seeds,
                             int num_traces,
