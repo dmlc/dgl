@@ -8,7 +8,7 @@ class TUDataset(object):
     
     _url= r"https://ls11-www.cs.uni-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
     
-    def __init__(self, name, use_node_attr=False):
+    def __init__(self, name, use_node_attr=False, use_node_label=False):
         
         self.name = name
         self.extract_dir = self._download()
@@ -28,6 +28,9 @@ class TUDataset(object):
         self.graph_lists = g.subgraphs(node_idx_list)
         self.graph_labels = DS_graph_labels
         
+        if use_node_label:
+            for idxs, g in zip(node_idx_list, graph_lists):
+                g.ndata['node_label'] = DS_node_labels[idxs, :]
         if use_node_attr:
             DS_node_attr = np.loadtxt(self._file_path("node_attributes"), delimiter=",")
             for idxs, g in zip(node_idx_list, self.graph_lists):
