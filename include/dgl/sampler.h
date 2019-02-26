@@ -42,7 +42,7 @@ struct NodeFlow {
   /*!
    * \brief
    */
-  FloatArray probabilities;
+  // FloatArray probabilities;
 };
 
 class SamplerOp {
