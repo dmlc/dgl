@@ -276,15 +276,8 @@ def LayerSampler(g, batch_size, layer_sizes,
     '''Create a sampler that samples neighborhood.
 
     This creates a NodeFlow loader that samples subgraphs from the input graph
-    with neighbor sampling. This sampling method is implemented in C and can perform
+    with layer-wise sampling. This sampling method is implemented in C and can perform
     sampling very efficiently.
-    
-    A NodeFlow grows from a seed vertex. It contains sampled neighbors
-    of the seed vertex as well as the edges that connect neighbor nodes with
-    seed nodes. When the number of hops is k (>1), the neighbors are sampled
-    from the k-hop neighborhood. In this case, the sampled edges are the ones
-    that connect the source nodes and the sampled neighbor nodes of the source
-    nodes.
 
     The NodeFlow loader returns a list of NodeFlows and a dictionary of additional
     information about the NodeFlows. The size of the NodeFlow list is the number of workers.
@@ -297,19 +290,9 @@ def LayerSampler(g, batch_size, layer_sizes,
     ----------
     g: the DGLGraph where we sample NodeFlows.
     batch_size: The number of NodeFlows in a batch.
-    expand_factor: the number of neighbors sampled from the neighbor list
-        of a vertex. The value of this parameter can be
-        an integer: indicates the number of neighbors sampled from a neighbor list.
-        a floating-point: indicates the ratio of the sampled neighbors in a neighbor list.
-        string: indicates some common ways of calculating the number of sampled neighbors,
-        e.g., 'sqrt(deg)'.
-    num_hops: The size of the neighborhood where we sample vertices.
-    neighbor_type: indicates the neighbors on different types of edges.
-        "in" means the neighbors on the in-edges, "out" means the neighbors on
-        the out-edges and "both" means neighbors on both types of edges.
+    layer_size: A list of layer sizes.
     node_prob: the probability that a neighbor node is sampled.
-        1D Tensor. None means uniform sampling. Otherwise, the number of elements
-        should be the same as the number of vertices in the graph.
+        Not implemented.
     seed_nodes: a list of nodes where we sample NodeFlows from.
         If it's None, the seed vertices are all vertices in the graph.
     shuffle: indicates the sampled NodeFlows are shuffled.

@@ -62,6 +62,16 @@ class SamplerOp {
                                         const std::string &edge_type,
                                         int num_hops, int expand_factor);
 
+  /*!
+   * \brief Sample a graph from the seed vertices with layer sampling.
+   * The layers are sampled with a uniform distribution.
+   *
+   * \param graphs A graph for sampling.
+   * \param seeds the nodes where we should start to sample.
+   * \param edge_type the type of edges we should sample neighbors.
+   * \param layer_sizes The size of layers.
+   * \return a NodeFlow graph.
+   */
   static NodeFlow LayerUniformSample(const ImmutableGraph *graph, IdArray seed_array,
                                      const std::string &neigh_type,
                                      const std::vector<size_t> &layer_sizes);
