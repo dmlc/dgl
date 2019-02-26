@@ -1,9 +1,7 @@
 """Distributed sampler infrastructure."""
 from __future__ import absolute_import
 
-from ._ffi.base import c_array
 from ._ffi.function import _init_api
-from .base import DGLError
 from .graph_index import NodeFlowIndex
 from . import utils
 
