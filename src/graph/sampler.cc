@@ -11,8 +11,6 @@
 #include <cmath>
 #include <dmlc/omp.h>
 
-#include <iostream>  // TODO
-
 #ifdef _MSC_VER
 // rand in MS compiler works well in multi-threading.
 int rand_r(unsigned *seed) {
@@ -530,23 +528,23 @@ void ConstructLayers(const int64_t *indptr,
                      const dgl_id_t *indices,
                      const IdArray seed_array,
                      const std::vector<size_t> &layer_sizes,
-                     std::vector<dgl_id_t> &layer_offsets,
-                     std::vector<dgl_id_t> &node_mapping,
-                     std::vector<int64_t> &actl_layer_sizes,
-                     std::vector<float> &probabilities) {
+                     std::vector<dgl_id_t> *layer_offsets,
+                     std::vector<dgl_id_t> *node_mapping,
+                     std::vector<int64_t> *actl_layer_sizes,
+                     std::vector<float> *probabilities) {
   const dgl_id_t* seed_data = static_cast<dgl_id_t*>(seed_array->data);
   size_t seed_len = seed_array->shape[0];
-  std::copy(seed_data, seed_data + seed_len, std::back_inserter(node_mapping));
-  actl_layer_sizes.push_back(node_mapping.size());
-  probabilities.insert(probabilities.end(), node_mapping.size(), 1);
+  std::copy(seed_data, seed_data + seed_len, std::back_inserter(*node_mapping));
+  actl_layer_sizes->push_back(node_mapping->size());
+  probabilities->insert(probabilities->end(), node_mapping->size(), 1);
 
   size_t curr = 0;
-  size_t next = node_mapping.size();
+  size_t next = node_mapping->size();
   unsigned int rand_seed = time(nullptr);
   for (auto i = layer_sizes.rbegin(); i != layer_sizes.rend(); ++i) {
     std::unordered_set<dgl_id_t> candidate_set;
     for (auto j = curr; j != next; ++j) {
-      auto src = node_mapping[j];
+      auto src = (*node_mapping)[j];
       candidate_set.insert(indices + indptr[src], indices + indptr[src + 1]);
     }
 
@@ -564,20 +562,20 @@ void ConstructLayers(const int64_t *indptr,
     }
 
     for (auto const &pair : n_occurrences) {
-      node_mapping.push_back(pair.first);
+      node_mapping->push_back(pair.first);
       float p = pair.second * n_candidates / static_cast<float>(*i);
-      probabilities.push_back(p);
+      probabilities->push_back(p);
     }
 
-    actl_layer_sizes.push_back(node_mapping.size() - next);
+    actl_layer_sizes->push_back(node_mapping->size() - next);
     curr = next;
-    next = node_mapping.size();
+    next = node_mapping->size();
   }
-  std::reverse(node_mapping.begin(), node_mapping.end());
-  std::reverse(actl_layer_sizes.begin(), actl_layer_sizes.end());
-  layer_offsets.push_back(0);
-  for (const auto &size : actl_layer_sizes) {
-    layer_offsets.push_back(size + layer_offsets.back());
+  std::reverse(node_mapping->begin(), node_mapping->end());
+  std::reverse(actl_layer_sizes->begin(), actl_layer_sizes->end());
+  layer_offsets->push_back(0);
+  for (const auto &size : *actl_layer_sizes) {
+    layer_offsets->push_back(size + layer_offsets->back());
   }
 }
 
@@ -586,14 +584,14 @@ void ConstructFlows(const int64_t *indptr,
                     const dgl_id_t *eids,
                     const std::vector<dgl_id_t> &node_mapping,
                     const std::vector<int64_t> &actl_layer_sizes,
-                    std::vector<int64_t> &sub_indptr,
-                    std::vector<dgl_id_t> &sub_indices,
-                    std::vector<dgl_id_t> &sub_eids,
-                    std::vector<dgl_id_t> &flow_offsets,
-                    std::vector<dgl_id_t> &edge_mapping) {
+                    std::vector<int64_t> *sub_indptr,
+                    std::vector<dgl_id_t> *sub_indices,
+                    std::vector<dgl_id_t> *sub_eids,
+                    std::vector<dgl_id_t> *flow_offsets,
+                    std::vector<dgl_id_t> *edge_mapping) {
   auto n_flows = actl_layer_sizes.size() - 1;
-  sub_indptr.insert(sub_indptr.end(), actl_layer_sizes.front() + 1, 0);
-  flow_offsets.push_back(0);
+  sub_indptr->insert(sub_indptr->end(), actl_layer_sizes.front() + 1, 0);
+  flow_offsets->push_back(0);
   int64_t first = 0;
   for (size_t i = 0; i < n_flows; ++i) {
     auto src_size = actl_layer_sizes[i];
@@ -615,16 +613,16 @@ void ConstructFlows(const int64_t *indptr,
       auto cmp = [](const id_pair p, const id_pair q)->bool { return p.first < q.first; };
       std::sort(neighbor_indices.begin(), neighbor_indices.end(), cmp);
       for (const auto &pair : neighbor_indices) {
-        sub_indices.push_back(pair.first);
-        edge_mapping.push_back(pair.second);
+        sub_indices->push_back(pair.first);
+        edge_mapping->push_back(pair.second);
       }
-      sub_indptr.push_back(sub_indices.size());
+      sub_indptr->push_back(sub_indices->size());
     }
-    flow_offsets.push_back(sub_indices.size());
+    flow_offsets->push_back(sub_indices->size());
     first += src_size;
   }
-  sub_eids.resize(sub_indices.size());
-  std::iota(sub_eids.begin(), sub_eids.end(), 0);
+  sub_eids->resize(sub_indices->size());
+  std::iota(sub_eids->begin(), sub_eids->end(), 0);
 }
 
 NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
@@ -644,10 +642,10 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
                   indices,
                   seed_array,
                   layer_sizes,
-                  layer_offsets,
-                  node_mapping,
-                  actl_layer_sizes,
-                  probabilities);
+                  &layer_offsets,
+                  &node_mapping,
+                  &actl_layer_sizes,
+                  &probabilities);
 
   std::vector<int64_t> sub_indptr;
   std::vector<dgl_id_t> sub_indices;
@@ -659,11 +657,11 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
                  eids,
                  node_mapping,
                  actl_layer_sizes,
-                 sub_indptr,
-                 sub_indices,
-                 sub_eids,
-                 flow_offsets,
-                 edge_mapping);
+                 &sub_indptr,
+                 &sub_indices,
+                 &sub_eids,
+                 &flow_offsets,
+                 &edge_mapping);
 
   /*
   std::cout << "layer_offsets:" << layer_offsets.size() << std::endl
