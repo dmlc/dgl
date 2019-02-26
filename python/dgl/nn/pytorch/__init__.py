@@ -1,1 +1,3 @@
-from .gcn import GraphConvolutionLayer
+"""Package for pytorch-specific NN modules."""
+from .conv import *
+from .softmax import *
