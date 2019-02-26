@@ -53,7 +53,7 @@ class ImmutableGraph: public GraphInterface {
         std::vector<int64_t> *indptr,
         std::vector<dgl_id_t> *indices,
         std::vector<dgl_id_t> *edge_ids,
-        int in_csr);
+        bool in_csr);
   };
 
   struct CSR {
