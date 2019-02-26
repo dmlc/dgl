@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cmath>
+#include <numeric>
 
 #ifdef _MSC_VER
 // rand in MS compiler works well in multi-threading.
