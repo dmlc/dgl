@@ -52,6 +52,7 @@ int MessageQueue::Add(const char* src, int size, bool is_blocking) {
     return -1;
   }
   if (size > free_size_ && !is_blocking) {
+    LOG(WARNING) << "Queue is full and message lost.";
     return 0;
   }
   cond_not_full_.wait(lock, [&]() {
