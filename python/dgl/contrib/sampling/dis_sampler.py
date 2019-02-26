@@ -1,6 +1,6 @@
 # This file contains distributed samplers.
 from ...node_flow import NodeFlow
-from ...graph_index import _create_sender, _create_receiver, _send_subgraph, _recv_subgraph
+from ...network import _create_sender, _create_receiver, _send_subgraph, _recv_subgraph
 
 class Sender(object):
     """The Sender class for distributed sampler.
