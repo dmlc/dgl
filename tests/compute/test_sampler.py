@@ -103,11 +103,15 @@ def test_layer_sampler(prefetch=False):
     g = generate_rand_graph(100)
     nid = g.nodes()
     src, dst, eid = g.all_edges(form='all', order='eid')
-    seed_nodes = np.sort(np.random.choice(F.asnumpy(nid), 50, replace=False))
-    layer_sizes = [50] * 2
+    n_batches = 5
+    batch_size = 50
+    seed_batches = [np.sort(np.random.choice(F.asnumpy(nid), batch_size, replace=False))
+                    for i in range(n_batches)]
+    seed_nodes = np.hstack(seed_batches)
+    layer_sizes = [50] * 3
     LayerSampler = getattr(dgl.contrib.sampling, 'LayerSampler')
-    sampler = LayerSampler(g, len(seed_nodes), layer_sizes, 'in',
-                           seed_nodes=seed_nodes, prefetch=prefetch)
+    sampler = LayerSampler(g, batch_size, layer_sizes, 'in',
+                           seed_nodes=seed_nodes, num_workers=4, prefetch=prefetch)
     for sub_g, ret in sampler:
         assert all(sub_g.layer_size(i) < size for i, size in enumerate(layer_sizes))
         sub_nid = np.arange(0, sub_g.number_of_nodes())
@@ -118,12 +122,11 @@ def test_layer_sampler(prefetch=False):
         sub_eid = F.arange(0, sub_g.number_of_edges())
         assert np.all(np.isin(F.asnumpy(sub_g.map_to_parent_eid(sub_eid)),
                               F.asnumpy(eid)))
-        assert np.all(seed_nodes == np.sort(F.asnumpy(sub_g.layer_parent_nid(-1))))
+        assert any(np.all(np.sort(F.asnumpy(sub_g.layer_parent_nid(-1))) == seed_batch)
+                   for seed_batch in seed_batches)
 
         sub_src, sub_dst = sub_g.all_edges(order='eid')
         for i in range(sub_g.num_blocks):
-            block_size = sub_g.block_size(i)
-
             block_eid = sub_g.block_eid(i)
             block_src = sub_g.map_to_parent_nid(sub_src[block_eid])
             block_dst = sub_g.map_to_parent_nid(sub_dst[block_eid])
@@ -133,6 +136,13 @@ def test_layer_sampler(prefetch=False):
             block_parent_dst = dst[block_parent_eid]
 
             assert np.all(block_src == block_parent_src)
+
+        n_layers = sub_g.num_layers
+        sub_n = sub_g.number_of_nodes()
+        assert sum(F.shape(sub_g.layer_nid(i))[0] for i in range(n_layers)) == sub_n
+        n_blocks = sub_g.num_blocks
+        sub_m = sub_g.number_of_edges()
+        assert sum(F.shape(sub_g.block_eid(i))[0] for i in range(n_blocks)) == sub_m
 
 def test_random_walk():
     edge_list = [(0, 1), (1, 2), (2, 3), (3, 4),
