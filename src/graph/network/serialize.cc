@@ -88,7 +88,7 @@ int64_t SerializeSampledSubgraph(char** data,
 }
 
 void DeserializeSampledSubgraph(char* data,
-                                ImmutableGraph::CSR::Ptr &csr,
+                                ImmutableGraph::CSR::Ptr* csr,
                                 IdArray* node_mapping,
                                 IdArray* edge_mapping,
                                 IdArray* layer_offsets,
@@ -133,25 +133,25 @@ void DeserializeSampledSubgraph(char* data,
   memcpy(edge_mapping_data, data_ptr, tensor_size);
   data_ptr += tensor_size;
   // Construct sub_csr_graph
-  csr = std::make_shared<ImmutableGraph::CSR>(num_vertices, num_edges);
-  csr->indices.resize(num_edges);
-  csr->edge_ids.resize(num_edges);
+  *csr = std::make_shared<ImmutableGraph::CSR>(num_vertices, num_edges);
+  (*csr)->indices.resize(num_edges);
+  (*csr)->edge_ids.resize(num_edges);
   // indices (CSR)
   tensor_size = static_cast<int64_t>(*data_ptr);
   data_ptr += sizeof(int64_t);
-  dgl_id_t* col_list_out = csr->indices.data();
+  dgl_id_t* col_list_out = (*csr)->indices.data();
   memcpy(col_list_out, data_ptr, tensor_size);
   data_ptr += tensor_size;
   // edge_ids (CSR)
   tensor_size = static_cast<int64_t>(*data_ptr);
   data_ptr += sizeof(int64_t);
-  dgl_id_t* edge_ids = csr->edge_ids.data();
+  dgl_id_t* edge_ids = (*csr)->edge_ids.data();
   memcpy(edge_ids, data_ptr, tensor_size);
   data_ptr += tensor_size;
   // indptr (CSR)
   tensor_size = static_cast<int64_t>(*data_ptr);
   data_ptr += sizeof(int64_t);
-  int64_t* indptr_out = csr->indptr.data();
+  int64_t* indptr_out = (*csr)->indptr.data();
   memcpy(indptr_out, data_ptr, tensor_size);
   data_ptr += tensor_size;
 }

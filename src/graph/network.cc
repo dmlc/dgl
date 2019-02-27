@@ -108,11 +108,11 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
     NodeFlow nf;
     ImmutableGraph::CSR::Ptr csr;
     network::DeserializeSampledSubgraph(global_data_buffer,
-    	                                csr,
-    	                                &(nf.node_mapping),
-    	                                &(nf.edge_mapping),
-    	                                &(nf.layer_offsets),
-    	                                &(nf.flow_offsets));
+                                        &csr,
+                                        &(nf.node_mapping),
+                                        &(nf.edge_mapping),
+                                        &(nf.layer_offsets),
+                                        &(nf.flow_offsets));
     nf.graph = GraphPtr(new ImmutableGraph(csr, nullptr, false));
     std::vector<NodeFlow> subgs(1);
     subgs[0] = nf;

@@ -39,7 +39,7 @@ int64_t SerializeSampledSubgraph(char** data,
  * \param flow_offsets flow offsets in NodeFlowIndex
  */
 void DeserializeSampledSubgraph(char* data,
-	                            ImmutableGraph::CSR::Ptr &csr,
+	                            ImmutableGraph::CSR::Ptr* csr,
                                 IdArray* node_mapping,
                                 IdArray* edge_mapping,
                                 IdArray* layer_offsets,
