@@ -106,10 +106,24 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
       LOG(ERROR) << "Receive error: (size: " << size << ")";
     }
     NodeFlow nf;
-    network::DeserializeSampledSubgraph(&nf, global_data_buffer);
+    ImmutableGraph::CSR::Ptr csr;
+    network::DeserializeSampledSubgraph(global_data_buffer,
+    	                                csr,
+    	                                &(nf.node_mapping),
+    	                                &(nf.edge_mapping),
+    	                                &(nf.layer_offsets),
+    	                                &(nf.flow_offsets));
+    nf.graph = GraphPtr(new ImmutableGraph(csr, nullptr, false));
     std::vector<NodeFlow> subgs(1);
     subgs[0] = nf;
     *rv = ConvertSubgraphToPackedFunc(subgs);
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeCommunicator")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+	CommunicatorHandle chandle = args[0];
+    network::Communicator* comm = static_cast<network::Communicator*>(chandle);
+    comm->Finalize();
   });
 
 }  // namespace network

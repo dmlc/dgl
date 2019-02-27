@@ -140,6 +140,7 @@ void SocketCommunicator::FinalizeSender() {
       sent_bytes += tmp;
     }
     socket_[0]->Close();
+    LOG(INFO) << "Close sender socket.";
     delete socket_[0];
     socket_[0] = nullptr;
   }

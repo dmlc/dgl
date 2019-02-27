@@ -49,6 +49,32 @@ def _send_subgraph(sender, nodeflow):
                              layers_offsets,
                              flows_offsets)
 
+def _batch_send_subgraph(sender, nodeflow_list):
+    """ Send a batch of sampled subgraph to remote trainer
+
+    Parameter:
+    ----------
+    sender : C sender handle
+    nodeflow_list : a list of nodeflow object
+    """
+    graph_index_list = []
+    node_mapping_list = []
+    edge_mapping_list = []
+    layers_offsets_list = []
+    flows_offsets_list = []
+    for nf in nodeflow_list:
+        graph_index_list.append(nf._graph._handle)
+        node_mapping_list.append(nf._node_mapping.todgltensor())
+        edge_mapping_list.append(nf._edge_mapping.todgltensor())
+        layers_offsets_list.append(nf._graph._layers.todgltensor())
+        flows_offsets_list.append(nf._graph._flows.todgltensor())
+    _CAPI_SenderBatchSendSubgraph(sender,
+                                  graph_index_list,
+                                  node_mapping_list,
+                                  edge_mapping_list,
+                                  layers_offsets_list,
+                                  flows_offsets_list)
+
 def _recv_subgraph(receiver):
     """ Receive sampled subgraph from remote sampler
 
@@ -58,7 +84,7 @@ def _recv_subgraph(receiver):
 
     Return
     -------
-    nfIdx: a NodeFlowIndex object
+    nodeflow_idx : a NodeFlowIndex object
     """
     rst = _CAPI_ReceiverRecvSubgraph(receiver)
     # Note that, for distributed sampler
@@ -70,3 +96,34 @@ def _recv_subgraph(receiver):
                                  utils.toindex(rst(3)),  # layers_offsets
                                  utils.toindex(rst(4)))  # flows_offsets
     return nodeflow_idx
+
+def _batch_recv_subgraph(receiver):
+    """ Receive a batch of sampled subgraph from remote sampler
+
+    Parameter
+    ----------
+    receiver :  C receiver handle
+
+    Return
+    -------
+    nodeflow_idx_list : a list of NodeFlowIndex object
+    """
+    rst = _CAPI_ReceiverBatchRecvSubgraph(receiver)
+
+def _finalize_sender(sender):
+    """ Finalize Sender communicator
+
+    Parameter
+    ----------
+    sender : C sender handle
+    """
+    _CAPI_DGLFinalizeCommunicator(sender)
+
+def _finalize_receiver(receiver):
+	""" Finalize Receiver communicator
+
+	Parameter
+	----------
+	receiver : C receiver handle
+	"""
+	_CAPI_DGLFinalizeCommunicator(receiver)

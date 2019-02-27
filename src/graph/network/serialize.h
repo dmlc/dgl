@@ -14,7 +14,7 @@ namespace network {
 
 /*!
  * \brief Serialize sampled subgraph to binary data
- * \param data data buffer
+ * \param data pointer of data buffer
  * \param csr subgraph csr
  * \param node_mapping node mapping in NodeFlowIndex
  * \param edge_mapping edge mapping in NodeFlowIndex
@@ -31,10 +31,19 @@ int64_t SerializeSampledSubgraph(char** data,
 
 /*!
  * \brief Deserialize sampled subgraph from binary data
- * \param nf NodeFlow
- * \param data data buffer
+ * \param data pointer of data buffer
+ * \param csr subgraph csr
+ * \param node_mapping node mapping in NodeFlowIndex
+ * \param edge_mapping edge mapping in NodeFlowIndex
+ * \param layer_offsets layer offsets in NodeFlowIndex
+ * \param flow_offsets flow offsets in NodeFlowIndex
  */
-void DeserializeSampledSubgraph(NodeFlow* nf, char* data);
+void DeserializeSampledSubgraph(char* data,
+	                            ImmutableGraph::CSR::Ptr &csr,
+                                IdArray* node_mapping,
+                                IdArray* edge_mapping,
+                                IdArray* layer_offsets,
+                                IdArray* flow_offsets);
 
 // TODO(chao): we can add compression and decompression method here
 

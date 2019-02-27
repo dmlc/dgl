@@ -16,11 +16,11 @@ namespace network {
 const int kNumTensor = 7;  // We need to serialize 7 conponents (tensor) here
 
 int64_t SerializeSampledSubgraph(char** data,
-                               const ImmutableGraph::CSR::Ptr csr,
-                               const IdArray& node_mapping,
-                               const IdArray& edge_mapping,
-                               const IdArray& layer_offsets,
-                               const IdArray& flow_offsets) {
+                                 const ImmutableGraph::CSR::Ptr csr,
+                                 const IdArray& node_mapping,
+                                 const IdArray& edge_mapping,
+                                 const IdArray& layer_offsets,
+                                 const IdArray& flow_offsets) {
   int64_t total_size = 0;
   // For each component, we first write its size at the
   // begining of the buffer and then write its binary data
@@ -87,9 +87,12 @@ int64_t SerializeSampledSubgraph(char** data,
   return total_size;
 }
 
-void DeserializeSampledSubgraph(NodeFlow* nf, char* data) {
-  CHECK_NOTNULL(nf);
-  CHECK_NOTNULL(data);
+void DeserializeSampledSubgraph(char* data,
+                                ImmutableGraph::CSR::Ptr &csr,
+                                IdArray* node_mapping,
+                                IdArray* edge_mapping,
+                                IdArray* layer_offsets,
+                                IdArray* flow_offsets) {
   // For each component, we first write its size at the
   // begining of the buffer and then write its binary data
   char* data_ptr = data;
@@ -97,61 +100,60 @@ void DeserializeSampledSubgraph(NodeFlow* nf, char* data) {
   int64_t tensor_size = static_cast<int64_t>(*data_ptr);
   int64_t num_vertices = tensor_size / sizeof(int64_t);
   data_ptr += sizeof(int64_t);
-  nf->node_mapping = IdArray::Empty({static_cast<int64_t>(num_vertices)},
-                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  dgl_id_t* node_map_data = static_cast<dgl_id_t*>(nf->node_mapping->data);
+  *node_mapping = IdArray::Empty({static_cast<int64_t>(num_vertices)},
+                                  DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  dgl_id_t* node_map_data = static_cast<dgl_id_t*>((*node_mapping)->data);
   memcpy(node_map_data, data_ptr, tensor_size);
   data_ptr += tensor_size;
   // layer offsets
   tensor_size = static_cast<int64_t>(*data_ptr);
   int64_t num_hops_add_one = tensor_size / sizeof(int64_t);
   data_ptr += sizeof(int64_t);
-  nf->layer_offsets = IdArray::Empty({static_cast<int64_t>(num_hops_add_one)},
-                                     DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  dgl_id_t* layer_off_data = static_cast<dgl_id_t*>(nf->layer_offsets->data);
+  *layer_offsets = IdArray::Empty({static_cast<int64_t>(num_hops_add_one)},
+                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  dgl_id_t* layer_off_data = static_cast<dgl_id_t*>((*layer_offsets)->data);
   memcpy(layer_off_data, data_ptr, tensor_size);
   data_ptr += tensor_size;
   // flow offsets
   tensor_size = static_cast<int64_t>(*data_ptr);
   int64_t num_hops = tensor_size / sizeof(int64_t);
   data_ptr += sizeof(int64_t);
-  nf->flow_offsets = IdArray::Empty({static_cast<int64_t>(num_hops)},
-                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  dgl_id_t* flow_off_data = static_cast<dgl_id_t*>(nf->flow_offsets->data);
+  *flow_offsets = IdArray::Empty({static_cast<int64_t>(num_hops)},
+                                  DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  dgl_id_t* flow_off_data = static_cast<dgl_id_t*>((*flow_offsets)->data);
   memcpy(flow_off_data, data_ptr, tensor_size);
   data_ptr += tensor_size;
   // edge_mapping
   tensor_size = static_cast<int64_t>(*data_ptr);
   int64_t num_edges = tensor_size / sizeof(int64_t);
   data_ptr += sizeof(int64_t);
-  nf->edge_mapping = IdArray::Empty({static_cast<int64_t>(num_edges)},
-                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  dgl_id_t* edge_mapping = static_cast<dgl_id_t*>(nf->edge_mapping->data);
-  memcpy(edge_mapping, data_ptr, tensor_size);
+  *edge_mapping = IdArray::Empty({static_cast<int64_t>(num_edges)},
+                                  DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  dgl_id_t* edge_mapping_data = static_cast<dgl_id_t*>((*edge_mapping)->data);
+  memcpy(edge_mapping_data, data_ptr, tensor_size);
   data_ptr += tensor_size;
   // Construct sub_csr_graph
-  auto subg_csr = std::make_shared<ImmutableGraph::CSR>(num_vertices, num_edges);
-  subg_csr->indices.resize(num_edges);
-  subg_csr->edge_ids.resize(num_edges);
+  csr = std::make_shared<ImmutableGraph::CSR>(num_vertices, num_edges);
+  csr->indices.resize(num_edges);
+  csr->edge_ids.resize(num_edges);
   // indices (CSR)
   tensor_size = static_cast<int64_t>(*data_ptr);
   data_ptr += sizeof(int64_t);
-  dgl_id_t* col_list_out = subg_csr->indices.data();
+  dgl_id_t* col_list_out = csr->indices.data();
   memcpy(col_list_out, data_ptr, tensor_size);
   data_ptr += tensor_size;
   // edge_ids (CSR)
   tensor_size = static_cast<int64_t>(*data_ptr);
   data_ptr += sizeof(int64_t);
-  dgl_id_t* edge_ids = subg_csr->edge_ids.data();
+  dgl_id_t* edge_ids = csr->edge_ids.data();
   memcpy(edge_ids, data_ptr, tensor_size);
   data_ptr += tensor_size;
   // indptr (CSR)
   tensor_size = static_cast<int64_t>(*data_ptr);
   data_ptr += sizeof(int64_t);
-  int64_t* indptr_out = subg_csr->indptr.data();
+  int64_t* indptr_out = csr->indptr.data();
   memcpy(indptr_out, data_ptr, tensor_size);
   data_ptr += tensor_size;
-  nf->graph = GraphPtr(new ImmutableGraph(subg_csr, nullptr, false));
 }
 
 }  // namespace network
