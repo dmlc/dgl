@@ -120,10 +120,10 @@ def _finalize_sender(sender):
     _CAPI_DGLFinalizeCommunicator(sender)
 
 def _finalize_receiver(receiver):
-	""" Finalize Receiver communicator
+    """ Finalize Receiver communicator
 
-	Parameter
-	----------
-	receiver : C receiver handle
-	"""
-	_CAPI_DGLFinalizeCommunicator(receiver)
+    Parameter
+    ----------
+    receiver : C receiver handle
+    """
+    _CAPI_DGLFinalizeCommunicator(receiver)

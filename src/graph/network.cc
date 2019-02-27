@@ -84,6 +84,11 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
     }
   });
 
+DGL_REGISTER_GLOBAL("network._CAPI_SenderBatchSendSubgraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+
+  });
+
 DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string ip = args[0];
@@ -117,6 +122,11 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
     std::vector<NodeFlow> subgs(1);
     subgs[0] = nf;
     *rv = ConvertSubgraphToPackedFunc(subgs);
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_ReceiverBatchRecvSubgraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeCommunicator")
