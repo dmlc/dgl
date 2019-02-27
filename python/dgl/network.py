@@ -62,12 +62,12 @@ def _batch_send_subgraph(sender, nodeflow_list):
     edge_mapping_list = []
     layers_offsets_list = []
     flows_offsets_list = []
-    for nf in nodeflow_list:
-        graph_index_list.append(nf._graph._handle)
-        node_mapping_list.append(nf._node_mapping.todgltensor())
-        edge_mapping_list.append(nf._edge_mapping.todgltensor())
-        layers_offsets_list.append(nf._graph._layers.todgltensor())
-        flows_offsets_list.append(nf._graph._flows.todgltensor())
+    for nodeflow in nodeflow_list:
+        graph_index_list.append(nodeflow._graph._handle)
+        node_mapping_list.append(nodeflow._node_mapping.todgltensor())
+        edge_mapping_list.append(nodeflow._edge_mapping.todgltensor())
+        layers_offsets_list.append(nodeflow._graph._layers.todgltensor())
+        flows_offsets_list.append(nodeflow._graph._flows.todgltensor())
     _CAPI_SenderBatchSendSubgraph(sender,
                                   graph_index_list,
                                   node_mapping_list,
@@ -109,6 +109,14 @@ def _batch_recv_subgraph(receiver):
     nodeflow_idx_list : a list of NodeFlowIndex object
     """
     rst = _CAPI_ReceiverBatchRecvSubgraph(receiver)
+    # Note that, for distributed sampler
+    # we should set parent graph to None
+    nodeflow_idx = NodeFlowIndex(rst(0),   # graph index handle
+                                 None,     # parent graph index
+                                 utils.toindex(rst(1)),  # node_mapping
+                                 utils.toindex(rst(2)),  # edge_mapping
+                                 utils.toindex(rst(3)),  # layers_offsets
+                                 utils.toindex(rst(4)))  # flows_offsets
 
 def _finalize_sender(sender):
     """ Finalize Sender communicator
