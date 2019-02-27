@@ -117,6 +117,7 @@ def _batch_recv_subgraph(receiver):
                                  utils.toindex(rst(2)),  # edge_mapping
                                  utils.toindex(rst(3)),  # layers_offsets
                                  utils.toindex(rst(4)))  # flows_offsets
+    return nodeflow_idx
 
 def _finalize_sender(sender):
     """ Finalize Sender communicator
