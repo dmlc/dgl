@@ -121,7 +121,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeCommunicator")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-	CommunicatorHandle chandle = args[0];
+    CommunicatorHandle chandle = args[0];
     network::Communicator* comm = static_cast<network::Communicator*>(chandle);
     comm->Finalize();
   });
