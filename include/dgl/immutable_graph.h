@@ -50,9 +50,9 @@ class ImmutableGraph: public GraphInterface {
     }
 
     static EdgeList::Ptr FromCSR(
-        std::vector<int64_t> *indptr,
-        std::vector<dgl_id_t> *indices,
-        std::vector<dgl_id_t> *edge_ids,
+        const std::vector<int64_t>& indptr,
+        const std::vector<dgl_id_t>& indices,
+        const std::vector<dgl_id_t>& edge_ids,
         bool in_csr);
   };
 
@@ -525,11 +525,11 @@ class ImmutableGraph: public GraphInterface {
       return edge_list_;
     if (in_csr_) {
       const_cast<ImmutableGraph *>(this)->edge_list_ =\
-        EdgeList::FromCSR(&in_csr_->indptr, &in_csr_->indices, &in_csr_->edge_ids, true);
+        EdgeList::FromCSR(in_csr_->indptr, in_csr_->indices, in_csr_->edge_ids, true);
     } else {
       CHECK(out_csr_ != nullptr) << "one of the CSRs must exist";
       const_cast<ImmutableGraph *>(this)->edge_list_ =\
-        EdgeList::FromCSR(&out_csr_->indptr, &out_csr_->indices, &out_csr_->edge_ids, false);
+        EdgeList::FromCSR(out_csr_->indptr, out_csr_->indices, out_csr_->edge_ids, false);
     }
     return edge_list_;
   }
