@@ -111,7 +111,7 @@ def test_layer_sampler(prefetch=False):
     LayerSampler = getattr(dgl.contrib.sampling, 'LayerSampler')
     sampler = LayerSampler(g, batch_size, layer_sizes, 'in',
                            seed_nodes=seed_nodes, num_workers=4, prefetch=prefetch)
-    for sub_g, ret in sampler:
+    for sub_g in sampler:
         assert all(sub_g.layer_size(i) < size for i, size in enumerate(layer_sizes))
         sub_nid = F.arange(0, sub_g.number_of_nodes())
         assert all(np.all(np.isin(F.asnumpy(sub_g.layer_nid(i)), F.asnumpy(sub_nid)))
