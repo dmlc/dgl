@@ -19,7 +19,8 @@ __all__ = ['NeighborSampler']
 class NSSubgraphLoader(object):
     def __init__(self, g, batch_size, expand_factor, num_hops=1,
                  neighbor_type='in', node_prob=None, seed_nodes=None,
-                 shuffle=False, num_workers=1, return_seed_id=False):
+                 shuffle=False, num_workers=1, return_seed_id=False,
+                 add_self_loop=False):
         self._g = g
         if not g._graph.is_readonly():
             raise NotImplementedError("NodeFlow loader only support read-only graphs.")
@@ -28,6 +29,7 @@ class NSSubgraphLoader(object):
         self._num_hops = num_hops
         self._node_prob = node_prob
         self._return_seed_id = return_seed_id
+        self._add_self_loop = add_self_loop
         if self._node_prob is not None:
             assert self._node_prob.shape[0] == g.number_of_nodes(), \
                     "We need to know the sampling probability of every node"
@@ -56,7 +58,7 @@ class NSSubgraphLoader(object):
             self._nflow_idx += 1
         sgi = self._g._graph.neighbor_sampling(seed_ids, self._expand_factor,
                                                self._num_hops, self._neighbor_type,
-                                               self._node_prob)
+                                               self._node_prob, self._add_self_loop)
         nflows = [NodeFlow(self._g, i) for i in sgi]
         self._nflows.extend(nflows)
         if self._return_seed_id:
@@ -194,8 +196,8 @@ class _PrefetchingLoader(object):
 
 def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
                     neighbor_type='in', node_prob=None, seed_nodes=None,
-                    shuffle=False, num_workers=1,
-                    return_seed_id=False, prefetch=False):
+                    shuffle=False, num_workers=1, return_seed_id=False,
+                    prefetch=False, add_self_loop=False):
     '''Create a sampler that samples neighborhood.
 
     This creates a NodeFlow loader that samples subgraphs from the input graph
@@ -241,6 +243,9 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
         The seed Ids are in the parent graph.
     prefetch : bool, default False
         Whether to prefetch the samples in the next batch.
+    add_self_loop : bool, default False
+        Whether to add self loop to the sampled NodeFlow.
+        If True, the edge IDs of the self loop edges are -1.
 
     Returns
     -------
@@ -249,7 +254,7 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
         information about the NodeFlows.
     '''
     loader = NSSubgraphLoader(g, batch_size, expand_factor, num_hops, neighbor_type, node_prob,
-                              seed_nodes, shuffle, num_workers, return_seed_id)
+                              seed_nodes, shuffle, num_workers, return_seed_id, add_self_loop)
     if not prefetch:
         return loader
     else:

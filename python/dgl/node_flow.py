@@ -354,7 +354,11 @@ class NodeFlow(DGLBaseGraph):
         block_id = self._get_block_id(block_id)
         start = self._block_offsets[block_id]
         end = self._block_offsets[block_id + 1]
-        return self._edge_mapping.tousertensor()[start:end]
+        ret = self._edge_mapping.tousertensor()[start:end]
+        # If `add_self_loop` is enabled, the returned parent eid can be -1.
+        # We have to make sure this case doesn't happen.
+        assert F.asnumpy(F.sum(ret == -1, 0)) == 0, "The eid in the parent graph is invalid."
+        return ret
 
     def set_n_initializer(self, initializer, layer_id=ALL, field=None):
         """Set the initializer for empty node features.
@@ -703,7 +707,7 @@ class NodeFlow(DGLBaseGraph):
                                inplace=inplace)
 
 
-def create_full_node_flow(g, num_layers):
+def create_full_node_flow(g, num_layers, add_self_loop=False):
     """Convert a full graph to NodeFlow to run a L-layer GNN model.
 
     Parameters
@@ -712,6 +716,9 @@ def create_full_node_flow(g, num_layers):
         a DGL graph
     num_layers : int
         The number of layers
+    add_self_loop : bool, default False
+        Whether to add self loop to the sampled NodeFlow.
+        If True, the edge IDs of the self loop edges are -1.
 
     Returns
     -------
@@ -719,5 +726,6 @@ def create_full_node_flow(g, num_layers):
         a NodeFlow with a specified number of layers.
     """
     seeds = [utils.toindex(F.arange(0, g.number_of_nodes()))]
-    nfi = g._graph.neighbor_sampling(seeds, g.number_of_nodes(), num_layers, 'in', None)
+    nfi = g._graph.neighbor_sampling(seeds, g.number_of_nodes(), num_layers,
+                                     'in', None, add_self_loop)
     return NodeFlow(g, nfi[0])
