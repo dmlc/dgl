@@ -190,7 +190,7 @@ def _build_adj_matrix_index_uv(edges, reduce_nodes, num_sources):
     row = F.unsqueeze(new_v, 0)
     col = F.unsqueeze(u, 0)
     idx = F.cat([row, col], dim=0)
-    return ('coo', idx), (m, n)
+    return ('coo', idx, False), (m, n)
 
 def build_adj_matrix_uv(edges, reduce_nodes, num_sources):
     """Build adj matrix using the given (u, v) edges and target nodes.
@@ -309,9 +309,9 @@ def build_inc_matrix_eid(m, eid, dst, reduce_nodes):
     # create dat tensor
     nnz = len(eid)
     dat = F.ones((nnz,), dtype=F.float32, ctx=F.cpu())
-    mat, _ = F.sparse_matrix(dat, ('coo', idx), (n, m))
+    mat, shuffle = F.sparse_matrix(dat, ('coo', idx, False), (n, m))
     # inc mat will not use data tensor so conversion index is not needed
-    return utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx)), None
+    return utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx)), shuffle
 
 def build_inc_matrix_dst(dst, reduce_nodes):
     """Build incidence matrix using only edge destinations.

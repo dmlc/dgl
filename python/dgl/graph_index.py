@@ -591,7 +591,7 @@ class GraphIndex(object):
             idx = F.reshape(idx, (2, m))
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
             n = self.number_of_nodes()
-            adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, n))
+            adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx, False), (n, n))
             shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
             return adj, shuffle_idx
         else:
@@ -645,14 +645,14 @@ class GraphIndex(object):
             idx = F.cat([row, col], dim=0)
             # FIXME(minjie): data type
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx, False), (n, m))
         elif typestr == 'out':
             row = F.unsqueeze(src, 0)
             col = F.unsqueeze(eid, 0)
             idx = F.cat([row, col], dim=0)
             # FIXME(minjie): data type
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx, False), (n, m))
         elif typestr == 'both':
             # first remove entries for self loops
             mask = F.logical_not(F.equal(src, dst))
@@ -668,7 +668,7 @@ class GraphIndex(object):
             x = -F.ones((n_entries,), dtype=F.float32, ctx=ctx)
             y = F.ones((n_entries,), dtype=F.float32, ctx=ctx)
             dat = F.cat([x, y], dim=0)
-            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx, False), (n, m))
         else:
             raise DGLError('Invalid incidence matrix type: %s' % str(typestr))
         shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None

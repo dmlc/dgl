@@ -100,9 +100,9 @@ def sparse_matrix(data, index, shape, force_format=False):
     index : tuple
         This is used to support different sparse formats.
         For COO format:
-          index=('coo', coord), where coord is of shape (2, nnz).
+          index=('coo', coord, coalesced), where coord is of shape (2, nnz).
           coord[0,:] should be the row index and coord[1,:] should be
-          the column index.
+          the column index. coalesced is True iff coord is sorted and unique.
         For CSR format:
           index=('csr', indices, indptr), where indices is of shape (nnz,)
           and indptr is of shape (nrows+1,). See ``scipy.sparse.csr_matrix``
@@ -137,9 +137,9 @@ def sparse_matrix_indices(spmat):
     index : tuple
         This is used to support different sparse formats.
         For COO format:
-          index=('coo', coord), where coord is of shape (2, nnz).
+          index=('coo', coord, coalesced), where coord is of shape (2, nnz).
           coord[0,:] should be the row index and coord[1,:] should be
-          the column index.
+          the column index. coalesced is True iff coord is sorted and unique.
         For CSR format:
           index=('csr', indices, indptr), where indices is of shape (nnz,)
           and indptr is of shape (nrows+1,). See ``scipy.sparse.csr_matrix``
@@ -392,7 +392,7 @@ def gather_row(data, row_index):
 
 def narrow_row(x, start, stop):
     """Narrow down the tensor along the first dimension.
-    
+
     Parameters
     ----------
     x : Tensor
