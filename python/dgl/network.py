@@ -7,24 +7,24 @@ from . import utils
 
 _init_api("dgl.network")
 
-def _create_sampler_sender(IP, port):
+def _create_sampler_sender(ip_addr, port):
     """ Create a sampler sender communicator via C socket.
 
     Parameters
     ----------
-    IP : str
+    ip_addr : str
         ip address of remote trainer.
     port : int
         listen port of remote trainer.
     """
-    return _CAPI_DGLSenderCreate(IP, port)
+    return _CAPI_DGLSenderCreate(ip_addr, port)
 
-def _create_sampler_receiver(IP, port, num_sender, queue_size):
+def _create_sampler_receiver(ip_addr, port, num_sender, queue_size):
     """ Create a sampler receiver communicator via C socket.
 
     Parameters
     ----------
-    IP : str
+    ip_addr : str
         ip address of remote trainer.
     port : int
         listen port of remote trainer.
@@ -33,7 +33,7 @@ def _create_sampler_receiver(IP, port, num_sender, queue_size):
     queue_size : int
         size (bytes) of message queue buffer.
     """
-    return _CAPI_DGLReceiverCreate(IP, port, num_sender, queue_size)
+    return _CAPI_DGLReceiverCreate(ip_addr, port, num_sender, queue_size)
 
 def _send_subgraph(sender, nodeflow):
     """ Send sampled subgraph to remote trainer.
@@ -67,6 +67,8 @@ def _batch_send_subgraph(sender, nodeflow_list):
     nodeflow_list : list
         a list of NodeFlow object
     """
+    print(sender)
+    print(nodeflow_list)
     raiseNotImplementedError("_batch_send_subgraph: not implemented!")
 
 def _recv_subgraph(receiver):
@@ -106,6 +108,7 @@ def _batch_recv_subgraph(receiver):
     list
         a list of NodeFlowIndex object
     """
+    print(receiver)
     raiseNotImplementedError("_batch_recv_subgraph: not implemented!")
 
 def _finalize_sampler_sender(sender):
