@@ -1171,7 +1171,7 @@ def _uniform_sampling(gidx, seed_ids, neigh_type, num_hops, expand_factor, add_s
     return _NEIGHBOR_SAMPLING_APIS[len(seed_ids)](gidx._handle, *seed_ids, neigh_type,
                                                   num_hops, expand_factor, num_seeds,
                                                   add_self_loop)
-  
+
 _LAYER_SAMPLING_APIS = {
     1: _CAPI_DGLGraphLayerUniformSampling,
     2: _CAPI_DGLGraphLayerUniformSampling2,
@@ -1193,3 +1193,4 @@ def _layer_uniform_sampling(gidx, seed_ids, neigh_type, layer_sizes):
     assert len(seed_ids) in _LAYER_SAMPLING_APIS.keys()
     return _LAYER_SAMPLING_APIS[len(seed_ids)](gidx._handle, *seed_ids, neigh_type,
                                                layer_sizes, num_seeds)
+

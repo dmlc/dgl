@@ -254,7 +254,7 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
                                    expand_factor=expand_factor, num_hops=num_hops,
                                    neighbor_type=neighbor_type, node_prob=node_prob,
                                    seed_nodes=seed_nodes, shuffle=shuffle,
-                                   num_workers=num_workers, return_seed_id=return_seed_id)
+                                   num_workers=num_workers)
     if not prefetch:
         return loader
     else:
@@ -262,8 +262,7 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
 
 def LayerSampler(g, batch_size, layer_sizes,
                  neighbor_type='in', node_prob=None, seed_nodes=None,
-                 shuffle=False, num_workers=1,
-                 return_seed_id=False, prefetch=False):
+                 shuffle=False, num_workers=1, prefetch=False):
     '''Create a sampler that samples neighborhood.
 
     This creates a NodeFlow loader that samples subgraphs from the input graph
@@ -295,7 +294,7 @@ def LayerSampler(g, batch_size, layer_sizes,
     loader = SampledSubgraphLoader(g, batch_size, 'layer', layer_sizes=layer_sizes,
                                    neighbor_type=neighbor_type, node_prob=node_prob,
                                    seed_nodes=seed_nodes, shuffle=shuffle,
-                                   num_workers=num_workers, return_seed_id=return_seed_id)
+                                   num_workers=num_workers)
     if not prefetch:
         return loader
     else:
