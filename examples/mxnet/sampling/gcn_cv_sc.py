@@ -228,12 +228,12 @@ def main(args):
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
-        for nf, aux in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
-                                                            num_neighbors,
-                                                            neighbor_type='in',
-                                                            shuffle=True,
-                                                            num_hops=n_layers,
-                                                            seed_nodes=train_nid):
+        for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
+                                                       num_neighbors,
+                                                       neighbor_type='in',
+                                                       shuffle=True,
+                                                       num_hops=n_layers,
+                                                       seed_nodes=train_nid):
             for i in range(n_layers):
                 agg_history_str = 'agg_h_{}'.format(i)
                 g.pull(nf.layer_parent_nid(i+1), fn.copy_src(src='h_{}'.format(i), out='m'),
@@ -270,11 +270,11 @@ def main(args):
 
         num_acc = 0.
 
-        for nf, aux in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
-                                                            g.number_of_nodes(),
-                                                            neighbor_type='in',
-                                                            num_hops=n_layers,
-                                                            seed_nodes=test_nid):
+        for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
+                                                       g.number_of_nodes(),
+                                                       neighbor_type='in',
+                                                       num_hops=n_layers,
+                                                       seed_nodes=test_nid):
             node_embed_names = [['preprocess']]
             for i in range(n_layers):
                 node_embed_names.append(['norm'])

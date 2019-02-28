@@ -304,6 +304,8 @@ class NodeFlow(DGLBaseGraph):
     def layer_parent_nid(self, layer_id):
         """Get the node Ids of the parent graph in the specified layer
 
+        layer_parent_nid(-1) returns seed vertices for this NodeFlow.
+
         Parameters
         ----------
         layer_id : int

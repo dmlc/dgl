@@ -189,12 +189,12 @@ def main(args):
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
-        for nf, aux in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
-                                                            args.num_neighbors,
-                                                            neighbor_type='in',
-                                                            shuffle=True,
-                                                            num_hops=args.n_layers+1,
-                                                            seed_nodes=train_nid):
+        for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
+                                                       args.num_neighbors,
+                                                       neighbor_type='in',
+                                                       shuffle=True,
+                                                       num_hops=args.n_layers+1,
+                                                       seed_nodes=train_nid):
             nf.copy_from_parent()
             # forward
             with mx.autograd.record():
@@ -215,11 +215,11 @@ def main(args):
 
         num_acc = 0.
 
-        for nf, aux in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
-                                                            g.number_of_nodes(),
-                                                            neighbor_type='in',
-                                                            num_hops=args.n_layers+1,
-                                                            seed_nodes=test_nid):
+        for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
+                                                       g.number_of_nodes(),
+                                                       neighbor_type='in',
+                                                       num_hops=args.n_layers+1,
+                                                       seed_nodes=test_nid):
             nf.copy_from_parent()
             pred = infer_model(nf)
             batch_nids = nf.layer_parent_nid(-1).astype('int64').as_in_context(ctx)

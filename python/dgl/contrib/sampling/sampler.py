@@ -19,8 +19,7 @@ __all__ = ['NeighborSampler']
 class NSSubgraphLoader(object):
     def __init__(self, g, batch_size, expand_factor, num_hops=1,
                  neighbor_type='in', node_prob=None, seed_nodes=None,
-                 shuffle=False, num_workers=1, return_seed_id=False,
-                 add_self_loop=False):
+                 shuffle=False, num_workers=1, add_self_loop=False):
         self._g = g
         if not g._graph.is_readonly():
             raise NotImplementedError("NodeFlow loader only support read-only graphs.")
@@ -28,7 +27,6 @@ class NSSubgraphLoader(object):
         self._expand_factor = expand_factor
         self._num_hops = num_hops
         self._node_prob = node_prob
-        self._return_seed_id = return_seed_id
         self._add_self_loop = add_self_loop
         if self._node_prob is not None:
             assert self._node_prob.shape[0] == g.number_of_nodes(), \
@@ -61,8 +59,6 @@ class NSSubgraphLoader(object):
                                                self._node_prob, self._add_self_loop)
         nflows = [NodeFlow(self._g, i) for i in sgi]
         self._nflows.extend(nflows)
-        if self._return_seed_id:
-            self._seed_ids.extend(seed_ids)
 
     def __iter__(self):
         return self
@@ -75,10 +71,7 @@ class NSSubgraphLoader(object):
         # iterate all NodeFlows and we should stop the iterator now.
         if len(self._nflows) == 0:
             raise StopIteration
-        aux_infos = {}
-        if self._return_seed_id:
-            aux_infos['seeds'] = self._seed_ids.pop(0).tousertensor()
-        return self._nflows.pop(0), aux_infos
+        return self._nflows.pop(0)
 
 class _Prefetcher(object):
     """Internal shared prefetcher logic. It can be sub-classed by a Thread-based implementation
@@ -196,8 +189,7 @@ class _PrefetchingLoader(object):
 
 def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
                     neighbor_type='in', node_prob=None, seed_nodes=None,
-                    shuffle=False, num_workers=1, return_seed_id=False,
-                    prefetch=False, add_self_loop=False):
+                    shuffle=False, num_workers=1, prefetch=False, add_self_loop=False):
     '''Create a sampler that samples neighborhood.
 
     This creates a NodeFlow loader that samples subgraphs from the input graph
@@ -211,12 +203,8 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
     that connect the source nodes and the sampled neighbor nodes of the source
     nodes.
 
-    The NodeFlow loader returns a list of NodeFlows and a dictionary of additional
-    information about the NodeFlows. The size of the NodeFlow list is the number of workers.
-
-    The dictionary contains:
-
-    - seeds: a list of 1D tensors of seed Ids, if return_seed_id is True.
+    The NodeFlow loader returns a list of NodeFlows. The size of the NodeFlow list
+    is the number of workers.
 
     Parameters
     ----------
@@ -239,8 +227,6 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
         If it's None, the seed vertices are all vertices in the graph.
     shuffle: indicates the sampled NodeFlows are shuffled.
     num_workers: the number of worker threads that sample NodeFlows in parallel.
-    return_seed_id: indicates whether to return seed ids along with the NodeFlows.
-        The seed Ids are in the parent graph.
     prefetch : bool, default False
         Whether to prefetch the samples in the next batch.
     add_self_loop : bool, default False
@@ -254,7 +240,7 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
         information about the NodeFlows.
     '''
     loader = NSSubgraphLoader(g, batch_size, expand_factor, num_hops, neighbor_type, node_prob,
-                              seed_nodes, shuffle, num_workers, return_seed_id, add_self_loop)
+                              seed_nodes, shuffle, num_workers, add_self_loop)
     if not prefetch:
         return loader
     else:
