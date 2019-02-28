@@ -11,7 +11,6 @@ class TUDataset(object):
 
     def __init__(self, name, use_node_attr=False, use_node_label=False,
                  mode='train', model='diffpool', **kwargs):
-        print('kwargs is', kwargs)
         # kwargs for now is for diffpool specifically.
         self.name = name
         self.extract_dir = self._download()
@@ -25,12 +24,7 @@ class TUDataset(object):
         g.add_edges(DS_edge_list[:, 0], DS_edge_list[:, 1])
         g.add_edges(DS_edge_list[:, 1], DS_edge_list[:, 0])
         # assume original list is only one-dimensional
-        #print(g.in_degrees().shape)
         self.max_degrees = int(max(list(g.in_degrees())))
-        #print(type(g.in_degrees().numpy()))
-
-        #DEBUG
-        print("max_degrees is", self.max_degrees)
 
         node_idx_list = []
         self.max_num_node = 0
@@ -40,8 +34,6 @@ class TUDataset(object):
             if len(subgraph_node_idx[0]) > self.max_num_node:
                 self.max_num_node = len(subgraph_node_idx[0])
 
-        #DEBUG
-        print("max_num_node is", self.max_num_node)
 
         self.graph_lists = g.subgraphs(node_idx_list)
 
@@ -51,7 +43,6 @@ class TUDataset(object):
         if use_node_label:
             DS_node_labels = self._idx_from_zero(np.loadtxt(self._file_path("node_labels"), dtype=int))
             self.max_node_label = max(DS_node_labels)
-            print("max node label is", self.max_node_label)
             for idxs, g in zip(node_idx_list, self.graph_lists):
                 # by default we make node label one-hot. Assume label is
                 # one-dim.
@@ -70,22 +61,15 @@ class TUDataset(object):
             diffpool specific data partition, pre-process and shuffling
             """
             # adjacency degree normalization -- not done here
-            # Should we re-index the subgraph?
             if kwargs['feature_mode'] == 'id':
                 for g in self.graph_lists:
                     id_list = np.arange(g.number_of_nodes)
                     g.ndata['feat'] = self.one_hotify(id_list, pad=True,
                                                       result_dim =
                                                       self.max_num_node)
-                    #g.ndata['feat'] = np.pad(np.identity(g.number_of_nodes()),
-                    #                         (0,self.max_num_node - g.number_of_nodes()),
-                    #                         (0, self.max_num_node - g.number_of_nodes()),
-                    #                         'constant', constant_value=0)
             elif kwargs['feature_mode'] == 'deg-num':
                 for g in self.graph_lists:
                     g.ndata['feat'] = np.expand_dims(g.in_degrees(), axis=1)
-                    #Debug
-                    print(g.ndata['feat'].shape)
 
             elif kwargs['feature_mode'] == 'deg':
                 # max degree is disabled.
@@ -121,7 +105,6 @@ class TUDataset(object):
                     id_list = np.arange(g.number_of_nodes())
                     g.ndata['a_feat'] = self.one_hotify(id_list, pad=True,
                                                         result_dim=self.max_num_node)
-                    #g.ndata['a_feat'] = np.identity(g.number_of_nodes())
             else:
                 for g in self.graph_lists:
                     id_list = np.arange(g.number_of_nodes())
