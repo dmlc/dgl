@@ -62,9 +62,13 @@ class GraphIndex(object):
         """The actual init function"""
         assert len(src_ids) == len(dst_ids)
         assert len(src_ids) == len(edge_ids)
-        self._handle = _CAPI_DGLGraphCreate(src_ids.todgltensor(), dst_ids.todgltensor(),
-                                            edge_ids.todgltensor(), self._multigraph, num_nodes,
-                                            self._readonly)
+        self._handle = _CAPI_DGLGraphCreate(
+            src_ids.todgltensor(),
+            dst_ids.todgltensor(),
+            edge_ids.todgltensor(),
+            self._multigraph,
+            int(num_nodes),
+            self._readonly)
 
     def add_nodes(self, num):
         """Add nodes.
@@ -217,7 +221,7 @@ class GraphIndex(object):
         bool
             True if the edge exists, False otherwise
         """
-        return bool(_CAPI_DGLGraphHasEdgeBetween(self._handle, u, v))
+        return bool(_CAPI_DGLGraphHasEdgeBetween(self._handle, int(u), int(v)))
 
     def has_edges_between(self, u, v):
         """Return true if the edge exists.
@@ -287,7 +291,7 @@ class GraphIndex(object):
         utils.Index
             The edge id array.
         """
-        return utils.toindex(_CAPI_DGLGraphEdgeId(self._handle, u, v))
+        return utils.toindex(_CAPI_DGLGraphEdgeId(self._handle, int(u), int(v)))
 
     def edge_ids(self, u, v):
         """Return a triplet of arrays that contains the edge IDs.
@@ -444,7 +448,7 @@ class GraphIndex(object):
         int
             The in degree.
         """
-        return _CAPI_DGLGraphInDegree(self._handle, v)
+        return _CAPI_DGLGraphInDegree(self._handle, int(v))
 
     def in_degrees(self, v):
         """Return the in degrees of the nodes.
@@ -475,7 +479,7 @@ class GraphIndex(object):
         int
             The out degree.
         """
-        return _CAPI_DGLGraphOutDegree(self._handle, v)
+        return _CAPI_DGLGraphOutDegree(self._handle, int(v))
 
     def out_degrees(self, v):
         """Return the out degrees of the nodes.

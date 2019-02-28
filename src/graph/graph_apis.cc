@@ -494,4 +494,32 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphRandomWalk")
     *rv = SamplerOp::RandomWalk(ptr, seeds, num_traces, num_hops);
   });
 
+struct TestArray {
+  std::vector<int> vec;
+};
+
+DGL_REGISTER_GLOBAL("ctype_test._CAPI_CREATE_INT_LIST")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const int n = args[0];
+    TestArray* t = new TestArray();
+    t->vec.resize(n, 1);
+    void* p = t;
+    *rv = p;
+  });
+
+DGL_REGISTER_GLOBAL("ctype_test._CAPI_LIST_LENGTH")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* p = args[0];
+    TestArray* t = static_cast<TestArray*>(p);
+    *rv = (int)(t->vec.size());
+  });
+
+DGL_REGISTER_GLOBAL("ctype_test._CAPI_LIST_GET_ITEM")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* p = args[0];
+    int i = args[1];
+    TestArray* t = static_cast<TestArray*>(p);
+    *rv = t->vec[i];
+  });
+
 }  // namespace dgl
