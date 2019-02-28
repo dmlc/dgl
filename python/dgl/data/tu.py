@@ -9,12 +9,10 @@ class TUDataset(object):
 
     _url= r"https://ls11-www.cs.uni-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
 
-    def __init__(self, name, use_node_attr=False, use_node_label=False,
-                 mode='train'):
+    def __init__(self, name, use_node_attr=False, use_node_label=False):
         # kwargs for now is for diffpool specifically.
         self.name = name
         self.extract_dir = self._download()
-        self.mode = mode
         DS_edge_list = self._idx_from_zero(np.loadtxt(self._file_path("A"), delimiter=",", dtype=int))
         DS_indicator = self._idx_from_zero(np.loadtxt(self._file_path("graph_indicator"), dtype=int))
         DS_graph_labels = self._idx_from_zero(np.loadtxt(self._file_path("graph_labels"), dtype=int))
@@ -34,9 +32,7 @@ class TUDataset(object):
             if len(subgraph_node_idx[0]) > self.max_num_node:
                 self.max_num_node = len(subgraph_node_idx[0])
 
-
         self.graph_lists = g.subgraphs(node_idx_list)
-
 
         self.graph_labels = DS_graph_labels
 
@@ -101,13 +97,35 @@ class TUDataset(object):
         return embeddings
 
 class DiffpoolDataset(TUDataset):
-    def __init__(self, name, use_node_attr, use_node_label, mode='train', **kwargs):
+    def __init__(self, name, use_node_attr, use_node_label, mode='train',
+                 train_ratio=0.8, test_ratio=0.1, **kwargs):
         super(DiffpoolDataset, self).__init__(name, use_node_attr,
                                             use_node_label, mode)
         self.kwargs = kwargs
         self.use_node_attr = use_node_attr
+        self.mode = mode
         self._preprocess()
         print("_proprocess for diffpool done")
+
+        # train vs val vs test split
+        train_idx = int(len(self.graph_lists)*train_ratio)
+        test_idx = int(len(self.graph_lists)*(1-test_ratio))
+
+        self.train_graphs = self.graph_lists[:train_idx]
+        self.val_graphs = self.graph_lists[train_idx:test_idx]
+        self.test_graphs = self.graph_lists[test_idx:]
+
+        self.train_labels = self.graph_labels[:train_idx]
+        self.val_labels = self.graph_labels[train_idx:test_idx]
+        self.test_labels = self.graph_labels[test_idx:]
+
+        # report dataset statistics
+        print("Num of training graphs: ", len(self.train_labels))
+        print("Num of validation graphs: ", len(self.val_labels))
+        print("Num of testing graphs: ", len(self.test_labels))
+
+    def set_mode(self, new_mode):
+        self.mode = new_mode
 
     def _preprocess(self):
         """
@@ -151,7 +169,7 @@ class DiffpoolDataset(TUDataset):
                 else:
                     g.ndata['feat'] = struct_feats
 
-        assert 'feat' in g.ndata, "node feature not initialized!"
+        assert 'feat' in self.graph_lists[0].ndata, "node feature not initialized!"
 
         if self.kwargs['assign_feat'] == 'id':
             for g in self.graph_lists:
@@ -169,4 +187,32 @@ class DiffpoolDataset(TUDataset):
         # sanity check
         assert self.graph_lists[0].ndata['feat'].shape[1] == self.graph_lists[1].ndata['feat'].shape[1]
 
+    def __len__(self):
+        if self.mode == 'train':
+            assert len(self.train_graphs)
+            return len(self.train_graphs)
 
+        elif self.mode == 'val':
+            assert len(self.val_graphs)
+            return len(self.val_graphs)
+
+        elif self.mode == 'test':
+            assert len(self.test_graphs)
+            return len(self.test_graphs)
+
+        else:
+            raise NotImplementedError
+
+    def __getitem__(self, idx):
+        if self.mode == 'train':
+            return self.train_graphs[idx], self.train_labels[idx]
+
+        elif self.mode == 'val':
+            return self.val_graphs[idx], self.val_labels[idx]
+
+        elif self.mode == 'test':
+            return self.test_graphs[idx], self.test_labels[idx]
+
+        else:
+            print("warning -- reading dataset without train/val/test split")
+            return self.graph_lists[idx], self.graph_labels[idx]
