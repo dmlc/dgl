@@ -252,6 +252,7 @@ Graph::EdgeArray Graph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
 }
 
 Graph::EdgeArray Graph::FindEdges(IdArray eids) const {
+  CHECK(IsValidIdArray(eids)) << "Invalid edge id array";
   int64_t len = eids->shape[0];
 
   IdArray rst_src = IdArray::Empty({len}, eids->dtype, eids->ctx);
@@ -472,7 +473,7 @@ Subgraph Graph::VertexSubgraph(IdArray vids) const {
 }
 
 Subgraph Graph::EdgeSubgraph(IdArray eids) const {
-  CHECK(IsValidIdArray(eids)) << "Invalid vertex id array.";
+  CHECK(IsValidIdArray(eids)) << "Invalid edge id array.";
 
   const auto len = eids->shape[0];
   std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
