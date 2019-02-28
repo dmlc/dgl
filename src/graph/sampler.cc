@@ -544,7 +544,7 @@ namespace {
     std::copy(seed_data, seed_data + seed_len, std::back_inserter(*node_mapping));
     actl_layer_sizes->push_back(node_mapping->size());
     probabilities->insert(probabilities->end(), node_mapping->size(), 1);
-  
+
     size_t curr = 0;
     size_t next = node_mapping->size();
     unsigned int rand_seed = time(nullptr);
@@ -555,11 +555,11 @@ namespace {
         auto src = (*node_mapping)[j];
         candidate_set.insert(indices + indptr[src], indices + indptr[src + 1]);
       }
-  
+
       std::vector<dgl_id_t> candidate_vector;
       std::copy(candidate_set.begin(), candidate_set.end(),
                 std::back_inserter(candidate_vector));
-  
+
       std::unordered_map<dgl_id_t, size_t> n_occurrences;
       auto n_candidates = candidate_vector.size();
       for (size_t j = 0; j != layer_size; ++j) {
@@ -568,13 +568,13 @@ namespace {
           ++n_occurrences[dst];
         }
       }
-  
+
       for (auto const &pair : n_occurrences) {
         node_mapping->push_back(pair.first);
         float p = pair.second * n_candidates / static_cast<float>(layer_size);
         probabilities->push_back(p);
       }
-  
+
       actl_layer_sizes->push_back(node_mapping->size() - next);
       curr = next;
       next = node_mapping->size();
