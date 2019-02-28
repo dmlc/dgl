@@ -1193,4 +1193,3 @@ def _layer_uniform_sampling(gidx, seed_ids, neigh_type, layer_sizes):
     assert len(seed_ids) in _LAYER_SAMPLING_APIS.keys()
     return _LAYER_SAMPLING_APIS[len(seed_ids)](gidx._handle, *seed_ids, neigh_type,
                                                layer_sizes, num_seeds)
-
