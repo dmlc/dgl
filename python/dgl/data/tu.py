@@ -10,7 +10,7 @@ class TUDataset(object):
     _url= r"https://ls11-www.cs.uni-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
 
     def __init__(self, name, use_node_attr=False, use_node_label=False,
-                 mode='train', model='diffpool', **kwargs):
+                 mode='train'):
         # kwargs for now is for diffpool specifically.
         self.name = name
         self.extract_dir = self._download()
@@ -56,66 +56,6 @@ class TUDataset(object):
             for idxs, g in zip(node_idx_list, self.graph_lists):
                 g.ndata['feat'] = DS_node_attr[list(idxs), ...]
 
-        if model == 'diffpool':
-            """
-            diffpool specific data partition, pre-process and shuffling
-            """
-            # adjacency degree normalization -- not done here
-            if kwargs['feature_mode'] == 'id':
-                for g in self.graph_lists:
-                    id_list = np.arange(g.number_of_nodes)
-                    g.ndata['feat'] = self.one_hotify(id_list, pad=True,
-                                                      result_dim =
-                                                      self.max_num_node)
-            elif kwargs['feature_mode'] == 'deg-num':
-                for g in self.graph_lists:
-                    g.ndata['feat'] = np.expand_dims(g.in_degrees(), axis=1)
-
-            elif kwargs['feature_mode'] == 'deg':
-                # max degree is disabled.
-                for g in self.graph_lists:
-                    degs = list(g.in_degrees())
-                    degs_one_hot = self.one_hotify(degs, pad=True, result_dim =
-                                                  self.max_degrees)
-                    g.ndata['feat'] = np.concatenate((g.ndata['feat'],
-                                                      degs_one_hot), axis=1)
-            elif kwargs['feature_mode'] == 'struct':
-                for g in self.graph_lists:
-                    degs = list(g.in_degrees())
-                    degs_one_hot = self.one_hotify(degs, pad=True, result_dim =
-                                                  self.max_degrees)
-                    nxg = g.to_networkx().to_undirected()
-                    clustering_coeffs = np.array(list(nx.clustering(nxg).values()))
-                    clustering_embedding = np.expand_dims(clustering_coeffs,
-                                                          axis=1)
-                    struct_feats = np.concatenate((degs_one_hot,
-                                                   clustering_embedding),
-                                                  axis=1)
-                    if use_node_attr:
-                        g.ndata['feat'] = np.concatenate((struct_feats,
-                                                         g.ndata['feat']),
-                                                         axis=1)
-                    else:
-                        g.ndata['feat'] = struct_feats
-
-            assert 'feat' in g.ndata, "node feature not initialized!"
-
-            if kwargs['assign_feat'] == 'id':
-                for g in self.graph_lists:
-                    id_list = np.arange(g.number_of_nodes())
-                    g.ndata['a_feat'] = self.one_hotify(id_list, pad=True,
-                                                        result_dim=self.max_num_node)
-            else:
-                for g in self.graph_lists:
-                    id_list = np.arange(g.number_of_nodes())
-                    id_embedding = self.one_hotify(id_list, pad=True,
-                                                   result_dim=self.max_num_node)
-                    g.ndata['a_feat'] = np.concatenate((id_embedding,
-                                                        g.ndata['feat']),
-                                                        axis=1)
-        # sanity check
-        assert self.graph_lists[0].ndata['feat'].shape[1] == self.graph_lists[1].ndata['feat'].shape[1]
-
 
 
 
@@ -159,4 +99,74 @@ class TUDataset(object):
         embeddings[np.arange(num_instances),labels] = 1
 
         return embeddings
+
+class DiffpoolDataset(TUDataset):
+    def __init__(self, name, use_node_attr, use_node_label, mode='train', **kwargs):
+        super(DiffpoolDataset, self).__init__(name, use_node_attr,
+                                            use_node_label, mode)
+        self.kwargs = kwargs
+        self.use_node_attr = use_node_attr
+        self._preprocess()
+        print("_proprocess for diffpool done")
+
+    def _preprocess(self):
+        """
+        diffpool specific data partition, pre-process and shuffling
+        """
+        # adjacency degree normalization -- not done here
+        if self.kwargs['feature_mode'] == 'id':
+            for g in self.graph_lists:
+                id_list = np.arange(g.number_of_nodes)
+                g.ndata['feat'] = self.one_hotify(id_list, pad=True,
+                                                      result_dim =
+                                                      self.max_num_node)
+        elif self.kwargs['feature_mode'] == 'deg-num':
+            for g in self.graph_lists:
+                g.ndata['feat'] = np.expand_dims(g.in_degrees(), axis=1)
+
+        elif self.kwargs['feature_mode'] == 'deg':
+            # max degree is disabled.
+            for g in self.graph_lists:
+                degs = list(g.in_degrees())
+                degs_one_hot = self.one_hotify(degs, pad=True, result_dim =
+                                                self.max_degrees)
+                g.ndata['feat'] = np.concatenate((g.ndata['feat'],
+                                                    degs_one_hot), axis=1)
+        elif self.kwargs['feature_mode'] == 'struct':
+            for g in self.graph_lists:
+                degs = list(g.in_degrees())
+                degs_one_hot = self.one_hotify(degs, pad=True, result_dim =
+                                                self.max_degrees)
+                nxg = g.to_networkx().to_undirected()
+                clustering_coeffs = np.array(list(nx.clustering(nxg).values()))
+                clustering_embedding = np.expand_dims(clustering_coeffs,
+                                                        axis=1)
+                struct_feats = np.concatenate((degs_one_hot,
+                                                clustering_embedding),
+                                                axis=1)
+                if self.use_node_attr:
+                    g.ndata['feat'] = np.concatenate((struct_feats,
+                                                        g.ndata['feat']),
+                                                        axis=1)
+                else:
+                    g.ndata['feat'] = struct_feats
+
+        assert 'feat' in g.ndata, "node feature not initialized!"
+
+        if self.kwargs['assign_feat'] == 'id':
+            for g in self.graph_lists:
+                id_list = np.arange(g.number_of_nodes())
+                g.ndata['a_feat'] = self.one_hotify(id_list, pad=True,
+                                                    result_dim=self.max_num_node)
+        else:
+            for g in self.graph_lists:
+                id_list = np.arange(g.number_of_nodes())
+                id_embedding = self.one_hotify(id_list, pad=True,
+                                                result_dim=self.max_num_node)
+                g.ndata['a_feat'] = np.concatenate((id_embedding,
+                                                    g.ndata['feat']),
+                                                    axis=1)
+        # sanity check
+        assert self.graph_lists[0].ndata['feat'].shape[1] == self.graph_lists[1].ndata['feat'].shape[1]
+
 
