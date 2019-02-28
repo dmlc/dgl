@@ -114,8 +114,8 @@ def test_layer_sampler(prefetch=False):
                            seed_nodes=seed_nodes, num_workers=4, prefetch=prefetch)
     for sub_g, ret in sampler:
         assert all(sub_g.layer_size(i) < size for i, size in enumerate(layer_sizes))
-        sub_nid = np.arange(0, sub_g.number_of_nodes())
-        assert all(np.all(np.isin(F.asnumpy(sub_g.layer_nid(i)), sub_nid))
+        sub_nid = F.arange(0, sub_g.number_of_nodes())
+        assert all(np.all(np.isin(F.asnumpy(sub_g.layer_nid(i)), F.asnumpy(sub_nid)))
                    for i in range(sub_g.num_layers))
         assert np.all(np.isin(F.asnumpy(sub_g.map_to_parent_nid(sub_nid)),
                               F.asnumpy(nid)))

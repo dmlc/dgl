@@ -666,6 +666,7 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
   int64_t n_nodes = node_mapping.size();
   // TODO(gaiyu): a better estimate for the expected number of nodes
   auto sub_csr = std::make_shared<ImmutableGraph::CSR>(n_nodes, n_nodes);
+  sub_csr->indptr.clear();  // TODO(zhengda): Why indptr.resize(num_vertices + 1)?
 
   std::vector<dgl_id_t> flow_offsets;
   std::vector<dgl_id_t> edge_mapping;
