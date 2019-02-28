@@ -42,8 +42,8 @@ if TH_VERSION.version[0] == 0:
             tmp_data = th.arange(len(data), dtype=data.dtype, device=data.device)
             tmp_spmat = th._sparse_coo_tensor_unsafe(index[1], tmp_data, shape).coalesce()
             convert_idx = tmp_spmat._values().long()
-            index[1] = tmp_spmat._indices()
             data = data[convert_idx]
+            index = (fmt, tmp_spmat._indices(), True)
         else:
             # No conversion is required.
             convert_idx = None
@@ -60,10 +60,10 @@ else:
         if not index[2]:
             # indices not yet coalesced
             tmp_data = th.arange(len(data), dtype=data.dtype, device=data.device)
-            spmat = th.sparse_coo_tensor(index[1], tmp_data, shape).coalesce()
+            tmp_spmat = th.sparse_coo_tensor(index[1], tmp_data, shape).coalesce()
             convert_idx = tmp_spmat._values().long()
-            index[1] = tmp_spmat._indices()
             data = data[convert_idx]
+            index = (fmt, tmp_spmat._indices(), True)
         else:
             # No conversion is required.
             convert_idx = None
