@@ -474,14 +474,13 @@ for epoch in range(30):
 #
 # Again, comparing with uniform distribution: 
 #
-# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/ppi-attention-uniform-hist.png
+# .. image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/ppi-uniform-hist.png
 #   :width: 250px
 #   :align: center
 #
 # Clearly, **GAT does learn sharp attention weights**! There is a clear pattern
 # over the layers as well: **the attention gets sharper with higher
-# layer**; the final layer is a mean aggregation thus it is not surprising that
-# the histogram looks similar to the uniform one.
+# layer**.
 #
 # Unlike the Cora dataset where GAT's gain is lukewarm at best, for PPI there
 # is a significant performance gap between GAT and other GNN variants compared
@@ -503,6 +502,6 @@ for epoch in range(30):
 # * Stay tune for our next tutorial about how to speedup GAT models by parallelizing multiple attention heads and SPMV optimization.
 #
 # .. |image2| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/cora-attention-hist.png
-# .. |image5| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/ppi-attention-hist-layer1.png
-# .. |image6| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/ppi-attention-hist-layer2.png
-# .. |image7| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/ppi-attention-hist-final.png
+# .. |image5| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/ppi-first-layer-hist.png
+# .. |image6| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/ppi-second-layer-hist.png
+# .. |image7| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/gat/ppi-final-layer-hist.png
