@@ -279,12 +279,8 @@ def LayerSampler(g, batch_size, layer_sizes,
     with layer-wise sampling. This sampling method is implemented in C and can perform
     sampling very efficiently.
 
-    The NodeFlow loader returns a list of NodeFlows and a dictionary of additional
-    information about the NodeFlows. The size of the NodeFlow list is the number of workers.
-
-    The dictionary contains:
-
-    - seeds: a list of 1D tensors of seed Ids, if return_seed_id is True.
+    The NodeFlow loader returns a list of NodeFlows.
+    The size of the NodeFlow list is the number of workers.
 
     Parameters
     ----------
@@ -305,8 +301,7 @@ def LayerSampler(g, batch_size, layer_sizes,
     Returns
     -------
     A NodeFlow iterator
-        The iterator returns a list of batched NodeFlows and a dictionary of additional
-        information about the NodeFlows.
+        The iterator returns a list of batched NodeFlows.
     '''
     loader = SampledSubgraphLoader(g, batch_size, 'layer', layer_sizes=layer_sizes,
                                    neighbor_type=neighbor_type, node_prob=node_prob,

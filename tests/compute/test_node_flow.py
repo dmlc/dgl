@@ -237,15 +237,9 @@ def test_copy():
 
 
 if __name__ == '__main__':
-    print(0)
     test_basic()
-    print(1)
     test_copy()
-    print(2)
     test_apply_nodes()
-    print(3)
     test_apply_edges()
-    print(4)
     test_flow_compute()
-    print(5)
     test_prop_flows()

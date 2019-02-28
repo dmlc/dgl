@@ -41,10 +41,6 @@ struct NodeFlow {
    * \brief The edge mapping from the NodeFlow graph to the parent graph.
    */
   IdArray edge_mapping;
-  /*!
-   * \brief
-   */
-  // FloatArray probabilities;
 };
 
 class SamplerOp {
