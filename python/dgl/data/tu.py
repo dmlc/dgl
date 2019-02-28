@@ -142,6 +142,13 @@ class TUDataset(object):
     def __getitem__(self, idx):
         return self.graph_lists[idx], self.graph_labels[idx]
 
+    @staticmethod
+    def collate_fn(batch):
+        graphs, labels = zip(*batch)
+        batched_graphs = dgl.batch(graphs)
+        batched_label = np.concatenate(labels, axis=0)
+        return batched_graphs, batched_labels
+
     def _download(self):
         download_dir = get_download_dir()
         zip_file_path = os.path.join(download_dir, "tu_{}.zip".format(self.name))
