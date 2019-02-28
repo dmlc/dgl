@@ -1,3 +1,3 @@
 from .sampler import NeighborSampler
 from .randomwalk import *
-from .dis_sampler import Sender, Receiver
+from .dis_sampler import SamplerSender, SamplerReceiver

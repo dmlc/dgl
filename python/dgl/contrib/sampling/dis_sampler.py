@@ -1,88 +1,104 @@
 # This file contains distributed samplers.
 from ...node_flow import NodeFlow
-from ...network import _create_sender, _create_receiver
 from ...network import _send_subgraph, _recv_subgraph
-from ...network import _finalize_sender, _finalize_receiver
+from ...network import _batch_send_subgraph, _batch_recv_subgraph
+from ...network import _create_sampler_sender, _create_sampler_receiver
+from ...network import _finalize_sampler_sender, _finalize_sampler_receiver
 
-class Sender(object):
-    """The Sender class for distributed sampler.
+class SamplerSender(object):
+    """The SamplerSender class for distributed sampler.
 
-    Users use the Sender class to send sampled subgraph 
-    to remote trainer machine.
+    Users use the this class to send sampled subgraph to remote trainer.
 
     Parameters
     ----------
-    ip : ip address of remote machine
-    port : listen port of remote machine
+    ip : str
+        ip address of remote trainer machine.
+    port : int
+        listen port of remote trainer machine.
     """
     def __init__(self, ip, port):
         self._ip = ip
         self._port = port
-        self._sender = _create_sender(ip, port)
+        self._sender = _create_sampler_sender(ip, port)
 
     def Send(self, nodeflow):
-        """Send nodeflow to remote receiver
+        """Send sampled NodeFlow to remote trainer.
 
-        Parameter
-        ---------
-        nodeflow : a NodeFlow object
+        Parameters
+        ----------
+        nodeflow : NodeFlow
+            sampled NodeFlow object.
         """
         _send_subgraph(self._sender, nodeflow)
 
     def BatchSend(self, nodeflow_list):
-        """Send a batch of nodeflow to remote receiver
+        """Send a batch of sampled NodeFlow to remote trainer.
 
-        Parameter
-        ---------
-        nodeflow_list : a list of nodeflow object
+        Parameters
+        ----------
+        nodeflow_list : list
+            a list of NodeFlow object.
         """
         _batch_send_subgraph(self._sender, nodeflow_list)
 
     def Finalize(self):
         """Finalize Sender
+
+        Users should invoke Finalize() API to tell the trainer that
+        the sampler has finished its job.
         """
-        _finalize_sender(self._sender)
+        _finalize_sampler_sender(self._sender)
 
-class Receiver(object):
-    """The Receiver class for distributed sampler.
+class SamplerReceiver(object):
+    """The SamplerReceiver class for distributed sampler.
 
-    Users use the Receiver class to receive sampled subgraph 
-    from the remote sampler machine.
+    Users use this class to receive sampled subgraph from remote sampler.
 
     Parameters
     ----------
-    ip : ip address of remote machine
-    port : port of remote machine
-    num_sender : total number of sender nodes
-    queue_size : size (bytes) of message queue 
+    ip : str
+        ip address of trainer machine.
+    port : int
+        listen port of trainer machine.
+    num_sender : int
+        total number of sampler nodes, use 1 by default.
+    queue_size : int
+        size (bytes) of message queue, use 500 MB by default.
     """
-    def __init__(self, ip, port, num_sender, queue_size):
+    def __init__(self, ip, port, num_sender=1, queue_size=500*1024*1024):
         self._ip = ip
         self._port = port
         self._num_sender = num_sender
         self._queue_size = queue_size
-        self._receiver = _create_receiver(ip, port, num_sender, queue_size)
+        self._receiver = _create_sampler_receiver(ip, port, num_sender, queue_size)
 
     def Receive(self):
-        """ Receive data from sender and construct sampled subgraph.
-        Note that, in distributed sampler, the parent graph of NodeFlow 
-        in will be set to None object.
+        """Receive data from sampler node and construct sampled subgraph.
         """
+        # Receive a NodeFlowIndex object
         sgi = _recv_subgraph(self._receiver)
+        # Note that the parent node will be set 
+        # to None in distributed sampler
         return NodeFlow(None, sgi)
 
     def BatchReceive(self):
         """ Receive data from sender and construct a batch of sampled subgraph.
-        Note that, in distributed sampler, the parent graph of NodeFlow 
-        in will be set to None object.
         """
+        # Receive a list of NodeFlowIndex object
         sgi_list = _batch_recv_subgraph(self._receiver)
         nodeflow_list = []
         for sgi in sgi_list:
+            # Note that the parent node will be set 
+            # to None in distributed sampler
             nodeflow_list.append(NodeFlow(None, sgi))
+
         return nodeflow_list
 
     def Finalize(self):
         """Finalize Receiver
+
+        Users should invoke Finalize() API before thay start a new service 
+        with the same ip address and port.
         """
-        _finalize_receiver(self._receiver)
+        _finalize_sampler_receiver(self._receiver)

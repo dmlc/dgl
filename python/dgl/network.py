@@ -7,35 +7,43 @@ from . import utils
 
 _init_api("dgl.network")
 
-def _create_sender(ip_addr, port):
-    """ Create a sender communicator via C socket
+def _create_sampler_sender(IP, port):
+    """ Create a sampler sender communicator via C socket.
 
-    Parameter:
-    -----------
-    ip : ip address of remote machine
-    port : port of remote machine
-    """
-    return _CAPI_DGLSenderCreate(ip_addr, port)
-
-def _create_receiver(ip_addr, port, num_sender, queue_size):
-    """ Create a receiver communicator via C socket
-
-    Parameter:
+    Parameters
     ----------
-    ip : ip address of remote machine
-    port : port of remote machine
-    num_sender : total number of sender nodes
-    queue_size : size (bytes) of message queue buffer
+    IP : str
+        ip address of remote trainer.
+    port : int
+        listen port of remote trainer.
     """
-    return _CAPI_DGLReceiverCreate(ip_addr, port, num_sender, queue_size)
+    return _CAPI_DGLSenderCreate(IP, port)
+
+def _create_sampler_receiver(IP, port, num_sender, queue_size):
+    """ Create a sampler receiver communicator via C socket.
+
+    Parameters
+    ----------
+    IP : str
+        ip address of remote trainer.
+    port : int
+        listen port of remote trainer.
+    num_sender : int
+        total number of sampler nodes.
+    queue_size : int
+        size (bytes) of message queue buffer.
+    """
+    return _CAPI_DGLReceiverCreate(IP, port, num_sender, queue_size)
 
 def _send_subgraph(sender, nodeflow):
-    """ Send sampled subgraph to remote trainer
+    """ Send sampled subgraph to remote trainer.
 
-    Parameter:
+    Parameters
     ----------
-    sender : C sender handle
-    nodeflow : a NodeFlow object
+    sender : ctypes.c_void_p
+        C sender handle
+    nodeflow : NodeFlow
+        sampled NodeFlow object
     """
     graph_index = nodeflow._graph._handle
     node_mapping = nodeflow._node_mapping.todgltensor()
@@ -50,41 +58,29 @@ def _send_subgraph(sender, nodeflow):
                              flows_offsets)
 
 def _batch_send_subgraph(sender, nodeflow_list):
-    """ Send a batch of sampled subgraph to remote trainer
+    """ Send a batch of sampled subgraph to remote trainer.
 
-    Parameter:
+    Parameters
     ----------
-    sender : C sender handle
-    nodeflow_list : a list of nodeflow object
+    sender : ctypes.c_void_p
+        C sender handle
+    nodeflow_list : list
+        a list of NodeFlow object
     """
-    graph_index_list = []
-    node_mapping_list = []
-    edge_mapping_list = []
-    layers_offsets_list = []
-    flows_offsets_list = []
-    for nodeflow in nodeflow_list:
-        graph_index_list.append(nodeflow._graph._handle)
-        node_mapping_list.append(nodeflow._node_mapping.todgltensor())
-        edge_mapping_list.append(nodeflow._edge_mapping.todgltensor())
-        layers_offsets_list.append(nodeflow._graph._layers.todgltensor())
-        flows_offsets_list.append(nodeflow._graph._flows.todgltensor())
-    _CAPI_SenderBatchSendSubgraph(sender,
-                                  graph_index_list,
-                                  node_mapping_list,
-                                  edge_mapping_list,
-                                  layers_offsets_list,
-                                  flows_offsets_list)
+    raiseNotImplementedError("_batch_send_subgraph: not implemented!")
 
 def _recv_subgraph(receiver):
-    """ Receive sampled subgraph from remote sampler
+    """ Receive sampled subgraph from remote sampler.
 
-    Parameter
+    Parameters
     ----------
-    receiver : C receiver handle
+    receiver : ctypes.c_void_p
+        C receiver handle
 
-    Return
+    Returns
     -------
-    nodeflow_idx : a NodeFlowIndex object
+    NodeFlowIndex
+        a NodeFlowIndex object
     """
     rst = _CAPI_ReceiverRecvSubgraph(receiver)
     # Note that, for distributed sampler
@@ -98,41 +94,36 @@ def _recv_subgraph(receiver):
     return nodeflow_idx
 
 def _batch_recv_subgraph(receiver):
-    """ Receive a batch of sampled subgraph from remote sampler
+    """ Receive a batch of sampled subgraph from remote sampler.
 
-    Parameter
+    Parameters
     ----------
-    receiver :  C receiver handle
+    receiver : ctypes.c_void_p
+        C receiver handle
 
-    Return
+    Returns
     -------
-    nodeflow_idx_list : a list of NodeFlowIndex object
+    list
+        a list of NodeFlowIndex object
     """
-    rst = _CAPI_ReceiverBatchRecvSubgraph(receiver)
-    # Note that, for distributed sampler
-    # we should set parent graph to None
-    nodeflow_idx = NodeFlowIndex(rst(0),   # graph index handle
-                                 None,     # parent graph index
-                                 utils.toindex(rst(1)),  # node_mapping
-                                 utils.toindex(rst(2)),  # edge_mapping
-                                 utils.toindex(rst(3)),  # layers_offsets
-                                 utils.toindex(rst(4)))  # flows_offsets
-    return nodeflow_idx
+    raiseNotImplementedError("_batch_recv_subgraph: not implemented!")
 
-def _finalize_sender(sender):
+def _finalize_sampler_sender(sender):
     """ Finalize Sender communicator
 
-    Parameter
+    Parameters
     ----------
-    sender : C sender handle
+    sender : ctypes.c_void_p
+        C sender handle
     """
     _CAPI_DGLFinalizeCommunicator(sender)
 
-def _finalize_receiver(receiver):
+def _finalize_sampler_receiver(receiver):
     """ Finalize Receiver communicator
 
-    Parameter
+    Parameters
     ----------
-    receiver : C receiver handle
+    receiver : ctypes.c_void_p
+        C receiver handle
     """
     _CAPI_DGLFinalizeCommunicator(receiver)
