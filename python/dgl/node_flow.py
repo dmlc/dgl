@@ -354,7 +354,11 @@ class NodeFlow(DGLBaseGraph):
         block_id = self._get_block_id(block_id)
         start = self._block_offsets[block_id]
         end = self._block_offsets[block_id + 1]
-        return self._edge_mapping.tousertensor()[start:end]
+        ret = self._edge_mapping.tousertensor()[start:end]
+        # If `add_self_loop` is enabled, the returned parent eid can be -1.
+        # We have to make sure this case doesn't happen.
+        assert F.asnumpy(F.sum(ret == -1)) == 0, "The eid in the parent graph is invalid."
+        return ret
 
     def set_n_initializer(self, initializer, layer_id=ALL, field=None):
         """Set the initializer for empty node features.
