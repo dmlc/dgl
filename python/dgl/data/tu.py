@@ -63,7 +63,7 @@ class TUDataset(object):
 
     @staticmethod
     def collate_fn(batch):
-        graphs, labels = zip(*batch)
+        graphs, labels = map(list, zip(*batch))
         batched_graphs = dgl.batch(graphs)
         batched_label = np.concatenate(labels, axis=0)
         return batched_graphs, batched_labels
