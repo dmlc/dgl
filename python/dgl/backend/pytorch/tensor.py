@@ -137,8 +137,7 @@ def ones(shape, dtype, ctx):
 
 def spmm(x, y):
     dst, src = x._indices()
-    dim = 0
-    dst = dst.view(-1, 1).expand_as(-1, y.shape[1])
+    dst = dst.view(-1, 1).expand(-1, y.shape[1])
     zeros = y.new_full((x.shape[0], y.shape[1]), 0)
     return zeros.scatter_add(0, dst, y[src] * x._values().unsqueeze(-1))
 
