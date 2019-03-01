@@ -124,6 +124,10 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeCommunicator")
     CommunicatorHandle chandle = args[0];
     network::Communicator* comm = static_cast<network::Communicator*>(chandle);
     comm->Finalize();
+    if (global_data_buffer != nullptr) {
+      delete [] global_data_buffer;
+      global_data_buffer = nullptr;
+    }
   });
 
 }  // namespace network
