@@ -96,11 +96,14 @@ class TUDataset(object):
 
         return embeddings
 
+    def statistics(self):
+        return self.grpah_lists[0].ndata['feat'].shape[1]
+
 class DiffpoolDataset(TUDataset):
     def __init__(self, name, use_node_attr, use_node_label, mode='train',
                  train_ratio=0.8, test_ratio=0.1, **kwargs):
         super(DiffpoolDataset, self).__init__(name, use_node_attr,
-                                            use_node_label, mode)
+                                            use_node_label)
         self.kwargs = kwargs
         self.use_node_attr = use_node_attr
         self.mode = mode
@@ -216,3 +219,9 @@ class DiffpoolDataset(TUDataset):
         else:
             print("warning -- reading dataset without train/val/test split")
             return self.graph_lists[idx], self.graph_labels[idx]
+
+    def statistics(self):
+        print("DEBUGGGG")
+        print(self.graph_labels[0])
+        print(len(self.graph_labels))
+        return self.graph_lists[0].ndata['feat'].shape[1], self.graph_lists[0].ndata['a_feat'].shape[1], self.graph_labels[0].shape
