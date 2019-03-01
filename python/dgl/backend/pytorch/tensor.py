@@ -139,7 +139,8 @@ def spmm(x, y):
     dst, src = x._indices()
     dst = dst.view(-1, 1).expand(-1, y.shape[1])
     zeros = y.new_full((x.shape[0], y.shape[1]), 0)
-    return zeros.scatter_add(0, dst, y[src] * x._values().unsqueeze(-1))
+    message = th.index_select(y, 0, src) * x._values().unsqueeze(-1)
+    return zeros.scatter_add(0, dst, message)
 
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     y = th.zeros(n_segs, *input.shape[1:]).to(input)
