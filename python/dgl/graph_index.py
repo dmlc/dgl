@@ -674,7 +674,8 @@ class GraphIndex(object):
         shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
         return inc, shuffle_idx
 
-    def neighbor_sampling(self, seed_ids, expand_factor, num_hops, neighbor_type, node_prob):
+    def neighbor_sampling(self, seed_ids, expand_factor, num_hops, neighbor_type,
+                          node_prob, add_self_loop=False):
         """Neighborhood sampling"""
         if len(seed_ids) == 0:
             return []
@@ -682,7 +683,8 @@ class GraphIndex(object):
         seed_ids = [v.todgltensor() for v in seed_ids]
         num_subgs = len(seed_ids)
         if node_prob is None:
-            rst = _uniform_sampling(self, seed_ids, neighbor_type, num_hops, expand_factor)
+            rst = _uniform_sampling(self, seed_ids, neighbor_type, num_hops,
+                                    expand_factor, add_self_loop)
         else:
             rst = _nonuniform_sampling(self, node_prob, seed_ids, neighbor_type, num_hops,
                                        expand_factor)
@@ -993,7 +995,7 @@ def map_to_nodeflow_nid(nflow, layer_id, parent_nids):
         The graph index of a NodeFlow.
 
     layer_id : int
-        The layer Id
+        The layer Id.
 
     parent_nids: utils.Index
         Node Ids in the parent graph.
@@ -1138,7 +1140,7 @@ _NEIGHBOR_SAMPLING_APIS = {
 
 _EMPTY_ARRAYS = [utils.toindex(F.ones(shape=(0), dtype=F.int64, ctx=F.cpu()))]
 
-def _uniform_sampling(gidx, seed_ids, neigh_type, num_hops, expand_factor):
+def _uniform_sampling(gidx, seed_ids, neigh_type, num_hops, expand_factor, add_self_loop):
     num_seeds = len(seed_ids)
     empty_ids = []
     if len(seed_ids) > 1 and len(seed_ids) not in _NEIGHBOR_SAMPLING_APIS.keys():
@@ -1147,4 +1149,5 @@ def _uniform_sampling(gidx, seed_ids, neigh_type, num_hops, expand_factor):
         seed_ids.extend([empty.todgltensor() for empty in empty_ids])
     assert len(seed_ids) in _NEIGHBOR_SAMPLING_APIS.keys()
     return _NEIGHBOR_SAMPLING_APIS[len(seed_ids)](gidx._handle, *seed_ids, neigh_type,
-                                                  num_hops, expand_factor, num_seeds)
+                                                  num_hops, expand_factor, num_seeds,
+                                                  add_self_loop)

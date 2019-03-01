@@ -425,7 +425,7 @@ G = dgl.DGLGraph(nx_G.to_directed(), readonly=True)
 sampler = dgl.contrib.sampling.NeighborSampler(
        G, 2, 3, num_hops=2, shuffle=True)
 seeds = []
-for subg, aux_info in sampler:
+for subg in sampler:
     seeds.append(subg.layer_parent_nid(-1))
 
 ##############################################################################
@@ -482,14 +482,13 @@ def train_on_subgraphs(g, label_nodes, batch_size,
  
     # The first phase samples from all vertices in the graph.
     sampler = dgl.contrib.sampling.NeighborSampler(
-            g, batch_size, g.number_of_nodes(), num_hops=1, return_seed_id=True)
+            g, batch_size, g.number_of_nodes(), num_hops=1)
  
     # The second phase only samples from labeled vertices.
     sampler_train = dgl.contrib.sampling.NeighborSampler(
-            g, batch_size, g.number_of_nodes(), seed_nodes=label_nodes, num_hops=1,
-            return_seed_id=True)
+            g, batch_size, g.number_of_nodes(), seed_nodes=label_nodes, num_hops=1)
     for i in range(n_embedding_updates):
-        subg, aux_info = next(sampler)
+        subg = next(sampler)
         # Currently, subgraphing does not copy or share features
         # automatically.  Therefore, we need to copy the node
         # embeddings of the subgraph from the parent graph with
@@ -500,7 +499,7 @@ def train_on_subgraphs(g, label_nodes, batch_size,
         g.ndata['h'][subg.layer_parent_nid(-1)] = subg.layers[-1].data['h']
     for i in range(n_parameter_updates):
         try:
-            subg, aux_info = next(sampler_train)
+            subg = next(sampler_train)
         except:
             break
         # Again we need to copy features from parent graph
