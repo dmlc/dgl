@@ -135,15 +135,12 @@ def zeros_like(input):
 def ones(shape, dtype, ctx):
     return th.ones(shape, dtype=dtype, device=ctx)
 
-if TH_VERSION.version[0] == 0:
-    # TODO(minjie): note this does not support autograd on the `x` tensor.
-    #               should adopt a workaround using custom op.
-    def spmm(x, y):
-        return th.spmm(x, y)
-else:
-    # torch v1.0+
-    def spmm(x, y):
-        return th.sparse.mm(x, y)
+def spmm(x, y):
+    dst, src = x._indices()
+    dim = 0
+    dst = dst.view(-1, 1).expand_as(-1, y.shape[1])
+    zeros = y.new_full((x.shape[0], y.shape[1]), 0)
+    return zeros.scatter_add(0, dst, y[src] * x._values().unsqueeze(-1))
 
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     y = th.zeros(n_segs, *input.shape[1:]).to(input)
