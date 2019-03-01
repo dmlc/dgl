@@ -12,13 +12,14 @@ def generate_rand_graph(n):
     return dgl.DGLGraph(arr, readonly=True)
 
 def start_trainer():
-    # we use 1 sender, 500 MB message buffer by default
     recv = dgl.contrib.sampling.SamplerReceiver(ip="127.0.0.1", port=50051)
     nodeflow = recv.Receive()
     print(nodeflow._node_mapping.todgltensor())
     print(nodeflow._edge_mapping.todgltensor())
     print(nodeflow._layer_offsets)
     print(nodeflow._block_offsets)
+
+    time.sleep(1)  # wait all senders to finalize their jobs
 
 def start_sampler():
     g = generate_rand_graph(100)
@@ -33,5 +34,5 @@ if __name__ == '__main__':
     if pid == 0:
         start_trainer()
     else:
-        time.sleep(2)  # wait for the setup of trainer
+        time.sleep(1)
         start_sampler()
