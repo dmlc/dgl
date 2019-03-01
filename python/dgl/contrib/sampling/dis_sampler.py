@@ -24,9 +24,6 @@ class SamplerSender(object):
 
     def __del__(self):
         """Finalize Sender
-
-        Users should invoke Finalize() API to tell the trainer that
-        the sampler has finished its job.
         """
         _finalize_sampler_sender(self._sender)
 
@@ -75,9 +72,6 @@ class SamplerReceiver(object):
 
     def __del__(self):
         """Finalize Receiver
-
-        Users should invoke Finalize() API before thay start a new service 
-        with the same ip address and port.
         """
         _finalize_sampler_receiver(self._receiver)
 
