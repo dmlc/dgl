@@ -18,8 +18,6 @@ def start_trainer():
     print(nodeflow._edge_mapping.todgltensor())
     print(nodeflow._layer_offsets)
     print(nodeflow._block_offsets)
-    
-    recv.Finalize()
 
 def start_sampler():
     g = generate_rand_graph(100)
@@ -28,8 +26,6 @@ def start_sampler():
                                                           num_workers=1, return_seed_id=True):
         sender.Send(nodeflow)
         break
-
-    sender.Finalize()
 
 if __name__ == '__main__':
     pid = os.fork()
