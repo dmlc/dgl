@@ -22,6 +22,14 @@ class SamplerSender(object):
         self._port = port
         self._sender = _create_sampler_sender(ip, port)
 
+    def __del__(self):
+        """Finalize Sender
+
+        Users should invoke Finalize() API to tell the trainer that
+        the sampler has finished its job.
+        """
+        _finalize_sampler_sender(self._sender)
+
     def Send(self, nodeflow):
         """Send sampled NodeFlow to remote trainer.
 
@@ -41,14 +49,6 @@ class SamplerSender(object):
             a list of NodeFlow object.
         """
         _batch_send_subgraph(self._sender, nodeflow_list)
-
-    def Finalize(self):
-        """Finalize Sender
-
-        Users should invoke Finalize() API to tell the trainer that
-        the sampler has finished its job.
-        """
-        _finalize_sampler_sender(self._sender)
 
 class SamplerReceiver(object):
     """The SamplerReceiver class for distributed sampler.
@@ -73,6 +73,14 @@ class SamplerReceiver(object):
         self._queue_size = queue_size
         self._receiver = _create_sampler_receiver(ip, port, num_sender, queue_size)
 
+    def __del__(self):
+        """Finalize Receiver
+
+        Users should invoke Finalize() API before thay start a new service 
+        with the same ip address and port.
+        """
+        _finalize_sampler_receiver(self._receiver)
+
     def Receive(self):
         """Receive data from sampler node and construct sampled subgraph.
         """
@@ -94,11 +102,3 @@ class SamplerReceiver(object):
             nodeflow_list.append(NodeFlow(None, sgi))
 
         return nodeflow_list
-
-    def Finalize(self):
-        """Finalize Receiver
-
-        Users should invoke Finalize() API before thay start a new service 
-        with the same ip address and port.
-        """
-        _finalize_sampler_receiver(self._receiver)
