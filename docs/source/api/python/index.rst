@@ -15,3 +15,4 @@ API Reference
    data
    transform
    nn
+   subgraph
