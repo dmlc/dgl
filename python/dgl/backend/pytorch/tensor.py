@@ -142,6 +142,8 @@ def spmm(x, y):
     # zero tensor to be scatter_add to
     out = y.new_full((x.shape[0], y.shape[1]), 0)
     # look up src features and multiply by edge features
+    # Note: using y[src] instead of index_select will lead to terrible
+    #       porformance in backward
     feature = th.index_select(y, 0, src) * x._values().unsqueeze(-1)
     return out.scatter_add(0, index, feature)
 
