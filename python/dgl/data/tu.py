@@ -226,4 +226,4 @@ class DiffpoolDataset(TUDataset):
         print("DEBUGGGG")
         print(self.graph_labels[0])
         print(len(self.graph_labels))
-        return self.graph_lists[0].ndata['feat'].shape[1], self.graph_lists[0].ndata['a_feat'].shape[1], self.num_labels
+        return self.graph_lists[0].ndata['feat'].shape[1], self.graph_lists[0].ndata['a_feat'].shape[1], self.num_labels, self.max_num_node
