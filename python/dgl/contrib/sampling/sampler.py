@@ -6,9 +6,12 @@ import threading
 import random
 import traceback
 
+from ..._ffi.function import _init_api
 from ... import utils
 from ...node_flow import NodeFlow
+from ...graph_index import NodeFlowIndex
 from ... import backend as F
+
 try:
     import Queue as queue
 except ImportError:
@@ -54,9 +57,9 @@ class NSSubgraphLoader(object):
             end = min((self._nflow_idx + 1) * self._batch_size, num_nodes)
             seed_ids.append(utils.toindex(self._seed_nodes[start:end]))
             self._nflow_idx += 1
-        sgi = self._g._graph.neighbor_sampling(seed_ids, self._expand_factor,
-                                               self._num_hops, self._neighbor_type,
-                                               self._node_prob, self._add_self_loop)
+        sgi = _neighbor_sampling(self._g._graph, seed_ids, self._expand_factor,
+                                 self._num_hops, self._neighbor_type,
+                                 self._node_prob, self._add_self_loop)
         nflows = [NodeFlow(self._g, i) for i in sgi]
         self._nflows.extend(nflows)
 
@@ -270,3 +273,51 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
         return loader
     else:
         return _PrefetchingLoader(loader, num_prefetch=num_workers*2)
+
+def _neighbor_sampling(gidx, seed_ids, expand_factor, num_hops, neighbor_type,
+                      node_prob, add_self_loop=False):
+    """Neighborhood sampling"""
+    if len(seed_ids) == 0:
+        return []
+
+    seed_ids = [v.todgltensor() for v in seed_ids]
+    num_subgs = len(seed_ids)
+    if node_prob is None:
+        rst = _uniform_sampling(gidx, seed_ids, neighbor_type, num_hops,
+                                expand_factor, add_self_loop)
+    else:
+        rst = _nonuniform_sampling(gidx, node_prob, seed_ids, neighbor_type, num_hops,
+                                   expand_factor)
+
+    return [NodeFlowIndex(rst(i), gidx, utils.toindex(rst(num_subgs + i)),
+                          utils.toindex(rst(num_subgs * 2 + i)),
+                          utils.toindex(rst(num_subgs * 3 + i)),
+                          utils.toindex(rst(num_subgs * 4 + i))) for i in range(num_subgs)]
+
+_init_api('dgl.sampling', __name__)
+
+# TODO(zhengda): we'll support variable-length inputs.
+_NEIGHBOR_SAMPLING_APIS = {
+    1: _CAPI_DGLGraphUniformSampling,
+    2: _CAPI_DGLGraphUniformSampling2,
+    4: _CAPI_DGLGraphUniformSampling4,
+    8: _CAPI_DGLGraphUniformSampling8,
+    16: _CAPI_DGLGraphUniformSampling16,
+    32: _CAPI_DGLGraphUniformSampling32,
+    64: _CAPI_DGLGraphUniformSampling64,
+    128: _CAPI_DGLGraphUniformSampling128,
+}
+
+_EMPTY_ARRAYS = [utils.toindex(F.ones(shape=(0), dtype=F.int64, ctx=F.cpu()))]
+
+def _uniform_sampling(gidx, seed_ids, neigh_type, num_hops, expand_factor, add_self_loop):
+    num_seeds = len(seed_ids)
+    empty_ids = []
+    if len(seed_ids) > 1 and len(seed_ids) not in _NEIGHBOR_SAMPLING_APIS.keys():
+        remain = 2**int(math.ceil(math.log2(len(dgl_ids)))) - len(dgl_ids)
+        empty_ids = _EMPTY_ARRAYS[0:remain]
+        seed_ids.extend([empty.todgltensor() for empty in empty_ids])
+    assert len(seed_ids) in _NEIGHBOR_SAMPLING_APIS.keys()
+    return _NEIGHBOR_SAMPLING_APIS[len(seed_ids)](gidx._handle, *seed_ids, neigh_type,
+                                                  num_hops, expand_factor, num_seeds,
+                                                  add_self_loop)
