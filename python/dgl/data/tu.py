@@ -34,7 +34,9 @@ class TUDataset(object):
 
         self.graph_lists = g.subgraphs(node_idx_list)
 
-        self.graph_labels = DS_graph_labels
+        self.num_labels = max(DS_graph_labels) + 1 # 0 indexed
+
+        self.graph_labels = [np.expand_dims(x, axis=1) for x in DS_graph_labels]
 
         if use_node_label:
             DS_node_labels = self._idx_from_zero(np.loadtxt(self._file_path("node_labels"), dtype=int))
@@ -224,4 +226,4 @@ class DiffpoolDataset(TUDataset):
         print("DEBUGGGG")
         print(self.graph_labels[0])
         print(len(self.graph_labels))
-        return self.graph_lists[0].ndata['feat'].shape[1], self.graph_lists[0].ndata['a_feat'].shape[1], self.graph_labels[0].shape
+        return self.graph_lists[0].ndata['feat'].shape[1], self.graph_lists[0].ndata['a_feat'].shape[1], self.num_labels
