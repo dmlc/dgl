@@ -410,8 +410,8 @@ def _load_data(dataset_str='aifb', dataset_path=None):
                 dst = nodes_dict[o]
                 assert src < num_node and dst < num_node
                 rel = relations_dict[p]
-                edge_list.append((src, dst, 2 * rel))
-                edge_list.append((dst, src, 2 * rel + 1))
+                edge_list.append((src, dst, 2 * rel + 1))
+                edge_list.append((dst, src, 2 * rel + 2))
 
             # sort indices by destination
             edge_list = sorted(edge_list, key=lambda x: (x[1], x[0], x[2]))
