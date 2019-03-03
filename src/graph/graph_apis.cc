@@ -433,6 +433,91 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLineGraph")
     *rv = lghandle;
   });
 
+/*
+template<int num_seeds>
+void CAPI_NeighborUniformSample(DGLArgs args, DGLRetValue* rv) {
+  GraphHandle ghandle = args[0];
+  std::vector<IdArray> seeds(num_seeds);
+  for (size_t i = 0; i < seeds.size(); i++)
+    seeds[i] = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[i + 1]));
+  std::string neigh_type = args[num_seeds + 1];
+  const int num_hops = args[num_seeds + 2];
+  const int num_neighbors = args[num_seeds + 3];
+  const int num_valid_seeds = args[num_seeds + 4];
+  const bool add_self_loop = args[num_seeds + 5];
+  const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+  const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
+  CHECK(gptr) << "sampling isn't implemented in mutable graph";
+  CHECK(num_valid_seeds <= num_seeds);
+  std::vector<NodeFlow> subgs(seeds.size());
+#pragma omp parallel for
+  for (int i = 0; i < num_valid_seeds; i++) {
+    subgs[i] = SamplerOp::NeighborUniformSample(gptr, seeds[i], neigh_type, num_hops,
+                                                num_neighbors, add_self_loop);
+  }
+  *rv = ConvertSubgraphToPackedFunc(subgs);
+}
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling")
+.set_body(CAPI_NeighborUniformSample<1>);
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling2")
+.set_body(CAPI_NeighborUniformSample<2>);
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling4")
+.set_body(CAPI_NeighborUniformSample<4>);
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling8")
+.set_body(CAPI_NeighborUniformSample<8>);
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling16")
+.set_body(CAPI_NeighborUniformSample<16>);
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling32")
+.set_body(CAPI_NeighborUniformSample<32>);
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling64")
+.set_body(CAPI_NeighborUniformSample<64>);
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphUniformSampling128")
+.set_body(CAPI_NeighborUniformSample<128>);
+
+template<int num_seeds>
+void CAPI_LayerUniformSample(DGLArgs args, DGLRetValue* rv) {
+  GraphHandle ghandle = args[0];
+  std::vector<IdArray> seeds(num_seeds);
+  for (size_t i = 0; i < seeds.size(); i++)
+    seeds[i] = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[i + 1]));
+  std::string neigh_type = args[num_seeds + 1];
+  auto ls_array = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[num_seeds + 2]));
+  size_t *ls_data = static_cast<size_t*>(ls_array->data);
+  size_t ls_len = ls_array->shape[0];
+  std::vector<size_t> layer_sizes;
+  std::copy(ls_data, ls_data + ls_len, std::back_inserter(layer_sizes));
+  const int num_valid_seeds = args[num_seeds + 3];
+  const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+  const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
+  CHECK(gptr) << "sampling isn't implemented in mutable graph";
+  CHECK(num_valid_seeds <= num_seeds);
+  std::vector<NodeFlow> subgs(seeds.size());
+#pragma omp parallel for
+  for (int i = 0; i < num_valid_seeds; i++) {
+    subgs[i] = SamplerOp::LayerUniformSample(gptr, seeds[i], neigh_type, layer_sizes);
+  }
+  *rv = ConvertSubgraphToPackedFunc(subgs);
+}
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLayerUniformSampling")
+.set_body(CAPI_LayerUniformSample<1>);
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLayerUniformSampling2")
+.set_body(CAPI_LayerUniformSample<2>);
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLayerUniformSampling4")
+.set_body(CAPI_LayerUniformSample<4>);
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLayerUniformSampling8")
+.set_body(CAPI_LayerUniformSample<8>);
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLayerUniformSampling16")
+.set_body(CAPI_LayerUniformSample<16>);
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLayerUniformSampling32")
+.set_body(CAPI_LayerUniformSample<32>);
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLayerUniformSampling64")
+.set_body(CAPI_LayerUniformSample<64>);
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLayerUniformSampling128")
+.set_body(CAPI_LayerUniformSample<128>);
+*/
+
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetAdj")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
