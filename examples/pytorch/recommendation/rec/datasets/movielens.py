@@ -65,19 +65,17 @@ class MovieLens(object):
         self.build_graph()
         self.find_neighbors(100, 20, 50)
 
-    def data_split(self):
-        test_set = self.ratings.sample(frac=0.02, random_state=1).index
-        valid_set = self.ratings.sample(frac=0.02, random_state=2).index
-        valid_set = valid_set.difference(test_set)
-        prev_set = valid_set.union(test_set)
-        train_set = self.ratings.sample(frac=0.1, random_state=3).index
-        train_set = train_set.difference(prev_set)
-        prev_set = prev_set.union(train_set)
+    def split_user(self, df):
+        df_new = df.copy()
+        df_new['prob'] = np.random.rand(df_new.shape[0])
+        df_new['train'] = df_new['prob'] <= 0.8
+        df_new['valid'] = (df_new['prob'] > 0.8) & (df_new['prob'] <= 0.9)
+        df_new['test'] = df_new['prob'] > 0.9
+        df_new.drop('prob', axis=1, inplace=True)
+        return df_new
 
-        self.ratings['valid'] = self.ratings.index.isin(valid_set)
-        self.ratings['test'] = self.ratings.index.isin(test_set)
-        self.ratings['train'] = self.ratings.index.isin(train_set)
-        self.ratings['prior'] = ~self.ratings.index.isin(prev_set)
+    def data_split(self):
+        self.ratings = self.ratings.groupby('user_id', group_keys=False).apply(self.split_user)
 
     def build_graph(self):
         user_ids = list(self.users.index)
@@ -95,12 +93,10 @@ class MovieLens(object):
         valid_tensor = torch.from_numpy(self.ratings['valid'].values.astype('uint8'))
         test_tensor = torch.from_numpy(self.ratings['test'].values.astype('uint8'))
         train_tensor = torch.from_numpy(self.ratings['train'].values.astype('uint8'))
-        prior_tensor = torch.from_numpy(self.ratings['prior'].values.astype('uint8'))
         edge_data = {
                 'valid': valid_tensor,
                 'test': test_tensor,
                 'train': train_tensor,
-                'prior': prior_tensor,
                 }
 
         g.add_edges(rating_user_vertices, rating_movie_vertices)
