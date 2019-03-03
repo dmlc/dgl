@@ -66,13 +66,13 @@ class SampledSubgraphLoader(object):
             end = min((self._nflow_idx + 1) * self._batch_size, num_nodes)
             seed_ids.append(utils.toindex(self._seed_nodes[start:end]))
             self._nflow_idx += 1
-<<<<<<< HEAD
         sgi = _neighbor_sampling(self._g._graph, seed_ids, self._expand_factor,
                                  self._num_hops, self._neighbor_type,
                                  self._node_prob, self._add_self_loop)
         '''
         handles = _CAPI_UniformSampling(
             self._g._graph._handle,
+            self._seed_nodes,
             int(self._nflow_idx),    # start batch id
             int(self._batch_size),   # batch size
             int(self._num_workers),  # num batches
@@ -92,6 +92,7 @@ class SampledSubgraphLoader(object):
         nflows = [NodeFlow(self._g, i) for i in sgi]
         '''
         self._nflows.extend(nflows)
+        self._nflow_idx += len(nflows)
 
     def __iter__(self):
         return self

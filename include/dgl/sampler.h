@@ -57,7 +57,8 @@ class SamplerOp {
    * \param add_self_loop whether to add self loop to the sampled subgraph
    * \return a NodeFlow graph.
    */
-  static NodeFlow NeighborUniformSample(const ImmutableGraph *graph, IdArray seeds,
+  static NodeFlow NeighborUniformSample(const ImmutableGraph *graph,
+                                        const std::vector<dgl_id_t>& seeds,
                                         const std::string &edge_type,
                                         int num_hops, int expand_factor,
                                         const bool add_self_loop);
