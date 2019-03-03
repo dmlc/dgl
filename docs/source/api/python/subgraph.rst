@@ -1,13 +1,14 @@
 .. _apigraph:
 
 DGLSubGraph -- Class for subgraph data structure
-=========================================
+================================================
 
-.. currentmodule:: dgl
+.. currentmodule:: dgl.subgraph
 .. autoclass:: DGLSubGraph
 
- Mapping between subgraph and parent graph
- -------------------------------------
+Mapping between subgraph and parent graph
+-----------------------------------------
+.. autosummary::
     :toctree: ../../generated/
 
     DGLSubGraph.parent_nid
@@ -16,6 +17,7 @@ DGLSubGraph -- Class for subgraph data structure
 
 Synchronize features between subgraph and parent graph
 ------------------------------------------------------
+.. autosummary::
     :toctree: ../../generated/
 
     DGLSubGraph.copy_from_parent
