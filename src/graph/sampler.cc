@@ -7,6 +7,7 @@
 #include <dgl/sampler.h>
 #include <dmlc/omp.h>
 #include <dgl/immutable_graph.h>
+#include "../c_api_common.h"
 #include <algorithm>
 #include <cstdlib>
 #include <cmath>
@@ -18,10 +19,15 @@ int rand_r(unsigned *seed) {
 }
 #endif
 
+using dgl::runtime::DGLArgs;
+using dgl::runtime::DGLArgValue;
+using dgl::runtime::DGLRetValue;
+using dgl::runtime::PackedFunc;
+using dgl::runtime::NDArray;
+
 namespace dgl {
 
 namespace {
-
 /*
  * ArrayHeap is used to sample elements from vector
  */
@@ -530,5 +536,60 @@ IdArray SamplerOp::RandomWalk(
 
   return traces;
 }
+
+template<int num_seeds>
+void CAPI_NeighborUniformSample(DGLArgs args, DGLRetValue* rv) {
+  GraphHandle ghandle = args[0];
+  std::vector<IdArray> seeds(num_seeds);
+  for (size_t i = 0; i < seeds.size(); i++)
+    seeds[i] = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[i + 1]));
+  std::string neigh_type = args[num_seeds + 1];
+  const int num_hops = args[num_seeds + 2];
+  const int num_neighbors = args[num_seeds + 3];
+  const int num_valid_seeds = args[num_seeds + 4];
+  const bool add_self_loop = args[num_seeds + 5];
+  const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+  const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
+  CHECK(gptr) << "sampling isn't implemented in mutable graph";
+  CHECK(num_valid_seeds <= num_seeds);
+  std::vector<NodeFlow> subgs(seeds.size());
+#pragma omp parallel for
+  for (int i = 0; i < num_valid_seeds; i++) {
+    subgs[i] = SamplerOp::NeighborUniformSample(gptr, seeds[i], neigh_type, num_hops,
+                                                num_neighbors, add_self_loop);
+  }
+  *rv = ConvertSubgraphToPackedFunc(subgs);
+}
+
+//DGL_REGISTER_GLOBAL("sampling._CAPI_DGLGraphUniformSampling")
+//.set_body(CAPI_NeighborUniformSample<1>);
+//DGL_REGISTER_GLOBAL("sampling._CAPI_DGLGraphUniformSampling2")
+//.set_body(CAPI_NeighborUniformSample<2>);
+//DGL_REGISTER_GLOBAL("sampling._CAPI_DGLGraphUniformSampling4")
+//.set_body(CAPI_NeighborUniformSample<4>);
+//DGL_REGISTER_GLOBAL("sampling._CAPI_DGLGraphUniformSampling8")
+//.set_body(CAPI_NeighborUniformSample<8>);
+//DGL_REGISTER_GLOBAL("sampling._CAPI_DGLGraphUniformSampling16")
+//.set_body(CAPI_NeighborUniformSample<16>);
+//DGL_REGISTER_GLOBAL("sampling._CAPI_DGLGraphUniformSampling32")
+//.set_body(CAPI_NeighborUniformSample<32>);
+//DGL_REGISTER_GLOBAL("sampling._CAPI_DGLGraphUniformSampling64")
+//.set_body(CAPI_NeighborUniformSample<64>);
+//DGL_REGISTER_GLOBAL("sampling._CAPI_DGLGraphUniformSampling128")
+//.set_body(CAPI_NeighborUniformSample<128>);
+
+DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const GraphHandle ghdl = args[0];
+    const int batch_start_id = args[1];
+    const int batch_size = args[2];
+    const int num_workers = args[3];
+    const int expand_factor = args[4];
+    const int num_hops = args[5];
+    const std::string neigh_type = args[6];
+    const bool add_self_loop = args[7];
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghdl);
+    const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
+  });
 
 }  // namespace dgl

@@ -40,6 +40,7 @@ class NSSubgraphLoader(object):
             self._seed_nodes = seed_nodes
         if shuffle:
             self._seed_nodes = F.rand_shuffle(self._seed_nodes)
+        self._seed_nodes = utils.toindex(self._seed_nodes)
         self._num_workers = num_workers
         self._neighbor_type = neighbor_type
         self._nflows = []
@@ -47,6 +48,7 @@ class NSSubgraphLoader(object):
         self._nflow_idx = 0
 
     def _prefetch(self):
+        '''
         seed_ids = []
         num_nodes = len(self._seed_nodes)
         for i in range(self._num_workers):
@@ -60,7 +62,17 @@ class NSSubgraphLoader(object):
         sgi = _neighbor_sampling(self._g._graph, seed_ids, self._expand_factor,
                                  self._num_hops, self._neighbor_type,
                                  self._node_prob, self._add_self_loop)
-        nflows = [NodeFlow(self._g, i) for i in sgi]
+        '''
+        handles = _CAPI_UniformSampling(
+            self._g._graph._handle,
+            int(self._nflow_idx),    # start batch id
+            int(self._batch_size),   # batch size
+            int(self._num_workers),  # num batches
+            int(self._expand_factor),
+            int(self._num_hops),
+            self._neighbor_type,
+            self._add_self_loop)
+        nflows = [NodeFlow(self._g, hdl) for hdl in handles]
         self._nflows.extend(nflows)
 
     def __iter__(self):
