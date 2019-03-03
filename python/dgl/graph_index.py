@@ -10,6 +10,7 @@ from ._ffi.base import c_array
 from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
+from . import ndarray as nd
 from . import utils
 
 GraphIndexHandle = ctypes.c_void_p
@@ -694,6 +695,25 @@ class GraphIndex(object):
                               utils.toindex(rst(num_subgs * 3 + i)),
                               utils.toindex(rst(num_subgs * 4 + i))) for i in range(num_subgs)]
 
+    def layer_sampling(self, seed_ids, layer_sizes, neighbor_type, node_prob=None):
+        """Layer sampling"""
+        if len(seed_ids) == 0:
+            return []
+
+        seed_ids = [v.todgltensor() for v in seed_ids]
+        layer_sizes = nd.from_dlpack(F.zerocopy_to_dlpack(F.tensor(layer_sizes)))
+        if node_prob is None:
+            rst = _layer_uniform_sampling(self, seed_ids, neighbor_type, layer_sizes)
+        else:
+            raise NotImplementedError()
+
+        num_subgs = len(seed_ids)
+        return [NodeFlowIndex(rst(i), self, utils.toindex(rst(num_subgs + i)),
+                              utils.toindex(rst(num_subgs * 2 + i)),
+                              utils.toindex(rst(num_subgs * 3 + i)),
+                              utils.toindex(rst(num_subgs * 4 + i))) for i in range(num_subgs)]
+
+
     def random_walk(self, seeds, num_traces, num_hops):
         """Random walk sampling.
 
@@ -1151,3 +1171,25 @@ def _uniform_sampling(gidx, seed_ids, neigh_type, num_hops, expand_factor, add_s
     return _NEIGHBOR_SAMPLING_APIS[len(seed_ids)](gidx._handle, *seed_ids, neigh_type,
                                                   num_hops, expand_factor, num_seeds,
                                                   add_self_loop)
+
+_LAYER_SAMPLING_APIS = {
+    1: _CAPI_DGLGraphLayerUniformSampling,
+    2: _CAPI_DGLGraphLayerUniformSampling2,
+    4: _CAPI_DGLGraphLayerUniformSampling4,
+    8: _CAPI_DGLGraphLayerUniformSampling8,
+    16: _CAPI_DGLGraphLayerUniformSampling16,
+    32: _CAPI_DGLGraphLayerUniformSampling32,
+    64: _CAPI_DGLGraphLayerUniformSampling64,
+    128: _CAPI_DGLGraphLayerUniformSampling128,
+}
+
+def _layer_uniform_sampling(gidx, seed_ids, neigh_type, layer_sizes):
+    num_seeds = len(seed_ids)
+    empty_ids = []
+    if len(seed_ids) > 1 and len(seed_ids) not in _LAYER_SAMPLING_APIS.keys():
+        remain = 2**int(math.ceil(math.log2(len(dgl_ids)))) - len(dgl_ids)
+        empty_ids = _EMPTY_ARRAYS[0:remain]
+        seed_ids.extend([empty.todgltensor() for empty in empty_ids])
+    assert len(seed_ids) in _LAYER_SAMPLING_APIS.keys()
+    return _LAYER_SAMPLING_APIS[len(seed_ids)](gidx._handle, *seed_ids, neigh_type,
+                                               layer_sizes, num_seeds)
