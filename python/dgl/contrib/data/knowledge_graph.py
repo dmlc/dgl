@@ -410,7 +410,9 @@ def _load_data(dataset_str='aifb', dataset_path=None):
                 dst = nodes_dict[o]
                 assert src < num_node and dst < num_node
                 rel = relations_dict[p]
+                # relation id 0 is self-relation, so others should start with 1
                 edge_list.append((src, dst, 2 * rel + 1))
+                # reverse relation
                 edge_list.append((dst, src, 2 * rel + 2))
 
             # sort indices by destination
