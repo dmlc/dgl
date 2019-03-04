@@ -292,7 +292,8 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
                                    expand_factor=expand_factor, num_hops=num_hops,
                                    neighbor_type=neighbor_type, node_prob=node_prob,
                                    seed_nodes=seed_nodes, shuffle=shuffle,
-                                   num_workers=num_workers)
+                                   num_workers=num_workers,
+                                   add_self_loop=add_self_loop)
     if not prefetch:
         return loader
     else:
