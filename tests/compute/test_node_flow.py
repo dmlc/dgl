@@ -6,23 +6,44 @@ from dgl.node_flow import create_full_node_flow
 from dgl import utils
 import dgl.function as fn
 from functools import partial
+import itertools
 
-def generate_rand_graph(n, connect_more=False):
-    arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
-    # having one node to connect to all other nodes.
-    if connect_more:
-        arr[0] = 1
-        arr[:,0] = 1
+
+def generate_rand_graph(n, connect_more=False, complete=False):
+    if complete:
+        cord = [(i,j) for i, j in itertools.product(range(n), range(n)) if i != j]
+        row = [t[0] for t in cord]
+        col = [t[1] for t in cord]
+        data = np.ones((len(row),))
+        arr = sp.sparse.coo_matrix((data, (row, col)), shape=(n, n))
+    else:
+        arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
+        # having one node to connect to all other nodes.
+        if connect_more:
+            arr[0] = 1
+            arr[:,0] = 1
     g = dgl.DGLGraph(arr, readonly=True)
     g.ndata['h1'] = F.randn((g.number_of_nodes(), 10))
     g.edata['h2'] = F.randn((g.number_of_edges(), 3))
     return g
 
 
-def create_mini_batch(g, num_hops):
+def test_self_loop():
+    n = 100
+    num_hops = 2
+    g = generate_rand_graph(n, complete=True)
+    nf = create_mini_batch(g, num_hops, add_self_loop=True)
+    for i in range(1, nf.num_layers):
+        in_deg = nf.layer_in_degree(i)
+        deg = F.ones(in_deg.shape, dtype=F.int64) * n
+        assert F.array_equal(in_deg, deg)
+
+
+def create_mini_batch(g, num_hops, add_self_loop=False):
     seed_ids = np.array([0, 1, 2, 3])
     seed_ids = utils.toindex(seed_ids)
-    sgi = g._graph.neighbor_sampling([seed_ids], g.number_of_nodes(), num_hops, "in", None)
+    sgi = g._graph.neighbor_sampling([seed_ids], g.number_of_nodes(), num_hops,
+                                     "in", None, add_self_loop)
     assert len(sgi) == 1
     return dgl.node_flow.NodeFlow(g, sgi[0])
 
@@ -50,17 +71,21 @@ def check_basic(g, nf):
 def test_basic():
     num_layers = 2
     g = generate_rand_graph(100, connect_more=True)
+    print(0, 0)
     nf = create_full_node_flow(g, num_layers)
+    print(0, 1)
     assert nf.number_of_nodes() == g.number_of_nodes() * (num_layers + 1)
     assert nf.number_of_edges() == g.number_of_edges() * num_layers
     assert nf.num_layers == num_layers + 1
     assert nf.layer_size(0) == g.number_of_nodes()
     assert nf.layer_size(1) == g.number_of_nodes()
     check_basic(g, nf)
+    print(0, 2)
 
     parent_nids = F.arange(0, g.number_of_nodes())
     nids = dgl.graph_index.map_to_nodeflow_nid(nf._graph, 0,
                                                utils.toindex(parent_nids)).tousertensor()
+    print(0, 3)
     assert F.array_equal(nids, parent_nids)
 
     g = generate_rand_graph(100)
@@ -239,3 +264,4 @@ if __name__ == '__main__':
     test_apply_edges()
     test_flow_compute()
     test_prop_flows()
+    test_self_loop()

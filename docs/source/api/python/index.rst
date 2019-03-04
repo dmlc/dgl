@@ -14,3 +14,5 @@ API Reference
    sampler
    data
    transform
+   nn
+   subgraph
