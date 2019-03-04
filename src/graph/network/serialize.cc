@@ -93,8 +93,8 @@ void DeserializeSampledSubgraph(char* data,
                                 IdArray* edge_mapping,
                                 IdArray* layer_offsets,
                                 IdArray* flow_offsets) {
-  // For each component, we first write its size at the
-  // begining of the buffer and then write its binary data
+  // For each component, we first read its size at the
+  // begining of the buffer and then read its binary data
   char* data_ptr = data;
   // node_mapping
   int64_t tensor_size = static_cast<int64_t>(*data_ptr);
