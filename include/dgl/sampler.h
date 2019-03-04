@@ -73,9 +73,10 @@ class SamplerOp {
    * \param layer_sizes The size of layers.
    * \return a NodeFlow graph.
    */
-  static NodeFlow LayerUniformSample(const ImmutableGraph *graph, IdArray seed_array,
+  static NodeFlow LayerUniformSample(const ImmutableGraph *graph,
+                                     const std::vector<dgl_id_t>& seeds,
                                      const std::string &neigh_type,
-                                     const std::vector<size_t> &layer_sizes);
+                                     IdArray layer_sizes);
 
   /*!
    * \brief Batch-generate random walk traces

@@ -679,48 +679,6 @@ class GraphIndex(object):
         shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
         return inc, shuffle_idx
 
-<<<<<<< HEAD
-=======
-    def neighbor_sampling(self, seed_ids, expand_factor, num_hops, neighbor_type,
-                          node_prob, add_self_loop=False):
-        """Neighborhood sampling"""
-        if len(seed_ids) == 0:
-            return []
-
-        seed_ids = [v.todgltensor() for v in seed_ids]
-        num_subgs = len(seed_ids)
-        if node_prob is None:
-            rst = _uniform_sampling(self, seed_ids, neighbor_type, num_hops,
-                                    expand_factor, add_self_loop)
-        else:
-            rst = _nonuniform_sampling(self, node_prob, seed_ids, neighbor_type, num_hops,
-                                       expand_factor)
-
-        return [NodeFlowIndex(rst(i), self, utils.toindex(rst(num_subgs + i)),
-                              utils.toindex(rst(num_subgs * 2 + i)),
-                              utils.toindex(rst(num_subgs * 3 + i)),
-                              utils.toindex(rst(num_subgs * 4 + i))) for i in range(num_subgs)]
-
-    def layer_sampling(self, seed_ids, layer_sizes, neighbor_type, node_prob=None):
-        """Layer sampling"""
-        if len(seed_ids) == 0:
-            return []
-
-        seed_ids = [v.todgltensor() for v in seed_ids]
-        layer_sizes = nd.from_dlpack(F.zerocopy_to_dlpack(F.tensor(layer_sizes)))
-        if node_prob is None:
-            rst = _layer_uniform_sampling(self, seed_ids, neighbor_type, layer_sizes)
-        else:
-            raise NotImplementedError()
-
-        num_subgs = len(seed_ids)
-        return [NodeFlowIndex(rst(i), self, utils.toindex(rst(num_subgs + i)),
-                              utils.toindex(rst(num_subgs * 2 + i)),
-                              utils.toindex(rst(num_subgs * 3 + i)),
-                              utils.toindex(rst(num_subgs * 4 + i))) for i in range(num_subgs)]
-
-
->>>>>>> master
     def random_walk(self, seeds, num_traces, num_hops):
         """Random walk sampling.
 
@@ -925,75 +883,6 @@ class SubgraphIndex(GraphIndex):
         raise NotImplementedError(
             "SubgraphIndex unpickling is not supported yet.")
 
-class NodeFlowIndex(GraphIndex):
-    """Graph index for a NodeFlow graph.
-
-    Parameters
-    ----------
-    handle : GraphIndexHandle
-        The capi handle.
-    paranet : GraphIndex
-        The parent graph index.
-    node_mapping : utils.Index
-        This maps nodes to the parent graph.
-    edge_mapping : utils.Index
-        The maps edges to the parent graph.
-    layers: utils.Index
-        The offsets of the layers.
-    flows: utils.Index
-        The offsets of the flows.
-    """
-    def __init__(self, handle, parent, node_mapping, edge_mapping, layers, flows):
-        super(NodeFlowIndex, self).__init__(handle, parent.is_multigraph(), parent.is_readonly())
-        self._parent = parent
-        self._node_mapping = node_mapping
-        self._edge_mapping = edge_mapping
-        self._layers = layers
-        self._flows = flows
-
-    @property
-    def node_mapping(self):
-        """Return the node mapping to the parent graph.
-
-        Returns
-        -------
-        utils.Index
-            The node mapping.
-        """
-        return self._node_mapping
-
-    @property
-    def edge_mapping(self):
-        """Return the edge mapping to the parent graph.
-
-        Returns
-        -------
-        utils.Index
-            The edge mapping.
-        """
-        return self._edge_mapping
-
-    @property
-    def layers(self):
-        """Return layer offsets.
-        """
-        return self._layers
-
-    @property
-    def flows(self):
-        """Return flow offsets.
-        """
-        return self._flows
-
-    def __getstate__(self):
-        raise NotImplementedError(
-            "SubgraphIndex pickling is not supported yet.")
-
-    def __setstate__(self, state):
-        raise NotImplementedError(
-            "SubgraphIndex unpickling is not supported yet.")
-
-
 def map_to_subgraph_nid(subgraph, parent_nids):
     """Map parent node Ids to the subgraph node Ids.
 
@@ -1013,33 +902,23 @@ def map_to_subgraph_nid(subgraph, parent_nids):
     return utils.toindex(_CAPI_DGLMapSubgraphNID(subgraph.induced_nodes.todgltensor(),
                                                  parent_nids.todgltensor()))
 
-def map_to_nodeflow_nid(nflow, layer_id, parent_nids):
-    """Map parent node Ids to NodeFlow node Ids in a certain layer.
+def transform_ids(mapping, ids):
+    """Transform ids by the given mapping.
 
     Parameters
     ----------
-    nflow : NodeFlowIndex
-        The graph index of a NodeFlow.
-
-    layer_id : int
-        The layer Id.
-
-    parent_nids: utils.Index
-        Node Ids in the parent graph.
+    mapping : utils.Index
+        The id mapping. new_id = mapping[old_id]
+    ids : utils.Index
+        The old ids.
 
     Returns
     -------
     utils.Index
-        Node Ids in the NodeFlow.
+        The new ids.
     """
-    mapping = nflow.node_mapping.tousertensor()
-    layers = nflow.layers.tonumpy()
-    start = int(layers[layer_id])
-    end = int(layers[layer_id + 1])
-    mapping = mapping[start:end]
-    mapping = utils.toindex(mapping)
-    return utils.toindex(_CAPI_DGLMapSubgraphNID(mapping.todgltensor(),
-                                                 parent_nids.todgltensor()))
+    return utils.toindex(_CAPI_DGLMapSubgraphNID(
+        mapping.todgltensor(), ids.todgltensor()))
 
 def disjoint_union(graphs):
     """Return a disjoint union of the input graphs.
@@ -1152,53 +1031,3 @@ def create_graph_index(graph_data=None, multigraph=False, readonly=False):
 
 
 _init_api("dgl.graph_index")
-'''
-
-# TODO(zhengda): we'll support variable-length inputs.
-_NEIGHBOR_SAMPLING_APIS = {
-    1: _CAPI_DGLGraphUniformSampling,
-    2: _CAPI_DGLGraphUniformSampling2,
-    4: _CAPI_DGLGraphUniformSampling4,
-    8: _CAPI_DGLGraphUniformSampling8,
-    16: _CAPI_DGLGraphUniformSampling16,
-    32: _CAPI_DGLGraphUniformSampling32,
-    64: _CAPI_DGLGraphUniformSampling64,
-    128: _CAPI_DGLGraphUniformSampling128,
-}
-
-_EMPTY_ARRAYS = [utils.toindex(F.ones(shape=(0), dtype=F.int64, ctx=F.cpu()))]
-
-def _uniform_sampling(gidx, seed_ids, neigh_type, num_hops, expand_factor, add_self_loop):
-    num_seeds = len(seed_ids)
-    empty_ids = []
-    if len(seed_ids) > 1 and len(seed_ids) not in _NEIGHBOR_SAMPLING_APIS.keys():
-        remain = 2**int(math.ceil(math.log2(len(dgl_ids)))) - len(dgl_ids)
-        empty_ids = _EMPTY_ARRAYS[0:remain]
-        seed_ids.extend([empty.todgltensor() for empty in empty_ids])
-    assert len(seed_ids) in _NEIGHBOR_SAMPLING_APIS.keys()
-    return _NEIGHBOR_SAMPLING_APIS[len(seed_ids)](gidx._handle, *seed_ids, neigh_type,
-                                                  num_hops, expand_factor, num_seeds,
-                                                  add_self_loop)
-
-_LAYER_SAMPLING_APIS = {
-    1: _CAPI_DGLGraphLayerUniformSampling,
-    2: _CAPI_DGLGraphLayerUniformSampling2,
-    4: _CAPI_DGLGraphLayerUniformSampling4,
-    8: _CAPI_DGLGraphLayerUniformSampling8,
-    16: _CAPI_DGLGraphLayerUniformSampling16,
-    32: _CAPI_DGLGraphLayerUniformSampling32,
-    64: _CAPI_DGLGraphLayerUniformSampling64,
-    128: _CAPI_DGLGraphLayerUniformSampling128,
-}
-
-def _layer_uniform_sampling(gidx, seed_ids, neigh_type, layer_sizes):
-    num_seeds = len(seed_ids)
-    empty_ids = []
-    if len(seed_ids) > 1 and len(seed_ids) not in _LAYER_SAMPLING_APIS.keys():
-        remain = 2**int(math.ceil(math.log2(len(dgl_ids)))) - len(dgl_ids)
-        empty_ids = _EMPTY_ARRAYS[0:remain]
-        seed_ids.extend([empty.todgltensor() for empty in empty_ids])
-    assert len(seed_ids) in _LAYER_SAMPLING_APIS.keys()
-    return _LAYER_SAMPLING_APIS[len(seed_ids)](gidx._handle, *seed_ids, neigh_type,
-                                               layer_sizes, num_seeds)
-'''

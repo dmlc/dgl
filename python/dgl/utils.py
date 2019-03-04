@@ -502,8 +502,10 @@ def unwrap_to_ptr_list(wrapper):
         A python list of void pointers.
     """
     size = _api_internal._GetVectorWrapperSize(wrapper)
+    if size == 0:
+        return []
     data = _api_internal._GetVectorWrapperData(wrapper)
     data = ctypes.cast(data, ctypes.POINTER(ctypes.c_void_p * size))
-    rst = [x for x in data.contents]
+    rst = [ctypes.c_void_p(x) for x in data.contents]
     _api_internal._FreeVectorWrapper(wrapper)
     return rst

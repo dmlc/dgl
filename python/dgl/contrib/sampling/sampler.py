@@ -1,4 +1,4 @@
-g This file contains NodeFlow samplers.
+"""This file contains NodeFlow samplers."""
 
 import sys
 import numpy as np
@@ -9,8 +9,8 @@ import traceback
 from ..._ffi.function import _init_api
 from ... import utils
 from ...node_flow import NodeFlow
-from ...graph_index import NodeFlowIndex
 from ... import backend as F
+from ...utils import unwrap_to_ptr_list
 
 try:
     import Queue as queue
@@ -33,10 +33,12 @@ class SampledSubgraphLoader(object):
             self._expand_factor = expand_factor
             self._num_hops = num_hops
         elif sampler == 'layer':
-            self._layer_sizes = layer_sizes
+            self._layer_sizes = utils.toindex(layer_sizes)
         else:
-            raise NotImplementedError()
+            raise NotImplementedError('Invalid sampler option: "%s"' % sampler)
         self._node_prob = node_prob
+        if node_prob is not None:
+            raise NotImplementedError('Non-uniform sampling is currently not supported.')
         self._add_self_loop = add_self_loop
         if self._node_prob is not None:
             assert self._node_prob.shape[0] == g.number_of_nodes(), \
@@ -55,42 +57,29 @@ class SampledSubgraphLoader(object):
         self._nflow_idx = 0
 
     def _prefetch(self):
-        '''
-        seed_ids = []
-        num_nodes = len(self._seed_nodes)
-        for i in range(self._num_workers):
-            start = self._nflow_idx * self._batch_size
-            # if we have visited all nodes, don't do anything.
-            if start >= num_nodes:
-                break
-            end = min((self._nflow_idx + 1) * self._batch_size, num_nodes)
-            seed_ids.append(utils.toindex(self._seed_nodes[start:end]))
-            self._nflow_idx += 1
-        sgi = _neighbor_sampling(self._g._graph, seed_ids, self._expand_factor,
-                                 self._num_hops, self._neighbor_type,
-                                 self._node_prob, self._add_self_loop)
-        '''
-        handles = _CAPI_UniformSampling(
-            self._g._graph._handle,
-            self._seed_nodes,
-            int(self._nflow_idx),    # start batch id
-            int(self._batch_size),   # batch size
-            int(self._num_workers),  # num batches
-            int(self._expand_factor),
-            int(self._num_hops),
-            self._neighbor_type,
-            self._add_self_loop)
-        nflows = [NodeFlow(self._g, hdl) for hdl in handles]
-        '''
         if self._sampler == 'neighbor':
-            sgi = self._g._graph.neighbor_sampling(seed_ids, self._expand_factor,
-                                                   self._num_hops, self._neighbor_type,
-                                                   self._node_prob, self._add_self_loop)
+            handles = unwrap_to_ptr_list(_CAPI_UniformSampling(
+                self._g._graph._handle,
+                self._seed_nodes.todgltensor(),
+                int(self._nflow_idx),    # start batch id
+                int(self._batch_size),   # batch size
+                int(self._num_workers),  # num batches
+                int(self._expand_factor),
+                int(self._num_hops),
+                self._neighbor_type,
+                self._add_self_loop))
         elif self._sampler == 'layer':
-            sgi = self._g._graph.layer_sampling(seed_ids, self._layer_sizes,
-                                                self._neighbor_type, self._node_prob)
-        nflows = [NodeFlow(self._g, i) for i in sgi]
-        '''
+            handles = unwrap_to_ptr_list(_CAPI_LayerSampling(
+                self._g._graph._handle,
+                self._seed_nodes.todgltensor(),
+                int(self._nflow_idx),    # start batch id
+                int(self._batch_size),   # batch size
+                int(self._num_workers),  # num batches
+                self._layer_sizes.todgltensor(),
+                self._neighbor_type))
+        else:
+            raise NotImplementedError('Invalid sampler option: "%s"' % self._sampler)
+        nflows = [NodeFlow(self._g, hdl) for hdl in handles]
         self._nflows.extend(nflows)
         self._nflow_idx += len(nflows)
 
@@ -263,6 +252,7 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
         * str: indicates some common ways of calculating the number of sampled neighbors,
           e.g., ``sqrt(deg)``.
 
+        TODO(minjie): What will happen if expand_factor > num_neighbors?
     num_hops : int, optional
         The number of hops to sample (i.e, the number of layers in the NodeFlow).
         Default: 1
@@ -348,50 +338,28 @@ def LayerSampler(g, batch_size, layer_sizes,
     else:
         return _PrefetchingLoader(loader, num_prefetch=num_workers*2)
 
-def _neighbor_sampling(gidx, seed_ids, expand_factor, num_hops, neighbor_type,
-                      node_prob, add_self_loop=False):
-    """Neighborhood sampling"""
-    if len(seed_ids) == 0:
-        return []
+def create_full_node_flow(g, num_layers, add_self_loop=False):
+    """Convert a full graph to NodeFlow to run a L-layer GNN model.
 
-    seed_ids = [v.todgltensor() for v in seed_ids]
-    num_subgs = len(seed_ids)
-    if node_prob is None:
-        rst = _uniform_sampling(gidx, seed_ids, neighbor_type, num_hops,
-                                expand_factor, add_self_loop)
-    else:
-        rst = _nonuniform_sampling(gidx, node_prob, seed_ids, neighbor_type, num_hops,
-                                   expand_factor)
+    Parameters
+    ----------
+    g : DGLGraph
+        a DGL graph
+    num_layers : int
+        The number of layers
+    add_self_loop : bool, default False
+        Whether to add self loop to the sampled NodeFlow.
+        If True, the edge IDs of the self loop edges are -1.
 
-    return [NodeFlowIndex(rst(i), gidx, utils.toindex(rst(num_subgs + i)),
-                          utils.toindex(rst(num_subgs * 2 + i)),
-                          utils.toindex(rst(num_subgs * 3 + i)),
-                          utils.toindex(rst(num_subgs * 4 + i))) for i in range(num_subgs)]
+    Returns
+    -------
+    NodeFlow
+        a NodeFlow with a specified number of layers.
+    """
+    batch_size = g.number_of_nodes()
+    expand_factor = g.number_of_nodes()
+    sampler = NeighborSampler(g, batch_size, expand_factor,
+        num_layers, add_self_loop=add_self_loop)
+    return next(sampler)
 
 _init_api('dgl.sampling', __name__)
-
-# TODO(zhengda): we'll support variable-length inputs.
-_NEIGHBOR_SAMPLING_APIS = {
-    1: _CAPI_DGLGraphUniformSampling,
-    2: _CAPI_DGLGraphUniformSampling2,
-    4: _CAPI_DGLGraphUniformSampling4,
-    8: _CAPI_DGLGraphUniformSampling8,
-    16: _CAPI_DGLGraphUniformSampling16,
-    32: _CAPI_DGLGraphUniformSampling32,
-    64: _CAPI_DGLGraphUniformSampling64,
-    128: _CAPI_DGLGraphUniformSampling128,
-}
-
-_EMPTY_ARRAYS = [utils.toindex(F.ones(shape=(0), dtype=F.int64, ctx=F.cpu()))]
-
-def _uniform_sampling(gidx, seed_ids, neigh_type, num_hops, expand_factor, add_self_loop):
-    num_seeds = len(seed_ids)
-    empty_ids = []
-    if len(seed_ids) > 1 and len(seed_ids) not in _NEIGHBOR_SAMPLING_APIS.keys():
-        remain = 2**int(math.ceil(math.log2(len(dgl_ids)))) - len(dgl_ids)
-        empty_ids = _EMPTY_ARRAYS[0:remain]
-        seed_ids.extend([empty.todgltensor() for empty in empty_ids])
-    assert len(seed_ids) in _NEIGHBOR_SAMPLING_APIS.keys()
-    return _NEIGHBOR_SAMPLING_APIS[len(seed_ids)](gidx._handle, *seed_ids, neigh_type,
-                                                  num_hops, expand_factor, num_seeds,
-                                                  add_self_loop)
