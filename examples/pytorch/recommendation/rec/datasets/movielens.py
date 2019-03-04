@@ -86,18 +86,12 @@ class MovieLens(object):
 
         g = dgl.DGLGraph()
         g.add_nodes(len(user_ids) + len(movie_ids))
+
         rating_user_vertices = [user_ids_invmap[id_] for id_ in self.ratings['user_id'].values]
         rating_movie_vertices = [movie_ids_invmap[id_] + len(user_ids)
                                  for id_ in self.ratings['movie_id'].values]
-
-        valid_tensor = torch.from_numpy(self.ratings['valid'].values.astype('uint8'))
-        test_tensor = torch.from_numpy(self.ratings['test'].values.astype('uint8'))
-        train_tensor = torch.from_numpy(self.ratings['train'].values.astype('uint8'))
-        edge_data = {
-                'valid': valid_tensor,
-                'test': test_tensor,
-                'train': train_tensor,
-                }
+        self.rating_user_vertices = rating_user_vertices
+        self.rating_movie_vertices = rating_movie_vertices
 
         g.add_edges(rating_user_vertices, rating_movie_vertices)
         g.add_edges(rating_movie_vertices, rating_user_vertices)
@@ -105,19 +99,13 @@ class MovieLens(object):
         #g_mat = sp.coo_matrix(g.adjacency_matrix().to_dense().numpy())
         #self.g = dgl.DGLGraph(g_mat, readonly=True)
         self.g = g
-
-        self.g.edges[rating_user_vertices, rating_movie_vertices].data.update(edge_data)
-        self.g.edges[rating_movie_vertices, rating_user_vertices].data.update(edge_data)
         self.user_ids = user_ids
         self.movie_ids = movie_ids
 
     def find_neighbors(self, n_traces, n_hops, top_T):
-        t0 = time.time()
         neighbor_probs, neighbors = randomwalk.random_walk_distribution_topt(
                 self.g, self.g.nodes(), n_traces, n_hops, top_T)
-        tt = time.time()
 
-        print('Pre-generating neighbors took %.4f seconds' % (tt - t0))
         self.neighbor_probs = neighbor_probs
         self.neighbors = neighbors
 
@@ -132,3 +120,21 @@ class MovieLens(object):
             movie_neighbor = neighbors[i].numpy()
             movie_neighbor = movie_neighbor[movie_neighbor >= len(self.user_ids)]
             self.movie_neighbors.append(movie_neighbor)
+
+    def refresh_mask(self):
+        train_mask = self.ratings['train'].values
+        prior_mask = np.random.rand(len(train_mask)) < 0.8
+
+        valid_tensor = torch.from_numpy(self.ratings['valid'].values.astype('uint8'))
+        test_tensor = torch.from_numpy(self.ratings['test'].values.astype('uint8'))
+        train_tensor = torch.from_numpy((train_mask & valid_mask).astype('uint8'))
+        prior_tensor = torch.from_numpy((train_mask & ~valid_mask).astype('uint8'))
+        edge_data = {
+                'prior': prior_tensor,
+                'valid': valid_tensor,
+                'test': test_tensor,
+                'train': train_tensor,
+                }
+
+        self.g.edges[rating_user_vertices, rating_movie_vertices].data.update(edge_data)
+        self.g.edges[rating_movie_vertices, rating_user_vertices].data.update(edge_data)

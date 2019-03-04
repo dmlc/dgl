@@ -77,10 +77,9 @@ class PinSage(nn.Module):
     n_traces: number of random walk traces to generate during sampling
     n_hops: number of hops of each random walk trace during sampling
     '''
-    def __init__(self, G, feature_sizes, T, n_traces, n_hops):
+    def __init__(self, feature_sizes, T, n_traces, n_hops):
         super(PinSage, self).__init__()
 
-        self.G = G
         self.T = T
         self.n_traces = n_traces
         self.n_hops = n_hops
@@ -96,7 +95,7 @@ class PinSage(nn.Module):
 
         self.h = create_embeddings(G.number_of_nodes(), self.in_features)
 
-    def forward(self, nodeset):
+    def forward(self, G, nodeset):
         '''
         Given a complete embedding matrix h and a list of node IDs, return
         the output embeddings of these node IDs.
@@ -106,7 +105,7 @@ class PinSage(nn.Module):
         '''
         h = self.h
         nodeflow = randomwalk.random_walk_nodeflow(
-                self.G, nodeset, self.n_layers, self.n_traces, self.n_hops, self.T)
+                G, nodeset, self.n_layers, self.n_traces, self.n_hops, self.T)
 
         for i, (nodeset, nb_weights, nb_nodes) in enumerate(nodeflow):
             new_embeddings = self.convs[i](h, nodeset, nb_nodes, nb_weights)

@@ -32,24 +32,18 @@ batch_size = 32
 # Note that each user-product pair is counted twice, but I think it is OK
 # since we can treat product negative sampling and user negative sampling
 # ubiquitously.
-g_prior_edges = g.filter_edges(lambda edges: edges.data['prior'])
-g_train_edges = g.filter_edges(lambda edges: edges.data['train'])
-g_valid_edges = g.filter_edges(lambda edges: edges.data['valid'])
-g_test_edges = g.filter_edges(lambda edges: edges.data['test'])
-g_prior = g.edge_subgraph(g_prior_edges)
-g_train = g.edge_subgraph(g_train_edges)
-g_prior_nid = g_prior.parent_nid
+ml.refresh_mask()
 
-model = cuda(PinSage(g_prior, [n_hidden] * n_layers, 10, 5, 5))
+model = cuda(PinSage([n_hidden] * n_layers, 10, 5, 5))
 opt = torch.optim.Adam(model.parameters(), lr=1e-3)
 
 
-def forward(model, nodeset, train=True):
+def forward(model, g_prior, nodeset, train=True):
     if train:
-        return model(nodeset)
+        return model(g_prior, nodeset)
     else:
         with torch.no_grad():
-            return model(nodeset)
+            return model(g_prior, nodeset)
 
 
 def filter_nid(nids, nid_from):
@@ -59,8 +53,17 @@ def filter_nid(nids, nid_from):
     return [torch.from_numpy(nid[np_mask]) for nid in nids]
 
 
-def train(edge_set):
-    model.train()
+def runtrain(edge_set, train):
+    if train:
+        model.train()
+    else:
+        model.eval()
+
+    g_prior_edges = g.filter_edges(lambda edges: edges.data['prior'])
+    g_train_edges = g.filter_edges(lambda edges: edges.data['train'])
+    g_prior = g.edge_subgraph(g_prior_edges)
+    g_train = g.edge_subgraph(g_train_edges)
+    g_prior_nid = g_prior.parent_nid
 
     edge_batches = edge_set[torch.randperm(edge_set.shape[0])].split(batch_size)
 
@@ -72,7 +75,11 @@ def train(edge_set):
             count += batch.shape[0]
             src, dst = g.find_edges(batch)
             dst_neg = torch.LongTensor(
-                    [np.random.choice(neighbors[i.item()]) for i in dst])
+                    [np.random.choice([
+                        j for j in neighbors[i.item()]
+                        if not g.has_edge_between(j, src)
+                    ])
+                    for i in dst])
 
             src, dst, dst_neg = filter_nid([src, dst, dst_neg], g_prior_nid)
 
@@ -85,7 +92,7 @@ def train(edge_set):
                     src.shape[0], dst.shape[0], dst_neg.shape[0]
 
             h_src, h_dst, h_dst_neg = (
-                    forward(model, nodeset, True)
+                    forward(model, g_prior, nodeset, train)
                     .split([src_size, dst_size, dst_neg_size]))
 
             diff = (h_src * (h_dst_neg - h_dst)).sum(1)
@@ -93,11 +100,12 @@ def train(edge_set):
             acc = (diff < 0).sum()
             assert loss.item() == loss.item()
 
-            opt.zero_grad()
-            loss.backward()
-            for name, p in model.named_parameters():
-                assert (p.grad != p.grad).sum() == 0
-            opt.step()
+            if train:
+                opt.zero_grad()
+                loss.backward()
+                for name, p in model.named_parameters():
+                    assert (p.grad != p.grad).sum() == 0
+                opt.step()
 
             sum_loss += loss.item()
             sum_acc += acc.item()
@@ -142,13 +150,13 @@ def train():
         run(g_train_edges, True)
         print('Epoch %d validation' % epoch)
         with torch.no_grad():
-            valid_loss, valid_acc = run(g_valid_edges, False)
+            valid_loss, valid_acc = runtrain(g_valid_edges, False)
             if best_acc < valid_acc:
                 best_acc = valid_acc
                 torch.save(model.state_dict(), 'model.pt')
         print('Epoch %d test' % epoch)
         with torch.no_grad():
-            test_loss, test_acc = run(g_test_edges, False)
+            test_loss, test_acc = runtrain(g_test_edges, False)
 
 
 if __name__ == '__main__':
