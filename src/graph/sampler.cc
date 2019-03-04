@@ -7,11 +7,11 @@
 #include <dgl/sampler.h>
 #include <dmlc/omp.h>
 #include <dgl/immutable_graph.h>
-#include "../c_api_common.h"
 #include <algorithm>
 #include <cstdlib>
 #include <cmath>
 #include <numeric>
+#include "../c_api_common.h"
 
 #ifdef _MSC_VER
 // rand in MS compiler works well in multi-threading.

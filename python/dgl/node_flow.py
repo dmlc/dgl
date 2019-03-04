@@ -67,9 +67,9 @@ class NodeFlow(DGLBaseGraph):
         self._node_mapping = utils.toindex(_CAPI_NodeFlowGetNodeMapping(handle))
         self._edge_mapping = utils.toindex(_CAPI_NodeFlowGetEdgeMapping(handle))
         self._layer_offsets = utils.toindex(
-                _CAPI_NodeFlowGetLayerOffsets(handle)).tonumpy()
+            _CAPI_NodeFlowGetLayerOffsets(handle)).tonumpy()
         self._block_offsets = utils.toindex(
-                _CAPI_NodeFlowGetBlockOffsets(handle)).tonumpy()
+            _CAPI_NodeFlowGetBlockOffsets(handle)).tonumpy()
         _CAPI_NodeFlowFree(handle)
         # node/edge frames
         self._node_frames = [FrameRef(Frame(num_rows=self.layer_size(i))) \
@@ -726,7 +726,7 @@ class NodeFlow(DGLBaseGraph):
         if is_all(flow_range):
             flow_range = range(0, self.num_blocks)
         elif isinstance(flow_range, slice):
-            if slice.step is not 1:
+            if slice.step != 1:
                 raise DGLError("We can't propogate flows and skip some of them")
             flow_range = range(flow_range.start, flow_range.stop)
         else:
