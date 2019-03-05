@@ -57,7 +57,8 @@ class SamplerOp {
    * \param add_self_loop whether to add self loop to the sampled subgraph
    * \return a NodeFlow graph.
    */
-  static NodeFlow NeighborUniformSample(const ImmutableGraph *graph, IdArray seeds,
+  static NodeFlow NeighborUniformSample(const ImmutableGraph *graph,
+                                        const std::vector<dgl_id_t>& seeds,
                                         const std::string &edge_type,
                                         int num_hops, int expand_factor,
                                         const bool add_self_loop);
@@ -72,9 +73,10 @@ class SamplerOp {
    * \param layer_sizes The size of layers.
    * \return a NodeFlow graph.
    */
-  static NodeFlow LayerUniformSample(const ImmutableGraph *graph, IdArray seed_array,
+  static NodeFlow LayerUniformSample(const ImmutableGraph *graph,
+                                     const std::vector<dgl_id_t>& seeds,
                                      const std::string &neigh_type,
-                                     const std::vector<size_t> &layer_sizes);
+                                     IdArray layer_sizes);
 
   /*!
    * \brief Batch-generate random walk traces

@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <numeric>
+#include "../c_api_common.h"
 
 #ifdef _MSC_VER
 // rand in MS compiler works well in multi-threading.
@@ -19,10 +20,15 @@ int rand_r(unsigned *seed) {
 }
 #endif
 
+using dgl::runtime::DGLArgs;
+using dgl::runtime::DGLArgValue;
+using dgl::runtime::DGLRetValue;
+using dgl::runtime::PackedFunc;
+using dgl::runtime::NDArray;
+
 namespace dgl {
 
 namespace {
-
 /*
  * ArrayHeap is used to sample elements from vector
  */
@@ -373,29 +379,28 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
 }
 
 NodeFlow SampleSubgraph(const ImmutableGraph *graph,
-                        IdArray seed_arr,
+                        const std::vector<dgl_id_t>& seeds,
                         const float* probability,
                         const std::string &edge_type,
                         int num_hops,
                         size_t num_neighbor,
                         const bool add_self_loop) {
   unsigned int time_seed = time(nullptr);
-  size_t num_seeds = seed_arr->shape[0];
+  const size_t num_seeds = seeds.size();
   auto orig_csr = edge_type == "in" ? graph->GetInCSR() : graph->GetOutCSR();
   const dgl_id_t* val_list = orig_csr->edge_ids.data();
   const dgl_id_t* col_list = orig_csr->indices.data();
   const int64_t* indptr = orig_csr->indptr.data();
-  const dgl_id_t* seed = static_cast<dgl_id_t*>(seed_arr->data);
 
   std::unordered_set<dgl_id_t> sub_ver_map;  // The vertex Ids in a layer.
   std::vector<std::pair<dgl_id_t, int> > sub_vers;
   sub_vers.reserve(num_seeds * 10);
   // add seed vertices
   for (size_t i = 0; i < num_seeds; ++i) {
-    auto ret = sub_ver_map.insert(seed[i]);
+    auto ret = sub_ver_map.insert(seeds[i]);
     // If the vertex is inserted successfully.
     if (ret.second) {
-      sub_vers.emplace_back(seed[i], 0);
+      sub_vers.emplace_back(seeds[i], 0);
     }
   }
   std::vector<dgl_id_t> tmp_sampled_src_list;
@@ -478,7 +483,51 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
 
 }  // namespace
 
-NodeFlow SamplerOp::NeighborUniformSample(const ImmutableGraph *graph, IdArray seeds,
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    GraphInterface* gptr = nflow->graph->Reset();
+    *rv = gptr;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetNodeMapping")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    *rv = nflow->node_mapping;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetEdgeMapping")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    *rv = nflow->edge_mapping;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetLayerOffsets")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    *rv = nflow->layer_offsets;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetBlockOffsets")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    *rv = nflow->flow_offsets;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowFree")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    delete nflow;
+  });
+
+NodeFlow SamplerOp::NeighborUniformSample(const ImmutableGraph *graph,
+                                          const std::vector<dgl_id_t>& seeds,
                                           const std::string &edge_type,
                                           int num_hops, int expand_factor,
                                           const bool add_self_loop) {
@@ -535,8 +584,8 @@ IdArray SamplerOp::RandomWalk(
 namespace {
   void ConstructLayers(const int64_t *indptr,
                        const dgl_id_t *indices,
-                       const IdArray seed_array,
-                       const std::vector<size_t> &layer_sizes,
+                       const std::vector<dgl_id_t>& seed_array,
+                       IdArray layer_sizes,
                        std::vector<dgl_id_t> *layer_offsets,
                        std::vector<dgl_id_t> *node_mapping,
                        std::vector<int64_t> *actl_layer_sizes,
@@ -546,17 +595,17 @@ namespace {
      * layers via uniform layer-wise sampling, and return the resultant layers and their
      * corresponding probabilities.
      */
-    const dgl_id_t* seed_data = static_cast<dgl_id_t*>(seed_array->data);
-    size_t seed_len = seed_array->shape[0];
-    std::copy(seed_data, seed_data + seed_len, std::back_inserter(*node_mapping));
+    std::copy(seed_array.begin(), seed_array.end(), std::back_inserter(*node_mapping));
     actl_layer_sizes->push_back(node_mapping->size());
     probabilities->insert(probabilities->end(), node_mapping->size(), 1);
+    const int64_t* layer_sizes_data = static_cast<int64_t*>(layer_sizes->data);
+    const int64_t num_layers = layer_sizes->shape[0];
 
     size_t curr = 0;
     size_t next = node_mapping->size();
     unsigned int rand_seed = time(nullptr);
-    for (auto i = layer_sizes.rbegin(); i != layer_sizes.rend(); ++i) {
-      auto layer_size = *i;
+    for (int64_t i = num_layers - 1; i >= 0; --i) {
+      const int64_t layer_size = layer_sizes_data[i];
       std::unordered_set<dgl_id_t> candidate_set;
       for (auto j = curr; j != next; ++j) {
         auto src = (*node_mapping)[j];
@@ -569,7 +618,7 @@ namespace {
 
       std::unordered_map<dgl_id_t, size_t> n_occurrences;
       auto n_candidates = candidate_vector.size();
-      for (size_t j = 0; j != layer_size; ++j) {
+      for (int64_t j = 0; j != layer_size; ++j) {
         auto dst = candidate_vector[rand_r(&rand_seed) % n_candidates];
         if (!n_occurrences.insert(std::make_pair(dst, 1)).second) {
           ++n_occurrences[dst];
@@ -647,9 +696,9 @@ namespace {
 }  // namespace
 
 NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
-                                       const IdArray seed_array,
+                                       const std::vector<dgl_id_t>& seeds,
                                        const std::string &neighbor_type,
-                                       const std::vector<size_t> &layer_sizes) {
+                                       IdArray layer_sizes) {
   const auto g_csr = neighbor_type == "in" ? graph->GetInCSR() : graph->GetOutCSR();
   const int64_t *indptr = g_csr->indptr.data();
   const dgl_id_t *indices = g_csr->indices.data();
@@ -661,7 +710,7 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
   std::vector<float> probabilities;
   ConstructLayers(indptr,
                   indices,
-                  seed_array,
+                  seeds,
                   layer_sizes,
                   &layer_offsets,
                   &node_mapping,
@@ -714,5 +763,83 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
 
   return nf;
 }
+
+DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    // arguments
+    const GraphHandle ghdl = args[0];
+    const IdArray seed_nodes = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const int64_t batch_start_id = args[2];
+    const int64_t batch_size = args[3];
+    const int64_t max_num_workers = args[4];
+    const int64_t expand_factor = args[5];
+    const int64_t num_hops = args[6];
+    const std::string neigh_type = args[7];
+    const bool add_self_loop = args[8];
+    // process args
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghdl);
+    const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
+    CHECK(gptr) << "sampling isn't implemented in mutable graph";
+    CHECK(IsValidIdArray(seed_nodes));
+    const dgl_id_t* seed_nodes_data = static_cast<dgl_id_t*>(seed_nodes->data);
+    const int64_t num_seeds = seed_nodes->shape[0];
+    const int64_t num_workers = std::min(max_num_workers,
+        (num_seeds + batch_size - 1) / batch_size - batch_start_id);
+    // generate node flows
+    std::vector<NodeFlow*> nflows(num_workers);
+#pragma omp parallel for
+    for (int i = 0; i < num_workers; i++) {
+      // create per-worker seed nodes.
+      const int64_t start = (batch_start_id + i) * batch_size;
+      const int64_t end = std::min(start + batch_size, num_seeds);
+      // TODO(minjie): the vector allocation/copy is unnecessary
+      std::vector<dgl_id_t> worker_seeds(end - start);
+      std::copy(seed_nodes_data + start, seed_nodes_data + end,
+                worker_seeds.begin());
+      nflows[i] = new NodeFlow();
+      *nflows[i] = SamplerOp::NeighborUniformSample(
+          gptr, worker_seeds, neigh_type, num_hops, expand_factor, add_self_loop);
+    }
+    *rv = WrapVectorReturn(nflows);
+  });
+
+DGL_REGISTER_GLOBAL("sampling._CAPI_LayerSampling")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    // arguments
+    const GraphHandle ghdl = args[0];
+    const IdArray seed_nodes = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const int64_t batch_start_id = args[2];
+    const int64_t batch_size = args[3];
+    const int64_t max_num_workers = args[4];
+    const IdArray layer_sizes = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[5]));
+    const std::string neigh_type = args[6];
+    // process args
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghdl);
+    const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
+    CHECK(gptr) << "sampling isn't implemented in mutable graph";
+    CHECK(IsValidIdArray(seed_nodes));
+    const dgl_id_t* seed_nodes_data = static_cast<dgl_id_t*>(seed_nodes->data);
+    const int64_t num_seeds = seed_nodes->shape[0];
+    const int64_t num_workers = std::min(max_num_workers,
+        (num_seeds + batch_size - 1) / batch_size - batch_start_id);
+    // generate node flows
+    std::vector<NodeFlow*> nflows(num_workers);
+#pragma omp parallel for
+    for (int i = 0; i < num_workers; i++) {
+      // create per-worker seed nodes.
+      const int64_t start = (batch_start_id + i) * batch_size;
+      const int64_t end = std::min(start + batch_size, num_seeds);
+      // TODO(minjie): the vector allocation/copy is unnecessary
+      std::vector<dgl_id_t> worker_seeds(end - start);
+      std::copy(seed_nodes_data + start, seed_nodes_data + end,
+                worker_seeds.begin());
+      nflows[i] = new NodeFlow();
+      *nflows[i] = SamplerOp::LayerUniformSample(
+          gptr, worker_seeds, neigh_type, layer_sizes);
+    }
+    *rv = WrapVectorReturn(nflows);
+  });
+
+
 
 }  // namespace dgl

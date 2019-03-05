@@ -52,6 +52,29 @@ dgl::runtime::NDArray CopyVectorToNDArray(
   return a;
 }
 
+/* A structure used to return a vector of void* pointers. */
+struct CAPIVectorWrapper {
+  // The pointer vector.
+  std::vector<void*> pointers;
+};
+
+/*!
+ * \brief A helper function used to return vector of pointers from C to frontend.
+ *
+ * Note that the function will move the given vector memory into the returned
+ * wrapper object.
+ * 
+ * \param vec The given pointer vectors.
+ * \return A wrapper object containing the given data.
+ */
+template<typename PType>
+CAPIVectorWrapper* WrapVectorReturn(std::vector<PType*> vec) {
+  CAPIVectorWrapper* wrapper = new CAPIVectorWrapper;
+  wrapper->pointers.reserve(vec.size());
+  wrapper->pointers.insert(wrapper->pointers.end(), vec.begin(), vec.end());
+  return wrapper;
+}
+
 }  // namespace dgl
 
 #endif  // DGL_C_API_COMMON_H_
