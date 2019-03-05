@@ -11,6 +11,7 @@ def random_walk_sampler(G, nodeset, n_traces, n_hops):
     n_hops: int
     return: 3D CPU Tensor or node IDs (n_nodes, n_traces, n_hops + 1)
     '''
+    assert (nodeset < 0).sum().item() == 0
     traces = dgl.contrib.sampling.random_walk(G, nodeset, n_traces, n_hops)
 
     return traces
@@ -49,10 +50,12 @@ def random_walk_nodeflow(G, nodeset, n_layers, n_traces, n_hops, top_T):
     '''
     dev = nodeset.device
     nodeset = nodeset.cpu()
+    assert (nodeset < 0).sum().item() == 0
     nodeflow = []
     cur_nodeset = nodeset
     for i in reversed(range(n_layers)):
         nb_weights, nb_nodes = random_walk_distribution_topt(G, cur_nodeset, n_traces, n_hops, top_T)
+        assert (nb_nodes < 0).sum().item() == 0
         nodeflow.insert(0, (cur_nodeset.to(dev), nb_weights.to(dev), nb_nodes.to(dev)))
         cur_nodeset = torch.cat([nb_nodes.view(-1), cur_nodeset]).unique()
 

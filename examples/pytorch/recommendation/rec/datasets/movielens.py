@@ -2,6 +2,7 @@ import pandas as pd
 import dgl
 import os
 import torch
+import numpy as np
 import scipy.sparse as sp
 import time
 from .. import randomwalk
@@ -55,7 +56,11 @@ class MovieLens(object):
                     'rating': rating,
                     'timestamp': timestamp,
                     })
-        self.ratings = pd.DataFrame(ratings)
+        ratings = pd.DataFrame(ratings)
+        movie_count = ratings['movie_id'].value_counts()
+        movie_count.name = 'movie_count'
+        ratings = ratings.join(movie_count, on='movie_id')
+        self.ratings = ratings
 
         # drop users and movies which do not exist in ratings
         self.users = self.users[self.users.index.isin(self.ratings['user_id'])]
@@ -63,15 +68,19 @@ class MovieLens(object):
 
         self.data_split()
         self.build_graph()
-        self.find_neighbors(100, 20, 50)
+        self.find_neighbors(100, 20, 500)
 
     def split_user(self, df):
         df_new = df.copy()
-        df_new['prob'] = np.random.rand(df_new.shape[0])
+        df_new['prob'] = 0
+        df_new_sub = (df_new['movie_count'] >= 10).nonzero()[0]
+        prob = np.linspace(0, 1, df_new_sub.shape[0], endpoint=False)
+        prob = np.random.permutation(prob)
+        df_new['prob'].iloc[df_new_sub] = prob
         df_new['train'] = df_new['prob'] <= 0.8
         df_new['valid'] = (df_new['prob'] > 0.8) & (df_new['prob'] <= 0.9)
         df_new['test'] = df_new['prob'] > 0.9
-        df_new.drop('prob', axis=1, inplace=True)
+        df_new.drop(['prob', 'movie_count'], axis=1, inplace=True)
         return df_new
 
     def data_split(self):
@@ -93,8 +102,14 @@ class MovieLens(object):
         self.rating_user_vertices = rating_user_vertices
         self.rating_movie_vertices = rating_movie_vertices
 
-        g.add_edges(rating_user_vertices, rating_movie_vertices)
-        g.add_edges(rating_movie_vertices, rating_user_vertices)
+        g.add_edges(
+                rating_user_vertices,
+                rating_movie_vertices,
+                data={'inv': torch.zeros(self.ratings.shape[0], dtype=torch.uint8)})
+        g.add_edges(
+                rating_movie_vertices,
+                rating_user_vertices,
+                data={'inv': torch.ones(self.ratings.shape[0], dtype=torch.uint8)})
 
         #g_mat = sp.coo_matrix(g.adjacency_matrix().to_dense().numpy())
         #self.g = dgl.DGLGraph(g_mat, readonly=True)
@@ -113,24 +128,26 @@ class MovieLens(object):
 
         self.user_neighbors = []
         for i in range(len(self.user_ids)):
-            user_neighbor = neighbors[i].numpy()
+            user_neighbor = neighbors[i]
             user_neighbor = user_neighbor[user_neighbor < len(self.user_ids)]
             self.user_neighbors.append(user_neighbor)
 
         self.movie_neighbors = []
         for i in range(len(self.user_ids), len(self.user_ids) + len(self.movie_ids)):
-            movie_neighbor = neighbors[i].numpy()
+            movie_neighbor = neighbors[i]
             movie_neighbor = movie_neighbor[movie_neighbor >= len(self.user_ids)]
             self.movie_neighbors.append(movie_neighbor)
 
     def refresh_mask(self):
         train_mask = self.ratings['train'].values
-        prior_mask = np.random.rand(len(train_mask)) < 0.8
+        prior_prob = np.random.rand(len(train_mask))
+        prior_mask = (prior_prob < 0.8) & train_mask
+        train_mask = (prior_prob >= 0.8) & train_mask
 
         valid_tensor = torch.from_numpy(self.ratings['valid'].values.astype('uint8'))
         test_tensor = torch.from_numpy(self.ratings['test'].values.astype('uint8'))
-        train_tensor = torch.from_numpy((train_mask & valid_mask).astype('uint8'))
-        prior_tensor = torch.from_numpy((train_mask & ~valid_mask).astype('uint8'))
+        train_tensor = torch.from_numpy(train_mask.astype('uint8'))
+        prior_tensor = torch.from_numpy(prior_mask.astype('uint8'))
         edge_data = {
                 'prior': prior_tensor,
                 'valid': valid_tensor,
@@ -138,5 +155,5 @@ class MovieLens(object):
                 'train': train_tensor,
                 }
 
-        self.g.edges[rating_user_vertices, rating_movie_vertices].data.update(edge_data)
-        self.g.edges[rating_movie_vertices, rating_user_vertices].data.update(edge_data)
+        self.g.edges[self.rating_user_vertices, self.rating_movie_vertices].data.update(edge_data)
+        self.g.edges[self.rating_movie_vertices, self.rating_user_vertices].data.update(edge_data)

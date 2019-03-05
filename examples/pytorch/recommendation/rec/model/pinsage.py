@@ -77,7 +77,7 @@ class PinSage(nn.Module):
     n_traces: number of random walk traces to generate during sampling
     n_hops: number of hops of each random walk trace during sampling
     '''
-    def __init__(self, feature_sizes, T, n_traces, n_hops):
+    def __init__(self, num_nodes, feature_sizes, T, n_traces, n_hops):
         super(PinSage, self).__init__()
 
         self.T = T
@@ -93,7 +93,7 @@ class PinSage(nn.Module):
             self.convs.append(PinSageConv(
                 feature_sizes[i], feature_sizes[i+1], feature_sizes[i+1]))
 
-        self.h = create_embeddings(G.number_of_nodes(), self.in_features)
+        self.h = create_embeddings(num_nodes, self.in_features)
 
     def forward(self, G, nodeset):
         '''
