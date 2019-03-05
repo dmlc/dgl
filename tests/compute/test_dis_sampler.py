@@ -19,13 +19,12 @@ def start_trainer():
     print(nodeflow._layer_offsets)
     print(nodeflow._block_offsets)
 
-    time.sleep(1)  # wait all senders to finalize their jobs
+    time.sleep(2)  # wait all senders to finalize their jobs
 
 def start_sampler():
     g = generate_rand_graph(100)
     sender = dgl.contrib.sampling.SamplerSender(ip="127.0.0.1", port=50051)
-    for nodeflow in dgl.contrib.sampling.NeighborSampler(g, 1, 4, neighbor_type='in',
-                                                        num_workers=1, return_seed_id=True):
+    for nodeflow in dgl.contrib.sampling.NeighborSampler(g, 1, 4, neighbor_type='in', num_workers=1):
         sender.Send(nodeflow)
         break
 
