@@ -370,6 +370,13 @@ class Graph: public GraphInterface {
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const;
 
+  virtual std::vector<IdArray> GetNodeFlowSlice(bool transpose, const std::string &fmt,
+                                                size_t layer0_size, size_t layer1_start,
+                                                size_t layer1_end, bool remap) const {
+	  LOG(FATAL) << "It's not supported yet.";
+    return std::vector<IdArray>();
+  }
+
  protected:
   friend class GraphOp;
   /*! \brief Internal edge list type */

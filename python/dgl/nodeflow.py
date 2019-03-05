@@ -395,6 +395,77 @@ class NodeFlow(DGLBaseGraph):
         assert F.asnumpy(F.sum(ret == -1, 0)) == 0, "The eid in the parent graph is invalid."
         return ret
 
+    def block_edges(self, block_id):
+        rst = _CAPI_DGLGraphGetBlockAdj(self._handle, False, "coo",
+                                        self.layers[block_id + 1] - self.layers[block_id],
+                                        self.layers[block_id + 1], self.layers[block_id + 2])
+        idx = utils.toindex(rst(0)).tousertensor()
+        eid = utils.toindex(rst(1))
+        num_edges = int(len(idx) / 2)
+        assert len(eid) == num_edges
+        return utils.toindex(idx[num_edges:len(idx)]), utils.toindex(idx[0:num_edges]), eid
+
+    def block_adjacency_matrix(self, block_id, transpose, ctx):
+        """Return the adjacency matrix representation of this graph.
+
+        By default, a row of returned adjacency matrix represents the destination
+        of an edge and the column represents the source.
+
+        When transpose is True, a row represents the source and a column represents
+        a destination.
+
+        Parameters
+        ----------
+        transpose : bool
+            A flag to transpose the returned adjacency matrix.
+        ctx : context
+            The context of the returned matrix.
+
+        Returns
+        -------
+        SparseTensor
+            The adjacency matrix.
+        utils.Index
+            A index for data shuffling due to sparse format change. Return None
+            if shuffle is not required.
+        """
+        if not isinstance(transpose, bool):
+            raise DGLError('Expect bool value for "transpose" arg,'
+                           ' but got %s.' % (type(transpose)))
+        fmt = F.get_preferred_sparse_format()
+        # We need to extract two layers.
+        rst = _CAPI_DGLGraphGetBlockAdj(self._handle, transpose, fmt,
+                                        self.layers[block_id + 1] - self.layers[block_id],
+                                        self.layers[block_id + 1], self.layers[block_id + 2])
+        if transpose:
+            num_rows = self.layer_size(block_id)
+            num_cols = self.layer_size(block_id + 1)
+        else:
+            num_rows = self.layer_size(block_id + 1)
+            num_cols = self.layer_size(block_id)
+
+        if fmt == "csr":
+            indptr = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
+            indices = F.copy_to(utils.toindex(rst(1)).tousertensor(), ctx)
+            shuffle = utils.toindex(rst(2))
+            dat = F.ones(indices.shape, dtype=F.float32, ctx=ctx)
+            return F.sparse_matrix(dat, ('csr', indices, indptr),
+                                   (num_rows, num_cols))[0], shuffle
+        elif fmt == "coo":
+            ## FIXME(minjie): data type
+            idx = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
+            m = self.block_size(block_id)
+            idx = F.reshape(idx, (2, m))
+            dat = F.ones((m,), dtype=F.float32, ctx=ctx)
+            adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (num_rows, num_cols))
+            shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+            return adj, shuffle_idx
+        else:
+            raise Exception("unknown format")
+
+    def block_incidence_matrix(self, block_id):
+        raise Exception("Unsupported yet")
+
     def set_n_initializer(self, initializer, layer_id=ALL, field=None):
         """Set the initializer for empty node features.
 
@@ -651,12 +722,14 @@ class NodeFlow(DGLBaseGraph):
         assert reduce_func is not None
 
         if is_all(v):
-            dest_nodes = utils.toindex(self.layer_nid(block_id + 1))
-            u, v, _ = self._graph.in_edges(dest_nodes)
-            u = utils.toindex(self._glb2lcl_nid(u.tousertensor(), block_id))
-            v = utils.toindex(self._glb2lcl_nid(v.tousertensor(), block_id + 1))
-            dest_nodes = utils.toindex(F.arange(0, self.layer_size(block_id + 1)))
-            eid = utils.toindex(F.arange(0, self.block_size(block_id)))
+            with ir.prog() as prog:
+                scheduler.schedule_nodeflow_update_all(graph=self,
+                                                       block_id=block_id,
+                                                       message_func=message_func,
+                                                       reduce_func=reduce_func,
+                                                       apply_func=apply_node_func,
+                                                       inplace=inplace)
+                Runtime.run(prog)
         else:
             dest_nodes = utils.toindex(v)
             u, v, eid = self._graph.in_edges(dest_nodes)
@@ -667,18 +740,18 @@ class NodeFlow(DGLBaseGraph):
                                                          block_id + 1))
             eid = utils.toindex(self._glb2lcl_eid(eid.tousertensor(), block_id))
 
-        with ir.prog() as prog:
-            scheduler.schedule_nodeflow_compute(graph=self,
-                                                block_id=block_id,
-                                                u=u,
-                                                v=v,
-                                                eid=eid,
-                                                dest_nodes=dest_nodes,
-                                                message_func=message_func,
-                                                reduce_func=reduce_func,
-                                                apply_func=apply_node_func,
-                                                inplace=inplace)
-            Runtime.run(prog)
+            with ir.prog() as prog:
+                scheduler.schedule_nodeflow_compute(graph=self,
+                                                    block_id=block_id,
+                                                    u=u,
+                                                    v=v,
+                                                    eid=eid,
+                                                    dest_nodes=dest_nodes,
+                                                    message_func=message_func,
+                                                    reduce_func=reduce_func,
+                                                    apply_func=apply_node_func,
+                                                    inplace=inplace)
+                Runtime.run(prog)
 
     def prop_flow(self, message_funcs="default", reduce_funcs="default",
                   apply_node_funcs="default", flow_range=ALL, inplace=False):

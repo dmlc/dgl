@@ -419,6 +419,19 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetAdj")
     *rv = ConvertAdjToPackedFunc(res);
   });
 
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetBlockAdj")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    bool transpose = args[1];
+    std::string format = args[2];
+    int64_t layer0_size = args[3];
+    int64_t start = args[4];
+    int64_t end = args[5];
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+    auto res = ptr->GetNodeFlowSlice(transpose, format, layer0_size, start, end, true);
+    *rv = ConvertAdjToPackedFunc(res);
+  });
+
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphRandomWalk")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
