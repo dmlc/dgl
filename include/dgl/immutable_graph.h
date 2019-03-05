@@ -543,14 +543,14 @@ class ImmutableGraph: public GraphInterface {
    * This method copies data from std::vector to IdArray.
    * \return the CSR array.
    */
-  CSRArray GetInCSRArray() const;
+  CSRArray GetInCSRArray(size_t start, size_t end) const;
 
   /*!
    * \brief Get the CSR array that represents the out-edges.
    * This method copies data from std::vector to IdArray.
    * \return the CSR array.
    */
-  CSRArray GetOutCSRArray() const;
+  CSRArray GetOutCSRArray(size_t start, size_t end) const;
 
   /*!
    * \brief Compact a subgraph.
