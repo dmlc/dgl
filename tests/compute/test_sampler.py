@@ -10,7 +10,7 @@ def generate_rand_graph(n):
 
 def test_create_full():
     g = generate_rand_graph(100)
-    full_nf = dgl.contrib.sampling.sampler.create_full_node_flow(g, 5)
+    full_nf = dgl.contrib.sampling.sampler.create_full_nodeflow(g, 5)
     assert full_nf.number_of_nodes() == 600
     assert full_nf.number_of_edges() == g.number_of_edges() * 5
 

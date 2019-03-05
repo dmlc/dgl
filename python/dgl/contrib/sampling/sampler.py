@@ -8,7 +8,7 @@ import traceback
 
 from ..._ffi.function import _init_api
 from ... import utils
-from ...node_flow import NodeFlow
+from ...nodeflow import NodeFlow
 from ... import backend as F
 from ...utils import unwrap_to_ptr_list
 
@@ -339,7 +339,7 @@ def LayerSampler(g, batch_size, layer_sizes,
     else:
         return _PrefetchingLoader(loader, num_prefetch=num_workers*2)
 
-def create_full_node_flow(g, num_layers, add_self_loop=False):
+def create_full_nodeflow(g, num_layers, add_self_loop=False):
     """Convert a full graph to NodeFlow to run a L-layer GNN model.
 
     Parameters

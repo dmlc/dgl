@@ -2,7 +2,7 @@ import backend as F
 import numpy as np
 import scipy as sp
 import dgl
-from dgl.contrib.sampling.sampler import create_full_node_flow, NeighborSampler
+from dgl.contrib.sampling.sampler import create_full_nodeflow, NeighborSampler
 from dgl import utils
 import dgl.function as fn
 from functools import partial
@@ -69,7 +69,7 @@ def check_basic(g, nf):
 def test_basic():
     num_layers = 2
     g = generate_rand_graph(100, connect_more=True)
-    nf = create_full_node_flow(g, num_layers)
+    nf = create_full_nodeflow(g, num_layers)
     assert nf.number_of_nodes() == g.number_of_nodes() * (num_layers + 1)
     assert nf.number_of_edges() == g.number_of_edges() * num_layers
     assert nf.num_layers == num_layers + 1
@@ -107,7 +107,7 @@ def check_apply_nodes(create_node_flow):
 
 
 def test_apply_nodes():
-    check_apply_nodes(create_full_node_flow)
+    check_apply_nodes(create_full_nodeflow)
     check_apply_nodes(create_mini_batch)
 
 
@@ -125,7 +125,7 @@ def check_apply_edges(create_node_flow):
 
 
 def test_apply_edges():
-    check_apply_edges(create_full_node_flow)
+    check_apply_edges(create_full_nodeflow)
     check_apply_edges(create_mini_batch)
 
 
@@ -158,7 +158,7 @@ def check_flow_compute(create_node_flow):
 
 
 def test_flow_compute():
-    check_flow_compute(create_full_node_flow)
+    check_flow_compute(create_full_nodeflow)
     check_flow_compute(create_mini_batch)
 
 
@@ -180,7 +180,7 @@ def check_prop_flows(create_node_flow):
 
 
 def test_prop_flows():
-    check_prop_flows(create_full_node_flow)
+    check_prop_flows(create_full_nodeflow)
     check_prop_flows(create_mini_batch)
 
 

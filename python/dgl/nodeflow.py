@@ -17,22 +17,6 @@ __all__ = ['NodeFlow']
 
 NodeFlowHandle = ctypes.c_void_p
 
-class NodeFlowIndex(GraphIndex):
-    """NodeFlow index object.
-
-    Parameters
-    ----------
-    handle : NodeFlowHandle
-        Handler
-    """
-    def __init__(self, handle):
-        super(NodeFlowIndex, self).__init__(
-            handle, multigraph=False, readonly=True)
-
-    def __del__(self):
-        """Free this nodeflow index object."""
-        _CAPI_NodeFlowFree(self._handle)
-
 class NodeFlow(DGLBaseGraph):
     """The NodeFlow class stores the sampling results of Neighbor
     sampling and Layer-wise sampling.
@@ -51,7 +35,7 @@ class NodeFlow(DGLBaseGraph):
     Parameters
     ----------
     parent : DGLGraph
-        The parent graph
+        The parent graph.
     handle : NodeFlowHandle
         The handle to the underlying C structure.
     """
