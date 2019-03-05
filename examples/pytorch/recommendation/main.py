@@ -170,7 +170,7 @@ def runtest(g_prior_edges, validation=True):
                 rr.append(rank)
                 tq.set_postfix({'rank': rank})
 
-    mrr = sum(1 / r for r in rr)
+    mrr = sum(1 / r for r in rr) / len(rr)
     return mrr
 
 
@@ -191,9 +191,11 @@ def train():
             if best_mrr < valid_mrr:
                 best_mrr = valid_mrr
                 torch.save(model.state_dict(), 'model.pt')
+        print('Epoch %d validation mrr:', valid_mrr)
         print('Epoch %d test' % epoch)
         with torch.no_grad():
             test_mrr = runtest(g_prior_train_edges, False)
+        print('Epoch %d test mrr:', test_mrr)
 
 
 if __name__ == '__main__':
