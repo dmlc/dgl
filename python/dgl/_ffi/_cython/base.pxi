@@ -104,6 +104,7 @@ cdef extern from "dgl/runtime/c_runtime_api.h":
                          DLManagedTensor** out)
     void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor)
 
+# (minjie): Node and class module are not used in DGL.
 #cdef extern from "dgl/c_dsl_api.h":
 #    int DGLNodeFree(NodeHandle handle)
 #    int DGLNodeTypeKey2Index(const char* type_key,

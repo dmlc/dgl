@@ -252,7 +252,8 @@ def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
         * str: indicates some common ways of calculating the number of sampled neighbors,
           e.g., ``sqrt(deg)``.
 
-        TODO(minjie): What will happen if expand_factor > num_neighbors?
+        Note that no matter how large the expand_factor, the max number of sampled neighbors
+        is the neighborhood size.
     num_hops : int, optional
         The number of hops to sample (i.e, the number of layers in the NodeFlow).
         Default: 1
