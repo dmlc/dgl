@@ -101,6 +101,8 @@ class MovieLens(object):
         self.g = g
         self.user_ids = user_ids
         self.movie_ids = movie_ids
+        self.user_ids_invmap = user_ids_invmap
+        self.movie_ids_invmap = movie_ids_invmap
 
     def find_neighbors(self, n_traces, n_hops, top_T):
         neighbor_probs, neighbors = randomwalk.random_walk_distribution_topt(

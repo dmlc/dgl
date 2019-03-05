@@ -32,7 +32,6 @@ batch_size = 32
 # Note that each user-product pair is counted twice, but I think it is OK
 # since we can treat product negative sampling and user negative sampling
 # ubiquitously.
-ml.refresh_mask()
 
 model = cuda(PinSage([n_hidden] * n_layers, 10, 5, 5))
 opt = torch.optim.Adam(model.parameters(), lr=1e-3)
@@ -59,6 +58,7 @@ def runtrain(edge_set, train):
     else:
         model.eval()
 
+    ml.refresh_mask()
     g_prior_edges = g.filter_edges(lambda edges: edges.data['prior'])
     g_train_edges = g.filter_edges(lambda edges: edges.data['train'])
     g_prior = g.edge_subgraph(g_prior_edges)
@@ -80,8 +80,6 @@ def runtrain(edge_set, train):
                         if not g.has_edge_between(j, src)
                     ])
                     for i in dst])
-
-            src, dst, dst_neg = filter_nid([src, dst, dst_neg], g_prior_nid)
 
             src_prior = g_prior.map_to_subgraph_nid(src)
             dst_prior = g_prior.map_to_subgraph_nid(dst)
@@ -118,17 +116,30 @@ def runtrain(edge_set, train):
     return avg_loss, avg_acc
 
 
-def runtest(edgeset):
+def runtest(edgeset, validation=True):
     model.eval()
 
     n_users = len(ml.users.index)
     n_items = len(ml.movies.index)
 
+    rr = []
+
     with torch.no_grad():
-        for uid in range(n_users):
-            dst = torch.arange(n_users, n_users + n_items)
+        for u_nid in range(n_users):
+            uid = ml.user_ids[u_nid]
+            pids_exclude = ml.ratings[
+                    (ml.ratings['user_id'] == uid) &
+                    (ml.ratings['train'] | ml.ratings['test' if validation else 'valid'])
+                    ]['movie_id'].values
+            pids_candidate = ml.ratings[
+                    (ml.ratings['user_id'] == uid) &
+                    ml.ratings['valid' if validation else 'test']]['movie_id'].values
+            pids = set(ml.movie_ids) - set(pids_exclude)
+            p_nids = [ml.movie_ids_invmap[pid] for pid in pids]
+            p_nids_candidate = [ml.movie_ids_invmap[pid] for pid in pids_candidate]
+
+            dst = torch.LongTensor(p_nids)
             src = torch.zeros_like(dst).fill_(uid)
-            src, dst = filter_nid([src, dst], g_prior_nid)
 
             src_prior = g_prior.map_to_subgraph_nid(src)
             dst_prior = g_prior.map_to_subgraph_nid(dst)
@@ -141,6 +152,15 @@ def runtest(edgeset):
                     .split([src_size, dst_size]))
 
             score = (h_src * h_dst).sum(1)
+            score_sort_idx = score.sort(descending=True).cpu().numpy()
+
+            for idx in score_sort_idx:
+                if p_nids[idx] in p_nids_candidate:
+                    rr.append(idx + 1)
+                    break
+
+    mrr = sum(1 / r for r in rr)
+    return mrr
 
 
 def train():
