@@ -553,27 +553,27 @@ IdArray SamplerOp::RandomWalk(
       DLContext{kDLCPU, 0});
   dgl_id_t *trace_data = static_cast<dgl_id_t *>(traces->data);
 
-#pragma omp parallel
-  {
-    // get per-thread seed
-    unsigned int random_seed = time(nullptr) ^ omp_get_thread_num();
+  // FIXME: does OpenMP work with exceptions?  Especially without throwing SIGABRT?
+  unsigned int random_seed = time(nullptr);
 
-#pragma omp for
-    for (int i = 0; i < num_nodes; ++i) {
-      const dgl_id_t seed_id = seed_ids[i];
+  for (int i = 0; i < num_nodes; ++i) {
+    const dgl_id_t seed_id = seed_ids[i];
 
-      for (int j = 0; j < num_traces; ++j) {
-        dgl_id_t cur = seed_id;
-        const int kmax = num_hops + 1;
+    for (int j = 0; j < num_traces; ++j) {
+      dgl_id_t cur = seed_id;
+      const int kmax = num_hops + 1;
 
-        for (int k = 0; k < kmax; ++k) {
-          const size_t offset = ((size_t)i * num_traces + j) * kmax + k;
-          trace_data[offset] = cur;
+      for (int k = 0; k < kmax; ++k) {
+        const size_t offset = ((size_t)i * num_traces + j) * kmax + k;
+        trace_data[offset] = cur;
 
-          const auto succ = gptr->SuccVec(cur);
-          const size_t size = succ.size();
-          cur = succ[rand_r(&random_seed) % size];
+        const auto succ = gptr->SuccVec(cur);
+        const size_t size = succ.size();
+        if (size == 0) {
+          LOG(FATAL) << "no successors from vertex " << cur;
+          return traces;
         }
+        cur = succ[rand_r(&random_seed) % size];
       }
     }
   }
