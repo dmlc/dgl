@@ -423,14 +423,13 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetAdj")
 DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetBlockAdj")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
-    bool transpose = args[1];
-    std::string format = args[2];
-    int64_t layer0_size = args[3];
-    int64_t start = args[4];
-    int64_t end = args[5];
+    std::string format = args[1];
+    int64_t layer0_size = args[2];
+    int64_t start = args[3];
+    int64_t end = args[4];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
     const ImmutableGraph* gptr = dynamic_cast<const ImmutableGraph*>(ptr);
-    auto res = GetNodeFlowSlice(*gptr, transpose, format, layer0_size, start, end, true);
+    auto res = GetNodeFlowSlice(*gptr, format, layer0_size, start, end, true);
     *rv = ConvertAdjToPackedFunc(res);
   });
 

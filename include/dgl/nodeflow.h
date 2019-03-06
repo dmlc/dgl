@@ -44,8 +44,21 @@ struct NodeFlow {
   IdArray edge_mapping;
 };
 
-std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph,
-                                      bool transpose, const std::string &fmt,
+/*!
+ * \brief Get a slice on a graph that represents a NodeFlow.
+ *
+ * A row of the returned adjacency matrix represents the destination
+ * of an edge and the column represents the source.
+ * \param graph An immutable graph.
+ * \param fmt the format of the returned adjacency matrix.
+ * \param layer0_size the size of the first layer in the block.
+ * \param layer1_start the location where the second layer starts.
+ * \param layer1_end the location where the secnd layer ends.
+ * \param remap Indicates to remap all vertex ids and edge Ids to local Id
+ * space.
+ * \return a vector of IdArrays.
+ */
+std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph, const std::string &fmt,
                                       size_t layer0_size, size_t layer1_start,
                                       size_t layer1_end, bool remap);
 

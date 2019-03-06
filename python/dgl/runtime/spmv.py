@@ -152,8 +152,8 @@ def build_block_adj_matrix_graph(graph, block_id):
     """
     gidx = graph._graph
     #TODO why is this constructed twice?
-    _, shuffle_idx = gidx.block_adjacency_matrix(block_id, False, F.cpu())
-    return lambda ctx: gidx.block_adjacency_matrix(block_id, False, ctx)[0], shuffle_idx
+    _, shuffle_idx = gidx.block_adjacency_matrix(block_id, F.cpu())
+    return lambda ctx: gidx.block_adjacency_matrix(block_id, ctx)[0], shuffle_idx
 
 def build_adj_matrix_graph(graph):
     """Build adjacency matrix of the whole graph.

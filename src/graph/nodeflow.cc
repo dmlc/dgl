@@ -13,15 +13,13 @@
 
 namespace dgl {
 
-std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph,
-                                      bool transpose, const std::string &fmt,
+std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph, const std::string &fmt,
                                       size_t layer0_size, size_t layer1_start,
                                       size_t layer1_end, bool remap) {
   CHECK_GE(layer1_start, layer0_size);
   if (fmt == "csr") {
     dgl_id_t first_vid = layer1_start - layer0_size;
-    CSRArray arrs = transpose ? graph.GetOutCSRArray(layer1_start, layer1_end)
-        : graph.GetInCSRArray(layer1_start, layer1_end);
+    ImmutableGraph::CSRArray arrs = graph.GetInCSRArray(layer1_start, layer1_end);
     if (remap) {
       dgl_id_t *indices_data = static_cast<dgl_id_t*>(arrs.indices->data);
       dgl_id_t *eid_data = static_cast<dgl_id_t*>(arrs.id->data);
@@ -36,7 +34,7 @@ std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph,
     }
     return std::vector<IdArray>{arrs.indptr, arrs.indices, arrs.id};
   } else if (fmt == "coo") {
-    CSR::Ptr csr = transpose ? graph.GetOutCSR() : graph.GetInCSR();
+    ImmutableGraph::CSR::Ptr csr = graph.GetInCSR();
     int64_t nnz = csr->indptr[layer1_end] - csr->indptr[layer1_start];
     IdArray idx = IdArray::Empty({2 * nnz}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
     IdArray eid = IdArray::Empty({nnz}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});

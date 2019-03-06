@@ -33,9 +33,24 @@ class NodeFlowIndex(GraphIndex):
         return int(self._layer_offsets[layer_id + 1]) - int(self._layer_offsets[layer_id])
 
     def block_edges(self, block_id):
+        """Return the edges in a block.
+
+        Parameters
+        ----------
+        block_id : int
+            The specified block to return the edges.
+
+        Returns
+        -------
+        utils.Index
+            The src nodes.
+        utils.Index
+            The dst nodes.
+        utils.Index
+            The edge ids.
+        """
         layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
-        rst = _CAPI_NodeFlowGetBlockAdj(self._handle, False, "coo",
-                                        layer0_size,
+        rst = _CAPI_NodeFlowGetBlockAdj(self._handle, "coo", layer0_size,
                                         self._layer_offsets[block_id + 1],
                                         self._layer_offsets[block_id + 2])
         idx = utils.toindex(rst(0)).tousertensor()
@@ -44,19 +59,16 @@ class NodeFlowIndex(GraphIndex):
         assert len(eid) == num_edges
         return utils.toindex(idx[num_edges:len(idx)]), utils.toindex(idx[0:num_edges]), eid
 
-    def block_adjacency_matrix(self, block_id, transpose, ctx):
-        """Return the adjacency matrix representation of this graph.
+    def block_adjacency_matrix(self, block_id, ctx):
+        """Return the adjacency matrix representation for a specific block in a NodeFlow.
 
-        By default, a row of returned adjacency matrix represents the destination
+        A row of the returned adjacency matrix represents the destination
         of an edge and the column represents the source.
-
-        When transpose is True, a row represents the source and a column represents
-        a destination.
 
         Parameters
         ----------
-        transpose : bool
-            A flag to transpose the returned adjacency matrix.
+        block_id : int
+            The specified block to return the adjacency matrix.
         ctx : context
             The context of the returned matrix.
 
@@ -68,22 +80,14 @@ class NodeFlowIndex(GraphIndex):
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
-        if not isinstance(transpose, bool):
-            raise DGLError('Expect bool value for "transpose" arg,'
-                           ' but got %s.' % (type(transpose)))
         fmt = F.get_preferred_sparse_format()
         # We need to extract two layers.
         layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
-        rst = _CAPI_NodeFlowGetBlockAdj(self._handle, transpose, fmt,
-                                        layer0_size,
+        rst = _CAPI_NodeFlowGetBlockAdj(self._handle, fmt, layer0_size,
                                         self._layer_offsets[block_id + 1],
                                         self._layer_offsets[block_id + 2])
-        if transpose:
-            num_rows = self.layer_size(block_id)
-            num_cols = self.layer_size(block_id + 1)
-        else:
-            num_rows = self.layer_size(block_id + 1)
-            num_cols = self.layer_size(block_id)
+        num_rows = self.layer_size(block_id + 1)
+        num_cols = self.layer_size(block_id)
 
         if fmt == "csr":
             indptr = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)

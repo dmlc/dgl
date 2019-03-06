@@ -264,7 +264,7 @@ def test_block_adj_matrix():
         assert F.array_equal(src.tousertensor(), u.tousertensor())
         assert F.array_equal(dst.tousertensor(), v.tousertensor())
 
-        adj, _ = nf._graph.block_adjacency_matrix(i, False, F.cpu())
+        adj, _ = nf._graph.block_adjacency_matrix(i, F.cpu())
         adj = adj.asscipy().tocoo()
         dst, src = adj.row, adj.col
         assert np.array_equal(src, u.tonumpy())
