@@ -28,8 +28,8 @@ std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph, const std::st
       for (size_t i = 0; i < len; i++) {
         CHECK_GE(indices_data[i], first_vid);
         indices_data[i] -= first_vid;
-//        CHECK_GE(eid_data[i], first_eid);
-//        eid_data[i] -= first_eid;
+        CHECK_GE(eid_data[i], first_eid);
+        eid_data[i] -= first_eid;
       }
     }
     return std::vector<IdArray>{arrs.indptr, arrs.indices, arrs.id};
