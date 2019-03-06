@@ -50,8 +50,7 @@ class NodeFlow(DGLBaseGraph):
             _CAPI_NodeFlowGetLayerOffsets(handle)).tonumpy()
         self._block_offsets = utils.toindex(
             _CAPI_NodeFlowGetBlockOffsets(handle)).tonumpy()
-        super(NodeFlow, self).__init__(GraphIndex(_CAPI_NodeFlowGetGraph(handle),
-                                                  self._layer_offsets))
+        super(NodeFlow, self).__init__(GraphIndex(_CAPI_NodeFlowGetGraph(handle)))
         self._parent = parent
         self._node_mapping = utils.toindex(_CAPI_NodeFlowGetNodeMapping(handle))
         self._edge_mapping = utils.toindex(_CAPI_NodeFlowGetEdgeMapping(handle))
