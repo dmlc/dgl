@@ -509,7 +509,49 @@ class NodeFlow(DGLBaseGraph):
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
-        raise Exception("Unsupported yet")
+        src, dst, eid = self.block_edges(block_id)
+        src = src.tousertensor(ctx)  # the index of the ctx will be cached
+        dst = dst.tousertensor(ctx)  # the index of the ctx will be cached
+        eid = eid.tousertensor(ctx)  # the index of the ctx will be cached
+        if typestr == 'in':
+            n = self.layer_size(block_id + 1)
+            m = self.block_size(block_id)
+            row = F.unsqueeze(dst, 0)
+            col = F.unsqueeze(eid, 0)
+            idx = F.cat([row, col], dim=0)
+            # FIXME(minjie): data type
+            dat = F.ones((m,), dtype=F.float32, ctx=ctx)
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
+        elif typestr == 'out':
+            n = self.layer_size(block_id)
+            m = self.block_size(block_id)
+            row = F.unsqueeze(src, 0)
+            col = F.unsqueeze(eid, 0)
+            idx = F.cat([row, col], dim=0)
+            # FIXME(minjie): data type
+            dat = F.ones((m,), dtype=F.float32, ctx=ctx)
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
+        elif typestr == 'both':
+            # TODO does it work for bipartite graph?
+            # first remove entries for self loops
+            mask = F.logical_not(F.equal(src, dst))
+            src = F.boolean_mask(src, mask)
+            dst = F.boolean_mask(dst, mask)
+            eid = F.boolean_mask(eid, mask)
+            n_entries = F.shape(src)[0]
+            # create index
+            row = F.unsqueeze(F.cat([src, dst], dim=0), 0)
+            col = F.unsqueeze(F.cat([eid, eid], dim=0), 0)
+            idx = F.cat([row, col], dim=0)
+            # FIXME(minjie): data type
+            x = -F.ones((n_entries,), dtype=F.float32, ctx=ctx)
+            y = F.ones((n_entries,), dtype=F.float32, ctx=ctx)
+            dat = F.cat([x, y], dim=0)
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
+        else:
+            raise DGLError('Invalid incidence matrix type: %s' % str(typestr))
+        shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+        return inc, shuffle_idx
 
     def set_n_initializer(self, initializer, layer_id=ALL, field=None):
         """Set the initializer for empty node features.
