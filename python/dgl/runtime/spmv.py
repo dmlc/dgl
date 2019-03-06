@@ -255,8 +255,8 @@ def build_block_inc_matrix_graph(graph, block_id):
 
     Parameters
     ----------
-    graph : DGLGraph
-        The graph.
+    graph : NodeFlow
+        The NodeFlow.
 
     block_id : int
         The block Id
@@ -269,9 +269,8 @@ def build_block_inc_matrix_graph(graph, block_id):
         A index for data shuffling due to sparse format change. Return None
         if shuffle is not required.
     """
-    gidx = graph._graph
     # inc mat will not use data tensor so conversion index is not needed
-    return lambda ctx: gidx.block_incidence_matrix(block_id, 'in', ctx)[0], None
+    return lambda ctx: graph.block_incidence_matrix(block_id, 'in', ctx)[0], None
 
 def build_inc_matrix_graph(graph):
     """Build incidence matrix.

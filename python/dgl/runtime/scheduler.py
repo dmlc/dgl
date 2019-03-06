@@ -499,7 +499,7 @@ def schedule_nodeflow_update_all(graph,
                                  message_func,
                                  reduce_func,
                                  apply_func):
-    """get send and recv schedule
+    """get update_all schedule in a block.
 
     Parameters
     ----------

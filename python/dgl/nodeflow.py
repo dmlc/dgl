@@ -46,14 +46,14 @@ class NodeFlow(DGLBaseGraph):
         #  afterwards. One can view the given handle object as a transient
         #  argument pack to construct this python class.
         # TODO(minjie): We should use TVM's Node system as a cleaner solution later.
-        self._layer_offsets = utils.toindex(
-            _CAPI_NodeFlowGetLayerOffsets(handle)).tonumpy()
-        self._block_offsets = utils.toindex(
-            _CAPI_NodeFlowGetBlockOffsets(handle)).tonumpy()
         super(NodeFlow, self).__init__(GraphIndex(_CAPI_NodeFlowGetGraph(handle)))
         self._parent = parent
         self._node_mapping = utils.toindex(_CAPI_NodeFlowGetNodeMapping(handle))
         self._edge_mapping = utils.toindex(_CAPI_NodeFlowGetEdgeMapping(handle))
+        self._layer_offsets = utils.toindex(
+            _CAPI_NodeFlowGetLayerOffsets(handle)).tonumpy()
+        self._block_offsets = utils.toindex(
+            _CAPI_NodeFlowGetBlockOffsets(handle)).tonumpy()
         _CAPI_NodeFlowFree(handle)
         # node/edge frames
         self._node_frames = [FrameRef(Frame(num_rows=self.layer_size(i))) \
