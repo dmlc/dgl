@@ -17,21 +17,6 @@ __all__ = ['NodeFlow']
 
 NodeFlowHandle = ctypes.c_void_p
 
-class NodeFlowIndex(GraphIndex):
-    def __init__(self, handle, layer_offsets):
-        super(NodeFlowIndex, self).__init__(handle)
-        self._layer_offsets = layer_offsets
-
-    def layer_size(self, layer_id):
-        """Return the number of nodes in a specified layer.
-
-        Parameters
-        ----------
-        layer_id : int
-            the specified layer to return the number of nodes.
-        """
-        return int(self._layer_offsets[layer_id + 1]) - int(self._layer_offsets[layer_id])
-
 class NodeFlow(DGLBaseGraph):
     """The NodeFlow class stores the sampling results of Neighbor
     sampling and Layer-wise sampling.
