@@ -882,7 +882,6 @@ class SubgraphIndex(GraphIndex):
         raise NotImplementedError(
             "SubgraphIndex unpickling is not supported yet.")
 
-
 def map_to_subgraph_nid(subgraph, parent_nids):
     """Map parent node Ids to the subgraph node Ids.
 

@@ -491,10 +491,6 @@ class ImmutableGraph: public GraphInterface {
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const;
 
-  virtual std::vector<IdArray> GetNodeFlowSlice(bool transpose, const std::string &fmt,
-                                                size_t layer0_size, size_t layer1_start,
-                                                size_t layer1_end, bool remap) const;
-
   /*
    * The immutable graph may only contain one of the CSRs (e.g., the sampled subgraphs).
    * When we get in csr or out csr, we try to get the one cached in the structure.
@@ -538,10 +534,6 @@ class ImmutableGraph: public GraphInterface {
     return edge_list_;
   }
 
- protected:
-  DGLIdIters GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
-  DGLIdIters GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
-
   /*!
    * \brief Get the CSR array that represents the in-edges.
    * This method copies data from std::vector to IdArray.
@@ -559,6 +551,10 @@ class ImmutableGraph: public GraphInterface {
    * \return the CSR array.
    */
   CSRArray GetOutCSRArray(size_t start, size_t end) const;
+
+ protected:
+  DGLIdIters GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
+  DGLIdIters GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
 
   /*!
    * \brief Compact a subgraph.

@@ -7,6 +7,7 @@
 #include <dgl/immutable_graph.h>
 #include <dgl/graph_op.h>
 #include <dgl/sampler.h>
+#include <dgl/nodeflow.h>
 #include "../c_api_common.h"
 
 using dgl::runtime::DGLArgs;
@@ -428,7 +429,8 @@ DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetBlockAdj")
     int64_t start = args[4];
     int64_t end = args[5];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    auto res = ptr->GetNodeFlowSlice(transpose, format, layer0_size, start, end, true);
+    const ImmutableGraph* gptr = dynamic_cast<const ImmutableGraph*>(ptr);
+    auto res = GetNodeFlowSlice(*gptr, transpose, format, layer0_size, start, end, true);
     *rv = ConvertAdjToPackedFunc(res);
   });
 
