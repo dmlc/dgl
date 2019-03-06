@@ -152,6 +152,7 @@ def build_block_adj_matrix_graph(graph, block_id):
     """
     #TODO why is this constructed twice?
     _, shuffle_idx = graph.block_adjacency_matrix(block_id, F.cpu())
+    shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
     return lambda ctx: graph.block_adjacency_matrix(block_id, ctx)[0], shuffle_idx
 
 def build_adj_matrix_graph(graph):

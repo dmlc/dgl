@@ -526,7 +526,7 @@ def schedule_nodeflow_update_all(graph,
     def uv_getter():
         # TODO get all edges in the block.
         src, dst, _ = graph.block_edges(block_id)
-        return var.IDX(src), var.IDX(dst)
+        return var.IDX(utils.toindex(src)), var.IDX(utils.toindex(dst))
     adj_creator = lambda: spmv.build_block_adj_matrix_graph(graph, block_id)
     inc_creator = lambda: spmv.build_block_inc_matrix_graph(graph, block_id)
     reduced_feat = _gen_send_reduce(graph, graph._get_node_frame(block_id),

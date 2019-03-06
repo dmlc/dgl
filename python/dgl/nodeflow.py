@@ -405,11 +405,11 @@ class NodeFlow(DGLBaseGraph):
 
         Returns
         -------
-        utils.Index
+        Tensor
             The src nodes.
-        utils.Index
+        Tensor
             The dst nodes.
-        utils.Index
+        Tensor
             The edge ids.
         """
         layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
@@ -420,7 +420,7 @@ class NodeFlow(DGLBaseGraph):
         eid = utils.toindex(rst(1))
         num_edges = int(len(idx) / 2)
         assert len(eid) == num_edges
-        return utils.toindex(idx[num_edges:len(idx)]), utils.toindex(idx[0:num_edges]), eid
+        return idx[num_edges:len(idx)], idx[0:num_edges], eid.tousertensor()
 
     def block_adjacency_matrix(self, block_id, ctx):
         """Return the adjacency matrix representation for a specific block in a NodeFlow.
@@ -439,7 +439,7 @@ class NodeFlow(DGLBaseGraph):
         -------
         SparseTensor
             The adjacency matrix.
-        utils.Index
+        Tensor
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
@@ -458,7 +458,7 @@ class NodeFlow(DGLBaseGraph):
             shuffle = utils.toindex(rst(2))
             dat = F.ones(indices.shape, dtype=F.float32, ctx=ctx)
             return F.sparse_matrix(dat, ('csr', indices, indptr),
-                                   (num_rows, num_cols))[0], shuffle
+                                   (num_rows, num_cols))[0], shuffle.tousertensor()
         elif fmt == "coo":
             ## FIXME(minjie): data type
             idx = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
@@ -466,7 +466,6 @@ class NodeFlow(DGLBaseGraph):
             idx = F.reshape(idx, (2, m))
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
             adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (num_rows, num_cols))
-            shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
             return adj, shuffle_idx
         else:
             raise Exception("unknown format")
@@ -504,14 +503,14 @@ class NodeFlow(DGLBaseGraph):
         -------
         SparseTensor
             The incidence matrix.
-        utils.Index
+        Tensor
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
         src, dst, eid = self.block_edges(block_id)
-        src = src.tousertensor(ctx)  # the index of the ctx will be cached
-        dst = dst.tousertensor(ctx)  # the index of the ctx will be cached
-        eid = eid.tousertensor(ctx)  # the index of the ctx will be cached
+        src = F.copy_to(src, ctx)  # the index of the ctx will be cached
+        dst = F.copy_to(dst, ctx)  # the index of the ctx will be cached
+        eid = F.copy_to(eid, ctx)  # the index of the ctx will be cached
         if typestr == 'in':
             n = self.layer_size(block_id + 1)
             m = self.block_size(block_id)
@@ -549,7 +548,6 @@ class NodeFlow(DGLBaseGraph):
             inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
         else:
             raise DGLError('Invalid incidence matrix type: %s' % str(typestr))
-        shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
         return inc, shuffle_idx
 
     def set_n_initializer(self, initializer, layer_id=ALL, field=None):
