@@ -2,7 +2,7 @@ import backend as F
 import numpy as np
 import scipy as sp
 import dgl
-from dgl.node_flow import create_full_node_flow
+from dgl.contrib.sampling.sampler import create_full_nodeflow, NeighborSampler
 from dgl import utils
 import dgl.function as fn
 from functools import partial
@@ -38,15 +38,13 @@ def test_self_loop():
         deg = F.ones(in_deg.shape, dtype=F.int64) * n
         assert F.array_equal(in_deg, deg)
 
-
 def create_mini_batch(g, num_hops, add_self_loop=False):
     seed_ids = np.array([0, 1, 2, 3])
-    seed_ids = utils.toindex(seed_ids)
-    sgi = g._graph.neighbor_sampling([seed_ids], g.number_of_nodes(), num_hops,
-                                     "in", None, add_self_loop)
-    assert len(sgi) == 1
-    return dgl.node_flow.NodeFlow(g, sgi[0])
-
+    sampler = NeighborSampler(g, batch_size=4, expand_factor=g.number_of_nodes(),
+            num_hops=num_hops, seed_nodes=seed_ids, add_self_loop=add_self_loop)
+    nfs = list(sampler)
+    assert len(nfs) == 1
+    return nfs[0]
 
 def check_basic(g, nf):
     num_nodes = 0
@@ -71,21 +69,16 @@ def check_basic(g, nf):
 def test_basic():
     num_layers = 2
     g = generate_rand_graph(100, connect_more=True)
-    print(0, 0)
-    nf = create_full_node_flow(g, num_layers)
-    print(0, 1)
+    nf = create_full_nodeflow(g, num_layers)
     assert nf.number_of_nodes() == g.number_of_nodes() * (num_layers + 1)
     assert nf.number_of_edges() == g.number_of_edges() * num_layers
     assert nf.num_layers == num_layers + 1
     assert nf.layer_size(0) == g.number_of_nodes()
     assert nf.layer_size(1) == g.number_of_nodes()
     check_basic(g, nf)
-    print(0, 2)
 
     parent_nids = F.arange(0, g.number_of_nodes())
-    nids = dgl.graph_index.map_to_nodeflow_nid(nf._graph, 0,
-                                               utils.toindex(parent_nids)).tousertensor()
-    print(0, 3)
+    nids = nf.map_from_parent_nid(0, parent_nids)
     assert F.array_equal(nids, parent_nids)
 
     g = generate_rand_graph(100)
@@ -114,7 +107,7 @@ def check_apply_nodes(create_node_flow):
 
 
 def test_apply_nodes():
-    check_apply_nodes(create_full_node_flow)
+    check_apply_nodes(create_full_nodeflow)
     check_apply_nodes(create_mini_batch)
 
 
@@ -132,7 +125,7 @@ def check_apply_edges(create_node_flow):
 
 
 def test_apply_edges():
-    check_apply_edges(create_full_node_flow)
+    check_apply_edges(create_full_nodeflow)
     check_apply_edges(create_mini_batch)
 
 
@@ -165,7 +158,7 @@ def check_flow_compute(create_node_flow):
 
 
 def test_flow_compute():
-    check_flow_compute(create_full_node_flow)
+    check_flow_compute(create_full_nodeflow)
     check_flow_compute(create_mini_batch)
 
 
@@ -187,7 +180,7 @@ def check_prop_flows(create_node_flow):
 
 
 def test_prop_flows():
-    check_prop_flows(create_full_node_flow)
+    check_prop_flows(create_full_nodeflow)
     check_prop_flows(create_mini_batch)
 
 

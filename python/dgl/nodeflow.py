@@ -1,54 +1,61 @@
 """Class for NodeFlow data structure."""
 from __future__ import absolute_import
 
+import ctypes
+
+from ._ffi.function import _init_api
 from .base import ALL, is_all, DGLError
 from . import backend as F
 from .frame import Frame, FrameRef
 from .graph import DGLBaseGraph
+from .graph_index import GraphIndex, transform_ids
 from .runtime import ir, scheduler, Runtime
 from . import utils
 from .view import LayerView, BlockView
 
-def _copy_to_like(arr1, arr2):
-    return F.copy_to(arr1, F.context(arr2))
+__all__ = ['NodeFlow']
 
-def _get_frame(frame, names, ids):
-    col_dict = {name: frame[name][_copy_to_like(ids, frame[name])] for name in names}
-    if len(col_dict) == 0:
-        return FrameRef(Frame(num_rows=len(ids)))
-    else:
-        return FrameRef(Frame(col_dict))
-
-
-def _update_frame(frame, names, ids, new_frame):
-    col_dict = {name: new_frame[name] for name in names}
-    if len(col_dict) > 0:
-        frame.update_rows(ids, FrameRef(Frame(col_dict)), inplace=True)
-
+NodeFlowHandle = ctypes.c_void_p
 
 class NodeFlow(DGLBaseGraph):
-    """The NodeFlow class stores the sampling results of Neighbor sampling and Layer-wise sampling.
+    """The NodeFlow class stores the sampling results of Neighbor
+    sampling and Layer-wise sampling.
 
-    These sampling algorithms generate graphs with multiple layers. The edges connect the nodes
-    between two layers while there don't exist edges between the nodes in the same layer.
+    These sampling algorithms generate graphs with multiple layers. The
+    edges connect the nodes between two layers while there don't exist
+    edges between the nodes in the same layer.
 
-    We store multiple layers of the sampling results in a single graph. We store extra information,
-    such as the node and edge mapping from the NodeFlow graph to the parent graph.
+    We store multiple layers of the sampling results in a single graph.
+    We store extra information, such as the node and edge mapping from
+    the NodeFlow graph to the parent graph.
+
+    DO NOT create NodeFlow object directly. Use sampling method to
+    generate NodeFlow instead.
 
     Parameters
     ----------
     parent : DGLGraph
-        The parent graph
-    graph_index : NodeFlowIndex
-        The graph index of the NodeFlow graph.
+        The parent graph.
+    handle : NodeFlowHandle
+        The handle to the underlying C structure.
     """
-    def __init__(self, parent, graph_idx):
-        super(NodeFlow, self).__init__(graph_idx)
+    def __init__(self, parent, handle):
+        # NOTE(minjie): handle is a pointer to the underlying C++ structure
+        #  defined in include/dgl/sampler.h. The constructor will save
+        #  all its members in the python side and destroy the handler
+        #  afterwards. One can view the given handle object as a transient
+        #  argument pack to construct this python class.
+        # TODO(minjie): We should use TVM's Node system as a cleaner solution later.
+        super(NodeFlow, self).__init__(GraphIndex(_CAPI_NodeFlowGetGraph(handle)))
         self._parent = parent
-        self._node_mapping = graph_idx.node_mapping
-        self._edge_mapping = graph_idx.edge_mapping
-        self._layer_offsets = graph_idx.layers.tonumpy()
-        self._block_offsets = graph_idx.flows.tonumpy()
+        self._node_mapping = utils.toindex(_CAPI_NodeFlowGetNodeMapping(handle))
+        self._edge_mapping = utils.toindex(_CAPI_NodeFlowGetEdgeMapping(handle))
+        self._layer_offsets = utils.toindex(
+            _CAPI_NodeFlowGetLayerOffsets(handle)).tonumpy()
+        self._block_offsets = utils.toindex(
+            _CAPI_NodeFlowGetBlockOffsets(handle)).tonumpy()
+        _CAPI_NodeFlowFree(handle)
+        # node/edge frames
         self._node_frames = [FrameRef(Frame(num_rows=self.layer_size(i))) \
                              for i in range(self.num_layers)]
         self._edge_frames = [FrameRef(Frame(num_rows=self.block_size(i))) \
@@ -251,6 +258,32 @@ class NodeFlow(DGLBaseGraph):
             The parent edge id array.
         """
         return self._edge_mapping.tousertensor()[eid]
+
+    def map_from_parent_nid(self, layer_id, parent_nids):
+        """Map parent node Ids to NodeFlow node Ids in a certain layer.
+
+        Parameters
+        ----------
+        layer_id : int
+            The layer Id.
+        parent_nids: list or Tensor
+            Node Ids in the parent graph.
+
+        Returns
+        -------
+        Tensor
+            Node Ids in the NodeFlow.
+        """
+        parent_nids = utils.toindex(parent_nids)
+        layers = self._layer_offsets
+        start = int(layers[layer_id])
+        end = int(layers[layer_id + 1])
+        # TODO(minjie): should not directly use []
+        mapping = self._node_mapping.tousertensor()
+        mapping = mapping[start:end]
+        mapping = utils.toindex(mapping)
+        nflow_ids = transform_ids(mapping, parent_nids)
+        return nflow_ids.tousertensor()
 
     def layer_in_degree(self, layer_id):
         """Return the in-degree of the nodes in the specified layer.
@@ -677,7 +710,7 @@ class NodeFlow(DGLBaseGraph):
         if is_all(flow_range):
             flow_range = range(0, self.num_blocks)
         elif isinstance(flow_range, slice):
-            if slice.step is not 1:
+            if slice.step != 1:
                 raise DGLError("We can't propogate flows and skip some of them")
             flow_range = range(flow_range.start, flow_range.stop)
         else:
@@ -708,26 +741,20 @@ class NodeFlow(DGLBaseGraph):
             self.block_compute(i, message_func, reduce_func, apply_node_func,
                                inplace=inplace)
 
+def _copy_to_like(arr1, arr2):
+    return F.copy_to(arr1, F.context(arr2))
 
-def create_full_node_flow(g, num_layers, add_self_loop=False):
-    """Convert a full graph to NodeFlow to run a L-layer GNN model.
+def _get_frame(frame, names, ids):
+    col_dict = {name: frame[name][_copy_to_like(ids, frame[name])] for name in names}
+    if len(col_dict) == 0:
+        return FrameRef(Frame(num_rows=len(ids)))
+    else:
+        return FrameRef(Frame(col_dict))
 
-    Parameters
-    ----------
-    g : DGLGraph
-        a DGL graph
-    num_layers : int
-        The number of layers
-    add_self_loop : bool, default False
-        Whether to add self loop to the sampled NodeFlow.
-        If True, the edge IDs of the self loop edges are -1.
 
-    Returns
-    -------
-    NodeFlow
-        a NodeFlow with a specified number of layers.
-    """
-    seeds = [utils.toindex(F.arange(0, g.number_of_nodes()))]
-    nfi = g._graph.neighbor_sampling(seeds, g.number_of_nodes(), num_layers,
-                                     'in', None, add_self_loop)
-    return NodeFlow(g, nfi[0])
+def _update_frame(frame, names, ids, new_frame):
+    col_dict = {name: new_frame[name] for name in names}
+    if len(col_dict) > 0:
+        frame.update_rows(ids, FrameRef(Frame(col_dict)), inplace=True)
+
+_init_api("dgl.nodeflow", __name__)

@@ -104,17 +104,18 @@ cdef extern from "dgl/runtime/c_runtime_api.h":
                          DLManagedTensor** out)
     void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor)
 
-cdef extern from "dgl/c_dsl_api.h":
-    int DGLNodeFree(NodeHandle handle)
-    int DGLNodeTypeKey2Index(const char* type_key,
-                             int* out_index)
-    int DGLNodeGetTypeIndex(NodeHandle handle,
-                            int* out_index)
-    int DGLNodeGetAttr(NodeHandle handle,
-                       const char* key,
-                       DGLValue* out_value,
-                       int* out_type_code,
-                       int* out_success)
+# (minjie): Node and class module are not used in DGL.
+#cdef extern from "dgl/c_dsl_api.h":
+#    int DGLNodeFree(NodeHandle handle)
+#    int DGLNodeTypeKey2Index(const char* type_key,
+#                             int* out_index)
+#    int DGLNodeGetTypeIndex(NodeHandle handle,
+#                            int* out_index)
+#    int DGLNodeGetAttr(NodeHandle handle,
+#                       const char* key,
+#                       DGLValue* out_value,
+#                       int* out_type_code,
+#                       int* out_success)
 
 cdef inline py_str(const char* x):
     if PY_MAJOR_VERSION < 3:

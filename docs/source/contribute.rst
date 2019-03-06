@@ -112,6 +112,12 @@ To achieve this, export following environment variables:
    export DGL_LIBRARY_PATH=$DGL_HOME/build
    export PYTHONPATH=$PYTHONPATH:$DGL_HOME/python
 
+If you are working on performance critical part, you may want to turn on Cython build:
+
+.. code-block:: bash
+   cd python
+   python setup.py build_ext --inplace
+
 You could test the build by running the following command and see the path of your local clone.
 
 .. code-block:: bash
