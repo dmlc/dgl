@@ -419,7 +419,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetAdj")
     *rv = ConvertAdjToPackedFunc(res);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetBlockAdj")
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetBlockAdj")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     bool transpose = args[1];
