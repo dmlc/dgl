@@ -498,14 +498,15 @@ def schedule_nodeflow_update_all(graph,
                                  block_id,
                                  message_func,
                                  reduce_func,
-                                 apply_func,
-                                 inplace):
+                                 apply_func):
     """get send and recv schedule
 
     Parameters
     ----------
     graph: NodeFlow
         The NodeFlow to use
+    block_id : int
+        The block where we perform computation.
     message_func: callable or list of callable
         The message function
     reduce_func: callable or list of callable

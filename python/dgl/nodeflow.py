@@ -814,8 +814,7 @@ class NodeFlow(DGLBaseGraph):
                                                        block_id=block_id,
                                                        message_func=message_func,
                                                        reduce_func=reduce_func,
-                                                       apply_func=apply_node_func,
-                                                       inplace=inplace)
+                                                       apply_func=apply_node_func)
                 Runtime.run(prog)
         else:
             dest_nodes = utils.toindex(v)
