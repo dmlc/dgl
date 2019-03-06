@@ -244,8 +244,8 @@ def schedule_nodeflow_apply_nodes(graph,
 
     Parameters
     ----------
-    graph: DGLGraph
-        The DGLGraph to use
+    graph: NodeFlow
+        The NodeFlow to use
     layer_id : int
         The layer where we apply node update function.
     v : utils.Index
@@ -326,8 +326,8 @@ def schedule_nodeflow_apply_edges(graph, block_id,
 
     Parameters
     ----------
-    graph: DGLGraph
-        The DGLGraph to use
+    graph: NodeFlow
+        The NodeFlow to use
     block_id : int
         The block whose edges we apply edge update function.
     u : utils.Index
@@ -504,8 +504,8 @@ def schedule_nodeflow_update_all(graph,
 
     Parameters
     ----------
-    graph: DGLGraph
-        The DGLGraph to use
+    graph: NodeFlow
+        The NodeFlow to use
     message_func: callable or list of callable
         The message function
     reduce_func: callable or list of callable
@@ -524,7 +524,7 @@ def schedule_nodeflow_update_all(graph,
     # generate send + reduce
     def uv_getter():
         # TODO get all edges in the block.
-        src, dst, _ = graph._graph.block_edges(block_id)
+        src, dst, _ = graph.block_edges(block_id)
         return var.IDX(src), var.IDX(dst)
     adj_creator = lambda: spmv.build_block_adj_matrix_graph(graph, block_id)
     inc_creator = lambda: spmv.build_block_inc_matrix_graph(graph, block_id)
@@ -551,8 +551,8 @@ def schedule_nodeflow_compute(graph,
 
     Parameters
     ----------
-    graph: DGLGraph
-        The DGLGraph to use
+    graph: NodeFlow
+        The NodeFlow to use
     block_id : int
         The block where we perform computation.
     u : utils.Index

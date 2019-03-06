@@ -32,85 +32,6 @@ class NodeFlowIndex(GraphIndex):
         """
         return int(self._layer_offsets[layer_id + 1]) - int(self._layer_offsets[layer_id])
 
-    def block_edges(self, block_id):
-        """Return the edges in a block.
-
-        Parameters
-        ----------
-        block_id : int
-            The specified block to return the edges.
-
-        Returns
-        -------
-        utils.Index
-            The src nodes.
-        utils.Index
-            The dst nodes.
-        utils.Index
-            The edge ids.
-        """
-        layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
-        rst = _CAPI_NodeFlowGetBlockAdj(self._handle, "coo", layer0_size,
-                                        self._layer_offsets[block_id + 1],
-                                        self._layer_offsets[block_id + 2])
-        idx = utils.toindex(rst(0)).tousertensor()
-        eid = utils.toindex(rst(1))
-        num_edges = int(len(idx) / 2)
-        assert len(eid) == num_edges
-        return utils.toindex(idx[num_edges:len(idx)]), utils.toindex(idx[0:num_edges]), eid
-
-    def block_adjacency_matrix(self, block_id, ctx):
-        """Return the adjacency matrix representation for a specific block in a NodeFlow.
-
-        A row of the returned adjacency matrix represents the destination
-        of an edge and the column represents the source.
-
-        Parameters
-        ----------
-        block_id : int
-            The specified block to return the adjacency matrix.
-        ctx : context
-            The context of the returned matrix.
-
-        Returns
-        -------
-        SparseTensor
-            The adjacency matrix.
-        utils.Index
-            A index for data shuffling due to sparse format change. Return None
-            if shuffle is not required.
-        """
-        fmt = F.get_preferred_sparse_format()
-        # We need to extract two layers.
-        layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
-        rst = _CAPI_NodeFlowGetBlockAdj(self._handle, fmt, layer0_size,
-                                        self._layer_offsets[block_id + 1],
-                                        self._layer_offsets[block_id + 2])
-        num_rows = self.layer_size(block_id + 1)
-        num_cols = self.layer_size(block_id)
-
-        if fmt == "csr":
-            indptr = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
-            indices = F.copy_to(utils.toindex(rst(1)).tousertensor(), ctx)
-            shuffle = utils.toindex(rst(2))
-            dat = F.ones(indices.shape, dtype=F.float32, ctx=ctx)
-            return F.sparse_matrix(dat, ('csr', indices, indptr),
-                                   (num_rows, num_cols))[0], shuffle
-        elif fmt == "coo":
-            ## FIXME(minjie): data type
-            idx = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
-            m = self.block_size(block_id)
-            idx = F.reshape(idx, (2, m))
-            dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-            adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (num_rows, num_cols))
-            shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
-            return adj, shuffle_idx
-        else:
-            raise Exception("unknown format")
-
-    def block_incidence_matrix(self, block_id):
-        raise Exception("Unsupported yet")
-
 class NodeFlow(DGLBaseGraph):
     """The NodeFlow class stores the sampling results of Neighbor
     sampling and Layer-wise sampling.
@@ -144,8 +65,8 @@ class NodeFlow(DGLBaseGraph):
             _CAPI_NodeFlowGetLayerOffsets(handle)).tonumpy()
         self._block_offsets = utils.toindex(
             _CAPI_NodeFlowGetBlockOffsets(handle)).tonumpy()
-        super(NodeFlow, self).__init__(NodeFlowIndex(_CAPI_NodeFlowGetGraph(handle),
-                                                     self._layer_offsets))
+        super(NodeFlow, self).__init__(GraphIndex(_CAPI_NodeFlowGetGraph(handle),
+                                                  self._layer_offsets))
         self._parent = parent
         self._node_mapping = utils.toindex(_CAPI_NodeFlowGetNodeMapping(handle))
         self._edge_mapping = utils.toindex(_CAPI_NodeFlowGetEdgeMapping(handle))
@@ -489,6 +410,85 @@ class NodeFlow(DGLBaseGraph):
         # We have to make sure this case doesn't happen.
         assert F.asnumpy(F.sum(ret == -1, 0)) == 0, "The eid in the parent graph is invalid."
         return ret
+
+    def block_edges(self, block_id):
+        """Return the edges in a block.
+
+        Parameters
+        ----------
+        block_id : int
+            The specified block to return the edges.
+
+        Returns
+        -------
+        utils.Index
+            The src nodes.
+        utils.Index
+            The dst nodes.
+        utils.Index
+            The edge ids.
+        """
+        layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
+        rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, "coo", layer0_size,
+                                        self._layer_offsets[block_id + 1],
+                                        self._layer_offsets[block_id + 2])
+        idx = utils.toindex(rst(0)).tousertensor()
+        eid = utils.toindex(rst(1))
+        num_edges = int(len(idx) / 2)
+        assert len(eid) == num_edges
+        return utils.toindex(idx[num_edges:len(idx)]), utils.toindex(idx[0:num_edges]), eid
+
+    def block_adjacency_matrix(self, block_id, ctx):
+        """Return the adjacency matrix representation for a specific block in a NodeFlow.
+
+        A row of the returned adjacency matrix represents the destination
+        of an edge and the column represents the source.
+
+        Parameters
+        ----------
+        block_id : int
+            The specified block to return the adjacency matrix.
+        ctx : context
+            The context of the returned matrix.
+
+        Returns
+        -------
+        SparseTensor
+            The adjacency matrix.
+        utils.Index
+            A index for data shuffling due to sparse format change. Return None
+            if shuffle is not required.
+        """
+        fmt = F.get_preferred_sparse_format()
+        # We need to extract two layers.
+        layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
+        rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, fmt, layer0_size,
+                                        self._layer_offsets[block_id + 1],
+                                        self._layer_offsets[block_id + 2])
+        num_rows = self.layer_size(block_id + 1)
+        num_cols = self.layer_size(block_id)
+
+        if fmt == "csr":
+            indptr = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
+            indices = F.copy_to(utils.toindex(rst(1)).tousertensor(), ctx)
+            shuffle = utils.toindex(rst(2))
+            dat = F.ones(indices.shape, dtype=F.float32, ctx=ctx)
+            return F.sparse_matrix(dat, ('csr', indices, indptr),
+                                   (num_rows, num_cols))[0], shuffle
+        elif fmt == "coo":
+            ## FIXME(minjie): data type
+            idx = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
+            m = self.block_size(block_id)
+            idx = F.reshape(idx, (2, m))
+            dat = F.ones((m,), dtype=F.float32, ctx=ctx)
+            adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (num_rows, num_cols))
+            shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+            return adj, shuffle_idx
+        else:
+            raise Exception("unknown format")
+
+    def block_incidence_matrix(self, block_id):
+        raise Exception("Unsupported yet")
 
     def set_n_initializer(self, initializer, layer_id=ALL, field=None):
         """Set the initializer for empty node features.

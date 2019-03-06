@@ -256,7 +256,7 @@ def test_block_adj_matrix():
     nf = create_mini_batch(g, num_layers)
     assert nf.num_layers == num_layers + 1
     for i in range(nf.num_blocks):
-        src, dst, eid = nf._graph.block_edges(i)
+        src, dst, eid = nf.block_edges(i)
         dest_nodes = utils.toindex(nf.layer_nid(i + 1))
         u, v, _ = nf._graph.in_edges(dest_nodes)
         u = utils.toindex(nf._glb2lcl_nid(u.tousertensor(), i))
@@ -264,7 +264,7 @@ def test_block_adj_matrix():
         assert F.array_equal(src.tousertensor(), u.tousertensor())
         assert F.array_equal(dst.tousertensor(), v.tousertensor())
 
-        adj, _ = nf._graph.block_adjacency_matrix(i, F.cpu())
+        adj, _ = nf.block_adjacency_matrix(i, F.cpu())
         adj = adj.asscipy().tocoo()
         dst, src = adj.row, adj.col
         assert np.array_equal(src, u.tonumpy())

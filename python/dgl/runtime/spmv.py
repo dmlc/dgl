@@ -136,8 +136,8 @@ def build_block_adj_matrix_graph(graph, block_id):
 
     Parameters
     ----------
-    graph : DGLGraph
-        The graph
+    graph : NodeFlow
+        The NodeFlow
 
     block_id : int
         the block Id
@@ -150,10 +150,9 @@ def build_block_adj_matrix_graph(graph, block_id):
         A index for data shuffling due to sparse format change. Return None
         if shuffle is not required.
     """
-    gidx = graph._graph
     #TODO why is this constructed twice?
-    _, shuffle_idx = gidx.block_adjacency_matrix(block_id, F.cpu())
-    return lambda ctx: gidx.block_adjacency_matrix(block_id, ctx)[0], shuffle_idx
+    _, shuffle_idx = graph.block_adjacency_matrix(block_id, F.cpu())
+    return lambda ctx: graph.block_adjacency_matrix(block_id, ctx)[0], shuffle_idx
 
 def build_adj_matrix_graph(graph):
     """Build adjacency matrix of the whole graph.
