@@ -176,6 +176,7 @@ def runtest(g_prior_edges, validation=True):
 
 def train():
     best_mrr = 0
+    logfile = open('output.log', 'w')
     for epoch in range(500):
         ml.refresh_mask()
         g_prior_edges = g.filter_edges(lambda edges: edges.data['prior'])
@@ -183,8 +184,6 @@ def train():
         g_prior_train_edges = g.filter_edges(
                 lambda edges: edges.data['prior'] | edges.data['train'])
 
-        print('Epoch %d train' % epoch)
-        runtrain(g_prior_edges, g_train_edges, True)
         print('Epoch %d validation' % epoch)
         with torch.no_grad():
             valid_mrr = runtest(g_prior_train_edges, True)
@@ -192,10 +191,15 @@ def train():
                 best_mrr = valid_mrr
                 torch.save(model.state_dict(), 'model.pt')
         print('Epoch %d validation mrr:', valid_mrr)
+        print('Epoch %d validation mrr:', valid_mrr, file=logfile)
         print('Epoch %d test' % epoch)
         with torch.no_grad():
             test_mrr = runtest(g_prior_train_edges, False)
         print('Epoch %d test mrr:', test_mrr)
+        print('Epoch %d test mrr:', test_mrr, file=logfile)
+        print('Epoch %d train' % epoch)
+        runtrain(g_prior_edges, g_train_edges, True)
+    logfile.close()
 
 
 if __name__ == '__main__':
