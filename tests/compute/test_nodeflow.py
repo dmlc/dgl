@@ -265,10 +265,11 @@ def test_block_adj_matrix():
         assert F.array_equal(dst.tousertensor(), v.tousertensor())
 
         adj, _ = nf.block_adjacency_matrix(i, F.cpu())
-        adj = adj.asscipy().tocoo()
-        dst, src = adj.row, adj.col
-        assert np.array_equal(src, u.tonumpy())
-        assert np.array_equal(dst, v.tonumpy())
+        adj = F.sparse_to_numpy(adj)
+        data = np.ones((len(u)), dtype=np.float32)
+        coo = sp.sparse.coo_matrix((data, (v.tonumpy(), u.tonumpy())),
+                                   shape=adj.shape).todense()
+        assert np.array_equal(adj, coo)
 
 
 if __name__ == '__main__':
