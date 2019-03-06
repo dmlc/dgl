@@ -77,7 +77,7 @@ bool TCPSocket::Accept(TCPSocket * socket, std::string * ip, int * port) {
 
   sock_client = accept(socket_, reinterpret_cast<SA*>(&sa_client), &len);
   if (sock_client < 0) {
-    LOG(ERROR) << "Failed accept connection on " << ip << ":" << port;
+    LOG(ERROR) << "Failed accept connection on " << *ip << ":" << *port;
     return false;
   }
 
