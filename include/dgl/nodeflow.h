@@ -6,6 +6,9 @@
 #ifndef DGL_NODEFLOW_H_
 #define DGL_NODEFLOW_H_
 
+#include <vector>
+#include <string>
+
 #include "graph_interface.h"
 
 namespace dgl {
@@ -48,5 +51,5 @@ std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph,
 
 }  // namespace dgl
 
-#endif  // DGL_GRAPH_H_
+#endif  // DGL_NODEFLOW_H_
 
