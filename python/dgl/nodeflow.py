@@ -472,7 +472,43 @@ class NodeFlow(DGLBaseGraph):
         else:
             raise Exception("unknown format")
 
-    def block_incidence_matrix(self, block_id):
+    def block_incidence_matrix(self, block_id, typestr, ctx):
+        """Return the incidence matrix representation of the block.
+
+        An incidence matrix is an n x m sparse matrix, where n is
+        the number of nodes and m is the number of edges. Each nnz
+        value indicating whether the edge is incident to the node
+        or not.
+
+        There are three types of an incidence matrix `I`:
+        * "in":
+          - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
+          - I[v, e] = 0 otherwise.
+        * "out":
+          - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
+          - I[v, e] = 0 otherwise.
+        * "both":
+          - I[v, e] = 1 if e is the in-edge of v;
+          - I[v, e] = -1 if e is the out-edge of v;
+          - I[v, e] = 0 otherwise (including self-loop).
+
+        Parameters
+        ----------
+        block_id : int
+            The specified block to return the incidence matrix.
+        typestr : str
+            Can be either "in", "out" or "both"
+        ctx : context
+            The context of returned incidence matrix.
+
+        Returns
+        -------
+        SparseTensor
+            The incidence matrix.
+        utils.Index
+            A index for data shuffling due to sparse format change. Return None
+            if shuffle is not required.
+        """
         raise Exception("Unsupported yet")
 
     def set_n_initializer(self, initializer, layer_id=ALL, field=None):
