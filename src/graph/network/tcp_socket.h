@@ -6,7 +6,14 @@
 #ifndef DGL_GRAPH_NETWORK_TCP_SOCKET_H_
 #define DGL_GRAPH_NETWORK_TCP_SOCKET_H_
 
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
+#pragma comment(lib, "Ws2_32.lib")
+#else   // !_WIN32
 #include <sys/socket.h>
+#endif  // _WIN32
 #include <string>
 
 namespace dgl {

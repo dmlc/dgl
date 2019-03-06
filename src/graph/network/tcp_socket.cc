@@ -6,12 +6,15 @@
 #include "tcp_socket.h"
 
 #include <dmlc/logging.h>
+
+#ifndef _WIN32
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#endif  // !_WIN32
 
 namespace dgl {
 namespace network {
@@ -21,7 +24,7 @@ typedef struct sockaddr SA;
 
 TCPSocket::TCPSocket() {
   // init socket
-  socket_ = socket(AF_INET, SOCK_STREAM, 0);
+  socket_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (socket_ < 0) {
     LOG(FATAL) << "Can't create new socket.";
   }
@@ -77,7 +80,7 @@ bool TCPSocket::Accept(TCPSocket * socket, std::string * ip, int * port) {
 
   sock_client = accept(socket_, reinterpret_cast<SA*>(&sa_client), &len);
   if (sock_client < 0) {
-    LOG(ERROR) << "Failed accept connection on " << ip << ":" << port;
+    LOG(ERROR) << "Failed accept connection on " << (*ip) << ":" << (*port);
     return false;
   }
 
@@ -94,6 +97,22 @@ bool TCPSocket::Accept(TCPSocket * socket, std::string * ip, int * port) {
   return true;
 }
 
+#ifdef _WIN32
+bool TCPSocket::SetBlocking(bool flag) {
+  int result;
+  u_long argp = flag ? 1 : 0;
+
+  // XXX Non-blocking Windows Sockets apparently has tons of issues:
+  // http://www.sockets.com/winsock.htm#Overview_BlockingNonBlocking
+  // Since SetBlocking() is not used at all, I'm leaving a default
+  // implementation here.  But be warned that this is not fully tested.
+  if ((result = ioctlsocket(socket_, FIONBIO, &argp)) != NO_ERROR) {
+    LOG(ERROR) << "Failed to set socket status.";
+    return false;
+  }
+  return true;
+}
+#else   // !_WIN32
 bool TCPSocket::SetBlocking(bool flag) {
   int opts;
 
@@ -115,6 +134,7 @@ bool TCPSocket::SetBlocking(bool flag) {
 
   return true;
 }
+#endif  // _WIN32
 
 void TCPSocket::SetTimeout(int timeout) {
   setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO,
@@ -127,7 +147,11 @@ bool TCPSocket::ShutDown(int ways) {
 
 void TCPSocket::Close() {
   if (socket_ >= 0) {
+#ifdef _WIN32
+    CHECK_EQ(0, closesocket(socket_));
+#else   // !_WIN32
     CHECK_EQ(0, close(socket_));
+#endif  // _WIN32
     socket_ = -1;
   }
 }
