@@ -1,5 +1,4 @@
 # This file contains distributed samplers.
-from ...node_flow import NodeFlow
 from ...network import _send_subgraph, _recv_subgraph
 from ...network import _batch_send_subgraph, _batch_recv_subgraph
 from ...network import _create_sampler_sender, _create_sampler_receiver
@@ -76,23 +75,11 @@ class SamplerReceiver(object):
         _finalize_sampler_receiver(self._receiver)
 
     def Receive(self):
-        """Receive data from sampler node and construct sampled subgraph.
+        """Receive a NodeFlow object from remote sampler.
         """
-        # Receive a NodeFlowIndex object
-        sgi = _recv_subgraph(self._receiver)
-        # Note that the parent node will be set 
-        # to None in distributed sampler
-        return NodeFlow(None, sgi)
+        return _recv_subgraph(self._receiver)
 
     def BatchReceive(self):
-        """ Receive data from sender and construct a batch of sampled subgraph.
+        """Receive a list of NodeFlow object from remote sampler.
         """
-        # Receive a list of NodeFlowIndex object
-        sgi_list = _batch_recv_subgraph(self._receiver)
-        nodeflow_list = []
-        for sgi in sgi_list:
-            # Note that the parent node will be set 
-            # to None in distributed sampler
-            nodeflow_list.append(NodeFlow(None, sgi))
-
-        return nodeflow_list
+        return _batch_recv_subgraph(self._receiver)

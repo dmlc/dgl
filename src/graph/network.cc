@@ -22,29 +22,6 @@ namespace network {
 static char* global_data_buffer = nullptr;
 const int kMaxBufferSize = 200 * 1024 * 1024;  // 200 MB
 
-// Convert Sampled Subgraph structures to PackedFunc.
-PackedFunc ConvertSubgraphToPackedFunc(const std::vector<NodeFlow>& sg) {
-  auto body = [sg] (DGLArgs args, DGLRetValue* rv) {
-      const uint64_t which = args[0];
-      if (which < sg.size()) {
-        GraphInterface* gptr = sg[which].graph->Reset();
-        GraphHandle ghandle = gptr;
-        *rv = ghandle;
-      } else if (which >= sg.size() && which < sg.size() * 2) {
-        *rv = std::move(sg[which - sg.size()].node_mapping);
-      } else if (which >= sg.size() * 2 && which < sg.size() * 3) {
-        *rv = std::move(sg[which - sg.size() * 2].edge_mapping);
-      } else if (which >= sg.size() * 3 && which < sg.size() * 4) {
-        *rv = std::move(sg[which - sg.size() * 3].layer_offsets);
-      } else if (which >= sg.size() * 4 && which < sg.size() * 5) {
-        *rv = std::move(sg[which - sg.size() * 4].flow_offsets);
-      } else {
-        LOG(FATAL) << "invalid choice";
-      }
-    };
-  return PackedFunc(body);
-}
-
 DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string ip = args[0];
@@ -105,18 +82,18 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
     if (size <= 0) {
       LOG(ERROR) << "Receive error: (size: " << size << ")";
     }
-    NodeFlow nf;
+    NodeFlow* nf = new NodeFlow();
     ImmutableGraph::CSR::Ptr csr;
     network::DeserializeSampledSubgraph(global_data_buffer,
                                         &csr,
-                                        &(nf.node_mapping),
-                                        &(nf.edge_mapping),
-                                        &(nf.layer_offsets),
-                                        &(nf.flow_offsets));
-    nf.graph = GraphPtr(new ImmutableGraph(csr, nullptr, false));
-    std::vector<NodeFlow> subgs(1);
+                                        &(nf->node_mapping),
+                                        &(nf->edge_mapping),
+                                        &(nf->layer_offsets),
+                                        &(nf->flow_offsets));
+    nf->graph = GraphPtr(new ImmutableGraph(csr, nullptr, false));
+    std::vector<NodeFlow*> subgs(1);
     subgs[0] = nf;
-    *rv = ConvertSubgraphToPackedFunc(subgs);
+    *rv = WrapVectorReturn(subgs);
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeCommunicator")

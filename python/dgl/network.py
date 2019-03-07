@@ -2,7 +2,8 @@
 from __future__ import absolute_import
 
 from ._ffi.function import _init_api
-from .graph_index import NodeFlowIndex
+from .nodeflow import NodeFlow
+from .utils import unwrap_to_ptr_list
 from . import utils
 
 _init_api("dgl.network")
@@ -45,13 +46,13 @@ def _send_subgraph(sender, nodeflow):
     nodeflow : NodeFlow
         sampled NodeFlow object
     """
-    graph_index = nodeflow._graph._handle
+    graph_handle = nodeflow._graph._handle
     node_mapping = nodeflow._node_mapping.todgltensor()
     edge_mapping = nodeflow._edge_mapping.todgltensor()
-    layers_offsets = nodeflow._graph._layers.todgltensor()
-    flows_offsets = nodeflow._graph._flows.todgltensor()
+    layers_offsets = utils.toindex(nodeflow._layer_offsets).todgltensor()
+    flows_offsets = utils.toindex(nodeflow._block_offsets).todgltensor()
     _CAPI_SenderSendSubgraph(sender,
-                             graph_index,
+                             graph_handle,
                              node_mapping,
                              edge_mapping,
                              layers_offsets,
@@ -84,16 +85,10 @@ def _recv_subgraph(receiver):
     NodeFlowIndex
         a NodeFlowIndex object
     """
-    rst = _CAPI_ReceiverRecvSubgraph(receiver)
+    hdl = unwrap_to_ptr_list(_CAPI_ReceiverRecvSubgraph(receiver))
     # Note that, for distributed sampler
     # we should set parent graph to None
-    nodeflow_idx = NodeFlowIndex(rst(0),   # graph index handle
-                                 None,     # parent graph index
-                                 utils.toindex(rst(1)),  # node_mapping
-                                 utils.toindex(rst(2)),  # edge_mapping
-                                 utils.toindex(rst(3)),  # layers_offsets
-                                 utils.toindex(rst(4)))  # flows_offsets
-    return nodeflow_idx
+    return NodeFlow(None, hdl[0])
 
 def _batch_recv_subgraph(receiver):
     """ Receive a batch of sampled subgraph from remote sampler.

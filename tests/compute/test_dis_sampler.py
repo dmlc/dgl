@@ -14,19 +14,30 @@ def generate_rand_graph(n):
 def start_trainer():
     recv = dgl.contrib.sampling.SamplerReceiver(ip="127.0.0.1", port=50051)
     nodeflow = recv.Receive()
+    print("----- trainer ------")
     print(nodeflow._node_mapping.todgltensor())
     print(nodeflow._edge_mapping.todgltensor())
     print(nodeflow._layer_offsets)
     print(nodeflow._block_offsets)
+    print("----- trainer ------")
 
-    time.sleep(2)  # wait all senders to finalize their jobs
+    time.sleep(3)  # wait all senders to finalize their jobs
 
 def start_sampler():
     g = generate_rand_graph(100)
     sender = dgl.contrib.sampling.SamplerSender(ip="127.0.0.1", port=50051)
-    for nodeflow in dgl.contrib.sampling.NeighborSampler(g, 1, 4, neighbor_type='in', num_workers=1):
-        sender.Send(nodeflow)
+    for i, subg in enumerate(dgl.contrib.sampling.NeighborSampler(
+            g, 1, 100, neighbor_type='in', num_workers=4)):
+        print("----- sampler ------")
+        print(subg._node_mapping.todgltensor())
+        print(subg._edge_mapping.todgltensor())
+        print(subg._layer_offsets)
+        print(subg._block_offsets)
+        print("----- sampler ------")
+        sender.Send(subg)
         break
+
+    time.sleep(1)
 
 if __name__ == '__main__':
     pid = os.fork()
