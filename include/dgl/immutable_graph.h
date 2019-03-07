@@ -534,23 +534,27 @@ class ImmutableGraph: public GraphInterface {
     return edge_list_;
   }
 
- protected:
-  DGLIdIters GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
-  DGLIdIters GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
-
   /*!
    * \brief Get the CSR array that represents the in-edges.
    * This method copies data from std::vector to IdArray.
+   * \param start the first row to copy.
+   * \param end the last row to copy (exclusive).
    * \return the CSR array.
    */
-  CSRArray GetInCSRArray() const;
+  CSRArray GetInCSRArray(size_t start, size_t end) const;
 
   /*!
    * \brief Get the CSR array that represents the out-edges.
    * This method copies data from std::vector to IdArray.
+   * \param start the first row to copy.
+   * \param end the last row to copy (exclusive).
    * \return the CSR array.
    */
-  CSRArray GetOutCSRArray() const;
+  CSRArray GetOutCSRArray(size_t start, size_t end) const;
+
+ protected:
+  DGLIdIters GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
+  DGLIdIters GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
 
   /*!
    * \brief Compact a subgraph.

@@ -604,43 +604,39 @@ Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids) const {
   return subg;
 }
 
-ImmutableGraph::CSRArray ImmutableGraph::GetInCSRArray() const {
-  auto in_csr = GetInCSR();
-  IdArray indptr = IdArray::Empty({static_cast<int64_t>(in_csr->indptr.size())},
+ImmutableGraph::CSRArray GetCSRArray(ImmutableGraph::CSR::Ptr csr, size_t start, size_t end) {
+  size_t num_rows = end - start;
+  size_t nnz = csr->indptr[end] - csr->indptr[start];
+  IdArray indptr = IdArray::Empty({static_cast<int64_t>(num_rows + 1)},
                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray indices = IdArray::Empty({static_cast<int64_t>(in_csr->NumEdges())},
+  IdArray indices = IdArray::Empty({static_cast<int64_t>(nnz)},
                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray eids = IdArray::Empty({static_cast<int64_t>(in_csr->NumEdges())},
+  IdArray eids = IdArray::Empty({static_cast<int64_t>(nnz)},
                                 DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   int64_t *indptr_data = static_cast<int64_t*>(indptr->data);
   dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices->data);
   dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
-  std::copy(in_csr->indptr.begin(), in_csr->indptr.end(), indptr_data);
-  std::copy(in_csr->indices.begin(), in_csr->indices.end(), indices_data);
-  std::copy(in_csr->edge_ids.begin(), in_csr->edge_ids.end(), eid_data);
-  return CSRArray{indptr, indices, eids};
+  for (size_t i = start; i < end + 1; i++)
+    indptr_data[i - start] = csr->indptr[i] - csr->indptr[start];
+  std::copy(csr->indices.begin() + csr->indptr[start],
+            csr->indices.begin() + csr->indptr[end], indices_data);
+  std::copy(csr->edge_ids.begin() + csr->indptr[start],
+            csr->edge_ids.begin() + csr->indptr[end], eid_data);
+  return ImmutableGraph::CSRArray{indptr, indices, eids};
 }
 
-ImmutableGraph::CSRArray ImmutableGraph::GetOutCSRArray() const {
-  auto out_csr = GetOutCSR();
-  IdArray indptr = IdArray::Empty({static_cast<int64_t>(out_csr->indptr.size())},
-                                  DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray indices = IdArray::Empty({static_cast<int64_t>(out_csr->NumEdges())},
-                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray eids = IdArray::Empty({static_cast<int64_t>(out_csr->NumEdges())},
-                                DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  int64_t *indptr_data = static_cast<int64_t*>(indptr->data);
-  dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices->data);
-  dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
-  std::copy(out_csr->indptr.begin(), out_csr->indptr.end(), indptr_data);
-  std::copy(out_csr->indices.begin(), out_csr->indices.end(), indices_data);
-  std::copy(out_csr->edge_ids.begin(), out_csr->edge_ids.end(), eid_data);
-  return CSRArray{indptr, indices, eids};
+ImmutableGraph::CSRArray ImmutableGraph::GetInCSRArray(size_t start, size_t end) const {
+  return GetCSRArray(GetInCSR(), start, end);
+}
+
+ImmutableGraph::CSRArray ImmutableGraph::GetOutCSRArray(size_t start, size_t end) const {
+  return GetCSRArray(GetOutCSR(), start, end);
 }
 
 std::vector<IdArray> ImmutableGraph::GetAdj(bool transpose, const std::string &fmt) const {
   if (fmt == "csr") {
-    CSRArray arrs = transpose ? this->GetOutCSRArray() : this->GetInCSRArray();
+    CSRArray arrs = transpose ? this->GetOutCSRArray(0, NumVertices())
+        : this->GetInCSRArray(0, NumVertices());
     return std::vector<IdArray>{arrs.indptr, arrs.indices, arrs.id};
   } else if (fmt == "coo") {
     int64_t num_edges = this->NumEdges();

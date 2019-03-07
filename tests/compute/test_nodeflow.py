@@ -250,8 +250,33 @@ def test_copy():
         nf.block_compute(i, partial(msg_func, ind=i), partial(reduce_func, ind=i))
 
 
+def test_block_adj_matrix():
+    num_layers = 3
+    g = generate_rand_graph(100)
+    nf = create_mini_batch(g, num_layers)
+    assert nf.num_layers == num_layers + 1
+    for i in range(nf.num_blocks):
+        src, dst, eid = nf.block_edges(i)
+        dest_nodes = utils.toindex(nf.layer_nid(i + 1))
+        u, v, _ = nf._graph.in_edges(dest_nodes)
+        u = nf._glb2lcl_nid(u.tousertensor(), i)
+        v = nf._glb2lcl_nid(v.tousertensor(), i + 1)
+        assert F.array_equal(src, u)
+        assert F.array_equal(dst, v)
+
+        adj, _ = nf.block_adjacency_matrix(i, F.cpu())
+        adj = F.sparse_to_numpy(adj)
+        data = np.ones((len(u)), dtype=np.float32)
+        v = utils.toindex(v)
+        u = utils.toindex(u)
+        coo = sp.sparse.coo_matrix((data, (v.tonumpy(), u.tonumpy())),
+                                   shape=adj.shape).todense()
+        assert np.array_equal(adj, coo)
+
+
 if __name__ == '__main__':
     test_basic()
+    test_block_adj_matrix()
     test_copy()
     test_apply_nodes()
     test_apply_edges()
