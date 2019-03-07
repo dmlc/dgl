@@ -47,8 +47,26 @@ struct NodeFlow {
 /*!
  * \brief Get a slice on a graph that represents a NodeFlow.
  *
+ * The entire block has to be taken as a slice. Users have to specify the
+ * correct starting and ending location of a layer.
+ *
+ * If remap is false, the returned arrays can be viewed as a sub-matrix slice
+ * of the adjmat of the input graph. Let the adjmat of the input graph be A,
+ * then the slice is equal to (in numpy syntax):
+ *   A[layer1_start:layer1_end, layer0_start:layer0_end]
+ *
+ * If remap is true,  the returned arrays represents an adjacency matrix
+ * of shape NxM, where N is the number of nodes in layer1 and M is
+ * the number of nodes in layer0. Nodes in layer0 will be remapped to
+ * [0, M) and nodes in layer1 will be remapped to [0, N).
+ *
  * A row of the returned adjacency matrix represents the destination
  * of an edge and the column represents the source.
+ *
+ * If fmt == "csr", the function returns three arrays: indptr, indices, eid.
+ * If fmt == "coo", the function returns two arrays: idx, eid. Here, the idx array
+ *   is the concatenation of src and dst node id arrays.
+ *
  * \param graph An immutable graph.
  * \param fmt the format of the returned adjacency matrix.
  * \param layer0_size the size of the first layer in the block.
