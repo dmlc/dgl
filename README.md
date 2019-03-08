@@ -31,6 +31,11 @@ a model similar to GCN.
 
 We are currently in Beta stage.  More features and improvements are coming.
 
+## News
+
+v0.2 has just been released! Many features, bugfix and performance improvement. See release note
+[here](https://github.com/dmlc/dgl/releases/tag/v0.2).
+
 ## System requirements
 
 DGL should work on
