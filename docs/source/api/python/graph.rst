@@ -68,6 +68,7 @@ Converting from/to other format
     DGLGraph.from_networkx
     DGLGraph.from_scipy_sparse_matrix
     DGLGraph.adjacency_matrix
+    DGLGraph.adjacency_matrix_scipy
     DGLGraph.incidence_matrix
 
 Using Node/edge features
