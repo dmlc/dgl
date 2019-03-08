@@ -12,6 +12,7 @@ requirements:
     - setuptools
     - cmake
     - git
+    - cython
     - m2w64-gcc         # [win]
     - m2w64-make        # [win]
   run:
