@@ -541,7 +541,7 @@ ImmutableGraph::EdgeArray ImmutableGraph::Edges(const std::string &order) const 
   dgl_id_t* rst_dst_data = static_cast<dgl_id_t*>(rst_dst->data);
   dgl_id_t* rst_eid_data = static_cast<dgl_id_t*>(rst_eid->data);
 
-  if (order.empty() || order == "srcdst") {
+  if (order == "srcdst") {
     auto out_csr = GetOutCSR();
     // If sorted, the returned edges are sorted by the source Id and dest Id.
     for (size_t i = 0; i < out_csr->indptr.size() - 1; i++) {
@@ -550,7 +550,7 @@ ImmutableGraph::EdgeArray ImmutableGraph::Edges(const std::string &order) const 
     }
     std::copy(out_csr->indices.begin(), out_csr->indices.end(), rst_dst_data);
     std::copy(out_csr->edge_ids.begin(), out_csr->edge_ids.end(), rst_eid_data);
-  } else if (order == "eid") {
+  } else if (order.empty() || order == "eid") {
     std::vector<Edge> edges;
     auto out_csr = GetOutCSR();
     out_csr->ReadAllEdges(&edges);
