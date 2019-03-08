@@ -635,8 +635,8 @@ ImmutableGraph::CSRArray ImmutableGraph::GetOutCSRArray(size_t start, size_t end
 
 std::vector<IdArray> ImmutableGraph::GetAdj(bool transpose, const std::string &fmt) const {
   if (fmt == "csr") {
-    CSRArray arrs = transpose ? this->GetOutCSRArray(0, NumVertices())
-        : this->GetInCSRArray(0, NumVertices());
+    CSRArray arrs = transpose ? this->GetInCSRArray(0, NumVertices())
+        : this->GetOutCSRArray(0, NumVertices());
     return std::vector<IdArray>{arrs.indptr, arrs.indices, arrs.id};
   } else if (fmt == "coo") {
     int64_t num_edges = this->NumEdges();
