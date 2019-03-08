@@ -92,6 +92,6 @@ def max(msg, out):
 
     >>> import torch
     >>> def reduce_func(nodes):
-    >>>     return {'h': torch.max(nodes.mailbox['m'], dim=1)}
+    >>>     return {'h': torch.max(nodes.mailbox['m'], dim=1)[0]}
     """
     return SimpleReduceFunction("max", F.max, msg, out)
