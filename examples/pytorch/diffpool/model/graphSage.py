@@ -5,7 +5,6 @@ from torch.autograd import Variable
 
 import dgl
 from dgl import DGLGraph
-from dgl.data import register_data_args, load_data
 import dgl.function as fn
 
 import numpy as np

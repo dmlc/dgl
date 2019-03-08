@@ -3,15 +3,12 @@ import torch
 import dgl
 import networkx as nx
 import argparse
-import os
 import random
 import time
-import sklearn.metrics as metrics
 
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data
-import numpy as np
 import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import tu
