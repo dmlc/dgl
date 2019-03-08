@@ -414,8 +414,8 @@ class NodeFlow(DGLBaseGraph):
         """
         layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
         rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, "coo", layer0_size,
-                                        self._layer_offsets[block_id + 1],
-                                        self._layer_offsets[block_id + 2])
+                                        int(self._layer_offsets[block_id + 1]),
+                                        int(self._layer_offsets[block_id + 2]))
         idx = utils.toindex(rst(0)).tousertensor()
         eid = utils.toindex(rst(1))
         num_edges = int(len(idx) / 2)
