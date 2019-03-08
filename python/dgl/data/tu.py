@@ -131,10 +131,6 @@ class DiffpoolDataset(TUDataset):
         self.train_labels = self.graph_labels[:train_idx]
         self.val_labels = self.graph_labels[train_idx:test_idx]
         self.test_labels = self.graph_labels[test_idx:]
-        # print("all test labels", self.test_labels)
-        # print("all val labels", self.val_labels)
-        # print("all train labels", self.train_labels)
-        # raise NotImplementedError
 
         # report dataset statistics
         print("Num of training graphs: ", len(self.train_labels))
@@ -238,7 +234,4 @@ class DiffpoolDataset(TUDataset):
             return self.graph_lists[idx], self.graph_labels[idx]
 
     def statistics(self):
-        print("DEBUGGGG")
-        print(self.graph_labels[0])
-        print(len(self.graph_labels))
         return self.graph_lists[0].ndata['feat'].shape[1], self.graph_lists[0].ndata['a_feat'].shape[1], self.num_labels, self.max_num_node
