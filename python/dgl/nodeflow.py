@@ -447,8 +447,8 @@ class NodeFlow(DGLBaseGraph):
         # We need to extract two layers.
         layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
         rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, fmt, layer0_size,
-                                        self._layer_offsets[block_id + 1],
-                                        self._layer_offsets[block_id + 2])
+                                        int(self._layer_offsets[block_id + 1]),
+                                        int(self._layer_offsets[block_id + 2]))
         num_rows = self.layer_size(block_id + 1)
         num_cols = self.layer_size(block_id)
 
