@@ -253,7 +253,7 @@ if __name__ == '__main__':
     test_create_from_elist()
     test_adjmat_cache()
     test_adjmat_immutable()
-    test_scipy_adjmat():
+    test_scipy_adjmat()
     test_incmat()
     test_incmat_cache()
     test_readonly()
