@@ -4,6 +4,7 @@ import dgl
 import os
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
 import networkx as nx
+import random
 
 class TUDataset(object):
 
@@ -109,12 +110,19 @@ class DiffpoolDataset(TUDataset):
         self.kwargs = kwargs
         self.use_node_attr = use_node_attr
         self.mode = mode
-        self._preprocess()
+        self._preprocess() # pre-process includes shuffling
         print("_proprocess for diffpool done")
 
         # train vs val vs test split
         train_idx = int(len(self.graph_lists)*train_ratio)
         test_idx = int(len(self.graph_lists)*(1-test_ratio))
+
+        # random shuffle the data
+        ind = [i for i in range(len(self.graph_labels))]
+        random.seed(0)
+        random.shuffle(ind)
+        self.graph_lists = [self.graph_lists[i] for i in ind]
+        self.graph_labels = [self.graph_labels[i] for i in ind]
 
         self.train_graphs = self.graph_lists[:train_idx]
         self.val_graphs = self.graph_lists[train_idx:test_idx]
@@ -123,6 +131,10 @@ class DiffpoolDataset(TUDataset):
         self.train_labels = self.graph_labels[:train_idx]
         self.val_labels = self.graph_labels[train_idx:test_idx]
         self.test_labels = self.graph_labels[test_idx:]
+        # print("all test labels", self.test_labels)
+        # print("all val labels", self.val_labels)
+        # print("all train labels", self.train_labels)
+        # raise NotImplementedError
 
         # report dataset statistics
         print("Num of training graphs: ", len(self.train_labels))
@@ -153,8 +165,11 @@ class DiffpoolDataset(TUDataset):
                 degs = list(g.in_degrees())
                 degs_one_hot = self.one_hotify(degs, pad=True, result_dim =
                                                 self.max_degrees)
-                g.ndata['feat'] = np.concatenate((g.ndata['feat'],
-                                                    degs_one_hot), axis=1)
+                if self.use_node_attr:
+                    g.ndata['feat'] = np.concatenate((g.ndata['feat'],
+                                                        degs_one_hot), axis=1)
+                else:
+                    g.ndata['feat'] = degs_one_hot
         elif self.kwargs['feature_mode'] == 'struct':
             for g in self.graph_lists:
                 degs = list(g.in_degrees())
