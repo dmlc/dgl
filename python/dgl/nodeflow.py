@@ -1,54 +1,61 @@
 """Class for NodeFlow data structure."""
 from __future__ import absolute_import
 
+import ctypes
+
+from ._ffi.function import _init_api
 from .base import ALL, is_all, DGLError
 from . import backend as F
 from .frame import Frame, FrameRef
 from .graph import DGLBaseGraph
+from .graph_index import GraphIndex, transform_ids
 from .runtime import ir, scheduler, Runtime
 from . import utils
 from .view import LayerView, BlockView
 
-def _copy_to_like(arr1, arr2):
-    return F.copy_to(arr1, F.context(arr2))
+__all__ = ['NodeFlow']
 
-def _get_frame(frame, names, ids):
-    col_dict = {name: frame[name][_copy_to_like(ids, frame[name])] for name in names}
-    if len(col_dict) == 0:
-        return FrameRef(Frame(num_rows=len(ids)))
-    else:
-        return FrameRef(Frame(col_dict))
-
-
-def _update_frame(frame, names, ids, new_frame):
-    col_dict = {name: new_frame[name] for name in names}
-    if len(col_dict) > 0:
-        frame.update_rows(ids, FrameRef(Frame(col_dict)), inplace=True)
-
+NodeFlowHandle = ctypes.c_void_p
 
 class NodeFlow(DGLBaseGraph):
-    """The NodeFlow class stores the sampling results of Neighbor sampling and Layer-wise sampling.
+    """The NodeFlow class stores the sampling results of Neighbor
+    sampling and Layer-wise sampling.
 
-    These sampling algorithms generate graphs with multiple layers. The edges connect the nodes
-    between two layers while there don't exist edges between the nodes in the same layer.
+    These sampling algorithms generate graphs with multiple layers. The
+    edges connect the nodes between two layers while there don't exist
+    edges between the nodes in the same layer.
 
-    We store multiple layers of the sampling results in a single graph. We store extra information,
-    such as the node and edge mapping from the NodeFlow graph to the parent graph.
+    We store multiple layers of the sampling results in a single graph.
+    We store extra information, such as the node and edge mapping from
+    the NodeFlow graph to the parent graph.
+
+    DO NOT create NodeFlow object directly. Use sampling method to
+    generate NodeFlow instead.
 
     Parameters
     ----------
     parent : DGLGraph
-        The parent graph
-    graph_index : NodeFlowIndex
-        The graph index of the NodeFlow graph.
+        The parent graph.
+    handle : NodeFlowHandle
+        The handle to the underlying C structure.
     """
-    def __init__(self, parent, graph_idx):
-        super(NodeFlow, self).__init__(graph_idx)
+    def __init__(self, parent, handle):
+        # NOTE(minjie): handle is a pointer to the underlying C++ structure
+        #  defined in include/dgl/sampler.h. The constructor will save
+        #  all its members in the python side and destroy the handler
+        #  afterwards. One can view the given handle object as a transient
+        #  argument pack to construct this python class.
+        # TODO(minjie): We should use TVM's Node system as a cleaner solution later.
+        super(NodeFlow, self).__init__(GraphIndex(_CAPI_NodeFlowGetGraph(handle)))
         self._parent = parent
-        self._node_mapping = graph_idx.node_mapping
-        self._edge_mapping = graph_idx.edge_mapping
-        self._layer_offsets = graph_idx.layers.tonumpy()
-        self._block_offsets = graph_idx.flows.tonumpy()
+        self._node_mapping = utils.toindex(_CAPI_NodeFlowGetNodeMapping(handle))
+        self._edge_mapping = utils.toindex(_CAPI_NodeFlowGetEdgeMapping(handle))
+        self._layer_offsets = utils.toindex(
+            _CAPI_NodeFlowGetLayerOffsets(handle)).tonumpy()
+        self._block_offsets = utils.toindex(
+            _CAPI_NodeFlowGetBlockOffsets(handle)).tonumpy()
+        _CAPI_NodeFlowFree(handle)
+        # node/edge frames
         self._node_frames = [FrameRef(Frame(num_rows=self.layer_size(i))) \
                              for i in range(self.num_layers)]
         self._edge_frames = [FrameRef(Frame(num_rows=self.block_size(i))) \
@@ -252,6 +259,32 @@ class NodeFlow(DGLBaseGraph):
         """
         return self._edge_mapping.tousertensor()[eid]
 
+    def map_from_parent_nid(self, layer_id, parent_nids):
+        """Map parent node Ids to NodeFlow node Ids in a certain layer.
+
+        Parameters
+        ----------
+        layer_id : int
+            The layer Id.
+        parent_nids: list or Tensor
+            Node Ids in the parent graph.
+
+        Returns
+        -------
+        Tensor
+            Node Ids in the NodeFlow.
+        """
+        parent_nids = utils.toindex(parent_nids)
+        layers = self._layer_offsets
+        start = int(layers[layer_id])
+        end = int(layers[layer_id + 1])
+        # TODO(minjie): should not directly use []
+        mapping = self._node_mapping.tousertensor()
+        mapping = mapping[start:end]
+        mapping = utils.toindex(mapping)
+        nflow_ids = transform_ids(mapping, parent_nids)
+        return nflow_ids.tousertensor()
+
     def layer_in_degree(self, layer_id):
         """Return the in-degree of the nodes in the specified layer.
 
@@ -361,6 +394,161 @@ class NodeFlow(DGLBaseGraph):
         # We have to make sure this case doesn't happen.
         assert F.asnumpy(F.sum(ret == -1, 0)) == 0, "The eid in the parent graph is invalid."
         return ret
+
+    def block_edges(self, block_id):
+        """Return the edges in a block.
+
+        Parameters
+        ----------
+        block_id : int
+            The specified block to return the edges.
+
+        Returns
+        -------
+        Tensor
+            The src nodes.
+        Tensor
+            The dst nodes.
+        Tensor
+            The edge ids.
+        """
+        layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
+        rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, "coo", layer0_size,
+                                        self._layer_offsets[block_id + 1],
+                                        self._layer_offsets[block_id + 2])
+        idx = utils.toindex(rst(0)).tousertensor()
+        eid = utils.toindex(rst(1))
+        num_edges = int(len(idx) / 2)
+        assert len(eid) == num_edges
+        return idx[num_edges:len(idx)], idx[0:num_edges], eid.tousertensor()
+
+    def block_adjacency_matrix(self, block_id, ctx):
+        """Return the adjacency matrix representation for a specific block in a NodeFlow.
+
+        A row of the returned adjacency matrix represents the destination
+        of an edge and the column represents the source.
+
+        Parameters
+        ----------
+        block_id : int
+            The specified block to return the adjacency matrix.
+        ctx : context
+            The context of the returned matrix.
+
+        Returns
+        -------
+        SparseTensor
+            The adjacency matrix.
+        Tensor
+            A index for data shuffling due to sparse format change. Return None
+            if shuffle is not required.
+        """
+        fmt = F.get_preferred_sparse_format()
+        # We need to extract two layers.
+        layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
+        rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, fmt, layer0_size,
+                                        self._layer_offsets[block_id + 1],
+                                        self._layer_offsets[block_id + 2])
+        num_rows = self.layer_size(block_id + 1)
+        num_cols = self.layer_size(block_id)
+
+        if fmt == "csr":
+            indptr = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
+            indices = F.copy_to(utils.toindex(rst(1)).tousertensor(), ctx)
+            shuffle = utils.toindex(rst(2))
+            dat = F.ones(indices.shape, dtype=F.float32, ctx=ctx)
+            return F.sparse_matrix(dat, ('csr', indices, indptr),
+                                   (num_rows, num_cols))[0], shuffle.tousertensor()
+        elif fmt == "coo":
+            ## FIXME(minjie): data type
+            idx = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
+            m = self.block_size(block_id)
+            idx = F.reshape(idx, (2, m))
+            dat = F.ones((m,), dtype=F.float32, ctx=ctx)
+            adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (num_rows, num_cols))
+            return adj, shuffle_idx
+        else:
+            raise Exception("unknown format")
+
+    def block_incidence_matrix(self, block_id, typestr, ctx):
+        """Return the incidence matrix representation of the block.
+
+        An incidence matrix is an n x m sparse matrix, where n is
+        the number of nodes and m is the number of edges. Each nnz
+        value indicating whether the edge is incident to the node
+        or not.
+
+        There are three types of an incidence matrix `I`:
+        * "in":
+          - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
+          - I[v, e] = 0 otherwise.
+        * "out":
+          - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
+          - I[v, e] = 0 otherwise.
+        * "both":
+          - I[v, e] = 1 if e is the in-edge of v;
+          - I[v, e] = -1 if e is the out-edge of v;
+          - I[v, e] = 0 otherwise (including self-loop).
+
+        Parameters
+        ----------
+        block_id : int
+            The specified block to return the incidence matrix.
+        typestr : str
+            Can be either "in", "out" or "both"
+        ctx : context
+            The context of returned incidence matrix.
+
+        Returns
+        -------
+        SparseTensor
+            The incidence matrix.
+        Tensor
+            A index for data shuffling due to sparse format change. Return None
+            if shuffle is not required.
+        """
+        src, dst, eid = self.block_edges(block_id)
+        src = F.copy_to(src, ctx)  # the index of the ctx will be cached
+        dst = F.copy_to(dst, ctx)  # the index of the ctx will be cached
+        eid = F.copy_to(eid, ctx)  # the index of the ctx will be cached
+        if typestr == 'in':
+            n = self.layer_size(block_id + 1)
+            m = self.block_size(block_id)
+            row = F.unsqueeze(dst, 0)
+            col = F.unsqueeze(eid, 0)
+            idx = F.cat([row, col], dim=0)
+            # FIXME(minjie): data type
+            dat = F.ones((m,), dtype=F.float32, ctx=ctx)
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
+        elif typestr == 'out':
+            n = self.layer_size(block_id)
+            m = self.block_size(block_id)
+            row = F.unsqueeze(src, 0)
+            col = F.unsqueeze(eid, 0)
+            idx = F.cat([row, col], dim=0)
+            # FIXME(minjie): data type
+            dat = F.ones((m,), dtype=F.float32, ctx=ctx)
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
+        elif typestr == 'both':
+            # TODO does it work for bipartite graph?
+            # first remove entries for self loops
+            mask = F.logical_not(F.equal(src, dst))
+            src = F.boolean_mask(src, mask)
+            dst = F.boolean_mask(dst, mask)
+            eid = F.boolean_mask(eid, mask)
+            n_entries = F.shape(src)[0]
+            # create index
+            row = F.unsqueeze(F.cat([src, dst], dim=0), 0)
+            col = F.unsqueeze(F.cat([eid, eid], dim=0), 0)
+            idx = F.cat([row, col], dim=0)
+            # FIXME(minjie): data type
+            x = -F.ones((n_entries,), dtype=F.float32, ctx=ctx)
+            y = F.ones((n_entries,), dtype=F.float32, ctx=ctx)
+            dat = F.cat([x, y], dim=0)
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
+        else:
+            raise DGLError('Invalid incidence matrix type: %s' % str(typestr))
+        return inc, shuffle_idx
 
     def set_n_initializer(self, initializer, layer_id=ALL, field=None):
         """Set the initializer for empty node features.
@@ -618,12 +806,13 @@ class NodeFlow(DGLBaseGraph):
         assert reduce_func is not None
 
         if is_all(v):
-            dest_nodes = utils.toindex(self.layer_nid(block_id + 1))
-            u, v, _ = self._graph.in_edges(dest_nodes)
-            u = utils.toindex(self._glb2lcl_nid(u.tousertensor(), block_id))
-            v = utils.toindex(self._glb2lcl_nid(v.tousertensor(), block_id + 1))
-            dest_nodes = utils.toindex(F.arange(0, self.layer_size(block_id + 1)))
-            eid = utils.toindex(F.arange(0, self.block_size(block_id)))
+            with ir.prog() as prog:
+                scheduler.schedule_nodeflow_update_all(graph=self,
+                                                       block_id=block_id,
+                                                       message_func=message_func,
+                                                       reduce_func=reduce_func,
+                                                       apply_func=apply_node_func)
+                Runtime.run(prog)
         else:
             dest_nodes = utils.toindex(v)
             u, v, eid = self._graph.in_edges(dest_nodes)
@@ -634,18 +823,18 @@ class NodeFlow(DGLBaseGraph):
                                                          block_id + 1))
             eid = utils.toindex(self._glb2lcl_eid(eid.tousertensor(), block_id))
 
-        with ir.prog() as prog:
-            scheduler.schedule_nodeflow_compute(graph=self,
-                                                block_id=block_id,
-                                                u=u,
-                                                v=v,
-                                                eid=eid,
-                                                dest_nodes=dest_nodes,
-                                                message_func=message_func,
-                                                reduce_func=reduce_func,
-                                                apply_func=apply_node_func,
-                                                inplace=inplace)
-            Runtime.run(prog)
+            with ir.prog() as prog:
+                scheduler.schedule_nodeflow_compute(graph=self,
+                                                    block_id=block_id,
+                                                    u=u,
+                                                    v=v,
+                                                    eid=eid,
+                                                    dest_nodes=dest_nodes,
+                                                    message_func=message_func,
+                                                    reduce_func=reduce_func,
+                                                    apply_func=apply_node_func,
+                                                    inplace=inplace)
+                Runtime.run(prog)
 
     def prop_flow(self, message_funcs="default", reduce_funcs="default",
                   apply_node_funcs="default", flow_range=ALL, inplace=False):
@@ -677,7 +866,7 @@ class NodeFlow(DGLBaseGraph):
         if is_all(flow_range):
             flow_range = range(0, self.num_blocks)
         elif isinstance(flow_range, slice):
-            if slice.step is not 1:
+            if slice.step != 1:
                 raise DGLError("We can't propogate flows and skip some of them")
             flow_range = range(flow_range.start, flow_range.stop)
         else:
@@ -708,26 +897,20 @@ class NodeFlow(DGLBaseGraph):
             self.block_compute(i, message_func, reduce_func, apply_node_func,
                                inplace=inplace)
 
+def _copy_to_like(arr1, arr2):
+    return F.copy_to(arr1, F.context(arr2))
 
-def create_full_node_flow(g, num_layers, add_self_loop=False):
-    """Convert a full graph to NodeFlow to run a L-layer GNN model.
+def _get_frame(frame, names, ids):
+    col_dict = {name: frame[name][_copy_to_like(ids, frame[name])] for name in names}
+    if len(col_dict) == 0:
+        return FrameRef(Frame(num_rows=len(ids)))
+    else:
+        return FrameRef(Frame(col_dict))
 
-    Parameters
-    ----------
-    g : DGLGraph
-        a DGL graph
-    num_layers : int
-        The number of layers
-    add_self_loop : bool, default False
-        Whether to add self loop to the sampled NodeFlow.
-        If True, the edge IDs of the self loop edges are -1.
 
-    Returns
-    -------
-    NodeFlow
-        a NodeFlow with a specified number of layers.
-    """
-    seeds = [utils.toindex(F.arange(0, g.number_of_nodes()))]
-    nfi = g._graph.neighbor_sampling(seeds, g.number_of_nodes(), num_layers,
-                                     'in', None, add_self_loop)
-    return NodeFlow(g, nfi[0])
+def _update_frame(frame, names, ids, new_frame):
+    col_dict = {name: new_frame[name] for name in names}
+    if len(col_dict) > 0:
+        frame.update_rows(ids, FrameRef(Frame(col_dict)), inplace=True)
+
+_init_api("dgl.nodeflow", __name__)

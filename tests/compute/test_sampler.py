@@ -8,11 +8,17 @@ def generate_rand_graph(n):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
     return dgl.DGLGraph(arr, readonly=True)
 
+def test_create_full():
+    g = generate_rand_graph(100)
+    full_nf = dgl.contrib.sampling.sampler.create_full_nodeflow(g, 5)
+    assert full_nf.number_of_nodes() == 600
+    assert full_nf.number_of_edges() == g.number_of_edges() * 5
+
 def test_1neighbor_sampler_all():
     g = generate_rand_graph(100)
     # In this case, NeighborSampling simply gets the neighborhood of a single vertex.
-    for subg in dgl.contrib.sampling.NeighborSampler(g, 1, 100, neighbor_type='in',
-                                                     num_workers=4):
+    for i, subg in enumerate(dgl.contrib.sampling.NeighborSampler(
+            g, 1, 100, neighbor_type='in', num_workers=4)):
         seed_ids = subg.layer_parent_nid(-1)
         assert len(seed_ids) == 1
         src, dst, eid = g.in_edges(seed_ids, form='all')
@@ -98,6 +104,51 @@ def test_10neighbor_sampler():
     check_10neighbor_sampler(g, seeds=np.unique(np.random.randint(0, g.number_of_nodes(),
                                                                   size=int(g.number_of_nodes() / 10))))
 
+def test_layer_sampler(prefetch=False):
+    g = generate_rand_graph(100)
+    nid = g.nodes()
+    src, dst, eid = g.all_edges(form='all', order='eid')
+    n_batches = 5
+    batch_size = 50
+    seed_batches = [np.sort(np.random.choice(F.asnumpy(nid), batch_size, replace=False))
+                    for i in range(n_batches)]
+    seed_nodes = np.hstack(seed_batches)
+    layer_sizes = [50] * 3
+    LayerSampler = getattr(dgl.contrib.sampling, 'LayerSampler')
+    sampler = LayerSampler(g, batch_size, layer_sizes, 'in',
+                           seed_nodes=seed_nodes, num_workers=4, prefetch=prefetch)
+    for sub_g in sampler:
+        assert all(sub_g.layer_size(i) < size for i, size in enumerate(layer_sizes))
+        sub_nid = F.arange(0, sub_g.number_of_nodes())
+        assert all(np.all(np.isin(F.asnumpy(sub_g.layer_nid(i)), F.asnumpy(sub_nid)))
+                   for i in range(sub_g.num_layers))
+        assert np.all(np.isin(F.asnumpy(sub_g.map_to_parent_nid(sub_nid)),
+                              F.asnumpy(nid)))
+        sub_eid = F.arange(0, sub_g.number_of_edges())
+        assert np.all(np.isin(F.asnumpy(sub_g.map_to_parent_eid(sub_eid)),
+                              F.asnumpy(eid)))
+        assert any(np.all(np.sort(F.asnumpy(sub_g.layer_parent_nid(-1))) == seed_batch)
+                   for seed_batch in seed_batches)
+
+        sub_src, sub_dst = sub_g.all_edges(order='eid')
+        for i in range(sub_g.num_blocks):
+            block_eid = sub_g.block_eid(i)
+            block_src = sub_g.map_to_parent_nid(sub_src[block_eid])
+            block_dst = sub_g.map_to_parent_nid(sub_dst[block_eid])
+
+            block_parent_eid = sub_g.block_parent_eid(i)
+            block_parent_src = src[block_parent_eid]
+            block_parent_dst = dst[block_parent_eid]
+
+            assert np.all(F.asnumpy(block_src == block_parent_src))
+
+        n_layers = sub_g.num_layers
+        sub_n = sub_g.number_of_nodes()
+        assert sum(F.shape(sub_g.layer_nid(i))[0] for i in range(n_layers)) == sub_n
+        n_blocks = sub_g.num_blocks
+        sub_m = sub_g.number_of_edges()
+        assert sum(F.shape(sub_g.block_eid(i))[0] for i in range(n_blocks)) == sub_m
+
 def test_random_walk():
     edge_list = [(0, 1), (1, 2), (2, 3), (3, 4),
                  (4, 3), (3, 2), (2, 1), (1, 0)]
@@ -119,8 +170,11 @@ def test_random_walk():
     assert (np.abs(trace_diff) == 1).all()
 
 if __name__ == '__main__':
+    test_create_full()
     test_1neighbor_sampler_all()
     test_10neighbor_sampler_all()
     test_1neighbor_sampler()
     test_10neighbor_sampler()
+    test_layer_sampler()
+    test_layer_sampler(prefetch=True)
     test_random_walk()
