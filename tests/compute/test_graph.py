@@ -38,6 +38,17 @@ def test_create_from_elist():
     #for i, (u, v) in enumerate(elist):
     #    assert g.edge_id(u, v) == i
 
+def test_adjmat_immutable():
+    n = 1000
+    p = 10 * math.log(n) / n
+    a = sp.random(n, n, p, data_rvs=lambda n: np.ones(n))
+    g = dgl.DGLGraph(a)
+    adj1 = g.adjacency_matrix()
+    g.readonly()
+    adj = g.adjacency_matrix()
+    assert F.array_equal(adj._indices(), adj1._indices())
+    assert F.array_equal(adj._values(), adj1._values())
+
 def test_adjmat_cache():
     n = 1000
     p = 10 * math.log(n) / n
@@ -217,6 +228,7 @@ if __name__ == '__main__':
     test_graph_creation()
     test_create_from_elist()
     test_adjmat_cache()
+    test_adjmat_immutable()
     test_incmat()
     test_incmat_cache()
     test_readonly()
