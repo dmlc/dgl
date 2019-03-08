@@ -413,9 +413,10 @@ class NodeFlow(DGLBaseGraph):
             The edge ids.
         """
         layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
-        rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, "coo", layer0_size,
-                                        self._layer_offsets[block_id + 1],
-                                        self._layer_offsets[block_id + 2])
+        rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, "coo",
+                                        int(layer0_size),
+                                        int(self._layer_offsets[block_id + 1]),
+                                        int(self._layer_offsets[block_id + 2]))
         idx = utils.toindex(rst(0)).tousertensor()
         eid = utils.toindex(rst(1))
         num_edges = int(len(idx) / 2)
@@ -446,9 +447,10 @@ class NodeFlow(DGLBaseGraph):
         fmt = F.get_preferred_sparse_format()
         # We need to extract two layers.
         layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
-        rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, fmt, layer0_size,
-                                        self._layer_offsets[block_id + 1],
-                                        self._layer_offsets[block_id + 2])
+        rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, fmt,
+                                        int(layer0_size),
+                                        int(self._layer_offsets[block_id + 1]),
+                                        int(self._layer_offsets[block_id + 2]))
         num_rows = self.layer_size(block_id + 1)
         num_cols = self.layer_size(block_id)
 
