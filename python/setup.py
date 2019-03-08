@@ -17,7 +17,8 @@ else:
 
 class BinaryDistribution(Distribution):
     def has_ext_modules(self):
-        return platform.system() == 'Darwin'
+        #return platform.system() == 'Darwin'
+        return True
 
 CURRENT_DIR = os.path.dirname(__file__)
 
@@ -58,7 +59,7 @@ def config_cython():
         path = "dgl/_ffi/_cython"
         if os.name == 'nt':
             library_dirs = ['dgl', '../build/Release', '../build']
-            libraries = ['libtvm']
+            libraries = ['libdgl']
         else:
             library_dirs = None
             libraries = None
