@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import pandas as pd
 import numpy as np
 import tqdm
 from rec.model.pinsage import PinSage
@@ -26,7 +27,9 @@ neighbors = ml.user_neighbors + ml.movie_neighbors
 
 n_hidden = 100
 n_layers = 3
-batch_size = 32
+batch_size = 1
+
+items = None
 
 # Use the prior graph to train on user-product pairs in the training set.
 # Validate on validation set.
@@ -54,6 +57,7 @@ def filter_nid(nids, nid_from):
 
 
 def runtrain(g_prior_edges, g_train_edges, train):
+    global items
     if train:
         model.train()
     else:
@@ -74,9 +78,12 @@ def runtrain(g_prior_edges, g_train_edges, train):
             src, dst = g.find_edges(batch)
             dst_neg = []
             for i in range(len(dst)):
-                nb = neighbors[dst[i].item()]
-                mask = ~(g.has_edges_between(nb, src[i].item()).byte())
-                dst_neg.append(np.random.choice(nb[mask].numpy()))
+                if 0:
+                    nb = neighbors[dst[i].item()]
+                    mask = ~(g.has_edges_between(nb, src[i].item()).byte())
+                    dst_neg.append(np.random.choice(nb[mask].numpy()))
+                else:
+                    dst_neg.append(np.random.randint(len(ml.user_ids), len(ml.user_ids) + len(ml.movie_ids)))
             dst_neg = torch.LongTensor(dst_neg)
 
             mask = (g_prior.in_degrees(dst_neg) > 0) & \
@@ -91,6 +98,8 @@ def runtrain(g_prior_edges, g_train_edges, train):
             nodeset = cuda(torch.cat([src, dst, dst_neg]))
             src_size, dst_size, dst_neg_size = \
                     src.shape[0], dst.shape[0], dst_neg.shape[0]
+
+            assert dst.item() - len(ml.user_ids) in items
 
             h_src, h_dst, h_dst_neg = (
                     forward(model, g_prior, nodeset, train)
@@ -120,6 +129,7 @@ def runtrain(g_prior_edges, g_train_edges, train):
 
 
 def runtest(g_prior_edges, validation=True):
+    global items
     model.eval()
 
     n_users = len(ml.users.index)
@@ -142,21 +152,25 @@ def runtest(g_prior_edges, validation=True):
     rr = []
 
     with torch.no_grad():
-        with tqdm.trange(n_users) as tq:
+        with tqdm.trange(1) as tq:
             for u_nid in tq:
                 uid = ml.user_ids[u_nid]
                 pids_exclude = ml.ratings[
                         (ml.ratings['user_id'] == uid) &
-                        (ml.ratings['train'] | ml.ratings['test' if validation else 'valid'])
+                        #(ml.ratings['train'] | ml.ratings['test' if validation else 'valid'])
+                        (ml.ratings['valid'] | ml.ratings['test'])
                         ]['movie_id'].values
                 pids_candidate = ml.ratings[
                         (ml.ratings['user_id'] == uid) &
-                        ml.ratings['valid' if validation else 'test']]['movie_id'].values
+                        #ml.ratings['valid' if validation else 'test']
+                        ml.ratings['train']
+                        ]['movie_id'].values
                 pids = set(ml.movie_ids) - set(pids_exclude)
                 p_nids = np.array([ml.movie_ids_invmap[pid] for pid in pids])
                 p_nids_candidate = np.array([ml.movie_ids_invmap[pid] for pid in pids_candidate])
+                items = p_nids_candidate
 
-                dst = torch.from_numpy(p_nids)
+                dst = torch.from_numpy(p_nids) + n_users
                 src = torch.zeros_like(dst).fill_(u_nid)
                 h_dst = h[dst]
                 h_src = h[src]
@@ -164,42 +178,44 @@ def runtest(g_prior_edges, validation=True):
                 score = (h_src * h_dst).sum(1)
                 score_sort_idx = score.sort(descending=True)[1].cpu().numpy()
 
-                is_candidate = np.isin(p_nids[score_sort_idx], p_nids_candidate)
-                rank_candidates = is_candidate.nonzero()[0]
-                rank = rank_candidates.min() + 1
-                rr.append(rank)
-                tq.set_postfix({'rank': rank})
+                rank_map = {v: i for i, v in enumerate(score_sort_idx)}
+                rank_candidates = np.array([rank_map[p_nid] for p_nid in p_nids_candidate])
+                rank = 1 / (rank_candidates + 1)
+                rr.append(rank.mean())
+                tq.set_postfix({'rank': rank.mean()})
 
-    mrr = sum(1 / r for r in rr) / len(rr)
-    return mrr
+    return np.array(rr)
 
 
 def train():
+    global items
     best_mrr = 0
-    logfile = open('output.log', 'w')
     for epoch in range(500):
         ml.refresh_mask()
         g_prior_edges = g.filter_edges(lambda edges: edges.data['prior'])
-        g_train_edges = g.filter_edges(lambda edges: edges.data['train'] & ~edges.data['inv'])
+        g_train_edges = g.filter_edges(lambda edges: edges.data['train'] & ~edges.data['inv'], g.out_edges(0, 'eid'))
         g_prior_train_edges = g.filter_edges(
                 lambda edges: edges.data['prior'] | edges.data['train'])
 
         print('Epoch %d validation' % epoch)
         with torch.no_grad():
             valid_mrr = runtest(g_prior_train_edges, True)
-            if best_mrr < valid_mrr:
-                best_mrr = valid_mrr
+            if best_mrr < valid_mrr.mean():
+                best_mrr = valid_mrr.mean()
                 torch.save(model.state_dict(), 'model.pt')
-        print('Epoch %d validation mrr:', valid_mrr)
-        print('Epoch %d validation mrr:', valid_mrr, file=logfile)
+        print(pd.Series(valid_mrr).describe())
         print('Epoch %d test' % epoch)
         with torch.no_grad():
             test_mrr = runtest(g_prior_train_edges, False)
-        print('Epoch %d test mrr:', test_mrr)
-        print('Epoch %d test mrr:', test_mrr, file=logfile)
+        print(pd.Series(test_mrr).describe())
         print('Epoch %d train' % epoch)
-        runtrain(g_prior_edges, g_train_edges, True)
-    logfile.close()
+        for _ in range(10):
+            ml.refresh_mask()
+            g_prior_edges = g.filter_edges(lambda edges: edges.data['prior'])
+            g_train_edges = g.filter_edges(lambda edges: edges.data['train'] & ~edges.data['inv'], g.out_edges(0, 'eid'))
+            g_prior_train_edges = g.filter_edges(
+                    lambda edges: edges.data['prior'] | edges.data['train'])
+            runtrain(g_prior_edges, g_train_edges, True)
 
 
 if __name__ == '__main__':
