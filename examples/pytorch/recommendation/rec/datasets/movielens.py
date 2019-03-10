@@ -5,6 +5,7 @@ import torch
 import numpy as np
 import scipy.sparse as sp
 import time
+from functools import partial
 from .. import randomwalk
 
 class MovieLens(object):
@@ -70,21 +71,26 @@ class MovieLens(object):
         self.build_graph()
         self.find_neighbors(100, 20, 500)
 
-    def split_user(self, df):
+    def split_user(self, df, filter_counts=False):
         df_new = df.copy()
         df_new['prob'] = 0
-        df_new_sub = (df_new['movie_count'] >= 10).nonzero()[0]
+
+        if filter_counts:
+            df_new_sub = (df_new['movie_count'] >= 10).nonzero()[0]
+        else:
+            df_new_sub = df_new['train'].nonzero()[0]
         prob = np.linspace(0, 1, df_new_sub.shape[0], endpoint=False)
-        prob = np.random.permutation(prob)
+        np.random.shuffle(prob)
         df_new['prob'].iloc[df_new_sub] = prob
-        df_new['train'] = df_new['prob'] <= 0.8
-        df_new['valid'] = (df_new['prob'] > 0.8) & (df_new['prob'] <= 0.9)
-        df_new['test'] = df_new['prob'] > 0.9
-        df_new.drop(['prob', 'movie_count'], axis=1, inplace=True)
         return df_new
 
     def data_split(self):
-        self.ratings = self.ratings.groupby('user_id', group_keys=False).apply(self.split_user)
+        self.ratings = self.ratings.groupby('user_id', group_keys=False).apply(
+                partial(self.split_user, filter_counts=True))
+        self.ratings['train'] = self.ratings['prob'] <= 0.8
+        self.ratings['valid'] = (self.ratings['prob'] > 0.8) & (self.ratings['prob'] <= 0.9)
+        self.ratings['test'] = self.ratings['prob'] > 0.9
+        self.ratings.drop(['prob'], axis=1, inplace=True)
 
     def build_graph(self):
         user_ids = list(self.users.index)
@@ -139,8 +145,9 @@ class MovieLens(object):
             self.movie_neighbors.append(movie_neighbor)
 
     def refresh_mask(self):
-        train_mask = self.ratings['train'].values
-        prior_prob = np.random.rand(len(train_mask))
+        ratings = self.ratings.groupby('user_id', group_keys=False).apply(self.split_user)
+        prior_prob = ratings['prob'].values
+        train_mask = ratings['train'].values
         prior_mask = (prior_prob < 0.8) & train_mask
         train_mask = (prior_prob >= 0.8) & train_mask
 
