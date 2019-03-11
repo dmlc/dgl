@@ -1,5 +1,11 @@
+from multiprocessing import Process
 import argparse, time, math
 import numpy as np
+import numa
+import os
+if os.environ['DMLC_ROLE'] == 'server':
+    os.environ['OMP_NUM_THREADS'] = '4'
+os.environ['OMP_NUM_THREADS'] = '16'
 import mxnet as mx
 from mxnet import gluon
 from functools import partial
@@ -107,57 +113,9 @@ class GCNInfer(gluon.Block):
 
         return g.ndata.pop('activation')
 
-
-def main(args):
-    # load and preprocess dataset
-    data = load_data(args)
-
-    if args.gpu >= 0:
-        ctx = mx.gpu(args.gpu)
-    else:
-        ctx = mx.cpu()
-
-    if args.self_loop and not args.dataset.startswith('reddit'):
-        data.graph.add_edges_from([(i,i) for i in range(len(data.graph))])
-
-    train_nid = mx.nd.array(np.nonzero(data.train_mask)[0]).astype(np.int64).as_in_context(ctx)
-    test_nid = mx.nd.array(np.nonzero(data.test_mask)[0]).astype(np.int64).as_in_context(ctx)
-
-    features = mx.nd.array(data.features).as_in_context(ctx)
-    labels = mx.nd.array(data.labels).as_in_context(ctx)
-    train_mask = mx.nd.array(data.train_mask).as_in_context(ctx)
-    val_mask = mx.nd.array(data.val_mask).as_in_context(ctx)
-    test_mask = mx.nd.array(data.test_mask).as_in_context(ctx)
-    in_feats = features.shape[1]
-    n_classes = data.num_labels
-    n_edges = data.graph.number_of_edges()
-
-    n_train_samples = train_mask.sum().asscalar()
-    n_val_samples = val_mask.sum().asscalar()
-    n_test_samples = test_mask.sum().asscalar()
-
-    print("""----Data statistics------'
-      #Edges %d
-      #Classes %d
-      #Train samples %d
-      #Val samples %d
-      #Test samples %d""" %
-          (n_edges, n_classes,
-              n_train_samples,
-              n_val_samples,
-              n_test_samples))
-
-    # create GCN model
-    g = DGLGraph(data.graph, readonly=True)
-
-    g.ndata['features'] = features
-
-    num_neighbors = args.num_neighbors
-
-    degs = g.in_degrees().astype('float32').as_in_context(ctx)
-    norm = mx.nd.expand_dims(1./degs, 1)
-    g.ndata['norm'] = norm
-
+def worker_func(worker_id, args, g, features, labels, train_mask, val_mask, test_mask,
+                in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, ctx):
+    numa.bind([worker_id % 4])
     model = GCNSampling(in_feats,
                         args.n_hidden,
                         n_classes,
@@ -182,7 +140,7 @@ def main(args):
     print(model.collect_params())
     trainer = gluon.Trainer(model.collect_params(), 'adam',
                             {'learning_rate': args.lr, 'wd': args.weight_decay},
-                            kvstore=mx.kv.create('local'))
+                            kvstore=mx.kv.create('dist_sync'))
 
     # initialize graph
     dur = []
@@ -238,6 +196,76 @@ def main(args):
         print("infer time: %.3f" % (time.time() - infer_start))
 
         print("Test Accuracy {:.4f}". format(num_acc/n_test_samples))
+
+def main(args):
+    # load and preprocess dataset
+    data = load_data(args)
+
+    if args.gpu >= 0:
+        ctx = mx.gpu(args.gpu)
+    else:
+        mem_ctx = mx.Context('cpu_shared', 0)
+        runtime_ctx = mx.cpu()
+
+    if args.self_loop and not args.dataset.startswith('reddit'):
+        data.graph.add_edges_from([(i,i) for i in range(len(data.graph))])
+
+    train_nid = mx.nd.array(np.nonzero(data.train_mask)[0]).astype(np.int64).as_in_context(mem_ctx)
+    test_nid = mx.nd.array(np.nonzero(data.test_mask)[0]).astype(np.int64).as_in_context(mem_ctx)
+
+    features = mx.nd.array(data.features, ctx=mem_ctx)
+    labels = mx.nd.array(data.labels, ctx=mem_ctx)
+    train_mask = mx.nd.array(data.train_mask, ctx=mem_ctx)
+    val_mask = mx.nd.array(data.val_mask, ctx=mem_ctx)
+    test_mask = mx.nd.array(data.test_mask, ctx=mem_ctx)
+    in_feats = features.shape[1]
+    n_classes = data.num_labels
+    n_edges = data.graph.number_of_edges()
+
+    n_train_samples = train_mask.sum().asscalar()
+    n_val_samples = val_mask.sum().asscalar()
+    n_test_samples = test_mask.sum().asscalar()
+
+    print("""----Data statistics------'
+      #Edges %d
+      #Classes %d
+      #Train samples %d
+      #Val samples %d
+      #Test samples %d""" %
+          (n_edges, n_classes,
+              n_train_samples,
+              n_val_samples,
+              n_test_samples))
+
+    # create GCN model
+    g = DGLGraph(data.graph, readonly=True)
+
+    g.ndata['features'] = features
+
+    num_neighbors = args.num_neighbors
+
+    degs = g.in_degrees().astype('float32').as_in_context(mem_ctx)
+    norm = mx.nd.expand_dims(1./degs, 1)
+    g.ndata['norm'] = norm
+
+    p1 = Process(target=worker_func, args=(0, args, g, features, labels, train_mask, val_mask, test_mask,
+                                           in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, runtime_ctx))
+    p2 = Process(target=worker_func, args=(1, args, g, features, labels, train_mask, val_mask, test_mask,
+                                           in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, runtime_ctx))
+    p3 = Process(target=worker_func, args=(2, args, g, features, labels, train_mask, val_mask, test_mask,
+                                           in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, runtime_ctx))
+    p4 = Process(target=worker_func, args=(3, args, g, features, labels, train_mask, val_mask, test_mask,
+                                           in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, runtime_ctx))
+    p1.start()
+    p2.start()
+    p3.start()
+    p4.start()
+    p1.join()
+    p2.join()
+    p3.join()
+    p4.join()
+
+    print("parent ends")
 
 
 if __name__ == '__main__':
