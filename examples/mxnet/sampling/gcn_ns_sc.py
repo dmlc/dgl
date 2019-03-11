@@ -8,7 +8,6 @@ import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 
-
 class NodeUpdate(gluon.Block):
     def __init__(self, in_feats, out_feats, activation=None, test=False, concat=False):
         super(NodeUpdate, self).__init__()
@@ -190,6 +189,8 @@ def main(args):
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
+        train_start = start = time.time()
+        train_sample_time = 0
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
                                                        args.num_neighbors,
                                                        neighbor_type='in',
@@ -197,6 +198,7 @@ def main(args):
                                                        num_workers=32,
                                                        num_hops=args.n_layers+1,
                                                        seed_nodes=train_nid):
+            train_sample_time += time.time() - start
             nf.copy_from_parent()
             # forward
             with mx.autograd.record():
@@ -208,6 +210,8 @@ def main(args):
 
             loss.backward()
             trainer.step(batch_size=1)
+            start = time.time()
+        print("train time: %.3f, sample: %.3f" % (time.time() - train_start, train_sample_time))
 
         infer_params = infer_model.collect_params()
 
@@ -217,17 +221,22 @@ def main(args):
 
         num_acc = 0.
 
+        infer_start = start = time.time()
+        infer_sample_time = 0
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
                                                        g.number_of_nodes(),
                                                        neighbor_type='in',
                                                        num_workers=32,
                                                        num_hops=args.n_layers+1,
                                                        seed_nodes=test_nid):
+            infer_sample_time += time.time() - start
             nf.copy_from_parent()
             pred = infer_model(nf)
             batch_nids = nf.layer_parent_nid(-1).astype('int64').as_in_context(ctx)
             batch_labels = labels[batch_nids]
             num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
+            start = time.time()
+        print("infer time: %.3f, sample: %.3f" % (time.time() - infer_start, infer_sample_time))
 
         print("Test Accuracy {:.4f}". format(num_acc/n_test_samples))
 
