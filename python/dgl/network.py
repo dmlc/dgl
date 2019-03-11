@@ -73,13 +73,15 @@ def _batch_send_subgraph(sender, nodeflow_list):
     print(nodeflow_list)
     raiseNotImplementedError("_batch_send_subgraph: not implemented!")
 
-def _recv_subgraph(receiver):
+def _recv_subgraph(receiver, graph):
     """ Receive sampled subgraph (NodeFlow) from remote sampler.
 
     Parameters
     ----------
     receiver : ctypes.c_void_p
         C receiver handle
+    graph : DGLGraph
+        The parent graph
 
     Returns
     -------
@@ -87,17 +89,17 @@ def _recv_subgraph(receiver):
         Sampled NodeFlow object
     """
     hdl = unwrap_to_ptr_list(_CAPI_ReceiverRecvSubgraph(receiver))
-    # Note that, for distributed sampler
-    # we should set parent graph to None
-    return NodeFlow(None, hdl[0])
+    return NodeFlow(graph, hdl[0])
 
-def _batch_recv_subgraph(receiver):
+def _batch_recv_subgraph(receiver, graph):
     """ Receive a batch of sampled subgraph from remote sampler.
 
     Parameters
     ----------
     receiver : ctypes.c_void_p
         C receiver handle
+    graph : DGLGraph
+        The parent graph
 
     Returns
     -------
@@ -105,6 +107,7 @@ def _batch_recv_subgraph(receiver):
         a list of Sampled NodeFlow objects
     """
     print(receiver)
+    print(graph)
     raiseNotImplementedError("_batch_recv_subgraph: not implemented!")
 
 def _finalize_sampler_sender(sender):

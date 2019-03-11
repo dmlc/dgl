@@ -59,15 +59,18 @@ class SamplerReceiver(object):
         ip address of trainer machine.
     port : int
         listen port of trainer machine.
+    graph : DGLGraph
+        The parent graph
     num_sender : int
         total number of sampler nodes, use 1 by default. 
         SamplerReceiver can recv message from multiple senders concurrently.
     queue_size : int
         size (bytes) of message queue, use 200 MB by default.
     """
-    def __init__(self, ip, port, num_sender=1, queue_size=200*1024*1024):
+    def __init__(self, ip, port, graph, num_sender=1, queue_size=200*1024*1024):
         self._ip = ip
         self._port = port
+        self._graph = graph,
         self._num_sender = num_sender
         self._queue_size = queue_size
         self._receiver = _create_sampler_receiver(ip, port, num_sender, queue_size)
@@ -85,7 +88,7 @@ class SamplerReceiver(object):
         NodeFlow
             Sampled NodeFlow object
         """
-        return _recv_subgraph(self._receiver)
+        return _recv_subgraph(self._receiver, self._graph)
 
     def BatchReceive(self):
         """Receive a batch of NodeFlow objects from remote sampler.
@@ -95,4 +98,4 @@ class SamplerReceiver(object):
         list
             A list of sampled NodeFlow object
         """
-        return _batch_recv_subgraph(self._receiver)
+        return _batch_recv_subgraph(self._receiver, self._graph)
