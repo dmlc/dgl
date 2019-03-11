@@ -19,8 +19,7 @@ class NodeUpdate(gluon.Block):
 
     def forward(self, node):
         h = node.data['h']
-        if self.test:
-            h = h * node.data['norm']
+        h = h * node.data['norm']
         h = self.dense(h)
         # skip connection
         if self.concat:
@@ -63,9 +62,11 @@ class GCNSampling(gluon.Block):
             if self.dropout:
                 h = mx.nd.Dropout(h, p=self.dropout)
             nf.layers[i].data['h'] = h
+            degs = nf.layer_in_degree(i + 1).astype('float32').as_in_context(h.context)
+            nf.layers[i + 1].data['norm'] = mx.nd.expand_dims(1./degs, 1)
             nf.block_compute(i,
                              fn.copy_src(src='h', out='m'),
-                             lambda node : {'h': node.mailbox['m'].mean(axis=1)},
+                             fn.sum(msg='m', out='h'),
                              layer)
 
         h = nf.layers[-1].data.pop('activation')
@@ -193,6 +194,7 @@ def main(args):
                                                        args.num_neighbors,
                                                        neighbor_type='in',
                                                        shuffle=True,
+                                                       num_workers=32,
                                                        num_hops=args.n_layers+1,
                                                        seed_nodes=train_nid):
             nf.copy_from_parent()
@@ -218,6 +220,7 @@ def main(args):
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
                                                        g.number_of_nodes(),
                                                        neighbor_type='in',
+                                                       num_workers=32,
                                                        num_hops=args.n_layers+1,
                                                        seed_nodes=test_nid):
             nf.copy_from_parent()
