@@ -19,15 +19,20 @@ using dgl::runtime::NDArray;
 namespace dgl {
 namespace network {
 
-static char* global_data_buffer = nullptr;
-const int kMaxBufferSize = 200 * 1024 * 1024;  // 200 MB
+// Each message cannot larger than 50 MB
+static char* sender_data_buffer = nullptr;
+static char* recv_data_buffer = nullptr;
+const int kMaxBufferSize = 50 * 1024 * 1024;
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string ip = args[0];
     int port = args[1];
     network::Communicator* comm = new network::SocketCommunicator();
-    comm->Initialize(true, ip.c_str(), port);
+    if (comm->Initialize(true, ip.c_str(), port) == false) {
+      LOG(ERROR) << "Initialize network communicator error.";
+    }
+    sender_data_buffer = new char[kMaxBufferSize];
     CommunicatorHandle chandle = static_cast<CommunicatorHandle>(comm);
     *rv = chandle;
   });
@@ -38,26 +43,23 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
     GraphHandle ghandle = args[1];
     ImmutableGraph *ptr = static_cast<ImmutableGraph*>(ghandle);
     network::Communicator* comm = static_cast<network::Communicator*>(chandle);
-    auto csr = ptr->GetInCSR();  // We only care about in_csr
+    auto csr = ptr->GetInCSR();  // We only care about in_csr here
     const IdArray node_mapping = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
     const IdArray edge_mapping = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[3]));
     const IdArray layer_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[4]));
     const IdArray flow_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[5]));
-    char* data_buffer = nullptr;
     int64_t data_size = network::SerializeSampledSubgraph(
-                             &data_buffer,
+                             sender_data_buffer,
                              csr,
                              node_mapping,
                              edge_mapping,
                              layer_offsets,
                              flow_offsets);
+    CHECK_GT(data_size, 0);
     // Send msg via network
-    int size = comm->Send(data_buffer, data_size);
+    int size = comm->Send(sender_data_buffer, data_size);
     if (size <= 0) {
-      LOG(ERROR) << "Send message erro (size: " << size << ")";
-    }
-    if (data_buffer != nullptr) {
-      delete [] data_buffer;
+      LOG(ERROR) << "Send message error (size: " << size << ")";
     }
   });
 
@@ -70,7 +72,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
     network::Communicator* comm = new network::SocketCommunicator();
     comm->Initialize(false, ip.c_str(), port, num_sender, queue_size);
     CommunicatorHandle chandle = static_cast<CommunicatorHandle>(comm);
-    global_data_buffer = new char[kMaxBufferSize];
+    recv_data_buffer = new char[kMaxBufferSize];
     *rv = chandle;
   });
 
@@ -78,13 +80,13 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
     network::Communicator* comm = static_cast<network::Communicator*>(chandle);
-    int size = comm->Receive(global_data_buffer, kMaxBufferSize);
+    int size = comm->Receive(recv_data_buffer, kMaxBufferSize);
     if (size <= 0) {
       LOG(ERROR) << "Receive error: (size: " << size << ")";
     }
     NodeFlow* nf = new NodeFlow();
     ImmutableGraph::CSR::Ptr csr;
-    network::DeserializeSampledSubgraph(global_data_buffer,
+    network::DeserializeSampledSubgraph(recv_data_buffer,
                                         &csr,
                                         &(nf->node_mapping),
                                         &(nf->edge_mapping),
@@ -101,9 +103,13 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeCommunicator")
     CommunicatorHandle chandle = args[0];
     network::Communicator* comm = static_cast<network::Communicator*>(chandle);
     comm->Finalize();
-    if (global_data_buffer != nullptr) {
-      delete [] global_data_buffer;
-      global_data_buffer = nullptr;
+    if (sender_data_buffer != nullptr) {
+      delete [] sender_data_buffer;
+      sender_data_buffer = nullptr;
+    }
+    if (recv_data_buffer != nullptr) {
+      delete [] recv_data_buffer;
+      recv_data_buffer = nullptr;
     }
   });
 

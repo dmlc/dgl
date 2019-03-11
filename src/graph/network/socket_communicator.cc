@@ -13,7 +13,7 @@ namespace network {
 
 const int kTimeOut = 5;  // 5 minutes for socket timeout
 const int kMaxConnection = 1024;  // 1024 maximal socket connection
-const int kMaxBuffer = 200 * 1024 * 1024;  // 200 MB bufferfor each message
+const int kMaxBuffer = 50 * 1024 * 1024;  // 50 MB buffer each message
 
 bool SocketCommunicator::Initialize(bool is_sender,
                                     const char* ip,
@@ -102,7 +102,7 @@ void SocketCommunicator::MsgHandler(TCPSocket* socket, MessageQueue* queue) {
         max_len);
       received_bytes += tmp;
     }
-    if (data_size == -1) {
+    if (data_size <= 0) {
       LOG(INFO) << "Socket finish job";
       break;
     }
@@ -153,9 +153,6 @@ void SocketCommunicator::FinalizeReceiver() {
       delete socket_[i];
       socket_[i] = nullptr;
     }
-  }
-  for (int i = 0; i < num_sender_; ++i) {
-    thread_[i]->join();
   }
 }
 
