@@ -95,19 +95,17 @@ class GCNInfer(gluon.Block):
             self.layers.add(NodeUpdate(2*n_hidden, n_classes, test=True))
 
 
-    def forward(self, nf):
-        nf.layers[0].data['activation'] = nf.layers[0].data['features']
+    def forward(self, g):
+        g.ndata['activation'] = g.ndata['features']
 
         for i, layer in enumerate(self.layers):
-            h = nf.layers[i].data.pop('activation')
-            nf.layers[i].data['h'] = h
-            nf.block_compute(i,
-                             fn.copy_src(src='h', out='m'),
-                             fn.sum(msg='m', out='h'),
-                             layer)
+            h = g.ndata.pop('activation')
+            g.ndata['h'] = h
+            g.update_all(fn.copy_src(src='h', out='m'),
+                         fn.sum(msg='m', out='h'),
+                         layer)
 
-        h = nf.layers[-1].data.pop('activation')
-        return h
+        return g.ndata.pop('activation')
 
 
 def main(args):
@@ -222,21 +220,22 @@ def main(args):
         num_acc = 0.
 
         infer_start = start = time.time()
-        infer_sample_time = 0
-        for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
-                                                       g.number_of_nodes(),
-                                                       neighbor_type='in',
-                                                       num_workers=32,
-                                                       num_hops=args.n_layers+1,
-                                                       seed_nodes=test_nid):
-            infer_sample_time += time.time() - start
-            nf.copy_from_parent()
-            pred = infer_model(nf)
-            batch_nids = nf.layer_parent_nid(-1).astype('int64').as_in_context(ctx)
-            batch_labels = labels[batch_nids]
-            num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
-            start = time.time()
-        print("infer time: %.3f, sample: %.3f" % (time.time() - infer_start, infer_sample_time))
+        pred = infer_model(g)
+        num_acc = (pred.argmax(axis=1) == labels)[test_nid].sum().asscalar()
+        #for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
+        #                                               g.number_of_nodes(),
+        #                                               neighbor_type='in',
+        #                                               num_workers=32,
+        #                                               num_hops=args.n_layers+1,
+        #                                               seed_nodes=test_nid):
+        #    infer_sample_time += time.time() - start
+        #    nf.copy_from_parent()
+        #    pred = infer_model(nf)
+        #    batch_nids = nf.layer_parent_nid(-1).astype('int64').as_in_context(ctx)
+        #    batch_labels = labels[batch_nids]
+        #    num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
+        #    start = time.time()
+        print("infer time: %.3f" % (time.time() - infer_start))
 
         print("Test Accuracy {:.4f}". format(num_acc/n_test_samples))
 
