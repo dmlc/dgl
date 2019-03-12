@@ -13,13 +13,6 @@
 #include <numeric>
 #include "../c_api_common.h"
 
-#ifdef _MSC_VER
-// rand in MS compiler works well in multi-threading.
-int rand_r(unsigned *seed) {
-  return rand();
-}
-#endif
-
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;
 using dgl::runtime::DGLRetValue;
@@ -538,47 +531,6 @@ NodeFlow SamplerOp::NeighborUniformSample(const ImmutableGraph *graph,
                         num_hops + 1,
                         expand_factor,
                         add_self_loop);
-}
-
-IdArray SamplerOp::RandomWalk(
-    const GraphInterface *gptr,
-    IdArray seeds,
-    int num_traces,
-    int num_hops) {
-  const int num_nodes = seeds->shape[0];
-  const dgl_id_t *seed_ids = static_cast<dgl_id_t *>(seeds->data);
-  IdArray traces = IdArray::Empty(
-      {num_nodes, num_traces, num_hops + 1},
-      DLDataType{kDLInt, 64, 1},
-      DLContext{kDLCPU, 0});
-  dgl_id_t *trace_data = static_cast<dgl_id_t *>(traces->data);
-
-  // FIXME: does OpenMP work with exceptions?  Especially without throwing SIGABRT?
-  unsigned int random_seed = time(nullptr);
-
-  for (int i = 0; i < num_nodes; ++i) {
-    const dgl_id_t seed_id = seed_ids[i];
-
-    for (int j = 0; j < num_traces; ++j) {
-      dgl_id_t cur = seed_id;
-      const int kmax = num_hops + 1;
-
-      for (int k = 0; k < kmax; ++k) {
-        const size_t offset = ((size_t)i * num_traces + j) * kmax + k;
-        trace_data[offset] = cur;
-
-        const auto succ = gptr->SuccVec(cur);
-        const size_t size = succ.size();
-        if (size == 0) {
-          LOG(FATAL) << "no successors from vertex " << cur;
-          return traces;
-        }
-        cur = succ[rand_r(&random_seed) % size];
-      }
-    }
-  }
-
-  return traces;
 }
 
 namespace {

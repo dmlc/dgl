@@ -1,0 +1,263 @@
+/*!
+ *  Copyright (c) 2018 by Contributors
+ * \file graph/sampler.cc
+ * \brief DGL sampler implementation
+ */
+
+#include <dgl/sampler.h>
+#include <dmlc/omp.h>
+#include <dgl/immutable_graph.h>
+#include <algorithm>
+#include <cstdlib>
+#include <cmath>
+#include <numeric>
+#include "../c_api_common.h"
+
+using dgl::runtime::DGLArgs;
+using dgl::runtime::DGLArgValue;
+using dgl::runtime::DGLRetValue;
+using dgl::runtime::PackedFunc;
+using dgl::runtime::NDArray;
+
+namespace dgl {
+
+namespace {
+
+template<int hops>
+static bool multihop_walker(
+    const GraphInterface *gptr,
+    unsigned int *random_seed,
+    dgl_id_t cur,
+    dgl_id_t *next) {
+  for (int i = 0; i < hops; ++i) {
+    if (!default_walker(gptr, random_seed, cur, next))
+      return false;
+    cur = *next;
+  }
+  return true;
+}
+
+};  // anonymous
+
+PackedFunc ConvertRandomWalkTracesToPackedFunc(const RandomWalkTraces &t) {
+  auto body = [t] (DGLArgs args, DGLRetValue *rv) {
+      const int which = args[0];
+      switch (which) {
+      case 0:
+        *rv = std::move(t.trace_counts);
+        break;
+      case 1:
+        *rv = std::move(t.trace_lengths);
+        break;
+      case 2:
+        *rv = std::move(t.vertices);
+        break;
+      default:
+        LOG(FATAL) << "invalid choice";
+      }
+    };
+  return PackedFunc(body);
+}
+
+IdArray SamplerOp::GenericRandomWalk(
+    const GraphInterface *gptr,
+    IdArray seeds,
+    int num_traces,
+    int num_hops,
+    bool (*walker)(const GraphInterface *, dgl_id_t, dgl_id_t *)) {
+  const int num_nodes = seeds->shape[0];
+  const dgl_id_t *seed_ids = static_cast<dgl_id_t *>(seeds->data);
+  IdArray traces = IdArray::Empty(
+      {num_nodes, num_traces, num_hops + 1},
+      DLDataType{kDLInt, 64, 1},
+      DLContext{kDLCPU, 0});
+  dgl_id_t *trace_data = static_cast<dgl_id_t *>(traces->data);
+
+  if (!walker)
+    walker = multihop_walker<1>;
+
+  // FIXME: does OpenMP work with exceptions?  Especially without throwing SIGABRT?
+  unsigned int random_seed = time(nullptr);
+
+  for (int i = 0; i < num_nodes; ++i) {
+    const dgl_id_t seed_id = seed_ids[i];
+
+    for (int j = 0; j < num_traces; ++j) {
+      dgl_id_t cur = seed_id, next;
+      const int kmax = num_hops + 1;
+
+      for (int k = 0; k < kmax; ++k) {
+        const size_t offset = ((size_t)i * num_traces + j) * kmax + k;
+        trace_data[offset] = cur;
+        if (!walker(gptr, cur, &next)) {
+          LOG(FATAL) << "no successors from vertex " << cur;
+          return traces;
+        }
+        cur = next;
+      }
+    }
+  }
+
+  return traces;
+}
+
+IdArray SamplerOp::RandomWalk(
+    const GraphInterface *gptr,
+    IdArray seeds,
+    int num_traces,
+    int num_hops) {
+  return GenericRandomWalk(gptr, seeds, num_traces, num_hops, multihop_walker<1>);
+}
+
+RandomWalkTraces SamplerOp::GenericRandomWalkWithRestart(
+    const GraphInterface *gptr,
+    IdArray seeds,
+    float restart_prob,
+    uint64_t max_nodes_per_seed,
+    uint64_t max_visit_counts,
+    uint64_t max_frequent_visited_nodes,
+    bool (*walker)(const GraphInterface *, dgl_id_t, dgl_id_t *)) {
+  std::vector<dgl_id_t> vertices;
+  std::vector<size_t> trace_lengths, trace_counts, visit_counts;
+  const dgl_id_t *seed_ids = static_cast<dgl_id_t *>(seeds->data);
+  const uint64_t num_nodes = seeds->shape[0];
+  uint64_t num_frequent_visited_nodes = 0;
+
+  if (!walker)
+    walker = multihop_walker<1>;
+
+  visit_counts.resize(gptr->NumVertices());
+
+  unsigned int random_seed = time(nullptr);
+
+  for (int i = 0; i < num_nodes; ++i) {
+    int stop = 0;
+    size_t total_trace_length = 0;
+    size_t num_traces = 0;
+    visit_counts.clear();
+
+    while (1) {
+      dgl_id_t cur = seed_ids[i], next;
+      size_t trace_length = 0;
+
+      for (; ; ++trace_length) {
+        if ((trace_length > 0) &&
+            (++visit_counts[cur] == max_visit_counts) &&
+            (++num_frequent_visited_nodes == max_frequent_visited_nodes))
+          stop = 1;
+
+        if ((float)rand_r(&random_seed) / RAND_MAX < restart_prob)
+          break;
+
+        if (!walker(gptr, cur, &next)) {
+          LOG(FATAL) << "no successors from vertex " << cur;
+          return RandomWalkTraces();
+        }
+        cur = next;
+        vertices.push_back(cur);
+      }
+
+      total_trace_length += trace_length;
+      ++num_traces;
+      trace_lengths.push_back(trace_length);
+      if ((total_trace_length >= max_nodes_per_seed) || stop)
+        break;
+    }
+
+    trace_counts.push_back(num_traces);
+  }
+
+  RandomWalkTraces traces;
+  traces.trace_counts = IdArray::Empty(
+      {trace_counts.size()},
+      DLDataType{kDLInt, 64, 1},
+      DLContext{kDLCPU, 0});
+  traces.trace_lengths = IdArray::Empty(
+      {trace_lengths.size()},
+      DLDataType{kDLInt, 64, 1},
+      DLContext{kDLCPU, 0});
+  traces.vertices = IdArray::Empty(
+      {vertices.size()},
+      DLDataType{kDLInt, 64, 1},
+      DLContext{kDLCPU, 0});
+
+  dgl_id_t *trace_counts_data = static_cast<dgl_id_t *>(traces.trace_counts->data);
+  dgl_id_t *trace_lengths_data = static_cast<dgl_id_t *>(traces.trace_legnths->data);
+  dgl_id_t *vertices_data = static_cast<dgl_id_t *>(traces.vertices->data);
+
+  std::copy(trace_counts.begin(), trace_counts.end(), trace_counts_data);
+  std::copy(trace_lengths.begin(), trace_lengths.end(), trace_lengths_data);
+  std::copy(vertices.begin(), vertices.end(), vertices_data);
+
+  return traces;
+}
+
+RandomWalkTraces SamplerOp::RandomWalkWithRestart(
+    const GraphInterface *gptr,
+    IdArray seeds,
+    float restart_prob,
+    uint64_t max_nodes_per_seed,
+    uint64_t max_visit_counts,
+    uint64_t max_frequent_visited_nodes) {
+  return GenericRandomWalkWithRestart(
+      gptr, seeds, restart_prob, max_nodes_per_seed, max_visit_counts,
+      max_frequent_visited_nodes);
+}
+
+RandomWalkTraces SamplerOp::BipartiteSingleSidedRandomWalkWithRestart(
+    const GraphInterface *gptr,
+    IdArray seeds,
+    float restart_prob,
+    uint64_t max_nodes_per_seed,
+    uint64_t max_visit_counts,
+    uint64_t max_frequent_visited_nodes) {
+  return GenericRandomWalkWithRestart(
+      gptr, seeds, restart_prob, max_nodes_per_seed, max_visit_counts,
+      max_frequent_visited_nodes, multihop_walker<2>);
+}
+
+DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLGraphRandomWalk")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const IdArray seeds = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const int num_traces = args[2];
+    const int num_hops = args[3];
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+
+    *rv = SamplerOp::RandomWalk(ptr, seeds, num_traces, num_hops);
+  });
+
+DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLGraphRandomWalkWithRestart")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const IdArray seeds = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const float restart_prob = args[2];
+    const uint64_t max_nodes_per_seed = args[3];
+    const uint64_t max_visit_counts = args[4];
+    const uint64_t max_frequent_visited_nodes = args[5];
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+
+    *rv = ConvertRandomWalkTracesToPackedFunc(
+        SamplerOp::RandomWalkWithRestart(gptr, seeds, restart_prob, max_nodes_per_seed,
+          max_visit_counts, max_frequent_visited_nodes)
+        );
+  });
+
+DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLGraphBipartiteSingleSidedRandomWalkWithRestart")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const IdArray seeds = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const float restart_prob = args[2];
+    const uint64_t max_nodes_per_seed = args[3];
+    const uint64_t max_visit_counts = args[4];
+    const uint64_t max_frequent_visited_nodes = args[5];
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+
+    *rv = ConvertRandomWalkTracesToPackedFunc(
+        SamplerOp::BipartiteSingleSidedRandomWalkWithRestart(
+          gptr, seeds, restart_prob, max_nodes_per_seed,
+          max_visit_counts, max_frequent_visited_nodes)
+        );
+  });
+
+};  // namespace dgl
