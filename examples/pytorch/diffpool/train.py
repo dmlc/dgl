@@ -16,11 +16,14 @@ from dgl.data import tu
 from model.encoder import GraphEncoder, DiffPoolEncoder
 
 def arg_parse():
+    '''
+    argument parser
+    '''
     parser = argparse.ArgumentParser(description='DiffPool arguments')
     parser.add_argument('--dataset', dest='dataset', help='Input Dataset')
     parser.add_argument('--bmname', dest='benchmark name', help='Name of the benchmark datset')
     parser.add_argument('--pool_ratio', dest='pool_ratio', type=float, help='pooling ratio')
-    parser.add_argument('--num_pool', dest='num_pool', type=int,  help='num_pooling layer')
+    parser.add_argument('--num_pool', dest='num_pool', type=int, help='num_pooling layer')
     parser.add_argument('--link_pred', dest='linkpred', action='store_const',
                         const=True, default=True,
                         help='switch of link prediction object')
@@ -70,6 +73,9 @@ def arg_parse():
     return parser.parse_args()
 
 def prepare_data(dataset, prog_args, mode):
+    '''
+    load dataset into dataloader
+    '''
     if mode == 'train':
         shuffle = True
     else:
@@ -85,6 +91,9 @@ def prepare_data(dataset, prog_args, mode):
 
 
 def graph_classify_task(prog_args):
+    '''
+    perform graph classification task
+    '''
     diffpool_kw_args = {}
     diffpool_kw_args['feature_mode'] = prog_args.feature_type
     diffpool_kw_args['assign_feat'] = 'id'
@@ -93,21 +102,21 @@ def graph_classify_task(prog_args):
         use_node_attr = True
     dataset = tu.DiffpoolDataset(name=prog_args.dataset,
                                  use_node_attr=use_node_attr,
-                                 use_node_label=True,mode='train',
+                                 use_node_label=True, mode='train',
                                  train_ratio=prog_args.train_ratio,
                                  test_ratio=prog_args.test_ratio,
                                  **diffpool_kw_args)
 
     val_dataset = tu.DiffpoolDataset(name=prog_args.dataset,
                                      use_node_attr=use_node_attr,
-                                     use_node_label=True,mode='val',
+                                     use_node_label=True, mode='val',
                                      train_ratio=prog_args.train_ratio,
                                      test_ratio=prog_args.test_ratio,
                                      **diffpool_kw_args)
 
     test_dataset = tu.DiffpoolDataset(name=prog_args.dataset,
                                       use_node_attr=use_node_attr,
-                                      use_node_label=True,mode='test',
+                                      use_node_label=True, mode='test',
                                       train_ratio=prog_args.train_ratio,
                                       test_ratio=prog_args.test_ratio,
                                       **diffpool_kw_args)
@@ -125,7 +134,7 @@ def graph_classify_task(prog_args):
     print("the max num node is", max_num_node)
     hidden_dim = 64
     embedding_dim = 64
-    pred_hidden_dims = [64,64]
+    pred_hidden_dims = [64, 64]
     assign_dim = int(max_num_node * prog_args.pool_ratio) * prog_args.batch_size
     print("++++++++++MODEL STATISTICS++++++++")
     print("model hidden dim is", hidden_dim)
@@ -151,9 +160,9 @@ def graph_classify_task(prog_args):
         print("MODEL:::::::::", prog_args.method)
     elif prog_args.method == 'diffpool':
         diffpoolkwargs = {'concat':True, 'bn':prog_args.bn, 'bias':True,
-                      'aggregator_type':'maxpool', 'pool_ratio':
-                      prog_args.pool_ratio, 'assign_dim': assign_dim,
-                      'batch_size': prog_args.batch_size}
+                          'aggregator_type':'maxpool', 'pool_ratio':
+                          prog_args.pool_ratio, 'assign_dim': assign_dim,
+                          'batch_size': prog_args.batch_size}
         assign_input_dim = -1
         assign_n_layers = -1
         assign_hidden_dim = hidden_dim
@@ -172,6 +181,9 @@ def graph_classify_task(prog_args):
     print("test  accuracy {}".format(result))
 
 def collate_fn(batch):
+    '''
+    collate_fn for dataset batching
+    '''
     graphs, labels = map(list, zip(*batch))
     cuda = torch.cuda.is_available()
     for graph in graphs:
@@ -191,20 +203,13 @@ def collate_fn(batch):
     return batched_graphs, batched_labels
 
 def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
+    '''
+    training function
+    '''
     dataloader = dataset
-    optimizer = torch.optim.Adam(filter(lambda p : p.requires_grad,
+    optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad,
                                         model.parameters()), lr=0.001)
     # iter
-    best_val_result = {'epoch': 0, 'loss': 0, 'acc': 0}
-    test_result = {'epoch': 0, 'loss': 0, 'acc': 0}
-
-    train_accs = []
-    train_epochs = []
-    best_val_accs = []
-    best_val_epochs = []
-    test_accs = []
-    test_epochs = []
-    val_accs = []
 
     if prog_args.cuda > 0:
         torch.cuda.set_device(0)
@@ -215,7 +220,6 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
 
     for epoch in range(prog_args.epoch):
         begin_time = time.time()
-        avg_loss = 0.0
         model.train()
         train_accu = 0
         print("EPOCH ###### {} ######".format(epoch))
@@ -249,10 +253,10 @@ def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
         torch.cuda.empty_cache()
 
 def evaluate(dataloader, model, prog_args):
+    '''
+    evaluate function
+    '''
     model.eval()
-    indi_list = []
-    preds = []
-    gt_labels = []
     correct_label = 0
     with torch.no_grad():
         for batch_idx, (batch_graph, graph_labels) in enumerate(dataloader):
@@ -264,6 +268,9 @@ def evaluate(dataloader, model, prog_args):
     return result
 
 def main():
+    '''
+    main
+    '''
     #torch.multiprocessing.set_start_method('spawn')
     # Not supported by DGL yet!
     prog_args = arg_parse()

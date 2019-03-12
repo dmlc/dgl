@@ -2,12 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import dgl
-from dgl import DGLGraph
-from dgl.data import register_data_args, load_data
-import dgl.function as fn
-
-import numpy as np
 
 
 class Bundler(nn.Module):
@@ -31,7 +25,7 @@ class Bundler(nn.Module):
     def forward(self, node):
         h = node.data['h']
         c = node.data['c']
-        bundle = self.concat(h,c)
+        bundle = self.concat(h, c)
         bundle = F.normalize(bundle, p=2, dim=1)
         if self.activation:
             bundle = self.activation(bundle)

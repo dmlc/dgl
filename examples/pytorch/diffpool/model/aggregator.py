@@ -2,11 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import dgl
-from dgl import DGLGraph
-from dgl.data import register_data_args, load_data
-import dgl.function as fn
-
 
 class Aggregator(nn.Module):
     """
@@ -16,7 +11,7 @@ class Aggregator(nn.Module):
     This class is not supposed to be called
     """
     def __init__(self):
-        super(Aggregator,self).__init__()
+        super(Aggregator, self).__init__()
 
     def forward(self, node):
         neighbour = node.mailbox['m']
@@ -24,11 +19,14 @@ class Aggregator(nn.Module):
 
         return {"c":c}
 
-    def aggre(self,neighbour):
+    def aggre(self, neighbour):
         # N x F
         raise NotImplementedError
 
 class MeanAggregator(Aggregator):
+    '''
+    Mean Aggregator for graphsage
+    '''
     def __init__(self):
         super(MeanAggregator, self).__init__()
 
@@ -38,6 +36,9 @@ class MeanAggregator(Aggregator):
         return mean_neighbour
 
 class MaxPoolAggregator(Aggregator):
+    '''
+    Maxpooling aggregator for graphsage
+    '''
     def __init__(self, in_feats, out_feats, activation, bias):
         super(MaxPoolAggregator, self).__init__()
         self.linear = nn.Linear(in_feats, out_feats, bias=bias)
@@ -54,7 +55,10 @@ class MaxPoolAggregator(Aggregator):
         return maxpool_neighbour
 
 class LSTMAggregator(Aggregator):
-    def __init__(self,in_feats, hidden_feats,init_type="defalut"):
+    '''
+    LSTM aggregator for graphsage
+    '''
+    def __init__(self, in_feats, hidden_feats):
         super(LSTMAggregator, self).__init__()
         self.lstm = nn.LSTM(in_feats, hidden_feats, batch_first=True)
         self.hidden_dim = hidden_feats
@@ -72,19 +76,20 @@ class LSTMAggregator(Aggregator):
                 torch.zeros(1, 1, self.hidden_dim))
 
     def aggre(self, neighbours):
+        '''
+        aggregation function
+        '''
         # N X F
         rand_order = torch.randperm(neighbours.size()[1])
-        neighbours = neighbours[:,rand_order,:]
+        neighbours = neighbours[:, rand_order, :]
 
-        test = neighbours.view(neighbours.size()[0],neighbours.size()[1],-1)
         (lstm_out, self.hidden) = self.lstm(neighbours.view(neighbours.size()[0],
-                                                          neighbours.size()[1],
+                                                            neighbours.size()[1],
                                                             -1))
-        return lstm_out[:,-1,:]
+        return lstm_out[:, -1, :]
 
-    def forward(self,node):
+    def forward(self, node):
         neighbour = node.mailbox['m']
         c = self.aggre(neighbour)
 
         return {"c":c}
-

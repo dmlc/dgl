@@ -4,22 +4,19 @@ from torch.nn import init
 import torch.nn.functional as F
 
 import numpy as np
+from scipy.linalg import block_diag
 
 import dgl
-from dgl import DGLGraph
-from dgl.data import register_data_args, load_data
-import dgl.function as fn
 
 from .graphSage import GraphSage, GraphSageLayer
 
-from scipy.linalg import block_diag
 
 class GraphEncoder(nn.Module):
     """
     Baseline model that only leverages GraphSage to do graph readout
     """
     def __init__(self,input_dim, hidden_dim, embedding_dim, pred_hidden_dims,
-                 label_dim,  activation, n_layers, dropout, **kwargs):
+                 label_dim, activation, n_layers, dropout, **kwargs):
         super(GraphEncoder, self).__init__()
         self.concat = kwargs['concat']
         self.bn = kwargs['bn']
@@ -50,7 +47,7 @@ class GraphEncoder(nn.Module):
         self.gc_layers.append(GraphSageLayer(input_dim, hidden_dim, activation,
                                              dropout, aggregator_type))
         assert n_layers >= 3, "n_layers too few"
-        for i in range(n_layers - 2):
+        for _ in range(n_layers - 2):
             self.gc_layers.append(GraphSageLayer(hidden_dim, hidden_dim,
                                                  activation, dropout,
                                                  aggregator_type))
@@ -62,7 +59,7 @@ class GraphEncoder(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Linear):
                 m.weight.data = init.xavier_uniform_(m.weight.data,
-                                                    gain=nn.init.calculate_gain('relu'))
+                                                     gain=nn.init.calculate_gain('relu'))
                 if m.bias is not None:
                     m.bias.data = init.constant_(m.bias.data, 0.0)
 
@@ -93,9 +90,12 @@ class GraphEncoder(nn.Module):
 
     def build_pred_layers(self, pred_input_dim, pred_hidden_dims, label_dim,
                           num_agg=1):
+        '''
+        build prediction MLP layers
+        '''
         # Num_agg denotes the aggregation mode
         pred_input_dim = pred_input_dim * num_agg
-        if len(pred_hidden_dims) == 0:
+        if not pred_hidden_dims:
             pred_model = nn.Linear(pred_input_dim, label_dim)
         else:
             pred_layers = []
@@ -149,6 +149,9 @@ class GraphEncoder(nn.Module):
         return ypred
 
     def loss(self, pred, label, loss_type='softmax'):
+        '''
+        loss function
+        '''
         #softmax + CE
         if loss_type == 'softmax':
             criterion = nn.CrossEntropyLoss()
@@ -157,8 +160,8 @@ class GraphEncoder(nn.Module):
         elif type == 'margin':
             batch_size = pred.size()[0]
             label_onehot = torch.zeros(batch_size,
-                                        self.label_dim).long().cuda()
-            label_onehot.scatter_(1, label.view(-1,1), 1)
+                                       self.label_dim).long().cuda()
+            label_onehot.scatter_(1, label.view(-1, 1), 1)
             return torch.nn.MultiLabelmarginLoss()(pred, label_onehot)
 
 class DiffPoolEncoder(GraphEncoder):
@@ -184,17 +187,17 @@ class DiffPoolEncoder(GraphEncoder):
 
         self.gc_layers_after_pool = nn.ModuleList()
 
-        for i in range(n_pooling):
+        for _ in range(n_pooling):
             gc_layer_after_pool = nn.ModuleList()
             aggregator_type = kwargs['aggregator_type']
             gc_layer_after_pool.append(GraphSageLayer(self.pred_input_dim,
                                                       hidden_dim, activation,
                                                       dropout,
                                                       aggregator_type))
-            for i in range(n_layers - 2):
+            for _ in range(n_layers - 2):
                 gc_layer_after_pool.append(GraphSageLayer(hidden_dim, hidden_dim,
-                                                     activation, dropout,
-                                                     aggregator_type))
+                                                          activation, dropout,
+                                                          aggregator_type))
             gc_layer_after_pool.append(GraphSageLayer(hidden_dim,
                                                       embedding_dim, None,
                                                       dropout,
@@ -216,14 +219,14 @@ class DiffPoolEncoder(GraphEncoder):
         self.pred_layers_assign = nn.ModuleList()
 
         assign_dim = kwargs['assign_dim'] # initialize assign_dim
-        for i in range(n_pooling):
+        for _ in range(n_pooling):
             assign_dims.append(assign_dim)
             gc_layer_assign = nn.ModuleList()
             gc_layer_assign.append(GraphSageLayer(assign_input_dim,
                                                   assign_hidden_dim,
                                                   activation, dropout,
                                                   aggregator_type))
-            for i in range(assign_n_layers - 2):
+            for _ in range(assign_n_layers - 2):
                 gc_layer_assign.append(GraphSageLayer(assign_hidden_dim,
                                                       assign_hidden_dim,
                                                       activation, dropout,
@@ -233,7 +236,8 @@ class DiffPoolEncoder(GraphEncoder):
                                                   dropout, aggregator_type))
 
 
-            assign_pred_input_dim = assign_hidden_dim * (n_layers - 1) + assign_dim if kwargs['concat'] else assign_dim
+            assign_pred_input_dim =\
+            assign_hidden_dim * (n_layers - 1) + assign_dim if kwargs['concat'] else assign_dim
             pred_layer_assign = self.build_pred_layers(assign_pred_input_dim,
                                                        [], assign_dim,
                                                        num_agg=1)
@@ -256,7 +260,7 @@ class DiffPoolEncoder(GraphEncoder):
         for m in self.modules():
             if isinstance(m, nn.Linear):
                 m.weight.data = init.xavier_uniform_(m.weight.data,
-                                                    gain=nn.init.calculate_gain('relu'))
+                                                     gain=nn.init.calculate_gain('relu'))
                 if m.bias is not None:
                     m.bias.data = init.constant_(m.bias.data, 0.0)
 
@@ -347,7 +351,8 @@ class DiffPoolEncoder(GraphEncoder):
             self.link_pred_loss.append(current_lp_loss)
 
             # entropy loss
-            current_entropy_loss = self.hloss(self.assign_tensor, mask) / np.power(g.number_of_nodes(), 2)
+            current_entropy_loss =\
+            self.hloss(self.assign_tensor, mask) / np.power(g.number_of_nodes(), 2)
             self.entropy_loss.append(current_entropy_loss)
 
             g = pooled_g
@@ -360,8 +365,7 @@ class DiffPoolEncoder(GraphEncoder):
         return ypred
 
     def loss(self, pred, label):
-        eps = 1e-7
-        original_loss = super(DiffPoolEncoder, self).loss(pred,label)
+        original_loss = super(DiffPoolEncoder, self).loss(pred, label)
         # default entropy loss enabled
         entropy_loss = sum(self.entropy_loss)
         original_loss = original_loss + entropy_loss
@@ -373,7 +377,10 @@ class DiffPoolEncoder(GraphEncoder):
             return original_loss
 
 def masked_softmax(matrix, mask, dim=-1, memory_efficient=True,
-                   mask_fill_value = -1e32):
+                   mask_fill_value=-1e32):
+    '''
+    masked_softmax for dgl batch graph
+    '''
     if mask is None:
         result = torch.nn.functional.softmax(matrix, dim=dim)
     else:
@@ -386,11 +393,14 @@ def masked_softmax(matrix, mask, dim=-1, memory_efficient=True,
             result = result / (result.sum(dim=dim, keepdim=True) + 1e-13)
         else:
             masked_matrix = matrix.masked_fill((1-mask).byte(),
-                                                mask_fill_value)
+                                               mask_fill_value)
             result = torch.nn.functional.softmax(masked_matrix, dim=dim)
     return result
 
 def masked_log_softmax(matrix, mask, dim=-1):
+    '''
+    masked log softmax for dgl batch graph
+    '''
     if mask is not None:
         mask = mask.float()
         while mask.dim() < matrix.dim():
@@ -399,6 +409,9 @@ def masked_log_softmax(matrix, mask, dim=-1):
     return torch.nn.functional.log_softmax(matrix, dim=dim)
 
 class HLoss(nn.Module):
+    '''
+    entropy loss
+    '''
     def __init__(self):
         super(HLoss, self).__init__()
 

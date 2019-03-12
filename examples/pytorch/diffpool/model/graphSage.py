@@ -1,13 +1,7 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.autograd import Variable
 
-import dgl
-from dgl import DGLGraph
 import dgl.function as fn
-
-import numpy as np
 
 from .aggregator import MaxPoolAggregator, MeanAggregator, LSTMAggregator
 from .bundler import Bundler
@@ -36,8 +30,8 @@ class GraphSageLayer(nn.Module):
     def forward(self, g, h):
         h = self.dropout(h)
         g.ndata['h'] = h
-        g.update_all(fn.copy_src(src='h', out='m'),self.aggregator,
-                         self.bundler)
+        g.update_all(fn.copy_src(src='h', out='m'), self.aggregator,
+                     self.bundler)
         h = g.ndata.pop('h')
 
         return h
@@ -56,7 +50,7 @@ class GraphSage(nn.Module):
         self.layers.append(GraphSageLayer(in_feats, n_hidden, activation, dropout,
                                           aggregator_type))
         # hidden layers
-        for i in range(n_layers -1):
+        for _ in range(n_layers -1):
             self.layers.append(GraphSageLayer(n_hidden, n_hidden, activation,
                                               dropout, aggregator_type))
         #output layer
@@ -69,4 +63,3 @@ class GraphSage(nn.Module):
             h = layer(g, h)
 
         return h
-
