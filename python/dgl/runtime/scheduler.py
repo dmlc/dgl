@@ -180,6 +180,7 @@ def schedule_update_all(graph,
             nodes = utils.toindex(slice(0, graph.number_of_nodes()))
             schedule_apply_nodes(graph, nodes, apply_func, inplace=False)
     else:
+        # TODO is the eid here correct?
         eid = utils.toindex(slice(0, graph.number_of_edges()))  # shortcut for ALL
         recv_nodes = utils.toindex(slice(0, graph.number_of_nodes()))  # shortcut for ALL
         # create vars
@@ -243,8 +244,8 @@ def schedule_nodeflow_apply_nodes(graph,
 
     Parameters
     ----------
-    graph: DGLGraph
-        The DGLGraph to use
+    graph: NodeFlow
+        The NodeFlow to use
     layer_id : int
         The layer where we apply node update function.
     v : utils.Index
@@ -266,6 +267,7 @@ def schedule_nodeflow_apply_nodes(graph,
         return apply_func(nbatch)
     afunc = var.FUNC(_afunc_wrapper)
     applied_feat = ir.NODE_UDF(afunc, v_nf)
+    # TODO we need to avoid index_copy here.
     if inplace:
         ir.WRITE_ROW_INPLACE_(var_nf, var_v, applied_feat)
     else:
@@ -324,8 +326,8 @@ def schedule_nodeflow_apply_edges(graph, block_id,
 
     Parameters
     ----------
-    graph: DGLGraph
-        The DGLGraph to use
+    graph: NodeFlow
+        The NodeFlow to use
     block_id : int
         The block whose edges we apply edge update function.
     u : utils.Index
@@ -359,6 +361,7 @@ def schedule_nodeflow_apply_edges(graph, block_id,
         return apply_func(ebatch)
     _efunc = var.FUNC(_efunc_wrapper)
     new_fdedge = ir.EDGE_UDF(_efunc, fdsrc, fdedge, fddst)
+    # TODO we need to avoid index_copy here.
     if inplace:
         ir.WRITE_ROW_INPLACE_(var_ef, var_eid, new_fdedge)
     else:
@@ -490,6 +493,53 @@ def schedule_group_apply_edge(graph,
     else:
         ir.WRITE_ROW_(var_ef, var_eid, var_out)
 
+
+def schedule_nodeflow_update_all(graph,
+                                 block_id,
+                                 message_func,
+                                 reduce_func,
+                                 apply_func):
+    """get update_all schedule in a block.
+
+    Parameters
+    ----------
+    graph: NodeFlow
+        The NodeFlow to use
+    block_id : int
+        The block where we perform computation.
+    message_func: callable or list of callable
+        The message function
+    reduce_func: callable or list of callable
+        The reduce function
+    apply_func: callable
+        The apply node function
+    """
+    # A NodeFlow shouldn't have 0 edges.
+    assert graph.block_size(block_id) > 0
+    eid = utils.toindex(slice(0, graph.block_size(block_id)))  # shortcut for ALL
+    dest_nodes = utils.toindex(slice(0, graph.layer_size(block_id + 1)))  # shortcut for ALL
+    # create vars
+    var_nf = var.FEAT_DICT(graph._get_node_frame(block_id + 1), name='out_nf')
+    var_dest_nodes = var.IDX(dest_nodes, name='dest_nodes')
+    var_eid = var.IDX(eid)
+    # generate send + reduce
+    def uv_getter():
+        # TODO get all edges in the block.
+        src, dst, _ = graph.block_edges(block_id)
+        return var.IDX(utils.toindex(src)), var.IDX(utils.toindex(dst))
+    adj_creator = lambda: spmv.build_block_adj_matrix_graph(graph, block_id)
+    inc_creator = lambda: spmv.build_block_inc_matrix_graph(graph, block_id)
+    reduced_feat = _gen_send_reduce(graph, graph._get_node_frame(block_id),
+                                    graph._get_node_frame(block_id + 1),
+                                    graph._get_edge_frame(block_id),
+                                    message_func, reduce_func,
+                                    var_eid, var_dest_nodes,
+                                    uv_getter, adj_creator, inc_creator)
+    # generate optional apply
+    final_feat = _apply_with_accum(graph, var_dest_nodes, var_nf, reduced_feat, apply_func)
+    ir.WRITE_DICT_(var_nf, final_feat)
+
+
 def schedule_nodeflow_compute(graph,
                               block_id,
                               u, v, eid,
@@ -502,8 +552,8 @@ def schedule_nodeflow_compute(graph,
 
     Parameters
     ----------
-    graph: DGLGraph
-        The DGLGraph to use
+    graph: NodeFlow
+        The NodeFlow to use
     block_id : int
         The block where we perform computation.
     u : utils.Index
@@ -527,7 +577,7 @@ def schedule_nodeflow_compute(graph,
     if len(eid) == 0:
         # All the nodes are 0deg; downgrades to apply.
         if apply_func is not None:
-            schedule_nodeflow_apply_nodes(graph, block_id + 1, v, apply_func, inplace)
+            schedule_nodeflow_apply_nodes(graph, block_id + 1, dest_nodes, apply_func, inplace)
     else:
         # create vars
         var_nf = var.FEAT_DICT(graph._get_node_frame(block_id + 1), name='out_nf')
