@@ -1,14 +1,17 @@
 from __future__ import absolute_import
-import numpy as np
-import dgl
 import os
-from .utils import download, extract_archive, get_download_dir, _get_dgl_url
-import networkx as nx
 import random
+import numpy as np
+import networkx as nx
+import dgl
+from .utils import download, extract_archive, get_download_dir
 
 class TUDataset(object):
+    '''
+    TU dataset
+    '''
 
-    _url= r"https://ls11-www.cs.uni-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
+    _url=r"https://ls11-www.cs.uni-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
 
     def __init__(self, name, use_node_attr=False, use_node_label=False):
         # kwargs for now is for diffpool specifically.
@@ -40,13 +43,15 @@ class TUDataset(object):
         self.graph_labels = [np.expand_dims(x, axis=1) for x in DS_graph_labels]
 
         if use_node_label:
-            DS_node_labels = self._idx_from_zero(np.loadtxt(self._file_path("node_labels"), dtype=int))
+            DS_node_labels =\
+                    self._idx_from_zero(np.loadtxt(self._file_path("node_labels"), dtype=int))
             self.max_node_label = max(DS_node_labels)
             for idxs, g in zip(node_idx_list, self.graph_lists):
                 # by default we make node label one-hot. Assume label is
                 # one-dim.
-                node_label_embedding = self.one_hotify(DS_node_labels[list(idxs), ...], pad=True,
-                                                        result_dim = self.max_node_label)
+                node_label_embedding =\
+                        self.one_hotify(DS_node_labels[list(idxs), ...], pad=True,
+                                        result_dim=self.max_node_label)
                 g.ndata['node_label'] = node_label_embedding
 
         if use_node_attr:
@@ -59,7 +64,7 @@ class TUDataset(object):
 
 
     def __len__(self):
-        return len(node_idx_list)
+        return len(self.graph_lists)
 
     def __getitem__(self, idx):
         return self.graph_lists[idx], self.graph_labels[idx]
@@ -68,7 +73,7 @@ class TUDataset(object):
     def collate_fn(batch):
         graphs, labels = map(list, zip(*batch))
         batched_graphs = dgl.batch(graphs)
-        batched_label = np.concatenate(labels, axis=0)
+        batched_labels = np.concatenate(labels, axis=0)
         return batched_graphs, batched_labels
 
     def _download(self):
@@ -88,6 +93,9 @@ class TUDataset(object):
 
     @staticmethod
     def one_hotify(labels, pad=False, result_dim=None):
+        '''
+        cast label to one hot vector
+        '''
         num_instances = len(labels)
         if not pad:
             dim_embedding = np.max(labels) + 1 #zero-indexed assumed
@@ -95,18 +103,21 @@ class TUDataset(object):
             assert result_dim, "result_dim for padding one hot embedding not set!"
             dim_embedding = result_dim + 1
         embeddings = np.zeros((num_instances, dim_embedding))
-        embeddings[np.arange(num_instances),labels] = 1
+        embeddings[np.arange(num_instances), labels] = 1
 
         return embeddings
 
     def statistics(self):
-        return self.grpah_lists[0].ndata['feat'].shape[1]
+        return self.graph_lists[0].ndata['feat'].shape[1]
 
 class DiffpoolDataset(TUDataset):
+    '''
+    diffpool dataset
+    '''
     def __init__(self, name, use_node_attr, use_node_label, mode='train',
                  train_ratio=0.8, test_ratio=0.1, **kwargs):
         super(DiffpoolDataset, self).__init__(name, use_node_attr,
-                                            use_node_label)
+                                              use_node_label)
         self.kwargs = kwargs
         self.use_node_attr = use_node_attr
         self.mode = mode
@@ -149,8 +160,7 @@ class DiffpoolDataset(TUDataset):
             for g in self.graph_lists:
                 id_list = np.arange(g.number_of_nodes)
                 g.ndata['feat'] = self.one_hotify(id_list, pad=True,
-                                                      result_dim =
-                                                      self.max_num_node)
+                                                  result_dim=self.max_num_node)
         elif self.kwargs['feature_mode'] == 'deg-num':
             for g in self.graph_lists:
                 g.ndata['feat'] = np.expand_dims(g.in_degrees(), axis=1)
@@ -159,29 +169,27 @@ class DiffpoolDataset(TUDataset):
             # max degree is disabled.
             for g in self.graph_lists:
                 degs = list(g.in_degrees())
-                degs_one_hot = self.one_hotify(degs, pad=True, result_dim =
-                                                self.max_degrees)
+                degs_one_hot = self.one_hotify(degs, pad=True, result_dim=self.max_degrees)
                 if self.use_node_attr:
                     g.ndata['feat'] = np.concatenate((g.ndata['feat'],
-                                                        degs_one_hot), axis=1)
+                                                      degs_one_hot), axis=1)
                 else:
                     g.ndata['feat'] = degs_one_hot
         elif self.kwargs['feature_mode'] == 'struct':
             for g in self.graph_lists:
                 degs = list(g.in_degrees())
-                degs_one_hot = self.one_hotify(degs, pad=True, result_dim =
-                                                self.max_degrees)
+                degs_one_hot = self.one_hotify(degs, pad=True, result_dim=self.max_degrees)
                 nxg = g.to_networkx().to_undirected()
                 clustering_coeffs = np.array(list(nx.clustering(nxg).values()))
                 clustering_embedding = np.expand_dims(clustering_coeffs,
-                                                        axis=1)
+                                                      axis=1)
                 struct_feats = np.concatenate((degs_one_hot,
-                                                clustering_embedding),
-                                                axis=1)
+                                               clustering_embedding),
+                                              axis=1)
                 if self.use_node_attr:
                     g.ndata['feat'] = np.concatenate((struct_feats,
-                                                        g.ndata['feat']),
-                                                        axis=1)
+                                                      g.ndata['feat']),
+                                                     axis=1)
                 else:
                     g.ndata['feat'] = struct_feats
 
@@ -196,24 +204,25 @@ class DiffpoolDataset(TUDataset):
             for g in self.graph_lists:
                 id_list = np.arange(g.number_of_nodes())
                 id_embedding = self.one_hotify(id_list, pad=True,
-                                                result_dim=self.max_num_node)
+                                               result_dim=self.max_num_node)
                 g.ndata['a_feat'] = np.concatenate((id_embedding,
                                                     g.ndata['feat']),
-                                                    axis=1)
+                                                   axis=1)
         # sanity check
-        assert self.graph_lists[0].ndata['feat'].shape[1] == self.graph_lists[1].ndata['feat'].shape[1]
+        assert self.graph_lists[0].ndata['feat'].shape[1] ==\
+                self.graph_lists[1].ndata['feat'].shape[1]
 
     def __len__(self):
         if self.mode == 'train':
-            assert len(self.train_graphs)
+            assert self.train_graphs
             return len(self.train_graphs)
 
         elif self.mode == 'val':
-            assert len(self.val_graphs)
+            assert self.val_graphs
             return len(self.val_graphs)
 
         elif self.mode == 'test':
-            assert len(self.test_graphs)
+            assert self.test_graphs
             return len(self.test_graphs)
 
         else:
@@ -234,4 +243,6 @@ class DiffpoolDataset(TUDataset):
             return self.graph_lists[idx], self.graph_labels[idx]
 
     def statistics(self):
-        return self.graph_lists[0].ndata['feat'].shape[1], self.graph_lists[0].ndata['a_feat'].shape[1], self.num_labels, self.max_num_node
+        return self.graph_lists[0].ndata['feat'].shape[1],\
+                self.graph_lists[0].ndata['a_feat'].shape[1],\
+                self.num_labels, self.max_num_node
