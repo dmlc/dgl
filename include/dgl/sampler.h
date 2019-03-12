@@ -6,40 +6,14 @@
 #ifndef DGL_SAMPLER_H_
 #define DGL_SAMPLER_H_
 
+#include <vector>
+#include <string>
 #include "graph_interface.h"
+#include "nodeflow.h"
 
 namespace dgl {
 
 class ImmutableGraph;
-
-/*!
- * \brief A NodeFlow graph stores the sampling results for a sampler that samples
- * nodes/edges in layers.
- *
- * We store multiple layers of the sampling results in a single graph, which results
- * in a more compact format. We store extra information,
- * such as the node and edge mapping from the NodeFlow graph to the parent graph.
- */
-struct NodeFlow {
-  /*! \brief The graph. */
-  GraphPtr graph;
-  /*!
-   * \brief the offsets of each layer.
-   */
-  IdArray layer_offsets;
-  /*!
-   * \brief the offsets of each flow.
-   */
-  IdArray flow_offsets;
-  /*!
-   * \brief The node mapping from the NodeFlow graph to the parent graph.
-   */
-  IdArray node_mapping;
-  /*!
-   * \brief The edge mapping from the NodeFlow graph to the parent graph.
-   */
-  IdArray edge_mapping;
-};
 
 class SamplerOp {
  public:
@@ -52,11 +26,29 @@ class SamplerOp {
    * \param edge_type the type of edges we should sample neighbors.
    * \param num_hops the number of hops to sample neighbors.
    * \param expand_factor the max number of neighbors to sample.
+   * \param add_self_loop whether to add self loop to the sampled subgraph
    * \return a NodeFlow graph.
    */
-  static NodeFlow NeighborUniformSample(const ImmutableGraph *graph, IdArray seeds,
+  static NodeFlow NeighborUniformSample(const ImmutableGraph *graph,
+                                        const std::vector<dgl_id_t>& seeds,
                                         const std::string &edge_type,
-                                        int num_hops, int expand_factor);
+                                        int num_hops, int expand_factor,
+                                        const bool add_self_loop);
+
+  /*!
+   * \brief Sample a graph from the seed vertices with layer sampling.
+   * The layers are sampled with a uniform distribution.
+   *
+   * \param graphs A graph for sampling.
+   * \param seeds the nodes where we should start to sample.
+   * \param edge_type the type of edges we should sample neighbors.
+   * \param layer_sizes The size of layers.
+   * \return a NodeFlow graph.
+   */
+  static NodeFlow LayerUniformSample(const ImmutableGraph *graph,
+                                     const std::vector<dgl_id_t>& seeds,
+                                     const std::string &neigh_type,
+                                     IdArray layer_sizes);
 
   /*!
    * \brief Batch-generate random walk traces
@@ -65,7 +57,6 @@ class SamplerOp {
    * \param num_hops The number of hops for each trace
    * \return a flat ID array with shape (num_seeds, num_traces, num_hops + 1)
    */
-  // TODO: move to sampler.cc
   static IdArray RandomWalk(const GraphInterface *gptr,
                             IdArray seeds,
                             int num_traces,

@@ -89,10 +89,10 @@ class RGCNBasisLayer(RGCNLayer):
                 # an embedding lookup using source node id
                 embed = weight.view(-1, self.out_feat)
                 index = edges.data['type'] * self.in_feat + edges.src['id']
-                return {'msg': embed[index] * edges.data['norm']}
+                return {'msg': embed.index_select(0, index) * edges.data['norm']}
         else:
             def msg_func(edges):
-                w = weight[edges.data['type']]
+                w = weight.index_select(0, edges.data['type'])
                 msg = torch.bmm(edges.src['h'].unsqueeze(1), w).squeeze()
                 msg = msg * edges.data['norm']
                 return {'msg': msg}
@@ -119,7 +119,7 @@ class RGCNBlockLayer(RGCNLayer):
         nn.init.xavier_uniform_(self.weight, gain=nn.init.calculate_gain('relu'))
 
     def msg_func(self, edges):
-        weight = self.weight[edges.data['type']].view(
+        weight = self.weight.index_select(0, edges.data['type']).view(
                     -1, self.submat_in, self.submat_out)
         node = edges.src['h'].view(-1, 1, self.submat_in)
         msg = torch.bmm(node, weight).view(-1, self.out_feat)

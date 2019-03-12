@@ -158,6 +158,25 @@ class HashTableChecker {
   }
 };
 
+ImmutableGraph::EdgeList::Ptr ImmutableGraph::EdgeList::FromCSR(
+    const std::vector<int64_t>& indptr,
+    const std::vector<dgl_id_t>& indices,
+    const std::vector<dgl_id_t>& edge_ids,
+    bool in_csr) {
+  const auto n = indptr.size() - 1;
+  const auto len = edge_ids.size();
+  auto t = std::make_shared<EdgeList>(len, n);
+  for (size_t i = 0; i < indptr.size() - 1; i++) {
+    for (int64_t j = indptr[i]; j < indptr[i + 1]; j++) {
+      dgl_id_t row = i, col = indices[j];
+      if (in_csr)
+        std::swap(row, col);
+      t->register_edge(edge_ids[j], row, col);
+    }
+  }
+  return t;
+}
+
 std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::VertexSubgraph(
     IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
@@ -165,7 +184,7 @@ std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::VertexSubgraph
   const int64_t len = vids->shape[0];
 
   HashTableChecker def_check(vid_data, len);
-  // check if varr is sorted.
+  // check if vid_data is sorted.
   CHECK(std::is_sorted(vid_data, vid_data + len)) << "The input vertex list has to be sorted";
 
   // Collect the non-zero entries in from the original graph.
@@ -196,6 +215,42 @@ std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::VertexSubgraph
 
   return std::pair<ImmutableGraph::CSR::Ptr, IdArray>(sub_csr, rst_eids);
 }
+
+std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::EdgeSubgraph(
+    IdArray eids, EdgeList::Ptr edge_list) const {
+  // Return sub_csr and vids array.
+  CHECK(IsValidIdArray(eids)) << "Invalid edge id array.";
+  const dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
+  const int64_t len = eids->shape[0];
+  std::vector<dgl_id_t> nodes;
+  std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
+  std::vector<Edge> edges;
+
+  for (int64_t i = 0; i < len; i++) {
+    dgl_id_t src_id = edge_list->src_points[eid_data[i]];
+    dgl_id_t dst_id = edge_list->dst_points[eid_data[i]];
+
+    // pair<iterator, bool>, the second indicates whether the insertion is successful or not.
+    auto src_pair = oldv2newv.insert(std::make_pair(src_id, oldv2newv.size()));
+    auto dst_pair = oldv2newv.insert(std::make_pair(dst_id, oldv2newv.size()));
+    if (src_pair.second)
+      nodes.push_back(src_id);
+    if (dst_pair.second)
+      nodes.push_back(dst_id);
+    edges.push_back(Edge{src_pair.first->second, dst_pair.first->second, static_cast<dgl_id_t>(i)});
+  }
+
+  const size_t n = oldv2newv.size();
+  auto sub_csr = CSR::FromEdges(&edges, 0, n);
+
+  IdArray rst_vids = IdArray::Empty({static_cast<int64_t>(nodes.size())},
+      DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  dgl_id_t* vid_data = static_cast<dgl_id_t*>(rst_vids->data);
+  std::copy(nodes.begin(), nodes.end(), vid_data);
+
+  return std::make_pair(sub_csr, rst_vids);
+}
+
 
 ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::FromEdges(std::vector<Edge> *edges,
                                                         int sort_on, uint64_t num_nodes) {
@@ -449,6 +504,34 @@ ImmutableGraph::EdgeArray ImmutableGraph::EdgeIds(IdArray src_ids, IdArray dst_i
   return ImmutableGraph::EdgeArray{rst_src, rst_dst, rst_eid};
 }
 
+std::pair<dgl_id_t, dgl_id_t> ImmutableGraph::FindEdge(dgl_id_t eid) const {
+  dgl_id_t row = 0, col = 0;
+  auto edge_list = GetEdgeList();
+  CHECK(eid < NumEdges()) << "Invalid edge id " << eid;
+  row = edge_list->src_points[eid];
+  col = edge_list->dst_points[eid];
+  CHECK(row < NumVertices() && col < NumVertices()) << "Invalid edge id " << eid;
+  return std::pair<dgl_id_t, dgl_id_t>(row, col);
+}
+
+ImmutableGraph::EdgeArray ImmutableGraph::FindEdges(IdArray eids) const {
+  CHECK(IsValidIdArray(eids)) << "Invalid edge id array";
+  dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
+  int64_t len = eids->shape[0];
+  IdArray rst_src = IdArray::Empty({len}, eids->dtype, eids->ctx);
+  IdArray rst_dst = IdArray::Empty({len}, eids->dtype, eids->ctx);
+  dgl_id_t* rst_src_data = static_cast<dgl_id_t*>(rst_src->data);
+  dgl_id_t* rst_dst_data = static_cast<dgl_id_t*>(rst_dst->data);
+
+  for (int64_t i = 0; i < len; i++) {
+    auto edge = ImmutableGraph::FindEdge(eid_data[i]);
+    rst_src_data[i] = edge.first;
+    rst_dst_data[i] = edge.second;
+  }
+
+  return ImmutableGraph::EdgeArray{rst_src, rst_dst, eids};
+}
+
 ImmutableGraph::EdgeArray ImmutableGraph::Edges(const std::string &order) const {
   int64_t rstlen = NumEdges();
   IdArray rst_src = IdArray::Empty({rstlen}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
@@ -506,47 +589,54 @@ Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
 }
 
 Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids) const {
-  LOG(FATAL) << "EdgeSubgraph isn't implemented in immutable graph";
-  return Subgraph();
+  Subgraph subg;
+  std::pair<CSR::Ptr, IdArray> ret;
+  auto edge_list = GetEdgeList();
+  if (out_csr_) {
+    ret = out_csr_->EdgeSubgraph(eids, edge_list);
+    subg.graph = GraphPtr(new ImmutableGraph(nullptr, ret.first, IsMultigraph()));
+  } else {
+    ret = in_csr_->EdgeSubgraph(eids, edge_list);
+    subg.graph = GraphPtr(new ImmutableGraph(ret.first, nullptr, IsMultigraph()));
+  }
+  subg.induced_edges = eids;
+  subg.induced_vertices = ret.second;
+  return subg;
 }
 
-ImmutableGraph::CSRArray ImmutableGraph::GetInCSRArray() const {
-  auto in_csr = GetInCSR();
-  IdArray indptr = IdArray::Empty({static_cast<int64_t>(in_csr->indptr.size())},
+ImmutableGraph::CSRArray GetCSRArray(ImmutableGraph::CSR::Ptr csr, size_t start, size_t end) {
+  size_t num_rows = end - start;
+  size_t nnz = csr->indptr[end] - csr->indptr[start];
+  IdArray indptr = IdArray::Empty({static_cast<int64_t>(num_rows + 1)},
                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray indices = IdArray::Empty({static_cast<int64_t>(in_csr->NumEdges())},
+  IdArray indices = IdArray::Empty({static_cast<int64_t>(nnz)},
                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray eids = IdArray::Empty({static_cast<int64_t>(in_csr->NumEdges())},
+  IdArray eids = IdArray::Empty({static_cast<int64_t>(nnz)},
                                 DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   int64_t *indptr_data = static_cast<int64_t*>(indptr->data);
   dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices->data);
   dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
-  std::copy(in_csr->indptr.begin(), in_csr->indptr.end(), indptr_data);
-  std::copy(in_csr->indices.begin(), in_csr->indices.end(), indices_data);
-  std::copy(in_csr->edge_ids.begin(), in_csr->edge_ids.end(), eid_data);
-  return CSRArray{indptr, indices, eids};
+  for (size_t i = start; i < end + 1; i++)
+    indptr_data[i - start] = csr->indptr[i] - csr->indptr[start];
+  std::copy(csr->indices.begin() + csr->indptr[start],
+            csr->indices.begin() + csr->indptr[end], indices_data);
+  std::copy(csr->edge_ids.begin() + csr->indptr[start],
+            csr->edge_ids.begin() + csr->indptr[end], eid_data);
+  return ImmutableGraph::CSRArray{indptr, indices, eids};
 }
 
-ImmutableGraph::CSRArray ImmutableGraph::GetOutCSRArray() const {
-  auto out_csr = GetOutCSR();
-  IdArray indptr = IdArray::Empty({static_cast<int64_t>(out_csr->indptr.size())},
-                                  DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray indices = IdArray::Empty({static_cast<int64_t>(out_csr->NumEdges())},
-                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray eids = IdArray::Empty({static_cast<int64_t>(out_csr->NumEdges())},
-                                DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  int64_t *indptr_data = static_cast<int64_t*>(indptr->data);
-  dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices->data);
-  dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
-  std::copy(out_csr->indptr.begin(), out_csr->indptr.end(), indptr_data);
-  std::copy(out_csr->indices.begin(), out_csr->indices.end(), indices_data);
-  std::copy(out_csr->edge_ids.begin(), out_csr->edge_ids.end(), eid_data);
-  return CSRArray{indptr, indices, eids};
+ImmutableGraph::CSRArray ImmutableGraph::GetInCSRArray(size_t start, size_t end) const {
+  return GetCSRArray(GetInCSR(), start, end);
+}
+
+ImmutableGraph::CSRArray ImmutableGraph::GetOutCSRArray(size_t start, size_t end) const {
+  return GetCSRArray(GetOutCSR(), start, end);
 }
 
 std::vector<IdArray> ImmutableGraph::GetAdj(bool transpose, const std::string &fmt) const {
   if (fmt == "csr") {
-    CSRArray arrs = transpose ? this->GetOutCSRArray() : this->GetInCSRArray();
+    CSRArray arrs = transpose ? this->GetOutCSRArray(0, NumVertices())
+        : this->GetInCSRArray(0, NumVertices());
     return std::vector<IdArray>{arrs.indptr, arrs.indices, arrs.id};
   } else if (fmt == "coo") {
     int64_t num_edges = this->NumEdges();
