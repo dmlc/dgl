@@ -111,4 +111,6 @@ class PinSage(nn.Module):
             new_embeddings = self.convs[i](h, nodeset, nb_nodes, nb_weights)
             h = put_embeddings(h, nodeset, new_embeddings)
 
-        return get_embeddings(h, nodeset)
+        h_new = get_embeddings(h, nodeset)
+        #h_new = safediv(h_new, h_new.norm(dim=1, keepdim=True)) # DEBUG
+        return h_new
