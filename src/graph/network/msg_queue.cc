@@ -13,7 +13,7 @@ namespace network {
 
 using std::string;
 
-MessageQueue::MessageQueue(int queue_size, int num_producers) {
+MessageQueue::MessageQueue(int64_t queue_size, int num_producers) {
   CHECK_LT(0, queue_size);
   try {
     queue_ = new char[queue_size];
@@ -36,7 +36,7 @@ MessageQueue::~MessageQueue() {
   }
 }
 
-int MessageQueue::Add(const char* src, int size, bool is_blocking) {
+int64_t MessageQueue::Add(const char* src, int64_t size, bool is_blocking) {
   // check if message is too long to fit into the queue
   if (size > queue_size_) {
     LOG(ERROR) << "Message is larger than the queue.";
@@ -70,7 +70,7 @@ int MessageQueue::Add(const char* src, int size, bool is_blocking) {
       write_pointer_ = 0;
     }
   } else {
-    int size_partial = queue_size_ - write_pointer_;
+    int64_t size_partial = queue_size_ - write_pointer_;
     memcpy(&queue_[write_pointer_], src, size_partial);
     memcpy(queue_, &src[size_partial], size - size_partial);
     write_pointer_ = size - size_partial;
@@ -82,12 +82,12 @@ int MessageQueue::Add(const char* src, int size, bool is_blocking) {
   return size;
 }
 
-int MessageQueue::Add(const string &src, bool is_blocking) {
+int64_t MessageQueue::Add(const string &src, bool is_blocking) {
   return Add(src.data(), src.size(), is_blocking);
 }
 
-int MessageQueue::Remove(char *dest, int max_size, bool is_blocking) {
-  int retval;
+int64_t MessageQueue::Remove(char *dest, int64_t max_size, bool is_blocking) {
+  int64_t retval;
 
   std::unique_lock<std::mutex> lock(mutex_);
   if (message_positions_.empty()) {
@@ -132,8 +132,8 @@ int MessageQueue::Remove(char *dest, int max_size, bool is_blocking) {
   return retval;
 }
 
-int MessageQueue::Remove(string *dest, bool is_blocking) {
-  int retval;
+int64_t MessageQueue::Remove(string *dest, bool is_blocking) {
+  int64_t retval;
 
   std::unique_lock<std::mutex> lock(mutex_);
   if (message_positions_.empty()) {
@@ -156,7 +156,7 @@ int MessageQueue::Remove(string *dest, bool is_blocking) {
   if (pos.first + pos.second <= queue_size_) {
     dest->assign(&queue_[pos.first], pos.second);
   } else {
-    int size_partial = queue_size_ - pos.first;
+    int64_t size_partial = queue_size_ - pos.first;
     dest->assign(&queue_[pos.first], size_partial);
     dest->append(queue_, pos.second - size_partial);
   }

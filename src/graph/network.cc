@@ -19,10 +19,11 @@ using dgl::runtime::NDArray;
 namespace dgl {
 namespace network {
 
-// Each message cannot larger than 50 MB
+// Each message cannot larger than 5 GB
 static char* sender_data_buffer = nullptr;
 static char* recv_data_buffer = nullptr;
-const int kMaxBufferSize = 50 * 1024 * 1024;
+// TODO(chao): make this configurable
+const int64_t kMaxBufferSize = 5000000000;
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
@@ -48,6 +49,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
     const IdArray edge_mapping = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[3]));
     const IdArray layer_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[4]));
     const IdArray flow_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[5]));
+    // Serialize nodeflow to send_data_buffer
     int64_t data_size = network::SerializeSampledSubgraph(
                              sender_data_buffer,
                              csr,
@@ -57,7 +59,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
                              flow_offsets);
     CHECK_GT(data_size, 0);
     // Send msg via network
-    int size = comm->Send(sender_data_buffer, data_size);
+    int64_t size = comm->Send(sender_data_buffer, data_size);
     if (size <= 0) {
       LOG(ERROR) << "Send message error (size: " << size << ")";
     }
@@ -68,9 +70,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
     std::string ip = args[0];
     int port = args[1];
     int num_sender = args[2];
-    int queue_size = args[3];
     network::Communicator* comm = new network::SocketCommunicator();
-    comm->Initialize(false, ip.c_str(), port, num_sender, queue_size);
+    comm->Initialize(false, ip.c_str(), port, num_sender, kMaxBufferSize);
     CommunicatorHandle chandle = static_cast<CommunicatorHandle>(comm);
     recv_data_buffer = new char[kMaxBufferSize];
     *rv = chandle;
@@ -80,12 +81,14 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
     network::Communicator* comm = static_cast<network::Communicator*>(chandle);
-    int size = comm->Receive(recv_data_buffer, kMaxBufferSize);
+    // Recv data from network
+    int64_t size = comm->Receive(recv_data_buffer, kMaxBufferSize);
     if (size <= 0) {
       LOG(ERROR) << "Receive error: (size: " << size << ")";
     }
     NodeFlow* nf = new NodeFlow();
     ImmutableGraph::CSR::Ptr csr;
+    // Deserialize nodeflow from recv_data_buffer
     network::DeserializeSampledSubgraph(recv_data_buffer,
                                         &csr,
                                         &(nf->node_mapping),

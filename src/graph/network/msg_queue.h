@@ -39,7 +39,7 @@ class MessageQueue {
    * \param queue_size size of message queue
    * \param num_producers number of producers, use 1 by default
    */
-  MessageQueue(int queue_size /* in bytes */,
+  MessageQueue(int64_t queue_size /* in bytes */,
                int num_producers = 1);
 
   /*!
@@ -57,7 +57,7 @@ class MessageQueue {
    *   = 0 : no enough space for this message (when is_blocking = false)
    *   - 1 : error 
    */
-  int Add(const char* src, int size, bool is_blocking = true);
+  int64_t Add(const char* src, int64_t size, bool is_blocking = true);
 
   /*!
    * \brief Add data to the message queue
@@ -68,7 +68,7 @@ class MessageQueue {
    *   = 0 : no enough space for this message (when is_blocking = false)
    *   - 1 : error 
    */
-  int Add(const std::string& src, bool is_blocking = true);
+  int64_t Add(const std::string& src, bool is_blocking = true);
 
   /*!
    * \brief Remove message from the queue
@@ -80,7 +80,7 @@ class MessageQueue {
    *   = 0 : queue is empty
    *   - 1 : error 
    */
-  int Remove(char *dest, int max_size, bool is_blocking = true);
+  int64_t Remove(char *dest, int64_t max_size, bool is_blocking = true);
 
   /*!
    * \brief Remove message from the queue
@@ -91,7 +91,7 @@ class MessageQueue {
    *   = 0 : queue is empty
    *   - 1 : error 
    */
-  int Remove(std::string *dest, bool is_blocking = true);
+  int64_t Remove(std::string *dest, bool is_blocking = true);
 
   /*!
    * \brief Signal that producer producer_id will no longer produce anything
@@ -105,8 +105,8 @@ class MessageQueue {
   bool EmptyAndNoMoreAdd() const;
 
  protected:
-  typedef std::pair<int /* message_start_position in queue_ */,
-                    int /* message_length */> MessagePosition;
+  typedef std::pair<int64_t /* message_start_position in queue_ */,
+                    int64_t /* message_length */> MessagePosition;
 
   /*! 
    * \brief Pointer to the queue 
@@ -116,12 +116,12 @@ class MessageQueue {
   /*! 
    * \brief Size of the queue in bytes 
    */
-  int queue_size_;
+  int64_t queue_size_;
 
   /*! 
    * \brief Free size of the queue 
    */
-  int free_size_;
+  int64_t free_size_;
 
   /*! 
    * \brief Location in queue_ for where to write the next element 
@@ -129,7 +129,7 @@ class MessageQueue {
    * by message_postions_, and the first element in message_position_ 
    * denotes where we should read
    */
-  int write_pointer_;
+  int64_t write_pointer_;
 
   /*! 
    * \brief Used to check all producers will no longer produce anything 

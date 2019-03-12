@@ -14,30 +14,28 @@ def _create_sampler_sender(ip_addr, port):
     Parameters
     ----------
     ip_addr : str
-        ip address of remote trainer.
+        ip address of remote trainer
     port : int
-        port of remote trainer.
+        port of remote trainer
     """
     return _CAPI_DGLSenderCreate(ip_addr, port)
 
-def _create_sampler_receiver(ip_addr, port, num_sender, queue_size):
+def _create_sampler_receiver(ip_addr, port, num_sender):
     """Create a receiver communicator of distributed sampler via C socket.
 
     Parameters
     ----------
     ip_addr : str
-        ip address of remote trainer.
+        ip address of remote trainer
     port : int
-        listen port of remote trainer.
+        listen port of remote trainer
     num_sender : int
-        total number of sampler nodes.
-    queue_size : int
-        size (bytes) of message queue buffer.
+        total number of sampler nodes
     """
-    return _CAPI_DGLReceiverCreate(ip_addr, port, num_sender, queue_size)
+    return _CAPI_DGLReceiverCreate(ip_addr, port, num_sender)
 
 def _send_subgraph(sender, nodeflow):
-    """ Send sampled subgraph (Nodeflow) to remote trainer.
+    """Send sampled subgraph (Nodeflow) to remote trainer.
 
     Parameters
     ----------
@@ -60,7 +58,7 @@ def _send_subgraph(sender, nodeflow):
                              flows_offsets)
 
 def _batch_send_subgraph(sender, nodeflow_list):
-    """ Send a batch of sampled subgraph (Nodeflow) to remote trainer.
+    """Send a batch of sampled subgraph (Nodeflow) to remote trainer.
 
     Parameters
     ----------
@@ -74,7 +72,7 @@ def _batch_send_subgraph(sender, nodeflow_list):
     raiseNotImplementedError("_batch_send_subgraph: not implemented!")
 
 def _recv_subgraph(receiver, graph):
-    """ Receive sampled subgraph (NodeFlow) from remote sampler.
+    """Receive sampled subgraph (NodeFlow) from remote sampler.
 
     Parameters
     ----------
@@ -89,10 +87,11 @@ def _recv_subgraph(receiver, graph):
         Sampled NodeFlow object
     """
     hdl = unwrap_to_ptr_list(_CAPI_ReceiverRecvSubgraph(receiver))
+    # hdl is a list of ptr
     return NodeFlow(graph, hdl[0])
 
 def _batch_recv_subgraph(receiver, graph):
-    """ Receive a batch of sampled subgraph from remote sampler.
+    """Receive a batch of sampled subgraph from remote sampler.
 
     Parameters
     ----------
@@ -111,7 +110,7 @@ def _batch_recv_subgraph(receiver, graph):
     raiseNotImplementedError("_batch_recv_subgraph: not implemented!")
 
 def _finalize_sampler_sender(sender):
-    """ Finalize Sender communicator
+    """Finalize Sender communicator
 
     Parameters
     ----------
@@ -121,7 +120,7 @@ def _finalize_sampler_sender(sender):
     _CAPI_DGLFinalizeCommunicator(sender)
 
 def _finalize_sampler_receiver(receiver):
-    """ Finalize Receiver communicator
+    """Finalize Receiver communicator
 
     Parameters
     ----------

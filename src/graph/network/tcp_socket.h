@@ -104,7 +104,7 @@ class TCPSocket {
    * \param len_data length of data
    * \return return number of bytes sent if OK, -1 on error
    */  
-  int Send(const char * data, int len_data);
+  int64_t Send(const char * data, int64_t len_data);
 
   /*!
    * \brief Receive data.
@@ -112,7 +112,7 @@ class TCPSocket {
    * \param size_buffer size of buffer
    * \return return number of bytes received if OK, -1 on error
    */ 
-  int Receive(char * buffer, int size_buffer);
+  int64_t Receive(char * buffer, int64_t size_buffer);
 
   /*!
    * \brief Get socket's file descriptor

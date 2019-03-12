@@ -33,14 +33,14 @@ class SocketCommunicator : public Communicator {
    * (e.g. "168.123.2.43:50051"). For Receiver, this address identifies
    * the local listening endpoint (e.g. "0.0.0.0:50051").
    * \param num_sender number of senders, only used for receiver.
-   * \param queue_size the size of message queue, only used for receiver.
+   * \param queue_size the size of message queue (500MB default), only for receiver.
    * \return true for success and false for error
    */
   bool Initialize(bool is_sender,
                   const char* ip,
                   int port,
                   int num_sender = 0,
-                  int queue_size = 0);
+                  int64_t queue_size = 500*1024*1024);
   /*!
    * \brief Send message to receiver node
    * \param src data pointer
@@ -49,7 +49,7 @@ class SocketCommunicator : public Communicator {
    *   > 0 : bytes send
    *   - 1 : error
    */
-  int Send(char* src, int size);
+  int64_t Send(char* src, int64_t size);
 
   /*!
    * \brief Receive mesesage from sender node, we
@@ -60,7 +60,7 @@ class SocketCommunicator : public Communicator {
    *   > 0 : bytes received
    *   - 1 : error
    */
-  int Receive(char* dest, int max_size);
+  int64_t Receive(char* dest, int64_t max_size);
 
   /*!
    * \brief Finalize the SocketCommunicator class
@@ -81,7 +81,7 @@ class SocketCommunicator : public Communicator {
   /*!
    * \brief maximal size of message queue
    */ 
-  int queue_size_;
+  int64_t queue_size_;
 
   /*!
    * \brief socket list
@@ -117,7 +117,7 @@ class SocketCommunicator : public Communicator {
   bool InitReceiver(const char* ip,
                     int port,
                     int num_sender,
-                    int queue_size);
+                    int64_t queue_size);
 
   /*!
    * \brief Finalize sender node

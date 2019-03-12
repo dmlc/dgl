@@ -13,13 +13,14 @@ namespace network {
 
 const int kTimeOut = 5;  // 5 minutes for socket timeout
 const int kMaxConnection = 1024;  // 1024 maximal socket connection
-const int kMaxBuffer = 50 * 1024 * 1024;  // 50 MB buffer each message
+// TODO(chao): make this configurable
+const int64_t kMaxBuffer = 5000000000;  // 5 GB buffer
 
 bool SocketCommunicator::Initialize(bool is_sender,
                                     const char* ip,
                                     int port,
                                     int num_sender,
-                                    int queue_size) {
+                                    int64_t queue_size) {
   if (is_sender) {
     is_sender_ = true;
     return InitSender(ip, port);
@@ -47,7 +48,7 @@ bool SocketCommunicator::InitSender(const char* ip, int port) {
 bool SocketCommunicator::InitReceiver(const char* ip,
                                       int port,
                                       int num_sender,
-                                      int queue_size) {
+                                      int64_t queue_size) {
   CHECK_GE(num_sender, 1);
   CHECK_GT(queue_size, 0);
   // Init message queue
@@ -93,11 +94,11 @@ void SocketCommunicator::MsgHandler(TCPSocket* socket, MessageQueue* queue) {
   char* buffer = new char[kMaxBuffer];
   for (;;) {
     // First recv the size
-    int received_bytes = 0;
-    int data_size = 0;
-    while (received_bytes < sizeof(int)) {
-      int max_len = sizeof(int) - received_bytes;
-      int tmp = socket->Receive(
+    int64_t received_bytes = 0;
+    int64_t data_size = 0;
+    while (received_bytes < sizeof(int64_t)) {
+      int64_t max_len = sizeof(int64_t) - received_bytes;
+      int64_t tmp = socket->Receive(
         reinterpret_cast<char*>(&data_size)+received_bytes,
         max_len);
       received_bytes += tmp;
@@ -109,8 +110,8 @@ void SocketCommunicator::MsgHandler(TCPSocket* socket, MessageQueue* queue) {
     // Then recv the data
     received_bytes = 0;
     while (received_bytes < data_size) {
-      int max_len = data_size - received_bytes;
-      int tmp = socket->Receive(buffer+received_bytes, max_len);
+      int64_t max_len = data_size - received_bytes;
+      int64_t tmp = socket->Receive(buffer+received_bytes, max_len);
       received_bytes += tmp;
     }
     queue->Add(buffer, data_size);
@@ -130,11 +131,11 @@ void SocketCommunicator::FinalizeSender() {
   // We send a size = -1 signal to notify
   // receiver to finish its job
   if (socket_[0] != nullptr) {
-    int size = -1;
-    int sent_bytes = 0;
-    while (sent_bytes < sizeof(int)) {
-      int max_len = sizeof(int) - sent_bytes;
-      int tmp = socket_[0]->Send(
+    int64_t size = -1;
+    int64_t sent_bytes = 0;
+    while (sent_bytes < sizeof(int64_t)) {
+      int64_t max_len = sizeof(int64_t) - sent_bytes;
+      int64_t tmp = socket_[0]->Send(
         reinterpret_cast<char*>(&size)+sent_bytes,
         max_len);
       sent_bytes += tmp;
@@ -156,17 +157,17 @@ void SocketCommunicator::FinalizeReceiver() {
   }
 }
 
-int SocketCommunicator::Send(char* src, int size) {
+int64_t SocketCommunicator::Send(char* src, int64_t size) {
   if (!is_sender_) {
     LOG(ERROR) << "Receiver cannot invoke send() API.";
     return -1;
   }
   TCPSocket* client = socket_[0];
   // First sent the size of data
-  int sent_bytes = 0;
-  while (sent_bytes < sizeof(int)) {
-    int max_len = sizeof(int) - sent_bytes;
-    int tmp = client->Send(
+  int64_t sent_bytes = 0;
+  while (sent_bytes < sizeof(int64_t)) {
+    int64_t max_len = sizeof(int64_t) - sent_bytes;
+    int64_t tmp = client->Send(
       reinterpret_cast<char*>(&size)+sent_bytes,
       max_len);
     sent_bytes += tmp;
@@ -174,15 +175,15 @@ int SocketCommunicator::Send(char* src, int size) {
   // Then send the data
   sent_bytes = 0;
   while (sent_bytes < size) {
-    int max_len = size - sent_bytes;
-    int tmp = client->Send(src+sent_bytes, max_len);
+    int64_t max_len = size - sent_bytes;
+    int64_t tmp = client->Send(src+sent_bytes, max_len);
     sent_bytes += tmp;
   }
 
-  return size + sizeof(int);
+  return size + sizeof(int64_t);
 }
 
-int SocketCommunicator::Receive(char* dest, int max_size) {
+int64_t SocketCommunicator::Receive(char* dest, int64_t max_size) {
   if (is_sender_) {
     LOG(ERROR) << "Sender cannot invoke Receive() API.";
     return -1;

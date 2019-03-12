@@ -156,11 +156,11 @@ void TCPSocket::Close() {
   }
 }
 
-int TCPSocket::Send(const char * data, int len_data) {
+int64_t TCPSocket::Send(const char * data, int64_t len_data) {
   return send(socket_, data, len_data, 0);
 }
 
-int TCPSocket::Receive(char * buffer, int size_buffer) {
+int64_t TCPSocket::Receive(char * buffer, int64_t size_buffer) {
   return recv(socket_, buffer, size_buffer, 0);
 }
 
