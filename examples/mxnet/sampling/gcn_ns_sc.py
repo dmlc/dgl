@@ -177,25 +177,26 @@ def worker_func(worker_id, args, g, features, labels, train_mask, val_mask, test
 
         num_acc = 0.
 
-        infer_start = start = time.time()
-        pred = infer_model(g)
-        num_acc = (pred.argmax(axis=1) == labels)[test_nid].sum().asscalar()
-        #for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
-        #                                               g.number_of_nodes(),
-        #                                               neighbor_type='in',
-        #                                               num_workers=32,
-        #                                               num_hops=args.n_layers+1,
-        #                                               seed_nodes=test_nid):
-        #    infer_sample_time += time.time() - start
-        #    nf.copy_from_parent()
-        #    pred = infer_model(nf)
-        #    batch_nids = nf.layer_parent_nid(-1).astype('int64').as_in_context(ctx)
-        #    batch_labels = labels[batch_nids]
-        #    num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
-        #    start = time.time()
-        print("infer time: %.3f" % (time.time() - infer_start))
+        if worker_id == 0:
+            infer_start = start = time.time()
+            pred = infer_model(g)
+            num_acc = (pred.argmax(axis=1) == labels)[test_nid].sum().asscalar()
+            #for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
+            #                                               g.number_of_nodes(),
+            #                                               neighbor_type='in',
+            #                                               num_workers=32,
+            #                                               num_hops=args.n_layers+1,
+            #                                               seed_nodes=test_nid):
+            #    infer_sample_time += time.time() - start
+            #    nf.copy_from_parent()
+            #    pred = infer_model(nf)
+            #    batch_nids = nf.layer_parent_nid(-1).astype('int64').as_in_context(ctx)
+            #    batch_labels = labels[batch_nids]
+            #    num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
+            #    start = time.time()
+            print("infer time: %.3f" % (time.time() - infer_start))
 
-        print("Test Accuracy {:.4f}". format(num_acc/n_test_samples))
+            print("Test Accuracy {:.4f}". format(num_acc/n_test_samples))
 
 def main(args):
     # load and preprocess dataset
@@ -248,22 +249,15 @@ def main(args):
     norm = mx.nd.expand_dims(1./degs, 1)
     g.ndata['norm'] = norm
 
-    p1 = Process(target=worker_func, args=(0, args, g, features, labels, train_mask, val_mask, test_mask,
-                                           in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, runtime_ctx))
-    p2 = Process(target=worker_func, args=(1, args, g, features, labels, train_mask, val_mask, test_mask,
-                                           in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, runtime_ctx))
-    p3 = Process(target=worker_func, args=(2, args, g, features, labels, train_mask, val_mask, test_mask,
-                                           in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, runtime_ctx))
-    p4 = Process(target=worker_func, args=(3, args, g, features, labels, train_mask, val_mask, test_mask,
-                                           in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, runtime_ctx))
-    p1.start()
-    p2.start()
-    p3.start()
-    p4.start()
-    p1.join()
-    p2.join()
-    p3.join()
-    p4.join()
+    args.nworkers = 3
+    ps = []
+    for i in range(args.nworkers):
+        p = Process(target=worker_func, args=(i, args, g, features, labels, train_mask, val_mask, test_mask,
+                                              in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, runtime_ctx))
+        ps.append(p)
+        p.start()
+    for p in ps:
+        p.join()
 
     print("parent ends")
 
@@ -293,6 +287,8 @@ if __name__ == '__main__':
             help="graph self-loop (default=False)")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
             help="Weight for L2 loss")
+    parser.add_argument("--nworkers", type=int, default=1,
+            help="number of workers")
     args = parser.parse_args()
 
     print(args)
