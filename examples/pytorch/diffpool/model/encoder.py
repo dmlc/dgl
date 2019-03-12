@@ -66,15 +66,11 @@ class GraphEncoder(nn.Module):
                 if m.bias is not None:
                     m.bias.data = init.constant_(m.bias.data, 0.0)
 
-    def construct_mask(self, max_nodes, batch_num_nodes):
-        # Not clear how to migrate this to dgl version yet.
-        raise NotImplementedError
-
     def apply_bn(self, x):
         """
         Batch norm for 3D tensor X
         """
-        bn_module = nn.BatchNorm1d(x.size()[1]).cuda()# \TODO check cuda
+        bn_module = nn.BatchNorm1d(x.size()[1]).cuda()
         return bn_module(x)
 
     def gcn_forward(self, g, h, gc_layers, cat=True):
@@ -119,20 +115,6 @@ class GraphEncoder(nn.Module):
         return pred_model
 
     def forward(self, g):
-            # graph convolution
-            # 1) you pass the result to ReLue then batch_norm
-            # 2) You got a read out of dim [Batch x 1 x feat_size]
-            # 3) You store that readout
-            # 4) For the intermediate layers:
-            #   you do the same thing, pass through the layer, relu, batchnorm,
-            #   and then append the max_readout to out_all list
-            # 5) For the intermediate layers, if num_aggs > 2, then you do a
-            # double readout for each layer (max readout and sum readout)
-            # 6) You do the same thing for the last layer. Why you need to
-            # separate this step is essentially because of dimension reason
-            # you concatenate out_all to a matrix, and feed it to the
-            # pred_module, which is a MLP that predicts label
-            # 7) send output to pred_model, get ypred, return ypred
         h = g.ndata['feat']
         out_all = []
         first_layer = self.gc_layers[0]
@@ -175,7 +157,7 @@ class GraphEncoder(nn.Module):
         elif type == 'margin':
             batch_size = pred.size()[0]
             label_onehot = torch.zeros(batch_size,
-                                        self.label_dim).long().cuda()# \TODO
+                                        self.label_dim).long().cuda()
             label_onehot.scatter_(1, label.view(-1,1), 1)
             return torch.nn.MultiLabelmarginLoss()(pred, label_onehot)
 
@@ -272,7 +254,7 @@ class DiffPoolEncoder(GraphEncoder):
 
         # weight initialization
         for m in self.modules():
-            if isinstance(m, nn.Linear): # fix weight init \TODO
+            if isinstance(m, nn.Linear):
                 m.weight.data = init.xavier_uniform_(m.weight.data,
                                                     gain=nn.init.calculate_gain('relu'))
                 if m.bias is not None:
@@ -329,7 +311,7 @@ class DiffPoolEncoder(GraphEncoder):
             adj = g.adjacency_matrix(ctx=device)
             node_seg_list = g.batch_num_nodes
             adj_new = torch.sparse.mm(adj, self.assign_tensor)
-            adj_new = torch.mm(torch.t(self.assign_tensor), adj_new) 
+            adj_new = torch.mm(torch.t(self.assign_tensor), adj_new)
 
             h_a = h# updating assignment input and embedding input
 

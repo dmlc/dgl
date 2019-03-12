@@ -20,10 +20,6 @@ class Aggregator(nn.Module):
 
     def forward(self, node):
         neighbour = node.mailbox['m']
-        #print(neighbour)
-        #print(type(neighbour))
-        #debug
-        #print("Neighbour size is### ", neighbour.size())
         c = self.aggre(neighbour)
 
         return {"c":c}
@@ -38,8 +34,6 @@ class MeanAggregator(Aggregator):
 
     def aggre(self, neighbour):
         mean_neighbour = torch.mean(neighbour, dim=1)
-        #Debug
-        #print("mean_neighbour size is### ", mean_neighbour.size())
 
         return mean_neighbour
 
@@ -56,9 +50,7 @@ class MaxPoolAggregator(Aggregator):
         neighbour = self.linear(neighbour)
         if self.activation:
             neighbour = self.activation(neighbour)
-        #print("size of neighbour before maxpool is### ", neighbour.size())
         maxpool_neighbour = torch.max(neighbour, dim=1)[0]
-        #print("size after maxpool is### ", maxpool_neighbour.size())
         return maxpool_neighbour
 
 class LSTMAggregator(Aggregator):
@@ -82,20 +74,12 @@ class LSTMAggregator(Aggregator):
     def aggre(self, neighbours):
         # N X F
         rand_order = torch.randperm(neighbours.size()[1])
-        #debug
-        #print("the size of neighbour is ", neighbours.size()[1])
         neighbours = neighbours[:,rand_order,:]
 
-        #print("This is neighbour size before lstm### ", neighbours.size())
-        #debug
         test = neighbours.view(neighbours.size()[0],neighbours.size()[1],-1)
-        #print("this is the view shape### ",test.size())
         (lstm_out, self.hidden) = self.lstm(neighbours.view(neighbours.size()[0],
                                                           neighbours.size()[1],
                                                             -1))
-        #                                    self.hidden)
-        #print("after each run, lstm_out is### ", type(lstm_out))
-        #print("lstm's shape is### ", lstm_out.size())
         return lstm_out[:,-1,:]
 
     def forward(self,node):
