@@ -12,8 +12,9 @@ def generate_rand_graph(n):
     return dgl.DGLGraph(arr, readonly=True)
 
 def start_trainer():
+    g = generate_rand_graph(100)
     recv = dgl.contrib.sampling.SamplerReceiver(ip="127.0.0.1", port=50051)
-    nodeflow = recv.Receive()
+    nodeflow = recv.Receive(g)
     print("----- trainer ------")
     print(nodeflow._node_mapping.todgltensor())
     print(nodeflow._edge_mapping.todgltensor())
