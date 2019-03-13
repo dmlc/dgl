@@ -16,8 +16,7 @@ class Aggregator(nn.Module):
     def forward(self, node):
         neighbour = node.mailbox['m']
         c = self.aggre(neighbour)
-
-        return {"c":c}
+        return {"c": c}
 
     def aggre(self, neighbour):
         # N x F
@@ -32,7 +31,6 @@ class MeanAggregator(Aggregator):
 
     def aggre(self, neighbour):
         mean_neighbour = torch.mean(neighbour, dim=1)
-
         return mean_neighbour
 
 class MaxPoolAggregator(Aggregator):
@@ -91,5 +89,4 @@ class LSTMAggregator(Aggregator):
     def forward(self, node):
         neighbour = node.mailbox['m']
         c = self.aggre(neighbour)
-
         return {"c":c}

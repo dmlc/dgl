@@ -33,7 +33,6 @@ class GraphSageLayer(nn.Module):
         g.update_all(fn.copy_src(src='h', out='m'), self.aggregator,
                      self.bundler)
         h = g.ndata.pop('h')
-
         return h
 
 
@@ -61,5 +60,4 @@ class GraphSage(nn.Module):
         h = features
         for layer in self.layers:
             h = layer(g, h)
-
         return h

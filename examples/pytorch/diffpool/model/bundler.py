@@ -29,5 +29,4 @@ class Bundler(nn.Module):
         bundle = F.normalize(bundle, p=2, dim=1)
         if self.activation:
             bundle = self.activation(bundle)
-
         return {"h":bundle}

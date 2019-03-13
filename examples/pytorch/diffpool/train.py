@@ -82,7 +82,6 @@ def prepare_data(dataset, prog_args, mode):
         shuffle = False
 
     dataset.set_mode(mode)
-
     return torch.utils.data.DataLoader(dataset,
                                        batch_size=prog_args.batch_size,
                                        shuffle=shuffle,
@@ -121,10 +120,6 @@ def graph_classify_task(prog_args):
                                       test_ratio=prog_args.test_ratio,
                                       **diffpool_kw_args)
 
-
-
-
-
     input_dim, assign_input_dim, label_dim, max_num_node = dataset.statistics()
     print("++++++++++STATISTICS ABOUT THE DATASET")
     print("dataset feature dimension is", input_dim)
@@ -140,7 +135,6 @@ def graph_classify_task(prog_args):
     print("model hidden dim is", hidden_dim)
     print("model embedding dim fr graph instance embedding", embedding_dim)
     print("initial batched pool graph dim is", assign_dim)
-
 
     train_dataloader = prepare_data(dataset, prog_args, mode='train')
     val_dataloader = prepare_data(val_dataset, prog_args, mode='val')
@@ -199,7 +193,6 @@ def collate_fn(batch):
     batched_labels = torch.LongTensor(np.concatenate(labels, axis=0))
     if cuda:
         batched_labels = batched_labels.cuda()
-
     return batched_graphs, batched_labels
 
 def train(dataset, model, prog_args, same_feat=True, val_dataset=None):
