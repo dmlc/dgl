@@ -249,7 +249,6 @@ def main(args):
     norm = mx.nd.expand_dims(1./degs, 1)
     g.ndata['norm'] = norm
 
-    args.nworkers = 3
     ps = []
     for i in range(args.nworkers):
         p = Process(target=worker_func, args=(i, args, g, features, labels, train_mask, val_mask, test_mask,
