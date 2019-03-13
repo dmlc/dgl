@@ -678,20 +678,6 @@ class GraphIndex(object):
         shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
         return inc, shuffle_idx
 
-    def random_walk(self, seeds, num_traces, num_hops):
-        """Random walk sampling.
-
-        Returns a user Tensor of random walk traces with shape
-        (num_seeds, num_traces, num_hops + 1)
-        """
-        if len(seeds) == 0:
-            return utils.toindex([])
-
-        seeds = seeds.todgltensor()
-        traces = _CAPI_DGLGraphRandomWalk(self._handle, seeds, num_traces, num_hops)
-
-        return F.zerocopy_from_dlpack(traces.to_dlpack())
-
     def to_networkx(self):
         """Convert to networkx graph.
 

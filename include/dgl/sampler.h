@@ -8,8 +8,28 @@
 
 #include <vector>
 #include <string>
+#include <cstdlib>
+#include <ctime>
 #include "graph_interface.h"
 #include "nodeflow.h"
+
+#ifdef _MSC_VER
+// rand in MS compiler works well in multi-threading.
+static inline int rand_r(unsigned *seed) {
+  return rand();
+}
+
+static inline unsigned int randseed() {
+  unsigned int seed = time(nullptr);
+  srand(seed);  // need to set seed manually since there's no rand_r
+  return seed;
+}
+#define _CRT_RAND_S
+#else
+static inline unsigned int randseed() {
+  return time(nullptr);
+}
+#endif
 
 namespace dgl {
 
@@ -86,7 +106,7 @@ class SamplerOp {
   static RandomWalkTraces RandomWalkWithRestart(
       const GraphInterface *gptr,
       IdArray seeds,
-      float restart_prob,
+      double restart_prob,
       uint64_t max_nodes_per_seed,
       uint64_t max_visit_counts,
       uint64_t max_frequent_visited_nodes);
@@ -97,12 +117,27 @@ class SamplerOp {
   static RandomWalkTraces BipartiteSingleSidedRandomWalkWithRestart(
       const GraphInterface *gptr,
       IdArray seeds,
-      float restart_prob,
+      double restart_prob,
       uint64_t max_nodes_per_seed,
       uint64_t max_visit_counts,
       uint64_t max_frequent_visited_nodes);
 
 private:
+  static IdArray GenericRandomWalk(
+      const GraphInterface *gptr,
+      IdArray seeds,
+      int num_traces,
+      int num_hops,
+      bool (*walker)(const GraphInterface *, unsigned int *, dgl_id_t, dgl_id_t *));
+
+  static RandomWalkTraces GenericRandomWalkWithRestart(
+      const GraphInterface *gptr,
+      IdArray seeds,
+      double restart_prob,
+      uint64_t max_nodes_per_seed,
+      uint64_t max_visit_counts,
+      uint64_t max_frequent_visited_nodes,
+      bool (*walker)(const GraphInterface *, unsigned int *, dgl_id_t, dgl_id_t *));
 };
 
 }  // namespace dgl

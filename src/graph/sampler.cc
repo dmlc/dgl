@@ -378,7 +378,7 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
                         int num_hops,
                         size_t num_neighbor,
                         const bool add_self_loop) {
-  unsigned int time_seed = time(nullptr);
+  unsigned int time_seed = randseed();
   const size_t num_seeds = seeds.size();
   auto orig_csr = edge_type == "in" ? graph->GetInCSR() : graph->GetOutCSR();
   const dgl_id_t* val_list = orig_csr->edge_ids.data();
@@ -555,7 +555,7 @@ namespace {
 
     size_t curr = 0;
     size_t next = node_mapping->size();
-    unsigned int rand_seed = time(nullptr);
+    unsigned int rand_seed = randseed();
     for (int64_t i = num_layers - 1; i >= 0; --i) {
       const int64_t layer_size = layer_sizes_data[i];
       std::unordered_set<dgl_id_t> candidate_set;

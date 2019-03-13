@@ -23,6 +23,19 @@ namespace dgl {
 
 namespace {
 
+static bool default_walker(
+    const GraphInterface *gptr,
+    unsigned int *random_seed,
+    dgl_id_t cur,
+    dgl_id_t *next) {
+  const auto succ = gptr->SuccVec(cur);
+  const size_t size = succ.size();
+  if (size == 0)
+    return false;
+  *next = succ[rand_r(random_seed) % size];
+  return true;
+}
+
 template<int hops>
 static bool multihop_walker(
     const GraphInterface *gptr,
@@ -64,7 +77,7 @@ IdArray SamplerOp::GenericRandomWalk(
     IdArray seeds,
     int num_traces,
     int num_hops,
-    bool (*walker)(const GraphInterface *, dgl_id_t, dgl_id_t *)) {
+    bool (*walker)(const GraphInterface *, unsigned int *, dgl_id_t, dgl_id_t *)) {
   const int num_nodes = seeds->shape[0];
   const dgl_id_t *seed_ids = static_cast<dgl_id_t *>(seeds->data);
   IdArray traces = IdArray::Empty(
@@ -73,11 +86,8 @@ IdArray SamplerOp::GenericRandomWalk(
       DLContext{kDLCPU, 0});
   dgl_id_t *trace_data = static_cast<dgl_id_t *>(traces->data);
 
-  if (!walker)
-    walker = multihop_walker<1>;
-
   // FIXME: does OpenMP work with exceptions?  Especially without throwing SIGABRT?
-  unsigned int random_seed = time(nullptr);
+  unsigned int random_seed = randseed();
 
   for (int i = 0; i < num_nodes; ++i) {
     const dgl_id_t seed_id = seed_ids[i];
@@ -89,7 +99,7 @@ IdArray SamplerOp::GenericRandomWalk(
       for (int k = 0; k < kmax; ++k) {
         const size_t offset = ((size_t)i * num_traces + j) * kmax + k;
         trace_data[offset] = cur;
-        if (!walker(gptr, cur, &next)) {
+        if (!walker(gptr, &random_seed, cur, &next)) {
           LOG(FATAL) << "no successors from vertex " << cur;
           return traces;
         }
@@ -112,29 +122,27 @@ IdArray SamplerOp::RandomWalk(
 RandomWalkTraces SamplerOp::GenericRandomWalkWithRestart(
     const GraphInterface *gptr,
     IdArray seeds,
-    float restart_prob,
+    double restart_prob,
     uint64_t max_nodes_per_seed,
     uint64_t max_visit_counts,
     uint64_t max_frequent_visited_nodes,
-    bool (*walker)(const GraphInterface *, dgl_id_t, dgl_id_t *)) {
+    bool (*walker)(const GraphInterface *, unsigned int *, dgl_id_t, dgl_id_t *)) {
   std::vector<dgl_id_t> vertices;
   std::vector<size_t> trace_lengths, trace_counts, visit_counts;
   const dgl_id_t *seed_ids = static_cast<dgl_id_t *>(seeds->data);
   const uint64_t num_nodes = seeds->shape[0];
-  uint64_t num_frequent_visited_nodes = 0;
-
-  if (!walker)
-    walker = multihop_walker<1>;
+  uint64_t restart_bound = static_cast<uint64_t>(restart_prob * RAND_MAX);
 
   visit_counts.resize(gptr->NumVertices());
 
-  unsigned int random_seed = time(nullptr);
+  unsigned int random_seed = randseed();
 
   for (int i = 0; i < num_nodes; ++i) {
     int stop = 0;
     size_t total_trace_length = 0;
     size_t num_traces = 0;
-    visit_counts.clear();
+    uint64_t num_frequent_visited_nodes = 0;
+    std::fill(visit_counts.begin(), visit_counts.end(), 0);
 
     while (1) {
       dgl_id_t cur = seed_ids[i], next;
@@ -146,10 +154,10 @@ RandomWalkTraces SamplerOp::GenericRandomWalkWithRestart(
             (++num_frequent_visited_nodes == max_frequent_visited_nodes))
           stop = 1;
 
-        if ((float)rand_r(&random_seed) / RAND_MAX < restart_prob)
+        if ((trace_length > 0) && (rand_r(&random_seed) < restart_bound))
           break;
 
-        if (!walker(gptr, cur, &next)) {
+        if (!walker(gptr, &random_seed, cur, &next)) {
           LOG(FATAL) << "no successors from vertex " << cur;
           return RandomWalkTraces();
         }
@@ -169,20 +177,20 @@ RandomWalkTraces SamplerOp::GenericRandomWalkWithRestart(
 
   RandomWalkTraces traces;
   traces.trace_counts = IdArray::Empty(
-      {trace_counts.size()},
+      {static_cast<int64_t>(trace_counts.size())},
       DLDataType{kDLInt, 64, 1},
       DLContext{kDLCPU, 0});
   traces.trace_lengths = IdArray::Empty(
-      {trace_lengths.size()},
+      {static_cast<int64_t>(trace_lengths.size())},
       DLDataType{kDLInt, 64, 1},
       DLContext{kDLCPU, 0});
   traces.vertices = IdArray::Empty(
-      {vertices.size()},
+      {static_cast<int64_t>(vertices.size())},
       DLDataType{kDLInt, 64, 1},
       DLContext{kDLCPU, 0});
 
   dgl_id_t *trace_counts_data = static_cast<dgl_id_t *>(traces.trace_counts->data);
-  dgl_id_t *trace_lengths_data = static_cast<dgl_id_t *>(traces.trace_legnths->data);
+  dgl_id_t *trace_lengths_data = static_cast<dgl_id_t *>(traces.trace_lengths->data);
   dgl_id_t *vertices_data = static_cast<dgl_id_t *>(traces.vertices->data);
 
   std::copy(trace_counts.begin(), trace_counts.end(), trace_counts_data);
@@ -195,19 +203,19 @@ RandomWalkTraces SamplerOp::GenericRandomWalkWithRestart(
 RandomWalkTraces SamplerOp::RandomWalkWithRestart(
     const GraphInterface *gptr,
     IdArray seeds,
-    float restart_prob,
+    double restart_prob,
     uint64_t max_nodes_per_seed,
     uint64_t max_visit_counts,
     uint64_t max_frequent_visited_nodes) {
   return GenericRandomWalkWithRestart(
       gptr, seeds, restart_prob, max_nodes_per_seed, max_visit_counts,
-      max_frequent_visited_nodes);
+      max_frequent_visited_nodes, multihop_walker<1>);
 }
 
 RandomWalkTraces SamplerOp::BipartiteSingleSidedRandomWalkWithRestart(
     const GraphInterface *gptr,
     IdArray seeds,
-    float restart_prob,
+    double restart_prob,
     uint64_t max_nodes_per_seed,
     uint64_t max_visit_counts,
     uint64_t max_frequent_visited_nodes) {
@@ -216,7 +224,7 @@ RandomWalkTraces SamplerOp::BipartiteSingleSidedRandomWalkWithRestart(
       max_frequent_visited_nodes, multihop_walker<2>);
 }
 
-DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLGraphRandomWalk")
+DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalk")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const IdArray seeds = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
@@ -227,15 +235,15 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLGraphRandomWalk")
     *rv = SamplerOp::RandomWalk(ptr, seeds, num_traces, num_hops);
   });
 
-DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLGraphRandomWalkWithRestart")
+DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalkWithRestart")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const IdArray seeds = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
-    const float restart_prob = args[2];
+    const double restart_prob = args[2];
     const uint64_t max_nodes_per_seed = args[3];
     const uint64_t max_visit_counts = args[4];
     const uint64_t max_frequent_visited_nodes = args[5];
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+    const GraphInterface *gptr = static_cast<const GraphInterface *>(ghandle);
 
     *rv = ConvertRandomWalkTracesToPackedFunc(
         SamplerOp::RandomWalkWithRestart(gptr, seeds, restart_prob, max_nodes_per_seed,
@@ -243,15 +251,15 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLGraphRandomWalkWithRestart")
         );
   });
 
-DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLGraphBipartiteSingleSidedRandomWalkWithRestart")
+DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLBipartiteSingleSidedRandomWalkWithRestart")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const IdArray seeds = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
-    const float restart_prob = args[2];
+    const double restart_prob = args[2];
     const uint64_t max_nodes_per_seed = args[3];
     const uint64_t max_visit_counts = args[4];
     const uint64_t max_frequent_visited_nodes = args[5];
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+    const GraphInterface *gptr = static_cast<const GraphInterface *>(ghandle);
 
     *rv = ConvertRandomWalkTracesToPackedFunc(
         SamplerOp::BipartiteSingleSidedRandomWalkWithRestart(
