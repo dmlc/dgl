@@ -78,7 +78,7 @@ IdArray SamplerOp::GenericRandomWalk(
     int num_traces,
     int num_hops,
     bool (*walker)(const GraphInterface *, unsigned int *, dgl_id_t, dgl_id_t *)) {
-  const int num_nodes = seeds->shape[0];
+  const int64_t num_nodes = seeds->shape[0];
   const dgl_id_t *seed_ids = static_cast<dgl_id_t *>(seeds->data);
   IdArray traces = IdArray::Empty(
       {num_nodes, num_traces, num_hops + 1},
@@ -89,7 +89,7 @@ IdArray SamplerOp::GenericRandomWalk(
   // FIXME: does OpenMP work with exceptions?  Especially without throwing SIGABRT?
   unsigned int random_seed = randseed();
 
-  for (int i = 0; i < num_nodes; ++i) {
+  for (int64_t i = 0; i < num_nodes; ++i) {
     const dgl_id_t seed_id = seed_ids[i];
 
     for (int j = 0; j < num_traces; ++j) {
@@ -131,13 +131,13 @@ RandomWalkTraces SamplerOp::GenericRandomWalkWithRestart(
   std::vector<size_t> trace_lengths, trace_counts, visit_counts;
   const dgl_id_t *seed_ids = static_cast<dgl_id_t *>(seeds->data);
   const uint64_t num_nodes = seeds->shape[0];
-  uint64_t restart_bound = static_cast<uint64_t>(restart_prob * RAND_MAX);
+  int64_t restart_bound = static_cast<int64_t>(restart_prob * RAND_MAX);
 
   visit_counts.resize(gptr->NumVertices());
 
   unsigned int random_seed = randseed();
 
-  for (int i = 0; i < num_nodes; ++i) {
+  for (uint64_t i = 0; i < num_nodes; ++i) {
     int stop = 0;
     size_t total_trace_length = 0;
     size_t num_traces = 0;
