@@ -86,8 +86,8 @@ def _recv_subgraph(receiver, graph):
     NodeFlow
         Sampled NodeFlow object
     """
-    hdl = unwrap_to_ptr_list(_CAPI_ReceiverRecvSubgraph(receiver))
     # hdl is a list of ptr
+    hdl = unwrap_to_ptr_list(_CAPI_ReceiverRecvSubgraph(receiver))
     return NodeFlow(graph, hdl[0])
 
 def _batch_recv_subgraph(receiver, graph):

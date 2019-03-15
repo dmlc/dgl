@@ -7,14 +7,13 @@
 
 #include "socket_communicator.h"
 #include "../../c_api_common.h"
+#include "../network.h"
 
 namespace dgl {
 namespace network {
 
-const int kTimeOut = 5;  // 5 minutes for socket timeout
+const int kTimeOut = 10;  // 10 minutes for socket timeout
 const int kMaxConnection = 1024;  // 1024 maximal socket connection
-// TODO(chao): make this configurable
-const int64_t kMaxBuffer = 5000000000;  // 5 GB buffer
 
 bool SocketCommunicator::Initialize(bool is_sender,
                                     const char* ip,
@@ -91,7 +90,7 @@ bool SocketCommunicator::InitReceiver(const char* ip,
 }
 
 void SocketCommunicator::MsgHandler(TCPSocket* socket, MessageQueue* queue) {
-  char* buffer = new char[kMaxBuffer];
+  char* buffer = new char[kMaxBufferSize];
   for (;;) {
     // First recv the size
     int64_t received_bytes = 0;

@@ -18,7 +18,7 @@ MessageQueue::MessageQueue(int64_t queue_size, int num_producers) {
   try {
     queue_ = new char[queue_size];
   } catch(const std::bad_alloc&) {
-    LOG(FATAL) << "Not enough memory for message buffer.";
+    LOG(FATAL) << "Not enough memory for message queue.";
   }
   memset(queue_, '\0', queue_size);
 
@@ -118,7 +118,7 @@ int64_t MessageQueue::Remove(char *dest, int64_t max_size, bool is_blocking) {
     if (pos.first + pos.second <= queue_size_) {
       memcpy(dest, &queue_[pos.first], pos.second);
     } else {
-      int size_partial = queue_size_ - pos.first;
+      int64_t size_partial = queue_size_ - pos.first;
       memcpy(dest, &queue_[pos.first], size_partial);
       memcpy(&dest[size_partial], queue_, pos.second - size_partial);
     }

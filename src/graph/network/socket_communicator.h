@@ -33,14 +33,14 @@ class SocketCommunicator : public Communicator {
    * (e.g. "168.123.2.43:50051"). For Receiver, this address identifies
    * the local listening endpoint (e.g. "0.0.0.0:50051").
    * \param num_sender number of senders, only used for receiver.
-   * \param queue_size the size of message queue (500MB default), only for receiver.
+   * \param queue_size the size of message queue, only for receiver.
    * \return true for success and false for error
    */
   bool Initialize(bool is_sender,
                   const char* ip,
                   int port,
-                  int num_sender = 0,
-                  int64_t queue_size = 500*1024*1024);
+                  int num_sender = 1,
+                  int64_t queue_size = 5 * 1024 * 1024);
   /*!
    * \brief Send message to receiver node
    * \param src data pointer

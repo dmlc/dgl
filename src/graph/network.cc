@@ -4,6 +4,7 @@
  * \brief DGL networking related APIs
  */
 
+#include "./network.h"
 #include "./network/communicator.h"
 #include "./network/socket_communicator.h"
 #include "./network/serialize.h"
@@ -19,21 +20,22 @@ using dgl::runtime::NDArray;
 namespace dgl {
 namespace network {
 
-// Each message cannot larger than 5 GB
 static char* sender_data_buffer = nullptr;
 static char* recv_data_buffer = nullptr;
-// TODO(chao): make this configurable
-const int64_t kMaxBufferSize = 5000000000;
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string ip = args[0];
     int port = args[1];
     network::Communicator* comm = new network::SocketCommunicator();
-    if (comm->Initialize(true, ip.c_str(), port) == false) {
-      LOG(ERROR) << "Initialize network communicator error.";
+    if (comm->Initialize(IS_SENDER, ip.c_str(), port) == false) {
+      LOG(ERROR) << "Initialize network communicator (sender) error.";
     }
-    sender_data_buffer = new char[kMaxBufferSize];
+    try {
+      sender_data_buffer = new char[kMaxBufferSize];
+    } catch (const std::bad_alloc&) {
+      LOG(FATAL) << "Not enough memory for msg buffer: " << kMaxBufferSize;
+    }
     CommunicatorHandle chandle = static_cast<CommunicatorHandle>(comm);
     *rv = chandle;
   });
@@ -71,9 +73,13 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
     int port = args[1];
     int num_sender = args[2];
     network::Communicator* comm = new network::SocketCommunicator();
-    comm->Initialize(false, ip.c_str(), port, num_sender, kMaxBufferSize);
+    comm->Initialize(IS_RECEIVER, ip.c_str(), port, num_sender, kQueueSize);
     CommunicatorHandle chandle = static_cast<CommunicatorHandle>(comm);
-    recv_data_buffer = new char[kMaxBufferSize];
+    try {
+      recv_data_buffer = new char[kMaxBufferSize];
+    } catch (const std::bad_alloc&) {
+      LOG(FATAL) << "Not enough memory for msg buffer: " << kMaxBufferSize;
+    }
     *rv = chandle;
   });
 
