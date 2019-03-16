@@ -9,6 +9,7 @@ else:
     os.environ['OMP_NUM_THREADS'] = '16'
 import mxnet as mx
 from mxnet import gluon
+from mxnet import profiler
 import argparse, time, math
 import numpy as np
 import mxnet as mx
@@ -221,9 +222,11 @@ def worker_func(worker_id, args, g, features, labels, train_mask, val_mask, test
 
     # initialize graph
     dur = []
+    profiler.set_config(profile_all=True, aggregate_stats=True, filename='profile_output-%d.json' % worker_id)
     for epoch in range(args.n_epochs):
         print("epoch: " + str(epoch))
         start = time.time()
+        #profiler.set_state('run')
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
                                                        num_neighbors,
                                                        neighbor_type='in',
@@ -258,6 +261,8 @@ def worker_func(worker_id, args, g, features, labels, train_mask, val_mask, test
 
             nf.copy_to_parent(node_embed_names=node_embed_names)
         print("train: " + str(time.time() - start))
+        #profiler.set_state('stop')
+        #print(profiler.dumps())
 
         infer_params = infer_model.collect_params()
 
