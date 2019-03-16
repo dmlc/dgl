@@ -234,7 +234,7 @@ def worker_func(worker_id, args, g, features, labels, train_mask, val_mask, test
             for i in range(n_layers):
                 agg_history_str = 'agg_h_{}'.format(i)
                 g.pull(nf.layer_parent_nid(i+1), fn.copy_src(src='h_{}'.format(i), out='m'),
-                       fn.sum(msg='m', out=agg_history_str))
+                       fn.sum(msg='m', out=agg_history_str), inplace=True)
 
             node_embed_names = [['preprocess', 'features', 'h_0']]
             for i in range(1, n_layers):
