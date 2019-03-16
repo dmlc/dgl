@@ -46,6 +46,9 @@ def sparse_matrix(data, index, shape, force_format=False):
         # generate convert idx
         # FIXME: cannot use int64
         tmp_data = nd.arange(len(coord[0]), dtype=data.dtype, ctx=coord[0].context)
+        #TODO for some reason, we have to materialize the arrays here.
+        coord[0].wait_to_read()
+        coord[1].wait_to_read()
         tmp_spmat = nd.sparse.csr_matrix((tmp_data, (coord[0], coord[1])),
                 tuple(shape), ctx=data.context)
         convert_idx = nd.cast(tmp_spmat.data, dtype='int64')
