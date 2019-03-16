@@ -122,7 +122,7 @@ class SamplerOp {
       uint64_t max_visit_counts,
       uint64_t max_frequent_visited_nodes);
 
-private:
+ private:
   static IdArray GenericRandomWalk(
       const GraphInterface *gptr,
       IdArray seeds,
