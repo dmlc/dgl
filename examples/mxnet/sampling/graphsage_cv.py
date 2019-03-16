@@ -3,10 +3,9 @@ import argparse, time, math
 import numpy as np
 import numa
 import os
+os.environ['OMP_NUM_THREADS'] = '16'
 if os.environ['DMLC_ROLE'] == 'server':
-    os.environ['OMP_NUM_THREADS'] = '4'
-else:
-    os.environ['OMP_NUM_THREADS'] = '16'
+    numa.bind([3])
 import mxnet as mx
 from mxnet import gluon
 from mxnet import profiler
@@ -188,7 +187,7 @@ class GraphSAGEInfer(gluon.Block):
 
         return h
 
-def worker_func(worker_id, args, g, features, labels, train_mask, val_mask, test_mask,
+def worker_func(worker_id, args, g, adj, features, labels, train_mask, val_mask, test_mask,
                 in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, ctx):
     print("run worker " + str(worker_id))
 
@@ -236,8 +235,11 @@ def worker_func(worker_id, args, g, features, labels, train_mask, val_mask, test
                                                        seed_nodes=train_nid):
             for i in range(n_layers):
                 agg_history_str = 'agg_h_{}'.format(i)
-                g.pull(nf.layer_parent_nid(i+1), fn.copy_src(src='h_{}'.format(i), out='m'),
-                       fn.sum(msg='m', out=agg_history_str), inplace=True)
+                dests = nf.layer_parent_nid(i+1)
+                # TODO we could use DGLGraph.pull to implement this, but the current
+                # implementation of pull is very slow. Let's manually do it for now.
+                g.ndata[agg_history_str][dests] = mx.nd.dot(mx.nd.take(adj, dests),
+                                                            g.ndata['h_{}'.format(i)])
 
             node_embed_names = [['preprocess', 'features', 'h_0']]
             for i in range(1, n_layers):
@@ -361,8 +363,9 @@ def main(args):
         g.ndata['agg_h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=shared_ctx)
 
     ps = []
+    adj = g.adjacency_matrix()
     for i in range(args.nworkers):
-        p = Process(target=worker_func, args=(i, args, g, features, labels, train_mask, val_mask, test_mask,
+        p = Process(target=worker_func, args=(i, args, g, adj, features, labels, train_mask, val_mask, test_mask,
                                               in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, ctx))
         ps.append(p)
         p.start()
