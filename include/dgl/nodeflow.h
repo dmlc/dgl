@@ -42,16 +42,6 @@ struct NodeFlow {
    * \brief The edge mapping from the NodeFlow graph to the parent graph.
    */
   IdArray edge_mapping;
-  /*!
-   * \brief optional tensor data for each node.  The first dimension always has
-   * the number of elements the same as number of nodes.
-   */
-  dgl::runtime::NDArray node_data;
-  /*!
-   * \brief optional tensor data for each edge.  The first dimension always has
-   * the number of elements the same as number of edges.
-   */
-  dgl::runtime::NDArray edge_data;
 };
 
 /*!

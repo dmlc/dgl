@@ -238,9 +238,6 @@ struct neighbor_info {
   }
 };
 
-/*
- * NOTE: this function does NOT populate node_data and edge_data
- */
 NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
                            std::vector<dgl_id_t> edge_list,
                            std::vector<size_t> layer_offsets,
@@ -473,18 +470,54 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
     CHECK_EQ(layer_offsets[layer_id + 1], sub_vers.size());
   }
 
-  NodeFlow nf = ConstructNodeFlow(
-      neighbor_list, edge_list, layer_offsets, &sub_vers, &neigh_pos,
-      edge_type, num_edges, num_hops, graph->IsMultigraph());
-  nf.node_data = NDArray::Empty(
-      {0}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  nf.edge_data = NDArray::Empty(
-      {0}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-
-  return nf;
+  return ConstructNodeFlow(neighbor_list, edge_list, layer_offsets, &sub_vers, &neigh_pos,
+                           edge_type, num_edges, num_hops, graph->IsMultigraph());
 }
 
 }  // namespace
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    GraphInterface* gptr = nflow->graph->Reset();
+    *rv = gptr;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetNodeMapping")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    *rv = nflow->node_mapping;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetEdgeMapping")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    *rv = nflow->edge_mapping;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetLayerOffsets")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    *rv = nflow->layer_offsets;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetBlockOffsets")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    *rv = nflow->flow_offsets;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowFree")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    delete nflow;
+  });
 
 NodeFlow SamplerOp::NeighborUniformSample(const ImmutableGraph *graph,
                                           const std::vector<dgl_id_t>& seeds,
@@ -670,10 +703,6 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
                                     DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   nf.flow_offsets = IdArray::Empty({static_cast<int64_t>(flow_offsets.size())},
                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  nf.node_data = NDArray::Empty(
-      {0}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  nf.edge_data = NDArray::Empty(
-      {0}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
 
   std::copy(node_mapping.begin(), node_mapping.end(),
             static_cast<dgl_id_t*>(nf.node_mapping->data));

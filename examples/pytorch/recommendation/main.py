@@ -10,20 +10,8 @@ from rec.utils import cuda
 from rec.adabound import AdaBound
 from dgl import DGLGraph
 
-import argparse
 import pickle
 import os
-
-parser = argparse.ArgumentParser()
-parser.add_argument('--opt', type=str, default='SGD')
-parser.add_argument('--lr', type=float, default=1)
-parser.add_argument('--sched', type=str, default='none')
-parser.add_argument('--layers', type=int, default=2)
-parser.add_argument('--use-feature', action='store_true')
-parser.add_argument('--sgd-switch', type=int, default=-1)
-args = parser.parse_args()
-
-print(args)
 
 cache_file = 'ml.pkl'
 
@@ -39,7 +27,7 @@ g = ml.g
 neighbors = ml.user_neighbors + ml.movie_neighbors
 
 n_hidden = 100
-n_layers = args.layers
+n_layers = 3
 batch_size = 256
 margin = 0.9
 
@@ -49,22 +37,8 @@ hard_neg_prob = 0
 items = None
 h_past = None
 
-sched_lambda = {
-        'none': lambda epoch: 1,
-        'decay': lambda epoch: max(0.98 ** epoch, 1e-4),
-        }
-
-model = cuda(PinSage(
-    g.number_of_nodes(),
-    [n_hidden] * (n_layers + 1),
-    20,
-    0.5,
-    10,
-    use_feature=args.use_feature,
-    G=g,
-    ))
-opt = getattr(torch.optim, args.opt)(model.parameters(), lr=args.lr)
-sched = torch.optim.lr_scheduler.LambdaLR(opt, sched_lambda[args.sched])
+model = cuda(PinSage(g.number_of_nodes(), [n_hidden] * n_layers, 10, 40, 5))
+opt = torch.optim.Adam(model.parameters(), lr=1e-2)
 
 
 def forward(model, g_prior, nodeset, train=True):
@@ -94,7 +68,6 @@ def runtrain(g_prior_edges, g_train_edges, train):
     g_prior = DGLGraph()
     g_prior.add_nodes(g.number_of_nodes())
     g_prior.add_edges(g_prior_src, g_prior_dst)
-    g_prior.ndata.update({k: cuda(v) for k, v in g.ndata.items()})
     edge_batches = g_train_edges[torch.randperm(g_train_edges.shape[0])].split(batch_size)
 
     with tqdm.tqdm(edge_batches) as tq:
@@ -107,7 +80,7 @@ def runtrain(g_prior_edges, g_train_edges, train):
             dst_neg = []
             for i in range(len(dst)):
                 if np.random.rand() < hard_neg_prob:
-                    nb = torch.LongTensor(neighbors[dst[i].item()])
+                    nb = neighbors[dst[i].item()]
                     mask = ~(g.has_edges_between(nb, src[i].item()).byte())
                     dst_neg.append(np.random.choice(nb[mask].numpy(), n_negs))
                 else:
@@ -136,8 +109,7 @@ def runtrain(g_prior_edges, g_train_edges, train):
                     .split([src_size, dst_size, dst_neg_size]))
 
             diff = (h_src * (h_dst_neg - h_dst)).sum(1)
-            #loss = (diff + margin).clamp(min=0).mean()
-            loss = (1 - torch.sigmoid(-diff)).mean()
+            loss = (diff + margin).clamp(min=0).mean()
             acc = (diff < 0).sum()
             assert loss.item() == loss.item()
 
@@ -172,7 +144,6 @@ def runtest(g_prior_edges, validation=True):
     g_prior = DGLGraph()
     g_prior.add_nodes(g.number_of_nodes())
     g_prior.add_edges(g_prior_src, g_prior_dst)
-    g_prior.ndata.update({k: cuda(v) for k, v in g.ndata.items()})
 
     hs = []
     with torch.no_grad():
@@ -223,7 +194,6 @@ def runtest(g_prior_edges, validation=True):
 def train():
     global items, h_past
     global n_negs, hard_neg_prob
-    global opt, sched
     best_mrr = 0
     for epoch in range(500):
         ml.refresh_mask()
@@ -246,12 +216,6 @@ def train():
 
         print('Epoch %d train' % epoch)
         runtrain(g_prior_edges, g_train_edges, True)
-
-        if epoch == args.sgd_switch:
-            opt = torch.optim.SGD(model.parameters(), lr=0.6)
-            sched = torch.optim.lr_scheduler.LambdaLR(opt, sched_lambda['decay'])
-        elif epoch < args.sgd_switch:
-            sched.step()
 
 
 if __name__ == '__main__':

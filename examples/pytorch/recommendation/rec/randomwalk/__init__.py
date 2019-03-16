@@ -1,47 +1,46 @@
 import torch
 import dgl
 from ..utils import cuda
-from collections import Counter
 
 
-def random_walk_sampler(G, nodeset, restart_prob, max_nodes):
+def random_walk_sampler(G, nodeset, n_traces, n_hops):
     '''
     G: DGLGraph
     nodeset: 1D CPU Tensor of node IDs
-    restart_prob: float
-    max_nodes: int
-    return: list[list[Tensor]]
+    n_traces: int
+    n_hops: int
+    return: 3D CPU Tensor or node IDs (n_nodes, n_traces, n_hops + 1)
     '''
-    traces = dgl.contrib.sampling.bipartite_single_sided_random_walk_with_restart(
-            G, nodeset, restart_prob, max_nodes)
+    assert (nodeset < 0).sum().item() == 0
+    traces = dgl.contrib.sampling.random_walk(G, nodeset, n_traces, n_hops)
 
     return traces
 
 # Note: this function is not friendly to giant graphs since we use a matrix
 # with size (num_nodes_in_nodeset, num_nodes_in_graph).
-def random_walk_distribution(G, nodeset, restart_prob, max_nodes):
+
+def random_walk_distribution(G, nodeset, n_traces, n_hops):
     n_nodes = nodeset.shape[0]
     n_available_nodes = G.number_of_nodes()
-    traces = random_walk_sampler(G, nodeset, restart_prob, max_nodes)
-    visited_counts = torch.zeros(n_nodes, n_available_nodes)
-    for i in range(n_nodes):
-        visited_nodes = torch.cat(traces[i])
-        visited_counts[i].scatter_add_(0, visited_nodes, torch.ones_like(visited_nodes, dtype=torch.float32))
-    return visited_counts
+    traces = random_walk_sampler(G, nodeset, n_traces, n_hops)
+    visited_nodes = traces[:, :, 1:].contiguous().view(n_nodes, -1)  # (n_nodes, n_visited_other_nodes)
+    visited_counts = (
+            torch.zeros(n_nodes, n_available_nodes)
+            .scatter_add_(1, visited_nodes, torch.ones_like(visited_nodes, dtype=torch.float32)))
+    visited_prob = visited_counts / visited_counts.sum(1, keepdim=True)
+    return visited_prob
 
 
-def random_walk_distribution_topt(G, nodeset, restart_prob, max_nodes, top_T):
+def random_walk_distribution_topt(G, nodeset, n_traces, n_hops, top_T):
     '''
     returns the top T important neighbors of each node in nodeset, as well as
     the weights of the neighbors.
     '''
-    visited_prob = random_walk_distribution(G, nodeset, restart_prob, max_nodes)
-    weights, nodes = visited_prob.topk(top_T, 1)
-    weights = weights / weights.sum(1, keepdim=True)
-    return weights, nodes
+    visited_prob = random_walk_distribution(G, nodeset, n_traces, n_hops)
+    return visited_prob.topk(top_T, 1)
 
 
-def random_walk_nodeflow(G, nodeset, n_layers, restart_prob, max_nodes, top_T):
+def random_walk_nodeflow(G, nodeset, n_layers, n_traces, n_hops, top_T):
     '''
     returns a list of triplets (
         "active" node IDs whose embeddings are computed at the i-th layer (num_nodes,)
@@ -51,10 +50,11 @@ def random_walk_nodeflow(G, nodeset, n_layers, restart_prob, max_nodes, top_T):
     '''
     dev = nodeset.device
     nodeset = nodeset.cpu()
+    assert (nodeset < 0).sum().item() == 0
     nodeflow = []
     cur_nodeset = nodeset
     for i in reversed(range(n_layers)):
-        nb_weights, nb_nodes = random_walk_distribution_topt(G, cur_nodeset, restart_prob, max_nodes, top_T)
+        nb_weights, nb_nodes = random_walk_distribution_topt(G, cur_nodeset, n_traces, n_hops, top_T)
         assert (nb_nodes < 0).sum().item() == 0
         nodeflow.insert(0, (cur_nodeset.to(dev), nb_weights.to(dev), nb_nodes.to(dev)))
         cur_nodeset = torch.cat([nb_nodes.view(-1), cur_nodeset]).unique()

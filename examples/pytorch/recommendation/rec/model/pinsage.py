@@ -8,18 +8,6 @@ from ..utils import cuda
 def create_embeddings(n_nodes, n_features):
     return nn.Parameter(torch.randn(n_nodes, n_features))
 
-def mix_embeddings(h, ndata, emb, proj):
-    '''Combine node-specific trainable embedding ``h`` with categorical inputs
-    (projected by ``emb``) and numeric inputs (projected by ``proj``).
-    '''
-    e = []
-    for key, value in ndata.items():
-        if value.dtype == torch.int64:
-            e.append(emb[key](value))
-        elif value.dtype == torch.float32:
-            e.append(proj[key](value))
-    return h + torch.stack(e, 0).sum(0)
-
 def get_embeddings(h, nodeset):
     return h[nodeset]
 
@@ -86,16 +74,15 @@ class PinSage(nn.Module):
     G: DGLGraph
     feature_sizes: the dimensionality of input/hidden/output features
     T: number of neighbors we pick for each node
-    restart_prob: restart probability
-    max_nodes: max number of nodes visited for each seed
+    n_traces: number of random walk traces to generate during sampling
+    n_hops: number of hops of each random walk trace during sampling
     '''
-    def __init__(self, num_nodes, feature_sizes, T, restart_prob, max_nodes,
-                 use_feature=False, G=None):
+    def __init__(self, num_nodes, feature_sizes, T, n_traces, n_hops):
         super(PinSage, self).__init__()
 
         self.T = T
-        self.restart_prob = restart_prob
-        self.max_nodes = max_nodes
+        self.n_traces = n_traces
+        self.n_hops = n_hops
 
         self.in_features = feature_sizes[0]
         self.out_features = feature_sizes[-1]
@@ -107,23 +94,6 @@ class PinSage(nn.Module):
                 feature_sizes[i], feature_sizes[i+1], feature_sizes[i+1]))
 
         self.h = create_embeddings(num_nodes, self.in_features)
-        self.use_feature = use_feature
-
-        if use_feature:
-            self.emb = nn.ModuleDict()
-            self.proj = nn.ModuleDict()
-
-            for key, scheme in G.node_attr_schemes().items():
-                if scheme.dtype == torch.int64:
-                    self.emb[key] = nn.Embedding(
-                            G.ndata[key].max().item() + 1,
-                            self.in_features,
-                            padding_idx=0)
-                elif scheme.dtype == torch.float32:
-                    self.proj[key] = nn.Sequential(
-                            nn.Linear(scheme.shape[0], self.in_features),
-                            nn.LeakyReLU(),
-                            )
 
     def forward(self, G, nodeset):
         '''
@@ -133,13 +103,9 @@ class PinSage(nn.Module):
         nodeset: node IDs in this minibatch (num_nodes,)
         return: new node embeddings (num_nodes, out_features)
         '''
-        if self.use_feature:
-            h = mix_embeddings(self.h, G.ndata, self.emb, self.proj)
-        else:
-            h = self.h
-
+        h = self.h
         nodeflow = randomwalk.random_walk_nodeflow(
-                G, nodeset, self.n_layers, self.restart_prob, self.max_nodes, self.T)
+                G, nodeset, self.n_layers, self.n_traces, self.n_hops, self.T)
 
         for i, (nodeset, nb_weights, nb_nodes) in enumerate(nodeflow):
             new_embeddings = self.convs[i](h, nodeset, nb_nodes, nb_weights)
