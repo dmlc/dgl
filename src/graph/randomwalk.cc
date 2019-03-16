@@ -50,7 +50,7 @@ static bool multihop_walker(
   return true;
 }
 
-};  // anonymous
+};  // namespace
 
 PackedFunc ConvertRandomWalkTracesToPackedFunc(const RandomWalkTraces &t) {
   auto body = [t] (DGLArgs args, DGLRetValue *rv) {
@@ -247,8 +247,7 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalkWithRestart")
 
     *rv = ConvertRandomWalkTracesToPackedFunc(
         SamplerOp::RandomWalkWithRestart(gptr, seeds, restart_prob, max_nodes_per_seed,
-          max_visit_counts, max_frequent_visited_nodes)
-        );
+          max_visit_counts, max_frequent_visited_nodes));
   });
 
 DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLBipartiteSingleSidedRandomWalkWithRestart")
@@ -264,8 +263,7 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLBipartiteSingleSidedRandomWalkWithResta
     *rv = ConvertRandomWalkTracesToPackedFunc(
         SamplerOp::BipartiteSingleSidedRandomWalkWithRestart(
           gptr, seeds, restart_prob, max_nodes_per_seed,
-          max_visit_counts, max_frequent_visited_nodes)
-        );
+          max_visit_counts, max_frequent_visited_nodes));
   });
 
 };  // namespace dgl
