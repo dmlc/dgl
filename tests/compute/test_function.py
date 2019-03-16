@@ -19,15 +19,21 @@ def generate_graph():
     return g
 
 def reducer_both(nodes):
-    return {'h' : F.sum(nodes.mailbox['m'], 1)}
+    return {'out' : F.sum(nodes.mailbox['m'], 1)}
 
 def test_copy_src():
     # copy_src with both fields
     g = generate_graph()
     g.register_message_func(fn.copy_src(src='h', out='m'))
     g.register_reduce_func(reducer_both)
+    # test with update_all
     g.update_all()
-    assert F.allclose(g.ndata['h'],
+    assert F.allclose(g.ndata.pop('out'),
+            F.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
+    # test with send and then recv
+    g.send()
+    g.recv()
+    assert F.allclose(g.ndata.pop('out'),
             F.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
 
 def test_copy_edge():
@@ -35,8 +41,14 @@ def test_copy_edge():
     g = generate_graph()
     g.register_message_func(fn.copy_edge(edge='h', out='m'))
     g.register_reduce_func(reducer_both)
+    # test with update_all
     g.update_all()
-    assert F.allclose(g.ndata['h'],
+    assert F.allclose(g.ndata.pop('out'),
+            F.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
+    # test with send and then recv
+    g.send()
+    g.recv()
+    assert F.allclose(g.ndata.pop('out'),
             F.tensor([10., 1., 1., 1., 1., 1., 1., 1., 1., 44.]))
 
 def test_src_mul_edge():
@@ -44,8 +56,14 @@ def test_src_mul_edge():
     g = generate_graph()
     g.register_message_func(fn.src_mul_edge(src='h', edge='h', out='m'))
     g.register_reduce_func(reducer_both)
+    # test with update_all
     g.update_all()
-    assert F.allclose(g.ndata['h'],
+    assert F.allclose(g.ndata.pop('out'),
+            F.tensor([100., 1., 1., 1., 1., 1., 1., 1., 1., 284.]))
+    # test with send and then recv
+    g.send()
+    g.recv()
+    assert F.allclose(g.ndata.pop('out'),
             F.tensor([100., 1., 1., 1., 1., 1., 1., 1., 1., 284.]))
 
 if __name__ == '__main__':
