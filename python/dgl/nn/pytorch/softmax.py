@@ -84,7 +84,7 @@ class EdgeSoftmax(nn.Module):
         graph.apply_edges(
             lambda edges: {self._logits_name : th.exp(edges.data[self._logits_name] -
                                                       edges.dst[self._max_logits_name])})
-        # pop out temporary feature _max_logits, otherwise get_ndata_name will have huge overhead
+        # pop out temporary feature _max_logits, otherwise get_ndata_name could have huge overhead
         graph.ndata.pop(self._max_logits_name)
         # compute normalizer
         graph.update_all(fn.copy_edge(self._logits_name, self._logits_name),
