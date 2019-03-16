@@ -5,7 +5,8 @@ import numa
 import os
 if os.environ['DMLC_ROLE'] == 'server':
     os.environ['OMP_NUM_THREADS'] = '4'
-os.environ['OMP_NUM_THREADS'] = '16'
+else:
+    os.environ['OMP_NUM_THREADS'] = '16'
 import mxnet as mx
 from mxnet import gluon
 from functools import partial
