@@ -7,6 +7,10 @@ import scipy.sparse as sp
 import time
 from functools import partial
 from .. import randomwalk
+import stanfordnlp
+import re
+import tqdm
+import string
 
 class MovieLens(object):
     def __init__(self, directory):
@@ -26,7 +30,7 @@ class MovieLens(object):
         # read users
         with open(os.path.join(directory, 'users.dat')) as f:
             for l in f:
-                id_, gender, age, occupation, zip_ = l.split('::')
+                id_, gender, age, occupation, zip_ = l.strip().split('::')
                 users.append({
                     'id': int(id_),
                     'gender': gender,
@@ -34,18 +38,29 @@ class MovieLens(object):
                     'occupation': occupation,
                     'zip': zip_,
                     })
-        self.users = pd.DataFrame(users).set_index('id')
+        self.users = pd.DataFrame(users).set_index('id').astype('category')
 
         # read movies
         with open(os.path.join(directory, 'movies.dat'), encoding='latin1') as f:
             for l in f:
-                id_, title, genres = l.split('::')
+                id_, title, genres = l.strip().split('::')
                 genres_set = set(genres.split('|'))
-                data = {'id': int(id_), 'title': title}
+
+                # extract year
+                assert re.match(r'.*\([0-9]{4}\)$', title)
+                year = title[-5:-1]
+                title = title[:-6].strip()
+
+                data = {'id': int(id_), 'title': title, 'year': year}
                 for g in genres_set:
                     data[g] = True
                 movies.append(data)
-        self.movies = pd.DataFrame(movies).set_index('id')
+        self.movies = (
+                pd.DataFrame(movies)
+                .set_index('id')
+                .fillna(False)
+                .astype({'year': 'category'}))
+        self.genres = self.movies.columns[self.movies.dtypes == bool]
 
         # read ratings
         with open(os.path.join(directory, 'ratings.dat')) as f:
@@ -69,7 +84,7 @@ class MovieLens(object):
 
         self.data_split()
         self.build_graph()
-        self.find_neighbors(100, 20, 500)
+        self.find_neighbors(0.2, 2000, 1000, 100)
 
     def split_user(self, df, filter_counts=False):
         df_new = df.copy()
@@ -95,12 +110,55 @@ class MovieLens(object):
     def build_graph(self):
         user_ids = list(self.users.index)
         movie_ids = list(self.movies.index)
-
         user_ids_invmap = {id_: i for i, id_ in enumerate(user_ids)}
         movie_ids_invmap = {id_: i for i, id_ in enumerate(movie_ids)}
+        self.user_ids = user_ids
+        self.movie_ids = movie_ids
+        self.user_ids_invmap = user_ids_invmap
+        self.movie_ids_invmap = movie_ids_invmap
 
         g = dgl.DGLGraph()
         g.add_nodes(len(user_ids) + len(movie_ids))
+
+        # user features
+        for user_column in self.users.columns:
+            udata = torch.zeros(g.number_of_nodes(), dtype=torch.int64)
+            # 0 for padding
+            udata[:len(user_ids)] = \
+                    torch.LongTensor(self.users[user_column].cat.codes.values.astype('int64') + 1)
+            g.ndata[user_column] = udata
+
+        # movie genre
+        movie_genres = torch.from_numpy(self.movies[self.genres].values.astype('float32'))
+        g.ndata['genre'] = torch.zeros(g.number_of_nodes(), len(self.genres))
+        g.ndata['genre'][len(user_ids):len(user_ids) + len(movie_ids)] = movie_genres
+
+        # movie year
+        g.ndata['year'] = torch.zeros(g.number_of_nodes(), dtype=torch.int64)
+        # 0 for padding
+        g.ndata['year'][len(user_ids):len(user_ids) + len(movie_ids)] = \
+                torch.LongTensor(self.movies['year'].cat.codes.values.astype('int64') + 1)
+
+        # movie title
+        nlp = stanfordnlp.Pipeline(use_gpu=False, processors='tokenize,lemma')
+        vocab = set()
+        title_words = []
+        for t in tqdm.tqdm(self.movies['title'].values):
+            doc = nlp(t)
+            words = set()
+            for s in doc.sentences:
+                words.update(w.lemma.lower() for w in s.words
+                             if not re.fullmatch(r'['+string.punctuation+']+', w.lemma))
+            vocab.update(words)
+            title_words.append(words)
+        vocab = list(vocab)
+        vocab_invmap = {w: i for i, w in enumerate(vocab)}
+        # bag-of-words
+        g.ndata['title'] = torch.zeros(g.number_of_nodes(), len(vocab))
+        for i, tw in enumerate(tqdm.tqdm(title_words)):
+            g.ndata['title'][i, [vocab_invmap[w] for w in tw]] = 1
+        self.vocab = vocab
+        self.vocab_invmap = vocab_invmap
 
         rating_user_vertices = [user_ids_invmap[id_] for id_ in self.ratings['user_id'].values]
         rating_movie_vertices = [movie_ids_invmap[id_] + len(user_ids)
@@ -116,33 +174,23 @@ class MovieLens(object):
                 rating_movie_vertices,
                 rating_user_vertices,
                 data={'inv': torch.ones(self.ratings.shape[0], dtype=torch.uint8)})
-
-        #g_mat = sp.coo_matrix(g.adjacency_matrix().to_dense().numpy())
-        #self.g = dgl.DGLGraph(g_mat, readonly=True)
         self.g = g
-        self.user_ids = user_ids
-        self.movie_ids = movie_ids
-        self.user_ids_invmap = user_ids_invmap
-        self.movie_ids_invmap = movie_ids_invmap
 
-    def find_neighbors(self, n_traces, n_hops, top_T):
+    def find_neighbors(self, restart_prob, max_nodes, top_T, top_T_preserve):
         neighbor_probs, neighbors = randomwalk.random_walk_distribution_topt(
-                self.g, self.g.nodes(), n_traces, n_hops, top_T)
-
-        self.neighbor_probs = neighbor_probs
-        self.neighbors = neighbors
+                self.g, self.g.nodes(), restart_prob, max_nodes, top_T)
+        neighbor_probs = neighbor_probs[:, -top_T_preserve:]
+        neighbors = neighbors[:, -top_T_preserve:]
 
         self.user_neighbors = []
         for i in range(len(self.user_ids)):
             user_neighbor = neighbors[i]
-            user_neighbor = user_neighbor[user_neighbor < len(self.user_ids)]
-            self.user_neighbors.append(user_neighbor)
+            self.user_neighbors.append(user_neighbor.tolist())
 
         self.movie_neighbors = []
         for i in range(len(self.user_ids), len(self.user_ids) + len(self.movie_ids)):
             movie_neighbor = neighbors[i]
-            movie_neighbor = movie_neighbor[movie_neighbor >= len(self.user_ids)]
-            self.movie_neighbors.append(movie_neighbor)
+            self.movie_neighbors.append(movie_neighbor.tolist())
 
     def generate_mask(self):
         while True:
