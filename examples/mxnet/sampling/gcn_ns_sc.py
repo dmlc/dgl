@@ -1,6 +1,7 @@
 from multiprocessing import Process
 import argparse, time, math
 import numpy as np
+from scipy import sparse as spsp
 import numa
 import os
 if os.environ['DMLC_ROLE'] == 'server':
@@ -199,9 +200,37 @@ def worker_func(worker_id, args, g, features, labels, train_mask, val_mask, test
 
             print("Test Accuracy {:.4f}". format(num_acc/n_test_samples))
 
+class GraphData:
+    def __init__(self, csr, num_feats):
+        num_nodes = csr.shape[0]
+        num_edges = mx.nd.contrib.getnnz(csr).asnumpy()[0]
+        edge_ids = np.arange(0, num_edges, step=1, dtype=np.int64)
+        csr = spsp.csr_matrix((edge_ids, csr.indices.asnumpy(), csr.indptr.asnumpy()),
+                              shape=csr.shape, dtype=np.int64)
+        self.graph = dgl.graph_index.GraphIndex(multigraph=False, readonly=True)
+        self.graph.from_scipy_csr_matrix(csr, "in")
+        self.features = mx.nd.random.normal(shape=(csr.shape[0], num_feats))
+        self.num_labels = 10
+        self.labels = mx.nd.floor(mx.nd.random.uniform(low=0, high=self.num_labels,
+                                                       shape=(csr.shape[0])))
+        self.train_mask = np.zeros((num_nodes,))
+        self.train_mask[np.arange(0, int(num_nodes/2), dtype=np.int64)] = 1
+        self.val_mask = np.zeros((num_nodes,))
+        self.val_mask[np.arange(int(num_nodes/2), int(num_nodes/4*3), dtype=np.int64)] = 1
+        self.test_mask = np.zeros((num_nodes,))
+        self.test_mask[np.arange(int(num_nodes/4*3), int(num_nodes), dtype=np.int64)] = 1
+
+
 def main(args):
     # load and preprocess dataset
-    data = load_data(args)
+    if args.graph_file != '':
+        csr = mx.nd.load(args.graph_file)[0]
+        n_edges = csr.shape[0]
+        data = GraphData(csr, args.num_feats)
+        csr = None
+    else:
+        data = load_data(args)
+        n_edges = data.graph.number_of_edges()
 
     if args.gpu >= 0:
         ctx = mx.gpu(args.gpu)
@@ -222,7 +251,6 @@ def main(args):
     test_mask = mx.nd.array(data.test_mask, ctx=mem_ctx)
     in_feats = features.shape[1]
     n_classes = data.num_labels
-    n_edges = data.graph.number_of_edges()
 
     n_train_samples = train_mask.sum().asscalar()
     n_val_samples = val_mask.sum().asscalar()
@@ -265,6 +293,10 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
     register_data_args(parser)
+    parser.add_argument("--graph-file", type=str, default="",
+            help="graph file")
+    parser.add_argument("--num-feats", type=int, default=100,
+            help="the number of features")
     parser.add_argument("--dropout", type=float, default=0.5,
             help="dropout probability")
     parser.add_argument("--gpu", type=int, default=-1,

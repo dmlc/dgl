@@ -826,6 +826,22 @@ class GraphIndex(object):
         self._init(src, dst, edge_ids, num_nodes)
 
 
+    def from_scipy_csr_matrix(self, adj, edge_dir):
+        assert self.is_readonly()
+        assert adj.shape[0] == adj.shape[1]
+        assert isinstance(adj, scipy.sparse.csr_matrix)
+        indptr = utils.toindex(adj.indptr)
+        indices = utils.toindex(adj.indices)
+        edge_ids = utils.toindex(F.arange(0, len(indices)))
+        self._handle = _CAPI_DGLGraphCSRCreate(
+            indptr.todgltensor(),
+            indices.todgltensor(),
+            edge_ids.todgltensor(),
+            self._multigraph,
+            int(adj.shape[0]),
+            edge_dir)
+
+
     def from_edge_list(self, elist):
         """Convert from an edge list.
 
