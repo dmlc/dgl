@@ -4,8 +4,6 @@
  * \brief DGL immutable graph index implementation
  */
 
-#include <parallel/algorithm>
-
 #include <dgl/immutable_graph.h>
 
 #ifdef _MSC_VER
@@ -259,7 +257,7 @@ ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::FromEdges(std::vector<Edge> *edges
   CHECK(sort_on == 0 || sort_on == 1) << "we must sort on the first or the second vector";
   int other_end = sort_on == 1 ? 0 : 1;
   // TODO(zhengda) we should sort in parallel.
-  __gnu_parallel::sort(edges->begin(), edges->end(), [sort_on, other_end](const Edge &e1, const Edge &e2) {
+  std::sort(edges->begin(), edges->end(), [sort_on, other_end](const Edge &e1, const Edge &e2) {
     if (e1.end_points[sort_on] == e2.end_points[sort_on]) {
       return e1.end_points[other_end] < e2.end_points[other_end];
     } else {
@@ -320,7 +318,6 @@ ImmutableGraph::ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_id
   const dgl_id_t *dst_data = static_cast<dgl_id_t*>(dst_ids->data);
   const dgl_id_t *edge_data = static_cast<dgl_id_t*>(edge_ids->data);
   std::vector<Edge> edges(len);
-#pragma omp parallel for
   for (size_t i = 0; i < edges.size(); i++) {
     Edge e;
     e.end_points[0] = src_data[i];
