@@ -22,6 +22,7 @@ parser.add_argument('--layers', type=int, default=2)
 parser.add_argument('--use-feature', action='store_true')
 parser.add_argument('--sgd-switch', type=int, default=-1)
 parser.add_argument('--n-negs', type=int, default=1)
+parser.add_argument('--loss', type=str, default='hinge')
 parser.add_argument('--hard-neg-prob', type=float, default=0)
 args = parser.parse_args()
 
@@ -51,6 +52,10 @@ hard_neg_prob = args.hard_neg_prob
 sched_lambda = {
         'none': lambda epoch: 1,
         'decay': lambda epoch: max(0.98 ** epoch, 1e-4),
+        }
+loss_func = {
+        'hinge': lambda diff: (diff + margin).clamp(min=0).mean(),
+        'bpr': lambda diff: (1 - torch.sigmoid(-diff)).mean(),
         }
 
 model = cuda(PinSage(
@@ -134,7 +139,7 @@ def runtrain(g_prior_edges, g_train_edges, train):
                     .split([src_size, dst_size, dst_neg_size]))
 
             diff = (h_src * (h_dst_neg - h_dst)).sum(1)
-            loss = (diff + margin).clamp(min=0).mean()
+            loss = loss_func[args.loss](diff)
             acc = (diff < 0).sum()
             assert loss.item() == loss.item()
 
