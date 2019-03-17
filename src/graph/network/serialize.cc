@@ -4,6 +4,7 @@
  * \brief Serialization for DGL distributed training.
  */
 #include "serialize.h"
+#include "../network.h"
 
 #include <dmlc/logging.h>
 #include <dgl/immutable_graph.h>
@@ -39,6 +40,11 @@ int64_t SerializeSampledSubgraph(char* data,
   total_size += indices_size;
   total_size += edge_ids_size;
   total_size += kNumTensor * sizeof(int64_t);
+  if (total_size > kMaxBufferSize) {
+    LOG(FATAL) << "Message size: (" << total_size
+               << ") is larger than buffer size: (" 
+               << kMaxBufferSize << ")";
+  }
   // Write binary data to buffer
   char* data_ptr = data;
   dgl_id_t* node_map_data = static_cast<dgl_id_t*>(node_mapping->data);
