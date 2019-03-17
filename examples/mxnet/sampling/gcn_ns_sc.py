@@ -157,12 +157,12 @@ def worker_func(worker_id, args, g, features, labels, train_mask, val_mask, test
                                                        num_hops=args.n_layers+1,
                                                        seed_nodes=train_nid):
             train_sample_time += time.time() - start
-            nf.copy_from_parent()
+            nf.copy_from_parent(ctx=ctx)
             # forward
             with mx.autograd.record():
                 pred = model(nf)
-                batch_nids = nf.layer_parent_nid(-1).astype('int64').as_in_context(ctx)
-                batch_labels = labels[batch_nids]
+                batch_nids = nf.layer_parent_nid(-1).astype('int64')
+                batch_labels = labels[batch_nids].as_in_context(ctx)
                 loss = loss_fcn(pred, batch_labels)
                 loss = loss.sum() / len(batch_nids)
 
@@ -232,11 +232,11 @@ def main(args):
         data = load_data(args)
         n_edges = data.graph.number_of_edges()
 
-    if args.gpu >= 0:
-        ctx = mx.gpu(args.gpu)
+    mem_ctx = mx.Context('cpu_shared', 0)
+    if args.num_gpu > 0:
+        runtime_ctx = [mx.gpu(i) for i in range(args.num_gpu)]
     else:
-        mem_ctx = mx.Context('cpu_shared', 0)
-        runtime_ctx = mx.cpu()
+        runtime_ctx = [mx.cpu()]
 
     if args.self_loop and not args.dataset.startswith('reddit'):
         data.graph.add_edges_from([(i,i) for i in range(len(data.graph))])
@@ -269,9 +269,7 @@ def main(args):
 
     # create GCN model
     g = DGLGraph(data.graph, readonly=True)
-
     g.ndata['features'] = features
-
     num_neighbors = args.num_neighbors
 
     degs = g.in_degrees().astype('float32').as_in_context(mem_ctx)
@@ -281,7 +279,8 @@ def main(args):
     ps = []
     for i in range(args.nworkers):
         p = Process(target=worker_func, args=(i, args, g, features, labels, train_mask, val_mask, test_mask,
-                                              in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, runtime_ctx))
+                                              in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples,
+                                              runtime_ctx[i % len(runtime_ctx)]))
         ps.append(p)
         p.start()
     for p in ps:
@@ -299,8 +298,8 @@ if __name__ == '__main__':
             help="the number of features")
     parser.add_argument("--dropout", type=float, default=0.5,
             help="dropout probability")
-    parser.add_argument("--gpu", type=int, default=-1,
-            help="gpu")
+    parser.add_argument("--num-gpu", type=int, default=0,
+            help="the number of gpu")
     parser.add_argument("--lr", type=float, default=3e-2,
             help="learning rate")
     parser.add_argument("--n-epochs", type=int, default=200,
