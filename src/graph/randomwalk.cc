@@ -278,20 +278,22 @@ NodeFlow CreateNodeFlowWithPPRFromRandomWalk(
       }
 
       // pick top t vertices and connect them to dst
+      std::vector<std::pair<dgl_id_t, size_t>> visit_counter_vec(
+          visit_counter.begin(), visit_counter.end());
       std::sort(
-          visit_counter.begin(),
-          visit_counter.end(),
-          [] (std::pair<dgl_id_t, size_t> a, std::pair<dgl_id_t, size_t> b) {
+          visit_counter_vec.begin(),
+          visit_counter_vec.end(),
+          [] (std::pair<dgl_id_t, size_t> &a, std::pair<dgl_id_t, size_t> &b) {
             return a.second > b.second;
           });
       size_t total_visits = 0;
       uint64_t t = 0;
-      auto it = visit_counter.cbegin();
-      for (; t < top_t && it != visit_counter.cend(); ++t, ++it)
+      auto it = visit_counter_vec.cbegin();
+      for (; t < top_t && it != visit_counter_vec.cend(); ++t, ++it)
         total_visits += it->second;
       neigh_pos.emplace_back(dst, neighbor_list.size(), t);
-      for (t = 0, it = visit_counter.cbegin();
-          t < top_t && it != visit_counter.cend();
+      for (t = 0, it = visit_counter_vec.cbegin();
+          t < top_t && it != visit_counter_vec.cend();
           ++t, ++it) {
         neighbor_list.push_back(it->first);
         edge_list.push_back(-1);    // not mapping edges to parent graph
@@ -313,11 +315,11 @@ NodeFlow CreateNodeFlowWithPPRFromRandomWalk(
       neighbor_list, edge_list, layer_offsets, &sub_vers, &neigh_pos,
       "in", gptr->IsMultigraph(), &nf, &vertex_mapping, &edge_mapping);
 
-  const size_t num_edges = edge_list.size();
+  const int64_t num_edges = edge_list.size();
   nf.edge_data = NDArray::Empty(
       {num_edges}, DLDataType{kDLFloat, 64, 1}, DLContext{kDLCPU, 0});
   double *edge_data_out = static_cast<double *>(nf.edge_data->data);
-  for (size_t i = 0; i < num_edges; ++i)
+  for (int64_t i = 0; i < num_edges; ++i)
     edge_data_out[i] = edge_data[edge_mapping[i]];
   return nf;
 }
@@ -378,10 +380,10 @@ void PPRNeighborSamplingEntry(
   const int num_hops = args[9];
   const uint64_t top_t = args[10];
 
-  const GraphInterface *gptr = static_cast<GraphInterface *>(ghandle);
+  const GraphInterface *gptr = static_cast<const GraphInterface *>(ghandle);
 
   std::vector<NodeFlow *> nflows = PPRNeighborSampling(
-      ghandle, seed_nodes, restart_prob, max_nodes_per_seed, max_visit_counts,
+      gptr, seed_nodes, restart_prob, max_nodes_per_seed, max_visit_counts,
       max_frequent_visited_nodes, walker, num_hops, top_t,
       max_num_workers, batch_size, batch_start_id);
 
