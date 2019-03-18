@@ -54,17 +54,31 @@ class NodeFlow(DGLBaseGraph):
             _CAPI_NodeFlowGetLayerOffsets(handle)).tonumpy()
         self._block_offsets = utils.toindex(
             _CAPI_NodeFlowGetBlockOffsets(handle)).tonumpy()
-        _CAPI_NodeFlowFree(handle)
+
         # node/edge frames
         self._node_frames = [FrameRef(Frame(num_rows=self.layer_size(i))) \
                              for i in range(self.num_layers)]
         self._edge_frames = [FrameRef(Frame(num_rows=self.block_size(i))) \
                              for i in range(self.num_blocks)]
+        if _CAPI_NodeFlowIsNodeDataAvailable(handle):
+            self._node_data = F.zerocopy_from_dlpack(
+                    _CAPI_NodeFlowGetNodeData(handle).to_dlpack())
+            for i in range(self.num_layers):
+                self._node_frames[i]['__data__'] = self._node_data[
+                        self._layer_offsets[i]:self._layer_offsets[i+1]]
+        if _CAPI_NodeFlowIsEdgeDataAvailable(handle):
+            self._edge_data = F.zerocopy_from_dlpack(
+                    _CAPI_NodeFlowGetEdgeData(handle).to_dlpack())
+            for i in range(self.num_blocks):
+                self._edge_frames[i]['__data__'] = self._edge_data[
+                        self._block_offsets[i]:self._block_offsets[i+1]]
         # registered functions
         self._message_funcs = [None] * self.num_blocks
         self._reduce_funcs = [None] * self.num_blocks
         self._apply_node_funcs = [None] * self.num_blocks
         self._apply_edge_funcs = [None] * self.num_blocks
+
+        _CAPI_NodeFlowFree(handle)
 
     def _get_layer_id(self, layer_id):
         """The layer Id might be negative. We need to convert it to the actual layer Id.

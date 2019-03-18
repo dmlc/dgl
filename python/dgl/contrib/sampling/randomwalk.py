@@ -35,7 +35,7 @@ def random_walk(g, seeds, num_traces, num_hops):
     if len(seeds) == 0:
         return utils.toindex([]).tousertensor()
     seeds = utils.toindex(seeds).todgltensor()
-    traces = _CAPI_DGLRandomWalk(g._graph._handle, seeds, num_traces, num_hops)
+    traces = _CAPI_RandomWalk(g._graph._handle, seeds, num_traces, num_hops)
     return F.zerocopy_from_dlpack(traces.to_dlpack())
 
 
@@ -107,7 +107,7 @@ def random_walk_with_restart(
     if len(seeds) == 0:
         return []
     seeds = utils.toindex(seeds).todgltensor()
-    traces = _CAPI_DGLRandomWalkWithRestart(
+    traces = _CAPI_RandomWalkWithRestart(
             g._graph._handle, seeds, restart_prob, max_nodes_per_seed,
             max_visit_counts, max_frequent_visited_nodes)
     return _split_traces(traces)
@@ -159,7 +159,7 @@ def bipartite_single_sided_random_walk_with_restart(
     if len(seeds) == 0:
         return []
     seeds = utils.toindex(seeds).todgltensor()
-    traces = _CAPI_DGLBipartiteSingleSidedRandomWalkWithRestart(
+    traces = _CAPI_BipartiteSingleSidedRandomWalkWithRestart(
             g._graph._handle, seeds, restart_prob, max_nodes_per_seed,
             max_visit_counts, max_frequent_visited_nodes)
     return _split_traces(traces)

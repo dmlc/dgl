@@ -10,6 +10,7 @@
 #include <string>
 #include <cstdlib>
 #include <ctime>
+#include <dmlc/omp.h>
 #include "graph_interface.h"
 #include "nodeflow.h"
 
@@ -20,14 +21,14 @@ inline int rand_r(unsigned *seed) {
 }
 
 inline unsigned int randseed() {
-  unsigned int seed = time(nullptr);
+  unsigned int seed = time(nullptr) ^ omp_get_thread_num();
   srand(seed);  // need to set seed manually since there's no rand_r
   return seed;
 }
 #define _CRT_RAND_S
 #else
 inline unsigned int randseed() {
-  return time(nullptr);
+  return time(nullptr) ^ omp_get_thread_num();
 }
 #endif
 
@@ -58,8 +59,10 @@ class SamplerOp {
    * \param add_self_loop whether to add self loop to the sampled subgraph
    * \return a NodeFlow graph.
    */
+  template<typename Iter>
   static NodeFlow NeighborUniformSample(const ImmutableGraph *graph,
-                                        const std::vector<dgl_id_t>& seeds,
+                                        Iter seed_iter,
+                                        size_t num_seeds,
                                         const std::string &edge_type,
                                         int num_hops, int expand_factor,
                                         const bool add_self_loop);
@@ -74,8 +77,10 @@ class SamplerOp {
    * \param layer_sizes The size of layers.
    * \return a NodeFlow graph.
    */
+  template <typename Iter>
   static NodeFlow LayerUniformSample(const ImmutableGraph *graph,
-                                     const std::vector<dgl_id_t>& seeds,
+                                     Iter seed_iter,
+                                     size_t num_seeds,
                                      const std::string &neigh_type,
                                      IdArray layer_sizes);
 };

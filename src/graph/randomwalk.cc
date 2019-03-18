@@ -5,6 +5,7 @@
  */
 
 #include <dgl/sampler.h>
+#include <dgl/nodeflow.h>
 #include <dmlc/omp.h>
 #include <dgl/immutable_graph.h>
 #include <algorithm>
@@ -100,7 +101,8 @@ IdArray GenericRandomWalk(
 
 RandomWalkTraces GenericRandomWalkWithRestart(
     const GraphInterface *gptr,
-    IdArray seeds,
+    Iter seed_iter,
+    uint64_t num_nodes,
     double restart_prob,
     uint64_t visit_threshold_per_seed,
     uint64_t max_visit_counts,
@@ -108,8 +110,6 @@ RandomWalkTraces GenericRandomWalkWithRestart(
     Walker walker) {
   std::vector<dgl_id_t> vertices;
   std::vector<size_t> trace_lengths, trace_counts, visit_counts;
-  const dgl_id_t *seed_ids = static_cast<dgl_id_t *>(seeds->data);
-  const uint64_t num_nodes = seeds->shape[0];
   int64_t restart_bound = static_cast<int64_t>(restart_prob * RAND_MAX);
 
   visit_counts.resize(gptr->NumVertices());
@@ -118,13 +118,13 @@ RandomWalkTraces GenericRandomWalkWithRestart(
 
   for (uint64_t i = 0; i < num_nodes; ++i) {
     int stop = 0;
+    dgl_id_t cur = *seed_iter, next;
     size_t total_trace_length = 0;
     size_t num_traces = 0;
     uint64_t num_frequent_visited_nodes = 0;
     std::fill(visit_counts.begin(), visit_counts.end(), 0);
 
     while (1) {
-      dgl_id_t cur = seed_ids[i], next;
       size_t trace_length = 0;
 
       for (; ; ++trace_length) {
@@ -150,6 +150,7 @@ RandomWalkTraces GenericRandomWalkWithRestart(
     }
 
     trace_counts.push_back(num_traces);
+    ++seed_iter;
   }
 
   RandomWalkTraces traces;
@@ -166,8 +167,8 @@ RandomWalkTraces GenericRandomWalkWithRestart(
       DLDataType{kDLInt, 64, 1},
       DLContext{kDLCPU, 0});
 
-  dgl_id_t *trace_counts_data = static_cast<dgl_id_t *>(traces.trace_counts->data);
-  dgl_id_t *trace_lengths_data = static_cast<dgl_id_t *>(traces.trace_lengths->data);
+  size_t *trace_counts_data = static_cast<size_t *>(traces.trace_counts->data);
+  size_t *trace_lengths_data = static_cast<size_t *>(traces.trace_lengths->data);
   dgl_id_t *vertices_data = static_cast<dgl_id_t *>(traces.vertices->data);
 
   std::copy(trace_counts.begin(), trace_counts.end(), trace_counts_data);
@@ -199,6 +200,8 @@ RandomWalkTraces RandomWalkWithRestart(
     uint64_t visit_threshold_per_seed,
     uint64_t max_visit_counts,
     uint64_t max_frequent_visited_nodes) {
+  const dgl_id_t *seed_data = static_cast<dgl_id_t *>(seeds->data);
+  const size_t num_nodes = seeds->shape[0];
   return GenericRandomWalkWithRestart(
       gptr, seeds, restart_prob, visit_threshold_per_seed, max_visit_counts,
       max_frequent_visited_nodes, WalkMultipleHops<1>);
@@ -211,12 +214,181 @@ RandomWalkTraces BipartiteSingleSidedRandomWalkWithRestart(
     uint64_t visit_threshold_per_seed,
     uint64_t max_visit_counts,
     uint64_t max_frequent_visited_nodes) {
+  const dgl_id_t *seed_data = static_cast<dgl_id_t *>(seeds->data);
+  const size_t num_nodes = seeds->shape[0];
   return GenericRandomWalkWithRestart(
       gptr, seeds, restart_prob, visit_threshold_per_seed, max_visit_counts,
       max_frequent_visited_nodes, WalkMultipleHops<2>);
 }
 
-DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalk")
+// TODO: Abstract common logic with SampleSubgraph
+template<typename Iter>
+NodeFlow CreateNodeFlowWithPPRFromRandomWalk(
+    const GraphInterface *gptr,
+    Iter seed_data,
+    size_t num_seeds,
+    double restart_prob,
+    uint64_t max_nodes_per_seed,
+    uint64_t max_visit_counts,
+    uint64_t max_frequent_visited_nodes,
+    bool (*walker)(const GraphInterface *, unsigned int *, dgl_id_t, dgl_id_t *),
+    int num_hops,
+    uint64_t top_t) {
+  // TODO: better naming; these follow SampleSubgraph
+  std::vector<dgl_id_t> neighbor_list, edge_list;
+  std::vector<double> edge_data;
+  std::vector<size_t> layer_offsets(num_hops + 1);
+  std::vector<neighbor_info> neigh_pos;
+  std::unordered_set<dgl_id_t> sub_ver_map;
+  std::vector<dgl_id_t> sub_vers;
+  std::map<dgl_id_t, size_t> visit_counter;   // ordered since we need to sort it
+
+  for (size_t i = 0; i < num_seeds; ++i) {
+    auto ret = sub_ver_map.insert(seed_data[i]);
+    if (ret.second)
+      sub_vers.push_back(seed_data[i]);
+  }
+
+  layer_offsets[0] = 0;
+  layer_offsets[1] = sub_vers.size();
+
+  for (int layer_id = 1; layer_id < num_hops; ++layer_id) {
+    sub_ver_map.clear();
+
+    auto sub_vers_iter = sub_vers.cbegin() + layer_offsets[layer_id - 1];
+    const uint64_t num_nodes_in_layer = layer_offsets[layer_id] - layer_offsets[layer_id - 1];
+
+    RandomWalkTraces traces = GenericRandomWalkWithRestart(
+        gptr, sub_vers_iter, num_nodes_in_layer, restart_prob, max_nodes_per_seed,
+        max_visit_counts, max_frequent_visited_nodes, walker);
+    const size_t *trace_counts_ptr = static_cast<size_t *>(traces.trace_counts->data);
+    const size_t *trace_lengths_ptr = static_cast<dgl_id_t *>(traces.trace_lengths->data);
+    const dgl_id_t *trace_vertices_ptr = static_cast<dgl_id_t *>(traces.vertices->data);
+
+    for (size_t seed_idx = 0; seed_idx < num_nodes_in_layer;
+         ++seed_idx, ++trace_counts_ptr, ++sub_vers_iter) {
+      const dgl_id_t dst = *sub_vers_iter;
+      visit_counter.clear();
+
+      for (size_t trace_idx = 0; trace_idx < *trace_counts_ptr;
+           ++trace_idx, ++trace_lengths_ptr) {
+        for (size_t vertex_idx = 0; vertex_idx < *trace_lengths_ptr;
+             ++vertex_idx, ++trace_vertices_ptr)
+          ++visit_counter[*trace_vertices_ptr];
+      }
+
+      // pick top t vertices and connect them to dst
+      std::sort(
+          visit_counter.begin(),
+          visit_counter.end(),
+          [] (std::pair<dgl_id_t, size_t> a, std::pair<dgl_id_t, size_t> b) {
+            return a.second > b.second;
+          });
+      size_t total_visits = 0;
+      uint64_t t = 0;
+      auto it = visit_counter.cbegin();
+      for (; t < top_t && it != visit_counter.cend(); ++t, ++it)
+        total_visits += it->second;
+      neigh_pos.emplace_back(dst, neighbor_list.size(), t);
+      for (t = 0, it = visit_counter.cbegin();
+          t < top_t && it != visit_counter.cend();
+          ++t, ++it) {
+        neighbor_list.push_back(it->first);
+        edge_list.push_back(-1);    // not mapping edges to parent graph
+        edge_data.push_back(it->second / total_visits);
+
+        auto ret = sub_ver_map.insert(it->first);
+        if (ret.second)
+          sub_vers.push_back(it->first);
+      }
+    }
+
+    layer_offsets[layer_id + 1] = layer_offsets[layer_id] + sub_ver_map.size();
+    CHECK_EQ(layer_offsets[layer_id + 1], sub_vers.size());
+  }
+
+  std::vector<dgl_id_t> vertex_mapping, edge_mapping;
+  NodeFlow nf;
+  ConstructNodeFlow(
+      neighbor_list, edge_list, layer_offsets, &sub_vers, &neigh_pos,
+      "in", gptr->IsMultigraph(), &nf, &vertex_mapping, &edge_mapping);
+
+  const size_t num_edges = edge_list.size();
+  nf.edge_data = NDArray::Empty(
+      {num_edges}, DLDataType{kDLFloat, 64, 1}, DLContext{kDLCPU, 0});
+  double *edge_data_out = static_cast<double *>(nf.edge_data->data);
+  for (size_t i = 0; i < num_edges; ++i)
+    edge_data_out[i] = edge_data[edge_mapping[i]];
+  return nf;
+}
+
+// TODO: extract common logic with UniformSampling & alike
+std::vector<NodeFlow *> PPRNeighborSampling(
+    const GraphInterface *gptr,
+    IdArray seed_nodes,
+    double restart_prob,
+    uint64_t max_nodes_per_seed,
+    uint64_t max_visit_counts,
+    uint64_t max_frequent_visited_nodes,
+    bool (*walker)(const GraphInterface *, unsigned int *, dgl_id_t, dgl_id_t *),
+    int num_hops,
+    uint64_t top_t,
+    int64_t max_num_workers,
+    int64_t batch_size,
+    /*
+     * FIXME: follows _CAPI_UniformSampling; why do we need this?
+     * Is passing a single huge array + start offset faster and/or more scalable than
+     * passing in multiple small arrays?
+     */
+    int64_t batch_start_id) {
+  CHECK(IsValidIdArray(seed_nodes));
+  const dgl_id_t *seed_nodes_data = static_cast<dgl_id_t *>(seed_nodes->data);
+  const int64_t num_seeds = seed_nodes->shape[0];
+  const int64_t num_workers = std::min(max_num_workers,
+      (num_seeds + batch_size - 1) / batch_size - batch_start_id);
+
+  std::vector<NodeFlow *> nflows(num_workers);
+#pragma omp parallel for
+  for (int i = 0; i < num_workers; ++i) {
+    const int64_t start = (batch_start_id + i) * batch_size;
+    const int64_t end = std::min(start + batch_size, num_seeds);
+    nflows[i] = new NodeFlow();
+    *nflows[i] = SamplerOp::CreateNodeFlowWithPPRFromRandomWalk(
+        gptr, seed_nodes_data + start, end - start, restart_prob, max_nodes_per_seed,
+        max_visit_counts, max_frequent_visited_nodes, walker, num_hops, top_t);
+  }
+
+  return nflows;
+}
+
+void PPRNeighborSamplingEntry(
+    DGLArgs args,
+    DGLRetValue* rv,
+    bool (*walker)(const GraphInterface *, unsigned int *, dgl_id_t, dgl_id_t *)) {
+  GraphHandle ghandle = args[0];
+  const IdArray seed_nodes = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+  const int64_t batch_start_id = args[2];
+  const int64_t batch_size = args[3];
+  const int64_t max_num_workers = args[4];
+
+  const double restart_prob = args[5];
+  const uint64_t max_nodes_per_seed = args[6];
+  const uint64_t max_visit_counts = args[7];
+  const uint64_t max_frequent_visited_nodes = args[8];
+  const int num_hops = args[9];
+  const uint64_t top_t = args[10];
+
+  const GraphInterface *gptr = static_cast<GraphInterface *>(ghandle);
+
+  std::vector<NodeFlow *> nflows = PPRNeighborSampling(
+      ghandle, seed_nodes, restart_prob, max_nodes_per_seed, max_visit_counts,
+      max_frequent_visited_nodes, walker, num_hops, top_t,
+      max_num_workers, batch_size, batch_start_id);
+
+  *rv = WrapVectorReturn(nflows);
+}
+
+DGL_REGISTER_GLOBAL("randomwalk._CAPI_RandomWalk")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const IdArray seeds = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
@@ -227,7 +399,7 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalk")
     *rv = RandomWalk(ptr, seeds, num_traces, num_hops);
   });
 
-DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalkWithRestart")
+DGL_REGISTER_GLOBAL("randomwalk._CAPI_RandomWalkWithRestart")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const IdArray seeds = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
@@ -242,7 +414,7 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalkWithRestart")
           max_visit_counts, max_frequent_visited_nodes));
   });
 
-DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLBipartiteSingleSidedRandomWalkWithRestart")
+DGL_REGISTER_GLOBAL("randomwalk._CAPI_BipartiteSingleSidedRandomWalkWithRestart")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const IdArray seeds = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
@@ -256,6 +428,16 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLBipartiteSingleSidedRandomWalkWithResta
         BipartiteSingleSidedRandomWalkWithRestart(
           gptr, seeds, restart_prob, visit_threshold_per_seed,
           max_visit_counts, max_frequent_visited_nodes));
+  });
+
+DGL_REGISTER_GLOBAL("randomwalk._CAPI_PPRNeighborSampling")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    PPRNeighborSamplingEntry(args, rv, multihop_walker<1>);
+  });
+
+DGL_REGISTER_GLOBAL("randomwalk._CAPI_PPRBipartiteSingleSidedNeighborSampling")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    PPRNeighborSamplingEntry(args, rv, multihop_walker<2>);
   });
 
 };  // namespace dgl

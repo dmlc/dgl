@@ -6,10 +6,18 @@
 
 #include <dgl/immutable_graph.h>
 #include <dgl/nodeflow.h>
+#include <dgl/sampler.h>
 
-#include <string.h>
+#include <string>
+#include <numeric>
 
 #include "../c_api_common.h"
+
+using dgl::runtime::DGLArgs;
+using dgl::runtime::DGLArgValue;
+using dgl::runtime::DGLRetValue;
+using dgl::runtime::PackedFunc;
+using dgl::runtime::NDArray;
 
 namespace dgl {
 
@@ -71,5 +79,228 @@ std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph, const std::st
     return std::vector<IdArray>();
   }
 }
+
+void ConstructNodeFlow(
+    const std::vector<dgl_id_t> &neighbor_list,
+    const std::vector<dgl_id_t> &edge_list,
+    const std::vector<size_t> &layer_offsets,
+    std::vector<dgl_id_t> *sub_vers,
+    std::vector<neighbor_info> *neigh_pos,
+    const std::string &edge_type,
+    bool is_multigraph,
+    NodeFlow *nf,
+    std::vector<dgl_id_t> *vertex_mapping,
+    std::vector<dgl_id_t> *edge_mapping) {
+  uint64_t num_vertices = sub_vers->size();
+  int64_t num_edges = static_cast<int64_t>(edge_list.size());
+  int num_hops = layer_offsets.size() - 1;
+  nf->node_mapping = IdArray::Empty({static_cast<int64_t>(num_vertices)},
+                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  nf->edge_mapping = IdArray::Empty({static_cast<int64_t>(num_edges)},
+                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  nf->layer_offsets = IdArray::Empty({static_cast<int64_t>(num_hops + 1)},
+                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  nf->flow_offsets = IdArray::Empty({static_cast<int64_t>(num_hops)},
+                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  vertex_mapping->resize(num_vertices);
+  edge_mapping->resize(num_edges);
+
+  dgl_id_t *node_map_data = static_cast<dgl_id_t *>(nf->node_mapping->data);
+  dgl_id_t *layer_off_data = static_cast<dgl_id_t *>(nf->layer_offsets->data);
+  dgl_id_t *flow_off_data = static_cast<dgl_id_t *>(nf->flow_offsets->data);
+  dgl_id_t *edge_map_data = static_cast<dgl_id_t *>(nf->edge_mapping->data);
+
+  // Construct sub_csr_graph
+  auto subg_csr = std::make_shared<ImmutableGraph::CSR>(num_vertices, num_edges);
+  subg_csr->indices.resize(num_edges);
+  subg_csr->edge_ids.resize(num_edges);
+  dgl_id_t* col_list_out = subg_csr->indices.data();
+  int64_t* indptr_out = subg_csr->indptr.data();
+  size_t collected_nedges = 0;
+
+  // The data from the previous steps:
+  // * node data: sub_vers (vid, layer), neigh_pos,
+  // * edge data: neighbor_list, edge_list, probability.
+  // * layer_offsets: the offset in sub_vers.
+  dgl_id_t ver_id = 0;
+  std::vector<std::unordered_map<dgl_id_t, dgl_id_t>> layer_ver_maps;
+  layer_ver_maps.resize(num_hops);
+  size_t out_node_idx = 0;
+  for (int layer_id = num_hops - 1; layer_id >= 0; layer_id--) {
+    // We sort the vertices in a layer so that we don't need to sort the neighbor Ids
+    // after remap to a subgraph.
+    std::sort(sub_vers->begin() + layer_offsets[layer_id],
+              sub_vers->begin() + layer_offsets[layer_id + 1]);
+
+    // Save the sampled vertices and its layer Id.
+    for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
+      (*vertex_mapping)[out_node_idx] = i;
+      node_map_data[out_node_idx] = sub_vers->at(i);
+      layer_ver_maps[layer_id].insert(std::pair<dgl_id_t, dgl_id_t>(sub_vers->at(i),
+                                                                    ver_id++));
+      ++out_node_idx;
+    }
+  }
+  CHECK(out_node_idx == num_vertices);
+
+  // sampling algorithms have to start from the seed nodes, so the seed nodes are
+  // in the first layer and the input nodes are in the last layer.
+  // When we expose the sampled graph to a Python user, we say the input nodes
+  // are in the first layer and the seed nodes are in the last layer.
+  // Thus, when we copy sampled results to a CSR, we need to reverse the order of layers.
+  size_t row_idx = 0;
+  for (size_t i = layer_offsets[num_hops - 1]; i < layer_offsets[num_hops]; i++) {
+    indptr_out[row_idx++] = 0;
+  }
+  layer_off_data[0] = 0;
+  layer_off_data[1] = layer_offsets[num_hops] - layer_offsets[num_hops - 1];
+  int out_layer_idx = 1;
+  for (int layer_id = num_hops - 2; layer_id >= 0; layer_id--) {
+    std::sort(neigh_pos->begin() + layer_offsets[layer_id],
+              neigh_pos->begin() + layer_offsets[layer_id + 1],
+              [](const neighbor_info &a1, const neighbor_info &a2) {
+                return a1.id < a2.id;
+              });
+
+    for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
+      dgl_id_t dst_id = sub_vers->at(i);
+      CHECK_EQ(dst_id, neigh_pos->at(i).id);
+      size_t pos = neigh_pos->at(i).pos;
+      CHECK_LE(pos, neighbor_list.size());
+      size_t num_edges = neigh_pos->at(i).num_edges;
+      if (neighbor_list.empty()) CHECK_EQ(num_edges, 0);
+
+      // We need to map the Ids of the neighbors to the subgraph.
+      auto neigh_it = neighbor_list.begin() + pos;
+      for (size_t i = 0; i < num_edges; i++) {
+        dgl_id_t neigh = *(neigh_it + i);
+        CHECK(layer_ver_maps[layer_id + 1].find(neigh) != layer_ver_maps[layer_id + 1].end());
+        col_list_out[collected_nedges + i] = layer_ver_maps[layer_id + 1][neigh];
+      }
+      // We can simply copy the edge Ids.
+      std::copy_n(edge_list.begin() + pos,
+                  num_edges, edge_map_data + collected_nedges);
+      std::iota(
+          edge_mapping->begin() + collected_nedges,
+          edge_mapping->begin() + collected_nedges + num_edges,
+          pos);
+      collected_nedges += num_edges;
+      indptr_out[row_idx+1] = indptr_out[row_idx] + num_edges;
+      row_idx++;
+    }
+    layer_off_data[out_layer_idx + 1] = layer_off_data[out_layer_idx]
+        + layer_offsets[layer_id + 1] - layer_offsets[layer_id];
+    out_layer_idx++;
+  }
+  CHECK(row_idx == num_vertices);
+  CHECK(indptr_out[row_idx] == num_edges);
+  CHECK(out_layer_idx == num_hops);
+  CHECK(layer_off_data[out_layer_idx] == num_vertices);
+
+  // Copy flow offsets.
+  flow_off_data[0] = 0;
+  int out_flow_idx = 0;
+  for (size_t i = 0; i < layer_offsets.size() - 2; i++) {
+    size_t num_edges = subg_csr->GetDegree(layer_off_data[i + 1], layer_off_data[i + 2]);
+    flow_off_data[out_flow_idx + 1] = flow_off_data[out_flow_idx] + num_edges;
+    out_flow_idx++;
+  }
+  CHECK(out_flow_idx == num_hops - 1);
+  CHECK(flow_off_data[num_hops - 1] == static_cast<uint64_t>(num_edges));
+
+  for (size_t i = 0; i < subg_csr->edge_ids.size(); i++) {
+    subg_csr->edge_ids[i] = i;
+  }
+
+  if (edge_type == "in") {
+    nf->graph = GraphPtr(new ImmutableGraph(subg_csr, nullptr, is_multigraph));
+  } else {
+    nf->graph = GraphPtr(new ImmutableGraph(nullptr, subg_csr, is_multigraph));
+  }
+
+  nf->node_data_available = false;
+  nf->edge_data_available = false;
+}
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    GraphInterface* gptr = nflow->graph->Reset();
+    *rv = gptr;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetNodeMapping")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    *rv = nflow->node_mapping;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetEdgeMapping")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    *rv = nflow->edge_mapping;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetLayerOffsets")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    *rv = nflow->layer_offsets;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetBlockOffsets")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    *rv = nflow->flow_offsets;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowFree")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    delete nflow;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowIsNodeDataAvailable")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    *rv = nflow->node_data_available;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowIsEdgeDataAvailable")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    *rv = nflow->edge_data_available;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetNodeData")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    if (!nflow->node_data_available) {
+      LOG(FATAL) << "node data unavailable";
+      *rv = nullptr;
+    } else {
+      *rv = nflow->node_data;
+    }
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetEdgeData")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    if (!nflow->edge_data_available) {
+      LOG(FATAL) << "edge data unavailable";
+      *rv = nullptr;
+    } else {
+      *rv = nflow->edge_data;
+    }
+  });
 
 }  // namespace dgl

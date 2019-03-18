@@ -16,6 +16,25 @@ namespace dgl {
 class ImmutableGraph;
 
 /*!
+ * \brief argument structure used in ConstructNodeFlow
+ */
+struct neighbor_info {
+  /*! \brief which node this set of edges is pointing to */
+  dgl_id_t id;
+  /*! \brief the offset of this edge set in neighbor_list */
+  size_t pos;
+  /*! \brief the number of edges in this edge set */
+  size_t num_edges;
+
+  /*! \brief default ctor */
+  neighbor_info(dgl_id_t id, size_t pos, size_t num_edges) {
+    this->id = id;
+    this->pos = pos;
+    this->num_edges = num_edges;
+  }
+};
+
+/*!
  * \brief A NodeFlow graph stores the sampling results for a sampler that samples
  * nodes/edges in layers.
  *
@@ -42,6 +61,22 @@ struct NodeFlow {
    * \brief The edge mapping from the NodeFlow graph to the parent graph.
    */
   IdArray edge_mapping;
+  /*!
+   * \brief Whether a node tensor is returned
+   */
+  bool node_data_available;
+  /*!
+   * \brief Whether an edge tensor is returned
+   */
+  bool edge_data_available;
+  /*!
+   * \brief Application-specific tensor data on nodes
+   */
+  runtime::NDArray node_data;
+  /*!
+   * \brief Application specific tensor data on edges
+   */
+  runtime::NDArray edge_data;
 };
 
 /*!
@@ -79,6 +114,32 @@ struct NodeFlow {
 std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph, const std::string &fmt,
                                       size_t layer0_size, size_t layer1_start,
                                       size_t layer1_end, bool remap);
+
+/*!
+ * \brief NodeFlow constructor
+ * \param sub_vers The flattened list of sampled nodes on the original graph
+ * \param layer_offsets The offsets to \a sub_vers for each NodeFlow layer, plus the last element
+ * containing the length of \a sub_vers
+ * \param edge_list The flattened list of edge IDs on the original graph (-1 if not exist)
+ * \param neighbor_list The flattened list of source nodes of \a edge_list
+ * \param neigh_pos List of \a neighbor_info keeping track of target nodes of \a edge_list
+ * \param edge_type If "out", switches direction of edges
+ * \param is_multigraph Whether the nodeflow graph could be a multigraph
+ * \param nf The output NodeFlow object
+ * \param vertex_mapping Output mapping from vertex IDs of NodeFlow graph to \a sub_vers
+ * \param edge_mapping Output mapping from edge IDs of NodeFlow graph to \a edge_list
+ */
+void ConstructNodeFlow(
+    const std::vector<dgl_id_t> &neighbor_list,
+    const std::vector<dgl_id_t> &edge_list,
+    const std::vector<size_t> &layer_offsets,
+    std::vector<dgl_id_t> *sub_vers,
+    std::vector<neighbor_info> *neigh_pos,
+    const std::string &edge_type,
+    bool is_multigraph,
+    NodeFlow *nf,
+    std::vector<dgl_id_t> *vertex_mapping,
+    std::vector<dgl_id_t> *edge_mapping);
 
 }  // namespace dgl
 

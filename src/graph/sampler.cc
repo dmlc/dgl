@@ -5,7 +5,6 @@
  */
 
 #include <dgl/sampler.h>
-#include <dmlc/omp.h>
 #include <dgl/immutable_graph.h>
 #include <dmlc/omp.h>
 #include <algorithm>
@@ -219,183 +218,33 @@ void GetNonUniformSample(const float* probability,
 /*
  * Used for subgraph sampling
  */
-struct neigh_list {
-  std::vector<dgl_id_t> neighs;
-  std::vector<dgl_id_t> edges;
-  neigh_list(const std::vector<dgl_id_t> &_neighs,
-             const std::vector<dgl_id_t> &_edges)
-    : neighs(_neighs), edges(_edges) {}
-};
 
-struct neighbor_info {
-  dgl_id_t id;
-  size_t pos;
-  size_t num_edges;
-
-  neighbor_info(dgl_id_t id, size_t pos, size_t num_edges) {
-    this->id = id;
-    this->pos = pos;
-    this->num_edges = num_edges;
-  }
-};
-
-NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
-                           std::vector<dgl_id_t> edge_list,
-                           std::vector<size_t> layer_offsets,
-                           std::vector<std::pair<dgl_id_t, int> > *sub_vers,
-                           std::vector<neighbor_info> *neigh_pos,
-                           const std::string &edge_type,
-                           int64_t num_edges, int num_hops, bool is_multigraph) {
-  NodeFlow nf;
-  uint64_t num_vertices = sub_vers->size();
-  nf.node_mapping = IdArray::Empty({static_cast<int64_t>(num_vertices)},
-                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  nf.edge_mapping = IdArray::Empty({static_cast<int64_t>(num_edges)},
-                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  nf.layer_offsets = IdArray::Empty({static_cast<int64_t>(num_hops + 1)},
-                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  nf.flow_offsets = IdArray::Empty({static_cast<int64_t>(num_hops)},
-                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-
-  dgl_id_t *node_map_data = static_cast<dgl_id_t *>(nf.node_mapping->data);
-  dgl_id_t *layer_off_data = static_cast<dgl_id_t *>(nf.layer_offsets->data);
-  dgl_id_t *flow_off_data = static_cast<dgl_id_t *>(nf.flow_offsets->data);
-  dgl_id_t *edge_map_data = static_cast<dgl_id_t *>(nf.edge_mapping->data);
-
-  // Construct sub_csr_graph
-  auto subg_csr = std::make_shared<ImmutableGraph::CSR>(num_vertices, num_edges);
-  subg_csr->indices.resize(num_edges);
-  subg_csr->edge_ids.resize(num_edges);
-  dgl_id_t* col_list_out = subg_csr->indices.data();
-  int64_t* indptr_out = subg_csr->indptr.data();
-  size_t collected_nedges = 0;
-
-  // The data from the previous steps:
-  // * node data: sub_vers (vid, layer), neigh_pos,
-  // * edge data: neighbor_list, edge_list, probability.
-  // * layer_offsets: the offset in sub_vers.
-  dgl_id_t ver_id = 0;
-  std::vector<std::unordered_map<dgl_id_t, dgl_id_t>> layer_ver_maps;
-  layer_ver_maps.resize(num_hops);
-  size_t out_node_idx = 0;
-  for (int layer_id = num_hops - 1; layer_id >= 0; layer_id--) {
-    // We sort the vertices in a layer so that we don't need to sort the neighbor Ids
-    // after remap to a subgraph.
-    std::sort(sub_vers->begin() + layer_offsets[layer_id],
-              sub_vers->begin() + layer_offsets[layer_id + 1],
-              [](const std::pair<dgl_id_t, dgl_id_t> &a1,
-                 const std::pair<dgl_id_t, dgl_id_t> &a2) {
-      return a1.first < a2.first;
-    });
-
-    // Save the sampled vertices and its layer Id.
-    for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
-      node_map_data[out_node_idx++] = sub_vers->at(i).first;
-      layer_ver_maps[layer_id].insert(std::pair<dgl_id_t, dgl_id_t>(sub_vers->at(i).first,
-                                                                    ver_id++));
-      CHECK_EQ(sub_vers->at(i).second, layer_id);
-    }
-  }
-  CHECK(out_node_idx == num_vertices);
-
-  // sampling algorithms have to start from the seed nodes, so the seed nodes are
-  // in the first layer and the input nodes are in the last layer.
-  // When we expose the sampled graph to a Python user, we say the input nodes
-  // are in the first layer and the seed nodes are in the last layer.
-  // Thus, when we copy sampled results to a CSR, we need to reverse the order of layers.
-  size_t row_idx = 0;
-  for (size_t i = layer_offsets[num_hops - 1]; i < layer_offsets[num_hops]; i++) {
-    indptr_out[row_idx++] = 0;
-  }
-  layer_off_data[0] = 0;
-  layer_off_data[1] = layer_offsets[num_hops] - layer_offsets[num_hops - 1];
-  int out_layer_idx = 1;
-  for (int layer_id = num_hops - 2; layer_id >= 0; layer_id--) {
-    std::sort(neigh_pos->begin() + layer_offsets[layer_id],
-              neigh_pos->begin() + layer_offsets[layer_id + 1],
-              [](const neighbor_info &a1, const neighbor_info &a2) {
-                return a1.id < a2.id;
-              });
-
-    for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
-      dgl_id_t dst_id = sub_vers->at(i).first;
-      CHECK_EQ(dst_id, neigh_pos->at(i).id);
-      size_t pos = neigh_pos->at(i).pos;
-      CHECK_LE(pos, neighbor_list.size());
-      size_t num_edges = neigh_pos->at(i).num_edges;
-      if (neighbor_list.empty()) CHECK_EQ(num_edges, 0);
-
-      // We need to map the Ids of the neighbors to the subgraph.
-      auto neigh_it = neighbor_list.begin() + pos;
-      for (size_t i = 0; i < num_edges; i++) {
-        dgl_id_t neigh = *(neigh_it + i);
-        CHECK(layer_ver_maps[layer_id + 1].find(neigh) != layer_ver_maps[layer_id + 1].end());
-        col_list_out[collected_nedges + i] = layer_ver_maps[layer_id + 1][neigh];
-      }
-      // We can simply copy the edge Ids.
-      std::copy_n(edge_list.begin() + pos,
-                  num_edges, edge_map_data + collected_nedges);
-      collected_nedges += num_edges;
-      indptr_out[row_idx+1] = indptr_out[row_idx] + num_edges;
-      row_idx++;
-    }
-    layer_off_data[out_layer_idx + 1] = layer_off_data[out_layer_idx]
-        + layer_offsets[layer_id + 1] - layer_offsets[layer_id];
-    out_layer_idx++;
-  }
-  CHECK(row_idx == num_vertices);
-  CHECK(indptr_out[row_idx] == num_edges);
-  CHECK(out_layer_idx == num_hops);
-  CHECK(layer_off_data[out_layer_idx] == num_vertices);
-
-  // Copy flow offsets.
-  flow_off_data[0] = 0;
-  int out_flow_idx = 0;
-  for (size_t i = 0; i < layer_offsets.size() - 2; i++) {
-    size_t num_edges = subg_csr->GetDegree(layer_off_data[i + 1], layer_off_data[i + 2]);
-    flow_off_data[out_flow_idx + 1] = flow_off_data[out_flow_idx] + num_edges;
-    out_flow_idx++;
-  }
-  CHECK(out_flow_idx == num_hops - 1);
-  CHECK(flow_off_data[num_hops - 1] == static_cast<uint64_t>(num_edges));
-
-  for (size_t i = 0; i < subg_csr->edge_ids.size(); i++) {
-    subg_csr->edge_ids[i] = i;
-  }
-
-  if (edge_type == "in") {
-    nf.graph = GraphPtr(new ImmutableGraph(subg_csr, nullptr, is_multigraph));
-  } else {
-    nf.graph = GraphPtr(new ImmutableGraph(nullptr, subg_csr, is_multigraph));
-  }
-
-  return nf;
-}
-
+template<typename Iter>
 NodeFlow SampleSubgraph(const ImmutableGraph *graph,
-                        const std::vector<dgl_id_t>& seeds,
+                        Iter seed_iter,
+                        size_t num_seeds,
                         const float* probability,
                         const std::string &edge_type,
                         int num_hops,
                         size_t num_neighbor,
                         const bool add_self_loop) {
   unsigned int time_seed = randseed();
-  const size_t num_seeds = seeds.size();
   auto orig_csr = edge_type == "in" ? graph->GetInCSR() : graph->GetOutCSR();
   const dgl_id_t* val_list = orig_csr->edge_ids.data();
   const dgl_id_t* col_list = orig_csr->indices.data();
   const int64_t* indptr = orig_csr->indptr.data();
 
   std::unordered_set<dgl_id_t> sub_ver_map;  // The vertex Ids in a layer.
-  std::vector<std::pair<dgl_id_t, int> > sub_vers;
+  std::vector<dgl_id_t> sub_vers;
   sub_vers.reserve(num_seeds * 10);
   // add seed vertices
   for (size_t i = 0; i < num_seeds; ++i) {
-    auto ret = sub_ver_map.insert(seeds[i]);
+    auto ret = sub_ver_map.insert(*seed_iter);
     // If the vertex is inserted successfully.
     if (ret.second) {
-      sub_vers.emplace_back(seeds[i], 0);
+      sub_vers.push_back(*seed_iter);
     }
+    ++seed_iter;
   }
   std::vector<dgl_id_t> tmp_sampled_src_list;
   std::vector<dgl_id_t> tmp_sampled_edge_list;
@@ -405,7 +254,7 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
   std::vector<dgl_id_t> neighbor_list;
   std::vector<dgl_id_t> edge_list;
   std::vector<size_t> layer_offsets(num_hops + 1);
-  int64_t num_edges = 0;
+  uint64_t num_edges = 0;
 
   layer_offsets[0] = 0;
   layer_offsets[1] = sub_vers.size();
@@ -417,8 +266,7 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
     // Previous iteration collects all nodes in sub_vers, which are collected
     // in the previous layer. sub_vers is used both as a node collection and a queue.
     for (size_t idx = layer_offsets[layer_id - 1]; idx < layer_offsets[layer_id]; idx++) {
-      dgl_id_t dst_id = sub_vers[idx].first;
-      const int cur_node_level = sub_vers[idx].second;
+      dgl_id_t dst_id = sub_vers[idx];
 
       tmp_sampled_src_list.clear();
       tmp_sampled_edge_list.clear();
@@ -463,70 +311,36 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
         auto ret = sub_ver_map.insert(tmp_sampled_src_list[i]);
         // If the sampled neighbor is inserted to the map successfully.
         if (ret.second) {
-          sub_vers.emplace_back(tmp_sampled_src_list[i], cur_node_level + 1);
+          sub_vers.push_back(tmp_sampled_src_list[i]);
         }
       }
     }
     layer_offsets[layer_id + 1] = layer_offsets[layer_id] + sub_ver_map.size();
     CHECK_EQ(layer_offsets[layer_id + 1], sub_vers.size());
   }
+  CHECK(num_edges == edge_list.size());
+  CHECK(num_edges == neighbor_list.size());
 
-  return ConstructNodeFlow(neighbor_list, edge_list, layer_offsets, &sub_vers, &neigh_pos,
-                           edge_type, num_edges, num_hops, graph->IsMultigraph());
+  NodeFlow nf;
+  std::vector<dgl_id_t> vertex_mapping, edge_mapping;
+  ConstructNodeFlow(
+      neighbor_list, edge_list, layer_offsets, &sub_vers, &neigh_pos,
+      edge_type, graph->IsMultigraph(), &nf, &vertex_mapping, &edge_mapping);
+  return nf;
 }
 
 }  // namespace
 
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetGraph")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    void* ptr = args[0];
-    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
-    GraphInterface* gptr = nflow->graph->Reset();
-    *rv = gptr;
-  });
-
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetNodeMapping")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    void* ptr = args[0];
-    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
-    *rv = nflow->node_mapping;
-  });
-
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetEdgeMapping")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    void* ptr = args[0];
-    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
-    *rv = nflow->edge_mapping;
-  });
-
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetLayerOffsets")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    void* ptr = args[0];
-    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
-    *rv = nflow->layer_offsets;
-  });
-
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetBlockOffsets")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    void* ptr = args[0];
-    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
-    *rv = nflow->flow_offsets;
-  });
-
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowFree")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    void* ptr = args[0];
-    NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
-    delete nflow;
-  });
-
+template<typename Iter>
 NodeFlow SamplerOp::NeighborUniformSample(const ImmutableGraph *graph,
-                                          const std::vector<dgl_id_t>& seeds,
+                                          Iter seed_iter,
+                                          size_t num_seeds,
                                           const std::string &edge_type,
                                           int num_hops, int expand_factor,
                                           const bool add_self_loop) {
   return SampleSubgraph(graph,
-                        seeds,                 // seed vector
+                        seed_iter,
+                        num_seeds,
                         nullptr,               // sample_id_probability
                         edge_type,
                         num_hops + 1,
@@ -535,9 +349,11 @@ NodeFlow SamplerOp::NeighborUniformSample(const ImmutableGraph *graph,
 }
 
 namespace {
+  template<typename Iter>
   void ConstructLayers(const int64_t *indptr,
                        const dgl_id_t *indices,
-                       const std::vector<dgl_id_t>& seed_array,
+                       Iter seed_iter,
+                       size_t num_seeds,
                        IdArray layer_sizes,
                        std::vector<dgl_id_t> *layer_offsets,
                        std::vector<dgl_id_t> *node_mapping,
@@ -548,7 +364,7 @@ namespace {
      * layers via uniform layer-wise sampling, and return the resultant layers and their
      * corresponding probabilities.
      */
-    std::copy(seed_array.begin(), seed_array.end(), std::back_inserter(*node_mapping));
+    std::copy(seed_iter, seed_iter + num_seeds, std::back_inserter(*node_mapping));
     actl_layer_sizes->push_back(node_mapping->size());
     probabilities->insert(probabilities->end(), node_mapping->size(), 1);
     const int64_t* layer_sizes_data = static_cast<int64_t*>(layer_sizes->data);
@@ -648,8 +464,10 @@ namespace {
   }
 }  // namespace
 
+template <typename Iter>
 NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
-                                       const std::vector<dgl_id_t>& seeds,
+                                       Iter seed_iter,
+                                       size_t num_seeds,
                                        const std::string &neighbor_type,
                                        IdArray layer_sizes) {
   const auto g_csr = neighbor_type == "in" ? graph->GetInCSR() : graph->GetOutCSR();
@@ -663,7 +481,8 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
   std::vector<float> probabilities;
   ConstructLayers(indptr,
                   indices,
-                  seeds,
+                  seed_iter,
+                  num_seeds,
                   layer_sizes,
                   &layer_offsets,
                   &node_mapping,
@@ -704,6 +523,8 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
                                     DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   nf.flow_offsets = IdArray::Empty({static_cast<int64_t>(flow_offsets.size())},
                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  nf.node_data_available = false;
+  nf.edge_data_available = false;
 
   std::copy(node_mapping.begin(), node_mapping.end(),
             static_cast<dgl_id_t*>(nf.node_mapping->data));
@@ -745,13 +566,10 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
       // create per-worker seed nodes.
       const int64_t start = (batch_start_id + i) * batch_size;
       const int64_t end = std::min(start + batch_size, num_seeds);
-      // TODO(minjie): the vector allocation/copy is unnecessary
-      std::vector<dgl_id_t> worker_seeds(end - start);
-      std::copy(seed_nodes_data + start, seed_nodes_data + end,
-                worker_seeds.begin());
       nflows[i] = new NodeFlow();
       *nflows[i] = SamplerOp::NeighborUniformSample(
-          gptr, worker_seeds, neigh_type, num_hops, expand_factor, add_self_loop);
+          gptr, seed_nodes_data + start, end - start, neigh_type, num_hops,
+          expand_factor, add_self_loop);
     }
     *rv = WrapVectorReturn(nflows);
   });
@@ -782,17 +600,11 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_LayerSampling")
       // create per-worker seed nodes.
       const int64_t start = (batch_start_id + i) * batch_size;
       const int64_t end = std::min(start + batch_size, num_seeds);
-      // TODO(minjie): the vector allocation/copy is unnecessary
-      std::vector<dgl_id_t> worker_seeds(end - start);
-      std::copy(seed_nodes_data + start, seed_nodes_data + end,
-                worker_seeds.begin());
       nflows[i] = new NodeFlow();
       *nflows[i] = SamplerOp::LayerUniformSample(
-          gptr, worker_seeds, neigh_type, layer_sizes);
+          gptr, seed_nodes_data + start, end - start, neigh_type, layer_sizes);
     }
     *rv = WrapVectorReturn(nflows);
   });
 
-
-
-}  // namespace dgl
+};  // namespace dgl
