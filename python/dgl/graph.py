@@ -38,6 +38,10 @@ class DGLBaseGraph(object):
     def __init__(self, graph):
         self._graph = graph
 
+    @property
+    def c_handle(self):
+        return self._graph._handle
+
     def number_of_nodes(self):
         """Return the number of nodes in the graph.
 
