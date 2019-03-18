@@ -21,14 +21,15 @@ class NodeUpdate(gluon.Block):
 
     def forward(self, node):
         h = node.data['h']
+        norm = node.data['norm']
         if self.test:
-            norm = node.data['norm']
             h = h * norm
         else:
             agg_history_str = 'agg_h_{}'.format(self.layer_id-1)
             agg_history = node.data[agg_history_str]
+            subg_norm = node.data['subg_norm']
             # control variate
-            h = h + agg_history
+            h = h * subg_norm + agg_history * norm
             if self.dropout:
                 h = mx.nd.Dropout(h, p=self.dropout)
         h = self.dense(h)
@@ -85,7 +86,7 @@ class GCNSampling(gluon.Block):
             nf.layers[i].data['h'] = h
             nf.block_compute(i,
                              fn.copy_src(src='h', out='m'),
-                             lambda node : {'h': node.mailbox['m'].mean(axis=1)},
+                             fn.sum(msg='m', out='h'),
                              layer)
             h = nf.layers[i+1].data.pop('activation')
             # update history
@@ -183,11 +184,16 @@ def main(args):
 
     # create GCN model
     g = DGLGraph(data.graph, readonly=True)
+    adj = g.adjacency_matrix()
 
     g.ndata['features'] = features
 
     norm = mx.nd.expand_dims(1./g.in_degrees().astype('float32'), 1)
     g.ndata['norm'] = norm.as_in_context(ctx)
+
+    degs = g.in_degrees().astype('float32').asnumpy()
+    degs[degs > num_neighbors] = num_neighbors
+    g.ndata['subg_norm'] = mx.nd.expand_dims(mx.nd.array(1./degs, ctx=ctx), 1)
 
     g.update_all(fn.copy_src(src='features', out='m'),
                  fn.sum(msg='m', out='preprocess'),
@@ -195,8 +201,10 @@ def main(args):
 
     for i in range(n_layers):
         g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
+        g.ndata['agg_h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
 
     g.ndata['h_{}'.format(n_layers-1)] = mx.nd.zeros((features.shape[0], 2*args.n_hidden), ctx=ctx)
+    g.ndata['agg_h_{}'.format(n_layers-1)] = mx.nd.zeros((features.shape[0], 2*args.n_hidden), ctx=ctx)
 
     model = GCNSampling(in_feats,
                         args.n_hidden,
@@ -228,6 +236,8 @@ def main(args):
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
+        print(epoch)
+        start = time.time()
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
                                                        num_neighbors,
                                                        neighbor_type='in',
@@ -236,14 +246,16 @@ def main(args):
                                                        seed_nodes=train_nid):
             for i in range(n_layers):
                 agg_history_str = 'agg_h_{}'.format(i)
-                g.pull(nf.layer_parent_nid(i+1), fn.copy_src(src='h_{}'.format(i), out='m'),
-                       fn.sum(msg='m', out=agg_history_str),
-                       lambda node : {agg_history_str: node.data[agg_history_str] * node.data['norm']})
+                dests = nf.layer_parent_nid(i+1)
+                # TODO we could use DGLGraph.pull to implement this, but the current
+                # implementation of pull is very slow. Let's manually do it for now.
+                g.ndata[agg_history_str][dests] = mx.nd.dot(mx.nd.take(adj, dests),
+                                                            g.ndata['h_{}'.format(i)])
 
             node_embed_names = [['preprocess', 'h_0']]
             for i in range(1, n_layers):
-                node_embed_names.append(['h_{}'.format(i), 'agg_h_{}'.format(i-1)])
-            node_embed_names.append(['agg_h_{}'.format(n_layers-1)])
+                node_embed_names.append(['h_{}'.format(i), 'agg_h_{}'.format(i-1), 'subg_norm', 'norm'])
+            node_embed_names.append(['agg_h_{}'.format(n_layers-1), 'subg_norm', 'norm'])
 
             nf.copy_from_parent(node_embed_names=node_embed_names)
             # forward
@@ -261,6 +273,7 @@ def main(args):
             node_embed_names.append([])
 
             nf.copy_to_parent(node_embed_names=node_embed_names)
+        print("train: " + str(time.time() - start))
 
         infer_params = infer_model.collect_params()
 
@@ -270,6 +283,7 @@ def main(args):
 
         num_acc = 0.
 
+        start = time.time()
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
                                                        g.number_of_nodes(),
                                                        neighbor_type='in',
@@ -284,6 +298,7 @@ def main(args):
             batch_nids = nf.layer_parent_nid(-1).as_in_context(ctx)
             batch_labels = labels[batch_nids]
             num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
+        print("infer: " + str(time.time() - start))
 
         print("Test Accuracy {:.4f}". format(num_acc/n_test_samples))
 
