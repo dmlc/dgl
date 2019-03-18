@@ -40,6 +40,7 @@ class DGLBaseGraph(object):
 
     @property
     def c_handle(self):
+        """The C handle for the graph."""
         return self._graph._handle
 
     def number_of_nodes(self):
