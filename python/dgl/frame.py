@@ -4,7 +4,6 @@ from __future__ import absolute_import
 from collections import namedtuple
 from collections.abc import MutableMapping
 
-import sys
 import numpy as np
 
 from . import backend as F
