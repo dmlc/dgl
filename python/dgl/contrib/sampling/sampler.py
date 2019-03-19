@@ -165,7 +165,7 @@ class NodeFlowSampler(object):
 
         if num_prefetch:
             self._prefetching_wrapper_class = prefetching_wrapper_class
-            self._num_prefetch = num_prefetch
+        self._num_prefetch = num_prefetch
 
     def fetch(self, current_nodeflow_index):
         '''
