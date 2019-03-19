@@ -551,6 +551,51 @@ class GraphIndex(object):
         induced_nodes = utils.toindex(rst(1))
         return SubgraphIndex(rst(0), self, induced_nodes, e)
 
+    @utils.cached_member(cache='_cache', prefix='scipy_adj')
+    def adjacency_matrix_scipy(self, transpose, fmt):
+        """Return the scipy adjacency matrix representation of this graph.
+
+        By default, a row of returned adjacency matrix represents the destination
+        of an edge and the column represents the source.
+
+        When transpose is True, a row represents the source and a column represents
+        a destination.
+
+        The elements in the adajency matrix are edge ids.
+
+        Parameters
+        ----------
+        transpose : bool
+            A flag to transpose the returned adjacency matrix.
+        fmt : str
+            Indicates the format of returned adjacency matrix.
+
+        Returns
+        -------
+        scipy.sparse.spmatrix
+            The scipy representation of adjacency matrix.
+        """
+        if not isinstance(transpose, bool):
+            raise DGLError('Expect bool value for "transpose" arg,'
+                           ' but got %s.' % (type(transpose)))
+        rst = _CAPI_DGLGraphGetAdj(self._handle, transpose, fmt)
+        if fmt == "csr":
+            indptr = utils.toindex(rst(0)).tonumpy()
+            indices = utils.toindex(rst(1)).tonumpy()
+            shuffle = utils.toindex(rst(2)).tonumpy()
+            n = self.number_of_nodes()
+            return scipy.sparse.csr_matrix((shuffle, indices, indptr), shape=(n, n))
+        elif fmt == 'coo':
+            idx = utils.toindex(rst(0)).tonumpy()
+            n = self.number_of_nodes()
+            m = self.number_of_edges()
+            row, col = np.reshape(idx, (2, m))
+            shuffle = np.arange(0, m)
+            return scipy.sparse.coo_matrix((shuffle, (row, col)), shape=(n, n))
+        else:
+            raise Exception("unknown format")
+
+
     @utils.cached_member(cache='_cache', prefix='adj')
     def adjacency_matrix(self, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
