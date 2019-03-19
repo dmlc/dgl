@@ -3,6 +3,8 @@ from ... import utils
 from ... import backend as F
 from ..._ffi.function import _init_api
 
+from .sampler import NodeFlowSampler
+
 __all__ = ['random_walk',
            'random_walk_with_restart',
            'bipartite_single_sided_random_walk_with_restart',
@@ -147,8 +149,8 @@ def bipartite_single_sided_random_walk_with_restart(
 
     Notes
     -----
-    The current implementation does not ensure that the graph is a bipartite
-    graph.
+    The current implementation does not verify whether the graph is a
+    bipartite graph.
 
     The traces does **not** include the seed nodes themselves.
 
@@ -163,5 +165,140 @@ def bipartite_single_sided_random_walk_with_restart(
             g._graph._handle, seeds, restart_prob, max_nodes_per_seed,
             max_visit_counts, max_frequent_visited_nodes)
     return _split_traces(traces)
+
+
+class BasePPRNeighborSampler(NodeFlowSampler):
+    '''Base PPR neighbor sampling class
+    '''
+    capi = None
+
+    def __init__(
+            self,
+            g,
+            batch_size,
+            num_hops,
+            top_t,
+            max_nodes_per_seed,
+            seed_nodes=None,
+            shuffle=False,
+            restart_prob=0.1,
+            max_visit_counts=0,
+            max_frequent_visited_nodes=0,
+            num_workers=1,
+            prefetch=False):
+        super(NeighborSampler, self).__init__(
+                g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0,
+                ThreadPrefetchingWrapper)
+
+        self._restart_prob = restart_prob
+        self._max_visit_counts = max_visit_counts
+        self._max_frequent_visited_nodes = max_frequent_visited_nodes
+        self._num_hops = num_hops
+        self._top_t = top_t
+        self._num_workers = num_workers
+        self._max_nodes_per_seed = max_nodes_per_seed
+
+    def fetch(self, current_nodeflow_index):
+        handles = unwrap_to_ptr_list(self.capi(
+            self.g.c_handle,
+            self.seed_nodes.todgltensor(),
+            current_nodeflow_index,
+            self.batch_size,
+            self._num_workers,
+            self._restart_prob,
+            self._max_nodes_per_seed,
+            self._max_visit_counts,
+            self._max_frequent_visited_nodes,
+            self._num_hops,
+            self._top_t))
+        nflows = [NodeFlow(self.g, hdl) for hdl in handles]
+        return nflows
+
+
+class PPRBipartiteSingleSidedNeighborSampler(BasePPRNeighborSampler):
+    '''Create a sampler that, given a node on a bipartite graph, samples the
+    top-k most important neighborhood of that node, using visit counts of
+    random walks with restart.
+
+    Note: this only works on undirected bipartite graph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph
+    batch_size : int
+        The batch size
+    num_hops : int
+        Number of random walk hops.
+    top_t : int
+        Number of most important neighbors to pick.
+    max_nodes_per_seed : int
+        Stop generating traces for a seed if total number of visited nodes
+        exceed this amount.
+    seed_nodes : Tensor, optional
+        A 1D tensor list of nodes where we sample NodeFlows from.
+        If None, the seed vertices are all the vertices in the graph.
+        Default: None
+    shuffle : bool, optional
+        Indicates the sampled NodeFlows are shuffled.  Default: False
+    max_visit_counts : int, optional
+    max_frequent_visited_nodes : int, optional
+        Alternatively, stop generating traces for a seed if no less than
+        ``max_frequent_visited_nodes`` are visited no less than
+        ``max_visit_counts`` times.  [1]
+    num_workers : int, optional
+        The number of worker threads that sample NodeFlows in parallel. Default: 1
+    prefetch : bool, optional
+        If true, prefetch the samples in the next batch. Default: False
+
+    Notes
+    -----
+    The current implementation does not verify whether the graph is a
+    bipartite graph.
+
+    Reference
+    ---------
+    [1] Eksombatchai et al., 2017
+    '''
+    capi = _CAPI_PPRBipartiteSingleSidedNeighborSampling
+
+class PPRNeighborSampler(BasePPRNeighborSampler):
+    '''Create a sampler that samples the top-k most important neighborhood of
+    that node, using visit counts of random walks with restart.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph
+    batch_size : int
+        The batch size
+    num_hops : int
+        Number of random walk hops.
+    top_t : int
+        Number of most important neighbors to pick.
+    max_nodes_per_seed : int
+        Stop generating traces for a seed if total number of visited nodes
+        exceed this amount.
+    seed_nodes : Tensor, optional
+        A 1D tensor list of nodes where we sample NodeFlows from.
+        If None, the seed vertices are all the vertices in the graph.
+        Default: None
+    shuffle : bool, optional
+        Indicates the sampled NodeFlows are shuffled.  Default: False
+    max_visit_counts : int, optional
+    max_frequent_visited_nodes : int, optional
+        Alternatively, stop generating traces for a seed if no less than
+        ``max_frequent_visited_nodes`` are visited no less than
+        ``max_visit_counts`` times.  [1]
+    num_workers : int, optional
+        The number of worker threads that sample NodeFlows in parallel. Default: 1
+    prefetch : bool, optional
+        If true, prefetch the samples in the next batch. Default: False
+
+    Reference
+    ---------
+    [1] Eksombatchai et al., 2017
+    '''
+    capi = _CAPI_PPRNeighborSampling
 
 _init_api('dgl.randomwalk', __name__)

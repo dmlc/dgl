@@ -112,6 +112,11 @@ RandomWalkTraces GenericRandomWalkWithRestart(
   std::vector<size_t> trace_lengths, trace_counts, visit_counts;
   int64_t restart_bound = static_cast<int64_t>(restart_prob * RAND_MAX);
 
+  if (!(restart_prob > 0)) {
+    LOG(FATAL) << "restart_prob is not positive";
+    return RandomWalkTraces();
+  }
+
   visit_counts.resize(gptr->NumVertices());
 
   unsigned int random_seed = randseed();

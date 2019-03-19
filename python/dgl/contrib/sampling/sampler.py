@@ -17,7 +17,7 @@ try:
 except ImportError:
     import queue
 
-__all__ = ['NeighborSampler', 'LayerSampler']
+__all__ = ['NeighborSampler', 'LayerSampler', 'NodeFlowSampler']
 
 class NodeFlowSamplerIter(object):
     def __init__(self, sampler):
