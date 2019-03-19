@@ -165,7 +165,7 @@ class NodeFlowSampler(object):
 
         if num_prefetch:
             self._prefetching_wrapper_class = prefetching_wrapper_class
-            self._num_prefetch = num_prefetch
+        self._num_prefetch = num_prefetch
 
     def fetch(self, current_nodeflow_index):
         '''
@@ -295,7 +295,7 @@ class NeighborSampler(NodeFlowSampler):
             prefetch=False,
             add_self_loop=False):
         super(NeighborSampler, self).__init__(
-                g, batch_size, seed_nodes, shuffle, num_workers * 2,
+                g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0,
                 ThreadPrefetchingWrapper)
 
         assert node_prob is None, 'non-uniform node probability not supported'
@@ -361,7 +361,7 @@ class LayerSampler(NodeFlowSampler):
             num_workers=1,
             prefetch=False):
         super(LayerSampler, self).__init__(
-                g, batch_size, seed_nodes, shuffle, num_workers * 2,
+                g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0,
                 ThreadPrefetchingWrapper)
 
         assert node_prob is None, 'non-uniform node probability not supported'
