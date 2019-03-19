@@ -204,12 +204,12 @@ def worker_func(worker_id, args, g, adj, features, labels, train_mask, val_mask,
                 node_embed_names.append(['h_{}'.format(i), 'agg_h_{}'.format(i-1), 'subg_norm', 'norm'])
             node_embed_names.append(['agg_h_{}'.format(n_layers-1), 'subg_norm', 'norm'])
 
-            nf.copy_from_parent(node_embed_names=node_embed_names)
+            nf.copy_from_parent(node_embed_names=node_embed_names, ctx=ctx)
             # forward
             with mx.autograd.record():
                 pred = model(nf)
-                batch_nids = nf.layer_parent_nid(-1).as_in_context(ctx)
-                batch_labels = labels[batch_nids]
+                batch_nids = nf.layer_parent_nid(-1)
+                batch_labels = labels[batch_nids].as_in_context(ctx)
                 loss = loss_fcn(pred, batch_labels)
                 loss = loss.sum() / len(batch_nids)
 
@@ -240,10 +240,10 @@ def worker_func(worker_id, args, g, adj, features, labels, train_mask, val_mask,
             for i in range(n_layers):
                 node_embed_names.append(['norm'])
 
-            nf.copy_from_parent(node_embed_names=node_embed_names)
+            nf.copy_from_parent(node_embed_names=node_embed_names, ctx=ctx)
             pred = infer_model(nf)
-            batch_nids = nf.layer_parent_nid(-1).as_in_context(ctx)
-            batch_labels = labels[batch_nids]
+            batch_nids = nf.layer_parent_nid(-1)
+            batch_labels = labels[batch_nids].as_in_context(ctx)
             num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
         print("infer: " + str(time.time() - start))
 
@@ -254,10 +254,11 @@ def main(args):
     # load and preprocess dataset
     data = load_data(args)
 
-    if args.gpu >= 0:
-        ctx = mx.gpu(args.gpu)
+    mem_ctx = mx.Context('cpu_shared', 0)
+    if args.num_gpu > 0:
+        runtime_ctx = [mx.gpu(i) for i in range(args.num_gpu)]
     else:
-        ctx = mx.cpu()
+        runtime_ctx = [mx.cpu()]
 
     if args.self_loop and not args.dataset.startswith('reddit'):
         data.graph.add_edges_from([(i,i) for i in range(len(data.graph))])
@@ -268,11 +269,11 @@ def main(args):
     num_neighbors = args.num_neighbors
     n_layers = args.n_layers
 
-    features = mx.nd.array(data.features).as_in_context(ctx)
-    labels = mx.nd.array(data.labels).as_in_context(ctx)
-    train_mask = mx.nd.array(data.train_mask).as_in_context(ctx)
-    val_mask = mx.nd.array(data.val_mask).as_in_context(ctx)
-    test_mask = mx.nd.array(data.test_mask).as_in_context(ctx)
+    features = mx.nd.array(data.features).as_in_context(mem_ctx)
+    labels = mx.nd.array(data.labels).as_in_context(mem_ctx)
+    train_mask = mx.nd.array(data.train_mask).as_in_context(mem_ctx)
+    val_mask = mx.nd.array(data.val_mask).as_in_context(mem_ctx)
+    test_mask = mx.nd.array(data.test_mask).as_in_context(mem_ctx)
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
@@ -299,28 +300,28 @@ def main(args):
     g.ndata['features'] = features
 
     norm = mx.nd.expand_dims(1./g.in_degrees().astype('float32'), 1)
-    g.ndata['norm'] = norm.as_in_context(ctx)
+    g.ndata['norm'] = norm.as_in_context(mem_ctx)
 
     degs = g.in_degrees().astype('float32').asnumpy()
     degs[degs > num_neighbors] = num_neighbors
-    g.ndata['subg_norm'] = mx.nd.expand_dims(mx.nd.array(1./degs, ctx=ctx), 1)
+    g.ndata['subg_norm'] = mx.nd.expand_dims(mx.nd.array(1./degs, ctx=mem_ctx), 1)
 
     g.update_all(fn.copy_src(src='features', out='m'),
                  fn.sum(msg='m', out='preprocess'),
                  lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
 
     for i in range(n_layers):
-        g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
-        g.ndata['agg_h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
+        g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=mem_ctx)
+        g.ndata['agg_h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=mem_ctx)
 
-    g.ndata['h_{}'.format(n_layers-1)] = mx.nd.zeros((features.shape[0], 2*args.n_hidden), ctx=ctx)
-    g.ndata['agg_h_{}'.format(n_layers-1)] = mx.nd.zeros((features.shape[0], 2*args.n_hidden), ctx=ctx)
+    g.ndata['h_{}'.format(n_layers-1)] = mx.nd.zeros((features.shape[0], 2*args.n_hidden), ctx=mem_ctx)
+    g.ndata['agg_h_{}'.format(n_layers-1)] = mx.nd.zeros((features.shape[0], 2*args.n_hidden), ctx=mem_ctx)
 
     ps = []
     for i in range(args.nworkers):
         p = Process(target=worker_func, args=(i, args, g, adj, features, labels, train_mask, val_mask, test_mask,
                                               in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples,
-                                              ctx, args.nworkers))
+                                              runtime_ctx[i % len(runtime_ctx)], args.nworkers))
         ps.append(p)
         p.start()
     for p in ps:
@@ -333,7 +334,7 @@ if __name__ == '__main__':
     register_data_args(parser)
     parser.add_argument("--dropout", type=float, default=0.5,
             help="dropout probability")
-    parser.add_argument("--gpu", type=int, default=-1,
+    parser.add_argument("--num-gpu", type=int, default=0,
             help="gpu")
     parser.add_argument("--lr", type=float, default=3e-2,
             help="learning rate")
