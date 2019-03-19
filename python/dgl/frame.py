@@ -4,7 +4,6 @@ from __future__ import absolute_import
 from collections import namedtuple
 from collections.abc import MutableMapping
 
-import sys
 import numpy as np
 
 from . import backend as F
@@ -22,22 +21,19 @@ class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
     dtype : backend-specific type object
         The feature data type.
     """
-    # FIXME:
-    # Python 3.5.2 is unable to pickle torch dtypes; this is a workaround.
+    # Pickling torch dtypes could be problemetic; this is a workaround.
     # I also have to create data_type_dict and reverse_data_type_dict
     # attribute just for this bug.
     # I raised an issue in PyTorch bug tracker:
     # https://github.com/pytorch/pytorch/issues/14057
-    if sys.version_info.major == 3 and sys.version_info.minor == 5:
-        def __reduce__(self):
-            state = (self.shape, F.reverse_data_type_dict[self.dtype])
-            return self._reconstruct_scheme, state
+    def __reduce__(self):
+        state = (self.shape, F.reverse_data_type_dict[self.dtype])
+        return self._reconstruct_scheme, state
 
-
-        @classmethod
-        def _reconstruct_scheme(cls, shape, dtype_str):
-            dtype = F.data_type_dict[dtype_str]
-            return cls(shape, dtype)
+    @classmethod
+    def _reconstruct_scheme(cls, shape, dtype_str):
+        dtype = F.data_type_dict[dtype_str]
+        return cls(shape, dtype)
 
 def infer_scheme(tensor):
     """Infer column scheme from the given tensor data.
