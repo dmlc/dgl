@@ -260,8 +260,9 @@ NodeFlow CreateNodeFlowWithPPRFromRandomWalk(
   for (int layer_id = 1; layer_id < num_hops; ++layer_id) {
     sub_ver_map.clear();
 
-    auto sub_vers_iter = sub_vers.cbegin() + layer_offsets[layer_id - 1];
+    const uint64_t layer_start_off = layer_offsets[layer_id - 1];
     const uint64_t num_nodes_in_layer = layer_offsets[layer_id] - layer_offsets[layer_id - 1];
+    auto sub_vers_iter = sub_vers.cbegin() + layer_start_off;
 
     RandomWalkTraces traces = GenericRandomWalkWithRestart(
         gptr, sub_vers_iter, num_nodes_in_layer, restart_prob, max_nodes_per_seed,
@@ -271,8 +272,8 @@ NodeFlow CreateNodeFlowWithPPRFromRandomWalk(
     const dgl_id_t *trace_vertices_ptr = static_cast<dgl_id_t *>(traces.vertices->data);
 
     for (size_t seed_idx = 0; seed_idx < num_nodes_in_layer;
-         ++seed_idx, ++trace_counts_ptr, ++sub_vers_iter) {
-      const dgl_id_t dst = *sub_vers_iter;
+         ++seed_idx, ++trace_counts_ptr) {
+      const dgl_id_t dst = sub_vers[seed_idx + layer_start_off];
       visit_counter.clear();
 
       for (size_t trace_idx = 0; trace_idx < *trace_counts_ptr;
@@ -302,7 +303,7 @@ NodeFlow CreateNodeFlowWithPPRFromRandomWalk(
           ++t, ++it) {
         neighbor_list.push_back(it->first);
         edge_list.push_back(-1);    // not mapping edges to parent graph
-        edge_data.push_back(it->second / total_visits);
+        edge_data.push_back(1. * it->second / total_visits);
 
         auto ret = sub_ver_map.insert(it->first);
         if (ret.second)
@@ -321,6 +322,7 @@ NodeFlow CreateNodeFlowWithPPRFromRandomWalk(
       "in", gptr->IsMultigraph(), &nf, &vertex_mapping, &edge_mapping);
 
   const int64_t num_edges = edge_list.size();
+  nf.edge_data_available = true;
   nf.edge_data = NDArray::Empty(
       {num_edges}, DLDataType{kDLFloat, 64, 1}, DLContext{kDLCPU, 0});
   double *edge_data_out = static_cast<double *>(nf.edge_data->data);

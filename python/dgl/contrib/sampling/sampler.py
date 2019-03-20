@@ -140,6 +140,7 @@ class NodeFlowSampler(object):
         Subclasses can override this property.
     '''
     immutable_only = False
+    prefetching_wrapper_class = ThreadPrefetchingWrapper
 
     def __init__(
             self,
@@ -147,8 +148,7 @@ class NodeFlowSampler(object):
             batch_size,
             seed_nodes,
             shuffle,
-            num_prefetch,
-            prefetching_wrapper_class):
+            num_prefetch):
         self._g = g
         if self.immutable_only and not g._graph.is_readonly():
             raise NotImplementedError("This loader only support read-only graphs.")
@@ -163,8 +163,6 @@ class NodeFlowSampler(object):
             self._seed_nodes = F.rand_shuffle(self._seed_nodes)
         self._seed_nodes = utils.toindex(self._seed_nodes)
 
-        if num_prefetch:
-            self._prefetching_wrapper_class = prefetching_wrapper_class
         self._num_prefetch = num_prefetch
 
     def fetch(self, current_nodeflow_index):
@@ -190,7 +188,7 @@ class NodeFlowSampler(object):
     def __iter__(self):
         it = NodeFlowSamplerIter(self)
         if self._num_prefetch:
-            return self._prefetching_wrapper_class(it, self._num_prefetch)
+            return self.prefetching_wrapper_class(it, self._num_prefetch)
         else:
             return it
 
@@ -295,8 +293,7 @@ class NeighborSampler(NodeFlowSampler):
             prefetch=False,
             add_self_loop=False):
         super(NeighborSampler, self).__init__(
-                g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0,
-                ThreadPrefetchingWrapper)
+                g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0)
 
         assert node_prob is None, 'non-uniform node probability not supported'
         assert isinstance(expand_factor, Integral), 'non-int expand_factor not supported'
@@ -361,8 +358,7 @@ class LayerSampler(NodeFlowSampler):
             num_workers=1,
             prefetch=False):
         super(LayerSampler, self).__init__(
-                g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0,
-                ThreadPrefetchingWrapper)
+                g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0)
 
         assert node_prob is None, 'non-uniform node probability not supported'
 

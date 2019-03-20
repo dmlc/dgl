@@ -2,7 +2,8 @@
 from ... import utils
 from ... import backend as F
 from ..._ffi.function import _init_api
-
+from ...utils import unwrap_to_ptr_list
+from ...nodeflow import NodeFlow
 from .sampler import NodeFlowSampler
 
 __all__ = ['random_walk',
@@ -186,9 +187,8 @@ class BasePPRNeighborSampler(NodeFlowSampler):
             max_frequent_visited_nodes=0,
             num_workers=1,
             prefetch=False):
-        super(NeighborSampler, self).__init__(
-                g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0,
-                ThreadPrefetchingWrapper)
+        super(BasePPRNeighborSampler, self).__init__(
+                g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0)
 
         self._restart_prob = restart_prob
         self._max_visit_counts = max_visit_counts
@@ -211,8 +211,11 @@ class BasePPRNeighborSampler(NodeFlowSampler):
             self._max_frequent_visited_nodes,
             self._num_hops,
             self._top_t))
-        nflows = [NodeFlow(self.g, hdl) for hdl in handles]
+        nflows = [NodeFlow(self.g, hdl, edata_key='ppr_weight') for hdl in handles]
         return nflows
+
+
+_init_api('dgl.randomwalk', __name__)
 
 
 class PPRBipartiteSingleSidedNeighborSampler(BasePPRNeighborSampler):
@@ -256,6 +259,9 @@ class PPRBipartiteSingleSidedNeighborSampler(BasePPRNeighborSampler):
     The current implementation does not verify whether the graph is a
     bipartite graph.
 
+    The importance of a neighbor to a node is stored on the edges of the NodeFlow
+    with column name ``ppr_weight``.
+
     Reference
     ---------
     [1] Eksombatchai et al., 2017
@@ -295,10 +301,13 @@ class PPRNeighborSampler(BasePPRNeighborSampler):
     prefetch : bool, optional
         If true, prefetch the samples in the next batch. Default: False
 
+    Notes
+    -----
+    The importance of a neighbor to a node is stored on the edges of the NodeFlow
+    with column name ``ppr_weight``.
+
     Reference
     ---------
     [1] Eksombatchai et al., 2017
     '''
     capi = _CAPI_PPRNeighborSampling
-
-_init_api('dgl.randomwalk', __name__)
