@@ -141,6 +141,8 @@ class NodeFlowSampler(object):
     '''
     immutable_only = False
     prefetching_wrapper_class = ThreadPrefetchingWrapper
+    ndata_key = '__data__'
+    edata_key = '__data__'
 
     def __init__(
             self,
@@ -250,14 +252,15 @@ class CNodeFlowSampler(NodeFlowSampler):
     def generate(self, seeds):
         idx = utils.toindex(seeds).todgltensor()
         hdl = self.generate_handles(idx, 0, len(idx))
-        return NodeFlow(self.g, hdl[0])
+        return NodeFlow(self.g, hdl[0], self.ndata_key, self.edata_key)
 
     def fetch(self, current_nodeflow_index):
         handles = self.generate_handles(
                 self.seed_nodes.todgltensor(),
                 current_nodeflow_index,
                 self.batch_size)
-        nflows = [NodeFlow(self.g, hdl) for hdl in handles]
+        nflows = [NodeFlow(self.g, hdl, self.ndata_key, self.edata_key)
+                  for hdl in handles]
         return nflows
 
 class NeighborSampler(CNodeFlowSampler):

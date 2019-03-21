@@ -174,6 +174,7 @@ class BasePPRNeighborSampler(CNodeFlowSampler):
     '''Base PPR neighbor sampling class
     '''
     capi = None
+    edata_key = 'ppr_weight'
 
     def __init__(
             self,

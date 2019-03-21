@@ -45,8 +45,7 @@ class NodeFlow(DGLBaseGraph):
         If edge data is returned in the C structure, store the data tensor
         in this key in all edge frames
     """
-    def __init__(self, parent, handle, ndata_key='__data__',
-                 edata_key='__data__'):
+    def __init__(self, parent, handle, ndata_key, edata_key):
         # NOTE(minjie): handle is a pointer to the underlying C++ structure
         #  defined in include/dgl/sampler.h. The constructor will save
         #  all its members in the python side and destroy the handler
