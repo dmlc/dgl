@@ -19,7 +19,7 @@ def mix_embeddings(h, ndata, emb, proj):
             e.append(emb[key](cuda(value)))
         elif value.dtype == torch.float32:
             e.append(proj[key](cuda(value)))
-    return h + torch.stack(e, 0).sum(0)
+    return cuda(h) + torch.stack(e, 0).sum(0)
 
 def get_embeddings(h, nodeset):
     return h[nodeset]

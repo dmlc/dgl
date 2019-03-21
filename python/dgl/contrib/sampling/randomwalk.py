@@ -4,11 +4,13 @@ from ... import backend as F
 from ..._ffi.function import _init_api
 from ...utils import unwrap_to_ptr_list
 from ...nodeflow import NodeFlow
-from .sampler import NodeFlowSampler
+from .sampler import CNodeFlowSampler
 
 __all__ = ['random_walk',
            'random_walk_with_restart',
            'bipartite_single_sided_random_walk_with_restart',
+           'PPRNeighborSampler',
+           'PPRBipartiteSingleSidedNeighborSampler',
            ]
 
 
@@ -168,7 +170,7 @@ def bipartite_single_sided_random_walk_with_restart(
     return _split_traces(traces)
 
 
-class BasePPRNeighborSampler(NodeFlowSampler):
+class BasePPRNeighborSampler(CNodeFlowSampler):
     '''Base PPR neighbor sampling class
     '''
     capi = None

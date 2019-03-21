@@ -9,6 +9,7 @@ from rec.datasets.movielens import MovieLens
 from rec.utils import cuda
 from rec.adabound import AdaBound
 from dgl import DGLGraph
+from dgl.contrib.sampling import PPRBipartiteSingleSidedNeighborSampler
 
 import argparse
 import pickle
@@ -90,7 +91,7 @@ def runtrain(g_prior_edges, g_train_edges, train):
     g_prior = DGLGraph()
     g_prior.add_nodes(g.number_of_nodes())
     g_prior.add_edges(g_prior_src, g_prior_dst)
-    g_prior.ndata.update({k: cuda(v) for k, v in g.ndata.items()})
+    g_prior.ndata.update({k: v for k, v in g.ndata.items()})
     edge_batches = g_train_edges[torch.randperm(g_train_edges.shape[0])].split(batch_size)
     sampler = PPRBipartiteSingleSidedNeighborSampler(
             g_prior,
@@ -177,7 +178,7 @@ def runtest(g_prior_edges, validation=True):
     g_prior = DGLGraph()
     g_prior.add_nodes(g.number_of_nodes())
     g_prior.add_edges(g_prior_src, g_prior_dst)
-    g_prior.ndata.update({k: cuda(v) for k, v in g.ndata.items()})
+    g_prior.ndata.update({k: v for k, v in g.ndata.items()})
     sampler = PPRBipartiteSingleSidedNeighborSampler(
             g_prior,
             batch_size,
@@ -191,8 +192,10 @@ def runtest(g_prior_edges, validation=True):
     with torch.no_grad():
         with tqdm.trange(n_users + n_items) as tq:
             for node_id in tq:
-                nodeflow = sampler.generate([node_id])
-                h = forward(model, nodeflow, [node_id], False)
+                node_id_tensor = torch.LongTensor([node_id])
+                nodeflow = sampler.generate(node_id_tensor)
+                nodeflow.copy_from_parent()
+                h = forward(model, nodeflow, node_id_tensor, False)
                 hs.append(h)
     h = torch.cat(hs, 0)
 

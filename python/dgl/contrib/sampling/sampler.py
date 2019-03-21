@@ -17,7 +17,7 @@ try:
 except ImportError:
     import queue
 
-__all__ = ['NeighborSampler', 'LayerSampler', 'NodeFlowSampler']
+__all__ = ['NeighborSampler', 'LayerSampler', 'NodeFlowSampler', 'CNodeFlowSampler']
 
 class NodeFlowSamplerIter(object):
     def __init__(self, sampler):
@@ -249,11 +249,11 @@ class CNodeFlowSampler(NodeFlowSampler):
 
     def generate(self, seeds):
         idx = utils.toindex(seeds).todgltensor()
-        hdl = self._generate_handles(idx, 0, len(idx))
+        hdl = self.generate_handles(idx, 0, len(idx))
         return NodeFlow(self.g, hdl[0])
 
     def fetch(self, current_nodeflow_index):
-        handles = self._generate_handles(
+        handles = self.generate_handles(
                 self.seed_nodes.todgltensor(),
                 current_nodeflow_index,
                 self.batch_size)
@@ -374,7 +374,7 @@ class NeighborSampler(CNodeFlowSampler):
         return handles
 
 
-class LayerSampler(NodeFlowSampler):
+class LayerSampler(CNodeFlowSampler):
     '''Create a sampler that samples neighborhood.
 
     This creates a NodeFlow loader that samples subgraphs from the input graph
