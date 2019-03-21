@@ -39,8 +39,7 @@ def _is_spmv_supported_edge_feat(g, field):
 
     Only scalar feature is supported currently.
     """
-    feat = g.get_e_repr()[field]
-    shape = F.shape(feat)
+    shape = g.edge_attr_schemes()[field].shape
     return len(shape) == 1 or (len(shape) == 2 and shape[1] == 1)
 
 

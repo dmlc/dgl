@@ -110,6 +110,40 @@ class NodeFlow(DGLBaseGraph):
     def _get_edge_frame(self, flow_id):
         return self._edge_frames[flow_id]
 
+    def node_attr_schemes(self):
+        """Return the node feature schemes.
+
+        Each feature scheme is a named tuple that stores the shape and data type
+        of the node feature
+
+        Returns
+        -------
+        dict of str to schemes
+            The schemes of node feature columns.
+
+        See Also
+        --------
+        dgl.DGLGraph.node_attr_schemes
+        """
+        return self._node_frames[0].schemes
+
+    def edge_attr_schemes(self):
+        """Return the edge feature schemes.
+
+        Each feature scheme is a named tuple that stores the shape and data type
+        of the edge feature
+
+        Returns
+        -------
+        dict of str to schemes
+            The schemes of edge feature columns.
+
+        See Also
+        --------
+        dgl.DGLGraph.node_attr_schemes
+        """
+        return self._edge_frames[0].schemes
+
     @property
     def num_layers(self):
         """Get the number of layers.

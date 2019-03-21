@@ -1312,7 +1312,7 @@ class DGLGraph(DGLBaseGraph):
         """Return the edge feature schemes.
 
         Each feature scheme is a named tuple that stores the shape and data type
-        of the node feature
+        of the edge feature
 
         Returns
         -------
