@@ -93,13 +93,15 @@ void ConstructNodeFlow(
     std::vector<dgl_id_t> *edge_mapping) {
   uint64_t num_vertices = sub_vers->size();
   int64_t num_edges = static_cast<int64_t>(edge_list.size());
+  bool edges_available = (num_edges > 0);
   int num_hops = layer_offsets.size() - 1;
   nf->node_mapping = IdArray::Empty({static_cast<int64_t>(num_vertices)},
                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  nf->edge_mapping = IdArray::Empty({static_cast<int64_t>(num_edges)},
-                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  if (edges_available)
+    nf->edge_mapping = IdArray::Empty({static_cast<int64_t>(num_edges)},
+                                      DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   nf->layer_offsets = IdArray::Empty({static_cast<int64_t>(num_hops + 1)},
-                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+                                     DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   nf->flow_offsets = IdArray::Empty({static_cast<int64_t>(num_hops)},
                                     DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   vertex_mapping->resize(num_vertices);
@@ -108,7 +110,9 @@ void ConstructNodeFlow(
   dgl_id_t *node_map_data = static_cast<dgl_id_t *>(nf->node_mapping->data);
   dgl_id_t *layer_off_data = static_cast<dgl_id_t *>(nf->layer_offsets->data);
   dgl_id_t *flow_off_data = static_cast<dgl_id_t *>(nf->flow_offsets->data);
-  dgl_id_t *edge_map_data = static_cast<dgl_id_t *>(nf->edge_mapping->data);
+  dgl_id_t *edge_map_data = nullptr;
+  if (edges_available)
+    edge_map_data = static_cast<dgl_id_t *>(nf->edge_mapping->data);
 
   // Construct sub_csr_graph
   auto subg_csr = std::make_shared<ImmutableGraph::CSR>(num_vertices, num_edges);
@@ -178,8 +182,13 @@ void ConstructNodeFlow(
         col_list_out[collected_nedges + i] = layer_ver_maps[layer_id + 1][neigh];
       }
       // We can simply copy the edge Ids.
-      std::copy_n(edge_list.begin() + pos,
-                  num_edges, edge_map_data + collected_nedges);
+      if (edges_available)
+        std::copy_n(edge_list.begin() + pos,
+                    num_edges, edge_map_data + collected_nedges);
+      else
+        std::fill(edge_map_data + collected_nedges,
+                  edge_map_data + collected_nedges + num_edges,
+                  -1);
       std::iota(
           edge_mapping->begin() + collected_nedges,
           edge_mapping->begin() + collected_nedges + num_edges,
@@ -235,6 +244,13 @@ DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetNodeMapping")
     void* ptr = args[0];
     const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
     *rv = nflow->node_mapping;
+  });
+
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowEdgeMappingIsAvailable")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void* ptr = args[0];
+    const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
+    *rv = nflow->edge_mapping_available;
   });
 
 DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetEdgeMapping")

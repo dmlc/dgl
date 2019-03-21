@@ -54,6 +54,10 @@ struct NodeFlow {
    */
   IdArray flow_offsets;
   /*!
+   * \brief whether the edge mapping to parent graph is available.
+   */
+  bool edge_mapping_available;
+  /*!
    * \brief The node mapping from the NodeFlow graph to the parent graph.
    */
   IdArray node_mapping;
@@ -62,11 +66,11 @@ struct NodeFlow {
    */
   IdArray edge_mapping;
   /*!
-   * \brief Whether a node tensor is returned
+   * \brief Whether a node tensor is returned.
    */
   bool node_data_available;
   /*!
-   * \brief Whether an edge tensor is returned
+   * \brief Whether an edge tensor is returned.
    */
   bool edge_data_available;
   /*!

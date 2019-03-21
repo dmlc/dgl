@@ -56,7 +56,9 @@ class NodeFlow(DGLBaseGraph):
         super(NodeFlow, self).__init__(GraphIndex(_CAPI_NodeFlowGetGraph(handle)))
         self._parent = parent
         self._node_mapping = utils.toindex(_CAPI_NodeFlowGetNodeMapping(handle))
-        self._edge_mapping = utils.toindex(_CAPI_NodeFlowGetEdgeMapping(handle))
+        self._edge_mapping_available = _CAPI_NodeFlowEdgeMappingIsAvailable(handle)
+        if self._edge_mapping_available:
+            self._edge_mapping = utils.toindex(_CAPI_NodeFlowGetEdgeMapping(handle))
         self._layer_offsets = utils.toindex(
             _CAPI_NodeFlowGetLayerOffsets(handle)).tonumpy()
         self._block_offsets = utils.toindex(
@@ -203,7 +205,9 @@ class NodeFlow(DGLBaseGraph):
                     self._node_frames[i] = _get_frame(self._parent._node_frame,
                                                       node_embed_names[i], nid)
 
-        if self._parent._edge_frame.num_rows != 0 and self._parent._edge_frame.num_columns != 0:
+        if (self._edge_mapping_available and
+            self._parent._edge_frame.num_rows != 0
+            and self._parent._edge_frame.num_columns != 0):
             if is_all(edge_embed_names):
                 for i in range(self.num_blocks):
                     eid = utils.toindex(self.block_parent_eid(i))
@@ -242,7 +246,9 @@ class NodeFlow(DGLBaseGraph):
                     _update_frame(self._parent._node_frame, node_embed_names[i], nid,
                                   self._node_frames[i])
 
-        if self._parent._edge_frame.num_rows != 0 and self._parent._edge_frame.num_columns != 0:
+        if (self._edge_mapping_available and
+            self._parent._edge_frame.num_rows != 0 and
+            self._parent._edge_frame.num_columns != 0):
             if is_all(edge_embed_names):
                 for i in range(self.num_blocks):
                     eid = utils.toindex(self.block_parent_eid(i))
@@ -284,6 +290,8 @@ class NodeFlow(DGLBaseGraph):
         Tensor
             The parent edge id array.
         """
+        if not self._edge_mapping_available:
+            raise AttributeError('edge mapping is unavailable in this NodeFlow')
         return self._edge_mapping.tousertensor()[eid]
 
     def map_from_parent_nid(self, layer_id, parent_nids):
@@ -413,6 +421,8 @@ class NodeFlow(DGLBaseGraph):
         Tensor
             The parent edge id array.
         """
+        if not self._edge_mapping_available:
+            raise AttributeError('edge mapping is unavailable in this NodeFlow')
         block_id = self._get_block_id(block_id)
         start = self._block_offsets[block_id]
         end = self._block_offsets[block_id + 1]
