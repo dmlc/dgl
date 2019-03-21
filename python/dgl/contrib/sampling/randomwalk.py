@@ -198,12 +198,12 @@ class BasePPRNeighborSampler(NodeFlowSampler):
         self._num_workers = num_workers
         self._max_nodes_per_seed = max_nodes_per_seed
 
-    def fetch(self, current_nodeflow_index):
+    def generate_handles(self, seeds, idx, num):
         handles = unwrap_to_ptr_list(self.capi(
             self.g.c_handle,
-            self.seed_nodes.todgltensor(),
-            current_nodeflow_index,
-            self.batch_size,
+            seeds,
+            idx,
+            num,
             self._num_workers,
             self._restart_prob,
             self._max_nodes_per_seed,
@@ -211,8 +211,7 @@ class BasePPRNeighborSampler(NodeFlowSampler):
             self._max_frequent_visited_nodes,
             self._num_hops,
             self._top_t))
-        nflows = [NodeFlow(self.g, hdl, edata_key='ppr_weight') for hdl in handles]
-        return nflows
+        return handles
 
 
 _init_api('dgl.randomwalk', __name__)

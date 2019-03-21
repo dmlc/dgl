@@ -151,6 +151,12 @@ class NodeFlow(DGLBaseGraph):
         """
         return BlockView(self)
 
+    def layer_offsets(self, layer_id):
+        return self._layer_offsets[self._get_layer_id(layer_id)]
+
+    def block_offsets(self, layer_id):
+        return self._block_offsets[self._get_layer_id(layer_id)]
+
     def layer_size(self, layer_id):
         """Return the number of nodes in a specified layer.
 

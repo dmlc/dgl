@@ -171,7 +171,8 @@ class NodeFlowSampler(object):
         Each worker will return a single NodeFlow constructed from a single
         batch.
 
-        Subclasses of NodeFlowSampler should override this method.
+        Subclasses of NodeFlowSampler should override this method if
+        iterators are to be used.
 
         Parameters
         ----------
@@ -182,6 +183,21 @@ class NodeFlowSampler(object):
         -------
         list[NodeFlow]
             Next "bunch" of nodeflows to be processed.
+        '''
+        raise NotImplementedError
+
+    def generate(self, seeds):
+        '''
+        Method that returns a NodeFlow given the seeds.
+
+        Parameters
+        ----------
+        seeds : list or Tensor of int
+            The seeds
+
+        Returns
+        -------
+        NodeFlow
         '''
         raise NotImplementedError
 
@@ -204,7 +220,47 @@ class NodeFlowSampler(object):
     def batch_size(self):
         return self._batch_size
 
-class NeighborSampler(NodeFlowSampler):
+class CNodeFlowSampler(NodeFlowSampler):
+    '''Base NodeFlow sampler that depends on the DGL C NodeFlow sampler
+    interface.
+
+    TODO: doc for the C NodeFlow sampler interface: what would a custom C
+    NodeFlow sampler look like, etc.
+    '''
+    def generate_handles(self, seeds, idx, num):
+        '''Generate a list of C NodeFlow handles.
+
+        Subclasses don't have to override generate() or fetch(); they should
+        override this method instead.
+
+        Parameters
+        ----------
+        seeds : DGLTensor
+            The seeds
+        idx, num : int
+            Generate NodeFlow for seeds[idx:idx+num]
+
+        Returns
+        -------
+        list[C pointer]
+            The list of C pointers to the NodeFlow objects
+        '''
+        raise NotImplementedError
+
+    def generate(self, seeds):
+        idx = utils.toindex(seeds).todgltensor()
+        hdl = self._generate_handles(idx, 0, len(idx))
+        return NodeFlow(self.g, hdl[0])
+
+    def fetch(self, current_nodeflow_index):
+        handles = self._generate_handles(
+                self.seed_nodes.todgltensor(),
+                current_nodeflow_index,
+                self.batch_size)
+        nflows = [NodeFlow(self.g, hdl) for hdl in handles]
+        return nflows
+
+class NeighborSampler(CNodeFlowSampler):
     '''Create a sampler that samples neighborhood.
 
     It returns a generator of :class:`~dgl.NodeFlow`. This can be viewed as
@@ -304,19 +360,18 @@ class NeighborSampler(NodeFlowSampler):
         self._num_workers = num_workers
         self._neighbor_type = neighbor_type
 
-    def fetch(self, current_nodeflow_index):
+    def generate_handles(self, seeds, idx, num):
         handles = unwrap_to_ptr_list(_CAPI_UniformSampling(
             self.g.c_handle,
-            self.seed_nodes.todgltensor(),
-            current_nodeflow_index, # start batch id
-            self.batch_size,        # batch size
-            self._num_workers,      # num batches
+            seeds,
+            idx,
+            num,
+            self._num_workers,
             self._expand_factor,
             self._num_hops,
             self._neighbor_type,
             self._add_self_loop))
-        nflows = [NodeFlow(self.g, hdl) for hdl in handles]
-        return nflows
+        return handles
 
 
 class LayerSampler(NodeFlowSampler):
@@ -366,17 +421,16 @@ class LayerSampler(NodeFlowSampler):
         self._neighbor_type = neighbor_type
         self._layer_sizes = utils.toindex(layer_sizes)
 
-    def fetch(self, current_nodeflow_index):
+    def fetch(self, seeds, idx, num):
         handles = unwrap_to_ptr_list(_CAPI_LayerSampling(
             self.g.c_handle,
-            self.seed_nodes.todgltensor(),
-            current_nodeflow_index,  # start batch id
-            self.batch_size,         # batch size
+            seeds,
+            idx,        # start batch id
+            num,        # batch size
             self._num_workers,       # num batches
             self._layer_sizes.todgltensor(),
             self._neighbor_type))
-        nflows = [NodeFlow(self.g, hdl) for hdl in handles]
-        return nflows
+        return handles
 
 def create_full_nodeflow(g, num_layers, add_self_loop=False):
     """Convert a full graph to NodeFlow to run a L-layer GNN model.
