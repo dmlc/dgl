@@ -84,7 +84,7 @@ def forward(model, nodeflow, train=True):
         with torch.no_grad():
             return model(nodeflow, embs)
 
-
+@profile
 def runtrain(g_prior_edges, g_train_edges, train):
     global opt
     if train:
@@ -105,7 +105,8 @@ def runtrain(g_prior_edges, g_train_edges, train):
             10,
             20,
             restart_prob=0.5,
-            prefetch=False)
+            prefetch=False,
+            add_self_loop=True)
 
     with tqdm.tqdm(edge_batches) as tq:
         sum_loss = 0
@@ -178,7 +179,7 @@ def runtrain(g_prior_edges, g_train_edges, train):
 
     return avg_loss, avg_acc
 
-
+@profile
 def runtest(g_prior_edges, validation=True):
     model.eval()
 
@@ -197,7 +198,8 @@ def runtest(g_prior_edges, validation=True):
             10,
             20,
             restart_prob=0.5,
-            prefetch=False)
+            prefetch=False,
+            add_self_loop=True)
 
     hs = []
     with torch.no_grad():
@@ -245,28 +247,28 @@ def runtest(g_prior_edges, validation=True):
 
     return np.array(rr)
 
-
+@profile
 def train():
     global opt, sched
     best_mrr = 0
-    for epoch in range(500):
+    for epoch in range(60):
         ml.refresh_mask()
         g_prior_edges = g.filter_edges(lambda edges: edges.data['prior'])
         g_train_edges = g.filter_edges(lambda edges: edges.data['train'] & ~edges.data['inv'])
         g_prior_train_edges = g.filter_edges(
                 lambda edges: edges.data['prior'] | edges.data['train'])
 
-        #print('Epoch %d validation' % epoch)
-        #with torch.no_grad():
-        #    valid_mrr = runtest(g_prior_train_edges, True)
-        #    if best_mrr < valid_mrr.mean():
-        #        best_mrr = valid_mrr.mean()
-        #        torch.save(model.state_dict(), 'model.pt')
-        #print(pd.Series(valid_mrr).describe())
-        #print('Epoch %d test' % epoch)
-        #with torch.no_grad():
-        #    test_mrr = runtest(g_prior_train_edges, False)
-        #print(pd.Series(test_mrr).describe())
+        print('Epoch %d validation' % epoch)
+        with torch.no_grad():
+            valid_mrr = runtest(g_prior_train_edges, True)
+            if best_mrr < valid_mrr.mean():
+                best_mrr = valid_mrr.mean()
+                torch.save(model.state_dict(), 'model.pt')
+        print(pd.Series(valid_mrr).describe())
+        print('Epoch %d test' % epoch)
+        with torch.no_grad():
+            test_mrr = runtest(g_prior_train_edges, False)
+        print(pd.Series(test_mrr).describe())
 
         print('Epoch %d train' % epoch)
         runtrain(g_prior_edges, g_train_edges, True)

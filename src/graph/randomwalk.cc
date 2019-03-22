@@ -298,6 +298,18 @@ NodeFlow CreateNodeFlowWithPPRFromRandomWalk(
       auto it = visit_counter_vec.cbegin();
       for (; t < top_t && it != visit_counter_vec.cend(); ++t, ++it)
         total_visits += it->second;
+      neigh_pos.emplace_back(dst, neighbor_list.size(), add_self_loop ? t+1 : t);
+
+      if (add_self_loop) {
+        neighbor_list.push_back(dst);
+        edge_list.push_back(-1);
+        edge_data.push_back(0.);    // not weighting over itself due to self loop
+        ++t;
+
+        auto ret = sub_ver_map.insert(dst);
+        if (ret.second)
+          sub_vers.push_back(dst);
+      }
       for (t = 0, it = visit_counter_vec.cbegin();
           t < top_t && it != visit_counter_vec.cend();
           ++t, ++it) {
@@ -309,13 +321,6 @@ NodeFlow CreateNodeFlowWithPPRFromRandomWalk(
         if (ret.second)
           sub_vers.push_back(it->first);
       }
-      if (add_self_loop) {
-        neighbor_list.push_back(dst);
-        edge_list.push_back(-1);
-        edge_data.push_back(0.);    // not weighting over itself due to self loop
-        ++t;
-      }
-      neigh_pos.emplace_back(dst, neighbor_list.size(), t);
     }
 
     layer_offsets[layer_id + 1] = layer_offsets[layer_id] + sub_ver_map.size();

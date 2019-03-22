@@ -62,11 +62,9 @@ class PinSageConv(nn.Module):
         h_concat = torch.cat([h, h_agg], 1)
         h_new = F.leaky_relu(self.W(h_concat))
         h_new = safediv(h_new, h_new.norm(dim=1, keepdim=True))
-        h_new_q = self.project(h_new)
-        return {'h': h_new, 'h_q': h_new_q}
+        return {'h': h_new}
 
     def project(self, h):
-        print(id(self))
         return F.leaky_relu(self.Q(h))
 
 
@@ -105,27 +103,25 @@ class PinSage(nn.Module):
         nf: NodeFlow.
         '''
         nf.copy_from_parent()
-        node_emb_names = []
+
+        nid = nf.layer_parent_nid(0)
         if self.use_feature:
             nf.layers[0].data['h'] = mix_embeddings(
-                    h(nid), nf.layers[i].data, self.emb, self.proj)
+                    h(nid), nf.layers[0].data, self.emb, self.proj)
         else:
             nf.layers[0].data['h'] = h(nid)
 
-        if i < nf.num_layers - 1:
-            nf.layers[0].data['h_q'] = self.convs[0].project(nf.layers[i].data['h'])
 
-        nf.copy_to_parent(node_emb_names)
         for i in range(nf.num_blocks):
             parent_nid = nf.layer_parent_nid(i + 1)
             nf.layers[i + 1].data['h'] = \
                     nf.layers[i].data['h'][nf.map_from_parent_nid(i, parent_nid)]
+            nf.layers[i].data['h_q'] = self.convs[i].project(nf.layers[i].data['h'])
             nf.block_compute(
                     i,
                     [FN.src_mul_edge('h_q', 'ppr_weight', 'h_w'),
-                     FN.copy_edge('ppr_weight', 'w')]
-                    [FN.sum('h_w', 'h_agg'), FN.sum('w', 'w')]
+                     FN.copy_edge('ppr_weight', 'w')],
+                    [FN.sum('h_w', 'h_agg'), FN.sum('w', 'w')],
                     self.convs[i])
-        nf.copy_to_parent()
 
         return nf.layers[-1].data['h']

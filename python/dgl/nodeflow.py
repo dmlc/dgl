@@ -345,7 +345,7 @@ class NodeFlow(DGLBaseGraph):
         Returns
         -------
         Tensor
-            Node Ids in the NodeFlow.
+            Node Ids in that layer in the NodeFlow.
         """
         parent_nids = utils.toindex(parent_nids)
         layer_id = self._get_layer_id(layer_id)
