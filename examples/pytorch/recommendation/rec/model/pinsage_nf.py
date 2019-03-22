@@ -14,11 +14,12 @@ def mix_embeddings(h, ndata, emb, proj):
     (projected by ``emb``) and numeric inputs (projected by ``proj``).
     '''
     e = []
-    for key, value in ndata.items():
-        if value.dtype == torch.int64:
-            e.append(emb[key](cuda(value)))
-        elif value.dtype == torch.float32:
-            e.append(proj[key](cuda(value)))
+    for key in emb.keys():
+        value = ndata[key]
+        e.append(emb[key](cuda(value)))
+    for key in proj.keys():
+        value = ndata[key]
+        e.append(proj[key](cuda(value)))
     return cuda(h) + torch.stack(e, 0).sum(0)
 
 def get_embeddings(h, nodeset):
@@ -55,17 +56,22 @@ class PinSageConv(nn.Module):
         init_bias(self.Q.bias)
         init_bias(self.W.bias)
 
-    message = [FN.src_mul_edge('h', 'ppr_weight', 'h_w'),
-               FN.copy_src('ppr_weight', 'w')]
+    message = [FN.src_mul_edge('h_q', 'ppr_weight', 'h_w'),
+               FN.copy_edge('ppr_weight', 'w')]
     reduce = [FN.sum('h_w', 'h_agg'), FN.sum('w', 'w')]
 
     def apply(self, nodes):
-        h_agg = safediv(nodes['h_agg'], nodes['w'])
-        h = nodes['h']
+        h_agg = safediv(nodes.data['h_agg'], nodes.data['w'][:, None])
+        h = nodes.data['h']
         h_concat = torch.cat([h, h_agg], 1)
         h_new = F.leaky_relu(self.W(h_concat))
         h_new = safediv(h_new, h_new.norm(dim=1, keepdim=True))
-        return {'h': h_new}
+        h_new_q = self.project(h_new)
+        return {'h': h_new, 'h_q': h_new_q}
+
+    def project(self, h):
+        print(id(self))
+        return F.leaky_relu(self.Q(h))
 
 
 class PinSage(nn.Module):
@@ -100,17 +106,30 @@ class PinSage(nn.Module):
 
     def forward(self, nf, h):
         '''
-        nf: NodeFlow.  Features are already copied from the original graph.
+        nf: NodeFlow.
         '''
-        if self.use_feature:
-            nf.layers[0].data['h'] = mix_embeddings(
-                    h, nf.layers[0].data, self.emb, self.proj)
+        nf.copy_from_parent()
+        for i in range(nf.num_layers):
+            nid = nf.layer_parent_nid(i)
+            if self.use_feature:
+                nf.layers[i].data['h'] = mix_embeddings(
+                        h(nid), nf.layers[i].data, self.emb, self.proj)
+            else:
+                nf.layers[i].data['h'] = h(nid)
 
-        for i in range(self.n_layers):
+            if i < nf.num_layers - 1:
+                nf.layers[i].data['h_q'] = self.convs[i].project(nf.layers[i].data['h'])
+        nf.copy_to_parent([['h', 'h_q']] * (nf.num_layers - 1) + [['h']])
+
+        for i in range(nf.num_blocks):
+            nf.copy_from_parent([
+                ['h', 'h_q'] if j == i else (['h'] if j == i + 1 else [])
+                for j in range(nf.num_layers)])
             nf.block_compute(
                     i,
                     self.convs[i].message,
                     self.convs[i].reduce,
                     self.convs[i].apply)
+            nf.copy_to_parent([['h', 'h_q'] if j == i + 1 else [] for j in range(nf.num_layers)])
 
         return nf.layers[-1].data['h']

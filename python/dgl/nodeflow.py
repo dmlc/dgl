@@ -145,6 +145,11 @@ class NodeFlow(DGLBaseGraph):
         return self._edge_frames[0].schemes
 
     @property
+    def parent(self):
+        """The parent graph."""
+        return self._parent
+
+    @property
     def num_layers(self):
         """Get the number of layers.
 
@@ -343,12 +348,12 @@ class NodeFlow(DGLBaseGraph):
             Node Ids in the NodeFlow.
         """
         parent_nids = utils.toindex(parent_nids)
+        layer_id = self._get_layer_id(layer_id)
         layers = self._layer_offsets
         start = int(layers[layer_id])
         end = int(layers[layer_id + 1])
-        # TODO(minjie): should not directly use []
         mapping = self._node_mapping.tousertensor()
-        mapping = mapping[start:end]
+        mapping = F.narrow_row(mapping, start, end)
         mapping = utils.toindex(mapping)
         nflow_ids = transform_ids(mapping, parent_nids)
         return nflow_ids.tousertensor()

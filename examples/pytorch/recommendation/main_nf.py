@@ -72,12 +72,17 @@ opt = getattr(torch.optim, args.opt)(
 sched = torch.optim.lr_scheduler.LambdaLR(opt, sched_lambda[args.sched])
 
 
-def forward(model, nodeflow, input_nid, train=True):
+def cast_ppr_weight(nodeflow):
+    for i in range(nodeflow.num_blocks):
+        nodeflow.apply_block(i, lambda x: {'ppr_weight': cuda(x.data['ppr_weight']).float()})
+
+
+def forward(model, nodeflow, train=True):
     if train:
-        return model(nodeflow, embs(input_nid))
+        return model(nodeflow, embs)
     else:
         with torch.no_grad():
-            return model(nodeflow, embs(input_nid))
+            return model(nodeflow, embs)
 
 
 def runtrain(g_prior_edges, g_train_edges, train):
@@ -96,7 +101,7 @@ def runtrain(g_prior_edges, g_train_edges, train):
     sampler = PPRBipartiteSingleSidedNeighborSampler(
             g_prior,
             batch_size,
-            n_layers,
+            n_layers + 1,
             10,
             20,
             restart_prob=0.5,
@@ -132,13 +137,19 @@ def runtrain(g_prior_edges, g_train_edges, train):
             if len(src) == 0:
                 continue
 
+            src_size = src.shape[0]
+            dst_size = dst.shape[0]
+            dst_neg_size = dst_neg.shape[0]
+
             nodeset = torch.cat([src, dst, dst_neg])
             nodeflow = sampler.generate(nodeset)
+            for i in range(nodeflow.num_layers - 1):
+                assert np.isin(nodeflow.layer_parent_nid(i + 1).numpy(),
+                        nodeflow.layer_parent_nid(i).numpy()).all()
             nodeflow.copy_from_parent()
-            input_nid = nodeflow.layer_parent_nid(0)
-            node_output = forward(model, nodeflow, input_nid, train)
-            output_idx = nodeflow.map_from_parent_nid(-1, nodeset) - \
-                         nodeflow.layer_offsets(-1)
+            cast_ppr_weight(nodeflow)
+            node_output = forward(model, nodeflow, train)
+            output_idx = nodeflow.map_from_parent_nid(-1, nodeset)
             h = node_output[output_idx]
             h_src, h_dst, h_dst_neg = h.split([src_size, dst_size, dst_neg_size])
 
@@ -182,7 +193,7 @@ def runtest(g_prior_edges, validation=True):
     sampler = PPRBipartiteSingleSidedNeighborSampler(
             g_prior,
             batch_size,
-            n_layers,
+            n_layers + 1,
             10,
             20,
             restart_prob=0.5,
@@ -195,7 +206,8 @@ def runtest(g_prior_edges, validation=True):
                 node_id_tensor = torch.LongTensor([node_id])
                 nodeflow = sampler.generate(node_id_tensor)
                 nodeflow.copy_from_parent()
-                h = forward(model, nodeflow, node_id_tensor, False)
+                cast_ppr_weight(nodeflow)
+                h = forward(model, nodeflow, False)
                 hs.append(h)
     h = torch.cat(hs, 0)
 
@@ -244,17 +256,17 @@ def train():
         g_prior_train_edges = g.filter_edges(
                 lambda edges: edges.data['prior'] | edges.data['train'])
 
-        print('Epoch %d validation' % epoch)
-        with torch.no_grad():
-            valid_mrr = runtest(g_prior_train_edges, True)
-            if best_mrr < valid_mrr.mean():
-                best_mrr = valid_mrr.mean()
-                torch.save(model.state_dict(), 'model.pt')
-        print(pd.Series(valid_mrr).describe())
-        print('Epoch %d test' % epoch)
-        with torch.no_grad():
-            test_mrr = runtest(g_prior_train_edges, False)
-        print(pd.Series(test_mrr).describe())
+        #print('Epoch %d validation' % epoch)
+        #with torch.no_grad():
+        #    valid_mrr = runtest(g_prior_train_edges, True)
+        #    if best_mrr < valid_mrr.mean():
+        #        best_mrr = valid_mrr.mean()
+        #        torch.save(model.state_dict(), 'model.pt')
+        #print(pd.Series(valid_mrr).describe())
+        #print('Epoch %d test' % epoch)
+        #with torch.no_grad():
+        #    test_mrr = runtest(g_prior_train_edges, False)
+        #print(pd.Series(test_mrr).describe())
 
         print('Epoch %d train' % epoch)
         runtrain(g_prior_edges, g_train_edges, True)
