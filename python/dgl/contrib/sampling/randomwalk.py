@@ -189,7 +189,8 @@ class BasePPRNeighborSampler(CNodeFlowSampler):
             max_visit_counts=0,
             max_frequent_visited_nodes=0,
             num_workers=1,
-            prefetch=False):
+            prefetch=False,
+            add_self_loop=False):
         super(BasePPRNeighborSampler, self).__init__(
                 g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0)
 
@@ -200,6 +201,7 @@ class BasePPRNeighborSampler(CNodeFlowSampler):
         self._top_t = top_t
         self._num_workers = num_workers
         self._max_nodes_per_seed = max_nodes_per_seed
+        self._add_self_loop = add_self_loop
 
     def generate_handles(self, seeds, idx, num):
         handles = unwrap_to_ptr_list(self.capi(
@@ -213,7 +215,8 @@ class BasePPRNeighborSampler(CNodeFlowSampler):
             self._max_visit_counts,
             self._max_frequent_visited_nodes,
             self._num_hops,
-            self._top_t))
+            self._top_t,
+            self._add_self_loop))
         return handles
 
 

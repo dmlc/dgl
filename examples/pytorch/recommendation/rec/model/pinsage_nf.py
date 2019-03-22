@@ -56,11 +56,7 @@ class PinSageConv(nn.Module):
         init_bias(self.Q.bias)
         init_bias(self.W.bias)
 
-    message = [FN.src_mul_edge('h_q', 'ppr_weight', 'h_w'),
-               FN.copy_edge('ppr_weight', 'w')]
-    reduce = [FN.sum('h_w', 'h_agg'), FN.sum('w', 'w')]
-
-    def apply(self, nodes):
+    def forward(self, nodes):
         h_agg = safediv(nodes.data['h_agg'], nodes.data['w'][:, None])
         h = nodes.data['h']
         h_concat = torch.cat([h, h_agg], 1)
@@ -109,27 +105,27 @@ class PinSage(nn.Module):
         nf: NodeFlow.
         '''
         nf.copy_from_parent()
-        for i in range(nf.num_layers):
-            nid = nf.layer_parent_nid(i)
-            if self.use_feature:
-                nf.layers[i].data['h'] = mix_embeddings(
-                        h(nid), nf.layers[i].data, self.emb, self.proj)
-            else:
-                nf.layers[i].data['h'] = h(nid)
+        node_emb_names = []
+        if self.use_feature:
+            nf.layers[0].data['h'] = mix_embeddings(
+                    h(nid), nf.layers[i].data, self.emb, self.proj)
+        else:
+            nf.layers[0].data['h'] = h(nid)
 
-            if i < nf.num_layers - 1:
-                nf.layers[i].data['h_q'] = self.convs[i].project(nf.layers[i].data['h'])
-        nf.copy_to_parent([['h', 'h_q']] * (nf.num_layers - 1) + [['h']])
+        if i < nf.num_layers - 1:
+            nf.layers[0].data['h_q'] = self.convs[0].project(nf.layers[i].data['h'])
 
+        nf.copy_to_parent(node_emb_names)
         for i in range(nf.num_blocks):
-            nf.copy_from_parent([
-                ['h', 'h_q'] if j == i else (['h'] if j == i + 1 else [])
-                for j in range(nf.num_layers)])
+            parent_nid = nf.layer_parent_nid(i + 1)
+            nf.layers[i + 1].data['h'] = \
+                    nf.layers[i].data['h'][nf.map_from_parent_nid(i, parent_nid)]
             nf.block_compute(
                     i,
-                    self.convs[i].message,
-                    self.convs[i].reduce,
-                    self.convs[i].apply)
-            nf.copy_to_parent([['h', 'h_q'] if j == i + 1 else [] for j in range(nf.num_layers)])
+                    [FN.src_mul_edge('h_q', 'ppr_weight', 'h_w'),
+                     FN.copy_edge('ppr_weight', 'w')]
+                    [FN.sum('h_w', 'h_agg'), FN.sum('w', 'w')]
+                    self.convs[i])
+        nf.copy_to_parent()
 
         return nf.layers[-1].data['h']

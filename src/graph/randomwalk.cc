@@ -238,7 +238,8 @@ NodeFlow CreateNodeFlowWithPPRFromRandomWalk(
     uint64_t max_frequent_visited_nodes,
     bool (*walker)(const GraphInterface *, unsigned int *, dgl_id_t, dgl_id_t *),
     int num_hops,
-    uint64_t top_t) {
+    uint64_t top_t,
+    bool add_self_loop) {
   // TODO: better naming; these follow SampleSubgraph
   std::vector<dgl_id_t> neighbor_list, edge_list;
   std::vector<double> edge_data;
@@ -297,7 +298,6 @@ NodeFlow CreateNodeFlowWithPPRFromRandomWalk(
       auto it = visit_counter_vec.cbegin();
       for (; t < top_t && it != visit_counter_vec.cend(); ++t, ++it)
         total_visits += it->second;
-      neigh_pos.emplace_back(dst, neighbor_list.size(), t);
       for (t = 0, it = visit_counter_vec.cbegin();
           t < top_t && it != visit_counter_vec.cend();
           ++t, ++it) {
@@ -309,6 +309,13 @@ NodeFlow CreateNodeFlowWithPPRFromRandomWalk(
         if (ret.second)
           sub_vers.push_back(it->first);
       }
+      if (add_self_loop) {
+        neighbor_list.push_back(dst);
+        edge_list.push_back(-1);
+        edge_data.push_back(0.);    // not weighting over itself due to self loop
+        ++t;
+      }
+      neigh_pos.emplace_back(dst, neighbor_list.size(), t);
     }
 
     layer_offsets[layer_id + 1] = layer_offsets[layer_id] + sub_ver_map.size();
@@ -349,7 +356,8 @@ std::vector<NodeFlow *> PPRNeighborSampling(
      * Is passing a single huge array + start offset faster and/or more scalable than
      * passing in multiple small arrays?
      */
-    int64_t batch_start_id) {
+    int64_t batch_start_id,
+    bool add_self_loop) {
   CHECK(IsValidIdArray(seed_nodes));
   const dgl_id_t *seed_nodes_data = static_cast<dgl_id_t *>(seed_nodes->data);
   const int64_t num_seeds = seed_nodes->shape[0];
@@ -364,7 +372,8 @@ std::vector<NodeFlow *> PPRNeighborSampling(
     nflows[i] = new NodeFlow();
     *nflows[i] = SamplerOp::CreateNodeFlowWithPPRFromRandomWalk(
         gptr, seed_nodes_data + start, end - start, restart_prob, max_nodes_per_seed,
-        max_visit_counts, max_frequent_visited_nodes, walker, num_hops, top_t);
+        max_visit_counts, max_frequent_visited_nodes, walker, num_hops, top_t,
+        add_self_loop);
   }
 
   return nflows;
@@ -386,13 +395,14 @@ void PPRNeighborSamplingEntry(
   const uint64_t max_frequent_visited_nodes = args[8];
   const int num_hops = args[9];
   const uint64_t top_t = args[10];
+  const bool add_self_loop = args[11];
 
   const GraphInterface *gptr = static_cast<const GraphInterface *>(ghandle);
 
   std::vector<NodeFlow *> nflows = PPRNeighborSampling(
       gptr, seed_nodes, restart_prob, max_nodes_per_seed, max_visit_counts,
       max_frequent_visited_nodes, walker, num_hops, top_t,
-      max_num_workers, batch_size, batch_start_id);
+      max_num_workers, batch_size, batch_start_id, add_self_loop);
 
   *rv = WrapVectorReturn(nflows);
 }
