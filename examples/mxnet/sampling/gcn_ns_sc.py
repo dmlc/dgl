@@ -2,12 +2,6 @@ from multiprocessing import Process
 import argparse, time, math
 import numpy as np
 from scipy import sparse as spsp
-import numa
-import os
-if os.environ['DMLC_ROLE'] == 'server':
-    os.environ['OMP_NUM_THREADS'] = '4'
-else:
-    os.environ['OMP_NUM_THREADS'] = '16'
 import mxnet as mx
 from mxnet import gluon
 from functools import partial
@@ -116,8 +110,10 @@ class GCNInfer(gluon.Block):
         return g.ndata.pop('activation')
 
 def worker_func(worker_id, args, g, features, labels, train_mask, val_mask, test_mask,
-                in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, ctx):
-    numa.bind([worker_id % 4])
+                in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, ctx, nworkers):
+    if nworkers > 1:
+        import numa
+        numa.bind([worker_id % nworkers])
     model = GCNSampling(in_feats,
                         args.n_hidden,
                         n_classes,
@@ -140,9 +136,10 @@ def worker_func(worker_id, args, g, features, labels, train_mask, val_mask, test
 
     # use optimizer
     print(model.collect_params())
+    kv_type = 'local' if nworkers == 1 else 'dist_sync'
     trainer = gluon.Trainer(model.collect_params(), 'adam',
                             {'learning_rate': args.lr, 'wd': args.weight_decay},
-                            kvstore=mx.kv.create('dist_sync'))
+                            kvstore=mx.kv.create(kv_type))
 
     # initialize graph
     dur = []
@@ -276,15 +273,20 @@ def main(args):
     norm = mx.nd.expand_dims(1./degs, 1)
     g.ndata['norm'] = norm
 
-    ps = []
-    for i in range(args.nworkers):
-        p = Process(target=worker_func, args=(i, args, g, features, labels, train_mask, val_mask, test_mask,
-                                              in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples,
-                                              runtime_ctx[i % len(runtime_ctx)]))
-        ps.append(p)
-        p.start()
-    for p in ps:
-        p.join()
+    if args.nworkers == 1:
+        worker_func(0, args, g, features, labels, train_mask, val_mask, test_mask,
+                    in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples,
+                    runtime_ctx[0], 1)
+    else:
+        ps = []
+        for i in range(args.nworkers):
+            p = Process(target=worker_func, args=(i, args, g, features, labels, train_mask, val_mask, test_mask,
+                                                  in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples,
+                                                  runtime_ctx[i % len(runtime_ctx)], args.nworkers))
+            ps.append(p)
+            p.start()
+        for p in ps:
+            p.join()
 
     print("parent ends")
 
