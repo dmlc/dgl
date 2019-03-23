@@ -1,12 +1,7 @@
 from multiprocessing import Process
 import argparse, time, math
 import numpy as np
-import numa
 import os
-if os.environ['DMLC_ROLE'] == 'server':
-    os.environ['OMP_NUM_THREADS'] = '4'
-else:
-    os.environ['OMP_NUM_THREADS'] = '16'
 import mxnet as mx
 from mxnet import gluon
 from mxnet import profiler
@@ -189,10 +184,12 @@ class GraphSAGEInfer(gluon.Block):
         return h
 
 def worker_func(worker_id, args, g, adj, features, labels, train_mask, val_mask, test_mask,
-                in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, ctx):
+                in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, ctx, nworkers):
     print("run worker " + str(worker_id))
 
-    numa.bind([worker_id % 4])
+    if nworkers > 1:
+        import numa
+        numa.bind([worker_id % nworkers])
     n_layers = args.n_layers
     num_neighbors = args.num_neighbors
     model = GraphSAGETrain(in_feats,
@@ -216,9 +213,10 @@ def worker_func(worker_id, args, g, adj, features, labels, train_mask, val_mask,
 
     # use optimizer
     print(model.collect_params())
+    kv_type = 'local' if nworkers == 1 else 'dist_sync'
     trainer = gluon.Trainer(model.collect_params(), 'adam',
                             {'learning_rate': args.lr, 'wd': args.weight_decay},
-                            kvstore=mx.kv.create('dist_sync'))
+                            kvstore=mx.kv.create(kv_type))
 
     # initialize graph
     dur = []
@@ -231,6 +229,7 @@ def worker_func(worker_id, args, g, adj, features, labels, train_mask, val_mask,
                                                        num_neighbors,
                                                        neighbor_type='in',
                                                        shuffle=True,
+                                                       num_workers=32,
                                                        num_hops=n_layers,
                                                        add_self_loop=True,
                                                        seed_nodes=train_nid):
@@ -282,6 +281,7 @@ def worker_func(worker_id, args, g, adj, features, labels, train_mask, val_mask,
             for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
                                                            g.number_of_nodes(),
                                                            neighbor_type='in',
+                                                           num_workers=32,
                                                            num_hops=n_layers,
                                                            seed_nodes=test_nid,
                                                            add_self_loop=True):
@@ -363,15 +363,22 @@ def main(args):
         g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=mem_ctx)
         g.ndata['agg_h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=mem_ctx)
 
-    ps = []
     adj = g.adjacency_matrix()
-    for i in range(args.nworkers):
-        p = Process(target=worker_func, args=(i, args, g, adj, features, labels, train_mask, val_mask, test_mask,
-                                              in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, runtime_ctx[i % len(runtime_ctx)]))
-        ps.append(p)
-        p.start()
-    for p in ps:
-        p.join()
+
+    if args.nworkers == 1:
+        worker_func(0, args, g, adj, features, labels, train_mask, val_mask, test_mask,
+                    in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples,
+                    runtime_ctx[0], 1)
+    else:
+        ps = []
+        for i in range(args.nworkers):
+            p = Process(target=worker_func, args=(i, args, g, adj, features, labels, train_mask, val_mask, test_mask,
+                                                  in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples,
+                                                  runtime_ctx[i % len(runtime_ctx)], args.nworkers))
+            ps.append(p)
+            p.start()
+        for p in ps:
+            p.join()
 
     print("parent ends")
 
