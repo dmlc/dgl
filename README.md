@@ -33,6 +33,10 @@ We are currently in Beta stage.  More features and improvements are coming.
 
 ## News
 
+We presented DGL at [GTC 2019](https://www.nvidia.com/en-us/gtc/) as an
+instructor-led training session. Check out our slides and tutorial materials
+[here](https://github.com/dglai/DGL-GTC2019)!!!
+
 v0.2 has just been released! Many features, bugfix and performance improvement. See release note
 [here](https://github.com/dmlc/dgl/releases/tag/v0.2).
 
