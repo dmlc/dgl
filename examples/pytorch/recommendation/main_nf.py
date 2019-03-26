@@ -40,7 +40,7 @@ else:
         pickle.dump(ml, f)
 
 g = ml.g
-neighbors = ml.user_neighbors + ml.movie_neighbors
+neighbors = ml.user_neighbors + ml.product_neighbors
 
 n_hidden = 100
 n_layers = args.layers
@@ -84,7 +84,7 @@ def forward(model, nodeflow, train=True):
         with torch.no_grad():
             return model(nodeflow, embs)
 
-@profile
+
 def runtrain(g_prior_edges, g_train_edges, train):
     global opt
     if train:
@@ -123,7 +123,7 @@ def runtrain(g_prior_edges, g_train_edges, train):
                     dst_neg.append(np.random.choice(nb[mask].numpy(), n_negs))
                 else:
                     dst_neg.append(np.random.randint(
-                        len(ml.user_ids), len(ml.user_ids) + len(ml.movie_ids), n_negs))
+                        len(ml.user_ids), len(ml.user_ids) + len(ml.product_ids), n_negs))
             dst_neg = torch.LongTensor(dst_neg)
             dst = dst.view(-1, 1).expand_as(dst_neg).flatten()
             src = src.view(-1, 1).expand_as(dst_neg).flatten()
@@ -179,12 +179,12 @@ def runtrain(g_prior_edges, g_train_edges, train):
 
     return avg_loss, avg_acc
 
-@profile
+
 def runtest(g_prior_edges, validation=True):
     model.eval()
 
     n_users = len(ml.users.index)
-    n_items = len(ml.movies.index)
+    n_items = len(ml.products.index)
 
     g_prior_src, g_prior_dst = g.find_edges(g_prior_edges)
     g_prior = DGLGraph()
@@ -203,9 +203,10 @@ def runtest(g_prior_edges, validation=True):
 
     hs = []
     with torch.no_grad():
-        with tqdm.trange(n_users + n_items) as tq:
+        with tqdm.trange(0, n_users + n_items, batch_size) as tq:
             for node_id in tq:
-                node_id_tensor = torch.LongTensor([node_id])
+                node_id_end = min(n_users + n_items, node_id + batch_size)
+                node_id_tensor = torch.arange(node_id, node_id_end)
                 nodeflow = sampler.generate(node_id_tensor)
                 nodeflow.copy_from_parent()
                 cast_ppr_weight(nodeflow)
@@ -222,14 +223,14 @@ def runtest(g_prior_edges, validation=True):
                 pids_exclude = ml.ratings[
                         (ml.ratings['user_id'] == uid) &
                         (ml.ratings['train'] | ml.ratings['test' if validation else 'valid'])
-                        ]['movie_id'].values
+                        ]['product_id'].values
                 pids_candidate = ml.ratings[
                         (ml.ratings['user_id'] == uid) &
                         ml.ratings['valid' if validation else 'test']
-                        ]['movie_id'].values
-                pids = np.setdiff1d(ml.movie_ids, pids_exclude)
-                p_nids = np.array([ml.movie_ids_invmap[pid] for pid in pids])
-                p_nids_candidate = np.array([ml.movie_ids_invmap[pid] for pid in pids_candidate])
+                        ]['product_id'].values
+                pids = np.setdiff1d(ml.product_ids, pids_exclude)
+                p_nids = np.array([ml.product_ids_invmap[pid] for pid in pids])
+                p_nids_candidate = np.array([ml.product_ids_invmap[pid] for pid in pids_candidate])
 
                 dst = torch.from_numpy(p_nids) + n_users
                 src = torch.zeros_like(dst).fill_(u_nid)
@@ -247,7 +248,7 @@ def runtest(g_prior_edges, validation=True):
 
     return np.array(rr)
 
-@profile
+
 def train():
     global opt, sched
     best_mrr = 0

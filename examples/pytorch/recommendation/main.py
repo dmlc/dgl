@@ -39,7 +39,7 @@ else:
         pickle.dump(ml, f)
 
 g = ml.g
-neighbors = ml.user_neighbors + ml.movie_neighbors
+neighbors = ml.user_neighbors + ml.product_neighbors
 
 n_hidden = 100
 n_layers = args.layers
@@ -51,7 +51,7 @@ hard_neg_prob = args.hard_neg_prob
 
 sched_lambda = {
         'none': lambda epoch: 1,
-        'decay': lambda epoch: max(0.98 ** epoch, 1e-4),
+        'decay': lambda epoch: max(0.999 ** epoch, 1e-4),
         }
 loss_func = {
         'hinge': lambda diff: (diff + margin).clamp(min=0).mean(),
@@ -67,7 +67,7 @@ model = cuda(PinSage(
     use_feature=args.use_feature,
     G=g,
     ))
-opt = getattr(torch.optim, args.opt)(model.parameters(), lr=args.lr)
+opt = getattr(torch.optim, args.opt)(model.parameters(), lr=args.lr, weight_decay=1e-4)
 sched = torch.optim.lr_scheduler.LambdaLR(opt, sched_lambda[args.sched])
 
 
@@ -115,7 +115,7 @@ def runtrain(g_prior_edges, g_train_edges, train):
                     dst_neg.append(np.random.choice(nb[mask].numpy(), n_negs))
                 else:
                     dst_neg.append(np.random.randint(
-                        len(ml.user_ids), len(ml.user_ids) + len(ml.movie_ids), n_negs))
+                        len(ml.user_ids), len(ml.user_ids) + len(ml.product_ids), n_negs))
             dst_neg = torch.LongTensor(dst_neg)
             dst = dst.view(-1, 1).expand_as(dst_neg).flatten()
             src = src.view(-1, 1).expand_as(dst_neg).flatten()
@@ -168,7 +168,7 @@ def runtest(g_prior_edges, validation=True):
     model.eval()
 
     n_users = len(ml.users.index)
-    n_items = len(ml.movies.index)
+    n_items = len(ml.products.index)
 
     g_prior_src, g_prior_dst = g.find_edges(g_prior_edges)
     g_prior = DGLGraph()
@@ -194,14 +194,14 @@ def runtest(g_prior_edges, validation=True):
                 pids_exclude = ml.ratings[
                         (ml.ratings['user_id'] == uid) &
                         (ml.ratings['train'] | ml.ratings['test' if validation else 'valid'])
-                        ]['movie_id'].values
+                        ]['product_id'].values
                 pids_candidate = ml.ratings[
                         (ml.ratings['user_id'] == uid) &
                         ml.ratings['valid' if validation else 'test']
-                        ]['movie_id'].values
-                pids = np.setdiff1d(ml.movie_ids, pids_exclude)
-                p_nids = np.array([ml.movie_ids_invmap[pid] for pid in pids])
-                p_nids_candidate = np.array([ml.movie_ids_invmap[pid] for pid in pids_candidate])
+                        ]['product_id'].values
+                pids = np.setdiff1d(ml.product_ids, pids_exclude)
+                p_nids = np.array([ml.product_ids_invmap[pid] for pid in pids])
+                p_nids_candidate = np.array([ml.product_ids_invmap[pid] for pid in pids_candidate])
 
                 dst = torch.from_numpy(p_nids) + n_users
                 src = torch.zeros_like(dst).fill_(u_nid)

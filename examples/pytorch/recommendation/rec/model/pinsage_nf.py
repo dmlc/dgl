@@ -98,12 +98,15 @@ class PinSage(nn.Module):
                             nn.LeakyReLU(),
                             )
 
+    msg = [FN.src_mul_edge('h_q', 'ppr_weight', 'h_w'),
+           FN.copy_edge('ppr_weight', 'w')]
+    red = [FN.sum('h_w', 'h_agg'), FN.sum('w', 'w')]
+
+    
     def forward(self, nf, h):
         '''
         nf: NodeFlow.
         '''
-        nf.copy_from_parent()
-
         nid = nf.layer_parent_nid(0)
         if self.use_feature:
             nf.layers[0].data['h'] = mix_embeddings(
@@ -111,17 +114,12 @@ class PinSage(nn.Module):
         else:
             nf.layers[0].data['h'] = h(nid)
 
-
         for i in range(nf.num_blocks):
             parent_nid = nf.layer_parent_nid(i + 1)
-            nf.layers[i + 1].data['h'] = \
-                    nf.layers[i].data['h'][nf.map_from_parent_nid(i, parent_nid)]
-            nf.layers[i].data['h_q'] = self.convs[i].project(nf.layers[i].data['h'])
-            nf.block_compute(
-                    i,
-                    [FN.src_mul_edge('h_q', 'ppr_weight', 'h_w'),
-                     FN.copy_edge('ppr_weight', 'w')],
-                    [FN.sum('h_w', 'h_agg'), FN.sum('w', 'w')],
-                    self.convs[i])
+            result = nf.layers[i].data['h'][nf.map_from_parent_nid(i, parent_nid)]
+            nf.layers[i + 1].data['h'] = result
+            result = self.convs[i].project(nf.layers[i].data['h'])
+            nf.layers[i].data['h_q'] = result
+            nf.block_compute(i, self.msg, self.red, self.convs[i])
 
         return nf.layers[-1].data['h']
