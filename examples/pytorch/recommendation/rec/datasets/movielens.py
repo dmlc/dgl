@@ -11,8 +11,9 @@ import stanfordnlp
 import re
 import tqdm
 import string
+from .base import UserProductDataset
 
-class MovieLens(object):
+class MovieLens(UserProductDataset):
     def __init__(self, directory):
         '''
         directory: path to movielens directory which should have the three
@@ -85,27 +86,6 @@ class MovieLens(object):
         self.data_split()
         self.build_graph()
         self.find_neighbors(0.2, 2000, 1000)
-
-    def split_user(self, df, filter_counts=False):
-        df_new = df.copy()
-        df_new['prob'] = 0
-
-        if filter_counts:
-            df_new_sub = (df_new['product_count'] >= 10).nonzero()[0]
-        else:
-            df_new_sub = df_new['train'].nonzero()[0]
-        prob = np.linspace(0, 1, df_new_sub.shape[0], endpoint=False)
-        np.random.shuffle(prob)
-        df_new['prob'].iloc[df_new_sub] = prob
-        return df_new
-
-    def data_split(self):
-        self.ratings = self.ratings.groupby('user_id', group_keys=False).apply(
-                partial(self.split_user, filter_counts=True))
-        self.ratings['train'] = self.ratings['prob'] <= 0.8
-        self.ratings['valid'] = (self.ratings['prob'] > 0.8) & (self.ratings['prob'] <= 0.9)
-        self.ratings['test'] = self.ratings['prob'] > 0.9
-        self.ratings.drop(['prob'], axis=1, inplace=True)
 
     def build_graph(self):
         user_ids = list(self.users.index)
