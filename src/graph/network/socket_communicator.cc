@@ -48,7 +48,7 @@ bool SocketCommunicator::InitSender(const char* ip, int port) {
       LOG(INFO) << "Connected to " << ip << ":" << port;
       return true;
     } else {
-      LOG(ERROR) << "Cannot connect to " << ip << ":" << port 
+      LOG(ERROR) << "Cannot connect to " << ip << ":" << port
                  << ", try again ...";
       bo = false;
       try_count++;
