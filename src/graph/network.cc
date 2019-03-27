@@ -23,18 +23,38 @@ namespace network {
 static char* sender_data_buffer = nullptr;
 static char* recv_data_buffer = nullptr;
 
+///////////////////////// Distrobuted Sampler /////////////////////////
+
 DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string ip = args[0];
     int port = args[1];
     network::Communicator* comm = new network::SocketCommunicator();
     if (comm->Initialize(IS_SENDER, ip.c_str(), port) == false) {
-      LOG(ERROR) << "Initialize network communicator (sender) error.";
+      LOG(FATAL) << "Initialize network communicator (sender) error.";
     }
     try {
       sender_data_buffer = new char[kMaxBufferSize];
     } catch (const std::bad_alloc&) {
-      LOG(FATAL) << "Not enough memory for msg buffer: " << kMaxBufferSize;
+      LOG(FATAL) << "Not enough memory for sender buffer: " << kMaxBufferSize;
+    }
+    CommunicatorHandle chandle = static_cast<CommunicatorHandle>(comm);
+    *rv = chandle;
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::string ip = args[0];
+    int port = args[1];
+    int num_sender = args[2];
+    network::Communicator* comm = new network::SocketCommunicator();
+    if (comm->Initialize(IS_RECEIVER, ip.c_str(), port, num_sender, kQueueSize) == false) {
+      LOG(FATAL) << "Initialize network communicator (receiver) error.";
+    }
+    try {
+      recv_data_buffer = new char[kMaxBufferSize];
+    } catch (const std::bad_alloc&) {
+      LOG(FATAL) << "Not enough memory for receiver buffer: " << kMaxBufferSize;
     }
     CommunicatorHandle chandle = static_cast<CommunicatorHandle>(comm);
     *rv = chandle;
@@ -44,14 +64,14 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
     GraphHandle ghandle = args[1];
-    ImmutableGraph *ptr = static_cast<ImmutableGraph*>(ghandle);
-    network::Communicator* comm = static_cast<network::Communicator*>(chandle);
-    auto csr = ptr->GetInCSR();  // We only care about in_csr here
     const IdArray node_mapping = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
     const IdArray edge_mapping = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[3]));
     const IdArray layer_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[4]));
     const IdArray flow_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[5]));
-    // Serialize nodeflow to send_data_buffer
+    ImmutableGraph *ptr = static_cast<ImmutableGraph*>(ghandle);
+    network::Communicator* comm = static_cast<network::Communicator*>(chandle);
+    auto csr = ptr->GetInCSR();
+    // Serialize nodeflow to data buffer
     int64_t data_size = network::SerializeSampledSubgraph(
                              sender_data_buffer,
                              csr,
@@ -65,22 +85,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
     if (size <= 0) {
       LOG(ERROR) << "Send message error (size: " << size << ")";
     }
-  });
-
-DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    std::string ip = args[0];
-    int port = args[1];
-    int num_sender = args[2];
-    network::Communicator* comm = new network::SocketCommunicator();
-    comm->Initialize(IS_RECEIVER, ip.c_str(), port, num_sender, kQueueSize);
-    CommunicatorHandle chandle = static_cast<CommunicatorHandle>(comm);
-    try {
-      recv_data_buffer = new char[kMaxBufferSize];
-    } catch (const std::bad_alloc&) {
-      LOG(FATAL) << "Not enough memory for msg buffer: " << kMaxBufferSize;
-    }
-    *rv = chandle;
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
@@ -112,14 +116,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeCommunicator")
     CommunicatorHandle chandle = args[0];
     network::Communicator* comm = static_cast<network::Communicator*>(chandle);
     comm->Finalize();
-    if (sender_data_buffer != nullptr) {
-      delete [] sender_data_buffer;
-      sender_data_buffer = nullptr;
-    }
-    if (recv_data_buffer != nullptr) {
-      delete [] recv_data_buffer;
-      recv_data_buffer = nullptr;
-    }
+    delete [] sender_data_buffer;
+    delete [] recv_data_buffer;
   });
 
 }  // namespace network

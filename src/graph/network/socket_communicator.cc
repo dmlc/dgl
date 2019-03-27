@@ -9,6 +9,12 @@
 #include "../../c_api_common.h"
 #include "../network.h"
 
+#ifdef _WIN32
+#include <<windows.h>
+#else   // !_WIN32
+#include <unistd.h>
+#endif  // _WIN32
+
 namespace dgl {
 namespace network {
 
@@ -34,14 +40,22 @@ bool SocketCommunicator::InitSender(const char* ip, int port) {
   socket_.resize(1);
   socket_[0] = new TCPSocket();
   TCPSocket* client = socket_[0];
+  bool bo = false;
+  int try_count = 0;
   // Connect to server
-  if (client->Connect(ip, port)) {
-    LOG(INFO) << "Connected to " << ip << ":" << port;
-    return true;
-  } else {
-    LOG(ERROR) << "Cannot connect to " << ip << ":" << port;
-    return false;
+  while (bo == false && try_count < kMaxTryCount) {
+    if (client->Connect(ip, port)) {
+      LOG(INFO) << "Connected to " << ip << ":" << port;
+      return true;
+    } else {
+      LOG(ERROR) << "Cannot connect to " << ip << ":" << port 
+                 << ", try again ...";
+      bo = false;
+      try_count++;
+      sleep(1);  // sleep 1 second and try again
+    }
   }
+  return false;
 }
 
 bool SocketCommunicator::InitReceiver(const char* ip,

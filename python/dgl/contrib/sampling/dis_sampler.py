@@ -1,4 +1,4 @@
-# This file contains distributed samplers.
+# This file contains DGL distributed samplers APIs.
 from ...network import _send_subgraph, _recv_subgraph
 from ...network import _batch_send_subgraph, _batch_recv_subgraph
 from ...network import _create_sampler_sender, _create_sampler_receiver
@@ -7,7 +7,10 @@ from ...network import _finalize_sampler_sender, _finalize_sampler_receiver
 class SamplerSender(object):
     """Sender of DGL distributed sampler.
 
-    Users use SamplerSender class to send sampled subgraph to remote trainer.
+    Users use SamplerSender class to send sampled 
+    subgraph (NodeFlow) to remote trainer. Note that, SamplerSender
+    class will try to connect to SamplerReceiver in a loop until the
+    SamplerReceiver started.
 
     Parameters
     ----------
@@ -25,7 +28,7 @@ class SamplerSender(object):
         """Finalize Sender
         """
         # _finalize_sampler_sender will send a special message
-        # to tell the remote trainer it has finished its job.
+        # to tell the remote trainer machine that it has finished its job.
         _finalize_sampler_sender(self._sender)
 
     def Send(self, nodeflow):
@@ -44,16 +47,18 @@ class SamplerSender(object):
         Parameters
         ----------
         nodeflow_list : list
-            a list of NodeFlow objects
+            A list of NodeFlow objects
         """
         _batch_send_subgraph(self._sender, nodeflow_list)
 
 class SamplerReceiver(object):
     """Receiver of DGL distributed sampler.
 
-    Users use SamplerReceiver class to receive sampled subgraph from remote samplers. 
-    Note that SamplerReceiver can receive messages from multiple senders concurrently,
-    by given the num_sender parameter.
+    Users use SamplerReceiver class to receive sampled 
+    subgraph (NodeFlow) from remote samplers. Note that SamplerReceiver 
+    can receive messages from multiple senders concurrently, by given 
+    the num_sender parameter, and only when all senders connect to SamplerReceiver,
+    the SamplerReceiver can start its job.
 
     Parameters
     ----------

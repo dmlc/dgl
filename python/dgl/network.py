@@ -1,4 +1,4 @@
-"""Distributed sampler infrastructure."""
+"""DGL Distributed Training Infrastructure."""
 from __future__ import absolute_import
 
 from ._ffi.function import _init_api
@@ -8,8 +8,10 @@ from . import utils
 
 _init_api("dgl.network")
 
+############################# Distrobuted Sampler #############################
+
 def _create_sampler_sender(ip_addr, port):
-    """Create a sender communicator of distributed sampler via C socket.
+    """Create a sender communicator via C socket.
 
     Parameters
     ----------
@@ -21,7 +23,7 @@ def _create_sampler_sender(ip_addr, port):
     return _CAPI_DGLSenderCreate(ip_addr, port)
 
 def _create_sampler_receiver(ip_addr, port, num_sender):
-    """Create a receiver communicator of distributed sampler via C socket.
+    """Create a receiver communicator via C socket.
 
     Parameters
     ----------
@@ -47,7 +49,7 @@ def _send_subgraph(sender, nodeflow):
     graph_handle = nodeflow._graph._handle
     node_mapping = nodeflow._node_mapping.todgltensor()
     edge_mapping = nodeflow._edge_mapping.todgltensor()
-    # Do we have more concise way to get a dgl_tensor for the offsets?
+    # Can we convert NDArray to tensor directly, instead of using toindex()?
     layers_offsets = utils.toindex(nodeflow._layer_offsets).todgltensor()
     flows_offsets = utils.toindex(nodeflow._block_offsets).todgltensor()
     _CAPI_SenderSendSubgraph(sender,
