@@ -202,7 +202,7 @@ PackedFunc ConvertRandomWalkTracesToPackedFunc(const RandomWalkTraces &t) {
   return PackedFunc(body);
 }
 
-IdArray SamplerOp::RandomWalk(
+IdArray RandomWalk(
     const GraphInterface *gptr,
     IdArray seeds,
     int num_traces,
@@ -210,7 +210,7 @@ IdArray SamplerOp::RandomWalk(
   return GenericRandomWalk(gptr, seeds, num_traces, num_hops, WalkMultipleHops<1>);
 }
 
-RandomWalkTraces SamplerOp::RandomWalkWithRestart(
+RandomWalkTraces RandomWalkWithRestart(
     const GraphInterface *gptr,
     IdArray seeds,
     double restart_prob,
@@ -222,7 +222,7 @@ RandomWalkTraces SamplerOp::RandomWalkWithRestart(
       max_frequent_visited_nodes, WalkMultipleHops<1>);
 }
 
-RandomWalkTraces SamplerOp::BipartiteSingleSidedRandomWalkWithRestart(
+RandomWalkTraces BipartiteSingleSidedRandomWalkWithRestart(
     const GraphInterface *gptr,
     IdArray seeds,
     double restart_prob,
@@ -242,7 +242,7 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalk")
     const int num_hops = args[3];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
 
-    *rv = SamplerOp::RandomWalk(ptr, seeds, num_traces, num_hops);
+    *rv = RandomWalk(ptr, seeds, num_traces, num_hops);
   });
 
 DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalkWithRestart")
@@ -256,7 +256,7 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalkWithRestart")
     const GraphInterface *gptr = static_cast<const GraphInterface *>(ghandle);
 
     *rv = ConvertRandomWalkTracesToPackedFunc(
-        SamplerOp::RandomWalkWithRestart(gptr, seeds, restart_prob, min_nodes_per_seed,
+        RandomWalkWithRestart(gptr, seeds, restart_prob, min_nodes_per_seed,
           max_visit_counts, max_frequent_visited_nodes));
   });
 
@@ -271,7 +271,7 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLBipartiteSingleSidedRandomWalkWithResta
     const GraphInterface *gptr = static_cast<const GraphInterface *>(ghandle);
 
     *rv = ConvertRandomWalkTracesToPackedFunc(
-        SamplerOp::BipartiteSingleSidedRandomWalkWithRestart(
+        BipartiteSingleSidedRandomWalkWithRestart(
           gptr, seeds, restart_prob, min_nodes_per_seed,
           max_visit_counts, max_frequent_visited_nodes));
   });
