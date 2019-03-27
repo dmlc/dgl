@@ -147,6 +147,12 @@ class NDArray {
   DGL_DLL static NDArray Empty(std::vector<int64_t> shape,
                                DLDataType dtype,
                                DLContext ctx);
+  DGL_DLL static NDArray EmptyShared(const std::string &name,
+                               std::vector<int64_t> shape,
+                               DLDataType dtype,
+                               DLContext ctx,
+                               bool is_create);
+  size_t GetSize() const;
   /*!
    * \brief Create a NDArray backed by a dlpack tensor.
    *
@@ -207,6 +213,8 @@ struct NDArray::Container {
    *  The head ptr of this struct can be viewed as DLTensor*.
    */
   DLTensor dl_tensor;
+
+  bool is_shared_mem{false};
   /*!
    * \brief addtional context, reserved for recycling
    * \note We can attach additional content here

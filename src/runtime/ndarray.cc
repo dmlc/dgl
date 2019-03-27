@@ -3,6 +3,9 @@
  * \file ndarray.cc
  * \brief NDArray container infratructure.
  */
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <dmlc/logging.h>
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/c_runtime_api.h>
@@ -46,6 +49,9 @@ struct NDArray::Internal {
     using dgl::runtime::NDArray;
     if (ptr->manager_ctx != nullptr) {
       static_cast<NDArray::Container*>(ptr->manager_ctx)->DecRef();
+    } else if (ptr->is_shared_mem) {
+      size_t size = GetDataSize(ptr->dl_tensor);
+      munmap(ptr->dl_tensor.data, size);
     } else if (ptr->dl_tensor.data != nullptr) {
       dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
           ptr->dl_tensor.ctx, ptr->dl_tensor.data);
@@ -112,6 +118,10 @@ struct NDArray::Internal {
   }
 };
 
+size_t NDArray::GetSize() const {
+  return GetDataSize(data_->dl_tensor);
+}
+
 NDArray NDArray::CreateView(std::vector<int64_t> shape,
                             DLDataType dtype) {
   CHECK(data_ != nullptr);
@@ -133,6 +143,34 @@ NDArray NDArray::CreateView(std::vector<int64_t> shape,
 
 DLManagedTensor* NDArray::ToDLPack() const {
   return Internal::ToDLPack(data_);
+}
+
+NDArray NDArray::EmptyShared(const std::string &name,
+                       std::vector<int64_t> shape,
+                       DLDataType dtype,
+                       DLContext ctx, bool is_create) {
+  NDArray ret = Internal::Create(shape, dtype, ctx);
+  // setup memory content
+  size_t size = GetDataSize(ret.data_->dl_tensor);
+  size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
+
+  // TODO do I open it right?
+  int flag = O_RDWR;
+  if (is_create) flag |= O_CREAT;
+  int fd = shm_open(name.c_str(), flag, S_IRUSR | S_IWUSR);
+  CHECK_NE(fd, -1) << "fail to open " << name << ": " << strerror(errno);
+  if (is_create) {
+    auto res = ftruncate(fd, size);
+    CHECK_NE(res, -1)
+      << "Failed to truncate the file. " << strerror(errno);
+  }
+  auto ptr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+  CHECK_NE(ptr, MAP_FAILED)
+    << "Failed to map shared memory. mmap failed with error " << strerror(errno);
+  ret.data_->dl_tensor.data = ptr;
+  ret.data_->is_shared_mem = true;
+  // TODO how to free the memory and close the file.
+  return ret;
 }
 
 NDArray NDArray::Empty(std::vector<int64_t> shape,
