@@ -38,6 +38,11 @@ class DGLBaseGraph(object):
     def __init__(self, graph):
         self._graph = graph
 
+    @property
+    def c_handle(self):
+        """The C handle for the graph."""
+        return self._graph._handle
+
     def number_of_nodes(self):
         """Return the number of nodes in the graph.
 
@@ -2831,6 +2836,32 @@ class DGLGraph(DGLBaseGraph):
         sgi = self._graph.edge_subgraph(induced_edges)
         return subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
 
+    def adjacency_matrix_scipy(self, transpose=False, fmt='csr'):
+        """Return the scipy adjacency matrix representation of this graph.
+
+        By default, a row of returned adjacency matrix represents the destination
+        of an edge and the column represents the source.
+
+        When transpose is True, a row represents the source and a column represents
+        a destination.
+
+        The elements in the adajency matrix are edge ids.
+
+        Parameters
+        ----------
+        transpose : bool, optional (default=False)
+            A flag to transpose the returned adjacency matrix.
+        fmt : str, optional (default='csr')
+            Indicates the format of returned adjacency matrix.
+
+        Returns
+        -------
+        scipy.sparse.spmatrix
+            The scipy representation of adjacency matrix.
+
+        """
+        return self._graph.adjacency_matrix_scipy(transpose, fmt)
+
     def adjacency_matrix(self, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of this graph.
 
@@ -3070,10 +3101,8 @@ class DGLGraph(DGLBaseGraph):
         >>> G.number_of_nodes()
         8
         """
-        if readonly_state == self._graph.is_readonly():
-            return self
-        self._graph.readonly(readonly_state)
-        return self
+        if readonly_state != self.is_readonly:
+            self._graph.readonly(readonly_state)
 
     def __repr__(self):
         ret = ('DGLGraph(num_nodes={node}, num_edges={edge},\n'

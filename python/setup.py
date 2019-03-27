@@ -1,16 +1,23 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import sys, os, platform
+import sys, os, platform, sysconfig
 import shutil
 import glob
 
 from setuptools import find_packages
 from setuptools.dist import Distribution
-from setuptools import setup
+
+# need to use distutils.core for correct placement of cython dll
+if '--inplace' in sys.argv:
+    from distutils.core import setup
+    from distutils.extension import Extension
+else:
+    from setuptools import setup
+    from setuptools.extension import Extension
 
 class BinaryDistribution(Distribution):
     def has_ext_modules(self):
-        return platform.system() == 'Darwin'
+        return True
 
 CURRENT_DIR = os.path.dirname(__file__)
 
@@ -29,6 +36,49 @@ def get_lib_path():
     return libs, version
 
 LIBS, VERSION = get_lib_path()
+
+def config_cython():
+    """Try to configure cython and return cython configuration"""
+    if os.name == 'nt':
+        print("WARNING: Cython is not supported on Windows, will compile without cython module")
+        return []
+    sys_cflags = sysconfig.get_config_var("CFLAGS")
+
+    if "i386" in sys_cflags and "x86_64" in sys_cflags:
+        print("WARNING: Cython library may not be compiled correctly with both i386 and x64")
+        return []
+    try:
+        from Cython.Build import cythonize
+        # from setuptools.extension import Extension
+        if sys.version_info >= (3, 0):
+            subdir = "_cy3"
+        else:
+            subdir = "_cy2"
+        ret = []
+        path = "dgl/_ffi/_cython"
+        if os.name == 'nt':
+            library_dirs = ['dgl', '../build/Release', '../build']
+            libraries = ['libtvm']
+        else:
+            library_dirs = None
+            libraries = None
+        for fn in os.listdir(path):
+            if not fn.endswith(".pyx"):
+                continue
+            ret.append(Extension(
+                "dgl._ffi.%s.%s" % (subdir, fn[:-4]),
+                ["dgl/_ffi/_cython/%s" % fn],
+                include_dirs=["../include/",
+                              "../third_party/dmlc-core/include",
+                              "../third_party/dlpack/include",
+                ],
+                library_dirs=library_dirs,
+                libraries=libraries,
+                language="c++"))
+        return cythonize(ret)
+    except ImportError:
+        print("WARNING: Cython is not installed, will compile without cython module")
+        return []
 
 include_libs = False
 wheel_include_libs = False
@@ -74,6 +124,7 @@ setup(
     ],
     url='https://github.com/dmlc/dgl',
     distclass=BinaryDistribution,
+    ext_modules=config_cython(),
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Programming Language :: Python :: 3',

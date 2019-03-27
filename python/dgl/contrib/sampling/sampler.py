@@ -1,84 +1,44 @@
-# This file contains NodeFlow samplers.
+"""This file contains NodeFlow samplers."""
 
 import sys
 import numpy as np
 import threading
-import random
+from numbers import Integral
 import traceback
 
+from ..._ffi.function import _init_api
 from ... import utils
-from ...node_flow import NodeFlow
+from ...nodeflow import NodeFlow
 from ... import backend as F
+from ...utils import unwrap_to_ptr_list
+
 try:
     import Queue as queue
 except ImportError:
     import queue
 
-__all__ = ['NeighborSampler']
+__all__ = ['NeighborSampler', 'LayerSampler']
 
-class NSSubgraphLoader(object):
-    def __init__(self, g, batch_size, expand_factor, num_hops=1,
-                 neighbor_type='in', node_prob=None, seed_nodes=None,
-                 shuffle=False, num_workers=1, return_seed_id=False):
-        self._g = g
-        if not g._graph.is_readonly():
-            raise NotImplementedError("NodeFlow loader only support read-only graphs.")
-        self._batch_size = batch_size
-        self._expand_factor = expand_factor
-        self._num_hops = num_hops
-        self._node_prob = node_prob
-        self._return_seed_id = return_seed_id
-        if self._node_prob is not None:
-            assert self._node_prob.shape[0] == g.number_of_nodes(), \
-                    "We need to know the sampling probability of every node"
-        if seed_nodes is None:
-            self._seed_nodes = F.arange(0, g.number_of_nodes())
-        else:
-            self._seed_nodes = seed_nodes
-        if shuffle:
-            self._seed_nodes = F.rand_shuffle(self._seed_nodes)
-        self._num_workers = num_workers
-        self._neighbor_type = neighbor_type
+class NodeFlowSamplerIter(object):
+    def __init__(self, sampler):
+        super(NodeFlowSamplerIter, self).__init__()
+        self._sampler = sampler
         self._nflows = []
-        self._seed_ids = []
         self._nflow_idx = 0
 
-    def _prefetch(self):
-        seed_ids = []
-        num_nodes = len(self._seed_nodes)
-        for i in range(self._num_workers):
-            start = self._nflow_idx * self._batch_size
-            # if we have visited all nodes, don't do anything.
-            if start >= num_nodes:
-                break
-            end = min((self._nflow_idx + 1) * self._batch_size, num_nodes)
-            seed_ids.append(utils.toindex(self._seed_nodes[start:end]))
-            self._nflow_idx += 1
-        sgi = self._g._graph.neighbor_sampling(seed_ids, self._expand_factor,
-                                               self._num_hops, self._neighbor_type,
-                                               self._node_prob)
-        nflows = [NodeFlow(self._g, i) for i in sgi]
+    def prefetch(self):
+        nflows = self._sampler.fetch(self._nflow_idx)
         self._nflows.extend(nflows)
-        if self._return_seed_id:
-            self._seed_ids.extend(seed_ids)
-
-    def __iter__(self):
-        return self
+        self._nflow_idx += len(nflows)
 
     def __next__(self):
-        # If we don't have prefetched NodeFlows, let's prefetch them.
         if len(self._nflows) == 0:
-            self._prefetch()
-        # At this point, if we still don't have NodeFlows, we must have
-        # iterate all NodeFlows and we should stop the iterator now.
+            self.prefetch()
         if len(self._nflows) == 0:
             raise StopIteration
-        aux_infos = {}
-        if self._return_seed_id:
-            aux_infos['seeds'] = self._seed_ids.pop(0).tousertensor()
-        return self._nflows.pop(0), aux_infos
+        return self._nflows.pop(0)
 
-class _Prefetcher(object):
+class PrefetchingWrapper(object):
     """Internal shared prefetcher logic. It can be sub-classed by a Thread-based implementation
     or Process-based implementation."""
     _dataq = None  # Data queue transmits prefetched elements
@@ -87,17 +47,17 @@ class _Prefetcher(object):
 
     _checked_start = False  # True once startup has been checkd by _check_start
 
-    def __init__(self, loader, num_prefetch):
-        super(_Prefetcher, self).__init__()
-        self.loader = loader
+    def __init__(self, sampler_iter, num_prefetch):
+        super(PrefetchingWrapper, self).__init__()
+        self.sampler_iter = sampler_iter
         assert num_prefetch > 0, 'Unbounded Prefetcher is unsupported.'
         self.num_prefetch = num_prefetch
 
     def run(self):
-        """Method representing the process’s activity."""
+        """Method representing the process activity."""
         # Startup - Master waits for this
         try:
-            loader_iter = iter(self.loader)
+            loader_iter = self.sampler_iter
             self._errorq.put(None)
         except Exception as e:  # pylint: disable=broad-except
             tb = traceback.format_exc()
@@ -156,12 +116,11 @@ class _Prefetcher(object):
     def next(self):
         return self.__next__()
 
-
-class _ThreadPrefetcher(_Prefetcher, threading.Thread):
+class ThreadPrefetchingWrapper(PrefetchingWrapper, threading.Thread):
     """Internal threaded prefetcher."""
 
     def __init__(self, *args, **kwargs):
-        super(_ThreadPrefetcher, self).__init__(*args, **kwargs)
+        super(ThreadPrefetchingWrapper, self).__init__(*args, **kwargs)
         self._dataq = queue.Queue(self.num_prefetch)
         self._controlq = queue.Queue()
         self._errorq = queue.Queue(self.num_prefetch)
@@ -169,88 +128,282 @@ class _ThreadPrefetcher(_Prefetcher, threading.Thread):
         self.start()
         self._check_start()
 
-class _PrefetchingLoader(object):
-    """Prefetcher for a Loader in a separate Thread or Process.
-    This iterator will create another thread or process to perform
-    ``iter_next`` and then store the data in memory. It potentially accelerates
-    the data read, at the cost of more memory usage.
+
+class NodeFlowSampler(object):
+    '''
+    Base class that generates NodeFlows from a graph.
+
+    Class properties
+    ----------------
+    immutable_only : bool
+        Whether the sampler only works on immutable graphs.
+        Subclasses can override this property.
+    '''
+    immutable_only = False
+
+    def __init__(
+            self,
+            g,
+            batch_size,
+            seed_nodes,
+            shuffle,
+            num_prefetch,
+            prefetching_wrapper_class):
+        self._g = g
+        if self.immutable_only and not g._graph.is_readonly():
+            raise NotImplementedError("This loader only support read-only graphs.")
+
+        self._batch_size = batch_size
+
+        if seed_nodes is None:
+            self._seed_nodes = F.arange(0, g.number_of_nodes())
+        else:
+            self._seed_nodes = seed_nodes
+        if shuffle:
+            self._seed_nodes = F.rand_shuffle(self._seed_nodes)
+        self._seed_nodes = utils.toindex(self._seed_nodes)
+
+        if num_prefetch:
+            self._prefetching_wrapper_class = prefetching_wrapper_class
+        self._num_prefetch = num_prefetch
+
+    def fetch(self, current_nodeflow_index):
+        '''
+        Method that returns the next "bunch" of NodeFlows.
+        Each worker will return a single NodeFlow constructed from a single
+        batch.
+
+        Subclasses of NodeFlowSampler should override this method.
+
+        Parameters
+        ----------
+        current_nodeflow_index : int
+            How many NodeFlows the sampler has generated so far.
+
+        Returns
+        -------
+        list[NodeFlow]
+            Next "bunch" of nodeflows to be processed.
+        '''
+        raise NotImplementedError
+
+    def __iter__(self):
+        it = NodeFlowSamplerIter(self)
+        if self._num_prefetch:
+            return self._prefetching_wrapper_class(it, self._num_prefetch)
+        else:
+            return it
+
+    @property
+    def g(self):
+        return self._g
+
+    @property
+    def seed_nodes(self):
+        return self._seed_nodes
+
+    @property
+    def batch_size(self):
+        return self._batch_size
+
+class NeighborSampler(NodeFlowSampler):
+    '''Create a sampler that samples neighborhood.
+
+    It returns a generator of :class:`~dgl.NodeFlow`. This can be viewed as
+    an analogy of *mini-batch training* on graph data -- the given graph represents
+    the whole dataset and the returned generator produces mini-batches (in the form
+    of :class:`~dgl.NodeFlow` objects).
+    
+    A NodeFlow grows from sampled nodes. It first samples a set of nodes from the given
+    ``seed_nodes`` (or all the nodes if not given), then samples their neighbors
+    and extracts the subgraph. If the number of hops is :math:`k(>1)`, the process is repeated
+    recursively, with the neighbor nodes just sampled become the new seed nodes.
+    The result is a graph we defined as :class:`~dgl.NodeFlow` that contains :math:`k+1`
+    layers. The last layer is the initial seed nodes. The sampled neighbor nodes in
+    layer :math:`i+1` are in layer :math:`i`. All the edges are from nodes
+    in layer :math:`i` to layer :math:`i+1`.
+
+    TODO(minjie): give a figure here.
+    
+    As an analogy to mini-batch training, the ``batch_size`` here is equal to the number
+    of the initial seed nodes (number of nodes in the last layer).
+    The number of nodeflow objects (the number of batches) is calculated by
+    ``len(seed_nodes) // batch_size`` (if ``seed_nodes`` is None, then it is equal
+    to the set of all nodes in the graph).
 
     Parameters
     ----------
-    loader : an iterator
-        Source loader.
-    num_prefetch : int, default 1
-        Number of elements to prefetch from the loader. Must be greater 0.
-    """
+    g : DGLGraph
+        The DGLGraph where we sample NodeFlows.
+    batch_size : int
+        The batch size (i.e, the number of nodes in the last layer)
+    expand_factor : int, float, str
+        The number of neighbors sampled from the neighbor list of a vertex.
+        The value of this parameter can be:
 
-    def __init__(self, loader, num_prefetch=1):
-        self._loader = loader
-        self._num_prefetch = num_prefetch
-        if num_prefetch < 1:
-            raise ValueError('num_prefetch must be greater 0.')
+        * int: indicates the number of neighbors sampled from a neighbor list.
+        * float: indicates the ratio of the sampled neighbors in a neighbor list.
+        * str: indicates some common ways of calculating the number of sampled neighbors,
+          e.g., ``sqrt(deg)``.
 
-    def __iter__(self):
-        return _ThreadPrefetcher(self._loader, self._num_prefetch)
+        Note that no matter how large the expand_factor, the max number of sampled neighbors
+        is the neighborhood size.
+    num_hops : int, optional
+        The number of hops to sample (i.e, the number of layers in the NodeFlow).
+        Default: 1
+    neighbor_type: str, optional
+        Indicates the neighbors on different types of edges.
 
-def NeighborSampler(g, batch_size, expand_factor, num_hops=1,
-                    neighbor_type='in', node_prob=None, seed_nodes=None,
-                    shuffle=False, num_workers=1,
-                    return_seed_id=False, prefetch=False):
+        * "in": the neighbors on the in-edges.
+        * "out": the neighbors on the out-edges.
+        * "both": the neighbors on both types of edges.
+
+        Default: "in"
+    node_prob : Tensor, optional
+        A 1D tensor for the probability that a neighbor node is sampled.
+        None means uniform sampling. Otherwise, the number of elements
+        should be equal to the number of vertices in the graph.
+        Default: None
+    seed_nodes : Tensor, optional
+        A 1D tensor  list of nodes where we sample NodeFlows from.
+        If None, the seed vertices are all the vertices in the graph.
+        Default: None
+    shuffle : bool, optional
+        Indicates the sampled NodeFlows are shuffled. Default: False
+    num_workers : int, optional
+        The number of worker threads that sample NodeFlows in parallel. Default: 1
+    prefetch : bool, optional
+        If true, prefetch the samples in the next batch. Default: False
+    add_self_loop : bool, optional
+        If true, add self loop to the sampled NodeFlow.
+        The edge IDs of the self loop edges are -1. Default: False
+    '''
+
+    immutable_only = True
+
+    def __init__(
+            self,
+            g,
+            batch_size,
+            expand_factor=None,
+            num_hops=1,
+            neighbor_type='in',
+            node_prob=None,
+            seed_nodes=None,
+            shuffle=False,
+            num_workers=1,
+            prefetch=False,
+            add_self_loop=False):
+        super(NeighborSampler, self).__init__(
+                g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0,
+                ThreadPrefetchingWrapper)
+
+        assert node_prob is None, 'non-uniform node probability not supported'
+        assert isinstance(expand_factor, Integral), 'non-int expand_factor not supported'
+
+        self._expand_factor = expand_factor
+        self._num_hops = num_hops
+        self._add_self_loop = add_self_loop
+        self._num_workers = num_workers
+        self._neighbor_type = neighbor_type
+
+    def fetch(self, current_nodeflow_index):
+        handles = unwrap_to_ptr_list(_CAPI_UniformSampling(
+            self.g.c_handle,
+            self.seed_nodes.todgltensor(),
+            current_nodeflow_index, # start batch id
+            self.batch_size,        # batch size
+            self._num_workers,      # num batches
+            self._expand_factor,
+            self._num_hops,
+            self._neighbor_type,
+            self._add_self_loop))
+        nflows = [NodeFlow(self.g, hdl) for hdl in handles]
+        return nflows
+
+
+class LayerSampler(NodeFlowSampler):
     '''Create a sampler that samples neighborhood.
 
     This creates a NodeFlow loader that samples subgraphs from the input graph
-    with neighbor sampling. This sampling method is implemented in C and can perform
+    with layer-wise sampling. This sampling method is implemented in C and can perform
     sampling very efficiently.
-    
-    A NodeFlow grows from a seed vertex. It contains sampled neighbors
-    of the seed vertex as well as the edges that connect neighbor nodes with
-    seed nodes. When the number of hops is k (>1), the neighbors are sampled
-    from the k-hop neighborhood. In this case, the sampled edges are the ones
-    that connect the source nodes and the sampled neighbor nodes of the source
-    nodes.
 
-    The NodeFlow loader returns a list of NodeFlows and a dictionary of additional
-    information about the NodeFlows. The size of the NodeFlow list is the number of workers.
-
-    The dictionary contains:
-
-    - seeds: a list of 1D tensors of seed Ids, if return_seed_id is True.
+    The NodeFlow loader returns a list of NodeFlows.
+    The size of the NodeFlow list is the number of workers.
 
     Parameters
     ----------
     g: the DGLGraph where we sample NodeFlows.
     batch_size: The number of NodeFlows in a batch.
-    expand_factor: the number of neighbors sampled from the neighbor list
-        of a vertex. The value of this parameter can be
-        an integer: indicates the number of neighbors sampled from a neighbor list.
-        a floating-point: indicates the ratio of the sampled neighbors in a neighbor list.
-        string: indicates some common ways of calculating the number of sampled neighbors,
-        e.g., 'sqrt(deg)'.
-    num_hops: The size of the neighborhood where we sample vertices.
-    neighbor_type: indicates the neighbors on different types of edges.
-        "in" means the neighbors on the in-edges, "out" means the neighbors on
-        the out-edges and "both" means neighbors on both types of edges.
+    layer_size: A list of layer sizes.
     node_prob: the probability that a neighbor node is sampled.
-        1D Tensor. None means uniform sampling. Otherwise, the number of elements
-        should be the same as the number of vertices in the graph.
+        Not implemented.
     seed_nodes: a list of nodes where we sample NodeFlows from.
         If it's None, the seed vertices are all vertices in the graph.
     shuffle: indicates the sampled NodeFlows are shuffled.
     num_workers: the number of worker threads that sample NodeFlows in parallel.
-    return_seed_id: indicates whether to return seed ids along with the NodeFlows.
-        The seed Ids are in the parent graph.
     prefetch : bool, default False
         Whether to prefetch the samples in the next batch.
+    '''
+
+    immutable_only = True
+
+    def __init__(
+            self,
+            g,
+            batch_size,
+            layer_sizes,
+            neighbor_type='in',
+            node_prob=None,
+            seed_nodes=None,
+            shuffle=False,
+            num_workers=1,
+            prefetch=False):
+        super(LayerSampler, self).__init__(
+                g, batch_size, seed_nodes, shuffle, num_workers * 2 if prefetch else 0,
+                ThreadPrefetchingWrapper)
+
+        assert node_prob is None, 'non-uniform node probability not supported'
+
+        self._num_workers = num_workers
+        self._neighbor_type = neighbor_type
+        self._layer_sizes = utils.toindex(layer_sizes)
+
+    def fetch(self, current_nodeflow_index):
+        handles = unwrap_to_ptr_list(_CAPI_LayerSampling(
+            self.g.c_handle,
+            self.seed_nodes.todgltensor(),
+            current_nodeflow_index,  # start batch id
+            self.batch_size,         # batch size
+            self._num_workers,       # num batches
+            self._layer_sizes.todgltensor(),
+            self._neighbor_type))
+        nflows = [NodeFlow(self.g, hdl) for hdl in handles]
+        return nflows
+
+def create_full_nodeflow(g, num_layers, add_self_loop=False):
+    """Convert a full graph to NodeFlow to run a L-layer GNN model.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        a DGL graph
+    num_layers : int
+        The number of layers
+    add_self_loop : bool, default False
+        Whether to add self loop to the sampled NodeFlow.
+        If True, the edge IDs of the self loop edges are -1.
 
     Returns
     -------
-    A NodeFlow iterator
-        The iterator returns a list of batched NodeFlows and a dictionary of additional
-        information about the NodeFlows.
-    '''
-    loader = NSSubgraphLoader(g, batch_size, expand_factor, num_hops, neighbor_type, node_prob,
-                              seed_nodes, shuffle, num_workers, return_seed_id)
-    if not prefetch:
-        return loader
-    else:
-        return _PrefetchingLoader(loader, num_prefetch=num_workers*2)
+    NodeFlow
+        a NodeFlow with a specified number of layers.
+    """
+    batch_size = g.number_of_nodes()
+    expand_factor = g.number_of_nodes()
+    sampler = NeighborSampler(g, batch_size, expand_factor,
+        num_layers, add_self_loop=add_self_loop)
+    return next(iter(sampler))
+
+_init_api('dgl.sampling', __name__)

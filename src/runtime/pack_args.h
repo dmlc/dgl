@@ -14,6 +14,7 @@
 #define DGL_RUNTIME_PACK_ARGS_H_
 
 #include <dgl/runtime/c_runtime_api.h>
+#include <dgl/runtime/packed_func.h>
 #include <vector>
 #include <cstring>
 

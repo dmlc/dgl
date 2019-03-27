@@ -2,30 +2,49 @@ import backend as F
 import numpy as np
 import scipy as sp
 import dgl
-from dgl.node_flow import create_full_node_flow
+from dgl.contrib.sampling.sampler import create_full_nodeflow, NeighborSampler
 from dgl import utils
 import dgl.function as fn
 from functools import partial
+import itertools
 
-def generate_rand_graph(n, connect_more=False):
-    arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
-    # having one node to connect to all other nodes.
-    if connect_more:
-        arr[0] = 1
-        arr[:,0] = 1
+
+def generate_rand_graph(n, connect_more=False, complete=False):
+    if complete:
+        cord = [(i,j) for i, j in itertools.product(range(n), range(n)) if i != j]
+        row = [t[0] for t in cord]
+        col = [t[1] for t in cord]
+        data = np.ones((len(row),))
+        arr = sp.sparse.coo_matrix((data, (row, col)), shape=(n, n))
+    else:
+        arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
+        # having one node to connect to all other nodes.
+        if connect_more:
+            arr[0] = 1
+            arr[:,0] = 1
     g = dgl.DGLGraph(arr, readonly=True)
     g.ndata['h1'] = F.randn((g.number_of_nodes(), 10))
     g.edata['h2'] = F.randn((g.number_of_edges(), 3))
     return g
 
 
-def create_mini_batch(g, num_hops):
-    seed_ids = np.array([0, 1, 2, 3])
-    seed_ids = utils.toindex(seed_ids)
-    sgi = g._graph.neighbor_sampling([seed_ids], g.number_of_nodes(), num_hops, "in", None)
-    assert len(sgi) == 1
-    return dgl.node_flow.NodeFlow(g, sgi[0])
+def test_self_loop():
+    n = 100
+    num_hops = 2
+    g = generate_rand_graph(n, complete=True)
+    nf = create_mini_batch(g, num_hops, add_self_loop=True)
+    for i in range(1, nf.num_layers):
+        in_deg = nf.layer_in_degree(i)
+        deg = F.ones(in_deg.shape, dtype=F.int64) * n
+        assert F.array_equal(in_deg, deg)
 
+def create_mini_batch(g, num_hops, add_self_loop=False):
+    seed_ids = np.array([0, 1, 2, 3])
+    sampler = NeighborSampler(g, batch_size=4, expand_factor=g.number_of_nodes(),
+            num_hops=num_hops, seed_nodes=seed_ids, add_self_loop=add_self_loop)
+    nfs = list(sampler)
+    assert len(nfs) == 1
+    return nfs[0]
 
 def check_basic(g, nf):
     num_nodes = 0
@@ -50,7 +69,7 @@ def check_basic(g, nf):
 def test_basic():
     num_layers = 2
     g = generate_rand_graph(100, connect_more=True)
-    nf = create_full_node_flow(g, num_layers)
+    nf = create_full_nodeflow(g, num_layers)
     assert nf.number_of_nodes() == g.number_of_nodes() * (num_layers + 1)
     assert nf.number_of_edges() == g.number_of_edges() * num_layers
     assert nf.num_layers == num_layers + 1
@@ -59,8 +78,7 @@ def test_basic():
     check_basic(g, nf)
 
     parent_nids = F.arange(0, g.number_of_nodes())
-    nids = dgl.graph_index.map_to_nodeflow_nid(nf._graph, 0,
-                                               utils.toindex(parent_nids)).tousertensor()
+    nids = nf.map_from_parent_nid(0, parent_nids)
     assert F.array_equal(nids, parent_nids)
 
     g = generate_rand_graph(100)
@@ -89,7 +107,7 @@ def check_apply_nodes(create_node_flow):
 
 
 def test_apply_nodes():
-    check_apply_nodes(create_full_node_flow)
+    check_apply_nodes(create_full_nodeflow)
     check_apply_nodes(create_mini_batch)
 
 
@@ -107,7 +125,7 @@ def check_apply_edges(create_node_flow):
 
 
 def test_apply_edges():
-    check_apply_edges(create_full_node_flow)
+    check_apply_edges(create_full_nodeflow)
     check_apply_edges(create_mini_batch)
 
 
@@ -140,7 +158,7 @@ def check_flow_compute(create_node_flow):
 
 
 def test_flow_compute():
-    check_flow_compute(create_full_node_flow)
+    check_flow_compute(create_full_nodeflow)
     check_flow_compute(create_mini_batch)
 
 
@@ -162,7 +180,7 @@ def check_prop_flows(create_node_flow):
 
 
 def test_prop_flows():
-    check_prop_flows(create_full_node_flow)
+    check_prop_flows(create_full_nodeflow)
     check_prop_flows(create_mini_batch)
 
 
@@ -232,10 +250,36 @@ def test_copy():
         nf.block_compute(i, partial(msg_func, ind=i), partial(reduce_func, ind=i))
 
 
+def test_block_adj_matrix():
+    num_layers = 3
+    g = generate_rand_graph(100)
+    nf = create_mini_batch(g, num_layers)
+    assert nf.num_layers == num_layers + 1
+    for i in range(nf.num_blocks):
+        src, dst, eid = nf.block_edges(i)
+        dest_nodes = utils.toindex(nf.layer_nid(i + 1))
+        u, v, _ = nf._graph.in_edges(dest_nodes)
+        u = nf._glb2lcl_nid(u.tousertensor(), i)
+        v = nf._glb2lcl_nid(v.tousertensor(), i + 1)
+        assert F.array_equal(src, u)
+        assert F.array_equal(dst, v)
+
+        adj, _ = nf.block_adjacency_matrix(i, F.cpu())
+        adj = F.sparse_to_numpy(adj)
+        data = np.ones((len(u)), dtype=np.float32)
+        v = utils.toindex(v)
+        u = utils.toindex(u)
+        coo = sp.sparse.coo_matrix((data, (v.tonumpy(), u.tonumpy())),
+                                   shape=adj.shape).todense()
+        assert np.array_equal(adj, coo)
+
+
 if __name__ == '__main__':
     test_basic()
+    test_block_adj_matrix()
     test_copy()
     test_apply_nodes()
     test_apply_edges()
     test_flow_compute()
     test_prop_flows()
+    test_self_loop()

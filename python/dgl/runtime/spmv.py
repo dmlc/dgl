@@ -131,6 +131,30 @@ def gen_e2v_spmv_schedule(inc, spmv_rfunc, mfr, out):
         ftdst = ir.SPMV(inc_var, ftmsg)
         ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
+def build_block_adj_matrix_graph(graph, block_id):
+    """Build adjacency matrix of the whole graph.
+
+    Parameters
+    ----------
+    graph : NodeFlow
+        The NodeFlow
+
+    block_id : int
+        the block Id
+
+    Returns
+    -------
+    utils.CtxCachedObject
+        Get be used to get adjacency matrix on the provided ctx.
+    utils.Index
+        A index for data shuffling due to sparse format change. Return None
+        if shuffle is not required.
+    """
+    #TODO why is this constructed twice?
+    _, shuffle_idx = graph.block_adjacency_matrix(block_id, F.cpu())
+    shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+    return lambda ctx: graph.block_adjacency_matrix(block_id, ctx)[0], shuffle_idx
+
 def build_adj_matrix_graph(graph):
     """Build adjacency matrix of the whole graph.
 
@@ -148,6 +172,7 @@ def build_adj_matrix_graph(graph):
         if shuffle is not required.
     """
     gidx = graph._graph
+    # TODO Why invoking adjacency_matrix twice?
     _, shuffle_idx = gidx.adjacency_matrix(False, F.cpu())
     return lambda ctx: gidx.adjacency_matrix(False, ctx)[0], shuffle_idx
 
@@ -225,6 +250,28 @@ def build_adj_matrix_uv(edges, reduce_nodes, num_sources):
     mat, shuffle_idx = F.sparse_matrix(dat, sp_idx, shape)
     shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
     return utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx)), shuffle_idx
+
+def build_block_inc_matrix_graph(graph, block_id):
+    """Build incidence matrix.
+
+    Parameters
+    ----------
+    graph : NodeFlow
+        The NodeFlow.
+
+    block_id : int
+        The block Id
+
+    Returns
+    -------
+    utils.CtxCachedObject
+        Get be used to get incidence matrix on the provided ctx.
+    utils.Index
+        A index for data shuffling due to sparse format change. Return None
+        if shuffle is not required.
+    """
+    # inc mat will not use data tensor so conversion index is not needed
+    return lambda ctx: graph.block_incidence_matrix(block_id, 'in', ctx)[0], None
 
 def build_inc_matrix_graph(graph):
     """Build incidence matrix.

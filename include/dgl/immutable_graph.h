@@ -32,6 +32,30 @@ class ImmutableGraph: public GraphInterface {
     dgl_id_t edge_id;
   };
 
+  // Edge list indexed by edge id;
+  struct EdgeList {
+    typedef std::shared_ptr<EdgeList> Ptr;
+    std::vector<dgl_id_t> src_points;
+    std::vector<dgl_id_t> dst_points;
+
+    EdgeList(int64_t len, dgl_id_t val) {
+      src_points.resize(len, val);
+      dst_points.resize(len, val);
+    }
+
+    void register_edge(dgl_id_t eid, dgl_id_t src, dgl_id_t dst) {
+      CHECK_LT(eid, src_points.size()) << "Invalid edge id " << eid;
+      src_points[eid] = src;
+      dst_points[eid] = dst;
+    }
+
+    static EdgeList::Ptr FromCSR(
+        const std::vector<int64_t>& indptr,
+        const std::vector<dgl_id_t>& indices,
+        const std::vector<dgl_id_t>& edge_ids,
+        bool in_csr);
+  };
+
   struct CSR {
     typedef std::shared_ptr<CSR> Ptr;
     std::vector<int64_t> indptr;
@@ -79,6 +103,7 @@ class ImmutableGraph: public GraphInterface {
     void ReadAllEdges(std::vector<Edge> *edges) const;
     CSR::Ptr Transpose() const;
     std::pair<CSR::Ptr, IdArray> VertexSubgraph(IdArray vids) const;
+    std::pair<CSR::Ptr, IdArray> EdgeSubgraph(IdArray eids, EdgeList::Ptr edge_list) const;
     /*
      * Construct a CSR from a list of edges.
      *
@@ -261,20 +286,14 @@ class ImmutableGraph: public GraphInterface {
    * \param eid The edge ID
    * \return a pair whose first element is the source and the second the destination.
    */
-  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const {
-    LOG(FATAL) << "FindEdge isn't supported in ImmutableGraph";
-    return std::pair<dgl_id_t, dgl_id_t>();
-  }
+  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const;
 
   /*!
    * \brief Find the edge IDs and return their source and target node IDs.
    * \param eids The edge ID array.
    * \return EdgeArray containing all edges with id in eid.  The order is preserved.
    */
-  EdgeArray FindEdges(IdArray eids) const {
-    LOG(FATAL) << "FindEdges isn't supported in ImmutableGraph";
-    return EdgeArray();
-  }
+  EdgeArray FindEdges(IdArray eids) const;
 
   /*!
    * \brief Get the in edges of the vertex.
@@ -496,23 +515,46 @@ class ImmutableGraph: public GraphInterface {
     }
   }
 
- protected:
-  DGLIdIters GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
-  DGLIdIters GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
+  /*
+   * The edge list is required for FindEdge/FindEdges/EdgeSubgraph, if no such function is called, we would not create edge list.
+   * if such function is called the first time, we create a edge list from one of the graph's csr representations,
+   * if we have called such function before, we get the one cached in the structure.
+   */
+  EdgeList::Ptr GetEdgeList() const {
+    if (edge_list_)
+      return edge_list_;
+    if (in_csr_) {
+      const_cast<ImmutableGraph *>(this)->edge_list_ =\
+        EdgeList::FromCSR(in_csr_->indptr, in_csr_->indices, in_csr_->edge_ids, true);
+    } else {
+      CHECK(out_csr_ != nullptr) << "one of the CSRs must exist";
+      const_cast<ImmutableGraph *>(this)->edge_list_ =\
+        EdgeList::FromCSR(out_csr_->indptr, out_csr_->indices, out_csr_->edge_ids, false);
+    }
+    return edge_list_;
+  }
 
   /*!
    * \brief Get the CSR array that represents the in-edges.
    * This method copies data from std::vector to IdArray.
+   * \param start the first row to copy.
+   * \param end the last row to copy (exclusive).
    * \return the CSR array.
    */
-  CSRArray GetInCSRArray() const;
+  CSRArray GetInCSRArray(size_t start, size_t end) const;
 
   /*!
    * \brief Get the CSR array that represents the out-edges.
    * This method copies data from std::vector to IdArray.
+   * \param start the first row to copy.
+   * \param end the last row to copy (exclusive).
    * \return the CSR array.
    */
-  CSRArray GetOutCSRArray() const;
+  CSRArray GetOutCSRArray(size_t start, size_t end) const;
+
+ protected:
+  DGLIdIters GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
+  DGLIdIters GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
 
   /*!
    * \brief Compact a subgraph.
@@ -525,6 +567,8 @@ class ImmutableGraph: public GraphInterface {
   CSR::Ptr in_csr_;
   // Store the out-edges.
   CSR::Ptr out_csr_;
+  // Store the edge list indexed by edge id
+  EdgeList::Ptr edge_list_;
   /*!
    * \brief Whether if this is a multigraph.
    *

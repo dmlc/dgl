@@ -149,7 +149,7 @@ def main(args):
 
         # set node/edge feature
         node_id = torch.from_numpy(node_id).view(-1, 1)
-        edge_type = torch.from_numpy(edge_type).view(-1, 1)
+        edge_type = torch.from_numpy(edge_type)
         node_norm = torch.from_numpy(node_norm).view(-1, 1)
         data, labels = torch.from_numpy(data), torch.from_numpy(labels)
         deg = g.in_degrees(range(g.number_of_nodes())).float().view(-1, 1)
