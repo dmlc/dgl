@@ -177,6 +177,7 @@ class MovieLens(object):
         self.g = g
 
     def find_neighbors(self, restart_prob, max_nodes, top_T):
+        # TODO: replace with more efficient PPR estimation
         neighbor_probs, neighbors = randomwalk.random_walk_distribution_topt(
                 self.g, self.g.nodes(), restart_prob, max_nodes, top_T)
 
