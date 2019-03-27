@@ -1,49 +1,72 @@
 import os
+import time
 
 from ..base import ALL, is_all, DGLError
 from .. import backend as F
 from ..graph import DGLGraph
 from .._ffi.function import _init_api
 
+class InitNData:
+    def __init__(self, serv, args):
+        self.graph = serv._graph
+        self.graph_name = serv._graph_name
+        args = args.split(',')
+        self.ndata_name = args[0]
+        self.num_feats = int(args[1])
+        self.dtype = int(args[2])
+
+    def run(self):
+        if self.ndata_name in self.graph.ndata:
+            ndata = self.graph.ndata[self.ndata_name]
+            assert ndata.shape[1] == self.num_feats
+            return
+
+        data = _CAPI_DGLCreateSharedMem("/" + self.graph_name + "_" + self.ndata_name,
+                                        self.graph.number_of_nodes(),
+                                        self.num_feats, self.dtype, "zero", True)
+        dlpack = data.to_dlpack()
+        self.graph.ndata[self.ndata_name] = F.zerocopy_from_dlpack(dlpack)
+
+_commands = {'init_ndata': lambda serv, args: InitNData(serv, args)}
+
 class SharedMemoryStoreServer:
     def __init__(self, graph_data, graph_name, multigraph,
                  num_workers):
         self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=False)
-        path = "/tmp/" + graph_name
-        #os.mkfifo(path)
-        #self._comm_pipe = open(path, 'r')
         self._num_workers = num_workers
-        print("shared memory server created")
+        self._graph_name = graph_name
+        self.path = "/tmp/" + graph_name
+        os.mkfifo(self.path)
+        self._comm_pipe = open(self.path, 'r')
 
-    def init_ndata(self, name, num_feats, dtype):
-        data = _CAPI_DGLCreateSharedMem("/" + name, self._graph.number_of_nodes(),
-                                        num_feats, dtype, "zero", True)
-        dlpack = data.to_dlpack()
-        self._graph.ndata[name] = F.zerocopy_from_dlpack(dlpack)
+    def read_command(self, line):
+        parts = line.split(':')
+        return _commands[parts[0]](self, parts[1])
 
     def run(self):
-        print("shared memory server runs")
-        self.init_ndata("test", 10, 0)
-        while True:
-            line = self._comm_pipe.readline()[:-1]
+        for line in self._comm_pipe:
             comm = self.read_command(line)
             comm.run()
+        self._comm_pipe.close()
+        os.unlink(self.path)
 
 class SharedMemoryGraphStore:
     def __init__(self, graph_data, graph_name, multigraph=False):
         self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=False)
+        self._graph_name = graph_name
         path = "/tmp/" + graph_name
         self._comm_pipe = open(path, 'w')
 
-        #TODO just for testing.
-        data = _CAPI_DGLCreateSharedMem("/test", self._graph.number_of_nodes(),
-                                        10, 0, "null", False)
+    def init_ndata(self, ndata_name, num_feats, dtype):
+        self._comm_pipe.write("init_ndata:" + ndata_name + "," + str(num_feats) + "," + str(dtype)+'\n')
+        self._comm_pipe.flush()
+        #TODO remove sleep later
+        time.sleep(1)
+        data = _CAPI_DGLCreateSharedMem("/" + self._graph_name + "_" + ndata_name,
+                                        self._graph.number_of_nodes(),
+                                        num_feats, dtype, "zero", False)
         dlpack = data.to_dlpack()
-        self._graph.ndata["test"] = F.zerocopy_from_dlpack(dlpack)
-
-    def init_ndata(self, name, num_feats):
-        os.write(self._comm_pipe, "init:" + name + "," + str(num_feats))
-        self._comm_pipe.readline()
+        self._graph.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
 
     def register_message_func(self, func):
         """Register global message function.
