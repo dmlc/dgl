@@ -9,15 +9,15 @@
 namespace dgl {
 namespace network {
 
-#define IS_SENDER   true
-#define IS_RECEIVER false
+#define IS_SENDER    true
+#define IS_RECEIVER  false
 
-// TODO(chao): make these number configurable
+// TODO(chao): make these numbers configurable
 
 // Message cannot larger than 300 MB
 const long long kMaxBufferSize = 300 * 1024 * 2014;
-// Size of message queue is 2 GB
-const long long kQueueSize = 2147483648;
+// Size of message queue is 1 GB
+const long long kQueueSize = 1024 * 1024 * 1024;
 
 }  // namespace network
 }  // namespace dgl

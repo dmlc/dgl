@@ -5,9 +5,9 @@ from ...network import _create_sampler_sender, _create_sampler_receiver
 from ...network import _finalize_sampler_sender, _finalize_sampler_receiver
 
 class SamplerSender(object):
-    """The SamplerSender class for DGL distributed sampler.
+    """Sender of DGL distributed sampler.
 
-    Users use this class to send sampled subgraph to remote trainer.
+    Users use SamplerSender class to send sampled subgraph to remote trainer.
 
     Parameters
     ----------
@@ -49,17 +49,18 @@ class SamplerSender(object):
         _batch_send_subgraph(self._sender, nodeflow_list)
 
 class SamplerReceiver(object):
-    """The SamplerReceiver class for DGL distributed sampler.
+    """Receiver of DGL distributed sampler.
 
-    Users use this class to receive sampled subgraph from remote samplers, 
-    and SamplerReceiver can recv messages from multiple senders concurrently.
+    Users use SamplerReceiver class to receive sampled subgraph from remote samplers. 
+    Note that SamplerReceiver can receive messages from multiple senders concurrently,
+    by given the num_sender parameter.
 
     Parameters
     ----------
     ip : str
-        ip address of trainer machine
+        ip address of current trainer machine
     port : int
-        listen port of trainer machine
+        port of current trainer machine
     num_sender : int
         total number of sampler nodes, use 1 by default
     """
@@ -71,6 +72,9 @@ class SamplerReceiver(object):
 
     def __del__(self):
         """Finalize Receiver
+
+        _finalize_sampler_receiver method will clean up the 
+        back-end threads started by the SamplerReceiver.
         """
         _finalize_sampler_receiver(self._receiver)
 
@@ -85,7 +89,7 @@ class SamplerReceiver(object):
         Returns
         -------
         NodeFlow
-            Sampled NodeFlow object
+            received NodeFlow object
         """
         return _recv_subgraph(self._receiver, graph)
 
@@ -100,6 +104,6 @@ class SamplerReceiver(object):
         Returns
         -------
         list
-            A list of sampled NodeFlow object
+            A list of received NodeFlow object
         """
         return _batch_recv_subgraph(self._receiver, graph)
