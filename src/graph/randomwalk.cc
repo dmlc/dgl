@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <numeric>
+#include <functional>
 #include "../c_api_common.h"
 
 using dgl::runtime::DGLArgs;
@@ -21,9 +22,16 @@ using dgl::runtime::NDArray;
 
 namespace dgl {
 
+using Walker = std::function<bool(
+    const GraphInterface *, unsigned int *, dgl_id_t, dgl_id_t *)>;
+
 namespace {
 
-static bool default_walker(
+/*!
+ * \brief Randomly select a single direct successor in \c next given the current vertex
+ * \return Whether such a successor could be found
+ */
+bool WalkOneHop(
     const GraphInterface *gptr,
     unsigned int *random_seed,
     dgl_id_t cur,
@@ -36,48 +44,31 @@ static bool default_walker(
   return true;
 }
 
+/*!
+ * \brief Randomly select a single direct successor after \c hops hops in \c next given the
+ * current vertex
+ * \return Whether such a successor could be found
+ */
 template<int hops>
-static bool multihop_walker(
+bool WalkMultipleHops(
     const GraphInterface *gptr,
     unsigned int *random_seed,
     dgl_id_t cur,
     dgl_id_t *next) {
   for (int i = 0; i < hops; ++i) {
-    if (!default_walker(gptr, random_seed, cur, next))
+    if (!WalkOneHop(gptr, random_seed, cur, next))
       return false;
     cur = *next;
   }
   return true;
 }
 
-};  // namespace
-
-PackedFunc ConvertRandomWalkTracesToPackedFunc(const RandomWalkTraces &t) {
-  auto body = [t] (DGLArgs args, DGLRetValue *rv) {
-      const int which = args[0];
-      switch (which) {
-      case 0:
-        *rv = std::move(t.trace_counts);
-        break;
-      case 1:
-        *rv = std::move(t.trace_lengths);
-        break;
-      case 2:
-        *rv = std::move(t.vertices);
-        break;
-      default:
-        LOG(FATAL) << "invalid choice";
-      }
-    };
-  return PackedFunc(body);
-}
-
-IdArray SamplerOp::GenericRandomWalk(
+IdArray GenericRandomWalk(
     const GraphInterface *gptr,
     IdArray seeds,
     int num_traces,
     int num_hops,
-    bool (*walker)(const GraphInterface *, unsigned int *, dgl_id_t, dgl_id_t *)) {
+    Walker walker) {
   const int64_t num_nodes = seeds->shape[0];
   const dgl_id_t *seed_ids = static_cast<dgl_id_t *>(seeds->data);
   IdArray traces = IdArray::Empty(
@@ -88,21 +79,20 @@ IdArray SamplerOp::GenericRandomWalk(
 
   // FIXME: does OpenMP work with exceptions?  Especially without throwing SIGABRT?
   unsigned int random_seed = randseed();
+  dgl_id_t next;
 
   for (int64_t i = 0; i < num_nodes; ++i) {
     const dgl_id_t seed_id = seed_ids[i];
 
     for (int j = 0; j < num_traces; ++j) {
-      dgl_id_t cur = seed_id, next;
+      dgl_id_t cur = seed_id;
       const int kmax = num_hops + 1;
 
       for (int k = 0; k < kmax; ++k) {
-        const size_t offset = ((size_t)i * num_traces + j) * kmax + k;
+        const int64_t offset = (i * num_traces + j) * kmax + k;
         trace_data[offset] = cur;
-        if (!walker(gptr, &random_seed, cur, &next)) {
+        if (!walker(gptr, &random_seed, cur, &next))
           LOG(FATAL) << "no successors from vertex " << cur;
-          return traces;
-        }
         cur = next;
       }
     }
@@ -111,22 +101,14 @@ IdArray SamplerOp::GenericRandomWalk(
   return traces;
 }
 
-IdArray SamplerOp::RandomWalk(
-    const GraphInterface *gptr,
-    IdArray seeds,
-    int num_traces,
-    int num_hops) {
-  return GenericRandomWalk(gptr, seeds, num_traces, num_hops, multihop_walker<1>);
-}
-
-RandomWalkTraces SamplerOp::GenericRandomWalkWithRestart(
+RandomWalkTraces GenericRandomWalkWithRestart(
     const GraphInterface *gptr,
     IdArray seeds,
     double restart_prob,
-    uint64_t max_nodes_per_seed,
+    uint64_t min_nodes_per_seed,
     uint64_t max_visit_counts,
     uint64_t max_frequent_visited_nodes,
-    bool (*walker)(const GraphInterface *, unsigned int *, dgl_id_t, dgl_id_t *)) {
+    Walker walker) {
   std::vector<dgl_id_t> vertices;
   std::vector<size_t> trace_lengths, trace_counts, visit_counts;
   const dgl_id_t *seed_ids = static_cast<dgl_id_t *>(seeds->data);
@@ -157,10 +139,8 @@ RandomWalkTraces SamplerOp::GenericRandomWalkWithRestart(
         if ((trace_length > 0) && (rand_r(&random_seed) < restart_bound))
           break;
 
-        if (!walker(gptr, &random_seed, cur, &next)) {
+        if (!walker(gptr, &random_seed, cur, &next))
           LOG(FATAL) << "no successors from vertex " << cur;
-          return RandomWalkTraces();
-        }
         cur = next;
         vertices.push_back(cur);
       }
@@ -168,7 +148,7 @@ RandomWalkTraces SamplerOp::GenericRandomWalkWithRestart(
       total_trace_length += trace_length;
       ++num_traces;
       trace_lengths.push_back(trace_length);
-      if ((total_trace_length >= max_nodes_per_seed) || stop)
+      if ((total_trace_length >= min_nodes_per_seed) || stop)
         break;
     }
 
@@ -200,28 +180,58 @@ RandomWalkTraces SamplerOp::GenericRandomWalkWithRestart(
   return traces;
 }
 
+};  // namespace
+
+PackedFunc ConvertRandomWalkTracesToPackedFunc(const RandomWalkTraces &t) {
+  auto body = [t] (DGLArgs args, DGLRetValue *rv) {
+      const int which = args[0];
+      switch (which) {
+      case 0:
+        *rv = std::move(t.trace_counts);
+        break;
+      case 1:
+        *rv = std::move(t.trace_lengths);
+        break;
+      case 2:
+        *rv = std::move(t.vertices);
+        break;
+      default:
+        LOG(FATAL) << "invalid choice";
+      }
+    };
+  return PackedFunc(body);
+}
+
+IdArray SamplerOp::RandomWalk(
+    const GraphInterface *gptr,
+    IdArray seeds,
+    int num_traces,
+    int num_hops) {
+  return GenericRandomWalk(gptr, seeds, num_traces, num_hops, WalkMultipleHops<1>);
+}
+
 RandomWalkTraces SamplerOp::RandomWalkWithRestart(
     const GraphInterface *gptr,
     IdArray seeds,
     double restart_prob,
-    uint64_t max_nodes_per_seed,
+    uint64_t min_nodes_per_seed,
     uint64_t max_visit_counts,
     uint64_t max_frequent_visited_nodes) {
   return GenericRandomWalkWithRestart(
-      gptr, seeds, restart_prob, max_nodes_per_seed, max_visit_counts,
-      max_frequent_visited_nodes, multihop_walker<1>);
+      gptr, seeds, restart_prob, min_nodes_per_seed, max_visit_counts,
+      max_frequent_visited_nodes, WalkMultipleHops<1>);
 }
 
 RandomWalkTraces SamplerOp::BipartiteSingleSidedRandomWalkWithRestart(
     const GraphInterface *gptr,
     IdArray seeds,
     double restart_prob,
-    uint64_t max_nodes_per_seed,
+    uint64_t min_nodes_per_seed,
     uint64_t max_visit_counts,
     uint64_t max_frequent_visited_nodes) {
   return GenericRandomWalkWithRestart(
-      gptr, seeds, restart_prob, max_nodes_per_seed, max_visit_counts,
-      max_frequent_visited_nodes, multihop_walker<2>);
+      gptr, seeds, restart_prob, min_nodes_per_seed, max_visit_counts,
+      max_frequent_visited_nodes, WalkMultipleHops<2>);
 }
 
 DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalk")
@@ -240,13 +250,13 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalkWithRestart")
     GraphHandle ghandle = args[0];
     const IdArray seeds = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     const double restart_prob = args[2];
-    const uint64_t max_nodes_per_seed = args[3];
+    const uint64_t min_nodes_per_seed = args[3];
     const uint64_t max_visit_counts = args[4];
     const uint64_t max_frequent_visited_nodes = args[5];
     const GraphInterface *gptr = static_cast<const GraphInterface *>(ghandle);
 
     *rv = ConvertRandomWalkTracesToPackedFunc(
-        SamplerOp::RandomWalkWithRestart(gptr, seeds, restart_prob, max_nodes_per_seed,
+        SamplerOp::RandomWalkWithRestart(gptr, seeds, restart_prob, min_nodes_per_seed,
           max_visit_counts, max_frequent_visited_nodes));
   });
 
@@ -255,14 +265,14 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLBipartiteSingleSidedRandomWalkWithResta
     GraphHandle ghandle = args[0];
     const IdArray seeds = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     const double restart_prob = args[2];
-    const uint64_t max_nodes_per_seed = args[3];
+    const uint64_t min_nodes_per_seed = args[3];
     const uint64_t max_visit_counts = args[4];
     const uint64_t max_frequent_visited_nodes = args[5];
     const GraphInterface *gptr = static_cast<const GraphInterface *>(ghandle);
 
     *rv = ConvertRandomWalkTracesToPackedFunc(
         SamplerOp::BipartiteSingleSidedRandomWalkWithRestart(
-          gptr, seeds, restart_prob, max_nodes_per_seed,
+          gptr, seeds, restart_prob, min_nodes_per_seed,
           max_visit_counts, max_frequent_visited_nodes));
   });
 

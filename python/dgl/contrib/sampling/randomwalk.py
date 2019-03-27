@@ -102,7 +102,7 @@ def random_walk_with_restart(
 
     Reference
     ---------
-    [1] Eksombatchai et al., 2017
+    [1] Eksombatchai et al., 2017 https://arxiv.org/abs/1711.07601
     """
     if len(seeds) == 0:
         return []
@@ -154,7 +154,7 @@ def bipartite_single_sided_random_walk_with_restart(
 
     Reference
     ---------
-    [1] Eksombatchai et al., 2017
+    [1] Eksombatchai et al., 2017 https://arxiv.org/abs/1711.07601
     """
     if len(seeds) == 0:
         return []

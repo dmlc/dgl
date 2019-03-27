@@ -15,18 +15,18 @@
 
 #ifdef _MSC_VER
 // rand in MS compiler works well in multi-threading.
-static inline int rand_r(unsigned *seed) {
+inline int rand_r(unsigned *seed) {
   return rand();
 }
 
-static inline unsigned int randseed() {
+inline unsigned int randseed() {
   unsigned int seed = time(nullptr);
   srand(seed);  // need to set seed manually since there's no rand_r
   return seed;
 }
 #define _CRT_RAND_S
 #else
-static inline unsigned int randseed() {
+inline unsigned int randseed() {
   return time(nullptr);
 }
 #endif
@@ -99,45 +99,55 @@ class SamplerOp {
    *
    * \param seeds The array of starting vertex IDs
    * \param restart_prob The restart probability
-   * \param max_nodes_per_seed Stop generating traces if this many nodes are visited for each seed
-   * \param num_hops The number of hops for each trace
-   * \return a flat ID array with shape (num_seeds, num_traces, num_hops + 1)
+   * \param min_nodes_per_seed Stop generating more traces once the number of nodes visited for
+   * a seed exceeds this number.
+   * \param max_visit_counts Alternatively, stop generating traces for a seed if no less
+   * than \c max_frequent_visited_nodes are visited no less than \c max_visit_counts
+   * times.  [1]
+   * \param max_frequent_visited_nodes See \c max_visit_counts
+   * \return A RandomWalkTraces instance.
+   *
+   * \sa [1] Eksombatchai et al., 2017 https://arxiv.org/abs/1711.07601
    */
   static RandomWalkTraces RandomWalkWithRestart(
       const GraphInterface *gptr,
       IdArray seeds,
       double restart_prob,
-      uint64_t max_nodes_per_seed,
+      uint64_t min_nodes_per_seed,
       uint64_t max_visit_counts,
       uint64_t max_frequent_visited_nodes);
 
   /*
+   * \brief Batch-generate random walk traces with restart on a bipartite graph, walking two
+   * hops at a time.
+   *
+   * Since it is walking on a bipartite graph, the vertices of a trace will always stay on the
+   * same side.
+   *
+   * Stop generating traces if max_frequrent_visited_nodes nodes are visited more than
+   * max_visit_counts times.
+   *
+   * \param seeds The array of starting vertex IDs
+   * \param restart_prob The restart probability
+   * \param min_nodes_per_seed Stop generating more traces once the number of nodes visited for
+   * a seed exceeds this number.
+   * \param max_visit_counts Alternatively, stop generating traces for a seed if no less
+   * than \c max_frequent_visited_nodes are visited no less than \c max_visit_counts
+   * times.  [1]
+   * \param max_frequent_visited_nodes See \c max_visit_counts
+   * \return A RandomWalkTraces instance.
+   *
    * \note Doesn't verify whether the graph is indeed a bipartite graph
+   *
+   * \sa [1] Eksombatchai et al., 2017 https://arxiv.org/abs/1711.07601
    */
   static RandomWalkTraces BipartiteSingleSidedRandomWalkWithRestart(
       const GraphInterface *gptr,
       IdArray seeds,
       double restart_prob,
-      uint64_t max_nodes_per_seed,
+      uint64_t min_nodes_per_seed,
       uint64_t max_visit_counts,
       uint64_t max_frequent_visited_nodes);
-
- private:
-  static IdArray GenericRandomWalk(
-      const GraphInterface *gptr,
-      IdArray seeds,
-      int num_traces,
-      int num_hops,
-      bool (*walker)(const GraphInterface *, unsigned int *, dgl_id_t, dgl_id_t *));
-
-  static RandomWalkTraces GenericRandomWalkWithRestart(
-      const GraphInterface *gptr,
-      IdArray seeds,
-      double restart_prob,
-      uint64_t max_nodes_per_seed,
-      uint64_t max_visit_counts,
-      uint64_t max_frequent_visited_nodes,
-      bool (*walker)(const GraphInterface *, unsigned int *, dgl_id_t, dgl_id_t *));
 };
 
 }  // namespace dgl
