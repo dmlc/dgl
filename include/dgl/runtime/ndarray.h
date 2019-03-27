@@ -192,6 +192,16 @@ class NDArray {
  */
 inline bool SaveDLTensor(dmlc::Stream* strm, const DLTensor* tensor);
 
+struct SharedMemory {
+  bool is_new{false};
+  std::string name;
+
+  SharedMemory(const std::string &name, bool is_new) {
+    this->name = name;
+    this->is_new = is_new;
+  }
+};
+
 /*!
  * \brief Reference counted Container object used to back NDArray.
  *
@@ -214,7 +224,7 @@ struct NDArray::Container {
    */
   DLTensor dl_tensor;
 
-  bool is_shared_mem{false};
+  std::shared_ptr<SharedMemory> mem;
   /*!
    * \brief addtional context, reserved for recycling
    * \note We can attach additional content here

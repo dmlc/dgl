@@ -49,9 +49,11 @@ struct NDArray::Internal {
     using dgl::runtime::NDArray;
     if (ptr->manager_ctx != nullptr) {
       static_cast<NDArray::Container*>(ptr->manager_ctx)->DecRef();
-    } else if (ptr->is_shared_mem) {
+    } else if (ptr->mem) {
       size_t size = GetDataSize(ptr->dl_tensor);
       munmap(ptr->dl_tensor.data, size);
+      if (ptr->mem->is_new)
+        shm_unlink(ptr->mem->name.c_str());
     } else if (ptr->dl_tensor.data != nullptr) {
       dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
           ptr->dl_tensor.ctx, ptr->dl_tensor.data);
@@ -156,7 +158,7 @@ NDArray NDArray::EmptyShared(const std::string &name,
 
   // TODO do I open it right?
   int flag = O_RDWR;
-  if (is_create) flag |= O_CREAT;
+  if (is_create) flag = flag|O_EXCL|O_CREAT;
   int fd = shm_open(name.c_str(), flag, S_IRUSR | S_IWUSR);
   CHECK_NE(fd, -1) << "fail to open " << name << ": " << strerror(errno);
   if (is_create) {
@@ -168,7 +170,7 @@ NDArray NDArray::EmptyShared(const std::string &name,
   CHECK_NE(ptr, MAP_FAILED)
     << "Failed to map shared memory. mmap failed with error " << strerror(errno);
   ret.data_->dl_tensor.data = ptr;
-  ret.data_->is_shared_mem = true;
+  ret.data_->mem = std::make_shared<SharedMemory>(name, is_create);
   // TODO how to free the memory and close the file.
   return ret;
 }
