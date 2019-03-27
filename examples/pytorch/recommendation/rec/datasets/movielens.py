@@ -84,7 +84,7 @@ class MovieLens(object):
 
         self.data_split()
         self.build_graph()
-        self.find_neighbors(0.2, 2000, 1000, 100)
+        self.find_neighbors(0.2, 2000, 1000)
 
     def split_user(self, df, filter_counts=False):
         df_new = df.copy()
@@ -176,11 +176,9 @@ class MovieLens(object):
                 data={'inv': torch.ones(self.ratings.shape[0], dtype=torch.uint8)})
         self.g = g
 
-    def find_neighbors(self, restart_prob, max_nodes, top_T, top_T_preserve):
+    def find_neighbors(self, restart_prob, max_nodes, top_T):
         neighbor_probs, neighbors = randomwalk.random_walk_distribution_topt(
                 self.g, self.g.nodes(), restart_prob, max_nodes, top_T)
-        neighbor_probs = neighbor_probs[:, -top_T_preserve:]
-        neighbors = neighbors[:, -top_T_preserve:]
 
         self.user_neighbors = []
         for i in range(len(self.user_ids)):
