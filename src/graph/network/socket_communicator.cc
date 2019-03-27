@@ -52,7 +52,11 @@ bool SocketCommunicator::InitSender(const char* ip, int port) {
                  << ", try again ...";
       bo = false;
       try_count++;
-      sleep(1);  // sleep 1 second and try again
+#ifdef _WIN32
+      Sleep(1);
+#else   // !_WIN32
+      sleep(1);
+#endif  // _WIN32
     }
   }
   return false;
