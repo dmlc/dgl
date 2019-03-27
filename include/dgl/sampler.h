@@ -78,19 +78,19 @@ class SamplerOp {
                                      const std::vector<dgl_id_t>& seeds,
                                      const std::string &neigh_type,
                                      IdArray layer_sizes);
-
-  /*!
-   * \brief Batch-generate random walk traces
-   * \param seeds The array of starting vertex IDs
-   * \param num_traces The number of traces to generate for each seed
-   * \param num_hops The number of hops for each trace
-   * \return a flat ID array with shape (num_seeds, num_traces, num_hops + 1)
-   */
-  static IdArray RandomWalk(const GraphInterface *gptr,
-                            IdArray seeds,
-                            int num_traces,
-                            int num_hops);
 };
+
+/*!
+ * \brief Batch-generate random walk traces
+ * \param seeds The array of starting vertex IDs
+ * \param num_traces The number of traces to generate for each seed
+ * \param num_hops The number of hops for each trace
+ * \return a flat ID array with shape (num_seeds, num_traces, num_hops + 1)
+ */
+static IdArray RandomWalk(const GraphInterface *gptr,
+                          IdArray seeds,
+                          int num_traces,
+                          int num_hops);
 
 /*!
  * \brief Batch-generate random walk traces with restart
