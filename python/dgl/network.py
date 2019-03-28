@@ -8,7 +8,7 @@ from . import utils
 
 _init_api("dgl.network")
 
-############################# Distrobuted Sampler #############################
+############################# Distributed Sampler #############################
 
 def _create_sampler_sender(ip_addr, port):
     """Create a sender communicator via C socket.
