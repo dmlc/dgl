@@ -4,6 +4,34 @@ from ...network import _batch_send_subgraph, _batch_recv_subgraph
 from ...network import _create_sampler_sender, _create_sampler_receiver
 from ...network import _finalize_sampler_sender, _finalize_sampler_receiver
 
+from multiprocessing import Pool
+from abc import ABCMeta, abstractmethod
+
+class SamplerPool(object):
+    """SamplerPool is an abstract class, in which the worker method 
+    should be implemented by users. SamplerPool will fork() N (N = num_worker)
+    child processes, and each process will perform worker() method independently.
+
+    Parameters
+    ----------
+    num_worker : int
+        number of worker (child process)
+    """
+    __metaclass__ = ABCMeta
+
+    def start(self, num_worker):
+        p = Pool()
+        for i in range(num_worker):
+            print("Start child process %d ..." % i)
+            p.apply_async(self.worker)
+        # Waiting for all subprocesses done ...
+        p.close()
+        p.join()
+
+    @abstractmethod
+    def worker(self):
+        pass
+
 class SamplerSender(object):
     """Sender of DGL distributed sampler.
 
