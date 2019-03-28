@@ -14,7 +14,7 @@ def generate_rand_graph(n):
 def start_trainer():
     g = generate_rand_graph(100)
     recv = dgl.contrib.sampling.SamplerReceiver(ip="127.0.0.1", port=50051)
-    nodeflow = recv.Receive(g)
+    nodeflow = recv.recv(g)
     print("----- trainer ------")
     print(nodeflow._node_mapping.todgltensor())
     print(nodeflow._edge_mapping.todgltensor())
@@ -35,7 +35,7 @@ def start_sampler():
         print(subg._layer_offsets)
         print(subg._block_offsets)
         print("----- sampler ------")
-        sender.Send(subg)
+        sender.send(subg)
         break
 
     time.sleep(1)
