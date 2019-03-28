@@ -3,6 +3,7 @@ import time
 import numpy as np
 from multiprocessing import Process
 from scipy import sparse as spsp
+import mxnet as mx
 
 graph = (spsp.random(100, 100, density=0.1, format='coo') != 0).astype(np.int64)
 
@@ -12,9 +13,12 @@ def worker_func(worker_id):
     store.init_ndata('test4', 10, 0)
     if worker_id == 0:
         store.ndata['test4'][0] = 1
+        print('set ndata')
+        print(store.ndata['test4'][0].asnumpy())
     else:
         time.sleep(1)
-        assert mx.nd.all(store.ndata['test4'][0] == 1)
+        print(store.ndata['test4'][0].asnumpy())
+        assert np.all(store.ndata['test4'][0].asnumpy() == 1)
 
 def server_func():
     print("server starts")

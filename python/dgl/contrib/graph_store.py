@@ -1,5 +1,6 @@
 import os
 import time
+import posix_ipc as ipc
 
 from ..base import ALL, is_all, DGLError
 from .. import backend as F
@@ -49,46 +50,44 @@ class SharedMemoryStoreServer:
         self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=False)
         self._num_workers = num_workers
         self._graph_name = graph_name
-        self.path = "/tmp/" + graph_name
         self._reply_pipes = {}
-        os.mkfifo(self.path)
-        self._comm_pipe = os.open(self.path, os.O_RDONLY)
+        self._msg_queue = ipc.MessageQueue("/" + graph_name, flags=ipc.O_CREAT)
 
     def __del__(self):
         for key in self._reply_pipes:
             os.close(self._reply_pipes[key])
-        os.close(self._comm_pipe)
-        os.unlink(self.path)
+        self._msg_queue.close()
+        self._msg_queue.unlink()
 
     def _decode_command(self, line):
-        parts = line.split(':')
+        parts = line[0].decode('utf-8').split(':')
         return _commands[parts[0]](self, parts[1])
 
     def run(self):
-        for line in self._comm_pipe:
+        while True:
+            line = self._msg_queue.receive()
             comm = self._decode_command(line)
             comm.run()
-        os.close(self._comm_pipe)
-        os.unlink(self.path)
+        self._msg_queue.close()
+        self._msg_queue.unlink()
 
 class SharedMemoryGraphStore:
     def __init__(self, graph_data, graph_name, multigraph=False):
         self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=False)
         self._graph_name = graph_name
-        send_path = "/tmp/" + graph_name
-        self._comm_pipe = os.open(send_path, os.O_WRONLY)
+        self._msg_queue = ipc.MessageQueue("/" + graph_name)
 
         self._pid = os.getpid()
-        self._recv_path = "/tmp/" + graph_name + "-" + str(self._pid)
-        self._comm_pipe.write(self._encode_comm("init:", [self._recv_path]))
-        self._comm_pipe.flush()
-        os.mkfifo(self._recv_path)
-        self._recv_pipe = os.open(self._recv_path, os.O_RDONLY)
+        #self._recv_path = "/" + graph_name + "-" + str(self._pid)
+        #self._comm_pipe.write(self._encode_comm("init:", [self._recv_path]))
+        #self._comm_pipe.flush()
+        #os.mkfifo(self._recv_path)
+        #self._recv_pipe = os.open(self._recv_path, os.O_RDONLY)
 
     def __del__(self):
-        os.close(self._comm_pipe)
-        os.close(self._recv_pipe)
-        os.unlink(self._recv_path)
+        self._msg_queue.close()
+        #os.close(self._recv_pipe)
+        #os.unlink(self._recv_path)
 
     def _encode_comm(self, comm, args):
         comm = comm + str(self._pid)
@@ -98,8 +97,7 @@ class SharedMemoryGraphStore:
         return comm
 
     def init_ndata(self, ndata_name, num_feats, dtype):
-        self._comm_pipe.write(self._encode_comm("init_ndata:", [str(num_feats), str(dtype)]))
-        self._comm_pipe.flush()
+        self._msg_queue.send(self._encode_comm("init_ndata:", [ndata_name, str(num_feats), str(dtype)]))
         #TODO remove sleep later
         time.sleep(1)
         data = _CAPI_DGLCreateSharedMem("/" + self._graph_name + "_" + ndata_name,
@@ -195,6 +193,30 @@ class SharedMemoryGraphStore:
         register_apply_node_func
         """
         self._graph.register_apply_edge_func(func)
+
+    @property
+    def ndata(self):
+        """Return the data view of all the nodes.
+
+        DGLGraph.ndata is an abbreviation of DGLGraph.nodes[:].data
+
+        See Also
+        --------
+        dgl.DGLGraph.nodes
+        """
+        return self._graph.ndata
+
+    @property
+    def edata(self):
+        """Return the data view of all the edges.
+
+        DGLGraph.data is an abbreviation of DGLGraph.edges[:].data
+
+        See Also
+        --------
+        dgl.DGLGraph.edges
+        """
+        return self._graph.edata
 
     def apply_nodes(self, func="default", v=ALL, inplace=False):
         """Apply the function on the nodes to update their features.
