@@ -23,7 +23,7 @@ namespace network {
 static char* sender_data_buffer = nullptr;
 static char* recv_data_buffer = nullptr;
 
-///////////////////////// Distrobuted Sampler /////////////////////////
+///////////////////////// Distributed Sampler /////////////////////////
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
