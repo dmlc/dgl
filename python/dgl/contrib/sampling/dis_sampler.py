@@ -31,7 +31,7 @@ class SamplerSender(object):
         # to tell the remote trainer machine that it has finished its job.
         _finalize_sampler_sender(self._sender)
 
-    def Send(self, nodeflow):
+    def send(self, nodeflow):
         """Send sampled subgraph (NodeFlow) to remote trainer.
 
         Parameters
@@ -41,7 +41,7 @@ class SamplerSender(object):
         """
         _send_subgraph(self._sender, nodeflow)
 
-    def BatchSend(self, nodeflow_list):
+    def batch_send(self, nodeflow_list):
         """Send a batch of sampled subgraph (NodeFlow) to remote trainer.
 
         Parameters
@@ -83,7 +83,7 @@ class SamplerReceiver(object):
         """
         _finalize_sampler_receiver(self._receiver)
 
-    def Receive(self, graph):
+    def recv(self, graph):
         """Receive a NodeFlow object from remote sampler.
 
         Parameters
@@ -98,7 +98,7 @@ class SamplerReceiver(object):
         """
         return _recv_subgraph(self._receiver, graph)
 
-    def BatchReceive(self, graph):
+    def batch_recv(self, graph):
         """Receive a batch of NodeFlow objects from remote sampler.
 
         Parameters
