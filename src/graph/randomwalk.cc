@@ -180,23 +180,8 @@ RandomWalkTraces GenericRandomWalkWithRestart(
 };  // namespace
 
 PackedFunc ConvertRandomWalkTracesToPackedFunc(const RandomWalkTraces &t) {
-  auto body = [t] (DGLArgs args, DGLRetValue *rv) {
-      const int which = args[0];
-      switch (which) {
-      case 0:
-        *rv = std::move(t.trace_counts);
-        break;
-      case 1:
-        *rv = std::move(t.trace_lengths);
-        break;
-      case 2:
-        *rv = std::move(t.vertices);
-        break;
-      default:
-        LOG(FATAL) << "invalid choice";
-      }
-    };
-  return PackedFunc(body);
+  return ConvertNDArrayVectorToPackedFunc({
+      t.trace_counts, t.trace_lengths, t.vertices});
 }
 
 IdArray RandomWalk(
