@@ -11,6 +11,8 @@ class SamplerPool(object):
     """SamplerPool is an abstract class, in which the worker method 
     should be implemented by users. SamplerPool will fork() N (N = num_worker)
     child processes, and each process will perform worker() method independently.
+    Note that, the fork() API will use shared memory for N process and the OS will
+    perfrom copy-on-write only when developers write that piece of memory.
 
     Parameters
     ----------
