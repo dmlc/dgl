@@ -28,7 +28,7 @@ using Walker = std::function<dgl_id_t(
 namespace {
 
 /*!
- * \brief Randomly select a single direct successor in \c next given the current vertex
+ * \brief Randomly select a single direct successor given the current vertex
  * \return Whether such a successor could be found
  */
 dgl_id_t WalkOneHop(
@@ -43,18 +43,19 @@ dgl_id_t WalkOneHop(
 }
 
 /*!
- * \brief Randomly select a single direct successor after \c hops hops in \c next given the
- * current vertex
+ * \brief Randomly select a single direct successor after \c hops hops given the current vertex
  * \return Whether such a successor could be found
  */
 template<int hops>
-bool WalkMultipleHops(
+dgl_id_t WalkMultipleHops(
     const GraphInterface *gptr,
     unsigned int *random_seed,
     dgl_id_t cur) {
+  dgl_id_t next;
   for (int i = 0; i < hops; ++i) {
-    if ((cur = WalkOneHop(gptr, random_seed, cur)) == DGL_INVALID_ID)
+    if ((next = WalkOneHop(gptr, random_seed, cur)) == DGL_INVALID_ID)
       return DGL_INVALID_ID;
+    cur = next;
   }
   return cur;
 }

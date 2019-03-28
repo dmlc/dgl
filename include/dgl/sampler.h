@@ -87,10 +87,10 @@ class SamplerOp {
  * \param num_hops The number of hops for each trace
  * \return a flat ID array with shape (num_seeds, num_traces, num_hops + 1)
  */
-static IdArray RandomWalk(const GraphInterface *gptr,
-                          IdArray seeds,
-                          int num_traces,
-                          int num_hops);
+IdArray RandomWalk(const GraphInterface *gptr,
+                   IdArray seeds,
+                   int num_traces,
+                   int num_hops);
 
 /*!
  * \brief Batch-generate random walk traces with restart
@@ -110,7 +110,7 @@ static IdArray RandomWalk(const GraphInterface *gptr,
  *
  * \sa [1] Eksombatchai et al., 2017 https://arxiv.org/abs/1711.07601
  */
-static RandomWalkTraces RandomWalkWithRestart(
+RandomWalkTraces RandomWalkWithRestart(
     const GraphInterface *gptr,
     IdArray seeds,
     double restart_prob,
@@ -142,7 +142,7 @@ static RandomWalkTraces RandomWalkWithRestart(
  *
  * \sa [1] Eksombatchai et al., 2017 https://arxiv.org/abs/1711.07601
  */
-static RandomWalkTraces BipartiteSingleSidedRandomWalkWithRestart(
+RandomWalkTraces BipartiteSingleSidedRandomWalkWithRestart(
     const GraphInterface *gptr,
     IdArray seeds,
     double restart_prob,
