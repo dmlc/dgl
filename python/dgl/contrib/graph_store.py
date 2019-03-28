@@ -6,14 +6,17 @@ from .. import backend as F
 from ..graph import DGLGraph
 from .._ffi.function import _init_api
 
+def _get_ndata_path(graph_name, ndata_name):
+    return "/" + graph_name + "_" + ndata_name
+
 class InitNData:
     def __init__(self, serv, args):
         self.graph = serv._graph
         self.graph_name = serv._graph_name
         args = args.split(',')
-        self.ndata_name = args[0]
-        self.num_feats = int(args[1])
-        self.dtype = int(args[2])
+        self.ndata_name = args[1]
+        self.num_feats = int(args[2])
+        self.dtype = int(args[3])
 
     def run(self):
         if self.ndata_name in self.graph.ndata:
@@ -21,13 +24,24 @@ class InitNData:
             assert ndata.shape[1] == self.num_feats
             return
 
-        data = _CAPI_DGLCreateSharedMem("/" + self.graph_name + "_" + self.ndata_name,
+        data = _CAPI_DGLCreateSharedMem(_get_ndata_path(self.graph_name, self.ndata_name),
                                         self.graph.number_of_nodes(),
                                         self.num_feats, self.dtype, "zero", True)
         dlpack = data.to_dlpack()
         self.graph.ndata[self.ndata_name] = F.zerocopy_from_dlpack(dlpack)
 
-_commands = {'init_ndata': lambda serv, args: InitNData(serv, args)}
+class Init:
+    def __init__(self, serv, args):
+        args = args.split(',')
+        self.pid = int(args[0])
+        self.pipe_path = args[1]
+        self.serv = serv
+
+    def run(self):
+        self.serv._reply_pipes[self.pid] = os.open(self.pipe_path, os.O_WRONLY)
+
+_commands = {'init_ndata': lambda serv, args: InitNData(serv, args),
+             'init':       lambda serv, args: Init(serv, args)}
 
 class SharedMemoryStoreServer:
     def __init__(self, graph_data, graph_name, multigraph,
@@ -36,29 +50,55 @@ class SharedMemoryStoreServer:
         self._num_workers = num_workers
         self._graph_name = graph_name
         self.path = "/tmp/" + graph_name
+        self._reply_pipes = {}
         os.mkfifo(self.path)
-        self._comm_pipe = open(self.path, 'r')
+        self._comm_pipe = os.open(self.path, os.O_RDONLY)
 
-    def read_command(self, line):
+    def __del__(self):
+        for key in self._reply_pipes:
+            os.close(self._reply_pipes[key])
+        os.close(self._comm_pipe)
+        os.unlink(self.path)
+
+    def _decode_command(self, line):
         parts = line.split(':')
         return _commands[parts[0]](self, parts[1])
 
     def run(self):
         for line in self._comm_pipe:
-            comm = self.read_command(line)
+            comm = self._decode_command(line)
             comm.run()
-        self._comm_pipe.close()
+        os.close(self._comm_pipe)
         os.unlink(self.path)
 
 class SharedMemoryGraphStore:
     def __init__(self, graph_data, graph_name, multigraph=False):
         self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=False)
         self._graph_name = graph_name
-        path = "/tmp/" + graph_name
-        self._comm_pipe = open(path, 'w')
+        send_path = "/tmp/" + graph_name
+        self._comm_pipe = os.open(send_path, os.O_WRONLY)
+
+        self._pid = os.getpid()
+        self._recv_path = "/tmp/" + graph_name + "-" + str(self._pid)
+        self._comm_pipe.write(self._encode_comm("init:", [self._recv_path]))
+        self._comm_pipe.flush()
+        os.mkfifo(self._recv_path)
+        self._recv_pipe = os.open(self._recv_path, os.O_RDONLY)
+
+    def __del__(self):
+        os.close(self._comm_pipe)
+        os.close(self._recv_pipe)
+        os.unlink(self._recv_path)
+
+    def _encode_comm(self, comm, args):
+        comm = comm + str(self._pid)
+        for arg in args:
+            comm = comm + "," + arg
+        comm = comm + '\n'
+        return comm
 
     def init_ndata(self, ndata_name, num_feats, dtype):
-        self._comm_pipe.write("init_ndata:" + ndata_name + "," + str(num_feats) + "," + str(dtype)+'\n')
+        self._comm_pipe.write(self._encode_comm("init_ndata:", [str(num_feats), str(dtype)]))
         self._comm_pipe.flush()
         #TODO remove sleep later
         time.sleep(1)
