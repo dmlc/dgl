@@ -10,6 +10,11 @@ def worker_func(worker_id):
     print("worker starts")
     store = dgl.contrib.graph_store.create_graph_store_client(graph, "test_graph", "shared_mem", False)
     store.init_ndata('test4', 10, 0)
+    if worker_id == 0:
+        store.ndata['test4'][0] = 1
+    else:
+        time.sleep(1)
+        assert mx.nd.all(store.ndata['test4'][0] == 1)
 
 def server_func():
     print("server starts")
