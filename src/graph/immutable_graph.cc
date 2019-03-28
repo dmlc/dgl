@@ -4,6 +4,11 @@
  * \brief DGL immutable graph index implementation
  */
 
+#include <string.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/types.h>
 #include <dgl/immutable_graph.h>
 
 #ifdef _MSC_VER
@@ -18,6 +23,49 @@ template<class ForwardIt, class T>
 bool binary_search(ForwardIt first, ForwardIt last, const T& value) {
   first = std::lower_bound(first, last, value);
   return (!(first == last) && !(value < *first));
+}
+
+ImmutableGraph::CSR::CSR(int64_t num_vertices, int64_t expected_num_edges): indptr(num_vertices + 1),
+    indices(expected_num_edges), edge_ids(expected_num_edges) {
+  indptr.resize(num_vertices + 1);
+}
+
+ImmutableGraph::CSR::CSR(int64_t num_vertices, int64_t expected_num_edges,
+                         const std::string &shared_mem_name, bool is_create) {
+  size_t file_size = (num_vertices + 1) * sizeof(int64_t) + expected_num_edges * sizeof(dgl_id_t) * 2;
+  int flag = O_RDWR;
+  if (is_create) flag = flag|O_EXCL|O_CREAT;
+  int fd = shm_open(shared_mem_name.c_str(), flag, S_IRUSR | S_IWUSR);
+  CHECK_NE(fd, -1) << "fail to open " << shared_mem_name << ": " << strerror(errno);
+  if (is_create) {
+    auto res = ftruncate(fd, file_size);
+    CHECK_NE(res, -1)
+      << "Failed to truncate the file. " << strerror(errno);
+  }
+  auto ptr = mmap(NULL, file_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+  CHECK_NE(ptr, MAP_FAILED)
+    << "Failed to map shared memory. mmap failed with error " << strerror(errno);
+  this->mem = std::make_shared<runtime::SharedMemory>(shared_mem_name, is_create);
+
+  int64_t *addr1 = static_cast<int64_t *>(ptr);
+  indptr.init(addr1, num_vertices + 1);
+  void *addr = addr1 + num_vertices + 1;
+  dgl_id_t *addr2 = static_cast<dgl_id_t *>(addr);
+  indices.init(addr2, expected_num_edges);
+  addr = addr2 + expected_num_edges;
+  dgl_id_t *addr3 = static_cast<dgl_id_t *>(addr);
+  edge_ids.init(addr3, expected_num_edges);
+  indptr.resize(num_vertices + 1);
+  this->mem_ptr = ptr;
+  this->mem_size = file_size;
+}
+
+ImmutableGraph::CSR::~CSR() {
+  if (mem) {
+    munmap(mem_ptr, mem_size);
+    if (mem->is_new)
+      shm_unlink(mem->name.c_str());
+  }
 }
 
 ImmutableGraph::EdgeArray ImmutableGraph::CSR::GetEdges(dgl_id_t vid) const {
@@ -119,7 +167,7 @@ class HashTableChecker {
    * and the source vertex. `col_idx` and `orig_eids` store the collected edges.
    */
   void Collect(const dgl_id_t old_id, const dgl_id_t old_eid,
-               std::vector<dgl_id_t> *col_idx,
+               ImmutableGraph::vector<dgl_id_t> *col_idx,
                std::vector<dgl_id_t> *orig_eids) {
     if (!map.test(old_id))
       return;
@@ -147,7 +195,7 @@ class HashTableChecker {
    * The collected edges are stored in `new_neigh_idx` and `orig_eids`.
    */
   void CollectOnRow(const dgl_id_t neigh_idx[], const dgl_id_t eids[], size_t row_len,
-                    std::vector<dgl_id_t> *new_neigh_idx,
+                    ImmutableGraph::vector<dgl_id_t> *new_neigh_idx,
                     std::vector<dgl_id_t> *orig_eids) {
     // TODO(zhengda) I need to make sure the column index in each row is sorted.
     for (size_t j = 0; j < row_len; ++j) {
@@ -159,9 +207,9 @@ class HashTableChecker {
 };
 
 ImmutableGraph::EdgeList::Ptr ImmutableGraph::EdgeList::FromCSR(
-    const std::vector<int64_t>& indptr,
-    const std::vector<dgl_id_t>& indices,
-    const std::vector<dgl_id_t>& edge_ids,
+    const ImmutableGraph::vector<int64_t>& indptr,
+    const ImmutableGraph::vector<dgl_id_t>& indices,
+    const ImmutableGraph::vector<dgl_id_t>& edge_ids,
     bool in_csr) {
   const auto n = indptr.size() - 1;
   const auto len = edge_ids.size();

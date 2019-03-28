@@ -32,6 +32,121 @@ class ImmutableGraph: public GraphInterface {
     dgl_id_t edge_id;
   };
 
+  template<class T>
+  class vector {
+   public:
+    vector() {
+      this->arr = nullptr;
+      this->capacity = 0;
+      this->curr = 0;
+      this->own = false;
+    }
+
+    vector(T *arr, size_t size) {
+      this->arr = arr;
+      this->capacity = size;
+      this->curr = 0;
+      this->own = false;
+    }
+
+    vector(size_t size) {
+      this->arr = static_cast<T *>(malloc(size * sizeof(T)));
+      this->capacity = size;
+      this->curr = 0;
+      this->own = true;
+    }
+
+    ~vector() {
+      if (this->own) {
+        free(this->arr);
+      }
+    }
+
+    vector(const vector &other) = delete;
+    vector(vector &other) = delete;
+
+    void init(T *arr, size_t size) {
+      CHECK(this->arr == nullptr);
+      this->arr = arr;
+      this->capacity = size;
+      this->curr = 0;
+      this->own = false;
+    }
+
+    void push_back(T val) {
+      // If the vector doesn't own the memory, it can't adjust its memory size.
+      if (!this->own) {
+        CHECK_LT(curr, capacity);
+      } else if (curr == capacity) {
+        this->capacity = this->capacity * 2;
+        this->arr = static_cast<T *>(realloc(this->arr, this->capacity * sizeof(T)));
+        CHECK(this->arr) << "can't allocate memory for a larger vector.";
+      }
+      this->arr[curr++] = val;
+    }
+
+    T &operator[](size_t idx) {
+      CHECK_LT(idx, curr);
+      return this->arr[idx];
+    }
+
+    const T &operator[](size_t idx) const {
+      CHECK_LT(idx, curr);
+      return this->arr[idx];
+    }
+
+    size_t size() const {
+      return this->curr;
+    }
+
+    void resize(size_t new_size) {
+      if (!this->own) {
+        CHECK_LE(new_size, capacity);
+      } else if (new_size > capacity) {
+        this->capacity = new_size;
+        this->arr = static_cast<T *>(realloc(this->arr, this->capacity * sizeof(T)));
+        CHECK(this->arr) << "can't allocate memory for a larger vector.";
+      }
+      for (size_t i = this->curr; i < new_size; i++)
+        this->arr[i] = 0;
+      this->curr = new_size;
+    }
+
+    void clear() {
+      this->curr = 0;
+    }
+
+    const T *data() const {
+      return this->arr;
+    }
+
+    T *data() {
+      return this->arr;
+    }
+
+    const T *begin() const {
+      return this->arr;
+    }
+
+    T *begin() {
+      return this->arr;
+    }
+
+    const T *end() const {
+      return this->arr + this->curr;
+    }
+
+    T *end() {
+      return this->arr + this->curr;
+    }
+
+   private:
+    T *arr;
+    size_t capacity;
+    size_t curr;
+    bool own;
+  };
+
   // Edge list indexed by edge id;
   struct EdgeList {
     typedef std::shared_ptr<EdgeList> Ptr;
@@ -50,23 +165,23 @@ class ImmutableGraph: public GraphInterface {
     }
 
     static EdgeList::Ptr FromCSR(
-        const std::vector<int64_t>& indptr,
-        const std::vector<dgl_id_t>& indices,
-        const std::vector<dgl_id_t>& edge_ids,
+        const vector<int64_t>& indptr,
+        const vector<dgl_id_t>& indices,
+        const vector<dgl_id_t>& edge_ids,
         bool in_csr);
   };
 
   struct CSR {
     typedef std::shared_ptr<CSR> Ptr;
-    std::vector<int64_t> indptr;
-    std::vector<dgl_id_t> indices;
-    std::vector<dgl_id_t> edge_ids;
 
-    CSR(int64_t num_vertices, int64_t expected_num_edges) {
-      indptr.resize(num_vertices + 1);
-      indices.reserve(expected_num_edges);
-      edge_ids.reserve(expected_num_edges);
-    }
+    vector<int64_t> indptr;
+    vector<dgl_id_t> indices;
+    vector<dgl_id_t> edge_ids;
+
+    CSR(int64_t num_vertices, int64_t expected_num_edges);
+    CSR(int64_t num_vertices, int64_t expected_num_edges,
+        const std::string &shared_mem_name, bool is_create);
+    ~CSR();
 
     bool HasVertex(dgl_id_t vid) const {
       return vid < NumVertices();
@@ -112,6 +227,11 @@ class ImmutableGraph: public GraphInterface {
      * which is specified by `sort_on`.
      */
     static CSR::Ptr FromEdges(std::vector<Edge> *edges, int sort_on, uint64_t num_nodes);
+
+   private:
+    std::shared_ptr<runtime::SharedMemory> mem;
+    void *mem_ptr;
+    size_t mem_size;
   };
 
   /*! \brief Construct an immutable graph from the COO format. */

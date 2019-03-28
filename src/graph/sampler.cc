@@ -648,9 +648,9 @@ namespace {
                       const dgl_id_t *eids,
                       const std::vector<dgl_id_t> &node_mapping,
                       const std::vector<int64_t> &actl_layer_sizes,
-                      std::vector<int64_t> *sub_indptr,
-                      std::vector<dgl_id_t> *sub_indices,
-                      std::vector<dgl_id_t> *sub_eids,
+                      ImmutableGraph::vector<int64_t> *sub_indptr,
+                      ImmutableGraph::vector<dgl_id_t> *sub_indices,
+                      ImmutableGraph::vector<dgl_id_t> *sub_eids,
                       std::vector<dgl_id_t> *flow_offsets,
                       std::vector<dgl_id_t> *edge_mapping) {
     /*
@@ -658,7 +658,8 @@ namespace {
      * subgraphs (flows) between consecutive layers.
      */
     auto n_flows = actl_layer_sizes.size() - 1;
-    sub_indptr->insert(sub_indptr->end(), actl_layer_sizes.front() + 1, 0);
+    for (int64_t i = 0; i < actl_layer_sizes.front() + 1; i++)
+      sub_indptr->push_back(0);
     flow_offsets->push_back(0);
     int64_t first = 0;
     for (size_t i = 0; i < n_flows; ++i) {
