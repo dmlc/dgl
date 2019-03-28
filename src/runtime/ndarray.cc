@@ -3,6 +3,7 @@
  * \file ndarray.cc
  * \brief NDArray container infratructure.
  */
+#include <string.h>
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>

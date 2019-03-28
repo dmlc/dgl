@@ -1,3 +1,4 @@
+#include <string.h>
 #include <dgl/graph.h>
 #include "../c_api_common.h"
 
