@@ -100,11 +100,11 @@ static IdArray RandomWalk(const GraphInterface *gptr,
  *
  * \param seeds The array of starting vertex IDs
  * \param restart_prob The restart probability
- * \param min_nodes_per_seed Stop generating more traces once the number of nodes visited for
- * a seed exceeds this number.
+ * \param visit_threshold_per_seed Stop generating more traces once the number of nodes
+ * visited for a seed exceeds this number.  (Algorithm 1 in [1])
  * \param max_visit_counts Alternatively, stop generating traces for a seed if no less
  * than \c max_frequent_visited_nodes are visited no less than \c max_visit_counts
- * times.  [1]
+ * times.  (Algorithm 2 in [1])
  * \param max_frequent_visited_nodes See \c max_visit_counts
  * \return A RandomWalkTraces instance.
  *
@@ -114,7 +114,7 @@ static RandomWalkTraces RandomWalkWithRestart(
     const GraphInterface *gptr,
     IdArray seeds,
     double restart_prob,
-    uint64_t min_nodes_per_seed,
+    uint64_t visit_threshold_per_seed,
     uint64_t max_visit_counts,
     uint64_t max_frequent_visited_nodes);
 
@@ -130,11 +130,11 @@ static RandomWalkTraces RandomWalkWithRestart(
  *
  * \param seeds The array of starting vertex IDs
  * \param restart_prob The restart probability
- * \param min_nodes_per_seed Stop generating more traces once the number of nodes visited for
- * a seed exceeds this number.
+ * \param visit_threshold_per_seed Stop generating more traces once the number of nodes
+ * visited for a seed exceeds this number.  (Algorithm 1 in [1])
  * \param max_visit_counts Alternatively, stop generating traces for a seed if no less
  * than \c max_frequent_visited_nodes are visited no less than \c max_visit_counts
- * times.  [1]
+ * times.  (Algorithm 2 in [1])
  * \param max_frequent_visited_nodes See \c max_visit_counts
  * \return A RandomWalkTraces instance.
  *
@@ -146,7 +146,7 @@ static RandomWalkTraces BipartiteSingleSidedRandomWalkWithRestart(
     const GraphInterface *gptr,
     IdArray seeds,
     double restart_prob,
-    uint64_t min_nodes_per_seed,
+    uint64_t visit_threshold_per_seed,
     uint64_t max_visit_counts,
     uint64_t max_frequent_visited_nodes);
 

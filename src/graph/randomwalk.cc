@@ -22,8 +22,8 @@ using dgl::runtime::NDArray;
 
 namespace dgl {
 
-using Walker = std::function<bool(
-    const GraphInterface *, unsigned int *, dgl_id_t, dgl_id_t *)>;
+using Walker = std::function<dgl_id_t(
+    const GraphInterface *, unsigned int *, dgl_id_t)>;
 
 namespace {
 
@@ -31,17 +31,15 @@ namespace {
  * \brief Randomly select a single direct successor in \c next given the current vertex
  * \return Whether such a successor could be found
  */
-bool WalkOneHop(
+dgl_id_t WalkOneHop(
     const GraphInterface *gptr,
     unsigned int *random_seed,
-    dgl_id_t cur,
-    dgl_id_t *next) {
+    dgl_id_t cur) {
   const auto succ = gptr->SuccVec(cur);
   const size_t size = succ.size();
   if (size == 0)
-    return false;
-  *next = succ[rand_r(random_seed) % size];
-  return true;
+    return DGL_INVALID_ID;
+  return succ[rand_r(random_seed) % size];
 }
 
 /*!
@@ -53,14 +51,12 @@ template<int hops>
 bool WalkMultipleHops(
     const GraphInterface *gptr,
     unsigned int *random_seed,
-    dgl_id_t cur,
-    dgl_id_t *next) {
+    dgl_id_t cur) {
   for (int i = 0; i < hops; ++i) {
-    if (!WalkOneHop(gptr, random_seed, cur, next))
-      return false;
-    cur = *next;
+    if ((cur = WalkOneHop(gptr, random_seed, cur)) == DGL_INVALID_ID)
+      return DGL_INVALID_ID;
   }
-  return true;
+  return cur;
 }
 
 IdArray GenericRandomWalk(
@@ -91,7 +87,7 @@ IdArray GenericRandomWalk(
       for (int k = 0; k < kmax; ++k) {
         const int64_t offset = (i * num_traces + j) * kmax + k;
         trace_data[offset] = cur;
-        if (!walker(gptr, &random_seed, cur, &next))
+        if ((next = walker(gptr, &random_seed, cur)) == DGL_INVALID_ID)
           LOG(FATAL) << "no successors from vertex " << cur;
         cur = next;
       }
@@ -105,7 +101,7 @@ RandomWalkTraces GenericRandomWalkWithRestart(
     const GraphInterface *gptr,
     IdArray seeds,
     double restart_prob,
-    uint64_t min_nodes_per_seed,
+    uint64_t visit_threshold_per_seed,
     uint64_t max_visit_counts,
     uint64_t max_frequent_visited_nodes,
     Walker walker) {
@@ -139,7 +135,7 @@ RandomWalkTraces GenericRandomWalkWithRestart(
         if ((trace_length > 0) && (rand_r(&random_seed) < restart_bound))
           break;
 
-        if (!walker(gptr, &random_seed, cur, &next))
+        if ((next = walker(gptr, &random_seed, cur)) == DGL_INVALID_ID)
           LOG(FATAL) << "no successors from vertex " << cur;
         cur = next;
         vertices.push_back(cur);
@@ -148,7 +144,7 @@ RandomWalkTraces GenericRandomWalkWithRestart(
       total_trace_length += trace_length;
       ++num_traces;
       trace_lengths.push_back(trace_length);
-      if ((total_trace_length >= min_nodes_per_seed) || stop)
+      if ((total_trace_length >= visit_threshold_per_seed) || stop)
         break;
     }
 
@@ -214,11 +210,11 @@ RandomWalkTraces RandomWalkWithRestart(
     const GraphInterface *gptr,
     IdArray seeds,
     double restart_prob,
-    uint64_t min_nodes_per_seed,
+    uint64_t visit_threshold_per_seed,
     uint64_t max_visit_counts,
     uint64_t max_frequent_visited_nodes) {
   return GenericRandomWalkWithRestart(
-      gptr, seeds, restart_prob, min_nodes_per_seed, max_visit_counts,
+      gptr, seeds, restart_prob, visit_threshold_per_seed, max_visit_counts,
       max_frequent_visited_nodes, WalkMultipleHops<1>);
 }
 
@@ -226,11 +222,11 @@ RandomWalkTraces BipartiteSingleSidedRandomWalkWithRestart(
     const GraphInterface *gptr,
     IdArray seeds,
     double restart_prob,
-    uint64_t min_nodes_per_seed,
+    uint64_t visit_threshold_per_seed,
     uint64_t max_visit_counts,
     uint64_t max_frequent_visited_nodes) {
   return GenericRandomWalkWithRestart(
-      gptr, seeds, restart_prob, min_nodes_per_seed, max_visit_counts,
+      gptr, seeds, restart_prob, visit_threshold_per_seed, max_visit_counts,
       max_frequent_visited_nodes, WalkMultipleHops<2>);
 }
 
@@ -250,13 +246,13 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalkWithRestart")
     GraphHandle ghandle = args[0];
     const IdArray seeds = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     const double restart_prob = args[2];
-    const uint64_t min_nodes_per_seed = args[3];
+    const uint64_t visit_threshold_per_seed = args[3];
     const uint64_t max_visit_counts = args[4];
     const uint64_t max_frequent_visited_nodes = args[5];
     const GraphInterface *gptr = static_cast<const GraphInterface *>(ghandle);
 
     *rv = ConvertRandomWalkTracesToPackedFunc(
-        RandomWalkWithRestart(gptr, seeds, restart_prob, min_nodes_per_seed,
+        RandomWalkWithRestart(gptr, seeds, restart_prob, visit_threshold_per_seed,
           max_visit_counts, max_frequent_visited_nodes));
   });
 
@@ -265,14 +261,14 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLBipartiteSingleSidedRandomWalkWithResta
     GraphHandle ghandle = args[0];
     const IdArray seeds = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     const double restart_prob = args[2];
-    const uint64_t min_nodes_per_seed = args[3];
+    const uint64_t visit_threshold_per_seed = args[3];
     const uint64_t max_visit_counts = args[4];
     const uint64_t max_frequent_visited_nodes = args[5];
     const GraphInterface *gptr = static_cast<const GraphInterface *>(ghandle);
 
     *rv = ConvertRandomWalkTracesToPackedFunc(
         BipartiteSingleSidedRandomWalkWithRestart(
-          gptr, seeds, restart_prob, min_nodes_per_seed,
+          gptr, seeds, restart_prob, visit_threshold_per_seed,
           max_visit_counts, max_frequent_visited_nodes));
   });
 
