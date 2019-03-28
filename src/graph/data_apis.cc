@@ -23,7 +23,7 @@ DGL_REGISTER_GLOBAL("contrib.graph_store._CAPI_DGLCreateSharedMem")
                                        DLDataType{kDLFloat, 32, 1}, DLContext{kDLCPU, 0},
                                        is_create);
     *rv = arr;
-    if (fill == "zero")
+    if (fill == "zero" && is_create)
       memset(arr->data, 0, arr.GetSize());
   });
 
