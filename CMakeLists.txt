@@ -19,7 +19,7 @@ include_directories("third_party/dmlc-core/include")
 
 # initial variables
 set(DGL_LINKER_LIBS "")
-set(DGL_RUNTIME_LINKER_LIBS "")
+set(DGL_RUNTIME_LINKER_LIBS "rt")
 
 # Generic compilation options
 if(MSVC)
