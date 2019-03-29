@@ -17,8 +17,8 @@ class SamplerPool(object):
 
       class MySamplerPool(SamplerPool):
 
-      def worker(self):
-          # Do anything here #
+        def worker(self):
+            # Do anything here #
 
       if __name__ == '__main__':
         pool = MySamplerPool()
