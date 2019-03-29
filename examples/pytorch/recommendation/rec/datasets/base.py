@@ -1,4 +1,7 @@
 from functools import partial
+import numpy as np
+from .. import randomwalk
+import tqdm
 
 class UserProductDataset(object):
     def split_user(self, df, filter_counts=False):
@@ -14,28 +17,32 @@ class UserProductDataset(object):
         df_new['prob'].iloc[df_new_sub] = prob
         return df_new
 
-    def data_split(self):
-        self.ratings = self.ratings.groupby('user_id', group_keys=False).apply(
+    def data_split(self, ratings):
+        ratings = ratings.groupby('user_id', group_keys=False).apply(
                 partial(self.split_user, filter_counts=True))
-        self.ratings['train'] = self.ratings['prob'] <= 0.8
-        self.ratings['valid'] = (self.ratings['prob'] > 0.8) & (self.ratings['prob'] <= 0.9)
-        self.ratings['test'] = self.ratings['prob'] > 0.9
-        self.ratings.drop(['prob'], axis=1, inplace=True)
+        ratings['train'] = ratings['prob'] <= 0.8
+        ratings['valid'] = (ratings['prob'] > 0.8) & (ratings['prob'] <= 0.9)
+        ratings['test'] = ratings['prob'] > 0.9
+        ratings.drop(['prob'], axis=1, inplace=True)
+        return ratings
 
-    def find_neighbors(self, restart_prob, max_nodes, top_T):
+    def find_neighbors(self, restart_prob, max_nodes, top_T, batch_size=1024):
         # TODO: replace with more efficient PPR estimation
-        neighbor_probs, neighbors = randomwalk.random_walk_distribution_topt(
-                self.g, self.g.nodes(), restart_prob, max_nodes, top_T)
-
+        import torch
         self.user_neighbors = []
-        for i in range(len(self.user_ids)):
-            user_neighbor = neighbors[i]
-            self.user_neighbors.append(user_neighbor.tolist())
-
         self.product_neighbors = []
-        for i in range(len(self.user_ids), len(self.user_ids) + len(self.product_ids)):
-            product_neighbor = neighbors[i]
-            self.product_neighbors.append(product_neighbor.tolist())
+
+        for i in tqdm.trange(0, len(self.user_ids), batch_size):
+            batch = torch.arange(i, min(i + batch_size, len(self.user_ids)))
+            neighbor_probs, neighbors = randomwalk.random_walk_distribution_topt(
+                    self.g, batch, restart_prob, max_nodes, top_T)
+            self.user_neighbors.extend(list(neighbors))
+
+        for i in tqdm.trange(0, len(self.product_ids), batch_size):
+            batch = torch.arange(i, min(i + batch_size, len(self.product_ids)))
+            neighbor_probs, neighbors = randomwalk.random_walk_distribution_topt(
+                    self.g, batch, restart_prob, max_nodes, top_T)
+            self.product_neighbors.extend(list(neighbors))
 
     def generate_mask(self):
         while True:
@@ -49,6 +56,7 @@ class UserProductDataset(object):
                 yield prior_mask, train_mask
 
     def refresh_mask(self):
+        import torch
         if not hasattr(self, 'masks'):
             self.masks = self.generate_mask()
         prior_mask, train_mask = next(self.masks)

@@ -167,8 +167,8 @@ def runtrain(g_prior_edges, g_train_edges, train):
 def runtest(g_prior_edges, validation=True):
     model.eval()
 
-    n_users = len(ml.users.index)
-    n_items = len(ml.products.index)
+    n_users = len(ml.user_ids)
+    n_items = len(ml.product_ids)
 
     g_prior_src, g_prior_dst = g.find_edges(g_prior_edges)
     g_prior = DGLGraph()

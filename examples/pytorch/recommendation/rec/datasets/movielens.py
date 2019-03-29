@@ -83,7 +83,7 @@ class MovieLens(UserProductDataset):
         self.users = self.users[self.users.index.isin(self.ratings['user_id'])]
         self.products = self.products[self.products.index.isin(self.ratings['product_id'])]
 
-        self.data_split()
+        self.ratings = self.data_split(self.ratings)
         self.build_graph()
         self.find_neighbors(0.2, 2000, 1000)
 

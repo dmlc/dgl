@@ -5,7 +5,6 @@ import pandas as pd
 import numpy as np
 import tqdm
 from rec.model.pinsage_nf import PinSage
-from rec.datasets.movielens import MovieLens
 from rec.utils import cuda
 from rec.adabound import AdaBound
 from dgl import DGLGraph
@@ -25,17 +24,26 @@ parser.add_argument('--sgd-switch', type=int, default=-1)
 parser.add_argument('--n-negs', type=int, default=1)
 parser.add_argument('--loss', type=str, default='hinge')
 parser.add_argument('--hard-neg-prob', type=float, default=0)
+parser.add_argument('--dataset', type=str, default='movielens')
 args = parser.parse_args()
 
 print(args)
 
-cache_file = 'ml.pkl'
-
+cache_files = {
+        'movielens': 'ml.pkl',
+        'reddit': '/efs/quagan/rd.pkl',
+        }
+cache_file = cache_files[args.dataset]
 if os.path.exists(cache_file):
     with open(cache_file, 'rb') as f:
         ml = pickle.load(f)
 else:
-    ml = MovieLens('./ml-1m')
+    if args.dataset == 'movielens':
+        from rec.datasets.movielens import MovieLens
+        ml = MovieLens('./ml-1m')
+    elif args.dataset == 'reddit':
+        from rec.datasets.reddit import Reddit
+        ml = Reddit('./subm-users.pkl')
     with open(cache_file, 'wb') as f:
         pickle.dump(ml, f)
 
@@ -183,8 +191,8 @@ def runtrain(g_prior_edges, g_train_edges, train):
 def runtest(g_prior_edges, validation=True):
     model.eval()
 
-    n_users = len(ml.users.index)
-    n_items = len(ml.products.index)
+    n_users = len(ml.user_ids)
+    n_items = len(ml.product_ids)
 
     g_prior_src, g_prior_dst = g.find_edges(g_prior_edges)
     g_prior = DGLGraph()
@@ -249,15 +257,26 @@ def runtest(g_prior_edges, validation=True):
     return np.array(rr)
 
 
+def refresh_mask():
+    ml.refresh_mask()
+    g_prior_edges = g.filter_edges(lambda edges: edges.data['prior'])
+    g_train_edges = g.filter_edges(lambda edges: edges.data['train'] & ~edges.data['inv'])
+    g_prior_train_edges = g.filter_edges(
+            lambda edges: edges.data['prior'] | edges.data['train'])
+    return g_prior_edges, g_train_edges, g_prior_train_edges
+
+
 def train():
     global opt, sched
     best_mrr = 0
-    for epoch in range(60):
-        ml.refresh_mask()
-        g_prior_edges = g.filter_edges(lambda edges: edges.data['prior'])
-        g_train_edges = g.filter_edges(lambda edges: edges.data['train'] & ~edges.data['inv'])
-        g_prior_train_edges = g.filter_edges(
-                lambda edges: edges.data['prior'] | edges.data['train'])
+    if args.dataset != 'movielens':
+        print('Mask initialization' % epoch)
+        g_prior_edges, g_train_edges, g_prior_train_edges = refresh_mask()
+
+    for epoch in range(500):
+        if args.dataset == 'movielens':
+            print('Epoch %d mask refresh' % epoch)
+            g_prior_edges, g_train_edges, g_prior_train_edges = refresh_mask()
 
         print('Epoch %d validation' % epoch)
         with torch.no_grad():
