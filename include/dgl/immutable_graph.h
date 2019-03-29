@@ -32,6 +32,13 @@ class ImmutableGraph: public GraphInterface {
     dgl_id_t edge_id;
   };
 
+  /*
+   * This vector provides interfaces similar to std::vector.
+   * The main difference is that the memory used by the vector can be allocated
+   * outside the vector. The main use case is that the vector can use the shared
+   * memory that is created by another process. In this way, we can access the
+   * graph structure loaded in another process.
+   */
   template<class T>
   class vector {
    public:
@@ -42,6 +49,10 @@ class ImmutableGraph: public GraphInterface {
       this->own = false;
     }
 
+    /*
+     * Create a vector whose memory is allocated outside.
+     * Here there are no elements in the vector.
+     */
     vector(T *arr, size_t size) {
       this->arr = arr;
       this->capacity = size;
@@ -49,6 +60,10 @@ class ImmutableGraph: public GraphInterface {
       this->own = false;
     }
 
+    /*
+     * Create a vector whose memory is allocated by the vector.
+     * Here there are no elements in the vector.
+     */
     vector(size_t size) {
       this->arr = static_cast<T *>(malloc(size * sizeof(T)));
       this->capacity = size;
@@ -57,6 +72,7 @@ class ImmutableGraph: public GraphInterface {
     }
 
     ~vector() {
+      // If the memory is allocated by the vector, it should be free'd.
       if (this->own) {
         free(this->arr);
       }
@@ -65,6 +81,10 @@ class ImmutableGraph: public GraphInterface {
     vector(const vector &other) = delete;
     vector(vector &other) = delete;
 
+    /*
+     * Initialize the vector whose memory is allocated outside.
+     * There are no elements in the vector.
+     */
     void init(T *arr, size_t size) {
       CHECK(this->arr == nullptr);
       this->arr = arr;
@@ -73,6 +93,7 @@ class ImmutableGraph: public GraphInterface {
       this->own = false;
     }
 
+    /* Similar to std::vector::push_back. */
     void push_back(T val) {
       // If the vector doesn't own the memory, it can't adjust its memory size.
       if (!this->own) {
@@ -85,20 +106,30 @@ class ImmutableGraph: public GraphInterface {
       this->arr[curr++] = val;
     }
 
+    /*
+     * Similar to std::vector::[].
+     * It checks the boundary of the vector.
+     */
     T &operator[](size_t idx) {
       CHECK_LT(idx, curr);
       return this->arr[idx];
     }
 
+    /*
+     * Similar to std::vector::[].
+     * It checks the boundary of the vector.
+     */
     const T &operator[](size_t idx) const {
       CHECK_LT(idx, curr);
       return this->arr[idx];
     }
 
+    /* Similar to std::vector::size. */
     size_t size() const {
       return this->curr;
     }
 
+    /* Similar to std::vector::resize. */
     void resize(size_t new_size) {
       if (!this->own) {
         CHECK_LE(new_size, capacity);
@@ -112,30 +143,49 @@ class ImmutableGraph: public GraphInterface {
       this->curr = new_size;
     }
 
+    /* Similar to std::vector::clear. */
     void clear() {
       this->curr = 0;
     }
 
+    /* Similar to std::vector::data. */
     const T *data() const {
       return this->arr;
     }
 
+    /* Similar to std::vector::data. */
     T *data() {
       return this->arr;
     }
 
+    /*
+     * This is to simulate begin() of std::vector.
+     * However, it returns the raw pointer instead of iterator.
+     */
     const T *begin() const {
       return this->arr;
     }
 
+    /*
+     * This is to simulate begin() of std::vector.
+     * However, it returns the raw pointer instead of iterator.
+     */
     T *begin() {
       return this->arr;
     }
 
+    /*
+     * This is to simulate end() of std::vector.
+     * However, it returns the raw pointer instead of iterator.
+     */
     const T *end() const {
       return this->arr + this->curr;
     }
 
+    /*
+     * This is to simulate end() of std::vector.
+     * However, it returns the raw pointer instead of iterator.
+     */
     T *end() {
       return this->arr + this->curr;
     }
