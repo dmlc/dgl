@@ -14,13 +14,19 @@ def generate_rand_graph(n):
 def start_trainer():
     g = generate_rand_graph(100)
     recv = dgl.contrib.sampling.SamplerReceiver(ip="127.0.0.1", port=50051)
-    nodeflow = recv.recv(g)
-    print("----- trainer ------")
-    print(nodeflow._node_mapping.todgltensor())
-    print(nodeflow._edge_mapping.todgltensor())
-    print(nodeflow._layer_offsets)
-    print(nodeflow._block_offsets)
-    print("----- trainer ------")
+    subg = recv.recv(g)
+    seed_ids = subg.layer_parent_nid(-1)
+    assert len(seed_ids) == 1
+    src, dst, eid = g.in_edges(seed_ids, form='all')
+    assert subg.number_of_nodes() == len(src) + 1
+    assert subg.number_of_edges() == len(src)
+
+    assert seed_ids == subg.layer_parent_nid(-1)
+    child_src, child_dst, child_eid = subg.in_edges(subg.layer_nid(-1), form='all')
+    assert F.array_equal(child_src, subg.layer_nid(0))
+
+    src1 = subg.map_to_parent_nid(child_src)
+    assert F.array_equal(src1, src)
 
     time.sleep(3)  # wait all senders to finalize their jobs
 
@@ -29,12 +35,6 @@ def start_sampler():
     sender = dgl.contrib.sampling.SamplerSender(ip="127.0.0.1", port=50051)
     for i, subg in enumerate(dgl.contrib.sampling.NeighborSampler(
             g, 1, 100, neighbor_type='in', num_workers=4)):
-        print("----- sampler ------")
-        print(subg._node_mapping.todgltensor())
-        print(subg._edge_mapping.todgltensor())
-        print(subg._layer_offsets)
-        print(subg._block_offsets)
-        print("----- sampler ------")
         sender.send(subg)
         break
 
