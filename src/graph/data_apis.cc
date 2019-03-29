@@ -27,4 +27,22 @@ DGL_REGISTER_GLOBAL("contrib.graph_store._CAPI_DGLCreateSharedMem")
       memset(arr->data, 0, arr.GetSize());
   });
 
+DGL_REGISTER_GLOBAL("contrib.graph_store._CAPI_DGLCreateSharedMemWithData")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::string mem_name = args[0];
+    NDArray data = args[1];
+    std::vector<int64_t> shape(data->shape, data->shape + data->ndim);
+    size_t mem_size = 1;
+    for (auto s : shape)
+      mem_size *= s;
+    // TODO set this correctly.
+    mem_size *= 4;
+    // TODO use the dtype correctly.
+    NDArray arr = NDArray::EmptyShared(mem_name, shape,
+                                       DLDataType{kDLFloat, 32, 1}, DLContext{kDLCPU, 0},
+                                       true);
+    memcpy(arr->data, data->data, mem_size);
+    *rv = arr;
+  });
+
 }  // namespace dgl

@@ -2,13 +2,19 @@ import os
 import time
 import posix_ipc as ipc
 
+from collections.abc import MutableMapping
+
 from ..base import ALL, is_all, DGLError
 from .. import backend as F
 from ..graph import DGLGraph
 from .._ffi.function import _init_api
+from .. import ndarray as nd
 
 def _get_ndata_path(graph_name, ndata_name):
-    return "/" + graph_name + "_" + ndata_name
+    return "/" + graph_name + "_node_" + ndata_name
+
+def _get_edata_path(graph_name, ndata_name):
+    return "/" + graph_name + "_edge_" + ndata_name
 
 class InitNData:
     def __init__(self, serv, args):
@@ -53,6 +59,88 @@ _commands = {'init_ndata': lambda serv, args: InitNData(serv, args),
              'init':       lambda serv, args: Init(serv, args),
              'terminate':  lambda serv, args: Terminate(serv, args)}
 
+class NodeDataView(MutableMapping):
+    """The data view class when G.nodes[...].data is called.
+
+    See Also
+    --------
+    dgl.DGLGraph.nodes
+    """
+    __slots__ = ['_graph', '_nodes', '_graph_name']
+
+    def __init__(self, graph, nodes, graph_name):
+        self._graph = graph
+        self._nodes = nodes
+        self._graph_name = graph_name
+
+    def __getitem__(self, key):
+        return self._graph.get_n_repr(self._nodes)[key]
+
+    def __setitem__(self, key, val):
+        # Move the data in val to shared memory.
+        dlpack = F.zerocopy_to_dlpack(val)
+        dgl_tensor = nd.from_dlpack(dlpack)
+        val = _CAPI_DGLCreateSharedMemWithData(_get_ndata_path(self._graph_name, key),
+                                                dgl_tensor)
+        self._graph.set_n_repr({key : val}, self._nodes)
+
+    def __delitem__(self, key):
+        if not is_all(self._nodes):
+            raise DGLError('Delete feature data is not supported on only a subset'
+                           ' of nodes. Please use `del G.ndata[key]` instead.')
+        self._graph.pop_n_repr(key)
+
+    def __len__(self):
+        return len(self._graph._node_frame)
+
+    def __iter__(self):
+        return iter(self._graph._node_frame)
+
+    def __repr__(self):
+        data = self._graph.get_n_repr(self._nodes)
+        return repr({key : data[key] for key in self._graph._node_frame})
+
+class EdgeDataView(MutableMapping):
+    """The data view class when G.edges[...].data is called.
+
+    See Also
+    --------
+    dgl.DGLGraph.edges
+    """
+    __slots__ = ['_graph', '_edges', '_graph_name']
+
+    def __init__(self, graph, edges, graph_name):
+        self._graph = graph
+        self._edges = edges
+        self._graph_name = graph_name
+
+    def __getitem__(self, key):
+        return self._graph.get_e_repr(self._edges)[key]
+
+    def __setitem__(self, key, val):
+        # Move the data in val to shared memory.
+        dlpack = F.zerocopy_to_dlpack(val)
+        dgl_tensor = nd.from_dlpack(dlpack)
+        val = _CAPI_DGLCreateSharedMemWithData(_get_edata_path(self._graph_name, key),
+                                                dgl_tensor)
+        self._graph.set_e_repr({key : val}, self._edges)
+
+    def __delitem__(self, key):
+        if not is_all(self._edges):
+            raise DGLError('Delete feature data is not supported on only a subset'
+                           ' of nodes. Please use `del G.edata[key]` instead.')
+        self._graph.pop_e_repr(key)
+
+    def __len__(self):
+        return len(self._graph._edge_frame)
+
+    def __iter__(self):
+        return iter(self._graph._edge_frame)
+
+    def __repr__(self):
+        data = self._graph.get_e_repr(self._edges)
+        return repr({key : data[key] for key in self._graph._edge_frame})
+
 class SharedMemoryStoreServer:
     def __init__(self, graph_data, graph_name, multigraph,
                  num_workers):
@@ -72,6 +160,30 @@ class SharedMemoryStoreServer:
     def _decode_command(self, line):
         parts = line[0].decode('utf-8').split(':')
         return _commands[parts[0]](self, parts[1])
+
+    @property
+    def ndata(self):
+        """Return the data view of all the nodes.
+
+        DGLGraph.ndata is an abbreviation of DGLGraph.nodes[:].data
+
+        See Also
+        --------
+        dgl.DGLGraph.nodes
+        """
+        return NodeDataView(self._graph, ALL, self._graph_name)
+
+    @property
+    def edata(self):
+        """Return the data view of all the edges.
+
+        DGLGraph.data is an abbreviation of DGLGraph.edges[:].data
+
+        See Also
+        --------
+        dgl.DGLGraph.edges
+        """
+        return EdgeDataView(self._graph, ALL, self._graph_name)
 
     def run(self):
         while self._num_workers > 0:
@@ -111,7 +223,7 @@ class SharedMemoryGraphStore:
         self._msg_queue.send(self._encode_comm("init_ndata:", [ndata_name, str(num_feats), str(dtype)]))
         #TODO remove sleep later
         time.sleep(1)
-        data = _CAPI_DGLCreateSharedMem("/" + self._graph_name + "_" + ndata_name,
+        data = _CAPI_DGLCreateSharedMem(_get_ndata_path(self._graph_name, ndata_name),
                                         self._graph.number_of_nodes(),
                                         num_feats, dtype, "zero", False)
         dlpack = data.to_dlpack()
@@ -606,10 +718,9 @@ class SharedMemoryGraphStore:
         self._graph.prop_edges(edges_generator, message_func, reduce_func, apply_node_func)
 
 
-def run_graph_store_server(graph_data, graph_name, store_type,
+def create_graph_store_server(graph_data, graph_name, store_type,
                            multigraph, num_workers):
-    serv = SharedMemoryStoreServer(graph_data, graph_name, multigraph, num_workers)
-    serv.run()
+    return SharedMemoryStoreServer(graph_data, graph_name, multigraph, num_workers)
 
 def create_graph_store_client(graph_data, graph_name, store_type, multigraph):
     return SharedMemoryGraphStore(graph_data, graph_name, multigraph)

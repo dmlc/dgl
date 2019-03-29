@@ -25,7 +25,9 @@ def worker_func(worker_id):
     assert F.array_equal(src, F.tensor(coo.col))
 
     store = dgl.contrib.graph_store.create_graph_store_client(graph, "test_graph", "shared_mem", False)
-    store.init_ndata('test4', 10, 0)
+    store.init_ndata('feat', 10, dtype=0)
+    assert F.array_equal(store.ndata['feat'][0], F.tensor(np.arange(10), dtype=np.float32))
+    store.init_ndata('test4', 10, dtype=0)
     if worker_id == 0:
         store.ndata['test4'][0] = 1
     else:
@@ -42,7 +44,9 @@ def server_func(num_workers):
     assert graph.number_of_nodes() == num_nodes
     assert graph.number_of_edges() == csr.nnz
 
-    dgl.contrib.graph_store.run_graph_store_server(graph, "test_graph", "shared_mem", False, num_workers)
+    g = dgl.contrib.graph_store.create_graph_store_server(graph, "test_graph", "shared_mem", False, num_workers)
+    g.ndata['feat'] = mx.nd.arange(graph.number_of_nodes() * 10).reshape((graph.number_of_nodes(), 10))
+    g.run()
 
 def test_worker_server():
     serv_p = Process(target=server_func, args=(2,))
