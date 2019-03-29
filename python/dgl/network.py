@@ -59,20 +59,6 @@ def _send_subgraph(sender, nodeflow):
                              layers_offsets,
                              flows_offsets)
 
-def _batch_send_subgraph(sender, nodeflow_list):
-    """Send a batch of sampled subgraph (Nodeflow) to remote trainer.
-
-    Parameters
-    ----------
-    sender : ctypes.c_void_p
-        C sender handle
-    nodeflow_list : list
-        a list of NodeFlow objects
-    """
-    assert(isinstance(sender, ctypes.c_void_p))
-    assert(isinstance(nodeflow_list, list))
-    raiseNotImplementedError("_batch_send_subgraph: not implemented!")
-
 def _recv_subgraph(receiver, graph):
     """Receive sampled subgraph (NodeFlow) from remote sampler.
 
@@ -91,25 +77,6 @@ def _recv_subgraph(receiver, graph):
     # hdl is a list of ptr
     hdl = unwrap_to_ptr_list(_CAPI_ReceiverRecvSubgraph(receiver))
     return NodeFlow(graph, hdl[0])
-
-def _batch_recv_subgraph(receiver, graph):
-    """Receive a batch of sampled subgraph from remote sampler.
-
-    Parameters
-    ----------
-    receiver : ctypes.c_void_p
-        C receiver handle
-    graph : DGLGraph
-        The parent graph
-
-    Returns
-    -------
-    list
-        a list of Sampled NodeFlow objects
-    """
-    assert(isinstance(receiver, ctypes.c_void_p))
-    assert(isinstance(graph, DGLGraph))
-    raiseNotImplementedError("_batch_recv_subgraph: not implemented!")
 
 def _finalize_sampler_sender(sender):
     """Finalize Sender communicator

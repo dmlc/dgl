@@ -1,6 +1,5 @@
 # This file contains DGL distributed samplers APIs.
 from ...network import _send_subgraph, _recv_subgraph
-from ...network import _batch_send_subgraph, _batch_recv_subgraph
 from ...network import _create_sampler_sender, _create_sampler_receiver
 from ...network import _finalize_sampler_sender, _finalize_sampler_receiver
 
@@ -71,16 +70,6 @@ class SamplerSender(object):
         """
         _send_subgraph(self._sender, nodeflow)
 
-    def batch_send(self, nodeflow_list):
-        """Send a batch of sampled subgraph (NodeFlow) to remote trainer.
-
-        Parameters
-        ----------
-        nodeflow_list : list
-            A list of NodeFlow objects
-        """
-        _batch_send_subgraph(self._sender, nodeflow_list)
-
 class SamplerReceiver(object):
     """Receiver of DGL distributed sampler.
 
@@ -127,18 +116,3 @@ class SamplerReceiver(object):
             received NodeFlow object
         """
         return _recv_subgraph(self._receiver, graph)
-
-    def batch_recv(self, graph):
-        """Receive a batch of NodeFlow objects from remote sampler.
-
-        Parameters
-        ----------
-        graph : DGLGraph
-            The parent graph
-
-        Returns
-        -------
-        list
-            A list of received NodeFlow object
-        """
-        return _batch_recv_subgraph(self._receiver, graph)
