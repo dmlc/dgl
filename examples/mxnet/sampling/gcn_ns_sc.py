@@ -205,7 +205,7 @@ class GraphData:
         csr = spsp.csr_matrix((edge_ids, csr.indices.asnumpy(), csr.indptr.asnumpy()),
                               shape=csr.shape, dtype=np.int64)
         self.graph = dgl.graph_index.GraphIndex(multigraph=False, readonly=True)
-        self.graph.from_scipy_csr_matrix(csr, "in")
+        self.graph.from_csr_matrix(csr.indptr, csr.indices, "in")
         self.features = mx.nd.random.normal(shape=(csr.shape[0], num_feats))
         self.num_labels = 10
         self.labels = mx.nd.floor(mx.nd.random.uniform(low=0, high=self.num_labels,

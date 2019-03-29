@@ -826,18 +826,26 @@ class GraphIndex(object):
         self._init(src, dst, edge_ids, num_nodes)
 
 
-    def from_scipy_csr_matrix(self, adj, edge_dir, shared_mem_name=""):
+    def from_csr_matrix(self, indptr, indices, edge_dir, shared_mem_name=""):
         assert self.is_readonly()
-        assert adj.shape[0] == adj.shape[1]
-        assert isinstance(adj, scipy.sparse.csr_matrix)
-        indptr = utils.toindex(adj.indptr)
-        indices = utils.toindex(adj.indices)
+        indptr = utils.toindex(indptr)
+        indices = utils.toindex(indices)
         edge_ids = utils.toindex(F.arange(0, len(indices)))
         self._handle = _CAPI_DGLGraphCSRCreate(
             indptr.todgltensor(),
             indices.todgltensor(),
             edge_ids.todgltensor(),
             shared_mem_name,
+            self._multigraph,
+            edge_dir)
+
+
+    def from_shared_mem_csr_matrix(self, shared_mem_name,
+                                   num_vertices, num_edges, edge_dir):
+        assert self.is_readonly()
+        self._handle = _CAPI_DGLGraphCSRCreateMMap(
+            shared_mem_name,
+            num_vertices, num_edges,
             self._multigraph,
             edge_dir)
 

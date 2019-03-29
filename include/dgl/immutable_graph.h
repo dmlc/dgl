@@ -260,6 +260,7 @@ class ImmutableGraph: public GraphInterface {
     CSR(IdArray indptr, IdArray indices, IdArray edge_ids);
     CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
         const std::string &shared_mem_name);
+    CSR(const std::string &shared_mem_name, size_t num_vertices, size_t num_edges);
 
     bool HasVertex(dgl_id_t vid) const {
       return vid < NumVertices();

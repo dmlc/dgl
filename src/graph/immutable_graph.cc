@@ -74,6 +74,22 @@ ImmutableGraph::CSR::CSR(IdArray indptr_arr, IdArray index_arr, IdArray edge_id_
   this->mem = mem;
 }
 
+ImmutableGraph::CSR::CSR(const std::string &shared_mem_name, size_t num_vertices, size_t num_edges) {
+  size_t file_size = (num_vertices + 1) * sizeof(int64_t) + num_edges * sizeof(dgl_id_t) * 2;
+  auto mem = std::make_shared<runtime::SharedMemory>(shared_mem_name);
+  auto ptr = mem->open(file_size);
+
+  int64_t *addr1 = static_cast<int64_t *>(ptr);
+  indptr.init(addr1, num_vertices + 1, num_vertices + 1);
+  void *addr = addr1 + num_vertices + 1;
+  dgl_id_t *addr2 = static_cast<dgl_id_t *>(addr);
+  indices.init(addr2, num_edges, num_edges);
+  addr = addr2 + num_edges;
+  dgl_id_t *addr3 = static_cast<dgl_id_t *>(addr);
+  edge_ids.init(addr3, num_edges, num_edges);
+  this->mem = mem;
+}
+
 ImmutableGraph::EdgeArray ImmutableGraph::CSR::GetEdges(dgl_id_t vid) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
   const int64_t off = this->indptr[vid];
