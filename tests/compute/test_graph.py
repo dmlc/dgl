@@ -76,7 +76,7 @@ def test_adjmat_cache():
     adj2 = g.adjacency_matrix()
     dur2 = time.time() - t0
     print('first time {}, second time {}'.format(dur1, dur2))
-    #assert dur2 < dur1
+    assert dur2 < dur1
     assert id(adj1) == id(adj2)
     # different arg should result in different cache
     adj3 = g.adjacency_matrix(transpose=True)
