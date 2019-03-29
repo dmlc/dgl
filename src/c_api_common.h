@@ -17,6 +17,8 @@ namespace dgl {
 // Graph handler type
 typedef void* GraphHandle;
 
+// Communicator handler type
+typedef void* CommunicatorHandle;
 /*!
  * \brief Convert the given DLTensor to DLManagedTensor.
  *

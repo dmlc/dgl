@@ -7,6 +7,7 @@
 #include <dgl/sampler.h>
 #include <dmlc/omp.h>
 #include <dgl/immutable_graph.h>
+#include <dmlc/omp.h>
 #include <algorithm>
 #include <cstdlib>
 #include <cmath>
