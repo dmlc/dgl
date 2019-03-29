@@ -13,6 +13,17 @@ class SamplerPool(object):
     Note that, the fork() API will use shared memory for N process and the OS will
     perfrom copy-on-write only when developers write that piece of memory.
 
+    Users can use this class like this:
+
+      class MySamplerPool(SamplerPool):
+
+      def worker(self):
+          # Do anything here #
+
+      if __name__ == '__main__':
+        pool = MySamplerPool()
+        pool.start(5) # Start 5 processes
+
     Parameters
     ----------
     num_worker : int
