@@ -41,8 +41,17 @@ class Init:
     def run(self):
         self.serv._reply_pipes[self.pid] = os.open(self.pipe_path, os.O_WRONLY)
 
+class Terminate:
+    def __init__(self, serv, args):
+        self.pid = int(args)
+        self.serv = serv
+
+    def run(self):
+        self.serv._num_workers -= 1
+
 _commands = {'init_ndata': lambda serv, args: InitNData(serv, args),
-             'init':       lambda serv, args: Init(serv, args)}
+             'init':       lambda serv, args: Init(serv, args),
+             'terminate':  lambda serv, args: Terminate(serv, args)}
 
 class SharedMemoryStoreServer:
     def __init__(self, graph_data, graph_name, multigraph,
@@ -56,20 +65,22 @@ class SharedMemoryStoreServer:
     def __del__(self):
         for key in self._reply_pipes:
             os.close(self._reply_pipes[key])
-        self._msg_queue.close()
-        self._msg_queue.unlink()
+        if self._msg_queue is not None:
+            self._msg_queue.close()
+            self._msg_queue.unlink()
 
     def _decode_command(self, line):
         parts = line[0].decode('utf-8').split(':')
         return _commands[parts[0]](self, parts[1])
 
     def run(self):
-        while True:
+        while self._num_workers > 0:
             line = self._msg_queue.receive()
             comm = self._decode_command(line)
             comm.run()
         self._msg_queue.close()
         self._msg_queue.unlink()
+        self._msg_queue = None
 
 class SharedMemoryGraphStore:
     def __init__(self, graph_data, graph_name, multigraph=False):
@@ -105,6 +116,9 @@ class SharedMemoryGraphStore:
                                         num_feats, dtype, "zero", False)
         dlpack = data.to_dlpack()
         self._graph.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
+
+    def destroy(self):
+        self._msg_queue.send(self._encode_comm("terminate:", []))
 
     def register_message_func(self, func):
         """Register global message function.
