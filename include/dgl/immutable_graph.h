@@ -232,7 +232,6 @@ class ImmutableGraph: public GraphInterface {
     CSR(IdArray indptr, IdArray indices, IdArray edge_ids);
     CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
         const std::string &shared_mem_name);
-    ~CSR();
 
     bool HasVertex(dgl_id_t vid) const {
       return vid < NumVertices();
@@ -281,8 +280,6 @@ class ImmutableGraph: public GraphInterface {
 
    private:
     std::shared_ptr<runtime::SharedMemory> mem;
-    void *mem_ptr;
-    size_t mem_size;
   };
 
   /*! \brief Construct an immutable graph from the COO format. */

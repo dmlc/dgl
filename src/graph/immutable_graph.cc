@@ -49,20 +49,13 @@ ImmutableGraph::CSR::CSR(IdArray indptr_arr, IdArray index_arr, IdArray edge_id_
 
 ImmutableGraph::CSR::CSR(IdArray indptr_arr, IdArray index_arr, IdArray edge_id_arr,
                          const std::string &shared_mem_name) {
-  size_t num_vertices = indptr_arr->shape[0];
+  size_t num_vertices = indptr_arr->shape[0] - 1;
   size_t num_edges = index_arr->shape[0];
   CHECK_EQ(num_edges, edge_id_arr->shape[0]);
   size_t file_size = (num_vertices + 1) * sizeof(int64_t) + num_edges * sizeof(dgl_id_t) * 2;
-  int flag = O_RDWR|O_EXCL|O_CREAT;
-  int fd = shm_open(shared_mem_name.c_str(), flag, S_IRUSR | S_IWUSR);
-  CHECK_NE(fd, -1) << "fail to open " << shared_mem_name << ": " << strerror(errno);
-  auto res = ftruncate(fd, file_size);
-  CHECK_NE(res, -1)
-      << "Failed to truncate the file. " << strerror(errno);
-  auto ptr = mmap(NULL, file_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-  CHECK_NE(ptr, MAP_FAILED)
-    << "Failed to map shared memory. mmap failed with error " << strerror(errno);
-  this->mem = std::make_shared<runtime::SharedMemory>(shared_mem_name, true);
+
+  auto mem = std::make_shared<runtime::SharedMemory>(shared_mem_name);
+  auto ptr = mem->create_new(file_size);
 
   int64_t *addr1 = static_cast<int64_t *>(ptr);
   indptr.init(addr1, num_vertices + 1);
@@ -73,8 +66,6 @@ ImmutableGraph::CSR::CSR(IdArray indptr_arr, IdArray index_arr, IdArray edge_id_
   dgl_id_t *addr3 = static_cast<dgl_id_t *>(addr);
   edge_ids.init(addr3, num_edges);
   indptr.resize(num_vertices + 1);
-  this->mem_ptr = ptr;
-  this->mem_size = file_size;
 
   const dgl_id_t *indptr_data = static_cast<dgl_id_t*>(indptr_arr->data);
   const dgl_id_t *indices_data = static_cast<dgl_id_t*>(index_arr->data);
@@ -84,14 +75,7 @@ ImmutableGraph::CSR::CSR(IdArray indptr_arr, IdArray index_arr, IdArray edge_id_
   std::copy(indptr_data, indptr_data + num_vertices + 1, indptr.data());
   std::copy(indices_data, indices_data + num_edges, indices.data());
   std::copy(edge_id_data, edge_id_data + num_edges, edge_ids.data());
-}
-
-ImmutableGraph::CSR::~CSR() {
-  if (mem) {
-    munmap(mem_ptr, mem_size);
-    if (mem->is_new)
-      shm_unlink(mem->name.c_str());
-  }
+  this->mem = mem;
 }
 
 ImmutableGraph::EdgeArray ImmutableGraph::CSR::GetEdges(dgl_id_t vid) const {

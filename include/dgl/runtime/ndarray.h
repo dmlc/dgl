@@ -192,14 +192,18 @@ class NDArray {
  */
 inline bool SaveDLTensor(dmlc::Stream* strm, const DLTensor* tensor);
 
-struct SharedMemory {
-  bool is_new{false};
+class SharedMemory {
+  bool is_new;
   std::string name;
+  int fd;
+  void *ptr;
+  size_t size;
 
-  SharedMemory(const std::string &name, bool is_new) {
-    this->name = name;
-    this->is_new = is_new;
-  }
+ public:
+  SharedMemory(const std::string &name);
+  ~SharedMemory();
+  void *create_new(size_t size);
+  void *open(size_t size);
 };
 
 /*!

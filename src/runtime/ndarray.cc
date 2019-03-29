@@ -19,6 +19,46 @@ extern "C" void NDArrayDLPackDeleter(DLManagedTensor* tensor);
 namespace dgl {
 namespace runtime {
 
+SharedMemory::SharedMemory(const std::string &name) {
+  this->name = name;
+  this->is_new = false;
+  this->fd = -1;
+  this->ptr = nullptr;
+  this->size = 0;
+}
+
+SharedMemory::~SharedMemory() {
+  munmap(ptr, size);
+  close(fd);
+  if (is_new)
+    shm_unlink(name.c_str());
+}
+
+void *SharedMemory::create_new(size_t size) {
+  this->is_new = true;
+
+  int flag = O_RDWR|O_EXCL|O_CREAT;
+  fd = shm_open(name.c_str(), flag, S_IRUSR | S_IWUSR);
+  CHECK_NE(fd, -1) << "fail to open " << name << ": " << strerror(errno);
+  auto res = ftruncate(fd, size);
+  CHECK_NE(res, -1)
+      << "Failed to truncate the file. " << strerror(errno);
+  ptr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+  CHECK_NE(ptr, MAP_FAILED)
+      << "Failed to map shared memory. mmap failed with error " << strerror(errno);
+  return ptr;
+}
+
+void *SharedMemory::open(size_t size) {
+  int flag = O_RDWR;
+  fd = shm_open(name.c_str(), flag, S_IRUSR | S_IWUSR);
+  CHECK_NE(fd, -1) << "fail to open " << name << ": " << strerror(errno);
+  ptr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+  CHECK_NE(ptr, MAP_FAILED)
+      << "Failed to map shared memory. mmap failed with error " << strerror(errno);
+  return ptr;
+}
+
 inline void VerifyDataType(DLDataType dtype) {
   CHECK_GE(dtype.lanes, 1);
   if (dtype.code == kDLFloat) {
@@ -51,10 +91,7 @@ struct NDArray::Internal {
     if (ptr->manager_ctx != nullptr) {
       static_cast<NDArray::Container*>(ptr->manager_ctx)->DecRef();
     } else if (ptr->mem) {
-      size_t size = GetDataSize(ptr->dl_tensor);
-      munmap(ptr->dl_tensor.data, size);
-      if (ptr->mem->is_new)
-        shm_unlink(ptr->mem->name.c_str());
+      ptr->mem = nullptr;
     } else if (ptr->dl_tensor.data != nullptr) {
       dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
           ptr->dl_tensor.ctx, ptr->dl_tensor.data);
@@ -155,24 +192,14 @@ NDArray NDArray::EmptyShared(const std::string &name,
   NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
-  size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
-
-  // TODO do I open it right?
-  int flag = O_RDWR;
-  if (is_create) flag = flag|O_EXCL|O_CREAT;
-  int fd = shm_open(name.c_str(), flag, S_IRUSR | S_IWUSR);
-  CHECK_NE(fd, -1) << "fail to open " << name << ": " << strerror(errno);
+  auto mem = std::make_shared<SharedMemory>(name);
   if (is_create) {
-    auto res = ftruncate(fd, size);
-    CHECK_NE(res, -1)
-      << "Failed to truncate the file. " << strerror(errno);
+    ret.data_->dl_tensor.data = mem->create_new(size);
+  } else {
+    ret.data_->dl_tensor.data = mem->open(size);
   }
-  auto ptr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-  CHECK_NE(ptr, MAP_FAILED)
-    << "Failed to map shared memory. mmap failed with error " << strerror(errno);
-  ret.data_->dl_tensor.data = ptr;
-  ret.data_->mem = std::make_shared<SharedMemory>(name, is_create);
-  // TODO how to free the memory and close the file.
+
+  ret.data_->mem = mem;
   return ret;
 }
 
