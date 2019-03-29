@@ -40,7 +40,7 @@ def _is_spmv_supported_edge_feat(g, field):
     Only scalar feature is supported currently.
     """
     shape = g.edge_attr_schemes()[field].shape
-    return len(shape) == 1 or (len(shape) == 2 and shape[1] == 1)
+    return len(shape) == 0 or (len(shape) == 1 and shape[0] == 1)
 
 
 class SrcMulEdgeMessageFunction(MessageFunction):
