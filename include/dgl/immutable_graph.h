@@ -93,6 +93,19 @@ class ImmutableGraph: public GraphInterface {
       this->own = false;
     }
 
+    /*
+     * Initialize the vector whose memory is allocated outside.
+     * There are elements in the vector.
+     */
+    void init(T *arr, size_t capacity, size_t size) {
+      CHECK(this->arr == nullptr);
+      CHECK_LE(size, capacity);
+      this->arr = arr;
+      this->capacity = capacity;
+      this->curr = size;
+      this->own = false;
+    }
+
     /* Similar to std::vector::push_back. */
     void push_back(T val) {
       // If the vector doesn't own the memory, it can't adjust its memory size.
@@ -104,6 +117,21 @@ class ImmutableGraph: public GraphInterface {
         CHECK(this->arr) << "can't allocate memory for a larger vector.";
       }
       this->arr[curr++] = val;
+    }
+
+    /*
+     * This inserts multiple elements to the back of the vector.
+     */
+    void insert_back(const T* val, size_t len) {
+      if (!this->own) {
+        CHECK_LE(curr + len, capacity);
+      } else if (curr + len > capacity) {
+        this->capacity = curr + len;
+        this->arr = static_cast<T *>(realloc(this->arr, this->capacity * sizeof(T)));
+        CHECK(this->arr) << "can't allocate memory for a larger vector.";
+      }
+      std::copy(val, val + len, this->arr + curr);
+      curr += len;
     }
 
     /*

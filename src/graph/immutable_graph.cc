@@ -34,17 +34,14 @@ ImmutableGraph::CSR::CSR(IdArray indptr_arr, IdArray index_arr, IdArray edge_id_
     indptr(indptr_arr->shape[0]), indices(index_arr->shape[0]), edge_ids(index_arr->shape[0]) {
   size_t num_vertices = indptr_arr->shape[0] - 1;
   size_t num_edges = index_arr->shape[0];
-  indptr.resize(num_vertices + 1);
-  indices.resize(num_edges);
-  edge_ids.resize(num_edges);
-  const dgl_id_t *indptr_data = static_cast<dgl_id_t*>(indptr_arr->data);
+  const int64_t *indptr_data = static_cast<int64_t*>(indptr_arr->data);
   const dgl_id_t *indices_data = static_cast<dgl_id_t*>(index_arr->data);
   const dgl_id_t *edge_id_data = static_cast<dgl_id_t*>(edge_id_arr->data);
   CHECK_EQ(indptr_data[0], 0);
   CHECK_EQ(indptr_data[num_vertices], num_edges);
-  std::copy(indptr_data, indptr_data + num_vertices + 1, indptr.data());
-  std::copy(indices_data, indices_data + num_edges, indices.data());
-  std::copy(edge_id_data, edge_id_data + num_edges, edge_ids.data());
+  indptr.insert_back(indptr_data, num_vertices + 1);
+  indices.insert_back(indices_data, num_edges);
+  edge_ids.insert_back(edge_id_data, num_edges);
 }
 
 ImmutableGraph::CSR::CSR(IdArray indptr_arr, IdArray index_arr, IdArray edge_id_arr,
@@ -65,16 +62,15 @@ ImmutableGraph::CSR::CSR(IdArray indptr_arr, IdArray index_arr, IdArray edge_id_
   addr = addr2 + num_edges;
   dgl_id_t *addr3 = static_cast<dgl_id_t *>(addr);
   edge_ids.init(addr3, num_edges);
-  indptr.resize(num_vertices + 1);
 
-  const dgl_id_t *indptr_data = static_cast<dgl_id_t*>(indptr_arr->data);
+  const int64_t *indptr_data = static_cast<int64_t*>(indptr_arr->data);
   const dgl_id_t *indices_data = static_cast<dgl_id_t*>(index_arr->data);
   const dgl_id_t *edge_id_data = static_cast<dgl_id_t*>(edge_id_arr->data);
   CHECK_EQ(indptr_data[0], 0);
   CHECK_EQ(indptr_data[num_vertices], num_edges);
-  std::copy(indptr_data, indptr_data + num_vertices + 1, indptr.data());
-  std::copy(indices_data, indices_data + num_edges, indices.data());
-  std::copy(edge_id_data, edge_id_data + num_edges, edge_ids.data());
+  indptr.insert_back(indptr_data, num_vertices + 1);
+  indices.insert_back(indices_data, num_edges);
+  edge_ids.insert_back(edge_id_data, num_edges);
   this->mem = mem;
 }
 
