@@ -69,8 +69,8 @@ def _batch_send_subgraph(sender, nodeflow_list):
     nodeflow_list : list
         a list of NodeFlow objects
     """
-    assert(sender)
-    assert(nodeflow_list)
+    assert(isinstance(sender, ctypes.c_void_p))
+    assert(isinstance(nodeflow_list, list))
     raiseNotImplementedError("_batch_send_subgraph: not implemented!")
 
 def _recv_subgraph(receiver, graph):
@@ -107,8 +107,8 @@ def _batch_recv_subgraph(receiver, graph):
     list
         a list of Sampled NodeFlow objects
     """
-    assert(receiver)
-    assert(graph)
+    assert(isinstance(receiver, ctypes.c_void_p))
+    assert(isinstance(graph, DGLGraph))
     raiseNotImplementedError("_batch_recv_subgraph: not implemented!")
 
 def _finalize_sampler_sender(sender):
