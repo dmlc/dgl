@@ -99,6 +99,7 @@ IdArray GenericRandomWalk(
   return traces;
 }
 
+template<typename Iter>
 RandomWalkTraces GenericRandomWalkWithRestart(
     const GraphInterface *gptr,
     Iter seed_iter,
@@ -208,7 +209,7 @@ RandomWalkTraces RandomWalkWithRestart(
   const dgl_id_t *seed_data = static_cast<dgl_id_t *>(seeds->data);
   const size_t num_nodes = seeds->shape[0];
   return GenericRandomWalkWithRestart(
-      gptr, seeds, restart_prob, visit_threshold_per_seed, max_visit_counts,
+      gptr, seed_data, num_nodes, restart_prob, visit_threshold_per_seed, max_visit_counts,
       max_frequent_visited_nodes, WalkMultipleHops<1>);
 }
 
@@ -222,7 +223,7 @@ RandomWalkTraces BipartiteSingleSidedRandomWalkWithRestart(
   const dgl_id_t *seed_data = static_cast<dgl_id_t *>(seeds->data);
   const size_t num_nodes = seeds->shape[0];
   return GenericRandomWalkWithRestart(
-      gptr, seeds, restart_prob, visit_threshold_per_seed, max_visit_counts,
+      gptr, seed_data, num_nodes, restart_prob, visit_threshold_per_seed, max_visit_counts,
       max_frequent_visited_nodes, WalkMultipleHops<2>);
 }
 
@@ -236,7 +237,7 @@ NodeFlow CreateNodeFlowWithPPRFromRandomWalk(
     uint64_t max_nodes_per_seed,
     uint64_t max_visit_counts,
     uint64_t max_frequent_visited_nodes,
-    bool (*walker)(const GraphInterface *, unsigned int *, dgl_id_t, dgl_id_t *),
+    Walker walker,
     int num_hops,
     uint64_t top_t,
     bool add_self_loop) {
@@ -351,7 +352,7 @@ std::vector<NodeFlow *> PPRNeighborSampling(
     uint64_t max_nodes_per_seed,
     uint64_t max_visit_counts,
     uint64_t max_frequent_visited_nodes,
-    bool (*walker)(const GraphInterface *, unsigned int *, dgl_id_t, dgl_id_t *),
+    Walker walker,
     int num_hops,
     uint64_t top_t,
     int64_t max_num_workers,
@@ -375,7 +376,7 @@ std::vector<NodeFlow *> PPRNeighborSampling(
     const int64_t start = (batch_start_id + i) * batch_size;
     const int64_t end = std::min(start + batch_size, num_seeds);
     nflows[i] = new NodeFlow();
-    *nflows[i] = SamplerOp::CreateNodeFlowWithPPRFromRandomWalk(
+    *nflows[i] = CreateNodeFlowWithPPRFromRandomWalk(
         gptr, seed_nodes_data + start, end - start, restart_prob, max_nodes_per_seed,
         max_visit_counts, max_frequent_visited_nodes, walker, num_hops, top_t,
         add_self_loop);
@@ -387,7 +388,7 @@ std::vector<NodeFlow *> PPRNeighborSampling(
 void PPRNeighborSamplingEntry(
     DGLArgs args,
     DGLRetValue* rv,
-    bool (*walker)(const GraphInterface *, unsigned int *, dgl_id_t, dgl_id_t *)) {
+    Walker walker) {
   GraphHandle ghandle = args[0];
   const IdArray seed_nodes = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
   const int64_t batch_start_id = args[2];
@@ -456,12 +457,12 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_BipartiteSingleSidedRandomWalkWithRestart"
 
 DGL_REGISTER_GLOBAL("randomwalk._CAPI_PPRNeighborSampling")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    PPRNeighborSamplingEntry(args, rv, multihop_walker<1>);
+    PPRNeighborSamplingEntry(args, rv, WalkMultipleHops<1>);
   });
 
 DGL_REGISTER_GLOBAL("randomwalk._CAPI_PPRBipartiteSingleSidedNeighborSampling")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    PPRNeighborSamplingEntry(args, rv, multihop_walker<2>);
+    PPRNeighborSamplingEntry(args, rv, WalkMultipleHops<2>);
   });
 
 };  // namespace dgl

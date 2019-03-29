@@ -424,7 +424,7 @@ class LayerSampler(CNodeFlowSampler):
         self._neighbor_type = neighbor_type
         self._layer_sizes = utils.toindex(layer_sizes)
 
-    def fetch(self, seeds, idx, num):
+    def generate_handles(self, seeds, idx, num):
         handles = unwrap_to_ptr_list(_CAPI_LayerSampling(
             self.g.c_handle,
             seeds,
