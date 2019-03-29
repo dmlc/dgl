@@ -22,6 +22,18 @@ def worker_func(worker_id):
 
 def server_func():
     print("server starts")
+    n = 100
+    csr = (sp.sparse.random(n, n, density=0.1, format='csr') != 0).astype(np.int64)
+    idx = dgl.graph_index.GraphIndex(multigraph=False, readonly=True)
+    idx.from_scipy_csr_matrix(csr, 'out', '/test_graph_struct')
+    assert idx.number_of_nodes() == n
+    assert idx.number_of_edges() == csr.nnz
+    src, dst, eid = idx.edges()
+    src, dst, eid = src.tousertensor(), dst.tousertensor(), eid.tousertensor()
+    coo = csr.tocoo()
+    assert F.array_equal(src, F.tensor(coo.row))
+    assert F.array_equal(dst, F.tensor(coo.col))
+
     dgl.contrib.graph_store.run_graph_store_server(graph, "test_graph", "shared_mem", False, 1)
 
 serv_p = Process(target=server_func, args=())

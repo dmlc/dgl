@@ -30,34 +30,60 @@ ImmutableGraph::CSR::CSR(int64_t num_vertices, int64_t expected_num_edges): indp
   indptr.resize(num_vertices + 1);
 }
 
-ImmutableGraph::CSR::CSR(int64_t num_vertices, int64_t expected_num_edges,
-                         const std::string &shared_mem_name, bool is_create) {
-  size_t file_size = (num_vertices + 1) * sizeof(int64_t) + expected_num_edges * sizeof(dgl_id_t) * 2;
-  int flag = O_RDWR;
-  if (is_create) flag = flag|O_EXCL|O_CREAT;
+ImmutableGraph::CSR::CSR(IdArray indptr_arr, IdArray index_arr, IdArray edge_id_arr):
+    indptr(indptr_arr->shape[0]), indices(index_arr->shape[0]), edge_ids(index_arr->shape[0]) {
+  size_t num_vertices = indptr_arr->shape[0] - 1;
+  size_t num_edges = index_arr->shape[0];
+  indptr.resize(num_vertices + 1);
+  indices.resize(num_edges);
+  edge_ids.resize(num_edges);
+  const dgl_id_t *indptr_data = static_cast<dgl_id_t*>(indptr_arr->data);
+  const dgl_id_t *indices_data = static_cast<dgl_id_t*>(index_arr->data);
+  const dgl_id_t *edge_id_data = static_cast<dgl_id_t*>(edge_id_arr->data);
+  CHECK_EQ(indptr_data[0], 0);
+  CHECK_EQ(indptr_data[num_vertices], num_edges);
+  std::copy(indptr_data, indptr_data + num_vertices + 1, indptr.data());
+  std::copy(indices_data, indices_data + num_edges, indices.data());
+  std::copy(edge_id_data, edge_id_data + num_edges, edge_ids.data());
+}
+
+ImmutableGraph::CSR::CSR(IdArray indptr_arr, IdArray index_arr, IdArray edge_id_arr,
+                         const std::string &shared_mem_name) {
+  size_t num_vertices = indptr_arr->shape[0];
+  size_t num_edges = index_arr->shape[0];
+  CHECK_EQ(num_edges, edge_id_arr->shape[0]);
+  size_t file_size = (num_vertices + 1) * sizeof(int64_t) + num_edges * sizeof(dgl_id_t) * 2;
+  int flag = O_RDWR|O_EXCL|O_CREAT;
   int fd = shm_open(shared_mem_name.c_str(), flag, S_IRUSR | S_IWUSR);
   CHECK_NE(fd, -1) << "fail to open " << shared_mem_name << ": " << strerror(errno);
-  if (is_create) {
-    auto res = ftruncate(fd, file_size);
-    CHECK_NE(res, -1)
+  auto res = ftruncate(fd, file_size);
+  CHECK_NE(res, -1)
       << "Failed to truncate the file. " << strerror(errno);
-  }
   auto ptr = mmap(NULL, file_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
   CHECK_NE(ptr, MAP_FAILED)
     << "Failed to map shared memory. mmap failed with error " << strerror(errno);
-  this->mem = std::make_shared<runtime::SharedMemory>(shared_mem_name, is_create);
+  this->mem = std::make_shared<runtime::SharedMemory>(shared_mem_name, true);
 
   int64_t *addr1 = static_cast<int64_t *>(ptr);
   indptr.init(addr1, num_vertices + 1);
   void *addr = addr1 + num_vertices + 1;
   dgl_id_t *addr2 = static_cast<dgl_id_t *>(addr);
-  indices.init(addr2, expected_num_edges);
-  addr = addr2 + expected_num_edges;
+  indices.init(addr2, num_edges);
+  addr = addr2 + num_edges;
   dgl_id_t *addr3 = static_cast<dgl_id_t *>(addr);
-  edge_ids.init(addr3, expected_num_edges);
+  edge_ids.init(addr3, num_edges);
   indptr.resize(num_vertices + 1);
   this->mem_ptr = ptr;
   this->mem_size = file_size;
+
+  const dgl_id_t *indptr_data = static_cast<dgl_id_t*>(indptr_arr->data);
+  const dgl_id_t *indices_data = static_cast<dgl_id_t*>(index_arr->data);
+  const dgl_id_t *edge_id_data = static_cast<dgl_id_t*>(edge_id_arr->data);
+  CHECK_EQ(indptr_data[0], 0);
+  CHECK_EQ(indptr_data[num_vertices], num_edges);
+  std::copy(indptr_data, indptr_data + num_vertices + 1, indptr.data());
+  std::copy(indices_data, indices_data + num_edges, indices.data());
+  std::copy(edge_id_data, edge_id_data + num_edges, edge_ids.data());
 }
 
 ImmutableGraph::CSR::~CSR() {

@@ -179,8 +179,9 @@ class ImmutableGraph: public GraphInterface {
     vector<dgl_id_t> edge_ids;
 
     CSR(int64_t num_vertices, int64_t expected_num_edges);
-    CSR(int64_t num_vertices, int64_t expected_num_edges,
-        const std::string &shared_mem_name, bool is_create);
+    CSR(IdArray indptr, IdArray indices, IdArray edge_ids);
+    CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
+        const std::string &shared_mem_name);
     ~CSR();
 
     bool HasVertex(dgl_id_t vid) const {

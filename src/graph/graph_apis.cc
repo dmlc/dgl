@@ -101,21 +101,15 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
     const IdArray indptr = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
     const IdArray indices = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     const IdArray edge_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
-    const bool multigraph = static_cast<bool>(args[3]);
-    const int64_t num_nodes = static_cast<int64_t>(args[4]);
+    const std::string shared_mem_name = args[3];
+    const bool multigraph = static_cast<bool>(args[4]);
     const std::string edge_dir = args[5];
-    const int64_t num_edges = edge_ids->shape[0];
-    ImmutableGraph::CSR::Ptr csr(new ImmutableGraph::CSR(num_nodes, num_edges));
-    csr->indices.resize(num_edges);
-    csr->edge_ids.resize(num_edges);
+    ImmutableGraph::CSR::Ptr csr;
+    if (shared_mem_name.empty())
+      csr.reset(new ImmutableGraph::CSR(indptr, indices, edge_ids));
+    else
+      csr.reset(new ImmutableGraph::CSR(indptr, indices, edge_ids, shared_mem_name));
 
-    const dgl_id_t *indptr_data = static_cast<dgl_id_t*>(indptr->data);
-    const dgl_id_t *indices_data = static_cast<dgl_id_t*>(indices->data);
-    const dgl_id_t *eid_data = static_cast<dgl_id_t*>(edge_ids->data);
-    const int64_t indptr_len = indptr->shape[0];
-    std::copy(indptr_data, indptr_data + indptr_len, csr->indptr.begin());
-    std::copy(indices_data, indices_data + num_edges, csr->indices.begin());
-    std::copy(eid_data, eid_data + num_edges, csr->edge_ids.begin());
     GraphHandle ghandle;
     if (edge_dir == "in")
       ghandle = new ImmutableGraph(csr, nullptr, multigraph);

@@ -826,7 +826,7 @@ class GraphIndex(object):
         self._init(src, dst, edge_ids, num_nodes)
 
 
-    def from_scipy_csr_matrix(self, adj, edge_dir):
+    def from_scipy_csr_matrix(self, adj, edge_dir, shared_mem_name=""):
         assert self.is_readonly()
         assert adj.shape[0] == adj.shape[1]
         assert isinstance(adj, scipy.sparse.csr_matrix)
@@ -837,8 +837,8 @@ class GraphIndex(object):
             indptr.todgltensor(),
             indices.todgltensor(),
             edge_ids.todgltensor(),
+            shared_mem_name,
             self._multigraph,
-            int(adj.shape[0]),
             edge_dir)
 
 
