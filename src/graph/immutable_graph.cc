@@ -106,6 +106,8 @@ ImmutableGraph::EdgeArray ImmutableGraph::CSR::GetEdges(IdArray vids) const {
     dgl_id_t vid = vid_data[i];
     int64_t off = this->indptr[vid];
     const int64_t len = this->GetDegree(vid);
+    if (len == 0)
+      continue;
     const auto *pred = &this->indices[off];
     const auto *eids = &this->edge_ids[off];
     for (int64_t j = 0; j < len; ++j) {
@@ -336,6 +338,9 @@ ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::FromEdges(std::vector<Edge> *edges
 void ImmutableGraph::CSR::ReadAllEdges(std::vector<Edge> *edges) const {
   edges->resize(NumEdges());
   for (size_t i = 0; i < NumVertices(); i++) {
+    // If all the remaining nodes don't have edges.
+    if (indptr[i] == indptr[NumVertices()])
+      break;
     const dgl_id_t *indices_begin = &indices[indptr[i]];
     const dgl_id_t *eid_begin = &edge_ids[indptr[i]];
     for (size_t j = 0; j < GetDegree(i); j++) {
