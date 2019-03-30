@@ -25,8 +25,8 @@ bool binary_search(ForwardIt first, ForwardIt last, const T& value) {
   return (!(first == last) && !(value < *first));
 }
 
-ImmutableGraph::CSR::CSR(int64_t num_vertices, int64_t expected_num_edges): indptr(num_vertices + 1),
-    indices(expected_num_edges), edge_ids(expected_num_edges) {
+ImmutableGraph::CSR::CSR(int64_t num_vertices, int64_t expected_num_edges):
+    indptr(num_vertices + 1), indices(expected_num_edges), edge_ids(expected_num_edges) {
   indptr.resize(num_vertices + 1);
 }
 
@@ -74,7 +74,8 @@ ImmutableGraph::CSR::CSR(IdArray indptr_arr, IdArray index_arr, IdArray edge_id_
   this->mem = mem;
 }
 
-ImmutableGraph::CSR::CSR(const std::string &shared_mem_name, size_t num_vertices, size_t num_edges) {
+ImmutableGraph::CSR::CSR(const std::string &shared_mem_name,
+                         size_t num_vertices, size_t num_edges) {
   size_t file_size = (num_vertices + 1) * sizeof(int64_t) + num_edges * sizeof(dgl_id_t) * 2;
   auto mem = std::make_shared<runtime::SharedMemory>(shared_mem_name);
   auto ptr = mem->open(file_size);

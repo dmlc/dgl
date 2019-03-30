@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <utility>
 #include <tuple>
+#include <algorithm>
 #include "runtime/ndarray.h"
 #include "graph_interface.h"
 
@@ -64,7 +65,7 @@ class ImmutableGraph: public GraphInterface {
      * Create a vector whose memory is allocated by the vector.
      * Here there are no elements in the vector.
      */
-    vector(size_t size) {
+    explicit vector(size_t size) {
       this->arr = static_cast<T *>(malloc(size * sizeof(T)));
       this->capacity = size;
       this->curr = 0;
@@ -79,7 +80,6 @@ class ImmutableGraph: public GraphInterface {
     }
 
     vector(const vector &other) = delete;
-    vector(vector &other) = delete;
 
     /*
      * Initialize the vector whose memory is allocated outside.

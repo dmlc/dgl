@@ -1,3 +1,9 @@
+/*!
+ *  Copyright (c) 2018 by Contributors
+ * \file graph/graph.cc
+ * \brief DGL graph index APIs
+ */
+
 #include <string.h>
 #include <dgl/graph.h>
 #include "../c_api_common.h"

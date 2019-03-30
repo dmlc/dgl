@@ -6,6 +6,7 @@
 #ifndef DGL_RUNTIME_NDARRAY_H_
 #define DGL_RUNTIME_NDARRAY_H_
 
+#include <string>
 #include <atomic>
 #include <vector>
 #include <utility>
@@ -200,7 +201,7 @@ class SharedMemory {
   size_t size;
 
  public:
-  SharedMemory(const std::string &name);
+  explicit SharedMemory(const std::string &name);
   ~SharedMemory();
   void *create_new(size_t size);
   void *open(size_t size);
