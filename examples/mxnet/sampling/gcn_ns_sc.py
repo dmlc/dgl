@@ -2,6 +2,8 @@ from multiprocessing import Process
 import argparse, time, math
 import numpy as np
 from scipy import sparse as spsp
+import os
+os.environ['OMP_NUM_THREADS'] = '16'
 import mxnet as mx
 from mxnet import gluon
 from functools import partial
