@@ -109,11 +109,8 @@ class GCNInfer(gluon.Block):
 
         return g.ndata.pop('activation')
 
-def worker_func(worker_id, args, g, features, labels, train_mask, val_mask, test_mask,
-                in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, ctx, nworkers):
-    if nworkers > 1:
-        import numa
-        numa.bind([worker_id % nworkers])
+def worker_func(args, g, features, labels, train_mask, val_mask, test_mask,
+                in_feats, n_classes, train_nid, test_nid, n_test_samples, ctx, nworkers):
     model = GCNSampling(in_feats,
                         args.n_hidden,
                         n_classes,
@@ -176,132 +173,71 @@ def worker_func(worker_id, args, g, features, labels, train_mask, val_mask, test
 
         num_acc = 0.
 
-        if worker_id == 0:
-            infer_start = start = time.time()
-            pred = infer_model(g)
-            num_acc = (pred.argmax(axis=1) == labels)[test_nid].sum().asscalar()
-            #for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
-            #                                               g.number_of_nodes(),
-            #                                               neighbor_type='in',
-            #                                               num_workers=32,
-            #                                               num_hops=args.n_layers+1,
-            #                                               seed_nodes=test_nid):
-            #    infer_sample_time += time.time() - start
-            #    nf.copy_from_parent()
-            #    pred = infer_model(nf)
-            #    batch_nids = nf.layer_parent_nid(-1).astype('int64').as_in_context(ctx)
-            #    batch_labels = labels[batch_nids]
-            #    num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
-            #    start = time.time()
-            print("infer time: %.3f" % (time.time() - infer_start))
+        infer_start = start = time.time()
+        pred = infer_model(g)
+        num_acc = (pred.argmax(axis=1) == labels)[test_nid].sum().asscalar()
+        #for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
+        #                                               g.number_of_nodes(),
+        #                                               neighbor_type='in',
+        #                                               num_workers=32,
+        #                                               num_hops=args.n_layers+1,
+        #                                               seed_nodes=test_nid):
+        #    infer_sample_time += time.time() - start
+        #    nf.copy_from_parent()
+        #    pred = infer_model(nf)
+        #    batch_nids = nf.layer_parent_nid(-1).astype('int64').as_in_context(ctx)
+        #    batch_labels = labels[batch_nids]
+        #    num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
+        #    start = time.time()
+        print("infer time: %.3f" % (time.time() - infer_start))
 
-            print("Test Accuracy {:.4f}". format(num_acc/n_test_samples))
-
-class GraphData:
-    def __init__(self, csr, num_feats):
-        num_nodes = csr.shape[0]
-        num_edges = mx.nd.contrib.getnnz(csr).asnumpy()[0]
-        edge_ids = np.arange(0, num_edges, step=1, dtype=np.int64)
-        csr = spsp.csr_matrix((edge_ids, csr.indices.asnumpy(), csr.indptr.asnumpy()),
-                              shape=csr.shape, dtype=np.int64)
-        self.graph = dgl.graph_index.GraphIndex(multigraph=False, readonly=True)
-        self.graph.from_csr_matrix(csr.indptr, csr.indices, "in")
-        self.features = mx.nd.random.normal(shape=(csr.shape[0], num_feats))
-        self.num_labels = 10
-        self.labels = mx.nd.floor(mx.nd.random.uniform(low=0, high=self.num_labels,
-                                                       shape=(csr.shape[0])))
-        self.train_mask = np.zeros((num_nodes,))
-        self.train_mask[np.arange(0, int(num_nodes/2), dtype=np.int64)] = 1
-        self.val_mask = np.zeros((num_nodes,))
-        self.val_mask[np.arange(int(num_nodes/2), int(num_nodes/4*3), dtype=np.int64)] = 1
-        self.test_mask = np.zeros((num_nodes,))
-        self.test_mask[np.arange(int(num_nodes/4*3), int(num_nodes), dtype=np.int64)] = 1
+        print("Test Accuracy {:.4f}". format(num_acc/n_test_samples))
 
 
 def main(args):
-    # load and preprocess dataset
-    if args.graph_file != '':
-        csr = mx.nd.load(args.graph_file)[0]
-        n_edges = csr.shape[0]
-        data = GraphData(csr, args.num_feats)
-        csr = None
+    g = dgl.contrib.graph_store.create_graph_store_client(args.graph_name, "shared_mem")
+    features = g.ndata['features']
+    labels = g.ndata['labels']
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
+    test_mask = g.ndata['test_mask']
+
+    if args.gpu >= 0:
+        runtime_ctx = mx.gpu(args.gpu)
     else:
-        data = load_data(args)
-        n_edges = data.graph.number_of_edges()
+        runtime_ctx = mx.cpu()
 
-    mem_ctx = mx.Context('cpu_shared', 0)
-    if args.num_gpu > 0:
-        runtime_ctx = [mx.gpu(i) for i in range(args.num_gpu)]
-    else:
-        runtime_ctx = [mx.cpu()]
+    train_nid = mx.nd.array(np.nonzero(train_mask.asnumpy())[0]).astype(np.int64)
+    test_nid = mx.nd.array(np.nonzero(test_mask.asnumpy())[0]).astype(np.int64)
 
-    if args.self_loop and not args.dataset.startswith('reddit'):
-        data.graph.add_edges_from([(i,i) for i in range(len(data.graph))])
-
-    train_nid = mx.nd.array(np.nonzero(data.train_mask)[0]).astype(np.int64).as_in_context(mem_ctx)
-    test_nid = mx.nd.array(np.nonzero(data.test_mask)[0]).astype(np.int64).as_in_context(mem_ctx)
-
-    features = mx.nd.array(data.features, ctx=mem_ctx)
-    labels = mx.nd.array(data.labels, ctx=mem_ctx)
-    train_mask = mx.nd.array(data.train_mask, ctx=mem_ctx)
-    val_mask = mx.nd.array(data.val_mask, ctx=mem_ctx)
-    test_mask = mx.nd.array(data.test_mask, ctx=mem_ctx)
     in_feats = features.shape[1]
-    n_classes = data.num_labels
-
+    n_classes = len(np.unique(labels.asnumpy()))
     n_train_samples = train_mask.sum().asscalar()
     n_val_samples = val_mask.sum().asscalar()
     n_test_samples = test_mask.sum().asscalar()
 
-    print("""----Data statistics------'
-      #Edges %d
-      #Classes %d
-      #Train samples %d
-      #Val samples %d
-      #Test samples %d""" %
-          (n_edges, n_classes,
-              n_train_samples,
-              n_val_samples,
-              n_test_samples))
-
-    # create GCN model
-    g = DGLGraph(data.graph, readonly=True)
-    g.ndata['features'] = features
     num_neighbors = args.num_neighbors
-
-    degs = g.in_degrees().astype('float32').as_in_context(mem_ctx)
+    degs = g.in_degrees().astype('float32')
     norm = mx.nd.expand_dims(1./degs, 1)
     g.ndata['norm'] = norm
 
-    if args.nworkers == 1:
-        worker_func(0, args, g, features, labels, train_mask, val_mask, test_mask,
-                    in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples,
-                    runtime_ctx[0], 1)
-    else:
-        ps = []
-        for i in range(args.nworkers):
-            p = Process(target=worker_func, args=(i, args, g, features, labels, train_mask, val_mask, test_mask,
-                                                  in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples,
-                                                  runtime_ctx[i % len(runtime_ctx)], args.nworkers))
-            ps.append(p)
-            p.start()
-        for p in ps:
-            p.join()
-
+    worker_func(args, g, features, labels, train_mask, val_mask, test_mask,
+                in_feats, n_classes, train_nid, test_nid, n_test_samples,
+                runtime_ctx, args.nworkers)
     print("parent ends")
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
     register_data_args(parser)
-    parser.add_argument("--graph-file", type=str, default="",
-            help="graph file")
+    parser.add_argument("--graph-name", type=str, default="",
+            help="graph name")
     parser.add_argument("--num-feats", type=int, default=100,
             help="the number of features")
     parser.add_argument("--dropout", type=float, default=0.5,
             help="dropout probability")
-    parser.add_argument("--num-gpu", type=int, default=0,
-            help="the number of gpu")
+    parser.add_argument("--gpu", type=int, default=-1,
+            help="the gpu index")
     parser.add_argument("--lr", type=float, default=3e-2,
             help="learning rate")
     parser.add_argument("--n-epochs", type=int, default=200,
