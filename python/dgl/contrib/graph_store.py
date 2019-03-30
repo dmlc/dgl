@@ -148,6 +148,14 @@ class SharedMemoryStoreServer:
             self._graph.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
             return 0
 
+        def list_ndata():
+            ndata = self._graph.ndata
+            return [[key, ndata[key].shape[1:], ndata[key].dtype] for key in ndata]
+
+        def list_edata():
+            edata = self._graph.edata
+            return [[key, edata[key].shape[1:], edata[key].dtype] for key in edata]
+
         def terminate():
             self._num_workers -= 1
             return 0
@@ -156,6 +164,8 @@ class SharedMemoryStoreServer:
         self.server.register_function(get_graph_info, "get_graph_info")
         self.server.register_function(init_ndata, "init_ndata")
         self.server.register_function(terminate, "terminate")
+        self.server.register_function(list_ndata, "list_ndata")
+        self.server.register_function(list_edata, "list_edata")
 
     def _decode_command(self, line):
         parts = line[0].decode('utf-8').split(':')
@@ -197,12 +207,22 @@ class SharedMemoryGraphStore:
     def __init__(self, graph_name, port):
         self._graph_name = graph_name
         self._pid = os.getpid()
-        self.proxy = xmlrpc.client.ServerProxy("http://localhost:" + str(port))
+        self.proxy = xmlrpc.client.ServerProxy("http://localhost:" + str(port) + "/")
         num_nodes, num_edges, multigraph, edge_dir = self.proxy.get_graph_info()
 
         graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
         graph_idx.from_shared_mem_csr_matrix(_get_graph_path(graph_name), num_nodes, num_edges, edge_dir)
         self._graph = DGLGraph(graph_idx, multigraph=multigraph, readonly=True)
+
+        # init all ndata and edata.
+        #TODO fix dtype
+        ndata_infos = self.proxy.list_ndata()
+        for name, shape, dtype in ndata_infos:
+            self.init_ndata(name, shape[0], dtype=0)
+
+        edata_infos = self.proxy.list_edata()
+        for name, shape, dtype in edata_infos:
+            self.init_edata(name, shape[0], dtype=0)
 
     def __del__(self):
         if self.proxy is not None:
