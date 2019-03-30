@@ -1,10 +1,7 @@
-from multiprocessing import Process
 import argparse, time, math
 import numpy as np
-import os
 import mxnet as mx
 from mxnet import gluon
-from mxnet import profiler
 import argparse, time, math
 import numpy as np
 import mxnet as mx
@@ -117,7 +114,7 @@ class GraphSAGETrain(gluon.Block):
 
         for i, layer in enumerate(self.layers):
             parent_nid = dgl.utils.toindex(nf.layer_parent_nid(i+1))
-            layer_nid = nf.map_from_parent_nid(i, parent_nid).as_in_context(h.context)
+            layer_nid = nf.map_from_parent_nid(i, parent_nid)
             self_h = h[layer_nid]
             # activation from previous layer of myself, used in graphSAGE
             nf.layers[i+1].data['self_h'] = self_h
@@ -171,7 +168,7 @@ class GraphSAGEInfer(gluon.Block):
         for i, layer in enumerate(self.layers):
             nf.layers[i].data['h'] = h
             parent_nid = dgl.utils.toindex(nf.layer_parent_nid(i+1))
-            layer_nid = nf.map_from_parent_nid(i, parent_nid).as_in_context(h.context)
+            layer_nid = nf.map_from_parent_nid(i, parent_nid)
             # activation from previous layer of the nodes in (i+1)-th layer, used in graphSAGE
             self_h = h[layer_nid]
             nf.layers[i+1].data['self_h'] = self_h
@@ -183,132 +180,15 @@ class GraphSAGEInfer(gluon.Block):
 
         return h
 
-def worker_func(worker_id, args, g, adj, features, labels, train_mask, val_mask, test_mask,
-                in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples, ctx, nworkers):
-    print("run worker " + str(worker_id))
-
-    if nworkers > 1:
-        import numa
-        numa.bind([worker_id % nworkers])
-    n_layers = args.n_layers
-    num_neighbors = args.num_neighbors
-    model = GraphSAGETrain(in_feats,
-                           args.n_hidden,
-                           n_classes,
-                           n_layers,
-                           args.dropout,
-                           prefix='GraphSAGE')
-
-    model.initialize(ctx=ctx)
-
-    loss_fcn = gluon.loss.SoftmaxCELoss()
-
-    infer_model = GraphSAGEInfer(in_feats,
-                                 args.n_hidden,
-                                 n_classes,
-                                 n_layers,
-                                 prefix='GraphSAGE')
-
-    infer_model.initialize(ctx=ctx)
-
-    # use optimizer
-    print(model.collect_params())
-    kv_type = 'local' if nworkers == 1 else 'dist_sync'
-    trainer = gluon.Trainer(model.collect_params(), 'adam',
-                            {'learning_rate': args.lr, 'wd': args.weight_decay},
-                            kvstore=mx.kv.create(kv_type))
-
-    # initialize graph
-    dur = []
-    profiler.set_config(profile_all=True, aggregate_stats=True, filename='profile_output-%d.json' % worker_id)
-    for epoch in range(args.n_epochs):
-        print("epoch: " + str(epoch))
-        start = time.time()
-        #profiler.set_state('run')
-        for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
-                                                       num_neighbors,
-                                                       neighbor_type='in',
-                                                       shuffle=True,
-                                                       num_workers=32,
-                                                       num_hops=n_layers,
-                                                       add_self_loop=True,
-                                                       seed_nodes=train_nid):
-            for i in range(n_layers):
-                agg_history_str = 'agg_h_{}'.format(i)
-                dests = nf.layer_parent_nid(i+1)
-                # TODO we could use DGLGraph.pull to implement this, but the current
-                # implementation of pull is very slow. Let's manually do it for now.
-                g.ndata[agg_history_str][dests] = mx.nd.dot(mx.nd.take(adj, dests),
-                                                            g.ndata['h_{}'.format(i)])
-
-            node_embed_names = [['preprocess', 'features', 'h_0']]
-            for i in range(1, n_layers):
-                node_embed_names.append(['h_{}'.format(i), 'agg_h_{}'.format(i-1), 'subg_norm', 'norm'])
-            node_embed_names.append(['agg_h_{}'.format(n_layers-1), 'subg_norm', 'norm'])
-
-            nf.copy_from_parent(node_embed_names=node_embed_names, ctx=ctx)
-            # forward
-            with mx.autograd.record():
-                pred = model(nf)
-                batch_nids = nf.layer_parent_nid(-1)
-                batch_labels = labels[batch_nids].as_in_context(ctx)
-                loss = loss_fcn(pred, batch_labels)
-                loss = loss.sum() / len(batch_nids)
-
-            loss.backward()
-            trainer.step(batch_size=1)
-
-            node_embed_names = [['h_{}'.format(i)] for i in range(n_layers)]
-            node_embed_names.append([])
-
-            nf.copy_to_parent(node_embed_names=node_embed_names)
-        print("train: " + str(time.time() - start))
-        #profiler.set_state('stop')
-        #print(profiler.dumps())
-
-        infer_params = infer_model.collect_params()
-
-        for key in infer_params:
-            idx = trainer._param2idx[key]
-            trainer._kvstore.pull(idx, out=infer_params[key].data())
-
-        start = time.time()
-        num_acc = 0.
-        num_tests = 0
-        if worker_id == 0:
-            #TODO We need to double check why some process might block
-            # if all processes test here.
-            for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
-                                                           g.number_of_nodes(),
-                                                           neighbor_type='in',
-                                                           num_workers=32,
-                                                           num_hops=n_layers,
-                                                           seed_nodes=test_nid,
-                                                           add_self_loop=True):
-                node_embed_names = [['preprocess', 'features']]
-                for i in range(n_layers):
-                    node_embed_names.append(['norm', 'subg_norm'])
-                nf.copy_from_parent(node_embed_names=node_embed_names, ctx=ctx)
-
-                pred = infer_model(nf)
-                batch_nids = nf.layer_parent_nid(-1)
-                batch_labels = labels[batch_nids].as_in_context(ctx)
-                num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
-                num_tests += len(batch_nids)
-                break
-            print("infer: " + str(time.time() - start))
-
-            print("Test Accuracy {:.4f}". format(num_acc/num_tests))
 
 def main(args):
     # load and preprocess dataset
     data = load_data(args)
 
-    mem_ctx = mx.Context('cpu_shared', 0)
-    if args.num_gpu > 0:
-        runtime_ctx = [mx.gpu(i) for i in range(args.num_gpu)]
+    if args.gpu >= 0:
+        ctx = mx.gpu(args.gpu)
     else:
-        runtime_ctx = [mx.cpu()]
+        ctx = mx.cpu()
 
     if args.self_loop and not args.dataset.startswith('reddit'):
         data.graph.add_edges_from([(i,i) for i in range(len(data.graph))])
@@ -319,11 +199,11 @@ def main(args):
     num_neighbors = args.num_neighbors
     n_layers = args.n_layers
 
-    features = mx.nd.array(data.features).as_in_context(mem_ctx)
-    labels = mx.nd.array(data.labels).as_in_context(mem_ctx)
-    train_mask = mx.nd.array(data.train_mask).as_in_context(mem_ctx)
-    val_mask = mx.nd.array(data.val_mask).as_in_context(mem_ctx)
-    test_mask = mx.nd.array(data.test_mask).as_in_context(mem_ctx)
+    features = mx.nd.array(data.features).as_in_context(ctx)
+    labels = mx.nd.array(data.labels).as_in_context(ctx)
+    train_mask = mx.nd.array(data.train_mask).as_in_context(ctx)
+    val_mask = mx.nd.array(data.val_mask).as_in_context(ctx)
+    test_mask = mx.nd.array(data.test_mask).as_in_context(ctx)
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
@@ -348,11 +228,11 @@ def main(args):
     g.ndata['features'] = features
 
     norm = mx.nd.expand_dims(1./g.in_degrees().astype('float32'), 1)
-    g.ndata['norm'] = norm.as_in_context(mem_ctx)
+    g.ndata['norm'] = norm.as_in_context(ctx)
 
     degs = g.in_degrees().astype('float32').asnumpy()
     degs[degs > num_neighbors] = num_neighbors
-    g.ndata['subg_norm'] = mx.nd.expand_dims(mx.nd.array(1./degs, ctx=mem_ctx), 1)
+    g.ndata['subg_norm'] = mx.nd.expand_dims(mx.nd.array(1./degs, ctx=ctx), 1)
 
 
     g.update_all(fn.copy_src(src='features', out='m'),
@@ -360,27 +240,95 @@ def main(args):
                  lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
 
     for i in range(n_layers):
-        g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=mem_ctx)
-        g.ndata['agg_h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=mem_ctx)
+        g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
 
-    adj = g.adjacency_matrix()
+    model = GraphSAGETrain(in_feats,
+                           args.n_hidden,
+                           n_classes,
+                           n_layers,
+                           args.dropout,
+                           prefix='GraphSAGE')
 
-    if args.nworkers == 1:
-        worker_func(0, args, g, adj, features, labels, train_mask, val_mask, test_mask,
-                    in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples,
-                    runtime_ctx[0], 1)
-    else:
-        ps = []
-        for i in range(args.nworkers):
-            p = Process(target=worker_func, args=(i, args, g, adj, features, labels, train_mask, val_mask, test_mask,
-                                                  in_feats, n_classes, n_edges, train_nid, test_nid, n_test_samples,
-                                                  runtime_ctx[i % len(runtime_ctx)], args.nworkers))
-            ps.append(p)
-            p.start()
-        for p in ps:
-            p.join()
+    model.initialize(ctx=ctx)
 
-    print("parent ends")
+    loss_fcn = gluon.loss.SoftmaxCELoss()
+
+    infer_model = GraphSAGEInfer(in_feats,
+                                 args.n_hidden,
+                                 n_classes,
+                                 n_layers,
+                                 prefix='GraphSAGE')
+
+    infer_model.initialize(ctx=ctx)
+
+    # use optimizer
+    print(model.collect_params())
+    trainer = gluon.Trainer(model.collect_params(), 'adam',
+                            {'learning_rate': args.lr, 'wd': args.weight_decay},
+                            kvstore=mx.kv.create('local'))
+
+    # initialize graph
+    dur = []
+    for epoch in range(args.n_epochs):
+        for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
+                                                       num_neighbors,
+                                                       neighbor_type='in',
+                                                       shuffle=True,
+                                                       num_hops=n_layers,
+                                                       add_self_loop=True,
+                                                       seed_nodes=train_nid):
+            for i in range(n_layers):
+                agg_history_str = 'agg_h_{}'.format(i)
+                g.pull(nf.layer_parent_nid(i+1), fn.copy_src(src='h_{}'.format(i), out='m'),
+                       fn.sum(msg='m', out=agg_history_str))
+
+            node_embed_names = [['preprocess', 'features', 'h_0']]
+            for i in range(1, n_layers):
+                node_embed_names.append(['h_{}'.format(i), 'agg_h_{}'.format(i-1), 'subg_norm', 'norm'])
+            node_embed_names.append(['agg_h_{}'.format(n_layers-1), 'subg_norm', 'norm'])
+
+            nf.copy_from_parent(node_embed_names=node_embed_names)
+            # forward
+            with mx.autograd.record():
+                pred = model(nf)
+                batch_nids = nf.layer_parent_nid(-1).as_in_context(ctx)
+                batch_labels = labels[batch_nids]
+                loss = loss_fcn(pred, batch_labels)
+                loss = loss.sum() / len(batch_nids)
+
+            loss.backward()
+            trainer.step(batch_size=1)
+
+            node_embed_names = [['h_{}'.format(i)] for i in range(n_layers)]
+            node_embed_names.append([])
+
+            nf.copy_to_parent(node_embed_names=node_embed_names)
+
+        infer_params = infer_model.collect_params()
+
+        for key in infer_params:
+            idx = trainer._param2idx[key]
+            trainer._kvstore.pull(idx, out=infer_params[key].data())
+
+        num_acc = 0.
+
+        for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
+                                                       g.number_of_nodes(),
+                                                       neighbor_type='in',
+                                                       num_hops=n_layers,
+                                                       seed_nodes=test_nid,
+                                                       add_self_loop=True):
+            node_embed_names = [['preprocess', 'features']]
+            for i in range(n_layers):
+                node_embed_names.append(['norm', 'subg_norm'])
+            nf.copy_from_parent(node_embed_names=node_embed_names)
+
+            pred = infer_model(nf)
+            batch_nids = nf.layer_parent_nid(-1).as_in_context(ctx)
+            batch_labels = labels[batch_nids]
+            num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
+
+        print("Test Accuracy {:.4f}". format(num_acc/n_test_samples))
 
 
 if __name__ == '__main__':
@@ -388,8 +336,8 @@ if __name__ == '__main__':
     register_data_args(parser)
     parser.add_argument("--dropout", type=float, default=0.5,
             help="dropout probability")
-    parser.add_argument("--num-gpu", type=int, default=0,
-            help="the number of gpu")
+    parser.add_argument("--gpu", type=int, default=-1,
+            help="gpu")
     parser.add_argument("--lr", type=float, default=3e-2,
             help="learning rate")
     parser.add_argument("--n-epochs", type=int, default=200,
@@ -408,8 +356,6 @@ if __name__ == '__main__':
             help="graph self-loop (default=False)")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
             help="Weight for L2 loss")
-    parser.add_argument("--nworkers", type=int, default=1,
-            help="number of workers")
     args = parser.parse_args()
 
     print(args)
