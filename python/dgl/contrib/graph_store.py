@@ -121,7 +121,7 @@ def _to_csr(graph_data, edge_dir, multigraph):
             return csr.indptr, csr.indices
 
 class SharedMemoryStoreServer:
-    def __init__(self, graph_data, edge_dir, graph_name, multigraph, num_workers):
+    def __init__(self, graph_data, edge_dir, graph_name, multigraph, num_workers, port):
         graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
         indptr, indices = _to_csr(graph_data, edge_dir, multigraph)
         graph_idx.from_csr_matrix(indptr, indices, edge_dir, _get_graph_path(graph_name))
@@ -152,7 +152,7 @@ class SharedMemoryStoreServer:
             self._num_workers -= 1
             return 0
 
-        self.server = SimpleXMLRPCServer(("localhost", 8000))
+        self.server = SimpleXMLRPCServer(("localhost", port))
         self.server.register_function(get_graph_info, "get_graph_info")
         self.server.register_function(init_ndata, "init_ndata")
         self.server.register_function(terminate, "terminate")
@@ -194,10 +194,10 @@ class SharedMemoryStoreServer:
         self._graph = None
 
 class SharedMemoryGraphStore:
-    def __init__(self, graph_name):
+    def __init__(self, graph_name, port):
         self._graph_name = graph_name
         self._pid = os.getpid()
-        self.proxy = xmlrpc.client.ServerProxy("http://localhost:8000/")
+        self.proxy = xmlrpc.client.ServerProxy("http://localhost:" + str(port))
         num_nodes, num_edges, multigraph, edge_dir = self.proxy.get_graph_info()
 
         graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
@@ -715,11 +715,12 @@ class SharedMemoryGraphStore:
 
 
 def create_graph_store_server(graph_data, edge_dir, graph_name, store_type,
-                              multigraph, num_workers):
-    return SharedMemoryStoreServer(graph_data, edge_dir, graph_name, multigraph, num_workers)
+                              multigraph, num_workers, port=8000):
+    return SharedMemoryStoreServer(graph_data, edge_dir, graph_name, multigraph,
+                                   num_workers, port)
 
-def create_graph_store_client(graph_name, store_type):
-    return SharedMemoryGraphStore(graph_name)
+def create_graph_store_client(graph_name, store_type, port=8000):
+    return SharedMemoryGraphStore(graph_name, port)
 
 
 _init_api("dgl.contrib.graph_store")
