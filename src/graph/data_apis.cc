@@ -19,16 +19,19 @@ std::unordered_map<std::string, DLDataType> dtype_map = {
 DGL_REGISTER_GLOBAL("contrib.graph_store._CAPI_DGLCreateSharedMem")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string mem_name = args[0];
-    int64_t num_nodes = args[1];
-    int64_t num_feats = args[2];
-    std::string dtype_str = args[3];
-    std::string fill = args[4];
-    bool is_create = args[5];
+    dgl::runtime::NDArray shape_arr = args[1];
+    std::string dtype_str = args[2];
+    std::string fill = args[3];
+    bool is_create = args[4];
     auto it = dtype_map.find(dtype_str);
     CHECK(it != dtype_map.end()) << "Unsupported dtype " << dtype_str;
     auto dtype = it->second;
-    NDArray arr = NDArray::EmptyShared(mem_name, {num_nodes, num_feats},
-                                       dtype, DLContext{kDLCPU, 0}, is_create);
+    std::vector<int64_t> shape(shape_arr->shape[0]);
+    auto *shape_data = static_cast<int64_t *>(shape_arr->data);
+    for (size_t i = 0; i < shape.size(); i++)
+      shape[i] = shape_data[i];
+    NDArray arr = NDArray::EmptyShared(mem_name, shape, dtype,
+                                       DLContext{kDLCPU, 0}, is_create);
     *rv = arr;
     if (fill == "zero" && is_create)
       memset(arr->data, 0, arr.GetSize());

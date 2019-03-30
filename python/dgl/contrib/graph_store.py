@@ -3,12 +3,14 @@ import time
 import scipy
 from xmlrpc.server import SimpleXMLRPCServer
 import xmlrpc.client
+import numpy as np
 
 from collections.abc import MutableMapping
 
 from ..base import ALL, is_all, DGLError
 from .. import backend as F
 from ..graph import DGLGraph
+from .. import utils
 from ..graph_index import GraphIndex, create_graph_index
 from .._ffi.function import _init_api
 from .. import ndarray as nd
@@ -135,26 +137,27 @@ class SharedMemoryStoreServer:
             return self._graph.number_of_nodes(), self._graph.number_of_edges(), \
                     self._graph.is_multigraph, edge_dir
 
-        def init_ndata(ndata_name, num_feats, dtype):
+        def init_ndata(ndata_name, shape, dtype):
             if ndata_name in self._graph.ndata:
                 ndata = self._graph.ndata[ndata_name]
-                assert ndata.shape[1] == num_feats
+                assert np.all(ndata.shape == tuple(shape))
                 return 0
 
+            assert self._graph.number_of_nodes() == shape[0]
+            shape = utils.toindex(np.array(shape, dtype=np.int64))
             data = _CAPI_DGLCreateSharedMem(_get_ndata_path(graph_name, ndata_name),
-                                            self._graph.number_of_nodes(),
-                                            num_feats, dtype, "zero", True)
+                                            shape.todgltensor(), dtype, "zero", True)
             dlpack = data.to_dlpack()
             self._graph.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
             return 0
 
         def list_ndata():
             ndata = self._graph.ndata
-            return [[key, ndata[key].shape[1:], F.dtype(ndata[key])] for key in ndata]
+            return [[key, ndata[key].shape, F.dtype(ndata[key])] for key in ndata]
 
         def list_edata():
             edata = self._graph.edata
-            return [[key, edata[key].shape[1:], F.dtype(edata[key])] for key in edata]
+            return [[key, edata[key].shape, F.dtype(edata[key])] for key in edata]
 
         def terminate():
             self._num_workers -= 1
@@ -213,23 +216,27 @@ class SharedMemoryGraphStore(DGLGraph):
         # init all ndata and edata.
         ndata_infos = self.proxy.list_ndata()
         for name, shape, dtype in ndata_infos:
-            self.init_ndata(name, shape[0], dtype)
+            self._init_ndata(name, shape, dtype)
 
         edata_infos = self.proxy.list_edata()
         for name, shape, dtype in edata_infos:
-            self.init_edata(name, shape[0], dtype)
+            self._init_edata(name, shape, dtype)
 
     def __del__(self):
         if self.proxy is not None:
             self.proxy.terminate()
 
-    def init_ndata(self, ndata_name, num_feats, dtype):
-        self.proxy.init_ndata(ndata_name, num_feats, dtype)
+    def _init_ndata(self, ndata_name, shape, dtype):
+        assert self.number_of_nodes() == shape[0]
+        shape = utils.toindex(np.array(shape, dtype=np.int64))
         data = _CAPI_DGLCreateSharedMem(_get_ndata_path(self._graph_name, ndata_name),
-                                        self.number_of_nodes(),
-                                        num_feats, dtype, "zero", False)
+                                        shape.todgltensor(), dtype, "zero", False)
         dlpack = data.to_dlpack()
         self.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
+
+    def init_ndata(self, ndata_name, shape, dtype):
+        self.proxy.init_ndata(ndata_name, shape, dtype)
+        self._init_ndata(ndata_name, shape, dtype)
 
     def destroy(self):
         if self.proxy is not None:
