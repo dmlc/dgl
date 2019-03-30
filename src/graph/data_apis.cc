@@ -10,18 +10,25 @@ using dgl::runtime::NDArray;
 
 namespace dgl {
 
+std::unordered_map<std::string, DLDataType> dtype_map = {
+  {"float32", DLDataType{kDLFloat, 32, 1}},
+  {"int", DLDataType{kDLInt, 32, 1}},
+  {"uint", DLDataType{kDLUInt, 32, 1}},
+};
+
 DGL_REGISTER_GLOBAL("contrib.graph_store._CAPI_DGLCreateSharedMem")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string mem_name = args[0];
     int64_t num_nodes = args[1];
     int64_t num_feats = args[2];
-    int dtype = args[3];
+    std::string dtype_str = args[3];
     std::string fill = args[4];
     bool is_create = args[5];
-    // TODO use the dtype correctly.
+    auto it = dtype_map.find(dtype_str);
+    CHECK(it != dtype_map.end()) << "Unsupported dtype " << dtype_str;
+    auto dtype = it->second;
     NDArray arr = NDArray::EmptyShared(mem_name, {num_nodes, num_feats},
-                                       DLDataType{kDLFloat, 32, 1}, DLContext{kDLCPU, 0},
-                                       is_create);
+                                       dtype, DLContext{kDLCPU, 0}, is_create);
     *rv = arr;
     if (fill == "zero" && is_create)
       memset(arr->data, 0, arr.GetSize());
@@ -35,12 +42,9 @@ DGL_REGISTER_GLOBAL("contrib.graph_store._CAPI_DGLCreateSharedMemWithData")
     size_t mem_size = 1;
     for (auto s : shape)
       mem_size *= s;
-    // TODO set this correctly.
-    mem_size *= 4;
-    // TODO use the dtype correctly.
-    NDArray arr = NDArray::EmptyShared(mem_name, shape,
-                                       DLDataType{kDLFloat, 32, 1}, DLContext{kDLCPU, 0},
-                                       true);
+    mem_size *= data->dtype.bits / 8;
+    NDArray arr = NDArray::EmptyShared(mem_name, shape, data->dtype,
+                                       DLContext{kDLCPU, 0}, true);
     memcpy(arr->data, data->data, mem_size);
     *rv = arr;
   });

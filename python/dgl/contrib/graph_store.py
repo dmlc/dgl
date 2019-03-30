@@ -150,11 +150,11 @@ class SharedMemoryStoreServer:
 
         def list_ndata():
             ndata = self._graph.ndata
-            return [[key, ndata[key].shape[1:], ndata[key].dtype] for key in ndata]
+            return [[key, ndata[key].shape[1:], F.dtype(ndata[key])] for key in ndata]
 
         def list_edata():
             edata = self._graph.edata
-            return [[key, edata[key].shape[1:], edata[key].dtype] for key in edata]
+            return [[key, edata[key].shape[1:], F.dtype(edata[key])] for key in edata]
 
         def terminate():
             self._num_workers -= 1
@@ -215,14 +215,13 @@ class SharedMemoryGraphStore:
         self._graph = DGLGraph(graph_idx, multigraph=multigraph, readonly=True)
 
         # init all ndata and edata.
-        #TODO fix dtype
         ndata_infos = self.proxy.list_ndata()
         for name, shape, dtype in ndata_infos:
-            self.init_ndata(name, shape[0], dtype=0)
+            self.init_ndata(name, shape[0], dtype)
 
         edata_infos = self.proxy.list_edata()
         for name, shape, dtype in edata_infos:
-            self.init_edata(name, shape[0], dtype=0)
+            self.init_edata(name, shape[0], dtype)
 
     def __del__(self):
         if self.proxy is not None:

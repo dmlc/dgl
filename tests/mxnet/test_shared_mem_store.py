@@ -21,7 +21,7 @@ def worker_func(worker_id):
     assert F.array_equal(dst, F.tensor(coo.row))
     assert F.array_equal(src, F.tensor(coo.col))
     assert F.array_equal(store.ndata['feat'][0], F.tensor(np.arange(10), dtype=np.float32))
-    store.init_ndata('test4', 10, dtype=0)
+    store.init_ndata('test4', 10, dtype='float32')
     if worker_id == 0:
         store.ndata['test4'][0] = 1
     else:
