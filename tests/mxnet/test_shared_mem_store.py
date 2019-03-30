@@ -14,20 +14,20 @@ def worker_func(worker_id):
     np.random.seed(0)
     csr = (spsp.random(num_nodes, num_nodes, density=0.1, format='csr') != 0).astype(np.int64)
 
-    store = dgl.contrib.graph_store.create_graph_store_client("test_graph5", "shared_mem")
+    g = dgl.contrib.graph_store.create_graph_store_client("test_graph5", "shared_mem")
     # Verify the graph structure loaded from the shared memory.
-    src, dst = store._graph.all_edges()
+    src, dst = g.all_edges()
     coo = csr.tocoo()
     assert F.array_equal(dst, F.tensor(coo.row))
     assert F.array_equal(src, F.tensor(coo.col))
-    assert F.array_equal(store.ndata['feat'][0], F.tensor(np.arange(10), dtype=np.float32))
-    store.init_ndata('test4', 10, dtype='float32')
+    assert F.array_equal(g.ndata['feat'][0], F.tensor(np.arange(10), dtype=np.float32))
+    g.init_ndata('test4', 10, dtype='float32')
     if worker_id == 0:
-        store.ndata['test4'][0] = 1
+        g.ndata['test4'][0] = 1
     else:
         time.sleep(1)
-        assert np.all(store.ndata['test4'][0].asnumpy() == 1)
-    store.destroy()
+        assert np.all(g.ndata['test4'][0].asnumpy() == 1)
+    g.destroy()
 
 def server_func(num_workers):
     print("server starts")
