@@ -11,20 +11,16 @@ num_edges = int(num_nodes * num_nodes * 0.1)
 
 def worker_func(worker_id):
     print("worker starts")
-    time.sleep(1)
     np.random.seed(0)
     csr = (spsp.random(num_nodes, num_nodes, density=0.1, format='csr') != 0).astype(np.int64)
-    graph = dgl.graph_index.GraphIndex(multigraph=False, readonly=True)
-    graph.from_shared_mem_csr_matrix('/test_graph_struct', num_nodes, num_edges, 'in')
 
+    store = dgl.contrib.graph_store.create_graph_store_client("test_graph5", "shared_mem")
     # Verify the graph structure loaded from the shared memory.
-    src, dst, eid = graph.edges()
-    src, dst, eid = src.tousertensor(), dst.tousertensor(), eid.tousertensor()
+    src, dst = store._graph.all_edges()
     coo = csr.tocoo()
     assert F.array_equal(dst, F.tensor(coo.row))
     assert F.array_equal(src, F.tensor(coo.col))
 
-    store = dgl.contrib.graph_store.create_graph_store_client(graph, "test_graph", "shared_mem", False)
     store.init_ndata('feat', 10, dtype=0)
     assert F.array_equal(store.ndata['feat'][0], F.tensor(np.arange(10), dtype=np.float32))
     store.init_ndata('test4', 10, dtype=0)
@@ -39,13 +35,11 @@ def server_func(num_workers):
     print("server starts")
     np.random.seed(0)
     csr = (spsp.random(num_nodes, num_nodes, density=0.1, format='csr') != 0).astype(np.int64)
-    graph = dgl.graph_index.GraphIndex(multigraph=False, readonly=True)
-    graph.from_csr_matrix(csr.indptr, csr.indices, 'in', '/test_graph_struct')
-    assert graph.number_of_nodes() == num_nodes
-    assert graph.number_of_edges() == csr.nnz
 
-    g = dgl.contrib.graph_store.create_graph_store_server(graph, "test_graph", "shared_mem", False, num_workers)
-    g.ndata['feat'] = mx.nd.arange(graph.number_of_nodes() * 10).reshape((graph.number_of_nodes(), 10))
+    g = dgl.contrib.graph_store.create_graph_store_server(csr, "in", "test_graph5", "shared_mem", False, num_workers)
+    assert num_nodes == g._graph.number_of_nodes()
+    assert num_edges == g._graph.number_of_edges()
+    g.ndata['feat'] = mx.nd.arange(num_nodes * 10).reshape((num_nodes, 10))
     g.run()
 
 def test_worker_server():

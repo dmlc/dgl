@@ -1,63 +1,27 @@
 import os
 import time
-import posix_ipc as ipc
+import scipy
+from xmlrpc.server import SimpleXMLRPCServer
+import xmlrpc.client
 
 from collections.abc import MutableMapping
 
 from ..base import ALL, is_all, DGLError
 from .. import backend as F
 from ..graph import DGLGraph
+from ..graph_index import GraphIndex
 from .._ffi.function import _init_api
 from .. import ndarray as nd
 
 def _get_ndata_path(graph_name, ndata_name):
     return "/" + graph_name + "_node_" + ndata_name
 
-def _get_edata_path(graph_name, ndata_name):
-    return "/" + graph_name + "_edge_" + ndata_name
+def _get_edata_path(graph_name, edata_name):
+    return "/" + graph_name + "_edge_" + edata_name
 
-class InitNData:
-    def __init__(self, serv, args):
-        self.graph = serv._graph
-        self.graph_name = serv._graph_name
-        args = args.split(',')
-        self.ndata_name = args[1]
-        self.num_feats = int(args[2])
-        self.dtype = int(args[3])
+def _get_graph_path(graph_name):
+    return "/" + graph_name
 
-    def run(self):
-        if self.ndata_name in self.graph.ndata:
-            ndata = self.graph.ndata[self.ndata_name]
-            assert ndata.shape[1] == self.num_feats
-            return
-
-        data = _CAPI_DGLCreateSharedMem(_get_ndata_path(self.graph_name, self.ndata_name),
-                                        self.graph.number_of_nodes(),
-                                        self.num_feats, self.dtype, "zero", True)
-        dlpack = data.to_dlpack()
-        self.graph.ndata[self.ndata_name] = F.zerocopy_from_dlpack(dlpack)
-
-class Init:
-    def __init__(self, serv, args):
-        args = args.split(',')
-        self.pid = int(args[0])
-        self.pipe_path = args[1]
-        self.serv = serv
-
-    def run(self):
-        self.serv._reply_pipes[self.pid] = os.open(self.pipe_path, os.O_WRONLY)
-
-class Terminate:
-    def __init__(self, serv, args):
-        self.pid = int(args)
-        self.serv = serv
-
-    def run(self):
-        self.serv._num_workers -= 1
-
-_commands = {'init_ndata': lambda serv, args: InitNData(serv, args),
-             'init':       lambda serv, args: Init(serv, args),
-             'terminate':  lambda serv, args: Terminate(serv, args)}
 
 class NodeDataView(MutableMapping):
     """The data view class when G.nodes[...].data is called.
@@ -142,24 +106,49 @@ class EdgeDataView(MutableMapping):
         return repr({key : data[key] for key in self._graph._edge_frame})
 
 class SharedMemoryStoreServer:
-    def __init__(self, graph_data, graph_name, multigraph,
-                 num_workers):
-        self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=False)
+    def __init__(self, graph_data, edge_dir, graph_name, multigraph, num_workers):
+        graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
+        assert isinstance(graph_data, scipy.sparse.spmatrix)
+        csr = graph_data.tocsr()
+        graph_idx.from_csr_matrix(csr.indptr, csr.indices, edge_dir, _get_graph_path(graph_name))
+
+        self._graph = DGLGraph(graph_idx, multigraph=multigraph, readonly=False)
         self._num_workers = num_workers
         self._graph_name = graph_name
-        self._reply_pipes = {}
-        self._msg_queue = ipc.MessageQueue("/" + graph_name, flags=ipc.O_CREAT)
+        self._edge_dir = edge_dir
 
-    def __del__(self):
-        for key in self._reply_pipes:
-            os.close(self._reply_pipes[key])
-        if self._msg_queue is not None:
-            self._msg_queue.close()
-            self._msg_queue.unlink()
+        def get_graph_info():
+            return self._graph.number_of_nodes(), self._graph.number_of_edges(), \
+                    self._graph.is_multigraph, edge_dir
+
+        def init_ndata(ndata_name, num_feats, dtype):
+            if ndata_name in self._graph.ndata:
+                ndata = self._graph.ndata[ndata_name]
+                assert ndata.shape[1] == num_feats
+                return 0
+
+            data = _CAPI_DGLCreateSharedMem(_get_ndata_path(graph_name, ndata_name),
+                                            self._graph.number_of_nodes(),
+                                            num_feats, dtype, "zero", True)
+            dlpack = data.to_dlpack()
+            self._graph.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
+            return 0
+
+        def terminate():
+            self._num_workers -= 1
+            return 0
+
+        self.server = SimpleXMLRPCServer(("localhost", 8000))
+        self.server.register_function(get_graph_info, "get_graph_info")
+        self.server.register_function(init_ndata, "init_ndata")
+        self.server.register_function(terminate, "terminate")
 
     def _decode_command(self, line):
         parts = line[0].decode('utf-8').split(':')
         return _commands[parts[0]](self, parts[1])
+
+    def __del__(self):
+        self._graph = None
 
     @property
     def ndata(self):
@@ -187,30 +176,23 @@ class SharedMemoryStoreServer:
 
     def run(self):
         while self._num_workers > 0:
-            line = self._msg_queue.receive()
-            comm = self._decode_command(line)
-            comm.run()
-        self._msg_queue.close()
-        self._msg_queue.unlink()
-        self._msg_queue = None
+            self.server.handle_request()
+        self._graph = None
 
 class SharedMemoryGraphStore:
-    def __init__(self, graph_data, graph_name, multigraph=False):
-        self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=False)
+    def __init__(self, graph_name):
         self._graph_name = graph_name
-        self._msg_queue = ipc.MessageQueue("/" + graph_name)
-
         self._pid = os.getpid()
-        #self._recv_path = "/" + graph_name + "-" + str(self._pid)
-        #self._comm_pipe.write(self._encode_comm("init:", [self._recv_path]))
-        #self._comm_pipe.flush()
-        #os.mkfifo(self._recv_path)
-        #self._recv_pipe = os.open(self._recv_path, os.O_RDONLY)
+        self.proxy = xmlrpc.client.ServerProxy("http://localhost:8000/")
+        num_nodes, num_edges, multigraph, edge_dir = self.proxy.get_graph_info()
+
+        graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
+        graph_idx.from_shared_mem_csr_matrix(_get_graph_path(graph_name), num_nodes, num_edges, edge_dir)
+        self._graph = DGLGraph(graph_idx, multigraph=multigraph, readonly=True)
 
     def __del__(self):
-        self._msg_queue.close()
-        #os.close(self._recv_pipe)
-        #os.unlink(self._recv_path)
+        if self.proxy is not None:
+            self.proxy.terminate()
 
     def _encode_comm(self, comm, args):
         comm = comm + str(self._pid)
@@ -220,9 +202,7 @@ class SharedMemoryGraphStore:
         return comm
 
     def init_ndata(self, ndata_name, num_feats, dtype):
-        self._msg_queue.send(self._encode_comm("init_ndata:", [ndata_name, str(num_feats), str(dtype)]))
-        #TODO remove sleep later
-        time.sleep(1)
+        self.proxy.init_ndata(ndata_name, num_feats, dtype)
         data = _CAPI_DGLCreateSharedMem(_get_ndata_path(self._graph_name, ndata_name),
                                         self._graph.number_of_nodes(),
                                         num_feats, dtype, "zero", False)
@@ -230,7 +210,9 @@ class SharedMemoryGraphStore:
         self._graph.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
 
     def destroy(self):
-        self._msg_queue.send(self._encode_comm("terminate:", []))
+        if self.proxy is not None:
+            self.proxy.terminate()
+        self.proxy = None
 
     def register_message_func(self, func):
         """Register global message function.
@@ -718,12 +700,12 @@ class SharedMemoryGraphStore:
         self._graph.prop_edges(edges_generator, message_func, reduce_func, apply_node_func)
 
 
-def create_graph_store_server(graph_data, graph_name, store_type,
-                           multigraph, num_workers):
-    return SharedMemoryStoreServer(graph_data, graph_name, multigraph, num_workers)
+def create_graph_store_server(graph_data, edge_dir, graph_name, store_type,
+                              multigraph, num_workers):
+    return SharedMemoryStoreServer(graph_data, edge_dir, graph_name, multigraph, num_workers)
 
-def create_graph_store_client(graph_data, graph_name, store_type, multigraph):
-    return SharedMemoryGraphStore(graph_data, graph_name, multigraph)
+def create_graph_store_client(graph_name, store_type):
+    return SharedMemoryGraphStore(graph_name)
 
 
 _init_api("dgl.contrib.graph_store")
