@@ -9,7 +9,7 @@ from collections.abc import MutableMapping
 from ..base import ALL, is_all, DGLError
 from .. import backend as F
 from ..graph import DGLGraph
-from ..graph_index import GraphIndex
+from ..graph_index import GraphIndex, create_graph_index
 from .._ffi.function import _init_api
 from .. import ndarray as nd
 
@@ -105,12 +105,26 @@ class EdgeDataView(MutableMapping):
         data = self._graph.get_e_repr(self._edges)
         return repr({key : data[key] for key in self._graph._edge_frame})
 
+def _to_csr(graph_data, edge_dir, multigraph):
+    try:
+        indptr = graph_data.indptr
+        indices = graph_data.indices
+        return indptr, indices
+    except:
+        if isinstance(graph_data, scipy.sparse.spmatrix):
+            csr = graph_data.tocsr()
+            return csr.indptr, csr.indices
+        else:
+            idx = create_graph_index(graph_data=graph_data, multigraph=multigraph, readonly=True)
+            transpose = False if edge_dir == 'in' else True
+            csr = idx.adjacency_matrix_scipy(transpose, 'csr')
+            return csr.indptr, csr.indices
+
 class SharedMemoryStoreServer:
     def __init__(self, graph_data, edge_dir, graph_name, multigraph, num_workers):
         graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
-        assert isinstance(graph_data, scipy.sparse.spmatrix)
-        csr = graph_data.tocsr()
-        graph_idx.from_csr_matrix(csr.indptr, csr.indices, edge_dir, _get_graph_path(graph_name))
+        indptr, indices = _to_csr(graph_data, edge_dir, multigraph)
+        graph_idx.from_csr_matrix(indptr, indices, edge_dir, _get_graph_path(graph_name))
 
         self._graph = DGLGraph(graph_idx, multigraph=multigraph, readonly=False)
         self._num_workers = num_workers
