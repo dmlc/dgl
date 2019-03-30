@@ -30,8 +30,10 @@ SharedMemory::SharedMemory(const std::string &name) {
 SharedMemory::~SharedMemory() {
   munmap(ptr, size);
   close(fd);
-  if (is_new)
+  if (is_new) {
+    LOG(INFO) << "remove " << name << " for shared memory";
     shm_unlink(name.c_str());
+  }
 }
 
 void *SharedMemory::create_new(size_t size) {
