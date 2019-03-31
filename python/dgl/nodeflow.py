@@ -166,7 +166,8 @@ class NodeFlow(DGLBaseGraph):
             if is_all(node_embed_names):
                 for i in range(self.num_layers):
                     nid = utils.toindex(self.layer_parent_nid(i))
-                    self._node_frames[i] = FrameRef(Frame(_copy_frame(self._parent._node_frame[nid], ctx)))
+                    self._node_frames[i] = FrameRef(Frame(_copy_frame(
+                        self._parent._node_frame[nid], ctx)))
             elif node_embed_names is not None:
                 assert isinstance(node_embed_names, list) \
                         and len(node_embed_names) == self.num_layers, \
@@ -180,7 +181,8 @@ class NodeFlow(DGLBaseGraph):
             if is_all(edge_embed_names):
                 for i in range(self.num_blocks):
                     eid = utils.toindex(self.block_parent_eid(i))
-                    self._edge_frames[i] = FrameRef(Frame(_copy_frame(self._parent._edge_frame[eid], ctx)))
+                    self._edge_frames[i] = FrameRef(Frame(_copy_frame(
+                        self._parent._edge_frame[eid], ctx)))
             elif edge_embed_names is not None:
                 assert isinstance(edge_embed_names, list) \
                         and len(edge_embed_names) == self.num_blocks, \
@@ -903,7 +905,8 @@ def _copy_to_like(arr1, arr2):
     return F.copy_to(arr1, F.context(arr2))
 
 def _get_frame(frame, names, ids, ctx):
-    col_dict = {name: F.copy_to(frame[name][_copy_to_like(ids, frame[name])], ctx) for name in names}
+    col_dict = {name: F.copy_to(frame[name][_copy_to_like(ids, frame[name])],
+                                ctx) for name in names}
     if len(col_dict) == 0:
         return FrameRef(Frame(num_rows=len(ids)))
     else:
