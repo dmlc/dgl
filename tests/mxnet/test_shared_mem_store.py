@@ -25,7 +25,7 @@ def worker_func(worker_id):
     if worker_id == 0:
         g.ndata['test4'][0] = 1
     else:
-        time.sleep(1)
+        time.sleep(3)
         assert np.all(g.ndata['test4'][0].asnumpy() == 1)
     g.destroy()
 
