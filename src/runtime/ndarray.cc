@@ -96,8 +96,10 @@ struct NDArray::Internal {
     using dgl::runtime::NDArray;
     if (ptr->manager_ctx != nullptr) {
       static_cast<NDArray::Container*>(ptr->manager_ctx)->DecRef();
+#ifndef _WIN32
     } else if (ptr->mem) {
       ptr->mem = nullptr;
+#endif  // _WIN32
     } else if (ptr->dl_tensor.data != nullptr) {
       dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
           ptr->dl_tensor.ctx, ptr->dl_tensor.data);
