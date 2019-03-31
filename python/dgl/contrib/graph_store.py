@@ -123,6 +123,26 @@ def _to_csr(graph_data, edge_dir, multigraph):
             return csr.indptr, csr.indices
 
 class SharedMemoryStoreServer:
+    """The graph store server.
+
+    The server loads graph structure and node embeddings and edge embeddings
+    and store them in shared memory.
+
+    Parameters
+    ----------
+    graph_data : graph data
+        Data to initialize graph. Same as networkx's semantics.
+    edge_dir : string
+        the edge direction for the graph structure.
+    graph_name : string
+        Define the name of the graph.
+    multigraph : bool, optional
+        Whether the graph would be a multigraph (default: False)
+    num_workers : int
+        The number of workers that will connect to the server.
+    port : int
+        The port that the server listens to.
+    """
     def __init__(self, graph_data, edge_dir, graph_name, multigraph, num_workers, port):
         graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
         indptr, indices = _to_csr(graph_data, edge_dir, multigraph)
@@ -203,6 +223,18 @@ class SharedMemoryStoreServer:
         self._graph = None
 
 class SharedMemoryGraphStore(DGLGraph):
+    """The shared-memory graph store.
+
+    The graph store constructs the graph structure and node embeddings and edge embeddings
+    in shared memory that has been loaded by the graph store server.
+
+    Parameters
+    ----------
+    graph_name : string
+        Define the name of the graph.
+    port : int
+        The port that the server listens to.
+    """
     def __init__(self, graph_name, port):
         self._graph_name = graph_name
         self._pid = os.getpid()
@@ -235,21 +267,88 @@ class SharedMemoryGraphStore(DGLGraph):
         self.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
 
     def init_ndata(self, ndata_name, shape, dtype):
+        """Create node embedding.
+
+        It first creates the node embedding in the server and maps it to the current process
+        with shared memory.
+
+        Parameters
+        ----------
+        ndata_name : string
+            The name of node embedding
+        shape : tuple
+            The shape of the node embedding
+        dtype : string
+            The data type of the node embedding.
+        """
         self.proxy.init_ndata(ndata_name, shape, dtype)
         self._init_ndata(ndata_name, shape, dtype)
 
     def destroy(self):
+        """Destroy the graph store.
+
+        This notifies the server that this client has terminated.
+        """
         if self.proxy is not None:
             self.proxy.terminate()
         self.proxy = None
 
 
-def create_graph_store_server(graph_data, edge_dir, graph_name, store_type,
-                              multigraph, num_workers, port=8000):
+def create_graph_store_server(graph_data, graph_name, store_type, num_workers,
+                              multigraph=False, edge_dir='in', port=8000):
+    """Create the graph store server.
+
+    The server loads graph structure and node embeddings and edge embeddings
+    in shared memory.
+
+    After the server runs, the graph store clients can access the graph data
+    with the specified graph name.
+
+    Parameters
+    ----------
+    graph_data : graph data
+        Data to initialize graph. Same as networkx's semantics.
+    graph_name : string
+        Define the name of the graph.
+    store_type : string
+        The type of the graph store.
+    num_workers : int
+        The number of workers that will connect to the server.
+    multigraph : bool, optional
+        Whether the graph would be a multigraph (default: False)
+    edge_dir : string
+        the edge direction for the graph structure.
+    port : int
+        The port that the server listens to.
+
+    Returns
+    -------
+    SharedMemoryStoreServer
+        The graph store server
+    """
     return SharedMemoryStoreServer(graph_data, edge_dir, graph_name, multigraph,
                                    num_workers, port)
 
 def create_graph_store_client(graph_name, store_type, port=8000):
+    """Create the graph store client.
+
+    The client constructs the graph structure and node embeddings and edge embeddings
+    in shared memory that has been loaded by the graph store server.
+
+    Parameters
+    ----------
+    graph_name : string
+        Define the name of the graph.
+    store_type : string
+        The type of the graph store.
+    port : int
+        The port that the server listens to.
+
+    Returns
+    -------
+    SharedMemoryGraphStore
+        The graph store
+    """
     return SharedMemoryGraphStore(graph_name, port)
 
 

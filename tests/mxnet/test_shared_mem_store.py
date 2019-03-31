@@ -34,8 +34,8 @@ def server_func(num_workers):
     np.random.seed(0)
     csr = (spsp.random(num_nodes, num_nodes, density=0.1, format='csr') != 0).astype(np.int64)
 
-    g = dgl.contrib.graph_store.create_graph_store_server(csr, "in", "test_graph5", "shared_mem",
-                                                          False, num_workers)
+    g = dgl.contrib.graph_store.create_graph_store_server(csr, "test_graph5", "shared_mem", num_workers,
+                                                          False, edge_dir="in")
     assert num_nodes == g._graph.number_of_nodes()
     assert num_edges == g._graph.number_of_edges()
     g.ndata['feat'] = mx.nd.arange(num_nodes * 10).reshape((num_nodes, 10))

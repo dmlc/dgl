@@ -148,11 +148,23 @@ class NDArray {
   DGL_DLL static NDArray Empty(std::vector<int64_t> shape,
                                DLDataType dtype,
                                DLContext ctx);
+  /*!
+   * \brief Create an empty NDArray with shared memory.
+   * \param name The name of shared memory.
+   * \param shape The shape of the new array.
+   * \param dtype The data type of the new array.
+   * \param ctx The context of the Array.
+   * \param is_create whether to create shared memory.
+   * \return The created Array
+   */
   DGL_DLL static NDArray EmptyShared(const std::string &name,
-                               std::vector<int64_t> shape,
-                               DLDataType dtype,
-                               DLContext ctx,
-                               bool is_create);
+                                     std::vector<int64_t> shape,
+                                     DLDataType dtype,
+                                     DLContext ctx,
+                                     bool is_create);
+  /*!
+   * \brief Get the size of the array in the number of bytes.
+   */
   size_t GetSize() const;
   /*!
    * \brief Create a NDArray backed by a dlpack tensor.
@@ -194,6 +206,13 @@ class NDArray {
 inline bool SaveDLTensor(dmlc::Stream* strm, const DLTensor* tensor);
 
 #ifndef _WIN32
+/*
+ * \brief This class owns shared memory.
+ *
+ * When the object is gone, the shared memory will also be destroyed.
+ * When the shared memory is destroyed, the file corresponding to
+ * the shared memory is removed.
+ */
 class SharedMemory {
   bool is_new;
   std::string name;
@@ -202,9 +221,26 @@ class SharedMemory {
   size_t size;
 
  public:
+  /*
+   * \brief constructor of the shared memory.
+   * \param name The file corresponding to the shared memory.
+   */
   explicit SharedMemory(const std::string &name);
+  /*
+   * \brief destructor of the shared memory.
+   * It deallocates the shared memory and removes the corresponding file.
+   */
   ~SharedMemory();
+  /*
+   * \brief create shared memory.
+   * It creates the file and shared memory.
+   * \param size the size of the shared memory.
+   */
   void *create_new(size_t size);
+  /*
+   * \brief allocate shared memory that has been created.
+   * \param size the size of the shared memory.
+   */
   void *open(size_t size);
 };
 #endif  // _WIN32
