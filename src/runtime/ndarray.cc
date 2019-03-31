@@ -112,6 +112,85 @@ struct NDArray::Internal {
   }
 };
 
+/*
+ * Serialization of NDArray DLTensor goes as follows:
+ * 0x00 + 0x02: DLContext.device_type
+ * 0x02 + 0x02: flags
+ *              0x0001: stride array is attached after shape array
+ * 0x04 + 0x04: DLContext.device_id
+ * 0x08 + 0x04: ndim
+ * 0x0c + 0x04: DLDataType
+ * 0x10 + ****: shape array, 8 bytes per element
+ *      + ****: data payload, size of each element depends on DLDataType.bits
+ */
+int64_t NDArray::Serialize(char *data) const {
+  DLTensor *tensor = &(data_->dl_tensor);
+  int64_t size = 0;
+  int16_t flags = 0;
+
+  CHECK(tensor->strides == nullptr) << "strided arrays not supported";
+
+  // 0x00: DLContext
+  *(reinterpret_cast<DLContext *>(data + size)) = tensor->ctx;
+  size += sizeof(tensor->ctx);
+  // 0x08: ndim
+  *(reinterpret_cast<int32_t *>(data + size)) = tensor->ndim;
+  size += sizeof(int32_t);
+  // 0x0c: DLDataType
+  *(reinterpret_cast<DLDataType *>(data + size)) = tensor->dtype;
+  size += sizeof(tensor->dtype);
+
+  // 0x10: shape array
+  uint64_t data_size = 1;
+  for (int32_t i = 0; i < tensor->ndim; ++i) {
+    *(reinterpret_cast<int64_t *>(data + size)) = tensor->shape[i];
+    data_size *= tensor->shape[i];
+    size += sizeof(int64_t);
+  }
+
+  // afterwards: data payload
+  // TODO: overflow check
+  data_size = tensor->dtype.bits / 8 * data_size;
+  memcpy(data + size, tensor->data, data_size);
+  size += data_size;
+
+  return size;
+}
+
+NDArray NDArray::Deserialize(const char *data, int64_t *sizeptr) {
+  int64_t size = 0;
+
+  // 0x00: DLContext
+  DLContext *ctx = *(reinterpret_cast<DLContext *>(data + size));
+  size += sizeof(*ctx);
+  // 0x08: ndim
+  int32_t ndim = *(reinterpret_cast<int32_t *>(data + size));
+  size += sizeof(ndim);
+  // 0x0c: DLDataType
+  DLDataType *dtype = *(reinterpret_cast<DLDataType *>(data + size));
+  size += sizeof(*dtype);
+
+  // 0x10: shape array
+  int64_t *shape_array = *(reinterpret_cast<int64_t *>(data + size));
+  std::vector<int64_t> shape_vector;
+  uint64_t data_size = 1;
+  for (int i = 0; i < ndim; ++i) {
+    shape_vector.push_back(shape_array[i]);
+    data_size *= shape_array[i];
+    size += sizeof(int64_t);
+  }
+
+  NDArray array = NDArray::Empty(shape_vector, *dtype, *ctx);
+  data_size = dtype->bits / 8 * data_size;
+  memcpy(array->data, data + size, data_size);
+  size += data_size;
+
+  if (sizeptr != nullptr)
+    *sizeptr = size;
+
+  return array;
+}
+
 NDArray NDArray::CreateView(std::vector<int64_t> shape,
                             DLDataType dtype) {
   CHECK(data_ != nullptr);

@@ -124,6 +124,20 @@ class NDArray {
    */
   inline void Save(dmlc::Stream* stream) const;
   /*!
+   * \brief Serialize to C byte array
+   * \param data The output data
+   * \note TODO: replace with DMLC serializer
+   * \return Number of bytes written
+   */
+  int64_t Serialize(char *data) const;
+  /*!
+   * \brief Deserialize from C byte array
+   * \param data The input data
+   * \param[out] sizeptr Output for number of bytes read, or nullptr to dismiss
+   * \note TODO: replace with DMLC deserializer
+   */
+  static NDArray Deserialize(char *data, int64_t *sizeptr);
+  /*!
    * \brief Create a NDArray that shares the data memory with the current one.
    * \param shape The shape of the new array.
    * \param dtype The data type of the new array.

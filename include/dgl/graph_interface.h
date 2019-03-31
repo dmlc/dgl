@@ -335,6 +335,22 @@ class GraphInterface {
    * \return a vector of IdArrays.
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const = 0;
+
+  /*!
+   * \brief Serialize to C byte array
+   * \param data The output data
+   * \return Number of bytes written
+   * \note TODO replace with DMLC serializer?
+   */
+  virtual int64_t Serialize(char *data) const = 0;
+
+  /*!
+   * \brief Deserialize from C byte array
+   * \param data The input data
+   * \param[out] sizeptr Output for number of bytes read, or nullptr to dismiss
+   * \note TODO: replace with DMLC deserializer
+   */
+  virtual static GraphInterface *Deserialize(const char *data, int64_t *sizeptr) = 0;
 };
 
 /*! \brief Subgraph data structure */
