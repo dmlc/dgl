@@ -6,9 +6,9 @@
 #include <string.h>
 #ifndef _WIN32
 #include <sys/mman.h>
-#endif
 #include <fcntl.h>
 #include <unistd.h>
+#endif
 #include <dmlc/logging.h>
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/c_runtime_api.h>

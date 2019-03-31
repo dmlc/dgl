@@ -5,8 +5,6 @@
  */
 
 #include <string.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <sys/types.h>
 #include <dgl/immutable_graph.h>
 
