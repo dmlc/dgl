@@ -193,6 +193,7 @@ class NDArray {
  */
 inline bool SaveDLTensor(dmlc::Stream* strm, const DLTensor* tensor);
 
+#ifndef _WIN32
 class SharedMemory {
   bool is_new;
   std::string name;
@@ -206,6 +207,7 @@ class SharedMemory {
   void *create_new(size_t size);
   void *open(size_t size);
 };
+#endif  // _WIN32
 
 /*!
  * \brief Reference counted Container object used to back NDArray.
@@ -229,7 +231,9 @@ struct NDArray::Container {
    */
   DLTensor dl_tensor;
 
+#ifndef _WIN32
   std::shared_ptr<SharedMemory> mem;
+#endif  // _WIN32
   /*!
    * \brief addtional context, reserved for recycling
    * \note We can attach additional content here

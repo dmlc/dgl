@@ -4,7 +4,9 @@
  * \brief NDArray container infratructure.
  */
 #include <string.h>
+#ifndef _WIN32
 #include <sys/mman.h>
+#endif
 #include <fcntl.h>
 #include <unistd.h>
 #include <dmlc/logging.h>
@@ -19,6 +21,7 @@ extern "C" void NDArrayDLPackDeleter(DLManagedTensor* tensor);
 namespace dgl {
 namespace runtime {
 
+#ifndef _WIN32
 SharedMemory::SharedMemory(const std::string &name) {
   this->name = name;
   this->is_new = false;
@@ -60,6 +63,7 @@ void *SharedMemory::open(size_t size) {
       << "Failed to map shared memory. mmap failed with error " << strerror(errno);
   return ptr;
 }
+#endif  // _WIN32
 
 inline void VerifyDataType(DLDataType dtype) {
   CHECK_GE(dtype.lanes, 1);
@@ -194,6 +198,7 @@ NDArray NDArray::EmptyShared(const std::string &name,
   NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
+#ifndef _WIN32
   auto mem = std::make_shared<SharedMemory>(name);
   if (is_create) {
     ret.data_->dl_tensor.data = mem->create_new(size);
@@ -202,6 +207,9 @@ NDArray NDArray::EmptyShared(const std::string &name,
   }
 
   ret.data_->mem = mem;
+#else
+  LOG(FATAL) << "Windows doesn't support NDArray with shared memory";
+#endif  // _WIN32
   return ret;
 }
 

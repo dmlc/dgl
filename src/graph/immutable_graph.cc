@@ -5,7 +5,6 @@
  */
 
 #include <string.h>
-#include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -51,8 +50,12 @@ ImmutableGraph::CSR::CSR(IdArray indptr_arr, IdArray index_arr, IdArray edge_id_
   CHECK_EQ(num_edges, edge_id_arr->shape[0]);
   size_t file_size = (num_vertices + 1) * sizeof(int64_t) + num_edges * sizeof(dgl_id_t) * 2;
 
+#ifndef _WIN32
   auto mem = std::make_shared<runtime::SharedMemory>(shared_mem_name);
   auto ptr = mem->create_new(file_size);
+#else
+  LOG(FATAL) << "Windows doesn't support ImmutableGraph with shared memory";
+#endif  // _WIN32
 
   int64_t *addr1 = static_cast<int64_t *>(ptr);
   indptr.init(addr1, num_vertices + 1);
@@ -71,14 +74,20 @@ ImmutableGraph::CSR::CSR(IdArray indptr_arr, IdArray index_arr, IdArray edge_id_
   indptr.insert_back(indptr_data, num_vertices + 1);
   indices.insert_back(indices_data, num_edges);
   edge_ids.insert_back(edge_id_data, num_edges);
+#ifndef _WIN32
   this->mem = mem;
+#endif  // _WIN32
 }
 
 ImmutableGraph::CSR::CSR(const std::string &shared_mem_name,
                          size_t num_vertices, size_t num_edges) {
   size_t file_size = (num_vertices + 1) * sizeof(int64_t) + num_edges * sizeof(dgl_id_t) * 2;
+#ifndef _WIN32
   auto mem = std::make_shared<runtime::SharedMemory>(shared_mem_name);
   auto ptr = mem->open(file_size);
+#else
+  LOG(FATAL) << "Windows doesn't support ImmutableGraph with shared memory";
+#endif  // _WIN32
 
   int64_t *addr1 = static_cast<int64_t *>(ptr);
   indptr.init(addr1, num_vertices + 1, num_vertices + 1);
@@ -88,7 +97,9 @@ ImmutableGraph::CSR::CSR(const std::string &shared_mem_name,
   addr = addr2 + num_edges;
   dgl_id_t *addr3 = static_cast<dgl_id_t *>(addr);
   edge_ids.init(addr3, num_edges, num_edges);
+#ifndef _WIN32
   this->mem = mem;
+#endif  // _WIN32
 }
 
 ImmutableGraph::EdgeArray ImmutableGraph::CSR::GetEdges(dgl_id_t vid) const {

@@ -308,7 +308,9 @@ class ImmutableGraph: public GraphInterface {
     static CSR::Ptr FromEdges(std::vector<Edge> *edges, int sort_on, uint64_t num_nodes);
 
    private:
+#ifndef _WIN32
     std::shared_ptr<runtime::SharedMemory> mem;
+#endif  // _WIN32
   };
 
   /*! \brief Construct an immutable graph from the COO format. */
