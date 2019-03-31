@@ -1,3 +1,4 @@
+import os
 import backend as F
 import networkx as nx
 import numpy as np
@@ -169,15 +170,17 @@ def test_load_csr():
     assert np.all(F.asnumpy(dst) == coo.col)
 
     # Load CSR to shared memory.
-    idx = dgl.graph_index.GraphIndex(multigraph=False, readonly=True)
-    idx.from_csr_matrix(csr.indptr, csr.indices, 'out', '/test_graph_struct')
-    assert idx.number_of_nodes() == n
-    assert idx.number_of_edges() == csr.nnz
-    src, dst, eid = idx.edges()
-    src, dst, eid = src.tousertensor(), dst.tousertensor(), eid.tousertensor()
-    coo = csr.tocoo()
-    assert np.all(F.asnumpy(src) == coo.row)
-    assert np.all(F.asnumpy(dst) == coo.col)
+    # Shared memory isn't supported in Windows.
+    if os.name is not 'nt':
+        idx = dgl.graph_index.GraphIndex(multigraph=False, readonly=True)
+        idx.from_csr_matrix(csr.indptr, csr.indices, 'out', '/test_graph_struct')
+        assert idx.number_of_nodes() == n
+        assert idx.number_of_edges() == csr.nnz
+        src, dst, eid = idx.edges()
+        src, dst, eid = src.tousertensor(), dst.tousertensor(), eid.tousertensor()
+        coo = csr.tocoo()
+        assert np.all(F.asnumpy(src) == coo.row)
+        assert np.all(F.asnumpy(dst) == coo.col)
 
 if __name__ == '__main__':
     test_basics()
