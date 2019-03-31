@@ -23,6 +23,8 @@ typedef dgl::runtime::NDArray FloatArray;
 struct Subgraph;
 struct NodeFlow;
 
+const dgl_id_t DGL_INVALID_ID = static_cast<dgl_id_t>(-1);
+
 /*!
  * \brief This class references data in std::vector.
  *

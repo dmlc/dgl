@@ -472,15 +472,4 @@ DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetBlockAdj")
     *rv = ConvertAdjToPackedFunc(res);
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphRandomWalk")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    const IdArray seeds = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
-    const int num_traces = args[2];
-    const int num_hops = args[3];
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-
-    *rv = SamplerOp::RandomWalk(ptr, seeds, num_traces, num_hops);
-  });
-
 }  // namespace dgl
