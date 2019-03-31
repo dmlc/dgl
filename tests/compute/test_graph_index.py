@@ -166,7 +166,7 @@ def test_load_csr():
     src, dst, eid = src.tousertensor(), dst.tousertensor(), eid.tousertensor()
     coo = csr.tocoo()
     assert F.array_equal(src, F.tensor(coo.row, dtype=F.dtype(src)))
-    assert F.array_equal(dst, F.tensor(coo.col, dtyep=F.dtype(dst)))
+    assert F.array_equal(dst, F.tensor(coo.col, dtype=F.dtype(dst)))
 
     # Load CSR to shared memory.
     idx = dgl.graph_index.GraphIndex(multigraph=False, readonly=True)
