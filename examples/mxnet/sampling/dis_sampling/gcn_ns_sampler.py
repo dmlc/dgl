@@ -44,7 +44,7 @@ class MySamplerPool(SamplerPool):
                                                            num_hops=args.n_layers+1,
                                                            seed_nodes=train_nid):
                 print("send train nodeflow: %d" %(idx))
-                sender.Send(nf)
+                sender.send(nf)
                 idx += 1
         
 

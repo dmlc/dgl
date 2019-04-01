@@ -194,7 +194,7 @@ def main(args):
     total_count = 153
     for epoch in range(args.n_epochs):
         for subg_count in range(total_count):
-            nf = receiver.Recv(g)
+            nf = receiver.recv(g)
             nf.copy_from_parent()
             # forward
             with mx.autograd.record():
