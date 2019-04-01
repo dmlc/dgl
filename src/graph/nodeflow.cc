@@ -75,6 +75,7 @@ std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph, const std::st
 int64_t NodeFlow::Serialize(char *data, const ImmutableGraph *g) const {
   int64_t size = 0;
 
+  // TODO(BarclayII): overflow check
   size += g->Serialize(data + size);
   size += this->node_mapping.Serialize(data + size);
   size += this->edge_mapping.Serialize(data + size);
@@ -89,6 +90,7 @@ NodeFlow *NodeFlow::Deserialize(const char *data, int64_t *sizeptr) {
   int64_t tmpsize;
   NodeFlow *nf = new NodeFlow();
 
+  // TODO(BarclayII): overflow check
   nf->graph = GraphPtr(ImmutableGraph::Deserialize(data + size, &tmpsize));
   size += tmpsize;
   nf->node_mapping = IdArray::Deserialize(data + size, &tmpsize);

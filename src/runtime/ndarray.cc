@@ -144,7 +144,7 @@ int64_t NDArray::Serialize(char *data) const {
   }
 
   // afterwards: data payload
-  // TODO: overflow check
+  // TODO(BarclayII): overflow check
   data_size = tensor->dtype.bits / 8 * data_size;
   memcpy(data + size, tensor->data, data_size);
   size += data_size;
@@ -176,6 +176,7 @@ NDArray NDArray::Deserialize(const char *data, int64_t *sizeptr) {
   }
 
   NDArray array = NDArray::Empty(shape_vector, *dtype, *ctx);
+  // TODO(BarclayII): overflow check
   data_size = dtype->bits / 8 * data_size;
   memcpy(array->data, data + size, data_size);
   size += data_size;

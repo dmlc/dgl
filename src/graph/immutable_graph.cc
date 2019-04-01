@@ -693,6 +693,7 @@ int64_t ImmutableGraph::Serialize(char *data) const {
   int64_t indptr_size = csr->indptr.size();
   *(reinterpret_cast<int64_t *>(data + size)) = indptr_size;
   size += sizeof(int64_t);
+  // TODO(BarclayII): overflow check
   data_size = indptr_size * sizeof(dgl_id_t);
   memcpy(data + size, csr->indptr.data(), data_size);
   size += data_size;
@@ -735,6 +736,7 @@ ImmutableGraph *ImmutableGraph::Deserialize(const char *data, int64_t *sizeptr) 
   int64_t indptr_size = *(reinterpret_cast<const int64_t *>(data + size));
   size += sizeof(int64_t);
   csr->indptr.resize(indptr_size);
+  // TODO(BarclayII): overflow check
   data_size = indptr_size * sizeof(dgl_id_t);
   memcpy(csr->indptr.data(), data + size, data_size);
   size += data_size;
