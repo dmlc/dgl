@@ -194,6 +194,7 @@ def main(args):
     total_count = 153
     for epoch in range(args.n_epochs):
         for subg_count in range(total_count):
+            print(subg_count)
             nf = receiver.recv(g)
             nf.copy_from_parent()
             # forward
