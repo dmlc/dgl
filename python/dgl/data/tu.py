@@ -3,16 +3,22 @@ import numpy as np
 import dgl
 import os
 
-from dgl.data.utils import download, extract_archive, get_download_dir, _get_dgl_url
+from dgl.data.utils import download, extract_archive, get_download_dir
 
 
 class TUDataset():
     """
-    TUDataset contains lots of graph kernel datasets for graph classification
+    TUDataset contains lots of graph kernel datasets for graph classification.
+    Use provided node feature by default. If no feature provided, use one-hot node label instead.
+    If neither labels provided, use constant for node feature.
 
     :param name: DataSet Name, such as `ENZYMES`, `DD`, `COLLAB`
-    :param use_pandas: Default: False. Numpy's file read function has performance issue when file is large, using pandas can be faster
-    :param hidden_size: Default 10. Some dataset doesn't contain features. Use constant node features initialization instead, with hidden size as `hidden_size`.
+    :param use_pandas: Default: False.
+        Numpy's file read function has performance issue when file is large,
+        using pandas can be faster.
+    :param hidden_size: Default 10. Some dataset doesn't contain features.
+        Use constant node features initialization instead, with hidden size as `hidden_size`.
+
     """
 
     _url = r"https://ls11-www.cs.uni-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
@@ -97,4 +103,7 @@ class TUDataset():
         one_hot_tensor = np.zeros((label_num, np.max(label_tensor) + 1))
         one_hot_tensor[np.arange(label_num), label_tensor] = 1
         return one_hot_tensor
+
+    def statistics(self):
+        return self.graph_lists[0].ndata['feat'].shape[1]
 
