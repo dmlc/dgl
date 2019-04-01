@@ -197,7 +197,7 @@ class HashTableChecker {
    * and the source vertex. `col_idx` and `orig_eids` store the collected edges.
    */
   void Collect(const dgl_id_t old_id, const dgl_id_t old_eid,
-               ImmutableGraph::vector<dgl_id_t> *col_idx,
+               vector<dgl_id_t> *col_idx,
                std::vector<dgl_id_t> *orig_eids) {
     if (!map.test(old_id))
       return;
@@ -225,7 +225,7 @@ class HashTableChecker {
    * The collected edges are stored in `new_neigh_idx` and `orig_eids`.
    */
   void CollectOnRow(const dgl_id_t neigh_idx[], const dgl_id_t eids[], size_t row_len,
-                    ImmutableGraph::vector<dgl_id_t> *new_neigh_idx,
+                    vector<dgl_id_t> *new_neigh_idx,
                     std::vector<dgl_id_t> *orig_eids) {
     // TODO(zhengda) I need to make sure the column index in each row is sorted.
     for (size_t j = 0; j < row_len; ++j) {
@@ -237,9 +237,9 @@ class HashTableChecker {
 };
 
 ImmutableGraph::EdgeList::Ptr ImmutableGraph::EdgeList::FromCSR(
-    const ImmutableGraph::vector<int64_t>& indptr,
-    const ImmutableGraph::vector<dgl_id_t>& indices,
-    const ImmutableGraph::vector<dgl_id_t>& edge_ids,
+    const vector<int64_t>& indptr,
+    const vector<dgl_id_t>& indices,
+    const vector<dgl_id_t>& edge_ids,
     bool in_csr) {
   const auto n = indptr.size() - 1;
   const auto len = edge_ids.size();
