@@ -3,8 +3,6 @@ from __future__ import absolute_import
 
 from ._ffi.function import _init_api
 from .nodeflow import NodeFlow
-from .utils import unwrap_to_ptr_list
-from . import utils
 
 _init_api("dgl.network")
 
