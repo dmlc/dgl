@@ -12,7 +12,7 @@ class TUDataset():
     Use provided node feature by default. If no feature provided, use one-hot node label instead.
     If neither labels provided, use constant for node feature.
 
-    :param name: DataSet Name, such as `ENZYMES`, `DD`, `COLLAB`
+    :param name: Dataset Name, such as `ENZYMES`, `DD`, `COLLAB`
     :param use_pandas: Default: False.
         Numpy's file read function has performance issue when file is large,
         using pandas can be faster.

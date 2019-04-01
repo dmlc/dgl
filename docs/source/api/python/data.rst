@@ -36,10 +36,10 @@ Mini graph classification dataset
 Graph kernel dataset
 ````````````````````
 
-For more information about the dataset, see `Benchmark Data Sets for Graph Kernels <https://ls11-www.cs.tu-dortmund.de/staff/morris/graphkerneldatasets>`
+For more information about the dataset, see `Benchmark Data Sets for Graph Kernels <https://ls11-www.cs.tu-dortmund.de/staff/morris/graphkerneldatasets>`__.
 
 .. autoclass:: TUDataset
-  ┊ :members: __getitem__, __len__
+    :members: __getitem__, __len__
 
 Protein-Protein Interaction dataset
 ```````````````````````````````````
