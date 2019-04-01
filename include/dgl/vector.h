@@ -6,6 +6,8 @@
 #ifndef DGL_VECTOR_H_
 #define DGL_VECTOR_H_
 
+#include <algorithm>
+
 namespace dgl {
 
 /*
