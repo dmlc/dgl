@@ -202,5 +202,5 @@ class vector {
 
 }  // namespace dgl
 
-#endif  // DGL_IMMUTABLE_GRAPH_H_
+#endif  // DGL_VECTOR_H_
 
