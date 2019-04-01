@@ -189,12 +189,15 @@ def main(args):
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
+        index = 0
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
                                                        args.num_neighbors,
                                                        neighbor_type='in',
                                                        shuffle=True,
                                                        num_hops=args.n_layers+1,
                                                        seed_nodes=train_nid):
+            print(index)
+            index = index + 1
             nf.copy_from_parent()
             # forward
             with mx.autograd.record():
