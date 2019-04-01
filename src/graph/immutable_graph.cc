@@ -71,7 +71,7 @@ ImmutableGraph::CSR::CSR(IdArray indptr_arr, IdArray index_arr, IdArray edge_id_
   edge_ids.insert_back(edge_id_data, num_edges);
   this->mem = mem;
 #else
-  LOG(FATAL) << "Windows doesn't support ImmutableGraph with shared memory";
+  LOG(FATAL) << "ImmutableGraph doesn't support shared memory in Windows yet";
 #endif  // _WIN32
 }
 
@@ -92,7 +92,7 @@ ImmutableGraph::CSR::CSR(const std::string &shared_mem_name,
   edge_ids.init(addr3, num_edges, num_edges);
   this->mem = mem;
 #else
-  LOG(FATAL) << "Windows doesn't support ImmutableGraph with shared memory";
+  LOG(FATAL) << "ImmutableGraph doesn't support shared memory in Windows yet";
 #endif  // _WIN32
 }
 
