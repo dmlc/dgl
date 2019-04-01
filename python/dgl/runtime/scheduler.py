@@ -42,8 +42,10 @@ def schedule_send(graph, u, v, eid, message_func):
     message_func: callable or list of callable
         The message function
     """
-    # TODO(minjie): support builtin message func
     message_func = _standardize_func_usage(message_func, 'message')
+    mfunc_is_list = utils.is_iterable(message_func)
+    if mfunc_is_list:
+        message_func = BundledFunction(message_func)
     # vars
     var_nf = var.FEAT_DICT(graph._node_frame)
     var_ef = var.FEAT_DICT(graph._edge_frame)

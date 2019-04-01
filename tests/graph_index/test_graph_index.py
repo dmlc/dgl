@@ -151,8 +151,25 @@ def test_create_from_elist():
     #    print(u, v, g.edge_id(u, v)[0])
     #    assert g.edge_id(u, v)[0] == i
 
+def test_edges():
+    gi = create_graph_index()
+    gi.add_nodes(10)
+    gi.add_edges(toindex([5,5,5,5]), toindex([6,7,8,9]))
+    gi.add_edges(toindex([0,0,0,0]), toindex([1,2,3,4]))
+    gi.add_edges(toindex([1,1,1,1]), toindex([2,3,4,5]))
+    src, dst, eid = gi.edges()
+    src0, dst0, eid0 = src.tonumpy(), dst.tonumpy(), eid.tonumpy()
+    gi.readonly()
+    src, dst, eid = gi.edges()
+    src, dst, eid = src.tonumpy(), dst.tonumpy(), eid.tonumpy()
+    import numpy as np
+    assert np.array_equal(src, src0)
+    assert np.array_equal(dst, dst0)
+    assert np.array_equal(eid, eid0)
+
 if __name__ == '__main__':
     test_edge_id()
     test_nx()
     test_predsucc()
     test_create_from_elist()
+    test_edges()

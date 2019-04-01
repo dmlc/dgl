@@ -1,3 +1,4 @@
+import networkx as nx
 import dgl
 import dgl.contrib as contrib
 from dgl.frame import Frame, FrameRef, Column
@@ -8,57 +9,7 @@ import dgl.function as fn
 import pickle
 import io
 
-def _reconstruct_pickle(obj):
-    f = io.BytesIO()
-    pickle.dump(obj, f)
-    f.seek(0)
-    obj = pickle.load(f)
-    f.close()
-
-    return obj
-
-def test_pickling_index():
-    i = toindex([1, 2, 3])
-    i.tousertensor()
-    i.todgltensor() # construct a dgl tensor which is unpicklable
-
-    i2 = _reconstruct_pickle(i)
-
-    assert F.array_equal(i2.tousertensor(), i.tousertensor())
-
-
-def test_pickling_graph_index():
-    gi = create_graph_index()
-    gi.add_nodes(3)
-    src_idx = toindex([0, 0])
-    dst_idx = toindex([1, 2])
-    gi.add_edges(src_idx, dst_idx)
-
-    gi2 = _reconstruct_pickle(gi)
-
-    assert gi2.number_of_nodes() == gi.number_of_nodes()
-    src_idx2, dst_idx2, _ = gi2.edges()
-    assert F.array_equal(src_idx.tousertensor(), src_idx2.tousertensor())
-    assert F.array_equal(dst_idx.tousertensor(), dst_idx2.tousertensor())
-
-
-def test_pickling_frame():
-    x = F.randn((3, 7))
-    y = F.randn((3, 5))
-
-    c = Column(x)
-
-    c2 = _reconstruct_pickle(c)
-    assert F.allclose(c.data, c2.data)
-
-    fr = Frame({'x': x, 'y': y})
-
-    fr2 = _reconstruct_pickle(fr)
-    assert F.allclose(fr2['x'].data, x)
-    assert F.allclose(fr2['y'].data, y)
-
-    fr = Frame()
-
+import torch
 
 def _assert_is_identical(g, g2):
     assert g.is_multigraph == g2.is_multigraph
@@ -97,6 +48,71 @@ def _assert_is_identical_nodeflow(nf1, nf2):
         assert nf1.blocks[i].data.keys() == nf2.blocks[i].data.keys()
         for k in nf1.blocks[i].data:
             assert F.allclose(nf1.blocks[i].data[k], nf2.blocks[i].data[k])
+
+def _assert_is_identical_batchedgraph(bg1, bg2):
+    _assert_is_identical(bg1, bg2)
+    assert bg1.batch_size == bg2.batch_size
+    assert bg1.batch_num_nodes == bg2.batch_num_nodes
+    assert bg1.batch_num_edges == bg2.batch_num_edges
+
+def _assert_is_identical_index(i1, i2):
+    assert i1.slice_data() == i2.slice_data()
+    assert F.array_equal(i1.tousertensor(), i2.tousertensor())
+
+def _reconstruct_pickle(obj):
+    f = io.BytesIO()
+    pickle.dump(obj, f)
+    f.seek(0)
+    obj = pickle.load(f)
+    f.close()
+
+    return obj
+
+def test_pickling_index():
+    # normal index
+    i = toindex([1, 2, 3])
+    i.tousertensor()
+    i.todgltensor() # construct a dgl tensor which is unpicklable
+    i2 = _reconstruct_pickle(i)
+    _assert_is_identical_index(i, i2)
+
+    # slice index
+    i = toindex(slice(5, 10))
+    i2 = _reconstruct_pickle(i)
+    _assert_is_identical_index(i, i2)
+
+def test_pickling_graph_index():
+    gi = create_graph_index()
+    gi.add_nodes(3)
+    src_idx = toindex([0, 0])
+    dst_idx = toindex([1, 2])
+    gi.add_edges(src_idx, dst_idx)
+
+    gi2 = _reconstruct_pickle(gi)
+
+    assert gi2.number_of_nodes() == gi.number_of_nodes()
+    src_idx2, dst_idx2, _ = gi2.edges()
+    assert F.array_equal(src_idx.tousertensor(), src_idx2.tousertensor())
+    assert F.array_equal(dst_idx.tousertensor(), dst_idx2.tousertensor())
+
+
+def test_pickling_frame():
+    x = F.randn((3, 7))
+    y = F.randn((3, 5))
+
+    c = Column(x)
+
+    c2 = _reconstruct_pickle(c)
+    assert F.allclose(c.data, c2.data)
+
+    fr = Frame({'x': x, 'y': y})
+
+    fr2 = _reconstruct_pickle(fr)
+    assert F.allclose(fr2['x'].data, x)
+    assert F.allclose(fr2['y'].data, y)
+
+    fr = Frame()
+
 
 def _global_message_func(nodes):
     return {'x': nodes.data['x']}
@@ -189,9 +205,19 @@ def test_pickling_nodeflow():
     new_nf = _reconstruct_pickle(nf)
     _assert_is_identical_nodeflow(nf, new_nf)
 
+def test_pickling_batched_graph():
+    glist = [nx.path_graph(i + 5) for i in range(5)]
+    glist = [dgl.DGLGraph(g) for g in glist]
+    bg = dgl.batch(glist)
+    bg.ndata['x'] = F.randn((35, 5))
+    bg.edata['y'] = F.randn((60, 3))
+    new_bg = _reconstruct_pickle(bg)
+    _assert_is_identical_batchedgraph(bg, new_bg)
+
 if __name__ == '__main__':
     test_pickling_index()
     test_pickling_graph_index()
     test_pickling_frame()
     test_pickling_graph()
     test_pickling_nodeflow()
+    test_pickling_batched_graph()

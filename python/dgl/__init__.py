@@ -1,4 +1,8 @@
 """DGL root package."""
+# Windows compatibility
+# This initializes Winsock and performs cleanup at termination as required
+import socket
+
 from . import function
 from . import nn
 from . import contrib

@@ -26,6 +26,7 @@ if(MSVC)
   add_definitions(-DWIN32_LEAN_AND_MEAN)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
   add_definitions(-D_SCL_SECURE_NO_WARNINGS)
+  add_definitions(-DNOMINMAX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /bigobj")
@@ -52,7 +53,7 @@ else(MSVC)
 endif(MSVC)
 
 # Source file lists
-file(GLOB CORE_SRCS src/graph/*.cc src/*.cc src/scheduler/*.cc)
+file(GLOB CORE_SRCS src/graph/*.cc src/graph/network/* src/*.cc src/scheduler/*.cc)
 
 file(GLOB RUNTIME_SRCS src/runtime/*.cc)
 

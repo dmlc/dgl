@@ -128,7 +128,11 @@ class Index(object):
         return self._slice_data == slice(start, stop)
 
     def __getstate__(self):
-        return self.tousertensor()
+        if self._slice_data is not None:
+            # the index can be represented by a slice
+            return self._slice_data
+        else:
+            return self.tousertensor()
 
     def __setstate__(self, state):
         self._initialize_data(state)

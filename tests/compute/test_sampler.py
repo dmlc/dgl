@@ -149,26 +149,6 @@ def test_layer_sampler(prefetch=False):
         sub_m = sub_g.number_of_edges()
         assert sum(F.shape(sub_g.block_eid(i))[0] for i in range(n_blocks)) == sub_m
 
-def test_random_walk():
-    edge_list = [(0, 1), (1, 2), (2, 3), (3, 4),
-                 (4, 3), (3, 2), (2, 1), (1, 0)]
-    seeds = [0, 1]
-    n_traces = 3
-    n_hops = 4
-
-    g = dgl.DGLGraph(edge_list, readonly=True)
-    traces = dgl.contrib.sampling.random_walk(g, seeds, n_traces, n_hops)
-    traces = F.zerocopy_to_numpy(traces)
-
-    assert traces.shape == (len(seeds), n_traces, n_hops + 1)
-
-    for i, seed in enumerate(seeds):
-        assert (traces[i, :, 0] == seeds[i]).all()
-
-    trace_diff = np.diff(traces, axis=-1)
-    # only nodes with adjacent IDs are connected
-    assert (np.abs(trace_diff) == 1).all()
-
 if __name__ == '__main__':
     test_create_full()
     test_1neighbor_sampler_all()
@@ -177,4 +157,3 @@ if __name__ == '__main__':
     test_10neighbor_sampler()
     test_layer_sampler()
     test_layer_sampler(prefetch=True)
-    test_random_walk()
