@@ -491,6 +491,22 @@ class ImmutableGraph: public GraphInterface {
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const;
 
+  /*!
+   * \brief Serialize to C byte array
+   * \param data The output data
+   * \return Number of bytes written
+   * \note TODO replace with DMLC serializer?
+   */
+  int64_t Serialize(char *data) const;
+
+  /*!
+   * \brief Deserialize from C byte array
+   * \param data The input data
+   * \param[out] sizeptr Output for number of bytes read, or nullptr to dismiss
+   * \note TODO: replace with DMLC deserializer?
+   */
+  static ImmutableGraph *Deserialize(const char *data, int64_t *sizeptr);
+
   /*
    * The immutable graph may only contain one of the CSRs (e.g., the sampled subgraphs).
    * When we get in csr or out csr, we try to get the one cached in the structure.

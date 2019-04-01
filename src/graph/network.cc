@@ -63,22 +63,14 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
 DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
-    GraphHandle ghandle = args[1];
-    const IdArray node_mapping = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
-    const IdArray edge_mapping = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[3]));
-    const IdArray layer_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[4]));
-    const IdArray flow_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[5]));
-    ImmutableGraph *ptr = static_cast<ImmutableGraph*>(ghandle);
     network::Communicator* comm = static_cast<network::Communicator*>(chandle);
-    auto csr = ptr->GetInCSR();
-    // Serialize nodeflow to data buffer
-    int64_t data_size = network::SerializeSampledSubgraph(
-                             sender_data_buffer,
-                             csr,
-                             node_mapping,
-                             edge_mapping,
-                             layer_offsets,
-                             flow_offsets);
+    NodeFlowHandle nfhandle = args[1];
+    GraphHandle ghandle = args[2];
+    const NodeFlow *nf = static_cast<const NodeFlow *>(nfhandle);
+    const GraphInterface *gptr = static_cast<const GraphInterface *>(ghandle);
+    const ImmutableGraph *graph = dynamic_cast<const ImmutableGraph *>(gptr);
+
+    int64_t data_size = nf->Serialize(sender_data_buffer, graph);
     CHECK_GT(data_size, 0);
     // Send msg via network
     int64_t size = comm->Send(sender_data_buffer, data_size);
@@ -96,19 +88,10 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
     if (size <= 0) {
       LOG(ERROR) << "Receive error: (size: " << size << ")";
     }
-    NodeFlow* nf = new NodeFlow();
-    ImmutableGraph::CSR::Ptr csr;
-    // Deserialize nodeflow from recv_data_buffer
-    network::DeserializeSampledSubgraph(recv_data_buffer,
-                                        &csr,
-                                        &(nf->node_mapping),
-                                        &(nf->edge_mapping),
-                                        &(nf->layer_offsets),
-                                        &(nf->flow_offsets));
-    nf->graph = GraphPtr(new ImmutableGraph(csr, nullptr, false));
-    std::vector<NodeFlow*> subgs(1);
-    subgs[0] = nf;
-    *rv = WrapVectorReturn(subgs);
+    int64_t decode_size;
+
+    NodeFlowHandle nfhandle = NodeFlow::Deserialize(recv_data_buffer, &decode_size);
+    *rv = nfhandle;
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeCommunicator")

@@ -136,7 +136,7 @@ class NDArray {
    * \param[out] sizeptr Output for number of bytes read, or nullptr to dismiss
    * \note TODO: replace with DMLC deserializer
    */
-  static NDArray Deserialize(char *data, int64_t *sizeptr);
+  static NDArray Deserialize(const char *data, int64_t *sizeptr);
   /*!
    * \brief Create a NDArray that shares the data memory with the current one.
    * \param shape The shape of the new array.

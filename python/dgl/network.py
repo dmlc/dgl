@@ -46,18 +46,7 @@ def _send_subgraph(sender, nodeflow):
     nodeflow : NodeFlow
         NodeFlow object
     """
-    graph_handle = nodeflow._graph._handle
-    node_mapping = nodeflow._node_mapping.todgltensor()
-    edge_mapping = nodeflow._edge_mapping.todgltensor()
-    # Can we convert NDArray to tensor directly, instead of using toindex()?
-    layers_offsets = utils.toindex(nodeflow._layer_offsets).todgltensor()
-    flows_offsets = utils.toindex(nodeflow._block_offsets).todgltensor()
-    _CAPI_SenderSendSubgraph(sender,
-                             graph_handle,
-                             node_mapping,
-                             edge_mapping,
-                             layers_offsets,
-                             flows_offsets)
+    _CAPI_SenderSendSubgraph(sender, nodeflow, nodeflow._graph._handle)
 
 def _recv_subgraph(receiver, graph):
     """Receive sampled subgraph (NodeFlow) from remote sampler.
@@ -75,8 +64,8 @@ def _recv_subgraph(receiver, graph):
         Sampled NodeFlow object
     """
     # hdl is a list of ptr
-    hdl = unwrap_to_ptr_list(_CAPI_ReceiverRecvSubgraph(receiver))
-    return NodeFlow(graph, hdl[0])
+    hdl = _CAPI_ReceiverRecvSubgraph(receiver)
+    return NodeFlow(graph, hdl)
 
 def _finalize_sampler_sender(sender):
     """Finalize Sender communicator

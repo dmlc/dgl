@@ -114,19 +114,15 @@ struct NDArray::Internal {
 
 /*
  * Serialization of NDArray DLTensor goes as follows:
- * 0x00 + 0x02: DLContext.device_type
- * 0x02 + 0x02: flags
- *              0x0001: stride array is attached after shape array
- * 0x04 + 0x04: DLContext.device_id
+ * 0x00 + 0x08: DLContext
  * 0x08 + 0x04: ndim
  * 0x0c + 0x04: DLDataType
  * 0x10 + ****: shape array, 8 bytes per element
  *      + ****: data payload, size of each element depends on DLDataType.bits
  */
 int64_t NDArray::Serialize(char *data) const {
-  DLTensor *tensor = &(data_->dl_tensor);
+  DLTensor *tensor = &(this->data_->dl_tensor);
   int64_t size = 0;
-  int16_t flags = 0;
 
   CHECK(tensor->strides == nullptr) << "strided arrays not supported";
 
@@ -161,17 +157,17 @@ NDArray NDArray::Deserialize(const char *data, int64_t *sizeptr) {
   int64_t size = 0;
 
   // 0x00: DLContext
-  DLContext *ctx = *(reinterpret_cast<DLContext *>(data + size));
+  const DLContext *ctx = reinterpret_cast<const DLContext *>(data + size);
   size += sizeof(*ctx);
   // 0x08: ndim
-  int32_t ndim = *(reinterpret_cast<int32_t *>(data + size));
+  int32_t ndim = *(reinterpret_cast<const int32_t *>(data + size));
   size += sizeof(ndim);
   // 0x0c: DLDataType
-  DLDataType *dtype = *(reinterpret_cast<DLDataType *>(data + size));
+  const DLDataType *dtype = reinterpret_cast<const DLDataType *>(data + size);
   size += sizeof(*dtype);
 
   // 0x10: shape array
-  int64_t *shape_array = *(reinterpret_cast<int64_t *>(data + size));
+  const int64_t *shape_array = reinterpret_cast<const int64_t *>(data + size);
   std::vector<int64_t> shape_vector;
   uint64_t data_size = 1;
   for (int i = 0; i < ndim; ++i) {

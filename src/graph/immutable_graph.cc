@@ -658,4 +658,105 @@ std::vector<IdArray> ImmutableGraph::GetAdj(bool transpose, const std::string &f
   }
 }
 
+/*
+ * Serialization of ImmutableGraph:
+ * 0x00 + 0x08: number of nodes
+ * 0x08 + 0x08: number of edges
+ * 0x10 + 0x08: flags
+ *              0x1: multigraph
+ * 0x18 + 0x08: number of indptr elements
+ *      + ****: int64_t array for indptr
+ *      + 0x08: number of indices elements
+ *      + ****: int64_t array for indices
+ *      + 0x08: number of edge_ids elements
+ *      + ****: int64_t array for edge_ids
+ */
+
+int64_t ImmutableGraph::Serialize(char *data) const {
+  int64_t size = 0;
+
+  *(reinterpret_cast<int64_t *>(data + size)) = this->NumVertices();
+  size += sizeof(int64_t);
+  *(reinterpret_cast<int64_t *>(data + size)) = this->NumEdges();
+  size += sizeof(int64_t);
+
+  int64_t flags = 0;
+  if (IsMultigraph())
+    flags |= 0x1;
+  *(reinterpret_cast<int64_t *>(data + size)) = flags;
+  size += sizeof(int64_t);
+
+  int64_t data_size;
+  ImmutableGraph::CSR::Ptr csr = this->GetInCSR();
+
+  int64_t indptr_size = csr->indptr.size();
+  *(reinterpret_cast<int64_t *>(data + size)) = indptr_size;
+  size += sizeof(int64_t);
+  data_size = indptr_size * sizeof(dgl_id_t);
+  memcpy(data + size, csr->indptr.data(), data_size);
+  size += data_size;
+
+  int64_t indices_size = csr->indices.size();
+  *(reinterpret_cast<int64_t *>(data + size)) = indices_size;
+  size += sizeof(int64_t);
+  data_size = indices_size * sizeof(dgl_id_t);
+  memcpy(data + size, csr->indices.data(), data_size);
+  size += data_size;
+
+  int64_t edge_ids_size = csr->edge_ids.size();
+  *(reinterpret_cast<int64_t *>(data + size)) = edge_ids_size;
+  size += sizeof(int64_t);
+  data_size = edge_ids_size * sizeof(dgl_id_t);
+  memcpy(data + size, csr->edge_ids.data(), data_size);
+  size += data_size;
+
+  return size;
+}
+
+ImmutableGraph *ImmutableGraph::Deserialize(const char *data, int64_t *sizeptr) {
+  int64_t size = 0;
+
+  int64_t num_nodes = *(reinterpret_cast<const int64_t *>(data + size));
+  size += sizeof(int64_t);
+  int64_t num_edges = *(reinterpret_cast<const int64_t *>(data + size));
+  size += sizeof(int64_t);
+
+  int64_t flags = *(reinterpret_cast<const int64_t *>(data + size));
+  size += sizeof(int64_t);
+  bool is_multigraph = flags & 0x1;
+
+  ImmutableGraph::CSR::Ptr csr = std::make_shared<ImmutableGraph::CSR>(num_nodes, num_edges);
+  csr->indices.resize(num_edges);
+  csr->edge_ids.resize(num_edges);
+
+  int64_t data_size;
+
+  int64_t indptr_size = *(reinterpret_cast<const int64_t *>(data + size));
+  size += sizeof(int64_t);
+  csr->indptr.resize(indptr_size);
+  data_size = indptr_size * sizeof(dgl_id_t);
+  memcpy(csr->indptr.data(), data + size, data_size);
+  size += data_size;
+
+  int64_t indices_size = *(reinterpret_cast<const int64_t *>(data + size));
+  size += sizeof(int64_t);
+  csr->indices.resize(indices_size);
+  data_size = indptr_size * sizeof(dgl_id_t);
+  memcpy(csr->indices.data(), data + size, data_size);
+  size += data_size;
+
+  int64_t edge_ids_size = *(reinterpret_cast<const int64_t *>(data + size));
+  size += sizeof(int64_t);
+  csr->edge_ids.resize(edge_ids_size);
+  data_size = edge_ids_size * sizeof(dgl_id_t);
+  memcpy(csr->edge_ids.data(), data + size, data_size);
+  size += data_size;
+
+  if (sizeptr != nullptr)
+    *sizeptr = size;
+
+  ImmutableGraph *graph = new ImmutableGraph(csr, nullptr, is_multigraph);
+  return graph;
+}
+
 }  // namespace dgl

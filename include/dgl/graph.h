@@ -370,28 +370,6 @@ class Graph: public GraphInterface {
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const;
 
-  /*!
-   * \brief Serialize to C byte array
-   * \param data The output data
-   * \return Number of bytes written
-   * \note TODO replace with DMLC serializer?
-   */
-  virtual int64_t Serialize(char *data) const {
-    LOG(FATAL) << "Serialize isn't supported in Mutable graph";
-    return 0;
-  }
-
-  /*!
-   * \brief Deserialize from C byte array
-   * \param data The input data
-   * \param[out] sizeptr Output for number of bytes read, or nullptr to dismiss
-   * \note TODO: replace with DMLC deserializer
-   */
-  virtual static GraphInterface *Deserialize(const char *data, int64_t *sizeptr) { 
-    LOG(FATAL) << "Deserialize isn't supported in Mutable graph";
-    return nullptr;
-  }
-
  protected:
   friend class GraphOp;
   /*! \brief Internal edge list type */

@@ -42,6 +42,25 @@ struct NodeFlow {
    * \brief The edge mapping from the NodeFlow graph to the parent graph.
    */
   IdArray edge_mapping;
+
+  /*!
+   * \brief Serialize to C byte array
+   * \param data The output data
+   * \param graph The pointer to the NodeFlow graph.
+   * \return Number of bytes written
+   * \note TODO replace with DMLC serializer?
+   * \note FIXME since NodeFlow::graph is Resetted to another graph pointer upon the call
+   * of \c _CAPI_NodeFlowGetGraph, we have to explicitly supply the graph pointer here
+   * since NodeFlow::graph may no longer contain the valid pointer.
+   */
+  int64_t Serialize(char *data, const ImmutableGraph *graph) const;
+  /*!
+   * \brief Deserialize from C byte array
+   * \param data The input data
+   * \param[out] sizeptr Output for number of bytes read, or nullptr to dismiss
+   * \note TODO: replace with DMLC deserializer?
+   */
+  static NodeFlow *Deserialize(const char *data, int64_t *sizeptr);
 };
 
 /*!

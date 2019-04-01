@@ -72,4 +72,37 @@ std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph, const std::st
   }
 }
 
+int64_t NodeFlow::Serialize(char *data, const ImmutableGraph *graph) const {
+  int64_t size = 0;
+
+  size += graph->Serialize(data + size);
+  size += this->node_mapping.Serialize(data + size);
+  size += this->edge_mapping.Serialize(data + size);
+  size += this->layer_offsets.Serialize(data + size);
+  size += this->flow_offsets.Serialize(data + size);
+
+  return size;
+}
+
+NodeFlow *NodeFlow::Deserialize(const char *data, int64_t *sizeptr) {
+  int64_t size = 0;
+  int64_t tmpsize;
+  NodeFlow *nf = new NodeFlow();
+
+  nf->graph = GraphPtr(ImmutableGraph::Deserialize(data + size, &tmpsize));
+  size += tmpsize;
+  nf->node_mapping = IdArray::Deserialize(data + size, &tmpsize);
+  size += tmpsize;
+  nf->edge_mapping = IdArray::Deserialize(data + size, &tmpsize);
+  size += tmpsize;
+  nf->layer_offsets = IdArray::Deserialize(data + size, &tmpsize);
+  size += tmpsize;
+  nf->flow_offsets = IdArray::Deserialize(data + size, &tmpsize);
+  size += tmpsize;
+
+  if (sizeptr != nullptr)
+    *sizeptr = size;
+  return nf;
+}
+
 }  // namespace dgl
