@@ -1,7 +1,7 @@
 /*!
- *  Copyright (c) 2018 by Contributors
- * \file dgl/immutable_graph.h
- * \brief DGL immutable graph index class.
+ *  Copyright (c) 2019 by Contributors
+ * \file dgl/vector.h
+ * \brief A customized vector.
  */
 #ifndef DGL_VECTOR_H_
 #define DGL_VECTOR_H_

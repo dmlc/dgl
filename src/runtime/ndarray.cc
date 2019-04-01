@@ -4,11 +4,6 @@
  * \brief NDArray container infratructure.
  */
 #include <string.h>
-#ifndef _WIN32
-#include <sys/mman.h>
-#include <fcntl.h>
-#include <unistd.h>
-#endif
 #include <dmlc/logging.h>
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/c_runtime_api.h>
@@ -20,50 +15,6 @@ extern "C" void NDArrayDLPackDeleter(DLManagedTensor* tensor);
 
 namespace dgl {
 namespace runtime {
-
-#ifndef _WIN32
-SharedMemory::SharedMemory(const std::string &name) {
-  this->name = name;
-  this->is_new = false;
-  this->fd = -1;
-  this->ptr = nullptr;
-  this->size = 0;
-}
-
-SharedMemory::~SharedMemory() {
-  munmap(ptr, size);
-  close(fd);
-  if (is_new) {
-    LOG(INFO) << "remove " << name << " for shared memory";
-    shm_unlink(name.c_str());
-  }
-}
-
-void *SharedMemory::create_new(size_t size) {
-  this->is_new = true;
-
-  int flag = O_RDWR|O_EXCL|O_CREAT;
-  fd = shm_open(name.c_str(), flag, S_IRUSR | S_IWUSR);
-  CHECK_NE(fd, -1) << "fail to open " << name << ": " << strerror(errno);
-  auto res = ftruncate(fd, size);
-  CHECK_NE(res, -1)
-      << "Failed to truncate the file. " << strerror(errno);
-  ptr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-  CHECK_NE(ptr, MAP_FAILED)
-      << "Failed to map shared memory. mmap failed with error " << strerror(errno);
-  return ptr;
-}
-
-void *SharedMemory::open(size_t size) {
-  int flag = O_RDWR;
-  fd = shm_open(name.c_str(), flag, S_IRUSR | S_IWUSR);
-  CHECK_NE(fd, -1) << "fail to open " << name << ": " << strerror(errno);
-  ptr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-  CHECK_NE(ptr, MAP_FAILED)
-      << "Failed to map shared memory. mmap failed with error " << strerror(errno);
-  return ptr;
-}
-#endif  // _WIN32
 
 inline void VerifyDataType(DLDataType dtype) {
   CHECK_GE(dtype.lanes, 1);
