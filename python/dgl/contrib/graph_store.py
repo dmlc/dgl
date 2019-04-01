@@ -118,11 +118,11 @@ def _to_csr(graph_data, edge_dir, multigraph):
             return csr.indptr, csr.indices
         else:
             idx = create_graph_index(graph_data=graph_data, multigraph=multigraph, readonly=True)
-            transpose = False if edge_dir == 'in' else True
+            transpose = (edge_dir != 'in')
             csr = idx.adjacency_matrix_scipy(transpose, 'csr')
             return csr.indptr, csr.indices
 
-class SharedMemoryStoreServer:
+class SharedMemoryStoreServer(object):
     """The graph store server.
 
     The server loads graph structure and node embeddings and edge embeddings
@@ -133,9 +133,9 @@ class SharedMemoryStoreServer:
     graph_data : graph data
         Data to initialize graph. Same as networkx's semantics.
     edge_dir : string
-        the edge direction for the graph structure.
+        the edge direction for the graph structure ("in" or "out")
     graph_name : string
-        Define the name of the graph.
+        Define the name of the graph, so the client can use the name to access the graph.
     multigraph : bool, optional
         Whether the graph would be a multigraph (default: False)
     num_workers : int
