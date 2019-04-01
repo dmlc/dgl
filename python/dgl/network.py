@@ -46,7 +46,7 @@ def _send_subgraph(sender, nodeflow):
     nodeflow : NodeFlow
         NodeFlow object
     """
-    _CAPI_SenderSendSubgraph(sender, nodeflow, nodeflow._graph._handle)
+    _CAPI_SenderSendSubgraph(sender, nodeflow._handle, nodeflow._graph._handle)
 
 def _recv_subgraph(receiver, graph):
     """Receive sampled subgraph (NodeFlow) from remote sampler.

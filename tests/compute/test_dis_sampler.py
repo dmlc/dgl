@@ -1,4 +1,4 @@
-from dgl import backend as F
+import backend as F
 import numpy as np
 import scipy as sp
 import dgl

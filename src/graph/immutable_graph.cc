@@ -5,6 +5,7 @@
  */
 
 #include <dgl/immutable_graph.h>
+#include <cstring>
 
 #ifdef _MSC_VER
 #define _CRT_RAND_S
@@ -741,7 +742,7 @@ ImmutableGraph *ImmutableGraph::Deserialize(const char *data, int64_t *sizeptr) 
   int64_t indices_size = *(reinterpret_cast<const int64_t *>(data + size));
   size += sizeof(int64_t);
   csr->indices.resize(indices_size);
-  data_size = indptr_size * sizeof(dgl_id_t);
+  data_size = indices_size * sizeof(dgl_id_t);
   memcpy(csr->indices.data(), data + size, data_size);
   size += data_size;
 

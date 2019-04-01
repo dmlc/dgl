@@ -72,10 +72,10 @@ std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph, const std::st
   }
 }
 
-int64_t NodeFlow::Serialize(char *data, const ImmutableGraph *graph) const {
+int64_t NodeFlow::Serialize(char *data, const ImmutableGraph *g) const {
   int64_t size = 0;
 
-  size += graph->Serialize(data + size);
+  size += g->Serialize(data + size);
   size += this->node_mapping.Serialize(data + size);
   size += this->edge_mapping.Serialize(data + size);
   size += this->layer_offsets.Serialize(data + size);

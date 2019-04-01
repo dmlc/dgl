@@ -127,6 +127,7 @@ class NDArray {
    * \brief Serialize to C byte array
    * \param data The output data
    * \note TODO: replace with DMLC serializer
+   * \note Strided arrays are not supported!
    * \return Number of bytes written
    */
   int64_t Serialize(char *data) const;

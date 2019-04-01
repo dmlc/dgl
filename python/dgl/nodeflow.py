@@ -70,8 +70,7 @@ class NodeFlow(DGLBaseGraph):
     def __del__(self):
         """Free the C handle of NodeFlow"""
         if hasattr(self, '_handle'):
-            _CAPI_DGLGraphFree(self._handle)
-        super(NodeFlow, self).__del__()
+            _CAPI_NodeFlowFree(self._handle)
 
     def _get_layer_id(self, layer_id):
         """The layer Id might be negative. We need to convert it to the actual layer Id.

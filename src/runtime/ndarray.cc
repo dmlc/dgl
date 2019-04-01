@@ -7,6 +7,7 @@
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/device_api.h>
+#include <cstring>
 #include "runtime_base.h"
 
 // deleter for arrays used by DLPack exporter
@@ -123,8 +124,6 @@ struct NDArray::Internal {
 int64_t NDArray::Serialize(char *data) const {
   DLTensor *tensor = &(this->data_->dl_tensor);
   int64_t size = 0;
-
-  CHECK(tensor->strides == nullptr) << "strided arrays not supported";
 
   // 0x00: DLContext
   *(reinterpret_cast<DLContext *>(data + size)) = tensor->ctx;
