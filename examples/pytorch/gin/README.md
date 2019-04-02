@@ -25,6 +25,6 @@ python main.py
 
 An experiment on the GIN in customized settings can be run with
 ```bash
-python main.py --device 0 --disable_cuda --dataset COLLAB \
+python main.py --device 0 --disable-cuda --dataset COLLAB \
                --graph_pooling_type max --neighbor_pooling_type sum
 ```

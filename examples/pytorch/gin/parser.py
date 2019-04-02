@@ -35,7 +35,7 @@ class Parser():
             '--disable-cuda', action='store_true',
             help='Disable CUDA')
         self.parser.add_argument(
-            '--device', type=int, default=1,
+            '--device', type=int, default=0,
             help='which gpu device to use (default: 0)')
 
         # net
