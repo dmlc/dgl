@@ -227,7 +227,7 @@ class SharedMemoryStoreServer(object):
             self.server.handle_request()
         self._graph = None
 
-class SharedMemoryGraphStore(DGLGraph):
+class SharedMemoryDGLGraph(DGLGraph):
     """The shared-memory graph store.
 
     The graph store constructs the graph structure and node embeddings and edge embeddings
@@ -248,7 +248,7 @@ class SharedMemoryGraphStore(DGLGraph):
 
         graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
         graph_idx.from_shared_mem_csr_matrix(_get_graph_path(graph_name), num_nodes, num_edges, edge_dir)
-        super(SharedMemoryGraphStore, self).__init__(graph_idx, multigraph=multigraph, readonly=True)
+        super(SharedMemoryDGLGraph, self).__init__(graph_idx, multigraph=multigraph, readonly=True)
 
         # init all ndata and edata.
         ndata_infos = self.proxy.list_ndata()
@@ -338,8 +338,8 @@ def create_graph_store_server(graph_data, graph_name, store_type, num_workers,
     return SharedMemoryStoreServer(graph_data, edge_dir, graph_name, multigraph,
                                    num_workers, port)
 
-def create_graph_store_client(graph_name, store_type, port=8000):
-    """Create the graph store client.
+def create_graph_from_store(graph_name, store_type, port=8000):
+    """Create a client from the graph store.
 
     The client constructs the graph structure and node embeddings and edge embeddings
     that has been loaded by the graph store server.
@@ -358,10 +358,10 @@ def create_graph_store_client(graph_name, store_type, port=8000):
 
     Returns
     -------
-    SharedMemoryGraphStore
-        The graph store
+    SharedMemoryDGLGraph
+        The shared-memory DGLGraph
     """
-    return SharedMemoryGraphStore(graph_name, port)
+    return SharedMemoryDGLGraph(graph_name, port)
 
 
 _init_api("dgl.contrib.graph_store")

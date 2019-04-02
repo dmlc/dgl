@@ -14,7 +14,7 @@ def worker_func(worker_id):
     np.random.seed(0)
     csr = (spsp.random(num_nodes, num_nodes, density=0.1, format='csr') != 0).astype(np.int64)
 
-    g = dgl.contrib.graph_store.create_graph_store_client("test_graph5", "shared_mem")
+    g = dgl.contrib.graph_store.create_graph_from_store("test_graph5", "shared_mem")
     # Verify the graph structure loaded from the shared memory.
     src, dst = g.all_edges()
     coo = csr.tocoo()
