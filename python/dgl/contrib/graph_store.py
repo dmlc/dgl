@@ -154,10 +154,12 @@ class SharedMemoryStoreServer(object):
         self._graph_name = graph_name
         self._edge_dir = edge_dir
 
+        # RPC command: get the graph information from the graph store server.
         def get_graph_info():
             return self._graph.number_of_nodes(), self._graph.number_of_edges(), \
                     self._graph.is_multigraph, edge_dir
 
+        # RPC command: initialize node embedding in the server.
         def init_ndata(ndata_name, shape, dtype):
             if ndata_name in self._graph.ndata:
                 ndata = self._graph.ndata[ndata_name]
@@ -172,14 +174,17 @@ class SharedMemoryStoreServer(object):
             self._graph.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
             return 0
 
+        # RPC command: get the names of all node embeddings.
         def list_ndata():
             ndata = self._graph.ndata
             return [[key, ndata[key].shape, F.dtype(ndata[key])] for key in ndata]
 
+        # RPC command: get the names of all edge embeddings.
         def list_edata():
             edata = self._graph.edata
             return [[key, edata[key].shape, F.dtype(edata[key])] for key in edata]
 
+        # RPC command: notify the server of the termination of the client.
         def terminate():
             self._num_workers -= 1
             return 0
