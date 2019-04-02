@@ -75,6 +75,10 @@ class GraphDataLoader():
             idx_list.append(idx)
         train_idx, valid_idx = idx_list[fold_idx]
 
+        logging.info(
+            "train_set : test_set = %d : %d",
+            len(train_idx), len(valid_idx))
+
         return train_idx, valid_idx
 
     def _split_rand(self, labels, split_ratio=0.7, seed=0, shuffle=True):
@@ -83,11 +87,11 @@ class GraphDataLoader():
         np.random.seed(seed)
         np.random.shuffle(indices)
         split = int(math.floor(split_ratio * num_entries))
-        train_idx, valid_idx = indices[split:], indices[:split]
+        train_idx, valid_idx = indices[:split], indices[split:]
 
         logging.info(
             "train_set : test_set = %d : %d",
-            num_entries - split, split)
+            len(train_idx), len(valid_idx))
 
         return train_idx, valid_idx
 

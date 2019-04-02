@@ -9,6 +9,7 @@ from .utils import *
 from .sbm import SBMMixture
 from .reddit import RedditDataset
 from .ppi import PPIDataset
+from .gindt import GINDataset
 
 def register_data_args(parser):
     parser.add_argument("--dataset", type=str, required=False,

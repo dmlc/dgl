@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from dataset import GraphDataset
+from dgl.data.gindt import GINDataset
 from dataloader import GraphDataLoader, collate
 from parser import Parser
 from gin import GIN
@@ -21,14 +21,11 @@ logging.basicConfig(level=logging.INFO, format=fmt, datefmt=dtfmt)
 def train(args, net, trainloader, optimizer, criterion, epoch):
     net.train()
 
-    total = len(trainloader)
-
     running_loss = 0
-    total_iters = math.ceil(len(trainloader) / args.batch_size)
+    total_iters = len(trainloader)
     pbar = tqdm(range(total_iters), unit='batch')
 
-    logging.debug('the length of trainloader is {}'.format(total))
-    logging.debug('the total iters of trainloader is {}'.format(total_iters))
+    logging.debug('the total iters of training data is {}'.format(total_iters))
 
     for pos, (graphs, labels) in zip(pbar, trainloader):
         # batch graphs will be shipped to device in forward part of model
@@ -56,19 +53,18 @@ def train(args, net, trainloader, optimizer, criterion, epoch):
 def eval_net(args, net, dataloader, type, criterion):
     net.eval()
 
-    total = len(dataloader)
-    # tt is better
-    tt = 0
+    total = 0
     total_loss = 0
     total_correct = 0
 
-    logging.debug('the length of loader is {}'.format(total))
+    total_iters = len(dataloader)
+    logging.debug('the total iters of data is {}'.format(total_iters))
 
     for data in dataloader:
         graphs, labels = data
         labels = labels.to(args.device)
 
-        tt += len(labels)
+        total += len(labels)
 
         outputs = net(graphs)
         _, predicted = torch.max(outputs.data, 1)
@@ -81,7 +77,7 @@ def eval_net(args, net, dataloader, type, criterion):
             'loss item is {}; length of labels is {}'
             .format(loss.item(), len(labels)))
 
-    loss, acc = 1.0*total_loss / tt, 1.0*total_correct / tt
+    loss, acc = 1.0*total_loss / total, 1.0*total_correct / total 
 
     dlname = 'train set' if type == 'train' else 'valid set'
     logging.info(
@@ -107,12 +103,12 @@ def main(args):
     else:
         args.device = torch.device("cpu")
 
-    dataset = GraphDataset(args.dataset, not args.learn_eps)
+    dataset = GINDataset(args.dataset, not args.learn_eps)
 
     trainloader, validloader = GraphDataLoader(
         dataset, batch_size=args.batch_size, device=args.device,
         collate_fn=collate, seed=args.seed, shuffle=True,
-        split_name='rand', fold_idx=args.fold_idx).train_valid_loader()
+        split_name='fold10', fold_idx=args.fold_idx).train_valid_loader()
     # or split_name='rand', split_ratio=0.7
 
     model = GIN(
