@@ -149,7 +149,7 @@ class SharedMemoryStoreServer(object):
         indptr, indices = _to_csr(graph_data, edge_dir, multigraph)
         graph_idx.from_csr_matrix(indptr, indices, edge_dir, _get_graph_path(graph_name))
 
-        self._graph = DGLGraph(graph_idx, multigraph=multigraph, readonly=False)
+        self._graph = DGLGraph(graph_idx, multigraph=multigraph, readonly=True)
         self._num_workers = num_workers
         self._graph_name = graph_name
         self._edge_dir = edge_dir
