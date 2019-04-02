@@ -63,13 +63,19 @@ class SamplerSender(object):
         self._ip = ip
         self._port = port
         self._sender = _create_sampler_sender(ip, port)
+        self._closed = False
 
-    def __del__(self):
+    def close(self):
         """Finalize Sender
         """
-        # _finalize_sampler_sender will send a special message
-        # to tell the remote trainer machine that it has finished its job.
-        _finalize_sampler_sender(self._sender)
+        if not self._closed:
+            # _finalize_sampler_sender will send a special message
+            # to tell the remote trainer machine that it has finished its job.
+            _finalize_sampler_sender(self._sender)
+            self._closed = True
+
+    def __del__(self):
+        self.close()
 
     def send(self, nodeflow):
         """Send sampled subgraph (NodeFlow) to remote trainer.
@@ -104,14 +110,20 @@ class SamplerReceiver(object):
         self._port = port
         self._num_sender = num_sender
         self._receiver = _create_sampler_receiver(ip, port, num_sender)
+        self._closed = False
 
-    def __del__(self):
+    def close(self):
         """Finalize Receiver
 
         _finalize_sampler_receiver method will clean up the 
         back-end threads started by the SamplerReceiver.
         """
-        _finalize_sampler_receiver(self._receiver)
+        if not self._closed:
+            _finalize_sampler_receiver(self._receiver)
+            self._closed = True
+
+    def __del__(self):
+        self.close()
 
     def recv(self, graph):
         """Receive a NodeFlow object from remote sampler.

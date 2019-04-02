@@ -15,6 +15,8 @@ namespace dgl {
 
 DLManagedTensor* CreateTmpDLManagedTensor(const DGLArgValue& arg) {
   const DLTensor* dl_tensor = arg;
+  if (dl_tensor == nullptr)
+    return nullptr;
   DLManagedTensor* ret = new DLManagedTensor();
   ret->deleter = [] (DLManagedTensor* self) { delete self; };
   ret->manager_ctx = nullptr;

@@ -4,7 +4,7 @@ import scipy as sp
 import dgl
 from dgl import utils
 
-import os
+import multiprocessing as mp
 import time
 
 def generate_rand_graph(n):
@@ -29,6 +29,7 @@ def start_trainer():
     assert F.array_equal(src1, src)
 
     time.sleep(3)  # wait all senders to finalize their jobs
+    recv.close()
 
 def start_sampler():
     g = generate_rand_graph(100)
@@ -39,11 +40,25 @@ def start_sampler():
         break
 
     time.sleep(1)
+    sender.close()
+
+def start_sampler2():
+    g = generate_rand_graph(100)
+    sender = dgl.contrib.sampling.SamplerSender(ip="127.0.0.1", port=50051)
+    for i, subg in enumerate(dgl.contrib.sampling.PPRNeighborSampler(
+            g, 1, 100, 100, 1000, neighbor_type='in', num_workers=4)):
+        sender.send(subg)
+        break
+
+    time.sleep(1)
+    sender.close()
 
 if __name__ == '__main__':
-    pid = os.fork()
-    if pid == 0:
-        start_trainer()
-    else:
-        time.sleep(1)
-        start_sampler()
+    p = mp.Process(target=start_sampler)
+    p.start()
+    start_trainer()
+    p.join()
+    p = mp.Process(target=start_sampler2)
+    p.start()
+    start_trainer()
+    p.join()

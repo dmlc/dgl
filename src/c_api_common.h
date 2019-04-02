@@ -17,6 +17,8 @@ namespace dgl {
 // Graph handler type
 typedef void* GraphHandle;
 
+typedef void* NodeFlowHandle;
+
 // Communicator handler type
 typedef void* CommunicatorHandle;
 /*!

@@ -64,21 +64,35 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
     GraphHandle ghandle = args[1];
-    const IdArray node_mapping = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
-    const IdArray edge_mapping = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[3]));
-    const IdArray layer_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[4]));
-    const IdArray flow_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[5]));
+    NodeFlow nf;
+    DLManagedTensor *mt;
+
+    nf.layer_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
+    nf.flow_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[3]));
+    nf.node_mapping = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[4]));
+    if ((mt = CreateTmpDLManagedTensor(args[5])) == nullptr) {
+      nf.edge_mapping_available = false;
+    } else {
+      nf.edge_mapping_available = true;
+      nf.edge_mapping = IdArray::FromDLPack(mt);
+    }
+    if ((mt = CreateTmpDLManagedTensor(args[6])) == nullptr) {
+      nf.node_data_available = false;
+    } else {
+      nf.node_data_available = true;
+      nf.node_data = NDArray::FromDLPack(mt);
+    }
+    if ((mt = CreateTmpDLManagedTensor(args[7])) == nullptr) {
+      nf.edge_data_available = false;
+    } else {
+      nf.edge_data_available = true;
+      nf.edge_data = NDArray::FromDLPack(mt);
+    }
+
     ImmutableGraph *ptr = static_cast<ImmutableGraph*>(ghandle);
     network::Communicator* comm = static_cast<network::Communicator*>(chandle);
-    auto csr = ptr->GetInCSR();
     // Serialize nodeflow to data buffer
-    int64_t data_size = network::SerializeSampledSubgraph(
-                             sender_data_buffer,
-                             csr,
-                             node_mapping,
-                             edge_mapping,
-                             layer_offsets,
-                             flow_offsets);
+    int64_t data_size = network::SerializeNodeFlow(sender_data_buffer, ptr, nf);
     CHECK_GT(data_size, 0);
     // Send msg via network
     int64_t size = comm->Send(sender_data_buffer, data_size);
@@ -97,18 +111,9 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
       LOG(ERROR) << "Receive error: (size: " << size << ")";
     }
     NodeFlow* nf = new NodeFlow();
-    ImmutableGraph::CSR::Ptr csr;
     // Deserialize nodeflow from recv_data_buffer
-    network::DeserializeSampledSubgraph(recv_data_buffer,
-                                        &csr,
-                                        &(nf->node_mapping),
-                                        &(nf->edge_mapping),
-                                        &(nf->layer_offsets),
-                                        &(nf->flow_offsets));
-    nf->graph = GraphPtr(new ImmutableGraph(csr, nullptr, false));
-    std::vector<NodeFlow*> subgs(1);
-    subgs[0] = nf;
-    *rv = WrapVectorReturn(subgs);
+    network::DeserializeNodeFlow(recv_data_buffer, nf);
+    *rv = static_cast<NodeFlowHandle>(nf);
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeCommunicator")
