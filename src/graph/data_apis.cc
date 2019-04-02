@@ -21,7 +21,7 @@ std::unordered_map<std::string, DLDataType> dtype_map = {
   {"int32", DLDataType{kDLInt, 32, 1}},
 };
 
-DGL_REGISTER_GLOBAL("contrib.graph_store._CAPI_DGLCreateSharedMem")
+DGL_REGISTER_GLOBAL("contrib.graph_store._CAPI_DGLAllocateSharedMem")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string mem_name = args[0];
     dgl::runtime::NDArray shape_arr = args[1];
@@ -42,7 +42,7 @@ DGL_REGISTER_GLOBAL("contrib.graph_store._CAPI_DGLCreateSharedMem")
       memset(arr->data, 0, arr.GetSize());
   });
 
-DGL_REGISTER_GLOBAL("contrib.graph_store._CAPI_DGLCreateSharedMemWithData")
+DGL_REGISTER_GLOBAL("contrib.graph_store._CAPI_DGLAllocateSharedMemWithData")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string mem_name = args[0];
     NDArray data = args[1];

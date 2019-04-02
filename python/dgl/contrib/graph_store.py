@@ -46,8 +46,8 @@ class NodeDataView(MutableMapping):
         # Move the data in val to shared memory.
         dlpack = F.zerocopy_to_dlpack(val)
         dgl_tensor = nd.from_dlpack(dlpack)
-        val = _CAPI_DGLCreateSharedMemWithData(_get_ndata_path(self._graph_name, key),
-                                                dgl_tensor)
+        val = _CAPI_DGLAllocateSharedMemWithData(_get_ndata_path(self._graph_name, key),
+                                                 dgl_tensor)
         self._graph.set_n_repr({key : val}, self._nodes)
 
     def __delitem__(self, key):
@@ -87,8 +87,8 @@ class EdgeDataView(MutableMapping):
         # Move the data in val to shared memory.
         dlpack = F.zerocopy_to_dlpack(val)
         dgl_tensor = nd.from_dlpack(dlpack)
-        val = _CAPI_DGLCreateSharedMemWithData(_get_edata_path(self._graph_name, key),
-                                                dgl_tensor)
+        val = _CAPI_DGLAllocateSharedMemWithData(_get_edata_path(self._graph_name, key),
+                                                 dgl_tensor)
         self._graph.set_e_repr({key : val}, self._edges)
 
     def __delitem__(self, key):
@@ -166,8 +166,8 @@ class SharedMemoryStoreServer(object):
 
             assert self._graph.number_of_nodes() == shape[0]
             shape = utils.toindex(np.array(shape, dtype=np.int64))
-            data = _CAPI_DGLCreateSharedMem(_get_ndata_path(graph_name, ndata_name),
-                                            shape.todgltensor(), dtype, "zero", True)
+            data = _CAPI_DGLAllocateSharedMem(_get_ndata_path(graph_name, ndata_name),
+                                              shape.todgltensor(), dtype, "zero", True)
             dlpack = data.to_dlpack()
             self._graph.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
             return 0
@@ -267,8 +267,8 @@ class SharedMemoryDGLGraph(DGLGraph):
     def _init_ndata(self, ndata_name, shape, dtype):
         assert self.number_of_nodes() == shape[0]
         shape = utils.toindex(np.array(shape, dtype=np.int64))
-        data = _CAPI_DGLCreateSharedMem(_get_ndata_path(self._graph_name, ndata_name),
-                                        shape.todgltensor(), dtype, "zero", False)
+        data = _CAPI_DGLAllocateSharedMem(_get_ndata_path(self._graph_name, ndata_name),
+                                          shape.todgltensor(), dtype, "zero", False)
         dlpack = data.to_dlpack()
         self.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
 
