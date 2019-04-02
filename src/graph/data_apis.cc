@@ -18,8 +18,7 @@ namespace dgl {
 
 std::unordered_map<std::string, DLDataType> dtype_map = {
   {"float32", DLDataType{kDLFloat, 32, 1}},
-  {"int", DLDataType{kDLInt, 32, 1}},
-  {"uint", DLDataType{kDLUInt, 32, 1}},
+  {"int32", DLDataType{kDLInt, 32, 1}},
 };
 
 DGL_REGISTER_GLOBAL("contrib.graph_store._CAPI_DGLCreateSharedMem")

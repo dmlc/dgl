@@ -822,7 +822,7 @@ class GraphIndex(object):
         indices : a 1D tensor
             column index array in the CSR format
         edge_dir : string
-            the edge direction
+            the edge direction. The supported option is "in" and "out".
         shared_mem_name : string
             the name of shared memory
         """
@@ -852,7 +852,7 @@ class GraphIndex(object):
         num_edges : int
             the number of edges
         edge_dir : string
-            the edge direction
+            the edge direction. The supported option is "in" and "out".
         """
         assert self.is_readonly()
         self._handle = _CAPI_DGLGraphCSRCreateMMap(

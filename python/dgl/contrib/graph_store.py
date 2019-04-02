@@ -126,7 +126,8 @@ class SharedMemoryStoreServer(object):
     """The graph store server.
 
     The server loads graph structure and node embeddings and edge embeddings
-    and store them in shared memory.
+    and store them in shared memory. The loaded graph can be identified by
+    the graph name in the input argument.
 
     Parameters
     ----------
@@ -218,6 +219,10 @@ class SharedMemoryStoreServer(object):
         return EdgeDataView(self._graph, ALL, self._graph_name)
 
     def run(self):
+        """Run the graph store server.
+
+        The server runs to process RPC requests from clients.
+        """
         while self._num_workers > 0:
             self.server.handle_request()
         self._graph = None
@@ -279,7 +284,8 @@ class SharedMemoryGraphStore(DGLGraph):
         shape : tuple
             The shape of the node embedding
         dtype : string
-            The data type of the node embedding.
+            The data type of the node embedding. The currently supported data types
+            are "float32" and "int32".
         """
         self.proxy.init_ndata(ndata_name, shape, dtype)
         self._init_ndata(ndata_name, shape, dtype)
@@ -298,8 +304,10 @@ def create_graph_store_server(graph_data, graph_name, store_type, num_workers,
                               multigraph=False, edge_dir='in', port=8000):
     """Create the graph store server.
 
-    The server loads graph structure and node embeddings and edge embeddings
-    in shared memory.
+    The server loads graph structure and node embeddings and edge embeddings.
+
+    Currently, only shared-memory graph store server is supported, so `store_type`
+    can only be "shared_mem".
 
     After the server runs, the graph store clients can access the graph data
     with the specified graph name.
@@ -311,13 +319,14 @@ def create_graph_store_server(graph_data, graph_name, store_type, num_workers,
     graph_name : string
         Define the name of the graph.
     store_type : string
-        The type of the graph store.
+        The type of the graph store. The current option is "shared_mem".
     num_workers : int
         The number of workers that will connect to the server.
     multigraph : bool, optional
         Whether the graph would be a multigraph (default: False)
     edge_dir : string
-        the edge direction for the graph structure.
+        the edge direction for the graph structure. The supported option is
+        "in" and "out".
     port : int
         The port that the server listens to.
 
@@ -333,14 +342,17 @@ def create_graph_store_client(graph_name, store_type, port=8000):
     """Create the graph store client.
 
     The client constructs the graph structure and node embeddings and edge embeddings
-    in shared memory that has been loaded by the graph store server.
+    that has been loaded by the graph store server.
+
+    Currently, only shared-memory graph store server is supported, so `store_type`
+    can only be "shared_memory".
 
     Parameters
     ----------
     graph_name : string
         Define the name of the graph.
     store_type : string
-        The type of the graph store.
+        The type of the graph store. The current option is "shared_mem".
     port : int
         The port that the server listens to.
 
