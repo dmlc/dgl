@@ -56,6 +56,8 @@ class NodeFlow(DGLBaseGraph):
         self._parent = parent
         self._node_mapping = utils.toindex(_CAPI_NodeFlowGetNodeMapping(handle))
         self._edge_mapping_available = _CAPI_NodeFlowEdgeMappingIsAvailable(handle)
+        self._node_data_available = _CAPI_NodeFlowIsNodeDataAvailable(handle)
+        self._edge_data_available = _CAPI_NodeFlowIsEdgeDataAvailable(handle)
         if self._edge_mapping_available:
             self._edge_mapping = utils.toindex(_CAPI_NodeFlowGetEdgeMapping(handle))
         self._layer_offsets = utils.toindex(
@@ -68,13 +70,13 @@ class NodeFlow(DGLBaseGraph):
                              for i in range(self.num_layers)]
         self._edge_frames = [FrameRef(Frame(num_rows=self.block_size(i))) \
                              for i in range(self.num_blocks)]
-        if _CAPI_NodeFlowIsNodeDataAvailable(handle):
+        if self._node_data_available:
             self._node_data = F.zerocopy_from_dlpack(
                     _CAPI_NodeFlowGetNodeData(handle).to_dlpack())
             for i in range(self.num_layers):
                 self._node_frames[i][ndata_key] = self._node_data[
                         self._layer_offsets[i]:self._layer_offsets[i+1]]
-        if _CAPI_NodeFlowIsEdgeDataAvailable(handle):
+        if self._edge_data_available:
             self._edge_data = F.zerocopy_from_dlpack(
                     _CAPI_NodeFlowGetEdgeData(handle).to_dlpack())
             for i in range(self.num_blocks):

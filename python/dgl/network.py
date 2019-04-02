@@ -5,6 +5,8 @@ from ._ffi.function import _init_api
 from .nodeflow import NodeFlow
 from .utils import unwrap_to_ptr_list
 from . import utils
+from . import ndarray as nd
+from . import backend as F
 
 _init_api("dgl.network")
 
@@ -52,12 +54,18 @@ def _send_subgraph(sender, nodeflow):
     # Can we convert NDArray to tensor directly, instead of using toindex()?
     layers_offsets = utils.toindex(nodeflow._layer_offsets).todgltensor()
     flows_offsets = utils.toindex(nodeflow._block_offsets).todgltensor()
-    _CAPI_SenderSendSubgraph(sender,
-                             graph_handle,
-                             node_mapping,
-                             edge_mapping,
-                             layers_offsets,
-                             flows_offsets)
+    _CAPI_SenderSendSubgraph(
+            sender,
+            nodeflow._graph._handle,
+            nd.zerocopy_from_numpy(nodeflow._layer_offsets),
+            nd.zerocopy_from_numpy(nodeflow._block_offsets),
+            nodeflow._node_mapping.todgltensor(),
+            nodeflow._edge_mapping.todgltensor()
+                if nodeflow._edge_mapping_available else None,
+            nd.from_dlpack(F.zerocopy_to_dlpack(nodeflow._node_data))
+            if nodeflow._node_data_available else None,
+            nd.from_dlpack(F.zerocopy_to_dlpack(nodeflow._edge_data))
+            if nodeflow._edge_data_available else None)
 
 def _recv_subgraph(receiver, graph):
     """Receive sampled subgraph (NodeFlow) from remote sampler.
