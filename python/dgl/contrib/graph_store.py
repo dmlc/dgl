@@ -228,10 +228,11 @@ class SharedMemoryStoreServer(object):
         self._graph = None
 
 class SharedMemoryDGLGraph(DGLGraph):
-    """The shared-memory graph store.
+    """Shared-memory DGLGraph.
 
-    The graph store constructs the graph structure and node embeddings and edge embeddings
-    in shared memory that has been loaded by the graph store server.
+    This is a client to access data in the shared-memory graph store that has loads
+    the graph structure and node embeddings and edge embeddings to shared memory.
+    It provides the DGLGraph interface.
 
     Parameters
     ----------
