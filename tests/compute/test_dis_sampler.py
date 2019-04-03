@@ -1,8 +1,8 @@
-from dgl import backend as F
 import numpy as np
 import scipy as sp
 import dgl
 from dgl import utils
+import backend as F
 
 import multiprocessing as mp
 import time
@@ -11,8 +11,9 @@ def generate_rand_graph(n):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
     return dgl.DGLGraph(arr, readonly=True)
 
+g = generate_rand_graph(100)
+
 def start_trainer():
-    g = generate_rand_graph(100)
     recv = dgl.contrib.sampling.SamplerReceiver(ip="127.0.0.1", port=50051)
     subg = recv.recv(g)
     seed_ids = subg.layer_parent_nid(-1)
@@ -32,7 +33,6 @@ def start_trainer():
     recv.close()
 
 def start_sampler():
-    g = generate_rand_graph(100)
     sender = dgl.contrib.sampling.SamplerSender(ip="127.0.0.1", port=50051)
     for i, subg in enumerate(dgl.contrib.sampling.NeighborSampler(
             g, 1, 100, neighbor_type='in', num_workers=4)):
@@ -42,11 +42,23 @@ def start_sampler():
     time.sleep(1)
     sender.close()
 
+def start_trainer2():
+    recv = dgl.contrib.sampling.SamplerReceiver(ip="127.0.0.1", port=50051)
+    subg = recv.recv(g)
+
+    eid = subg.block_eid(0)
+    edata = F.asnumpy(subg.blocks[0].data['ppr_weight'])
+    dst = F.asnumpy(subg.find_edges(eid)[1])
+    for i in np.unique(dst)[:5]:
+        assert np.isclose(edata[dst == i].sum(), 1)
+
+    time.sleep(3)  # wait all senders to finalize their jobs
+    recv.close()
+
 def start_sampler2():
-    g = generate_rand_graph(100)
     sender = dgl.contrib.sampling.SamplerSender(ip="127.0.0.1", port=50051)
     for i, subg in enumerate(dgl.contrib.sampling.PPRNeighborSampler(
-            g, 1, 100, 100, 1000, neighbor_type='in', num_workers=4)):
+            g, 1, 100, 100, 1000, num_workers=4)):
         sender.send(subg)
         break
 
@@ -60,5 +72,5 @@ if __name__ == '__main__':
     p.join()
     p = mp.Process(target=start_sampler2)
     p.start()
-    start_trainer()
+    start_trainer2()
     p.join()

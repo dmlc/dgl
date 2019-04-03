@@ -76,10 +76,12 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
       nf.edge_mapping_available = true;
       nf.edge_mapping = IdArray::FromDLPack(mt);
     }
-    nf.node_data_name = args[6];
+    std::string node_data_name = args[6];
+    nf.node_data_name = std::move(node_data_name);
     if (!nf.node_data_name.empty())
       nf.node_data = NDArray::FromDLPack(CreateTmpDLManagedTensor(args[7]));
-    nf.edge_data_name = args[8];
+    std::string edge_data_name = args[8];
+    nf.edge_data_name = std::move(edge_data_name);
     if (!nf.edge_data_name.empty())
       nf.edge_data = NDArray::FromDLPack(CreateTmpDLManagedTensor(args[9]));
 

@@ -5,10 +5,9 @@ import pandas as pd
 import numpy as np
 import tqdm
 from rec.model.pinsage import PinSage
-from rec.datasets.movielens import MovieLens
 from rec.utils import cuda
-from rec.adabound import AdaBound
 from dgl import DGLGraph
+from dgl.contrib.sampling import PPRBipartiteSingleSidedNeighborSampler
 
 import argparse
 import pickle
@@ -24,17 +23,26 @@ parser.add_argument('--sgd-switch', type=int, default=-1)
 parser.add_argument('--n-negs', type=int, default=1)
 parser.add_argument('--loss', type=str, default='hinge')
 parser.add_argument('--hard-neg-prob', type=float, default=0)
+parser.add_argument('--dataset', type=str, default='movielens')
 args = parser.parse_args()
 
 print(args)
 
-cache_file = 'ml.pkl'
-
+cache_files = {
+        'movielens': '/efs/quagan/ml.pkl',
+        'reddit': '/efs/quagan/rd.pkl',
+        }
+cache_file = cache_files[args.dataset]
 if os.path.exists(cache_file):
     with open(cache_file, 'rb') as f:
         ml = pickle.load(f)
 else:
-    ml = MovieLens('./ml-1m')
+    if args.dataset == 'movielens':
+        from rec.datasets.movielens import MovieLens
+        ml = MovieLens('./ml-1m')
+    elif args.dataset == 'reddit':
+        from rec.datasets.reddit import Reddit
+        ml = Reddit('./subm-users.pkl')
     with open(cache_file, 'wb') as f:
         pickle.dump(ml, f)
 
@@ -51,7 +59,7 @@ hard_neg_prob = args.hard_neg_prob
 
 sched_lambda = {
         'none': lambda epoch: 1,
-        'decay': lambda epoch: max(0.999 ** epoch, 1e-4),
+        'decay': lambda epoch: max(0.98 ** epoch, 1e-4),
         }
 loss_func = {
         'hinge': lambda diff: (diff + margin).clamp(min=0).mean(),
@@ -59,31 +67,29 @@ loss_func = {
         }
 
 model = cuda(PinSage(
-    g.number_of_nodes(),
     [n_hidden] * (n_layers + 1),
-    20,
-    0.5,
-    10,
     use_feature=args.use_feature,
     G=g,
     ))
-opt = getattr(torch.optim, args.opt)(model.parameters(), lr=args.lr, weight_decay=1e-4)
+embs = nn.Embedding(g.number_of_nodes(), n_hidden)  # note: on CPU
+
+opt = getattr(torch.optim, args.opt)(
+        list(model.parameters()) + list(embs.parameters()),
+        lr=args.lr)
 sched = torch.optim.lr_scheduler.LambdaLR(opt, sched_lambda[args.sched])
 
 
-def forward(model, g_prior, nodeset, train=True):
+def cast_ppr_weight(nodeflow):
+    for i in range(nodeflow.num_blocks):
+        nodeflow.apply_block(i, lambda x: {'ppr_weight': cuda(x.data['ppr_weight']).float()})
+
+
+def forward(model, nodeflow, train=True):
     if train:
-        return model(g_prior, nodeset)
+        return model(nodeflow, embs)
     else:
         with torch.no_grad():
-            return model(g_prior, nodeset)
-
-
-def filter_nid(nids, nid_from):
-    nids = [nid.numpy() for nid in nids]
-    nid_from = nid_from.numpy()
-    np_mask = np.logical_and(*[np.isin(nid, nid_from) for nid in nids])
-    return [torch.from_numpy(nid[np_mask]) for nid in nids]
+            return model(nodeflow, embs)
 
 
 def runtrain(g_prior_edges, g_train_edges, train):
@@ -97,8 +103,17 @@ def runtrain(g_prior_edges, g_train_edges, train):
     g_prior = DGLGraph()
     g_prior.add_nodes(g.number_of_nodes())
     g_prior.add_edges(g_prior_src, g_prior_dst)
-    g_prior.ndata.update({k: cuda(v) for k, v in g.ndata.items()})
+    g_prior.ndata.update({k: v for k, v in g.ndata.items()})
     edge_batches = g_train_edges[torch.randperm(g_train_edges.shape[0])].split(batch_size)
+    sampler = PPRBipartiteSingleSidedNeighborSampler(
+            g_prior,
+            batch_size,
+            n_layers + 1,
+            10,
+            20,
+            restart_prob=0.5,
+            prefetch=False,
+            add_self_loop=True)
 
     with tqdm.tqdm(edge_batches) as tq:
         sum_loss = 0
@@ -130,13 +145,21 @@ def runtrain(g_prior_edges, g_train_edges, train):
             if len(src) == 0:
                 continue
 
-            nodeset = cuda(torch.cat([src, dst, dst_neg]))
-            src_size, dst_size, dst_neg_size = \
-                    src.shape[0], dst.shape[0], dst_neg.shape[0]
+            src_size = src.shape[0]
+            dst_size = dst.shape[0]
+            dst_neg_size = dst_neg.shape[0]
 
-            h_src, h_dst, h_dst_neg = (
-                    forward(model, g_prior, nodeset, train)
-                    .split([src_size, dst_size, dst_neg_size]))
+            nodeset = torch.cat([src, dst, dst_neg])
+            nodeflow = sampler.generate(nodeset)
+            for i in range(nodeflow.num_layers - 1):
+                assert np.isin(nodeflow.layer_parent_nid(i + 1).numpy(),
+                        nodeflow.layer_parent_nid(i).numpy()).all()
+            nodeflow.copy_from_parent()
+            cast_ppr_weight(nodeflow)
+            node_output = forward(model, nodeflow, train)
+            output_idx = nodeflow.map_from_parent_nid(-1, nodeset)
+            h = node_output[output_idx]
+            h_src, h_dst, h_dst_neg = h.split([src_size, dst_size, dst_neg_size])
 
             diff = (h_src * (h_dst_neg - h_dst)).sum(1)
             loss = loss_func[args.loss](diff)
@@ -174,14 +197,27 @@ def runtest(g_prior_edges, validation=True):
     g_prior = DGLGraph()
     g_prior.add_nodes(g.number_of_nodes())
     g_prior.add_edges(g_prior_src, g_prior_dst)
-    g_prior.ndata.update({k: cuda(v) for k, v in g.ndata.items()})
+    g_prior.ndata.update({k: v for k, v in g.ndata.items()})
+    sampler = PPRBipartiteSingleSidedNeighborSampler(
+            g_prior,
+            batch_size,
+            n_layers + 1,
+            10,
+            20,
+            restart_prob=0.5,
+            prefetch=False,
+            add_self_loop=True)
 
     hs = []
     with torch.no_grad():
-        with tqdm.trange(n_users + n_items) as tq:
+        with tqdm.trange(0, n_users + n_items, batch_size) as tq:
             for node_id in tq:
-                nodeset = cuda(torch.LongTensor([node_id]))
-                h = forward(model, g_prior, nodeset, False)
+                node_id_end = min(n_users + n_items, node_id + batch_size)
+                node_id_tensor = torch.arange(node_id, node_id_end)
+                nodeflow = sampler.generate(node_id_tensor)
+                nodeflow.copy_from_parent()
+                cast_ppr_weight(nodeflow)
+                h = forward(model, nodeflow, False)
                 hs.append(h)
     h = torch.cat(hs, 0)
 
@@ -220,15 +256,26 @@ def runtest(g_prior_edges, validation=True):
     return np.array(rr)
 
 
+def refresh_mask():
+    ml.refresh_mask()
+    g_prior_edges = g.filter_edges(lambda edges: edges.data['prior'])
+    g_train_edges = g.filter_edges(lambda edges: edges.data['train'] & ~edges.data['inv'])
+    g_prior_train_edges = g.filter_edges(
+            lambda edges: edges.data['prior'] | edges.data['train'])
+    return g_prior_edges, g_train_edges, g_prior_train_edges
+
+
 def train():
     global opt, sched
     best_mrr = 0
+    if args.dataset != 'movielens':
+        print('Mask initialization' % epoch)
+        g_prior_edges, g_train_edges, g_prior_train_edges = refresh_mask()
+
     for epoch in range(500):
-        ml.refresh_mask()
-        g_prior_edges = g.filter_edges(lambda edges: edges.data['prior'])
-        g_train_edges = g.filter_edges(lambda edges: edges.data['train'] & ~edges.data['inv'])
-        g_prior_train_edges = g.filter_edges(
-                lambda edges: edges.data['prior'] | edges.data['train'])
+        if args.dataset == 'movielens':
+            print('Epoch %d mask refresh' % epoch)
+            g_prior_edges, g_train_edges, g_prior_train_edges = refresh_mask()
 
         print('Epoch %d validation' % epoch)
         with torch.no_grad():

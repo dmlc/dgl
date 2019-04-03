@@ -34,7 +34,6 @@ int64_t SerializeNodeFlow(char* data,
                           const ImmutableGraph *graph,
                           const NodeFlow &nf) {
   const auto csr = graph->GetInCSR();
-  const int64_t flags = 0;
   int64_t total_size = 0;
 
   // First check the size of the data to prevent overflowing the buffer.

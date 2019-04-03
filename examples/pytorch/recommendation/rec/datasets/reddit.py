@@ -31,8 +31,8 @@ class Reddit(UserProductDataset):
         self.ratings = self.data_split(self.ratings)
         print('build graph')
         self.build_graph()
-        print('find neighbors')
-        self.find_neighbors(0.2, 5000, 1000)
+        #print('find neighbors')
+        #self.find_neighbors(0.2, 5000, 1000)
 
     def split_user(self, df, filter_counts=False):
         df_new = df.copy()
