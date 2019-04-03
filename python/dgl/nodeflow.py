@@ -68,7 +68,7 @@ class NodeFlow(DGLBaseGraph):
                              for i in range(self.num_blocks)]
         if self._node_data_available:
             self._node_data = F.zerocopy_from_dlpack(
-                    _CAPI_NodeFlowGetNodeData(handle).to_dlpack())
+                _CAPI_NodeFlowGetNodeData(handle).to_dlpack())
             for i in range(self.num_layers):
                 self._node_frames[i][self._node_data_name] = self._node_data[
                     self._layer_offsets[i]:self._layer_offsets[i+1]]
