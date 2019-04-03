@@ -6,11 +6,11 @@
 #ifndef DGL_SAMPLER_H_
 #define DGL_SAMPLER_H_
 
+#include <dmlc/omp.h>
 #include <vector>
 #include <string>
 #include <cstdlib>
 #include <ctime>
-#include <dmlc/omp.h>
 #include "graph_interface.h"
 #include "nodeflow.h"
 
