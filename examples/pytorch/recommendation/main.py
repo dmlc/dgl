@@ -40,14 +40,16 @@ else:
     if args.dataset == 'movielens':
         from rec.datasets.movielens import MovieLens
         ml = MovieLens('./ml-1m')
+        neighbors = ml.user_neighbors + ml.product_neighbors
     elif args.dataset == 'reddit':
         from rec.datasets.reddit import Reddit
         ml = Reddit('./subm-users.pkl')
+        if args.hard_neg_prob > 0:
+            raise ValueError('Hard negative examples currently not supported on reddit.')
     with open(cache_file, 'wb') as f:
         pickle.dump(ml, f)
 
 g = ml.g
-neighbors = ml.user_neighbors + ml.product_neighbors
 
 n_hidden = 100
 n_layers = args.layers
