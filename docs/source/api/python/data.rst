@@ -33,6 +33,17 @@ Mini graph classification dataset
 .. autoclass:: MiniGCDataset
     :members: __getitem__, __len__, num_classes
 
+
+.. insert TUDataset above GIN dataset and remove this line when merged
+Graph isomorphism network dataset
+```````````````````````````````````
+
+A compact subset of graph kernel dataset
+
+.. autoclass:: GINDataset
+    :members: __getitem__, __len__
+
+
 Protein-Protein Interaction dataset
 ```````````````````````````````````
 

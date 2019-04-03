@@ -21,13 +21,13 @@ _url = 'https://raw.githubusercontent.com/weihua916/powerful-gnns/master/dataset
 
 class GINDataset(object):
     """Datasets for Graph Isomorphism Network (GIN)
-    Adapted for the paper 'how powerful are graph neural networks?'
+    Adapted from https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip.
 
-    The dataset contains the compact format of popular graph kernel datasets,
-    which included:
+    The dataset contains the compact format of popular graph kernel datasets, which includes: 
     MUTAG, COLLAB, IMDBBINARY, IMDBMULTI, NCI1, PROTEINS, PTC, REDDITBINARY, REDDITMULTI5K
 
-    This datset class processes all data sets listed above.
+    This datset class processes all data sets listed above. For more graph kernel datasets, 
+    see :class:`TUDataset`
 
     Paramters
     ---------
@@ -97,7 +97,7 @@ class GINDataset(object):
 
         Returns
         -------
-        (DGLGraph, int)
+        (dgl.DGLGraph, int)
             The graph and its label.
         """
         return self.graphs[idx], self.labels[idx]
