@@ -19,6 +19,17 @@ namespace network {
 
 const int kNumTensor = 7;  // We need to serialize 7 conponents (tensor) here
 
+/*!
+ * Round x + 1 up to \c roundto
+ * Example:
+ * roundup(1, 8) = 8
+ * roundup(7, 8) = 8
+ * roundup(8, 8) = 16
+ */
+inline int64_t roundup(int64_t x, int64_t roundto) {
+  return (x / roundto + 1) * roundto;
+}
+
 int64_t SerializeNodeFlow(char* data,
                           const ImmutableGraph *graph,
                           const NodeFlow &nf) {
@@ -49,12 +60,19 @@ int64_t SerializeNodeFlow(char* data,
   total_size += sizeof(edge_mapping_size);
   total_size += edge_mapping_size;
 
-  // node_data
-  int64_t node_ndim = nf.node_data_available ? nf.node_data->ndim : 0;
+  // node_data, serialized as follows:
+  // ndim
+  // dtype (8-bytes aligned)
+  // node data name (8-bytes aligned, null-terminated)
+  // shape array
+  // content
+  int64_t node_ndim = !nf.node_data_name.empty() ? nf.node_data->ndim : 0;
   total_size += sizeof(node_ndim);
-  int64_t node_data_size = 0;
-  if (nf.node_data_available) {
+  int64_t node_data_size = 0, node_data_name_size = 0;
+  if (!nf.node_data_name.empty()) {
     total_size += sizeof(int64_t);  // DLDataType
+    node_data_name_size = roundup(nf.node_data_name.length(), 8);
+    total_size += node_data_name_size;
     node_data_size = nf.node_data->dtype.bits / 8;
 
     for (int i = 0; i < node_ndim; ++i) {
@@ -65,11 +83,13 @@ int64_t SerializeNodeFlow(char* data,
   total_size += node_data_size;
 
   // edge_data
-  int64_t edge_ndim = nf.edge_data_available ? nf.edge_data->ndim : 0;
+  int64_t edge_ndim = !nf.edge_data_name.empty() ? nf.edge_data->ndim : 0;
   total_size += sizeof(edge_ndim);
-  int64_t edge_data_size = 0;
-  if (nf.edge_data_available) {
+  int64_t edge_data_size = 0, edge_data_name_size = 0;
+  if (!nf.edge_data_name.empty()) {
     total_size += sizeof(int64_t);  // DLDataType
+    edge_data_name_size = roundup(nf.edge_data_name.length(), 8);
+    total_size += edge_data_name_size;
     edge_data_size = nf.edge_data->dtype.bits / 8;
 
     for (int i = 0; i < edge_ndim; ++i) {
@@ -133,9 +153,11 @@ int64_t SerializeNodeFlow(char* data,
   // node_data
   *(reinterpret_cast<int64_t*>(data_ptr)) = node_ndim;
   data_ptr += sizeof(node_ndim);
-  if (nf.node_data_available) {
+  if (!nf.node_data_name.empty()) {
     *(reinterpret_cast<DLDataType*>(data_ptr)) = nf.node_data->dtype;
     data_ptr += sizeof(int64_t);
+    strncpy(data_ptr, nf.node_data_name.c_str(), node_data_name_size);
+    data_ptr += node_data_name_size;
     for (int i = 0; i < node_ndim; ++i) {
       *(reinterpret_cast<int64_t*>(data_ptr)) = nf.node_data->shape[i];
       data_ptr += sizeof(int64_t);
@@ -147,9 +169,11 @@ int64_t SerializeNodeFlow(char* data,
   // edge_data
   *(reinterpret_cast<int64_t*>(data_ptr)) = edge_ndim;
   data_ptr += sizeof(edge_ndim);
-  if (nf.edge_data_available) {
+  if (!nf.edge_data_name.empty()) {
     *(reinterpret_cast<DLDataType*>(data_ptr)) = nf.edge_data->dtype;
     data_ptr += sizeof(int64_t);
+    strncpy(data_ptr, nf.edge_data_name.c_str(), edge_data_name_size);
+    data_ptr += edge_data_name_size;
     for (int i = 0; i < edge_ndim; ++i) {
       *(reinterpret_cast<int64_t*>(data_ptr)) = nf.edge_data->shape[i];
       data_ptr += sizeof(int64_t);
@@ -246,12 +270,13 @@ void DeserializeNodeFlow(char* data, NodeFlow *nf) {
   int64_t node_ndim = *(reinterpret_cast<int64_t*>(data_ptr));
   data_ptr += sizeof(int64_t);
   if (node_ndim == 0) {
-    nf->node_data_available = false;
+    nf->node_data_name = "";
   } else {
-    nf->node_data_available = true;
-
     DLDataType *dtype_ptr = reinterpret_cast<DLDataType*>(data_ptr);
     data_ptr += sizeof(int64_t);
+
+    nf->node_data_name = data_ptr;  // data_ptr points to null-terminated name string
+    data_ptr += roundup(nf->node_data_name.length(), 8);
 
     int64_t *node_shape_ptr = reinterpret_cast<int64_t*>(data_ptr);
     int64_t node_data_size = dtype_ptr->bits / 8;
@@ -269,12 +294,13 @@ void DeserializeNodeFlow(char* data, NodeFlow *nf) {
   int64_t edge_ndim = *(reinterpret_cast<int64_t*>(data_ptr));
   data_ptr += sizeof(int64_t);
   if (edge_ndim == 0) {
-    nf->edge_data_available = false;
+    nf->edge_data_name = "";
   } else {
-    nf->edge_data_available = true;
-
     DLDataType *dtype_ptr = reinterpret_cast<DLDataType*>(data_ptr);
     data_ptr += sizeof(int64_t);
+
+    nf->edge_data_name = data_ptr;  // data_ptr points to null-terminated name string
+    data_ptr += roundup(nf->edge_data_name.length(), 8);
 
     int64_t *edge_shape_ptr = reinterpret_cast<int64_t*>(data_ptr);
     int64_t edge_data_size = dtype_ptr->bits / 8;

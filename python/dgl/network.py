@@ -62,8 +62,10 @@ def _send_subgraph(sender, nodeflow):
             nodeflow._node_mapping.todgltensor(),
             nodeflow._edge_mapping.todgltensor()
                 if nodeflow._edge_mapping_available else None,
+            nodeflow._node_data_name,
             nd.from_dlpack(F.zerocopy_to_dlpack(nodeflow._node_data))
             if nodeflow._node_data_available else None,
+            nodeflow._edge_data_name,
             nd.from_dlpack(F.zerocopy_to_dlpack(nodeflow._edge_data))
             if nodeflow._edge_data_available else None)
 

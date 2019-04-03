@@ -335,7 +335,7 @@ NodeFlow CreateNodeFlowWithPPRFromRandomWalk(
       "in", gptr->IsMultigraph(), &nf, &vertex_mapping, &edge_mapping);
 
   const int64_t num_edges = edge_list.size();
-  nf.edge_data_available = true;
+  nf.edge_data_name = "ppr_weight";
   nf.edge_data = NDArray::Empty(
       {num_edges}, DLDataType{kDLFloat, 64, 1}, DLContext{kDLCPU, 0});
   double *edge_data_out = static_cast<double *>(nf.edge_data->data);

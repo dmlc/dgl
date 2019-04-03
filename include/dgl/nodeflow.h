@@ -66,13 +66,13 @@ struct NodeFlow {
    */
   IdArray edge_mapping;
   /*!
-   * \brief Whether a node tensor is returned.
+   * \brief The column name in node frame.  Empty string if no node data is returned.
    */
-  bool node_data_available;
+  std::string node_data_name;
   /*!
-   * \brief Whether an edge tensor is returned.
+   * \brief The column name in edge frame.  Empty string if no edge data is returned.
    */
-  bool edge_data_available;
+  std::string edge_data_name;
   /*!
    * \brief Application-specific tensor data on nodes
    */

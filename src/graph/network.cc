@@ -76,18 +76,12 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
       nf.edge_mapping_available = true;
       nf.edge_mapping = IdArray::FromDLPack(mt);
     }
-    if ((mt = CreateTmpDLManagedTensor(args[6])) == nullptr) {
-      nf.node_data_available = false;
-    } else {
-      nf.node_data_available = true;
-      nf.node_data = NDArray::FromDLPack(mt);
-    }
-    if ((mt = CreateTmpDLManagedTensor(args[7])) == nullptr) {
-      nf.edge_data_available = false;
-    } else {
-      nf.edge_data_available = true;
-      nf.edge_data = NDArray::FromDLPack(mt);
-    }
+    nf.node_data_name = args[6];
+    if (!nf.node_data_name.empty())
+      nf.node_data = NDArray::FromDLPack(CreateTmpDLManagedTensor(args[7]));
+    nf.edge_data_name = args[8];
+    if (!nf.edge_data_name.empty())
+      nf.edge_data = NDArray::FromDLPack(CreateTmpDLManagedTensor(args[9]));
 
     ImmutableGraph *ptr = static_cast<ImmutableGraph*>(ghandle);
     network::Communicator* comm = static_cast<network::Communicator*>(chandle);

@@ -227,8 +227,8 @@ void ConstructNodeFlow(
     nf->graph = GraphPtr(new ImmutableGraph(nullptr, subg_csr, is_multigraph));
   }
 
-  nf->node_data_available = false;
-  nf->edge_data_available = false;
+  nf->node_data_name = "";
+  nf->edge_data_name = "";
 }
 
 DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetGraph")
@@ -281,25 +281,25 @@ DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowFree")
     delete nflow;
   });
 
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowIsNodeDataAvailable")
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowNodeDataName")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     void* ptr = args[0];
     const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
-    *rv = nflow->node_data_available;
+    *rv = nflow->node_data_name;
   });
 
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowIsEdgeDataAvailable")
+DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowEdgeDataName")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     void* ptr = args[0];
     const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
-    *rv = nflow->edge_data_available;
+    *rv = nflow->edge_data_name;
   });
 
 DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetNodeData")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     void* ptr = args[0];
     const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
-    if (!nflow->node_data_available) {
+    if (nflow->node_data_name.empty()) {
       LOG(FATAL) << "node data unavailable";
       *rv = nullptr;
     } else {
@@ -311,7 +311,7 @@ DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetEdgeData")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     void* ptr = args[0];
     const NodeFlow* nflow = static_cast<NodeFlow*>(ptr);
-    if (!nflow->edge_data_available) {
+    if (nflow->edge_data_name.empty()) {
       LOG(FATAL) << "edge data unavailable";
       *rv = nullptr;
     } else {

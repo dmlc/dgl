@@ -38,14 +38,8 @@ class NodeFlow(DGLBaseGraph):
         The parent graph.
     handle : NodeFlowHandle
         The handle to the underlying C structure.
-    ndata_key : str, optional
-        If node data is returned in the C structure, store the data tensor
-        in this key in all node frames
-    edata_key : str, optional
-        If edge data is returned in the C structure, store the data tensor
-        in this key in all edge frames
     """
-    def __init__(self, parent, handle, ndata_key, edata_key):
+    def __init__(self, parent, handle):
         # NOTE(minjie): handle is a pointer to the underlying C++ structure
         #  defined in include/dgl/sampler.h. The constructor will save
         #  all its members in the python side and destroy the handler
@@ -56,8 +50,10 @@ class NodeFlow(DGLBaseGraph):
         self._parent = parent
         self._node_mapping = utils.toindex(_CAPI_NodeFlowGetNodeMapping(handle))
         self._edge_mapping_available = _CAPI_NodeFlowEdgeMappingIsAvailable(handle)
-        self._node_data_available = _CAPI_NodeFlowIsNodeDataAvailable(handle)
-        self._edge_data_available = _CAPI_NodeFlowIsEdgeDataAvailable(handle)
+        self._node_data_name = _CAPI_NodeFlowNodeDataName(handle);
+        self._edge_data_name = _CAPI_NodeFlowEdgeDataName(handle);
+        self._node_data_available = (len(self._node_data_name) != 0)
+        self._edge_data_available = (len(self._edge_data_name) != 0)
         if self._edge_mapping_available:
             self._edge_mapping = utils.toindex(_CAPI_NodeFlowGetEdgeMapping(handle))
         self._layer_offsets = utils.toindex(
@@ -74,13 +70,13 @@ class NodeFlow(DGLBaseGraph):
             self._node_data = F.zerocopy_from_dlpack(
                     _CAPI_NodeFlowGetNodeData(handle).to_dlpack())
             for i in range(self.num_layers):
-                self._node_frames[i][ndata_key] = self._node_data[
+                self._node_frames[i][self._node_data_name] = self._node_data[
                         self._layer_offsets[i]:self._layer_offsets[i+1]]
         if self._edge_data_available:
             self._edge_data = F.zerocopy_from_dlpack(
                     _CAPI_NodeFlowGetEdgeData(handle).to_dlpack())
             for i in range(self.num_blocks):
-                self._edge_frames[i][edata_key] = self._edge_data[
+                self._edge_frames[i][self._edge_data_name] = self._edge_data[
                         self._block_offsets[i]:self._block_offsets[i+1]]
         # registered functions
         self._message_funcs = [None] * self.num_blocks
