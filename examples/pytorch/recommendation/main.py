@@ -271,7 +271,6 @@ def train():
     global opt, sched
     best_mrr = 0
     if args.dataset != 'movielens':
-        print('Mask initialization' % epoch)
         g_prior_edges, g_train_edges, g_prior_train_edges = refresh_mask()
 
     for epoch in range(500):
