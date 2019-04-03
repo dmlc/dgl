@@ -19,4 +19,4 @@ then, you can start sampler:
 
 ```
 ./run_sampler.sh
-```
+``` 

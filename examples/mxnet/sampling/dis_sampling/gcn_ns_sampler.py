@@ -55,8 +55,6 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
     register_data_args(parser)
-    parser.add_argument("--gpu", type=int, default=-1,
-            help="gpu")
     parser.add_argument("--n-epochs", type=int, default=200,
             help="number of training epochs")
     parser.add_argument("--batch-size", type=int, default=1000,
