@@ -525,6 +525,7 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   nf.node_data_name = "";
   nf.edge_data_name = "";
+  nf.edge_mapping_available = true;
 
   std::copy(node_mapping.begin(), node_mapping.end(),
             static_cast<dgl_id_t*>(nf.node_mapping->data));
