@@ -9,6 +9,7 @@
 #include <dgl/immutable_graph.h>
 
 #include <cstring>
+#include <vector>
 
 #include "../network.h"
 

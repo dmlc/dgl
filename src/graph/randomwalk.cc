@@ -227,7 +227,7 @@ RandomWalkTraces BipartiteSingleSidedRandomWalkWithRestart(
       max_frequent_visited_nodes, WalkMultipleHops<2>);
 }
 
-// TODO: Abstract common logic with SampleSubgraph
+// TODO(BarclayII): Abstract common logic with SampleSubgraph
 template<typename Iter>
 NodeFlow CreateNodeFlowWithPPRFromRandomWalk(
     const GraphInterface *gptr,
@@ -241,7 +241,7 @@ NodeFlow CreateNodeFlowWithPPRFromRandomWalk(
     int num_hops,
     uint64_t top_t,
     bool add_self_loop) {
-  // TODO: better naming; these follow SampleSubgraph
+  // TODO(BarclayII): better naming; these follow SampleSubgraph
   std::vector<dgl_id_t> neighbor_list, edge_list;
   std::vector<double> edge_data;
   std::vector<size_t> layer_offsets(num_hops + 1);
@@ -344,7 +344,7 @@ NodeFlow CreateNodeFlowWithPPRFromRandomWalk(
   return nf;
 }
 
-// TODO: extract common logic with UniformSampling & alike
+// TODO(BarclayII): extract common logic with UniformSampling & alike
 std::vector<NodeFlow *> PPRNeighborSampling(
     const GraphInterface *gptr,
     IdArray seed_nodes,
@@ -358,8 +358,7 @@ std::vector<NodeFlow *> PPRNeighborSampling(
     int64_t max_num_workers,
     int64_t batch_size,
     /*
-     * FIXME: follows _CAPI_UniformSampling; why do we need this?
-     * Is passing a single huge array + start offset faster and/or more scalable than
+     * XXX Is passing a single huge array + start offset faster and/or more scalable than
      * passing in multiple small arrays?
      */
     int64_t batch_start_id,
