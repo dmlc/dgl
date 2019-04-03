@@ -97,6 +97,7 @@ void ConstructNodeFlow(
   int num_hops = layer_offsets.size() - 1;
   nf->node_mapping = IdArray::Empty({static_cast<int64_t>(num_vertices)},
                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  nf->edge_mapping_available = edges_available;
   if (edges_available)
     nf->edge_mapping = IdArray::Empty({static_cast<int64_t>(num_edges)},
                                       DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
