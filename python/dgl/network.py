@@ -3,8 +3,6 @@ from __future__ import absolute_import
 
 from ._ffi.function import _init_api
 from .nodeflow import NodeFlow
-from .utils import unwrap_to_ptr_list
-from . import utils
 from . import ndarray as nd
 from . import backend as F
 
@@ -49,19 +47,19 @@ def _send_subgraph(sender, nodeflow):
         NodeFlow object
     """
     _CAPI_SenderSendSubgraph(
-            sender,
-            nodeflow._graph._handle,
-            nd.zerocopy_from_numpy(nodeflow._layer_offsets),
-            nd.zerocopy_from_numpy(nodeflow._block_offsets),
-            nodeflow._node_mapping.todgltensor(),
-            nodeflow._edge_mapping.todgltensor()
-                if nodeflow._edge_mapping_available else None,
-            nodeflow._node_data_name,
-            nd.from_dlpack(F.zerocopy_to_dlpack(nodeflow._node_data))
-            if nodeflow._node_data_available else None,
-            nodeflow._edge_data_name,
-            nd.from_dlpack(F.zerocopy_to_dlpack(nodeflow._edge_data))
-            if nodeflow._edge_data_available else None)
+        sender,
+        nodeflow._graph._handle,
+        nd.zerocopy_from_numpy(nodeflow._layer_offsets),
+        nd.zerocopy_from_numpy(nodeflow._block_offsets),
+        nodeflow._node_mapping.todgltensor(),
+        nodeflow._edge_mapping.todgltensor()
+        if nodeflow._edge_mapping_available else None,
+        nodeflow._node_data_name,
+        nd.from_dlpack(F.zerocopy_to_dlpack(nodeflow._node_data))
+        if nodeflow._node_data_available else None,
+        nodeflow._edge_data_name,
+        nd.from_dlpack(F.zerocopy_to_dlpack(nodeflow._edge_data))
+        if nodeflow._edge_data_available else None)
 
 def _recv_subgraph(receiver, graph):
     """Receive sampled subgraph (NodeFlow) from remote sampler.

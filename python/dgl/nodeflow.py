@@ -50,8 +50,8 @@ class NodeFlow(DGLBaseGraph):
         self._parent = parent
         self._node_mapping = utils.toindex(_CAPI_NodeFlowGetNodeMapping(handle))
         self._edge_mapping_available = _CAPI_NodeFlowEdgeMappingIsAvailable(handle)
-        self._node_data_name = _CAPI_NodeFlowNodeDataName(handle);
-        self._edge_data_name = _CAPI_NodeFlowEdgeDataName(handle);
+        self._node_data_name = _CAPI_NodeFlowNodeDataName(handle)
+        self._edge_data_name = _CAPI_NodeFlowEdgeDataName(handle)
         self._node_data_available = (len(self._node_data_name) != 0)
         self._edge_data_available = (len(self._edge_data_name) != 0)
         if self._edge_mapping_available:
@@ -71,13 +71,13 @@ class NodeFlow(DGLBaseGraph):
                     _CAPI_NodeFlowGetNodeData(handle).to_dlpack())
             for i in range(self.num_layers):
                 self._node_frames[i][self._node_data_name] = self._node_data[
-                        self._layer_offsets[i]:self._layer_offsets[i+1]]
+                    self._layer_offsets[i]:self._layer_offsets[i+1]]
         if self._edge_data_available:
             self._edge_data = F.zerocopy_from_dlpack(
-                    _CAPI_NodeFlowGetEdgeData(handle).to_dlpack())
+                _CAPI_NodeFlowGetEdgeData(handle).to_dlpack())
             for i in range(self.num_blocks):
                 self._edge_frames[i][self._edge_data_name] = self._edge_data[
-                        self._block_offsets[i]:self._block_offsets[i+1]]
+                    self._block_offsets[i]:self._block_offsets[i+1]]
         # registered functions
         self._message_funcs = [None] * self.num_blocks
         self._reduce_funcs = [None] * self.num_blocks
@@ -190,9 +190,23 @@ class NodeFlow(DGLBaseGraph):
         return BlockView(self)
 
     def layer_offsets(self, layer_id):
+        """Return the layer offsets given layer id.
+
+        Parameters
+        ----------
+        layer_id : int
+            the specified layer, can be negative
+        """
         return self._layer_offsets[self._get_layer_id(layer_id)]
 
     def block_offsets(self, layer_id):
+        """Return the block offsets given block id.
+
+        Parameters
+        ----------
+        block_id : int
+            the specified block, can be negative
+        """
         return self._block_offsets[self._get_layer_id(layer_id)]
 
     def layer_size(self, layer_id):
@@ -242,8 +256,8 @@ class NodeFlow(DGLBaseGraph):
                                                       node_embed_names[i], nid)
 
         if (self._edge_mapping_available and
-            self._parent._edge_frame.num_rows != 0
-            and self._parent._edge_frame.num_columns != 0):
+                self._parent._edge_frame.num_rows != 0
+                and self._parent._edge_frame.num_columns != 0):
             if is_all(edge_embed_names):
                 for i in range(self.num_blocks):
                     eid = utils.toindex(self.block_parent_eid(i))
@@ -283,8 +297,8 @@ class NodeFlow(DGLBaseGraph):
                                   self._node_frames[i])
 
         if (self._edge_mapping_available and
-            self._parent._edge_frame.num_rows != 0 and
-            self._parent._edge_frame.num_columns != 0):
+                self._parent._edge_frame.num_rows != 0 and
+                self._parent._edge_frame.num_columns != 0):
             if is_all(edge_embed_names):
                 for i in range(self.num_blocks):
                     eid = utils.toindex(self.block_parent_eid(i))
