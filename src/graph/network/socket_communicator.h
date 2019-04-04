@@ -109,7 +109,7 @@ class SocketCommunicator : public Communicator {
   MessageQueue* queue_;
 
   /*!
-   * \brief Message queue for communicator
+   * \brief Memory buffer for communicator
    */ 
   char* buffer_ = nullptr;
 
