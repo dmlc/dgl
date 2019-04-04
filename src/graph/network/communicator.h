@@ -67,6 +67,16 @@ class Communicator {
    * \brief Finalize the Communicator class
    */
   virtual void Finalize() = 0;
+
+  /*!
+   * \brief Set pointer of memory buffer allocated for Communicator
+   */
+  virtual void SetBuffer(char* buffer) = 0;
+
+  /*!
+   * \brief Get pointer of memory buffer allocated for Communicator
+   */
+  virtual char* GetBuffer() = 0;
 };
 
 }  // namespace network
