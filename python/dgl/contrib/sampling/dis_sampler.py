@@ -21,27 +21,33 @@ class SamplerPool(object):
               # Do anything here #
 
       if __name__ == '__main__':
+          ...
+          args = parser.parse_args()
           pool = MySamplerPool()
-          pool.start(5) # Start 5 processes
-
-    Parameters
-    ----------
-    num_worker : int
-        number of worker (child process)
+          pool.start(args.num_sender, args)
     """
     __metaclass__ = ABCMeta
 
-    def start(self, num_worker):
+    def start(self, num_worker, args):
+        """Start sampler pool
+
+        Parameters
+        ----------
+        num_worker : int
+            number of worker (number of child process)
+        args : arguments
+            arguments passed by user
+        """
         p = Pool()
         for i in range(num_worker):
             print("Start child process %d ..." % i)
-            p.apply_async(self.worker)
+            p.apply_async(self.worker, args=(args,))
         # Waiting for all subprocesses done ...
         p.close()
         p.join()
 
     @abstractmethod
-    def worker(self):
+    def worker(self, args):
         pass
 
 class SamplerSender(object):
