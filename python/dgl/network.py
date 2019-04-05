@@ -8,9 +8,7 @@ from . import backend as F
 
 _init_api("dgl.network")
 
-############################# Distributed Sampler #############################
-
-def _create_sampler_sender(ip_addr, port):
+def _create_sender(ip_addr, port):
     """Create a sender communicator via C socket.
 
     Parameters
@@ -22,7 +20,7 @@ def _create_sampler_sender(ip_addr, port):
     """
     return _CAPI_DGLSenderCreate(ip_addr, port)
 
-def _create_sampler_receiver(ip_addr, port, num_sender):
+def _create_receiver(ip_addr, port, num_sender):
     """Create a receiver communicator via C socket.
 
     Parameters
@@ -80,7 +78,7 @@ def _recv_subgraph(receiver, graph):
     hdl = _CAPI_ReceiverRecvSubgraph(receiver)
     return NodeFlow(graph, hdl)
 
-def _finalize_sampler_sender(sender):
+def _finalize_sender(sender):
     """Finalize Sender communicator
 
     Parameters
@@ -90,7 +88,7 @@ def _finalize_sampler_sender(sender):
     """
     _CAPI_DGLFinalizeCommunicator(sender)
 
-def _finalize_sampler_receiver(receiver):
+def _finalize_receiver(receiver):
     """Finalize Receiver communicator
 
     Parameters
