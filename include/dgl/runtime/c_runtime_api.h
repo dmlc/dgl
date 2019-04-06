@@ -395,6 +395,29 @@ DGL_DLL int DGLArrayAlloc(const dgl_index_t* shape,
                           DGLArrayHandle* out);
 
 /*!
+ * \brief Allocate a nd-array's with shared memory,
+ *  including space of shape, of given spec.
+ *
+ * \param the name of the shared memory
+ * \param shape The shape of the array, the data content will be copied to out
+ * \param ndim The number of dimension of the array.
+ * \param dtype_code The type code of the dtype
+ * \param dtype_bits The number of bits of dtype
+ * \param dtype_lanes The number of lanes in the dtype.
+ * \param is_create whether the shared memory is created
+ * \param out The output handle.
+ * \return 0 when success, -1 when failure happens
+ */
+int DGLArrayAllocSharedMem(const char *mem_name,
+                           const dgl_index_t *shape,
+                           int ndim,
+                           int dtype_code,
+                           int dtype_bits,
+                           int dtype_lanes,
+                           bool is_create,
+                           DGLArrayHandle* out);
+
+/*!
  * \brief Free the DGL Array.
  * \param handle The array handle to be freed.
  * \return 0 when success, -1 when failure happens

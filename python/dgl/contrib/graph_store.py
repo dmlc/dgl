@@ -12,6 +12,7 @@ from .. import backend as F
 from ..graph import DGLGraph
 from .. import utils
 from ..graph_index import GraphIndex, create_graph_index
+from .._ffi.ndarray import empty_shared_mem
 from .._ffi.function import _init_api
 from .. import ndarray as nd
 
@@ -27,6 +28,13 @@ def _get_edata_path(graph_name, edata_name):
 def _get_graph_path(graph_name):
     return "/" + graph_name
 
+def _move_data_to_shared_mem_array(arr, name):
+    dlpack = F.zerocopy_to_dlpack(arr)
+    dgl_tensor = nd.from_dlpack(dlpack)
+    new_arr = empty_shared_mem(name, True, F.shape(arr), np.dtype(F.dtype(arr)).name)
+    dgl_tensor.copyto(new_arr)
+    dlpack = new_arr.to_dlpack()
+    return F.zerocopy_from_dlpack(dlpack)
 
 class NodeDataView(MutableMapping):
     """The data view class when G.nodes[...].data is called.
@@ -47,10 +55,7 @@ class NodeDataView(MutableMapping):
 
     def __setitem__(self, key, val):
         # Move the data in val to shared memory.
-        dlpack = F.zerocopy_to_dlpack(val)
-        dgl_tensor = nd.from_dlpack(dlpack)
-        val = _CAPI_DGLAllocateSharedMemWithData(_get_ndata_path(self._graph_name, key),
-                                                 dgl_tensor)
+        val = _move_data_to_shared_mem_array(val, _get_ndata_path(self._graph_name, key))
         self._graph.set_n_repr({key : val}, self._nodes)
 
     def __delitem__(self, key):
@@ -88,10 +93,7 @@ class EdgeDataView(MutableMapping):
 
     def __setitem__(self, key, val):
         # Move the data in val to shared memory.
-        dlpack = F.zerocopy_to_dlpack(val)
-        dgl_tensor = nd.from_dlpack(dlpack)
-        val = _CAPI_DGLAllocateSharedMemWithData(_get_edata_path(self._graph_name, key),
-                                                 dgl_tensor)
+        val = _move_data_to_shared_mem_array(val, _get_edata_path(self._graph_name, key))
         self._graph.set_e_repr({key : val}, self._edges)
 
     def __delitem__(self, key):
@@ -170,9 +172,8 @@ class SharedMemoryStoreServer(object):
                 return 0
 
             assert self._graph.number_of_nodes() == shape[0]
-            shape = utils.toindex(np.array(shape, dtype=np.int64))
-            data = _CAPI_DGLAllocateSharedMem(_get_ndata_path(graph_name, ndata_name),
-                                              shape.todgltensor(), dtype, "zero", True)
+            data = empty_shared_mem(_get_ndata_path(graph_name, ndata_name), True, shape, dtype)
+            #TODO initialize.
             dlpack = data.to_dlpack()
             self._graph.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
             return 0
@@ -185,9 +186,8 @@ class SharedMemoryStoreServer(object):
                 return 0
 
             assert self._graph.number_of_edges() == shape[0]
-            shape = utils.toindex(np.array(shape, dtype=np.int64))
-            data = _CAPI_DGLAllocateSharedMem(_get_edata_path(graph_name, edata_name),
-                                              shape.todgltensor(), dtype, "zero", True)
+            data = empty_shared_mem(_get_edata_path(graph_name, edata_name), True, shape, dtype)
+            #TODO initialize.
             dlpack = data.to_dlpack()
             self._graph.edata[edata_name] = F.zerocopy_from_dlpack(dlpack)
             return 0
@@ -195,12 +195,12 @@ class SharedMemoryStoreServer(object):
         # RPC command: get the names of all node embeddings.
         def list_ndata():
             ndata = self._graph.ndata
-            return [[key, ndata[key].shape, F.dtype(ndata[key])] for key in ndata]
+            return [[key, F.shape(ndata[key]), np.dtype(F.dtype(ndata[key])).name] for key in ndata]
 
         # RPC command: get the names of all edge embeddings.
         def list_edata():
             edata = self._graph.edata
-            return [[key, edata[key].shape, F.dtype(edata[key])] for key in edata]
+            return [[key, F.shape(edata[key]), np.dtype(F.dtype(edata[key])).name] for key in edata]
 
         # RPC command: notify the server of the termination of the client.
         def terminate():
@@ -290,17 +290,13 @@ class SharedMemoryDGLGraph(DGLGraph):
 
     def _init_ndata(self, ndata_name, shape, dtype):
         assert self.number_of_nodes() == shape[0]
-        shape = utils.toindex(np.array(shape, dtype=np.int64))
-        data = _CAPI_DGLAllocateSharedMem(_get_ndata_path(self._graph_name, ndata_name),
-                                          shape.todgltensor(), dtype, "zero", False)
+        data = empty_shared_mem(_get_ndata_path(self._graph_name, ndata_name), False, shape, dtype)
         dlpack = data.to_dlpack()
         self.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
 
     def _init_edata(self, edata_name, shape, dtype):
         assert self.number_of_edges() == shape[0]
-        shape = utils.toindex(np.array(shape, dtype=np.int64))
-        data = _CAPI_DGLAllocateSharedMem(_get_edata_path(self._graph_name, edata_name),
-                                          shape.todgltensor(), dtype, "zero", False)
+        data = empty_shared_mem(_get_edata_path(self._graph_name, edata_name), False, shape, dtype)
         dlpack = data.to_dlpack()
         self.edata[edata_name] = F.zerocopy_from_dlpack(dlpack)
 

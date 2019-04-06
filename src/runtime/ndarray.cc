@@ -241,6 +241,26 @@ int DGLArrayAlloc(const dgl_index_t* shape,
   API_END();
 }
 
+int DGLArrayAllocSharedMem(const char *mem_name,
+                           const dgl_index_t *shape,
+                           int ndim,
+                           int dtype_code,
+                           int dtype_bits,
+                           int dtype_lanes,
+                           bool is_create,
+                           DGLArrayHandle* out) {
+  API_BEGIN();
+  DLDataType dtype;
+  dtype.code = static_cast<uint8_t>(dtype_code);
+  dtype.bits = static_cast<uint8_t>(dtype_bits);
+  dtype.lanes = static_cast<uint16_t>(dtype_lanes);
+  std::vector<int64_t> shape_vec(shape, shape + ndim);
+  NDArray arr = NDArray::EmptyShared(mem_name, shape_vec, dtype,
+                                     DLContext{kDLCPU, 0}, is_create);
+  *out = NDArray::Internal::MoveAsDLTensor(arr);
+  API_END();
+}
+
 int DGLArrayFree(DGLArrayHandle handle) {
   API_BEGIN();
   reinterpret_cast<NDArray::Container*>(handle)->DecRef();
