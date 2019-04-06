@@ -67,6 +67,16 @@ class SocketCommunicator : public Communicator {
    */
   void Finalize();
 
+  /*!
+   * \brief Set pointer of memory buffer allocated for Communicator
+   */
+  void SetBuffer(char* buffer);
+
+  /*!
+   * \brief Get pointer of memory buffer allocated for Communicator
+   */
+  char* GetBuffer();
+
  private:
   /*!
    * \brief Is a sender or reciever node?
@@ -97,6 +107,11 @@ class SocketCommunicator : public Communicator {
    * \brief Message queue for communicator
    */ 
   MessageQueue* queue_;
+
+  /*!
+   * \brief Memory buffer for communicator
+   */ 
+  char* buffer_ = nullptr;
 
   /*!
    * \brief Initalize sender node

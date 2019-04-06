@@ -1,7 +1,7 @@
 # This file contains DGL distributed samplers APIs.
 from ...network import _send_subgraph, _recv_subgraph
-from ...network import _create_sampler_sender, _create_sampler_receiver
-from ...network import _finalize_sampler_sender, _finalize_sampler_receiver
+from ...network import _create_sender, _create_receiver
+from ...network import _finalize_sender, _finalize_receiver
 
 from multiprocessing import Pool
 from abc import ABCMeta, abstractmethod
@@ -21,27 +21,33 @@ class SamplerPool(object):
               # Do anything here #
 
       if __name__ == '__main__':
+          ...
+          args = parser.parse_args()
           pool = MySamplerPool()
-          pool.start(5) # Start 5 processes
-
-    Parameters
-    ----------
-    num_worker : int
-        number of worker (child process)
+          pool.start(args.num_sender, args)
     """
     __metaclass__ = ABCMeta
 
-    def start(self, num_worker):
+    def start(self, num_worker, args):
+        """Start sampler pool
+
+        Parameters
+        ----------
+        num_worker : int
+            number of worker (number of child process)
+        args : arguments
+            arguments passed by user
+        """
         p = Pool()
         for i in range(num_worker):
             print("Start child process %d ..." % i)
-            p.apply_async(self.worker)
+            p.apply_async(self.worker, args=(args,))
         # Waiting for all subprocesses done ...
         p.close()
         p.join()
 
     @abstractmethod
-    def worker(self):
+    def worker(self, args):
         pass
 
 class SamplerSender(object):
@@ -62,14 +68,14 @@ class SamplerSender(object):
     def __init__(self, ip, port):
         self._ip = ip
         self._port = port
-        self._sender = _create_sampler_sender(ip, port)
+        self._sender = _create_sender(ip, port)
 
     def __del__(self):
         """Finalize Sender
         """
-        # _finalize_sampler_sender will send a special message
+        # _finalize_sender will send a special message
         # to tell the remote trainer machine that it has finished its job.
-        _finalize_sampler_sender(self._sender)
+        _finalize_sender(self._sender)
 
     def send(self, nodeflow):
         """Send sampled subgraph (NodeFlow) to remote trainer.
@@ -103,7 +109,7 @@ class SamplerReceiver(object):
         self._ip = ip
         self._port = port
         self._num_sender = num_sender
-        self._receiver = _create_sampler_receiver(ip, port, num_sender)
+        self._receiver = _create_receiver(ip, port, num_sender)
 
     def __del__(self):
         """Finalize Receiver
@@ -111,7 +117,7 @@ class SamplerReceiver(object):
         _finalize_sampler_receiver method will clean up the 
         back-end threads started by the SamplerReceiver.
         """
-        _finalize_sampler_receiver(self._receiver)
+        _finalize_receiver(self._receiver)
 
     def recv(self, graph):
         """Receive a NodeFlow object from remote sampler.
