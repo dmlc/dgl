@@ -113,7 +113,7 @@ def empty(shape, dtype="float32", ctx=context(1, 0)):
     return _make_array(handle, False)
 
 
-def empty_shared_mem(name, is_create, shape, dtype="float32"):
+def create_shared_mem(name, is_create, shape, dtype="float32", fill=None):
     """Create an empty array with shared memory given shape and dtype
 
     Parameters
@@ -130,6 +130,9 @@ def empty_shared_mem(name, is_create, shape, dtype="float32"):
     dtype : type or str
         The data type of the array.
 
+    fill : str, optional
+        Indicate how to fill the new array.
+
     Returns
     -------
     arr : dgl.nd.NDArray
@@ -140,12 +143,17 @@ def empty_shared_mem(name, is_create, shape, dtype="float32"):
     ndim = ctypes.c_int(len(shape))
     handle = DGLArrayHandle()
     dtype = DGLType(dtype)
+    if fill is None:
+        fill = ctypes.c_char_p(None)
+    else:
+        fill = ctypes.c_char_p(fill.encode('utf-8'))
     check_call(_LIB.DGLArrayAllocSharedMem(
         name, shape, ndim,
         ctypes.c_int(dtype.type_code),
         ctypes.c_int(dtype.bits),
         ctypes.c_int(dtype.lanes),
         is_create,
+        fill,
         ctypes.byref(handle)))
     return _make_array(handle, False)
 

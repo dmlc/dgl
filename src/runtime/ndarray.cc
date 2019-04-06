@@ -4,10 +4,12 @@
  * \brief NDArray container infratructure.
  */
 #include <string.h>
+#include <dmlc/omp.h>
 #include <dmlc/logging.h>
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/device_api.h>
+#include <algorithm>
 #include "runtime_base.h"
 
 // deleter for arrays used by DLPack exporter
@@ -248,6 +250,7 @@ int DGLArrayAllocSharedMem(const char *mem_name,
                            int dtype_bits,
                            int dtype_lanes,
                            bool is_create,
+                           const char *fill,
                            DGLArrayHandle* out) {
   API_BEGIN();
   DLDataType dtype;
@@ -257,6 +260,28 @@ int DGLArrayAllocSharedMem(const char *mem_name,
   std::vector<int64_t> shape_vec(shape, shape + ndim);
   NDArray arr = NDArray::EmptyShared(mem_name, shape_vec, dtype,
                                      DLContext{kDLCPU, 0}, is_create);
+  std::string fill_str;
+  if (fill)
+    fill_str = fill;
+  if (fill_str == "zero" && is_create) {
+    size_t size = 1;
+    for (auto dim : shape_vec)
+      size *= dim;
+    size_t num_bytes = size * dtype.bits / 8;
+#pragma omp parallel
+    {
+      int num_threads = omp_get_num_threads();
+      size_t range_size = num_bytes / num_threads + 1;
+      CHECK_GE(range_size * num_threads, num_bytes);
+#pragma omp for
+      for (size_t i = 0; i < num_threads; i++) {
+        size_t part_start = std::min(range_size * i, num_bytes);
+        size_t part_end = std::min(part_start + range_size, num_bytes);
+        char *data = static_cast<char *>(arr->data);
+        memset(data + part_start, 0, part_end - part_start);
+      }
+    }
+  }
   *out = NDArray::Internal::MoveAsDLTensor(arr);
   API_END();
 }
