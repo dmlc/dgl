@@ -162,6 +162,9 @@ void SocketCommunicator::FinalizeSender() {
     delete socket_[0];
     socket_[0] = nullptr;
   }
+  if (buffer_ != nullptr) {
+    delete [] buffer_;
+  }
 }
 
 void SocketCommunicator::FinalizeReceiver() {
@@ -207,6 +210,16 @@ int64_t SocketCommunicator::Receive(char* dest, int64_t max_size) {
   }
   // Get message from the message queue
   return queue_->Remove(dest, max_size);
+}
+
+void SocketCommunicator::SetBuffer(char* buffer) {
+  // Set memory buffer allocated for current Communicator
+  buffer_ = buffer;
+}
+
+char* SocketCommunicator::GetBuffer() {
+  // Get memory buffer allocated for current Communicator
+  return buffer_;
 }
 
 }  // namespace network
