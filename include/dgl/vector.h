@@ -196,9 +196,17 @@ class vector {
   }
 
  private:
+  /*
+   * \brief the raw array that contains elements of type T.
+   *
+   * The vector may or may not own the memory of the raw array.
+   */
   T *arr;
+  /* \brief the memory size of the raw array. */
   size_t capacity;
+  /* \brief the number of elements in the array. */
   size_t curr;
+  /* \brief whether the vector owns the memory. */
   bool own;
 };
 

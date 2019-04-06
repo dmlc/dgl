@@ -19,7 +19,7 @@ namespace runtime {
 #ifndef _WIN32
 SharedMemory::SharedMemory(const std::string &name) {
   this->name = name;
-  this->is_new = false;
+  this->own = false;
   this->fd = -1;
   this->ptr = nullptr;
   this->size = 0;
@@ -28,14 +28,14 @@ SharedMemory::SharedMemory(const std::string &name) {
 SharedMemory::~SharedMemory() {
   munmap(ptr, size);
   close(fd);
-  if (is_new) {
+  if (own) {
     LOG(INFO) << "remove " << name << " for shared memory";
     shm_unlink(name.c_str());
   }
 }
 
 void *SharedMemory::create_new(size_t size) {
-  this->is_new = true;
+  this->own = true;
 
   int flag = O_RDWR|O_EXCL|O_CREAT;
   fd = shm_open(name.c_str(), flag, S_IRUSR | S_IWUSR);
