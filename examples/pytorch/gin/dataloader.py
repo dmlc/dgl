@@ -16,11 +16,20 @@ import dgl
 
 # default collate function
 def collate(samples):
-    # The input `samples` is a list of pairs
-    #  (graph, label).
+    # The input `samples` is a list of pairs (graph, label).
     graphs, labels = map(list, zip(*samples))
+    for g in graphs:
+        # deal with node feats
+        for feat in g.node_attr_schemes().keys():
+            # TODO torch.Tensor is not recommended
+            # torch.DoubleTensor and torch.tensor
+            # will meet error in executor.py@runtime line 472, tensor.py@backend line 147
+            # RuntimeError: expected type torch.cuda.DoubleTensor but got torch.cuda.FloatTensor
+            g.ndata[feat] = torch.Tensor(g.ndata[feat])
+        # no edge feats
     batched_graph = dgl.batch(graphs)
-    return batched_graph, torch.tensor(labels)
+    labels = torch.tensor(labels)
+    return batched_graph, labels
 
 
 class GraphDataLoader():

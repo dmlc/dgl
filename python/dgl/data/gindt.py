@@ -9,7 +9,6 @@ https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip
 
 import os
 import logging
-import torch
 import numpy as np
 
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
@@ -159,9 +158,8 @@ class GINDataset(object):
                         nrow = [int(w) for w in nrow]
                         nattr = None
                     elif tmp > len(nrow):
-                        nrow, nattr = [int(w)
-                                       for w in nrow[:tmp]], torch.tensor(
-                                           [float(w) for w in nrow[tmp:]])
+                        nrow = [int(w) for w in nrow[:tmp]]
+                        nattr = [float(w) for w in nrow[tmp:]]
                         nattrs.append(nattr)
                     else:
                         raise Exception('edge number is incorrect!')
@@ -191,12 +189,12 @@ class GINDataset(object):
 
                 if nattrs != []:
                     nattrs = np.stack(nattrs)
-                    g.ndata['attr'] = torch.tensor(nattrs)
+                    g.ndata['attr'] = nattrs
                     self.nattrs_flag = True
                 else:
                     nattrs = None
 
-                g.ndata['label'] = torch.tensor(nlabels)
+                g.ndata['label'] = np.array(nlabels)
                 if len(self.nlabel_dict) > 1:
                     self.nlabels_flag = True
 
@@ -220,7 +218,7 @@ class GINDataset(object):
                     # actually this label shouldn't be updated
                     # in case users want to keep it
                     # but usually no features means no labels, fine.
-                    g.ndata['label'] = torch.tensor(g.in_degrees())
+                    g.ndata['label'] = g.in_degrees()
                     # extracting unique node labels
                     nlabel_set = nlabel_set.union(set(g.ndata['label']))
 
@@ -237,8 +235,8 @@ class GINDataset(object):
                 label2idx = self.nlabel_dict
 
             for g in self.graphs:
-                g.ndata['attr'] = torch.zeros(
-                    g.number_of_nodes(), len(label2idx))
+                g.ndata['attr'] = np.zeros((
+                    g.number_of_nodes(), len(label2idx)))
                 g.ndata['attr'][range(g.number_of_nodes(
                 )), [label2idx[nl.item()] for nl in g.ndata['label']]] = 1
 
