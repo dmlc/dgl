@@ -113,7 +113,7 @@ void SocketCommunicator::MsgHandler(TCPSocket* socket, MessageQueue* queue) {
     // First recv the size
     int64_t received_bytes = 0;
     int64_t data_size = 0;
-    while (received_bytes < sizeof(int64_t)) {
+    while (static_cast<size_t>(received_bytes) < sizeof(int64_t)) {
       int64_t max_len = sizeof(int64_t) - received_bytes;
       int64_t tmp = socket->Receive(
         reinterpret_cast<char*>(&data_size)+received_bytes,
@@ -150,7 +150,7 @@ void SocketCommunicator::FinalizeSender() {
   if (socket_[0] != nullptr) {
     int64_t size = -1;
     int64_t sent_bytes = 0;
-    while (sent_bytes < sizeof(int64_t)) {
+    while (static_cast<size_t>(sent_bytes) < sizeof(int64_t)) {
       int64_t max_len = sizeof(int64_t) - sent_bytes;
       int64_t tmp = socket_[0]->Send(
         reinterpret_cast<char*>(&size)+sent_bytes,
@@ -185,7 +185,7 @@ int64_t SocketCommunicator::Send(char* src, int64_t size) {
   TCPSocket* client = socket_[0];
   // First sent the size of data
   int64_t sent_bytes = 0;
-  while (sent_bytes < sizeof(int64_t)) {
+  while (static_cast<size_t>(sent_bytes) < sizeof(int64_t)) {
     int64_t max_len = sizeof(int64_t) - sent_bytes;
     int64_t tmp = client->Send(
       reinterpret_cast<char*>(&size)+sent_bytes,
