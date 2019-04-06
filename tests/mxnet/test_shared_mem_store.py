@@ -10,6 +10,7 @@ num_nodes = 100
 num_edges = int(num_nodes * num_nodes * 0.1)
 
 def worker_func(worker_id):
+    time.sleep(3)
     print("worker starts")
     np.random.seed(0)
     csr = (spsp.random(num_nodes, num_nodes, density=0.1, format='csr') != 0).astype(np.int64)
@@ -21,12 +22,16 @@ def worker_func(worker_id):
     assert F.array_equal(dst, F.tensor(coo.row))
     assert F.array_equal(src, F.tensor(coo.col))
     assert F.array_equal(g.ndata['feat'][0], F.tensor(np.arange(10), dtype=np.float32))
+    assert F.array_equal(g.edata['feat'][0], F.tensor(np.arange(10), dtype=np.float32))
     g.init_ndata('test4', (g.number_of_nodes(), 10), dtype='float32')
+    g.init_edata('test4', (g.number_of_edges(), 10), dtype='float32')
     if worker_id == 0:
         g.ndata['test4'][0] = 1
+        g.edata['test4'][0] = 2
     else:
         time.sleep(3)
         assert np.all(g.ndata['test4'][0].asnumpy() == 1)
+        assert np.all(g.edata['test4'][0].asnumpy() == 2)
     g.destroy()
 
 def server_func(num_workers):
@@ -39,6 +44,7 @@ def server_func(num_workers):
     assert num_nodes == g._graph.number_of_nodes()
     assert num_edges == g._graph.number_of_edges()
     g.ndata['feat'] = mx.nd.arange(num_nodes * 10).reshape((num_nodes, 10))
+    g.edata['feat'] = mx.nd.arange(num_edges * 10).reshape((num_edges, 10))
     g.run()
 
 def test_worker_server():

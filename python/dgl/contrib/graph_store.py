@@ -21,6 +21,9 @@ def _get_ndata_path(graph_name, ndata_name):
 def _get_edata_path(graph_name, edata_name):
     return "/" + graph_name + "_edge_" + edata_name
 
+def _get_edata_path(graph_name, edata_name):
+    return "/" + graph_name + "_edge_" + edata_name
+
 def _get_graph_path(graph_name):
     return "/" + graph_name
 
@@ -174,6 +177,21 @@ class SharedMemoryStoreServer(object):
             self._graph.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
             return 0
 
+        # RPC command: initialize edge embedding in the server.
+        def init_edata(edata_name, shape, dtype):
+            if edata_name in self._graph.edata:
+                edata = self._graph.edata[edata_name]
+                assert np.all(edata.shape == tuple(shape))
+                return 0
+
+            assert self._graph.number_of_edges() == shape[0]
+            shape = utils.toindex(np.array(shape, dtype=np.int64))
+            data = _CAPI_DGLAllocateSharedMem(_get_edata_path(graph_name, edata_name),
+                                              shape.todgltensor(), dtype, "zero", True)
+            dlpack = data.to_dlpack()
+            self._graph.edata[edata_name] = F.zerocopy_from_dlpack(dlpack)
+            return 0
+
         # RPC command: get the names of all node embeddings.
         def list_ndata():
             ndata = self._graph.ndata
@@ -192,6 +210,7 @@ class SharedMemoryStoreServer(object):
         self.server = SimpleXMLRPCServer(("localhost", port))
         self.server.register_function(get_graph_info, "get_graph_info")
         self.server.register_function(init_ndata, "init_ndata")
+        self.server.register_function(init_edata, "init_edata")
         self.server.register_function(terminate, "terminate")
         self.server.register_function(list_ndata, "list_ndata")
         self.server.register_function(list_edata, "list_edata")
@@ -277,6 +296,14 @@ class SharedMemoryDGLGraph(DGLGraph):
         dlpack = data.to_dlpack()
         self.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
 
+    def _init_edata(self, edata_name, shape, dtype):
+        assert self.number_of_edges() == shape[0]
+        shape = utils.toindex(np.array(shape, dtype=np.int64))
+        data = _CAPI_DGLAllocateSharedMem(_get_edata_path(self._graph_name, edata_name),
+                                          shape.todgltensor(), dtype, "zero", False)
+        dlpack = data.to_dlpack()
+        self.edata[edata_name] = F.zerocopy_from_dlpack(dlpack)
+
     def init_ndata(self, ndata_name, shape, dtype):
         """Create node embedding.
 
@@ -295,6 +322,25 @@ class SharedMemoryDGLGraph(DGLGraph):
         """
         self.proxy.init_ndata(ndata_name, shape, dtype)
         self._init_ndata(ndata_name, shape, dtype)
+
+    def init_edata(self, edata_name, shape, dtype):
+        """Create edge embedding.
+
+        It first creates the edge embedding in the server and maps it to the current process
+        with shared memory.
+
+        Parameters
+        ----------
+        edata_name : string
+            The name of edge embedding
+        shape : tuple
+            The shape of the edge embedding
+        dtype : string
+            The data type of the edge embedding. The currently supported data types
+            are "float32" and "int32".
+        """
+        self.proxy.init_edata(edata_name, shape, dtype)
+        self._init_edata(edata_name, shape, dtype)
 
     def destroy(self):
         """Destroy the graph store.
