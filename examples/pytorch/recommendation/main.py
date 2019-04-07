@@ -16,23 +16,26 @@ import os
 parser = argparse.ArgumentParser()
 parser.add_argument('--opt', type=str, default='SGD')
 parser.add_argument('--lr', type=float, default=1)
-parser.add_argument('--sched', type=str, default='none')
+parser.add_argument('--sched', type=str, default='none',
+                    help='learning rate scheduler (none or decay)')
 parser.add_argument('--layers', type=int, default=2)
 parser.add_argument('--use-feature', action='store_true')
-parser.add_argument('--sgd-switch', type=int, default=-1)
+parser.add_argument('--sgd-switch', type=int, default=-1,
+                    help='The number of epoch to switch to SGD (-1 = never)')
 parser.add_argument('--n-negs', type=int, default=1)
 parser.add_argument('--loss', type=str, default='hinge')
-parser.add_argument('--hard-neg-prob', type=float, default=0)
-parser.add_argument('--dataset', type=str, default='movielens')
+parser.add_argument('--hard-neg-prob', type=float, default=0,
+                    help='Probability to sample from hard negative examples (0 = never)')
+# Reddit dataset in particular is not finalized and is only for my (GQ's) internal purpose.
+parser.add_argument('--dataset', type=str, default='movielens',
+                    help='Dataset (movielens, reddit)')
+parser.add_argument('--cache', type=str, default='/tmp/dataset.pkl',
+                    help='File to cache the postprocessed dataset object')
 args = parser.parse_args()
 
 print(args)
 
-cache_files = {
-        'movielens': '/efs/quagan/ml.pkl',
-        'reddit': '/efs/quagan/rd.pkl',
-        }
-cache_file = cache_files[args.dataset]
+cache_file = args.cache
 if os.path.exists(cache_file):
     with open(cache_file, 'rb') as f:
         ml = pickle.load(f)
@@ -158,6 +161,9 @@ def runtrain(g_prior_edges, g_train_edges, train):
                         nodeflow.layer_parent_nid(i).numpy()).all()
             nodeflow.copy_from_parent()
             cast_ppr_weight(nodeflow)
+
+            # The features on nodeflow is stored on CPUs for now.  We copy them to GPUs
+            # in model.forward().
             node_output = forward(model, nodeflow, train)
             output_idx = nodeflow.map_from_parent_nid(-1, nodeset)
             h = node_output[output_idx]

@@ -227,7 +227,7 @@ class CNodeFlowSampler(NodeFlowSampler):
     TODO: doc for the C NodeFlow sampler interface: what would a custom C
     NodeFlow sampler look like, etc.
     '''
-    def generate_handles(self, seeds, idx, num):
+    def generate_handles(self, seeds, idx, batch_size):
         '''Generate a list of C NodeFlow handles.
 
         Subclasses don't have to override generate() or fetch(); they should
@@ -237,8 +237,8 @@ class CNodeFlowSampler(NodeFlowSampler):
         ----------
         seeds : DGLTensor
             The seeds
-        idx, num : int
-            Generate NodeFlow for seeds[idx:idx+num]
+        idx, batch_size : int
+            Generate NodeFlow for seeds[idx:idx+batch_size]
 
         Returns
         -------
@@ -360,12 +360,12 @@ class NeighborSampler(CNodeFlowSampler):
         self._num_workers = num_workers
         self._neighbor_type = neighbor_type
 
-    def generate_handles(self, seeds, idx, num):
+    def generate_handles(self, seeds, idx, batch_size):
         handles = unwrap_to_ptr_list(_CAPI_UniformSampling(
             self.g.c_handle,
             seeds,
             idx,
-            num,
+            batch_size,
             self._num_workers,
             self._expand_factor,
             self._num_hops,
@@ -421,13 +421,13 @@ class LayerSampler(CNodeFlowSampler):
         self._neighbor_type = neighbor_type
         self._layer_sizes = utils.toindex(layer_sizes)
 
-    def generate_handles(self, seeds, idx, num):
+    def generate_handles(self, seeds, idx, batch_size):
         handles = unwrap_to_ptr_list(_CAPI_LayerSampling(
             self.g.c_handle,
             seeds,
             idx,        # start batch id
-            num,        # batch size
-            self._num_workers,       # num batches
+            batch_size,
+            self._num_workers,
             self._layer_sizes.todgltensor(),
             self._neighbor_type))
         return handles
