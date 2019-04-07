@@ -173,9 +173,9 @@ class SharedMemoryStoreServer(object):
 
             assert self._graph.number_of_nodes() == shape[0]
             data = empty_shared_mem(_get_ndata_path(graph_name, ndata_name), True, shape, dtype)
-            #TODO initialize.
             dlpack = data.to_dlpack()
             self._graph.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
+            self._graph.ndata[ndata_name][:] = 0
             return 0
 
         # RPC command: initialize edge embedding in the server.
@@ -187,9 +187,9 @@ class SharedMemoryStoreServer(object):
 
             assert self._graph.number_of_edges() == shape[0]
             data = empty_shared_mem(_get_edata_path(graph_name, edata_name), True, shape, dtype)
-            #TODO initialize.
             dlpack = data.to_dlpack()
             self._graph.edata[edata_name] = F.zerocopy_from_dlpack(dlpack)
+            self._graph.edata[edata_name][:] = 0
             return 0
 
         # RPC command: get the names of all node embeddings.
