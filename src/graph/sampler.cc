@@ -601,9 +601,9 @@ namespace {
                       const dgl_id_t *eids,
                       const std::vector<dgl_id_t> &node_mapping,
                       const std::vector<int64_t> &actl_layer_sizes,
-                      vector<int64_t> *sub_indptr,
-                      vector<dgl_id_t> *sub_indices,
-                      vector<dgl_id_t> *sub_eids,
+                      ImmutableGraph::CSR::vector<int64_t> *sub_indptr,
+                      ImmutableGraph::CSR::vector<dgl_id_t> *sub_indices,
+                      ImmutableGraph::CSR::vector<dgl_id_t> *sub_eids,
                       std::vector<dgl_id_t> *flow_offsets,
                       std::vector<dgl_id_t> *edge_mapping) {
     /*
