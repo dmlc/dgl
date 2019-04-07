@@ -405,7 +405,6 @@ DGL_DLL int DGLArrayAlloc(const dgl_index_t* shape,
  * \param dtype_bits The number of bits of dtype
  * \param dtype_lanes The number of lanes in the dtype.
  * \param is_create whether the shared memory is created
- * \param fill how to fill the data
  * \param out The output handle.
  * \return 0 when success, -1 when failure happens
  */
@@ -416,7 +415,6 @@ int DGLArrayAllocSharedMem(const char *mem_name,
                            int dtype_bits,
                            int dtype_lanes,
                            bool is_create,
-                           const char *fill,
                            DGLArrayHandle* out);
 
 /*!
