@@ -133,12 +133,12 @@ ImmutableGraph::EdgeArray ImmutableGraph::CSR::GetEdges(IdArray vids) const {
   for (int64_t i = 0; i < len; ++i) {
     dgl_id_t vid = vid_data[i];
     int64_t off = this->indptr[vid];
-    const int64_t len = this->GetDegree(vid);
-    if (len == 0)
+    const int64_t deg = this->GetDegree(vid);
+    if (deg == 0)
       continue;
     const auto *pred = &this->indices[off];
     const auto *eids = &this->edge_ids[off];
-    for (int64_t j = 0; j < len; ++j) {
+    for (int64_t j = 0; j < deg; ++j) {
       *(src_ptr++) = pred[j];
       *(dst_ptr++) = vid;
       *(eid_ptr++) = eids[j];
