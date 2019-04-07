@@ -175,7 +175,6 @@ class SharedMemoryStoreServer(object):
             data = empty_shared_mem(_get_ndata_path(graph_name, ndata_name), True, shape, dtype)
             dlpack = data.to_dlpack()
             self._graph.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
-            self._graph.ndata[ndata_name][:] = 0
             return 0
 
         # RPC command: initialize edge embedding in the server.
@@ -189,7 +188,6 @@ class SharedMemoryStoreServer(object):
             data = empty_shared_mem(_get_edata_path(graph_name, edata_name), True, shape, dtype)
             dlpack = data.to_dlpack()
             self._graph.edata[edata_name] = F.zerocopy_from_dlpack(dlpack)
-            self._graph.edata[edata_name][:] = 0
             return 0
 
         # RPC command: get the names of all node embeddings.
@@ -275,7 +273,7 @@ class SharedMemoryDGLGraph(DGLGraph):
         graph_idx.from_shared_mem_csr_matrix(_get_graph_path(graph_name), num_nodes, num_edges, edge_dir)
         super(SharedMemoryDGLGraph, self).__init__(graph_idx, multigraph=multigraph, readonly=True)
 
-        # init all ndata and edata.
+        # map all ndata and edata from the server.
         ndata_infos = self.proxy.list_ndata()
         for name, shape, dtype in ndata_infos:
             self._init_ndata(name, shape, dtype)
@@ -283,6 +281,32 @@ class SharedMemoryDGLGraph(DGLGraph):
         edata_infos = self.proxy.list_edata()
         for name, shape, dtype in edata_infos:
             self._init_edata(name, shape, dtype)
+
+        # Set the ndata and edata initializers.
+        # so that when a new node/edge embedding is created, it'll be created on the server as well.
+        def node_initializer(name, arr):
+            shape = F.shape(arr)
+            dtype = np.dtype(F.dtype(arr)).name
+            self.proxy.init_ndata(name, shape, dtype)
+            data = empty_shared_mem(_get_ndata_path(self._graph_name, name),
+                                    False, shape, dtype)
+            dlpack = data.to_dlpack()
+            arr1 = F.zerocopy_from_dlpack(dlpack)
+            arr1[:] = arr
+            return arr1
+        def edge_initializer(name, arr):
+            shape = F.shape(arr)
+            dtype = np.dtype(F.dtype(arr)).name
+            self.proxy.init_edata(name, shape, dtype)
+            data = empty_shared_mem(_get_edata_path(self._graph_name, name),
+                                    False, shape, dtype)
+            dlpack = data.to_dlpack()
+            arr1 = F.zerocopy_from_dlpack(dlpack)
+            arr1[:] = arr
+            return arr1
+        self._node_frame.set_remote_initializer(node_initializer)
+        self._edge_frame.set_remote_initializer(edge_initializer)
+        self._msg_frame.set_remote_initializer(edge_initializer)
 
     def __del__(self):
         if self.proxy is not None:
@@ -299,44 +323,6 @@ class SharedMemoryDGLGraph(DGLGraph):
         data = empty_shared_mem(_get_edata_path(self._graph_name, edata_name), False, shape, dtype)
         dlpack = data.to_dlpack()
         self.edata[edata_name] = F.zerocopy_from_dlpack(dlpack)
-
-    def init_ndata(self, ndata_name, shape, dtype):
-        """Create node embedding.
-
-        It first creates the node embedding in the server and maps it to the current process
-        with shared memory.
-
-        Parameters
-        ----------
-        ndata_name : string
-            The name of node embedding
-        shape : tuple
-            The shape of the node embedding
-        dtype : string
-            The data type of the node embedding. The currently supported data types
-            are "float32" and "int32".
-        """
-        self.proxy.init_ndata(ndata_name, shape, dtype)
-        self._init_ndata(ndata_name, shape, dtype)
-
-    def init_edata(self, edata_name, shape, dtype):
-        """Create edge embedding.
-
-        It first creates the edge embedding in the server and maps it to the current process
-        with shared memory.
-
-        Parameters
-        ----------
-        edata_name : string
-            The name of edge embedding
-        shape : tuple
-            The shape of the edge embedding
-        dtype : string
-            The data type of the edge embedding. The currently supported data types
-            are "float32" and "int32".
-        """
-        self.proxy.init_edata(edata_name, shape, dtype)
-        self._init_edata(edata_name, shape, dtype)
 
     def destroy(self):
         """Destroy the graph store.

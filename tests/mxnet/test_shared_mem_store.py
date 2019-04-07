@@ -23,13 +23,14 @@ def worker_func(worker_id):
     assert F.array_equal(src, F.tensor(coo.col))
     assert F.array_equal(g.ndata['feat'][0], F.tensor(np.arange(10), dtype=np.float32))
     assert F.array_equal(g.edata['feat'][0], F.tensor(np.arange(10), dtype=np.float32))
-    g.init_ndata('test4', (g.number_of_nodes(), 10), dtype='float32')
-    g.init_edata('test4', (g.number_of_edges(), 10), dtype='float32')
+    g.ndata['test4'] = mx.nd.zeros((g.number_of_nodes(), 10))
+    g.edata['test4'] = mx.nd.zeros((g.number_of_edges(), 10))
     if worker_id == 0:
+        time.sleep(3)
         g.ndata['test4'][0] = 1
         g.edata['test4'][0] = 2
     else:
-        time.sleep(3)
+        time.sleep(5)
         assert np.all(g.ndata['test4'][0].asnumpy() == 1)
         assert np.all(g.edata['test4'][0].asnumpy() == 2)
     g.destroy()
