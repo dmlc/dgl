@@ -9,6 +9,8 @@
 #include <dgl/sampler.h>
 #include <dgl/immutable_graph.h>
 
+#include <string>
+
 namespace dgl {
 namespace network {
 
