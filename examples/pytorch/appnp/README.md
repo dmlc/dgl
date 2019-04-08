@@ -13,14 +13,15 @@ Dependencies
 pip install torch requests
 ``
 
-Codes
+Code
 -----
 The folder contains an implementation of APPNP (`appnp.py`).
+
 
 Results
 -------
 
-Run with following (available dataset: "cora", "citeseer", "pubmed")
+Run with following (available dataset: "cora", "citeseer", "pubmed").   
 ```bash
 python train.py --dataset cora --gpu 0
 ```
@@ -28,3 +29,9 @@ python train.py --dataset cora --gpu 0
 * cora: 0.8370 (paper: 0.850)
 * citeseer: 0.715 (paper: 0.757)
 * pubmed: 0.793 (paper: 0.797)
+
+Differences from the original implementation 
+---------
+
+- This implementation does not perform dropout on adjacency matrices  during propagation step.
+- Experiments were done on dgl datasets (GCN settings) which are different from those used in the original implementation. (discrepancies are detailed in experimental section of the original paper)
