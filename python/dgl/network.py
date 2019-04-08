@@ -1,12 +1,12 @@
 """DGL Distributed Training Infrastructure."""
 from __future__ import absolute_import
 
+import socket
+
 from ._ffi.function import _init_api
 from .nodeflow import NodeFlow
 from .utils import unwrap_to_ptr_list
 from . import utils
-
-import socket
 
 _init_api("dgl.network")
 
