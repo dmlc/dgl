@@ -53,7 +53,8 @@ def main(args):
 
     # create GCN model
     g = DGLGraph(data.graph)
-    g.add_edges(g.nodes(), g.nodes())
+    if args.self_loop:
+        g.add_edges(g.nodes(), g.nodes())
     # normalization
     degs = g.in_degrees().astype('float32')
     norm = mx.nd.power(degs, -0.5)
@@ -120,6 +121,9 @@ if __name__ == '__main__':
             help="number of hidden gcn layers")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
             help="Weight for L2 loss")
+    parser.add_argument("--self-loop", action='store_true',
+            help="graph self-loop (default=False)")
+    parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
     print(args)
