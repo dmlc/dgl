@@ -97,7 +97,6 @@ class GraphStore(object):
         SocketSync()
         self._sender = _create_sender(wk_ip, wk_port)
         # Solve message in a loop (use CTL-C to exit)
-        """
         while True:
             msg = _recv_graph_store_msg(self._receiver)
             if msg.type == MessageType.PUSH:
@@ -107,7 +106,6 @@ class GraphStore(object):
                 _send_node_feats(self._sender, node_feats)
             else:
                 raise RuntimeError('Unknow message type.')
-        """
 
     def push_msg_handle(self, feat_name, node_ids, node_feats):
         """User-defined handler for push message
