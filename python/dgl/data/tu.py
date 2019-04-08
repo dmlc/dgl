@@ -6,7 +6,7 @@ import os
 from dgl.data.utils import download, extract_archive, get_download_dir
 
 
-class TUDataset():
+class TUDataset(object):
     """
     TUDataset contains lots of graph kernel datasets for graph classification.
     Use provided node feature by default. If no feature provided, use one-hot node label instead.
