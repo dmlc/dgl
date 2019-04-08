@@ -1,8 +1,8 @@
 # This file contains DGL distributed graph store APIs.
 from ...network import _create_sender, _create_receiver
 from ...network import _finalize_sender, _finalize_receiver
-from ...network import _recv_ip_port, _recv_graph_store_msg
-from ...network import _send_local_ip_port, _send_node_feats
+from ...network import _recv_ip_port, _send_local_ip_port
+from ...network import _recv_graph_store_msg, _send_graph_store_msg
 from ...network import _pull, _push
 
 import time
@@ -13,7 +13,7 @@ from collections import namedtuple
 _WAIT_TIME_SEC = 3  # 3 seconds for socket sync
 
 def SocketSync():
-  time.sleep(_WAIT_TIME_SEC)
+    time.sleep(_WAIT_TIME_SEC)
 
 def keyboardInterruptHandler(signal, frame):
     """Users use [Ctl + C] to exit the GraphStore service
@@ -96,7 +96,7 @@ class GraphStore(object):
         wk_ip, wk_port = _recv_ip_port(self._receiver)
         SocketSync()
         self._sender = _create_sender(wk_ip, wk_port)
-        # Solve message in a loop (use CTL-C to exit)
+        # Solve message in a loop (use [Ctl + C] to exit)
         while True:
             msg = _recv_graph_store_msg(self._receiver)
             if msg.type == MessageType.PUSH:
@@ -153,7 +153,7 @@ class GraphStore(object):
         self._server_ip = server_ip
         self._server_port = server_port
         self._sender = _create_sender(self._server_ip, self._server_port)
-        #  Auto find useable ip and port
+        # Auto find useable ip and port
         self._local_ip, self._local_port = _send_local_ip_port(self._sender)
         self._receiver = _create_receiver(self._local_ip, self._local_port, 1)
 
