@@ -12,6 +12,9 @@ from collections import namedtuple
 
 _WAIT_TIME_SEC = 3  # 3 seconds for socket sync
 
+def SocketSync():
+  time.sleep(_WAIT_TIME_SEC)
+
 def keyboardInterruptHandler(signal, frame):
     """Users use [Ctl + C] to exit the GraphStore service
     """
@@ -64,7 +67,7 @@ class GraphStore(object):
         """Finalize GraphStore
         """
         _finalize_sender(self._sender)
-        time.sleep(_WAIT_TIME_SEC)
+        SocketSync()
         _finalize_receiver(self._receiver)
 
     def init_server(self, ip, port, tensor_store):
@@ -91,7 +94,7 @@ class GraphStore(object):
         self._tensor_store = tensor_store
         self._receiver = _create_receiver(self._ip, self._port, 1)
         wk_ip, wk_port = _recv_ip_port(self._receiver)
-        time.sleep(_WAIT_TIME_SEC)  # wait client to start listener
+        SocketSync()
         self._sender = _create_sender(wk_ip, wk_port)
         # Solve message in a loop (use CTL-C to exit)
         """
