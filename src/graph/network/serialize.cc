@@ -89,7 +89,6 @@ int64_t SerializeSampledSubgraph(char* data,
   *(reinterpret_cast<int64_t*>(data_ptr)) = indptr_size;
   data_ptr += sizeof(int64_t);
   memcpy(data_ptr, indptr, indptr_size);
-  data_ptr += indptr_size;
   return total_size;
 }
 
@@ -159,7 +158,46 @@ void DeserializeSampledSubgraph(char* data,
   data_ptr += sizeof(int64_t);
   int64_t* indptr_out = (*csr)->indptr.data();
   memcpy(indptr_out, data_ptr, tensor_size);
-  data_ptr += tensor_size;
+}
+
+int64_t SerializeIP(char* data, const std::string& ip) {
+  int64_t total_size = 0;
+  total_size += ip.size();
+  total_size += sizeof(int64_t);
+  if (total_size > kMaxBufferSize) {
+    LOG(FATAL) << "Message size: (" << total_size
+               << ") is larger than buffer size: ("
+               << kMaxBufferSize << ")";
+  }
+  char* data_ptr = data;
+  const char* ip_data = ip.c_str();
+  *(reinterpret_cast<int64_t*>(data_ptr)) = ip.size();
+  data_ptr += sizeof(int64_t);
+  memcpy(data_ptr, ip_data, ip.size());
+  return total_size;
+}
+
+void DeserializeIP(char* data, std::string* ip) {
+  char* data_ptr = data;
+  int64_t ip_size = *(reinterpret_cast<int64_t*>(data_ptr));
+  data_ptr += sizeof(int64_t);
+  ip->assign(data_ptr, ip_size);
+}
+
+int64_t SerializePort(char* data, int port) {
+  int64_t total_size = 0;
+  total_size += sizeof(int64_t);
+  if (total_size > kMaxBufferSize) {
+    LOG(FATAL) << "Message size: (" << total_size
+               << ") is larger than buffer size: ("
+               << kMaxBufferSize << ")";
+  }
+  *(reinterpret_cast<int64_t*>(data)) = port;
+  return total_size;
+}
+
+void DeserializePort(char* data, int* port) {
+  *port = *(reinterpret_cast<int64_t*>(data));
 }
 
 }  // namespace network

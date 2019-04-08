@@ -45,6 +45,36 @@ void DeserializeSampledSubgraph(char* data,
                                 IdArray* layer_offsets,
                                 IdArray* flow_offsets);
 
+/*!
+ * \brief Serialize IP address to binary data
+ * \param data pointer of data buffer
+ * \param ip IP address
+ * \return the total size of the serialized binary data
+ */
+int64_t SerializeIP(char* data, const std::string& ip);
+
+/*!
+ * \brief Serialize port to binary data
+ * \param data pointer of data buffer
+ * \param port port number
+ * \return the total size of the serialized binary data
+ */
+int64_t SerializePort(char* data, int port);
+
+/*!
+ * \brief Deserialize IP address from binary data
+ * \param data pointer of data buffer
+ * \param ip IP address
+ */
+void DeserializeIP(char* data, std::string* ip);
+
+/*!
+ * \brief Deserialize port from binary data
+ * \param data pointer of data buffer
+ * \param port port number
+ */
+void DeserializePort(char* data, int* port);
+
 // TODO(chao): we can add compression and decompression method here
 
 }  // namespace network

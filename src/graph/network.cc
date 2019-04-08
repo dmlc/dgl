@@ -20,6 +20,20 @@ using dgl::runtime::NDArray;
 namespace dgl {
 namespace network {
 
+static void SendData(network::Communicator* comm, int64_t size) {
+  int64_t send_size = comm->Send(comm->GetBuffer(), size);
+  if (send_size <= 0) {
+    LOG(FATAL) << "Send message error (size: " << send_size << ")";
+  }
+}
+
+static void RecvData(network::Communicator* comm, int max_size) {
+  int64_t recv_size = comm->Receive(comm->GetBuffer(), max_size);
+  if (recv_size <= 0) {
+    LOG(FATAL) << "Receive error: (size: " << recv_size << ")";
+  }
+}
+
 DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string ip = args[0];
@@ -76,10 +90,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
                              flow_offsets);
     CHECK_GT(data_size, 0);
     // Send msg via network
-    int64_t size = comm->Send(comm->GetBuffer(), data_size);
-    if (size <= 0) {
-      LOG(ERROR) << "Send message error (size: " << size << ")";
-    }
+    SendData(comm, data_size);
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
@@ -87,13 +98,10 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
     CommunicatorHandle chandle = args[0];
     network::Communicator* comm = static_cast<network::Communicator*>(chandle);
     // Recv data from network
-    int64_t size = comm->Receive(comm->GetBuffer(), kMaxBufferSize);
-    if (size <= 0) {
-      LOG(ERROR) << "Receive error: (size: " << size << ")";
-    }
+    RecvData(comm, kMaxBufferSize);
     NodeFlow* nf = new NodeFlow();
     ImmutableGraph::CSR::Ptr csr;
-    // Deserialize nodeflow from recv_data_buffer
+    // Deserialize nodeflow from data buffer
     network::DeserializeSampledSubgraph(comm->GetBuffer(),
                                         &(csr),
                                         &(nf->node_mapping),
@@ -111,6 +119,44 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeCommunicator")
     CommunicatorHandle chandle = args[0];
     network::Communicator* comm = static_cast<network::Communicator*>(chandle);
     comm->Finalize();
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_DGLSendIPandPort")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    CommunicatorHandle chandle = args[0];
+    network::Communicator* comm = static_cast<network::Communicator*>(chandle);
+    std::string ip = args[1];
+    int port = args[2];
+    // Send IP
+    int64_t data_size = network::SerializeIP(comm->GetBuffer(), ip);
+    SendData(comm, data_size);
+    // Send Port
+    data_size = network::SerializePort(comm->GetBuffer(), port);
+    SendData(comm, data_size);
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_DGLRecvIP")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    CommunicatorHandle chandle = args[0];
+    network::Communicator* comm = static_cast<network::Communicator*>(chandle);
+    // Recv data from network
+    RecvData(comm, kMaxBufferSize);
+    // Deserialize IP from data buffer
+    std::string ip;
+    network::DeserializeIP(comm->GetBuffer(), &ip);
+    *rv = ip;
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_DGLRecvPort")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    CommunicatorHandle chandle = args[0];
+    network::Communicator* comm = static_cast<network::Communicator*>(chandle);
+    // Recv data from network
+    RecvData(comm, kMaxBufferSize);
+    // Deserialize port
+    int port;
+    network::DeserializePort(comm->GetBuffer(), &port);
+    *rv = port;
   });
 
 }  // namespace network
