@@ -21,6 +21,7 @@ The folder contains three implementations of GCN:
 - `gcn_mp.py` uses user-defined message and reduce functions.
 - `gcn_spmv.py` improves from `gcn_mp.py` by using DGL's builtin functions
    so SPMV optimization could be applied.
+Modify `train.py` to switch between different implementations.
 
 The provided implementation in `gcn_concat.py` is a bit different from the
 original paper for better performance, credit to @yifeim and @ZiyueHuang.
@@ -29,7 +30,7 @@ Results
 -------
 Run with following (available dataset: "cora", "citeseer", "pubmed")
 ```bash
-DGLBACKEND=mxnet python3 train.py --dataset cora --gpu 0
+DGLBACKEND=mxnet python3 train.py --dataset cora --gpu 0 --self-loop
 ```
 
 * cora: ~0.810 (paper: 0.815)

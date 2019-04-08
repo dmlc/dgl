@@ -57,7 +57,8 @@ def main(args):
     g = DGLGraph(data.graph)
     n_edges = g.number_of_edges()
     # add self loop
-    g.add_edges(g.nodes(), g.nodes())
+    if args.self_loop:
+        g.add_edges(g.nodes(), g.nodes())
     # normalization
     degs = g.in_degrees().float()
     norm = torch.pow(degs, -0.5)
@@ -128,6 +129,9 @@ if __name__ == '__main__':
             help="number of hidden gcn layers")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
             help="Weight for L2 loss")
+    parser.add_argument("--self-loop", action='store_true',
+            help="graph self-loop (default=False)")
+    parser.set_defaults(self_loop=False)
     args = parser.parse_args()
     print(args)
 
