@@ -4,6 +4,8 @@
  * \brief DGL immutable graph index implementation
  */
 
+#include <string.h>
+#include <sys/types.h>
 #include <dgl/immutable_graph.h>
 
 #ifdef _MSC_VER
@@ -18,6 +20,80 @@ template<class ForwardIt, class T>
 bool binary_search(ForwardIt first, ForwardIt last, const T& value) {
   first = std::lower_bound(first, last, value);
   return (!(first == last) && !(value < *first));
+}
+
+ImmutableGraph::CSR::CSR(int64_t num_vertices, int64_t expected_num_edges):
+    indptr(num_vertices + 1), indices(expected_num_edges), edge_ids(expected_num_edges) {
+  indptr.resize(num_vertices + 1);
+}
+
+ImmutableGraph::CSR::CSR(IdArray indptr_arr, IdArray index_arr, IdArray edge_id_arr):
+    indptr(indptr_arr->shape[0]), indices(index_arr->shape[0]), edge_ids(index_arr->shape[0]) {
+  size_t num_vertices = indptr_arr->shape[0] - 1;
+  size_t num_edges = index_arr->shape[0];
+  const int64_t *indptr_data = static_cast<int64_t*>(indptr_arr->data);
+  const dgl_id_t *indices_data = static_cast<dgl_id_t*>(index_arr->data);
+  const dgl_id_t *edge_id_data = static_cast<dgl_id_t*>(edge_id_arr->data);
+  CHECK_EQ(indptr_data[0], 0);
+  CHECK_EQ(indptr_data[num_vertices], num_edges);
+  indptr.insert_back(indptr_data, num_vertices + 1);
+  indices.insert_back(indices_data, num_edges);
+  edge_ids.insert_back(edge_id_data, num_edges);
+}
+
+ImmutableGraph::CSR::CSR(IdArray indptr_arr, IdArray index_arr, IdArray edge_id_arr,
+                         const std::string &shared_mem_name) {
+#ifndef _WIN32
+  size_t num_vertices = indptr_arr->shape[0] - 1;
+  size_t num_edges = index_arr->shape[0];
+  CHECK_EQ(num_edges, edge_id_arr->shape[0]);
+  size_t file_size = (num_vertices + 1) * sizeof(int64_t) + num_edges * sizeof(dgl_id_t) * 2;
+
+  auto mem = std::make_shared<runtime::SharedMemory>(shared_mem_name);
+  auto ptr = mem->create_new(file_size);
+
+  int64_t *addr1 = static_cast<int64_t *>(ptr);
+  indptr.init(addr1, num_vertices + 1);
+  void *addr = addr1 + num_vertices + 1;
+  dgl_id_t *addr2 = static_cast<dgl_id_t *>(addr);
+  indices.init(addr2, num_edges);
+  addr = addr2 + num_edges;
+  dgl_id_t *addr3 = static_cast<dgl_id_t *>(addr);
+  edge_ids.init(addr3, num_edges);
+
+  const int64_t *indptr_data = static_cast<int64_t*>(indptr_arr->data);
+  const dgl_id_t *indices_data = static_cast<dgl_id_t*>(index_arr->data);
+  const dgl_id_t *edge_id_data = static_cast<dgl_id_t*>(edge_id_arr->data);
+  CHECK_EQ(indptr_data[0], 0);
+  CHECK_EQ(indptr_data[num_vertices], num_edges);
+  indptr.insert_back(indptr_data, num_vertices + 1);
+  indices.insert_back(indices_data, num_edges);
+  edge_ids.insert_back(edge_id_data, num_edges);
+  this->mem = mem;
+#else
+  LOG(FATAL) << "ImmutableGraph doesn't support shared memory in Windows yet";
+#endif  // _WIN32
+}
+
+ImmutableGraph::CSR::CSR(const std::string &shared_mem_name,
+                         size_t num_vertices, size_t num_edges) {
+#ifndef _WIN32
+  size_t file_size = (num_vertices + 1) * sizeof(int64_t) + num_edges * sizeof(dgl_id_t) * 2;
+  auto mem = std::make_shared<runtime::SharedMemory>(shared_mem_name);
+  auto ptr = mem->open(file_size);
+
+  int64_t *addr1 = static_cast<int64_t *>(ptr);
+  indptr.init(addr1, num_vertices + 1, num_vertices + 1);
+  void *addr = addr1 + num_vertices + 1;
+  dgl_id_t *addr2 = static_cast<dgl_id_t *>(addr);
+  indices.init(addr2, num_edges, num_edges);
+  addr = addr2 + num_edges;
+  dgl_id_t *addr3 = static_cast<dgl_id_t *>(addr);
+  edge_ids.init(addr3, num_edges, num_edges);
+  this->mem = mem;
+#else
+  LOG(FATAL) << "ImmutableGraph doesn't support shared memory in Windows yet";
+#endif  // _WIN32
 }
 
 ImmutableGraph::EdgeArray ImmutableGraph::CSR::GetEdges(dgl_id_t vid) const {
@@ -57,10 +133,12 @@ ImmutableGraph::EdgeArray ImmutableGraph::CSR::GetEdges(IdArray vids) const {
   for (int64_t i = 0; i < len; ++i) {
     dgl_id_t vid = vid_data[i];
     int64_t off = this->indptr[vid];
-    const int64_t len = this->GetDegree(vid);
+    const int64_t deg = this->GetDegree(vid);
+    if (deg == 0)
+      continue;
     const auto *pred = &this->indices[off];
     const auto *eids = &this->edge_ids[off];
-    for (int64_t j = 0; j < len; ++j) {
+    for (int64_t j = 0; j < deg; ++j) {
       *(src_ptr++) = pred[j];
       *(dst_ptr++) = vid;
       *(eid_ptr++) = eids[j];
@@ -119,7 +197,7 @@ class HashTableChecker {
    * and the source vertex. `col_idx` and `orig_eids` store the collected edges.
    */
   void Collect(const dgl_id_t old_id, const dgl_id_t old_eid,
-               std::vector<dgl_id_t> *col_idx,
+               ImmutableGraph::CSR::vector<dgl_id_t> *col_idx,
                std::vector<dgl_id_t> *orig_eids) {
     if (!map.test(old_id))
       return;
@@ -147,7 +225,7 @@ class HashTableChecker {
    * The collected edges are stored in `new_neigh_idx` and `orig_eids`.
    */
   void CollectOnRow(const dgl_id_t neigh_idx[], const dgl_id_t eids[], size_t row_len,
-                    std::vector<dgl_id_t> *new_neigh_idx,
+                    ImmutableGraph::CSR::vector<dgl_id_t> *new_neigh_idx,
                     std::vector<dgl_id_t> *orig_eids) {
     // TODO(zhengda) I need to make sure the column index in each row is sorted.
     for (size_t j = 0; j < row_len; ++j) {
@@ -159,9 +237,9 @@ class HashTableChecker {
 };
 
 ImmutableGraph::EdgeList::Ptr ImmutableGraph::EdgeList::FromCSR(
-    const std::vector<int64_t>& indptr,
-    const std::vector<dgl_id_t>& indices,
-    const std::vector<dgl_id_t>& edge_ids,
+    const CSR::vector<int64_t>& indptr,
+    const CSR::vector<dgl_id_t>& indices,
+    const CSR::vector<dgl_id_t>& edge_ids,
     bool in_csr) {
   const auto n = indptr.size() - 1;
   const auto len = edge_ids.size();
@@ -288,6 +366,9 @@ ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::FromEdges(std::vector<Edge> *edges
 void ImmutableGraph::CSR::ReadAllEdges(std::vector<Edge> *edges) const {
   edges->resize(NumEdges());
   for (size_t i = 0; i < NumVertices(); i++) {
+    // If all the remaining nodes don't have edges.
+    if (indptr[i] == indptr[NumVertices()])
+      break;
     const dgl_id_t *indices_begin = &indices[indptr[i]];
     const dgl_id_t *eid_begin = &edge_ids[indptr[i]];
     for (size_t j = 0; j < GetDegree(i); j++) {

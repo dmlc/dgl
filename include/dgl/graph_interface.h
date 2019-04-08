@@ -32,17 +32,16 @@ const dgl_id_t DGL_INVALID_ID = static_cast<dgl_id_t>(-1);
  * but it doesn't own data itself. instead, it only references data in std::vector.
  */
 class DGLIdIters {
-  std::vector<dgl_id_t>::const_iterator begin_, end_;
+  const dgl_id_t *begin_, *end_;
  public:
-  DGLIdIters(std::vector<dgl_id_t>::const_iterator begin,
-             std::vector<dgl_id_t>::const_iterator end) {
+  DGLIdIters(const dgl_id_t *begin, const dgl_id_t *end) {
     this->begin_ = begin;
     this->end_ = end;
   }
-  std::vector<dgl_id_t>::const_iterator begin() const {
+  const dgl_id_t *begin() const {
     return this->begin_;
   }
-  std::vector<dgl_id_t>::const_iterator end() const {
+  const dgl_id_t *end() const {
     return this->end_;
   }
   dgl_id_t operator[](int64_t i) const {
