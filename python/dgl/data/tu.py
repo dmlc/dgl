@@ -55,10 +55,12 @@ class TUDataset(object):
         self.graph_labels = DS_graph_labels
 
         try:
-            DS_node_labels = self._to_onehot(
-                self._idx_from_zero(np.loadtxt(self._file_path("node_labels"), dtype=int)))
+            DS_node_labels = self._idx_from_zero(
+                np.loadtxt(self._file_path("node_labels"), dtype=int))
+            g.ndata['node_label'] = DS_node_labels
+            one_hot_node_labels = self._to_onehot(DS_node_labels)
             for idxs, g in zip(node_idx_list, self.graph_lists):
-                g.ndata['feat'] = DS_node_labels[idxs, :]
+                g.ndata['feat'] = one_hot_node_labels[idxs, :]
         except IOError:
             print("No Node Label Data")
 
@@ -75,6 +77,17 @@ class TUDataset(object):
             print("Use Constant one as Feature with hidden size {}".format(hidden_size))
 
     def __getitem__(self, idx):
+        """Get the i^th sample.
+        Paramters
+        ---------
+        idx : int
+            The sample index.
+        Returns
+        -------
+        (dgl.DGLGraph, int)
+            DGLGraph with node feature stored in `feat` field and node label in `node_label` if available.
+            And its label.
+        """
         g = self.graph_lists[idx]
         return g, self.graph_labels[idx]
 
