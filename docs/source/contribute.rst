@@ -43,7 +43,7 @@ Setup the upstream to the DGL official repository:
 
    git remote add upstream https://github.com/dmlc/dgl.git
 
-You could verify the remote setting by typing ``git remove -v``:
+You could verify the remote setting by typing ``git remote -v``:
 
 .. code-block:: bash
 

@@ -134,7 +134,7 @@ class MessageQueue {
   /*! 
    * \brief Used to check all producers will no longer produce anything 
    */
-  int num_producers_;
+  size_t num_producers_;
 
   /*! 
    * \brief Messages in the queue 
