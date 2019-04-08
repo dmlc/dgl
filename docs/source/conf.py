@@ -215,8 +215,8 @@ sphinx_gallery_conf = {
 }
 
 # Compatibility for different backend when builds tutorials
-os.environ['DGLBACKEND'] = os.environ.get("DGLBACKEND", "")
-if os.environ['DGLBACKEND'] == 'mxnet':
+dglbackend = os.environ.get("DGLBACKEND", "")
+if dglbackend == 'mxnet':
     sphinx_gallery_conf['filename_pattern'] = "/*(?<=mx)\.py"
-if os.environ['DGLBACKEND'] == 'pytorch':
+if dglbackend == 'pytorch':
     sphinx_gallery_conf['filename_pattern'] = "/*(?<!mx)\.py"
