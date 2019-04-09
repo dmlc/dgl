@@ -318,7 +318,9 @@ class Graph: public GraphInterface {
    * \return the successor vector
    */
   DGLIdIters SuccVec(dgl_id_t vid) const {
-    return DGLIdIters(adjlist_[vid].succ.begin(), adjlist_[vid].succ.end());
+    auto data = adjlist_[vid].succ.data();
+    auto size = adjlist_[vid].succ.size();
+    return DGLIdIters(data, data + size);
   }
 
   /*!
@@ -327,7 +329,9 @@ class Graph: public GraphInterface {
    * \return the out edge id vector
    */
   DGLIdIters OutEdgeVec(dgl_id_t vid) const {
-    return DGLIdIters(adjlist_[vid].edge_id.begin(), adjlist_[vid].edge_id.end());
+    auto data = adjlist_[vid].edge_id.data();
+    auto size = adjlist_[vid].edge_id.size();
+    return DGLIdIters(data, data + size);
   }
 
   /*!
@@ -336,7 +340,9 @@ class Graph: public GraphInterface {
    * \return the predecessor vector
    */
   DGLIdIters PredVec(dgl_id_t vid) const {
-    return DGLIdIters(reverse_adjlist_[vid].succ.begin(), reverse_adjlist_[vid].succ.end());
+    auto data = reverse_adjlist_[vid].succ.data();
+    auto size = reverse_adjlist_[vid].succ.size();
+    return DGLIdIters(data, data + size);
   }
 
   /*!
@@ -345,8 +351,9 @@ class Graph: public GraphInterface {
    * \return the in edge id vector
    */
   DGLIdIters InEdgeVec(dgl_id_t vid) const {
-    return DGLIdIters(reverse_adjlist_[vid].edge_id.begin(),
-                      reverse_adjlist_[vid].edge_id.end());
+    auto data = reverse_adjlist_[vid].edge_id.data();
+    auto size = reverse_adjlist_[vid].edge_id.size();
+    return DGLIdIters(data, data + size);
   }
 
   /*!

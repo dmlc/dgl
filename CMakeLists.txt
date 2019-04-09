@@ -19,7 +19,11 @@ include_directories("third_party/dmlc-core/include")
 
 # initial variables
 set(DGL_LINKER_LIBS "")
+if(MSVC OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 set(DGL_RUNTIME_LINKER_LIBS "")
+else(MSVC OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+set(DGL_RUNTIME_LINKER_LIBS "rt")
+endif(MSVC OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 
 # Generic compilation options
 if(MSVC)

@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <utility>
 #include <tuple>
+#include <algorithm>
 #include "runtime/ndarray.h"
 #include "graph_interface.h"
 
@@ -32,41 +33,220 @@ class ImmutableGraph: public GraphInterface {
     dgl_id_t edge_id;
   };
 
-  // Edge list indexed by edge id;
-  struct EdgeList {
-    typedef std::shared_ptr<EdgeList> Ptr;
-    std::vector<dgl_id_t> src_points;
-    std::vector<dgl_id_t> dst_points;
-
-    EdgeList(int64_t len, dgl_id_t val) {
-      src_points.resize(len, val);
-      dst_points.resize(len, val);
-    }
-
-    void register_edge(dgl_id_t eid, dgl_id_t src, dgl_id_t dst) {
-      CHECK_LT(eid, src_points.size()) << "Invalid edge id " << eid;
-      src_points[eid] = src;
-      dst_points[eid] = dst;
-    }
-
-    static EdgeList::Ptr FromCSR(
-        const std::vector<int64_t>& indptr,
-        const std::vector<dgl_id_t>& indices,
-        const std::vector<dgl_id_t>& edge_ids,
-        bool in_csr);
-  };
+  struct EdgeList;
 
   struct CSR {
     typedef std::shared_ptr<CSR> Ptr;
-    std::vector<int64_t> indptr;
-    std::vector<dgl_id_t> indices;
-    std::vector<dgl_id_t> edge_ids;
 
-    CSR(int64_t num_vertices, int64_t expected_num_edges) {
-      indptr.resize(num_vertices + 1);
-      indices.reserve(expected_num_edges);
-      edge_ids.reserve(expected_num_edges);
-    }
+    /*
+     * This vector provides interfaces similar to std::vector.
+     * The main difference is that the memory used by the vector can be allocated
+     * outside the vector. The main use case is that the vector can use the shared
+     * memory that is created by another process. In this way, we can access the
+     * graph structure loaded in another process.
+     */
+    template<class T>
+    class vector {
+     public:
+      vector() {
+        this->arr = nullptr;
+        this->capacity = 0;
+        this->curr = 0;
+        this->own = false;
+      }
+
+      /*
+       * Create a vector whose memory is allocated outside.
+       * Here there are no elements in the vector.
+       */
+      vector(T *arr, size_t size) {
+        this->arr = arr;
+        this->capacity = size;
+        this->curr = 0;
+        this->own = false;
+      }
+
+      /*
+       * Create a vector whose memory is allocated by the vector.
+       * Here there are no elements in the vector.
+       */
+      explicit vector(size_t size) {
+        this->arr = static_cast<T *>(malloc(size * sizeof(T)));
+        this->capacity = size;
+        this->curr = 0;
+        this->own = true;
+      }
+
+      ~vector() {
+        // If the memory is allocated by the vector, it should be free'd.
+        if (this->own) {
+          free(this->arr);
+        }
+      }
+
+      vector(const vector &other) = delete;
+
+      /*
+       * Initialize the vector whose memory is allocated outside.
+       * There are no elements in the vector.
+       */
+      void init(T *arr, size_t size) {
+        CHECK(this->arr == nullptr);
+        this->arr = arr;
+        this->capacity = size;
+        this->curr = 0;
+        this->own = false;
+      }
+
+      /*
+       * Initialize the vector whose memory is allocated outside.
+       * There are elements in the vector.
+       */
+      void init(T *arr, size_t capacity, size_t size) {
+        CHECK(this->arr == nullptr);
+        CHECK_LE(size, capacity);
+        this->arr = arr;
+        this->capacity = capacity;
+        this->curr = size;
+        this->own = false;
+      }
+
+      /* Similar to std::vector::push_back. */
+      void push_back(T val) {
+        // If the vector doesn't own the memory, it can't adjust its memory size.
+        if (!this->own) {
+          CHECK_LT(curr, capacity);
+        } else if (curr == capacity) {
+          this->capacity = this->capacity * 2;
+          this->arr = static_cast<T *>(realloc(this->arr, this->capacity * sizeof(T)));
+          CHECK(this->arr) << "can't allocate memory for a larger vector.";
+        }
+        this->arr[curr++] = val;
+      }
+
+      /*
+       * This inserts multiple elements to the back of the vector.
+       */
+      void insert_back(const T* val, size_t len) {
+        if (!this->own) {
+          CHECK_LE(curr + len, capacity);
+        } else if (curr + len > capacity) {
+          this->capacity = curr + len;
+          this->arr = static_cast<T *>(realloc(this->arr, this->capacity * sizeof(T)));
+          CHECK(this->arr) << "can't allocate memory for a larger vector.";
+        }
+        std::copy(val, val + len, this->arr + curr);
+        curr += len;
+      }
+
+      /*
+       * Similar to std::vector::[].
+       * It checks the boundary of the vector.
+       */
+      T &operator[](size_t idx) {
+        CHECK_LT(idx, curr);
+        return this->arr[idx];
+      }
+
+      /*
+       * Similar to std::vector::[].
+       * It checks the boundary of the vector.
+       */
+      const T &operator[](size_t idx) const {
+        CHECK_LT(idx, curr);
+        return this->arr[idx];
+      }
+
+      /* Similar to std::vector::size. */
+      size_t size() const {
+        return this->curr;
+      }
+
+      /* Similar to std::vector::resize. */
+      void resize(size_t new_size) {
+        if (!this->own) {
+          CHECK_LE(new_size, capacity);
+        } else if (new_size > capacity) {
+          this->capacity = new_size;
+          this->arr = static_cast<T *>(realloc(this->arr, this->capacity * sizeof(T)));
+          CHECK(this->arr) << "can't allocate memory for a larger vector.";
+        }
+        for (size_t i = this->curr; i < new_size; i++)
+          this->arr[i] = 0;
+        this->curr = new_size;
+      }
+
+      /* Similar to std::vector::clear. */
+      void clear() {
+        this->curr = 0;
+      }
+
+      /* Similar to std::vector::data. */
+      const T *data() const {
+        return this->arr;
+      }
+
+      /* Similar to std::vector::data. */
+      T *data() {
+        return this->arr;
+      }
+
+      /*
+       * This is to simulate begin() of std::vector.
+       * However, it returns the raw pointer instead of iterator.
+       */
+      const T *begin() const {
+        return this->arr;
+      }
+
+      /*
+       * This is to simulate begin() of std::vector.
+       * However, it returns the raw pointer instead of iterator.
+       */
+      T *begin() {
+        return this->arr;
+      }
+
+      /*
+       * This is to simulate end() of std::vector.
+       * However, it returns the raw pointer instead of iterator.
+       */
+      const T *end() const {
+        return this->arr + this->curr;
+      }
+
+      /*
+       * This is to simulate end() of std::vector.
+       * However, it returns the raw pointer instead of iterator.
+       */
+      T *end() {
+        return this->arr + this->curr;
+      }
+
+     private:
+      /*
+       * \brief the raw array that contains elements of type T.
+       *
+       * The vector may or may not own the memory of the raw array.
+       */
+      T *arr;
+      /* \brief the memory size of the raw array. */
+      size_t capacity;
+      /* \brief the number of elements in the array. */
+      size_t curr;
+      /* \brief whether the vector owns the memory. */
+      bool own;
+    };
+
+    vector<int64_t> indptr;
+    vector<dgl_id_t> indices;
+    vector<dgl_id_t> edge_ids;
+
+    CSR(int64_t num_vertices, int64_t expected_num_edges);
+    CSR(IdArray indptr, IdArray indices, IdArray edge_ids);
+    CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
+        const std::string &shared_mem_name);
+    CSR(const std::string &shared_mem_name, size_t num_vertices, size_t num_edges);
 
     bool HasVertex(dgl_id_t vid) const {
       return vid < NumVertices();
@@ -103,7 +283,8 @@ class ImmutableGraph: public GraphInterface {
     void ReadAllEdges(std::vector<Edge> *edges) const;
     CSR::Ptr Transpose() const;
     std::pair<CSR::Ptr, IdArray> VertexSubgraph(IdArray vids) const;
-    std::pair<CSR::Ptr, IdArray> EdgeSubgraph(IdArray eids, EdgeList::Ptr edge_list) const;
+    std::pair<CSR::Ptr, IdArray> EdgeSubgraph(IdArray eids,
+                                              std::shared_ptr<EdgeList> edge_list) const;
     /*
      * Construct a CSR from a list of edges.
      *
@@ -112,6 +293,35 @@ class ImmutableGraph: public GraphInterface {
      * which is specified by `sort_on`.
      */
     static CSR::Ptr FromEdges(std::vector<Edge> *edges, int sort_on, uint64_t num_nodes);
+
+   private:
+#ifndef _WIN32
+    std::shared_ptr<runtime::SharedMemory> mem;
+#endif  // _WIN32
+  };
+
+  // Edge list indexed by edge id;
+  struct EdgeList {
+    typedef std::shared_ptr<EdgeList> Ptr;
+    std::vector<dgl_id_t> src_points;
+    std::vector<dgl_id_t> dst_points;
+
+    EdgeList(int64_t len, dgl_id_t val) {
+      src_points.resize(len, val);
+      dst_points.resize(len, val);
+    }
+
+    void register_edge(dgl_id_t eid, dgl_id_t src, dgl_id_t dst) {
+      CHECK_LT(eid, src_points.size()) << "Invalid edge id " << eid;
+      src_points[eid] = src;
+      dst_points[eid] = dst;
+    }
+
+    static EdgeList::Ptr FromCSR(
+        const CSR::vector<int64_t>& indptr,
+        const CSR::vector<dgl_id_t>& indices,
+        const CSR::vector<dgl_id_t>& edge_ids,
+        bool in_csr);
   };
 
   /*! \brief Construct an immutable graph from the COO format. */
