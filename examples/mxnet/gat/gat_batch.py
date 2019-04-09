@@ -183,8 +183,6 @@ def main(args):
     g.remove_edges_from(g.selfloop_edges())
     g = DGLGraph(g)
     g.add_edges(g.nodes(), g.nodes())
-    
-
     # create model
     model = GAT(g,
                 args.num_layers,
