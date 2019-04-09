@@ -50,8 +50,9 @@ class APPNP(nn.Module):
         h = self.activation(self.layers[0](h))
         for layer in self.layers[1:-1]:
             h = self.activation(layer(h))
-        h = self.layers[-1](h)
-        # propagation step
+        if self.dropout:
+            h = self.layers[-1](self.dropout(h))
+        # propagation step without dropout on adjacency matrices
         self.cached_h = h
         for _ in range(self.K):
             # normalization by square root of src degree

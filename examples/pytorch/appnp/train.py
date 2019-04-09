@@ -127,9 +127,9 @@ if __name__ == '__main__':
     parser.add_argument("--hidden_sizes", type=int, nargs='+', default=[64],
             help="hidden unit sizes for appnp")
     parser.add_argument("--k", type=int, default=10,
-                        help="Number of propagation steps")
+            help="Number of propagation steps")
     parser.add_argument("--alpha", type=float, default=0.1,
-                        help="Teleport Probability")
+            help="Teleport Probability")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
             help="Weight for L2 loss")
     args = parser.parse_args()
