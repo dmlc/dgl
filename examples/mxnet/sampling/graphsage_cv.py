@@ -114,7 +114,7 @@ class GraphSAGETrain(gluon.Block):
 
         for i, layer in enumerate(self.layers):
             parent_nid = dgl.utils.toindex(nf.layer_parent_nid(i+1))
-            layer_nid = nf.map_from_parent_nid(i, parent_nid)
+            layer_nid = nf.map_from_parent_nid(i, parent_nid).as_in_context(h.context)
             self_h = h[layer_nid]
             # activation from previous layer of myself, used in graphSAGE
             nf.layers[i+1].data['self_h'] = self_h
@@ -168,7 +168,7 @@ class GraphSAGEInfer(gluon.Block):
         for i, layer in enumerate(self.layers):
             nf.layers[i].data['h'] = h
             parent_nid = dgl.utils.toindex(nf.layer_parent_nid(i+1))
-            layer_nid = nf.map_from_parent_nid(i, parent_nid)
+            layer_nid = nf.map_from_parent_nid(i, parent_nid).as_in_context(h.context)
             # activation from previous layer of the nodes in (i+1)-th layer, used in graphSAGE
             self_h = h[layer_nid]
             nf.layers[i+1].data['self_h'] = self_h
@@ -193,7 +193,6 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
     degs[degs > args.num_neighbors] = args.num_neighbors
     g.ndata['subg_norm'] = mx.nd.expand_dims(mx.nd.array(1./degs, ctx=ctx), 1)
 
-
     g.update_all(fn.copy_src(src='features', out='m'),
                  fn.sum(msg='m', out='preprocess'),
                  lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
@@ -201,6 +200,7 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
     n_layers = args.n_layers
     for i in range(n_layers):
         g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
+        g.ndata['agg_h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
 
     model = GraphSAGETrain(in_feats,
                            args.n_hidden,
@@ -223,9 +223,10 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
 
     # use optimizer
     print(model.collect_params())
+    kv_type = 'local' if args.nworkers == 1 else 'dist_sync'
     trainer = gluon.Trainer(model.collect_params(), 'adam',
                             {'learning_rate': args.lr, 'wd': args.weight_decay},
-                            kvstore=mx.kv.create('local'))
+                            kvstore=mx.kv.create(kv_type))
 
     # initialize graph
     dur = []
