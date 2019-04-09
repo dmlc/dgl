@@ -250,5 +250,3 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
             break
 
         print("Test Accuracy {:.4f}". format(num_acc/num_tests))
-
-
