@@ -10,17 +10,15 @@ from dgl.data import register_data_args, load_data
 
 
 class NodeUpdate(gluon.Block):
-    def __init__(self, in_feats, out_feats, activation=None, test=False, concat=False):
+    def __init__(self, in_feats, out_feats, activation=None, concat=False):
         super(NodeUpdate, self).__init__()
         self.dense = gluon.nn.Dense(out_feats, in_units=in_feats)
         self.activation = activation
         self.concat = concat
-        self.test = test
 
     def forward(self, node):
         h = node.data['h']
-        if self.test:
-            h = h * node.data['norm']
+        h = h * node.data['norm']
         h = self.dense(h)
         # skip connection
         if self.concat:
@@ -63,9 +61,11 @@ class GCNSampling(gluon.Block):
             if self.dropout:
                 h = mx.nd.Dropout(h, p=self.dropout)
             nf.layers[i].data['h'] = h
+            degs = nf.layer_in_degree(i + 1).astype('float32').as_in_context(h.context)
+            nf.layers[i + 1].data['norm'] = mx.nd.expand_dims(1./degs, 1)
             nf.block_compute(i,
                              fn.copy_src(src='h', out='m'),
-                             lambda node : {'h': node.mailbox['m'].mean(axis=1)},
+                             fn.sum(msg='m', out='h'),
                              layer)
 
         h = nf.layers[-1].data.pop('activation')
@@ -86,13 +86,13 @@ class GCNInfer(gluon.Block):
             self.layers = gluon.nn.Sequential()
             # input layer
             skip_start = (0 == n_layers-1)
-            self.layers.add(NodeUpdate(in_feats, n_hidden, activation, test=True, concat=skip_start))
+            self.layers.add(NodeUpdate(in_feats, n_hidden, activation, concat=skip_start))
             # hidden layers
             for i in range(1, n_layers):
                 skip_start = (i == n_layers-1)
-                self.layers.add(NodeUpdate(n_hidden, n_hidden, activation, test=True, concat=skip_start))
+                self.layers.add(NodeUpdate(n_hidden, n_hidden, activation, concat=skip_start))
             # output layer
-            self.layers.add(NodeUpdate(2*n_hidden, n_classes, test=True))
+            self.layers.add(NodeUpdate(2*n_hidden, n_classes))
 
 
     def forward(self, nf):
@@ -106,8 +106,7 @@ class GCNInfer(gluon.Block):
                              fn.sum(msg='m', out='h'),
                              layer)
 
-        h = nf.layers[-1].data.pop('activation')
-        return h
+        return nf.layers[-1].data.pop('activation')
 
 
 def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
