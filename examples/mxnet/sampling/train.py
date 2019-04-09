@@ -93,6 +93,8 @@ if __name__ == '__main__':
             help="graph self-loop (default=False)")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
             help="Weight for L2 loss")
+    parser.add_argument("--nworkers", type=int, default=1,
+            help="number of workers")
     args = parser.parse_args()
 
     print(args)
