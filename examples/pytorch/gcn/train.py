@@ -54,11 +54,13 @@ def main(args):
         test_mask = test_mask.cuda()
 
     # graph preprocess and calculate normalization factor
-    g = DGLGraph(data.graph)
-    n_edges = g.number_of_edges()
+    g = data.graph
     # add self loop
     if args.self_loop:
-        g.add_edges(g.nodes(), g.nodes())
+            g.remove_edges_from(g.selfloop_edges())
+            g.add_edges_from(zip(g.nodes(), g.nodes()))
+    g = DGLGraph(g)
+    n_edges = g.number_of_edges()
     # normalization
     degs = g.in_degrees().float()
     norm = torch.pow(degs, -0.5)
