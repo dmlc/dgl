@@ -200,6 +200,7 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
     n_layers = args.n_layers
     for i in range(n_layers):
         g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
+        g.ndata['agg_h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
 
     model = GraphSAGETrain(in_feats,
                            args.n_hidden,
@@ -222,9 +223,10 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
 
     # use optimizer
     print(model.collect_params())
+    kv_type = 'local' if args.nworkers == 1 else 'dist_sync'
     trainer = gluon.Trainer(model.collect_params(), 'adam',
                             {'learning_rate': args.lr, 'wd': args.weight_decay},
-                            kvstore=mx.kv.create('local'))
+                            kvstore=mx.kv.create(kv_type))
 
     # initialize graph
     dur = []
