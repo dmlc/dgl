@@ -1,3 +1,4 @@
+import os
 import backend as F
 import networkx as nx
 import numpy as np
@@ -153,8 +154,37 @@ def test_create_graph():
     for edge in elist:
         assert g.edge_id(edge[0], edge[1]) == ig.edge_id(edge[0], edge[1])
 
+def test_load_csr():
+    n = 100
+    csr = (sp.sparse.random(n, n, density=0.1, format='csr') != 0).astype(np.int64)
+
+    # Load CSR normally.
+    idx = dgl.graph_index.GraphIndex(multigraph=False, readonly=True)
+    idx.from_csr_matrix(csr.indptr, csr.indices, 'out')
+    assert idx.number_of_nodes() == n
+    assert idx.number_of_edges() == csr.nnz
+    src, dst, eid = idx.edges()
+    src, dst, eid = src.tousertensor(), dst.tousertensor(), eid.tousertensor()
+    coo = csr.tocoo()
+    assert np.all(F.asnumpy(src) == coo.row)
+    assert np.all(F.asnumpy(dst) == coo.col)
+
+    # Load CSR to shared memory.
+    # Shared memory isn't supported in Windows.
+    if os.name is not 'nt':
+        idx = dgl.graph_index.GraphIndex(multigraph=False, readonly=True)
+        idx.from_csr_matrix(csr.indptr, csr.indices, 'out', '/test_graph_struct')
+        assert idx.number_of_nodes() == n
+        assert idx.number_of_edges() == csr.nnz
+        src, dst, eid = idx.edges()
+        src, dst, eid = src.tousertensor(), dst.tousertensor(), eid.tousertensor()
+        coo = csr.tocoo()
+        assert np.all(F.asnumpy(src) == coo.row)
+        assert np.all(F.asnumpy(dst) == coo.col)
+
 if __name__ == '__main__':
     test_basics()
     test_graph_gen()
     test_node_subgraph()
     test_create_graph()
+    test_load_csr()

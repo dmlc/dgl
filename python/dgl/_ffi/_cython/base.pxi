@@ -94,6 +94,14 @@ cdef extern from "dgl/runtime/c_runtime_api.h":
                       DLDataType dtype,
                       DLContext ctx,
                       DLTensorHandle* out)
+    int DGLArrayAllocSharedMem(const char *mem_name,
+                               const dgl_index_t *shape,
+                               int ndim,
+                               int dtype_code,
+                               int dtype_bits,
+                               int dtype_lanes,
+                               bool is_create,
+                               DGLArrayHandle* out)
     int DGLArrayFree(DLTensorHandle handle)
     int DGLArrayCopyFromTo(DLTensorHandle src,
                            DLTensorHandle to,
