@@ -277,7 +277,14 @@ def train():
     global opt, sched
     best_mrr = 0
     if args.dataset != 'movielens':
-        g_prior_edges, g_train_edges, g_prior_train_edges = refresh_mask()
+        cache_mask_file = cache_file + '.mask'
+        if os.path.exists(cache_mask_file):
+            with open(cache_mask_file, 'rb') as f:
+                g_prior_edges, g_train_edges, g_prior_train_edges = pickle.load(f)
+        else:
+            g_prior_edges, g_train_edges, g_prior_train_edges = refresh_mask()
+            with open(cache_mask_file, 'wb') as f:
+                pickle.dump((g_prior_edges, g_train_edges, g_prior_train_edges), f)
 
     for epoch in range(500):
         if args.dataset == 'movielens':

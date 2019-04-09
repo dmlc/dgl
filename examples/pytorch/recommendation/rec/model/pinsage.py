@@ -112,7 +112,7 @@ class PinSage(nn.Module):
             nf.layers[0].data['h'] = mix_embeddings(
                     h(nid), nf.layers[0].data, self.emb, self.proj)
         else:
-            nf.layers[0].data['h'] = h(nid)
+            nf.layers[0].data['h'] = cuda(h(nid))
 
         for i in range(nf.num_blocks):
             parent_nid = nf.layer_parent_nid(i + 1)

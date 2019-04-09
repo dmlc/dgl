@@ -229,6 +229,8 @@ def main(args):
 
         print("Test Accuracy {:.4f}". format(num_acc/n_test_samples))
 
+    receiver.close()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')

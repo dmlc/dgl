@@ -29,23 +29,11 @@ class Reddit(UserProductDataset):
 
         print('data split')
         self.ratings = self.data_split(self.ratings)
+
         print('build graph')
         self.build_graph()
         #print('find neighbors')
         #self.find_neighbors(0.2, 5000, 1000)
-
-    def split_user(self, df, filter_counts=False):
-        df_new = df.copy()
-        df_new['prob'] = 0
-
-        if filter_counts:
-            df_new_sub = (df_new['product_count'] >= 10).nonzero()[0]
-        else:
-            df_new_sub = df_new['train'].nonzero()[0]
-        prob = np.linspace(0, 1, df_new_sub.shape[0], endpoint=False)
-        np.random.shuffle(prob)
-        df_new['prob'].iloc[df_new_sub] = prob
-        return df_new
 
     def data_split(self, ratings):
         import dask
@@ -59,7 +47,7 @@ class Reddit(UserProductDataset):
         ratings['valid'] = (ratings['prob'] > 0.8) & (ratings['prob'] <= 0.9)
         ratings['test'] = ratings['prob'] > 0.9
         ratings = ratings.drop(['prob'], axis=1)
-        return ratings.compute()
+        return ratings.compute().reset_index(drop=True)
 
     def build_graph(self):
         import torch
