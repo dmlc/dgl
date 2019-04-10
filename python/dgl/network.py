@@ -152,7 +152,7 @@ def _recv_ip_port(receiver):
     return ip, port
 
 def _recv_graph_store_msg(receiver):
-    """Receive message of Graphstore
+    """Receive GraphStore message
 
     Parameters
     ----------
@@ -166,39 +166,15 @@ def _recv_graph_store_msg(receiver):
     """
     pass
 
-def _send_node_feats(sender, node_feats):
-    """Send node features
-    """
-    pass
-
-def _push(sender, feat_name, node_ids, node_feats):
-    """Send feature name, node IDs, and node features to the 
-    GraphStore server, which uses these data to updating GraphStore.
+def _send_graph_store_msg(sender, msg):
+    """Send GraphStore message
 
     Parameters
     ----------
-    sender : ctypes.void.c_void_p
+    sender : ctypes.c_void_p
         C sender handle
-    feat_name : string
-        feature name
-    node_ids : tensor
-        A tensor of node IDs
-    node_feats : tensor
-        tensor of node feature
+    msg : GraphStoreMsg
+        GraphStore message
     """
     pass
 
-def _pull(sender, feat_name, node_ids):
-    """Request the feature values associated with corresponding 
-    feature name and node IDs.
-
-    Parameters
-    ----------
-    sender : ctypes.void.c_void_p
-        C sender handle
-    feat_name : string
-        feature name
-    node_ids : tensor
-        A tensor of node IDs
-    """
-    pass
