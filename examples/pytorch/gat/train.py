@@ -65,11 +65,12 @@ def main(args):
         val_mask = val_mask.cuda()
         test_mask = test_mask.cuda()
 
-    # create DGL graph
-    g = DGLGraph(data.graph)
-    n_edges = g.number_of_edges()
+    g = data.graph
     # add self loop
+    g.remove_edges_from(g.selfloop_edges())
+    g = DGLGraph(g)
     g.add_edges(g.nodes(), g.nodes())
+    n_edges = g.number_of_edges()
     # create model
     heads = ([args.num_heads] * args.num_layers) + [args.num_out_heads]
     model = GAT(g,
