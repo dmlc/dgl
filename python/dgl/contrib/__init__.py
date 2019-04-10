@@ -1,3 +1,3 @@
 from . import sampling
 from . import graph_store
-from . import kvstore
+from .kvstore import KVStore

@@ -78,7 +78,7 @@ class KVStore(object):
             IP address of KVStore-server
         port : int
             listening port of KVStore-server
-        tensor_store: dictionary of tensor
+        tensor_dict: dictionary of tensor
             A dictionary of tensor. The key of the dict is string, representing 
             the feature name. The value of the dict is tensor (torch.tensor() or mxnet.ndarray()), 
             representing the node feature or node embedding.
@@ -87,13 +87,12 @@ class KVStore(object):
             raise RuntimeError('init_store() can only be used for KVStore-server.')
         self._ip = ip
         self._port = port
-        self._tensor_store = tensor_store
+        self._tensor_dict = tensor_dict
         self._receiver = _create_receiver(self._ip, self._port, 1)
         wk_ip, wk_port = _recv_ip_port(self._receiver)
         SocketSync()
         self._sender = _create_sender(wk_ip, wk_port)
         # Solve message in a loop (use [Ctl + C] to exit)
-        """
         while True:
             msg = _recv_graph_store_msg(self._receiver)
             if msg.type == MessageType.PUSH:
@@ -103,7 +102,6 @@ class KVStore(object):
                 _send_node_feats(self._sender, node_feats)
             else:
                 raise RuntimeError('Unknow message type.')
-        """
 
     def push_msg_handle(self, feat_name, node_ids, node_feats):
         """User-defined handler for push message
