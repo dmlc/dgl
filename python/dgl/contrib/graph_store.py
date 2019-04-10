@@ -127,6 +127,21 @@ def _to_csr(graph_data, edge_dir, multigraph):
             csr = idx.adjacency_matrix_scipy(transpose, 'csr')
             return csr.indptr, csr.indices
 
+class Barrier(object):
+    def __init__(self, num_workers):
+        self.worker_ids = [0] * num_workers
+        self.num_workers = num_workers
+
+    def enter(self, worker_id):
+        assert self.worker_id[worker_id] == 0
+        self.worker_ids[worker_id] = 1
+        self.num_workers += 1
+
+    def leave(self, worker_id):
+        assert self.worker_id[worker_id] == 1
+        self.worker_ids[worker_id] = 0
+        self.num_workers -= 1
+
 class SharedMemoryStoreServer(object):
     """The graph store server.
 
@@ -158,9 +173,19 @@ class SharedMemoryStoreServer(object):
         self._num_workers = num_workers
         self._graph_name = graph_name
         self._edge_dir = edge_dir
+        self._registered_nworkers = 0
+
+        self._barrier = Barrier(num_workers)
+
+        def register(graph_name):
+            assert graph_name == self._graph_name
+            worker_id = self._registered_nworkers
+            self._registered_nworkers += 1
+            return worker_id, self._num_workers
 
         # RPC command: get the graph information from the graph store server.
-        def get_graph_info():
+        def get_graph_info(graph_name):
+            assert graph_name == self._graph_name
             return self._graph.number_of_nodes(), self._graph.number_of_edges(), \
                     self._graph.is_multigraph, edge_dir
 
@@ -205,13 +230,26 @@ class SharedMemoryStoreServer(object):
             self._num_workers -= 1
             return 0
 
+        def enter_barrier(worker_id):
+            self._barrier.enter(worker_id)
+
+        def leave_barrier(worker_id):
+            self._barrier.leave(worker_id)
+
+        def get_barrier_count():
+            return self._barrier.num_workers
+
         self.server = SimpleXMLRPCServer(("localhost", port))
+        self.server.register_function(register, "register")
         self.server.register_function(get_graph_info, "get_graph_info")
         self.server.register_function(init_ndata, "init_ndata")
         self.server.register_function(init_edata, "init_edata")
         self.server.register_function(terminate, "terminate")
         self.server.register_function(list_ndata, "list_ndata")
         self.server.register_function(list_edata, "list_edata")
+        self.server.register_function(enter_barrier, "enter_barrier")
+        self.server.register_function(leave_barrier, "leave_barrier")
+        self.server.register_function(get_barrier_count, "get_barrier_count")
 
     def __del__(self):
         self._graph = None
@@ -267,7 +305,8 @@ class SharedMemoryDGLGraph(DGLGraph):
         self._graph_name = graph_name
         self._pid = os.getpid()
         self.proxy = xmlrpc.client.ServerProxy("http://localhost:" + str(port) + "/")
-        num_nodes, num_edges, multigraph, edge_dir = self.proxy.get_graph_info()
+        self._worker_id, self._num_workers = self.proxy.register(graph_name)
+        num_nodes, num_edges, multigraph, edge_dir = self.proxy.get_graph_info(graph_name)
 
         graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
         graph_idx.from_shared_mem_csr_matrix(_get_graph_path(graph_name), num_nodes, num_edges, edge_dir)
@@ -323,6 +362,72 @@ class SharedMemoryDGLGraph(DGLGraph):
         data = empty_shared_mem(_get_edata_path(self._graph_name, edata_name), False, shape, dtype)
         dlpack = data.to_dlpack()
         self.edata[edata_name] = F.zerocopy_from_dlpack(dlpack)
+
+    @property
+    def num_workers(self):
+        return self._num_workers
+
+    @property
+    def worker_id(self):
+        return self._worker_id
+
+    def sync_barrier(self):
+        # Here we manually implement multi-processing barrier with RPC.
+        # It uses busy wait.
+        self.proxy.enter_barrier()
+        while self.proxy.get_barrier_count() < self.num_workers:
+            continue
+        self.proxy.leave_barrier()
+
+    def init_ndata(self, ndata_name, shape, dtype):
+        """Create node embedding.
+
+        It first creates the node embedding in the server and maps it to the current process
+        with shared memory.
+
+        Parameters
+        ----------
+        ndata_name : string
+            The name of node embedding
+        shape : tuple
+            The shape of the node embedding
+        dtype : string
+            The data type of the node embedding. The currently supported data types
+            are "float32" and "int32".
+        """
+        self.proxy.init_ndata(ndata_name, shape, dtype)
+        self._init_ndata(ndata_name, shape, dtype)
+
+    def init_edata(self, edata_name, shape, dtype):
+        """Create edge embedding.
+
+        It first creates the edge embedding in the server and maps it to the current process
+        with shared memory.
+
+        Parameters
+        ----------
+        edata_name : string
+            The name of edge embedding
+        shape : tuple
+            The shape of the edge embedding
+        dtype : string
+            The data type of the edge embedding. The currently supported data types
+            are "float32" and "int32".
+        """
+        self.proxy.init_edata(edata_name, shape, dtype)
+        self._init_edata(edata_name, shape, dtype)
+
+
+    def dist_update_all(self, message_func="default",
+                        reduce_func="default",
+                        apply_node_func="default"):
+        num_worker_nodes = int(self.number_of_nodes() / self.num_workers) + 1
+        start_node = self.worker_id * num_worker_nodes
+        end_node = min((self.worker_id + 1) * num_worker_nodes, self.number_of_nodes())
+        worker_nodes = np.arange(start_node, end_node, dtype=np.int64)
+        self.pull(worker_nodes, message_func, reduce_func, apply_node_func, inplace=True)
+        self.sync_barrier()
+
 
     def destroy(self):
         """Destroy the graph store.

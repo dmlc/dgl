@@ -28,10 +28,12 @@ def worker_func(worker_id):
     g.edata['test4'] = mx.nd.zeros((g.number_of_edges(), 10))
     if worker_id == 0:
         time.sleep(3)
+        print(g.worker_id)
         g.ndata['test4'][0] = 1
         g.edata['test4'][0] = 2
     else:
         time.sleep(5)
+        print(g.worker_id)
         assert np.all(g.ndata['test4'][0].asnumpy() == 1)
         assert np.all(g.edata['test4'][0].asnumpy() == 2)
     g.destroy()
