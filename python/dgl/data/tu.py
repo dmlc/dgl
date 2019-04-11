@@ -32,7 +32,7 @@ class TUDataset(object):
         if use_pandas:
             import pandas as pd
             DS_edge_list = self._idx_from_zero(
-                pd.read_csv(self._file_path("A"), delimiter=",", dtype=int).values)
+                pd.read_csv(self._file_path("A"), delimiter=",", dtype=int, header=None).values)
         else:
             DS_edge_list = self._idx_from_zero(
                 np.genfromtxt(self._file_path("A"), delimiter=",", dtype=int))
@@ -45,7 +45,6 @@ class TUDataset(object):
         g = dgl.DGLGraph()
         g.add_nodes(int(DS_edge_list.max()) + 1)
         g.add_edges(DS_edge_list[:, 0], DS_edge_list[:, 1])
-        g.add_edges(DS_edge_list[:, 1], DS_edge_list[:, 0])
 
         node_idx_list = []
         for idx in range(np.max(DS_indicator) + 1):
