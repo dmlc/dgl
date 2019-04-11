@@ -129,18 +129,43 @@ def _to_csr(graph_data, edge_dir, multigraph):
 
 class Barrier(object):
     def __init__(self, num_workers):
-        self.worker_ids = [0] * num_workers
+        self.num_enters = 0
+        self.num_leaves = 0
         self.num_workers = num_workers
 
-    def enter(self, worker_id):
-        assert self.worker_id[worker_id] == 0
-        self.worker_ids[worker_id] = 1
-        self.num_workers += 1
+    def enter(self):
+        self.num_enters += 1
 
-    def leave(self, worker_id):
-        assert self.worker_id[worker_id] == 1
-        self.worker_ids[worker_id] = 0
-        self.num_workers -= 1
+    def leave(self):
+        self.num_leaves += 1
+
+    def all_enter(self):
+        return self.num_enters == self.num_workers
+
+    def all_leave(self):
+        return self.num_leaves == self.num_workers
+
+class BarrierServer(object):
+    def __init__(self, num_workers):
+        self.num_workers = num_workers
+        self.barrier_ids = [0] * num_workers
+        self.barriers = {}
+
+    def enter(self, worker_id):
+        bid = self.barrier_ids[worker_id]
+        self.barrier_ids[worker_id] += 1
+        if bid in self.barriers:
+            self.barriers[bid].enter()
+        else:
+            self.barriers.update({bid : Barrier(self.num_workers)})
+        return bid
+
+    def all_enter(self, worker_id, barrier_id):
+        return self.barriers[barrier_id].all_enter()
+
+    def leave(self, worker_id, barrier_id):
+        self.barriers[barrier_id].leave()
+        del self.barriers[barrier_id]
 
 class SharedMemoryStoreServer(object):
     """The graph store server.
@@ -175,7 +200,7 @@ class SharedMemoryStoreServer(object):
         self._edge_dir = edge_dir
         self._registered_nworkers = 0
 
-        self._barrier = Barrier(num_workers)
+        self._barrier = BarrierServer(num_workers)
 
         def register(graph_name):
             assert graph_name == self._graph_name
@@ -231,13 +256,13 @@ class SharedMemoryStoreServer(object):
             return 0
 
         def enter_barrier(worker_id):
-            self._barrier.enter(worker_id)
+            return self._barrier.enter(worker_id)
 
-        def leave_barrier(worker_id):
-            self._barrier.leave(worker_id)
+        def leave_barrier(worker_id, barrier_id):
+            self._barrier.leave(worker_id, barrier_id)
 
-        def get_barrier_count():
-            return self._barrier.num_workers
+        def all_enter(worker_id, barrier_id):
+            return self._barrier.all_enter(worker_id, barrier_id)
 
         self.server = SimpleXMLRPCServer(("localhost", port))
         self.server.register_function(register, "register")
@@ -249,7 +274,7 @@ class SharedMemoryStoreServer(object):
         self.server.register_function(list_edata, "list_edata")
         self.server.register_function(enter_barrier, "enter_barrier")
         self.server.register_function(leave_barrier, "leave_barrier")
-        self.server.register_function(get_barrier_count, "get_barrier_count")
+        self.server.register_function(all_enter, "all_enter")
 
     def __del__(self):
         self._graph = None
@@ -372,12 +397,13 @@ class SharedMemoryDGLGraph(DGLGraph):
         return self._worker_id
 
     def sync_barrier(self):
-        # Here we manually implement multi-processing barrier with RPC.
-        # It uses busy wait.
-        self.proxy.enter_barrier()
-        while self.proxy.get_barrier_count() < self.num_workers:
+        # Here I manually implement multi-processing barrier with RPC.
+        # It uses busy wait with RPC. Whenever, all_enter is called, there is
+        # a context switch, so it doesn't burn CPUs so badly.
+        bid = self.proxy.enter_barrier(self._worker_id)
+        while not self.proxy.all_enter(self._worker_id, bid):
             continue
-        self.proxy.leave_barrier()
+        self.proxy.leave_barrier(self._worker_id, bid)
 
     def init_ndata(self, ndata_name, shape, dtype):
         """Create node embedding.
