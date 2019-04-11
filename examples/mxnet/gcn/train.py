@@ -52,9 +52,11 @@ def main(args):
     test_mask = test_mask.as_in_context(ctx)
 
     # create GCN model
-    g = DGLGraph(data.graph)
+    g = data.graph
     if args.self_loop:
-        g.add_edges(g.nodes(), g.nodes())
+        g.remove_edges_from(g.selfloop_edges())
+        g.add_edges_from(zip(g.nodes(), g.nodes()))
+    g = DGLGraph(g)
     # normalization
     degs = g.in_degrees().astype('float32')
     norm = mx.nd.power(degs, -0.5)

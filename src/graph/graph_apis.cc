@@ -96,6 +96,45 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
     *rv = ghandle;
   });
 
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const IdArray indptr = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
+    const IdArray indices = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray edge_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
+    const std::string shared_mem_name = args[3];
+    const bool multigraph = static_cast<bool>(args[4]);
+    const std::string edge_dir = args[5];
+    ImmutableGraph::CSR::Ptr csr;
+    if (shared_mem_name.empty())
+      csr.reset(new ImmutableGraph::CSR(indptr, indices, edge_ids));
+    else
+      csr.reset(new ImmutableGraph::CSR(indptr, indices, edge_ids, shared_mem_name));
+
+    GraphHandle ghandle;
+    if (edge_dir == "in")
+      ghandle = new ImmutableGraph(csr, nullptr, multigraph);
+    else
+      ghandle = new ImmutableGraph(nullptr, csr, multigraph);
+    *rv = ghandle;
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreateMMap")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const std::string shared_mem_name = args[0];
+    const int64_t num_vertices = args[1];
+    const int64_t num_edges = args[2];
+    const bool multigraph = static_cast<bool>(args[3]);
+    const std::string edge_dir = args[4];
+    ImmutableGraph::CSR::Ptr csr(new ImmutableGraph::CSR(shared_mem_name,
+                                                         num_vertices, num_edges));
+    GraphHandle ghandle;
+    if (edge_dir == "in")
+      ghandle = new ImmutableGraph(csr, nullptr, multigraph);
+    else
+      ghandle = new ImmutableGraph(nullptr, csr, multigraph);
+    *rv = ghandle;
+  });
+
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphFree")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
