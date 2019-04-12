@@ -8,12 +8,10 @@ https://github.com/weihua916/powerful-gnns/blob/master/dataset.zip
 """
 
 import os
-import logging
 import numpy as np
 
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
 from ..graph import DGLGraph
-
 
 _url = 'https://raw.githubusercontent.com/weihua916/powerful-gnns/master/dataset.zip'
 
@@ -120,14 +118,14 @@ class GINDataset(object):
 
         """
 
-        logging.info('loading data...')
+        print('loading data...')
         with open(self.file, 'r') as f:
             # line_1 == N, total number of graphs
             self.N = int(f.readline().strip())
 
             for i in range(self.N):
                 if (i + 1) % 10 == 0 and self.verbosity is True:
-                    logging.info('processing graph {}...'.format(i + 1))
+                    print('processing graph {}...'.format(i + 1))
 
                 grow = f.readline().strip().split()
                 # line_2 == [n_nodes, l] is equal to
@@ -181,10 +179,10 @@ class GINDataset(object):
                         g.add_edge(j, j)
 
                     if (j + 1) % 10 == 0 and self.verbosity is True:
-                        logging.info(
+                        print(
                             'processing node {} of graph {}...'.format(
                                 j + 1, i + 1))
-                        logging.info('this node has {} edgs.'.format(
+                        print('this node has {} edgs.'.format(
                             nrow[1]))
 
                 if nattrs != []:
@@ -208,11 +206,11 @@ class GINDataset(object):
 
         # if no attr
         if not self.nattrs_flag:
-            logging.info('there are no node features in this dataset!')
+            print('there are no node features in this dataset!')
             label2idx = {}
             # generate node attr by node degree
             if self.degree_as_nlabel:
-                logging.info('generate node features by node degree...')
+                print('generate node features by node degree...')
                 nlabel_set = set([])
                 for g in self.graphs:
                     # actually this label shouldn't be updated
@@ -231,7 +229,7 @@ class GINDataset(object):
                 label2idx = self.ndegree_dict
             # generate node attr by node label
             else:
-                logging.info('generate node features by node label...')
+                print('generate node features by node label...')
                 label2idx = self.nlabel_dict
 
             for g in self.graphs:
@@ -246,8 +244,8 @@ class GINDataset(object):
         self.eclasses = len(self.elabel_dict)
         self.dim_nfeats = len(self.graphs[0].ndata['attr'][0])
 
-        logging.info('Done.')
-        logging.info(
+        print('Done.')
+        print(
             """
             -------- Data Statistics --------'
             #Graphs: %d

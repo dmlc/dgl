@@ -1,5 +1,4 @@
-import logging
-import math
+import sys
 import numpy as np
 from tqdm import tqdm
 
@@ -12,22 +11,16 @@ from dataloader import GraphDataLoader, collate
 from parser import Parser
 from gin import GIN
 
-# loggging basic settings
-dtfmt = '[%Y-%m_%d %H:%M:%S]'
-fmt = '[LINE:%(lineno)-4d (%(filename)s)][%(levelname)-8s] %(message)s'
-logging.basicConfig(level=logging.INFO, format=fmt, datefmt=dtfmt)
-
 
 def train(args, net, trainloader, optimizer, criterion, epoch):
     net.train()
 
     running_loss = 0
     total_iters = len(trainloader)
-    pbar = tqdm(range(total_iters), unit='batch')
+    # setup the offset to avoid the overlap with mouse cursor
+    bar = tqdm(range(total_iters), unit='batch', position=2, file=sys.stdout)
 
-    logging.debug('the total iters of training data is {}'.format(total_iters))
-
-    for pos, (graphs, labels) in zip(pbar, trainloader):
+    for pos, (graphs, labels) in zip(bar, trainloader):
         # batch graphs will be shipped to device in forward part of model
         labels = labels.to(args.device)
         outputs = net(graphs)
@@ -42,23 +35,22 @@ def train(args, net, trainloader, optimizer, criterion, epoch):
             optimizer.step()
 
         # report
-        pbar.set_description('epoch: %d' % (epoch))
-
+        bar.set_description('epoch-{}'.format(epoch))
+    bar.close()
     # the final batch will be aligned
     running_loss = running_loss / total_iters
 
     return running_loss
 
 
-def eval_net(args, net, dataloader, type, criterion):
+def eval_net(args, net, dataloader, criterion):
     net.eval()
 
     total = 0
     total_loss = 0
     total_correct = 0
 
-    total_iters = len(dataloader)
-    logging.debug('the total iters of data is {}'.format(total_iters))
+    # total_iters = len(dataloader)
 
     for data in dataloader:
         graphs, labels = data
@@ -73,16 +65,8 @@ def eval_net(args, net, dataloader, type, criterion):
         loss = criterion(outputs, labels)
         # crossentropy(reduce=True) for default
         total_loss += loss.item() * len(labels)
-        logging.debug(
-            'loss item is {}; length of labels is {}'
-            .format(loss.item(), len(labels)))
 
-    loss, acc = 1.0*total_loss / total, 1.0*total_correct / total 
-
-    dlname = 'train set' if type == 'train' else 'valid set'
-    logging.info(
-        '\n{} with learn_eps={} - average loss: {:.4f}, accuracy: {:.0f}%\n'
-        .format(dlname, args.learn_eps, loss, 100. * acc))
+    loss, acc = 1.0*total_loss / total, 1.0*total_correct / total
 
     net.train()
 
@@ -122,15 +106,28 @@ def main(args):
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
 
-    for epoch in range(1, args.epochs + 1):
+    # it's not cost-effective to hanle the cursor and init 0
+    # https://stackoverflow.com/a/23121189
+    tbar = tqdm(range(args.epochs), unit="epoch", position=3, ncols=0, file=sys.stdout)
+    vbar = tqdm(range(args.epochs), unit="epoch", position=4, ncols=0, file=sys.stdout)
+    lrbar = tqdm(range(args.epochs), unit="epoch", position=5, ncols=0, file=sys.stdout)
+
+    for epoch, _, _ in zip(tbar, vbar, lrbar):
         scheduler.step()
 
         train(args, model, trainloader, optimizer, criterion, epoch)
 
         train_loss, train_acc = eval_net(
-            args, model, trainloader, 'train', criterion)
+            args, model, trainloader, criterion)
+        tbar.set_description(
+            'train set - average loss: {:.4f}, accuracy: {:.0f}%'
+            .format(train_loss, 100. * train_acc))
+
         valid_loss, valid_acc = eval_net(
-            args, model, validloader, 'valid', criterion)
+            args, model, validloader, criterion)
+        vbar.set_description(
+            'valid set - average loss: {:.4f}, accuracy: {:.0f}%'
+            .format(valid_loss, 100. * valid_acc))
 
         if not args.filename == "":
             with open(args.filename, 'a') as f:
@@ -149,12 +146,18 @@ def main(args):
                 ))
                 f.write("\n")
 
-        logging.info("the learning eps is: {}".format(model.eps))
+        lrbar.set_description(
+            "the learning eps with learn_eps={} is: {}".format(
+                args.learn_eps, model.eps.data))
+
+    tbar.close()
+    vbar.close()
+    lrbar.close()
 
 
 if __name__ == '__main__':
     args = Parser(description='GIN').args
-    logging.info('show all arguments configuration...')
-    logging.info(args)
+    print('show all arguments configuration...')
+    print(args)
 
     main(args)

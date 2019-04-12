@@ -4,7 +4,6 @@ PyTorch compatible dataloader
 """
 
 
-import logging
 import math
 import numpy as np
 import torch
@@ -74,7 +73,7 @@ class GraphDataLoader():
 
     def _split_fold10(self, labels, fold_idx=0, seed=0, shuffle=True):
         ''' 10 flod '''
-        assert 0 <= fold_idx and fold_idx < 10, logging.error(
+        assert 0 <= fold_idx and fold_idx < 10, print(
             "fold_idx must be from 0 to 9.")
 
         idx_list = []
@@ -84,7 +83,7 @@ class GraphDataLoader():
             idx_list.append(idx)
         train_idx, valid_idx = idx_list[fold_idx]
 
-        logging.info(
+        print(
             "train_set : test_set = %d : %d",
             len(train_idx), len(valid_idx))
 
@@ -98,7 +97,7 @@ class GraphDataLoader():
         split = int(math.floor(split_ratio * num_entries))
         train_idx, valid_idx = indices[:split], indices[split:]
 
-        logging.info(
+        print(
             "train_set : test_set = %d : %d",
             len(train_idx), len(valid_idx))
 

@@ -15,6 +15,7 @@ Contributors
 * [Yizhi Liu](https://github.com/yzhliu): RGCN in MXNet
 * [@hbsun2113](https://github.com/hbsun2113): GraphSAGE in Pytorch
 * [Tianyi Zhang](https://github.com/Tiiiger): SGC in Pytorch
+* [Jun Chen](https://github.com/kitaev-chen): GIN in Pytorch
 
 Other improvement
 * [Brett Koonce](https://github.com/brettkoonce)

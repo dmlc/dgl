@@ -25,6 +25,21 @@ python main.py
 
 An experiment on the GIN in customized settings can be run with
 ```bash
-python main.py --device 0 --disable-cuda --dataset COLLAB \
+python main.py [--device 0 | --disable-cuda] --dataset COLLAB \
                --graph_pooling_type max --neighbor_pooling_type sum
 ```
+
+Results
+-------
+
+Run with following with the double SUM pooling way:
+(tested dataset: "MUTAG"(default), "COLLAB", "IMDBBINARY", "IMDBMULTI")
+```bash
+python train.py --dataset MUTAB --device 0  \
+                --graph_pooling_type sum --neighbor_pooling_type sum
+```
+
+* MUTAG: 0.85 (paper: ~0.89)
+* COLLAB: 0.89 (paper: ~0.80)
+* IMDBBINARY: 0.76 (paper: ~0.75)
+* IMDBMULTI: 0.51 (paper: ~0.52)
