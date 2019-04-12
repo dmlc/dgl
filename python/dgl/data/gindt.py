@@ -28,7 +28,7 @@ class GINDataset(object):
 
     Paramters
     ---------
-    name : str
+    name: str
         dataset name, one of below -
         ('MUTAG', 'COLLAB', \
         'IMDBBINARY', 'IMDBMULTI', \
@@ -37,7 +37,7 @@ class GINDataset(object):
     self_loop: boolean
         add self to self edge if true
     degree_as_nlabel: boolean
-        take node degree as label and features if true
+        take node degree as label and feature if true
 
     """
 

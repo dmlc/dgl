@@ -12,7 +12,7 @@ from .jtmpn import mol2dgl_single as mol2dgl_dec
 from .jtmpn import ATOM_FDIM as ATOM_FDIM_DEC
 from .jtmpn import BOND_FDIM as BOND_FDIM_DEC
 
-_url = 'https://www.dropbox.com/s/4ypr0e0abcbsvoh/jtnn.zip?dl=1'
+_url = 'https://s3-ap-southeast-1.amazonaws.com/dgl-data-cn/dataset/jtnn.zip'
 
 def _unpack_field(examples, field):
     return [e[field] for e in examples]

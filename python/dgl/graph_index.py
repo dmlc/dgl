@@ -812,6 +812,56 @@ class GraphIndex(object):
         self._init(src, dst, edge_ids, num_nodes)
 
 
+    def from_csr_matrix(self, indptr, indices, edge_dir, shared_mem_name=""):
+        """Load a graph from the CSR matrix.
+
+        Parameters
+        ----------
+        indptr : a 1D tensor
+            index pointer in the CSR format
+        indices : a 1D tensor
+            column index array in the CSR format
+        edge_dir : string
+            the edge direction. The supported option is "in" and "out".
+        shared_mem_name : string
+            the name of shared memory
+        """
+        assert self.is_readonly()
+        indptr = utils.toindex(indptr)
+        indices = utils.toindex(indices)
+        edge_ids = utils.toindex(F.arange(0, len(indices)))
+        self._handle = _CAPI_DGLGraphCSRCreate(
+            indptr.todgltensor(),
+            indices.todgltensor(),
+            edge_ids.todgltensor(),
+            shared_mem_name,
+            self._multigraph,
+            edge_dir)
+
+
+    def from_shared_mem_csr_matrix(self, shared_mem_name,
+                                   num_nodes, num_edges, edge_dir):
+        """Load a graph from the shared memory in the CSR format.
+
+        Parameters
+        ----------
+        shared_mem_name : string
+            the name of shared memory
+        num_nodes : int
+            the number of nodes
+        num_edges : int
+            the number of edges
+        edge_dir : string
+            the edge direction. The supported option is "in" and "out".
+        """
+        assert self.is_readonly()
+        self._handle = _CAPI_DGLGraphCSRCreateMMap(
+            shared_mem_name,
+            num_nodes, num_edges,
+            self._multigraph,
+            edge_dir)
+
+
     def from_edge_list(self, elist):
         """Convert from an edge list.
 
