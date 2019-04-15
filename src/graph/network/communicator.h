@@ -12,71 +12,87 @@ namespace dgl {
 namespace network {
 
 /*!
- * \brief Communicator for DGL distributed training.
+ * \brief Network Sender for DGL distributed training.
  *
- * Communicator is a set of interface for network communication, which
- * can be implemented by real network libraries, such as grpc, mpi, as well
- * as raw socket. There has two types of Communicator, one is Sender 
- * (is_sender = true), and another is Receiver. For Sender, it can send binary 
- * data to remote Receiver node. For Receiver, it can listen on a specified 
- * endpoint and receive the binary data sent from Sender node. Note that, a 
- * receiver node can recv messages from multiple senders concurrently.
+ * Sender is an abstract class that defines a set of APIs for sending data. 
+ * It can be implemented by different underlying libraries such TCP socket and ZMQ. 
+ * One Sender can connect to multiple receivers, and it and send binary 
+ * data to specified receiver via receiver's ID.
  */
-class Communicator {
+class Sender {
  public:
-  virtual ~Communicator() {}
+  virtual ~Sender() {}
 
   /*!
-   * \brief Initialize Communicator
-   * \param is_sender true for sender and false for receiver
-   * \param ip ip address
-   * \param port end port
-   * (e.g. "168.123.2.43:50051"). For Receiver, this address identifies
-   * the local listening endpoint (e.g. "0.0.0.0:50051").
-   * \param num_sender number of senders, only used for receiver.
-   * \param queue_size the size of message queue, only for receiver.
-   * \return true for success and false for error
+   * \brief Add receiver address to the list
+   * \param ip receviver IP address
+   * \param port receiver port
+   * \param recv_id receiver's ID
    */
-  virtual bool Initialize(bool is_sender,
-                          const char* ip,
-                          int port,
-                          int num_sender = 1,
-                          int64_t queue_size = 5 * 1024 * 1024) = 0;
+  virtual void AddReceiver(char* ip, int port, int recv_id) = 0;
+
   /*!
-   * \brief Send message to receiver node
-   * \param src data pointer
+   * \brief Connect to Receiver
+   * \return true for sucess and false for fail
+   */
+  virtual bool Connect() = 0;
+
+  /*!
+   * \brief Send data to receiver
+   * \param data data buffer
    * \param size data size
+   * \param recv_id receiver's ID
    * \return bytes send
    *   > 0 : bytes send
    *   - 1 : error
    */
-  virtual int64_t Send(char* src, int64_t size) = 0;
+  virtual int64_t Send(char* data, int64_t size, int recv_id) = 0;
 
   /*!
-   * \brief Receive mesesage from sender node, we
-   * actually reading data from local message queue.
-   * \param dest destination data pointer
-   * \param max_size maximal data size
+   * \brief Finalize Sender
+   */
+  virtual void Finalize() = 0;
+};
+
+/*!
+ * \brief Network Receiver for DGL distributed training.
+ *
+ * Receiver is an abstract class that defines a set of APIs for receiving data.
+ * It can be implemented by different underlying libraries such TCP socket and ZMQ.
+ * One Receiver can connect with multiple senders, and it and receive binary data 
+ * from all of the senders concurrently via multi-threading and message queue.
+ */
+class Receiver {
+ public:
+  virtual ~Receiver() {}
+
+  /*!
+   * \brief Wait all of the Sender connect
+   * \param ip IP address of receiver
+   * \param port port of receiver
+   * \param num_sender total number of Sender
+   * \param queue_size size of message queue
+   * \return true for sucess and false for fail
+   */
+  virtual bool Wait(char* ip, 
+                    int port, 
+                    int num_sender, 
+                    int queue_size) = 0;
+
+  /*!
+   * \brief Recv data from Sender
+   * \param dest data buffer
+   * \param max_size maximul size of data buffer
    * \return bytes received
    *   > 0 : bytes received
    *   - 1 : error
    */
-  virtual int64_t Receive(char* dest, int64_t max_size) = 0;
+  virtual int64_t Recv(char* dest, int64_t max_size) = 0;
 
   /*!
-   * \brief Finalize the Communicator class
+   * \brief Finalize Receiver
    */
   virtual void Finalize() = 0;
-
-  /*!
-   * \brief Set pointer of memory buffer allocated for Communicator
-   */
-  virtual void SetBuffer(char* buffer) = 0;
-
-  /*!
-   * \brief Get pointer of memory buffer allocated for Communicator
-   */
-  virtual char* GetBuffer() = 0;
 };
 
 }  // namespace network

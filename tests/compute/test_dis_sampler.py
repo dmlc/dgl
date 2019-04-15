@@ -13,7 +13,7 @@ def generate_rand_graph(n):
 
 def start_trainer():
     g = generate_rand_graph(100)
-    recv = dgl.contrib.sampling.SamplerReceiver(ip="127.0.0.1", port=50051)
+    recv = dgl.contrib.sampling.SamplerReceiver('127.0.0.1:50051', 1)
     subg = recv.recv(g)
     seed_ids = subg.layer_parent_nid(-1)
     assert len(seed_ids) == 1
@@ -32,10 +32,11 @@ def start_trainer():
 
 def start_sampler():
     g = generate_rand_graph(100)
-    sender = dgl.contrib.sampling.SamplerSender(ip="127.0.0.1", port=50051)
+    recv_dict = {0:{'127.0.0.1:50051'}}
+    sender = dgl.contrib.sampling.SamplerSender(recv_dict)
     for i, subg in enumerate(dgl.contrib.sampling.NeighborSampler(
             g, 1, 100, neighbor_type='in', num_workers=4)):
-        sender.send(subg)
+        sender.send(subg, 0)
         break
 
     time.sleep(1)

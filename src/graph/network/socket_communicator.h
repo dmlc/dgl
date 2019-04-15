@@ -9,6 +9,7 @@
 #include <thread>
 #include <vector>
 #include <string>
+#include <unordered_map>
 
 #include "communicator.h"
 #include "msg_queue.h"
@@ -19,70 +20,105 @@ namespace network {
 
 using dgl::network::MessageQueue;
 using dgl::network::TCPSocket;
+using dgl::network::Sender;
+using dgl::network::Receiver;
 
 /*!
- * \brief Implementation of Communicator class with TCP socket.
+ * \breif Networking address
  */
-class SocketCommunicator : public Communicator {
+struct Addr {
+  std::string ip_;
+  int port_;
+};
+
+/*!
+ * \brief Network Sender for DGL distributed training.
+ *
+ * Sender is an abstract class that defines a set of APIs for sending data. 
+ * It can be implemented by different underlying libraries such TCP socket and ZMQ. 
+ * One Sender can connect to multiple receivers, and it and send binary 
+ * data to specified receiver via receiver's ID.
+ */
+class SocketSender : public Sender {
  public:
   /*!
-   * \brief Initialize Communicator
-   * \param is_sender true for sender and false for receiver
-   * \param ip ip address
-   * \param port end port
-   * (e.g. "168.123.2.43:50051"). For Receiver, this address identifies
-   * the local listening endpoint (e.g. "0.0.0.0:50051").
-   * \param num_sender number of senders, only used for receiver.
-   * \param queue_size the size of message queue, only for receiver.
-   * \return true for success and false for error
+   * \brief Add receiver address to the list
+   * \param ip receviver IP address
+   * \param port receiver port
+   * \param id receiver's ID
    */
-  bool Initialize(bool is_sender,
-                  const char* ip,
-                  int port,
-                  int num_sender = 1,
-                  int64_t queue_size = 5 * 1024 * 1024);
+  void AddReceiver(char* ip, int port, int recv_id);
+
   /*!
-   * \brief Send message to receiver node
-   * \param src data pointer
+   * \brief Connect to Receiver
+   * \return true for sucess and false for fail
+   */
+  bool Connect();
+
+  /*!
+   * \brief Send data to receiver
+   * \param data data buffer
    * \param size data size
+   * \param id receiver's ID
    * \return bytes send
    *   > 0 : bytes send
    *   - 1 : error
    */
-  int64_t Send(char* src, int64_t size);
+  int64_t Send(char* data, int64_t size, int recv_id);
 
   /*!
-   * \brief Receive mesesage from sender node, we
-   * actually reading data from local message queue.
-   * \param dest destination data pointer
-   * \param max_size maximal data size
+   * \brief Finalize Sender
+   */
+  void Finalize();
+
+ private:
+  /*!
+   * \brief socket map
+   */ 
+  std::unordered_map<int, TCPSocket*> socket_map_;
+
+  /*!
+   * \brief receiver address map
+   */ 
+  std::unordered_map<int, Addr> receiver_addr_map_;
+};
+
+/*!
+ * \brief Network Receiver for DGL distributed training.
+ *
+ * Receiver is an abstract class that defines a set of APIs for receiving data.
+ * It can be implemented by different underlying libraries such TCP socket and ZMQ.
+ * One Receiver can connect with multiple senders, and it and receive binary data 
+ * from all of the senders concurrently via multi-threading and message queue.
+ */
+class SocketReceiver : public Receiver {
+ public:
+  /*!
+   * \brief Wait all of the Sender connect
+   * \param ip IP address of receiver
+   * \param port port of receiver
+   * \param num_sender total number of Sender
+   * \param queue_size size of message queue
+   * \return true for sucess and false for fail
+   */
+  bool Wait(char* ip, int port, int num_sender, int queue_size);
+
+  /*!
+   * \brief Recv data from Sender
+   * \param dest data buffer
+   * \param max_size maximul size of data buffer
    * \return bytes received
    *   > 0 : bytes received
    *   - 1 : error
    */
-  int64_t Receive(char* dest, int64_t max_size);
+  int64_t Recv(char* dest, int64_t max_size);
 
   /*!
-   * \brief Finalize the SocketCommunicator class
+   * \brief Finalize Receiver
    */
   void Finalize();
 
-  /*!
-   * \brief Set pointer of memory buffer allocated for Communicator
-   */
-  void SetBuffer(char* buffer);
-
-  /*!
-   * \brief Get pointer of memory buffer allocated for Communicator
-   */
-  char* GetBuffer();
-
  private:
-  /*!
-   * \brief Is a sender or reciever node?
-   */
-  bool is_sender_;
-
   /*!
    * \brief number of sender
    */
@@ -109,47 +145,12 @@ class SocketCommunicator : public Communicator {
   MessageQueue* queue_;
 
   /*!
-   * \brief Memory buffer for communicator
-   */ 
-  char* buffer_ = nullptr;
-
-  /*!
-   * \brief Initalize sender node
-   * \param ip receiver ip address
-   * \param port receiver port
-   * \return true for success and false for error
-   */ 
-  bool InitSender(const char* ip, int port);
-
-  /*!
-   * \brief Initialize receiver node
-   * \param ip receiver ip address
-   * \param port receiver port
-   * \param num_sender number of sender
-   * \param queue_size size of message queue
-   * \return true for success and false for error
-   */ 
-  bool InitReceiver(const char* ip,
-                    int port,
-                    int num_sender,
-                    int64_t queue_size);
-
-  /*!
-   * \brief Finalize sender node
-   */ 
-  void FinalizeSender();
-
-  /*!
-   * \brief Finalize receiver node
-   */ 
-  void FinalizeReceiver();
-
-  /*!
    * \brief Process received message in independent threads
    * \param socket new accpeted socket
    * \param queue message queue
+   * \param id producer_id
    */ 
-  static void MsgHandler(TCPSocket* socket, MessageQueue* queue);
+  static void MsgHandler(TCPSocket* socket, MessageQueue* queue, int id);
 };
 
 }  // namespace network
