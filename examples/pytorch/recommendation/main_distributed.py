@@ -292,7 +292,9 @@ def train():
             pickle.dump((g_prior_edges, g_train_edges, g_prior_train_edges), f)
 
     for epoch in range(500):
-        if args.dataset == 'movielens':
+        if 0:
+            # Temporarily disabled; validation is too slow here since I'm computing
+            # representation for every single node
             print('Epoch %d validation' % epoch)
             with torch.no_grad():
                 valid_mrr = runtest(g_prior_train_edges, True)
