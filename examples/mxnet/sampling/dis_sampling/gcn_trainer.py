@@ -122,8 +122,8 @@ def main(args):
     if args.self_loop and not args.dataset.startswith('reddit'):
         data.graph.add_edges_from([(i,i) for i in range(len(data.graph))])
 
-    # Create sampler receiver
-    receiver = dgl.contrib.sampling.SamplerReceiver(args.ip, num_sender=args.num_sender)
+    # Create sampler receiverls
+    receiver = dgl.contrib.sampling.SamplerReceiver(addr=args.ip, num_sender=args.num_sender)
 
     train_nid = mx.nd.array(np.nonzero(data.train_mask)[0]).astype(np.int64).as_in_context(ctx)
     test_nid = mx.nd.array(np.nonzero(data.test_mask)[0]).astype(np.int64).as_in_context(ctx)

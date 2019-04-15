@@ -15,8 +15,8 @@ class MySamplerPool(SamplerPool):
         """User-defined worker function
         """
         # Start sender
-        recv_dict = {0:args.ip}
-        sender = dgl.contrib.sampling.SamplerSender(recv_dict)
+        namebook = { 0:args.ip }
+        sender = dgl.contrib.sampling.SamplerSender(namebook)
 
         # load and preprocess dataset
         data = load_data(args)
@@ -45,7 +45,6 @@ class MySamplerPool(SamplerPool):
                 sender.send(nf, 0)
                 idx += 1
         
-
 def main(args):
     pool = MySamplerPool()
     pool.start(args.num_sender, args)
@@ -69,8 +68,6 @@ if __name__ == '__main__':
             help="ip address of remote trainer machine")
     parser.add_argument("--port", type=int, default=2049,
             help="listen port of remote trainer machine")
-    parser.add_argument("--num-sender", type=int, default=1,
-            help="total number of sampler sender")
     args = parser.parse_args()
 
     print(args)

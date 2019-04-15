@@ -34,37 +34,37 @@ struct Addr {
 /*!
  * \brief Network Sender for DGL distributed training.
  *
- * Sender is an abstract class that defines a set of APIs for sending data. 
- * It can be implemented by different underlying libraries such TCP socket and ZMQ. 
- * One Sender can connect to multiple receivers, and it and send binary 
- * data to specified receiver via receiver's ID.
+ * Sender is an abstract class that defines a set of APIs for sending 
+ * binary data over network. It can be implemented by different underlying 
+ * networking libraries such TCP socket and ZMQ. One Sender can connect to 
+ * multiple receivers, and it can send data to specified receiver via receiver's ID.
  */
 class SocketSender : public Sender {
  public:
   /*!
-   * \brief Add receiver address to the list
-   * \param ip receviver IP address
-   * \param port receiver port
+   * \brief Add receiver address and it's ID to the namebook
+   * \param ip receviver's IP address
+   * \param port receiver's port
    * \param id receiver's ID
    */
-  void AddReceiver(char* ip, int port, int recv_id);
+  void AddReceiver(const char* ip, int port, int recv_id);
 
   /*!
-   * \brief Connect to Receiver
-   * \return true for sucess and false for fail
+   * \brief Connect with all the Receivers
+   * \return True for sucess and False for fail
    */
   bool Connect();
 
   /*!
-   * \brief Send data to receiver
-   * \param data data buffer
-   * \param size data size
-   * \param id receiver's ID
-   * \return bytes send
-   *   > 0 : bytes send
+   * \brief Send data to specified Receiver
+   * \param data data buffer for sending
+   * \param size data size for sending
+   * \param recv_id receiver's ID
+   * \return bytes we sent
+   *   > 0 : bytes we sent
    *   - 1 : error
    */
-  int64_t Send(char* data, int64_t size, int recv_id);
+  int64_t Send(const char* data, int64_t size, int recv_id);
 
   /*!
    * \brief Finalize Sender
@@ -86,29 +86,29 @@ class SocketSender : public Sender {
 /*!
  * \brief Network Receiver for DGL distributed training.
  *
- * Receiver is an abstract class that defines a set of APIs for receiving data.
- * It can be implemented by different underlying libraries such TCP socket and ZMQ.
- * One Receiver can connect with multiple senders, and it and receive binary data 
- * from all of the senders concurrently via multi-threading and message queue.
+ * Receiver is an abstract class that defines a set of APIs for receiving binary 
+ * data over network. It can be implemented by different underlying networking libraries 
+ * such TCP socket and ZMQ. One Receiver can connect with multiple Senders, and it can receive 
+ * data from these Senders concurrently via multi-threading and message queue.
  */
 class SocketReceiver : public Receiver {
  public:
   /*!
-   * \brief Wait all of the Sender connect
-   * \param ip IP address of receiver
-   * \param port port of receiver
-   * \param num_sender total number of Sender
+   * \brief Wait all of the Senders to connect
+   * \param ip Receiver's IP address
+   * \param port Receiver's port
+   * \param num_sender total number of Senders
    * \param queue_size size of message queue
-   * \return true for sucess and false for fail
+   * \return True for sucess and False for fail
    */
-  bool Wait(char* ip, int port, int num_sender, int queue_size);
+  bool Wait(const char* ip, int port, int num_sender, int queue_size);
 
   /*!
-   * \brief Recv data from Sender
-   * \param dest data buffer
+   * \brief Recv data from Sender (copy data from message queue)
+   * \param dest data buffer of destination
    * \param max_size maximul size of data buffer
-   * \return bytes received
-   *   > 0 : bytes received
+   * \return bytes we received
+   *   > 0 : bytes we received
    *   - 1 : error
    */
   int64_t Recv(char* dest, int64_t max_size);

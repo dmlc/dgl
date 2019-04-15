@@ -69,11 +69,11 @@ class SamplerSender(object):
           2:'168.12.46.12:50051' }
 
     """
-    def __init__(self, recv_addr):
-        assert len(recv_addr) > 0, 'recv_addr cannot be empty.'
-        self._recv_addr = recv_addr
+    def __init__(self, namebook):
+        assert len(namebook) > 0, 'recv_addr cannot be empty.'
+        self._namebook = namebook
         self._sender = _create_sender()
-        for ID, addr in recv_addr.items():
+        for ID, addr in self._namebook.items():
             vec = addr.split(':')
             _add_receiver_addr(self._sender, vec[0], int(vec[1]), ID)
         _sender_connect(self._sender)

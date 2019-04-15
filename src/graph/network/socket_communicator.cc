@@ -21,9 +21,9 @@ namespace network {
 const int kTimeOut = 10;  // 10 minutes for socket timeout
 const int kMaxConnection = 1024;  // 1024 maximal socket connection
 
-void SocketSender::AddReceiver(char* ip, int port, int recv_id) {
+void SocketSender::AddReceiver(const char* ip, int port, int recv_id) {
   dgl::network::Addr addr;
-  addr.ip_.assign(ip);
+  addr.ip_.assign(const_cast<char*>(ip));
   addr.port_ = port;
   receiver_addr_map_[recv_id] = addr;
 }
@@ -61,7 +61,7 @@ bool SocketSender::Connect() {
   return true;
 }
 
-int64_t SocketSender::Send(char* data, int64_t size, int recv_id) {
+int64_t SocketSender::Send(const char* data, int64_t size, int recv_id) {
   TCPSocket* client = socket_map_[recv_id];
   // First sent the size of data
   int64_t sent_bytes = 0;
@@ -95,7 +95,7 @@ void SocketSender::Finalize() {
   }
 }
 
-bool SocketReceiver::Wait(char* ip, 
+bool SocketReceiver::Wait(const char* ip, 
                           int port, 
                           int num_sender, 
                           int queue_size) {
