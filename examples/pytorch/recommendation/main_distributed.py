@@ -38,9 +38,10 @@ if os.path.exists(cache_file):
     with open(cache_file, 'rb') as f:
         ml = pickle.load(f)
 else:
-    from rec.datasets.movielens import MovieLens
-    ml = MovieLens('./ml-1m')
-    neighbors = ml.user_neighbors + ml.product_neighbors
+    from rec.datasets.reddit import Reddit
+    ml = Reddit('./subm-users.pkl')
+    if args.hard_neg_prob > 0:
+        raise ValueError('Hard negative examples currently not supported on reddit.')
     with open(cache_file, 'wb') as f:
         pickle.dump(ml, f)
 
@@ -88,6 +89,7 @@ def forward(model, nodeflow, train=True):
         with torch.no_grad():
             return model(nodeflow, embs)
 
+@profile
 def runtrain(g_prior_edges, g_train_edges, train):
     global opt
     if train:
@@ -280,21 +282,28 @@ def train():
     global opt, sched
     best_mrr = 0
 
-    for epoch in range(500):
-        print('Epoch %d mask refresh' % epoch)
+    cache_mask_file = cache_file + '.mask'
+    if os.path.exists(cache_mask_file):
+        with open(cache_mask_file, 'rb') as f:
+            g_prior_edges, g_train_edges, g_prior_train_edges = pickle.load(f)
+    else:
         g_prior_edges, g_train_edges, g_prior_train_edges = refresh_mask()
+        with open(cache_mask_file, 'wb') as f:
+            pickle.dump((g_prior_edges, g_train_edges, g_prior_train_edges), f)
 
-        print('Epoch %d validation' % epoch)
-        with torch.no_grad():
-            valid_mrr = runtest(g_prior_train_edges, True)
-            if best_mrr < valid_mrr.mean():
-                best_mrr = valid_mrr.mean()
-                torch.save(model.state_dict(), 'model.pt')
-        print(pd.Series(valid_mrr).describe())
-        print('Epoch %d test' % epoch)
-        with torch.no_grad():
-            test_mrr = runtest(g_prior_train_edges, False)
-        print(pd.Series(test_mrr).describe())
+    for epoch in range(500):
+        if args.dataset == 'movielens':
+            print('Epoch %d validation' % epoch)
+            with torch.no_grad():
+                valid_mrr = runtest(g_prior_train_edges, True)
+                if best_mrr < valid_mrr.mean():
+                    best_mrr = valid_mrr.mean()
+                    torch.save(model.state_dict(), 'model.pt')
+            print(pd.Series(valid_mrr).describe())
+            print('Epoch %d test' % epoch)
+            with torch.no_grad():
+                test_mrr = runtest(g_prior_train_edges, False)
+            print(pd.Series(test_mrr).describe())
 
         print('Epoch %d train' % epoch)
         runtrain(g_prior_edges, g_train_edges, True)
