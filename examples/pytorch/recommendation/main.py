@@ -96,7 +96,7 @@ def forward(model, nodeflow, train=True):
         with torch.no_grad():
             return model(nodeflow, embs)
 
-
+@profile
 def runtrain(g_prior_edges, g_train_edges, train):
     global opt
     if train:
@@ -117,15 +117,19 @@ def runtrain(g_prior_edges, g_train_edges, train):
             10,
             20,
             restart_prob=0.5,
-            prefetch=False,
-            add_self_loop=True)
+            prefetch=True,
+            add_self_loop=True,
+            num_workers=10)
 
     with tqdm.tqdm(edge_batches) as tq:
         sum_loss = 0
         sum_acc = 0
         count = 0
         for batch_id, batch in enumerate(tq):
-            count += batch.shape[0]
+            # TODO: got stuck on making this sampling process distributed...
+            # SAMPLING PROCESS BEGIN
+            # find the source nodes (users), destination nodes (positive products), and
+            # negative destination nodes (negative products) in *original* graph.
             src, dst = g.find_edges(batch)
             dst_neg = []
             for i in range(len(dst)):
@@ -141,6 +145,8 @@ def runtrain(g_prior_edges, g_train_edges, train):
             src = src.view(-1, 1).expand_as(dst_neg).flatten()
             dst_neg = dst_neg.flatten()
 
+            # Check whether sources, destinations, and negative destinations have predecessors
+            # in *prior* graph.  Filter out those who don't.
             mask = (g_prior.in_degrees(dst_neg) > 0) & \
                    (g_prior.in_degrees(dst) > 0) & \
                    (g_prior.in_degrees(src) > 0)
@@ -153,12 +159,17 @@ def runtrain(g_prior_edges, g_train_edges, train):
             src_size = src.shape[0]
             dst_size = dst.shape[0]
             dst_neg_size = dst_neg.shape[0]
+            count += src_size
 
+            # Generate a NodeFlow given the sources/destinations/negative destinations.  We need
+            # GCN output of those nodes.
             nodeset = torch.cat([src, dst, dst_neg])
             nodeflow = sampler.generate(nodeset)
             for i in range(nodeflow.num_layers - 1):
                 assert np.isin(nodeflow.layer_parent_nid(i + 1).numpy(),
                         nodeflow.layer_parent_nid(i).numpy()).all()
+            # SAMPLING PROCESS END
+            # copy features from parent graph
             nodeflow.copy_from_parent()
             cast_ppr_weight(nodeflow)
 
@@ -213,8 +224,9 @@ def runtest(g_prior_edges, validation=True):
             10,
             20,
             restart_prob=0.5,
-            prefetch=False,
-            add_self_loop=True)
+            prefetch=True,
+            add_self_loop=True,
+            num_workers=10)
 
     hs = []
     with torch.no_grad():
@@ -291,17 +303,18 @@ def train():
             print('Epoch %d mask refresh' % epoch)
             g_prior_edges, g_train_edges, g_prior_train_edges = refresh_mask()
 
-        print('Epoch %d validation' % epoch)
-        with torch.no_grad():
-            valid_mrr = runtest(g_prior_train_edges, True)
-            if best_mrr < valid_mrr.mean():
-                best_mrr = valid_mrr.mean()
-                torch.save(model.state_dict(), 'model.pt')
-        print(pd.Series(valid_mrr).describe())
-        print('Epoch %d test' % epoch)
-        with torch.no_grad():
-            test_mrr = runtest(g_prior_train_edges, False)
-        print(pd.Series(test_mrr).describe())
+        if args.dataset == 'movielens':
+            print('Epoch %d validation' % epoch)
+            with torch.no_grad():
+                valid_mrr = runtest(g_prior_train_edges, True)
+                if best_mrr < valid_mrr.mean():
+                    best_mrr = valid_mrr.mean()
+                    torch.save(model.state_dict(), 'model.pt')
+            print(pd.Series(valid_mrr).describe())
+            print('Epoch %d test' % epoch)
+            with torch.no_grad():
+                test_mrr = runtest(g_prior_train_edges, False)
+            print(pd.Series(test_mrr).describe())
 
         print('Epoch %d train' % epoch)
         runtrain(g_prior_edges, g_train_edges, True)

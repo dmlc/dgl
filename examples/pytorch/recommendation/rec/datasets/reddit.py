@@ -43,9 +43,9 @@ class Reddit(UserProductDataset):
         ratings = dd.from_pandas(ratings, chunksize=524288)
         ratings = ratings.groupby('user_id').apply(
                 partial(self.split_user, filter_counts=True))
-        ratings['train'] = ratings['prob'] <= 0.8
-        ratings['valid'] = (ratings['prob'] > 0.8) & (ratings['prob'] <= 0.9)
-        ratings['test'] = ratings['prob'] > 0.9
+        ratings['train'] = ratings['prob'] <= 0.95
+        ratings['valid'] = (ratings['prob'] > 0.95) & (ratings['prob'] <= 0.98)
+        ratings['test'] = ratings['prob'] > 0.98
         ratings = ratings.drop(['prob'], axis=1)
         return ratings.compute().reset_index(drop=True)
 

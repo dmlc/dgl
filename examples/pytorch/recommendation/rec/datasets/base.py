@@ -6,7 +6,7 @@ import tqdm
 class UserProductDataset(object):
     def split_user(self, df, filter_counts=0):
         df_new = df.copy()
-        df_new['prob'] = 0
+        df_new['prob'] = -1
 
         df_new_sub = (df_new['product_count'] >= filter_counts).nonzero()[0]
         prob = np.linspace(0, 1, df_new_sub.shape[0], endpoint=False)
