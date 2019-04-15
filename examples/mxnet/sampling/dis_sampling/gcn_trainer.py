@@ -123,7 +123,7 @@ def main(args):
         data.graph.add_edges_from([(i,i) for i in range(len(data.graph))])
 
     # Create sampler receiver
-    receiver = dgl.contrib.sampling.SamplerReceiver(ip=args.ip, port=args.port, num_sender=args.num_sender)
+    receiver = dgl.contrib.sampling.SamplerReceiver(args.ip, num_sender=args.num_sender)
 
     train_nid = mx.nd.array(np.nonzero(data.train_mask)[0]).astype(np.int64).as_in_context(ctx)
     test_nid = mx.nd.array(np.nonzero(data.test_mask)[0]).astype(np.int64).as_in_context(ctx)

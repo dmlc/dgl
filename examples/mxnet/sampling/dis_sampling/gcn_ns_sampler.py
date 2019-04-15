@@ -15,7 +15,8 @@ class MySamplerPool(SamplerPool):
         """User-defined worker function
         """
         # Start sender
-        sender = dgl.contrib.sampling.SamplerSender(ip=args.ip, port=args.port)
+        recv_dict = {0:args.ip}
+        sender = dgl.contrib.sampling.SamplerSender(recv_dict)
 
         # load and preprocess dataset
         data = load_data(args)
@@ -41,7 +42,7 @@ class MySamplerPool(SamplerPool):
                                                            num_hops=args.n_layers+1,
                                                            seed_nodes=train_nid):
                 print("send train nodeflow: %d" %(idx))
-                sender.send(nf)
+                sender.send(nf, 0)
                 idx += 1
         
 
