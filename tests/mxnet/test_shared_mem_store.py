@@ -5,6 +5,7 @@ from multiprocessing import Process
 from scipy import sparse as spsp
 import mxnet as mx
 import backend as F
+import unittest
 
 num_nodes = 100
 num_edges = int(num_nodes * num_nodes * 0.1)
