@@ -1,6 +1,6 @@
 ### Demo for Distributed Sampler
 
-First we need to change the `--ip` and `--port` in `run_trainer.sh` and `run_sampler.sh` for your own environemnt.
+First we need to change the `--ip` in `run_trainer.sh` and `run_sampler.sh` for your own environemnt.
 
 Then we need to start trainer node:
 
