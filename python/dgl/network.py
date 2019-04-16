@@ -23,21 +23,21 @@ def _finalize_sender(sender):
     """
     _CAPI_DGLFinalizeSender(sender)
 
-def _add_receiver_addr(sender, IP, port, recv_id):
+def _add_receiver_addr(sender, ip_addr, port, recv_id):
     """Add Receiver IP address to namebook
 
     Parameters
     ----------
     sender : ctypes.c_void_p
         C Sender handle
-    IP : str
+    ip_addr : str
         IP address of Receiver
     port : int
         listen of Receiver
     recv_id : int
         Receiver ID
     """
-    _CAPI_DGLSenderAddReceiver(sender, IP, port, recv_id)
+    _CAPI_DGLSenderAddReceiver(sender, ip_addr, port, recv_id)
 
 def _sender_connect(sender):
     """Connect to all the Receiver
@@ -84,21 +84,21 @@ def _finalize_receiver(receiver):
     """
     _CAPI_DGLFinalizeReceiver(receiver)
 
-def _receiver_wait(receiver, IP, port, num_sender):
+def _receiver_wait(receiver, ip_addr, port, num_sender):
     """Wait all Sender to connect..
 
     Parameters
     ----------
     receiver : ctypes.c_void_p
         C Receiver handle
-    IP : str
+    ip_addr : str
         IP address of Receiver
     port : int
         port of Receiver
     num_sender : int
         total number of Sender
     """
-    _CAPI_DGLReceiverWait(receiver, IP, port, num_sender)
+    _CAPI_DGLReceiverWait(receiver, ip_addr, port, num_sender)
 
 def _recv_nodeflow(receiver, graph):
     """Receive sampled subgraph (NodeFlow) from remote sampler.
