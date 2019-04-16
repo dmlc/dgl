@@ -26,7 +26,7 @@ static char* RECV_BUFFER = nullptr;
 DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     try {
-      SEND_BUFFER = new char[kMaxBufferSize]; 
+      SEND_BUFFER = new char[kMaxBufferSize];
     } catch (const std::bad_alloc&) {
       LOG(FATAL) << "Not enough memory for sender buffer: " << kMaxBufferSize;
     }
@@ -93,7 +93,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
 DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     try {
-      RECV_BUFFER = new char[kMaxBufferSize]; 
+      RECV_BUFFER = new char[kMaxBufferSize];
     } catch (const std::bad_alloc&) {
       LOG(FATAL) << "Not enough memory for receiver buffer: " << kMaxBufferSize;
     }

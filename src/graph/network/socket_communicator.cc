@@ -95,9 +95,9 @@ void SocketSender::Finalize() {
   }
 }
 
-bool SocketReceiver::Wait(const char* ip, 
-                          int port, 
-                          int num_sender, 
+bool SocketReceiver::Wait(const char* ip,
+                          int port,
+                          int num_sender,
                           int queue_size) {
   CHECK_GE(num_sender, 1);
   CHECK_GT(queue_size, 0);
@@ -153,7 +153,7 @@ void SocketReceiver::MsgHandler(TCPSocket* socket, MessageQueue* queue, int id) 
         max_len);
       received_bytes += tmp;
     }
-    // Data_size ==-99 is a special signal to tell 
+    // Data_size ==-99 is a special signal to tell
     // the MsgHandler to exit the loop
     if (data_size <= 0) {
       queue->Signal(id);
@@ -181,7 +181,7 @@ void SocketReceiver::Finalize() {
     if (i != 0) {  // write -99 signal to exit loop
       int64_t data_size = -99;
       queue_->Add(
-        reinterpret_cast<char*>(&data_size), 
+        reinterpret_cast<char*>(&data_size),
         sizeof(int64_t));
     }
     if (socket_[i] != nullptr) {
