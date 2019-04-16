@@ -20,13 +20,13 @@ using dgl::runtime::NDArray;
 namespace dgl {
 namespace network {
 
-static char* send_buffer = nullptr;
-static char* recv_buffer = nullptr;
+static char* SEND_BUFFER = nullptr;
+static char* RECV_BUFFER = nullptr;
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     try {
-      send_buffer = new char[kMaxBufferSize]; 
+      SEND_BUFFER = new char[kMaxBufferSize]; 
     } catch (const std::bad_alloc&) {
       LOG(FATAL) << "Not enough memory for sender buffer: " << kMaxBufferSize;
     }
@@ -40,6 +40,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeSender")
     CommunicatorHandle chandle = args[0];
     network::Sender* sender = static_cast<network::Sender*>(chandle);
     sender->Finalize();
+    delete [] SEND_BUFFER;
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderAddReceiver")
@@ -49,7 +50,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderAddReceiver")
     int port = args[2];
     int recv_id = args[3];
     network::Sender* sender = static_cast<network::Sender*>(chandle);
-    sender->AddReceiver(const_cast<char*>(ip.c_str()), port, recv_id);
+    sender->AddReceiver(ip.c_str(), port, recv_id);
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderConnect")
@@ -75,7 +76,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
     auto csr = ptr->GetInCSR();
     // Serialize nodeflow to data buffer
     int64_t data_size = network::SerializeSampledSubgraph(
-                             send_buffer,
+                             SEND_BUFFER,
                              csr,
                              node_mapping,
                              edge_mapping,
@@ -83,7 +84,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
                              flow_offsets);
     CHECK_GT(data_size, 0);
     // Send msg via network
-    int64_t size = sender->Send(send_buffer, data_size, recv_id);
+    int64_t size = sender->Send(SEND_BUFFER, data_size, recv_id);
     if (size <= 0) {
       LOG(FATAL) << "Send message error (size: " << size << ")";
     }
@@ -92,7 +93,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
 DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     try {
-      recv_buffer = new char[kMaxBufferSize]; 
+      RECV_BUFFER = new char[kMaxBufferSize]; 
     } catch (const std::bad_alloc&) {
       LOG(FATAL) << "Not enough memory for receiver buffer: " << kMaxBufferSize;
     }
@@ -106,6 +107,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeReceiver")
     CommunicatorHandle chandle = args[0];
     network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
     receiver->Finalize();
+    delete [] RECV_BUFFER;
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverWait")
@@ -115,7 +117,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverWait")
     int port = args[2];
     int num_sender = args[3];
     network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
-    receiver->Wait(const_cast<char*>(ip.c_str()), port, num_sender, kQueueSize);
+    receiver->Wait(ip.c_str(), port, num_sender, kQueueSize);
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
@@ -123,14 +125,14 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
     CommunicatorHandle chandle = args[0];
     network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
     // Recv data from network
-    int64_t size = receiver->Recv(recv_buffer, kMaxBufferSize);
+    int64_t size = receiver->Recv(RECV_BUFFER, kMaxBufferSize);
     if (size <= 0) {
       LOG(FATAL) << "Receive error: (size: " << size << ")";
     }
     NodeFlow* nf = new NodeFlow();
     ImmutableGraph::CSR::Ptr csr;
     // Deserialize nodeflow from recv_data_buffer
-    network::DeserializeSampledSubgraph(recv_buffer,
+    network::DeserializeSampledSubgraph(RECV_BUFFER,
                                         &(csr),
                                         &(nf->node_mapping),
                                         &(nf->edge_mapping),

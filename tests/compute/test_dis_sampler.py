@@ -28,8 +28,6 @@ def start_trainer():
     src1 = subg.map_to_parent_nid(child_src)
     assert F.array_equal(src1, src)
 
-    time.sleep(3)  # wait all senders to finalize their jobs
-
 def start_sampler():
     g = generate_rand_graph(100)
     namebook = { 0:'127.0.0.1:50051' }
@@ -38,8 +36,6 @@ def start_sampler():
             g, 1, 100, neighbor_type='in', num_workers=4)):
         sender.send(subg, 0)
         break
-
-    time.sleep(1)
 
 if __name__ == '__main__':
     pid = os.fork()

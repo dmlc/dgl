@@ -12,7 +12,8 @@ class SamplerPool(object):
     should be implemented by users. SamplerPool will fork() N (N = num_worker)
     child processes, and each process will perform worker() method independently.
     Note that, the fork() API will use shared memory for N process and the OS will
-    perfrom copy-on-write only when developers write that piece of memory.
+    perfrom copy-on-write only when developers write that piece of memory. So fork N
+    processes and load N copy of graph will not increase the memory overhead.
 
     Users can use this class like this:
 
@@ -37,7 +38,7 @@ class SamplerPool(object):
         num_worker : int
             number of worker (number of child process)
         args : arguments
-            arguments passed by user
+            any arguments passed by user
         """
         p = Pool()
         for i in range(num_worker):
@@ -49,6 +50,13 @@ class SamplerPool(object):
 
     @abstractmethod
     def worker(self, args):
+        """User-defined function
+
+        Parameters
+        ----------
+        args : arguments
+            any arguments passed by user 
+        """
         pass
 
 class SamplerSender(object):
@@ -60,9 +68,9 @@ class SamplerSender(object):
 
     Parameters
     ----------
-    recv_addr : dict
-        address dict of SamplerReceiver, where
-        key is recv_id and value is recv address, e.g.,
+    namebook : dict
+        address namebook of SamplerReceiver, where
+        key is recevier's ID and value is receiver's address, e.g.,
 
         { 0:'168.12.23.45:50051', 
           1:'168.12.23.21:50051', 
@@ -70,7 +78,7 @@ class SamplerSender(object):
 
     """
     def __init__(self, namebook):
-        assert len(namebook) > 0, 'recv_addr cannot be empty.'
+        assert len(namebook) > 0, 'namebook cannot be empty.'
         self._namebook = namebook
         self._sender = _create_sender()
         for ID, addr in self._namebook.items():
@@ -100,9 +108,9 @@ class SamplerReceiver(object):
 
     Users use SamplerReceiver to receive sampled subgraph (NodeFlow) 
     from remote SamplerSender. Note that SamplerReceiver can receive messages 
-    from multiple SamplerSenders concurrently, by given the num_sender parameter. 
-    Note that, only when all SamplerSenders connect to SamplerReceiver, it can 
-    start its job.
+    from multiple SamplerSenders concurrently by given the num_sender parameter. 
+    Note that, only when all SamplerSenders connect to SamplerReceiver, receiver
+    can start its job.
 
     Parameters
     ----------

@@ -9,7 +9,7 @@ from . import utils
 _init_api("dgl.network")
 
 def _create_sender():
-    """Create a sender communicator via C socket.
+    """Create a Sender communicator via C api
     """
     return _CAPI_DGLSenderCreate()
 
@@ -19,43 +19,43 @@ def _finalize_sender(sender):
     Parameters
     ----------
     sender : ctypes.c_void_p
-        C sender handle
+        C Sender handle
     """
     _CAPI_DGLFinalizeSender(sender)
 
 def _add_receiver_addr(sender, ip, port, recv_id):
-    """Add receiver address to receiver list
+    """Add Receiver IP address to namebook
 
     Parameters
     ----------
     sender : ctypes.c_void_p
-        C sender handle
+        C Sender handle
     ip : str
-        IP address of receiver
+        IP address of Receiver
     port : int
-        listen of receiver
+        listen of Receiver
     recv_id : int
         Receiver ID
     """
     _CAPI_DGLSenderAddReceiver(sender, ip, port, recv_id)
 
 def _sender_connect(sender):
-    """Connect to receiver
+    """Connect to all the Receiver
 
     Parameters
     ----------
     sender : ctypes.c_void_p
-        C sender handle
+        C Sender handle
     """
     _CAPI_DGLSenderConnect(sender)
 
 def _send_nodeflow(sender, nodeflow, recv_id):
-    """Send sampled subgraph (Nodeflow) to remote receiver.
+    """Send sampled subgraph (Nodeflow) to remote Receiver.
 
     Parameters
     ----------
     sender : ctypes.c_void_p
-        C sender handle
+        C Sender handle
     nodeflow : NodeFlow
         NodeFlow object
     recv_id : int
@@ -64,7 +64,6 @@ def _send_nodeflow(sender, nodeflow, recv_id):
     graph_handle = nodeflow._graph._handle
     node_mapping = nodeflow._node_mapping.todgltensor()
     edge_mapping = nodeflow._edge_mapping.todgltensor()
-    # Can we convert NDArray to tensor directly, instead of using toindex()?
     layers_offsets = utils.toindex(nodeflow._layer_offsets).todgltensor()
     flows_offsets = utils.toindex(nodeflow._block_offsets).todgltensor()
     _CAPI_SenderSendSubgraph(sender,
@@ -76,7 +75,7 @@ def _send_nodeflow(sender, nodeflow, recv_id):
                              flows_offsets)
 
 def _create_receiver():
-    """Create a receiver communicator via C socket.
+    """Create a Receiver communicator via C api
     """
     return _CAPI_DGLReceiverCreate()
 
@@ -86,18 +85,18 @@ def _finalize_receiver(receiver):
     _CAPI_DGLFinalizeReceiver(receiver)
 
 def _receiver_wait(receiver, ip, port, num_sender):
-    """Wait all Sender connect
+    """Wait all Sender to connect..
 
     Parameters
     ----------
     receiver : ctypes.c_void_p
-        C receiver handle
+        C Receiver handle
     ip : str
-        IP address of receiver
+        IP address of Receiver
     port : int
-        port of receiver
+        port of Receiver
     num_sender : int
-        number of sender
+        total number of Sender
     """
     _CAPI_DGLReceiverWait(receiver, ip, port, num_sender)
 
@@ -107,7 +106,7 @@ def _recv_nodeflow(receiver, graph):
     Parameters
     ----------
     receiver : ctypes.c_void_p
-        C receiver handle
+        C Receiver handle
     graph : DGLGraph
         The parent graph
 
