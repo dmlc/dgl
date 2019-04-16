@@ -144,7 +144,6 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
     labels = g.ndata['labels']
     in_feats = features.shape[1]
 
-    #TODO how to initialize the data here.
     norm = mx.nd.expand_dims(1./g.in_degrees().astype('float32'), 1)
     g.ndata['norm'] = norm.as_in_context(ctx)
     degs = g.in_degrees().astype('float32').asnumpy()
@@ -156,12 +155,9 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
                  lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
 
     n_layers = args.n_layers
-    #TODO this is a bad way of initializing data in the graph store.
     for i in range(n_layers):
         g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
-        g.ndata['agg_h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
     g.ndata['h_{}'.format(n_layers-1)] = mx.nd.zeros((features.shape[0], 2*args.n_hidden), ctx=ctx)
-    g.ndata['agg_h_{}'.format(n_layers-1)] = mx.nd.zeros((features.shape[0], 2*args.n_hidden), ctx=ctx)
 
     model = GCNSampling(in_feats,
                         args.n_hidden,
@@ -186,10 +182,9 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
 
     # use optimizer
     print(model.collect_params())
-    kv_type = 'local' if args.nworkers == 1 else 'dist_sync'
     trainer = gluon.Trainer(model.collect_params(), 'adam',
                             {'learning_rate': args.lr, 'wd': args.weight_decay},
-                            kvstore=mx.kv.create(kv_type))
+                            kvstore=mx.kv.create('local'))
 
     # initialize graph
     dur = []
