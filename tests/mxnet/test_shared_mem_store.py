@@ -5,6 +5,7 @@ from multiprocessing import Process
 from scipy import sparse as spsp
 import mxnet as mx
 import backend as F
+import unittest
 
 num_nodes = 100
 num_edges = int(num_nodes * num_nodes * 0.1)
@@ -48,6 +49,7 @@ def server_func(num_workers):
     g.edata['feat'] = mx.nd.arange(num_edges * 10).reshape((num_edges, 10))
     g.run()
 
+@unittest.skip("disable shared memory test temporarily")
 def test_worker_server():
     serv_p = Process(target=server_func, args=(2,))
     work_p1 = Process(target=worker_func, args=(0,))
