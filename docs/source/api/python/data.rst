@@ -33,6 +33,7 @@ Mini graph classification dataset
 .. autoclass:: MiniGCDataset
     :members: __getitem__, __len__, num_classes
 
+
 Graph kernel dataset
 ````````````````````
 
@@ -40,6 +41,16 @@ For more information about the dataset, see `Benchmark Data Sets for Graph Kerne
 
 .. autoclass:: TUDataset
     :members: __getitem__, __len__
+
+
+Graph isomorphism network dataset
+```````````````````````````````````
+
+A compact subset of graph kernel dataset
+
+.. autoclass:: GINDataset
+    :members: __getitem__, __len__
+
 
 Protein-Protein Interaction dataset
 ```````````````````````````````````
