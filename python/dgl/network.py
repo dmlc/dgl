@@ -87,7 +87,7 @@ def _send_end_signal(sender, recv_id):
     recv_id : int
         Receiver ID
     """
-    _CAPI_SenderSendEndSignal(sender, recv_id);
+    _CAPI_SenderSendEndSignal(sender, recv_id)
 
 def _create_receiver():
     """Create a Receiver communicator via C api
