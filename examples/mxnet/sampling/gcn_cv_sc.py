@@ -21,14 +21,15 @@ class NodeUpdate(gluon.Block):
 
     def forward(self, node):
         h = node.data['h']
+        norm = node.data['norm']
         if self.test:
-            norm = node.data['norm']
             h = h * norm
         else:
             agg_history_str = 'agg_h_{}'.format(self.layer_id-1)
             agg_history = node.data[agg_history_str]
+            subg_norm = node.data['subg_norm']
             # control variate
-            h = h + agg_history
+            h = h * subg_norm + agg_history * norm
             if self.dropout:
                 h = mx.nd.Dropout(h, p=self.dropout)
         h = self.dense(h)
@@ -37,7 +38,6 @@ class NodeUpdate(gluon.Block):
         elif self.activation:
             h = self.activation(h)
         return {'activation': h}
-
 
 
 class GCNSampling(gluon.Block):
@@ -85,7 +85,7 @@ class GCNSampling(gluon.Block):
             nf.layers[i].data['h'] = h
             nf.block_compute(i,
                              fn.copy_src(src='h', out='m'),
-                             lambda node : {'h': node.mailbox['m'].mean(axis=1)},
+                             fn.sum(msg='m', out='h'),
                              layer)
             h = nf.layers[i+1].data.pop('activation')
             # update history
@@ -139,63 +139,24 @@ class GCNInfer(gluon.Block):
         return h
 
 
-def main(args):
-    # load and preprocess dataset
-    data = load_data(args)
-
-    if args.gpu >= 0:
-        ctx = mx.gpu(args.gpu)
-    else:
-        ctx = mx.cpu()
-
-    if args.self_loop and not args.dataset.startswith('reddit'):
-        data.graph.add_edges_from([(i,i) for i in range(len(data.graph))])
-
-    train_nid = mx.nd.array(np.nonzero(data.train_mask)[0]).astype(np.int64)
-    test_nid = mx.nd.array(np.nonzero(data.test_mask)[0]).astype(np.int64)
-
-    num_neighbors = args.num_neighbors
-    n_layers = args.n_layers
-
-    features = mx.nd.array(data.features).as_in_context(ctx)
-    labels = mx.nd.array(data.labels).as_in_context(ctx)
-    train_mask = mx.nd.array(data.train_mask).as_in_context(ctx)
-    val_mask = mx.nd.array(data.val_mask).as_in_context(ctx)
-    test_mask = mx.nd.array(data.test_mask).as_in_context(ctx)
+def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
+    features = g.ndata['features']
+    labels = g.ndata['labels']
     in_feats = features.shape[1]
-    n_classes = data.num_labels
-    n_edges = data.graph.number_of_edges()
-
-    n_train_samples = train_mask.sum().asscalar()
-    n_test_samples = test_mask.sum().asscalar()
-    n_val_samples = val_mask.sum().asscalar()
-
-    print("""----Data statistics------'
-      #Edges %d
-      #Classes %d
-      #Train samples %d
-      #Val samples %d
-      #Test samples %d""" %
-          (n_edges, n_classes,
-              n_train_samples,
-              n_val_samples,
-              n_test_samples))
-
-    # create GCN model
-    g = DGLGraph(data.graph, readonly=True)
-
-    g.ndata['features'] = features
 
     norm = mx.nd.expand_dims(1./g.in_degrees().astype('float32'), 1)
     g.ndata['norm'] = norm.as_in_context(ctx)
+    degs = g.in_degrees().astype('float32').asnumpy()
+    degs[degs > args.num_neighbors] = args.num_neighbors
+    g.ndata['subg_norm'] = mx.nd.expand_dims(mx.nd.array(1./degs, ctx=ctx), 1)
 
     g.update_all(fn.copy_src(src='features', out='m'),
                  fn.sum(msg='m', out='preprocess'),
                  lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
 
+    n_layers = args.n_layers
     for i in range(n_layers):
         g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
-
     g.ndata['h_{}'.format(n_layers-1)] = mx.nd.zeros((features.shape[0], 2*args.n_hidden), ctx=ctx)
 
     model = GCNSampling(in_feats,
@@ -229,21 +190,21 @@ def main(args):
     dur = []
     for epoch in range(args.n_epochs):
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
-                                                       num_neighbors,
+                                                       args.num_neighbors,
                                                        neighbor_type='in',
+                                                       num_workers=32,
                                                        shuffle=True,
                                                        num_hops=n_layers,
                                                        seed_nodes=train_nid):
             for i in range(n_layers):
                 agg_history_str = 'agg_h_{}'.format(i)
                 g.pull(nf.layer_parent_nid(i+1), fn.copy_src(src='h_{}'.format(i), out='m'),
-                       fn.sum(msg='m', out=agg_history_str),
-                       lambda node : {agg_history_str: node.data[agg_history_str] * node.data['norm']})
+                       fn.sum(msg='m', out=agg_history_str))
 
             node_embed_names = [['preprocess', 'h_0']]
             for i in range(1, n_layers):
-                node_embed_names.append(['h_{}'.format(i), 'agg_h_{}'.format(i-1)])
-            node_embed_names.append(['agg_h_{}'.format(n_layers-1)])
+                node_embed_names.append(['h_{}'.format(i), 'agg_h_{}'.format(i-1), 'subg_norm', 'norm'])
+            node_embed_names.append(['agg_h_{}'.format(n_layers-1), 'subg_norm', 'norm'])
 
             nf.copy_from_parent(node_embed_names=node_embed_names)
             # forward
@@ -269,6 +230,7 @@ def main(args):
             trainer._kvstore.pull(idx, out=infer_params[key].data())
 
         num_acc = 0.
+        num_tests = 0
 
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
                                                        g.number_of_nodes(),
@@ -284,38 +246,9 @@ def main(args):
             batch_nids = nf.layer_parent_nid(-1).as_in_context(ctx)
             batch_labels = labels[batch_nids]
             num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
+            num_tests += nf.layer_size(-1)
+            break
 
-        print("Test Accuracy {:.4f}". format(num_acc/n_test_samples))
+        print("Test Accuracy {:.4f}". format(num_acc/num_tests))
 
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='GCN')
-    register_data_args(parser)
-    parser.add_argument("--dropout", type=float, default=0.5,
-            help="dropout probability")
-    parser.add_argument("--gpu", type=int, default=-1,
-            help="gpu")
-    parser.add_argument("--lr", type=float, default=3e-2,
-            help="learning rate")
-    parser.add_argument("--n-epochs", type=int, default=200,
-            help="number of training epochs")
-    parser.add_argument("--batch-size", type=int, default=1000,
-            help="train batch size")
-    parser.add_argument("--test-batch-size", type=int, default=1000,
-            help="test batch size")
-    parser.add_argument("--num-neighbors", type=int, default=2,
-            help="number of neighbors to be sampled")
-    parser.add_argument("--n-hidden", type=int, default=16,
-            help="number of hidden gcn units")
-    parser.add_argument("--n-layers", type=int, default=1,
-            help="number of hidden gcn layers")
-    parser.add_argument("--self-loop", action='store_true',
-            help="graph self-loop (default=False)")
-    parser.add_argument("--weight-decay", type=float, default=5e-4,
-            help="Weight for L2 loss")
-    args = parser.parse_args()
-
-    print(args)
-
-    main(args)
 
