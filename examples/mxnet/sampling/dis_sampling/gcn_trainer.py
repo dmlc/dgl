@@ -123,7 +123,7 @@ def main(args):
         data.graph.add_edges_from([(i,i) for i in range(len(data.graph))])
 
     # Create sampler receiver
-    receiver = dgl.contrib.sampling.SamplerReceiver(ip=args.ip, port=args.port, num_sender=args.num_sender)
+    receiver = dgl.contrib.sampling.SamplerReceiver(addr=args.ip, num_sender=args.num_sender)
 
     train_nid = mx.nd.array(np.nonzero(data.train_mask)[0]).astype(np.int64).as_in_context(ctx)
     test_nid = mx.nd.array(np.nonzero(data.test_mask)[0]).astype(np.int64).as_in_context(ctx)
@@ -257,10 +257,8 @@ if __name__ == '__main__':
             help="graph self-loop (default=False)")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
             help="Weight for L2 loss")
-    parser.add_argument("--ip", type=str, default='127.0.0.1',
+    parser.add_argument("--ip", type=str, default='127.0.0.1:50051',
             help="IP address of sampler receiver machine")
-    parser.add_argument("--port", type=int, default=2049,
-            help="Listening port of sampler receiver machine")
     parser.add_argument("--num-sender", type=int, default=1,
             help="Number of sampler sender machine")
     args = parser.parse_args()

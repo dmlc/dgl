@@ -14,7 +14,7 @@ def generate_rand_graph(n):
 g = generate_rand_graph(100)
 
 def start_trainer():
-    recv = dgl.contrib.sampling.SamplerReceiver(ip="127.0.0.1", port=50051)
+    recv = dgl.contrib.sampling.SamplerReceiver(addr='127.0.0.1:50051', num_sender=1)
     subg = recv.recv(g)
     seed_ids = subg.layer_parent_nid(-1)
     assert len(seed_ids) == 1
@@ -29,21 +29,20 @@ def start_trainer():
     src1 = subg.map_to_parent_nid(child_src)
     assert F.array_equal(src1, src)
 
-    time.sleep(3)  # wait all senders to finalize their jobs
     recv.close()
 
 def start_sampler():
-    sender = dgl.contrib.sampling.SamplerSender(ip="127.0.0.1", port=50051)
+    namebook = { 0:'127.0.0.1:50051' }
+    sender = dgl.contrib.sampling.SamplerSender(namebook)
     for i, subg in enumerate(dgl.contrib.sampling.NeighborSampler(
             g, 1, 100, neighbor_type='in', num_workers=4)):
-        sender.send(subg)
+        sender.send(subg, 0)
         break
 
-    time.sleep(1)
     sender.close()
 
 def start_trainer2():
-    recv = dgl.contrib.sampling.SamplerReceiver(ip="127.0.0.1", port=50051)
+    recv = dgl.contrib.sampling.SamplerReceiver(addr='127.0.0.1:50051', num_sender=1)
     subg = recv.recv(g)
 
     eid = subg.block_eid(0)
@@ -56,10 +55,11 @@ def start_trainer2():
     recv.close()
 
 def start_sampler2():
-    sender = dgl.contrib.sampling.SamplerSender(ip="127.0.0.1", port=50051)
+    namebook = { 0:'127.0.0.1:50051' }
+    sender = dgl.contrib.sampling.SamplerSender(namebook)
     for i, subg in enumerate(dgl.contrib.sampling.PPRNeighborSampler(
             g, 1, 100, 100, 1000, num_workers=4)):
-        sender.send(subg)
+        sender.send(subg, 0)
         break
 
     time.sleep(1)

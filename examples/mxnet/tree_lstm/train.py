@@ -122,7 +122,7 @@ def main(args):
                 dur.append(time.time() - t0) # tok
 
             if step > 0 and step % args.log_every == 0:
-                pred = pred.argmax(axis=1)
+                pred = pred.argmax(axis=1).astype(batch.label.dtype)
                 acc = (batch.label == pred).sum()
                 root_ids = [i for i in range(batch.graph.number_of_nodes()) if batch.graph.out_degree(i)==0]
                 root_acc = np.sum(batch.label.asnumpy()[root_ids] == pred.asnumpy()[root_ids])
@@ -139,7 +139,7 @@ def main(args):
             n = g.number_of_nodes()
             h = mx.nd.zeros((n, args.h_size), ctx=ctx)
             c = mx.nd.zeros((n, args.h_size), ctx=ctx)
-            pred = model(batch, h, c).argmax(1)
+            pred = model(batch, h, c).argmax(1).astype(batch.label.dtype)
 
             acc = (batch.label == pred).sum().asscalar()
             accs.append([acc, len(batch.label)])
@@ -175,7 +175,7 @@ def main(args):
         n = g.number_of_nodes()
         h = mx.nd.zeros((n, args.h_size), ctx=ctx)
         c = mx.nd.zeros((n, args.h_size), ctx=ctx)
-        pred = model(batch, h, c).argmax(axis=1)
+        pred = model(batch, h, c).argmax(axis=1).astype(batch.label.dtype)
 
         acc = (batch.label == pred).sum().asscalar()
         accs.append([acc, len(batch.label)])
