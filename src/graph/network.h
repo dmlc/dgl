@@ -23,6 +23,10 @@ const int64_t kQueueSize = 1024 * 1024 * 1024;
 // Maximal try count of connection
 const int kMaxTryCount = 500;
 
+// Control number
+const int CNTROL_NODEFLOW = 0;
+const int CNTROL_END_SIGNAL = 1;
+
 }  // namespace network
 }  // namespace dgl
 

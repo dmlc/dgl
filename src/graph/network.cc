@@ -23,6 +23,25 @@ namespace network {
 static char* SEND_BUFFER = nullptr;
 static char* RECV_BUFFER = nullptr;
 
+static void SendData(network::Sender* sender, 
+                     const char* data, 
+                     int64_t size,
+                     int recv_id) {
+  int64_t send_size = sender->Send(data, size, recv_id);
+  if (send_size <= 0) {
+    LOG(FATAL) << "Send message error (size: " << send_size << ")";
+  }
+}
+
+static void RecvData(network::Receiver* receiver, 
+                     char* dest, 
+                     int64_t max_size) {
+  int64_t recv_size = receiver->Recv(dest, max_size);
+  if (recv_size <= 0) {
+    LOG(FATAL) << "Receive error (size: " << recv_size << ")";
+  }
+}
+
 DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     try {
@@ -74,20 +93,30 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
     ImmutableGraph *ptr = static_cast<ImmutableGraph*>(ghandle);
     network::Sender* sender = static_cast<network::Sender*>(chandle);
     auto csr = ptr->GetInCSR();
+    // Write control message
+    *SEND_BUFFER = CNTROL_NODEFLOW;
     // Serialize nodeflow to data buffer
     int64_t data_size = network::SerializeSampledSubgraph(
-                             SEND_BUFFER,
+                             SEND_BUFFER+sizeof(CNTROL_NODEFLOW),
                              csr,
                              node_mapping,
                              edge_mapping,
                              layer_offsets,
                              flow_offsets);
     CHECK_GT(data_size, 0);
+    data_size += sizeof(CNTROL_NODEFLOW);
     // Send msg via network
-    int64_t size = sender->Send(SEND_BUFFER, data_size, recv_id);
-    if (size <= 0) {
-      LOG(FATAL) << "Send message error (size: " << size << ")";
-    }
+    SendData(sender, SEND_BUFFER, data_size, recv_id);
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_SenderSendEndSignal")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    CommunicatorHandle chandle = args[0];
+    int recv_id = args[1];
+    network::Sender* sender = static_cast<network::Sender*>(chandle);
+    *SEND_BUFFER = CNTROL_END_SIGNAL;
+    // Send msg via network
+    SendData(sender, SEND_BUFFER, sizeof(CNTROL_END_SIGNAL), recv_id);
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
@@ -125,23 +154,27 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
     CommunicatorHandle chandle = args[0];
     network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
     // Recv data from network
-    int64_t size = receiver->Recv(RECV_BUFFER, kMaxBufferSize);
-    if (size <= 0) {
-      LOG(FATAL) << "Receive error: (size: " << size << ")";
+    RecvData(receiver, RECV_BUFFER, kMaxBufferSize);
+    int control = *RECV_BUFFER;
+    if (control == CNTROL_NODEFLOW) {
+      NodeFlow* nf = new NodeFlow();
+      ImmutableGraph::CSR::Ptr csr;
+      // Deserialize nodeflow from recv_data_buffer
+      network::DeserializeSampledSubgraph(RECV_BUFFER+sizeof(CNTROL_NODEFLOW),
+                                          &(csr),
+                                          &(nf->node_mapping),
+                                          &(nf->edge_mapping),
+                                          &(nf->layer_offsets),
+                                          &(nf->flow_offsets));
+      nf->graph = GraphPtr(new ImmutableGraph(csr, nullptr, false));
+      std::vector<NodeFlow*> subgs(1);
+      subgs[0] = nf;
+      *rv = WrapVectorReturn(subgs);
+    } else if (control == CNTROL_END_SIGNAL) {
+      *rv = CNTROL_END_SIGNAL;
+    } else {
+      LOG(FATAL) << "Unknow control number: " << control;
     }
-    NodeFlow* nf = new NodeFlow();
-    ImmutableGraph::CSR::Ptr csr;
-    // Deserialize nodeflow from recv_data_buffer
-    network::DeserializeSampledSubgraph(RECV_BUFFER,
-                                        &(csr),
-                                        &(nf->node_mapping),
-                                        &(nf->edge_mapping),
-                                        &(nf->layer_offsets),
-                                        &(nf->flow_offsets));
-    nf->graph = GraphPtr(new ImmutableGraph(csr, nullptr, false));
-    std::vector<NodeFlow*> subgs(1);
-    subgs[0] = nf;
-    *rv = WrapVectorReturn(subgs);
   });
 
 }  // namespace network

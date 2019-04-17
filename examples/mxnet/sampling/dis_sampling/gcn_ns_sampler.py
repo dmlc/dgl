@@ -44,6 +44,7 @@ class MySamplerPool(SamplerPool):
                 print("send train nodeflow: %d" %(idx))
                 sender.send(nf, 0)
                 idx += 1
+            sender.signal(0)
         
 def main(args):
     pool = MySamplerPool()

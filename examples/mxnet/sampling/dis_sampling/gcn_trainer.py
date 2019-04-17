@@ -122,9 +122,6 @@ def main(args):
     if args.self_loop and not args.dataset.startswith('reddit'):
         data.graph.add_edges_from([(i,i) for i in range(len(data.graph))])
 
-    # Create sampler receiver
-    receiver = dgl.contrib.sampling.SamplerReceiver(addr=args.ip, num_sender=args.num_sender)
-
     train_nid = mx.nd.array(np.nonzero(data.train_mask)[0]).astype(np.int64).as_in_context(ctx)
     test_nid = mx.nd.array(np.nonzero(data.test_mask)[0]).astype(np.int64).as_in_context(ctx)
 
@@ -163,6 +160,10 @@ def main(args):
     norm = mx.nd.expand_dims(1./degs, 1)
     g.ndata['norm'] = norm
 
+        # Create sampler receiver
+    receiver = dgl.contrib.sampling.SamplerReceiver(graph=g, addr=args.ip, num_sender=args.num_sender)
+    recv_iter = iter(receiver)
+
     model = GCNSampling(in_feats,
                         args.n_hidden,
                         n_classes,
@@ -191,11 +192,12 @@ def main(args):
 
     # initialize graph
     dur = []
-    total_count = 153
     for epoch in range(args.n_epochs):
-        for subg_count in range(total_count):
-            print(subg_count)
-            nf = receiver.recv(g)
+        print('epoch: %d' % epoch)
+        idx = 0
+        for nf in recv_iter:
+            print(idx)
+            idx += 1
             nf.copy_from_parent()
             # forward
             with mx.autograd.record():

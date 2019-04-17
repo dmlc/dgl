@@ -8,6 +8,9 @@ from . import utils
 
 _init_api("dgl.network")
 
+_CONTROL_NODEFLOW = 0
+_CONTROL_END_SIGNAL = 1
+
 def _create_sender():
     """Create a Sender communicator via C api
     """
@@ -74,6 +77,18 @@ def _send_nodeflow(sender, nodeflow, recv_id):
                              layers_offsets,
                              flows_offsets)
 
+def _send_end_signal(sender, recv_id):
+    """Send an epoch-end signal to remote Receiver.
+
+    Parameters
+    ----------
+    sender : ctypes.c_void_p
+        C sender handle
+    recv_id : int
+        Receiver ID
+    """
+    _CAPI_SenderSendEndSignal(sender, recv_id);
+
 def _create_receiver():
     """Create a Receiver communicator via C api
     """
@@ -115,6 +130,12 @@ def _recv_nodeflow(receiver, graph):
     NodeFlow
         Sampled NodeFlow object
     """
-    # hdl is a list of ptr
-    hdl = unwrap_to_ptr_list(_CAPI_ReceiverRecvSubgraph(receiver))
-    return NodeFlow(graph, hdl[0])
+    res = _CAPI_ReceiverRecvSubgraph(receiver)
+    if isinstance(res, int):
+        if res == _CONTROL_END_SIGNAL:
+            return _CONTROL_END_SIGNAL
+        else:
+            raise RuntimeError('Got unexpected control code {}'.format(res))
+    else:
+        hdl = unwrap_to_ptr_list(res)
+        return NodeFlow(graph, hdl[0])
