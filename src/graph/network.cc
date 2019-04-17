@@ -20,55 +20,63 @@ using dgl::runtime::NDArray;
 namespace dgl {
 namespace network {
 
+static char* SEND_BUFFER = nullptr;
+static char* RECV_BUFFER = nullptr;
+
 DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    std::string ip = args[0];
-    int port = args[1];
-    network::Communicator* comm = new network::SocketCommunicator();
-    if (comm->Initialize(IS_SENDER, ip.c_str(), port) == false) {
-      LOG(FATAL) << "Initialize network communicator (sender) error.";
-    }
     try {
-      comm->SetBuffer(new char[kMaxBufferSize]);
+      SEND_BUFFER = new char[kMaxBufferSize];
     } catch (const std::bad_alloc&) {
       LOG(FATAL) << "Not enough memory for sender buffer: " << kMaxBufferSize;
     }
-    CommunicatorHandle chandle = static_cast<CommunicatorHandle>(comm);
+    network::Sender* sender = new network::SocketSender();
+    CommunicatorHandle chandle = static_cast<CommunicatorHandle>(sender);
     *rv = chandle;
   });
 
-DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
+DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeSender")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    std::string ip = args[0];
-    int port = args[1];
-    int num_sender = args[2];
-    network::Communicator* comm = new network::SocketCommunicator();
-    if (comm->Initialize(IS_RECEIVER, ip.c_str(), port, num_sender, kQueueSize) == false) {
-      LOG(FATAL) << "Initialize network communicator (receiver) error.";
+    CommunicatorHandle chandle = args[0];
+    network::Sender* sender = static_cast<network::Sender*>(chandle);
+    sender->Finalize();
+    delete [] SEND_BUFFER;
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderAddReceiver")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    CommunicatorHandle chandle = args[0];
+    std::string ip = args[1];
+    int port = args[2];
+    int recv_id = args[3];
+    network::Sender* sender = static_cast<network::Sender*>(chandle);
+    sender->AddReceiver(ip.c_str(), port, recv_id);
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderConnect")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    CommunicatorHandle chandle = args[0];
+    network::Sender* sender = static_cast<network::Sender*>(chandle);
+    if (sender->Connect() == false) {
+      LOG(FATAL) << "Sender connection failed.";
     }
-    try {
-      comm->SetBuffer(new char[kMaxBufferSize]);
-    } catch (const std::bad_alloc&) {
-      LOG(FATAL) << "Not enough memory for receiver buffer: " << kMaxBufferSize;
-    }
-    CommunicatorHandle chandle = static_cast<CommunicatorHandle>(comm);
-    *rv = chandle;
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
-    GraphHandle ghandle = args[1];
-    const IdArray node_mapping = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
-    const IdArray edge_mapping = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[3]));
-    const IdArray layer_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[4]));
-    const IdArray flow_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[5]));
+    int recv_id = args[1];
+    GraphHandle ghandle = args[2];
+    const IdArray node_mapping = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[3]));
+    const IdArray edge_mapping = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[4]));
+    const IdArray layer_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[5]));
+    const IdArray flow_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[6]));
     ImmutableGraph *ptr = static_cast<ImmutableGraph*>(ghandle);
-    network::Communicator* comm = static_cast<network::Communicator*>(chandle);
+    network::Sender* sender = static_cast<network::Sender*>(chandle);
     auto csr = ptr->GetInCSR();
     // Serialize nodeflow to data buffer
     int64_t data_size = network::SerializeSampledSubgraph(
-                             comm->GetBuffer(),
+                             SEND_BUFFER,
                              csr,
                              node_mapping,
                              edge_mapping,
@@ -76,25 +84,55 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
                              flow_offsets);
     CHECK_GT(data_size, 0);
     // Send msg via network
-    int64_t size = comm->Send(comm->GetBuffer(), data_size);
+    int64_t size = sender->Send(SEND_BUFFER, data_size, recv_id);
     if (size <= 0) {
-      LOG(ERROR) << "Send message error (size: " << size << ")";
+      LOG(FATAL) << "Send message error (size: " << size << ")";
     }
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    try {
+      RECV_BUFFER = new char[kMaxBufferSize];
+    } catch (const std::bad_alloc&) {
+      LOG(FATAL) << "Not enough memory for receiver buffer: " << kMaxBufferSize;
+    }
+    network::Receiver* receiver = new network::SocketReceiver();
+    CommunicatorHandle chandle = static_cast<CommunicatorHandle>(receiver);
+    *rv = chandle;
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeReceiver")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    CommunicatorHandle chandle = args[0];
+    network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
+    receiver->Finalize();
+    delete [] RECV_BUFFER;
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverWait")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    CommunicatorHandle chandle = args[0];
+    std::string ip = args[1];
+    int port = args[2];
+    int num_sender = args[3];
+    network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
+    receiver->Wait(ip.c_str(), port, num_sender, kQueueSize);
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
-    network::Communicator* comm = static_cast<network::Communicator*>(chandle);
+    network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
     // Recv data from network
-    int64_t size = comm->Receive(comm->GetBuffer(), kMaxBufferSize);
+    int64_t size = receiver->Recv(RECV_BUFFER, kMaxBufferSize);
     if (size <= 0) {
-      LOG(ERROR) << "Receive error: (size: " << size << ")";
+      LOG(FATAL) << "Receive error: (size: " << size << ")";
     }
     NodeFlow* nf = new NodeFlow();
     ImmutableGraph::CSR::Ptr csr;
     // Deserialize nodeflow from recv_data_buffer
-    network::DeserializeSampledSubgraph(comm->GetBuffer(),
+    network::DeserializeSampledSubgraph(RECV_BUFFER,
                                         &(csr),
                                         &(nf->node_mapping),
                                         &(nf->edge_mapping),
@@ -104,13 +142,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
     std::vector<NodeFlow*> subgs(1);
     subgs[0] = nf;
     *rv = WrapVectorReturn(subgs);
-  });
-
-DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeCommunicator")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    CommunicatorHandle chandle = args[0];
-    network::Communicator* comm = static_cast<network::Communicator*>(chandle);
-    comm->Finalize();
   });
 
 }  // namespace network
