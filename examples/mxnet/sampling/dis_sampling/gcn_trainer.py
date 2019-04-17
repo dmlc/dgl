@@ -160,7 +160,7 @@ def main(args):
     norm = mx.nd.expand_dims(1./degs, 1)
     g.ndata['norm'] = norm
 
-        # Create sampler receiver
+    # Create sampler receiver
     sampler = dgl.contrib.sampling.SamplerReceiver(graph=g, addr=args.ip, num_sender=args.num_sender)
 
     model = GCNSampling(in_feats,
