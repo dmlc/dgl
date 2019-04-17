@@ -13,9 +13,8 @@ def generate_rand_graph(n):
 
 def start_trainer():
     g = generate_rand_graph(100)
-    recv = dgl.contrib.sampling.SamplerReceiver(graph=g, addr='127.0.0.1:50051', num_sender=1)
-    recv_iter = iter(recv_iter)
-    for subg in recv_iter:
+    sampler = dgl.contrib.sampling.SamplerReceiver(graph=g, addr='127.0.0.1:50051', num_sender=1)
+    for subg in sampler:
         seed_ids = subg.layer_parent_nid(-1)
         assert len(seed_ids) == 1
         src, dst, eid = g.in_edges(seed_ids, form='all')

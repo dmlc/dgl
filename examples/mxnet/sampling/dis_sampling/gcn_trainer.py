@@ -161,8 +161,7 @@ def main(args):
     g.ndata['norm'] = norm
 
         # Create sampler receiver
-    receiver = dgl.contrib.sampling.SamplerReceiver(graph=g, addr=args.ip, num_sender=args.num_sender)
-    recv_iter = iter(receiver)
+    sampler = dgl.contrib.sampling.SamplerReceiver(graph=g, addr=args.ip, num_sender=args.num_sender)
 
     model = GCNSampling(in_feats,
                         args.n_hidden,
@@ -195,7 +194,7 @@ def main(args):
     for epoch in range(args.n_epochs):
         print('epoch: %d' % epoch)
         idx = 0
-        for nf in recv_iter:
+        for nf in sampler:
             print(idx)
             idx += 1
             nf.copy_from_parent()
