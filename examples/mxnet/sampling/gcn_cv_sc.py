@@ -192,6 +192,7 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
                                                        args.num_neighbors,
                                                        neighbor_type='in',
+                                                       num_workers=32,
                                                        shuffle=True,
                                                        num_hops=n_layers,
                                                        seed_nodes=train_nid):
@@ -229,6 +230,7 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
             trainer._kvstore.pull(idx, out=infer_params[key].data())
 
         num_acc = 0.
+        num_tests = 0
 
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
                                                        g.number_of_nodes(),
@@ -244,7 +246,9 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
             batch_nids = nf.layer_parent_nid(-1).as_in_context(ctx)
             batch_labels = labels[batch_nids]
             num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
+            num_tests += nf.layer_size(-1)
+            break
 
-        print("Test Accuracy {:.4f}". format(num_acc/n_test_samples))
+        print("Test Accuracy {:.4f}". format(num_acc/num_tests))
 
 
