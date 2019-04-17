@@ -23,8 +23,8 @@ namespace network {
 static char* SEND_BUFFER = nullptr;
 static char* RECV_BUFFER = nullptr;
 
-static void SendData(network::Sender* sender, 
-                     const char* data, 
+static void SendData(network::Sender* sender,
+                     const char* data,
                      int64_t size,
                      int recv_id) {
   int64_t send_size = sender->Send(data, size, recv_id);
@@ -33,8 +33,8 @@ static void SendData(network::Sender* sender,
   }
 }
 
-static void RecvData(network::Receiver* receiver, 
-                     char* dest, 
+static void RecvData(network::Receiver* receiver,
+                     char* dest,
                      int64_t max_size) {
   int64_t recv_size = receiver->Recv(dest, max_size);
   if (recv_size <= 0) {
