@@ -178,10 +178,11 @@ def main(args):
         test_mask = test_mask.as_in_context(ctx)
         val_mask = val_mask.as_in_context(ctx)
     # create graph
-    g = DGLGraph(data.graph)
+    g = data.graph
     # add self-loop
+    g.remove_edges_from(g.selfloop_edges())
+    g = DGLGraph(g)
     g.add_edges(g.nodes(), g.nodes())
-
     # create model
     model = GAT(g,
                 args.num_layers,

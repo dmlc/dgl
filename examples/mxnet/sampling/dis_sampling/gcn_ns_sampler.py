@@ -15,7 +15,8 @@ class MySamplerPool(SamplerPool):
         """User-defined worker function
         """
         # Start sender
-        sender = dgl.contrib.sampling.SamplerSender(ip=args.ip, port=args.port)
+        namebook = { 0:args.ip }
+        sender = dgl.contrib.sampling.SamplerSender(namebook)
 
         # load and preprocess dataset
         data = load_data(args)
@@ -41,10 +42,9 @@ class MySamplerPool(SamplerPool):
                                                            num_hops=args.n_layers+1,
                                                            seed_nodes=train_nid):
                 print("send train nodeflow: %d" %(idx))
-                sender.send(nf)
+                sender.send(nf, 0)
                 idx += 1
         
-
 def main(args):
     pool = MySamplerPool()
     pool.start(args.num_sender, args)
@@ -64,12 +64,10 @@ if __name__ == '__main__':
             help="graph self-loop (default=False)")
     parser.add_argument("--n-layers", type=int, default=1,
             help="number of hidden gcn layers")
-    parser.add_argument("--ip", type=str, default='127.0.0.1',
-            help="ip address of remote trainer machine")
-    parser.add_argument("--port", type=int, default=2049,
-            help="listen port of remote trainer machine")
+    parser.add_argument("--ip", type=str, default='127.0.0.1:50051',
+            help="IP address of remote trainer machine")
     parser.add_argument("--num-sender", type=int, default=1,
-            help="total number of sampler sender")
+            help="Number of sampler sender machine")
     args = parser.parse_args()
 
     print(args)
