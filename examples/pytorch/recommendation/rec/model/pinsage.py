@@ -20,7 +20,7 @@ def mix_embeddings(h, ndata, emb, proj):
     for key in proj.keys():
         value = ndata[key]
         e.append(proj[key](cuda(value)))
-    return cuda(h) + torch.stack(e, 0).sum(0)
+    return (cuda(h) if h is not None else 0) + torch.stack(e, 0).sum(0)
 
 def get_embeddings(h, nodeset):
     return h[nodeset]
@@ -108,11 +108,13 @@ class PinSage(nn.Module):
         nf: NodeFlow.
         '''
         nid = nf.layer_parent_nid(0)
+        if h is not None:
+            h = h(nid)
         if self.use_feature:
             nf.layers[0].data['h'] = mix_embeddings(
-                    h(nid), nf.layers[0].data, self.emb, self.proj)
+                    h, nf.layers[0].data, self.emb, self.proj)
         else:
-            nf.layers[0].data['h'] = cuda(h(nid))
+            nf.layers[0].data['h'] = cuda(h)
 
         for i in range(nf.num_blocks):
             parent_nid = nf.layer_parent_nid(i + 1)

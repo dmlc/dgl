@@ -63,6 +63,14 @@ class Reddit(UserProductDataset):
         g = dgl.DGLGraph()
         g.add_nodes(len(user_ids) + len(product_ids))
 
+        features = np.load(self.path + '.features')
+        x = torch.zeros(g.number_of_nodes(), features.shape[1])
+        x[len(user_ids):] = torch.FloatTensor(features)
+        g.ndata['features'] = x
+        g.ndata['nid'] = torch.cat([
+            torch.arange(1, 1 + len(user_ids)),
+            torch.zeros(len(product_ids), dtype=torch.int64)])
+
         rating_user_vertices = [user_ids_invmap[id_] for id_ in self.ratings['user_id'].values]
         rating_product_vertices = [product_ids_invmap[id_] + len(user_ids)
                                  for id_ in self.ratings['product_id'].values]

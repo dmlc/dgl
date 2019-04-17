@@ -39,17 +39,17 @@ if os.path.exists(cache_file):
         ml = pickle.load(f)
 else:
     from rec.datasets.reddit import Reddit
-    ml = Reddit('./subm-users.pkl')
+    ml = Reddit('/efs/quagan/2018/subm-users.pkl')
     if args.hard_neg_prob > 0:
         raise ValueError('Hard negative examples currently not supported on reddit.')
     with open(cache_file, 'wb') as f:
-        pickle.dump(ml, f)
+        pickle.dump(ml, f, protocol=4)
 
 g = ml.g
 
 n_hidden = 100
 n_layers = args.layers
-batch_size = 256
+batch_size = 32
 margin = 0.9
 
 n_negs = args.n_negs
@@ -69,10 +69,9 @@ model = cuda(PinSage(
     use_feature=args.use_feature,
     G=g,
     ))
-embs = nn.Embedding(g.number_of_nodes(), n_hidden)  # note: on CPU
 
 opt = getattr(torch.optim, args.opt)(
-        list(model.parameters()) + list(embs.parameters()),
+        list(model.parameters()),
         lr=args.lr)
 sched = torch.optim.lr_scheduler.LambdaLR(opt, sched_lambda[args.sched])
 
@@ -84,12 +83,11 @@ def cast_ppr_weight(nodeflow):
 
 def forward(model, nodeflow, train=True):
     if train:
-        return model(nodeflow, embs)
+        return model(nodeflow, None)
     else:
         with torch.no_grad():
-            return model(nodeflow, embs)
+            return model(nodeflow, None)
 
-@profile
 def runtrain(g_prior_edges, g_train_edges, train):
     global opt
     if train:
@@ -102,65 +100,85 @@ def runtrain(g_prior_edges, g_train_edges, train):
     g_prior.add_nodes(g.number_of_nodes())
     g_prior.add_edges(g_prior_src, g_prior_dst)
     g_prior.ndata.update({k: v for k, v in g.ndata.items()})
-    edge_batches = g_train_edges[torch.randperm(g_train_edges.shape[0])].split(batch_size)
+
+    # prepare seed nodes
+    edge_shuffled = g_train_edges[torch.randperm(g_train_edges.shape[0])]
+    src, dst = g.find_edges(edge_shuffled)
+    dst_neg = []
+    for i in range(len(dst)):
+        if np.random.rand() < hard_neg_prob:
+            nb = torch.LongTensor(neighbors[dst[i].item()])
+            mask = ~(g.has_edges_between(nb, src[i].item()).byte())
+            dst_neg.append(np.random.choice(nb[mask].numpy(), n_negs))
+        else:
+            dst_neg.append(np.random.randint(
+                len(ml.user_ids), len(ml.user_ids) + len(ml.product_ids), n_negs))
+    dst_neg = torch.LongTensor(dst_neg)
+    # expand if we have multiple negative products for each training pair
+    dst = dst.view(-1, 1).expand_as(dst_neg).flatten()
+    src = src.view(-1, 1).expand_as(dst_neg).flatten()
+    dst_neg = dst_neg.flatten()
+    # Check whether these nodes have predecessors in *prior* graph.  Filter out
+    # those who don't.
+    mask = (g_prior.in_degrees(dst_neg) > 0) & \
+           (g_prior.in_degrees(dst) > 0) & \
+           (g_prior.in_degrees(src) > 0)
+    src = src[mask]
+    dst = dst[mask]
+    dst_neg = dst_neg[mask]
+    # Chop the users, items and negative items into batches and reorganize
+    # them into seed nodes.
+    # Note that the batch size of DGL sampler here is 3 times our batch size,
+    # since the sampler is handling 3 nodes per training example.
+    src_batches = src.split(batch_size)
+    dst_batches = dst.split(batch_size)
+    dst_neg_batches = dst_neg.split(batch_size)
+    seed_nodes = []
+    for i in range(len(src_batches)):
+        seed_nodes.append(src_batches[i])
+        seed_nodes.append(dst_batches[i])
+        seed_nodes.append(dst_neg_batches[i])
+    seed_nodes = torch.cat(seed_nodes)
+
     sampler = PPRBipartiteSingleSidedNeighborSampler(
             g_prior,
-            batch_size,
+            batch_size * 3,
             n_layers + 1,
             10,
             20,
+            seed_nodes=seed_nodes,
             restart_prob=0.5,
             prefetch=True,
             add_self_loop=True,
-            num_workers=10)
+            num_workers=20)
+    sampler_iter = iter(sampler)
 
-    with tqdm.tqdm(edge_batches) as tq:
+    with tqdm.trange(len(src_batches)) as tq:
         sum_loss = 0
         sum_acc = 0
         count = 0
-        for batch_id, batch in enumerate(tq):
+        for batch_id in tq:
             # TODO: got stuck on making this sampling process distributed...
             # SAMPLING PROCESS BEGIN
             # find the source nodes (users), destination nodes (positive products), and
             # negative destination nodes (negative products) in *original* graph.
-            src, dst = g.find_edges(batch)
-            dst_neg = []
-            for i in range(len(dst)):
-                if np.random.rand() < hard_neg_prob:
-                    nb = torch.LongTensor(neighbors[dst[i].item()])
-                    mask = ~(g.has_edges_between(nb, src[i].item()).byte())
-                    dst_neg.append(np.random.choice(nb[mask].numpy(), n_negs))
-                else:
-                    dst_neg.append(np.random.randint(
-                        len(ml.user_ids), len(ml.user_ids) + len(ml.product_ids), n_negs))
-            dst_neg = torch.LongTensor(dst_neg)
-            dst = dst.view(-1, 1).expand_as(dst_neg).flatten()
-            src = src.view(-1, 1).expand_as(dst_neg).flatten()
-            dst_neg = dst_neg.flatten()
-
-            # Check whether sources, destinations, and negative destinations have predecessors
-            # in *prior* graph.  Filter out those who don't.
-            mask = (g_prior.in_degrees(dst_neg) > 0) & \
-                   (g_prior.in_degrees(dst) > 0) & \
-                   (g_prior.in_degrees(src) > 0)
-            src = src[mask]
-            dst = dst[mask]
-            dst_neg = dst_neg[mask]
-            if len(src) == 0:
-                continue
-
-            src_size = src.shape[0]
-            dst_size = dst.shape[0]
-            dst_neg_size = dst_neg.shape[0]
+            src = src_batches[batch_id]
+            dst = dst_batches[batch_id]
+            dst_neg = dst_neg_batches[batch_id]
+            src_size = dst_size = dst_neg_size = src.shape[0]
             count += src_size
 
             # Generate a NodeFlow given the sources/destinations/negative destinations.  We need
             # GCN output of those nodes.
             nodeset = torch.cat([src, dst, dst_neg])
-            nodeflow = sampler.generate(nodeset)
+            nodeflow = next(sampler_iter)
             for i in range(nodeflow.num_layers - 1):
                 assert np.isin(nodeflow.layer_parent_nid(i + 1).numpy(),
                         nodeflow.layer_parent_nid(i).numpy()).all()
+            last_nid = nodeflow.layer_parent_nid(-1).numpy()
+            assert np.isin(src.numpy(), last_nid).all()
+            assert np.isin(dst.numpy(), last_nid).all()
+            assert np.isin(dst_neg.numpy(), last_nid).all()
             # SAMPLING PROCESS END
             # copy features from parent graph
             nodeflow.copy_from_parent()
@@ -217,21 +235,17 @@ def runtest(g_prior_edges, validation=True):
             10,
             20,
             restart_prob=0.5,
-            prefetch=True,
+            prefetch=False,
             add_self_loop=True,
-            num_workers=10)
+            num_workers=20)
 
     hs = []
     with torch.no_grad():
-        with tqdm.trange(0, n_users + n_items, batch_size) as tq:
-            for node_id in tq:
-                node_id_end = min(n_users + n_items, node_id + batch_size)
-                node_id_tensor = torch.arange(node_id, node_id_end)
-                nodeflow = sampler.generate(node_id_tensor)
-                nodeflow.copy_from_parent()
-                cast_ppr_weight(nodeflow)
-                h = forward(model, nodeflow, False)
-                hs.append(h)
+        for nodeflow in tqdm.tqdm(sampler):
+            nodeflow.copy_from_parent()
+            cast_ppr_weight(nodeflow)
+            h = forward(model, nodeflow, False)
+            hs.append(h)
     h = torch.cat(hs, 0)
 
     rr = []
@@ -292,20 +306,17 @@ def train():
             pickle.dump((g_prior_edges, g_train_edges, g_prior_train_edges), f)
 
     for epoch in range(500):
-        if 0:
-            # Temporarily disabled; validation is too slow here since I'm computing
-            # representation for every single node
-            print('Epoch %d validation' % epoch)
-            with torch.no_grad():
-                valid_mrr = runtest(g_prior_train_edges, True)
-                if best_mrr < valid_mrr.mean():
-                    best_mrr = valid_mrr.mean()
-                    torch.save(model.state_dict(), 'model.pt')
-            print(pd.Series(valid_mrr).describe())
-            print('Epoch %d test' % epoch)
-            with torch.no_grad():
-                test_mrr = runtest(g_prior_train_edges, False)
-            print(pd.Series(test_mrr).describe())
+        print('Epoch %d validation' % epoch)
+        with torch.no_grad():
+            valid_mrr = runtest(g_prior_train_edges, True)
+            if best_mrr < valid_mrr.mean():
+                best_mrr = valid_mrr.mean()
+                torch.save(model.state_dict(), 'model.pt')
+        print(pd.Series(valid_mrr).describe())
+        print('Epoch %d test' % epoch)
+        with torch.no_grad():
+            test_mrr = runtest(g_prior_train_edges, False)
+        print(pd.Series(test_mrr).describe())
 
         print('Epoch %d train' % epoch)
         runtrain(g_prior_edges, g_train_edges, True)

@@ -186,21 +186,6 @@ class NodeFlowSampler(object):
         '''
         raise NotImplementedError
 
-    def generate(self, seeds):
-        '''
-        Method that returns a NodeFlow given the seeds.
-
-        Parameters
-        ----------
-        seeds : list or Tensor of int
-            The seeds
-
-        Returns
-        -------
-        NodeFlow
-        '''
-        raise NotImplementedError
-
     def __iter__(self):
         it = NodeFlowSamplerIter(self)
         if self._num_prefetch:
@@ -230,7 +215,7 @@ class CNodeFlowSampler(NodeFlowSampler):
     def generate_handles(self, seeds, idx, batch_size):
         '''Generate a list of C NodeFlow handles.
 
-        Subclasses don't have to override generate() or fetch(); they should
+        Subclasses don't have to override fetch(); they should
         override this method instead.
 
         Parameters
@@ -246,11 +231,6 @@ class CNodeFlowSampler(NodeFlowSampler):
             The list of C pointers to the NodeFlow objects
         '''
         raise NotImplementedError
-
-    def generate(self, seeds):
-        idx = utils.toindex(seeds).todgltensor()
-        hdl = self.generate_handles(idx, 0, len(idx))
-        return NodeFlow(self.g, hdl[0])
 
     def fetch(self, current_nodeflow_index):
         handles = self.generate_handles(
