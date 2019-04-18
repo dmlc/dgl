@@ -158,6 +158,7 @@ class BarrierServer(object):
             self.barriers[bid].enter()
         else:
             self.barriers.update({bid : Barrier(self.num_workers)})
+            self.barriers[bid].enter()
         return bid
 
     def all_enter(self, worker_id, barrier_id):
@@ -260,6 +261,7 @@ class SharedMemoryStoreServer(object):
 
         def leave_barrier(worker_id, barrier_id):
             self._barrier.leave(worker_id, barrier_id)
+            return 0
 
         def all_enter(worker_id, barrier_id):
             return self._barrier.all_enter(worker_id, barrier_id)
