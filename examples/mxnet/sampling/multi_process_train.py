@@ -21,9 +21,9 @@ def main(args):
     test_mask = g.ndata['test_mask']
 
     if args.gpu >= 0:
-        runtime_ctx = mx.gpu(args.gpu)
+        ctx = mx.gpu(args.gpu)
     else:
-        runtime_ctx = mx.cpu()
+        ctx = mx.cpu()
 
     train_nid = mx.nd.array(np.nonzero(train_mask.asnumpy())[0]).astype(np.int64)
     test_nid = mx.nd.array(np.nonzero(test_mask.asnumpy())[0]).astype(np.int64)
