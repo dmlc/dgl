@@ -139,7 +139,7 @@ class GCNInfer(gluon.Block):
         return h
 
 
-def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
+def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples, distributed):
     features = g.ndata['features']
     labels = g.ndata['labels']
     in_feats = features.shape[1]
@@ -150,17 +150,24 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
     degs = g.in_degrees().astype('float32').asnumpy()
     degs[degs > args.num_neighbors] = args.num_neighbors
     g.ndata['subg_norm'] = mx.nd.expand_dims(mx.nd.array(1./degs, ctx=ctx), 1)
-
-    g.dist_update_all(fn.copy_src(src='features', out='m'),
-                      fn.sum(msg='m', out='preprocess'),
-                      lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
-
     n_layers = args.n_layers
-    for i in range(n_layers):
-        g.init_ndata('h_{}'.format(i), (features.shape[0], args.n_hidden), 'float32')
-        g.init_ndata('agg_h_{}'.format(i), (features.shape[0], args.n_hidden), 'float32')
-    g.init_ndata('h_{}'.format(n_layers-1), (features.shape[0], 2*args.n_hidden), 'float32')
-    g.init_ndata('agg_h_{}'.format(n_layers-1), (features.shape[0], 2*args.n_hidden), 'float32')
+
+    if distributed:
+        g.dist_update_all(fn.copy_src(src='features', out='m'),
+                          fn.sum(msg='m', out='preprocess'),
+                          lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
+        for i in range(n_layers):
+            g.init_ndata('h_{}'.format(i), (features.shape[0], args.n_hidden), 'float32')
+            g.init_ndata('agg_h_{}'.format(i), (features.shape[0], args.n_hidden), 'float32')
+        g.init_ndata('h_{}'.format(n_layers-1), (features.shape[0], 2*args.n_hidden), 'float32')
+        g.init_ndata('agg_h_{}'.format(n_layers-1), (features.shape[0], 2*args.n_hidden), 'float32')
+    else:
+        g.update_all(fn.copy_src(src='features', out='m'),
+                     fn.sum(msg='m', out='preprocess'),
+                     lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
+        for i in range(n_layers):
+            g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
+        g.ndata['h_{}'.format(n_layers-1)] = mx.nd.zeros((features.shape[0], 2*args.n_hidden), ctx=ctx)
 
     model = GCNSampling(in_feats,
                         args.n_hidden,

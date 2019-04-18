@@ -33,9 +33,9 @@ def main(args):
     if args.model == "gcn_ns":
         gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples)
     elif args.model == "gcn_cv":
-        gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples)
+        gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples, True)
     elif args.model == "graphsage_cv":
-        graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples)
+        graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples, True)
     else:
         print("unknown model. Please choose from gcn_ns, gcn_cv, graphsage_cv")
     print("parent ends")
