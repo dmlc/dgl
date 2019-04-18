@@ -8,6 +8,7 @@ from dgl.data import register_data_args, load_data
 import dgl
 from appnp import APPNP
 
+
 def evaluate(model, features, labels, mask):
     model.eval()
     with torch.no_grad():
@@ -17,6 +18,7 @@ def evaluate(model, features, labels, mask):
         _, indices = torch.max(logits, dim=1)
         correct = torch.sum(indices == labels)
         return correct.item() * 1.0 / len(labels)
+
 
 def main(args):
     # load and preprocess dataset
@@ -36,9 +38,9 @@ def main(args):
       #Val samples %d
       #Test samples %d""" %
           (n_edges, n_classes,
-              train_mask.sum().item(),
-              val_mask.sum().item(),
-              test_mask.sum().item()))
+           train_mask.sum().item(),
+           val_mask.sum().item(),
+           test_mask.sum().item()))
 
     if args.gpu < 0:
         cuda = False
@@ -72,13 +74,13 @@ def main(args):
                   args.hidden_sizes,
                   n_classes,
                   F.relu,
-                  args.dropout,
+                  args.in_drop,
+                  args.edge_drop,
                   args.alpha,
                   args.k)
 
     if cuda:
         model.cuda()
-    model.reset_parameters()
     loss_fcn = torch.nn.CrossEntropyLoss()
 
     # use optimizer
@@ -105,8 +107,8 @@ def main(args):
 
         acc = evaluate(model, features, labels, val_mask)
         print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-              "ETputs(KTEPS) {:.2f}". format(epoch, np.mean(dur), loss.item(),
-                                             acc, n_edges / np.mean(dur) / 1000))
+              "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
+                                            acc, n_edges / np.mean(dur) / 1000))
 
     print()
     acc = evaluate(model, features, labels, test_mask)
@@ -116,22 +118,24 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='APPNP')
     register_data_args(parser)
-    parser.add_argument("--dropout", type=float, default=0.5,
-            help="dropout probability")
+    parser.add_argument("--in-drop", type=float, default=0.5,
+                        help="input feature dropout")
+    parser.add_argument("--edge-drop", type=float, default=0.5,
+                        help="edge propagation dropout")
     parser.add_argument("--gpu", type=int, default=-1,
-            help="gpu")
+                        help="gpu")
     parser.add_argument("--lr", type=float, default=1e-2,
-            help="learning rate")
+                        help="learning rate")
     parser.add_argument("--n-epochs", type=int, default=200,
-            help="number of training epochs")
+                        help="number of training epochs")
     parser.add_argument("--hidden_sizes", type=int, nargs='+', default=[64],
-            help="hidden unit sizes for appnp")
+                        help="hidden unit sizes for appnp")
     parser.add_argument("--k", type=int, default=10,
-            help="Number of propagation steps")
+                        help="Number of propagation steps")
     parser.add_argument("--alpha", type=float, default=0.1,
-            help="Teleport Probability")
+                        help="Teleport Probability")
     parser.add_argument("--weight-decay", type=float, default=5e-4,
-            help="Weight for L2 loss")
+                        help="Weight for L2 loss")
     args = parser.parse_args()
     print(args)
 

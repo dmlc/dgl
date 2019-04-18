@@ -29,8 +29,4 @@ python train.py --dataset cora --gpu 0
 * citeseer: 0.715 (paper: 0.757)
 * pubmed: 0.793 (paper: 0.797)
 
-Differences from the original implementation 
----------
-
-- This implementation does not perform dropout on adjacency matrices  during propagation step.
-- Experiments were done on dgl datasets (GCN settings) which are different from those used in the original implementation. (discrepancies are detailed in experimental section of the original paper)
+Experiments were done on dgl datasets (GCN settings) which are different from those used in the original implementation. (discrepancies are detailed in experimental section of the original paper)
