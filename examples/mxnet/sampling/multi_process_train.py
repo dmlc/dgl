@@ -8,9 +8,12 @@ from mxnet import gluon
 import dgl
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
+from gcn_ns_sc import gcn_ns_train
+from gcn_cv_sc import gcn_cv_train
+from graphsage_cv import graphsage_cv_train
 
 def main(args):
-    g = dgl.contrib.graph_store.create_graph_store_client(args.graph_name, "shared_mem")
+    g = dgl.contrib.graph_store.create_graph_from_store(args.graph_name, "shared_mem")
     features = g.ndata['features']
     labels = g.ndata['labels']
     train_mask = g.ndata['train_mask']
@@ -44,6 +47,8 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
     register_data_args(parser)
+    parser.add_argument("--model", type=str,
+                        help="select a model. Valid models: gcn_ns, gcn_cv, graphsage_cv")
     parser.add_argument("--graph-name", type=str, default="",
             help="graph name")
     parser.add_argument("--num-feats", type=int, default=100,
