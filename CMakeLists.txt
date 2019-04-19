@@ -57,12 +57,9 @@ else(MSVC)
 endif(MSVC)
 
 # Source file lists
-file(GLOB CORE_SRCS src/graph/*.cc src/graph/network/* src/*.cc src/scheduler/*.cc)
+file(GLOB_RECURSE CORE_SRCS src/**/*.cc src/*.cc src/scheduler/*.cc)
 
-file(GLOB RUNTIME_SRCS src/runtime/*.cc)
-
-
-add_library(dgl SHARED ${CORE_SRCS} ${RUNTIME_SRCS})
+add_library(dgl SHARED ${CORE_SRCS})
 
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
 
