@@ -211,6 +211,14 @@ def context(input):
     """
     pass
 
+def device_type(ctx):
+    """Return a str representing device type"""
+    pass
+
+def device_id(ctx):
+    """Return device index"""
+    pass
+
 def astype(input, ty):
     """Convert the input tensor to the given data type.
 
@@ -392,7 +400,7 @@ def gather_row(data, row_index):
 
 def narrow_row(x, start, stop):
     """Narrow down the tensor along the first dimension.
-    
+
     Parameters
     ----------
     x : Tensor

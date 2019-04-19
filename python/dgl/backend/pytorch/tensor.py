@@ -68,6 +68,15 @@ def ndim(input):
 def context(input):
     return input.device
 
+def device_type(ctx):
+    return ctx.type
+
+def device_id(ctx):
+    if ctx.index is None:
+        return 0
+    else:
+        return ctx.index
+
 def astype(input, ty):
     return input.type(ty)
 
