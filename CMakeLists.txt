@@ -4,6 +4,11 @@
 cmake_minimum_required(VERSION 2.8)
 project(dgl C CXX)
 
+# cmake utils
+include(cmake/util/Util.cmake)
+include(cmake/util/MshadowUtil.cmake)
+include(cmake/util/FindCUDA.cmake)
+
 if(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
   include(${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
 else()
@@ -11,6 +16,12 @@ else()
     include(${CMAKE_CURRENT_SOURCE_DIR}/config.cmake)
   endif()
 endif()
+
+# NOTE: do not modify this file to change option values.
+# You can create a config.cmake at build folder
+# and add set(OPTION VALUE) to override these build options.
+# Alernatively, use cmake -DOPTION=VALUE through command-line.
+dgl_option(USE_CUDA "Build with CUDA" OFF)
 
 # include directories
 include_directories("include")
@@ -58,9 +69,23 @@ else(MSVC)
 endif(MSVC)
 
 # Source file lists
-file(GLOB_RECURSE CORE_SRCS src/**/*.cc src/*.cc src/scheduler/*.cc)
+file(GLOB DGL_SRC
+  src/*.cc
+  src/kernel/*.cc
+  src/kernel/cpu/*.cc
+  src/runtime/*.cc
+)
 
-add_library(dgl SHARED ${CORE_SRCS})
+file(GLOB_RECURSE DGL_SRC_1
+  src/graph/*.cc
+  src/scheduler/*.cc
+)
+
+list(APPEND DGL_SRC ${DGL_SRC_1})
+
+include(cmake/modules/CUDA.cmake)
+
+add_library(dgl SHARED ${DGL_SRC})
 
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
 
