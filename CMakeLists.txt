@@ -16,6 +16,7 @@ endif()
 include_directories("include")
 include_directories("third_party/dlpack/include")
 include_directories("third_party/dmlc-core/include")
+include_directories("third_party/minigun/minigun/")
 
 # initial variables
 set(DGL_LINKER_LIBS "")
