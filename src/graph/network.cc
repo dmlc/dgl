@@ -30,7 +30,7 @@ static void SendData(network::Sender* sender,
                      int recv_id) {
   int64_t send_size = sender->Send(data, size, recv_id);
   if (send_size <= 0) {
-    LOG(FATAL) << "Send message error (size: " << send_size << ")";
+    LOG(FATAL) << "Send error (size: " << send_size << ")";
   }
 }
 
