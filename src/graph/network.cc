@@ -23,6 +23,7 @@ namespace network {
 static char* SEND_BUFFER = nullptr;
 static char* RECV_BUFFER = nullptr;
 
+// Wrapper for Send api
 static void SendData(network::Sender* sender,
                      const char* data,
                      int64_t size,
@@ -33,6 +34,7 @@ static void SendData(network::Sender* sender,
   }
 }
 
+// Wrapper for Recv api
 static void RecvData(network::Receiver* receiver,
                      char* dest,
                      int64_t max_size) {
@@ -94,17 +96,17 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
     network::Sender* sender = static_cast<network::Sender*>(chandle);
     auto csr = ptr->GetInCSR();
     // Write control message
-    *SEND_BUFFER = CNTROL_NODEFLOW;
+    *SEND_BUFFER = CONTROL_NODEFLOW;
     // Serialize nodeflow to data buffer
     int64_t data_size = network::SerializeSampledSubgraph(
-                             SEND_BUFFER+sizeof(CNTROL_NODEFLOW),
+                             SEND_BUFFER+sizeof(CONTROL_NODEFLOW),
                              csr,
                              node_mapping,
                              edge_mapping,
                              layer_offsets,
                              flow_offsets);
     CHECK_GT(data_size, 0);
-    data_size += sizeof(CNTROL_NODEFLOW);
+    data_size += sizeof(CONTROL_NODEFLOW);
     // Send msg via network
     SendData(sender, SEND_BUFFER, data_size, recv_id);
   });
@@ -114,9 +116,9 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendEndSignal")
     CommunicatorHandle chandle = args[0];
     int recv_id = args[1];
     network::Sender* sender = static_cast<network::Sender*>(chandle);
-    *SEND_BUFFER = CNTROL_END_SIGNAL;
+    *SEND_BUFFER = CONTROL_END_SIGNAL;
     // Send msg via network
-    SendData(sender, SEND_BUFFER, sizeof(CNTROL_END_SIGNAL), recv_id);
+    SendData(sender, SEND_BUFFER, sizeof(CONTROL_END_SIGNAL), recv_id);
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
@@ -156,11 +158,11 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
     // Recv data from network
     RecvData(receiver, RECV_BUFFER, kMaxBufferSize);
     int control = *RECV_BUFFER;
-    if (control == CNTROL_NODEFLOW) {
+    if (control == CONTROL_NODEFLOW) {
       NodeFlow* nf = new NodeFlow();
       ImmutableGraph::CSR::Ptr csr;
       // Deserialize nodeflow from recv_data_buffer
-      network::DeserializeSampledSubgraph(RECV_BUFFER+sizeof(CNTROL_NODEFLOW),
+      network::DeserializeSampledSubgraph(RECV_BUFFER+sizeof(CONTROL_NODEFLOW),
                                           &(csr),
                                           &(nf->node_mapping),
                                           &(nf->edge_mapping),
@@ -170,8 +172,8 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
       std::vector<NodeFlow*> subgs(1);
       subgs[0] = nf;
       *rv = WrapVectorReturn(subgs);
-    } else if (control == CNTROL_END_SIGNAL) {
-      *rv = CNTROL_END_SIGNAL;
+    } else if (control == CONTROL_END_SIGNAL) {
+      *rv = CONTROL_END_SIGNAL;
     } else {
       LOG(FATAL) << "Unknow control number: " << control;
     }
