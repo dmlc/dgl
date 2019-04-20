@@ -179,9 +179,21 @@ class BatchedDGLGraph(DGLGraph):
 
         node_attrs = _init_attrs(node_attrs, 'node')
         edge_attrs = _init_attrs(edge_attrs, 'edge')
+        
+        # Handle readonly graphs.
+        readonly_graphs = []
+        for i, g in enumerate(graph_list):
+            if g.is_readonly:
+                readonly_graphs.append(i)
+                g.readonly(False)
 
         # create batched graph index
         batched_index = gi.disjoint_union([g._graph for g in graph_list])
+        
+        # Reset graphs to readonly
+        for i in readonly_graphs:
+            graph_list[i].readonly()
+        
         # create batched node and edge frames
         if len(node_attrs) == 0:
             batched_node_frame = FrameRef(Frame(num_rows=batched_index.number_of_nodes()))

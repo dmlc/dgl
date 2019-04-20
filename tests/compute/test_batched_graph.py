@@ -76,6 +76,27 @@ def test_batch_unbatch1():
     assert F.allclose(t2.ndata['h'], s3.ndata['h'])
     assert F.allclose(t2.edata['h'], s3.edata['h'])
 
+    # Test batching readonly graphs
+    t1.readonly()
+    t2.readonly()
+    t1_was_readonly = t1.is_readonly
+    t2_was_readonly = t2.is_readonly
+    bg = dgl.batch([t1, t2])
+
+    assert t1.is_readonly == t1_was_readonly
+    assert t2.is_readonly == t2_was_readonly
+    assert bg.number_of_nodes() == 10
+    assert bg.number_of_edges() == 8
+    assert bg.batch_size == 2
+    assert bg.batch_num_nodes == [5, 5]
+    assert bg.batch_num_edges == [4, 4]
+
+    s1, s2 = dgl.unbatch(bg)
+    assert F.allclose(t1.ndata['h'], s1.ndata['h'])
+    assert F.allclose(t1.edata['h'], s1.edata['h'])
+    assert F.allclose(t2.ndata['h'], s2.ndata['h'])
+    assert F.allclose(t2.edata['h'], s2.edata['h'])
+
 def test_batch_unbatch2():
     # test setting/getting features after batch
     a = dgl.DGLGraph()
