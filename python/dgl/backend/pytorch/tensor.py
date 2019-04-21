@@ -5,6 +5,9 @@ from distutils.version import LooseVersion
 import torch as th
 from torch.utils import dlpack
 
+from ... import ndarray as nd
+from .. import kernel as knl
+
 TH_VERSION = LooseVersion(th.__version__)
 
 def data_type_dict():
@@ -31,24 +34,12 @@ def get_preferred_sparse_format():
     """
     return "coo"
 
-if TH_VERSION.version[0] == 0:
-    def sparse_matrix(data, index, shape, force_format=False):
-        fmt = index[0]
-        if fmt != 'coo':
-            raise TypeError('Pytorch backend only supports COO format. But got %s.' % fmt)
-        # NOTE: use _sparse_coo_tensor_unsafe to avoid unnecessary boundary check
-        spmat = th._sparse_coo_tensor_unsafe(index[1], data, shape)
-        # No conversion is required.
-        return spmat, None
-else:
-    # VERSION 1.0+
-    def sparse_matrix(data, index, shape, force_format=False):
-        fmt = index[0]
-        if fmt != 'coo':
-            raise TypeError('Pytorch backend only supports COO format. But got %s.' % fmt)
-        spmat = th.sparse_coo_tensor(index[1], data, shape)
-        # No conversion is required.
-        return spmat, None
+def sparse_matrix(data, index, shape, force_format=False):
+    fmt = index[0]
+    if fmt != 'coo':
+        raise TypeError('Pytorch backend only supports COO format. But got %s.' % fmt)
+    spmat = th.sparse_coo_tensor(index[1], data, shape)
+    return spmat, None
 
 def sparse_matrix_indices(spmat):
     return ('coo', spmat._indices())
@@ -144,18 +135,6 @@ def zeros_like(input):
 def ones(shape, dtype, ctx):
     return th.ones(shape, dtype=dtype, device=ctx)
 
-def spmm(x, y):
-    dst, src = x._indices()
-    # scatter index
-    index = dst.view(-1, 1).expand(-1, y.shape[1])
-    # zero tensor to be scatter_add to
-    out = y.new_full((x.shape[0], y.shape[1]), 0)
-    # look up src features and multiply by edge features
-    # Note: using y[src] instead of index_select will lead to terrible
-    #       performance in backward
-    feature = th.index_select(y, 0, src) * x._values().unsqueeze(-1)
-    return out.scatter_add(0, index, feature)
-
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     y = th.zeros(n_segs, *input.shape[1:]).to(input)
     seg_id = seg_id.view((-1,) + (1,) * (input.dim() - 1)).expand_as(input)
@@ -210,3 +189,71 @@ def zerocopy_to_numpy(input):
 
 def zerocopy_from_numpy(np_array):
     return th.from_numpy(np_array)
+
+def to_dgl_ndarray(input):
+    return nd.from_dlpack(dlpack.to_dlpack(input.contiguous()))
+
+def from_dgl_ndarray(input):
+    return dlpack.from_dlpack(input.to_dlpack())
+
+
+class SrcMulEdgeReduce(th.autograd.Function):
+    @staticmethod
+    def forward(ctx, reducer, adj, inv_adj, src_data, edge_data):
+        src_data = to_dgl_ndarray(src_data)
+        edge_data = to_dgl_ndarray(edge_data)
+        out = knl.src_mul_edge_reduce(reducer, "mul", *adj,
+                                      src_data, edge_data)
+        ctx.save_for_backward(reducer, inv_adj, src_data, edge_data)
+        return from_dgl_ndarray(out)
+
+    @staticmethod
+    def backward(ctx, grad_out):
+        reducer, inv_adj, src_data, edge_data = ctx.saved_variable
+
+
+class SrcMulDstReduce(th.autograd.Function):
+    @staticmethod
+    def forward(ctx, reducer, adj, inv_adj, src_data, dst_data):
+        src_data = to_dgl_ndarray(src_data)
+        dst_data = to_dgl_ndarray(dst_data)
+        out = knl.src_mul_dst_reduce(reducer, "mul", *adj,
+                                     src_data, dst_data)
+        ctx.save_for_backward(reducer, inv_adj, src_data, dst_data)
+        return from_dgl_ndarray(out)
+
+    @staticmethod
+    def backward(ctx, grad_out):
+        reducer, inv_adj, src_data, dst_data = ctx.saved_variable
+
+
+class CopySrcReduce(th.autograd.Function):
+    @staticmethod
+    def forward(ctx, reducer, adj, inv_adj, src_data):
+        src_data = to_dgl_ndarray(src_data)
+        out = knl.copy_src_reduce(reducer, *adj, src_data)
+        ctx.save_for_backward(reducer, inv_adj, src_data)
+        return from_dgl_ndarray(out)
+
+    @staticmethod
+    def backward(ctx, grad_out):
+        reducer, inv_adj, src_data = ctx.saved_variable
+
+
+class CopyEdgeReduce(th.autograd.Function):
+    @staticmethod
+    def forward(ctx, reducer, adj, inv_adj, edge_data):
+        edge_data = to_dgl_ndarray(edge_data)
+        out = knl.copy_edge_reduce(reducer, *adj, edge_data)
+        ctx.save_for_backward(reducer, inv_adj, edge_data)
+        return from_dgl_ndarray(out)
+
+    @staticmethod
+    def backward(ctx, grad_out):
+        reducer, inv_adj, edge_data = ctx.saved_variable
+
+
+src_mul_dst_reduce = SrcMulEdgeReduce.apply
+src_mul_dst_reduce = SrcMulDstReduce.apply
+copy_src_reduce = CopySrcReduce.apply
+copy_edge_reduce = CopyEdgeReduce.apply

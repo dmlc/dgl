@@ -563,23 +563,6 @@ def ones(shape, dtype, ctx):
     """
     pass
 
-def spmm(x, y):
-    """Multiply a sparse matrix with a dense matrix.
-
-    Parameters
-    ----------
-    x : SparseTensor
-        The sparse matrix.
-    y : Tensor
-        The dense matrix.
-
-    Returns
-    -------
-    Tensor
-        The result dense matrix.
-    """
-    pass
-
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     """Computes the sum along segments of a tensor.
 
@@ -847,6 +830,117 @@ def zerocopy_from_numpy(np_array):
     -------
     Tensor
         A framework-specific tensor.
+    """
+    pass
+
+###############################################################################
+# Custom Operators for graph level computations.
+
+# Note: These operators are supposed to be implemented using DGL-provided
+# kernels (see kernel.py), and plug into tensor framework using custom op
+# extensions.
+
+def src_mul_edge_reduce(reducer, adj, inv_adj, src_data, edge_data):
+    """Multiply source node features with edge features, and perform reduction
+    on destination nodes optionally.
+
+    Parameters
+    ----------
+    reducer: str
+        Reduction to be done: can be 'sum', 'max', 'mean', 'min', 'none' (no
+        reduction)
+    adj: tuple of three NDArray
+        adjacency matrix represented by a tuple of three NDArray:
+        (indptr, indices, eids), each row represents a source node
+    inv_adj: tuple of three NDArray
+        inverse adjacency matrix represented by a tuple of three NDArray:
+        (indptr, indices, eids), each row represents a destination node
+    src_data: Tensor
+        Source node feature tensor
+    edge_data: Tensor
+        Edge feature tensor
+
+    Returns
+    -------
+    Tensor
+        The result.
+    """
+    pass
+
+def src_mul_dst_reduce(reducer, adj, inv_adj, src_data, dst_data):
+    """Multiply source node features with destination node features, and
+    perform reduction on destination nodes optionally.
+
+    Parameters
+    ----------
+    reducer: str
+        Reduction to be done: can be 'sum', 'max', 'mean', 'min', 'none' (no
+        reduction)
+    adj: tuple of three NDArray
+        adjacency matrix represented by a tuple of three NDArray:
+        (indptr, indices, eids), each row represents a source node
+    inv_adj: tuple of three NDArray
+        inverse adjacency matrix represented by a tuple of three NDArray:
+        (indptr, indices, eids), each row represents a destination node
+    src_data: Tensor
+        Source node feature tensor
+    dst_data: Tensor
+        Destination node feature tensor
+
+    Returns
+    -------
+    Tensor
+        The result.
+    """
+    pass
+
+def copy_src_reduce(reducer, adj, inv_adj, src_data):
+    """Copy source node features to edge, and perform reduction on destination
+    nodes optionally.
+
+    Parameters
+    ----------
+    reducer: str
+        Reduction to be done: can be 'sum', 'max', 'mean', 'min', 'none' (no
+        reduction)
+    adj: tuple of three NDArray
+        adjacency matrix represented by a tuple of three NDArray:
+        (indptr, indices, eids), each row represents a source node
+    inv_adj: tuple of three NDArray
+        inverse adjacency matrix represented by a tuple of three NDArray:
+        (indptr, indices, eids), each row represents a destination node
+    src_data: Tensor
+        Source node feature tensor
+
+    Returns
+    -------
+    Tensor
+        The result.
+    """
+    pass
+
+def copy_edge_reduce(reducer, adj, inv_adj, edge_data):
+    """Copy source edge features, and perform reduction on destination nodes
+    optionally.
+
+    Parameters
+    ----------
+    reducer: str
+        Reduction to be done: can be 'sum', 'max', 'mean', 'min', 'none' (no
+        reduction)
+    adj: tuple of three NDArray
+        adjacency matrix represented by a tuple of three NDArray:
+        (indptr, indices, eids), each row represents a source node
+    inv_adj: tuple of three NDArray
+        inverse adjacency matrix represented by a tuple of three NDArray:
+        (indptr, indices, eids), each row represents a destination node
+    edge_data: Tensor
+        Edge feature tensor
+
+    Returns
+    -------
+    Tensor
+        The result.
     """
     pass
 
