@@ -194,7 +194,7 @@ def main(args):
     for epoch in range(args.n_epochs):
         idx = 0
         for nf in sampler:
-            print("epoch: %d, subgraph: %d", %(epoch, idx))
+            print("epoch: %d, subgraph: %d" %(epoch, idx))
             idx += 1
             nf.copy_from_parent()
             # forward
