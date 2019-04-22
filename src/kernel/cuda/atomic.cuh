@@ -18,7 +18,7 @@ template <> struct Code<8> {
 
 // Helper class for converting to/from atomicCAS compatible types.
 template <typename T> struct Cast {
-  typedef Code<sizeof(T)>::Type Type;
+  typedef typename Code<sizeof(T)>::Type Type;
   static __device__ __forceinline__ Type Encode(T val) {
     return static_cast<Type>(val);
   }
@@ -50,7 +50,7 @@ template <> struct Cast<double> {
 #define DEFINE_ATOMIC(NAME) \
   template <typename T>                                          \
   __device__ __forceinline__ T Atomic##NAME##(T* addr, T val) {  \
-    typedef Cast<T>::Type CT;                                    \
+    typedef typename Cast<T>::Type CT;                           \
     CT* addr_as_ui = reinterpret_cast<CT*>(addr);                \
     CT old = *addr_as_ui;                                        \
     CT assumed = old;                                            \

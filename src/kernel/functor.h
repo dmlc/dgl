@@ -14,54 +14,27 @@ struct Nop {
   }
 };
 
-// Read src node data
-template <typename DType, typename ReadOp>
-struct ReadSrc {
-  static DGLDEVICE DGLINLINE DType Call(
-      DType* src_data, DType* edge_data, DType* dst_data) {
-    return ReadOp::Call(src_data);
-  }
-};
-
-// Read edge data
-template <typename DType, typename ReadOp>
-struct ReadEdge {
-  static DGLDEVICE DGLINLINE DType Call(
-      DType* src_data, DType* edge_data, DType* dst_data) {
-    return ReadOp::Call(edge_data);
-  }
-};
-
-// Read dst node data
-template <typename DType, typename ReadOp>
-struct ReadDst {
-  static DGLDEVICE DGLINLINE DType Call(
-      DType* src_data, DType* edge_data, DType* dst_data) {
-    return ReadOp::Call(dst_data);
-  }
-};
-
-// Select src node id
-template <typename IdxType>
+// Select src
 struct SelectSrc {
-  static DGLDEVICE DGLINLINE IdxType Call(IdxType src, IdxType eid, IdxType dst) {
+  template <typename T>
+  static DGLDEVICE DGLINLINE T Call(T src, T edge, T dst) {
     return src;
   }
 };
 
-// Select dst node id
-template <typename IdxType>
+// Select dst
 struct SelectDst {
-  static DGLDEVICE DGLINLINE IdxType Call(IdxType src, IdxType eid, IdxType dst) {
+  template <typename T>
+  static DGLDEVICE DGLINLINE T Call(T src, T edge, T dst) {
     return dst;
   }
 };
 
-// Select dst node id
-template <typename IdxType>
+// Select edge
 struct SelectEdge {
-  static DGLDEVICE DGLINLINE IdxType Call(IdxType src, IdxType eid, IdxType dst) {
-    return eid;
+  template <typename T>
+  static DGLDEVICE DGLINLINE T Call(T src, T edge, T dst) {
+    return edge;
   }
 };
 
@@ -74,73 +47,11 @@ struct DirectId {
 };
 
 // id mapped by another array
-template <typename IdxType, typename ReadOp>
+template <int XPU, typename IdxType>
 struct IndirectId {
-  static DGLDEVICE DGLINLINE IdxType Call(IdxType id, IdxType* shuffle_ids) {
-    return ReadOp::Call(shuffle_ids + id);
-  }
+  static DGLDEVICE DGLINLINE IdxType Call(IdxType id, IdxType* shuffle_ids);
 };
 
-
-// functors for binary operation
-template <typename DType>
-struct BinaryAdd {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs + rhs;
-  }
-};
-
-template <typename DType>
-struct BinaryMul {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs * rhs;
-  }
-};
-
-template <typename DType>
-struct BinarySub {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs - rhs;
-  }
-};
-
-template <typename DType>
-struct BinaryDiv {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs / rhs;
-  }
-};
-
-template <typename DType>
-struct BinaryUseLhs {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs;
-  }
-};
-
-template <typename DType>
-struct BinaryUseRhs {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return rhs;
-  }
-};
-
-#define BINARY_OP_SWITCH(val, DType, OpType, ...)   \
-  if (val == "add") {                               \
-    typedef BinaryAdd<DType> OpType;                \
-    {__VA_ARGS__}                                   \
-  } else if (val == "sub") {                        \
-    typedef BinarySub<DType> OpType;                \
-    {__VA_ARGS__}                                   \
-  } else if (val == "mul") {                        \
-    typedef BinaryMul<DType> OpType;                \
-    {__VA_ARGS__}                                   \
-  } else if (val == "div") {                        \
-    typedef BinaryDiv<DType> OpType;                \
-    {__VA_ARGS__}                                   \
-  } else {                                          \
-    LOG(FATAL) << "Unsupported binary op: " << val; \
-  }
 
 }  // namespace kernel
 }  // namespace dgl

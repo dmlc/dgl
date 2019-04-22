@@ -1,7 +1,7 @@
 #ifndef DGL_KERNEL_CUDA_FUNCTOR_CUH_
 #define DGL_KERNEL_CUDA_FUNCTOR_CUH_
 
-#include "../binary_elewise.h"
+#include "../binary_reduce.h"
 #include "./atomic.cuh"
 
 namespace dgl {
@@ -20,64 +20,58 @@ struct LDGReader {
   }
 };
 
-// Direct write
-template <typename DType>
-struct StoreWriter {
-  static __device__ __forceinline__ void Call(DType* addr, DType val) {
-    *addr = val;
-  }
-};
+}  // namespace cuda
 
-// Reducer
+// Reducer functor specialization
 template <typename DType>
-struct AtomicAddWriter {
+struct ReduceSum<kDLGPU, DType> {
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
     AtomicAdd(addr, val);
   }
 };
 
 template <typename DType>
-struct AtomicMaxWriter {
+struct ReduceMax<kDLGPU, DType> {
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
     AtomicMax(addr, val);
   }
 };
 
 template <typename DType>
-struct AtomicMinWriter {
+struct ReduceMin<kDLGPU, DType> {
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
     AtomicMin(addr, val);
   }
 };
 
 template <typename DType>
-struct AtomicMulWriter {
+struct ReduceMean<kDLGPU, DType> {
+  static __device__ __forceinline__ void Call(DType* addr, DType val) {
+    AtomicAdd(addr, val);
+  }
+};
+
+template <typename DType>
+struct ReduceProd<kDLGPU, DType> {
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
     AtomicMul(addr, val);
   }
 };
 
-#define REDUCER_SWITCH(val, DType, RedType, ...)   \
-  if (val == binary_op::kReduceSum) {              \
-    typedef AtomicAddWriter<DType> RedType;        \
-    {__VA_ARGS__}                                  \
-  } else if (val == binary_op::kReduceMax) {       \
-    typedef AtomicMaxWriter<DType> RedType;        \
-    {__VA_ARGS__}                                  \
-  } else if (val == binary_op::kReduceMin) {       \
-    typedef AtomicMinWriter<DType> RedType;        \
-    {__VA_ARGS__}                                  \
-  } else if (val == binary_op::kReduceProd) {      \
-    typedef AtomicMulWriter<DType> RedType;        \
-    {__VA_ARGS__}                                  \
-  } else if (val == binary_op::kReduceMean) {      \
-    typedef AtomicAddWriter<DType> RedType;        \
-    {__VA_ARGS__}                                  \
-  } else {                                         \
-    LOG(FATAL) << "Unsupported reducer: " << val;  \
+template <typename DType>
+struct ReduceNone<kDLGPU, DType> {
+  static __device__ __forceinline__ void Call(DType* addr, DType val) {
+    *addr = val;
   }
+};
 
-}  // namespace cuda
+template <typename IdxType>
+struct IndirectId<kDLGPU, IdxType> {
+  static __device__ __forceinline__ IdxType Call(IdxType id, IdxType* shuffle_ids) {
+    return LDGReader<IdxType>::Call(shuffle_ids + id);
+  }
+};
+
 }  // namespace kernel
 }  // namespace dgl
 

@@ -3,9 +3,10 @@
  * \file kernel/kernel_apis.cc
  * \brief kernel APIs for graph computation
  */
-#include "./binary_elewise.h"
-#include "./common.h"
 #include "../c_api_common.h"
+#include "./binary_reduce.h"
+#include "./common.h"
+#include "./functor.h"
 
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;
@@ -79,10 +80,31 @@ NDArray SrcOpEdgeReduce(
     << ShapeString(src_data) << " and " << ShapeString(edge_data);
   const DLContext& ctx = indptr->ctx;
   const DLDataType& dtype = src_data->dtype;
+  // Allocate output
+  const auto& out_shape = BinaryElewiseInferShape(reducer, indptr,
+      indices, src_data, edge_data);
+  NDArray out_data = NDArray::Empty(out_shape, dtype, ctx);
+  NDArray dummy;  // dummy dst data
   DGL_XPU_SWITCH(ctx.device_type, XPU, {
     DGL_DTYPE_SWITCH(dtype, DType, {
+      REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
+        BINARY_OP_SWITCH(binary_op, DType, BinaryOp, {
+          if (edge_ids->ndim == 0) {
+            BinaryReduceExecutor<XPU, DType, DirectId<int64_t>,
+                                 SelectDst, SelectSrc, SelectEdge,
+                                 BinaryOp, Reducer>::Run(
+              indptr, indices, edge_ids, src_data, edge_data, dummy, out_data);
+          } else {
+            BinaryReduceExecutor<XPU, DType, IndirectId<XPU, int64_t>,
+                                 SelectDst, SelectSrc, SelectEdge,
+                                 BinaryOp, Reducer>::Run(
+              indptr, indices, edge_ids, src_data, edge_data, dummy, out_data);
+          }
+        });
+      });
     });
   });
+  return out_data;
 }
 
 DGL_REGISTER_GLOBAL("backend.kernel._CAPI_DGLKernelSrcMulEdgeReduce")
