@@ -68,7 +68,7 @@ struct ReduceNone<kDLGPU, DType> {
 template <typename IdxType>
 struct IndirectId<kDLGPU, IdxType> {
   static __device__ __forceinline__ IdxType Call(IdxType id, IdxType* shuffle_ids) {
-    return LDGReader<IdxType>::Call(shuffle_ids + id);
+    return cuda::LDGReader<IdxType>::Call(shuffle_ids + id);
   }
 };
 

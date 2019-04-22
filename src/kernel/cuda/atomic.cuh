@@ -49,7 +49,7 @@ template <> struct Cast<double> {
 
 #define DEFINE_ATOMIC(NAME) \
   template <typename T>                                          \
-  __device__ __forceinline__ T Atomic##NAME##(T* addr, T val) {  \
+  __device__ __forceinline__ T Atomic##NAME(T* addr, T val) {    \
     typedef typename Cast<T>::Type CT;                           \
     CT* addr_as_ui = reinterpret_cast<CT*>(addr);                \
     CT old = *addr_as_ui;                                        \

@@ -87,7 +87,7 @@ struct BinaryReduceExecutor<kDLGPU, DType,
     typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
     typedef cuda::FunctorsTempl<DType, OutIdGetter, LeftIdGetter, RightIdGetter,
             OutSelector, LeftSelector, RightSelector, BinaryOp, Reducer> Functors;
-    typedef BinaryReduce<DType, Functors> BinaryReduceUDF;
+    typedef cuda::BinaryReduce<DType, Functors> BinaryReduceUDF;
     // TODO(minjie): allocator
     minigun::advance::Advance<kDLGPU, Config, cuda::GData<DType>, BinaryReduceUDF>(
         rtcfg, csr, d_gdata, IntArray1D(), IntArray1D());

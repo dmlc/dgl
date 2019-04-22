@@ -51,7 +51,7 @@ struct BinaryReduce {
       tx += stride_x;
     }
   }
-}
+};
 
 // functors
 template <typename DType,
@@ -61,15 +61,15 @@ template <typename DType,
 struct FunctorsTempl {
   static __device__ __forceinline__ int64_t SelectOut(
       int64_t src, int64_t edge, int64_t dst) {
-    return OutSelector::Call(src, eid, dst);
+    return OutSelector::Call(src, edge, dst);
   }
   static __device__ __forceinline__ int64_t SelectLeft(
       int64_t src, int64_t edge, int64_t dst) {
-    return LeftSelector::Call(src, eid, dst);
+    return LeftSelector::Call(src, edge, dst);
   }
   static __device__ __forceinline__ int64_t SelectRight(
       int64_t src, int64_t edge, int64_t dst) {
-    return RightSelector::Call(src, eid, dst);
+    return RightSelector::Call(src, edge, dst);
   }
   static __device__ __forceinline__ DType Call(DType lhs, DType rhs) {
     return BinaryOp::Call(lhs, rhs);
@@ -80,14 +80,14 @@ struct FunctorsTempl {
   static __device__ __forceinline__ void Write(DType* addr, DType val) {
     Reducer::Call(addr, val);
   }
-  static __device__ __forceinline__ int64_t MapLeft(int64_t eid, int64_t* id_map) {
-    return LeftIdGetter::Call(eid, id_map);
+  static __device__ __forceinline__ int64_t MapLeft(int64_t id, int64_t* id_map) {
+    return LeftIdGetter::Call(id, id_map);
   }
-  static __device__ __forceinline__ int64_t MapRight(int64_t eid, int64_t* id_map) {
-    return RightIdGetter::Call(eid, id_map);
+  static __device__ __forceinline__ int64_t MapRight(int64_t id, int64_t* id_map) {
+    return RightIdGetter::Call(id, id_map);
   }
-  static __device__ __forceinline__ int64_t MapOut(int64_t eid, int64_t* id_map) {
-    return OutIdGetter::Call(eid, id_map);
+  static __device__ __forceinline__ int64_t MapOut(int64_t id, int64_t* id_map) {
+    return OutIdGetter::Call(id, id_map);
   }
 };
 
