@@ -192,10 +192,9 @@ def main(args):
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
-        print('epoch: %d' % epoch)
         idx = 0
         for nf in sampler:
-            print(idx)
+            print("epoch: %d, subgraph: %d", %(epoch, idx))
             idx += 1
             nf.copy_from_parent()
             # forward
