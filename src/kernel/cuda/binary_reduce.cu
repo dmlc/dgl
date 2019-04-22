@@ -2,6 +2,7 @@
 #include <minigun/minigun.h>
 #include <dgl/runtime/device_api.h>
 
+#include "../../runtime/cuda/cuda_common.h"
 #include "../binary_reduce.h"
 #include "./binary_reduce.cuh"
 
@@ -16,6 +17,18 @@ int64_t ComputeXLength(NDArray feat_array) {
   int64_t ret = 1;
   for (int i = 1; i < feat_array->ndim; ++i) {
     ret *= feat_array->shape[i];
+  }
+  return ret;
+}
+
+// Find the number of threads that is:
+//  - power of two
+//  - smaller or equal to dim
+//  - smaller or equal to max_nthrs
+int FindNumThreads(int dim, int max_nthrs) {
+  int ret = max_nthrs;
+  while (ret > dim) {
+    ret = ret >> 1;
   }
   return ret;
 }
@@ -36,6 +49,7 @@ struct BinaryReduceExecutor<kDLGPU, DType, EidGetter,
                   NDArray out_data) {
     // device
     auto device = runtime::DeviceAPI::Get(out_data->ctx);
+    auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
     // Graph
     Csr csr;
     csr.row_offsets.data = static_cast<int64_t*>(indptr->data);
@@ -59,6 +73,17 @@ struct BinaryReduceExecutor<kDLGPU, DType, EidGetter,
     // call advance
     minigun::advance::RuntimeConfig rtcfg;
     rtcfg.ctx = out_data->ctx;
+    rtcfg.stream = thr_entry->stream;
+    const int nt = FindNumThreads(x_len, 64);
+    rtcfg.data_num_threads = nt;
+    // XXX(minjie): hard-code to let each thread compute two elements to increase
+    //              instruction level parallelism
+    rtcfg.data_num_blocks = (x_len + (nt * 2) - 1) / (nt * 2);
+
+    typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
+    minigun::advance::Advance<kDLGPU, Config, cuda::GData<DType>, Functor, Alloc>(
+        rtcfg, csr, d_gdata, IntArray1D(), IntArray1D());
+
     // free device GData
     CUDA_CALL(cudaFree(d_gdata));
   }
