@@ -1,5 +1,8 @@
-# One has to manually import dgl.data; fixes #125
-#from . import data
+"""DGL root package."""
+# Windows compatibility
+# This initializes Winsock and performs cleanup at termination as required
+import socket
+
 from . import function
 from . import nn
 from . import contrib
@@ -12,7 +15,8 @@ from .base import ALL
 from .backend import load_backend
 from .batched_graph import *
 from .graph import DGLGraph
-from .subgraph import DGLSubGraph
+from .nodeflow import *
 from .traversal import *
+from .transform import *
 from .propagate import *
 from .udf import NodeBatch, EdgeBatch

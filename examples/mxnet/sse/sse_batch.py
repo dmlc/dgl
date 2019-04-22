@@ -16,7 +16,6 @@ from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 
 def gcn_msg(edges):
-    # TODO should we use concat?
     return {'m': mx.nd.concat(edges.src['in'], edges.src['h'], dim=1)}
 
 def gcn_reduce(nodes):
@@ -26,7 +25,6 @@ class NodeUpdate(gluon.Block):
     def __init__(self, out_feats, activation=None, alpha=0.1, **kwargs):
         super(NodeUpdate, self).__init__(**kwargs)
         self.linear1 = gluon.nn.Dense(out_feats, activation=activation)
-        # TODO what is the dimension here?
         self.linear2 = gluon.nn.Dense(out_feats)
         self.alpha = alpha
 
@@ -43,48 +41,7 @@ class DGLNodeUpdate(gluon.Block):
     def forward(self, node):
         return {'h1': self.update(node.data['in'], node.data['h'], node.data['accum'])}
 
-class SSEUpdateHidden(gluon.Block):
-    def __init__(self,
-                 n_hidden,
-                 dropout,
-                 activation,
-                 **kwargs):
-        super(SSEUpdateHidden, self).__init__(**kwargs)
-        with self.name_scope():
-            self.layer = NodeUpdate(n_hidden, activation)
-        self.dropout = dropout
-        self.n_hidden = n_hidden
-
-    def forward(self, g, vertices):
-        if vertices is None:
-            deg = mx.nd.expand_dims(g.in_degrees(), 1).astype(np.float32)
-            feat = g.get_n_repr()['in']
-            cat = mx.nd.concat(feat, g.ndata['h'], dim=1)
-            accum = mx.nd.dot(g.adjacency_matrix(), cat) / deg
-            batch_size = 100000
-            num_batches = int(math.ceil(g.number_of_nodes() / batch_size))
-            ret = mx.nd.empty(shape=(feat.shape[0], self.n_hidden), ctx=feat.context)
-            for i in range(num_batches):
-                vs = mx.nd.arange(i * batch_size, min((i + 1) * batch_size, g.number_of_nodes()), dtype=np.int64)
-                ret[vs] = self.layer(mx.nd.take(feat, vs),
-                                     mx.nd.take(g.ndata['h'], vs),
-                                     mx.nd.take(accum, vs))
-            return ret
-        else:
-            deg = mx.nd.expand_dims(g.in_degrees(vertices), 1).astype(np.float32)
-            # We don't need dropout for inference.
-            if self.dropout:
-                # TODO here we apply dropout on all vertex representation.
-                g.ndata['h'] = mx.nd.Dropout(g.ndata['h'], p=self.dropout)
-            feat = g.get_n_repr()['in']
-            cat = mx.nd.concat(feat, g.ndata['h'], dim=1)
-            slices = mx.nd.take(g.adjacency_matrix(), vertices).as_in_context(cat.context)
-            accum = mx.nd.dot(slices, cat) / deg.as_in_context(cat.context)
-            vertices = vertices.as_in_context(g.ndata['in'].context)
-            return self.layer(mx.nd.take(feat, vertices),
-                              mx.nd.take(g.ndata['h'], vertices), accum)
-
-class DGLSSEUpdateHidden(gluon.Block):
+class DGLSSEUpdateHiddenInfer(gluon.Block):
     def __init__(self,
                  n_hidden,
                  activation,
@@ -92,7 +49,7 @@ class DGLSSEUpdateHidden(gluon.Block):
                  use_spmv,
                  inference,
                  **kwargs):
-        super(DGLSSEUpdateHidden, self).__init__(**kwargs)
+        super(DGLSSEUpdateHiddenInfer, self).__init__(**kwargs)
         with self.name_scope():
             self.layer = DGLNodeUpdate(NodeUpdate(n_hidden, activation))
         self.dropout = dropout
@@ -125,7 +82,6 @@ class DGLSSEUpdateHidden(gluon.Block):
         else:
             # We don't need dropout for inference.
             if self.dropout:
-                # TODO here we apply dropout on all vertex representation.
                 g.ndata['h'] = mx.nd.Dropout(g.ndata['h'], p=self.dropout)
             g.update_all(msg_func, reduce_func, None)
             ctx = g.ndata['accum'].context
@@ -136,6 +92,47 @@ class DGLSSEUpdateHidden(gluon.Block):
             g.apply_nodes(self.layer, vertices, inplace=self.inference)
             g.ndata.pop('accum')
             return mx.nd.take(g.ndata['h1'], vertices.as_in_context(ctx))
+
+class DGLSSEUpdateHiddenTrain(gluon.Block):
+    def __init__(self,
+                 n_hidden,
+                 activation,
+                 dropout,
+                 use_spmv,
+                 inference,
+                 **kwargs):
+        super(DGLSSEUpdateHiddenTrain, self).__init__(**kwargs)
+        with self.name_scope():
+            self.update = DGLNodeUpdate(NodeUpdate(n_hidden, activation))
+        self.dropout = dropout
+        self.use_spmv = use_spmv
+        self.inference = inference
+
+    def forward(self, subg, vertices):
+        assert vertices is not None
+        if self.use_spmv:
+            feat = subg.layers[0].data['in']
+            subg.layers[0].data['cat'] = mx.nd.concat(feat, subg.layers[0].data['h'],
+                                                      dim=1)
+
+            msg_func = fn.copy_src(src='cat', out='m')
+            reduce_func = fn.sum(msg='m', out='accum')
+        else:
+            msg_func = gcn_msg
+            reduce_func = gcn_reduce
+        deg = mx.nd.expand_dims(subg.layer_in_degree(1), 1).astype(np.float32)
+        # We don't need dropout for inference.
+        if self.dropout:
+            subg.layers[0].data['h'] = mx.nd.Dropout(subg.layers[0].data['h'], p=self.dropout)
+        subg.block_compute(0, msg_func, reduce_func, None)
+        ctx = subg.layers[1].data['accum'].context
+        if self.use_spmv:
+            subg.layers[0].data.pop('cat')
+            deg = deg.as_in_context(ctx)
+            subg.layers[1].data['accum'] = subg.layers[1].data['accum'] / deg
+        subg.apply_layer(1, self.update, inplace=self.inference)
+        subg.layers[1].data.pop('accum')
+        return subg.layers[1].data['h1']
 
 class SSEPredict(gluon.Block):
     def __init__(self, update_hidden, out_feats, dropout, **kwargs):
@@ -153,17 +150,10 @@ class SSEPredict(gluon.Block):
         return self.linear2(self.linear1(hidden))
 
 def copy_to_gpu(subg, ctx):
-    frame = subg.ndata
-    for key in frame:
-        subg.ndata[key] = frame[key].as_in_context(ctx)
-
-class CachedSubgraph(object):
-    def __init__(self, subg, seeds):
-        # We can't cache the input subgraph because it contains node frames
-        # and data frames.
-        self.subg = dgl.DGLSubGraph(subg._parent, subg._parent_nid, subg._parent_eid,
-                                subg._graph)
-        self.seeds = seeds
+    for i in range(subg.num_layers):
+        frame = subg.layers[i].data
+        for key in frame:
+            subg.layers[i].data[key] = frame[key].as_in_context(ctx)
 
 class CachedSubgraphLoader(object):
     def __init__(self, loader, shuffle):
@@ -182,14 +172,17 @@ class CachedSubgraphLoader(object):
 
     def __next__(self):
         if len(self._subgraphs) > 0:
-            s = self._subgraphs.pop(0)
-            subg, seeds = s.subg, s.seeds
+            subg = self._subgraphs.pop(0)
         elif self._gen_subgraph:
-            subg, seeds = self._loader.__next__()
+            subg = self._loader.__next__()
         else:
             raise StopIteration
-        self._cached.append(CachedSubgraph(subg, seeds))
-        return subg, seeds
+
+        # We can't cache the input subgraph because it contains node frames
+        # and data frames.
+        subg = dgl.NodeFlow(subg._parent, subg._graph)
+        self._cached.append(subg)
+        return subg
 
 def main(args, data):
     if isinstance(data.features, mx.nd.NDArray):
@@ -200,9 +193,14 @@ def main(args, data):
         labels = data.labels
     else:
         labels = mx.nd.array(data.labels)
-    train_size = len(labels) * args.train_percent
-    train_vs = mx.nd.arange(0, train_size, dtype='int64')
-    eval_vs = mx.nd.arange(train_size, len(labels), dtype='int64')
+    if data.train_mask is not None:
+        train_vs = mx.nd.array(np.nonzero(data.train_mask)[0], dtype='int64')
+        eval_vs = mx.nd.array(np.nonzero(data.train_mask == 0)[0], dtype='int64')
+    else:
+        train_size = len(labels) * args.train_percent
+        train_vs = mx.nd.arange(0, train_size, dtype='int64')
+        eval_vs = mx.nd.arange(train_size, len(labels), dtype='int64')
+
     print("train size: " + str(len(train_vs)))
     print("eval size: " + str(len(eval_vs)))
     eval_labels = mx.nd.take(labels, eval_vs)
@@ -219,17 +217,12 @@ def main(args, data):
     g.ndata['h'] = mx.nd.random.normal(shape=(g.number_of_nodes(), args.n_hidden),
             ctx=mx.cpu(0))
 
-    update_hidden_infer = DGLSSEUpdateHidden(args.n_hidden, 'relu',
-                                             args.update_dropout, args.use_spmv,
-                                             inference=True, prefix='sse')
-    update_hidden_train = DGLSSEUpdateHidden(args.n_hidden, 'relu',
-                                             args.update_dropout, args.use_spmv,
-                                             inference=False, prefix='sse')
-    if not args.dgl:
-        update_hidden_infer = SSEUpdateHidden(args.n_hidden, args.update_dropout, 'relu',
-                                              prefix='sse')
-        update_hidden_train = SSEUpdateHidden(args.n_hidden, args.update_dropout, 'relu',
-                                              prefix='sse')
+    update_hidden_infer = DGLSSEUpdateHiddenInfer(args.n_hidden, 'relu',
+                                                  args.update_dropout, args.use_spmv,
+                                                  inference=True, prefix='sse')
+    update_hidden_train = DGLSSEUpdateHiddenTrain(args.n_hidden, 'relu',
+                                                  args.update_dropout, args.use_spmv,
+                                                  inference=False, prefix='sse')
 
     model_train = SSEPredict(update_hidden_train, args.n_hidden, args.predict_dropout, prefix='app')
     model_infer = SSEPredict(update_hidden_infer, args.n_hidden, args.predict_dropout, prefix='app')
@@ -263,7 +256,7 @@ def main(args, data):
     dur = []
     sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, neigh_expand,
             neighbor_type='in', num_workers=args.num_parallel_subgraphs, seed_nodes=train_vs,
-            shuffle=True, return_seed_id=True)
+            shuffle=True)
     if args.cache_subgraph:
         sampler = CachedSubgraphLoader(sampler, shuffle=True)
     for epoch in range(args.n_epochs):
@@ -272,9 +265,9 @@ def main(args, data):
         i = 0
         num_batches = len(train_vs) / args.batch_size
         start1 = time.time()
-        for subg, aux_infos in sampler:
-            seeds = aux_infos['seeds']
-            subg_seeds = subg.map_to_subgraph_nid(seeds)
+        for subg in sampler:
+            seeds = subg.layer_parent_nid(-1)
+            subg_seeds = subg.layer_nid(-1)
             subg.copy_from_parent()
 
             losses = []
@@ -305,22 +298,20 @@ def main(args, data):
                         + " subgraphs takes " + str(end1 - start1))
                 start1 = end1
 
-            if i > num_batches / 3:
-                break
-
         if args.cache_subgraph:
             sampler.restart()
         else:
             sampler = dgl.contrib.sampling.NeighborSampler(g, args.batch_size, neigh_expand,
                                                            neighbor_type='in',
                                                            num_workers=args.num_parallel_subgraphs,
-                                                           seed_nodes=train_vs, shuffle=True,
-                                                           return_seed_id=True)
+                                                           seed_nodes=train_vs, shuffle=True)
 
-        # prediction.
+        # test set accuracy
         logits = model_infer(g, eval_vs)
-        eval_loss = mx.nd.softmax_cross_entropy(logits, eval_labels)
-        eval_loss = eval_loss.asnumpy()[0]
+        y_bar = mx.nd.argmax(logits, axis=1)
+        y = eval_labels
+        accuracy = mx.nd.sum(y_bar == y) / len(y)
+        accuracy = accuracy.asnumpy()[0]
 
         # update the inference model.
         infer_params = model_infer.collect_params()
@@ -334,8 +325,8 @@ def main(args, data):
         rets.append(all_hidden)
 
         dur.append(time.time() - t0)
-        print("Epoch {:05d} | Train Loss {:.4f} | Eval Loss {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
-            epoch, train_loss, eval_loss, np.mean(dur), n_edges / np.mean(dur) / 1000))
+        print("Epoch {:05d} | Train Loss {:.4f} | Test Accuracy {:.4f} | Time(s) {:.4f} | ETputs(KTEPS) {:.2f}".format(
+            epoch, train_loss, accuracy, np.mean(dur), n_edges / np.mean(dur) / 1000))
 
     return rets
 
@@ -361,6 +352,7 @@ class GraphData:
         self.graph = MXNetGraph(csr)
         self.features = mx.nd.random.normal(shape=(csr.shape[0], num_feats))
         self.labels = mx.nd.floor(mx.nd.random.uniform(low=0, high=10, shape=(csr.shape[0])))
+        self.train_mask = None
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
@@ -389,7 +381,6 @@ if __name__ == '__main__':
             help="the percentage of data used for training")
     parser.add_argument("--use-spmv", action="store_true",
             help="use SpMV for faster speed.")
-    parser.add_argument("--dgl", action="store_true")
     parser.add_argument("--cache-subgraph", default=False, action="store_false")
     parser.add_argument("--num-parallel-subgraphs", type=int, default=1,
             help="the number of subgraphs to construct in parallel.")

@@ -1,10 +1,12 @@
 """Utility module."""
 from __future__ import absolute_import, division
 
-from collections import Mapping, Iterable
+import ctypes
+from collections.abc import Mapping, Iterable
 from functools import wraps
 import numpy as np
 
+from . import _api_internal
 from .base import DGLError
 from . import backend as F
 from . import ndarray as nd
@@ -15,9 +17,10 @@ class Index(object):
         self._initialize_data(data)
 
     def _initialize_data(self, data):
-        self._pydata = None   # a numpy type data or a slice
+        self._pydata = None   # a numpy type data
         self._user_tensor_data = dict()  # dictionary of user tensors
         self._dgl_tensor_data = None  # a dgl ndarray
+        self._slice_data = None # a slice type data
         self._dispatch(data)
 
     def __iter__(self):
@@ -25,12 +28,9 @@ class Index(object):
             yield int(i)
 
     def __len__(self):
-        if self._pydata is not None and isinstance(self._pydata, slice):
-            slc = self._pydata
-            if slc.step is None:
-                return slc.stop - slc.start
-            else:
-                return (slc.stop - slc.start) // slc.step
+        if self._slice_data is not None:
+            slc = self._slice_data
+            return slc.stop - slc.start
         elif self._pydata is not None:
             return len(self._pydata)
         elif len(self._user_tensor_data) > 0:
@@ -45,7 +45,7 @@ class Index(object):
     def _dispatch(self, data):
         """Store data based on its type."""
         if F.is_tensor(data):
-            if not (F.dtype(data) == F.int64):
+            if F.dtype(data) != F.int64:
                 raise DGLError('Index data must be an int64 vector, but got: %s' % str(data))
             if len(F.shape(data)) > 1:
                 raise DGLError('Index data must be 1D int64 vector, but got: %s' % str(data))
@@ -60,33 +60,33 @@ class Index(object):
             self._dgl_tensor_data = data
         elif isinstance(data, slice):
             # save it in the _pydata temporarily; materialize it if `tonumpy` is called
-            self._pydata = data
+            assert data.step == 1 or data.step is None, \
+                "step for slice type must be 1"
+            self._slice_data = slice(data.start, data.stop)
         else:
             try:
-                self._pydata = np.array([int(data)]).astype(np.int64)
-            except:
-                try:
-                    data = np.array(data).astype(np.int64)
-                    if data.ndim != 1:
-                        raise DGLError('Index data must be 1D int64 vector,'
-                                       ' but got: %s' % str(data))
-                    self._pydata = data
-                except:
-                    raise DGLError('Error index data: %s' % str(data))
+                data = np.array(data).astype(np.int64)
+            except Exception:  # pylint: disable=broad-except
+                raise DGLError('Error index data: %s' % str(data))
+            if data.ndim == 0:  # scalar array
+                data = np.expand_dims(data, 0)
+            elif data.ndim != 1:
+                raise DGLError('Index data must be 1D int64 vector,'
+                               ' but got: %s' % str(data))
+            self._pydata = data
             self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self._pydata)
 
     def tonumpy(self):
         """Convert to a numpy ndarray."""
         if self._pydata is None:
-            if self._dgl_tensor_data is not None:
+            if self._slice_data is not None:
+                slc = self._slice_data
+                self._pydata = np.arange(slc.start, slc.stop).astype(np.int64)
+            elif self._dgl_tensor_data is not None:
                 self._pydata = self._dgl_tensor_data.asnumpy()
             else:
                 data = self.tousertensor()
                 self._pydata = F.zerocopy_to_numpy(data)
-        elif isinstance(self._pydata, slice):
-            # convert it to numpy array
-            slc = self._pydata
-            self._pydata = np.arange(slc.start, slc.stop, slc.step).astype(np.int64)
         return self._pydata
 
     def tousertensor(self, ctx=None):
@@ -96,8 +96,8 @@ class Index(object):
         if len(self._user_tensor_data) == 0:
             if self._dgl_tensor_data is not None:
                 # zero copy from dgl tensor
-                dl = self._dgl_tensor_data.to_dlpack()
-                self._user_tensor_data[F.cpu()] = F.zerocopy_from_dlpack(dl)
+                dlpack = self._dgl_tensor_data.to_dlpack()
+                self._user_tensor_data[F.cpu()] = F.zerocopy_from_dlpack(dlpack)
             else:
                 # zero copy from numpy array
                 self._user_tensor_data[F.cpu()] = F.zerocopy_from_numpy(self.tonumpy())
@@ -112,22 +112,145 @@ class Index(object):
         if self._dgl_tensor_data is None:
             # zero copy from user tensor
             tsor = self.tousertensor()
-            dl = F.zerocopy_to_dlpack(tsor)
-            self._dgl_tensor_data = nd.from_dlpack(dl)
+            dlpack = F.zerocopy_to_dlpack(tsor)
+            self._dgl_tensor_data = nd.from_dlpack(dlpack)
         return self._dgl_tensor_data
 
-    def is_slice(self, start, stop, step=None):
-        return (isinstance(self._pydata, slice)
-                and self._pydata == slice(start, stop, step))
+    def slice_data(self):
+        """Return the internal slice data.
+
+        If this index is not initialized from slice, the return will be None.
+        """
+        return self._slice_data
+
+    def is_slice(self, start, stop):
+        """Check if Index wraps a slice data with given start and stop"""
+        return self._slice_data == slice(start, stop)
 
     def __getstate__(self):
-        return self.tousertensor()
+        if self._slice_data is not None:
+            # the index can be represented by a slice
+            return self._slice_data
+        else:
+            return self.tousertensor()
 
     def __setstate__(self, state):
         self._initialize_data(state)
 
-def toindex(x):
-    return x if isinstance(x, Index) else Index(x)
+    def get_items(self, index):
+        """Return values at given positions of an Index
+
+        Parameters
+        ----------
+        index: utils.Index
+
+        Returns
+        -------
+        utils.Index
+            The values at the given position.
+        """
+        if self._slice_data is not None and self._slice_data.start == 0:
+            # short-cut for identical mapping
+            # NOTE: we don't check for out-of-bound error
+            return index
+        elif index._slice_data is None:
+            # the provided index is not a slice
+            tensor = self.tousertensor()
+            index = index.tousertensor()
+            return Index(F.gather_row(tensor, index))
+        elif self._slice_data is None:
+            # the current index is not a slice but the provided is a slice
+            tensor = self.tousertensor()
+            index = index._slice_data
+            return Index(F.narrow_row(tensor, index.start, index.stop))
+        else:
+            # both self and index wrap a slice object, then return another
+            # Index wrapping a slice
+            start = self._slice_data.start
+            index = index._slice_data
+            return Index(slice(start + index.start, start + index.stop))
+
+    def set_items(self, index, value):
+        """Set values at given positions of an Index. Set is not done in place,
+        instead, a new Index object will be returned.
+
+        Parameters
+        ----------
+        index: utils.Index
+            Positions to set values
+        value: int or utils.Index
+            Values to set. If value is an integer, then all positions are set
+            to the same value
+
+        Returns
+        -------
+        utils.Index
+            The new values.
+        """
+        tensor = self.tousertensor()
+        index = index.tousertensor()
+        if isinstance(value, int):
+            value = F.full_1d(len(index), value, dtype=F.int64, ctx=F.cpu())
+        else:
+            value = value.tousertensor()
+        return Index(F.scatter_row(tensor, index, value))
+
+    def append_zeros(self, num):
+        """Append zeros to an Index
+
+        Parameters
+        ----------
+        num: int
+            number of zeros to append
+        """
+        if num == 0:
+            return self
+        new_items = F.zeros((num,), dtype=F.int64, ctx=F.cpu())
+        if len(self) == 0:
+            return Index(new_items)
+        else:
+            tensor = self.tousertensor()
+            tensor = F.cat((tensor, new_items), dim=0)
+            return Index(tensor)
+
+    def nonzero(self):
+        """Return the nonzero positions"""
+        tensor = self.tousertensor()
+        mask = F.nonzero_1d(tensor != 0)
+        return Index(mask)
+
+    def has_nonzero(self):
+        """Check if there is any nonzero value in this Index"""
+        tensor = self.tousertensor()
+        return F.sum(tensor, 0) > 0
+
+def toindex(data):
+    """Convert the given data to Index object.
+
+    Parameters
+    ----------
+    data : index data
+        Data to create the index.
+
+    Returns
+    -------
+    Index
+        The index object.
+
+    See Also
+    --------
+    Index
+    """
+    return data if isinstance(data, Index) else Index(data)
+
+def zero_index(size):
+    """Create a index with provided size initialized to zero
+
+    Parameters
+    ----------
+    size: int
+    """
+    return Index(F.zeros((size,), dtype=F.int64, ctx=F.cpu()))
 
 class LazyDict(Mapping):
     """A readonly dictionary that does not materialize the storage."""
@@ -154,21 +277,22 @@ class LazyDict(Mapping):
 
 class HybridDict(Mapping):
     """A readonly dictonary that merges several dict-like (python dict, LazyDict).
-       If there are duplicate keys, early keys have priority over latter ones
+
+    If there are duplicate keys, early keys have priority over latter ones.
     """
     def __init__(self, *dict_like_list):
         self._dict_like_list = dict_like_list
         self._keys = set()
-        for d in dict_like_list:
-            self._keys.update(d.keys())
+        for obj in dict_like_list:
+            self._keys.update(obj.keys())
 
     def keys(self):
         return self._keys
 
     def __getitem__(self, key):
-        for d in self._dict_like_list:
-            if key in d:
-                return d[key]
+        for obj in self._dict_like_list:
+            if key in obj:
+                return obj[key]
         raise KeyError(key)
 
     def __contains__(self, key):
@@ -200,7 +324,7 @@ class ReadOnlyDict(Mapping):
     def __len__(self):
         return len(self._dict_like)
 
-def build_relabel_map(x, sorted=False):
+def build_relabel_map(x, is_sorted=False):
     """Relabel the input ids to continuous ids that starts from zero.
 
     Ids are assigned new ids according to their ascending order.
@@ -220,7 +344,7 @@ def build_relabel_map(x, sorted=False):
     ----------
     x : Index
         The input ids.
-    sorted : bool, default=False
+    is_sorted : bool, default=False
         Whether the input has already been unique and sorted.
 
     Returns
@@ -233,7 +357,7 @@ def build_relabel_map(x, sorted=False):
         new id tensor: new_id = old_to_new[old_id]
     """
     x = x.tousertensor()
-    if not sorted:
+    if not is_sorted:
         unique_x, _ = F.sort_1d(F.unique(x))
     else:
         unique_x = x
@@ -276,46 +400,38 @@ class CtxCachedObject(object):
         self._generator = generator
         self._ctx_dict = {}
 
-    def get(self, ctx):
+    def __call__(self, ctx):
         if not ctx in self._ctx_dict:
             self._ctx_dict[ctx] = self._generator(ctx)
         return self._ctx_dict[ctx]
 
-def ctx_cached_member(func):
-    """Convenient class member function wrapper to cache the function result.
+def cached_member(cache, prefix):
+    """A member function decorator to memorize the result.
 
-    The wrapped function must only have two arguments: `self` and `ctx`. The former is the
-    class object and the later is the context. It will check whether the class object is
-    freezed (by checking the `_freeze` member). If yes, it caches the function result in
-    the field prefixed by '_CACHED_' before the function name.
+    Note that the member function cannot support kwargs after being decorated.
+    The member function must be functional. Otherwise, the behavior is undefined.
+
+    Parameters
+    ----------
+    cache : str
+        The cache name. The cache should be a dictionary attribute
+        in the class object.
+    prefix : str
+        The key prefix to save the result of the function.
     """
-    cache_name = '_CACHED_' + func.__name__
-    @wraps(func)
-    def wrapper(self, ctx):
-        if self._freeze:
-            # cache
-            if getattr(self, cache_name, None) is None:
-                bind_func = lambda _ctx : func(self, _ctx)
-                setattr(self, cache_name, CtxCachedObject(bind_func))
-            return getattr(self, cache_name).get(ctx)
-        else:
-            return func(self, ctx)
-    return wrapper
-
-def cached_member(func):
-    cache_name = '_CACHED_' + func.__name__
-    @wraps(func)
-    def wrapper(self):
-        if self._freeze:
-            # cache
-            if getattr(self, cache_name, None) is None:
-                setattr(self, cache_name, func(self))
-            return getattr(self, cache_name)
-        else:
-            return func(self)
-    return wrapper
+    def _creator(func):
+        @wraps(func)
+        def wrapper(self, *args):
+            dic = getattr(self, cache)
+            key = '%s-%s' % (prefix, '-'.join([str(a) for a in args]))
+            if not key in dic:
+                dic[key] = func(self, *args)
+            return dic[key]
+        return wrapper
+    return _creator
 
 def is_dict_like(obj):
+    """Return true if the object can be treated as a dictionary."""
     return isinstance(obj, Mapping)
 
 def reorder(dict_like, index):
@@ -352,3 +468,48 @@ def reorder_index(idx, order):
 def is_iterable(obj):
     """Return true if the object is an iterable."""
     return isinstance(obj, Iterable)
+
+def get_ndata_name(g, name):
+    """Return a node data name that does not exist in the given graph.
+
+    The given name is directly returned if it does not exist in the given graph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph.
+    name : str
+        The proposed name.
+
+    Returns
+    -------
+    str
+        The node data name that does not exist.
+    """
+    while name in g.ndata:
+        name += '_'
+    return name
+
+def unwrap_to_ptr_list(wrapper):
+    """Convert the internal vector wrapper to a python list of ctypes.c_void_p.
+
+    The wrapper will be destroyed after this function.
+
+    Parameters
+    ----------
+    wrapper : ctypes.c_void_p
+        The handler to the wrapper.
+
+    Returns
+    -------
+    list of ctypes.c_void_p
+        A python list of void pointers.
+    """
+    size = _api_internal._GetVectorWrapperSize(wrapper)
+    if size == 0:
+        return []
+    data = _api_internal._GetVectorWrapperData(wrapper)
+    data = ctypes.cast(data, ctypes.POINTER(ctypes.c_void_p * size))
+    rst = [ctypes.c_void_p(x) for x in data.contents]
+    _api_internal._FreeVectorWrapper(wrapper)
+    return rst

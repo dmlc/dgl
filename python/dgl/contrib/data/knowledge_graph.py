@@ -282,7 +282,7 @@ class RDFReader(object):
 
     def relationList(self):
         """
-        Returns a list of relations, ordered descending by frequenecy
+        Returns a list of relations, ordered descending by frequency
         :return:
         """
         res = list(set(self.__graph.predicates()))
@@ -327,7 +327,7 @@ def _load_data(dataset_str='aifb', dataset_path=None):
     train_file = os.path.join(dataset_path, 'trainingSet.tsv')
     test_file = os.path.join(dataset_path, 'testSet.tsv')
     if dataset_str == 'am':
-        label_header = 'label_cateogory'
+        label_header = 'label_category'
         nodes_header = 'proxy'
     elif dataset_str == 'aifb':
         label_header = 'label_affiliation'
@@ -410,8 +410,10 @@ def _load_data(dataset_str='aifb', dataset_path=None):
                 dst = nodes_dict[o]
                 assert src < num_node and dst < num_node
                 rel = relations_dict[p]
-                edge_list.append((src, dst, 2 * rel))
-                edge_list.append((dst, src, 2 * rel + 1))
+                # relation id 0 is self-relation, so others should start with 1
+                edge_list.append((src, dst, 2 * rel + 1))
+                # reverse relation
+                edge_list.append((dst, src, 2 * rel + 2))
 
             # sort indices by destination
             edge_list = sorted(edge_list, key=lambda x: (x[1], x[0], x[2]))

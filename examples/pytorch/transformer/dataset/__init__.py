@@ -2,14 +2,14 @@ from .graph import *
 from .fields import *
 from .utils import prepare_dataset
 import os
-import numpy as np
+import random
 
-class ClassificationDataset:
+class ClassificationDataset(object):
     "Dataset class for classification task."
     def __init__(self):
         raise NotImplementedError
 
-class TranslationDataset:
+class TranslationDataset(object):
     '''
     Dataset class for translation task.
     By default, the source language shares the same vocabulary with the target language.
@@ -22,17 +22,17 @@ class TranslationDataset:
         vocab_path = os.path.join(path, vocab)
         self.src = {}
         self.tgt = {}
-        with open(os.path.join(path, train + '.' + exts[0]), 'r') as f:
+        with open(os.path.join(path, train + '.' + exts[0]), 'r', encoding='utf-8') as f:
             self.src['train'] = f.readlines()
-        with open(os.path.join(path, train + '.' + exts[1]), 'r') as f:
+        with open(os.path.join(path, train + '.' + exts[1]), 'r', encoding='utf-8') as f:
             self.tgt['train'] = f.readlines()
-        with open(os.path.join(path, valid + '.' + exts[0]), 'r') as f:
+        with open(os.path.join(path, valid + '.' + exts[0]), 'r', encoding='utf-8') as f:
             self.src['valid'] = f.readlines()
-        with open(os.path.join(path, valid + '.' + exts[1]), 'r') as f:
+        with open(os.path.join(path, valid + '.' + exts[1]), 'r', encoding='utf-8') as f:
             self.tgt['valid'] = f.readlines()
-        with open(os.path.join(path, test + '.' + exts[0]), 'r') as f:
+        with open(os.path.join(path, test + '.' + exts[0]), 'r', encoding='utf-8') as f:
             self.src['test'] = f.readlines()
-        with open(os.path.join(path, test + '.' + exts[1]), 'r') as f:
+        with open(os.path.join(path, test + '.' + exts[1]), 'r', encoding='utf-8') as f:
             self.tgt['test'] = f.readlines()
 
         if not os.path.exists(vocab_path):
@@ -90,20 +90,30 @@ class TranslationDataset:
     def eos_id(self):
         return self.vocab[self.EOS_TOKEN]
 
-    def __call__(self, graph_pool, mode='train', batch_size=32, k=1, devices=['cpu']):
+    def __call__(self, graph_pool, mode='train', batch_size=32, k=1,
+                 device='cpu', dev_rank=0, ndev=1):
         '''
         Create a batched graph correspond to the mini-batch of the dataset.
         args:
             graph_pool: a GraphPool object for accelerating.
             mode: train/valid/test
             batch_size: batch size
-            devices: ['cpu'] or a list of gpu ids.
-            k: beam size(only required for test) 
+            k: beam size(only required for test)
+            device: str or torch.device
+            dev_rank: rank (id) of current device
+            ndev: number of devices
         '''
-        dev_id, gs = 0, []
         src_data, tgt_data = self.src[mode], self.tgt[mode]
         n = len(src_data)
-        order = np.random.permutation(n) if mode == 'train' else range(n)
+        # make sure all devices have the same number of batch
+        n = n // ndev * ndev
+
+        # XXX: partition then shuffle may not be equivalent to shuffle then
+        # partition
+        order = list(range(dev_rank, n, ndev))
+        if mode == 'train':
+            random.shuffle(order)
+
         src_buf, tgt_buf = [], []
 
         for idx in order:
@@ -115,22 +125,16 @@ class TranslationDataset:
             tgt_buf.append(tgt_sample)
             if len(src_buf) == batch_size:
                 if mode == 'test':
-                    assert len(devices) == 1 # we only allow single gpu for inference
-                    yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=devices[0])
+                    yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device)
                 else:
-                    gs.append(graph_pool(src_buf, tgt_buf, device=devices[dev_id]))
-                    dev_id += 1
-                    if dev_id == len(devices):
-                        yield gs if len(devices) > 1 else gs[0]
-                        dev_id, gs = 0, []
+                    yield graph_pool(src_buf, tgt_buf, device=device)
                 src_buf, tgt_buf = [], []
 
         if len(src_buf) != 0:
             if mode == 'test':
-                yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=devices[0])
+                yield graph_pool.beam(src_buf, self.sos_id, self.MAX_LENGTH, k, device=device)
             else:
-                gs.append(graph_pool(src_buf, tgt_buf, device=devices[dev_id]))
-                yield gs if len(devices) > 1 else gs[0]
+                yield graph_pool(src_buf, tgt_buf, device=device)
 
     def get_sequence(self, batch):
         "return a list of sequence from a list of index arrays"
@@ -151,8 +155,8 @@ def get_dataset(dataset):
         raise NotImplementedError
     elif dataset == 'copy' or dataset == 'sort':
         return TranslationDataset(
-            'data/{}'.format(dataset), 
-            ('in', 'out'), 
+            'data/{}'.format(dataset),
+            ('in', 'out'),
             train='train',
             valid='valid',
             test='test',
@@ -172,7 +176,7 @@ def get_dataset(dataset):
             ('en', 'de'),
             train='train.tok.clean.bpe.32000',
             valid='newstest2013.tok.bpe.32000',
-            test='newstest2014.tok.bpe.32000',
+            test='newstest2014.tok.bpe.32000.ende',
             vocab='vocab.bpe.32000')
     else:
         raise KeyError()

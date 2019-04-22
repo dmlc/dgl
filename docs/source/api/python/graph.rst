@@ -55,6 +55,8 @@ Transforming graph
     DGLGraph.subgraphs
     DGLGraph.edge_subgraph
     DGLGraph.line_graph
+    DGLGraph.reverse
+    DGLGraph.readonly
 
 Converting from/to other format
 -------------------------------
@@ -66,6 +68,7 @@ Converting from/to other format
     DGLGraph.from_networkx
     DGLGraph.from_scipy_sparse_matrix
     DGLGraph.adjacency_matrix
+    DGLGraph.adjacency_matrix_scipy
     DGLGraph.incidence_matrix
 
 Using Node/edge features
@@ -95,6 +98,7 @@ Computing with DGLGraph
     DGLGraph.register_apply_edge_func
     DGLGraph.apply_nodes
     DGLGraph.apply_edges
+    DGLGraph.group_apply_edges
     DGLGraph.send
     DGLGraph.recv
     DGLGraph.send_and_recv

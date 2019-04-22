@@ -23,6 +23,14 @@ def cpu():
 def tensor(data, dtype=None):
     return th.tensor(data, dtype=dtype)
 
+def get_preferred_sparse_format():
+    """Get the preferred sparse matrix format supported by the backend.
+
+    Different backends have their preferred backend. This info is useful when
+    constructing a sparse matrix.
+    """
+    return "coo"
+
 if TH_VERSION.version[0] == 0:
     def sparse_matrix(data, index, shape, force_format=False):
         fmt = index[0]
@@ -64,7 +72,10 @@ def astype(input, ty):
     return input.type(ty)
 
 def asnumpy(input):
-    return input.cpu().numpy()
+    if isinstance(input, th.sparse.FloatTensor):
+        return input.to_dense().cpu().numpy()
+    else:
+        return input.cpu().numpy()
 
 def copy_to(input, ctx):
     if ctx.type == 'cpu':
@@ -118,11 +129,23 @@ def reshape(input, shape):
 def zeros(shape, dtype, ctx):
     return th.zeros(shape, dtype=dtype, device=ctx)
 
+def zeros_like(input):
+    return th.zeros_like(input)
+
 def ones(shape, dtype, ctx):
     return th.ones(shape, dtype=dtype, device=ctx)
 
 def spmm(x, y):
-    return th.spmm(x, y)
+    dst, src = x._indices()
+    # scatter index
+    index = dst.view(-1, 1).expand(-1, y.shape[1])
+    # zero tensor to be scatter_add to
+    out = y.new_full((x.shape[0], y.shape[1]), 0)
+    # look up src features and multiply by edge features
+    # Note: using y[src] instead of index_select will lead to terrible
+    #       performance in backward
+    feature = th.index_select(y, 0, src) * x._values().unsqueeze(-1)
+    return out.scatter_add(0, index, feature)
 
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     y = th.zeros(n_segs, *input.shape[1:]).to(input)
@@ -137,14 +160,24 @@ def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
     y /= w.view((-1,) + (1,) * (y.dim() - 1))
     return y
 
+def boolean_mask(input, mask):
+    return input[mask]
+
+def equal(x, y):
+    return x == y
+
+def logical_not(input):
+    return ~input
+
 def unique(input):
     return th.unique(input)
 
-def full_1d(length, fill_value):
-    return th.full((length,), fill_value)
+def full_1d(length, fill_value, dtype, ctx):
+    return th.full((length,), fill_value, dtype=dtype, device=ctx)
 
 def nonzero_1d(input):
-    return th.nonzero(input).squeeze()
+    x = th.nonzero(input).squeeze()
+    return x if x.dim() == 1 else x.view(-1)
 
 def sort_1d(input):
     return th.sort(input)
@@ -168,5 +201,3 @@ def zerocopy_to_numpy(input):
 
 def zerocopy_from_numpy(np_array):
     return th.from_numpy(np_array)
-
-# create_immutable_graph_index not enabled

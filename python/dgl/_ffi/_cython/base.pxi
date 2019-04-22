@@ -1,5 +1,6 @@
 from ..base import DGLError
 from libcpp.vector cimport vector
+from libcpp cimport bool
 from cpython.version cimport PY_MAJOR_VERSION
 from cpython cimport pycapsule
 from libc.stdint cimport int64_t, uint64_t, uint8_t, uint16_t
@@ -56,6 +57,8 @@ cdef extern from "dgl/runtime/c_runtime_api.h":
 
 ctypedef int64_t dgl_index_t
 ctypedef DLTensor* DLTensorHandle
+ctypedef DLTensor DGLArray
+ctypedef DGLArray* CDGLArrayHandle
 ctypedef void* DGLStreamHandle
 ctypedef void* DGLRetValueHandle
 ctypedef void* DGLFunctionHandle
@@ -94,6 +97,14 @@ cdef extern from "dgl/runtime/c_runtime_api.h":
                       DLDataType dtype,
                       DLContext ctx,
                       DLTensorHandle* out)
+    int DGLArrayAllocSharedMem(const char *mem_name,
+                               const dgl_index_t *shape,
+                               int ndim,
+                               int dtype_code,
+                               int dtype_bits,
+                               int dtype_lanes,
+                               bool is_create,
+                               CDGLArrayHandle* out)
     int DGLArrayFree(DLTensorHandle handle)
     int DGLArrayCopyFromTo(DLTensorHandle src,
                            DLTensorHandle to,
@@ -104,17 +115,18 @@ cdef extern from "dgl/runtime/c_runtime_api.h":
                          DLManagedTensor** out)
     void DGLDLManagedTensorCallDeleter(DLManagedTensor* dltensor)
 
-cdef extern from "dgl/c_dsl_api.h":
-    int DGLNodeFree(NodeHandle handle)
-    int DGLNodeTypeKey2Index(const char* type_key,
-                             int* out_index)
-    int DGLNodeGetTypeIndex(NodeHandle handle,
-                            int* out_index)
-    int DGLNodeGetAttr(NodeHandle handle,
-                       const char* key,
-                       DGLValue* out_value,
-                       int* out_type_code,
-                       int* out_success)
+# (minjie): Node and class module are not used in DGL.
+#cdef extern from "dgl/c_dsl_api.h":
+#    int DGLNodeFree(NodeHandle handle)
+#    int DGLNodeTypeKey2Index(const char* type_key,
+#                             int* out_index)
+#    int DGLNodeGetTypeIndex(NodeHandle handle,
+#                            int* out_index)
+#    int DGLNodeGetAttr(NodeHandle handle,
+#                       const char* key,
+#                       DGLValue* out_value,
+#                       int* out_type_code,
+#                       int* out_success)
 
 cdef inline py_str(const char* x):
     if PY_MAJOR_VERSION < 3:

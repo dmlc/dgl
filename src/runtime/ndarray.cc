@@ -3,6 +3,7 @@
  * \file ndarray.cc
  * \brief NDArray container infratructure.
  */
+#include <string.h>
 #include <dmlc/logging.h>
 #include <dgl/runtime/ndarray.h>
 #include <dgl/runtime/c_runtime_api.h>
@@ -46,6 +47,10 @@ struct NDArray::Internal {
     using dgl::runtime::NDArray;
     if (ptr->manager_ctx != nullptr) {
       static_cast<NDArray::Container*>(ptr->manager_ctx)->DecRef();
+#ifndef _WIN32
+    } else if (ptr->mem) {
+      ptr->mem = nullptr;
+#endif  // _WIN32
     } else if (ptr->dl_tensor.data != nullptr) {
       dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
           ptr->dl_tensor.ctx, ptr->dl_tensor.data);
@@ -112,6 +117,10 @@ struct NDArray::Internal {
   }
 };
 
+size_t NDArray::GetSize() const {
+  return GetDataSize(data_->dl_tensor);
+}
+
 NDArray NDArray::CreateView(std::vector<int64_t> shape,
                             DLDataType dtype) {
   CHECK(data_ != nullptr);
@@ -133,6 +142,28 @@ NDArray NDArray::CreateView(std::vector<int64_t> shape,
 
 DLManagedTensor* NDArray::ToDLPack() const {
   return Internal::ToDLPack(data_);
+}
+
+NDArray NDArray::EmptyShared(const std::string &name,
+                       std::vector<int64_t> shape,
+                       DLDataType dtype,
+                       DLContext ctx, bool is_create) {
+  NDArray ret = Internal::Create(shape, dtype, ctx);
+  // setup memory content
+  size_t size = GetDataSize(ret.data_->dl_tensor);
+#ifndef _WIN32
+  auto mem = std::make_shared<SharedMemory>(name);
+  if (is_create) {
+    ret.data_->dl_tensor.data = mem->create_new(size);
+  } else {
+    ret.data_->dl_tensor.data = mem->open(size);
+  }
+
+  ret.data_->mem = mem;
+#else
+  LOG(FATAL) << "Windows doesn't support NDArray with shared memory";
+#endif  // _WIN32
+  return ret;
 }
 
 NDArray NDArray::Empty(std::vector<int64_t> shape,
@@ -207,6 +238,26 @@ int DGLArrayAlloc(const dgl_index_t* shape,
   ctx.device_id = device_id;
   *out = NDArray::Internal::MoveAsDLTensor(
       NDArray::Empty(std::vector<int64_t>(shape, shape + ndim), dtype, ctx));
+  API_END();
+}
+
+int DGLArrayAllocSharedMem(const char *mem_name,
+                           const dgl_index_t *shape,
+                           int ndim,
+                           int dtype_code,
+                           int dtype_bits,
+                           int dtype_lanes,
+                           bool is_create,
+                           DGLArrayHandle* out) {
+  API_BEGIN();
+  DLDataType dtype;
+  dtype.code = static_cast<uint8_t>(dtype_code);
+  dtype.bits = static_cast<uint8_t>(dtype_bits);
+  dtype.lanes = static_cast<uint16_t>(dtype_lanes);
+  std::vector<int64_t> shape_vec(shape, shape + ndim);
+  NDArray arr = NDArray::EmptyShared(mem_name, shape_vec, dtype,
+                                     DLContext{kDLCPU, 0}, is_create);
+  *out = NDArray::Internal::MoveAsDLTensor(arr);
   API_END();
 }
 

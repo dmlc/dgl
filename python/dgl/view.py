@@ -1,11 +1,11 @@
 """Views of DGLGraph."""
 from __future__ import absolute_import
 
-from collections import MutableMapping, namedtuple
+from collections import namedtuple
+from collections.abc import MutableMapping
 
 from .base import ALL, is_all, DGLError
 from . import backend as F
-from . import utils
 
 NodeSpace = namedtuple('NodeSpace', ['data'])
 
@@ -41,6 +41,12 @@ class NodeView(object):
         return F.arange(0, len(self))
 
 class NodeDataView(MutableMapping):
+    """The data view class when G.nodes[...].data is called.
+
+    See Also
+    --------
+    dgl.DGLGraph.nodes
+    """
     __slots__ = ['_graph', '_nodes']
 
     def __init__(self, graph, nodes):
@@ -103,6 +109,12 @@ class EdgeView(object):
         return self._graph.all_edges(*args, **kwargs)
 
 class EdgeDataView(MutableMapping):
+    """The data view class when G.edges[...].data is called.
+
+    See Also
+    --------
+    dgl.DGLGraph.edges
+    """
     __slots__ = ['_graph', '_edges']
 
     def __init__(self, graph, edges):
@@ -130,3 +142,103 @@ class EdgeDataView(MutableMapping):
     def __repr__(self):
         data = self._graph.get_e_repr(self._edges)
         return repr({key : data[key] for key in self._graph._edge_frame})
+
+class LayerView(object):
+    """A LayerView class to act as nflow.layers for a NodeFlow.
+
+    Can be used to get a list of current nodes and get and set node data.
+    """
+    __slots__ = ['_graph']
+
+    def __init__(self, graph):
+        self._graph = graph
+
+    def __len__(self):
+        return self._graph.num_layers()
+
+    def __getitem__(self, layer):
+        if not isinstance(layer, int):
+            raise DGLError('Currently we only support the view of one layer')
+        return NodeSpace(data=LayerDataView(self._graph, layer))
+
+    def __call__(self):
+        """Return the nodes."""
+        return F.arange(0, len(self))
+
+class LayerDataView(MutableMapping):
+    """The data view class when G.layers[...].data is called.
+    """
+    __slots__ = ['_graph', '_layer']
+
+    def __init__(self, graph, layer):
+        self._graph = graph
+        self._layer = layer
+
+    def __getitem__(self, key):
+        return self._graph._node_frames[self._layer][key]
+
+    def __setitem__(self, key, val):
+        self._graph._node_frames[self._layer][key] = val
+
+    def __delitem__(self, key):
+        del self._graph._node_frames[self._layer][key]
+
+    def __len__(self):
+        return len(self._graph._node_frames[self._layer])
+
+    def __iter__(self):
+        return iter(self._graph._node_frames[self._layer])
+
+    def __repr__(self):
+        data = self._graph._node_frames[self._layer]
+        return repr({key : data[key] for key in data})
+
+class BlockView(object):
+    """A BlockView class to act as nflow.blocks for a NodeFlow.
+
+    Can be used to get a list of current edges and get and set edge data.
+    """
+    __slots__ = ['_graph']
+
+    def __init__(self, graph):
+        self._graph = graph
+
+    def __len__(self):
+        return self._graph.num_blocks
+
+    def __getitem__(self, flow):
+        if not isinstance(flow, int):
+            raise DGLError('Currently we only support the view of one flow')
+        return EdgeSpace(data=BlockDataView(self._graph, flow))
+
+    def __call__(self, *args, **kwargs):
+        """Return all the edges."""
+        return self._graph.all_edges(*args, **kwargs)
+
+class BlockDataView(MutableMapping):
+    """The data view class when G.blocks[...].data is called.
+    """
+    __slots__ = ['_graph', '_flow']
+
+    def __init__(self, graph, flow):
+        self._graph = graph
+        self._flow = flow
+
+    def __getitem__(self, key):
+        return self._graph._edge_frames[self._flow][key]
+
+    def __setitem__(self, key, val):
+        self._graph._edge_frames[self._flow][key] = val
+
+    def __delitem__(self, key):
+        del self._graph._edge_frames[self._flow][key]
+
+    def __len__(self):
+        return len(self._graph._edge_frames[self._flow])
+
+    def __iter__(self):
+        return iter(self._graph._edge_frames[self._flow])
+
+    def __repr__(self):
+        data = self._graph._edge_frames[self._flow]
+        return repr({key : data[key] for key in data})

@@ -113,7 +113,7 @@ def main(args):
     test_deg = test_graph.in_degrees(
                 range(test_graph.number_of_nodes())).float().view(-1,1)
     test_node_id = torch.arange(0, num_nodes, dtype=torch.long).view(-1, 1)
-    test_rel = torch.from_numpy(test_rel).view(-1, 1)
+    test_rel = torch.from_numpy(test_rel)
     test_norm = torch.from_numpy(test_norm).view(-1, 1)
     test_graph.ndata.update({'id': test_node_id, 'norm': test_norm})
     test_graph.edata['type'] = test_rel
@@ -149,7 +149,7 @@ def main(args):
 
         # set node/edge feature
         node_id = torch.from_numpy(node_id).view(-1, 1)
-        edge_type = torch.from_numpy(edge_type).view(-1, 1)
+        edge_type = torch.from_numpy(edge_type)
         node_norm = torch.from_numpy(node_norm).view(-1, 1)
         data, labels = torch.from_numpy(data), torch.from_numpy(labels)
         deg = g.in_degrees(range(g.number_of_nodes())).float().view(-1, 1)
@@ -242,7 +242,7 @@ if __name__ == '__main__':
     parser.add_argument("--negative-sample", type=int, default=10,
             help="number of negative samples per positive sample")
     parser.add_argument("--evaluate-every", type=int, default=500,
-            help="perform evalution every n epochs")
+            help="perform evaluation every n epochs")
 
     args = parser.parse_args()
     print(args)

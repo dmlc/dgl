@@ -211,4 +211,12 @@ sphinx_gallery_conf = {
     'gallery_dirs' : gallery_dirs,
     'within_subsection_order' : FileNameSortKey,
     'filename_pattern' : '.py',
+    'download_all_examples' : False,
 }
+
+# Compatibility for different backend when builds tutorials
+dglbackend = os.environ.get("DGLBACKEND", "")
+if dglbackend == 'mxnet':
+    sphinx_gallery_conf['filename_pattern'] = "/*(?<=mx)\.py"
+if dglbackend == 'pytorch':
+    sphinx_gallery_conf['filename_pattern'] = "/*(?<!mx)\.py"

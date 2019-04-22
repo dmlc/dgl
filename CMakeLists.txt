@@ -19,13 +19,18 @@ include_directories("third_party/dmlc-core/include")
 
 # initial variables
 set(DGL_LINKER_LIBS "")
+if(MSVC OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 set(DGL_RUNTIME_LINKER_LIBS "")
+else(MSVC OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+set(DGL_RUNTIME_LINKER_LIBS "rt")
+endif(MSVC OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 
 # Generic compilation options
 if(MSVC)
   add_definitions(-DWIN32_LEAN_AND_MEAN)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
   add_definitions(-D_SCL_SECURE_NO_WARNINGS)
+  add_definitions(-DNOMINMAX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /bigobj")
@@ -43,14 +48,16 @@ else(MSVC)
   check_cxx_compiler_flag("-std=c++11"    SUPPORT_CXX11)
   set(CMAKE_C_FLAGS "-O2 -Wall -fPIC ${CMAKE_C_FLAGS}")
   set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++11 ${CMAKE_CXX_FLAGS}")
-  if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    set(CMAKE_C_FLAGS "-fopenmp ${CMAKE_C_FLAGS}")
-    set(CMAKE_CXX_FLAGS "-fopenmp ${CMAKE_CXX_FLAGS}")
-  endif()
+
+  include(FindOpenMP)
+  if(OPENMP_FOUND)
+    set(CMAKE_C_FLAGS "${OpenMP_C_FLAGS} ${CMAKE_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${OpenMP_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
+  endif(OPENMP_FOUND)
 endif(MSVC)
 
 # Source file lists
-file(GLOB CORE_SRCS src/graph/*.cc src/*.cc src/scheduler/*.cc)
+file(GLOB CORE_SRCS src/graph/*.cc src/graph/network/* src/*.cc src/scheduler/*.cc)
 
 file(GLOB RUNTIME_SRCS src/runtime/*.cc)
 

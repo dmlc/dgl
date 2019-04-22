@@ -51,7 +51,7 @@ class Function(_FunctionBase):
     dgl.register_func: How to register global function.
     dgl.get_global_func: How to get global function.
     """
-    pass
+    pass  # pylint: disable=unnecessary-pass
 
 
 class ModuleBase(object):
@@ -258,7 +258,6 @@ def extract_ext_funcs(finit):
         raise RuntimeError("cannot initialize with %s" % finit)
     return fdict
 
-
 def _get_api(f):
     flocal = f
     flocal.is_global = True
@@ -285,19 +284,30 @@ def _init_api_prefix(module_name, prefix):
     module = sys.modules[module_name]
 
     for name in list_global_func_names():
-        if prefix == "api":
-            fname = name
-            if name.startswith("_"):
-                target_module = sys.modules["dgl._api_internal"]
-            else:
-                target_module = module
-        else:
-            if not name.startswith(prefix):
-                continue
-            fname = name[len(prefix)+1:]
-            target_module = module
+        if name.startswith("_"):
+            continue
+        if not name.startswith(prefix):
+            continue
+        fname = name[len(prefix)+1:]
+        target_module = module
 
         if fname.find(".") != -1:
+            print('Warning: invalid API name "%s".' % fname)
+            continue
+        f = get_global_func(name)
+        ff = _get_api(f)
+        ff.__name__ = fname
+        ff.__doc__ = ("DGL PackedFunc %s. " % fname)
+        setattr(target_module, ff.__name__, ff)
+
+def _init_internal_api():
+    for name in list_global_func_names():
+        if not name.startswith("_"):
+            continue
+        target_module = sys.modules["dgl._api_internal"]
+        fname = name
+        if fname.find(".") != -1:
+            print('Warning: invalid API name "%s".' % fname)
             continue
         f = get_global_func(name)
         ff = _get_api(f)

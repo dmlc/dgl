@@ -2,7 +2,8 @@
 
 
 Old (new) wines in new bottle
------------------------------
+=============================
+
 * **Capsule** `[paper] <https://arxiv.org/abs/1710.09829>`__ `[tutorial]
   <4_old_wines/2_capsule.html>`__ `[code]
   <https://github.com/dmlc/dgl/tree/master/examples/pytorch/capsule>`__:
