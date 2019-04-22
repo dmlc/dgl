@@ -32,8 +32,7 @@ class MySamplerPool(SamplerPool):
         # create GCN model
         g = DGLGraph(data.graph, readonly=True)
 
-        for epoch in range(args.n_epochs):
-            # Here we onlt send nodeflow for training
+        while True:
             idx = 0
             for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
                                                            args.num_neighbors,
@@ -44,6 +43,7 @@ class MySamplerPool(SamplerPool):
                 print("send train nodeflow: %d" %(idx))
                 sender.send(nf, 0)
                 idx += 1
+            sender.signal(0)
         
 def main(args):
     pool = MySamplerPool()
