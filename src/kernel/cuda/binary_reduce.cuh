@@ -13,16 +13,18 @@ struct GData {
   // length along x dimension
   int64_t x_length;
   // input data
-  DType* src_data, edge_data, dst_data;
-  // shuffle edge ids
-  int64_t* edge_ids;
+  DType* lhs_data, rhs_data;
+  // input id mappings
+  int64_t* lhs_mapping, rhs_mapping;
   // output data
   DType* out_data;
+  // output id mapping
+  int64_t* out_mapping;
 };
 
 template <typename DType,
           typename Functors>
-struct BinaryElewise {
+struct BinaryReduce {
   static __device__ __forceinline__ bool CondEdge(
       int64_t src, int64_t dst, int64_t eid, GData<DType>* gdata) {
     return true;
@@ -32,17 +34,19 @@ struct BinaryElewise {
     const int64_t D = gdata->x_length;
     int tx = blockIdx.x * blockDim.x + threadIdx.x;
     int stride_x = blockDim.x * gridDim.x;
-    eid = Functors::GetEid(eid, gdata->edge_ids);
-    DType* srcoff = gdata->src_data + src * D;
-    DType* edgeoff = gdata->edge_data + eid * D;
-    DType* dstoff = gdata->dst_data + dst * D;
-    DType* lhs = Functors::SelectLeft(srcoff, edgeoff, dstoff);
-    DType* rhs = Functors::SelectLeft(srcoff, edgeoff, dstoff);
-    DType* outoff = gdata->out_data + Functors::SelectOut(src, eid, dst);
+    int64_t lid = Functors::SelectLeft(src, eid, dst);
+    int64_t rid = Functors::SelectRight(src, eid, dst);
+    int64_t oid = Functors::SelectOut(src, eid, dst);
+    lid = Functors::MapLeft(lid, gdata->lhs_mapping);
+    rid = Functors::MapRight(rid, gdata->rhs_mapping);
+    oid = Functors::MapOut(oid, gdata->out_mapping);
+    DType* lhsoff = gdata->lhs_data + lid * D;
+    DType* rhsoff = gdata->rhs_data + rid * D;
+    DType* outoff = gdata->out_data + oid * D;
     while (tx < D) {
-      DType v1 = Functors::Read(lhs + tx);
-      DType v2 = Functors::Read(rhs + tx);
-      DType out = Functors::Call(v1, v2);
+      DType lhs = Functors::Read(lhsoff + tx);
+      DType rhs = Functors::Read(rhsoff + tx);
+      DType out = Functors::Call(lhs, rhs);
       Functors::Write(outoff + tx, out);
       tx += stride_x;
     }
@@ -50,24 +54,22 @@ struct BinaryElewise {
 }
 
 // functors
-template <typename DType, typename EidGetter,
+template <typename DType,
+          typename OutIdGetter, typename LeftIdGetter, typename RightIdGetter,
           typename OutSelector, typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 struct FunctorsTempl {
-  static __device__ __forceinline__ int64_t GetEid(int64_t eid, int64_t* id_map) {
-    return EidGetter::Call(eid, id_map);
-  }
   static __device__ __forceinline__ int64_t SelectOut(
-      int64_t src, int64_t eid, int64_t dst) {
+      int64_t src, int64_t edge, int64_t dst) {
     return OutSelector::Call(src, eid, dst);
   }
-  static __device__ __forceinline__ DType* SelectLeft(
-      DType* src_data, DType* edge_data, DType* dst_data) {
-    return LeftSelector::Call(src_data, eid_data, dst_data);
+  static __device__ __forceinline__ int64_t SelectLeft(
+      int64_t src, int64_t edge, int64_t dst) {
+    return LeftSelector::Call(src, eid, dst);
   }
-  static __device__ __forceinline__ DType* SelectRight(
-      DType* src_data, DType* edge_data, DType* dst_data) {
-    return RightSelector::Call(src_data, eid_data, dst_data);
+  static __device__ __forceinline__ int64_t SelectRight(
+      int64_t src, int64_t edge, int64_t dst) {
+    return RightSelector::Call(src, eid, dst);
   }
   static __device__ __forceinline__ DType Call(DType lhs, DType rhs) {
     return BinaryOp::Call(lhs, rhs);
@@ -77,6 +79,15 @@ struct FunctorsTempl {
   }
   static __device__ __forceinline__ void Write(DType* addr, DType val) {
     Reducer::Call(addr, val);
+  }
+  static __device__ __forceinline__ int64_t MapLeft(int64_t eid, int64_t* id_map) {
+    return LeftIdGetter::Call(eid, id_map);
+  }
+  static __device__ __forceinline__ int64_t MapRight(int64_t eid, int64_t* id_map) {
+    return RightIdGetter::Call(eid, id_map);
+  }
+  static __device__ __forceinline__ int64_t MapOut(int64_t eid, int64_t* id_map) {
+    return OutIdGetter::Call(eid, id_map);
   }
 };
 

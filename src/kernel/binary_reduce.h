@@ -15,18 +15,22 @@ namespace binary_op {
   static const std::string kReduceNone = "none";
 }  // namespace binary_op
 
-template <int XPU, typename DType, typename EidGetter,
+template <int XPU, typename DType,
+          typename OutIdGetter, typename LeftIdGetter, typename RightIdGetter,
           typename OutSelector, typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 struct BinaryReduceExecutor {
   static void Run(
     runtime::NDArray indptr,
     runtime::NDArray indices,
-    runtime::NDArray edge_ids,
-    runtime::NDArray src_data,
-    runtime::NDArray edge_data,
-    runtime::NDArray dst_data,
-    runtime::NDArray out_data);
+    runtime::NDArray lhs_mapping,
+    runtime::NDArray rhs_mapping,
+    runtime::NDArray lhs_data,
+    runtime::NDArray rhs_data,
+    runtime::NDArray out_mapping,
+    runtime::NDArray out_data) {
+    LOG(FATAL) << "Not implemented.";
+  }
 };
 
 /*

@@ -87,22 +87,22 @@ NDArray SrcOpEdgeReduce(
   const auto& out_shape = BinaryElewiseInferShape(reducer, indptr,
       indices, src_data, edge_data);
   NDArray out_data = NDArray::Empty(out_shape, dtype, ctx);
-  NDArray dummy;  // dummy dst data
   DGL_XPU_SWITCH(ctx.device_type, XPU, {
     DGL_DTYPE_SWITCH(dtype, DType, {
       REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
         BINARY_OP_SWITCH(binary_op, DType, BinaryOp, {
-          if (edge_mapping->ndim == 0) {
-            BinaryReduceExecutor<XPU, DType, DirectId<int64_t>,
-                                 SelectDst, SelectSrc, SelectEdge,
-                                 BinaryOp, Reducer>::Run(
-              indptr, indices, edge_mapping, src_data, edge_data, dummy, out_data);
-          } else {
-            BinaryReduceExecutor<XPU, DType, IndirectId<XPU, int64_t>,
-                                 SelectDst, SelectSrc, SelectEdge,
-                                 BinaryOp, Reducer>::Run(
-              indptr, indices, edge_mapping, src_data, edge_data, dummy, out_data);
-          }
+          MAPPING_SWITCH(edge_mapping, XPU, EdgeIdGetter, {
+            MAPPING_SWITCH(src_mapping, XPU, SrcIdGetter, {
+              MAPPING_SWITCH(out_mapping, XPU, OutIdGetter, {
+                BinaryReduceExecutor<XPU, DType,
+                                     OutIdGetter, SrcIdGetter, EdgeIdGetter,
+                                     SelectDst, SelectSrc, SelectEdge,
+                                     BinaryOp, Reducer>::Run(
+                  indptr, indices, src_mapping, edge_mapping,
+                  src_data, edge_data, out_mapping, out_data);
+              });
+            });
+          });
         });
       });
     });
@@ -137,6 +137,7 @@ NDArray SrcOpDstReduce(
     NDArray dst_data,
     NDArray out_mapping,
     const int64_t out_size) {
+  return NDArray();
 }
 
 DGL_REGISTER_GLOBAL("backend.kernel._CAPI_DGLKernelSrcMulDstReduce")

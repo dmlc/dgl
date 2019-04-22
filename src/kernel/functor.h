@@ -52,6 +52,14 @@ struct IndirectId {
   static DGLDEVICE DGLINLINE IdxType Call(IdxType id, IdxType* shuffle_ids);
 };
 
+#define MAPPING_SWITCH(val, XPU, MapType, ...) \
+  if (val->ndim == 0) {                        \
+    typedef DirectId<int64_t> MapType;         \
+    {__VA_ARGS__}                              \
+  } else {                                     \
+    typedef IndirectId<XPU, int64_t> MapType;  \
+    {__VA_ARGS__}                              \
+  }
 
 }  // namespace kernel
 }  // namespace dgl

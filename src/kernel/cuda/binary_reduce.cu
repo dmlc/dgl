@@ -34,18 +34,21 @@ int FindNumThreads(int dim, int max_nthrs) {
 }
 }  // namespace
 
-template <typename DType, typename EidGetter,
+template <typename DType,
+          typename OutIdGetter, typename LeftIdGetter, typename RightIdGetter,
           typename OutSelector, typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
-struct BinaryReduceExecutor<kDLGPU, DType, EidGetter,
+struct BinaryReduceExecutor<kDLGPU, DType,
+                            OutIdGetter, LeftIdGetter, RightIdGetter,
                             OutSelector, LeftSelector, RightSelector,
                             BinaryOp, Reducer> {
   static void Run(NDArray indptr,
                   NDArray indices,
-                  NDArray edge_ids,
-                  NDArray src_data,
-                  NDArray edge_data,
-                  NDArray dst_data,
+                  NDArray lhs_mapping,
+                  NDArray rhs_mapping,
+                  NDArray lhs_data,
+                  NDArray rhs_data,
+                  NDArray out_mapping,
                   NDArray out_data) {
     // device
     auto device = runtime::DeviceAPI::Get(out_data->ctx);
@@ -60,11 +63,12 @@ struct BinaryReduceExecutor<kDLGPU, DType, EidGetter,
     // GData
     cuda::GData<DType> gdata;
     gdata.x_length = x_len;
-    gdata.src_data = static_cast<DType*>(src_data->data);
-    gdata.edge_data = static_cast<DType*>(edge_data->data);
-    gdata.dst_data = static_cast<DType*>(dst_data->data);
-    gdata.edge_ids = static_cast<int64_t*>(edge_ids->data);
+    gdata.lhs_data = static_cast<DType*>(lhs_data->data);
+    gdata.rhs_data = static_cast<DType*>(rhs_data->data);
     gdata.out_data = static_cast<DType*>(out_data->data);
+    gdata.lhs_mapping = static_cast<int64_t*>(lhs_mapping->data);
+    gdata.rhs_mapping = static_cast<int64_t*>(rhs_mapping->data);
+    gdata.out_mapping = static_cast<int64_t*>(out_mapping->data);
     // device GData
     cuda::GData<DType>* d_gdata;
     CUDA_CALL(cudaMalloc(&d_gdata, sizeof(cuda::GData<DType>)));
@@ -81,7 +85,11 @@ struct BinaryReduceExecutor<kDLGPU, DType, EidGetter,
     rtcfg.data_num_blocks = (x_len + (nt * 2) - 1) / (nt * 2);
 
     typedef minigun::advance::Config<true, minigun::advance::kV2N> Config;
-    minigun::advance::Advance<kDLGPU, Config, cuda::GData<DType>, Functor, Alloc>(
+    typedef cuda::FunctorsTempl<DType, OutIdGetter, LeftIdGetter, RightIdGetter,
+            OutSelector, LeftSelector, RightSelector, BinaryOp, Reducer> Functors;
+    typedef BinaryReduce<DType, Functors> BinaryReduceUDF;
+    // TODO(minjie): allocator
+    minigun::advance::Advance<kDLGPU, Config, cuda::GData<DType>, BinaryReduceUDF>(
         rtcfg, csr, d_gdata, IntArray1D(), IntArray1D());
 
     // free device GData
