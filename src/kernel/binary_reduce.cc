@@ -71,9 +71,12 @@ NDArray SrcOpEdgeReduce(
     const std::string& binary_op,
     NDArray indptr,
     NDArray indices,
-    NDArray edge_ids,
+    NDArray src_mapping,
+    NDArray edge_mapping,
     NDArray src_data,
-    NDArray edge_data) {
+    NDArray edge_data,
+    NDArray out_mapping,
+    const int64_t out_size) {
   // TODO(minjie): no broadcasting shape
   CHECK(IsValidBinaryOpShape(src_data, edge_data))
     << "Cannot compute binary operation between feature shapes "
@@ -89,16 +92,16 @@ NDArray SrcOpEdgeReduce(
     DGL_DTYPE_SWITCH(dtype, DType, {
       REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
         BINARY_OP_SWITCH(binary_op, DType, BinaryOp, {
-          if (edge_ids->ndim == 0) {
+          if (edge_mapping->ndim == 0) {
             BinaryReduceExecutor<XPU, DType, DirectId<int64_t>,
                                  SelectDst, SelectSrc, SelectEdge,
                                  BinaryOp, Reducer>::Run(
-              indptr, indices, edge_ids, src_data, edge_data, dummy, out_data);
+              indptr, indices, edge_mapping, src_data, edge_data, dummy, out_data);
           } else {
             BinaryReduceExecutor<XPU, DType, IndirectId<XPU, int64_t>,
                                  SelectDst, SelectSrc, SelectEdge,
                                  BinaryOp, Reducer>::Run(
-              indptr, indices, edge_ids, src_data, edge_data, dummy, out_data);
+              indptr, indices, edge_mapping, src_data, edge_data, dummy, out_data);
           }
         });
       });
@@ -113,11 +116,14 @@ DGL_REGISTER_GLOBAL("backend.kernel._CAPI_DGLKernelSrcMulEdgeReduce")
     std::string binary_op = args[1];
     NDArray indptr = args[2];
     NDArray indices = args[3];
-    NDArray edge_ids = args[4];
-    NDArray src_data = args[5];
-    NDArray edge_data = args[6];
+    NDArray src_mapping = args[4];
+    NDArray edge_mapping = args[5];
+    NDArray src_data = args[6];
+    NDArray edge_data = args[7];
+    NDArray out_mapping = args[8];
+    const int64_t out_size = args[9];
     *rv = SrcOpEdgeReduce(reducer, binary_op, indptr, indices,
-        edge_ids, src_data, edge_data);
+        src_mapping, edge_mapping, src_data, edge_data, out_mapping, out_size);
   });
 
 NDArray SrcOpDstReduce(
@@ -125,9 +131,12 @@ NDArray SrcOpDstReduce(
     const std::string& binary_op,
     NDArray indptr,
     NDArray indices,
-    NDArray edge_ids,
+    NDArray src_mapping,
+    NDArray dst_mapping,
     NDArray src_data,
-    NDArray dst_data) {
+    NDArray dst_data,
+    NDArray out_mapping,
+    const int64_t out_size) {
 }
 
 DGL_REGISTER_GLOBAL("backend.kernel._CAPI_DGLKernelSrcMulDstReduce")
@@ -136,11 +145,14 @@ DGL_REGISTER_GLOBAL("backend.kernel._CAPI_DGLKernelSrcMulDstReduce")
     std::string binary_op = args[1];
     NDArray indptr = args[2];
     NDArray indices = args[3];
-    NDArray edge_ids = args[4];
-    NDArray src_data = args[5];
-    NDArray dst_data = args[6];
+    NDArray src_mapping = args[4];
+    NDArray dst_mapping = args[5];
+    NDArray src_data = args[6];
+    NDArray dst_data = args[7];
+    NDArray out_mapping = args[8];
+    const int64_t out_size = args[9];
     *rv = SrcOpDstReduce(reducer, binary_op, indptr, indices,
-        edge_ids, src_data, dst_data);
+        src_mapping, dst_mapping, src_data, dst_data, out_mapping, out_size);
   });
 
 }  // namespace kernel
