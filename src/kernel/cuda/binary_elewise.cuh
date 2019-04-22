@@ -1,5 +1,5 @@
-#ifndef DGL_KERNEL_CUDA_BINARY_ELEWISE_H_
-#define DGL_KERNEL_CUDA_BINARY_ELEWISE_H_
+#ifndef DGL_KERNEL_CUDA_BINARY_ELEWISE_CUH_
+#define DGL_KERNEL_CUDA_BINARY_ELEWISE_CUH_
 
 #include "../functor.h"
 #include "./functor.cuh"
@@ -82,14 +82,24 @@ using SrcOpEdgeReduce = FunctorsTempl<DType, EidGetter, SelectDst<int64_t>,
                                       ReadSrc<DType, LDGReader>, ReadEdge<DType, LDGReader>,
                                       BinaryOp, OutputWriter>;
 
+template <typename DType, typename EidGetter, typename BinaryOp>
+using SrcOpEdgeToEdge = FunctorsTempl<DType, EidGetter, SelectEdge<int64_t>,
+                                      ReadSrc<DType, LDGReader>, ReadDst<DType, LDGReader>,
+                                      BinaryOp, StoreWriter<DType>>;
+
 template <typename DType, typename EidGetter,
           typename BinaryOp, typename OutputWriter>
 using SrcOpDstReduce = FunctorsTempl<DType, EidGetter, SelectDst<int64_t>,
                                      ReadSrc<DType, LDGReader>, ReadDst<DType, LDGReader>,
                                      BinaryOp, OutputWriter>;
 
+template <typename DType, typename EidGetter, typename BinaryOp>
+using SrcOpDstToEdge = FunctorsTempl<DType, EidGetter, SelectEdge<int64_t>,
+                                     ReadSrc<DType, LDGReader>, ReadDst<DType, LDGReader>,
+                                     BinaryOp, StoreWriter<DType>>;
+
 }  // namespace cuda
 }  // namespace kernel
 }  // namespace dgl
 
-#endif  // DGL_KERNEL_CUDA_BINARY_ELEWISE_H_
+#endif  // DGL_KERNEL_CUDA_BINARY_ELEWISE_CUH_

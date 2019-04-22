@@ -125,6 +125,23 @@ struct BinaryUseRhs {
   }
 };
 
+#define BINARY_OP_SWITCH(val, DType, OpType, ...)   \
+  if (val == "add") {                               \
+    typedef BinaryAdd<DType> OpType;                \
+    {__VA_ARGS__}                                   \
+  } else if (val == "sub") {                        \
+    typedef BinarySub<DType> OpType;                \
+    {__VA_ARGS__}                                   \
+  } else if (val == "mul") {                        \
+    typedef BinaryMul<DType> OpType;                \
+    {__VA_ARGS__}                                   \
+  } else if (val == "div") {                        \
+    typedef BinaryDiv<DType> OpType;                \
+    {__VA_ARGS__}                                   \
+  } else {                                          \
+    LOG(FATAL) << "Unsupported binary op: " << val; \
+  }
+
 }  // namespace kernel
 }  // namespace dgl
 

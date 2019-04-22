@@ -1,6 +1,7 @@
 #ifndef DGL_KERNEL_CUDA_FUNCTOR_CUH_
 #define DGL_KERNEL_CUDA_FUNCTOR_CUH_
 
+#include "../binary_elewise.h"
 #include "./atomic.cuh"
 
 namespace dgl {
@@ -55,6 +56,26 @@ struct AtomicMulWriter {
     AtomicMul(addr, val);
   }
 };
+
+#define REDUCER_SWITCH(val, DType, RedType, ...)   \
+  if (val == binary_op::kReduceSum) {              \
+    typedef AtomicAddWriter<DType> RedType;        \
+    {__VA_ARGS__}                                  \
+  } else if (val == binary_op::kReduceMax) {       \
+    typedef AtomicMaxWriter<DType> RedType;        \
+    {__VA_ARGS__}                                  \
+  } else if (val == binary_op::kReduceMin) {       \
+    typedef AtomicMinWriter<DType> RedType;        \
+    {__VA_ARGS__}                                  \
+  } else if (val == binary_op::kReduceProd) {      \
+    typedef AtomicMulWriter<DType> RedType;        \
+    {__VA_ARGS__}                                  \
+  } else if (val == binary_op::kReduceMean) {      \
+    typedef AtomicAddWriter<DType> RedType;        \
+    {__VA_ARGS__}                                  \
+  } else {                                         \
+    LOG(FATAL) << "Unsupported reducer: " << val;  \
+  }
 
 }  // namespace cuda
 }  // namespace kernel
