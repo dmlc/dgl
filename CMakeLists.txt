@@ -4,6 +4,8 @@
 cmake_minimum_required(VERSION 2.8)
 project(dgl C CXX)
 
+message(STATUS "Start configuring project ${PROJECT_NAME}")
+
 # cmake utils
 include(cmake/util/Util.cmake)
 include(cmake/util/MshadowUtil.cmake)
@@ -27,7 +29,8 @@ dgl_option(USE_CUDA "Build with CUDA" OFF)
 include_directories("include")
 include_directories("third_party/dlpack/include")
 include_directories("third_party/dmlc-core/include")
-include_directories("third_party/minigun/minigun/")
+include_directories("third_party/minigun/minigun")
+include_directories("third_party/minigun/third_party/moderngpu/src")
 
 # initial variables
 set(DGL_LINKER_LIBS "")
@@ -84,6 +87,9 @@ file(GLOB_RECURSE DGL_SRC_1
 list(APPEND DGL_SRC ${DGL_SRC_1})
 
 include(cmake/modules/CUDA.cmake)
+if(USE_CUDA)
+  dgl_cuda_compile(cuda_objs ${DGL_CUDA_SRC})
+endif(USE_CUDA)
 
 add_library(dgl SHARED ${DGL_SRC})
 
