@@ -280,7 +280,11 @@ def load_cora_data():
     features = torch.FloatTensor(data.features)
     labels = torch.LongTensor(data.labels)
     mask = torch.ByteTensor(data.train_mask)
-    g = DGLGraph(data.graph)
+    g = data.graph
+    # add self loop
+    g.remove_edges_from(g.selfloop_edges())
+    g = DGLGraph(g)
+    g.add_edges(g.nodes(), g.nodes())
     return g, features, labels, mask
 
 ##############################################################################
