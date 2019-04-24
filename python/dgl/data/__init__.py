@@ -15,7 +15,7 @@ from .gindt import GINDataset
 
 def register_data_args(parser):
     parser.add_argument("--dataset", type=str, required=True,
-            help="The input dataset.")
+            help="(Required) The input dataset. Can be cora, citeseer, pubmed, syn(synthetic dataset) or reddit")
     citegrh.register_args(parser)
 
 def load_data(args):
