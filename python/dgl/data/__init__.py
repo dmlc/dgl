@@ -14,7 +14,7 @@ from .gindt import GINDataset
 
 
 def register_data_args(parser):
-    parser.add_argument("--dataset", type=str, required=False,
+    parser.add_argument("--dataset", type=str, required=True,
             help="The input dataset.")
     citegrh.register_args(parser)
 
