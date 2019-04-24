@@ -30,6 +30,9 @@ struct BinaryReduce {
     DType* lhsoff = gdata->lhs_data + lid * D;
     DType* rhsoff = gdata->rhs_data + rid * D;
     DType* outoff = gdata->out_data + oid * D;
+    if (dst == 0 && tx == 0) {
+      printf("%ld %ld %f\n", src, eid, (*lhsoff) * (*rhsoff));
+    }
     while (tx < D) {
       DType lhs = Functors::Read(lhsoff + tx);
       DType rhs = Functors::Read(rhsoff + tx);

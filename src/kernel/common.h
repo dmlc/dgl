@@ -34,17 +34,13 @@ namespace kernel {
   if (val.code == kDLFloat && val.bits == 32) {             \
     typedef float DType;                                    \
     {__VA_ARGS__}                                           \
-  } else if (val.code == kDLFloat && val.bits == 64) {      \
-    typedef double DType;                                   \
-    {__VA_ARGS__}                                           \
   } else {                                                  \
     LOG(FATAL) << "Unsupported dtype: " << val.code << "_"  \
                << val.bits;                                 \
   }
 
 #define GEN_DTYPE(GEN, ...) \
-  GEN(__VA_ARGS__, float)  \
-  GEN(__VA_ARGS__, double)
+  GEN(__VA_ARGS__, float)
 
 #if 0
 #define DGL_DTYPE_SWITCH(val, DType, ...)                   \

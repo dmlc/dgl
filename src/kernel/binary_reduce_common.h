@@ -1,6 +1,7 @@
 #ifndef DGL_KERNEL_BINARY_REDUCE_COMMON_H_
 #define DGL_KERNEL_BINARY_REDUCE_COMMON_H_
 
+#include <limits>
 #include <string>
 #include "./common.h"
 
@@ -221,6 +222,51 @@ struct ReduceNone { };
     LOG(FATAL) << "Unsupported reducer: " << val;  \
   }
 
+// functors for zero elements of reducers
+template <typename Reducer>
+struct Zero { };
+
+template <int XPU, typename DType>
+struct Zero<ReduceSum<XPU, DType>> {
+  static constexpr DType value = 0;
+};
+
+template <int XPU, typename DType>
+struct Zero<ReduceMax<XPU, DType>> {
+  static constexpr DType value = std::numeric_limits<DType>::lowest();
+};
+
+template <int XPU, typename DType>
+struct Zero<ReduceMin<XPU, DType>> {
+  static constexpr DType value = std::numeric_limits<DType>::max();
+};
+
+template <int XPU, typename DType>
+struct Zero<ReduceProd<XPU, DType>> {
+  static constexpr DType value = 1;
+};
+
+template <int XPU, typename DType>
+struct Zero<ReduceNone<XPU, DType>> {
+  static constexpr DType value = 0;
+};
+
+template <int XPU, typename DType>
+constexpr DType Zero<ReduceSum<XPU, DType>>::value;
+
+template <int XPU, typename DType>
+constexpr DType Zero<ReduceMax<XPU, DType>>::value;
+
+template <int XPU, typename DType>
+constexpr DType Zero<ReduceMin<XPU, DType>>::value;
+
+template <int XPU, typename DType>
+constexpr DType Zero<ReduceProd<XPU, DType>>::value;
+
+template <int XPU, typename DType>
+constexpr DType Zero<ReduceNone<XPU, DType>>::value;
+
+// functors for selecting output target
 template <typename Reducer>
 struct OutSelector {
   typedef SelectDst Type;

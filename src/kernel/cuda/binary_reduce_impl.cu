@@ -1,3 +1,6 @@
+#include <thrust/device_ptr.h>
+#include <thrust/fill.h>
+
 #include <dlpack/dlpack.h>
 #include <minigun/minigun.h>
 #include <dgl/runtime/device_api.h>
@@ -14,7 +17,7 @@ namespace dgl {
 namespace kernel {
 namespace cuda {
 namespace {
-int64_t ComputeXLength(NDArray feat_array) {
+inline int64_t ComputeXLength(NDArray feat_array) {
   int64_t ret = 1;
   for (int i = 1; i < feat_array->ndim; ++i) {
     ret *= feat_array->shape[i];
@@ -26,17 +29,29 @@ int64_t ComputeXLength(NDArray feat_array) {
 //  - power of two
 //  - smaller or equal to dim
 //  - smaller or equal to max_nthrs
-int FindNumThreads(int dim, int max_nthrs) {
+inline int FindNumThreads(int dim, int max_nthrs) {
   int ret = max_nthrs;
   while (ret > dim) {
     ret = ret >> 1;
   }
   return ret;
 }
+
+inline int64_t NElements(NDArray array) {
+  if (array->ndim == 0) {
+    return 0;
+  } else {
+    int64_t ret = 1;
+    for (int i = 0; i < array->ndim; ++i) {
+      ret *= array->shape[i];
+    }
+    return ret;
+  }
+}
 }  // namespace
 
-template <typename DType>
-GData<DType>* AllocGData(int64_t x_len,
+template <typename DType, typename Reducer>
+GData<DType>* AllocGData(cudaStream_t stream, int64_t x_len,
                          NDArray lhs_mapping, NDArray rhs_mapping,
                          NDArray lhs_data, NDArray rhs_data,
                          NDArray out_mapping, NDArray out_data) {
@@ -46,13 +61,23 @@ GData<DType>* AllocGData(int64_t x_len,
   gdata.lhs_data = static_cast<DType*>(lhs_data->data);
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
-  gdata.lhs_mapping = static_cast<int64_t*>(lhs_mapping->data);
-  gdata.rhs_mapping = static_cast<int64_t*>(rhs_mapping->data);
-  gdata.out_mapping = static_cast<int64_t*>(out_mapping->data);
+  if (lhs_mapping->ndim != 0) {
+    gdata.lhs_mapping = static_cast<int64_t*>(lhs_mapping->data);
+  }
+  if (rhs_mapping->ndim != 0) {
+    gdata.rhs_mapping = static_cast<int64_t*>(rhs_mapping->data);
+  }
+  if (out_mapping->ndim != 0) {
+    gdata.out_mapping = static_cast<int64_t*>(out_mapping->data);
+  }
+  // fill out data with zero values
+  thrust::device_ptr<DType> out_ptr = thrust::device_pointer_cast(gdata.out_data);
+  thrust::fill(thrust::cuda::par.on(stream),
+      out_ptr, out_ptr + NElements(out_data), Zero<Reducer>::value);
   // device GData
-  cuda::GData<DType>* d_gdata;
-  CUDA_CALL(cudaMalloc(&d_gdata, sizeof(cuda::GData<DType>)));
-  CUDA_CALL(cudaMemcpy(d_gdata, &gdata, sizeof(cuda::GData<DType>),
+  GData<DType>* d_gdata;
+  CUDA_CALL(cudaMalloc(&d_gdata, sizeof(GData<DType>)));
+  CUDA_CALL(cudaMemcpy(d_gdata, &gdata, sizeof(GData<DType>),
         cudaMemcpyHostToDevice));
   return d_gdata;
 }
@@ -80,6 +105,9 @@ void BinaryReduceImpl(
   csr.column_indices.data = static_cast<int64_t*>(indices->data);
   csr.column_indices.length = indices->shape[0];
   const int64_t x_len = ComputeXLength(out_data);
+  LOG(INFO) << "csr.rowlen=" << csr.row_offsets.length
+    << " csr.collen=" << csr.column_indices.length
+    << " xlen=" << x_len;
 
   // advance config
   minigun::advance::RuntimeConfig rtcfg;
@@ -94,22 +122,26 @@ void BinaryReduceImpl(
   const DLDataType& dtype = lhs_data->dtype;
   const bool has_indirect =
     (lhs_mapping->ndim != 0 || rhs_mapping->ndim != 0 || out_mapping->ndim != 0);
+  LOG(INFO) << "has_indirect? " << has_indirect;
+  LOG(INFO) << "nt=" << nt << " nb=" << rtcfg.data_num_blocks;
   DGL_DTYPE_SWITCH(dtype, DType, {
-    GData<DType>* gdata = AllocGData<DType>(x_len, lhs_mapping, rhs_mapping,
-        lhs_data, rhs_data, out_mapping, out_data);
     //REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {
       typedef ReduceSum<kDLGPU, DType> Reducer;
+      GData<DType>* gdata = AllocGData<DType, Reducer>(
+          rtcfg.stream, x_len, lhs_mapping, rhs_mapping,
+          lhs_data, rhs_data, out_mapping, out_data);
       BINARY_OP_SWITCH(op, DType, BinaryOp, {
         TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
           if (has_indirect) {
-            typedef DirectId<kDLGPU, int64_t> IdGetter;
-            CallBinaryReduce<DType, IdGetter, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, csr, gdata);
-          } else {
             typedef IndirectId<kDLGPU, int64_t> IdGetter;
             CallBinaryReduce<DType, IdGetter, LeftTarget,
               RightTarget, BinaryOp, Reducer>(rtcfg, csr, gdata);
+          } else {
+            typedef DirectId<kDLGPU, int64_t> IdGetter;
+            CallBinaryReduce<DType, IdGetter, LeftTarget,
+              RightTarget, BinaryOp, Reducer>(rtcfg, csr, gdata);
           }
+          CUDA_CALL(cudaDeviceSynchronize());
         });
       });
     //});

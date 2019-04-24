@@ -1,9 +1,7 @@
 ########################################
 # Borrowed and adapted from TVM project
 ########################################
-cmake_minimum_required(VERSION 2.8)
 project(dgl C CXX)
-
 message(STATUS "Start configuring project ${PROJECT_NAME}")
 
 # cmake utils
@@ -24,6 +22,14 @@ endif()
 # and add set(OPTION VALUE) to override these build options.
 # Alernatively, use cmake -DOPTION=VALUE through command-line.
 dgl_option(USE_CUDA "Build with CUDA" OFF)
+
+if(USE_CUDA)
+  project(dgl C CXX CUDA)
+  cmake_minimum_required(VERSION 3.9)
+else(USE_CUA)
+  cmake_minimum_required(VERSION 2.8)
+endif(USE_CUDA)
+
 
 # include directories
 include_directories("include")
@@ -87,10 +93,6 @@ file(GLOB_RECURSE DGL_SRC_1
 list(APPEND DGL_SRC ${DGL_SRC_1})
 
 include(cmake/modules/CUDA.cmake)
-if(USE_CUDA)
-  dgl_cuda_compile(CUDA_OBJ ${DGL_CUDA_SRC})
-  list(APPEND DGL_SRC ${CUDA_OBJ})
-endif(USE_CUDA)
 
 add_library(dgl SHARED ${DGL_SRC})
 
