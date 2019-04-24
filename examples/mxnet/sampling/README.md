@@ -64,3 +64,4 @@ reddit: test accuracy 96.1% with `--num-neighbors 1` and `--batch-size 1000`, ~9
 DGLBACKEND=mxnet python examples/mxnet/sampling/train.py --model graphsage_cv --batch-size 1000 --test-batch-size 5000 --n-epochs 50 --dataset reddit --num-neighbors 1 --n-hidden 128 --dropout 0.2 --weight-decay 0
 ```
 
+python3 ../incubator-mxnet/tools/launch.py -n 1 -s 1 --launcher local python3 examples/mxnet/sampling/multi_process_train.py --graph-name pubmed --model gcn_ns
