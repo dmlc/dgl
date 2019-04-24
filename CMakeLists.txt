@@ -88,7 +88,8 @@ list(APPEND DGL_SRC ${DGL_SRC_1})
 
 include(cmake/modules/CUDA.cmake)
 if(USE_CUDA)
-  dgl_cuda_compile(cuda_objs ${DGL_CUDA_SRC})
+  dgl_cuda_compile(CUDA_OBJ ${DGL_CUDA_SRC})
+  list(APPEND DGL_SRC ${CUDA_OBJ})
 endif(USE_CUDA)
 
 add_library(dgl SHARED ${DGL_SRC})

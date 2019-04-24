@@ -1,7 +1,7 @@
 #ifndef DGL_KERNEL_CUDA_FUNCTOR_CUH_
 #define DGL_KERNEL_CUDA_FUNCTOR_CUH_
 
-#include "../binary_reduce.h"
+#include "../binary_reduce_common.h"
 #include "./atomic.cuh"
 
 namespace dgl {
@@ -26,35 +26,35 @@ struct LDGReader {
 template <typename DType>
 struct ReduceSum<kDLGPU, DType> {
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
-    AtomicAdd(addr, val);
+    cuda::AtomicAdd(addr, val);
   }
 };
 
 template <typename DType>
 struct ReduceMax<kDLGPU, DType> {
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
-    AtomicMax(addr, val);
+    cuda::AtomicMax(addr, val);
   }
 };
 
 template <typename DType>
 struct ReduceMin<kDLGPU, DType> {
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
-    AtomicMin(addr, val);
+    cuda::AtomicMin(addr, val);
   }
 };
 
 template <typename DType>
 struct ReduceMean<kDLGPU, DType> {
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
-    AtomicAdd(addr, val);
+    cuda::AtomicAdd(addr, val);
   }
 };
 
 template <typename DType>
 struct ReduceProd<kDLGPU, DType> {
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
-    AtomicMul(addr, val);
+    cuda::AtomicMul(addr, val);
   }
 };
 
@@ -68,7 +68,11 @@ struct ReduceNone<kDLGPU, DType> {
 template <typename IdxType>
 struct IndirectId<kDLGPU, IdxType> {
   static __device__ __forceinline__ IdxType Call(IdxType id, IdxType* shuffle_ids) {
-    return cuda::LDGReader<IdxType>::Call(shuffle_ids + id);
+    if (shuffle_ids) {
+      return cuda::LDGReader<IdxType>::Call(shuffle_ids + id);
+    } else {
+      return id;
+    }
   }
 };
 

@@ -12,16 +12,23 @@ namespace kernel {
 #define DGLINLINE __inline__
 #endif  // __CUDACC__
 
-#define DGL_XPU_SWITCH(val, XPU, ...)  \
-  if (val == kDLCPU) {                 \
-    const int XPU = kDLCPU;            \
-    {__VA_ARGS__}                      \
-  } else if (val == kDLGPU) {          \
-    const int XPU = kDLGPU;            \
-    {__VA_ARGS__}                      \
-  } else {                             \
+#ifdef DGL_USE_CUDA
+#define DGL_XPU_SWITCH(val, Method, ...)  \
+  if (val == kDLCPU) {                    \
+    cpu::Method(__VA_ARGS__);             \
+  } else if (val == kDLGPU) {             \
+    cuda::Method(__VA_ARGS__);            \
+  } else {                                \
     LOG(FATAL) << "Unsupported device type: " << val;  \
   }
+#else  // DGL_USE_CUDA
+#define DGL_XPU_SWITCH(val, Method, ...)  \
+  if (val == kDLCPU) {                    \
+    cpu::Method(__VA_ARGS__);             \
+  } else {                                \
+    LOG(FATAL) << "Unsupported device type: " << val;  \
+  }
+#endif  // DGL_USE_CUDA
 
 #define DGL_DTYPE_SWITCH(val, DType, ...)                   \
   if (val.code == kDLFloat && val.bits == 32) {             \
@@ -35,6 +42,9 @@ namespace kernel {
                << val.bits;                                 \
   }
 
+#define GEN_DTYPE(GEN, ...) \
+  GEN(__VA_ARGS__, float)  \
+  GEN(__VA_ARGS__, double)
 
 #if 0
 #define DGL_DTYPE_SWITCH(val, DType, ...)                   \

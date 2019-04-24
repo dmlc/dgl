@@ -2,37 +2,10 @@
 #define DGL_KERNEL_BINARY_REDUCE_H_
 
 #include <dgl/runtime/ndarray.h>
-#include "./common.h"
+#include "./binary_reduce_common.h"
 
 namespace dgl {
 namespace kernel {
-namespace binary_op {
-  static const std::string kReduceSum = "sum";
-  static const std::string kReduceMax = "max";
-  static const std::string kReduceMin = "min";
-  static const std::string kReduceMean = "mean";
-  static const std::string kReduceProd = "prod";
-  static const std::string kReduceNone = "none";
-}  // namespace binary_op
-
-template <int XPU, typename DType,
-          typename OutIdGetter, typename LeftIdGetter, typename RightIdGetter,
-          typename OutSelector, typename LeftSelector, typename RightSelector,
-          typename BinaryOp, typename Reducer>
-struct BinaryReduceExecutor {
-  static void Run(
-    runtime::NDArray indptr,
-    runtime::NDArray indices,
-    runtime::NDArray lhs_mapping,
-    runtime::NDArray rhs_mapping,
-    runtime::NDArray lhs_data,
-    runtime::NDArray rhs_data,
-    runtime::NDArray out_mapping,
-    runtime::NDArray out_data) {
-    LOG(FATAL) << "Not implemented.";
-  }
-};
-
 /*
  * !\brief Infer the output shape of binary elewise graph computation.
  */
@@ -120,107 +93,42 @@ runtime::NDArray SrcOpDstReduce(
     runtime::NDArray out_mapping,
     const int64_t out_size);
 
-// common binary functors
-template <typename DType>
-struct BinaryAdd {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs + rhs;
-  }
-};
 
-template <typename DType>
-struct BinaryMul {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs * rhs;
-  }
-};
+// Implementations
 
-template <typename DType>
-struct BinarySub {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs - rhs;
-  }
-};
+namespace cpu {
+void BinaryReduceImpl(
+    const std::string& reducer,
+    const std::string& binary_op,
+    runtime::NDArray indptr,
+    runtime::NDArray indices,
+    binary_op::Target lhs,
+    binary_op::Target rhs,
+    runtime::NDArray lhs_mapping,
+    runtime::NDArray rhs_mapping,
+    runtime::NDArray lhs_data,
+    runtime::NDArray rhs_data,
+    binary_op::Target out,
+    runtime::NDArray out_mapping,
+    runtime::NDArray out_data);
+}  // namespace cpu
 
-template <typename DType>
-struct BinaryDiv {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs / rhs;
-  }
-};
-
-template <typename DType>
-struct BinaryUseLhs {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return lhs;
-  }
-};
-
-template <typename DType>
-struct BinaryUseRhs {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return rhs;
-  }
-};
-
-#define BINARY_OP_SWITCH(val, DType, OpType, ...)   \
-  if (val == "add") {                               \
-    typedef BinaryAdd<DType> OpType;                \
-    {__VA_ARGS__}                                   \
-  } else if (val == "sub") {                        \
-    typedef BinarySub<DType> OpType;                \
-    {__VA_ARGS__}                                   \
-  } else if (val == "mul") {                        \
-    typedef BinaryMul<DType> OpType;                \
-    {__VA_ARGS__}                                   \
-  } else if (val == "div") {                        \
-    typedef BinaryDiv<DType> OpType;                \
-    {__VA_ARGS__}                                   \
-  } else {                                          \
-    LOG(FATAL) << "Unsupported binary op: " << val; \
-  }
-
-// functors for reducers
-template <int XPU, typename DType>
-struct ReduceSum { };
-
-template <int XPU, typename DType>
-struct ReduceMax { };
-
-template <int XPU, typename DType>
-struct ReduceMin { };
-
-template <int XPU, typename DType>
-struct ReduceMean { };
-
-template <int XPU, typename DType>
-struct ReduceProd { };
-
-template <int XPU, typename DType>
-struct ReduceNone { };
-
-#define REDUCER_SWITCH(val, XPU, DType, RedType, ...)   \
-  if (val == binary_op::kReduceSum) {              \
-    typedef ReduceSum<XPU, DType> RedType;         \
-    {__VA_ARGS__}                                  \
-  } else if (val == binary_op::kReduceMax) {       \
-    typedef ReduceMax<XPU, DType> RedType;         \
-    {__VA_ARGS__}                                  \
-  } else if (val == binary_op::kReduceMin) {       \
-    typedef ReduceMin<XPU, DType> RedType;         \
-    {__VA_ARGS__}                                  \
-  } else if (val == binary_op::kReduceMean) {      \
-    typedef ReduceMean<XPU, DType> RedType;        \
-    {__VA_ARGS__}                                  \
-  } else if (val == binary_op::kReduceProd) {      \
-    typedef ReduceProd<XPU, DType> RedType;        \
-    {__VA_ARGS__}                                  \
-  } else if (val == binary_op::kReduceNone) {      \
-    typedef ReduceNone<XPU, DType> RedType;        \
-    {__VA_ARGS__}                                  \
-  } else {                                         \
-    LOG(FATAL) << "Unsupported reducer: " << val;  \
-  }
+namespace cuda {
+void BinaryReduceImpl(
+    const std::string& reducer,
+    const std::string& binary_op,
+    runtime::NDArray indptr,
+    runtime::NDArray indices,
+    binary_op::Target lhs,
+    binary_op::Target rhs,
+    runtime::NDArray lhs_mapping,
+    runtime::NDArray rhs_mapping,
+    runtime::NDArray lhs_data,
+    runtime::NDArray rhs_data,
+    binary_op::Target out,
+    runtime::NDArray out_mapping,
+    runtime::NDArray out_data);
+}  // namespace cuda
 
 }  // namespace kernel
 }  // namespace dgl

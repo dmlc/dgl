@@ -9,11 +9,11 @@ namespace cuda {
 template <int Bytes> struct Code { };
 
 template <> struct Code<4> {
-  typedef uint32_t Type;
+  typedef unsigned int Type;
 };
 
 template <> struct Code<8> {
-  typedef uint64_t Type;
+  typedef unsigned long long int Type;
 };
 
 // Helper class for converting to/from atomicCAS compatible types.

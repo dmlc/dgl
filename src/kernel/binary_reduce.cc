@@ -6,7 +6,6 @@
 #include "../c_api_common.h"
 #include "./binary_reduce.h"
 #include "./common.h"
-#include "./functor.h"
 
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;
@@ -87,30 +86,17 @@ NDArray SrcOpEdgeReduce(
   const auto& out_shape = BinaryElewiseInferShape(reducer, indptr,
       indices, src_data, edge_data);
   NDArray out_data = NDArray::Empty(out_shape, dtype, ctx);
-  DGL_XPU_SWITCH(ctx.device_type, XPU, {
-    DGL_DTYPE_SWITCH(dtype, DType, {
-      REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
-        BINARY_OP_SWITCH(binary_op, DType, BinaryOp, {
-          MAPPING_SWITCH(edge_mapping, XPU, EdgeIdGetter, {
-            MAPPING_SWITCH(src_mapping, XPU, SrcIdGetter, {
-              MAPPING_SWITCH(out_mapping, XPU, OutIdGetter, {
-                BinaryReduceExecutor<XPU, DType,
-                                     OutIdGetter, SrcIdGetter, EdgeIdGetter,
-                                     SelectDst, SelectSrc, SelectEdge,
-                                     BinaryOp, Reducer>::Run(
-                  indptr, indices, src_mapping, edge_mapping,
-                  src_data, edge_data, out_mapping, out_data);
-              });
-            });
-          });
-        });
-      });
-    });
-  });
+  DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl,
+      reducer, binary_op, indptr, indices,
+      binary_op::kSrc, binary_op::kEdge,
+      src_mapping, edge_mapping,
+      src_data, edge_data,
+      (reducer == binary_op::kReduceNone)? binary_op::kEdge : binary_op::kDst,
+      out_mapping, out_data);
   return out_data;
 }
 
-DGL_REGISTER_GLOBAL("backend.kernel._CAPI_DGLKernelSrcMulEdgeReduce")
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelSrcMulEdgeReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string binary_op = args[1];
