@@ -108,7 +108,6 @@ void BinaryReduceImpl(
     runtime::NDArray rhs_mapping,
     runtime::NDArray lhs_data,
     runtime::NDArray rhs_data,
-    binary_op::Target out,
     runtime::NDArray out_mapping,
     runtime::NDArray out_data);
 }  // namespace cpu
@@ -125,7 +124,6 @@ void BinaryReduceImpl(
     runtime::NDArray rhs_mapping,
     runtime::NDArray lhs_data,
     runtime::NDArray rhs_data,
-    binary_op::Target out,
     runtime::NDArray out_mapping,
     runtime::NDArray out_data);
 }  // namespace cuda

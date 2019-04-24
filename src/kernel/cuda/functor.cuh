@@ -45,13 +45,6 @@ struct ReduceMin<kDLGPU, DType> {
 };
 
 template <typename DType>
-struct ReduceMean<kDLGPU, DType> {
-  static __device__ __forceinline__ void Call(DType* addr, DType val) {
-    cuda::AtomicAdd(addr, val);
-  }
-};
-
-template <typename DType>
 struct ReduceProd<kDLGPU, DType> {
   static __device__ __forceinline__ void Call(DType* addr, DType val) {
     cuda::AtomicMul(addr, val);

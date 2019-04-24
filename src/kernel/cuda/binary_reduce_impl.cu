@@ -68,7 +68,6 @@ void BinaryReduceImpl(
     NDArray rhs_mapping,
     NDArray lhs_data,
     NDArray rhs_data,
-    binary_op::Target out,
     NDArray out_mapping,
     NDArray out_data) {
   // device
@@ -101,20 +100,16 @@ void BinaryReduceImpl(
     //REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {
       typedef ReduceSum<kDLGPU, DType> Reducer;
       BINARY_OP_SWITCH(op, DType, BinaryOp, {
-        TARGET_SWITCH(out, OutSelector, {
-          TARGET_SWITCH(lhs, LeftSelector, {
-            TARGET_SWITCH(rhs, RightSelector, {
-              if (has_indirect) {
-                typedef DirectId<kDLGPU, int64_t> IdGetter;
-                CallBinaryReduce<DType, IdGetter, OutSelector, LeftSelector,
-                  RightSelector, BinaryOp, Reducer>(rtcfg, csr, gdata);
-              } else {
-                typedef IndirectId<kDLGPU, int64_t> IdGetter;
-                CallBinaryReduce<DType, IdGetter, OutSelector, LeftSelector,
-                  RightSelector, BinaryOp, Reducer>(rtcfg, csr, gdata);
-              }
-            });
-          });
+        TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
+          if (has_indirect) {
+            typedef DirectId<kDLGPU, int64_t> IdGetter;
+            CallBinaryReduce<DType, IdGetter, LeftTarget,
+              RightTarget, BinaryOp, Reducer>(rtcfg, csr, gdata);
+          } else {
+            typedef IndirectId<kDLGPU, int64_t> IdGetter;
+            CallBinaryReduce<DType, IdGetter, LeftTarget,
+              RightTarget, BinaryOp, Reducer>(rtcfg, csr, gdata);
+          }
         });
       });
     //});

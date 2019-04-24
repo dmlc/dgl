@@ -41,12 +41,12 @@ struct BinaryReduce {
 };
 
 template <typename DType, typename IdGetter,
-          typename OutSelector, typename LeftSelector, typename RightSelector,
+          typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 struct FunctorsTempl {
   static __device__ __forceinline__ int64_t SelectOut(
       int64_t src, int64_t edge, int64_t dst) {
-    return OutSelector::Call(src, edge, dst);
+    return OutSelector<Reducer>::Type::Call(src, edge, dst);
   }
   static __device__ __forceinline__ int64_t SelectLeft(
       int64_t src, int64_t edge, int64_t dst) {
@@ -73,14 +73,14 @@ struct FunctorsTempl {
 typedef minigun::advance::Config<true, minigun::advance::kV2N> AdvanceConfig;
 
 template <typename DType, typename IdGetter,
-          typename OutSelector, typename LeftSelector, typename RightSelector,
+          typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
     const minigun::Csr& csr,
     GData<DType>* gdata) {
   using minigun::IntArray1D;
-  typedef FunctorsTempl<DType, IdGetter, OutSelector, LeftSelector,
+  typedef FunctorsTempl<DType, IdGetter, LeftSelector,
                         RightSelector, BinaryOp, Reducer>
           Functors;
   typedef cuda::BinaryReduce<DType, Functors> BinaryReduceUDF;
@@ -90,9 +90,9 @@ void CallBinaryReduce(
         rtcfg, csr, gdata, IntArray1D(), IntArray1D());
 }
 
-#define GEN_DEFINE(dtype, out_tgt, lhs_tgt, rhs_tgt, op) \
+#define GEN_DEFINE(dtype, lhs_tgt, rhs_tgt, op) \
   template void CallBinaryReduce<dtype, GETID<XPU, int64_t>, \
-                                 out_tgt, lhs_tgt, rhs_tgt, \
+                                 lhs_tgt, rhs_tgt, \
                                  op<dtype>, REDUCER<XPU, dtype>>( \
       const minigun::advance::RuntimeConfig& rtcfg, \
       const minigun::Csr& csr, \

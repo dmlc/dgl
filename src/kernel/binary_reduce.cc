@@ -91,7 +91,6 @@ NDArray SrcOpEdgeReduce(
       binary_op::kSrc, binary_op::kEdge,
       src_mapping, edge_mapping,
       src_data, edge_data,
-      (reducer == binary_op::kReduceNone)? binary_op::kEdge : binary_op::kDst,
       out_mapping, out_data);
   return out_data;
 }

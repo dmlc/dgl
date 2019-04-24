@@ -55,43 +55,42 @@ struct SelectEdge {
   }
 };
 
-#define TARGET_SWITCH(val, Selector, ...)        \
-  switch (val) {                                 \
-    case dgl::kernel::binary_op::kSrc:           \
-      {                                          \
-      typedef SelectSrc Selector;                \
-      {__VA_ARGS__}                              \
-      }                                          \
-      break;                                     \
-    case dgl::kernel::binary_op::kDst:           \
-      {                                          \
-      typedef SelectDst Selector;                \
-      {__VA_ARGS__}                              \
-      }                                          \
-      break;                                     \
-    case dgl::kernel::binary_op::kEdge:          \
-      {                                          \
-      typedef SelectEdge Selector;               \
-      {__VA_ARGS__}                              \
-      }                                          \
-      break;                                     \
-    default:                                     \
-      LOG(FATAL) << "Invalid selector: " << val; \
-  };
+#define TARGET_SWITCH(v1, v2, Tgt1, Tgt2, ...)                  \
+  if (v1 == binary_op::kSrc && v2 == binary_op::kDst) {         \
+    typedef SelectSrc Tgt1;                                     \
+    typedef SelectDst Tgt2;                                     \
+    {__VA_ARGS__}                                               \
+  } else if (v1 == binary_op::kSrc && v2 == binary_op::kEdge) { \
+    typedef SelectSrc Tgt1;                                     \
+    typedef SelectEdge Tgt2;                                     \
+    {__VA_ARGS__}                                               \
+  } else if (v1 == binary_op::kEdge && v2 == binary_op::kDst) { \
+    typedef SelectEdge Tgt1;                                     \
+    typedef SelectDst Tgt2;                                     \
+    {__VA_ARGS__}                                               \
+  } else if (v1 == binary_op::kDst && v2 == binary_op::kEdge) { \
+    typedef SelectDst Tgt1;                                     \
+    typedef SelectEdge Tgt2;                                     \
+    {__VA_ARGS__}                                               \
+  } else if (v1 == binary_op::kDst && v2 == binary_op::kSrc) { \
+    typedef SelectDst Tgt1;                                     \
+    typedef SelectSrc Tgt2;                                     \
+    {__VA_ARGS__}                                               \
+  } else if (v1 == binary_op::kEdge && v2 == binary_op::kSrc) { \
+    typedef SelectEdge Tgt1;                                     \
+    typedef SelectSrc Tgt2;                                     \
+    {__VA_ARGS__}                                               \
+  } else {                                                      \
+    LOG(FATAL) << "Invalid operand target: " << v1 << " and " << v2; \
+  }
 
-#define GEN_TARGET(GEN, ...) \
-  GEN(__VA_ARGS__, SelectSrc, SelectDst, SelectDst) \
-  GEN(__VA_ARGS__, SelectSrc, SelectDst, SelectEdge) \
-  GEN(__VA_ARGS__, SelectDst, SelectSrc, SelectDst) \
-  GEN(__VA_ARGS__, SelectDst, SelectSrc, SelectEdge) \
-  GEN(__VA_ARGS__, SelectSrc, SelectEdge, SelectDst) \
-  GEN(__VA_ARGS__, SelectSrc, SelectEdge, SelectEdge) \
-  GEN(__VA_ARGS__, SelectEdge, SelectSrc, SelectDst) \
-  GEN(__VA_ARGS__, SelectEdge, SelectSrc, SelectEdge) \
-  GEN(__VA_ARGS__, SelectEdge, SelectDst, SelectDst) \
-  GEN(__VA_ARGS__, SelectEdge, SelectDst, SelectEdge) \
-  GEN(__VA_ARGS__, SelectDst, SelectEdge, SelectDst) \
-  GEN(__VA_ARGS__, SelectDst, SelectEdge, SelectEdge)
+#define GEN_TARGET(GEN, ...)               \
+  GEN(__VA_ARGS__, SelectSrc, SelectDst)   \
+  GEN(__VA_ARGS__, SelectDst, SelectSrc)   \
+  GEN(__VA_ARGS__, SelectSrc, SelectEdge)  \
+  GEN(__VA_ARGS__, SelectEdge, SelectSrc)  \
+  GEN(__VA_ARGS__, SelectDst, SelectEdge)  \
+  GEN(__VA_ARGS__, SelectEdge, SelectDst)
 
 // direct id
 template <int XPU, typename IdxType>
@@ -193,16 +192,14 @@ template <int XPU, typename DType>
 struct ReduceMin { };
 
 template <int XPU, typename DType>
-struct ReduceMean { };
-
-template <int XPU, typename DType>
 struct ReduceProd { };
 
 template <int XPU, typename DType>
 struct ReduceNone { };
 
 #define REDUCER_SWITCH(val, XPU, DType, RedType, ...)   \
-  if (val == binary_op::kReduceSum) {              \
+  if (val == binary_op::kReduceSum                 \
+      || val == binary_op::kReduceMean) {          \
     typedef ReduceSum<XPU, DType> RedType;         \
     {__VA_ARGS__}                                  \
   } else if (val == binary_op::kReduceMax) {       \
@@ -223,6 +220,16 @@ struct ReduceNone { };
   } else {                                         \
     LOG(FATAL) << "Unsupported reducer: " << val;  \
   }
+
+template <typename Reducer>
+struct OutSelector {
+  typedef SelectDst Type;
+};
+
+template <int XPU, typename DType>
+struct OutSelector<ReduceNone<XPU, DType>> {
+  typedef SelectEdge Type;
+};
 
 }  // namespace kernel
 }  // namespace dgl
