@@ -1,6 +1,3 @@
-#include <thrust/device_ptr.h>
-#include <thrust/fill.h>
-
 #include <dlpack/dlpack.h>
 #include <minigun/minigun.h>
 #include <dgl/runtime/device_api.h>
@@ -8,6 +5,7 @@
 #include "../../runtime/cuda/cuda_common.h"
 #include "../binary_reduce_common.h"
 #include "./binary_reduce_impl.h"
+#include "./utils.cuh"
 
 using dgl::runtime::NDArray;
 using minigun::Csr;
@@ -21,18 +19,6 @@ inline int64_t ComputeXLength(NDArray feat_array) {
   int64_t ret = 1;
   for (int i = 1; i < feat_array->ndim; ++i) {
     ret *= feat_array->shape[i];
-  }
-  return ret;
-}
-
-// Find the number of threads that is:
-//  - power of two
-//  - smaller or equal to dim
-//  - smaller or equal to max_nthrs
-inline int FindNumThreads(int dim, int max_nthrs) {
-  int ret = max_nthrs;
-  while (ret > dim) {
-    ret = ret >> 1;
   }
   return ret;
 }
@@ -71,9 +57,7 @@ GData<DType>* AllocGData(cudaStream_t stream, int64_t x_len,
     gdata.out_mapping = static_cast<int64_t*>(out_mapping->data);
   }
   // fill out data with zero values
-  thrust::device_ptr<DType> out_ptr = thrust::device_pointer_cast(gdata.out_data);
-  thrust::fill(thrust::cuda::par.on(stream),
-      out_ptr, out_ptr + NElements(out_data), Zero<Reducer>::value);
+  utils::Fill(stream, gdata.out_data, NElements(out_data), Zero<Reducer>::value);
   // device GData
   GData<DType>* d_gdata;
   CUDA_CALL(cudaMalloc(&d_gdata, sizeof(GData<DType>)));
@@ -105,15 +89,12 @@ void BinaryReduceImpl(
   csr.column_indices.data = static_cast<int64_t*>(indices->data);
   csr.column_indices.length = indices->shape[0];
   const int64_t x_len = ComputeXLength(out_data);
-  LOG(INFO) << "csr.rowlen=" << csr.row_offsets.length
-    << " csr.collen=" << csr.column_indices.length
-    << " xlen=" << x_len;
 
   // advance config
   minigun::advance::RuntimeConfig rtcfg;
   rtcfg.ctx = out_data->ctx;
   rtcfg.stream = thr_entry->stream;
-  const int nt = FindNumThreads(x_len, 64);
+  const int nt = utils::FindNumThreads(x_len, 64);
   rtcfg.data_num_threads = nt;
   // XXX(minjie): hard-code to let each thread compute two elements to increase
   //              instruction level parallelism
@@ -122,8 +103,6 @@ void BinaryReduceImpl(
   const DLDataType& dtype = lhs_data->dtype;
   const bool has_indirect =
     (lhs_mapping->ndim != 0 || rhs_mapping->ndim != 0 || out_mapping->ndim != 0);
-  LOG(INFO) << "has_indirect? " << has_indirect;
-  LOG(INFO) << "nt=" << nt << " nb=" << rtcfg.data_num_blocks;
   DGL_DTYPE_SWITCH(dtype, DType, {
     REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {
       GData<DType>* gdata = AllocGData<DType, Reducer>(

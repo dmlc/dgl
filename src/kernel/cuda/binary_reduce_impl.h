@@ -1,4 +1,5 @@
-#pragma once
+#ifndef DGL_KERNEL_CUDA_BINARY_REDUCE_IMPL_H_
+#define DGL_KERNEL_CUDA_BINARY_REDUCE_IMPL_H_
 
 #include <cstdint>
 
@@ -39,3 +40,5 @@ void CallBinaryReduce(
 }  // namespace cuda
 }  // namespace kernel
 }  // namespace dgl
+
+#endif  // DGL_KERNEL_CUDA_BINARY_REDUCE_IMPL_H_

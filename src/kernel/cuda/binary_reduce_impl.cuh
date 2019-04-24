@@ -1,4 +1,5 @@
-#pragma once
+#ifndef DGL_KERNEL_CUDA_BINARY_REDUCE_IMPL_CUH_
+#define DGL_KERNEL_CUDA_BINARY_REDUCE_IMPL_CUH_
 
 #include <minigun/minigun.h>
 
@@ -30,9 +31,6 @@ struct BinaryReduce {
     DType* lhsoff = gdata->lhs_data + lid * D;
     DType* rhsoff = gdata->rhs_data + rid * D;
     DType* outoff = gdata->out_data + oid * D;
-    if (dst == 0 && tx == 0) {
-      printf("%ld %ld %f\n", src, eid, (*lhsoff) * (*rhsoff));
-    }
     while (tx < D) {
       DType lhs = Functors::Read(lhsoff + tx);
       DType rhs = Functors::Read(rhsoff + tx);
@@ -106,3 +104,5 @@ void CallBinaryReduce(
 }  // namespace cuda
 }  // namespace kernel
 }  // namespace dgl
+
+#endif  // DGL_KERNEL_CUDA_BINARY_REDUCE_IMPL_CUH_
