@@ -27,7 +27,7 @@ def load_data(args):
         return citegrh.load_pubmed()
     elif args.dataset == 'syn':
         return citegrh.load_synthetic(args)
-    elif args.dataset.startswith('reddit'):
+    elif args.dataset is not None and args.dataset.startswith('reddit'):
         return RedditDataset(self_loop=('self-loop' in args.dataset))
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
