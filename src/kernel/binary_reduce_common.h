@@ -209,9 +209,6 @@ struct ReduceNone { };
   } else if (val == binary_op::kReduceMin) {       \
     typedef ReduceMin<XPU, DType> RedType;         \
     {__VA_ARGS__}                                  \
-  } else if (val == binary_op::kReduceMean) {      \
-    typedef ReduceMean<XPU, DType> RedType;        \
-    {__VA_ARGS__}                                  \
   } else if (val == binary_op::kReduceProd) {      \
     typedef ReduceProd<XPU, DType> RedType;        \
     {__VA_ARGS__}                                  \

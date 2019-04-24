@@ -40,7 +40,8 @@ namespace kernel {
   }
 
 #define GEN_DTYPE(GEN, ...) \
-  GEN(__VA_ARGS__, float)
+  GEN(__VA_ARGS__, float)   \
+  GEN(__VA_ARGS__, double)  \
 
 #if 0
 #define DGL_DTYPE_SWITCH(val, DType, ...)                   \

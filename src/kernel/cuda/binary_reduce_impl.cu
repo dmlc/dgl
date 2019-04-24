@@ -125,8 +125,7 @@ void BinaryReduceImpl(
   LOG(INFO) << "has_indirect? " << has_indirect;
   LOG(INFO) << "nt=" << nt << " nb=" << rtcfg.data_num_blocks;
   DGL_DTYPE_SWITCH(dtype, DType, {
-    //REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {
-      typedef ReduceSum<kDLGPU, DType> Reducer;
+    REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {
       GData<DType>* gdata = AllocGData<DType, Reducer>(
           rtcfg.stream, x_len, lhs_mapping, rhs_mapping,
           lhs_data, rhs_data, out_mapping, out_data);
@@ -141,12 +140,15 @@ void BinaryReduceImpl(
             CallBinaryReduce<DType, IdGetter, LeftTarget,
               RightTarget, BinaryOp, Reducer>(rtcfg, csr, gdata);
           }
-          CUDA_CALL(cudaDeviceSynchronize());
         });
       });
-    //});
-    // free device GData
-    CUDA_CALL(cudaFree(gdata));
+      // free device GData
+      CUDA_CALL(cudaFree(gdata));
+    });
+    if (reducer == binary_op::kReduceMean) {
+      // TODO(minjie): divide
+      LOG(FATAL) << "reduce mean is not supported.";
+    }
   });
 }
 
