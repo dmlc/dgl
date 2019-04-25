@@ -6,7 +6,7 @@ import torch as th
 from torch.utils import dlpack
 
 from ... import ndarray as nd
-from .. import kernel as knl
+from ... import kernel as knl
 
 TH_VERSION = LooseVersion(th.__version__)
 
@@ -261,7 +261,7 @@ class CopyEdgeReduce(th.autograd.Function):
         reducer, inv_adj, edge_data = ctx.saved_variable
 
 
-src_mul_dst_reduce = SrcMulEdgeReduce.apply
+src_mul_edge_reduce = SrcMulEdgeReduce.apply
 src_mul_dst_reduce = SrcMulDstReduce.apply
 copy_src_reduce = CopySrcReduce.apply
 copy_edge_reduce = CopyEdgeReduce.apply

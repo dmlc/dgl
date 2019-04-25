@@ -10,46 +10,22 @@ from . import ir
 from .ir import var
 
 import scipy.sparse as sp
+import numpy as np
 from functools import partial
 
-def analyze_v2v_spmv(graph, mfunc, rfunc):
-    """Analyze if SPMV from node space to node space can be applied.
 
-    Parameters
-    ----------
-    graph: DGLGraph
-        DGLGraph to use
-    mfunc : list of dgl.function.BuiltinFunction
-        The message function list.
-    rfunc : list of dgl.function.BuiltinFunction
-        The reduce function list.
-
-    Returns
-    -------
-    spmv_pairs : list of pair of builtin functions
-        The pair of spvm applicable message/reduce functions.
-    """
-    spmv_pairs = []
-    fld2mfunc = {fn.out_field: fn for fn in mfunc}
-
-    for rfn in rfunc:
-        mfld = rfn.msg_field
-        if mfld not in fld2mfunc:
-            raise DGLError('Reduce function requires message field "%s",'
-                           ' but no message function generates it.' % mfld)
-        mfn = fld2mfunc[mfld]
-        spmv_pairs.append((mfn, rfn))
-
-    return spmv_pairs
-
-def gen_v2v_spmv_schedule(adj, spmv_pairs, src_frame, dst_frame, edge_frame,
-                          out, out_size, edge_mapping, out_mapping):
+def gen_v2v_spmv_schedule(adj, mfunc, rfunc, src_frame, dst_frame, edge_frame,
+                          out, out_size, edge_map, out_map):
     """Generate v2v spmv schedule.
 
     Parameters
     ----------
-    adj : tuple (sparse matrix, utils.Index)
-    spmv_pairs : list of pair
+    adj : CtxCachedObject
+        A callable that generates for dgl.ndarray (indptr, indices, inv_indptr,
+        inv_indices) representing CSR and inverse-CSR matrix, copies to and
+        caches on to given context
+    mfunc : list of builtin message func
+    rfunc : list of builtin reduce func
     src_frame : var.Var
         input source node features
     dst_frame : var.Var
@@ -58,19 +34,49 @@ def gen_v2v_spmv_schedule(adj, spmv_pairs, src_frame, dst_frame, edge_frame,
         input edge features
     out : var.Var
         output node features
-    out_mapping : var.Var
-        mapping from recv nodes to relabeled consecutive node ids
+    out_size : int
+        number of output nodes
+    out_map : var.Var
+        a function that generates a map from recv nodes to relabeled
+        consecutive node ids
     """
     spmat = var.SPMAT(adj)
-    for mfn, rfn in spmv_pairs:
-        ftdst = mfn(spmat, src_frame, dst_frame, edge_frame, reducer=rfn.name,
-                    edge_mapping=edge_mapping, out_mapping=out_mapping)
-        # save for merge
+    fld2mfunc = {fn.out_field: fn for fn in mfunc}
+    for rfn in rfunc:
+        mfld = rfn.msg_field
+        if mfld not in fld2mfunc:
+            raise DGLError('Reduce function requires message field "%s",'
+                           ' but no message function generates it.' % mfld)
+        mfn = fld2mfunc[mfld]
+        ftdst = mfn(spmat, src_frame, dst_frame, edge_frame, out_size,
+                    reducer=rfn.name, edge_map=edge_map, out_map=out_map)
         ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
 def gen_v2e_spmv_schedule(adj, mfunc, src_frame, dst_frame, edge_frame,
-                          out_frame, out_size, edge_mapping, eid=None):
-    """Generate v2e SPMV schedule"""
+                          out_frame, out_size, edge_map, eid=None):
+    """Generate v2e SPMV schedule
+
+    Parameters
+    ----------
+    adj : CtxCachedObject
+        A callable that generates for dgl.ndarray (indptr, indices, inv_indptr,
+        inv_indices) representing CSR and inverse-CSR matrix, copies to and
+        caches on to given context
+    mfunc : list of builtin message func
+    src_frame : var.Var
+        input source node features
+    dst_frame : var.Var
+        input destination node features
+    edge_frame : var.Var
+        input edge features
+    out : var.Var
+        output node features
+    out_size : int
+        number of output nodes
+    edge_map : var.Var
+        a function that generates a map from recv nodes to relabeled
+        consecutive node ids
+    """
     spmat = var.SPMAT(adj)
     if eid is not None:
         write_back = partial(ir.WRITE_, row=eid)
@@ -78,11 +84,11 @@ def gen_v2e_spmv_schedule(adj, mfunc, src_frame, dst_frame, edge_frame,
         write_back = ir.WRITE_COL_
     for mfn in mfunc:
         fmsg = mfn(spmat, src_frame, dst_frame, edge_frame, out_size,
-                   edge_mapping=edge_mapping)
+                   edge_map=edge_map)
         write_back(out_frame, var.STR(mfn.out_field), fmsg)
 
-def gen_e2v_spmv_schedule(adj, rfunc, mfr, edge_mapping, out, out_size,
-                          out_mapping):
+def gen_e2v_spmv_schedule(adj, rfunc, mfr, edge_map, out, out_size,
+                          out_map):
     """Generate e2v SPMV schedule.
 
     Parameters
@@ -96,7 +102,7 @@ def gen_e2v_spmv_schedule(adj, rfunc, mfr, edge_mapping, out, out_size,
     """
     spmat = var.SPMAT(adj)
     for rfn in rfunc:
-        ftdst = rfn(spmat, mfr, edge_mapping, out_mapping, out_size)
+        ftdst = rfn(spmat, mfr, out_size, edge_map=edge_map, out_map=out_map)
         ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
 def build_block_adj_matrix_graph(graph, block_id):
@@ -137,10 +143,11 @@ def build_adj_matrix_graph(graph):
         Get be used to get adjacency matrix on the provided ctx.
     """
     gidx = graph._graph
-    eid = gidx.adjacency_matrix(True)[2]
-    inv_eid = gidx.adjacency_matrix(False)[2]
-    return lambda ctx: (gidx.adjacency_matrix(True, ctx)[:2] +
-                        gidx.adjacency_matrix(False, ctx)[:2]), eid, inv_eid
+    edge_map = gidx.csr_adjacency_matrix(True, ndarray.cpu())[2]
+    inv_edge_map = gidx.csr_adjacency_matrix(False, ndarray.cpu())[2]
+    return lambda ctx: (gidx.csr_adjacency_matrix(True, ctx)[:2] +
+                        gidx.csr_adjacency_matrix(False, ctx)[:2]), \
+                  edge_map, inv_edge_map
 
 def _build_adj_matrix_index_uv(edge_tuple, num_nodes):
     """Build adj matrix index and shape using the given (u, v) edges.
@@ -176,8 +183,14 @@ def _build_adj_matrix_index_uv(edge_tuple, num_nodes):
     eid = F.zerocopy_to_numpy(eid)
     csr = sp.csr_matrix((eid, (u, v)), shape=(num_nodes, num_nodes))
     inv_csr = sp.csr_matrix((eid, (v, u)), shape=(num_nodes, num_nodes))
-    spmat = (csr.indptr, csr.indices, csr.data)
-    inv_spmat = (inv_csr.indptr, inv_csr.indices, inv_csr.data)
+    indptr = F.zerocopy_from_numpy(csr.indptr.astype(np.int64))
+    indices = F.zerocopy_from_numpy(csr.indices.astype(np.int64))
+    edge_map = F.zerocopy_from_numpy(csr.data)
+    inv_indptr = F.zerocopy_from_numpy(inv_csr.indptr.astype(np.int64))
+    inv_indices = F.zerocopy_from_numpy(inv_csr.indices.astype(np.int64))
+    inv_edge_map = F.zerocopy_from_numpy(inv_csr.data)
+    spmat = (indptr, indices, edge_map)
+    inv_spmat = (inv_indptr, inv_indices, inv_edge_map)
     return spmat, inv_spmat
 
 
@@ -208,6 +221,8 @@ def build_adj_matrix_uv(edge_tuple, num_nodes):
     """
     u, v, eid = edge_tuple
     spmat, inv_spmat = _build_adj_matrix_index_uv(edge_tuple, num_nodes)
+    eid = F.to_dgl_ndarray(spmat[2])
+    inv_eid = F.to_dgl_ndarray(inv_spmat[2])
 
     def copy_to(ctx):
         indptr = ndarray.array(spmat[0], ctx=ctx)
@@ -216,7 +231,7 @@ def build_adj_matrix_uv(edge_tuple, num_nodes):
         inv_indices = ndarray.array(inv_spmat[1], ctx=ctx)
         return indptr, indices, inv_indptr, inv_indices
 
-    return utils.CtxCachedObject(copy_to), spmat[2], inv_spmat[2]
+    return utils.CtxCachedObject(copy_to), eid, inv_eid
 
 def build_block_inc_matrix_graph(graph, block_id):
     """Build incidence matrix.

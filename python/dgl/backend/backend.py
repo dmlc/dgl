@@ -833,6 +833,12 @@ def zerocopy_from_numpy(np_array):
     """
     pass
 
+def to_dgl_ndarray(input):
+    pass
+
+def from_dgl_ndarray(input):
+    pass
+
 ###############################################################################
 # Custom Operators for graph level computations.
 

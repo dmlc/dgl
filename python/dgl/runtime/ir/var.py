@@ -3,7 +3,6 @@
 from __future__ import absolute_import
 
 from .program import get_current_prog
-from ... import ndarray as nd
 
 class VarType(object):
     """Variable types."""
@@ -102,7 +101,3 @@ def MAP(data=None, name=None):
 def INT(data=None, name=None):
     """Create a variable for int value"""
     return new(VarType.INT, data, name)
-
-def EMPTY_MAP(name=None):
-    """Create a variable for an empty mapping"""
-    return new(VarType.MAP, lambda ctx: nd.empty([]), name)

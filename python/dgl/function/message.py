@@ -1,7 +1,7 @@
 """Built-in message function."""
 from __future__ import absolute_import
 
-from .base import BuiltinFunction
+from .base import BuiltinFunction, _empty_map
 from ..runtime import ir
 from ..runtime.ir import var
 
@@ -37,11 +37,14 @@ class SrcMulEdgeMessageFunction(MessageFunction):
         self.out_field = out_field
 
     def __call__(self, spmat, src_frame, dst_frame, edge_frame, out_size,
-                 reducer="none", src_map=var.EMPTY_MAP(),
-                 edge_map=var.EMPTY_MAP(), out_map=var.EMPTY_MAP()):
+                 reducer="none", src_map=_empty_map, dst_map=_empty_map,
+                 edge_map=_empty_map, out_map=_empty_map):
         """Symbolic computation of this builtin function to create
         runtime.executor
         """
+        src_map = var.MAP(src_map)
+        edge_map = var.MAP(edge_map)
+        out_map = var.MAP(out_map)
         src_data = ir.READ_COL(src_frame, var.STR(self.src_field))
         edge_data = ir.READ_COL(edge_frame, var.STR(self.edge_field))
         return ir.SRC_MUL_EDGE_REDUCE(reducer, self.mul_op, spmat, src_data,
@@ -67,11 +70,14 @@ class SrcMulDstMessageFunction(MessageFunction):
         self.out_field = out_field
 
     def __call__(self, spmat, src_frame, dst_frame, edge_frame, out_size,
-                 reducer="none", src_map=var.EMPTY_MAP(),
-                 dst_map=var.EMPTY_MAP(), out_map=var.EMPTY_MAP()):
+                 reducer="none", src_map=_empty_map, dst_map=_empty_map,
+                 edge_map=_empty_map, out_map=_empty_map):
         """Symbolic computation of this builtin function to create
         runtime.executor
         """
+        src_map = var.MAP(src_map)
+        dst_map = var.MAP(dst_map)
+        out_map = var.MAP(out_map)
         src_data = ir.READ_COL(src_frame, var.STR(self.src_field))
         dst_data = ir.READ_COL(src_frame, var.STR(self.dst_field))
         return ir.SRC_MUL_DST_REDUCE(reducer, self.mul_op, spmat, src_data,
@@ -95,11 +101,13 @@ class CopySrcMessageFunction(MessageFunction):
         self.out_field = out_field
 
     def __call__(self, spmat, src_frame, dst_frame, edge_frame, out_size,
-                 reducer="none", src_map=var.EMPTY_MAP(),
-                 out_map=var.EMPTY_MAP()):
+                 reducer="none", src_map=_empty_map, dst_map=_empty_map,
+                 edge_map=_empty_map, out_map=_empty_map):
         """Symbolic computation of this builtin function to create
         runtime.executor
         """
+        src_map = var.MAP(src_map)
+        out_map = var.MAP(out_map)
         src_data = ir.READ_COL(src_frame, var.STR(self.src_field))
         return ir.COPY_SRC_REDUCE(reducer, spmat, src_data, out_size,
                                   src_map, out_map)
@@ -121,11 +129,13 @@ class CopyEdgeMessageFunction(MessageFunction):
         self.out_field = out_field
 
     def __call__(self, spmat, src_frame, dst_frame, edge_frame, out_size,
-                 reducer="none", edge_map=var.EMPTY_MAP(),
-                 out_map=var.EMPTY_MAP()):
+                 reducer="none", src_map=_empty_map, dst_map=_empty_map,
+                 edge_map=_empty_map, out_map=_empty_map):
         """Symbolic computation of this builtin function to create
         runtime.executor
         """
+        edge_map = var.MAP(edge_map)
+        out_map = var.MAP(out_map)
         edge_data = ir.READ_COL(edge_frame, var.STR(self.edge_field))
         return ir.COPY_EDGE_REDUCE(reducer, spmat, edge_data, out_size,
                                    edge_map, out_map)

@@ -62,8 +62,8 @@ def schedule_send(graph, u, v, eid, message_func):
             # build edge_mapping
             adj, edge_map, inv_edge_map = spmv.build_adj_matrix_uv(
                 (u, v, eid), graph.number_of_nodes())
-        edge_map = var.MAP(_build_idx_map(edge_map))
-        inv_edge_map = var.MAP(_build_idx_map(inv_edge_map))
+        edge_map = _context_cached_idx_map(edge_map)
+        inv_edge_map = _context_cached_idx_map(inv_edge_map)
         spmv.gen_v2e_spmv_schedule(adj, message_func, var_nf, var_nf, var_ef,
                                    var_mf, len(eid), (edge_map, inv_edge_map),
                                    eid=eid)
@@ -213,7 +213,7 @@ def schedule_update_all(graph,
             src, dst, _ = graph._graph.edges()
             return var.IDX(src), var.IDX(dst)
         adj_creator = lambda: spmv.build_adj_matrix_graph(graph)
-        out_map_creator = lambda: nd.empty([])
+        out_map_creator = lambda: lambda ctx: nd.empty([])
         reduced_feat = _gen_send_reduce(graph, graph._node_frame,
                                         graph._node_frame, graph._edge_frame,
                                         message_func, reduce_func, var_eid,
@@ -721,9 +721,9 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
         # we don't need edge_map here, because send scatter messages back to
         # msg_frame using eid
         adj, edge_map, inv_edge_map = spmv.build_adj_matrix_uv(edge_tuples, graph.number_of_nodes())
-        edge_map = var.MAP(_build_idx_map(edge_map))
-        inv_edge_map = var.MAP(_build_idx_map(inv_edge_map))
-        var_out_map = var.MAP(_build_idx_map(recv_nodes))
+        edge_map = _context_cached_idx_map(edge_map)
+        inv_edge_map = _context_cached_idx_map(inv_edge_map)
+        var_out_map = _build_idx_map(recv_nodes)
         spmv.gen_e2v_spmv_schedule(adj, rfunc, var_msg,
                                    (edge_map, inv_edge_map), var_out,
                                    len(recv_nodes), var_out_map)
@@ -745,7 +745,6 @@ def _gen_send_reduce(
         var_reduce_nodes,
         uv_getter,
         adj_creator,
-        edge_map_creator,
         out_map_creator):
     """Generate send and reduce schedule.
 
@@ -807,20 +806,19 @@ def _gen_send_reduce(
     # generate a mapping from eid to message id
     if mfunc_is_list or rfunc_is_list:
         adj, edge_map, inv_edge_map = adj_creator()
-        edge_map = var.MAP(_build_idx_map(edge_map))
-        inv_edge_map = var.MAP(_build_idx_map(inv_edge_map))
+        edge_map = _context_cached_idx_map(edge_map)
+        inv_edge_map = _context_cached_idx_map(inv_edge_map)
 
     # 3. If rfunc is builtin, generate a mapping from recv nodes to consecutive
     # output id
     if rfunc_is_list:
-        var_out_map = var.MAP(out_map_creator())
+        var_out_map = out_map_creator()
 
     # 4. First try fused message and reduce function
     if mfunc_is_list and rfunc_is_list:
         # builtin message + builtin reducer
         # analyze v2v spmv
-        spmv_pairs = spmv.analyze_v2v_spmv(graph, mfunc, rfunc)
-        spmv.gen_v2v_spmv_schedule(adj, spmv_pairs, var_src_nf, var_dst_nf,
+        spmv.gen_v2v_spmv_schedule(adj, mfunc, rfunc, var_src_nf, var_dst_nf,
                                    var_ef, var_out, len(reduce_nodes),
                                    (edge_map, inv_edge_map), var_out_map)
         return var_out
@@ -868,6 +866,9 @@ def _gen_send(graph, src_nfr, dst_nfr, efr, u, v, eid, mfunc):
     msg = ir.EDGE_UDF(_mfunc_wrapper, fdsrc, fdedge, fddst)
     return msg
 
+def _context_cached_idx_map(idx_map):
+    return utils.CtxCachedObject(lambda ctx: nd.array(idx_map, ctx=ctx))
+
 def _build_idx_map(idx):
     """Build a map from the input ids to continuous ids that starts from zero.
 
@@ -892,14 +893,12 @@ def _build_idx_map(idx):
         One can use advanced indexing to convert an old id tensor to a
         new id tensor: new_id = old_to_new[old_id]
     """
-    def build_map(ctx):
-        x = idx.tousertensor()
-        map_len = int(F.asnumpy(F.max(x, dim=0))) + 1
-        old_to_new = F.zeros((map_len,), dtype=F.int64, ctx=F.cpu())
-        F.scatter_row_inplace(old_to_new, x, F.arange(0, len(x)))
-        old_to_new = F.to_dgl_tensor(old_to_new)
-        return nd.array(nd.array(old_to_new, ctx=ctx))
-    return utils.CtxCachedObject(build_map)
+    x = idx.tousertensor()
+    map_len = int(F.asnumpy(F.max(x, dim=0))) + 1
+    old_to_new = F.zeros((map_len,), dtype=F.int64, ctx=F.cpu())
+    F.scatter_row_inplace(old_to_new, x, F.arange(0, len(x)))
+    old_to_new= F.to_dgl_ndarray(old_to_new)
+    return _context_cached_idx_map(old_to_new)
 
 
 _init_api("dgl.runtime.scheduler")
