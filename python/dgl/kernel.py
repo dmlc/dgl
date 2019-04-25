@@ -3,11 +3,17 @@ from __future__ import absolute_import
 
 from ._ffi.function import _init_api
 
-def src_mul_edge_reduce(reducer, mul_op,
-                        indptr, indices,
-                        src_mapping, edge_mapping,
-                        src_data, edge_data,
-                        out_mapping, out_size):
+
+def src_mul_edge_reduce(reducer,
+                        mul_op,
+                        indptr,
+                        indices,
+                        src_mapping,
+                        edge_mapping,
+                        src_data,
+                        edge_data,
+                        out_mapping,
+                        out_size):
     """Multiply src node data with edge data and perform reduce.
 
     Parameter
@@ -48,18 +54,20 @@ def src_mul_edge_reduce(reducer, mul_op,
         depending on the reducer.
     """
     return _CAPI_DGLKernelSrcMulEdgeReduce(
-        reducer, mul_op, indptr, indices,
-        src_mapping, edge_mapping,
-        src_data, edge_data,
-        out_mapping, int(out_size))
+        reducer, mul_op, indptr, indices, src_mapping, edge_mapping, src_data,
+        edge_data, out_mapping, int(out_size))
+
 
 def src_mul_dst_reduce(reducer,
                        mul_op,
                        indptr,
                        indices,
-                       edge_ids,
+                       src_mapping,
+                       dst_mapping,
                        src_data,
-                       dst_data):
+                       dst_data,
+                       out_mapping,
+                       out_size):
     """Multiply src node data with dst node data and perform reduce.
 
     Parameter
@@ -90,7 +98,9 @@ def src_mul_dst_reduce(reducer,
         depending on the reducer.
     """
     return _CAPI_DGLKernelSrcMulEdgeReduce(
-        reducer, mul_op, indptr, indices, edge_ids, src_data, dst_data)
+        reducer, mul_op, indptr, indices, src_mapping, dst_mapping, src_data,
+        dst_data, out_mapping, out_size)
+
 
 def copy_src_reduce(reducer,
                     indptr,
@@ -131,8 +141,9 @@ def copy_src_reduce(reducer,
         depending on the reducer.
     """
     return _CAPI_DGLKernelCopySrcReduce(
-        reducer, indptr, indices, src_mapping, src_data,
-        out_mapping, int(out_size))
+        reducer, indptr, indices, src_mapping, src_data, out_mapping,
+        int(out_size))
+
 
 def copy_edge_reduce(reducer,
                      indptr,
@@ -172,8 +183,9 @@ def copy_edge_reduce(reducer,
         The output tensor. Could be either node or edge feature tensor
         depending on the reducer.
     """
-    return _CAPI_DGLKernelCopyEdgeReduce(
-        reducer, indptr, indices, edge_mapping, edge_data,
-        out_mapping, out_size)
+    return _CAPI_DGLKernelCopySrcReduce(
+        reducer, indptr, indices, edge_mapping, edge_data, out_mapping,
+        int(out_size))
+
 
 _init_api("dgl.kernel")
