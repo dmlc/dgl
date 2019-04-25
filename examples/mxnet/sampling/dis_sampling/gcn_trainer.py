@@ -194,7 +194,7 @@ def main(args):
     for epoch in range(args.n_epochs):
         idx = 0
         for nf in sampler:
-            print("epoch: %d, subgraph: %d" %(epoch, idx))
+            print("Train epoch: %d, subgraph: %d" %(epoch, idx))
             idx += 1
             nf.copy_from_parent()
             # forward
@@ -216,11 +216,14 @@ def main(args):
 
         num_acc = 0.
 
+        idx = 0
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
                                                        g.number_of_nodes(),
                                                        neighbor_type='in',
                                                        num_hops=args.n_layers+1,
                                                        seed_nodes=test_nid):
+            print("Test epoch: %d, subgraph: %d" %(epoch, idx))
+            idx += 1
             nf.copy_from_parent()
             pred = infer_model(nf)
             batch_nids = nf.layer_parent_nid(-1).astype('int64').as_in_context(ctx)
