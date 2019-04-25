@@ -214,17 +214,17 @@ macro(dgl_cuda_compile objlist_variable)
   set(${objlist_variable} ${cuda_objcs})
 endmacro()
 
-if(CUDA_FOUND)
+################################################################################################
+# Config cuda compilation.
+# Usage:
+#   dgl_config_cuda(<dgl_cuda_src>)
+macro(dgl_config_cuda out_variable)
+  if(NOT CUDA_FOUND)
+    message(FATAL_ERROR "Cannot find CUDA.")
+  endif()
   # always set the includedir when cuda is available
   # avoid global retrigger of cmake
 	include_directories(${CUDA_INCLUDE_DIRS})
-endif(CUDA_FOUND)
-
-if(USE_CUDA)
-  if(NOT CUDA_FOUND)
-    message(FATAL_ERROR "Cannot find CUDA, USE_CUDA=" ${USE_CUDA})
-  endif()
-  message(STATUS "Build with CUDA support")
 
   add_definitions(-DDGL_USE_CUDA)
 
@@ -233,8 +233,6 @@ if(USE_CUDA)
     src/kernel/cuda/*.cu
     src/runtime/cuda/*.cc
   )
-
-  list(APPEND DGL_SRC ${DGL_CUDA_SRC})
 
   dgl_select_nvcc_arch_flags(NVCC_FLAGS_ARCH)
   string(REPLACE ";" " " NVCC_FLAGS_ARCH "${NVCC_FLAGS_ARCH}")
@@ -248,4 +246,6 @@ if(USE_CUDA)
   list(APPEND CMAKE_CUDA_FLAGS "${NVCC_FLAGS_EXTRA}")
 
   list(APPEND DGL_LINKER_LIBS ${CUDA_CUDA_LIBRARY} ${CUDA_CUDART_LIBRARY})
-endif(USE_CUDA)
+
+  set(${out_variable} ${DGL_CUDA_SRC})
+endmacro()

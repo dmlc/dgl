@@ -24,12 +24,13 @@ endif()
 dgl_option(USE_CUDA "Build with CUDA" OFF)
 
 if(USE_CUDA)
+  message(STATUS "Build with CUDA support")
   project(dgl C CXX CUDA)
   cmake_minimum_required(VERSION 3.9)
+  include(cmake/modules/CUDA.cmake)
 else(USE_CUA)
   cmake_minimum_required(VERSION 2.8)
 endif(USE_CUDA)
-
 
 # include directories
 include_directories("include")
@@ -92,9 +93,16 @@ file(GLOB_RECURSE DGL_SRC_1
 
 list(APPEND DGL_SRC ${DGL_SRC_1})
 
-include(cmake/modules/CUDA.cmake)
+if(USE_CUDA)
+  dgl_config_cuda(DGL_CUDA_SRC)
+  list(APPEND DGL_SRC ${DGL_CUDA_SRC})
+endif(USE_CUDA)
 
-add_library(dgl SHARED ${DGL_SRC})
+if(USE_CUDA)
+  cuda_add_library(dgl SHARED ${DGL_SRC})
+else(USE_CUDA)
+  add_library(dgl SHARED ${DGL_SRC})
+endif(USE_CUDA)
 
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
 
