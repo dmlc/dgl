@@ -336,7 +336,7 @@ def build_relabel_map(x, is_sorted=False):
     >>> n2o
     [1, 3, 5, 6]
     >>> o2n
-    [n/a, 0, n/a, 2, n/a, 3, 4]
+    [n/a, 0, n/a, 1, n/a, 2, 3]
 
     "n/a" will be filled with 0
 

@@ -597,7 +597,7 @@ class GraphIndex(object):
             raise Exception("unknown format")
 
     @utils.cached_member(cache='_cache', prefix='csr_adj')
-    def _csr_adjacency_matrix(self, transpose, ctx):
+    def csr_adjacency_matrix(self, transpose, ctx):
         """Return the adjacency matrix representation of this graph in csr format
 
         By default, a row of returned adjacency matrix represents the destination
@@ -631,7 +631,7 @@ class GraphIndex(object):
             indptr = ndarray.array(indptr, ctx=ctx)
             indices = ndarray.array(indices, ctx=ctx)
             eids = ndarray.array(eids, ctx=ctx)
-        return (indptr, indices, eids)
+        return indptr, indices, eids
 
     def adjacency_matrix(self, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
