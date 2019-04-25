@@ -2,19 +2,19 @@
 # pylint: disable=redefined-builtin
 from __future__ import absolute_import
 
-from .. import backend as F
 from .base import BuiltinFunction
+from ..runtime import ir
+from ..runtime.ir import var
 
 __all__ = ["sum", "max"]
+
 
 class ReduceFunction(BuiltinFunction):
     """Base builtin reduce function class."""
 
-    def __call__(self, nodes):
-        """Regular computation of this builtin function
-
-        This will be used when optimization is not available and should
-        ONLY be called by DGL framework.
+    def __call__(self)
+        """Sumbolic computation of this builtin function to create
+        runtime.executor
         """
         raise NotImplementedError
 
@@ -23,31 +23,26 @@ class ReduceFunction(BuiltinFunction):
         """Return the name of this builtin function."""
         raise NotImplementedError
 
-    def is_spmv_supported(self):
-        """Return whether the SPMV optimization is supported."""
-        raise NotImplementedError
-
 
 class SimpleReduceFunction(ReduceFunction):
     """Builtin reduce function that aggregates a single field into another
     single field."""
-    def __init__(self, name, reduce_op, msg_field, out_field):
+    def __init__(self, name, msg_field, out_field):
         self._name = name
-        self.reduce_op = reduce_op
         self.msg_field = msg_field
         self.out_field = out_field
 
-    def is_spmv_supported(self):
-        """Return whether the SPMV optimization is supported."""
-        # NOTE: only sum is supported right now.
-        return self._name == "sum"
-
-    def __call__(self, nodes):
-        return {self.out_field : self.reduce_op(nodes.mailbox[self.msg_field], 1)}
+    def __call__(self, spmat, edge_frame, out_size, edge_map=var.EMPTY_MAP(),
+                 out_map=var.EMPTY_MAP()):
+        reducer = self._name
+        edge_data = ir.READ_COL(edge_frame, var.STR(self.msg_field))
+        return ir.COPY_EDGE_REDUCE(reducer, spmat, edge_data, out_size,
+                                   edge_map, out_map)
 
     @property
     def name(self):
         return self._name
+
 
 def sum(msg, out):
     """Builtin reduce function that aggregates messages by sum.
@@ -70,7 +65,8 @@ def sum(msg, out):
     >>> def reduce_func(nodes):
     >>>     return {'h': torch.sum(nodes.mailbox['m'], dim=1)}
     """
-    return SimpleReduceFunction("sum", F.sum, msg, out)
+    return SimpleReduceFunction("sum", msg, out)
+
 
 def max(msg, out):
     """Builtin reduce function that aggregates messages by max.
@@ -94,4 +90,4 @@ def max(msg, out):
     >>> def reduce_func(nodes):
     >>>     return {'h': torch.max(nodes.mailbox['m'], dim=1)[0]}
     """
-    return SimpleReduceFunction("max", F.max, msg, out)
+    return SimpleReduceFunction("max", msg, out)
