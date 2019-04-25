@@ -17,18 +17,6 @@ namespace dgl {
 namespace kernel {
 namespace {
 
-bool IsValidBinaryOpShape(NDArray lhs, NDArray rhs) {
-  if (lhs->ndim != rhs->ndim) {
-    return false;
-  }
-  for (int i = 1; i < lhs->ndim; ++i) {
-    if (lhs->shape[i] != rhs->shape[i]) {
-      return false;
-    }
-  }
-  return true;
-}
-
 std::string ShapeString(NDArray nd) {
   std::ostringstream oss;
   oss << "(";
@@ -42,28 +30,110 @@ std::string ShapeString(NDArray nd) {
   return oss.str();
 }
 
-}  // namespace
-
-std::vector<int64_t> BinaryElewiseInferShape(
-    const std::string& reducer,
-    NDArray indptr,
-    NDArray indices,
-    NDArray lhs,
-    NDArray rhs) {
-  // TODO(minjie): no broadcasting shape
-  std::vector<int64_t> ret;
-  if (reducer == binary_op::kReduceNone) {
-    // Output is an edge feature tensor.
-    ret.push_back(indices->shape[0]);
-  } else {
-    // Output is a node feature tensor.
-    ret.push_back(indptr->shape[0] - 1);
+bool IsValidBinaryOpShape(NDArray lhs, NDArray rhs) {
+  if (lhs->ndim != rhs->ndim) {
+    return false;
   }
   for (int i = 1; i < lhs->ndim; ++i) {
-    ret.push_back(lhs->shape[i]);
+    if (lhs->shape[i] != rhs->shape[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+NDArray BinaryOpReduce(
+    const std::string& reducer,
+    const std::string& binary_op,
+    NDArray indptr,
+    NDArray indices,
+    binary_op::Target lhs,
+    binary_op::Target rhs,
+    NDArray lhs_mapping,
+    NDArray rhs_mapping,
+    NDArray lhs_data,
+    NDArray rhs_data,
+    NDArray out_mapping,
+    const int64_t out_size) {
+  CHECK(IsValidBinaryOpShape(lhs_data, rhs_data))
+    << "Cannot compute binary operation between feature shapes "
+    << ShapeString(lhs_data) << " and " << ShapeString(rhs_data);
+  const DLContext& ctx = indptr->ctx;
+  const DLDataType& dtype = lhs_data->dtype;
+  // Allocate output
+  std::vector<int64_t> out_shape = {out_size};
+  out_shape.insert(out_shape.end(), lhs_data->shape + 1, lhs_data->shape + lhs_data->ndim);
+  NDArray out_data = NDArray::Empty(out_shape, dtype, ctx);
+  DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl,
+      reducer, binary_op, indptr, indices,
+      binary_op::kSrc, binary_op::kEdge,
+      lhs_mapping, rhs_mapping,
+      lhs_data, rhs_data,
+      out_mapping, out_data);
+  return out_data;
+}
+
+bool HasBcast(NDArray lhs, NDArray rhs) {
+  if (lhs->ndim != rhs->ndim) {
+    return true;
+  }
+  for (int i = 1; i < lhs->ndim; ++i) {
+    if (lhs->shape[i] != rhs->shape[i]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+BcastInfo CalcBcastInfo(NDArray lhs, NDArray rhs) {
+  BcastInfo ret;
+  const int max_ndim = std::max(lhs->ndim, rhs->ndim);
+  for (int j = 0; j < max_ndim; ++j) {
+    const int dl = (j > lhs->ndim)? 1 : lhs->shape[(lhs->ndim - j)];
+    const int dr = (j > rhs->ndim)? 1 : rhs->shape[(rhs->ndim - j)];
+    if (dl != dr) {
+      if (dl != 1 && dr != 1) {
+        LOG(FATAL) << "Invalid broadcasting between feature shapes "
+          << ShapeString(lhs) << " and " << ShapeString(rhs);
+      }
+    }
+    ret.real_out_shape.push_back(std::max(dl, dr));
   }
   return ret;
 }
+
+NDArray BinaryOpReduceBcast(
+    const std::string& reducer,
+    const std::string& binary_op,
+    NDArray indptr,
+    NDArray indices,
+    binary_op::Target lhs,
+    binary_op::Target rhs,
+    NDArray lhs_mapping,
+    NDArray rhs_mapping,
+    NDArray lhs_data,
+    NDArray rhs_data,
+    NDArray out_mapping,
+    const int64_t out_size) {
+  BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
+  const DLContext& ctx = indptr->ctx;
+  const DLDataType& dtype = lhs_data->dtype;
+  // Allocate output
+  std::vector<int64_t> out_shape = {out_size};
+  out_shape.insert(out_shape.end(),
+      info.real_out_shape.begin(), info.real_out_shape.end());
+  NDArray out_data = NDArray::Empty(out_shape, dtype, ctx);
+
+  //DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl,
+  //    reducer, binary_op, indptr, indices,
+  //    binary_op::kSrc, binary_op::kEdge,
+  //    lhs_mapping, rhs_mapping,
+  //    lhs_data, rhs_data,
+  //    out_mapping, out_data);
+  return out_data;
+}
+}  // namespace
+
 
 NDArray SrcOpEdgeReduce(
     const std::string& reducer,
@@ -76,23 +146,19 @@ NDArray SrcOpEdgeReduce(
     NDArray edge_data,
     NDArray out_mapping,
     const int64_t out_size) {
-  // TODO(minjie): no broadcasting shape
-  CHECK(IsValidBinaryOpShape(src_data, edge_data))
-    << "Cannot compute binary operation between feature shapes "
-    << ShapeString(src_data) << " and " << ShapeString(edge_data);
-  const DLContext& ctx = indptr->ctx;
-  const DLDataType& dtype = src_data->dtype;
-  // Allocate output
-  const auto& out_shape = BinaryElewiseInferShape(reducer, indptr,
-      indices, src_data, edge_data);
-  NDArray out_data = NDArray::Empty(out_shape, dtype, ctx);
-  DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl,
-      reducer, binary_op, indptr, indices,
-      binary_op::kSrc, binary_op::kEdge,
-      src_mapping, edge_mapping,
-      src_data, edge_data,
-      out_mapping, out_data);
-  return out_data;
+  if (HasBcast(src_data, edge_data)) {
+    return BinaryOpReduceBcast(reducer, binary_op, indptr, indices,
+        binary_op::kSrc, binary_op::kEdge,
+        src_mapping, edge_mapping,
+        src_data, edge_data,
+        out_mapping, out_size);
+  } else {
+    return BinaryOpReduce(reducer, binary_op, indptr, indices,
+        binary_op::kSrc, binary_op::kEdge,
+        src_mapping, edge_mapping,
+        src_data, edge_data,
+        out_mapping, out_size);
+  }
 }
 
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelSrcMulEdgeReduce")
@@ -122,7 +188,11 @@ NDArray SrcOpDstReduce(
     NDArray dst_data,
     NDArray out_mapping,
     const int64_t out_size) {
-  return NDArray();
+  return BinaryOpReduce(reducer, binary_op, indptr, indices,
+      binary_op::kSrc, binary_op::kDst,
+      src_mapping, dst_mapping,
+      src_data, dst_data,
+      out_mapping, out_size);
 }
 
 DGL_REGISTER_GLOBAL("backend.kernel._CAPI_DGLKernelSrcMulDstReduce")

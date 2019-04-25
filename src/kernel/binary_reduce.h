@@ -6,15 +6,21 @@
 
 namespace dgl {
 namespace kernel {
-/*
- * !\brief Infer the output shape of binary elewise graph computation.
- */
-std::vector<int64_t> BinaryElewiseInferShape(
-    const std::string& reducer,
-    runtime::NDArray indptr,
-    runtime::NDArray indices,
-    runtime::NDArray lhs,
-    runtime::NDArray rhs);
+
+// Structure for broadcasting shapes
+struct BcastInfo {
+  // inferred output shape
+  std::vector<int64_t> real_out_shape;
+  // Following shapes here have been preprocessed, so that:
+  //  - The first dimension (for graph) is removed. Shapes here are only for features.
+  //  - They have the same number of dimensions.
+  //    e.g. (4,) and (3, 4) become (1, 4) and (3, 4)
+  //  - Continuous non-broadcasting dimenions are flattened.
+  //    e.g. (4, 1, 3, 3) and (4, 5, 3, 3) become (4, 1, 9) and (4, 5, 9)
+  std::vector<int64_t> lhs_shape, lhs_stride;
+  std::vector<int64_t> rhs_shape, rhs_stride;
+  std::vector<int64_t> out_shape, out_stride;
+};
 
 /*
  * !\brief Multiply src node data with edge data and perform reduce
@@ -94,10 +100,26 @@ runtime::NDArray SrcOpDstReduce(
     const int64_t out_size);
 
 
-// Implementations
+// Declaration of implementations.
 
 namespace cpu {
 void BinaryReduceImpl(
+    const std::string& reducer,
+    const std::string& binary_op,
+    runtime::NDArray indptr,
+    runtime::NDArray indices,
+    binary_op::Target lhs,
+    binary_op::Target rhs,
+    runtime::NDArray lhs_mapping,
+    runtime::NDArray rhs_mapping,
+    runtime::NDArray lhs_data,
+    runtime::NDArray rhs_data,
+    runtime::NDArray out_mapping,
+    runtime::NDArray out_data);
+
+
+void BinaryReduceBcastImpl(
+    const BcastInfo& info,
     const std::string& reducer,
     const std::string& binary_op,
     runtime::NDArray indptr,
@@ -114,6 +136,21 @@ void BinaryReduceImpl(
 
 namespace cuda {
 void BinaryReduceImpl(
+    const std::string& reducer,
+    const std::string& binary_op,
+    runtime::NDArray indptr,
+    runtime::NDArray indices,
+    binary_op::Target lhs,
+    binary_op::Target rhs,
+    runtime::NDArray lhs_mapping,
+    runtime::NDArray rhs_mapping,
+    runtime::NDArray lhs_data,
+    runtime::NDArray rhs_data,
+    runtime::NDArray out_mapping,
+    runtime::NDArray out_data);
+
+void BinaryReduceBcastImpl(
+    const BcastInfo& info,
     const std::string& reducer,
     const std::string& binary_op,
     runtime::NDArray indptr,

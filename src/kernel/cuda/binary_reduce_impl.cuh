@@ -41,6 +41,55 @@ struct BinaryReduce {
   }
 };
 
+__device__ __forceinline__ void Unravel(
+    int64_t idx, int ndim, const int64_t* shape, const int64_t* stride, int64_t* out) {
+  for (int d = 0; d < ndim; ++d) {
+    out[d] = (idx / stride[d]) % shape[d];
+  }
+}
+
+__device__ __forceinline__ int64_t Ravel(
+    const int64_t* idx, int ndim, const int64_t* shape, const int64_t* stride) {
+  int64_t out = 0;
+  for (int d = 0; d < ndim; ++d) {
+    out += min(idx[d], shape[d]) * stride[d];
+  }
+  return out;
+}
+
+template <int NDim, typename DType, typename Functors>
+struct BinaryReduceBcast {
+  static __device__ __forceinline__ bool CondEdge(
+      int64_t src, int64_t dst, int64_t eid, BcastGData<DType>* gdata) {
+    return true;
+  }
+  static __device__ __forceinline__ void ApplyEdge(
+      int64_t src, int64_t dst, int64_t eid, BcastGData<DType>* gdata) {
+    int tx = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride_x = blockDim.x * gridDim.x;
+    int64_t lid = Functors::SelectLeft(src, eid, dst);
+    int64_t rid = Functors::SelectRight(src, eid, dst);
+    int64_t oid = Functors::SelectOut(src, eid, dst);
+    lid = Functors::GetId(lid, gdata->lhs_mapping);
+    rid = Functors::GetId(rid, gdata->rhs_mapping);
+    oid = Functors::GetId(oid, gdata->out_mapping);
+    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len;
+    DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len;
+    DType* outoff = gdata->out_data + oid * gdata->out_len;
+    int64_t tmp[NDim];  // store unraveled idx.
+    while (tx < gdata->out_len) {
+      Unravel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride, tmp);
+      DType lhs = Functors::Read(lhsoff +
+          Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride));
+      DType rhs = Functors::Read(rhsoff +
+          Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride));
+      DType out = Functors::Call(lhs, rhs);
+      Functors::Write(outoff + tx, out);
+      tx += stride_x;
+    }
+  }
+};
+
 template <typename DType, typename IdGetter,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
@@ -98,6 +147,14 @@ void CallBinaryReduce(
       const minigun::advance::RuntimeConfig& rtcfg, \
       const minigun::Csr& csr, \
       GData<dtype>* gdata);
+
+#define GEN_BCAST_DEFINE(dtype, lhs_tgt, rhs_tgt, op) \
+  template void CallBinaryReduceBcast<dtype, GETID<XPU, int64_t>, \
+                                 lhs_tgt, rhs_tgt, \
+                                 op<dtype>, REDUCER<XPU, dtype>>( \
+      const minigun::advance::RuntimeConfig& rtcfg, \
+      const minigun::Csr& csr, \
+      BcastGData<dtype>* gdata);
 
 #define EVAL(F, ...) F(__VA_ARGS__)
 
