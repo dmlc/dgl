@@ -1,6 +1,11 @@
 #ifndef DGL_KERNEL_CUDA_ATOMIC_H_
 #define DGL_KERNEL_CUDA_ATOMIC_H_
 
+#include <cuda_runtime.h>
+#if __CUDA_ARCH__ >= 600
+#include <cuda_fp16.h>
+#endif
+
 namespace dgl {
 namespace kernel {
 namespace cuda {
@@ -86,6 +91,10 @@ template <>
 __device__ __forceinline__ double AtomicAdd<double>(double* addr, double val) {
   return atomicAdd(addr, val);
 }
+#endif
+
+#if defined(CUDART_VERSION) && CUDART_VERSION >= 10000
+#if __CUDA_ARCH__ >= 600
 template <>
 __device__ __forceinline__ __half2 AtomicAdd<__half2>(__half2* addr, __half2 val) {
   return atomicAdd(addr, val);
@@ -98,6 +107,7 @@ __device__ __forceinline__ __half AtomicAdd<__half>(__half* addr, __half val) {
   return atomicAdd(addr, val);
 }
 #endif  // __CUDA_ARCH__
+#endif
 
 #define OP(a, b) a * b
 DEFINE_ATOMIC(Mul)

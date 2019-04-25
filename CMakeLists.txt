@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.9)
 ########################################
 # Borrowed and adapted from TVM project
 ########################################
@@ -26,10 +27,7 @@ dgl_option(USE_CUDA "Build with CUDA" OFF)
 if(USE_CUDA)
   message(STATUS "Build with CUDA support")
   project(dgl C CXX CUDA)
-  cmake_minimum_required(VERSION 3.9)
   include(cmake/modules/CUDA.cmake)
-else(USE_CUA)
-  cmake_minimum_required(VERSION 2.8)
 endif(USE_CUDA)
 
 # include directories
