@@ -840,7 +840,8 @@ def zerocopy_from_numpy(np_array):
 # kernels (see kernel.py), and plug into tensor framework using custom op
 # extensions.
 
-def src_mul_edge_reduce(reducer, adj, inv_adj, src_data, edge_data):
+def src_mul_edge_reduce(reducer, mul_op, spmat, src_data, edge_data, out_size,
+                        src_map, edge_map, out_map):
     """Multiply source node features with edge features, and perform reduction
     on destination nodes optionally.
 
@@ -867,7 +868,8 @@ def src_mul_edge_reduce(reducer, adj, inv_adj, src_data, edge_data):
     """
     pass
 
-def src_mul_dst_reduce(reducer, adj, inv_adj, src_data, dst_data):
+def src_mul_dst_reduce(reducer, mul_op, spmat, src_data, dst_data, out_size,
+                       src_map, dst_map, out_map):
     """Multiply source node features with destination node features, and
     perform reduction on destination nodes optionally.
 
@@ -894,7 +896,7 @@ def src_mul_dst_reduce(reducer, adj, inv_adj, src_data, dst_data):
     """
     pass
 
-def copy_src_reduce(reducer, adj, inv_adj, src_data):
+def copy_src_reduce(reducer, spmat, src_data, out_size, src_map, out_map):
     """Copy source node features to edge, and perform reduction on destination
     nodes optionally.
 
@@ -919,7 +921,7 @@ def copy_src_reduce(reducer, adj, inv_adj, src_data):
     """
     pass
 
-def copy_edge_reduce(reducer, adj, inv_adj, edge_data):
+def copy_edge_reduce(reducer, spmat, edge_data, out_size, edge_map, out_map):
     """Copy source edge features, and perform reduction on destination nodes
     optionally.
 
