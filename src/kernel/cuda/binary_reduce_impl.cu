@@ -207,23 +207,25 @@ void BinaryReduceBcastImpl(
   const DLDataType& dtype = lhs_data->dtype;
   const bool has_indirect =
     (lhs_mapping->ndim != 0 || rhs_mapping->ndim != 0 || out_mapping->ndim != 0);
+  const int bcast_ndim = info.out_shape.size();
   DGL_DTYPE_SWITCH(dtype, DType, {
     REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {
-      const int NDim = 8;
-      BcastGData<NDim, DType> gdata = AllocBcastGData<NDim, DType, Reducer>(
-          rtcfg.stream, info, lhs_mapping, rhs_mapping,
-          lhs_data, rhs_data, out_mapping, out_data);
-      BINARY_OP_SWITCH(op, DType, BinaryOp, {
-        TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-          if (has_indirect) {
-            typedef IndirectId<kDLGPU, int64_t> IdGetter;
-            CallBinaryReduceBcast<NDim, DType, IdGetter, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, csr, &gdata);
-          } else {
-            typedef DirectId<kDLGPU, int64_t> IdGetter;
-            CallBinaryReduceBcast<NDim, DType, IdGetter, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, csr, &gdata);
-          }
+      BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
+        BcastGData<NDim, DType> gdata = AllocBcastGData<NDim, DType, Reducer>(
+            rtcfg.stream, info, lhs_mapping, rhs_mapping,
+            lhs_data, rhs_data, out_mapping, out_data);
+        BINARY_OP_SWITCH(op, DType, BinaryOp, {
+          TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
+            if (has_indirect) {
+              typedef IndirectId<kDLGPU, int64_t> IdGetter;
+              CallBinaryReduceBcast<NDim, DType, IdGetter, LeftTarget,
+                RightTarget, BinaryOp, Reducer>(rtcfg, csr, &gdata);
+            } else {
+              typedef DirectId<kDLGPU, int64_t> IdGetter;
+              CallBinaryReduceBcast<NDim, DType, IdGetter, LeftTarget,
+                RightTarget, BinaryOp, Reducer>(rtcfg, csr, &gdata);
+            }
+          });
         });
       });
     });

@@ -165,13 +165,13 @@ void CallBinaryReduceBcast(
       const minigun::Csr& csr, \
       GData<dtype>* gdata);
 
-#define GEN_BCAST_DEFINE(dtype, lhs_tgt, rhs_tgt, op) \
-  template void CallBinaryReduceBcast<8, dtype, GETID<XPU, int64_t>, \
+#define GEN_BCAST_DEFINE(ndim, dtype, lhs_tgt, rhs_tgt, op) \
+  template void CallBinaryReduceBcast<ndim, dtype, GETID<XPU, int64_t>, \
                                  lhs_tgt, rhs_tgt, \
                                  op<dtype>, REDUCER<XPU, dtype>>( \
       const minigun::advance::RuntimeConfig& rtcfg, \
       const minigun::Csr& csr, \
-      BcastGData<8, dtype>* gdata);
+      BcastGData<ndim, dtype>* gdata);
 
 #define EVAL(F, ...) F(__VA_ARGS__)
 

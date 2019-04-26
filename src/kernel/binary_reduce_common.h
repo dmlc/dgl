@@ -289,6 +289,11 @@ struct OutSelector<ReduceNone<XPU, DType>> {
     LOG(FATAL) << "Too many broadcasting dimensions."; \
   }
 
+#define GEN_NDIM(GEN, ...) \
+  GEN(__VA_ARGS__, 2) \
+  GEN(__VA_ARGS__, 4) \
+  GEN(__VA_ARGS__, 8)
+
 }  // namespace kernel
 }  // namespace dgl
 

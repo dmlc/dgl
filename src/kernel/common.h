@@ -30,11 +30,12 @@ namespace kernel {
   }
 #endif  // DGL_USE_CUDA
 
+#if 0
 #define GEN_DTYPE(GEN, ...)  \
   GEN(__VA_ARGS__, float)    \
   GEN(__VA_ARGS__, double)   \
   GEN(__VA_ARGS__, int32_t)  \
-  GEN(__VA_ARGS__, int64_t)  \
+  GEN(__VA_ARGS__, int64_t)
 
 #define DGL_DTYPE_SWITCH(val, DType, ...)                   \
   if (val.code == kDLInt && val.bits == 32) {               \
@@ -53,6 +54,19 @@ namespace kernel {
     LOG(FATAL) << "Unsupported dtype: " << val.code << "_"  \
                << val.bits;                                 \
   }
+#else
+#define GEN_DTYPE(GEN, ...)  \
+  GEN(__VA_ARGS__, float)
+
+#define DGL_DTYPE_SWITCH(val, DType, ...)                   \
+  if (val.code == kDLFloat && val.bits == 32) {             \
+    typedef float DType;                                    \
+    {__VA_ARGS__}                                           \
+  } else {                                                  \
+    LOG(FATAL) << "Unsupported dtype: " << val.code << "_"  \
+               << val.bits;                                 \
+  }
+#endif
 
 
 }  // namespace kernel
