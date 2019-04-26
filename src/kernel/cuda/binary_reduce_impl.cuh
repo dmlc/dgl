@@ -52,7 +52,7 @@ __device__ __forceinline__ int64_t Ravel(
     const int64_t* idx, int ndim, const int64_t* shape, const int64_t* stride) {
   int64_t out = 0;
   for (int d = 0; d < ndim; ++d) {
-    out += min(idx[d], shape[d]) * stride[d];
+    out += min(idx[d], shape[d] - 1) * stride[d];
   }
   return out;
 }
@@ -133,10 +133,27 @@ void CallBinaryReduce(
   typedef FunctorsTempl<DType, IdGetter, LeftSelector,
                         RightSelector, BinaryOp, Reducer>
           Functors;
-  typedef cuda::BinaryReduce<DType, Functors> BinaryReduceUDF;
+  typedef BinaryReduce<DType, Functors> UDF;
+  // TODO(minjie): allocator
+  minigun::advance::Advance<kDLGPU, AdvanceConfig, GData<DType>, UDF>(
+        rtcfg, csr, gdata, IntArray1D(), IntArray1D());
+}
+
+template <int NDim, typename DType, typename IdGetter,
+          typename LeftSelector, typename RightSelector,
+          typename BinaryOp, typename Reducer>
+void CallBinaryReduceBcast(
+    const minigun::advance::RuntimeConfig& rtcfg,
+    const minigun::Csr& csr,
+    BcastGData<NDim, DType>* gdata) {
+  using minigun::IntArray1D;
+  typedef FunctorsTempl<DType, IdGetter, LeftSelector,
+                        RightSelector, BinaryOp, Reducer>
+          Functors;
+  typedef BinaryReduceBcast<NDim, DType, Functors> UDF;
   // TODO(minjie): allocator
   minigun::advance::Advance<kDLGPU, AdvanceConfig,
-    GData<DType>, BinaryReduceUDF>(
+    BcastGData<NDim, DType>, UDF>(
         rtcfg, csr, gdata, IntArray1D(), IntArray1D());
 }
 
@@ -148,13 +165,13 @@ void CallBinaryReduce(
       const minigun::Csr& csr, \
       GData<dtype>* gdata);
 
-#define GEN_BCAST_DEFINE(ndim, dtype, lhs_tgt, rhs_tgt, op) \
-  template void CallBinaryReduceBcast<ndim, dtype, GETID<XPU, int64_t>, \
+#define GEN_BCAST_DEFINE(dtype, lhs_tgt, rhs_tgt, op) \
+  template void CallBinaryReduceBcast<8, dtype, GETID<XPU, int64_t>, \
                                  lhs_tgt, rhs_tgt, \
                                  op<dtype>, REDUCER<XPU, dtype>>( \
       const minigun::advance::RuntimeConfig& rtcfg, \
       const minigun::Csr& csr, \
-      BcastGData<ndim, dtype>* gdata);
+      BcastGData<8, dtype>* gdata);
 
 #define EVAL(F, ...) F(__VA_ARGS__)
 

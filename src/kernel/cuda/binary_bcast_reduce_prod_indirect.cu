@@ -5,10 +5,10 @@ namespace dgl {
 namespace kernel {
 namespace cuda {
 
-//#define REDUCER ReduceSum
-//#define XPU kDLGPU
-//#define GETID DirectId
-//EVAL(GEN_DTYPE, GEN_TARGET, GEN_BINARY_OP, GEN_BCAST_DEFINE)
+#define REDUCER ReduceProd
+#define XPU kDLGPU
+#define GETID IndirectId
+EVAL(GEN_DTYPE, GEN_TARGET, GEN_BINARY_OP, GEN_BCAST_DEFINE)
 
 }  // namespace cuda
 }  // namespace kernel

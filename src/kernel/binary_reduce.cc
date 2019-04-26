@@ -136,6 +136,9 @@ BcastInfo CalcBcastInfo(NDArray lhs, NDArray rhs) {
   oss << "lhs=(";
   for (auto x : ret.lhs_shape) oss << x << " ";
   oss << ") ";
+  oss << "lhs_stride=(";
+  for (auto x : ret.lhs_stride) oss << x << " ";
+  oss << ") ";
   oss << "rhs=(";
   for (auto x : ret.rhs_shape) oss << x << " ";
   oss << ") ";
@@ -144,6 +147,9 @@ BcastInfo CalcBcastInfo(NDArray lhs, NDArray rhs) {
   oss << ") ";
   oss << "out=(";
   for (auto x : ret.out_shape) oss << x << " ";
+  oss << ") ";
+  oss << "out_stride=(";
+  for (auto x : ret.out_stride) oss << x << " ";
   oss << ") ";
   LOG(INFO) << oss.str();
   */

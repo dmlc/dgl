@@ -41,6 +41,11 @@ void CallBinaryReduce(
 
 // Binary reduce with broadcasting
 
+/*
+ * !\brief Data and auxiliary information for binary broadcasting op.
+ *
+ * Note that all the shapes and strides are for the feature dimensions.
+ */
 template <int NDim, typename DType>
 struct BcastGData {
   int ndim{0};

@@ -34,6 +34,13 @@ inline int64_t NElements(NDArray array) {
     return ret;
   }
 }
+inline int64_t Prod(const std::vector<int64_t>& vec) {
+  int64_t ret = 1;
+  for (int64_t v : vec) {
+    ret *= v;
+  }
+  return ret;
+}
 }  // namespace
 
 template <typename DType, typename Reducer>
@@ -140,7 +147,18 @@ BcastGData<NDim, DType>* AllocBcastGData(
     NDArray out_mapping, NDArray out_data) {
   // GData
   BcastGData<NDim, DType> gdata;
+  // dim, shape and stride
+  gdata.ndim = info.lhs_shape.size();
   std::copy(info.lhs_shape.begin(), info.lhs_shape.end(), gdata.lhs_shape);
+  std::copy(info.lhs_stride.begin(), info.lhs_stride.end(), gdata.lhs_stride);
+  std::copy(info.rhs_shape.begin(), info.rhs_shape.end(), gdata.rhs_shape);
+  std::copy(info.rhs_stride.begin(), info.rhs_stride.end(), gdata.rhs_stride);
+  std::copy(info.out_shape.begin(), info.out_shape.end(), gdata.out_shape);
+  std::copy(info.out_stride.begin(), info.out_stride.end(), gdata.out_stride);
+  gdata.lhs_len = Prod(info.lhs_shape);
+  gdata.rhs_len = Prod(info.rhs_shape);
+  gdata.out_len = Prod(info.out_shape);
+  // data
   gdata.lhs_data = static_cast<DType*>(lhs_data->data);
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
@@ -157,8 +175,8 @@ BcastGData<NDim, DType>* AllocBcastGData(
   utils::Fill(stream, gdata.out_data, NElements(out_data), Zero<Reducer>::value);
   // device GData
   BcastGData<NDim, DType>* d_gdata;
-  CUDA_CALL(cudaMalloc(&d_gdata, sizeof(BcastGData<DType>)));
-  CUDA_CALL(cudaMemcpy(d_gdata, &gdata, sizeof(BcastGData<DType>),
+  CUDA_CALL(cudaMalloc(&d_gdata, sizeof(BcastGData<NDim, DType>)));
+  CUDA_CALL(cudaMemcpy(d_gdata, &gdata, sizeof(BcastGData<NDim, DType>),
         cudaMemcpyHostToDevice));
   return d_gdata;
 }
@@ -166,7 +184,7 @@ BcastGData<NDim, DType>* AllocBcastGData(
 void BinaryReduceBcastImpl(
     const BcastInfo& info,
     const std::string& reducer,
-    const std::string& binary_op,
+    const std::string& op,
     NDArray indptr,
     NDArray indices,
     binary_op::Target lhs,
@@ -201,38 +219,33 @@ void BinaryReduceBcastImpl(
   const DLDataType& dtype = lhs_data->dtype;
   const bool has_indirect =
     (lhs_mapping->ndim != 0 || rhs_mapping->ndim != 0 || out_mapping->ndim != 0);
-  //DGL_DTYPE_SWITCH(dtype, DType, {
-    //REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {
-      typedef float DType;
-      typedef ReduceSum<kDLGPU, DType> Reducer;
+  DGL_DTYPE_SWITCH(dtype, DType, {
+    REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {
       const int NDim = 8;
       BcastGData<NDim, DType>* gdata = AllocBcastGData<NDim, DType, Reducer>(
           rtcfg.stream, info, lhs_mapping, rhs_mapping,
           lhs_data, rhs_data, out_mapping, out_data);
-      typedef BinaryMul<DType> BinaryOp;
-      typedef SelectSrc LeftTarget;
-      typedef SelectEdge RightTarget;
-      //BINARY_OP_SWITCH(op, DType, BinaryOp, {
-      //  TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-      //    if (has_indirect) {
-      //      typedef IndirectId<kDLGPU, int64_t> IdGetter;
-      //      CallBinaryReduce<DType, IdGetter, LeftTarget,
-      //        RightTarget, BinaryOp, Reducer>(rtcfg, csr, gdata);
-      //    } else {
+      BINARY_OP_SWITCH(op, DType, BinaryOp, {
+        TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
+          if (has_indirect) {
+            typedef IndirectId<kDLGPU, int64_t> IdGetter;
+            CallBinaryReduceBcast<NDim, DType, IdGetter, LeftTarget,
+              RightTarget, BinaryOp, Reducer>(rtcfg, csr, gdata);
+          } else {
             typedef DirectId<kDLGPU, int64_t> IdGetter;
-            //CallBinaryReduceBcast<DType, IdGetter, LeftTarget,
-            //  RightTarget, BinaryOp, Reducer>(rtcfg, csr, gdata);
-      //    }
-      //  });
-      //});
+            CallBinaryReduceBcast<NDim, DType, IdGetter, LeftTarget,
+              RightTarget, BinaryOp, Reducer>(rtcfg, csr, gdata);
+          }
+        });
+      });
       // free device GData
       CUDA_CALL(cudaFree(gdata));
-    //});
+    });
     if (reducer == binary_op::kReduceMean) {
       // TODO(minjie): divide
       LOG(FATAL) << "reduce mean is not supported.";
     }
-  //});
+  });
 }
 
 }  // namespace cuda
