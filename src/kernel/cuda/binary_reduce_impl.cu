@@ -44,10 +44,10 @@ inline int64_t Prod(const std::vector<int64_t>& vec) {
 }  // namespace
 
 template <typename DType, typename Reducer>
-GData<DType>* AllocGData(cudaStream_t stream, int64_t x_len,
-                         NDArray lhs_mapping, NDArray rhs_mapping,
-                         NDArray lhs_data, NDArray rhs_data,
-                         NDArray out_mapping, NDArray out_data) {
+GData<DType> AllocGData(cudaStream_t stream, int64_t x_len,
+                        NDArray lhs_mapping, NDArray rhs_mapping,
+                        NDArray lhs_data, NDArray rhs_data,
+                        NDArray out_mapping, NDArray out_data) {
   // GData
   GData<DType> gdata;
   gdata.x_length = x_len;
@@ -65,12 +65,7 @@ GData<DType>* AllocGData(cudaStream_t stream, int64_t x_len,
   }
   // fill out data with zero values
   utils::Fill(stream, gdata.out_data, NElements(out_data), Zero<Reducer>::value);
-  // device GData
-  GData<DType>* d_gdata;
-  CUDA_CALL(cudaMalloc(&d_gdata, sizeof(GData<DType>)));
-  CUDA_CALL(cudaMemcpy(d_gdata, &gdata, sizeof(GData<DType>),
-        cudaMemcpyHostToDevice));
-  return d_gdata;
+  return gdata;
 }
 
 void BinaryReduceImpl(
@@ -112,7 +107,7 @@ void BinaryReduceImpl(
     (lhs_mapping->ndim != 0 || rhs_mapping->ndim != 0 || out_mapping->ndim != 0);
   DGL_DTYPE_SWITCH(dtype, DType, {
     REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {
-      GData<DType>* gdata = AllocGData<DType, Reducer>(
+      GData<DType> gdata = AllocGData<DType, Reducer>(
           rtcfg.stream, x_len, lhs_mapping, rhs_mapping,
           lhs_data, rhs_data, out_mapping, out_data);
       BINARY_OP_SWITCH(op, DType, BinaryOp, {
@@ -120,16 +115,14 @@ void BinaryReduceImpl(
           if (has_indirect) {
             typedef IndirectId<kDLGPU, int64_t> IdGetter;
             CallBinaryReduce<DType, IdGetter, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, csr, gdata);
+              RightTarget, BinaryOp, Reducer>(rtcfg, csr, &gdata);
           } else {
             typedef DirectId<kDLGPU, int64_t> IdGetter;
             CallBinaryReduce<DType, IdGetter, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, csr, gdata);
+              RightTarget, BinaryOp, Reducer>(rtcfg, csr, &gdata);
           }
         });
       });
-      // free device GData
-      CUDA_CALL(cudaFree(gdata));
     });
     if (reducer == binary_op::kReduceMean) {
       // TODO(minjie): divide
@@ -139,7 +132,7 @@ void BinaryReduceImpl(
 }
 
 template <int NDim, typename DType, typename Reducer>
-BcastGData<NDim, DType>* AllocBcastGData(
+BcastGData<NDim, DType> AllocBcastGData(
     cudaStream_t stream,
     const BcastInfo& info,
     NDArray lhs_mapping, NDArray rhs_mapping,
@@ -173,12 +166,7 @@ BcastGData<NDim, DType>* AllocBcastGData(
   }
   // fill out data with zero values
   utils::Fill(stream, gdata.out_data, NElements(out_data), Zero<Reducer>::value);
-  // device GData
-  BcastGData<NDim, DType>* d_gdata;
-  CUDA_CALL(cudaMalloc(&d_gdata, sizeof(BcastGData<NDim, DType>)));
-  CUDA_CALL(cudaMemcpy(d_gdata, &gdata, sizeof(BcastGData<NDim, DType>),
-        cudaMemcpyHostToDevice));
-  return d_gdata;
+  return gdata;
 }
 
 void BinaryReduceBcastImpl(
@@ -222,7 +210,7 @@ void BinaryReduceBcastImpl(
   DGL_DTYPE_SWITCH(dtype, DType, {
     REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {
       const int NDim = 8;
-      BcastGData<NDim, DType>* gdata = AllocBcastGData<NDim, DType, Reducer>(
+      BcastGData<NDim, DType> gdata = AllocBcastGData<NDim, DType, Reducer>(
           rtcfg.stream, info, lhs_mapping, rhs_mapping,
           lhs_data, rhs_data, out_mapping, out_data);
       BINARY_OP_SWITCH(op, DType, BinaryOp, {
@@ -230,16 +218,14 @@ void BinaryReduceBcastImpl(
           if (has_indirect) {
             typedef IndirectId<kDLGPU, int64_t> IdGetter;
             CallBinaryReduceBcast<NDim, DType, IdGetter, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, csr, gdata);
+              RightTarget, BinaryOp, Reducer>(rtcfg, csr, &gdata);
           } else {
             typedef DirectId<kDLGPU, int64_t> IdGetter;
             CallBinaryReduceBcast<NDim, DType, IdGetter, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, csr, gdata);
+              RightTarget, BinaryOp, Reducer>(rtcfg, csr, &gdata);
           }
         });
       });
-      // free device GData
-      CUDA_CALL(cudaFree(gdata));
     });
     if (reducer == binary_op::kReduceMean) {
       // TODO(minjie): divide

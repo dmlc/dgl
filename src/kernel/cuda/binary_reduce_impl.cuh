@@ -136,7 +136,7 @@ void CallBinaryReduce(
   typedef BinaryReduce<DType, Functors> UDF;
   // TODO(minjie): allocator
   minigun::advance::Advance<kDLGPU, AdvanceConfig, GData<DType>, UDF>(
-        rtcfg, csr, gdata, IntArray1D(), IntArray1D());
+        rtcfg, csr, gdata, IntArray1D());
 }
 
 template <int NDim, typename DType, typename IdGetter,
@@ -154,7 +154,7 @@ void CallBinaryReduceBcast(
   // TODO(minjie): allocator
   minigun::advance::Advance<kDLGPU, AdvanceConfig,
     BcastGData<NDim, DType>, UDF>(
-        rtcfg, csr, gdata, IntArray1D(), IntArray1D());
+        rtcfg, csr, gdata, IntArray1D());
 }
 
 #define GEN_DEFINE(dtype, lhs_tgt, rhs_tgt, op) \

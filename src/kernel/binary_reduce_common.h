@@ -274,6 +274,21 @@ struct OutSelector<ReduceNone<XPU, DType>> {
   typedef SelectEdge Type;
 };
 
+// macro for broadcasting
+#define BCAST_NDIM_SWITCH(ndim, NDim, ...) \
+  if (ndim <= 2) {                         \
+    constexpr int NDim = 2;                \
+    {__VA_ARGS__}                          \
+  } else if (ndim <= 4) {                  \
+    constexpr int NDim = 4;                \
+    {__VA_ARGS__}                          \
+  } else if (ndim <= 8) {                  \
+    constexpr int NDim = 8;                \
+    {__VA_ARGS__}                          \
+  } else {                                 \
+    LOG(FATAL) << "Too many broadcasting dimensions."; \
+  }
+
 }  // namespace kernel
 }  // namespace dgl
 

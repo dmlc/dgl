@@ -242,11 +242,19 @@ NDArray SrcOpDstReduce(
     NDArray dst_data,
     NDArray out_mapping,
     const int64_t out_size) {
-  return BinaryOpReduce(reducer, binary_op, indptr, indices,
-      binary_op::kSrc, binary_op::kDst,
-      src_mapping, dst_mapping,
-      src_data, dst_data,
-      out_mapping, out_size);
+  if (HasBcast(src_data, dst_data)) {
+    return BinaryOpReduceBcast(reducer, binary_op, indptr, indices,
+        binary_op::kSrc, binary_op::kDst,
+        src_mapping, dst_mapping,
+        src_data, dst_data,
+        out_mapping, out_size);
+  } else {
+    return BinaryOpReduce(reducer, binary_op, indptr, indices,
+        binary_op::kSrc, binary_op::kDst,
+        src_mapping, dst_mapping,
+        src_data, dst_data,
+        out_mapping, out_size);
+  }
 }
 
 DGL_REGISTER_GLOBAL("backend.kernel._CAPI_DGLKernelSrcMulDstReduce")
