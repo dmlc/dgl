@@ -93,6 +93,15 @@ void SocketSender::Finalize() {
       client = nullptr;
     }
   }
+  delete buffer_;
+}
+
+char* SocketSender::GetBuffer() {
+  return buffer_;
+}
+
+void SocketSender::SetBuffer(char* buffer) {
+  buffer_ = buffer;
 }
 
 bool SocketReceiver::Wait(const char* ip,
@@ -190,6 +199,15 @@ void SocketReceiver::Finalize() {
       socket_[i] = nullptr;
     }
   }
+  delete buffer_;
+}
+
+char* SocketReceiver::GetBuffer() {
+  return buffer_;
+}
+
+void SocketReceiver::SetBuffer(char* buffer) {
+  buffer_ = buffer;
 }
 
 }  // namespace network
