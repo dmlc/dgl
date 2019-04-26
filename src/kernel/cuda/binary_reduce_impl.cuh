@@ -60,11 +60,11 @@ __device__ __forceinline__ int64_t Ravel(
 template <int NDim, typename DType, typename Functors>
 struct BinaryReduceBcast {
   static __device__ __forceinline__ bool CondEdge(
-      int64_t src, int64_t dst, int64_t eid, BcastGData<DType>* gdata) {
+      int64_t src, int64_t dst, int64_t eid, BcastGData<NDim, DType>* gdata) {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int64_t src, int64_t dst, int64_t eid, BcastGData<DType>* gdata) {
+      int64_t src, int64_t dst, int64_t eid, BcastGData<NDim, DType>* gdata) {
     int tx = blockIdx.x * blockDim.x + threadIdx.x;
     int stride_x = blockDim.x * gridDim.x;
     int64_t lid = Functors::SelectLeft(src, eid, dst);
@@ -148,13 +148,13 @@ void CallBinaryReduce(
       const minigun::Csr& csr, \
       GData<dtype>* gdata);
 
-#define GEN_BCAST_DEFINE(dtype, lhs_tgt, rhs_tgt, op) \
-  template void CallBinaryReduceBcast<dtype, GETID<XPU, int64_t>, \
+#define GEN_BCAST_DEFINE(ndim, dtype, lhs_tgt, rhs_tgt, op) \
+  template void CallBinaryReduceBcast<ndim, dtype, GETID<XPU, int64_t>, \
                                  lhs_tgt, rhs_tgt, \
                                  op<dtype>, REDUCER<XPU, dtype>>( \
       const minigun::advance::RuntimeConfig& rtcfg, \
       const minigun::Csr& csr, \
-      BcastGData<dtype>* gdata);
+      BcastGData<ndim, dtype>* gdata);
 
 #define EVAL(F, ...) F(__VA_ARGS__)
 

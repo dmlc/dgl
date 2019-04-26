@@ -41,33 +41,33 @@ void CallBinaryReduce(
 
 // Binary reduce with broadcasting
 
-template <typename DType>
+template <int NDim, typename DType>
 struct BcastGData {
   int ndim{0};
   // input shape and stride
   int64_t lhs_len{0}, rhs_len{0};
-  int64_t *lhs_shape{nullptr}, *lhs_stride{nullptr};
-  int64_t *rhs_shape{nullptr}, *rhs_stride{nullptr};
+  int64_t lhs_shape[NDim]{0}, lhs_stride[NDim]{0};
+  int64_t rhs_shape[NDim]{0}, rhs_stride[NDim]{0};
   // input data
   DType *lhs_data{nullptr}, *rhs_data{nullptr};
   // input id mappings
   int64_t *lhs_mapping{nullptr}, *rhs_mapping{nullptr};
   // output shape and stride
   int64_t out_len{0};  // output total length;
-  int64_t *out_shape{nullptr}, *out_stride{nullptr};
+  int64_t out_shape[NDim]{0}, out_stride[NDim]{0};
   // output data
   DType *out_data{nullptr};
   // output id mapping
   int64_t *out_mapping{nullptr};
 };
 
-template <typename DType, typename IdGetter,
+template <int NDim, typename DType, typename IdGetter,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduceBcast(
     const minigun::advance::RuntimeConfig& rtcfg,
     const minigun::Csr& csr,
-    BcastGData<DType>* gdata);
+    BcastGData<NDim, DType>* gdata);
 
 }  // namespace cuda
 }  // namespace kernel

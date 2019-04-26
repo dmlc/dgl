@@ -30,6 +30,14 @@ std::string ShapeString(NDArray nd) {
   return oss.str();
 }
 
+std::vector<int64_t> ComputeStride(const std::vector<int64_t>& shape) {
+  std::vector<int64_t> ret(shape.size(), 1);
+  for (int i = shape.size() - 2; i >= 0; --i) {
+    ret[i] = ret[i+1] * shape[i+1];
+  }
+  return ret;
+}
+
 bool IsValidBinaryOpShape(NDArray lhs, NDArray rhs) {
   if (lhs->ndim != rhs->ndim) {
     return false;
@@ -66,7 +74,7 @@ NDArray BinaryOpReduce(
   NDArray out_data = NDArray::Empty(out_shape, dtype, ctx);
   DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl,
       reducer, binary_op, indptr, indices,
-      binary_op::kSrc, binary_op::kEdge,
+      lhs, rhs,
       lhs_mapping, rhs_mapping,
       lhs_data, rhs_data,
       out_mapping, out_data);
@@ -87,18 +95,58 @@ bool HasBcast(NDArray lhs, NDArray rhs) {
 
 BcastInfo CalcBcastInfo(NDArray lhs, NDArray rhs) {
   BcastInfo ret;
-  const int max_ndim = std::max(lhs->ndim, rhs->ndim);
+  const int max_ndim = std::max(lhs->ndim, rhs->ndim) - 1;
+  int64_t accum = 0;
   for (int j = 0; j < max_ndim; ++j) {
-    const int dl = (j > lhs->ndim)? 1 : lhs->shape[(lhs->ndim - j)];
-    const int dr = (j > rhs->ndim)? 1 : rhs->shape[(rhs->ndim - j)];
+    const int dl = (lhs->ndim - 1 - j < 1)? 1 : lhs->shape[lhs->ndim - 1 - j];
+    const int dr = (rhs->ndim - 1 - j < 1)? 1 : rhs->shape[rhs->ndim - 1 - j];
     if (dl != dr) {
       if (dl != 1 && dr != 1) {
         LOG(FATAL) << "Invalid broadcasting between feature shapes "
           << ShapeString(lhs) << " and " << ShapeString(rhs);
       }
+      if (accum != 0) {
+        ret.lhs_shape.push_back(accum);
+        ret.rhs_shape.push_back(accum);
+        ret.out_shape.push_back(accum);
+        accum = 0;
+      }
+      ret.lhs_shape.push_back(dl);
+      ret.rhs_shape.push_back(dr);
+      ret.out_shape.push_back(std::max(dl, dr));
+    } else {
+      if (accum == 0) {
+        accum = dl;
+      } else {
+        accum *= dl;
+      }
     }
     ret.real_out_shape.push_back(std::max(dl, dr));
   }
+  std::reverse(ret.real_out_shape.begin(), ret.real_out_shape.end());
+  std::reverse(ret.lhs_shape.begin(), ret.lhs_shape.end());
+  std::reverse(ret.rhs_shape.begin(), ret.rhs_shape.end());
+  std::reverse(ret.out_shape.begin(), ret.out_shape.end());
+  // stride
+  ret.lhs_stride = ComputeStride(ret.lhs_shape);
+  ret.rhs_stride = ComputeStride(ret.rhs_shape);
+  ret.out_stride = ComputeStride(ret.out_shape);
+  /*
+  std::ostringstream oss; 
+  oss << "lhs=(";
+  for (auto x : ret.lhs_shape) oss << x << " ";
+  oss << ") ";
+  oss << "rhs=(";
+  for (auto x : ret.rhs_shape) oss << x << " ";
+  oss << ") ";
+  oss << "rhs_stride=(";
+  for (auto x : ret.rhs_stride) oss << x << " ";
+  oss << ") ";
+  oss << "out=(";
+  for (auto x : ret.out_shape) oss << x << " ";
+  oss << ") ";
+  LOG(INFO) << oss.str();
+  */
   return ret;
 }
 
@@ -124,12 +172,12 @@ NDArray BinaryOpReduceBcast(
       info.real_out_shape.begin(), info.real_out_shape.end());
   NDArray out_data = NDArray::Empty(out_shape, dtype, ctx);
 
-  //DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl,
-  //    reducer, binary_op, indptr, indices,
-  //    binary_op::kSrc, binary_op::kEdge,
-  //    lhs_mapping, rhs_mapping,
-  //    lhs_data, rhs_data,
-  //    out_mapping, out_data);
+  DGL_XPU_SWITCH(ctx.device_type, BinaryReduceBcastImpl,
+      info, reducer, binary_op, indptr, indices,
+      lhs, rhs,
+      lhs_mapping, rhs_mapping,
+      lhs_data, rhs_data,
+      out_mapping, out_data);
   return out_data;
 }
 }  // namespace
