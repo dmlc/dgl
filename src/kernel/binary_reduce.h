@@ -100,6 +100,69 @@ runtime::NDArray SrcOpDstReduce(
     const int64_t out_size);
 
 
+/*
+ * !\brief Copy src node data and perform reduce
+ 
+ * \param reducer The type of the reducer ("sum", "max", "mean", "min", "none").
+ *                If the reducer is "none", the output is an edge feature tensor.
+ *                Otherwise, a node feature tensor is returned.
+ * \param indptr An int64 row offset array for the graph CSR.
+ * \param indices An int64 column index array for the graph CSR.
+ * \param src_mapping An optional int64 array for source node mapping. If empty,
+ *                    source ids are consecutive integers [0, len(indptr) - 1).
+ *                    Source ids are used to read source node data.
+ * \param src_data The source node feature tensor.
+ * \param out_mapping An optional int64 array for output mapping. If reducer is
+ *                    "none", then it's a mapping to edge ids. Otherwise, it's
+ *                    mapping to destination node ids.
+ * \param out_size An integer indicating the output size. If reducer is "none",
+ *                 it is the number of output edges. Otherwise it's the number
+ *                 of output nodes.
+ * \return out_data The output tensor. Could be either node or edge feature tensor
+ *                  depending on the reducer.
+ *
+ */
+runtime::NDArray CopySrcReduce(
+    const std::string& reducer,
+    runtime::NDArray indptr,
+    runtime::NDArray indices,
+    runtime::NDArray src_mapping,
+    runtime::NDArray src_data,
+    runtime::NDArray out_mapping,
+    const int64_t out_size);
+
+/*
+ * !\brief Copy edge data and perform reduce
+ 
+ * \param reducer The type of the reducer ("sum", "max", "mean", "min", "none").
+ *                If the reducer is "none", the output is an edge feature tensor.
+ *                Otherwise, a node feature tensor is returned.
+ * \param indptr An int64 row offset array for the graph CSR.
+ * \param indices An int64 column index array for the graph CSR.
+ * \param edge_mapping An optional int64 array for source node mapping. If empty,
+ *                    source ids are consecutive integers [0, len(indptr) - 1).
+ *                    Source ids are used to read source node data.
+ * \param edge_data The source node feature tensor.
+ * \param out_mapping An optional int64 array for output mapping. If reducer is
+ *                    "none", then it's a mapping to edge ids. Otherwise, it's
+ *                    mapping to destination node ids.
+ * \param out_size An integer indicating the output size. If reducer is "none",
+ *                 it is the number of output edges. Otherwise it's the number
+ *                 of output nodes.
+ * \return out_data The output tensor. Could be either node or edge feature tensor
+ *                  depending on the reducer.
+ *
+ */
+runtime::NDArray CopyEdgeReduce(
+    const std::string& reducer,
+    runtime::NDArray indptr,
+    runtime::NDArray indices,
+    runtime::NDArray edge_mapping,
+    runtime::NDArray edge_data,
+    runtime::NDArray out_mapping,
+    const int64_t out_size);
+
+
 // Declaration of implementations.
 
 namespace cpu {

@@ -16,6 +16,12 @@ static const std::string kReduceMean = "mean";
 static const std::string kReduceProd = "prod";
 static const std::string kReduceNone = "none";
 
+static const std::string kAdd = "add";
+static const std::string kSub = "sub";
+static const std::string kMul = "mul";
+static const std::string kDiv = "div";
+static const std::string kUseLhs = "use_lhs";
+
 enum Target {
   kSrc = 0,
   kDst,
@@ -160,17 +166,20 @@ struct BinaryUseRhs {
 };
 
 #define BINARY_OP_SWITCH(val, DType, OpType, ...)   \
-  if (val == "add") {                               \
+  if (val == binary_op::kAdd) {                     \
     typedef BinaryAdd<DType> OpType;                \
     {__VA_ARGS__}                                   \
-  } else if (val == "sub") {                        \
+  } else if (val == binary_op::kSub) {              \
     typedef BinarySub<DType> OpType;                \
     {__VA_ARGS__}                                   \
-  } else if (val == "mul") {                        \
+  } else if (val == binary_op::kMul) {              \
     typedef BinaryMul<DType> OpType;                \
     {__VA_ARGS__}                                   \
-  } else if (val == "div") {                        \
+  } else if (val == binary_op::kDiv) {              \
     typedef BinaryDiv<DType> OpType;                \
+    {__VA_ARGS__}                                   \
+  } else if (val == binary_op::kUseLhs) {           \
+    typedef BinaryUseLhs<DType> OpType;             \
     {__VA_ARGS__}                                   \
   } else {                                          \
     LOG(FATAL) << "Unsupported binary op: " << val; \

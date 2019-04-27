@@ -52,7 +52,7 @@ bool IsValidBinaryOpShape(NDArray lhs, NDArray rhs) {
 
 NDArray BinaryOpReduce(
     const std::string& reducer,
-    const std::string& binary_op,
+    const std::string& op,
     NDArray indptr,
     NDArray indices,
     binary_op::Target lhs,
@@ -63,9 +63,11 @@ NDArray BinaryOpReduce(
     NDArray rhs_data,
     NDArray out_mapping,
     const int64_t out_size) {
-  CHECK(IsValidBinaryOpShape(lhs_data, rhs_data))
-    << "Cannot compute binary operation between feature shapes "
-    << ShapeString(lhs_data) << " and " << ShapeString(rhs_data);
+  if (op != binary_op::kUseLhs) {
+    CHECK(IsValidBinaryOpShape(lhs_data, rhs_data))
+      << "Cannot compute binary operation between feature shapes "
+      << ShapeString(lhs_data) << " and " << ShapeString(rhs_data);
+  }
   const DLContext& ctx = indptr->ctx;
   const DLDataType& dtype = lhs_data->dtype;
   // Allocate output
@@ -73,7 +75,7 @@ NDArray BinaryOpReduce(
   out_shape.insert(out_shape.end(), lhs_data->shape + 1, lhs_data->shape + lhs_data->ndim);
   NDArray out_data = NDArray::Empty(out_shape, dtype, ctx);
   DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl,
-      reducer, binary_op, indptr, indices,
+      reducer, op, indptr, indices,
       lhs, rhs,
       lhs_mapping, rhs_mapping,
       lhs_data, rhs_data,
@@ -257,7 +259,7 @@ NDArray SrcOpDstReduce(
   }
 }
 
-DGL_REGISTER_GLOBAL("backend.kernel._CAPI_DGLKernelSrcMulDstReduce")
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelSrcMulDstReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string binary_op = args[1];
@@ -271,6 +273,65 @@ DGL_REGISTER_GLOBAL("backend.kernel._CAPI_DGLKernelSrcMulDstReduce")
     const int64_t out_size = args[9];
     *rv = SrcOpDstReduce(reducer, binary_op, indptr, indices,
         src_mapping, dst_mapping, src_data, dst_data, out_mapping, out_size);
+  });
+
+
+NDArray CopySrcReduce(
+    const std::string& reducer,
+    NDArray indptr,
+    NDArray indices,
+    NDArray src_mapping,
+    NDArray src_data,
+    NDArray out_mapping,
+    const int64_t out_size) {
+  return BinaryOpReduce(reducer, binary_op::kUseLhs,
+      indptr, indices,
+      binary_op::kSrc, binary_op::kDst,
+      src_mapping, NDArray(),
+      src_data, NDArray(),
+      out_mapping, out_size);
+}
+
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopySrcReduce")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::string reducer = args[0];
+    NDArray indptr = args[1];
+    NDArray indices = args[2];
+    NDArray src_mapping = args[3];
+    NDArray src_data = args[4];
+    NDArray out_mapping = args[5];
+    const int64_t out_size = args[6];
+    *rv = CopySrcReduce(reducer, indptr, indices,
+        src_mapping, src_data, out_mapping, out_size);
+  });
+
+NDArray CopyEdgeReduce(
+    const std::string& reducer,
+    NDArray indptr,
+    NDArray indices,
+    NDArray edge_mapping,
+    NDArray edge_data,
+    NDArray out_mapping,
+    const int64_t out_size) {
+  return BinaryOpReduce(reducer, binary_op::kUseLhs,
+      indptr, indices,
+      binary_op::kEdge, binary_op::kDst,
+      edge_mapping, NDArray(),
+      edge_data, NDArray(),
+      out_mapping, out_size);
+}
+
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopyEdgeReduce")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::string reducer = args[0];
+    NDArray indptr = args[1];
+    NDArray indices = args[2];
+    NDArray edge_mapping = args[3];
+    NDArray edge_data = args[4];
+    NDArray out_mapping = args[5];
+    const int64_t out_size = args[6];
+    *rv = CopyEdgeReduce(reducer, indptr, indices,
+        edge_mapping, edge_data, out_mapping, out_size);
   });
 
 }  // namespace kernel

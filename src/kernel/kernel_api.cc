@@ -14,26 +14,6 @@ using dgl::runtime::NDArray;
 namespace dgl {
 
 /*
- * !\brief Copy src node data and perform reduce
- * 
- * \param reducer The type of the reducer ("sum", "max", "mean", "min", "none").
- *                If the reducer is "none", the output is an edge feature tensor.
- *                Otherwise, a node feature tensor is returned.
- * \param indptr An int64 row offset array for the graph CSR.
- * \param indices An int64 column index array for the graph CSR.
- * \param edge_ids An optional int64 array for the edge ids. If empty,
- *                 the edge ids are consecutive integers [0, len(indices)).
- *                 The edge ids are used to read and write edge data.
- * \param src_data The source node feature tensor.
- * \return out_data The output tensor. Could be either node or edge feature tensor
- *                  depending on the reducer.
- */
-DGL_REGISTER_GLOBAL("backend.kernel._CAPI_DGLKernelCopySrcReduce")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    LOG(FATAL) << "Not implemented";
-  });
-
-/*
  * !\brief Copy edge data and perform reduce
  * 
  * \param reducer The type of the reducer ("sum", "max", "mean", "min", "none").

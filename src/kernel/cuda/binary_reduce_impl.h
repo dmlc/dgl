@@ -23,10 +23,10 @@ struct GData {
   int64_t x_length{0};
   // input data
   DType *lhs_data{nullptr}, *rhs_data{nullptr};
-  // input id mappings
-  int64_t *lhs_mapping{nullptr}, *rhs_mapping{nullptr};
   // output data
   DType *out_data{nullptr};
+  // input id mappings
+  int64_t *lhs_mapping{nullptr}, *rhs_mapping{nullptr};
   // output id mapping
   int64_t *out_mapping{nullptr};
 };
@@ -38,6 +38,23 @@ void CallBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
     const minigun::Csr& csr,
     GData<DType>* gdata);
+
+// Backward binary reduce
+
+template <typename DType>
+struct BackwardGData {
+  // length along x dimension
+  int64_t x_length{0};
+  // input data
+  DType *lhs_data{nullptr}, *rhs_data{nullptr};
+  DType *grad_out_data{nullptr};
+  // output data
+  DType *grad_lhs_data{nullptr}, *grad_rhs_data{nullptr};
+  // input id mappings
+  int64_t *lhs_mapping{nullptr}, *rhs_mapping{nullptr};
+  // output id mapping
+  int64_t *out_mapping{nullptr};
+};
 
 // Binary reduce with broadcasting
 
