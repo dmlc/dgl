@@ -52,6 +52,7 @@ def gen_v2v_spmv_schedule(adj, mfunc, rfunc, src_frame, dst_frame, edge_frame,
                     reducer=rfn.name, edge_map=edge_map, out_map=out_map)
         ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
+
 def gen_v2e_spmv_schedule(adj, mfunc, src_frame, dst_frame, edge_frame,
                           out, out_size, edge_map, eid=None):
     """Generate v2e SPMV schedule
@@ -87,6 +88,7 @@ def gen_v2e_spmv_schedule(adj, mfunc, src_frame, dst_frame, edge_frame,
                    edge_map=edge_map)
         write_back(out, var.STR(mfn.out_field), fmsg)
 
+
 def gen_e2v_spmv_schedule(adj, rfunc, message_frame, edge_map, out, out_size,
                           out_map):
     """Generate e2v SPMV schedule.
@@ -117,29 +119,6 @@ def gen_e2v_spmv_schedule(adj, rfunc, message_frame, edge_map, out, out_size,
                     out_map=out_map)
         ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
-def build_block_adj_matrix_graph(graph, block_id):
-    """Build adjacency matrix of the whole graph.
-
-    Parameters
-    ----------
-    graph : NodeFlow
-        The NodeFlow
-
-    block_id : int
-        the block Id
-
-    Returns
-    -------
-    utils.CtxCachedObject
-        Get be used to get adjacency matrix on the provided ctx.
-    utils.Index
-        A index for data shuffling due to sparse format change. Return None
-        if shuffle is not required.
-    """
-    # TODO why is this constructed twice?
-    _, shuffle_idx = graph.block_adjacency_matrix(block_id, F.cpu())
-    shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
-    return lambda ctx: graph.block_adjacency_matrix(block_id, ctx)[0], shuffle_idx
 
 def build_adj_matrix_graph(graph):
     """Build adjacency matrix of the whole graph.
@@ -159,14 +138,15 @@ def build_adj_matrix_graph(graph):
     inv_edge_map = gidx.csr_adjacency_matrix(False, ndarray.cpu())[2]
     return lambda ctx: (gidx.csr_adjacency_matrix(True, ctx)[:2] +
                         gidx.csr_adjacency_matrix(False, ctx)[:2]), \
-                  edge_map, inv_edge_map
+        edge_map, inv_edge_map
 
-def _build_adj_matrix_index_uv(edge_tuple, num_nodes):
+
+def _build_adj_matrix_index_uv(edge_tuple, num_src, num_dst):
     """Build adj matrix index and shape using the given (u, v) edges.
 
-    The matrix is of shape (len(reduce_nodes), n), where n is the number of nodes
-    in the graph. Therefore, when doing SPMV, the src node data
-    should be all the node features.
+    The matrix is of shape (len(reduce_nodes), n), where n is the number of
+    nodes in the graph. Therefore, when doing SPMV, the src node data should be
+    all the node features.
 
     The dst nodes will be sorted in the *unique-ascending* order of
     their ids. This is compatible with other reduce scheduler such as
@@ -174,10 +154,12 @@ def _build_adj_matrix_index_uv(edge_tuple, num_nodes):
 
     Paramters
     ---------
-    edges : tuple of utils.Index
-        (u, v)
-    num_sources : int
-        The number of source nodes.
+    edge_tuple : tuple of utils.Index
+        (u, v, eid)
+    num_src : int
+        Number of source nodes.
+    num_dst : int
+        Number of destination nodes
 
     Returns
     -------
@@ -193,8 +175,8 @@ def _build_adj_matrix_index_uv(edge_tuple, num_nodes):
     u = F.zerocopy_to_numpy(u)
     v = F.zerocopy_to_numpy(v)
     eid = F.zerocopy_to_numpy(eid)
-    csr = sp.csr_matrix((eid, (u, v)), shape=(num_nodes, num_nodes))
-    inv_csr = sp.csr_matrix((eid, (v, u)), shape=(num_nodes, num_nodes))
+    csr = sp.csr_matrix((eid, (u, v)), shape=(num_src, num_dst))
+    inv_csr = sp.csr_matrix((eid, (v, u)), shape=(num_dst, num_src))
     indptr = F.zerocopy_from_numpy(csr.indptr.astype(np.int64))
     indices = F.zerocopy_from_numpy(csr.indices.astype(np.int64))
     edge_map = F.zerocopy_from_numpy(csr.data)
@@ -206,7 +188,7 @@ def _build_adj_matrix_index_uv(edge_tuple, num_nodes):
     return spmat, inv_spmat
 
 
-def build_adj_matrix_uv(edge_tuple, num_nodes):
+def build_adj_matrix_uv(edge_tuple, num_src, num_dst):
     """Build adj matrix using the given (u, v, eid) edges and target nodes.
 
     The matrix is of shape (len(reduce_nodes), n), where n is the number of
@@ -232,7 +214,7 @@ def build_adj_matrix_uv(edge_tuple, num_nodes):
         if shuffle is not required.
     """
     u, v, eid = edge_tuple
-    spmat, inv_spmat = _build_adj_matrix_index_uv(edge_tuple, num_nodes)
+    spmat, inv_spmat = _build_adj_matrix_index_uv(edge_tuple, num_src, num_dst)
     eid = F.zerocopy_to_dgl_ndarray(spmat[2])
     inv_eid = F.zerocopy_to_dgl_ndarray(inv_spmat[2])
 
@@ -245,154 +227,29 @@ def build_adj_matrix_uv(edge_tuple, num_nodes):
 
     return utils.CtxCachedObject(copy_to), eid, inv_eid
 
-def build_block_inc_matrix_graph(graph, block_id):
-    """Build incidence matrix.
+
+def build_block_adj_matrix_graph(graph, block_id):
+    """Build adjacency matrix of the whole graph.
 
     Parameters
     ----------
     graph : NodeFlow
-        The NodeFlow.
+        The NodeFlow
 
     block_id : int
-        The block Id
+        the block Id
 
     Returns
     -------
     utils.CtxCachedObject
-        Get be used to get incidence matrix on the provided ctx.
+        Get be used to get adjacency matrix on the provided ctx.
     utils.Index
         A index for data shuffling due to sparse format change. Return None
         if shuffle is not required.
     """
-    # inc mat will not use data tensor so conversion index is not needed
-    return lambda ctx: graph.block_incidence_matrix(block_id, 'in', ctx)[0], None
-
-
-'''
-def build_inc_matrix_graph(graph):
-    """Build incidence matrix.
-
-    Parameters
-    ----------
-    graph : DGLGraph
-        The graph.
-
-    Returns
-    -------
-    utils.CtxCachedObject
-        Get be used to get incidence matrix on the provided ctx.
-    utils.Index
-        A index for data shuffling due to sparse format change. Return None
-        if shuffle is not required.
-    """
-    gidx = graph._graph
-    # inc mat will not use data tensor so conversion index is not needed
-    return lambda ctx: gidx.incidence_matrix('in', ctx)[0], None
-
-def build_inc_matrix_eid(m, eid, dst, reduce_nodes):
-    """Build incidence matrix using edge id and edge dst nodes.
-
-    The incidence matrix is of shape (n, m), where n=len(reduce_nodes).
-    The nnz is equal to len(eid).
-
-    Invariant: len(eid) == len(dst)
-
-    The dst nodes will be sorted in the *unique-ascending* order of
-    their ids. This is compatible with other reduce scheduler such as
-    degree-bucketing scheduler.
-
-    Examples
-    --------
-    Total of seven edges. Three edges point to node 1 (eid=0,1,2);
-    two point to node 3 (eid=3,4); two point to node 4 (eid=5,6).
-    Only five edges should be included in the result incmat (eid=1,2,3,5,6).
-    There are five nodes in the final target dimension (0~4),
-    where node 0 and 2 are two 0-deg nodes.
-    >>> m = 7
-    >>> eid = [1, 2, 3, 5, 6]
-    >>> dst = [1, 1, 3, 4, 4]
-    >>> reduce_nodes = [0, 1, 2, 3, 4]
-    >>> build_inc_matrix_eid(m, eid, dst, reduce_nodes)
-    tensor([[0, 0, 0, 0, 0, 0, 0],
-            [0, 1, 1, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 1, 0, 0, 0],
-            [0, 0, 0, 0, 0, 1, 1]], shape=(5, 7))
-
-    Parameters
-    ---------
-    m : int
-        The source dimension size of the incidence matrix.
-    eid : utils.Index
-        The edge ids. All ids must be in range [0, m).
-    dst : utils.Index
-        The edge destination nodes. len(eid) == len(dst).
-    reduce_nodes : utils.Index
-        The nodes to reduce messages, which will be target dimension
-        of the incmat. The nodes include unique(dst) and zero-degree-nodes.
-
-    Returns
-    -------
-    utils.CtxCachedObject
-        Get be used to get incidence matrix on the provided ctx.
-    utils.Index
-        A index for data shuffling due to sparse format change. Return None
-        if shuffle is not required.
-    """
-    _, old2new = utils.build_relabel_map(reduce_nodes, is_sorted=True)
-    dst = dst.tousertensor()
-    eid = eid.tousertensor()
-    # relabel edges dsts
-    new_v = old2new[dst]  # FIXME(minjie): no use []
-    # create sparse index tensor
-    n = len(reduce_nodes)
-    row = F.unsqueeze(new_v, 0)
-    col = F.unsqueeze(eid, 0)
-    idx = F.cat([row, col], dim=0)
-    # create dat tensor
-    nnz = len(eid)
-    dat = F.ones((nnz,), dtype=F.float32, ctx=F.cpu())
-    mat, _ = F.sparse_matrix(dat, ('coo', idx), (n, m))
-    # inc mat will not use data tensor so conversion index is not needed
-    return utils.CtxCachedObject(lambda ctx: F.copy_to(mat, ctx)), None
-
-def build_inc_matrix_dst(dst, reduce_nodes):
-    """Build incidence matrix using only edge destinations.
-
-    The incidence matrix is of shape (n, m), where n=len(reduce_nodes), m=len(dst).
-    The nnz is equal to len(dst).
-
-    Examples
-    --------
-    Five edges. Two edges point to node 1; one points to node 3;
-    two point to node 4. There are five nodes in the final
-    target dimension (0~4), where node 0 and 2 are two 0-deg nodes.
-    >>> dst = [1, 1, 3, 4, 4]
-    >>> reduce_nodes = [0, 1, 2, 3, 4]
-    >>> build_inc_matrix_dst(dst, reduced_nodes)
-    tensor([[0, 0, 0, 0, 0],
-            [1, 1, 0, 0, 0],
-            [0, 0, 0, 0, 0],
-            [0, 0, 1, 0, 0],
-            [0, 0, 0, 1, 1]], shape=(5, 5))
-
-    Parameters
-    ----------
-    dst : utils.Index
-        The edge destinations.
-    reduce_nodes : utils.Index
-        The nodes to reduce messages, which will be target dimension
-        of the incmat. The nodes include unique(dst) and zero-degree-nodes.
-
-    Returns
-    -------
-    utils.CtxCachedObject
-        Get be used to get incidence matrix on the provided ctx.
-    utils.Index
-        A index for data shuffling due to sparse format change. Return None
-        if shuffle is not required.
-    """
-    eid = utils.toindex(F.arange(0, len(dst)))
-    return build_inc_matrix_eid(len(eid), eid, dst, reduce_nodes)
-
-'''
+    # FIXME (lingfan): nodeflow does not support get both csr and transposed
+    # csr, for now use scipy to implement
+    edge_tuple = graph.block_edges(block_id)
+    num_src = graph.layer_size(block_id)
+    num_dst = graph.layer_size(block_id + 1)
+    return build_adj_matrix_uv(edge_tuple, num_src, num_dst)

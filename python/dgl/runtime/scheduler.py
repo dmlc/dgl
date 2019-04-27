@@ -61,7 +61,7 @@ def schedule_send(graph, u, v, eid, message_func):
         else:
             # build edge_mapping
             adj, edge_map, inv_edge_map = spmv.build_adj_matrix_uv(
-                (u, v, eid), graph.number_of_nodes())
+                (u, v, eid), graph.number_of_nodes(), graph.number_of_nodes())
         edge_map = _context_cached_idx_map(edge_map)
         inv_edge_map = _context_cached_idx_map(inv_edge_map)
         spmv.gen_v2e_spmv_schedule(adj, message_func, var_nf, var_nf, var_ef,
@@ -163,8 +163,8 @@ def schedule_snr(graph,
     var_recv_nodes = var.IDX(recv_nodes, name='recv_nodes')
     # generate send and reduce schedule
     uv_getter = lambda: (var_u, var_v)
-    adj_creator = lambda: spmv.build_adj_matrix_uv(edge_tuples,
-                                                   graph.number_of_nodes())
+    adj_creator = lambda: spmv.build_adj_matrix_uv(
+        edge_tuples, graph.number_of_nodes(), graph.number_of_nodes())
     out_map_creator = lambda: _build_idx_map(recv_nodes)
     reduced_feat = _gen_send_reduce(graph, graph._node_frame,
                                     graph._node_frame, graph._edge_frame,
@@ -462,8 +462,8 @@ def schedule_pull(graph,
         var_eid = var.IDX(eid)
         # generate send and reduce schedule
         uv_getter = lambda: (var_u, var_v)
-        adj_creator = lambda: spmv.build_adj_matrix_uv((u, v, eid),
-                                                       graph.number_of_nodes())
+        adj_creator = lambda: spmv.build_adj_matrix_uv(
+            (u, v, eid), graph.number_of_nodes(), graph.number_of_nodes())
         out_map_creator = lambda: _build_idx_map(pull_nodes)
         reduced_feat = _gen_send_reduce(graph, graph._node_frame,
                                         graph._node_frame, graph._edge_frame,
@@ -540,8 +540,8 @@ def schedule_nodeflow_update_all(graph,
     """
     # A NodeFlow shouldn't have 0 edges.
     assert graph.block_size(block_id) > 0
-    eid = utils.toindex(slice(0, graph.block_size(block_id)))  # shortcut for ALL
-    dest_nodes = utils.toindex(slice(0, graph.layer_size(block_id + 1)))  # shortcut for ALL
+    eid = utils.toindex(slice(0, graph.block_size(block_id)))  # ALL
+    dest_nodes = utils.toindex(slice(0, graph.layer_size(block_id + 1)))  # ALL
     # create vars
     var_nf = var.FEAT_DICT(graph._get_node_frame(block_id + 1), name='out_nf')
     var_dest_nodes = var.IDX(dest_nodes, name='dest_nodes')
@@ -552,13 +552,13 @@ def schedule_nodeflow_update_all(graph,
         src, dst, _ = graph.block_edges(block_id)
         return var.IDX(utils.toindex(src)), var.IDX(utils.toindex(dst))
     adj_creator = lambda: spmv.build_block_adj_matrix_graph(graph, block_id)
-    inc_creator = lambda: spmv.build_block_inc_matrix_graph(graph, block_id)
+    out_map_creator = lambda: lambda ctx: nd.empty([])
     reduced_feat = _gen_send_reduce(graph, graph._get_node_frame(block_id),
                                     graph._get_node_frame(block_id + 1),
                                     graph._get_edge_frame(block_id),
-                                    message_func, reduce_func,
-                                    var_eid, var_dest_nodes,
-                                    uv_getter, adj_creator, inc_creator)
+                                    message_func, reduce_func, var_eid,
+                                    var_dest_nodes, uv_getter, adj_creator,
+                                    out_map_creator)
     # generate optional apply
     final_feat = _apply_with_accum(graph, var_dest_nodes, var_nf, reduced_feat, apply_func)
     ir.WRITE_DICT_(var_nf, final_feat)
@@ -586,6 +586,8 @@ def schedule_nodeflow_compute(graph,
         Destination nodes of edges to apply
     eid : utils.Index
         Ids of sending edges
+    dest_nodes : utils.Index
+        Destination nodes ids
     message_func: callable or list of callable
         The message function
     reduce_func: callable or list of callable
@@ -601,25 +603,30 @@ def schedule_nodeflow_compute(graph,
     if len(eid) == 0:
         # All the nodes are 0deg; downgrades to apply.
         if apply_func is not None:
-            schedule_nodeflow_apply_nodes(graph, block_id + 1, dest_nodes, apply_func, inplace)
+            schedule_nodeflow_apply_nodes(graph, block_id + 1, dest_nodes,
+                                          apply_func, inplace)
     else:
+        dest_nodes, _ = F.sort_1d(F.unique(dest_nodes.tousertensor()))
+        dest_nodes = utils.toindex(dest_nodes)
         # create vars
-        var_nf = var.FEAT_DICT(graph._get_node_frame(block_id + 1), name='out_nf')
-        var_dest_nodes = var.IDX(dest_nodes, name='dest_nodes')
+        var_nf = var.FEAT_DICT(graph._get_node_frame(block_id + 1),
+                               name='out_nf')
         var_u = var.IDX(u)
         var_v = var.IDX(v)
         var_eid = var.IDX(eid)
+        var_dest_nodes = var.IDX(dest_nodes, name='dest_nodes')
         # generate send and reduce schedule
         uv_getter = lambda: (var_u, var_v)
-        adj_creator = lambda: spmv.build_adj_matrix_uv((u, v), dest_nodes,
-                                                       graph.layer_size(block_id))
-        inc_creator = lambda: spmv.build_inc_matrix_dst(v, dest_nodes)
+        adj_creator = lambda: spmv.build_adj_matrix_uv(
+            (u, v, eid), graph.layer_size(block_id),
+            graph.layer_size(block_id + 1))
+        out_map_creator = lambda: _build_idx_map(dest_nodes)
         reduced_feat = _gen_send_reduce(graph, graph._get_node_frame(block_id),
                                         graph._get_node_frame(block_id + 1),
                                         graph._get_edge_frame(block_id),
-                                        message_func, reduce_func,
-                                        var_eid, var_dest_nodes,
-                                        uv_getter, adj_creator, inc_creator)
+                                        message_func, reduce_func, var_eid,
+                                        var_dest_nodes, uv_getter, adj_creator,
+                                        out_map_creator)
         # generate optional apply
         final_feat = _apply_with_accum(graph, var_dest_nodes, var_nf,
                                        reduced_feat, apply_func)
@@ -727,7 +734,8 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
     if rfunc_is_list:
         # we don't need edge_map here, because send scatter messages back to
         # msg_frame using eid
-        adj, edge_map, inv_edge_map = spmv.build_adj_matrix_uv(edge_tuples, graph.number_of_nodes())
+        adj, edge_map, inv_edge_map = spmv.build_adj_matrix_uv(
+            edge_tuples, graph.number_of_nodes(), graph.number_of_nodes())
         edge_map = _context_cached_idx_map(edge_map)
         inv_edge_map = _context_cached_idx_map(inv_edge_map)
         var_out_map = _build_idx_map(recv_nodes)
