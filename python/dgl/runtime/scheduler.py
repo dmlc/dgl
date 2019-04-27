@@ -509,7 +509,6 @@ def schedule_group_apply_edge(graph,
     var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
     var_ef = var.FEAT_DICT(graph._edge_frame, name='ef')
     var_out = var.FEAT_DICT(name='new_ef')
-    # TODO (lingfan): check if apply_func is a DGL builtin
     db.gen_group_apply_edge_schedule(graph, apply_func, u, v, eid, group_by,
                                      var_nf, var_ef, var_out)
     var_eid = var.IDX(eid)
@@ -696,11 +695,19 @@ def _apply_with_accum(graph, var_nodes, var_nf, var_accum, apply_func):
     return final_feat
 
 def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
-    """
+    """Generate reduce schedule
+
+    Parameters
+    ----------
     graph : DGLGraph
     reduce_func : callable
     edge_tuples : tuple of utils.Index
     recv_nodes : utils.Index
+
+    Returns
+    -------
+    var.FEAT_DICT
+        The reduced feature dict.
     """
     _, dst, eid = edge_tuples
     rfunc = _standardize_func_usage(reduce_func, 'reduce')
@@ -748,9 +755,6 @@ def _gen_send_reduce(
         out_map_creator):
     """Generate send and reduce schedule.
 
-    This guarantees that the returned reduced features are batched
-    in the *unique-ascending* order of the edge destination node ids.
-
     Parameters
     ----------
     graph : DGLGraph
@@ -768,18 +772,30 @@ def _gen_send_reduce(
     var_send_edges : var.IDX
         The edges (ids) to perform send.
     var_reduce_nodes : var.IDX
-        The nodes to perform reduce. This should include unique(v) + 0deg nodes.
+        Unique and sorted nodes to perform reduce. This should include
+        unique(v) + 0deg nodes.
     uv_getter : callable
-        A function that returns a pair of var.IDX (u, v) for the triggered edges.
+        Function that returns a pair of var.IDX (u, v) for the triggered edges.
     adj_creator : callable
-        A function that returns the adjmat and the shuffle index.
+        Function that returns the adjmat, edge order of csr matrix, and edge
+        order of transposed csr matrix
+    out_map_creator: callable
+        A function that returns a mapping from reduce_nodes to relabeled
+        consecutive ids
 
     Returns
     -------
     var.FEAT_DICT
         The reduced feature dict.
+
+    Notes
+    -----
+    Reduce_nodes are assumed to be in the *unique-ascending* order of the edge
+    destination node ids. The returned reduced features will be batched
+    following the order of reduce_nodes.
     """
-    # NOTE: currently, this function requires all var.IDX to contain concrete data.
+    # NOTE: currently, this function requires all var.IDX to contain concrete
+    # data.
     reduce_nodes = var_reduce_nodes.data
 
     # arg vars
@@ -794,38 +810,36 @@ def _gen_send_reduce(
     mfunc_is_list = utils.is_iterable(mfunc)
     rfunc_is_list = utils.is_iterable(rfunc)
 
-    # Create a tmp frame to hold the feature data.
-    # The frame has the same size and schemes of the
-    # node frame.
+    # Create a tmp frame to hold the feature data. The frame has the same size
+    # and schemes of the node frame.
     # TODO(minjie): should replace this with an IR call to make the program
     # stateless.
     tmpframe = FrameRef(frame_like(dst_node_frame._frame, len(reduce_nodes)))
     var_out = var.FEAT_DICT(data=tmpframe)
 
-    # 2. If either message or reduce is UDF (i.e. need to materialize message),
-    # generate a mapping from eid to message id
+    # 1. If either mfunc or rfunc is builtin, generate adjmat and edge orders
     if mfunc_is_list or rfunc_is_list:
         adj, edge_map, inv_edge_map = adj_creator()
         edge_map = _context_cached_idx_map(edge_map)
         inv_edge_map = _context_cached_idx_map(inv_edge_map)
 
-    # 3. If rfunc is builtin, generate a mapping from recv nodes to consecutive
+    # 2. If rfunc is builtin, generate a mapping from recv nodes to consecutive
     # output id
     if rfunc_is_list:
         var_out_map = out_map_creator()
 
-    # 4. First try fused message and reduce function
+    # 3. First try fused message and reduce function
     if mfunc_is_list and rfunc_is_list:
         # builtin message + builtin reducer
-        # analyze v2v spmv
         spmv.gen_v2v_spmv_schedule(adj, mfunc, rfunc, var_src_nf, var_dst_nf,
                                    var_ef, var_out, len(reduce_nodes),
                                    (edge_map, inv_edge_map), var_out_map)
         return var_out
 
-    # 5. Generate message
+    # 4. Unable to fuse, then generate message
     if mfunc_is_list:
         # messages are builtin but reduce is UDF
+        # Create a tmp frame to hold the message.
         n_message = len(var_eid.data)
         tmp_msg_frame = FrameRef(frame_like(edge_frame._frame, n_message))
         var_mf = var.FEAT_DICT(data=tmp_msg_frame)
@@ -846,7 +860,6 @@ def _gen_send_reduce(
         return var_out
     else:
         # gen degree bucketing schedule for UDF recv
-        # message id is from 0~|dst|
         mid = utils.toindex(slice(0, len(var_v.data)))
         db.gen_degree_bucketing_schedule(graph, rfunc, mid, var_v.data,
                                          reduce_nodes, var_dst_nf, var_mf,
@@ -897,7 +910,7 @@ def _build_idx_map(idx):
     map_len = int(F.asnumpy(F.max(x, dim=0))) + 1
     old_to_new = F.zeros((map_len,), dtype=F.int64, ctx=F.cpu())
     F.scatter_row_inplace(old_to_new, x, F.arange(0, len(x)))
-    old_to_new= F.to_dgl_ndarray(old_to_new)
+    old_to_new= F.zerocopy_to_dgl_ndarray(old_to_new)
     return _context_cached_idx_map(old_to_new)
 
 

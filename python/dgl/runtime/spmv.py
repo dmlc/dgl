@@ -20,9 +20,9 @@ def gen_v2v_spmv_schedule(adj, mfunc, rfunc, src_frame, dst_frame, edge_frame,
 
     Parameters
     ----------
-    adj : CtxCachedObject
-        A callable that generates for dgl.ndarray (indptr, indices, inv_indptr,
-        inv_indices) representing CSR and inverse-CSR matrix, copies to and
+    adj : utils.CtxCachedObject
+        function that generates four dgl.ndarray (indptr, indices, inv_indptr,
+        inv_indices) representing CSR and transposed-CSR matrix, copies to and
         caches on to given context
     mfunc : list of builtin message func
     rfunc : list of builtin reduce func
@@ -36,9 +36,9 @@ def gen_v2v_spmv_schedule(adj, mfunc, rfunc, src_frame, dst_frame, edge_frame,
         output node features
     out_size : int
         number of output nodes
-    out_map : var.Var
-        a function that generates a map from recv nodes to relabeled
-        consecutive node ids
+    out_map : utils.CtxCachedObject
+        function that generates a mapping from destination nodes to consecutive
+        ids and caches on given context
     """
     spmat = var.SPMAT(adj)
     fld2mfunc = {fn.out_field: fn for fn in mfunc}
@@ -53,14 +53,14 @@ def gen_v2v_spmv_schedule(adj, mfunc, rfunc, src_frame, dst_frame, edge_frame,
         ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
 def gen_v2e_spmv_schedule(adj, mfunc, src_frame, dst_frame, edge_frame,
-                          out_frame, out_size, edge_map, eid=None):
+                          out, out_size, edge_map, eid=None):
     """Generate v2e SPMV schedule
 
     Parameters
     ----------
-    adj : CtxCachedObject
-        A callable that generates for dgl.ndarray (indptr, indices, inv_indptr,
-        inv_indices) representing CSR and inverse-CSR matrix, copies to and
+    adj : utils.CtxCachedObject
+        function that generates four dgl.ndarray (indptr, indices, inv_indptr,
+        inv_indices) representing CSR and transposed-CSR matrix, copies to and
         caches on to given context
     mfunc : list of builtin message func
     src_frame : var.Var
@@ -70,12 +70,12 @@ def gen_v2e_spmv_schedule(adj, mfunc, src_frame, dst_frame, edge_frame,
     edge_frame : var.Var
         input edge features
     out : var.Var
-        output node features
+        output message features
     out_size : int
-        number of output nodes
-    edge_map : var.Var
-        a function that generates a map from recv nodes to relabeled
-        consecutive node ids
+        number of output messages
+    out_map : utils.CtxCachedObject
+        function that generates a mapping from message ids to edge ids and
+        caches on given context
     """
     spmat = var.SPMAT(adj)
     if eid is not None:
@@ -85,24 +85,36 @@ def gen_v2e_spmv_schedule(adj, mfunc, src_frame, dst_frame, edge_frame,
     for mfn in mfunc:
         fmsg = mfn(spmat, src_frame, dst_frame, edge_frame, out_size,
                    edge_map=edge_map)
-        write_back(out_frame, var.STR(mfn.out_field), fmsg)
+        write_back(out, var.STR(mfn.out_field), fmsg)
 
-def gen_e2v_spmv_schedule(adj, rfunc, mfr, edge_map, out, out_size,
+def gen_e2v_spmv_schedule(adj, rfunc, message_frame, edge_map, out, out_size,
                           out_map):
     """Generate e2v SPMV schedule.
 
     Parameters
     ----------
-    inc : tuple (sparse matrix, utils.Index)
-    rfunc : list of builtin reducers
-    mf : var.Var
-        Variable for message frame.
+    adj : utils.CtxCachedObject
+        function that generates four dgl.ndarray (indptr, indices, inv_indptr,
+        inv_indices) representing CSR and transposed-CSR matrix, copies to and
+        caches on to given context
+    rfunc : list of builtin reduce func
+    message_frame : var.Var
+        input message features
+    edge_map : CtxCachedObject
+        Function that copies and caches mapping from message id to edge id for
+        CSR and transposed CSR matrix on given context
     out : var.Var
-        Variable for output reduced features.
+        output node features
+    out_size : int
+        number of output nodes
+    out_map : utils.CtxCachedObject
+        function that generates a mapping from destination nodes to consecutive
+        ids and caches on given context
     """
     spmat = var.SPMAT(adj)
     for rfn in rfunc:
-        ftdst = rfn(spmat, mfr, out_size, edge_map=edge_map, out_map=out_map)
+        ftdst = rfn(spmat, message_frame, out_size, edge_map=edge_map,
+                    out_map=out_map)
         ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
 def build_block_adj_matrix_graph(graph, block_id):
@@ -221,8 +233,8 @@ def build_adj_matrix_uv(edge_tuple, num_nodes):
     """
     u, v, eid = edge_tuple
     spmat, inv_spmat = _build_adj_matrix_index_uv(edge_tuple, num_nodes)
-    eid = F.to_dgl_ndarray(spmat[2])
-    inv_eid = F.to_dgl_ndarray(inv_spmat[2])
+    eid = F.zerocopy_to_dgl_ndarray(spmat[2])
+    inv_eid = F.zerocopy_to_dgl_ndarray(inv_spmat[2])
 
     def copy_to(ctx):
         indptr = ndarray.array(spmat[0], ctx=ctx)

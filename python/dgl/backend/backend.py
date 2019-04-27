@@ -833,10 +833,30 @@ def zerocopy_from_numpy(np_array):
     """
     pass
 
-def to_dgl_ndarray(input):
+def zerocopy_to_dgl_ndarray(input):
+    """Zerocopy a framework-specific Tensor to dgl.ndarray.NDArray
+
+    Parameters
+    ----------
+    input : Tensor
+
+    Returns
+    -------
+    dgl.ndarray.NDArray
+    """
     pass
 
-def from_dgl_ndarray(input):
+def zerocopy_from_dgl_ndarray(input):
+    """Zerocopy a dgl.ndarray.NDArray to framework-specific Tensor
+
+    Parameters
+    ----------
+    input : dgl.ndarray.NDArray
+
+    Returns
+    -------
+    Tensor
+    """
     pass
 
 ###############################################################################
@@ -846,58 +866,76 @@ def from_dgl_ndarray(input):
 # kernels (see kernel.py), and plug into tensor framework using custom op
 # extensions.
 
-def src_mul_edge_reduce(reducer, mul_op, spmat, src_data, edge_data, out_size,
-                        src_map, edge_map, out_map):
-    """Multiply source node features with edge features, and perform reduction
-    on destination nodes optionally.
+def src_op_edge_reduce(reducer, binary_op, spmat, src_data, edge_data,
+                       out_size, src_map, edge_map, out_map):
+    """Perform binary operation between source node features and edge features,
+    and then reduce on destination nodes optionally.
 
     Parameters
     ----------
-    reducer: str
-        Reduction to be done: can be 'sum', 'max', 'mean', 'min', 'none' (no
-        reduction)
-    adj: tuple of three NDArray
-        adjacency matrix represented by a tuple of three NDArray:
-        (indptr, indices, eids), each row represents a source node
-    inv_adj: tuple of three NDArray
-        inverse adjacency matrix represented by a tuple of three NDArray:
-        (indptr, indices, eids), each row represents a destination node
-    src_data: Tensor
+    reducer : str
+        Reduction to be done, can be 'sum', 'max', 'min', 'mean', 'prod',
+        'none' (no reduction)
+    binary_op : str
+        Binary operation to perform, can be 'add', 'mul', 'sub', 'div', 'dot'
+    spmat : tuple of four dgl.ndarray.NDArray
+        Adjacency matrix (indptr, indices, inv_indptr, inv_indices),
+        indptr and indices form a CSR where each row is a source node
+        inv_indptr and inv_indices form a CSR where each column is a source
+        node
+    src_data : Tensor
         Source node feature tensor
-    edge_data: Tensor
+    edge_data : Tensor
         Edge feature tensor
+    out_size : int
+        Number of rows of output tensor
+    src_map : dgl.ndarray.NDArray
+        int64 array used for reading source data
+    edge_map : dgl.ndarray.NDArray
+        int64 array used for reading edge data
+    out_map : dgl.ndarray.NDArray
+        int64 array used for writing output data
 
     Returns
     -------
-    Tensor
+    dgl.ndarray.NDArray
         The result.
     """
     pass
 
-def src_mul_dst_reduce(reducer, mul_op, spmat, src_data, dst_data, out_size,
-                       src_map, dst_map, out_map):
-    """Multiply source node features with destination node features, and
-    perform reduction on destination nodes optionally.
+def src_op_dst_reduce(reducer, binary_op, spmat, src_data, dst_data, out_size,
+                      src_map, dst_map, out_map):
+    """Perform binary operation between source node features and edge features,
+    and reduce on destination nodes optionally.
 
     Parameters
     ----------
-    reducer: str
-        Reduction to be done: can be 'sum', 'max', 'mean', 'min', 'none' (no
-        reduction)
-    adj: tuple of three NDArray
-        adjacency matrix represented by a tuple of three NDArray:
-        (indptr, indices, eids), each row represents a source node
-    inv_adj: tuple of three NDArray
-        inverse adjacency matrix represented by a tuple of three NDArray:
-        (indptr, indices, eids), each row represents a destination node
-    src_data: Tensor
+    reducer : str
+        Reduction to be done, can be 'sum', 'max', 'min', 'mean', 'prod',
+        'none' (no reduction)
+    binary_op : str
+        Binary operation to perform, can be 'add', 'mul', 'sub', 'div', 'dot'
+    spmat : tuple of four dgl.ndarray.NDArray
+        Adjacency matrix (indptr, indices, inv_indptr, inv_indices),
+        indptr and indices form a CSR where each row is a source node
+        inv_indptr and inv_indices form a CSR where each column is a source
+        node
+    src_data : Tensor
         Source node feature tensor
-    dst_data: Tensor
-        Destination node feature tensor
+    edge_data : Tensor
+        Edge feature tensor
+    out_size : int
+        Number of rows of output tensor
+    src_map : dgl.ndarray.NDArray
+        int64 array used for reading source data
+    edge_map : dgl.ndarray.NDArray
+        int64 array used for reading edge data
+    out_map : dgl.ndarray.NDArray
+        int64 array used for writing output data
 
     Returns
     -------
-    Tensor
+    dgl.ndarray.NDArray
         The result.
     """
     pass
@@ -908,21 +946,26 @@ def copy_src_reduce(reducer, spmat, src_data, out_size, src_map, out_map):
 
     Parameters
     ----------
-    reducer: str
-        Reduction to be done: can be 'sum', 'max', 'mean', 'min', 'none' (no
-        reduction)
-    adj: tuple of three NDArray
-        adjacency matrix represented by a tuple of three NDArray:
-        (indptr, indices, eids), each row represents a source node
-    inv_adj: tuple of three NDArray
-        inverse adjacency matrix represented by a tuple of three NDArray:
-        (indptr, indices, eids), each row represents a destination node
-    src_data: Tensor
+    reducer : str
+        Reduction to be done, can be 'sum', 'max', 'min', 'mean', 'prod',
+        'none' (no reduction)
+    spmat : tuple of four dgl.ndarray.NDArray
+        Adjacency matrix (indptr, indices, inv_indptr, inv_indices),
+        indptr and indices form a CSR where each row is a source node
+        inv_indptr and inv_indices form a CSR where each column is a source
+        node
+    src_data : Tensor
         Source node feature tensor
+    out_size : int
+        Number of rows of output tensor
+    src_map : dgl.ndarray.NDArray
+        int64 array used for reading source data
+    out_map : dgl.ndarray.NDArray
+        int64 array used for writing output data
 
     Returns
     -------
-    Tensor
+    dgl.ndarray.NDArray
         The result.
     """
     pass
@@ -933,21 +976,26 @@ def copy_edge_reduce(reducer, spmat, edge_data, out_size, edge_map, out_map):
 
     Parameters
     ----------
-    reducer: str
-        Reduction to be done: can be 'sum', 'max', 'mean', 'min', 'none' (no
-        reduction)
-    adj: tuple of three NDArray
-        adjacency matrix represented by a tuple of three NDArray:
-        (indptr, indices, eids), each row represents a source node
-    inv_adj: tuple of three NDArray
-        inverse adjacency matrix represented by a tuple of three NDArray:
-        (indptr, indices, eids), each row represents a destination node
-    edge_data: Tensor
+    reducer : str
+        Reduction to be done, can be 'sum', 'max', 'min', 'mean', 'prod',
+        'none' (no reduction)
+    spmat : tuple of four dgl.ndarray.NDArray
+        Adjacency matrix (indptr, indices, inv_indptr, inv_indices),
+        indptr and indices form a CSR where each row is a source node
+        inv_indptr and inv_indices form a CSR where each column is a source
+        node
+    edge_data : Tensor
         Edge feature tensor
+    out_size : int
+        Number of rows of output tensor
+    edge_map : dgl.ndarray.NDArray
+        int64 array used for reading edge data
+    out_map : dgl.ndarray.NDArray
+        int64 array used for writing output data
 
     Returns
     -------
-    Tensor
+    dgl.ndarray.NDArray
         The result.
     """
     pass

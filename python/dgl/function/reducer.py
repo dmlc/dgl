@@ -13,7 +13,7 @@ class ReduceFunction(BuiltinFunction):
     """Base builtin reduce function class."""
 
     def __call__(self):
-        """Sumbolic computation of this builtin function to create
+        """Symbolic computation of this builtin function to create
         runtime.executor
         """
         raise NotImplementedError
@@ -34,6 +34,7 @@ class SimpleReduceFunction(ReduceFunction):
 
     def __call__(self, spmat, edge_frame, out_size, edge_map=_empty_map,
                  out_map=_empty_map):
+        """Symbolic execution of this builtin function"""
         reducer = self._name
         edge_map = var.MAP(edge_map)
         out_map = var.MAP(out_map)

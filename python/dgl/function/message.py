@@ -23,15 +23,15 @@ class MessageFunction(BuiltinFunction):
         raise NotImplementedError
 
 
-class SrcMulEdgeMessageFunction(MessageFunction):
-    """Class for the src_mul_edge builtin message function.
+class SrcOpEdgeMessageFunction(MessageFunction):
+    """Class for the src_op_edge builtin message function.
 
     See Also
     --------
     src_mul_edge
     """
-    def __init__(self, mul_op, src_field, edge_field, out_field):
-        self.mul_op = mul_op
+    def __init__(self, binary_op, src_field, edge_field, out_field):
+        self.binary_op = binary_op
         self.src_field = src_field
         self.edge_field = edge_field
         self.out_field = out_field
@@ -47,24 +47,24 @@ class SrcMulEdgeMessageFunction(MessageFunction):
         out_map = var.MAP(out_map)
         src_data = ir.READ_COL(src_frame, var.STR(self.src_field))
         edge_data = ir.READ_COL(edge_frame, var.STR(self.edge_field))
-        return ir.SRC_MUL_EDGE_REDUCE(reducer, self.mul_op, spmat, src_data,
-                                      edge_data, out_size, src_map, edge_map,
-                                      out_map)
+        return ir.SRC_OP_EDGE_REDUCE(reducer, self.binary_op, spmat, src_data,
+                                     edge_data, out_size, src_map, edge_map,
+                                     out_map)
 
     @property
     def name(self):
-        return "src_mul_edge"
+        return "src_{}_edge".format(self.binary_op)
 
 
-class SrcMulDstMessageFunction(MessageFunction):
-    """Class for the src_mul_dst builtin message function.
+class SrcOpDstMessageFunction(MessageFunction):
+    """Class for the src_op_dst builtin message function.
 
     See Also
     --------
     src_mul_dst
     """
-    def __init__(self, mul_op, src_field, dst_field, out_field):
-        self.mul_op = mul_op
+    def __init__(self, binary_op, src_field, dst_field, out_field):
+        self.binary_op = binary_op
         self.src_field = src_field
         self.dst_field = dst_field
         self.out_field = out_field
@@ -80,13 +80,13 @@ class SrcMulDstMessageFunction(MessageFunction):
         out_map = var.MAP(out_map)
         src_data = ir.READ_COL(src_frame, var.STR(self.src_field))
         dst_data = ir.READ_COL(src_frame, var.STR(self.dst_field))
-        return ir.SRC_MUL_DST_REDUCE(reducer, self.mul_op, spmat, src_data,
-                                     dst_data, out_size, src_map, dst_map,
-                                     out_map)
+        return ir.SRC_OP_DST_REDUCE(reducer, self.binary_op, spmat, src_data,
+                                    dst_data, out_size, src_map, dst_map,
+                                    out_map)
 
     @property
     def name(self):
-        return "src_mul_dst"
+        return "src_{}_dst".format(self.binary_op)
 
 
 class CopySrcMessageFunction(MessageFunction):
@@ -168,7 +168,7 @@ def src_mul_edge(src, edge, out):
     >>> def message_func(edges):
     >>>   return {'m': edges.src['h'] * edges.data['w']}
     """
-    return SrcMulEdgeMessageFunction("mul", src, edge, out)
+    return SrcOpEdgeMessageFunction("mul", src, edge, out)
 
 
 def src_mul_dst(src, dst, out):
@@ -194,7 +194,7 @@ def src_mul_dst(src, dst, out):
     >>> def message_func(edges):
     >>>   return {'m': edges.src['h1'] * edges.dst['h2']}
     """
-    return SrcMulDstMessageFunction("mul", src, dst, out)
+    return SrcOpDstMessageFunction("mul", src, dst, out)
 
 
 def copy_src(src, out):
