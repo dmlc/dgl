@@ -189,7 +189,8 @@ struct BinaryUseRhs {
   GEN(__VA_ARGS__, BinaryAdd) \
   GEN(__VA_ARGS__, BinarySub) \
   GEN(__VA_ARGS__, BinaryMul) \
-  GEN(__VA_ARGS__, BinaryDiv)
+  GEN(__VA_ARGS__, BinaryDiv) \
+  GEN(__VA_ARGS__, BinaryUseLhs)
 
 // functors for reducers
 template <int XPU, typename DType>
