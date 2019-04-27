@@ -235,7 +235,9 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
 
     # initialize graph
     dur = []
+
     for epoch in range(args.n_epochs):
+        start = time.time()
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
                                                        args.num_neighbors,
                                                        neighbor_type='in',
@@ -247,7 +249,7 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
             for i in range(n_layers):
                 agg_history_str = 'agg_h_{}'.format(i)
                 g.pull(nf.layer_parent_nid(i+1), fn.copy_src(src='h_{}'.format(i), out='m'),
-                       fn.sum(msg='m', out=agg_history_str))
+                       fn.sum(msg='m', out=agg_history_str), inplace=True)
 
             node_embed_names = [['preprocess', 'features', 'h_0']]
             for i in range(1, n_layers):
@@ -270,6 +272,7 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
             node_embed_names.append([])
 
             nf.copy_to_parent(node_embed_names=node_embed_names)
+        print('training takes ' + str(time.time() - start))
 
         infer_params = infer_model.collect_params()
 
