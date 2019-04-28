@@ -29,11 +29,6 @@ pubmed: test accuracy ~76% with --num-neighbors 3, ~77% by training on the full 
 python gcn_ns_sc.py --dataset pubmed --self-loop --num-neighbors 3 --batch-size 1000000 --test-batch-size 1000000 --gpu 0
 ```
 
-reddit: test accuracy ~91% with --num-neighbors 2 and --batch-size 1000, ~93% by training on the full graph
-```
-python gcn_ns_sc.py --dataset reddit-self-loop --num-neighbors 2 --batch-size 1000 --test-batch-size 500000 --n-hidden 64
-```
-
 ### Control Variate & Skip Connection
 cora: test accuracy ~84% with --num-neighbors 1, ~84% by training on the full graph
 ```
@@ -48,10 +43,5 @@ python gcn_cv_sc.py --dataset citeseer --self-loop --num-neighbors 1 --batch-siz
 pubmed: test accuracy ~77% with --num-neighbors 1, ~77% by training on the full graph
 ```
 python gcn_cv_sc.py --dataset pubmed --self-loop --num-neighbors 1 --batch-size 1000000 --test-batch-size 1000000 --gpu 0
-```
-
-reddit: test accuracy ~93% with --num-neighbors 1 and --batch-size 1000, ~93% by training on the full graph
-```
-python gcn_cv_sc.py --dataset reddit-self-loop --num-neighbors 1 --batch-size 1000 --test-batch-size 500000 --n-hidden 64
 ```
 
