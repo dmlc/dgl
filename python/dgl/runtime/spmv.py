@@ -245,7 +245,9 @@ def build_block_adj_matrix_graph(graph, block_id):
     """
     # FIXME (lingfan): nodeflow does not support get both csr and transposed
     # csr, for now use scipy to implement
-    edge_tuple = graph.block_edges(block_id)
+    u, v, _ = graph.block_edges(block_id)
+    u = utils.Index(u)
+    v = utils.Index(v)
     num_src = graph.layer_size(block_id)
     num_dst = graph.layer_size(block_id + 1)
-    return build_adj_matrix_uv(edge_tuple, num_src, num_dst)
+    return build_adj_matrix_uv(u, v, num_src, num_dst)
