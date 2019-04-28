@@ -136,12 +136,24 @@ struct BinaryAdd {
   static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
     return lhs + rhs;
   }
+  static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
+    return 1;
+  }
+  static DGLDEVICE DGLINLINE DType BackwardRhs(DType lhs, DType rhs, DType out) {
+    return 1;
+  }
 };
 
 template <typename DType>
 struct BinaryMul {
   static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
     return lhs * rhs;
+  }
+  static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
+    return rhs;
+  }
+  static DGLDEVICE DGLINLINE DType BackwardRhs(DType lhs, DType rhs, DType out) {
+    return lhs;
   }
 };
 
@@ -150,12 +162,24 @@ struct BinarySub {
   static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
     return lhs - rhs;
   }
+  static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
+    return 1;
+  }
+  static DGLDEVICE DGLINLINE DType BackwardRhs(DType lhs, DType rhs, DType out) {
+    return -1;
+  }
 };
 
 template <typename DType>
 struct BinaryDiv {
   static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
     return lhs / rhs;
+  }
+  static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
+    return static_cast<DType>(1) / rhs;
+  }
+  static DGLDEVICE DGLINLINE DType BackwardRhs(DType lhs, DType rhs, DType out) {
+    return -lhs;
   }
 };
 
@@ -164,12 +188,11 @@ struct BinaryUseLhs {
   static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
     return lhs;
   }
-};
-
-template <typename DType>
-struct BinaryUseRhs {
-  static DGLDEVICE DGLINLINE DType Call(DType lhs, DType rhs) {
-    return rhs;
+  static DGLDEVICE DGLINLINE DType BackwardLhs(DType lhs, DType rhs, DType out) {
+    return 1;
+  }
+  static DGLDEVICE DGLINLINE DType BackwardRhs(DType lhs, DType rhs, DType out) {
+    return 0;
   }
 };
 

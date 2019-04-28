@@ -46,7 +46,7 @@ struct BackwardGData {
   // length along x dimension
   int64_t x_length{0};
   // input data
-  DType *lhs_data{nullptr}, *rhs_data{nullptr};
+  DType *lhs_data{nullptr}, *rhs_data{nullptr}, *out_data{nullptr};
   DType *grad_out_data{nullptr};
   // output data
   DType *grad_lhs_data{nullptr}, *grad_rhs_data{nullptr};

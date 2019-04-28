@@ -334,5 +334,21 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopyEdgeReduce")
         edge_mapping, edge_data, out_mapping, out_size);
   });
 
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardSrcMulEdgeReduce")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::string reducer = args[0];
+    std::string op = args[1];
+    NDArray rev_indptr = args[2];
+    NDArray rev_indices = args[3];
+    NDArray src_mapping = args[4];
+    NDArray edge_mapping = args[5];
+    NDArray out_mapping = args[6];
+    NDArray src_data = args[7];
+    NDArray edge_data = args[8];
+    NDArray out_data = args[9];
+    NDArray grad_out_data = args[10];
+    LOG(FATAL) << "Not implemented.";
+  });
+
 }  // namespace kernel
 }  // namespace dgl

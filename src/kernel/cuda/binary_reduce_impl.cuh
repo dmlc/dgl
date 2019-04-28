@@ -34,38 +34,7 @@ struct BinaryReduce {
     while (tx < D) {
       DType lhs = Functors::Read(lhsoff + tx);
       DType rhs = Functors::Read(rhsoff + tx);
-      DType out = Functors::Call(lhs, rhs);
-      Functors::Write(outoff + tx, out);
-      tx += stride_x;
-    }
-  }
-};
-
-template <typename DType,
-          typename Functors>
-struct BackwardBinaryReduce {
-  static __device__ __forceinline__ bool CondEdge(
-      int64_t src, int64_t dst, int64_t eid, GData<DType>* gdata) {
-    return true;
-  }
-  static __device__ __forceinline__ void ApplyEdge(
-      int64_t src, int64_t dst, int64_t eid, GData<DType>* gdata) {
-    const int64_t D = gdata->x_length;
-    int tx = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride_x = blockDim.x * gridDim.x;
-    int64_t lid = Functors::SelectLeft(src, eid, dst);
-    int64_t rid = Functors::SelectRight(src, eid, dst);
-    int64_t oid = Functors::SelectOut(src, eid, dst);
-    lid = Functors::GetId(lid, gdata->lhs_mapping);
-    rid = Functors::GetId(rid, gdata->rhs_mapping);
-    oid = Functors::GetId(oid, gdata->out_mapping);
-    DType* lhsoff = gdata->lhs_data + lid * D;
-    DType* rhsoff = gdata->rhs_data + rid * D;
-    DType* outoff = gdata->out_data + oid * D;
-    while (tx < D) {
-      DType lhs = Functors::Read(lhsoff + tx);
-      DType rhs = Functors::Read(rhsoff + tx);
-      DType out = Functors::Call(lhs, rhs);
+      DType out = Functors::Op(lhs, rhs);
       Functors::Write(outoff + tx, out);
       tx += stride_x;
     }
@@ -114,7 +83,7 @@ struct BinaryReduceBcast {
           Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride));
       DType rhs = Functors::Read(rhsoff +
           Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride));
-      DType out = Functors::Call(lhs, rhs);
+      DType out = Functors::Op(lhs, rhs);
       Functors::Write(outoff + tx, out);
       tx += stride_x;
     }
@@ -137,7 +106,7 @@ struct FunctorsTempl {
       int64_t src, int64_t edge, int64_t dst) {
     return RightSelector::Call(src, edge, dst);
   }
-  static __device__ __forceinline__ DType Call(DType lhs, DType rhs) {
+  static __device__ __forceinline__ DType Op(DType lhs, DType rhs) {
     return BinaryOp::Call(lhs, rhs);
   }
   static __device__ __forceinline__ DType Read(DType* addr) {

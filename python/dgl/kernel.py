@@ -137,29 +137,43 @@ def copy_src_reduce(reducer,
 def copy_edge_reduce(reducer,
                      indptr,
                      indices,
-                     edge_ids,
-                     edge_data):
+                     edge_mapping,
+                     edge_data,
+                     out_mapping,
+                     out_size):
     """Copy edge data and perform reduce to destination node.
 
     Parameter
     ---------
+    reducer : str
+        The type of the reducer ("sum", "max", "mean", "min", "none").
+        If the reducer is "none", the output is an edge feature tensor.
+        Otherwise, a node feature tensor is returned.
     indptr : dgl.ndarray.NDArray
         An int64 row offset array for the graph CSR.
     indices : dgl.ndarray.NDArray
         An int64 column index array for the graph CSR.
-    edge_ids : dgl.ndarray.NDArray
-        An int64 array for the edge ids. If empty,
-        the edge ids are consecutive integers [0, len(indices)).
-        The edge ids are used to read edge data.
+    edge_mapping : dgl.ndarray.NDArray
+        An optional int64 array for edge mapping.
+        If empty, source ids are consecutive integers [0, len(indptr) - 1).
+        Source ids are used to read edge data.
     edge_data : dgl.ndarray.NDArray
-        The source node feature tensor.
+        The edge feature tensor.
+    out_mapping : dgl.ndarray.NDArray
+        An optional int64 array for output mapping. If reducer is
+        "none", then it's a mapping to edge ids. Otherwise, it's
+        mapping to destination node ids.
+    out_size : int
+        The size of the first dimension of the output array.
 
     Returns
     -------
     dgl.ndarray.NDArray
-        The dst node feature tensor.
+        The output tensor. Could be either node or edge feature tensor
+        depending on the reducer.
     """
-    return _CAPI_DGLKernelCopySrcReduce(
-        reducer, indptr, indices, edge_ids, src_data)
+    return _CAPI_DGLKernelCopyEdgeReduce(
+        reducer, indptr, indices, edge_mapping, edge_data,
+        out_mapping, out_size)
 
 _init_api("dgl.kernel")
