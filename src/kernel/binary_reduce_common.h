@@ -3,6 +3,7 @@
 
 #include <limits>
 #include <string>
+#include <dgl/runtime/ndarray.h>
 #include "./common.h"
 
 namespace dgl {
@@ -29,6 +30,13 @@ enum Target {
 };
 }  // namespace binary_op
 
+__inline__ runtime::NDArray NoneArray() {
+  return runtime::NDArray::Empty({}, DLDataType{kDLInt, 32, 1}, DLContext{kDLCPU, 0});
+}
+
+__inline__ bool IsNoneArray(runtime::NDArray array) {
+  return array->ndim == 0;
+}
 
 // functor for no-op
 template <typename Ret, typename ... Args>

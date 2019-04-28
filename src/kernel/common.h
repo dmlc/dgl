@@ -68,7 +68,6 @@ namespace kernel {
   }
 #endif
 
-
 }  // namespace kernel
 }  // namespace dgl
 

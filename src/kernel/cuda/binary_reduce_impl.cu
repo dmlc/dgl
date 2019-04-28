@@ -24,7 +24,7 @@ inline int64_t ComputeXLength(NDArray feat_array) {
 }
 
 inline int64_t NElements(NDArray array) {
-  if (array->ndim == 0) {
+  if (IsNoneArray(array)) {
     return 0;
   } else {
     int64_t ret = 1;
@@ -54,13 +54,13 @@ GData<DType> AllocGData(cudaStream_t stream, int64_t x_len,
   gdata.lhs_data = static_cast<DType*>(lhs_data->data);
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
-  if (lhs_mapping->ndim != 0) {
+  if (!IsNoneArray(lhs_mapping)) {
     gdata.lhs_mapping = static_cast<int64_t*>(lhs_mapping->data);
   }
-  if (rhs_mapping->ndim != 0) {
+  if (!IsNoneArray(rhs_mapping)) {
     gdata.rhs_mapping = static_cast<int64_t*>(rhs_mapping->data);
   }
-  if (out_mapping->ndim != 0) {
+  if (!IsNoneArray(out_mapping)) {
     gdata.out_mapping = static_cast<int64_t*>(out_mapping->data);
   }
   // fill out data with zero values
@@ -104,7 +104,7 @@ void BinaryReduceImpl(
 
   const DLDataType& dtype = lhs_data->dtype;
   const bool has_indirect =
-    (lhs_mapping->ndim != 0 || rhs_mapping->ndim != 0 || out_mapping->ndim != 0);
+    !(IsNoneArray(lhs_mapping) && IsNoneArray(rhs_mapping) && IsNoneArray(out_mapping));
   DGL_DTYPE_SWITCH(dtype, DType, {
     REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {
       GData<DType> gdata = AllocGData<DType, Reducer>(
@@ -155,13 +155,13 @@ BcastGData<NDim, DType> AllocBcastGData(
   gdata.lhs_data = static_cast<DType*>(lhs_data->data);
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
-  if (lhs_mapping->ndim != 0) {
+  if (!IsNoneArray(lhs_mapping)) {
     gdata.lhs_mapping = static_cast<int64_t*>(lhs_mapping->data);
   }
-  if (rhs_mapping->ndim != 0) {
+  if (!IsNoneArray(rhs_mapping)) {
     gdata.rhs_mapping = static_cast<int64_t*>(rhs_mapping->data);
   }
-  if (out_mapping->ndim != 0) {
+  if (!IsNoneArray(out_mapping)) {
     gdata.out_mapping = static_cast<int64_t*>(out_mapping->data);
   }
   // fill out data with zero values
@@ -206,7 +206,7 @@ void BinaryReduceBcastImpl(
 
   const DLDataType& dtype = lhs_data->dtype;
   const bool has_indirect =
-    (lhs_mapping->ndim != 0 || rhs_mapping->ndim != 0 || out_mapping->ndim != 0);
+    !(IsNoneArray(lhs_mapping) && IsNoneArray(rhs_mapping) && IsNoneArray(out_mapping));
   const int bcast_ndim = info.out_shape.size();
   DGL_DTYPE_SWITCH(dtype, DType, {
     REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {

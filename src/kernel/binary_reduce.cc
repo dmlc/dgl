@@ -287,8 +287,8 @@ NDArray CopySrcReduce(
   return BinaryOpReduce(reducer, binary_op::kUseLhs,
       indptr, indices,
       binary_op::kSrc, binary_op::kDst,
-      src_mapping, NDArray(),
-      src_data, NDArray(),
+      src_mapping, NoneArray(),
+      src_data, NoneArray(),
       out_mapping, out_size);
 }
 
@@ -316,8 +316,8 @@ NDArray CopyEdgeReduce(
   return BinaryOpReduce(reducer, binary_op::kUseLhs,
       indptr, indices,
       binary_op::kEdge, binary_op::kDst,
-      edge_mapping, NDArray(),
-      edge_data, NDArray(),
+      edge_mapping, NoneArray(),
+      edge_data, NoneArray(),
       out_mapping, out_size);
 }
 
