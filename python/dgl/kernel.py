@@ -190,7 +190,7 @@ def copy_edge_reduce(reducer,
         The output tensor. Could be either node or edge feature tensor
         depending on the reducer.
     """
-    return _CAPI_DGLKernelCopySrcReduce(
+    return _CAPI_DGLKernelCopyEdgeReduce(
         reducer, indptr, indices, edge_mapping, edge_data, out_mapping,
         int(out_size))
 

@@ -203,9 +203,13 @@ class SrcOpEdgeReduce(th.autograd.Function):
                 src_map, edge_map, out_map):
         src_data = zerocopy_to_dgl_ndarray(src_data)
         edge_data = zerocopy_to_dgl_ndarray(edge_data)
+        if reducer == "none":
+            forward_out_map = out_map[0]
+        else:
+            forward_out_map = out_map
         out = knl.src_op_edge_reduce(reducer, binary_op, spmat[0], spmat[1],
                                      src_map, edge_map[0], src_data,
-                                     edge_data, out_map, out_size)
+                                     edge_data, forward_out_map, out_size)
         ctx.save_for_backward(reducer, binary_op, spmat, src_map, edge_map,
                               src_data, edge_data, out_map)
         return zerocopy_from_dgl_ndarray(out)
@@ -221,9 +225,13 @@ class SrcOpDstReduce(th.autograd.Function):
                 src_map, dst_map, out_map):
         src_data = zerocopy_to_dgl_ndarray(src_data)
         dst_data = zerocopy_to_dgl_ndarray(dst_data)
+        if reducer == "none":
+            forward_out_map = out_map[0]
+        else:
+            forward_out_map = out_map
         out = knl.src_op_dst_reduce(reducer, binary_op, spmat[0], spmat[1],
                                     src_map, dst_map, src_data, dst_data,
-                                    out_map, out_size)
+                                    forward_out_map, out_size)
         ctx.save_for_backward(reducer, binary_op, spmat, src_map, dst_map,
                               src_data, dst_data, out_map)
         return zerocopy_from_dgl_ndarray(out)
@@ -236,9 +244,13 @@ class SrcOpDstReduce(th.autograd.Function):
 class CopySrcReduce(th.autograd.Function):
     @staticmethod
     def forward(ctx, reducer, spmat, src_data, out_size, src_map, out_map):
+        if reducer == "none":
+            forward_out_map = out_map[0]
+        else:
+            forward_out_map = out_map
         src_data = zerocopy_to_dgl_ndarray(src_data)
         out = knl.copy_src_reduce(reducer, spmat[0], spmat[1], src_map,
-                                  src_data, out_map, out_size)
+                                  src_data, forward_out_map, out_size)
         ctx.save_for_backward(reducer, spmat, src_data, src_map, out_map)
         return zerocopy_from_dgl_ndarray(out)
 
@@ -251,8 +263,12 @@ class CopyEdgeReduce(th.autograd.Function):
     @staticmethod
     def forward(ctx, reducer, spmat, edge_data, out_size, edge_map, out_map):
         edge_data = zerocopy_to_dgl_ndarray(edge_data)
+        if reducer == "none":
+            forward_out_map = out_map[0]
+        else:
+            forward_out_map = out_map
         out = knl.copy_edge_reduce(reducer, spmat[0], spmat[1], edge_map[0],
-                                   edge_data, out_map, out_size)
+                                   edge_data, forward_out_map, out_size)
         ctx.save_for_backward(reducer, spmat, edge_data, edge_map, out_map)
         return zerocopy_from_dgl_ndarray(out)
 

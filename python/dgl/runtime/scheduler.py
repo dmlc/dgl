@@ -57,21 +57,27 @@ def schedule_send(graph, u, v, eid, message_func):
     if mfunc_is_list:
         if eid.is_slice(0, graph.number_of_edges()):
             # full graph case, no edge mapping needed
-            adj, edge_map, inv_edge_map = spmv.build_adj_matrix_graph(graph)
+            adj, shuffle_idx, inv_shuffle_idx= spmv.build_adj_matrix_graph(graph)
         else:
             # build edge_mapping
-            adj, edge_map, inv_edge_map = spmv.build_adj_matrix_uv(
-                (u, v, eid), graph.number_of_nodes(), graph.number_of_nodes())
-        edge_map = _context_cached_idx_map(edge_map)
-        inv_edge_map = _context_cached_idx_map(inv_edge_map)
+            adj, shuffle_idx, inv_shuffle_idx= spmv.build_adj_matrix_uv(
+                u, v, graph.number_of_nodes(), graph.number_of_nodes())
+        edge_map, inv_edge_map = _build_edge_map(
+            var_eid.data, shuffle_idx, inv_shuffle_idx)
+        msg_map = _context_cached_idx_map(shuffle_idx.todgltensor())
+        inv_msg_map = _context_cached_idx_map(inv_shuffle_idx.todgltensor())
+        # create a tmp message frame
+        tmp_mfr = FrameRef(frame_like(graph._edge_frame._frame, len(eid)))
+        msg = var.FEAT_DICT(data=tmp_mfr)
         spmv.gen_v2e_spmv_schedule(adj, message_func, var_nf, var_nf, var_ef,
-                                   var_mf, len(eid), (edge_map, inv_edge_map),
-                                   eid=eid)
+                                   msg, len(eid), (edge_map, inv_edge_map),
+                                   (msg_map, inv_msg_map))
     else:
         # UDF send
         msg = _gen_send(graph, var_nf, var_nf, var_ef, var_u, var_v, var_eid,
                         message_func)
-        ir.WRITE_ROW_(var_mf, var_eid, msg)
+    # write tmp msg back
+    ir.WRITE_ROW_(var_mf, var_eid, msg)
     # set message indicator to 1
     graph._msg_index = graph._msg_index.set_items(eid, 1)
 
@@ -164,7 +170,7 @@ def schedule_snr(graph,
     # generate send and reduce schedule
     uv_getter = lambda: (var_u, var_v)
     adj_creator = lambda: spmv.build_adj_matrix_uv(
-        edge_tuples, graph.number_of_nodes(), graph.number_of_nodes())
+        u, v, graph.number_of_nodes(), graph.number_of_nodes())
     out_map_creator = lambda: _build_idx_map(recv_nodes)
     reduced_feat = _gen_send_reduce(graph, graph._node_frame,
                                     graph._node_frame, graph._edge_frame,
@@ -463,7 +469,7 @@ def schedule_pull(graph,
         # generate send and reduce schedule
         uv_getter = lambda: (var_u, var_v)
         adj_creator = lambda: spmv.build_adj_matrix_uv(
-            (u, v, eid), graph.number_of_nodes(), graph.number_of_nodes())
+            u, v, graph.number_of_nodes(), graph.number_of_nodes())
         out_map_creator = lambda: _build_idx_map(pull_nodes)
         reduced_feat = _gen_send_reduce(graph, graph._node_frame,
                                         graph._node_frame, graph._edge_frame,
@@ -618,7 +624,7 @@ def schedule_nodeflow_compute(graph,
         # generate send and reduce schedule
         uv_getter = lambda: (var_u, var_v)
         adj_creator = lambda: spmv.build_adj_matrix_uv(
-            (u, v, eid), graph.layer_size(block_id),
+            u, v, graph.layer_size(block_id),
             graph.layer_size(block_id + 1))
         out_map_creator = lambda: _build_idx_map(dest_nodes)
         reduced_feat = _gen_send_reduce(graph, graph._get_node_frame(block_id),
@@ -716,7 +722,7 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
     var.FEAT_DICT
         The reduced feature dict.
     """
-    _, dst, eid = edge_tuples
+    src, dst, eid = edge_tuples
     rfunc = _standardize_func_usage(reduce_func, 'reduce')
     rfunc_is_list = utils.is_iterable(rfunc)
     # Create a tmp frame to hold the feature data.
@@ -732,12 +738,12 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
     var_out = var.FEAT_DICT(data=tmpframe)
 
     if rfunc_is_list:
-        # we don't need edge_map here, because send scatter messages back to
-        # msg_frame using eid
-        adj, edge_map, inv_edge_map = spmv.build_adj_matrix_uv(
-            edge_tuples, graph.number_of_nodes(), graph.number_of_nodes())
-        edge_map = _context_cached_idx_map(edge_map)
-        inv_edge_map = _context_cached_idx_map(inv_edge_map)
+        adj, shuffle_idx, inv_shuffle_idx= spmv.build_adj_matrix_uv(
+            src, dst, graph.number_of_nodes(), graph.number_of_nodes())
+        # using edge map instead of message map because messages are in global
+        # message frame
+        edge_map, inv_edge_map = _build_edge_map(
+            eid, shuffle_idx, inv_shuffle_idx)
         var_out_map = _build_idx_map(recv_nodes)
         spmv.gen_e2v_spmv_schedule(adj, rfunc, var_msg,
                                    (edge_map, inv_edge_map), var_out,
@@ -825,11 +831,14 @@ def _gen_send_reduce(
     tmpframe = FrameRef(frame_like(dst_node_frame._frame, len(reduce_nodes)))
     var_out = var.FEAT_DICT(data=tmpframe)
 
-    # 1. If either mfunc or rfunc is builtin, generate adjmat and edge orders
+    # 1. If either mfunc or rfunc is builtin, generate adjmat, edge mapping and
+    # message mapping
     if mfunc_is_list or rfunc_is_list:
-        adj, edge_map, inv_edge_map = adj_creator()
-        edge_map = _context_cached_idx_map(edge_map)
-        inv_edge_map = _context_cached_idx_map(inv_edge_map)
+        adj, shuffle_idx, inv_shuffle_idx = adj_creator()
+        edge_map, inv_edge_map = _build_edge_map(
+            var_eid.data, shuffle_idx, inv_shuffle_idx)
+        msg_map = _context_cached_idx_map(shuffle_idx.todgltensor())
+        inv_msg_map = _context_cached_idx_map(inv_shuffle_idx.todgltensor())
 
     # 2. If rfunc is builtin, generate a mapping from recv nodes to consecutive
     # output id
@@ -844,6 +853,8 @@ def _gen_send_reduce(
                                    (edge_map, inv_edge_map), var_out_map)
         return var_out
 
+    var_u, var_v = uv_getter()
+
     # 4. Unable to fuse, then generate message
     if mfunc_is_list:
         # messages are builtin but reduce is UDF
@@ -852,18 +863,19 @@ def _gen_send_reduce(
         tmp_msg_frame = FrameRef(frame_like(edge_frame._frame, n_message))
         var_mf = var.FEAT_DICT(data=tmp_msg_frame)
         spmv.gen_v2e_spmv_schedule(adj, mfunc, var_src_nf, var_dst_nf, var_ef,
-                                   var_mf, n_message, (edge_map, inv_edge_map))
+                                   var_mf, n_message, (edge_map, inv_edge_map),
+                                   (msg_map, inv_msg_map))
     else:
         # generate UDF send schedule
-        var_u, var_v = uv_getter()
         var_mf = _gen_send(graph, var_src_nf, var_dst_nf, var_ef, var_u, var_v,
                            var_eid, mfunc)
 
     # 6. Generate reduce
     if rfunc_is_list:
         # UDF message + builtin reducer
+        # reduce from message, so msg_map becomes edge_map here
         spmv.gen_e2v_spmv_schedule(adj, rfunc, var_mf,
-                                   (edge_map, inv_edge_map), var_out,
+                                   (msg_map, inv_msg_map), var_out,
                                    len(reduce_nodes), var_out_map)
         return var_out
     else:
@@ -889,6 +901,15 @@ def _gen_send(graph, src_nfr, dst_nfr, efr, u, v, eid, mfunc):
 
 def _context_cached_idx_map(idx_map):
     return utils.CtxCachedObject(lambda ctx: nd.array(idx_map, ctx=ctx))
+
+def _build_edge_map(eids, shuffle_idx, inv_shuffle_idx):
+    """Build edge maps for forward (using CSR) and backward (using inv_CSR)"""
+    eids = eids.tousertensor()
+    shuffle_idx = shuffle_idx.tousertensor()
+    inv_shuffle_idx = inv_shuffle_idx.tousertensor()
+    edge_map = _context_cached_idx_map(eids[shuffle_idx])
+    inv_edge_map = _context_cached_idx_map(eids[inv_shuffle_idx])
+    return edge_map, inv_edge_map
 
 def _build_idx_map(idx):
     """Build a map from the input ids to continuous ids that starts from zero.

@@ -11,7 +11,6 @@ from .ir import var
 
 import scipy.sparse as sp
 import numpy as np
-from functools import partial
 
 
 def gen_v2v_spmv_schedule(adj, mfunc, rfunc, src_frame, dst_frame, edge_frame,
@@ -54,7 +53,7 @@ def gen_v2v_spmv_schedule(adj, mfunc, rfunc, src_frame, dst_frame, edge_frame,
 
 
 def gen_v2e_spmv_schedule(adj, mfunc, src_frame, dst_frame, edge_frame,
-                          out, out_size, edge_map, eid=None):
+                          out, out_size, edge_map, out_map):
     """Generate v2e SPMV schedule
 
     Parameters
@@ -79,14 +78,10 @@ def gen_v2e_spmv_schedule(adj, mfunc, src_frame, dst_frame, edge_frame,
         caches on given context
     """
     spmat = var.SPMAT(adj)
-    if eid is not None:
-        write_back = partial(ir.WRITE_, row=eid)
-    else:
-        write_back = ir.WRITE_COL_
     for mfn in mfunc:
         fmsg = mfn(spmat, src_frame, dst_frame, edge_frame, out_size,
-                   edge_map=edge_map)
-        write_back(out, var.STR(mfn.out_field), fmsg)
+                   edge_map=edge_map, out_map=out_map)
+        ir.WRITE_COL_(out, var.STR(mfn.out_field), fmsg)
 
 
 def gen_e2v_spmv_schedule(adj, rfunc, message_frame, edge_map, out, out_size,
@@ -134,14 +129,14 @@ def build_adj_matrix_graph(graph):
         Get be used to get adjacency matrix on the provided ctx.
     """
     gidx = graph._graph
-    edge_map = gidx.csr_adjacency_matrix(True, ndarray.cpu())[2]
-    inv_edge_map = gidx.csr_adjacency_matrix(False, ndarray.cpu())[2]
+    shuffle_idx = gidx.csr_adjacency_matrix(True, ndarray.cpu())[2]
+    inv_shuffle_idx = gidx.csr_adjacency_matrix(False, ndarray.cpu())[2]
     return lambda ctx: (gidx.csr_adjacency_matrix(True, ctx)[:2] +
                         gidx.csr_adjacency_matrix(False, ctx)[:2]), \
-        edge_map, inv_edge_map
+        utils.Index(shuffle_idx), utils.Index(inv_shuffle_idx)
 
 
-def _build_adj_matrix_index_uv(edge_tuple, num_src, num_dst):
+def _build_adj_matrix_index_uv(u, v, num_src, num_dst):
     """Build adj matrix index and shape using the given (u, v) edges.
 
     The matrix is of shape (len(reduce_nodes), n), where n is the number of
@@ -154,8 +149,10 @@ def _build_adj_matrix_index_uv(edge_tuple, num_src, num_dst):
 
     Paramters
     ---------
-    edge_tuple : tuple of utils.Index
-        (u, v, eid)
+    u : utils.index
+        Source nodes
+    v : utils.index
+        Destination nodes
     num_src : int
         Number of source nodes.
     num_dst : int
@@ -168,28 +165,26 @@ def _build_adj_matrix_index_uv(edge_tuple, num_src, num_dst):
     tuple of int
         The dense shape.
     """
-    u, v, eid = edge_tuple
     u = u.tousertensor()
     v = v.tousertensor()
-    eid = eid.tousertensor()
     u = F.zerocopy_to_numpy(u)
     v = F.zerocopy_to_numpy(v)
-    eid = F.zerocopy_to_numpy(eid)
-    csr = sp.csr_matrix((eid, (u, v)), shape=(num_src, num_dst))
-    inv_csr = sp.csr_matrix((eid, (v, u)), shape=(num_dst, num_src))
+    dat = np.arange(len(v), dtype=np.int64)
+    csr = sp.csr_matrix((dat, (u, v)), shape=(num_src, num_dst))
+    inv_csr = sp.csr_matrix((dat, (v, u)), shape=(num_dst, num_src))
     indptr = F.zerocopy_from_numpy(csr.indptr.astype(np.int64))
     indices = F.zerocopy_from_numpy(csr.indices.astype(np.int64))
-    edge_map = F.zerocopy_from_numpy(csr.data)
+    shuffle_idx = F.zerocopy_from_numpy(csr.data)
     inv_indptr = F.zerocopy_from_numpy(inv_csr.indptr.astype(np.int64))
     inv_indices = F.zerocopy_from_numpy(inv_csr.indices.astype(np.int64))
-    inv_edge_map = F.zerocopy_from_numpy(inv_csr.data)
-    spmat = (indptr, indices, edge_map)
-    inv_spmat = (inv_indptr, inv_indices, inv_edge_map)
+    inv_shuffle_idx = F.zerocopy_from_numpy(inv_csr.data)
+    spmat = (indptr, indices, shuffle_idx)
+    inv_spmat = (inv_indptr, inv_indices, inv_shuffle_idx)
     return spmat, inv_spmat
 
 
-def build_adj_matrix_uv(edge_tuple, num_src, num_dst):
-    """Build adj matrix using the given (u, v, eid) edges and target nodes.
+def build_adj_matrix_uv(u, v, num_src, num_dst):
+    """Build adj matrix using the given (u, v) edges and target nodes.
 
     The matrix is of shape (len(reduce_nodes), n), where n is the number of
     nodes in the graph. Therefore, when doing SPMV, the src node data should be
@@ -197,8 +192,10 @@ def build_adj_matrix_uv(edge_tuple, num_src, num_dst):
 
     Parameters
     ---------
-    edge_tuple : tuple of utils.Index
-        (u, v, eid)
+    u : utils.Index
+        Source nodes
+    v : utils.Index
+        Destination nodes
     reduce_nodes : utils.Index
         The nodes to reduce messages, which will be target dimension
         of the adjmat. The nodes include unique(v) and zero-degree-nodes.
@@ -213,10 +210,9 @@ def build_adj_matrix_uv(edge_tuple, num_src, num_dst):
         A index for data shuffling due to sparse format change. Return None
         if shuffle is not required.
     """
-    u, v, eid = edge_tuple
-    spmat, inv_spmat = _build_adj_matrix_index_uv(edge_tuple, num_src, num_dst)
-    eid = F.zerocopy_to_dgl_ndarray(spmat[2])
-    inv_eid = F.zerocopy_to_dgl_ndarray(inv_spmat[2])
+    spmat, inv_spmat = _build_adj_matrix_index_uv(u, v, num_src, num_dst)
+    shuffle_idx = utils.Index(spmat[2])
+    inv_shuffle_idx = utils.Index(inv_spmat[2])
 
     def copy_to(ctx):
         indptr = ndarray.array(spmat[0], ctx=ctx)
@@ -225,7 +221,7 @@ def build_adj_matrix_uv(edge_tuple, num_src, num_dst):
         inv_indices = ndarray.array(inv_spmat[1], ctx=ctx)
         return indptr, indices, inv_indptr, inv_indices
 
-    return utils.CtxCachedObject(copy_to), eid, inv_eid
+    return utils.CtxCachedObject(copy_to), shuffle_idx, inv_shuffle_idx
 
 
 def build_block_adj_matrix_graph(graph, block_id):

@@ -1065,7 +1065,14 @@ class SrcOpEdgeReduceExecutor(Executor):
         edge_map, inv_edge_map = self.edge_map.data
         edge_map = edge_map(ctx)
         inv_edge_map = inv_edge_map(ctx)
-        out_map = self.out_map.data(ctx)
+        if self.reducer == "none":
+            # write to edge
+            msg_map, inv_msg_map = self.out_map.data
+            msg_map = msg_map(ctx)
+            inv_msg_map = inv_msg_map(ctx)
+            out_map = (msg_map, inv_msg_map)
+        else:
+            out_map = self.out_map.data(ctx)
         self.ret.data = F.src_op_edge_reduce(
             self.reducer, self.binary_op, spmat, src_data, edge_data,
             self.out_size, src_map, (edge_map, inv_edge_map), out_map)
@@ -1074,8 +1081,8 @@ class SrcOpEdgeReduceExecutor(Executor):
 IR_REGISTRY[OpCode.SRC_OP_EDGE_REDUCE] = {
     'name': 'SRC_OP_EDGE_REDUCE',
     'args_type': [VarType.STR, VarType.STR, VarType.SPMAT, VarType.FEAT,
-                  VarType.FEAT, VarType.INT, VarType.MAP,
-                  (VarType.MAP, VarType.MAP), VarType.MAP],
+                  VarType.FEAT, VarType.INT, VarType.MAP, VarType.MAP,
+                  VarType.MAP],
     'ret_type': VarType.FEAT,
     'executor_cls': SrcOpEdgeReduceExecutor,
 }
@@ -1190,7 +1197,14 @@ class SrcOpDstReduceExecutor(Executor):
         spmat = self.spmat.data(ctx)
         src_map = self.src_map.data(ctx)
         dst_map = self.dst_map.data(ctx)
-        out_map = self.out_map.data(ctx)
+        if self.reducer == "none":
+            # write to edge
+            msg_map, inv_msg_map = self.out_map.data
+            msg_map = msg_map(ctx)
+            inv_msg_map = inv_msg_map(ctx)
+            out_map = (msg_map, inv_msg_map)
+        else:
+            out_map = self.out_map.data(ctx)
         self.ret.data = F.src_op_dst_reduce(
             self.reducer, self.binary_op, spmat, src_data, dst_data,
             self.out_size, src_map, dst_map, out_map)
@@ -1301,7 +1315,14 @@ class CopySrcReduceExecutor(Executor):
         ctx = _to_dgl_context(F.context(src_data))
         spmat = self.spmat.data(ctx)
         src_map = self.src_map.data(ctx)
-        out_map = self.out_map.data(ctx)
+        if self.reducer == "none":
+            # write to edge
+            msg_map, inv_msg_map = self.out_map.data
+            msg_map = msg_map(ctx)
+            inv_msg_map = inv_msg_map(ctx)
+            out_map = (msg_map, inv_msg_map)
+        else:
+            out_map = self.out_map.data(ctx)
         self.ret.data = F.copy_src_reduce(
             self.reducer, spmat, src_data, self.out_size, src_map, out_map)
 
@@ -1403,15 +1424,23 @@ class CopyEdgeReduceExecutor(Executor):
         edge_map, inv_edge_map = self.edge_map.data
         edge_map = edge_map(ctx)
         inv_edge_map = inv_edge_map(ctx)
-        out_map = self.out_map.data(ctx)
+        if self.reducer == "none":
+            # write to edge
+            msg_map, inv_msg_map = self.out_map.data
+            msg_map = msg_map(ctx)
+            inv_msg_map = inv_msg_map(ctx)
+            out_map = (msg_map, inv_msg_map)
+        else:
+            out_map = self.out_map.data(ctx)
         self.ret.data = F.copy_edge_reduce(
-            self.reducer, spmat, edge_data, self.out_size, edge_map, out_map)
+            self.reducer, spmat, edge_data, self.out_size,
+            (edge_map, inv_edge_map), out_map)
 
 
 IR_REGISTRY[OpCode.COPY_EDGE_REDUCE] = {
     'name': 'COPY_EDGE_REDUCE',
     'args_type': [VarType.STR, VarType.SPMAT, VarType.FEAT, VarType.INT,
-                  (VarType.MAP, VarType.MAP), VarType.MAP],
+                  VarType.MAP, VarType.MAP],
     'ret_type': VarType.FEAT,
     'executor_cls': CopyEdgeReduceExecutor,
 }
