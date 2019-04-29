@@ -393,7 +393,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsSrcMulEdgeReduce")
     NDArray edge_data = args[8];
     NDArray out_data = args[9];
     NDArray grad_out_data = args[10];
-    *rv = BackwardLhsSrcOpEdgeReduce(
+    *rv = BackwardRhsSrcOpEdgeReduce(
         reducer, op, rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data);
