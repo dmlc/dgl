@@ -14,6 +14,7 @@ namespace cuda {
 
 // specialization for cusparse
 
+/*
 void CusparseCsrmm2(const RuntimeConfig& rtcfg, const Csr& csr, GData<float>* gdata) {
   const int m = csr.row_offsets.length - 1;
   const int k = csr.row_offsets.length - 1;
@@ -45,7 +46,6 @@ void CusparseCsrmm2(const RuntimeConfig& rtcfg, const Csr& csr, GData<float>* gd
   device->FreeWorkspace(rtcfg.ctx, valptr);
 }
 
-/*
 void CusparseCsrmm2(const RuntimeConfig& rtcfg, const Csr& csr, GData<double>* gdata) {
   LOG(FATAL) << "NOT IMPLEMENTED";
 }
