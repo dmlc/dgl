@@ -12,7 +12,6 @@ from .program import get_current_prog
 from . import var
 from .var import VarType
 from .registry import IR_REGISTRY
-from ...ndarray import DGLContext
 
 __all__ = [
     'OpCode', 'Executor',
@@ -1059,7 +1058,7 @@ class SrcOpEdgeReduceExecutor(Executor):
     def run(self):
         src_data = self.src_data.data
         edge_data = self.edge_data.data
-        ctx = _to_dgl_context(F.context(src_data))
+        ctx = utils.to_dgl_context(F.context(src_data))
         spmat = self.spmat.data(ctx)
         src_map = self.src_map.data(ctx)
         edge_map, inv_edge_map = self.edge_map.data
@@ -1193,7 +1192,7 @@ class SrcOpDstReduceExecutor(Executor):
     def run(self):
         src_data = self.src_data.data
         dst_data = self.dst_data.data
-        ctx = _to_dgl_context(F.context(src_data))
+        ctx = utils.to_dgl_context(F.context(src_data))
         spmat = self.spmat.data(ctx)
         src_map = self.src_map.data(ctx)
         dst_map = self.dst_map.data(ctx)
@@ -1312,7 +1311,7 @@ class CopySrcReduceExecutor(Executor):
 
     def run(self):
         src_data = self.src_data.data
-        ctx = _to_dgl_context(F.context(src_data))
+        ctx = utils.to_dgl_context(F.context(src_data))
         spmat = self.spmat.data(ctx)
         src_map = self.src_map.data(ctx)
         if self.reducer == "none":
@@ -1419,7 +1418,7 @@ class CopyEdgeReduceExecutor(Executor):
 
     def run(self):
         edge_data = self.edge_data.data
-        ctx = _to_dgl_context(F.context(edge_data))
+        ctx = utils.to_dgl_context(F.context(edge_data))
         spmat = self.spmat.data(ctx)
         edge_map, inv_edge_map = self.edge_map.data
         edge_map = edge_map(ctx)
@@ -1481,9 +1480,3 @@ def COPY_EDGE_REDUCE(reducer, spmat, edge_data, out_size, edge_map, out_map,
     get_current_prog().issue(reg['executor_cls'](
         reducer, spmat, edge_data, out_size, edge_map, out_map, ret))
     return ret
-
-def _to_dgl_context(ctx):
-    """Convert a backend context to DGLContext"""
-    device_type = DGLContext.STR2MASK[F.device_type(ctx)]
-    device_id = F.device_id(ctx)
-    return DGLContext(device_type, device_id)

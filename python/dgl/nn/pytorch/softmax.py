@@ -2,9 +2,7 @@
 # pylint: disable= no-member, arguments-differ
 from ... import ndarray as nd
 from ... import backend as F
-
-import scipy.sparse as sp
-import numpy as np
+from ... import utils
 
 __all__ = ['EdgeSoftmax']
 
@@ -26,19 +24,15 @@ class EdgeSoftmax(object):
     the attention weights are computed with such an edgesoftmax operation.
     """
 
-    def __call__(logits, edge_tuple, num_nodes):
+    def __call__(self, logits, graph):
         r"""Compute edge softmax.
 
         Parameters
         ----------
         logits : torch.Tensor
             The input edge feature
-        edge_tuple : (torch.Tensor, torch.Tensor, torch.Tensor)
-            A tuple of representing the edges to perform softmax. The three
-            elements in the tuple are source node ids, destination node ids,
-            and edge ids
-        num_nodes : int
-            Number of nodes in the graph
+        graph : DGLGraph
+            The graph to perform edge softmax
 
         Returns
         -------
@@ -61,9 +55,7 @@ class EdgeSoftmax(object):
         softmax results. The last step can be proceeded as follows:
 
         >>> import dgl.function as fn
-        >>> edge_tuple = graph.all_edges('all')
-        >>> num_nodes = graph.number_of_nodes()
-        >>> scores, normalizer = EdgeSoftmax(logits, edge_tuple, num_nodes)
+        >>> scores, normalizer = EdgeSoftmax(logits, graph)
         >>> graph.edata['a'] = scores
         >>> graph.ndata['normalizer'] = normalizer
         >>> graph.apply_edges(
@@ -72,32 +64,19 @@ class EdgeSoftmax(object):
         We left this last step to users as depending on the particular use
         case, this step can be combined with other computation at once.
         """
-        _, v, _ = edge_tuple
-        indptr, indices, inv_indptr, inv_indices, edge_map, inv_edge_map \
-            = _build_adj_and_edge_map(edge_tuple, F.context(logits))
+        num_nodes = graph.number_of_nodes()
+        ctx = utils.to_dgl_context(F.context(logits))
+        csr = graph._graph.csr_adjacency_matrix(True, ctx)
+        inv_csr = graph._graph.csr_adjacency_matrix(False, ctx)
+        _, dst, _ = graph._graph.edges(None, ctx)
+        dst = dst.tousertensor()
+        indptr, indices, edge_map = csr
+        inv_indptr, inv_indices, inv_edge_map = inv_csr
         spmat = (indptr, indices, inv_indptr, inv_indices)
         out_map = nd.empty([])
         max_logits_ = F.copy_edge_reduce("max", spmat, logits, num_nodes,
                                          (edge_map, inv_edge_map), out_map)
-        logits = (logits - max_logits_[v]).exp()
+        logits = (logits - max_logits_.index_select(0, dst)).exp()
         norm = F.copy_edge_reduce("sum", spmat, logits, num_nodes,
                                   (edge_map, inv_edge_map), out_map)
         return logits, norm
-
-
-def _build_adj_and_edge_map(edge_tuple, num_nodes, ctx):
-    u, v, eid = edge_tuple
-    u = u.numpy()
-    v = v.numpy()
-    dat = np.arange(len(v), dtype=np.int64)
-    csr = sp.csr_matrix((dat, (u, v)), shape=(num_nodes, num_nodes))
-    inv_csr = sp.csr_matrix((dat, (v, u)), shape=(num_nodes, num_nodes))
-    res = [
-        F.copy_to(F.zerocopy_from_numpy(csr.indptr.astype(np.int64))),
-        F.copy_to(F.zerocopy_from_numpy(csr.indices.astype(np.int64))),
-        F.copy_to(F.zerocopy_from_numpy(inv_csr.indptr.astype(np.int64))),
-        F.copy_to(F.zerocopy_from_numpy(inv_csr.indices.astype(np.int64))),
-        F.copy_to(eid[csr.data]),
-        F.copy_to(eid[inv_csr.data]),
-    ]
-    return res
