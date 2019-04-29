@@ -8,6 +8,7 @@
 namespace dgl {
 namespace kernel {
 namespace cuda {
+
 template <int Mode, typename DType, typename Functors>
 struct BackwardBinaryReduce {
   static __device__ __forceinline__ bool CondEdge(
@@ -28,12 +29,58 @@ struct BackwardBinaryReduce {
     DType* lhsoff = gdata->lhs_data + lid * D;
     DType* rhsoff = gdata->rhs_data + rid * D;
     DType* outoff = gdata->out_data + oid * D;
-    DType* gradoutoff = gdata->grad_out_data + oid * D;
     DType* gradlhsoff = gdata->grad_lhs_data + lid * D;
     DType* gradrhsoff = gdata->grad_rhs_data + rid * D;
+    DType* gradoutoff = gdata->grad_out_data + oid * D;
     while (tx < D) {
       DType lhs = Functors::Read(lhsoff + tx);
       DType rhs = Functors::Read(rhsoff + tx);
+      DType out = Functors::Read(outoff + tx);
+      DType grad_out = Functors::Read(gradoutoff + tx);
+      DType e = Functors::Op(lhs, rhs);
+      DType grad_e = grad_out * Functors::BackwardWrite(e, out);
+      if (Mode == binary_op::kGradLhs || Mode == binary_op::kGradBoth) {
+        DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
+        AtomicAdd(gradlhsoff + tx, grad_lhs);
+      }
+      if (Mode == binary_op::kGradRhs || Mode == binary_op::kGradBoth) {
+        DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
+        AtomicAdd(gradrhsoff + tx, grad_rhs);
+      }
+      tx += stride_x;
+    }
+  }
+};
+
+template <int Mode, int NDim, typename DType, typename Functors>
+struct BackwardBinaryReduceBcast {
+  static __device__ __forceinline__ bool CondEdge(
+      mg_int src, mg_int dst, mg_int eid, BackwardBcastGData<NDim, DType>* gdata) {
+    return true;
+  }
+  static __device__ __forceinline__ void ApplyEdge(
+      mg_int src, mg_int dst, mg_int eid, BackwardBcastGData<NDim, DType>* gdata) {
+    int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride_x = blockDim.x * gridDim.x;
+    int64_t lid = Functors::SelectLeft(src, eid, dst);
+    int64_t rid = Functors::SelectRight(src, eid, dst);
+    int64_t oid = Functors::SelectOut(src, eid, dst);
+    lid = Functors::GetId(lid, gdata->lhs_mapping);
+    rid = Functors::GetId(rid, gdata->rhs_mapping);
+    oid = Functors::GetId(oid, gdata->out_mapping);
+    DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len;
+    DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len;
+    DType* outoff = gdata->out_data + oid * gdata->out_len;
+    DType* gradlhsoff = gdata->grad_lhs_data + lid * gdata->out_len;
+    DType* gradrhsoff = gdata->grad_rhs_data + rid * gdata->out_len;
+    DType* gradoutoff = gdata->grad_out_data + oid * gdata->out_len;
+    int64_t tmp[NDim];  // store unraveled idx.
+    while (tx < gdata->out_len) {
+      Unravel(tx, gdata->ndim, gdata->out_shape, gdata->out_stride, tmp);
+      DType lhs = Functors::Read(lhsoff +
+          Ravel(tmp, gdata->ndim, gdata->lhs_shape, gdata->lhs_stride));
+      DType rhs = Functors::Read(rhsoff +
+          Ravel(tmp, gdata->ndim, gdata->rhs_shape, gdata->rhs_stride));
       DType out = Functors::Read(outoff + tx);
       DType grad_out = Functors::Read(gradoutoff + tx);
       DType e = Functors::Op(lhs, rhs);
@@ -109,14 +156,41 @@ void CallBackwardBinaryReduce(
         rtcfg, csr, gdata, IntArray1D());
 }
 
-#define GEN_BACKWARD_DEFINE(mode, dtype, lhs_tgt, rhs_tgt, op) \
-  template void CallBackwardBinaryReduce< \
-                    mode, dtype, GETID<XPU, int64_t>, \
-                    lhs_tgt, rhs_tgt, \
-                    op<dtype>, REDUCER<XPU, dtype>>( \
-      const minigun::advance::RuntimeConfig& rtcfg, \
-      const minigun::Csr& csr, \
+template <int Mode, int NDim, typename DType, typename IdGetter,
+          typename LeftSelector, typename RightSelector,
+          typename BinaryOp, typename Reducer>
+void CallBackwardBinaryReduceBcast(
+    const minigun::advance::RuntimeConfig& rtcfg,
+    const minigun::Csr& csr,
+    BackwardBcastGData<NDim, DType>* gdata) {
+  using minigun::IntArray1D;
+  typedef BackwardFunctorsTempl<DType, IdGetter, LeftSelector,
+                        RightSelector, BinaryOp, Reducer>
+          Functors;
+  typedef BackwardBinaryReduceBcast<Mode, NDim, DType, Functors> UDF;
+  // TODO(minjie): allocator
+  minigun::advance::Advance<kDLGPU, AdvanceConfig,
+    BackwardBcastGData<NDim, DType>, UDF>(
+        rtcfg, csr, gdata, IntArray1D());
+}
+
+#define GEN_BACKWARD_DEFINE(mode, dtype, lhs_tgt, rhs_tgt, op)  \
+  template void CallBackwardBinaryReduce<                       \
+                    mode, dtype, GETID<XPU, int64_t>,           \
+                    lhs_tgt, rhs_tgt,                           \
+                    op<dtype>, REDUCER<XPU, dtype>>(            \
+      const minigun::advance::RuntimeConfig& rtcfg,             \
+      const minigun::Csr& csr,                                  \
       BackwardGData<dtype>* gdata);
+
+#define GEN_BACKWARD_BCAST_DEFINE(mode, ndim, dtype, lhs_tgt, rhs_tgt, op)  \
+  template void CallBackwardBinaryReduceBcast<                              \
+                    mode, ndim, dtype, GETID<XPU, int64_t>,                 \
+                    lhs_tgt, rhs_tgt,                                       \
+                    op<dtype>, REDUCER<XPU, dtype>>(                        \
+      const minigun::advance::RuntimeConfig& rtcfg,                         \
+      const minigun::Csr& csr,                                              \
+      BackwardBcastGData<ndim, dtype>* gdata);
 
 }  // namespace cuda
 }  // namespace kernel

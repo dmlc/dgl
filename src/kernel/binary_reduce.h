@@ -252,6 +252,26 @@ void BackwardBinaryReduceImpl(
     runtime::NDArray grad_lhs_data,
     runtime::NDArray grad_rhs_data);
 
+void BackwardBinaryReduceBcastImpl(
+    const BcastInfo& info,
+    const std::string& reducer,
+    const std::string& binary_op,
+    runtime::NDArray rev_indptr,
+    runtime::NDArray rev_indices,
+    binary_op::Target lhs_tgt,
+    binary_op::Target rhs_tgt,
+    runtime::NDArray lhs_mapping,
+    runtime::NDArray rhs_mapping,
+    runtime::NDArray out_mapping,
+    runtime::NDArray lhs,
+    runtime::NDArray rhs,
+    runtime::NDArray out,
+    runtime::NDArray grad_out,
+    runtime::NDArray grad_lhs,
+    runtime::NDArray grad_rhs);
+
+
+
 }  // namespace cpu
 
 namespace cuda {
@@ -302,6 +322,24 @@ void BackwardBinaryReduceImpl(
     runtime::NDArray grad_out_data,
     runtime::NDArray grad_lhs_data,
     runtime::NDArray grad_rhs_data);
+
+void BackwardBinaryReduceBcastImpl(
+    const BcastInfo& info,
+    const std::string& reducer,
+    const std::string& binary_op,
+    runtime::NDArray rev_indptr,
+    runtime::NDArray rev_indices,
+    binary_op::Target lhs_tgt,
+    binary_op::Target rhs_tgt,
+    runtime::NDArray lhs_mapping,
+    runtime::NDArray rhs_mapping,
+    runtime::NDArray out_mapping,
+    runtime::NDArray lhs,
+    runtime::NDArray rhs,
+    runtime::NDArray out,
+    runtime::NDArray grad_out,
+    runtime::NDArray grad_lhs,
+    runtime::NDArray grad_rhs);
 
 }  // namespace cuda
 

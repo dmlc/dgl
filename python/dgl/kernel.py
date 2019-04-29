@@ -16,6 +16,8 @@ def src_op_edge_reduce(reducer,
                        out_size):
     """Perform binary op between src node data with edge data and reduce.
 
+    Broadcasting is supported for feature dimensions.
+
     Parameter
     ---------
     reducer : str
@@ -64,6 +66,9 @@ def backward_lhs_src_mul_edge_reduce(
         src_data, edge_data, out_data,
         grad_out_data):
     """Backward operator for SrcOpEdgeReduce. Compute the gradient for the src data.
+
+    The returned gradient tensor has the same shape as the grad_out_data. To compute
+    the correct gradient, extra reduction along broadcasting dimensions is required.
 
     Parameter
     ---------
@@ -115,6 +120,9 @@ def backward_rhs_src_mul_edge_reduce(
         src_data, edge_data, out_data,
         grad_out_data):
     """Backward operator for SrcOpEdgeReduce. Compute the gradient for the edge data.
+
+    The returned gradient tensor has the same shape as the grad_out_data. To compute
+    the correct gradient, extra reduction along broadcasting dimensions is required.
 
     Parameter
     ---------
@@ -337,6 +345,5 @@ def copy_edge_reduce(reducer,
     return _CAPI_DGLKernelCopyEdgeReduce(
         reducer, indptr, indices, edge_mapping, edge_data, out_mapping,
         int(out_size))
-
 
 _init_api("dgl.kernel")

@@ -1,4 +1,3 @@
-#include <dlpack/dlpack.h>
 #include "./binary_reduce_impl.cuh"
 #include "./backward_binary_reduce_impl.cuh"
 

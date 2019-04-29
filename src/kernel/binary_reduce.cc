@@ -329,14 +329,25 @@ NDArray BackwardLhsSrcOpEdgeReduce(
     NDArray grad_out_data) {
   CHECK(IsValidCsr(rev_indptr, rev_indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
   // Allocate output
-  std::vector<int64_t> shape(src_data->shape, src_data->shape + src_data->ndim);
-  NDArray grad_src_data = NDArray::Empty(shape, src_data->dtype, src_data->ctx);
-  DGL_XPU_SWITCH(grad_src_data->ctx.device_type, BackwardBinaryReduceImpl,
-      reducer, op, rev_indptr, rev_indices,
-      binary_op::kDst, binary_op::kEdge,
-      src_mapping, edge_mapping, out_mapping,
-      src_data, edge_data, out_data, grad_out_data,
-      grad_src_data, NoneArray());
+  std::vector<int64_t> shape = {src_data->shape[0]};
+  shape.insert(shape.end(), out_data->shape + 1, out_data->shape + out_data->ndim);
+  NDArray grad_src_data = NDArray::Empty(shape, out_data->dtype, out_data->ctx);
+  if (HasBcast(src_data, edge_data)) {
+    BcastInfo info = CalcBcastInfo(src_data, edge_data);
+    DGL_XPU_SWITCH(grad_src_data->ctx.device_type, BackwardBinaryReduceBcastImpl,
+        info, reducer, op, rev_indptr, rev_indices,
+        binary_op::kDst, binary_op::kEdge,
+        src_mapping, edge_mapping, out_mapping,
+        src_data, edge_data, out_data, grad_out_data,
+        grad_src_data, NoneArray());
+  } else {
+    DGL_XPU_SWITCH(grad_src_data->ctx.device_type, BackwardBinaryReduceImpl,
+        reducer, op, rev_indptr, rev_indices,
+        binary_op::kDst, binary_op::kEdge,
+        src_mapping, edge_mapping, out_mapping,
+        src_data, edge_data, out_data, grad_out_data,
+        grad_src_data, NoneArray());
+  }
   return grad_src_data;
 }
 
@@ -371,15 +382,27 @@ NDArray BackwardRhsSrcOpEdgeReduce(
     NDArray edge_data,
     NDArray out_data,
     NDArray grad_out_data) {
+  CHECK(IsValidCsr(rev_indptr, rev_indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
   // Allocate output
-  std::vector<int64_t> shape(edge_data->shape, edge_data->shape + edge_data->ndim);
-  NDArray grad_edge_data = NDArray::Empty(shape, edge_data->dtype, edge_data->ctx);
-  DGL_XPU_SWITCH(grad_edge_data->ctx.device_type, BackwardBinaryReduceImpl,
-      reducer, op, rev_indptr, rev_indices,
-      binary_op::kDst, binary_op::kEdge,
-      src_mapping, edge_mapping, out_mapping,
-      src_data, edge_data, out_data, grad_out_data,
-      NoneArray(), grad_edge_data);
+  std::vector<int64_t> shape = {edge_data->shape[0]};
+  shape.insert(shape.end(), out_data->shape + 1, out_data->shape + out_data->ndim);
+  NDArray grad_edge_data = NDArray::Empty(shape, out_data->dtype, out_data->ctx);
+  if (HasBcast(src_data, edge_data)) {
+    BcastInfo info = CalcBcastInfo(src_data, edge_data);
+    DGL_XPU_SWITCH(grad_edge_data->ctx.device_type, BackwardBinaryReduceBcastImpl,
+        info, reducer, op, rev_indptr, rev_indices,
+        binary_op::kDst, binary_op::kEdge,
+        src_mapping, edge_mapping, out_mapping,
+        src_data, edge_data, out_data, grad_out_data,
+        NoneArray(), grad_edge_data);
+  } else {
+    DGL_XPU_SWITCH(grad_edge_data->ctx.device_type, BackwardBinaryReduceImpl,
+        reducer, op, rev_indptr, rev_indices,
+        binary_op::kDst, binary_op::kEdge,
+        src_mapping, edge_mapping, out_mapping,
+        src_data, edge_data, out_data, grad_out_data,
+        NoneArray(), grad_edge_data);
+  }
   return grad_edge_data;
 }
 
