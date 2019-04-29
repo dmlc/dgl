@@ -56,6 +56,15 @@ struct BackwardGData {
   int64_t *out_mapping{nullptr};
 };
 
+template <int Mode, typename DType, typename IdGetter,
+          typename LeftSelector, typename RightSelector,
+          typename BinaryOp, typename Reducer>
+void CallBackwardBinaryReduce(
+    const minigun::advance::RuntimeConfig& rtcfg,
+    const minigun::Csr& csr,
+    BackwardGData<DType>* gdata);
+
+
 // Binary reduce with broadcasting
 
 /*

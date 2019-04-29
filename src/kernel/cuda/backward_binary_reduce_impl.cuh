@@ -8,15 +8,14 @@
 namespace dgl {
 namespace kernel {
 namespace cuda {
-template <typename DType,
-          typename Functors>
+template <int Mode, typename DType, typename Functors>
 struct BackwardBinaryReduce {
   static __device__ __forceinline__ bool CondEdge(
-      int64_t src, int64_t dst, int64_t eid, GData<DType>* gdata) {
+      int64_t src, int64_t dst, int64_t eid, BackwardGData<DType>* gdata) {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int64_t src, int64_t dst, int64_t eid, GData<DType>* gdata) {
+      int64_t src, int64_t dst, int64_t eid, BackwardGData<DType>* gdata) {
     const int64_t D = gdata->x_length;
     int tx = blockIdx.x * blockDim.x + threadIdx.x;
     int stride_x = blockDim.x * gridDim.x;
@@ -35,14 +34,18 @@ struct BackwardBinaryReduce {
     while (tx < D) {
       DType lhs = Functors::Read(lhsoff + tx);
       DType rhs = Functors::Read(rhsoff + tx);
-      DType e = Functors::Op(lhs, rhs);
       DType out = Functors::Read(outoff + tx);
       DType grad_out = Functors::Read(gradoutoff + tx);
+      DType e = Functors::Op(lhs, rhs);
       DType grad_e = grad_out * Functors::BackwardWrite(e, out);
-      DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
-      DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
-      Functors::Write(gradlhsoff + tx, grad_lhs);
-      Functors::Write(gradrhsoff + tx, grad_rhs);
+      if (Mode == binary_op::kGradLhs || Mode == binary_op::kGradBoth) {
+        DType grad_lhs = grad_e * Functors::BackwardOpLhs(lhs, rhs, e);
+        AtomicAdd(gradlhsoff + tx, grad_lhs);
+      }
+      if (Mode == binary_op::kGradRhs || Mode == binary_op::kGradBoth) {
+        DType grad_rhs = grad_e * Functors::BackwardOpRhs(lhs, rhs, e);
+        AtomicAdd(gradrhsoff + tx, grad_rhs);
+      }
       tx += stride_x;
     }
   }
@@ -54,7 +57,7 @@ template <typename DType, typename IdGetter,
 struct BackwardFunctorsTempl {
   static __device__ __forceinline__ int64_t SelectOut(
       int64_t src, int64_t edge, int64_t dst) {
-    return OutSelector<Reducer>::Type::Call(src, edge, dst);
+    return GradOutSelector<Reducer>::Type::Call(src, edge, dst);
   }
   static __device__ __forceinline__ int64_t SelectLeft(
       int64_t src, int64_t edge, int64_t dst) {
@@ -86,6 +89,34 @@ struct BackwardFunctorsTempl {
     return BinaryOp::BackwardRhs(lhs, rhs, out);
   }
 };
+
+typedef minigun::advance::Config<true, minigun::advance::kV2N> AdvanceConfig;
+
+template <int Mode, typename DType, typename IdGetter,
+          typename LeftSelector, typename RightSelector,
+          typename BinaryOp, typename Reducer>
+void CallBackwardBinaryReduce(
+    const minigun::advance::RuntimeConfig& rtcfg,
+    const minigun::Csr& csr,
+    BackwardGData<DType>* gdata) {
+  using minigun::IntArray1D;
+  typedef BackwardFunctorsTempl<DType, IdGetter, LeftSelector,
+                        RightSelector, BinaryOp, Reducer>
+          Functors;
+  typedef BackwardBinaryReduce<Mode, DType, Functors> UDF;
+  // TODO(minjie): allocator
+  minigun::advance::Advance<kDLGPU, AdvanceConfig, BackwardGData<DType>, UDF>(
+        rtcfg, csr, gdata, IntArray1D());
+}
+
+#define GEN_BACKWARD_DEFINE(mode, dtype, lhs_tgt, rhs_tgt, op) \
+  template void CallBackwardBinaryReduce< \
+                    mode, dtype, GETID<XPU, int64_t>, \
+                    lhs_tgt, rhs_tgt, \
+                    op<dtype>, REDUCER<XPU, dtype>>( \
+      const minigun::advance::RuntimeConfig& rtcfg, \
+      const minigun::Csr& csr, \
+      BackwardGData<dtype>* gdata);
 
 }  // namespace cuda
 }  // namespace kernel

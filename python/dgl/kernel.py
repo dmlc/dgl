@@ -53,6 +53,108 @@ def src_mul_edge_reduce(reducer, mul_op,
         src_data, edge_data,
         out_mapping, int(out_size))
 
+def backward_lhs_src_mul_edge_reduce(
+        reducer, op,
+        rev_indptr, rev_indices,
+        src_mapping, edge_mapping, out_mapping,
+        src_data, edge_data, out_data,
+        grad_out_data):
+    """Backward operator for SrcOpEdgeReduce. Compute the gradient for the src data.
+
+    Parameter
+    ---------
+    reducer : str
+        The type of the reducer ("sum", "max", "mean", "min", "none").
+        If the reducer is "none", the output is an edge feature tensor.
+        Otherwise, a node feature tensor is returned.
+    op : str
+        The type of the mul functor ("mul", "add").
+    rev_indptr : dgl.ndarray.NDArray
+        An int64 row offset array for the graph CSR.
+    rev_indices : dgl.ndarray.NDArray
+        An int64 column index array for the graph CSR.
+    src_mapping : dgl.ndarray.NDArray
+        An int64 array used for read src node data.
+        `src_mapping[src_node_id]` stores the location to read data.
+        Empty array represents identity mapping.
+    edge_mapping : dgl.ndarray.NDArray
+        An int64 array used for read edge data.
+        `edge_mapping[edge_id]` stores the location to read data.
+        Empty array represents identity mapping.
+    out_mapping : dgl.ndarray.NDArray
+        An int64 array used for write output data.
+        `out_mapping[out_id]` stores the location to read data.
+        Empty array represents identity mapping.
+    src_data : dgl.ndarray.NDArray
+        The source node feature tensor.
+    edge_data : dgl.ndarray.NDArray
+        The edge feature tensor.
+    out_data : dgl.ndarray.NDArray
+        The forward output tensor.
+    grad_out_data : dgl.ndarray.NDArray
+        The gradient of the forward output tensor.
+
+    Returns
+    -------
+    dgl.ndarray.NDArray
+        The gradient of src data.
+    """
+    return _CAPI_DGLKernelBackwardLhsSrcMulEdgeReduce(
+        reducer, op, rev_indptr, rev_indices,
+        src_mapping, edge_mapping, out_mapping,
+        src_data, edge_data, out_data, grad_out_data)
+
+def backward_rhs_src_mul_edge_reduce(
+        reducer, op,
+        rev_indptr, rev_indices,
+        src_mapping, edge_mapping, out_mapping,
+        src_data, edge_data, out_data,
+        grad_out_data):
+    """Backward operator for SrcOpEdgeReduce. Compute the gradient for the edge data.
+
+    Parameter
+    ---------
+    reducer : str
+        The type of the reducer ("sum", "max", "mean", "min", "none").
+        If the reducer is "none", the output is an edge feature tensor.
+        Otherwise, a node feature tensor is returned.
+    op : str
+        The type of the mul functor ("mul", "add").
+    rev_indptr : dgl.ndarray.NDArray
+        An int64 row offset array for the graph CSR.
+    rev_indices : dgl.ndarray.NDArray
+        An int64 column index array for the graph CSR.
+    src_mapping : dgl.ndarray.NDArray
+        An int64 array used for read src node data.
+        `src_mapping[src_node_id]` stores the location to read data.
+        Empty array represents identity mapping.
+    edge_mapping : dgl.ndarray.NDArray
+        An int64 array used for read edge data.
+        `edge_mapping[edge_id]` stores the location to read data.
+        Empty array represents identity mapping.
+    out_mapping : dgl.ndarray.NDArray
+        An int64 array used for write output data.
+        `out_mapping[out_id]` stores the location to read data.
+        Empty array represents identity mapping.
+    src_data : dgl.ndarray.NDArray
+        The source node feature tensor.
+    edge_data : dgl.ndarray.NDArray
+        The edge feature tensor.
+    out_data : dgl.ndarray.NDArray
+        The forward output tensor.
+    grad_out_data : dgl.ndarray.NDArray
+        The gradient of the forward output tensor.
+
+    Returns
+    -------
+    dgl.ndarray.NDArray
+        The gradient of edge data.
+    """
+    return _CAPI_DGLKernelBackwardRhsSrcMulEdgeReduce(
+        reducer, op, rev_indptr, rev_indices,
+        src_mapping, edge_mapping, out_mapping,
+        src_data, edge_data, out_data, grad_out_data)
+
 def src_mul_dst_reduce(reducer,
                        mul_op,
                        indptr,
@@ -133,6 +235,49 @@ def copy_src_reduce(reducer,
     return _CAPI_DGLKernelCopySrcReduce(
         reducer, indptr, indices, src_mapping, src_data,
         out_mapping, int(out_size))
+
+def backward_copy_src_reduce(
+        reducer,
+        rev_indptr, rev_indices,
+        src_mapping, out_mapping,
+        src_data, out_data,
+        grad_out_data):
+    """Backward operator for CopySrcReduce.
+
+    Parameter
+    ---------
+    reducer : str
+        The type of the reducer ("sum", "max", "mean", "min", "none").
+        If the reducer is "none", the output is an edge feature tensor.
+        Otherwise, a node feature tensor is returned.
+    rev_indptr : dgl.ndarray.NDArray
+        An int64 row offset array for the graph CSR.
+    rev_indices : dgl.ndarray.NDArray
+        An int64 column index array for the graph CSR.
+    src_mapping : dgl.ndarray.NDArray
+        An int64 array used for read src node data.
+        `src_mapping[src_node_id]` stores the location to read data.
+        Empty array represents identity mapping.
+    out_mapping : dgl.ndarray.NDArray
+        An int64 array used for write output data.
+        `out_mapping[out_id]` stores the location to read data.
+        Empty array represents identity mapping.
+    src_data : dgl.ndarray.NDArray
+        The source node feature tensor.
+    out_data : dgl.ndarray.NDArray
+        The forward output tensor.
+    grad_out_data : dgl.ndarray.NDArray
+        The gradient of the forward output tensor.
+
+    Returns
+    -------
+    dgl.ndarray.NDArray
+        The gradient of src data.
+    """
+    return _CAPI_DGLKernelBackwardCopySrcReduce(
+        reducer, rev_indptr, rev_indices,
+        src_mapping, out_mapping,
+        src_data, out_data, grad_out_data)
 
 def copy_edge_reduce(reducer,
                      indptr,

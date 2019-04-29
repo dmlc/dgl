@@ -236,6 +236,109 @@ void BinaryReduceBcastImpl(
   });
 }
 
+template <typename DType>
+BackwardGData<DType> AllocBackwardGData(
+    cudaStream_t stream, int64_t x_len,
+    NDArray lhs_mapping, NDArray rhs_mapping, NDArray out_mapping,
+    NDArray lhs_data, NDArray rhs_data, NDArray out_data, NDArray grad_out_data,
+    NDArray grad_lhs_data, NDArray grad_rhs_data) {
+  // GData
+  BackwardGData<DType> gdata;
+  gdata.x_length = x_len;
+  gdata.lhs_data = static_cast<DType*>(lhs_data->data);
+  gdata.rhs_data = static_cast<DType*>(rhs_data->data);
+  gdata.out_data = static_cast<DType*>(out_data->data);
+  gdata.grad_out_data = static_cast<DType*>(grad_out_data->data);
+  if (!IsNoneArray(grad_lhs_data)) {
+    gdata.grad_lhs_data = static_cast<DType*>(grad_lhs_data->data);
+    // fill out data with zero values
+    utils::Fill(stream, gdata.grad_lhs_data, NElements(grad_lhs_data),
+                static_cast<DType>(0));
+  }
+  if (!IsNoneArray(grad_rhs_data)) {
+    gdata.grad_rhs_data = static_cast<DType*>(grad_rhs_data->data);
+    // fill out data with zero values
+    utils::Fill(stream, gdata.grad_rhs_data, NElements(grad_rhs_data),
+                static_cast<DType>(0));
+  }
+  if (!IsNoneArray(lhs_mapping)) {
+    gdata.lhs_mapping = static_cast<int64_t*>(lhs_mapping->data);
+  }
+  if (!IsNoneArray(rhs_mapping)) {
+    gdata.rhs_mapping = static_cast<int64_t*>(rhs_mapping->data);
+  }
+  if (!IsNoneArray(out_mapping)) {
+    gdata.out_mapping = static_cast<int64_t*>(out_mapping->data);
+  }
+  return gdata;
+}
+
+void BackwardBinaryReduceImpl(
+    const std::string& reducer,
+    const std::string& op,
+    NDArray rev_indptr, NDArray rev_indices,
+    binary_op::Target lhs, binary_op::Target rhs,
+    NDArray lhs_mapping, NDArray rhs_mapping, NDArray out_mapping,
+    NDArray lhs_data, NDArray rhs_data, NDArray out_data,
+    NDArray grad_out_data,
+    NDArray grad_lhs_data, NDArray grad_rhs_data) {
+  // device
+  auto device = runtime::DeviceAPI::Get(lhs_data->ctx);
+  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
+  // Graph
+  Csr csr;
+  csr.row_offsets.data = static_cast<int64_t*>(rev_indptr->data);
+  csr.row_offsets.length = rev_indptr->shape[0];
+  csr.column_indices.data = static_cast<int64_t*>(rev_indices->data);
+  csr.column_indices.length = rev_indices->shape[0];
+  const int64_t x_len = ComputeXLength(lhs_data);
+
+  // advance config
+  minigun::advance::RuntimeConfig rtcfg;
+  rtcfg.ctx = out_data->ctx;
+  rtcfg.stream = thr_entry->stream;
+  const int nt = utils::FindNumThreads(x_len, 64);
+  rtcfg.data_num_threads = nt;
+  // XXX(minjie): hard-code to let each thread compute two elements to increase
+  //              instruction level parallelism
+  rtcfg.data_num_blocks = (x_len + (nt * 2) - 1) / (nt * 2);
+
+  const DLDataType& dtype = lhs_data->dtype;
+  const bool has_indirect =
+    !(IsNoneArray(lhs_mapping) && IsNoneArray(rhs_mapping) && IsNoneArray(out_mapping));
+  const bool req_lhs = !IsNoneArray(grad_lhs_data);
+  const bool req_rhs = !IsNoneArray(grad_rhs_data);
+  BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, {
+    DGL_DTYPE_SWITCH(dtype, DType, {
+      BackwardGData<DType> gdata = AllocBackwardGData<DType>(
+          rtcfg.stream, x_len,
+          lhs_mapping, rhs_mapping, out_mapping,
+          lhs_data, rhs_data, out_data, grad_out_data,
+          grad_lhs_data, grad_rhs_data);
+      //REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {
+        typedef ReduceSum<kDLGPU, DType> Reducer;
+        BINARY_OP_SWITCH(op, DType, BinaryOp, {
+          TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
+            if (has_indirect) {
+              typedef IndirectId<kDLGPU, int64_t> IdGetter;
+              CallBackwardBinaryReduce<Mode, DType, IdGetter, LeftTarget,
+                RightTarget, BinaryOp, Reducer>(rtcfg, csr, &gdata);
+            } else {
+              typedef DirectId<kDLGPU, int64_t> IdGetter;
+              CallBackwardBinaryReduce<Mode, DType, IdGetter, LeftTarget,
+                RightTarget, BinaryOp, Reducer>(rtcfg, csr, &gdata);
+            }
+          });
+        });
+      //});
+      if (reducer == binary_op::kReduceMean) {
+        // TODO(minjie): divide
+        LOG(FATAL) << "reduce mean is not supported.";
+      }
+    });
+  });
+}
+
 }  // namespace cuda
 }  // namespace kernel
 }  // namespace dgl

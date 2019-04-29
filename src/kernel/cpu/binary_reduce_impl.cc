@@ -40,6 +40,25 @@ void BinaryReduceBcastImpl(
   LOG(INFO) << "Not implemented (CPU)";
 }
 
+void BackwardBinaryReduceImpl(
+    const std::string& reducer,
+    const std::string& op,
+    NDArray rev_indptr,
+    NDArray rev_indices,
+    binary_op::Target lhs,
+    binary_op::Target rhs,
+    NDArray lhs_mapping,
+    NDArray rhs_mapping,
+    NDArray out_mapping,
+    NDArray lhs_data,
+    NDArray rhs_data,
+    NDArray out_data,
+    NDArray grad_out_data,
+    NDArray grad_lhs_data,
+    NDArray grad_rhs_data) {
+  LOG(INFO) << "Not implemented (CPU)";
+}
+
 }  // namespace cpu
 }  // namespace kernel
 }  // namespace dgl

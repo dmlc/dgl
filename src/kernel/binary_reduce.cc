@@ -133,28 +133,6 @@ BcastInfo CalcBcastInfo(NDArray lhs, NDArray rhs) {
   ret.lhs_stride = ComputeStride(ret.lhs_shape);
   ret.rhs_stride = ComputeStride(ret.rhs_shape);
   ret.out_stride = ComputeStride(ret.out_shape);
-  /*
-  std::ostringstream oss; 
-  oss << "lhs=(";
-  for (auto x : ret.lhs_shape) oss << x << " ";
-  oss << ") ";
-  oss << "lhs_stride=(";
-  for (auto x : ret.lhs_stride) oss << x << " ";
-  oss << ") ";
-  oss << "rhs=(";
-  for (auto x : ret.rhs_shape) oss << x << " ";
-  oss << ") ";
-  oss << "rhs_stride=(";
-  for (auto x : ret.rhs_stride) oss << x << " ";
-  oss << ") ";
-  oss << "out=(";
-  for (auto x : ret.out_shape) oss << x << " ";
-  oss << ") ";
-  oss << "out_stride=(";
-  for (auto x : ret.out_stride) oss << x << " ";
-  oss << ") ";
-  LOG(INFO) << oss.str();
-  */
   return ret;
 }
 
@@ -334,7 +312,32 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopyEdgeReduce")
         edge_mapping, edge_data, out_mapping, out_size);
   });
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardSrcMulEdgeReduce")
+
+NDArray BackwardLhsSrcOpEdgeReduce(
+    const std::string& reducer,
+    const std::string& op,
+    NDArray rev_indptr,
+    NDArray rev_indices,
+    NDArray src_mapping,
+    NDArray edge_mapping,
+    NDArray out_mapping,
+    NDArray src_data,
+    NDArray edge_data,
+    NDArray out_data,
+    NDArray grad_out_data) {
+  // Allocate output
+  std::vector<int64_t> shape(src_data->shape, src_data->shape + src_data->ndim);
+  NDArray grad_src_data = NDArray::Empty(shape, src_data->dtype, src_data->ctx);
+  DGL_XPU_SWITCH(grad_src_data->ctx.device_type, BackwardBinaryReduceImpl,
+      reducer, op, rev_indptr, rev_indices,
+      binary_op::kDst, binary_op::kEdge,
+      src_mapping, edge_mapping, out_mapping,
+      src_data, edge_data, out_data, grad_out_data,
+      grad_src_data, NoneArray());
+  return grad_src_data;
+}
+
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsSrcMulEdgeReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
@@ -347,7 +350,77 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardSrcMulEdgeReduce")
     NDArray edge_data = args[8];
     NDArray out_data = args[9];
     NDArray grad_out_data = args[10];
-    LOG(FATAL) << "Not implemented.";
+    *rv = BackwardLhsSrcOpEdgeReduce(
+        reducer, op, rev_indptr, rev_indices,
+        src_mapping, edge_mapping, out_mapping,
+        src_data, edge_data, out_data, grad_out_data);
+  });
+
+NDArray BackwardRhsSrcOpEdgeReduce(
+    const std::string& reducer,
+    const std::string& op,
+    NDArray rev_indptr,
+    NDArray rev_indices,
+    NDArray src_mapping,
+    NDArray edge_mapping,
+    NDArray out_mapping,
+    NDArray src_data,
+    NDArray edge_data,
+    NDArray out_data,
+    NDArray grad_out_data) {
+  // Allocate output
+  std::vector<int64_t> shape(edge_data->shape, edge_data->shape + edge_data->ndim);
+  NDArray grad_edge_data = NDArray::Empty(shape, edge_data->dtype, edge_data->ctx);
+  DGL_XPU_SWITCH(grad_edge_data->ctx.device_type, BackwardBinaryReduceImpl,
+      reducer, op, rev_indptr, rev_indices,
+      binary_op::kDst, binary_op::kEdge,
+      src_mapping, edge_mapping, out_mapping,
+      src_data, edge_data, out_data, grad_out_data,
+      NoneArray(), grad_edge_data);
+  return grad_edge_data;
+}
+
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsSrcMulEdgeReduce")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::string reducer = args[0];
+    std::string op = args[1];
+    NDArray rev_indptr = args[2];
+    NDArray rev_indices = args[3];
+    NDArray src_mapping = args[4];
+    NDArray edge_mapping = args[5];
+    NDArray out_mapping = args[6];
+    NDArray src_data = args[7];
+    NDArray edge_data = args[8];
+    NDArray out_data = args[9];
+    NDArray grad_out_data = args[10];
+    *rv = BackwardLhsSrcOpEdgeReduce(
+        reducer, op, rev_indptr, rev_indices,
+        src_mapping, edge_mapping, out_mapping,
+        src_data, edge_data, out_data, grad_out_data);
+  });
+
+
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopySrcReduce")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::string reducer = args[0];
+    NDArray rev_indptr = args[1];
+    NDArray rev_indices = args[2];
+    NDArray src_mapping = args[3];
+    NDArray out_mapping = args[4];
+    NDArray src_data = args[5];
+    NDArray out_data = args[6];
+    NDArray grad_out_data = args[7];
+
+    // Allocate output
+    std::vector<int64_t> shape(src_data->shape, src_data->shape + src_data->ndim);
+    NDArray grad_src_data = NDArray::Empty(shape, src_data->dtype, src_data->ctx);
+    DGL_XPU_SWITCH(grad_src_data->ctx.device_type, BackwardBinaryReduceImpl,
+      reducer, binary_op::kUseLhs, rev_indptr, rev_indices,
+      binary_op::kDst, binary_op::kEdge,
+      src_mapping, NoneArray(), out_mapping,
+      src_data, NoneArray(), out_data, grad_out_data,
+      grad_src_data, NoneArray());
+    *rv = grad_src_data;
   });
 
 }  // namespace kernel

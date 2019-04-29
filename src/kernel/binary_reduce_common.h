@@ -28,6 +28,12 @@ enum Target {
   kDst,
   kEdge,
 };
+
+enum BackwardMode {
+  kGradLhs = 0,
+  kGradRhs,
+  kGradBoth,
+};
 }  // namespace binary_op
 
 __inline__ runtime::NDArray NoneArray() {
@@ -304,7 +310,7 @@ constexpr DType Zero<ReduceProd<XPU, DType>>::value;
 template <int XPU, typename DType>
 constexpr DType Zero<ReduceNone<XPU, DType>>::value;
 
-// functors for selecting output target
+// Selecting output target based on reducer type
 template <typename Reducer>
 struct OutSelector {
   typedef SelectDst Type;
@@ -312,6 +318,16 @@ struct OutSelector {
 
 template <int XPU, typename DType>
 struct OutSelector<ReduceNone<XPU, DType>> {
+  typedef SelectEdge Type;
+};
+
+template <typename Reducer>
+struct GradOutSelector {
+  typedef SelectSrc Type;
+};
+
+template <int XPU, typename DType>
+struct GradOutSelector<ReduceNone<XPU, DType>> {
   typedef SelectEdge Type;
 };
 
@@ -334,6 +350,22 @@ struct OutSelector<ReduceNone<XPU, DType>> {
   GEN(__VA_ARGS__, 2) \
   GEN(__VA_ARGS__, 4) \
   GEN(__VA_ARGS__, 8)
+
+// macro for backward mode
+#define BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, ...) \
+  if (req_lhs && req_rhs) {                               \
+    LOG(FATAL) << "Computing both lhs and rhs grad is currently not supported.";  \
+  } else if (req_lhs) {                                   \
+    constexpr int Mode = binary_op::kGradLhs;             \
+    {__VA_ARGS__}                                         \
+  } else {                                                \
+    constexpr int Mode = binary_op::kGradRhs;             \
+    {__VA_ARGS__}                                         \
+  }
+
+#define GEN_BACKWARD_MODE(GEN, ...) \
+  GEN(__VA_ARGS__, binary_op::kGradLhs) \
+  GEN(__VA_ARGS__, binary_op::kGradRhs)
 
 }  // namespace kernel
 }  // namespace dgl
