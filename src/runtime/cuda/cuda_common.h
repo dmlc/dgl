@@ -6,6 +6,7 @@
 #ifndef DGL_RUNTIME_CUDA_CUDA_COMMON_H_
 #define DGL_RUNTIME_CUDA_CUDA_COMMON_H_
 
+#include <cusparse.h>
 #include <cuda_runtime.h>
 #include <dgl/runtime/packed_func.h>
 #include <string>
@@ -32,11 +33,20 @@ namespace runtime {
         << "CUDA: " << cudaGetErrorString(e);                      \
   }
 
+#define CUSPARSE_CALL(func)                                        \
+  {                                                                \
+    cusparseStatus_t e = (func);                                   \
+    CHECK(e == CUSPARSE_STATUS_SUCCESS)                            \
+        << "CUSPARSE ERROR: " << e;                                \
+  }
+
 /*! \brief Thread local workspace */
 class CUDAThreadEntry {
  public:
   /*! \brief The cuda stream */
   cudaStream_t stream{nullptr};
+  /*! \brief The cusparse handler */
+  cusparseHandle_t cusparse_handle{nullptr};
   /*! \brief thread local pool*/
   WorkspacePool pool;
   /*! \brief constructor */
