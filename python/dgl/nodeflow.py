@@ -721,8 +721,8 @@ class NodeFlow(DGLBaseGraph):
         block_id : int
             The specified block to update edge embeddings.
         func : callable or None, optional
-            Apply function on the nodes. The function should be
-            a :mod:`Node UDF <dgl.udf>`.
+            Apply function on the edges. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
         edges : a list of edge Ids or ALL.
             The edges to run the edge update function.
         inplace : bool, optional
@@ -732,12 +732,10 @@ class NodeFlow(DGLBaseGraph):
             func = self._apply_edge_funcs[block_id]
         assert func is not None
 
-        def _layer_local_nid(layer_id):
-            return F.arange(0, self.layer_size(layer_id))
-
         if is_all(edges):
-            u = utils.toindex(_layer_local_nid(block_id))
-            v = utils.toindex(_layer_local_nid(block_id + 1))
+            u, v, _ = self.block_edges(block_id)
+            u = utils.toindex(u)
+            v = utils.toindex(v)
             eid = utils.toindex(slice(0, self.block_size(block_id)))
         elif isinstance(edges, tuple):
             u, v = edges
