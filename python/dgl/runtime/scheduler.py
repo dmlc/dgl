@@ -835,10 +835,15 @@ def _gen_send_reduce(
     # message mapping
     if mfunc_is_list or rfunc_is_list:
         adj, shuffle_idx, inv_shuffle_idx = adj_creator()
-        edge_map, inv_edge_map = _build_edge_map(
-            var_eid.data, shuffle_idx, inv_shuffle_idx)
-        msg_map = _context_cached_idx_map(shuffle_idx.todgltensor())
-        inv_msg_map = _context_cached_idx_map(inv_shuffle_idx.todgltensor())
+        if var_eid.data.is_slice(0, graph.number_of_edges()):
+            # full graph shuffle idx is edge map
+            edge_map = shuffle_idx
+            inv_edge_map = shuffle_idx
+        else:
+            edge_map, inv_edge_map = _build_edge_map(
+                var_eid.data, shuffle_idx, inv_shuffle_idx)
+        msg_map = shuffle_idx
+        inv_msg_map = inv_shuffle_idx
 
     # 2. If rfunc is builtin, generate a mapping from recv nodes to consecutive
     # output id

@@ -129,11 +129,15 @@ def build_adj_matrix_graph(graph):
         Get be used to get adjacency matrix on the provided ctx.
     """
     gidx = graph._graph
-    shuffle_idx = gidx.csr_adjacency_matrix(True, ndarray.cpu())[2]
-    inv_shuffle_idx = gidx.csr_adjacency_matrix(False, ndarray.cpu())[2]
+    def shuffle_idx(ctx):
+        return gidx.csr_adjacency_matrix(True, ctx)[2]
+
+    def inv_shuffle_idx(ctx):
+        return gidx.csr_adjacency_matrix(False, ctx)[2]
+
     return lambda ctx: (gidx.csr_adjacency_matrix(True, ctx)[:2] +
                         gidx.csr_adjacency_matrix(False, ctx)[:2]), \
-        utils.Index(shuffle_idx), utils.Index(inv_shuffle_idx)
+        shuffle_idx, inv_shuffle_idx
 
 
 def _build_adj_matrix_index_uv(u, v, num_src, num_dst):
