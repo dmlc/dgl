@@ -172,6 +172,34 @@ class Column(object):
         else:
             return Column(data)
 
+class SharedMemColumn(Column):
+    def __init__(self, data, scheme=None):
+        super(SharedMemColumn, self).__init__(data, scheme)
+        self.locks = F.zeros((len(data),), F.int32, F.cpu())
+
+    def __getitem__(self, idx):
+        if idx.slice_data() is not None:
+            raise Exception("shared-memory column doesn't support slice.")
+        else:
+            rows = _CAPI_DGLSharedMemoryGatherRow(self.data.todgltensor(),
+                                                  self.locks.todgltensor(),
+                                                  idx.todgltensor())
+            return rows.tousertensor()
+
+    def update(self, idx, feats, inplace):
+        feat_scheme = infer_scheme(feats)
+        if feat_scheme != self.scheme:
+            raise DGLError("Cannot update column of scheme %s using feature of scheme %s."
+                           % (feat_scheme, self.scheme))
+
+        if not inplace:
+            raise Exception("shared-memory column only support in-place update.")
+        _CAPI_DGLSharedMemoryScatterRow(self.data.todgltensor(), self.locks.todgltensor(),
+                                        idx.todgltensor(), feats.todgltensor())
+
+    def extend(self, feats, feat_scheme=None):
+        raise Exception("shared-memory column doesn't support extend")
+
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
 
