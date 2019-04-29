@@ -61,11 +61,12 @@ def src_op_edge_reduce(reducer,
 
 def backward_lhs_src_mul_edge_reduce(
         reducer, op,
-        rev_indptr, rev_indices,
+        inv_indptr, inv_indices,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data,
         grad_out_data):
-    """Backward operator for SrcOpEdgeReduce. Compute the gradient for the src data.
+    """Backward operator for SrcOpEdgeReduce. Compute the gradient for the src
+    data.
 
     The returned gradient tensor has the same shape as the grad_out_data. To compute
     the correct gradient, extra reduction along broadcasting dimensions is required.
@@ -78,9 +79,9 @@ def backward_lhs_src_mul_edge_reduce(
         Otherwise, a node feature tensor is returned.
     op : str
         The type of the mul functor ("mul", "add").
-    rev_indptr : dgl.ndarray.NDArray
+    inv_indptr : dgl.ndarray.NDArray
         An int64 row offset array for the graph CSR.
-    rev_indices : dgl.ndarray.NDArray
+    inv_indices : dgl.ndarray.NDArray
         An int64 column index array for the graph CSR.
     src_mapping : dgl.ndarray.NDArray
         An int64 array used for read src node data.
@@ -109,17 +110,17 @@ def backward_lhs_src_mul_edge_reduce(
         The gradient of src data.
     """
     return _CAPI_DGLKernelBackwardLhsSrcMulEdgeReduce(
-        reducer, op, rev_indptr, rev_indices,
-        src_mapping, edge_mapping, out_mapping,
-        src_data, edge_data, out_data, grad_out_data)
+        reducer, op, inv_indptr, inv_indices, src_mapping, edge_mapping,
+        out_mapping, src_data, edge_data, out_data, grad_out_data)
 
 def backward_rhs_src_mul_edge_reduce(
         reducer, op,
-        rev_indptr, rev_indices,
+        inv_indptr, inv_indices,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data,
         grad_out_data):
-    """Backward operator for SrcOpEdgeReduce. Compute the gradient for the edge data.
+    """Backward operator for SrcOpEdgeReduce. Compute the gradient for the edge
+    data.
 
     The returned gradient tensor has the same shape as the grad_out_data. To compute
     the correct gradient, extra reduction along broadcasting dimensions is required.
@@ -132,9 +133,9 @@ def backward_rhs_src_mul_edge_reduce(
         Otherwise, a node feature tensor is returned.
     op : str
         The type of the mul functor ("mul", "add").
-    rev_indptr : dgl.ndarray.NDArray
+    inv_indptr : dgl.ndarray.NDArray
         An int64 row offset array for the graph CSR.
-    rev_indices : dgl.ndarray.NDArray
+    inv_indices : dgl.ndarray.NDArray
         An int64 column index array for the graph CSR.
     src_mapping : dgl.ndarray.NDArray
         An int64 array used for read src node data.
@@ -163,9 +164,8 @@ def backward_rhs_src_mul_edge_reduce(
         The gradient of edge data.
     """
     return _CAPI_DGLKernelBackwardRhsSrcMulEdgeReduce(
-        reducer, op, rev_indptr, rev_indices,
-        src_mapping, edge_mapping, out_mapping,
-        src_data, edge_data, out_data, grad_out_data)
+        reducer, op, inv_indptr, inv_indices, src_mapping, edge_mapping,
+        out_mapping, src_data, edge_data, out_data, grad_out_data)
 
 def src_op_dst_reduce(reducer,
                       binary_op,
@@ -267,7 +267,7 @@ def copy_src_reduce(reducer,
 
 def backward_copy_src_reduce(
         reducer,
-        rev_indptr, rev_indices,
+        inv_indptr, inv_indices,
         src_mapping, out_mapping,
         src_data, out_data,
         grad_out_data):
@@ -279,9 +279,9 @@ def backward_copy_src_reduce(
         The type of the reducer ("sum", "max", "mean", "min", "none").
         If the reducer is "none", the output is an edge feature tensor.
         Otherwise, a node feature tensor is returned.
-    rev_indptr : dgl.ndarray.NDArray
+    inv_indptr : dgl.ndarray.NDArray
         An int64 row offset array for the graph CSR.
-    rev_indices : dgl.ndarray.NDArray
+    inv_indices : dgl.ndarray.NDArray
         An int64 column index array for the graph CSR.
     src_mapping : dgl.ndarray.NDArray
         An int64 array used for read src node data.
@@ -304,9 +304,8 @@ def backward_copy_src_reduce(
         The gradient of src data.
     """
     return _CAPI_DGLKernelBackwardCopySrcReduce(
-        reducer, rev_indptr, rev_indices,
-        src_mapping, out_mapping,
-        src_data, out_data, grad_out_data)
+        reducer, inv_indptr, inv_indices, src_mapping, out_mapping, src_data,
+        out_data, grad_out_data)
 
 def copy_edge_reduce(reducer,
                      indptr,

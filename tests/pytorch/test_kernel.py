@@ -3,9 +3,6 @@ import torch
 import torch_scatter
 import dgl.function as fn
 
-D = 10
-test_backward = False
-
 
 def allclose(a, b):
     return torch.allclose(a.float(), b.float(), rtol=1e-4, atol=1e-4)
@@ -15,6 +12,7 @@ def scatter_max(*args, **kwargs):
     return torch_scatter.scatter_max(*args, **kwargs)[0]
 
 
+D = 5
 scatter_add = torch_scatter.scatter_add
 builtin = {'sum': fn.sum, 'max': fn.max}
 udf_reduce = {'sum': scatter_add, 'max': scatter_max}
@@ -35,7 +33,7 @@ def generate_graph():
 
 
 def test_src_op_edge_reduce():
-    def _test(red):
+    def _test(red, test_backward=False):
         g = generate_graph()
         # test forward
         g.update_all(fn.src_mul_edge(src='n', edge='e', out='m'),
@@ -56,12 +54,12 @@ def test_src_op_edge_reduce():
             assert(allclose(n1.grad, g.ndata['n'].grad))
             assert(allclose(e1.grad, g.edata['e'].grad))
 
-    _test('sum')
+    _test('sum', True)
     _test('max')
 
 
 def test_src_op_dst_reduce():
-    def _test(red):
+    def _test(red, test_backward=False):
         g = generate_graph()
         # test forward
         g.update_all(fn.src_mul_dst(src='n', dst='f', out='m'),
@@ -87,7 +85,7 @@ def test_src_op_dst_reduce():
 
 
 def test_copy_src_reduce():
-    def _test(red):
+    def _test(red, test_backward=False):
         g = generate_graph()
         # test forward
         g.update_all(fn.copy_src(src='n', out='m'),
@@ -106,12 +104,12 @@ def test_copy_src_reduce():
             r2.sum().backward()
             assert(allclose(n1.grad, g.ndata['n'].grad))
 
-    _test('sum')
+    _test('sum', True)
     _test('max')
 
 
 def test_copy_edge_reduce():
-    def _test(red):
+    def _test(red, test_backward=False):
         g = generate_graph()
         # test forward
         g.update_all(fn.copy_edge(edge='e', out='m'),
@@ -135,7 +133,7 @@ def test_copy_edge_reduce():
 
 
 if __name__ == '__main__':
-    test_src_op_edge_reduce()
-    test_src_op_dst_reduce()
     test_copy_src_reduce()
     test_copy_edge_reduce()
+    test_src_op_edge_reduce()
+    test_src_op_dst_reduce()

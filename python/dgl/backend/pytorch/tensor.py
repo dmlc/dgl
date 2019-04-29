@@ -224,14 +224,17 @@ class SrcOpEdgeReduce(th.autograd.Function):
         ctx.backward_cache = None
         grad_src = None
         grad_edge = None
+        grad_out = zerocopy_to_dgl_ndarray(grad_out)
         if ctx.needs_input_grad[3]:
-            grad_src = K.src_op_edge_reduce_backward0(
+            grad_src = K.backward_lhs_src_mul_edge_reduce(
                 reducer, binary_op, spmat[2], spmat[3], src_map, edge_map[1],
                 backward_out_map, src_data, edge_data, out_data, grad_out)
+            grad_src = zerocopy_from_dgl_ndarray(grad_src)
         if ctx.needs_input_grad[4]:
-            grad_edge = K.src_op_edge_reduce_backward1(
+            grad_edge = K.backward_rhs_src_mul_edge_reduce(
                 reducer, binary_op, spmat[2], spmat[3], src_map, edge_map[1],
                 backward_out_map, src_data, edge_data, out_data, grad_out)
+            grad_edge = zerocopy_from_dgl_ndarray(grad_edge)
         return None, None, None, grad_src, grad_edge, None, None, None, None
 
 
@@ -262,14 +265,17 @@ class SrcOpDstReduce(th.autograd.Function):
         ctx.backward_cache = None
         grad_src = None
         grad_dst = None
+        grad_out = zerocopy_to_dgl_ndarray(grad_out)
         if ctx.needs_input_grad[3]:
-            grad_src = K.src_op_dst_reduce_backward0(
+            grad_src = K.backward_lhs_src_mul_dst_reduce(
                 reducer, binary_op, spmat[2], spmat[3], src_map, dst_map,
                 backward_out_map, src_data, dst_data, out_data, grad_out)
+            grad_src = zerocopy_from_dgl_ndarray(grad_src)
         if ctx.needs_input_grad[4]:
-            grad_dst = K.src_op_dst_reduce_backward1(
+            grad_dst = K.backward_rhs_src_mul_dst_reduce(
                 reducer, binary_op, spmat[2], spmat[3], src_map, dst_map,
                 backward_out_map, src_data, dst_data, out_data, grad_out)
+            grad_dst = zerocopy_from_dgl_ndarray(grad_dst)
         return None, None, None, grad_src, grad_dst, None, None, None, None
 
 
@@ -297,10 +303,12 @@ class CopySrcReduce(th.autograd.Function):
             = ctx.backward_cache
         ctx.backward_cache = None
         grad_src = None
+        grad_out = zerocopy_to_dgl_ndarray(grad_out)
         if ctx.needs_input_grad[2]:
-            grad_src = K.copy_src_reduce_backward(
+            grad_src = K.backward_copy_src_reduce(
                 reducer, spmat[2], spmat[3], src_map, backward_out_map,
                 src_data, out_data, grad_out)
+            grad_src = zerocopy_from_dgl_ndarray(grad_src)
         return None, None, grad_src, None, None, None
 
 
@@ -328,10 +336,12 @@ class CopyEdgeReduce(th.autograd.Function):
             = ctx.backward_cache
         ctx.backward_cache = None
         grad_edge = None
+        grad_out = zerocopy_to_dgl_ndarray(grad_out)
         if ctx.needs_input_grad[2]:
-            grad_edge = K.copy_edge_reduce_backward(
+            grad_edge = K.backward_copy_edge_reduce(
                 reducer, spmat[2], spmat[3], edge_map[1], backward_out_map,
                 edge_data, out_data, grad_out)
+            grad_edge = zerocopy_from_dgl_ndarray(grad_edge)
         return None, None, grad_edge, None, None, None
 
 
