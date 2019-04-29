@@ -1,14 +1,15 @@
 """Torch modules for graph related softmax."""
 # pylint: disable= no-member, arguments-differ
-import torch as th
-from torch import nn
+from ... import ndarray as nd
+from ... import backend as F
 
-from ... import function as fn
-from ...utils import get_ndata_name
+import scipy.sparse as sp
+import numpy as np
 
 __all__ = ['EdgeSoftmax']
 
-class EdgeSoftmax(nn.Module):
+
+class EdgeSoftmax(object):
     r"""Apply softmax over signals of incoming edges.
 
     For a node :math:`i`, edgesoftmax is an operation of computing
@@ -24,22 +25,20 @@ class EdgeSoftmax(nn.Module):
     `Graph Attention Network <https://arxiv.org/pdf/1710.10903.pdf>`__ where
     the attention weights are computed with such an edgesoftmax operation.
     """
-    def __init__(self):
-        super(EdgeSoftmax, self).__init__()
-        # compute the softmax
-        self._logits_name = "_logits"
-        self._max_logits_name = "_max_logits"
-        self._normalizer_name = "_norm"
 
-    def forward(self, logits, graph):
+    def __call__(logits, edge_tuple, num_nodes):
         r"""Compute edge softmax.
 
         Parameters
         ----------
         logits : torch.Tensor
             The input edge feature
-        graph : DGLGraph
-            The graph.
+        edge_tuple : (torch.Tensor, torch.Tensor, torch.Tensor)
+            A tuple of representing the edges to perform softmax. The three
+            elements in the tuple are source node ids, destination node ids,
+            and edge ids
+        num_nodes : int
+            Number of nodes in the graph
 
         Returns
         -------
@@ -50,46 +49,55 @@ class EdgeSoftmax(nn.Module):
 
         Notes
         -----
-            * Input shape: :math:`(N, *, 1)` where * means any number of additional
-              dimensions, :math:`N` is the number of edges.
-            * Unnormalized scores shape: :math:`(N, *, 1)` where all but the last
-              dimension are the same shape as the input.
-            * Normalizer shape: :math:`(M, *, 1)` where :math:`M` is the number of
-              nodes and all but the first and the last dimensions are the same as
-              the input.
+            * Input shape: :math:`(N, *, 1)` where * means any number of
+              additional dimensions, :math:`N` is the number of edges.
+            * Unnormalized scores shape: :math:`(N, *, 1)` where all but the
+              last dimension are the same shape as the input.
+            * Normalizer shape: :math:`(M, *, 1)` where :math:`M` is the number
+              of nodes and all but the first and the last dimensions are the
+              same as the input.
 
-        Note that this computation is still one step away from getting real softmax
-        results. The last step can be proceeded as follows:
+        Note that this computation is still one step away from getting real
+        softmax results. The last step can be proceeded as follows:
 
         >>> import dgl.function as fn
-        >>>
-        >>> scores, normalizer = EdgeSoftmax(...).forward(logits, graph)
+        >>> edge_tuple = graph.all_edges('all')
+        >>> num_nodes = graph.number_of_nodes()
+        >>> scores, normalizer = EdgeSoftmax(logits, edge_tuple, num_nodes)
         >>> graph.edata['a'] = scores
         >>> graph.ndata['normalizer'] = normalizer
-        >>> graph.apply_edges(lambda edges : {'a' : edges.data['a'] / edges.dst['normalizer']})
+        >>> graph.apply_edges(
+                lambda edges: {'a': edges.data['a'] / edges.dst['normalizer']})
 
-        We left this last step to users as depending on the particular use case,
-        this step can be combined with other computation at once.
+        We left this last step to users as depending on the particular use
+        case, this step can be combined with other computation at once.
         """
-        self._logits_name = get_ndata_name(graph, self._logits_name)
-        self._max_logits_name = get_ndata_name(graph, self._max_logits_name)
-        self._normalizer_name = get_ndata_name(graph, self._normalizer_name)
+        _, v, _ = edge_tuple
+        indptr, indices, inv_indptr, inv_indices, edge_map, inv_edge_map \
+            = _build_adj_and_edge_map(edge_tuple, F.context(logits))
+        spmat = (indptr, indices, inv_indptr, inv_indices)
+        out_map = nd.empty([])
+        max_logits_ = F.copy_edge_reduce("max", spmat, logits, num_nodes,
+                                         (edge_map, inv_edge_map), out_map)
+        logits = (logits - max_logits_[v]).exp()
+        norm = F.copy_edge_reduce("sum", spmat, logits, num_nodes,
+                                  (edge_map, inv_edge_map), out_map)
+        return logits, norm
 
-        graph.edata[self._logits_name] = logits
 
-        # compute the softmax
-        graph.update_all(fn.copy_edge(self._logits_name, self._logits_name),
-                         fn.max(self._logits_name, self._max_logits_name))
-        # minus the max and exp
-        graph.apply_edges(
-            lambda edges: {self._logits_name : th.exp(edges.data[self._logits_name] -
-                                                      edges.dst[self._max_logits_name])})
-        # pop out temporary feature _max_logits, otherwise get_ndata_name could have huge overhead
-        graph.ndata.pop(self._max_logits_name)
-        # compute normalizer
-        graph.update_all(fn.copy_edge(self._logits_name, self._logits_name),
-                         fn.sum(self._logits_name, self._normalizer_name))
-        return graph.edata.pop(self._logits_name), graph.ndata.pop(self._normalizer_name)
-
-    def __repr__(self):
-        return 'EdgeSoftmax()'
+def _build_adj_and_edge_map(edge_tuple, num_nodes, ctx):
+    u, v, eid = edge_tuple
+    u = u.numpy()
+    v = v.numpy()
+    dat = np.arange(len(v), dtype=np.int64)
+    csr = sp.csr_matrix((dat, (u, v)), shape=(num_nodes, num_nodes))
+    inv_csr = sp.csr_matrix((dat, (v, u)), shape=(num_nodes, num_nodes))
+    res = [
+        F.copy_to(F.zerocopy_from_numpy(csr.indptr.astype(np.int64))),
+        F.copy_to(F.zerocopy_from_numpy(csr.indices.astype(np.int64))),
+        F.copy_to(F.zerocopy_from_numpy(inv_csr.indptr.astype(np.int64))),
+        F.copy_to(F.zerocopy_from_numpy(inv_csr.indices.astype(np.int64))),
+        F.copy_to(eid[csr.data]),
+        F.copy_to(eid[inv_csr.data]),
+    ]
+    return res

@@ -6,7 +6,7 @@ import torch as th
 from torch.utils import dlpack
 
 from ... import ndarray as nd
-from ... import kernel as knl
+from ... import kernel as K
 
 TH_VERSION = LooseVersion(th.__version__)
 
@@ -209,10 +209,9 @@ class SrcOpEdgeReduce(th.autograd.Function):
         else:
             forward_out_map = out_map
             backward_out_map = out_map
-        out_data = knl.src_op_edge_reduce(reducer, binary_op, spmat[0],
-                                          spmat[1], src_map, edge_map[0],
-                                          src_data, edge_data, forward_out_map,
-                                          out_size)
+        out_data = K.src_op_edge_reduce(
+            reducer, binary_op, spmat[0], spmat[1], src_map, edge_map[0],
+            src_data, edge_data, forward_out_map, out_size)
         # save_for_backward can only save variables
         ctx.backward_cache = (reducer, binary_op, spmat, src_map, edge_map,
                               backward_out_map, src_data, edge_data, out_data)
@@ -226,11 +225,11 @@ class SrcOpEdgeReduce(th.autograd.Function):
         grad_src = None
         grad_edge = None
         if ctx.needs_input_grad[3]:
-            grad_src = knl.src_op_edge_reduce_backward0(
+            grad_src = K.src_op_edge_reduce_backward0(
                 reducer, binary_op, spmat[2], spmat[3], src_map, edge_map[1],
                 backward_out_map, src_data, edge_data, out_data, grad_out)
         if ctx.needs_input_grad[4]:
-            grad_edge = knl.src_op_edge_reduce_backward1(
+            grad_edge = K.src_op_edge_reduce_backward1(
                 reducer, binary_op, spmat[2], spmat[3], src_map, edge_map[1],
                 backward_out_map, src_data, edge_data, out_data, grad_out)
         return None, None, None, grad_src, grad_edge, None, None, None, None
@@ -248,9 +247,9 @@ class SrcOpDstReduce(th.autograd.Function):
         else:
             forward_out_map = out_map
             backward_out_map = out_map
-        out_data = knl.src_op_dst_reduce(reducer, binary_op, spmat[0],
-                                         spmat[1], src_map, dst_map, src_data,
-                                         dst_data, forward_out_map, out_size)
+        out_data = K.src_op_dst_reduce(
+            reducer, binary_op, spmat[0], spmat[1], src_map, dst_map, src_data,
+            dst_data, forward_out_map, out_size)
         # save_for_backward can only save variables
         ctx.backward_cache = (reducer, binary_op, spmat, src_map, dst_map,
                               backward_out_map, src_data, dst_data, out_data)
@@ -264,11 +263,11 @@ class SrcOpDstReduce(th.autograd.Function):
         grad_src = None
         grad_dst = None
         if ctx.needs_input_grad[3]:
-            grad_src = knl.src_op_dst_reduce_backward0(
+            grad_src = K.src_op_dst_reduce_backward0(
                 reducer, binary_op, spmat[2], spmat[3], src_map, dst_map,
                 backward_out_map, src_data, dst_data, out_data, grad_out)
         if ctx.needs_input_grad[4]:
-            grad_dst = knl.src_op_dst_reduce_backward1(
+            grad_dst = K.src_op_dst_reduce_backward1(
                 reducer, binary_op, spmat[2], spmat[3], src_map, dst_map,
                 backward_out_map, src_data, dst_data, out_data, grad_out)
         return None, None, None, grad_src, grad_dst, None, None, None, None
@@ -284,8 +283,9 @@ class CopySrcReduce(th.autograd.Function):
             forward_out_map = out_map
             backward_out_map = out_map
         src_data = zerocopy_to_dgl_ndarray(src_data)
-        out_data = knl.copy_src_reduce(reducer, spmat[0], spmat[1], src_map,
-                                       src_data, forward_out_map, out_size)
+        out_data = K.copy_src_reduce(
+            reducer, spmat[0], spmat[1], src_map, src_data, forward_out_map,
+            out_size)
         # save_for_backward can only save variables
         ctx.backward_cache = (reducer, spmat, src_map, backward_out_map,
                               src_data, out_data)
@@ -298,7 +298,7 @@ class CopySrcReduce(th.autograd.Function):
         ctx.backward_cache = None
         grad_src = None
         if ctx.needs_input_grad[2]:
-            grad_src = knl.copy_src_reduce_backward(
+            grad_src = K.copy_src_reduce_backward(
                 reducer, spmat[2], spmat[3], src_map, backward_out_map,
                 src_data, out_data, grad_out)
         return None, None, grad_src, None, None, None
@@ -314,9 +314,9 @@ class CopyEdgeReduce(th.autograd.Function):
         else:
             forward_out_map = out_map
             backward_out_map = out_map
-        out_data = knl.copy_edge_reduce(reducer, spmat[0], spmat[1],
-                                        edge_map[0], edge_data,
-                                        forward_out_map, out_size)
+        out_data = K.copy_edge_reduce(
+            reducer, spmat[0], spmat[1], edge_map[0], edge_data,
+            forward_out_map, out_size)
         # save_for_backward can only save variables
         ctx.backward_cache = (reducer, spmat, edge_map, backward_out_map,
                               edge_data, out_data)
@@ -329,7 +329,7 @@ class CopyEdgeReduce(th.autograd.Function):
         ctx.backward_cache = None
         grad_edge = None
         if ctx.needs_input_grad[2]:
-            grad_edge = knl.copy_edge_reduce_backward(
+            grad_edge = K.copy_edge_reduce_backward(
                 reducer, spmat[2], spmat[3], edge_map[1], backward_out_map,
                 edge_data, out_data, grad_out)
         return None, None, grad_edge, None, None, None
