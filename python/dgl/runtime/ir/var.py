@@ -15,6 +15,8 @@ class VarType(object):
     IDX = 3
     STR = 4
     FUNC = 5
+    MAP = 6
+    INT = 7
 
 VAR_TYPE_NAME_MAP = [
     'Feat',
@@ -23,14 +25,16 @@ VAR_TYPE_NAME_MAP = [
     'Idx',
     'Str',
     'Func',
+    'Map',
+    'Int',
 ]
 
 class Var(object):
     """Class for variables in IR.
 
     Variables represent data in the IR. A variable can contain concrete values.
-    Otherwise, it can act as a "symbol", whose values are not materialized at the
-    moment, but later.
+    Otherwise, it can act as a "symbol", whose values are not materialized at
+    the moment, but later.
 
     Parameters
     ----------
@@ -42,6 +46,7 @@ class Var(object):
         The data.
     """
     __slots__ = ['name', 'typecode', 'data']
+
     def __init__(self, name, typecode, data):
         self.name = name
         self.typecode = typecode
@@ -88,3 +93,11 @@ def STR(data=None, name=None):
 def FUNC(data=None, name=None):
     """Create a variable for function."""
     return new(VarType.FUNC, data, name)
+
+def MAP(data=None, name=None):
+    """Create a variable for mapping lambda"""
+    return new(VarType.MAP, data, name)
+
+def INT(data=None, name=None):
+    """Create a variable for int value"""
+    return new(VarType.INT, data, name)

@@ -11,6 +11,7 @@ from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
 from . import utils
+from . import ndarray
 
 GraphIndexHandle = ctypes.c_void_p
 
@@ -595,8 +596,43 @@ class GraphIndex(object):
         else:
             raise Exception("unknown format")
 
+    @utils.cached_member(cache='_cache', prefix='csr_adj')
+    def csr_adjacency_matrix(self, transpose, ctx):
+        """Return the adjacency matrix representation of this graph in csr format
 
-    @utils.cached_member(cache='_cache', prefix='adj')
+        By default, a row of returned adjacency matrix represents the destination
+        of an edge and the column represents the source.
+
+        When transpose is True, a row represents the source and a column represents
+        a destination.
+
+        Note: this internal function is for scheduler use only
+
+        Parameters
+        ----------
+        transpose : bool
+            A flag to transpose the returned adjacency matrix.
+        ctx : DGLContext
+            The context of the returned matrix.
+
+        Returns
+        -------
+        SparseTensor
+            The adjacency matrix.
+        utils.Index
+            A index for data shuffling due to sparse format change. Return None
+            if shuffle is not required.
+        """
+        rst = _CAPI_DGLGraphGetAdj(self._handle, transpose, "csr")
+        indptr = rst(0)
+        indices = rst(1)
+        eids = rst(2)
+        if ctx.device_type != 1: # not on cpu
+            indptr = ndarray.array(indptr, ctx=ctx)
+            indices = ndarray.array(indices, ctx=ctx)
+            eids = ndarray.array(eids, ctx=ctx)
+        return indptr, indices, eids
+
     def adjacency_matrix(self, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
 
@@ -646,7 +682,6 @@ class GraphIndex(object):
         else:
             raise Exception("unknown format")
 
-    @utils.cached_member(cache='_cache', prefix='inc')
     def incidence_matrix(self, typestr, ctx):
         """Return the incidence matrix representation of this graph.
 
