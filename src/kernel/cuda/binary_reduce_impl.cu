@@ -86,9 +86,9 @@ void BinaryReduceImpl(
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   // Graph
   Csr csr;
-  csr.row_offsets.data = static_cast<int64_t*>(indptr->data);
+  csr.row_offsets.data = static_cast<mg_int*>(indptr->data);
   csr.row_offsets.length = indptr->shape[0];
-  csr.column_indices.data = static_cast<int64_t*>(indices->data);
+  csr.column_indices.data = static_cast<mg_int*>(indices->data);
   csr.column_indices.length = indices->shape[0];
   const int64_t x_len = ComputeXLength(out_data);
 
@@ -188,9 +188,9 @@ void BinaryReduceBcastImpl(
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   // Graph
   Csr csr;
-  csr.row_offsets.data = static_cast<int64_t*>(indptr->data);
+  csr.row_offsets.data = static_cast<mg_int*>(indptr->data);
   csr.row_offsets.length = indptr->shape[0];
-  csr.column_indices.data = static_cast<int64_t*>(indices->data);
+  csr.column_indices.data = static_cast<mg_int*>(indices->data);
   csr.column_indices.length = indices->shape[0];
   const int64_t x_len = ComputeXLength(out_data);
 
@@ -287,9 +287,9 @@ void BackwardBinaryReduceImpl(
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   // Graph
   Csr csr;
-  csr.row_offsets.data = static_cast<int64_t*>(rev_indptr->data);
+  csr.row_offsets.data = static_cast<mg_int*>(rev_indptr->data);
   csr.row_offsets.length = rev_indptr->shape[0];
-  csr.column_indices.data = static_cast<int64_t*>(rev_indices->data);
+  csr.column_indices.data = static_cast<mg_int*>(rev_indices->data);
   csr.column_indices.length = rev_indices->shape[0];
   const int64_t x_len = ComputeXLength(lhs_data);
 

@@ -29,8 +29,8 @@ void CusparseCsrmm2(const RuntimeConfig& rtcfg, const Csr& csr, GData<float>* gd
   }
   cusparseMatDescr_t descr;
   CUSPARSE_CALL(cusparseCreateMatDescr(&descr));
-  cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL);
-  cusparseSetMatIndexBase(descr, CUSPARSE_INDEX_BASE_ZERO);
+  CUSPARSE_CALL(cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL));
+  CUSPARSE_CALL(cusparseSetMatIndexBase(descr, CUSPARSE_INDEX_BASE_ZERO));
   //cusparseScsrmm(
       //thr_entry->cusparse_handle,
       //CUSPARSE_OPERATION_NON_TRANSPOSE,

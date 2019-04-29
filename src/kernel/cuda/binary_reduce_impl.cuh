@@ -14,13 +14,13 @@ template <typename DType,
           typename Functors>
 struct BinaryReduce {
   static __device__ __forceinline__ bool CondEdge(
-      int64_t src, int64_t dst, int64_t eid, GData<DType>* gdata) {
+      mg_int src, mg_int dst, mg_int eid, GData<DType>* gdata) {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int64_t src, int64_t dst, int64_t eid, GData<DType>* gdata) {
+      mg_int src, mg_int dst, mg_int eid, GData<DType>* gdata) {
     const int64_t D = gdata->x_length;
-    int tx = blockIdx.x * blockDim.x + threadIdx.x;
+    int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
     int stride_x = blockDim.x * gridDim.x;
     int64_t lid = Functors::SelectLeft(src, eid, dst);
     int64_t rid = Functors::SelectRight(src, eid, dst);
@@ -60,12 +60,12 @@ __device__ __forceinline__ int64_t Ravel(
 template <int NDim, typename DType, typename Functors>
 struct BinaryReduceBcast {
   static __device__ __forceinline__ bool CondEdge(
-      int64_t src, int64_t dst, int64_t eid, BcastGData<NDim, DType>* gdata) {
+      mg_int src, mg_int dst, mg_int eid, BcastGData<NDim, DType>* gdata) {
     return true;
   }
   static __device__ __forceinline__ void ApplyEdge(
-      int64_t src, int64_t dst, int64_t eid, BcastGData<NDim, DType>* gdata) {
-    int tx = blockIdx.x * blockDim.x + threadIdx.x;
+      mg_int src, mg_int dst, mg_int eid, BcastGData<NDim, DType>* gdata) {
+    int64_t tx = blockIdx.x * blockDim.x + threadIdx.x;
     int stride_x = blockDim.x * gridDim.x;
     int64_t lid = Functors::SelectLeft(src, eid, dst);
     int64_t rid = Functors::SelectRight(src, eid, dst);
@@ -94,16 +94,16 @@ template <typename DType, typename IdGetter,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 struct FunctorsTempl {
-  static __device__ __forceinline__ int64_t SelectOut(
-      int64_t src, int64_t edge, int64_t dst) {
+  static __device__ __forceinline__ mg_int SelectOut(
+      mg_int src, mg_int edge, mg_int dst) {
     return OutSelector<Reducer>::Type::Call(src, edge, dst);
   }
-  static __device__ __forceinline__ int64_t SelectLeft(
-      int64_t src, int64_t edge, int64_t dst) {
+  static __device__ __forceinline__ mg_int SelectLeft(
+      mg_int src, mg_int edge, mg_int dst) {
     return LeftSelector::Call(src, edge, dst);
   }
-  static __device__ __forceinline__ int64_t SelectRight(
-      int64_t src, int64_t edge, int64_t dst) {
+  static __device__ __forceinline__ mg_int SelectRight(
+      mg_int src, mg_int edge, mg_int dst) {
     return RightSelector::Call(src, edge, dst);
   }
   static __device__ __forceinline__ DType Op(DType lhs, DType rhs) {

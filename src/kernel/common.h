@@ -1,6 +1,9 @@
 #ifndef DGL_KERNEL_COMMON_H_
 #define DGL_KERNEL_COMMON_H_
 
+#include <cstdint>
+#include <dgl/runtime/ndarray.h>
+
 namespace dgl {
 namespace kernel {
 
@@ -67,6 +70,11 @@ namespace kernel {
                << val.bits;                                 \
   }
 #endif
+
+__inline__ bool IsValidCsr(runtime::NDArray indptr, runtime::NDArray indices) {
+  return (indptr->ndim == 1) && (indptr->dtype.code == kDLInt) && (indptr->dtype.bits == 32)
+    && (indices->ndim == 1) && (indices->dtype.code == kDLInt) && (indices->dtype.bits == 32);
+}
 
 }  // namespace kernel
 }  // namespace dgl

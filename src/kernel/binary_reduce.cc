@@ -63,6 +63,7 @@ NDArray BinaryOpReduce(
     NDArray rhs_data,
     NDArray out_mapping,
     const int64_t out_size) {
+  CHECK(IsValidCsr(indptr, indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
   if (op != binary_op::kUseLhs) {
     CHECK(IsValidBinaryOpShape(lhs_data, rhs_data))
       << "Cannot compute binary operation between feature shapes "
@@ -149,6 +150,7 @@ NDArray BinaryOpReduceBcast(
     NDArray rhs_data,
     NDArray out_mapping,
     const int64_t out_size) {
+  CHECK(IsValidCsr(indptr, indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
   BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
   const DLContext& ctx = indptr->ctx;
   const DLDataType& dtype = lhs_data->dtype;
@@ -325,6 +327,7 @@ NDArray BackwardLhsSrcOpEdgeReduce(
     NDArray edge_data,
     NDArray out_data,
     NDArray grad_out_data) {
+  CHECK(IsValidCsr(rev_indptr, rev_indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
   // Allocate output
   std::vector<int64_t> shape(src_data->shape, src_data->shape + src_data->ndim);
   NDArray grad_src_data = NDArray::Empty(shape, src_data->dtype, src_data->ctx);
@@ -393,6 +396,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsSrcMulEdgeReduce")
     NDArray edge_data = args[8];
     NDArray out_data = args[9];
     NDArray grad_out_data = args[10];
+    CHECK(IsValidCsr(rev_indptr, rev_indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
     *rv = BackwardRhsSrcOpEdgeReduce(
         reducer, op, rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
@@ -410,7 +414,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopySrcReduce")
     NDArray src_data = args[5];
     NDArray out_data = args[6];
     NDArray grad_out_data = args[7];
-
+    CHECK(IsValidCsr(rev_indptr, rev_indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
     // Allocate output
     std::vector<int64_t> shape(src_data->shape, src_data->shape + src_data->ndim);
     NDArray grad_src_data = NDArray::Empty(shape, src_data->dtype, src_data->ctx);
