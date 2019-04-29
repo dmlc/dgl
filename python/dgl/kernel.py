@@ -192,9 +192,13 @@ def src_op_dst_reduce(reducer,
         An int64 row offset array for the graph CSR.
     indices : dgl.ndarray.NDArray
         An int64 column index array for the graph CSR.
-    edge_mapping : dgl.ndarray.NDArray
-        An int64 array used for read edge data.
-        `edge_mapping[edge_id]` stores the location to read data.
+    src_mapping : dgl.ndarray.NDArray
+        An int64 array used for read src node data.
+        `src_mapping[src_node_id]` stores the location to read data.
+        Empty array represents identity mapping.
+    dst_mapping : dgl.ndarray.NDArray
+        An int64 array used for read dst node data.
+        `dst_mapping[dst_node_id]` stores the location to read data.
         Empty array represents identity mapping.
     src_data : dgl.ndarray.NDArray
         The source node feature tensor.
@@ -213,7 +217,7 @@ def src_op_dst_reduce(reducer,
         The output tensor. Could be either node or edge feature tensor
         depending on the reducer.
     """
-    return _CAPI_DGLKernelSrcMulEdgeReduce(
+    return _CAPI_DGLKernelSrcMulDstReduce(
         reducer, binary_op, indptr, indices, src_mapping, dst_mapping,
         src_data, dst_data, out_mapping, out_size)
 
