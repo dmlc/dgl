@@ -290,7 +290,7 @@ class CopySrcReduce(th.autograd.Function):
             backward_out_map = out_map
         src_data = zerocopy_to_dgl_ndarray(src_data)
         out_data = K.copy_src_reduce(
-            reducer, spmat[0], spmat[1], src_map, src_data, forward_out_map,
+            reducer, spmat[0], spmat[1], spmat[2], spmat[3], src_map, src_data, forward_out_map,
             out_size)
         # save_for_backward can only save variables
         ctx.backward_cache = (reducer, spmat, src_map, backward_out_map,
@@ -306,7 +306,7 @@ class CopySrcReduce(th.autograd.Function):
         grad_out = zerocopy_to_dgl_ndarray(grad_out)
         if ctx.needs_input_grad[2]:
             grad_src = K.backward_copy_src_reduce(
-                reducer, spmat[2], spmat[3], src_map, backward_out_map,
+                reducer, spmat[0], spmat[1], spmat[2], spmat[3], src_map, backward_out_map,
                 src_data, out_data, grad_out)
             grad_src = zerocopy_from_dgl_ndarray(grad_src)
         return None, None, grad_src, None, None, None
