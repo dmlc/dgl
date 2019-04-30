@@ -6,12 +6,10 @@ from ._ffi.function import _init_api
 
 def src_op_edge_reduce(reducer,
                        binary_op,
-                       indptr,
-                       indices,
-                       src_mapping,
-                       edge_mapping,
-                       src_data,
-                       edge_data,
+                       indptr, indices,
+                       rev_indptr, rev_indices,
+                       src_mapping, edge_mapping,
+                       src_data, edge_data,
                        out_mapping,
                        out_size):
     """Perform binary op between src node data with edge data and reduce.
@@ -56,11 +54,13 @@ def src_op_edge_reduce(reducer,
         depending on the reducer.
     """
     return _CAPI_DGLKernelSrcMulEdgeReduce(
-        reducer, binary_op, indptr, indices, src_mapping, edge_mapping,
+        reducer, binary_op, indptr, indices, rev_indptr, rev_indices,
+        src_mapping, edge_mapping,
         src_data, edge_data, out_mapping, int(out_size))
 
 def backward_lhs_src_mul_edge_reduce(
         reducer, op,
+        indptr, indices,
         rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data,
@@ -109,12 +109,13 @@ def backward_lhs_src_mul_edge_reduce(
         The gradient of src data.
     """
     return _CAPI_DGLKernelBackwardLhsSrcMulEdgeReduce(
-        reducer, op, rev_indptr, rev_indices,
+        reducer, op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data)
 
 def backward_rhs_src_mul_edge_reduce(
         reducer, op,
+        indptr, indices,
         rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data,
@@ -163,18 +164,16 @@ def backward_rhs_src_mul_edge_reduce(
         The gradient of edge data.
     """
     return _CAPI_DGLKernelBackwardRhsSrcMulEdgeReduce(
-        reducer, op, rev_indptr, rev_indices,
+        reducer, op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data)
 
 def src_op_dst_reduce(reducer,
                       binary_op,
-                      indptr,
-                      indices,
-                      src_mapping,
-                      dst_mapping,
-                      src_data,
-                      dst_data,
+                      indptr, indices,
+                      rev_indptr, rev_indices,
+                      src_mapping, dst_mapping,
+                      src_data, dst_data,
                       out_mapping,
                       out_size):
     """Perform binary operation between src node data with dst node data and
@@ -214,15 +213,15 @@ def src_op_dst_reduce(reducer,
         depending on the reducer.
     """
     return _CAPI_DGLKernelSrcMulEdgeReduce(
-        reducer, binary_op, indptr, indices, src_mapping, dst_mapping,
+        reducer, binary_op, indptr, indices, rev_indptr, rev_indices,
+        src_mapping, dst_mapping,
         src_data, dst_data, out_mapping, out_size)
 
 
 def copy_src_reduce(reducer,
-                    indptr,
-                    indices,
-                    src_mapping,
-                    src_data,
+                    indptr, indices,
+                    rev_indptr, rev_indices,
+                    src_mapping, src_data,
                     out_mapping,
                     out_size):
     """Copy src node data and perform reduce.
@@ -257,12 +256,14 @@ def copy_src_reduce(reducer,
         depending on the reducer.
     """
     return _CAPI_DGLKernelCopySrcReduce(
-        reducer, indptr, indices, src_mapping, src_data, out_mapping,
+        reducer, indptr, indices, rev_indptr, rev_indices,
+        src_mapping, src_data, out_mapping,
         int(out_size))
 
 
 def backward_copy_src_reduce(
         reducer,
+        indptr, indices,
         rev_indptr, rev_indices,
         src_mapping, out_mapping,
         src_data, out_data,
@@ -300,13 +301,13 @@ def backward_copy_src_reduce(
         The gradient of src data.
     """
     return _CAPI_DGLKernelBackwardCopySrcReduce(
-        reducer, rev_indptr, rev_indices,
+        reducer, indptr, indices, rev_indptr, rev_indices,
         src_mapping, out_mapping,
         src_data, out_data, grad_out_data)
 
 def copy_edge_reduce(reducer,
-                     indptr,
-                     indices,
+                     indptr, indices,
+                     rev_indptr, rev_indices,
                      edge_mapping,
                      edge_data,
                      out_mapping,
@@ -343,7 +344,8 @@ def copy_edge_reduce(reducer,
         depending on the reducer.
     """
     return _CAPI_DGLKernelCopyEdgeReduce(
-        reducer, indptr, indices, edge_mapping, edge_data, out_mapping,
+        reducer, indptr, indices, rev_indptr, rev_indices,
+        edge_mapping, edge_data, out_mapping,
         int(out_size))
 
 _init_api("dgl.kernel")

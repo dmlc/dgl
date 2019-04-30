@@ -53,8 +53,8 @@ bool IsValidBinaryOpShape(NDArray lhs, NDArray rhs) {
 NDArray BinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
-    NDArray indptr,
-    NDArray indices,
+    NDArray indptr, NDArray indices,
+    NDArray rev_indptr, NDArray rev_indices,
     binary_op::Target lhs,
     binary_op::Target rhs,
     NDArray lhs_mapping,
@@ -76,7 +76,7 @@ NDArray BinaryOpReduce(
   out_shape.insert(out_shape.end(), lhs_data->shape + 1, lhs_data->shape + lhs_data->ndim);
   NDArray out_data = NDArray::Empty(out_shape, dtype, ctx);
   DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl,
-      reducer, op, indptr, indices,
+      reducer, op, indptr, indices, rev_indptr, rev_indices,
       lhs, rhs,
       lhs_mapping, rhs_mapping,
       lhs_data, rhs_data,
@@ -140,8 +140,8 @@ BcastInfo CalcBcastInfo(NDArray lhs, NDArray rhs) {
 NDArray BinaryOpReduceBcast(
     const std::string& reducer,
     const std::string& binary_op,
-    NDArray indptr,
-    NDArray indices,
+    NDArray indptr, NDArray indices,
+    NDArray rev_indptr, NDArray rev_indices,
     binary_op::Target lhs,
     binary_op::Target rhs,
     NDArray lhs_mapping,
@@ -161,7 +161,8 @@ NDArray BinaryOpReduceBcast(
   NDArray out_data = NDArray::Empty(out_shape, dtype, ctx);
 
   DGL_XPU_SWITCH(ctx.device_type, BinaryReduceBcastImpl,
-      info, reducer, binary_op, indptr, indices,
+      info, reducer, binary_op,
+      indptr, indices, rev_indptr, rev_indices,
       lhs, rhs,
       lhs_mapping, rhs_mapping,
       lhs_data, rhs_data,
@@ -174,8 +175,8 @@ NDArray BinaryOpReduceBcast(
 NDArray SrcOpEdgeReduce(
     const std::string& reducer,
     const std::string& binary_op,
-    NDArray indptr,
-    NDArray indices,
+    NDArray indptr, NDArray indices,
+    NDArray rev_indptr, NDArray rev_indices,
     NDArray src_mapping,
     NDArray edge_mapping,
     NDArray src_data,
@@ -183,13 +184,15 @@ NDArray SrcOpEdgeReduce(
     NDArray out_mapping,
     const int64_t out_size) {
   if (HasBcast(src_data, edge_data)) {
-    return BinaryOpReduceBcast(reducer, binary_op, indptr, indices,
+    return BinaryOpReduceBcast(reducer, binary_op,
+        indptr, indices, rev_indptr, rev_indices,
         binary_op::kSrc, binary_op::kEdge,
         src_mapping, edge_mapping,
         src_data, edge_data,
         out_mapping, out_size);
   } else {
-    return BinaryOpReduce(reducer, binary_op, indptr, indices,
+    return BinaryOpReduce(reducer, binary_op,
+        indptr, indices, rev_indptr, rev_indices,
         binary_op::kSrc, binary_op::kEdge,
         src_mapping, edge_mapping,
         src_data, edge_data,
@@ -203,21 +206,24 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelSrcMulEdgeReduce")
     std::string binary_op = args[1];
     NDArray indptr = args[2];
     NDArray indices = args[3];
-    NDArray src_mapping = args[4];
-    NDArray edge_mapping = args[5];
-    NDArray src_data = args[6];
-    NDArray edge_data = args[7];
-    NDArray out_mapping = args[8];
-    const int64_t out_size = args[9];
-    *rv = SrcOpEdgeReduce(reducer, binary_op, indptr, indices,
+    NDArray rev_indptr = args[4];
+    NDArray rev_indices = args[5];
+    NDArray src_mapping = args[6];
+    NDArray edge_mapping = args[7];
+    NDArray src_data = args[8];
+    NDArray edge_data = args[9];
+    NDArray out_mapping = args[10];
+    const int64_t out_size = args[11];
+    *rv = SrcOpEdgeReduce(reducer, binary_op,
+        indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping, src_data, edge_data, out_mapping, out_size);
   });
 
 NDArray SrcOpDstReduce(
     const std::string& reducer,
     const std::string& binary_op,
-    NDArray indptr,
-    NDArray indices,
+    NDArray indptr, NDArray indices,
+    NDArray rev_indptr, NDArray rev_indices,
     NDArray src_mapping,
     NDArray dst_mapping,
     NDArray src_data,
@@ -225,13 +231,15 @@ NDArray SrcOpDstReduce(
     NDArray out_mapping,
     const int64_t out_size) {
   if (HasBcast(src_data, dst_data)) {
-    return BinaryOpReduceBcast(reducer, binary_op, indptr, indices,
+    return BinaryOpReduceBcast(reducer, binary_op,
+        indptr, indices, rev_indptr, rev_indices,
         binary_op::kSrc, binary_op::kDst,
         src_mapping, dst_mapping,
         src_data, dst_data,
         out_mapping, out_size);
   } else {
-    return BinaryOpReduce(reducer, binary_op, indptr, indices,
+    return BinaryOpReduce(reducer, binary_op,
+        indptr, indices, rev_indptr, rev_indices,
         binary_op::kSrc, binary_op::kDst,
         src_mapping, dst_mapping,
         src_data, dst_data,
@@ -245,27 +253,30 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelSrcMulDstReduce")
     std::string binary_op = args[1];
     NDArray indptr = args[2];
     NDArray indices = args[3];
-    NDArray src_mapping = args[4];
-    NDArray dst_mapping = args[5];
-    NDArray src_data = args[6];
-    NDArray dst_data = args[7];
-    NDArray out_mapping = args[8];
-    const int64_t out_size = args[9];
-    *rv = SrcOpDstReduce(reducer, binary_op, indptr, indices,
+    NDArray rev_indptr = args[4];
+    NDArray rev_indices = args[5];
+    NDArray src_mapping = args[6];
+    NDArray dst_mapping = args[7];
+    NDArray src_data = args[8];
+    NDArray dst_data = args[9];
+    NDArray out_mapping = args[10];
+    const int64_t out_size = args[11];
+    *rv = SrcOpDstReduce(reducer, binary_op,
+        indptr, indices, rev_indptr, rev_indices,
         src_mapping, dst_mapping, src_data, dst_data, out_mapping, out_size);
   });
 
 
 NDArray CopySrcReduce(
     const std::string& reducer,
-    NDArray indptr,
-    NDArray indices,
+    NDArray indptr, NDArray indices,
+    NDArray rev_indptr, NDArray rev_indices,
     NDArray src_mapping,
     NDArray src_data,
     NDArray out_mapping,
     const int64_t out_size) {
   return BinaryOpReduce(reducer, binary_op::kUseLhs,
-      indptr, indices,
+      indptr, indices, rev_indptr, rev_indices,
       binary_op::kSrc, binary_op::kDst,
       src_mapping, NoneArray(),
       src_data, NoneArray(),
@@ -277,24 +288,26 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopySrcReduce")
     std::string reducer = args[0];
     NDArray indptr = args[1];
     NDArray indices = args[2];
-    NDArray src_mapping = args[3];
-    NDArray src_data = args[4];
-    NDArray out_mapping = args[5];
-    const int64_t out_size = args[6];
-    *rv = CopySrcReduce(reducer, indptr, indices,
+    NDArray rev_indptr = args[3];
+    NDArray rev_indices = args[4];
+    NDArray src_mapping = args[5];
+    NDArray src_data = args[6];
+    NDArray out_mapping = args[7];
+    const int64_t out_size = args[8];
+    *rv = CopySrcReduce(reducer, indptr, indices, rev_indptr, rev_indices,
         src_mapping, src_data, out_mapping, out_size);
   });
 
 NDArray CopyEdgeReduce(
     const std::string& reducer,
-    NDArray indptr,
-    NDArray indices,
+    NDArray indptr, NDArray indices,
+    NDArray rev_indptr, NDArray rev_indices,
     NDArray edge_mapping,
     NDArray edge_data,
     NDArray out_mapping,
     const int64_t out_size) {
   return BinaryOpReduce(reducer, binary_op::kUseLhs,
-      indptr, indices,
+      indptr, indices, rev_indptr, rev_indices,
       binary_op::kEdge, binary_op::kDst,
       edge_mapping, NoneArray(),
       edge_data, NoneArray(),
@@ -306,11 +319,13 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopyEdgeReduce")
     std::string reducer = args[0];
     NDArray indptr = args[1];
     NDArray indices = args[2];
-    NDArray edge_mapping = args[3];
-    NDArray edge_data = args[4];
-    NDArray out_mapping = args[5];
-    const int64_t out_size = args[6];
-    *rv = CopyEdgeReduce(reducer, indptr, indices,
+    NDArray rev_indptr = args[3];
+    NDArray rev_indices = args[4];
+    NDArray edge_mapping = args[5];
+    NDArray edge_data = args[6];
+    NDArray out_mapping = args[7];
+    const int64_t out_size = args[8];
+    *rv = CopyEdgeReduce(reducer, indptr, indices, rev_indptr, rev_indices,
         edge_mapping, edge_data, out_mapping, out_size);
   });
 
@@ -318,8 +333,8 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopyEdgeReduce")
 NDArray BackwardLhsSrcOpEdgeReduce(
     const std::string& reducer,
     const std::string& op,
-    NDArray rev_indptr,
-    NDArray rev_indices,
+    NDArray indptr, NDArray indices,
+    NDArray rev_indptr, NDArray rev_indices,
     NDArray src_mapping,
     NDArray edge_mapping,
     NDArray out_mapping,
@@ -327,6 +342,7 @@ NDArray BackwardLhsSrcOpEdgeReduce(
     NDArray edge_data,
     NDArray out_data,
     NDArray grad_out_data) {
+  CHECK(IsValidCsr(indptr, indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
   CHECK(IsValidCsr(rev_indptr, rev_indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
   // Allocate output
   std::vector<int64_t> shape = {src_data->shape[0]};
@@ -335,14 +351,14 @@ NDArray BackwardLhsSrcOpEdgeReduce(
   if (HasBcast(src_data, edge_data)) {
     BcastInfo info = CalcBcastInfo(src_data, edge_data);
     DGL_XPU_SWITCH(grad_src_data->ctx.device_type, BackwardBinaryReduceBcastImpl,
-        info, reducer, op, rev_indptr, rev_indices,
+        info, reducer, op, indptr, indices, rev_indptr, rev_indices,
         binary_op::kDst, binary_op::kEdge,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data,
         grad_src_data, NoneArray());
   } else {
     DGL_XPU_SWITCH(grad_src_data->ctx.device_type, BackwardBinaryReduceImpl,
-        reducer, op, rev_indptr, rev_indices,
+        reducer, op, indptr, indices, rev_indptr, rev_indices,
         binary_op::kDst, binary_op::kEdge,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data,
@@ -355,17 +371,19 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsSrcMulEdgeReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
-    NDArray rev_indptr = args[2];
-    NDArray rev_indices = args[3];
-    NDArray src_mapping = args[4];
-    NDArray edge_mapping = args[5];
-    NDArray out_mapping = args[6];
-    NDArray src_data = args[7];
-    NDArray edge_data = args[8];
-    NDArray out_data = args[9];
-    NDArray grad_out_data = args[10];
+    NDArray indptr = args[2];
+    NDArray indices = args[3];
+    NDArray rev_indptr = args[4];
+    NDArray rev_indices = args[5];
+    NDArray src_mapping = args[6];
+    NDArray edge_mapping = args[7];
+    NDArray out_mapping = args[8];
+    NDArray src_data = args[9];
+    NDArray edge_data = args[10];
+    NDArray out_data = args[11];
+    NDArray grad_out_data = args[12];
     *rv = BackwardLhsSrcOpEdgeReduce(
-        reducer, op, rev_indptr, rev_indices,
+        reducer, op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data);
   });
@@ -373,8 +391,8 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsSrcMulEdgeReduce")
 NDArray BackwardRhsSrcOpEdgeReduce(
     const std::string& reducer,
     const std::string& op,
-    NDArray rev_indptr,
-    NDArray rev_indices,
+    NDArray indptr, NDArray indices,
+    NDArray rev_indptr, NDArray rev_indices,
     NDArray src_mapping,
     NDArray edge_mapping,
     NDArray out_mapping,
@@ -390,14 +408,14 @@ NDArray BackwardRhsSrcOpEdgeReduce(
   if (HasBcast(src_data, edge_data)) {
     BcastInfo info = CalcBcastInfo(src_data, edge_data);
     DGL_XPU_SWITCH(grad_edge_data->ctx.device_type, BackwardBinaryReduceBcastImpl,
-        info, reducer, op, rev_indptr, rev_indices,
+        info, reducer, op, indptr, indices, rev_indptr, rev_indices,
         binary_op::kDst, binary_op::kEdge,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data,
         NoneArray(), grad_edge_data);
   } else {
     DGL_XPU_SWITCH(grad_edge_data->ctx.device_type, BackwardBinaryReduceImpl,
-        reducer, op, rev_indptr, rev_indices,
+        reducer, op, indptr, indices, rev_indptr, rev_indices,
         binary_op::kDst, binary_op::kEdge,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data,
@@ -410,18 +428,21 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsSrcMulEdgeReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
-    NDArray rev_indptr = args[2];
-    NDArray rev_indices = args[3];
-    NDArray src_mapping = args[4];
-    NDArray edge_mapping = args[5];
-    NDArray out_mapping = args[6];
-    NDArray src_data = args[7];
-    NDArray edge_data = args[8];
-    NDArray out_data = args[9];
-    NDArray grad_out_data = args[10];
+    NDArray indptr = args[2];
+    NDArray indices = args[3];
+    NDArray rev_indptr = args[4];
+    NDArray rev_indices = args[5];
+    NDArray src_mapping = args[6];
+    NDArray edge_mapping = args[7];
+    NDArray out_mapping = args[8];
+    NDArray src_data = args[9];
+    NDArray edge_data = args[10];
+    NDArray out_data = args[11];
+    NDArray grad_out_data = args[12];
+    CHECK(IsValidCsr(indptr, indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
     CHECK(IsValidCsr(rev_indptr, rev_indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
     *rv = BackwardRhsSrcOpEdgeReduce(
-        reducer, op, rev_indptr, rev_indices,
+        reducer, op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data);
   });
@@ -430,19 +451,22 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsSrcMulEdgeReduce")
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopySrcReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
-    NDArray rev_indptr = args[1];
-    NDArray rev_indices = args[2];
-    NDArray src_mapping = args[3];
-    NDArray out_mapping = args[4];
-    NDArray src_data = args[5];
-    NDArray out_data = args[6];
-    NDArray grad_out_data = args[7];
+    NDArray indptr = args[1];
+    NDArray indices = args[2];
+    NDArray rev_indptr = args[3];
+    NDArray rev_indices = args[4];
+    NDArray src_mapping = args[5];
+    NDArray out_mapping = args[6];
+    NDArray src_data = args[7];
+    NDArray out_data = args[8];
+    NDArray grad_out_data = args[9];
+    CHECK(IsValidCsr(indptr, indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
     CHECK(IsValidCsr(rev_indptr, rev_indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
     // Allocate output
     std::vector<int64_t> shape(src_data->shape, src_data->shape + src_data->ndim);
     NDArray grad_src_data = NDArray::Empty(shape, src_data->dtype, src_data->ctx);
     DGL_XPU_SWITCH(grad_src_data->ctx.device_type, BackwardBinaryReduceImpl,
-      reducer, binary_op::kUseLhs, rev_indptr, rev_indices,
+      reducer, binary_op::kUseLhs, indptr, indices, rev_indptr, rev_indices,
       binary_op::kDst, binary_op::kEdge,
       src_mapping, NoneArray(), out_mapping,
       src_data, NoneArray(), out_data, grad_out_data,

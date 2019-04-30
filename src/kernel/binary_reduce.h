@@ -31,6 +31,8 @@ struct BcastInfo {
  * \param binary_op The type of the binary operator ("mul", "add").
  * \param indptr An int64 row offset array for the graph CSR.
  * \param indices An int64 column index array for the graph CSR.
+ * \param rev_indptr An int64 row offset array for the reverse graph CSR.
+ * \param rev_indices An int64 column index array for the reverse graph CSR.
  * \param src_mapping An optional int64 array for source node mapping. If empty,
  *                    source ids are consecutive integers [0, len(indptr) - 1).
  *                    Source ids are used to read source node data.
@@ -51,8 +53,8 @@ struct BcastInfo {
 runtime::NDArray SrcOpEdgeReduce(
     const std::string& reducer,
     const std::string& binary_op,
-    runtime::NDArray indptr,
-    runtime::NDArray indices,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
     runtime::NDArray src_mapping,
     runtime::NDArray edge_mapping,
     runtime::NDArray src_data,
@@ -69,6 +71,8 @@ runtime::NDArray SrcOpEdgeReduce(
  * \param binary_op The type of the mul functor ("mul", "add").
  * \param indptr An int64 row offset array for the graph CSR.
  * \param indices An int64 column index array for the graph CSR.
+ * \param rev_indptr An int64 row offset array for the reverse graph CSR.
+ * \param rev_indices An int64 column index array for the reverse graph CSR.
  * \param src_mapping An optional int64 array for source node mapping. If empty,
  *                    source ids are consecutive integers [0, len(indptr) - 1).
  *                    Source ids are used to read source node data.
@@ -90,8 +94,8 @@ runtime::NDArray SrcOpEdgeReduce(
 runtime::NDArray SrcOpDstReduce(
     const std::string& reducer,
     const std::string& binary_op,
-    runtime::NDArray indptr,
-    runtime::NDArray indices,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
     runtime::NDArray src_mapping,
     runtime::NDArray dst_mapping,
     runtime::NDArray src_data,
@@ -108,6 +112,8 @@ runtime::NDArray SrcOpDstReduce(
  *                Otherwise, a node feature tensor is returned.
  * \param indptr An int64 row offset array for the graph CSR.
  * \param indices An int64 column index array for the graph CSR.
+ * \param rev_indptr An int64 row offset array for the reverse graph CSR.
+ * \param rev_indices An int64 column index array for the reverse graph CSR.
  * \param src_mapping An optional int64 array for source node mapping. If empty,
  *                    source ids are consecutive integers [0, len(indptr) - 1).
  *                    Source ids are used to read source node data.
@@ -124,8 +130,8 @@ runtime::NDArray SrcOpDstReduce(
  */
 runtime::NDArray CopySrcReduce(
     const std::string& reducer,
-    runtime::NDArray indptr,
-    runtime::NDArray indices,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
     runtime::NDArray src_mapping,
     runtime::NDArray src_data,
     runtime::NDArray out_mapping,
@@ -139,6 +145,8 @@ runtime::NDArray CopySrcReduce(
  *                Otherwise, a node feature tensor is returned.
  * \param indptr An int64 row offset array for the graph CSR.
  * \param indices An int64 column index array for the graph CSR.
+ * \param rev_indptr An int64 row offset array for the reverse graph CSR.
+ * \param rev_indices An int64 column index array for the reverse graph CSR.
  * \param edge_mapping An optional int64 array for source node mapping. If empty,
  *                    source ids are consecutive integers [0, len(indptr) - 1).
  *                    Source ids are used to read source node data.
@@ -155,8 +163,8 @@ runtime::NDArray CopySrcReduce(
  */
 runtime::NDArray CopyEdgeReduce(
     const std::string& reducer,
-    runtime::NDArray indptr,
-    runtime::NDArray indices,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
     runtime::NDArray edge_mapping,
     runtime::NDArray edge_data,
     runtime::NDArray out_mapping,
@@ -171,6 +179,8 @@ runtime::NDArray CopyEdgeReduce(
  * \param binary_op The type of the binary operator ("mul", "add").
  * \param indptr An int64 row offset array for the graph CSR.
  * \param indices An int64 column index array for the graph CSR.
+ * \param rev_indptr An int64 row offset array for the reverse graph CSR.
+ * \param rev_indices An int64 column index array for the reverse graph CSR.
  * \param src_mapping An optional int64 array for source node mapping. If empty,
  *                    source ids are consecutive integers [0, len(indptr) - 1).
  *                    Source ids are used to read source node data.
@@ -190,8 +200,8 @@ runtime::NDArray CopyEdgeReduce(
 runtime::NDArray BackwardLhsSrcOpEdgeReduce(
     const std::string& reducer,
     const std::string& binary_op,
-    runtime::NDArray indptr,
-    runtime::NDArray indices,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
     runtime::NDArray src_mapping,
     runtime::NDArray edge_mapping,
     runtime::NDArray out_mapping,
@@ -206,8 +216,8 @@ namespace cpu {
 void BinaryReduceImpl(
     const std::string& reducer,
     const std::string& binary_op,
-    runtime::NDArray indptr,
-    runtime::NDArray indices,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
     binary_op::Target lhs,
     binary_op::Target rhs,
     runtime::NDArray lhs_mapping,
@@ -222,8 +232,8 @@ void BinaryReduceBcastImpl(
     const BcastInfo& info,
     const std::string& reducer,
     const std::string& binary_op,
-    runtime::NDArray indptr,
-    runtime::NDArray indices,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
     binary_op::Target lhs,
     binary_op::Target rhs,
     runtime::NDArray lhs_mapping,
@@ -238,8 +248,8 @@ void BinaryReduceBcastImpl(
 void BackwardBinaryReduceImpl(
     const std::string& reducer,
     const std::string& binary_op,
-    runtime::NDArray rev_indptr,
-    runtime::NDArray rev_indices,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
     binary_op::Target lhs,
     binary_op::Target rhs,
     runtime::NDArray lhs_mapping,
@@ -256,8 +266,8 @@ void BackwardBinaryReduceBcastImpl(
     const BcastInfo& info,
     const std::string& reducer,
     const std::string& binary_op,
-    runtime::NDArray rev_indptr,
-    runtime::NDArray rev_indices,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
     binary_op::Target lhs_tgt,
     binary_op::Target rhs_tgt,
     runtime::NDArray lhs_mapping,
@@ -278,8 +288,8 @@ namespace cuda {
 void BinaryReduceImpl(
     const std::string& reducer,
     const std::string& binary_op,
-    runtime::NDArray indptr,
-    runtime::NDArray indices,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
     binary_op::Target lhs,
     binary_op::Target rhs,
     runtime::NDArray lhs_mapping,
@@ -293,8 +303,8 @@ void BinaryReduceBcastImpl(
     const BcastInfo& info,
     const std::string& reducer,
     const std::string& binary_op,
-    runtime::NDArray indptr,
-    runtime::NDArray indices,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
     binary_op::Target lhs,
     binary_op::Target rhs,
     runtime::NDArray lhs_mapping,
@@ -309,8 +319,8 @@ void BinaryReduceBcastImpl(
 void BackwardBinaryReduceImpl(
     const std::string& reducer,
     const std::string& binary_op,
-    runtime::NDArray rev_indptr,
-    runtime::NDArray rev_indices,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
     binary_op::Target lhs,
     binary_op::Target rhs,
     runtime::NDArray lhs_mapping,
@@ -327,8 +337,8 @@ void BackwardBinaryReduceBcastImpl(
     const BcastInfo& info,
     const std::string& reducer,
     const std::string& binary_op,
-    runtime::NDArray rev_indptr,
-    runtime::NDArray rev_indices,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
     binary_op::Target lhs_tgt,
     binary_op::Target rhs_tgt,
     runtime::NDArray lhs_mapping,
