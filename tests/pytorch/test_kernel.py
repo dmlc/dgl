@@ -94,7 +94,10 @@ def test_src_op_edge_reduce():
     _test('sum', True, 'src')
     _test('sum', True, 'dst')
     _test('sum', True, 'edge')
-    #_test('max', True)
+    _test('max', True)
+    _test('max', True, 'src')
+    _test('max', True, 'dst')
+    _test('max', True, 'edge')
 
 
 def test_src_op_dst_reduce():
@@ -120,7 +123,13 @@ def test_src_op_dst_reduce():
             assert(allclose(f1.grad, g.ndata['f'].grad))
 
     _test('sum', True)
-    #_test('max', True)
+    _test('sum', True, 'src')
+    _test('sum', True, 'dst')
+    _test('sum', True, 'edge')
+    _test('max', True)
+    _test('max', True, 'src')
+    _test('max', True, 'dst')
+    _test('max', True, 'edge')
 
 
 def test_copy_src_reduce():
@@ -144,7 +153,7 @@ def test_copy_src_reduce():
             assert(allclose(n.grad, g.ndata['n'].grad))
 
     _test('sum', True)
-    #_test('max', True)
+    _test('max', True)
 
 
 def test_copy_edge_reduce():
@@ -168,7 +177,7 @@ def test_copy_edge_reduce():
             assert(allclose(e1.grad, g.edata['e'].grad))
 
     _test('sum', True)
-    #_test('max', True)
+    _test('max', True)
 
 
 if __name__ == '__main__':
