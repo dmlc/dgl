@@ -111,6 +111,10 @@ void BinaryReduceImpl(
   const DLDataType& dtype = out_data->dtype;
   const bool has_indirect =
     !(IsNoneArray(lhs_mapping) && IsNoneArray(rhs_mapping) && IsNoneArray(out_mapping));
+  if (reducer == binary_op::kReduceMean) {
+    // TODO(minjie): divide
+    LOG(FATAL) << "reduce mean is not supported.";
+  }
   DGL_DTYPE_SWITCH(dtype, DType, {
     REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {
       GData<DType> gdata = AllocGData<DType, Reducer>(
@@ -118,22 +122,11 @@ void BinaryReduceImpl(
           lhs_data, rhs_data, out_mapping, out_data);
       BINARY_OP_SWITCH(op, DType, BinaryOp, {
         TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-          if (has_indirect) {
-            typedef IndirectId<kDLGPU, int64_t> IdGetter;
-            CallBinaryReduce<DType, IdGetter, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
-          } else {
-            typedef DirectId<kDLGPU, int64_t> IdGetter;
-            CallBinaryReduce<DType, IdGetter, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
-          }
+          CallBinaryReduce<DType, LeftTarget,
+            RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
         });
       });
     });
-    if (reducer == binary_op::kReduceMean) {
-      // TODO(minjie): divide
-      LOG(FATAL) << "reduce mean is not supported.";
-    }
   });
 }
 
@@ -212,6 +205,10 @@ void BinaryReduceBcastImpl(
   const bool has_indirect =
     !(IsNoneArray(lhs_mapping) && IsNoneArray(rhs_mapping) && IsNoneArray(out_mapping));
   const int bcast_ndim = info.out_shape.size();
+  if (reducer == binary_op::kReduceMean) {
+    // TODO(minjie): divide
+    LOG(FATAL) << "reduce mean is not supported.";
+  }
   DGL_DTYPE_SWITCH(dtype, DType, {
     REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {
       BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
@@ -220,23 +217,12 @@ void BinaryReduceBcastImpl(
             lhs_data, rhs_data, out_mapping, out_data);
         BINARY_OP_SWITCH(op, DType, BinaryOp, {
           TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-            if (has_indirect) {
-              typedef IndirectId<kDLGPU, int64_t> IdGetter;
-              CallBinaryReduceBcast<NDim, DType, IdGetter, LeftTarget,
-                RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
-            } else {
-              typedef DirectId<kDLGPU, int64_t> IdGetter;
-              CallBinaryReduceBcast<NDim, DType, IdGetter, LeftTarget,
-                RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
-            }
+            CallBinaryReduceBcast<NDim, DType, LeftTarget,
+              RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
           });
         });
       });
     });
-    if (reducer == binary_op::kReduceMean) {
-      // TODO(minjie): divide
-      LOG(FATAL) << "reduce mean is not supported.";
-    }
   });
 }
 
@@ -313,33 +299,25 @@ void BackwardBinaryReduceImpl(
     !(IsNoneArray(lhs_mapping) && IsNoneArray(rhs_mapping) && IsNoneArray(out_mapping));
   const bool req_lhs = !IsNoneArray(grad_lhs_data);
   const bool req_rhs = !IsNoneArray(grad_rhs_data);
-  BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, {
-    DGL_DTYPE_SWITCH(dtype, DType, {
-      BackwardGData<DType> gdata = AllocBackwardGData<DType>(
-          rtcfg.stream, x_len,
-          lhs_mapping, rhs_mapping, out_mapping,
-          lhs_data, rhs_data, out_data, grad_out_data,
-          grad_lhs_data, grad_rhs_data);
-      //REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {
-        typedef ReduceSum<kDLGPU, DType> Reducer;
+  if (reducer == binary_op::kReduceMean) {
+    // TODO(minjie): divide
+    LOG(FATAL) << "reduce mean is not supported.";
+  }
+  DGL_DTYPE_SWITCH(dtype, DType, {
+    BackwardGData<DType> gdata = AllocBackwardGData<DType>(
+        rtcfg.stream, x_len,
+        lhs_mapping, rhs_mapping, out_mapping,
+        lhs_data, rhs_data, out_data, grad_out_data,
+        grad_lhs_data, grad_rhs_data);
+    BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, {
+      REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {
         BINARY_OP_SWITCH(op, DType, BinaryOp, {
           TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-            if (has_indirect) {
-              typedef IndirectId<kDLGPU, int64_t> IdGetter;
-              CallBackwardBinaryReduce<Mode, DType, IdGetter, LeftTarget,
-                RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
-            } else {
-              typedef DirectId<kDLGPU, int64_t> IdGetter;
-              CallBackwardBinaryReduce<Mode, DType, IdGetter, LeftTarget,
-                RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
-            }
+            CallBackwardBinaryReduce<Mode, DType, LeftTarget,
+              RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
           });
         });
-      //});
-      if (reducer == binary_op::kReduceMean) {
-        // TODO(minjie): divide
-        LOG(FATAL) << "reduce mean is not supported.";
-      }
+      });
     });
   });
 }
@@ -429,35 +407,27 @@ void BackwardBinaryReduceBcastImpl(
   const int bcast_ndim = info.out_shape.size();
   const bool req_lhs = !IsNoneArray(grad_lhs);
   const bool req_rhs = !IsNoneArray(grad_rhs);
-  BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, {
-    DGL_DTYPE_SWITCH(dtype, DType, {
-      BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
-        BackwardBcastGData<NDim, DType> gdata = AllocBackwardBcastGData<NDim, DType>(
-            rtcfg.stream, info,
-            lhs_mapping, rhs_mapping, out_mapping,
-            lhs, rhs, out, grad_out,
-            grad_lhs, grad_rhs);
-        //REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {
-        typedef ReduceSum<kDLGPU, DType> Reducer;
+  if (reducer == binary_op::kReduceMean) {
+    // TODO(minjie): divide
+    LOG(FATAL) << "reduce mean is not supported.";
+  }
+  DGL_DTYPE_SWITCH(dtype, DType, {
+    BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
+      BackwardBcastGData<NDim, DType> gdata = AllocBackwardBcastGData<NDim, DType>(
+          rtcfg.stream, info,
+          lhs_mapping, rhs_mapping, out_mapping,
+          lhs, rhs, out, grad_out,
+          grad_lhs, grad_rhs);
+      BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, {
+        REDUCER_SWITCH(reducer, kDLGPU, DType, Reducer, {
           BINARY_OP_SWITCH(op, DType, BinaryOp, {
             TARGET_SWITCH(lhs_tgt, rhs_tgt, LeftTarget, RightTarget, {
-              if (has_indirect) {
-                typedef IndirectId<kDLGPU, int64_t> IdGetter;
-                CallBackwardBinaryReduceBcast<Mode, NDim, DType, IdGetter, LeftTarget,
-                  RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
-              } else {
-                typedef DirectId<kDLGPU, int64_t> IdGetter;
-                CallBackwardBinaryReduceBcast<Mode, NDim, DType, IdGetter, LeftTarget,
-                  RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
-              }
+              CallBackwardBinaryReduceBcast<Mode, NDim, DType, LeftTarget,
+                RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
             });
           });
-        //});
+        });
       });
-      if (reducer == binary_op::kReduceMean) {
-        // TODO(minjie): divide
-        LOG(FATAL) << "reduce mean is not supported.";
-      }
     });
   });
 }

@@ -277,7 +277,7 @@ NDArray CopySrcReduce(
     const int64_t out_size) {
   return BinaryOpReduce(reducer, binary_op::kUseLhs,
       indptr, indices, rev_indptr, rev_indices,
-      binary_op::kSrc, binary_op::kDst,
+      binary_op::kSrc, binary_op::kEdge,
       src_mapping, NoneArray(),
       src_data, NoneArray(),
       out_mapping, out_size);

@@ -25,9 +25,15 @@ struct BinaryReduce {
     int64_t lid = Functors::SelectLeft(src, eid, dst);
     int64_t rid = Functors::SelectRight(src, eid, dst);
     int64_t oid = Functors::SelectOut(src, eid, dst);
-    lid = Functors::GetId(lid, gdata->lhs_mapping);
-    rid = Functors::GetId(rid, gdata->rhs_mapping);
-    oid = Functors::GetId(oid, gdata->out_mapping);
+    if (gdata->lhs_mapping) {
+      lid = Functors::GetId(lid, gdata->lhs_mapping);
+    }
+    if (gdata->rhs_mapping) {
+      rid = Functors::GetId(rid, gdata->rhs_mapping);
+    }
+    if (gdata->out_mapping) {
+      oid = Functors::GetId(oid, gdata->out_mapping);
+    }
     DType* lhsoff = gdata->lhs_data + lid * D;
     DType* rhsoff = gdata->rhs_data + rid * D;
     DType* outoff = gdata->out_data + oid * D;
@@ -70,9 +76,15 @@ struct BinaryReduceBcast {
     int64_t lid = Functors::SelectLeft(src, eid, dst);
     int64_t rid = Functors::SelectRight(src, eid, dst);
     int64_t oid = Functors::SelectOut(src, eid, dst);
-    lid = Functors::GetId(lid, gdata->lhs_mapping);
-    rid = Functors::GetId(rid, gdata->rhs_mapping);
-    oid = Functors::GetId(oid, gdata->out_mapping);
+    if (gdata->lhs_mapping) {
+      lid = Functors::GetId(lid, gdata->lhs_mapping);
+    }
+    if (gdata->rhs_mapping) {
+      rid = Functors::GetId(rid, gdata->rhs_mapping);
+    }
+    if (gdata->out_mapping) {
+      oid = Functors::GetId(oid, gdata->out_mapping);
+    }
     DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len;
     DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len;
     DType* outoff = gdata->out_data + oid * gdata->out_len;
@@ -90,7 +102,7 @@ struct BinaryReduceBcast {
   }
 };
 
-template <typename DType, typename IdGetter,
+template <typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 struct FunctorsTempl {
@@ -116,13 +128,13 @@ struct FunctorsTempl {
     Reducer::Call(addr, val);
   }
   static __device__ __forceinline__ int64_t GetId(int64_t id, int64_t* id_map) {
-    return IdGetter::Call(id, id_map);
+    return LDGReader<int64_t>::Call(id_map + id);
   }
 };
 
 typedef minigun::advance::Config<true, minigun::advance::kV2N> AdvanceConfig;
 
-template <typename DType, typename IdGetter,
+template <typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduce(
@@ -131,7 +143,7 @@ void CallBinaryReduce(
     const minigun::Csr& rev_csr,
     GData<DType>* gdata) {
   using minigun::IntArray1D;
-  typedef FunctorsTempl<DType, IdGetter, LeftSelector,
+  typedef FunctorsTempl<DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer>
           Functors;
   typedef BinaryReduce<DType, Functors> UDF;
@@ -140,7 +152,7 @@ void CallBinaryReduce(
         rtcfg, csr, gdata, IntArray1D());
 }
 
-template <int NDim, typename DType, typename IdGetter,
+template <int NDim, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduceBcast(
@@ -149,7 +161,7 @@ void CallBinaryReduceBcast(
     const minigun::Csr& rev_csr,
     BcastGData<NDim, DType>* gdata) {
   using minigun::IntArray1D;
-  typedef FunctorsTempl<DType, IdGetter, LeftSelector,
+  typedef FunctorsTempl<DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer>
           Functors;
   typedef BinaryReduceBcast<NDim, DType, Functors> UDF;
@@ -160,7 +172,7 @@ void CallBinaryReduceBcast(
 }
 
 #define GEN_DEFINE(dtype, lhs_tgt, rhs_tgt, op)                    \
-  template void CallBinaryReduce<dtype, GETID<XPU, int64_t>,       \
+  template void CallBinaryReduce<dtype,                            \
                                  lhs_tgt, rhs_tgt,                 \
                                  op<dtype>, REDUCER<XPU, dtype>>(  \
       const minigun::advance::RuntimeConfig& rtcfg,                \
@@ -169,7 +181,7 @@ void CallBinaryReduceBcast(
       GData<dtype>* gdata);
 
 #define GEN_BCAST_DEFINE(ndim, dtype, lhs_tgt, rhs_tgt, op)              \
-  template void CallBinaryReduceBcast<ndim, dtype, GETID<XPU, int64_t>,  \
+  template void CallBinaryReduceBcast<ndim, dtype,                       \
                                  lhs_tgt, rhs_tgt,                       \
                                  op<dtype>, REDUCER<XPU, dtype>>(        \
       const minigun::advance::RuntimeConfig& rtcfg,                      \
