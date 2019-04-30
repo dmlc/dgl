@@ -41,6 +41,14 @@ inline int64_t Prod(const std::vector<int64_t>& vec) {
   }
   return ret;
 }
+inline Csr CreateCsr(NDArray indptr, NDArray indices) {
+  Csr csr;
+  csr.row_offsets.data = static_cast<mg_int*>(indptr->data);
+  csr.row_offsets.length = indptr->shape[0];
+  csr.column_indices.data = static_cast<mg_int*>(indices->data);
+  csr.column_indices.length = indices->shape[0];
+  return csr;
+}
 }  // namespace
 
 template <typename DType, typename Reducer>
@@ -85,11 +93,9 @@ void BinaryReduceImpl(
   auto device = runtime::DeviceAPI::Get(out_data->ctx);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   // Graph
-  Csr csr;
-  csr.row_offsets.data = static_cast<mg_int*>(indptr->data);
-  csr.row_offsets.length = indptr->shape[0];
-  csr.column_indices.data = static_cast<mg_int*>(indices->data);
-  csr.column_indices.length = indices->shape[0];
+  Csr csr = CreateCsr(indptr, indices);
+  Csr rev_csr = CreateCsr(rev_indptr, rev_indices);
+
   const int64_t x_len = ComputeXLength(out_data);
 
   // advance config
@@ -115,11 +121,11 @@ void BinaryReduceImpl(
           if (has_indirect) {
             typedef IndirectId<kDLGPU, int64_t> IdGetter;
             CallBinaryReduce<DType, IdGetter, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, csr, &gdata);
+              RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
           } else {
             typedef DirectId<kDLGPU, int64_t> IdGetter;
             CallBinaryReduce<DType, IdGetter, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, csr, &gdata);
+              RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
           }
         });
       });
@@ -187,11 +193,9 @@ void BinaryReduceBcastImpl(
   auto device = runtime::DeviceAPI::Get(out_data->ctx);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   // Graph
-  Csr csr;
-  csr.row_offsets.data = static_cast<mg_int*>(indptr->data);
-  csr.row_offsets.length = indptr->shape[0];
-  csr.column_indices.data = static_cast<mg_int*>(indices->data);
-  csr.column_indices.length = indices->shape[0];
+  Csr csr = CreateCsr(indptr, indices);
+  Csr rev_csr = CreateCsr(rev_indptr, rev_indices);
+
   const int64_t x_len = ComputeXLength(out_data);
 
   // advance config
@@ -219,11 +223,11 @@ void BinaryReduceBcastImpl(
             if (has_indirect) {
               typedef IndirectId<kDLGPU, int64_t> IdGetter;
               CallBinaryReduceBcast<NDim, DType, IdGetter, LeftTarget,
-                RightTarget, BinaryOp, Reducer>(rtcfg, csr, &gdata);
+                RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
             } else {
               typedef DirectId<kDLGPU, int64_t> IdGetter;
               CallBinaryReduceBcast<NDim, DType, IdGetter, LeftTarget,
-                RightTarget, BinaryOp, Reducer>(rtcfg, csr, &gdata);
+                RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
             }
           });
         });
@@ -289,11 +293,9 @@ void BackwardBinaryReduceImpl(
   auto device = runtime::DeviceAPI::Get(out_data->ctx);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   // Graph
-  Csr csr;
-  csr.row_offsets.data = static_cast<mg_int*>(rev_indptr->data);
-  csr.row_offsets.length = rev_indptr->shape[0];
-  csr.column_indices.data = static_cast<mg_int*>(rev_indices->data);
-  csr.column_indices.length = rev_indices->shape[0];
+  Csr csr = CreateCsr(indptr, indices);
+  Csr rev_csr = CreateCsr(rev_indptr, rev_indices);
+
   const int64_t x_len = ComputeXLength(out_data);
 
   // advance config
@@ -325,11 +327,11 @@ void BackwardBinaryReduceImpl(
             if (has_indirect) {
               typedef IndirectId<kDLGPU, int64_t> IdGetter;
               CallBackwardBinaryReduce<Mode, DType, IdGetter, LeftTarget,
-                RightTarget, BinaryOp, Reducer>(rtcfg, csr, &gdata);
+                RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
             } else {
               typedef DirectId<kDLGPU, int64_t> IdGetter;
               CallBackwardBinaryReduce<Mode, DType, IdGetter, LeftTarget,
-                RightTarget, BinaryOp, Reducer>(rtcfg, csr, &gdata);
+                RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
             }
           });
         });
@@ -406,11 +408,9 @@ void BackwardBinaryReduceBcastImpl(
   auto device = runtime::DeviceAPI::Get(out->ctx);
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
   // Graph
-  Csr csr;
-  csr.row_offsets.data = static_cast<mg_int*>(rev_indptr->data);
-  csr.row_offsets.length = rev_indptr->shape[0];
-  csr.column_indices.data = static_cast<mg_int*>(rev_indices->data);
-  csr.column_indices.length = rev_indices->shape[0];
+  Csr csr = CreateCsr(indptr, indices);
+  Csr rev_csr = CreateCsr(rev_indptr, rev_indices);
+
   const int64_t x_len = ComputeXLength(out);
 
   // advance config
@@ -444,11 +444,11 @@ void BackwardBinaryReduceBcastImpl(
               if (has_indirect) {
                 typedef IndirectId<kDLGPU, int64_t> IdGetter;
                 CallBackwardBinaryReduceBcast<Mode, NDim, DType, IdGetter, LeftTarget,
-                  RightTarget, BinaryOp, Reducer>(rtcfg, csr, &gdata);
+                  RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
               } else {
                 typedef DirectId<kDLGPU, int64_t> IdGetter;
                 CallBackwardBinaryReduceBcast<Mode, NDim, DType, IdGetter, LeftTarget,
-                  RightTarget, BinaryOp, Reducer>(rtcfg, csr, &gdata);
+                  RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
               }
             });
           });

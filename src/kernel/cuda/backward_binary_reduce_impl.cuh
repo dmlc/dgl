@@ -144,7 +144,7 @@ template <int Mode, typename DType, typename IdGetter,
           typename BinaryOp, typename Reducer>
 void CallBackwardBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
-    const minigun::Csr& csr,
+    const minigun::Csr& csr, const minigun::Csr& rev_csr,
     BackwardGData<DType>* gdata) {
   using minigun::IntArray1D;
   typedef BackwardFunctorsTempl<DType, IdGetter, LeftSelector,
@@ -153,7 +153,7 @@ void CallBackwardBinaryReduce(
   typedef BackwardBinaryReduce<Mode, DType, Functors> UDF;
   // TODO(minjie): allocator
   minigun::advance::Advance<kDLGPU, AdvanceConfig, BackwardGData<DType>, UDF>(
-        rtcfg, csr, gdata, IntArray1D());
+        rtcfg, rev_csr, gdata, IntArray1D());
 }
 
 template <int Mode, int NDim, typename DType, typename IdGetter,
@@ -161,7 +161,7 @@ template <int Mode, int NDim, typename DType, typename IdGetter,
           typename BinaryOp, typename Reducer>
 void CallBackwardBinaryReduceBcast(
     const minigun::advance::RuntimeConfig& rtcfg,
-    const minigun::Csr& csr,
+    const minigun::Csr& csr, const minigun::Csr& rev_csr,
     BackwardBcastGData<NDim, DType>* gdata) {
   using minigun::IntArray1D;
   typedef BackwardFunctorsTempl<DType, IdGetter, LeftSelector,
@@ -171,7 +171,7 @@ void CallBackwardBinaryReduceBcast(
   // TODO(minjie): allocator
   minigun::advance::Advance<kDLGPU, AdvanceConfig,
     BackwardBcastGData<NDim, DType>, UDF>(
-        rtcfg, csr, gdata, IntArray1D());
+        rtcfg, rev_csr, gdata, IntArray1D());
 }
 
 #define GEN_BACKWARD_DEFINE(mode, dtype, lhs_tgt, rhs_tgt, op)  \
@@ -181,6 +181,7 @@ void CallBackwardBinaryReduceBcast(
                     op<dtype>, REDUCER<XPU, dtype>>(            \
       const minigun::advance::RuntimeConfig& rtcfg,             \
       const minigun::Csr& csr,                                  \
+      const minigun::Csr& rev_csr,                              \
       BackwardGData<dtype>* gdata);
 
 #define GEN_BACKWARD_BCAST_DEFINE(mode, ndim, dtype, lhs_tgt, rhs_tgt, op)  \
@@ -190,6 +191,7 @@ void CallBackwardBinaryReduceBcast(
                     op<dtype>, REDUCER<XPU, dtype>>(                        \
       const minigun::advance::RuntimeConfig& rtcfg,                         \
       const minigun::Csr& csr,                                              \
+      const minigun::Csr& rev_csr,                                          \
       BackwardBcastGData<ndim, dtype>* gdata);
 
 }  // namespace cuda

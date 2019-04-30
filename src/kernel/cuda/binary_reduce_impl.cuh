@@ -128,6 +128,7 @@ template <typename DType, typename IdGetter,
 void CallBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
     const minigun::Csr& csr,
+    const minigun::Csr& rev_csr,
     GData<DType>* gdata) {
   using minigun::IntArray1D;
   typedef FunctorsTempl<DType, IdGetter, LeftSelector,
@@ -145,6 +146,7 @@ template <int NDim, typename DType, typename IdGetter,
 void CallBinaryReduceBcast(
     const minigun::advance::RuntimeConfig& rtcfg,
     const minigun::Csr& csr,
+    const minigun::Csr& rev_csr,
     BcastGData<NDim, DType>* gdata) {
   using minigun::IntArray1D;
   typedef FunctorsTempl<DType, IdGetter, LeftSelector,
@@ -157,20 +159,22 @@ void CallBinaryReduceBcast(
         rtcfg, csr, gdata, IntArray1D());
 }
 
-#define GEN_DEFINE(dtype, lhs_tgt, rhs_tgt, op) \
-  template void CallBinaryReduce<dtype, GETID<XPU, int64_t>, \
-                                 lhs_tgt, rhs_tgt, \
-                                 op<dtype>, REDUCER<XPU, dtype>>( \
-      const minigun::advance::RuntimeConfig& rtcfg, \
-      const minigun::Csr& csr, \
+#define GEN_DEFINE(dtype, lhs_tgt, rhs_tgt, op)                    \
+  template void CallBinaryReduce<dtype, GETID<XPU, int64_t>,       \
+                                 lhs_tgt, rhs_tgt,                 \
+                                 op<dtype>, REDUCER<XPU, dtype>>(  \
+      const minigun::advance::RuntimeConfig& rtcfg,                \
+      const minigun::Csr& csr,                                     \
+      const minigun::Csr& rev_csr,                                 \
       GData<dtype>* gdata);
 
-#define GEN_BCAST_DEFINE(ndim, dtype, lhs_tgt, rhs_tgt, op) \
-  template void CallBinaryReduceBcast<ndim, dtype, GETID<XPU, int64_t>, \
-                                 lhs_tgt, rhs_tgt, \
-                                 op<dtype>, REDUCER<XPU, dtype>>( \
-      const minigun::advance::RuntimeConfig& rtcfg, \
-      const minigun::Csr& csr, \
+#define GEN_BCAST_DEFINE(ndim, dtype, lhs_tgt, rhs_tgt, op)              \
+  template void CallBinaryReduceBcast<ndim, dtype, GETID<XPU, int64_t>,  \
+                                 lhs_tgt, rhs_tgt,                       \
+                                 op<dtype>, REDUCER<XPU, dtype>>(        \
+      const minigun::advance::RuntimeConfig& rtcfg,                      \
+      const minigun::Csr& csr,                                           \
+      const minigun::Csr& rev_csr,                                       \
       BcastGData<ndim, dtype>* gdata);
 
 #define EVAL(F, ...) F(__VA_ARGS__)

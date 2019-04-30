@@ -36,7 +36,7 @@ template <typename DType, typename IdGetter,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
-    const minigun::Csr& csr,
+    const minigun::Csr& csr, const minigun::Csr& rev_csr,
     GData<DType>* gdata);
 
 // Backward binary reduce
@@ -61,7 +61,7 @@ template <int Mode, typename DType, typename IdGetter,
           typename BinaryOp, typename Reducer>
 void CallBackwardBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
-    const minigun::Csr& csr,
+    const minigun::Csr& csr, const minigun::Csr& rev_csr,
     BackwardGData<DType>* gdata);
 
 
@@ -97,7 +97,7 @@ template <int NDim, typename DType, typename IdGetter,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduceBcast(
     const minigun::advance::RuntimeConfig& rtcfg,
-    const minigun::Csr& csr,
+    const minigun::Csr& csr, const minigun::Csr& rev_csr,
     BcastGData<NDim, DType>* gdata);
 
 /*
@@ -130,7 +130,7 @@ template <int Mode, int NDim, typename DType, typename IdGetter,
           typename BinaryOp, typename Reducer>
 void CallBackwardBinaryReduceBcast(
     const minigun::advance::RuntimeConfig& rtcfg,
-    const minigun::Csr& csr,
+    const minigun::Csr& csr, const minigun::Csr& rev_csr,
     BackwardBcastGData<NDim, DType>* gdata);
 
 }  // namespace cuda
