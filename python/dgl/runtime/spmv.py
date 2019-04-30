@@ -4,7 +4,7 @@ from __future__ import absolute_import
 from ..base import DGLError
 from .. import backend as F
 from .. import utils
-from .. import ndarray
+from .. import ndarray as nd
 
 from . import ir
 from .ir import var
@@ -129,11 +129,19 @@ def build_adj_matrix_graph(graph):
         Get be used to get adjacency matrix on the provided ctx.
     """
     gidx = graph._graph
-    shuffle_idx = gidx.csr_adjacency_matrix(True, ndarray.cpu())[2]
-    inv_shuffle_idx = gidx.csr_adjacency_matrix(False, ndarray.cpu())[2]
+
+    def edge_map(ctx):
+        return gidx.csr_adjacency_matrix(True, ctx)[2]
+
+    def inv_edge_map(ctx):
+        return gidx.csr_adjacency_matrix(False, ctx)[2]
+
+    msg_map = edge_map
+    inv_msg_map = inv_edge_map
+
     return lambda ctx: (gidx.csr_adjacency_matrix(True, ctx)[:2] +
                         gidx.csr_adjacency_matrix(False, ctx)[:2]), \
-        utils.Index(shuffle_idx), utils.Index(inv_shuffle_idx)
+        edge_map, inv_edge_map, msg_map, inv_msg_map
 
 
 def _build_adj_matrix_index_uv(u, v, num_src, num_dst):
@@ -172,18 +180,17 @@ def _build_adj_matrix_index_uv(u, v, num_src, num_dst):
     dat = np.arange(len(v), dtype=np.int64)
     csr = sp.csr_matrix((dat, (u, v)), shape=(num_src, num_dst))
     inv_csr = sp.csr_matrix((dat, (v, u)), shape=(num_dst, num_src))
-    indptr = F.zerocopy_from_numpy(csr.indptr.astype(np.int64))
-    indices = F.zerocopy_from_numpy(csr.indices.astype(np.int64))
-    shuffle_idx = F.zerocopy_from_numpy(csr.data)
-    inv_indptr = F.zerocopy_from_numpy(inv_csr.indptr.astype(np.int64))
-    inv_indices = F.zerocopy_from_numpy(inv_csr.indices.astype(np.int64))
-    inv_shuffle_idx = F.zerocopy_from_numpy(inv_csr.data)
-    spmat = (indptr, indices, shuffle_idx)
-    inv_spmat = (inv_indptr, inv_indices, inv_shuffle_idx)
-    return spmat, inv_spmat
+    spmat = (csr.indptr.astype(np.int64),
+             csr.indices.astype(np.int64),
+             csr.data,
+             inv_csr.indptr.astype(np.int64),
+             inv_csr.indices.astype(np.int64),
+             inv_csr.data)
+    spmat = list(map(F.zerocopy_from_numpy, spmat))
+    return spmat
 
 
-def build_adj_matrix_uv(u, v, num_src, num_dst):
+def build_adj_matrix_uv(edge_tuples, num_src, num_dst):
     """Build adj matrix using the given (u, v) edges and target nodes.
 
     The matrix is of shape (len(reduce_nodes), n), where n is the number of
@@ -210,18 +217,23 @@ def build_adj_matrix_uv(u, v, num_src, num_dst):
         A index for data shuffling due to sparse format change. Return None
         if shuffle is not required.
     """
-    spmat, inv_spmat = _build_adj_matrix_index_uv(u, v, num_src, num_dst)
-    shuffle_idx = utils.Index(spmat[2])
-    inv_shuffle_idx = utils.Index(inv_spmat[2])
+    u, v, eid = edge_tuples
+    eid = eid.tousertensor()
+    res = _build_adj_matrix_index_uv(u, v, num_src, num_dst)
+    edge_map = F.zerocopy_to_dgl_ndarray(eid[res[2]])
+    inv_edge_map = F.zerocopy_to_dgl_ndarray(eid[res[5]])
+    res = list(map(F.zerocopy_to_dgl_ndarray, res))
+    indptr, indices, msg_map, inv_indptr, inv_indices, inv_msg_map= res
 
-    def copy_to(ctx):
-        indptr = ndarray.array(spmat[0], ctx=ctx)
-        indices = ndarray.array(spmat[1], ctx=ctx)
-        inv_indptr = ndarray.array(inv_spmat[0], ctx=ctx)
-        inv_indices = ndarray.array(inv_spmat[1], ctx=ctx)
-        return indptr, indices, inv_indptr, inv_indices
+    def spmat(ctx):
+        return list(map(lambda x: nd.array(x, ctx=ctx),
+                        (indptr, indices, inv_indptr, inv_indices)))
 
-    return utils.CtxCachedObject(copy_to), shuffle_idx, inv_shuffle_idx
+    return utils.CtxCachedObject(spmat), \
+        utils.CtxCachedObject(lambda ctx: nd.array(edge_map, ctx=ctx)), \
+        utils.CtxCachedObject(lambda ctx: nd.array(inv_edge_map, ctx=ctx)), \
+        utils.CtxCachedObject(lambda ctx: nd.array(msg_map, ctx=ctx)), \
+        utils.CtxCachedObject(lambda ctx: nd.array(inv_msg_map, ctx=ctx)) \
 
 
 def build_block_adj_matrix_graph(graph, block_id):

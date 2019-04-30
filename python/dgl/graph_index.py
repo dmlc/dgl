@@ -404,7 +404,7 @@ class GraphIndex(object):
         return src, dst, eid
 
     @utils.cached_member(cache='_cache', prefix='edges')
-    def edges(self, order=None):
+    def edges(self, order=None, ctx=None):
         """Return all the edges
 
         Parameters
@@ -425,16 +425,20 @@ class GraphIndex(object):
         utils.Index
             The edge ids.
         """
-        key = 'edges_s%s' % order
-        if key not in self._cache:
-            if order is None:
-                order = ""
-            edge_array = _CAPI_DGLGraphEdges(self._handle, order)
-            src = utils.toindex(edge_array(0))
-            dst = utils.toindex(edge_array(1))
-            eid = utils.toindex(edge_array(2))
-            self._cache[key] = (src, dst, eid)
-        return self._cache[key]
+        if order is None:
+            order = ""
+        edge_array = _CAPI_DGLGraphEdges(self._handle, order)
+        src = edge_array(0)
+        dst = edge_array(1)
+        eid = edge_array(2)
+        if ctx and ctx.device_type != 1: # not on cpu
+            src = ndarray.array(src, ctx=ctx)
+            dst = ndarray.array(dst, ctx=ctx)
+            eid = ndarray.array(eid, ctx=ctx)
+        src = utils.toindex(src)
+        dst = utils.toindex(dst)
+        eid = utils.toindex(eid)
+        return src, dst, eid
 
     def in_degree(self, v):
         """Return the in degree of the node.

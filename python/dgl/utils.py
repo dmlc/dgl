@@ -513,3 +513,9 @@ def unwrap_to_ptr_list(wrapper):
     rst = [ctypes.c_void_p(x) for x in data.contents]
     _api_internal._FreeVectorWrapper(wrapper)
     return rst
+
+def to_dgl_context(ctx):
+    """Convert a backend context to DGLContext"""
+    device_type = nd.DGLContext.STR2MASK[F.device_type(ctx)]
+    device_id = F.device_id(ctx)
+    return nd.DGLContext(device_type, device_id)

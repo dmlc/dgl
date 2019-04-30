@@ -6,7 +6,7 @@ import torch as th
 from torch.utils import dlpack
 
 from ... import ndarray as nd
-from ... import kernel as knl
+from ... import kernel as K
 
 TH_VERSION = LooseVersion(th.__version__)
 
@@ -205,18 +205,37 @@ class SrcOpEdgeReduce(th.autograd.Function):
         edge_data = zerocopy_to_dgl_ndarray(edge_data)
         if reducer == "none":
             forward_out_map = out_map[0]
+            backward_out_map = out_map[1]
         else:
             forward_out_map = out_map
-        out = knl.src_op_edge_reduce(reducer, binary_op, spmat[0], spmat[1],
-                                     src_map, edge_map[0], src_data,
-                                     edge_data, forward_out_map, out_size)
-        ctx.save_for_backward(reducer, binary_op, spmat, src_map, edge_map,
-                              src_data, edge_data, out_map)
-        return zerocopy_from_dgl_ndarray(out)
+            backward_out_map = out_map
+        out_data = K.src_op_edge_reduce(
+            reducer, binary_op, spmat[0], spmat[1], src_map, edge_map[0],
+            src_data, edge_data, forward_out_map, out_size)
+        # save_for_backward can only save variables
+        ctx.backward_cache = (reducer, binary_op, spmat, src_map, edge_map,
+                              backward_out_map, src_data, edge_data, out_data)
+        return zerocopy_from_dgl_ndarray(out_data)
 
     @staticmethod
     def backward(ctx, grad_out):
-        reducer, inv_adj, src_data, edge_data = ctx.saved_variable
+        reducer, binary_op, spmat, src_map, edge_map, backward_out_map, \
+            src_data, edge_data, out_data = ctx.backward_cache
+        ctx.backward_cache = None
+        grad_src = None
+        grad_edge = None
+        grad_out = zerocopy_to_dgl_ndarray(grad_out)
+        if ctx.needs_input_grad[3]:
+            grad_src = K.backward_lhs_src_mul_edge_reduce(
+                reducer, binary_op, spmat[2], spmat[3], src_map, edge_map[1],
+                backward_out_map, src_data, edge_data, out_data, grad_out)
+            grad_src = zerocopy_from_dgl_ndarray(grad_src)
+        if ctx.needs_input_grad[4]:
+            grad_edge = K.backward_rhs_src_mul_edge_reduce(
+                reducer, binary_op, spmat[2], spmat[3], src_map, edge_map[1],
+                backward_out_map, src_data, edge_data, out_data, grad_out)
+            grad_edge = zerocopy_from_dgl_ndarray(grad_edge)
+        return None, None, None, grad_src, grad_edge, None, None, None, None
 
 
 class SrcOpDstReduce(th.autograd.Function):
@@ -227,18 +246,37 @@ class SrcOpDstReduce(th.autograd.Function):
         dst_data = zerocopy_to_dgl_ndarray(dst_data)
         if reducer == "none":
             forward_out_map = out_map[0]
+            backward_out_map = out_map[1]
         else:
             forward_out_map = out_map
-        out = knl.src_op_dst_reduce(reducer, binary_op, spmat[0], spmat[1],
-                                    src_map, dst_map, src_data, dst_data,
-                                    forward_out_map, out_size)
-        ctx.save_for_backward(reducer, binary_op, spmat, src_map, dst_map,
-                              src_data, dst_data, out_map)
-        return zerocopy_from_dgl_ndarray(out)
+            backward_out_map = out_map
+        out_data = K.src_op_dst_reduce(
+            reducer, binary_op, spmat[0], spmat[1], src_map, dst_map, src_data,
+            dst_data, forward_out_map, out_size)
+        # save_for_backward can only save variables
+        ctx.backward_cache = (reducer, binary_op, spmat, src_map, dst_map,
+                              backward_out_map, src_data, dst_data, out_data)
+        return zerocopy_from_dgl_ndarray(out_data)
 
     @staticmethod
     def backward(ctx, grad_out):
-        reducer, inv_adj, src_data, dst_data = ctx.saved_variable
+        reducer, binary_op, spmat, src_map, dst_map, backward_out_map, \
+            src_data, dst_data, out_data = ctx.backward_cache
+        ctx.backward_cache = None
+        grad_src = None
+        grad_dst = None
+        grad_out = zerocopy_to_dgl_ndarray(grad_out)
+        if ctx.needs_input_grad[3]:
+            grad_src = K.backward_lhs_src_mul_dst_reduce(
+                reducer, binary_op, spmat[2], spmat[3], src_map, dst_map,
+                backward_out_map, src_data, dst_data, out_data, grad_out)
+            grad_src = zerocopy_from_dgl_ndarray(grad_src)
+        if ctx.needs_input_grad[4]:
+            grad_dst = K.backward_rhs_src_mul_dst_reduce(
+                reducer, binary_op, spmat[2], spmat[3], src_map, dst_map,
+                backward_out_map, src_data, dst_data, out_data, grad_out)
+            grad_dst = zerocopy_from_dgl_ndarray(grad_dst)
+        return None, None, None, grad_src, grad_dst, None, None, None, None
 
 
 class CopySrcReduce(th.autograd.Function):
@@ -246,17 +284,32 @@ class CopySrcReduce(th.autograd.Function):
     def forward(ctx, reducer, spmat, src_data, out_size, src_map, out_map):
         if reducer == "none":
             forward_out_map = out_map[0]
+            backward_out_map = out_map[1]
         else:
             forward_out_map = out_map
+            backward_out_map = out_map
         src_data = zerocopy_to_dgl_ndarray(src_data)
-        out = knl.copy_src_reduce(reducer, spmat[0], spmat[1], src_map,
-                                  src_data, forward_out_map, out_size)
-        ctx.save_for_backward(reducer, spmat, src_data, src_map, out_map)
-        return zerocopy_from_dgl_ndarray(out)
+        out_data = K.copy_src_reduce(
+            reducer, spmat[0], spmat[1], src_map, src_data, forward_out_map,
+            out_size)
+        # save_for_backward can only save variables
+        ctx.backward_cache = (reducer, spmat, src_map, backward_out_map,
+                              src_data, out_data)
+        return zerocopy_from_dgl_ndarray(out_data)
 
     @staticmethod
     def backward(ctx, grad_out):
-        reducer, inv_adj, src_data = ctx.saved_variable
+        reducer, spmat, src_map, backward_out_map, src_data, out_data \
+            = ctx.backward_cache
+        ctx.backward_cache = None
+        grad_src = None
+        grad_out = zerocopy_to_dgl_ndarray(grad_out)
+        if ctx.needs_input_grad[2]:
+            grad_src = K.backward_copy_src_reduce(
+                reducer, spmat[2], spmat[3], src_map, backward_out_map,
+                src_data, out_data, grad_out)
+            grad_src = zerocopy_from_dgl_ndarray(grad_src)
+        return None, None, grad_src, None, None, None
 
 
 class CopyEdgeReduce(th.autograd.Function):
@@ -265,16 +318,31 @@ class CopyEdgeReduce(th.autograd.Function):
         edge_data = zerocopy_to_dgl_ndarray(edge_data)
         if reducer == "none":
             forward_out_map = out_map[0]
+            backward_out_map = out_map[1]
         else:
             forward_out_map = out_map
-        out = knl.copy_edge_reduce(reducer, spmat[0], spmat[1], edge_map[0],
-                                   edge_data, forward_out_map, out_size)
-        ctx.save_for_backward(reducer, spmat, edge_data, edge_map, out_map)
-        return zerocopy_from_dgl_ndarray(out)
+            backward_out_map = out_map
+        out_data = K.copy_edge_reduce(
+            reducer, spmat[0], spmat[1], edge_map[0], edge_data,
+            forward_out_map, out_size)
+        # save_for_backward can only save variables
+        ctx.backward_cache = (reducer, spmat, edge_map, backward_out_map,
+                              edge_data, out_data)
+        return zerocopy_from_dgl_ndarray(out_data)
 
     @staticmethod
     def backward(ctx, grad_out):
-        reducer, inv_adj, edge_data = ctx.saved_variable
+        reducer, spmat, edge_map, backward_out_map, edge_data, out_data \
+            = ctx.backward_cache
+        ctx.backward_cache = None
+        grad_edge = None
+        grad_out = zerocopy_to_dgl_ndarray(grad_out)
+        if ctx.needs_input_grad[2]:
+            grad_edge = K.backward_copy_edge_reduce(
+                reducer, spmat[2], spmat[3], edge_map[1], backward_out_map,
+                edge_data, out_data, grad_out)
+            grad_edge = zerocopy_from_dgl_ndarray(grad_edge)
+        return None, None, grad_edge, None, None, None
 
 
 src_op_edge_reduce = SrcOpEdgeReduce.apply
