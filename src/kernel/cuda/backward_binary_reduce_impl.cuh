@@ -23,9 +23,15 @@ struct BackwardBinaryReduce {
     int64_t lid = Functors::SelectLeft(src, eid, dst);
     int64_t rid = Functors::SelectRight(src, eid, dst);
     int64_t oid = Functors::SelectOut(src, eid, dst);
-    lid = Functors::GetId(lid, gdata->lhs_mapping);
-    rid = Functors::GetId(rid, gdata->rhs_mapping);
-    oid = Functors::GetId(oid, gdata->out_mapping);
+    if (gdata->lhs_mapping) {
+      lid = Functors::GetId(lid, gdata->lhs_mapping);
+    }
+    if (gdata->rhs_mapping) {
+      rid = Functors::GetId(rid, gdata->rhs_mapping);
+    }
+    if (gdata->out_mapping) {
+      oid = Functors::GetId(oid, gdata->out_mapping);
+    }
     DType* lhsoff = gdata->lhs_data + lid * D;
     DType* rhsoff = gdata->rhs_data + rid * D;
     DType* outoff = gdata->out_data + oid * D;
@@ -65,9 +71,15 @@ struct BackwardBinaryReduceBcast {
     int64_t lid = Functors::SelectLeft(src, eid, dst);
     int64_t rid = Functors::SelectRight(src, eid, dst);
     int64_t oid = Functors::SelectOut(src, eid, dst);
-    lid = Functors::GetId(lid, gdata->lhs_mapping);
-    rid = Functors::GetId(rid, gdata->rhs_mapping);
-    oid = Functors::GetId(oid, gdata->out_mapping);
+    if (gdata->lhs_mapping) {
+      lid = Functors::GetId(lid, gdata->lhs_mapping);
+    }
+    if (gdata->rhs_mapping) {
+      rid = Functors::GetId(rid, gdata->rhs_mapping);
+    }
+    if (gdata->out_mapping) {
+      oid = Functors::GetId(oid, gdata->out_mapping);
+    }
     DType* lhsoff = gdata->lhs_data + lid * gdata->lhs_len;
     DType* rhsoff = gdata->rhs_data + rid * gdata->rhs_len;
     DType* outoff = gdata->out_data + oid * gdata->out_len;
@@ -98,7 +110,7 @@ struct BackwardBinaryReduceBcast {
   }
 };
 
-template <typename DType, typename IdGetter,
+template <typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 struct BackwardFunctorsTempl {
@@ -124,7 +136,7 @@ struct BackwardFunctorsTempl {
     Reducer::Call(addr, val);
   }
   static __device__ __forceinline__ int64_t GetId(int64_t id, int64_t* id_map) {
-    return IdGetter::Call(id, id_map);
+    return LDGReader<int64_t>::Call(id_map + id);
   }
   static __device__ __forceinline__ DType BackwardWrite(DType val, DType accum) {
     return Reducer::BackwardCall(val, accum);
@@ -139,7 +151,7 @@ struct BackwardFunctorsTempl {
 
 typedef minigun::advance::Config<true, minigun::advance::kV2N> AdvanceConfig;
 
-template <int Mode, typename DType, typename IdGetter,
+template <int Mode, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBackwardBinaryReduce(
@@ -147,7 +159,7 @@ void CallBackwardBinaryReduce(
     const minigun::Csr& csr, const minigun::Csr& rev_csr,
     BackwardGData<DType>* gdata) {
   using minigun::IntArray1D;
-  typedef BackwardFunctorsTempl<DType, IdGetter, LeftSelector,
+  typedef BackwardFunctorsTempl<DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer>
           Functors;
   typedef BackwardBinaryReduce<Mode, DType, Functors> UDF;
@@ -156,7 +168,7 @@ void CallBackwardBinaryReduce(
         rtcfg, rev_csr, gdata, IntArray1D());
 }
 
-template <int Mode, int NDim, typename DType, typename IdGetter,
+template <int Mode, int NDim, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBackwardBinaryReduceBcast(
@@ -164,7 +176,7 @@ void CallBackwardBinaryReduceBcast(
     const minigun::Csr& csr, const minigun::Csr& rev_csr,
     BackwardBcastGData<NDim, DType>* gdata) {
   using minigun::IntArray1D;
-  typedef BackwardFunctorsTempl<DType, IdGetter, LeftSelector,
+  typedef BackwardFunctorsTempl<DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer>
           Functors;
   typedef BackwardBinaryReduceBcast<Mode, NDim, DType, Functors> UDF;
@@ -176,7 +188,7 @@ void CallBackwardBinaryReduceBcast(
 
 #define GEN_BACKWARD_DEFINE(mode, dtype, lhs_tgt, rhs_tgt, op)  \
   template void CallBackwardBinaryReduce<                       \
-                    mode, dtype, GETID<XPU, int64_t>,           \
+                    mode, dtype,                                \
                     lhs_tgt, rhs_tgt,                           \
                     op<dtype>, REDUCER<XPU, dtype>>(            \
       const minigun::advance::RuntimeConfig& rtcfg,             \
@@ -186,7 +198,7 @@ void CallBackwardBinaryReduceBcast(
 
 #define GEN_BACKWARD_BCAST_DEFINE(mode, ndim, dtype, lhs_tgt, rhs_tgt, op)  \
   template void CallBackwardBinaryReduceBcast<                              \
-                    mode, ndim, dtype, GETID<XPU, int64_t>,                 \
+                    mode, ndim, dtype,                                      \
                     lhs_tgt, rhs_tgt,                                       \
                     op<dtype>, REDUCER<XPU, dtype>>(                        \
       const minigun::advance::RuntimeConfig& rtcfg,                         \

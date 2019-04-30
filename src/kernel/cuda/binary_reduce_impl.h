@@ -31,7 +31,7 @@ struct GData {
   int64_t *out_mapping{nullptr};
 };
 
-template <typename DType, typename IdGetter,
+template <typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduce(
@@ -56,7 +56,7 @@ struct BackwardGData {
   int64_t *out_mapping{nullptr};
 };
 
-template <int Mode, typename DType, typename IdGetter,
+template <int Mode, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBackwardBinaryReduce(
@@ -92,7 +92,7 @@ struct BcastGData {
   int64_t *out_mapping{nullptr};
 };
 
-template <int NDim, typename DType, typename IdGetter,
+template <int NDim, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduceBcast(
@@ -125,7 +125,7 @@ struct BackwardBcastGData {
   DType *grad_lhs_data{nullptr}, *grad_rhs_data{nullptr};
 };
 
-template <int Mode, int NDim, typename DType, typename IdGetter,
+template <int Mode, int NDim, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBackwardBinaryReduceBcast(
