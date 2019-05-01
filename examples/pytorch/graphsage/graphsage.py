@@ -80,7 +80,7 @@ class PoolingAggregator(Aggregator):
             nei = self.linear(nei)
             if self.activation:
                 nei = self.activation(nei)
-            if self.pooling_type = 'mean':
+            if self.pooling_type == 'mean':
                 mean_value = torch.mean(nei, dim=1)
                 return mean_value
             else:
