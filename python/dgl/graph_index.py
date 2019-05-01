@@ -628,8 +628,8 @@ class GraphIndex(object):
             if shuffle is not required.
         """
         rst = _CAPI_DGLGraphGetAdj(self._handle, transpose, "csr")
-        indptr = rst(0)
-        indices = rst(1)
+        indptr = rst(0).asnumpy().astype(np.int32)
+        indices = rst(1).asnumpy().astype(np.int32)
         eids = rst(2)
         if ctx.device_type != 1: # not on cpu
             indptr = ndarray.array(indptr, ctx=ctx)

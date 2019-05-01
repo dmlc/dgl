@@ -218,7 +218,7 @@ def src_op_dst_reduce(reducer,
         The output tensor. Could be either node or edge feature tensor
         depending on the reducer.
     """
-    return _CAPI_DGLKernelSrcMulEdgeReduce(
+    return _CAPI_DGLKernelSrcMulDstReduce(
         reducer, binary_op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, dst_mapping,
         src_data, dst_data, out_mapping, out_size)
@@ -353,5 +353,49 @@ def copy_edge_reduce(reducer,
         reducer, indptr, indices, rev_indptr, rev_indices,
         edge_mapping, edge_data, out_mapping,
         int(out_size))
+
+def backward_copy_edge_reduce(
+        reducer,
+        indptr, indices,
+        rev_indptr, rev_indices,
+        edge_mapping, out_mapping,
+        edge_data, out_data,
+        grad_out_data):
+    """Backward operator for CopyEdgeReduce.
+
+    Parameter
+    ---------
+    reducer : str
+        The type of the reducer ("sum", "max", "mean", "min", "none").
+        If the reducer is "none", the output is an edge feature tensor.
+        Otherwise, a node feature tensor is returned.
+    inv_indptr : dgl.ndarray.NDArray
+        An int64 row offset array for the graph CSR.
+    inv_indices : dgl.ndarray.NDArray
+        An int64 column index array for the graph CSR.
+    edge_mapping : dgl.ndarray.NDArray
+        An int64 array used for read edge data.
+        `edge_mapping[edge_id]` stores the location to read data.
+        Empty array represents identity mapping.
+    out_mapping : dgl.ndarray.NDArray
+        An int64 array used for write output data.
+        `out_mapping[out_id]` stores the location to read data.
+        Empty array represents identity mapping.
+    edge_data : dgl.ndarray.NDArray
+        The edge feature tensor.
+    out_data : dgl.ndarray.NDArray
+        The forward output tensor.
+    grad_out_data : dgl.ndarray.NDArray
+        The gradient of the forward output tensor.
+
+    Returns
+    -------
+    dgl.ndarray.NDArray
+        The gradient of edge data.
+    """
+    return _CAPI_DGLKernelBackwardCopyEdgeReduce(
+        reducer, indptr, indices, rev_indptr, rev_indices,
+        edge_mapping, out_mapping,
+        edge_data, out_data, grad_out_data)
 
 _init_api("dgl.kernel")

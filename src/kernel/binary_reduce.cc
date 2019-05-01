@@ -475,5 +475,31 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopySrcReduce")
     *rv = grad_src_data;
   });
 
+
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopyEdgeReduce")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::string reducer = args[0];
+    NDArray indptr = args[1];
+    NDArray indices = args[2];
+    NDArray rev_indptr = args[3];
+    NDArray rev_indices = args[4];
+    NDArray edge_mapping = args[5];
+    NDArray out_mapping = args[6];
+    NDArray edge_data = args[7];
+    NDArray out_data = args[8];
+    NDArray grad_out_data = args[9];
+    CHECK(IsValidCsr(indptr, indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
+    CHECK(IsValidCsr(rev_indptr, rev_indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
+    // Allocate output
+    std::vector<int64_t> shape(edge_data->shape, edge_data->shape + edge_data->ndim);
+    NDArray grad_edge_data = NDArray::Empty(shape, edge_data->dtype, edge_data->ctx);
+    DGL_XPU_SWITCH(grad_edge_data->ctx.device_type, BackwardBinaryReduceImpl,
+      reducer, binary_op::kUseLhs, indptr, indices, rev_indptr, rev_indices,
+      binary_op::kEdge, binary_op::kDst,
+      edge_mapping, NoneArray(), out_mapping,
+      edge_data, NoneArray(), out_data, grad_out_data,
+      grad_edge_data, NoneArray());
+    *rv = grad_edge_data;
+  });
 }  // namespace kernel
 }  // namespace dgl
