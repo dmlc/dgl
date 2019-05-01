@@ -1,21 +1,14 @@
-#ifndef DGL_KERNEL_CUDA_BINARY_REDUCE_IMPL_H_
-#define DGL_KERNEL_CUDA_BINARY_REDUCE_IMPL_H_
+#pragma once
 
-#include <cstdint>
+#include <minigun/minigun.h>
+#include <dgl/runtime/ndarray.h>
 
-// forward declaration
-namespace minigun {
-struct Csr;
-namespace advance {
-struct RuntimeConfig;
-}  // namespace advance
-}  // namespace minigun
+#include "./binary_reduce_common.h"
 
 namespace dgl {
 namespace kernel {
-namespace cuda {
 
-// Binary reduce
+struct BcastInfo;
 
 template <typename DType>
 struct GData {
@@ -31,7 +24,7 @@ struct GData {
   int64_t *out_mapping{nullptr};
 };
 
-template <typename DType,
+template <int XPU, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduce(
@@ -39,7 +32,16 @@ void CallBinaryReduce(
     const minigun::Csr& csr, const minigun::Csr& rev_csr,
     GData<DType>* gdata);
 
-// Backward binary reduce
+template <int XPU>
+void BinaryReduceImpl(
+    const std::string& reducer,
+    const std::string& op,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
+    binary_op::Target lhs, binary_op::Target rhs,
+    runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
+    runtime::NDArray lhs_data, runtime::NDArray rhs_data,
+    runtime::NDArray out_mapping, runtime::NDArray out_data);
 
 template <typename DType>
 struct BackwardGData {
@@ -56,7 +58,7 @@ struct BackwardGData {
   int64_t *out_mapping{nullptr};
 };
 
-template <int Mode, typename DType,
+template <int XPU, int Mode, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBackwardBinaryReduce(
@@ -64,6 +66,17 @@ void CallBackwardBinaryReduce(
     const minigun::Csr& csr, const minigun::Csr& rev_csr,
     BackwardGData<DType>* gdata);
 
+template <int XPU>
+void BackwardBinaryReduceImpl(
+    const std::string& reducer,
+    const std::string& op,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
+    binary_op::Target lhs, binary_op::Target rhs,
+    runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping,
+    runtime::NDArray lhs_data, runtime::NDArray rhs_data, runtime::NDArray out_data,
+    runtime::NDArray grad_out_data,
+    runtime::NDArray grad_lhs_data, runtime::NDArray grad_rhs_data);
 
 // Binary reduce with broadcasting
 
@@ -92,13 +105,29 @@ struct BcastGData {
   int64_t *out_mapping{nullptr};
 };
 
-template <int NDim, typename DType,
+template <int XPU, int NDim, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduceBcast(
     const minigun::advance::RuntimeConfig& rtcfg,
     const minigun::Csr& csr, const minigun::Csr& rev_csr,
     BcastGData<NDim, DType>* gdata);
+
+template <int XPU>
+void BinaryReduceBcastImpl(
+    const BcastInfo& info,
+    const std::string& reducer,
+    const std::string& op,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
+    binary_op::Target lhs,
+    binary_op::Target rhs,
+    runtime::NDArray lhs_mapping,
+    runtime::NDArray rhs_mapping,
+    runtime::NDArray lhs_data,
+    runtime::NDArray rhs_data,
+    runtime::NDArray out_mapping,
+    runtime::NDArray out_data);
 
 /*
  * !\brief Data and auxiliary information for backward binary broadcasting op.
@@ -125,7 +154,7 @@ struct BackwardBcastGData {
   DType *grad_lhs_data{nullptr}, *grad_rhs_data{nullptr};
 };
 
-template <int Mode, int NDim, typename DType,
+template <int XPU, int Mode, int NDim, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBackwardBinaryReduceBcast(
@@ -133,8 +162,17 @@ void CallBackwardBinaryReduceBcast(
     const minigun::Csr& csr, const minigun::Csr& rev_csr,
     BackwardBcastGData<NDim, DType>* gdata);
 
-}  // namespace cuda
+template <int XPU>
+void BackwardBinaryReduceBcastImpl(
+    const BcastInfo& info,
+    const std::string& reducer,
+    const std::string& op,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
+    binary_op::Target lhs_tgt, binary_op::Target rhs_tgt,
+    runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping,
+    runtime::NDArray lhs, runtime::NDArray rhs, runtime::NDArray out, runtime::NDArray grad_out,
+    runtime::NDArray grad_lhs, runtime::NDArray grad_rhs);
+
 }  // namespace kernel
 }  // namespace dgl
-
-#endif  // DGL_KERNEL_CUDA_BINARY_REDUCE_IMPL_H_

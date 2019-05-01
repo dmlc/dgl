@@ -4,8 +4,9 @@
  * \brief kernel APIs for graph computation
  */
 #include "../c_api_common.h"
-#include "./binary_reduce.h"
 #include "./common.h"
+#include "./binary_reduce.h"
+#include "./binary_reduce_impl_decl.h"
 
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;
@@ -159,7 +160,6 @@ NDArray BinaryOpReduceBcast(
   out_shape.insert(out_shape.end(),
       info.real_out_shape.begin(), info.real_out_shape.end());
   NDArray out_data = NDArray::Empty(out_shape, dtype, ctx);
-
   DGL_XPU_SWITCH(ctx.device_type, BinaryReduceBcastImpl,
       info, reducer, binary_op,
       indptr, indices, rev_indptr, rev_indices,
