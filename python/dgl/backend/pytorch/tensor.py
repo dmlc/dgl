@@ -201,43 +201,53 @@ class SrcOpEdgeReduce(th.autograd.Function):
     @staticmethod
     def forward(ctx, reducer, binary_op, spmat, src_data, edge_data, out_size,
                 src_map, edge_map, out_map):
-        src_data = zerocopy_to_dgl_ndarray(src_data)
-        edge_data = zerocopy_to_dgl_ndarray(edge_data)
+        src_data_nd = zerocopy_to_dgl_ndarray(src_data)
+        edge_data_nd = zerocopy_to_dgl_ndarray(edge_data)
+        feat_shape = K.infer_binary_feature_shape(src_data_nd, edge_data_nd)
+        out_data = src_data.new_empty((out_size,) + feat_shape)
+        out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         if reducer == "none":
             forward_out_map = out_map[0]
             backward_out_map = out_map[1]
         else:
             forward_out_map = out_map
             backward_out_map = out_map
-        out_data = K.src_op_edge_reduce(
+        K.src_op_edge_reduce(
             reducer, binary_op, spmat[0], spmat[1], spmat[2], spmat[3],
-            src_map, edge_map[0], src_data, edge_data, forward_out_map,
-            out_size)
+            src_map, edge_map[0], src_data_nd, edge_data_nd, forward_out_map,
+            out_data_nd)
         # save_for_backward can only save variables
         ctx.backward_cache = (reducer, binary_op, spmat, src_map, edge_map,
-                              backward_out_map, src_data, edge_data, out_data)
-        return zerocopy_from_dgl_ndarray(out_data)
+                              backward_out_map, src_data_nd, edge_data_nd,
+                              out_data_nd, feat_shape)
+        return out_data
 
     @staticmethod
     def backward(ctx, grad_out):
         reducer, binary_op, spmat, src_map, edge_map, backward_out_map, \
-            src_data, edge_data, out_data = ctx.backward_cache
+            src_data_nd, edge_data_nd, out_data_nd, feat_shape = ctx.backward_cache
         ctx.backward_cache = None
         grad_src = None
         grad_edge = None
-        grad_out = zerocopy_to_dgl_ndarray(grad_out)
+        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         if ctx.needs_input_grad[3]:
-            grad_src = K.backward_lhs_src_mul_edge_reduce(
-                reducer, binary_op, spmat[0], spmat[1], spmat[2], spmat[3], src_map, edge_map[1],
-                backward_out_map, src_data, edge_data, out_data, grad_out)
-            grad_src = zerocopy_from_dgl_ndarray(grad_src)
-            grad_src = _reduce_grad(grad_src, src_data.shape)
+            grad_src = grad_out.new_empty((src_data_nd.shape[0],) + feat_shape)
+            K.backward_lhs_src_mul_edge_reduce(
+                reducer, binary_op, spmat[0], spmat[1], spmat[2], spmat[3],
+                src_map, edge_map[1], backward_out_map, src_data_nd,
+                edge_data_nd, out_data_nd, grad_out_nd,
+                zerocopy_to_dgl_ndarray(grad_src))
+            grad_src = _reduce_grad(grad_src, src_data_nd.shape)
         if ctx.needs_input_grad[4]:
-            grad_edge = K.backward_rhs_src_mul_edge_reduce(
-                reducer, binary_op, spmat[0], spmat[1], spmat[2], spmat[3], src_map, edge_map[1],
-                backward_out_map, src_data, edge_data, out_data, grad_out)
-            grad_edge = zerocopy_from_dgl_ndarray(grad_edge)
-            grad_edge = _reduce_grad(grad_edge, edge_data.shape)
+            grad_edge = grad_out.new_empty((edge_data_nd.shape[0],) + feat_shape)
+            K.backward_rhs_src_mul_edge_reduce(
+                reducer, binary_op, spmat[0], spmat[1], spmat[2], spmat[3],
+                src_map, edge_map[1], backward_out_map, src_data_nd,
+                edge_data_nd, out_data_nd, grad_out_nd,
+                zerocopy_to_dgl_ndarray(grad_edge))
+            grad_edge = _reduce_grad(grad_edge, edge_data_nd.shape)
+            #grad_edge = grad_edge.sum(dim=2, keepdim=True)
+
         return None, None, None, grad_src, grad_edge, None, None, None, None
 
 
@@ -247,15 +257,18 @@ class SrcOpDstReduce(th.autograd.Function):
                 src_map, dst_map, out_map):
         src_data = zerocopy_to_dgl_ndarray(src_data)
         dst_data = zerocopy_to_dgl_ndarray(dst_data)
+        feat_shape = K.infer_binary_feature_shape(src_data, dst_data)
+        out_data = src_data.new_empty((out_size,) + feat_shape)
         if reducer == "none":
             forward_out_map = out_map[0]
             backward_out_map = out_map[1]
         else:
             forward_out_map = out_map
             backward_out_map = out_map
-        out_data = K.src_op_dst_reduce(
+        K.src_op_dst_reduce(
             reducer, binary_op, spmat[0], spmat[1], spmat[2], spmat[3],
-            src_map, dst_map, src_data, dst_data, forward_out_map, out_size)
+            src_map, dst_map, src_data, dst_data, forward_out_map, out_data,
+            feat_shape)
         # save_for_backward can only save variables
         ctx.backward_cache = (reducer, binary_op, spmat, src_map, dst_map,
                               backward_out_map, src_data, dst_data, out_data)
@@ -264,23 +277,25 @@ class SrcOpDstReduce(th.autograd.Function):
     @staticmethod
     def backward(ctx, grad_out):
         reducer, binary_op, spmat, src_map, dst_map, backward_out_map, \
-            src_data, dst_data, out_data = ctx.backward_cache
+            src_data, dst_data, out_data, feat_shape = ctx.backward_cache
         ctx.backward_cache = None
         grad_src = None
         grad_dst = None
         grad_out = zerocopy_to_dgl_ndarray(grad_out)
         if ctx.needs_input_grad[3]:
-            grad_src = K.backward_lhs_src_mul_dst_reduce(
+            grad_src = src_data.new_empty((src_data.shape[0]) + feat_shape)
+            K.backward_lhs_src_mul_dst_reduce(
                 reducer, binary_op, spmat[0], spmat[1], spmat[2], spmat[3],
                 src_map, dst_map, backward_out_map, src_data, dst_data,
-                out_data, grad_out)
+                out_data, grad_out, grad_src)
             grad_src = zerocopy_from_dgl_ndarray(grad_src)
             grad_src = _reduce_grad(grad_src, src_data.shape)
         if ctx.needs_input_grad[4]:
-            grad_dst = K.backward_rhs_src_mul_dst_reduce(
+            grad_dst = dst_data.new_empty((dst_data.shape[1],) + feat_shape)
+            K.backward_rhs_src_mul_dst_reduce(
                 reducer, binary_op, spmat[0], spmat[1], spmat[2], spmat[3],
                 src_map, dst_map, backward_out_map, src_data, dst_data,
-                out_data, grad_out)
+                out_data, grad_out, grad_dst)
             grad_dst = zerocopy_from_dgl_ndarray(grad_dst)
             grad_dst = _reduce_grad(grad_dst, dst_data.shape)
         return None, None, None, grad_src, grad_dst, None, None, None, None
@@ -295,47 +310,52 @@ class CopySrcReduce(th.autograd.Function):
         else:
             forward_out_map = out_map
             backward_out_map = out_map
-        src_data = zerocopy_to_dgl_ndarray(src_data)
-        out_data = K.copy_src_reduce(
-            reducer, spmat[0], spmat[1], spmat[2], spmat[3], src_map, src_data,
-            forward_out_map, out_size)
+        out_data = src_data.new_empty((out_size,) + src_data.shape[1:])
+        src_data_nd = zerocopy_to_dgl_ndarray(src_data)
+        out_data_nd = zerocopy_to_dgl_ndarray(out_data)
+        K.copy_src_reduce(
+            reducer, spmat[0], spmat[1], spmat[2], spmat[3], src_map,
+            src_data_nd, forward_out_map, out_data_nd)
         # save_for_backward can only save variables
         ctx.backward_cache = (reducer, spmat, src_map, backward_out_map,
-                              src_data, out_data)
-        return zerocopy_from_dgl_ndarray(out_data)
+                              src_data_nd, out_data_nd)
+        return out_data
 
     @staticmethod
     def backward(ctx, grad_out):
-        reducer, spmat, src_map, backward_out_map, src_data, out_data \
+        reducer, spmat, src_map, backward_out_map, src_data_nd, out_data_nd \
             = ctx.backward_cache
         ctx.backward_cache = None
         grad_src = None
-        grad_out = zerocopy_to_dgl_ndarray(grad_out)
+        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         if ctx.needs_input_grad[2]:
-            grad_src = K.backward_copy_src_reduce(
+            grad_src = grad_out.new_empty(src_data_nd.shape)
+            K.backward_copy_src_reduce(
                 reducer, spmat[0], spmat[1], spmat[2], spmat[3], src_map,
-                backward_out_map, src_data, out_data, grad_out)
-            grad_src = zerocopy_from_dgl_ndarray(grad_src)
+                backward_out_map, src_data_nd, out_data_nd, grad_out_nd,
+                zerocopy_to_dgl_ndarray(grad_src))
         return None, None, grad_src, None, None, None
 
 
 class CopyEdgeReduce(th.autograd.Function):
     @staticmethod
     def forward(ctx, reducer, spmat, edge_data, out_size, edge_map, out_map):
-        edge_data = zerocopy_to_dgl_ndarray(edge_data)
+        out_data = edge_data.new_empty((out_size,) + edge_data.shape[1:])
+        edge_data_nd = zerocopy_to_dgl_ndarray(edge_data)
+        out_data_nd = zerocopy_to_dgl_ndarray(out_data)
         if reducer == "none":
             forward_out_map = out_map[0]
             backward_out_map = out_map[1]
         else:
             forward_out_map = out_map
             backward_out_map = out_map
-        out_data = K.copy_edge_reduce(
+        K.copy_edge_reduce(
             reducer, spmat[0], spmat[1], spmat[2], spmat[3], edge_map[0],
-            edge_data, forward_out_map, out_size)
+            edge_data_nd, forward_out_map, out_data_nd)
         # save_for_backward can only save variables
         ctx.backward_cache = (reducer, spmat, edge_map, backward_out_map,
-                              edge_data, out_data)
-        return zerocopy_from_dgl_ndarray(out_data)
+                              edge_data_nd, out_data_nd)
+        return out_data
 
     @staticmethod
     def backward(ctx, grad_out):
@@ -343,12 +363,13 @@ class CopyEdgeReduce(th.autograd.Function):
             = ctx.backward_cache
         ctx.backward_cache = None
         grad_edge = None
-        grad_out = zerocopy_to_dgl_ndarray(grad_out)
+        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         if ctx.needs_input_grad[2]:
-            grad_edge = K.backward_copy_edge_reduce(
-                reducer, spmat[0], spmat[1], spmat[2], spmat[3], edge_map[1], backward_out_map,
-                edge_data, out_data, grad_out)
-            grad_edge = zerocopy_from_dgl_ndarray(grad_edge)
+            grad_edge = grad_out.new_empty(edge_data.shape)
+            K.backward_copy_edge_reduce(
+                reducer, spmat[0], spmat[1], spmat[2], spmat[3], edge_map[1],
+                backward_out_map, edge_data, out_data, grad_out_nd,
+                zerocopy_to_dgl_ndarray(grad_edge))
         return None, None, grad_edge, None, None, None
 
 
@@ -367,7 +388,7 @@ def _reduce_grad(grad, src_shape):
     # pad src_shape
     src_shape = (1,) * num_to_squeeze + src_shape
     reduce_idx = th.nonzero(th.tensor(grad_shape) - th.tensor(src_shape))
-    reduce_idx += 1 # skip batch dim
+    reduce_idx += 1  # skip batch dim
     grad = grad.sum(dim=tuple(reduce_idx), keepdim=True)
     for dim in range(1, num_to_squeeze + 1):
         grad = grad.squeeze(dim)
