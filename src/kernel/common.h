@@ -18,16 +18,16 @@ namespace kernel {
 #ifdef DGL_USE_CUDA
 #define DGL_XPU_SWITCH(val, Method, ...)  \
   if (val == kDLCPU) {                    \
-    cpu::Method(__VA_ARGS__);             \
+    Method<kDLCPU>(__VA_ARGS__);          \
   } else if (val == kDLGPU) {             \
-    cuda::Method(__VA_ARGS__);            \
+    Method<kDLGPU>(__VA_ARGS__);          \
   } else {                                \
     LOG(FATAL) << "Unsupported device type: " << val;  \
   }
 #else  // DGL_USE_CUDA
 #define DGL_XPU_SWITCH(val, Method, ...)  \
   if (val == kDLCPU) {                    \
-    cpu::Method(__VA_ARGS__);             \
+    Method<kDLCPU>(__VA_ARGS__);          \
   } else {                                \
     LOG(FATAL) << "Unsupported device type: " << val;  \
   }

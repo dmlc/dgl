@@ -4,8 +4,10 @@
  * \brief kernel APIs for graph computation
  */
 #include "../c_api_common.h"
-#include "./binary_reduce.h"
 #include "./common.h"
+#include "./binary_reduce.h"
+#include "./binary_reduce_impl_decl.h"
+#include "./utils.h"
 
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;
@@ -159,7 +161,6 @@ NDArray BinaryOpReduceBcast(
   out_shape.insert(out_shape.end(),
       info.real_out_shape.begin(), info.real_out_shape.end());
   NDArray out_data = NDArray::Empty(out_shape, dtype, ctx);
-
   DGL_XPU_SWITCH(ctx.device_type, BinaryReduceBcastImpl,
       info, reducer, binary_op,
       indptr, indices, rev_indptr, rev_indices,
@@ -278,8 +279,8 @@ NDArray CopySrcReduce(
   return BinaryOpReduce(reducer, binary_op::kUseLhs,
       indptr, indices, rev_indptr, rev_indices,
       binary_op::kSrc, binary_op::kEdge,
-      src_mapping, NoneArray(),
-      src_data, NoneArray(),
+      src_mapping, utils::NoneArray(),
+      src_data, utils::NoneArray(),
       out_mapping, out_size);
 }
 
@@ -309,8 +310,8 @@ NDArray CopyEdgeReduce(
   return BinaryOpReduce(reducer, binary_op::kUseLhs,
       indptr, indices, rev_indptr, rev_indices,
       binary_op::kEdge, binary_op::kDst,
-      edge_mapping, NoneArray(),
-      edge_data, NoneArray(),
+      edge_mapping, utils::NoneArray(),
+      edge_data, utils::NoneArray(),
       out_mapping, out_size);
 }
 
@@ -355,14 +356,14 @@ NDArray BackwardLhsSrcOpEdgeReduce(
         binary_op::kDst, binary_op::kEdge,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data,
-        grad_src_data, NoneArray());
+        grad_src_data, utils::NoneArray());
   } else {
     DGL_XPU_SWITCH(grad_src_data->ctx.device_type, BackwardBinaryReduceImpl,
         reducer, op, indptr, indices, rev_indptr, rev_indices,
         binary_op::kDst, binary_op::kEdge,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data,
-        grad_src_data, NoneArray());
+        grad_src_data, utils::NoneArray());
   }
   return grad_src_data;
 }
@@ -412,14 +413,14 @@ NDArray BackwardRhsSrcOpEdgeReduce(
         binary_op::kDst, binary_op::kEdge,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data,
-        NoneArray(), grad_edge_data);
+        utils::NoneArray(), grad_edge_data);
   } else {
     DGL_XPU_SWITCH(grad_edge_data->ctx.device_type, BackwardBinaryReduceImpl,
         reducer, op, indptr, indices, rev_indptr, rev_indices,
         binary_op::kDst, binary_op::kEdge,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data,
-        NoneArray(), grad_edge_data);
+        utils::NoneArray(), grad_edge_data);
   }
   return grad_edge_data;
 }
@@ -468,9 +469,9 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopySrcReduce")
     DGL_XPU_SWITCH(grad_src_data->ctx.device_type, BackwardBinaryReduceImpl,
       reducer, binary_op::kUseLhs, indptr, indices, rev_indptr, rev_indices,
       binary_op::kDst, binary_op::kEdge,
-      src_mapping, NoneArray(), out_mapping,
-      src_data, NoneArray(), out_data, grad_out_data,
-      grad_src_data, NoneArray());
+      src_mapping, utils::NoneArray(), out_mapping,
+      src_data, utils::NoneArray(), out_data, grad_out_data,
+      grad_src_data, utils::NoneArray());
     *rv = grad_src_data;
   });
 

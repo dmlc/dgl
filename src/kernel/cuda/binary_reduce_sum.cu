@@ -3,7 +3,7 @@
 #include "../../runtime/cuda/cuda_common.h"
 #include "./binary_reduce_impl.cuh"
 #include "./backward_binary_reduce_impl.cuh"
-#include "./utils.cuh"
+#include "../utils.h"
 
 using minigun::Csr;
 using minigun::advance::RuntimeConfig;
@@ -11,18 +11,7 @@ using minigun::advance::RuntimeConfig;
 namespace dgl {
 namespace kernel {
 namespace cuda {
-
 // specialization for cusparse
-
-template <typename DType>
-struct IsFloat {
-  constexpr static bool value = false;
-};
-
-template <>
-struct IsFloat<float> {
-  constexpr static bool value = true;
-};
 
 template <typename DType>
 cusparseStatus_t Xcsrmm2(cusparseHandle_t handle, cusparseOperation_t transA,
@@ -107,7 +96,7 @@ void CusparseCsrmm2(const RuntimeConfig& rtcfg, const Csr& csr,
   DType* trans_out = static_cast<DType*>(device->AllocWorkspace(rtcfg.ctx, k * n * sizeof(DType)));
   // all one data array
   DType* valptr = static_cast<DType*>(device->AllocWorkspace(rtcfg.ctx, nnz * sizeof(DType)));
-  utils::Fill(rtcfg.stream, valptr, nnz, static_cast<DType>(1.));
+  utils::Fill<kDLGPU>(rtcfg.ctx, valptr, nnz, static_cast<DType>(1.));
   cusparseMatDescr_t descr;
   CUSPARSE_CALL(cusparseCreateMatDescr(&descr));
   CUSPARSE_CALL(cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL));
@@ -172,64 +161,65 @@ void FallbackCallBackwardBinaryReduce(
   minigun::advance::Advance<kDLGPU, AdvanceConfig, BackwardGData<DType>, UDF>(
         rtcfg, rev_csr, gdata, IntArray1D());
 }
+}  // namespace cuda
 
 template <>
-void CallBinaryReduce<float, SelectSrc, SelectEdge,
+void CallBinaryReduce<kDLGPU, float, SelectSrc, SelectEdge,
                       BinaryUseLhs<float>, ReduceSum<kDLGPU, float>>(
     const RuntimeConfig& rtcfg,
     const Csr& csr, const Csr& rev_csr,
     GData<float>* gdata) {
   if (gdata->lhs_mapping || gdata->rhs_mapping || gdata->out_mapping) {
-    FallbackCallBinaryReduce<float, SelectSrc, SelectEdge,
+    cuda::FallbackCallBinaryReduce<float, SelectSrc, SelectEdge,
       BinaryUseLhs<float>, ReduceSum<kDLGPU, float>>(rtcfg, csr, rev_csr, gdata);
   } else {
-    CusparseCsrmm2(rtcfg, rev_csr, gdata->lhs_data, gdata->out_data, gdata->x_length);
+    cuda::CusparseCsrmm2(rtcfg, rev_csr, gdata->lhs_data, gdata->out_data, gdata->x_length);
   }
 }
 
 template <>
-void CallBinaryReduce<double, SelectSrc, SelectEdge,
+void CallBinaryReduce<kDLGPU, double, SelectSrc, SelectEdge,
                       BinaryUseLhs<double>, ReduceSum<kDLGPU, double>>(
     const RuntimeConfig& rtcfg,
     const Csr& csr, const Csr& rev_csr,
     GData<double>* gdata) {
   if (gdata->lhs_mapping || gdata->rhs_mapping || gdata->out_mapping) {
-    FallbackCallBinaryReduce<double, SelectSrc, SelectEdge,
+    cuda::FallbackCallBinaryReduce<double, SelectSrc, SelectEdge,
       BinaryUseLhs<double>, ReduceSum<kDLGPU, double>>(rtcfg, csr, rev_csr, gdata);
   } else {
-    CusparseCsrmm2(rtcfg, rev_csr, gdata->lhs_data, gdata->out_data, gdata->x_length);
+    cuda::CusparseCsrmm2(rtcfg, rev_csr, gdata->lhs_data, gdata->out_data, gdata->x_length);
   }
 }
 
 // backward
 
 template <>
-void CallBackwardBinaryReduce<binary_op::kGradLhs, float,
+void CallBackwardBinaryReduce<kDLGPU, binary_op::kGradLhs, float,
                               SelectDst, SelectEdge,
                               BinaryUseLhs<float>, ReduceSum<kDLGPU, float>>(
     const RuntimeConfig& rtcfg,
     const Csr& csr, const Csr& rev_csr,
     BackwardGData<float>* gdata) {
   if (gdata->lhs_mapping || gdata->rhs_mapping || gdata->out_mapping) {
-    FallbackCallBackwardBinaryReduce<binary_op::kGradLhs, float, SelectDst, SelectEdge,
+    cuda::FallbackCallBackwardBinaryReduce<binary_op::kGradLhs, float, SelectDst, SelectEdge,
       BinaryUseLhs<float>, ReduceSum<kDLGPU, float>>(rtcfg, csr, rev_csr, gdata);
   } else {
-    CusparseCsrmm2(rtcfg, csr, gdata->grad_out_data, gdata->grad_lhs_data, gdata->x_length);
+    cuda::CusparseCsrmm2(rtcfg, csr, gdata->grad_out_data, gdata->grad_lhs_data, gdata->x_length);
   }
 }
 
 template <>
-void CallBackwardBinaryReduce<binary_op::kGradLhs, double,
+void CallBackwardBinaryReduce<kDLGPU, binary_op::kGradLhs, double,
                               SelectDst, SelectEdge,
                               BinaryUseLhs<double>, ReduceSum<kDLGPU, double>>(
     const RuntimeConfig& rtcfg,
     const Csr& csr, const Csr& rev_csr,
     BackwardGData<double>* gdata) {
   if (gdata->lhs_mapping || gdata->rhs_mapping || gdata->out_mapping) {
-    FallbackCallBackwardBinaryReduce<binary_op::kGradLhs, double, SelectDst, SelectEdge,
+    cuda::FallbackCallBackwardBinaryReduce<binary_op::kGradLhs, double, SelectDst, SelectEdge,
       BinaryUseLhs<double>, ReduceSum<kDLGPU, double>>(rtcfg, csr, rev_csr, gdata);
   } else {
-    CusparseCsrmm2(rtcfg, csr, gdata->grad_out_data, gdata->grad_lhs_data, gdata->x_length);
+    cuda::CusparseCsrmm2(rtcfg, csr, gdata->grad_out_data, gdata->grad_lhs_data, gdata->x_length);
   }
 }
 
@@ -241,6 +231,5 @@ void CallBackwardBinaryReduce<binary_op::kGradLhs, double,
 EVAL(GEN_DTYPE, GEN_TARGET, GEN_BINARY_OP, GEN_DEFINE)
 EVAL(GEN_BACKWARD_MODE, GEN_DTYPE, GEN_TARGET, GEN_BINARY_OP, GEN_BACKWARD_DEFINE)
 
-}  // namespace cuda
 }  // namespace kernel
 }  // namespace dgl
