@@ -1,13 +1,13 @@
 /*!
- *  Copyright (c) 2018 by Contributors
- * \file kernel/kernel_apis.cc
- * \brief kernel APIs for graph computation
+ *  Copyright (c) 2019 by Contributors
+ * \file kernel/binary_reduce.cc
+ * \brief Binary reduce C APIs and definitions.
  */
-#include "../c_api_common.h"
-#include "./common.h"
 #include "./binary_reduce.h"
+#include "./common.h"
 #include "./binary_reduce_impl_decl.h"
 #include "./utils.h"
+#include "../c_api_common.h"
 
 using dgl::runtime::DGLArgs;
 using dgl::runtime::DGLArgValue;

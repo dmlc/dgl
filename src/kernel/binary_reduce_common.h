@@ -1,27 +1,34 @@
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file kernel/binary_reduce_common.h
+ * \brief Common utilities for binary reduce operation.
+ */
 #ifndef DGL_KERNEL_BINARY_REDUCE_COMMON_H_
 #define DGL_KERNEL_BINARY_REDUCE_COMMON_H_
 
+#include <dgl/runtime/ndarray.h>
+
 #include <limits>
 #include <string>
-#include <dgl/runtime/ndarray.h>
+
 #include "./common.h"
 
 namespace dgl {
 namespace kernel {
 namespace binary_op {
 
-static const std::string kReduceSum = "sum";
-static const std::string kReduceMax = "max";
-static const std::string kReduceMin = "min";
-static const std::string kReduceMean = "mean";
-static const std::string kReduceProd = "prod";
-static const std::string kReduceNone = "none";
+static const char kReduceSum[] = "sum";
+static const char kReduceMax[] = "max";
+static const char kReduceMin[] = "min";
+static const char kReduceMean[] = "mean";
+static const char kReduceProd[] = "prod";
+static const char kReduceNone[] = "none";
 
-static const std::string kAdd = "add";
-static const std::string kSub = "sub";
-static const std::string kMul = "mul";
-static const std::string kDiv = "div";
-static const std::string kUseLhs = "use_lhs";
+static const char kAdd[] = "add";
+static const char kSub[] = "sub";
+static const char kMul[] = "mul";
+static const char kDiv[] = "div";
+static const char kUseLhs[] = "use_lhs";
 
 enum Target {
   kSrc = 0,

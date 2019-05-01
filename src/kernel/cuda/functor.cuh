@@ -1,3 +1,8 @@
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file kernel/cuda/functor.cuh
+ * \brief Functors for template on CUDA
+ */
 #ifndef DGL_KERNEL_CUDA_FUNCTOR_CUH_
 #define DGL_KERNEL_CUDA_FUNCTOR_CUH_
 

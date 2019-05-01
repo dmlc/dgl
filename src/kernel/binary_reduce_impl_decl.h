@@ -1,6 +1,14 @@
-#pragma once
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file kernel/binary_reduce_impl_decl.h
+ * \brief Data structure and function declarations for implementations.
+ */
+#ifndef DGL_KERNEL_BINARY_REDUCE_IMPL_DECL_H_
+#define DGL_KERNEL_BINARY_REDUCE_IMPL_DECL_H_
 
 #include <dgl/runtime/ndarray.h>
+
+#include <string>
 
 #include "./binary_reduce_common.h"
 
@@ -182,3 +190,5 @@ void BackwardBinaryReduceBcastImpl(
 
 }  // namespace kernel
 }  // namespace dgl
+
+#endif  // DGL_KERNEL_BINARY_REDUCE_IMPL_DECL_H_

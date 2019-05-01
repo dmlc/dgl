@@ -1,3 +1,8 @@
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file kernel/cuda/binary_reduce_impl.cu
+ * \brief Binary reduce implementation on cuda.
+ */
 #include "../binary_reduce_impl.h"
 
 using dgl::runtime::NDArray;

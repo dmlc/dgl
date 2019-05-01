@@ -1,3 +1,8 @@
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file kernel/cuda/binary_reduce_impl.cuh
+ * \brief Minigun CUDA UDFs for binary reduce
+ */
 #ifndef DGL_KERNEL_CUDA_BINARY_REDUCE_IMPL_CUH_
 #define DGL_KERNEL_CUDA_BINARY_REDUCE_IMPL_CUH_
 

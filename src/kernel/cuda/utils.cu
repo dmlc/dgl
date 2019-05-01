@@ -1,3 +1,8 @@
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file kernel/cuda/utils.cu
+ * \brief Utility function implementations on CUDA
+ */
 #include "../../runtime/cuda/cuda_common.h"
 #include "../utils.h"
 

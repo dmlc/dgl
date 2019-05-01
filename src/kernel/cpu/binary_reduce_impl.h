@@ -1,7 +1,14 @@
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file kernel/cpu/binary_reduce_impl.h
+ * \brief Minigun CPU UDFs for binary reduce
+ */
 #ifndef DGL_KERNEL_CPU_BINARY_REDUCE_IMPL_H_
 #define DGL_KERNEL_CPU_BINARY_REDUCE_IMPL_H_
 
 #include <minigun/minigun.h>
+
+#include <algorithm>
 
 #include "../binary_reduce_impl_decl.h"
 #include "./functor.h"

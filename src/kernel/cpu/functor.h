@@ -1,7 +1,15 @@
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file kernel/cpu/functor.h
+ * \brief Functors for template on CPU
+ */
 #ifndef DGL_KERNEL_CPU_FUNCTOR_H_
 #define DGL_KERNEL_CPU_FUNCTOR_H_
 
 #include <dmlc/omp.h>
+
+#include <algorithm>
+
 #include "../binary_reduce_common.h"
 
 namespace dgl {

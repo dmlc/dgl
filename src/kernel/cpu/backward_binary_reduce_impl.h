@@ -1,3 +1,8 @@
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file kernel/cuda/backward_binary_reduce_impl.h
+ * \brief Minigun CPU UDFs for bacward binary reduce
+ */
 #ifndef DGL_KERNEL_CPU_BACKWARD_BINARY_REDUCE_IMPL_H_
 #define DGL_KERNEL_CPU_BACKWARD_BINARY_REDUCE_IMPL_H_
 

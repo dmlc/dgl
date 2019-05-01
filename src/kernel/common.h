@@ -1,8 +1,14 @@
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file kernel/common.h
+ * \brief Kernel common utilities
+ */
 #ifndef DGL_KERNEL_COMMON_H_
 #define DGL_KERNEL_COMMON_H_
 
-#include <cstdint>
 #include <dgl/runtime/ndarray.h>
+
+#include <cstdint>
 
 namespace dgl {
 namespace kernel {

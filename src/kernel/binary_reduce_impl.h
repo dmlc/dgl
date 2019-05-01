@@ -1,7 +1,16 @@
-#pragma once
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file kernel/binary_reduce_impl.h
+ * \brief Implementations of binary reduce operations.
+ */
+#ifndef DGL_KERNEL_BINARY_REDUCE_IMPL_H_
+#define DGL_KERNEL_BINARY_REDUCE_IMPL_H_
 
 #include <minigun/minigun.h>
 #include <dgl/runtime/device_api.h>
+
+#include <algorithm>
+#include <string>
 
 #include "../runtime/cuda/cuda_common.h"
 #include "./binary_reduce.h"
@@ -416,3 +425,5 @@ void BackwardBinaryReduceBcastImpl(
 
 }  // namespace kernel
 }  // namespace dgl
+
+#endif  // DGL_KERNEL_BINARY_REDUCE_IMPL_H_

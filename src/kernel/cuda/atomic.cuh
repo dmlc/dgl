@@ -1,3 +1,8 @@
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file kernel/cuda/atomic.cuh
+ * \brief Atomic functions
+ */
 #ifndef DGL_KERNEL_CUDA_ATOMIC_H_
 #define DGL_KERNEL_CUDA_ATOMIC_H_
 

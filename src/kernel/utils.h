@@ -1,9 +1,16 @@
+/*!
+ *  Copyright (c) 2018 by Contributors
+ * \file kernel/utils.h
+ * \brief Kernel utilities
+ */
 #ifndef DGL_KERNEL_UTILS_H_
 #define DGL_KERNEL_UTILS_H_
 
-#include <cstdlib>
 #include <dlpack/dlpack.h>
 #include <dgl/runtime/ndarray.h>
+
+#include <cstdlib>
+#include <vector>
 
 namespace minigun {
 struct Csr;

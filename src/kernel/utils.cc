@@ -1,4 +1,13 @@
+/*!
+ *  Copyright (c) 2018 by Contributors
+ * \file kernel/utils.cc
+ * \brief Kernel utilities
+ */
 #include <minigun/csr.h>
+
+#include <vector>
+#include <string>
+
 #include "./utils.h"
 #include "./binary_reduce_common.h"
 

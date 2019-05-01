@@ -1,3 +1,8 @@
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file kernel/cpu/utils.cc
+ * \brief Utility function implementations on CPU
+ */
 #include "../utils.h"
 
 namespace dgl {

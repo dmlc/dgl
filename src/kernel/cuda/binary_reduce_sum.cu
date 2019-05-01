@@ -1,3 +1,8 @@
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file kernel/cuda/binary_reduce_sum.cu
+ * \brief CUDA kernels for binary reduce sum
+ */
 #include <dgl/runtime/device_api.h>
 
 #include "../../runtime/cuda/cuda_common.h"

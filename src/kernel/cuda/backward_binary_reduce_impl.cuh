@@ -1,4 +1,10 @@
-#pragma once
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file kernel/cuda/backward_binary_reduce_impl.cuh
+ * \brief Minigun CUDA UDFs for bacward binary reduce
+ */
+#ifndef DGL_KERNEL_CUDA_BACKWARD_BINARY_REDUCE_IMPL_CUH_
+#define DGL_KERNEL_CUDA_BACKWARD_BINARY_REDUCE_IMPL_CUH_
 
 #include <minigun/minigun.h>
 
@@ -210,3 +216,5 @@ void CallBackwardBinaryReduceBcast(
 
 }  // namespace kernel
 }  // namespace dgl
+
+#endif  // DGL_KERNEL_CUDA_BACKWARD_BINARY_REDUCE_IMPL_CUH_
