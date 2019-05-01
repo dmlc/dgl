@@ -28,6 +28,10 @@ def src_op_edge_reduce(reducer,
         An int64 row offset array for the graph CSR.
     indices : dgl.ndarray.NDArray
         An int64 column index array for the graph CSR.
+    rev_indptr : dgl.ndarray.NDArray
+        An int64 row offset array for the reverse graph CSR.
+    rev_indices : dgl.ndarray.NDArray
+        An int64 column index array for the reverse graph CSR.
     src_mapping : dgl.ndarray.NDArray
         An int64 array used for read src node data.
         `src_mapping[src_node_id]` stores the location to read data.
@@ -79,10 +83,14 @@ def backward_lhs_src_mul_edge_reduce(
         Otherwise, a node feature tensor is returned.
     op : str
         The type of the mul functor ("mul", "add").
-    inv_indptr : dgl.ndarray.NDArray
+    indptr : dgl.ndarray.NDArray
         An int64 row offset array for the graph CSR.
-    inv_indices : dgl.ndarray.NDArray
+    indices : dgl.ndarray.NDArray
         An int64 column index array for the graph CSR.
+    rev_indptr : dgl.ndarray.NDArray
+        An int64 row offset array for the reverse graph CSR.
+    rev_indices : dgl.ndarray.NDArray
+        An int64 column index array for the reverse graph CSR.
     src_mapping : dgl.ndarray.NDArray
         An int64 array used for read src node data.
         `src_mapping[src_node_id]` stores the location to read data.
@@ -135,10 +143,14 @@ def backward_rhs_src_mul_edge_reduce(
         Otherwise, a node feature tensor is returned.
     op : str
         The type of the mul functor ("mul", "add").
-    inv_indptr : dgl.ndarray.NDArray
+    indptr : dgl.ndarray.NDArray
         An int64 row offset array for the graph CSR.
-    inv_indices : dgl.ndarray.NDArray
+    indices : dgl.ndarray.NDArray
         An int64 column index array for the graph CSR.
+    rev_indptr : dgl.ndarray.NDArray
+        An int64 row offset array for the reverse graph CSR.
+    rev_indices : dgl.ndarray.NDArray
+        An int64 column index array for the reverse graph CSR.
     src_mapping : dgl.ndarray.NDArray
         An int64 array used for read src node data.
         `src_mapping[src_node_id]` stores the location to read data.
@@ -170,6 +182,69 @@ def backward_rhs_src_mul_edge_reduce(
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data)
 
+def backward_both_src_mul_edge_reduce(
+        reducer, op,
+        indptr, indices,
+        rev_indptr, rev_indices,
+        src_mapping, edge_mapping, out_mapping,
+        src_data, edge_data, out_data,
+        grad_out_data):
+    """Backward operator for SrcOpEdgeReduce. Compute the gradient for both inputs
+    in one fused kernel.
+
+    The returned gradient tensor has the same shape as the grad_out_data. To compute
+    the correct gradient, extra reduction along broadcasting dimensions is required.
+
+    Parameter
+    ---------
+    reducer : str
+        The type of the reducer ("sum", "max", "mean", "min", "none").
+        If the reducer is "none", the output is an edge feature tensor.
+        Otherwise, a node feature tensor is returned.
+    op : str
+        The type of the mul functor ("mul", "add").
+    indptr : dgl.ndarray.NDArray
+        An int64 row offset array for the graph CSR.
+    indices : dgl.ndarray.NDArray
+        An int64 column index array for the graph CSR.
+    rev_indptr : dgl.ndarray.NDArray
+        An int64 row offset array for the reverse graph CSR.
+    rev_indices : dgl.ndarray.NDArray
+        An int64 column index array for the reverse graph CSR.
+    src_mapping : dgl.ndarray.NDArray
+        An int64 array used for read src node data.
+        `src_mapping[src_node_id]` stores the location to read data.
+        Empty array represents identity mapping.
+    edge_mapping : dgl.ndarray.NDArray
+        An int64 array used for read edge data.
+        `edge_mapping[edge_id]` stores the location to read data.
+        Empty array represents identity mapping.
+    out_mapping : dgl.ndarray.NDArray
+        An int64 array used for write output data.
+        `out_mapping[out_id]` stores the location to read data.
+        Empty array represents identity mapping.
+    src_data : dgl.ndarray.NDArray
+        The source node feature tensor.
+    edge_data : dgl.ndarray.NDArray
+        The edge feature tensor.
+    out_data : dgl.ndarray.NDArray
+        The forward output tensor.
+    grad_out_data : dgl.ndarray.NDArray
+        The gradient of the forward output tensor.
+
+    Returns
+    -------
+    dgl.ndarray.NDArray
+        The gradient of src data.
+    dgl.ndarray.NDArray
+        The gradient of edge data.
+    """
+    fn = _CAPI_DGLKernelBackwardBothSrcMulEdgeReduce(
+        reducer, op, indptr, indices, rev_indptr, rev_indices,
+        src_mapping, edge_mapping, out_mapping,
+        src_data, edge_data, out_data, grad_out_data)
+    return fn(0), fn(1)
+
 def src_op_dst_reduce(reducer,
                       binary_op,
                       indptr, indices,
@@ -193,6 +268,10 @@ def src_op_dst_reduce(reducer,
         An int64 row offset array for the graph CSR.
     indices : dgl.ndarray.NDArray
         An int64 column index array for the graph CSR.
+    rev_indptr : dgl.ndarray.NDArray
+        An int64 row offset array for the reverse graph CSR.
+    rev_indices : dgl.ndarray.NDArray
+        An int64 column index array for the reverse graph CSR.
     src_mapping : dgl.ndarray.NDArray
         An int64 array used for read src node data.
         `src_mapping[src_node_id]` stores the location to read data.
@@ -242,6 +321,10 @@ def copy_src_reduce(reducer,
         An int64 row offset array for the graph CSR.
     indices : dgl.ndarray.NDArray
         An int64 column index array for the graph CSR.
+    rev_indptr : dgl.ndarray.NDArray
+        An int64 row offset array for the reverse graph CSR.
+    rev_indices : dgl.ndarray.NDArray
+        An int64 column index array for the reverse graph CSR.
     src_mapping : dgl.ndarray.NDArray
         An optional int64 array for source node mapping.
         If empty, source ids are consecutive integers [0, len(indptr) - 1).
@@ -282,10 +365,14 @@ def backward_copy_src_reduce(
         The type of the reducer ("sum", "max", "mean", "min", "none").
         If the reducer is "none", the output is an edge feature tensor.
         Otherwise, a node feature tensor is returned.
-    inv_indptr : dgl.ndarray.NDArray
+    indptr : dgl.ndarray.NDArray
         An int64 row offset array for the graph CSR.
-    inv_indices : dgl.ndarray.NDArray
+    indices : dgl.ndarray.NDArray
         An int64 column index array for the graph CSR.
+    rev_indptr : dgl.ndarray.NDArray
+        An int64 row offset array for the reverse graph CSR.
+    rev_indices : dgl.ndarray.NDArray
+        An int64 column index array for the reverse graph CSR.
     src_mapping : dgl.ndarray.NDArray
         An int64 array used for read src node data.
         `src_mapping[src_node_id]` stores the location to read data.
@@ -330,6 +417,10 @@ def copy_edge_reduce(reducer,
         An int64 row offset array for the graph CSR.
     indices : dgl.ndarray.NDArray
         An int64 column index array for the graph CSR.
+    rev_indptr : dgl.ndarray.NDArray
+        An int64 row offset array for the reverse graph CSR.
+    rev_indices : dgl.ndarray.NDArray
+        An int64 column index array for the reverse graph CSR.
     edge_mapping : dgl.ndarray.NDArray
         An int64 array used for read edge data.
         `edge_mapping[edge_id]` stores the location to read data.
@@ -369,10 +460,14 @@ def backward_copy_edge_reduce(
         The type of the reducer ("sum", "max", "mean", "min", "none").
         If the reducer is "none", the output is an edge feature tensor.
         Otherwise, a node feature tensor is returned.
-    inv_indptr : dgl.ndarray.NDArray
+    indptr : dgl.ndarray.NDArray
         An int64 row offset array for the graph CSR.
-    inv_indices : dgl.ndarray.NDArray
+    indices : dgl.ndarray.NDArray
         An int64 column index array for the graph CSR.
+    rev_indptr : dgl.ndarray.NDArray
+        An int64 row offset array for the reverse graph CSR.
+    rev_indices : dgl.ndarray.NDArray
+        An int64 column index array for the reverse graph CSR.
     edge_mapping : dgl.ndarray.NDArray
         An int64 array used for read edge data.
         `edge_mapping[edge_id]` stores the location to read data.

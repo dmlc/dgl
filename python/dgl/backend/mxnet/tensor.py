@@ -162,9 +162,6 @@ def zeros_like(input):
 def ones(shape, dtype, ctx):
     return nd.ones(shape, dtype=dtype, ctx=ctx)
 
-def spmm(x, y):
-    return nd.dot(x, y)
-
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     # TODO: support other dimensions
     assert dim == 0, 'MXNet only supports segment sum on first dimension'

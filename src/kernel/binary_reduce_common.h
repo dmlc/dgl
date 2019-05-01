@@ -337,7 +337,8 @@ struct GradOutSelector<ReduceNone<XPU, DType>> {
 // macro for backward mode
 #define BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, ...) \
   if (req_lhs && req_rhs) {                               \
-    LOG(FATAL) << "Computing both lhs and rhs grad is currently not supported.";  \
+    constexpr int Mode = binary_op::kGradBoth;            \
+    {__VA_ARGS__}                                         \
   } else if (req_lhs) {                                   \
     constexpr int Mode = binary_op::kGradLhs;             \
     {__VA_ARGS__}                                         \
@@ -346,9 +347,10 @@ struct GradOutSelector<ReduceNone<XPU, DType>> {
     {__VA_ARGS__}                                         \
   }
 
-#define GEN_BACKWARD_MODE(GEN, ...) \
-  GEN(__VA_ARGS__, binary_op::kGradLhs) \
-  GEN(__VA_ARGS__, binary_op::kGradRhs)
+#define GEN_BACKWARD_MODE(GEN, ...)        \
+  GEN(__VA_ARGS__, binary_op::kGradLhs)    \
+  GEN(__VA_ARGS__, binary_op::kGradRhs)    \
+  GEN(__VA_ARGS__, binary_op::kGradBoth)
 
 }  // namespace kernel
 }  // namespace dgl
