@@ -23,6 +23,13 @@ struct BcastInfo {
 };
 
 /*
+ * !\brief Compute the feature shape after binary reduce computation.
+ */
+std::vector<int64_t> InferBinaryFeatureShape(
+    runtime::NDArray lhs,
+    runtime::NDArray rhs);
+
+/*
  * !\brief Multiply src node data with edge data and perform reduce
  *
  * \param reducer The type of the reducer ("sum", "max", "mean", "min", "none").
@@ -50,7 +57,7 @@ struct BcastInfo {
  * \return out_data The output tensor. Could be either node or edge feature
  *                  tensor depending on the reducer.
  */
-runtime::NDArray SrcOpEdgeReduce(
+void SrcOpEdgeReduce(
     const std::string& reducer,
     const std::string& binary_op,
     runtime::NDArray indptr, runtime::NDArray indices,
@@ -60,7 +67,7 @@ runtime::NDArray SrcOpEdgeReduce(
     runtime::NDArray src_data,
     runtime::NDArray edge_data,
     runtime::NDArray out_mapping,
-    const int64_t out_size);
+    runtime::NDArray out_data);
 
 /*
  * !\brief Multiply src node data with dst node data and perform reduce
@@ -91,7 +98,7 @@ runtime::NDArray SrcOpEdgeReduce(
  * \return out_data The output tensor. Could be either node or edge feature tensor
  *                  depending on the reducer.
  */
-runtime::NDArray SrcOpDstReduce(
+void SrcOpDstReduce(
     const std::string& reducer,
     const std::string& binary_op,
     runtime::NDArray indptr, runtime::NDArray indices,
@@ -101,8 +108,7 @@ runtime::NDArray SrcOpDstReduce(
     runtime::NDArray src_data,
     runtime::NDArray dst_data,
     runtime::NDArray out_mapping,
-    const int64_t out_size);
-
+    runtime::NDArray out_data);
 
 /*
  * !\brief Copy src node data and perform reduce
@@ -128,14 +134,14 @@ runtime::NDArray SrcOpDstReduce(
  *                  depending on the reducer.
  *
  */
-runtime::NDArray CopySrcReduce(
+void CopySrcReduce(
     const std::string& reducer,
     runtime::NDArray indptr, runtime::NDArray indices,
     runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
     runtime::NDArray src_mapping,
     runtime::NDArray src_data,
     runtime::NDArray out_mapping,
-    const int64_t out_size);
+    runtime::NDArray out_data);
 
 /*
  * !\brief Copy edge data and perform reduce
@@ -161,14 +167,14 @@ runtime::NDArray CopySrcReduce(
  *                  depending on the reducer.
  *
  */
-runtime::NDArray CopyEdgeReduce(
+void CopyEdgeReduce(
     const std::string& reducer,
     runtime::NDArray indptr, runtime::NDArray indices,
     runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
     runtime::NDArray edge_mapping,
     runtime::NDArray edge_data,
     runtime::NDArray out_mapping,
-    const int64_t out_size);
+    runtime::NDArray out_data);
 
 /*
  * !\brief Backward operator for SrcOpEdgeReduce. Compute the gradient for the src data.
@@ -197,7 +203,7 @@ runtime::NDArray CopyEdgeReduce(
  * \param grad_out_data The gradient tensor fo the output.
  * \return The gradient tensor of the src data.
  */
-runtime::NDArray BackwardLhsSrcOpEdgeReduce(
+void BackwardLhsSrcOpEdgeReduce(
     const std::string& reducer,
     const std::string& binary_op,
     runtime::NDArray indptr, runtime::NDArray indices,
@@ -208,7 +214,37 @@ runtime::NDArray BackwardLhsSrcOpEdgeReduce(
     runtime::NDArray src_data,
     runtime::NDArray edge_data,
     runtime::NDArray out_data,
-    runtime::NDArray grad_out_data);
+    runtime::NDArray grad_out_data,
+    runtime::NDArray grad_lhs_data);
+
+void BackwardRhsSrcOpEdgeReduce(
+    const std::string& reducer,
+    const std::string& binary_op,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
+    runtime::NDArray src_mapping,
+    runtime::NDArray edge_mapping,
+    runtime::NDArray out_mapping,
+    runtime::NDArray src_data,
+    runtime::NDArray edge_data,
+    runtime::NDArray out_data,
+    runtime::NDArray grad_out_data,
+    runtime::NDArray grad_rhs_data);
+
+void BackwardBothSrcOpEdgeReduce(
+    const std::string& reducer,
+    const std::string& binary_op,
+    runtime::NDArray indptr, runtime::NDArray indices,
+    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
+    runtime::NDArray src_mapping,
+    runtime::NDArray edge_mapping,
+    runtime::NDArray out_mapping,
+    runtime::NDArray src_data,
+    runtime::NDArray edge_data,
+    runtime::NDArray out_data,
+    runtime::NDArray grad_out_data,
+    runtime::NDArray grad_lhs_data,
+    runtime::NDArray grad_rhs_data);
 
 }  // namespace kernel
 }  // namespace dgl

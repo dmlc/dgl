@@ -3,6 +3,23 @@ from __future__ import absolute_import
 
 from ._ffi.function import _init_api
 
+def infer_binary_feature_shape(lhs, rhs):
+    """Infer the output feature shape after a binary operation between lhs and rhs.
+
+    Parameter
+    ---------
+    lhs : dgl.ndarray.NDArray
+        The lhs tensor.
+    rhs : dgl.ndarray.NDArray
+        The rhs tensor.
+
+    Returns
+    -------
+    tuple of int
+        The output feature shape.
+    """
+    ret = _CAPI_DGLKernelInferBinaryFeatureShape(lhs, rhs)
+    return tuple(ret.asnumpy())
 
 def src_op_edge_reduce(reducer,
                        binary_op,
@@ -11,7 +28,7 @@ def src_op_edge_reduce(reducer,
                        src_mapping, edge_mapping,
                        src_data, edge_data,
                        out_mapping,
-                       out_size):
+                       out_data):
     """Perform binary op between src node data with edge data and reduce.
 
     Broadcasting is supported for feature dimensions.
@@ -50,17 +67,14 @@ def src_op_edge_reduce(reducer,
         Empty array represents identity mapping.
     out_size : int
         The number of rows of the output tensor.
-
-    Returns
-    -------
-    dgl.ndarray.NDArray
+    out_data : dgl.ndarray.NDArray
         The output tensor. Could be either node or edge feature tensor
         depending on the reducer.
     """
-    return _CAPI_DGLKernelSrcMulEdgeReduce(
+    _CAPI_DGLKernelSrcMulEdgeReduce(
         reducer, binary_op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping,
-        src_data, edge_data, out_mapping, int(out_size))
+        src_data, edge_data, out_mapping, out_data)
 
 def backward_lhs_src_mul_edge_reduce(
         reducer, op,
@@ -68,7 +82,8 @@ def backward_lhs_src_mul_edge_reduce(
         rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data,
-        grad_out_data):
+        grad_out_data,
+        grad_src_data):
     """Backward operator for SrcOpEdgeReduce. Compute the gradient for the src
     data.
 
@@ -110,17 +125,14 @@ def backward_lhs_src_mul_edge_reduce(
     out_data : dgl.ndarray.NDArray
         The forward output tensor.
     grad_out_data : dgl.ndarray.NDArray
-        The gradient of the forward output tensor.
-
-    Returns
-    -------
-    dgl.ndarray.NDArray
-        The gradient of src data.
+        (output variable) The gradient of the forward output tensor.
+    grad_src_data : dgl.ndarray.NDArray
+        (output variable) The gradient of src data.
     """
-    return _CAPI_DGLKernelBackwardLhsSrcMulEdgeReduce(
+    _CAPI_DGLKernelBackwardLhsSrcMulEdgeReduce(
         reducer, op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
-        src_data, edge_data, out_data, grad_out_data)
+        src_data, edge_data, out_data, grad_out_data, grad_src_data)
 
 def backward_rhs_src_mul_edge_reduce(
         reducer, op,
@@ -128,7 +140,7 @@ def backward_rhs_src_mul_edge_reduce(
         rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data,
-        grad_out_data):
+        grad_out_data, grad_edge_data):
     """Backward operator for SrcOpEdgeReduce. Compute the gradient for the edge
     data.
 
@@ -170,17 +182,14 @@ def backward_rhs_src_mul_edge_reduce(
     out_data : dgl.ndarray.NDArray
         The forward output tensor.
     grad_out_data : dgl.ndarray.NDArray
-        The gradient of the forward output tensor.
-
-    Returns
-    -------
-    dgl.ndarray.NDArray
-        The gradient of edge data.
+        (output variable) The gradient of the forward output tensor.
+    grad_edge_data : dgl.ndarray.NDArray
+        (output variable) The gradient of edge data.
     """
-    return _CAPI_DGLKernelBackwardRhsSrcMulEdgeReduce(
+    _CAPI_DGLKernelBackwardRhsSrcMulEdgeReduce(
         reducer, op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
-        src_data, edge_data, out_data, grad_out_data)
+        src_data, edge_data, out_data, grad_out_data, grad_edge_data)
 
 def backward_both_src_mul_edge_reduce(
         reducer, op,
@@ -188,7 +197,8 @@ def backward_both_src_mul_edge_reduce(
         rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data,
-        grad_out_data):
+        grad_out_data,
+        grad_src_data, grad_edge_data):
     """Backward operator for SrcOpEdgeReduce. Compute the gradient for both inputs
     in one fused kernel.
 
@@ -231,19 +241,16 @@ def backward_both_src_mul_edge_reduce(
         The forward output tensor.
     grad_out_data : dgl.ndarray.NDArray
         The gradient of the forward output tensor.
-
-    Returns
-    -------
-    dgl.ndarray.NDArray
-        The gradient of src data.
-    dgl.ndarray.NDArray
-        The gradient of edge data.
+    grad_src_data : dgl.ndarray.NDArray
+        (output variable) The gradient of src data.
+    grad_edge_data : dgl.ndarray.NDArray
+        (output variable) The gradient of edge data.
     """
-    fn = _CAPI_DGLKernelBackwardBothSrcMulEdgeReduce(
+    _CAPI_DGLKernelBackwardBothSrcMulEdgeReduce(
         reducer, op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
-        src_data, edge_data, out_data, grad_out_data)
-    return fn(0), fn(1)
+        src_data, edge_data, out_data, grad_out_data,
+        grad_src_data, grad_edge_data)
 
 def src_op_dst_reduce(reducer,
                       binary_op,
@@ -252,7 +259,7 @@ def src_op_dst_reduce(reducer,
                       src_mapping, dst_mapping,
                       src_data, dst_data,
                       out_mapping,
-                      out_size):
+                      out_data):
     """Perform binary operation between src node data with dst node data and
     then reduce.
 
@@ -290,25 +297,21 @@ def src_op_dst_reduce(reducer,
         Empty array represents identity mapping.
     out_size : int
         The number of rows of the output tensor.
-
-    Returns
-    -------
-    dgl.ndarray.NDArray
+    out_data : dgl.ndarray.NDArray
         The output tensor. Could be either node or edge feature tensor
         depending on the reducer.
     """
-    return _CAPI_DGLKernelSrcMulDstReduce(
+    _CAPI_DGLKernelSrcMulDstReduce(
         reducer, binary_op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, dst_mapping,
-        src_data, dst_data, out_mapping, out_size)
-
+        src_data, dst_data, out_mapping, out_data)
 
 def copy_src_reduce(reducer,
                     indptr, indices,
                     rev_indptr, rev_indices,
                     src_mapping, src_data,
                     out_mapping,
-                    out_size):
+                    out_data):
     """Copy src node data and perform reduce.
 
     Parameter
@@ -337,18 +340,14 @@ def copy_src_reduce(reducer,
         mapping to destination node ids.
     out_size : int
         The size of the first dimension of the output array.
-
-    Returns
-    -------
-    dgl.ndarray.NDArray
+    out_data : dgl.ndarray.NDArray
         The output tensor. Could be either node or edge feature tensor
         depending on the reducer.
     """
     return _CAPI_DGLKernelCopySrcReduce(
         reducer, indptr, indices, rev_indptr, rev_indices,
         src_mapping, src_data, out_mapping,
-        int(out_size))
-
+        out_data)
 
 def backward_copy_src_reduce(
         reducer,
@@ -356,7 +355,8 @@ def backward_copy_src_reduce(
         rev_indptr, rev_indices,
         src_mapping, out_mapping,
         src_data, out_data,
-        grad_out_data):
+        grad_out_data,
+        grad_src_data):
     """Backward operator for CopySrcReduce.
 
     Parameter
@@ -387,16 +387,13 @@ def backward_copy_src_reduce(
         The forward output tensor.
     grad_out_data : dgl.ndarray.NDArray
         The gradient of the forward output tensor.
-
-    Returns
-    -------
-    dgl.ndarray.NDArray
+    grad_src_data : dgl.ndarray.NDArray
         The gradient of src data.
     """
-    return _CAPI_DGLKernelBackwardCopySrcReduce(
+    _CAPI_DGLKernelBackwardCopySrcReduce(
         reducer, indptr, indices, rev_indptr, rev_indices,
         src_mapping, out_mapping,
-        src_data, out_data, grad_out_data)
+        src_data, out_data, grad_out_data, grad_src_data)
 
 def copy_edge_reduce(reducer,
                      indptr, indices,
@@ -404,7 +401,7 @@ def copy_edge_reduce(reducer,
                      edge_mapping,
                      edge_data,
                      out_mapping,
-                     out_size):
+                     out_data):
     """Copy edge data and perform reduce to destination node.
 
     Parameter
@@ -440,10 +437,10 @@ def copy_edge_reduce(reducer,
         The output tensor. Could be either node or edge feature tensor
         depending on the reducer.
     """
-    return _CAPI_DGLKernelCopyEdgeReduce(
+    _CAPI_DGLKernelCopyEdgeReduce(
         reducer, indptr, indices, rev_indptr, rev_indices,
         edge_mapping, edge_data, out_mapping,
-        int(out_size))
+        out_data)
 
 def backward_copy_edge_reduce(
         reducer,
@@ -451,7 +448,8 @@ def backward_copy_edge_reduce(
         rev_indptr, rev_indices,
         edge_mapping, out_mapping,
         edge_data, out_data,
-        grad_out_data):
+        grad_out_data,
+        grad_edge_data):
     """Backward operator for CopyEdgeReduce.
 
     Parameter
@@ -482,15 +480,12 @@ def backward_copy_edge_reduce(
         The forward output tensor.
     grad_out_data : dgl.ndarray.NDArray
         The gradient of the forward output tensor.
-
-    Returns
-    -------
-    dgl.ndarray.NDArray
+    grad_edge_data : dgl.ndarray.NDArray
         The gradient of edge data.
     """
-    return _CAPI_DGLKernelBackwardCopyEdgeReduce(
+    _CAPI_DGLKernelBackwardCopyEdgeReduce(
         reducer, indptr, indices, rev_indptr, rev_indices,
         edge_mapping, out_mapping,
-        edge_data, out_data, grad_out_data)
+        edge_data, out_data, grad_out_data, grad_edge_data)
 
 _init_api("dgl.kernel")

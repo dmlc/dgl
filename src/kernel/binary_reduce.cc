@@ -52,7 +52,7 @@ bool IsValidBinaryOpShape(NDArray lhs, NDArray rhs) {
   return true;
 }
 
-NDArray BinaryOpReduce(
+void BinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
     NDArray indptr, NDArray indices,
@@ -64,7 +64,7 @@ NDArray BinaryOpReduce(
     NDArray lhs_data,
     NDArray rhs_data,
     NDArray out_mapping,
-    const int64_t out_size) {
+    NDArray out_data) {
   CHECK(IsValidCsr(indptr, indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
   if (op != binary_op::kUseLhs) {
     CHECK(IsValidBinaryOpShape(lhs_data, rhs_data))
@@ -72,18 +72,13 @@ NDArray BinaryOpReduce(
       << ShapeString(lhs_data) << " and " << ShapeString(rhs_data);
   }
   const DLContext& ctx = indptr->ctx;
-  const DLDataType& dtype = lhs_data->dtype;
   // Allocate output
-  std::vector<int64_t> out_shape = {out_size};
-  out_shape.insert(out_shape.end(), lhs_data->shape + 1, lhs_data->shape + lhs_data->ndim);
-  NDArray out_data = NDArray::Empty(out_shape, dtype, ctx);
   DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl,
       reducer, op, indptr, indices, rev_indptr, rev_indices,
       lhs, rhs,
       lhs_mapping, rhs_mapping,
       lhs_data, rhs_data,
       out_mapping, out_data);
-  return out_data;
 }
 
 bool HasBcast(NDArray lhs, NDArray rhs) {
@@ -145,7 +140,7 @@ BcastInfo CalcBcastInfo(NDArray lhs, NDArray rhs) {
   return ret;
 }
 
-NDArray BinaryOpReduceBcast(
+void BinaryOpReduceBcast(
     const std::string& reducer,
     const std::string& binary_op,
     NDArray indptr, NDArray indices,
@@ -157,16 +152,10 @@ NDArray BinaryOpReduceBcast(
     NDArray lhs_data,
     NDArray rhs_data,
     NDArray out_mapping,
-    const int64_t out_size) {
+    NDArray out_data) {
   CHECK(IsValidCsr(indptr, indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
   BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
   const DLContext& ctx = indptr->ctx;
-  const DLDataType& dtype = lhs_data->dtype;
-  // Allocate output
-  std::vector<int64_t> out_shape = {out_size};
-  out_shape.insert(out_shape.end(),
-      info.real_out_shape.begin(), info.real_out_shape.end());
-  NDArray out_data = NDArray::Empty(out_shape, dtype, ctx);
   DGL_XPU_SWITCH(ctx.device_type, BinaryReduceBcastImpl,
       info, reducer, binary_op,
       indptr, indices, rev_indptr, rev_indices,
@@ -174,12 +163,30 @@ NDArray BinaryOpReduceBcast(
       lhs_mapping, rhs_mapping,
       lhs_data, rhs_data,
       out_mapping, out_data);
-  return out_data;
 }
 }  // namespace
 
 
-NDArray SrcOpEdgeReduce(
+std::vector<int64_t> InferBinaryFeatureShape(
+    NDArray lhs,
+    NDArray rhs) {
+  return CalcBcastInfo(lhs, rhs).real_out_shape;
+}
+
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelInferBinaryFeatureShape")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    NDArray lhs = args[0];
+    NDArray rhs = args[1];
+    const auto& shape = InferBinaryFeatureShape(lhs, rhs);
+    const int64_t len = shape.size();
+    NDArray ret = NDArray::Empty(
+        {len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    int64_t* ret_data = static_cast<int64_t*>(ret->data);
+    std::copy(shape.begin(), shape.end(), ret_data);
+    *rv = ret;
+  });
+
+void SrcOpEdgeReduce(
     const std::string& reducer,
     const std::string& binary_op,
     NDArray indptr, NDArray indices,
@@ -189,21 +196,21 @@ NDArray SrcOpEdgeReduce(
     NDArray src_data,
     NDArray edge_data,
     NDArray out_mapping,
-    const int64_t out_size) {
+    NDArray out_data) {
   if (HasBcast(src_data, edge_data)) {
-    return BinaryOpReduceBcast(reducer, binary_op,
+    BinaryOpReduceBcast(reducer, binary_op,
         indptr, indices, rev_indptr, rev_indices,
         binary_op::kSrc, binary_op::kEdge,
         src_mapping, edge_mapping,
         src_data, edge_data,
-        out_mapping, out_size);
+        out_mapping, out_data);
   } else {
-    return BinaryOpReduce(reducer, binary_op,
+    BinaryOpReduce(reducer, binary_op,
         indptr, indices, rev_indptr, rev_indices,
         binary_op::kSrc, binary_op::kEdge,
         src_mapping, edge_mapping,
         src_data, edge_data,
-        out_mapping, out_size);
+        out_mapping, out_data);
   }
 }
 
@@ -220,13 +227,14 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelSrcMulEdgeReduce")
     NDArray src_data = args[8];
     NDArray edge_data = args[9];
     NDArray out_mapping = args[10];
-    const int64_t out_size = args[11];
-    *rv = SrcOpEdgeReduce(reducer, binary_op,
+    NDArray out_data = args[11];
+    SrcOpEdgeReduce(reducer, binary_op,
         indptr, indices, rev_indptr, rev_indices,
-        src_mapping, edge_mapping, src_data, edge_data, out_mapping, out_size);
+        src_mapping, edge_mapping, src_data, edge_data,
+        out_mapping, out_data);
   });
 
-NDArray SrcOpDstReduce(
+void SrcOpDstReduce(
     const std::string& reducer,
     const std::string& binary_op,
     NDArray indptr, NDArray indices,
@@ -236,21 +244,21 @@ NDArray SrcOpDstReduce(
     NDArray src_data,
     NDArray dst_data,
     NDArray out_mapping,
-    const int64_t out_size) {
+    NDArray out_data) {
   if (HasBcast(src_data, dst_data)) {
-    return BinaryOpReduceBcast(reducer, binary_op,
+    BinaryOpReduceBcast(reducer, binary_op,
         indptr, indices, rev_indptr, rev_indices,
         binary_op::kSrc, binary_op::kDst,
         src_mapping, dst_mapping,
         src_data, dst_data,
-        out_mapping, out_size);
+        out_mapping, out_data);
   } else {
-    return BinaryOpReduce(reducer, binary_op,
+    BinaryOpReduce(reducer, binary_op,
         indptr, indices, rev_indptr, rev_indices,
         binary_op::kSrc, binary_op::kDst,
         src_mapping, dst_mapping,
         src_data, dst_data,
-        out_mapping, out_size);
+        out_mapping, out_data);
   }
 }
 
@@ -267,27 +275,28 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelSrcMulDstReduce")
     NDArray src_data = args[8];
     NDArray dst_data = args[9];
     NDArray out_mapping = args[10];
-    const int64_t out_size = args[11];
-    *rv = SrcOpDstReduce(reducer, binary_op,
+    NDArray out_data = args[11];
+    SrcOpDstReduce(reducer, binary_op,
         indptr, indices, rev_indptr, rev_indices,
-        src_mapping, dst_mapping, src_data, dst_data, out_mapping, out_size);
+        src_mapping, dst_mapping, src_data, dst_data,
+        out_mapping, out_data);
   });
 
 
-NDArray CopySrcReduce(
+void CopySrcReduce(
     const std::string& reducer,
     NDArray indptr, NDArray indices,
     NDArray rev_indptr, NDArray rev_indices,
     NDArray src_mapping,
     NDArray src_data,
     NDArray out_mapping,
-    const int64_t out_size) {
-  return BinaryOpReduce(reducer, binary_op::kUseLhs,
+    NDArray out_data) {
+  BinaryOpReduce(reducer, binary_op::kUseLhs,
       indptr, indices, rev_indptr, rev_indices,
       binary_op::kSrc, binary_op::kEdge,
       src_mapping, utils::NoneArray(),
       src_data, utils::NoneArray(),
-      out_mapping, out_size);
+      out_mapping, out_data);
 }
 
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopySrcReduce")
@@ -300,25 +309,25 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopySrcReduce")
     NDArray src_mapping = args[5];
     NDArray src_data = args[6];
     NDArray out_mapping = args[7];
-    const int64_t out_size = args[8];
-    *rv = CopySrcReduce(reducer, indptr, indices, rev_indptr, rev_indices,
-        src_mapping, src_data, out_mapping, out_size);
+    NDArray out_data = args[8];
+    CopySrcReduce(reducer, indptr, indices, rev_indptr, rev_indices,
+        src_mapping, src_data, out_mapping, out_data);
   });
 
-NDArray CopyEdgeReduce(
+void CopyEdgeReduce(
     const std::string& reducer,
     NDArray indptr, NDArray indices,
     NDArray rev_indptr, NDArray rev_indices,
     NDArray edge_mapping,
     NDArray edge_data,
     NDArray out_mapping,
-    const int64_t out_size) {
-  return BinaryOpReduce(reducer, binary_op::kUseLhs,
+    NDArray out_data) {
+  BinaryOpReduce(reducer, binary_op::kUseLhs,
       indptr, indices, rev_indptr, rev_indices,
       binary_op::kEdge, binary_op::kDst,
       edge_mapping, utils::NoneArray(),
       edge_data, utils::NoneArray(),
-      out_mapping, out_size);
+      out_mapping, out_data);
 }
 
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopyEdgeReduce")
@@ -331,13 +340,13 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelCopyEdgeReduce")
     NDArray edge_mapping = args[5];
     NDArray edge_data = args[6];
     NDArray out_mapping = args[7];
-    const int64_t out_size = args[8];
-    *rv = CopyEdgeReduce(reducer, indptr, indices, rev_indptr, rev_indices,
-        edge_mapping, edge_data, out_mapping, out_size);
+    NDArray out_data = args[8];
+    CopyEdgeReduce(reducer, indptr, indices, rev_indptr, rev_indices,
+        edge_mapping, edge_data, out_mapping, out_data);
   });
 
 
-NDArray BackwardLhsSrcOpEdgeReduce(
+void BackwardLhsSrcOpEdgeReduce(
     const std::string& reducer,
     const std::string& op,
     NDArray indptr, NDArray indices,
@@ -348,13 +357,10 @@ NDArray BackwardLhsSrcOpEdgeReduce(
     NDArray src_data,
     NDArray edge_data,
     NDArray out_data,
-    NDArray grad_out_data) {
+    NDArray grad_out_data,
+    NDArray grad_src_data) {
   CHECK(IsValidCsr(indptr, indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
   CHECK(IsValidCsr(rev_indptr, rev_indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
-  // Allocate output
-  std::vector<int64_t> shape = {src_data->shape[0]};
-  shape.insert(shape.end(), out_data->shape + 1, out_data->shape + out_data->ndim);
-  NDArray grad_src_data = NDArray::Empty(shape, out_data->dtype, out_data->ctx);
   if (HasBcast(src_data, edge_data)) {
     BcastInfo info = CalcBcastInfo(src_data, edge_data);
     DGL_XPU_SWITCH(grad_src_data->ctx.device_type, BackwardBinaryReduceBcastImpl,
@@ -371,7 +377,6 @@ NDArray BackwardLhsSrcOpEdgeReduce(
         src_data, edge_data, out_data, grad_out_data,
         grad_src_data, utils::NoneArray());
   }
-  return grad_src_data;
 }
 
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsSrcMulEdgeReduce")
@@ -389,13 +394,15 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsSrcMulEdgeReduce")
     NDArray edge_data = args[10];
     NDArray out_data = args[11];
     NDArray grad_out_data = args[12];
-    *rv = BackwardLhsSrcOpEdgeReduce(
+    NDArray grad_src_data = args[13];
+    BackwardLhsSrcOpEdgeReduce(
         reducer, op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
-        src_data, edge_data, out_data, grad_out_data);
+        src_data, edge_data, out_data, grad_out_data,
+        grad_src_data);
   });
 
-NDArray BackwardRhsSrcOpEdgeReduce(
+void BackwardRhsSrcOpEdgeReduce(
     const std::string& reducer,
     const std::string& op,
     NDArray indptr, NDArray indices,
@@ -406,13 +413,10 @@ NDArray BackwardRhsSrcOpEdgeReduce(
     NDArray src_data,
     NDArray edge_data,
     NDArray out_data,
-    NDArray grad_out_data) {
+    NDArray grad_out_data,
+    NDArray grad_edge_data) {
   CHECK(IsValidCsr(indptr, indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
   CHECK(IsValidCsr(rev_indptr, rev_indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
-  // Allocate output
-  std::vector<int64_t> shape = {edge_data->shape[0]};
-  shape.insert(shape.end(), out_data->shape + 1, out_data->shape + out_data->ndim);
-  NDArray grad_edge_data = NDArray::Empty(shape, out_data->dtype, out_data->ctx);
   if (HasBcast(src_data, edge_data)) {
     BcastInfo info = CalcBcastInfo(src_data, edge_data);
     DGL_XPU_SWITCH(grad_edge_data->ctx.device_type, BackwardBinaryReduceBcastImpl,
@@ -429,7 +433,6 @@ NDArray BackwardRhsSrcOpEdgeReduce(
         src_data, edge_data, out_data, grad_out_data,
         utils::NoneArray(), grad_edge_data);
   }
-  return grad_edge_data;
 }
 
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsSrcMulEdgeReduce")
@@ -447,14 +450,16 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsSrcMulEdgeReduce")
     NDArray edge_data = args[10];
     NDArray out_data = args[11];
     NDArray grad_out_data = args[12];
-    *rv = BackwardRhsSrcOpEdgeReduce(
+    NDArray grad_edge_data = args[13];
+    BackwardRhsSrcOpEdgeReduce(
         reducer, op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
-        src_data, edge_data, out_data, grad_out_data);
+        src_data, edge_data, out_data, grad_out_data,
+        grad_edge_data);
   });
 
 
-std::pair<NDArray, NDArray> BackwardBothSrcOpEdgeReduce(
+void BackwardBothSrcOpEdgeReduce(
     const std::string& reducer,
     const std::string& op,
     NDArray indptr, NDArray indices,
@@ -465,16 +470,11 @@ std::pair<NDArray, NDArray> BackwardBothSrcOpEdgeReduce(
     NDArray src_data,
     NDArray edge_data,
     NDArray out_data,
-    NDArray grad_out_data) {
+    NDArray grad_out_data,
+    NDArray grad_src_data,
+    NDArray grad_edge_data) {
   CHECK(IsValidCsr(indptr, indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
   CHECK(IsValidCsr(rev_indptr, rev_indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
-  // Allocate output
-  std::vector<int64_t> shape = {src_data->shape[0]};
-  shape.insert(shape.end(), out_data->shape + 1, out_data->shape + out_data->ndim);
-  NDArray grad_src_data = NDArray::Empty(shape, out_data->dtype, out_data->ctx);
-  shape = {edge_data->shape[0]};
-  shape.insert(shape.end(), out_data->shape + 1, out_data->shape + out_data->ndim);
-  NDArray grad_edge_data = NDArray::Empty(shape, out_data->dtype, out_data->ctx);
   if (HasBcast(src_data, edge_data)) {
     BcastInfo info = CalcBcastInfo(src_data, edge_data);
     DGL_XPU_SWITCH(grad_edge_data->ctx.device_type, BackwardBinaryReduceBcastImpl,
@@ -491,7 +491,6 @@ std::pair<NDArray, NDArray> BackwardBothSrcOpEdgeReduce(
         src_data, edge_data, out_data, grad_out_data,
         grad_src_data, grad_edge_data);
   }
-  return std::make_pair(grad_src_data, grad_edge_data);
 }
 
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardBothSrcMulEdgeReduce")
@@ -509,19 +508,13 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardBothSrcMulEdgeReduce")
     NDArray edge_data = args[10];
     NDArray out_data = args[11];
     NDArray grad_out_data = args[12];
-    const auto& pair = BackwardBothSrcOpEdgeReduce(
+    NDArray grad_src_data = args[13];
+    NDArray grad_edge_data = args[14];
+    BackwardBothSrcOpEdgeReduce(
         reducer, op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
-        src_data, edge_data, out_data, grad_out_data);
-    auto body = [pair] (DGLArgs args, DGLRetValue* rv) {
-        const int which = args[0];
-        if (which == 0) {
-          *rv = pair.first;
-        } else {
-          *rv = pair.second;
-        }
-      };
-    return PackedFunc(body);
+        src_data, edge_data, out_data, grad_out_data,
+        grad_src_data, grad_edge_data);
   });
 
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopySrcReduce")
@@ -536,18 +529,15 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopySrcReduce")
     NDArray src_data = args[7];
     NDArray out_data = args[8];
     NDArray grad_out_data = args[9];
+    NDArray grad_src_data = args[10];
     CHECK(IsValidCsr(indptr, indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
     CHECK(IsValidCsr(rev_indptr, rev_indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
-    // Allocate output
-    std::vector<int64_t> shape(src_data->shape, src_data->shape + src_data->ndim);
-    NDArray grad_src_data = NDArray::Empty(shape, src_data->dtype, src_data->ctx);
     DGL_XPU_SWITCH(grad_src_data->ctx.device_type, BackwardBinaryReduceImpl,
       reducer, binary_op::kUseLhs, indptr, indices, rev_indptr, rev_indices,
       binary_op::kDst, binary_op::kEdge,
       src_mapping, utils::NoneArray(), out_mapping,
       src_data, utils::NoneArray(), out_data, grad_out_data,
       grad_src_data, utils::NoneArray());
-    *rv = grad_src_data;
   });
 
 
@@ -563,18 +553,16 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopyEdgeReduce")
     NDArray edge_data = args[7];
     NDArray out_data = args[8];
     NDArray grad_out_data = args[9];
+    NDArray grad_edge_data = args[10];
     CHECK(IsValidCsr(indptr, indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
     CHECK(IsValidCsr(rev_indptr, rev_indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
-    // Allocate output
-    std::vector<int64_t> shape(edge_data->shape, edge_data->shape + edge_data->ndim);
-    NDArray grad_edge_data = NDArray::Empty(shape, edge_data->dtype, edge_data->ctx);
     DGL_XPU_SWITCH(grad_edge_data->ctx.device_type, BackwardBinaryReduceImpl,
       reducer, binary_op::kUseLhs, indptr, indices, rev_indptr, rev_indices,
       binary_op::kEdge, binary_op::kDst,
       edge_mapping, utils::NoneArray(), out_mapping,
       edge_data, utils::NoneArray(), out_data, grad_out_data,
       grad_edge_data, utils::NoneArray());
-    *rv = grad_edge_data;
   });
+
 }  // namespace kernel
 }  // namespace dgl
