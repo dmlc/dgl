@@ -128,6 +128,12 @@ BcastInfo CalcBcastInfo(NDArray lhs, NDArray rhs) {
     }
     ret.real_out_shape.push_back(std::max(dl, dr));
   }
+  if (accum != 0) {
+    ret.lhs_shape.push_back(accum);
+    ret.rhs_shape.push_back(accum);
+    ret.out_shape.push_back(accum);
+    accum = 0;
+  }
   std::reverse(ret.real_out_shape.begin(), ret.real_out_shape.end());
   std::reverse(ret.lhs_shape.begin(), ret.lhs_shape.end());
   std::reverse(ret.rhs_shape.begin(), ret.rhs_shape.end());
