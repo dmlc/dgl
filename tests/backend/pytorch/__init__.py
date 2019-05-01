@@ -48,6 +48,9 @@ def reduce_sum(x):
 def softmax(x, dim):
     return th.softmax(x, dim)
 
+def spmm(x, y):
+    return th.spmm(x, y)
+
 class record_grad(object):
     def __init__(self):
         pass

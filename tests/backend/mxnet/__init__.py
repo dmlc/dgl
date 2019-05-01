@@ -48,6 +48,9 @@ def reduce_sum(x):
 def softmax(x, dim):
     return nd.softmax(x, dim)
 
+def spmm(x, y):
+    return nd.dot(x, y)
+
 record_grad = autograd.record
 
 
