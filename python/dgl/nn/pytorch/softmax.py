@@ -4,6 +4,7 @@ from ... import ndarray as nd
 from ... import backend as F
 from ... import utils
 
+
 __all__ = ['EdgeSoftmax']
 
 

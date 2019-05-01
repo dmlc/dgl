@@ -2,6 +2,8 @@ import dgl
 import torch
 import torch_scatter
 import dgl.function as fn
+from dgl.nn.pytorch import EdgeSoftmax
+import networkx as nx
 
 
 def allclose(a, b):
@@ -14,7 +16,7 @@ def scatter_max(*args, **kwargs):
 
 D1 = 5
 D2 = 10
-D3 = 2
+D3 = 4
 scatter_add = torch_scatter.scatter_add
 builtin = {'sum': fn.sum, 'max': fn.max}
 udf_reduce = {'sum': scatter_add, 'max': scatter_max}
@@ -25,12 +27,7 @@ def generate_graph(broadcast='none'):
     """Create graph with src, edge, dst feature. broadcast can be 'src',
     'edge', 'dst', 'none'
     """
-    g = dgl.DGLGraph()
-    g.add_nodes(10)
-    for i in range(1, 9):
-        g.add_edges(0, i)
-        g.add_edges(i, 9)
-    g.add_edge(9, 0)
+    g = dgl.DGLGraph(nx.erdos_renyi_graph(100, 0.5))
     nv = g.number_of_nodes()
     ne = g.number_of_edges()
     if broadcast == 'edge':
@@ -55,6 +52,7 @@ def generate_graph(broadcast='none'):
     g.edata['e'] = e.cuda().requires_grad_()
     return g
 
+
 def _tweak_shape(n, e, f, broadcast):
     if broadcast == 'src':
         n = n.unsqueeze(1)
@@ -63,6 +61,7 @@ def _tweak_shape(n, e, f, broadcast):
     elif broadcast == 'edge':
         e = e.unsqueeze(1)
     return n, e, f
+
 
 def test_src_op_edge_reduce():
     def _test(red, test_backward=False, broadcast='none'):
@@ -180,8 +179,40 @@ def test_copy_edge_reduce():
     _test('max', True)
 
 
+def _edge_softmax_ground_truth(a, dst, nv):
+    shape = a.shape
+    a = a.view(shape[0], -1)
+    max_norm = scatter_max(a, dst, dim=0, fill_value=float("-inf"))
+    a = a - max_norm.index_select(0, dst)
+    a = a.exp()
+    norm = scatter_add(a, dst, dim=0)
+    a = a.view(shape)
+    norm = norm.view((nv, ) + shape[1:])
+    return a, norm
+
+
+def test_edge_softmax():
+    g = generate_graph('src')  # generate high dim edge feature
+    softmax = EdgeSoftmax()
+    e = g.edata['e']
+    e1 = e.detach().requires_grad_()
+    a, norm = softmax(e, g)
+    _, dst = g.edges()
+    nv = g.number_of_nodes()
+    a1, norm1 = _edge_softmax_ground_truth(e1, dst.cuda(), nv)
+    assert(allclose(a, a1))
+    assert(allclose(norm, norm1))
+    loss = a.sum() + norm.sum()
+    loss1 = a1.sum() + norm1.sum()
+    loss.backward()
+    loss1.backward()
+    assert(allclose(e.grad, e1.grad))
+
+
 if __name__ == '__main__':
     test_copy_src_reduce()
     test_copy_edge_reduce()
     test_src_op_edge_reduce()
-    #test_src_op_dst_reduce()
+    # FIXME: expose backward of src_op_dst_reduce and enable this unit test
+    # test_src_op_dst_reduce()
+    test_edge_softmax()

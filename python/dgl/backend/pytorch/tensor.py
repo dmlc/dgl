@@ -275,12 +275,14 @@ class SrcOpDstReduce(th.autograd.Function):
                 src_map, dst_map, backward_out_map, src_data, dst_data,
                 out_data, grad_out)
             grad_src = zerocopy_from_dgl_ndarray(grad_src)
+            grad_src = _reduce_grad(grad_src, src_data.shape)
         if ctx.needs_input_grad[4]:
             grad_dst = K.backward_rhs_src_mul_dst_reduce(
                 reducer, binary_op, spmat[0], spmat[1], spmat[2], spmat[3],
                 src_map, dst_map, backward_out_map, src_data, dst_data,
                 out_data, grad_out)
             grad_dst = zerocopy_from_dgl_ndarray(grad_dst)
+            grad_dst = _reduce_grad(grad_dst, dst_data.shape)
         return None, None, None, grad_src, grad_dst, None, None, None, None
 
 
