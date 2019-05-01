@@ -1,9 +1,15 @@
 #pragma once
 
-#include <minigun/minigun.h>
 #include <dgl/runtime/ndarray.h>
 
 #include "./binary_reduce_common.h"
+
+namespace minigun {
+struct Csr;
+namespace advance {
+struct RuntimeConfig;
+}  // namespace advance
+}  // namespace minigun
 
 namespace dgl {
 namespace kernel {

@@ -3,7 +3,7 @@
 #include "../../runtime/cuda/cuda_common.h"
 #include "./binary_reduce_impl.cuh"
 #include "./backward_binary_reduce_impl.cuh"
-#include "./utils.cuh"
+#include "../utils.h"
 
 using minigun::Csr;
 using minigun::advance::RuntimeConfig;
@@ -96,7 +96,7 @@ void CusparseCsrmm2(const RuntimeConfig& rtcfg, const Csr& csr,
   DType* trans_out = static_cast<DType*>(device->AllocWorkspace(rtcfg.ctx, k * n * sizeof(DType)));
   // all one data array
   DType* valptr = static_cast<DType*>(device->AllocWorkspace(rtcfg.ctx, nnz * sizeof(DType)));
-  utils::Fill(rtcfg.stream, valptr, nnz, static_cast<DType>(1.));
+  utils::Fill<kDLGPU>(rtcfg.ctx, valptr, nnz, static_cast<DType>(1.));
   cusparseMatDescr_t descr;
   CUSPARSE_CALL(cusparseCreateMatDescr(&descr));
   CUSPARSE_CALL(cusparseSetMatType(descr, CUSPARSE_MATRIX_TYPE_GENERAL));

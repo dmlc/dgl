@@ -10,42 +10,6 @@
 
 namespace dgl {
 namespace kernel {
-namespace {
-inline int64_t ComputeXLength(runtime::NDArray feat_array) {
-  int64_t ret = 1;
-  for (int i = 1; i < feat_array->ndim; ++i) {
-    ret *= feat_array->shape[i];
-  }
-  return ret;
-}
-
-inline int64_t NElements(runtime::NDArray array) {
-  if (IsNoneArray(array)) {
-    return 0;
-  } else {
-    int64_t ret = 1;
-    for (int i = 0; i < array->ndim; ++i) {
-      ret *= array->shape[i];
-    }
-    return ret;
-  }
-}
-inline int64_t Prod(const std::vector<int64_t>& vec) {
-  int64_t ret = 1;
-  for (int64_t v : vec) {
-    ret *= v;
-  }
-  return ret;
-}
-inline minigun::Csr CreateCsr(runtime::NDArray indptr, runtime::NDArray indices) {
-  minigun::Csr csr;
-  csr.row_offsets.data = static_cast<mg_int*>(indptr->data);
-  csr.row_offsets.length = indptr->shape[0];
-  csr.column_indices.data = static_cast<mg_int*>(indices->data);
-  csr.column_indices.length = indices->shape[0];
-  return csr;
-}
-}  // namespace
 
 /****************************************************
  * BinaryOpReduce
@@ -53,7 +17,7 @@ inline minigun::Csr CreateCsr(runtime::NDArray indptr, runtime::NDArray indices)
 
 template <int XPU, typename DType, typename Reducer>
 GData<DType> AllocGData(
-    int64_t x_len,
+    const DLContext& ctx, int64_t x_len,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data,
     runtime::NDArray out_mapping, runtime::NDArray out_data) {
@@ -63,17 +27,17 @@ GData<DType> AllocGData(
   gdata.lhs_data = static_cast<DType*>(lhs_data->data);
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
-  if (!IsNoneArray(lhs_mapping)) {
+  if (!utils::IsNoneArray(lhs_mapping)) {
     gdata.lhs_mapping = static_cast<int64_t*>(lhs_mapping->data);
   }
-  if (!IsNoneArray(rhs_mapping)) {
+  if (!utils::IsNoneArray(rhs_mapping)) {
     gdata.rhs_mapping = static_cast<int64_t*>(rhs_mapping->data);
   }
-  if (!IsNoneArray(out_mapping)) {
+  if (!utils::IsNoneArray(out_mapping)) {
     gdata.out_mapping = static_cast<int64_t*>(out_mapping->data);
   }
   // fill out data with zero values
-  utils::Fill<XPU>(gdata.out_data, NElements(out_data), Zero<Reducer>::value);
+  utils::Fill<XPU>(ctx, gdata.out_data, utils::NElements(out_data), Zero<Reducer>::value);
   return gdata;
 }
 
@@ -94,10 +58,10 @@ void BinaryReduceImpl(
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
 #endif
   // Graph
-  Csr csr = CreateCsr(indptr, indices);
-  Csr rev_csr = CreateCsr(rev_indptr, rev_indices);
+  Csr csr = utils::CreateCsr(indptr, indices);
+  Csr rev_csr = utils::CreateCsr(rev_indptr, rev_indices);
 
-  const int64_t x_len = ComputeXLength(out_data);
+  const int64_t x_len = utils::ComputeXLength(out_data);
 
   // advance config
   minigun::advance::RuntimeConfig rtcfg;
@@ -118,7 +82,7 @@ void BinaryReduceImpl(
   DGL_DTYPE_SWITCH(dtype, DType, {
     REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
       GData<DType> gdata = AllocGData<XPU, DType, Reducer>(
-          x_len, lhs_mapping, rhs_mapping,
+          rtcfg.ctx, x_len, lhs_mapping, rhs_mapping,
           lhs_data, rhs_data, out_mapping, out_data);
       BINARY_OP_SWITCH(op, DType, BinaryOp, {
         TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
@@ -135,9 +99,9 @@ void BinaryReduceImpl(
  * BackwardBinaryOpReduce
  ****************************************************/
 
-
 template <int XPU, typename DType>
-BackwardGData<DType> AllocBackwardGData( int64_t x_len,
+BackwardGData<DType> AllocBackwardGData(
+    const DLContext& ctx, int64_t x_len,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data, runtime::NDArray out_data,
     runtime::NDArray grad_out_data,
@@ -149,25 +113,25 @@ BackwardGData<DType> AllocBackwardGData( int64_t x_len,
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
   gdata.grad_out_data = static_cast<DType*>(grad_out_data->data);
-  if (!IsNoneArray(grad_lhs_data)) {
+  if (!utils::IsNoneArray(grad_lhs_data)) {
     gdata.grad_lhs_data = static_cast<DType*>(grad_lhs_data->data);
     // fill out data with zero values
-    utils::Fill<XPU>(gdata.grad_lhs_data, NElements(grad_lhs_data),
+    utils::Fill<XPU>(ctx, gdata.grad_lhs_data, utils::NElements(grad_lhs_data),
                 static_cast<DType>(0));
   }
-  if (!IsNoneArray(grad_rhs_data)) {
+  if (!utils::IsNoneArray(grad_rhs_data)) {
     gdata.grad_rhs_data = static_cast<DType*>(grad_rhs_data->data);
     // fill out data with zero values
-    utils::Fill<XPU>(gdata.grad_rhs_data, NElements(grad_rhs_data),
+    utils::Fill<XPU>(ctx, gdata.grad_rhs_data, utils::NElements(grad_rhs_data),
                 static_cast<DType>(0));
   }
-  if (!IsNoneArray(lhs_mapping)) {
+  if (!utils::IsNoneArray(lhs_mapping)) {
     gdata.lhs_mapping = static_cast<int64_t*>(lhs_mapping->data);
   }
-  if (!IsNoneArray(rhs_mapping)) {
+  if (!utils::IsNoneArray(rhs_mapping)) {
     gdata.rhs_mapping = static_cast<int64_t*>(rhs_mapping->data);
   }
-  if (!IsNoneArray(out_mapping)) {
+  if (!utils::IsNoneArray(out_mapping)) {
     gdata.out_mapping = static_cast<int64_t*>(out_mapping->data);
   }
   return gdata;
@@ -191,10 +155,10 @@ void BackwardBinaryReduceImpl(
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
 #endif
   // Graph
-  Csr csr = CreateCsr(indptr, indices);
-  Csr rev_csr = CreateCsr(rev_indptr, rev_indices);
+  Csr csr = utils::CreateCsr(indptr, indices);
+  Csr rev_csr = utils::CreateCsr(rev_indptr, rev_indices);
 
-  const int64_t x_len = ComputeXLength(out_data);
+  const int64_t x_len = utils::ComputeXLength(out_data);
 
   // advance config
   minigun::advance::RuntimeConfig rtcfg;
@@ -209,15 +173,15 @@ void BackwardBinaryReduceImpl(
 #endif
 
   const DLDataType& dtype = out_data->dtype;
-  const bool req_lhs = !IsNoneArray(grad_lhs_data);
-  const bool req_rhs = !IsNoneArray(grad_rhs_data);
+  const bool req_lhs = !utils::IsNoneArray(grad_lhs_data);
+  const bool req_rhs = !utils::IsNoneArray(grad_rhs_data);
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
   }
   DGL_DTYPE_SWITCH(dtype, DType, {
     BackwardGData<DType> gdata = AllocBackwardGData<XPU, DType>(
-        x_len, lhs_mapping, rhs_mapping, out_mapping,
+        rtcfg.ctx, x_len, lhs_mapping, rhs_mapping, out_mapping,
         lhs_data, rhs_data, out_data, grad_out_data,
         grad_lhs_data, grad_rhs_data);
     BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, {
@@ -239,7 +203,7 @@ void BackwardBinaryReduceImpl(
 
 template <int XPU, int NDim, typename DType, typename Reducer>
 BcastGData<NDim, DType> AllocBcastGData(
-    const BcastInfo& info,
+    const DLContext& ctx, const BcastInfo& info,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data,
     runtime::NDArray out_mapping, runtime::NDArray out_data) {
@@ -253,24 +217,24 @@ BcastGData<NDim, DType> AllocBcastGData(
   std::copy(info.rhs_stride.begin(), info.rhs_stride.end(), gdata.rhs_stride);
   std::copy(info.out_shape.begin(), info.out_shape.end(), gdata.out_shape);
   std::copy(info.out_stride.begin(), info.out_stride.end(), gdata.out_stride);
-  gdata.lhs_len = Prod(info.lhs_shape);
-  gdata.rhs_len = Prod(info.rhs_shape);
-  gdata.out_len = Prod(info.out_shape);
+  gdata.lhs_len = utils::Prod(info.lhs_shape);
+  gdata.rhs_len = utils::Prod(info.rhs_shape);
+  gdata.out_len = utils::Prod(info.out_shape);
   // data
   gdata.lhs_data = static_cast<DType*>(lhs_data->data);
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
-  if (!IsNoneArray(lhs_mapping)) {
+  if (!utils::IsNoneArray(lhs_mapping)) {
     gdata.lhs_mapping = static_cast<int64_t*>(lhs_mapping->data);
   }
-  if (!IsNoneArray(rhs_mapping)) {
+  if (!utils::IsNoneArray(rhs_mapping)) {
     gdata.rhs_mapping = static_cast<int64_t*>(rhs_mapping->data);
   }
-  if (!IsNoneArray(out_mapping)) {
+  if (!utils::IsNoneArray(out_mapping)) {
     gdata.out_mapping = static_cast<int64_t*>(out_mapping->data);
   }
   // fill out data with zero values
-  utils::Fill<XPU>(gdata.out_data, NElements(out_data), Zero<Reducer>::value);
+  utils::Fill<XPU>(ctx, gdata.out_data, utils::NElements(out_data), Zero<Reducer>::value);
   return gdata;
 }
 
@@ -295,15 +259,15 @@ void BinaryReduceBcastImpl(
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
 #endif
   // Graph
-  Csr csr = CreateCsr(indptr, indices);
-  Csr rev_csr = CreateCsr(rev_indptr, rev_indices);
+  Csr csr = utils::CreateCsr(indptr, indices);
+  Csr rev_csr = utils::CreateCsr(rev_indptr, rev_indices);
 
   // advance config
   minigun::advance::RuntimeConfig rtcfg;
   rtcfg.ctx = out_data->ctx;
 #ifdef __CUDACC__
   rtcfg.stream = thr_entry->stream;
-  const int64_t x_len = ComputeXLength(out_data);
+  const int64_t x_len = utils::ComputeXLength(out_data);
   const int nt = utils::FindNumThreads(x_len, 64);
   rtcfg.data_num_threads = nt;
   // XXX(minjie): hard-code to let each thread compute two elements to increase
@@ -321,7 +285,7 @@ void BinaryReduceBcastImpl(
     REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
       BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
         BcastGData<NDim, DType> gdata = AllocBcastGData<XPU, NDim, DType, Reducer>(
-            info, lhs_mapping, rhs_mapping,
+            rtcfg.ctx, info, lhs_mapping, rhs_mapping,
             lhs_data, rhs_data, out_mapping, out_data);
         BINARY_OP_SWITCH(op, DType, BinaryOp, {
           TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
@@ -341,7 +305,7 @@ void BinaryReduceBcastImpl(
 
 template <int XPU, int NDim, typename DType>
 BackwardBcastGData<NDim, DType> AllocBackwardBcastGData(
-    const BcastInfo& info,
+    const DLContext& ctx, const BcastInfo& info,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping,
     runtime::NDArray lhs, runtime::NDArray rhs, runtime::NDArray out, runtime::NDArray grad_out,
     runtime::NDArray grad_lhs, runtime::NDArray grad_rhs) {
@@ -349,9 +313,9 @@ BackwardBcastGData<NDim, DType> AllocBackwardBcastGData(
   BackwardBcastGData<NDim, DType> gdata;
   // dim, shape and stride
   gdata.ndim = info.lhs_shape.size();
-  gdata.lhs_len = Prod(info.lhs_shape);
-  gdata.rhs_len = Prod(info.rhs_shape);
-  gdata.out_len = Prod(info.out_shape);
+  gdata.lhs_len = utils::Prod(info.lhs_shape);
+  gdata.rhs_len = utils::Prod(info.rhs_shape);
+  gdata.out_len = utils::Prod(info.out_shape);
   std::copy(info.lhs_shape.begin(), info.lhs_shape.end(), gdata.lhs_shape);
   std::copy(info.lhs_stride.begin(), info.lhs_stride.end(), gdata.lhs_stride);
   std::copy(info.rhs_shape.begin(), info.rhs_shape.end(), gdata.rhs_shape);
@@ -359,13 +323,13 @@ BackwardBcastGData<NDim, DType> AllocBackwardBcastGData(
   std::copy(info.out_shape.begin(), info.out_shape.end(), gdata.out_shape);
   std::copy(info.out_stride.begin(), info.out_stride.end(), gdata.out_stride);
   // mappings
-  if (!IsNoneArray(lhs_mapping)) {
+  if (!utils::IsNoneArray(lhs_mapping)) {
     gdata.lhs_mapping = static_cast<int64_t*>(lhs_mapping->data);
   }
-  if (!IsNoneArray(rhs_mapping)) {
+  if (!utils::IsNoneArray(rhs_mapping)) {
     gdata.rhs_mapping = static_cast<int64_t*>(rhs_mapping->data);
   }
-  if (!IsNoneArray(out_mapping)) {
+  if (!utils::IsNoneArray(out_mapping)) {
     gdata.out_mapping = static_cast<int64_t*>(out_mapping->data);
   }
   // data
@@ -373,16 +337,16 @@ BackwardBcastGData<NDim, DType> AllocBackwardBcastGData(
   gdata.rhs_data = static_cast<DType*>(rhs->data);
   gdata.out_data = static_cast<DType*>(out->data);
   gdata.grad_out_data = static_cast<DType*>(grad_out->data);
-  if (!IsNoneArray(grad_lhs)) {
+  if (!utils::IsNoneArray(grad_lhs)) {
     gdata.grad_lhs_data = static_cast<DType*>(grad_lhs->data);
     // fill out data with zero values
-    utils::Fill<XPU>(gdata.grad_lhs_data, NElements(grad_lhs),
+    utils::Fill<XPU>(ctx, gdata.grad_lhs_data, utils::NElements(grad_lhs),
                 static_cast<DType>(0));
   }
-  if (!IsNoneArray(grad_rhs)) {
+  if (!utils::IsNoneArray(grad_rhs)) {
     gdata.grad_rhs_data = static_cast<DType*>(grad_rhs->data);
     // fill out data with zero values
-    utils::Fill<XPU>(gdata.grad_rhs_data, NElements(grad_rhs),
+    utils::Fill<XPU>(ctx, gdata.grad_rhs_data, utils::NElements(grad_rhs),
                 static_cast<DType>(0));
   }
   return gdata;
@@ -405,15 +369,15 @@ void BackwardBinaryReduceBcastImpl(
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
 #endif
   // Graph
-  Csr csr = CreateCsr(indptr, indices);
-  Csr rev_csr = CreateCsr(rev_indptr, rev_indices);
+  Csr csr = utils::CreateCsr(indptr, indices);
+  Csr rev_csr = utils::CreateCsr(rev_indptr, rev_indices);
 
   // advance config
   minigun::advance::RuntimeConfig rtcfg;
   rtcfg.ctx = out->ctx;
 #ifdef __CUDACC__
   rtcfg.stream = thr_entry->stream;
-  const int64_t x_len = ComputeXLength(out);
+  const int64_t x_len = utils::ComputeXLength(out);
   const int nt = utils::FindNumThreads(x_len, 64);
   rtcfg.data_num_threads = nt;
   // XXX(minjie): hard-code to let each thread compute two elements to increase
@@ -423,8 +387,8 @@ void BackwardBinaryReduceBcastImpl(
 
   const DLDataType& dtype = out->dtype;
   const int bcast_ndim = info.out_shape.size();
-  const bool req_lhs = !IsNoneArray(grad_lhs);
-  const bool req_rhs = !IsNoneArray(grad_rhs);
+  const bool req_lhs = !utils::IsNoneArray(grad_lhs);
+  const bool req_rhs = !utils::IsNoneArray(grad_rhs);
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
@@ -432,7 +396,7 @@ void BackwardBinaryReduceBcastImpl(
   DGL_DTYPE_SWITCH(dtype, DType, {
     BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
       BackwardBcastGData<NDim, DType> gdata = AllocBackwardBcastGData<XPU, NDim, DType>(
-          info,
+          rtcfg.ctx, info,
           lhs_mapping, rhs_mapping, out_mapping,
           lhs, rhs, out, grad_out,
           grad_lhs, grad_rhs);
@@ -449,7 +413,6 @@ void BackwardBinaryReduceBcastImpl(
     });
   });
 }
-
 
 }  // namespace kernel
 }  // namespace dgl
