@@ -67,11 +67,12 @@ class PoolingAggregator(Aggregator):
         return concatenate
 
     class MLP(nn.Module):
-        def __init__(self, in_feats, out_feats, activation, dropout, bias):  # (F, F)
+        def __init__(self, in_feats, out_feats, activation, dropout, bias, pooling_type='mean'):  # (F, F)
             super(PoolingAggregator.MLP, self).__init__()
             self.linear = nn.Linear(in_feats, out_feats, bias=bias)  # (F, F)
             self.dropout = nn.Dropout(p=dropout)
             self.activation = activation
+            self.pooling_type = pooling_type
             nn.init.xavier_uniform_(self.linear.weight, gain=nn.init.calculate_gain('relu'))
 
         def forward(self, nei):
@@ -79,8 +80,12 @@ class PoolingAggregator(Aggregator):
             nei = self.linear(nei)
             if self.activation:
                 nei = self.activation(nei)
-            max_value = torch.max(nei, dim=1)[0]  # (B, F)
-            return max_value
+            if self.pooling_type = 'mean':
+                mean_value = torch.mean(nei, dim=1)
+                return mean_value
+            else:
+                max_value = torch.max(nei, dim=1)[0]  # (B, F)
+                return max_value
 
 
 class GraphSAGELayer(nn.Module):
