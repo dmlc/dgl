@@ -31,12 +31,10 @@ def _get_graph_path(graph_name):
     return "/" + graph_name
 
 def _move_data_to_shared_mem_array(arr, name):
-    dlpack = F.zerocopy_to_dlpack(arr)
-    dgl_tensor = nd.from_dlpack(dlpack)
+    dgl_tensor = utils.todgltensor(arr)
     new_arr = empty_shared_mem(name, True, F.shape(arr), np.dtype(F.dtype(arr)).name)
     dgl_tensor.copyto(new_arr)
-    dlpack = new_arr.to_dlpack()
-    return F.zerocopy_from_dlpack(dlpack)
+    return utils.tousertensor(new_arr)
 
 class NodeDataView(MutableMapping):
     """The data view class when G.nodes[...].data is called.
@@ -219,8 +217,7 @@ def shared_mem_zero_initializer(shape, dtype, name):  # pylint: disable=unused-a
     """Zero feature initializer in shared memory
     """
     data = empty_shared_mem(name, True, shape, dtype)
-    dlpack = data.to_dlpack()
-    arr = F.zerocopy_from_dlpack(dlpack)
+    arr = utils.tousertensor(data)
     arr[:] = 0
     return arr
 
@@ -334,7 +331,7 @@ class SharedMemoryStoreServer(object):
                     self._graph.is_multigraph, edge_dir
 
         # RPC command: initialize node embedding in the server.
-        def init_ndata(init, ndata_name, shape, dtype):
+        def init_ndata(init, ndata_name, shape, dtype, writable):
             if ndata_name in self._graph.ndata:
                 ndata = self._graph.ndata[ndata_name]
                 assert np.all(ndata.shape == tuple(shape))
@@ -344,10 +341,14 @@ class SharedMemoryStoreServer(object):
             init = self._init_manager.deserialize(init)
             data = init(shape, dtype, _get_ndata_path(graph_name, ndata_name))
             self._graph.ndata[ndata_name] = data
+            if writable:
+                lock_data = empty_shared_mem(_get_ndata_path(graph_name, ndata_name) + "_lock",
+                                             True, (shape[0]), "int32")
+                self._graph.ndata[ndata_name + "_lock"] = utils.tousertensor(lock_data)
             return 0
 
         # RPC command: initialize edge embedding in the server.
-        def init_edata(init, edata_name, shape, dtype):
+        def init_edata(init, edata_name, shape, dtype, writable):
             if edata_name in self._graph.edata:
                 edata = self._graph.edata[edata_name]
                 assert np.all(edata.shape == tuple(shape))
@@ -357,6 +358,10 @@ class SharedMemoryStoreServer(object):
             init = self._init_manager.deserialize(init)
             data = init(shape, dtype, _get_edata_path(graph_name, edata_name))
             self._graph.edata[edata_name] = data
+            if writable:
+                lock_data = empty_shared_mem(_get_edata_path(graph_name, edata_name) + "_lock",
+                                             True, (shape[0]), "int32")
+                self._graph.edata[edata_name + "_lock"] = utils.tousertensor(lock_data)
             return 0
 
         # RPC command: get the names of all node embeddings.
@@ -480,19 +485,17 @@ class SharedMemoryDGLGraph(DGLGraph):
         def node_initializer(init, name, shape, dtype, ctx):
             init = self._init_manager.serialize(init)
             dtype = np.dtype(dtype).name
-            self.proxy.init_ndata(init, name, shape, dtype)
+            self.proxy.init_ndata(init, name, shape, dtype, True)
             data = empty_shared_mem(_get_ndata_path(self._graph_name, name),
                                     False, shape, dtype)
-            dlpack = data.to_dlpack()
-            return F.zerocopy_from_dlpack(dlpack)
+            return utils.tousertensor(data)
         def edge_initializer(init, name, shape, dtype, ctx):
             init = self._init_manager.serialize(init)
             dtype = np.dtype(dtype).name
-            self.proxy.init_edata(init, name, shape, dtype)
+            self.proxy.init_edata(init, name, shape, dtype, True)
             data = empty_shared_mem(_get_edata_path(self._graph_name, name),
                                     False, shape, dtype)
-            dlpack = data.to_dlpack()
-            return F.zerocopy_from_dlpack(dlpack)
+            return utils.tousertensor(data)
 
         self._node_frame.set_remote_init_builder(lambda init, name: partial(node_initializer, init, name))
         self._edge_frame.set_remote_init_builder(lambda init, name: partial(edge_initializer, init, name))
@@ -505,14 +508,12 @@ class SharedMemoryDGLGraph(DGLGraph):
     def _init_ndata(self, ndata_name, shape, dtype):
         assert self.number_of_nodes() == shape[0]
         data = empty_shared_mem(_get_ndata_path(self._graph_name, ndata_name), False, shape, dtype)
-        dlpack = data.to_dlpack()
-        self.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
+        self.ndata[ndata_name] = utils.tousertensor(data)
 
     def _init_edata(self, edata_name, shape, dtype):
         assert self.number_of_edges() == shape[0]
         data = empty_shared_mem(_get_edata_path(self._graph_name, edata_name), False, shape, dtype)
-        dlpack = data.to_dlpack()
-        self.edata[edata_name] = F.zerocopy_from_dlpack(dlpack)
+        self.edata[edata_name] = utils.tousertensor(data)
 
     @property
     def num_workers(self):

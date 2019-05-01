@@ -243,6 +243,14 @@ def toindex(data):
     """
     return data if isinstance(data, Index) else Index(data)
 
+def todgltensor(data):
+    dlpack = F.zerocopy_to_dlpack(data)
+    return nd.from_dlpack(dlpack)
+
+def tousertensor(data):
+    dlpack = data.to_dlpack()
+    return F.zerocopy_from_dlpack(dlpack)
+
 def zero_index(size):
     """Create a index with provided size initialized to zero
 

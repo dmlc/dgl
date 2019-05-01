@@ -149,6 +149,15 @@ def empty_shared_mem(name, is_create, shape, dtype="float32"):
         ctypes.byref(handle)))
     return _make_array(handle, False)
 
+def shared_mem_gather_rows(src_arr, lock_arr, idx_arr):
+    dst_shape = (idx_arr.shape[0], ) + src_arr.shape[1:]
+    dst_arr = empty(dst_shape, src_arr.dtype, src_arr.context)
+    check_call(_LIB.DGLArraySharedMemGatherRows(
+        src_arr.handle, lock_arr.handle, idx_arr, dst_arr))
+
+def shared_mem_scatter_rows(src_arr, lock_arr, idx_arr, dst_arr):
+    check_call(_LIB.DGLArraySharedMemScatterRows(
+        src_arr.handle, lock_arr.handle, idx_arr, dst_arr))
 
 def from_dlpack(dltensor):
     """Produce an array from a DLPack tensor without memory copy.

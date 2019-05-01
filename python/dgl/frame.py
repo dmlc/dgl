@@ -173,17 +173,18 @@ class Column(object):
             return Column(data)
 
 class SharedMemColumn(Column):
-    def __init__(self, data, scheme=None):
+    def __init__(self, data, data_name, scheme=None):
         super(SharedMemColumn, self).__init__(data, scheme)
-        self.locks = F.zeros((len(data),), F.int32, F.cpu())
+        self.locks = empty_shared_mem(data_name + "_lock", False,
+                                      shape=(data.shape[0]), dtype='int32')
 
     def __getitem__(self, idx):
         if idx.slice_data() is not None:
             raise Exception("shared-memory column doesn't support slice.")
         else:
-            rows = _CAPI_DGLSharedMemoryGatherRow(self.data.todgltensor(),
-                                                  self.locks.todgltensor(),
-                                                  idx.todgltensor())
+            rows = shared_mem_gather_rows(utils.todgltensor(self.data),
+                                          self.locks,
+                                          idx.todgltensor())
             return rows.tousertensor()
 
     def update(self, idx, feats, inplace):
@@ -194,8 +195,8 @@ class SharedMemColumn(Column):
 
         if not inplace:
             raise Exception("shared-memory column only support in-place update.")
-        _CAPI_DGLSharedMemoryScatterRow(self.data.todgltensor(), self.locks.todgltensor(),
-                                        idx.todgltensor(), feats.todgltensor())
+        shared_mem_scatter_rows(utils.todgltensor(feats), self.locks,
+                                idx.todgltensor(), utils.todgltensor(data))
 
     def extend(self, feats, feat_scheme=None):
         raise Exception("shared-memory column doesn't support extend")

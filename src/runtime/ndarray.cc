@@ -9,12 +9,20 @@
 #include <dgl/runtime/c_runtime_api.h>
 #include <dgl/runtime/device_api.h>
 #include "runtime_base.h"
+#include "atomic.h"
 
 // deleter for arrays used by DLPack exporter
 extern "C" void NDArrayDLPackDeleter(DLManagedTensor* tensor);
 
 namespace dgl {
 namespace runtime {
+
+template<class T>
+T *get_int_data(DLTensor *tensor) {
+  CHECK_EQ(tensor->dtype.code, kDLInt);
+  CHECK_EQ(tensor->dtype.bits, sizeof(T) * 8);
+  return static_cast<T*>(tensor->data);
+}
 
 inline void VerifyDataType(DLDataType dtype) {
   CHECK_GE(dtype.lanes, 1);
@@ -210,6 +218,61 @@ void NDArray::CopyFromTo(DLTensor* from,
     from_size, from->ctx, to->ctx, from->dtype, stream);
 }
 
+void SharedMemGatherRows(DLTensor *from, DLTensor *lock, DLTensor *idx, DLTensor *to) {
+  CHECK_EQ(idx->ndim, 1);
+  CHECK_EQ(lock->ndim, 1);
+  CHECK_EQ(lock->shape[0], from->shape[0]);
+  CHECK_EQ(from->ndim, to->ndim);
+  size_t row_size = 1;
+  for (int i = 1; i < from->ndim; i++) {
+    CHECK_EQ(from->shape[i], to->shape[i]);
+    row_size *= from->shape[i];
+  }
+  row_size *= from->dtype.bits / 8;
+  int64_t *idx_data = get_int_data<int64_t>(idx);
+  int *lock_data = get_int_data<int>(lock);
+  size_t num_rows = idx->shape[0];
+  char *from_data = static_cast<char *>(from->data);
+  char *to_data = static_cast<char *>(to->data);
+#pragma omp parallel for
+  for (size_t i = 0; i < num_rows; i++) {
+    size_t row_idx = idx_data[i];
+    ReadWriteLock row_lock(lock_data[row_idx]);
+    bool success;
+    do {
+      row_lock.ReadLock();
+      memcpy(from_data + row_idx * row_size, to_data + i * row_size, row_size);
+      success = row_lock.ReadUnlock();
+    } while (!success);
+  }
+}
+
+void SharedMemScatterRows(DLTensor *from, DLTensor *lock, DLTensor *idx, DLTensor *to) {
+  CHECK_EQ(idx->ndim, 1);
+  CHECK_EQ(lock->ndim, 1);
+  CHECK_EQ(lock->shape[0], to->shape[0]);
+  CHECK_EQ(from->ndim, to->ndim);
+  size_t row_size = 1;
+  for (int i = 1; i < from->ndim; i++) {
+    CHECK_EQ(from->shape[i], to->shape[i]);
+    row_size *= from->shape[i];
+  }
+  row_size *= from->dtype.bits / 8;
+  int64_t *idx_data = get_int_data<int64_t>(idx);
+  int *lock_data = get_int_data<int>(lock);
+  size_t num_rows = idx->shape[0];
+  char *from_data = static_cast<char *>(from->data);
+  char *to_data = static_cast<char *>(to->data);
+#pragma omp parallel for
+  for (size_t i = 0; i < num_rows; i++) {
+    size_t row_idx = idx_data[i];
+    ReadWriteLock row_lock(lock_data[row_idx]);
+    row_lock.WriteLock();
+    memcpy(from_data + i * row_size, to_data + row_idx * row_size, row_size);
+    row_lock.WriteUnlock();
+  }
+}
+
 }  // namespace runtime
 }  // namespace dgl
 
@@ -272,6 +335,24 @@ int DGLArrayCopyFromTo(DGLArrayHandle from,
                        DGLStreamHandle stream) {
   API_BEGIN();
   NDArray::CopyFromTo(from, to, stream);
+  API_END();
+}
+
+int DGLArraySharedMemGatherRows(DGLArrayHandle from,
+                                DGLArrayHandle lock,
+                                DGLArrayHandle idx,
+                                DGLArrayHandle to) {
+  API_BEGIN();
+  SharedMemGatherRows(from, lock, idx, to);
+  API_END();
+}
+
+int DGLArraySharedMemScatterRows(DGLArrayHandle from,
+                                 DGLArrayHandle lock,
+                                 DGLArrayHandle idx,
+                                 DGLArrayHandle to) {
+  API_BEGIN();
+  SharedMemScatterRows(from, lock, idx, to);
   API_END();
 }
 

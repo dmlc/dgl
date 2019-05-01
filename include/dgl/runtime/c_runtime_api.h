@@ -457,6 +457,16 @@ DGL_DLL int DGLArrayCopyFromTo(DGLArrayHandle from,
                                DGLArrayHandle to,
                                DGLStreamHandle stream);
 
+DGL_DLL int DGLArraySharedMemGatherRows(DGLArrayHandle from,
+                                        DGLArrayHandle lock,
+                                        DGLArrayHandle idx,
+                                        DGLArrayHandle to);
+
+DGL_DLL int DGLArraySharedMemScatterRows(DGLArrayHandle from,
+                                         DGLArrayHandle lock,
+                                         DGLArrayHandle idx,
+                                         DGLArrayHandle to);
+
 /*!
  * \brief Produce an array from the DLManagedTensor that shares data memory
  * with the DLManagedTensor.

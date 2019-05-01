@@ -109,6 +109,14 @@ cdef extern from "dgl/runtime/c_runtime_api.h":
     int DGLArrayCopyFromTo(DLTensorHandle src,
                            DLTensorHandle to,
                            DGLStreamHandle stream)
+    int DGLArraySharedMemGatherRows(DLTensorHandle from,
+                                    DLTensorHandle lock,
+                                    DLTensorHandle idx,
+                                    DLTensorHandle to);
+    int DGLArraySharedMemScatterRows(DLTensorHandle from,
+                                     DLTensorHandle lock,
+                                     DLTensorHandle idx,
+                                     DLTensorHandle to);
     int DGLArrayFromDLPack(DLManagedTensor* arr_from,
                            DLTensorHandle* out)
     int DGLArrayToDLPack(DLTensorHandle arr_from,
