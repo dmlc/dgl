@@ -11,7 +11,7 @@ from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
 from . import utils
-from . import ndarray
+from . import ndarray as nd
 
 GraphIndexHandle = ctypes.c_void_p
 
@@ -404,7 +404,7 @@ class GraphIndex(object):
         return src, dst, eid
 
     @utils.cached_member(cache='_cache', prefix='edges')
-    def edges(self, order=None, ctx=None):
+    def edges(self, order=None):
         """Return all the edges
 
         Parameters
@@ -431,10 +431,6 @@ class GraphIndex(object):
         src = edge_array(0)
         dst = edge_array(1)
         eid = edge_array(2)
-        if ctx and ctx.device_type != 1: # not on cpu
-            src = ndarray.array(src, ctx=ctx)
-            dst = ndarray.array(dst, ctx=ctx)
-            eid = ndarray.array(eid, ctx=ctx)
         src = utils.toindex(src)
         dst = utils.toindex(dst)
         eid = utils.toindex(eid)
@@ -631,10 +627,9 @@ class GraphIndex(object):
         indptr = rst(0).asnumpy().astype(np.int32)
         indices = rst(1).asnumpy().astype(np.int32)
         eids = rst(2)
-        if ctx.device_type != 1: # not on cpu
-            indptr = ndarray.array(indptr, ctx=ctx)
-            indices = ndarray.array(indices, ctx=ctx)
-            eids = ndarray.array(eids, ctx=ctx)
+        indptr = nd.array(indptr, ctx=ctx)
+        indices = nd.array(indices, ctx=ctx)
+        eids = nd.array(eids, ctx=ctx)
         return indptr, indices, eids
 
     def adjacency_matrix(self, transpose, ctx):

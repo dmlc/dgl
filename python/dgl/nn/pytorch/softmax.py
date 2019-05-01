@@ -68,8 +68,8 @@ class EdgeSoftmax(object):
         ctx = utils.to_dgl_context(F.context(logits))
         csr = graph._graph.csr_adjacency_matrix(True, ctx)
         inv_csr = graph._graph.csr_adjacency_matrix(False, ctx)
-        _, dst, _ = graph._graph.edges(None, ctx)
-        dst = dst.tousertensor()
+        _, dst, _ = graph._graph.edges()
+        dst = dst.tousertensor(F.context(logits))
         indptr, indices, edge_map = csr
         inv_indptr, inv_indices, inv_edge_map = inv_csr
         spmat = (indptr, indices, inv_indptr, inv_indices)

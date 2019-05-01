@@ -496,9 +496,9 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopyEdgeReduce")
     DGL_XPU_SWITCH(grad_edge_data->ctx.device_type, BackwardBinaryReduceImpl,
       reducer, binary_op::kUseLhs, indptr, indices, rev_indptr, rev_indices,
       binary_op::kEdge, binary_op::kDst,
-      edge_mapping, NoneArray(), out_mapping,
-      edge_data, NoneArray(), out_data, grad_out_data,
-      grad_edge_data, NoneArray());
+      edge_mapping, utils::NoneArray(), out_mapping,
+      edge_data, utils::NoneArray(), out_data, grad_out_data,
+      grad_edge_data, utils::NoneArray());
     *rv = grad_edge_data;
   });
 }  // namespace kernel
