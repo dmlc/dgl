@@ -3,9 +3,6 @@ import numpy as np
 import mxnet as mx
 from mxnet import gluon
 import argparse, time, math
-import numpy as np
-import mxnet as mx
-from mxnet import gluon
 import dgl
 import dgl.function as fn
 from dgl import DGLGraph
@@ -206,6 +203,7 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
                      lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
         for i in range(n_layers):
             g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
+            g.ndata['agg_h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
 
     model = GraphSAGETrain(in_feats,
                            args.n_hidden,
@@ -236,6 +234,7 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
     # initialize graph
     dur = []
 
+    adj = g.adjacency_matrix()
     for epoch in range(args.n_epochs):
         start = time.time()
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
@@ -248,8 +247,11 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
                                                        seed_nodes=train_nid):
             for i in range(n_layers):
                 agg_history_str = 'agg_h_{}'.format(i)
-                g.pull(nf.layer_parent_nid(i+1), fn.copy_src(src='h_{}'.format(i), out='m'),
-                       fn.sum(msg='m', out=agg_history_str), inplace=True)
+                dests = nf.layer_parent_nid(i+1)
+                # TODO we could use DGLGraph.pull to implement this, but the current
+                # implementation of pull is very slow. Let's manually do it for now.
+                g.ndata[agg_history_str][dests] = mx.nd.dot(mx.nd.take(adj, dests),
+                                                            g.ndata['h_{}'.format(i)])
 
             node_embed_names = [['preprocess', 'features', 'h_0']]
             for i in range(1, n_layers):

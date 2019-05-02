@@ -167,7 +167,9 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples, d
                      lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
         for i in range(n_layers):
             g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
+            g.ndata['agg_h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
         g.ndata['h_{}'.format(n_layers-1)] = mx.nd.zeros((features.shape[0], 2*args.n_hidden), ctx=ctx)
+        g.ndata['agg_h_{}'.format(n_layers-1)] = mx.nd.zeros((features.shape[0], 2*args.n_hidden), ctx=ctx)
 
     model = GCNSampling(in_feats,
                         args.n_hidden,
@@ -199,6 +201,7 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples, d
 
     # initialize graph
     dur = []
+    adj = g.adjacency_matrix()
     for epoch in range(args.n_epochs):
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
                                                        args.num_neighbors,
@@ -209,8 +212,11 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples, d
                                                        seed_nodes=train_nid):
             for i in range(n_layers):
                 agg_history_str = 'agg_h_{}'.format(i)
-                g.pull(nf.layer_parent_nid(i+1), fn.copy_src(src='h_{}'.format(i), out='m'),
-                       fn.sum(msg='m', out=agg_history_str))
+                dests = nf.layer_parent_nid(i+1)
+                # TODO we could use DGLGraph.pull to implement this, but the current
+                # implementation of pull is very slow. Let's manually do it for now.
+                g.ndata[agg_history_str][dests] = mx.nd.dot(mx.nd.take(adj, dests),
+                                                            g.ndata['h_{}'.format(i)])
 
             node_embed_names = [['preprocess', 'h_0']]
             for i in range(1, n_layers):
