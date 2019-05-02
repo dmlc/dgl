@@ -182,12 +182,13 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
     features = g.ndata['features']
     labels = g.ndata['labels']
     in_feats = g.ndata['features'].shape[1]
+    g_ctx = features.context
 
     norm = mx.nd.expand_dims(1./g.in_degrees().astype('float32'), 1)
-    g.ndata['norm'] = norm.as_in_context(ctx)
+    g.ndata['norm'] = norm.as_in_context(g_ctx)
     degs = g.in_degrees().astype('float32').asnumpy()
     degs[degs > args.num_neighbors] = args.num_neighbors
-    g.ndata['subg_norm'] = mx.nd.expand_dims(mx.nd.array(1./degs, ctx=ctx), 1)
+    g.ndata['subg_norm'] = mx.nd.expand_dims(mx.nd.array(1./degs, ctx=g_ctx), 1)
     n_layers = args.n_layers
 
     if distributed:
@@ -202,8 +203,8 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
                      fn.sum(msg='m', out='preprocess'),
                      lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
         for i in range(n_layers):
-            g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
-            g.ndata['agg_h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
+            g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=g_ctx)
+            g.ndata['agg_h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=g_ctx)
 
     model = GraphSAGETrain(in_feats,
                            args.n_hidden,
@@ -234,7 +235,7 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
     # initialize graph
     dur = []
 
-    adj = g.adjacency_matrix()
+    adj = g.adjacency_matrix().as_in_context(g_ctx)
     for epoch in range(args.n_epochs):
         start = time.time()
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
@@ -247,7 +248,7 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
                                                        seed_nodes=train_nid):
             for i in range(n_layers):
                 agg_history_str = 'agg_h_{}'.format(i)
-                dests = nf.layer_parent_nid(i+1)
+                dests = nf.layer_parent_nid(i+1).as_in_context(g_ctx)
                 # TODO we could use DGLGraph.pull to implement this, but the current
                 # implementation of pull is very slow. Let's manually do it for now.
                 g.ndata[agg_history_str][dests] = mx.nd.dot(mx.nd.take(adj, dests),
@@ -258,12 +259,12 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
                 node_embed_names.append(['h_{}'.format(i), 'agg_h_{}'.format(i-1), 'subg_norm', 'norm'])
             node_embed_names.append(['agg_h_{}'.format(n_layers-1), 'subg_norm', 'norm'])
 
-            nf.copy_from_parent(node_embed_names=node_embed_names)
+            nf.copy_from_parent(node_embed_names=node_embed_names, ctx=ctx)
             # forward
             with mx.autograd.record():
                 pred = model(nf)
-                batch_nids = nf.layer_parent_nid(-1).as_in_context(ctx)
-                batch_labels = labels[batch_nids]
+                batch_nids = nf.layer_parent_nid(-1)
+                batch_labels = labels[batch_nids].as_in_context(ctx)
                 loss = loss_fcn(pred, batch_labels)
                 loss = loss.sum() / len(batch_nids)
 
@@ -294,11 +295,11 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
             node_embed_names = [['preprocess', 'features']]
             for i in range(n_layers):
                 node_embed_names.append(['norm', 'subg_norm'])
-            nf.copy_from_parent(node_embed_names=node_embed_names)
+            nf.copy_from_parent(node_embed_names=node_embed_names, ctx=ctx)
 
             pred = infer_model(nf)
-            batch_nids = nf.layer_parent_nid(-1).as_in_context(ctx)
-            batch_labels = labels[batch_nids]
+            batch_nids = nf.layer_parent_nid(-1)
+            batch_labels = labels[batch_nids].as_in_context(ctx)
             num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
             num_tests += nf.layer_size(-1)
             break
