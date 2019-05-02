@@ -211,6 +211,14 @@ def context(input):
     """
     pass
 
+def device_type(ctx):
+    """Return a str representing device type"""
+    pass
+
+def device_id(ctx):
+    """Return device index"""
+    pass
+
 def astype(input, ty):
     """Convert the input tensor to the given data type.
 
@@ -392,7 +400,7 @@ def gather_row(data, row_index):
 
 def narrow_row(x, start, stop):
     """Narrow down the tensor along the first dimension.
-    
+
     Parameters
     ----------
     x : Tensor
@@ -552,23 +560,6 @@ def ones(shape, dtype, ctx):
     -------
     Tensor
         The one tensor.
-    """
-    pass
-
-def spmm(x, y):
-    """Multiply a sparse matrix with a dense matrix.
-
-    Parameters
-    ----------
-    x : SparseTensor
-        The sparse matrix.
-    y : Tensor
-        The dense matrix.
-
-    Returns
-    -------
-    Tensor
-        The result dense matrix.
     """
     pass
 
@@ -839,6 +830,173 @@ def zerocopy_from_numpy(np_array):
     -------
     Tensor
         A framework-specific tensor.
+    """
+    pass
+
+def zerocopy_to_dgl_ndarray(input):
+    """Zerocopy a framework-specific Tensor to dgl.ndarray.NDArray
+
+    Parameters
+    ----------
+    input : Tensor
+
+    Returns
+    -------
+    dgl.ndarray.NDArray
+    """
+    pass
+
+def zerocopy_from_dgl_ndarray(input):
+    """Zerocopy a dgl.ndarray.NDArray to framework-specific Tensor
+
+    Parameters
+    ----------
+    input : dgl.ndarray.NDArray
+
+    Returns
+    -------
+    Tensor
+    """
+    pass
+
+###############################################################################
+# Custom Operators for graph level computations.
+
+# Note: These operators are supposed to be implemented using DGL-provided
+# kernels (see kernel.py), and plug into tensor framework using custom op
+# extensions.
+
+def src_op_edge_reduce(reducer, binary_op, spmat, src_data, edge_data,
+                       out_size, src_map, edge_map, out_map):
+    """Perform binary operation between source node features and edge features,
+    and then reduce on destination nodes optionally.
+
+    Parameters
+    ----------
+    reducer : str
+        Reduction to be done, can be 'sum', 'max', 'min', 'mean', 'prod',
+        'none' (no reduction)
+    binary_op : str
+        Binary operation to perform, can be 'add', 'mul', 'sub', 'div', 'dot'
+    spmat : tuple of four dgl.ndarray.NDArray
+        Adjacency matrix (indptr, indices, inv_indptr, inv_indices),
+        indptr and indices form a CSR where each row is a source node
+        inv_indptr and inv_indices form a CSR where each column is a source
+        node
+    src_data : Tensor
+        Source node feature tensor
+    edge_data : Tensor
+        Edge feature tensor
+    out_size : int
+        Number of rows of output tensor
+    src_map : dgl.ndarray.NDArray
+        int64 array used for reading source data
+    edge_map : dgl.ndarray.NDArray
+        int64 array used for reading edge data
+    out_map : dgl.ndarray.NDArray
+        int64 array used for writing output data
+
+    Returns
+    -------
+    dgl.ndarray.NDArray
+        The result.
+    """
+    pass
+
+def src_op_dst_reduce(reducer, binary_op, spmat, src_data, dst_data, out_size,
+                      src_map, dst_map, out_map):
+    """Perform binary operation between source node features and edge features,
+    and reduce on destination nodes optionally.
+
+    Parameters
+    ----------
+    reducer : str
+        Reduction to be done, can be 'sum', 'max', 'min', 'mean', 'prod',
+        'none' (no reduction)
+    binary_op : str
+        Binary operation to perform, can be 'add', 'mul', 'sub', 'div', 'dot'
+    spmat : tuple of four dgl.ndarray.NDArray
+        Adjacency matrix (indptr, indices, inv_indptr, inv_indices),
+        indptr and indices form a CSR where each row is a source node
+        inv_indptr and inv_indices form a CSR where each column is a source
+        node
+    src_data : Tensor
+        Source node feature tensor
+    edge_data : Tensor
+        Edge feature tensor
+    out_size : int
+        Number of rows of output tensor
+    src_map : dgl.ndarray.NDArray
+        int64 array used for reading source data
+    edge_map : dgl.ndarray.NDArray
+        int64 array used for reading edge data
+    out_map : dgl.ndarray.NDArray
+        int64 array used for writing output data
+
+    Returns
+    -------
+    dgl.ndarray.NDArray
+        The result.
+    """
+    pass
+
+def copy_src_reduce(reducer, spmat, src_data, out_size, src_map, out_map):
+    """Copy source node features to edge, and perform reduction on destination
+    nodes optionally.
+
+    Parameters
+    ----------
+    reducer : str
+        Reduction to be done, can be 'sum', 'max', 'min', 'mean', 'prod',
+        'none' (no reduction)
+    spmat : tuple of four dgl.ndarray.NDArray
+        Adjacency matrix (indptr, indices, inv_indptr, inv_indices),
+        indptr and indices form a CSR where each row is a source node
+        inv_indptr and inv_indices form a CSR where each column is a source
+        node
+    src_data : Tensor
+        Source node feature tensor
+    out_size : int
+        Number of rows of output tensor
+    src_map : dgl.ndarray.NDArray
+        int64 array used for reading source data
+    out_map : dgl.ndarray.NDArray
+        int64 array used for writing output data
+
+    Returns
+    -------
+    dgl.ndarray.NDArray
+        The result.
+    """
+    pass
+
+def copy_edge_reduce(reducer, spmat, edge_data, out_size, edge_map, out_map):
+    """Copy source edge features, and perform reduction on destination nodes
+    optionally.
+
+    Parameters
+    ----------
+    reducer : str
+        Reduction to be done, can be 'sum', 'max', 'min', 'mean', 'prod',
+        'none' (no reduction)
+    spmat : tuple of four dgl.ndarray.NDArray
+        Adjacency matrix (indptr, indices, inv_indptr, inv_indices),
+        indptr and indices form a CSR where each row is a source node
+        inv_indptr and inv_indices form a CSR where each column is a source
+        node
+    edge_data : Tensor
+        Edge feature tensor
+    out_size : int
+        Number of rows of output tensor
+    edge_map : dgl.ndarray.NDArray
+        int64 array used for reading edge data
+    out_map : dgl.ndarray.NDArray
+        int64 array used for writing output data
+
+    Returns
+    -------
+    dgl.ndarray.NDArray
+        The result.
     """
     pass
 

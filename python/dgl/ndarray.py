@@ -14,6 +14,7 @@ import numpy as _np
 from ._ffi.ndarray import DGLContext, DGLType, NDArrayBase
 from ._ffi.ndarray import context, empty, from_dlpack, numpyasarray
 from ._ffi.ndarray import _set_class_ndarray
+from . import _api_internal
 from . import backend as F
 
 class NDArray(NDArrayBase):

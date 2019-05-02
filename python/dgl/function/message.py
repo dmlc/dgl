@@ -1,22 +1,19 @@
 """Built-in message function."""
 from __future__ import absolute_import
 
-import operator
+from .base import BuiltinFunction, _empty_map
+from ..runtime import ir
+from ..runtime.ir import var
 
-from .base import BuiltinFunction
-from .. import backend as F
-
-__all__ = ["src_mul_edge", "copy_src", "copy_edge"]
+__all__ = ["src_mul_edge", "src_mul_dst", "copy_src", "copy_edge"]
 
 
 class MessageFunction(BuiltinFunction):
     """Base builtin message function class."""
 
-    def __call__(self, edges):
-        """Regular computation of this builtin function
-
-        This will be used when optimization is not available and should
-        ONLY be called by DGL framework.
+    def __call__(self):
+        """Symbolic computation of this builtin function to create
+        runtime.executor
         """
         raise NotImplementedError
 
@@ -25,79 +22,72 @@ class MessageFunction(BuiltinFunction):
         """Return the name of this builtin function."""
         raise NotImplementedError
 
-    def is_spmv_supported(self, g):
-        """Return whether the SPMV optimization is supported."""
-        raise NotImplementedError
 
-    @property
-    def use_edge_feature(self):
-        """Return true if the message function uses edge feature data."""
-        raise NotImplementedError
-
-def _is_spmv_supported_edge_feat(g, field):
-    """Return whether the edge feature shape supports SPMV optimization.
-
-    Only scalar feature is supported currently.
-    """
-    feat = g.get_e_repr()[field]
-    shape = F.shape(feat)
-    return len(shape) == 1 or (len(shape) == 2 and shape[1] == 1)
-
-
-class SrcMulEdgeMessageFunction(MessageFunction):
-    """Class for the src_mul_edge builtin message function.
+class SrcOpEdgeMessageFunction(MessageFunction):
+    """Class for the src_op_edge builtin message function.
 
     See Also
     --------
     src_mul_edge
     """
-    def __init__(self, mul_op, src_field, edge_field, out_field):
-        self.mul_op = mul_op
+    def __init__(self, binary_op, src_field, edge_field, out_field):
+        self.binary_op = binary_op
         self.src_field = src_field
         self.edge_field = edge_field
         self.out_field = out_field
 
-    def is_spmv_supported(self, g):
-        """Return true if this supports SPMV optimization.
-
-        Parameters
-        ----------
-        g : DGLGraph
-            The graph.
-
-        Returns
-        -------
-        bool
-            True if this supports SPMV optimization.
+    def __call__(self, spmat, src_frame, dst_frame, edge_frame, out_size,
+                 reducer="none", src_map=_empty_map, dst_map=_empty_map,
+                 edge_map=_empty_map, out_map=_empty_map):
+        """Symbolic computation of this builtin function to create
+        runtime.executor
         """
-        return _is_spmv_supported_edge_feat(g, self.edge_field)
-
-    def __call__(self, edges):
-        """Regular computation of this builtin function
-
-        This will be used when optimization is not available and should
-        ONLY be called by DGL framework.
-        """
-        sdata = edges.src[self.src_field]
-        edata = edges.data[self.edge_field]
-        # Due to the different broadcasting semantics of different backends,
-        #   we need to broadcast the sdata and edata to be of the same rank.
-        rank = max(F.ndim(sdata), F.ndim(edata))
-        sshape = F.shape(sdata)
-        eshape = F.shape(edata)
-        sdata = F.reshape(sdata, sshape + (1,) * (rank - F.ndim(sdata)))
-        edata = F.reshape(edata, eshape + (1,) * (rank - F.ndim(edata)))
-        ret = self.mul_op(sdata, edata)
-        return {self.out_field : ret}
+        src_map = var.MAP(src_map)
+        edge_map = var.MAP(edge_map)
+        out_map = var.MAP(out_map)
+        src_data = ir.READ_COL(src_frame, var.STR(self.src_field))
+        edge_data = ir.READ_COL(edge_frame, var.STR(self.edge_field))
+        return ir.SRC_OP_EDGE_REDUCE(reducer, self.binary_op, spmat, src_data,
+                                     edge_data, out_size, src_map, edge_map,
+                                     out_map)
 
     @property
     def name(self):
-        return "src_mul_edge"
+        return "src_{}_edge".format(self.binary_op)
+
+
+class SrcOpDstMessageFunction(MessageFunction):
+    """Class for the src_op_dst builtin message function.
+
+    See Also
+    --------
+    src_mul_dst
+    """
+    def __init__(self, binary_op, src_field, dst_field, out_field):
+        self.binary_op = binary_op
+        self.src_field = src_field
+        self.dst_field = dst_field
+        self.out_field = out_field
+
+    def __call__(self, spmat, src_frame, dst_frame, edge_frame, out_size,
+                 reducer="none", src_map=_empty_map, dst_map=_empty_map,
+                 edge_map=_empty_map, out_map=_empty_map):
+        """Symbolic computation of this builtin function to create
+        runtime.executor
+        """
+        src_map = var.MAP(src_map)
+        dst_map = var.MAP(dst_map)
+        out_map = var.MAP(out_map)
+        src_data = ir.READ_COL(src_frame, var.STR(self.src_field))
+        dst_data = ir.READ_COL(src_frame, var.STR(self.dst_field))
+        return ir.SRC_OP_DST_REDUCE(reducer, self.binary_op, spmat, src_data,
+                                    dst_data, out_size, src_map, dst_map,
+                                    out_map)
 
     @property
-    def use_edge_feature(self):
-        """Return true if the message function uses edge feature data."""
-        return True
+    def name(self):
+        return "src_{}_dst".format(self.binary_op)
+
 
 class CopySrcMessageFunction(MessageFunction):
     """Class for the copy_src builtin message function.
@@ -110,37 +100,22 @@ class CopySrcMessageFunction(MessageFunction):
         self.src_field = src_field
         self.out_field = out_field
 
-    def is_spmv_supported(self, g):
-        """Return true if this supports SPMV optimization.
-
-        Parameters
-        ----------
-        g : DGLGraph
-            The graph.
-
-        Returns
-        -------
-        bool
-            True if this supports SPMV optimization.
+    def __call__(self, spmat, src_frame, dst_frame, edge_frame, out_size,
+                 reducer="none", src_map=_empty_map, dst_map=_empty_map,
+                 edge_map=_empty_map, out_map=_empty_map):
+        """Symbolic computation of this builtin function to create
+        runtime.executor
         """
-        return True
-
-    def __call__(self, edges):
-        """Regular computation of this builtin function
-
-        This will be used when optimization is not available and should
-        ONLY be called by DGL framework.
-        """
-        return {self.out_field : edges.src[self.src_field]}
+        src_map = var.MAP(src_map)
+        out_map = var.MAP(out_map)
+        src_data = ir.READ_COL(src_frame, var.STR(self.src_field))
+        return ir.COPY_SRC_REDUCE(reducer, spmat, src_data, out_size,
+                                  src_map, out_map)
 
     @property
     def name(self):
         return "copy_src"
 
-    @property
-    def use_edge_feature(self):
-        """Return true if the message function uses edge feature data."""
-        return False
 
 class CopyEdgeMessageFunction(MessageFunction):
     """Class for the copy_edge builtin message function.
@@ -153,39 +128,22 @@ class CopyEdgeMessageFunction(MessageFunction):
         self.edge_field = edge_field
         self.out_field = out_field
 
-    def is_spmv_supported(self, g):
-        """Return true if this supports SPMV optimization.
-
-        Parameters
-        ----------
-        g : DGLGraph
-            The graph.
-
-        Returns
-        -------
-        bool
-            True if this supports SPMV optimization.
+    def __call__(self, spmat, src_frame, dst_frame, edge_frame, out_size,
+                 reducer="none", src_map=_empty_map, dst_map=_empty_map,
+                 edge_map=_empty_map, out_map=_empty_map):
+        """Symbolic computation of this builtin function to create
+        runtime.executor
         """
-        # TODO: support this with e2v spmv
-        return False
-        # return _is_spmv_supported_edge_feat(g, self.edge_field)
-
-    def __call__(self, edges):
-        """Regular computation of this builtin function
-
-        This will be used when optimization is not available and should
-        ONLY be called by DGL framework.
-        """
-        return {self.out_field : edges.data[self.edge_field]}
+        edge_map = var.MAP(edge_map)
+        out_map = var.MAP(out_map)
+        edge_data = ir.READ_COL(edge_frame, var.STR(self.edge_field))
+        return ir.COPY_EDGE_REDUCE(reducer, spmat, edge_data, out_size,
+                                   edge_map, out_map)
 
     @property
     def name(self):
         return "copy_edge"
 
-    @property
-    def use_edge_feature(self):
-        """Return true if the message function uses edge feature data."""
-        return True
 
 def src_mul_edge(src, edge, out):
     """Builtin message function that computes message by multiplying source
@@ -210,10 +168,38 @@ def src_mul_edge(src, edge, out):
     >>> def message_func(edges):
     >>>   return {'m': edges.src['h'] * edges.data['w']}
     """
-    return SrcMulEdgeMessageFunction(operator.mul, src, edge, out)
+    return SrcOpEdgeMessageFunction("mul", src, edge, out)
+
+
+def src_mul_dst(src, dst, out):
+    """Builtin message function that computes message by multiplying source
+    node features with destination node features.
+
+    Parameters
+    ----------
+    src : str
+        The source feature field.
+    dst : str
+        The destination feature field.
+    out : str
+        The output message field.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> message_func = dgl.function.src_mul_dst(src='h1', dst='h2', out='m')
+
+    The above example is equivalent to the following user defined function:
+
+    >>> def message_func(edges):
+    >>>   return {'m': edges.src['h1'] * edges.dst['h2']}
+    """
+    return SrcOpDstMessageFunction("mul", src, dst, out)
+
 
 def copy_src(src, out):
-    """Builtin message function that computes message using source node feature.
+    """Builtin message function that computes message using source node
+    feature.
 
     Parameters
     ----------
@@ -233,6 +219,7 @@ def copy_src(src, out):
     >>>     return {'m': edges.src['h']}
     """
     return CopySrcMessageFunction(src, out)
+
 
 def copy_edge(edge, out):
     """Builtin message function that computes message using edge feature.

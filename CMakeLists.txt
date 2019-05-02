@@ -1,8 +1,14 @@
+cmake_minimum_required(VERSION 3.9)
 ########################################
 # Borrowed and adapted from TVM project
 ########################################
-cmake_minimum_required(VERSION 2.8)
 project(dgl C CXX)
+message(STATUS "Start configuring project ${PROJECT_NAME}")
+
+# cmake utils
+include(cmake/util/Util.cmake)
+include(cmake/util/MshadowUtil.cmake)
+include(cmake/util/FindCUDA.cmake)
 
 if(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
   include(${CMAKE_CURRENT_BINARY_DIR}/config.cmake)
@@ -12,10 +18,24 @@ else()
   endif()
 endif()
 
+# NOTE: do not modify this file to change option values.
+# You can create a config.cmake at build folder
+# and add set(OPTION VALUE) to override these build options.
+# Alernatively, use cmake -DOPTION=VALUE through command-line.
+dgl_option(USE_CUDA "Build with CUDA" OFF)
+
+if(USE_CUDA)
+  message(STATUS "Build with CUDA support")
+  project(dgl C CXX CUDA)
+  include(cmake/modules/CUDA.cmake)
+endif(USE_CUDA)
+
 # include directories
 include_directories("include")
 include_directories("third_party/dlpack/include")
 include_directories("third_party/dmlc-core/include")
+include_directories("third_party/minigun/minigun")
+include_directories("third_party/minigun/third_party/moderngpu/src")
 
 # initial variables
 set(DGL_LINKER_LIBS "")
@@ -57,12 +77,30 @@ else(MSVC)
 endif(MSVC)
 
 # Source file lists
-file(GLOB CORE_SRCS src/graph/*.cc src/graph/network/* src/*.cc src/scheduler/*.cc)
+file(GLOB DGL_SRC
+  src/*.cc
+  src/kernel/*.cc
+  src/kernel/cpu/*.cc
+  src/runtime/*.cc
+)
 
-file(GLOB RUNTIME_SRCS src/runtime/*.cc)
+file(GLOB_RECURSE DGL_SRC_1
+  src/graph/*.cc
+  src/scheduler/*.cc
+)
 
+list(APPEND DGL_SRC ${DGL_SRC_1})
 
-add_library(dgl SHARED ${CORE_SRCS} ${RUNTIME_SRCS})
+if(USE_CUDA)
+  dgl_config_cuda(DGL_CUDA_SRC)
+  list(APPEND DGL_SRC ${DGL_CUDA_SRC})
+endif(USE_CUDA)
+
+if(USE_CUDA)
+  cuda_add_library(dgl SHARED ${DGL_SRC})
+else(USE_CUDA)
+  add_library(dgl SHARED ${DGL_SRC})
+endif(USE_CUDA)
 
 target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
 

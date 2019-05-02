@@ -336,7 +336,7 @@ def build_relabel_map(x, is_sorted=False):
     >>> n2o
     [1, 3, 5, 6]
     >>> o2n
-    [n/a, 0, n/a, 2, n/a, 3, 4]
+    [n/a, 0, n/a, 1, n/a, 2, 3]
 
     "n/a" will be filled with 0
 
@@ -513,3 +513,9 @@ def unwrap_to_ptr_list(wrapper):
     rst = [ctypes.c_void_p(x) for x in data.contents]
     _api_internal._FreeVectorWrapper(wrapper)
     return rst
+
+def to_dgl_context(ctx):
+    """Convert a backend context to DGLContext"""
+    device_type = nd.DGLContext.STR2MASK[F.device_type(ctx)]
+    device_id = F.device_id(ctx)
+    return nd.DGLContext(device_type, device_id)

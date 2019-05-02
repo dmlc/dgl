@@ -11,6 +11,7 @@ from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
 from . import utils
+from . import ndarray as nd
 
 GraphIndexHandle = ctypes.c_void_p
 
@@ -424,16 +425,16 @@ class GraphIndex(object):
         utils.Index
             The edge ids.
         """
-        key = 'edges_s%s' % order
-        if key not in self._cache:
-            if order is None:
-                order = ""
-            edge_array = _CAPI_DGLGraphEdges(self._handle, order)
-            src = utils.toindex(edge_array(0))
-            dst = utils.toindex(edge_array(1))
-            eid = utils.toindex(edge_array(2))
-            self._cache[key] = (src, dst, eid)
-        return self._cache[key]
+        if order is None:
+            order = ""
+        edge_array = _CAPI_DGLGraphEdges(self._handle, order)
+        src = edge_array(0)
+        dst = edge_array(1)
+        eid = edge_array(2)
+        src = utils.toindex(src)
+        dst = utils.toindex(dst)
+        eid = utils.toindex(eid)
+        return src, dst, eid
 
     def in_degree(self, v):
         """Return the in degree of the node.
@@ -595,8 +596,42 @@ class GraphIndex(object):
         else:
             raise Exception("unknown format")
 
+    @utils.cached_member(cache='_cache', prefix='csr_adj')
+    def csr_adjacency_matrix(self, transpose, ctx):
+        """Return the adjacency matrix representation of this graph in csr format
 
-    @utils.cached_member(cache='_cache', prefix='adj')
+        By default, a row of returned adjacency matrix represents the destination
+        of an edge and the column represents the source.
+
+        When transpose is True, a row represents the source and a column represents
+        a destination.
+
+        Note: this internal function is for scheduler use only
+
+        Parameters
+        ----------
+        transpose : bool
+            A flag to transpose the returned adjacency matrix.
+        ctx : DGLContext
+            The context of the returned matrix.
+
+        Returns
+        -------
+        SparseTensor
+            The adjacency matrix.
+        utils.Index
+            A index for data shuffling due to sparse format change. Return None
+            if shuffle is not required.
+        """
+        rst = _CAPI_DGLGraphGetAdj(self._handle, transpose, "csr")
+        indptr = rst(0).asnumpy().astype(np.int32)
+        indices = rst(1).asnumpy().astype(np.int32)
+        eids = rst(2)
+        indptr = nd.array(indptr, ctx=ctx)
+        indices = nd.array(indices, ctx=ctx)
+        eids = nd.array(eids, ctx=ctx)
+        return indptr, indices, eids
+
     def adjacency_matrix(self, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
 
@@ -646,7 +681,6 @@ class GraphIndex(object):
         else:
             raise Exception("unknown format")
 
-    @utils.cached_member(cache='_cache', prefix='inc')
     def incidence_matrix(self, typestr, ctx):
         """Return the incidence matrix representation of this graph.
 

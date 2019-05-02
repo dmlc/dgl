@@ -71,6 +71,10 @@ def softmax(x, dim):
     """Softmax Operation on Tensors"""
     pass
 
+def spmm(x, y):
+    """Sparse dense matrix multiply"""
+    pass
+
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------

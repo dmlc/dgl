@@ -150,7 +150,6 @@ def test_pickling_graph():
     assert new_g._message_func == _global_message_func
     assert isinstance(new_g._reduce_func, type(reduce_func))
     assert new_g._reduce_func._name == 'sum'
-    assert new_g._reduce_func.reduce_op == F.sum
     assert new_g._reduce_func.msg_field == 'x'
     assert new_g._reduce_func.out_field == 'x'
 
