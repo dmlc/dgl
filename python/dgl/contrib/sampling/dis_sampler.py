@@ -2,7 +2,8 @@
 from ...network import _send_nodeflow, _recv_nodeflow
 from ...network import _create_sender, _create_receiver
 from ...network import _finalize_sender, _finalize_receiver
-from ...network import _add_receiver_addr, _sender_connect, _receiver_wait
+from ...network import _add_receiver_addr, _sender_connect
+from ...network import _receiver_wait, _send_end_signal
 
 from multiprocessing import Pool
 from abc import ABCMeta, abstractmethod
@@ -103,6 +104,17 @@ class SamplerSender(object):
         """
         _send_nodeflow(self._sender, nodeflow, recv_id)
 
+    def signal(self, recv_id):
+        """Whene samplling of each epoch is finished, users can 
+        invoke this API to tell SamplerReceiver it has finished its job.
+
+        Parameters
+        ----------
+        recv_id : int
+            receiver ID
+        """
+        _send_end_signal(self._sender, recv_id)
+
 class SamplerReceiver(object):
     """SamplerReceiver for DGL distributed training.
 
@@ -114,14 +126,18 @@ class SamplerReceiver(object):
 
     Parameters
     ----------
+    graph : DGLGraph
+        The parent graph
     addr : str
         address of SamplerReceiver, e.g., '127.0.0.1:50051'
     num_sender : int
         total number of SamplerSender
     """
-    def __init__(self, addr, num_sender):
+    def __init__(self, graph, addr, num_sender):
+        self._graph = graph
         self._addr = addr
         self._num_sender = num_sender
+        self._tmp_count = 0
         self._receiver = _create_receiver()
         vec = self._addr.split(':')
         _receiver_wait(self._receiver, vec[0], int(vec[1]), self._num_sender);
@@ -131,17 +147,20 @@ class SamplerReceiver(object):
         """
         _finalize_receiver(self._receiver)
 
-    def recv(self, graph):
-        """Receive a NodeFlow object from remote sampler.
-
-        Parameters
-        ----------
-        graph : DGLGraph
-            The parent graph
-
-        Returns
-        -------
-        NodeFlow
-            received NodeFlow object
+    def __iter__(self):
+        """Iterator
         """
-        return _recv_nodeflow(self._receiver, graph)
+        return self
+
+    def __next__(self):
+        """Return sampled NodeFlow object
+        """
+        while True:
+            res = _recv_nodeflow(self._receiver, self._graph)
+            if isinstance(res, int):
+                self._tmp_count += 1
+                if self._tmp_count == self._num_sender:
+                    self._tmp_count = 0
+                    raise StopIteration
+            else:
+                return res

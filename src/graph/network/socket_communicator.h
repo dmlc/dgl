@@ -71,6 +71,17 @@ class SocketSender : public Sender {
    */
   void Finalize();
 
+  /*!
+   * \brief Get data buffer
+   * \return buffer pointer
+   */
+  char* GetBuffer();
+
+  /*!
+   * \brief Set data buffer
+   */
+  void SetBuffer(char* buffer);
+
  private:
   /*!
    * \brief socket map
@@ -81,6 +92,11 @@ class SocketSender : public Sender {
    * \brief receiver address map
    */ 
   std::unordered_map<int, Addr> receiver_addr_map_;
+
+  /*!
+   * \brief data buffer
+   */ 
+  char* buffer_;
 };
 
 /*!
@@ -118,6 +134,17 @@ class SocketReceiver : public Receiver {
    */
   void Finalize();
 
+  /*!
+   * \brief Get data buffer
+   * \return buffer pointer
+   */
+  char* GetBuffer();
+
+  /*!
+   * \brief Set data buffer
+   */
+  void SetBuffer(char* buffer);
+
  private:
   /*!
    * \brief number of sender
@@ -143,6 +170,11 @@ class SocketReceiver : public Receiver {
    * \brief Message queue for communicator
    */ 
   MessageQueue* queue_;
+
+  /*!
+   * \brief data buffer
+   */ 
+  char* buffer_;
 
   /*!
    * \brief Process received message in independent threads

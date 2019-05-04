@@ -52,6 +52,17 @@ class Sender {
    * \brief Finalize Sender
    */
   virtual void Finalize() = 0;
+
+  /*!
+   * \brief Get data buffer
+   * \return buffer pointer
+   */
+  virtual char* GetBuffer() = 0;
+
+  /*!
+   * \brief Set data buffer
+   */
+  virtual void SetBuffer(char* buffer) = 0;
 };
 
 /*!
@@ -90,6 +101,17 @@ class Receiver {
    * \brief Finalize Receiver
    */
   virtual void Finalize() = 0;
+
+  /*!
+   * \brief Get data buffer
+   * \return buffer pointer
+   */
+  virtual char* GetBuffer() = 0;
+
+  /*!
+   * \brief Set data buffer
+   */
+  virtual void SetBuffer(char* buffer) = 0;
 };
 
 }  // namespace network
