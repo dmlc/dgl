@@ -20,8 +20,8 @@ def main(args):
     val_mask = g.ndata['val_mask']
     test_mask = g.ndata['test_mask']
 
-    if args.gpu >= 0:
-        ctx = mx.gpu(args.gpu)
+    if args.num_gpus > 0:
+        ctx = mx.gpu(g.worker_id % args.num_gpus)
     else:
         ctx = mx.cpu()
 
@@ -55,8 +55,8 @@ if __name__ == '__main__':
             help="the number of features")
     parser.add_argument("--dropout", type=float, default=0.5,
             help="dropout probability")
-    parser.add_argument("--gpu", type=int, default=-1,
-            help="the gpu index")
+    parser.add_argument("--num-gpus", type=int, default=0,
+            help="the number of GPUs to train")
     parser.add_argument("--lr", type=float, default=3e-2,
             help="learning rate")
     parser.add_argument("--n-epochs", type=int, default=200,
