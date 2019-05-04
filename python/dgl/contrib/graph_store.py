@@ -166,7 +166,8 @@ class BarrierServer(object):
 
     def leave(self, worker_id, barrier_id):
         self.barriers[barrier_id].leave()
-        del self.barriers[barrier_id]
+        if self.barriers[barrier_id].all_leave():
+            del self.barriers[barrier_id]
 
 class SharedMemoryStoreServer(object):
     """The graph store server.
