@@ -157,7 +157,7 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples, d
         g.dist_update_all(fn.copy_src(src='features', out='m'),
                           fn.sum(msg='m', out='preprocess'),
                           lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
-        for i in range(n_layers):
+        for i in range(n_layers - 1):
             g.init_ndata('h_{}'.format(i), (features.shape[0], args.n_hidden), 'float32')
             g.init_ndata('agg_h_{}'.format(i), (features.shape[0], args.n_hidden), 'float32')
         g.init_ndata('h_{}'.format(n_layers-1), (features.shape[0], 2*args.n_hidden), 'float32')
@@ -195,7 +195,7 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples, d
 
     # use optimizer
     print(model.collect_params())
-    kv_type = 'local' if args.nworkers == 1 else 'dist_sync'
+    kv_type = 'dist_sync' if distributed else 'local'
     trainer = gluon.Trainer(model.collect_params(), 'adam',
                             {'learning_rate': args.lr, 'wd': args.weight_decay},
                             kvstore=mx.kv.create(kv_type))
