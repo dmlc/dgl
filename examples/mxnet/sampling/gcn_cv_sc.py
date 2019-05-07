@@ -139,25 +139,37 @@ class GCNInfer(gluon.Block):
         return h
 
 
-def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
+def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples, distributed):
     features = g.ndata['features']
     labels = g.ndata['labels']
     in_feats = features.shape[1]
+    g_ctx = features.context
 
     norm = mx.nd.expand_dims(1./g.in_degrees().astype('float32'), 1)
-    g.ndata['norm'] = norm.as_in_context(ctx)
+    g.ndata['norm'] = norm.as_in_context(g_ctx)
     degs = g.in_degrees().astype('float32').asnumpy()
     degs[degs > args.num_neighbors] = args.num_neighbors
-    g.ndata['subg_norm'] = mx.nd.expand_dims(mx.nd.array(1./degs, ctx=ctx), 1)
-
-    g.update_all(fn.copy_src(src='features', out='m'),
-                 fn.sum(msg='m', out='preprocess'),
-                 lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
-
+    g.ndata['subg_norm'] = mx.nd.expand_dims(mx.nd.array(1./degs, ctx=g_ctx), 1)
     n_layers = args.n_layers
-    for i in range(n_layers):
-        g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=ctx)
-    g.ndata['h_{}'.format(n_layers-1)] = mx.nd.zeros((features.shape[0], 2*args.n_hidden), ctx=ctx)
+
+    if distributed:
+        g.dist_update_all(fn.copy_src(src='features', out='m'),
+                          fn.sum(msg='m', out='preprocess'),
+                          lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
+        for i in range(n_layers - 1):
+            g.init_ndata('h_{}'.format(i), (features.shape[0], args.n_hidden), 'float32')
+            g.init_ndata('agg_h_{}'.format(i), (features.shape[0], args.n_hidden), 'float32')
+        g.init_ndata('h_{}'.format(n_layers-1), (features.shape[0], 2*args.n_hidden), 'float32')
+        g.init_ndata('agg_h_{}'.format(n_layers-1), (features.shape[0], 2*args.n_hidden), 'float32')
+    else:
+        g.update_all(fn.copy_src(src='features', out='m'),
+                     fn.sum(msg='m', out='preprocess'),
+                     lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
+        for i in range(n_layers):
+            g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=g_ctx)
+            g.ndata['agg_h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=g_ctx)
+        g.ndata['h_{}'.format(n_layers-1)] = mx.nd.zeros((features.shape[0], 2*args.n_hidden), ctx=g_ctx)
+        g.ndata['agg_h_{}'.format(n_layers-1)] = mx.nd.zeros((features.shape[0], 2*args.n_hidden), ctx=g_ctx)
 
     model = GCNSampling(in_feats,
                         args.n_hidden,
@@ -182,12 +194,14 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
 
     # use optimizer
     print(model.collect_params())
+    kv_type = 'dist_sync' if distributed else 'local'
     trainer = gluon.Trainer(model.collect_params(), 'adam',
                             {'learning_rate': args.lr, 'wd': args.weight_decay},
-                            kvstore=mx.kv.create('local'))
+                            kvstore=mx.kv.create(kv_type))
 
     # initialize graph
     dur = []
+    adj = g.adjacency_matrix().as_in_context(g_ctx)
     for epoch in range(args.n_epochs):
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
                                                        args.num_neighbors,
@@ -198,20 +212,23 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
                                                        seed_nodes=train_nid):
             for i in range(n_layers):
                 agg_history_str = 'agg_h_{}'.format(i)
-                g.pull(nf.layer_parent_nid(i+1), fn.copy_src(src='h_{}'.format(i), out='m'),
-                       fn.sum(msg='m', out=agg_history_str))
+                dests = nf.layer_parent_nid(i+1).as_in_context(g_ctx)
+                # TODO we could use DGLGraph.pull to implement this, but the current
+                # implementation of pull is very slow. Let's manually do it for now.
+                g.ndata[agg_history_str][dests] = mx.nd.dot(mx.nd.take(adj, dests),
+                                                            g.ndata['h_{}'.format(i)])
 
             node_embed_names = [['preprocess', 'h_0']]
             for i in range(1, n_layers):
                 node_embed_names.append(['h_{}'.format(i), 'agg_h_{}'.format(i-1), 'subg_norm', 'norm'])
             node_embed_names.append(['agg_h_{}'.format(n_layers-1), 'subg_norm', 'norm'])
 
-            nf.copy_from_parent(node_embed_names=node_embed_names)
+            nf.copy_from_parent(node_embed_names=node_embed_names, ctx=ctx)
             # forward
             with mx.autograd.record():
                 pred = model(nf)
-                batch_nids = nf.layer_parent_nid(-1).as_in_context(ctx)
-                batch_labels = labels[batch_nids]
+                batch_nids = nf.layer_parent_nid(-1)
+                batch_labels = labels[batch_nids].as_in_context(ctx)
                 loss = loss_fcn(pred, batch_labels)
                 loss = loss.sum() / len(batch_nids)
 
@@ -241,14 +258,12 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
             for i in range(n_layers):
                 node_embed_names.append(['norm'])
 
-            nf.copy_from_parent(node_embed_names=node_embed_names)
+            nf.copy_from_parent(node_embed_names=node_embed_names, ctx=ctx)
             pred = infer_model(nf)
-            batch_nids = nf.layer_parent_nid(-1).as_in_context(ctx)
-            batch_labels = labels[batch_nids]
+            batch_nids = nf.layer_parent_nid(-1)
+            batch_labels = labels[batch_nids].as_in_context(ctx)
             num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
             num_tests += nf.layer_size(-1)
             break
 
         print("Test Accuracy {:.4f}". format(num_acc/num_tests))
-
-
