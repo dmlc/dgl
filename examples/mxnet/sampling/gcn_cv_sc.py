@@ -145,7 +145,6 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples, d
     in_feats = features.shape[1]
     g_ctx = features.context
 
-    #TODO how to initialize the data here.
     norm = mx.nd.expand_dims(1./g.in_degrees().astype('float32'), 1)
     g.ndata['norm'] = norm.as_in_context(g_ctx)
     degs = g.in_degrees().astype('float32').asnumpy()

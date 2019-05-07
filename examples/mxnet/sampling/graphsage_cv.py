@@ -227,7 +227,7 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
 
     # use optimizer
     print(model.collect_params())
-    kv_type = 'local' if args.nworkers == 1 else 'dist_sync'
+    kv_type = 'dist_sync' if distributed else 'local'
     trainer = gluon.Trainer(model.collect_params(), 'adam',
                             {'learning_rate': args.lr, 'wd': args.weight_decay},
                             kvstore=mx.kv.create(kv_type))
