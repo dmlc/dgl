@@ -250,7 +250,10 @@ class SharedMemoryStoreServer(object):
 
         # RPC command: register a graph to the graph store server.
         def register(graph_name):
-            assert graph_name == self._graph_name
+            if graph_name != self._graph_name:
+                print("graph store has %s, but the worker wants %s"
+                      % (self._graph_name, graph_name))
+                return (-1, -1)
             worker_id = self._registered_nworkers
             self._registered_nworkers += 1
             return worker_id, self._num_workers
@@ -382,6 +385,8 @@ class SharedMemoryDGLGraph(DGLGraph):
         self._pid = os.getpid()
         self.proxy = xmlrpc.client.ServerProxy("http://localhost:" + str(port) + "/")
         self._worker_id, self._num_workers = self.proxy.register(graph_name)
+        if self._worker_id < 0:
+            raise Exception('fail to get graph ' + graph_name + ' from the graph store')
         num_nodes, num_edges, multigraph, edge_dir = self.proxy.get_graph_info(graph_name)
 
         graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
