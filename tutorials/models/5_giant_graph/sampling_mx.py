@@ -6,6 +6,8 @@ NodeFlow and Sampling
 
 **Author**: Ziyue Huang, Da Zheng, Quan Gan, Jinjing Zhou, Zheng Zhang
 """
+################################################################################################
+#
 # GCN
 # ~~~
 #
@@ -39,19 +41,78 @@ NodeFlow and Sampling
 #
 # While training GCN on the full graph, each node aggregates the hidden
 # features of its neighbors to compute its hidden feature in the next
-# layer. In DGL, we implement this with ``pull`` and ``update_all`` in
-# ``DGLGraph``:
+# layer.
+#
+# In this tutorial, we will run GCN on the Reddit dataset constructed by `Hamilton et
+# al. <https://arxiv.org/abs/1706.02216>`__, wherein the nodes are posts
+# and edges are established if two nodes are commented by a same user. The
+# task is to predict the category that a post belongs to. This graph has
+# 233K nodes, 114.6M edges and 41 categories. Let's first load the Reddit graph.
+#
+import numpy as np
+import dgl
+import dgl.function as fn
+from dgl import DGLGraph
+from dgl.data import RedditDataset
+import mxnet as mx
+from mxnet import gluon
+
+# load dataset
+data = RedditDataset(self_loop=True)
+train_nid = mx.nd.array(np.nonzero(data.train_mask)[0]).astype(np.int64)
+features = mx.nd.array(data.features)
+in_feats = features.shape[1]
+labels = mx.nd.array(data.labels)
+n_classes = data.num_labels
+
+# construct DGLGraph and prepare related data
+g = DGLGraph(data.graph, readonly=True)
+g.ndata['features'] = features
+
+################################################################################################
+# Here we define the node UDF which has a fully-connected layer:
 #
 
-h = g.ndata['in']
-for _ in range(num_layers):
+class NodeUpdate(gluon.Block):
+    def __init__(self, in_feats, out_feats, activation=None):
+        super(NodeUpdate, self).__init__()
+        self.dense = gluon.nn.Dense(out_feats, in_units=in_feats)
+        self.activation = activation
+
+    def forward(self, node):
+        h = node.data['h']
+        h = self.dense(h)
+        if self.activation:
+            h = self.activation(h)
+        return {'activation': h}
+
+################################################################################################
+# In DGL, we implement GCN on the full graph with ``update_all`` in ``DGLGraph``.
+# The following code performs two-layer GCN on the Reddit graph.
+#
+
+# number of GCN layers
+L = 2
+# number of hidden units of a fully connected layer
+n_hidden = 64
+
+layers = [NodeUpdate(g.ndata['features'].shape[1], n_hidden, mx.nd.relu),
+          NodeUpdate(n_hidden, n_hidden, mx.nd.relu)]
+for layer in layers:
+    layer.initialize()
+
+h = g.ndata['features']
+for i in range(L):
     g.ndata['h'] = h
-    g.pull(message_func=fn.copy_src(src='h', out='m'),
-           reduce_func=fn.sum(msg='m', out='h'))
-    g.update_all(apply_node_func=lambda node: {'h': layer(node.data['h'])})
+    g.update_all(message_func=fn.copy_src(src='h', out='m'),
+                 reduce_func=fn.sum(msg='m', out='h'),
+                 apply_node_func=lambda node: {'h': layers[i](node)['activation']})
     h = g.ndata.pop('h')
 
 ##############################################################################
+# NodeFlow
+# ~~~~~~~~~~~~~~~~~
+#
 # As the graph scales up to billions of nodes or edges, training on the
 # full graph would no longer be efficient or even feasible.
 #
@@ -93,22 +154,10 @@ for _ in range(num_layers):
 #
 # .. raw:: html
 #
-#    <!--In `NodeFlow`, the nodes in the same layer are distinct but there might exist duplicate nodes, from the original graph, in different layers, and edges only exist between nodes in the consecutive layers. Two consecutive layers and the edges between them forms a `block`. The data of the nodes in different layers or edges in different blocks is partitioned and stored as different tensors.-->
-#
 # ``NodeFlow`` provides ``block_compute`` for per-block computation, which
 # triggers computation and data propogation from the lower layer to the
-# next upper layer. An :math:`L`-layer GCN can be *conceptually* written
-# by the ``NodeFlow`` of a mini-batch as follows,
+# next upper layer.
 #
-
-h = nf.layers[0].data['in']
-for i in range(num_layers):
-    nf.layers[i].data['h'] = h
-    nf.block_compute(flow_id=i,
-                     message_func=fn.copy_src(src='h', out='m'),
-                     reduce_func=fn.sum(msg='m', out='h'),
-                     apply_node_func=lambda node: {'h': layer(node.data['h'])})
-    h = nf.layers[i+1].ndata.pop('h')
 
 ##############################################################################
 # Neighbor Sampling
@@ -141,24 +190,6 @@ for i in range(num_layers):
 # node can be controlled under :math:`\prod_{i=0}^{L-1} D^{(l)}` by
 # *neighbor sampling*.
 #
-# Here we define the node UDF which is a fully-connected layer:
-#
-
-import mxnet as mx
-from mxnet import gluon
-
-class NodeUpdate(gluon.Block):
-    def __init__(self, in_feats, out_feats, activation=None):
-        super(NodeUpdate, self).__init__()
-        self.dense = gluon.nn.Dense(out_feats, in_units=in_feats)
-        self.activation = activation
-
-    def forward(self, node):
-        h = node.data['h']
-        h = self.dense(h)
-        if self.activation:
-            h = self.activation(h)
-        return {'activation': h}
 
 ##############################################################################
 # We then implement *neighbor smapling* by ``NodeFlow``:
@@ -205,41 +236,25 @@ class GCNSampling(gluon.Block):
         return h
 
 ##############################################################################
-# Here we use the Reddit dataset constructed by `Hamilton et
-# al. <https://arxiv.org/abs/1706.02216>`__, wherein the nodes are posts
-# and edges are established if two nodes are commented by a same user. The
-# task is to predict the category that a post belongs to. This graph has
-# 233K nodes, 114.6M edges and 41 categories.
+# DGL provides ``NeighborSampler`` to construct the ``NodeFlow`` for a
+# mini-batch according to the computation logic of neighbor sampling.
+# ``NeighborSampler``
+# returns an iterator that generates a ``NodeFlow`` each time. This function
+# has many options to give users opportunities to customize the behavior
+# of the neighbor sampler, including the number of neighbors to sample,
+# the number of hops to sample, etc. Please see `its API
+# document <https://doc.dgl.ai/api/python/sampler.html>`__ for more
+# details.
 #
 
-import numpy as np
-import dgl
-import dgl.function as fn
-from dgl import DGLGraph
-from dgl.data import RedditDataset
-
-# load dataset
-data = RedditDataset(self_loop=True)
-train_nid = mx.nd.array(np.nonzero(data.train_mask)[0]).astype(np.int64)
-features = mx.nd.array(data.features)
-in_feats = features.shape[1]
-labels = mx.nd.array(data.labels)
-n_classes = data.num_labels
-
-# construct DGLGraph and prepare related data
-g = DGLGraph(data.graph, readonly=True)
-g.ndata['features'] = features
-
-# number of GCN layers
-L = 2
-# number of hidden units of a fully connected layer
-n_hidden = 64
 # dropout probability
 dropout = 0.2
 # batch size
-batch_size = 1000
+batch_size = 10000
 # number of neighbors to sample
 num_neighbors = 8
+# number of epochs
+num_epochs = 1
 
 # initialize the model and cross entropy loss
 model = GCNSampling(in_feats, n_hidden, n_classes, L,
@@ -251,7 +266,7 @@ loss_fcn = gluon.loss.SoftmaxCELoss()
 trainer = gluon.Trainer(model.collect_params(), 'adam',
                         {'learning_rate': 0.03, 'wd': 0})
 
-for epoch in range(10):
+for epoch in range(num_epochs):
     for nf in dgl.contrib.sampling.NeighborSampler(g, batch_size,
                                                    num_neighbors,
                                                    neighbor_type='in',
@@ -278,16 +293,6 @@ for epoch in range(10):
         print("Epoch[{}]: loss {}".format(epoch, loss.asscalar()))
 
 ##############################################################################
-# DGL provides ``NeighborSampler`` to construct the ``NodeFlow`` for a
-# mini-batch according to the computation logic of neighbor sampling.
-# ```NeighborSampler`` <https://doc.dgl.ai/api/python/sampler.html>`__
-# returns an iterator that returns a ``NodeFlow`` each time. This function
-# has many options to give users opportunities to customize the behavior
-# of the neighbor sampler, including the number of neighbors to sample,
-# the number of hops to sample, etc. Please see `its API
-# document <https://doc.dgl.ai/api/python/sampler.html>`__ for more
-# details.
-#
 # Control Variate
 # ~~~~~~~~~~~~~~~
 #
@@ -328,34 +333,42 @@ for epoch in range(10):
 # below,
 #
 
-for nf in NeighborSampler(g, batch_size, num_neighbors,
-                          neighbor_type='in', num_hops=L,
-                          seed_nodes=labeled_nodes):
-    h = nf.layers[0].data['in']
-    for i in range(nf.num_blocks):
-        # aggregate history on the original graph
-        g.pull(nf.layer_parent_nid(i+1),
-               fn.copy_src(src='h_{}'.format(i), out='m'),
-               lambda node: {'agg_h_{}'.format(i): node.data['m'].mean(axis=1)})
-    nf.copy_from_parent()
-    for i in range(nf.num_blocks):
-        prev_h = nf.layers[i].data['h_{}'.format(i)]
-        # compute delta_h, the difference of the current activation and the history
-        nf.layers[i].data['delta_h'] = h - prev_h
-        # refresh the old history
-        nf.layers[i].data['h_{}'.format(i)] = h.detach()
-        # aggregate the delta_h
-        nf.block_compute(i,
-                         fn.copy_src(src='delta_h', out='m'),
-                         lambda node: {'delta_h': node.data['m'].mean(axis=1)})
-        delta_h = nf.layers[i + 1].data['delta_h']
-        agg_h = nf.layers[i + 1].data['agg_h_{}'.format(i)]
-        # control variate estimator
-        nf.layers[i + 1].data['h'] = delta_h + agg_h
-        nf.apply_layer(i + 1, lambda node : {'h' : layer(node.data['h'])})
-        h = nf.layers[i + 1].data['h']
-    # update history
-    nf.copy_to_parent()
+have_large_memory = False
+# The control-variate sampling code below needs to run on a large-memory
+# machine for the Reddit graph.
+if have_large_memory:
+    g.ndata['h_0'] = features
+    for i in range(L):
+        g.ndata['h_{}'.format(i+1)] = mx.nd.zeros((features.shape[0], n_hidden))
+    # With control-variate sampling, we only need to sample 2 neighbors to train GCN.
+    for nf in dgl.contrib.sampling.NeighborSampler(g, batch_size, expand_factor=2,
+                                                   neighbor_type='in', num_hops=L,
+                                                   seed_nodes=train_nid):
+        for i in range(nf.num_blocks):
+            # aggregate history on the original graph
+            g.pull(nf.layer_parent_nid(i+1),
+                   fn.copy_src(src='h_{}'.format(i), out='m'),
+                   lambda node: {'agg_h_{}'.format(i): node.mailbox['m'].mean(axis=1)})
+        nf.copy_from_parent()
+        h = nf.layers[0].data['features']
+        for i in range(nf.num_blocks):
+            prev_h = nf.layers[i].data['h_{}'.format(i)]
+            # compute delta_h, the difference of the current activation and the history
+            nf.layers[i].data['delta_h'] = h - prev_h
+            # refresh the old history
+            nf.layers[i].data['h_{}'.format(i)] = h.detach()
+            # aggregate the delta_h
+            nf.block_compute(i,
+                             fn.copy_src(src='delta_h', out='m'),
+                             lambda node: {'delta_h': node.data['m'].mean(axis=1)})
+            delta_h = nf.layers[i + 1].data['delta_h']
+            agg_h = nf.layers[i + 1].data['agg_h_{}'.format(i)]
+            # control variate estimator
+            nf.layers[i + 1].data['h'] = delta_h + agg_h
+            nf.apply_layer(i + 1, lambda node : {'h' : layer(node.data['h'])})
+            h = nf.layers[i + 1].data['h']
+        # update history
+        nf.copy_to_parent()
 
 ##############################################################################
 # You can see full example here, `MXNet
@@ -377,8 +390,11 @@ for nf in NeighborSampler(g, batch_size, num_neighbors,
 # calling ``prop_flows``
 #
 
-for nf in NeighborSampler(g, ...):
+for nf in NeighborSampler(g, batch_size, num_neighbors,
+                          neighbor_type='in', num_hops=L,
+                          seed_nodes=train_nid):
     nf.copy_from_parent()
+    nf.layers[0].data['h'] = nf.layers[0].data['features']
     nf.prop_flow(fn.copy_src(src='h', out='m'),
                  fn.sum(msg='m', out='h'),
                  lambda node : {'h' : layer(node.data['h'])})
