@@ -153,7 +153,7 @@ class NodeFlowSampler(object):
         if self.immutable_only and not g._graph.is_readonly():
             raise NotImplementedError("This loader only support read-only graphs.")
 
-        self._batch_size = batch_size
+        self._batch_size = int(batch_size)
 
         if seed_nodes is None:
             self._seed_nodes = F.arange(0, g.number_of_nodes())
