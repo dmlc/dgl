@@ -4,7 +4,7 @@
 NodeFlow and Sampling
 =======================================
 
-**Author**: Gai Yu, Da Zheng, Quan Gan, Jinjing Zhou, Zheng Zhang
+**Author**: Ziyue Huang, Da Zheng, Quan Gan, Jinjing Zhou, Zheng Zhang
 """
 # GCN
 # ~~~
