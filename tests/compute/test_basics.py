@@ -318,7 +318,7 @@ def test_apply_edges():
     u = F.tensor([0, 0, 0, 4, 5, 6])
     v = F.tensor([1, 2, 3, 9, 9, 9])
     g.apply_edges(lambda edges : {'w' : edges.data['w'] * 0.}, (u, v))
-    eid = g.edge_ids(u, v)
+    eid = F.tensor(g.edge_ids(u, v))
     assert F.allclose(F.gather_row(g.edata['w'], eid), F.zeros((6, D)))
 
 def test_update_routines():

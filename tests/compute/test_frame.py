@@ -144,13 +144,13 @@ def test_row1():
     rows = f[rowid]
     for k, v in rows.items():
         assert tuple(F.shape(v)) == (len(rowid), D)
-        assert F.allclose(v, F.gather_row(data[k], rowid.tousertensor()))
+        assert F.allclose(v, F.gather_row(data[k], F.tensor(rowid.tousertensor())))
     # test duplicate keys
     rowid = Index(F.tensor([8, 2, 2, 1]))
     rows = f[rowid]
     for k, v in rows.items():
         assert tuple(F.shape(v)) == (len(rowid), D)
-        assert F.allclose(v, F.gather_row(data[k], rowid.tousertensor()))
+        assert F.allclose(v, F.gather_row(data[k], F.tensor(rowid.tousertensor())))
 
     # setter
     rowid = Index(F.tensor([0, 2, 4]))
