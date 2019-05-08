@@ -387,17 +387,23 @@ if have_large_memory:
 # In fact, ``block_compute`` is one of the APIs that comes with
 # ``NodeFlow``, which provides flexibility to research new ideas. The
 # computation flow underlying a DAG can be executed in one sweep, by
-# calling ``prop_flows``
+# calling ``prop_flows``.
+#
+# ``prop_flows`` accepts a list of UDFs. The code defines node update UDFs
+# for each layer.
 #
 
-for nf in NeighborSampler(g, batch_size, num_neighbors,
-                          neighbor_type='in', num_hops=L,
-                          seed_nodes=train_nid):
+apply_node_funcs = [
+    lambda node : {'h' : layers[0](node)['activation']},
+    lambda node : {'h' : layers[1](node)['activation']},
+]
+for nf in dgl.contrib.sampling.NeighborSampler(g, batch_size, num_neighbors,
+                                               neighbor_type='in', num_hops=L,
+                                               seed_nodes=train_nid):
     nf.copy_from_parent()
     nf.layers[0].data['h'] = nf.layers[0].data['features']
     nf.prop_flow(fn.copy_src(src='h', out='m'),
-                 fn.sum(msg='m', out='h'),
-                 lambda node : {'h' : layer(node.data['h'])})
+                 fn.sum(msg='m', out='h'), apply_node_funcs)
 
 ##############################################################################
 # Internally, ``prop_flow`` triggers the computation by fusing together
