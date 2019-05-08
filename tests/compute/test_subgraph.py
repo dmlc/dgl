@@ -30,7 +30,7 @@ def test_basics():
     sg = g.subgraph(nid)
     eid = {2, 3, 4, 5, 10, 11, 12, 13, 16}
     assert set(F.zerocopy_to_numpy(sg.parent_eid)) == eid
-    eid = sg.parent_eid
+    eid = F.tensor(sg.parent_eid)
     # the subgraph is empty initially
     assert len(sg.ndata) == 0
     assert len(sg.edata) == 0

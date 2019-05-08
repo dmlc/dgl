@@ -8,7 +8,7 @@ function fail {
 }
 
 function usage {
-    echo "Usage: $0 [CPU|GPU]"
+    echo "Usage: $0 [cpu|cuda]"
 }
 
 # check arguments
@@ -17,9 +17,9 @@ if [ $# -ne 1 ]; then
     fail "Error: must specify device"
 fi
 
-if [ "$1" == "CPU" ]; then
+if [ "$1" == "cpu" ]; then
     dev=-1
-elif [ "$1" == "GPU" ]; then
+elif [ "$1" == "cuda" ]; then
     export CUDA_VISIBLE_DEVICES=0
     dev=0
 else

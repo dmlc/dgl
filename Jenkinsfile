@@ -22,13 +22,13 @@ def build_dgl_win64() {
 
 def unit_test(backend, dev) {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python", "DGLBACKEND=${backend}"]) {
-    sh "bash tests/scripts/task_unit_test.sh ${backend}"
+    sh "bash tests/scripts/task_unit_test.sh ${dev}"
   }
 }
 
 def unit_test_win64(backend, dev) {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}\\build", "PYTHONPATH=${env.WORKSPACE}\\python", "DGLBACKEND=${backend}"]) {
-    bat "CALL tests\\scripts\\task_unit_test.bat ${backend}"
+    bat "CALL tests\\scripts\\task_unit_test.bat ${dev}"
   }
 }
 
@@ -126,10 +126,10 @@ pipeline {
           }
           stages {
             stage("TH CPU unittest") {
-              steps { unit_test("pytorch", "CPU") }
+              steps { unit_test("pytorch", "cpu") }
             }
             stage("TH CPU example test") {
-              steps { example_test("pytorch", "CPU") }
+              steps { example_test("pytorch", "cpu") }
             }
           }
           post {
@@ -140,10 +140,10 @@ pipeline {
           agent { label "windows" }
           stages {
             stage("TH CPU Win64 unittest") {
-              steps { unit_test_win64("pytorch", "CPU") }
+              steps { unit_test_win64("pytorch", "cpu") }
             }
             stage("TH CPU Win64 example test") {
-              steps { example_test_win64("pytorch", "CPU") }
+              steps { example_test_win64("pytorch", "cpu") }
             }
           }
           post {
@@ -158,18 +158,16 @@ pipeline {
             }
           }
           stages {
-            // TODO: have GPU unittest
-            //stage("TH GPU unittest") {
-            //  steps { pytorch_unit_test("GPU") }
-            //}
+            stage("TH GPU unittest") {
+              steps { unit_test("cuda") }
+            }
             stage("TH GPU example test") {
-              steps { example_test("pytorch", "GPU") }
+              steps { example_test("pytorch", "cuda") }
             }
           }
-          // TODO: have GPU unittest
-          //post {
-          //  always { junit "*.xml" }
-          //}
+          post {
+            always { junit "*.xml" }
+          }
         }
         stage("MXNet CPU") {
           agent {
@@ -177,7 +175,7 @@ pipeline {
           }
           stages {
             stage("MX Unittest") {
-              steps { unit_test("mxnet", "CPU") }
+              steps { unit_test("mxnet", "cpu") }
             }
           }
           post {

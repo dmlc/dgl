@@ -3,13 +3,14 @@ from __future__ import absolute_import
 import torch as th
 
 def cuda():
-    return th.device('cuda')
+    return th.device('cuda:0')
 
 def array_equal(a, b):
-    return th.equal(a, b)
+    return th.equal(a.cpu(), b.cpu())
 
 def allclose(a, b):
-    return th.allclose(a.float(), b.float(), rtol=1e-4, atol=1e-4)
+    return th.allclose(a.float().cpu(),
+            b.float().cpu(), rtol=1e-4, atol=1e-4)
 
 def randn(shape):
     return th.randn(*shape)
