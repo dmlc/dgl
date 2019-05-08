@@ -389,8 +389,8 @@ if have_large_memory:
 # computation flow underlying a DAG can be executed in one sweep, by
 # calling ``prop_flows``.
 #
-# ``prop_flows`` accepts a list of UDFs. The code defines node update UDFs
-# for each layer.
+# ``prop_flows`` accepts a list of UDFs. The code below defines node update UDFs
+# for each layer and computes a simplified version of GCN with neighbor sampling.
 #
 
 apply_node_funcs = [
