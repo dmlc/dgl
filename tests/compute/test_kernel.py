@@ -3,10 +3,6 @@ import dgl.function as fn
 import networkx as nx
 import backend as F
 
-
-#def scatter_max(*args, **kwargs):
-    #return torch_scatter.scatter_max(*args, **kwargs)[0]
-
 def udf_src_x_edge(broadcast):
     def fn(edges):
         n = edges.src['n']
@@ -22,7 +18,7 @@ def udf_copy_src(edges):
     return {'m' : edges.src['n']}
 
 def udf_copy_edge(edges):
-    return {'m' : edges.data['n']}
+    return {'m' : edges.data['e']}
 
 def udf_sum(nodes):
     return {'r1' : nodes.mailbox['m'].sum(1)}
@@ -33,7 +29,6 @@ def udf_max(nodes):
 D1 = 5
 D2 = 10
 D3 = 4
-#scatter_add = torch_scatter.scatter_add
 builtin = {'sum': fn.sum, 'max': fn.max}
 udf_reduce = {'sum': udf_sum, 'max': udf_max}
 fill_value = {'sum': 0, 'max': float("-inf")}
@@ -67,17 +62,6 @@ def generate_graph(broadcast='none'):
     g.edata['e'] = F.attach_grad(e)
     return g
 
-
-def _tweak_shape(n, e, f, broadcast):
-    if broadcast == 'src':
-        n = F.unsqueeze(n, 1)
-    elif broadcast == 'dst':
-        f = F.unsqueeze(f, 1)
-    elif broadcast == 'edge':
-        e = F.unsqueeze(e, 1)
-    return n, e, f
-
-
 def test_src_op_edge_reduce():
     def _test(red, test_backward=False, broadcast='none'):
         g = generate_graph(broadcast)
@@ -104,13 +88,7 @@ def test_src_op_edge_reduce():
             n_grad2 = F.grad(g.ndata['n'])
             e_grad2 = F.grad(g.edata['e'])
 
-        #u, v, eid = g.all_edges('all')
-        #u, v, eid = F.tensor(u), F.tensor(v), F.tensor(eid)
-        #nn, ee, _ = _tweak_shape(n, e, f, broadcast)
-        #msg = nn[u] * ee[eid]
-        #r2 = udf_reduce[red](msg, v, dim=0, fill_value=fill_value[red])
         assert F.allclose(r1, r2)
-
         # test backward
         if test_backward:
             assert(F.allclose(n_grad1, n_grad2))
@@ -124,7 +102,7 @@ def test_src_op_edge_reduce():
     _test('max', True, 'edge')
 
 
-def test_src_op_dst_reduce():
+def _test_src_op_dst_reduce():
     def _test(red, test_backward=False, broadcast='none'):
         g = generate_graph(broadcast)
         # test forward
@@ -149,56 +127,69 @@ def test_src_op_dst_reduce():
     _test('sum', True)
     _test('sum', True, 'src')
     _test('sum', True, 'dst')
-    _test('sum', True, 'edge')
     _test('max', True)
     _test('max', True, 'src')
     _test('max', True, 'dst')
-    _test('max', True, 'edge')
-
 
 def test_copy_src_reduce():
     def _test(red, test_backward=False):
         g = generate_graph('none')
-        n = g.ndata['n'].detach().requires_grad_()
         # test forward
         g.update_all(fn.copy_src(src='n', out='m'),
                      builtin[red](msg='m', out='r1'))
         r1 = g.ndata['r1']
-        u, v = g.all_edges('uv')
-        u, v = u.cuda(), v.cuda()
-        msg = n[u]
-        r2 = udf_reduce[red](msg, v, dim=0, fill_value=fill_value[red])
-        assert F.allclose(r1, r2)
+        # test backward
+        if test_backward:
+            F.backward(r1.sum())
+            n_grad1 = F.grad(g.ndata['n'])
+
+        # reset grad
+        F.attach_grad(g.ndata['n'])
+
+        g.update_all(udf_copy_src, udf_reduce[red])
+        r2 = g.ndata['r1']
 
         # test backward
         if test_backward:
-            r1.sum().backward()
-            r2.sum().backward()
-            assert(F.allclose(n.grad, g.ndata['n'].grad))
+            F.backward(r2.sum())
+            n_grad2 = F.grad(g.ndata['n'])
+
+        assert F.allclose(r1, r2)
+        # test backward
+        if test_backward:
+            assert(F.allclose(n_grad1, n_grad2))
 
     _test('sum', True)
     _test('max', True)
 
 
 def test_copy_edge_reduce():
-    def _test(red, test_backward=False, broadcast='none'):
-        g = generate_graph(broadcast)
+    def _test(red, test_backward=False):
+        g = generate_graph('none')
         # test forward
         g.update_all(fn.copy_edge(edge='e', out='m'),
                      builtin[red](msg='m', out='r1'))
         r1 = g.ndata['r1']
-        e1 = g.edata['e'].detach().requires_grad_()
-        _, v, eid = g.all_edges('all')
-        v, eid = v.cuda(), eid.cuda()
-        msg = e1[eid]
-        r2 = udf_reduce[red](msg, v, dim=0, fill_value=fill_value[red])
-        assert F.allclose(r1, r2)
+        # test backward
+        if test_backward:
+            F.backward(r1.sum())
+            e_grad1 = F.grad(g.edata['e'])
+
+        # reset grad
+        F.attach_grad(g.edata['e'])
+
+        g.update_all(udf_copy_edge, udf_reduce[red])
+        r2 = g.ndata['r1']
 
         # test backward
         if test_backward:
-            r1.sum().backward()
-            r2.sum().backward()
-            assert(F.allclose(e1.grad, g.edata['e'].grad))
+            F.backward(r2.sum())
+            e_grad2 = F.grad(g.edata['e'])
+
+        assert F.allclose(r1, r2)
+        # test backward
+        if test_backward:
+            assert(F.allclose(e_grad1, e_grad2))
 
     _test('sum', True)
     _test('max', True)
@@ -216,7 +207,7 @@ def _edge_softmax_ground_truth(a, dst, nv):
     return a, norm
 
 
-def test_edge_softmax():
+def _test_edge_softmax():
     g = generate_graph('src')  # generate high dim edge feature
     softmax = EdgeSoftmax()
     e = g.edata['e']
@@ -235,8 +226,8 @@ def test_edge_softmax():
 
 
 if __name__ == '__main__':
-    #test_copy_src_reduce()
-    #test_copy_edge_reduce()
+    test_copy_src_reduce()
+    test_copy_edge_reduce()
     test_src_op_edge_reduce()
     # FIXME: expose backward of src_op_dst_reduce and enable this unit test
     # test_src_op_dst_reduce()
