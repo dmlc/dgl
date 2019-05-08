@@ -9,6 +9,7 @@ import numpy as np
 from . import backend as F
 from .base import DGLError, dgl_warning
 from .init import zero_initializer
+from ._ffi.ndarray import empty_shared_mem
 from . import utils
 
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
@@ -165,18 +166,20 @@ class Column(object):
         self.data = F.cat([self.data, feats], dim=0)
 
     @staticmethod
-    def create(data):
+    def create(data, scheme, data_name):
         """Create a new column using the given data."""
-        if isinstance(data, Column):
+        if isinstance(data, Column) and scheme is not None:
+            return Column(data.data, scheme)
+        elif isinstance(data, Column):
             return Column(data.data, data.scheme)
         else:
             return Column(data)
 
 class SharedMemColumn(Column):
-    def __init__(self, data, data_name, scheme=None):
+    def __init__(self, data, data_path, create_lock, scheme=None):
         super(SharedMemColumn, self).__init__(data, scheme)
-        self.locks = empty_shared_mem(data_name + "_lock", False,
-                                      shape=(data.shape[0]), dtype='int32')
+        self.locks = empty_shared_mem(data_path + "_lock", create_lock,
+                                      shape=(data.shape[0],), dtype='int32')
 
     def __getitem__(self, idx):
         if idx.slice_data() is not None:
@@ -201,6 +204,16 @@ class SharedMemColumn(Column):
     def extend(self, feats, feat_scheme=None):
         raise Exception("shared-memory column doesn't support extend")
 
+    @staticmethod
+    def create(data, scheme, data_path, create_lock):
+        """Create a new column using the given data."""
+        if isinstance(data, Column) and scheme is not None:
+            return SharedMemColumn(data.data, data_path, create_lock, scheme)
+        elif isinstance(data, Column):
+            return SharedMemColumn(data.data, data_path, create_lock, data.scheme)
+        else:
+            return SharedMemColumn(data, data_path, create_lock)
+
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
 
@@ -217,15 +230,18 @@ class Frame(MutableMapping):
     num_rows : int, optional [default=0]
         The number of rows in this frame. If ``data`` is provided, ``num_rows``
         will be ignored and inferred from the given data.
+    column_create : function, optional [default=Column.create]
+        Create a column from the given data.
     """
-    def __init__(self, data=None, num_rows=0):
+    def __init__(self, data=None, num_rows=0, column_create=Column.create):
+        self._column_create = column_create
         if data is None:
             self._columns = dict()
             self._num_rows = num_rows
         else:
             # Note that we always create a new column for the given data.
             # This avoids two frames accidentally sharing the same column.
-            self._columns = {k : Column.create(v) for k, v in data.items()}
+            self._columns = {k : self._column_create(v, None, k) for k, v in data.items()}
             if len(self._columns) != 0:
                 self._num_rows = len(next(iter(self._columns.values())))
             else:
@@ -241,6 +257,9 @@ class Frame(MutableMapping):
         self._initializers = {}  # per-column initializers
         self._remote_init_builder = None
         self._default_initializer = None
+
+    def set_column_create(self, column_create):
+        self._column_create = column_create
 
     def _warn_and_set_initializer(self):
         dgl_warning('Initializer is not set. Use zero initializer instead.'
@@ -395,7 +414,7 @@ class Frame(MutableMapping):
             initializer = self.get_initializer(name)
             init_data = initializer((self.num_rows,) + scheme.shape, scheme.dtype,
                                     ctx, slice(0, self.num_rows))
-        self._columns[name] = Column(init_data, scheme)
+        self._columns[name] = self._column_create(init_data, scheme, name)
 
     def add_rows(self, num_rows):
         """Add blank rows to this frame.
@@ -435,10 +454,12 @@ class Frame(MutableMapping):
         # to the remote server.
         initializer = self.get_remote_initializer(name)
         if initializer is not None:
+            if isinstance(data, Column):
+                data = data.data
             new_data = initializer(F.shape(data), F.dtype(data), F.context(data))
             new_data[:] = data
             data = new_data
-        col = Column.create(data)
+        col = self._column_create(data, None, name)
         if len(col) != self.num_rows:
             raise DGLError('Expected data to have %d rows, got %d.' %
                            (self.num_rows, len(col)))
@@ -451,7 +472,7 @@ class Frame(MutableMapping):
         if self.num_rows == 0:
             # if no rows in current frame; append is equivalent to
             # directly updating columns.
-            self._columns = {key: Column.create(data) for key, data in other.items()}
+            self._columns = {key: self._column_create(data, key) for key, data in other.items()}
         else:
             # pad columns that are not provided in the other frame with initial values
             for key, col in self.items():

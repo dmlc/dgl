@@ -11,6 +11,7 @@ from collections.abc import MutableMapping
 from ..base import ALL, is_all, DGLError
 from .. import backend as F
 from ..graph import DGLGraph
+from ..frame import SharedMemColumn
 from .. import utils
 from ..graph_index import GraphIndex, create_graph_index
 from .._ffi.ndarray import empty_shared_mem
@@ -20,9 +21,6 @@ from ..init import zero_initializer
 
 def _get_ndata_path(graph_name, ndata_name):
     return "/" + graph_name + "_node_" + ndata_name
-
-def _get_edata_path(graph_name, edata_name):
-    return "/" + graph_name + "_edge_" + edata_name
 
 def _get_edata_path(graph_name, edata_name):
     return "/" + graph_name + "_edge_" + edata_name
@@ -311,6 +309,14 @@ class SharedMemoryStoreServer(object):
         self._edge_dir = edge_dir
         self._registered_nworkers = 0
 
+        # We need to create shared-memory columns in the frame.
+        ndata_create = lambda data, schema, name: SharedMemColumn.create(
+            data, schema, _get_ndata_path(graph_name, name), True)
+        edata_create = lambda data, schema, name: SharedMemColumn.create(
+            data, schema, _get_edata_path(graph_name, name), True)
+        self._graph._node_frame._frame.set_column_create(ndata_create)
+        self._graph._edge_frame._frame.set_column_create(edata_create)
+
         self._barrier = BarrierManager(num_workers)
         self._init_manager = InitializerManager()
 
@@ -340,11 +346,8 @@ class SharedMemoryStoreServer(object):
             assert self._graph.number_of_nodes() == shape[0]
             init = self._init_manager.deserialize(init)
             data = init(shape, dtype, _get_ndata_path(graph_name, ndata_name))
+            # TODO we need to pass the writable flag to column creator.
             self._graph.ndata[ndata_name] = data
-            if writable:
-                lock_data = empty_shared_mem(_get_ndata_path(graph_name, ndata_name) + "_lock",
-                                             True, (shape[0]), "int32")
-                self._graph.ndata[ndata_name + "_lock"] = utils.tousertensor(lock_data)
             return 0
 
         # RPC command: initialize edge embedding in the server.
@@ -357,11 +360,8 @@ class SharedMemoryStoreServer(object):
             assert self._graph.number_of_edges() == shape[0]
             init = self._init_manager.deserialize(init)
             data = init(shape, dtype, _get_edata_path(graph_name, edata_name))
+            # TODO we need to pass the writable flag to column creator.
             self._graph.edata[edata_name] = data
-            if writable:
-                lock_data = empty_shared_mem(_get_edata_path(graph_name, edata_name) + "_lock",
-                                             True, (shape[0]), "int32")
-                self._graph.edata[edata_name + "_lock"] = utils.tousertensor(lock_data)
             return 0
 
         # RPC command: get the names of all node embeddings.
@@ -468,6 +468,14 @@ class SharedMemoryDGLGraph(DGLGraph):
         graph_idx.from_shared_mem_csr_matrix(_get_graph_path(graph_name), num_nodes, num_edges, edge_dir)
         super(SharedMemoryDGLGraph, self).__init__(graph_idx, multigraph=multigraph, readonly=True)
         self._init_manager = InitializerManager()
+
+        # We need to create shared-memory columns in the frame.
+        ndata_create = lambda data, schema, name: SharedMemColumn.create(
+            data, schema, _get_ndata_path(graph_name, name), False)
+        edata_create = lambda data, schema, name: SharedMemColumn.create(
+            data, schema, _get_edata_path(graph_name, name), False)
+        self._node_frame._frame.set_column_create(ndata_create)
+        self._edge_frame._frame.set_column_create(edata_create)
 
         # map all ndata and edata from the server.
         ndata_infos = self.proxy.list_ndata()
