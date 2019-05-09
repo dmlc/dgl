@@ -241,7 +241,7 @@ void SharedMemGatherRows(DLTensor *from, DLTensor *lock, DLTensor *idx, DLTensor
     bool success;
     do {
       row_lock.ReadLock();
-      memcpy(from_data + row_idx * row_size, to_data + i * row_size, row_size);
+      memcpy(to_data + i * row_size, from_data + row_idx * row_size, row_size);
       success = row_lock.ReadUnlock();
     } while (!success);
   }
@@ -268,7 +268,7 @@ void SharedMemScatterRows(DLTensor *from, DLTensor *lock, DLTensor *idx, DLTenso
     size_t row_idx = idx_data[i];
     ReadWriteLock row_lock(lock_data[row_idx]);
     row_lock.WriteLock();
-    memcpy(from_data + i * row_size, to_data + row_idx * row_size, row_size);
+    memcpy(to_data + row_idx * row_size, from_data + i * row_size, row_size);
     row_lock.WriteUnlock();
   }
 }
