@@ -9,7 +9,7 @@ import numpy as np
 from . import backend as F
 from .base import DGLError, dgl_warning
 from .init import zero_initializer
-from ._ffi.ndarray import empty_shared_mem
+from ._ffi.ndarray import empty_shared_mem, shared_mem_gather_rows, shared_mem_scatter_rows
 from . import utils
 
 class Scheme(namedtuple('Scheme', ['shape', 'dtype'])):
@@ -188,7 +188,7 @@ class SharedMemColumn(Column):
             rows = shared_mem_gather_rows(utils.todgltensor(self.data),
                                           self.locks,
                                           idx.todgltensor())
-            return rows.tousertensor()
+            return utils.tousertensor(rows)
 
     def update(self, idx, feats, inplace):
         feat_scheme = infer_scheme(feats)
@@ -199,7 +199,7 @@ class SharedMemColumn(Column):
         if not inplace:
             raise Exception("shared-memory column only support in-place update.")
         shared_mem_scatter_rows(utils.todgltensor(feats), self.locks,
-                                idx.todgltensor(), utils.todgltensor(data))
+                                idx.todgltensor(), utils.todgltensor(self.data))
 
     def extend(self, feats, feat_scheme=None):
         raise Exception("shared-memory column doesn't support extend")

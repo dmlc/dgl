@@ -16,14 +16,15 @@ rand_port = random.randint(5000, 8000)
 print('run graph store with port ' + str(rand_port), file=sys.stderr)
 
 def check_array_shared_memory(g, worker_id, arrays):
+    idx = dgl.utils.toindex(np.array([5]))
     if worker_id == 0:
         for i, arr in enumerate(arrays):
-            arr[0] = i
+            arr.update(idx, mx.nd.ones(shape=(1, 10)) * i, inplace=True)
         g._sync_barrier()
     else:
         g._sync_barrier()
         for i, arr in enumerate(arrays):
-            assert np.all(arr[0].asnumpy() == i)
+            assert np.all(arr[0][idx].asnumpy() == i)
 
 def check_init_func(worker_id, graph_name):
     time.sleep(3)
@@ -42,7 +43,8 @@ def check_init_func(worker_id, graph_name):
     g.init_ndata('test4', (g.number_of_nodes(), 10), 'float32')
     g.init_edata('test4', (g.number_of_edges(), 10), 'float32')
     g._sync_barrier()
-    check_array_shared_memory(g, worker_id, [g.ndata['test4'], g.edata['test4']])
+    check_array_shared_memory(g, worker_id,
+                              [g._node_frame._frame['test4'], g._edge_frame._frame['test4']])
     g.destroy()
 
 def server_func(num_workers, graph_name):
