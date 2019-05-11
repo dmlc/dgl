@@ -2,12 +2,7 @@ from multiprocessing import Process
 import argparse, time, math
 import numpy as np
 import os
-import numa
-if 'DMLC_TASK_ID' in os.environ and int(os.environ['DMLC_TASK_ID']) < 4:
-    numa.bind([int(os.environ['DMLC_TASK_ID'])])
-    os.environ['OMP_NUM_THREADS'] = '15'
-else:
-    os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['OMP_NUM_THREADS'] = '16'
 import mxnet as mx
 from mxnet import gluon
 import dgl
