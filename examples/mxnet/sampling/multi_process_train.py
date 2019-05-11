@@ -14,6 +14,7 @@ from graphsage_cv import graphsage_cv_train
 
 def main(args):
     g = dgl.contrib.graph_store.create_graph_from_store(args.graph_name, "shared_mem")
+    mx.random.seed(g.worker_id)
     features = g.ndata['features']
     labels = g.ndata['labels']
     train_mask = g.ndata['train_mask']
