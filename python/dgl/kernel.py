@@ -301,7 +301,7 @@ def src_op_dst_reduce(reducer,
         The output tensor. Could be either node or edge feature tensor
         depending on the reducer.
     """
-    _CAPI_DGLKernelSrcMulDstReduce(
+    _CAPI_DGLKernelSrcOpDstReduce(
         reducer, binary_op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, dst_mapping,
         src_data, dst_data, out_mapping, out_data)

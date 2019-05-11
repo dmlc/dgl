@@ -262,7 +262,7 @@ void SrcOpDstReduce(
   }
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelSrcMulDstReduce")
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelSrcOpDstReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string binary_op = args[1];
