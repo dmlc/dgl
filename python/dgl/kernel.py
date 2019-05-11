@@ -71,7 +71,7 @@ def src_op_edge_reduce(reducer,
         The output tensor. Could be either node or edge feature tensor
         depending on the reducer.
     """
-    _CAPI_DGLKernelSrcMulEdgeReduce(
+    _CAPI_DGLKernelSrcOpEdgeReduce(
         reducer, binary_op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping,
         src_data, edge_data, out_mapping, out_data)
@@ -129,7 +129,7 @@ def backward_lhs_src_mul_edge_reduce(
     grad_src_data : dgl.ndarray.NDArray
         (output variable) The gradient of src data.
     """
-    _CAPI_DGLKernelBackwardLhsSrcMulEdgeReduce(
+    _CAPI_DGLKernelBackwardLhsSrcOpEdgeReduce(
         reducer, op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data, grad_src_data)
@@ -186,7 +186,7 @@ def backward_rhs_src_mul_edge_reduce(
     grad_edge_data : dgl.ndarray.NDArray
         (output variable) The gradient of edge data.
     """
-    _CAPI_DGLKernelBackwardRhsSrcMulEdgeReduce(
+    _CAPI_DGLKernelBackwardRhsSrcOpEdgeReduce(
         reducer, op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data, grad_edge_data)
@@ -246,7 +246,7 @@ def backward_both_src_mul_edge_reduce(
     grad_edge_data : dgl.ndarray.NDArray
         (output variable) The gradient of edge data.
     """
-    _CAPI_DGLKernelBackwardBothSrcMulEdgeReduce(
+    _CAPI_DGLKernelBackwardBothSrcOpEdgeReduce(
         reducer, op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data,

@@ -214,7 +214,7 @@ void SrcOpEdgeReduce(
   }
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelSrcMulEdgeReduce")
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelSrcOpEdgeReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string binary_op = args[1];
@@ -379,7 +379,7 @@ void BackwardLhsSrcOpEdgeReduce(
   }
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsSrcMulEdgeReduce")
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsSrcOpEdgeReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
@@ -435,7 +435,7 @@ void BackwardRhsSrcOpEdgeReduce(
   }
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsSrcMulEdgeReduce")
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsSrcOpEdgeReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
@@ -493,7 +493,7 @@ void BackwardBothSrcOpEdgeReduce(
   }
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardBothSrcMulEdgeReduce")
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardBothSrcOpEdgeReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];

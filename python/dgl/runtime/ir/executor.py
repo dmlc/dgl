@@ -30,10 +30,11 @@ __all__ = [
     'AppendRow_Executor', 'APPEND_ROW_',
     'WriteRowInplace_Executor', 'WRITE_ROW_INPLACE_',
     'ClearFrame_Executor', 'CLEAR_FRAME_',
-    'SrcOpEdgeReduceExecutor', 'SRC_OP_EDGE_REDUCE',
-    'SrcOpDstReduceExecutor', 'SRC_OP_DST_REDUCE',
+    #'SrcOpEdgeReduceExecutor', 'SRC_OP_EDGE_REDUCE',
+    #'SrcOpDstReduceExecutor', 'SRC_OP_DST_REDUCE',
     'CopySrcReduceExecutor', 'COPY_SRC_REDUCE',
     'CopyEdgeReduceExecutor', 'COPY_EDGE_REDUCE',
+    'BinaryReduceExecutor', 'BINARY_REDUCE',
 ]
 
 class OpCode(object):
@@ -57,10 +58,16 @@ class OpCode(object):
     WRITE_ROW_INPLACE_ = 26
     CLEAR_FRAME_ = 27
     # DGL kernels
+    BINARY_REDUCE = 50
     SRC_OP_EDGE_REDUCE = 51
     SRC_OP_DST_REDUCE = 52
     COPY_SRC_REDUCE = 53
     COPY_EDGE_REDUCE = 54
+
+class TargetCode(object):
+    SRC = 0
+    DST = 1
+    EDGE = 2
 
 class Executor(object):
     """Base executor class.
@@ -1262,6 +1269,145 @@ def SRC_OP_DST_REDUCE(reducer, binary_op, spmat, src_data, dst_data, out_size,
     get_current_prog().issue(reg['executor_cls'](
         reducer, binary_op, spmat, src_data, dst_data, out_size, src_map,
         dst_map, out_map, ret))
+    return ret
+
+
+class BinaryReduceExecutor(Executor):
+    """Executor for SRC_OP_EDGE_REDUCE
+
+    Parameters
+    ----------
+    reducer : str
+        String representing reduction to perform, can be "sum", "max", "min",
+        "mean", "prod", "none" (no reduction)
+    binary_op : str
+        String representing binary operation to perform, can be "add", "mul",
+        "sub", "div", "dot"
+    lhs_tgt : TargetCode
+        Can be SRC, DST or EDGE
+    rhs_tgt : TargetCode
+        Can be SRC, DST or EDGE
+    spmat : var.Var
+        Variable for sparse matrix lambda. The lambda returns the sparse matrix
+        given a context object.
+    lhs_data : var.Var
+        Variable for the dense feature tensor of source nodes.
+    rhs_data : var.Var
+        Variable for the dense feature tensor of edges.
+    out_size : int
+        Output size
+    lhs_map : var.Var
+        Variable for mapping lambda. The lambda returns the mapping from source
+        node id to relabeled consecutive integers
+    rhs_map : var.Var
+        Variable for mapping lambda. The lambda returns two mappings for CSR
+        and transposed CSR matrix
+    out_map : var.Var
+        Variable for mapping lambda. The lambda returns the mapping from output
+        to relabeled consecutive integers
+    ret : var.Var
+        Variable for the result.
+    """
+    def __init__(self, reducer, binary_op, lhs_tgt, rhs_tgt,
+                 spmat, lhs_data, edge_data,
+                 out_size, lhs_map, edge_map, out_map, ret):
+        assert False
+        self.reducer = reducer
+        self.binary_op = binary_op
+        self.spmat = spmat
+        self.lhs_data = lhs_data
+        self.edge_data = edge_data
+        self.out_size = out_size
+        self.lhs_map = lhs_map
+        self.edge_map = edge_map
+        self.out_map = out_map
+        self.ret = ret
+
+    def opcode(self):
+        return OpCode.BINARY_REDUCE
+
+    def arg_vars(self):
+        return [self.reducer, self.binary_op, self.spmat, self.lhs_data,
+                self.edge_data, self.out_size, self.lhs_map, self.edge_map,
+                self.out_map]
+
+    def ret_var(self):
+        return self.ret
+
+    def run(self):
+        lhs_data = self.lhs_data.data
+        edge_data = self.edge_data.data
+        ctx = utils.to_dgl_context(F.context(lhs_data))
+        spmat = self.spmat.data(ctx)
+        lhs_map = self.lhs_map.data(ctx)
+        edge_map, inv_edge_map = self.edge_map.data
+        edge_map = edge_map(ctx)
+        inv_edge_map = inv_edge_map(ctx)
+        if self.reducer == "none":
+            # write to edge
+            msg_map, inv_msg_map = self.out_map.data
+            msg_map = msg_map(ctx)
+            inv_msg_map = inv_msg_map(ctx)
+            out_map = (msg_map, inv_msg_map)
+        else:
+            out_map = self.out_map.data(ctx)
+        self.ret.data = F.binary_reduce(
+            self.reducer, self.binary_op, spmat, lhs_data, edge_data,
+            self.out_size, lhs_map, (edge_map, inv_edge_map), out_map)
+
+IR_REGISTRY[OpCode.BINARY_REDUCE] = {
+    'name': 'BINARY_REDUCE',
+    'args_type': [VarType.STR, VarType.STR, VarType.SPMAT, VarType.FEAT,
+                  VarType.FEAT, VarType.INT, VarType.MAP, VarType.MAP,
+                  VarType.MAP],
+    'ret_type': VarType.FEAT,
+    'executor_cls': SrcOpEdgeReduceExecutor,
+}
+
+
+def BINARY_REDUCE(reducer, binary_op, spmat, lhs_data, edge_data,
+                        out_size, lhs_map, edge_map, out_map, ret=None):
+    """Perform BINARY_REDUCE symbolically.
+
+    Parameters
+    ----------
+    reducer : str
+        String representing reduction to perform, can be "sum", "max", "min",
+        "mean", "prod", "none" (no reduction)
+    binary_op : str
+        String representing binary operation to perform, can be "add", "mul",
+        "sub", "div", "dot"
+    spmat : var.Var
+        Variable for sparse matrix lambda. The lambda returns the sparse matrix
+        given a context object.
+    lhs_data : var.Var
+        Variable for the dense feature tensor of source nodes.
+    edge_data : var.Var
+        Variable for the dense feature tensor of edges.
+    out_size : int
+        Output size
+    src_map : var.Var
+        Variable for mapping lambda. The lambda returns the mapping from source
+        node id to relabeled consecutive integers
+    edge_map : var.Var
+        Variable for mapping lambda. The lambda returns two mappings for CSR
+        and transposed CSR matrix
+    out_map : var.Var
+        Variable for mapping lambda. The lambda returns the mapping from output
+        to relabeled consecutive integers
+    ret : var.Var, optional
+        Variable for the result. If not give, a new variable will be created.
+
+    Returns
+    -------
+    var.Var
+        Variable for the result.
+    """
+    reg = IR_REGISTRY[OpCode.BINARY_REDUCE]
+    ret = var.new(reg['ret_type']) if ret is None else ret
+    get_current_prog().issue(reg['executor_cls'](
+        reducer, binary_op, spmat, src_data, edge_data, out_size, src_map,
+        edge_map, out_map, ret))
     return ret
 
 
