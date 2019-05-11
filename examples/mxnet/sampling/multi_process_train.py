@@ -2,7 +2,12 @@ from multiprocessing import Process
 import argparse, time, math
 import numpy as np
 import os
-os.environ['OMP_NUM_THREADS'] = '16'
+import numa
+if 'DMLC_TASK_ID' in os.environ and int(os.environ['DMLC_TASK_ID']) < 4:
+    numa.bind([int(os.environ['DMLC_TASK_ID'])])
+    os.environ['OMP_NUM_THREADS'] = '15'
+else:
+    os.environ['OMP_NUM_THREADS'] = '1'
 import mxnet as mx
 from mxnet import gluon
 import dgl
@@ -14,6 +19,7 @@ from graphsage_cv import graphsage_cv_train
 
 def main(args):
     g = dgl.contrib.graph_store.create_graph_from_store(args.graph_name, "shared_mem")
+    # We need to set random seed here. Otherwise, all processes have the same mini-batches.
     mx.random.seed(g.worker_id)
     features = g.ndata['features']
     labels = g.ndata['labels']
