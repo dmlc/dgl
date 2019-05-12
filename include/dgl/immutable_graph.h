@@ -14,16 +14,16 @@
 #include <algorithm>
 #include <dgl/runtime/ndarray.h>
 #include <dgl/graph_interface.h>
-#include <dgl/lazy_pointer.h>
 
 namespace dgl {
 
 class CSR;
 class COO;
+typedef std::shared_ptr<CSR> CSRPtr;
+typedef std::shared_ptr<COO> COOPtr;
 
 class CSR : public GraphInterface {
  public:
-  typedef std::shared_ptr<CSR> Ptr;
   // Create a csr graph that has the given number of verts and edges.
   CSR(int64_t num_vertices, int64_t num_edges);
   // Create a csr graph that shares the given indptr and indices.
@@ -168,17 +168,191 @@ class CSR : public GraphInterface {
 
   std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override;
 
-  CSR::Ptr Transpose() const;
+  CSRPtr Transpose() const;
 
-  COO::Ptr ToCOO() const;
+  COOPtr ToCOO() const;
 
  private:
   IdArray indptr_, indices_, edge_ids_;
+#ifndef _WIN32
+  std::shared_ptr<runtime::SharedMemory> mem_;
+#endif  // _WIN32
+};
+
+class COO : public GraphInterface {
+ public:
+  // Create a coo graph that shares the given src and dst
+  COO(int64_t num_vertices, IdArray src, IdArray dst);
+
+  void AddVertices(uint64_t num_vertices) override {
+    LOG(FATAL) << "CSR graph does not allow mutation.";
+  }
+
+  void AddEdge(dgl_id_t src, dgl_id_t dst) override {
+    LOG(FATAL) << "CSR graph does not allow mutation.";
+  }
+
+  void AddEdges(IdArray src_ids, IdArray dst_ids) override {
+    LOG(FATAL) << "CSR graph does not allow mutation.";
+  }
+
+  void Clear() override {
+    LOG(FATAL) << "CSR graph does not allow mutation.";
+  }
+
+  bool IsMultigraph() const override {
+    return false;
+  }
+
+  bool IsReadonly() const override {
+    return true;
+  }
+
+  uint64_t NumVertices() const override {
+    return num_vertices_;
+  }
+
+  uint64_t NumEdges() const override {
+    return src_->shape[0];
+  }
+
+  bool HasVertex(dgl_id_t vid) const override {
+    return vid < NumVertices() && vid >= 0;
+  }
+
+  bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const override {
+    LOG(FATAL) << "COO graph does not support efficient HasEdgeBetween."
+      << " Please use CSR graph or AdjList graph instead.";
+    return false;
+  }
+
+  BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const override {
+    LOG(FATAL) << "COO graph does not support efficient HasEdgesBetween."
+      << " Please use CSR graph or AdjList graph instead.";
+    return {};
+  }
+
+  IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const override {
+    LOG(FATAL) << "COO graph does not support efficient Predecessors."
+      << " Please use CSR graph or AdjList graph instead.";
+    return {};
+  }
+
+  IdArray Successors(dgl_id_t vid, uint64_t radius = 1) const override {
+    LOG(FATAL) << "COO graph does not support efficient Successors."
+      << " Please use CSR graph or AdjList graph instead.";
+    return {};
+  }
+
+  IdArray EdgeId(dgl_id_t src, dgl_id_t dst) const override {
+    LOG(FATAL) << "COO graph does not support efficient EdgeId."
+      << " Please use CSR graph or AdjList graph instead.";
+    return {};
+  }
+
+  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const override {
+    const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
+    const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
+    return std::make_pair(src_data[eid], dst_data[eid]);
+  }
+
+  EdgeArray FindEdges(IdArray eids) const override;
+
+  EdgeArray InEdges(dgl_id_t vid) const override {
+    LOG(FATAL) << "COO graph does not support efficient InEdges."
+      << " Please use CSR graph or AdjList graph instead.";
+    return {};
+  }
+
+  EdgeArray InEdges(IdArray vids) const override {
+    LOG(FATAL) << "COO graph does not support efficient InEdges."
+      << " Please use CSR graph or AdjList graph instead.";
+    return {};
+  }
+
+  EdgeArray OutEdges(dgl_id_t vid) const override {
+    LOG(FATAL) << "COO graph does not support efficient OutEdges."
+      << " Please use CSR graph or AdjList graph instead.";
+    return {};
+  }
+
+  EdgeArray OutEdges(IdArray vids) const override {
+    LOG(FATAL) << "COO graph does not support efficient OutEdges."
+      << " Please use CSR graph or AdjList graph instead.";
+    return {};
+  }
+
+  EdgeArray Edges(const std::string &order = "") const override;
+
+  uint64_t InDegree(dgl_id_t vid) const override {
+    LOG(FATAL) << "COO graph does not support efficient InDegree."
+      << " Please use CSR graph or AdjList graph instead.";
+    return 0;
+  }
+
+  DegreeArray InDegrees(IdArray vids) const override {
+    LOG(FATAL) << "COO graph does not support efficient InDegrees."
+      << " Please use CSR graph or AdjList graph instead.";
+    return {};
+  }
+
+  uint64_t OutDegree(dgl_id_t vid) const override {
+    LOG(FATAL) << "COO graph does not support efficient OutDegree."
+      << " Please use CSR graph or AdjList graph instead.";
+    return 0;
+  }
+
+  DegreeArray OutDegrees(IdArray vids) const override {
+    LOG(FATAL) << "COO graph does not support efficient OutDegrees."
+      << " Please use CSR graph or AdjList graph instead.";
+    return {};
+  }
+
+  Subgraph VertexSubgraph(IdArray vids) const override {
+    LOG(FATAL) << "COO graph does not support efficient VertexSubgraph."
+      << " Please use CSR graph or AdjList graph instead.";
+    return {};
+  }
+
+  Subgraph EdgeSubgraph(IdArray eids) const override;
+
+  GraphPtr Reverse() const override;
+
+  DGLIdIters SuccVec(dgl_id_t vid) const override {
+    LOG(FATAL) << "COO graph does not support efficient SuccVec."
+      << " Please use CSR graph or AdjList graph instead.";
+    return DGLIdIters(nullptr, nullptr);
+  }
+
+  DGLIdIters OutEdgeVec(dgl_id_t vid) const override {
+    LOG(FATAL) << "COO graph does not support efficient OutEdgeVec."
+      << " Please use CSR graph or AdjList graph instead.";
+    return DGLIdIters(nullptr, nullptr);
+  }
+
+  DGLIdIters PredVec(dgl_id_t vid) const override {
+    LOG(FATAL) << "COO graph does not support efficient PredVec."
+      << " Please use CSR graph or AdjList graph instead.";
+    return DGLIdIters(nullptr, nullptr);
+  }
+
+  DGLIdIters InEdgeVec(dgl_id_t vid) const override {
+    LOG(FATAL) << "COO graph does not support efficient InEdgeVec."
+      << " Please use CSR graph or AdjList graph instead.";
+    return DGLIdIters(nullptr, nullptr);
+  }
+
+  GraphInterface *Reset() override;
+
+  std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override;
+
+  COOPtr Transpose() const;
+
+  CSRPtr ToCSR() const;
 
  private:
-#ifndef _WIN32
-  std::shared_ptr<runtime::SharedMemory> mem;
-#endif  // _WIN32
+  const int64_t num_vertices_;
+  IdArray src_, dst_;
 };
 
 /*!
@@ -188,45 +362,10 @@ class CSR : public GraphInterface {
  */
 class ImmutableGraph: public GraphInterface {
  public:
-  /*
-  typedef struct {
-    IdArray indptr, indices, id;
-  } CSRArray;
-
-  struct Edge {
-    dgl_id_t end_points[2];
-    dgl_id_t edge_id;
-  };
-
-  // Edge list indexed by edge id;
-  struct EdgeList {
-    typedef std::shared_ptr<EdgeList> Ptr;
-    std::vector<dgl_id_t> src_points;
-    std::vector<dgl_id_t> dst_points;
-
-    EdgeList(int64_t len, dgl_id_t val) {
-      src_points.resize(len, val);
-      dst_points.resize(len, val);
-    }
-
-    void register_edge(dgl_id_t eid, dgl_id_t src, dgl_id_t dst) {
-      CHECK_LT(eid, src_points.size()) << "Invalid edge id " << eid;
-      src_points[eid] = src;
-      dst_points[eid] = dst;
-    }
-
-    static EdgeList::Ptr FromCSR(
-        const CSR::vector<int64_t>& indptr,
-        const CSR::vector<dgl_id_t>& indices,
-        const CSR::vector<dgl_id_t>& edge_ids,
-        bool in_csr);
-  };
-  */
-
   /*! \brief Construct an immutable graph from the COO format. */
-  ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
-                 bool multigraph = false);
-
+  ImmutableGraph(COOPtr coo, bool multigraph = false)
+    : coo_(coo), is_multigraph_(multigraph) {
+  }
   /*!
    * \brief Construct an immutable graph from the CSR format.
    *
@@ -240,12 +379,9 @@ class ImmutableGraph: public GraphInterface {
    * construct one of the CSRs that runs fast for some operations we expect and construct
    * the other CSR on demand.
    */
-  ImmutableGraph(CSR::Ptr in_csr, CSR::Ptr out_csr,
-                 bool multigraph = false) : is_multigraph_(multigraph) {
-    this->in_csr_ = in_csr;
-    this->out_csr_ = out_csr;
-    CHECK(this->in_csr_ != nullptr || this->out_csr_ != nullptr)
-                   << "there must exist one of the CSRs";
+  ImmutableGraph(CSRPtr in_csr, CSRPtr out_csr, bool multigraph = false)
+    : in_csr_(in_csr), out_csr_(out_csr), is_multigraph_(multigraph) {
+    CHECK(in_csr_ || out_csr_) << "Both CSR are missing.";
   }
 
   /*! \brief default copy constructor */
@@ -273,37 +409,18 @@ class ImmutableGraph: public GraphInterface {
   /*! \brief default destructor */
   ~ImmutableGraph() = default;
 
-  /*!
-   * \brief Add vertices to the graph.
-   * \note Since vertices are integers enumerated from zero, only the number of
-   *       vertices to be added needs to be specified.
-   * \param num_vertices The number of vertices to be added.
-   */
   void AddVertices(uint64_t num_vertices) override {
     LOG(FATAL) << "AddVertices isn't supported in ImmutableGraph";
   }
 
-  /*!
-   * \brief Add one edge to the graph.
-   * \param src The source vertex.
-   * \param dst The destination vertex.
-   */
   void AddEdge(dgl_id_t src, dgl_id_t dst) override {
     LOG(FATAL) << "AddEdge isn't supported in ImmutableGraph";
   }
 
-  /*!
-   * \brief Add edges to the graph.
-   * \param src_ids The source vertex id array.
-   * \param dst_ids The destination vertex id array.
-   */
   void AddEdges(IdArray src_ids, IdArray dst_ids) override {
     LOG(FATAL) << "AddEdges isn't supported in ImmutableGraph";
   }
 
-  /*!
-   * \brief Clear the graph. Remove all vertices/edges.
-   */
   void Clear() override {
     LOG(FATAL) << "Clear isn't supported in ImmutableGraph";
   }
@@ -324,22 +441,14 @@ class ImmutableGraph: public GraphInterface {
   }
 
   /*! \return the number of vertices in the graph.*/
-  uint64_t NumVertices() const override;
-  /*{
-    if (in_csr_)
-      return in_csr_->NumVertices();
-    else
-      return out_csr_->NumVertices();
-  }*/
+  uint64_t NumVertices() const override {
+    return AnyGraph()->NumVertices();
+  }
 
   /*! \return the number of edges in the graph.*/
-  uint64_t NumEdges() const override;
-  /*{
-    if (in_csr_)
-      return in_csr_->NumEdges();
-    else
-      return out_csr_->NumEdges();
-  }*/
+  uint64_t NumEdges() const override {
+    return AnyGraph()->NumEdges();
+  }
 
   /*! \return true if the given vertex is in the graph.*/
   bool HasVertex(dgl_id_t vid) const override {
@@ -412,20 +521,18 @@ class ImmutableGraph: public GraphInterface {
    * \param vid The vertex id.
    * \return the edges
    */
-  EdgeArray InEdges(dgl_id_t vid) const override;
-  /*{
-    return this->GetInCSR()->GetEdges(vid);
-  }*/
+  EdgeArray InEdges(dgl_id_t vid) const override {
+    return GetInCSR()->OutEdges(vid);
+  }
 
   /*!
    * \brief Get the in edges of the vertices.
    * \param vids The vertex id array.
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray InEdges(IdArray vids) const override;
-  /*{
-    return this->GetInCSR()->GetEdges(vids);
-  }*/
+  EdgeArray InEdges(IdArray vids) const override {
+    return GetInCSR()->OutEdges(vids);
+  }
 
   /*!
    * \brief Get the out edges of the vertex.
@@ -433,23 +540,18 @@ class ImmutableGraph: public GraphInterface {
    * \param vid The vertex id.
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray OutEdges(dgl_id_t vid) const override;
-  /*{
-    auto ret = this->GetOutCSR()->GetEdges(vid);
-    // We should reverse the source and destination in the edge array.
-    return ImmutableGraph::EdgeArray{ret.dst, ret.src, ret.id};
-  }*/
+  EdgeArray OutEdges(dgl_id_t vid) const override {
+    return GetOutCSR()->OutEdges(vid);
+  }
 
   /*!
    * \brief Get the out edges of the vertices.
    * \param vids The vertex id array.
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray OutEdges(IdArray vids) const override;
-  /*{
-    auto ret = this->GetOutCSR()->GetEdges(vids);
-    return ImmutableGraph::EdgeArray{ret.dst, ret.src, ret.id};
-  }*/
+  EdgeArray OutEdges(IdArray vids) const override {
+    return GetOutCSR()->OutEdges(vids);
+  }
 
   /*!
    * \brief Get all the edges in the graph.
@@ -458,49 +560,45 @@ class ImmutableGraph: public GraphInterface {
    * \param sorted Whether the returned edge list is sorted by their src and dst ids
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray Edges(const std::string &order = "") const override;
+  EdgeArray Edges(const std::string &order = "") const override {
+    return GetCOO()->Edges(order);
+  }
 
   /*!
    * \brief Get the in degree of the given vertex.
    * \param vid The vertex id.
    * \return the in degree
    */
-  uint64_t InDegree(dgl_id_t vid) const override;
-  /*{
-    CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
-    return this->GetInCSR()->GetDegree(vid);
-  }*/
+  uint64_t InDegree(dgl_id_t vid) const override {
+    return GetInCSR()->OutDegree(vid);
+  }
 
   /*!
    * \brief Get the in degrees of the given vertices.
    * \param vid The vertex id array.
    * \return the in degree array
    */
-  DegreeArray InDegrees(IdArray vids) const override;
-  /*{
-    return this->GetInCSR()->GetDegrees(vids);
-  }*/
+  DegreeArray InDegrees(IdArray vids) const override {
+    return GetInCSR()->OutDegrees(vids);
+  }
 
   /*!
    * \brief Get the out degree of the given vertex.
    * \param vid The vertex id.
    * \return the out degree
    */
-  uint64_t OutDegree(dgl_id_t vid) const override;
-  /*{
-    CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
-    return this->GetOutCSR()->GetDegree(vid);
-  }*/
+  uint64_t OutDegree(dgl_id_t vid) const override {
+    return GetOutCSR()->OutDegree(vid);
+  }
 
   /*!
    * \brief Get the out degrees of the given vertices.
    * \param vid The vertex id array.
    * \return the out degree array
    */
-  DegreeArray OutDegrees(IdArray vids) const override;
-  /*{
-    return this->GetOutCSR()->GetDegrees(vids);
-  }*/
+  DegreeArray OutDegrees(IdArray vids) const override {
+    return GetOutCSR()->OutDegrees(vids);
+  }
 
   /*!
    * \brief Construct the induced subgraph of the given vertices.
@@ -545,60 +643,55 @@ class ImmutableGraph: public GraphInterface {
    *
    * \return the reversed graph
    */
-  GraphPtr Reverse() const override;
-  /*{
-    return GraphPtr(new ImmutableGraph(out_csr_, in_csr_, is_multigraph_));
-  }*/
+  GraphPtr Reverse() const override {
+    if (coo_) {
+      return GraphPtr(new ImmutableGraph(out_csr_, in_csr_, coo_->Transpose(), is_multigraph_));
+    } else {
+      return GraphPtr(new ImmutableGraph(out_csr_, in_csr_, is_multigraph_));
+    }
+  }
 
   /*!
    * \brief Return the successor vector
    * \param vid The vertex id.
    * \return the successor vector
    */
-  DGLIdIters SuccVec(dgl_id_t vid) const override;
-  /*{
-    return DGLIdIters(out_csr_->indices.begin() + out_csr_->indptr[vid],
-                      out_csr_->indices.begin() + out_csr_->indptr[vid + 1]);
-  }*/
+  DGLIdIters SuccVec(dgl_id_t vid) const override {
+    return GetOutCSR()->SuccVec(vid);
+  }
 
   /*!
    * \brief Return the out edge id vector
    * \param vid The vertex id.
    * \return the out edge id vector
    */
-  DGLIdIters OutEdgeVec(dgl_id_t vid) const override;
-  /*{
-    return DGLIdIters(out_csr_->edge_ids.begin() + out_csr_->indptr[vid],
-                      out_csr_->edge_ids.begin() + out_csr_->indptr[vid + 1]);
-  }*/
+  DGLIdIters OutEdgeVec(dgl_id_t vid) const override {
+    return GetOutCSR()->OutEdgeVec(vid);
+  }
 
   /*!
    * \brief Return the predecessor vector
    * \param vid The vertex id.
    * \return the predecessor vector
    */
-  DGLIdIters PredVec(dgl_id_t vid) const override;
-  /*{
-    return DGLIdIters(in_csr_->indices.begin() + in_csr_->indptr[vid],
-                      in_csr_->indices.begin() + in_csr_->indptr[vid + 1]);
-  }*/
+  DGLIdIters PredVec(dgl_id_t vid) const override {
+    return GetInCSR()->SuccVec(vid);
+  }
 
   /*!
    * \brief Return the in edge id vector
    * \param vid The vertex id.
    * \return the in edge id vector
    */
-  DGLIdIters InEdgeVec(dgl_id_t vid) const override;
-  /*{
-    return DGLIdIters(in_csr_->edge_ids.begin() + in_csr_->indptr[vid],
-                      in_csr_->edge_ids.begin() + in_csr_->indptr[vid + 1]);
-  }*/
+  DGLIdIters InEdgeVec(dgl_id_t vid) const override {
+    return GetInCSR()->OutEdgeVec(vid);
+  }
 
   /*!
    * \brief Reset the data in the graph and move its data to the returned graph object.
    * \return a raw pointer to the graph object.
    */
-  virtual GraphInterface *Reset() {
+  GraphInterface *Reset() override {
     ImmutableGraph* gptr = new ImmutableGraph();
     *gptr = std::move(*this);
     return gptr;
@@ -613,60 +706,60 @@ class ImmutableGraph: public GraphInterface {
    * \param fmt the format of the returned adjacency matrix.
    * \return a vector of three IdArray.
    */
-  virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const;
+  virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override;
 
   /* !\brief Return in csr. If not exist, transpose the other one.*/
-  CSR::Ptr GetInCSR() const {
-    return in_csr_.Get([&] () {
-        CHECK(out_csr_) << "Both CSR are missing.";
-        return out_csr_->Transpose(); });
+  CSRPtr GetInCSR() const {
+    if (!in_csr_) {
+      CHECK(out_csr_) << "Both CSR are missing.";
+      in_csr_ = out_csr_->Transpose();
+    }
+    return in_csr_;
   }
 
   /* !\brief Return out csr. If not exist, transpose the other one.*/
-  CSR::Ptr GetOutCSR() const {
-    return out_csr_.Get([&] () {
-        CHECK(in_csr_) << "Both CSR are missing.";
-        return in_csr_->Transpose(); });
-  }
-
-  /*
-   * The edge list is required for FindEdge/FindEdges/EdgeSubgraph, if no such function is called, we would not create edge list.
-   * if such function is called the first time, we create a edge list from one of the graph's csr representations,
-   * if we have called such function before, we get the one cached in the structure.
-   */
-  EdgeList::Ptr GetEdgeList() const {
-    if (edge_list_)
-      return edge_list_;
-    if (in_csr_) {
-      const_cast<ImmutableGraph *>(this)->edge_list_ =\
-        EdgeList::FromCSR(in_csr_->indptr, in_csr_->indices, in_csr_->edge_ids, true);
-    } else {
-      CHECK(out_csr_ != nullptr) << "one of the CSRs must exist";
-      const_cast<ImmutableGraph *>(this)->edge_list_ =\
-        EdgeList::FromCSR(out_csr_->indptr, out_csr_->indices, out_csr_->edge_ids, false);
+  CSRPtr GetOutCSR() const {
+    if (!out_csr_) {
+      CHECK(in_csr_) << "Both CSR are missing.";
+      out_csr_ = in_csr_->Transpose();
     }
-    return edge_list_;
+    return out_csr_;
   }
 
-  /*!
-   * \brief Get the CSR array that represents the in-edges.
-   * This method copies data from std::vector to IdArray.
-   * \param start the first row to copy.
-   * \param end the last row to copy (exclusive).
-   * \return the CSR array.
-   */
-  CSRArray GetInCSRArray(size_t start, size_t end) const;
-
-  /*!
-   * \brief Get the CSR array that represents the out-edges.
-   * This method copies data from std::vector to IdArray.
-   * \param start the first row to copy.
-   * \param end the last row to copy (exclusive).
-   * \return the CSR array.
-   */
-  CSRArray GetOutCSRArray(size_t start, size_t end) const;
+  /* !\brief Return coo. If not exist, create from csr.*/
+  COOPtr GetCOO() const {
+    if (!coo_) {
+      if (in_csr_) {
+        coo_ = in_csr_->ToCOO()->Transpose();
+      } else {
+        CHECK(out_csr_) << "Both CSR are missing.";
+        coo_ = out_csr_->ToCOO();
+      }
+    }
+    return coo_;
+  }
 
  protected:
+  /* !\brief internal default constructor */
+  ImmutableGraph() {}
+
+  /* !\brief internal constructor for all the members */
+  ImmutableGraph(CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, bool is_multigraph)
+    : in_csr_(in_csr), out_csr_(out_csr), coo_(coo), is_multigraph_(is_multigraph) {
+    CHECK(AnyGraph()) << "At least one graph structure should exist.";
+  }
+
+  /* !\brief return pointer to any available graph structure */
+  GraphPtr AnyGraph() const {
+    if (in_csr_) {
+      return in_csr_;
+    } else if (out_csr_) {
+      return out_csr_;
+    } else {
+      return coo_;
+    }
+  }
+
   DGLIdIters GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
   DGLIdIters GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
 
@@ -677,19 +770,69 @@ class ImmutableGraph: public GraphInterface {
    */
   void CompactSubgraph(IdArray induced_vertices);
 
-  // Store the in csr
-  mutable LazyPointer<CSR> in_csr_;
-  // Store the out csr
-  mutable LazyPointer<CSR> out_csr_;
+  // Store the in csr (i.e, the reverse csr)
+  mutable CSRPtr in_csr_;
+  // Store the out csr (i.e, the normal csr)
+  mutable CSRPtr out_csr_;
   // Store the edge list indexed by edge id (COO)
-  mutable LazyPointer<COO> coo_;
-  /*!
-   * \brief Whether if this is a multigraph.
-   *
-   * When a multiedge is added, this flag switches to true.
-   */
+  mutable COOPtr coo_;
+  /*! \brief Whether if this is a multigraph. */
   bool is_multigraph_ = false;
 };
+
+
+  /*
+  typedef struct {
+    IdArray indptr, indices, id;
+  } CSRArray;
+
+  struct Edge {
+    dgl_id_t end_points[2];
+    dgl_id_t edge_id;
+  };
+
+  // Edge list indexed by edge id;
+  struct EdgeList {
+    typedef std::shared_ptr<EdgeList> Ptr;
+    std::vector<dgl_id_t> src_points;
+    std::vector<dgl_id_t> dst_points;
+
+    EdgeList(int64_t len, dgl_id_t val) {
+      src_points.resize(len, val);
+      dst_points.resize(len, val);
+    }
+
+    void register_edge(dgl_id_t eid, dgl_id_t src, dgl_id_t dst) {
+      CHECK_LT(eid, src_points.size()) << "Invalid edge id " << eid;
+      src_points[eid] = src;
+      dst_points[eid] = dst;
+    }
+
+    static EdgeList::Ptr FromCSR(
+        const CSR::vector<int64_t>& indptr,
+        const CSR::vector<dgl_id_t>& indices,
+        const CSR::vector<dgl_id_t>& edge_ids,
+        bool in_csr);
+  };
+  */
+
+  /*!
+   * \brief Get the CSR array that represents the in-edges.
+   * This method copies data from std::vector to IdArray.
+   * \param start the first row to copy.
+   * \param end the last row to copy (exclusive).
+   * \return the CSR array.
+   */
+  //CSRArray GetInCSRArray(size_t start, size_t end) const;
+
+  /*!
+   * \brief Get the CSR array that represents the out-edges.
+   * This method copies data from std::vector to IdArray.
+   * \param start the first row to copy.
+   * \param end the last row to copy (exclusive).
+   * \return the CSR array.
+   */
+  //CSRArray GetOutCSRArray(size_t start, size_t end) const;
 
 }  // namespace dgl
 
