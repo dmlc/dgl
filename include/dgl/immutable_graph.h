@@ -12,10 +12,174 @@
 #include <utility>
 #include <tuple>
 #include <algorithm>
-#include "runtime/ndarray.h"
-#include "graph_interface.h"
+#include <dgl/runtime/ndarray.h>
+#include <dgl/graph_interface.h>
+#include <dgl/lazy_pointer.h>
 
 namespace dgl {
+
+class CSR;
+class COO;
+
+class CSR : public GraphInterface {
+ public:
+  typedef std::shared_ptr<CSR> Ptr;
+  // Create a csr graph that has the given number of verts and edges.
+  CSR(int64_t num_vertices, int64_t num_edges);
+  // Create a csr graph that shares the given indptr and indices.
+  CSR(IdArray indptr, IdArray indices, IdArray edge_ids);
+  // Create a csr graph whose memory is stored in the shared memory
+  //   and the structure is given by the indptr and indcies.
+  CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
+      const std::string &shared_mem_name);
+  // Create a csr graph whose memory is stored in the shared memory
+  //   that has the given number of verts and edges.
+  CSR(const std::string &shared_mem_name, size_t num_vertices, size_t num_edges);
+
+  void AddVertices(uint64_t num_vertices) override {
+    LOG(FATAL) << "CSR graph does not allow mutation.";
+  }
+
+  void AddEdge(dgl_id_t src, dgl_id_t dst) override {
+    LOG(FATAL) << "CSR graph does not allow mutation.";
+  }
+
+  void AddEdges(IdArray src_ids, IdArray dst_ids) override {
+    LOG(FATAL) << "CSR graph does not allow mutation.";
+  }
+
+  void Clear() override {
+    LOG(FATAL) << "CSR graph does not allow mutation.";
+  }
+
+  bool IsMultigraph() const override {
+    return false;
+  }
+
+  bool IsReadonly() const override {
+    return true;
+  }
+
+  uint64_t NumVertices() const override {
+    return indptr_->shape[0] - 1;
+  }
+
+  uint64_t NumEdges() const override {
+    return indices_->shape[0];
+  }
+
+  bool HasVertex(dgl_id_t vid) const override {
+    return vid < NumVertices() && vid >= 0;
+  }
+
+  bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const override;
+
+  BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const override;
+
+  IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const override {
+    LOG(FATAL) << "CSR graph does not support efficient predecessor query."
+      << " Please use successors on the reverse CSR graph.";
+    return {};
+  }
+
+  IdArray Successors(dgl_id_t vid, uint64_t radius = 1) const override;
+
+  IdArray EdgeId(dgl_id_t src, dgl_id_t dst) const override;
+
+  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const override;
+
+  EdgeArray FindEdges(IdArray eids) const override;
+
+  EdgeArray InEdges(dgl_id_t vid) const override {
+    LOG(FATAL) << "CSR graph does not support efficient inedges query."
+      << " Please use outedges on the reverse CSR graph.";
+    return {};
+  }
+
+  EdgeArray InEdges(IdArray vids) const override {
+    LOG(FATAL) << "CSR graph does not support efficient inedges query."
+      << " Please use outedges on the reverse CSR graph.";
+    return {};
+  }
+
+  EdgeArray OutEdges(dgl_id_t vid) const override;
+
+  EdgeArray OutEdges(IdArray vids) const override;
+
+  EdgeArray Edges(const std::string &order = "") const override {
+    LOG(FATAL) << "CSR graph does not support efficient edges query.";
+    return {};
+  }
+
+  uint64_t InDegree(dgl_id_t vid) const override {
+    LOG(FATAL) << "CSR graph does not support efficient indegree query."
+      << " Please use outdegree on the reverse CSR graph.";
+    return 0;
+  }
+
+  DegreeArray InDegrees(IdArray vids) const override {
+    LOG(FATAL) << "CSR graph does not support efficient indegree query."
+      << " Please use outdegree on the reverse CSR graph.";
+    return {};
+  }
+
+  uint64_t OutDegree(dgl_id_t vid) const override {
+    const int64_t* indptr_data = static_cast<int64_t*>(indptr_->data);
+    return indptr_data[vid + 1] - indptr_data[vid];
+  }
+
+  DegreeArray OutDegrees(IdArray vids) const override;
+
+  Subgraph VertexSubgraph(IdArray vids) const override;
+
+  Subgraph EdgeSubgraph(IdArray eids) const override;
+
+  GraphPtr Reverse() const override;
+
+  DGLIdIters SuccVec(dgl_id_t vid) const override {
+    const int64_t* indptr_data = static_cast<int64_t*>(indptr_->data);
+    const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
+    const int64_t start = indptr_data[vid];
+    const int64_t end = indptr_data[vid + 1];
+    return DGLIdIters(indices_data + start, indices_data + end);
+  }
+
+  DGLIdIters OutEdgeVec(dgl_id_t vid) const override {
+    const int64_t* indptr_data = static_cast<int64_t*>(indptr_->data);
+    const dgl_id_t* eid_data = static_cast<dgl_id_t*>(edge_ids_->data);
+    const int64_t start = indptr_data[vid];
+    const int64_t end = indptr_data[vid + 1];
+    return DGLIdIters(eid_data + start, eid_data + end);
+  }
+
+  DGLIdIters PredVec(dgl_id_t vid) const override {
+    LOG(FATAL) << "CSR graph does not support efficient PredVec."
+      << " Please use SuccVec on the reverse CSR graph.";
+    return DGLIdIters(nullptr, nullptr);
+  }
+
+  DGLIdIters InEdgeVec(dgl_id_t vid) const override {
+    LOG(FATAL) << "CSR graph does not support efficient InEdgeVec."
+      << " Please use OutEdgeVec on the reverse CSR graph.";
+    return DGLIdIters(nullptr, nullptr);
+  }
+
+  GraphInterface *Reset() override;
+
+  std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override;
+
+  CSR::Ptr Transpose() const;
+
+  COO::Ptr ToCOO() const;
+
+ private:
+  IdArray indptr_, indices_, edge_ids_;
+
+ private:
+#ifndef _WIN32
+  std::shared_ptr<runtime::SharedMemory> mem;
+#endif  // _WIN32
+};
 
 /*!
  * \brief DGL immutable graph index class.
@@ -24,6 +188,7 @@ namespace dgl {
  */
 class ImmutableGraph: public GraphInterface {
  public:
+  /*
   typedef struct {
     IdArray indptr, indices, id;
   } CSRArray;
@@ -31,273 +196,6 @@ class ImmutableGraph: public GraphInterface {
   struct Edge {
     dgl_id_t end_points[2];
     dgl_id_t edge_id;
-  };
-
-  struct EdgeList;
-
-  struct CSR {
-    typedef std::shared_ptr<CSR> Ptr;
-
-    /*
-     * This vector provides interfaces similar to std::vector.
-     * The main difference is that the memory used by the vector can be allocated
-     * outside the vector. The main use case is that the vector can use the shared
-     * memory that is created by another process. In this way, we can access the
-     * graph structure loaded in another process.
-     */
-    template<class T>
-    class vector {
-     public:
-      vector() {
-        this->arr = nullptr;
-        this->capacity = 0;
-        this->curr = 0;
-        this->own = false;
-      }
-
-      /*
-       * Create a vector whose memory is allocated outside.
-       * Here there are no elements in the vector.
-       */
-      vector(T *arr, size_t size) {
-        this->arr = arr;
-        this->capacity = size;
-        this->curr = 0;
-        this->own = false;
-      }
-
-      /*
-       * Create a vector whose memory is allocated by the vector.
-       * Here there are no elements in the vector.
-       */
-      explicit vector(size_t size) {
-        this->arr = static_cast<T *>(malloc(size * sizeof(T)));
-        this->capacity = size;
-        this->curr = 0;
-        this->own = true;
-      }
-
-      ~vector() {
-        // If the memory is allocated by the vector, it should be free'd.
-        if (this->own) {
-          free(this->arr);
-        }
-      }
-
-      vector(const vector &other) = delete;
-
-      /*
-       * Initialize the vector whose memory is allocated outside.
-       * There are no elements in the vector.
-       */
-      void init(T *arr, size_t size) {
-        CHECK(this->arr == nullptr);
-        this->arr = arr;
-        this->capacity = size;
-        this->curr = 0;
-        this->own = false;
-      }
-
-      /*
-       * Initialize the vector whose memory is allocated outside.
-       * There are elements in the vector.
-       */
-      void init(T *arr, size_t capacity, size_t size) {
-        CHECK(this->arr == nullptr);
-        CHECK_LE(size, capacity);
-        this->arr = arr;
-        this->capacity = capacity;
-        this->curr = size;
-        this->own = false;
-      }
-
-      /* Similar to std::vector::push_back. */
-      void push_back(T val) {
-        // If the vector doesn't own the memory, it can't adjust its memory size.
-        if (!this->own) {
-          CHECK_LT(curr, capacity);
-        } else if (curr == capacity) {
-          this->capacity = this->capacity * 2;
-          this->arr = static_cast<T *>(realloc(this->arr, this->capacity * sizeof(T)));
-          CHECK(this->arr) << "can't allocate memory for a larger vector.";
-        }
-        this->arr[curr++] = val;
-      }
-
-      /*
-       * This inserts multiple elements to the back of the vector.
-       */
-      void insert_back(const T* val, size_t len) {
-        if (!this->own) {
-          CHECK_LE(curr + len, capacity);
-        } else if (curr + len > capacity) {
-          this->capacity = curr + len;
-          this->arr = static_cast<T *>(realloc(this->arr, this->capacity * sizeof(T)));
-          CHECK(this->arr) << "can't allocate memory for a larger vector.";
-        }
-        std::copy(val, val + len, this->arr + curr);
-        curr += len;
-      }
-
-      /*
-       * Similar to std::vector::[].
-       * It checks the boundary of the vector.
-       */
-      T &operator[](size_t idx) {
-        CHECK_LT(idx, curr);
-        return this->arr[idx];
-      }
-
-      /*
-       * Similar to std::vector::[].
-       * It checks the boundary of the vector.
-       */
-      const T &operator[](size_t idx) const {
-        CHECK_LT(idx, curr);
-        return this->arr[idx];
-      }
-
-      /* Similar to std::vector::size. */
-      size_t size() const {
-        return this->curr;
-      }
-
-      /* Similar to std::vector::resize. */
-      void resize(size_t new_size) {
-        if (!this->own) {
-          CHECK_LE(new_size, capacity);
-        } else if (new_size > capacity) {
-          this->capacity = new_size;
-          this->arr = static_cast<T *>(realloc(this->arr, this->capacity * sizeof(T)));
-          CHECK(this->arr) << "can't allocate memory for a larger vector.";
-        }
-        for (size_t i = this->curr; i < new_size; i++)
-          this->arr[i] = 0;
-        this->curr = new_size;
-      }
-
-      /* Similar to std::vector::clear. */
-      void clear() {
-        this->curr = 0;
-      }
-
-      /* Similar to std::vector::data. */
-      const T *data() const {
-        return this->arr;
-      }
-
-      /* Similar to std::vector::data. */
-      T *data() {
-        return this->arr;
-      }
-
-      /*
-       * This is to simulate begin() of std::vector.
-       * However, it returns the raw pointer instead of iterator.
-       */
-      const T *begin() const {
-        return this->arr;
-      }
-
-      /*
-       * This is to simulate begin() of std::vector.
-       * However, it returns the raw pointer instead of iterator.
-       */
-      T *begin() {
-        return this->arr;
-      }
-
-      /*
-       * This is to simulate end() of std::vector.
-       * However, it returns the raw pointer instead of iterator.
-       */
-      const T *end() const {
-        return this->arr + this->curr;
-      }
-
-      /*
-       * This is to simulate end() of std::vector.
-       * However, it returns the raw pointer instead of iterator.
-       */
-      T *end() {
-        return this->arr + this->curr;
-      }
-
-     private:
-      /*
-       * \brief the raw array that contains elements of type T.
-       *
-       * The vector may or may not own the memory of the raw array.
-       */
-      T *arr;
-      /* \brief the memory size of the raw array. */
-      size_t capacity;
-      /* \brief the number of elements in the array. */
-      size_t curr;
-      /* \brief whether the vector owns the memory. */
-      bool own;
-    };
-
-    vector<int64_t> indptr;
-    vector<dgl_id_t> indices;
-    vector<dgl_id_t> edge_ids;
-
-    CSR(int64_t num_vertices, int64_t expected_num_edges);
-    CSR(IdArray indptr, IdArray indices, IdArray edge_ids);
-    CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
-        const std::string &shared_mem_name);
-    CSR(const std::string &shared_mem_name, size_t num_vertices, size_t num_edges);
-
-    bool HasVertex(dgl_id_t vid) const {
-      return vid < NumVertices();
-    }
-
-    uint64_t NumVertices() const {
-      return indptr.size() - 1;
-    }
-
-    uint64_t NumEdges() const {
-      return indices.size();
-    }
-
-    /* This gets the sum of vertex degrees in the range. */
-    uint64_t GetDegree(dgl_id_t start, dgl_id_t end) const {
-      return indptr[end] - indptr[start];
-    }
-
-    uint64_t GetDegree(dgl_id_t vid) const {
-      return indptr[vid + 1] - indptr[vid];
-    }
-    DegreeArray GetDegrees(IdArray vids) const;
-    EdgeArray GetEdges(dgl_id_t vid) const;
-    EdgeArray GetEdges(IdArray vids) const;
-    /* \brief this returns the start and end position of the column indices corresponding v. */
-    DGLIdIters GetIndexRef(dgl_id_t v) const {
-      const int64_t start = indptr[v];
-      const int64_t end = indptr[v + 1];
-      return DGLIdIters(indices.begin() + start, indices.begin() + end);
-    }
-    /*
-     * Read all edges and store them in the vector.
-     */
-    void ReadAllEdges(std::vector<Edge> *edges) const;
-    CSR::Ptr Transpose() const;
-    std::pair<CSR::Ptr, IdArray> VertexSubgraph(IdArray vids) const;
-    std::pair<CSR::Ptr, IdArray> EdgeSubgraph(IdArray eids,
-                                              std::shared_ptr<EdgeList> edge_list) const;
-    /*
-     * Construct a CSR from a list of edges.
-     *
-     * When constructing a CSR, we need to sort the edge list. To reduce the overhead,
-     * we simply sort on the input edge list. We allow sorting on both end points of an edge,
-     * which is specified by `sort_on`.
-     */
-    static CSR::Ptr FromEdges(std::vector<Edge> *edges, int sort_on, uint64_t num_nodes);
-
-   private:
-#ifndef _WIN32
-    std::shared_ptr<runtime::SharedMemory> mem;
-#endif  // _WIN32
   };
 
   // Edge list indexed by edge id;
@@ -323,6 +221,7 @@ class ImmutableGraph: public GraphInterface {
         const CSR::vector<dgl_id_t>& edge_ids,
         bool in_csr);
   };
+  */
 
   /*! \brief Construct an immutable graph from the COO format. */
   ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
@@ -349,9 +248,6 @@ class ImmutableGraph: public GraphInterface {
                    << "there must exist one of the CSRs";
   }
 
-  /*! \brief default constructor */
-  explicit ImmutableGraph(bool multigraph = false) : is_multigraph_(multigraph) {}
-
   /*! \brief default copy constructor */
   ImmutableGraph(const ImmutableGraph& other) = default;
 
@@ -362,9 +258,12 @@ class ImmutableGraph: public GraphInterface {
   ImmutableGraph(ImmutableGraph&& other) {
     this->in_csr_ = other.in_csr_;
     this->out_csr_ = other.out_csr_;
+    this->coo_ = other.coo_;
     this->is_multigraph_ = other.is_multigraph_;
     other.in_csr_ = nullptr;
     other.out_csr_ = nullptr;
+    other.coo_ = nullptr;
+    other->is_multigraph_ = false;
   }
 #endif  // _MSC_VER
 
@@ -380,7 +279,7 @@ class ImmutableGraph: public GraphInterface {
    *       vertices to be added needs to be specified.
    * \param num_vertices The number of vertices to be added.
    */
-  void AddVertices(uint64_t num_vertices) {
+  void AddVertices(uint64_t num_vertices) override {
     LOG(FATAL) << "AddVertices isn't supported in ImmutableGraph";
   }
 
@@ -389,7 +288,7 @@ class ImmutableGraph: public GraphInterface {
    * \param src The source vertex.
    * \param dst The destination vertex.
    */
-  void AddEdge(dgl_id_t src, dgl_id_t dst) {
+  void AddEdge(dgl_id_t src, dgl_id_t dst) override {
     LOG(FATAL) << "AddEdge isn't supported in ImmutableGraph";
   }
 
@@ -398,14 +297,14 @@ class ImmutableGraph: public GraphInterface {
    * \param src_ids The source vertex id array.
    * \param dst_ids The destination vertex id array.
    */
-  void AddEdges(IdArray src_ids, IdArray dst_ids) {
+  void AddEdges(IdArray src_ids, IdArray dst_ids) override {
     LOG(FATAL) << "AddEdges isn't supported in ImmutableGraph";
   }
 
   /*!
    * \brief Clear the graph. Remove all vertices/edges.
    */
-  void Clear() {
+  void Clear() override {
     LOG(FATAL) << "Clear isn't supported in ImmutableGraph";
   }
 
@@ -413,46 +312,48 @@ class ImmutableGraph: public GraphInterface {
    * \note not const since we have caches
    * \return whether the graph is a multigraph
    */
-  bool IsMultigraph() const {
+  bool IsMultigraph() const override {
     return is_multigraph_;
   }
 
   /*!
    * \return whether the graph is read-only
    */
-  virtual bool IsReadonly() const {
+  virtual bool IsReadonly() const override {
     return true;
   }
 
   /*! \return the number of vertices in the graph.*/
-  uint64_t NumVertices() const {
+  uint64_t NumVertices() const override;
+  /*{
     if (in_csr_)
       return in_csr_->NumVertices();
     else
       return out_csr_->NumVertices();
-  }
+  }*/
 
   /*! \return the number of edges in the graph.*/
-  uint64_t NumEdges() const {
+  uint64_t NumEdges() const override;
+  /*{
     if (in_csr_)
       return in_csr_->NumEdges();
     else
       return out_csr_->NumEdges();
-  }
+  }*/
 
   /*! \return true if the given vertex is in the graph.*/
-  bool HasVertex(dgl_id_t vid) const {
+  bool HasVertex(dgl_id_t vid) const override {
     return vid < NumVertices();
   }
 
   /*! \return a 0-1 array indicating whether the given vertices are in the graph.*/
-  BoolArray HasVertices(IdArray vids) const;
+  BoolArray HasVertices(IdArray vids) const override;
 
   /*! \return true if the given edge is in the graph.*/
-  bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const;
+  bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const override;
 
   /*! \return a 0-1 array indicating whether the given edges are in the graph.*/
-  BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const;
+  BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const override;
 
   /*!
    * \brief Find the predecessors of a vertex.
@@ -460,7 +361,7 @@ class ImmutableGraph: public GraphInterface {
    * \param radius The radius of the neighborhood. Default is immediate neighbor (radius=1).
    * \return the predecessor id array.
    */
-  IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const;
+  IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const override;
 
   /*!
    * \brief Find the successors of a vertex.
@@ -468,7 +369,7 @@ class ImmutableGraph: public GraphInterface {
    * \param radius The radius of the neighborhood. Default is immediate neighbor (radius=1).
    * \return the successor id array.
    */
-  IdArray Successors(dgl_id_t vid, uint64_t radius = 1) const;
+  IdArray Successors(dgl_id_t vid, uint64_t radius = 1) const override;
 
   /*!
    * \brief Get all edge ids between the two given endpoints
@@ -478,7 +379,7 @@ class ImmutableGraph: public GraphInterface {
    * \param dst The destination vertex.
    * \return the edge id array.
    */
-  IdArray EdgeId(dgl_id_t src, dgl_id_t dst) const;
+  IdArray EdgeId(dgl_id_t src, dgl_id_t dst) const override;
 
   /*!
    * \brief Get all edge ids between the given endpoint pairs.
@@ -489,21 +390,21 @@ class ImmutableGraph: public GraphInterface {
    *       first, and ties are broken by the order of edge ID.
    * \return EdgeArray containing all edges between all pairs.
    */
-  EdgeArray EdgeIds(IdArray src, IdArray dst) const;
+  EdgeArray EdgeIds(IdArray src, IdArray dst) const override;
 
   /*!
    * \brief Find the edge ID and return the pair of endpoints
    * \param eid The edge ID
    * \return a pair whose first element is the source and the second the destination.
    */
-  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const;
+  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const override;
 
   /*!
    * \brief Find the edge IDs and return their source and target node IDs.
    * \param eids The edge ID array.
    * \return EdgeArray containing all edges with id in eid.  The order is preserved.
    */
-  EdgeArray FindEdges(IdArray eids) const;
+  EdgeArray FindEdges(IdArray eids) const override;
 
   /*!
    * \brief Get the in edges of the vertex.
@@ -511,18 +412,20 @@ class ImmutableGraph: public GraphInterface {
    * \param vid The vertex id.
    * \return the edges
    */
-  EdgeArray InEdges(dgl_id_t vid) const {
+  EdgeArray InEdges(dgl_id_t vid) const override;
+  /*{
     return this->GetInCSR()->GetEdges(vid);
-  }
+  }*/
 
   /*!
    * \brief Get the in edges of the vertices.
    * \param vids The vertex id array.
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray InEdges(IdArray vids) const {
+  EdgeArray InEdges(IdArray vids) const override;
+  /*{
     return this->GetInCSR()->GetEdges(vids);
-  }
+  }*/
 
   /*!
    * \brief Get the out edges of the vertex.
@@ -530,21 +433,23 @@ class ImmutableGraph: public GraphInterface {
    * \param vid The vertex id.
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray OutEdges(dgl_id_t vid) const {
+  EdgeArray OutEdges(dgl_id_t vid) const override;
+  /*{
     auto ret = this->GetOutCSR()->GetEdges(vid);
     // We should reverse the source and destination in the edge array.
     return ImmutableGraph::EdgeArray{ret.dst, ret.src, ret.id};
-  }
+  }*/
 
   /*!
    * \brief Get the out edges of the vertices.
    * \param vids The vertex id array.
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray OutEdges(IdArray vids) const {
+  EdgeArray OutEdges(IdArray vids) const override;
+  /*{
     auto ret = this->GetOutCSR()->GetEdges(vids);
     return ImmutableGraph::EdgeArray{ret.dst, ret.src, ret.id};
-  }
+  }*/
 
   /*!
    * \brief Get all the edges in the graph.
@@ -553,45 +458,49 @@ class ImmutableGraph: public GraphInterface {
    * \param sorted Whether the returned edge list is sorted by their src and dst ids
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray Edges(const std::string &order = "") const;
+  EdgeArray Edges(const std::string &order = "") const override;
 
   /*!
    * \brief Get the in degree of the given vertex.
    * \param vid The vertex id.
    * \return the in degree
    */
-  uint64_t InDegree(dgl_id_t vid) const {
+  uint64_t InDegree(dgl_id_t vid) const override;
+  /*{
     CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
     return this->GetInCSR()->GetDegree(vid);
-  }
+  }*/
 
   /*!
    * \brief Get the in degrees of the given vertices.
    * \param vid The vertex id array.
    * \return the in degree array
    */
-  DegreeArray InDegrees(IdArray vids) const {
+  DegreeArray InDegrees(IdArray vids) const override;
+  /*{
     return this->GetInCSR()->GetDegrees(vids);
-  }
+  }*/
 
   /*!
    * \brief Get the out degree of the given vertex.
    * \param vid The vertex id.
    * \return the out degree
    */
-  uint64_t OutDegree(dgl_id_t vid) const {
+  uint64_t OutDegree(dgl_id_t vid) const override;
+  /*{
     CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
     return this->GetOutCSR()->GetDegree(vid);
-  }
+  }*/
 
   /*!
    * \brief Get the out degrees of the given vertices.
    * \param vid The vertex id array.
    * \return the out degree array
    */
-  DegreeArray OutDegrees(IdArray vids) const {
+  DegreeArray OutDegrees(IdArray vids) const override;
+  /*{
     return this->GetOutCSR()->GetDegrees(vids);
-  }
+  }*/
 
   /*!
    * \brief Construct the induced subgraph of the given vertices.
@@ -609,7 +518,7 @@ class ImmutableGraph: public GraphInterface {
    * \param vids The vertices in the subgraph.
    * \return the induced subgraph
    */
-  Subgraph VertexSubgraph(IdArray vids) const;
+  Subgraph VertexSubgraph(IdArray vids) const override;
 
   /*!
    * \brief Construct the induced edge subgraph of the given edges.
@@ -627,7 +536,7 @@ class ImmutableGraph: public GraphInterface {
    * \param eids The edges in the subgraph.
    * \return the induced edge subgraph
    */
-  Subgraph EdgeSubgraph(IdArray eids) const;
+  Subgraph EdgeSubgraph(IdArray eids) const override;
 
   /*!
    * \brief Return a new graph with all the edges reversed.
@@ -636,49 +545,54 @@ class ImmutableGraph: public GraphInterface {
    *
    * \return the reversed graph
    */
-  GraphPtr Reverse() const {
+  GraphPtr Reverse() const override;
+  /*{
     return GraphPtr(new ImmutableGraph(out_csr_, in_csr_, is_multigraph_));
-  }
+  }*/
 
   /*!
    * \brief Return the successor vector
    * \param vid The vertex id.
    * \return the successor vector
    */
-  DGLIdIters SuccVec(dgl_id_t vid) const {
+  DGLIdIters SuccVec(dgl_id_t vid) const override;
+  /*{
     return DGLIdIters(out_csr_->indices.begin() + out_csr_->indptr[vid],
                       out_csr_->indices.begin() + out_csr_->indptr[vid + 1]);
-  }
+  }*/
 
   /*!
    * \brief Return the out edge id vector
    * \param vid The vertex id.
    * \return the out edge id vector
    */
-  DGLIdIters OutEdgeVec(dgl_id_t vid) const {
+  DGLIdIters OutEdgeVec(dgl_id_t vid) const override;
+  /*{
     return DGLIdIters(out_csr_->edge_ids.begin() + out_csr_->indptr[vid],
                       out_csr_->edge_ids.begin() + out_csr_->indptr[vid + 1]);
-  }
+  }*/
 
   /*!
    * \brief Return the predecessor vector
    * \param vid The vertex id.
    * \return the predecessor vector
    */
-  DGLIdIters PredVec(dgl_id_t vid) const {
+  DGLIdIters PredVec(dgl_id_t vid) const override;
+  /*{
     return DGLIdIters(in_csr_->indices.begin() + in_csr_->indptr[vid],
                       in_csr_->indices.begin() + in_csr_->indptr[vid + 1]);
-  }
+  }*/
 
   /*!
    * \brief Return the in edge id vector
    * \param vid The vertex id.
    * \return the in edge id vector
    */
-  DGLIdIters InEdgeVec(dgl_id_t vid) const {
+  DGLIdIters InEdgeVec(dgl_id_t vid) const override;
+  /*{
     return DGLIdIters(in_csr_->edge_ids.begin() + in_csr_->indptr[vid],
                       in_csr_->edge_ids.begin() + in_csr_->indptr[vid + 1]);
-  }
+  }*/
 
   /*!
    * \brief Reset the data in the graph and move its data to the returned graph object.
@@ -701,28 +615,18 @@ class ImmutableGraph: public GraphInterface {
    */
   virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const;
 
-  /*
-   * The immutable graph may only contain one of the CSRs (e.g., the sampled subgraphs).
-   * When we get in csr or out csr, we try to get the one cached in the structure.
-   * If not, we transpose the other one to get the one we need.
-   */
+  /* !\brief Return in csr. If not exist, transpose the other one.*/
   CSR::Ptr GetInCSR() const {
-    if (in_csr_) {
-      return in_csr_;
-    } else {
-      CHECK(out_csr_ != nullptr) << "one of the CSRs must exist";
-      const_cast<ImmutableGraph *>(this)->in_csr_ = out_csr_->Transpose();
-      return in_csr_;
-    }
+    return in_csr_.Get([&] () {
+        CHECK(out_csr_) << "Both CSR are missing.";
+        return out_csr_->Transpose(); });
   }
+
+  /* !\brief Return out csr. If not exist, transpose the other one.*/
   CSR::Ptr GetOutCSR() const {
-    if (out_csr_) {
-      return out_csr_;
-    } else {
-      CHECK(in_csr_ != nullptr) << "one of the CSRs must exist";
-      const_cast<ImmutableGraph *>(this)->out_csr_ = in_csr_->Transpose();
-      return out_csr_;
-    }
+    return out_csr_.Get([&] () {
+        CHECK(in_csr_) << "Both CSR are missing.";
+        return in_csr_->Transpose(); });
   }
 
   /*
@@ -773,12 +677,12 @@ class ImmutableGraph: public GraphInterface {
    */
   void CompactSubgraph(IdArray induced_vertices);
 
-  // Store the in-edges.
-  CSR::Ptr in_csr_;
-  // Store the out-edges.
-  CSR::Ptr out_csr_;
-  // Store the edge list indexed by edge id
-  EdgeList::Ptr edge_list_;
+  // Store the in csr
+  mutable LazyPointer<CSR> in_csr_;
+  // Store the out csr
+  mutable LazyPointer<CSR> out_csr_;
+  // Store the edge list indexed by edge id (COO)
+  mutable LazyPointer<COO> coo_;
   /*!
    * \brief Whether if this is a multigraph.
    *
@@ -790,4 +694,3 @@ class ImmutableGraph: public GraphInterface {
 }  // namespace dgl
 
 #endif  // DGL_IMMUTABLE_GRAPH_H_
-
