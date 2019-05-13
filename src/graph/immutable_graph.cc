@@ -273,12 +273,72 @@ Subgraph CSR::EdgeSubgraph(IdArray eids) const {
   // TODO
 }
 
+// complexity: time O(E + V), space O(1)
 CSRPtr CSR::Transpose() const {
-  // TODO
+  // TODO: do we need sort?
+  const int64_t N = NumVertices();
+  const int64_t M = NumEdges();
+  const dgl_id_t* Ap = static_cast<dgl_id_t*>(indptr_->data);
+  const dgl_id_t* Aj = static_cast<dgl_id_t*>(indices_->data);
+  const dgl_id_t* Ax = static_cast<dgl_id_t*>(edge_ids_->data);
+  IdArray ret_indptr = NewIdArray(N + 1);
+  IdArray ret_indices = NewIdArray(M);
+  IdArray ret_edge_ids = NewIdArray(M);
+  dgl_id_t* Bp = static_cast<dgl_id_t*>(ret_indptr->data);
+  dgl_id_t* Bi = static_cast<dgl_id_t*>(ret_indices->data);
+  dgl_id_t* Bx = static_cast<dgl_id_t*>(ret_edge_ids->data);
+
+  std::fill(Bp, Bp + N, 0);
+
+  for (int64_t j = 0; j < M; ++j) {
+    Bp[Aj[j]]++;
+  }
+
+  // cumsum
+  for (int64_t i = 0, cumsum = 0; i < N; ++i) {
+    const dgl_id_t temp = Bp[i];
+    Bp[i] = cumsum;
+    cumsum += temp;
+  }
+  Bp[N] = M;
+
+  for (int64_t i = 0; i < N; ++i) {
+    for (int64_t j = Ap[i]; j < Ap[i+1]; ++j) {
+      const dgl_id_t dst = Aj[j];
+      Bi[Bp[dst]] = i;
+      Bx[Bp[dst]] = Ax[j];
+      Bp[dst]++;
+    }
+  }
+
+  // correct the indptr
+  for (int64_t i = 0, last = 0; i <= N; ++i) {
+    dgl_id_t temp = Bp[i];
+    Bp[i] = last;
+    last = temp;
+  }
+
+  return CSRPtr(new CSR(ret_indptr, ret_indices, ret_edge_ids));
 }
 
+// complexity: time O(E + V), space O(1)
 COOPtr CSR::ToCOO() const {
-  // TODO
+  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
+  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
+  const dgl_id_t* eid_data = static_cast<dgl_id_t*>(edge_ids_->data);
+  IdArray ret_src = NewIdArray(NumEdges());
+  IdArray ret_dst = NewIdArray(NumEdges());
+  dgl_id_t* ret_src_data = static_cast<dgl_id_t*>(ret_src->data);
+  dgl_id_t* ret_dst_data = static_cast<dgl_id_t*>(ret_dst->data);
+  // scatter by edge id
+  for (dgl_id_t src = 0; src < NumVertices(); ++src) {
+    for (dgl_id_t eid = indptr_data[src]; eid < indptr_data[src + 1]; ++eid) {
+      const dgl_id_t dst = indices_data[eid];
+      ret_src_data[eid_data[eid]] = src;
+      ret_dst_data[eid_data[eid]] = dst;
+    }
+  }
+  return COOPtr(new COO(NumVertices(), ret_src, ret_dst));
 }
 
 std::pair<int64_t, int64_t> CSR::GetEdgeRange(dgl_id_t src, dgl_id_t dst) const {
@@ -418,25 +478,6 @@ class HashTableChecker {
   }
 };
 
-ImmutableGraph::EdgeList::Ptr ImmutableGraph::EdgeList::FromCSR(
-    const CSR::vector<int64_t>& indptr,
-    const CSR::vector<dgl_id_t>& indices,
-    const CSR::vector<dgl_id_t>& edge_ids,
-    bool in_csr) {
-  const auto n = indptr.size() - 1;
-  const auto len = edge_ids.size();
-  auto t = std::make_shared<EdgeList>(len, n);
-  for (size_t i = 0; i < indptr.size() - 1; i++) {
-    for (int64_t j = indptr[i]; j < indptr[i + 1]; j++) {
-      dgl_id_t row = i, col = indices[j];
-      if (in_csr)
-        std::swap(row, col);
-      t->register_edge(edge_ids[j], row, col);
-    }
-  }
-  return t;
-}
-
 std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::VertexSubgraph(
     IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
@@ -563,35 +604,6 @@ void ImmutableGraph::CSR::ReadAllEdges(std::vector<Edge> *edges) const {
   }
 }
 
-ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::Transpose() const {
-  std::vector<Edge> edges;
-  ReadAllEdges(&edges);
-  return FromEdges(&edges, 1, NumVertices());
-}
-
-ImmutableGraph::ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
-                               bool multigraph) : is_multigraph_(multigraph) {
-  CHECK(IsValidIdArray(src_ids)) << "Invalid vertex id array.";
-  CHECK(IsValidIdArray(dst_ids)) << "Invalid vertex id array.";
-  CHECK(IsValidIdArray(edge_ids)) << "Invalid vertex id array.";
-  const int64_t len = src_ids->shape[0];
-  CHECK(len == dst_ids->shape[0]);
-  CHECK(len == edge_ids->shape[0]);
-  const dgl_id_t *src_data = static_cast<dgl_id_t*>(src_ids->data);
-  const dgl_id_t *dst_data = static_cast<dgl_id_t*>(dst_ids->data);
-  const dgl_id_t *edge_data = static_cast<dgl_id_t*>(edge_ids->data);
-  std::vector<Edge> edges(len);
-  for (size_t i = 0; i < edges.size(); i++) {
-    Edge e;
-    e.end_points[0] = src_data[i];
-    e.end_points[1] = dst_data[i];
-    e.edge_id = edge_data[i];
-    edges[i] = e;
-  }
-  in_csr_ = CSR::FromEdges(&edges, 1, num_nodes);
-  out_csr_ = CSR::FromEdges(&edges, 0, num_nodes);
-}
-
 ImmutableGraph::EdgeArray ImmutableGraph::Edges(const std::string &order) const {
   if (order.empty()) {
     // arbitrary order
@@ -640,7 +652,7 @@ Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids) const {
   return subg;
 }
 
-ImmutableGraph::CSRArray GetCSRArray(ImmutableGraph::CSR::Ptr csr, size_t start, size_t end) {
+/*ImmutableGraph::CSRArray GetCSRArray(ImmutableGraph::CSR::Ptr csr, size_t start, size_t end) {
   size_t num_rows = end - start;
   size_t nnz = csr->indptr[end] - csr->indptr[start];
   IdArray indptr = IdArray::Empty({static_cast<int64_t>(num_rows + 1)},
@@ -667,30 +679,16 @@ ImmutableGraph::CSRArray ImmutableGraph::GetInCSRArray(size_t start, size_t end)
 
 ImmutableGraph::CSRArray ImmutableGraph::GetOutCSRArray(size_t start, size_t end) const {
   return GetCSRArray(GetOutCSR(), start, end);
-}
+}*/
 
 std::vector<IdArray> ImmutableGraph::GetAdj(bool transpose, const std::string &fmt) const {
-  if (fmt == "csr") {
-    CSRArray arrs = transpose ? this->GetOutCSRArray(0, NumVertices())
-        : this->GetInCSRArray(0, NumVertices());
-    return std::vector<IdArray>{arrs.indptr, arrs.indices, arrs.id};
-  } else if (fmt == "coo") {
-    int64_t num_edges = this->NumEdges();
-    IdArray idx = IdArray::Empty({2 * num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-    IdArray eid = IdArray::Empty({num_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-    CSR::Ptr csr = transpose ? GetOutCSR() : GetInCSR();
-    int64_t *idx_data = static_cast<int64_t*>(idx->data);
-    dgl_id_t *eid_data = static_cast<dgl_id_t*>(eid->data);
-    for (size_t i = 0; i < csr->indptr.size() - 1; i++) {
-      for (int64_t j = csr->indptr[i]; j < csr->indptr[i + 1]; j++)
-        idx_data[j] = i;
-    }
-    std::copy(csr->indices.begin(), csr->indices.end(), idx_data + num_edges);
-    std::copy(csr->edge_ids.begin(), csr->edge_ids.end(), eid_data);
-    return std::vector<IdArray>{idx, eid};
+  if (fmt == std::string("csr")) {
+    return transpose? GetInCSR()->GetAdj(false, "csr") : GetOutCSR()->GetAdj(false, "csr");
+  } else if (fmt == std::string("coo")) {
+    return GetCOO()->GetAdj(transpose, fmt);
   } else {
-    LOG(FATAL) << "unsupported adjacency matrix format";
-    return std::vector<IdArray>();
+    LOG(FATAL) << "unsupported adjacency matrix format: " << fmt;
+    return {};
   }
 }
 
