@@ -192,6 +192,7 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
     n_layers = args.n_layers
 
     if distributed:
+        g.init_ndata('preprocess', g.ndata['features'].shape, 'float32')
         g.dist_update_all(fn.copy_src(src='features', out='m'),
                           fn.sum(msg='m', out='preprocess'),
                           lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
