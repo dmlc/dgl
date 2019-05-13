@@ -74,8 +74,6 @@ class CSR : public GraphInterface {
 
   bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const override;
 
-  BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const override;
-
   IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const override {
     LOG(FATAL) << "CSR graph does not support efficient predecessor query."
       << " Please use successors on the reverse CSR graph.";
@@ -86,9 +84,19 @@ class CSR : public GraphInterface {
 
   IdArray EdgeId(dgl_id_t src, dgl_id_t dst) const override;
 
-  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const override;
+  EdgeArray EdgeIds(IdArray src, IdArray dst) const override;
 
-  EdgeArray FindEdges(IdArray eids) const override;
+  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const override {
+    LOG(FATAL) << "CSR graph does not support efficient FindEdge."
+      << " Please use COO graph.";
+    return {};
+  }
+
+  EdgeArray FindEdges(IdArray eids) const override {
+    LOG(FATAL) << "CSR graph does not support efficient FindEdges."
+      << " Please use COO graph.";
+    return {};
+  }
 
   EdgeArray InEdges(dgl_id_t vid) const override {
     LOG(FATAL) << "CSR graph does not support efficient inedges query."
@@ -106,10 +114,7 @@ class CSR : public GraphInterface {
 
   EdgeArray OutEdges(IdArray vids) const override;
 
-  EdgeArray Edges(const std::string &order = "") const override {
-    LOG(FATAL) << "CSR graph does not support efficient edges query.";
-    return {};
-  }
+  EdgeArray Edges(const std::string &order = "") const override;
 
   uint64_t InDegree(dgl_id_t vid) const override {
     LOG(FATAL) << "CSR graph does not support efficient indegree query."
@@ -134,7 +139,9 @@ class CSR : public GraphInterface {
 
   Subgraph EdgeSubgraph(IdArray eids) const override;
 
-  GraphPtr Reverse() const override;
+  GraphPtr Reverse() const override {
+    return Transpose();
+  }
 
   DGLIdIters SuccVec(dgl_id_t vid) const override {
     const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
@@ -164,17 +171,39 @@ class CSR : public GraphInterface {
     return DGLIdIters(nullptr, nullptr);
   }
 
-  GraphInterface *Reset() override;
+  GraphInterface *Reset() override {
+    CSR* gptr = new CSR();
+    *gptr = std::move(*this);
+    return gptr;
+  }
 
-  std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override;
+  std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override {
+    CHECK(!transpose && fmt == "csr") << "Not valid adj format request.";
+    return {indptr_, indices_, edge_ids_};
+  }
 
   CSRPtr Transpose() const;
 
   COOPtr ToCOO() const;
 
  private:
+  /*! \brief prive default constructor */
+  CSR() {}
+
+  /*!
+   * \brief Internal function to get the range of the given edge in the CSR indices.
+   * \note If the graph is a simple graph, the returned range contains only one element.
+   */
+  std::pair<int64_t, int64_t> GetEdgeRange(dgl_id_t src, dgl_id_t dst) const;
+
+  // The CSR arrays.
+  //  - The index is 0-based.
+  //  - The out edges of vertex v is stored from `indices_[indptr_[v]]` to
+  //    `indices_[indptr_[v+1]]` (exclusive).
+  //  - The dst nodes of each vertex v are sorted.
   IdArray indptr_, indices_, edge_ids_;
 #ifndef _WIN32
+  // shared memory handler
   std::shared_ptr<runtime::SharedMemory> mem_;
 #endif  // _WIN32
 };
@@ -182,7 +211,8 @@ class CSR : public GraphInterface {
 class COO : public GraphInterface {
  public:
   // Create a coo graph that shares the given src and dst
-  COO(int64_t num_vertices, IdArray src, IdArray dst);
+  COO(int64_t num_vertices, IdArray src, IdArray dst)
+    : num_vertices_(num_vertices), src_(src), dst_(dst) {}
 
   void AddVertices(uint64_t num_vertices) override {
     LOG(FATAL) << "CSR graph does not allow mutation.";
@@ -226,12 +256,6 @@ class COO : public GraphInterface {
     return false;
   }
 
-  BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const override {
-    LOG(FATAL) << "COO graph does not support efficient HasEdgesBetween."
-      << " Please use CSR graph or AdjList graph instead.";
-    return {};
-  }
-
   IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const override {
     LOG(FATAL) << "COO graph does not support efficient Predecessors."
       << " Please use CSR graph or AdjList graph instead.";
@@ -245,6 +269,12 @@ class COO : public GraphInterface {
   }
 
   IdArray EdgeId(dgl_id_t src, dgl_id_t dst) const override {
+    LOG(FATAL) << "COO graph does not support efficient EdgeId."
+      << " Please use CSR graph or AdjList graph instead.";
+    return {};
+  }
+
+  EdgeArray EdgeIds(IdArray src, IdArray dst) const override {
     LOG(FATAL) << "COO graph does not support efficient EdgeId."
       << " Please use CSR graph or AdjList graph instead.";
     return {};
@@ -316,7 +346,9 @@ class COO : public GraphInterface {
 
   Subgraph EdgeSubgraph(IdArray eids) const override;
 
-  GraphPtr Reverse() const override;
+  GraphPtr Reverse() const override {
+    return Transpose();
+  }
 
   DGLIdIters SuccVec(dgl_id_t vid) const override {
     LOG(FATAL) << "COO graph does not support efficient SuccVec."
@@ -342,16 +374,32 @@ class COO : public GraphInterface {
     return DGLIdIters(nullptr, nullptr);
   }
 
-  GraphInterface *Reset() override;
+  GraphInterface *Reset() override {
+    COO* gptr = new COO();
+    *gptr = std::move(*this);
+    return gptr;
+  }
 
-  std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override;
+  std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override {
+    CHECK(fmt == "coo") << "Not valid adj format request.";
+    if (transpose) {
+      return {dst_, src_};
+    } else {
+      return {src_, dst_};
+    }
+  }
 
-  COOPtr Transpose() const;
+  COOPtr Transpose() const {
+    return COOPtr(new COO(num_vertices_, dst_, src_));
+  }
 
   CSRPtr ToCSR() const;
 
  private:
-  const int64_t num_vertices_;
+  /* !\brief private default constructor */
+  COO() {}
+
+  int64_t num_vertices_;
   IdArray src_, dst_;
 };
 
@@ -455,14 +503,14 @@ class ImmutableGraph: public GraphInterface {
     return vid < NumVertices();
   }
 
-  /*! \return a 0-1 array indicating whether the given vertices are in the graph.*/
-  BoolArray HasVertices(IdArray vids) const override;
-
   /*! \return true if the given edge is in the graph.*/
-  bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const override;
-
-  /*! \return a 0-1 array indicating whether the given edges are in the graph.*/
-  BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const override;
+  bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const override {
+    if (in_csr_) {
+      return in_csr_->HasEdgeBetween(dst, src);
+    } else {
+      return GetOutCSR()->HasEdgeBetween(src, dst);
+    }
+  }
 
   /*!
    * \brief Find the predecessors of a vertex.
@@ -470,7 +518,9 @@ class ImmutableGraph: public GraphInterface {
    * \param radius The radius of the neighborhood. Default is immediate neighbor (radius=1).
    * \return the predecessor id array.
    */
-  IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const override;
+  IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const override {
+    return GetInCSR()->Successors(vid, radius);
+  }
 
   /*!
    * \brief Find the successors of a vertex.
@@ -478,7 +528,9 @@ class ImmutableGraph: public GraphInterface {
    * \param radius The radius of the neighborhood. Default is immediate neighbor (radius=1).
    * \return the successor id array.
    */
-  IdArray Successors(dgl_id_t vid, uint64_t radius = 1) const override;
+  IdArray Successors(dgl_id_t vid, uint64_t radius = 1) const override {
+    return GetOutCSR()->Successors(vid, radius);
+  }
 
   /*!
    * \brief Get all edge ids between the two given endpoints
@@ -506,14 +558,18 @@ class ImmutableGraph: public GraphInterface {
    * \param eid The edge ID
    * \return a pair whose first element is the source and the second the destination.
    */
-  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const override;
+  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const override {
+    return GetCOO()->FindEdge(eid);
+  }
 
   /*!
    * \brief Find the edge IDs and return their source and target node IDs.
    * \param eids The edge ID array.
    * \return EdgeArray containing all edges with id in eid.  The order is preserved.
    */
-  EdgeArray FindEdges(IdArray eids) const override;
+  EdgeArray FindEdges(IdArray eids) const override {
+    return GetCOO()->FindEdges(eids);
+  }
 
   /*!
    * \brief Get the in edges of the vertex.
@@ -560,9 +616,7 @@ class ImmutableGraph: public GraphInterface {
    * \param sorted Whether the returned edge list is sorted by their src and dst ids
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray Edges(const std::string &order = "") const override {
-    return GetCOO()->Edges(order);
-  }
+  EdgeArray Edges(const std::string &order = "") const override;
 
   /*!
    * \brief Get the in degree of the given vertex.
@@ -706,7 +760,7 @@ class ImmutableGraph: public GraphInterface {
    * \param fmt the format of the returned adjacency matrix.
    * \return a vector of three IdArray.
    */
-  virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override;
+  std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override;
 
   /* !\brief Return in csr. If not exist, transpose the other one.*/
   CSRPtr GetInCSR() const {
@@ -759,9 +813,6 @@ class ImmutableGraph: public GraphInterface {
       return coo_;
     }
   }
-
-  DGLIdIters GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
-  DGLIdIters GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const;
 
   /*!
    * \brief Compact a subgraph.

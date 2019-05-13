@@ -18,11 +18,17 @@
 namespace dgl {
 namespace {
 template<class ForwardIt, class T>
-bool binary_search(ForwardIt first, ForwardIt last, const T& value) {
+bool BinarySearch(ForwardIt first, ForwardIt last, const T& value) {
   first = std::lower_bound(first, last, value);
   return (!(first == last) && !(value < *first));
 }
 }  // namespace
+
+//////////////////////////////////////////////////////////
+//
+// CSR graph implementation
+//
+//////////////////////////////////////////////////////////
 
 CSR::CSR(int64_t num_vertices, int64_t num_edges) {
   indptr_ = NewIdArray(num_vertices + 1);
@@ -153,6 +159,189 @@ DegreeArray CSR::OutDegrees(IdArray vids) const {
   }
   return rst;
 }
+
+bool CSR::HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
+  CHECK(HasVertex(src)) << "Invalid vertex id: " << src;
+  CHECK(HasVertex(dst)) << "Invalid vertex id: " << dst;
+  const auto& range = GetEdgeRange(src, dst);
+  return range.first != range.second;
+}
+
+IdArray CSR::Successors(dgl_id_t vid, uint64_t radius) const {
+  CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
+  CHECK(radius == 1) << "invalid radius: " << radius;
+  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
+  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
+  const int64_t len = indptr_data[vid + 1] - indptr_data[vid];
+  IdArray rst = NewIdArray(len);
+  dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
+  std::copy(indices_data + indptr_data[vid],
+            indices_data + indptr_data[vid + 1],
+            rst_data);
+  return rst;
+}
+
+IdArray CSR::EdgeId(dgl_id_t src, dgl_id_t dst) const {
+  CHECK(HasVertex(src)) << "invalid vertex: " << src;
+  CHECK(HasVertex(dst)) << "invalid vertex: " << dst;
+  const auto& range = GetEdgeRange(src, dst);
+  if (range.first == range.second) {
+    LOG(FATAL) << "Invalid edge: " << src << " -> " << dst;
+  }
+  const dgl_id_t* eid_data = static_cast<dgl_id_t*>(edge_ids_->data);
+  IdArray ret = NewIdArray(range.second - range.first);
+  dgl_id_t* ret_data = static_cast<dgl_id_t*>(ret->data);
+  std::copy(eid_data + range.first, eid_data + range.second, ret_data);
+  return ret;
+}
+
+CSR::EdgeArray CSR::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
+  CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
+  CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
+  const auto srclen = src_ids->shape[0];
+  const auto dstlen = dst_ids->shape[0];
+
+  CHECK((srclen == dstlen) || (srclen == 1) || (dstlen == 1))
+    << "Invalid src and dst id array.";
+
+  const int src_stride = (srclen == 1 && dstlen != 1) ? 0 : 1;
+  const int dst_stride = (dstlen == 1 && srclen != 1) ? 0 : 1;
+  const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_ids->data);
+  const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_ids->data);
+  const dgl_id_t* eid_data = static_cast<dgl_id_t*>(edge_ids_->data);
+
+  std::vector<dgl_id_t> src, dst, eid;
+
+  // TODO(minjie): Below algorithm can be improved. Currently, the complexity is
+  //   O(K*log(E)), where K is the length of given src/dst pairs and E is the number
+  //   of edges. This can be improved to O(K + E) since the CSR structure is sorted.
+  for (int64_t i = 0, j = 0; i < srclen && j < dstlen; i += src_stride, j += dst_stride) {
+    const dgl_id_t src_id = src_data[i], dst_id = dst_data[j];
+    CHECK(HasVertex(src_id) && HasVertex(dst_id)) <<
+        "invalid edge: " << src_id << " -> " << dst_id;
+
+    const auto& range = GetEdgeRange(src_id, dst_id);
+    if (range.first == range.second) {
+      LOG(FATAL) << "Invalid edge: " << src_id << " -> " << dst_id;
+    }
+    for (int64_t k = range.first; k < range.second; k++) {
+        src.push_back(src_id);
+        dst.push_back(dst_id);
+        eid.push_back(eid_data[k]);
+    }
+  }
+
+  const int64_t rstlen = src.size();
+  IdArray rst_src = NewIdArray(rstlen);
+  IdArray rst_dst = NewIdArray(rstlen);
+  IdArray rst_eid = NewIdArray(rstlen);
+  dgl_id_t* rst_src_data = static_cast<dgl_id_t*>(rst_src->data);
+  dgl_id_t* rst_dst_data = static_cast<dgl_id_t*>(rst_dst->data);
+  dgl_id_t* rst_eid_data = static_cast<dgl_id_t*>(rst_eid->data);
+
+  std::copy(src.begin(), src.end(), rst_src_data);
+  std::copy(dst.begin(), dst.end(), rst_dst_data);
+  std::copy(eid.begin(), eid.end(), rst_eid_data);
+
+  return CSR::EdgeArray{rst_src, rst_dst, rst_eid};
+}
+
+CSR::EdgeArray CSR::Edges(const std::string &order) const {
+  CHECK(order.empty() || order == std::string("srcdst"))
+    << "COO only support Edges of order \"srcdst\","
+    << " but got \"" << order << "\".";
+  const int64_t rstlen = NumEdges();
+  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
+  IdArray rst_src = NewIdArray(rstlen);
+  dgl_id_t* rst_src_data = static_cast<dgl_id_t*>(rst_src->data);
+
+  // If sorted, the returned edges are sorted by the source Id and dest Id.
+  for (dgl_id_t src = 0; src < NumVertices(); ++src) {
+    std::fill(rst_src_data + indptr_data[src],
+              rst_src_data + indptr_data[src + 1],
+              src);
+  }
+
+  return CSR::EdgeArray{rst_src, indices_, edge_ids_};
+}
+
+Subgraph CSR::VertexSubgraph(IdArray vids) const {
+  // TODO
+}
+
+Subgraph CSR::EdgeSubgraph(IdArray eids) const {
+  // TODO
+}
+
+CSRPtr CSR::Transpose() const {
+  // TODO
+}
+
+COOPtr CSR::ToCOO() const {
+  // TODO
+}
+
+std::pair<int64_t, int64_t> CSR::GetEdgeRange(dgl_id_t src, dgl_id_t dst) const {
+  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
+  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
+  auto start = indices_data + indptr_data[src];
+  auto last = indices_data + indptr_data[src + 1];
+  auto first = std::lower_bound(start, last, dst);
+  int64_t len = 0;
+  for (auto it = first; it != last && *it == dst; ++it, ++len);
+  return std::make_pair(first - start, len);
+}
+
+//////////////////////////////////////////////////////////
+//
+// COO graph implementation
+//
+//////////////////////////////////////////////////////////
+
+COO::EdgeArray COO::FindEdges(IdArray eids) const {
+  CHECK(IsValidIdArray(eids)) << "Invalid edge id array";
+  dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
+  int64_t len = eids->shape[0];
+  IdArray rst_src = IdArray::Empty({len}, eids->dtype, eids->ctx);
+  IdArray rst_dst = IdArray::Empty({len}, eids->dtype, eids->ctx);
+  dgl_id_t* rst_src_data = static_cast<dgl_id_t*>(rst_src->data);
+  dgl_id_t* rst_dst_data = static_cast<dgl_id_t*>(rst_dst->data);
+
+  for (int64_t i = 0; i < len; i++) {
+    auto edge = COO::FindEdge(eid_data[i]);
+    rst_src_data[i] = edge.first;
+    rst_dst_data[i] = edge.second;
+  }
+
+  return COO::EdgeArray{rst_src, rst_dst, eids};
+}
+
+COO::EdgeArray COO::Edges(const std::string &order) const {
+  const int64_t rstlen = NumEdges();
+  CHECK(order.empty() || order == std::string("eid"))
+    << "COO only support Edges of order \"eid\", but got \""
+    << order << "\".";
+  IdArray rst_eid = NewIdArray(rstlen);
+  dgl_id_t* rst_eid_data = static_cast<dgl_id_t*>(rst_eid->data);
+  for (int64_t i = 0; i < rstlen; ++i) {
+    rst_eid_data[i] = i;
+  }
+  return EdgeArray{src_, dst_, rst_eid};
+}
+
+Subgraph COO::EdgeSubgraph(IdArray eids) const {
+  // TODO
+}
+
+CSRPtr COO::ToCSR() const {
+  // TODO
+}
+
+//////////////////////////////////////////////////////////
+//
+// immutable graph implementation
+//
+//////////////////////////////////////////////////////////
 
 class Bitmap {
   const size_t size = 1024 * 1024 * 4;
@@ -403,244 +592,17 @@ ImmutableGraph::ImmutableGraph(IdArray src_ids, IdArray dst_ids, IdArray edge_id
   out_csr_ = CSR::FromEdges(&edges, 0, num_nodes);
 }
 
-BoolArray ImmutableGraph::HasVertices(IdArray vids) const {
-  CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
-  const auto len = vids->shape[0];
-  BoolArray rst = BoolArray::Empty({len}, vids->dtype, vids->ctx);
-  const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
-  dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-  const uint64_t nverts = NumVertices();
-  for (int64_t i = 0; i < len; ++i) {
-    rst_data[i] = (vid_data[i] < nverts)? 1 : 0;
-  }
-  return rst;
-}
-
-bool ImmutableGraph::HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const {
-  if (!HasVertex(src) || !HasVertex(dst)) return false;
-  if (this->in_csr_) {
-    auto pred = this->in_csr_->GetIndexRef(dst);
-    return dgl::binary_search(pred.begin(), pred.end(), src);
-  } else {
-    CHECK(this->out_csr_) << "one of the CSRs must exist";
-    auto succ = this->out_csr_->GetIndexRef(src);
-    return dgl::binary_search(succ.begin(), succ.end(), dst);
-  }
-}
-
-BoolArray ImmutableGraph::HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const {
-  CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
-  CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
-  const auto srclen = src_ids->shape[0];
-  const auto dstlen = dst_ids->shape[0];
-  const auto rstlen = std::max(srclen, dstlen);
-  BoolArray rst = BoolArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
-  dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-  const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_ids->data);
-  const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_ids->data);
-  if (srclen == 1) {
-    // one-many
-    for (int64_t i = 0; i < dstlen; ++i) {
-      rst_data[i] = HasEdgeBetween(src_data[0], dst_data[i])? 1 : 0;
-    }
-  } else if (dstlen == 1) {
-    // many-one
-    for (int64_t i = 0; i < srclen; ++i) {
-      rst_data[i] = HasEdgeBetween(src_data[i], dst_data[0])? 1 : 0;
-    }
-  } else {
-    // many-many
-    CHECK(srclen == dstlen) << "Invalid src and dst id array.";
-    for (int64_t i = 0; i < srclen; ++i) {
-      rst_data[i] = HasEdgeBetween(src_data[i], dst_data[i])? 1 : 0;
-    }
-  }
-  return rst;
-}
-
-IdArray ImmutableGraph::Predecessors(dgl_id_t vid, uint64_t radius) const {
-  CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
-  CHECK(radius >= 1) << "invalid radius: " << radius;
-
-  auto pred = this->GetInCSR()->GetIndexRef(vid);
-  const int64_t len = pred.size();
-  IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-
-  std::copy(pred.begin(), pred.end(), rst_data);
-  return rst;
-}
-
-IdArray ImmutableGraph::Successors(dgl_id_t vid, uint64_t radius) const {
-  CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
-  CHECK(radius >= 1) << "invalid radius: " << radius;
-
-  auto succ = this->GetOutCSR()->GetIndexRef(vid);
-  const int64_t len = succ.size();
-  IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-
-  std::copy(succ.begin(), succ.end(), rst_data);
-  return rst;
-}
-
-DGLIdIters ImmutableGraph::GetInEdgeIdRef(dgl_id_t src, dgl_id_t dst) const {
-  CHECK(this->in_csr_);
-  auto pred = this->in_csr_->GetIndexRef(dst);
-  auto it = std::lower_bound(pred.begin(), pred.end(), src);
-  // If there doesn't exist edges between the two nodes.
-  if (it == pred.end() || *it != src) {
-    return DGLIdIters(it, it);
-  }
-
-  size_t off = it - in_csr_->indices.begin();
-  CHECK(off < in_csr_->indices.size());
-  auto start = in_csr_->edge_ids.begin() + off;
-  int64_t len = 0;
-  // There are edges between the source and the destination.
-  for (auto it1 = it; it1 != pred.end() && *it1 == src; it1++, len++) {}
-  return DGLIdIters(start, start + len);
-}
-
-DGLIdIters ImmutableGraph::GetOutEdgeIdRef(dgl_id_t src, dgl_id_t dst) const {
-  CHECK(this->out_csr_);
-  auto succ = this->out_csr_->GetIndexRef(src);
-  auto it = std::lower_bound(succ.begin(), succ.end(), dst);
-  // If there doesn't exist edges between the two nodes.
-  if (it == succ.end() || *it != dst) {
-    return DGLIdIters(it, it);
-  }
-
-  size_t off = it - out_csr_->indices.begin();
-  CHECK(off < out_csr_->indices.size());
-  auto start = out_csr_->edge_ids.begin() + off;
-  int64_t len = 0;
-  // There are edges between the source and the destination.
-  for (auto it1 = it; it1 != succ.end() && *it1 == dst; it1++, len++) {}
-  return DGLIdIters(start, start + len);
-}
-
-IdArray ImmutableGraph::EdgeId(dgl_id_t src, dgl_id_t dst) const {
-  CHECK(HasVertex(src) && HasVertex(dst)) << "invalid edge: " << src << " -> " << dst;
-
-  auto edge_ids = in_csr_ ? GetInEdgeIdRef(src, dst) : GetOutEdgeIdRef(src, dst);
-  int64_t len = edge_ids.size();
-  IdArray rst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
-  if (len > 0) {
-    std::copy(edge_ids.begin(), edge_ids.end(), rst_data);
-  }
-
-  return rst;
-}
-
-ImmutableGraph::EdgeArray ImmutableGraph::EdgeIds(IdArray src_ids, IdArray dst_ids) const {
-  CHECK(IsValidIdArray(src_ids)) << "Invalid src id array.";
-  CHECK(IsValidIdArray(dst_ids)) << "Invalid dst id array.";
-  const auto srclen = src_ids->shape[0];
-  const auto dstlen = dst_ids->shape[0];
-
-  CHECK((srclen == dstlen) || (srclen == 1) || (dstlen == 1))
-    << "Invalid src and dst id array.";
-
-  const int src_stride = (srclen == 1 && dstlen != 1) ? 0 : 1;
-  const int dst_stride = (dstlen == 1 && srclen != 1) ? 0 : 1;
-  const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_ids->data);
-  const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_ids->data);
-
-  std::vector<dgl_id_t> src, dst, eid;
-
-  for (int64_t i = 0, j = 0; i < srclen && j < dstlen; i += src_stride, j += dst_stride) {
-    const dgl_id_t src_id = src_data[i], dst_id = dst_data[j];
-    CHECK(HasVertex(src_id) && HasVertex(dst_id)) <<
-        "invalid edge: " << src_id << " -> " << dst_id;
-
-    auto edges = this->in_csr_ ? GetInEdgeIdRef(src_id, dst_id) : GetOutEdgeIdRef(src_id, dst_id);
-    for (size_t k = 0; k < edges.size(); k++) {
-        src.push_back(src_id);
-        dst.push_back(dst_id);
-        eid.push_back(edges[k]);
-    }
-  }
-
-  const int64_t rstlen = src.size();
-  IdArray rst_src = IdArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
-  IdArray rst_dst = IdArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
-  IdArray rst_eid = IdArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
-  dgl_id_t* rst_src_data = static_cast<dgl_id_t*>(rst_src->data);
-  dgl_id_t* rst_dst_data = static_cast<dgl_id_t*>(rst_dst->data);
-  dgl_id_t* rst_eid_data = static_cast<dgl_id_t*>(rst_eid->data);
-
-  std::copy(src.begin(), src.end(), rst_src_data);
-  std::copy(dst.begin(), dst.end(), rst_dst_data);
-  std::copy(eid.begin(), eid.end(), rst_eid_data);
-
-  return ImmutableGraph::EdgeArray{rst_src, rst_dst, rst_eid};
-}
-
-std::pair<dgl_id_t, dgl_id_t> ImmutableGraph::FindEdge(dgl_id_t eid) const {
-  dgl_id_t row = 0, col = 0;
-  auto edge_list = GetEdgeList();
-  CHECK(eid < NumEdges()) << "Invalid edge id " << eid;
-  row = edge_list->src_points[eid];
-  col = edge_list->dst_points[eid];
-  CHECK(row < NumVertices() && col < NumVertices()) << "Invalid edge id " << eid;
-  return std::pair<dgl_id_t, dgl_id_t>(row, col);
-}
-
-ImmutableGraph::EdgeArray ImmutableGraph::FindEdges(IdArray eids) const {
-  CHECK(IsValidIdArray(eids)) << "Invalid edge id array";
-  dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
-  int64_t len = eids->shape[0];
-  IdArray rst_src = IdArray::Empty({len}, eids->dtype, eids->ctx);
-  IdArray rst_dst = IdArray::Empty({len}, eids->dtype, eids->ctx);
-  dgl_id_t* rst_src_data = static_cast<dgl_id_t*>(rst_src->data);
-  dgl_id_t* rst_dst_data = static_cast<dgl_id_t*>(rst_dst->data);
-
-  for (int64_t i = 0; i < len; i++) {
-    auto edge = ImmutableGraph::FindEdge(eid_data[i]);
-    rst_src_data[i] = edge.first;
-    rst_dst_data[i] = edge.second;
-  }
-
-  return ImmutableGraph::EdgeArray{rst_src, rst_dst, eids};
-}
-
 ImmutableGraph::EdgeArray ImmutableGraph::Edges(const std::string &order) const {
-  int64_t rstlen = NumEdges();
-  IdArray rst_src = IdArray::Empty({rstlen}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray rst_dst = IdArray::Empty({rstlen}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray rst_eid = IdArray::Empty({rstlen}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  dgl_id_t* rst_src_data = static_cast<dgl_id_t*>(rst_src->data);
-  dgl_id_t* rst_dst_data = static_cast<dgl_id_t*>(rst_dst->data);
-  dgl_id_t* rst_eid_data = static_cast<dgl_id_t*>(rst_eid->data);
-
-  if (order == "srcdst") {
-    auto out_csr = GetOutCSR();
-    // If sorted, the returned edges are sorted by the source Id and dest Id.
-    for (size_t i = 0; i < out_csr->indptr.size() - 1; i++) {
-      std::fill(rst_src_data + out_csr->indptr[i], rst_src_data + out_csr->indptr[i + 1],
-          static_cast<dgl_id_t>(i));
-    }
-    std::copy(out_csr->indices.begin(), out_csr->indices.end(), rst_dst_data);
-    std::copy(out_csr->edge_ids.begin(), out_csr->edge_ids.end(), rst_eid_data);
-  } else if (order.empty() || order == "eid") {
-    std::vector<Edge> edges;
-    auto out_csr = GetOutCSR();
-    out_csr->ReadAllEdges(&edges);
-    std::sort(edges.begin(), edges.end(), [](const Edge &e1, const Edge &e2) {
-      return e1.edge_id < e2.edge_id;
-    });
-    for (size_t i = 0; i < edges.size(); i++) {
-      rst_src_data[i] = edges[i].end_points[0];
-      rst_dst_data[i] = edges[i].end_points[1];
-      rst_eid_data[i] = edges[i].edge_id;
-    }
+  if (order.empty()) {
+    // arbitrary order
+    return AnyGraph()->Edges(order);
+  } else if (order == std::string("srcdst")) {
+    return GetOutCSR()->Edges(order);
+  } else if (order == std::string("eid")) {
+    return GetCOO()->Edges(order);
   } else {
-    LOG(FATAL) << "unsupported order " << order;
+    LOG(FATAL) << "Unsupported order request: " << order;
   }
-
-  return ImmutableGraph::EdgeArray{rst_src, rst_dst, rst_eid};
 }
 
 Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
