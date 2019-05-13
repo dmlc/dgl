@@ -34,7 +34,7 @@ class CSR : public GraphInterface {
       const std::string &shared_mem_name);
   // Create a csr graph whose memory is stored in the shared memory
   //   that has the given number of verts and edges.
-  CSR(const std::string &shared_mem_name, size_t num_vertices, size_t num_edges);
+  CSR(const std::string &shared_mem_name, int64_t num_vertices, int64_t num_edges);
 
   void AddVertices(uint64_t num_vertices) override {
     LOG(FATAL) << "CSR graph does not allow mutation.";
@@ -137,18 +137,18 @@ class CSR : public GraphInterface {
   GraphPtr Reverse() const override;
 
   DGLIdIters SuccVec(dgl_id_t vid) const override {
-    const int64_t* indptr_data = static_cast<int64_t*>(indptr_->data);
+    const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
     const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
-    const int64_t start = indptr_data[vid];
-    const int64_t end = indptr_data[vid + 1];
+    const dgl_id_t start = indptr_data[vid];
+    const dgl_id_t end = indptr_data[vid + 1];
     return DGLIdIters(indices_data + start, indices_data + end);
   }
 
   DGLIdIters OutEdgeVec(dgl_id_t vid) const override {
-    const int64_t* indptr_data = static_cast<int64_t*>(indptr_->data);
+    const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
     const dgl_id_t* eid_data = static_cast<dgl_id_t*>(edge_ids_->data);
-    const int64_t start = indptr_data[vid];
-    const int64_t end = indptr_data[vid + 1];
+    const dgl_id_t start = indptr_data[vid];
+    const dgl_id_t end = indptr_data[vid + 1];
     return DGLIdIters(eid_data + start, eid_data + end);
   }
 

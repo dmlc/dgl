@@ -8,146 +8,139 @@
 #include <sys/types.h>
 #include <dgl/immutable_graph.h>
 
+#include "../c_api_common.h"
+#include "./common.h"
+
 #ifdef _MSC_VER
 #define _CRT_RAND_S
 #endif
 
-#include "../c_api_common.h"
-
 namespace dgl {
-
+namespace {
 template<class ForwardIt, class T>
 bool binary_search(ForwardIt first, ForwardIt last, const T& value) {
   first = std::lower_bound(first, last, value);
   return (!(first == last) && !(value < *first));
 }
+}  // namespace
 
-ImmutableGraph::CSR::CSR(int64_t num_vertices, int64_t expected_num_edges):
-    indptr(num_vertices + 1), indices(expected_num_edges), edge_ids(expected_num_edges) {
-  indptr.resize(num_vertices + 1);
+CSR::CSR(int64_t num_vertices, int64_t num_edges) {
+  indptr_ = NewIdArray(num_vertices + 1);
+  indices_ = NewIdArray(num_edges);
+  edge_ids_ = NewIdArray(num_edges);
 }
 
-ImmutableGraph::CSR::CSR(IdArray indptr_arr, IdArray index_arr, IdArray edge_id_arr):
-    indptr(indptr_arr->shape[0]), indices(index_arr->shape[0]), edge_ids(index_arr->shape[0]) {
-  size_t num_vertices = indptr_arr->shape[0] - 1;
-  size_t num_edges = index_arr->shape[0];
-  const int64_t *indptr_data = static_cast<int64_t*>(indptr_arr->data);
-  const dgl_id_t *indices_data = static_cast<dgl_id_t*>(index_arr->data);
-  const dgl_id_t *edge_id_data = static_cast<dgl_id_t*>(edge_id_arr->data);
-  CHECK_EQ(indptr_data[0], 0);
-  CHECK_EQ(indptr_data[num_vertices], num_edges);
-  indptr.insert_back(indptr_data, num_vertices + 1);
-  indices.insert_back(indices_data, num_edges);
-  edge_ids.insert_back(edge_id_data, num_edges);
+CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids)
+  : indptr_(indptr), indices_(indices), edge_ids_(edge_ids) {
+  CHECK(IsValidIdArray(indptr));
+  CHECK(IsValidIdArray(indices));
+  CHECK(IsValidIdArray(edge_ids));
+  CHECK_EQ(indices_->shape[0], edge_ids_->shape[0]);
 }
 
-ImmutableGraph::CSR::CSR(IdArray indptr_arr, IdArray index_arr, IdArray edge_id_arr,
-                         const std::string &shared_mem_name) {
+CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
+         const std::string &shared_mem_name) {
 #ifndef _WIN32
-  size_t num_vertices = indptr_arr->shape[0] - 1;
-  size_t num_edges = index_arr->shape[0];
-  CHECK_EQ(num_edges, edge_id_arr->shape[0]);
-  size_t file_size = (num_vertices + 1) * sizeof(int64_t) + num_edges * sizeof(dgl_id_t) * 2;
+  CHECK(IsValidIdArray(indptr));
+  CHECK(IsValidIdArray(indices));
+  CHECK(IsValidIdArray(edge_ids));
+  CHECK_EQ(indices_->shape[0], edge_ids_->shape[0]);
+  const int64_t num_verts = indptr->shape[0] - 1;
+  const int64_t num_edges = indices->shape[0];
+  const int64_t file_size = (num_verts + 1 + num_edges * 2) * sizeof(dgl_id_t);
 
-  auto mem = std::make_shared<runtime::SharedMemory>(shared_mem_name);
-  auto ptr = mem->create_new(file_size);
-
-  int64_t *addr1 = static_cast<int64_t *>(ptr);
-  indptr.init(addr1, num_vertices + 1);
-  void *addr = addr1 + num_vertices + 1;
-  dgl_id_t *addr2 = static_cast<dgl_id_t *>(addr);
-  indices.init(addr2, num_edges);
-  addr = addr2 + num_edges;
-  dgl_id_t *addr3 = static_cast<dgl_id_t *>(addr);
-  edge_ids.init(addr3, num_edges);
-
-  const int64_t *indptr_data = static_cast<int64_t*>(indptr_arr->data);
-  const dgl_id_t *indices_data = static_cast<dgl_id_t*>(index_arr->data);
-  const dgl_id_t *edge_id_data = static_cast<dgl_id_t*>(edge_id_arr->data);
-  CHECK_EQ(indptr_data[0], 0);
-  CHECK_EQ(indptr_data[num_vertices], num_edges);
-  indptr.insert_back(indptr_data, num_vertices + 1);
-  indices.insert_back(indices_data, num_edges);
-  edge_ids.insert_back(edge_id_data, num_edges);
-  this->mem = mem;
+  IdArray sm_array = IdArray::EmptyShared(
+      shared_mem_name, {file_size}, DLDataType{kDLInt, 8, 1}, DLContext{kDLCPU, 0}, true);
+  // Create views from the shared memory array. Note that we don't need to save
+  //   the sm_array because the refcount is maintained by the view arrays.
+  indptr_ = sm_array.CreateView({num_verts + 1}, DLDataType{kDLInt, 64, 1});
+  indices_ = sm_array.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
+      (num_verts + 1) * sizeof(dgl_id_t));
+  edge_ids_ = sm_array.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
+      (num_verts + 1 + num_edges) * sizeof(dgl_id_t));
+  // copy the given data into the shared memory arrays
+  indptr_.CopyFrom(indptr);
+  indices_.CopyFrom(indices);
+  edge_ids_.CopyFrom(edge_ids);
 #else
   LOG(FATAL) << "ImmutableGraph doesn't support shared memory in Windows yet";
 #endif  // _WIN32
 }
 
-ImmutableGraph::CSR::CSR(const std::string &shared_mem_name,
-                         size_t num_vertices, size_t num_edges) {
+CSR::CSR(const std::string &shared_mem_name,
+         int64_t num_verts, int64_t num_edges) {
 #ifndef _WIN32
-  size_t file_size = (num_vertices + 1) * sizeof(int64_t) + num_edges * sizeof(dgl_id_t) * 2;
-  auto mem = std::make_shared<runtime::SharedMemory>(shared_mem_name);
-  auto ptr = mem->open(file_size);
-
-  int64_t *addr1 = static_cast<int64_t *>(ptr);
-  indptr.init(addr1, num_vertices + 1, num_vertices + 1);
-  void *addr = addr1 + num_vertices + 1;
-  dgl_id_t *addr2 = static_cast<dgl_id_t *>(addr);
-  indices.init(addr2, num_edges, num_edges);
-  addr = addr2 + num_edges;
-  dgl_id_t *addr3 = static_cast<dgl_id_t *>(addr);
-  edge_ids.init(addr3, num_edges, num_edges);
-  this->mem = mem;
+  const int64_t file_size = (num_verts + 1 + num_edges * 2) * sizeof(dgl_id_t);
+  IdArray sm_array = IdArray::EmptyShared(
+      shared_mem_name, {file_size}, DLDataType{kDLInt, 8, 1}, DLContext{kDLCPU, 0}, true);
+  // Create views from the shared memory array. Note that we don't need to save
+  //   the sm_array because the refcount is maintained by the view arrays.
+  indptr_ = sm_array.CreateView({num_verts + 1}, DLDataType{kDLInt, 64, 1});
+  indices_ = sm_array.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
+      (num_verts + 1) * sizeof(dgl_id_t));
+  edge_ids_ = sm_array.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
+      (num_verts + 1 + num_edges) * sizeof(dgl_id_t));
 #else
   LOG(FATAL) << "ImmutableGraph doesn't support shared memory in Windows yet";
 #endif  // _WIN32
 }
 
-ImmutableGraph::EdgeArray ImmutableGraph::CSR::GetEdges(dgl_id_t vid) const {
+ImmutableGraph::EdgeArray CSR::OutEdges(dgl_id_t vid) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
-  const int64_t off = this->indptr[vid];
-  const int64_t len = this->GetDegree(vid);
-  IdArray src = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray dst = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  IdArray eid = IdArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
+  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
+  const dgl_id_t* edge_ids_data = static_cast<dgl_id_t*>(edge_ids_->data);
+  const dgl_id_t off = indptr_data[vid];
+  const int64_t len = OutDegree(vid);
+  IdArray src = NewIdArray(len);
+  IdArray dst = NewIdArray(len);
+  IdArray eid = NewIdArray(len);
   dgl_id_t* src_data = static_cast<dgl_id_t*>(src->data);
   dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst->data);
   dgl_id_t* eid_data = static_cast<dgl_id_t*>(eid->data);
-  for (int64_t i = 0; i < len; ++i) {
-    src_data[i] = this->indices[off + i];
-    eid_data[i] = this->edge_ids[off + i];
-  }
-  std::fill(dst_data, dst_data + len, vid);
+  std::fill(src_data, src_data + len, vid);
+  std::copy(indices_data + off, indices_data + off + len, dst_data);
+  std::copy(edge_ids_data + off, edge_ids_data + off + len, eid_data);
   return ImmutableGraph::EdgeArray{src, dst, eid};
 }
 
-ImmutableGraph::EdgeArray ImmutableGraph::CSR::GetEdges(IdArray vids) const {
+ImmutableGraph::EdgeArray CSR::OutEdges(IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
+  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
+  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
+  const dgl_id_t* edge_ids_data = static_cast<dgl_id_t*>(edge_ids_->data);
   const auto len = vids->shape[0];
   const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
   int64_t rstlen = 0;
   for (int64_t i = 0; i < len; ++i) {
     dgl_id_t vid = vid_data[i];
     CHECK(HasVertex(vid)) << "Invalid vertex: " << vid;
-    rstlen += this->GetDegree(vid);
+    rstlen += OutDegree(vid);
   }
-  IdArray src = IdArray::Empty({rstlen}, vids->dtype, vids->ctx);
-  IdArray dst = IdArray::Empty({rstlen}, vids->dtype, vids->ctx);
-  IdArray eid = IdArray::Empty({rstlen}, vids->dtype, vids->ctx);
+  IdArray src = NewIdArray(rstlen);
+  IdArray dst = NewIdArray(rstlen);
+  IdArray eid = NewIdArray(rstlen);
   dgl_id_t* src_ptr = static_cast<dgl_id_t*>(src->data);
   dgl_id_t* dst_ptr = static_cast<dgl_id_t*>(dst->data);
   dgl_id_t* eid_ptr = static_cast<dgl_id_t*>(eid->data);
   for (int64_t i = 0; i < len; ++i) {
-    dgl_id_t vid = vid_data[i];
-    int64_t off = this->indptr[vid];
-    const int64_t deg = this->GetDegree(vid);
+    const dgl_id_t vid = vid_data[i];
+    const dgl_id_t off = indptr_data[vid];
+    const int64_t deg = OutDegree(vid);
     if (deg == 0)
       continue;
-    const auto *pred = &this->indices[off];
-    const auto *eids = &this->edge_ids[off];
+    const auto *succ = indices_data + off;
+    const auto *eids = edge_ids_data + off;
     for (int64_t j = 0; j < deg; ++j) {
-      *(src_ptr++) = pred[j];
-      *(dst_ptr++) = vid;
+      *(src_ptr++) = vid;
+      *(dst_ptr++) = succ[j];
       *(eid_ptr++) = eids[j];
     }
   }
   return ImmutableGraph::EdgeArray{src, dst, eid};
 }
 
-DegreeArray ImmutableGraph::CSR::GetDegrees(IdArray vids) const {
+DegreeArray CSR::OutDegrees(IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
   const auto len = vids->shape[0];
   const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
@@ -156,7 +149,7 @@ DegreeArray ImmutableGraph::CSR::GetDegrees(IdArray vids) const {
   for (int64_t i = 0; i < len; ++i) {
     const auto vid = vid_data[i];
     CHECK(HasVertex(vid)) << "Invalid vertex: " << vid;
-    rst_data[i] = this->GetDegree(vid);
+    rst_data[i] = OutDegree(vid);
   }
   return rst;
 }

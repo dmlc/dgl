@@ -122,7 +122,8 @@ size_t NDArray::GetSize() const {
 }
 
 NDArray NDArray::CreateView(std::vector<int64_t> shape,
-                            DLDataType dtype) {
+                            DLDataType dtype,
+                            int64_t offset) {
   CHECK(data_ != nullptr);
   CHECK(data_->dl_tensor.strides == nullptr)
       << "Can only create view for compact tensor";
@@ -136,7 +137,8 @@ NDArray NDArray::CreateView(std::vector<int64_t> shape,
   // increase ref count
   this->data_->IncRef();
   ret.data_->manager_ctx = this->data_;
-  ret.data_->dl_tensor.data = this->data_->dl_tensor.data;
+  ret.data_->dl_tensor.data =
+    static_cast<char*>(this->data_->dl_tensor.data) + offset;
   return ret;
 }
 
