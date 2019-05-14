@@ -363,7 +363,7 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
     subg_csr->edge_ids[i] = i;
   }
 
-  if (edge_type == "in") {
+  if (edge_type == std::string("in")) {
     nf.graph = GraphPtr(new ImmutableGraph(subg_csr, nullptr, is_multigraph));
   } else {
     nf.graph = GraphPtr(new ImmutableGraph(nullptr, subg_csr, is_multigraph));
@@ -691,7 +691,7 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
                  &flow_offsets,
                  &edge_mapping);
 
-  if (neighbor_type == "in") {
+  if (neighbor_type == std::string("in")) {
     nf.graph = GraphPtr(new ImmutableGraph(sub_csr, nullptr, graph->IsMultigraph()));
   } else {
     nf.graph = GraphPtr(new ImmutableGraph(nullptr, sub_csr, graph->IsMultigraph()));
@@ -793,7 +793,5 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_LayerSampling")
     }
     *rv = WrapVectorReturn(nflows);
   });
-
-
 
 }  // namespace dgl

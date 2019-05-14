@@ -22,6 +22,9 @@ class COO;
 typedef std::shared_ptr<CSR> CSRPtr;
 typedef std::shared_ptr<COO> COOPtr;
 
+/*!
+ * \brief Graph class stored using CSR structure.
+ */
 class CSR : public GraphInterface {
  public:
   // Create a csr graph that has the given number of verts and edges.
@@ -186,9 +189,16 @@ class CSR : public GraphInterface {
     return {indptr_, indices_, edge_ids_};
   }
 
+  /*! \brief Return the reverse of this CSR graph (i.e, a CSC graph) */
   CSRPtr Transpose() const;
 
+  /*! \brief Convert this CSR to COO */
   COOPtr ToCOO() const;
+
+  /*! \brief Convert this CSR graph to plain CSR structure */
+  CSRMatrix ToCSRMatrix() const {
+    return CSRMatrix{indptr_, indices_, edge_ids_};
+  }
 
  private:
   /*! \brief prive default constructor */
@@ -199,6 +209,10 @@ class CSR : public GraphInterface {
   //  - The out edges of vertex v is stored from `indices_[indptr_[v]]` to
   //    `indices_[indptr_[v+1]]` (exclusive).
   //  - The indices are *not* necessarily sorted.
+  // TODO(minjie): in the future, we should separate CSR and graph. A general CSR
+  //   is not necessarily a graph, but graph operations could be implemented by
+  //   CSR matrix operations. CSR matrix operations would be backed by different
+  //   devices (CPU, CUDA, ...), while graph interface will not be aware of that.
   IdArray indptr_, indices_, edge_ids_;
 #ifndef _WIN32
   // shared memory handler
@@ -387,12 +401,19 @@ class COO : public GraphInterface {
     }
   }
 
+  /*! \brief Return the transpose of this COO */
   COOPtr Transpose() const {
     return COOPtr(new COO(num_vertices_, dst_, src_));
   }
 
+  /*! \brief Convert this COO to CSR */
   CSRPtr ToCSR() const;
 
+  /*! \brief Convert this CSR graph to plain CSR structure */
+  COOMatrix ToCOOMatrix() const {
+    return COOMatrix{src_, dst_, {}};
+  }
+  
  private:
   /* !\brief private default constructor */
   COO() {}

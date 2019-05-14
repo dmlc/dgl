@@ -10,7 +10,6 @@
 #include <dgl/immutable_graph.h>
 
 #include "../c_api_common.h"
-#include "./common.h"
 
 namespace dgl {
 namespace {

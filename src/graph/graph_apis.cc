@@ -84,15 +84,16 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const IdArray src_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
     const IdArray dst_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
-    const IdArray edge_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
-    const bool multigraph = static_cast<bool>(args[3]);
-    const int64_t num_nodes = static_cast<int64_t>(args[4]);
-    const bool readonly = static_cast<bool>(args[5]);
+    const bool multigraph = static_cast<bool>(args[2]);
+    const int64_t num_nodes = static_cast<int64_t>(args[3]);
+    const bool readonly = static_cast<bool>(args[4]);
     GraphHandle ghandle;
-    if (readonly)
-      ghandle = new ImmutableGraph(src_ids, dst_ids, edge_ids, num_nodes, multigraph);
-    else
-      ghandle = new Graph(src_ids, dst_ids, edge_ids, num_nodes, multigraph);
+    if (readonly) {
+      COOPtr coo(new COO(num_nodes, src_ids, dst_ids));
+      ghandle = new ImmutableGraph(coo, multigraph);
+    } else {
+      ghandle = new Graph(src_ids, dst_ids, num_nodes, multigraph);
+    }
     *rv = ghandle;
   });
 
@@ -104,11 +105,11 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
     const std::string shared_mem_name = args[3];
     const bool multigraph = static_cast<bool>(args[4]);
     const std::string edge_dir = args[5];
-    ImmutableGraph::CSR::Ptr csr;
+    CSRPtr csr;
     if (shared_mem_name.empty())
-      csr.reset(new ImmutableGraph::CSR(indptr, indices, edge_ids));
+      csr.reset(new CSR(indptr, indices, edge_ids));
     else
-      csr.reset(new ImmutableGraph::CSR(indptr, indices, edge_ids, shared_mem_name));
+      csr.reset(new CSR(indptr, indices, edge_ids, shared_mem_name));
 
     GraphHandle ghandle;
     if (edge_dir == "in")
@@ -125,8 +126,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreateMMap")
     const int64_t num_edges = args[2];
     const bool multigraph = static_cast<bool>(args[3]);
     const std::string edge_dir = args[4];
-    ImmutableGraph::CSR::Ptr csr(new ImmutableGraph::CSR(shared_mem_name,
-                                                         num_vertices, num_edges));
+    CSRPtr csr(new CSR(shared_mem_name, num_vertices, num_edges));
     GraphHandle ghandle;
     if (edge_dir == "in")
       ghandle = new ImmutableGraph(csr, nullptr, multigraph);

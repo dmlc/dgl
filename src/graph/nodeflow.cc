@@ -17,14 +17,16 @@ std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph, const std::st
                                       size_t layer0_size, size_t layer1_start,
                                       size_t layer1_end, bool remap) {
   CHECK_GE(layer1_start, layer0_size);
-  if (fmt == "csr") {
+  if (fmt == std::string("csr")) {
     dgl_id_t first_vid = layer1_start - layer0_size;
-    ImmutableGraph::CSRArray arrs = graph.GetInCSRArray(layer1_start, layer1_end);
+    //CSRPtr csr = graph.GetInCSRArray(layer1_start, layer1_end);
+    CSRMatrix csr = SliceRows(graph.GetInCSR()->ToCSRMatrix(), layer1_start, layer1_end);
     if (remap) {
-      dgl_id_t *indices_data = static_cast<dgl_id_t*>(arrs.indices->data);
-      dgl_id_t *eid_data = static_cast<dgl_id_t*>(arrs.id->data);
-      const size_t len = arrs.indices->shape[0];
-      dgl_id_t first_eid = eid_data[0];
+      // TODO: should not do inplace
+      dgl_id_t *indices_data = static_cast<dgl_id_t*>(csr.indices->data);
+      dgl_id_t *eid_data = static_cast<dgl_id_t*>(csr.data->data);
+      const size_t len = csr.indices->shape[0];
+      const dgl_id_t first_eid = eid_data[0];
       for (size_t i = 0; i < len; i++) {
         CHECK_GE(indices_data[i], first_vid);
         indices_data[i] -= first_vid;
@@ -32,12 +34,12 @@ std::vector<IdArray> GetNodeFlowSlice(const ImmutableGraph &graph, const std::st
         eid_data[i] -= first_eid;
       }
     }
-    return std::vector<IdArray>{arrs.indptr, arrs.indices, arrs.id};
-  } else if (fmt == "coo") {
-    ImmutableGraph::CSR::Ptr csr = graph.GetInCSR();
+    return std::vector<IdArray>{csr->indptr(), arrs.indices, arrs.id};
+  } else if (fmt == std::string("coo")) {
+    CSRPtr csr = graph.GetInCSR();
     int64_t nnz = csr->indptr[layer1_end] - csr->indptr[layer1_start];
-    IdArray idx = IdArray::Empty({2 * nnz}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-    IdArray eid = IdArray::Empty({nnz}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    IdArray idx = NewIdArray(2 * nnz);
+    IdArray eid = NewIdArray(nnz);
     int64_t *idx_data = static_cast<int64_t*>(idx->data);
     dgl_id_t *eid_data = static_cast<dgl_id_t*>(eid->data);
     size_t num_edges = 0;

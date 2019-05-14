@@ -9,16 +9,10 @@
 #include <string>
 #include <vector>
 #include <utility>
-#include "runtime/ndarray.h"
+
+#include <dgl/array.h>
 
 namespace dgl {
-
-typedef uint64_t dgl_id_t;
-typedef dgl::runtime::NDArray IdArray;
-typedef dgl::runtime::NDArray DegreeArray;
-typedef dgl::runtime::NDArray BoolArray;
-typedef dgl::runtime::NDArray IntArray;
-typedef dgl::runtime::NDArray FloatArray;
 
 struct Subgraph;
 struct NodeFlow;

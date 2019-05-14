@@ -51,21 +51,19 @@ class GraphIndex(object):
         self._multigraph = multigraph
         self._readonly = readonly
         if readonly:
-            self._init(src, dst, utils.toindex(F.arange(0, len(src))), n_nodes)
+            self._init(src, dst, n_nodes)
         else:
             self._handle = _CAPI_DGLGraphCreateMutable(multigraph)
             self.clear()
             self.add_nodes(n_nodes)
             self.add_edges(src, dst)
 
-    def _init(self, src_ids, dst_ids, edge_ids, num_nodes):
+    def _init(self, src_ids, dst_ids, num_nodes):
         """The actual init function"""
         assert len(src_ids) == len(dst_ids)
-        assert len(src_ids) == len(edge_ids)
         self._handle = _CAPI_DGLGraphCreate(
             src_ids.todgltensor(),
             dst_ids.todgltensor(),
-            edge_ids.todgltensor(),
             self._multigraph,
             int(num_nodes),
             self._readonly)
@@ -786,13 +784,12 @@ class GraphIndex(object):
             for e in nx_graph.edges:
                 src.append(e[0])
                 dst.append(e[1])
-        eid = np.arange(0, len(src), dtype=np.int64)
         num_nodes = nx_graph.number_of_nodes()
         # We store edge Ids as an edge attribute.
         eid = utils.toindex(eid)
         src = utils.toindex(src)
         dst = utils.toindex(dst)
-        self._init(src, dst, eid, num_nodes)
+        self._init(src, dst, num_nodes)
 
 
     def from_scipy_sparse_matrix(self, adj):
@@ -808,8 +805,7 @@ class GraphIndex(object):
         adj_coo = adj.tocoo()
         src = utils.toindex(adj_coo.row)
         dst = utils.toindex(adj_coo.col)
-        edge_ids = utils.toindex(F.arange(0, len(adj_coo.row)))
-        self._init(src, dst, edge_ids, num_nodes)
+        self._init(src, dst, num_nodes)
 
 
     def from_csr_matrix(self, indptr, indices, edge_dir, shared_mem_name=""):
@@ -881,8 +877,7 @@ class GraphIndex(object):
         min_nodes = min(src.min(), dst.min())
         if min_nodes != 0:
             raise DGLError('Invalid edge list. Nodes must start from 0.')
-        edge_ids = utils.toindex(F.arange(0, len(src)))
-        self._init(src_ids, dst_ids, edge_ids, num_nodes)
+        self._init(src_ids, dst_ids, num_nodes)
 
     def line_graph(self, backtracking=True):
         """Return the line graph of this graph.
