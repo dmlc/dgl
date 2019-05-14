@@ -137,7 +137,11 @@ class CSR : public GraphInterface {
 
   Subgraph VertexSubgraph(IdArray vids) const override;
 
-  Subgraph EdgeSubgraph(IdArray eids) const override;
+  Subgraph EdgeSubgraph(IdArray eids) const override {
+    LOG(FATAL) << "CSR graph does not support efficient EdgeSubgraph."
+      << " Please use COO graph instead.";
+    return {};
+  }
 
   GraphPtr Reverse() const override {
     return Transpose();
@@ -189,12 +193,6 @@ class CSR : public GraphInterface {
  private:
   /*! \brief prive default constructor */
   CSR() {}
-
-  /*!
-   * \brief Internal function to get the range of the given edge in the CSR indices.
-   * \note If the graph is a simple graph, the returned range contains only one element.
-   */
-  std::pair<int64_t, int64_t> GetEdgeRange(dgl_id_t src, dgl_id_t dst) const;
 
   // The CSR arrays.
   //  - The index is 0-based.
@@ -430,6 +428,11 @@ class ImmutableGraph: public GraphInterface {
   ImmutableGraph(CSRPtr in_csr, CSRPtr out_csr, bool multigraph = false)
     : in_csr_(in_csr), out_csr_(out_csr), is_multigraph_(multigraph) {
     CHECK(in_csr_ || out_csr_) << "Both CSR are missing.";
+  }
+
+  /*! \brief Construct an immutable graph from one CSR. */
+  ImmutableGraph(CSRPtr csr, bool multigraph = false)
+    : out_csr_(csr), is_multigraph_(multigraph) {
   }
 
   /*! \brief default copy constructor */
@@ -814,13 +817,6 @@ class ImmutableGraph: public GraphInterface {
     }
   }
 
-  /*!
-   * \brief Compact a subgraph.
-   * In a sampled subgraph, the vertex Id is still in the ones in the original graph.
-   * We want to convert them to the subgraph Ids.
-   */
-  void CompactSubgraph(IdArray induced_vertices);
-
   // Store the in csr (i.e, the reverse csr)
   mutable CSRPtr in_csr_;
   // Store the out csr (i.e, the normal csr)
@@ -830,60 +826,6 @@ class ImmutableGraph: public GraphInterface {
   /*! \brief Whether if this is a multigraph. */
   bool is_multigraph_ = false;
 };
-
-
-  /*
-  typedef struct {
-    IdArray indptr, indices, id;
-  } CSRArray;
-
-  struct Edge {
-    dgl_id_t end_points[2];
-    dgl_id_t edge_id;
-  };
-
-  // Edge list indexed by edge id;
-  struct EdgeList {
-    typedef std::shared_ptr<EdgeList> Ptr;
-    std::vector<dgl_id_t> src_points;
-    std::vector<dgl_id_t> dst_points;
-
-    EdgeList(int64_t len, dgl_id_t val) {
-      src_points.resize(len, val);
-      dst_points.resize(len, val);
-    }
-
-    void register_edge(dgl_id_t eid, dgl_id_t src, dgl_id_t dst) {
-      CHECK_LT(eid, src_points.size()) << "Invalid edge id " << eid;
-      src_points[eid] = src;
-      dst_points[eid] = dst;
-    }
-
-    static EdgeList::Ptr FromCSR(
-        const CSR::vector<int64_t>& indptr,
-        const CSR::vector<dgl_id_t>& indices,
-        const CSR::vector<dgl_id_t>& edge_ids,
-        bool in_csr);
-  };
-  */
-
-  /*!
-   * \brief Get the CSR array that represents the in-edges.
-   * This method copies data from std::vector to IdArray.
-   * \param start the first row to copy.
-   * \param end the last row to copy (exclusive).
-   * \return the CSR array.
-   */
-  //CSRArray GetInCSRArray(size_t start, size_t end) const;
-
-  /*!
-   * \brief Get the CSR array that represents the out-edges.
-   * This method copies data from std::vector to IdArray.
-   * \param start the first row to copy.
-   * \param end the last row to copy (exclusive).
-   * \return the CSR array.
-   */
-  //CSRArray GetOutCSRArray(size_t start, size_t end) const;
 
 }  // namespace dgl
 
