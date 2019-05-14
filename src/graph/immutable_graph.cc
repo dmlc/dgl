@@ -16,13 +16,6 @@
 #endif
 
 namespace dgl {
-namespace {
-template<class ForwardIt, class T>
-bool BinarySearch(ForwardIt first, ForwardIt last, const T& value) {
-  first = std::lower_bound(first, last, value);
-  return (!(first == last) && !(value < *first));
-}
-}  // namespace
 
 //////////////////////////////////////////////////////////
 //
@@ -273,136 +266,6 @@ Subgraph CSR::EdgeSubgraph(IdArray eids) const {
   // TODO
 }
 
-// complexity: time O(E + V), space O(1)
-CSRPtr CSR::Transpose() const {
-  // TODO: do we need sort?
-  const int64_t N = NumVertices();
-  const int64_t M = NumEdges();
-  const dgl_id_t* Ap = static_cast<dgl_id_t*>(indptr_->data);
-  const dgl_id_t* Aj = static_cast<dgl_id_t*>(indices_->data);
-  const dgl_id_t* Ax = static_cast<dgl_id_t*>(edge_ids_->data);
-  IdArray ret_indptr = NewIdArray(N + 1);
-  IdArray ret_indices = NewIdArray(M);
-  IdArray ret_edge_ids = NewIdArray(M);
-  dgl_id_t* Bp = static_cast<dgl_id_t*>(ret_indptr->data);
-  dgl_id_t* Bi = static_cast<dgl_id_t*>(ret_indices->data);
-  dgl_id_t* Bx = static_cast<dgl_id_t*>(ret_edge_ids->data);
-
-  std::fill(Bp, Bp + N, 0);
-
-  for (int64_t j = 0; j < M; ++j) {
-    Bp[Aj[j]]++;
-  }
-
-  // cumsum
-  for (int64_t i = 0, cumsum = 0; i < N; ++i) {
-    const dgl_id_t temp = Bp[i];
-    Bp[i] = cumsum;
-    cumsum += temp;
-  }
-  Bp[N] = M;
-
-  for (int64_t i = 0; i < N; ++i) {
-    for (int64_t j = Ap[i]; j < Ap[i+1]; ++j) {
-      const dgl_id_t dst = Aj[j];
-      Bi[Bp[dst]] = i;
-      Bx[Bp[dst]] = Ax[j];
-      Bp[dst]++;
-    }
-  }
-
-  // correct the indptr
-  for (int64_t i = 0, last = 0; i <= N; ++i) {
-    dgl_id_t temp = Bp[i];
-    Bp[i] = last;
-    last = temp;
-  }
-
-  return CSRPtr(new CSR(ret_indptr, ret_indices, ret_edge_ids));
-}
-
-// complexity: time O(E + V), space O(1)
-COOPtr CSR::ToCOO() const {
-  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
-  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
-  const dgl_id_t* eid_data = static_cast<dgl_id_t*>(edge_ids_->data);
-  IdArray ret_src = NewIdArray(NumEdges());
-  IdArray ret_dst = NewIdArray(NumEdges());
-  dgl_id_t* ret_src_data = static_cast<dgl_id_t*>(ret_src->data);
-  dgl_id_t* ret_dst_data = static_cast<dgl_id_t*>(ret_dst->data);
-  // scatter by edge id
-  for (dgl_id_t src = 0; src < NumVertices(); ++src) {
-    for (dgl_id_t eid = indptr_data[src]; eid < indptr_data[src + 1]; ++eid) {
-      const dgl_id_t dst = indices_data[eid];
-      ret_src_data[eid_data[eid]] = src;
-      ret_dst_data[eid_data[eid]] = dst;
-    }
-  }
-  return COOPtr(new COO(NumVertices(), ret_src, ret_dst));
-}
-
-std::pair<int64_t, int64_t> CSR::GetEdgeRange(dgl_id_t src, dgl_id_t dst) const {
-  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
-  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
-  auto start = indices_data + indptr_data[src];
-  auto last = indices_data + indptr_data[src + 1];
-  auto first = std::lower_bound(start, last, dst);
-  int64_t len = 0;
-  for (auto it = first; it != last && *it == dst; ++it, ++len);
-  return std::make_pair(first - start, len);
-}
-
-//////////////////////////////////////////////////////////
-//
-// COO graph implementation
-//
-//////////////////////////////////////////////////////////
-
-COO::EdgeArray COO::FindEdges(IdArray eids) const {
-  CHECK(IsValidIdArray(eids)) << "Invalid edge id array";
-  dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
-  int64_t len = eids->shape[0];
-  IdArray rst_src = IdArray::Empty({len}, eids->dtype, eids->ctx);
-  IdArray rst_dst = IdArray::Empty({len}, eids->dtype, eids->ctx);
-  dgl_id_t* rst_src_data = static_cast<dgl_id_t*>(rst_src->data);
-  dgl_id_t* rst_dst_data = static_cast<dgl_id_t*>(rst_dst->data);
-
-  for (int64_t i = 0; i < len; i++) {
-    auto edge = COO::FindEdge(eid_data[i]);
-    rst_src_data[i] = edge.first;
-    rst_dst_data[i] = edge.second;
-  }
-
-  return COO::EdgeArray{rst_src, rst_dst, eids};
-}
-
-COO::EdgeArray COO::Edges(const std::string &order) const {
-  const int64_t rstlen = NumEdges();
-  CHECK(order.empty() || order == std::string("eid"))
-    << "COO only support Edges of order \"eid\", but got \""
-    << order << "\".";
-  IdArray rst_eid = NewIdArray(rstlen);
-  dgl_id_t* rst_eid_data = static_cast<dgl_id_t*>(rst_eid->data);
-  for (int64_t i = 0; i < rstlen; ++i) {
-    rst_eid_data[i] = i;
-  }
-  return EdgeArray{src_, dst_, rst_eid};
-}
-
-Subgraph COO::EdgeSubgraph(IdArray eids) const {
-  // TODO
-}
-
-CSRPtr COO::ToCSR() const {
-  // TODO
-}
-
-//////////////////////////////////////////////////////////
-//
-// immutable graph implementation
-//
-//////////////////////////////////////////////////////////
-
 class Bitmap {
   const size_t size = 1024 * 1024 * 4;
   const size_t mask = size - 1;
@@ -552,39 +415,185 @@ std::pair<ImmutableGraph::CSR::Ptr, IdArray> ImmutableGraph::CSR::EdgeSubgraph(
   return std::make_pair(sub_csr, rst_vids);
 }
 
+// complexity: time O(E + V), space O(1)
+CSRPtr CSR::Transpose() const {
+  const int64_t N = NumVertices();
+  const int64_t M = NumEdges();
+  const dgl_id_t* Ap = static_cast<dgl_id_t*>(indptr_->data);
+  const dgl_id_t* Aj = static_cast<dgl_id_t*>(indices_->data);
+  const dgl_id_t* Ax = static_cast<dgl_id_t*>(edge_ids_->data);
+  IdArray ret_indptr = NewIdArray(N + 1);
+  IdArray ret_indices = NewIdArray(M);
+  IdArray ret_edge_ids = NewIdArray(M);
+  dgl_id_t* Bp = static_cast<dgl_id_t*>(ret_indptr->data);
+  dgl_id_t* Bi = static_cast<dgl_id_t*>(ret_indices->data);
+  dgl_id_t* Bx = static_cast<dgl_id_t*>(ret_edge_ids->data);
 
-ImmutableGraph::CSR::Ptr ImmutableGraph::CSR::FromEdges(std::vector<Edge> *edges,
-                                                        int sort_on, uint64_t num_nodes) {
-  CHECK(sort_on == 0 || sort_on == 1) << "we must sort on the first or the second vector";
-  int other_end = sort_on == 1 ? 0 : 1;
-  // TODO(zhengda) we should sort in parallel.
-  std::sort(edges->begin(), edges->end(), [sort_on, other_end](const Edge &e1, const Edge &e2) {
-    if (e1.end_points[sort_on] == e2.end_points[sort_on]) {
-      return e1.end_points[other_end] < e2.end_points[other_end];
-    } else {
-      return e1.end_points[sort_on] < e2.end_points[sort_on];
-    }
-  });
-  auto t = std::make_shared<CSR>(0, 0);
-  t->indices.resize(edges->size());
-  t->edge_ids.resize(edges->size());
-  for (size_t i = 0; i < edges->size(); i++) {
-    t->indices[i] = edges->at(i).end_points[other_end];
-    CHECK(t->indices[i] < num_nodes);
-    t->edge_ids[i] = edges->at(i).edge_id;
-    dgl_id_t vid = edges->at(i).end_points[sort_on];
-    CHECK(vid < num_nodes);
-    while (vid > 0 && t->indptr.size() <= static_cast<size_t>(vid)) {
-      t->indptr.push_back(i);
-    }
-    CHECK(t->indptr.size() == vid + 1);
+  std::fill(Bp, Bp + N, 0);
+
+  for (int64_t j = 0; j < M; ++j) {
+    Bp[Aj[j]]++;
   }
-  while (t->indptr.size() < num_nodes + 1) {
-    t->indptr.push_back(edges->size());
+
+  // cumsum
+  for (int64_t i = 0, cumsum = 0; i < N; ++i) {
+    const dgl_id_t temp = Bp[i];
+    Bp[i] = cumsum;
+    cumsum += temp;
   }
-  CHECK(t->indptr.size() == num_nodes + 1);
-  return t;
+  Bp[N] = M;
+
+  for (int64_t i = 0; i < N; ++i) {
+    for (int64_t j = Ap[i]; j < Ap[i+1]; ++j) {
+      const dgl_id_t dst = Aj[j];
+      Bi[Bp[dst]] = i;
+      Bx[Bp[dst]] = Ax[j];
+      Bp[dst]++;
+    }
+  }
+
+  // correct the indptr
+  for (int64_t i = 0, last = 0; i <= N; ++i) {
+    dgl_id_t temp = Bp[i];
+    Bp[i] = last;
+    last = temp;
+  }
+
+  return CSRPtr(new CSR(ret_indptr, ret_indices, ret_edge_ids));
 }
+
+// complexity: time O(E + V), space O(1)
+COOPtr CSR::ToCOO() const {
+  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
+  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
+  const dgl_id_t* eid_data = static_cast<dgl_id_t*>(edge_ids_->data);
+  IdArray ret_src = NewIdArray(NumEdges());
+  IdArray ret_dst = NewIdArray(NumEdges());
+  dgl_id_t* ret_src_data = static_cast<dgl_id_t*>(ret_src->data);
+  dgl_id_t* ret_dst_data = static_cast<dgl_id_t*>(ret_dst->data);
+  // scatter by edge id
+  for (dgl_id_t src = 0; src < NumVertices(); ++src) {
+    for (dgl_id_t eid = indptr_data[src]; eid < indptr_data[src + 1]; ++eid) {
+      const dgl_id_t dst = indices_data[eid];
+      ret_src_data[eid_data[eid]] = src;
+      ret_dst_data[eid_data[eid]] = dst;
+    }
+  }
+  return COOPtr(new COO(NumVertices(), ret_src, ret_dst));
+}
+
+// worst case: O(E)
+std::pair<int64_t, int64_t> CSR::GetEdgeRange(dgl_id_t src, dgl_id_t dst) const {
+  const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
+  const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
+  auto start = indices_data + indptr_data[src];
+  auto last = indices_data + indptr_data[src + 1];
+  // TODO(minjie): optimize the linear search when the indices_ are sorted (binary search).
+  auto first = start;
+  for (; first != last && *first != dst; ++first);
+  int64_t len = 0;
+  for (auto it = first; it != last && *it == dst; ++it, ++len);
+  return std::make_pair(first - start, len);
+}
+
+//////////////////////////////////////////////////////////
+//
+// COO graph implementation
+//
+//////////////////////////////////////////////////////////
+
+COO::EdgeArray COO::FindEdges(IdArray eids) const {
+  CHECK(IsValidIdArray(eids)) << "Invalid edge id array";
+  dgl_id_t* eid_data = static_cast<dgl_id_t*>(eids->data);
+  int64_t len = eids->shape[0];
+  IdArray rst_src = NewIdArray(len);
+  IdArray rst_dst = NewIdArray(len);
+  dgl_id_t* rst_src_data = static_cast<dgl_id_t*>(rst_src->data);
+  dgl_id_t* rst_dst_data = static_cast<dgl_id_t*>(rst_dst->data);
+
+  for (int64_t i = 0; i < len; i++) {
+    auto edge = COO::FindEdge(eid_data[i]);
+    rst_src_data[i] = edge.first;
+    rst_dst_data[i] = edge.second;
+  }
+
+  return COO::EdgeArray{rst_src, rst_dst, eids};
+}
+
+COO::EdgeArray COO::Edges(const std::string &order) const {
+  const int64_t rstlen = NumEdges();
+  CHECK(order.empty() || order == std::string("eid"))
+    << "COO only support Edges of order \"eid\", but got \""
+    << order << "\".";
+  IdArray rst_eid = NewIdArray(rstlen);
+  dgl_id_t* rst_eid_data = static_cast<dgl_id_t*>(rst_eid->data);
+  for (int64_t i = 0; i < rstlen; ++i) {
+    rst_eid_data[i] = i;
+  }
+  return EdgeArray{src_, dst_, rst_eid};
+}
+
+Subgraph COO::EdgeSubgraph(IdArray eids) const {
+  CHECK(IsValidIdArray(eids));
+  const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
+  const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
+  const dgl_id_t* eids_data = static_cast<dgl_id_t*>(eids->data);
+  IdArray new_src = NewIdArray(eids->shape[0]);
+  IdArray new_dst = NewIdArray(eids->shape[0]);
+}
+
+// complexity: time O(E + V), space O(1)
+CSRPtr COO::ToCSR() const {
+  const int64_t N = num_vertices_;
+  const int64_t M = src_->shape[0];
+  const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
+  const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
+  IdArray indptr = NewIdArray(N + 1);
+  IdArray indices = NewIdArray(M);
+  IdArray edge_ids = NewIdArray(M);
+
+  dgl_id_t* Bp = static_cast<dgl_id_t*>(indptr->data);
+  dgl_id_t* Bi = static_cast<dgl_id_t*>(indices->data);
+  dgl_id_t* Bx = static_cast<dgl_id_t*>(edge_ids->data);
+
+  std::fill(Bp, Bp + N, 0);
+
+  for (int64_t i = 0; i < M; ++i) {
+    Bp[src_data[i]]++;
+  }
+
+  // cumsum
+  for (int64_t i = 0, cumsum = 0; i < N; ++i) {
+    const dgl_id_t temp = Bp[i];
+    Bp[i] = cumsum;
+    cumsum += temp;
+  }
+  Bp[N] = M;
+
+  for (int64_t i = 0; i < M; ++i) {
+    const dgl_id_t src = src_data[i];
+    const dgl_id_t dst = dst_data[i];
+    Bi[Bp[src]] = dst;
+    Bx[Bp[src]] = i;
+    Bp[src]++;
+  }
+
+  // correct the indptr
+  for (int64_t i = 0, last = 0; i <= N; ++i) {
+    dgl_id_t temp = Bp[i];
+    Bp[i] = last;
+    last = temp;
+  }
+
+  return CSRPtr(new CSR(indptr, indices, edge_ids));
+}
+
+//////////////////////////////////////////////////////////
+//
+// immutable graph implementation
+//
+//////////////////////////////////////////////////////////
+
 
 void ImmutableGraph::CSR::ReadAllEdges(std::vector<Edge> *edges) const {
   edges->resize(NumEdges());

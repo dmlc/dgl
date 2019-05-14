@@ -200,7 +200,7 @@ class CSR : public GraphInterface {
   //  - The index is 0-based.
   //  - The out edges of vertex v is stored from `indices_[indptr_[v]]` to
   //    `indices_[indptr_[v+1]]` (exclusive).
-  //  - The dst nodes of each vertex v are sorted.
+  //  - The indices are *not* necessarily sorted.
   IdArray indptr_, indices_, edge_ids_;
 #ifndef _WIN32
   // shared memory handler
