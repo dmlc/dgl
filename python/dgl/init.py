@@ -5,7 +5,7 @@ from . import backend as F
 
 __all__ = ['base_initializer', 'zero_initializer']
 
-def base_initializer(shape, dtype, ctx, id_range):  # pylint: disable=unused-argument
+def base_initializer(shape, dtype, ctx, id_range, name):  # pylint: disable=unused-argument
     """The function signature for feature initializer.
 
     Any customized feature initializer should follow this signature (see
@@ -24,6 +24,8 @@ def base_initializer(shape, dtype, ctx, id_range):  # pylint: disable=unused-arg
         The start id and the end id of the features to be initialized.
         The id could be node or edge id depending on the scenario.
         Note that the step is always None.
+    name : string
+        The name to identify the created tensor.
 
     Examples
     --------
@@ -44,7 +46,7 @@ def base_initializer(shape, dtype, ctx, id_range):  # pylint: disable=unused-arg
     """
     raise NotImplementedError
 
-def zero_initializer(shape, dtype, ctx, id_range):  # pylint: disable=unused-argument
+def zero_initializer(shape, dtype, ctx, id_range, name):  # pylint: disable=unused-argument
     """Zero feature initializer
 
     Examples

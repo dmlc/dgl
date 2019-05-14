@@ -341,11 +341,7 @@ class Frame(MutableMapping):
             self._warn_and_set_initializer()
         initializer = self.get_initializer(name)
         init_data = initializer((self.num_rows,) + scheme.shape, scheme.dtype,
-                                ctx, slice(0, self.num_rows))
-        # If the data is backed by a remote server, we need to move data
-        # to the remote server.
-        if self._remote_initializer is not None:
-            init_data = self._remote_initializer(name, init_data)
+                                ctx, slice(0, self.num_rows), name)
         self._columns[name] = Column(init_data, scheme)
 
     def add_rows(self, num_rows):
@@ -367,7 +363,7 @@ class Frame(MutableMapping):
                 self._warn_and_set_initializer()
             initializer = self.get_initializer(key)
             new_data = initializer((num_rows,) + scheme.shape, scheme.dtype,
-                                   ctx, slice(self._num_rows, self._num_rows + num_rows))
+                                   ctx, slice(self._num_rows, self._num_rows + num_rows), name)
             feat_placeholders[key] = new_data
         self._append(Frame(feat_placeholders))
         self._num_rows += num_rows
@@ -412,7 +408,8 @@ class Frame(MutableMapping):
                 initializer = self.get_initializer(key)
                 new_data = initializer((other.num_rows,) + scheme.shape,
                                        scheme.dtype, ctx,
-                                       slice(self._num_rows, self._num_rows + other.num_rows))
+                                       slice(self._num_rows, self._num_rows + other.num_rows),
+                                       name)
                 other[key] = new_data
             # append other to self
             for key, col in other.items():
