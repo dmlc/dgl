@@ -210,7 +210,7 @@ class Frame(MutableMapping):
         # If is none, then a warning will be raised
         # in the first call and zero initializer will be used later.
         self._initializers = {}  # per-column initializers
-        self._remote_initializer = None
+        self._remote_init_builder = None
         self._default_initializer = None
 
     def _warn_and_set_initializer(self):
@@ -252,20 +252,27 @@ class Frame(MutableMapping):
         else:
             self._initializers[column] = initializer
 
-    def set_remote_initializer(self, initializer):
-        """Set the remote initializer when a column is added to the frame.
+    def set_remote_init_builder(self, builder):
+        """Set an initializer builder that create a remote initializer for adding a new column to a frame.
 
-        Initializer is a callable that returns a tensor given a local tensor and tensor name.
+        The builder is a callable that returns an initializer. The returned initializer
+        is also a callable that returns a tensor given a local tensor and tensor name.
 
         Parameters
         ----------
-        initializer : callable
-            The initializer.
+        builder : callable
+            The builder to construct a remote initializer.
         """
-        self._remote_initializer = initializer
+        self._remote_init_builder = builder
 
-    def get_remote_initializer(self):
-        return self._remote_initializer
+    def get_remote_initializer(self, name):
+        if self._remote_init_builder is None:
+            return None
+
+        if self.get_initializer(name) is None:
+            self._warn_and_set_initializer()
+        initializer = self.get_initializer(name)
+        return self._remote_init_builder(initializer)
 
     @property
     def schemes(self):
@@ -343,7 +350,7 @@ class Frame(MutableMapping):
 
         # If the data is backed by a remote server, we need to move data
         # to the remote server.
-        initializer = self.get_remote_initializer()
+        initializer = self.get_remote_initializer(name)
         if initializer is not None:
             init_data = initializer((self.num_rows,) + scheme.shape, scheme.dtype,
                                     ctx, name)
@@ -391,7 +398,7 @@ class Frame(MutableMapping):
         """
         # If the data is backed by a remote server, we need to move data
         # to the remote server.
-        initializer = self.get_remote_initializer()
+        initializer = self.get_remote_initializer(name)
         if initializer is not None:
             new_data = initializer(F.shape(data), F.dtype(data), F.context(data), name)
             new_data[:] = data
@@ -522,17 +529,18 @@ class FrameRef(MutableMapping):
         """
         self._frame.set_initializer(initializer, column=column)
 
-    def set_remote_initializer(self, initializer):
-        """Set the remote initializer when a column is added to the frame.
+    def set_remote_init_builder(self, builder):
+        """Set an initializer builder that create a remote initializer for adding a new column to a frame.
 
-        Initializer is a callable that returns a tensor given a local tensor and tensor name.
+        The builder is a callable that returns an initializer. The returned initializer
+        is also a callable that returns a tensor given a local tensor and tensor name.
 
         Parameters
         ----------
-        initializer : callable
-            The initializer.
+        builder : callable
+            The builder to construct a remote initializer.
         """
-        self._frame.set_remote_initializer(initializer)
+        self._frame.set_remote_init_builder(builder)
 
     def get_initializer(self, column=None):
         """Get the initializer for empty values for the given column.

@@ -4,6 +4,7 @@ import scipy
 from xmlrpc.server import SimpleXMLRPCServer
 import xmlrpc.client
 import numpy as np
+from functools import partial
 
 from collections.abc import MutableMapping
 
@@ -265,7 +266,7 @@ class SharedMemoryStoreServer(object):
                     self._graph.is_multigraph, edge_dir
 
         # RPC command: initialize node embedding in the server.
-        def init_ndata(ndata_name, shape, dtype):
+        def init_ndata(init, ndata_name, shape, dtype):
             if ndata_name in self._graph.ndata:
                 ndata = self._graph.ndata[ndata_name]
                 assert np.all(ndata.shape == tuple(shape))
@@ -278,7 +279,7 @@ class SharedMemoryStoreServer(object):
             return 0
 
         # RPC command: initialize edge embedding in the server.
-        def init_edata(edata_name, shape, dtype):
+        def init_edata(init, edata_name, shape, dtype):
             if edata_name in self._graph.edata:
                 edata = self._graph.edata[edata_name]
                 assert np.all(edata.shape == tuple(shape))
@@ -406,24 +407,24 @@ class SharedMemoryDGLGraph(DGLGraph):
         # so that when a new node/edge embedding is created, it'll be created on the server as well.
 
         # These two functions create initialized tensors on the server.
-        def node_zero_initializer(shape, dtype, ctx, name):
+        def node_initializer(init, shape, dtype, ctx, name):
             dtype = np.dtype(dtype).name
-            self.proxy.init_ndata(name, shape, dtype)
+            self.proxy.init_ndata(init, name, shape, dtype)
             data = empty_shared_mem(_get_ndata_path(self._graph_name, name),
                                     False, shape, dtype)
             dlpack = data.to_dlpack()
             return F.zerocopy_from_dlpack(dlpack)
-        def edge_zero_initializer(shape, dtype, ctx, name):
+        def edge_initializer(init, shape, dtype, ctx, name):
             dtype = np.dtype(dtype).name
-            self.proxy.init_edata(name, shape, dtype)
+            self.proxy.init_edata(init, name, shape, dtype)
             data = empty_shared_mem(_get_edata_path(self._graph_name, name),
                                     False, shape, dtype)
             dlpack = data.to_dlpack()
             return F.zerocopy_from_dlpack(dlpack)
 
-        self._node_frame.set_remote_initializer(node_zero_initializer)
-        self._edge_frame.set_remote_initializer(edge_zero_initializer)
-        self._msg_frame.set_remote_initializer(edge_zero_initializer)
+        self._node_frame.set_remote_init_builder(lambda init: partial(node_initializer, init))
+        self._edge_frame.set_remote_init_builder(lambda init: partial(edge_initializer, init))
+        self._msg_frame.set_remote_init_builder(lambda init: partial(edge_initializer, init))
 
     def __del__(self):
         if self.proxy is not None:
@@ -487,7 +488,11 @@ class SharedMemoryDGLGraph(DGLGraph):
             The data type of the node embedding. The currently supported data types
             are "float32" and "int32".
         """
-        self.proxy.init_ndata(ndata_name, shape, dtype)
+        init = self._node_frame.get_initializer(ndata_name)
+        if init is None:
+            self._node_frame._frame._warn_and_set_initializer()
+        init = self._node_frame.get_initializer(ndata_name)
+        self.proxy.init_ndata(init, ndata_name, shape, dtype)
         self._init_ndata(ndata_name, shape, dtype)
 
     def init_edata(self, edata_name, shape, dtype):
@@ -506,7 +511,11 @@ class SharedMemoryDGLGraph(DGLGraph):
             The data type of the edge embedding. The currently supported data types
             are "float32" and "int32".
         """
-        self.proxy.init_edata(edata_name, shape, dtype)
+        init = self._edge_frame.get_initializer(edata_name)
+        if init is None:
+            self._edge_frame._frame._warn_and_set_initializer()
+        init = self._edge_frame.get_initializer(edata_name)
+        self.proxy.init_edata(init, edata_name, shape, dtype)
         self._init_edata(edata_name, shape, dtype)
 
 
