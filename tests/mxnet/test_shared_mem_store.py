@@ -73,9 +73,10 @@ def test_update_all_func(worker_id, graph_name):
     g._sync_barrier()
     g.dist_update_all(fn.copy_src(src='feat', out='m'),
                       fn.sum(msg='m', out='preprocess'))
-    g.update_all(fn.copy_src(src='feat', out='m'),
-                 fn.sum(msg='m', out='tmp'))
-    assert np.all((g.ndata['preprocess'] == g.ndata['tmp']).asnumpy())
+    adj = g.adjacency_matrix()
+    tmp = mx.nd.dot(adj, g.ndata['feat'])
+    assert np.all((g.ndata['preprocess'] == tmp).asnumpy())
+    g._sync_barrier()
     test_array_shared_memory(worker_id, [g.ndata['preprocess']])
     g.destroy()
 
