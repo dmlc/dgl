@@ -99,7 +99,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
   indices_.CopyFrom(indices);
   edge_ids_.CopyFrom(edge_ids);
 #else
-  LOG(FATAL) << "ImmutableGraph doesn't support shared memory in Windows yet";
+  LOG(FATAL) << "CSR graph doesn't support shared memory in Windows yet";
 #endif  // _WIN32
 }
 
@@ -117,11 +117,11 @@ CSR::CSR(const std::string &shared_mem_name,
   edge_ids_ = sm_array.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
       (num_verts + 1 + num_edges) * sizeof(dgl_id_t));
 #else
-  LOG(FATAL) << "ImmutableGraph doesn't support shared memory in Windows yet";
+  LOG(FATAL) << "CSR graph doesn't support shared memory in Windows yet";
 #endif  // _WIN32
 }
 
-ImmutableGraph::EdgeArray CSR::OutEdges(dgl_id_t vid) const {
+CSR::EdgeArray CSR::OutEdges(dgl_id_t vid) const {
   CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
   const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
   const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
@@ -137,10 +137,10 @@ ImmutableGraph::EdgeArray CSR::OutEdges(dgl_id_t vid) const {
   std::fill(src_data, src_data + len, vid);
   std::copy(indices_data + off, indices_data + off + len, dst_data);
   std::copy(edge_ids_data + off, edge_ids_data + off + len, eid_data);
-  return ImmutableGraph::EdgeArray{src, dst, eid};
+  return CSR::EdgeArray{src, dst, eid};
 }
 
-ImmutableGraph::EdgeArray CSR::OutEdges(IdArray vids) const {
+CSR::EdgeArray CSR::OutEdges(IdArray vids) const {
   CHECK(IsValidIdArray(vids)) << "Invalid vertex id array.";
   const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
   const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
@@ -173,7 +173,7 @@ ImmutableGraph::EdgeArray CSR::OutEdges(IdArray vids) const {
       *(eid_ptr++) = eids[j];
     }
   }
-  return ImmutableGraph::EdgeArray{src, dst, eid};
+  return CSR::EdgeArray{src, dst, eid};
 }
 
 DegreeArray CSR::OutDegrees(IdArray vids) const {
@@ -403,6 +403,11 @@ COOPtr CSR::ToCOO() const {
 // COO graph implementation
 //
 //////////////////////////////////////////////////////////
+COO::COO(int64_t num_vertices, IdArray src, IdArray dst)
+  : num_vertices_(num_vertices), src_(src), dst_(dst) {
+  CHECK(IsValidIdArray(src));
+  CHECK(IsValidIdArray(dst));
+}
 
 COO::EdgeArray COO::FindEdges(IdArray eids) const {
   CHECK(IsValidIdArray(eids)) << "Invalid edge id array";
@@ -478,6 +483,7 @@ CSRPtr COO::ToCSR() const {
   const int64_t M = src_->shape[0];
   const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
   const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
+  LOG(INFO) << "N=" << N << " M=" << M;
   IdArray indptr = NewIdArray(N + 1);
   IdArray indices = NewIdArray(M);
   IdArray edge_ids = NewIdArray(M);

@@ -235,8 +235,7 @@ class CSR : public GraphInterface {
 class COO : public GraphInterface {
  public:
   // Create a coo graph that shares the given src and dst
-  COO(int64_t num_vertices, IdArray src, IdArray dst)
-    : num_vertices_(num_vertices), src_(src), dst_(dst) {}
+  COO(int64_t num_vertices, IdArray src, IdArray dst);
 
   void AddVertices(uint64_t num_vertices) override {
     LOG(FATAL) << "CSR graph does not allow mutation.";
@@ -586,7 +585,13 @@ class ImmutableGraph: public GraphInterface {
    * \param dst The destination vertex.
    * \return the edge id array.
    */
-  IdArray EdgeId(dgl_id_t src, dgl_id_t dst) const override;
+  IdArray EdgeId(dgl_id_t src, dgl_id_t dst) const override {
+    if (in_csr_) {
+      return in_csr_->EdgeId(dst, src);
+    } else {
+      return GetOutCSR()->EdgeId(src, dst);
+    }
+  }
 
   /*!
    * \brief Get all edge ids between the given endpoint pairs.
@@ -597,7 +602,13 @@ class ImmutableGraph: public GraphInterface {
    *       first, and ties are broken by the order of edge ID.
    * \return EdgeArray containing all edges between all pairs.
    */
-  EdgeArray EdgeIds(IdArray src, IdArray dst) const override;
+  EdgeArray EdgeIds(IdArray src, IdArray dst) const override {
+    if (in_csr_) {
+      return in_csr_->EdgeIds(dst, src);
+    } else {
+      return GetOutCSR()->EdgeIds(src, dst);
+    }
+  }
 
   /*!
    * \brief Find the edge ID and return the pair of endpoints
@@ -811,8 +822,12 @@ class ImmutableGraph: public GraphInterface {
   /* !\brief Return in csr. If not exist, transpose the other one.*/
   CSRPtr GetInCSR() const {
     if (!in_csr_) {
-      CHECK(out_csr_) << "Both CSR are missing.";
-      in_csr_ = out_csr_->Transpose();
+      if (out_csr_) {
+        in_csr_ = out_csr_->Transpose();
+      } else {
+        CHECK(coo_) << "None of CSR, COO exist";
+        in_csr_ = coo_->Transpose()->ToCSR();
+      }
     }
     return in_csr_;
   }
@@ -820,8 +835,12 @@ class ImmutableGraph: public GraphInterface {
   /* !\brief Return out csr. If not exist, transpose the other one.*/
   CSRPtr GetOutCSR() const {
     if (!out_csr_) {
-      CHECK(in_csr_) << "Both CSR are missing.";
-      out_csr_ = in_csr_->Transpose();
+      if (in_csr_) {
+        out_csr_ = in_csr_->Transpose();
+      } else {
+        CHECK(coo_) << "None of CSR, COO exist";
+        out_csr_ = coo_->ToCSR();
+      }
     }
     return out_csr_;
   }

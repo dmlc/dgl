@@ -133,7 +133,7 @@ DGL_REGISTER_GLOBAL("traversal._CAPI_DGLBFSNodes")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
-    const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray src = args[1];
     bool reversed = args[2];
     const auto& front = BFSNodesFrontiers(*gptr, src, reversed);
     IdArray node_ids = CopyVectorToNDArray(front.ids);
@@ -164,7 +164,7 @@ DGL_REGISTER_GLOBAL("traversal._CAPI_DGLBFSEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
-    const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray src = args[1];
     bool reversed = args[2];
     const auto& front = BFSEdgesFrontiers(*gptr, src, reversed);
     IdArray edge_ids = CopyVectorToNDArray(front.ids);
@@ -202,7 +202,7 @@ DGL_REGISTER_GLOBAL("traversal._CAPI_DGLDFSEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
-    const IdArray source = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray source = args[1];
     const bool reversed = args[2];
     CHECK(IsValidIdArray(source)) << "Invalid source node id array.";
     const int64_t len = source->shape[0];
@@ -221,7 +221,7 @@ DGL_REGISTER_GLOBAL("traversal._CAPI_DGLDFSLabeledEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const Graph* gptr = static_cast<Graph*>(ghandle);
-    const IdArray source = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray source = args[1];
     const bool reversed = args[2];
     const bool has_reverse_edge = args[3];
     const bool has_nontree_edge = args[4];

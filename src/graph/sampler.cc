@@ -709,7 +709,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     // arguments
     const GraphHandle ghdl = args[0];
-    const IdArray seed_nodes = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray seed_nodes = args[1];
     const int64_t batch_start_id = args[2];
     const int64_t batch_size = args[3];
     const int64_t max_num_workers = args[4];
@@ -748,11 +748,11 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_LayerSampling")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     // arguments
     const GraphHandle ghdl = args[0];
-    const IdArray seed_nodes = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray seed_nodes = args[1];
     const int64_t batch_start_id = args[2];
     const int64_t batch_size = args[3];
     const int64_t max_num_workers = args[4];
-    const IdArray layer_sizes = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[5]));
+    const IdArray layer_sizes = args[5];
     const std::string neigh_type = args[6];
     // process args
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghdl);

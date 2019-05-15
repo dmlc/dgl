@@ -786,7 +786,6 @@ class GraphIndex(object):
                 dst.append(e[1])
         num_nodes = nx_graph.number_of_nodes()
         # We store edge Ids as an edge attribute.
-        eid = utils.toindex(eid)
         src = utils.toindex(src)
         dst = utils.toindex(dst)
         self._init(src, dst, num_nodes)

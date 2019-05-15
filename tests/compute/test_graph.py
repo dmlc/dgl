@@ -53,6 +53,18 @@ def test_scipy_adjmat():
 
     g.readonly()
     adj_2 = g.adjacency_matrix_scipy()
+    #indptr = [0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    #indices = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+
+    #gidx = dgl.graph_index.GraphIndex(None, False, True)
+    #def foo():
+    #    th_indptr = F.tensor(indptr)
+    #    th_indices = F.tensor(indices)
+    #    gidx.from_csr_matrix(th_indptr, th_indices, "out")
+    #foo()
+    #adjj = gidx.adjacency_matrix_scipy(False, "csr")
+    #print(adjj.indptr, adjj.indices)
+
     adj_3 = g.adjacency_matrix_scipy(fmt='coo')
     assert np.array_equal(adj_2.toarray(), adj_3.toarray())
     assert np.array_equal(adj_0.toarray(), adj_2.toarray())
@@ -238,11 +250,11 @@ def test_find_edges():
         assert fail
 
 if __name__ == '__main__':
-    test_graph_creation()
-    test_create_from_elist()
-    test_adjmat_cache()
+    #test_graph_creation()
+    #test_create_from_elist()
+    #test_adjmat_cache()
     test_scipy_adjmat()
-    test_incmat()
-    test_incmat_cache()
-    test_readonly()
-    test_find_edges()
+    #test_incmat()
+    #test_incmat_cache()
+    #test_readonly()
+    #test_find_edges()
