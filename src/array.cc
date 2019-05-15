@@ -132,6 +132,20 @@ IdArray Div(dgl_id_t lhs, IdArray rhs) {
   return ret;
 }
 
+IdArray HStack(IdArray arr1, IdArray arr2) {
+  CHECK_EQ(arr1->shape[0], arr2->shape[0]);
+  const int64_t L = arr1->shape[0];
+  IdArray ret = NewIdArray(2 * L);
+  const dgl_id_t* arr1_data = static_cast<dgl_id_t*>(arr1->data);
+  const dgl_id_t* arr2_data = static_cast<dgl_id_t*>(arr2->data);
+  dgl_id_t* ret_data = static_cast<dgl_id_t*>(ret->data);
+  for (int64_t i = 0; i < L; ++i) {
+    ret_data[i] = arr1_data[i];
+    ret_data[i + L] = arr2_data[i];
+  }
+  return ret;
+}
+
 CSRMatrix SliceRows(const CSRMatrix& csr, int64_t start, int64_t end) {
   // TODO
   LOG(FATAL) << "Not implemented.";

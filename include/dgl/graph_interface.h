@@ -363,6 +363,13 @@ class GraphInterface {
    *
    * By default, a row of returned adjacency matrix represents the destination
    * of an edge and the column represents the source.
+   *
+   * If the fmt is 'csr', the function should return three arrays, representing
+   *  indptr, indices and edge ids
+   *
+   * If the fmt is 'coo', the function should return one array of shape (2, nnz),
+   * representing a horitonzal stack of row and col indices.
+   *
    * \param transpose A flag to transpose the returned adjacency matrix.
    * \param fmt the format of the returned adjacency matrix.
    * \return a vector of IdArrays.

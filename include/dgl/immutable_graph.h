@@ -406,9 +406,9 @@ class COO : public GraphInterface {
   std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override {
     CHECK(fmt == "coo") << "Not valid adj format request.";
     if (transpose) {
-      return {dst_, src_};
+      return {HStack(dst_, src_)};
     } else {
-      return {src_, dst_};
+      return {HStack(src_, dst_)};
     }
   }
 

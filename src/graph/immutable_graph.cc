@@ -483,7 +483,6 @@ CSRPtr COO::ToCSR() const {
   const int64_t M = src_->shape[0];
   const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
   const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
-  LOG(INFO) << "N=" << N << " M=" << M;
   IdArray indptr = NewIdArray(N + 1);
   IdArray indices = NewIdArray(M);
   IdArray edge_ids = NewIdArray(M);
