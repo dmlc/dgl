@@ -73,6 +73,9 @@ def test_update_all_func(worker_id, graph_name):
     g._sync_barrier()
     g.dist_update_all(fn.copy_src(src='feat', out='m'),
                       fn.sum(msg='m', out='preprocess'))
+    g.update_all(fn.copy_src(src='feat', out='m'),
+                 fn.sum(msg='m', out='tmp'))
+    assert np.all((g.ndata['preprocess'] == g.ndata['tmp']).asnumpy())
     test_array_shared_memory(worker_id, [g.ndata['preprocess']])
     g.destroy()
 
