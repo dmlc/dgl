@@ -195,10 +195,22 @@ class CSR : public GraphInterface {
   /*! \brief Convert this CSR to COO */
   COOPtr ToCOO() const;
 
-  /*! \brief Convert this CSR graph to plain CSR structure */
+  /*!
+   * \return the csr matrix that represents this graph.
+   * \note The csr matrix shares the storage with this graph.
+   *       The data field of the CSR matrix stores the edge ids.
+   */
   CSRMatrix ToCSRMatrix() const {
     return CSRMatrix{indptr_, indices_, edge_ids_};
   }
+
+  // member getters
+  
+  IdArray indptr() const { return indptr_; }
+
+  IdArray indices() const { return indices_; }
+
+  IdArray edge_ids() const { return edge_ids_; }
 
  private:
   /*! \brief prive default constructor */
@@ -409,11 +421,21 @@ class COO : public GraphInterface {
   /*! \brief Convert this COO to CSR */
   CSRPtr ToCSR() const;
 
-  /*! \brief Convert this CSR graph to plain CSR structure */
+  /*!
+   * \brief Get the coo matrix that represents this graph.
+   * \note The coo matrix shares the storage with this graph.
+   *       The data field of the coo matrix is none.
+   */
   COOMatrix ToCOOMatrix() const {
     return COOMatrix{src_, dst_, {}};
   }
   
+  // member getters
+  
+  IdArray src() const { return src_; }
+
+  IdArray dst() const { return dst_; }
+
  private:
   /* !\brief private default constructor */
   COO() {}

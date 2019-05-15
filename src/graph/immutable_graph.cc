@@ -360,7 +360,7 @@ CSRPtr CSR::Transpose() const {
   Bp[N] = M;
 
   for (int64_t i = 0; i < N; ++i) {
-    for (int64_t j = Ap[i]; j < Ap[i+1]; ++j) {
+    for (dgl_id_t j = Ap[i]; j < Ap[i+1]; ++j) {
       const dgl_id_t dst = Aj[j];
       Bi[Bp[dst]] = i;
       Bx[Bp[dst]] = Ax[j];
@@ -447,7 +447,7 @@ Subgraph COO::EdgeSubgraph(IdArray eids) const {
   dgl_id_t newid = 0;
   std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
 
-  for (dgl_id_t i = 0; i < eids->shape[0]; ++i) {
+  for (int64_t i = 0; i < eids->shape[0]; ++i) {
     const dgl_id_t eid = eids_data[i];
     const dgl_id_t src = src_data[eid];
     const dgl_id_t dst = dst_data[eid];
@@ -555,10 +555,17 @@ Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids) const {
 }
 
 std::vector<IdArray> ImmutableGraph::GetAdj(bool transpose, const std::string &fmt) const {
+  // TODO(minjie): Our current semantics of adjacency matrix is row for dst nodes and col for
+  //   src nodes. Therefore, we need to flip the transpose flag. For example, transpose=False
+  //   is equal to in edge CSR.
+  //   We have this behavior because previously we use framework's SPMM and we don't cache
+  //   reverse adj. This is not intuitive and also not consistent with networkx's
+  //   to_scipy_sparse_matrix. With the upcoming custom kernel change, we should change the
+  //   behavior and make row for src and col for dst.
   if (fmt == std::string("csr")) {
-    return transpose? GetInCSR()->GetAdj(false, "csr") : GetOutCSR()->GetAdj(false, "csr");
+    return transpose? GetOutCSR()->GetAdj(false, "csr") : GetInCSR()->GetAdj(false, "csr");
   } else if (fmt == std::string("coo")) {
-    return GetCOO()->GetAdj(transpose, fmt);
+    return GetCOO()->GetAdj(!transpose, fmt);
   } else {
     LOG(FATAL) << "unsupported adjacency matrix format: " << fmt;
     return {};

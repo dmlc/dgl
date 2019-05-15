@@ -160,7 +160,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
     int control = *buffer;
     if (control == CONTROL_NODEFLOW) {
       NodeFlow* nf = new NodeFlow();
-      ImmutableGraph::CSR::Ptr csr;
+      CSRPtr csr;
       // Deserialize nodeflow from recv_data_buffer
       network::DeserializeSampledSubgraph(buffer+sizeof(CONTROL_NODEFLOW),
                                           &(csr),
