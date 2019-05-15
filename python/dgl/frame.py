@@ -264,6 +264,9 @@ class Frame(MutableMapping):
         """
         self._remote_initializer = initializer
 
+    def get_remote_initializer(self):
+        return self._remote_initializer
+
     @property
     def schemes(self):
         """Return a dictionary of column name to column schemes."""
@@ -337,11 +340,19 @@ class Frame(MutableMapping):
         if name in self:
             dgl_warning('Column "%s" already exists. Ignore adding this column again.' % name)
             return
-        if self.get_initializer(name) is None:
-            self._warn_and_set_initializer()
-        initializer = self.get_initializer(name)
-        init_data = initializer((self.num_rows,) + scheme.shape, scheme.dtype,
-                                ctx, slice(0, self.num_rows), name)
+
+        # If the data is backed by a remote server, we need to move data
+        # to the remote server.
+        initializer = self.get_remote_initializer()
+        if initializer is not None:
+            init_data = initializer((self.num_rows,) + scheme.shape, scheme.dtype,
+                                    ctx, name)
+        else:
+            if self.get_initializer(name) is None:
+                self._warn_and_set_initializer()
+            initializer = self.get_initializer(name)
+            init_data = initializer((self.num_rows,) + scheme.shape, scheme.dtype,
+                                    ctx, slice(0, self.num_rows))
         self._columns[name] = Column(init_data, scheme)
 
     def add_rows(self, num_rows):
@@ -363,7 +374,7 @@ class Frame(MutableMapping):
                 self._warn_and_set_initializer()
             initializer = self.get_initializer(key)
             new_data = initializer((num_rows,) + scheme.shape, scheme.dtype,
-                                   ctx, slice(self._num_rows, self._num_rows + num_rows), name)
+                                   ctx, slice(self._num_rows, self._num_rows + num_rows))
             feat_placeholders[key] = new_data
         self._append(Frame(feat_placeholders))
         self._num_rows += num_rows
@@ -380,8 +391,11 @@ class Frame(MutableMapping):
         """
         # If the data is backed by a remote server, we need to move data
         # to the remote server.
-        if self._remote_initializer is not None:
-            data = self._remote_initializer(name, data)
+        initializer = self.get_remote_initializer()
+        if initializer is not None:
+            new_data = initializer(F.shape(data), F.dtype(data), F.context(data), name)
+            new_data[:] = data
+            data = new_data
         col = Column.create(data)
         if len(col) != self.num_rows:
             raise DGLError('Expected data to have %d rows, got %d.' %
@@ -389,7 +403,7 @@ class Frame(MutableMapping):
         self._columns[name] = col
 
     def _append(self, other):
-        assert self._remote_initializer is None, \
+        assert self.get_remote_initializer() is None, \
                 "We don't support append if data in the frame is mapped from a remote server."
         # NOTE: `other` can be empty.
         if self.num_rows == 0:
@@ -408,8 +422,7 @@ class Frame(MutableMapping):
                 initializer = self.get_initializer(key)
                 new_data = initializer((other.num_rows,) + scheme.shape,
                                        scheme.dtype, ctx,
-                                       slice(self._num_rows, self._num_rows + other.num_rows),
-                                       name)
+                                       slice(self._num_rows, self._num_rows + other.num_rows))
                 other[key] = new_data
             # append other to self
             for key, col in other.items():

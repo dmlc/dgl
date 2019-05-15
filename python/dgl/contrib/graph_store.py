@@ -406,48 +406,24 @@ class SharedMemoryDGLGraph(DGLGraph):
         # so that when a new node/edge embedding is created, it'll be created on the server as well.
 
         # These two functions create initialized tensors on the server.
-        def node_zero_initializer(shape, dtype, ctx, id_range, name):
+        def node_zero_initializer(shape, dtype, ctx, name):
             dtype = np.dtype(dtype).name
             self.proxy.init_ndata(name, shape, dtype)
             data = empty_shared_mem(_get_ndata_path(self._graph_name, name),
                                     False, shape, dtype)
             dlpack = data.to_dlpack()
             return F.zerocopy_from_dlpack(dlpack)
-        def edge_zero_initializer(shape, dtype, ctx, id_range, name):
+        def edge_zero_initializer(shape, dtype, ctx, name):
             dtype = np.dtype(dtype).name
             self.proxy.init_edata(name, shape, dtype)
             data = empty_shared_mem(_get_edata_path(self._graph_name, name),
                                     False, shape, dtype)
             dlpack = data.to_dlpack()
             return F.zerocopy_from_dlpack(dlpack)
-        self._node_frame.set_initializer(node_zero_initializer)
-        self._edge_frame.set_initializer(edge_zero_initializer)
-        self._msg_frame.set_initializer(edge_zero_initializer)
 
-        # These two functions create a tensor on the server and move data to the tensor.
-        def node_initializer(name, arr):
-            shape = F.shape(arr)
-            dtype = np.dtype(F.dtype(arr)).name
-            self.proxy.init_ndata(name, shape, dtype)
-            data = empty_shared_mem(_get_ndata_path(self._graph_name, name),
-                                    False, shape, dtype)
-            dlpack = data.to_dlpack()
-            arr1 = F.zerocopy_from_dlpack(dlpack)
-            arr1[:] = arr
-            return arr1
-        def edge_initializer(name, arr):
-            shape = F.shape(arr)
-            dtype = np.dtype(F.dtype(arr)).name
-            self.proxy.init_edata(name, shape, dtype)
-            data = empty_shared_mem(_get_edata_path(self._graph_name, name),
-                                    False, shape, dtype)
-            dlpack = data.to_dlpack()
-            arr1 = F.zerocopy_from_dlpack(dlpack)
-            arr1[:] = arr
-            return arr1
-        self._node_frame.set_remote_initializer(node_initializer)
-        self._edge_frame.set_remote_initializer(edge_initializer)
-        self._msg_frame.set_remote_initializer(edge_initializer)
+        self._node_frame.set_remote_initializer(node_zero_initializer)
+        self._edge_frame.set_remote_initializer(edge_zero_initializer)
+        self._msg_frame.set_remote_initializer(edge_zero_initializer)
 
     def __del__(self):
         if self.proxy is not None:
