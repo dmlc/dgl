@@ -37,7 +37,7 @@ def attach_grad(x):
 
 def backward(x, head_gradient=None):
     """Invoke backward computation with an optional head gradient.
-    
+
     Returns nothing."""
     pass
 
@@ -73,6 +73,10 @@ def softmax(x, dim):
 
 def spmm(x, y):
     """Sparse dense matrix multiply"""
+    pass
+
+def max(x, dim):
+    """Computes the max of array elements over given axes"""
     pass
 
 ###############################################################################
