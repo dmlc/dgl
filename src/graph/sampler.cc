@@ -248,14 +248,10 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
                            int64_t num_edges, int num_hops, bool is_multigraph) {
   NodeFlow nf;
   uint64_t num_vertices = sub_vers->size();
-  nf.node_mapping = IdArray::Empty({static_cast<int64_t>(num_vertices)},
-                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  nf.edge_mapping = IdArray::Empty({static_cast<int64_t>(num_edges)},
-                                   DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  nf.layer_offsets = IdArray::Empty({static_cast<int64_t>(num_hops + 1)},
-                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-  nf.flow_offsets = IdArray::Empty({static_cast<int64_t>(num_hops)},
-                                    DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  nf.node_mapping = NewIdArray(num_vertices);
+  nf.edge_mapping = NewIdArray(num_edges);
+  nf.layer_offsets = NewIdArray(num_hops + 1);
+  nf.flow_offsets = NewIdArray(num_hops);
 
   dgl_id_t *node_map_data = static_cast<dgl_id_t *>(nf.node_mapping->data);
   dgl_id_t *layer_off_data = static_cast<dgl_id_t *>(nf.layer_offsets->data);
@@ -302,10 +298,8 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   // When we expose the sampled graph to a Python user, we say the input nodes
   // are in the first layer and the seed nodes are in the last layer.
   // Thus, when we copy sampled results to a CSR, we need to reverse the order of layers.
-  size_t row_idx = 0;
-  for (size_t i = layer_offsets[num_hops - 1]; i < layer_offsets[num_hops]; i++) {
-    indptr_out[row_idx++] = 0;
-  }
+  std::fill(indptr_out, indptr_out + num_vertices + 1, 0);
+  size_t row_idx = layer_offsets[num_hops] - layer_offsets[num_hops - 1];
   layer_off_data[0] = 0;
   layer_off_data[1] = layer_offsets[num_hops] - layer_offsets[num_hops - 1];
   int out_layer_idx = 1;
@@ -321,31 +315,31 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
       CHECK_EQ(dst_id, neigh_pos->at(i).id);
       size_t pos = neigh_pos->at(i).pos;
       CHECK_LE(pos, neighbor_list.size());
-      size_t num_edges = neigh_pos->at(i).num_edges;
-      if (neighbor_list.empty()) CHECK_EQ(num_edges, 0);
+      const size_t nedges = neigh_pos->at(i).num_edges;
+      if (neighbor_list.empty()) CHECK_EQ(nedges, 0);
 
       // We need to map the Ids of the neighbors to the subgraph.
       auto neigh_it = neighbor_list.begin() + pos;
-      for (size_t i = 0; i < num_edges; i++) {
+      for (size_t i = 0; i < nedges; i++) {
         dgl_id_t neigh = *(neigh_it + i);
         CHECK(layer_ver_maps[layer_id + 1].find(neigh) != layer_ver_maps[layer_id + 1].end());
         col_list_out[collected_nedges + i] = layer_ver_maps[layer_id + 1][neigh];
       }
       // We can simply copy the edge Ids.
       std::copy_n(edge_list.begin() + pos,
-                  num_edges, edge_map_data + collected_nedges);
-      collected_nedges += num_edges;
-      indptr_out[row_idx+1] = indptr_out[row_idx] + num_edges;
+                  nedges, edge_map_data + collected_nedges);
+      collected_nedges += nedges;
+      indptr_out[row_idx+1] = indptr_out[row_idx] + nedges;
       row_idx++;
     }
     layer_off_data[out_layer_idx + 1] = layer_off_data[out_layer_idx]
         + layer_offsets[layer_id + 1] - layer_offsets[layer_id];
     out_layer_idx++;
   }
-  CHECK(row_idx == num_vertices);
-  CHECK(indptr_out[row_idx] == num_edges);
-  CHECK(out_layer_idx == num_hops);
-  CHECK(layer_off_data[out_layer_idx] == num_vertices);
+  CHECK_EQ(row_idx, num_vertices);
+  CHECK_EQ(indptr_out[row_idx], num_edges);
+  CHECK_EQ(out_layer_idx, num_hops);
+  CHECK_EQ(layer_off_data[out_layer_idx], num_vertices);
 
   // Copy flow offsets.
   flow_off_data[0] = 0;
