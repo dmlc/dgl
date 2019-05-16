@@ -3,8 +3,8 @@
  * \file c_atomic.h
  * \brief DGL atomic operations
  */
-#ifndef DGL_ATOMIC_H_
-#define DGL_ATOMIC_H_
+#ifndef DGL_RUNTIME_ATOMIC_H_
+#define DGL_RUNTIME_ATOMIC_H_
 
 #include <stdatomic.h>
 #include <atomic>
@@ -19,7 +19,7 @@ T atomic_read(volatile T *val) {
 }
 
 class ReadWriteLock {
-  volatile int &lock;
+  volatile int *lock;
   int tmp_val;
 
   static bool is_write_mode(int lock_val) {
@@ -29,28 +29,30 @@ class ReadWriteLock {
   void enter_write_mode() {
     int prev;
     do {
-      prev = __atomic_fetch_or(&lock, 1<<31, memory_order_seq_cst);
+      prev = __atomic_fetch_or(lock, 1<<31, memory_order_seq_cst);
       // If the previous value already has write lock set up,
       // we have to wait until the write lock is reset.
-    } while(prev < 0);
+    } while (prev < 0);
   }
 
   void leave_write_mode() {
-    int prev = __atomic_fetch_and(&lock, ~(1<<31), memory_order_seq_cst);
+    int prev = __atomic_fetch_and(lock, ~(1<<31), memory_order_seq_cst);
     // when leaving the write mode, we have to make sure the write lock was
     // set up.
-    CHECK(prev < 0);
+    CHECK_LT(prev, 0);
   }
-public:
-  ReadWriteLock(int &_lock): lock(_lock) {
+
+ public:
+  ReadWriteLock(int *_lock) {
+    this->lock = _lock;
   }
 
   void ReadLock() {
-    tmp_val = atomic_read(&lock);
+    tmp_val = atomic_read(lock);
   }
 
   bool ReadUnlock() {
-    int tmp_val2 = atomic_read(&lock);
+    int tmp_val2 = atomic_read(lock);
     // If the first read and the second read has different values,
     // it means the row has been modified during reading. We should read it again.
     // Even if they are the same, we still need to check if the lock is in the write mode,
@@ -63,11 +65,11 @@ public:
   }
 
   void WriteUnlock() {
-    __atomic_fetch_add(&lock, 1, memory_order_seq_cst);
+    __atomic_fetch_add(lock, 1, memory_order_seq_cst);
     leave_write_mode();
   }
 };
 
 }  // namespace dgl
 
-#endif  // DGL_ATOMIC_H_
+#endif  // DGL_RUNTIME_ATOMIC_H_

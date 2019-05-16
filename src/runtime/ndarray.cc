@@ -237,7 +237,7 @@ void SharedMemGatherRows(DLTensor *from, DLTensor *lock, DLTensor *idx, DLTensor
 #pragma omp parallel for
   for (size_t i = 0; i < num_rows; i++) {
     size_t row_idx = idx_data[i];
-    ReadWriteLock row_lock(lock_data[row_idx]);
+    ReadWriteLock row_lock(&lock_data[row_idx]);
     bool success;
     do {
       row_lock.ReadLock();
@@ -266,7 +266,7 @@ void SharedMemScatterRows(DLTensor *from, DLTensor *lock, DLTensor *idx, DLTenso
 #pragma omp parallel for
   for (size_t i = 0; i < num_rows; i++) {
     size_t row_idx = idx_data[i];
-    ReadWriteLock row_lock(lock_data[row_idx]);
+    ReadWriteLock row_lock(&lock_data[row_idx]);
     row_lock.WriteLock();
     memcpy(to_data + row_idx * row_size, from_data + i * row_size, row_size);
     row_lock.WriteUnlock();
