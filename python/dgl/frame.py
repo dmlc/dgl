@@ -253,7 +253,7 @@ class Frame(MutableMapping):
             self._initializers[column] = initializer
 
     def set_remote_init_builder(self, builder):
-        """Set an initializer builder that create a remote initializer for adding a new column to a frame.
+        """Set an initializer builder to create a remote initializer for a new column to a frame.
 
         The builder is a callable that returns an initializer. The returned initializer
         is also a callable that returns a tensor given a local tensor and tensor name.
@@ -266,6 +266,8 @@ class Frame(MutableMapping):
         self._remote_init_builder = builder
 
     def get_remote_initializer(self, name):
+        """Get a remote initializer.
+        """
         if self._remote_init_builder is None:
             return None
 
@@ -530,7 +532,7 @@ class FrameRef(MutableMapping):
         self._frame.set_initializer(initializer, column=column)
 
     def set_remote_init_builder(self, builder):
-        """Set an initializer builder that create a remote initializer for adding a new column to a frame.
+        """Set an initializer builder to create a remote initializer for a new column to a frame.
 
         The builder is a callable that returns an initializer. The returned initializer
         is also a callable that returns a tensor given a local tensor and tensor name.
