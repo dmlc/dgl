@@ -7,7 +7,68 @@ import dgl
 import backend as F
 from dgl import DGLError
 
-def test_graph_creation():
+# graph generation: a random graph with 10 nodes
+#  and 20 edges.
+#  - has self loop
+#  - no multi edge
+def edge_pair_input():
+    src = [0, 0, 4, 5, 0, 4, 7, 4, 4, 3, 2, 7, 7, 5, 3, 2, 1, 9, 6, 1]
+    dst = [9, 6, 3, 9, 4, 4, 9, 9, 1, 8, 3, 2, 8, 1, 5, 7, 3, 2, 6, 5]
+    return src, dst
+
+def nx_input():
+    g = nx.DiGraph()
+    src, dst = edge_pair_input()
+    for i, e in enumerate(zip(src, dst)):
+        g.add_edge(*e, id=i)
+    return g
+
+def elist_input():
+    src, dst = edge_pair_input()
+    return list(zip(src, dst))
+
+def scipy_coo_input():
+    src, dst = edge_pair_input()
+    return sp.coo_matrix((np.ones((20,)), (src, dst)), shape=(10,10))
+
+def gen_by_mutation():
+    g = dgl.DGLGraph()
+    src, dst = edge_pair_input()
+    g.add_nodes(10)
+    g.add_edges(src, dst)
+    return g
+
+def gen_from_data(data, readonly):
+    g = dgl.DGLGraph(data, readonly)
+    return g
+
+def test_query():
+    def _test(g):
+        assert g.number_of_nodes() == 10
+        assert g.number_of_edges() == 20
+        assert len(g) == 10
+        assert not g.is_multigraph
+        for i in range(10):
+            assert g.has_node(i)
+            assert i in g
+        assert not g.has_node(11)
+        assert not g.has_node(-1)
+        assert not -1 in g
+        assert F.allclose(g.has_nodes([-1,0,2,10,11]), F.tensor([0,1,1,0,0]))
+        src, dst = edge_pair_input()
+        for u, v in zip(src, dst):
+            assert g.has_edge_between(u, v)
+        assert not g.has_edge_between(0, 0)
+        assert F.allclose(g.has_edges_between([0, 0, 3], [0, 9, 8]), F.tensor([0,1,1]))
+    _test(gen_by_mutation())
+    _test(gen_from_data(nx_input(), False))
+    _test(gen_from_data(nx_input(), True))
+    _test(gen_from_data(elist_input(), False))
+    _test(gen_from_data(elist_input(), True))
+    _test(gen_from_data(scipy_coo_input(), False))
+    _test(gen_from_data(scipy_coo_input(), True))
+
+def test_mutation():
     g = dgl.DGLGraph()
     # test add nodes with data
     g.add_nodes(5)
@@ -74,34 +135,6 @@ def test_scipy_adjmat():
     assert np.array_equal(adj_t2.toarray(), adj_t3.toarray())
     assert np.array_equal(adj_t0.toarray(), adj_t2.toarray())
 
-def test_adjmat_cache():
-    n = 1000
-    p = 10 * math.log(n) / n
-    a = sp.random(n, n, p, data_rvs=lambda n: np.ones(n))
-    g = dgl.DGLGraph(a)
-    # the first call should contruct the adj
-    t0 = time.time()
-    adj1 = g.adjacency_matrix()
-    dur1 = time.time() - t0
-    # the second call should be cached and should be very fast
-    t0 = time.time()
-    adj2 = g.adjacency_matrix()
-    dur2 = time.time() - t0
-    print('first time {}, second time {}'.format(dur1, dur2))
-    assert dur2 < dur1
-    assert id(adj1) == id(adj2)
-    # different arg should result in different cache
-    adj3 = g.adjacency_matrix(transpose=True)
-    assert id(adj3) != id(adj2)
-    # manually clear the cache
-    g.clear_cache()
-    adj35 = g.adjacency_matrix()
-    assert id(adj35) != id(adj2)
-    # mutating the graph should invalidate the cache
-    g.add_nodes(10)
-    adj4 = g.adjacency_matrix()
-    assert id(adj4) != id(adj35)
-
 def test_incmat():
     g = dgl.DGLGraph()
     g.add_nodes(4)
@@ -134,34 +167,6 @@ def test_incmat():
                       [1., 0., 0., 0., 0.],
                       [0., 1., 0., -1., 0.],
                       [0., 0., 1., 1., 0.]]))
-
-def test_incmat_cache():
-    n = 1000
-    p = 10 * math.log(n) / n
-    a = sp.random(n, n, p, data_rvs=lambda n: np.ones(n))
-    g = dgl.DGLGraph(a)
-    # the first call should contruct the inc
-    t0 = time.time()
-    inc1 = g.incidence_matrix("in")
-    dur1 = time.time() - t0
-    # the second call should be cached and should be very fast
-    t0 = time.time()
-    inc2 = g.incidence_matrix("in")
-    dur2 = time.time() - t0
-    print('first time {}, second time {}'.format(dur1, dur2))
-    assert dur2 < dur1
-    assert id(inc1) == id(inc2)
-    # different arg should result in different cache
-    inc3 = g.incidence_matrix("both")
-    assert id(inc3) != id(inc2)
-    # manually clear the cache
-    g.clear_cache()
-    inc35 = g.incidence_matrix("in")
-    assert id(inc35) != id(inc2)
-    # mutating the graph should invalidate the cache
-    g.add_nodes(10)
-    inc4 = g.incidence_matrix("in")
-    assert id(inc4) != id(inc35)
 
 def test_readonly():
     g = dgl.DGLGraph()
@@ -250,11 +255,10 @@ def test_find_edges():
         assert fail
 
 if __name__ == '__main__':
-    #test_graph_creation()
+    test_query()
+    #test_mutation()
     #test_create_from_elist()
-    #test_adjmat_cache()
-    test_scipy_adjmat()
+    #test_scipy_adjmat()
     #test_incmat()
-    #test_incmat_cache()
     #test_readonly()
     #test_find_edges()

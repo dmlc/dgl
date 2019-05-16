@@ -99,7 +99,7 @@ BoolArray Graph::HasVertices(IdArray vids) const {
   int64_t* rst_data = static_cast<int64_t*>(rst->data);
   const int64_t nverts = NumVertices();
   for (int64_t i = 0; i < len; ++i) {
-    rst_data[i] = (vid_data[i] < nverts)? 1 : 0;
+    rst_data[i] = (vid_data[i] < nverts && vid_data[i] >= 0)? 1 : 0;
   }
   return rst;
 }
