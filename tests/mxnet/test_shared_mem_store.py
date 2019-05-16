@@ -15,6 +15,7 @@ num_edges = int(num_nodes * num_nodes * 0.1)
 rand_port = random.randint(5000, 8000)
 print('run graph store with port ' + str(rand_port), file=sys.stderr)
 
+
 def check_array_shared_memory(g, worker_id, arrays):
     if worker_id == 0:
         for i, arr in enumerate(arrays):
