@@ -21,7 +21,7 @@ def check_array_shared_memory(g, worker_id, arrays):
         for i, arr in enumerate(arrays):
             assert np.all(arr[0].asnumpy() == i)
 
-def test_init_func(worker_id, graph_name):
+def check_init_func(worker_id, graph_name):
     time.sleep(3)
     print("worker starts")
     np.random.seed(0)
@@ -57,8 +57,8 @@ def server_func(num_workers, graph_name):
 #@unittest.skip("disable shared memory test temporarily")
 def test_test_init():
     serv_p = Process(target=server_func, args=(2, 'test_graph1'))
-    work_p1 = Process(target=test_init_func, args=(0, 'test_graph1'))
-    work_p2 = Process(target=test_init_func, args=(1, 'test_graph1'))
+    work_p1 = Process(target=check_init_func, args=(0, 'test_graph1'))
+    work_p2 = Process(target=check_init_func, args=(1, 'test_graph1'))
     serv_p.start()
     work_p1.start()
     work_p2.start()
@@ -67,7 +67,7 @@ def test_test_init():
     work_p2.join()
 
 
-def test_update_all_func(worker_id, graph_name):
+def check_update_all_func(worker_id, graph_name):
     time.sleep(3)
     print("worker starts")
     g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem")
@@ -83,8 +83,8 @@ def test_update_all_func(worker_id, graph_name):
 
 def test_update_all():
     serv_p = Process(target=server_func, args=(2, 'test_graph3'))
-    work_p1 = Process(target=test_update_all_func, args=(0, 'test_graph3'))
-    work_p2 = Process(target=test_update_all_func, args=(1, 'test_graph3'))
+    work_p1 = Process(target=check_update_all_func, args=(0, 'test_graph3'))
+    work_p2 = Process(target=check_update_all_func, args=(1, 'test_graph3'))
     serv_p.start()
     work_p1.start()
     work_p2.start()
