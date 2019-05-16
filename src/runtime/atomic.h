@@ -43,7 +43,7 @@ class ReadWriteLock {
   }
 
  public:
-  ReadWriteLock(int *_lock) {
+  explicit ReadWriteLock(int *_lock) {
     this->lock = _lock;
   }
 
