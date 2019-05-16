@@ -304,6 +304,7 @@ class COO : public GraphInterface {
   }
 
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const override {
+    CHECK(eid < NumEdges() && eid >= 0) << "Invalid edge id: " << eid;
     const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
     const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
     return std::make_pair(src_data[eid], dst_data[eid]);

@@ -48,6 +48,7 @@ def test_query():
         assert g.number_of_edges() == 20
         assert len(g) == 10
         assert not g.is_multigraph
+
         for i in range(10):
             assert g.has_node(i)
             assert i in g
@@ -55,11 +56,57 @@ def test_query():
         assert not g.has_node(-1)
         assert not -1 in g
         assert F.allclose(g.has_nodes([-1,0,2,10,11]), F.tensor([0,1,1,0,0]))
+
         src, dst = edge_pair_input()
         for u, v in zip(src, dst):
             assert g.has_edge_between(u, v)
         assert not g.has_edge_between(0, 0)
         assert F.allclose(g.has_edges_between([0, 0, 3], [0, 9, 8]), F.tensor([0,1,1]))
+        assert set(F.asnumpy(g.predecessors(9))) == set([0,5,7,4])
+        assert set(F.asnumpy(g.successors(2))) == set([7,3])
+
+        assert g.edge_id(4,4) == 5
+        assert F.allclose(g.edge_ids([4,0], [4,9]), F.tensor([5,0]))
+
+        src, dst = g.find_edges([3, 6, 5])
+        assert F.allclose(src, F.tensor([5, 7, 4]))
+        assert F.allclose(dst, F.tensor([9, 9, 4]))
+
+        src, dst, eid = g.in_edges(9, form='all')
+        tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
+        assert set(tup) == set([(0,9,0),(5,9,3),(7,9,6),(4,9,7)])
+        src, dst, eid = g.in_edges([9,0,8], form='all')  # test node#0 has no in edges
+        tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
+        assert set(tup) == set([(0,9,0),(5,9,3),(7,9,6),(4,9,7),(3,8,9),(7,8,12)])
+
+        src, dst, eid = g.out_edges(0, form='all')
+        tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
+        assert set(tup) == set([(0,9,0),(0,6,1),(0,4,4)])
+        src, dst, eid = g.out_edges([0,4,8], form='all')  # test node#8 has no out edges
+        tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
+        assert set(tup) == set([(0,9,0),(0,6,1),(0,4,4),(4,3,2),(4,4,5),(4,9,7),(4,1,8)])
+
+        src, dst, eid = g.edges('all', 'eid')
+        t_src, t_dst = edge_pair_input()
+        t_tup = list(zip(t_src, t_dst, list(range(20))))
+        tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
+        assert set(tup) == set(t_tup)
+        assert list(F.asnumpy(eid)) == list(range(20))
+
+        src, dst, eid = g.edges('all', 'srcdst')
+        t_src, t_dst = edge_pair_input()
+        t_tup = list(zip(t_src, t_dst, list(range(20))))
+        tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
+        assert set(tup) == set(t_tup)
+        assert list(F.asnumpy(src)) == sorted(list(F.asnumpy(src)))
+
+        assert g.in_degree(0) == 0
+        assert g.in_degree(9) == 4
+        assert F.allclose(g.in_degrees([0, 9]), F.tensor([0, 4]))
+        assert g.out_degree(8) == 0
+        assert g.out_degree(9) == 1
+        assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
+
     _test(gen_by_mutation())
     _test(gen_from_data(nx_input(), False))
     _test(gen_from_data(nx_input(), True))
@@ -88,17 +135,6 @@ def test_mutation():
     g.ndata['h'] = 3 * F.ones((5, 2))
     assert F.allclose(3 * F.ones((5, 2)), g.ndata['h'])
 
-def test_create_from_elist():
-    elist = [(2, 1), (1, 0), (2, 0), (3, 0), (0, 2)]
-    g = dgl.DGLGraph(elist)
-    for i, (u, v) in enumerate(elist):
-        assert g.edge_id(u, v) == i
-    # immutable graph
-    # XXX: not enabled for pytorch
-    #g = dgl.DGLGraph(elist, readonly=True)
-    #for i, (u, v) in enumerate(elist):
-    #    assert g.edge_id(u, v) == i
-
 def test_scipy_adjmat():
     g = dgl.DGLGraph()
     g.add_nodes(10)
@@ -114,18 +150,6 @@ def test_scipy_adjmat():
 
     g.readonly()
     adj_2 = g.adjacency_matrix_scipy()
-    #indptr = [0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-    #indices = [0, 1, 2, 3, 4, 5, 6, 7, 8]
-
-    #gidx = dgl.graph_index.GraphIndex(None, False, True)
-    #def foo():
-    #    th_indptr = F.tensor(indptr)
-    #    th_indices = F.tensor(indices)
-    #    gidx.from_csr_matrix(th_indptr, th_indices, "out")
-    #foo()
-    #adjj = gidx.adjacency_matrix_scipy(False, "csr")
-    #print(adjj.indptr, adjj.indices)
-
     adj_3 = g.adjacency_matrix_scipy(fmt='coo')
     assert np.array_equal(adj_2.toarray(), adj_3.toarray())
     assert np.array_equal(adj_0.toarray(), adj_2.toarray())
@@ -256,9 +280,8 @@ def test_find_edges():
 
 if __name__ == '__main__':
     test_query()
-    #test_mutation()
-    #test_create_from_elist()
-    #test_scipy_adjmat()
-    #test_incmat()
-    #test_readonly()
-    #test_find_edges()
+    test_mutation()
+    test_scipy_adjmat()
+    test_incmat()
+    test_readonly()
+    test_find_edges()

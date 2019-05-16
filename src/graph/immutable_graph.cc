@@ -534,6 +534,8 @@ ImmutableGraph::EdgeArray ImmutableGraph::Edges(const std::string &order) const 
     // arbitrary order
     return AnyGraph()->Edges(order);
   } else if (order == std::string("srcdst")) {
+    // TODO(minjie): CSR only guarantees "src" to be sorted.
+    //   Maybe we should relax this requirement?
     return GetOutCSR()->Edges(order);
   } else if (order == std::string("eid")) {
     return GetCOO()->Edges(order);
