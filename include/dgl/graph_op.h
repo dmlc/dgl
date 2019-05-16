@@ -9,7 +9,6 @@
 #include <vector>
 #include "graph.h"
 #include "immutable_graph.h"
-#include "../../src/c_api_common.h"
 
 namespace dgl {
 
