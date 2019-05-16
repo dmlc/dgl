@@ -58,7 +58,6 @@ def server_func(num_workers, graph_name):
     g.edata['feat'] = mx.nd.arange(num_edges * 10).reshape((num_edges, 10))
     g.run()
 
-#@unittest.skip("disable shared memory test temporarily")
 def test_test_init():
     serv_p = Process(target=server_func, args=(2, 'test_graph1'))
     work_p1 = Process(target=check_init_func, args=(0, 'test_graph1'))
