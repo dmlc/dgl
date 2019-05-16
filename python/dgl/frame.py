@@ -251,16 +251,6 @@ class SharedMemColumn(Column):
         """
         raise Exception("shared-memory column doesn't support extend")
 
-    @staticmethod
-    def create(data, scheme, data_path, create_lock):
-        """Create a new column using the given data."""
-        if isinstance(data, Column) and scheme is not None:
-            return SharedMemColumn(data.data, data_path, create_lock, scheme)
-        elif isinstance(data, Column):
-            return SharedMemColumn(data.data, data_path, create_lock, data.scheme)
-        else:
-            return SharedMemColumn(data, data_path, create_lock)
-
 class Frame(MutableMapping):
     """The columnar storage for node/edge features.
 
@@ -306,6 +296,15 @@ class Frame(MutableMapping):
         self._default_initializer = None
 
     def set_column_create(self, column_create):
+        """Set the column creator.
+
+        We allow users to define how to create a column.
+
+        Parameters
+        ----------
+        column_create : callable
+            A function to create a column
+        """
         self._column_create = column_create
 
     def _warn_and_set_initializer(self):

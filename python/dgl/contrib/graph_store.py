@@ -11,7 +11,7 @@ from collections.abc import MutableMapping
 from ..base import ALL, is_all, DGLError
 from .. import backend as F
 from ..graph import DGLGraph
-from ..frame import SharedMemColumn
+from ..frame import Column, SharedMemColumn
 from .. import utils
 from ..graph_index import GraphIndex, create_graph_index
 from .._ffi.ndarray import empty_shared_mem
@@ -275,6 +275,15 @@ class InitializerManager(object):
             raise Exception("Shared-memory graph store doesn't support initializer "
                             + str(init))
 
+def _create_column(data, scheme, data_path, create_lock):
+    """Create a new column using the given data."""
+    if isinstance(data, Column) and scheme is not None:
+        return SharedMemColumn(data.data, data_path, create_lock, scheme)
+    elif isinstance(data, Column):
+        return SharedMemColumn(data.data, data_path, create_lock, data.scheme)
+    else:
+        return SharedMemColumn(data, data_path, create_lock)
+
 
 class SharedMemoryStoreServer(object):
     """The graph store server.
@@ -310,10 +319,12 @@ class SharedMemoryStoreServer(object):
         self._registered_nworkers = 0
 
         # We need to create shared-memory columns in the frame.
-        ndata_create = lambda data, schema, name: SharedMemColumn.create(
-            data, schema, _get_ndata_path(graph_name, name), True)
-        edata_create = lambda data, schema, name: SharedMemColumn.create(
-            data, schema, _get_edata_path(graph_name, name), True)
+        ndata_create = lambda data, schema, name: _create_column(data, schema,
+                                                                 _get_ndata_path(graph_name, name),
+                                                                 True)
+        edata_create = lambda data, schema, name: _create_column(data, schema,
+                                                                 _get_edata_path(graph_name, name),
+                                                                 True)
         self._graph._node_frame._frame.set_column_create(ndata_create)
         self._graph._edge_frame._frame.set_column_create(edata_create)
 
@@ -470,10 +481,13 @@ class SharedMemoryDGLGraph(DGLGraph):
         self._init_manager = InitializerManager()
 
         # We need to create shared-memory columns in the frame.
-        ndata_create = lambda data, schema, name: SharedMemColumn.create(
-            data, schema, _get_ndata_path(graph_name, name), False)
-        edata_create = lambda data, schema, name: SharedMemColumn.create(
-            data, schema, _get_edata_path(graph_name, name), False)
+        ndata_create = lambda data, schema, name: _create_column(data, schema,
+                                                                 _get_ndata_path(graph_name, name),
+                                                                 False)
+        edata_create = lambda data, schema, name: _create_column(data, schema,
+                                                                 _get_edata_path(graph_name, name),
+                                                                 False)
+
         self._node_frame._frame.set_column_create(ndata_create)
         self._edge_frame._frame.set_column_create(edata_create)
 
