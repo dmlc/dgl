@@ -412,7 +412,7 @@ class Frame(MutableMapping):
         self._columns[name] = col
 
     def _append(self, other):
-        assert self.get_remote_initializer() is None, \
+        assert self._remote_init_builder is None, \
                 "We don't support append if data in the frame is mapped from a remote server."
         # NOTE: `other` can be empty.
         if self.num_rows == 0:
