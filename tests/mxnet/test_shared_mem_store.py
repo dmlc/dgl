@@ -11,12 +11,13 @@ import dgl.function as fn
 num_nodes = 100
 num_edges = int(num_nodes * num_nodes * 0.1)
 
-def test_array_shared_memory(worker_id, arrays):
+def test_array_shared_memory(g, worker_id, arrays):
     if worker_id == 0:
         for i, arr in enumerate(arrays):
             arr[0] = i
+        g._sync_barrier()
     else:
-        time.sleep(2)
+        g._sync_barrier()
         for i, arr in enumerate(arrays):
             assert np.all(arr[0].asnumpy() == i)
 
@@ -37,7 +38,7 @@ def test_init_func(worker_id, graph_name):
     g.init_ndata('test4', (g.number_of_nodes(), 10), 'float32')
     g.init_edata('test4', (g.number_of_edges(), 10), 'float32')
     g._sync_barrier()
-    test_array_shared_memory(worker_id, [g.ndata['test4'], g.edata['test4']])
+    test_array_shared_memory(g, worker_id, [g.ndata['test4'], g.edata['test4']])
     g.destroy()
 
 def server_func(num_workers, graph_name):
@@ -77,7 +78,7 @@ def test_update_all_func(worker_id, graph_name):
     tmp = mx.nd.dot(adj, g.ndata['feat'])
     assert np.all((g.ndata['preprocess'] == tmp).asnumpy())
     g._sync_barrier()
-    test_array_shared_memory(worker_id, [g.ndata['preprocess']])
+    test_array_shared_memory(g, worker_id, [g.ndata['preprocess']])
     g.destroy()
 
 def test_update_all():
