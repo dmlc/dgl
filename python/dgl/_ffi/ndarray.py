@@ -150,6 +150,10 @@ def empty_shared_mem(name, is_create, shape, dtype="float32"):
     return _make_array(handle, False)
 
 def shared_mem_gather_rows(src_arr, lock_arr, idx_arr):
+    """Slice rows from the shared-memory tensor.
+
+    When slicing rows, we make sure that we read a row atomically.
+    """
     dst_shape = (idx_arr.shape[0], ) + src_arr.shape[1:]
     dst_arr = empty(dst_shape, src_arr.dtype, src_arr.context)
     check_call(_LIB.DGLArraySharedMemGatherRows(
@@ -157,6 +161,10 @@ def shared_mem_gather_rows(src_arr, lock_arr, idx_arr):
     return dst_arr
 
 def shared_mem_scatter_rows(src_arr, lock_arr, idx_arr, dst_arr):
+    """Scatter data to rows.
+
+    When scattering data, we make sure that a row is written atomically.
+    """
     check_call(_LIB.DGLArraySharedMemScatterRows(
         src_arr.handle, lock_arr.handle, idx_arr.handle, dst_arr.handle))
 

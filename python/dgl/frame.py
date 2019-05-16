@@ -176,12 +176,39 @@ class Column(object):
             return Column(data)
 
 class SharedMemColumn(Column):
+    """A shared-memory column.
+
+    The dense tensor in the column stores data in shared memory.
+
+    Parameters
+    ----------
+    data : Tensor
+        The initial data of the column.
+    data_path : string
+        The path for the shared-memory data.
+    create_lock : boolean
+        Whether to create a lock.
+    scheme : Scheme, optional
+        The scheme of the column. Will be inferred if not provided.
+    """
     def __init__(self, data, data_path, create_lock, scheme=None):
         super(SharedMemColumn, self).__init__(data, scheme)
         self.locks = empty_shared_mem(data_path + "_lock", create_lock,
                                       shape=(data.shape[0],), dtype='int32')
 
     def __getitem__(self, idx):
+        """Return the feature data given the index.
+
+        Parameters
+        ----------
+        idx : utils.Index
+            The index.
+
+        Returns
+        -------
+        Tensor
+            The feature data
+        """
         if idx.slice_data() is not None:
             raise Exception("shared-memory column doesn't support slice.")
         else:
@@ -191,6 +218,17 @@ class SharedMemColumn(Column):
             return utils.tousertensor(rows)
 
     def update(self, idx, feats, inplace):
+        """Update the feature data given the index.
+
+        Parameters
+        ----------
+        idx : utils.Index
+            The index.
+        feats : Tensor
+            The new features.
+        inplace : bool
+            If true, use inplace write.
+        """
         feat_scheme = infer_scheme(feats)
         if feat_scheme != self.scheme:
             raise DGLError("Cannot update column of scheme %s using feature of scheme %s."
@@ -202,6 +240,15 @@ class SharedMemColumn(Column):
                                 idx.todgltensor(), utils.todgltensor(self.data))
 
     def extend(self, feats, feat_scheme=None):
+        """Extend the feature data.
+
+         Parameters
+        ----------
+        feats : Tensor
+            The new features.
+        feat_scheme : Scheme, optional
+            The scheme
+        """
         raise Exception("shared-memory column doesn't support extend")
 
     @staticmethod

@@ -244,10 +244,14 @@ def toindex(data):
     return data if isinstance(data, Index) else Index(data)
 
 def todgltensor(data):
+    """Convert data to dgl tensor
+    """
     dlpack = F.zerocopy_to_dlpack(data)
     return nd.from_dlpack(dlpack)
 
 def tousertensor(data):
+    """Convert dgl tensor to the tensor of the underlying framework.
+    """
     dlpack = data.to_dlpack()
     return F.zerocopy_from_dlpack(dlpack)
 
