@@ -1,4 +1,5 @@
 import dgl
+import random
 import time
 import numpy as np
 from multiprocessing import Process
@@ -10,6 +11,7 @@ import dgl.function as fn
 
 num_nodes = 100
 num_edges = int(num_nodes * num_nodes * 0.1)
+rand_port = random.randint(5000, 8000)
 
 def check_array_shared_memory(g, worker_id, arrays):
     if worker_id == 0:
@@ -27,7 +29,7 @@ def check_init_func(worker_id, graph_name):
     np.random.seed(0)
     csr = (spsp.random(num_nodes, num_nodes, density=0.1, format='csr') != 0).astype(np.int64)
 
-    g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem")
+    g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem", port=rand_port)
     # Verify the graph structure loaded from the shared memory.
     src, dst = g.all_edges()
     coo = csr.tocoo()
@@ -47,7 +49,7 @@ def server_func(num_workers, graph_name):
     csr = (spsp.random(num_nodes, num_nodes, density=0.1, format='csr') != 0).astype(np.int64)
 
     g = dgl.contrib.graph_store.create_graph_store_server(csr, graph_name, "shared_mem", num_workers,
-                                                          False, edge_dir="in")
+                                                          False, edge_dir="in", port=rand_port)
     assert num_nodes == g._graph.number_of_nodes()
     assert num_edges == g._graph.number_of_edges()
     g.ndata['feat'] = mx.nd.arange(num_nodes * 10).reshape((num_nodes, 10))
@@ -70,7 +72,7 @@ def test_test_init():
 def check_update_all_func(worker_id, graph_name):
     time.sleep(3)
     print("worker starts")
-    g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem")
+    g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem", port=rand_port)
     g._sync_barrier()
     g.dist_update_all(fn.copy_src(src='feat', out='m'),
                       fn.sum(msg='m', out='preprocess'))
