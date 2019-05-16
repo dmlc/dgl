@@ -301,15 +301,14 @@ class SharedMemoryStoreServer(object):
 
         # RPC command: initialize node embedding in the server.
         def init_ndata(init, ndata_name, shape, dtype):
-            init = self._init_manager.deserialize(init)
             if ndata_name in self._graph.ndata:
                 ndata = self._graph.ndata[ndata_name]
                 assert np.all(ndata.shape == tuple(shape))
                 return 0
 
             assert self._graph.number_of_nodes() == shape[0]
-            data = shared_mem_zero_initializer(shape, dtype,
-                                               _get_ndata_path(graph_name, ndata_name))
+            init = self._init_manager.deserialize(init)
+            data = init(shape, dtype, _get_ndata_path(graph_name, ndata_name))
             self._graph.ndata[ndata_name] = data
             return 0
 
@@ -321,8 +320,8 @@ class SharedMemoryStoreServer(object):
                 return 0
 
             assert self._graph.number_of_edges() == shape[0]
-            data = shared_mem_zero_initializer(shape, dtype,
-                                               _get_edata_path(graph_name, edata_name))
+            init = self._init_manager.deserialize(init)
+            data = init(shape, dtype, _get_edata_path(graph_name, edata_name))
             self._graph.edata[edata_name] = data
             return 0
 
