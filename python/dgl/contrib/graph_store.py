@@ -225,21 +225,55 @@ def shared_mem_zero_initializer(shape, dtype, name):  # pylint: disable=unused-a
     return arr
 
 class InitializerManager(object):
+    """Manage initializer.
+
+    We need to convert built-in frame initializer to strings
+    and send them to the graph store server through RPC.
+    Through the conversion, we need to convert local built-in initializer
+    to shared-memory initializer.
+    """
+
+    # Map the built-in initializer functions to strings.
     _fun2str = {
         zero_initializer: 'zero',
     }
 
+    # Map the strings to built-in initializer functions.
     _str2fun = {
         'zero': shared_mem_zero_initializer,
     }
 
     def serialize(self, init):
+        """Convert the initializer function to string.
+
+        Parameters
+        ----------
+        init : callable
+            the initializer function.
+
+        Returns
+        ------
+        string
+            The name of the built-in initializer function.
+        """
         if init in self._fun2str:
             return self._fun2str[init]
         else:
             raise Exception("Shared-memory graph store doesn't support user's initializer")
 
     def deserialize(self, init):
+        """Convert the string to the initializer function.
+
+        Parameters
+        ----------
+        init : string
+            the name of the initializer function
+
+        Returns
+        -------
+        callable
+            The shared-memory initializer function.
+        """
         if init in self._str2fun:
             return self._str2fun[init]
         else:
