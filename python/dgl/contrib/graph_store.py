@@ -401,6 +401,7 @@ class SharedMemoryStoreServer(object):
 
     def __del__(self):
         self._graph = None
+        self.server.server_close()
 
     @property
     def ndata(self):
