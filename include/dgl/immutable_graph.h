@@ -636,7 +636,8 @@ class ImmutableGraph: public GraphInterface {
    * \return the edges
    */
   EdgeArray InEdges(dgl_id_t vid) const override {
-    return GetInCSR()->OutEdges(vid);
+    const EdgeArray& ret = GetInCSR()->OutEdges(vid);
+    return {ret.dst, ret.src, ret.id};
   }
 
   /*!
@@ -645,7 +646,8 @@ class ImmutableGraph: public GraphInterface {
    * \return the id arrays of the two endpoints of the edges.
    */
   EdgeArray InEdges(IdArray vids) const override {
-    return GetInCSR()->OutEdges(vids);
+    const EdgeArray& ret = GetInCSR()->OutEdges(vids);
+    return {ret.dst, ret.src, ret.id};
   }
 
   /*!

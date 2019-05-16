@@ -121,12 +121,23 @@ size_t NDArray::GetSize() const {
   return GetDataSize(data_->dl_tensor);
 }
 
+bool NDArray::IsContiguous() const {
+  CHECK(data_ != nullptr);
+  if (data_->dl_tensor.strides == nullptr)
+    return true;
+  for (int i = 0; i < data_->dl_tensor.ndim - 1; ++i) {
+    if (data_->dl_tensor.strides[i] !=
+        data_->dl_tensor.shape[i+1] * data_->dl_tensor.strides[i+1])
+      return false;
+  }
+  return data_->dl_tensor.strides[data_->dl_tensor.ndim - 1] == 1;
+}
+
 NDArray NDArray::CreateView(std::vector<int64_t> shape,
                             DLDataType dtype,
                             int64_t offset) {
   CHECK(data_ != nullptr);
-  CHECK(data_->dl_tensor.strides == nullptr)
-      << "Can only create view for compact tensor";
+  CHECK(IsContiguous()) << "Can only create view for compact tensor";
   NDArray ret = Internal::Create(shape, dtype, data_->dl_tensor.ctx);
   ret.data_->dl_tensor.byte_offset =
       this->data_->dl_tensor.byte_offset;

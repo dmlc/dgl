@@ -71,7 +71,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids)
   CHECK(IsValidIdArray(indptr));
   CHECK(IsValidIdArray(indices));
   CHECK(IsValidIdArray(edge_ids));
-  CHECK_EQ(indices_->shape[0], edge_ids_->shape[0]);
+  CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
@@ -80,7 +80,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
   CHECK(IsValidIdArray(indptr));
   CHECK(IsValidIdArray(indices));
   CHECK(IsValidIdArray(edge_ids));
-  CHECK_EQ(indices_->shape[0], edge_ids_->shape[0]);
+  CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
   const int64_t num_verts = indptr->shape[0] - 1;
   const int64_t num_edges = indices->shape[0];
   const int64_t file_size = (num_verts + 1 + num_edges * 2) * sizeof(dgl_id_t);

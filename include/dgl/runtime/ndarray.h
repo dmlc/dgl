@@ -92,6 +92,8 @@ class NDArray {
   inline int use_count() const;
   /*! \return Pointer to content of DLTensor */
   inline const DLTensor* operator->() const;
+  /*! \return True if the ndarray is contiguous. */
+  bool IsContiguous() const;
   /*!
    * \brief Copy data content from another array.
    * \param other The source array to be copied from.
