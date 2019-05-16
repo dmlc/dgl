@@ -378,9 +378,9 @@ src_op_dst_reduce = SrcOpDstReduce.apply
 copy_src_reduce = CopySrcReduce.apply
 copy_edge_reduce = CopyEdgeReduce.apply
 
-def _reduce_grad(grad, src_shape):
+def _reduce_grad(grad, shape):
     grad_shape = grad.shape[1:]
-    src_shape = src_shape[1:]
+    src_shape = shape[1:]
     if src_shape == grad_shape:
         # no need to reduce
         return grad
@@ -390,6 +390,4 @@ def _reduce_grad(grad, src_shape):
     reduce_idx = th.nonzero(th.tensor(grad_shape) - th.tensor(src_shape))
     reduce_idx += 1  # skip batch dim
     grad = grad.sum(dim=tuple(reduce_idx), keepdim=True)
-    for dim in range(1, num_to_squeeze + 1):
-        grad = grad.squeeze(dim)
-    return grad
+    return grad.view(shape)
