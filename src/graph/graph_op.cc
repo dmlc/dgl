@@ -4,8 +4,8 @@
  * \brief Graph operation implementation
  */
 #include <dgl/graph_op.h>
-#include <algorithm>
 #include <dgl/immutable_graph.h>
+#include <algorithm>
 #include "../c_api_common.h"
 
 namespace dgl {
@@ -114,7 +114,8 @@ ImmutableGraph GraphOp::DisjointUnion(std::vector<const ImmutableGraph *> graphs
     num_nodes += gr->NumVertices();
     num_edges += gr->NumEdges();
   }
-  ImmutableGraph::CSR::Ptr batched_csr_ptr = std::make_shared<ImmutableGraph::CSR>(num_nodes, num_edges);
+  ImmutableGraph::CSR::Ptr batched_csr_ptr = std::make_shared<ImmutableGraph::CSR>(num_nodes,
+                                                                                   num_edges);
   dgl_id_t cum_num_nodes = 0;
   dgl_id_t cum_num_edges = 0;
   dgl_id_t indptr_idx = 1;
@@ -144,7 +145,8 @@ ImmutableGraph GraphOp::DisjointUnion(std::vector<const ImmutableGraph *> graphs
   return ImmutableGraph(batched_csr_ptr, nullptr);
 }
 
-std::vector<ImmutableGraph> GraphOp::DisjointPartitionByNum(const ImmutableGraph *graph, int64_t num) {
+std::vector<ImmutableGraph> GraphOp::DisjointPartitionByNum(const ImmutableGraph *graph,
+        int64_t num) {
   CHECK(num != 0 && graph->NumVertices() % num == 0)
     << "Number of partitions must evenly divide the number of nodes.";
   IdArray sizes = IdArray::Empty({num}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
@@ -153,7 +155,8 @@ std::vector<ImmutableGraph> GraphOp::DisjointPartitionByNum(const ImmutableGraph
   return DisjointPartitionBySizes(graph, sizes);
 }
 
-std::vector<ImmutableGraph> GraphOp::DisjointPartitionBySizes(const ImmutableGraph *batched_graph, IdArray sizes) {
+std::vector<ImmutableGraph> GraphOp::DisjointPartitionBySizes(const ImmutableGraph *batched_graph,
+        IdArray sizes) {
   const int64_t len = sizes->shape[0];
   const int64_t *sizes_data = static_cast<int64_t *>(sizes->data);
   std::vector<int64_t> cumsum;
@@ -172,7 +175,8 @@ std::vector<ImmutableGraph> GraphOp::DisjointPartitionBySizes(const ImmutableGra
     int64_t start_pos = cumsum[i];
     int64_t end_pos = cumsum[i + 1];
     int64_t g_num_edges = bg_indptr[end_pos] - bg_indptr[start_pos];
-    ImmutableGraph::CSR::Ptr g_in_csr_ptr = std::make_shared<ImmutableGraph::CSR>(sizes_data[i], g_num_edges);
+    ImmutableGraph::CSR::Ptr g_in_csr_ptr = std::make_shared<ImmutableGraph::CSR>(sizes_data[i],
+            g_num_edges);
     ImmutableGraph::CSR::vector<int64_t> &g_indptr = g_in_csr_ptr->indptr;
     ImmutableGraph::CSR::vector<dgl_id_t> &g_indices = g_in_csr_ptr->indices;
     ImmutableGraph::CSR::vector<dgl_id_t> &g_edge_ids = g_in_csr_ptr->edge_ids;

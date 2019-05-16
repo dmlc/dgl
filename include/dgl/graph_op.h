@@ -93,7 +93,8 @@ class GraphOp {
    * \param num The number of partitions.
    * \return a list of partitioned ImmutableGraph
    */
-  static std::vector<ImmutableGraph> DisjointPartitionByNum(const ImmutableGraph *graph, int64_t num);
+  static std::vector<ImmutableGraph> DisjointPartitionByNum(const ImmutableGraph *graph,
+          int64_t num);
 
   /*!
   * \brief Partition the ImmutableGraph into several immutable subgraphs.
@@ -106,7 +107,8 @@ class GraphOp {
   * \param sizes The number of partitions.
   * \return a list of partitioned ImmutableGraph
   */
-  static std::vector<ImmutableGraph> DisjointPartitionBySizes(const ImmutableGraph *batched_graph, IdArray sizes);
+  static std::vector<ImmutableGraph> DisjointPartitionBySizes(const ImmutableGraph *batched_graph,
+          IdArray sizes);
 
   /*!
    * \brief Map vids in the parent graph to the vids in the subgraph.

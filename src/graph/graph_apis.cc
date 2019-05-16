@@ -69,8 +69,11 @@ PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
   return PackedFunc(body);
 }
 
+}  // namespace
+
 namespace {
-// This namespace contains template functions for batching and unbatching over graph and immutable graph
+// This namespace contains template functions for batching
+// and unbatching over graph and immutable graph
 template<typename T>
 void DGLDisjointPartitionByNum(const T *gptr, DGLArgs args, DGLRetValue *rv) {
   int64_t num = args[1];
@@ -116,7 +119,6 @@ void DGLDisjointPartitionBySizes(const T *gptr, const IdArray sizes, DGLRetValue
     ptr_array_data[i] = reinterpret_cast<std::intptr_t>(ptr);
   }
   *rv = ptr_array;
-}
 }
 }  // namespace
 
@@ -430,7 +432,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeSubgraph")
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     void* list = args[0];
-    GraphHandle *inhandles = static_cast<GraphHandle *>(list);
+    GraphHandle* inhandles = static_cast<GraphHandle*>(list);
     int list_size = args[1];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(inhandles[0]);
     const ImmutableGraph *im_gr = dynamic_cast<const ImmutableGraph *>(ptr);
