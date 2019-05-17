@@ -898,6 +898,7 @@ class DGLGraph(DGLBaseGraph):
                  readonly=False):
         # graph
         super(DGLGraph, self).__init__(create_graph_index(graph_data, multigraph, readonly))
+
         # node and edge frame
         if node_frame is None:
             self._node_frame = FrameRef(Frame(num_rows=self.number_of_nodes()))

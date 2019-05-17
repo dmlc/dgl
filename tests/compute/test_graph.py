@@ -11,10 +11,15 @@ from dgl import DGLError
 #  and 20 edges.
 #  - has self loop
 #  - no multi edge
-def edge_pair_input():
-    src = [0, 0, 4, 5, 0, 4, 7, 4, 4, 3, 2, 7, 7, 5, 3, 2, 1, 9, 6, 1]
-    dst = [9, 6, 3, 9, 4, 4, 9, 9, 1, 8, 3, 2, 8, 1, 5, 7, 3, 2, 6, 5]
-    return src, dst
+def edge_pair_input(sort=False):
+    if sort:
+        src = [0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 4, 5, 5, 6, 7, 7, 7, 9]
+        dst = [4, 6, 9, 3, 5, 3, 7, 5, 8, 1, 3, 4, 9, 1, 9, 6, 2, 8, 9, 2]
+        return src, dst
+    else:
+        src = [0, 0, 4, 5, 0, 4, 7, 4, 4, 3, 2, 7, 7, 5, 3, 2, 1, 9, 6, 1]
+        dst = [9, 6, 3, 9, 4, 4, 9, 9, 1, 8, 3, 2, 8, 1, 5, 7, 3, 2, 6, 5]
+        return src, dst
 
 def nx_input():
     g = nx.DiGraph()
@@ -31,6 +36,14 @@ def scipy_coo_input():
     src, dst = edge_pair_input()
     return sp.coo_matrix((np.ones((20,)), (src, dst)), shape=(10,10))
 
+def scipy_csr_input():
+    src, dst = edge_pair_input()
+    csr = sp.coo_matrix((np.ones((20,)), (src, dst)), shape=(10,10)).tocsr()
+    csr.sort_indices()
+    # src = [0 0 0 1 1 2 2 3 3 4 4 4 4 5 5 6 7 7 7 9]
+    # dst = [4 6 9 3 5 3 7 5 8 1 3 4 9 1 9 6 2 8 9 2]
+    return csr
+
 def gen_by_mutation():
     g = dgl.DGLGraph()
     src, dst = edge_pair_input()
@@ -39,7 +52,8 @@ def gen_by_mutation():
     return g
 
 def gen_from_data(data, readonly):
-    g = dgl.DGLGraph(data, readonly)
+    g = dgl.DGLGraph(data, readonly=readonly)
+    print(g.edges())
     return g
 
 def test_query():
@@ -107,13 +121,84 @@ def test_query():
         assert g.out_degree(9) == 1
         assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
 
-    _test(gen_by_mutation())
+    #_test(gen_by_mutation())
+    #_test(gen_from_data(elist_input(), False))
+    _test(gen_from_data(elist_input(), True))
+    exit(0)
     _test(gen_from_data(nx_input(), False))
     _test(gen_from_data(nx_input(), True))
-    _test(gen_from_data(elist_input(), False))
-    _test(gen_from_data(elist_input(), True))
     _test(gen_from_data(scipy_coo_input(), False))
     _test(gen_from_data(scipy_coo_input(), True))
+
+    def _test_csr(g):
+        assert g.number_of_nodes() == 10
+        assert g.number_of_edges() == 20
+        assert len(g) == 10
+        assert not g.is_multigraph
+
+        for i in range(10):
+            assert g.has_node(i)
+            assert i in g
+        assert not g.has_node(11)
+        assert not g.has_node(-1)
+        assert not -1 in g
+        assert F.allclose(g.has_nodes([-1,0,2,10,11]), F.tensor([0,1,1,0,0]))
+
+        src, dst = edge_pair_input(sort=True)
+        for u, v in zip(src, dst):
+            assert g.has_edge_between(u, v)
+        assert not g.has_edge_between(0, 0)
+        assert F.allclose(g.has_edges_between([0, 0, 3], [0, 9, 8]), F.tensor([0,1,1]))
+        assert set(F.asnumpy(g.predecessors(9))) == set([0,5,7,4])
+        assert set(F.asnumpy(g.successors(2))) == set([7,3])
+
+        # src = [0 0 0 1 1 2 2 3 3 4 4 4 4 5 5 6 7 7 7 9]
+        # dst = [4 6 9 3 5 3 7 5 8 1 3 4 9 1 9 6 2 8 9 2]
+        # eid = [0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9]
+        assert g.edge_id(4,4) == 11
+        assert F.allclose(g.edge_ids([4,0], [4,9]), F.tensor([11,2]))
+
+        src, dst = g.find_edges([3, 6, 5])
+        assert F.allclose(src, F.tensor([1, 2, 2]))
+        assert F.allclose(dst, F.tensor([3, 7, 3]))
+
+        src, dst, eid = g.in_edges(9, form='all')
+        tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
+        assert set(tup) == set([(0,9,2),(5,9,14),(7,9,18),(4,9,12)])
+        src, dst, eid = g.in_edges([9,0,8], form='all')  # test node#0 has no in edges
+        tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
+        assert set(tup) == set([(0,9,2),(5,9,14),(7,9,18),(4,9,12),(3,8,8),(7,8,17)])
+
+        src, dst, eid = g.out_edges(0, form='all')
+        tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
+        assert set(tup) == set([(0,9,2),(0,6,1),(0,4,0)])
+        src, dst, eid = g.out_edges([0,4,8], form='all')  # test node#8 has no out edges
+        tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
+        assert set(tup) == set([(0,9,2),(0,6,1),(0,4,0),(4,3,10),(4,4,11),(4,9,12),(4,1,9)])
+
+        src, dst, eid = g.edges('all', 'eid')
+        t_src, t_dst = edge_pair_input(sort=True)
+        t_tup = list(zip(t_src, t_dst, list(range(20))))
+        tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
+        assert set(tup) == set(t_tup)
+        assert list(F.asnumpy(eid)) == list(range(20))
+
+        src, dst, eid = g.edges('all', 'srcdst')
+        t_src, t_dst = edge_pair_input(sort=True)
+        t_tup = list(zip(t_src, t_dst, list(range(20))))
+        tup = list(zip(F.asnumpy(src), F.asnumpy(dst), F.asnumpy(eid)))
+        assert set(tup) == set(t_tup)
+        assert list(F.asnumpy(src)) == sorted(list(F.asnumpy(src)))
+
+        assert g.in_degree(0) == 0
+        assert g.in_degree(9) == 4
+        assert F.allclose(g.in_degrees([0, 9]), F.tensor([0, 4]))
+        assert g.out_degree(8) == 0
+        assert g.out_degree(9) == 1
+        assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
+
+    _test_csr(gen_from_data(scipy_csr_input(), False))
+    _test_csr(gen_from_data(scipy_csr_input(), True))
 
 def test_mutation():
     g = dgl.DGLGraph()
@@ -278,10 +363,28 @@ def test_find_edges():
     finally:
         assert fail
 
+def foo():
+    gidx = dgl.graph_index.GraphIndex(None, False, True)
+    def bar():
+        #csr = scipy_csr_input()
+        #indptr = F.tensor(csr.indptr)
+        #indices = F.tensor(csr.indices)
+        #gidx.from_csr_matrix(indptr, indices, "out")
+        #gidx.from_scipy_sparse_matrix(csr)
+        elist = list(zip(*edge_pair_input()))
+        gidx.from_edge_list(elist)
+        x = F.zeros((20,), dtype=F.int64, ctx=F.cpu())
+    bar()
+    x, y, z = gidx.edges()
+    print(x.tousertensor())
+    print(y.tousertensor())
+    print(z.tousertensor())
+
 if __name__ == '__main__':
-    test_query()
-    test_mutation()
-    test_scipy_adjmat()
-    test_incmat()
-    test_readonly()
-    test_find_edges()
+    foo()
+    #test_query()
+    #test_mutation()
+    #test_scipy_adjmat()
+    #test_incmat()
+    #test_readonly()
+    #test_find_edges()

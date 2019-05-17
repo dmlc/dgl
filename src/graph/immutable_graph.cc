@@ -407,6 +407,7 @@ COO::COO(int64_t num_vertices, IdArray src, IdArray dst)
   : num_vertices_(num_vertices), src_(src), dst_(dst) {
   CHECK(IsValidIdArray(src));
   CHECK(IsValidIdArray(dst));
+  CHECK_EQ(src->shape[0], dst->shape[0]);
 }
 
 COO::EdgeArray COO::FindEdges(IdArray eids) const {
@@ -434,9 +435,7 @@ COO::EdgeArray COO::Edges(const std::string &order) const {
     << order << "\".";
   IdArray rst_eid = NewIdArray(rstlen);
   dgl_id_t* rst_eid_data = static_cast<dgl_id_t*>(rst_eid->data);
-  for (int64_t i = 0; i < rstlen; ++i) {
-    rst_eid_data[i] = i;
-  }
+  std::iota(rst_eid_data, rst_eid_data + rstlen, 0);
   return EdgeArray{src_, dst_, rst_eid};
 }
 

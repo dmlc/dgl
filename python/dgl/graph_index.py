@@ -806,7 +806,6 @@ class GraphIndex(object):
         dst = utils.toindex(adj_coo.col)
         self._init(src, dst, num_nodes)
 
-
     def from_csr_matrix(self, indptr, indices, edge_dir, shared_mem_name=""):
         """Load a graph from the CSR matrix.
 
