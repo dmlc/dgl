@@ -18,7 +18,7 @@ namespace kernel {
 #define DGLINLINE __forceinline__
 #else
 #define DGLDEVICE
-#define DGLINLINE __inline__
+#define DGLINLINE inline
 #endif  // __CUDACC__
 
 #ifdef DGL_USE_CUDA
@@ -77,7 +77,7 @@ namespace kernel {
   }
 #endif
 
-__inline__ bool IsValidCsr(runtime::NDArray indptr, runtime::NDArray indices) {
+inline bool IsValidCsr(runtime::NDArray indptr, runtime::NDArray indices) {
   return (indptr->ndim == 1) && (indptr->dtype.code == kDLInt) && (indptr->dtype.bits == 32)
     && (indices->ndim == 1) && (indices->dtype.code == kDLInt) && (indices->dtype.bits == 32);
 }

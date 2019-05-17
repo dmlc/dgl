@@ -43,14 +43,6 @@ enum BackwardMode {
 };
 }  // namespace binary_op
 
-// functor for no-op
-template <typename Ret, typename ... Args>
-struct Nop {
-  static DGLDEVICE DGLINLINE Ret Call(Args ... args) {
-    return 0;
-  }
-};
-
 // Select src
 struct SelectSrc {
   template <typename T>
