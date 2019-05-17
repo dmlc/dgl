@@ -493,7 +493,7 @@ class ImmutableGraph: public GraphInterface {
     other.in_csr_ = nullptr;
     other.out_csr_ = nullptr;
     other.coo_ = nullptr;
-    other->is_multigraph_ = false;
+    other.is_multigraph_ = false;
   }
 #endif  // _MSC_VER
 
