@@ -6,12 +6,12 @@
 #ifndef DGL_RUNTIME_ATOMIC_H_
 #define DGL_RUNTIME_ATOMIC_H_
 
+#ifndef _WIN32
+
 #include <stdatomic.h>
 #include <atomic>
 
 namespace dgl {
-
-#ifndef _WIN32
 
 template<class T>
 T atomic_read(volatile T *val) {
@@ -72,8 +72,8 @@ class ReadWriteLock {
   }
 };
 
-#endif  // _WIN32
-
 }  // namespace dgl
+
+#endif  // _WIN32
 
 #endif  // DGL_RUNTIME_ATOMIC_H_
