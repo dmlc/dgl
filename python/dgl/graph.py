@@ -1934,7 +1934,7 @@ class DGLGraph(DGLBaseGraph):
         assert func is not None
 
         if is_all(edges):
-            u, v, _ = self._graph.edges()
+            u, v, _ = self._graph.edges('eid')
             eid = utils.toindex(slice(0, self.number_of_edges()))
         elif isinstance(edges, tuple):
             u, v = edges

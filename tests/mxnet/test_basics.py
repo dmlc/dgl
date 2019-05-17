@@ -42,11 +42,6 @@ def generate_graph(grad=False, readonly=False):
         ones = np.ones(shape=(len(row_idx)))
         csr = spsp.csr_matrix((ones, (row_idx, col_idx)), shape=(10, 10))
         g = DGLGraph(csr, readonly=True)
-        print(g.number_of_nodes())
-        print(g.number_of_edges())
-        print(g.edges())
-        print(g.number_of_edges())
-        assert False
         ncol = mx.nd.random.normal(shape=(10, D))
         ecol = mx.nd.random.normal(shape=(17, D))
         if grad:

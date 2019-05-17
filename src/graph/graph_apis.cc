@@ -89,7 +89,11 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
     const bool readonly = static_cast<bool>(args[4]);
     GraphHandle ghandle;
     if (readonly) {
-      COOPtr coo(new COO(num_nodes, src_ids, dst_ids));
+      // TODO(minjie): The array copy here is unnecessary and adds extra overhead.
+      //   However, with MXNet backend, the memory would be corrupted if we directly
+      //   save the passed-in ndarrays into DGL's graph object. We hope MXNet team
+      //   could help look into this.
+      COOPtr coo(new COO(num_nodes, Clone(src_ids), Clone(dst_ids)));
       ghandle = new ImmutableGraph(coo, multigraph);
     } else {
       ghandle = new Graph(src_ids, dst_ids, num_nodes, multigraph);
@@ -107,7 +111,11 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
     const std::string edge_dir = args[5];
     CSRPtr csr;
     if (shared_mem_name.empty())
-      csr.reset(new CSR(indptr, indices, edge_ids));
+      // TODO(minjie): The array copy here is unnecessary and adds extra overhead.
+      //   However, with MXNet backend, the memory would be corrupted if we directly
+      //   save the passed-in ndarrays into DGL's graph object. We hope MXNet team
+      //   could help look into this.
+      csr.reset(new CSR(Clone(indptr), Clone(indices), Clone(edge_ids)));
     else
       csr.reset(new CSR(indptr, indices, edge_ids, shared_mem_name));
 

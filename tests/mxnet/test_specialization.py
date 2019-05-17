@@ -227,7 +227,7 @@ def test_update_all_multi_fn():
     def reduce_func(nodes):
         return {'v2': mx.nd.sum(nodes.mailbox['m2'], axis=1)}
 
-    g = generate_graph(100)
+    g = generate_graph(10)
     g.set_n_repr({'v1' : mx.nd.zeros(shape=(g.number_of_nodes(),)),
         'v2' : mx.nd.zeros(shape=(g.number_of_nodes(),))})
     fld = 'f2'

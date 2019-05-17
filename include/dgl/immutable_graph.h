@@ -826,10 +826,10 @@ class ImmutableGraph: public GraphInterface {
   CSRPtr GetInCSR() const {
     if (!in_csr_) {
       if (out_csr_) {
-        in_csr_ = out_csr_->Transpose();
+        const_cast<ImmutableGraph*>(this)->in_csr_ = out_csr_->Transpose();
       } else {
         CHECK(coo_) << "None of CSR, COO exist";
-        in_csr_ = coo_->Transpose()->ToCSR();
+        const_cast<ImmutableGraph*>(this)->in_csr_ = coo_->Transpose()->ToCSR();
       }
     }
     return in_csr_;
@@ -839,10 +839,10 @@ class ImmutableGraph: public GraphInterface {
   CSRPtr GetOutCSR() const {
     if (!out_csr_) {
       if (in_csr_) {
-        out_csr_ = in_csr_->Transpose();
+        const_cast<ImmutableGraph*>(this)->out_csr_ = in_csr_->Transpose();
       } else {
         CHECK(coo_) << "None of CSR, COO exist";
-        out_csr_ = coo_->ToCSR();
+        const_cast<ImmutableGraph*>(this)->out_csr_ = coo_->ToCSR();
       }
     }
     return out_csr_;
@@ -852,10 +852,10 @@ class ImmutableGraph: public GraphInterface {
   COOPtr GetCOO() const {
     if (!coo_) {
       if (in_csr_) {
-        coo_ = in_csr_->ToCOO()->Transpose();
+        const_cast<ImmutableGraph*>(this)->coo_ = in_csr_->ToCOO()->Transpose();
       } else {
         CHECK(out_csr_) << "Both CSR are missing.";
-        coo_ = out_csr_->ToCOO();
+        const_cast<ImmutableGraph*>(this)->coo_ = out_csr_->ToCOO();
       }
     }
     return coo_;
@@ -883,11 +883,11 @@ class ImmutableGraph: public GraphInterface {
   }
 
   // Store the in csr (i.e, the reverse csr)
-  mutable CSRPtr in_csr_;
+  CSRPtr in_csr_;
   // Store the out csr (i.e, the normal csr)
-  mutable CSRPtr out_csr_;
+  CSRPtr out_csr_;
   // Store the edge list indexed by edge id (COO)
-  mutable COOPtr coo_;
+  COOPtr coo_;
   /*! \brief Whether if this is a multigraph. */
   bool is_multigraph_ = false;
 };

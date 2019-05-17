@@ -53,11 +53,10 @@ def gen_by_mutation():
 
 def gen_from_data(data, readonly):
     g = dgl.DGLGraph(data, readonly=readonly)
-    print(g.edges())
     return g
 
 def test_query():
-    def _test(g):
+    def _test_one(g):
         assert g.number_of_nodes() == 10
         assert g.number_of_edges() == 20
         assert len(g) == 10
@@ -121,16 +120,15 @@ def test_query():
         assert g.out_degree(9) == 1
         assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
 
-    #_test(gen_by_mutation())
-    #_test(gen_from_data(elist_input(), False))
-    _test(gen_from_data(elist_input(), True))
-    exit(0)
-    _test(gen_from_data(nx_input(), False))
-    _test(gen_from_data(nx_input(), True))
-    _test(gen_from_data(scipy_coo_input(), False))
-    _test(gen_from_data(scipy_coo_input(), True))
+        assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix()), scipy_coo_input().toarray().T)
+        assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix(transpose=True)), scipy_coo_input().toarray())
 
-    def _test_csr(g):
+    def _test(g):
+        # test twice to see whether the cached format works or not
+        _test_one(g)
+        _test_one(g)
+
+    def _test_csr_one(g):
         assert g.number_of_nodes() == 10
         assert g.number_of_edges() == 20
         assert len(g) == 10
@@ -196,6 +194,22 @@ def test_query():
         assert g.out_degree(8) == 0
         assert g.out_degree(9) == 1
         assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 1]))
+
+        assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix()), scipy_coo_input().toarray().T)
+        assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix(transpose=True)), scipy_coo_input().toarray())
+
+    def _test_csr(g):
+        # test twice to see whether the cached format works or not
+        _test_csr_one(g)
+        _test_csr_one(g)
+
+    _test(gen_by_mutation())
+    _test(gen_from_data(elist_input(), False))
+    _test(gen_from_data(elist_input(), True))
+    _test(gen_from_data(nx_input(), False))
+    _test(gen_from_data(nx_input(), True))
+    _test(gen_from_data(scipy_coo_input(), False))
+    _test(gen_from_data(scipy_coo_input(), True))
 
     _test_csr(gen_from_data(scipy_csr_input(), False))
     _test_csr(gen_from_data(scipy_csr_input(), True))
@@ -363,28 +377,10 @@ def test_find_edges():
     finally:
         assert fail
 
-def foo():
-    gidx = dgl.graph_index.GraphIndex(None, False, True)
-    def bar():
-        #csr = scipy_csr_input()
-        #indptr = F.tensor(csr.indptr)
-        #indices = F.tensor(csr.indices)
-        #gidx.from_csr_matrix(indptr, indices, "out")
-        #gidx.from_scipy_sparse_matrix(csr)
-        elist = list(zip(*edge_pair_input()))
-        gidx.from_edge_list(elist)
-        x = F.zeros((20,), dtype=F.int64, ctx=F.cpu())
-    bar()
-    x, y, z = gidx.edges()
-    print(x.tousertensor())
-    print(y.tousertensor())
-    print(z.tousertensor())
-
 if __name__ == '__main__':
-    foo()
-    #test_query()
-    #test_mutation()
-    #test_scipy_adjmat()
-    #test_incmat()
-    #test_readonly()
-    #test_find_edges()
+    test_query()
+    test_mutation()
+    test_scipy_adjmat()
+    test_incmat()
+    test_readonly()
+    test_find_edges()
