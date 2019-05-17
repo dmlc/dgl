@@ -12,8 +12,8 @@
 #include <utility>
 #include <tuple>
 #include <algorithm>
-#include <dgl/runtime/ndarray.h>
-#include <dgl/graph_interface.h>
+#include "runtime/ndarray.h"
+#include "graph_interface.h"
 
 namespace dgl {
 
@@ -205,7 +205,7 @@ class CSR : public GraphInterface {
   }
 
   // member getters
-  
+
   IdArray indptr() const { return indptr_; }
 
   IdArray indices() const { return indices_; }
@@ -429,9 +429,9 @@ class COO : public GraphInterface {
   COOMatrix ToCOOMatrix() const {
     return COOMatrix{src_, dst_, {}};
   }
-  
+
   // member getters
-  
+
   IdArray src() const { return src_; }
 
   IdArray dst() const { return dst_; }
@@ -452,7 +452,7 @@ class COO : public GraphInterface {
 class ImmutableGraph: public GraphInterface {
  public:
   /*! \brief Construct an immutable graph from the COO format. */
-  ImmutableGraph(COOPtr coo, bool multigraph = false)
+  explicit ImmutableGraph(COOPtr coo, bool multigraph = false)
     : coo_(coo), is_multigraph_(multigraph) {
   }
   /*!
@@ -474,7 +474,7 @@ class ImmutableGraph: public GraphInterface {
   }
 
   /*! \brief Construct an immutable graph from one CSR. */
-  ImmutableGraph(CSRPtr csr, bool multigraph = false)
+  explicit ImmutableGraph(CSRPtr csr, bool multigraph = false)
     : out_csr_(csr), is_multigraph_(multigraph) {
   }
 
@@ -530,7 +530,7 @@ class ImmutableGraph: public GraphInterface {
   /*!
    * \return whether the graph is read-only
    */
-  virtual bool IsReadonly() const override {
+  bool IsReadonly() const override {
     return true;
   }
 

@@ -9,8 +9,9 @@
 #include <string>
 #include <vector>
 #include <utility>
+#include <algorithm>
 
-#include <dgl/array.h>
+#include "array.h"
 
 namespace dgl {
 

@@ -4,10 +4,10 @@
  * \brief DGL immutable graph index implementation
  */
 
+#include <dgl/immutable_graph.h>
 #include <string.h>
 #include <bitset>
 #include <numeric>
-#include <dgl/immutable_graph.h>
 
 #include "../c_api_common.h"
 
@@ -20,7 +20,7 @@ class IdHashMap {
  public:
   // Construct the hashmap using the given id arrays.
   // The id array could contain duplicates.
-  IdHashMap(IdArray ids) {
+  explicit IdHashMap(IdArray ids) {
     const dgl_id_t* ids_data = static_cast<dgl_id_t*>(ids->data);
     const int64_t len = ids->shape[0];
     dgl_id_t newid = 0;
@@ -292,8 +292,6 @@ Subgraph CSR::VertexSubgraph(IdArray vids) const {
   IdHashMap hashmap(vids);
   const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
   const int64_t len = vids->shape[0];
-  // check if vid_data is sorted.
-  //CHECK(std::is_sorted(vid_data, vid_data + len)) << "The input vertex list has to be sorted";
 
   const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
   const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);

@@ -676,7 +676,7 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
                  &flow_offsets,
                  &edge_mapping);
   // sanity check
-  CHECK(sub_indptr.size() > 0);
+  CHECK_GT(sub_indptr.size(), 0);
   CHECK_EQ(sub_indptr[0], 0);
   CHECK_EQ(sub_indptr.back(), sub_indices.size());
   CHECK_EQ(sub_indices.size(), sub_edge_ids.size());
@@ -693,8 +693,8 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
 
   nf.node_mapping = VecToIdArray(node_mapping);
   nf.edge_mapping = VecToIdArray(edge_mapping);
-  nf.layer_offsets = VecToIdArray(layer_offsets); 
-  nf.flow_offsets = VecToIdArray(flow_offsets); 
+  nf.layer_offsets = VecToIdArray(layer_offsets);
+  nf.flow_offsets = VecToIdArray(flow_offsets);
 
   return nf;
 }

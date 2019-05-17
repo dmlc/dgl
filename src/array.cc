@@ -1,3 +1,8 @@
+/*!
+ *  Copyright (c) 2019 by Contributors
+ * \file array.cc
+ * \brief DGL array utilities implementation
+ */
 #include <dgl/array.h>
 
 namespace dgl {
@@ -147,7 +152,7 @@ IdArray HStack(IdArray arr1, IdArray arr2) {
 }
 
 CSRMatrix SliceRows(const CSRMatrix& csr, int64_t start, int64_t end) {
-  // TODO
+  // TODO(minjie): TBD
   LOG(FATAL) << "Not implemented.";
   return {};
 }
