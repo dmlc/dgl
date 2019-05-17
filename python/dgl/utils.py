@@ -521,4 +521,5 @@ def to_dgl_context(ctx):
     return nd.DGLContext(device_type, device_id)
 
 def create_empty_mapping(ctx):
-    return nd.empty([])
+    """Create an empty id mapping"""
+    return nd.empty([], ctx=ctx)

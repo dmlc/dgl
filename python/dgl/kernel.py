@@ -77,7 +77,7 @@ def src_op_edge_reduce(reducer,
         src_data, edge_data, out_mapping, out_data)
 
 def backward_lhs_src_mul_edge_reduce(
-        reducer, op,
+        reducer, binary_op,
         indptr, indices,
         rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
@@ -96,7 +96,7 @@ def backward_lhs_src_mul_edge_reduce(
         The type of the reducer ("sum", "max", "mean", "min", "none").
         If the reducer is "none", the output is an edge feature tensor.
         Otherwise, a node feature tensor is returned.
-    op : str
+    binary_op : str
         The type of the mul functor ("mul", "add").
     indptr : dgl.ndarray.NDArray
         An int64 row offset array for the graph CSR.
@@ -130,12 +130,12 @@ def backward_lhs_src_mul_edge_reduce(
         (output variable) The gradient of src data.
     """
     _CAPI_DGLKernelBackwardLhsSrcMulEdgeReduce(
-        reducer, op, indptr, indices, rev_indptr, rev_indices,
+        reducer, binary_op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data, grad_src_data)
 
 def backward_rhs_src_mul_edge_reduce(
-        reducer, op,
+        reducer, binary_op,
         indptr, indices,
         rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
@@ -153,7 +153,7 @@ def backward_rhs_src_mul_edge_reduce(
         The type of the reducer ("sum", "max", "mean", "min", "none").
         If the reducer is "none", the output is an edge feature tensor.
         Otherwise, a node feature tensor is returned.
-    op : str
+    binary_op : str
         The type of the mul functor ("mul", "add").
     indptr : dgl.ndarray.NDArray
         An int64 row offset array for the graph CSR.
@@ -187,12 +187,12 @@ def backward_rhs_src_mul_edge_reduce(
         (output variable) The gradient of edge data.
     """
     _CAPI_DGLKernelBackwardRhsSrcMulEdgeReduce(
-        reducer, op, indptr, indices, rev_indptr, rev_indices,
+        reducer, binary_op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data, grad_edge_data)
 
 def backward_both_src_mul_edge_reduce(
-        reducer, op,
+        reducer, binary_op,
         indptr, indices,
         rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
@@ -211,7 +211,7 @@ def backward_both_src_mul_edge_reduce(
         The type of the reducer ("sum", "max", "mean", "min", "none").
         If the reducer is "none", the output is an edge feature tensor.
         Otherwise, a node feature tensor is returned.
-    op : str
+    binary_op : str
         The type of the mul functor ("mul", "add").
     indptr : dgl.ndarray.NDArray
         An int64 row offset array for the graph CSR.
@@ -247,7 +247,7 @@ def backward_both_src_mul_edge_reduce(
         (output variable) The gradient of edge data.
     """
     _CAPI_DGLKernelBackwardBothSrcMulEdgeReduce(
-        reducer, op, indptr, indices, rev_indptr, rev_indices,
+        reducer, binary_op, indptr, indices, rev_indptr, rev_indices,
         src_mapping, edge_mapping, out_mapping,
         src_data, edge_data, out_data, grad_out_data,
         grad_src_data, grad_edge_data)
