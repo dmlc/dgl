@@ -15,7 +15,7 @@ MAX_NB = 8
 def level_order(forest, roots):
     edges = bfs_edges_generator(forest, roots)
     _, leaves = forest.find_edges(edges[-1])
-    edges_back = bfs_edges_generator(forest, roots, reversed=True)
+    edges_back = bfs_edges_generator(forest, roots, reverse=True)
     yield from reversed(edges_back)
     yield from edges
 
