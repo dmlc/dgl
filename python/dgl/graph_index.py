@@ -630,7 +630,7 @@ class GraphIndex(object):
             shuffle = utils.toindex(rst(2))
             dat = F.ones(indices.shape, dtype=F.float32, ctx=ctx)
             spmat = F.sparse_matrix(dat, ('csr', indices, indptr),
-                                   (self.number_of_nodes(), self.number_of_nodes()))[0]
+                                    (self.number_of_nodes(), self.number_of_nodes()))[0]
             return spmat, shuffle
         elif fmt == "coo":
             ## FIXME(minjie): data type
