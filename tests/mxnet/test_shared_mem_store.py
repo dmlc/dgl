@@ -144,9 +144,7 @@ def test_concurrent():
     work_p2.join()
     work_p3.join()
     work_p4.join()
-    print('wait for s')
     serv_p.join()
-    print('end')
 
 if __name__ == '__main__':
     test_test_init()
