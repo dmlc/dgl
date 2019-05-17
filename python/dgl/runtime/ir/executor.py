@@ -1088,7 +1088,7 @@ IR_REGISTRY[OpCode.SRC_OP_EDGE_REDUCE] = {
 
 
 def SRC_OP_EDGE_REDUCE(reducer, binary_op, spmat, src_data, edge_data,
-                        out_size, src_map, edge_map, out_map, ret=None):
+                       out_size, src_map, edge_map, out_map, ret=None):
     """Perform SRC_OP_EDGE_REDUCE symbolically.
 
     Parameters
@@ -1220,7 +1220,7 @@ IR_REGISTRY[OpCode.SRC_OP_DST_REDUCE] = {
 
 
 def SRC_OP_DST_REDUCE(reducer, binary_op, spmat, src_data, dst_data, out_size,
-                       src_map, dst_map, out_map, ret=None):
+                      src_map, dst_map, out_map, ret=None):
     """Perform SRC_OP_DST_REDUCE symbolically.
 
     Parameters

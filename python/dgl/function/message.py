@@ -1,9 +1,10 @@
 """Built-in message function."""
 from __future__ import absolute_import
 
-from .base import BuiltinFunction, _empty_map
+from .base import BuiltinFunction
 from ..runtime import ir
 from ..runtime.ir import var
+from ..utils import create_empty_mapping as empty_map
 
 __all__ = ["src_mul_edge", "src_mul_dst", "copy_src", "copy_edge"]
 
@@ -37,8 +38,8 @@ class SrcOpEdgeMessageFunction(MessageFunction):
         self.out_field = out_field
 
     def __call__(self, spmat, src_frame, dst_frame, edge_frame, out_size,
-                 reducer="none", src_map=_empty_map, dst_map=_empty_map,
-                 edge_map=_empty_map, out_map=_empty_map):
+                 reducer="none", src_map=empty_map, dst_map=empty_map,
+                 edge_map=empty_map, out_map=empty_map):
         """Symbolic computation of this builtin function to create
         runtime.executor
         """
@@ -70,8 +71,8 @@ class SrcOpDstMessageFunction(MessageFunction):
         self.out_field = out_field
 
     def __call__(self, spmat, src_frame, dst_frame, edge_frame, out_size,
-                 reducer="none", src_map=_empty_map, dst_map=_empty_map,
-                 edge_map=_empty_map, out_map=_empty_map):
+                 reducer="none", src_map=empty_map, dst_map=empty_map,
+                 edge_map=empty_map, out_map=empty_map):
         """Symbolic computation of this builtin function to create
         runtime.executor
         """
@@ -101,8 +102,8 @@ class CopySrcMessageFunction(MessageFunction):
         self.out_field = out_field
 
     def __call__(self, spmat, src_frame, dst_frame, edge_frame, out_size,
-                 reducer="none", src_map=_empty_map, dst_map=_empty_map,
-                 edge_map=_empty_map, out_map=_empty_map):
+                 reducer="none", src_map=empty_map, dst_map=empty_map,
+                 edge_map=empty_map, out_map=empty_map):
         """Symbolic computation of this builtin function to create
         runtime.executor
         """
@@ -129,8 +130,8 @@ class CopyEdgeMessageFunction(MessageFunction):
         self.out_field = out_field
 
     def __call__(self, spmat, src_frame, dst_frame, edge_frame, out_size,
-                 reducer="none", src_map=_empty_map, dst_map=_empty_map,
-                 edge_map=_empty_map, out_map=_empty_map):
+                 reducer="none", src_map=empty_map, dst_map=empty_map,
+                 edge_map=empty_map, out_map=empty_map):
         """Symbolic computation of this builtin function to create
         runtime.executor
         """

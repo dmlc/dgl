@@ -1,6 +1,9 @@
 """Module for SPMV rules."""
 from __future__ import absolute_import
 
+import scipy.sparse as sp
+import numpy as np
+
 from ..base import DGLError
 from .. import backend as F
 from .. import utils
@@ -8,9 +11,6 @@ from .. import ndarray as nd
 
 from . import ir
 from .ir import var
-
-import scipy.sparse as sp
-import numpy as np
 
 
 def gen_v2v_spmv_schedule(adj, mfunc, rfunc, src_frame, dst_frame, edge_frame,
@@ -223,7 +223,7 @@ def build_adj_matrix_uv(edge_tuples, num_src, num_dst):
     edge_map = F.zerocopy_to_dgl_ndarray(eid[res[2]])
     inv_edge_map = F.zerocopy_to_dgl_ndarray(eid[res[5]])
     res = list(map(F.zerocopy_to_dgl_ndarray, res))
-    indptr, indices, msg_map, inv_indptr, inv_indices, inv_msg_map= res
+    indptr, indices, msg_map, inv_indptr, inv_indices, inv_msg_map = res
 
     def spmat(ctx):
         return list(map(lambda x: nd.array(x, ctx=ctx),
@@ -233,7 +233,7 @@ def build_adj_matrix_uv(edge_tuples, num_src, num_dst):
         utils.CtxCachedObject(lambda ctx: nd.array(edge_map, ctx=ctx)), \
         utils.CtxCachedObject(lambda ctx: nd.array(inv_edge_map, ctx=ctx)), \
         utils.CtxCachedObject(lambda ctx: nd.array(msg_map, ctx=ctx)), \
-        utils.CtxCachedObject(lambda ctx: nd.array(inv_msg_map, ctx=ctx)) \
+        utils.CtxCachedObject(lambda ctx: nd.array(inv_msg_map, ctx=ctx))
 
 
 def build_block_adj_matrix_graph(graph, block_id):
@@ -257,9 +257,10 @@ def build_block_adj_matrix_graph(graph, block_id):
     """
     # FIXME (lingfan): nodeflow does not support get both csr and transposed
     # csr, for now use scipy to implement
-    u, v, _ = graph.block_edges(block_id)
+    u, v, eid = graph.block_edges(block_id)
     u = utils.Index(u)
     v = utils.Index(v)
+    eid = utils.Index(eid)
     num_src = graph.layer_size(block_id)
     num_dst = graph.layer_size(block_id + 1)
-    return build_adj_matrix_uv(u, v, num_src, num_dst)
+    return build_adj_matrix_uv((u, v, eid), num_src, num_dst)

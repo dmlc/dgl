@@ -920,7 +920,7 @@ def _build_idx_map(idx):
     map_len = int(F.asnumpy(F.max(x, dim=0))) + 1
     old_to_new = F.zeros((map_len,), dtype=F.int64, ctx=F.cpu())
     F.scatter_row_inplace(old_to_new, x, F.arange(0, len(x)))
-    old_to_new= F.zerocopy_to_dgl_ndarray(old_to_new)
+    old_to_new = F.zerocopy_to_dgl_ndarray(old_to_new)
     return utils.CtxCachedObject(lambda ctx: nd.array(old_to_new, ctx=ctx))
 
 
