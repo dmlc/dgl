@@ -11,6 +11,8 @@
 
 namespace dgl {
 
+#ifndef _WIN32
+
 template<class T>
 T atomic_read(volatile T *val) {
   T ret_val;
@@ -69,6 +71,8 @@ class ReadWriteLock {
     leave_write_mode();
   }
 };
+
+#endif  // _WIN32
 
 }  // namespace dgl
 

@@ -218,6 +218,8 @@ void NDArray::CopyFromTo(DLTensor* from,
     from_size, from->ctx, to->ctx, from->dtype, stream);
 }
 
+#ifndef _WIN32
+
 void SharedMemGatherRows(DLTensor *from, DLTensor *lock, DLTensor *idx, DLTensor *to) {
   CHECK_EQ(idx->ndim, 1);
   CHECK_EQ(lock->ndim, 1);
@@ -272,6 +274,8 @@ void SharedMemScatterRows(DLTensor *from, DLTensor *lock, DLTensor *idx, DLTenso
     row_lock.WriteUnlock();
   }
 }
+
+#endif  // _WIN32
 
 }  // namespace runtime
 }  // namespace dgl
@@ -343,7 +347,11 @@ int DGLArraySharedMemGatherRows(DGLArrayHandle from,
                                 DGLArrayHandle idx,
                                 DGLArrayHandle to) {
   API_BEGIN();
+#ifndef _WIN32
   SharedMemGatherRows(from, lock, idx, to);
+#else
+  LOG(FATAL) << "Windows doesn't support NDArray with shared memory";
+#endif  // _WIN32
   API_END();
 }
 
@@ -352,7 +360,11 @@ int DGLArraySharedMemScatterRows(DGLArrayHandle from,
                                  DGLArrayHandle idx,
                                  DGLArrayHandle to) {
   API_BEGIN();
+#ifndef _WIN32
   SharedMemScatterRows(from, lock, idx, to);
+#else
+  LOG(FATAL) << "Windows doesn't support NDArray with shared memory";
+#endif  // _WIN32
   API_END();
 }
 
