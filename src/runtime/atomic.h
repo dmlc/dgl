@@ -8,15 +8,12 @@
 
 #ifndef _WIN32
 
-#include <stdatomic.h>
-#include <atomic>
-
 namespace dgl {
 
 template<class T>
 T atomic_read(volatile T *val) {
   T ret_val;
-  __atomic_load(val, &ret_val, memory_order_seq_cst);
+  __atomic_load(val, &ret_val, __ATOMIC_SEQ_CST);
   return ret_val;
 }
 
@@ -31,14 +28,14 @@ class ReadWriteLock {
   void enter_write_mode() {
     int prev;
     do {
-      prev = __atomic_fetch_or(lock, 1<<31, memory_order_seq_cst);
+      prev = __atomic_fetch_or(lock, 1<<31, __ATOMIC_SEQ_CST);
       // If the previous value already has write lock set up,
       // we have to wait until the write lock is reset.
     } while (prev < 0);
   }
 
   void leave_write_mode() {
-    int prev = __atomic_fetch_and(lock, ~(1<<31), memory_order_seq_cst);
+    int prev = __atomic_fetch_and(lock, ~(1<<31), __ATOMIC_SEQ_CST);
     // when leaving the write mode, we have to make sure the write lock was
     // set up.
     CHECK_LT(prev, 0);
@@ -67,7 +64,7 @@ class ReadWriteLock {
   }
 
   void WriteUnlock() {
-    __atomic_fetch_add(lock, 1, memory_order_seq_cst);
+    __atomic_fetch_add(lock, 1, __ATOMIC_SEQ_CST);
     leave_write_mode();
   }
 };
