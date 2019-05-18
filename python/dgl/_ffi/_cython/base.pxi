@@ -112,11 +112,11 @@ cdef extern from "dgl/runtime/c_runtime_api.h":
     int DGLArraySharedMemGatherRows(DLTensorHandle from,
                                     DLTensorHandle lock,
                                     DLTensorHandle idx,
-                                    DLTensorHandle to);
+                                    DLTensorHandle to)
     int DGLArraySharedMemScatterRows(DLTensorHandle from,
                                      DLTensorHandle lock,
                                      DLTensorHandle idx,
-                                     DLTensorHandle to);
+                                     DLTensorHandle to)
     int DGLArrayFromDLPack(DLManagedTensor* arr_from,
                            DLTensorHandle* out)
     int DGLArrayToDLPack(DLTensorHandle arr_from,
