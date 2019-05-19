@@ -869,7 +869,6 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         pass
 
     # TODO should we support this?
-    # pylint: disable=abstract-method
     def prop_nodes(self,
                    nodes_generator,
                    message_func="default",
@@ -877,10 +876,9 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
                    apply_node_func="default"):
         """Node propagation in heterogeneous graph is not supported.
         """
-        raise NotImplementedError
+        raise NotImplementedError('not supported')
 
     # TODO should we support this?
-    # pylint: disable=abstract-method
     def prop_edges(self,
                    edges_generator,
                    message_func="default",
@@ -888,7 +886,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
                    apply_node_func="default"):
         """Edge propagation in heterogeneous graph is not supported.
         """
-        raise NotImplementedError
+        raise NotImplementedError('not supported')
 
     def subgraph(self, nodes):
         """Return the subgraph induced on given nodes.
@@ -1126,6 +1124,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
     def __repr__(self):
         pass
 
+# pylint: disable=abstract-method
 class DGLHeteroSubGraph(DGLHeteroGraph):
     """
     Parameters
