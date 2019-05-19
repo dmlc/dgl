@@ -3,7 +3,7 @@ class DGLBaseHeteroGraph(object):
 
     A Heterogeneous graph is defined as a graph with node types and edge
     types.
-    
+
     If two edges share the same edge type, then their source nodes, as well
     as their destination nodes, also have the same type (the source node
     types don't have to be the same as the destination node types).
@@ -25,11 +25,11 @@ class DGLBaseHeteroGraph(object):
             {edge_type: (source_node_id_tensor, destination_node_id_tensor)}
 
         where
-        
+
         * ``source_node_id_tensor`` and ``destination_node_id_tensor`` are
           IDs within the source and destination node type respectively.
         * ``edge_type`` is a triplet of
-        
+
               (source_node_type_name,
                destination_node_type_name,
                edge_type_name)
@@ -99,7 +99,7 @@ class DGLBaseHeteroGraph(object):
             metagraph,
             node_types,
             edge_connections_by_type):
-        pass
+        super(DGLBaseHeteroGraph, self).__init__()
 
     # TODO: should this return DGLBaseHeteroGraph or something like
     # DGLBaseHeteroSubgraph?
@@ -111,9 +111,9 @@ class DGLBaseHeteroGraph(object):
         * If ``key`` is a pair of str (type_A, type_B), it returns a
           heterogeneous subgraph induced from the union of both node types.
         * If ``key`` is a triplet of str
-        
+
               (src_type_name, dst_type_name, edge_type_name)
-              
+
           It returns a heterogeneous subgraph induced from the edges with
           source type name ``src_type_name``, destination type name
           ``dst_type_name``, and edge type name ``edge_type_name``.
@@ -157,7 +157,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             node_frame=None,
             edge_frame=None,
             readonly=False):
-        pass
+        super(DGLHeteroGraph, self).__init__(metagraph, node_types, edge_connections_by_type)
 
     # TODO: REVIEW
     def add_nodes(self, num, node_type, data=None):
@@ -1146,16 +1146,49 @@ class DGLHeteroSubGraph(DGLHeteroGraph):
 
     @property
     def parent_nid(self):
+        """Get the parent node ids.
+
+        The returned tensor dictionary can be used as a map from the node id
+        in this subgraph to the node id in the parent graph.
+
+        Returns
+        -------
+        dict[str, Tensor]
+            The parent node id array for each type.
+        """
         pass
 
     @property
     def parent_eid(self):
+        """Get the parent edge ids.
+
+        The returned tensor dictionary can be used as a map from the edge id
+        in this subgraph to the edge id in the parent graph.
+
+        Returns
+        -------
+        dict[etype, Tensor]
+            The parent edge id array for each type.
+            The edge types are characterized by a triplet of source type
+            name, destination type name, and edge type name.
+        """
         pass
 
-    def copy_to_parent(self):
+    def copy_to_parent(self, inplace=False):
+        """Write node/edge features to the parent graph.
+
+        Parameters
+        ----------
+        inplace : bool
+            If true, use inplace write (no gradient but faster)
+        """
         pass
 
     def copy_from_parent(self):
+        """Copy node/edge features from the parent graph.
+
+        All old features will be removed.
+        """
         pass
 
     def map_to_subgraph_nid(self, parent_vids):
