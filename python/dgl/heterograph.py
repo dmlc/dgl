@@ -1,3 +1,5 @@
+"""Classes for heterogeneous graphs."""
+
 class DGLBaseHeteroGraph(object):
     """Base Heterogeneous graph class.
 
@@ -94,6 +96,7 @@ class DGLBaseHeteroGraph(object):
     ...         ('developer', 'game', 'develops'): ([0, 1], [0, 1])})
     """
 
+    # pylint: disable=unused-argument
     def __init__(
             self,
             metagraph,
@@ -149,6 +152,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
     readonly : bool, optional
         Whether the graph structure is read-only (default: False)
     """
+    # pylint: disable=unused-argument
     def __init__(
             self,
             metagraph,
@@ -865,6 +869,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         pass
 
     # TODO should we support this?
+    # pylint: disable=abstract-method
     def prop_nodes(self,
                    nodes_generator,
                    message_func="default",
@@ -875,6 +880,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         raise NotImplementedError
 
     # TODO should we support this?
+    # pylint: disable=abstract-method
     def prop_edges(self,
                    edges_generator,
                    message_func="default",
@@ -1135,6 +1141,7 @@ class DGLHeteroSubGraph(DGLHeteroGraph):
     shared : bool, optional
         Whether the subgraph shares node/edge features with the parent graph
     """
+    # pylint: disable=unused-argument, super-init-not-called
     def __init__(
             self,
             parent,
