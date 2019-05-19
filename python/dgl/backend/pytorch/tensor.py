@@ -157,7 +157,7 @@ def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
     w = unsorted_1d_segment_sum(th.ones_like(seg_id), seg_id, n_segs, 0).to(input)
     w = w.clamp(min=1)   # remove 0 entries
     y = unsorted_1d_segment_sum(input, seg_id, n_segs, dim)
-    y /= w.view((-1,) + (1,) * (y.dim() - 1))
+    y = y / w.view((-1,) + (1,) * (y.dim() - 1))
     return y
 
 def boolean_mask(input, mask):
