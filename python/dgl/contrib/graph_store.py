@@ -588,7 +588,7 @@ class SharedMemoryDGLGraph(DGLGraph):
             self._node_frame._frame._warn_and_set_initializer()
         init = self._node_frame.get_initializer(ndata_name)
         init = self._init_manager.serialize(init)
-        self.proxy.init_ndata(init, ndata_name, shape, dtype)
+        self.proxy.init_ndata(init, ndata_name, shape, dtype, True)
         self._init_ndata(ndata_name, shape, dtype)
 
     def init_edata(self, edata_name, shape, dtype):
@@ -612,7 +612,7 @@ class SharedMemoryDGLGraph(DGLGraph):
             self._edge_frame._frame._warn_and_set_initializer()
         init = self._edge_frame.get_initializer(edata_name)
         init = self._init_manager.serialize(init)
-        self.proxy.init_edata(init, edata_name, shape, dtype)
+        self.proxy.init_edata(init, edata_name, shape, dtype, True)
         self._init_edata(edata_name, shape, dtype)
 
 
