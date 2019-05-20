@@ -12,7 +12,9 @@
 #include <algorithm>
 #include <string>
 
+#ifdef __CUDACC__
 #include "../runtime/cuda/cuda_common.h"
+#endif
 #include "./binary_reduce.h"
 #include "./binary_reduce_impl_decl.h"
 #include "./utils.h"
