@@ -112,7 +112,7 @@ def test_basics():
     g, ig = generate_rand_graph(100)
     check_basics(g, ig)
 
-def _test_node_subgraph():
+def test_node_subgraph():
     num_vertices = 100
     g, ig = generate_rand_graph(num_vertices)
 
@@ -185,6 +185,6 @@ def test_load_csr():
 if __name__ == '__main__':
     test_basics()
     test_graph_gen()
-    #test_node_subgraph()
+    test_node_subgraph()
     test_create_graph()
     test_load_csr()
