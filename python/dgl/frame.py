@@ -267,6 +267,11 @@ class Frame(MutableMapping):
 
     def get_remote_initializer(self, name):
         """Get a remote initializer.
+
+        Parameters
+        ----------
+        name : string
+            The column name.
         """
         if self._remote_init_builder is None:
             return None
