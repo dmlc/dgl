@@ -152,9 +152,24 @@ IdArray HStack(IdArray arr1, IdArray arr2) {
 }
 
 CSRMatrix SliceRows(const CSRMatrix& csr, int64_t start, int64_t end) {
-  // TODO(minjie): TBD
-  LOG(FATAL) << "Not implemented.";
-  return {};
+  const dgl_id_t* indptr = static_cast<dgl_id_t*>(csr.indptr->data);
+  const dgl_id_t* indices = static_cast<dgl_id_t*>(csr.indices->data);
+  const dgl_id_t* data = static_cast<dgl_id_t*>(csr.data->data);
+  const int64_t num_rows = end - start;
+  const int64_t nnz = indptr[end] - indptr[start];
+  CSRMatrix ret;
+  ret.indptr = NewIdArray(num_rows + 1);
+  ret.indices = NewIdArray(nnz);
+  ret.data = NewIdArray(nnz);
+  dgl_id_t* r_indptr = static_cast<dgl_id_t*>(ret.indptr->data);
+  dgl_id_t* r_indices = static_cast<dgl_id_t*>(ret.indices->data);
+  dgl_id_t* r_data = static_cast<dgl_id_t*>(ret.data->data);
+  for (int64_t i = start; i < end + 1; ++i) {
+    r_indptr[i - start] = indptr[i] - indptr[start];
+  }
+  std::copy(indices + indptr[start], indices + indptr[end], r_indices);
+  std::copy(data + indptr[start], data + indptr[end], r_data);
+  return ret;
 }
 
 }  // namespace dgl

@@ -85,10 +85,10 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
     CommunicatorHandle chandle = args[0];
     int recv_id = args[1];
     GraphHandle ghandle = args[2];
-    const IdArray node_mapping = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[3]));
-    const IdArray edge_mapping = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[4]));
-    const IdArray layer_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[5]));
-    const IdArray flow_offsets = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[6]));
+    const IdArray node_mapping = args[3];
+    const IdArray edge_mapping = args[4];
+    const IdArray layer_offsets = args[5];
+    const IdArray flow_offsets = args[6];
     ImmutableGraph *ptr = static_cast<ImmutableGraph*>(ghandle);
     network::Sender* sender = static_cast<network::Sender*>(chandle);
     auto csr = ptr->GetInCSR();
