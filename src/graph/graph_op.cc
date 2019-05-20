@@ -4,7 +4,9 @@
  * \brief Graph operation implementation
  */
 #include <dgl/graph_op.h>
+#include <dgl/immutable_graph.h>
 #include <algorithm>
+#include "../c_api_common.h"
 
 namespace dgl {
 namespace {
@@ -104,9 +106,110 @@ std::vector<Graph> GraphOp::DisjointPartitionBySizes(const Graph* graph, IdArray
   return rst;
 }
 
+
+ImmutableGraph GraphOp::DisjointUnion(std::vector<const ImmutableGraph *> graphs) {
+  int64_t num_nodes = 0;
+  int64_t num_edges = 0;
+  for (const ImmutableGraph *gr : graphs) {
+    num_nodes += gr->NumVertices();
+    num_edges += gr->NumEdges();
+  }
+  CSRPtr batched_csr_ptr = CSRPtr(new CSR(num_nodes, num_edges));
+  dgl_id_t* indptr = static_cast<dgl_id_t*>(batched_csr_ptr->indptr()->data);
+  dgl_id_t* indices = static_cast<dgl_id_t*>(batched_csr_ptr->indices()->data);
+  dgl_id_t* edge_ids = static_cast<dgl_id_t*>(batched_csr_ptr->edge_ids()->data);
+
+  indptr[0] = 0;
+  dgl_id_t cum_num_nodes = 0;
+  dgl_id_t cum_num_edges = 0;
+  bool is_multigraph = false;
+  for (const ImmutableGraph *gr : graphs) {
+    const CSRPtr g_csrptr = gr->GetInCSR();
+    const int64_t g_num_nodes = g_csrptr->NumVertices();
+    const int64_t g_num_edges = g_csrptr->NumEdges();
+    dgl_id_t* g_indptr = static_cast<dgl_id_t*>(g_csrptr->indptr()->data);
+    dgl_id_t* g_indices = static_cast<dgl_id_t*>(g_csrptr->indices()->data);
+    dgl_id_t* g_edge_ids = static_cast<dgl_id_t*>(g_csrptr->edge_ids()->data);
+    for (dgl_id_t i = 1; i < g_num_nodes + 1; ++i) {
+      indptr[cum_num_nodes + i] = g_indptr[i] + cum_num_edges;
+    }
+    for (dgl_id_t i = 0; i < g_num_edges; ++i) {
+      indices[cum_num_edges + i] = g_indices[i] + cum_num_nodes;
+    }
+
+    for (dgl_id_t i = 0; i < g_num_edges; ++i) {
+      edge_ids[cum_num_edges + i] = g_edge_ids[i] + cum_num_edges;
+    }
+    cum_num_nodes += g_num_nodes;
+    cum_num_edges += g_num_edges;
+    is_multigraph |= gr->IsMultigraph();
+  }
+
+  return ImmutableGraph(batched_csr_ptr, nullptr, is_multigraph);
+}
+
+std::vector<ImmutableGraph> GraphOp::DisjointPartitionByNum(const ImmutableGraph *graph,
+        int64_t num) {
+  CHECK(num != 0 && graph->NumVertices() % num == 0)
+    << "Number of partitions must evenly divide the number of nodes.";
+  IdArray sizes = IdArray::Empty({num}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  int64_t *sizes_data = static_cast<int64_t *>(sizes->data);
+  std::fill(sizes_data, sizes_data + num, graph->NumVertices() / num);
+  return DisjointPartitionBySizes(graph, sizes);
+}
+
+std::vector<ImmutableGraph> GraphOp::DisjointPartitionBySizes(const ImmutableGraph *batched_graph,
+        IdArray sizes) {
+  // TODO(minjie): use array views to speedup this operation
+  const int64_t len = sizes->shape[0];
+  const int64_t *sizes_data = static_cast<int64_t *>(sizes->data);
+  std::vector<int64_t> cumsum;
+  cumsum.reserve(len + 1);
+  cumsum.push_back(0);
+  for (int64_t i = 0; i < len; ++i) {
+    cumsum.push_back(cumsum[i] + sizes_data[i]);
+  }
+  CHECK_EQ(cumsum[len], batched_graph->NumVertices())
+    << "Sum of the given sizes must equal to the number of nodes.";
+  std::vector<ImmutableGraph> rst;
+  CSRPtr in_csr_ptr = batched_graph->GetInCSR();
+  const dgl_id_t* indptr = static_cast<dgl_id_t*>(in_csr_ptr->indptr()->data);
+  const dgl_id_t* indices = static_cast<dgl_id_t*>(in_csr_ptr->indices()->data);
+  const dgl_id_t* edge_ids = static_cast<dgl_id_t*>(in_csr_ptr->edge_ids()->data);
+  dgl_id_t cum_sum_edges = 0;
+  for (int64_t i = 0; i < len; ++i) {
+    const int64_t start_pos = cumsum[i];
+    const int64_t end_pos = cumsum[i + 1];
+    const int64_t g_num_edges = indptr[end_pos] - indptr[start_pos];
+    CSRPtr g_in_csr_ptr = CSRPtr(new CSR(sizes_data[i], g_num_edges));
+    dgl_id_t* g_indptr = static_cast<dgl_id_t*>(g_in_csr_ptr->indptr()->data);
+    dgl_id_t* g_indices = static_cast<dgl_id_t*>(g_in_csr_ptr->indices()->data);
+    dgl_id_t* g_edge_ids = static_cast<dgl_id_t*>(g_in_csr_ptr->edge_ids()->data);
+
+    const dgl_id_t idoff = indptr[start_pos];
+    g_indptr[0] = 0;
+    for (int l = start_pos + 1; l < end_pos + 1; ++l) {
+      g_indptr[l - start_pos] = indptr[l] - indptr[start_pos];
+    }
+
+    for (int j = indptr[start_pos]; j < indptr[end_pos]; ++j) {
+      g_indices[j - idoff] = indices[j] - cumsum[i];
+    }
+
+    for (int k = indptr[start_pos]; k < indptr[end_pos]; ++k) {
+      g_edge_ids[k - idoff] = edge_ids[k] - cum_sum_edges;
+    }
+
+    cum_sum_edges += g_num_edges;
+    // TODO(minjie): is multigraph
+    rst.emplace_back(g_in_csr_ptr, nullptr, false);
+  }
+  return rst;
+}
+
 IdArray GraphOp::MapParentIdToSubgraphId(IdArray parent_vids, IdArray query) {
-  CHECK(IsValidIdArray(parent_vids)) << "Invalid parent id array.";
-  CHECK(IsValidIdArray(query)) << "Invalid query id array.";
+  CHECK(dgl::IsValidIdArray(parent_vids)) << "Invalid parent id array.";
+  CHECK(dgl::IsValidIdArray(query)) << "Invalid query id array.";
   const auto parent_len = parent_vids->shape[0];
   const auto query_len = query->shape[0];
   const dgl_id_t* parent_data = static_cast<dgl_id_t*>(parent_vids->data);

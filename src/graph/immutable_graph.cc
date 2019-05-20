@@ -529,7 +529,13 @@ CSRPtr COO::ToCSR() const {
 ImmutableGraph::EdgeArray ImmutableGraph::Edges(const std::string &order) const {
   if (order.empty()) {
     // arbitrary order
-    return AnyGraph()->Edges(order);
+    if (in_csr_) {
+      // transpose
+      const auto& edges = in_csr_->Edges(order);
+      return EdgeArray{edges.dst, edges.src, edges.id};
+    } else {
+      return AnyGraph()->Edges(order);
+    }
   } else if (order == std::string("srcdst")) {
     // TODO(minjie): CSR only guarantees "src" to be sorted.
     //   Maybe we should relax this requirement?

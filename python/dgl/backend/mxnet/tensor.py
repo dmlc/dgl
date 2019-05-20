@@ -185,7 +185,7 @@ def unsorted_1d_segment_mean(input, seg_id, n_segs, dim):
     w = unsorted_1d_segment_sum(n_ones, seg_id, n_segs, 0)
     w = nd.clip(w, a_min=1, a_max=np.inf)
     y = unsorted_1d_segment_sum(input, seg_id, n_segs, dim)
-    y /= w.reshape((-1,) + (1,) * (y.ndim - 1))
+    y = y / w.reshape((-1,) + (1,) * (y.ndim - 1))
     return y
 
 def boolean_mask(input, mask):
