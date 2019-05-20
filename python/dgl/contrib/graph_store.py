@@ -4,6 +4,7 @@ import scipy
 from xmlrpc.server import SimpleXMLRPCServer
 import xmlrpc.client
 import numpy as np
+from functools import partial
 
 from collections.abc import MutableMapping
 
@@ -15,6 +16,7 @@ from ..graph_index import GraphIndex, create_graph_index
 from .._ffi.ndarray import empty_shared_mem
 from .._ffi.function import _init_api
 from .. import ndarray as nd
+from ..init import zero_initializer
 
 def _get_ndata_path(graph_name, ndata_name):
     return "/" + graph_name + "_node_" + ndata_name
@@ -213,6 +215,72 @@ class BarrierManager(object):
         if self.barriers[barrier_id].all_leave():
             del self.barriers[barrier_id]
 
+def shared_mem_zero_initializer(shape, dtype, name):  # pylint: disable=unused-argument
+    """Zero feature initializer in shared memory
+    """
+    data = empty_shared_mem(name, True, shape, dtype)
+    dlpack = data.to_dlpack()
+    arr = F.zerocopy_from_dlpack(dlpack)
+    arr[:] = 0
+    return arr
+
+class InitializerManager(object):
+    """Manage initializer.
+
+    We need to convert built-in frame initializer to strings
+    and send them to the graph store server through RPC.
+    Through the conversion, we need to convert local built-in initializer
+    to shared-memory initializer.
+    """
+
+    # Map the built-in initializer functions to strings.
+    _fun2str = {
+        zero_initializer: 'zero',
+    }
+
+    # Map the strings to built-in initializer functions.
+    _str2fun = {
+        'zero': shared_mem_zero_initializer,
+    }
+
+    def serialize(self, init):
+        """Convert the initializer function to string.
+
+        Parameters
+        ----------
+        init : callable
+            the initializer function.
+
+        Returns
+        ------
+        string
+            The name of the built-in initializer function.
+        """
+        if init in self._fun2str:
+            return self._fun2str[init]
+        else:
+            raise Exception("Shared-memory graph store doesn't support user's initializer")
+
+    def deserialize(self, init):
+        """Convert the string to the initializer function.
+
+        Parameters
+        ----------
+        init : string
+            the name of the initializer function
+
+        Returns
+        -------
+        callable
+            The shared-memory initializer function.
+        """
+        if init in self._str2fun:
+            return self._str2fun[init]
+        else:
+            raise Exception("Shared-memory graph store doesn't support initializer "
+                            + str(init))
+
+
 class SharedMemoryStoreServer(object):
     """The graph store server.
 
@@ -247,6 +315,7 @@ class SharedMemoryStoreServer(object):
         self._registered_nworkers = 0
 
         self._barrier = BarrierManager(num_workers)
+        self._init_manager = InitializerManager()
 
         # RPC command: register a graph to the graph store server.
         def register(graph_name):
@@ -265,29 +334,29 @@ class SharedMemoryStoreServer(object):
                     self._graph.is_multigraph, edge_dir
 
         # RPC command: initialize node embedding in the server.
-        def init_ndata(ndata_name, shape, dtype):
+        def init_ndata(init, ndata_name, shape, dtype):
             if ndata_name in self._graph.ndata:
                 ndata = self._graph.ndata[ndata_name]
                 assert np.all(ndata.shape == tuple(shape))
                 return 0
 
             assert self._graph.number_of_nodes() == shape[0]
-            data = empty_shared_mem(_get_ndata_path(graph_name, ndata_name), True, shape, dtype)
-            dlpack = data.to_dlpack()
-            self._graph.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
+            init = self._init_manager.deserialize(init)
+            data = init(shape, dtype, _get_ndata_path(graph_name, ndata_name))
+            self._graph.ndata[ndata_name] = data
             return 0
 
         # RPC command: initialize edge embedding in the server.
-        def init_edata(edata_name, shape, dtype):
+        def init_edata(init, edata_name, shape, dtype):
             if edata_name in self._graph.edata:
                 edata = self._graph.edata[edata_name]
                 assert np.all(edata.shape == tuple(shape))
                 return 0
 
             assert self._graph.number_of_edges() == shape[0]
-            data = empty_shared_mem(_get_edata_path(graph_name, edata_name), True, shape, dtype)
-            dlpack = data.to_dlpack()
-            self._graph.edata[edata_name] = F.zerocopy_from_dlpack(dlpack)
+            init = self._init_manager.deserialize(init)
+            data = init(shape, dtype, _get_edata_path(graph_name, edata_name))
+            self._graph.edata[edata_name] = data
             return 0
 
         # RPC command: get the names of all node embeddings.
@@ -332,6 +401,7 @@ class SharedMemoryStoreServer(object):
 
     def __del__(self):
         self._graph = None
+        self.server.server_close()
 
     @property
     def ndata(self):
@@ -392,6 +462,7 @@ class SharedMemoryDGLGraph(DGLGraph):
         graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
         graph_idx.from_shared_mem_csr_matrix(_get_graph_path(graph_name), num_nodes, num_edges, edge_dir)
         super(SharedMemoryDGLGraph, self).__init__(graph_idx, multigraph=multigraph, readonly=True)
+        self._init_manager = InitializerManager()
 
         # map all ndata and edata from the server.
         ndata_infos = self.proxy.list_ndata()
@@ -404,29 +475,28 @@ class SharedMemoryDGLGraph(DGLGraph):
 
         # Set the ndata and edata initializers.
         # so that when a new node/edge embedding is created, it'll be created on the server as well.
-        def node_initializer(name, arr):
-            shape = F.shape(arr)
-            dtype = np.dtype(F.dtype(arr)).name
-            self.proxy.init_ndata(name, shape, dtype)
+
+        # These two functions create initialized tensors on the server.
+        def node_initializer(init, name, shape, dtype, ctx):
+            init = self._init_manager.serialize(init)
+            dtype = np.dtype(dtype).name
+            self.proxy.init_ndata(init, name, shape, dtype)
             data = empty_shared_mem(_get_ndata_path(self._graph_name, name),
                                     False, shape, dtype)
             dlpack = data.to_dlpack()
-            arr1 = F.zerocopy_from_dlpack(dlpack)
-            arr1[:] = arr
-            return arr1
-        def edge_initializer(name, arr):
-            shape = F.shape(arr)
-            dtype = np.dtype(F.dtype(arr)).name
-            self.proxy.init_edata(name, shape, dtype)
+            return F.zerocopy_from_dlpack(dlpack)
+        def edge_initializer(init, name, shape, dtype, ctx):
+            init = self._init_manager.serialize(init)
+            dtype = np.dtype(dtype).name
+            self.proxy.init_edata(init, name, shape, dtype)
             data = empty_shared_mem(_get_edata_path(self._graph_name, name),
                                     False, shape, dtype)
             dlpack = data.to_dlpack()
-            arr1 = F.zerocopy_from_dlpack(dlpack)
-            arr1[:] = arr
-            return arr1
-        self._node_frame.set_remote_initializer(node_initializer)
-        self._edge_frame.set_remote_initializer(edge_initializer)
-        self._msg_frame.set_remote_initializer(edge_initializer)
+            return F.zerocopy_from_dlpack(dlpack)
+
+        self._node_frame.set_remote_init_builder(lambda init, name: partial(node_initializer, init, name))
+        self._edge_frame.set_remote_init_builder(lambda init, name: partial(edge_initializer, init, name))
+        self._msg_frame.set_remote_init_builder(lambda init, name: partial(edge_initializer, init, name))
 
     def __del__(self):
         if self.proxy is not None:
@@ -490,7 +560,12 @@ class SharedMemoryDGLGraph(DGLGraph):
             The data type of the node embedding. The currently supported data types
             are "float32" and "int32".
         """
-        self.proxy.init_ndata(ndata_name, shape, dtype)
+        init = self._node_frame.get_initializer(ndata_name)
+        if init is None:
+            self._node_frame._frame._warn_and_set_initializer()
+        init = self._node_frame.get_initializer(ndata_name)
+        init = self._init_manager.serialize(init)
+        self.proxy.init_ndata(init, ndata_name, shape, dtype)
         self._init_ndata(ndata_name, shape, dtype)
 
     def init_edata(self, edata_name, shape, dtype):
@@ -509,7 +584,12 @@ class SharedMemoryDGLGraph(DGLGraph):
             The data type of the edge embedding. The currently supported data types
             are "float32" and "int32".
         """
-        self.proxy.init_edata(edata_name, shape, dtype)
+        init = self._edge_frame.get_initializer(edata_name)
+        if init is None:
+            self._edge_frame._frame._warn_and_set_initializer()
+        init = self._edge_frame.get_initializer(edata_name)
+        init = self._init_manager.serialize(init)
+        self.proxy.init_edata(init, edata_name, shape, dtype)
         self._init_edata(edata_name, shape, dtype)
 
 
