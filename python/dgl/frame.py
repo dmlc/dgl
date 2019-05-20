@@ -166,7 +166,7 @@ class Column(object):
         self.data = F.cat([self.data, feats], dim=0)
 
     @staticmethod
-    def create(data, scheme, data_name):
+    def create(data, scheme, data_name):  # pylint: disable=unused-argument
         """Create a new column using the given data."""
         if isinstance(data, Column) and scheme is not None:
             return Column(data.data, scheme)
