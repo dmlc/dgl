@@ -274,7 +274,7 @@ class Frame(MutableMapping):
         if self.get_initializer(name) is None:
             self._warn_and_set_initializer()
         initializer = self.get_initializer(name)
-        return self._remote_init_builder(initializer)
+        return self._remote_init_builder(initializer, name)
 
     @property
     def schemes(self):
@@ -354,8 +354,7 @@ class Frame(MutableMapping):
         # to the remote server.
         initializer = self.get_remote_initializer(name)
         if initializer is not None:
-            init_data = initializer((self.num_rows,) + scheme.shape, scheme.dtype,
-                                    ctx, name)
+            init_data = initializer((self.num_rows,) + scheme.shape, scheme.dtype, ctx)
         else:
             if self.get_initializer(name) is None:
                 self._warn_and_set_initializer()
@@ -402,7 +401,7 @@ class Frame(MutableMapping):
         # to the remote server.
         initializer = self.get_remote_initializer(name)
         if initializer is not None:
-            new_data = initializer(F.shape(data), F.dtype(data), F.context(data), name)
+            new_data = initializer(F.shape(data), F.dtype(data), F.context(data))
             new_data[:] = data
             data = new_data
         col = Column.create(data)

@@ -407,14 +407,14 @@ class SharedMemoryDGLGraph(DGLGraph):
         # so that when a new node/edge embedding is created, it'll be created on the server as well.
 
         # These two functions create initialized tensors on the server.
-        def node_initializer(init, shape, dtype, ctx, name):
+        def node_initializer(init, name, shape, dtype, ctx):
             dtype = np.dtype(dtype).name
             self.proxy.init_ndata(init, name, shape, dtype)
             data = empty_shared_mem(_get_ndata_path(self._graph_name, name),
                                     False, shape, dtype)
             dlpack = data.to_dlpack()
             return F.zerocopy_from_dlpack(dlpack)
-        def edge_initializer(init, shape, dtype, ctx, name):
+        def edge_initializer(init, name, shape, dtype, ctx):
             dtype = np.dtype(dtype).name
             self.proxy.init_edata(init, name, shape, dtype)
             data = empty_shared_mem(_get_edata_path(self._graph_name, name),
@@ -422,9 +422,9 @@ class SharedMemoryDGLGraph(DGLGraph):
             dlpack = data.to_dlpack()
             return F.zerocopy_from_dlpack(dlpack)
 
-        self._node_frame.set_remote_init_builder(lambda init: partial(node_initializer, init))
-        self._edge_frame.set_remote_init_builder(lambda init: partial(edge_initializer, init))
-        self._msg_frame.set_remote_init_builder(lambda init: partial(edge_initializer, init))
+        self._node_frame.set_remote_init_builder(lambda init, name: partial(node_initializer, init, name))
+        self._edge_frame.set_remote_init_builder(lambda init, name: partial(edge_initializer, init, name))
+        self._msg_frame.set_remote_init_builder(lambda init, name: partial(edge_initializer, init, name))
 
     def __del__(self):
         if self.proxy is not None:
