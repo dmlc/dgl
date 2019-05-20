@@ -112,7 +112,7 @@ def test_basics():
     g, ig = generate_rand_graph(100)
     check_basics(g, ig)
 
-def test_node_subgraph():
+def _test_node_subgraph():
     num_vertices = 100
     g, ig = generate_rand_graph(num_vertices)
 
