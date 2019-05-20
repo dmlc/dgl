@@ -12,9 +12,6 @@ namespace kernel {
 #define REDUCER ReduceSum
 #define XPU kDLCPU
 
-//EVAL(GEN_DTYPE, GEN_TARGET, GEN_BINARY_OP, GEN_DEFINE)
-//EVAL(GEN_BACKWARD_MODE, GEN_DTYPE, GEN_TARGET, GEN_BINARY_OP, GEN_BACKWARD_DEFINE)
-
 template void CallBinaryReduce<XPU, float, SelectSrc, SelectDst,
          BinaryAdd<float>, REDUCER<XPU, float>>(
              const minigun::advance::RuntimeConfig& rtcfg,
