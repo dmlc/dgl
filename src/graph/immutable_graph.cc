@@ -38,9 +38,15 @@ class IdHashMap {
     return filter_.test(id & kFilterMask) && oldv2newv_.count(id);
   }
 
-  // Return the new id of the given id.
-  dgl_id_t Map(dgl_id_t id) const {
-    return oldv2newv_.at(id);
+  // Return the new id of the given id. If the given id is not contained
+  // in the hash map, returns the default_val instead.
+  dgl_id_t Map(dgl_id_t id, dgl_id_t default_val) const {
+    if (filter_.test(id & kFilterMask)) {
+      auto it = oldv2newv_.find(id);
+      return (it == oldv2newv_.end()) ? default_val : it->second;
+    } else {
+      return default_val;
+    }
   }
 
  private:
@@ -299,14 +305,15 @@ Subgraph CSR::VertexSubgraph(IdArray vids) const {
 
   std::vector<dgl_id_t> sub_indptr, sub_indices, sub_eids, induced_edges;
   sub_indptr.resize(len + 1, 0);
+  const dgl_id_t kInvalidId = len + 1;
   for (int64_t i = 0; i < len; ++i) {
     // NOTE: newv == i
     const dgl_id_t oldv = vid_data[i];
     CHECK(HasVertex(oldv)) << "Invalid vertex: " << oldv;
     for (dgl_id_t olde = indptr_data[oldv]; olde < indptr_data[oldv+1]; ++olde) {
       const dgl_id_t oldu = indices_data[olde];
-      if (hashmap.Contains(oldu)) {
-        const dgl_id_t newu = hashmap.Map(oldu);
+      const dgl_id_t newu = hashmap.Map(oldu, kInvalidId);
+      if (newu != kInvalidId) {
         ++sub_indptr[i];
         sub_indices.push_back(newu);
         induced_edges.push_back(eid_data[olde]);
