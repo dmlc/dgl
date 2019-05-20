@@ -110,7 +110,8 @@ class DGLBaseHeteroGraph(object):
         super(DGLBaseHeteroGraph, self).__init__()
 
     def __getitem__(self, key):
-        """Returns a heterogeneous graph with given node/edge type:
+        """Returns a view on the heterogeneous graph with given node/edge
+        type:
 
         * If ``key`` is a str, it returns a heterogeneous subgraph induced
           from nodes of type ``key``.
@@ -124,6 +125,14 @@ class DGLBaseHeteroGraph(object):
           source type name ``src_type_name``, destination type name
           ``dst_type_name``, and edge type name ``edge_type_name``.
 
+        Note that the subgraph itself is not materialized until someone
+        queries the subgraph structure.  This implies that calling computation
+        methods such as
+
+            g['user'].update_all(...)
+
+        would not create a subgraph of users.
+
         Parameters
         ----------
         key : str or tuple
@@ -131,10 +140,23 @@ class DGLBaseHeteroGraph(object):
 
         Returns
         -------
-        DGLBaseHeteroSubGraph
-            The induced subgraph.
+        DGLBaseHeteroGraphView
+            The induced subgraph view.
         """
         pass
+
+
+class DGLBaseHeteroGraphView(object):
+    """View on a heterogeneous graph, constructed from
+    DGLBaseHeteroGraph.__getitem__().
+
+    It is semantically the same as a subgraph, except that
+
+    * The subgraph itself is not materialized until the user explicitly
+    queries the subgraph structure (e.g. calling ``in_edges``, but not
+    ``update_all``).
+    """
+    pass
 
 
 class DGLHeteroGraph(DGLBaseHeteroGraph):
