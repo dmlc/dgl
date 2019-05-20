@@ -37,7 +37,7 @@ SharedMemory::~SharedMemory() {
 void *SharedMemory::create_new(size_t size) {
   this->own = true;
 
-  int flag = O_RDWR|O_EXCL|O_CREAT;
+  int flag = O_RDWR|O_CREAT;
   fd = shm_open(name.c_str(), flag, S_IRUSR | S_IWUSR);
   CHECK_NE(fd, -1) << "fail to open " << name << ": " << strerror(errno);
   auto res = ftruncate(fd, size);
