@@ -12,30 +12,7 @@ namespace kernel {
 #define REDUCER ReduceSum
 #define XPU kDLCPU
 
-template void CallBinaryReduce<XPU, float, SelectSrc, SelectDst,
-         BinaryAdd<float>, REDUCER<XPU, float>>(
-             const minigun::advance::RuntimeConfig& rtcfg,
-             const minigun::Csr& csr,
-             const minigun::Csr& rev_csr,
-             GData<float>* gdata);
-template void CallBinaryReduce<XPU, float, SelectSrc, SelectDst,
-         BinarySub<float>, REDUCER<XPU, float>>(
-             const minigun::advance::RuntimeConfig& rtcfg,
-             const minigun::Csr& csr,
-             const minigun::Csr& rev_csr,
-             GData<float>* gdata);
-template void CallBinaryReduce<XPU, float, SelectDst, SelectSrc,
-         BinaryAdd<float>, REDUCER<XPU, float>>(
-             const minigun::advance::RuntimeConfig& rtcfg,
-             const minigun::Csr& csr,
-             const minigun::Csr& rev_csr,
-             GData<float>* gdata);
-template void CallBinaryReduce<XPU, float, SelectDst, SelectSrc,
-         BinarySub<float>, REDUCER<XPU, float>>(
-             const minigun::advance::RuntimeConfig& rtcfg,
-             const minigun::Csr& csr,
-             const minigun::Csr& rev_csr,
-             GData<float>* gdata);
+EVAL(GEN_DTYPE, GEN_TARGET, GEN_BINARY_OP, GEN_DEFINE)
 
 }  // namespace kernel
 }  // namespace dgl
