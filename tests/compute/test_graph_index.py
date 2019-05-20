@@ -185,6 +185,6 @@ def test_load_csr():
 if __name__ == '__main__':
     test_basics()
     test_graph_gen()
-    test_node_subgraph()
+    #test_node_subgraph()
     test_create_graph()
     test_load_csr()
