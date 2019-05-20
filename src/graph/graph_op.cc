@@ -116,6 +116,7 @@ ImmutableGraph GraphOp::DisjointUnion(std::vector<const ImmutableGraph *> graphs
   }
   ImmutableGraph::CSR::Ptr batched_csr_ptr = std::make_shared<ImmutableGraph::CSR>(num_nodes,
                                                                                    num_edges);
+  batched_csr_ptr->indptr[0] = 0;
   dgl_id_t cum_num_nodes = 0;
   dgl_id_t cum_num_edges = 0;
   dgl_id_t indptr_idx = 1;
@@ -126,7 +127,6 @@ ImmutableGraph GraphOp::DisjointUnion(std::vector<const ImmutableGraph *> graphs
     ImmutableGraph::CSR::vector<dgl_id_t> &g_indices = g_csrptr->indices;
     ImmutableGraph::CSR::vector<int64_t> &g_indptr = g_csrptr->indptr;
     ImmutableGraph::CSR::vector<dgl_id_t> &g_edge_ids = g_csrptr->edge_ids;
-    batched_csr_ptr->indptr[0] = 0;
     for (dgl_id_t i = 1; i < g_indptr.size(); ++i) {
       batched_csr_ptr->indptr[indptr_idx] = g_indptr[i] + cum_num_edges;
       indptr_idx++;
@@ -135,8 +135,8 @@ ImmutableGraph GraphOp::DisjointUnion(std::vector<const ImmutableGraph *> graphs
       batched_csr_ptr->indices.push_back(g_indices[i] + cum_num_nodes);
     }
 
-    for (dgl_id_t j = 0; j < g_edge_ids.size(); ++j) {
-      batched_csr_ptr->edge_ids.push_back(g_edge_ids[j] + cum_num_edges);
+    for (dgl_id_t i = 0; i < g_edge_ids.size(); ++i) {
+      batched_csr_ptr->edge_ids.push_back(g_edge_ids[i] + cum_num_edges);
     }
     cum_num_nodes += g_num_nodes;
     cum_num_edges += g_num_edges;
@@ -189,8 +189,8 @@ std::vector<ImmutableGraph> GraphOp::DisjointPartitionBySizes(const ImmutableGra
       g_indices.push_back(bg_indices[j] - cumsum[i]);
     }
 
-    for (int j = bg_indptr[start_pos]; j < bg_indptr[end_pos]; ++j) {
-      g_edge_ids.push_back(in_csr_ptr->edge_ids[j] - cum_sum_edges);
+    for (int k = bg_indptr[start_pos]; k < bg_indptr[end_pos]; ++k) {
+      g_edge_ids.push_back(in_csr_ptr->edge_ids[k] - cum_sum_edges);
     }
 
     cum_sum_edges += g_num_edges;

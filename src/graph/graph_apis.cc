@@ -77,7 +77,7 @@ namespace {
 template<typename T>
 void DGLDisjointPartitionByNum(const T *gptr, DGLArgs args, DGLRetValue *rv) {
   int64_t num = args[1];
-  std::vector<T> &&rst = GraphOp::DisjointPartitionByNum(gptr, num);
+  const std::vector<T> &&rst = GraphOp::DisjointPartitionByNum(gptr, num);
   // return the pointer array as an integer array
   const int64_t len = rst.size();
   NDArray ptr_array = NDArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
@@ -439,8 +439,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")
     const Graph *gr = dynamic_cast<const Graph *>(ptr);
     if (gr) {
       DGLDisjointUnion<Graph>(inhandles, list_size, rv);
-    }
-    if (im_gr) {
+    } else {
+      CHECK(im_gr) << "Args[0] is not a list of valid DGLGraph";
       DGLDisjointUnion<ImmutableGraph>(inhandles, list_size, rv);
     }
   });
@@ -453,8 +453,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointPartitionByNum")
     const ImmutableGraph* im_gptr = dynamic_cast<const ImmutableGraph*>(ptr);
     if (gptr) {
       DGLDisjointPartitionByNum(gptr, args, rv);
-    }
-    if (im_gptr){
+    } else {
+      CHECK(im_gptr) << "Args[0] is not a valid DGLGraph";
       DGLDisjointPartitionByNum(im_gptr, args, rv);
     }
   });
@@ -468,8 +468,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointPartitionBySizes")
     const ImmutableGraph* im_gptr = dynamic_cast<const ImmutableGraph*>(ptr);
     if (gptr) {
       DGLDisjointPartitionBySizes(gptr, sizes, rv);
-    }
-    if (im_gptr){
+    } else {
+      CHECK(im_gptr) << "Args[0] is not a valid DGLGraph";
       DGLDisjointPartitionBySizes(im_gptr, sizes, rv);
     }
 });
