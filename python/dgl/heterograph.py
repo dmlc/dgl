@@ -24,17 +24,22 @@ class DGLBaseHeteroGraph(object):
         Specifies how edges would connect nodes of the source type to nodes of
         the destination type in the following form:
 
-            {edge_type: (source_node_id_tensor, destination_node_id_tensor)}
+            {edge_type: edge_specifier}
 
-        where
+        where edge_specifier can be either of the following:
 
-        * ``source_node_id_tensor`` and ``destination_node_id_tensor`` are
-          IDs within the source and destination node type respectively.
-        * ``edge_type`` is a triplet of
+        * (source_node_id_tensor, destination_node_id_tensor)
+            * ``source_node_id_tensor`` and ``destination_node_id_tensor`` are
+              IDs within the source and destination node type respectively.
+            * ``edge_type`` is a triplet of
 
-              (source_node_type_name,
-               destination_node_type_name,
-               edge_type_name)
+                  (source_node_type_name,
+                   destination_node_type_name,
+                   edge_type_name)
+
+        * scipy.sparse.matrix
+          By default, the rows represent the destination of an edge, and the
+          column represents the source.
 
     Examples
     --------
