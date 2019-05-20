@@ -237,6 +237,8 @@ class COO : public GraphInterface {
   // Create a coo graph that shares the given src and dst
   COO(int64_t num_vertices, IdArray src, IdArray dst);
 
+  // TODO(da): add constructor for creating COO from shared memory
+
   void AddVertices(uint64_t num_vertices) override {
     LOG(FATAL) << "CSR graph does not allow mutation.";
   }
