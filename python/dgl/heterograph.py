@@ -104,8 +104,6 @@ class DGLBaseHeteroGraph(object):
             edge_connections_by_type):
         super(DGLBaseHeteroGraph, self).__init__()
 
-    # TODO: should this return DGLBaseHeteroGraph or something like
-    # DGLBaseHeteroSubgraph?
     def __getitem__(self, key):
         """Returns a heterogeneous graph with given node/edge type:
 
@@ -128,7 +126,7 @@ class DGLBaseHeteroGraph(object):
 
         Returns
         -------
-        DGLBaseHeteroGraph
+        DGLBaseHeteroSubGraph
             The induced subgraph.
         """
         pass
@@ -162,7 +160,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             edge_frame=None,
             readonly=False):
         super(DGLHeteroGraph, self).__init__(
-                metagraph, number_of_nodes_by_type, edge_connections_by_type)
+            metagraph, number_of_nodes_by_type, edge_connections_by_type)
 
     # TODO: REVIEW
     def add_nodes(self, num, node_type, data=None):
