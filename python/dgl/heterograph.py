@@ -18,8 +18,8 @@ class DGLBaseHeteroGraph(object):
         metagraph.
         The edge types are specified as edge keys on the NetworkX MultiGraph.
         The node types and edge types must be strings.
-    node_types : list
-        The node types.
+    number_of_nodes_by_type : dict[str, int]
+        Number of nodes for each node type.
     edge_connections_by_type : dict
         Specifies how edges would connect nodes of the source type to nodes of
         the destination type in the following form:
@@ -86,7 +86,7 @@ class DGLBaseHeteroGraph(object):
     ...     ('developer', 'game', 'develops')])
     >>> g = DGLBaseHeteroGraph(
     ...     metagraph=metagraph,
-    ...     node_types=['user'] * 4 + ['game'] * 2 + ['developer'] * 2,
+    ...     number_of_nodes_by_type={'user': 4, 'game': 2, 'developer': 2},
     ...     edge_connections_by_type={
     ...         # Alice follows Bob and Bob follows Carol
     ...         ('user', 'user', 'follows'): ([0, 1], [1, 2]),
@@ -100,7 +100,7 @@ class DGLBaseHeteroGraph(object):
     def __init__(
             self,
             metagraph,
-            node_types,
+            number_of_nodes_by_type,
             edge_connections_by_type):
         super(DGLBaseHeteroGraph, self).__init__()
 
@@ -143,7 +143,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
     Parameters
     ----------
-    metagraph, node_types, edge_connections_by_type :
+    metagraph, number_of_nodes_by_type, edge_connections_by_type :
         See DGLBaseHeteroGraph
     node_frame : dict[str, FrameRef], optional
         Node feature storage per type
@@ -156,12 +156,13 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
     def __init__(
             self,
             metagraph,
-            node_types,
+            number_of_nodes_by_type,
             edge_connections_by_type,
             node_frame=None,
             edge_frame=None,
             readonly=False):
-        super(DGLHeteroGraph, self).__init__(metagraph, node_types, edge_connections_by_type)
+        super(DGLHeteroGraph, self).__init__(
+                metagraph, number_of_nodes_by_type, edge_connections_by_type)
 
     # TODO: REVIEW
     def add_nodes(self, num, node_type, data=None):
