@@ -518,7 +518,7 @@ class Frame(MutableMapping):
         if self.num_rows == 0:
             # if no rows in current frame; append is equivalent to
             # directly updating columns.
-            self._columns = {key: self._column_create(data, key) for key, data in other.items()}
+            self._columns = {key: self._column_create(data, None, key) for key, data in other.items()}
         else:
             # pad columns that are not provided in the other frame with initial values
             for key, col in self.items():
