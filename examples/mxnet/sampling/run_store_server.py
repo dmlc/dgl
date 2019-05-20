@@ -1,3 +1,4 @@
+import os
 import argparse, time, math
 import numpy as np
 from scipy import sparse as spsp
@@ -33,7 +34,7 @@ def main(args):
         n_edges = csr.shape[0]
         data = GraphData(csr, args.num_feats)
         csr = None
-        graph_name = args.graph_file
+        graph_name = os.path.basename(args.graph_file)
     else:
         data = load_data(args)
         n_edges = data.graph.number_of_edges()
@@ -67,6 +68,7 @@ def main(args):
               n_test_samples))
 
     # create GCN model
+    print('graph name: ' + graph_name)
     g = dgl.contrib.graph_store.create_graph_store_server(data.graph, graph_name, "shared_mem",
                                                           args.num_workers, False)
     g.ndata['features'] = features

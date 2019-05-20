@@ -305,9 +305,12 @@ class SharedMemoryStoreServer(object):
     """
     def __init__(self, graph_data, edge_dir, graph_name, multigraph, num_workers, port):
         self.server = None
-        graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
-        indptr, indices = _to_csr(graph_data, edge_dir, multigraph)
-        graph_idx.from_csr_matrix(indptr, indices, edge_dir, _get_graph_path(graph_name))
+        if isinstance(graph_data, GraphIndex):
+            graph_idx = graph_data
+        else:
+            graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
+            indptr, indices = _to_csr(graph_data, edge_dir, multigraph)
+            graph_idx.from_csr_matrix(indptr, indices, edge_dir, _get_graph_path(graph_name))
 
         self._graph = DGLGraph(graph_idx, multigraph=multigraph, readonly=True)
         self._num_workers = num_workers
