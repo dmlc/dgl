@@ -204,12 +204,13 @@ struct BinaryUseLhs {
     LOG(FATAL) << "Unsupported binary op: " << val; \
   }
 
+#define EXPAND( x ) x
 #define GEN_BINARY_OP(GEN, ...) \
-  GEN(__VA_ARGS__, BinaryAdd) \
-  GEN(__VA_ARGS__, BinarySub) \
-  GEN(__VA_ARGS__, BinaryMul) \
-  GEN(__VA_ARGS__, BinaryDiv) \
-  GEN(__VA_ARGS__, BinaryUseLhs)
+  EXPAND(GEN(__VA_ARGS__, BinaryAdd)) \
+  EXPAND(GEN(__VA_ARGS__, BinarySub)) \
+  EXPAND(GEN(__VA_ARGS__, BinaryMul)) \
+  EXPAND(GEN(__VA_ARGS__, BinaryDiv)) \
+  EXPAND(GEN(__VA_ARGS__, BinaryUseLhs))
 
 // functors for reducers
 template <int XPU, typename DType>
