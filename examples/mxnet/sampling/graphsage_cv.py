@@ -179,32 +179,24 @@ class GraphSAGEInfer(gluon.Block):
 
 
 def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples, distributed):
-    features = g.ndata['features']
-    labels = g.ndata['labels']
-    in_feats = g.ndata['features'].shape[1]
-    g_ctx = features.context
+    n0_feats = g.nodes[0].data['features']
+    num_nodes = g.number_of_nodes()
+    in_feats = n0_feats.shape[1]
+    g_ctx = n0_feats.context
 
     norm = mx.nd.expand_dims(1./g.in_degrees().astype('float32'), 1)
-    g.ndata['norm'] = norm.as_in_context(g_ctx)
+    g.set_n_repr({'norm': norm.as_in_context(g_ctx)})
     degs = g.in_degrees().astype('float32').asnumpy()
     degs[degs > args.num_neighbors] = args.num_neighbors
-    g.ndata['subg_norm'] = mx.nd.expand_dims(mx.nd.array(1./degs, ctx=g_ctx), 1)
+    g.set_n_repr({'subg_norm': mx.nd.expand_dims(mx.nd.array(1./degs, ctx=g_ctx), 1)})
     n_layers = args.n_layers
 
-    if distributed:
-        g.dist_update_all(fn.copy_src(src='features', out='m'),
-                          fn.sum(msg='m', out='preprocess'),
-                          lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
-        for i in range(n_layers):
-            g.init_ndata('h_{}'.format(i), (features.shape[0], args.n_hidden), 'float32')
-            g.init_ndata('agg_h_{}'.format(i), (features.shape[0], args.n_hidden), 'float32')
-    else:
-        g.update_all(fn.copy_src(src='features', out='m'),
-                     fn.sum(msg='m', out='preprocess'),
-                     lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
-        for i in range(n_layers):
-            g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=g_ctx)
-            g.ndata['agg_h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=g_ctx)
+    g.update_all(fn.copy_src(src='features', out='m'),
+                 fn.sum(msg='m', out='preprocess'),
+                 lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
+    for i in range(n_layers):
+        g.init_ndata('h_{}'.format(i), (num_nodes, args.n_hidden), 'float32')
+        g.init_ndata('agg_h_{}'.format(i), (num_nodes, args.n_hidden), 'float32')
 
     model = GraphSAGETrain(in_feats,
                            args.n_hidden,
@@ -255,8 +247,8 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
                 dests = nf.layer_parent_nid(i+1).as_in_context(g_ctx)
                 # TODO we could use DGLGraph.pull to implement this, but the current
                 # implementation of pull is very slow. Let's manually do it for now.
-                g.ndata[agg_history_str][dests] = mx.nd.dot(mx.nd.take(adj, dests),
-                                                            g.ndata['h_{}'.format(i)])
+                agg = mx.nd.dot(mx.nd.take(adj, dests), g.nodes[:].data['h_{}'.format(i)])
+                g.set_n_repr({agg_history_str: agg}, dests)
 
             node_embed_names = [['preprocess', 'features', 'h_0']]
             for i in range(1, n_layers):
@@ -268,7 +260,7 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
             with mx.autograd.record():
                 pred = model(nf)
                 batch_nids = nf.layer_parent_nid(-1)
-                batch_labels = labels[batch_nids].as_in_context(ctx)
+                batch_labels = g.nodes[batch_nids].data['labels'].as_in_context(ctx)
                 loss = loss_fcn(pred, batch_labels)
                 if distributed:
                     loss = loss.sum() / (len(batch_nids) * g.num_workers)
@@ -308,7 +300,7 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
 
                 pred = infer_model(nf)
                 batch_nids = nf.layer_parent_nid(-1)
-                batch_labels = labels[batch_nids].as_in_context(ctx)
+                batch_labels = g.nodes[batch_nids].data['labels'].as_in_context(ctx)
                 num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
                 num_tests += nf.layer_size(-1)
                 if distributed:

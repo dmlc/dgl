@@ -37,12 +37,12 @@ def check_init_func(worker_id, graph_name):
     coo = csr.tocoo()
     assert F.array_equal(dst, F.tensor(coo.row))
     assert F.array_equal(src, F.tensor(coo.col))
-    assert F.array_equal(g.ndata['feat'][0], F.tensor(np.arange(10), dtype=np.float32))
-    assert F.array_equal(g.edata['feat'][0], F.tensor(np.arange(10), dtype=np.float32))
+    assert F.array_equal(g.nodes[0].data['feat'], F.tensor(np.arange(10), dtype=np.float32))
+    assert F.array_equal(g.edges[0].data['feat'], F.tensor(np.arange(10), dtype=np.float32))
     g.init_ndata('test4', (g.number_of_nodes(), 10), 'float32')
     g.init_edata('test4', (g.number_of_edges(), 10), 'float32')
     g._sync_barrier()
-    check_array_shared_memory(g, worker_id, [g.ndata['test4'], g.edata['test4']])
+    check_array_shared_memory(g, worker_id, [g.nodes[:].data['test4'], g.edges[:].data['test4']])
     g.destroy()
 
 def server_func(num_workers, graph_name):
@@ -58,7 +58,7 @@ def server_func(num_workers, graph_name):
     g.edata['feat'] = mx.nd.arange(num_edges * 10).reshape((num_edges, 10))
     g.run()
 
-def test_test_init():
+def test_init():
     serv_p = Process(target=server_func, args=(2, 'test_graph1'))
     work_p1 = Process(target=check_init_func, args=(0, 'test_graph1'))
     work_p2 = Process(target=check_init_func, args=(1, 'test_graph1'))
@@ -75,13 +75,12 @@ def check_update_all_func(worker_id, graph_name):
     print("worker starts")
     g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem", port=rand_port)
     g._sync_barrier()
-    g.dist_update_all(fn.copy_src(src='feat', out='m'),
-                      fn.sum(msg='m', out='preprocess'))
+    g.update_all(fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='preprocess'))
     adj = g.adjacency_matrix()
-    tmp = mx.nd.dot(adj, g.ndata['feat'])
-    assert np.all((g.ndata['preprocess'] == tmp).asnumpy())
+    tmp = mx.nd.dot(adj, g.nodes[:].data['feat'])
+    assert np.all((g.nodes[:].data['preprocess'] == tmp).asnumpy())
     g._sync_barrier()
-    check_array_shared_memory(g, worker_id, [g.ndata['preprocess']])
+    check_array_shared_memory(g, worker_id, [g.nodes[:].data['preprocess']])
     g.destroy()
 
 def test_update_all():
@@ -96,5 +95,5 @@ def test_update_all():
     work_p2.join()
 
 if __name__ == '__main__':
-    test_test_init()
+    test_init()
     test_update_all()
