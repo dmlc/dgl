@@ -84,7 +84,7 @@ std::tuple<IdArray, IdArray, IdArray> MapFromSharedMemory(
   return {indptr, indices, edge_ids};
 #else
   LOG(FATAL) << "CSR graph doesn't support shared memory in Windows yet";
-  return {};
+  return std::tuple<IdArray, IdArray, IdArray>();
 #endif  // _WIN32
 }
 }  // namespace
