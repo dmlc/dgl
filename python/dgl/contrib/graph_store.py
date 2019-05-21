@@ -443,9 +443,15 @@ class BaseGraphStore(DGLGraph):
     """The base class of the graph store.
 
     Shared-memory graph store and distributed graph store will be inherited from
-    this base class. The graph stores only support large graphs. Thus, many of
-    DGLGraph APIs aren't supported. In addition, the graph store doesn't support
-    mutable graph.
+    this base class. The graph stores only support large read-only graphs. Thus, many of
+    DGLGraph APIs aren't supported.
+
+    Specially, the graph store doesn't support the following methods:
+        - ndata
+        - edata
+        - incidence_matrix
+        - line_graph
+        - reverse
     """
     def __init__(self,
                  graph_data=None,
