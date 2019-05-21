@@ -8,7 +8,7 @@ from functools import partial
 
 from collections.abc import MutableMapping
 
-from ..base import ALL, is_all, DGLError
+from ..base import ALL, is_all, DGLError, dgl_warning
 from .. import backend as F
 from ..graph import DGLGraph
 from .. import utils
@@ -667,6 +667,49 @@ class SharedMemoryDGLGraph(BaseGraphStore):
         self.proxy.init_edata(init, edata_name, shape, dtype)
         self._init_edata(edata_name, shape, dtype)
 
+    def get_n_repr(self, u=ALL):
+        """Get node(s) representation.
+
+        The returned feature tensor batches multiple node features on the first dimension.
+
+        Parameters
+        ----------
+        u : node, container or tensor
+            The node(s).
+
+        Returns
+        -------
+        dict
+            Representation dict from feature name to feature tensor.
+        """
+        if len(self.node_attr_schemes()) == 0:
+            return dict()
+        if is_all(u):
+            dgl_warning("It may not be safe to access node data of all nodes."
+                        "It's recommended to node data of a subset of nodes directly.")
+            return dict(self._node_frame)
+        else:
+            u = utils.toindex(u)
+            return self._node_frame.select_rows(u)
+
+    def get_e_repr(self, edges=ALL):
+        """Get edge(s) representation.
+
+        Parameters
+        ----------
+        edges : edges
+            Edges can be a pair of endpoint nodes (u, v), or a
+            tensor of edge ids. The default value is all the edges.
+
+        Returns
+        -------
+        dict
+            Representation dict
+        """
+        if is_all(edges):
+            dgl_warning("It may not be safe to access edge data of all edges."
+                        "It's recommended to edge data of a subset of edges directly.")
+        return super(SharedMemoryDGLGraph, self).get_e_repr(edges)
 
     def update_all(self, message_func="default",
                         reduce_func="default",
