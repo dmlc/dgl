@@ -115,13 +115,21 @@ def check_apply_edges(create_node_flow):
     num_layers = 2
     for i in range(num_layers):
         g = generate_rand_graph(100)
+        g.ndata["f"] = F.randn((100, 10))
         nf = create_node_flow(g, num_layers)
         nf.copy_from_parent()
         new_feats = F.randn((nf.block_size(i), 5))
-        def update_func(nodes):
-            return {'h2' : new_feats}
+
+        def update_func(edges):
+            return {'h2': new_feats, "f2": edges.src["f"] + edges.dst["f"]}
+
         nf.apply_block(i, update_func)
         assert F.array_equal(nf.blocks[i].data['h2'], new_feats)
+
+        eids = nf.block_parent_eid(i)
+        srcs, dsts = g.find_edges(eids)
+        expected_f_sum = g.ndata["f"][srcs] + g.ndata["f"][dsts]
+        assert F.array_equal(nf.blocks[i].data['f2'], expected_f_sum)
 
 
 def test_apply_edges():

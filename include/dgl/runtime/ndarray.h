@@ -92,6 +92,8 @@ class NDArray {
   inline int use_count() const;
   /*! \return Pointer to content of DLTensor */
   inline const DLTensor* operator->() const;
+  /*! \return True if the ndarray is contiguous. */
+  bool IsContiguous() const;
   /*!
    * \brief Copy data content from another array.
    * \param other The source array to be copied from.
@@ -129,10 +131,11 @@ class NDArray {
    * \brief Create a NDArray that shares the data memory with the current one.
    * \param shape The shape of the new array.
    * \param dtype The data type of the new array.
+   * \param offset The offset (in bytes) of the starting pointer.
    * \note The memory size of new array must be smaller than the current one.
    */
   DGL_DLL NDArray CreateView(
-      std::vector<int64_t> shape, DLDataType dtype);
+      std::vector<int64_t> shape, DLDataType dtype, int64_t offset = 0);
   /*!
    * \brief Create a reference view of NDArray that
    *  represents as DLManagedTensor.

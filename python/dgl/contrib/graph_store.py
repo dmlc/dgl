@@ -4,10 +4,11 @@ import scipy
 from xmlrpc.server import SimpleXMLRPCServer
 import xmlrpc.client
 import numpy as np
+from functools import partial
 
 from collections.abc import MutableMapping
 
-from ..base import ALL, is_all, DGLError
+from ..base import ALL, is_all, DGLError, dgl_warning
 from .. import backend as F
 from ..graph import DGLGraph
 from .. import utils
@@ -15,6 +16,7 @@ from ..graph_index import GraphIndex, create_graph_index
 from .._ffi.ndarray import empty_shared_mem
 from .._ffi.function import _init_api
 from .. import ndarray as nd
+from ..init import zero_initializer
 
 def _get_ndata_path(graph_name, ndata_name):
     return "/" + graph_name + "_node_" + ndata_name
@@ -127,6 +129,158 @@ def _to_csr(graph_data, edge_dir, multigraph):
             csr = idx.adjacency_matrix_scipy(transpose, 'csr')
             return csr.indptr, csr.indices
 
+class Barrier(object):
+    """ A barrier in the KVStore server used for one synchronization.
+
+    All workers have to enter the barrier before any of them can proceed
+    with any further computation.
+
+    Parameters
+    ----------
+    num_workers: int
+        The number of workers will enter the barrier.
+    """
+    def __init__(self, num_workers):
+        self.num_enters = 0
+        self.num_leaves = 0
+        self.num_workers = num_workers
+
+    def enter(self):
+        """ A worker enters the barrier.
+        """
+        self.num_enters += 1
+
+    def leave(self):
+        """ A worker notifies the server that it's going to leave the barrier.
+        """
+        self.num_leaves += 1
+
+    def all_enter(self):
+        """ Indicate that all workers have entered the barrier.
+        """
+        return self.num_enters == self.num_workers
+
+    def all_leave(self):
+        """ Indicate that all workers have left the barrier.
+        """
+        return self.num_leaves == self.num_workers
+
+class BarrierManager(object):
+    """ The manager of barriers
+
+    When a worker wants to enter a barrier, it creates the barrier if it doesn't
+    exist. Otherwise, the worker will enter an existing barrier.
+
+    The manager needs to know the number of workers in advance so that it can
+    keep track of barriers and workers.
+
+    Parameters
+    ----------
+    num_workers: int
+        The number of workers that need to synchronize with barriers.
+    """
+    def __init__(self, num_workers):
+        self.num_workers = num_workers
+        self.barrier_ids = [0] * num_workers
+        self.barriers = {}
+
+    def enter(self, worker_id):
+        """ A worker enters a barrier.
+
+        Parameters
+        ----------
+        worker_id : int
+            The worker that wants to enter a barrier.
+        """
+        bid = self.barrier_ids[worker_id]
+        self.barrier_ids[worker_id] += 1
+        if bid in self.barriers:
+            self.barriers[bid].enter()
+        else:
+            self.barriers.update({bid : Barrier(self.num_workers)})
+            self.barriers[bid].enter()
+        return bid
+
+    def all_enter(self, worker_id, barrier_id):
+        """ Indicate whether all workers have entered a specified barrier.
+        """
+        return self.barriers[barrier_id].all_enter()
+
+    def leave(self, worker_id, barrier_id):
+        """ A worker leaves a barrier.
+
+        This is useful for garbage collection of used barriers.
+        """
+        self.barriers[barrier_id].leave()
+        if self.barriers[barrier_id].all_leave():
+            del self.barriers[barrier_id]
+
+def shared_mem_zero_initializer(shape, dtype, name):  # pylint: disable=unused-argument
+    """Zero feature initializer in shared memory
+    """
+    data = empty_shared_mem(name, True, shape, dtype)
+    dlpack = data.to_dlpack()
+    arr = F.zerocopy_from_dlpack(dlpack)
+    arr[:] = 0
+    return arr
+
+class InitializerManager(object):
+    """Manage initializer.
+
+    We need to convert built-in frame initializer to strings
+    and send them to the graph store server through RPC.
+    Through the conversion, we need to convert local built-in initializer
+    to shared-memory initializer.
+    """
+
+    # Map the built-in initializer functions to strings.
+    _fun2str = {
+        zero_initializer: 'zero',
+    }
+
+    # Map the strings to built-in initializer functions.
+    _str2fun = {
+        'zero': shared_mem_zero_initializer,
+    }
+
+    def serialize(self, init):
+        """Convert the initializer function to string.
+
+        Parameters
+        ----------
+        init : callable
+            the initializer function.
+
+        Returns
+        ------
+        string
+            The name of the built-in initializer function.
+        """
+        if init in self._fun2str:
+            return self._fun2str[init]
+        else:
+            raise Exception("Shared-memory graph store doesn't support user's initializer")
+
+    def deserialize(self, init):
+        """Convert the string to the initializer function.
+
+        Parameters
+        ----------
+        init : string
+            the name of the initializer function
+
+        Returns
+        -------
+        callable
+            The shared-memory initializer function.
+        """
+        if init in self._str2fun:
+            return self._str2fun[init]
+        else:
+            raise Exception("Shared-memory graph store doesn't support initializer "
+                            + str(init))
+
+
 class SharedMemoryStoreServer(object):
     """The graph store server.
 
@@ -150,6 +304,7 @@ class SharedMemoryStoreServer(object):
         The port that the server listens to.
     """
     def __init__(self, graph_data, edge_dir, graph_name, multigraph, num_workers, port):
+        self.server = None
         graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
         indptr, indices = _to_csr(graph_data, edge_dir, multigraph)
         graph_idx.from_csr_matrix(indptr, indices, edge_dir, _get_graph_path(graph_name))
@@ -158,36 +313,51 @@ class SharedMemoryStoreServer(object):
         self._num_workers = num_workers
         self._graph_name = graph_name
         self._edge_dir = edge_dir
+        self._registered_nworkers = 0
+
+        self._barrier = BarrierManager(num_workers)
+        self._init_manager = InitializerManager()
+
+        # RPC command: register a graph to the graph store server.
+        def register(graph_name):
+            if graph_name != self._graph_name:
+                print("graph store has %s, but the worker wants %s"
+                      % (self._graph_name, graph_name))
+                return (-1, -1)
+            worker_id = self._registered_nworkers
+            self._registered_nworkers += 1
+            return worker_id, self._num_workers
 
         # RPC command: get the graph information from the graph store server.
-        def get_graph_info():
+        def get_graph_info(graph_name):
+            assert graph_name == self._graph_name
             return self._graph.number_of_nodes(), self._graph.number_of_edges(), \
                     self._graph.is_multigraph, edge_dir
 
         # RPC command: initialize node embedding in the server.
-        def init_ndata(ndata_name, shape, dtype):
+        def init_ndata(init, ndata_name, shape, dtype):
             if ndata_name in self._graph.ndata:
                 ndata = self._graph.ndata[ndata_name]
                 assert np.all(ndata.shape == tuple(shape))
                 return 0
 
             assert self._graph.number_of_nodes() == shape[0]
-            data = empty_shared_mem(_get_ndata_path(graph_name, ndata_name), True, shape, dtype)
-            dlpack = data.to_dlpack()
-            self._graph.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
+            init = self._init_manager.deserialize(init)
+            data = init(shape, dtype, _get_ndata_path(graph_name, ndata_name))
+            self._graph.ndata[ndata_name] = data
             return 0
 
         # RPC command: initialize edge embedding in the server.
-        def init_edata(edata_name, shape, dtype):
+        def init_edata(init, edata_name, shape, dtype):
             if edata_name in self._graph.edata:
                 edata = self._graph.edata[edata_name]
                 assert np.all(edata.shape == tuple(shape))
                 return 0
 
             assert self._graph.number_of_edges() == shape[0]
-            data = empty_shared_mem(_get_edata_path(graph_name, edata_name), True, shape, dtype)
-            dlpack = data.to_dlpack()
-            self._graph.edata[edata_name] = F.zerocopy_from_dlpack(dlpack)
+            init = self._init_manager.deserialize(init)
+            data = init(shape, dtype, _get_edata_path(graph_name, edata_name))
+            self._graph.edata[edata_name] = data
             return 0
 
         # RPC command: get the names of all node embeddings.
@@ -205,15 +375,34 @@ class SharedMemoryStoreServer(object):
             self._num_workers -= 1
             return 0
 
+        # RPC command: a worker enters a barrier.
+        def enter_barrier(worker_id):
+            return self._barrier.enter(worker_id)
+
+        # RPC command: a worker leaves a barrier.
+        def leave_barrier(worker_id, barrier_id):
+            self._barrier.leave(worker_id, barrier_id)
+            return 0
+
+        # RPC command: test if all workers have left a barrier.
+        def all_enter(worker_id, barrier_id):
+            return self._barrier.all_enter(worker_id, barrier_id)
+
         self.server = SimpleXMLRPCServer(("localhost", port))
+        self.server.register_function(register, "register")
         self.server.register_function(get_graph_info, "get_graph_info")
         self.server.register_function(init_ndata, "init_ndata")
         self.server.register_function(init_edata, "init_edata")
         self.server.register_function(terminate, "terminate")
         self.server.register_function(list_ndata, "list_ndata")
         self.server.register_function(list_edata, "list_edata")
+        self.server.register_function(enter_barrier, "enter_barrier")
+        self.server.register_function(leave_barrier, "leave_barrier")
+        self.server.register_function(all_enter, "all_enter")
 
     def __del__(self):
+        if self.server is not None:
+            self.server.server_close()
         self._graph = None
 
     @property
@@ -249,7 +438,78 @@ class SharedMemoryStoreServer(object):
             self.server.handle_request()
         self._graph = None
 
-class SharedMemoryDGLGraph(DGLGraph):
+
+class BaseGraphStore(DGLGraph):
+    """The base class of the graph store.
+
+    Shared-memory graph store and distributed graph store will be inherited from
+    this base class. The graph stores only support large read-only graphs. Thus, many of
+    DGLGraph APIs aren't supported.
+
+    Specially, the graph store doesn't support the following methods:
+        - ndata
+        - edata
+        - incidence_matrix
+        - line_graph
+        - reverse
+    """
+    def __init__(self,
+                 graph_data=None,
+                 multigraph=False):
+        super(BaseGraphStore, self).__init__(graph_data, multigraph=multigraph, readonly=True)
+
+    @property
+    def ndata(self):
+        """Return the data view of all the nodes.
+
+        DGLGraph.ndata is an abbreviation of DGLGraph.nodes[:].data
+        """
+        raise Exception("Graph store doesn't support access data of all nodes.")
+
+    @property
+    def edata(self):
+        """Return the data view of all the edges.
+
+        DGLGraph.data is an abbreviation of DGLGraph.edges[:].data
+
+        See Also
+        --------
+        dgl.DGLGraph.edges
+        """
+        raise Exception("Graph store doesn't support access data of all edges.")
+
+    def incidence_matrix(self, typestr, ctx=F.cpu()):
+        """Return the incidence matrix representation of this graph.
+
+        Parameters
+        ----------
+        typestr : str
+            Can be either ``in``, ``out`` or ``both``
+        ctx : context, optional (default=cpu)
+            The context of returned incidence matrix.
+
+        Returns
+        -------
+        SparseTensor
+            The incidence matrix.
+        """
+        raise Exception("Graph store doesn't support creating an incidence matrix.")
+
+    def line_graph(self, backtracking=True, shared=False):
+        """Return the line graph of this graph.
+
+        See :func:`~dgl.transform.line_graph`.
+        """
+        raise Exception("Graph store doesn't support creating an line matrix.")
+
+    def reverse(self, share_ndata=False, share_edata=False):
+        """Return the reverse of this graph.
+
+        See :func:`~dgl.transform.reverse`.
+        """
+        raise Exception("Graph store doesn't support reversing a matrix.")
+
+class SharedMemoryDGLGraph(BaseGraphStore):
     """Shared-memory DGLGraph.
 
     This is a client to access data in the shared-memory graph store that has loads
@@ -267,11 +527,15 @@ class SharedMemoryDGLGraph(DGLGraph):
         self._graph_name = graph_name
         self._pid = os.getpid()
         self.proxy = xmlrpc.client.ServerProxy("http://localhost:" + str(port) + "/")
-        num_nodes, num_edges, multigraph, edge_dir = self.proxy.get_graph_info()
+        self._worker_id, self._num_workers = self.proxy.register(graph_name)
+        if self._worker_id < 0:
+            raise Exception('fail to get graph ' + graph_name + ' from the graph store')
+        num_nodes, num_edges, multigraph, edge_dir = self.proxy.get_graph_info(graph_name)
 
         graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
         graph_idx.from_shared_mem_csr_matrix(_get_graph_path(graph_name), num_nodes, num_edges, edge_dir)
-        super(SharedMemoryDGLGraph, self).__init__(graph_idx, multigraph=multigraph, readonly=True)
+        super(SharedMemoryDGLGraph, self).__init__(graph_idx, multigraph=multigraph)
+        self._init_manager = InitializerManager()
 
         # map all ndata and edata from the server.
         ndata_infos = self.proxy.list_ndata()
@@ -284,29 +548,28 @@ class SharedMemoryDGLGraph(DGLGraph):
 
         # Set the ndata and edata initializers.
         # so that when a new node/edge embedding is created, it'll be created on the server as well.
-        def node_initializer(name, arr):
-            shape = F.shape(arr)
-            dtype = np.dtype(F.dtype(arr)).name
-            self.proxy.init_ndata(name, shape, dtype)
+
+        # These two functions create initialized tensors on the server.
+        def node_initializer(init, name, shape, dtype, ctx):
+            init = self._init_manager.serialize(init)
+            dtype = np.dtype(dtype).name
+            self.proxy.init_ndata(init, name, shape, dtype)
             data = empty_shared_mem(_get_ndata_path(self._graph_name, name),
                                     False, shape, dtype)
             dlpack = data.to_dlpack()
-            arr1 = F.zerocopy_from_dlpack(dlpack)
-            arr1[:] = arr
-            return arr1
-        def edge_initializer(name, arr):
-            shape = F.shape(arr)
-            dtype = np.dtype(F.dtype(arr)).name
-            self.proxy.init_edata(name, shape, dtype)
+            return F.zerocopy_from_dlpack(dlpack)
+        def edge_initializer(init, name, shape, dtype, ctx):
+            init = self._init_manager.serialize(init)
+            dtype = np.dtype(dtype).name
+            self.proxy.init_edata(init, name, shape, dtype)
             data = empty_shared_mem(_get_edata_path(self._graph_name, name),
                                     False, shape, dtype)
             dlpack = data.to_dlpack()
-            arr1 = F.zerocopy_from_dlpack(dlpack)
-            arr1[:] = arr
-            return arr1
-        self._node_frame.set_remote_initializer(node_initializer)
-        self._edge_frame.set_remote_initializer(edge_initializer)
-        self._msg_frame.set_remote_initializer(edge_initializer)
+            return F.zerocopy_from_dlpack(dlpack)
+
+        self._node_frame.set_remote_init_builder(lambda init, name: partial(node_initializer, init, name))
+        self._edge_frame.set_remote_init_builder(lambda init, name: partial(edge_initializer, init, name))
+        self._msg_frame.set_remote_init_builder(lambda init, name: partial(edge_initializer, init, name))
 
     def __del__(self):
         if self.proxy is not None:
@@ -316,13 +579,173 @@ class SharedMemoryDGLGraph(DGLGraph):
         assert self.number_of_nodes() == shape[0]
         data = empty_shared_mem(_get_ndata_path(self._graph_name, ndata_name), False, shape, dtype)
         dlpack = data.to_dlpack()
-        self.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
+        self.set_n_repr({ndata_name: F.zerocopy_from_dlpack(dlpack)})
 
     def _init_edata(self, edata_name, shape, dtype):
         assert self.number_of_edges() == shape[0]
         data = empty_shared_mem(_get_edata_path(self._graph_name, edata_name), False, shape, dtype)
         dlpack = data.to_dlpack()
-        self.edata[edata_name] = F.zerocopy_from_dlpack(dlpack)
+        self.set_e_repr({edata_name: F.zerocopy_from_dlpack(dlpack)})
+
+    @property
+    def num_workers(self):
+        """ The number of workers using the graph store.
+        """
+        return self._num_workers
+
+    @property
+    def worker_id(self):
+        """ The id of the current worker using the graph store.
+
+        When a worker connects to a graph store, it is assigned with a worker id.
+        This is useful for the graph store server to identify who is sending
+        requests.
+
+        The worker id is a unique number between 0 and num_workers.
+        This is also useful for user's code. For example, user's code can
+        use this number to decide how to assign GPUs to workers in multi-processing
+        training.
+        """
+        return self._worker_id
+
+    def _sync_barrier(self):
+        # Here I manually implement multi-processing barrier with RPC.
+        # It uses busy wait with RPC. Whenever, all_enter is called, there is
+        # a context switch, so it doesn't burn CPUs so badly.
+        bid = self.proxy.enter_barrier(self._worker_id)
+        while not self.proxy.all_enter(self._worker_id, bid):
+            continue
+        self.proxy.leave_barrier(self._worker_id, bid)
+
+    def init_ndata(self, ndata_name, shape, dtype, ctx=F.cpu()):
+        """Create node embedding.
+
+        It first creates the node embedding in the server and maps it to the current process
+        with shared memory.
+
+        Parameters
+        ----------
+        ndata_name : string
+            The name of node embedding
+        shape : tuple
+            The shape of the node embedding
+        dtype : string
+            The data type of the node embedding. The currently supported data types
+            are "float32" and "int32".
+        ctx : DGLContext
+            The column context.
+        """
+        if ctx != F.cpu():
+            raise Exception("graph store only supports CPU context for node data")
+        init = self._node_frame.get_initializer(ndata_name)
+        if init is None:
+            self._node_frame._frame._warn_and_set_initializer()
+        init = self._node_frame.get_initializer(ndata_name)
+        init = self._init_manager.serialize(init)
+        self.proxy.init_ndata(init, ndata_name, shape, dtype)
+        self._init_ndata(ndata_name, shape, dtype)
+
+    def init_edata(self, edata_name, shape, dtype, ctx=F.cpu()):
+        """Create edge embedding.
+
+        It first creates the edge embedding in the server and maps it to the current process
+        with shared memory.
+
+        Parameters
+        ----------
+        edata_name : string
+            The name of edge embedding
+        shape : tuple
+            The shape of the edge embedding
+        dtype : string
+            The data type of the edge embedding. The currently supported data types
+            are "float32" and "int32".
+        ctx : DGLContext
+            The column context.
+        """
+        if ctx != F.cpu():
+            raise Exception("graph store only supports CPU context for edge data")
+        init = self._edge_frame.get_initializer(edata_name)
+        if init is None:
+            self._edge_frame._frame._warn_and_set_initializer()
+        init = self._edge_frame.get_initializer(edata_name)
+        init = self._init_manager.serialize(init)
+        self.proxy.init_edata(init, edata_name, shape, dtype)
+        self._init_edata(edata_name, shape, dtype)
+
+    def get_n_repr(self, u=ALL):
+        """Get node(s) representation.
+
+        The returned feature tensor batches multiple node features on the first dimension.
+
+        Parameters
+        ----------
+        u : node, container or tensor
+            The node(s).
+
+        Returns
+        -------
+        dict
+            Representation dict from feature name to feature tensor.
+        """
+        if len(self.node_attr_schemes()) == 0:
+            return dict()
+        if is_all(u):
+            dgl_warning("It may not be safe to access node data of all nodes."
+                        "It's recommended to node data of a subset of nodes directly.")
+            return dict(self._node_frame)
+        else:
+            u = utils.toindex(u)
+            return self._node_frame.select_rows(u)
+
+    def get_e_repr(self, edges=ALL):
+        """Get edge(s) representation.
+
+        Parameters
+        ----------
+        edges : edges
+            Edges can be a pair of endpoint nodes (u, v), or a
+            tensor of edge ids. The default value is all the edges.
+
+        Returns
+        -------
+        dict
+            Representation dict
+        """
+        if is_all(edges):
+            dgl_warning("It may not be safe to access edge data of all edges."
+                        "It's recommended to edge data of a subset of edges directly.")
+        return super(SharedMemoryDGLGraph, self).get_e_repr(edges)
+
+    def update_all(self, message_func="default",
+                        reduce_func="default",
+                        apply_node_func="default"):
+        """ Distribute the computation in update_all among all pre-defined workers.
+
+        update_all requires that all workers invoke this method and will
+        return only when all workers finish their own portion of computation.
+        The number of workers are pre-defined. If one of them doesn't invoke the method,
+        it won't return because some portion of computation isn't finished.
+
+        Parameters
+        ----------
+        message_func : callable, optional
+            Message function on the edges. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
+        reduce_func : callable, optional
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        apply_node_func : callable, optional
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        """
+        num_worker_nodes = int(self.number_of_nodes() / self.num_workers) + 1
+        start_node = self.worker_id * num_worker_nodes
+        end_node = min((self.worker_id + 1) * num_worker_nodes, self.number_of_nodes())
+        worker_nodes = np.arange(start_node, end_node, dtype=np.int64)
+        self.pull(worker_nodes, message_func, reduce_func, apply_node_func, inplace=True)
+        self._sync_barrier()
+
 
     def destroy(self):
         """Destroy the graph store.
