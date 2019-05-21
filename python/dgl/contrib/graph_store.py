@@ -304,6 +304,7 @@ class SharedMemoryStoreServer(object):
         The port that the server listens to.
     """
     def __init__(self, graph_data, edge_dir, graph_name, multigraph, num_workers, port):
+        self.server = None
         graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
         indptr, indices = _to_csr(graph_data, edge_dir, multigraph)
         graph_idx.from_csr_matrix(indptr, indices, edge_dir, _get_graph_path(graph_name))
@@ -400,8 +401,9 @@ class SharedMemoryStoreServer(object):
         self.server.register_function(all_enter, "all_enter")
 
     def __del__(self):
+        if self.server is not None:
+            self.server.server_close()
         self._graph = None
-        self.server.server_close()
 
     @property
     def ndata(self):
@@ -436,7 +438,72 @@ class SharedMemoryStoreServer(object):
             self.server.handle_request()
         self._graph = None
 
-class SharedMemoryDGLGraph(DGLGraph):
+
+class BaseGraphStore(DGLGraph):
+    """The base class of the graph store.
+
+    Shared-memory graph store and distributed graph store will be inherited from
+    this base class. The graph stores only support large graphs. Thus, many of
+    DGLGraph APIs aren't supported. In addition, the graph store doesn't support
+    mutable graph.
+    """
+    def __init__(self,
+                 graph_data=None,
+                 multigraph=False):
+        super(BaseGraphStore, self).__init__(graph_data, multigraph=multigraph, readonly=True)
+
+    @property
+    def ndata(self):
+        """Return the data view of all the nodes.
+
+        DGLGraph.ndata is an abbreviation of DGLGraph.nodes[:].data
+        """
+        raise Exception("Graph store doesn't support access data of all nodes.")
+
+    @property
+    def edata(self):
+        """Return the data view of all the edges.
+
+        DGLGraph.data is an abbreviation of DGLGraph.edges[:].data
+
+        See Also
+        --------
+        dgl.DGLGraph.edges
+        """
+        raise Exception("Graph store doesn't support access data of all edges.")
+
+    def incidence_matrix(self, typestr, ctx=F.cpu()):
+        """Return the incidence matrix representation of this graph.
+
+        Parameters
+        ----------
+        typestr : str
+            Can be either ``in``, ``out`` or ``both``
+        ctx : context, optional (default=cpu)
+            The context of returned incidence matrix.
+
+        Returns
+        -------
+        SparseTensor
+            The incidence matrix.
+        """
+        raise Exception("Graph store doesn't support creating an incidence matrix.")
+
+    def line_graph(self, backtracking=True, shared=False):
+        """Return the line graph of this graph.
+
+        See :func:`~dgl.transform.line_graph`.
+        """
+        raise Exception("Graph store doesn't support creating an line matrix.")
+
+    def reverse(self, share_ndata=False, share_edata=False):
+        """Return the reverse of this graph.
+
+        See :func:`~dgl.transform.reverse`.
+        """
+        raise Exception("Graph store doesn't support reversing a matrix.")
+
+class SharedMemoryDGLGraph(BaseGraphStore):
     """Shared-memory DGLGraph.
 
     This is a client to access data in the shared-memory graph store that has loads
@@ -461,7 +528,7 @@ class SharedMemoryDGLGraph(DGLGraph):
 
         graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
         graph_idx.from_shared_mem_csr_matrix(_get_graph_path(graph_name), num_nodes, num_edges, edge_dir)
-        super(SharedMemoryDGLGraph, self).__init__(graph_idx, multigraph=multigraph, readonly=True)
+        super(SharedMemoryDGLGraph, self).__init__(graph_idx, multigraph=multigraph)
         self._init_manager = InitializerManager()
 
         # map all ndata and edata from the server.
@@ -506,13 +573,13 @@ class SharedMemoryDGLGraph(DGLGraph):
         assert self.number_of_nodes() == shape[0]
         data = empty_shared_mem(_get_ndata_path(self._graph_name, ndata_name), False, shape, dtype)
         dlpack = data.to_dlpack()
-        self.ndata[ndata_name] = F.zerocopy_from_dlpack(dlpack)
+        self.set_n_repr({ndata_name: F.zerocopy_from_dlpack(dlpack)})
 
     def _init_edata(self, edata_name, shape, dtype):
         assert self.number_of_edges() == shape[0]
         data = empty_shared_mem(_get_edata_path(self._graph_name, edata_name), False, shape, dtype)
         dlpack = data.to_dlpack()
-        self.edata[edata_name] = F.zerocopy_from_dlpack(dlpack)
+        self.set_e_repr({edata_name: F.zerocopy_from_dlpack(dlpack)})
 
     @property
     def num_workers(self):
@@ -544,7 +611,7 @@ class SharedMemoryDGLGraph(DGLGraph):
             continue
         self.proxy.leave_barrier(self._worker_id, bid)
 
-    def init_ndata(self, ndata_name, shape, dtype):
+    def init_ndata(self, ndata_name, shape, dtype, ctx=F.cpu()):
         """Create node embedding.
 
         It first creates the node embedding in the server and maps it to the current process
@@ -559,7 +626,11 @@ class SharedMemoryDGLGraph(DGLGraph):
         dtype : string
             The data type of the node embedding. The currently supported data types
             are "float32" and "int32".
+        ctx : DGLContext
+            The column context.
         """
+        if ctx != F.cpu():
+            raise Exception("graph store only supports CPU context for node data")
         init = self._node_frame.get_initializer(ndata_name)
         if init is None:
             self._node_frame._frame._warn_and_set_initializer()
@@ -568,7 +639,7 @@ class SharedMemoryDGLGraph(DGLGraph):
         self.proxy.init_ndata(init, ndata_name, shape, dtype)
         self._init_ndata(ndata_name, shape, dtype)
 
-    def init_edata(self, edata_name, shape, dtype):
+    def init_edata(self, edata_name, shape, dtype, ctx=F.cpu()):
         """Create edge embedding.
 
         It first creates the edge embedding in the server and maps it to the current process
@@ -583,7 +654,11 @@ class SharedMemoryDGLGraph(DGLGraph):
         dtype : string
             The data type of the edge embedding. The currently supported data types
             are "float32" and "int32".
+        ctx : DGLContext
+            The column context.
         """
+        if ctx != F.cpu():
+            raise Exception("graph store only supports CPU context for edge data")
         init = self._edge_frame.get_initializer(edata_name)
         if init is None:
             self._edge_frame._frame._warn_and_set_initializer()
@@ -593,12 +668,12 @@ class SharedMemoryDGLGraph(DGLGraph):
         self._init_edata(edata_name, shape, dtype)
 
 
-    def dist_update_all(self, message_func="default",
+    def update_all(self, message_func="default",
                         reduce_func="default",
                         apply_node_func="default"):
         """ Distribute the computation in update_all among all pre-defined workers.
 
-        dist_update_all requires that all workers invoke this method and will
+        update_all requires that all workers invoke this method and will
         return only when all workers finish their own portion of computation.
         The number of workers are pre-defined. If one of them doesn't invoke the method,
         it won't return because some portion of computation isn't finished.
