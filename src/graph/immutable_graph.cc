@@ -273,6 +273,8 @@ IdArray CSR::Successors(dgl_id_t vid, uint64_t radius) const {
 }
 
 IdArray CSR::EdgeId(dgl_id_t src, dgl_id_t dst) const {
+  // TODO(minjie): use more efficient binary search when the column indices
+  //   are also sorted.
   CHECK(HasVertex(src)) << "invalid vertex: " << src;
   CHECK(HasVertex(dst)) << "invalid vertex: " << dst;
   std::vector<dgl_id_t> ids;
