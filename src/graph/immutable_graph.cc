@@ -158,6 +158,7 @@ CSR::CSR(const std::string &shared_mem_name,
 }
 
 bool CSR::IsMultigraph() const {
+  // The lambda will be called the first time to initialize the is_multigraph flag.
   return const_cast<CSR*>(this)->is_multigraph_.Get([this] () {
       const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
       const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
@@ -474,6 +475,7 @@ COO::COO(int64_t num_vertices, IdArray src, IdArray dst, bool is_multigraph)
 }
 
 bool COO::IsMultigraph() const {
+  // The lambda will be called the first time to initialize the is_multigraph flag.
   return const_cast<COO*>(this)->is_multigraph_.Get([this] () {
       std::unordered_set<std::pair<dgl_id_t, dgl_id_t>, PairHash> hashmap;
       const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);

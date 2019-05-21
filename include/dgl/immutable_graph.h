@@ -459,7 +459,7 @@ class COO : public GraphInterface {
 class ImmutableGraph: public GraphInterface {
  public:
   /*! \brief Construct an immutable graph from the COO format. */
-  explicit ImmutableGraph(COOPtr coo, bool multigraph = false): coo_(coo) { }
+  explicit ImmutableGraph(COOPtr coo): coo_(coo) { }
   /*!
    * \brief Construct an immutable graph from the CSR format.
    *
