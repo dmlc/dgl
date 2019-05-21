@@ -191,20 +191,12 @@ def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samp
     g.ndata['subg_norm'] = mx.nd.expand_dims(mx.nd.array(1./degs, ctx=g_ctx), 1)
     n_layers = args.n_layers
 
-    if distributed:
-        g.dist_update_all(fn.copy_src(src='features', out='m'),
-                          fn.sum(msg='m', out='preprocess'),
-                          lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
-        for i in range(n_layers):
-            g.init_ndata('h_{}'.format(i), (features.shape[0], args.n_hidden), 'float32')
-            g.init_ndata('agg_h_{}'.format(i), (features.shape[0], args.n_hidden), 'float32')
-    else:
-        g.update_all(fn.copy_src(src='features', out='m'),
-                     fn.sum(msg='m', out='preprocess'),
-                     lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
-        for i in range(n_layers):
-            g.ndata['h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=g_ctx)
-            g.ndata['agg_h_{}'.format(i)] = mx.nd.zeros((features.shape[0], args.n_hidden), ctx=g_ctx)
+    g.update_all(fn.copy_src(src='features', out='m'),
+                 fn.sum(msg='m', out='preprocess'),
+                 lambda node : {'preprocess': node.data['preprocess'] * node.data['norm']})
+    for i in range(n_layers):
+        g.init_ndata('h_{}'.format(i), (features.shape[0], args.n_hidden), 'float32')
+        g.init_ndata('agg_h_{}'.format(i), (features.shape[0], args.n_hidden), 'float32')
 
     model = GraphSAGETrain(in_feats,
                            args.n_hidden,
