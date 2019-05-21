@@ -219,7 +219,7 @@ RandomWalkTraces BipartiteSingleSidedRandomWalkWithRestart(
 DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalk")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
-    const IdArray seeds = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray seeds = args[1];
     const int num_traces = args[2];
     const int num_hops = args[3];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
@@ -230,7 +230,7 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalk")
 DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalkWithRestart")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
-    const IdArray seeds = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray seeds = args[1];
     const double restart_prob = args[2];
     const uint64_t visit_threshold_per_seed = args[3];
     const uint64_t max_visit_counts = args[4];
@@ -245,7 +245,7 @@ DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLRandomWalkWithRestart")
 DGL_REGISTER_GLOBAL("randomwalk._CAPI_DGLBipartiteSingleSidedRandomWalkWithRestart")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
-    const IdArray seeds = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray seeds = args[1];
     const double restart_prob = args[2];
     const uint64_t visit_threshold_per_seed = args[3];
     const uint64_t max_visit_counts = args[4];

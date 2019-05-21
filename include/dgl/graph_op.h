@@ -8,6 +8,7 @@
 
 #include <vector>
 #include "graph.h"
+#include "immutable_graph.h"
 
 namespace dgl {
 
@@ -65,6 +66,48 @@ class GraphOp {
    * \return a list of partitioned graphs
    */
   static std::vector<Graph> DisjointPartitionBySizes(const Graph* graph, IdArray sizes);
+
+  /*!
+  * \brief Return a readonly disjoint union of the input graphs.
+  *
+  * The new readonly graph will include all the nodes/edges in the given graphs.
+  * Nodes/Edges will be relabled in the given sequence order by batching over CSR Graphs.
+  * For example, giving input [g1, g2, g3], where
+  * they have 5, 6, 7 nodes respectively. Then node#2 of g2 will become node#7
+  * in the result graph. Edge ids are re-assigned similarly.
+  *
+  * \param ImmutableGraph A list of input graphs to be unioned.
+  * \return the disjoint union of the ImmutableGraph
+  */
+  static ImmutableGraph DisjointUnion(std::vector<const ImmutableGraph*> graphs);
+
+   /*!
+   * \brief Partition the ImmutableGraph into several immutable subgraphs.
+   *
+   * This is a reverse operation of DisjointUnion. The graph will be partitioned
+   * into num graphs. This requires the given number of partitions to evenly
+   * divides the number of nodes in the graph.
+   *
+   * \param graph The ImmutableGraph to be partitioned.
+   * \param num The number of partitions.
+   * \return a list of partitioned ImmutableGraph
+   */
+  static std::vector<ImmutableGraph> DisjointPartitionByNum(const ImmutableGraph *graph,
+          int64_t num);
+
+  /*!
+  * \brief Partition the ImmutableGraph into several immutable subgraphs.
+  *
+  * This is a reverse operation of DisjointUnion. The graph will be partitioned
+  * based on the given sizes. This requires the sum of the given sizes is equal
+  * to the number of nodes in the graph.
+  *
+  * \param graph The ImmutableGraph to be partitioned.
+  * \param sizes The number of partitions.
+  * \return a list of partitioned ImmutableGraph
+  */
+  static std::vector<ImmutableGraph> DisjointPartitionBySizes(const ImmutableGraph *batched_graph,
+          IdArray sizes);
 
   /*!
    * \brief Map vids in the parent graph to the vids in the subgraph.

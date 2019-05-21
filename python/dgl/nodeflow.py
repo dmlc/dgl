@@ -152,7 +152,7 @@ class NodeFlow(DGLBaseGraph):
         block_id = self._get_block_id(block_id)
         return int(self._block_offsets[block_id + 1]) - int(self._block_offsets[block_id])
 
-    def copy_from_parent(self, node_embed_names=ALL, edge_embed_names=ALL):
+    def copy_from_parent(self, node_embed_names=ALL, edge_embed_names=ALL, ctx=F.cpu()):
         """Copy node/edge features from the parent graph.
 
         Parameters
@@ -166,7 +166,8 @@ class NodeFlow(DGLBaseGraph):
             if is_all(node_embed_names):
                 for i in range(self.num_layers):
                     nid = utils.toindex(self.layer_parent_nid(i))
-                    self._node_frames[i] = FrameRef(Frame(self._parent._node_frame[nid]))
+                    self._node_frames[i] = FrameRef(Frame(_copy_frame(
+                        self._parent._node_frame[nid], ctx)))
             elif node_embed_names is not None:
                 assert isinstance(node_embed_names, list) \
                         and len(node_embed_names) == self.num_layers, \
@@ -174,13 +175,14 @@ class NodeFlow(DGLBaseGraph):
                 for i in range(self.num_layers):
                     nid = self.layer_parent_nid(i)
                     self._node_frames[i] = _get_frame(self._parent._node_frame,
-                                                      node_embed_names[i], nid)
+                                                      node_embed_names[i], nid, ctx)
 
         if self._parent._edge_frame.num_rows != 0 and self._parent._edge_frame.num_columns != 0:
             if is_all(edge_embed_names):
                 for i in range(self.num_blocks):
                     eid = utils.toindex(self.block_parent_eid(i))
-                    self._edge_frames[i] = FrameRef(Frame(self._parent._edge_frame[eid]))
+                    self._edge_frames[i] = FrameRef(Frame(_copy_frame(
+                        self._parent._edge_frame[eid], ctx)))
             elif edge_embed_names is not None:
                 assert isinstance(edge_embed_names, list) \
                         and len(edge_embed_names) == self.num_blocks, \
@@ -188,7 +190,7 @@ class NodeFlow(DGLBaseGraph):
                 for i in range(self.num_blocks):
                     eid = self.block_parent_eid(i)
                     self._edge_frames[i] = _get_frame(self._parent._edge_frame,
-                                                      edge_embed_names[i], eid)
+                                                      edge_embed_names[i], eid, ctx)
 
     def copy_to_parent(self, node_embed_names=ALL, edge_embed_names=ALL):
         """Copy node/edge embeddings to the parent graph.
@@ -721,8 +723,8 @@ class NodeFlow(DGLBaseGraph):
         block_id : int
             The specified block to update edge embeddings.
         func : callable or None, optional
-            Apply function on the nodes. The function should be
-            a :mod:`Node UDF <dgl.udf>`.
+            Apply function on the edges. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
         edges : a list of edge Ids or ALL.
             The edges to run the edge update function.
         inplace : bool, optional
@@ -732,12 +734,10 @@ class NodeFlow(DGLBaseGraph):
             func = self._apply_edge_funcs[block_id]
         assert func is not None
 
-        def _layer_local_nid(layer_id):
-            return F.arange(0, self.layer_size(layer_id))
-
         if is_all(edges):
-            u = utils.toindex(_layer_local_nid(block_id))
-            v = utils.toindex(_layer_local_nid(block_id + 1))
+            u, v, _ = self.block_edges(block_id)
+            u = utils.toindex(u)
+            v = utils.toindex(v)
             eid = utils.toindex(slice(0, self.block_size(block_id)))
         elif isinstance(edges, tuple):
             u, v = edges
@@ -902,12 +902,16 @@ class NodeFlow(DGLBaseGraph):
 def _copy_to_like(arr1, arr2):
     return F.copy_to(arr1, F.context(arr2))
 
-def _get_frame(frame, names, ids):
-    col_dict = {name: frame[name][_copy_to_like(ids, frame[name])] for name in names}
+def _get_frame(frame, names, ids, ctx):
+    col_dict = {name: F.copy_to(frame[name][_copy_to_like(ids, frame[name])], \
+                                ctx) for name in names}
     if len(col_dict) == 0:
         return FrameRef(Frame(num_rows=len(ids)))
     else:
         return FrameRef(Frame(col_dict))
+
+def _copy_frame(frame, ctx):
+    return {name: F.copy_to(frame[name], ctx) for name in frame}
 
 
 def _update_frame(frame, names, ids, new_frame):

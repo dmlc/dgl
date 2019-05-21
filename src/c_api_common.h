@@ -19,13 +19,6 @@ typedef void* GraphHandle;
 
 // Communicator handler type
 typedef void* CommunicatorHandle;
-/*!
- * \brief Convert the given DLTensor to DLManagedTensor.
- *
- * Return a temporary DLManagedTensor that does not own memory.
- */
-DLManagedTensor* CreateTmpDLManagedTensor(
-    const dgl::runtime::DGLArgValue& arg);
 
 /*!
  * \brief Convert a vector of NDArray to PackedFunc.
