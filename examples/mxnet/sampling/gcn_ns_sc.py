@@ -110,13 +110,13 @@ class GCNInfer(gluon.Block):
 
 
 def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
-    in_feats = g.ndata['features'].shape[1]
-    labels = g.ndata['labels']
-    g_ctx = labels.context
+    n0_feats = g.nodes[0].data['features']
+    in_feats = n0_feats.shape[1]
+    g_ctx = n0_feats.context
 
     degs = g.in_degrees().astype('float32').as_in_context(g_ctx)
     norm = mx.nd.expand_dims(1./degs, 1)
-    g.ndata['norm'] = norm
+    g.set_n_repr({'norm': norm})
 
     model = GCNSampling(in_feats,
                         args.n_hidden,
@@ -159,7 +159,7 @@ def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
             with mx.autograd.record():
                 pred = model(nf)
                 batch_nids = nf.layer_parent_nid(-1)
-                batch_labels = labels[batch_nids].as_in_context(ctx)
+                batch_labels = g.nodes[batch_nids].data['labels'].as_in_context(ctx)
                 loss = loss_fcn(pred, batch_labels)
                 loss = loss.sum() / len(batch_nids)
 
@@ -183,7 +183,7 @@ def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
             nf.copy_from_parent(ctx=ctx)
             pred = infer_model(nf)
             batch_nids = nf.layer_parent_nid(-1)
-            batch_labels = labels[batch_nids].as_in_context(ctx)
+            batch_labels = g.nodes[batch_nids].data['labels'].as_in_context(ctx)
             num_acc += (pred.argmax(axis=1) == batch_labels).sum().asscalar()
             num_tests += nf.layer_size(-1)
             break
