@@ -26,6 +26,10 @@ def test_graph_creation():
     g.add_nodes(5)
     g.ndata['h'] = 3 * F.ones((5, 2))
     assert F.allclose(3 * F.ones((5, 2)), g.ndata['h'])
+    g.init_ndata('h1', (g.number_of_nodes(), 3), 'float32')
+    assert F.allclose(F.zeros((g.number_of_nodes(), 3)), g.ndata['h1'])
+    g.init_edata('h2', (g.number_of_edges(), 3), 'float32')
+    assert F.allclose(F.zeros((g.number_of_edges(), 3)), g.edata['h2'])
 
 def test_create_from_elist():
     elist = [(2, 1), (1, 0), (2, 0), (3, 0), (0, 2)]
