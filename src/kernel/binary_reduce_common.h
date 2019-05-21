@@ -96,13 +96,15 @@ struct SelectEdge {
     LOG(FATAL) << "Invalid operand target: " << v1 << " and " << v2; \
   }
 
-#define GEN_TARGET(GEN, ...)               \
-  GEN(__VA_ARGS__, SelectSrc, SelectDst)   \
-  GEN(__VA_ARGS__, SelectDst, SelectSrc)   \
-  GEN(__VA_ARGS__, SelectSrc, SelectEdge)  \
-  GEN(__VA_ARGS__, SelectEdge, SelectSrc)  \
-  GEN(__VA_ARGS__, SelectDst, SelectEdge)  \
-  GEN(__VA_ARGS__, SelectEdge, SelectDst)
+#define EXPAND(x) x
+
+#define GEN_TARGET(GEN, ...)                        \
+  EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectDst))    \
+  EXPAND(GEN(__VA_ARGS__, SelectDst, SelectSrc))    \
+  EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectEdge))   \
+  EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectSrc))   \
+  EXPAND(GEN(__VA_ARGS__, SelectDst, SelectEdge))   \
+  EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectDst))
 
 // direct id
 template <int XPU, typename IdxType>
@@ -203,8 +205,6 @@ struct BinaryUseLhs {
   } else {                                          \
     LOG(FATAL) << "Unsupported binary op: " << val; \
   }
-
-#define EXPAND(x) x
 
 #define GEN_BINARY_OP(GEN, ...) \
   EXPAND(GEN(__VA_ARGS__, BinaryAdd)) \
