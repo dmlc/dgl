@@ -168,7 +168,7 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
                                           &(nf->edge_mapping),
                                           &(nf->layer_offsets),
                                           &(nf->flow_offsets));
-      nf->graph = GraphPtr(new ImmutableGraph(csr, nullptr, false));
+      nf->graph = GraphPtr(new ImmutableGraph(csr, nullptr));
       std::vector<NodeFlow*> subgs(1);
       subgs[0] = nf;
       *rv = WrapVectorReturn(subgs);

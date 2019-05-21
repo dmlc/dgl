@@ -259,7 +259,8 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   dgl_id_t *edge_map_data = static_cast<dgl_id_t *>(nf.edge_mapping->data);
 
   // Construct sub_csr_graph
-  auto subg_csr = CSRPtr(new CSR(num_vertices, num_edges));
+  // TODO(minjie): is nodeflow a multigraph?
+  auto subg_csr = CSRPtr(new CSR(num_vertices, num_edges, is_multigraph));
   dgl_id_t* indptr_out = static_cast<dgl_id_t*>(subg_csr->indptr()->data);
   dgl_id_t* col_list_out = static_cast<dgl_id_t*>(subg_csr->indices()->data);
   dgl_id_t* eid_out = static_cast<dgl_id_t*>(subg_csr->edge_ids()->data);
@@ -355,9 +356,9 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   std::iota(eid_out, eid_out + num_edges, 0);
 
   if (edge_type == std::string("in")) {
-    nf.graph = GraphPtr(new ImmutableGraph(subg_csr, nullptr, is_multigraph));
+    nf.graph = GraphPtr(new ImmutableGraph(subg_csr, nullptr));
   } else {
-    nf.graph = GraphPtr(new ImmutableGraph(nullptr, subg_csr, is_multigraph));
+    nf.graph = GraphPtr(new ImmutableGraph(nullptr, subg_csr));
   }
 
   return nf;
@@ -686,9 +687,9 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
         VecToIdArray(sub_indptr), VecToIdArray(sub_indices), VecToIdArray(sub_edge_ids)));
 
   if (neighbor_type == std::string("in")) {
-    nf.graph = GraphPtr(new ImmutableGraph(sub_csr, nullptr, graph->IsMultigraph()));
+    nf.graph = GraphPtr(new ImmutableGraph(sub_csr, nullptr));
   } else {
-    nf.graph = GraphPtr(new ImmutableGraph(nullptr, sub_csr, graph->IsMultigraph()));
+    nf.graph = GraphPtr(new ImmutableGraph(nullptr, sub_csr));
   }
 
   nf.node_mapping = VecToIdArray(node_mapping);

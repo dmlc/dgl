@@ -114,15 +114,16 @@ ImmutableGraph GraphOp::DisjointUnion(std::vector<const ImmutableGraph *> graphs
     num_nodes += gr->NumVertices();
     num_edges += gr->NumEdges();
   }
-  CSRPtr batched_csr_ptr = CSRPtr(new CSR(num_nodes, num_edges));
-  dgl_id_t* indptr = static_cast<dgl_id_t*>(batched_csr_ptr->indptr()->data);
-  dgl_id_t* indices = static_cast<dgl_id_t*>(batched_csr_ptr->indices()->data);
-  dgl_id_t* edge_ids = static_cast<dgl_id_t*>(batched_csr_ptr->edge_ids()->data);
+  IdArray indptr_arr = NewIdArray(num_nodes + 1);
+  IdArray indices_arr = NewIdArray(num_edges);
+  IdArray edge_ids_arr = NewIdArray(num_edges);
+  dgl_id_t* indptr = static_cast<dgl_id_t*>(indptr_arr->data);
+  dgl_id_t* indices = static_cast<dgl_id_t*>(indices_arr->data);
+  dgl_id_t* edge_ids = static_cast<dgl_id_t*>(edge_ids_arr->data);
 
   indptr[0] = 0;
   dgl_id_t cum_num_nodes = 0;
   dgl_id_t cum_num_edges = 0;
-  bool is_multigraph = false;
   for (const ImmutableGraph *gr : graphs) {
     const CSRPtr g_csrptr = gr->GetInCSR();
     const int64_t g_num_nodes = g_csrptr->NumVertices();
@@ -142,10 +143,10 @@ ImmutableGraph GraphOp::DisjointUnion(std::vector<const ImmutableGraph *> graphs
     }
     cum_num_nodes += g_num_nodes;
     cum_num_edges += g_num_edges;
-    is_multigraph |= gr->IsMultigraph();
   }
 
-  return ImmutableGraph(batched_csr_ptr, nullptr, is_multigraph);
+  CSRPtr batched_csr_ptr = CSRPtr(new CSR(indptr_arr, indices_arr, edge_ids_arr));
+  return ImmutableGraph(batched_csr_ptr, nullptr);
 }
 
 std::vector<ImmutableGraph> GraphOp::DisjointPartitionByNum(const ImmutableGraph *graph,
@@ -180,11 +181,14 @@ std::vector<ImmutableGraph> GraphOp::DisjointPartitionBySizes(const ImmutableGra
   for (int64_t i = 0; i < len; ++i) {
     const int64_t start_pos = cumsum[i];
     const int64_t end_pos = cumsum[i + 1];
+    const int64_t g_num_nodes = sizes_data[i];
     const int64_t g_num_edges = indptr[end_pos] - indptr[start_pos];
-    CSRPtr g_in_csr_ptr = CSRPtr(new CSR(sizes_data[i], g_num_edges));
-    dgl_id_t* g_indptr = static_cast<dgl_id_t*>(g_in_csr_ptr->indptr()->data);
-    dgl_id_t* g_indices = static_cast<dgl_id_t*>(g_in_csr_ptr->indices()->data);
-    dgl_id_t* g_edge_ids = static_cast<dgl_id_t*>(g_in_csr_ptr->edge_ids()->data);
+    IdArray indptr_arr = NewIdArray(g_num_nodes + 1);
+    IdArray indices_arr = NewIdArray(g_num_edges);
+    IdArray edge_ids_arr = NewIdArray(g_num_edges);
+    dgl_id_t* g_indptr = static_cast<dgl_id_t*>(indptr_arr->data);
+    dgl_id_t* g_indices = static_cast<dgl_id_t*>(indices_arr->data);
+    dgl_id_t* g_edge_ids = static_cast<dgl_id_t*>(edge_ids_arr->data);
 
     const dgl_id_t idoff = indptr[start_pos];
     g_indptr[0] = 0;
@@ -201,8 +205,8 @@ std::vector<ImmutableGraph> GraphOp::DisjointPartitionBySizes(const ImmutableGra
     }
 
     cum_sum_edges += g_num_edges;
-    // TODO(minjie): is multigraph
-    rst.emplace_back(g_in_csr_ptr, nullptr, false);
+    CSRPtr g_in_csr_ptr = CSRPtr(new CSR(indptr_arr, indices_arr, edge_ids_arr));
+    rst.emplace_back(g_in_csr_ptr, nullptr);
   }
   return rst;
 }

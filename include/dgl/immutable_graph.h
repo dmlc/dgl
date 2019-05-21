@@ -14,6 +14,7 @@
 #include <algorithm>
 #include "runtime/ndarray.h"
 #include "graph_interface.h"
+#include "lazy.h"
 
 namespace dgl {
 
@@ -28,16 +29,20 @@ typedef std::shared_ptr<COO> COOPtr;
 class CSR : public GraphInterface {
  public:
   // Create a csr graph that has the given number of verts and edges.
-  CSR(int64_t num_vertices, int64_t num_edges);
+  CSR(int64_t num_vertices, int64_t num_edges, bool is_multigraph);
+  // Create a csr graph whose memory is stored in the shared memory
+  //   that has the given number of verts and edges.
+  CSR(const std::string &shared_mem_name,
+      int64_t num_vertices, int64_t num_edges, bool is_multigraph);
   // Create a csr graph that shares the given indptr and indices.
   CSR(IdArray indptr, IdArray indices, IdArray edge_ids);
+  CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph);
   // Create a csr graph whose memory is stored in the shared memory
   //   and the structure is given by the indptr and indcies.
   CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
       const std::string &shared_mem_name);
-  // Create a csr graph whose memory is stored in the shared memory
-  //   that has the given number of verts and edges.
-  CSR(const std::string &shared_mem_name, int64_t num_vertices, int64_t num_edges);
+  CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
+      const std::string &shared_mem_name);
 
   void AddVertices(uint64_t num_vertices) override {
     LOG(FATAL) << "CSR graph does not allow mutation.";
@@ -55,9 +60,7 @@ class CSR : public GraphInterface {
     LOG(FATAL) << "CSR graph does not allow mutation.";
   }
 
-  bool IsMultigraph() const override {
-    return false;
-  }
+  bool IsMultigraph() const override;
 
   bool IsReadonly() const override {
     return true;
@@ -226,16 +229,16 @@ class CSR : public GraphInterface {
   //   CSR matrix operations. CSR matrix operations would be backed by different
   //   devices (CPU, CUDA, ...), while graph interface will not be aware of that.
   IdArray indptr_, indices_, edge_ids_;
-#ifndef _WIN32
-  // shared memory handler
-  std::shared_ptr<runtime::SharedMemory> mem_;
-#endif  // _WIN32
+
+  // whether the graph is a multi-graph
+  LazyObject<bool> is_multigraph_;
 };
 
 class COO : public GraphInterface {
  public:
   // Create a coo graph that shares the given src and dst
   COO(int64_t num_vertices, IdArray src, IdArray dst);
+  COO(int64_t num_vertices, IdArray src, IdArray dst, bool is_multigraph);
 
   // TODO(da): add constructor for creating COO from shared memory
 
@@ -255,9 +258,7 @@ class COO : public GraphInterface {
     LOG(FATAL) << "CSR graph does not allow mutation.";
   }
 
-  bool IsMultigraph() const override {
-    return false;
-  }
+  bool IsMultigraph() const override;
 
   bool IsReadonly() const override {
     return true;
@@ -442,8 +443,12 @@ class COO : public GraphInterface {
   /* !\brief private default constructor */
   COO() {}
 
+  /*! \brief number of vertices */
   int64_t num_vertices_;
+  /*! \brief coordinate arrays */
   IdArray src_, dst_;
+  /*! \brief whether the graph is a multi-graph */
+  LazyObject<bool> is_multigraph_;
 };
 
 /*!
@@ -454,9 +459,7 @@ class COO : public GraphInterface {
 class ImmutableGraph: public GraphInterface {
  public:
   /*! \brief Construct an immutable graph from the COO format. */
-  explicit ImmutableGraph(COOPtr coo, bool multigraph = false)
-    : coo_(coo), is_multigraph_(multigraph) {
-  }
+  explicit ImmutableGraph(COOPtr coo, bool multigraph = false): coo_(coo) { }
   /*!
    * \brief Construct an immutable graph from the CSR format.
    *
@@ -470,15 +473,13 @@ class ImmutableGraph: public GraphInterface {
    * construct one of the CSRs that runs fast for some operations we expect and construct
    * the other CSR on demand.
    */
-  ImmutableGraph(CSRPtr in_csr, CSRPtr out_csr, bool multigraph = false)
-    : in_csr_(in_csr), out_csr_(out_csr), is_multigraph_(multigraph) {
+  ImmutableGraph(CSRPtr in_csr, CSRPtr out_csr)
+    : in_csr_(in_csr), out_csr_(out_csr) {
     CHECK(in_csr_ || out_csr_) << "Both CSR are missing.";
   }
 
   /*! \brief Construct an immutable graph from one CSR. */
-  explicit ImmutableGraph(CSRPtr csr, bool multigraph = false)
-    : out_csr_(csr), is_multigraph_(multigraph) {
-  }
+  explicit ImmutableGraph(CSRPtr csr): out_csr_(csr) { }
 
   /*! \brief default copy constructor */
   ImmutableGraph(const ImmutableGraph& other) = default;
@@ -491,11 +492,9 @@ class ImmutableGraph: public GraphInterface {
     this->in_csr_ = other.in_csr_;
     this->out_csr_ = other.out_csr_;
     this->coo_ = other.coo_;
-    this->is_multigraph_ = other.is_multigraph_;
     other.in_csr_ = nullptr;
     other.out_csr_ = nullptr;
     other.coo_ = nullptr;
-    other.is_multigraph_ = false;
   }
 #endif  // _MSC_VER
 
@@ -526,7 +525,7 @@ class ImmutableGraph: public GraphInterface {
    * \return whether the graph is a multigraph
    */
   bool IsMultigraph() const override {
-    return is_multigraph_;
+    return AnyGraph()->IsMultigraph();
   }
 
   /*!
@@ -761,9 +760,9 @@ class ImmutableGraph: public GraphInterface {
    */
   GraphPtr Reverse() const override {
     if (coo_) {
-      return GraphPtr(new ImmutableGraph(out_csr_, in_csr_, coo_->Transpose(), is_multigraph_));
+      return GraphPtr(new ImmutableGraph(out_csr_, in_csr_, coo_->Transpose()));
     } else {
-      return GraphPtr(new ImmutableGraph(out_csr_, in_csr_, is_multigraph_));
+      return GraphPtr(new ImmutableGraph(out_csr_, in_csr_));
     }
   }
 
@@ -868,8 +867,8 @@ class ImmutableGraph: public GraphInterface {
   ImmutableGraph() {}
 
   /* !\brief internal constructor for all the members */
-  ImmutableGraph(CSRPtr in_csr, CSRPtr out_csr, COOPtr coo, bool is_multigraph)
-    : in_csr_(in_csr), out_csr_(out_csr), coo_(coo), is_multigraph_(is_multigraph) {
+  ImmutableGraph(CSRPtr in_csr, CSRPtr out_csr, COOPtr coo)
+    : in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
     CHECK(AnyGraph()) << "At least one graph structure should exist.";
   }
 
@@ -890,8 +889,6 @@ class ImmutableGraph: public GraphInterface {
   CSRPtr out_csr_;
   // Store the edge list indexed by edge id (COO)
   COOPtr coo_;
-  /*! \brief Whether if this is a multigraph. */
-  bool is_multigraph_ = false;
 };
 
 }  // namespace dgl

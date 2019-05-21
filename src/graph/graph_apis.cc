@@ -162,15 +162,15 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
       //   However, with MXNet backend, the memory would be corrupted if we directly
       //   save the passed-in ndarrays into DGL's graph object. We hope MXNet team
       //   could help look into this.
-      csr.reset(new CSR(Clone(indptr), Clone(indices), Clone(edge_ids)));
+      csr.reset(new CSR(Clone(indptr), Clone(indices), Clone(edge_ids), multigraph));
     else
-      csr.reset(new CSR(indptr, indices, edge_ids, shared_mem_name));
+      csr.reset(new CSR(indptr, indices, edge_ids, multigraph, shared_mem_name));
 
     GraphHandle ghandle;
     if (edge_dir == "in")
-      ghandle = new ImmutableGraph(csr, nullptr, multigraph);
+      ghandle = new ImmutableGraph(csr, nullptr);
     else
-      ghandle = new ImmutableGraph(nullptr, csr, multigraph);
+      ghandle = new ImmutableGraph(nullptr, csr);
     *rv = ghandle;
   });
 
@@ -181,12 +181,13 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreateMMap")
     const int64_t num_edges = args[2];
     const bool multigraph = static_cast<bool>(args[3]);
     const std::string edge_dir = args[4];
-    CSRPtr csr(new CSR(shared_mem_name, num_vertices, num_edges));
+    // TODO(minjie): how to know multigraph
+    CSRPtr csr(new CSR(shared_mem_name, num_vertices, num_edges, multigraph));
     GraphHandle ghandle;
     if (edge_dir == "in")
-      ghandle = new ImmutableGraph(csr, nullptr, multigraph);
+      ghandle = new ImmutableGraph(csr, nullptr);
     else
-      ghandle = new ImmutableGraph(nullptr, csr, multigraph);
+      ghandle = new ImmutableGraph(nullptr, csr);
     *rv = ghandle;
   });
 

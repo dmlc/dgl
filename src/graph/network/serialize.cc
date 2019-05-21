@@ -139,7 +139,8 @@ void DeserializeSampledSubgraph(char* data,
   memcpy(edge_mapping_data, data_ptr, tensor_size);
   data_ptr += tensor_size;
   // Construct sub_csr_graph
-  *csr = CSRPtr(new CSR(num_vertices, num_edges));
+  // TODO(minjie): multigraph flag
+  *csr = CSRPtr(new CSR(num_vertices, num_edges, false));
   // indices (CSR)
   tensor_size = *(reinterpret_cast<int64_t*>(data_ptr));
   data_ptr += sizeof(int64_t);

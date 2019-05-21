@@ -8,6 +8,7 @@
 #include <string.h>
 #include <bitset>
 #include <numeric>
+#include <tuple>
 
 #include "../c_api_common.h"
 
@@ -20,7 +21,7 @@ class IdHashMap {
  public:
   // Construct the hashmap using the given id arrays.
   // The id array could contain duplicates.
-  explicit IdHashMap(IdArray ids) {
+  explicit IdHashMap(IdArray ids): filter_(kFilterSize, false) {
     const dgl_id_t* ids_data = static_cast<dgl_id_t*>(ids->data);
     const int64_t len = ids->shape[0];
     dgl_id_t newid = 0;
@@ -28,20 +29,20 @@ class IdHashMap {
       const dgl_id_t id = ids_data[i];
       if (!Contains(id)) {
         oldv2newv_[id] = newid++;
-        filter_.flip(id & kFilterMask);
+        filter_[id & kFilterMask] = true;
       }
     }
   }
 
   // Return true if the given id is contained in this hashmap.
   bool Contains(dgl_id_t id) const {
-    return filter_.test(id & kFilterMask) && oldv2newv_.count(id);
+    return filter_[id & kFilterMask] && oldv2newv_.count(id);
   }
 
   // Return the new id of the given id. If the given id is not contained
   // in the hash map, returns the default_val instead.
   dgl_id_t Map(dgl_id_t id, dgl_id_t default_val) const {
-    if (filter_.test(id & kFilterMask)) {
+    if (filter_[id & kFilterMask]) {
       auto it = oldv2newv_.find(id);
       return (it == oldv2newv_.end()) ? default_val : it->second;
     } else {
@@ -54,10 +55,38 @@ class IdHashMap {
   static constexpr int32_t kFilterSize = kFilterMask + 1;
   // This bitmap is used as a bloom filter to remove some lookups.
   // Hashtable is very slow. Using bloom filter can significantly speed up lookups.
-  std::bitset<kFilterSize> filter_;
+  std::vector<bool> filter_;
   // The hashmap from old vid to new vid
   std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv_;
 };
+
+struct PairHash {
+  template <class T1, class T2>
+  std::size_t operator() (const std::pair<T1, T2>& pair) const {
+    return std::hash<T1>()(pair.first) ^ std::hash<T2>()(pair.second);
+  }
+};
+
+std::tuple<IdArray, IdArray, IdArray> MapFromSharedMemory(
+#ifndef _WIN32
+  const std::string &shared_mem_name, int64_t num_verts, int64_t num_edges) {
+  const int64_t file_size = (num_verts + 1 + num_edges * 2) * sizeof(dgl_id_t);
+
+  IdArray sm_array = IdArray::EmptyShared(
+      shared_mem_name, {file_size}, DLDataType{kDLInt, 8, 1}, DLContext{kDLCPU, 0}, true);
+  // Create views from the shared memory array. Note that we don't need to save
+  //   the sm_array because the refcount is maintained by the view arrays.
+  IdArray indptr = sm_array.CreateView({num_verts + 1}, DLDataType{kDLInt, 64, 1});
+  IdArray indices = sm_array.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
+      (num_verts + 1) * sizeof(dgl_id_t));
+  IdArray edge_ids = sm_array.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
+      (num_verts + 1 + num_edges) * sizeof(dgl_id_t));
+  return {indptr, indices, edge_ids};
+#else
+  LOG(FATAL) << "CSR graph doesn't support shared memory in Windows yet";
+  return {};
+#endif  // _WIN32
+}
 }  // namespace
 
 //////////////////////////////////////////////////////////
@@ -66,7 +95,8 @@ class IdHashMap {
 //
 //////////////////////////////////////////////////////////
 
-CSR::CSR(int64_t num_vertices, int64_t num_edges) {
+CSR::CSR(int64_t num_vertices, int64_t num_edges, bool is_multigraph)
+  : is_multigraph_(is_multigraph) {
   indptr_ = NewIdArray(num_vertices + 1);
   indices_ = NewIdArray(num_edges);
   edge_ids_ = NewIdArray(num_edges);
@@ -80,51 +110,70 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids)
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
 }
 
+CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
+  : indptr_(indptr), indices_(indices), edge_ids_(edge_ids), is_multigraph_(is_multigraph) {
+  CHECK(IsValidIdArray(indptr));
+  CHECK(IsValidIdArray(indices));
+  CHECK(IsValidIdArray(edge_ids));
+  CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
+}
+
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
          const std::string &shared_mem_name) {
-#ifndef _WIN32
   CHECK(IsValidIdArray(indptr));
   CHECK(IsValidIdArray(indices));
   CHECK(IsValidIdArray(edge_ids));
   CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
   const int64_t num_verts = indptr->shape[0] - 1;
   const int64_t num_edges = indices->shape[0];
-  const int64_t file_size = (num_verts + 1 + num_edges * 2) * sizeof(dgl_id_t);
-
-  IdArray sm_array = IdArray::EmptyShared(
-      shared_mem_name, {file_size}, DLDataType{kDLInt, 8, 1}, DLContext{kDLCPU, 0}, true);
-  // Create views from the shared memory array. Note that we don't need to save
-  //   the sm_array because the refcount is maintained by the view arrays.
-  indptr_ = sm_array.CreateView({num_verts + 1}, DLDataType{kDLInt, 64, 1});
-  indices_ = sm_array.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
-      (num_verts + 1) * sizeof(dgl_id_t));
-  edge_ids_ = sm_array.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
-      (num_verts + 1 + num_edges) * sizeof(dgl_id_t));
+  std::tie(indptr_, indices_, edge_ids_) = MapFromSharedMemory(
+      shared_mem_name, num_verts, num_edges);
   // copy the given data into the shared memory arrays
   indptr_.CopyFrom(indptr);
   indices_.CopyFrom(indices);
   edge_ids_.CopyFrom(edge_ids);
-#else
-  LOG(FATAL) << "CSR graph doesn't support shared memory in Windows yet";
-#endif  // _WIN32
+}
+
+CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
+         const std::string &shared_mem_name): is_multigraph_(is_multigraph) {
+  CHECK(IsValidIdArray(indptr));
+  CHECK(IsValidIdArray(indices));
+  CHECK(IsValidIdArray(edge_ids));
+  CHECK_EQ(indices->shape[0], edge_ids->shape[0]);
+  const int64_t num_verts = indptr->shape[0] - 1;
+  const int64_t num_edges = indices->shape[0];
+  std::tie(indptr_, indices_, edge_ids_) = MapFromSharedMemory(
+      shared_mem_name, num_verts, num_edges);
+  // copy the given data into the shared memory arrays
+  indptr_.CopyFrom(indptr);
+  indices_.CopyFrom(indices);
+  edge_ids_.CopyFrom(edge_ids);
 }
 
 CSR::CSR(const std::string &shared_mem_name,
-         int64_t num_verts, int64_t num_edges) {
-#ifndef _WIN32
-  const int64_t file_size = (num_verts + 1 + num_edges * 2) * sizeof(dgl_id_t);
-  IdArray sm_array = IdArray::EmptyShared(
-      shared_mem_name, {file_size}, DLDataType{kDLInt, 8, 1}, DLContext{kDLCPU, 0}, true);
-  // Create views from the shared memory array. Note that we don't need to save
-  //   the sm_array because the refcount is maintained by the view arrays.
-  indptr_ = sm_array.CreateView({num_verts + 1}, DLDataType{kDLInt, 64, 1});
-  indices_ = sm_array.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
-      (num_verts + 1) * sizeof(dgl_id_t));
-  edge_ids_ = sm_array.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
-      (num_verts + 1 + num_edges) * sizeof(dgl_id_t));
-#else
-  LOG(FATAL) << "CSR graph doesn't support shared memory in Windows yet";
-#endif  // _WIN32
+         int64_t num_verts, int64_t num_edges, bool is_multigraph)
+  : is_multigraph_(is_multigraph) {
+  std::tie(indptr_, indices_, edge_ids_) = MapFromSharedMemory(
+      shared_mem_name, num_verts, num_edges);
+}
+
+bool CSR::IsMultigraph() const {
+  return const_cast<CSR*>(this)->is_multigraph_.Get([this] () {
+      const dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
+      const dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
+      for (dgl_id_t src = 0; src < NumVertices(); ++src) {
+        std::unordered_set<dgl_id_t> hashmap;
+        for (dgl_id_t eid = indptr_data[src]; eid < indptr_data[src+1]; ++eid) {
+          const dgl_id_t dst = indices_data[eid];
+          if (hashmap.count(dst)) {
+            return true;
+          } else {
+            hashmap.insert(dst);
+          }
+        }
+      }
+      return false;
+    });
 }
 
 CSR::EdgeArray CSR::OutEdges(dgl_id_t vid) const {
@@ -413,6 +462,30 @@ COO::COO(int64_t num_vertices, IdArray src, IdArray dst)
   CHECK(IsValidIdArray(src));
   CHECK(IsValidIdArray(dst));
   CHECK_EQ(src->shape[0], dst->shape[0]);
+}
+
+COO::COO(int64_t num_vertices, IdArray src, IdArray dst, bool is_multigraph)
+  : num_vertices_(num_vertices), src_(src), dst_(dst), is_multigraph_(is_multigraph) {
+  CHECK(IsValidIdArray(src));
+  CHECK(IsValidIdArray(dst));
+  CHECK_EQ(src->shape[0], dst->shape[0]);
+}
+
+bool COO::IsMultigraph() const {
+  return const_cast<COO*>(this)->is_multigraph_.Get([this] () {
+      std::unordered_set<std::pair<dgl_id_t, dgl_id_t>, PairHash> hashmap;
+      const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
+      const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
+      for (dgl_id_t eid = 0; eid < NumEdges(); ++eid) {
+        const auto& p = std::make_pair(src_data[eid], dst_data[eid]);
+        if (hashmap.count(p)) {
+          return true;
+        } else {
+          hashmap.insert(p);
+        }
+      }
+      return false;
+    });
 }
 
 COO::EdgeArray COO::FindEdges(IdArray eids) const {
