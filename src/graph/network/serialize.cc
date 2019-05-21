@@ -18,7 +18,7 @@ namespace network {
 const int kNumTensor = 7;  // We need to serialize 7 conponents (tensor) here
 
 int64_t SerializeSampledSubgraph(char* data,
-                                 const ImmutableGraph::CSR::Ptr csr,
+                                 const CSRPtr csr,
                                  const IdArray& node_mapping,
                                  const IdArray& edge_mapping,
                                  const IdArray& layer_offsets,
@@ -30,9 +30,9 @@ int64_t SerializeSampledSubgraph(char* data,
   int64_t edge_mapping_size = edge_mapping->shape[0] * sizeof(dgl_id_t);
   int64_t layer_offsets_size = layer_offsets->shape[0] * sizeof(dgl_id_t);
   int64_t flow_offsets_size = flow_offsets->shape[0] * sizeof(dgl_id_t);
-  int64_t indptr_size = csr->indptr.size() * sizeof(int64_t);
-  int64_t indices_size = csr->indices.size() * sizeof(dgl_id_t);
-  int64_t edge_ids_size = csr->edge_ids.size() * sizeof(dgl_id_t);
+  int64_t indptr_size = csr->indptr().GetSize();
+  int64_t indices_size = csr->indices().GetSize();
+  int64_t edge_ids_size = csr->edge_ids().GetSize();
   total_size += node_mapping_size;
   total_size += edge_mapping_size;
   total_size += layer_offsets_size;
@@ -52,9 +52,9 @@ int64_t SerializeSampledSubgraph(char* data,
   dgl_id_t* edge_map_data = static_cast<dgl_id_t*>(edge_mapping->data);
   dgl_id_t* layer_off_data = static_cast<dgl_id_t*>(layer_offsets->data);
   dgl_id_t* flow_off_data = static_cast<dgl_id_t*>(flow_offsets->data);
-  int64_t* indptr = static_cast<int64_t*>(csr->indptr.data());
-  dgl_id_t* indices = static_cast<dgl_id_t*>(csr->indices.data());
-  dgl_id_t* edge_ids = static_cast<dgl_id_t*>(csr->edge_ids.data());
+  dgl_id_t* indptr = static_cast<dgl_id_t*>(csr->indptr()->data);
+  dgl_id_t* indices = static_cast<dgl_id_t*>(csr->indices()->data);
+  dgl_id_t* edge_ids = static_cast<dgl_id_t*>(csr->edge_ids()->data);
   // node_mapping
   *(reinterpret_cast<int64_t*>(data_ptr)) = node_mapping_size;
   data_ptr += sizeof(int64_t);
@@ -94,7 +94,7 @@ int64_t SerializeSampledSubgraph(char* data,
 }
 
 void DeserializeSampledSubgraph(char* data,
-                                ImmutableGraph::CSR::Ptr* csr,
+                                CSRPtr* csr,
                                 IdArray* node_mapping,
                                 IdArray* edge_mapping,
                                 IdArray* layer_offsets,
@@ -139,25 +139,24 @@ void DeserializeSampledSubgraph(char* data,
   memcpy(edge_mapping_data, data_ptr, tensor_size);
   data_ptr += tensor_size;
   // Construct sub_csr_graph
-  *csr = std::make_shared<ImmutableGraph::CSR>(num_vertices, num_edges);
-  (*csr)->indices.resize(num_edges);
-  (*csr)->edge_ids.resize(num_edges);
+  // TODO(minjie): multigraph flag
+  *csr = CSRPtr(new CSR(num_vertices, num_edges, false));
   // indices (CSR)
   tensor_size = *(reinterpret_cast<int64_t*>(data_ptr));
   data_ptr += sizeof(int64_t);
-  dgl_id_t* col_list_out = (*csr)->indices.data();
+  dgl_id_t* col_list_out = static_cast<dgl_id_t*>((*csr)->indices()->data);
   memcpy(col_list_out, data_ptr, tensor_size);
   data_ptr += tensor_size;
   // edge_ids (CSR)
   tensor_size = *(reinterpret_cast<int64_t*>(data_ptr));
   data_ptr += sizeof(int64_t);
-  dgl_id_t* edge_ids = (*csr)->edge_ids.data();
+  dgl_id_t* edge_ids = static_cast<dgl_id_t*>((*csr)->edge_ids()->data);
   memcpy(edge_ids, data_ptr, tensor_size);
   data_ptr += tensor_size;
   // indptr (CSR)
   tensor_size = *(reinterpret_cast<int64_t*>(data_ptr));
   data_ptr += sizeof(int64_t);
-  int64_t* indptr_out = (*csr)->indptr.data();
+  dgl_id_t* indptr_out = static_cast<dgl_id_t*>((*csr)->indptr()->data);
   memcpy(indptr_out, data_ptr, tensor_size);
   data_ptr += tensor_size;
 }

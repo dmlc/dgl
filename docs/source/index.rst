@@ -158,6 +158,8 @@ The model tutorials are categorized based on the way they utilize DGL APIs.
 * :ref:`Generative models <tutorials3-index>`: Learn how to deal with **dynamically-changing graphs**.
 * :ref:`Old (new) wines in new bottle <tutorials4-index>`: Learn how to combine DGL with tensor-based
   DGL framework in a flexible way. Explore new perspective on traditional models by graphs.
+* :ref:`Training on giant graphs <tutorials5-index>`: Learn how to train graph neural networks
+  on giant graphs.
 
 Or go through all of them :doc:`here <tutorials/models/index>`.
 

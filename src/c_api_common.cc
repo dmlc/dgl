@@ -13,15 +13,6 @@ using dgl::runtime::NDArray;
 
 namespace dgl {
 
-DLManagedTensor* CreateTmpDLManagedTensor(const DGLArgValue& arg) {
-  const DLTensor* dl_tensor = arg;
-  DLManagedTensor* ret = new DLManagedTensor();
-  ret->deleter = [] (DLManagedTensor* self) { delete self; };
-  ret->manager_ctx = nullptr;
-  ret->dl_tensor = *dl_tensor;
-  return ret;
-}
-
 PackedFunc ConvertNDArrayVectorToPackedFunc(const std::vector<NDArray>& vec) {
     auto body = [vec](DGLArgs args, DGLRetValue* rv) {
         const uint64_t which = args[0];
