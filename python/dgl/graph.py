@@ -1736,7 +1736,7 @@ class DGLGraph(DGLBaseGraph):
             self._edge_frame.update_rows(eid, data, inplace=inplace)
 
     def get_e_repr(self, edges=ALL):
-        """Get node(s) representation.
+        """Get edge(s) representation.
 
         Parameters
         ----------
