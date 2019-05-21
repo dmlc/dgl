@@ -64,8 +64,12 @@ namespace kernel {
                << val.bits;                                 \
   }
 #else
+
+// MSVC does not expand __VA_ARGS__ correctly, and needs this expand hack
+#define MSVC_EXPAND(x) x
+
 #define GEN_DTYPE(GEN, ...)  \
-  GEN(__VA_ARGS__, float)
+  MSVC_EXPAND(GEN(__VA_ARGS__, float))
 
 #define DGL_DTYPE_SWITCH(val, DType, ...)                   \
   if (val.code == kDLFloat && val.bits == 32) {             \
