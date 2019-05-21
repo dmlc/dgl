@@ -77,14 +77,13 @@ namespace {
 template<typename T>
 void DGLDisjointPartitionByNum(const T *gptr, DGLArgs args, DGLRetValue *rv) {
   int64_t num = args[1];
-  const std::vector<T> &&rst = GraphOp::DisjointPartitionByNum(gptr, num);
+  std::vector<T> &&rst = GraphOp::DisjointPartitionByNum(gptr, num);
   // return the pointer array as an integer array
   const int64_t len = rst.size();
   NDArray ptr_array = NDArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   int64_t *ptr_array_data = static_cast<int64_t *>(ptr_array->data);
   for (size_t i = 0; i < rst.size(); ++i) {
-    T *ptr = new T();
-    *ptr = std::move(rst[i]);
+    GraphInterface *ptr = rst[i].Reset();
     ptr_array_data[i] = reinterpret_cast<std::intptr_t>(ptr);
   }
   *rv = ptr_array;
@@ -100,9 +99,7 @@ void DGLDisjointUnion(GraphHandle *inhandles, int list_size, DGLRetValue *rv) {
     graphs.push_back(gr);
   }
 
-  T *gptr = new T();
-  *gptr = GraphOp::DisjointUnion(std::move(graphs));
-  GraphHandle ghandle = gptr;
+  GraphHandle ghandle = GraphOp::DisjointUnion(std::move(graphs)).Reset();
   *rv = ghandle;
 }
 
@@ -114,8 +111,7 @@ void DGLDisjointPartitionBySizes(const T *gptr, const IdArray sizes, DGLRetValue
   NDArray ptr_array = NDArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
   int64_t *ptr_array_data = static_cast<int64_t *>(ptr_array->data);
   for (size_t i = 0; i < rst.size(); ++i) {
-    T *ptr = new T();
-    *ptr = std::move(rst[i]);
+    GraphInterface *ptr = rst[i].Reset();
     ptr_array_data[i] = reinterpret_cast<std::intptr_t>(ptr);
   }
   *rv = ptr_array;
@@ -133,39 +129,48 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreateMutable")
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    const IdArray src_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
-    const IdArray dst_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
-    const IdArray edge_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
-    const bool multigraph = static_cast<bool>(args[3]);
-    const int64_t num_nodes = static_cast<int64_t>(args[4]);
-    const bool readonly = static_cast<bool>(args[5]);
+    const IdArray src_ids = args[0];
+    const IdArray dst_ids = args[1];
+    const bool multigraph = static_cast<bool>(args[2]);
+    const int64_t num_nodes = static_cast<int64_t>(args[3]);
+    const bool readonly = static_cast<bool>(args[4]);
     GraphHandle ghandle;
-    if (readonly)
-      ghandle = new ImmutableGraph(src_ids, dst_ids, edge_ids, num_nodes, multigraph);
-    else
-      ghandle = new Graph(src_ids, dst_ids, edge_ids, num_nodes, multigraph);
+    if (readonly) {
+      // TODO(minjie): The array copy here is unnecessary and adds extra overhead.
+      //   However, with MXNet backend, the memory would be corrupted if we directly
+      //   save the passed-in ndarrays into DGL's graph object. We hope MXNet team
+      //   could help look into this.
+      COOPtr coo(new COO(num_nodes, Clone(src_ids), Clone(dst_ids), multigraph));
+      ghandle = new ImmutableGraph(coo);
+    } else {
+      ghandle = new Graph(src_ids, dst_ids, num_nodes, multigraph);
+    }
     *rv = ghandle;
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    const IdArray indptr = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
-    const IdArray indices = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
-    const IdArray edge_ids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
+    const IdArray indptr = args[0];
+    const IdArray indices = args[1];
+    const IdArray edge_ids = args[2];
     const std::string shared_mem_name = args[3];
     const bool multigraph = static_cast<bool>(args[4]);
     const std::string edge_dir = args[5];
-    ImmutableGraph::CSR::Ptr csr;
+    CSRPtr csr;
     if (shared_mem_name.empty())
-      csr.reset(new ImmutableGraph::CSR(indptr, indices, edge_ids));
+      // TODO(minjie): The array copy here is unnecessary and adds extra overhead.
+      //   However, with MXNet backend, the memory would be corrupted if we directly
+      //   save the passed-in ndarrays into DGL's graph object. We hope MXNet team
+      //   could help look into this.
+      csr.reset(new CSR(Clone(indptr), Clone(indices), Clone(edge_ids), multigraph));
     else
-      csr.reset(new ImmutableGraph::CSR(indptr, indices, edge_ids, shared_mem_name));
+      csr.reset(new CSR(indptr, indices, edge_ids, multigraph, shared_mem_name));
 
     GraphHandle ghandle;
     if (edge_dir == "in")
-      ghandle = new ImmutableGraph(csr, nullptr, multigraph);
+      ghandle = new ImmutableGraph(csr, nullptr);
     else
-      ghandle = new ImmutableGraph(nullptr, csr, multigraph);
+      ghandle = new ImmutableGraph(nullptr, csr);
     *rv = ghandle;
   });
 
@@ -176,13 +181,13 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreateMMap")
     const int64_t num_edges = args[2];
     const bool multigraph = static_cast<bool>(args[3]);
     const std::string edge_dir = args[4];
-    ImmutableGraph::CSR::Ptr csr(new ImmutableGraph::CSR(shared_mem_name,
-                                                         num_vertices, num_edges));
+    // TODO(minjie): how to know multigraph
+    CSRPtr csr(new CSR(shared_mem_name, num_vertices, num_edges, multigraph));
     GraphHandle ghandle;
     if (edge_dir == "in")
-      ghandle = new ImmutableGraph(csr, nullptr, multigraph);
+      ghandle = new ImmutableGraph(csr, nullptr);
     else
-      ghandle = new ImmutableGraph(nullptr, csr, multigraph);
+      ghandle = new ImmutableGraph(nullptr, csr);
     *rv = ghandle;
   });
 
@@ -214,8 +219,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphAddEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
-    const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
-    const IdArray dst = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
+    const IdArray src = args[1];
+    const IdArray dst = args[2];
     gptr->AddEdges(src, dst);
   });
 
@@ -268,14 +273,14 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasVertices")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
-    const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray vids = args[1];
     *rv = gptr->HasVertices(vids);
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLMapSubgraphNID")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    const IdArray parent_vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[0]));
-    const IdArray query = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray parent_vids = args[0];
+    const IdArray query = args[1];
     *rv = GraphOp::MapParentIdToSubgraphId(parent_vids, query);
   });
 
@@ -292,8 +297,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphHasEdgesBetween")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
-    const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
-    const IdArray dst = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
+    const IdArray src = args[1];
+    const IdArray dst = args[2];
     *rv = gptr->HasEdgesBetween(src, dst);
   });
 
@@ -328,8 +333,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeIds")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
-    const IdArray src = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
-    const IdArray dst = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[2]));
+    const IdArray src = args[1];
+    const IdArray dst = args[2];
     *rv = ConvertEdgeArrayToPackedFunc(gptr->EdgeIds(src, dst));
   });
 
@@ -337,7 +342,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphFindEdges")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
-    const IdArray eids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray eids = args[1];
     *rv = ConvertEdgeArrayToPackedFunc(gptr->FindEdges(eids));
   });
 
@@ -353,7 +358,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphInEdges_2")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
-    const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray vids = args[1];
     *rv = ConvertEdgeArrayToPackedFunc(gptr->InEdges(vids));
   });
 
@@ -369,7 +374,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphOutEdges_2")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
-    const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray vids = args[1];
     *rv = ConvertEdgeArrayToPackedFunc(gptr->OutEdges(vids));
   });
 
@@ -393,7 +398,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphInDegrees")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
-    const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray vids = args[1];
     *rv = gptr->InDegrees(vids);
   });
 
@@ -409,7 +414,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphOutDegrees")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
-    const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray vids = args[1];
     *rv = gptr->OutDegrees(vids);
   });
 
@@ -417,7 +422,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphVertexSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const GraphInterface* gptr = static_cast<GraphInterface*>(ghandle);
-    const IdArray vids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray vids = args[1];
     *rv = ConvertSubgraphToPackedFunc(gptr->VertexSubgraph(vids));
   });
 
@@ -425,7 +430,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const GraphInterface *gptr = static_cast<GraphInterface*>(ghandle);
-    const IdArray eids = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray eids = args[1];
     *rv = ConvertSubgraphToPackedFunc(gptr->EdgeSubgraph(eids));
   });
 
@@ -462,7 +467,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointPartitionByNum")
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointPartitionBySizes")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
-    const IdArray sizes = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
+    const IdArray sizes = args[1];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
     const Graph* gptr = dynamic_cast<const Graph*>(ptr);
     const ImmutableGraph* im_gptr = dynamic_cast<const ImmutableGraph*>(ptr);
@@ -494,19 +499,6 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetAdj")
     std::string format = args[2];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
     auto res = ptr->GetAdj(transpose, format);
-    *rv = ConvertAdjToPackedFunc(res);
-  });
-
-DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetBlockAdj")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    GraphHandle ghandle = args[0];
-    std::string format = args[1];
-    int64_t layer0_size = args[2];
-    int64_t start = args[3];
-    int64_t end = args[4];
-    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    const ImmutableGraph* gptr = dynamic_cast<const ImmutableGraph*>(ptr);
-    auto res = GetNodeFlowSlice(*gptr, format, layer0_size, start, end, true);
     *rv = ConvertAdjToPackedFunc(res);
   });
 

@@ -191,7 +191,7 @@ def schedule_update_all(graph,
         var_eid = var.IDX(eid)
         # generate send + reduce
         def uv_getter():
-            src, dst, _ = graph._graph.edges()
+            src, dst, _ = graph._graph.edges('eid')
             return var.IDX(src), var.IDX(dst)
         adj_creator = lambda: spmv.build_adj_matrix_graph(graph)
         inc_creator = lambda: spmv.build_inc_matrix_graph(graph)

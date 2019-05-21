@@ -108,40 +108,44 @@ std::vector<Graph> GraphOp::DisjointPartitionBySizes(const Graph* graph, IdArray
 
 
 ImmutableGraph GraphOp::DisjointUnion(std::vector<const ImmutableGraph *> graphs) {
-  dgl_id_t num_nodes = 0;
-  dgl_id_t num_edges = 0;
+  int64_t num_nodes = 0;
+  int64_t num_edges = 0;
   for (const ImmutableGraph *gr : graphs) {
     num_nodes += gr->NumVertices();
     num_edges += gr->NumEdges();
   }
-  ImmutableGraph::CSR::Ptr batched_csr_ptr = std::make_shared<ImmutableGraph::CSR>(num_nodes,
-                                                                                   num_edges);
-  batched_csr_ptr->indptr[0] = 0;
+  IdArray indptr_arr = NewIdArray(num_nodes + 1);
+  IdArray indices_arr = NewIdArray(num_edges);
+  IdArray edge_ids_arr = NewIdArray(num_edges);
+  dgl_id_t* indptr = static_cast<dgl_id_t*>(indptr_arr->data);
+  dgl_id_t* indices = static_cast<dgl_id_t*>(indices_arr->data);
+  dgl_id_t* edge_ids = static_cast<dgl_id_t*>(edge_ids_arr->data);
+
+  indptr[0] = 0;
   dgl_id_t cum_num_nodes = 0;
   dgl_id_t cum_num_edges = 0;
-  dgl_id_t indptr_idx = 1;
   for (const ImmutableGraph *gr : graphs) {
-    const ImmutableGraph::CSR::Ptr &g_csrptr = gr->GetInCSR();
-    dgl_id_t g_num_nodes = g_csrptr->NumVertices();
-    dgl_id_t g_num_edges = g_csrptr->NumEdges();
-    ImmutableGraph::CSR::vector<dgl_id_t> &g_indices = g_csrptr->indices;
-    ImmutableGraph::CSR::vector<int64_t> &g_indptr = g_csrptr->indptr;
-    ImmutableGraph::CSR::vector<dgl_id_t> &g_edge_ids = g_csrptr->edge_ids;
-    for (dgl_id_t i = 1; i < g_indptr.size(); ++i) {
-      batched_csr_ptr->indptr[indptr_idx] = g_indptr[i] + cum_num_edges;
-      indptr_idx++;
+    const CSRPtr g_csrptr = gr->GetInCSR();
+    const int64_t g_num_nodes = g_csrptr->NumVertices();
+    const int64_t g_num_edges = g_csrptr->NumEdges();
+    dgl_id_t* g_indptr = static_cast<dgl_id_t*>(g_csrptr->indptr()->data);
+    dgl_id_t* g_indices = static_cast<dgl_id_t*>(g_csrptr->indices()->data);
+    dgl_id_t* g_edge_ids = static_cast<dgl_id_t*>(g_csrptr->edge_ids()->data);
+    for (dgl_id_t i = 1; i < g_num_nodes + 1; ++i) {
+      indptr[cum_num_nodes + i] = g_indptr[i] + cum_num_edges;
     }
-    for (dgl_id_t i = 0; i < g_indices.size(); ++i) {
-      batched_csr_ptr->indices.push_back(g_indices[i] + cum_num_nodes);
+    for (dgl_id_t i = 0; i < g_num_edges; ++i) {
+      indices[cum_num_edges + i] = g_indices[i] + cum_num_nodes;
     }
 
-    for (dgl_id_t i = 0; i < g_edge_ids.size(); ++i) {
-      batched_csr_ptr->edge_ids.push_back(g_edge_ids[i] + cum_num_edges);
+    for (dgl_id_t i = 0; i < g_num_edges; ++i) {
+      edge_ids[cum_num_edges + i] = g_edge_ids[i] + cum_num_edges;
     }
     cum_num_nodes += g_num_nodes;
     cum_num_edges += g_num_edges;
   }
 
+  CSRPtr batched_csr_ptr = CSRPtr(new CSR(indptr_arr, indices_arr, edge_ids_arr));
   return ImmutableGraph(batched_csr_ptr, nullptr);
 }
 
@@ -157,9 +161,11 @@ std::vector<ImmutableGraph> GraphOp::DisjointPartitionByNum(const ImmutableGraph
 
 std::vector<ImmutableGraph> GraphOp::DisjointPartitionBySizes(const ImmutableGraph *batched_graph,
         IdArray sizes) {
+  // TODO(minjie): use array views to speedup this operation
   const int64_t len = sizes->shape[0];
   const int64_t *sizes_data = static_cast<int64_t *>(sizes->data);
   std::vector<int64_t> cumsum;
+  cumsum.reserve(len + 1);
   cumsum.push_back(0);
   for (int64_t i = 0; i < len; ++i) {
     cumsum.push_back(cumsum[i] + sizes_data[i]);
@@ -167,35 +173,40 @@ std::vector<ImmutableGraph> GraphOp::DisjointPartitionBySizes(const ImmutableGra
   CHECK_EQ(cumsum[len], batched_graph->NumVertices())
     << "Sum of the given sizes must equal to the number of nodes.";
   std::vector<ImmutableGraph> rst;
-  const ImmutableGraph::CSR::Ptr &in_csr_ptr = batched_graph->GetInCSR();
-  ImmutableGraph::CSR::vector<int64_t> &bg_indptr = in_csr_ptr->indptr;
-  ImmutableGraph::CSR::vector<dgl_id_t> &bg_indices = in_csr_ptr->indices;
+  CSRPtr in_csr_ptr = batched_graph->GetInCSR();
+  const dgl_id_t* indptr = static_cast<dgl_id_t*>(in_csr_ptr->indptr()->data);
+  const dgl_id_t* indices = static_cast<dgl_id_t*>(in_csr_ptr->indices()->data);
+  const dgl_id_t* edge_ids = static_cast<dgl_id_t*>(in_csr_ptr->edge_ids()->data);
   dgl_id_t cum_sum_edges = 0;
   for (int64_t i = 0; i < len; ++i) {
-    int64_t start_pos = cumsum[i];
-    int64_t end_pos = cumsum[i + 1];
-    int64_t g_num_edges = bg_indptr[end_pos] - bg_indptr[start_pos];
-    ImmutableGraph::CSR::Ptr g_in_csr_ptr = std::make_shared<ImmutableGraph::CSR>(sizes_data[i],
-            g_num_edges);
-    ImmutableGraph::CSR::vector<int64_t> &g_indptr = g_in_csr_ptr->indptr;
-    ImmutableGraph::CSR::vector<dgl_id_t> &g_indices = g_in_csr_ptr->indices;
-    ImmutableGraph::CSR::vector<dgl_id_t> &g_edge_ids = g_in_csr_ptr->edge_ids;
+    const int64_t start_pos = cumsum[i];
+    const int64_t end_pos = cumsum[i + 1];
+    const int64_t g_num_nodes = sizes_data[i];
+    const int64_t g_num_edges = indptr[end_pos] - indptr[start_pos];
+    IdArray indptr_arr = NewIdArray(g_num_nodes + 1);
+    IdArray indices_arr = NewIdArray(g_num_edges);
+    IdArray edge_ids_arr = NewIdArray(g_num_edges);
+    dgl_id_t* g_indptr = static_cast<dgl_id_t*>(indptr_arr->data);
+    dgl_id_t* g_indices = static_cast<dgl_id_t*>(indices_arr->data);
+    dgl_id_t* g_edge_ids = static_cast<dgl_id_t*>(edge_ids_arr->data);
 
+    const dgl_id_t idoff = indptr[start_pos];
+    g_indptr[0] = 0;
     for (int l = start_pos + 1; l < end_pos + 1; ++l) {
-      g_indptr[l - start_pos] = bg_indptr[l] - bg_indptr[start_pos];
+      g_indptr[l - start_pos] = indptr[l] - indptr[start_pos];
     }
 
-    for (int j = bg_indptr[start_pos]; j < bg_indptr[end_pos]; ++j) {
-      g_indices.push_back(bg_indices[j] - cumsum[i]);
+    for (int j = indptr[start_pos]; j < indptr[end_pos]; ++j) {
+      g_indices[j - idoff] = indices[j] - cumsum[i];
     }
 
-    for (int k = bg_indptr[start_pos]; k < bg_indptr[end_pos]; ++k) {
-      g_edge_ids.push_back(in_csr_ptr->edge_ids[k] - cum_sum_edges);
+    for (int k = indptr[start_pos]; k < indptr[end_pos]; ++k) {
+      g_edge_ids[k - idoff] = edge_ids[k] - cum_sum_edges;
     }
 
     cum_sum_edges += g_num_edges;
-    ImmutableGraph graph(g_in_csr_ptr, nullptr);
-    rst.push_back(graph);
+    CSRPtr g_in_csr_ptr = CSRPtr(new CSR(indptr_arr, indices_arr, edge_ids_arr));
+    rst.emplace_back(g_in_csr_ptr, nullptr);
   }
   return rst;
 }
