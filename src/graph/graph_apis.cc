@@ -71,6 +71,57 @@ PackedFunc ConvertSubgraphToPackedFunc(const Subgraph& sg) {
 
 }  // namespace
 
+namespace {
+// This namespace contains template functions for batching
+// and unbatching over graph and immutable graph
+template<typename T>
+void DGLDisjointPartitionByNum(const T *gptr, DGLArgs args, DGLRetValue *rv) {
+  int64_t num = args[1];
+  const std::vector<T> &&rst = GraphOp::DisjointPartitionByNum(gptr, num);
+  // return the pointer array as an integer array
+  const int64_t len = rst.size();
+  NDArray ptr_array = NDArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  int64_t *ptr_array_data = static_cast<int64_t *>(ptr_array->data);
+  for (size_t i = 0; i < rst.size(); ++i) {
+    T *ptr = new T();
+    *ptr = std::move(rst[i]);
+    ptr_array_data[i] = reinterpret_cast<std::intptr_t>(ptr);
+  }
+  *rv = ptr_array;
+}
+
+template<typename T>
+void DGLDisjointUnion(GraphHandle *inhandles, int list_size, DGLRetValue *rv) {
+  std::vector<const T *> graphs;
+  for (int i = 0; i < list_size; ++i) {
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(inhandles[i]);
+    const T *gr = dynamic_cast<const T *>(ptr);
+    CHECK(gr) << "Error: Attempted to batch MutableGraph with ImmutableGraph";
+    graphs.push_back(gr);
+  }
+
+  T *gptr = new T();
+  *gptr = GraphOp::DisjointUnion(std::move(graphs));
+  GraphHandle ghandle = gptr;
+  *rv = ghandle;
+}
+
+template<typename T>
+void DGLDisjointPartitionBySizes(const T *gptr, const IdArray sizes, DGLRetValue *rv) {
+  std::vector<T> &&rst = GraphOp::DisjointPartitionBySizes(gptr, sizes);
+  // return the pointer array as an integer array
+  const int64_t len = rst.size();
+  NDArray ptr_array = NDArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  int64_t *ptr_array_data = static_cast<int64_t *>(ptr_array->data);
+  for (size_t i = 0; i < rst.size(); ++i) {
+    T *ptr = new T();
+    *ptr = std::move(rst[i]);
+    ptr_array_data[i] = reinterpret_cast<std::intptr_t>(ptr);
+  }
+  *rv = ptr_array;
+}
+}  // namespace
+
 ///////////////////////////// Graph API ///////////////////////////////////
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreateMutable")
@@ -383,17 +434,15 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")
     void* list = args[0];
     GraphHandle* inhandles = static_cast<GraphHandle*>(list);
     int list_size = args[1];
-    std::vector<const Graph*> graphs;
-    for (int i = 0; i < list_size; ++i) {
-      const GraphInterface *ptr = static_cast<const GraphInterface *>(inhandles[i]);
-      const Graph* gr = dynamic_cast<const Graph*>(ptr);
-      CHECK(gr) << "_CAPI_DGLDisjointUnion isn't implemented in immutable graph";
-      graphs.push_back(gr);
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(inhandles[0]);
+    const ImmutableGraph *im_gr = dynamic_cast<const ImmutableGraph *>(ptr);
+    const Graph *gr = dynamic_cast<const Graph *>(ptr);
+    if (gr) {
+      DGLDisjointUnion<Graph>(inhandles, list_size, rv);
+    } else {
+      CHECK(im_gr) << "Args[0] is not a list of valid DGLGraph";
+      DGLDisjointUnion<ImmutableGraph>(inhandles, list_size, rv);
     }
-    Graph* gptr = new Graph();
-    *gptr = GraphOp::DisjointUnion(std::move(graphs));
-    GraphHandle ghandle = gptr;
-    *rv = ghandle;
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointPartitionByNum")
@@ -401,40 +450,29 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointPartitionByNum")
     GraphHandle ghandle = args[0];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
     const Graph* gptr = dynamic_cast<const Graph*>(ptr);
-    CHECK(gptr) << "_CAPI_DGLDisjointPartitionByNum isn't implemented in immutable graph";
-    int64_t num = args[1];
-    std::vector<Graph>&& rst = GraphOp::DisjointPartitionByNum(gptr, num);
-    // return the pointer array as an integer array
-    const int64_t len = rst.size();
-    NDArray ptr_array = NDArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-    int64_t* ptr_array_data = static_cast<int64_t*>(ptr_array->data);
-    for (size_t i = 0; i < rst.size(); ++i) {
-      Graph* ptr = new Graph();
-      *ptr = std::move(rst[i]);
-      ptr_array_data[i] = reinterpret_cast<std::intptr_t>(ptr);
+    const ImmutableGraph* im_gptr = dynamic_cast<const ImmutableGraph*>(ptr);
+    if (gptr) {
+      DGLDisjointPartitionByNum(gptr, args, rv);
+    } else {
+      CHECK(im_gptr) << "Args[0] is not a valid DGLGraph";
+      DGLDisjointPartitionByNum(im_gptr, args, rv);
     }
-    *rv = ptr_array;
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointPartitionBySizes")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
+    const IdArray sizes = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
     const Graph* gptr = dynamic_cast<const Graph*>(ptr);
-    CHECK(gptr) << "_CAPI_DGLDisjointPartitionBySizes isn't implemented in immutable graph";
-    const IdArray sizes = IdArray::FromDLPack(CreateTmpDLManagedTensor(args[1]));
-    std::vector<Graph>&& rst = GraphOp::DisjointPartitionBySizes(gptr, sizes);
-    // return the pointer array as an integer array
-    const int64_t len = rst.size();
-    NDArray ptr_array = NDArray::Empty({len}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
-    int64_t* ptr_array_data = static_cast<int64_t*>(ptr_array->data);
-    for (size_t i = 0; i < rst.size(); ++i) {
-      Graph* ptr = new Graph();
-      *ptr = std::move(rst[i]);
-      ptr_array_data[i] = reinterpret_cast<std::intptr_t>(ptr);
+    const ImmutableGraph* im_gptr = dynamic_cast<const ImmutableGraph*>(ptr);
+    if (gptr) {
+      DGLDisjointPartitionBySizes(gptr, sizes, rv);
+    } else {
+      CHECK(im_gptr) << "Args[0] is not a valid DGLGraph";
+      DGLDisjointPartitionBySizes(im_gptr, sizes, rv);
     }
-    *rv = ptr_array;
-  });
+});
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphLineGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
