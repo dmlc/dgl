@@ -1556,6 +1556,50 @@ class DGLGraph(DGLBaseGraph):
         """
         return self.edges[:].data
 
+
+    def init_ndata(self, ndata_name, shape, dtype, ctx=F.cpu()):
+        """Create node embedding.
+
+        It first creates the node embedding in the server and maps it to the current process
+        with shared memory.
+
+        Parameters
+        ----------
+        ndata_name : string
+            The name of node embedding
+        shape : tuple
+            The shape of the node embedding
+        dtype : string
+            The data type of the node embedding. The currently supported data types
+            are "float32" and "int32".
+        ctx : DGLContext
+            The column context.
+        """
+        scheme = Scheme(tuple(shape[1:]), F.data_type_dict[dtype])
+        self._node_frame.add_column(ndata_name, scheme, ctx)
+
+    def init_edata(self, edata_name, shape, dtype, ctx=F.cpu()):
+        """Create edge embedding.
+
+        It first creates the edge embedding in the server and maps it to the current process
+        with shared memory.
+
+        Parameters
+        ----------
+        edata_name : string
+            The name of edge embedding
+        shape : tuple
+            The shape of the edge embedding
+        dtype : string
+            The data type of the edge embedding. The currently supported data types
+            are "float32" and "int32".
+        ctx : DGLContext
+            The column context.
+        """
+        scheme = Scheme(tuple(shape[1:]), F.data_type_dict[dtype])
+        self._node_frame.add_column(edata_name, scheme, ctx)
+
+
     def set_n_repr(self, data, u=ALL, inplace=False):
         """Set node(s) representation.
 
