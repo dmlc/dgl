@@ -204,7 +204,8 @@ struct BinaryUseLhs {
     LOG(FATAL) << "Unsupported binary op: " << val; \
   }
 
-#define EXPAND( x ) x
+#define EXPAND(x) x
+
 #define GEN_BINARY_OP(GEN, ...) \
   EXPAND(GEN(__VA_ARGS__, BinaryAdd)) \
   EXPAND(GEN(__VA_ARGS__, BinarySub)) \

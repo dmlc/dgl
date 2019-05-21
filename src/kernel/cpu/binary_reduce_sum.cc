@@ -13,5 +13,6 @@ namespace kernel {
 #define XPU kDLCPU
 
 GEN_BINARY_OP(GEN_DEFINE, float, SelectSrc, SelectDst)
+
 }  // namespace kernel
 }  // namespace dgl
