@@ -81,7 +81,7 @@ std::tuple<IdArray, IdArray, IdArray> MapFromSharedMemory(
       (num_verts + 1) * sizeof(dgl_id_t));
   IdArray edge_ids = sm_array.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
       (num_verts + 1 + num_edges) * sizeof(dgl_id_t));
-  return {indptr, indices, edge_ids};
+  return std::make_tuple(indptr, indices, edge_ids);
 #else
   LOG(FATAL) << "CSR graph doesn't support shared memory in Windows yet";
   return {};
