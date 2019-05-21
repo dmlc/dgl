@@ -68,8 +68,8 @@ struct PairHash {
 };
 
 std::tuple<IdArray, IdArray, IdArray> MapFromSharedMemory(
-#ifndef _WIN32
   const std::string &shared_mem_name, int64_t num_verts, int64_t num_edges) {
+#ifndef _WIN32
   const int64_t file_size = (num_verts + 1 + num_edges * 2) * sizeof(dgl_id_t);
 
   IdArray sm_array = IdArray::EmptyShared(
@@ -84,7 +84,7 @@ std::tuple<IdArray, IdArray, IdArray> MapFromSharedMemory(
   return {indptr, indices, edge_ids};
 #else
   LOG(FATAL) << "CSR graph doesn't support shared memory in Windows yet";
-  return std::tuple<IdArray, IdArray, IdArray>();
+  return {};
 #endif  // _WIN32
 }
 }  // namespace
