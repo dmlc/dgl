@@ -140,8 +140,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
       //   However, with MXNet backend, the memory would be corrupted if we directly
       //   save the passed-in ndarrays into DGL's graph object. We hope MXNet team
       //   could help look into this.
-      COOPtr coo(new COO(num_nodes, Clone(src_ids), Clone(dst_ids)));
-      ghandle = new ImmutableGraph(coo, multigraph);
+      COOPtr coo(new COO(num_nodes, Clone(src_ids), Clone(dst_ids), multigraph));
+      ghandle = new ImmutableGraph(coo);
     } else {
       ghandle = new Graph(src_ids, dst_ids, num_nodes, multigraph);
     }
