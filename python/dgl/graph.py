@@ -8,7 +8,7 @@ import dgl
 from .base import ALL, is_all, DGLError
 from . import backend as F
 from . import init
-from .frame import FrameRef, Frame
+from .frame import FrameRef, Frame, Scheme
 from .graph_index import create_graph_index
 from .runtime import ir, scheduler, Runtime
 from . import utils
@@ -1576,7 +1576,7 @@ class DGLGraph(DGLBaseGraph):
             The column context.
         """
         scheme = Scheme(tuple(shape[1:]), F.data_type_dict[dtype])
-        self._node_frame.add_column(ndata_name, scheme, ctx)
+        self._node_frame._frame.add_column(ndata_name, scheme, ctx)
 
     def init_edata(self, edata_name, shape, dtype, ctx=F.cpu()):
         """Create edge embedding.
@@ -1597,7 +1597,7 @@ class DGLGraph(DGLBaseGraph):
             The column context.
         """
         scheme = Scheme(tuple(shape[1:]), F.data_type_dict[dtype])
-        self._node_frame.add_column(edata_name, scheme, ctx)
+        self._edge_frame._frame.add_column(edata_name, scheme, ctx)
 
 
     def set_n_repr(self, data, u=ALL, inplace=False):
