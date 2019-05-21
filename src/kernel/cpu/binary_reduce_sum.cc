@@ -12,7 +12,7 @@ namespace kernel {
 #define REDUCER ReduceSum
 #define XPU kDLCPU
 
-EVAL(GEN_DTYPE, GEN_TARGET, GEN_BINARY_OP, GEN_DEFINE)
+GEN_TARGET(GEN_BINARY_OP, GEN_DEFINE, float)
 
 }  // namespace kernel
 }  // namespace dgl
