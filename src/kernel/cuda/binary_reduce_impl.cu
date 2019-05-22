@@ -62,8 +62,21 @@ template void BinaryReduceImpl_v2<kDLGPU>(
     const std::string& op,
     const ImmutableGraph* graph,
     binary_op::Target lhs, binary_op::Target rhs,
-    runtime::NDArray lhs_data, runtime::NDArray rhs_data, runtime::NDArray out_data,
-    runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping);
+    runtime::NDArray lhs_data, runtime::NDArray rhs_data,
+    runtime::NDArray out_data,
+    runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
+    runtime::NDArray out_mapping);
+
+template void BinaryReduceBcastImpl_v2<kDLGPU>(
+    const BcastInfo& info,
+    const std::string& reducer,
+    const std::string& op,
+    const ImmutableGraph* graph,
+    binary_op::Target lhs, binary_op::Target rhs,
+    runtime::NDArray lhs_data, runtime::NDArray rhs_data,
+    runtime::NDArray out_data,
+    runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
+    runtime::NDArray out_mapping);
 
 }  // namespace kernel
 }  // namespace dgl

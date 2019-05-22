@@ -53,6 +53,9 @@ struct Nop {
 
 // Select src
 struct SelectSrc {
+  // Target value
+  static constexpr binary_op::Target target = binary_op::kSrc;
+  // Call functor.
   template <typename T>
   static DGLDEVICE DGLINLINE T Call(T src, T edge, T dst) {
     return src;
@@ -61,6 +64,9 @@ struct SelectSrc {
 
 // Select dst
 struct SelectDst {
+  // Target value
+  static constexpr binary_op::Target target = binary_op::kDst;
+  // Call functor.
   template <typename T>
   static DGLDEVICE DGLINLINE T Call(T src, T edge, T dst) {
     return dst;
@@ -69,6 +75,9 @@ struct SelectDst {
 
 // Select edge
 struct SelectEdge {
+  // Target value
+  static constexpr binary_op::Target target = binary_op::kEdge;
+  // Call functor.
   template <typename T>
   static DGLDEVICE DGLINLINE T Call(T src, T edge, T dst) {
     return edge;

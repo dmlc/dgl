@@ -15,6 +15,16 @@ using dgl::runtime::DGLRetValue;
 using dgl::runtime::PackedFunc;
 using dgl::runtime::NDArray;
 
+namespace {
+bool operator == (const DLContext& ctx1, const DLContext& ctx2) {
+  return ctx1.device_type == ctx2.device_type && ctx1.device_id == ctx2.device_id;
+}
+
+std::ostream& operator << (std::ostream& os, const DLContext& ctx) {
+  return os << "" << ctx.device_type << ":" << ctx.device_id << "";
+}
+}  // namespace
+
 namespace dgl {
 namespace kernel {
 namespace {
@@ -197,29 +207,23 @@ void BinaryOpReduce_v2(
     NDArray out_mapping) {
   // sanity check
   const auto& ctx = graph->Context();
-  CHECK_EQ(ctx, lhs_data->ctx) << "Expected device context (type="
-    << ctx.device_type << ", id=" << ctx.device_id << "). But got (type="
-    << lhs_data->ctx.device_type << ", id=" << lhs_data->ctx.device_id << " for lhs_data.";
-  CHECK_EQ(ctx, rhs_data->ctx) << "Expected device context (type="
-    << ctx.device_type << ", id=" << ctx.device_id << "). But got (type="
-    << rhs_data->ctx.device_type << ", id=" << rhs_data->ctx.device_id << " for rhs_data.";
-  CHECK_EQ(ctx, out_data->ctx) << "Expected device context (type="
-    << ctx.device_type << ", id=" << ctx.device_id << "). But got (type="
-    << out_data->ctx.device_type << ", id=" << out_data->ctx.device_id << " for out_data.";
+  CHECK_EQ(ctx, lhs_data->ctx) << "Expected device context " << ctx
+    << ". But got " << lhs_data->ctx << " for lhs_data.";
+  CHECK_EQ(ctx, rhs_data->ctx) << "Expected device context " << ctx
+    << ". But got " << rhs_data->ctx << " for rhs_data.";
+  CHECK_EQ(ctx, out_data->ctx) << "Expected device context " << ctx
+    << ". But got " << out_data->ctx << " for out_data.";
   if (!utils::IsNoneArray(lhs_mapping)) {
-    CHECK_EQ(ctx, lhs_mapping->ctx) << "Expected device context (type="
-      << ctx.device_type << ", id=" << ctx.device_id << "). But got (type="
-      << lhs_mapping->ctx.device_type << ", id=" << lhs_mapping->ctx.device_id << " for lhs_mapping.";
+    CHECK_EQ(ctx, lhs_mapping->ctx) << "Expected device context " << ctx
+      << ". But got " << lhs_mapping->ctx << " for rhs_data.";
   }
   if (!utils::IsNoneArray(rhs_mapping)) {
-    CHECK_EQ(ctx, rhs_mapping->ctx) << "Expected device context (type="
-      << ctx.device_type << ", id=" << ctx.device_id << "). But got (type="
-      << rhs_mapping->ctx.device_type << ", id=" << rhs_mapping->ctx.device_id << " for rhs_mapping.";
+    CHECK_EQ(ctx, rhs_mapping->ctx) << "Expected device context " << ctx
+      << ". But got " << rhs_mapping->ctx << " for rhs_data.";
   }
   if (!utils::IsNoneArray(out_mapping)) {
-    CHECK_EQ(ctx, out_mapping->ctx) << "Expected device context (type="
-      << ctx.device_type << ", id=" << ctx.device_id << "). But got (type="
-      << out_mapping->ctx.device_type << ", id=" << out_mapping->ctx.device_id << " for out_mapping.";
+    CHECK_EQ(ctx, out_mapping->ctx) << "Expected device context " << ctx
+      << ". But got " << out_mapping->ctx << " for rhs_data.";
   }
   // Process mapping
   if (HasBcast(lhs_data, rhs_data)) {

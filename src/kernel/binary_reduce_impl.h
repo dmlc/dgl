@@ -13,7 +13,9 @@
 #include <algorithm>
 #include <string>
 
+#ifdef __CUDACC__
 #include "../runtime/cuda/cuda_common.h"
+#endif
 #include "./binary_reduce.h"
 #include "./binary_reduce_impl_decl.h"
 #include "./utils.h"
@@ -118,12 +120,6 @@ void BinaryReduceImpl_v2(
 #ifdef __CUDACC__
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
 #endif
-  // Graph
-  const auto& adj = graph->GetAdj(false, "csr");
-  const auto& rev_adj = graph->GetAdj(true, "csr");
-  Csr csr = utils::CreateCsr(adj[0], adj[1]);
-  Csr rev_csr = utils::CreateCsr(rev_adj[0], rev_adj[1]);
-
   const int64_t x_len = utils::ComputeXLength(out_data);
 
   // advance config
@@ -149,8 +145,8 @@ void BinaryReduceImpl_v2(
           lhs_data, rhs_data, out_mapping, out_data);
       BINARY_OP_SWITCH(op, DType, BinaryOp, {
         TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-          CallBinaryReduce<XPU, DType, LeftTarget,
-            RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
+          CallBinaryReduce_v2<XPU, DType, LeftTarget,
+            RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
         });
       });
     });
@@ -361,66 +357,6 @@ void BinaryReduceBcastImpl(
 }
 
 template <int XPU>
-void BinaryReduceBcastImpl(
-    const BcastInfo& info,
-    const std::string& reducer,
-    const std::string& op,
-    runtime::NDArray indptr, runtime::NDArray indices,
-    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
-    binary_op::Target lhs,
-    binary_op::Target rhs,
-    runtime::NDArray lhs_mapping,
-    runtime::NDArray rhs_mapping,
-    runtime::NDArray lhs_data,
-    runtime::NDArray rhs_data,
-    runtime::NDArray out_mapping,
-    runtime::NDArray out_data) {
-  using runtime::NDArray;
-  using minigun::Csr;
-#ifdef __CUDACC__
-  auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
-#endif
-  // Graph
-  Csr csr = utils::CreateCsr(indptr, indices);
-  Csr rev_csr = utils::CreateCsr(rev_indptr, rev_indices);
-
-  // advance config
-  minigun::advance::RuntimeConfig rtcfg;
-  rtcfg.ctx = out_data->ctx;
-#ifdef __CUDACC__
-  rtcfg.stream = thr_entry->stream;
-  const int64_t x_len = utils::ComputeXLength(out_data);
-  const int nt = utils::FindNumThreads(x_len, 64);
-  rtcfg.data_num_threads = nt;
-  // XXX(minjie): hard-code to let each thread compute two elements to increase
-  //              instruction level parallelism
-  rtcfg.data_num_blocks = (x_len + (nt * 2) - 1) / (nt * 2);
-#endif
-
-  const DLDataType& dtype = out_data->dtype;
-  const int bcast_ndim = info.out_shape.size();
-  if (reducer == binary_op::kReduceMean) {
-    // TODO(minjie): divide
-    LOG(FATAL) << "reduce mean is not supported.";
-  }
-  DGL_DTYPE_SWITCH(dtype, DType, {
-    REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
-      BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
-        BcastGData<NDim, DType> gdata = AllocBcastGData<XPU, NDim, DType, Reducer>(
-            rtcfg.ctx, info, lhs_mapping, rhs_mapping,
-            lhs_data, rhs_data, out_mapping, out_data);
-        BINARY_OP_SWITCH(op, DType, BinaryOp, {
-          TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-            CallBinaryReduceBcast<XPU, NDim, DType, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
-          });
-        });
-      });
-    });
-  });
-}
-
-template <int XPU>
 void BinaryReduceBcastImpl_v2(
     const BcastInfo& info,
     const std::string& reducer,
@@ -439,12 +375,6 @@ void BinaryReduceBcastImpl_v2(
 #ifdef __CUDACC__
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
 #endif
-  // Graph
-  const auto& adj = graph->GetAdj(false, "csr");
-  const auto& rev_adj = graph->GetAdj(true, "csr");
-  Csr csr = utils::CreateCsr(adj[0], adj[1]);
-  Csr rev_csr = utils::CreateCsr(rev_adj[0], rev_adj[1]);
-
   // advance config
   minigun::advance::RuntimeConfig rtcfg;
   rtcfg.ctx = out_data->ctx;
@@ -472,15 +402,14 @@ void BinaryReduceBcastImpl_v2(
             lhs_data, rhs_data, out_mapping, out_data);
         BINARY_OP_SWITCH(op, DType, BinaryOp, {
           TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-            CallBinaryReduceBcast<XPU, NDim, DType, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
+            CallBinaryReduceBcast_v2<XPU, NDim, DType, LeftTarget,
+              RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
           });
         });
       });
     });
   });
 }
-
 
 /****************************************************
  * BackwardBinaryOpReduceBcast

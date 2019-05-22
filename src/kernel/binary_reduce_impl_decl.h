@@ -39,8 +39,6 @@ struct GData {
   int64_t *lhs_mapping{nullptr}, *rhs_mapping{nullptr};
   // output id mapping
   int64_t *out_mapping{nullptr};
-  // graph edge id mapping
-  int64_t *edge_ids{nullptr}, *rev_edge_ids{nullptr};
 };
 
 template <int XPU, typename DType,
@@ -61,6 +59,14 @@ void BinaryReduceImpl(
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data,
     runtime::NDArray out_mapping, runtime::NDArray out_data);
+
+template <int XPU, typename DType,
+          typename LeftSelector, typename RightSelector,
+          typename BinaryOp, typename Reducer>
+void CallBinaryReduce_v2(
+    const minigun::advance::RuntimeConfig& rtcfg,
+    const ImmutableGraph* graph,
+    GData<DType>* gdata);
 
 template <int XPU>
 void BinaryReduceImpl_v2(
@@ -131,8 +137,6 @@ struct BcastGData {
   DType *out_data{nullptr};
   // output id mapping
   int64_t *out_mapping{nullptr};
-  // graph edge id mapping
-  int64_t *edge_ids{nullptr}, *rev_edge_ids{nullptr};
 };
 
 template <int XPU, int NDim, typename DType,
@@ -159,6 +163,14 @@ void BinaryReduceBcastImpl(
     runtime::NDArray out_mapping,
     runtime::NDArray out_data);
 
+template <int XPU, int NDim, typename DType,
+          typename LeftSelector, typename RightSelector,
+          typename BinaryOp, typename Reducer>
+void CallBinaryReduceBcast_v2(
+    const minigun::advance::RuntimeConfig& rtcfg,
+    const ImmutableGraph* graph,
+    BcastGData<NDim, DType>* gdata);
+
 template <int XPU>
 void BinaryReduceBcastImpl_v2(
     const BcastInfo& info,
@@ -166,8 +178,10 @@ void BinaryReduceBcastImpl_v2(
     const std::string& op,
     const ImmutableGraph* graph,
     binary_op::Target lhs, binary_op::Target rhs,
-    runtime::NDArray lhs_data, runtime::NDArray rhs_data, runtime::NDArray out_data,
-    runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping);
+    runtime::NDArray lhs_data, runtime::NDArray rhs_data,
+    runtime::NDArray out_data,
+    runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
+    runtime::NDArray out_mapping);
 
 /*
  * !\brief Data and auxiliary information for backward binary broadcasting op.
