@@ -16,11 +16,11 @@ def main(args):
     g = dgl.contrib.graph_store.create_graph_from_store(args.graph_name, "shared_mem")
     # We need to set random seed here. Otherwise, all processes have the same mini-batches.
     mx.random.seed(g.worker_id)
-    features = g.ndata['features']
-    labels = g.ndata['labels']
-    train_mask = g.ndata['train_mask']
-    val_mask = g.ndata['val_mask']
-    test_mask = g.ndata['test_mask']
+    features = g.nodes[:].data['features']
+    labels = g.nodes[:].data['labels']
+    train_mask = g.nodes[:].data['train_mask']
+    val_mask = g.nodes[:].data['val_mask']
+    test_mask = g.nodes[:].data['test_mask']
 
     if args.num_gpus > 0:
         ctx = mx.gpu(g.worker_id % args.num_gpus)
