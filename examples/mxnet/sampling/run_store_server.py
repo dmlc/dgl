@@ -8,13 +8,14 @@ from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
 
 class GraphData:
-    def __init__(self, csr, num_feats):
+    def __init__(self, csr, num_feats, graph_name):
         num_nodes = csr.shape[0]
         num_edges = mx.nd.contrib.getnnz(csr).asnumpy()[0]
         edge_ids = np.arange(0, num_edges, step=1, dtype=np.int64)
         self.graph = dgl.graph_index.GraphIndex(multigraph=False, readonly=True)
         self.graph.from_csr_matrix(dgl.utils.toindex(csr.indptr),
-                                   dgl.utils.toindex(csr.indices), "in")
+                                   dgl.utils.toindex(csr.indices), "in",
+                                   dgl.contrib.graph_store._get_graph_path(graph_name))
         self.features = mx.nd.random.normal(shape=(csr.shape[0], num_feats))
         self.num_labels = 10
         self.labels = mx.nd.floor(mx.nd.random.uniform(low=0, high=self.num_labels,
@@ -31,9 +32,9 @@ def main(args):
     if args.graph_file != '':
         csr = mx.nd.load(args.graph_file)[0]
         n_edges = csr.shape[0]
-        data = GraphData(csr, args.num_feats)
-        csr = None
         graph_name = os.path.basename(args.graph_file)
+        data = GraphData(csr, args.num_feats, graph_name)
+        csr = None
     else:
         data = load_data(args)
         n_edges = data.graph.number_of_edges()
