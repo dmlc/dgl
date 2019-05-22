@@ -97,6 +97,11 @@ class GraphInterface {
   virtual void Clear() = 0;
 
   /*!
+   * \brief Get the device context of this graph.
+   */
+  virtual DLContext Context() const = 0;
+
+  /*!
    * \note not const since we have caches
    * \return whether the graph is a multigraph
    */

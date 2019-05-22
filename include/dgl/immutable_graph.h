@@ -59,6 +59,10 @@ class CSR : public GraphInterface {
   void Clear() override {
     LOG(FATAL) << "CSR graph does not allow mutation.";
   }
+  
+  DLContext Context() const override {
+    return indptr_->ctx;
+  }
 
   bool IsMultigraph() const override;
 
@@ -256,6 +260,10 @@ class COO : public GraphInterface {
 
   void Clear() override {
     LOG(FATAL) << "CSR graph does not allow mutation.";
+  }
+
+  DLContext Context() const override {
+    return src_->ctx;
   }
 
   bool IsMultigraph() const override;
@@ -518,6 +526,10 @@ class ImmutableGraph: public GraphInterface {
 
   void Clear() override {
     LOG(FATAL) << "Clear isn't supported in ImmutableGraph";
+  }
+
+  DLContext Context() const override {
+    return AnyGraph()->Context();
   }
 
   /*!

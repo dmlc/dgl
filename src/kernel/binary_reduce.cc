@@ -186,6 +186,89 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelInferBinaryFeatureShape")
     *rv = ret;
   });
 
+void BinaryOpReduce_v2(
+    const std::string& reducer,
+    const std::string& op,
+    const ImmutableGraph* graph,
+    binary_op::Target lhs, binary_op::Target rhs,
+    NDArray lhs_data, NDArray rhs_data,
+    NDArray out_data,
+    NDArray lhs_mapping, NDArray rhs_mapping,
+    NDArray out_mapping) {
+  // sanity check
+  const auto& ctx = graph->Context();
+  CHECK_EQ(ctx, lhs_data->ctx) << "Expected device context (type="
+    << ctx.device_type << ", id=" << ctx.device_id << "). But got (type="
+    << lhs_data->ctx.device_type << ", id=" << lhs_data->ctx.device_id << " for lhs_data.";
+  CHECK_EQ(ctx, rhs_data->ctx) << "Expected device context (type="
+    << ctx.device_type << ", id=" << ctx.device_id << "). But got (type="
+    << rhs_data->ctx.device_type << ", id=" << rhs_data->ctx.device_id << " for rhs_data.";
+  CHECK_EQ(ctx, out_data->ctx) << "Expected device context (type="
+    << ctx.device_type << ", id=" << ctx.device_id << "). But got (type="
+    << out_data->ctx.device_type << ", id=" << out_data->ctx.device_id << " for out_data.";
+  if (!utils::IsNoneArray(lhs_mapping)) {
+    CHECK_EQ(ctx, lhs_mapping->ctx) << "Expected device context (type="
+      << ctx.device_type << ", id=" << ctx.device_id << "). But got (type="
+      << lhs_mapping->ctx.device_type << ", id=" << lhs_mapping->ctx.device_id << " for lhs_mapping.";
+  }
+  if (!utils::IsNoneArray(rhs_mapping)) {
+    CHECK_EQ(ctx, rhs_mapping->ctx) << "Expected device context (type="
+      << ctx.device_type << ", id=" << ctx.device_id << "). But got (type="
+      << rhs_mapping->ctx.device_type << ", id=" << rhs_mapping->ctx.device_id << " for rhs_mapping.";
+  }
+  if (!utils::IsNoneArray(out_mapping)) {
+    CHECK_EQ(ctx, out_mapping->ctx) << "Expected device context (type="
+      << ctx.device_type << ", id=" << ctx.device_id << "). But got (type="
+      << out_mapping->ctx.device_type << ", id=" << out_mapping->ctx.device_id << " for out_mapping.";
+  }
+  // Process mapping
+  if (HasBcast(lhs_data, rhs_data)) {
+    BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
+    const DLContext& ctx = lhs_data->ctx;
+    DGL_XPU_SWITCH(ctx.device_type, BinaryReduceBcastImpl_v2,
+        info, reducer, op, graph,
+        lhs, rhs,
+        lhs_data, rhs_data, out_data,
+        lhs_mapping, rhs_mapping, out_mapping);
+  } else {
+    if (op != binary_op::kUseLhs) {
+      CHECK(IsValidBinaryOpShape(lhs_data, rhs_data))
+        << "Cannot compute binary operation between feature shapes "
+        << ShapeString(lhs_data) << " and " << ShapeString(rhs_data);
+    }
+    const DLContext& ctx = lhs_data->ctx;
+    DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl_v2,
+        reducer, op, graph,
+        lhs, rhs,
+        lhs_data, rhs_data, out_data,
+        lhs_mapping, rhs_mapping, out_mapping);
+  }
+}
+
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBinaryOpReduce_v2")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::string reducer = args[0];
+    std::string op = args[1];
+    GraphHandle ghdl = args[2];
+    int lhs = args[3];
+    int rhs = args[4];
+    NDArray lhs_data = args[5];
+    NDArray rhs_data = args[6];
+    NDArray out_data = args[7];
+    NDArray lhs_mapping = args[8];
+    NDArray rhs_mapping = args[9];
+    NDArray out_mapping = args[10];
+
+    GraphInterface* gptr = static_cast<GraphInterface*>(ghdl);
+    const ImmutableGraph* igptr = dynamic_cast<ImmutableGraph*>(gptr);
+    CHECK(igptr) << "Invalid graph object argument. Must be an immutable graph.";
+    BinaryOpReduce_v2(reducer, op, igptr,
+        static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
+        lhs_data, rhs_data, out_data,
+        lhs_mapping, rhs_mapping, out_mapping);
+  });
+
+/*
 void SrcOpEdgeReduce(
     const std::string& reducer,
     const std::string& binary_op,
@@ -563,6 +646,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopyEdgeReduce")
       edge_data, utils::NoneArray(), out_data, grad_out_data,
       grad_edge_data, utils::NoneArray());
   });
+*/
 
 }  // namespace kernel
 }  // namespace dgl

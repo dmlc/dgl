@@ -7,6 +7,7 @@
 #define DGL_KERNEL_BINARY_REDUCE_H_
 
 #include <dgl/runtime/ndarray.h>
+#include <dgl/immutable_graph.h>
 
 #include <vector>
 #include <string>
@@ -118,6 +119,16 @@ void SrcOpDstReduce(
     runtime::NDArray dst_data,
     runtime::NDArray out_mapping,
     runtime::NDArray out_data);
+
+void BinaryOpReduce_v2(
+    const std::string& reducer,
+    const std::string& op,
+    const ImmutableGraph* graph,
+    binary_op::Target lhs, binary_op::Target rhs,
+    runtime::NDArray lhs_data, runtime::NDArray rhs_data,
+    runtime::NDArray out_data,
+    runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
+    runtime::NDArray out_mapping);
 
 /*
  * !\brief Copy src node data and perform reduce
