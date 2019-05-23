@@ -233,6 +233,7 @@ def main(args):
                                                        num_neighbors,
                                                        neighbor_type='in',
                                                        shuffle=True,
+                                                       num_workers=32,
                                                        num_hops=n_layers,
                                                        seed_nodes=train_nid):
             for i in range(n_layers):
@@ -272,6 +273,7 @@ def main(args):
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
                                                        g.number_of_nodes(),
                                                        neighbor_type='in',
+                                                       num_workers=32,
                                                        num_hops=n_layers,
                                                        seed_nodes=test_nid):
             node_embed_names = [['preprocess']]
