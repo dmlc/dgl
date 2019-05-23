@@ -1,3 +1,4 @@
+sys.path.append('../')
 import argparse, time, math
 import numpy as np
 import mxnet as mx
@@ -6,7 +7,7 @@ import dgl
 import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
-from ..gcn_cv_sc import NodeUpdate, GCNSampling, GCNInfer
+from gcn_cv_sc import NodeUpdate, GCNSampling, GCNInfer
 
 
 def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples, distributed):

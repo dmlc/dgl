@@ -1,3 +1,4 @@
+sys.path.append('../')
 import argparse, time, math
 import numpy as np
 import mxnet as mx
@@ -7,8 +8,8 @@ import dgl
 import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
-from ..graphsage_cv import GraphSAGELayer, NodeUpdate, 
-from ..graphsage_cv import GraphSAGETrain, GraphSAGEInfer
+from graphsage_cv import GraphSAGELayer, NodeUpdate, 
+from graphsage_cv import GraphSAGETrain, GraphSAGEInfer
 
 def graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples, distributed):
     n0_feats = g.nodes[0].data['features']
