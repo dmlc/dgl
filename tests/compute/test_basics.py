@@ -5,10 +5,12 @@
 import backend as F
 import numpy as np
 from scipy import sparse as spsp
+import sys
 import dgl
 import networkx as nx
 from dgl import DGLGraph
 from collections import defaultdict as ddict
+import dgl.function as fn
 
 D = 5
 reduce_msg_shapes = set()
@@ -662,14 +664,16 @@ def test_group_apply_edges():
 
 def test_send_and_recv():
     np.random.seed(0)
-    csr = (spsp.random(20, 20, density=0.1, format='csr') != 0).astype(np.int64)
+    csr = (spsp.random(20, 20, density=0.1, format='csr') != 0).astype(F.int64)
+    csr = csr.transpose()
     g = DGLGraph(csr, readonly=True)
-    print(g.adjacency_matrix().asscipy())
+    print(g.adjacency_matrix().asscipy(), file=sys.stderr)
     num_nodes = g.number_of_nodes()
-    g.ndata['feat'] = mx.nd.arange(num_nodes * 10).reshape((num_nodes, 10))
+    g.ndata['feat'] = F.astype(F.arange(0, num_nodes * 10), F.float32).reshape((num_nodes, 10))
     in_edges = g.in_edges(v=2)
-    g.send_and_recv(in_edges, fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='tmp'))
-    print(g.ndata['tmp'])
+    print(in_edges, file=sys.stderr)
+    g.send_and_recv(in_edges, fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='tmp'), inplace=True)
+    print(g.ndata['tmp'], file=sys.stderr)
 
 
 if __name__ == '__main__':
