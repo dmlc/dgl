@@ -509,6 +509,256 @@ class BaseGraphStore(DGLGraph):
         """
         raise Exception("Graph store doesn't support reversing a matrix.")
 
+    def set_n_repr(self, data, u=ALL, inplace=True):
+        """Set node(s) representation.
+
+        `data` is a dictionary from the feature name to feature tensor. Each tensor
+        is of shape (B, D1, D2, ...), where B is the number of nodes to be updated,
+        and (D1, D2, ...) be the shape of the node representation tensor. The
+        length of the given node ids must match B (i.e, len(u) == B).
+
+        In the graph store, all updates are written inplace.
+
+        Parameters
+        ----------
+        data : dict of tensor
+            Node representation.
+        u : node, container or tensor
+            The node(s).
+        inplace : bool
+            The value is always True.
+        """
+        super(BaseGraphStore, self).set_n_repr(data, u, inplace=True)
+
+    def set_e_repr(self, data, edges=ALL, inplace=True):
+        """Set edge(s) representation.
+
+        `data` is a dictionary from the feature name to feature tensor. Each tensor
+        is of shape (B, D1, D2, ...), where B is the number of edges to be updated,
+        and (D1, D2, ...) be the shape of the edge representation tensor.
+
+        In the graph store, all updates are written inplace.
+
+        Parameters
+        ----------
+        data : tensor or dict of tensor
+            Edge representation.
+        edges : edges
+            Edges can be a pair of endpoint nodes (u, v), or a
+            tensor of edge ids. The default value is all the edges.
+        inplace : bool
+            The value is always True.
+        """
+        super(BaseGraphStore, self).set_e_repr(data, edges, inplace=True)
+
+    def apply_nodes(self, func="default", v=ALL, inplace=True):
+        """Apply the function on the nodes to update their features.
+
+        If None is provided for ``func``, nothing will happen.
+
+        In the graph store, all updates are written inplace.
+
+        Parameters
+        ----------
+        func : callable or None, optional
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        v : int, iterable of int, tensor, optional
+            The node (ids) on which to apply ``func``. The default
+            value is all the nodes.
+        inplace : bool, optional
+            The value is always True.
+        """
+        super(BaseGraphStore, self).apply_nodes(func, v, inplace=True)
+
+    def apply_edges(self, func="default", edges=ALL, inplace=True):
+        """Apply the function on the edges to update their features.
+
+        If None is provided for ``func``, nothing will happen.
+
+        In the graph store, all updates are written inplace.
+
+        Parameters
+        ----------
+        func : callable, optional
+            Apply function on the edge. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
+        edges : valid edges type, optional
+            Edges on which to apply ``func``. See :func:`send` for valid
+            edges type. Default is all the edges.
+        inplace: bool, optional
+            The value is always True.
+        """
+        super(BaseGraphStore, self).apply_edges(func, edges, inplace=True)
+
+    def group_apply_edges(self, group_by, func, edges=ALL, inplace=True):
+        """Group the edges by nodes and apply the function on the grouped edges to
+         update their features.
+
+        In the graph store, all updates are written inplace.
+
+        Parameters
+        ----------
+        group_by : str
+            Specify how to group edges. Expected to be either 'src' or 'dst'
+        func : callable
+            Apply function on the edge. The function should be
+            an :mod:`Edge UDF <dgl.udf>`. The input of `Edge UDF` should
+            be (bucket_size, degrees, *feature_shape), and
+            return the dict with values of the same shapes.
+        edges : valid edges type, optional
+            Edges on which to group and apply ``func``. See :func:`send` for valid
+            edges type. Default is all the edges.
+        inplace: bool, optional
+            The value is always True.
+        """
+        super(BaseGraphStore, self).apply_edges(func, edges, inplace=True)
+
+    def recv(self,
+             v=ALL,
+             reduce_func="default",
+             apply_node_func="default",
+             inplace=True):
+        """Receive and reduce incoming messages and update the features of node(s) :math:`v`.
+
+        Optionally, apply a function to update the node features after receive.
+
+        In the graph store, all updates are written inplace.
+
+        * `reduce_func` will be skipped for nodes with no incoming message.
+        * If all ``v`` have no incoming message, this will downgrade to an :func:`apply_nodes`.
+        * If some ``v`` have no incoming message, their new feature value will be calculated
+          by the column initializer (see :func:`set_n_initializer`). The feature shapes and
+          dtypes will be inferred.
+
+        The node features will be updated by the result of the ``reduce_func``.
+
+        Messages are consumed once received.
+
+        The provided UDF maybe called multiple times so it is recommended to provide
+        function with no side effect.
+
+        Parameters
+        ----------
+        v : node, container or tensor, optional
+            The node to be updated. Default is receiving all the nodes.
+        reduce_func : callable, optional
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        apply_node_func : callable
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        inplace: bool, optional
+            The value is always True.
+        """
+        super(BaseGraphStore, self).recv(v, reduce_func, apply_node_func, inplace=True)
+
+    def send_and_recv(self,
+                      edges,
+                      message_func="default",
+                      reduce_func="default",
+                      apply_node_func="default",
+                      inplace=False):
+        """Send messages along edges and let destinations receive them.
+
+        Optionally, apply a function to update the node features after receive.
+
+        In the graph store, all updates are written inplace.
+
+        This is a convenient combination for performing
+        ``send(self, self.edges, message_func)`` and
+        ``recv(self, dst, reduce_func, apply_node_func)``, where ``dst``
+        are the destinations of the ``edges``.
+
+        Parameters
+        ----------
+        edges : valid edges type
+            Edges on which to apply ``func``. See :func:`send` for valid
+            edges type.
+        message_func : callable, optional
+            Message function on the edges. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
+        reduce_func : callable, optional
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        apply_node_func : callable, optional
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        inplace: bool, optional
+            The value is always True.
+        """
+        super(BaseGraphStore, self).send_and_recv(edges, message_func, reduce_func,
+                                                  apply_node_func, inplace=True)
+
+    def pull(self,
+             v,
+             message_func="default",
+             reduce_func="default",
+             apply_node_func="default",
+             inplace=False):
+        """Pull messages from the node(s)' predecessors and then update their features.
+
+        Optionally, apply a function to update the node features after receive.
+
+        In the graph store, all updates are written inplace.
+
+        * `reduce_func` will be skipped for nodes with no incoming message.
+        * If all ``v`` have no incoming message, this will downgrade to an :func:`apply_nodes`.
+        * If some ``v`` have no incoming message, their new feature value will be calculated
+          by the column initializer (see :func:`set_n_initializer`). The feature shapes and
+          dtypes will be inferred.
+
+        Parameters
+        ----------
+        v : int, iterable of int, or tensor
+            The node(s) to be updated.
+        message_func : callable, optional
+            Message function on the edges. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
+        reduce_func : callable, optional
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        apply_node_func : callable, optional
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        inplace: bool, optional
+            The value is always True.
+        """
+        super(BaseGraphStore, self).pull(v, message_func, reduce_func,
+                                         apply_node_func, inplace=True)
+
+    def push(self,
+             u,
+             message_func="default",
+             reduce_func="default",
+             apply_node_func="default",
+             inplace=False):
+        """Send message from the node(s) to their successors and update them.
+
+        Optionally, apply a function to update the node features after receive.
+
+        In the graph store, all updates are written inplace.
+
+        Parameters
+        ----------
+        u : int, iterable of int, or tensor
+            The node(s) to push messages out.
+        message_func : callable, optional
+            Message function on the edges. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
+        reduce_func : callable, optional
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        apply_node_func : callable, optional
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+        inplace: bool, optional
+            The value is always True.
+        """
+        super(BaseGraphStore, self).pull(u, message_func, reduce_func,
+                                         apply_node_func, inplace=True)
+
+
 class SharedMemoryDGLGraph(BaseGraphStore):
     """Shared-memory DGLGraph.
 
