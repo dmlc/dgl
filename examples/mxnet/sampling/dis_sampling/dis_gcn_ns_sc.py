@@ -1,3 +1,4 @@
+import os, sys
 import argparse, time, math
 import numpy as np
 import mxnet as mx
@@ -7,7 +8,9 @@ import dgl
 import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
-from ..gcn_ns_sc import NodeUpdate, GCNSampling, GCNInfer
+parentdir=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, parentdir)
+from gcn_ns_sc import NodeUpdate, GCNSampling, GCNInfer
 
 
 def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
