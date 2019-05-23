@@ -14,6 +14,20 @@ class MySamplerPool(SamplerPool):
     def worker(self, args):
         """User-defined worker function
         """
+        is_shuffle = True
+        self_loop = False;
+        number_hops = 1
+
+        if args.model == "gcn_ns":
+            num_hops = args.n_layers + 1
+        elif args.model == "gcn_cv":
+            num_hops = args.n_layers
+        elif args.model == "graphsage_cv":
+            num_hops = args.n_layers
+            self_loop = True
+        else:
+            print("unknown model. Please choose from gcn_ns, gcn_cv, graphsage_cv")
+
         # Start sender
         namebook = { 0:args.ip }
         sender = dgl.contrib.sampling.SamplerSender(namebook)
@@ -37,9 +51,10 @@ class MySamplerPool(SamplerPool):
             for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
                                                            args.num_neighbors,
                                                            neighbor_type='in',
-                                                           shuffle=True,
+                                                           shuffle=is_shuffle,
                                                            num_workers=32,
-                                                           num_hops=args.n_layers+1,
+                                                           num_hops=number_hops,
+                                                           add_self_loop=self_loop,
                                                            seed_nodes=train_nid):
                 print("send train nodeflow: %d" %(idx))
                 sender.send(nf, 0)
