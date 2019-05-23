@@ -49,7 +49,7 @@ def check_init_func(worker_id, graph_name):
     assert np.all(data[0].asnumpy() == g.nodes[0].data['test4'].asnumpy())
 
     data = g.edges[:].data['test4']
-    g.set_e_repr({'test4': mx.nd.ones((1, 10)) * 20}, u=[0])
+    g.set_e_repr({'test4': mx.nd.ones((1, 10)) * 20}, edges=[0])
     assert np.all(data[0].asnumpy() == g.edges[0].data['test4'].asnumpy())
 
     g.destroy()
