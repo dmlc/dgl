@@ -509,6 +509,216 @@ class BaseGraphStore(DGLGraph):
         """
         raise Exception("Graph store doesn't support reversing a matrix.")
 
+
+class SharedMemoryDGLGraph(BaseGraphStore):
+    """Shared-memory DGLGraph.
+
+    This is a client to access data in the shared-memory graph store that has loads
+    the graph structure and node embeddings and edge embeddings to shared memory.
+    It provides the DGLGraph interface.
+
+    Parameters
+    ----------
+    graph_name : string
+        Define the name of the graph.
+    port : int
+        The port that the server listens to.
+    """
+    def __init__(self, graph_name, port):
+        self._graph_name = graph_name
+        self._pid = os.getpid()
+        self.proxy = xmlrpc.client.ServerProxy("http://localhost:" + str(port) + "/")
+        self._worker_id, self._num_workers = self.proxy.register(graph_name)
+        if self._worker_id < 0:
+            raise Exception('fail to get graph ' + graph_name + ' from the graph store')
+        num_nodes, num_edges, multigraph, edge_dir = self.proxy.get_graph_info(graph_name)
+
+        graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
+        graph_idx.from_shared_mem_csr_matrix(_get_graph_path(graph_name), num_nodes, num_edges, edge_dir)
+        super(SharedMemoryDGLGraph, self).__init__(graph_idx, multigraph=multigraph)
+        self._init_manager = InitializerManager()
+
+        # map all ndata and edata from the server.
+        ndata_infos = self.proxy.list_ndata()
+        for name, shape, dtype in ndata_infos:
+            self._init_ndata(name, shape, dtype)
+
+        edata_infos = self.proxy.list_edata()
+        for name, shape, dtype in edata_infos:
+            self._init_edata(name, shape, dtype)
+
+        # Set the ndata and edata initializers.
+        # so that when a new node/edge embedding is created, it'll be created on the server as well.
+
+        # These two functions create initialized tensors on the server.
+        def node_initializer(init, name, shape, dtype, ctx):
+            init = self._init_manager.serialize(init)
+            dtype = np.dtype(dtype).name
+            self.proxy.init_ndata(init, name, shape, dtype)
+            data = empty_shared_mem(_get_ndata_path(self._graph_name, name),
+                                    False, shape, dtype)
+            dlpack = data.to_dlpack()
+            return F.zerocopy_from_dlpack(dlpack)
+        def edge_initializer(init, name, shape, dtype, ctx):
+            init = self._init_manager.serialize(init)
+            dtype = np.dtype(dtype).name
+            self.proxy.init_edata(init, name, shape, dtype)
+            data = empty_shared_mem(_get_edata_path(self._graph_name, name),
+                                    False, shape, dtype)
+            dlpack = data.to_dlpack()
+            return F.zerocopy_from_dlpack(dlpack)
+
+        self._node_frame.set_remote_init_builder(lambda init, name: partial(node_initializer, init, name))
+        self._edge_frame.set_remote_init_builder(lambda init, name: partial(edge_initializer, init, name))
+        self._msg_frame.set_remote_init_builder(lambda init, name: partial(edge_initializer, init, name))
+
+    def __del__(self):
+        if self.proxy is not None:
+            self.proxy.terminate()
+
+    def _init_ndata(self, ndata_name, shape, dtype):
+        assert self.number_of_nodes() == shape[0]
+        data = empty_shared_mem(_get_ndata_path(self._graph_name, ndata_name), False, shape, dtype)
+        dlpack = data.to_dlpack()
+        self.set_n_repr({ndata_name: F.zerocopy_from_dlpack(dlpack)})
+
+    def _init_edata(self, edata_name, shape, dtype):
+        assert self.number_of_edges() == shape[0]
+        data = empty_shared_mem(_get_edata_path(self._graph_name, edata_name), False, shape, dtype)
+        dlpack = data.to_dlpack()
+        self.set_e_repr({edata_name: F.zerocopy_from_dlpack(dlpack)})
+
+    @property
+    def num_workers(self):
+        """ The number of workers using the graph store.
+        """
+        return self._num_workers
+
+    @property
+    def worker_id(self):
+        """ The id of the current worker using the graph store.
+
+        When a worker connects to a graph store, it is assigned with a worker id.
+        This is useful for the graph store server to identify who is sending
+        requests.
+
+        The worker id is a unique number between 0 and num_workers.
+        This is also useful for user's code. For example, user's code can
+        use this number to decide how to assign GPUs to workers in multi-processing
+        training.
+        """
+        return self._worker_id
+
+    def _sync_barrier(self):
+        # Here I manually implement multi-processing barrier with RPC.
+        # It uses busy wait with RPC. Whenever, all_enter is called, there is
+        # a context switch, so it doesn't burn CPUs so badly.
+        bid = self.proxy.enter_barrier(self._worker_id)
+        while not self.proxy.all_enter(self._worker_id, bid):
+            continue
+        self.proxy.leave_barrier(self._worker_id, bid)
+
+    def init_ndata(self, ndata_name, shape, dtype, ctx=F.cpu()):
+        """Create node embedding.
+
+        It first creates the node embedding in the server and maps it to the current process
+        with shared memory.
+
+        Parameters
+        ----------
+        ndata_name : string
+            The name of node embedding
+        shape : tuple
+            The shape of the node embedding
+        dtype : string
+            The data type of the node embedding. The currently supported data types
+            are "float32" and "int32".
+        ctx : DGLContext
+            The column context.
+        """
+        if ctx != F.cpu():
+            raise Exception("graph store only supports CPU context for node data")
+        init = self._node_frame.get_initializer(ndata_name)
+        if init is None:
+            self._node_frame._frame._warn_and_set_initializer()
+        init = self._node_frame.get_initializer(ndata_name)
+        init = self._init_manager.serialize(init)
+        self.proxy.init_ndata(init, ndata_name, shape, dtype)
+        self._init_ndata(ndata_name, shape, dtype)
+
+    def init_edata(self, edata_name, shape, dtype, ctx=F.cpu()):
+        """Create edge embedding.
+
+        It first creates the edge embedding in the server and maps it to the current process
+        with shared memory.
+
+        Parameters
+        ----------
+        edata_name : string
+            The name of edge embedding
+        shape : tuple
+            The shape of the edge embedding
+        dtype : string
+            The data type of the edge embedding. The currently supported data types
+            are "float32" and "int32".
+        ctx : DGLContext
+            The column context.
+        """
+        if ctx != F.cpu():
+            raise Exception("graph store only supports CPU context for edge data")
+        init = self._edge_frame.get_initializer(edata_name)
+        if init is None:
+            self._edge_frame._frame._warn_and_set_initializer()
+        init = self._edge_frame.get_initializer(edata_name)
+        init = self._init_manager.serialize(init)
+        self.proxy.init_edata(init, edata_name, shape, dtype)
+        self._init_edata(edata_name, shape, dtype)
+
+    def get_n_repr(self, u=ALL):
+        """Get node(s) representation.
+
+        The returned feature tensor batches multiple node features on the first dimension.
+
+        Parameters
+        ----------
+        u : node, container or tensor
+            The node(s).
+
+        Returns
+        -------
+        dict
+            Representation dict from feature name to feature tensor.
+        """
+        if len(self.node_attr_schemes()) == 0:
+            return dict()
+        if is_all(u):
+            dgl_warning("It may not be safe to access node data of all nodes."
+                        "It's recommended to node data of a subset of nodes directly.")
+            return dict(self._node_frame)
+        else:
+            u = utils.toindex(u)
+            return self._node_frame.select_rows(u)
+
+    def get_e_repr(self, edges=ALL):
+        """Get edge(s) representation.
+
+        Parameters
+        ----------
+        edges : edges
+            Edges can be a pair of endpoint nodes (u, v), or a
+            tensor of edge ids. The default value is all the edges.
+
+        Returns
+        -------
+        dict
+            Representation dict
+        """
+        if is_all(edges):
+            dgl_warning("It may not be safe to access edge data of all edges."
+                        "It's recommended to edge data of a subset of edges directly.")
+        return super(SharedMemoryDGLGraph, self).get_e_repr(edges)
+
+
     def set_n_repr(self, data, u=ALL, inplace=True):
         """Set node(s) representation.
 
@@ -758,214 +968,6 @@ class BaseGraphStore(DGLGraph):
         super(BaseGraphStore, self).pull(u, message_func, reduce_func,
                                          apply_node_func, inplace=True)
 
-
-class SharedMemoryDGLGraph(BaseGraphStore):
-    """Shared-memory DGLGraph.
-
-    This is a client to access data in the shared-memory graph store that has loads
-    the graph structure and node embeddings and edge embeddings to shared memory.
-    It provides the DGLGraph interface.
-
-    Parameters
-    ----------
-    graph_name : string
-        Define the name of the graph.
-    port : int
-        The port that the server listens to.
-    """
-    def __init__(self, graph_name, port):
-        self._graph_name = graph_name
-        self._pid = os.getpid()
-        self.proxy = xmlrpc.client.ServerProxy("http://localhost:" + str(port) + "/")
-        self._worker_id, self._num_workers = self.proxy.register(graph_name)
-        if self._worker_id < 0:
-            raise Exception('fail to get graph ' + graph_name + ' from the graph store')
-        num_nodes, num_edges, multigraph, edge_dir = self.proxy.get_graph_info(graph_name)
-
-        graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
-        graph_idx.from_shared_mem_csr_matrix(_get_graph_path(graph_name), num_nodes, num_edges, edge_dir)
-        super(SharedMemoryDGLGraph, self).__init__(graph_idx, multigraph=multigraph)
-        self._init_manager = InitializerManager()
-
-        # map all ndata and edata from the server.
-        ndata_infos = self.proxy.list_ndata()
-        for name, shape, dtype in ndata_infos:
-            self._init_ndata(name, shape, dtype)
-
-        edata_infos = self.proxy.list_edata()
-        for name, shape, dtype in edata_infos:
-            self._init_edata(name, shape, dtype)
-
-        # Set the ndata and edata initializers.
-        # so that when a new node/edge embedding is created, it'll be created on the server as well.
-
-        # These two functions create initialized tensors on the server.
-        def node_initializer(init, name, shape, dtype, ctx):
-            init = self._init_manager.serialize(init)
-            dtype = np.dtype(dtype).name
-            self.proxy.init_ndata(init, name, shape, dtype)
-            data = empty_shared_mem(_get_ndata_path(self._graph_name, name),
-                                    False, shape, dtype)
-            dlpack = data.to_dlpack()
-            return F.zerocopy_from_dlpack(dlpack)
-        def edge_initializer(init, name, shape, dtype, ctx):
-            init = self._init_manager.serialize(init)
-            dtype = np.dtype(dtype).name
-            self.proxy.init_edata(init, name, shape, dtype)
-            data = empty_shared_mem(_get_edata_path(self._graph_name, name),
-                                    False, shape, dtype)
-            dlpack = data.to_dlpack()
-            return F.zerocopy_from_dlpack(dlpack)
-
-        self._node_frame.set_remote_init_builder(lambda init, name: partial(node_initializer, init, name))
-        self._edge_frame.set_remote_init_builder(lambda init, name: partial(edge_initializer, init, name))
-        self._msg_frame.set_remote_init_builder(lambda init, name: partial(edge_initializer, init, name))
-
-    def __del__(self):
-        if self.proxy is not None:
-            self.proxy.terminate()
-
-    def _init_ndata(self, ndata_name, shape, dtype):
-        assert self.number_of_nodes() == shape[0]
-        data = empty_shared_mem(_get_ndata_path(self._graph_name, ndata_name), False, shape, dtype)
-        dlpack = data.to_dlpack()
-        self.set_n_repr({ndata_name: F.zerocopy_from_dlpack(dlpack)})
-
-    def _init_edata(self, edata_name, shape, dtype):
-        assert self.number_of_edges() == shape[0]
-        data = empty_shared_mem(_get_edata_path(self._graph_name, edata_name), False, shape, dtype)
-        dlpack = data.to_dlpack()
-        self.set_e_repr({edata_name: F.zerocopy_from_dlpack(dlpack)})
-
-    @property
-    def num_workers(self):
-        """ The number of workers using the graph store.
-        """
-        return self._num_workers
-
-    @property
-    def worker_id(self):
-        """ The id of the current worker using the graph store.
-
-        When a worker connects to a graph store, it is assigned with a worker id.
-        This is useful for the graph store server to identify who is sending
-        requests.
-
-        The worker id is a unique number between 0 and num_workers.
-        This is also useful for user's code. For example, user's code can
-        use this number to decide how to assign GPUs to workers in multi-processing
-        training.
-        """
-        return self._worker_id
-
-    def _sync_barrier(self):
-        # Here I manually implement multi-processing barrier with RPC.
-        # It uses busy wait with RPC. Whenever, all_enter is called, there is
-        # a context switch, so it doesn't burn CPUs so badly.
-        bid = self.proxy.enter_barrier(self._worker_id)
-        while not self.proxy.all_enter(self._worker_id, bid):
-            continue
-        self.proxy.leave_barrier(self._worker_id, bid)
-
-    def init_ndata(self, ndata_name, shape, dtype, ctx=F.cpu()):
-        """Create node embedding.
-
-        It first creates the node embedding in the server and maps it to the current process
-        with shared memory.
-
-        Parameters
-        ----------
-        ndata_name : string
-            The name of node embedding
-        shape : tuple
-            The shape of the node embedding
-        dtype : string
-            The data type of the node embedding. The currently supported data types
-            are "float32" and "int32".
-        ctx : DGLContext
-            The column context.
-        """
-        if ctx != F.cpu():
-            raise Exception("graph store only supports CPU context for node data")
-        init = self._node_frame.get_initializer(ndata_name)
-        if init is None:
-            self._node_frame._frame._warn_and_set_initializer()
-        init = self._node_frame.get_initializer(ndata_name)
-        init = self._init_manager.serialize(init)
-        self.proxy.init_ndata(init, ndata_name, shape, dtype)
-        self._init_ndata(ndata_name, shape, dtype)
-
-    def init_edata(self, edata_name, shape, dtype, ctx=F.cpu()):
-        """Create edge embedding.
-
-        It first creates the edge embedding in the server and maps it to the current process
-        with shared memory.
-
-        Parameters
-        ----------
-        edata_name : string
-            The name of edge embedding
-        shape : tuple
-            The shape of the edge embedding
-        dtype : string
-            The data type of the edge embedding. The currently supported data types
-            are "float32" and "int32".
-        ctx : DGLContext
-            The column context.
-        """
-        if ctx != F.cpu():
-            raise Exception("graph store only supports CPU context for edge data")
-        init = self._edge_frame.get_initializer(edata_name)
-        if init is None:
-            self._edge_frame._frame._warn_and_set_initializer()
-        init = self._edge_frame.get_initializer(edata_name)
-        init = self._init_manager.serialize(init)
-        self.proxy.init_edata(init, edata_name, shape, dtype)
-        self._init_edata(edata_name, shape, dtype)
-
-    def get_n_repr(self, u=ALL):
-        """Get node(s) representation.
-
-        The returned feature tensor batches multiple node features on the first dimension.
-
-        Parameters
-        ----------
-        u : node, container or tensor
-            The node(s).
-
-        Returns
-        -------
-        dict
-            Representation dict from feature name to feature tensor.
-        """
-        if len(self.node_attr_schemes()) == 0:
-            return dict()
-        if is_all(u):
-            dgl_warning("It may not be safe to access node data of all nodes."
-                        "It's recommended to node data of a subset of nodes directly.")
-            return dict(self._node_frame)
-        else:
-            u = utils.toindex(u)
-            return self._node_frame.select_rows(u)
-
-    def get_e_repr(self, edges=ALL):
-        """Get edge(s) representation.
-
-        Parameters
-        ----------
-        edges : edges
-            Edges can be a pair of endpoint nodes (u, v), or a
-            tensor of edge ids. The default value is all the edges.
-
-        Returns
-        -------
-        dict
-            Representation dict
-        """
-        if is_all(edges):
-            dgl_warning("It may not be safe to access edge data of all edges."
-                        "It's recommended to edge data of a subset of edges directly.")
-        return super(SharedMemoryDGLGraph, self).get_e_repr(edges)
 
     def update_all(self, message_func="default",
                         reduce_func="default",
