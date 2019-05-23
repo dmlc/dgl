@@ -43,6 +43,15 @@ def check_init_func(worker_id, graph_name):
     g.init_edata('test4', (g.number_of_edges(), 10), 'float32')
     g._sync_barrier()
     check_array_shared_memory(g, worker_id, [g.nodes[:].data['test4'], g.edges[:].data['test4']])
+
+    data = g.nodes[:].data['test4']
+    g.set_n_repr({'test4': mx.nd.ones((1, 10)) * 10}, u=[0])
+    assert np.all(data[0].asnumpy() == g.nodes[0].data['test4'].asnumpy())
+
+    data = g.edges[:].data['test4']
+    g.set_e_repr({'test4': mx.nd.ones((1, 10)) * 20}, u=[0])
+    assert np.all(data[0].asnumpy() == g.edges[0].data['test4'].asnumpy())
+
     g.destroy()
 
 def server_func(num_workers, graph_name):
@@ -70,23 +79,50 @@ def test_init():
     work_p2.join()
 
 
-def check_update_all_func(worker_id, graph_name):
+def check_compute_func(worker_id, graph_name):
     time.sleep(3)
     print("worker starts")
     g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem", port=rand_port)
     g._sync_barrier()
+    in_feats = g.nodes[0].data['feat'].shape[1]
+
+    # Test update all.
     g.update_all(fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='preprocess'))
     adj = g.adjacency_matrix()
     tmp = mx.nd.dot(adj, g.nodes[:].data['feat'])
     assert np.all((g.nodes[:].data['preprocess'] == tmp).asnumpy())
     g._sync_barrier()
     check_array_shared_memory(g, worker_id, [g.nodes[:].data['preprocess']])
+
+    # Test apply nodes.
+    data = g.nodes[:].data['feat']
+    g.apply_nodes(func=lambda nodes: {'feat': mx.nd.ones((1, in_feats)) * 10}, v=0)
+    assert np.all(data[0].asnumpy() == g.nodes[0].data['feat'].asnumpy())
+
+    # Test apply edges.
+    data = g.edges[:].data['feat']
+    g.apply_edges(func=lambda edges: {'feat': mx.nd.ones((1, in_feats)) * 10}, v=0)
+    assert np.all(data[0].asnumpy() == g.edges[0].data['feat'].asnumpy())
+
+    g.init_ndata('tmp', (g.number_of_nodes(), 10), 'float32')
+    data = g.nodes[:].data['tmp']
+    # Test pull
+    assert np.all(data[0].asnumpy() != g.nodes[0].data['preprocess'].asnumpy())
+    g.pull(0, fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='tmp'))
+    assert np.all(data[0].asnumpy() == g.nodes[0].data['preprocess'].asnumpy())
+
+    # Test send_and_recv
+    in_edges = g.in_edges(v=2)
+    assert np.all(data[2].asnumpy() != g.nodes[2].data['preprocess'].asnumpy())
+    g.send_and_recv(in_edges, fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='tmp'))
+    assert np.all(data[2].asnumpy() == g.nodes[2].data['preprocess'].asnumpy())
+
     g.destroy()
 
-def test_update_all():
+def test_compute():
     serv_p = Process(target=server_func, args=(2, 'test_graph3'))
-    work_p1 = Process(target=check_update_all_func, args=(0, 'test_graph3'))
-    work_p2 = Process(target=check_update_all_func, args=(1, 'test_graph3'))
+    work_p1 = Process(target=check_compute_func, args=(0, 'test_graph3'))
+    work_p2 = Process(target=check_compute_func, args=(1, 'test_graph3'))
     serv_p.start()
     work_p1.start()
     work_p2.start()
@@ -96,4 +132,4 @@ def test_update_all():
 
 if __name__ == '__main__':
     test_init()
-    test_update_all()
+    test_compute()
