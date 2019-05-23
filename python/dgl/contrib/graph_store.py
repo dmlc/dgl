@@ -822,7 +822,7 @@ class SharedMemoryDGLGraph(BaseGraphStore):
         inplace: bool, optional
             The value is always True.
         """
-        super(BaseGraphStore, self).apply_edges(func, edges, inplace=True)
+        super(BaseGraphStore, self).group_apply_edges(group_by, func, edges, inplace=True)
 
     def recv(self,
              v=ALL,
@@ -965,13 +965,13 @@ class SharedMemoryDGLGraph(BaseGraphStore):
         inplace: bool, optional
             The value is always True.
         """
-        super(BaseGraphStore, self).pull(u, message_func, reduce_func,
+        super(BaseGraphStore, self).push(u, message_func, reduce_func,
                                          apply_node_func, inplace=True)
 
 
     def update_all(self, message_func="default",
-                        reduce_func="default",
-                        apply_node_func="default"):
+                   reduce_func="default",
+                   apply_node_func="default"):
         """ Distribute the computation in update_all among all pre-defined workers.
 
         update_all requires that all workers invoke this method and will
