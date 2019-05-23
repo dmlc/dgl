@@ -3,14 +3,10 @@
 # tensor.  For now, readonly graph test is postponed until we have better
 # readonly graph support.
 import backend as F
-import numpy as np
-from scipy import sparse as spsp
-import sys
 import dgl
 import networkx as nx
 from dgl import DGLGraph
 from collections import defaultdict as ddict
-import dgl.function as fn
 
 D = 5
 reduce_msg_shapes = set()
