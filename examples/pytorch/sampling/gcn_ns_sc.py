@@ -197,6 +197,7 @@ def main(args):
                                                        args.num_neighbors,
                                                        neighbor_type='in',
                                                        shuffle=True,
+                                                       num_workers=32,
                                                        num_hops=args.n_layers+1,
                                                        seed_nodes=train_nid):
             nf.copy_from_parent()
@@ -219,6 +220,7 @@ def main(args):
         for nf in dgl.contrib.sampling.NeighborSampler(g, args.test_batch_size,
                                                        g.number_of_nodes(),
                                                        neighbor_type='in',
+                                                       num_workers=32,
                                                        num_hops=args.n_layers+1,
                                                        seed_nodes=test_nid):
             nf.copy_from_parent()

@@ -1,3 +1,4 @@
+import os, sys
 import argparse, time, math
 import numpy as np
 import mxnet as mx
@@ -7,106 +8,9 @@ import dgl
 import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
-
-
-class NodeUpdate(gluon.Block):
-    def __init__(self, in_feats, out_feats, activation=None, concat=False):
-        super(NodeUpdate, self).__init__()
-        self.dense = gluon.nn.Dense(out_feats, in_units=in_feats)
-        self.activation = activation
-        self.concat = concat
-
-    def forward(self, node):
-        h = node.data['h']
-        h = h * node.data['norm']
-        h = self.dense(h)
-        # skip connection
-        if self.concat:
-            h = mx.nd.concat(h, self.activation(h))
-        elif self.activation:
-            h = self.activation(h)
-        return {'activation': h}
-
-
-class GCNSampling(gluon.Block):
-    def __init__(self,
-                 in_feats,
-                 n_hidden,
-                 n_classes,
-                 n_layers,
-                 activation,
-                 dropout,
-                 **kwargs):
-        super(GCNSampling, self).__init__(**kwargs)
-        self.dropout = dropout
-        self.n_layers = n_layers
-        with self.name_scope():
-            self.layers = gluon.nn.Sequential()
-            # input layer
-            skip_start = (0 == n_layers-1)
-            self.layers.add(NodeUpdate(in_feats, n_hidden, activation, concat=skip_start))
-            # hidden layers
-            for i in range(1, n_layers):
-                skip_start = (i == n_layers-1)
-                self.layers.add(NodeUpdate(n_hidden, n_hidden, activation, concat=skip_start))
-            # output layer
-            self.layers.add(NodeUpdate(2*n_hidden, n_classes))
-
-
-    def forward(self, nf):
-        nf.layers[0].data['activation'] = nf.layers[0].data['features']
-
-        for i, layer in enumerate(self.layers):
-            h = nf.layers[i].data.pop('activation')
-            if self.dropout:
-                h = mx.nd.Dropout(h, p=self.dropout)
-            nf.layers[i].data['h'] = h
-            degs = nf.layer_in_degree(i + 1).astype('float32').as_in_context(h.context)
-            nf.layers[i + 1].data['norm'] = mx.nd.expand_dims(1./degs, 1)
-            nf.block_compute(i,
-                             fn.copy_src(src='h', out='m'),
-                             fn.sum(msg='m', out='h'),
-                             layer)
-
-        h = nf.layers[-1].data.pop('activation')
-        return h
-
-
-class GCNInfer(gluon.Block):
-    def __init__(self,
-                 in_feats,
-                 n_hidden,
-                 n_classes,
-                 n_layers,
-                 activation,
-                 **kwargs):
-        super(GCNInfer, self).__init__(**kwargs)
-        self.n_layers = n_layers
-        with self.name_scope():
-            self.layers = gluon.nn.Sequential()
-            # input layer
-            skip_start = (0 == n_layers-1)
-            self.layers.add(NodeUpdate(in_feats, n_hidden, activation, concat=skip_start))
-            # hidden layers
-            for i in range(1, n_layers):
-                skip_start = (i == n_layers-1)
-                self.layers.add(NodeUpdate(n_hidden, n_hidden, activation, concat=skip_start))
-            # output layer
-            self.layers.add(NodeUpdate(2*n_hidden, n_classes))
-
-
-    def forward(self, nf):
-        nf.layers[0].data['activation'] = nf.layers[0].data['features']
-
-        for i, layer in enumerate(self.layers):
-            h = nf.layers[i].data.pop('activation')
-            nf.layers[i].data['h'] = h
-            nf.block_compute(i,
-                             fn.copy_src(src='h', out='m'),
-                             fn.sum(msg='m', out='h'),
-                             layer)
-
-        return nf.layers[-1].data.pop('activation')
+parentdir=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, parentdir)
+from gcn_ns_sc import NodeUpdate, GCNSampling, GCNInfer
 
 
 def gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples):
