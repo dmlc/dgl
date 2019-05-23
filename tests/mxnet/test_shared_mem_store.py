@@ -107,13 +107,11 @@ def check_compute_func(worker_id, graph_name):
     g.init_ndata('tmp', (g.number_of_nodes(), 10), 'float32')
     data = g.nodes[:].data['tmp']
     # Test pull
-    assert np.all(data[1].asnumpy() != g.nodes[1].data['preprocess'].asnumpy())
     g.pull(1, fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='tmp'))
     assert np.all(data[1].asnumpy() == g.nodes[1].data['preprocess'].asnumpy())
 
     # Test send_and_recv
     in_edges = g.in_edges(v=2)
-    assert np.all(data[2].asnumpy() != g.nodes[2].data['preprocess'].asnumpy())
     g.send_and_recv(in_edges, fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='tmp'))
     assert np.all(data[2].asnumpy() == g.nodes[2].data['preprocess'].asnumpy())
 
