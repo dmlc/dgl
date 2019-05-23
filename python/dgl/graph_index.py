@@ -929,6 +929,45 @@ class GraphIndex(object):
         handle = _CAPI_DGLGraphLineGraph(self._handle, backtracking)
         return GraphIndex(handle)
 
+    def to_immutable(self):
+        """Convert this graph index to an immutable one.
+
+        Returns
+        -------
+        GraphIndex
+            An immutable graph index.
+        """
+        handle = _CAPI_DGLToImmutable(self._handle)
+        return GraphIndex(handle, readonly=True)
+
+    def ctx(self):
+        """Return the context of this graph index.
+
+        Returns
+        -------
+        DGLContext
+            The context of the graph.
+        """
+        return _CAPI_DGLGraphContext(self._handle)
+
+    def copy_to(self, ctx):
+        """Copy this immutable graph index to the given device context.
+
+        NOTE: this method only works for immutable graph index
+
+        Parameters
+        ----------
+        ctx : DGLContext
+            The target device context.
+
+        Returns
+        -------
+        GraphIndex
+            The graph index on the given device context.
+        """
+        handle = _CAPI_DGLImmutableGraphCopyTo(self._handle, ctx)
+        return GraphIndex(handle, readonly=True)
+
 class SubgraphIndex(GraphIndex):
     """Graph index for subgraph.
 

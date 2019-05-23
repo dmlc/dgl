@@ -21,6 +21,29 @@ def infer_binary_feature_shape(lhs, rhs):
     ret = _CAPI_DGLKernelInferBinaryFeatureShape(lhs, rhs)
     return tuple(ret.asnumpy())
 
+def binary_op_reduce(reducer, op, graph,
+                     lhs, rhs,
+                     lhs_data, rhs_data, out_data,
+                     lhs_mapping, rhs_mapping, out_mapping):
+    """
+    reducer : str
+    op : str
+    graph : GraphIndex
+    lhs : int
+    rhs : int
+    lhs_data : NDArray
+    rhs_data : NDArray
+    out_data : NDArray
+    lhs_mapping : NDArray
+    rhs_mapping : NDArray
+    out_mapping : NDArray
+    """
+    _CAPI_DGLKernelBinaryOpReduce_v2(
+            reducer, op, graph,
+            int(lhs), int(rhs),
+            lhs_data, rhs_data, out_data,
+            lhs_mapping, rhs_mapping, out_mapping)
+
 def src_op_edge_reduce(reducer,
                        binary_op,
                        indptr, indices,

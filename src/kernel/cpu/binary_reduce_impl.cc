@@ -11,7 +11,7 @@ using dgl::runtime::NDArray;
 namespace dgl {
 namespace kernel {
 
-template void BinaryReduceImpl<kDLCPU>(
+/*template void BinaryReduceImpl<kDLCPU>(
     const std::string& reducer,
     const std::string& op,
     NDArray indptr, NDArray indices,
@@ -57,6 +57,7 @@ template void BackwardBinaryReduceBcastImpl<kDLCPU>(
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping,
     runtime::NDArray lhs, runtime::NDArray rhs, runtime::NDArray out, runtime::NDArray grad_out,
     runtime::NDArray grad_lhs, runtime::NDArray grad_rhs);
+*/
 
 template void BinaryReduceImpl_v2<kDLCPU>(
     const std::string& reducer,
