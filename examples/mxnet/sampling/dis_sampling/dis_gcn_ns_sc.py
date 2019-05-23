@@ -1,3 +1,5 @@
+import sys
+sys.path.append('../')
 import argparse, time, math
 import numpy as np
 import mxnet as mx
@@ -7,7 +9,6 @@ import dgl
 import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
-from .. import gcn_ns_sc
 from gcn_ns_sc import NodeUpdate, GCNSampling, GCNInfer
 
 
