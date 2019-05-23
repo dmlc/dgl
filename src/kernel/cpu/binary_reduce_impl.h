@@ -151,20 +151,20 @@ void CallBinaryReduce_v2(const minigun::advance::RuntimeConfig& rtcfg,
           Functors;
   typedef cpu::BinaryReduce<DType, Functors> UDF;
   // csr
-  const auto& adj = graph->GetAdj(false, "csr");
-  minigun::Csr csr = utils::CreateCsr(adj[0], adj[1]);
+  auto outcsr = graph->GetOutCSR();
+  minigun::Csr csr = utils::CreateCsr(outcsr->indptr(), outcsr->indices());
   // If the user-given mapping is none and the target is edge data, we need to
   // replace the mapping by the edge ids in the csr graph so that the edge
   // data is correctly read/written.
   if (LeftSelector::target == binary_op::kEdge && gdata->lhs_mapping == nullptr) {
-    gdata->lhs_mapping = static_cast<int64_t*>(adj[2]->data);
+    gdata->lhs_mapping = static_cast<int64_t*>(outcsr->edge_ids()->data);
   }
   if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
-    gdata->rhs_mapping = static_cast<int64_t*>(adj[2]->data);
+    gdata->rhs_mapping = static_cast<int64_t*>(outcsr->edge_ids()->data);
   }
   if (OutSelector<Reducer>::Type::target == binary_op::kEdge
       && gdata->out_mapping == nullptr) {
-    gdata->out_mapping = static_cast<int64_t*>(adj[2]->data);
+    gdata->out_mapping = static_cast<int64_t*>(outcsr->edge_ids()->data);
   }
   // TODO(minjie): allocator
   minigun::advance::Advance<XPU, cpu::AdvanceConfig, GData<DType>, UDF>(
@@ -184,20 +184,20 @@ void CallBinaryReduceBcast_v2(
           Functors;
   typedef cpu::BinaryReduceBcast<NDim, DType, Functors> UDF;
   // csr
-  const auto& adj = graph->GetAdj(false, "csr");
-  minigun::Csr csr = utils::CreateCsr(adj[0], adj[1]);
+  auto outcsr = graph->GetOutCSR();
+  minigun::Csr csr = utils::CreateCsr(outcsr->indptr(), outcsr->indices());
   // If the user-given mapping is none and the target is edge data, we need to
   // replace the mapping by the edge ids in the csr graph so that the edge
   // data is correctly read/written.
   if (LeftSelector::target == binary_op::kEdge && gdata->lhs_mapping == nullptr) {
-    gdata->lhs_mapping = static_cast<int64_t*>(adj[2]->data);
+    gdata->lhs_mapping = static_cast<int64_t*>(outcsr->edge_ids()->data);
   }
   if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
-    gdata->rhs_mapping = static_cast<int64_t*>(adj[2]->data);
+    gdata->rhs_mapping = static_cast<int64_t*>(outcsr->edge_ids()->data);
   }
   if (OutSelector<Reducer>::Type::target == binary_op::kEdge
       && gdata->out_mapping == nullptr) {
-    gdata->out_mapping = static_cast<int64_t*>(adj[2]->data);
+    gdata->out_mapping = static_cast<int64_t*>(outcsr->edge_ids()->data);
   }
   // TODO(minjie): allocator
   minigun::advance::Advance<XPU, cpu::AdvanceConfig,

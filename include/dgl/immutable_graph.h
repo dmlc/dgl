@@ -211,6 +211,13 @@ class CSR : public GraphInterface {
     return CSRMatrix{indptr_, indices_, edge_ids_};
   }
 
+  /*!
+   * \brief Copy the data to another context.
+   * \param ctx The target context.
+   * \return The graph under another context.
+   */
+  CSR CopyTo(const DLContext& ctx) const;
+
   // member getters
 
   IdArray indptr() const { return indptr_; }
@@ -440,6 +447,13 @@ class COO : public GraphInterface {
   COOMatrix ToCOOMatrix() const {
     return COOMatrix{src_, dst_, {}};
   }
+
+  /*!
+   * \brief Copy the data to another context.
+   * \param ctx The target context.
+   * \return The graph under another context.
+   */
+  COO CopyTo(const DLContext& ctx) const;
 
   // member getters
 
@@ -873,6 +887,24 @@ class ImmutableGraph: public GraphInterface {
     }
     return coo_;
   }
+
+  /*!
+   * \brief Convert the given graph to an immutable graph.
+   *
+   * If the graph is already an immutable graph. The result graph will share
+   * the storage with the given one.
+   *
+   * \param graph The input graph.
+   * \return an immutable graph object.
+   */
+  static ImmutableGraph ToImmutable(const GraphInterface* graph);
+
+  /*!
+   * \brief Copy the data to another context.
+   * \param ctx The target context.
+   * \return The graph under another context.
+   */
+  ImmutableGraph CopyTo(const DLContext& ctx) const;
 
  protected:
   /* !\brief internal default constructor */

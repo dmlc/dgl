@@ -15,16 +15,6 @@ using dgl::runtime::DGLRetValue;
 using dgl::runtime::PackedFunc;
 using dgl::runtime::NDArray;
 
-namespace {
-bool operator == (const DLContext& ctx1, const DLContext& ctx2) {
-  return ctx1.device_type == ctx2.device_type && ctx1.device_id == ctx2.device_id;
-}
-
-std::ostream& operator << (std::ostream& os, const DLContext& ctx) {
-  return os << "" << ctx.device_type << ":" << ctx.device_id << "";
-}
-}  // namespace
-
 namespace dgl {
 namespace kernel {
 namespace {
@@ -62,7 +52,7 @@ bool IsValidBinaryOpShape(NDArray lhs, NDArray rhs) {
   return true;
 }
 
-void BinaryOpReduce(
+/*void BinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
     NDArray indptr, NDArray indices,
@@ -89,7 +79,7 @@ void BinaryOpReduce(
       lhs_mapping, rhs_mapping,
       lhs_data, rhs_data,
       out_mapping, out_data);
-}
+}*/
 
 bool HasBcast(NDArray lhs, NDArray rhs) {
   if (lhs->ndim != rhs->ndim) {
@@ -150,7 +140,7 @@ BcastInfo CalcBcastInfo(NDArray lhs, NDArray rhs) {
   return ret;
 }
 
-void BinaryOpReduceBcast(
+/*void BinaryOpReduceBcast(
     const std::string& reducer,
     const std::string& binary_op,
     NDArray indptr, NDArray indices,
@@ -173,7 +163,7 @@ void BinaryOpReduceBcast(
       lhs_mapping, rhs_mapping,
       lhs_data, rhs_data,
       out_mapping, out_data);
-}
+}*/
 }  // namespace
 
 

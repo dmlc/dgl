@@ -502,4 +502,23 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetAdj")
     *rv = ConvertAdjToPackedFunc(res);
   });
 
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLToImmutable")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
+    GraphHandle newhandle = new ImmutableGraph(ImmutableGraph::ToImmutable(ptr));
+    *rv = newhandle;
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLToImmutableGraphCopyTo")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    DLContext ctx = args[1];
+    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
+    const ImmutableGraph *ig = dynamic_cast<const ImmutableGraph*>(ptr);
+    CHECK(ig) << "Invalid argument: must be an immutable graph object.";
+    GraphHandle newhandle = new ImmutableGraph(ig->CopyTo(ctx));
+    *rv = newhandle;
+  });
+
 }  // namespace dgl

@@ -455,6 +455,15 @@ COOPtr CSR::ToCOO() const {
   return COOPtr(new COO(NumVertices(), ret_src, ret_dst));
 }
 
+CSR CSR::CopyTo(const DLContext& ctx) const {
+  CSR ret;
+  ret.indptr_ = indptr_.CopyTo(ctx);
+  ret.indices_ = indices_.CopyTo(ctx);
+  ret.edge_ids_ = edge_ids_.CopyTo(ctx);
+  ret.is_multigraph_ = is_multigraph_;
+  return ret;
+}
+
 //////////////////////////////////////////////////////////
 //
 // COO graph implementation
@@ -604,6 +613,15 @@ CSRPtr COO::ToCSR() const {
   return CSRPtr(new CSR(indptr, indices, edge_ids));
 }
 
+COO COO::CopyTo(const DLContext& ctx) const {
+  COO ret;
+  ret.num_vertices_ = num_vertices_;
+  ret.src_ = src_.CopyTo(ctx);
+  ret.dst_ = dst_.CopyTo(ctx);
+  ret.is_multigraph_ = is_multigraph_;
+  return ret;
+}
+
 //////////////////////////////////////////////////////////
 //
 // immutable graph implementation
@@ -664,6 +682,30 @@ std::vector<IdArray> ImmutableGraph::GetAdj(bool transpose, const std::string &f
     LOG(FATAL) << "unsupported adjacency matrix format: " << fmt;
     return {};
   }
+}
+
+ImmutableGraph ImmutableGraph::ToImmutable(const GraphInterface* graph) {
+  const ImmutableGraph* ig = dynamic_cast<const ImmutableGraph*>(graph);
+  if (ig) {
+    return *ig;
+  } else {
+    const auto& adj = graph->GetAdj(false, "csr");
+    CSRPtr csr(new CSR(adj[0], adj[1], adj[2]));
+    return ImmutableGraph(nullptr, csr);
+  }
+}
+
+ImmutableGraph ImmutableGraph::CopyTo(const DLContext& ctx) const {
+  if (ctx == Context()) {
+    return *this;
+  }
+  // TODO(minjie): since we don't have GPU implementation of COO<->CSR,
+  //   we make sure that this graph (on CPU) has materialized CSR,
+  //   and then copy them to other context (usually GPU). This should
+  //   be fixed later.
+  CSRPtr new_incsr = CSRPtr(new CSR(GetInCSR()->CopyTo(ctx)));
+  CSRPtr new_outcsr = CSRPtr(new CSR(GetOutCSR()->CopyTo(ctx)));
+  return ImmutableGraph(new_incsr, new_outcsr, nullptr);
 }
 
 }  // namespace dgl
