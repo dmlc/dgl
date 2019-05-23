@@ -38,6 +38,7 @@ class MySamplerPool(SamplerPool):
                                                            args.num_neighbors,
                                                            neighbor_type='in',
                                                            shuffle=True,
+                                                           num_workers=32,
                                                            num_hops=args.n_layers+1,
                                                            seed_nodes=train_nid):
                 print("send train nodeflow: %d" %(idx))
