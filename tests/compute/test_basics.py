@@ -664,7 +664,7 @@ def test_group_apply_edges():
 
 def test_send_and_recv():
     np.random.seed(0)
-    csr = (spsp.random(20, 20, density=0.1, format='csr') != 0).astype(F.int64)
+    csr = (spsp.random(20, 20, density=0.1, format='csr') != 0).astype(np.int64)
     csr = csr.transpose()
     g = DGLGraph(csr, readonly=True)
     print(g.adjacency_matrix().asscipy(), file=sys.stderr)
