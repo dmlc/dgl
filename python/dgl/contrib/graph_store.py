@@ -868,7 +868,7 @@ class SharedMemoryDGLGraph(BaseGraphStore):
                       message_func="default",
                       reduce_func="default",
                       apply_node_func="default",
-                      inplace=False):
+                      inplace=True):
         """Send messages along edges and let destinations receive them.
 
         Optionally, apply a function to update the node features after receive.
@@ -905,7 +905,7 @@ class SharedMemoryDGLGraph(BaseGraphStore):
              message_func="default",
              reduce_func="default",
              apply_node_func="default",
-             inplace=False):
+             inplace=True):
         """Pull messages from the node(s)' predecessors and then update their features.
 
         Optionally, apply a function to update the node features after receive.
@@ -942,7 +942,7 @@ class SharedMemoryDGLGraph(BaseGraphStore):
              message_func="default",
              reduce_func="default",
              apply_node_func="default",
-             inplace=False):
+             inplace=True):
         """Send message from the node(s) to their successors and update them.
 
         Optionally, apply a function to update the node features after receive.
