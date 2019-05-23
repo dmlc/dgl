@@ -9,16 +9,11 @@
 #include <string>
 #include <vector>
 #include <utility>
-#include "runtime/ndarray.h"
+#include <algorithm>
+
+#include "array.h"
 
 namespace dgl {
-
-typedef uint64_t dgl_id_t;
-typedef dgl::runtime::NDArray IdArray;
-typedef dgl::runtime::NDArray DegreeArray;
-typedef dgl::runtime::NDArray BoolArray;
-typedef dgl::runtime::NDArray IntArray;
-typedef dgl::runtime::NDArray FloatArray;
 
 struct Subgraph;
 struct NodeFlow;
@@ -32,8 +27,10 @@ const dgl_id_t DGL_INVALID_ID = static_cast<dgl_id_t>(-1);
  * but it doesn't own data itself. instead, it only references data in std::vector.
  */
 class DGLIdIters {
-  const dgl_id_t *begin_, *end_;
  public:
+  /* !\brief default constructor to create an empty range */
+  DGLIdIters() {}
+  /* !\brief constructor with given begin and end */
   DGLIdIters(const dgl_id_t *begin, const dgl_id_t *end) {
     this->begin_ = begin;
     this->end_ = end;
@@ -50,6 +47,8 @@ class DGLIdIters {
   size_t size() const {
     return this->end_ - this->begin_;
   }
+ private:
+  const dgl_id_t *begin_{nullptr}, *end_{nullptr};
 };
 
 class GraphInterface;
@@ -118,13 +117,49 @@ class GraphInterface {
   virtual bool HasVertex(dgl_id_t vid) const = 0;
 
   /*! \return a 0-1 array indicating whether the given vertices are in the graph.*/
-  virtual BoolArray HasVertices(IdArray vids) const = 0;
+  virtual BoolArray HasVertices(IdArray vids) const {
+    const auto len = vids->shape[0];
+    BoolArray rst = BoolArray::Empty({len}, vids->dtype, vids->ctx);
+    const dgl_id_t* vid_data = static_cast<dgl_id_t*>(vids->data);
+    dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
+    const uint64_t nverts = NumVertices();
+    for (int64_t i = 0; i < len; ++i) {
+      rst_data[i] = (vid_data[i] < nverts)? 1 : 0;
+    }
+    return rst;
+  }
 
   /*! \return true if the given edge is in the graph.*/
   virtual bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const = 0;
 
   /*! \return a 0-1 array indicating whether the given edges are in the graph.*/
-  virtual BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const = 0;
+  virtual BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const {
+    const auto srclen = src_ids->shape[0];
+    const auto dstlen = dst_ids->shape[0];
+    const auto rstlen = std::max(srclen, dstlen);
+    BoolArray rst = BoolArray::Empty({rstlen}, src_ids->dtype, src_ids->ctx);
+    dgl_id_t* rst_data = static_cast<dgl_id_t*>(rst->data);
+    const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_ids->data);
+    const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_ids->data);
+    if (srclen == 1) {
+      // one-many
+      for (int64_t i = 0; i < dstlen; ++i) {
+        rst_data[i] = HasEdgeBetween(src_data[0], dst_data[i])? 1 : 0;
+      }
+    } else if (dstlen == 1) {
+      // many-one
+      for (int64_t i = 0; i < srclen; ++i) {
+        rst_data[i] = HasEdgeBetween(src_data[i], dst_data[0])? 1 : 0;
+      }
+    } else {
+      // many-many
+      CHECK(srclen == dstlen) << "Invalid src and dst id array.";
+      for (int64_t i = 0; i < srclen; ++i) {
+        rst_data[i] = HasEdgeBetween(src_data[i], dst_data[i])? 1 : 0;
+      }
+    }
+    return rst;
+  }
 
   /*!
    * \brief Find the predecessors of a vertex.
@@ -329,6 +364,13 @@ class GraphInterface {
    *
    * By default, a row of returned adjacency matrix represents the destination
    * of an edge and the column represents the source.
+   *
+   * If the fmt is 'csr', the function should return three arrays, representing
+   *  indptr, indices and edge ids
+   *
+   * If the fmt is 'coo', the function should return one array of shape (2, nnz),
+   * representing a horitonzal stack of row and col indices.
+   *
    * \param transpose A flag to transpose the returned adjacency matrix.
    * \param fmt the format of the returned adjacency matrix.
    * \return a vector of IdArrays.

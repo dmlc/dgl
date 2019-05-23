@@ -40,8 +40,7 @@ class Graph: public GraphInterface {
   explicit Graph(bool multigraph = false) : is_multigraph_(multigraph) {}
 
   /*! \brief construct a graph from the coo format. */
-  Graph(IdArray src_ids, IdArray dst_ids, IdArray edge_ids, size_t num_nodes,
-      bool multigraph = false);
+  Graph(IdArray src_ids, IdArray dst_ids, size_t num_nodes, bool multigraph = false);
 
   /*! \brief default copy constructor */
   Graph(const Graph& other) = default;

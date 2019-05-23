@@ -14,6 +14,20 @@ class MySamplerPool(SamplerPool):
     def worker(self, args):
         """User-defined worker function
         """
+        is_shuffle = True
+        self_loop = False;
+        number_hops = 1
+
+        if args.model == "gcn_ns":
+            number_hops = args.n_layers + 1
+        elif args.model == "gcn_cv":
+            number_hops = args.n_layers
+        elif args.model == "graphsage_cv":
+            num_hops = args.n_layers
+            self_loop = True
+        else:
+            print("unknown model. Please choose from gcn_ns, gcn_cv, graphsage_cv")
+
         # Start sender
         namebook = { 0:args.ip }
         sender = dgl.contrib.sampling.SamplerSender(namebook)
@@ -37,8 +51,10 @@ class MySamplerPool(SamplerPool):
             for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
                                                            args.num_neighbors,
                                                            neighbor_type='in',
-                                                           shuffle=True,
-                                                           num_hops=args.n_layers+1,
+                                                           shuffle=is_shuffle,
+                                                           num_workers=32,
+                                                           num_hops=number_hops,
+                                                           add_self_loop=self_loop,
                                                            seed_nodes=train_nid):
                 print("send train nodeflow: %d" %(idx))
                 sender.send(nf, 0)
@@ -47,17 +63,15 @@ class MySamplerPool(SamplerPool):
         
 def main(args):
     pool = MySamplerPool()
-    pool.start(args.num_sender, args)
+    pool.start(args.num_sampler, args)
  
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
     register_data_args(parser)
-    parser.add_argument("--n-epochs", type=int, default=200,
-            help="number of training epochs")
+    parser.add_argument("--model", type=str,
+                        help="select a model. Valid models: gcn_ns, gcn_cv, graphsage_cv")
     parser.add_argument("--batch-size", type=int, default=1000,
             help="batch size")
-    parser.add_argument("--test-batch-size", type=int, default=1000,
-            help="test batch size")
     parser.add_argument("--num-neighbors", type=int, default=3,
             help="number of neighbors to be sampled")
     parser.add_argument("--self-loop", action='store_true',
@@ -65,12 +79,11 @@ if __name__ == '__main__':
     parser.add_argument("--n-layers", type=int, default=1,
             help="number of hidden gcn layers")
     parser.add_argument("--ip", type=str, default='127.0.0.1:50051',
-            help="IP address of remote trainer machine")
-    parser.add_argument("--num-sender", type=int, default=1,
-            help="Number of sampler sender machine")
+            help="IP address")
+    parser.add_argument("--num-sampler", type=int, default=1,
+            help="number of sampler")
     args = parser.parse_args()
 
     print(args)
 
     main(args)
-
