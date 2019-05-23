@@ -1,5 +1,3 @@
-import sys
-sys.path.append('../')
 import argparse, time, math
 import numpy as np
 import mxnet as mx
