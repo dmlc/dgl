@@ -19,9 +19,9 @@ class MySamplerPool(SamplerPool):
         number_hops = 1
 
         if args.model == "gcn_ns":
-            num_hops = args.n_layers
+            number_hops = args.n_layers + 1
         elif args.model == "gcn_cv":
-            num_hops = args.n_layers
+            number_hops = args.n_layers
         elif args.model == "graphsage_cv":
             num_hops = args.n_layers
             self_loop = True
