@@ -3,6 +3,8 @@
 # tensor.  For now, readonly graph test is postponed until we have better
 # readonly graph support.
 import backend as F
+import numpy as np
+from scipy import sparse as spsp
 import dgl
 import networkx as nx
 from dgl import DGLGraph
@@ -658,8 +660,20 @@ def test_group_apply_edges():
     # test group by destination nodes
     _test('dst')
 
+def test_send_and_recv():
+    np.random.seed(0)
+    csr = (spsp.random(20, 20, density=0.1, format='csr') != 0).astype(np.int64)
+    g = DGLGraph(csr, readonly=True)
+    print(g.adjacency_matrix().asscipy())
+    num_nodes = g.number_of_nodes()
+    g.ndata['feat'] = mx.nd.arange(num_nodes * 10).reshape((num_nodes, 10))
+    in_edges = g.in_edges(v=2)
+    g.send_and_recv(in_edges, fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='tmp'))
+    print(g.ndata['tmp'])
+
 
 if __name__ == '__main__':
+    test_send_and_recv()
     test_nx_conversion()
     test_batch_setter_getter()
     test_batch_setter_autograd()
