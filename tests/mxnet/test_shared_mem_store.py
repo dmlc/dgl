@@ -101,7 +101,7 @@ def check_compute_func(worker_id, graph_name):
 
     # Test apply edges.
     data = g.edges[:].data['feat']
-    g.apply_edges(func=lambda edges: {'feat': mx.nd.ones((1, in_feats)) * 10}, v=0)
+    g.apply_edges(func=lambda edges: {'feat': mx.nd.ones((1, in_feats)) * 10}, edges=0)
     assert np.all(data[0].asnumpy() == g.edges[0].data['feat'].asnumpy())
 
     g.init_ndata('tmp', (g.number_of_nodes(), 10), 'float32')
