@@ -379,6 +379,11 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             g[ntype]
 
         to select nodes with type ``ntype``.
+
+        Examples
+        --------
+        To set features of User #0 and #2 in a heterogeneous graph:
+        >>> g['user'].nodes[[0, 2]].data['h'] = torch.zeros(2, 5)
         """
         pass
 
@@ -393,6 +398,11 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             g[ntype]
 
         to select nodes with type ``ntype``.
+
+        Examples
+        --------
+        To set features of games in a heterogeneous graph:
+        >>> g['game'].ndata['h'] = torch.zeros(2, 5)
         """
         pass
 
@@ -408,6 +418,12 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             g[src_type, dst_type, edge_type]
 
         to select edges with type ``(src_type, dst_type, edge_type)``.
+
+        Examples
+        --------
+        To set features of gameplays #1 (Bob -> Tetris) and #3 (Carol ->
+        Minecraft) in a heterogeneous graph:
+        >>> g['user', 'game', 'plays'].edges[[1, 3]].data['h'] = torch.zeros(2, 5)
         """
         pass
 
@@ -422,6 +438,10 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             g[src_type, dst_type, edge_type]
 
         to select edges with type ``(src_type, dst_type, edge_type)``.
+
+        Examples
+        --------
+        >>> g['developer', 'game', 'develops'].edata['h'] = torch.zeros(2, 5)
         """
         pass
 
@@ -503,8 +523,13 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             The edge type, characterized by a triplet of source type name,
             destination type name, and edge type name.
         edges : edges
-            Edges can be a pair of endpoint nodes (u, v), or a
-            tensor of edge ids. The default value is all the edges.
+            Edges can be either
+
+            * A pair of endpoint nodes (u, v), where u is the node ID of source
+              node type and v is that of destination node type.
+            * A tensor of edge ids of the given type.
+
+            The default value is all the edges.
         inplace : bool
             If True, update will be done in place, but autograd will break.
         """
@@ -676,11 +701,13 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
 
         ``edges`` can be any of the following types:
 
-        * ``int`` : Specify one edge using its edge id.
-        * ``pair of int`` : Specify one edge using its endpoints.
+        * ``int`` : Specify one edge using its edge id (of the given edge type).
+        * ``pair of int`` : Specify one edge using its endpoints (of source node type
+          and destination node type respectively).
         * ``int iterable`` / ``tensor`` : Specify multiple edges using their edge ids.
         * ``pair of int iterable`` / ``pair of tensors`` :
           Specify multiple edges using their endpoints.
+        * a dict of all the above, if ``message_func`` is a dict.
 
         The UDF returns messages on the edges and can be later fetched in
         the destination node's ``mailbox``. Receiving will consume the messages.
