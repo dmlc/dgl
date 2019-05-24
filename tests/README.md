@@ -20,10 +20,10 @@ The code organization goes as follows:
 ## C++ Unittest
 Compile with unittest by executing the command below
 ```
-# Assume current directory is the root directory of dgl
+# Assume current directory is the root directory of dgl, and googletest submodule is initialized
 mkdir build
 cd build
-cmake .. -DBUILD_TEST=1
+cmake .. -DBUILD_CPP_TEST=1
 make -j${nproc}
 ./runUnitTests
 ```
