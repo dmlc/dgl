@@ -148,8 +148,686 @@ class DGLBaseHeteroGraph(object):
         """
         pass
 
+    @property
+    def metagraph(self):
+        """Return the metagraph as networkx.MultiDiGraph."""
+        pass
 
-class DGLBaseHeteroGraphView(object):
+    def number_of_nodes(self):
+        """Return the number of nodes in the graph.
+
+        Returns
+        -------
+        int
+            The number of nodes
+        """
+        pass
+
+    def __len__(self):
+        """Return the number of nodes in the graph."""
+        pass
+
+    @property
+    def is_multigraph(self):
+        """True if the graph is a multigraph, False otherwise.
+        """
+        pass
+
+    @property
+    def is_readonly(self):
+        """True if the graph is readonly, False otherwise.
+        """
+        pass
+
+    def number_of_edges(self):
+        """Return the number of edges in the graph.
+
+        Returns
+        -------
+        int
+            The number of edges
+        """
+        pass
+
+    def has_node(self, vid):
+        """Return True if the graph contains node `vid`.
+
+        Only works if the graph has one node type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['vtype'].has_node(vid)
+
+        Parameters
+        ----------
+        vid : int
+            The node ID.
+
+        Returns
+        -------
+        bool
+            True if the node exists
+
+        Examples
+        --------
+        >>> g['user'].has_node(0)
+        True
+        >>> g['user'].has_node(4)
+        False
+
+        Equivalently,
+
+        >>> 0 in g['user']
+        True
+
+        See Also
+        --------
+        has_nodes
+        """
+        pass
+
+    def __contains__(self, vid):
+        """Return True if the graph contains node `vid`.
+
+        Only works if the graph has one node type.  For multiple types,
+        query with
+
+        .. code::
+
+           vid in g['vtype']
+
+        Examples
+        --------
+        >>> 0 in g['user']
+        True
+        """
+        pass
+
+    def has_nodes(self, vids):
+        """Return a 0-1 array ``a`` given the node ID array ``vids``.
+
+        ``a[i]`` is 1 if the graph contains node ``vids[i]``, 0 otherwise.
+
+        Only works if the graph has one node type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['vtype'].has_nodes(vids)
+
+        Parameters
+        ----------
+        vid : list or tensor
+            The array of node IDs.
+
+        Returns
+        -------
+        a : tensor
+            0-1 array indicating existence
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> g['user'].has_nodes([0, 1, 2, 3, 4])
+        tensor([1, 1, 1, 0, 0])
+
+        See Also
+        --------
+        has_node
+        """
+        pass
+
+    def has_edge_between(self, u, v):
+        """Return True if the edge (u, v) is in the graph.
+
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].has_edge_between(u, v)
+
+        Parameters
+        ----------
+        u : int
+            The node ID of source type.
+        v : int
+            The node ID of destination type.
+
+        Returns
+        -------
+        bool
+            True if the edge is in the graph, False otherwise.
+
+        Examples
+        --------
+        Check whether Alice plays Tetris
+        >>> g['user', 'game', 'plays'].has_edge_between(0, 1)
+        True
+
+        And whether Alice plays Minecraft
+        >>> g['user', 'game', 'plays'].has_edge_between(0, 2)
+        False
+
+        See Also
+        --------
+        has_edges_between
+        """
+        pass
+
+    def has_edges_between(self, u, v):
+        """Return a 0-1 array `a` given the source node ID array `u` and
+        destination node ID array `v`.
+
+        `a[i]` is 1 if the graph contains edge `(u[i], v[i])`, 0 otherwise.
+
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].has_edges_between(u, v)
+
+        Parameters
+        ----------
+        u : list, tensor
+            The node ID array of source type.
+        v : list, tensor
+            The node ID array of destination type.
+
+        Returns
+        -------
+        a : tensor
+            0-1 array indicating existence.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        >>> g['user', 'game', 'plays'].has_edges_between([0, 0], [1, 2])
+        tensor([1, 0])
+
+        See Also
+        --------
+        has_edge_between
+        """
+        pass
+
+    def predecessors(self, v):
+        """Return the predecessors of node `v` in the graph with the same
+        edge type.
+
+        Node `u` is a predecessor of `v` if an edge `(u, v)` exist in the
+        graph.
+
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].predecessors(v)
+
+        Parameters
+        ----------
+        v : int
+            The node.
+
+        Returns
+        -------
+        tensor
+            Array of predecessor node IDs of source node type.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        Query who plays Tetris:
+        >>> g['user', 'game', 'plays'].predecessors(0)
+        tensor([0, 1])
+
+        This indicates User #0 (Alice) and User #1 (Bob).
+
+        See Also
+        --------
+        successors
+        """
+        pass
+
+    def successors(self, v):
+        """Return the successors of node `v` in the graph with the same edge
+        type.
+
+        Node `u` is a successor of `v` if an edge `(v, u)` exist in the
+        graph.
+
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].successors(v)
+
+        Parameters
+        ----------
+        v : int
+            The node.
+
+        Returns
+        -------
+        tensor
+            Array of successor node IDs if destination node type.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        Asks which game Alice plays:
+        >>> g['user', 'game', 'plays'].successors(0)
+        tensor([0])
+
+        This indicates Game #0 (Tetris).
+
+        See Also
+        --------
+        predecessors
+        """
+        pass
+
+    def edge_id(self, u, v, force_multi=False):
+        """Return the edge ID, or an array of edge IDs, between source node
+        `u` and destination node `v`.
+
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].edge_id(u, v)
+
+        Parameters
+        ----------
+        u : int
+            The node ID of source type.
+        v : int
+            The node ID of destination type.
+        force_multi : bool
+            If False, will return a single edge ID if the graph is a simple graph.
+            If True, will always return an array.
+
+        Returns
+        -------
+        int or tensor
+            The edge ID if force_multi == True and the graph is a simple graph.
+            The edge ID array otherwise.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        Find the edge ID of "Bob plays Tetris"
+        >>> g['user', 'game', 'plays'].edge_id(1, 0)
+        1
+
+        See Also
+        --------
+        edge_ids
+        """
+        pass
+
+    def edge_ids(self, u, v, force_multi=False):
+        """Return all edge IDs between source node array `u` and destination
+        node array `v`.
+
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+
+        Parameters
+        ----------
+        u : list, tensor
+            The node ID array of source type.
+        v : list, tensor
+            The node ID array of destination type.
+        force_multi : bool
+            Whether to always treat the graph as a multigraph.
+
+        Returns
+        -------
+        tensor, or (tensor, tensor, tensor)
+            If the graph is a simple graph and `force_multi` is False, return
+            a single edge ID array `e`.  `e[i]` is the edge ID between `u[i]`
+            and `v[i]`.
+            Otherwise, return three arrays `(eu, ev, e)`.  `e[i]` is the ID
+            of an edge between `eu[i]` and `ev[i]`.  All edges between `u[i]`
+            and `v[i]` are returned.
+
+        Notes
+        -----
+        If the graph is a simple graph, `force_multi` is False, and no edge
+        exist between some pairs of `u[i]` and `v[i]`, the result is undefined.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        Find the edge IDs of "Alice plays Tetris" and "Bob plays Minecraft".
+        >>> g['user', 'game', 'plays'].edge_ids([0, 1], [0, 1])
+        tensor([0, 2])
+
+        See Also
+        --------
+        edge_id
+        """
+        pass
+
+    def find_edges(self, eid):
+        """Given an edge ID array, return the source and destination node ID
+        array `s` and `d`.  `s[i]` and `d[i]` are source and destination node
+        ID for edge `eid[i]`.
+
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+
+        Parameters
+        ----------
+        eid : list, tensor
+            The edge ID array.
+
+        Returns
+        -------
+        tensor
+            The source node ID array.
+        tensor
+            The destination node ID array.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        Find the user and game of gameplay #0 and #2:
+        >>> g['user', 'game', 'plays'].find_edges([0, 2])
+        (tensor([0, 1]), tensor([0, 1]))
+        """
+        pass
+
+    def in_edges(self, v, form='uv'):
+        """Return the inbound edges of the node(s).
+
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+
+        Parameters
+        ----------
+        v : int, list, tensor
+            The node(s).
+        form : str, optional
+            The return form. Currently support:
+
+            - 'all' : a tuple (u, v, eid)
+            - 'uv'  : a pair (u, v), default
+            - 'eid' : one eid tensor
+
+        Returns
+        -------
+        A tuple of Tensors ``(eu, ev, eid)`` if ``form == 'all'``.
+            ``eid[i]`` is the ID of an inbound edge to ``ev[i]`` from ``eu[i]``.
+            All inbound edges to ``v`` are returned.
+        A pair of Tensors (eu, ev) if form == 'uv'
+            ``eu[i]`` is the source node of an inbound edge to ``ev[i]``.
+            All inbound edges to ``v`` are returned.
+        One Tensor if form == 'eid'
+            ``eid[i]`` is ID of an inbound edge to any of the nodes in ``v``.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        Find the gameplay IDs of game #0 (Tetris)
+        >>> g['user', 'game', 'plays'].in_edges(0, 'eid')
+        tensor([0, 1])
+        """
+        pass
+
+    def out_edges(self, v, form='uv'):
+        """Return the outbound edges of the node(s).
+
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+
+        Parameters
+        ----------
+        v : int, list, tensor
+            The node(s).
+        form : str, optional
+            The return form. Currently support:
+
+            - 'all' : a tuple (u, v, eid)
+            - 'uv'  : a pair (u, v), default
+            - 'eid' : one eid tensor
+
+        Returns
+        -------
+        A tuple of Tensors ``(eu, ev, eid)`` if ``form == 'all'``.
+            ``eid[i]`` is the ID of an outbound edge from ``eu[i]`` to ``ev[i]``.
+            All outbound edges from ``v`` are returned.
+        A pair of Tensors (eu, ev) if form == 'uv'
+            ``ev[i]`` is the destination node of an outbound edge from ``eu[i]``.
+            All outbound edges from ``v`` are returned.
+        One Tensor if form == 'eid'
+            ``eid[i]`` is ID of an outbound edge from any of the nodes in ``v``.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        Find the gameplay IDs of user #0 (Alice)
+        >>> g['user', 'game', 'plays'].out_edges(0, 'eid')
+        tensor([0])
+        """
+        pass
+
+    def all_edges(self, form='uv', order=None):
+        """Return all the edges.
+
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+
+        Parameters
+        ----------
+        form : str, optional
+            The return form. Currently support:
+
+            - 'all' : a tuple (u, v, eid)
+            - 'uv'  : a pair (u, v), default
+            - 'eid' : one eid tensor
+        order : string
+            The order of the returned edges. Currently support:
+
+            - 'srcdst' : sorted by their src and dst ids.
+            - 'eid'    : sorted by edge Ids.
+            - None     : the arbitrary order.
+
+        Returns
+        -------
+        A tuple of Tensors (u, v, eid) if form == 'all'
+            ``eid[i]`` is the ID of an edge between ``u[i]`` and ``v[i]``.
+            All edges are returned.
+        A pair of Tensors (u, v) if form == 'uv'
+            An edge exists between ``u[i]`` and ``v[i]``.
+            If ``n`` edges exist between ``u`` and ``v``, then ``u`` and ``v`` as a pair
+            will appear ``n`` times.
+        One Tensor if form == 'eid'
+            ``eid[i]`` is the ID of an edge in the graph.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        Find the user-game pairs for all gameplays:
+        >>> g['user', 'game', 'plays'].all_edges('uv')
+        (tensor([0, 1, 1, 2]), tensor([0, 0, 1, 1]))
+        """
+        pass
+
+    def in_degree(self, v):
+        """Return the in-degree of node ``v``.
+
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+
+        Parameters
+        ----------
+        v : int
+            The node ID.
+
+        Returns
+        -------
+        int
+            The in-degree.
+
+        Examples
+        --------
+        Find how many users are playing Game #0 (Tetris):
+        >>> g['user', 'game', 'plays'].in_degree(0)
+        2
+
+        See Also
+        --------
+        in_degrees
+        """
+        pass
+
+    def in_degrees(self, v=ALL):
+        """Return the array `d` of in-degrees of the node array `v`.
+
+        `d[i]` is the in-degree of node `v[i]`.
+
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+
+        Parameters
+        ----------
+        v : list, tensor, optional.
+            The node ID array. Default is to return the degrees of all the nodes.
+
+        Returns
+        -------
+        d : tensor
+            The in-degree array.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        Find how many users are playing Game #0 and #1 (Tetris and Minecraft):
+        >>> g['user', 'game', 'plays'].in_degrees([0, 1])
+        tensor([2, 2])
+
+        See Also
+        --------
+        in_degree
+        """
+        pass
+
+    def out_degree(self, v):
+        """Return the out-degree of node `v`.
+
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+
+        Parameters
+        ----------
+        v : int
+            The node ID.
+
+        Returns
+        -------
+        int
+            The out-degree.
+
+        Examples
+        --------
+        Find how many games User #0 Alice is playing
+        >>> g['user', 'game', 'plays'].out_degree(0)
+        1
+
+        See Also
+        --------
+        out_degrees
+        """
+        pass
+
+    def out_degrees(self, v=ALL):
+        """Return the array `d` of out-degrees of the node array `v`.
+
+        `d[i]` is the out-degree of node `v[i]`.
+
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+
+        Parameters
+        ----------
+        v : list, tensor
+            The node ID array. Default is to return the degrees of all the nodes.
+
+        Returns
+        -------
+        d : tensor
+            The out-degree array.
+
+        Examples
+        --------
+        The following example uses PyTorch backend.
+
+        Find how many games User #0 and #1 (Alice and Bob) are playing
+        >>> g['user', 'game', 'plays'].out_degrees([0, 1])
+        tensor([1, 2])
+
+        See Also
+        --------
+        out_degree
+        """
+        pass
+
+
+class DGLBaseHeteroGraphView(DGLBaseHeteroGraph):
     """View on a heterogeneous graph, constructed from
     DGLBaseHeteroGraph.__getitem__().
 
