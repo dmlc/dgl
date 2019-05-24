@@ -169,9 +169,16 @@ std::string IdArrayToStr(IdArray arr) {
   int64_t len = arr->shape[0];
   std::ostringstream oss;
   oss << "[";
-  dgl_id_t* data = static_cast<dgl_id_t*>(arr->data);
-  for (int64_t i = 0; i < len; ++i) {
-    oss << data[i] << " ";
+  if (arr->dtype.bits == 32) {
+    int32_t* data = static_cast<int32_t*>(arr->data);
+    for (int64_t i = 0; i < len; ++i) {
+      oss << data[i] << " ";
+    }
+  } else {
+    int64_t* data = static_cast<int64_t*>(arr->data);
+    for (int64_t i = 0; i < len; ++i) {
+      oss << data[i] << " ";
+    }
   }
   oss << "]";
   return oss.str();

@@ -750,18 +750,13 @@ ImmutableGraph ImmutableGraph::AsNumBits(uint8_t bits) const {
   if (NumBits() == bits) {
     return *this;
   } else {
-    CSRPtr new_incsr{nullptr}, new_outcsr{nullptr};
-    COOPtr new_coo{nullptr};
-    if (in_csr_) {
-      new_incsr = CSRPtr(new CSR(in_csr_->AsNumBits(bits)));
-    }
-    if (out_csr_) {
-      new_outcsr = CSRPtr(new CSR(out_csr_->AsNumBits(bits)));
-    }
-    if (coo_) {
-      new_coo = COOPtr(new COO(coo_->AsNumBits(bits)));
-    }
-    return ImmutableGraph(new_incsr, new_outcsr, new_coo);
+    // TODO(minjie): since we don't have int32 operations,
+    //   we make sure that this graph (on CPU) has materialized CSR,
+    //   and then copy them to other context (usually GPU). This should
+    //   be fixed later.
+    CSRPtr new_incsr = CSRPtr(new CSR(GetInCSR()->AsNumBits(bits)));
+    CSRPtr new_outcsr = CSRPtr(new CSR(GetOutCSR()->AsNumBits(bits)));
+    return ImmutableGraph(new_incsr, new_outcsr, nullptr);
   }
 }
 

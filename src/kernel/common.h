@@ -82,7 +82,7 @@ namespace kernel {
     typedef int32_t Idx;                               \
     {__VA_ARGS__}                                      \
   } else if (bits == 64) {                             \
-    typedef int32_t Idx;                               \
+    typedef int64_t Idx;                               \
     {__VA_ARGS__}                                      \
   } else {                                             \
     LOG(FATAL) << "Unsupported idx bits: " << bits;    \
