@@ -1,3 +1,4 @@
+import os, sys
 import argparse, time, math
 import numpy as np
 import mxnet as mx
@@ -6,137 +7,9 @@ import dgl
 import dgl.function as fn
 from dgl import DGLGraph
 from dgl.data import register_data_args, load_data
-
-
-class NodeUpdate(gluon.Block):
-    def __init__(self, layer_id, in_feats, out_feats, dropout, activation=None, test=False, concat=False):
-        super(NodeUpdate, self).__init__()
-        self.layer_id = layer_id
-        self.dropout = dropout
-        self.test = test
-        self.concat = concat
-        with self.name_scope():
-            self.dense = gluon.nn.Dense(out_feats, in_units=in_feats)
-            self.activation = activation
-
-    def forward(self, node):
-        h = node.data['h']
-        norm = node.data['norm']
-        if self.test:
-            h = h * norm
-        else:
-            agg_history_str = 'agg_h_{}'.format(self.layer_id-1)
-            agg_history = node.data[agg_history_str]
-            subg_norm = node.data['subg_norm']
-            # control variate
-            h = h * subg_norm + agg_history * norm
-            if self.dropout:
-                h = mx.nd.Dropout(h, p=self.dropout)
-        h = self.dense(h)
-        if self.concat:
-            h = mx.nd.concat(h, self.activation(h))
-        elif self.activation:
-            h = self.activation(h)
-        return {'activation': h}
-
-
-class GCNSampling(gluon.Block):
-    def __init__(self,
-                 in_feats,
-                 n_hidden,
-                 n_classes,
-                 n_layers,
-                 activation,
-                 dropout,
-                 **kwargs):
-        super(GCNSampling, self).__init__(**kwargs)
-        self.dropout = dropout
-        self.n_layers = n_layers
-        with self.name_scope():
-            self.layers = gluon.nn.Sequential()
-            # input layer
-            self.dense = gluon.nn.Dense(n_hidden, in_units=in_feats)
-            self.activation = activation
-            # hidden layers
-            for i in range(1, n_layers):
-                skip_start = (i == self.n_layers-1)
-                self.layers.add(NodeUpdate(i, n_hidden, n_hidden, dropout, activation, concat=skip_start))
-            # output layer
-            self.layers.add(NodeUpdate(n_layers, 2*n_hidden, n_classes, dropout))
-
-    def forward(self, nf):
-        h = nf.layers[0].data['preprocess']
-        if self.dropout:
-            h = mx.nd.Dropout(h, p=self.dropout)
-        h = self.dense(h)
-
-        skip_start = (0 == self.n_layers-1)
-        if skip_start:
-            h = mx.nd.concat(h, self.activation(h))
-        else:
-            h = self.activation(h)
-
-        for i, layer in enumerate(self.layers):
-            new_history = h.copy().detach()
-            history_str = 'h_{}'.format(i)
-            history = nf.layers[i].data[history_str]
-            h = h - history
-
-            nf.layers[i].data['h'] = h
-            nf.block_compute(i,
-                             fn.copy_src(src='h', out='m'),
-                             fn.sum(msg='m', out='h'),
-                             layer)
-            h = nf.layers[i+1].data.pop('activation')
-            # update history
-            if i < nf.num_layers-1:
-                nf.layers[i].data[history_str] = new_history
-
-        return h
-
-
-class GCNInfer(gluon.Block):
-    def __init__(self,
-                 in_feats,
-                 n_hidden,
-                 n_classes,
-                 n_layers,
-                 activation,
-                 **kwargs):
-        super(GCNInfer, self).__init__(**kwargs)
-        self.n_layers = n_layers
-        with self.name_scope():
-            self.layers = gluon.nn.Sequential()
-            # input layer
-            self.dense = gluon.nn.Dense(n_hidden, in_units=in_feats)
-            self.activation = activation
-            # hidden layers
-            for i in range(1, n_layers):
-                skip_start = (i == self.n_layers-1)
-                self.layers.add(NodeUpdate(i, n_hidden, n_hidden, 0, activation, True, concat=skip_start))
-            # output layer
-            self.layers.add(NodeUpdate(n_layers, 2*n_hidden, n_classes, 0, None, True))
-
-
-    def forward(self, nf):
-        h = nf.layers[0].data['preprocess']
-        h = self.dense(h)
-
-        skip_start = (0 == self.n_layers-1)
-        if skip_start:
-            h = mx.nd.concat(h, self.activation(h))
-        else:
-            h = self.activation(h)
-
-        for i, layer in enumerate(self.layers):
-            nf.layers[i].data['h'] = h
-            nf.block_compute(i,
-                             fn.copy_src(src='h', out='m'),
-                             fn.sum(msg='m', out='h'),
-                             layer)
-            h = nf.layers[i+1].data.pop('activation')
-
-        return h
+parentdir=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, parentdir)
+from gcn_cv_sc import NodeUpdate, GCNSampling, GCNInfer
 
 
 def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples, distributed):
@@ -189,6 +62,9 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples, d
                             {'learning_rate': args.lr, 'wd': args.weight_decay},
                             kvstore=mx.kv.create(kv_type))
 
+    # Create sampler receiver
+    sampler = dgl.contrib.sampling.SamplerReceiver(graph=g, addr=args.ip, num_sender=args.num_sampler)
+
     # initialize graph
     dur = []
     adj = g.adjacency_matrix().as_in_context(g_ctx)
@@ -198,13 +74,7 @@ def gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples, d
             msg_head = "Worker {:d}, epoch {:d}".format(g.worker_id, epoch)
         else:
             msg_head = "epoch {:d}".format(epoch)
-        for nf in dgl.contrib.sampling.NeighborSampler(g, args.batch_size,
-                                                       args.num_neighbors,
-                                                       neighbor_type='in',
-                                                       num_workers=32,
-                                                       shuffle=True,
-                                                       num_hops=n_layers,
-                                                       seed_nodes=train_nid):
+        for nf in sampler:
             for i in range(n_layers):
                 agg_history_str = 'agg_h_{}'.format(i)
                 dests = nf.layer_parent_nid(i+1).as_in_context(g_ctx)
