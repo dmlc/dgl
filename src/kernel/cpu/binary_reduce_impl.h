@@ -19,19 +19,20 @@ namespace dgl {
 namespace kernel {
 namespace cpu {
 
-template <typename DType,
+template <typename Idx,
+          typename DType,
           typename Functors>
 struct BinaryReduce {
   static inline bool CondEdge(
-      mg_int src, mg_int dst, mg_int eid, GData<DType>* gdata) {
+      Idx src, Idx dst, Idx eid, GData<Idx, DType>* gdata) {
     return true;
   }
   static inline void ApplyEdge(
-      mg_int src, mg_int dst, mg_int eid, GData<DType>* gdata) {
+      Idx src, Idx dst, Idx eid, GData<Idx, DType>* gdata) {
     const int64_t D = gdata->x_length;
-    int64_t lid = Functors::SelectLeft(src, eid, dst);
-    int64_t rid = Functors::SelectRight(src, eid, dst);
-    int64_t oid = Functors::SelectOut(src, eid, dst);
+    Idx lid = Functors::SelectLeft(src, eid, dst);
+    Idx rid = Functors::SelectRight(src, eid, dst);
+    Idx oid = Functors::SelectOut(src, eid, dst);
     if (gdata->lhs_mapping) {
       lid = Functors::GetId(lid, gdata->lhs_mapping);
     }
@@ -69,17 +70,17 @@ inline int64_t Ravel(const int64_t* idx, int ndim,
   return out;
 }
 
-template <int NDim, typename DType, typename Functors>
+template <int NDim, typename Idx, typename DType, typename Functors>
 struct BinaryReduceBcast {
   static inline bool CondEdge(
-      mg_int src, mg_int dst, mg_int eid, BcastGData<NDim, DType>* gdata) {
+      Idx src, Idx dst, Idx eid, BcastGData<NDim, Idx, DType>* gdata) {
     return true;
   }
   static inline void ApplyEdge(
-      mg_int src, mg_int dst, mg_int eid, BcastGData<NDim, DType>* gdata) {
-    int64_t lid = Functors::SelectLeft(src, eid, dst);
-    int64_t rid = Functors::SelectRight(src, eid, dst);
-    int64_t oid = Functors::SelectOut(src, eid, dst);
+      Idx src, Idx dst, Idx eid, BcastGData<NDim, Idx, DType>* gdata) {
+    Idx lid = Functors::SelectLeft(src, eid, dst);
+    Idx rid = Functors::SelectRight(src, eid, dst);
+    Idx oid = Functors::SelectOut(src, eid, dst);
     if (gdata->lhs_mapping) {
       lid = Functors::GetId(lid, gdata->lhs_mapping);
     }
@@ -105,20 +106,21 @@ struct BinaryReduceBcast {
   }
 };
 
-template <typename DType,
+template <typename Idx,
+          typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 struct FunctorsTempl {
-  static inline mg_int SelectOut(
-      mg_int src, mg_int edge, mg_int dst) {
+  static inline Idx SelectOut(
+      Idx src, Idx edge, Idx dst) {
     return OutSelector<Reducer>::Type::Call(src, edge, dst);
   }
-  static inline mg_int SelectLeft(
-      mg_int src, mg_int edge, mg_int dst) {
+  static inline Idx SelectLeft(
+      Idx src, Idx edge, Idx dst) {
     return LeftSelector::Call(src, edge, dst);
   }
-  static inline mg_int SelectRight(
-      mg_int src, mg_int edge, mg_int dst) {
+  static inline Idx SelectRight(
+      Idx src, Idx edge, Idx dst) {
     return RightSelector::Call(src, edge, dst);
   }
   static inline DType Op(DType lhs, DType rhs) {
@@ -130,7 +132,7 @@ struct FunctorsTempl {
   static inline void Write(DType* addr, DType val) {
     Reducer::Call(addr, val);
   }
-  static inline int64_t GetId(int64_t id, int64_t* id_map) {
+  static inline Idx GetId(Idx id, Idx* id_map) {
     return *(id_map + id);
   }
 };
@@ -139,86 +141,84 @@ typedef minigun::advance::Config<true, minigun::advance::kV2N> AdvanceConfig;
 
 }  // namespace cpu
 
-template <int XPU, typename DType,
+template <int XPU, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduce_v2(const minigun::advance::RuntimeConfig& rtcfg,
                          const ImmutableGraph* graph,
-                         GData<DType>* gdata) {
-  using minigun::IntArray1D;
-  typedef cpu::FunctorsTempl<DType, LeftSelector,
+                         GData<Idx, DType>* gdata) {
+  typedef cpu::FunctorsTempl<Idx, DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer>
           Functors;
-  typedef cpu::BinaryReduce<DType, Functors> UDF;
+  typedef cpu::BinaryReduce<Idx, DType, Functors> UDF;
   // csr
   auto outcsr = graph->GetOutCSR();
-  minigun::Csr csr = utils::CreateCsr(outcsr->indptr(), outcsr->indices());
+  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr->indptr(), outcsr->indices());
   // If the user-given mapping is none and the target is edge data, we need to
   // replace the mapping by the edge ids in the csr graph so that the edge
   // data is correctly read/written.
   if (LeftSelector::target == binary_op::kEdge && gdata->lhs_mapping == nullptr) {
-    gdata->lhs_mapping = static_cast<int64_t*>(outcsr->edge_ids()->data);
+    gdata->lhs_mapping = static_cast<Idx*>(outcsr->edge_ids()->data);
   }
   if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
-    gdata->rhs_mapping = static_cast<int64_t*>(outcsr->edge_ids()->data);
+    gdata->rhs_mapping = static_cast<Idx*>(outcsr->edge_ids()->data);
   }
   if (OutSelector<Reducer>::Type::target == binary_op::kEdge
       && gdata->out_mapping == nullptr) {
-    gdata->out_mapping = static_cast<int64_t*>(outcsr->edge_ids()->data);
+    gdata->out_mapping = static_cast<Idx*>(outcsr->edge_ids()->data);
   }
   // TODO(minjie): allocator
-  minigun::advance::Advance<XPU, cpu::AdvanceConfig, GData<DType>, UDF>(
-        rtcfg, csr, gdata, IntArray1D());
+  minigun::advance::Advance<XPU, Idx, cpu::AdvanceConfig, GData<Idx, DType>, UDF>(
+        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
 }
 
-template <int XPU, int NDim, typename DType,
+template <int XPU, int NDim, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduceBcast_v2(
-    const minigun::advance::RuntimeConfig& rtcfg,
-    const ImmutableGraph* graph,
-    BcastGData<NDim, DType>* gdata) {
-  using minigun::IntArray1D;
-  typedef cpu::FunctorsTempl<DType, LeftSelector,
+  const minigun::advance::RuntimeConfig& rtcfg,
+  const ImmutableGraph* graph,
+  BcastGData<NDim, Idx, DType>* gdata) {
+  typedef cpu::FunctorsTempl<Idx, DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer>
           Functors;
-  typedef cpu::BinaryReduceBcast<NDim, DType, Functors> UDF;
+  typedef cpu::BinaryReduceBcast<NDim, Idx, DType, Functors> UDF;
   // csr
   auto outcsr = graph->GetOutCSR();
-  minigun::Csr csr = utils::CreateCsr(outcsr->indptr(), outcsr->indices());
+  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr->indptr(), outcsr->indices());
   // If the user-given mapping is none and the target is edge data, we need to
   // replace the mapping by the edge ids in the csr graph so that the edge
   // data is correctly read/written.
   if (LeftSelector::target == binary_op::kEdge && gdata->lhs_mapping == nullptr) {
-    gdata->lhs_mapping = static_cast<int64_t*>(outcsr->edge_ids()->data);
+    gdata->lhs_mapping = static_cast<Idx*>(outcsr->edge_ids()->data);
   }
   if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
-    gdata->rhs_mapping = static_cast<int64_t*>(outcsr->edge_ids()->data);
+    gdata->rhs_mapping = static_cast<Idx*>(outcsr->edge_ids()->data);
   }
   if (OutSelector<Reducer>::Type::target == binary_op::kEdge
       && gdata->out_mapping == nullptr) {
-    gdata->out_mapping = static_cast<int64_t*>(outcsr->edge_ids()->data);
+    gdata->out_mapping = static_cast<Idx*>(outcsr->edge_ids()->data);
   }
   // TODO(minjie): allocator
-  minigun::advance::Advance<XPU, cpu::AdvanceConfig,
-    BcastGData<NDim, DType>, UDF>(
-        rtcfg, csr, gdata, IntArray1D());
+  minigun::advance::Advance<XPU, Idx, cpu::AdvanceConfig,
+    BcastGData<NDim, Idx, DType>, UDF>(
+        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
 }
 
 #define GEN_DEFINE(dtype, lhs_tgt, rhs_tgt, op)                    \
-  template void CallBinaryReduce_v2<XPU,                           \
+  template void CallBinaryReduce_v2<XPU, IDX,                      \
         dtype, lhs_tgt, rhs_tgt, op<dtype>, REDUCER<XPU, dtype>>(  \
       const minigun::advance::RuntimeConfig& rtcfg,                \
       const ImmutableGraph* graph,                                 \
-      GData<dtype>* gdata);
+      GData<IDX, dtype>* gdata);
 
-#define GEN_BCAST_DEFINE(ndim, dtype, lhs_tgt, rhs_tgt, op)              \
-  template void CallBinaryReduceBcast_v2<XPU, ndim, dtype,               \
-                                 lhs_tgt, rhs_tgt,                       \
-                                 op<dtype>, REDUCER<XPU, dtype>>(        \
-      const minigun::advance::RuntimeConfig& rtcfg,                      \
-      const ImmutableGraph* graph,                                       \
-      BcastGData<ndim, dtype>* gdata);
+#define GEN_BCAST_DEFINE(ndim, dtype, lhs_tgt, rhs_tgt, op)         \
+  template void CallBinaryReduceBcast_v2<XPU, ndim, IDX, dtype,     \
+                                 lhs_tgt, rhs_tgt,                  \
+                                 op<dtype>, REDUCER<XPU, dtype>>(   \
+      const minigun::advance::RuntimeConfig& rtcfg,                 \
+      const ImmutableGraph* graph,                                  \
+      BcastGData<ndim, IDX, dtype>* gdata);
 
 #define EVAL(F, ...) F(__VA_ARGS__)
 

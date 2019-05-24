@@ -77,6 +77,17 @@ namespace kernel {
   }
 #endif
 
+#define DGL_IDX_TYPE_SWITCH(bits, Idx, ...)            \
+  if (bits == 32) {                                    \
+    typedef int32_t Idx;                               \
+    {__VA_ARGS__}                                      \
+  } else if (bits == 64) {                             \
+    typedef int32_t Idx;                               \
+    {__VA_ARGS__}                                      \
+  } else {                                             \
+    LOG(FATAL) << "Unsupported idx bits: " << bits;    \
+  }
+
 }  // namespace kernel
 }  // namespace dgl
 

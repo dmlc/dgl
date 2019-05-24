@@ -6,15 +6,12 @@
 #ifndef DGL_KERNEL_UTILS_H_
 #define DGL_KERNEL_UTILS_H_
 
+#include <minigun/csr.h>
 #include <dlpack/dlpack.h>
 #include <dgl/runtime/ndarray.h>
 
 #include <cstdlib>
 #include <vector>
-
-namespace minigun {
-struct Csr;
-}  // namespace minigun
 
 namespace dgl {
 namespace kernel {
@@ -52,15 +49,23 @@ int64_t NElements(const runtime::NDArray& array);
 int64_t Prod(const std::vector<int64_t>& vec);
 
 /*
- * !\brief Create minigun CSR from two ndarrays.
- */
-minigun::Csr CreateCsr(runtime::NDArray indptr, runtime::NDArray indices);
-
-/*
  * !\brief Fill the array with constant value.
  */
 template <int XPU, typename DType>
 void Fill(const DLContext& ctx, DType* ptr, size_t length, DType val);
+
+/*
+ * !\brief Create minigun CSR from two ndarrays.
+ */
+template <typename Idx>
+minigun::Csr<Idx> CreateCsr(runtime::NDArray indptr, runtime::NDArray indices) {
+  minigun::Csr<Idx> csr;
+  csr.row_offsets.data = static_cast<Idx*>(indptr->data);
+  csr.row_offsets.length = indptr->shape[0];
+  csr.column_indices.data = static_cast<Idx*>(indices->data);
+  csr.column_indices.length = indices->shape[0];
+  return csr;
+}
 
 }  // namespace utils
 }  // namespace kernel

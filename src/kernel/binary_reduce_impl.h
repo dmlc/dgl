@@ -26,33 +26,33 @@ namespace kernel {
 /****************************************************
  * BinaryOpReduce
  ****************************************************/
-
-template <int XPU, typename DType, typename Reducer>
-GData<DType> AllocGData(
+template <int XPU, typename Idx, typename DType, typename Reducer>
+GData<Idx, DType> AllocGData(
     const DLContext& ctx, int64_t x_len,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data,
     runtime::NDArray out_mapping, runtime::NDArray out_data) {
   // GData
-  GData<DType> gdata;
+  GData<Idx, DType> gdata;
   gdata.x_length = x_len;
   gdata.lhs_data = static_cast<DType*>(lhs_data->data);
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
   if (!utils::IsNoneArray(lhs_mapping)) {
-    gdata.lhs_mapping = static_cast<int64_t*>(lhs_mapping->data);
+    gdata.lhs_mapping = static_cast<Idx*>(lhs_mapping->data);
   }
   if (!utils::IsNoneArray(rhs_mapping)) {
-    gdata.rhs_mapping = static_cast<int64_t*>(rhs_mapping->data);
+    gdata.rhs_mapping = static_cast<Idx*>(rhs_mapping->data);
   }
   if (!utils::IsNoneArray(out_mapping)) {
-    gdata.out_mapping = static_cast<int64_t*>(out_mapping->data);
+    gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
   // fill out data with zero values
   utils::Fill<XPU>(ctx, gdata.out_data, utils::NElements(out_data), Zero<Reducer>::value);
   return gdata;
 }
 
+/*
 template <int XPU>
 void BinaryReduceImpl(
     const std::string& reducer,
@@ -104,7 +104,7 @@ void BinaryReduceImpl(
       });
     });
   });
-}
+}*/
 
 template <int XPU>
 void BinaryReduceImpl_v2(
@@ -135,20 +135,27 @@ void BinaryReduceImpl_v2(
   //              instruction level parallelism
   rtcfg.data_num_blocks = (x_len + (nt * 2) - 1) / (nt * 2);
 #endif
-  const DLDataType& dtype = out_data->dtype;
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
   }
+  const DLDataType& dtype = out_data->dtype;
+  const auto bits = graph->NumBits();
   DGL_DTYPE_SWITCH(dtype, DType, {
-    REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
-      GData<DType> gdata = AllocGData<XPU, DType, Reducer>(
-          rtcfg.ctx, x_len, lhs_mapping, rhs_mapping,
-          lhs_data, rhs_data, out_mapping, out_data);
-      BINARY_OP_SWITCH(op, DType, BinaryOp, {
-        TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-          CallBinaryReduce_v2<XPU, DType, LeftTarget,
-            RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
+#ifdef __CUDACC__
+    ({typedef int32_t Idx;
+#else
+    DGL_IDX_TYPE_SWITCH(bits, Idx, {
+#endif
+      REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
+        auto gdata = AllocGData<XPU, Idx, DType, Reducer>(
+            rtcfg.ctx, x_len, lhs_mapping, rhs_mapping,
+            lhs_data, rhs_data, out_mapping, out_data);
+        BINARY_OP_SWITCH(op, DType, BinaryOp, {
+          TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
+            CallBinaryReduce_v2<XPU, Idx, DType, LeftTarget,
+              RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
+          });
         });
       });
     });
@@ -158,7 +165,7 @@ void BinaryReduceImpl_v2(
 /****************************************************
  * BackwardBinaryOpReduce
  ****************************************************/
-
+/*
 template <int XPU, typename DType>
 BackwardGData<DType> AllocBackwardGData(
     const DLContext& ctx, int64_t x_len,
@@ -255,20 +262,19 @@ void BackwardBinaryReduceImpl(
       });
     });
   });
-}
+}*/
 
 /****************************************************
  * BinaryOpReduceBcast
  ****************************************************/
-
-template <int XPU, int NDim, typename DType, typename Reducer>
-BcastGData<NDim, DType> AllocBcastGData(
+template <int XPU, int NDim, typename Idx, typename DType, typename Reducer>
+BcastGData<NDim, Idx, DType> AllocBcastGData(
     const DLContext& ctx, const BcastInfo& info,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data,
     runtime::NDArray out_mapping, runtime::NDArray out_data) {
   // GData
-  BcastGData<NDim, DType> gdata;
+  BcastGData<NDim, Idx, DType> gdata;
   // dim, shape and stride
   gdata.ndim = info.lhs_shape.size();
   std::copy(info.lhs_shape.begin(), info.lhs_shape.end(), gdata.lhs_shape);
@@ -285,19 +291,20 @@ BcastGData<NDim, DType> AllocBcastGData(
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
   if (!utils::IsNoneArray(lhs_mapping)) {
-    gdata.lhs_mapping = static_cast<int64_t*>(lhs_mapping->data);
+    gdata.lhs_mapping = static_cast<Idx*>(lhs_mapping->data);
   }
   if (!utils::IsNoneArray(rhs_mapping)) {
-    gdata.rhs_mapping = static_cast<int64_t*>(rhs_mapping->data);
+    gdata.rhs_mapping = static_cast<Idx*>(rhs_mapping->data);
   }
   if (!utils::IsNoneArray(out_mapping)) {
-    gdata.out_mapping = static_cast<int64_t*>(out_mapping->data);
+    gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
   // fill out data with zero values
   utils::Fill<XPU>(ctx, gdata.out_data, utils::NElements(out_data), Zero<Reducer>::value);
   return gdata;
 }
 
+/*
 template <int XPU>
 void BinaryReduceBcastImpl(
     const BcastInfo& info,
@@ -356,7 +363,7 @@ void BinaryReduceBcastImpl(
       });
     });
   });
-}
+}*/
 
 template <int XPU>
 void BinaryReduceBcastImpl_v2(
@@ -392,20 +399,27 @@ void BinaryReduceBcastImpl_v2(
 
   const DLDataType& dtype = out_data->dtype;
   const int bcast_ndim = info.out_shape.size();
+  const auto bits = graph->NumBits();
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
   }
   DGL_DTYPE_SWITCH(dtype, DType, {
-    REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
-      BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
-        BcastGData<NDim, DType> gdata = AllocBcastGData<XPU, NDim, DType, Reducer>(
-            rtcfg.ctx, info, lhs_mapping, rhs_mapping,
-            lhs_data, rhs_data, out_mapping, out_data);
-        BINARY_OP_SWITCH(op, DType, BinaryOp, {
-          TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-            CallBinaryReduceBcast_v2<XPU, NDim, DType, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
+#ifdef __CUDACC__
+    ({typedef int32_t Idx;
+#else
+    DGL_IDX_TYPE_SWITCH(bits, Idx, {
+#endif
+      REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
+        BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
+          auto gdata = AllocBcastGData<XPU, NDim, Idx, DType, Reducer>(
+              rtcfg.ctx, info, lhs_mapping, rhs_mapping,
+              lhs_data, rhs_data, out_mapping, out_data);
+          BINARY_OP_SWITCH(op, DType, BinaryOp, {
+            TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
+              CallBinaryReduceBcast_v2<XPU, NDim, Idx, DType, LeftTarget,
+                RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
+            });
           });
         });
       });
@@ -416,7 +430,7 @@ void BinaryReduceBcastImpl_v2(
 /****************************************************
  * BackwardBinaryOpReduceBcast
  ****************************************************/
-
+/*
 template <int XPU, int NDim, typename DType>
 BackwardBcastGData<NDim, DType> AllocBackwardBcastGData(
     const DLContext& ctx, const BcastInfo& info,
@@ -526,7 +540,7 @@ void BackwardBinaryReduceBcastImpl(
       });
     });
   });
-}
+}*/
 
 }  // namespace kernel
 }  // namespace dgl

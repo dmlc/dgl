@@ -13,7 +13,6 @@
 #include "./binary_reduce_common.h"
 
 namespace minigun {
-struct Csr;
 namespace advance {
 struct RuntimeConfig;
 }  // namespace advance
@@ -27,7 +26,7 @@ namespace kernel {
 
 struct BcastInfo;
 
-template <typename DType>
+template <typename Idx, typename DType>
 struct GData {
   // length along x dimension
   int64_t x_length{0};
@@ -36,18 +35,19 @@ struct GData {
   // output data
   DType *out_data{nullptr};
   // input id mappings
-  int64_t *lhs_mapping{nullptr}, *rhs_mapping{nullptr};
+  Idx *lhs_mapping{nullptr}, *rhs_mapping{nullptr};
   // output id mapping
-  int64_t *out_mapping{nullptr};
+  Idx *out_mapping{nullptr};
 };
 
-template <int XPU, typename DType,
+/*template <int XPU, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
     const minigun::Csr& csr, const minigun::Csr& rev_csr,
     GData<DType>* gdata);
+*/
 
 template <int XPU>
 void BinaryReduceImpl(
@@ -60,13 +60,13 @@ void BinaryReduceImpl(
     runtime::NDArray lhs_data, runtime::NDArray rhs_data,
     runtime::NDArray out_mapping, runtime::NDArray out_data);
 
-template <int XPU, typename DType,
+template <int XPU, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduce_v2(
     const minigun::advance::RuntimeConfig& rtcfg,
     const ImmutableGraph* graph,
-    GData<DType>* gdata);
+    GData<Idx, DType>* gdata);
 
 template <int XPU>
 void BinaryReduceImpl_v2(
@@ -92,6 +92,7 @@ struct BackwardGData {
   int64_t *out_mapping{nullptr};
 };
 
+/*
 template <int XPU, int Mode, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
@@ -99,6 +100,7 @@ void CallBackwardBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
     const minigun::Csr& csr, const minigun::Csr& rev_csr,
     BackwardGData<DType>* gdata);
+*/
 
 template <int XPU>
 void BackwardBinaryReduceImpl(
@@ -119,7 +121,7 @@ void BackwardBinaryReduceImpl(
  *
  * Note that all the shapes and strides are for the feature dimensions.
  */
-template <int NDim, typename DType>
+template <int NDim, typename Idx, typename DType>
 struct BcastGData {
   int ndim{0};
   // input shape and stride
@@ -129,16 +131,17 @@ struct BcastGData {
   // input data
   DType *lhs_data{nullptr}, *rhs_data{nullptr};
   // input id mappings
-  int64_t *lhs_mapping{nullptr}, *rhs_mapping{nullptr};
+  Idx *lhs_mapping{nullptr}, *rhs_mapping{nullptr};
   // output shape and stride
   int64_t out_len{0};  // output total length;
   int64_t out_shape[NDim]{0}, out_stride[NDim]{0};
   // output data
   DType *out_data{nullptr};
   // output id mapping
-  int64_t *out_mapping{nullptr};
+  Idx *out_mapping{nullptr};
 };
 
+/*
 template <int XPU, int NDim, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
@@ -146,6 +149,7 @@ void CallBinaryReduceBcast(
     const minigun::advance::RuntimeConfig& rtcfg,
     const minigun::Csr& csr, const minigun::Csr& rev_csr,
     BcastGData<NDim, DType>* gdata);
+*/
 
 template <int XPU>
 void BinaryReduceBcastImpl(
@@ -163,13 +167,13 @@ void BinaryReduceBcastImpl(
     runtime::NDArray out_mapping,
     runtime::NDArray out_data);
 
-template <int XPU, int NDim, typename DType,
+template <int XPU, int NDim, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduceBcast_v2(
     const minigun::advance::RuntimeConfig& rtcfg,
     const ImmutableGraph* graph,
-    BcastGData<NDim, DType>* gdata);
+    BcastGData<NDim, Idx, DType>* gdata);
 
 template <int XPU>
 void BinaryReduceBcastImpl_v2(
@@ -208,6 +212,7 @@ struct BackwardBcastGData {
   DType *grad_lhs_data{nullptr}, *grad_rhs_data{nullptr};
 };
 
+/*
 template <int XPU, int Mode, int NDim, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
@@ -215,6 +220,7 @@ void CallBackwardBinaryReduceBcast(
     const minigun::advance::RuntimeConfig& rtcfg,
     const minigun::Csr& csr, const minigun::Csr& rev_csr,
     BackwardBcastGData<NDim, DType>* gdata);
+*/
 
 template <int XPU>
 void BackwardBinaryReduceBcastImpl(

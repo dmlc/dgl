@@ -15,14 +15,14 @@ namespace dgl {
 namespace kernel {
 namespace cpu {
 
-template <int Mode, typename DType, typename Functors>
+template <int Mode, typename Idx, typename DType, typename Functors>
 struct BackwardBinaryReduce {
   static inline bool CondEdge(
-      mg_int src, mg_int dst, mg_int eid, BackwardGData<DType>* gdata) {
+      Idx src, Idx dst, Idx eid, BackwardGData<DType>* gdata) {
     return true;
   }
   static inline void ApplyEdge(
-      mg_int src, mg_int dst, mg_int eid, BackwardGData<DType>* gdata) {
+      Idx src, Idx dst, Idx eid, BackwardGData<DType>* gdata) {
     const int64_t D = gdata->x_length;
     int64_t lid = Functors::SelectLeft(src, eid, dst);
     int64_t rid = Functors::SelectRight(src, eid, dst);
@@ -63,14 +63,15 @@ struct BackwardBinaryReduce {
   }
 };
 
-template <int Mode, int NDim, typename DType, typename Functors>
+template <int Mode, int NDim,
+          typename Idx, typename DType, typename Functors>
 struct BackwardBinaryReduceBcast {
   static inline bool CondEdge(
-      mg_int src, mg_int dst, mg_int eid, BackwardBcastGData<NDim, DType>* gdata) {
+      Idx src, Idx dst, Idx eid, BackwardBcastGData<NDim, DType>* gdata) {
     return true;
   }
   static inline void ApplyEdge(
-      mg_int src, mg_int dst, mg_int eid, BackwardBcastGData<NDim, DType>* gdata) {
+      Idx src, Idx dst, Idx eid, BackwardBcastGData<NDim, DType>* gdata) {
     int64_t lid = Functors::SelectLeft(src, eid, dst);
     int64_t rid = Functors::SelectRight(src, eid, dst);
     int64_t oid = Functors::SelectOut(src, eid, dst);
@@ -114,20 +115,20 @@ struct BackwardBinaryReduceBcast {
   }
 };
 
-template <typename DType,
+template <typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 struct BackwardFunctorsTempl {
-  static inline mg_int SelectOut(
-      mg_int src, mg_int edge, mg_int dst) {
+  static inline Idx SelectOut(
+      Idx src, Idx edge, Idx dst) {
     return GradOutSelector<Reducer>::Type::Call(src, edge, dst);
   }
-  static inline mg_int SelectLeft(
-      mg_int src, mg_int edge, mg_int dst) {
+  static inline Idx SelectLeft(
+      Idx src, Idx edge, Idx dst) {
     return LeftSelector::Call(src, edge, dst);
   }
-  static inline mg_int SelectRight(
-      mg_int src, mg_int edge, mg_int dst) {
+  static inline Idx SelectRight(
+      Idx src, Idx edge, Idx dst) {
     return RightSelector::Call(src, edge, dst);
   }
   static inline DType Op(DType lhs, DType rhs) {
@@ -139,7 +140,7 @@ struct BackwardFunctorsTempl {
   static inline void Write(DType* addr, DType val) {
     Reducer::Call(addr, val);
   }
-  static inline int64_t GetId(int64_t id, int64_t* id_map) {
+  static inline Idx GetId(Idx id, Idx* id_map) {
     return *(id_map + id);
   }
   static inline DType BackwardWrite(DType val, DType accum) {
@@ -162,16 +163,16 @@ template <int XPU, int Mode, typename DType,
           typename BinaryOp, typename Reducer>
 void CallBackwardBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
-    const minigun::Csr& csr, const minigun::Csr& rev_csr,
+    const minigun::LongCsr& csr, const minigun::LongCsr& rev_csr,
     BackwardGData<DType>* gdata) {
-  using minigun::IntArray1D;
-  typedef cpu::BackwardFunctorsTempl<DType, LeftSelector,
+  using minigun::LongArray;
+  typedef cpu::BackwardFunctorsTempl<int64_t, DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer>
           Functors;
-  typedef cpu::BackwardBinaryReduce<Mode, DType, Functors> UDF;
+  typedef cpu::BackwardBinaryReduce<Mode, int64_t, DType, Functors> UDF;
   // TODO(minjie): allocator
-  minigun::advance::Advance<XPU, cpu::AdvanceConfig, BackwardGData<DType>, UDF>(
-        rtcfg, rev_csr, gdata, IntArray1D());
+  minigun::advance::Advance<XPU, int64_t, cpu::AdvanceConfig, BackwardGData<DType>, UDF>(
+        rtcfg, rev_csr, gdata, LongArray());
 }
 
 #define GEN_BACKWARD_DEFINE(mode, dtype, lhs_tgt, rhs_tgt, op)  \
@@ -180,8 +181,8 @@ void CallBackwardBinaryReduce(
                     lhs_tgt, rhs_tgt,                           \
                     op<dtype>, REDUCER<XPU, dtype>>(            \
       const minigun::advance::RuntimeConfig& rtcfg,             \
-      const minigun::Csr& csr,                                  \
-      const minigun::Csr& rev_csr,                              \
+      const minigun::LongCsr& csr,                                  \
+      const minigun::LongCsr& rev_csr,                              \
       BackwardGData<dtype>* gdata);
 
 template <int XPU, int Mode, int NDim, typename DType,
@@ -189,17 +190,17 @@ template <int XPU, int Mode, int NDim, typename DType,
           typename BinaryOp, typename Reducer>
 void CallBackwardBinaryReduceBcast(
     const minigun::advance::RuntimeConfig& rtcfg,
-    const minigun::Csr& csr, const minigun::Csr& rev_csr,
+    const minigun::LongCsr& csr, const minigun::LongCsr& rev_csr,
     BackwardBcastGData<NDim, DType>* gdata) {
-  using minigun::IntArray1D;
-  typedef cpu::BackwardFunctorsTempl<DType, LeftSelector,
+  using minigun::LongArray;
+  typedef cpu::BackwardFunctorsTempl<int64_t, DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer>
           Functors;
-  typedef cpu::BackwardBinaryReduceBcast<Mode, NDim, DType, Functors> UDF;
+  typedef cpu::BackwardBinaryReduceBcast<Mode, NDim, int64_t, DType, Functors> UDF;
   // TODO(minjie): allocator
-  minigun::advance::Advance<XPU, cpu::AdvanceConfig,
+  minigun::advance::Advance<XPU, int64_t, cpu::AdvanceConfig,
     BackwardBcastGData<NDim, DType>, UDF>(
-        rtcfg, rev_csr, gdata, IntArray1D());
+        rtcfg, rev_csr, gdata, LongArray());
 }
 
 #define GEN_BACKWARD_BCAST_DEFINE(mode, ndim, dtype, lhs_tgt, rhs_tgt, op)  \
@@ -208,8 +209,8 @@ void CallBackwardBinaryReduceBcast(
                     lhs_tgt, rhs_tgt,                                       \
                     op<dtype>, REDUCER<XPU, dtype>>(                        \
       const minigun::advance::RuntimeConfig& rtcfg,                         \
-      const minigun::Csr& csr,                                              \
-      const minigun::Csr& rev_csr,                                          \
+      const minigun::LongCsr& csr,                                              \
+      const minigun::LongCsr& rev_csr,                                          \
       BackwardBcastGData<ndim, dtype>* gdata);
 
 }  // namespace kernel
