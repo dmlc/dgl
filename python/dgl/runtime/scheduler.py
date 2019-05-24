@@ -56,7 +56,7 @@ def schedule_send(graph, u, v, eid, message_func):
     msg = _gen_send(graph, var_nf, var_nf, var_ef, var_u, var_v, var_eid, message_func)
     ir.WRITE_ROW_(var_mf, var_eid, msg)
     # set message indicator to 1
-    graph._msg_index = graph._msg_index.set_items(eid, 1)
+    graph._set_msg_index(graph._get_msg_index().set_items(eid, 1))
 
 def schedule_recv(graph,
                   recv_nodes,
@@ -80,7 +80,7 @@ def schedule_recv(graph,
     """
     src, dst, eid = graph._graph.in_edges(recv_nodes)
     if len(eid) > 0:
-        nonzero_idx = graph._msg_index.get_items(eid).nonzero()
+        nonzero_idx = graph._get_msg_index().get_items(eid).nonzero()
         eid = eid.get_items(nonzero_idx)
         src = src.get_items(nonzero_idx)
         dst = dst.get_items(nonzero_idx)
@@ -107,8 +107,8 @@ def schedule_recv(graph,
         else:
             ir.WRITE_ROW_(var_nf, var_recv_nodes, final_feat)
         # set message indicator to 0
-        graph._msg_index = graph._msg_index.set_items(eid, 0)
-        if not graph._msg_index.has_nonzero():
+        graph._set_msg_index(graph._get_msg_index().set_items(eid, 0))
+        if not graph._get_msg_index().has_nonzero():
             ir.CLEAR_FRAME_(var.FEAT_DICT(graph._msg_frame, name='mf'))
 
 def schedule_snr(graph,
