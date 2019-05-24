@@ -12,6 +12,10 @@ from dgl.contrib.sampling import SamplerPool
 
 class MySamplerPool(SamplerPool):
     def worker(self, args):
+        # Start sender
+        namebook = { 0:args.ip }
+        sender = dgl.contrib.sampling.SamplerSender(namebook)
+
         # load and preprocess dataset
         data = load_data(args)
 
