@@ -164,6 +164,19 @@ BcastInfo CalcBcastInfo(NDArray lhs, NDArray rhs) {
       lhs_data, rhs_data,
       out_mapping, out_data);
 }*/
+
+std::string IdArrayToStr(IdArray arr) {
+  int64_t len = arr->shape[0];
+  std::ostringstream oss;
+  oss << "[";
+  dgl_id_t* data = static_cast<dgl_id_t*>(arr->data);
+  for (int64_t i = 0; i < len; ++i) {
+    oss << data[i] << " ";
+  }
+  oss << "]";
+  return oss.str();
+}
+
 }  // namespace
 
 

@@ -456,12 +456,31 @@ COOPtr CSR::ToCOO() const {
 }
 
 CSR CSR::CopyTo(const DLContext& ctx) const {
-  CSR ret;
-  ret.indptr_ = indptr_.CopyTo(ctx);
-  ret.indices_ = indices_.CopyTo(ctx);
-  ret.edge_ids_ = edge_ids_.CopyTo(ctx);
-  ret.is_multigraph_ = is_multigraph_;
-  return ret;
+  if (Context() == ctx) {
+    return *this;
+  } else {
+    // TODO(minjie): change to use constructor later
+    CSR ret;
+    ret.indptr_ = indptr_.CopyTo(ctx);
+    ret.indices_ = indices_.CopyTo(ctx);
+    ret.edge_ids_ = edge_ids_.CopyTo(ctx);
+    ret.is_multigraph_ = is_multigraph_;
+    return ret;
+  }
+}
+
+CSR CSR::AsNumBits(uint8_t bits) const {
+  if (NumBits() == bits) {
+    return *this;
+  } else {
+    // TODO(minjie): change to use constructor later
+    CSR ret;
+    ret.indptr_ = dgl::AsNumBits(indptr_, bits);
+    ret.indices_ = dgl::AsNumBits(indices_, bits);
+    ret.edge_ids_ = dgl::AsNumBits(edge_ids_, bits);
+    ret.is_multigraph_ = is_multigraph_;
+    return ret;
+  }
 }
 
 //////////////////////////////////////////////////////////
@@ -614,12 +633,31 @@ CSRPtr COO::ToCSR() const {
 }
 
 COO COO::CopyTo(const DLContext& ctx) const {
-  COO ret;
-  ret.num_vertices_ = num_vertices_;
-  ret.src_ = src_.CopyTo(ctx);
-  ret.dst_ = dst_.CopyTo(ctx);
-  ret.is_multigraph_ = is_multigraph_;
-  return ret;
+  if (Context() == ctx) {
+    return *this;
+  } else {
+    // TODO(minjie): change to use constructor later
+    COO ret;
+    ret.num_vertices_ = num_vertices_;
+    ret.src_ = src_.CopyTo(ctx);
+    ret.dst_ = dst_.CopyTo(ctx);
+    ret.is_multigraph_ = is_multigraph_;
+    return ret;
+  }
+}
+
+COO COO::AsNumBits(uint8_t bits) const {
+  if (NumBits() == bits) {
+    return *this;
+  } else {
+    // TODO(minjie): change to use constructor later
+    COO ret;
+    ret.num_vertices_ = num_vertices_;
+    ret.src_ = dgl::AsNumBits(src_, bits);
+    ret.dst_ = dgl::AsNumBits(dst_, bits);
+    ret.is_multigraph_ = is_multigraph_;
+    return ret;
+  }
 }
 
 //////////////////////////////////////////////////////////
@@ -706,6 +744,25 @@ ImmutableGraph ImmutableGraph::CopyTo(const DLContext& ctx) const {
   CSRPtr new_incsr = CSRPtr(new CSR(GetInCSR()->CopyTo(ctx)));
   CSRPtr new_outcsr = CSRPtr(new CSR(GetOutCSR()->CopyTo(ctx)));
   return ImmutableGraph(new_incsr, new_outcsr, nullptr);
+}
+
+ImmutableGraph ImmutableGraph::AsNumBits(uint8_t bits) const {
+  if (NumBits() == bits) {
+    return *this;
+  } else {
+    CSRPtr new_incsr{nullptr}, new_outcsr{nullptr};
+    COOPtr new_coo{nullptr};
+    if (in_csr_) {
+      new_incsr = CSRPtr(new CSR(in_csr_->AsNumBits(bits)));
+    }
+    if (out_csr_) {
+      new_outcsr = CSRPtr(new CSR(out_csr_->AsNumBits(bits)));
+    }
+    if (coo_) {
+      new_coo = COOPtr(new COO(coo_->AsNumBits(bits)));
+    }
+    return ImmutableGraph(new_incsr, new_outcsr, new_coo);
+  }
 }
 
 }  // namespace dgl

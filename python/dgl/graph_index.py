@@ -968,6 +968,34 @@ class GraphIndex(object):
         handle = _CAPI_DGLImmutableGraphCopyTo(self._handle, ctx)
         return GraphIndex(handle, readonly=True)
 
+    def nbits(self):
+        """Return the number of integer bits used in the storage (32 or 64).
+
+        Returns
+        -------
+        int
+            The number of bits.
+        """
+        return _CAPI_DGLGraphNumBits(self._handle)
+
+    def asbits(self, bits):
+        """Transform the graph to a new one with the given number of bits storage.
+
+        NOTE: this method only works for immutable graph index
+
+        Parameters
+        ----------
+        bits : int
+            The number of integer bits (32 or 64)
+
+        Returns
+        -------
+        GraphIndex
+            The graph index stored using the given number of bits.
+        """
+        handle = _CAPI_DGLImmutableGraphAsNumBits(self._handle, int(bits))
+        return GraphIndex(handle, readonly=True)
+
 class SubgraphIndex(GraphIndex):
     """Graph index for subgraph.
 

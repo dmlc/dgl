@@ -64,6 +64,10 @@ class CSR : public GraphInterface {
     return indptr_->ctx;
   }
 
+  uint8_t NumBits() const override {
+    return indptr_->dtype.bits;
+  }
+
   bool IsMultigraph() const override;
 
   bool IsReadonly() const override {
@@ -218,6 +222,13 @@ class CSR : public GraphInterface {
    */
   CSR CopyTo(const DLContext& ctx) const;
 
+  /*!
+   * \brief Convert the graph to use the given number of bits for storage.
+   * \param bits The new number of integer bits (32 or 64).
+   * \return The graph with new bit size storage.
+   */
+  CSR AsNumBits(uint8_t bits) const;
+
   // member getters
 
   IdArray indptr() const { return indptr_; }
@@ -271,6 +282,10 @@ class COO : public GraphInterface {
 
   DLContext Context() const override {
     return src_->ctx;
+  }
+
+  uint8_t NumBits() const override {
+    return src_->dtype.bits;
   }
 
   bool IsMultigraph() const override;
@@ -455,6 +470,13 @@ class COO : public GraphInterface {
    */
   COO CopyTo(const DLContext& ctx) const;
 
+  /*!
+   * \brief Convert the graph to use the given number of bits for storage.
+   * \param bits The new number of integer bits (32 or 64).
+   * \return The graph with new bit size storage.
+   */
+  COO AsNumBits(uint8_t bits) const;
+
   // member getters
 
   IdArray src() const { return src_; }
@@ -544,6 +566,10 @@ class ImmutableGraph: public GraphInterface {
 
   DLContext Context() const override {
     return AnyGraph()->Context();
+  }
+
+  uint8_t NumBits() const override {
+    return AnyGraph()->NumBits();
   }
 
   /*!
@@ -905,6 +931,13 @@ class ImmutableGraph: public GraphInterface {
    * \return The graph under another context.
    */
   ImmutableGraph CopyTo(const DLContext& ctx) const;
+
+  /*!
+   * \brief Convert the graph to use the given number of bits for storage.
+   * \param bits The new number of integer bits (32 or 64).
+   * \return The graph with new bit size storage.
+   */
+  ImmutableGraph AsNumBits(uint8_t bits) const;
 
  protected:
   /* !\brief internal default constructor */

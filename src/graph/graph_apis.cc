@@ -131,9 +131,9 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const IdArray src_ids = args[0];
     const IdArray dst_ids = args[1];
-    const bool multigraph = static_cast<bool>(args[2]);
-    const int64_t num_nodes = static_cast<int64_t>(args[3]);
-    const bool readonly = static_cast<bool>(args[4]);
+    const bool multigraph = args[2];
+    const int64_t num_nodes = args[3];
+    const bool readonly = args[4];
     GraphHandle ghandle;
     if (readonly) {
       // TODO(minjie): The array copy here is unnecessary and adds extra overhead.
@@ -154,7 +154,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
     const IdArray indices = args[1];
     const IdArray edge_ids = args[2];
     const std::string shared_mem_name = args[3];
-    const bool multigraph = static_cast<bool>(args[4]);
+    const bool multigraph = args[4];
     const std::string edge_dir = args[5];
     CSRPtr csr;
     if (shared_mem_name.empty())
@@ -179,7 +179,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreateMMap")
     const std::string shared_mem_name = args[0];
     const int64_t num_vertices = args[1];
     const int64_t num_edges = args[2];
-    const bool multigraph = static_cast<bool>(args[3]);
+    const bool multigraph = args[3];
     const std::string edge_dir = args[4];
     // TODO(minjie): how to know multigraph
     CSRPtr csr(new CSR(shared_mem_name, num_vertices, num_edges, multigraph));
@@ -510,6 +510,13 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLToImmutable")
     *rv = newhandle;
   });
 
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphContext")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
+    *rv = ptr->Context();
+  });
+
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyTo")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
@@ -521,11 +528,22 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyTo")
     *rv = newhandle;
   });
 
-DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphContext")
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphNumBits")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
-    *rv = ptr->Context();
+    *rv = ptr->NumBits();
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphAsNumBits")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    int bits = args[1];
+    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
+    const ImmutableGraph *ig = dynamic_cast<const ImmutableGraph*>(ptr);
+    CHECK(ig) << "Invalid argument: must be an immutable graph object.";
+    GraphHandle newhandle = new ImmutableGraph(ig->AsNumBits(bits));
+    *rv = newhandle;
   });
 
 }  // namespace dgl

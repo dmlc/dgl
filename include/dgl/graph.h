@@ -105,6 +105,10 @@ class Graph: public GraphInterface {
     return DLContext{kDLCPU, 0};
   }
 
+  uint8_t NumBits() const override {
+    return 64;
+  }
+
   /*!
    * \note not const since we have caches
    * \return whether the graph is a multigraph
