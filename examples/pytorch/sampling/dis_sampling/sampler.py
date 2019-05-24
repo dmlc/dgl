@@ -12,6 +12,15 @@ from dgl.contrib.sampling import SamplerPool
 
 class MySamplerPool(SamplerPool):
     def worker(self, args):
+
+        number_hops = 1
+        if args.model == "gcn_ns":
+            number_hops = args.n_layers + 1
+        elif args.model == "gcn_cv":
+            number_hops = args.n_layers
+        else:
+            print("unknown model. Please choose from gcn_ns and gcn_cv")
+
         # Start sender
         namebook = { 0:args.ip }
         sender = dgl.contrib.sampling.SamplerSender(namebook)
@@ -35,7 +44,7 @@ class MySamplerPool(SamplerPool):
                                                            neighbor_type='in',
                                                            shuffle=True,
                                                            num_workers=32,
-                                                           num_hops=args.n_layers+1,
+                                                           num_hops=number_hops,
                                                            seed_nodes=train_nid):
                 print("send train nodeflow: %d" % (idx))
                 sender.send(nf, 0)
@@ -49,6 +58,8 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
     register_data_args(parser)
+    parser.add_argument("--model", type=str,
+                        help="select a model. Valid models: gcn_ns, gcn_cv")
     parser.add_argument("--dropout", type=float, default=0.5,
             help="dropout probability")
     parser.add_argument("--gpu", type=int, default=-1,
