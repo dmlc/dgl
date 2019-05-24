@@ -1,6 +1,7 @@
 Unit test
 ===
 
+## Python Unittest
 The code organization goes as follows:
 
 * `backend`: Additional unified tensor interface for supported frameworks.
@@ -15,3 +16,14 @@ The code organization goes as follows:
   functions).
 * `lint`: Pylint-related files.
 * `scripts`: Automated test scripts for CI.
+
+## C++ Unittest
+Compile with unittest by executing the command below
+```
+# Assume current directory is the root directory of dgl, and googletest submodule is initialized
+mkdir build
+cd build
+cmake .. -DBUILD_CPP_TEST=1
+make -j${nproc}
+./runUnitTests
+```
