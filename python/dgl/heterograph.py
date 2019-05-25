@@ -1299,6 +1299,120 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         """
         pass
 
+    def register_message_func(self, func):
+        """Register global message function for each edge type provided.
+
+        Once registered, ``func`` will be used as the default
+        message function in message passing operations, including
+        :func:`send`, :func:`send_and_recv`, :func:`pull`,
+        :func:`push`, :func:`update_all`.
+
+        Parameters
+        ----------
+        func : callable, dict[etype, callable]
+            Message function on the edge. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
+
+            If a dict is provided, the functions will be applied according to
+            edge type.
+            The edge type is characterized by a triplet of source type name,
+            destination type name, and edge type name.
+            If the graph has more than one edge type and ``func`` is not a
+            dict, it will throw an error.
+
+        See Also
+        --------
+        send
+        send_and_recv
+        pull
+        push
+        update_all
+        """
+        pass
+
+    def register_reduce_func(self, func):
+        """Register global message reduce function for each edge type provided.
+
+        Once registered, ``func`` will be used as the default
+        message reduce function in message passing operations, including
+        :func:`recv`, :func:`send_and_recv`, :func:`push`, :func:`pull`,
+        :func:`update_all`.
+
+        Parameters
+        ----------
+        func : callable, dict[etype, callable]
+            Reduce function on the node. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+
+            If a dict is provided, the messages will be aggregated onto the
+            nodes by the edge type of the message.
+            The edge type is characterized by a triplet of source type name,
+            destination type name, and edge type name.
+            If the graph has more than one edge type and ``reduce_func`` is not
+            a dict, it will throw an error.
+
+        See Also
+        --------
+        recv
+        send_and_recv
+        push
+        pull
+        update_all
+        """
+        pass
+
+    def register_apply_node_func(self, func):
+        """Register global node apply function for each node type provided.
+
+        Once registered, ``func`` will be used as the default apply
+        node function. Related operations include :func:`apply_nodes`,
+        :func:`recv`, :func:`send_and_recv`, :func:`push`, :func:`pull`,
+        :func:`update_all`.
+
+        Parameters
+        ----------
+        func : callable, dict[str, callable]
+            Apply function on the nodes. The function should be
+            a :mod:`Node UDF <dgl.udf>`.
+
+            If a dict is provided, the functions will be applied according to
+            node type.
+            If the graph has more than one node type and ``func`` is not a
+            dict, it will throw an error.
+
+        See Also
+        --------
+        apply_nodes
+        register_apply_edge_func
+        """
+        pass
+
+    def register_apply_edge_func(self, func):
+        """Register global edge apply function for each edge type provided.
+
+        Once registered, ``func`` will be used as the default apply
+        edge function in :func:`apply_edges`.
+
+        Parameters
+        ----------
+        func : callable, dict[etype, callable]
+            Apply function on the edge. The function should be
+            an :mod:`Edge UDF <dgl.udf>`.
+
+            If a dict is provided, the functions will be applied according to
+            edge type.
+            The edge type is characterized by a triplet of source type name,
+            destination type name, and edge type name.
+            If the graph has more than one edge type and ``func`` is not a
+            dict, it will throw an error.
+
+        See Also
+        --------
+        apply_edges
+        register_apply_node_func
+        """
+        pass
+
     def apply_nodes(self, func, v=ALL, inplace=False):
         """Apply the function on the nodes with the same type to update their
         features.
