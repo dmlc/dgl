@@ -1,179 +1,246 @@
-"""Classes for heterogeneous graphs."""
-from .base import ALL
+import numpy as np
+from scipy import sparse as spsp
+
+from .graph_index import create_bigraph_index
+from .heterograph import DGLHeteroGraph
+from .base import ALL, is_all
 from . import backend as F
+from .frame import FrameRef, Frame, Scheme
+from .view import HeteroEdgeView, HeteroNodeView
+from . import utils
+from .runtime import ir, scheduler, Runtime
 
-class DGLBaseHeteroGraph(object):
-    """Base Heterogeneous graph class.
+__all__ = ['DGLGraph']
 
-    A Heterogeneous graph is defined as a graph with node types and edge
-    types.
+class DGLBipartiteGraph(DGLHeteroGraph):
+    """Bipartite graph class.
 
-    If two edges share the same edge type, then their source nodes, as well
-    as their destination nodes, also have the same type (the source node
-    types don't have to be the same as the destination node types).
+    Bipartite graphs have two types of nodes and one type of edges to connect nodes.
+    The graph stores nodes, edges and also their (type-specific) features.
 
     Parameters
     ----------
-    metagraph : NetworkX MultiGraph or compatible data structure
-        The set of node types and edge types, as well as the
-        source/destination node type of each edge type is specified in the
-        metagraph.
-        The edge types are specified as edge keys on the NetworkX MultiGraph.
-        The node types and edge types must be strings.
-    number_of_nodes_by_type : dict[str, int]
-        Number of nodes for each node type.
-    edge_connections_by_type : dict
-        Specifies how edges would connect nodes of the source type to nodes of
-        the destination type in the following form:
-
-            {edge_type: edge_specifier}
-
-        where ``edge_type`` is a triplet of
-
-                  (source_node_type_name,
-                   destination_node_type_name,
-                   edge_type_name)
-
-        and ``edge_specifier`` can be either of the following:
-
-        * (source_node_id_tensor, destination_node_id_tensor)
-            * ``source_node_id_tensor`` and ``destination_node_id_tensor`` are
-              IDs within the source and destination node type respectively.
-            * source node id and destination node id are both in their own ID space.
-              That is, source nodes and destination nodes may have the same ID,
-              but they are different nodes if they belong to different node types.
-
-        * scipy.sparse.matrix
-          By default, the rows represent the destination of an edge, and the
-          column represents the source.
-
-    Examples
-    --------
-    Suppose that we want to construct the following heterogeneous graph:
-
-    .. graphviz::
-
-       digraph G {
-           Alice -> Bob [label=follows]
-           Bob -> Carol [label=follows]
-           Alice -> Tetris [label=plays]
-           Bob -> Tetris [label=plays]
-           Bob -> Minecraft [label=plays]
-           Carol -> Minecraft [label=plays]
-           Nintendo -> Tetris [label=develops]
-           Mojang -> Minecraft [label=develops]
-           {rank=source; Alice; Bob; Carol}
-           {rank=sink; Nintendo; Mojang}
-       }
-
-    One can analyze the graph and figure out the metagraph as follows:
-
-    .. graphviz::
-
-       digraph G {
-           User -> User [label=follows]
-           User -> Game [label=plays]
-           Developer -> Game [label=develops]
-       }
-
-    Suppose that one maps the users, games and developers to the following
-    IDs:
-
-        User name   Alice   Bob     Carol
-        User ID     0       1       2
-
-        Game name   Tetris  Minecraft
-        Game ID     0       1
-
-        Developer name  Nintendo    Mojang
-        Developer ID    0           1
-
-    One can construct the graph as follows:
-
-    >>> import networkx as nx
-    >>> metagraph = nx.MultiGraph([
-    ...     ('user', 'user', 'follows'),
-    ...     ('user', 'game', 'plays'),
-    ...     ('developer', 'game', 'develops')])
-    >>> g = DGLBaseHeteroGraph(
-    ...     metagraph=metagraph,
-    ...     number_of_nodes_by_type={'user': 4, 'game': 2, 'developer': 2},
-    ...     edge_connections_by_type={
-    ...         # Alice follows Bob and Bob follows Carol
-    ...         ('user', 'user', 'follows'): ([0, 1], [1, 2]),
-    ...         # Alice and Bob play Tetris and Bob and Carol play Minecraft
-    ...         ('user', 'game', 'plays'): ([0, 1, 1, 2], [0, 0, 1, 1]),
-    ...         # Nintendo develops Tetris and Mojang develops Minecraft
-    ...         ('developer', 'game', 'develops'): ([0, 1], [0, 1])})
+    metagraph, number_of_nodes_by_type, edge_connections_by_type :
+        See DGLBaseHeteroGraph
+    node_frame : dict[str, FrameRef], optional
+        Node feature storage per type
+    edge_frame : dict[str, FrameRef], optional
+        Edge feature storage per type
+    readonly : bool, optional
+        Whether the graph structure is read-only (default: False)
     """
-
     # pylint: disable=unused-argument
     def __init__(
             self,
             metagraph,
             number_of_nodes_by_type,
-            edge_connections_by_type):
-        super(DGLBaseHeteroGraph, self).__init__()
+            edge_connections_by_type,
+            node_frame=None,
+            edge_frame=None,
+            readonly=False):
+        super(DGLBipartiteGraph, self).__init__(
+            metagraph, number_of_nodes_by_type, edge_connections_by_type)
+        if not readonly:
+            raise Exception("Bipartite graph only readonly graphs for now.")
 
-    def __getitem__(self, key):
-        """Returns a view on the heterogeneous graph with given node/edge
-        type:
+        if len(number_of_nodes_by_type) != 2:
+            raise Exception("Bipartite graph should have only two node types")
+        assert metagraph.number_of_edges() == 1
+        self._etype = list(metagraph.edges)[0]
+        self._ntypes = [self._etype[0], self._etype[1]]
+        assert self._ntypes[0] in number_of_nodes_by_type.keys()
+        assert self._ntypes[1] in number_of_nodes_by_type.keys()
+        self._num_nodes = [number_of_nodes_by_type[self._ntypes[0]],
+                           number_of_nodes_by_type[self._ntypes[1]]]
+        self._num_nodes_by_type = number_of_nodes_by_type
 
-        * If ``key`` is a str, it returns a heterogeneous subgraph induced
-          from nodes of type ``key``.
-        * If ``key`` is a pair of str (type_A, type_B), it returns a
-          heterogeneous subgraph induced from the union of both node types.
-        * If ``key`` is a triplet of str
+        # TODO(zhengda) this is a hack way of constructing a bipartite graph.
+        if len(edge_connections_by_type) > 1:
+            raise Exception("Bipartite graph only support one type of edges")
+        assert self._etype in edge_connections_by_type.keys()
+        edges = edge_connections_by_type[self._etype]
 
-              (src_type_name, dst_type_name, edge_type_name)
+        self._graph = create_bigraph_index(edges, self._num_nodes, False, readonly)
 
-          It returns a heterogeneous subgraph induced from the edges with
-          source type name ``src_type_name``, destination type name
-          ``dst_type_name``, and edge type name ``edge_type_name``.
+        if node_frame is not None:
+            assert self._ntypes[0] in node_frame
+            assert self._ntypes[1] in node_frame
+            assert len(node_frame) == 2
+            self._node_frames = node_frame
+        else:
+            self._node_frames = {self._ntypes[0]: FrameRef(Frame(num_rows=self._num_nodes[0])),
+                                 self._ntypes[1]: FrameRef(Frame(num_rows=self._num_nodes[1]))}
 
-        The view would share the frames with the parent graph; any
-        modifications on one's frames would reflect on the other.
+        if edge_frame is not None:
+            assert self._etype in edge_frame
+            assert len(edge_frame) == 1
+            self._edge_frames = edge_frame
+        else:
+            num_edges = self._graph.number_of_edges()
+            self._edge_frames = {self._etype: FrameRef(Frame(num_rows=num_edges))}
 
-        Note that the subgraph itself is not materialized until someone
-        queries the subgraph structure.  This implies that calling computation
-        methods such as
+        # registered functions
+        self._message_funcs = {}
+        self._reduce_funcs = {}
+        self._apply_node_funcs = {}
+        self._apply_edge_funcs = {}
 
-            g['user'].update_all(...)
+    def _get_node_frame(self, idx):
+        return self._node_frames[self._ntypes[idx]]
 
-        would not create a subgraph of users.
+    def _get_edge_frame(self, idx):
+        return self._edge_frames[self._etype]
 
-        Parameters
-        ----------
-        key : str or tuple
-            See above
-
-        Returns
-        -------
-        DGLBaseHeteroGraphView
-            The induced subgraph view.
-        """
-        pass
-
-    @property
-    def metagraph(self):
-        """Return the metagraph as networkx.MultiDiGraph."""
-        pass
+    def _number_of_nodes(self, ntype):
+        if isinstance(ntype, str):
+            return self._num_nodes_by_type[ntype]
+        elif isinstance(ntype, int):
+            return self._num_nodes[ntype]
+        elif isinstance(ntype, tuple):
+            raise Exception("we can't get the number of nodes of different types")
+        else:
+            raise Exception('Wrong input type')
 
     def number_of_nodes(self):
-        """Return the number of nodes in the graph.
+        raise Exception("Bipartite graph doesn't support number_of_nodes."
+                        "Please use g['ntype'].number_of_nodes() to get number of nodes.")
 
-        Returns
-        -------
-        int
-            The number of nodes
+    def _number_of_edges(self, etype):
+        assert etype == self._etype
+        return self._graph.number_of_edges()
+
+    def number_of_edges(self):
+        return self._graph.number_of_edges()
+
+    def _has_node(self, ntype, vid):
+        if isinstance(ntype, str):
+            return vid < self._number_of_nodes(ntype) and vid >= 0
+        else:
+            raise Exception('invalid node type')
+
+    def _has_nodes(self, ntype, vids):
+        if isinstance(ntype, str):
+            if isinstance(vids, list):
+                vids = F.tensor(vids, F.int64)
+            return (vids < self._number_of_nodes(ntype)) + (vids >= 0) > 1
+        else:
+            raise Exception('invalid node type')
+
+    def has_edge_between(self, u, v):
+        return self._graph.has_edge_between(u, v + self._number_of_nodes(0))
+
+    def has_edges_between(self, u, v):
+        u = utils.toindex(u)
+        v = F.tensor(v, F.int64) + self._number_of_nodes(0)
+        v = utils.toindex(v)
+        return self._graph.has_edges_between(u, v).tousertensor()
+
+    @property
+    def is_multigraph(self):
+        """True if the graph is a multigraph, False otherwise.
         """
-        pass
+        return self._graph.is_multigraph()
 
-    def __len__(self):
-        """Return the number of nodes in the graph."""
-        pass
+    def predecessors(self, v):
+        return self._graph.predecessors(v + self._number_of_nodes(0)).tousertensor()
 
-    # TODO: REVIEW
+    def successors(self, v):
+        return self._graph.successors(v).tousertensor() - self._number_of_nodes(0)
+
+    def edge_id(self, u, v, force_multi=False):
+        idx = self._graph.edge_id(u, v + self._number_of_nodes(0))
+        return idx.tousertensor() if force_multi or self.is_multigraph else idx[0]
+
+    def _to_dst_index(self, v):
+        if isinstance(v, int):
+            v = v + self._number_of_nodes(0)
+        elif isinstance(v, list):
+            v = F.tensor(v, F.int64) + self._number_of_nodes(0)
+        elif isinstance(v, utils.Index):
+            v = v.tousertensor() + self._number_of_nodes(0)
+        else:
+            v = v + self._number_of_nodes(0)
+        return utils.toindex(v)
+
+    def edge_ids(self, u, v, force_multi=False):
+        u = utils.toindex(u)
+        v = self._to_dst_index(v)
+        src, dst, eid = self._graph.edge_ids(u, v)
+        if force_multi or self.is_multigraph:
+            dst = dst.tousertensor() - self._number_of_nodes(0)
+            return src.tousertensor(), dst, eid.tousertensor()
+        else:
+            return eid.tousertensor()
+
+    def find_edges(self, eid):
+        eid = utils.toindex(eid)
+        src, dst, _ = self._graph.find_edges(eid)
+        return src.tousertensor(), dst.tousertensor() - self._number_of_nodes(0)
+
+    def in_edges(self, v, form='uv'):
+        v = self._to_dst_index(v)
+        src, dst, eid = self._graph.in_edges(v)
+        if form == 'all':
+            dst = dst.tousertensor() - self._number_of_nodes(0)
+            return (src.tousertensor(), dst, eid.tousertensor())
+        elif form == 'uv':
+            return (src.tousertensor(), dst.tousertensor() - self._number_of_nodes(0))
+        elif form == 'eid':
+            return eid.tousertensor()
+        else:
+            raise DGLError('Invalid form:', form)
+
+    def out_edges(self, v, form='uv'):
+        v = utils.toindex(v)
+        src, dst, eid = self._graph.out_edges(v)
+        if form == 'all':
+            dst = dst.tousertensor() - self._number_of_nodes(0)
+            return (src.tousertensor(), dst, eid.tousertensor())
+        elif form == 'uv':
+            return (src.tousertensor(), dst.tousertensor() - self._number_of_nodes(0))
+        elif form == 'eid':
+            return eid.tousertensor()
+        else:
+            raise DGLError('Invalid form:', form)
+
+    def _all_edges(self, etype, form='uv', order=None):
+        assert etype == self._etype
+        return self.all_edges(form, order)
+
+    def all_edges(self, form='uv', order=None):
+        src, dst, eid = self._graph.edges(order)
+        if form == 'all':
+            dst = dst.tousertensor() - self._number_of_nodes(0)
+            return (src.tousertensor(), dst, eid.tousertensor())
+        elif form == 'uv':
+            return (src.tousertensor(), dst.tousertensor() - self._number_of_nodes(0))
+        elif form == 'eid':
+            return eid.tousertensor()
+        else:
+            raise DGLError('Invalid form:', form)
+
+    def in_degree(self, v):
+        v = v + self._number_of_nodes(0)
+        return self._graph.in_degree(v)
+
+    def in_degrees(self, v=ALL):
+        if is_all(v):
+            v = utils.toindex(slice(self._number_of_nodes(0),
+                                    self._number_of_nodes(0) + self._number_of_nodes(1)))
+        else:
+            v = utils.toindex(self._to_dst_index(v))
+        return self._graph.in_degrees(v).tousertensor()
+
+    def out_degree(self, v):
+        return self._graph.out_degree(v)
+
+    def out_degrees(self, v=ALL):
+        if is_all(v):
+            v = utils.toindex(slice(0, self._number_of_nodes(0)))
+        else:
+            v = utils.toindex(v)
+        return self._graph.out_degrees(v).tousertensor()
+
     def add_nodes(self, num, node_type, data=None):
         """Add multiple new nodes of the same node type
 
@@ -197,9 +264,8 @@ class DGLBaseHeteroGraph(object):
         >>> g['game'].number_of_nodes()
         5
         """
-        pass
+        raise Exception("Bipartite graph doesn't support adding nodes")
 
-    # TODO: REVIEW
     def add_edge(self, u, v, utype, vtype, etype, data=None):
         """Add an edge of ``etype`` between u of type ``utype`` and v of type
         ``vtype``.
@@ -231,7 +297,7 @@ class DGLBaseHeteroGraph(object):
         >>> g['user', 'game', 'plays'].number_of_edges()
         5
         """
-        pass
+        raise Exception("Bipartite graph doesn't support adding edges")
 
     def add_edges(self, u, v, utype, vtype, etype, data=None):
         """Add multiple edges of ``etype`` between list of source nodes ``u``
@@ -266,759 +332,7 @@ class DGLBaseHeteroGraph(object):
         >>> g['user', 'game', 'plays'].number_of_edges()
         6
         """
-        pass
-
-    @property
-    def is_multigraph(self):
-        """True if the graph is a multigraph, False otherwise.
-        """
-        pass
-
-    @property
-    def is_readonly(self):
-        """True if the graph is readonly, False otherwise.
-        """
-        pass
-
-    def number_of_edges(self):
-        """Return the number of edges in the graph.
-
-        Returns
-        -------
-        int
-            The number of edges
-        """
-        pass
-
-    def has_node(self, vid):
-        """Return True if the graph contains node `vid`.
-
-        Only works if the graph has one node type.  For multiple types,
-        query with
-
-        .. code::
-
-           g['vtype'].has_node(vid)
-
-        Parameters
-        ----------
-        vid : int
-            The node ID.
-
-        Returns
-        -------
-        bool
-            True if the node exists
-
-        Examples
-        --------
-        >>> g['user'].has_node(0)
-        True
-        >>> g['user'].has_node(4)
-        False
-
-        Equivalently,
-
-        >>> 0 in g['user']
-        True
-
-        See Also
-        --------
-        has_nodes
-        """
-        pass
-
-    def __contains__(self, vid):
-        """Return True if the graph contains node `vid`.
-
-        Only works if the graph has one node type.  For multiple types,
-        query with
-
-        .. code::
-
-           vid in g['vtype']
-
-        Examples
-        --------
-        >>> 0 in g['user']
-        True
-        """
-        pass
-
-    def has_nodes(self, vids):
-        """Return a 0-1 array ``a`` given the node ID array ``vids``.
-
-        ``a[i]`` is 1 if the graph contains node ``vids[i]``, 0 otherwise.
-
-        Only works if the graph has one node type.  For multiple types,
-        query with
-
-        .. code::
-
-           g['vtype'].has_nodes(vids)
-
-        Parameters
-        ----------
-        vid : list or tensor
-            The array of node IDs.
-
-        Returns
-        -------
-        a : tensor
-            0-1 array indicating existence
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        >>> g['user'].has_nodes([0, 1, 2, 3, 4])
-        tensor([1, 1, 1, 0, 0])
-
-        See Also
-        --------
-        has_node
-        """
-        pass
-
-    def has_edge_between(self, u, v):
-        """Return True if the edge (u, v) is in the graph.
-
-        Only works if the graph has one edge type.  For multiple types,
-        query with
-
-        .. code::
-
-           g['srctype', 'dsttype', 'edgetype'].has_edge_between(u, v)
-
-        Parameters
-        ----------
-        u : int
-            The node ID of source type.
-        v : int
-            The node ID of destination type.
-
-        Returns
-        -------
-        bool
-            True if the edge is in the graph, False otherwise.
-
-        Examples
-        --------
-        Check whether Alice plays Tetris
-        >>> g['user', 'game', 'plays'].has_edge_between(0, 1)
-        True
-
-        And whether Alice plays Minecraft
-        >>> g['user', 'game', 'plays'].has_edge_between(0, 2)
-        False
-
-        See Also
-        --------
-        has_edges_between
-        """
-        pass
-
-    def has_edges_between(self, u, v):
-        """Return a 0-1 array `a` given the source node ID array `u` and
-        destination node ID array `v`.
-
-        `a[i]` is 1 if the graph contains edge `(u[i], v[i])`, 0 otherwise.
-
-        Only works if the graph has one edge type.  For multiple types,
-        query with
-
-        .. code::
-
-           g['srctype', 'dsttype', 'edgetype'].has_edges_between(u, v)
-
-        Parameters
-        ----------
-        u : list, tensor
-            The node ID array of source type.
-        v : list, tensor
-            The node ID array of destination type.
-
-        Returns
-        -------
-        a : tensor
-            0-1 array indicating existence.
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        >>> g['user', 'game', 'plays'].has_edges_between([0, 0], [1, 2])
-        tensor([1, 0])
-
-        See Also
-        --------
-        has_edge_between
-        """
-        pass
-
-    def predecessors(self, v):
-        """Return the predecessors of node `v` in the graph with the same
-        edge type.
-
-        Node `u` is a predecessor of `v` if an edge `(u, v)` exist in the
-        graph.
-
-        Only works if the graph has one edge type.  For multiple types,
-        query with
-
-        .. code::
-
-           g['srctype', 'dsttype', 'edgetype'].predecessors(v)
-
-        Parameters
-        ----------
-        v : int
-            The node of destination type.
-
-        Returns
-        -------
-        tensor
-            Array of predecessor node IDs of source node type.
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        Query who plays Tetris:
-        >>> g['user', 'game', 'plays'].predecessors(0)
-        tensor([0, 1])
-
-        This indicates User #0 (Alice) and User #1 (Bob).
-
-        See Also
-        --------
-        successors
-        """
-        pass
-
-    def successors(self, v):
-        """Return the successors of node `v` in the graph with the same edge
-        type.
-
-        Node `u` is a successor of `v` if an edge `(v, u)` exist in the
-        graph.
-
-        Only works if the graph has one edge type.  For multiple types,
-        query with
-
-        .. code::
-
-           g['srctype', 'dsttype', 'edgetype'].successors(v)
-
-        Parameters
-        ----------
-        v : int
-            The node of source type.
-
-        Returns
-        -------
-        tensor
-            Array of successor node IDs if destination node type.
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        Asks which game Alice plays:
-        >>> g['user', 'game', 'plays'].successors(0)
-        tensor([0])
-
-        This indicates Game #0 (Tetris).
-
-        See Also
-        --------
-        predecessors
-        """
-        pass
-
-    def edge_id(self, u, v, force_multi=False):
-        """Return the edge ID, or an array of edge IDs, between source node
-        `u` and destination node `v`.
-
-        Only works if the graph has one edge type.  For multiple types,
-        query with
-
-        .. code::
-
-           g['srctype', 'dsttype', 'edgetype'].edge_id(u, v)
-
-        Parameters
-        ----------
-        u : int
-            The node ID of source type.
-        v : int
-            The node ID of destination type.
-        force_multi : bool
-            If False, will return a single edge ID if the graph is a simple graph.
-            If True, will always return an array.
-
-        Returns
-        -------
-        int or tensor
-            The edge ID if force_multi == True and the graph is a simple graph.
-            The edge ID array otherwise.
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        Find the edge ID of "Bob plays Tetris"
-        >>> g['user', 'game', 'plays'].edge_id(1, 0)
-        1
-
-        See Also
-        --------
-        edge_ids
-        """
-        pass
-
-    def edge_ids(self, u, v, force_multi=False):
-        """Return all edge IDs between source node array `u` and destination
-        node array `v`.
-
-        Only works if the graph has one edge type.  For multiple types,
-        query with
-
-        .. code::
-
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
-
-        Parameters
-        ----------
-        u : list, tensor
-            The node ID array of source type.
-        v : list, tensor
-            The node ID array of destination type.
-        force_multi : bool
-            Whether to always treat the graph as a multigraph.
-
-        Returns
-        -------
-        tensor, or (tensor, tensor, tensor)
-            If the graph is a simple graph and `force_multi` is False, return
-            a single edge ID array `e`.  `e[i]` is the edge ID between `u[i]`
-            and `v[i]`.
-            Otherwise, return three arrays `(eu, ev, e)`.  `e[i]` is the ID
-            of an edge between `eu[i]` and `ev[i]`.  All edges between `u[i]`
-            and `v[i]` are returned.
-
-        Notes
-        -----
-        If the graph is a simple graph, `force_multi` is False, and no edge
-        exist between some pairs of `u[i]` and `v[i]`, the result is undefined.
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        Find the edge IDs of "Alice plays Tetris" and "Bob plays Minecraft".
-        >>> g['user', 'game', 'plays'].edge_ids([0, 1], [0, 1])
-        tensor([0, 2])
-
-        See Also
-        --------
-        edge_id
-        """
-        pass
-
-    def find_edges(self, eid):
-        """Given an edge ID array, return the source and destination node ID
-        array `s` and `d`.  `s[i]` and `d[i]` are source and destination node
-        ID for edge `eid[i]`.
-
-        Only works if the graph has one edge type.  For multiple types,
-        query with
-
-        .. code::
-
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
-
-        Parameters
-        ----------
-        eid : list, tensor
-            The edge ID array.
-
-        Returns
-        -------
-        tensor
-            The source node ID array.
-        tensor
-            The destination node ID array.
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        Find the user and game of gameplay #0 and #2:
-        >>> g['user', 'game', 'plays'].find_edges([0, 2])
-        (tensor([0, 1]), tensor([0, 1]))
-        """
-        pass
-
-    def in_edges(self, v, form='uv'):
-        """Return the inbound edges of the node(s).
-
-        Only works if the graph has one edge type.  For multiple types,
-        query with
-
-        .. code::
-
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
-
-        Parameters
-        ----------
-        v : int, list, tensor
-            The node(s) of destination type.
-        form : str, optional
-            The return form. Currently support:
-
-            - 'all' : a tuple (u, v, eid)
-            - 'uv'  : a pair (u, v), default
-            - 'eid' : one eid tensor
-
-        Returns
-        -------
-        A tuple of Tensors ``(eu, ev, eid)`` if ``form == 'all'``.
-            ``eid[i]`` is the ID of an inbound edge to ``ev[i]`` from ``eu[i]``.
-            All inbound edges to ``v`` are returned.
-        A pair of Tensors (eu, ev) if form == 'uv'
-            ``eu[i]`` is the source node of an inbound edge to ``ev[i]``.
-            All inbound edges to ``v`` are returned.
-        One Tensor if form == 'eid'
-            ``eid[i]`` is ID of an inbound edge to any of the nodes in ``v``.
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        Find the gameplay IDs of game #0 (Tetris)
-        >>> g['user', 'game', 'plays'].in_edges(0, 'eid')
-        tensor([0, 1])
-        """
-        pass
-
-    def out_edges(self, v, form='uv'):
-        """Return the outbound edges of the node(s).
-
-        Only works if the graph has one edge type.  For multiple types,
-        query with
-
-        .. code::
-
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
-
-        Parameters
-        ----------
-        v : int, list, tensor
-            The node(s) of source type.
-        form : str, optional
-            The return form. Currently support:
-
-            - 'all' : a tuple (u, v, eid)
-            - 'uv'  : a pair (u, v), default
-            - 'eid' : one eid tensor
-
-        Returns
-        -------
-        A tuple of Tensors ``(eu, ev, eid)`` if ``form == 'all'``.
-            ``eid[i]`` is the ID of an outbound edge from ``eu[i]`` to ``ev[i]``.
-            All outbound edges from ``v`` are returned.
-        A pair of Tensors (eu, ev) if form == 'uv'
-            ``ev[i]`` is the destination node of an outbound edge from ``eu[i]``.
-            All outbound edges from ``v`` are returned.
-        One Tensor if form == 'eid'
-            ``eid[i]`` is ID of an outbound edge from any of the nodes in ``v``.
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        Find the gameplay IDs of user #0 (Alice)
-        >>> g['user', 'game', 'plays'].out_edges(0, 'eid')
-        tensor([0])
-        """
-        pass
-
-    def all_edges(self, form='uv', order=None):
-        """Return all the edges.
-
-        Only works if the graph has one edge type.  For multiple types,
-        query with
-
-        .. code::
-
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
-
-        Parameters
-        ----------
-        form : str, optional
-            The return form. Currently support:
-
-            - 'all' : a tuple (u, v, eid)
-            - 'uv'  : a pair (u, v), default
-            - 'eid' : one eid tensor
-        order : string
-            The order of the returned edges. Currently support:
-
-            - 'srcdst' : sorted by their src and dst ids.
-            - 'eid'    : sorted by edge Ids.
-            - None     : the arbitrary order.
-
-        Returns
-        -------
-        A tuple of Tensors (u, v, eid) if form == 'all'
-            ``eid[i]`` is the ID of an edge between ``u[i]`` and ``v[i]``.
-            All edges are returned.
-        A pair of Tensors (u, v) if form == 'uv'
-            An edge exists between ``u[i]`` and ``v[i]``.
-            If ``n`` edges exist between ``u`` and ``v``, then ``u`` and ``v`` as a pair
-            will appear ``n`` times.
-        One Tensor if form == 'eid'
-            ``eid[i]`` is the ID of an edge in the graph.
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        Find the user-game pairs for all gameplays:
-        >>> g['user', 'game', 'plays'].all_edges('uv')
-        (tensor([0, 1, 1, 2]), tensor([0, 0, 1, 1]))
-        """
-        pass
-
-    def in_degree(self, v):
-        """Return the in-degree of node ``v``.
-
-        Only works if the graph has one edge type.  For multiple types,
-        query with
-
-        .. code::
-
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
-
-        Parameters
-        ----------
-        v : int
-            The node ID of destination type.
-
-        Returns
-        -------
-        int
-            The in-degree.
-
-        Examples
-        --------
-        Find how many users are playing Game #0 (Tetris):
-        >>> g['user', 'game', 'plays'].in_degree(0)
-        2
-
-        See Also
-        --------
-        in_degrees
-        """
-        pass
-
-    def in_degrees(self, v=ALL):
-        """Return the array `d` of in-degrees of the node array `v`.
-
-        `d[i]` is the in-degree of node `v[i]`.
-
-        Only works if the graph has one edge type.  For multiple types,
-        query with
-
-        .. code::
-
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
-
-        Parameters
-        ----------
-        v : list, tensor, optional.
-            The node ID array of destination type. Default is to return the
-            degrees of all the nodes.
-
-        Returns
-        -------
-        d : tensor
-            The in-degree array.
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        Find how many users are playing Game #0 and #1 (Tetris and Minecraft):
-        >>> g['user', 'game', 'plays'].in_degrees([0, 1])
-        tensor([2, 2])
-
-        See Also
-        --------
-        in_degree
-        """
-        pass
-
-    def out_degree(self, v):
-        """Return the out-degree of node `v`.
-
-        Only works if the graph has one edge type.  For multiple types,
-        query with
-
-        .. code::
-
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
-
-        Parameters
-        ----------
-        v : int
-            The node ID of source type.
-
-        Returns
-        -------
-        int
-            The out-degree.
-
-        Examples
-        --------
-        Find how many games User #0 Alice is playing
-        >>> g['user', 'game', 'plays'].out_degree(0)
-        1
-
-        See Also
-        --------
-        out_degrees
-        """
-        pass
-
-    def out_degrees(self, v=ALL):
-        """Return the array `d` of out-degrees of the node array `v`.
-
-        `d[i]` is the out-degree of node `v[i]`.
-
-        Only works if the graph has one edge type.  For multiple types,
-        query with
-
-        .. code::
-
-           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
-
-        Parameters
-        ----------
-        v : list, tensor
-            The node ID array of source type. Default is to return the degrees
-            of all the nodes.
-
-        Returns
-        -------
-        d : tensor
-            The out-degree array.
-
-        Examples
-        --------
-        The following example uses PyTorch backend.
-
-        Find how many games User #0 and #1 (Alice and Bob) are playing
-        >>> g['user', 'game', 'plays'].out_degrees([0, 1])
-        tensor([1, 2])
-
-        See Also
-        --------
-        out_degree
-        """
-        pass
-
-
-class DGLBaseHeteroGraphView(DGLBaseHeteroGraph):
-    """View on a heterogeneous graph, constructed from
-    DGLBaseHeteroGraph.__getitem__().
-
-    It is semantically the same as a subgraph, except that
-
-    * The subgraph itself is not materialized until the user explicitly
-    queries the subgraph structure (e.g. calling ``in_edges``, but not
-    ``update_all``).
-    """
-    pass
-
-
-class DGLHeteroGraph(DGLBaseHeteroGraph):
-    """Base heterogeneous graph class.
-
-    The graph stores nodes, edges and also their (type-specific) features.
-
-    Heterogeneous graphs are by default multigraphs.
-
-    Parameters
-    ----------
-    metagraph, number_of_nodes_by_type, edge_connections_by_type :
-        See DGLBaseHeteroGraph
-    node_frame : dict[str, FrameRef], optional
-        Node feature storage per type
-    edge_frame : dict[str, FrameRef], optional
-        Edge feature storage per type
-    readonly : bool, optional
-        Whether the graph structure is read-only (default: False)
-    """
-    # pylint: disable=unused-argument
-    def __init__(
-            self,
-            metagraph,
-            number_of_nodes_by_type,
-            edge_connections_by_type,
-            node_frame=None,
-            edge_frame=None,
-            readonly=False):
-        super(DGLHeteroGraph, self).__init__(
-            metagraph, number_of_nodes_by_type, edge_connections_by_type)
-
-    def from_networkx(
-            self,
-            nx_graph,
-            node_type_attr_name='type',
-            edge_type_attr_name='type',
-            node_id_attr_name='id',
-            edge_id_attr_name='id',
-            node_attrs=None,
-            edge_attrs=None):
-        """Convert from networkx graph.
-
-        The networkx graph must satisfy the metagraph.  That is, for any
-        edge in the networkx graph, the source/destination node type must
-        be the same as the source/destination node of the edge type in
-        the metagraph.  An error will be raised otherwise.
-
-        Parameters
-        ----------
-        nx_graph : networkx.DiGraph
-            The networkx graph.
-        node_type_attr_name : str
-            The node attribute name for the node type.
-            The attribute contents must be strings.
-        edge_type_attr_name : str
-            The edge attribute name for the edge type.
-            The attribute contents must be strings.
-        node_id_attr_name : str
-            The node attribute name for node type-specific IDs.
-            The attribute contents must be integers.
-            If the IDs of the same type are not consecutive integers, its
-            nodes will be relabeled using consecutive integers.  The new
-            node ordering will inherit that of the sorted IDs.
-        edge_id_attr_name : str or None
-            The edge attribute name for edge type-specific IDs.
-            The attribute contents must be integers.
-            If the IDs of the same type are not consecutive integers, its
-            nodes will be relabeled using consecutive integers.  The new
-            node ordering will inherit that of the sorted IDs.
-
-            If None is provided, the edge order would be arbitrary.
-        node_attrs : iterable of str, optional
-            The node attributes whose data would be copied.
-        edge_attrs : iterable of str, optional
-            The edge attributes whose data would be copied.
-        """
-        pass
+        raise Exception("Bipartite graph doesn't support adding edges")
 
     def node_attr_schemes(self, ntype):
         """Return the node feature schemes for a given node type.
@@ -1036,7 +350,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         dict of str to schemes
             The schemes of node feature columns.
         """
-        pass
+        return self._node_frames[ntype].schemes
 
     def edge_attr_schemes(self, etype):
         """Return the edge feature schemes for a given edge type.
@@ -1055,7 +369,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         dict of str to schemes
             The schemes of node feature columns.
         """
-        pass
+        return self._edge_frames[etype].schemes
 
     def set_n_initializer(self, ntype, initializer, field=None):
         """Set the initializer for empty node features of given type.
@@ -1076,7 +390,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             The feature field name. Default is set an initializer for all the
             feature fields.
         """
-        pass
+        self._node_frames[ntype].set_initializer(initializer, field)
 
     def set_e_initializer(self, etype, initializer, field=None):
         """Set the initializer for empty edge features of given type.
@@ -1098,7 +412,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             The feature field name. Default is set an initializer for all the
             feature fields.
         """
-        pass
+        self._edge_frames[etype].set_initializer(initializer, field)
 
     @property
     def nodes(self):
@@ -1112,13 +426,8 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             g[ntype]
 
         to select nodes with type ``ntype``.
-
-        Examples
-        --------
-        To set features of User #0 and #2 in a heterogeneous graph:
-        >>> g['user'].nodes[[0, 2]].data['h'] = torch.zeros(2, 5)
         """
-        pass
+        return HeteroNodeView(self)
 
     @property
     def ndata(self):
@@ -1131,13 +440,8 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             g[ntype]
 
         to select nodes with type ``ntype``.
-
-        Examples
-        --------
-        To set features of games in a heterogeneous graph:
-        >>> g['game'].ndata['h'] = torch.zeros(2, 5)
         """
-        pass
+        return self.nodes[:].data
 
     @property
     def edges(self):
@@ -1151,14 +455,8 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             g[src_type, dst_type, edge_type]
 
         to select edges with type ``(src_type, dst_type, edge_type)``.
-
-        Examples
-        --------
-        To set features of gameplays #1 (Bob -> Tetris) and #3 (Carol ->
-        Minecraft) in a heterogeneous graph:
-        >>> g['user', 'game', 'plays'].edges[[1, 3]].data['h'] = torch.zeros(2, 5)
         """
-        pass
+        return HeteroEdgeView(self, self._etype)
 
     @property
     def edata(self):
@@ -1171,12 +469,8 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             g[src_type, dst_type, edge_type]
 
         to select edges with type ``(src_type, dst_type, edge_type)``.
-
-        Examples
-        --------
-        >>> g['developer', 'game', 'develops'].edata['h'] = torch.zeros(2, 5)
         """
-        pass
+        return self.edges[:].data
 
     def set_n_repr(self, data, ntype, u=ALL, inplace=False):
         """Set node(s) representation of a single node type.
@@ -1200,7 +494,25 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         inplace : bool
             If True, update will be done in place, but autograd will break.
         """
-        pass
+        if not utils.is_dict_like(data):
+            raise DGLError('Expect dictionary type for feature data.'
+                           ' Got "%s" instead.' % type(data))
+        if is_all(u):
+            num_nodes = self._number_of_nodes(ntype)
+        else:
+            u = utils.toindex(u)
+            num_nodes = len(u)
+        for key, val in data.items():
+            nfeats = F.shape(val)[0]
+            if nfeats != num_nodes:
+                raise DGLError('Expect number of features to match number of nodes (len(u)).'
+                               ' Got %d and %d instead.' % (nfeats, num_nodes))
+        # set
+        if is_all(u):
+            for key, val in data.items():
+                self._node_frames[ntype][key] = val
+        else:
+            self._node_frames[ntype].update_rows(u, data, inplace=inplace)
 
     def get_n_repr(self, ntype, u=ALL):
         """Get node(s) representation of a single node type.
@@ -1219,7 +531,13 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         dict
             Representation dict from feature name to feature tensor.
         """
-        pass
+        if len(self.node_attr_schemes(ntype)) == 0:
+            return dict()
+        if is_all(u):
+            return dict(self._node_frames[ntype])
+        else:
+            u = utils.toindex(u)
+            return self._node_frames[ntype].select_rows(u)
 
     def pop_n_repr(self, ntype, key):
         """Get and remove the specified node repr of a given node type.
@@ -1236,7 +554,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         Tensor
             The popped representation
         """
-        pass
+        return self._node_frames[ntype].pop(key)
 
     def set_e_repr(self, data, etype, edges=ALL, inplace=False):
         """Set edge(s) representation of a single edge type.
@@ -1256,17 +574,47 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             The edge type, characterized by a triplet of source type name,
             destination type name, and edge type name.
         edges : edges
-            Edges can be either
-
-            * A pair of endpoint nodes (u, v), where u is the node ID of source
-              node type and v is that of destination node type.
-            * A tensor of edge ids of the given type.
-
-            The default value is all the edges.
+            Edges can be a pair of endpoint nodes (u, v), or a
+            tensor of edge ids. The default value is all the edges.
         inplace : bool
             If True, update will be done in place, but autograd will break.
         """
-        pass
+        # parse argument
+        if is_all(edges):
+            eid = ALL
+        elif isinstance(edges, tuple):
+            u, v = edges
+            v = v + self.number_of_nodes(0)
+            u = utils.toindex(u)
+            v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            _, _, eid = self._graph.edge_ids(u, v)
+        else:
+            eid = utils.toindex(edges)
+
+        # sanity check
+        if not utils.is_dict_like(data):
+            raise DGLError('Expect dictionary type for feature data.'
+                           ' Got "%s" instead.' % type(data))
+
+        if is_all(eid):
+            num_edges = self.number_of_edges()
+        else:
+            eid = utils.toindex(eid)
+            num_edges = len(eid)
+        for key, val in data.items():
+            nfeats = F.shape(val)[0]
+            if nfeats != num_edges:
+                raise DGLError('Expect number of features to match number of edges.'
+                               ' Got %d and %d instead.' % (nfeats, num_edges))
+        # set
+        if is_all(eid):
+            # update column
+            for key, val in data.items():
+                self._edge_frames[etype][key] = val
+        else:
+            # update row
+            self._edge_frames[etype].update_rows(eid, data, inplace=inplace)
 
     def get_e_repr(self, etype, edges=ALL):
         """Get edge(s) representation.
@@ -1285,7 +633,26 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         dict
             Representation dict
         """
-        pass
+        if len(self.edge_attr_schemes(self._etype)) == 0:
+            return dict()
+        # parse argument
+        if is_all(edges):
+            eid = ALL
+        elif isinstance(edges, tuple):
+            u, v = edges
+            v = v + self.number_of_nodes(0)
+            u = utils.toindex(u)
+            v = utils.toindex(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            _, _, eid = self._graph.edge_ids(u, v)
+        else:
+            eid = utils.toindex(edges)
+
+        if is_all(eid):
+            return dict(self._edge_frames[etype])
+        else:
+            eid = utils.toindex(eid)
+            return self._edge_frames[etype].select_rows(eid)
 
     def pop_e_repr(self, etype, key):
         """Get and remove the specified edge repr of a single edge type.
@@ -1303,123 +670,39 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         Tensor
             The popped representation
         """
-        pass
+        return self._edge_frames[etype].pop(key)
 
     def register_message_func(self, func):
-        """Register global message function for each edge type provided.
-
-        Once registered, ``func`` will be used as the default
-        message function in message passing operations, including
-        :func:`send`, :func:`send_and_recv`, :func:`pull`,
-        :func:`push`, :func:`update_all`.
-
-        Parameters
-        ----------
-        func : callable, dict[etype, callable]
-            Message function on the edge. The function should be
-            an :mod:`Edge UDF <dgl.udf>`.
-
-            If a dict is provided, the functions will be applied according to
-            edge type.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-            If the graph has more than one edge type and ``func`` is not a
-            dict, it will throw an error.
-
-        See Also
-        --------
-        send
-        send_and_recv
-        pull
-        push
-        update_all
-        """
-        pass
+        if isinstance(func, dict):
+            assert len(func) == 1
+            key = list(func.keys())[0]
+            assert key == self._etype
+            self._message_funcs[key] = func[key]
+        else:
+            self._message_funcs[self._etype] = func
 
     def register_reduce_func(self, func):
-        """Register global message reduce function for each edge type provided.
-
-        Once registered, ``func`` will be used as the default
-        message reduce function in message passing operations, including
-        :func:`recv`, :func:`send_and_recv`, :func:`push`, :func:`pull`,
-        :func:`update_all`.
-
-        Parameters
-        ----------
-        func : callable, dict[etype, callable]
-            Reduce function on the node. The function should be
-            a :mod:`Node UDF <dgl.udf>`.
-
-            If a dict is provided, the messages will be aggregated onto the
-            nodes by the edge type of the message.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-            If the graph has more than one edge type and ``reduce_func`` is not
-            a dict, it will throw an error.
-
-        See Also
-        --------
-        recv
-        send_and_recv
-        push
-        pull
-        update_all
-        """
-        pass
+        assert isinstance(func, dict)
+        for key in func:
+            assert key in self._ntypes
+            self._reduce_funcs[key] = func[key]
 
     def register_apply_node_func(self, func):
-        """Register global node apply function for each node type provided.
-
-        Once registered, ``func`` will be used as the default apply
-        node function. Related operations include :func:`apply_nodes`,
-        :func:`recv`, :func:`send_and_recv`, :func:`push`, :func:`pull`,
-        :func:`update_all`.
-
-        Parameters
-        ----------
-        func : callable, dict[str, callable]
-            Apply function on the nodes. The function should be
-            a :mod:`Node UDF <dgl.udf>`.
-
-            If a dict is provided, the functions will be applied according to
-            node type.
-            If the graph has more than one node type and ``func`` is not a
-            dict, it will throw an error.
-
-        See Also
-        --------
-        apply_nodes
-        register_apply_edge_func
-        """
-        pass
+        assert isinstance(func, dict)
+        for key in func:
+            assert key in self._ntypes
+            self._apply_node_funcs[key] = func[key]
 
     def register_apply_edge_func(self, func):
-        """Register global edge apply function for each edge type provided.
+        if isinstance(func, dict):
+            assert len(func) == 1
+            key = list(func.keys())[0]
+            assert key == self._etype
+            self._apply_edge_funcs[key] = func[key]
+        else:
+            self._apply_edge_funcs[self._etype] = func
 
-        Once registered, ``func`` will be used as the default apply
-        edge function in :func:`apply_edges`.
-
-        Parameters
-        ----------
-        func : callable, dict[etype, callable]
-            Apply function on the edge. The function should be
-            an :mod:`Edge UDF <dgl.udf>`.
-
-            If a dict is provided, the functions will be applied according to
-            edge type.
-            The edge type is characterized by a triplet of source type name,
-            destination type name, and edge type name.
-            If the graph has more than one edge type and ``func`` is not a
-            dict, it will throw an error.
-
-        See Also
-        --------
-        apply_edges
-        register_apply_node_func
-        """
-        pass
-
-    def apply_nodes(self, func, v=ALL, inplace=False):
+    def apply_nodes(self, func="default", v=ALL, inplace=False):
         """Apply the function on the nodes with the same type to update their
         features.
 
@@ -1460,9 +743,26 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
                 [4., 4., 4., 4., 4.],
                 [4., 4., 4., 4., 4.]])
         """
-        pass
+        if func == "default":
+            func = self._apply_node_funcs
+        assert isinstance(v, dict)
+        assert isinstance(func, dict)
 
-    def apply_edges(self, func, edges=ALL, inplace=False):
+        for ntype, varr in v:
+            if is_all(varr):
+                varr = utils.toindex(slice(0, self.number_of_nodes(ntype)))
+            else:
+                varr = utils.toindex(varr)
+            assert ntype in func
+            with ir.prog() as prog:
+                scheduler.schedule_heterograph_apply_nodes(graph=self,
+                                                           ntype=ntype,
+                                                           v=varr,
+                                                           apply_func=func[ntype],
+                                                           inplace=inplace)
+                Runtime.run(prog)
+
+    def apply_edges(self, func="default", edges=ALL, inplace=False):
         """Apply the function on the edges with the same type to update their
         features.
 
@@ -1505,7 +805,35 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
                 [4., 4., 4., 4., 4.],
                 [4., 4., 4., 4., 4.]])
         """
-        pass
+        if func == "default":
+            func = self._apply_edge_funcs[self._etype]
+        assert func is not None
+
+        # Bipartite graphs have only one edge type.
+        if is_all(edges):
+            u, v, _ = self._graph.edges('eid')
+            v = utils.toindex(v.tousertensor() - self._number_of_nodes(0))
+            eid = utils.toindex(slice(0, self.number_of_edges()))
+        elif isinstance(edges, tuple):
+            u, v = edges
+            u = utils.toindex(u)
+            v = utils.toindex(v + self._number_of_nodes(0))
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            u, v, eid = self._graph.edge_ids(u, v)
+            v = utils.toindex(v.tousertensor() - self._number_of_nodes(0))
+        else:
+            eid = utils.toindex(edges)
+            u, v, _ = self._graph.find_edges(eid)
+            v = utils.toindex(v.tousertensor() - self._number_of_nodes(0))
+
+        with ir.prog() as prog:
+            scheduler.schedule_bipartite_apply_edges(graph=self,
+                                                     u=u,
+                                                     v=v,
+                                                     eid=eid,
+                                                     apply_func=func,
+                                                     inplace=inplace)
+            Runtime.run(prog)
 
     def group_apply_edges(self, group_by, func, edges=ALL, inplace=False):
         """Group the edges by nodes and apply the function of the grouped
@@ -1540,21 +868,18 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
         """
-        pass
+        raise Exception("bipartite graph doesn't support group_apply_edges for now")
 
-    # TODO: REVIEW
     def send(self, edges=ALL, message_func=None):
         """Send messages along the given edges with the same edge type.
 
         ``edges`` can be any of the following types:
 
-        * ``int`` : Specify one edge using its edge id (of the given edge type).
-        * ``pair of int`` : Specify one edge using its endpoints (of source node type
-          and destination node type respectively).
+        * ``int`` : Specify one edge using its edge id.
+        * ``pair of int`` : Specify one edge using its endpoints.
         * ``int iterable`` / ``tensor`` : Specify multiple edges using their edge ids.
         * ``pair of int iterable`` / ``pair of tensors`` :
           Specify multiple edges using their endpoints.
-        * a dict of all the above, if ``message_func`` is a dict.
 
         The UDF returns messages on the edges and can be later fetched in
         the destination node's ``mailbox``. Receiving will consume the messages.
@@ -1592,7 +917,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         On multigraphs, if :math:`u` and :math:`v` are specified, then the messages will be sent
         along all edges between :math:`u` and :math:`v`.
         """
-        pass
+        raise Exception("bipartite graph doesn't support send for now")
 
     def recv(self,
              v=ALL,
@@ -1656,7 +981,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         * the node types in ``v``, the node types in ``apply_node_func``,
           and the destination types in ``reduce_func`` must be the same.
         """
-        pass
+        raise Exception("bipartite graph doesn't support recv for now")
 
     def send_and_recv(self,
                       edges,
@@ -1727,7 +1052,39 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         * the edge type of ``edges``, ``message_func`` and ``reduce_func``
           must also be the same.
         """
-        pass
+        if message_func == "default":
+            message_func = self._message_funcs[self._etype]
+        if reduce_func == "default":
+            reduce_func = self._reduce_funcs[self._ntypes[1]]
+        if apply_node_func == "default":
+            apply_node_func = self._apply_node_funcs[self._ntypes[1]]
+
+        assert message_func is not None
+        assert reduce_func is not None
+
+        if isinstance(edges, tuple):
+            u, v = edges
+            u = utils.toindex(u)
+            gv = self._to_dst_index(v)
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            u, gv, eid = self._graph.edge_ids(u, gv)
+        else:
+            eid = utils.toindex(edges)
+            u, gv, _ = self._graph.find_edges(eid)
+
+        if len(u) == 0:
+            # no edges to be triggered
+            return
+
+        v = utils.toindex(gv.tousertensor() - self._number_of_nodes(0))
+        with ir.prog() as prog:
+            scheduler.schedule_bipartite_snr(graph=self,
+                                             edge_tuples=(u, v, eid),
+                                             message_func=message_func,
+                                             reduce_func=reduce_func,
+                                             apply_func=apply_node_func,
+                                             inplace=inplace)
+            Runtime.run(prog)
 
     def pull(self,
              v,
@@ -1794,7 +1151,27 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         * the edge type of ``message_func`` and ``reduce_func`` must also be
           the same.
         """
-        pass
+        if message_func == "default":
+            message_func = self._message_funcs[self._etype]
+        if reduce_func == "default":
+            reduce_func = self._reduce_funcs[self._ntypes[1]]
+        if apply_node_func == "default":
+            apply_node_func = self._apply_node_funcs[self._ntypes[1]]
+
+        assert message_func is not None
+        assert reduce_func is not None
+
+        v = utils.toindex(v)
+        if len(v) == 0:
+            return
+        with ir.prog() as prog:
+            scheduler.schedule_bipartite_pull(graph=self,
+                                              pull_nodes=v,
+                                              message_func=message_func,
+                                              reduce_func=reduce_func,
+                                              apply_func=apply_node_func,
+                                              inplace=inplace)
+            Runtime.run(prog)
 
     def push(self,
              u,
@@ -1913,7 +1290,21 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         * the edge type of ``message_func`` and ``reduce_func`` must also be
           the same.
         """
-        pass
+        if message_func == "default":
+            message_func = self._message_funcs[self._etype]
+        if reduce_func == "default":
+            reduce_func = self._reduce_funcs[self._ntypes[1]]
+        if apply_node_func == "default":
+            apply_node_func = self._apply_node_funcs[self._ntypes[1]]
+        assert message_func is not None
+        assert reduce_func is not None
+
+        with ir.prog() as prog:
+            scheduler.schedule_bipartite_update_all(graph=self,
+                                                    message_func=message_func,
+                                                    reduce_func=reduce_func,
+                                                    apply_func=apply_node_func)
+            Runtime.run(prog)
 
     # TODO should we support this?
     def prop_nodes(self,
@@ -2171,91 +1562,147 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
     def __repr__(self):
         pass
 
-# pylint: disable=abstract-method
-class DGLHeteroSubGraph(DGLHeteroGraph):
-    """
-    Parameters
-    ----------
-    parent : DGLHeteroGraph
-        The parent graph.
-    parent_nid : dict[str, utils.Index]
-        The type-specific parent node IDs for each type.
-    parent_eid : dict[etype, utils.Index]
-        The type-specific parent edge IDs for each type.
-    graph_idx : GraphIndex
-        The graph index
-    shared : bool, optional
-        Whether the subgraph shares node/edge features with the parent graph
-    """
-    # pylint: disable=unused-argument, super-init-not-called
-    def __init__(
-            self,
-            parent,
-            parent_nid,
-            parent_eid,
-            graph_idx,
-            shared=False):
-        pass
+    def __getitem__(self, key):
+        """Returns a view on the heterogeneous graph with given node/edge
+        type:
 
-    @property
-    def parent_nid(self):
-        """Get the parent node ids.
+        * If ``key`` is a str, it returns a heterogeneous subgraph induced
+          from nodes of type ``key``.
+        * If ``key`` is a pair of str (type_A, type_B), it returns a
+          heterogeneous subgraph induced from the union of both node types.
+        * If ``key`` is a triplet of str
 
-        The returned tensor dictionary can be used as a map from the node id
-        in this subgraph to the node id in the parent graph.
+              (src_type_name, dst_type_name, edge_type_name)
 
-        Returns
-        -------
-        dict[str, Tensor]
-            The parent node id array for each type.
-        """
-        pass
+          It returns a heterogeneous subgraph induced from the edges with
+          source type name ``src_type_name``, destination type name
+          ``dst_type_name``, and edge type name ``edge_type_name``.
 
-    @property
-    def parent_eid(self):
-        """Get the parent edge ids.
+        The view would share the frames with the parent graph; any
+        modifications on one's frames would reflect on the other.
 
-        The returned tensor dictionary can be used as a map from the edge id
-        in this subgraph to the edge id in the parent graph.
+        Note that the subgraph itself is not materialized until someone
+        queries the subgraph structure.  This implies that calling computation
+        methods such as
 
-        Returns
-        -------
-        dict[etype, Tensor]
-            The parent edge id array for each type.
-            The edge types are characterized by a triplet of source type
-            name, destination type name, and edge type name.
-        """
-        pass
+            g['user'].update_all(...)
 
-    def copy_to_parent(self, inplace=False):
-        """Write node/edge features to the parent graph.
+        would not create a subgraph of users.
 
         Parameters
         ----------
-        inplace : bool
-            If true, use inplace write (no gradient but faster)
-        """
-        pass
-
-    def copy_from_parent(self):
-        """Copy node/edge features from the parent graph.
-
-        All old features will be removed.
-        """
-        pass
-
-    def map_to_subgraph_nid(self, parent_vids):
-        """Map the node IDs in the parent graph to the node IDs in the
-        subgraph.
-
-        Parameters
-        ----------
-        parent_vids : dict[str, list or tensor]
-            The dictionary of node types to parent node ID array.
+        key : str or tuple
+            See above
 
         Returns
         -------
-        dict[str, tensor]
-            The node ID array in the subgraph of each node type.
+        DGLBaseHeteroGraphView
+            The induced subgraph view.
         """
-        pass
+        if isinstance(key, str):
+            assert key in self._num_nodes_by_type
+            return DGLBipartiteGraphView(self, key)
+        else:
+            key = tuple(key)
+            if len(key) == 2:
+                if key[0] == self._ntypes[0] and key[1] == self._ntypes[1]:
+                    return self
+                else:
+                    raise Exception("The subgraph view doesn't exist")
+            elif len(key) == 3:
+                if key[0] == self._ntypes[0] and key[1] == self._ntypes[1] and key[2] == self._etype:
+                    return self
+                else:
+                    raise Exception("The subgraph view doesn't exist")
+            else:
+                raise Exception('invalid key')
+
+class DGLBipartiteGraphView(object):
+    def __init__(self, parent, subtype):
+        self._subtype = subtype
+        self._parent = parent
+
+    def __len__(self):
+        """Return the number of nodes in the graph."""
+        return self._parent._number_of_nodes(self._subtype)
+
+    def number_of_nodes(self):
+        return self._parent._number_of_nodes(self._subtype)
+
+    def number_of_edges(self):
+        return 0
+
+    def has_node(self, vid):
+        return self._parent._has_node(self._subtype, vid)
+
+    def __contains__(self, vid):
+        return self._parent._has_node(self._subtype, vid)
+
+    def has_nodes(self, vids):
+        return self._parent._has_nodes(self._subtype, vids)
+
+    @property
+    def _node_frame(self):
+        assert isinstance(self._subtype, str)
+        return self._parent._node_frames[self._subtype]
+
+    @property
+    def ndata(self):
+        """Return the data view of all the nodes.
+
+        DGLGraph.ndata is an abbreviation of DGLGraph.nodes[:].data
+
+        See Also
+        --------
+        dgl.DGLGraph.nodes
+        """
+        return self.nodes[:].data
+
+    @property
+    def nodes(self):
+        assert isinstance(self._subtype, str)
+        return HeteroNodeView(self, self._subtype)
+
+    def set_n_repr(self, data, ntype, u=ALL, inplace=False):
+        assert ntype == self._subtype
+        self._parent.set_n_repr(data, ntype, u, inplace)
+
+    def get_n_repr(self, ntype, u=ALL):
+        assert ntype == self._subtype
+        return self._parent.get_n_repr(ntype, u)
+
+    def pop_n_repr(self, ntype, key):
+        assert ntype == self._subtype
+        self._parent.pop_n_repr(ntype, key)
+
+    def register_reduce_func(self, func):
+        assert isinstance(self._subtype, str)
+        self._parent.register_reduce_func({self._subtype: func})
+
+    def register_apply_node_func(self, func):
+        assert isinstance(self._subtype, str)
+        self._parent.register_apply_node_func({self._subtype: func})
+
+    def register_message_func(self, func):
+        assert isinstance(self._subtype, tuple)
+        self._parent.register_apply_message_func(func)
+
+    def register_apply_edge_func(self, func):
+        assert isinstance(self._subtype, tuple)
+        self._parent.register_apply_edge_func(func)
+
+    def apply_nodes(self, func="default", v=ALL, inplace=False):
+        if func == "default":
+            assert isinstance(self._subtype, str)
+            func = self._parent._apply_node_funcs[self._subtype]
+
+        if is_all(v):
+            v = utils.toindex(slice(0, self._parent._number_of_nodes(self._subtype)))
+        else:
+            v = utils.toindex(v)
+        with ir.prog() as prog:
+            scheduler.schedule_apply_nodes(graph=self,
+                                           v=v,
+                                           apply_func=func,
+                                           inplace=inplace)
+            Runtime.run(prog)
