@@ -164,7 +164,7 @@ typedef minigun::advance::Config<true, minigun::advance::kV2N> AdvanceConfig;
 template <int XPU, int Mode, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
-void CallBackwardBinaryReduce_v2(
+void CallBackwardBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
     const ImmutableGraph* graph,
     BackwardGData<Idx, DType>* gdata) {
@@ -200,7 +200,7 @@ void CallBackwardBinaryReduce_v2(
 }
 
 #define GEN_BACKWARD_DEFINE(mode, dtype, lhs_tgt, rhs_tgt, op)  \
-  template void CallBackwardBinaryReduce_v2<XPU,                \
+  template void CallBackwardBinaryReduce<XPU,                \
                     mode, IDX, dtype,                           \
                     lhs_tgt, rhs_tgt,                           \
                     op<dtype>, REDUCER<XPU, dtype>>(            \
@@ -211,7 +211,7 @@ void CallBackwardBinaryReduce_v2(
 template <int XPU, int Mode, int NDim, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
-void CallBackwardBinaryReduceBcast_v2(
+void CallBackwardBinaryReduceBcast(
     const minigun::advance::RuntimeConfig& rtcfg,
     const ImmutableGraph* graph,
     BackwardBcastGData<NDim, Idx, DType>* gdata) {
@@ -248,7 +248,7 @@ void CallBackwardBinaryReduceBcast_v2(
 }
 
 #define GEN_BACKWARD_BCAST_DEFINE(mode, ndim, dtype, lhs_tgt, rhs_tgt, op)  \
-  template void CallBackwardBinaryReduceBcast_v2<XPU,                       \
+  template void CallBackwardBinaryReduceBcast<XPU,                       \
                     mode, ndim, IDX, dtype,                                 \
                     lhs_tgt, rhs_tgt,                                       \
                     op<dtype>, REDUCER<XPU, dtype>>(                        \

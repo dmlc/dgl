@@ -144,7 +144,7 @@ typedef minigun::advance::Config<true, minigun::advance::kV2N> AdvanceConfig;
 template <int XPU, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
-void CallBinaryReduce_v2(const minigun::advance::RuntimeConfig& rtcfg,
+void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
                          const ImmutableGraph* graph,
                          GData<Idx, DType>* gdata) {
   typedef cpu::FunctorsTempl<Idx, DType, LeftSelector,
@@ -175,7 +175,7 @@ void CallBinaryReduce_v2(const minigun::advance::RuntimeConfig& rtcfg,
 template <int XPU, int NDim, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
-void CallBinaryReduceBcast_v2(
+void CallBinaryReduceBcast(
   const minigun::advance::RuntimeConfig& rtcfg,
   const ImmutableGraph* graph,
   BcastGData<NDim, Idx, DType>* gdata) {
@@ -206,14 +206,14 @@ void CallBinaryReduceBcast_v2(
 }
 
 #define GEN_DEFINE(dtype, lhs_tgt, rhs_tgt, op)                    \
-  template void CallBinaryReduce_v2<XPU, IDX,                      \
+  template void CallBinaryReduce<XPU, IDX,                      \
         dtype, lhs_tgt, rhs_tgt, op<dtype>, REDUCER<XPU, dtype>>(  \
       const minigun::advance::RuntimeConfig& rtcfg,                \
       const ImmutableGraph* graph,                                 \
       GData<IDX, dtype>* gdata);
 
 #define GEN_BCAST_DEFINE(ndim, dtype, lhs_tgt, rhs_tgt, op)         \
-  template void CallBinaryReduceBcast_v2<XPU, ndim, IDX, dtype,     \
+  template void CallBinaryReduceBcast<XPU, ndim, IDX, dtype,     \
                                  lhs_tgt, rhs_tgt,                  \
                                  op<dtype>, REDUCER<XPU, dtype>>(   \
       const minigun::advance::RuntimeConfig& rtcfg,                 \

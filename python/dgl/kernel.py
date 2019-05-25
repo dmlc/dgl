@@ -64,7 +64,7 @@ def binary_op_reduce(reducer, op, graph,
         rhs_mapping = empty([])
     if out_mapping is None:
         out_mapping = empty([])
-    _CAPI_DGLKernelBinaryOpReduce_v2(
+    _CAPI_DGLKernelBinaryOpReduce(
         reducer, op, graph._handle,
         int(lhs), int(rhs),
         lhs_data, rhs_data, out_data,
@@ -116,7 +116,7 @@ def backward_lhs_binary_op_reduce(
         rhs_mapping = empty([])
     if out_mapping is None:
         out_mapping = empty([])
-    _CAPI_DGLKernelBackwardLhsBinaryOpReduce_v2(
+    _CAPI_DGLKernelBackwardLhsBinaryOpReduce(
         reducer, op, graph._handle,
         int(lhs), int(rhs),
         lhs_mapping, rhs_mapping, out_mapping,
@@ -169,7 +169,7 @@ def backward_rhs_binary_op_reduce(
         rhs_mapping = empty([])
     if out_mapping is None:
         out_mapping = empty([])
-    _CAPI_DGLKernelBackwardRhsBinaryOpReduce_v2(
+    _CAPI_DGLKernelBackwardRhsBinaryOpReduce(
         reducer, op, graph._handle,
         int(lhs), int(rhs),
         lhs_mapping, rhs_mapping, out_mapping,

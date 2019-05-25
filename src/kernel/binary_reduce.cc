@@ -52,35 +52,6 @@ bool IsValidBinaryOpShape(NDArray lhs, NDArray rhs) {
   return true;
 }
 
-/*void BinaryOpReduce(
-    const std::string& reducer,
-    const std::string& op,
-    NDArray indptr, NDArray indices,
-    NDArray rev_indptr, NDArray rev_indices,
-    binary_op::Target lhs,
-    binary_op::Target rhs,
-    NDArray lhs_mapping,
-    NDArray rhs_mapping,
-    NDArray lhs_data,
-    NDArray rhs_data,
-    NDArray out_mapping,
-    NDArray out_data) {
-  CHECK(IsValidCsr(indptr, indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
-  if (op != binary_op::kUseLhs) {
-    CHECK(IsValidBinaryOpShape(lhs_data, rhs_data))
-      << "Cannot compute binary operation between feature shapes "
-      << ShapeString(lhs_data) << " and " << ShapeString(rhs_data);
-  }
-  const DLContext& ctx = indptr->ctx;
-  // Allocate output
-  DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl,
-      reducer, op, indptr, indices, rev_indptr, rev_indices,
-      lhs, rhs,
-      lhs_mapping, rhs_mapping,
-      lhs_data, rhs_data,
-      out_mapping, out_data);
-}*/
-
 bool HasBcast(NDArray lhs, NDArray rhs) {
   if (lhs->ndim != rhs->ndim) {
     return true;
@@ -140,31 +111,6 @@ BcastInfo CalcBcastInfo(NDArray lhs, NDArray rhs) {
   return ret;
 }
 
-/*void BinaryOpReduceBcast(
-    const std::string& reducer,
-    const std::string& binary_op,
-    NDArray indptr, NDArray indices,
-    NDArray rev_indptr, NDArray rev_indices,
-    binary_op::Target lhs,
-    binary_op::Target rhs,
-    NDArray lhs_mapping,
-    NDArray rhs_mapping,
-    NDArray lhs_data,
-    NDArray rhs_data,
-    NDArray out_mapping,
-    NDArray out_data) {
-  CHECK(IsValidCsr(indptr, indices)) << "Invalid CSR arrays (e.g. shape, dtype)";
-  BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
-  const DLContext& ctx = indptr->ctx;
-  DGL_XPU_SWITCH(ctx.device_type, BinaryReduceBcastImpl,
-      info, reducer, binary_op,
-      indptr, indices, rev_indptr, rev_indices,
-      lhs, rhs,
-      lhs_mapping, rhs_mapping,
-      lhs_data, rhs_data,
-      out_mapping, out_data);
-}*/
-
 std::string IdArrayToStr(IdArray arr) {
   int64_t len = arr->shape[0];
   std::ostringstream oss;
@@ -206,7 +152,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelInferBinaryFeatureShape")
     *rv = ret;
   });
 
-void BinaryOpReduce_v2(
+void BinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
     const ImmutableGraph* graph,
@@ -238,7 +184,7 @@ void BinaryOpReduce_v2(
   // Process mapping
   if (HasBcast(lhs_data, rhs_data)) {
     BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
-    DGL_XPU_SWITCH(ctx.device_type, BinaryReduceBcastImpl_v2,
+    DGL_XPU_SWITCH(ctx.device_type, BinaryReduceBcastImpl,
         info, reducer, op, graph,
         lhs, rhs,
         lhs_data, rhs_data, out_data,
@@ -249,7 +195,7 @@ void BinaryOpReduce_v2(
         << "Cannot compute binary operation between feature shapes "
         << ShapeString(lhs_data) << " and " << ShapeString(rhs_data);
     }
-    DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl_v2,
+    DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl,
         reducer, op, graph,
         lhs, rhs,
         lhs_data, rhs_data, out_data,
@@ -257,7 +203,7 @@ void BinaryOpReduce_v2(
   }
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBinaryOpReduce_v2")
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
@@ -274,13 +220,13 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBinaryOpReduce_v2")
     GraphInterface* gptr = static_cast<GraphInterface*>(ghdl);
     const ImmutableGraph* igptr = dynamic_cast<ImmutableGraph*>(gptr);
     CHECK(igptr) << "Invalid graph object argument. Must be an immutable graph.";
-    BinaryOpReduce_v2(reducer, op, igptr,
+    BinaryOpReduce(reducer, op, igptr,
         static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
         lhs_data, rhs_data, out_data,
         lhs_mapping, rhs_mapping, out_mapping);
   });
 
-void BackwardLhsSrcOpEdgeReduce(
+void BackwardLhsBinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
     const ImmutableGraph* graph,
@@ -319,14 +265,14 @@ void BackwardLhsSrcOpEdgeReduce(
   }
   if (HasBcast(lhs_data, rhs_data)) {
     BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
-    DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceBcastImpl_v2,
+    DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceBcastImpl,
         info, reducer, op, graph,
         lhs, rhs,
         lhs_mapping, rhs_mapping, out_mapping,
         lhs_data, rhs_data, out_data, grad_out_data,
         grad_lhs_data, utils::NoneArray());
   } else {
-    DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceImpl_v2,
+    DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceImpl,
         reducer, op, graph,
         lhs, rhs,
         lhs_mapping, rhs_mapping, out_mapping,
@@ -335,7 +281,7 @@ void BackwardLhsSrcOpEdgeReduce(
   }
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce_v2")
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
@@ -354,7 +300,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce_v2")
     GraphInterface* gptr = static_cast<GraphInterface*>(ghdl);
     const ImmutableGraph* igptr = dynamic_cast<ImmutableGraph*>(gptr);
     CHECK(igptr) << "Invalid graph object argument. Must be an immutable graph.";
-    BackwardLhsSrcOpEdgeReduce(
+    BackwardLhsBinaryOpReduce(
         reducer, op, igptr,
         static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
         lhs_mapping, rhs_mapping, out_mapping,
@@ -362,7 +308,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce_v2")
         grad_lhs_data);
   });
 
-void BackwardRhsSrcOpEdgeReduce(
+void BackwardRhsBinaryOpReduce(
     const std::string& reducer,
     const std::string& op,
     const ImmutableGraph* graph,
@@ -401,14 +347,14 @@ void BackwardRhsSrcOpEdgeReduce(
   }
   if (HasBcast(lhs_data, rhs_data)) {
     BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
-    DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceBcastImpl_v2,
+    DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceBcastImpl,
         info, reducer, op, graph,
         lhs, rhs,
         lhs_mapping, rhs_mapping, out_mapping,
         lhs_data, rhs_data, out_data, grad_out_data,
         utils::NoneArray(), grad_rhs_data);
   } else {
-    DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceImpl_v2,
+    DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceImpl,
         reducer, op, graph,
         lhs, rhs,
         lhs_mapping, rhs_mapping, out_mapping,
@@ -417,7 +363,7 @@ void BackwardRhsSrcOpEdgeReduce(
   }
 }
 
-DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce_v2")
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
     std::string op = args[1];
@@ -436,7 +382,7 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce_v2")
     GraphInterface* gptr = static_cast<GraphInterface*>(ghdl);
     const ImmutableGraph* igptr = dynamic_cast<ImmutableGraph*>(gptr);
     CHECK(igptr) << "Invalid graph object argument. Must be an immutable graph.";
-    BackwardRhsSrcOpEdgeReduce(
+    BackwardRhsBinaryOpReduce(
         reducer, op, igptr,
         static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
         lhs_mapping, rhs_mapping, out_mapping,

@@ -43,13 +43,13 @@ struct GData {
 template <int XPU, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
-void CallBinaryReduce_v2(
+void CallBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
     const ImmutableGraph* graph,
     GData<Idx, DType>* gdata);
 
 template <int XPU>
-void BinaryReduceImpl_v2(
+void BinaryReduceImpl(
     const std::string& reducer,
     const std::string& op,
     const ImmutableGraph* graph,
@@ -72,38 +72,16 @@ struct BackwardGData {
   Idx *out_mapping{nullptr};
 };
 
-/*
-template <int XPU, int Mode, typename DType,
-          typename LeftSelector, typename RightSelector,
-          typename BinaryOp, typename Reducer>
-void CallBackwardBinaryReduce(
-    const minigun::advance::RuntimeConfig& rtcfg,
-    const minigun::Csr& csr, const minigun::Csr& rev_csr,
-    BackwardGData<DType>* gdata);
-*/
-
-/*template <int XPU>
-void BackwardBinaryReduceImpl(
-    const std::string& reducer,
-    const std::string& op,
-    runtime::NDArray indptr, runtime::NDArray indices,
-    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
-    binary_op::Target lhs, binary_op::Target rhs,
-    runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping,
-    runtime::NDArray lhs_data, runtime::NDArray rhs_data, runtime::NDArray out_data,
-    runtime::NDArray grad_out_data,
-    runtime::NDArray grad_lhs_data, runtime::NDArray grad_rhs_data);*/
-
 template <int XPU, int Mode, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
-void CallBackwardBinaryReduce_v2(
+void CallBackwardBinaryReduce(
     const minigun::advance::RuntimeConfig& rtcfg,
     const ImmutableGraph* graph,
     BackwardGData<Idx, DType>* gdata);
 
 template <int XPU>
-void BackwardBinaryReduceImpl_v2(
+void BackwardBinaryReduceImpl(
     const std::string& reducer,
     const std::string& op,
     const ImmutableGraph* graph,
@@ -143,13 +121,13 @@ struct BcastGData {
 template <int XPU, int NDim, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
-void CallBinaryReduceBcast_v2(
+void CallBinaryReduceBcast(
     const minigun::advance::RuntimeConfig& rtcfg,
     const ImmutableGraph* graph,
     BcastGData<NDim, Idx, DType>* gdata);
 
 template <int XPU>
-void BinaryReduceBcastImpl_v2(
+void BinaryReduceBcastImpl(
     const BcastInfo& info,
     const std::string& reducer,
     const std::string& op,
@@ -185,38 +163,16 @@ struct BackwardBcastGData {
   DType *grad_lhs_data{nullptr}, *grad_rhs_data{nullptr};
 };
 
-/*
-template <int XPU, int Mode, int NDim, typename DType,
-          typename LeftSelector, typename RightSelector,
-          typename BinaryOp, typename Reducer>
-void CallBackwardBinaryReduceBcast(
-    const minigun::advance::RuntimeConfig& rtcfg,
-    const minigun::Csr& csr, const minigun::Csr& rev_csr,
-    BackwardBcastGData<NDim, DType>* gdata);
-
-template <int XPU>
-void BackwardBinaryReduceBcastImpl(
-    const BcastInfo& info,
-    const std::string& reducer,
-    const std::string& op,
-    runtime::NDArray indptr, runtime::NDArray indices,
-    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
-    binary_op::Target lhs_tgt, binary_op::Target rhs_tgt,
-    runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping,
-    runtime::NDArray lhs, runtime::NDArray rhs, runtime::NDArray out, runtime::NDArray grad_out,
-    runtime::NDArray grad_lhs, runtime::NDArray grad_rhs);
-*/
-
 template <int XPU, int Mode, int NDim, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
-void CallBackwardBinaryReduceBcast_v2(
+void CallBackwardBinaryReduceBcast(
     const minigun::advance::RuntimeConfig& rtcfg,
     const ImmutableGraph* graph,
     BackwardBcastGData<NDim, Idx, DType>* gdata);
 
 template <int XPU>
-void BackwardBinaryReduceBcastImpl_v2(
+void BackwardBinaryReduceBcastImpl(
     const BcastInfo& info,
     const std::string& reducer,
     const std::string& op,
