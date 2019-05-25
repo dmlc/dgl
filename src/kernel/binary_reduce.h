@@ -136,70 +136,52 @@ void BackwardRhsBinaryOpReduce(
     runtime::NDArray grad_rhs_data);
 
 /*
- * !\brief Copy src node data and perform reduce
- 
+ * !\brief Copy the target data and reduce by graph structure.
+ *
  * \param reducer The type of the reducer ("sum", "max", "mean", "min", "none").
  *                If the reducer is "none", the output is an edge feature tensor.
  *                Otherwise, a node feature tensor is returned.
- * \param indptr An int64 row offset array for the graph CSR.
- * \param indices An int64 column index array for the graph CSR.
- * \param rev_indptr An int64 row offset array for the reverse graph CSR.
- * \param rev_indices An int64 column index array for the reverse graph CSR.
- * \param src_mapping An optional int64 array for source node mapping. If empty,
- *                    source ids are consecutive integers [0, len(indptr) - 1).
- *                    Source ids are used to read source node data.
- * \param src_data The source node feature tensor.
- * \param out_mapping An optional int64 array for output mapping. If reducer is
- *                    "none", then it's a mapping to edge ids. Otherwise, it's
- *                    mapping to destination node ids.
- * \param out_size An integer indicating the output size. If reducer is "none",
- *                 it is the number of output edges. Otherwise it's the number
- *                 of output nodes.
- * \param out_data The output tensor. Could be either node or edge feature tensor
- *                  depending on the reducer.
- *
+ * \param graph The graph object.
+ * \param target The nput target (src, edge)
+ * \param in_data The input feature tensor.
+ * \param out_data The output tensor. Could be either node or edge feature
+ *                  tensor depending on the reducer.
+ * \param in_mapping An optional int64 id mapping array.
+ * \param out_mapping An optional int64 id mapping array.
  */
-void CopySrcReduce(
+void CopyReduce(
     const std::string& reducer,
-    runtime::NDArray indptr, runtime::NDArray indices,
-    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
-    runtime::NDArray src_mapping,
-    runtime::NDArray src_data,
-    runtime::NDArray out_mapping,
-    runtime::NDArray out_data);
+    const ImmutableGraph* graph,
+    binary_op::Target target,
+    runtime::NDArray in_data, runtime::NDArray out_data,
+    runtime::NDArray in_mapping, runtime::NDArray out_mapping);
 
 /*
- * !\brief Copy edge data and perform reduce
- 
+ * !\brief Compute backward of the CopyReduce
+ *
  * \param reducer The type of the reducer ("sum", "max", "mean", "min", "none").
  *                If the reducer is "none", the output is an edge feature tensor.
  *                Otherwise, a node feature tensor is returned.
- * \param indptr An int64 row offset array for the graph CSR.
- * \param indices An int64 column index array for the graph CSR.
- * \param rev_indptr An int64 row offset array for the reverse graph CSR.
- * \param rev_indices An int64 column index array for the reverse graph CSR.
- * \param edge_mapping An optional int64 array for source node mapping. If empty,
- *                    source ids are consecutive integers [0, len(indptr) - 1).
- *                    Source ids are used to read source node data.
- * \param edge_data The source node feature tensor.
- * \param out_mapping An optional int64 array for output mapping. If reducer is
- *                    "none", then it's a mapping to edge ids. Otherwise, it's
- *                    mapping to destination node ids.
- * \param out_size An integer indicating the output size. If reducer is "none",
- *                 it is the number of output edges. Otherwise it's the number
- *                 of output nodes.
- * \param out_data The output tensor. Could be either node or edge feature tensor
- *                  depending on the reducer.
- *
+ * \param graph The graph object.
+ * \param target The nput target (src, edge)
+ * \param in_mapping An optional int64 id mapping array.
+ * \param out_mapping An optional int64 id mapping array.
+ * \param in_data The input feature tensor.
+ * \param out_data The output tensor. Could be either node or edge feature
+ *                  tensor depending on the reducer.
+ * \param grad_out_data The gradient output tensor.
+ * \param grad_in_data The gradient input tensor.
  */
-void CopyEdgeReduce(
+void BackwardCopyReduce(
     const std::string& reducer,
-    runtime::NDArray indptr, runtime::NDArray indices,
-    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
-    runtime::NDArray edge_mapping,
-    runtime::NDArray edge_data,
+    const ImmutableGraph* graph,
+    binary_op::Target target,
+    runtime::NDArray in_mapping,
     runtime::NDArray out_mapping,
-    runtime::NDArray out_data);
+    runtime::NDArray in_data,
+    runtime::NDArray out_data,
+    runtime::NDArray grad_out_data,
+    runtime::NDArray grad_in_data);
 
 }  // namespace kernel
 }  // namespace dgl
