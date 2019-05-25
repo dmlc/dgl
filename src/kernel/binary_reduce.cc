@@ -238,7 +238,6 @@ void BinaryOpReduce_v2(
   // Process mapping
   if (HasBcast(lhs_data, rhs_data)) {
     BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
-    const DLContext& ctx = lhs_data->ctx;
     DGL_XPU_SWITCH(ctx.device_type, BinaryReduceBcastImpl_v2,
         info, reducer, op, graph,
         lhs, rhs,
@@ -250,7 +249,6 @@ void BinaryOpReduce_v2(
         << "Cannot compute binary operation between feature shapes "
         << ShapeString(lhs_data) << " and " << ShapeString(rhs_data);
     }
-    const DLContext& ctx = lhs_data->ctx;
     DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl_v2,
         reducer, op, graph,
         lhs, rhs,
@@ -280,6 +278,170 @@ DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBinaryOpReduce_v2")
         static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
         lhs_data, rhs_data, out_data,
         lhs_mapping, rhs_mapping, out_mapping);
+  });
+
+void BackwardLhsSrcOpEdgeReduce(
+    const std::string& reducer,
+    const std::string& op,
+    const ImmutableGraph* graph,
+    binary_op::Target lhs, binary_op::Target rhs,
+    NDArray lhs_mapping,
+    NDArray rhs_mapping,
+    NDArray out_mapping,
+    NDArray lhs_data,
+    NDArray rhs_data,
+    NDArray out_data,
+    NDArray grad_out_data,
+    NDArray grad_lhs_data) {
+  // sanity check
+  const auto& ctx = graph->Context();
+  CHECK_EQ(ctx, lhs_data->ctx) << "Expected device context " << ctx
+    << ". But got " << lhs_data->ctx << " for lhs_data.";
+  CHECK_EQ(ctx, rhs_data->ctx) << "Expected device context " << ctx
+    << ". But got " << rhs_data->ctx << " for rhs_data.";
+  CHECK_EQ(ctx, out_data->ctx) << "Expected device context " << ctx
+    << ". But got " << out_data->ctx << " for out_data.";
+  CHECK_EQ(ctx, grad_out_data->ctx) << "Expected device context " << ctx
+    << ". But got " << grad_out_data->ctx << " for grad_out_data.";
+  CHECK_EQ(ctx, grad_lhs_data->ctx) << "Expected device context " << ctx
+    << ". But got " << grad_lhs_data->ctx << " for grad_lhs_data.";
+  if (!utils::IsNoneArray(lhs_mapping)) {
+    CHECK_EQ(ctx, lhs_mapping->ctx) << "Expected device context " << ctx
+      << ". But got " << lhs_mapping->ctx << " for rhs_data.";
+  }
+  if (!utils::IsNoneArray(rhs_mapping)) {
+    CHECK_EQ(ctx, rhs_mapping->ctx) << "Expected device context " << ctx
+      << ". But got " << rhs_mapping->ctx << " for rhs_data.";
+  }
+  if (!utils::IsNoneArray(out_mapping)) {
+    CHECK_EQ(ctx, out_mapping->ctx) << "Expected device context " << ctx
+      << ". But got " << out_mapping->ctx << " for rhs_data.";
+  }
+  if (HasBcast(lhs_data, rhs_data)) {
+    BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
+    DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceBcastImpl_v2,
+        info, reducer, op, graph,
+        lhs, rhs,
+        lhs_mapping, rhs_mapping, out_mapping,
+        lhs_data, rhs_data, out_data, grad_out_data,
+        grad_lhs_data, utils::NoneArray());
+  } else {
+    DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceImpl_v2,
+        reducer, op, graph,
+        lhs, rhs,
+        lhs_mapping, rhs_mapping, out_mapping,
+        lhs_data, rhs_data, out_data, grad_out_data,
+        grad_lhs_data, utils::NoneArray());
+  }
+}
+
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardLhsBinaryOpReduce_v2")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::string reducer = args[0];
+    std::string op = args[1];
+    GraphHandle ghdl = args[2];
+    int lhs = args[3];
+    int rhs = args[4];
+    NDArray lhs_mapping = args[5];
+    NDArray rhs_mapping = args[6];
+    NDArray out_mapping = args[7];
+    NDArray lhs_data = args[8];
+    NDArray rhs_data = args[9];
+    NDArray out_data = args[10];
+    NDArray grad_out_data = args[11];
+    NDArray grad_lhs_data = args[12];
+
+    GraphInterface* gptr = static_cast<GraphInterface*>(ghdl);
+    const ImmutableGraph* igptr = dynamic_cast<ImmutableGraph*>(gptr);
+    CHECK(igptr) << "Invalid graph object argument. Must be an immutable graph.";
+    BackwardLhsSrcOpEdgeReduce(
+        reducer, op, igptr,
+        static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
+        lhs_mapping, rhs_mapping, out_mapping,
+        lhs_data, rhs_data, out_data, grad_out_data,
+        grad_lhs_data);
+  });
+
+void BackwardRhsSrcOpEdgeReduce(
+    const std::string& reducer,
+    const std::string& op,
+    const ImmutableGraph* graph,
+    binary_op::Target lhs, binary_op::Target rhs,
+    NDArray lhs_mapping,
+    NDArray rhs_mapping,
+    NDArray out_mapping,
+    NDArray lhs_data,
+    NDArray rhs_data,
+    NDArray out_data,
+    NDArray grad_out_data,
+    NDArray grad_rhs_data) {
+  // sanity check
+  const auto& ctx = graph->Context();
+  CHECK_EQ(ctx, lhs_data->ctx) << "Expected device context " << ctx
+    << ". But got " << lhs_data->ctx << " for lhs_data.";
+  CHECK_EQ(ctx, rhs_data->ctx) << "Expected device context " << ctx
+    << ". But got " << rhs_data->ctx << " for rhs_data.";
+  CHECK_EQ(ctx, out_data->ctx) << "Expected device context " << ctx
+    << ". But got " << out_data->ctx << " for out_data.";
+  CHECK_EQ(ctx, grad_out_data->ctx) << "Expected device context " << ctx
+    << ". But got " << grad_out_data->ctx << " for grad_out_data.";
+  CHECK_EQ(ctx, grad_rhs_data->ctx) << "Expected device context " << ctx
+    << ". But got " << grad_rhs_data->ctx << " for grad_rhs_data.";
+  if (!utils::IsNoneArray(lhs_mapping)) {
+    CHECK_EQ(ctx, lhs_mapping->ctx) << "Expected device context " << ctx
+      << ". But got " << lhs_mapping->ctx << " for rhs_data.";
+  }
+  if (!utils::IsNoneArray(rhs_mapping)) {
+    CHECK_EQ(ctx, rhs_mapping->ctx) << "Expected device context " << ctx
+      << ". But got " << rhs_mapping->ctx << " for rhs_data.";
+  }
+  if (!utils::IsNoneArray(out_mapping)) {
+    CHECK_EQ(ctx, out_mapping->ctx) << "Expected device context " << ctx
+      << ". But got " << out_mapping->ctx << " for rhs_data.";
+  }
+  if (HasBcast(lhs_data, rhs_data)) {
+    BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
+    DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceBcastImpl_v2,
+        info, reducer, op, graph,
+        lhs, rhs,
+        lhs_mapping, rhs_mapping, out_mapping,
+        lhs_data, rhs_data, out_data, grad_out_data,
+        utils::NoneArray(), grad_rhs_data);
+  } else {
+    DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceImpl_v2,
+        reducer, op, graph,
+        lhs, rhs,
+        lhs_mapping, rhs_mapping, out_mapping,
+        lhs_data, rhs_data, out_data, grad_out_data,
+        utils::NoneArray(), grad_rhs_data);
+  }
+}
+
+DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardRhsBinaryOpReduce_v2")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    std::string reducer = args[0];
+    std::string op = args[1];
+    GraphHandle ghdl = args[2];
+    int lhs = args[3];
+    int rhs = args[4];
+    NDArray lhs_mapping = args[5];
+    NDArray rhs_mapping = args[6];
+    NDArray out_mapping = args[7];
+    NDArray lhs_data = args[8];
+    NDArray rhs_data = args[9];
+    NDArray out_data = args[10];
+    NDArray grad_out_data = args[11];
+    NDArray grad_rhs_data = args[12];
+
+    GraphInterface* gptr = static_cast<GraphInterface*>(ghdl);
+    const ImmutableGraph* igptr = dynamic_cast<ImmutableGraph*>(gptr);
+    CHECK(igptr) << "Invalid graph object argument. Must be an immutable graph.";
+    BackwardRhsSrcOpEdgeReduce(
+        reducer, op, igptr,
+        static_cast<binary_op::Target>(lhs), static_cast<binary_op::Target>(rhs),
+        lhs_mapping, rhs_mapping, out_mapping,
+        lhs_data, rhs_data, out_data, grad_out_data,
+        grad_rhs_data);
   });
 
 /*

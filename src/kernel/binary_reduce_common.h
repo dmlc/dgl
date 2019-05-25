@@ -84,6 +84,23 @@ struct SelectEdge {
   }
 };
 
+// Change SelectSrc to SelectDst and vice versa
+// SelectEdge will remain the same.
+template <typename Selector>
+struct SwitchSrcDst {
+  typedef Selector Type;
+};
+
+template <>
+struct SwitchSrcDst<SelectSrc> {
+  typedef SelectDst Type;
+};
+
+template <>
+struct SwitchSrcDst<SelectDst> {
+  typedef SelectSrc Type;
+};
+
 #define TARGET_SWITCH(v1, v2, Tgt1, Tgt2, ...)                  \
   if (v1 == binary_op::kSrc && v2 == binary_op::kDst) {         \
     typedef SelectSrc Tgt1;                                     \
@@ -320,16 +337,6 @@ struct OutSelector<ReduceNone<XPU, DType>> {
   typedef SelectEdge Type;
 };
 
-template <typename Reducer>
-struct GradOutSelector {
-  typedef SelectSrc Type;
-};
-
-template <int XPU, typename DType>
-struct GradOutSelector<ReduceNone<XPU, DType>> {
-  typedef SelectEdge Type;
-};
-
 // macro for broadcasting
 #define BCAST_NDIM_SWITCH(ndim, NDim, ...) \
   if (ndim <= 2) {                         \
@@ -352,10 +359,8 @@ struct GradOutSelector<ReduceNone<XPU, DType>> {
 
 // macro for backward mode
 #define BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, ...) \
-  if (req_lhs && req_rhs) {                               \
-    constexpr int Mode = binary_op::kGradBoth;            \
-    {__VA_ARGS__}                                         \
-  } else if (req_lhs) {                                   \
+  CHECK(!(req_lhs && req_rhs));                           \
+  if (req_lhs) {                                          \
     constexpr int Mode = binary_op::kGradLhs;             \
     {__VA_ARGS__}                                         \
   } else {                                                \

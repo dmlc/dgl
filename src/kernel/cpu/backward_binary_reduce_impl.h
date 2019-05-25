@@ -7,8 +7,10 @@
 #define DGL_KERNEL_CPU_BACKWARD_BINARY_REDUCE_IMPL_H_
 
 #include <minigun/minigun.h>
+#include <dgl/immutable_graph.h>
 
 #include "../binary_reduce_impl_decl.h"
+#include "../utils.h"
 #include "./functor.h"
 
 namespace dgl {
@@ -18,11 +20,11 @@ namespace cpu {
 template <int Mode, typename Idx, typename DType, typename Functors>
 struct BackwardBinaryReduce {
   static inline bool CondEdge(
-      Idx src, Idx dst, Idx eid, BackwardGData<DType>* gdata) {
+      Idx src, Idx dst, Idx eid, BackwardGData<Idx, DType>* gdata) {
     return true;
   }
   static inline void ApplyEdge(
-      Idx src, Idx dst, Idx eid, BackwardGData<DType>* gdata) {
+      Idx src, Idx dst, Idx eid, BackwardGData<Idx, DType>* gdata) {
     const int64_t D = gdata->x_length;
     int64_t lid = Functors::SelectLeft(src, eid, dst);
     int64_t rid = Functors::SelectRight(src, eid, dst);
@@ -67,11 +69,11 @@ template <int Mode, int NDim,
           typename Idx, typename DType, typename Functors>
 struct BackwardBinaryReduceBcast {
   static inline bool CondEdge(
-      Idx src, Idx dst, Idx eid, BackwardBcastGData<NDim, DType>* gdata) {
+      Idx src, Idx dst, Idx eid, BackwardBcastGData<NDim, Idx, DType>* gdata) {
     return true;
   }
   static inline void ApplyEdge(
-      Idx src, Idx dst, Idx eid, BackwardBcastGData<NDim, DType>* gdata) {
+      Idx src, Idx dst, Idx eid, BackwardBcastGData<NDim, Idx, DType>* gdata) {
     int64_t lid = Functors::SelectLeft(src, eid, dst);
     int64_t rid = Functors::SelectRight(src, eid, dst);
     int64_t oid = Functors::SelectOut(src, eid, dst);
@@ -121,7 +123,8 @@ template <typename Idx, typename DType,
 struct BackwardFunctorsTempl {
   static inline Idx SelectOut(
       Idx src, Idx edge, Idx dst) {
-    return GradOutSelector<Reducer>::Type::Call(src, edge, dst);
+    typedef typename OutSelector<Reducer>::Type OutTarget;
+    return SwitchSrcDst<OutTarget>::Type::Call(src, edge, dst);
   }
   static inline Idx SelectLeft(
       Idx src, Idx edge, Idx dst) {
@@ -158,60 +161,100 @@ typedef minigun::advance::Config<true, minigun::advance::kV2N> AdvanceConfig;
 
 }  // namespace cpu
 
-template <int XPU, int Mode, typename DType,
+template <int XPU, int Mode, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
-void CallBackwardBinaryReduce(
+void CallBackwardBinaryReduce_v2(
     const minigun::advance::RuntimeConfig& rtcfg,
-    const minigun::LongCsr& csr, const minigun::LongCsr& rev_csr,
-    BackwardGData<DType>* gdata) {
-  using minigun::LongArray;
-  typedef cpu::BackwardFunctorsTempl<int64_t, DType, LeftSelector,
-                        RightSelector, BinaryOp, Reducer>
-          Functors;
-  typedef cpu::BackwardBinaryReduce<Mode, int64_t, DType, Functors> UDF;
+    const ImmutableGraph* graph,
+    BackwardGData<Idx, DType>* gdata) {
+  // For backward computation, we use reverse csr and switch dst and src.
+  // This benefits the most common src_op_edge or copy_src case, because the
+  // gradients of src are now aggregated into destination buffer to reduce
+  // competition of atomic add.
+  auto incsr = graph->GetInCSR();
+  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr->indptr(), incsr->indices());
+  typedef cpu::BackwardFunctorsTempl<Idx, DType,
+          typename SwitchSrcDst<LeftSelector>::Type,
+          typename SwitchSrcDst<RightSelector>::Type,
+          BinaryOp, Reducer> Functors;
+  typedef cpu::BackwardBinaryReduce<Mode, Idx, DType, Functors> UDF;
+  // If the user-given mapping is none and the target is edge data, we need to
+  // replace the mapping by the edge ids in the csr graph so that the edge
+  // data is correctly read/written.
+  if (LeftSelector::target == binary_op::kEdge
+      && gdata->lhs_mapping == nullptr) {
+    gdata->lhs_mapping = static_cast<Idx*>(incsr->edge_ids()->data);
+  }
+  if (RightSelector::target == binary_op::kEdge
+      && gdata->rhs_mapping == nullptr) {
+    gdata->rhs_mapping = static_cast<Idx*>(incsr->edge_ids()->data);
+  }
+  if (OutSelector<Reducer>::Type::target == binary_op::kEdge
+      && gdata->out_mapping == nullptr) {
+    gdata->out_mapping = static_cast<Idx*>(incsr->edge_ids()->data);
+  }
   // TODO(minjie): allocator
-  minigun::advance::Advance<XPU, int64_t, cpu::AdvanceConfig, BackwardGData<DType>, UDF>(
-        rtcfg, rev_csr, gdata, LongArray());
+  minigun::advance::Advance<XPU, Idx, cpu::AdvanceConfig, BackwardGData<Idx, DType>, UDF>(
+        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
 }
 
 #define GEN_BACKWARD_DEFINE(mode, dtype, lhs_tgt, rhs_tgt, op)  \
-  template void CallBackwardBinaryReduce<XPU,                   \
-                    mode, dtype,                                \
+  template void CallBackwardBinaryReduce_v2<XPU,                \
+                    mode, IDX, dtype,                           \
                     lhs_tgt, rhs_tgt,                           \
                     op<dtype>, REDUCER<XPU, dtype>>(            \
       const minigun::advance::RuntimeConfig& rtcfg,             \
-      const minigun::LongCsr& csr,                                  \
-      const minigun::LongCsr& rev_csr,                              \
-      BackwardGData<dtype>* gdata);
+      const ImmutableGraph* graph,                              \
+      BackwardGData<IDX, dtype>* gdata);
 
-template <int XPU, int Mode, int NDim, typename DType,
+template <int XPU, int Mode, int NDim, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
-void CallBackwardBinaryReduceBcast(
+void CallBackwardBinaryReduceBcast_v2(
     const minigun::advance::RuntimeConfig& rtcfg,
-    const minigun::LongCsr& csr, const minigun::LongCsr& rev_csr,
-    BackwardBcastGData<NDim, DType>* gdata) {
-  using minigun::LongArray;
-  typedef cpu::BackwardFunctorsTempl<int64_t, DType, LeftSelector,
-                        RightSelector, BinaryOp, Reducer>
-          Functors;
-  typedef cpu::BackwardBinaryReduceBcast<Mode, NDim, int64_t, DType, Functors> UDF;
+    const ImmutableGraph* graph,
+    BackwardBcastGData<NDim, Idx, DType>* gdata) {
+  // For backward computation, we use reverse csr and switch dst and src.
+  // This benefits the most common src_op_edge or copy_src case, because the
+  // gradients of src are now aggregated into destination buffer to reduce
+  // competition of atomic add.
+  auto incsr = graph->GetInCSR();
+  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr->indptr(), incsr->indices());
+  typedef cpu::BackwardFunctorsTempl<Idx, DType,
+          typename SwitchSrcDst<LeftSelector>::Type,
+          typename SwitchSrcDst<RightSelector>::Type,
+          BinaryOp, Reducer> Functors;
+  typedef cpu::BackwardBinaryReduceBcast<Mode, NDim, Idx, DType, Functors> UDF;
+  // If the user-given mapping is none and the target is edge data, we need to
+  // replace the mapping by the edge ids in the csr graph so that the edge
+  // data is correctly read/written.
+  if (LeftSelector::target == binary_op::kEdge
+      && gdata->lhs_mapping == nullptr) {
+    gdata->lhs_mapping = static_cast<Idx*>(incsr->edge_ids()->data);
+  }
+  if (RightSelector::target == binary_op::kEdge
+      && gdata->rhs_mapping == nullptr) {
+    gdata->rhs_mapping = static_cast<Idx*>(incsr->edge_ids()->data);
+  }
+  if (OutSelector<Reducer>::Type::target == binary_op::kEdge
+      && gdata->out_mapping == nullptr) {
+    gdata->out_mapping = static_cast<Idx*>(incsr->edge_ids()->data);
+  }
   // TODO(minjie): allocator
-  minigun::advance::Advance<XPU, int64_t, cpu::AdvanceConfig,
-    BackwardBcastGData<NDim, DType>, UDF>(
-        rtcfg, rev_csr, gdata, LongArray());
+  minigun::advance::Advance<XPU, Idx, cpu::AdvanceConfig,
+    BackwardBcastGData<NDim, Idx, DType>, UDF>(
+        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
 }
 
 #define GEN_BACKWARD_BCAST_DEFINE(mode, ndim, dtype, lhs_tgt, rhs_tgt, op)  \
-  template void CallBackwardBinaryReduceBcast<XPU,                          \
-                    mode, ndim, dtype,                                      \
+  template void CallBackwardBinaryReduceBcast_v2<XPU,                       \
+                    mode, ndim, IDX, dtype,                                 \
                     lhs_tgt, rhs_tgt,                                       \
                     op<dtype>, REDUCER<XPU, dtype>>(                        \
       const minigun::advance::RuntimeConfig& rtcfg,                         \
-      const minigun::LongCsr& csr,                                              \
-      const minigun::LongCsr& rev_csr,                                          \
-      BackwardBcastGData<ndim, dtype>* gdata);
+      const ImmutableGraph* graph,                                          \
+      BackwardBcastGData<ndim, IDX, dtype>* gdata);
 
 }  // namespace kernel
 }  // namespace dgl

@@ -80,6 +80,25 @@ template void BinaryReduceBcastImpl_v2<kDLCPU>(
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
     runtime::NDArray out_mapping);
 
+template void BackwardBinaryReduceImpl_v2<kDLCPU>(
+    const std::string& reducer,
+    const std::string& op,
+    const ImmutableGraph* graph,
+    binary_op::Target lhs, binary_op::Target rhs,
+    NDArray lhs_mapping, NDArray rhs_mapping, NDArray out_mapping,
+    NDArray lhs_data, NDArray rhs_data, NDArray out_data,
+    NDArray grad_out_data,
+    NDArray grad_lhs_data, NDArray grad_rhs_data);
+
+template void BackwardBinaryReduceBcastImpl_v2<kDLCPU>(
+    const BcastInfo& info,
+    const std::string& reducer,
+    const std::string& op,
+    const ImmutableGraph* graph,
+    binary_op::Target lhs_tgt, binary_op::Target rhs_tgt,
+    runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping,
+    runtime::NDArray lhs, runtime::NDArray rhs, runtime::NDArray out, runtime::NDArray grad_out,
+    runtime::NDArray grad_lhs, runtime::NDArray grad_rhs);
 
 }  // namespace kernel
 }  // namespace dgl

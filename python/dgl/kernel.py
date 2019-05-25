@@ -39,10 +39,68 @@ def binary_op_reduce(reducer, op, graph,
     out_mapping : NDArray
     """
     _CAPI_DGLKernelBinaryOpReduce_v2(
-            reducer, op, graph,
-            int(lhs), int(rhs),
-            lhs_data, rhs_data, out_data,
-            lhs_mapping, rhs_mapping, out_mapping)
+        reducer, op, graph._handle,
+        int(lhs), int(rhs),
+        lhs_data, rhs_data, out_data,
+        lhs_mapping, rhs_mapping, out_mapping)
+
+def backward_lhs_binary_op_reduce(
+        reducer, op, graph,
+        lhs, rhs,
+        lhs_mapping, rhs_mapping, out_mapping,
+        lhs_data, rhs_data, out_data,
+        grad_out_data, grad_lhs_data):
+    """
+    reducer : str
+    op : str
+    graph : GraphIndex
+    lhs : int
+    rhs : int
+    lhs_mapping : NDArray
+    rhs_mapping : NDArray
+    out_mapping : NDArray
+    lhs_data : NDArray
+    rhs_data : NDArray
+    out_data : NDArray
+    grad_out_data : NDArray
+    grad_lhs_data : NDArray
+    """
+    _CAPI_DGLKernelBackwardLhsBinaryOpReduce_v2(
+        reducer, op, graph._handle,
+        int(lhs), int(rhs),
+        lhs_mapping, rhs_mapping, out_mapping,
+        lhs_data, rhs_data, out_data,
+        grad_out_data, grad_lhs_data)
+
+
+def backward_rhs_binary_op_reduce(
+        reducer, op, graph,
+        lhs, rhs,
+        lhs_mapping, rhs_mapping, out_mapping,
+        lhs_data, rhs_data, out_data,
+        grad_out_data, grad_rhs_data):
+    """
+    reducer : str
+    op : str
+    graph : GraphIndex
+    lhs : int
+    rhs : int
+    lhs_mapping : NDArray
+    rhs_mapping : NDArray
+    out_mapping : NDArray
+    lhs_data : NDArray
+    rhs_data : NDArray
+    out_data : NDArray
+    grad_out_data : NDArray
+    grad_rhs_data : NDArray
+    """
+    _CAPI_DGLKernelBackwardRhsBinaryOpReduce_v2(
+        reducer, op, graph._handle,
+        int(lhs), int(rhs),
+        lhs_mapping, rhs_mapping, out_mapping,
+        lhs_data, rhs_data, out_data,
+        grad_out_data, grad_rhs_data)
+
 
 def src_op_edge_reduce(reducer,
                        binary_op,
