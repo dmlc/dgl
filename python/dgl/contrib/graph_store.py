@@ -305,9 +305,13 @@ class SharedMemoryStoreServer(object):
     """
     def __init__(self, graph_data, edge_dir, graph_name, multigraph, num_workers, port):
         self.server = None
-        graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
-        indptr, indices = _to_csr(graph_data, edge_dir, multigraph)
-        graph_idx.from_csr_matrix(indptr, indices, edge_dir, _get_graph_path(graph_name))
+        if isinstance(graph_data, GraphIndex):
+            graph_idx = graph_data
+        else:
+            graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
+            indptr, indices = _to_csr(graph_data, edge_dir, multigraph)
+            graph_idx.from_csr_matrix(utils.toindex(indptr), utils.toindex(indices),
+                                      edge_dir, _get_graph_path(graph_name))
 
         self._graph = DGLGraph(graph_idx, multigraph=multigraph, readonly=True)
         self._num_workers = num_workers
@@ -331,7 +335,9 @@ class SharedMemoryStoreServer(object):
         # RPC command: get the graph information from the graph store server.
         def get_graph_info(graph_name):
             assert graph_name == self._graph_name
-            return self._graph.number_of_nodes(), self._graph.number_of_edges(), \
+            # if the integers are larger than 2^31, xmlrpc can't handle them.
+            # we convert them to strings to send them to clients.
+            return str(self._graph.number_of_nodes()), str(self._graph.number_of_edges()), \
                     self._graph.is_multigraph, edge_dir
 
         # RPC command: initialize node embedding in the server.
@@ -532,6 +538,7 @@ class SharedMemoryDGLGraph(BaseGraphStore):
         if self._worker_id < 0:
             raise Exception('fail to get graph ' + graph_name + ' from the graph store')
         num_nodes, num_edges, multigraph, edge_dir = self.proxy.get_graph_info(graph_name)
+        num_nodes, num_edges = int(num_nodes), int(num_edges)
 
         graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
         graph_idx.from_shared_mem_csr_matrix(_get_graph_path(graph_name), num_nodes, num_edges, edge_dir)
