@@ -167,6 +167,101 @@ class DGLBaseHeteroGraph(object):
         """Return the number of nodes in the graph."""
         pass
 
+    # TODO: REVIEW
+    def add_nodes(self, num, node_type, data=None):
+        """Add multiple new nodes of the same node type
+
+        Parameters
+        ----------
+        num : int
+            Number of nodes to be added.
+        node_type : str
+            Type of the added nodes.  Must appear in the metagraph.
+        data : dict, optional
+            Feature data of the added nodes.
+
+        Examples
+        --------
+        The variable ``g`` is constructed from the example in
+        DGLBaseHeteroGraph.
+
+        >>> g['game'].number_of_nodes()
+        2
+        >>> g.add_nodes(3, 'game')  # add 3 new games
+        >>> g['game'].number_of_nodes()
+        5
+        """
+        pass
+
+    # TODO: REVIEW
+    def add_edge(self, u, v, utype, vtype, etype, data=None):
+        """Add an edge of ``etype`` between u of type ``utype`` and v of type
+        ``vtype``.
+
+        Parameters
+        ----------
+        u : int
+            The source node ID of type ``utype``.  Must exist in the graph.
+        v : int
+            The destination node ID of type ``vtype``.  Must exist in the
+            graph.
+        utype : str
+            The source node type name.  Must exist in the metagraph.
+        vtype : str
+            The destination node type name.  Must exist in the metagraph.
+        etype : str
+            The edge type name.  Must exist in the metagraph.
+        data : dict, optional
+            Feature data of the added edge.
+
+        Examples
+        --------
+        The variable ``g`` is constructed from the example in
+        DGLBaseHeteroGraph.
+
+        >>> g['user', 'game', 'plays'].number_of_edges()
+        4
+        >>> g.add_edge(2, 0, 'user', 'game', 'plays')
+        >>> g['user', 'game', 'plays'].number_of_edges()
+        5
+        """
+        pass
+
+    def add_edges(self, u, v, utype, vtype, etype, data=None):
+        """Add multiple edges of ``etype`` between list of source nodes ``u``
+        of type ``utype`` and list of destination nodes ``v`` of type
+        ``vtype``.  A single edge is added between every pair of ``u[i]`` and
+        ``v[i]``.
+
+        Parameters
+        ----------
+        u : list, tensor
+            The source node IDs of type ``utype``.  Must exist in the graph.
+        v : list, tensor
+            The destination node IDs of type ``vtype``.  Must exist in the
+            graph.
+        utype : str
+            The source node type name.  Must exist in the metagraph.
+        vtype : str
+            The destination node type name.  Must exist in the metagraph.
+        etype : str
+            The edge type name.  Must exist in the metagraph.
+        data : dict, optional
+            Feature data of the added edge.
+
+        Examples
+        --------
+        The variable ``g`` is constructed from the example in
+        DGLBaseHeteroGraph.
+
+        >>> g['user', 'game', 'plays'].number_of_edges()
+        4
+        >>> g.add_edges([0, 2], [1, 0], 'user', 'game', 'plays')
+        >>> g['user', 'game', 'plays'].number_of_edges()
+        6
+        """
+        pass
+
     @property
     def is_multigraph(self):
         """True if the graph is a multigraph, False otherwise.
@@ -871,101 +966,6 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
             readonly=False):
         super(DGLHeteroGraph, self).__init__(
             metagraph, number_of_nodes_by_type, edge_connections_by_type)
-
-    # TODO: REVIEW
-    def add_nodes(self, num, node_type, data=None):
-        """Add multiple new nodes of the same node type
-
-        Parameters
-        ----------
-        num : int
-            Number of nodes to be added.
-        node_type : str
-            Type of the added nodes.  Must appear in the metagraph.
-        data : dict, optional
-            Feature data of the added nodes.
-
-        Examples
-        --------
-        The variable ``g`` is constructed from the example in
-        DGLBaseHeteroGraph.
-
-        >>> g['game'].number_of_nodes()
-        2
-        >>> g.add_nodes(3, 'game')  # add 3 new games
-        >>> g['game'].number_of_nodes()
-        5
-        """
-        pass
-
-    # TODO: REVIEW
-    def add_edge(self, u, v, utype, vtype, etype, data=None):
-        """Add an edge of ``etype`` between u of type ``utype`` and v of type
-        ``vtype``.
-
-        Parameters
-        ----------
-        u : int
-            The source node ID of type ``utype``.  Must exist in the graph.
-        v : int
-            The destination node ID of type ``vtype``.  Must exist in the
-            graph.
-        utype : str
-            The source node type name.  Must exist in the metagraph.
-        vtype : str
-            The destination node type name.  Must exist in the metagraph.
-        etype : str
-            The edge type name.  Must exist in the metagraph.
-        data : dict, optional
-            Feature data of the added edge.
-
-        Examples
-        --------
-        The variable ``g`` is constructed from the example in
-        DGLBaseHeteroGraph.
-
-        >>> g['user', 'game', 'plays'].number_of_edges()
-        4
-        >>> g.add_edge(2, 0, 'user', 'game', 'plays')
-        >>> g['user', 'game', 'plays'].number_of_edges()
-        5
-        """
-        pass
-
-    def add_edges(self, u, v, utype, vtype, etype, data=None):
-        """Add multiple edges of ``etype`` between list of source nodes ``u``
-        of type ``utype`` and list of destination nodes ``v`` of type
-        ``vtype``.  A single edge is added between every pair of ``u[i]`` and
-        ``v[i]``.
-
-        Parameters
-        ----------
-        u : list, tensor
-            The source node IDs of type ``utype``.  Must exist in the graph.
-        v : list, tensor
-            The destination node IDs of type ``vtype``.  Must exist in the
-            graph.
-        utype : str
-            The source node type name.  Must exist in the metagraph.
-        vtype : str
-            The destination node type name.  Must exist in the metagraph.
-        etype : str
-            The edge type name.  Must exist in the metagraph.
-        data : dict, optional
-            Feature data of the added edge.
-
-        Examples
-        --------
-        The variable ``g`` is constructed from the example in
-        DGLBaseHeteroGraph.
-
-        >>> g['user', 'game', 'plays'].number_of_edges()
-        4
-        >>> g.add_edges([0, 2], [1, 0], 'user', 'game', 'plays')
-        >>> g['user', 'game', 'plays'].number_of_edges()
-        6
-        """
-        pass
 
     def node_attr_schemes(self, ntype):
         """Return the node feature schemes for a given node type.
