@@ -1100,4 +1100,21 @@ def create_graph_index(graph_data=None, multigraph=False, readonly=False):
     return gidx
 
 
+def create_bigraph_index(graph_data=None, num_nodes=[0, 0], multigraph=False, readonly=False):
+    if isinstance(graph_data, list) or isinstance(graph_data, tuple):
+        assert len(graph_data) == 2
+        src_nodes, dst_nodes = graph_data
+        num_edges = len(src_nodes)
+        dst_nodes = dst_nodes + num_nodes[0]
+        # TODO(zhengda) let's use scipy coo first.
+        data = np.zeros((num_edges,))
+        spm = scipy.sparse.coo_matrix((data, (src_nodes, dst_nodes)))
+        return create_graph_index(spm, False, readonly)
+    elif isinstance(graph_data, scipy.sparse.spmatrix):
+        coo = graph_data.tocoo()
+        return create_bigraph_index([coo.row, coo.col], num_nodes, multigraph, readonly)
+    else:
+        raise Exception("cannot create a bipartite graph from an unknown format")
+
+
 _init_api("dgl.graph_index")
