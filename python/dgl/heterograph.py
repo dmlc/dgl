@@ -372,7 +372,7 @@ class DGLBaseHeteroGraph(object):
         Parameters
         ----------
         v : int
-            The node.
+            The node of destination type.
 
         Returns
         -------
@@ -412,7 +412,7 @@ class DGLBaseHeteroGraph(object):
         Parameters
         ----------
         v : int
-            The node.
+            The node of source type.
 
         Returns
         -------
@@ -572,7 +572,7 @@ class DGLBaseHeteroGraph(object):
         Parameters
         ----------
         v : int, list, tensor
-            The node(s).
+            The node(s) of destination type.
         form : str, optional
             The return form. Currently support:
 
@@ -614,7 +614,7 @@ class DGLBaseHeteroGraph(object):
         Parameters
         ----------
         v : int, list, tensor
-            The node(s).
+            The node(s) of source type.
         form : str, optional
             The return form. Currently support:
 
@@ -703,7 +703,7 @@ class DGLBaseHeteroGraph(object):
         Parameters
         ----------
         v : int
-            The node ID.
+            The node ID of destination type.
 
         Returns
         -------
@@ -737,7 +737,8 @@ class DGLBaseHeteroGraph(object):
         Parameters
         ----------
         v : list, tensor, optional.
-            The node ID array. Default is to return the degrees of all the nodes.
+            The node ID array of destination type. Default is to return the
+            degrees of all the nodes.
 
         Returns
         -------
@@ -771,7 +772,7 @@ class DGLBaseHeteroGraph(object):
         Parameters
         ----------
         v : int
-            The node ID.
+            The node ID of source type.
 
         Returns
         -------
@@ -805,7 +806,8 @@ class DGLBaseHeteroGraph(object):
         Parameters
         ----------
         v : list, tensor
-            The node ID array. Default is to return the degrees of all the nodes.
+            The node ID array of source type. Default is to return the degrees
+            of all the nodes.
 
         Returns
         -------
