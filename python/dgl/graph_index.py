@@ -1147,16 +1147,177 @@ def create_graph_index(graph_data, multigraph, readonly):
                            % type(graph_data))
         return gidx
 
-def create_bigraph_index(graph_data=None, num_nodes=[0, 0], multigraph=False, readonly=False):
+class BiGraphIndex(GraphIndex):
+    def __init__(self, handle=None, num_nodes=[0, 0], multigraph=None, readonly=None):
+        super(BiGraphIndex, self).__init__(handle, multigraph, readonly)
+        self._num_nodes = num_nodes
+
+    def from_csr_matrix(self, indptr, indices, edge_dir, shared_mem_name=""):
+        """Load a graph from the CSR matrix.
+
+        Parameters
+        ----------
+        indptr : a 1D tensor
+            index pointer in the CSR format
+        indices : a 1D tensor
+            column index array in the CSR format
+        edge_dir : string
+            the edge direction. The supported option is "in" and "out".
+        shared_mem_name : string
+            the name of shared memory
+        """
+        assert self.is_readonly()
+        indptr = utils.toindex(indptr)
+        assert(len(indptr) == self._num_nodes[0] + self._num_nodes[1] + 1)
+        indices = utils.toindex(indices)
+        edge_ids = utils.toindex(F.arange(0, len(indices)))
+        self._handle = _CAPI_DGLBiGraphCSRCreate(
+            indptr.todgltensor(),
+            indices.todgltensor(),
+            edge_ids.todgltensor(),
+            self._num_nodes[0],
+            self._num_nodes[1],
+            shared_mem_name,
+            self._multigraph,
+            edge_dir)
+
+    def _init(self, src_ids, dst_ids, num_nodes):
+        """The actual init function"""
+        assert len(src_ids) == len(dst_ids)
+        assert num_nodes == self._num_nodes[0] + self._num_nodes[1]
+        self._handle = _CAPI_DGLBiGraphCreate(
+            src_ids.todgltensor(),
+            dst_ids.todgltensor(),
+            self._multigraph,
+            self._num_nodes[0],
+            self._num_nodes[1],
+            self._readonly)
+
+    @utils.cached_member(cache='_cache', prefix='scipy_adj')
+    def adjacency_matrix_scipy(self, transpose, fmt):
+        """Return the scipy adjacency matrix representation of this graph.
+
+        By default, a row of returned adjacency matrix represents the destination
+        of an edge and the column represents the source.
+
+        When transpose is True, a row represents the source and a column represents
+        a destination.
+
+        The elements in the adajency matrix are edge ids.
+
+        Parameters
+        ----------
+        transpose : bool
+            A flag to transpose the returned adjacency matrix.
+        fmt : str
+            Indicates the format of returned adjacency matrix.
+
+        Returns
+        -------
+        scipy.sparse.spmatrix
+            The scipy representation of adjacency matrix.
+        """
+        if not isinstance(transpose, bool):
+            raise DGLError('Expect bool value for "transpose" arg,'
+                           ' but got %s.' % (type(transpose)))
+        rst = _CAPI_DGLGraphGetAdj(self._handle, transpose, fmt)
+        if transpose:
+            nrows, ncols = self._num_nodes[0], self._num_nodes[1]
+        else:
+            nrows, ncols = self._num_nodes[1], self._num_nodes[0]
+        if fmt == "csr":
+            indptr = utils.toindex(rst(0)).tonumpy()
+            indices = utils.toindex(rst(1)).tonumpy()
+            shuffle = utils.toindex(rst(2)).tonumpy()
+            assert len(indptr) ==  nrows + 1
+            return scipy.sparse.csr_matrix((shuffle, indices, indptr), shape=(nrows, ncols))
+        elif fmt == 'coo':
+            idx = utils.toindex(rst(0)).tonumpy()
+            m = self.number_of_edges()
+            row, col = np.reshape(idx, (2, m))
+            shuffle = np.arange(0, m)
+            return scipy.sparse.coo_matrix((shuffle, (row, col)), shape=(nrows, ncols))
+        else:
+            raise Exception("unknown format")
+
+
+    @utils.cached_member(cache='_cache', prefix='adj')
+    def adjacency_matrix(self, transpose, ctx):
+        """Return the adjacency matrix representation of this graph.
+
+        By default, a row of returned adjacency matrix represents the destination
+        of an edge and the column represents the source.
+
+        When transpose is True, a row represents the source and a column represents
+        a destination.
+
+        Parameters
+        ----------
+        transpose : bool
+            A flag to transpose the returned adjacency matrix.
+        ctx : context
+            The context of the returned matrix.
+
+        Returns
+        -------
+        SparseTensor
+            The adjacency matrix.
+        utils.Index
+            A index for data shuffling due to sparse format change. Return None
+            if shuffle is not required.
+        """
+        if not isinstance(transpose, bool):
+            raise DGLError('Expect bool value for "transpose" arg,'
+                           ' but got %s.' % (type(transpose)))
+        fmt = F.get_preferred_sparse_format()
+        rst = _CAPI_DGLGraphGetAdj(self._handle, transpose, fmt)
+        if transpose:
+            nrows, ncols = self._num_nodes[0], self._num_nodes[1]
+        else:
+            nrows, ncols = self._num_nodes[1], self._num_nodes[0]
+        if fmt == "csr":
+            indptr = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
+            indices = F.copy_to(utils.toindex(rst(1)).tousertensor(), ctx)
+            shuffle = utils.toindex(rst(2))
+            dat = F.ones(indices.shape, dtype=F.float32, ctx=ctx)
+            spmat = F.sparse_matrix(dat, ('csr', indices, indptr), (nrows, ncols))[0]
+            return spmat, shuffle
+        elif fmt == "coo":
+            ## FIXME(minjie): data type
+            idx = F.copy_to(utils.toindex(rst(0)).tousertensor(), ctx)
+            m = self.number_of_edges()
+            idx = F.reshape(idx, (2, m))
+            dat = F.ones((m,), dtype=F.float32, ctx=ctx)
+            adj, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (nrows, ncols))
+            shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+            return adj, shuffle_idx
+        else:
+            raise Exception("unknown format")
+
+
+def create_bigraph_index(graph_data=None, num_nodes=(0, 0), multigraph=False, readonly=False):
+    """Create a graph index object.
+
+    Parameters
+    ----------
+    graph_data : graph data, optional
+        Data to initialize graph. Same as networkx's semantics.
+    num_nodes : tuple, optional
+        The number of source nodes and destination nodes.
+    multigraph : bool, optional
+        Whether the graph is multigraph (default is False)
+    """
     if isinstance(graph_data, list) or isinstance(graph_data, tuple):
         assert len(graph_data) == 2
         src_nodes, dst_nodes = graph_data
         num_edges = len(src_nodes)
         dst_nodes = dst_nodes + num_nodes[0]
-        # TODO(zhengda) let's use scipy coo first.
-        data = np.zeros((num_edges,))
-        spm = scipy.sparse.coo_matrix((data, (src_nodes, dst_nodes)))
-        return create_graph_index(spm, False, readonly)
+        src_nodes = utils.toindex(src_nodes)
+        dst_nodes = utils.toindex(dst_nodes)
+
+        gidx = BiGraphIndex(None, num_nodes, multigraph, readonly)
+        gidx._init(src_nodes, dst_nodes, num_nodes[0] + num_nodes[1])
+        return gidx
     elif isinstance(graph_data, scipy.sparse.spmatrix):
         coo = graph_data.tocoo()
         return create_bigraph_index([coo.row, coo.col], num_nodes, multigraph, readonly)

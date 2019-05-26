@@ -130,8 +130,10 @@ def test_query():
         assert g.out_degree(9) == 2
         assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 2]))
 
-        #assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix()), scipy_coo_input().toarray().T)
-        #assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix(transpose=True)), scipy_coo_input().toarray())
+        assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix(('src', 'dst', 'e'))),
+                              scipy_coo_input().toarray().T)
+        assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix(('src', 'dst', 'e'), transpose=True)),
+                              scipy_coo_input().toarray())
 
     def _test(g):
         # test twice to see whether the cached format works or not
@@ -211,8 +213,10 @@ def test_query():
         assert g.out_degree(9) == 2
         assert F.allclose(g.out_degrees([8, 9]), F.tensor([0, 2]))
 
-        #assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix()), scipy_coo_input().toarray().T)
-        #assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix(transpose=True)), scipy_coo_input().toarray())
+        assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix(('src', 'dst', 'e'))),
+                              scipy_coo_input().toarray().T)
+        assert np.array_equal(F.sparse_to_numpy(g.adjacency_matrix(('src', 'dst', 'e'), transpose=True)),
+                              scipy_coo_input().toarray())
 
     def _test_csr(g):
         # test twice to see whether the cached format works or not
@@ -251,28 +255,21 @@ def test_mutation():
     assert F.allclose(F.zeros((g.number_of_edges(), 3)), g.edata['h2'])
 
 def test_scipy_adjmat():
-    g = dgl.DGLGraph()
-    g.add_nodes(10)
-    g.add_edges(range(9), range(1, 10))
+    g = gen_from_edgelist()
+    coo = scipy_coo_input()
+    coo_t = coo.transpose()
 
-    adj_0 = g.adjacency_matrix_scipy()
-    adj_1 = g.adjacency_matrix_scipy(fmt='coo')
+    adj_0 = g.adjacency_matrix_scipy(('src', 'dst', 'e'))
+    adj_1 = g.adjacency_matrix_scipy(('src', 'dst', 'e'), fmt='coo')
+    assert np.array_equal(coo_t.row, adj_1.row)
+    assert np.array_equal(coo_t.col, adj_1.col)
     assert np.array_equal(adj_0.toarray(), adj_1.toarray())
 
-    adj_t0 = g.adjacency_matrix_scipy(transpose=True)
-    adj_t_1 = g.adjacency_matrix_scipy(transpose=True, fmt='coo')
-    assert np.array_equal(adj_0.toarray(), adj_1.toarray())
-
-    g.readonly()
-    adj_2 = g.adjacency_matrix_scipy()
-    adj_3 = g.adjacency_matrix_scipy(fmt='coo')
-    assert np.array_equal(adj_2.toarray(), adj_3.toarray())
-    assert np.array_equal(adj_0.toarray(), adj_2.toarray())
-
-    adj_t2 = g.adjacency_matrix_scipy(transpose=True)
-    adj_t3 = g.adjacency_matrix_scipy(transpose=True, fmt='coo')
-    assert np.array_equal(adj_t2.toarray(), adj_t3.toarray())
-    assert np.array_equal(adj_t0.toarray(), adj_t2.toarray())
+    adj_t0 = g.adjacency_matrix_scipy(('src', 'dst', 'e'), transpose=True)
+    adj_t_1 = g.adjacency_matrix_scipy(('src', 'dst', 'e'), transpose=True, fmt='coo')
+    assert np.array_equal(coo.row, adj_t_1.row)
+    assert np.array_equal(coo.col, adj_t_1.col)
+    assert np.array_equal(adj_t0.toarray(), adj_t_1.toarray())
 
 def test_incmat():
     g = dgl.DGLGraph()
@@ -486,7 +483,7 @@ def test_update_routines():
 if __name__ == '__main__':
     test_query()
     #test_mutation()
-    #test_scipy_adjmat()
+    test_scipy_adjmat()
     #test_incmat()
     #test_readonly()
     #test_find_edges()
