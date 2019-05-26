@@ -26,16 +26,20 @@ class DGLBaseHeteroGraph(object):
 
             {edge_type: edge_specifier}
 
-        where edge_specifier can be either of the following:
-
-        * (source_node_id_tensor, destination_node_id_tensor)
-            * ``source_node_id_tensor`` and ``destination_node_id_tensor`` are
-              IDs within the source and destination node type respectively.
-            * ``edge_type`` is a triplet of
+        where ``edge_type`` is a triplet of
 
                   (source_node_type_name,
                    destination_node_type_name,
                    edge_type_name)
+
+        and ``edge_specifier`` can be either of the following:
+
+        * (source_node_id_tensor, destination_node_id_tensor)
+            * ``source_node_id_tensor`` and ``destination_node_id_tensor`` are
+              IDs within the source and destination node type respectively.
+            * source node id and destination node id are both in their own ID space.
+              That is, source nodes and destination nodes may have the same ID,
+              but they are different nodes if they belong to different node types.
 
         * scipy.sparse.matrix
           By default, the rows represent the destination of an edge, and the
