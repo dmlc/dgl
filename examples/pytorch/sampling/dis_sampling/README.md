@@ -15,7 +15,7 @@ pip install torch requests
 
 ### Usage
 
-To run the following demos, you need to start trainer and sampler process on different machines by changing the `--ip`. 
+To run the following demos, you need to start trainer and sampler process on different machines by changing the `--ip`. You can also change the number of sampler by the `--num-sampler` option.
 
 ### Neighbor Sampling & Skip Connection
 
