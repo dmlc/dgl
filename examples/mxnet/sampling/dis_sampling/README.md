@@ -13,6 +13,10 @@
 pip install mxnet --pre
 ```
 
+### Usage
+
+To run the following demos, you need to start trainer and sampler process on different machines by changing the `--ip`. 
+
 ### Neighbor Sampling & Skip Connection
 
 #### cora
@@ -26,7 +30,7 @@ DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/train.py --model g
 
 Sampler side:
 ```
-DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/sampler.py --model gcn_ns --dataset cora --self-loop --num-neighbors 2 --batch-size 1000 --ip 127.0.0.1:50051
+DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/sampler.py --model gcn_ns --dataset cora --self-loop --num-neighbors 2 --batch-size 1000 --ip 127.0.0.1:50051 --num-sampler 1
 ```
 
 #### citeseer 
@@ -40,7 +44,7 @@ DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/train.py --model g
 
 Sampler side:
 ```
-DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/sampler.py --model gcn_ns --dataset citeseer --self-loop --num-neighbors 2 --batch-size 1000 --ip 127.0.0.1:50051
+DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/sampler.py --model gcn_ns --dataset citeseer --self-loop --num-neighbors 2 --batch-size 1000 --ip 127.0.0.1:50051 --num-sampler 1
 ```
 
 #### pubmed
@@ -54,7 +58,7 @@ DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/train.py --model g
 
 Sampler side:
 ```
-DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/sampler.py --model gcn_ns --dataset pubmed --self-loop --num-neighbors 3 --batch-size 1000 --ip 127.0.0.1:50051
+DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/sampler.py --model gcn_ns --dataset pubmed --self-loop --num-neighbors 3 --batch-size 1000 --ip 127.0.0.1:50051 --num-sampler 1
 ```
 
 #### reddit
@@ -68,7 +72,7 @@ DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/train.py --model g
 
 Sampler side:
 ```
-DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/sampler.py --model gcn_ns --dataset reddit-self-loop --num-neighbors 2 --batch-size 1000 --ip 127.0.0.1:2049
+DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/sampler.py --model gcn_ns --dataset reddit-self-loop --num-neighbors 2 --batch-size 1000 --ip 127.0.0.1:2049 --num-sampler 1
 ```
 
 ### Control Variate & Skip Connection
@@ -84,7 +88,7 @@ DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/train.py --model g
 
 Sampler side:
 ```
-DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/sampler.py --model gcn_cv --dataset cora --self-loop --num-neighbors 1 --batch-size 1000000 --ip 127.0.0.1:50051
+DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/sampler.py --model gcn_cv --dataset cora --self-loop --num-neighbors 1 --batch-size 1000000 --ip 127.0.0.1:50051 --num-sampler 1
 ```
 
 #### citeseer
@@ -98,7 +102,7 @@ DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/train.py --model g
 
 Sampler Side:
 ```
-DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/sampler.py --model gcn_cv --dataset citeseer --self-loop --num-neighbors 1 --batch-size 1000000 --ip 127.0.0.1:50051
+DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/sampler.py --model gcn_cv --dataset citeseer --self-loop --num-neighbors 1 --batch-size 1000000 --ip 127.0.0.1:50051 --num-sampler 1
 ```
 
 #### pubmed
@@ -110,7 +114,7 @@ DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/train.py --model g
 
 Sampler Side:
 ```
-DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/sampler.py --model gcn_cv --dataset pubmed --self-loop --num-neighbors 1 --batch-size 1000000 --ip 127.0.0.1:50051
+DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/sampler.py --model gcn_cv --dataset pubmed --self-loop --num-neighbors 1 --batch-size 1000000 --ip 127.0.0.1:50051 --num-sampler 1
 ```
 
 #### reddit
@@ -124,7 +128,7 @@ DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/train.py --model g
 
 Sampler Side:
 ```
-DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/sampler.py --model gcn_cv --dataset reddit-self-loop --num-neighbors 1 --batch-size 10000 --ip 127.0.0.1:50051
+DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/sampler.py --model gcn_cv --dataset reddit-self-loop --num-neighbors 1 --batch-size 10000 --ip 127.0.0.1:50051 --num-sampler 1
 ```
 
 ### Control Variate & GraphSAGE-mean
@@ -142,5 +146,5 @@ DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/train.py --model g
 
 Sampler side:
 ```
-DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/sampler.py --model graphsage_cv --batch-size 1000 --dataset reddit --num-neighbors 1 --ip 127.0.0.1:50051
+DGLBACKEND=mxnet python3 examples/mxnet/sampling/dis_sampling/sampler.py --model graphsage_cv --batch-size 1000 --dataset reddit --num-neighbors 1 --ip 127.0.0.1:50051 --num-sampler 1
 ```
