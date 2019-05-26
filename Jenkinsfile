@@ -25,7 +25,7 @@ def cpp_unit_test_linux(){
 }
 
 def cpp_unit_test_windows(){
-  bat "CALL tests\\scripts\\task_cpp_unit_task.bat"
+  bat "CALL tests\\scripts\\task_cpp_unit_test.bat"
 }
 
 def unit_test(backend, dev) {
