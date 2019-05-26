@@ -203,10 +203,10 @@ pipeline {
             docker { image "dgllib/dgl-ci-mxnet-cpu" }
           }
           stages {
-            options {
-                timeout(time: 5, unit: 'MINUTES') 
-            }
             stage("MX Unittest") {
+              options {
+                  timeout(time: 5, unit: 'MINUTES') 
+              }
               steps { unit_test("mxnet", "CPU") }
             }
           }
