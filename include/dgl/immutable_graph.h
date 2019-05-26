@@ -891,6 +891,34 @@ class ImmutableGraph: public GraphInterface {
   COOPtr coo_;
 };
 
+class ImmutableBiGraph: public ImmutableGraph {
+ public:
+  /*! \brief Construct an immutable graph from the COO format. */
+  explicit ImmutableBiGraph(COOPtr coo, size_t num_src, size_t num_dst): ImmutableGraph(coo) {
+    this->num_src = num_src;
+    this->num_dst = num_dst;
+  }
+  /*! \brief Construct an immutable graph from the CSR format. */
+  ImmutableBiGraph(CSRPtr in_csr, CSRPtr out_csr, size_t num_src, size_t num_dst)
+    : ImmutableGraph(in_csr, out_csr) {
+    CHECK(in_csr_ || out_csr_) << "Both CSR are missing.";
+    this->num_src = num_src;
+    this->num_dst = num_dst;
+  }
+
+  /*! \brief Construct an immutable graph from one CSR. */
+  ImmutableBiGraph(CSRPtr csr, size_t num_src, size_t num_dst): ImmutableGraph(csr) {
+    this->num_src = num_src;
+    this->num_dst = num_dst;
+  }
+
+  std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override;
+
+ private:
+  size_t num_src;
+  size_t num_dst;
+};
+
 }  // namespace dgl
 
 #endif  // DGL_IMMUTABLE_GRAPH_H_
