@@ -20,8 +20,12 @@ def build_dgl_win64() {
   bat "CALL tests\\scripts\\build_dgl.bat"
 }
 
-def cpp_unit_test(){
+def cpp_unit_test_linux(){
   sh "bash tests/scripts/task_cpp_unit_test.sh"
+}
+
+def cpp_unit_test_windows(){
+  bat "CALL tests\\scripts\\task_cpp_unit_task.bat"
 }
 
 def unit_test(backend, dev) {
@@ -125,12 +129,21 @@ pipeline {
     stage("Test") {
       parallel {
         stage("CPP Test"){
-          agent {
-            docker {image "dgllib/dgl-ci-cpu"}
-          }
           stages{
-            stage("CPP Unit Test"){
-              steps { cpp_unit_test() }
+            stage("CPP Unit Test Linux"){
+              agent {
+                docker {image "dgllib/dgl-ci-cpu"}
+              }
+              steps { cpp_unit_test_linux() }
+            }
+            stage("CPP Unit Test Windows"){
+              agent {
+                label "windows"
+              }
+              steps {
+                init_git_submodule_win64()
+                cpp_unit_test_windows()
+              }
             }
           }
         }
