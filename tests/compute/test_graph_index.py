@@ -161,7 +161,7 @@ def test_load_csr():
 
     # Load CSR normally.
     idx = dgl.graph_index.GraphIndex(multigraph=False, readonly=True)
-    idx.from_csr_matrix(csr.indptr, csr.indices, 'out')
+    idx.from_csr_matrix(utils.toindex(csr.indptr), utils.toindex(csr.indices), 'out')
     assert idx.number_of_nodes() == n
     assert idx.number_of_edges() == csr.nnz
     src, dst, eid = idx.edges()
@@ -174,7 +174,8 @@ def test_load_csr():
     # Shared memory isn't supported in Windows.
     if os.name is not 'nt':
         idx = dgl.graph_index.GraphIndex(multigraph=False, readonly=True)
-        idx.from_csr_matrix(csr.indptr, csr.indices, 'out', '/test_graph_struct')
+        idx.from_csr_matrix(utils.toindex(csr.indptr), utils.toindex(csr.indices),
+                            'out', '/test_graph_struct')
         assert idx.number_of_nodes() == n
         assert idx.number_of_edges() == csr.nnz
         src, dst, eid = idx.edges()
