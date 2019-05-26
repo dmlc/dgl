@@ -75,7 +75,7 @@ TEST(TCPSocket, SendRecieve) {
       sent_bytes += tmp;
     }
   } else {  // child: client
-    sleep(3);   // wait for server
+    sleep(1);   // wait for server
     TCPSocket client;
     ASSERT_TRUE(client.Connect("127.0.0.1", 2049));
     char clibuff[10];
@@ -124,5 +124,4 @@ TEST(TCPSocket, SendRecieve) {
       ASSERT_EQ(bigbuff[i], 'x');
     }
   }
-  wait(0);
 }
