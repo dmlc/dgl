@@ -10,11 +10,12 @@
 #include "./backward_binary_reduce_impl.cuh"
 #include "../utils.h"
 
-using minigun::Csr;
-using minigun::advance::RuntimeConfig;
+//using minigun::Csr;
+//using minigun::advance::RuntimeConfig;
 
 namespace dgl {
 namespace kernel {
+/*
 namespace cuda {
 // specialization for cusparse
 
@@ -227,14 +228,16 @@ void CallBackwardBinaryReduce<kDLGPU, binary_op::kGradLhs, double,
     cuda::CusparseCsrmm2(rtcfg, csr, gdata->grad_out_data, gdata->grad_lhs_data, gdata->x_length);
   }
 }
+*/
 
 // generate definitions
 
 #define REDUCER ReduceSum
 #define XPU kDLGPU
+#define IDX int32_t
 
-EVAL(GEN_DTYPE, GEN_TARGET, GEN_BINARY_OP, GEN_DEFINE)
-EVAL(GEN_BACKWARD_MODE, GEN_DTYPE, GEN_TARGET, GEN_BINARY_OP, GEN_BACKWARD_DEFINE)
+EVAL(GEN_DTYPE, GEN_TARGET, GEN_BINARY_OP, GEN_DEFINE);
+EVAL(GEN_BACKWARD_MODE, GEN_DTYPE, GEN_TARGET, GEN_BINARY_OP, GEN_BACKWARD_DEFINE);
 
 }  // namespace kernel
 }  // namespace dgl

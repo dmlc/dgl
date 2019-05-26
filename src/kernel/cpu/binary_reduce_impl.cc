@@ -3,7 +3,6 @@
  * \file kernel/cpu/binary_reduce_impl.cc
  * \brief Binary reduce implementation on CPU.
  */
-#include "../binary_reduce.h"
 #include "../binary_reduce_impl.h"
 
 using dgl::runtime::NDArray;

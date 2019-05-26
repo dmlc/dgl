@@ -26,9 +26,9 @@ struct BackwardBinaryReduce {
   static inline void ApplyEdge(
       Idx src, Idx dst, Idx eid, BackwardGData<Idx, DType>* gdata) {
     const int64_t D = gdata->x_length;
-    int64_t lid = Functors::SelectLeft(src, eid, dst);
-    int64_t rid = Functors::SelectRight(src, eid, dst);
-    int64_t oid = Functors::SelectOut(src, eid, dst);
+    Idx lid = Functors::SelectLeft(src, eid, dst);
+    Idx rid = Functors::SelectRight(src, eid, dst);
+    Idx oid = Functors::SelectOut(src, eid, dst);
     if (gdata->lhs_mapping) {
       lid = Functors::GetId(lid, gdata->lhs_mapping);
     }
@@ -74,9 +74,9 @@ struct BackwardBinaryReduceBcast {
   }
   static inline void ApplyEdge(
       Idx src, Idx dst, Idx eid, BackwardBcastGData<NDim, Idx, DType>* gdata) {
-    int64_t lid = Functors::SelectLeft(src, eid, dst);
-    int64_t rid = Functors::SelectRight(src, eid, dst);
-    int64_t oid = Functors::SelectOut(src, eid, dst);
+    Idx lid = Functors::SelectLeft(src, eid, dst);
+    Idx rid = Functors::SelectRight(src, eid, dst);
+    Idx oid = Functors::SelectOut(src, eid, dst);
     if (gdata->lhs_mapping) {
       lid = Functors::GetId(lid, gdata->lhs_mapping);
     }

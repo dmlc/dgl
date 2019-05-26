@@ -87,6 +87,9 @@ void BinaryReduceImpl(
   }
   const DLDataType& dtype = out_data->dtype;
   const auto bits = graph->NumBits();
+#ifdef __CUDACC__
+  CHECK(bits == 32) << "CUDA kernel only supports 32 bits graph.";
+#endif
   DGL_DTYPE_SWITCH(dtype, DType, {
 #ifdef __CUDACC__
     ({typedef int32_t Idx;
@@ -184,6 +187,9 @@ void BackwardBinaryReduceImpl(
   const bool req_lhs = !utils::IsNoneArray(grad_lhs_data);
   const bool req_rhs = !utils::IsNoneArray(grad_rhs_data);
   const auto bits = graph->NumBits();
+#ifdef __CUDACC__
+  CHECK(bits == 32) << "CUDA kernel only supports 32 bits graph.";
+#endif
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
@@ -287,6 +293,9 @@ void BinaryReduceBcastImpl(
   const DLDataType& dtype = out_data->dtype;
   const int bcast_ndim = info.out_shape.size();
   const auto bits = graph->NumBits();
+#ifdef __CUDACC__
+  CHECK(bits == 32) << "CUDA kernel only supports 32 bits graph.";
+#endif
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
@@ -399,6 +408,9 @@ void BackwardBinaryReduceBcastImpl(
   const bool req_lhs = !utils::IsNoneArray(grad_lhs);
   const bool req_rhs = !utils::IsNoneArray(grad_rhs);
   const auto bits = graph->NumBits();
+#ifdef __CUDACC__
+  CHECK(bits == 32) << "CUDA kernel only supports 32 bits graph.";
+#endif
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";

@@ -145,8 +145,8 @@ template <int XPU, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
 void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
-                         const ImmutableGraph* graph,
-                         GData<Idx, DType>* gdata) {
+                      const ImmutableGraph* graph,
+                      GData<Idx, DType>* gdata) {
   typedef cpu::FunctorsTempl<Idx, DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer>
           Functors;
