@@ -1424,7 +1424,8 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         scipy.sparse.spmatrix
             The scipy representation of adjacency matrix.
         """
-        pass
+        assert etype == self._etype
+        return self._graph.adjacency_matrix_scipy(transpose, fmt)
 
     def adjacency_matrix(self, etype, transpose=False, ctx=F.cpu()):
         """Return the adjacency matrix representation of edges with the
@@ -1451,7 +1452,8 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         SparseTensor
             The adjacency matrix.
         """
-        pass
+        assert etype == self._etype
+        return self._graph.adjacency_matrix(transpose, ctx)[0]
 
     def incidence_matrix(self, etype, typestr, ctx=F.cpu()):
         """Return the incidence matrix representation of edges with the given

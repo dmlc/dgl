@@ -666,4 +666,52 @@ std::vector<IdArray> ImmutableGraph::GetAdj(bool transpose, const std::string &f
   }
 }
 
+std::vector<IdArray> ImmutableBiGraph::GetAdj(bool transpose, const std::string &fmt) const {
+  // TODO(minjie): Our current semantics of adjacency matrix is row for dst nodes and col for
+  //   src nodes. Therefore, we need to flip the transpose flag. For example, transpose=False
+  //   is equal to in edge CSR.
+  //   We have this behavior because previously we use framework's SPMM and we don't cache
+  //   reverse adj. This is not intuitive and also not consistent with networkx's
+  //   to_scipy_sparse_matrix. With the upcoming custom kernel change, we should change the
+  //   behavior and make row for src and col for dst.
+  if (fmt == std::string("csr") && transpose) {
+    std::vector<IdArray> csr = GetOutCSR()->GetAdj(false, "csr");
+    IdArray indices = csr[1];
+    int64_t index_len = indices->shape[0];
+
+    IdArray adjust_indices = IdArray::Empty({index_len}, indices->dtype, indices->ctx);
+    const dgl_id_t *index_data = static_cast<const dgl_id_t *>(indices->data);
+    dgl_id_t *adjust_data = static_cast<dgl_id_t *>(adjust_indices->data);
+    for (int64_t i = 0; i < index_len; i++) {
+      CHECK_GE(index_data[i], this->num_src);
+      adjust_data[i] = index_data[i] - this->num_src;
+    }
+
+    int64_t num_offs = this->num_src + 1;
+    IdArray adjust_indptr = csr[0].CreateView({num_offs}, DLDataType{kDLInt, 64, 1});
+    return {adjust_indptr, adjust_indices, csr[2]};
+  } else if (fmt == std::string("csr")) {
+    std::vector<IdArray> csr = GetInCSR()->GetAdj(false, "csr");
+    int64_t num_offs = this->num_dst + 1;
+    IdArray adjust_indptr = csr[0].CreateView({num_offs}, DLDataType{kDLInt, 64, 1},
+                                              // offset is the number of bytes.
+                                              this->num_src * 8);
+    return {adjust_indptr, csr[1], csr[2]};
+  } else if (fmt == std::string("coo")) {
+    std::vector<IdArray> coo = GetCOO()->GetAdj(!transpose, fmt);
+    int64_t num_edges = coo[0]->shape[0] / 2;
+    int64_t dst_off = transpose ? num_edges : 0;
+    dgl_id_t *dst_data = static_cast<dgl_id_t *>(coo[0]->data) + dst_off;
+    // The IdArray is created by GetAdj, so we can modify it directly.
+    for (int64_t i = 0; i < num_edges; i++) {
+      CHECK_GE(dst_data[i], this->num_src);
+      dst_data[i] -= this->num_src;
+    }
+    return coo;
+  } else {
+    LOG(FATAL) << "unsupported adjacency matrix format: " << fmt;
+    return {};
+  }
+}
+
 }  // namespace dgl

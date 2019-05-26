@@ -196,6 +196,54 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreateMMap")
     *rv = ghandle;
   });
 
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLBiGraphCreate")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const IdArray src_ids = args[0];
+    const IdArray dst_ids = args[1];
+    const bool multigraph = static_cast<bool>(args[2]);
+    const int64_t num_src_nodes = static_cast<int64_t>(args[3]);
+    const int64_t num_dst_nodes = static_cast<int64_t>(args[4]);
+    const bool readonly = static_cast<bool>(args[5]);
+    GraphHandle ghandle;
+    CHECK(readonly) << "We only support readonly bipartite graph for now";
+    // TODO(minjie): The array copy here is unnecessary and adds extra overhead.
+    //   However, with MXNet backend, the memory would be corrupted if we directly
+    //   save the passed-in ndarrays into DGL's graph object. We hope MXNet team
+    //   could help look into this.
+    COOPtr coo(new COO(num_src_nodes + num_dst_nodes,
+                       Clone(src_ids), Clone(dst_ids), multigraph));
+    ghandle = new ImmutableBiGraph(coo, num_src_nodes, num_dst_nodes);
+    *rv = ghandle;
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLBiGraphCSRCreate")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    const IdArray indptr = args[0];
+    const IdArray indices = args[1];
+    const IdArray edge_ids = args[2];
+    const int64_t num_src_nodes = args[3];
+    const int64_t num_dst_nodes = args[4];
+    const std::string shared_mem_name = args[5];
+    const bool multigraph = static_cast<bool>(args[6]);
+    const std::string edge_dir = args[7];
+    CSRPtr csr;
+    if (shared_mem_name.empty())
+      // TODO(minjie): The array copy here is unnecessary and adds extra overhead.
+      //   However, with MXNet backend, the memory would be corrupted if we directly
+      //   save the passed-in ndarrays into DGL's graph object. We hope MXNet team
+      //   could help look into this.
+      csr.reset(new CSR(Clone(indptr), Clone(indices), Clone(edge_ids), multigraph));
+    else
+      csr.reset(new CSR(indptr, indices, edge_ids, multigraph, shared_mem_name));
+
+    GraphHandle ghandle;
+    if (edge_dir == "in")
+      ghandle = new ImmutableBiGraph(csr, nullptr, num_src_nodes, num_dst_nodes);
+    else
+      ghandle = new ImmutableBiGraph(nullptr, csr, num_src_nodes, num_dst_nodes);
+    *rv = ghandle;
+  });
+
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphFree")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
