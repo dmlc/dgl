@@ -10,12 +10,11 @@
 #include "./backward_binary_reduce_impl.cuh"
 #include "../utils.h"
 
-//using minigun::Csr;
-//using minigun::advance::RuntimeConfig;
+using minigun::advance::RuntimeConfig;
+using Csr = minigun::Csr<int32_t>;
 
 namespace dgl {
 namespace kernel {
-/*
 namespace cuda {
 // specialization for cusparse
 
@@ -82,7 +81,9 @@ cublasStatus_t Xgeam<double>(cublasHandle_t handle, cublasOperation_t transa,
 }
 
 template <typename DType>
-void CusparseCsrmm2(const RuntimeConfig& rtcfg, const Csr& csr,
+void CusparseCsrmm2(
+    const RuntimeConfig& rtcfg,
+    const Csr& csr,
     const DType* B_data, DType* C_data, int x_length) {
   const int m = csr.row_offsets.length - 1;
   const int k = csr.row_offsets.length - 1;
@@ -133,102 +134,152 @@ void CusparseCsrmm2(const RuntimeConfig& rtcfg, const Csr& csr,
 
 // forward
 
-template <typename DType,
-          typename LeftSelector, typename RightSelector,
-          typename BinaryOp, typename Reducer>
+template <typename DType>
 void FallbackCallBinaryReduce(
-    const minigun::advance::RuntimeConfig& rtcfg,
-    const minigun::Csr& csr,
-    const minigun::Csr& rev_csr,
-    GData<DType>* gdata) {
-  using minigun::IntArray1D;
-  typedef FunctorsTempl<DType, LeftSelector,
+    const RuntimeConfig& rtcfg,
+    const ImmutableGraph* graph,
+    GData<int32_t, DType>* gdata) {
+  constexpr int XPU = kDLGPU;
+  typedef int32_t Idx;
+  typedef SelectSrc LeftSelector;
+  typedef SelectDst RightSelector;
+  typedef BinaryUseLhs<DType> BinaryOp;
+  typedef ReduceSum<kDLGPU, DType> Reducer;
+  typedef cuda::FunctorsTempl<Idx, DType, LeftSelector,
                         RightSelector, BinaryOp, Reducer>
           Functors;
-  typedef BinaryReduce<DType, Functors> UDF;
+  typedef cuda::BinaryReduce<Idx, DType, Functors> UDF;
+  // csr
+  auto outcsr = graph->GetOutCSR();
+  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(outcsr->indptr(), outcsr->indices());
+  // If the user-given mapping is none and the target is edge data, we need to
+  // replace the mapping by the edge ids in the csr graph so that the edge
+  // data is correctly read/written.
+  if (LeftSelector::target == binary_op::kEdge && gdata->lhs_mapping == nullptr) {
+    gdata->lhs_mapping = static_cast<Idx*>(outcsr->edge_ids()->data);
+  }
+  if (RightSelector::target == binary_op::kEdge && gdata->rhs_mapping == nullptr) {
+    gdata->rhs_mapping = static_cast<Idx*>(outcsr->edge_ids()->data);
+  }
+  if (OutSelector<Reducer>::Type::target == binary_op::kEdge
+      && gdata->out_mapping == nullptr) {
+    gdata->out_mapping = static_cast<Idx*>(outcsr->edge_ids()->data);
+  }
   // TODO(minjie): allocator
-  minigun::advance::Advance<kDLGPU, AdvanceConfig, GData<DType>, UDF>(
-        rtcfg, csr, gdata, IntArray1D());
+  minigun::advance::Advance<XPU, Idx, cuda::AdvanceConfig, GData<Idx, DType>, UDF>(
+        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
 }
 
-template <int Mode, typename DType,
-          typename LeftSelector, typename RightSelector,
-          typename BinaryOp, typename Reducer>
+template <typename DType>
 void FallbackCallBackwardBinaryReduce(
-    const minigun::advance::RuntimeConfig& rtcfg,
-    const minigun::Csr& csr, const minigun::Csr& rev_csr,
-    BackwardGData<DType>* gdata) {
-  using minigun::IntArray1D;
-  typedef BackwardFunctorsTempl<DType, LeftSelector,
-                        RightSelector, BinaryOp, Reducer>
-          Functors;
-  typedef BackwardBinaryReduce<Mode, DType, Functors> UDF;
+    const RuntimeConfig& rtcfg,
+    const ImmutableGraph* graph,
+    BackwardGData<int32_t, DType>* gdata) {
+  constexpr int XPU = kDLGPU;
+  constexpr int Mode = binary_op::kGradLhs;
+  typedef int32_t Idx;
+  typedef SelectSrc LeftSelector;
+  typedef SelectDst RightSelector;
+  typedef BinaryUseLhs<DType> BinaryOp;
+  typedef ReduceSum<kDLGPU, DType> Reducer;
+  // For backward computation, we use reverse csr and switch dst and src.
+  // This benefits the most common src_op_edge or copy_src case, because the
+  // gradients of src are now aggregated into destination buffer to reduce
+  // competition of atomic add.
+  auto incsr = graph->GetInCSR();
+  minigun::Csr<Idx> csr = utils::CreateCsr<Idx>(incsr->indptr(), incsr->indices());
+  typedef cuda::BackwardFunctorsTempl<Idx, DType,
+          typename SwitchSrcDst<LeftSelector>::Type,
+          typename SwitchSrcDst<RightSelector>::Type,
+          BinaryOp, Reducer> Functors;
+  typedef cuda::BackwardBinaryReduce<Mode, Idx, DType, Functors> UDF;
+  // If the user-given mapping is none and the target is edge data, we need to
+  // replace the mapping by the edge ids in the csr graph so that the edge
+  // data is correctly read/written.
+  if (LeftSelector::target == binary_op::kEdge
+      && gdata->lhs_mapping == nullptr) {
+    gdata->lhs_mapping = static_cast<Idx*>(incsr->edge_ids()->data);
+  }
+  if (RightSelector::target == binary_op::kEdge
+      && gdata->rhs_mapping == nullptr) {
+    gdata->rhs_mapping = static_cast<Idx*>(incsr->edge_ids()->data);
+  }
+  if (OutSelector<Reducer>::Type::target == binary_op::kEdge
+      && gdata->out_mapping == nullptr) {
+    gdata->out_mapping = static_cast<Idx*>(incsr->edge_ids()->data);
+  }
   // TODO(minjie): allocator
-  minigun::advance::Advance<kDLGPU, AdvanceConfig, BackwardGData<DType>, UDF>(
-        rtcfg, rev_csr, gdata, IntArray1D());
+  minigun::advance::Advance<XPU, Idx, cuda::AdvanceConfig, BackwardGData<Idx, DType>, UDF>(
+        rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
 }
+
 }  // namespace cuda
 
 template <>
-void CallBinaryReduce<kDLGPU, float, SelectSrc, SelectEdge,
+void CallBinaryReduce<kDLGPU, int32_t, float, SelectSrc, SelectDst,
                       BinaryUseLhs<float>, ReduceSum<kDLGPU, float>>(
     const RuntimeConfig& rtcfg,
-    const Csr& csr, const Csr& rev_csr,
-    GData<float>* gdata) {
+    const ImmutableGraph* graph,
+    GData<int32_t, float>* gdata) {
   if (gdata->lhs_mapping || gdata->rhs_mapping || gdata->out_mapping) {
-    cuda::FallbackCallBinaryReduce<float, SelectSrc, SelectEdge,
-      BinaryUseLhs<float>, ReduceSum<kDLGPU, float>>(rtcfg, csr, rev_csr, gdata);
+    cuda::FallbackCallBinaryReduce<float>(rtcfg, graph, gdata);
   } else {
-    cuda::CusparseCsrmm2(rtcfg, rev_csr, gdata->lhs_data, gdata->out_data, gdata->x_length);
+    // cusparse use rev csr for csrmm
+    auto incsr = graph->GetInCSR();
+    Csr csr = utils::CreateCsr<int32_t>(incsr->indptr(), incsr->indices());
+    cuda::CusparseCsrmm2(rtcfg, csr, gdata->lhs_data, gdata->out_data, gdata->x_length);
   }
 }
 
 template <>
-void CallBinaryReduce<kDLGPU, double, SelectSrc, SelectEdge,
+void CallBinaryReduce<kDLGPU, int32_t, double, SelectSrc, SelectDst,
                       BinaryUseLhs<double>, ReduceSum<kDLGPU, double>>(
     const RuntimeConfig& rtcfg,
-    const Csr& csr, const Csr& rev_csr,
-    GData<double>* gdata) {
+    const ImmutableGraph* graph,
+    GData<int32_t, double>* gdata) {
   if (gdata->lhs_mapping || gdata->rhs_mapping || gdata->out_mapping) {
-    cuda::FallbackCallBinaryReduce<double, SelectSrc, SelectEdge,
-      BinaryUseLhs<double>, ReduceSum<kDLGPU, double>>(rtcfg, csr, rev_csr, gdata);
+    cuda::FallbackCallBinaryReduce<double>(rtcfg, graph, gdata);
   } else {
-    cuda::CusparseCsrmm2(rtcfg, rev_csr, gdata->lhs_data, gdata->out_data, gdata->x_length);
+    // cusparse use rev csr for csrmm
+    auto incsr = graph->GetInCSR();
+    Csr csr = utils::CreateCsr<int32_t>(incsr->indptr(), incsr->indices());
+    cuda::CusparseCsrmm2(rtcfg, csr, gdata->lhs_data, gdata->out_data, gdata->x_length);
   }
 }
 
 // backward
 
 template <>
-void CallBackwardBinaryReduce<kDLGPU, binary_op::kGradLhs, float,
-                              SelectDst, SelectEdge,
+void CallBackwardBinaryReduce<kDLGPU, binary_op::kGradLhs, int32_t, float,
+                              SelectSrc, SelectDst,
                               BinaryUseLhs<float>, ReduceSum<kDLGPU, float>>(
     const RuntimeConfig& rtcfg,
-    const Csr& csr, const Csr& rev_csr,
-    BackwardGData<float>* gdata) {
+    const ImmutableGraph* graph,
+    BackwardGData<int32_t, float>* gdata) {
   if (gdata->lhs_mapping || gdata->rhs_mapping || gdata->out_mapping) {
-    cuda::FallbackCallBackwardBinaryReduce<binary_op::kGradLhs, float, SelectDst, SelectEdge,
-      BinaryUseLhs<float>, ReduceSum<kDLGPU, float>>(rtcfg, csr, rev_csr, gdata);
+    cuda::FallbackCallBackwardBinaryReduce<float>(rtcfg, graph, gdata);
   } else {
+    auto outcsr = graph->GetOutCSR();
+    Csr csr = utils::CreateCsr<int32_t>(outcsr->indptr(), outcsr->indices());
     cuda::CusparseCsrmm2(rtcfg, csr, gdata->grad_out_data, gdata->grad_lhs_data, gdata->x_length);
   }
 }
 
 template <>
-void CallBackwardBinaryReduce<kDLGPU, binary_op::kGradLhs, double,
-                              SelectDst, SelectEdge,
+void CallBackwardBinaryReduce<kDLGPU, binary_op::kGradLhs, int32_t, double,
+                              SelectSrc, SelectDst,
                               BinaryUseLhs<double>, ReduceSum<kDLGPU, double>>(
     const RuntimeConfig& rtcfg,
-    const Csr& csr, const Csr& rev_csr,
-    BackwardGData<double>* gdata) {
+    const ImmutableGraph* graph,
+    BackwardGData<int32_t, double>* gdata) {
   if (gdata->lhs_mapping || gdata->rhs_mapping || gdata->out_mapping) {
-    cuda::FallbackCallBackwardBinaryReduce<binary_op::kGradLhs, double, SelectDst, SelectEdge,
-      BinaryUseLhs<double>, ReduceSum<kDLGPU, double>>(rtcfg, csr, rev_csr, gdata);
+    cuda::FallbackCallBackwardBinaryReduce<double>(rtcfg, graph, gdata);
   } else {
+    auto outcsr = graph->GetOutCSR();
+    Csr csr = utils::CreateCsr<int32_t>(outcsr->indptr(), outcsr->indices());
     cuda::CusparseCsrmm2(rtcfg, csr, gdata->grad_out_data, gdata->grad_lhs_data, gdata->x_length);
   }
 }
-*/
 
 // generate definitions
 

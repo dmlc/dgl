@@ -473,14 +473,14 @@ void BackwardCopyReduce(
 DGL_REGISTER_GLOBAL("kernel._CAPI_DGLKernelBackwardCopyReduce")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     std::string reducer = args[0];
-    GraphHandle ghdl = args[2];
-    int target = args[3];
-    NDArray in_mapping = args[5];
-    NDArray out_mapping = args[7];
-    NDArray in_data = args[8];
-    NDArray out_data = args[10];
-    NDArray grad_out_data = args[11];
-    NDArray grad_in_data = args[12];
+    GraphHandle ghdl = args[1];
+    int target = args[2];
+    NDArray in_data = args[3];
+    NDArray out_data = args[4];
+    NDArray grad_out_data = args[5];
+    NDArray grad_in_data = args[6];
+    NDArray in_mapping = args[7];
+    NDArray out_mapping = args[8];
 
     GraphInterface* gptr = static_cast<GraphInterface*>(ghdl);
     const ImmutableGraph* igptr = dynamic_cast<ImmutableGraph*>(gptr);
