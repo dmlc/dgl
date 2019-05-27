@@ -162,6 +162,14 @@ class DGLBaseHeteroGraph(object):
     def number_of_nodes(self):
         """Return the number of nodes in the graph.
 
+        Notes
+        -----
+        An error is raised if the graph contains multiple node types.  Use
+
+            g[ntype].number_of_nodes()
+
+        to get the number of nodes with type ``ntype``.
+
         Returns
         -------
         int
@@ -934,11 +942,7 @@ class DGLBaseHeteroGraphView(DGLBaseHeteroGraph):
     """View on a heterogeneous graph, constructed from
     DGLBaseHeteroGraph.__getitem__().
 
-    It is semantically the same as a subgraph, except that
-
-    * The subgraph itself is not materialized until the user explicitly
-    queries the subgraph structure (e.g. calling ``in_edges``, but not
-    ``update_all``).
+    It is semantically the same as a subgraph.
     """
     pass
 
