@@ -6,7 +6,6 @@
 #ifndef DGL_GRAPH_NETWORK_MSG_QUEUE_H_
 #define DGL_GRAPH_NETWORK_MSG_QUEUE_H_
 
-#include <dgl/runtime/c_runtime_api.h>
 #include <queue>
 #include <set>
 #include <string>
@@ -33,7 +32,7 @@ namespace network {
  * have finished their jobs.
  * 
  */
-class DGL_DLL MessageQueue {
+class MessageQueue {
  public:
   /*!
    * \brief MessageQueue constructor

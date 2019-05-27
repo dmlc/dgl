@@ -34,7 +34,7 @@ class GraphOp;
  * If the length of src id array is one, it represents one-many connections.
  * If the length of dst id array is one, it represents many-one connections.
  */
-class DGL_DLL Graph: public GraphInterface {
+class Graph: public GraphInterface {
  public:
   /*! \brief default constructor */
   explicit Graph(bool multigraph = false) : is_multigraph_(multigraph) {}

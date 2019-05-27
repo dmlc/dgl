@@ -6,7 +6,6 @@
 #ifndef DGL_GRAPH_NETWORK_SOCKET_COMMUNICATOR_H_
 #define DGL_GRAPH_NETWORK_SOCKET_COMMUNICATOR_H_
 
-#include <dgl/runtime/c_runtime_api.h>
 #include <thread>
 #include <vector>
 #include <string>
@@ -40,7 +39,7 @@ struct Addr {
  * networking libraries such TCP socket and ZMQ. One Sender can connect to 
  * multiple receivers, and it can send data to specified receiver via receiver's ID.
  */
-class DGL_DLL SocketSender : public Sender {
+class SocketSender : public Sender {
  public:
   /*!
    * \brief Add receiver address and it's ID to the namebook
@@ -108,7 +107,7 @@ class DGL_DLL SocketSender : public Sender {
  * such TCP socket and ZMQ. One Receiver can connect with multiple Senders, and it can receive 
  * data from these Senders concurrently via multi-threading and message queue.
  */
-class DGL_DLL SocketReceiver : public Receiver {
+class SocketReceiver : public Receiver {
  public:
   /*!
    * \brief Wait all of the Senders to connect
