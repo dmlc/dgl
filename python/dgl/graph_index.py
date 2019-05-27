@@ -1385,7 +1385,7 @@ def create_bigraph_index(graph_data=None, num_nodes=(0, 0), multigraph=False, re
     multigraph : bool, optional
         Whether the graph is multigraph (default is False)
     """
-    if isinstance(graph_data, list) or isinstance(graph_data, tuple):
+    if isinstance(graph_data, (list, tuple)):
         assert len(graph_data) == 2
         src_nodes, dst_nodes = graph_data
         dst_nodes = dst_nodes + num_nodes[0]

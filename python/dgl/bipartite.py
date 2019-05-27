@@ -150,7 +150,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
 
     def _has_node(self, ntype, vid):
         if isinstance(ntype, str):
-            return vid < self._number_of_nodes(ntype) and vid >= 0
+            return 0 <= vid < self._number_of_nodes(ntype)
         else:
             raise Exception('invalid node type')
 
@@ -1123,22 +1123,14 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         """
         if func == "default":
             func = self._apply_node_funcs
+        if func is None:
+            return
+
         assert isinstance(v, dict)
         assert isinstance(func, dict)
 
-        for ntype, varr in v:
-            if is_all(varr):
-                varr = utils.toindex(slice(0, self._number_of_nodes(ntype)))
-            else:
-                varr = utils.toindex(varr)
-            assert ntype in func
-            with ir.prog() as prog:
-                scheduler.schedule_heterograph_apply_nodes(graph=self,
-                                                           ntype=ntype,
-                                                           v=varr,
-                                                           apply_func=func[ntype],
-                                                           inplace=inplace)
-                Runtime.run(prog)
+        for key in func:
+            self[key].apply_nodes(func[key], v[key], inplace)
 
     def apply_edges(self, func="default", edges=ALL, inplace=False):
         """Apply the function on the edges with the same type to update their
