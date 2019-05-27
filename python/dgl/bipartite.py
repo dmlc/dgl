@@ -1,5 +1,4 @@
 """Bipartite graph class specialized for neural networks on graphs."""
-import sys
 from .graph_index import create_bigraph_index
 from .heterograph import DGLHeteroGraph
 from .base import ALL, is_all
