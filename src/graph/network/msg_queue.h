@@ -14,6 +14,8 @@
 #include <condition_variable>
 #include <atomic>
 
+#include <dgl/runtime/c_runtime_api.h>
+
 namespace dgl {
 namespace network {
 
@@ -32,7 +34,7 @@ namespace network {
  * have finished their jobs.
  * 
  */
-class MessageQueue {
+class DGL_DLL MessageQueue {
  public:
   /*!
    * \brief MessageQueue constructor

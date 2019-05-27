@@ -11,6 +11,8 @@
 #include <string>
 #include <unordered_map>
 
+#include <dgl/runtime/c_runtime_api.h>
+
 #include "communicator.h"
 #include "msg_queue.h"
 #include "tcp_socket.h"
@@ -39,7 +41,7 @@ struct Addr {
  * networking libraries such TCP socket and ZMQ. One Sender can connect to 
  * multiple receivers, and it can send data to specified receiver via receiver's ID.
  */
-class SocketSender : public Sender {
+class DGL_DLL SocketSender : public Sender {
  public:
   /*!
    * \brief Add receiver address and it's ID to the namebook
@@ -107,7 +109,7 @@ class SocketSender : public Sender {
  * such TCP socket and ZMQ. One Receiver can connect with multiple Senders, and it can receive 
  * data from these Senders concurrently via multi-threading and message queue.
  */
-class SocketReceiver : public Receiver {
+class DGL_DLL SocketReceiver : public Receiver {
  public:
   /*!
    * \brief Wait all of the Senders to connect
