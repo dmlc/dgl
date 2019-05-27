@@ -46,7 +46,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
             raise Exception("Bipartite graph should have only two node types")
         assert metagraph.number_of_edges() == 1
         self._metagraph = metagraph
-        self._etype = list(metagraph.edges)[0]
+        self._etype = list(edge_connections_by_type.keys())[0]
         self._ntypes = [self._etype[0], self._etype[1]]
         assert self._ntypes[0] in number_of_nodes_by_type.keys()
         assert self._ntypes[1] in number_of_nodes_by_type.keys()
@@ -57,9 +57,6 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         # TODO(zhengda) this is a hack way of constructing a bipartite graph.
         if len(edge_connections_by_type) > 1:
             raise Exception("Bipartite graph only support one type of edges")
-        print(self._etype, file=sys.stderr)
-        print(edge_connections_by_type.keys(), file=sys.stderr)
-        assert self._etype in edge_connections_by_type.keys()
         edges = edge_connections_by_type[self._etype]
 
         self._graph = create_bigraph_index(edges, self._num_nodes, False, readonly)
