@@ -1,4 +1,5 @@
 """Bipartite graph class specialized for neural networks on graphs."""
+import sys
 from .graph_index import create_bigraph_index
 from .heterograph import DGLHeteroGraph
 from .base import ALL, is_all
@@ -56,6 +57,8 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         # TODO(zhengda) this is a hack way of constructing a bipartite graph.
         if len(edge_connections_by_type) > 1:
             raise Exception("Bipartite graph only support one type of edges")
+        print(self._etype, file=sys.stderr)
+        print(edge_connections_by_type.keys(), file=sys.stderr)
         assert self._etype in edge_connections_by_type.keys()
         edges = edge_connections_by_type[self._etype]
 
