@@ -429,7 +429,7 @@ def reduce_func(nodes):
     return {'accum' : F.sum(msgs, 1)}
 
 def apply_node_func(nodes):
-    return {'h' : nodes.data['h'] + nodes.data['accum']}
+    return {'res' : nodes.data['h'] + nodes.data['accum']}
 
 def test_update_routines():
     g = gen_from_edgelist()
@@ -438,6 +438,8 @@ def test_update_routines():
     g['dst'].register_apply_node_func(apply_node_func)
     g['src'].ndata['h'] = F.randn((g['src'].number_of_nodes(), D))
     g['dst'].ndata['h'] = F.randn((g['dst'].number_of_nodes(), D))
+    adj = g.adjacency_matrix(('src', 'dst', 'e'))
+    comp_res = F.spmm(adj, g['src'].ndata['h']) + g['dst'].ndata['h']
 
     # send_and_recv
     reduce_msg_shapes.clear()
@@ -458,6 +460,7 @@ def test_update_routines():
     g.pull(v)
     assert(reduce_msg_shapes == {(2, 2, D), (1, 3, D), (1, 4, D)})
     reduce_msg_shapes.clear()
+    F.allclose(g['dst'].ndata['res'][v], comp_res[v])
 
     # push
     #v = F.tensor([0, 1, 2, 3])
@@ -471,6 +474,7 @@ def test_update_routines():
     g.update_all()
     assert(reduce_msg_shapes == {(1, 3, D), (2, 1, D), (6, 2, D), (1, 4, D)})
     reduce_msg_shapes.clear()
+    F.allclose(g['dst'].ndata['res'], comp_res)
 
 if __name__ == '__main__':
     test_query()
