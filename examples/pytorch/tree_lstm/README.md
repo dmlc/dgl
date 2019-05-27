@@ -24,7 +24,7 @@ pip install torch requests nltk
 
 ## Usage
 ```
-python train.py --gpu 0
+python3 train.py --gpu 0
 ```
 
 ## Speed

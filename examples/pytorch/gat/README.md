@@ -23,19 +23,19 @@ How to run
 Run with following:
 
 ```bash
-python train.py --dataset=cora --gpu=0
+python3 train.py --dataset=cora --gpu=0
 ```
 
 ```bash
-python train.py --dataset=citeseer --gpu=0
+python3 train.py --dataset=citeseer --gpu=0
 ```
 
 ```bash
-python train.py --dataset=pubmed --gpu=0 --num-out-heads=8 --weight-decay=0.001
+python3 train.py --dataset=pubmed --gpu=0 --num-out-heads=8 --weight-decay=0.001
 ```
 
 ```bash
-python train_ppi.py --gpu=0
+python3 train_ppi.py --gpu=0
 ```
 
 Results

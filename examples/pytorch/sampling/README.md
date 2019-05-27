@@ -14,34 +14,48 @@ pip install torch requests
 ``
 
 ### Neighbor Sampling & Skip Connection
-cora: test accuracy ~83% with --num-neighbors 2, ~84% by training on the full graph
+
+#### cora 
+
+Test accuracy ~83% with --num-neighbors 2, ~84% by training on the full graph
 ```
-python gcn_ns_sc.py --dataset cora --self-loop --num-neighbors 2 --batch-size 1000000 --test-batch-size 1000000 --gpu 0
+DGLBACKEND=pytorch python3 gcn_ns_sc.py --dataset cora --self-loop --num-neighbors 2 --batch-size 1000000 --test-batch-size 1000000
 ```
 
-citeseer: test accuracy ~69% with --num-neighbors 2, ~70% by training on the full graph
+#### citeseer 
+
+Test accuracy ~69% with --num-neighbors 2, ~70% by training on the full graph
 ```
-python gcn_ns_sc.py --dataset citeseer --self-loop --num-neighbors 2 --batch-size 1000000 --test-batch-size 1000000 --gpu 0
+DGLBACKEND=pytorch python3 gcn_ns_sc.py --dataset citeseer --self-loop --num-neighbors 2 --batch-size 1000000 --test-batch-size 1000000
 ```
 
-pubmed: test accuracy ~76% with --num-neighbors 3, ~77% by training on the full graph
+#### pubmed 
+
+Test accuracy ~76% with --num-neighbors 3, ~77% by training on the full graph
 ```
-python gcn_ns_sc.py --dataset pubmed --self-loop --num-neighbors 3 --batch-size 1000000 --test-batch-size 1000000 --gpu 0
+DGLBACKEND=pytorch python3 gcn_ns_sc.py --dataset pubmed --self-loop --num-neighbors 3 --batch-size 1000000 --test-batch-size 1000000
 ```
 
 ### Control Variate & Skip Connection
-cora: test accuracy ~84% with --num-neighbors 1, ~84% by training on the full graph
+
+#### cora 
+
+Test accuracy ~84% with --num-neighbors 1, ~84% by training on the full graph
 ```
-python gcn_cv_sc.py --dataset cora --self-loop --num-neighbors 1 --batch-size 1000000 --test-batch-size 1000000 --gpu 0
+DGLBACKEND=pytorch python3 gcn_cv_sc.py --dataset cora --self-loop --num-neighbors 1 --batch-size 1000000 --test-batch-size 1000000
 ```
 
-citeseer: test accuracy ~69% with --num-neighbors 1, ~70% by training on the full graph
+#### citeseer 
+
+Test accuracy ~69% with --num-neighbors 1, ~70% by training on the full graph
 ```
-python gcn_cv_sc.py --dataset citeseer --self-loop --num-neighbors 1 --batch-size 1000000 --test-batch-size 1000000 --gpu 0
+DGLBACKEND=pytorch python3 gcn_cv_sc.py --dataset citeseer --self-loop --num-neighbors 1 --batch-size 1000000 --test-batch-size 1000000
 ```
 
-pubmed: test accuracy ~77% with --num-neighbors 1, ~77% by training on the full graph
+#### pubmed 
+
+Test accuracy ~77% with --num-neighbors 1, ~77% by training on the full graph
 ```
-python gcn_cv_sc.py --dataset pubmed --self-loop --num-neighbors 1 --batch-size 1000000 --test-batch-size 1000000 --gpu 0
+DGLBACKEND=pytorch python3 gcn_cv_sc.py --dataset pubmed --self-loop --num-neighbors 1 --batch-size 1000000 --test-batch-size 1000000
 ```
 
