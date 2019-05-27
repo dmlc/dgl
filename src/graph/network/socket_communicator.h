@@ -6,12 +6,11 @@
 #ifndef DGL_GRAPH_NETWORK_SOCKET_COMMUNICATOR_H_
 #define DGL_GRAPH_NETWORK_SOCKET_COMMUNICATOR_H_
 
+#include <dgl/runtime/c_runtime_api.h>
 #include <thread>
 #include <vector>
 #include <string>
 #include <unordered_map>
-
-#include <dgl/runtime/c_runtime_api.h>
 
 #include "communicator.h"
 #include "msg_queue.h"

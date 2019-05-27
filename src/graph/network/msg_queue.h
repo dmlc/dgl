@@ -6,6 +6,7 @@
 #ifndef DGL_GRAPH_NETWORK_MSG_QUEUE_H_
 #define DGL_GRAPH_NETWORK_MSG_QUEUE_H_
 
+#include <dgl/runtime/c_runtime_api.h>
 #include <queue>
 #include <set>
 #include <string>
@@ -13,8 +14,6 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
-
-#include <dgl/runtime/c_runtime_api.h>
 
 namespace dgl {
 namespace network {
