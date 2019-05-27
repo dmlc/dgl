@@ -846,9 +846,9 @@ class GraphIndex(object):
 
         Parameters
         ----------
-        indptr : a 1D tensor
+        indptr : utils.Index
             index pointer in the CSR format
-        indices : a 1D tensor
+        indices : utils.Index
             column index array in the CSR format
         edge_dir : string
             the edge direction. The supported option is "in" and "out".
@@ -856,13 +856,9 @@ class GraphIndex(object):
             the name of shared memory
         """
         assert self.is_readonly()
-        indptr = utils.toindex(indptr)
-        indices = utils.toindex(indices)
-        edge_ids = utils.toindex(F.arange(0, len(indices)))
         self._handle = _CAPI_DGLGraphCSRCreate(
             indptr.todgltensor(),
             indices.todgltensor(),
-            edge_ids.todgltensor(),
             shared_mem_name,
             self._multigraph,
             edge_dir)

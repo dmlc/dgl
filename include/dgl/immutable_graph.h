@@ -658,7 +658,8 @@ class ImmutableGraph: public GraphInterface {
    */
   EdgeArray EdgeIds(IdArray src, IdArray dst) const override {
     if (in_csr_) {
-      return in_csr_->EdgeIds(dst, src);
+      EdgeArray edges = in_csr_->EdgeIds(dst, src);
+      return EdgeArray{edges.dst, edges.src, edges.id};
     } else {
       return GetOutCSR()->EdgeIds(src, dst);
     }

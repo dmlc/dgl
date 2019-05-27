@@ -152,11 +152,16 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const IdArray indptr = args[0];
     const IdArray indices = args[1];
-    const IdArray edge_ids = args[2];
-    const std::string shared_mem_name = args[3];
-    const bool multigraph = args[4];
-    const std::string edge_dir = args[5];
+    const std::string shared_mem_name = args[2];
+    const bool multigraph = static_cast<bool>(args[3]);
+    const std::string edge_dir = args[4];
     CSRPtr csr;
+
+    IdArray edge_ids = IdArray::Empty({indices->shape[0]},
+                                      DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    int64_t *edge_data = static_cast<int64_t *>(edge_ids->data);
+    for (size_t i = 0; i < edge_ids->shape[0]; i++)
+      edge_data[i] = i;
     if (shared_mem_name.empty())
       // TODO(minjie): The array copy here is unnecessary and adds extra overhead.
       //   However, with MXNet backend, the memory would be corrupted if we directly

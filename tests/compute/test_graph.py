@@ -43,6 +43,20 @@ def scipy_csr_input():
     # dst = [4 6 9 3 5 3 7 5 8 1 3 4 9 1 9 6 2 8 9 2]
     return csr
 
+# Need to test more thoroughly about creation with csr edge ids
+# pasted from #560 #561
+#def test_edge_ids():
+#    np.random.seed(0)
+#    csr = (spsp.random(20, 20, density=0.1, format='csr') != 0).astype(np.int64)
+#    #csr = csr.transpose()
+#    g = dgl.DGLGraph(csr, readonly=True)
+#    num_nodes = g.number_of_nodes()
+#    in_edges = g._graph.in_edges(v=dgl.utils.toindex([2]))
+#    src, dst, eids = g._graph.edge_ids(dgl.utils.toindex(in_edges[0]),
+#                                       dgl.utils.toindex(in_edges[1]))
+#    assert np.all(in_edges[0].tonumpy() == src.tonumpy())
+#    assert np.all(in_edges[1].tonumpy() == dst.tonumpy())
+
 def gen_by_mutation():
     g = dgl.DGLGraph()
     src, dst = edge_pair_input()
