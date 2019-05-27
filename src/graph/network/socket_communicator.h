@@ -96,7 +96,7 @@ class SocketSender : public Sender {
   /*!
    * \brief data buffer
    */ 
-  char* buffer_;
+  char* buffer_ = nullptr;
 };
 
 /*!
@@ -174,7 +174,7 @@ class SocketReceiver : public Receiver {
   /*!
    * \brief data buffer
    */ 
-  char* buffer_;
+  char* buffer_ = nullptr;
 
   /*!
    * \brief Process received message in independent threads

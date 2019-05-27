@@ -68,3 +68,16 @@ target_link_libraries(dgl ${DGL_LINKER_LIBS} ${DGL_RUNTIME_LINKER_LIBS})
 
 # Installation rules
 install(TARGETS dgl DESTINATION lib${LIB_SUFFIX})
+
+# Testing
+if(BUILD_CPP_TEST)
+  message("Build with unittest")
+  add_subdirectory(./third_party/googletest)
+  enable_testing()
+  include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
+  file(GLOB_RECURSE TEST_SRC_FILES ${PROJECT_SOURCE_DIR}/tests/cpp/*.cc)
+  add_executable(runUnitTests ${TEST_SRC_FILES})
+  target_link_libraries(runUnitTests gtest gtest_main)
+  target_link_libraries(runUnitTests dgl)
+  add_test(UnitTests runUnitTests)
+endif(BUILD_CPP_TEST)
