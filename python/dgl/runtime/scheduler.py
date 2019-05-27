@@ -640,8 +640,9 @@ def schedule_bipartite_pull(graph,
         var_v = var.IDX(v)
         var_eid = var.IDX(eid)
         # generate send and reduce schedule
+        num_src = graph._number_of_nodes(0)
         uv_getter = lambda: (var_u, var_v)
-        adj_creator = lambda: spmv.build_adj_matrix_uv((u, v), pull_nodes, graph._number_of_nodes(0))
+        adj_creator = lambda: spmv.build_adj_matrix_uv((u, v), pull_nodes, num_src)
         inc_creator = lambda: spmv.build_inc_matrix_dst(v, pull_nodes)
         reduced_feat = _gen_send_reduce(graph, graph._get_node_frame(0), graph._get_node_frame(1),
                                         graph._get_edge_frame(0), message_func, reduce_func,

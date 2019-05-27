@@ -1,17 +1,14 @@
 """Bipartite graph class specialized for neural networks on graphs."""
-import numpy as np
-from scipy import sparse as spsp
-
 from .graph_index import create_bigraph_index
 from .heterograph import DGLHeteroGraph
 from .base import ALL, is_all
 from . import backend as F
-from .frame import FrameRef, Frame, Scheme
+from .frame import FrameRef, Frame
 from .view import HeteroEdgeView, HeteroNodeView
 from . import utils
 from .runtime import ir, scheduler, Runtime
 
-__all__ = ['DGLGraph']
+__all__ = ['DGLBipartiteGraph']
 
 class DGLBipartiteGraph(DGLHeteroGraph):
     """Bipartite graph class.
@@ -1082,18 +1079,18 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         if isinstance(edges, tuple):
             u, v = edges
             u = utils.toindex(u)
-            gv = self._to_dst_index(v)
+            global_vid = self._to_dst_index(v)
             # Rewrite u, v to handle edge broadcasting and multigraph.
-            u, gv, eid = self._graph.edge_ids(u, gv)
+            u, global_vid, eid = self._graph.edge_ids(u, global_vid)
         else:
             eid = utils.toindex(edges)
-            u, gv, _ = self._graph.find_edges(eid)
+            u, global_vid, _ = self._graph.find_edges(eid)
 
         if len(u) == 0:
             # no edges to be triggered
             return
 
-        v = utils.toindex(gv.tousertensor() - self._number_of_nodes(0))
+        v = utils.toindex(global_vid.tousertensor() - self._number_of_nodes(0))
         with ir.prog() as prog:
             scheduler.schedule_bipartite_snr(graph=self,
                                              edge_tuples=(u, v, eid),
