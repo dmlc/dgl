@@ -3,6 +3,7 @@ import backend as F
 import networkx as nx
 import numpy as np
 import scipy as sp
+from scipy import sparse as spsp
 import dgl
 from dgl.graph_index import map_to_subgraph_nid, GraphIndex, create_graph_index
 from dgl import utils
@@ -160,7 +161,7 @@ def test_load_csr():
 
     # Load CSR normally.
     idx = dgl.graph_index.GraphIndex(multigraph=False, readonly=True)
-    idx.from_csr_matrix(csr.indptr, csr.indices, 'out')
+    idx.from_csr_matrix(utils.toindex(csr.indptr), utils.toindex(csr.indices), 'out')
     assert idx.number_of_nodes() == n
     assert idx.number_of_edges() == csr.nnz
     src, dst, eid = idx.edges()
@@ -173,7 +174,8 @@ def test_load_csr():
     # Shared memory isn't supported in Windows.
     if os.name is not 'nt':
         idx = dgl.graph_index.GraphIndex(multigraph=False, readonly=True)
-        idx.from_csr_matrix(csr.indptr, csr.indices, 'out', '/test_graph_struct')
+        idx.from_csr_matrix(utils.toindex(csr.indptr), utils.toindex(csr.indices),
+                            'out', '/test_graph_struct')
         assert idx.number_of_nodes() == n
         assert idx.number_of_edges() == csr.nnz
         src, dst, eid = idx.edges()
@@ -182,8 +184,21 @@ def test_load_csr():
         assert np.all(F.asnumpy(src) == coo.row)
         assert np.all(F.asnumpy(dst) == coo.col)
 
+def test_edge_ids():
+    np.random.seed(0)
+    csr = (spsp.random(20, 20, density=0.1, format='csr') != 0).astype(np.int64)
+    #csr = csr.transpose()
+    g = dgl.DGLGraph(csr, readonly=True)
+    num_nodes = g.number_of_nodes()
+    in_edges = g._graph.in_edges(v=dgl.utils.toindex([2]))
+    src, dst, eids = g._graph.edge_ids(dgl.utils.toindex(in_edges[0]),
+                                       dgl.utils.toindex(in_edges[1]))
+    assert np.all(in_edges[0].tonumpy() == src.tonumpy())
+    assert np.all(in_edges[1].tonumpy() == dst.tonumpy())
+
 if __name__ == '__main__':
     test_basics()
+    test_edge_ids()
     test_graph_gen()
     test_node_subgraph()
     test_create_graph()
