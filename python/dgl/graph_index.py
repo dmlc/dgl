@@ -1247,6 +1247,67 @@ class BiGraphIndex(GraphIndex):
         else:
             raise Exception("unknown format")
 
+    @utils.cached_member(cache='_cache', prefix='inc')
+    def incidence_matrix(self, typestr, ctx):
+        """Return the incidence matrix representation of this graph.
+
+        An incidence matrix is an n x m sparse matrix, where n is
+        the number of nodes and m is the number of edges. Each nnz
+        value indicating whether the edge is incident to the node
+        or not.
+
+        There are three types of an incidence matrix `I`:
+        * "in":
+          - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
+          - I[v, e] = 0 otherwise.
+        * "out":
+          - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
+          - I[v, e] = 0 otherwise.
+
+        Parameters
+        ----------
+        typestr : str
+            Can be either "in" or "out"
+        ctx : context
+            The context of returned incidence matrix.
+
+        Returns
+        -------
+        SparseTensor
+            The incidence matrix.
+        utils.Index
+            A index for data shuffling due to sparse format change. Return None
+            if shuffle is not required.
+        """
+        src, dst, eid = self.edges()
+        src = src.tousertensor(ctx)  # the index of the ctx will be cached
+        dst = dst.tousertensor(ctx)  # the index of the ctx will be cached
+        eid = eid.tousertensor(ctx)  # the index of the ctx will be cached
+        m = self.number_of_edges()
+        if typestr == 'in':
+            n = self._num_nodes[1]
+            dst = dst - self._num_nodes[0]
+            print(dst)
+            print(eid)
+            row = F.unsqueeze(dst, 0)
+            col = F.unsqueeze(eid, 0)
+            idx = F.cat([row, col], dim=0)
+            # FIXME(minjie): data type
+            dat = F.ones((m,), dtype=F.float32, ctx=ctx)
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
+        elif typestr == 'out':
+            n = self._num_nodes[0]
+            row = F.unsqueeze(src, 0)
+            col = F.unsqueeze(eid, 0)
+            idx = F.cat([row, col], dim=0)
+            # FIXME(minjie): data type
+            dat = F.ones((m,), dtype=F.float32, ctx=ctx)
+            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
+        else:
+            raise DGLError('Invalid incidence matrix type: %s' % str(typestr))
+        shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
+        return inc, shuffle_idx
+
 
 def create_bigraph_index(graph_data=None, num_nodes=(0, 0), multigraph=False, readonly=False):
     """Create a graph index object.
