@@ -616,12 +616,12 @@ class DGLBipartiteGraph(DGLHeteroGraph):
             # update row
             self._edge_frames[etype].update_rows(eid, data, inplace=inplace)
 
-    def get_e_repr(self, etype, edges=ALL):
+    def get_e_repr(self, etype=ALL, edges=ALL):
         """Get edge(s) representation.
 
         Parameters
         ----------
-        etype : tuple[str, str, str]
+        etype : tuple[str, str, str], optional
             The edge type, characterized by a triplet of source type name,
             destination type name, and edge type name.
         edges : edges
@@ -633,6 +633,9 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         dict
             Representation dict
         """
+        if is_all(etype):
+            etype = self._etype
+
         if len(self.edge_attr_schemes(self._etype)) == 0:
             return dict()
         # parse argument
@@ -983,6 +986,24 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         """
         raise Exception("bipartite graph doesn't support recv for now")
 
+    def _get_func(self, message_func, reduce_func, apply_node_func):
+        if message_func == "default":
+            if self._etype in self._message_funcs:
+                message_func = self._message_funcs[self._etype]
+            else:
+                message_func = None
+        if reduce_func == "default":
+            if self._ntypes[1] in self._reduce_funcs:
+                reduce_func = self._reduce_funcs[self._ntypes[1]]
+            else:
+                reduce_func = None
+        if apply_node_func == "default":
+            if self._ntypes[1] in self._apply_node_funcs:
+                apply_node_func = self._apply_node_funcs[self._ntypes[1]]
+            else:
+                apply_node_func = None
+        return message_func, reduce_func, apply_node_func
+
     def send_and_recv(self,
                       edges,
                       message_func="default",
@@ -1052,13 +1073,8 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         * the edge type of ``edges``, ``message_func`` and ``reduce_func``
           must also be the same.
         """
-        if message_func == "default":
-            message_func = self._message_funcs[self._etype]
-        if reduce_func == "default":
-            reduce_func = self._reduce_funcs[self._ntypes[1]]
-        if apply_node_func == "default":
-            apply_node_func = self._apply_node_funcs[self._ntypes[1]]
-
+        message_func, reduce_func, apply_node_func = self._get_func(message_func, reduce_func,
+                                                                    apply_node_func)
         assert message_func is not None
         assert reduce_func is not None
 
@@ -1151,13 +1167,8 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         * the edge type of ``message_func`` and ``reduce_func`` must also be
           the same.
         """
-        if message_func == "default":
-            message_func = self._message_funcs[self._etype]
-        if reduce_func == "default":
-            reduce_func = self._reduce_funcs[self._ntypes[1]]
-        if apply_node_func == "default":
-            apply_node_func = self._apply_node_funcs[self._ntypes[1]]
-
+        message_func, reduce_func, apply_node_func = self._get_func(message_func, reduce_func,
+                                                                    apply_node_func)
         assert message_func is not None
         assert reduce_func is not None
 
@@ -1290,12 +1301,8 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         * the edge type of ``message_func`` and ``reduce_func`` must also be
           the same.
         """
-        if message_func == "default":
-            message_func = self._message_funcs[self._etype]
-        if reduce_func == "default":
-            reduce_func = self._reduce_funcs[self._ntypes[1]]
-        if apply_node_func == "default":
-            apply_node_func = self._apply_node_funcs[self._ntypes[1]]
+        message_func, reduce_func, apply_node_func = self._get_func(message_func, reduce_func,
+                                                                    apply_node_func)
         assert message_func is not None
         assert reduce_func is not None
 

@@ -241,8 +241,8 @@ def schedule_update_all(graph,
         def uv_getter():
             src, dst, _ = graph._graph.edges('eid')
             return var.IDX(src), var.IDX(dst)
-        adj_creator = lambda: spmv.build_bipartite_adj_matrix_graph(graph)
-        inc_creator = lambda: spmv.build_bipartite_inc_matrix_graph(graph)
+        adj_creator = lambda: spmv.build_adj_matrix_graph(graph)
+        inc_creator = lambda: spmv.build_inc_matrix_graph(graph)
         reduced_feat = _gen_send_reduce(graph, graph._node_frame, graph._node_frame,
                                         graph._edge_frame, message_func, reduce_func,
                                         var_eid, var_recv_nodes,
@@ -285,7 +285,9 @@ def schedule_bipartite_update_all(graph,
         def uv_getter():
             src, dst = graph.all_edges(order='eid')
             return var.IDX(utils.toindex(src)), var.IDX(utils.toindex(dst))
+        # The adjacency matrix creator for a bipartite graph is the same as a regular graph.
         adj_creator = lambda: spmv.build_adj_matrix_graph(graph)
+        # The incidence matrix creator for a bipartite graph is the same as a regular graph.
         inc_creator = lambda: spmv.build_inc_matrix_graph(graph)
         reduced_feat = _gen_send_reduce(graph, graph._get_node_frame(0), graph._get_node_frame(1),
                                         graph._get_edge_frame(0), message_func, reduce_func,
@@ -639,7 +641,7 @@ def schedule_bipartite_pull(graph,
         var_eid = var.IDX(eid)
         # generate send and reduce schedule
         uv_getter = lambda: (var_u, var_v)
-        adj_creator = lambda: spmv.build_adj_matrix_uv((u, v), pull_nodes, graph.number_of_nodes())
+        adj_creator = lambda: spmv.build_adj_matrix_uv((u, v), pull_nodes, graph._number_of_nodes(0))
         inc_creator = lambda: spmv.build_inc_matrix_dst(v, pull_nodes)
         reduced_feat = _gen_send_reduce(graph, graph._get_node_frame(0), graph._get_node_frame(1),
                                         graph._get_edge_frame(0), message_func, reduce_func,

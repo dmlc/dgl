@@ -486,5 +486,4 @@ if __name__ == '__main__':
     test_apply_nodes()
     test_apply_edges()
     test_update_routines()
-    #TODO(zhengda) test builtin
 
