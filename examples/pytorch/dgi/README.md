@@ -20,15 +20,15 @@ How to run
 Run with following:
 
 ```bash
-python train.py --dataset=cora --gpu=0 --self-loop
+python3 train.py --dataset=cora --gpu=0 --self-loop
 ```
 
 ```bash
-python train.py --dataset=citeseer --gpu=0
+python3 train.py --dataset=citeseer --gpu=0
 ```
 
 ```bash
-python train.py --dataset=pubmed --gpu=0
+python3 train.py --dataset=pubmed --gpu=0
 ```
 
 Results

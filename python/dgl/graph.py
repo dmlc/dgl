@@ -910,7 +910,7 @@ class DGLGraph(DGLBaseGraph):
             self._edge_frame = edge_frame
         # message indicator:
         # if self._msg_index[eid] == 1, then edge eid has message
-        self._msg_index = utils.zero_index(size=self.number_of_edges())
+        self._msg_index = None
         # message frame
         self._msg_frame = FrameRef(Frame(num_rows=self.number_of_edges()))
         # set initializer for message frame
@@ -920,6 +920,14 @@ class DGLGraph(DGLBaseGraph):
         self._reduce_func = None
         self._apply_node_func = None
         self._apply_edge_func = None
+
+    def _get_msg_index(self):
+        if self._msg_index is None:
+            self._msg_index = utils.zero_index(size=self.number_of_edges())
+        return self._msg_index
+
+    def _set_msg_index(self, index):
+        self._msg_index = index
 
     def add_nodes(self, num, data=None):
         """Add multiple new nodes.
@@ -1026,7 +1034,8 @@ class DGLGraph(DGLBaseGraph):
         else:
             self._edge_frame.append(data)
         # resize msg_index and msg_frame
-        self._msg_index = self._msg_index.append_zeros(1)
+        if self._msg_index is not None:
+            self._msg_index = self._msg_index.append_zeros(1)
         self._msg_frame.add_rows(1)
 
     def add_edges(self, u, v, data=None):
@@ -1086,7 +1095,8 @@ class DGLGraph(DGLBaseGraph):
         else:
             self._edge_frame.append(data)
         # initialize feature placeholder for messages
-        self._msg_index = self._msg_index.append_zeros(num)
+        if self._msg_index is not None:
+            self._msg_index = self._msg_index.append_zeros(num)
         self._msg_frame.add_rows(num)
 
     def clear(self):
@@ -1111,7 +1121,7 @@ class DGLGraph(DGLBaseGraph):
         self._graph.clear()
         self._node_frame.clear()
         self._edge_frame.clear()
-        self._msg_index = utils.zero_index(0)
+        self._msg_index = None
         self._msg_frame.clear()
 
     def clear_cache(self):
@@ -1218,7 +1228,6 @@ class DGLGraph(DGLBaseGraph):
         self._graph.from_networkx(nx_graph)
         self._node_frame.add_rows(self.number_of_nodes())
         self._edge_frame.add_rows(self.number_of_edges())
-        self._msg_index = utils.zero_index(self.number_of_edges())
         self._msg_frame.add_rows(self.number_of_edges())
 
         # copy attributes
@@ -1285,7 +1294,6 @@ class DGLGraph(DGLBaseGraph):
         self._graph.from_scipy_sparse_matrix(spmat)
         self._node_frame.add_rows(self.number_of_nodes())
         self._edge_frame.add_rows(self.number_of_edges())
-        self._msg_index = utils.zero_index(self.number_of_edges())
         self._msg_frame.add_rows(self.number_of_edges())
 
     def node_attr_schemes(self):
