@@ -27,6 +27,10 @@ class GraphIndex(object):
     ----------
     handle : GraphIndexHandle
         Handler
+    multigraph : bool, optional
+        whether the graph is a multigraph
+    readonly : bool, optional
+        whether the graph is readonly.
     """
     def __init__(self, handle):
         self._handle = handle
@@ -1148,7 +1152,20 @@ def create_graph_index(graph_data, multigraph, readonly):
         return gidx
 
 class BiGraphIndex(GraphIndex):
-    def __init__(self, handle=None, num_nodes=[0, 0], multigraph=None, readonly=None):
+    """Bipartite graph index object.
+
+    Parameters
+    ----------
+    handle : GraphIndexHandle
+        Handler
+    num_nodes : tuple
+        The number of nodes of each type.
+    multigraph : bool, optional
+        whether the graph is a multigraph
+    readonly : bool, optional
+        whether the graph is readonly.
+    """
+    def __init__(self, handle=None, num_nodes=(0, 0), multigraph=None, readonly=None):
         super(BiGraphIndex, self).__init__(handle, multigraph, readonly)
         self._num_nodes = num_nodes
 
@@ -1168,7 +1185,7 @@ class BiGraphIndex(GraphIndex):
         """
         assert self.is_readonly()
         indptr = utils.toindex(indptr)
-        assert(len(indptr) == self._num_nodes[0] + self._num_nodes[1] + 1)
+        assert len(indptr) == self._num_nodes[0] + self._num_nodes[1] + 1
         indices = utils.toindex(indices)
         edge_ids = utils.toindex(F.arange(0, len(indices)))
         self._handle = _CAPI_DGLBiGraphCSRCreate(
@@ -1229,7 +1246,7 @@ class BiGraphIndex(GraphIndex):
             indptr = utils.toindex(rst(0)).tonumpy()
             indices = utils.toindex(rst(1)).tonumpy()
             shuffle = utils.toindex(rst(2)).tonumpy()
-            assert len(indptr) ==  nrows + 1
+            assert len(indptr) == nrows + 1
             return scipy.sparse.csr_matrix((shuffle, indices, indptr), shape=(nrows, ncols))
         elif fmt == 'coo':
             idx = utils.toindex(rst(0)).tonumpy()
@@ -1371,7 +1388,6 @@ def create_bigraph_index(graph_data=None, num_nodes=(0, 0), multigraph=False, re
     if isinstance(graph_data, list) or isinstance(graph_data, tuple):
         assert len(graph_data) == 2
         src_nodes, dst_nodes = graph_data
-        num_edges = len(src_nodes)
         dst_nodes = dst_nodes + num_nodes[0]
         src_nodes = utils.toindex(src_nodes)
         dst_nodes = utils.toindex(dst_nodes)

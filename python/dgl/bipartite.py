@@ -1,3 +1,4 @@
+"""Bipartite graph class specialized for neural networks on graphs."""
 import numpy as np
 from scipy import sparse as spsp
 
@@ -1620,7 +1621,8 @@ class DGLBipartiteGraph(DGLHeteroGraph):
                 else:
                     raise Exception("The subgraph view doesn't exist")
             elif len(key) == 3:
-                if key[0] == self._ntypes[0] and key[1] == self._ntypes[1] and key[2] == self._etype:
+                if key[0] == self._ntypes[0] and key[1] == self._ntypes[1] \
+                   and key[2] == self._etype:
                     return self
                 else:
                     raise Exception("The subgraph view doesn't exist")
