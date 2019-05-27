@@ -1499,7 +1499,8 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         SparseTensor
             The incidence matrix.
         """
-        pass
+        assert etype == self._etype
+        return self._graph.incidence_matrix(typestr, ctx)[0]
 
     def filter_nodes(self, ntype, predicate, nodes=ALL):
         """Return a tensor of node IDs with the given node type that satisfy
