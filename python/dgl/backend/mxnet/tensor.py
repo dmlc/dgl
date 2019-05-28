@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import numpy as np
 import mxnet as mx
+print(mx.__version__)
 import mxnet.ndarray as nd
 import numbers
 from ... import ndarray as dglnd
