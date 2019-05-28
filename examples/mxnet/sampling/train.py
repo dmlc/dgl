@@ -24,14 +24,14 @@ def main(args):
     if args.self_loop and not args.dataset.startswith('reddit'):
         data.graph.add_edges_from([(i,i) for i in range(len(data.graph))])
 
-    train_nid = mx.nd.array(np.nonzero(data.train_mask)[0]).astype(np.int64).as_in_context(ctx)
-    test_nid = mx.nd.array(np.nonzero(data.test_mask)[0]).astype(np.int64).as_in_context(ctx)
+    train_nid = mx.nd.array(np.nonzero(data.train_mask)[0]).astype(np.int64)
+    test_nid = mx.nd.array(np.nonzero(data.test_mask)[0]).astype(np.int64)
 
-    features = mx.nd.array(data.features).as_in_context(ctx)
-    labels = mx.nd.array(data.labels).as_in_context(ctx)
-    train_mask = mx.nd.array(data.train_mask).as_in_context(ctx)
-    val_mask = mx.nd.array(data.val_mask).as_in_context(ctx)
-    test_mask = mx.nd.array(data.test_mask).as_in_context(ctx)
+    features = mx.nd.array(data.features)
+    labels = mx.nd.array(data.labels)
+    train_mask = mx.nd.array(data.train_mask)
+    val_mask = mx.nd.array(data.val_mask)
+    test_mask = mx.nd.array(data.test_mask)
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
@@ -59,9 +59,9 @@ def main(args):
     if args.model == "gcn_ns":
         gcn_ns_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples)
     elif args.model == "gcn_cv":
-        gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples)
+        gcn_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples, False)
     elif args.model == "graphsage_cv":
-        graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples)
+        graphsage_cv_train(g, ctx, args, n_classes, train_nid, test_nid, n_test_samples, False)
     else:
         print("unknown model. Please choose from gcn_ns, gcn_cv, graphsage_cv")
 

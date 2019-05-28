@@ -120,7 +120,7 @@ class RGCNEntityDataset(object):
                 self.test_idx = node_map[self.test_idx]
                 print("{} nodes left".format(self.num_nodes))
         else:
-            self.src, self.dst, self.edge_type = edges.transpose()
+            self.edge_src, self.edge_dst, self.edge_type = edges.transpose()
 
         # normalize by dst degree
         _, inverse_index, count = np.unique((self.edge_dst, self.edge_type), axis=1, return_inverse=True, return_counts=True)

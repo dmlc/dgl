@@ -22,7 +22,7 @@ Results
 
 Run with following (available dataset: "cora", "citeseer", "pubmed")
 ```bash
-python train.py --dataset cora --gpu 0
+python3 train.py --dataset cora --gpu 0
 ```
 
 * cora: 0.8370 (paper: 0.850)
