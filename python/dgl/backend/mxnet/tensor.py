@@ -1,5 +1,7 @@
 from __future__ import absolute_import
 
+from distutils.version import LooseVersion
+
 import numpy as np
 import mxnet as mx
 print(mx.__version__)
@@ -7,6 +9,12 @@ import mxnet.ndarray as nd
 import numbers
 from ... import ndarray as dglnd
 from ... import kernel as K
+
+MX_VERSION = LooseVersion(mx.__version__)
+# After MXNet 1.5, empty tensors aren't supprted by default.
+# after we turn on the numpy compatible flag, MXNet supports empty NDArray.
+if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] >= 5:
+    mx.set_np_compat(True)
 
 def data_type_dict():
     return {'float16' : np.float16,
