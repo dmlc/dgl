@@ -134,7 +134,10 @@ pipeline {
               agent {
                 docker {image "dgllib/dgl-ci-cpu"}
               }
-              steps { cpp_unit_test_linux() }
+              steps { 
+                init_git_submodule()
+                cpp_unit_test_linux() 
+              }
             }
             stage("CPP Unit Test Windows"){
               agent {
