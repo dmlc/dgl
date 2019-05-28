@@ -1,7 +1,3 @@
-# Currently readonly graph construction only accepts sparse tensor in MXNet,
-# and pytorch doesn't support readonly graph or graph creation from sparse
-# tensor.  For now, readonly graph test is postponed until we have better
-# readonly graph support.
 import backend as F
 import dgl
 import networkx as nx

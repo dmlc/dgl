@@ -9,8 +9,6 @@ import dgl.function as fn
 import pickle
 import io
 
-import torch
-
 def _assert_is_identical(g, g2):
     assert g.is_multigraph == g2.is_multigraph
     assert g.is_readonly == g2.is_readonly

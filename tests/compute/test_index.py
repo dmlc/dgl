@@ -68,7 +68,7 @@ def test_index():
     assert np.allclose(ans, y2)
     assert np.allclose(ans, y3)
 
-    # from torch
+    # from dl tensor
     data = F.ones((10,), dtype=F.int64) * 10
     idx = toindex(data)
     y1 = idx.tonumpy()
