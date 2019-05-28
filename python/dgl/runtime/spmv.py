@@ -182,10 +182,10 @@ def _build_adj_matrix_index_uv(u, v, num_src, num_dst):
     inv_csr = sp.csr_matrix((dat, (v, u)), shape=(num_dst, num_src))
     spmat = (csr.indptr.astype(np.int32),
              csr.indices.astype(np.int32),
-             csr.data,
+             csr.data.astype(np.int64),
              inv_csr.indptr.astype(np.int32),
              inv_csr.indices.astype(np.int32),
-             inv_csr.data)
+             inv_csr.data.astype(np.int64))
     spmat = list(map(F.zerocopy_from_numpy, spmat))
     return spmat
 

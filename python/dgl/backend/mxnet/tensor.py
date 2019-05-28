@@ -244,7 +244,7 @@ def zerocopy_from_numpy(np_data):
     # NOTE: not zerocopy
     return nd.array(np_data, dtype=np_data.dtype)
 
-def zerocopy_to_dgl_ndarray_for_read(arr):
+def zerocopy_to_dgl_ndarray(arr):
     return dglnd.from_dlpack(arr.to_dlpack_for_read())
 
 def zerocopy_to_dgl_ndarray_for_write(arr):
@@ -272,8 +272,8 @@ class SrcOpEdgeReduce(mx.autograd.Function):
             self.backward_out_map = out_map
 
     def forward(self, src_data, edge_data):
-        src_data_nd = zerocopy_to_dgl_ndarray_for_read(src_data)
-        edge_data_nd = zerocopy_to_dgl_ndarray_for_read(edge_data)
+        src_data_nd = zerocopy_to_dgl_ndarray(src_data)
+        edge_data_nd = zerocopy_to_dgl_ndarray(edge_data)
         feat_shape = K.infer_binary_feature_shape(src_data_nd, edge_data_nd)
         out_data = nd.empty((self.out_size,) + feat_shape,
                             ctx=src_data.context, dtype=src_data.dtype)
@@ -288,7 +288,7 @@ class SrcOpEdgeReduce(mx.autograd.Function):
 
     def backward(self, grad_out):
         src_data_nd, edge_data_nd, out_data_nd, feat_shape = self.saved_tensors
-        grad_out_nd = zerocopy_to_dgl_ndarray_for_read(grad_out)
+        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         grad_src = nd.empty((src_data_nd.shape[0],) + feat_shape,
                             ctx=grad_out.context, dtype=grad_out.dtype)
         K.backward_lhs_src_mul_edge_reduce(
@@ -318,8 +318,8 @@ def src_op_edge_reduce(reducer, binary_op, spmat, src_data, edge_data,
 class SrcOpDstReduce(mx.autograd.Function):
     def forward(self, reducer, binary_op, spmat, src_data, dst_data, out_size,
                 src_map, dst_map, out_map):
-        src_data_nd = zerocopy_to_dgl_ndarray_for_read(src_data)
-        dst_data_nd = zerocopy_to_dgl_ndarray_for_read(dst_data)
+        src_data_nd = zerocopy_to_dgl_ndarray(src_data)
+        dst_data_nd = zerocopy_to_dgl_ndarray(dst_data)
         feat_shape = K.infer_binary_feature_shape(src_data_nd, dst_data_nd)
         out_data = nd.empty((out_size,) + feat_shape, ctx=src_data.context,
                             dtype=src_data.dtype)
@@ -346,7 +346,7 @@ class SrcOpDstReduce(mx.autograd.Function):
         self.backward_cache = None
         grad_src = None
         grad_dst = None
-        grad_out_nd = zerocopy_to_dgl_ndarray_for_read(grad_out)
+        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         if self.needs_input_grad[3]:
             grad_src = nd.empty((src_data_nd.shape[0],) + feat_shape,
                                 ctx=grad_out.context, dtype=grad_out.dtype)
@@ -393,7 +393,7 @@ class CopySrcReduce(mx.autograd.Function):
         feat_shape = src_data.shape[1:]
         out_data = nd.empty((self.out_size,) + feat_shape,
                             ctx=src_data.context, dtype=src_data.dtype)
-        src_data_nd = zerocopy_to_dgl_ndarray_for_read(src_data)
+        src_data_nd = zerocopy_to_dgl_ndarray(src_data)
         out_data_nd = zerocopy_to_dgl_ndarray_for_write(out_data)
         K.copy_src_reduce(
             self.reducer, self.spmat[0], self.spmat[1], self.spmat[2],
@@ -404,7 +404,7 @@ class CopySrcReduce(mx.autograd.Function):
 
     def backward(self, grad_out):
         src_data_nd, out_data_nd = self.saved_tensors
-        grad_out_nd = zerocopy_to_dgl_ndarray_for_read(grad_out)
+        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         grad_src = nd.empty(src_data_nd.shape, ctx=grad_out.context,
                             dtype=grad_out.dtype)
         K.backward_copy_src_reduce(
@@ -438,7 +438,7 @@ class CopyEdgeReduce(mx.autograd.Function):
         feat_shape = edge_data.shape[1:]
         out_data = nd.empty((self.out_size,) + feat_shape,
                             ctx=edge_data.context, dtype=edge_data.dtype)
-        edge_data_nd = zerocopy_to_dgl_ndarray_for_read(edge_data)
+        edge_data_nd = zerocopy_to_dgl_ndarray(edge_data)
         out_data_nd = zerocopy_to_dgl_ndarray_for_write(out_data)
         K.copy_edge_reduce(
             self.reducer, self.spmat[0], self.spmat[1], self.spmat[2],
@@ -449,7 +449,7 @@ class CopyEdgeReduce(mx.autograd.Function):
 
     def backward(self, grad_out):
         edge_data_nd, out_data_nd = self.saved_tensors
-        grad_out_nd = zerocopy_to_dgl_ndarray_for_read(grad_out)
+        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         grad_edge = nd.empty(edge_data_nd.shape, ctx=grad_out.context,
                              dtype=grad_out.dtype)
         K.backward_copy_edge_reduce(
