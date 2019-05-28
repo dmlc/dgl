@@ -107,7 +107,7 @@ def _test_src_op_dst_reduce():
         n1 = g.ndata['n'].detach().requires_grad_()
         f1 = g.ndata['f'].detach().requires_grad_()
         u, v = g.all_edges('uv')
-        u, v = u.cuda(), v.cuda()
+        u, v = F.tensor(u), F.tensor(v)
         msg = n1[u] * f1[v]
         r2 = udf_reduce[red](msg, v, dim=0, fill_value=fill_value[red])
         assert F.allclose(r1, r2)
