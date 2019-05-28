@@ -193,7 +193,7 @@ void CallBinaryReduceBcast(
       const minigun::Csr& rev_csr,                                       \
       BcastGData<ndim, dtype>* gdata);
 
-#define EVAL(F, ...) MSVC_EXPAND(F(__VA_ARGS__))
+#define EVAL(F, ...) F(__VA_ARGS__)
 
 }  // namespace kernel
 }  // namespace dgl
