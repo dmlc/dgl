@@ -4,9 +4,9 @@ SETLOCAL EnableDelayedExpansion
 IF x%1x==xx (
 	ECHO Must supply CPU or GPU
 	GOTO :FAIL
-) ELSE IF x%1x==xCPUx (
+) ELSE IF x%1x==xcpux (
 	SET DEV=-1
-) ELSE IF x%1x==xGPUx (
+) ELSE IF x%1x==xgpux (
 	SET DEV=0
 	SET CUDA_VISIBLE_DEVICES=0
 ) ELSE (
