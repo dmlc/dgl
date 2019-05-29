@@ -159,7 +159,7 @@ pipeline {
           }
           stages {
             stage("TH GPU unittest") {
-              steps { unit_test("cuda") }
+              steps { unit_test("pytorch", "cuda") }
             }
             stage("TH GPU example test") {
               steps { example_test("pytorch", "cuda") }
