@@ -68,6 +68,11 @@ class GraphIndex(object):
             int(num_nodes),
             self._readonly)
 
+    @property
+    def handle(self):
+        """Get the CAPI handle."""
+        return self._handle
+
     def add_nodes(self, num):
         """Add nodes.
 

@@ -1,5 +1,7 @@
 """Module for graph transformation methods."""
+from ._ffi.function import _init_api
 from .graph import DGLGraph
+from .graph_index import GraphIndex
 from .batched_graph import BatchedDGLGraph
 
 __all__ = ['line_graph', 'reverse']
@@ -103,3 +105,23 @@ def reverse(g, share_ndata=False, share_edata=False):
     if share_edata:
         g_reversed._edge_frame = g._edge_frame
     return g_reversed
+
+def to_simple_graph(g):
+    """Convert the graph to a simple graph with no multi-edge.
+
+    The function generates a new *readonly* graph with no node/edge feature.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+
+    Returns
+    -------
+    DGLGraph
+        A simple graph.
+    """
+    newgidx = GraphIndex(_CAPI_DGLToSimpleGraph(g._graph.handle))
+    return DGLGraph(newgidx, readonly=True)
+
+_init_api("dgl.transform")

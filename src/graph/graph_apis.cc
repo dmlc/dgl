@@ -507,4 +507,12 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetAdj")
     *rv = ConvertAdjToPackedFunc(res);
   });
 
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLToSimpleGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+    GraphHandle ret = GraphOp::ToSimpleGraph(ptr).Reset();
+    *rv = ret;
+  });
+
 }  // namespace dgl

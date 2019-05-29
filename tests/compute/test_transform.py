@@ -84,9 +84,14 @@ def test_reverse_shared_frames():
     rg.update_all(src_msg, sum_reduce)
     assert F.allclose(g.ndata['h'], rg.ndata['h'])
 
+def test_simple_graph():
+    elist = [(0, 1), (0, 2), (1, 2), (0, 1)]
+    g = dgl.DGLGraph(elist)
+    assert g.is_multigraph
 
 if __name__ == '__main__':
     test_line_graph()
     test_no_backtracking()
     test_reverse()
     test_reverse_shared_frames()
+    test_simple_graph()
