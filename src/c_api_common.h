@@ -12,6 +12,16 @@
 #include <algorithm>
 #include <vector>
 
+namespace {
+inline bool operator == (const DLContext& ctx1, const DLContext& ctx2) {
+  return ctx1.device_type == ctx2.device_type && ctx1.device_id == ctx2.device_id;
+}
+
+inline std::ostream& operator << (std::ostream& os, const DLContext& ctx) {
+  return os << "" << ctx.device_type << ":" << ctx.device_id << "";
+}
+}  // namespace
+
 namespace dgl {
 
 // Graph handler type

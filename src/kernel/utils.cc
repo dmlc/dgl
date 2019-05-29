@@ -3,8 +3,6 @@
  * \file kernel/utils.cc
  * \brief Kernel utilities
  */
-#include <minigun/csr.h>
-
 #include <vector>
 #include <string>
 
@@ -49,15 +47,6 @@ int64_t Prod(const std::vector<int64_t>& vec) {
     ret *= v;
   }
   return ret;
-}
-
-minigun::Csr CreateCsr(runtime::NDArray indptr, runtime::NDArray indices) {
-  minigun::Csr csr;
-  csr.row_offsets.data = static_cast<mg_int*>(indptr->data);
-  csr.row_offsets.length = indptr->shape[0];
-  csr.column_indices.data = static_cast<mg_int*>(indices->data);
-  csr.column_indices.length = indices->shape[0];
-  return csr;
 }
 
 }  // namespace utils

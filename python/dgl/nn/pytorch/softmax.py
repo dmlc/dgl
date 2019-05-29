@@ -1,9 +1,11 @@
 """Torch modules for graph related softmax."""
 # pylint: disable= no-member, arguments-differ
+import torch as th
+
 from ... import ndarray as nd
 from ... import backend as F
 from ... import utils
-
+from ... import function as fn
 
 __all__ = ['EdgeSoftmax']
 
@@ -81,3 +83,54 @@ class EdgeSoftmax(object):
         norm = F.copy_edge_reduce("sum", spmat, logits, num_nodes,
                                   (edge_map, inv_edge_map), out_map)
         return logits, norm
+
+class EdgeSoftmax1(th.autograd.Function):
+    @staticmethod
+    def forward(ctx, g, score):
+        """
+        score = dgl.EData(g, score)
+        score_max = score.dst_max()  # of type dgl.NData
+        score = score - score_max  # edge_sub_dst, ret dgl.EData
+        score_sum = score.dst_sum()  # of type dgl.NData
+        out = score / score_sum    # edge_div_dst, ret dgl.EData
+        return out.data
+        """
+        score_name = utils.get_edata_name(g, 'score')
+        tmp_name = utils.get_ndata_name(g, 'tmp')
+        out_name = utils.get_edata_name(g, 'out')
+        g.edata[score_name] = score
+        g.update_all(fn.copy_edge(score_name, 'm'), fn.max('m', tmp_name))
+        g.apply_edges(fn.edge_sub_dst(score_name, tmp_name, out_name))
+        g.edata[out_name] = th.exp(g.edata[out_name])
+        g.update_all(fn.copy_edge(out_name, 'm'), fn.sum('m', tmp_name))
+        g.apply_edges(fn.edge_div_dst(out_name, tmp_name, out_name))
+        g.edata.pop(score_name)
+        g.ndata.pop(tmp_name)
+        out = g.edata.pop(out_name)
+        ctx.backward_cache = (g, out)
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_out):
+        """
+        g, out = ctx.backward_cache
+        grad_out = dgl.EData(g, grad_out)
+        out = dgl.EData(g, out)
+        sds = out * grad_out  # type dgl.EData
+        sds_sum = sds.dst_sum()  # type dgl.NData
+        grad_score = sds - sds * sds_sum  # multiple expressions
+        return grad_score.data
+        """
+        g, out = ctx.backward_cache
+        out_name = utils.get_edata_name(g, 'out')
+        accum_name = utils.get_ndata_name(g, 'accum')
+        tmp_score_name = utils.get_edata_name(g, 'tmp_score')
+        grad_score_name = utils.get_edata_name(g, 'grad_score')
+        g.edata[out_name] = out
+        g.edata[grad_score_name] = out * grad_out
+        g.update_all(fn.copy_edge(grad_score_name, 'm'), fn.sum('m', accum_name))
+        g.apply_edges(fn.edge_mul_dst(out_name, accum_name, out_name))
+        grad_score = g.edata[grad_score_name] - g.edata[out_name]
+        return grad_score
+
+edge_softmax = EdgeSoftmax1.apply

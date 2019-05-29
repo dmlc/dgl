@@ -30,6 +30,9 @@ IdArray VecToIdArray(const std::vector<dgl_id_t>& vec);
 /*! \brief Create a copy of the given array */
 IdArray Clone(IdArray arr);
 
+/*! \brief Convert the idarray to the given bit width (on CPU) */
+IdArray AsNumBits(IdArray arr, uint8_t bits);
+
 /*! \brief Arithmetic functions */
 IdArray Add(IdArray lhs, IdArray rhs);
 IdArray Sub(IdArray lhs, IdArray rhs);
@@ -46,10 +49,8 @@ IdArray Sub(dgl_id_t lhs, IdArray rhs);
 IdArray Mul(dgl_id_t lhs, IdArray rhs);
 IdArray Div(dgl_id_t lhs, IdArray rhs);
 
-
 /*! \brief Stack two arrays (of len L) into a 2*L length array */
 IdArray HStack(IdArray arr1, IdArray arr2);
-
 
 /*! \brief Plain CSR matrix */
 struct CSRMatrix {

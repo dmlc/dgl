@@ -925,6 +925,73 @@ class GraphIndex(object):
         handle = _CAPI_DGLGraphLineGraph(self._handle, backtracking)
         return GraphIndex(handle)
 
+    def to_immutable(self):
+        """Convert this graph index to an immutable one.
+
+        Returns
+        -------
+        GraphIndex
+            An immutable graph index.
+        """
+        handle = _CAPI_DGLToImmutable(self._handle)
+        return GraphIndex(handle, readonly=True)
+
+    def ctx(self):
+        """Return the context of this graph index.
+
+        Returns
+        -------
+        DGLContext
+            The context of the graph.
+        """
+        return _CAPI_DGLGraphContext(self._handle)
+
+    def copy_to(self, ctx):
+        """Copy this immutable graph index to the given device context.
+
+        NOTE: this method only works for immutable graph index
+
+        Parameters
+        ----------
+        ctx : DGLContext
+            The target device context.
+
+        Returns
+        -------
+        GraphIndex
+            The graph index on the given device context.
+        """
+        handle = _CAPI_DGLImmutableGraphCopyTo(self._handle, ctx)
+        return GraphIndex(handle, readonly=True)
+
+    def nbits(self):
+        """Return the number of integer bits used in the storage (32 or 64).
+
+        Returns
+        -------
+        int
+            The number of bits.
+        """
+        return _CAPI_DGLGraphNumBits(self._handle)
+
+    def asbits(self, bits):
+        """Transform the graph to a new one with the given number of bits storage.
+
+        NOTE: this method only works for immutable graph index
+
+        Parameters
+        ----------
+        bits : int
+            The number of integer bits (32 or 64)
+
+        Returns
+        -------
+        GraphIndex
+            The graph index stored using the given number of bits.
+        """
+        handle = _CAPI_DGLImmutableGraphAsNumBits(self._handle, int(bits))
+        return GraphIndex(handle, readonly=True)
+
 class SubgraphIndex(GraphIndex):
     """Graph index for subgraph.
 

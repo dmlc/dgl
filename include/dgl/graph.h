@@ -73,26 +73,26 @@ class Graph: public GraphInterface {
    *       vertices to be added needs to be specified.
    * \param num_vertices The number of vertices to be added.
    */
-  void AddVertices(uint64_t num_vertices);
+  void AddVertices(uint64_t num_vertices) override;
 
   /*!
    * \brief Add one edge to the graph.
    * \param src The source vertex.
    * \param dst The destination vertex.
    */
-  void AddEdge(dgl_id_t src, dgl_id_t dst);
+  void AddEdge(dgl_id_t src, dgl_id_t dst) override;
 
   /*!
    * \brief Add edges to the graph.
    * \param src_ids The source vertex id array.
    * \param dst_ids The destination vertex id array.
    */
-  void AddEdges(IdArray src_ids, IdArray dst_ids);
+  void AddEdges(IdArray src_ids, IdArray dst_ids) override;
 
   /*!
    * \brief Clear the graph. Remove all vertices/edges.
    */
-  void Clear() {
+  void Clear() override {
     adjlist_.clear();
     reverse_adjlist_.clear();
     all_edges_src_.clear();
@@ -101,44 +101,52 @@ class Graph: public GraphInterface {
     num_edges_ = 0;
   }
 
+  DLContext Context() const override {
+    return DLContext{kDLCPU, 0};
+  }
+
+  uint8_t NumBits() const override {
+    return 64;
+  }
+
   /*!
    * \note not const since we have caches
    * \return whether the graph is a multigraph
    */
-  bool IsMultigraph() const {
+  bool IsMultigraph() const override {
     return is_multigraph_;
   }
 
   /*!
    * \return whether the graph is read-only
    */
-  virtual bool IsReadonly() const {
+  virtual bool IsReadonly() const override {
     return false;
   }
 
   /*! \return the number of vertices in the graph.*/
-  uint64_t NumVertices() const {
+  uint64_t NumVertices() const override {
     return adjlist_.size();
   }
 
   /*! \return the number of edges in the graph.*/
-  uint64_t NumEdges() const {
+  uint64_t NumEdges() const override {
     return num_edges_;
   }
 
   /*! \return true if the given vertex is in the graph.*/
-  bool HasVertex(dgl_id_t vid) const {
+  bool HasVertex(dgl_id_t vid) const override {
     return vid < NumVertices();
   }
 
   /*! \return a 0-1 array indicating whether the given vertices are in the graph.*/
-  BoolArray HasVertices(IdArray vids) const;
+  BoolArray HasVertices(IdArray vids) const override;
 
   /*! \return true if the given edge is in the graph.*/
-  bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const;
+  bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const override;
 
   /*! \return a 0-1 array indicating whether the given edges are in the graph.*/
-  BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const;
+  BoolArray HasEdgesBetween(IdArray src_ids, IdArray dst_ids) const override;
 
   /*!
    * \brief Find the predecessors of a vertex.
@@ -146,7 +154,7 @@ class Graph: public GraphInterface {
    * \param radius The radius of the neighborhood. Default is immediate neighbor (radius=1).
    * \return the predecessor id array.
    */
-  IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const;
+  IdArray Predecessors(dgl_id_t vid, uint64_t radius = 1) const override;
 
   /*!
    * \brief Find the successors of a vertex.
@@ -154,7 +162,7 @@ class Graph: public GraphInterface {
    * \param radius The radius of the neighborhood. Default is immediate neighbor (radius=1).
    * \return the successor id array.
    */
-  IdArray Successors(dgl_id_t vid, uint64_t radius = 1) const;
+  IdArray Successors(dgl_id_t vid, uint64_t radius = 1) const override;
 
   /*!
    * \brief Get all edge ids between the two given endpoints
@@ -164,7 +172,7 @@ class Graph: public GraphInterface {
    * \param dst The destination vertex.
    * \return the edge id array.
    */
-  IdArray EdgeId(dgl_id_t src, dgl_id_t dst) const;
+  IdArray EdgeId(dgl_id_t src, dgl_id_t dst) const override;
 
   /*!
    * \brief Get all edge ids between the given endpoint pairs.
@@ -175,14 +183,14 @@ class Graph: public GraphInterface {
    *       first, and ties are broken by the order of edge ID.
    * \return EdgeArray containing all edges between all pairs.
    */
-  EdgeArray EdgeIds(IdArray src, IdArray dst) const;
+  EdgeArray EdgeIds(IdArray src, IdArray dst) const override;
 
   /*!
    * \brief Find the edge ID and return the pair of endpoints
    * \param eid The edge ID
    * \return a pair whose first element is the source and the second the destination.
    */
-  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const {
+  std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const override {
     return std::make_pair(all_edges_src_[eid], all_edges_dst_[eid]);
   }
 
@@ -191,7 +199,7 @@ class Graph: public GraphInterface {
    * \param eids The edge ID array.
    * \return EdgeArray containing all edges with id in eid.  The order is preserved.
    */
-  EdgeArray FindEdges(IdArray eids) const;
+  EdgeArray FindEdges(IdArray eids) const override;
 
   /*!
    * \brief Get the in edges of the vertex.
@@ -199,14 +207,14 @@ class Graph: public GraphInterface {
    * \param vid The vertex id.
    * \return the edges
    */
-  EdgeArray InEdges(dgl_id_t vid) const;
+  EdgeArray InEdges(dgl_id_t vid) const override;
 
   /*!
    * \brief Get the in edges of the vertices.
    * \param vids The vertex id array.
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray InEdges(IdArray vids) const;
+  EdgeArray InEdges(IdArray vids) const override;
 
   /*!
    * \brief Get the out edges of the vertex.
@@ -214,14 +222,14 @@ class Graph: public GraphInterface {
    * \param vid The vertex id.
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray OutEdges(dgl_id_t vid) const;
+  EdgeArray OutEdges(dgl_id_t vid) const override;
 
   /*!
    * \brief Get the out edges of the vertices.
    * \param vids The vertex id array.
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray OutEdges(IdArray vids) const;
+  EdgeArray OutEdges(IdArray vids) const override;
 
   /*!
    * \brief Get all the edges in the graph.
@@ -230,14 +238,14 @@ class Graph: public GraphInterface {
    * \param sorted Whether the returned edge list is sorted by their src and dst ids
    * \return the id arrays of the two endpoints of the edges.
    */
-  EdgeArray Edges(const std::string &order = "") const;
+  EdgeArray Edges(const std::string &order = "") const override;
 
   /*!
    * \brief Get the in degree of the given vertex.
    * \param vid The vertex id.
    * \return the in degree
    */
-  uint64_t InDegree(dgl_id_t vid) const {
+  uint64_t InDegree(dgl_id_t vid) const override {
     CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
     return reverse_adjlist_[vid].succ.size();
   }
@@ -247,14 +255,14 @@ class Graph: public GraphInterface {
    * \param vid The vertex id array.
    * \return the in degree array
    */
-  DegreeArray InDegrees(IdArray vids) const;
+  DegreeArray InDegrees(IdArray vids) const override;
 
   /*!
    * \brief Get the out degree of the given vertex.
    * \param vid The vertex id.
    * \return the out degree
    */
-  uint64_t OutDegree(dgl_id_t vid) const {
+  uint64_t OutDegree(dgl_id_t vid) const override {
     CHECK(HasVertex(vid)) << "invalid vertex: " << vid;
     return adjlist_[vid].succ.size();
   }
@@ -264,7 +272,7 @@ class Graph: public GraphInterface {
    * \param vid The vertex id array.
    * \return the out degree array
    */
-  DegreeArray OutDegrees(IdArray vids) const;
+  DegreeArray OutDegrees(IdArray vids) const override;
 
   /*!
    * \brief Construct the induced subgraph of the given vertices.
@@ -282,7 +290,7 @@ class Graph: public GraphInterface {
    * \param vids The vertices in the subgraph.
    * \return the induced subgraph
    */
-  Subgraph VertexSubgraph(IdArray vids) const;
+  Subgraph VertexSubgraph(IdArray vids) const override;
 
   /*!
    * \brief Construct the induced edge subgraph of the given edges.
@@ -300,7 +308,7 @@ class Graph: public GraphInterface {
    * \param eids The edges in the subgraph.
    * \return the induced edge subgraph
    */
-  Subgraph EdgeSubgraph(IdArray eids) const;
+  Subgraph EdgeSubgraph(IdArray eids) const override;
 
   /*!
    * \brief Return a new graph with all the edges reversed.
@@ -309,14 +317,14 @@ class Graph: public GraphInterface {
    *
    * \return the reversed graph
    */
-  GraphPtr Reverse() const;
+  GraphPtr Reverse() const override;
 
   /*!
    * \brief Return the successor vector
    * \param vid The vertex id.
    * \return the successor vector
    */
-  DGLIdIters SuccVec(dgl_id_t vid) const {
+  DGLIdIters SuccVec(dgl_id_t vid) const override {
     auto data = adjlist_[vid].succ.data();
     auto size = adjlist_[vid].succ.size();
     return DGLIdIters(data, data + size);
@@ -327,7 +335,7 @@ class Graph: public GraphInterface {
    * \param vid The vertex id.
    * \return the out edge id vector
    */
-  DGLIdIters OutEdgeVec(dgl_id_t vid) const {
+  DGLIdIters OutEdgeVec(dgl_id_t vid) const override {
     auto data = adjlist_[vid].edge_id.data();
     auto size = adjlist_[vid].edge_id.size();
     return DGLIdIters(data, data + size);
@@ -338,7 +346,7 @@ class Graph: public GraphInterface {
    * \param vid The vertex id.
    * \return the predecessor vector
    */
-  DGLIdIters PredVec(dgl_id_t vid) const {
+  DGLIdIters PredVec(dgl_id_t vid) const override {
     auto data = reverse_adjlist_[vid].succ.data();
     auto size = reverse_adjlist_[vid].succ.size();
     return DGLIdIters(data, data + size);
@@ -349,7 +357,7 @@ class Graph: public GraphInterface {
    * \param vid The vertex id.
    * \return the in edge id vector
    */
-  DGLIdIters InEdgeVec(dgl_id_t vid) const {
+  DGLIdIters InEdgeVec(dgl_id_t vid) const override {
     auto data = reverse_adjlist_[vid].edge_id.data();
     auto size = reverse_adjlist_[vid].edge_id.size();
     return DGLIdIters(data, data + size);
@@ -359,7 +367,7 @@ class Graph: public GraphInterface {
    * \brief Reset the data in the graph and move its data to the returned graph object.
    * \return a raw pointer to the graph object.
    */
-  virtual GraphInterface *Reset() {
+  GraphInterface *Reset() override {
     Graph* gptr = new Graph();
     *gptr = std::move(*this);
     return gptr;
@@ -374,7 +382,7 @@ class Graph: public GraphInterface {
    * \param fmt the format of the returned adjacency matrix.
    * \return a vector of three IdArray.
    */
-  virtual std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const;
+  std::vector<IdArray> GetAdj(bool transpose, const std::string &fmt) const override;
 
  protected:
   friend class GraphOp;

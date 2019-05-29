@@ -81,10 +81,16 @@ namespace kernel {
   }
 #endif
 
-inline bool IsValidCsr(runtime::NDArray indptr, runtime::NDArray indices) {
-  return (indptr->ndim == 1) && (indptr->dtype.code == kDLInt) && (indptr->dtype.bits == 32)
-    && (indices->ndim == 1) && (indices->dtype.code == kDLInt) && (indices->dtype.bits == 32);
-}
+#define DGL_IDX_TYPE_SWITCH(bits, Idx, ...)            \
+  if (bits == 32) {                                    \
+    typedef int32_t Idx;                               \
+    {__VA_ARGS__}                                      \
+  } else if (bits == 64) {                             \
+    typedef int64_t Idx;                               \
+    {__VA_ARGS__}                                      \
+  } else {                                             \
+    LOG(FATAL) << "Unsupported idx bits: " << bits;    \
+  }
 
 }  // namespace kernel
 }  // namespace dgl
