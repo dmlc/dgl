@@ -88,7 +88,7 @@ pipeline {
           agent { docker { image "dgllib/dgl-ci-cpu" } }
           steps {
             ws('workspace/cpu-build') {
-              init_git_submodule()
+              //init_git_submodule()
               sh "pwd"
               sh "ls -lh"
             }
@@ -103,7 +103,7 @@ pipeline {
           }
           steps {
             ws('workspace/gpu-build') {
-              init_git_submodule()
+              //init_git_submodule()
               sh "pwd"
               sh "ls -lh"
             }
