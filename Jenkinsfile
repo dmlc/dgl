@@ -130,7 +130,7 @@ pipeline {
       parallel {
         stage("CPP Test") {
           stages{
-            stage("CPP Unit Test Linux"){
+            stage("CPP Unit Test Linux") {
               agent {
                 docker {image "dgllib/dgl-ci-cpu"}
               }
@@ -138,7 +138,7 @@ pipeline {
                 cpp_unit_test_linux() 
               }
             }
-            stage("CPP Unit Test Windows"){
+            stage("CPP Unit Test Windows") {
               agent {
                 label "windows"
               }
@@ -146,6 +146,15 @@ pipeline {
                 cpp_unit_test_windows()
               }
             }
+          }
+        }
+        stage("Test stage") {
+          agent {
+            docker {image "dgllib/dgl-ci-cpu"}
+          }
+          steps {
+            sh "echo $PWD"
+            sh "ls -lh"
           }
         }
         stage("Pytorch CPU") {
