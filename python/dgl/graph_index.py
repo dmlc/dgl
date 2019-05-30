@@ -594,8 +594,8 @@ class GraphIndex(object):
         else:
             raise Exception("unknown format")
 
-    @utils.cached_member(cache='_cache', prefix='csr_adj')
-    def csr_adjacency_matrix(self, transpose, ctx):
+    @utils.cached_member(cache='_cache', prefix='immu_gidx')
+    def get_immutable_gidx(self, ctx):
         """Return the adjacency matrix representation of this graph in csr format
 
         By default, a row of returned adjacency matrix represents the destination
@@ -604,7 +604,7 @@ class GraphIndex(object):
         When transpose is True, a row represents the source and a column represents
         a destination.
 
-        Note: this internal function is for scheduler use only
+        Note: this internal function is for DGL scheduler use only
 
         Parameters
         ----------
@@ -621,14 +621,16 @@ class GraphIndex(object):
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
-        rst = _CAPI_DGLGraphGetAdj(self._handle, transpose, "csr")
-        indptr = rst(0).asnumpy().astype(np.int32)
-        indices = rst(1).asnumpy().astype(np.int32)
-        eids = rst(2)
-        indptr = nd.array(indptr, ctx=ctx)
-        indices = nd.array(indices, ctx=ctx)
-        eids = nd.array(eids, ctx=ctx)
-        return indptr, indices, eids
+        bits = 32 if self.number_of_edges() < 0x80000000 else 64
+        return self.to_immutable().asbits(bits).copy_to(ctx)
+
+    def get_csr_shuffle_order(self):
+        """Return the shuffle order of edge id of immutable csr graph index"""
+        csr = _CAPI_DGLGraphGetAdj(self._handle, True, "csr")
+        order = csr(2)
+        rev_csr = _CAPI_DGLGraphGetAdj(self._handle, False, "csr")
+        rev_order = rev_csr(2)
+        return order, rev_order
 
     def adjacency_matrix(self, transpose, ctx):
         """Return the adjacency matrix representation of this graph.

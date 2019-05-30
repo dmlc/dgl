@@ -216,4 +216,4 @@ if __name__ == '__main__':
     test_src_op_edge_reduce()
     # FIXME: expose backward of src_op_dst_reduce and enable this unit test
     # test_src_op_dst_reduce()
-    #test_edge_softmax()
+    # test_edge_softmax()

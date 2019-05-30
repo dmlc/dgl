@@ -866,45 +866,8 @@ def zerocopy_from_dgl_ndarray(input):
 # kernels (see kernel.py), and plug into tensor framework using custom op
 # extensions.
 
-def src_op_edge_reduce(reducer, binary_op, spmat, src_data, edge_data,
-                       out_size, src_map, edge_map, out_map):
-    """Perform binary operation between source node features and edge features,
-    and then reduce on destination nodes optionally.
-
-    Parameters
-    ----------
-    reducer : str
-        Reduction to be done, can be 'sum', 'max', 'min', 'mean', 'prod',
-        'none' (no reduction)
-    binary_op : str
-        Binary operation to perform, can be 'add', 'mul', 'sub', 'div', 'dot'
-    spmat : tuple of four dgl.ndarray.NDArray
-        Adjacency matrix (indptr, indices, inv_indptr, inv_indices),
-        indptr and indices form a CSR where each row is a source node
-        inv_indptr and inv_indices form a CSR where each column is a source
-        node
-    src_data : Tensor
-        Source node feature tensor
-    edge_data : Tensor
-        Edge feature tensor
-    out_size : int
-        Number of rows of output tensor
-    src_map : dgl.ndarray.NDArray
-        int64 array used for reading source data
-    edge_map : dgl.ndarray.NDArray
-        int64 array used for reading edge data
-    out_map : dgl.ndarray.NDArray
-        int64 array used for writing output data
-
-    Returns
-    -------
-    dgl.ndarray.NDArray
-        The result.
-    """
-    pass
-
-def src_op_dst_reduce(reducer, binary_op, spmat, src_data, dst_data, out_size,
-                      src_map, dst_map, out_map):
+def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
+                  out_size, lhs_map, rhs_map, out_map):
     """Perform binary operation between source node features and edge features,
     and reduce on destination nodes optionally.
 
@@ -940,37 +903,7 @@ def src_op_dst_reduce(reducer, binary_op, spmat, src_data, dst_data, out_size,
     """
     pass
 
-def copy_src_reduce(reducer, spmat, src_data, out_size, src_map, out_map):
-    """Copy source node features to edge, and perform reduction on destination
-    nodes optionally.
-
-    Parameters
-    ----------
-    reducer : str
-        Reduction to be done, can be 'sum', 'max', 'min', 'mean', 'prod',
-        'none' (no reduction)
-    spmat : tuple of four dgl.ndarray.NDArray
-        Adjacency matrix (indptr, indices, inv_indptr, inv_indices),
-        indptr and indices form a CSR where each row is a source node
-        inv_indptr and inv_indices form a CSR where each column is a source
-        node
-    src_data : Tensor
-        Source node feature tensor
-    out_size : int
-        Number of rows of output tensor
-    src_map : dgl.ndarray.NDArray
-        int64 array used for reading source data
-    out_map : dgl.ndarray.NDArray
-        int64 array used for writing output data
-
-    Returns
-    -------
-    dgl.ndarray.NDArray
-        The result.
-    """
-    pass
-
-def copy_edge_reduce(reducer, spmat, edge_data, out_size, edge_map, out_map):
+def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
     """Copy source edge features, and perform reduction on destination nodes
     optionally.
 

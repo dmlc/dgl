@@ -13,8 +13,9 @@ from . import ir
 from .ir import var
 
 
-def gen_v2v_spmv_schedule(adj, mfunc, rfunc, src_frame, dst_frame, edge_frame,
-                          out, out_size, edge_map, out_map):
+def gen_v2v_spmv_schedule(graph, mfunc, rfunc, src_frame, dst_frame, edge_frame,
+                          out, out_size, src_map=None, dst_map=None,
+                          edge_map=None, out_map=None):
     """Generate v2v spmv schedule.
 
     Parameters
@@ -39,7 +40,6 @@ def gen_v2v_spmv_schedule(adj, mfunc, rfunc, src_frame, dst_frame, edge_frame,
         function that generates a mapping from destination nodes to consecutive
         ids and caches on given context
     """
-    spmat = var.SPMAT(adj)
     fld2mfunc = {fn.out_field: fn for fn in mfunc}
     for rfn in rfunc:
         mfld = rfn.msg_field
@@ -47,13 +47,13 @@ def gen_v2v_spmv_schedule(adj, mfunc, rfunc, src_frame, dst_frame, edge_frame,
             raise DGLError('Reduce function requires message field "%s",'
                            ' but no message function generates it.' % mfld)
         mfn = fld2mfunc[mfld]
-        ftdst = mfn(spmat, src_frame, dst_frame, edge_frame, out_size,
-                    reducer=rfn.name, edge_map=edge_map, out_map=out_map)
+        ftdst = mfn(graph, src_frame, dst_frame, edge_frame, out_size, src_map,
+                    dst_map, edge_map, out_map, reducer=rfn.name)
         ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
 
 def gen_v2e_spmv_schedule(adj, mfunc, src_frame, dst_frame, edge_frame,
-                          out, out_size, edge_map, out_map):
+                          out, out_size, edge_map, out_map=None):
     """Generate v2e SPMV schedule
 
     Parameters
@@ -77,15 +77,14 @@ def gen_v2e_spmv_schedule(adj, mfunc, src_frame, dst_frame, edge_frame,
         function that generates a mapping from message ids to edge ids and
         caches on given context
     """
-    spmat = var.SPMAT(adj)
     for mfn in mfunc:
-        fmsg = mfn(spmat, src_frame, dst_frame, edge_frame, out_size,
+        fmsg = mfn(adj, src_frame, dst_frame, edge_frame, out_size,
                    edge_map=edge_map, out_map=out_map)
         ir.WRITE_COL_(out, var.STR(mfn.out_field), fmsg)
 
 
 def gen_e2v_spmv_schedule(adj, rfunc, message_frame, edge_map, out, out_size,
-                          out_map):
+                          out_map=None):
     """Generate e2v SPMV schedule.
 
     Parameters
@@ -108,9 +107,8 @@ def gen_e2v_spmv_schedule(adj, rfunc, message_frame, edge_map, out, out_size,
         function that generates a mapping from destination nodes to consecutive
         ids and caches on given context
     """
-    spmat = var.SPMAT(adj)
     for rfn in rfunc:
-        ftdst = rfn(spmat, message_frame, out_size, edge_map=edge_map,
+        ftdst = rfn(adj, message_frame, out_size, edge_map=edge_map,
                     out_map=out_map)
         ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
@@ -129,19 +127,7 @@ def build_adj_matrix_graph(graph):
         Get be used to get adjacency matrix on the provided ctx.
     """
     gidx = graph._graph
-
-    def edge_map(ctx):
-        return gidx.csr_adjacency_matrix(True, ctx)[2]
-
-    def inv_edge_map(ctx):
-        return gidx.csr_adjacency_matrix(False, ctx)[2]
-
-    msg_map = edge_map
-    inv_msg_map = inv_edge_map
-
-    return lambda ctx: (gidx.csr_adjacency_matrix(True, ctx)[:2] +
-                        gidx.csr_adjacency_matrix(False, ctx)[:2]), \
-        edge_map, inv_edge_map, msg_map, inv_msg_map
+    return lambda ctx: gidx.get_immutable_gidx(ctx), None
 
 
 def _build_adj_matrix_index_uv(u, v, num_src, num_dst):

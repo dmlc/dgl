@@ -2,10 +2,9 @@
 # pylint: disable=redefined-builtin
 from __future__ import absolute_import
 
-from .base import BuiltinFunction
+from .base import BuiltinFunction, TargetCode
 from ..runtime import ir
 from ..runtime.ir import var
-from ..utils import create_empty_mapping as empty_map
 
 __all__ = ["sum", "max"]
 
@@ -33,15 +32,15 @@ class SimpleReduceFunction(ReduceFunction):
         self.msg_field = msg_field
         self.out_field = out_field
 
-    def __call__(self, spmat, edge_frame, out_size, edge_map=empty_map,
-                 out_map=empty_map):
+    def __call__(self, graph, edge_frame, out_size, edge_map=None,
+                 out_map=None):
         """Symbolic execution of this builtin function"""
         reducer = self._name
         edge_map = var.MAP(edge_map)
         out_map = var.MAP(out_map)
         edge_data = ir.READ_COL(edge_frame, var.STR(self.msg_field))
-        return ir.COPY_EDGE_REDUCE(reducer, spmat, edge_data, out_size,
-                                   edge_map, out_map)
+        return ir.COPY_REDUCE(reducer, TargetCode.EDGE, graph, edge_data,
+                              out_size, edge_map, out_map)
 
     @property
     def name(self):

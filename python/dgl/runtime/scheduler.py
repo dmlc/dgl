@@ -217,11 +217,17 @@ def schedule_update_all(graph,
             return var.IDX(src), var.IDX(dst)
         adj_creator = lambda: spmv.build_adj_matrix_graph(graph)
         out_map_creator = lambda: lambda ctx: nd.empty([])
-        reduced_feat = _gen_send_reduce(graph, graph._node_frame,
-                                        graph._node_frame, graph._edge_frame,
-                                        message_func, reduce_func, var_eid,
-                                        var_recv_nodes, uv_getter, adj_creator,
-                                        out_map_creator)
+        reduced_feat = _gen_send_reduce(graph=graph,
+                                        src_node_frame=graph._node_frame,
+                                        dst_node_frame=graph._node_frame,
+                                        edge_frame=graph._edge_frame,
+                                        message_func=message_func,
+                                        reduce_func=reduce_func,
+                                        var_send_edges=var_eid,
+                                        var_reduce_nodes=var_recv_nodes,
+                                        uv_getter=uv_getter,
+                                        adj_creator=adj_creator,
+                                        out_map_creator=out_map_creator)
         # generate optional apply
         final_feat = _apply_with_accum(graph, var_recv_nodes, var_nf,
                                        reduced_feat, apply_func)
@@ -831,19 +837,26 @@ def _gen_send_reduce(
     # 1. If either mfunc or rfunc is builtin, generate adjmat, edge mapping and
     # message mapping
     if mfunc_is_list or rfunc_is_list:
-        adj, edge_map, inv_edge_map, msg_map, inv_msg_map = adj_creator()
+        adj, edge_map = adj_creator()
 
     # 2. If rfunc is builtin, generate a mapping from recv nodes to consecutive
     # output id
     if rfunc_is_list:
-        var_out_map = out_map_creator()
+        out_map = out_map_creator()
 
     # 3. First try fused message and reduce function
     if mfunc_is_list and rfunc_is_list:
         # builtin message + builtin reducer
-        spmv.gen_v2v_spmv_schedule(adj, mfunc, rfunc, var_src_nf, var_dst_nf,
-                                   var_ef, var_out, len(reduce_nodes),
-                                   (edge_map, inv_edge_map), var_out_map)
+        spmv.gen_v2v_spmv_schedule(graph=adj,
+                                   mfunc=mfunc,
+                                   rfunc=rfunc,
+                                   src_frame=var_src_nf,
+                                   dst_frame=var_dst_nf,
+                                   edge_frame=var_ef,
+                                   out=var_out,
+                                   out_size=len(reduce_nodes),
+                                   edge_map=edge_map,
+                                   out_map=out_map)
         return var_out
 
     var_u, var_v = uv_getter()
@@ -856,8 +869,7 @@ def _gen_send_reduce(
         tmp_msg_frame = FrameRef(frame_like(edge_frame._frame, n_message))
         var_mf = var.FEAT_DICT(data=tmp_msg_frame)
         spmv.gen_v2e_spmv_schedule(adj, mfunc, var_src_nf, var_dst_nf, var_ef,
-                                   var_mf, n_message, (edge_map, inv_edge_map),
-                                   (msg_map, inv_msg_map))
+                                   var_mf, n_message, edge_map)
     else:
         # generate UDF send schedule
         var_mf = _gen_send(graph, var_src_nf, var_dst_nf, var_ef, var_u, var_v,
@@ -868,8 +880,8 @@ def _gen_send_reduce(
         # UDF message + builtin reducer
         # reduce from message, so msg_map becomes edge_map here
         spmv.gen_e2v_spmv_schedule(adj, rfunc, var_mf,
-                                   (msg_map, inv_msg_map), var_out,
-                                   len(reduce_nodes), var_out_map)
+                                   None, var_out,
+                                   len(reduce_nodes), out_map)
         return var_out
     else:
         # gen degree bucketing schedule for UDF recv

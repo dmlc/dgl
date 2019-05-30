@@ -536,6 +536,7 @@ def test_spmv_3d_feat():
 
 if __name__ == '__main__':
     test_v2v_update_all()
+    exit()
     test_v2v_snr()
     test_v2v_pull()
     test_v2v_update_all_multi_fn()

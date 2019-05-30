@@ -22,10 +22,8 @@ def infer_binary_feature_shape(lhs, rhs):
     ret = _CAPI_DGLKernelInferBinaryFeatureShape(lhs, rhs)
     return tuple(ret.asnumpy())
 
-def binary_op_reduce(reducer, op, graph,
-                     lhs, rhs,
-                     lhs_data, rhs_data, out_data,
-                     lhs_mapping=None, rhs_mapping=None, out_mapping=None):
+def binary_reduce(reducer, op, graph, lhs, rhs, lhs_data, rhs_data, out_data,
+                  lhs_mapping, rhs_mapping, out_mapping):
     """Perform binary operation between the given data and reduce by the graph.
 
     Broadcasting is supported for feature dimensions.
@@ -77,7 +75,7 @@ def backward_lhs_binary_op_reduce(
         lhs, rhs,
         lhs_data, rhs_data, out_data,
         grad_out_data, grad_lhs_data,
-        lhs_mapping=None, rhs_mapping=None, out_mapping=None):
+        lhs_mapping, rhs_mapping, out_mapping):
     """Compute lhs gradient of binary_op_reduce.
 
     The returned gradient tensor has the same shape as the grad_out_data. To compute
@@ -132,7 +130,7 @@ def backward_rhs_binary_op_reduce(
         lhs, rhs,
         lhs_data, rhs_data, out_data,
         grad_out_data, grad_rhs_data,
-        lhs_mapping=None, rhs_mapping=None, out_mapping=None):
+        lhs_mapping, rhs_mapping, out_mapping):
     """Compute rhs gradient of binary_op_reduce.
 
     The returned gradient tensor has the same shape as the grad_out_data. To compute
@@ -184,7 +182,7 @@ def backward_rhs_binary_op_reduce(
 
 def copy_reduce(reducer, graph, target,
                 in_data, out_data,
-                in_mapping=None, out_mapping=None):
+                in_mapping, out_mapping):
     """Copy target data and perform reduce by graph.
 
     Optional id mapping arrays could be provided to read/write from/to locations
@@ -220,7 +218,7 @@ def copy_reduce(reducer, graph, target,
 def backward_copy_reduce(reducer, graph, target,
                          in_data, out_data,
                          grad_out_data, grad_in_data,
-                         in_mapping=None, out_mapping=None):
+                         in_mapping, out_mapping):
     """Copy target data and perform reduce by graph.
 
     Optional id mapping arrays could be provided to read/write from/to locations
