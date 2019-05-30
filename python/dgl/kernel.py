@@ -22,7 +22,7 @@ def infer_binary_feature_shape(lhs, rhs):
     ret = _CAPI_DGLKernelInferBinaryFeatureShape(lhs, rhs)
     return tuple(ret.asnumpy())
 
-def binary_reduce(reducer, op, graph, lhs, rhs, lhs_data, rhs_data, out_data,
+def binary_op_reduce(reducer, op, graph, lhs, rhs, lhs_data, rhs_data, out_data,
                   lhs_mapping, rhs_mapping, out_mapping):
     """Perform binary operation between the given data and reduce by the graph.
 

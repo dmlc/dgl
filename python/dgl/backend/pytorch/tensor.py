@@ -206,7 +206,7 @@ class BinaryReduce(th.autograd.Function):
         feat_shape = K.infer_binary_feature_shape(lhs_data_nd, rhs_data_nd)
         out_data = lhs_data.new_empty((out_size,) + feat_shape)
         out_data_nd = zerocopy_to_dgl_ndarray(out_data)
-        K.binary_reduce(
+        K.binary_op_reduce(
             reducer, binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
             out_data_nd, lhs_map[0], rhs_map[0], out_map[0])
         # save_for_backward can only save variables
@@ -263,14 +263,14 @@ class CopyReduce(th.autograd.Function):
         reducer, graph, target, in_map, out_map, in_data_nd, out_data_nd \
             = ctx.backward_cache
         ctx.backward_cache = None
-        grad_target = None
+        grad_in = None
         grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
         if ctx.needs_input_grad[3]:
-            grad_target = grad_out.new_empty(in_data_nd.shape)
+            grad_in = grad_out.new_empty(in_data_nd.shape)
             K.backward_copy_reduce(
                 reducer, graph, target, in_data_nd, out_data_nd, grad_out_nd,
-                zerocopy_to_dgl_ndarray(grad_target), in_map[1], out_map[1])
-        return None, None, None, grad_target, None, None, None
+                zerocopy_to_dgl_ndarray(grad_in), in_map[1], out_map[1])
+        return None, None, None, grad_in, None, None, None
 
 
 binary_reduce = BinaryReduce.apply
@@ -279,14 +279,14 @@ copy_reduce = CopyReduce.apply
 
 def _reduce_grad(grad, shape):
     grad_shape = grad.shape[1:]
-    src_shape = shape[1:]
-    if src_shape == grad_shape:
+    in_shape = shape[1:]
+    if in_shape == grad_shape:
         # no need to reduce
         return grad
-    num_to_squeeze = len(grad_shape) - len(src_shape)
-    # pad src_shape
-    src_shape = (1,) * num_to_squeeze + src_shape
-    reduce_idx = th.nonzero(th.tensor(grad_shape) - th.tensor(src_shape))
+    num_to_squeeze = len(grad_shape) - len(in_shape)
+    # pad inshape
+    in_shape = (1,) * num_to_squeeze + in_shape
+    reduce_idx = th.nonzero(th.tensor(grad_shape) - th.tensor(in_shape))
     reduce_idx += 1  # skip batch dim
     grad = grad.sum(dim=tuple(reduce_idx), keepdim=True)
     return grad.view(shape)
