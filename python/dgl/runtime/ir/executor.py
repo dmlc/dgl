@@ -34,6 +34,7 @@ __all__ = [
     'CopyReduceExecutor', 'COPY_REDUCE',
 ]
 
+
 class OpCode(object):
     """Opcode for all the executor types."""
     # immutable op
@@ -58,10 +59,6 @@ class OpCode(object):
     BINARY_REDUCE = 50
     COPY_REDUCE = 51
 
-class TargetCode(object):
-    SRC = 0
-    DST = 1
-    EDGE = 2
 
 class Executor(object):
     """Base executor class.
@@ -1207,7 +1204,7 @@ IR_REGISTRY[OpCode.COPY_REDUCE] = {
 
 
 def COPY_REDUCE(reducer, graph, target, in_data, out_size, in_map, out_map,
-                    ret=None):
+                ret=None):
     """Perform COPY_SRC_REDUCE symbolically.
 
     Parameters

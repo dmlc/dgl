@@ -56,13 +56,12 @@ def schedule_send(graph, u, v, eid, message_func):
 
     if mfunc_is_list:
         if eid.is_slice(0, graph.number_of_edges()):
-            # full graph case, no edge mapping needed
+            # full graph case
             res = spmv.build_adj_matrix_graph(graph)
         else:
-            # build edge_mapping
             num_nodes = graph.number_of_nodes()
-            res = spmv.build_adj_matrix_uv((u, v, eid), num_nodes, num_nodes)
-        adj, edge_map, nbits = res
+            res = spmv.build_adj_matrix_uv((u, v, eid), num_nodes)
+        adj, edge_map, _ = res
         # create a tmp message frame
         tmp_mfr = FrameRef(frame_like(graph._edge_frame._frame, len(eid)))
         msg = var.FEAT_DICT(data=tmp_mfr)
@@ -638,7 +637,7 @@ def schedule_nodeflow_compute(graph,
         # generate send and reduce schedule
         uv_getter = lambda: (var_u, var_v)
         adj_creator = lambda: spmv.build_adj_matrix_uv(
-            (u, v, eid), graph.layer_size(block_id),
+            (u, v, eid) + graph.layer_size(block_id),
             graph.layer_size(block_id + 1))
         out_map_creator = lambda nbits: _build_idx_map(dest_nodes, nbits)
         reduced_feat = _gen_send_reduce(graph, graph._get_node_frame(block_id),

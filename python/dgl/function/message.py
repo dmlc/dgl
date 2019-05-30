@@ -12,8 +12,7 @@ class MessageFunction(BuiltinFunction):
     """Base builtin message function class."""
 
     def __call__(self, graph, src_frame, dst_frame, edge_frame, out_size,
-                 reducer="none", src_map=None, dst_map=None, edge_map=None,
-                 out_map=None):
+                 src_map, dst_map, edge_map, out_map, reducer="none"):
         """Symbolic computation of this builtin function to create
         runtime.executor
         """

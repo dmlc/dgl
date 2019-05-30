@@ -22,8 +22,8 @@ def infer_binary_feature_shape(lhs, rhs):
     ret = _CAPI_DGLKernelInferBinaryFeatureShape(lhs, rhs)
     return tuple(ret.asnumpy())
 
-def binary_op_reduce(reducer, op, graph, lhs, rhs, lhs_data, rhs_data, out_data,
-                  lhs_mapping, rhs_mapping, out_mapping):
+def binary_op_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
+                     out_data, lhs_mapping, rhs_mapping, out_mapping):
     """Perform binary operation between the given data and reduce by the graph.
 
     Broadcasting is supported for feature dimensions.
@@ -37,7 +37,7 @@ def binary_op_reduce(reducer, op, graph, lhs, rhs, lhs_data, rhs_data, out_data,
         The type of the reducer ("sum", "max", "min", "mean", "prod", "none").
         If the reducer is "none", the output is an edge feature tensor.
         Otherwise, a node feature tensor is returned.
-    op : str
+    binary_op : str
         The type of the binary functor ("add", "mul", "sub", "div").
     graph : GraphIndex
         The graph
@@ -65,13 +65,13 @@ def binary_op_reduce(reducer, op, graph, lhs, rhs, lhs_data, rhs_data, out_data,
     if out_mapping is None:
         out_mapping = empty([])
     _CAPI_DGLKernelBinaryOpReduce(
-        reducer, op, graph._handle,
+        reducer, binary_op, graph._handle,
         int(lhs), int(rhs),
         lhs_data, rhs_data, out_data,
         lhs_mapping, rhs_mapping, out_mapping)
 
 def backward_lhs_binary_op_reduce(
-        reducer, op, graph,
+        reducer, binary_op, graph,
         lhs, rhs,
         lhs_data, rhs_data, out_data,
         grad_out_data, grad_lhs_data,
@@ -87,7 +87,7 @@ def backward_lhs_binary_op_reduce(
         The type of the reducer ("sum", "max", "min", "mean", "prod", "none").
         If the reducer is "none", the output is an edge feature tensor.
         Otherwise, a node feature tensor is returned.
-    op : str
+    binary_op : str
         The type of the binary functor ("add", "mul", "sub", "div").
     graph : GraphIndex
         The graph
@@ -119,14 +119,14 @@ def backward_lhs_binary_op_reduce(
     if out_mapping is None:
         out_mapping = empty([])
     _CAPI_DGLKernelBackwardLhsBinaryOpReduce(
-        reducer, op, graph._handle,
+        reducer, binary_op, graph._handle,
         int(lhs), int(rhs),
         lhs_mapping, rhs_mapping, out_mapping,
         lhs_data, rhs_data, out_data,
         grad_out_data, grad_lhs_data)
 
 def backward_rhs_binary_op_reduce(
-        reducer, op, graph,
+        reducer, binary_op, graph,
         lhs, rhs,
         lhs_data, rhs_data, out_data,
         grad_out_data, grad_rhs_data,
@@ -142,7 +142,7 @@ def backward_rhs_binary_op_reduce(
         The type of the reducer ("sum", "max", "min", "mean", "prod", "none").
         If the reducer is "none", the output is an edge feature tensor.
         Otherwise, a node feature tensor is returned.
-    op : str
+    binary_op : str
         The type of the binary functor ("add", "mul", "sub", "div").
     graph : GraphIndex
         The graph
@@ -174,7 +174,7 @@ def backward_rhs_binary_op_reduce(
     if out_mapping is None:
         out_mapping = empty([])
     _CAPI_DGLKernelBackwardRhsBinaryOpReduce(
-        reducer, op, graph._handle,
+        reducer, binary_op, graph._handle,
         int(lhs), int(rhs),
         lhs_mapping, rhs_mapping, out_mapping,
         lhs_data, rhs_data, out_data,
