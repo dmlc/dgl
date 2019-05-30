@@ -120,7 +120,7 @@ class Graph: public GraphInterface {
   /*!
    * \return whether the graph is read-only
    */
-  virtual bool IsReadonly() const override {
+  bool IsReadonly() const override {
     return false;
   }
 

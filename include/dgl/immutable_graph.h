@@ -59,7 +59,7 @@ class CSR : public GraphInterface {
   void Clear() override {
     LOG(FATAL) << "CSR graph does not allow mutation.";
   }
-  
+
   DLContext Context() const override {
     return indptr_->ctx;
   }

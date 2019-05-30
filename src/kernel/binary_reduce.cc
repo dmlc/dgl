@@ -151,7 +151,7 @@ inline void CheckIdArray(
     if (utils::IsNoneArray(arrays[i]))
       continue;
     CHECK(arrays[i]->dtype.code == kDLInt);
-    CHECK(arrays[i]->ndim == 1);
+    CHECK_EQ(arrays[i]->ndim, 1);
     CHECK_EQ(bits, arrays[i]->dtype.bits)
       << "Expected " << bits << " integer array. But got "
       << arrays[i]->dtype.bits << " for " << names[i] << ".";
