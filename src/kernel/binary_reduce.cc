@@ -130,6 +130,33 @@ std::string IdArrayToStr(IdArray arr) {
   return oss.str();
 }
 
+inline void CheckCtx(
+    const DLContext& ctx,
+    const std::vector<NDArray>& arrays,
+    const std::vector<std::string>& names) {
+  for (size_t i = 0; i < arrays.size(); ++i) {
+    if (utils::IsNoneArray(arrays[i]))
+      continue;
+    CHECK_EQ(ctx, arrays[i]->ctx)
+      << "Expected device context " << ctx << ". But got "
+      << arrays[i]->ctx << " for " << names[i] << ".";
+  }
+}
+
+inline void CheckIdArray(
+    const uint8_t bits,
+    const std::vector<NDArray>& arrays,
+    const std::vector<std::string>& names) {
+  for (size_t i = 0; i < arrays.size(); ++i) {
+    if (utils::IsNoneArray(arrays[i]))
+      continue;
+    CHECK(IsValidIdArray(arrays[i]));
+    CHECK_EQ(bits, arrays[i]->dtype.bits)
+      << "Expected " << bits << " integer array. But got "
+      << arrays[i]->dtype.bits << " for " << names[i] << ".";
+  }
+}
+
 }  // namespace
 
 
@@ -161,26 +188,14 @@ void BinaryOpReduce(
     NDArray out_data,
     NDArray lhs_mapping, NDArray rhs_mapping,
     NDArray out_mapping) {
-  // sanity check
   const auto& ctx = graph->Context();
-  CHECK_EQ(ctx, lhs_data->ctx) << "Expected device context " << ctx
-    << ". But got " << lhs_data->ctx << " for lhs_data.";
-  CHECK_EQ(ctx, rhs_data->ctx) << "Expected device context " << ctx
-    << ". But got " << rhs_data->ctx << " for rhs_data.";
-  CHECK_EQ(ctx, out_data->ctx) << "Expected device context " << ctx
-    << ". But got " << out_data->ctx << " for out_data.";
-  if (!utils::IsNoneArray(lhs_mapping)) {
-    CHECK_EQ(ctx, lhs_mapping->ctx) << "Expected device context " << ctx
-      << ". But got " << lhs_mapping->ctx << " for rhs_data.";
-  }
-  if (!utils::IsNoneArray(rhs_mapping)) {
-    CHECK_EQ(ctx, rhs_mapping->ctx) << "Expected device context " << ctx
-      << ". But got " << rhs_mapping->ctx << " for rhs_data.";
-  }
-  if (!utils::IsNoneArray(out_mapping)) {
-    CHECK_EQ(ctx, out_mapping->ctx) << "Expected device context " << ctx
-      << ". But got " << out_mapping->ctx << " for rhs_data.";
-  }
+  // sanity check
+  CheckCtx(ctx,
+      {lhs_data, rhs_data, out_data, lhs_mapping, rhs_mapping, out_mapping},
+      {"lhs_data", "rhs_data", "out_data", "lhs_mapping", "rhs_mapping", "out_mapping"});
+  CheckIdArray(graph->NumBits(),
+      {lhs_mapping, rhs_mapping, out_mapping},
+      {"lhs_mapping", "rhs_mapping", "out_mapping"});
   // Process mapping
   if (HasBcast(lhs_data, rhs_data)) {
     BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
@@ -237,30 +252,16 @@ void BackwardLhsBinaryOpReduce(
     NDArray out_data,
     NDArray grad_out_data,
     NDArray grad_lhs_data) {
-  // sanity check
   const auto& ctx = graph->Context();
-  CHECK_EQ(ctx, lhs_data->ctx) << "Expected device context " << ctx
-    << ". But got " << lhs_data->ctx << " for lhs_data.";
-  CHECK_EQ(ctx, rhs_data->ctx) << "Expected device context " << ctx
-    << ". But got " << rhs_data->ctx << " for rhs_data.";
-  CHECK_EQ(ctx, out_data->ctx) << "Expected device context " << ctx
-    << ". But got " << out_data->ctx << " for out_data.";
-  CHECK_EQ(ctx, grad_out_data->ctx) << "Expected device context " << ctx
-    << ". But got " << grad_out_data->ctx << " for grad_out_data.";
-  CHECK_EQ(ctx, grad_lhs_data->ctx) << "Expected device context " << ctx
-    << ". But got " << grad_lhs_data->ctx << " for grad_lhs_data.";
-  if (!utils::IsNoneArray(lhs_mapping)) {
-    CHECK_EQ(ctx, lhs_mapping->ctx) << "Expected device context " << ctx
-      << ". But got " << lhs_mapping->ctx << " for rhs_data.";
-  }
-  if (!utils::IsNoneArray(rhs_mapping)) {
-    CHECK_EQ(ctx, rhs_mapping->ctx) << "Expected device context " << ctx
-      << ". But got " << rhs_mapping->ctx << " for rhs_data.";
-  }
-  if (!utils::IsNoneArray(out_mapping)) {
-    CHECK_EQ(ctx, out_mapping->ctx) << "Expected device context " << ctx
-      << ". But got " << out_mapping->ctx << " for rhs_data.";
-  }
+  // sanity check
+  CheckCtx(ctx,
+      {lhs_data, rhs_data, out_data, grad_out_data, grad_lhs_data,
+       lhs_mapping, rhs_mapping, out_mapping},
+      {"lhs_data", "rhs_data", "out_data", "grad_out_data", "grad_lhs_data",
+       "lhs_mapping", "rhs_mapping", "out_mapping"});
+  CheckIdArray(graph->NumBits(),
+      {lhs_mapping, rhs_mapping, out_mapping},
+      {"lhs_mapping", "rhs_mapping", "out_mapping"});
   if (HasBcast(lhs_data, rhs_data)) {
     BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
     DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceBcastImpl,
@@ -319,30 +320,16 @@ void BackwardRhsBinaryOpReduce(
     NDArray out_data,
     NDArray grad_out_data,
     NDArray grad_rhs_data) {
-  // sanity check
   const auto& ctx = graph->Context();
-  CHECK_EQ(ctx, lhs_data->ctx) << "Expected device context " << ctx
-    << ". But got " << lhs_data->ctx << " for lhs_data.";
-  CHECK_EQ(ctx, rhs_data->ctx) << "Expected device context " << ctx
-    << ". But got " << rhs_data->ctx << " for rhs_data.";
-  CHECK_EQ(ctx, out_data->ctx) << "Expected device context " << ctx
-    << ". But got " << out_data->ctx << " for out_data.";
-  CHECK_EQ(ctx, grad_out_data->ctx) << "Expected device context " << ctx
-    << ". But got " << grad_out_data->ctx << " for grad_out_data.";
-  CHECK_EQ(ctx, grad_rhs_data->ctx) << "Expected device context " << ctx
-    << ". But got " << grad_rhs_data->ctx << " for grad_rhs_data.";
-  if (!utils::IsNoneArray(lhs_mapping)) {
-    CHECK_EQ(ctx, lhs_mapping->ctx) << "Expected device context " << ctx
-      << ". But got " << lhs_mapping->ctx << " for rhs_data.";
-  }
-  if (!utils::IsNoneArray(rhs_mapping)) {
-    CHECK_EQ(ctx, rhs_mapping->ctx) << "Expected device context " << ctx
-      << ". But got " << rhs_mapping->ctx << " for rhs_data.";
-  }
-  if (!utils::IsNoneArray(out_mapping)) {
-    CHECK_EQ(ctx, out_mapping->ctx) << "Expected device context " << ctx
-      << ". But got " << out_mapping->ctx << " for rhs_data.";
-  }
+  // sanity check
+  CheckCtx(ctx,
+      {lhs_data, rhs_data, out_data, grad_out_data, grad_rhs_data,
+       lhs_mapping, rhs_mapping, out_mapping},
+      {"lhs_data", "rhs_data", "out_data", "grad_out_data", "grad_rhs_data",
+       "lhs_mapping", "rhs_mapping", "out_mapping"});
+  CheckIdArray(graph->NumBits(),
+      {lhs_mapping, rhs_mapping, out_mapping},
+      {"lhs_mapping", "rhs_mapping", "out_mapping"});
   if (HasBcast(lhs_data, rhs_data)) {
     BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
     DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceBcastImpl,
@@ -394,20 +381,14 @@ void CopyReduce(
     binary_op::Target target,
     NDArray in_data, NDArray out_data,
     NDArray in_mapping, NDArray out_mapping) {
-  // sanity check
   const auto& ctx = graph->Context();
-  CHECK_EQ(ctx, in_data->ctx) << "Expected device context " << ctx
-    << ". But got " << in_data->ctx << " for in_data.";
-  CHECK_EQ(ctx, out_data->ctx) << "Expected device context " << ctx
-    << ". But got " << out_data->ctx << " for out_data.";
-  if (!utils::IsNoneArray(in_mapping)) {
-    CHECK_EQ(ctx, in_mapping->ctx) << "Expected device context " << ctx
-      << ". But got " << in_mapping->ctx << " for rhs_data.";
-  }
-  if (!utils::IsNoneArray(out_mapping)) {
-    CHECK_EQ(ctx, out_mapping->ctx) << "Expected device context " << ctx
-      << ". But got " << out_mapping->ctx << " for rhs_data.";
-  }
+  // sanity check
+  CheckCtx(ctx,
+      {in_data, out_data, in_mapping, out_mapping},
+      {"in_data", "out_data", "in_mapping", "out_mapping"});
+  CheckIdArray(graph->NumBits(),
+      {in_mapping, out_mapping},
+      {"in_mapping", "out_mapping"});
   DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl,
       reducer, binary_op::kUseLhs, graph,
       target, binary_op::kDst /* any value != target could do */,
@@ -444,20 +425,14 @@ void BackwardCopyReduce(
     NDArray out_data,
     NDArray grad_out_data,
     NDArray grad_in_data) {
-  // sanity check
   const auto& ctx = graph->Context();
-  CHECK_EQ(ctx, in_data->ctx) << "Expected device context " << ctx
-    << ". But got " << in_data->ctx << " for in_data.";
-  CHECK_EQ(ctx, out_data->ctx) << "Expected device context " << ctx
-    << ". But got " << out_data->ctx << " for out_data.";
-  CHECK_EQ(ctx, grad_out_data->ctx) << "Expected device context " << ctx
-    << ". But got " << grad_out_data->ctx << " for grad_out_data.";
-  CHECK_EQ(ctx, grad_in_data->ctx) << "Expected device context " << ctx
-    << ". But got " << grad_in_data->ctx << " for grad_in_data.";
-  if (!utils::IsNoneArray(in_mapping)) {
-    CHECK_EQ(ctx, in_mapping->ctx) << "Expected device context " << ctx
-      << ". But got " << in_mapping->ctx << " for rhs_data.";
-  }
+  // sanity check
+  CheckCtx(ctx,
+      {in_data, out_data, grad_out_data, grad_in_data, in_mapping, out_mapping},
+      {"in_data", "out_data", "grad_out_data", "grad_in_data", "in_mapping", "out_mapping"});
+  CheckIdArray(graph->NumBits(),
+      {in_mapping, out_mapping},
+      {"in_mapping", "out_mapping"});
   if (!utils::IsNoneArray(out_mapping)) {
     CHECK_EQ(ctx, out_mapping->ctx) << "Expected device context " << ctx
       << ". But got " << out_mapping->ctx << " for rhs_data.";
