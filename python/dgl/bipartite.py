@@ -1550,6 +1550,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
                                               inplace=inplace)
             Runtime.run(prog)
 
+    # pylint: disable=unnecessary-pass
     def push(self,
              u,
              message_func="default",
@@ -1699,6 +1700,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         """
         raise NotImplementedError('not supported')
 
+    # pylint: disable=unnecessary-pass
     def subgraph(self, nodes):
         """Return the subgraph induced on given nodes.
 
@@ -1723,6 +1725,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         """
         pass
 
+    # pylint: disable=unnecessary-pass
     def subgraphs(self, nodes):
         """Return a list of subgraphs, each induced in the corresponding given
         nodes in the list.
@@ -1745,6 +1748,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         """
         pass
 
+    # pylint: disable=unnecessary-pass
     def edge_subgraph(self, edges):
         """Return the subgraph induced on given edges.
 
@@ -1875,6 +1879,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         assert etype == self._etype
         return self._graph.incidence_matrix(typestr, ctx)[0]
 
+    # pylint: disable=unnecessary-pass
     def filter_nodes(self, ntype, predicate, nodes=ALL):
         """Return a tensor of node IDs with the given node type that satisfy
         the given predicate.
@@ -1899,6 +1904,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         """
         pass
 
+    # pylint: disable=unnecessary-pass
     def filter_edges(self, etype, predicate, edges=ALL):
         """Return a tensor of edge IDs with the given edge type that satisfy
         the given predicate.
@@ -1925,6 +1931,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         """
         pass
 
+    # pylint: disable=unnecessary-pass
     def readonly(self, readonly_state=True):
         """Set this graph's readonly state in-place.
 
@@ -1935,6 +1942,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         """
         pass
 
+    # pylint: disable=unnecessary-pass
     def __repr__(self):
         pass
 
