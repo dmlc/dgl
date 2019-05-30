@@ -53,17 +53,17 @@ class GraphIndex(object):
         self._readonly = readonly
         if multigraph is None:
             self._handle = _CAPI_DGLGraphCreate1(
-                    src.todgltensor(),
-                    dst.todgltensor(),
-                    int(num_nodes),
-                    readonly)
+                src.todgltensor(),
+                dst.todgltensor(),
+                int(num_nodes),
+                readonly)
         else:
             self._handle = _CAPI_DGLGraphCreate(
-                    src.todgltensor(),
-                    dst.todgltensor(),
-                    multigraph,
-                    int(num_nodes),
-                    readonly)
+                src.todgltensor(),
+                dst.todgltensor(),
+                multigraph,
+                int(num_nodes),
+                readonly)
 
     @property
     def handle(self):
@@ -822,7 +822,7 @@ class SubgraphIndex(GraphIndex):
         raise NotImplementedError(
             "SubgraphIndex unpickling is not supported yet.")
 
-    
+
 ###############################################################
 # Conversion functions
 ###############################################################
@@ -852,17 +852,17 @@ def from_coo(num_nodes, src, dst, is_multigraph, readonly):
     if readonly:
         if is_multigraph is None:
             handle = _CAPI_DGLGraphCreate1(
-                    src.todgltensor(),
-                    dst.todgltensor(),
-                    int(num_nodes),
-                    readonly)
+                src.todgltensor(),
+                dst.todgltensor(),
+                int(num_nodes),
+                readonly)
         else:
             handle = _CAPI_DGLGraphCreate(
-                    src.todgltensor(),
-                    dst.todgltensor(),
-                    is_multigraph,
-                    int(num_nodes),
-                    readonly)
+                src.todgltensor(),
+                dst.todgltensor(),
+                is_multigraph,
+                int(num_nodes),
+                readonly)
         gidx = GraphIndex(handle)
     else:
         if is_multigraph is None:

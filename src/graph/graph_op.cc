@@ -34,6 +34,7 @@ class RangeIter : public std::iterator<std::input_iterator_tag, dgl_id_t> {
   dgl_id_t operator*() const {
     return cur_;
   }
+
  private:
   dgl_id_t cur_;
 };
