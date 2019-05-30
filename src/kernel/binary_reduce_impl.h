@@ -329,12 +329,26 @@ void BinaryReduceBcastImpl(
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
   }
-  DGL_DTYPE_SWITCH(dtype, DType, {
 #ifdef __CUDACC__
-    ({typedef int32_t Idx;
+  DGL_DTYPE_SWITCH(dtype, DType, {
+    typedef int32_t Idx;
+    REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
+      BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
+        auto gdata = AllocBcastGData<XPU, NDim, Idx, DType, Reducer>(
+            rtcfg.ctx, info, lhs_mapping, rhs_mapping,
+            lhs_data, rhs_data, out_mapping, out_data);
+        BINARY_OP_SWITCH(op, DType, BinaryOp, {
+          TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
+            CallBinaryReduceBcast<XPU, NDim, Idx, DType, LeftTarget,
+              RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
+          });
+        });
+      });
+    });
+  });
 #else
+  DGL_DTYPE_SWITCH(dtype, DType, {
     DGL_IDX_TYPE_SWITCH(bits, Idx, {
-#endif
       REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
         BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
           auto gdata = AllocBcastGData<XPU, NDim, Idx, DType, Reducer>(
@@ -350,6 +364,7 @@ void BinaryReduceBcastImpl(
       });
     });
   });
+#endif
 }
 
 /****************************************************
@@ -444,12 +459,30 @@ void BackwardBinaryReduceBcastImpl(
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
   }
-  DGL_DTYPE_SWITCH(dtype, DType, {
 #ifdef __CUDACC__
-    ({typedef int32_t Idx;
+  DGL_DTYPE_SWITCH(dtype, DType, {
+    typedef int32_t Idx;
+    BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
+      auto gdata = AllocBackwardBcastGData<XPU, NDim, Idx, DType>(
+          rtcfg.ctx, info,
+          lhs_mapping, rhs_mapping, out_mapping,
+          lhs, rhs, out, grad_out,
+          grad_lhs, grad_rhs);
+      BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, {
+        REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
+          BINARY_OP_SWITCH(op, DType, BinaryOp, {
+            TARGET_SWITCH(lhs_tgt, rhs_tgt, LeftTarget, RightTarget, {
+              CallBackwardBinaryReduceBcast<XPU, Mode, NDim, Idx, DType,
+                LeftTarget, RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
+            });
+          });
+        });
+      });
+    });
+  });
 #else
+  DGL_DTYPE_SWITCH(dtype, DType, {
     DGL_IDX_TYPE_SWITCH(bits, Idx, {
-#endif
       BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
         auto gdata = AllocBackwardBcastGData<XPU, NDim, Idx, DType>(
             rtcfg.ctx, info,
@@ -469,6 +502,7 @@ void BackwardBinaryReduceBcastImpl(
       });
     });
   });
+#endif
 }
 
 }  // namespace kernel
