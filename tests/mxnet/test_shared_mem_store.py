@@ -10,6 +10,7 @@ import backend as F
 import unittest
 import dgl.function as fn
 import traceback
+from numpy.testing import assert_almost_equal
 
 num_nodes = 100
 num_edges = int(num_nodes * num_nodes * 0.1)
@@ -55,11 +56,11 @@ def _check_init_func(worker_id, graph_name):
 
     data = g.nodes[:].data['test4']
     g.set_n_repr({'test4': mx.nd.ones((1, 10)) * 10}, u=[0])
-    assert np.all(data[0].asnumpy() == g.nodes[0].data['test4'].asnumpy())
+    assert_almost_equal(data[0].asnumpy(), g.nodes[0].data['test4'].asnumpy())
 
     data = g.edges[:].data['test4']
     g.set_e_repr({'test4': mx.nd.ones((1, 10)) * 20}, edges=[0])
-    assert np.all(data[0].asnumpy() == g.edges[0].data['test4'].asnumpy())
+    assert_almost_equal(data[0].asnumpy(), g.edges[0].data['test4'].asnumpy())
 
     g.destroy()
 
@@ -119,30 +120,30 @@ def _check_compute_func(worker_id, graph_name):
     g.update_all(fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='preprocess'))
     adj = g.adjacency_matrix()
     tmp = mx.nd.dot(adj, g.nodes[:].data['feat'])
-    assert np.all((g.nodes[:].data['preprocess'] == tmp).asnumpy())
+    assert_almost_equal(g.nodes[:].data['preprocess'].asnumpy(), tmp.asnumpy())
     g._sync_barrier()
     check_array_shared_memory(g, worker_id, [g.nodes[:].data['preprocess']])
 
     # Test apply nodes.
     data = g.nodes[:].data['feat']
     g.apply_nodes(func=lambda nodes: {'feat': mx.nd.ones((1, in_feats)) * 10}, v=0)
-    assert np.all(data[0].asnumpy() == g.nodes[0].data['feat'].asnumpy())
+    assert_almost_equal(data[0].asnumpy(), g.nodes[0].data['feat'].asnumpy())
 
     # Test apply edges.
     data = g.edges[:].data['feat']
     g.apply_edges(func=lambda edges: {'feat': mx.nd.ones((1, in_feats)) * 10}, edges=0)
-    assert np.all(data[0].asnumpy() == g.edges[0].data['feat'].asnumpy())
+    assert_almost_equal(data[0].asnumpy(), g.edges[0].data['feat'].asnumpy())
 
     g.init_ndata('tmp', (g.number_of_nodes(), 10), 'float32')
     data = g.nodes[:].data['tmp']
     # Test pull
     g.pull(1, fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='tmp'))
-    assert np.all(data[1].asnumpy() == g.nodes[1].data['preprocess'].asnumpy())
+    assert_almost_equal(data[1].asnumpy(), g.nodes[1].data['preprocess'].asnumpy())
 
     # Test send_and_recv
     in_edges = g.in_edges(v=2)
     g.send_and_recv(in_edges, fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='tmp'))
-    assert np.all(data[2].asnumpy() == g.nodes[2].data['preprocess'].asnumpy())
+    assert_almost_equal(data[2].asnumpy(), g.nodes[2].data['preprocess'].asnumpy())
 
     g.destroy()
 
