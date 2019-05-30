@@ -727,7 +727,7 @@ ImmutableGraph ImmutableGraph::ToImmutable(const GraphInterface* graph) {
   if (ig) {
     return *ig;
   } else {
-    const auto& adj = graph->GetAdj(false, "csr");
+    const auto& adj = graph->GetAdj(true, "csr");
     CSRPtr csr(new CSR(adj[0], adj[1], adj[2]));
     return ImmutableGraph(nullptr, csr);
   }
