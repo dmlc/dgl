@@ -90,12 +90,24 @@ void BinaryReduceImpl(
 #ifdef __CUDACC__
   CHECK(bits == 32) << "CUDA kernel only supports 32 bits graph.";
 #endif
-  DGL_DTYPE_SWITCH(dtype, DType, {
 #ifdef __CUDACC__
-    ({typedef int32_t Idx;
+  DGL_DTYPE_SWITCH(dtype, DType, {
+    typedef int32_t Idx;
+    REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
+      auto gdata = AllocGData<XPU, Idx, DType, Reducer>(
+          rtcfg.ctx, x_len, lhs_mapping, rhs_mapping,
+          lhs_data, rhs_data, out_mapping, out_data);
+      BINARY_OP_SWITCH(op, DType, BinaryOp, {
+        TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
+          CallBinaryReduce<XPU, Idx, DType, LeftTarget,
+            RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
+        });
+      });
+    });
+  });
 #else
+  DGL_DTYPE_SWITCH(dtype, DType, {
     DGL_IDX_TYPE_SWITCH(bits, Idx, {
-#endif
       REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
         auto gdata = AllocGData<XPU, Idx, DType, Reducer>(
             rtcfg.ctx, x_len, lhs_mapping, rhs_mapping,
@@ -109,6 +121,7 @@ void BinaryReduceImpl(
       });
     });
   });
+#endif
 }
 
 /****************************************************
