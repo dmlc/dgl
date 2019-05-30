@@ -115,6 +115,7 @@ class DGLBaseHeteroGraph(object):
             edge_connections_by_type):
         super(DGLBaseHeteroGraph, self).__init__()
 
+    # pylint: disable=unnecessary-pass
     def __getitem__(self, key):
         """Returns a view on the heterogeneous graph with given node/edge
         type:
