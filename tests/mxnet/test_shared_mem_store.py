@@ -39,7 +39,7 @@ def _check_init_func(worker_id, graph_name):
                                                                 port=rand_port)
             break
         except ConnectionError as e:
-            print(e)
+            print(e, file=sys.stderr)
             traceback.print_exc()
             time.sleep(1)
     # Verify the graph structure loaded from the shared memory.
@@ -70,7 +70,7 @@ def check_init_func(worker_id, graph_name, return_dict):
         return_dict[worker_id] = 0
     except Exception as e:
         return_dict[worker_id] = -1
-        print(e)
+        print(e, file=sys.stderr)
         traceback.print_exc()
 
 def server_func(num_workers, graph_name):
@@ -153,7 +153,7 @@ def check_compute_func(worker_id, graph_name, return_dict):
         return_dict[worker_id] = 0
     except Exception as e:
         return_dict[worker_id] = -1
-        print(e)
+        print(e, file=sys.stderr)
         traceback.print_exc()
 
 def test_compute():
