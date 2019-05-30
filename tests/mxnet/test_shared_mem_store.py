@@ -96,7 +96,7 @@ def test_init():
     serv_p.join()
     work_p1.join()
     work_p2.join()
-    for worker_id in return_dict:
+    for worker_id in return_dict.keys():
         assert return_dict[worker_id] == 0, "worker %d fails" % worker_id
 
 
@@ -166,7 +166,7 @@ def test_compute():
     serv_p.join()
     work_p1.join()
     work_p2.join()
-    for worker_id in return_dict:
+    for worker_id in return_dict.keys():
         assert return_dict[worker_id] == 0, "worker %d fails" % worker_id
 
 if __name__ == '__main__':
