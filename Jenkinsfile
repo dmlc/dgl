@@ -130,14 +130,14 @@ pipeline {
       parallel {
         stage("CPP Test") {
           stages{
-            stage("CPP Unit Test Linux"){
-              agent {
-                docker {image "dgllib/dgl-ci-cpu"}
-              }
-              steps { 
-                cpp_unit_test_linux() 
-              }
-            }
+            //stage("CPP Unit Test Linux"){
+            //  agent {
+            //    docker {image "dgllib/dgl-ci-cpu"}
+            //  }
+            //  steps { 
+            //    cpp_unit_test_linux() 
+            //  }
+            //}
             stage("CPP Unit Test Windows"){
               agent {
                 label "windows"
