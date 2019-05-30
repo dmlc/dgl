@@ -765,7 +765,8 @@ class DGLGraph(DGLBaseGraph):
     edge_frame : FrameRef, optional
         Edge feature storage.
     multigraph : bool, optional
-        Whether the graph would be a multigraph (default: False)
+        Whether the graph would be a multigraph. If none, the flag will be determined
+        by scanning the whole graph. (default: None)
     readonly : bool, optional
         Whether the graph structure is read-only (default: False).
 
@@ -894,7 +895,7 @@ class DGLGraph(DGLBaseGraph):
                  graph_data=None,
                  node_frame=None,
                  edge_frame=None,
-                 multigraph=False,
+                 multigraph=None,
                  readonly=False):
         # graph
         super(DGLGraph, self).__init__(create_graph_index(graph_data, multigraph, readonly))

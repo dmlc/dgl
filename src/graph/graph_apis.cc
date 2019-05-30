@@ -127,6 +127,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreateMutable")
     *rv = ghandle;
   });
 
+
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const IdArray src_ids = args[0];
@@ -144,6 +145,27 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
       ghandle = new ImmutableGraph(coo);
     } else {
       ghandle = new Graph(src_ids, dst_ids, num_nodes, multigraph);
+    }
+    *rv = ghandle;
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate1")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    // Create graph without multigraph argument
+    const IdArray src_ids = args[0];
+    const IdArray dst_ids = args[1];
+    const int64_t num_nodes = static_cast<int64_t>(args[2]);
+    const bool readonly = static_cast<bool>(args[3]);
+    GraphHandle ghandle;
+    if (readonly) {
+      // TODO(minjie): The array copy here is unnecessary and adds extra overhead.
+      //   However, with MXNet backend, the memory would be corrupted if we directly
+      //   save the passed-in ndarrays into DGL's graph object. We hope MXNet team
+      //   could help look into this.
+      COOPtr coo(new COO(num_nodes, Clone(src_ids), Clone(dst_ids)));
+      ghandle = new ImmutableGraph(coo);
+    } else {
+      ghandle = new Graph(src_ids, dst_ids, num_nodes, false);
     }
     *rv = ghandle;
   });
