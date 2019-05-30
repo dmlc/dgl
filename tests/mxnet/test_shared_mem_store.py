@@ -25,7 +25,7 @@ def check_array_shared_memory(g, worker_id, arrays):
     else:
         g._sync_barrier()
         for i, arr in enumerate(arrays):
-            assert np.all(arr[0].asnumpy() == i)
+            assert_almost_equal(arr[0].asnumpy(), i)
 
 def _check_init_func(worker_id, graph_name):
     time.sleep(3)
