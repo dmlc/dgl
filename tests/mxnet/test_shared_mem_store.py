@@ -31,7 +31,14 @@ def check_init_func(worker_id, graph_name):
     np.random.seed(0)
     csr = (spsp.random(num_nodes, num_nodes, density=0.1, format='csr') != 0).astype(np.int64)
 
-    g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem", port=rand_port)
+    for _ in range(10):
+        try:
+            g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem",
+                                                                port=rand_port)
+            break
+        except:
+            print("fail to connect to the graph store server.")
+            time.sleep(1)
     # Verify the graph structure loaded from the shared memory.
     src, dst = g.all_edges()
     coo = csr.tocoo()
@@ -82,7 +89,14 @@ def test_init():
 def check_compute_func(worker_id, graph_name):
     time.sleep(3)
     print("worker starts")
-    g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem", port=rand_port)
+    for _ in range(10):
+        try:
+            g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem",
+                                                                port=rand_port)
+            break
+        except:
+            print("fail to connect to the graph store server.")
+            time.sleep(1)
     g._sync_barrier()
     in_feats = g.nodes[0].data['feat'].shape[1]
 
