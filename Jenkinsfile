@@ -20,6 +20,14 @@ def build_dgl_win64() {
   bat "CALL tests\\scripts\\build_dgl.bat"
 }
 
+def cpp_unit_test_linux(){
+  sh "bash tests/scripts/task_cpp_unit_test.sh"
+}
+
+def cpp_unit_test_windows(){
+  bat "CALL tests\\scripts\\task_cpp_unit_test.bat"
+}
+
 def unit_test(backend, dev) {
   withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build", "PYTHONPATH=${env.WORKSPACE}/python", "DGLBACKEND=${backend}"]) {
     sh "bash tests/scripts/task_unit_test.sh ${backend}"
@@ -120,6 +128,28 @@ pipeline {
     }
     stage("Test") {
       parallel {
+        stage("CPP Test"){
+          stages{
+            stage("CPP Unit Test Linux"){
+              agent {
+                docker {image "dgllib/dgl-ci-cpu"}
+              }
+              steps { 
+                init_git_submodule()
+                cpp_unit_test_linux() 
+              }
+            }
+            stage("CPP Unit Test Windows"){
+              agent {
+                label "windows"
+              }
+              steps {
+                init_git_submodule_win64()
+                cpp_unit_test_windows()
+              }
+            }
+          }
+        }
         stage("Pytorch CPU") {
           agent {
             docker { image "dgllib/dgl-ci-cpu" }
@@ -177,6 +207,9 @@ pipeline {
           }
           stages {
             stage("MX Unittest") {
+              options {
+                  timeout(time: 5, unit: 'MINUTES') 
+              }
               steps { unit_test("mxnet", "CPU") }
             }
           }
