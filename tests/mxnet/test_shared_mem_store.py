@@ -108,7 +108,7 @@ def _check_compute_func(worker_id, graph_name):
             g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem",
                                                                 port=rand_port)
             break
-        except:
+        except e:
             print("fail to connect to the graph store server.")
             time.sleep(1)
     g._sync_barrier()

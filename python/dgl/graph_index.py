@@ -908,7 +908,7 @@ def from_csr(indptr, indices, is_multigraph,
             direction)
     return GraphIndex(handle)
 
-def from_shared_mem_csr_matrix(self, shared_mem_name,
+def from_shared_mem_csr_matrix(shared_mem_name,
                                num_nodes, num_edges, edge_dir,
                                is_multigraph):
     """Load a graph from the shared memory in the CSR format.
