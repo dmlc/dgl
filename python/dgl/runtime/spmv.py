@@ -53,8 +53,9 @@ def gen_v2v_spmv_schedule(graph, mfunc, rfunc, src_frame, dst_frame, edge_frame,
         ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
 
-def gen_v2e_spmv_schedule(graph, mfunc, src_frame, dst_frame, edge_frame,
-                          out, out_size, edge_map, out_map=None):
+def gen_v2e_spmv_schedule(graph, mfunc, src_frame, dst_frame, edge_frame, out,
+                          out_size, src_map=None, dst_map=None, edge_map=None,
+                          out_map=None):
     """Generate v2e SPMV schedule
 
     Parameters
@@ -79,8 +80,8 @@ def gen_v2e_spmv_schedule(graph, mfunc, src_frame, dst_frame, edge_frame,
         caches on given context
     """
     for mfn in mfunc:
-        fmsg = mfn(graph, src_frame, dst_frame, edge_frame, out_size,
-                   edge_map=edge_map, out_map=out_map)
+        fmsg = mfn(graph, src_frame, dst_frame, edge_frame, out_size, src_map,
+                   dst_map, edge_map, out_map=out_map, reducer="none")
         ir.WRITE_COL_(out, var.STR(mfn.out_field), fmsg)
 
 

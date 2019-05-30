@@ -62,13 +62,18 @@ def schedule_send(graph, u, v, eid, message_func):
             # build edge_mapping
             num_nodes = graph.number_of_nodes()
             res = spmv.build_adj_matrix_uv((u, v, eid), num_nodes, num_nodes)
-        adj, edge_map, inv_edge_map, msg_map, inv_msg_map = res
+        adj, edge_map, nbits = res
         # create a tmp message frame
         tmp_mfr = FrameRef(frame_like(graph._edge_frame._frame, len(eid)))
         msg = var.FEAT_DICT(data=tmp_mfr)
-        spmv.gen_v2e_spmv_schedule(adj, message_func, var_nf, var_nf, var_ef,
-                                   msg, len(eid), (edge_map, inv_edge_map),
-                                   (msg_map, inv_msg_map))
+        spmv.gen_v2e_spmv_schedule(graph=adj,
+                                   mfunc=message_func,
+                                   src_frame=var_nf,
+                                   dst_frame=var_nf,
+                                   edge_frame=var_ef,
+                                   out=msg,
+                                   out_size=len(eid),
+                                   edge_map=edge_map)
     else:
         # UDF send
         msg = _gen_send(graph, var_nf, var_nf, var_ef, var_u, var_v, var_eid,
@@ -877,8 +882,14 @@ def _gen_send_reduce(
         n_message = len(var_eid.data)
         tmp_msg_frame = FrameRef(frame_like(edge_frame._frame, n_message))
         var_mf = var.FEAT_DICT(data=tmp_msg_frame)
-        spmv.gen_v2e_spmv_schedule(adj, mfunc, var_src_nf, var_dst_nf, var_ef,
-                                   var_mf, n_message, edge_map)
+        spmv.gen_v2e_spmv_schedule(graph=adj,
+                                   mfunc=mfunc,
+                                   src_frame=var_src_nf,
+                                   dst_frame=var_dst_nf,
+                                   edge_frame=var_ef,
+                                   out=var_mf,
+                                   out_size=n_message,
+                                   edge_map=edge_map)
     else:
         # generate UDF send schedule
         var_mf = _gen_send(graph, var_src_nf, var_dst_nf, var_ef, var_u, var_v,
