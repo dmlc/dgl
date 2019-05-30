@@ -36,10 +36,11 @@ class SimpleReduceFunction(ReduceFunction):
                  out_map=None):
         """Symbolic execution of this builtin function"""
         reducer = self._name
+        graph = var.GRAPH(graph)
         edge_map = var.MAP(edge_map)
         out_map = var.MAP(out_map)
         edge_data = ir.READ_COL(edge_frame, var.STR(self.msg_field))
-        return ir.COPY_REDUCE(reducer, TargetCode.EDGE, graph, edge_data,
+        return ir.COPY_REDUCE(reducer, graph, TargetCode.EDGE, edge_data,
                               out_size, edge_map, out_map)
 
     @property

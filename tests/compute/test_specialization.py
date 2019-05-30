@@ -15,7 +15,8 @@ def generate_graph():
         g.add_edge(i, 9)
     # add a back flow from 9 to 0
     g.add_edge(9, 0)
-    g.set_n_repr({'f1' : F.randn((10,)), 'f2' : F.randn((10, D))})
+    #g.set_n_repr({'f1' : F.randn((10,)), 'f2' : F.randn((10, D))})
+    g.set_n_repr({'f1' : F.arange(0, 10).float(), 'f2' : F.randn((10, D))})
     weights = F.randn((17,))
     g.set_e_repr({'e1': weights, 'e2': F.unsqueeze(weights, 1)})
     return g
@@ -536,7 +537,6 @@ def test_spmv_3d_feat():
 
 if __name__ == '__main__':
     test_v2v_update_all()
-    exit()
     test_v2v_snr()
     test_v2v_pull()
     test_v2v_update_all_multi_fn()

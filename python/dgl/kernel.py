@@ -211,7 +211,7 @@ def copy_reduce(reducer, graph, target,
         in_mapping = empty([])
     if out_mapping is None:
         out_mapping = empty([])
-    return _CAPI_DGLKernelCopyReduce(
+    _CAPI_DGLKernelCopyReduce(
         reducer, graph._handle, int(target),
         in_data, out_data, in_mapping, out_mapping)
 
@@ -251,7 +251,7 @@ def backward_copy_reduce(reducer, graph, target,
         in_mapping = empty([])
     if out_mapping is None:
         out_mapping = empty([])
-    return _CAPI_DGLKernelBackwardCopyReduce(
+    _CAPI_DGLKernelBackwardCopyReduce(
         reducer, graph._handle, int(target),
         in_data, out_data, grad_out_data, grad_in_data,
         in_mapping, out_mapping)

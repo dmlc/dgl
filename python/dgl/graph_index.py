@@ -621,8 +621,7 @@ class GraphIndex(object):
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
-        bits = 32 if self.number_of_edges() < 0x80000000 else 64
-        return self.to_immutable().asbits(bits).copy_to(ctx)
+        return self.to_immutable().asbits(self.bits_needed()).copy_to(ctx)
 
     def get_csr_shuffle_order(self):
         """Return the shuffle order of edge id of immutable csr graph index"""
@@ -630,7 +629,7 @@ class GraphIndex(object):
         order = csr(2)
         rev_csr = _CAPI_DGLGraphGetAdj(self._handle, False, "csr")
         rev_order = rev_csr(2)
-        return order, rev_order
+        return utils.toindex(order), utils.toindex(rev_order)
 
     def adjacency_matrix(self, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
@@ -975,6 +974,16 @@ class GraphIndex(object):
             The number of bits.
         """
         return _CAPI_DGLGraphNumBits(self._handle)
+
+    def bits_needed(self):
+        """Return the number of integer bits needed to represent the graph
+        """
+        if self.number_of_edges() >= 0x80000000:
+            return 64
+        elif self.number_of_nodes() >= 0x80000000:
+            return 64
+        else:
+            return 32
 
     def asbits(self, bits):
         """Transform the graph to a new one with the given number of bits storage.
