@@ -128,7 +128,7 @@ pipeline {
     }
     stage("Test") {
       parallel {
-        stage("CPP Test"){
+        stage("CPP Test") {
           stages{
             stage("CPP Unit Test Linux"){
               agent {

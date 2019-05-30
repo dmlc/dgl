@@ -24,3 +24,4 @@ popd
 
 echo $PWD
 ls -lh
+ls build -lh
