@@ -130,8 +130,7 @@ class ThreadPrefetchingWrapper(PrefetchingWrapper, threading.Thread):
 
 
 class NodeFlowSampler(object):
-    '''
-    Base class that generates NodeFlows from a graph.
+    '''Base class that generates NodeFlows from a graph.
 
     Class properties
     ----------------
@@ -301,10 +300,10 @@ class NeighborSampler(NodeFlowSampler):
         assert node_prob is None, 'non-uniform node probability not supported'
         assert isinstance(expand_factor, Integral), 'non-int expand_factor not supported'
 
-        self._expand_factor = expand_factor
-        self._num_hops = num_hops
+        self._expand_factor = int(expand_factor)
+        self._num_hops = int(num_hops)
         self._add_self_loop = add_self_loop
-        self._num_workers = num_workers
+        self._num_workers = int(num_workers)
         self._neighbor_type = neighbor_type
 
     def fetch(self, current_nodeflow_index):
@@ -366,7 +365,7 @@ class LayerSampler(NodeFlowSampler):
 
         assert node_prob is None, 'non-uniform node probability not supported'
 
-        self._num_workers = num_workers
+        self._num_workers = int(num_workers)
         self._neighbor_type = neighbor_type
         self._layer_sizes = utils.toindex(layer_sizes)
 
