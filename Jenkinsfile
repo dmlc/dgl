@@ -90,6 +90,7 @@ pipeline {
             ws('workspace/cpu-build') {
               //init_git_submodule()
               sh "pwd"
+              sh "touch cpu-build"
               sh "ls -lh"
             }
           }
@@ -105,6 +106,7 @@ pipeline {
             ws('workspace/gpu-build') {
               //init_git_submodule()
               sh "pwd"
+              sh "touch gpu-build"
               sh "ls -lh"
             }
           }
@@ -129,6 +131,7 @@ pipeline {
               steps { 
                 ws('workspace/cpu-build') {
                   sh "pwd"
+                  sh "touch cpu-cpp-test"
                   sh "ls -lh"
                 }
               }
@@ -150,6 +153,7 @@ pipeline {
               steps {
                 ws('workspace/cpu-build') {
                   sh "pwd"
+                  sh "touch cpu-torch-utest"
                   sh "ls -lh"
                 }
               }
@@ -158,13 +162,11 @@ pipeline {
               steps {
                 ws('workspace/cpu-build') {
                   sh "pwd"
+                  sh "touch cpu-torch-exptest"
                   sh "ls -lh"
                 }
               }
             }
-          }
-          post {
-            always { junit "*.xml" }
           }
         }
         //stage("Pytorch CPU (Windows)") {
@@ -205,6 +207,7 @@ pipeline {
               steps {
                 ws('workspace/gpu-build') {
                   sh "pwd"
+                  sh "touch gpu-torch-exptest"
                   sh "ls -lh"
                 }
               }
@@ -227,13 +230,11 @@ pipeline {
               steps {
                 ws('workspace/cpu-build') {
                   sh "pwd"
+                  sh "touch cpu-mxnet-utest"
                   sh "ls -lh"
                 }
               }
             }
-          }
-          post {
-            always { junit "*.xml" }
           }
         }
       }
