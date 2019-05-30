@@ -27,7 +27,7 @@ def check_array_shared_memory(g, worker_id, arrays):
         for i, arr in enumerate(arrays):
             assert_almost_equal(arr[0].asnumpy(), i)
 
-def _check_init_func(worker_id, graph_name):
+def check_init_func(worker_id, graph_name, return_dict):
     time.sleep(3)
     print("worker starts")
     np.random.seed(0)
@@ -42,34 +42,33 @@ def _check_init_func(worker_id, graph_name):
             print(e, file=sys.stderr)
             traceback.print_exc()
             time.sleep(1)
+
     # Verify the graph structure loaded from the shared memory.
-    src, dst = g.all_edges()
-    coo = csr.tocoo()
-    assert F.array_equal(dst, F.tensor(coo.row))
-    assert F.array_equal(src, F.tensor(coo.col))
-    assert F.array_equal(g.nodes[0].data['feat'], F.tensor(np.arange(10), dtype=np.float32))
-    assert F.array_equal(g.edges[0].data['feat'], F.tensor(np.arange(10), dtype=np.float32))
-    g.init_ndata('test4', (g.number_of_nodes(), 10), 'float32')
-    g.init_edata('test4', (g.number_of_edges(), 10), 'float32')
-    g._sync_barrier()
-    check_array_shared_memory(g, worker_id, [g.nodes[:].data['test4'], g.edges[:].data['test4']])
-
-    data = g.nodes[:].data['test4']
-    g.set_n_repr({'test4': mx.nd.ones((1, 10)) * 10}, u=[0])
-    assert_almost_equal(data[0].asnumpy(), g.nodes[0].data['test4'].asnumpy())
-
-    data = g.edges[:].data['test4']
-    g.set_e_repr({'test4': mx.nd.ones((1, 10)) * 20}, edges=[0])
-    assert_almost_equal(data[0].asnumpy(), g.edges[0].data['test4'].asnumpy())
-
-    g.destroy()
-
-def check_init_func(worker_id, graph_name, return_dict):
     try:
-        _check_init_func(worker_id, graph_name)
+        src, dst = g.all_edges()
+        coo = csr.tocoo()
+        assert F.array_equal(dst, F.tensor(coo.row))
+        assert F.array_equal(src, F.tensor(coo.col))
+        assert F.array_equal(g.nodes[0].data['feat'], F.tensor(np.arange(10), dtype=np.float32))
+        assert F.array_equal(g.edges[0].data['feat'], F.tensor(np.arange(10), dtype=np.float32))
+        g.init_ndata('test4', (g.number_of_nodes(), 10), 'float32')
+        g.init_edata('test4', (g.number_of_edges(), 10), 'float32')
+        g._sync_barrier()
+        check_array_shared_memory(g, worker_id, [g.nodes[:].data['test4'], g.edges[:].data['test4']])
+
+        data = g.nodes[:].data['test4']
+        g.set_n_repr({'test4': mx.nd.ones((1, 10)) * 10}, u=[0])
+        assert_almost_equal(data[0].asnumpy(), g.nodes[0].data['test4'].asnumpy())
+
+        data = g.edges[:].data['test4']
+        g.set_e_repr({'test4': mx.nd.ones((1, 10)) * 20}, edges=[0])
+        assert_almost_equal(data[0].asnumpy(), g.edges[0].data['test4'].asnumpy())
+
+        g.destroy()
         return_dict[worker_id] = 0
     except Exception as e:
         return_dict[worker_id] = -1
+        g.destroy()
         print(e, file=sys.stderr)
         traceback.print_exc()
 
@@ -102,7 +101,7 @@ def test_init():
         assert return_dict[worker_id] == 0, "worker %d fails" % worker_id
 
 
-def _check_compute_func(worker_id, graph_name):
+def check_compute_func(worker_id, graph_name, return_dict):
     time.sleep(3)
     print("worker starts")
     for _ in range(10):
@@ -113,46 +112,45 @@ def _check_compute_func(worker_id, graph_name):
         except:
             print("fail to connect to the graph store server.")
             time.sleep(1)
-    g._sync_barrier()
-    in_feats = g.nodes[0].data['feat'].shape[1]
 
-    # Test update all.
-    g.update_all(fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='preprocess'))
-    adj = g.adjacency_matrix()
-    tmp = mx.nd.dot(adj, g.nodes[:].data['feat'])
-    assert_almost_equal(g.nodes[:].data['preprocess'].asnumpy(), tmp.asnumpy())
-    g._sync_barrier()
-    check_array_shared_memory(g, worker_id, [g.nodes[:].data['preprocess']])
-
-    # Test apply nodes.
-    data = g.nodes[:].data['feat']
-    g.apply_nodes(func=lambda nodes: {'feat': mx.nd.ones((1, in_feats)) * 10}, v=0)
-    assert_almost_equal(data[0].asnumpy(), g.nodes[0].data['feat'].asnumpy())
-
-    # Test apply edges.
-    data = g.edges[:].data['feat']
-    g.apply_edges(func=lambda edges: {'feat': mx.nd.ones((1, in_feats)) * 10}, edges=0)
-    assert_almost_equal(data[0].asnumpy(), g.edges[0].data['feat'].asnumpy())
-
-    g.init_ndata('tmp', (g.number_of_nodes(), 10), 'float32')
-    data = g.nodes[:].data['tmp']
-    # Test pull
-    g.pull(1, fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='tmp'))
-    assert_almost_equal(data[1].asnumpy(), g.nodes[1].data['preprocess'].asnumpy())
-
-    # Test send_and_recv
-    in_edges = g.in_edges(v=2)
-    g.send_and_recv(in_edges, fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='tmp'))
-    assert_almost_equal(data[2].asnumpy(), g.nodes[2].data['preprocess'].asnumpy())
-
-    g.destroy()
-
-def check_compute_func(worker_id, graph_name, return_dict):
     try:
-        _check_compute_func(worker_id, graph_name)
+        g._sync_barrier()
+        in_feats = g.nodes[0].data['feat'].shape[1]
+
+        # Test update all.
+        g.update_all(fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='preprocess'))
+        adj = g.adjacency_matrix()
+        tmp = mx.nd.dot(adj, g.nodes[:].data['feat'])
+        assert_almost_equal(g.nodes[:].data['preprocess'].asnumpy(), tmp.asnumpy())
+        g._sync_barrier()
+        check_array_shared_memory(g, worker_id, [g.nodes[:].data['preprocess']])
+
+        # Test apply nodes.
+        data = g.nodes[:].data['feat']
+        g.apply_nodes(func=lambda nodes: {'feat': mx.nd.ones((1, in_feats)) * 10}, v=0)
+        assert_almost_equal(data[0].asnumpy(), g.nodes[0].data['feat'].asnumpy())
+
+        # Test apply edges.
+        data = g.edges[:].data['feat']
+        g.apply_edges(func=lambda edges: {'feat': mx.nd.ones((1, in_feats)) * 10}, edges=0)
+        assert_almost_equal(data[0].asnumpy(), g.edges[0].data['feat'].asnumpy())
+
+        g.init_ndata('tmp', (g.number_of_nodes(), 10), 'float32')
+        data = g.nodes[:].data['tmp']
+        # Test pull
+        g.pull(1, fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='tmp'))
+        assert_almost_equal(data[1].asnumpy(), g.nodes[1].data['preprocess'].asnumpy())
+
+        # Test send_and_recv
+        in_edges = g.in_edges(v=2)
+        g.send_and_recv(in_edges, fn.copy_src(src='feat', out='m'), fn.sum(msg='m', out='tmp'))
+        assert_almost_equal(data[2].asnumpy(), g.nodes[2].data['preprocess'].asnumpy())
+
+        g.destroy()
         return_dict[worker_id] = 0
     except Exception as e:
         return_dict[worker_id] = -1
+        g.destroy()
         print(e, file=sys.stderr)
         traceback.print_exc()
 
