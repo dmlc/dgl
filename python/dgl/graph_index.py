@@ -76,7 +76,7 @@ class GraphIndex(object):
         num : int
             Number of nodes to be added.
         """
-        _CAPI_DGLGraphAddVertices(self._handle, num)
+        _CAPI_DGLGraphAddVertices(self._handle, int(num))
         self.clear_cache()
 
     def add_edge(self, u, v):
@@ -186,7 +186,7 @@ class GraphIndex(object):
         bool
             True if the node exists, False otherwise.
         """
-        return bool(_CAPI_DGLGraphHasVertex(self._handle, vid))
+        return bool(_CAPI_DGLGraphHasVertex(self._handle, int(vid)))
 
     def has_nodes(self, vids):
         """Return true if the nodes exist.
@@ -255,7 +255,8 @@ class GraphIndex(object):
         utils.Index
             Array of predecessors
         """
-        return utils.toindex(_CAPI_DGLGraphPredecessors(self._handle, v, radius))
+        return utils.toindex(_CAPI_DGLGraphPredecessors(
+            self._handle, int(v), int(radius)))
 
     def successors(self, v, radius=1):
         """Return the successors of the node.
@@ -272,7 +273,8 @@ class GraphIndex(object):
         utils.Index
             Array of successors
         """
-        return utils.toindex(_CAPI_DGLGraphSuccessors(self._handle, v, radius))
+        return utils.toindex(_CAPI_DGLGraphSuccessors(
+            self._handle, int(v), int(radius)))
 
     def edge_id(self, u, v):
         """Return the id array of all edges between u and v.
@@ -364,7 +366,7 @@ class GraphIndex(object):
             The edge ids.
         """
         if len(v) == 1:
-            edge_array = _CAPI_DGLGraphInEdges_1(self._handle, v[0])
+            edge_array = _CAPI_DGLGraphInEdges_1(self._handle, int(v[0]))
         else:
             v_array = v.todgltensor()
             edge_array = _CAPI_DGLGraphInEdges_2(self._handle, v_array)
@@ -391,7 +393,7 @@ class GraphIndex(object):
             The edge ids.
         """
         if len(v) == 1:
-            edge_array = _CAPI_DGLGraphOutEdges_1(self._handle, v[0])
+            edge_array = _CAPI_DGLGraphOutEdges_1(self._handle, int(v[0]))
         else:
             v_array = v.todgltensor()
             edge_array = _CAPI_DGLGraphOutEdges_2(self._handle, v_array)
@@ -848,7 +850,7 @@ class GraphIndex(object):
         assert self.is_readonly()
         self._handle = _CAPI_DGLGraphCSRCreateMMap(
             shared_mem_name,
-            num_nodes, num_edges,
+            int(num_nodes), int(num_edges),
             self._multigraph,
             edge_dir)
 
