@@ -78,7 +78,8 @@ pipeline {
       agent { docker { image "dgllib/dgl-ci-lint" } }
       steps {
         init_git_submodule()
-        sh "bash tests/scripts/task_lint.sh"
+        sh "pwd"
+        sh "ls -lh"
       }
     }
     stage("Build") {
@@ -88,7 +89,8 @@ pipeline {
           steps {
             ws('workspace/cpu-build') {
               init_git_submodule()
-              build_dgl()
+              sh "pwd"
+              sh "ls -lh"
             }
           }
         }
@@ -102,19 +104,20 @@ pipeline {
           steps {
             ws('workspace/gpu-build') {
               init_git_submodule()
-              build_dgl()
+              sh "pwd"
+              sh "ls -lh"
             }
           }
         }
-        stage("CPU Build (Win64)") {
-          agent { label "windows" }
-          steps {
-            ws('workspace/cpu-build-win') {
-              init_git_submodule_win64()
-              build_dgl_win64()
-            }
-          }
-        }
+        //stage("CPU Build (Win64)") {
+        //  agent { label "windows" }
+        //  steps {
+        //    ws('workspace/cpu-build-win') {
+        //      init_git_submodule_win64()
+        //      build_dgl_win64()
+        //    }
+        //  }
+        //}
       }
     }
     stage("Test") {
@@ -125,18 +128,19 @@ pipeline {
               agent { docker {image "dgllib/dgl-ci-cpu"} }
               steps { 
                 ws('workspace/cpu-build') {
-                  cpp_unit_test_linux() 
+                  sh "pwd"
+                  sh "ls -lh"
                 }
               }
             }
-            stage("CPP Unit Test Windows") {
-              agent { label "windows" }
-              steps {
-                ws('workspace/cpu-build-win') {
-                  cpp_unit_test_windows()
-                }
-              }
-            }
+            //stage("CPP Unit Test Windows") {
+            //  agent { label "windows" }
+            //  steps {
+            //    ws('workspace/cpu-build-win') {
+            //      cpp_unit_test_windows()
+            //    }
+            //  }
+            //}
           }
         }
         stage("Pytorch CPU") {
@@ -145,14 +149,16 @@ pipeline {
             stage("TH CPU unittest") {
               steps {
                 ws('workspace/cpu-build') {
-                  unit_test("pytorch", "CPU")
+                  sh "pwd"
+                  sh "ls -lh"
                 }
               }
             }
             stage("TH CPU example test") {
               steps {
                 ws('workspace/cpu-build') {
-                  example_test("pytorch", "CPU")
+                  sh "pwd"
+                  sh "ls -lh"
                 }
               }
             }
@@ -161,28 +167,28 @@ pipeline {
             always { junit "*.xml" }
           }
         }
-        stage("Pytorch CPU (Windows)") {
-          agent { label "windows" }
-          stages {
-            stage("TH CPU Win64 unittest") {
-              steps {
-                ws('workspace/cpu-build-win') {
-                  unit_test_win64("pytorch", "CPU")
-                }
-              }
-            }
-            stage("TH CPU Win64 example test") {
-              steps {
-                ws('workspace/cpu-build-win') {
-                  example_test_win64("pytorch", "CPU")
-                }
-              }
-            }
-          }
-          post {
-            always { junit "*.xml" }
-          }
-        }
+        //stage("Pytorch CPU (Windows)") {
+        //  agent { label "windows" }
+        //  stages {
+        //    stage("TH CPU Win64 unittest") {
+        //      steps {
+        //        ws('workspace/cpu-build-win') {
+        //          unit_test_win64("pytorch", "CPU")
+        //        }
+        //      }
+        //    }
+        //    stage("TH CPU Win64 example test") {
+        //      steps {
+        //        ws('workspace/cpu-build-win') {
+        //          example_test_win64("pytorch", "CPU")
+        //        }
+        //      }
+        //    }
+        //  }
+        //  post {
+        //    always { junit "*.xml" }
+        //  }
+        //}
         stage("Pytorch GPU") {
           agent {
             docker {
@@ -198,7 +204,8 @@ pipeline {
             stage("TH GPU example test") {
               steps {
                 ws('workspace/gpu-build') {
-                  example_test("pytorch", "GPU")
+                  sh "pwd"
+                  sh "ls -lh"
                 }
               }
             }
@@ -219,7 +226,8 @@ pipeline {
               }
               steps {
                 ws('workspace/cpu-build') {
-                  unit_test("mxnet", "CPU")
+                  sh "pwd"
+                  sh "ls -lh"
                 }
               }
             }
@@ -230,27 +238,27 @@ pipeline {
         }
       }
     }
-    stage("Doc") {
-      parallel {
-        stage("TH Tutorial") {
-          agent {
-            docker { image "dgllib/dgl-ci-cpu" }
-          }
-          steps {
-            ws('workspace/cpu-build') {
-              pytorch_tutorials()
-            }
-          }
-        }
-        //stage("MX Tutorial") {
-        //  agent {
-        //    docker { image "dgllib/dgl-ci-mxnet-cpu" }
-        //  }
-        //  steps {
-        //    mxnet_tutorials()
-        //  }
-        //}
-      }
-    }
+    //stage("Doc") {
+    //  parallel {
+    //    stage("TH Tutorial") {
+    //      agent {
+    //        docker { image "dgllib/dgl-ci-cpu" }
+    //      }
+    //      steps {
+    //        ws('workspace/cpu-build') {
+    //          pytorch_tutorials()
+    //        }
+    //      }
+    //    }
+    //    //stage("MX Tutorial") {
+    //    //  agent {
+    //    //    docker { image "dgllib/dgl-ci-mxnet-cpu" }
+    //    //  }
+    //    //  steps {
+    //    //    mxnet_tutorials()
+    //    //  }
+    //    //}
+    //  }
+    //}
   }
 }
