@@ -3,7 +3,7 @@ import sys
 import random
 import time
 import numpy as np
-from multiprocessing import Process
+from multiprocessing import Process, Manager
 from scipy import sparse as spsp
 import mxnet as mx
 import backend as F
@@ -85,7 +85,7 @@ def server_func(num_workers, graph_name):
     g.run()
 
 def test_init():
-    manager = multiprocessing.Manager()
+    manager = Manager()
     return_dict = manager.dict()
     serv_p = Process(target=server_func, args=(2, 'test_graph1'))
     work_p1 = Process(target=check_init_func, args=(0, 'test_graph1', return_dict))
@@ -155,7 +155,7 @@ def check_compute_func(worker_id, graph_name, return_dict):
         traceback.print_exc()
 
 def test_compute():
-    manager = multiprocessing.Manager()
+    manager = Manager()
     return_dict = manager.dict()
     serv_p = Process(target=server_func, args=(2, 'test_graph3'))
     work_p1 = Process(target=check_compute_func, args=(0, 'test_graph3', return_dict))
