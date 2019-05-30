@@ -135,7 +135,6 @@ pipeline {
                 docker {image "dgllib/dgl-ci-cpu"}
               }
               steps { 
-                init_git_submodule()
                 cpp_unit_test_linux() 
               }
             }
@@ -144,7 +143,6 @@ pipeline {
                 label "windows"
               }
               steps {
-                init_git_submodule_win64()
                 cpp_unit_test_windows()
               }
             }
