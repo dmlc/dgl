@@ -40,7 +40,7 @@ def _add_receiver_addr(sender, ip_addr, port, recv_id):
     recv_id : int
         Receiver ID
     """
-    _CAPI_DGLSenderAddReceiver(sender, ip_addr, port, recv_id)
+    _CAPI_DGLSenderAddReceiver(sender, ip_addr, int(port), int(recv_id))
 
 def _sender_connect(sender):
     """Connect to all the Receiver
@@ -70,7 +70,7 @@ def _send_nodeflow(sender, nodeflow, recv_id):
     layers_offsets = utils.toindex(nodeflow._layer_offsets).todgltensor()
     flows_offsets = utils.toindex(nodeflow._block_offsets).todgltensor()
     _CAPI_SenderSendSubgraph(sender,
-                             recv_id,
+                             int(recv_id),
                              graph_handle,
                              node_mapping,
                              edge_mapping,
@@ -87,7 +87,7 @@ def _send_end_signal(sender, recv_id):
     recv_id : int
         Receiver ID
     """
-    _CAPI_SenderSendEndSignal(sender, recv_id)
+    _CAPI_SenderSendEndSignal(sender, int(recv_id))
 
 def _create_receiver():
     """Create a Receiver communicator via C api
@@ -113,7 +113,7 @@ def _receiver_wait(receiver, ip_addr, port, num_sender):
     num_sender : int
         total number of Sender
     """
-    _CAPI_DGLReceiverWait(receiver, ip_addr, port, num_sender)
+    _CAPI_DGLReceiverWait(receiver, ip_addr, int(port), int(num_sender))
 
 def _recv_nodeflow(receiver, graph):
     """Receive sampled subgraph (NodeFlow) from remote sampler.
