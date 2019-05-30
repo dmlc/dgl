@@ -37,8 +37,9 @@ def _check_init_func(worker_id, graph_name):
             g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem",
                                                                 port=rand_port)
             break
-        except:
-            print("fail to connect to the graph store server.")
+        except ConnectionError as e:
+            print(e)
+            traceback.print_exc()
             time.sleep(1)
     # Verify the graph structure loaded from the shared memory.
     src, dst = g.all_edges()
