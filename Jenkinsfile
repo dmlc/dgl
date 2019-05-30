@@ -10,8 +10,8 @@ def init_git_submodule_win64() {
   bat "git submodule update"
 }
 
-def build_dgl() {
-  sh "bash tests/scripts/build_dgl.sh"
+def build_dgl(dev) {
+  sh "bash tests/scripts/build_dgl.sh ${dev}"
 }
 
 def build_dgl_win64() {
@@ -83,7 +83,7 @@ pipeline {
           }
           steps {
             init_git_submodule()
-            build_dgl()
+            build_dgl("cpu")
           }
         }
         stage("GPU Build") {
@@ -95,7 +95,7 @@ pipeline {
           }
           steps {
             init_git_submodule()
-            build_dgl()
+            build_dgl("cuda")
           }
         }
         stage("MXNet CPU Build (temp)") {
@@ -104,7 +104,7 @@ pipeline {
           }
           steps {
             init_git_submodule()
-            build_dgl()
+            build_dgl("cpu")
           }
         }
         stage("CPU Build (Win64/PyTorch)") {
