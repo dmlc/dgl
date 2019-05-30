@@ -2,6 +2,7 @@
 from .base import ALL
 from . import backend as F
 
+# pylint: disable=unnecessary-pass
 class DGLBaseHeteroGraph(object):
     """Base Heterogeneous graph class.
 
@@ -115,7 +116,6 @@ class DGLBaseHeteroGraph(object):
             edge_connections_by_type):
         super(DGLBaseHeteroGraph, self).__init__()
 
-    # pylint: disable=unnecessary-pass
     def __getitem__(self, key):
         """Returns a view on the heterogeneous graph with given node/edge
         type:
@@ -939,6 +939,7 @@ class DGLBaseHeteroGraph(object):
         pass
 
 
+# pylint: disable=unnecessary-pass
 class DGLBaseHeteroGraphView(DGLBaseHeteroGraph):
     """View on a heterogeneous graph, constructed from
     DGLBaseHeteroGraph.__getitem__().
@@ -948,6 +949,7 @@ class DGLBaseHeteroGraphView(DGLBaseHeteroGraph):
     pass
 
 
+# pylint: disable=unnecessary-pass
 class DGLHeteroGraph(DGLBaseHeteroGraph):
     """Base heterogeneous graph class.
 
