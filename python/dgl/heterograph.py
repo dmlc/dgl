@@ -807,7 +807,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].in_degree(v)
+           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
 
         Parameters
         ----------
@@ -841,7 +841,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].in_degrees(v)
+           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
 
         Parameters
         ----------
@@ -876,7 +876,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].out_degree(v)
+           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
 
         Parameters
         ----------
@@ -910,7 +910,7 @@ class DGLBaseHeteroGraph(object):
 
         .. code::
 
-           g['srctype', 'dsttype', 'edgetype'].out_degrees(v)
+           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
 
         Parameters
         ----------

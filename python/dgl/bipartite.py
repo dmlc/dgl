@@ -102,8 +102,13 @@ class DGLBipartiteGraph(DGLHeteroGraph):
     def number_of_nodes(self):
         """Return the number of nodes in the graph.
 
-        Bipartite graph doesn't support number_of_nodes().
-        Please use g['ntype'].number_of_nodes() to get number of nodes.
+        Notes
+        -----
+        An error is raised if the graph contains multiple node types.  Use
+
+            g[ntype].number_of_nodes()
+
+        to get the number of nodes with type ``ntype``.
 
         Returns
         -------
@@ -159,6 +164,13 @@ class DGLBipartiteGraph(DGLHeteroGraph):
     def has_edge_between(self, u, v):
         """Return True if the edge (u, v) is in the graph.
 
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].has_edge_between(u, v)
+
         Parameters
         ----------
         u : int
@@ -178,6 +190,13 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         destination node ID array `v`.
 
         `a[i]` is 1 if the graph contains edge `(u[i], v[i])`, 0 otherwise.
+
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].has_edges_between(u, v)
 
         Parameters
         ----------
@@ -419,6 +438,13 @@ class DGLBipartiteGraph(DGLHeteroGraph):
     def all_edges(self, form='uv', order=None):
         """Return all the edges.
 
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+
         Parameters
         ----------
         form : str, optional
@@ -460,6 +486,13 @@ class DGLBipartiteGraph(DGLHeteroGraph):
     def in_degree(self, v):
         """Return the in-degree of node ``v``.
 
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+
         Parameters
         ----------
         v : int
@@ -477,6 +510,13 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         """Return the array `d` of in-degrees of the node array `v`.
 
         `d[i]` is the in-degree of node `v[i]`.
+
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
 
         Parameters
         ----------
@@ -499,6 +539,13 @@ class DGLBipartiteGraph(DGLHeteroGraph):
     def out_degree(self, v):
         """Return the out-degree of node `v`.
 
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
+
         Parameters
         ----------
         v : int
@@ -515,6 +562,13 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         """Return the array `d` of out-degrees of the node array `v`.
 
         `d[i]` is the out-degree of node `v[i]`.
+
+        Only works if the graph has one edge type.  For multiple types,
+        query with
+
+        .. code::
+
+           g['srctype', 'dsttype', 'edgetype'].edge_ids(u, v)
 
         Parameters
         ----------
@@ -1258,7 +1312,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
 
         Parameters
         ----------
-        v : int, container or tensor, optional
+        v : int, container or tensor, dict, optional
             The node(s) to be updated. Default is receiving all the nodes.
 
             If ``apply_node_func`` is not a dict, then ``v`` must not be a
