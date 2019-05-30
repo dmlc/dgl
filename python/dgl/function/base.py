@@ -1,7 +1,7 @@
 """Built-in function base class"""
 from __future__ import absolute_import
 
-__all__ = ['BuiltinFunction']
+__all__ = ['BuiltinFunction', 'TargetCode']
 
 
 class TargetCode(object):

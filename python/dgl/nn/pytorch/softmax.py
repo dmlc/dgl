@@ -6,6 +6,7 @@ from ... import ndarray as nd
 from ... import backend as F
 from ... import utils
 from ... import function as fn
+from ...runtime import spmv
 
 __all__ = ['EdgeSoftmax']
 
@@ -69,19 +70,16 @@ class EdgeSoftmax(object):
         """
         num_nodes = graph.number_of_nodes()
         ctx = utils.to_dgl_context(F.context(logits))
-        csr = graph._graph.csr_adjacency_matrix(True, ctx)
-        inv_csr = graph._graph.csr_adjacency_matrix(False, ctx)
+        gidx, _, nbits = spmv.build_adj_matrix_graph(graph)
+        gidx = gidx(ctx)
         _, dst, _ = graph._graph.edges()
         dst = dst.tousertensor(F.context(logits))
-        indptr, indices, edge_map = csr
-        inv_indptr, inv_indices, inv_edge_map = inv_csr
-        spmat = (indptr, indices, inv_indptr, inv_indices)
-        out_map = nd.empty([])
-        max_logits_ = F.copy_edge_reduce("max", spmat, logits, num_nodes,
-                                         (edge_map, inv_edge_map), out_map)
+        empty_map = (None, None)
+        max_logits_ = F.copy_reduce("max", gidx, fn.TargetCode.EDGE, logits,
+                                    num_nodes, empty_map, empty_map)
         logits = (logits - max_logits_.index_select(0, dst)).exp()
-        norm = F.copy_edge_reduce("sum", spmat, logits, num_nodes,
-                                  (edge_map, inv_edge_map), out_map)
+        norm = F.copy_reduce("sum", gidx, fn.TargetCode.EDGE, logits,
+                             num_nodes, empty_map, empty_map)
         return logits, norm
 
 class EdgeSoftmax1(th.autograd.Function):
