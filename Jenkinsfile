@@ -196,14 +196,14 @@ pipeline {
             pytorch_tutorials()
           }
         }
-        stage("MX Tutorial") {
-          agent {
-            docker { image "dgllib/dgl-ci-mxnet-cpu" }
-          }
-          steps {
-            mxnet_tutorials()
-          }
-        }
+        //stage("MX Tutorial") {
+        //  agent {
+        //    docker { image "dgllib/dgl-ci-mxnet-cpu" }
+        //  }
+        //  steps {
+        //    mxnet_tutorials()
+        //  }
+        //}
       }
     }
   }
