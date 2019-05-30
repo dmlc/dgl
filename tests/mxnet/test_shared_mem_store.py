@@ -3,12 +3,13 @@ import sys
 import random
 import time
 import numpy as np
-from multiprocessing import Process
+from multiprocessing import Process, Manager
 from scipy import sparse as spsp
 import mxnet as mx
 import backend as F
 import unittest
 import dgl.function as fn
+import traceback
 
 num_nodes = 100
 num_edges = int(num_nodes * num_nodes * 0.1)
@@ -25,13 +26,20 @@ def check_array_shared_memory(g, worker_id, arrays):
         for i, arr in enumerate(arrays):
             assert np.all(arr[0].asnumpy() == i)
 
-def check_init_func(worker_id, graph_name):
+def _check_init_func(worker_id, graph_name):
     time.sleep(3)
     print("worker starts")
     np.random.seed(0)
     csr = (spsp.random(num_nodes, num_nodes, density=0.1, format='csr') != 0).astype(np.int64)
 
-    g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem", port=rand_port)
+    for _ in range(10):
+        try:
+            g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem",
+                                                                port=rand_port)
+            break
+        except:
+            print("fail to connect to the graph store server.")
+            time.sleep(1)
     # Verify the graph structure loaded from the shared memory.
     src, dst = g.all_edges()
     coo = csr.tocoo()
@@ -54,6 +62,15 @@ def check_init_func(worker_id, graph_name):
 
     g.destroy()
 
+def check_init_func(worker_id, graph_name, return_dict):
+    try:
+        _check_init_func(worker_id, graph_name)
+        return_dict[worker_id] = 0
+    except Exception as e:
+        return_dict[worker_id] = -1
+        print(e)
+        traceback.print_exc()
+
 def server_func(num_workers, graph_name):
     print("server starts")
     np.random.seed(0)
@@ -68,21 +85,32 @@ def server_func(num_workers, graph_name):
     g.run()
 
 def test_init():
+    manager = Manager()
+    return_dict = manager.dict()
     serv_p = Process(target=server_func, args=(2, 'test_graph1'))
-    work_p1 = Process(target=check_init_func, args=(0, 'test_graph1'))
-    work_p2 = Process(target=check_init_func, args=(1, 'test_graph1'))
+    work_p1 = Process(target=check_init_func, args=(0, 'test_graph1', return_dict))
+    work_p2 = Process(target=check_init_func, args=(1, 'test_graph1', return_dict))
     serv_p.start()
     work_p1.start()
     work_p2.start()
     serv_p.join()
     work_p1.join()
     work_p2.join()
+    for worker_id in return_dict.keys():
+        assert return_dict[worker_id] == 0, "worker %d fails" % worker_id
 
 
-def check_compute_func(worker_id, graph_name):
+def _check_compute_func(worker_id, graph_name):
     time.sleep(3)
     print("worker starts")
-    g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem", port=rand_port)
+    for _ in range(10):
+        try:
+            g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem",
+                                                                port=rand_port)
+            break
+        except:
+            print("fail to connect to the graph store server.")
+            time.sleep(1)
     g._sync_barrier()
     in_feats = g.nodes[0].data['feat'].shape[1]
 
@@ -117,16 +145,29 @@ def check_compute_func(worker_id, graph_name):
 
     g.destroy()
 
+def check_compute_func(worker_id, graph_name, return_dict):
+    try:
+        _check_compute_func(worker_id, graph_name)
+        return_dict[worker_id] = 0
+    except Exception as e:
+        return_dict[worker_id] = -1
+        print(e)
+        traceback.print_exc()
+
 def test_compute():
+    manager = Manager()
+    return_dict = manager.dict()
     serv_p = Process(target=server_func, args=(2, 'test_graph3'))
-    work_p1 = Process(target=check_compute_func, args=(0, 'test_graph3'))
-    work_p2 = Process(target=check_compute_func, args=(1, 'test_graph3'))
+    work_p1 = Process(target=check_compute_func, args=(0, 'test_graph3', return_dict))
+    work_p2 = Process(target=check_compute_func, args=(1, 'test_graph3', return_dict))
     serv_p.start()
     work_p1.start()
     work_p2.start()
     serv_p.join()
     work_p1.join()
     work_p2.join()
+    for worker_id in return_dict.keys():
+        assert return_dict[worker_id] == 0, "worker %d fails" % worker_id
 
 if __name__ == '__main__':
     test_init()
