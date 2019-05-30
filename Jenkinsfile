@@ -75,9 +75,7 @@ pipeline {
   agent none
   stages {
     stage("Lint Check") {
-      agent {
-        docker { image "dgllib/dgl-ci-lint" }
-      }
+      agent { docker { image "dgllib/dgl-ci-lint" } }
       steps {
         init_git_submodule()
         sh "bash tests/scripts/task_lint.sh"
@@ -86,12 +84,12 @@ pipeline {
     stage("Build") {
       parallel {
         stage("CPU Build") {
-          agent {
-            docker { image "dgllib/dgl-ci-cpu" }
-          }
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
           steps {
-            init_git_submodule()
-            build_dgl()
+            ws('workspace/cpu-build') {
+              init_git_submodule()
+              build_dgl()
+            }
           }
         }
         stage("GPU Build") {
@@ -102,26 +100,19 @@ pipeline {
             }
           }
           steps {
-            init_git_submodule()
-            build_dgl()
+            ws('workspace/gpu-build') {
+              init_git_submodule()
+              build_dgl()
+            }
           }
         }
-        stage("MXNet CPU Build (temp)") {
-          agent {
-            docker { image "dgllib/dgl-ci-mxnet-cpu" }
-          }
+        stage("CPU Build (Win64)") {
+          agent { label "windows" }
           steps {
-            init_git_submodule()
-            build_dgl()
-          }
-        }
-        stage("CPU Build (Win64/PyTorch)") {
-          agent {
-            label "windows"
-          }
-          steps {
-            init_git_submodule_win64()
-            build_dgl_win64()
+            ws('workspace/cpu-build-win') {
+              init_git_submodule_win64()
+              build_dgl_win64()
+            }
           }
         }
       }
@@ -129,44 +120,41 @@ pipeline {
     stage("Test") {
       parallel {
         stage("CPP Test") {
-          stages{
+          stages {
             stage("CPP Unit Test Linux") {
-              agent {
-                docker {image "dgllib/dgl-ci-cpu"}
-              }
+              agent { docker {image "dgllib/dgl-ci-cpu"} }
               steps { 
-                cpp_unit_test_linux() 
+                ws('workspace/cpu-build') {
+                  cpp_unit_test_linux() 
+                }
               }
             }
             stage("CPP Unit Test Windows") {
-              agent {
-                label "windows"
-              }
+              agent { label "windows" }
               steps {
-                cpp_unit_test_windows()
+                ws('workspace/cpu-build-win') {
+                  cpp_unit_test_windows()
+                }
               }
             }
-          }
-        }
-        stage("Test stage") {
-          agent {
-            docker {image "dgllib/dgl-ci-cpu"}
-          }
-          steps {
-            sh "echo $PWD"
-            sh "ls -lh"
           }
         }
         stage("Pytorch CPU") {
-          agent {
-            docker { image "dgllib/dgl-ci-cpu" }
-          }
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
           stages {
             stage("TH CPU unittest") {
-              steps { unit_test("pytorch", "CPU") }
+              steps {
+                ws('workspace/cpu-build') {
+                  unit_test("pytorch", "CPU")
+                }
+              }
             }
             stage("TH CPU example test") {
-              steps { example_test("pytorch", "CPU") }
+              steps {
+                ws('workspace/cpu-build') {
+                  example_test("pytorch", "CPU")
+                }
+              }
             }
           }
           post {
@@ -177,10 +165,18 @@ pipeline {
           agent { label "windows" }
           stages {
             stage("TH CPU Win64 unittest") {
-              steps { unit_test_win64("pytorch", "CPU") }
+              steps {
+                ws('workspace/cpu-build-win') {
+                  unit_test_win64("pytorch", "CPU")
+                }
+              }
             }
             stage("TH CPU Win64 example test") {
-              steps { example_test_win64("pytorch", "CPU") }
+              steps {
+                ws('workspace/cpu-build-win') {
+                  example_test_win64("pytorch", "CPU")
+                }
+              }
             }
           }
           post {
@@ -200,7 +196,11 @@ pipeline {
             //  steps { pytorch_unit_test("GPU") }
             //}
             stage("TH GPU example test") {
-              steps { example_test("pytorch", "GPU") }
+              steps {
+                ws('workspace/gpu-build') {
+                  example_test("pytorch", "GPU")
+                }
+              }
             }
           }
           // TODO: have GPU unittest
@@ -217,7 +217,11 @@ pipeline {
               options {
                   timeout(time: 5, unit: 'MINUTES') 
               }
-              steps { unit_test("mxnet", "CPU") }
+              steps {
+                ws('workspace/cpu-build') {
+                  unit_test("mxnet", "CPU")
+                }
+              }
             }
           }
           post {
@@ -233,7 +237,9 @@ pipeline {
             docker { image "dgllib/dgl-ci-cpu" }
           }
           steps {
-            pytorch_tutorials()
+            ws('workspace/cpu-build') {
+              pytorch_tutorials()
+            }
           }
         }
         //stage("MX Tutorial") {
