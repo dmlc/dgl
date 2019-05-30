@@ -4,7 +4,7 @@ from .graph import DGLGraph
 from .graph_index import GraphIndex
 from .batched_graph import BatchedDGLGraph
 
-__all__ = ['line_graph', 'reverse']
+__all__ = ['line_graph', 'reverse', 'to_simple_graph']
 
 
 def line_graph(g, backtracking=True, shared=False):

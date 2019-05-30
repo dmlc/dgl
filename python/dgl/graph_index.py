@@ -36,8 +36,9 @@ class GraphIndex(object):
     def __getstate__(self):
         src, dst, _ = self.edges()
         n_nodes = self.number_of_nodes()
-        multigraph = self._multigraph
-        readonly = self._readonly
+        # TODO(minjie): should try to avoid calling is_multigraph
+        multigraph = self.is_multigraph()
+        readonly = self.is_readonly()
 
         return n_nodes, multigraph, readonly, src, dst
 
@@ -774,7 +775,7 @@ class SubgraphIndex(GraphIndex):
         The parent edge ids in this subgraph.
     """
     def __init__(self, handle, parent, induced_nodes, induced_edges):
-        super(SubgraphIndex, self).__init__(handle, parent.is_multigraph(), parent.is_readonly())
+        super(SubgraphIndex, self).__init__(handle)
         self._parent = parent
         self._induced_nodes = induced_nodes
         self._induced_edges = induced_edges
@@ -868,12 +869,12 @@ def from_coo(num_nodes, src, dst, is_multigraph, readonly):
             # TODO(minjie): better behavior in the future
             is_multigraph = False
         handle = _CAPI_DGLGraphCreateMutable(is_multigraph)
-        gdix = GraphIndex(handle)
-        gdix.add_nodes(num_nodes)
+        gidx = GraphIndex(handle)
+        gidx.add_nodes(num_nodes)
         gidx.add_edges(src, dst)
     return gidx
 
-def from_csr(indptr, indices, is_multigraph, readonly,
+def from_csr(indptr, indices, is_multigraph,
              direction, shared_mem_name=""):
     """Load a graph from CSR arrays.
 
@@ -885,8 +886,6 @@ def from_csr(indptr, indices, is_multigraph, readonly,
         column index array in the CSR format
     is_multigraph : bool or None
         True if the graph is a multigraph. None means determined by data.
-    readonly : bool
-        True if the returned graph is readonly.
     direction : str
         the edge direction. Either "in" or "out".
     shared_mem_name : str
@@ -894,7 +893,6 @@ def from_csr(indptr, indices, is_multigraph, readonly,
     """
     indptr = utils.toindex(indptr)
     indices = utils.toindex(indices)
-    assert readonly, "Only readonly graph can be created from csr arrays."
     if is_multigraph is None:
         handle = _CAPI_DGLGraphCSRCreate1(
             indptr.todgltensor(),
@@ -928,7 +926,7 @@ def from_shared_mem_csr_matrix(self, shared_mem_name,
     """
     handle = _CAPI_DGLGraphCSRCreateMMap(
         shared_mem_name,
-        num_nodes, num_edges,
+        int(num_nodes), int(num_edges),
         is_multigraph,
         edge_dir)
     return GraphIndex(handle)
@@ -952,16 +950,14 @@ def from_networkx(nx_graph, readonly):
         The graph index.
     """
     if not isinstance(nx_graph, nx.Graph):
-        nx_graph = nx.DiGraph(nx_graph))
+        nx_graph = nx.DiGraph(nx_graph)
     else:
         if not nx_graph.is_directed():
             # to_directed creates a deep copy of the networkx graph even if
             # the original graph is already directed and we do not want to do it.
             nx_graph = nx_graph.to_directed()
 
-    if isinstance(nx_graph, nx.MultiDiGraph):
-        is_multigraph = True
-
+    is_multigraph = isinstance(nx_graph, nx.MultiDiGraph)
     num_nodes = nx_graph.number_of_nodes()
 
     # nx_graph.edges(data=True) returns src, dst, attr_dict
@@ -1000,14 +996,14 @@ def from_scipy_sparse_matrix(adj, readonly):
     GraphIndex
         The graph index.
     """
-    if adj.getformat() == 'csr':
-        return from_csr(adj.indptr, adj.indices, False, readonly, "in")
-    else:
+    if adj.getformat() != 'csr' or not readonly:
         num_nodes = max(adj.shape[0], adj.shape[1])
         adj_coo = adj.tocoo()
         return from_coo(num_nodes, adj_coo.row, adj_coo.col, False, readonly)
+    else:
+        return from_csr(adj.indptr, adj.indices, False, "out")
 
-def from_edge_list(self, elist, is_multigraph, readonly):
+def from_edge_list(elist, is_multigraph, readonly):
     """Convert from an edge list.
 
     Parameters
@@ -1015,8 +1011,6 @@ def from_edge_list(self, elist, is_multigraph, readonly):
     elist : list
         List of (u, v) edge tuple.
     """
-    if not self.is_readonly():
-        self.clear()
     src, dst = zip(*elist)
     src = np.array(src)
     dst = np.array(dst)
@@ -1149,18 +1143,10 @@ def create_graph_index(graph_data, multigraph, readonly):
         return GraphIndex(handle)
     elif isinstance(graph_data, (list, tuple)):
         # edge list
-        try:
-            gidx = from_edge_list(graph_data, multigraph, readonly)
-        except Exception:  # pylint: disable=broad-except
-            raise DGLError('Graph data is not a valid edge list.')
-        return gidx
+        return from_edge_list(graph_data, multigraph, readonly)
     elif isinstance(graph_data, scipy.sparse.spmatrix):
         # scipy format
-        try:
-            gidx = from_scipy_sparse_matrix(graph_data, readonly)
-        except Exception:  # pylint: disable=broad-except
-            raise DGLError('Graph data is not a valid scipy sparse matrix.')
-        return gidx
+        return from_scipy_sparse_matrix(graph_data, readonly)
     else:
         # networkx - any format
         try:

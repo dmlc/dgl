@@ -151,7 +151,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate1")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
-    // Create graph without multigraph argument
+    // Function overload without multigraph argument
     const IdArray src_ids = args[0];
     const IdArray dst_ids = args[1];
     const int64_t num_nodes = static_cast<int64_t>(args[2]);
@@ -200,6 +200,38 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
       ghandle = new ImmutableGraph(nullptr, csr);
     *rv = ghandle;
   });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate1")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    // Function overload without multigraph argument
+    const IdArray indptr = args[0];
+    const IdArray indices = args[1];
+    const std::string shared_mem_name = args[2];
+    const std::string edge_dir = args[3];
+    CSRPtr csr;
+
+    IdArray edge_ids = IdArray::Empty({indices->shape[0]},
+                                      DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+    int64_t *edge_data = static_cast<int64_t *>(edge_ids->data);
+    for (size_t i = 0; i < edge_ids->shape[0]; i++)
+      edge_data[i] = i;
+    if (shared_mem_name.empty())
+      // TODO(minjie): The array copy here is unnecessary and adds extra overhead.
+      //   However, with MXNet backend, the memory would be corrupted if we directly
+      //   save the passed-in ndarrays into DGL's graph object. We hope MXNet team
+      //   could help look into this.
+      csr.reset(new CSR(Clone(indptr), Clone(indices), Clone(edge_ids)));
+    else
+      csr.reset(new CSR(indptr, indices, edge_ids, shared_mem_name));
+
+    GraphHandle ghandle;
+    if (edge_dir == "in")
+      ghandle = new ImmutableGraph(csr, nullptr);
+    else
+      ghandle = new ImmutableGraph(nullptr, csr);
+    *rv = ghandle;
+  });
+
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreateMMap")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {

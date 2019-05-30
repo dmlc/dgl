@@ -9,7 +9,7 @@ from .base import ALL, is_all, DGLError
 from . import backend as F
 from . import init
 from .frame import FrameRef, Frame, Scheme
-from .graph_index import create_graph_index
+from . import graph_index
 from .runtime import ir, scheduler, Runtime
 from . import utils
 from .view import NodeView, EdgeView
@@ -898,7 +898,8 @@ class DGLGraph(DGLBaseGraph):
                  multigraph=None,
                  readonly=False):
         # graph
-        super(DGLGraph, self).__init__(create_graph_index(graph_data, multigraph, readonly))
+        gidx = graph_index.create_graph_index(graph_data, multigraph, readonly)
+        super(DGLGraph, self).__init__(gidx)
 
         # node and edge frame
         if node_frame is None:
@@ -1226,7 +1227,7 @@ class DGLGraph(DGLBaseGraph):
             nx_graph = nx_graph.to_directed()
 
         self.clear()
-        self._graph.from_networkx(nx_graph)
+        self._graph = graph_index.from_networkx(nx_graph, self.is_readonly)
         self._node_frame.add_rows(self.number_of_nodes())
         self._edge_frame.add_rows(self.number_of_edges())
         self._msg_frame.add_rows(self.number_of_edges())
@@ -1292,7 +1293,7 @@ class DGLGraph(DGLBaseGraph):
         >>> g.from_scipy_sparse_matrix(a)
         """
         self.clear()
-        self._graph.from_scipy_sparse_matrix(spmat)
+        self._graph = graph_index.from_scipy_sparse_matrix(spmat, self.is_readonly)
         self._node_frame.add_rows(self.number_of_nodes())
         self._edge_frame.add_rows(self.number_of_edges())
         self._msg_frame.add_rows(self.number_of_edges())

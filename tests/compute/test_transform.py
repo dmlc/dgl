@@ -86,8 +86,10 @@ def test_reverse_shared_frames():
 
 def test_simple_graph():
     elist = [(0, 1), (0, 2), (1, 2), (0, 1)]
-    g = dgl.DGLGraph(elist)
+    g = dgl.DGLGraph(elist, readonly=True)
     assert g.is_multigraph
+    sg = dgl.to_simple_graph(g)
+    assert not g.is_multigraph
 
 if __name__ == '__main__':
     test_line_graph()
