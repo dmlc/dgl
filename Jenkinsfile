@@ -1,13 +1,11 @@
 #!/usr/bin/env groovy
 
 def init_git_submodule() {
-  sh "git submodule init"
-  sh "git submodule update"
+  sh "git submodule update --recursive --init"
 }
 
 def init_git_submodule_win64() {
-  bat "git submodule init"
-  bat "git submodule update"
+  bat "git submodule update --recursive --init"
 }
 
 def build_dgl(dev) {
