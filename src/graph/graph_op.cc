@@ -304,11 +304,12 @@ ImmutableGraph GraphOp::ToSimpleGraph(const GraphInterface* graph) {
     for (const dgl_id_t dst : graph->SuccVec(src)) {
       if (!hashmap.count(dst)) {
         indices.push_back(dst);
+        hashmap.insert(dst);
       }
     }
     indptr[src+1] = indices.size();
   }
-  CSRPtr csr(new CSR(graph->NumVertices(), graph->NumEdges(),
+  CSRPtr csr(new CSR(graph->NumVertices(), indices.size(),
         indptr.begin(), indices.begin(), RangeIter(0), false));
   return ImmutableGraph(csr);
 }

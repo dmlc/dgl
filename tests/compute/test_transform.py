@@ -89,8 +89,11 @@ def test_simple_graph():
     g = dgl.DGLGraph(elist, readonly=True)
     assert g.is_multigraph
     sg = dgl.to_simple_graph(g)
-    print(sg.edges())
     assert not sg.is_multigraph
+    assert sg.number_of_edges() == 3
+    src, dst = sg.edges()
+    eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+    assert eset == set(elist)
 
 if __name__ == '__main__':
     test_line_graph()
