@@ -621,6 +621,8 @@ class GraphIndex(object):
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
+        assert(ctx.device_type == 1), \
+            "device id {}, device type {}".format(ctx.device_id, ctx.device_type)
         return self.to_immutable().asbits(self.bits_needed()).copy_to(ctx)
 
     def get_csr_shuffle_order(self):
