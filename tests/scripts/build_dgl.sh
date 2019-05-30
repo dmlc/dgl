@@ -21,3 +21,6 @@ python3 setup.py install
 # test inplace build (for cython)
 python3 setup.py build_ext --inplace
 popd
+
+echo $PWD
+ls -lh
