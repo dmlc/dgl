@@ -89,6 +89,7 @@ pipeline {
           steps {
             ws('workspace/cpu-build') {
               //init_git_submodule()
+              checkout scm
               sh "pwd"
               sh "touch cpu-build"
               sh "ls -lh"
@@ -105,6 +106,7 @@ pipeline {
           steps {
             ws('workspace/gpu-build') {
               //init_git_submodule()
+              checkout scm
               sh "pwd"
               sh "touch gpu-build"
               sh "ls -lh"
