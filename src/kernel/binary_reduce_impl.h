@@ -207,12 +207,27 @@ void BackwardBinaryReduceImpl(
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
   }
-  DGL_DTYPE_SWITCH(dtype, DType, {
 #ifdef __CUDACC__
-    ({typedef int32_t Idx;
+  DGL_DTYPE_SWITCH(dtype, DType, {
+    typedef int32_t Idx;
+    auto gdata = AllocBackwardGData<XPU, Idx, DType>(
+        rtcfg.ctx, x_len, lhs_mapping, rhs_mapping, out_mapping,
+        lhs_data, rhs_data, out_data, grad_out_data,
+        grad_lhs_data, grad_rhs_data);
+    BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, {
+      REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
+        BINARY_OP_SWITCH(op, DType, BinaryOp, {
+          TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
+            CallBackwardBinaryReduce<XPU, Mode, Idx, DType, LeftTarget,
+              RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
+          });
+        });
+      });
+    });
+  });
 #else
+  DGL_DTYPE_SWITCH(dtype, DType, {
     DGL_IDX_TYPE_SWITCH(bits, Idx, {
-#endif
       auto gdata = AllocBackwardGData<XPU, Idx, DType>(
           rtcfg.ctx, x_len, lhs_mapping, rhs_mapping, out_mapping,
           lhs_data, rhs_data, out_data, grad_out_data,
