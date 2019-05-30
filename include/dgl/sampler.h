@@ -35,6 +35,8 @@ namespace dgl {
 
 class ImmutableGraph;
 
+void RandomSample(size_t set_size, size_t num, std::vector<size_t>* out, unsigned int* seed);
+
 struct RandomWalkTraces {
   /*! \brief number of traces generated for each seed */
   IdArray trace_counts;

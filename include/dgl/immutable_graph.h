@@ -892,6 +892,8 @@ class ImmutableGraph: public GraphInterface {
   COOPtr coo_;
 };
 
+typedef std::shared_ptr<ImmutableGraph> ImmutableGraphPtr;
+
 }  // namespace dgl
 
 #endif  // DGL_IMMUTABLE_GRAPH_H_

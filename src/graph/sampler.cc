@@ -22,6 +22,18 @@ using dgl::runtime::NDArray;
 
 namespace dgl {
 
+/*
+ * Uniformly sample integers from [0, set_size) without replacement.
+ */
+void RandomSample(size_t set_size, size_t num, std::vector<size_t>* out, unsigned int* seed) {
+  std::unordered_set<size_t> sampled_idxs;
+  while (sampled_idxs.size() < num) {
+    sampled_idxs.insert(rand_r(seed) % set_size);
+  }
+  out->clear();
+  out->insert(out->end(), sampled_idxs.begin(), sampled_idxs.end());
+}
+
 namespace {
 /*
  * ArrayHeap is used to sample elements from vector
@@ -103,18 +115,6 @@ class ArrayHeap {
   int limit_;
   std::vector<float> heap_;
 };
-
-/*
- * Uniformly sample integers from [0, set_size) without replacement.
- */
-void RandomSample(size_t set_size, size_t num, std::vector<size_t>* out, unsigned int* seed) {
-  std::unordered_set<size_t> sampled_idxs;
-  while (sampled_idxs.size() < num) {
-    sampled_idxs.insert(rand_r(seed) % set_size);
-  }
-  out->clear();
-  out->insert(out->end(), sampled_idxs.begin(), sampled_idxs.end());
-}
 
 /*
  * For a sparse array whose non-zeros are represented by nz_idxs,
