@@ -43,7 +43,7 @@ def unit_test(backend, dev) {
   ws("${wspace}") {
     withEnv(["DGL_LIBRARY_PATH=${build}/build",
              "PYTHONPATH=${build}/python",
-             "DGLBACKEND=${backend},
+             "DGLBACKEND=${backend}",
              "DGL_DOWNLOAD_DIR=${wspace}"]) {
       timeout(time: 2, unit: 'MINUTES') {
         init_git()
