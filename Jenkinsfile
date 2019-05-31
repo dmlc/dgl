@@ -16,10 +16,10 @@ def init_git_win64() {
 }
 
 def build_dgl(dev) {
-  ws("${env.WORKSPACE}/${dev}-build") {
+  //ws("${env.WORKSPACE}/${dev}-build") {
     init_git()
     sh "bash tests/scripts/build_dgl.sh"
-  }
+  //}
 }
 
 def build_dgl_win64() {
@@ -53,7 +53,6 @@ def unit_test(backend, dev) {
              "DGLBACKEND=${backend}",
              "DGL_DOWNLOAD_DIR=${env.WORKSPACE}"]) {
       timeout(time: 2, unit: 'MINUTES') {
-        init_git()
         sh "bash tests/scripts/task_unit_test.sh ${backend}"
       }
     }
@@ -80,7 +79,6 @@ def example_test(backend, dev) {
              "DGLBACKEND=${backend}",
              "DGL_DOWNLOAD_DIR=${env.WORKSPACE}"]) {
       timeout(time: 20, unit: 'MINUTES') {
-        init_git()
         sh "bash tests/scripts/task_example_test.sh ${dev}"
       }
     }
@@ -103,7 +101,6 @@ def tutorial_test(backend) {
              "PYTHONPATH=${env.WORKSPACE}/python",
              "DGLBACKEND=${backend}"]) {
       timeout(time: 20, unit: 'MINUTES') {
-        init_git()
         sh "bash tests/scripts/task_${backend}_tutorial_test.sh"
       }
     }
@@ -116,6 +113,7 @@ pipeline {
     stage("Lint Check") {
       agent { docker { image "dgllib/dgl-ci-lint" } }
       steps {
+        init_git()
         sh "bash tests/scripts/task_lint.sh"
       }
     }
