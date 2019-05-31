@@ -5,7 +5,7 @@ __all__ = ['BuiltinFunction', 'TargetCode']
 
 
 class TargetCode(object):
-    """Code for all target"""
+    """Code for target"""
     SRC = 0
     DST = 1
     EDGE = 2

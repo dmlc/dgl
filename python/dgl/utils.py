@@ -542,8 +542,8 @@ def to_dgl_context(ctx):
     return nd.DGLContext(device_type, device_id)
 
 def to_nbits_int(tensor, nbits):
-    """Change the dtype of integer tensor, and the dtype of returned tensor
-    uses nbits, nbits can only be 32 or 64
+    """Change the dtype of integer tensor
+    The dtype of returned tensor uses nbits, nbits can only be 32 or 64
     """
     if nbits == 32:
         return F.astype(tensor, F.int32)

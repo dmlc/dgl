@@ -12,7 +12,8 @@ __all__ = ["sum", "max"]
 class ReduceFunction(BuiltinFunction):
     """Base builtin reduce function class."""
 
-    def __call__(self):
+    def __call__(self, graph, edge_frame, out_size, edge_map=None,
+                 out_map=None):
         """Symbolic computation of this builtin function to create
         runtime.executor
         """

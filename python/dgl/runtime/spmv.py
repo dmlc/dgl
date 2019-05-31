@@ -21,10 +21,7 @@ def gen_v2v_spmv_schedule(graph, mfunc, rfunc, src_frame, dst_frame, edge_frame,
 
     Parameters
     ----------
-    adj : utils.CtxCachedObject
-        function that generates four dgl.ndarray (indptr, indices, inv_indptr,
-        inv_indices) representing CSR and transposed-CSR matrix, copies to and
-        caches on to given context
+    graph :
     mfunc : list of builtin message func
     rfunc : list of builtin reduce func
     src_frame : var.Var

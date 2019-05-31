@@ -596,37 +596,30 @@ class GraphIndex(object):
 
     @utils.cached_member(cache='_cache', prefix='immu_gidx')
     def get_immutable_gidx(self, ctx):
-        """Return the adjacency matrix representation of this graph in csr format
-
-        By default, a row of returned adjacency matrix represents the destination
-        of an edge and the column represents the source.
-
-        When transpose is True, a row represents the source and a column represents
-        a destination.
+        """Create an immutable graph index and copy to the given device context.
 
         Note: this internal function is for DGL scheduler use only
 
         Parameters
         ----------
-        transpose : bool
-            A flag to transpose the returned adjacency matrix.
         ctx : DGLContext
-            The context of the returned matrix.
+            The context of the returned graph.
 
         Returns
         -------
-        SparseTensor
-            The adjacency matrix.
-        utils.Index
-            A index for data shuffling due to sparse format change. Return None
-            if shuffle is not required.
+        GraphIndex
         """
-        assert(ctx.device_type == 1), \
-            "device id {}, device type {}".format(ctx.device_id, ctx.device_type)
         return self.to_immutable().asbits(self.bits_needed()).copy_to(ctx)
 
     def get_csr_shuffle_order(self):
-        """Return the shuffle order of edge id of immutable csr graph index"""
+        """Return the edge shuffling order when a coo graph is converted to csr format
+
+        Returns
+        -------
+        tuple of two utils.Index
+            The first element of the tuple is the shuffle order for outward graph
+            The second element of the tuple is the shuffle order for inward graph
+        """
         csr = _CAPI_DGLGraphGetAdj(self._handle, True, "csr")
         order = csr(2)
         rev_csr = _CAPI_DGLGraphGetAdj(self._handle, False, "csr")
@@ -964,6 +957,8 @@ class GraphIndex(object):
         GraphIndex
             The graph index on the given device context.
         """
+        assert(ctx.device_type == 1), \
+            "device id {}, device type {}".format(ctx.device_id, ctx.device_type)
         handle = _CAPI_DGLImmutableGraphCopyTo(self._handle, ctx)
         return GraphIndex(handle, readonly=True)
 

@@ -41,7 +41,7 @@ class BinaryMessageFunction(MessageFunction):
 
     def __call__(self, graph, src_frame, dst_frame, edge_frame, out_size,
                  src_map, dst_map, edge_map, out_map, reducer="none"):
-        """Symbolic computation of this builtin function to create
+        """Symbolic computation of builtin binary message function to create
         runtime.executor
         """
         graph = var.GRAPH(graph)
@@ -64,7 +64,7 @@ class BinaryMessageFunction(MessageFunction):
 
 
 class CopyMessageFunction(MessageFunction):
-    """Class for the copy_src builtin message function.
+    """Class for the copy builtin message function.
 
     See Also
     --------
@@ -77,7 +77,7 @@ class CopyMessageFunction(MessageFunction):
 
     def __call__(self, graph, src_frame, dst_frame, edge_frame, out_size,
                  src_map, dst_map, edge_map, out_map, reducer="none"):
-        """Symbolic computation of this builtin function to create
+        """Symbolic computation of builtin message function to create
         runtime.executor
         """
         graph = var.GRAPH(graph)
