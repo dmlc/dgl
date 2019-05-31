@@ -1,6 +1,7 @@
 #!/usr/bin/env groovy
 
 def init_git() {
+  sh "pwd"
   sh "rm -rf *"  // clear the current folder
   checkout scm
   sh "git submodule init"
@@ -29,6 +30,7 @@ def build_dgl_win64() {
 
 def cpp_unit_test_linux(){
   ws("${env.WORKSPACE}/cpu-build") {
+    sh "pwd"
     sh "bash tests/scripts/task_cpp_unit_test.sh"
   }
 }
@@ -38,6 +40,7 @@ def cpp_unit_test_windows(){
 }
 
 def unit_test(backend, dev) {
+  sh "pwd"
   def wspace = "${env.WORKSPACE}/${backend}-${dev}-unittest/"
   def build = "${env.WORKSPACE}/${dev}-build/"
   ws("${wspace}") {
@@ -60,6 +63,7 @@ def unit_test(backend, dev) {
 //}
 
 def example_test(backend, dev) {
+  sh "pwd"
   def wspace = "${env.WORKSPACE}/${backend}-${dev}-exptest/"
   def build = "${env.WORKSPACE}/${dev}-build/"
   ws("${wspace}") {
