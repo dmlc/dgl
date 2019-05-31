@@ -119,43 +119,45 @@ pipeline {
         sh "bash tests/scripts/task_lint.sh"
       }
     }
-    parallel {
-      stage("Linux CPU") {
-        agent { docker { image "dgllib/dgl-ci-cpu" } }
-        stages {
-          stage("Build") {
-            steps { build_dgl("cpu") }
-          }
-          stage("CPP test") {
-            steps { cpp_unit_test_linux() }
-          }
-          stage("TH unit test") {
-            steps { unit_test("pytorch", "cpu") }
-          }
-          stage("TH example test") {
-            steps { example_test("pytorch", "cpu") }
-          }
-          stage("MX unit test") {
-            steps { unit_test("mxnet", "cpu") }
-          }
-          stage("Torch tutorial test") {
-            steps { tutorial_test("pytorch") }
-          }
-        }
-      }
-      stage("Linux GPU") {
-        agent {
-          docker {
-            image "dgllib/dgl-ci-gpu"
-            args "--runtime nvidia"
+    stage("Build & Test") {
+      parallel {
+        stage("Linux CPU") {
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          stages {
+            stage("Build") {
+              steps { build_dgl("cpu") }
+            }
+            stage("CPP test") {
+              steps { cpp_unit_test_linux() }
+            }
+            stage("TH unit test") {
+              steps { unit_test("pytorch", "cpu") }
+            }
+            stage("TH example test") {
+              steps { example_test("pytorch", "cpu") }
+            }
+            stage("MX unit test") {
+              steps { unit_test("mxnet", "cpu") }
+            }
+            stage("Torch tutorial test") {
+              steps { tutorial_test("pytorch") }
+            }
           }
         }
-        stages {
-          stage("Build") {
-            steps { build_dgl("gpu") }
+        stage("Linux GPU") {
+          agent {
+            docker {
+              image "dgllib/dgl-ci-gpu"
+              args "--runtime nvidia"
+            }
           }
-          stage("TH example test") {
-            steps { example_test("pytorch", "gpu") }
+          stages {
+            stage("Build") {
+              steps { build_dgl("gpu") }
+            }
+            stage("TH example test") {
+              steps { example_test("pytorch", "gpu") }
+            }
           }
         }
       }
