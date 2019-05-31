@@ -21,22 +21,31 @@ def gen_v2v_spmv_schedule(graph, mfunc, rfunc, src_frame, dst_frame, edge_frame,
 
     Parameters
     ----------
-    graph :
+    graph : utils.CtxCachedObject
+        Function that generates immutable graph index on given context
     mfunc : list of builtin message func
+        Builtin message function list
     rfunc : list of builtin reduce func
+        Builtin reduce function list
     src_frame : var.Var
-        input source node features
+        Input source node features
     dst_frame : var.Var
-        input destination node features
+        Input destination node features
     edge_frame : var.Var
-        input edge features
+        Input edge features
     out : var.Var
-        output node features
+        Output node features
     out_size : int
-        number of output nodes
+        Number of output nodes
+    src_map : utils.CtxCachedObject
+        Function that generates source node id mapping array on given context
+    dst_map : utils.CtxCachedObject
+        Function that generates destination node id mapping array on given
+        context
+    edge_map : utils.CtxCachedObject
+        Function that generates edge id mapping array on given context
     out_map : utils.CtxCachedObject
-        function that generates a mapping from destination nodes to consecutive
-        ids and caches on given context
+        Function that generates output id mapping array on given context
     """
     fld2mfunc = {fn.out_field: fn for fn in mfunc}
     for rfn in rfunc:
@@ -57,24 +66,29 @@ def gen_v2e_spmv_schedule(graph, mfunc, src_frame, dst_frame, edge_frame, out,
 
     Parameters
     ----------
-    adj : utils.CtxCachedObject
-        function that generates four dgl.ndarray (indptr, indices, inv_indptr,
-        inv_indices) representing CSR and transposed-CSR matrix, copies to and
-        caches on to given context
+    graph : utils.CtxCachedObject
+        Function that generates immutable graph index on given context
     mfunc : list of builtin message func
+        Builtin message function list
     src_frame : var.Var
-        input source node features
+        Input source node features
     dst_frame : var.Var
-        input destination node features
+        Input destination node features
     edge_frame : var.Var
-        input edge features
+        Input edge features
     out : var.Var
-        output message features
+        Output node features
     out_size : int
-        number of output messages
+        Number of output nodes
+    src_map : utils.CtxCachedObject
+        Function that generates source node id mapping array on given context
+    dst_map : utils.CtxCachedObject
+        Function that generates destination node id mapping array on given
+        context
+    edge_map : utils.CtxCachedObject
+        Function that generates edge id mapping array on given context
     out_map : utils.CtxCachedObject
-        function that generates a mapping from message ids to edge ids and
-        caches on given context
+        Function that generates output id mapping array on given context
     """
     for mfn in mfunc:
         fmsg = mfn(graph, src_frame, dst_frame, edge_frame, out_size, src_map,
@@ -82,29 +96,26 @@ def gen_v2e_spmv_schedule(graph, mfunc, src_frame, dst_frame, edge_frame, out,
         ir.WRITE_COL_(out, var.STR(mfn.out_field), fmsg)
 
 
-def gen_e2v_spmv_schedule(graph, rfunc, message_frame, edge_map, out, out_size,
-                          out_map=None):
+def gen_e2v_spmv_schedule(graph, rfunc, message_frame, out, out_size,
+                          edge_map=None, out_map=None):
     """Generate e2v SPMV schedule.
 
     Parameters
     ----------
-    adj : utils.CtxCachedObject
-        function that generates four dgl.ndarray (indptr, indices, inv_indptr,
-        inv_indices) representing CSR and transposed-CSR matrix, copies to and
-        caches on to given context
+    graph : utils.CtxCachedObject
+        Function that generates immutable graph index on given context
     rfunc : list of builtin reduce func
+        Builtin reduce function list
     message_frame : var.Var
-        input message features
-    edge_map : CtxCachedObject
-        Function that copies and caches mapping from message id to edge id for
-        CSR and transposed CSR matrix on given context
+        Message features
     out : var.Var
-        output node features
+        Output node features
     out_size : int
-        number of output nodes
+        Number of output nodes
+    edge_map : utils.CtxCachedObject
+        Function that generates edge id mapping array on given context
     out_map : utils.CtxCachedObject
-        function that generates a mapping from destination nodes to consecutive
-        ids and caches on given context
+        Function that generates output id mapping array on given context
     """
     for rfn in rfunc:
         ftdst = rfn(graph, message_frame, out_size, edge_map=edge_map,
@@ -113,7 +124,7 @@ def gen_e2v_spmv_schedule(graph, rfunc, message_frame, edge_map, out, out_size,
 
 
 def build_adj_matrix_graph(graph):
-    """Build adjacency matrix of the whole graph.
+    """Build immutable graph index of the whole graph.
 
     Parameters
     ----------
@@ -122,8 +133,13 @@ def build_adj_matrix_graph(graph):
 
     Returns
     -------
-    utils.CtxCachedObject
-        Get be used to get adjacency matrix on the provided ctx.
+    graph : utils.CtxCachedObject
+        Function that generates a immutable graph index on given context
+    edge_map : utils.CtxCachedObject
+        Function that generates forward and backward edge mapping on given
+        context
+    nbits : int
+        Number of ints needed to represent the graph
     """
     gidx = graph._graph
     return lambda ctx: gidx.get_immutable_gidx(ctx), None, gidx.bits_needed()
@@ -138,23 +154,20 @@ def build_adj_matrix_uv(edge_tuples, num_nodes):
 
     Parameters
     ---------
-    u : utils.Index
-        Source nodes
-    v : utils.Index
-        Destination nodes
-    reduce_nodes : utils.Index
-        The nodes to reduce messages, which will be target dimension
-        of the adjmat. The nodes include unique(v) and zero-degree-nodes.
-    num_sources : int
-        The number of source nodes.
+    edge_tuples : tuple of three utils.Index
+        A tuple of (u, v, eid)
+    num_nodes : int
+        The number of nodes.
 
     Returns
     -------
-    utils.CtxCachedObject
-        Get be used to get adjacency matrix and on the provided ctx.
-    utils.Index
-        A index for data shuffling due to sparse format change. Return None
-        if shuffle is not required.
+    graph : utils.CtxCachedObject
+        Function that generates a immutable graph index on given context
+    edge_map : utils.CtxCachedObject
+        Function that generates forward and backward edge mapping on given
+        context
+    nbits : int
+        Number of ints needed to represent the graph
     """
     u, v, eid = edge_tuples
     gidx = create_graph_index()

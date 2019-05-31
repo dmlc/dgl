@@ -760,9 +760,9 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
         spmv.gen_e2v_spmv_schedule(graph=adj,
                                    rfunc=rfunc,
                                    message_frame=var_msg,
-                                   edge_map=edge_map,
                                    out=var_out,
                                    out_size=len(recv_nodes),
+                                   edge_map=edge_map,
                                    out_map=var_out_map)
         return var_out
     else:
@@ -897,10 +897,13 @@ def _gen_send_reduce(
     # 6. Generate reduce
     if rfunc_is_list:
         # UDF message + builtin reducer
-        # reduce from message, so msg_map becomes edge_map here
-        spmv.gen_e2v_spmv_schedule(adj, rfunc, var_mf,
-                                   None, var_out,
-                                   len(reduce_nodes), out_map)
+        spmv.gen_e2v_spmv_schedule(graph=adj,
+                                   rfunc=rfunc,
+                                   message_frame=var_mf,
+                                   out=var_out,
+                                   out_size=len(reduce_nodes),
+                                   edge_map=None,
+                                   out_map=out_map)
         return var_out
     else:
         # gen degree bucketing schedule for UDF recv
@@ -923,8 +926,10 @@ def _gen_send(graph, src_nfr, dst_nfr, efr, u, v, eid, mfunc):
     msg = ir.EDGE_UDF(_mfunc_wrapper, fdsrc, fdedge, fddst)
     return msg
 
-def _build_idx_map(idx, bits):
+def _build_idx_map(idx, nbits):
     """Build a map from the input ids to continuous ids that starts from zero.
+    And the number of bits data type of each integer in the mapping uses will
+    be nbits
 
     Examples
     --------
@@ -939,7 +944,7 @@ def _build_idx_map(idx, bits):
     ----------
     x : Index
         The input ids, assumed to be unique.
-    bits: int
+    nbits: int
         Number of bits each integer in the mapping should use, can be 32 or 64
 
     Returns
@@ -953,7 +958,7 @@ def _build_idx_map(idx, bits):
     map_len = int(F.asnumpy(F.max(x, dim=0))) + 1
     old_to_new = F.zeros((map_len,), dtype=F.int64, ctx=F.cpu())
     F.scatter_row_inplace(old_to_new, x, F.arange(0, len(x)))
-    old_to_new = utils.to_nbits_int(old_to_new, bits)
+    old_to_new = utils.to_nbits_int(old_to_new, nbits)
     old_to_new = F.zerocopy_to_dgl_ndarray(old_to_new)
     return utils.CtxCachedObject(lambda ctx: nd.array(old_to_new, ctx=ctx))
 
