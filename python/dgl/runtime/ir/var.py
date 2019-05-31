@@ -79,7 +79,7 @@ def FEAT_DICT(data=None, name=None):
     return new(VarType.FEAT_DICT, data, name)
 
 def GRAPH(data=None, name=None):
-    """Create a variable for sparse matrix lambda."""
+    """Create a variable for graph index lambda."""
     return new(VarType.GRAPH, data, name)
 
 def IDX(data=None, name=None):

@@ -972,6 +972,11 @@ class GraphIndex(object):
 
     def bits_needed(self):
         """Return the number of integer bits needed to represent the graph
+
+        Returns
+        -------
+        int
+            The number of bits needed
         """
         if self.number_of_edges() >= 0x80000000:
             return 64

@@ -998,7 +998,7 @@ def CLEAR_FRAME_(fd):
 
 
 class BinaryReduceExecutor(Executor):
-    """Executor for SRC_OP_EDGE_REDUCE
+    """Executor for BINARY_REDUCE
 
     Parameters
     ----------
@@ -1008,28 +1008,28 @@ class BinaryReduceExecutor(Executor):
     binary_op : str
         String representing binary operation to perform, can be "add", "mul",
         "sub", "div", "dot"
-    lhs_tgt : TargetCode
-        Can be SRC, DST or EDGE
-    rhs_tgt : TargetCode
-        Can be SRC, DST or EDGE
     graph : var.Var
-        Variable for sparse matrix lambda. The lambda returns the sparse matrix
-        given a context object.
+        Variable for graph index lambda. The lambda returns the immutable graph
+        index given a context object.
+    lhs: int
+        The lhs target (src, dst, edge)
+    rhs: int
+        The rhs target (src, dst, edge)
     lhs_data : var.Var
-        Variable for the dense feature tensor of source nodes.
+        Variable for the lhs data
     rhs_data : var.Var
-        Variable for the dense feature tensor of edges.
+        Variable for the rhs data
     out_size : int
         Output size
     lhs_map : var.Var
-        Variable for mapping lambda. The lambda returns the mapping from source
-        node id to relabeled consecutive integers
+        Variable for mapping lambda. The lambda returns the lhs id mapping
+        array on given context
     rhs_map : var.Var
-        Variable for mapping lambda. The lambda returns two mappings for CSR
-        and transposed CSR matrix
+        Variable for mapping lambda. The lambda returns the rhs id mapping
+        array on given context
     out_map : var.Var
-        Variable for mapping lambda. The lambda returns the mapping from output
-        to relabeled consecutive integers
+        Variable for mapping lambda. The lambda returns the output id mapping
+        array on given context
     ret : var.Var
         Variable for the result.
     """
@@ -1088,8 +1088,8 @@ IR_REGISTRY[OpCode.BINARY_REDUCE] = {
 }
 
 
-def BINARY_REDUCE(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data, out_size,
-                  lhs_map, rhs_map, out_map, ret=None):
+def BINARY_REDUCE(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
+                  out_size, lhs_map, rhs_map, out_map, ret=None):
     """Perform BINARY_REDUCE symbolically.
 
     Parameters
@@ -1101,23 +1101,27 @@ def BINARY_REDUCE(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data, out_s
         String representing binary operation to perform, can be "add", "mul",
         "sub", "div", "dot"
     graph : var.Var
-        Variable for sparse matrix lambda. The lambda returns the sparse matrix
-        given a context object.
+        Variable for graph index lambda. The lambda returns the immutable graph
+        index given a context object.
+    lhs: int
+        The lhs target (src, dst, edge)
+    rhs: int
+        The rhs target (src, dst, edge)
     lhs_data : var.Var
-        Variable for the dense feature tensor of source nodes.
-    edge_data : var.Var
-        Variable for the dense feature tensor of edges.
+        Variable for the lhs data
+    rhs_data : var.Var
+        Variable for the rhs data
     out_size : int
         Output size
     lhs_map : var.Var
-        Variable for mapping lambda. The lambda returns the mapping from source
-        node id to relabeled consecutive integers
+        Variable for mapping lambda. The lambda returns the lhs id mapping
+        array on given context
     rhs_map : var.Var
-        Variable for mapping lambda. The lambda returns two mappings for CSR
-        and transposed CSR matrix
+        Variable for mapping lambda. The lambda returns the rhs id mapping
+        array on given context
     out_map : var.Var
-        Variable for mapping lambda. The lambda returns the mapping from output
-        to relabeled consecutive integers
+        Variable for mapping lambda. The lambda returns the output id mapping
+        array on given context
     ret : var.Var, optional
         Variable for the result. If not give, a new variable will be created.
 
@@ -1135,7 +1139,7 @@ def BINARY_REDUCE(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data, out_s
 
 
 class CopyReduceExecutor(Executor):
-    """Executor for COPY_SRC_REDUCE
+    """Executor for COPY_REDUCE
 
     Parameters
     ----------
@@ -1143,18 +1147,20 @@ class CopyReduceExecutor(Executor):
         String representing reduction to perform, can be "sum", "max", "min",
         "mean", "prod", "none" (no reduction)
     graph : var.Var
-        Variable for sparse matrix lambda. The lambda returns the sparse matrix
-        given a context object.
-    src_data : var.Var
-        Variable for the dense feature tensor of source nodes.
+        Variable for graph index lambda. The lambda returns the immutable graph
+        index given a context object.
+    target: int
+        The input target (src, dst, edge)
+    in_data : var.Var
+        Variable for the input data
     out_size : int
         Output size
-    src_map : var.Var
-        Variable for mapping lambda. The lambda returns the mapping from source
-        node id to relabeled consecutive integers
+    in_map : var.Var
+        Variable for mapping lambda. The lambda returns the input id mapping
+        array on given context
     out_map : var.Var
-        Variable for mapping lambda. The lambda returns the mapping from output
-        to relabeled consecutive integers
+        Variable for mapping lambda. The lambda returns the output id mapping
+        array on given context
     ret : var.Var
         Variable for the result.
     """
@@ -1195,7 +1201,7 @@ class CopyReduceExecutor(Executor):
 
 
 IR_REGISTRY[OpCode.COPY_REDUCE] = {
-    'name': 'COPY_SRC_REDUCE',
+    'name': 'COPY_REDUCE',
     'args_type': [VarType.STR, VarType.GRAPH, VarType.INT, VarType.FEAT, VarType.INT,
                   VarType.MAP, VarType.MAP],
     'ret_type': VarType.FEAT,
@@ -1205,7 +1211,7 @@ IR_REGISTRY[OpCode.COPY_REDUCE] = {
 
 def COPY_REDUCE(reducer, graph, target, in_data, out_size, in_map, out_map,
                 ret=None):
-    """Perform COPY_SRC_REDUCE symbolically.
+    """Perform COPY_REDUCE symbolically.
 
     Parameters
     ----------
@@ -1213,18 +1219,20 @@ def COPY_REDUCE(reducer, graph, target, in_data, out_size, in_map, out_map,
         String representing reduction to perform, can be "sum", "max", "min",
         "mean", "prod", "none" (no reduction)
     graph : var.Var
-        Variable for sparse matrix lambda. The lambda returns the sparse matrix
-        given a context object.
-    src_data : var.Var
-        Variable for the dense feature tensor of source nodes.
+        Variable for graph index lambda. The lambda returns the immutable graph
+        index given a context object.
+    target: int
+        The input target (src, dst, edge)
+    in_data : var.Var
+        Variable for the input data
     out_size : int
         Output size
-    src_map : var.Var
-        Variable for mapping lambda. The lambda returns the mapping from source
-        node id to relabeled consecutive integers
+    in_map : var.Var
+        Variable for mapping lambda. The lambda returns the input id mapping
+        array on given context
     out_map : var.Var
-        Variable for mapping lambda. The lambda returns the mapping from output
-        to relabeled consecutive integers
+        Variable for mapping lambda. The lambda returns the output id mapping
+        array on given context
     ret : var.Var, optional
         Variable for the result. If not give, a new variable will be created.
 
