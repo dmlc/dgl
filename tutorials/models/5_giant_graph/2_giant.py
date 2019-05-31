@@ -335,6 +335,27 @@ Large-Scale Training of Graph Neural Networks
 #
 # |image2|
 #
+# Scale to giant graphs
+# ---------------------
+#
+# Finally, we would like to demonstrate the scalability of DGL with giant
+# synthetic graphs. We create three large power-law graphs with
+# `RMAT <http://www.cs.cmu.edu/~christos/PUBLICATIONS/siam04.pdf>`__. Each
+# node is associated with 100 features and we compute node embeddings with
+# 64 dimensions. Below shows the training speed and memory consumption of
+# GCN with neighbor sampling.
+#
+# ====== ====== ================== ===========
+# #Nodes #Edges Time per epoch (s) Memory (GB)
+# ====== ====== ================== ===========
+# 5M     250M   4.7                8
+# 50M    2.5B   46                 75
+# 500M   25B    505                740
+# ====== ====== ================== ===========
+#
+# We can see that DGL can scale to graphs with up to 500M nodes and 25B
+# edges.
+#
 # .. |image0| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/sampling/arch.png
 # .. |image1| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/sampling/NUMA_speedup.png
 # .. |image2| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/sampling/whole_speedup.png
