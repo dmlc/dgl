@@ -84,6 +84,27 @@ pipeline {
             build_dgl("cpu")
           }
         }
+        stage("GPU Build") {
+          agent {
+            docker {
+              image "dgllib/dgl-ci-gpu"
+              args "--runtime nvidia"
+            }
+          }
+          steps {
+            init_git_submodule()
+            build_dgl("cuda")
+          }
+        }
+        stage("MXNet CPU Build (temp)") {
+          agent {
+            docker { image "dgllib/dgl-ci-mxnet-cpu" }
+          }
+          steps {
+            init_git_submodule()
+            build_dgl("cpu")
+          }
+        }
         stage("CPU Build (Win64/PyTorch)") {
           agent {
             label "windows"
@@ -121,6 +142,38 @@ pipeline {
             }
             stage("TH CPU Win64 example test") {
               steps { example_test_win64("pytorch", "cpu") }
+            }
+          }
+          post {
+            always { junit "*.xml" }
+          }
+        }
+        stage("Pytorch GPU") {
+          agent {
+            docker {
+              image "dgllib/dgl-ci-gpu"
+              args "--runtime nvidia"
+            }
+          }
+          stages {
+            stage("TH GPU unittest") {
+              steps { unit_test("pytorch", "cuda") }
+            }
+            stage("TH GPU example test") {
+              steps { example_test("pytorch", "cuda") }
+            }
+          }
+          post {
+            always { junit "*.xml" }
+          }
+        }
+        stage("MXNet CPU") {
+          agent {
+            docker { image "dgllib/dgl-ci-mxnet-cpu" }
+          }
+          stages {
+            stage("MX Unittest") {
+              steps { unit_test("mxnet", "cpu") }
             }
           }
           post {

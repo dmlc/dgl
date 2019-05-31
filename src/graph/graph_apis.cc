@@ -525,13 +525,11 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphContext")
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyTo")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
-    int device_type = args[1];
-    int device_id = args[2];
+    const int device_type = args[1];
+    const int device_id = args[2];
     DLContext ctx;
     ctx.device_type = static_cast<DLDeviceType>(device_type);
     ctx.device_id = device_id;
-    CHECK_EQ(ctx.device_type, 1) << "device type: " << ctx.device_type;
-    CHECK_EQ(ctx.device_id, 0) << "device id: " << ctx.device_id;
     const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
     const ImmutableGraph *ig = dynamic_cast<const ImmutableGraph*>(ptr);
     CHECK(ig) << "Invalid argument: must be an immutable graph object.";

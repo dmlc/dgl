@@ -957,8 +957,6 @@ class GraphIndex(object):
         GraphIndex
             The graph index on the given device context.
         """
-        assert(ctx.device_type == 1), \
-            "device id {}, device type {}".format(ctx.device_id, ctx.device_type)
         handle = _CAPI_DGLImmutableGraphCopyTo(self._handle, ctx.device_type, ctx.device_id)
         return GraphIndex(handle, readonly=True)
 
