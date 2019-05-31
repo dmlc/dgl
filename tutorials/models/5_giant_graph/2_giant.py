@@ -335,7 +335,7 @@ Large-Scale Training of Graph Neural Networks
 #
 # |image2|
 #
-# .. |image0| image:: https://i.imgur.com/OmLVXfo.png
-# .. |image1| image:: https://i.imgur.com/eaiEcEi.png
-# .. |image2| image:: https://i.imgur.com/e0MXa5N.png
+# .. |image0| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/sampling/arch.png
+# .. |image1| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/sampling/NUMA_speedup.png
+# .. |image2| image:: https://s3.us-east-2.amazonaws.com/dgl.ai/tutorial/sampling/whole_speedup.png
 #
