@@ -70,8 +70,7 @@ class EdgeSoftmax(object):
         """
         num_nodes = graph.number_of_nodes()
         ctx = utils.to_dgl_context(F.context(logits))
-        gidx, _, nbits = spmv.build_adj_matrix_graph(graph)
-        gidx = gidx(ctx)
+        gidx = graph._graph.get_immutable_gidx(ctx)
         _, dst, _ = graph._graph.edges()
         dst = dst.tousertensor(F.context(logits))
         empty_map = (None, None)

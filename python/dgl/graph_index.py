@@ -959,7 +959,7 @@ class GraphIndex(object):
         """
         assert(ctx.device_type == 1), \
             "device id {}, device type {}".format(ctx.device_id, ctx.device_type)
-        handle = _CAPI_DGLImmutableGraphCopyTo(self._handle, ctx)
+        handle = _CAPI_DGLImmutableGraphCopyTo(self._handle, ctx.device_type, ctx.device_id)
         return GraphIndex(handle, readonly=True)
 
     def nbits(self):
