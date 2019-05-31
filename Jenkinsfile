@@ -29,10 +29,10 @@ def build_dgl_win64() {
 }
 
 def cpp_unit_test_linux(){
-  ws("${env.WORKSPACE}/cpu-build") {
+  //ws("${env.WORKSPACE}/cpu-build") {
     sh "pwd"
     sh "bash tests/scripts/task_cpp_unit_test.sh"
-  }
+  //}
 }
 
 def cpp_unit_test_windows(){
@@ -40,20 +40,24 @@ def cpp_unit_test_windows(){
 }
 
 def unit_test(backend, dev) {
-  sh "pwd"
-  def wspace = "${env.WORKSPACE}/${backend}-${dev}-unittest/"
-  def build = "${env.WORKSPACE}/${dev}-build/"
-  ws("${wspace}") {
-    withEnv(["DGL_LIBRARY_PATH=${build}/build",
-             "PYTHONPATH=${build}/python",
+  //sh "pwd"
+  //def wspace = "${env.WORKSPACE}/${backend}-${dev}-unittest/"
+  //def build = "${env.WORKSPACE}/${dev}-build/"
+  //ws("${wspace}") {
+    //withEnv(["DGL_LIBRARY_PATH=${build}/build",
+             //"PYTHONPATH=${build}/python",
+             //"DGLBACKEND=${backend}",
+             //"DGL_DOWNLOAD_DIR=${wspace}"]) {
+    withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build",
+             "PYTHONPATH=${env.WORKSPACE}/python",
              "DGLBACKEND=${backend}",
-             "DGL_DOWNLOAD_DIR=${wspace}"]) {
+             "DGL_DOWNLOAD_DIR=${env.WORKSPACE}"]) {
       timeout(time: 2, unit: 'MINUTES') {
         init_git()
         sh "bash tests/scripts/task_unit_test.sh ${backend}"
       }
     }
-  }
+  //}
 }
 
 //def unit_test_win64(backend, dev) {
@@ -63,20 +67,24 @@ def unit_test(backend, dev) {
 //}
 
 def example_test(backend, dev) {
-  sh "pwd"
-  def wspace = "${env.WORKSPACE}/${backend}-${dev}-exptest/"
-  def build = "${env.WORKSPACE}/${dev}-build/"
-  ws("${wspace}") {
-    withEnv(["DGL_LIBRARY_PATH=${build}/build",
-             "PYTHONPATH=${build}/python",
+  //sh "pwd"
+  //def wspace = "${env.WORKSPACE}/${backend}-${dev}-exptest/"
+  //def build = "${env.WORKSPACE}/${dev}-build/"
+  //ws("${wspace}") {
+    //withEnv(["DGL_LIBRARY_PATH=${build}/build",
+             //"PYTHONPATH=${build}/python",
+             //"DGLBACKEND=${backend}",
+             //"DGL_DOWNLOAD_DIR=${wspace}"]) {
+    withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build",
+             "PYTHONPATH=${env.WORKSPACE}/python",
              "DGLBACKEND=${backend}",
-             "DGL_DOWNLOAD_DIR=${wspace}"]) {
+             "DGL_DOWNLOAD_DIR=${env.WORKSPACE}"]) {
       timeout(time: 20, unit: 'MINUTES') {
         init_git()
         sh "bash tests/scripts/task_example_test.sh ${dev}"
       }
     }
-  }
+  //}
 }
 
 //def example_test_win64(backend, dev) {
@@ -108,13 +116,51 @@ pipeline {
     stage("Lint Check") {
       agent { docker { image "dgllib/dgl-ci-lint" } }
       steps {
-        ws("${env.WORKSPACE}/lint") {
-          init_git()
-          sh "bash tests/scripts/task_lint.sh"
+        sh "bash tests/scripts/task_lint.sh"
+      }
+    }
+    parallel {
+      stage("Linux CPU") {
+        agent { docker { image "dgllib/dgl-ci-cpu" } }
+        stages {
+          stage("Build") {
+            steps { build_dgl("cpu") }
+          }
+          stage("CPP test") {
+            steps { cpp_unit_test_linux() }
+          }
+          stage("TH unit test") {
+            steps { unit_test("pytorch", "cpu") }
+          }
+          stage("TH example test") {
+            steps { example_test("pytorch", "cpu") }
+          }
+          stage("MX unit test") {
+            steps { unit_test("mxnet", "cpu") }
+          }
+          stage("Torch tutorial test") {
+            steps { tutorial_test("pytorch") }
+          }
+        }
+      }
+      stage("Linux GPU") {
+        agent {
+          docker {
+            image "dgllib/dgl-ci-gpu"
+            args "--runtime nvidia"
+          }
+        }
+        stages {
+          stage("Build") {
+            steps { build_dgl("gpu") }
+          }
+          stage("TH example test") {
+            steps { example_test("pytorch", "gpu") }
+          }
         }
       }
     }
-    stage("Build") {
+    /*stage("Build") {
       parallel {
         stage("CPU Build") {
           agent { docker { image "dgllib/dgl-ci-cpu" } }
@@ -233,5 +279,6 @@ pipeline {
         //}
       }
     }
+    */
   }
 }
