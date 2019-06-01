@@ -3,15 +3,12 @@
 dgl_linux_libs = "build/libdgl.so, python/dgl/_ffi/_cy3/core.cpython-35m-x86_64-linux-gnu.so"
 
 def init_git() {
-  sh "pwd"
-  sh "rm -rf *"  // clear the current folder
   checkout scm
   sh "git submodule init"
   sh "git submodule update"
 }
 
 def init_git_win64() {
-  sh "del /s /f *"  // clear the current folder
   checkout scm
   bat "git submodule init"
   bat "git submodule update"
@@ -38,7 +35,6 @@ def unpack_lib(name, libs) {
 def build_dgl_linux(dev) {
   ws("workspace/${dev}-build") {
     init_git()
-    sh "pwd"
     sh "bash tests/scripts/build_dgl.sh"
     pack_lib("dgl-${dev}", dgl_linux_libs)
   }
@@ -52,7 +48,6 @@ def build_dgl_win64() {
 
 def cpp_unit_test_linux() {
   ws("workspace/cpp-cpu-test") {
-    sh "pwd"
     init_git()
     unpack_lib("dgl-cpu", dgl_linux_libs)
     sh "bash tests/scripts/task_cpp_unit_test.sh"
@@ -66,17 +61,10 @@ def cpp_unit_test_windows() {
 def unit_test(backend, dev) {
   def wspace = "workspace/${backend}-${dev}-unittest"
   ws(wspace) {
-    sh "pwd"
-    sh "ls -lh"
     init_git()
     unpack_lib("dgl-${dev}", dgl_linux_libs)
-    withEnv(["DGL_LIBRARY_PATH=${wspace}/build",
-             "PYTHONPATH=${wspace}/python",
-             "DGLBACKEND=${backend}",
-             "DGL_DOWNLOAD_DIR=${wspace}"]) {
-      timeout(time: 2, unit: 'MINUTES') {
-        sh "bash tests/scripts/task_unit_test.sh ${backend}"
-      }
+    timeout(time: 2, unit: 'MINUTES') {
+      sh "bash tests/scripts/task_unit_test.sh ${backend}"
     }
   }
 }
