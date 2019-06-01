@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-dgl_linux_libs = "build/libdgl.so, python/dgl/_ffi/_cython/core.cpython-35m-x86_64-linux-gnu.so"
+dgl_linux_libs = "build/libdgl.so, python/dgl/_ffi/_cy3/core.cpython-35m-x86_64-linux-gnu.so"
 
 def init_git() {
   sh "pwd"
