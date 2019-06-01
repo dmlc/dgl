@@ -1,5 +1,7 @@
 #!/usr/bin/env groovy
 
+dgl_linux_libs = "build/libdgl.so, python/dgl/_ffi/_cython/core.cpython-35m-x86_64-linux-gnu.so"
+
 def init_git() {
   sh "pwd"
   sh "rm -rf *"  // clear the current folder
@@ -33,12 +35,12 @@ def unpack_lib(name, libs) {
      """
 }
 
-def build_dgl(dev) {
+def build_dgl_linux(dev) {
   ws("workspace/${dev}-build") {
     init_git()
     sh "pwd"
     sh "bash tests/scripts/build_dgl.sh"
-    pack_lib("dgl-${dev}", "build/libdgl.so")
+    pack_lib("dgl-${dev}", dgl_linux_libs)
   }
 }
 
@@ -52,7 +54,7 @@ def cpp_unit_test_linux() {
   ws("workspace/cpp-cpu-test") {
     sh "pwd"
     init_git()
-    unpack_lib("dgl-cpu")
+    unpack_lib("dgl-cpu", dgl_linux_libs)
     sh "bash tests/scripts/task_cpp_unit_test.sh"
   }
 }
@@ -65,7 +67,7 @@ def unit_test(backend, dev) {
   ws("workspace/${backend}-${dev}-unittest") {
     sh "pwd"
     init_git()
-    unpack_lib("dgl-${dev}")
+    unpack_lib("dgl-${dev}", dgl_linux_libs)
     withEnv(["DGL_LIBRARY_PATH=${PWD}/build",
              "PYTHONPATH=${PWD}/python",
              "DGLBACKEND=${backend}",
@@ -138,7 +140,7 @@ pipeline {
     stage("Build") {
       agent { label "CPUNode" }
       steps {
-        build_dgl("cpu")
+        build_dgl_linux("cpu")
       }
     }
     stage("Test") {
