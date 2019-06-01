@@ -8,16 +8,17 @@ function fail {
     exit -1
 }
 
-pushd ${TUTORIAL_ROOT} > /dev/null
-# Install requirements
-pip3 install -r requirements.txt || fail "installing requirements"
-
-# Test
 export MPLBACKEND=Agg
 export DGLBACKEND=mxnet
 export DGL_LIBRARY_PATH=${PWD}/build
 export PYTHONPATH=${PWD}/python:$PYTHONPATH
 export DGL_DOWNLOAD_DIR=${PWD}
+
+pushd ${TUTORIAL_ROOT} > /dev/null
+# Install requirements
+pip3 install -r requirements.txt || fail "installing requirements"
+
+# Test
 for f in $(find . -name "*_mx.py")
 do
     echo "Running tutorial ${f} ..."
