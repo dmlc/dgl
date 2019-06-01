@@ -187,10 +187,11 @@ def check_sync_barrier(worker_id, graph_name, return_dict):
 
         start = time.time()
         try:
-            g._sync_barrier(30)
+            g._sync_barrier(10)
         except TimeoutError as e:
             # this is very loose.
-            assert 25 < abs(time.time() - start) < 35
+            print("timeout: " + str(abs(time.time() - start)), file=sys.stderr)
+            assert 5 < abs(time.time() - start) < 15
         g.destroy()
         return_dict[worker_id] = 0
     except Exception as e:
