@@ -10,6 +10,14 @@ RUN bash /install/ubuntu_install_core.sh
 COPY install/ubuntu_install_build.sh /install/ubuntu_install_build.sh
 RUN bash /install/ubuntu_install_build.sh
 
+# ANTLR deps
+COPY install/ubuntu_install_java.sh /install/ubuntu_install_java.sh
+RUN bash /install/ubuntu_install_java.sh
+
+COPY install/ubuntu_install_antlr.sh /install/ubuntu_install_antlr.sh
+RUN bash /install/ubuntu_install_antlr.sh
+
+# python
 COPY install/ubuntu_install_python.sh /install/ubuntu_install_python.sh
 RUN bash /install/ubuntu_install_python.sh
 
