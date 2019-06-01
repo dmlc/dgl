@@ -3,6 +3,8 @@
 dgl_linux_libs = "build/libdgl.so, python/dgl/_ffi/_cy3/core.cpython-35m-x86_64-linux-gnu.so"
 
 def init_git() {
+  sh "pwd"
+  sh "rm -rf *"
   checkout scm
   sh "git submodule init"
   sh "git submodule update"
@@ -33,7 +35,7 @@ def unpack_lib(name, libs) {
 }
 
 def build_dgl_linux(dev) {
-  ws("workspace/${dev}-build") {
+  ws("${env.WORKSPACE}/${dev}-build") {
     init_git()
     sh "bash tests/scripts/build_dgl.sh"
     pack_lib("dgl-${dev}", dgl_linux_libs)
@@ -47,7 +49,7 @@ def build_dgl_win64() {
 }
 
 def cpp_unit_test_linux() {
-  ws("workspace/cpp-cpu-test") {
+  ws("${env.WORKSPACE}/cpp-cpu-test") {
     init_git()
     unpack_lib("dgl-cpu", dgl_linux_libs)
     sh "bash tests/scripts/task_cpp_unit_test.sh"
@@ -59,7 +61,7 @@ def cpp_unit_test_windows() {
 }
 
 def unit_test(backend, dev) {
-  def wspace = "workspace/${backend}-${dev}-unittest"
+  def wspace = "${env.WORKSPACE}/${backend}-${dev}-unittest"
   ws(wspace) {
     init_git()
     unpack_lib("dgl-${dev}", dgl_linux_libs)
@@ -130,19 +132,22 @@ pipeline {
     stage("Build") {
       parallel {
         stage("CPU Build") {
-          agent { label "CPUNode" }
+          //agent { label "CPUNode" }
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
           steps {
             build_dgl_linux("cpu")
           }
         }
         stage("GPU Build") {
+          //agent { label "GPUNode" }
           agent {
-            node {
-              label "GPUNode"
+            docker {
+              image "dgllib/dgl-ci-gpu"
               args "--runtime nvidia"
             }
           }
           steps {
+            sh "nvidia-smi"
             build_dgl_linux("gpu")
           }
         }
@@ -151,7 +156,8 @@ pipeline {
     stage("Test") {
       parallel {
         stage("Torch CPU") {
-          agent { label "CPUNode" }
+          //agent { label "CPUNode" }
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
           stages {
             stage("Unit test") {
               steps {
@@ -166,7 +172,12 @@ pipeline {
           }
         }
         stage("Torch GPU") {
-          agent { label "CPUNode" }
+          agent {
+            docker {
+              image "dgllib/dgl-ci-gpu"
+              args "--runtime nvidia"
+            }
+          }
           stages {
             stage("Unit test") {
               steps {
@@ -182,7 +193,7 @@ pipeline {
           }
         }
         stage("MXNet CPU") {
-          agent { label "CPUNode" }
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
           stages {
             stage("Unit test") {
               steps {
