@@ -126,6 +126,7 @@ pipeline {
         sh "ls -lh"
       }
     }
+
     /*stage("Build & Test") {
       parallel {
         stage("Linux CPU") {
