@@ -126,7 +126,9 @@ pipeline {
               steps { build_dgl("cpu") }
             }
             stage("CPP test") {
-              steps { cpp_unit_test_linux() }
+              steps {
+                //cpp_unit_test_linux()
+              }
             }
             stage("TH unit test") {
               steps { unit_test("pytorch", "cpu") }
