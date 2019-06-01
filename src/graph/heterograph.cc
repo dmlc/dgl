@@ -37,4 +37,4 @@ void HeteroGraph::SampleNeighbors(const CSR &csr, dgl_id_t local_vid, int k,
   }
 }
 
-}
+}  // namespace dgl

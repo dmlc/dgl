@@ -6,6 +6,9 @@
 #ifndef DGL_HETEROGRAPH_H_
 #define DGL_HETEROGRAPH_H_
 
+#include <utility>
+#include <vector>
+
 #include "immutable_graph.h"
 
 namespace dgl {
@@ -18,6 +21,7 @@ class HeteroGraph {
   std::vector<ImmutableGraphPtr> _subgraphs;
   int _num_ntypes;
   int _num_etypes;
+
  public:
   typedef std::pair<int, dgl_id_t> gnode_id_t;
   typedef int node_type_t;
