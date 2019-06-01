@@ -9,7 +9,6 @@ def init_git() {
   checkout scm
   sh "git submodule init"
   sh "git submodule update"
-  sh "ls -lh"
 }
 
 def init_git_win64() {
@@ -102,8 +101,11 @@ pipeline {
     stage("Lint Check") {
       agent { docker { image "dgllib/dgl-ci-lint" } }
       steps {
-        init_git()
-        sh "bash tests/scripts/task_lint.sh"
+        ws("workspace/lint") {
+          sh "pwd"
+          init_git()
+          sh "bash tests/scripts/task_lint.sh"
+        }
       }
     }
     stage("Build") {
