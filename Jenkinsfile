@@ -40,7 +40,7 @@ def build_dgl_linux(dev) {
   pack_lib("dgl-${dev}", dgl_linux_libs)
 }
 
-def build_dgl_win64() {
+def build_dgl_win64(dev) {
   /* Assuming that Windows slaves are already configured with MSBuild VS2017,
    * CMake and Python/pip/setuptools etc. */
   init_git_win64()
