@@ -117,7 +117,16 @@ pipeline {
         sh "bash tests/scripts/task_lint.sh"
       }
     }
-    stage("Build & Test") {
+    stage("Build") {
+      agent {
+        label "CPUNode"
+      }
+      steps {
+        sh "pwd"
+        sh "ls -lh"
+      }
+    }
+    /*stage("Build & Test") {
       parallel {
         stage("Linux CPU") {
           agent { docker { image "dgllib/dgl-ci-cpu" } }
@@ -131,15 +140,11 @@ pipeline {
                 sh "ls ./build"
               }
             }
-            stage("Unittest") {
-              parallel {
-                stage("TH unit test") {
-                  steps { unit_test("pytorch", "cpu") }
-                }
-                stage("TH example test") {
-                  steps { example_test("pytorch", "cpu") }
-                }
-              }
+            stage("TH unit test") {
+              steps { unit_test("pytorch", "cpu") }
+            }
+            stage("TH example test") {
+              steps { example_test("pytorch", "cpu") }
             }
             //stage("MX unit test") {
             //  steps { unit_test("mxnet", "cpu") }
@@ -166,7 +171,8 @@ pipeline {
           }
         }
       }
-    }
+    }*/
+
     /*stage("Build") {
       parallel {
         stage("CPU Build") {
