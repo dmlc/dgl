@@ -128,6 +128,7 @@ pipeline {
             stage("CPP test") {
               steps {
                 //cpp_unit_test_linux()
+                sh "ls ./build"
               }
             }
             stage("TH unit test") {
