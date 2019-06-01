@@ -21,9 +21,9 @@ def check_array_shared_memory(g, worker_id, arrays):
     if worker_id == 0:
         for i, arr in enumerate(arrays):
             arr[0] = i
-        g._sync_barrier()
+        g._sync_barrier(60)
     else:
-        g._sync_barrier()
+        g._sync_barrier(60)
         for i, arr in enumerate(arrays):
             assert_almost_equal(arr[0].asnumpy(), i)
 
@@ -53,7 +53,7 @@ def check_init_func(worker_id, graph_name, return_dict):
         assert F.array_equal(g.edges[0].data['feat'], F.tensor(np.arange(10), dtype=np.float32))
         g.init_ndata('test4', (g.number_of_nodes(), 10), 'float32')
         g.init_edata('test4', (g.number_of_edges(), 10), 'float32')
-        g._sync_barrier()
+        g._sync_barrier(60)
         check_array_shared_memory(g, worker_id, [g.nodes[:].data['test4'], g.edges[:].data['test4']])
 
         data = g.nodes[:].data['test4']
@@ -114,7 +114,7 @@ def check_compute_func(worker_id, graph_name, return_dict):
             time.sleep(1)
 
     try:
-        g._sync_barrier()
+        g._sync_barrier(60)
         in_feats = g.nodes[0].data['feat'].shape[1]
 
         # Test update all.
@@ -122,7 +122,7 @@ def check_compute_func(worker_id, graph_name, return_dict):
         adj = g.adjacency_matrix()
         tmp = mx.nd.dot(adj, g.nodes[:].data['feat'])
         assert_almost_equal(g.nodes[:].data['preprocess'].asnumpy(), tmp.asnumpy())
-        g._sync_barrier()
+        g._sync_barrier(60)
         check_array_shared_memory(g, worker_id, [g.nodes[:].data['preprocess']])
 
         # Test apply nodes.

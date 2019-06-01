@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import scipy
 from xmlrpc.server import SimpleXMLRPCServer
@@ -616,14 +617,29 @@ class SharedMemoryDGLGraph(BaseGraphStore):
         """
         return self._worker_id
 
-    def _sync_barrier(self):
+    def _sync_barrier(self, timeout=None):
+        """This is a sync barrier among all workers.
+
+        Parameters
+        ----------
+        timeout: int
+            time out in seconds.
+        """
         # Here I manually implement multi-processing barrier with RPC.
         # It uses busy wait with RPC. Whenever, all_enter is called, there is
         # a context switch, so it doesn't burn CPUs so badly.
+
+        # if timeout isn't specified, we wait forever.
+        if timeout is None:
+            timeout = sys.maxsize
+
         bid = self.proxy.enter_barrier(self._worker_id)
-        while not self.proxy.all_enter(self._worker_id, bid):
+        start = time.time()
+        while not self.proxy.all_enter(self._worker_id, bid) and time.time() - start < timeout:
             continue
         self.proxy.leave_barrier(self._worker_id, bid)
+        if time.time() - start >= timeout and not self.proxy.all_enter(self._worker_id, bid):
+            raise TimeoutError("leave the sync barrier because of timeout.")
 
     def init_ndata(self, ndata_name, shape, dtype, ctx=F.cpu()):
         """Create node embedding.
