@@ -1,12 +1,13 @@
 #!/usr/bin/env groovy
 
-dgl_linux_libs = "build/libdgl.so, python/dgl/_ffi/_cy3/core.cpython-35m-x86_64-linux-gnu.so"
+dgl_linux_libs = "build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-35m-x86_64-linux-gnu.so"
 
 def init_git() {
   sh "rm -rf *"
   checkout scm
   sh "git submodule init"
   sh "git submodule update"
+  sh "ls -lh"
 }
 
 def init_git_win64() {
@@ -86,6 +87,8 @@ def example_test(backend, dev) {
 //}
 
 def tutorial_test(backend) {
+  init_git()
+  unpack_lib("dgl-cpu", dgl_linux_libs)
   timeout(time: 20, unit: 'MINUTES') {
     sh "bash tests/scripts/task_${backend}_tutorial_test.sh"
   }
@@ -144,6 +147,11 @@ pipeline {
                 example_test("pytorch", "cpu")
               }
             }
+            stage("Tutorial test") {
+              steps {
+                tutorial_test("pytorch")
+              }
+            }
           }
         }
         stage("Torch GPU") {
@@ -182,7 +190,7 @@ pipeline {
             //}
             stage("Tutorial test") {
               steps {
-                mxnet_tutorials()
+                tutorial_test("mxnet")
               }
             }
           }
