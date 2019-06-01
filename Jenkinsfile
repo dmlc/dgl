@@ -3,7 +3,6 @@
 dgl_linux_libs = "build/libdgl.so, python/dgl/_ffi/_cy3/core.cpython-35m-x86_64-linux-gnu.so"
 
 def init_git() {
-  sh "pwd"
   sh "rm -rf *"
   checkout scm
   sh "git submodule init"
@@ -35,11 +34,9 @@ def unpack_lib(name, libs) {
 }
 
 def build_dgl_linux(dev) {
-  ws("${env.WORKSPACE}/${dev}-build") {
-    init_git()
-    sh "bash tests/scripts/build_dgl.sh"
-    pack_lib("dgl-${dev}", dgl_linux_libs)
-  }
+  init_git()
+  sh "bash tests/scripts/build_dgl.sh"
+  pack_lib("dgl-${dev}", dgl_linux_libs)
 }
 
 def build_dgl_win64() {
@@ -49,11 +46,9 @@ def build_dgl_win64() {
 }
 
 def cpp_unit_test_linux() {
-  ws("${env.WORKSPACE}/cpp-cpu-test") {
-    init_git()
-    unpack_lib("dgl-cpu", dgl_linux_libs)
-    sh "bash tests/scripts/task_cpp_unit_test.sh"
-  }
+  init_git()
+  unpack_lib("dgl-cpu", dgl_linux_libs)
+  sh "bash tests/scripts/task_cpp_unit_test.sh"
 }
 
 def cpp_unit_test_windows() {
@@ -61,13 +56,10 @@ def cpp_unit_test_windows() {
 }
 
 def unit_test(backend, dev) {
-  def wspace = "${env.WORKSPACE}/${backend}-${dev}-unittest"
-  ws(wspace) {
-    init_git()
-    unpack_lib("dgl-${dev}", dgl_linux_libs)
-    timeout(time: 2, unit: 'MINUTES') {
-      sh "bash tests/scripts/task_unit_test.sh ${backend}"
-    }
+  init_git()
+  unpack_lib("dgl-${dev}", dgl_linux_libs)
+  timeout(time: 2, unit: 'MINUTES') {
+    sh "bash tests/scripts/task_unit_test.sh ${backend}"
   }
 }
 
@@ -78,23 +70,11 @@ def unit_test(backend, dev) {
 //}
 
 def example_test(backend, dev) {
-  sh "pwd"
-  //def wspace = "${env.WORKSPACE}/${backend}-${dev}-exptest/"
-  //def build = "${env.WORKSPACE}/${dev}-build/"
-  //ws("${wspace}") {
-    //withEnv(["DGL_LIBRARY_PATH=${build}/build",
-             //"PYTHONPATH=${build}/python",
-             //"DGLBACKEND=${backend}",
-             //"DGL_DOWNLOAD_DIR=${wspace}"]) {
-    withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build",
-             "PYTHONPATH=${env.WORKSPACE}/python",
-             "DGLBACKEND=${backend}",
-             "DGL_DOWNLOAD_DIR=${env.WORKSPACE}"]) {
-      timeout(time: 20, unit: 'MINUTES') {
-        sh "bash tests/scripts/task_example_test.sh ${dev}"
-      }
-    }
-  //}
+  init_git()
+  unpack_lib("dgl-${dev}", dgl_linux_libs)
+  timeout(time: 20, unit: 'MINUTES') {
+    sh "bash tests/scripts/task_example_test.sh ${dev}"
+  }
 }
 
 //def example_test_win64(backend, dev) {
@@ -106,16 +86,8 @@ def example_test(backend, dev) {
 //}
 
 def tutorial_test(backend) {
-  def wspace = "${env.WORKSPACE}/${backend}-tuttest/"
-  def build = "${env.WORKSPACE}/cpu-build/"
-  ws("${wspace}") {
-    withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build",
-             "PYTHONPATH=${env.WORKSPACE}/python",
-             "DGLBACKEND=${backend}"]) {
-      timeout(time: 20, unit: 'MINUTES') {
-        sh "bash tests/scripts/task_${backend}_tutorial_test.sh"
-      }
-    }
+  timeout(time: 20, unit: 'MINUTES') {
+    sh "bash tests/scripts/task_${backend}_tutorial_test.sh"
   }
 }
 
@@ -132,14 +104,12 @@ pipeline {
     stage("Build") {
       parallel {
         stage("CPU Build") {
-          //agent { label "CPUNode" }
           agent { docker { image "dgllib/dgl-ci-cpu" } }
           steps {
             build_dgl_linux("cpu")
           }
         }
         stage("GPU Build") {
-          //agent { label "GPUNode" }
           agent {
             docker {
               image "dgllib/dgl-ci-gpu"
@@ -155,8 +125,13 @@ pipeline {
     }
     stage("Test") {
       parallel {
+        stage("C++ CPU") {
+          agent { docker { image "dgllib/dgl-ci-cpu" } }
+          steps {
+            cpp_unit_test_linux()
+          }
+        }
         stage("Torch CPU") {
-          //agent { label "CPUNode" }
           agent { docker { image "dgllib/dgl-ci-cpu" } }
           stages {
             stage("Unit test") {
@@ -164,11 +139,11 @@ pipeline {
                 unit_test("pytorch", "cpu")
               }
             }
-            //stage("Example test") {
-            //  steps {
-            //    unit_test("pytorch", "cpu")
-            //  }
-            //}
+            stage("Example test") {
+              steps {
+                example_test("pytorch", "cpu")
+              }
+            }
           }
         }
         stage("Torch GPU") {
@@ -185,11 +160,11 @@ pipeline {
                 sh "nvidia-smi"
               }
             }
-            //stage("Example test") {
-            //  steps {
-            //    unit_test("pytorch", "cpu")
-            //  }
-            //}
+            stage("Example test") {
+              steps {
+                example_test("pytorch", "gpu")
+              }
+            }
           }
         }
         stage("MXNet CPU") {
@@ -205,6 +180,11 @@ pipeline {
             //    unit_test("pytorch", "cpu")
             //  }
             //}
+            stage("Tutorial test") {
+              steps {
+                mxnet_tutorials()
+              }
+            }
           }
         }
       }
