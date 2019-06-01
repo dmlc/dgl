@@ -139,7 +139,7 @@ def build_gidx_and_mapping_graph(graph):
         Number of ints needed to represent the graph
     """
     gidx = graph._graph
-    return lambda ctx: gidx.get_immutable_gidx(ctx), None, gidx.bits_needed()
+    return gidx.get_immutable_gidx, None, gidx.bits_needed()
 
 
 def build_gidx_and_mapping_uv(edge_tuples, num_nodes):
@@ -180,8 +180,7 @@ def build_gidx_and_mapping_uv(edge_tuples, num_nodes):
     edge_map = utils.CtxCachedObject(
         lambda ctx: (nd.array(forward_map, ctx=ctx),
                      nd.array(backward_map, ctx=ctx)))
-    return utils.CtxCachedObject(lambda ctx: gidx.get_immutable_gidx(ctx)), \
-        edge_map, nbits
+    return utils.CtxCachedObject(gidx.get_immutable_gidx), edge_map, nbits
 
 
 def build_gidx_and_mapping_block(graph, block_id, edge_tuples=None):
