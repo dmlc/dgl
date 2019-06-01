@@ -57,10 +57,10 @@ def schedule_send(graph, u, v, eid, message_func):
     if mfunc_is_list:
         if eid.is_slice(0, graph.number_of_edges()):
             # full graph case
-            res = spmv.build_adj_matrix_graph(graph)
+            res = spmv.build_gidx_and_mapping_graph(graph)
         else:
             num_nodes = graph.number_of_nodes()
-            res = spmv.build_adj_matrix_uv((u, v, eid), num_nodes)
+            res = spmv.build_gidx_and_mapping_uv((u, v, eid), num_nodes)
         adj, edge_map, _ = res
         # create a tmp message frame
         tmp_mfr = FrameRef(frame_like(graph._edge_frame._frame, len(eid)))
@@ -170,8 +170,8 @@ def schedule_snr(graph,
     var_recv_nodes = var.IDX(recv_nodes, name='recv_nodes')
     # generate send and reduce schedule
     uv_getter = lambda: (var_u, var_v)
-    adj_creator = lambda: spmv.build_adj_matrix_uv(edge_tuples,
-                                                   graph.number_of_nodes())
+    adj_creator = lambda: spmv.build_gidx_and_mapping_uv(
+        edge_tuples, graph.number_of_nodes())
     out_map_creator = lambda nbits: _build_idx_map(recv_nodes, nbits)
     reduced_feat = _gen_send_reduce(graph=graph,
                                     src_node_frame=graph._node_frame,
@@ -225,7 +225,7 @@ def schedule_update_all(graph,
         def uv_getter():
             src, dst, _ = graph._graph.edges('eid')
             return var.IDX(src), var.IDX(dst)
-        adj_creator = lambda: spmv.build_adj_matrix_graph(graph)
+        adj_creator = lambda: spmv.build_gidx_and_mapping_graph(graph)
         out_map_creator = lambda nbits: None
         reduced_feat = _gen_send_reduce(graph=graph,
                                         src_node_frame=graph._node_frame,
@@ -482,7 +482,7 @@ def schedule_pull(graph,
         # generate send and reduce schedule
         uv_getter = lambda: (var_u, var_v)
         num_nodes = graph.number_of_nodes()
-        adj_creator = lambda: spmv.build_adj_matrix_uv((u, v, eid), num_nodes)
+        adj_creator = lambda: spmv.build_gidx_and_mapping_uv((u, v, eid), num_nodes)
         out_map_creator = lambda nbits: _build_idx_map(pull_nodes, nbits)
         reduced_feat = _gen_send_reduce(graph, graph._node_frame,
                                         graph._node_frame, graph._edge_frame,
@@ -569,7 +569,7 @@ def schedule_nodeflow_update_all(graph,
     def uv_getter():
         src, dst, _ = graph.block_edges(block_id, remap=True)
         return var.IDX(utils.toindex(src)), var.IDX(utils.toindex(dst))
-    adj_creator = lambda: spmv.build_block_adj_matrix(graph, block_id)
+    adj_creator = lambda: spmv.build_gidx_and_mapping_block(graph, block_id)
     out_map_creator = lambda nbits: None
     reduced_feat = _gen_send_reduce(graph=graph,
                                     src_node_frame=graph._get_node_frame(block_id),
@@ -638,7 +638,7 @@ def schedule_nodeflow_compute(graph,
         var_dest_nodes = var.IDX(dest_nodes, name='dest_nodes')
         # generate send and reduce schedule
         uv_getter = lambda: (var_u, var_v)
-        adj_creator = lambda: spmv.build_block_adj_matrix(
+        adj_creator = lambda: spmv.build_gidx_and_mapping_block(
             graph, block_id, (u, v, eid))
         out_map_creator = lambda nbits: _build_idx_map(utils.toindex(dest_nodes), nbits)
 
@@ -759,7 +759,7 @@ def _gen_reduce(graph, reduce_func, edge_tuples, recv_nodes):
 
     if rfunc_is_list:
         num_nodes = graph.number_of_nodes()
-        adj, edge_map, nbits = spmv.build_adj_matrix_uv(
+        adj, edge_map, nbits = spmv.build_gidx_and_mapping_uv(
             (src, dst, eid), num_nodes)
         # using edge map instead of message map because messages are in global
         # message frame

@@ -120,7 +120,7 @@ def gen_e2v_spmv_schedule(graph, rfunc, message_frame, out, out_size,
         ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
 
-def build_adj_matrix_graph(graph):
+def build_gidx_and_mapping_graph(graph):
     """Build immutable graph index of the whole graph.
 
     Parameters
@@ -142,8 +142,8 @@ def build_adj_matrix_graph(graph):
     return lambda ctx: gidx.get_immutable_gidx(ctx), None, gidx.bits_needed()
 
 
-def build_adj_matrix_uv(edge_tuples, num_nodes):
-    """Build adj matrix using the given (u, v) edges and target nodes.
+def build_gidx_and_mapping_uv(edge_tuples, num_nodes):
+    """Build immutable graph index and mapping using the given (u, v) edges
 
     The matrix is of shape (len(reduce_nodes), n), where n is the number of
     nodes in the graph. Therefore, when doing SPMV, the src node data should be
@@ -184,16 +184,17 @@ def build_adj_matrix_uv(edge_tuples, num_nodes):
         edge_map, nbits
 
 
-def build_block_adj_matrix(graph, block_id, edge_tuples=None):
-    """Build adjacency matrix for a given block in the node flow
+def build_gidx_and_mapping_block(graph, block_id, edge_tuples=None):
+    """Build immutable graph index and mapping for node flow
 
     Parameters
     ----------
     graph : NodeFlow
         The NodeFlow
-
     block_id : int
         the block Id
+    edge_tuple :  tuple of three utils.Index
+        A tuple of (u, v, eid)
 
     Returns
     -------
@@ -205,8 +206,6 @@ def build_block_adj_matrix(graph, block_id, edge_tuples=None):
     nbits : int
         Number of ints needed to represent the graph
     """
-    # FIXME (lingfan): nodeflow does not support get both csr and transposed
-    # csr, for now use scipy to implement
     if edge_tuples is None:
         u, v, eid = graph.block_edges(block_id, remap=True)
         u = utils.toindex(u)
@@ -215,5 +214,5 @@ def build_block_adj_matrix(graph, block_id, edge_tuples=None):
     else:
         u, v, eid = edge_tuples
     num_nodes = max(graph.layer_size(block_id), graph.layer_size(block_id + 1))
-    gidx, edge_map, nbits = build_adj_matrix_uv((u, v, eid), num_nodes)
+    gidx, edge_map, nbits = build_gidx_and_mapping_uv((u, v, eid), num_nodes)
     return gidx, edge_map, nbits
