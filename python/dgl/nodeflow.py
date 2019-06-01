@@ -152,7 +152,7 @@ class NodeFlow(DGLBaseGraph):
         block_id = self._get_block_id(block_id)
         return int(self._block_offsets[block_id + 1]) - int(self._block_offsets[block_id])
 
-    def copy_from_parent(self, node_embed_names=ALL, edge_embed_names=ALL, ctx=F.cpu()):
+    def copy_from_parent(self, node_embed_names=ALL, edge_embed_names=ALL, ctx=None):
         """Copy node/edge features from the parent graph.
 
         Parameters
@@ -161,6 +161,8 @@ class NodeFlow(DGLBaseGraph):
             The names of embeddings in each layer.
         edge_embed_names : a list of lists of strings, optional
             The names of embeddings in each block.
+        ctx : Context
+            The device to copy tensor to. If None, features will stay at its original device
         """
         if self._parent._node_frame.num_rows != 0 and self._parent._node_frame.num_columns != 0:
             if is_all(node_embed_names):
@@ -910,15 +912,20 @@ def _copy_to_like(arr1, arr2):
     return F.copy_to(arr1, F.context(arr2))
 
 def _get_frame(frame, names, ids, ctx):
-    col_dict = {name: F.copy_to(frame[name][_copy_to_like(ids, frame[name])], \
-                                ctx) for name in names}
+    col_dict = {}
+    for name in names:
+        col = frame[name][_copy_to_like(ids, frame[name])]
+        if ctx:
+            col = F.copy_to(col, ctx)
+        col_dict[name] = col
     if len(col_dict) == 0:
         return FrameRef(Frame(num_rows=len(ids)))
     else:
         return FrameRef(Frame(col_dict))
 
 def _copy_frame(frame, ctx):
-    return {name: F.copy_to(frame[name], ctx) for name in frame}
+    return {name: F.copy_to(frame[name], ctx)
+            if ctx else frame[name] for name in frame}
 
 
 def _update_frame(frame, names, ids, new_frame):
