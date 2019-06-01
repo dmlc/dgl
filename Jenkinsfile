@@ -20,18 +20,14 @@ def init_git_win64() {
 
 // pack libraries for later use
 def pack_lib(name, libs) {
-  sh """
-     echo "Packing ${libs} into ${name}"
-     """
+  echo "Packing ${libs} into ${name}"
   stash includes: libs, name: name
 }
 
 // unpack libraries saved before
 def unpack_lib(name, libs) {
   unstash name
-  sh """
-     echo "Unpacked ${libs} from ${name}"
-     """
+  echo "Unpacked ${libs} from ${name}"
 }
 
 def build_dgl_linux(dev) {
