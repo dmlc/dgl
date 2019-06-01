@@ -15,11 +15,31 @@ def init_git_win64() {
   bat "git submodule update"
 }
 
+// pack libraries for later use
+def pack_lib(name, libs) {
+  sh """
+     echo "Packing ${libs} into ${name}"
+     echo ${libs} | sed -e 's/,/ /g' | xargs md5sum
+     """
+  stash includes: libs, name: name
+}
+
+// unpack libraries saved before
+def unpack_lib(name, libs) {
+  unstash name
+  sh """
+     echo "Unpacked ${libs} from ${name}"
+     echo ${libs} | sed -e 's/,/ /g' | xargs md5sum
+     """
+}
+
 def build_dgl(dev) {
-  //ws("${env.WORKSPACE}/${dev}-build") {
+  ws("workspace/${dev}-build") {
     init_git()
+    sh "pwd"
     sh "bash tests/scripts/build_dgl.sh"
-  //}
+    pack_lib("dgl-${dev}", "build/libdgl.so")
+  }
 }
 
 def build_dgl_win64() {
@@ -28,35 +48,33 @@ def build_dgl_win64() {
   bat "CALL tests\\scripts\\build_dgl.bat"
 }
 
-def cpp_unit_test_linux(){
-  //ws("${env.WORKSPACE}/cpu-build") {
+def cpp_unit_test_linux() {
+  ws("workspace/cpp-cpu-test") {
     sh "pwd"
+    init_git()
+    unpack_lib("dgl-cpu")
     sh "bash tests/scripts/task_cpp_unit_test.sh"
-  //}
+  }
 }
 
-def cpp_unit_test_windows(){
+def cpp_unit_test_windows() {
   bat "CALL tests\\scripts\\task_cpp_unit_test.bat"
 }
 
 def unit_test(backend, dev) {
-  sh "pwd"
-  //def wspace = "${env.WORKSPACE}/${backend}-${dev}-unittest/"
-  //def build = "${env.WORKSPACE}/${dev}-build/"
-  //ws("${wspace}") {
-    //withEnv(["DGL_LIBRARY_PATH=${build}/build",
-             //"PYTHONPATH=${build}/python",
-             //"DGLBACKEND=${backend}",
-             //"DGL_DOWNLOAD_DIR=${wspace}"]) {
-    withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}/build",
-             "PYTHONPATH=${env.WORKSPACE}/python",
+  ws("workspace/${backend}-${dev}-unittest") {
+    sh "pwd"
+    init_git()
+    unpack_lib("dgl-${dev}")
+    withEnv(["DGL_LIBRARY_PATH=${PWD}/build",
+             "PYTHONPATH=${PWD}/python",
              "DGLBACKEND=${backend}",
-             "DGL_DOWNLOAD_DIR=${env.WORKSPACE}"]) {
+             "DGL_DOWNLOAD_DIR=${PWD}"]) {
       timeout(time: 2, unit: 'MINUTES') {
         sh "bash tests/scripts/task_unit_test.sh ${backend}"
       }
     }
-  //}
+  }
 }
 
 //def unit_test_win64(backend, dev) {
@@ -118,12 +136,15 @@ pipeline {
       }
     }
     stage("Build") {
-      agent {
-        label "CPUNode"
-      }
+      agent { label "CPUNode" }
       steps {
-        sh "pwd"
-        sh "ls -lh"
+        build_dgl("cpu")
+      }
+    }
+    stage("Test") {
+      agent { label "CPUNode" }
+      steps {
+        unit_test("pytorch", "cpu")
       }
     }
 
