@@ -395,7 +395,7 @@ class SharedMemoryStoreServer(object):
         def all_enter(worker_id, barrier_id):
             return self._barrier.all_enter(worker_id, barrier_id)
 
-        self.server = SimpleXMLRPCServer(("127.0.0.1", port))
+        self.server = SimpleXMLRPCServer(("127.0.0.1", port), logRequests=False)
         self.server.register_function(register, "register")
         self.server.register_function(get_graph_info, "get_graph_info")
         self.server.register_function(init_ndata, "init_ndata")
