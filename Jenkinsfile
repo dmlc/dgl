@@ -1,6 +1,8 @@
 #!/usr/bin/env groovy
 
 dgl_linux_libs = "build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-35m-x86_64-linux-gnu.so"
+// Currently DGL on Windows is not working with Cython yet
+dgl_windows_libs = "build\\dgl.dll, build\\runUnitTests.exe"
 
 def init_git() {
   sh "rm -rf *"
@@ -20,7 +22,6 @@ def init_git_win64() {
 def pack_lib(name, libs) {
   sh """
      echo "Packing ${libs} into ${name}"
-     echo ${libs} | sed -e 's/,/ /g' | xargs md5sum
      """
   stash includes: libs, name: name
 }
@@ -30,7 +31,6 @@ def unpack_lib(name, libs) {
   unstash name
   sh """
      echo "Unpacked ${libs} from ${name}"
-     echo ${libs} | sed -e 's/,/ /g' | xargs md5sum
      """
 }
 
@@ -43,7 +43,9 @@ def build_dgl_linux(dev) {
 def build_dgl_win64() {
   /* Assuming that Windows slaves are already configured with MSBuild VS2017,
    * CMake and Python/pip/setuptools etc. */
+  init_git_win64()
   bat "CALL tests\\scripts\\build_dgl.bat"
+  pack_lib("dgl-${dev}", dgl_windows_libs)
 }
 
 def cpp_unit_test_linux() {
@@ -52,7 +54,9 @@ def cpp_unit_test_linux() {
   sh "bash tests/scripts/task_cpp_unit_test.sh"
 }
 
-def cpp_unit_test_windows() {
+def cpp_unit_test_win64() {
+  init_git_win64()
+  unpack_lib("dgl-cpu", dgl_windows_libs)
   bat "CALL tests\\scripts\\task_cpp_unit_test.bat"
 }
 
@@ -64,11 +68,13 @@ def unit_test(backend, dev) {
   }
 }
 
-//def unit_test_win64(backend, dev) {
-//  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}\\build", "PYTHONPATH=${env.WORKSPACE}\\python", "DGLBACKEND=${backend}"]) {
-//    bat "CALL tests\\scripts\\task_unit_test.bat ${backend}"
-//  }
-//}
+def unit_test_win64(backend, dev) {
+  init_git_win64()
+  unpack_lib("dgl-${dev}", dgl_windows_libs)
+  timeout(time: 2, unit: 'MINUTES') {
+    bat "CALL tests\\scripts\\task_unit_test.bat ${backend}"
+  }
+}
 
 def example_test(backend, dev) {
   init_git()
@@ -78,13 +84,13 @@ def example_test(backend, dev) {
   }
 }
 
-//def example_test_win64(backend, dev) {
-//  withEnv(["DGL_LIBRARY_PATH=${env.WORKSPACE}\\build", "PYTHONPATH=${env.WORKSPACE}\\python", "DGLBACKEND=${backend}"]) {
-//    dir ("tests\\scripts") {
-//      bat "CALL task_example_test ${dev}"
-//    }
-//  }
-//}
+def example_test_win64(backend, dev) {
+  init_git_win64()
+  unpack_lib("dgl-${dev}", dgl_windows_libs)
+  timeout(time: 20, unit: 'MINUTES') {
+    bat "CALL task_example_test.bat ${dev}"
+  }
+}
 
 def tutorial_test(backend) {
   init_git()
@@ -124,6 +130,15 @@ pipeline {
             build_dgl_linux("gpu")
           }
         }
+        stage("CPU Build (Win64)") {
+          // Windows build machines are manually added to Jenkins master with
+          // "windows" label as permanent agents.
+          agent { label "windows" }
+          steps {
+            build_dgl_windows("cpu")
+          }
+        }
+        // Currently we don't have Windows GPU build machines
       }
     }
     stage("Test") {
@@ -132,6 +147,12 @@ pipeline {
           agent { docker { image "dgllib/dgl-ci-cpu" } }
           steps {
             cpp_unit_test_linux()
+          }
+        }
+        stage("C++ CPU (Win64)") {
+          agent { label "windows" }
+          steps {
+            cpp_unit_test_win64()
           }
         }
         stage("Torch CPU") {
@@ -150,6 +171,21 @@ pipeline {
             stage("Tutorial test") {
               steps {
                 tutorial_test("pytorch")
+              }
+            }
+          }
+        }
+        stage("Torch CPU (Win64)") {
+          agent { label "windows" }
+          stages {
+            stage("Unit test") {
+              steps {
+                unit_test_win64("pytorch", "cpu")
+              }
+            }
+            stage("Example test") {
+              steps {
+                example_test_win64("pytorch", "cpu")
               }
             }
           }
