@@ -180,6 +180,11 @@ def check_sync_barrier(worker_id, graph_name, return_dict):
             return_dict[worker_id] = -1
             return
 
+        if worker_id == 1:
+            g.destroy()
+            return_dict[worker_id] = 0
+            return
+
         start = time.time()
         try:
             g._sync_barrier(30)
@@ -200,10 +205,13 @@ def test_sync_barrier():
     return_dict = manager.dict()
     serv_p = Process(target=server_func, args=(2, 'test_graph4'))
     work_p1 = Process(target=check_sync_barrier, args=(0, 'test_graph4', return_dict))
+    work_p2 = Process(target=check_sync_barrier, args=(1, 'test_graph4', return_dict))
     serv_p.start()
     work_p1.start()
+    work_p2.start()
     serv_p.join()
     work_p1.join()
+    work_p2.join()
     for worker_id in return_dict.keys():
         assert return_dict[worker_id] == 0, "worker %d fails" % worker_id
 
