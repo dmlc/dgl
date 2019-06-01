@@ -27,24 +27,30 @@ def check_array_shared_memory(g, worker_id, arrays):
         for i, arr in enumerate(arrays):
             assert_almost_equal(arr[0].asnumpy(), i)
 
+def create_graph_store(graph_name):
+    for _ in range(10):
+        try:
+            g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem",
+                                                                port=rand_port)
+            return g
+        except ConnectionError as e:
+            traceback.print_exc()
+            time.sleep(1)
+    return None
+
 def check_init_func(worker_id, graph_name, return_dict):
     time.sleep(3)
     print("worker starts")
     np.random.seed(0)
     csr = (spsp.random(num_nodes, num_nodes, density=0.1, format='csr') != 0).astype(np.int64)
 
-    for _ in range(10):
-        try:
-            g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem",
-                                                                port=rand_port)
-            break
-        except ConnectionError as e:
-            print(e, file=sys.stderr)
-            traceback.print_exc()
-            time.sleep(1)
-
     # Verify the graph structure loaded from the shared memory.
     try:
+        g = create_graph_store(graph_name)
+        if g is None:
+            return_dict[worker_id] = -1
+            return
+
         src, dst = g.all_edges()
         coo = csr.tocoo()
         assert F.array_equal(dst, F.tensor(coo.row))
@@ -104,16 +110,12 @@ def test_init():
 def check_compute_func(worker_id, graph_name, return_dict):
     time.sleep(3)
     print("worker starts")
-    for _ in range(10):
-        try:
-            g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem",
-                                                                port=rand_port)
-            break
-        except:
-            print("fail to connect to the graph store server.")
-            time.sleep(1)
-
     try:
+        g = create_graph_store(graph_name)
+        if g is None:
+            return_dict[worker_id] = -1
+            return
+
         g._sync_barrier(60)
         in_feats = g.nodes[0].data['feat'].shape[1]
 
@@ -169,6 +171,41 @@ def test_compute():
     for worker_id in return_dict.keys():
         assert return_dict[worker_id] == 0, "worker %d fails" % worker_id
 
+def check_sync_barrier(graph_name, return_dict):
+    time.sleep(3)
+    print("worker starts")
+    try:
+        g = create_graph_store(graph_name)
+        if g is None:
+            return_dict[worker_id] = -1
+            return
+
+        start = time.time()
+        g._sync_barrier(30)
+        # this is very loose.
+        assert abs(time.time() - start) < 5
+        g.destroy()
+        return_dict[worker_id] = 0
+    except Exception as e:
+        return_dict[worker_id] = -1
+        g.destroy()
+        print(e, file=sys.stderr)
+        traceback.print_exc()
+
+
+def test_sync_barrier():
+    manager = Manager()
+    return_dict = manager.dict()
+    serv_p = Process(target=server_func, args=(2, 'test_graph4'))
+    work_p1 = Process(target=check_sync_barrier, args=('test_graph4', return_dict))
+    serv_p.start()
+    work_p1.start()
+    serv_p.join()
+    work_p1.join()
+    for worker_id in return_dict.keys():
+        assert return_dict[worker_id] == 0, "worker %d fails" % worker_id
+
 if __name__ == '__main__':
     test_init()
+    test_sync_barrier()
     test_compute()
