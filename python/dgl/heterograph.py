@@ -929,6 +929,7 @@ class DGLBaseHeteroGraph(object):
         pass
 
 
+# pylint: disable=unnecessary-pass
 class DGLBaseHeteroGraphView(DGLBaseHeteroGraph):
     """View on a heterogeneous graph, constructed from
     DGLBaseHeteroGraph.__getitem__().
@@ -972,6 +973,7 @@ class DGLHeteroGraph(DGLBaseHeteroGraph):
         super(DGLHeteroGraph, self).__init__(
             metagraph, number_of_nodes_by_type, edge_connections_by_type)
 
+    # pylint: disable=unnecessary-pass
     def from_networkx(
             self,
             nx_graph,
