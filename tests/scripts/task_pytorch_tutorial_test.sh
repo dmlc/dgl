@@ -1,7 +1,7 @@
 #!/bin/bash
 # The working directory for this script will be "tests/scripts"
 
-TUTORIAL_ROOT="../../tutorials"
+TUTORIAL_ROOT="./tutorials"
 
 function fail {
     echo FAIL: $@
