@@ -128,15 +128,53 @@ pipeline {
       }
     }
     stage("Build") {
-      agent { label "CPUNode" }
-      steps {
-        build_dgl_linux("cpu")
+      parallel {
+        stage("CPU Build") {
+          agent { label "CPUNode" }
+          steps {
+            build_dgl_linux("cpu")
+          }
+        }
+        stage("GPU Build") {
+          agent { label "GPUNode" }
+          steps {
+            build_dgl_linux("gpu")
+          }
+        }
       }
     }
     stage("Test") {
-      agent { label "CPUNode" }
-      steps {
-        unit_test("pytorch", "cpu")
+      parallel {
+        stage("Torch CPU") {
+          agent { label "CPUNode" }
+          stages {
+            stage("Unit test") {
+              steps {
+                unit_test("pytorch", "cpu")
+              }
+            }
+            //stage("Example test") {
+            //  steps {
+            //    unit_test("pytorch", "cpu")
+            //  }
+            //}
+          }
+        }
+        stage("MXNet CPU") {
+          agent { label "CPUNode" }
+          stages {
+            stage("Unit test") {
+              steps {
+                unit_test("mxnet", "cpu")
+              }
+            }
+            //stage("Example test") {
+            //  steps {
+            //    unit_test("pytorch", "cpu")
+            //  }
+            //}
+          }
+        }
       }
     }
 
