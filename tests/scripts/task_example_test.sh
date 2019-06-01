@@ -1,6 +1,6 @@
 #!/bin/bash
 
-GCN_EXAMPLE_DIR="../../examples/pytorch/"
+GCN_EXAMPLE_DIR="./examples/pytorch/"
 
 function fail {
     echo FAIL: $@
