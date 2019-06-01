@@ -135,7 +135,7 @@ pipeline {
           // "windows" label as permanent agents.
           agent { label "windows" }
           steps {
-            build_dgl_windows("cpu")
+            build_dgl_win64("cpu")
           }
         }
         // Currently we don't have Windows GPU build machines
