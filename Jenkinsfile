@@ -84,7 +84,7 @@ def example_test_win64(backend, dev) {
   init_git_win64()
   unpack_lib("dgl-${dev}", dgl_windows_libs)
   timeout(time: 20, unit: 'MINUTES') {
-    bat "CALL task_example_test.bat ${dev}"
+    bat "CALL tests\\scripts\\task_example_test.bat ${dev}"
   }
 }
 
