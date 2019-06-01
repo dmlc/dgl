@@ -2,7 +2,7 @@
 
 dgl_linux_libs = "build/libdgl.so, build/runUnitTests, python/dgl/_ffi/_cy3/core.cpython-35m-x86_64-linux-gnu.so"
 // Currently DGL on Windows is not working with Cython yet
-dgl_windows_libs = "build\\dgl.dll, build\\runUnitTests.exe"
+dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe"
 
 def init_git() {
   sh "rm -rf *"
@@ -33,7 +33,7 @@ def unpack_lib(name, libs) {
 def build_dgl_linux(dev) {
   init_git()
   sh "bash tests/scripts/build_dgl.sh"
-  pack_lib("dgl-${dev}", dgl_linux_libs)
+  pack_lib("dgl-${dev}-linux", dgl_linux_libs)
 }
 
 def build_dgl_win64(dev) {
@@ -41,24 +41,24 @@ def build_dgl_win64(dev) {
    * CMake and Python/pip/setuptools etc. */
   init_git_win64()
   bat "CALL tests\\scripts\\build_dgl.bat"
-  pack_lib("dgl-${dev}", dgl_windows_libs)
+  pack_lib("dgl-${dev}-win64", dgl_win64_libs)
 }
 
 def cpp_unit_test_linux() {
   init_git()
-  unpack_lib("dgl-cpu", dgl_linux_libs)
+  unpack_lib("dgl-cpu-linux", dgl_linux_libs)
   sh "bash tests/scripts/task_cpp_unit_test.sh"
 }
 
 def cpp_unit_test_win64() {
   init_git_win64()
-  unpack_lib("dgl-cpu", dgl_windows_libs)
+  unpack_lib("dgl-cpu-win64", dgl_win64_libs)
   bat "CALL tests\\scripts\\task_cpp_unit_test.bat"
 }
 
-def unit_test(backend, dev) {
+def unit_test_linux(backend, dev) {
   init_git()
-  unpack_lib("dgl-${dev}", dgl_linux_libs)
+  unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
   timeout(time: 2, unit: 'MINUTES') {
     sh "bash tests/scripts/task_unit_test.sh ${backend}"
   }
@@ -66,15 +66,15 @@ def unit_test(backend, dev) {
 
 def unit_test_win64(backend, dev) {
   init_git_win64()
-  unpack_lib("dgl-${dev}", dgl_windows_libs)
+  unpack_lib("dgl-${dev}-win64", dgl_win64_libs)
   timeout(time: 2, unit: 'MINUTES') {
     bat "CALL tests\\scripts\\task_unit_test.bat ${backend}"
   }
 }
 
-def example_test(backend, dev) {
+def example_test_linux(backend, dev) {
   init_git()
-  unpack_lib("dgl-${dev}", dgl_linux_libs)
+  unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
   timeout(time: 20, unit: 'MINUTES') {
     sh "bash tests/scripts/task_example_test.sh ${dev}"
   }
@@ -82,15 +82,15 @@ def example_test(backend, dev) {
 
 def example_test_win64(backend, dev) {
   init_git_win64()
-  unpack_lib("dgl-${dev}", dgl_windows_libs)
+  unpack_lib("dgl-${dev}-win64", dgl_win64_libs)
   timeout(time: 20, unit: 'MINUTES') {
     bat "CALL tests\\scripts\\task_example_test.bat ${dev}"
   }
 }
 
-def tutorial_test(backend) {
+def tutorial_test_linux(backend) {
   init_git()
-  unpack_lib("dgl-cpu", dgl_linux_libs)
+  unpack_lib("dgl-cpu-linux", dgl_linux_libs)
   timeout(time: 20, unit: 'MINUTES') {
     sh "bash tests/scripts/task_${backend}_tutorial_test.sh"
   }
@@ -156,17 +156,17 @@ pipeline {
           stages {
             stage("Unit test") {
               steps {
-                unit_test("pytorch", "cpu")
+                unit_test_linux("pytorch", "cpu")
               }
             }
             stage("Example test") {
               steps {
-                example_test("pytorch", "cpu")
+                example_test_linux("pytorch", "cpu")
               }
             }
             stage("Tutorial test") {
               steps {
-                tutorial_test("pytorch")
+                tutorial_test_linux("pytorch")
               }
             }
           }
@@ -196,13 +196,13 @@ pipeline {
           stages {
             stage("Unit test") {
               steps {
-                //unit_test("pytorch", "gpu")
+                //unit_test_linux("pytorch", "gpu")
                 sh "nvidia-smi"
               }
             }
             stage("Example test") {
               steps {
-                example_test("pytorch", "gpu")
+                example_test_linux("pytorch", "gpu")
               }
             }
           }
@@ -212,17 +212,17 @@ pipeline {
           stages {
             stage("Unit test") {
               steps {
-                unit_test("mxnet", "cpu")
+                unit_test_linux("mxnet", "cpu")
               }
             }
             //stage("Example test") {
             //  steps {
-            //    unit_test("pytorch", "cpu")
+            //    unit_test_linux("pytorch", "cpu")
             //  }
             //}
             //stage("Tutorial test") {
             //  steps {
-            //    tutorial_test("mxnet")
+            //    tutorial_test_linux("mxnet")
             //  }
             //}
           }
