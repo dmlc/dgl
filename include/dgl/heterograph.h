@@ -66,10 +66,11 @@ class HeteroGraph {
 
     int get_id() const {
     }
+
+    friend class HeteroGraph;
   };
 
   RelationType create_rtype(int src_type, int dst_type) const {
-    assert(etype == -1);
     return RelationType(src_type, dst_type, _num_ntypes);
   }
 
@@ -85,7 +86,7 @@ class HeteroGraph {
 
   void SampleInNeighbors(gnode_id_t vid, node_type_t ntype, int k,
                          std::vector<dgl_id_t> *sampled) {
-    auto g = _subgraphs[RelationType(vid.first, ntype).get_id()];
+    auto g = _subgraphs[create_rtype(vid.first, ntype).get_id()];
     auto csr = g->GetInCSR();
     SampleNeighbors(*csr, vid.second, k, sampled);
   }
@@ -99,7 +100,7 @@ class HeteroGraph {
 
   void SampleOutNeighbors(gnode_id_t vid, node_type_t ntype, int k,
                           std::vector<dgl_id_t> *sampled) {
-    auto g = _subgraphs[RelationType(vid.first, ntype).get_id()];
+    auto g = _subgraphs[create_rtype(vid.first, ntype).get_id()];
     auto csr = g->GetOutCSR();
     SampleNeighbors(*csr, vid.second, k, sampled);
   }

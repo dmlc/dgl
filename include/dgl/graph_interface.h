@@ -113,6 +113,16 @@ class GraphInterface {
   /*! \return the number of edges in the graph.*/
   virtual uint64_t NumEdges() const = 0;
 
+  /*! \return the number of node types in the graph. */
+  virtual int NumNodeType() const {
+    return 1;
+  }
+
+  /*! \return the number of edge types in the graph. */
+  virtual int NumEdgeType() const {
+    return 1;
+  }
+
   /*! \return true if the given vertex is in the graph.*/
   virtual bool HasVertex(dgl_id_t vid) const = 0;
 
