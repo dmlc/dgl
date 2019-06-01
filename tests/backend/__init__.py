@@ -30,7 +30,7 @@ _softmax = softmax
 _default_context_str = os.getenv('DGLTESTDEV', 'cpu')
 _context_dict = {
         'cpu': cpu(),
-        'cuda': cuda(),
+        'gpu': cuda(),
         }
 _default_context = _context_dict[_default_context_str]
 
