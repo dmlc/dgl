@@ -69,12 +69,23 @@ class HeteroGraph {
     }
 
     int get_id() const {
+      // We want to get a unique id from the source node type,
+      // the destination node type and the edge type.
+      if (_num_etypes == -1) {
+        // If the edge type isn't provided, we will just use node types to determine
+        // the Id of a relation.
+        return _num_ntypes * _src_type + _dst_type;
+      } else {
+        // We assume edge types are unique.
+        return _etype;
+      }
     }
 
     friend class HeteroGraph;
   };
 
   RelationType create_rtype(int src_type, int dst_type) const {
+    CHECK_EQ(_num_etypes, -1);
     return RelationType(src_type, dst_type, _num_ntypes);
   }
 
