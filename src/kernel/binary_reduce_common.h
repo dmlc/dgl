@@ -43,16 +43,11 @@ enum BackwardMode {
 };
 }  // namespace binary_op
 
-// functor for no-op
-template <typename Ret, typename ... Args>
-struct Nop {
-  static DGLDEVICE DGLINLINE Ret Call(Args ... args) {
-    return 0;
-  }
-};
-
 // Select src
 struct SelectSrc {
+  // Target value
+  static constexpr binary_op::Target target = binary_op::kSrc;
+  // Call functor.
   template <typename T>
   static DGLDEVICE DGLINLINE T Call(T src, T edge, T dst) {
     return src;
@@ -61,6 +56,9 @@ struct SelectSrc {
 
 // Select dst
 struct SelectDst {
+  // Target value
+  static constexpr binary_op::Target target = binary_op::kDst;
+  // Call functor.
   template <typename T>
   static DGLDEVICE DGLINLINE T Call(T src, T edge, T dst) {
     return dst;
@@ -69,10 +67,30 @@ struct SelectDst {
 
 // Select edge
 struct SelectEdge {
+  // Target value
+  static constexpr binary_op::Target target = binary_op::kEdge;
+  // Call functor.
   template <typename T>
   static DGLDEVICE DGLINLINE T Call(T src, T edge, T dst) {
     return edge;
   }
+};
+
+// Change SelectSrc to SelectDst and vice versa
+// SelectEdge will remain the same.
+template <typename Selector>
+struct SwitchSrcDst {
+  typedef Selector Type;
+};
+
+template <>
+struct SwitchSrcDst<SelectSrc> {
+  typedef SelectDst Type;
+};
+
+template <>
+struct SwitchSrcDst<SelectDst> {
+  typedef SelectSrc Type;
 };
 
 #define TARGET_SWITCH(v1, v2, Tgt1, Tgt2, ...)                  \
@@ -104,13 +122,13 @@ struct SelectEdge {
     LOG(FATAL) << "Invalid operand target: " << v1 << " and " << v2; \
   }
 
-#define GEN_TARGET(GEN, ...)               \
-  GEN(__VA_ARGS__, SelectSrc, SelectDst)   \
-  GEN(__VA_ARGS__, SelectDst, SelectSrc)   \
-  GEN(__VA_ARGS__, SelectSrc, SelectEdge)  \
-  GEN(__VA_ARGS__, SelectEdge, SelectSrc)  \
-  GEN(__VA_ARGS__, SelectDst, SelectEdge)  \
-  GEN(__VA_ARGS__, SelectEdge, SelectDst)
+#define GEN_TARGET(GEN, ...)                        \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectDst))    \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectDst, SelectSrc))    \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectEdge))   \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectSrc))   \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectDst, SelectEdge))   \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectDst))
 
 // direct id
 template <int XPU, typename IdxType>
@@ -213,11 +231,11 @@ struct BinaryUseLhs {
   }
 
 #define GEN_BINARY_OP(GEN, ...) \
-  GEN(__VA_ARGS__, BinaryAdd) \
-  GEN(__VA_ARGS__, BinarySub) \
-  GEN(__VA_ARGS__, BinaryMul) \
-  GEN(__VA_ARGS__, BinaryDiv) \
-  GEN(__VA_ARGS__, BinaryUseLhs)
+  MSVC_EXPAND(GEN(__VA_ARGS__, BinaryAdd)) \
+  MSVC_EXPAND(GEN(__VA_ARGS__, BinarySub)) \
+  MSVC_EXPAND(GEN(__VA_ARGS__, BinaryMul)) \
+  MSVC_EXPAND(GEN(__VA_ARGS__, BinaryDiv)) \
+  MSVC_EXPAND(GEN(__VA_ARGS__, BinaryUseLhs))
 
 // functors for reducers
 template <int XPU, typename DType>
@@ -311,16 +329,6 @@ struct OutSelector<ReduceNone<XPU, DType>> {
   typedef SelectEdge Type;
 };
 
-template <typename Reducer>
-struct GradOutSelector {
-  typedef SelectSrc Type;
-};
-
-template <int XPU, typename DType>
-struct GradOutSelector<ReduceNone<XPU, DType>> {
-  typedef SelectEdge Type;
-};
-
 // macro for broadcasting
 #define BCAST_NDIM_SWITCH(ndim, NDim, ...) \
   if (ndim <= 2) {                         \
@@ -337,16 +345,14 @@ struct GradOutSelector<ReduceNone<XPU, DType>> {
   }
 
 #define GEN_NDIM(GEN, ...) \
-  GEN(__VA_ARGS__, 2) \
-  GEN(__VA_ARGS__, 4) \
-  GEN(__VA_ARGS__, 8)
+  MSVC_EXPAND(GEN(__VA_ARGS__, 2)) \
+  MSVC_EXPAND(GEN(__VA_ARGS__, 4)) \
+  MSVC_EXPAND(GEN(__VA_ARGS__, 8))
 
 // macro for backward mode
 #define BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, ...) \
-  if (req_lhs && req_rhs) {                               \
-    constexpr int Mode = binary_op::kGradBoth;            \
-    {__VA_ARGS__}                                         \
-  } else if (req_lhs) {                                   \
+  CHECK(!(req_lhs && req_rhs));                           \
+  if (req_lhs) {                                          \
     constexpr int Mode = binary_op::kGradLhs;             \
     {__VA_ARGS__}                                         \
   } else {                                                \
@@ -355,9 +361,9 @@ struct GradOutSelector<ReduceNone<XPU, DType>> {
   }
 
 #define GEN_BACKWARD_MODE(GEN, ...)        \
-  GEN(__VA_ARGS__, binary_op::kGradLhs)    \
-  GEN(__VA_ARGS__, binary_op::kGradRhs)    \
-  GEN(__VA_ARGS__, binary_op::kGradBoth)
+  MSVC_EXPAND(GEN(__VA_ARGS__, binary_op::kGradLhs))    \
+  MSVC_EXPAND(GEN(__VA_ARGS__, binary_op::kGradRhs))    \
+  MSVC_EXPAND(GEN(__VA_ARGS__, binary_op::kGradBoth))
 
 }  // namespace kernel
 }  // namespace dgl

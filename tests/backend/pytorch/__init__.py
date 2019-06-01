@@ -52,6 +52,9 @@ def softmax(x, dim):
 def spmm(x, y):
     return th.spmm(x, y)
 
+def max(x, dim):
+    return x.max(dim)[0]
+
 class record_grad(object):
     def __init__(self):
         pass

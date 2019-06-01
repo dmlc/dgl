@@ -1,7 +1,7 @@
 """Built-in message function."""
 from __future__ import absolute_import
 
-from .base import BuiltinFunction, _empty_map
+from .base import BuiltinFunction, TargetCode
 from ..runtime import ir
 from ..runtime.ir import var
 
@@ -11,7 +11,8 @@ __all__ = ["src_mul_edge", "src_mul_dst", "copy_src", "copy_edge"]
 class MessageFunction(BuiltinFunction):
     """Base builtin message function class."""
 
-    def __call__(self):
+    def __call__(self, graph, src_frame, dst_frame, edge_frame, out_size,
+                 src_map, dst_map, edge_map, out_map, reducer="none"):
         """Symbolic computation of this builtin function to create
         runtime.executor
         """
@@ -23,126 +24,74 @@ class MessageFunction(BuiltinFunction):
         raise NotImplementedError
 
 
-class SrcOpEdgeMessageFunction(MessageFunction):
-    """Class for the src_op_edge builtin message function.
+class BinaryMessageFunction(MessageFunction):
+    """Class for the lhs_op_rhs builtin message function.
 
     See Also
     --------
     src_mul_edge
     """
-    def __init__(self, binary_op, src_field, edge_field, out_field):
+    def __init__(self, binary_op, lhs, rhs, lhs_field, rhs_field, out_field):
         self.binary_op = binary_op
-        self.src_field = src_field
-        self.edge_field = edge_field
+        self.lhs = lhs
+        self.rhs = rhs
+        self.lhs_field = lhs_field
+        self.rhs_field = rhs_field
         self.out_field = out_field
 
-    def __call__(self, spmat, src_frame, dst_frame, edge_frame, out_size,
-                 reducer="none", src_map=_empty_map, dst_map=_empty_map,
-                 edge_map=_empty_map, out_map=_empty_map):
-        """Symbolic computation of this builtin function to create
+    def __call__(self, graph, src_frame, dst_frame, edge_frame, out_size,
+                 src_map, dst_map, edge_map, out_map, reducer="none"):
+        """Symbolic computation of builtin binary message function to create
         runtime.executor
         """
-        src_map = var.MAP(src_map)
-        edge_map = var.MAP(edge_map)
+        graph = var.GRAPH(graph)
+        in_frames = (src_frame, dst_frame, edge_frame)
+        in_maps = (src_map, dst_map, edge_map)
+        lhs_data = ir.READ_COL(in_frames[self.lhs], var.STR(self.lhs_field))
+        rhs_data = ir.READ_COL(in_frames[self.rhs], var.STR(self.rhs_field))
+        lhs_map = var.MAP(in_maps[self.lhs])
+        rhs_map = var.MAP(in_maps[self.rhs])
         out_map = var.MAP(out_map)
-        src_data = ir.READ_COL(src_frame, var.STR(self.src_field))
-        edge_data = ir.READ_COL(edge_frame, var.STR(self.edge_field))
-        return ir.SRC_OP_EDGE_REDUCE(reducer, self.binary_op, spmat, src_data,
-                                     edge_data, out_size, src_map, edge_map,
-                                     out_map)
+        return ir.BINARY_REDUCE(reducer, self.binary_op, graph, self.lhs,
+                                self.rhs, lhs_data, rhs_data, out_size,
+                                lhs_map, rhs_map, out_map)
 
     @property
     def name(self):
-        return "src_{}_edge".format(self.binary_op)
+        lhs = TargetCode.CODE2STR[self.lhs]
+        rhs = TargetCode.CODE2STR[self.rhs]
+        return "{}_{}_{}".format(lhs, self.binary_op, rhs)
 
 
-class SrcOpDstMessageFunction(MessageFunction):
-    """Class for the src_op_dst builtin message function.
-
-    See Also
-    --------
-    src_mul_dst
-    """
-    def __init__(self, binary_op, src_field, dst_field, out_field):
-        self.binary_op = binary_op
-        self.src_field = src_field
-        self.dst_field = dst_field
-        self.out_field = out_field
-
-    def __call__(self, spmat, src_frame, dst_frame, edge_frame, out_size,
-                 reducer="none", src_map=_empty_map, dst_map=_empty_map,
-                 edge_map=_empty_map, out_map=_empty_map):
-        """Symbolic computation of this builtin function to create
-        runtime.executor
-        """
-        src_map = var.MAP(src_map)
-        dst_map = var.MAP(dst_map)
-        out_map = var.MAP(out_map)
-        src_data = ir.READ_COL(src_frame, var.STR(self.src_field))
-        dst_data = ir.READ_COL(src_frame, var.STR(self.dst_field))
-        return ir.SRC_OP_DST_REDUCE(reducer, self.binary_op, spmat, src_data,
-                                    dst_data, out_size, src_map, dst_map,
-                                    out_map)
-
-    @property
-    def name(self):
-        return "src_{}_dst".format(self.binary_op)
-
-
-class CopySrcMessageFunction(MessageFunction):
-    """Class for the copy_src builtin message function.
+class CopyMessageFunction(MessageFunction):
+    """Class for the copy builtin message function.
 
     See Also
     --------
     copy_src
     """
-    def __init__(self, src_field, out_field):
-        self.src_field = src_field
+    def __init__(self, target, in_field, out_field):
+        self.target = target
+        self.in_field = in_field
         self.out_field = out_field
 
-    def __call__(self, spmat, src_frame, dst_frame, edge_frame, out_size,
-                 reducer="none", src_map=_empty_map, dst_map=_empty_map,
-                 edge_map=_empty_map, out_map=_empty_map):
-        """Symbolic computation of this builtin function to create
+    def __call__(self, graph, src_frame, dst_frame, edge_frame, out_size,
+                 src_map, dst_map, edge_map, out_map, reducer="none"):
+        """Symbolic computation of builtin message function to create
         runtime.executor
         """
-        src_map = var.MAP(src_map)
+        graph = var.GRAPH(graph)
+        in_frames = (src_frame, dst_frame, edge_frame)
+        in_maps = (src_map, dst_map, edge_map)
+        in_data = ir.READ_COL(in_frames[self.target], var.STR(self.in_field))
+        in_map = var.MAP(in_maps[self.target])
         out_map = var.MAP(out_map)
-        src_data = ir.READ_COL(src_frame, var.STR(self.src_field))
-        return ir.COPY_SRC_REDUCE(reducer, spmat, src_data, out_size,
-                                  src_map, out_map)
+        return ir.COPY_REDUCE(reducer, graph, self.target, in_data, out_size,
+                              in_map, out_map)
 
     @property
     def name(self):
-        return "copy_src"
-
-
-class CopyEdgeMessageFunction(MessageFunction):
-    """Class for the copy_edge builtin message function.
-
-    See Also
-    --------
-    copy_edge
-    """
-    def __init__(self, edge_field=None, out_field=None):
-        self.edge_field = edge_field
-        self.out_field = out_field
-
-    def __call__(self, spmat, src_frame, dst_frame, edge_frame, out_size,
-                 reducer="none", src_map=_empty_map, dst_map=_empty_map,
-                 edge_map=_empty_map, out_map=_empty_map):
-        """Symbolic computation of this builtin function to create
-        runtime.executor
-        """
-        edge_map = var.MAP(edge_map)
-        out_map = var.MAP(out_map)
-        edge_data = ir.READ_COL(edge_frame, var.STR(self.edge_field))
-        return ir.COPY_EDGE_REDUCE(reducer, spmat, edge_data, out_size,
-                                   edge_map, out_map)
-
-    @property
-    def name(self):
-        return "copy_edge"
+        return "copy_{}".format(TargetCode.CODE2STR[self.target])
 
 
 def src_mul_edge(src, edge, out):
@@ -168,7 +117,8 @@ def src_mul_edge(src, edge, out):
     >>> def message_func(edges):
     >>>   return {'m': edges.src['h'] * edges.data['w']}
     """
-    return SrcOpEdgeMessageFunction("mul", src, edge, out)
+    return BinaryMessageFunction(
+        "mul", TargetCode.SRC, TargetCode.EDGE, src, edge, out)
 
 
 def src_mul_dst(src, dst, out):
@@ -194,7 +144,8 @@ def src_mul_dst(src, dst, out):
     >>> def message_func(edges):
     >>>   return {'m': edges.src['h1'] * edges.dst['h2']}
     """
-    return SrcOpDstMessageFunction("mul", src, dst, out)
+    return BinaryMessageFunction(
+        "mul", TargetCode.SRC, TargetCode.DST, src, dst, out)
 
 
 def copy_src(src, out):
@@ -218,7 +169,7 @@ def copy_src(src, out):
     >>> def message_func(edges):
     >>>     return {'m': edges.src['h']}
     """
-    return CopySrcMessageFunction(src, out)
+    return CopyMessageFunction(TargetCode.SRC, src, out)
 
 
 def copy_edge(edge, out):
@@ -241,4 +192,4 @@ def copy_edge(edge, out):
     >>> def message_func(edges):
     >>>     return {'m': edges.data['h']}
     """
-    return CopyEdgeMessageFunction(edge, out)
+    return CopyMessageFunction(TargetCode.EDGE, edge, out)

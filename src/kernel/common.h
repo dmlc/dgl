@@ -18,7 +18,7 @@ namespace kernel {
 #define DGLINLINE __forceinline__
 #else
 #define DGLDEVICE
-#define DGLINLINE __inline__
+#define DGLINLINE inline
 #endif  // __CUDACC__
 
 #ifdef DGL_USE_CUDA
@@ -64,8 +64,12 @@ namespace kernel {
                << val.bits;                                 \
   }
 #else
+
+// MSVC does not expand __VA_ARGS__ correctly, and needs this expand hack
+#define MSVC_EXPAND(x) x
+
 #define GEN_DTYPE(GEN, ...)  \
-  GEN(__VA_ARGS__, float)
+  MSVC_EXPAND(GEN(__VA_ARGS__, float))
 
 #define DGL_DTYPE_SWITCH(val, DType, ...)                   \
   if (val.code == kDLFloat && val.bits == 32) {             \
@@ -77,10 +81,16 @@ namespace kernel {
   }
 #endif
 
-__inline__ bool IsValidCsr(runtime::NDArray indptr, runtime::NDArray indices) {
-  return (indptr->ndim == 1) && (indptr->dtype.code == kDLInt) && (indptr->dtype.bits == 32)
-    && (indices->ndim == 1) && (indices->dtype.code == kDLInt) && (indices->dtype.bits == 32);
-}
+#define DGL_IDX_TYPE_SWITCH(bits, Idx, ...)            \
+  if (bits == 32) {                                    \
+    typedef int32_t Idx;                               \
+    {__VA_ARGS__}                                      \
+  } else if (bits == 64) {                             \
+    typedef int64_t Idx;                               \
+    {__VA_ARGS__}                                      \
+  } else {                                             \
+    LOG(FATAL) << "Unsupported idx bits: " << bits;    \
+  }
 
 }  // namespace kernel
 }  // namespace dgl

@@ -1,17 +1,15 @@
 #!/usr/bin/env groovy
 
 def init_git_submodule() {
-  sh "git submodule init"
-  sh "git submodule update"
+  sh "git submodule update --recursive --init"
 }
 
 def init_git_submodule_win64() {
-  bat "git submodule init"
-  bat "git submodule update"
+  bat "git submodule update --recursive --init"
 }
 
-def build_dgl() {
-  sh "bash tests/scripts/build_dgl.sh"
+def build_dgl(dev) {
+  sh "bash tests/scripts/build_dgl.sh ${dev}"
 }
 
 def build_dgl_win64() {
@@ -83,7 +81,7 @@ pipeline {
           }
           steps {
             init_git_submodule()
-            build_dgl()
+            build_dgl("cpu")
           }
         }
         stage("GPU Build") {
@@ -95,7 +93,7 @@ pipeline {
           }
           steps {
             init_git_submodule()
-            build_dgl()
+            build_dgl("cuda")
           }
         }
         stage("MXNet CPU Build (temp)") {
@@ -104,7 +102,7 @@ pipeline {
           }
           steps {
             init_git_submodule()
-            build_dgl()
+            build_dgl("cpu")
           }
         }
         stage("CPU Build (Win64/PyTorch)") {
@@ -159,7 +157,7 @@ pipeline {
           }
           stages {
             stage("TH GPU unittest") {
-              steps { unit_test("cuda") }
+              steps { unit_test("pytorch", "cuda") }
             }
             stage("TH GPU example test") {
               steps { example_test("pytorch", "cuda") }
@@ -194,14 +192,14 @@ pipeline {
             pytorch_tutorials()
           }
         }
-        stage("MX Tutorial") {
-          agent {
-            docker { image "dgllib/dgl-ci-mxnet-cpu" }
-          }
-          steps {
-            mxnet_tutorials()
-          }
-        }
+        //stage("MX Tutorial") {
+        //  agent {
+        //    docker { image "dgllib/dgl-ci-mxnet-cpu" }
+        //  }
+        //  steps {
+        //    mxnet_tutorials()
+        //  }
+        //}
       }
     }
   }

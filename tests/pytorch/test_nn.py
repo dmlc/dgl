@@ -53,7 +53,6 @@ def uniform_attention(g, shape):
 
 def test_edge_softmax():
     edge_softmax = nn.EdgeSoftmax()
-    print(edge_softmax)
 
     # Basic
     g = dgl.DGLGraph(nx.path_graph(3))

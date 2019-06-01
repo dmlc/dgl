@@ -8,11 +8,14 @@
 
 #include <minigun/minigun.h>
 #include <dgl/runtime/device_api.h>
+#include <dgl/immutable_graph.h>
 
 #include <algorithm>
 #include <string>
 
+#ifdef __CUDACC__
 #include "../runtime/cuda/cuda_common.h"
+#endif
 #include "./binary_reduce.h"
 #include "./binary_reduce_impl_decl.h"
 #include "./utils.h"
@@ -23,27 +26,26 @@ namespace kernel {
 /****************************************************
  * BinaryOpReduce
  ****************************************************/
-
-template <int XPU, typename DType, typename Reducer>
-GData<DType> AllocGData(
+template <int XPU, typename Idx, typename DType, typename Reducer>
+GData<Idx, DType> AllocGData(
     const DLContext& ctx, int64_t x_len,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data,
     runtime::NDArray out_mapping, runtime::NDArray out_data) {
   // GData
-  GData<DType> gdata;
+  GData<Idx, DType> gdata;
   gdata.x_length = x_len;
   gdata.lhs_data = static_cast<DType*>(lhs_data->data);
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
   if (!utils::IsNoneArray(lhs_mapping)) {
-    gdata.lhs_mapping = static_cast<int64_t*>(lhs_mapping->data);
+    gdata.lhs_mapping = static_cast<Idx*>(lhs_mapping->data);
   }
   if (!utils::IsNoneArray(rhs_mapping)) {
-    gdata.rhs_mapping = static_cast<int64_t*>(rhs_mapping->data);
+    gdata.rhs_mapping = static_cast<Idx*>(rhs_mapping->data);
   }
   if (!utils::IsNoneArray(out_mapping)) {
-    gdata.out_mapping = static_cast<int64_t*>(out_mapping->data);
+    gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
   // fill out data with zero values
   utils::Fill<XPU>(ctx, gdata.out_data, utils::NElements(out_data), Zero<Reducer>::value);
@@ -54,22 +56,18 @@ template <int XPU>
 void BinaryReduceImpl(
     const std::string& reducer,
     const std::string& op,
-    runtime::NDArray indptr, runtime::NDArray indices,
-    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
+    const ImmutableGraph* graph,
     binary_op::Target lhs, binary_op::Target rhs,
-    runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data,
-    runtime::NDArray out_mapping, runtime::NDArray out_data) {
+    runtime::NDArray out_data,
+    runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
+    runtime::NDArray out_mapping) {
   using runtime::NDArray;
   using minigun::Csr;
   // device
 #ifdef __CUDACC__
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
 #endif
-  // Graph
-  Csr csr = utils::CreateCsr(indptr, indices);
-  Csr rev_csr = utils::CreateCsr(rev_indptr, rev_indices);
-
   const int64_t x_len = utils::ComputeXLength(out_data);
 
   // advance config
@@ -83,40 +81,61 @@ void BinaryReduceImpl(
   //              instruction level parallelism
   rtcfg.data_num_blocks = (x_len + (nt * 2) - 1) / (nt * 2);
 #endif
-  const DLDataType& dtype = out_data->dtype;
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
   }
+  const DLDataType& dtype = out_data->dtype;
+  const auto bits = graph->NumBits();
+#ifdef __CUDACC__
+  CHECK(bits == 32) << "CUDA kernel only supports 32 bits graph.";
+#endif
+#ifdef __CUDACC__
   DGL_DTYPE_SWITCH(dtype, DType, {
+    typedef int32_t Idx;
     REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
-      GData<DType> gdata = AllocGData<XPU, DType, Reducer>(
+      auto gdata = AllocGData<XPU, Idx, DType, Reducer>(
           rtcfg.ctx, x_len, lhs_mapping, rhs_mapping,
           lhs_data, rhs_data, out_mapping, out_data);
       BINARY_OP_SWITCH(op, DType, BinaryOp, {
         TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-          CallBinaryReduce<XPU, DType, LeftTarget,
-            RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
+          CallBinaryReduce<XPU, Idx, DType, LeftTarget,
+            RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
         });
       });
     });
   });
+#else
+  DGL_DTYPE_SWITCH(dtype, DType, {
+    DGL_IDX_TYPE_SWITCH(bits, Idx, {
+      REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
+        auto gdata = AllocGData<XPU, Idx, DType, Reducer>(
+            rtcfg.ctx, x_len, lhs_mapping, rhs_mapping,
+            lhs_data, rhs_data, out_mapping, out_data);
+        BINARY_OP_SWITCH(op, DType, BinaryOp, {
+          TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
+            CallBinaryReduce<XPU, Idx, DType, LeftTarget,
+              RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
+          });
+        });
+      });
+    });
+  });
+#endif
 }
-
 
 /****************************************************
  * BackwardBinaryOpReduce
  ****************************************************/
-
-template <int XPU, typename DType>
-BackwardGData<DType> AllocBackwardGData(
+template <int XPU, typename Idx, typename DType>
+BackwardGData<Idx, DType> AllocBackwardGData(
     const DLContext& ctx, int64_t x_len,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data, runtime::NDArray out_data,
     runtime::NDArray grad_out_data,
     runtime::NDArray grad_lhs_data, runtime::NDArray grad_rhs_data) {
   // GData
-  BackwardGData<DType> gdata;
+  BackwardGData<Idx, DType> gdata;
   gdata.x_length = x_len;
   gdata.lhs_data = static_cast<DType*>(lhs_data->data);
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
@@ -135,13 +154,13 @@ BackwardGData<DType> AllocBackwardGData(
                 static_cast<DType>(0));
   }
   if (!utils::IsNoneArray(lhs_mapping)) {
-    gdata.lhs_mapping = static_cast<int64_t*>(lhs_mapping->data);
+    gdata.lhs_mapping = static_cast<Idx*>(lhs_mapping->data);
   }
   if (!utils::IsNoneArray(rhs_mapping)) {
-    gdata.rhs_mapping = static_cast<int64_t*>(rhs_mapping->data);
+    gdata.rhs_mapping = static_cast<Idx*>(rhs_mapping->data);
   }
   if (!utils::IsNoneArray(out_mapping)) {
-    gdata.out_mapping = static_cast<int64_t*>(out_mapping->data);
+    gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
   return gdata;
 }
@@ -150,8 +169,7 @@ template <int XPU>
 void BackwardBinaryReduceImpl(
     const std::string& reducer,
     const std::string& op,
-    runtime::NDArray indptr, runtime::NDArray indices,
-    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
+    const ImmutableGraph* graph,
     binary_op::Target lhs, binary_op::Target rhs,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data, runtime::NDArray out_data,
@@ -164,9 +182,6 @@ void BackwardBinaryReduceImpl(
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
 #endif
   // Graph
-  Csr csr = utils::CreateCsr(indptr, indices);
-  Csr rev_csr = utils::CreateCsr(rev_indptr, rev_indices);
-
   const int64_t x_len = utils::ComputeXLength(out_data);
 
   // advance config
@@ -184,12 +199,18 @@ void BackwardBinaryReduceImpl(
   const DLDataType& dtype = out_data->dtype;
   const bool req_lhs = !utils::IsNoneArray(grad_lhs_data);
   const bool req_rhs = !utils::IsNoneArray(grad_rhs_data);
+  const auto bits = graph->NumBits();
+#ifdef __CUDACC__
+  CHECK(bits == 32) << "CUDA kernel only supports 32 bits graph.";
+#endif
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
   }
+#ifdef __CUDACC__
   DGL_DTYPE_SWITCH(dtype, DType, {
-    BackwardGData<DType> gdata = AllocBackwardGData<XPU, DType>(
+    typedef int32_t Idx;
+    auto gdata = AllocBackwardGData<XPU, Idx, DType>(
         rtcfg.ctx, x_len, lhs_mapping, rhs_mapping, out_mapping,
         lhs_data, rhs_data, out_data, grad_out_data,
         grad_lhs_data, grad_rhs_data);
@@ -197,27 +218,46 @@ void BackwardBinaryReduceImpl(
       REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
         BINARY_OP_SWITCH(op, DType, BinaryOp, {
           TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-            CallBackwardBinaryReduce<XPU, Mode, DType, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
+            CallBackwardBinaryReduce<XPU, Mode, Idx, DType, LeftTarget,
+              RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
           });
         });
       });
     });
   });
+#else
+  DGL_DTYPE_SWITCH(dtype, DType, {
+    DGL_IDX_TYPE_SWITCH(bits, Idx, {
+      auto gdata = AllocBackwardGData<XPU, Idx, DType>(
+          rtcfg.ctx, x_len, lhs_mapping, rhs_mapping, out_mapping,
+          lhs_data, rhs_data, out_data, grad_out_data,
+          grad_lhs_data, grad_rhs_data);
+      BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, {
+        REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
+          BINARY_OP_SWITCH(op, DType, BinaryOp, {
+            TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
+              CallBackwardBinaryReduce<XPU, Mode, Idx, DType, LeftTarget,
+                RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
+            });
+          });
+        });
+      });
+    });
+  });
+#endif
 }
 
 /****************************************************
  * BinaryOpReduceBcast
  ****************************************************/
-
-template <int XPU, int NDim, typename DType, typename Reducer>
-BcastGData<NDim, DType> AllocBcastGData(
+template <int XPU, int NDim, typename Idx, typename DType, typename Reducer>
+BcastGData<NDim, Idx, DType> AllocBcastGData(
     const DLContext& ctx, const BcastInfo& info,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data,
     runtime::NDArray out_mapping, runtime::NDArray out_data) {
   // GData
-  BcastGData<NDim, DType> gdata;
+  BcastGData<NDim, Idx, DType> gdata;
   // dim, shape and stride
   gdata.ndim = info.lhs_shape.size();
   std::copy(info.lhs_shape.begin(), info.lhs_shape.end(), gdata.lhs_shape);
@@ -234,13 +274,13 @@ BcastGData<NDim, DType> AllocBcastGData(
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
   if (!utils::IsNoneArray(lhs_mapping)) {
-    gdata.lhs_mapping = static_cast<int64_t*>(lhs_mapping->data);
+    gdata.lhs_mapping = static_cast<Idx*>(lhs_mapping->data);
   }
   if (!utils::IsNoneArray(rhs_mapping)) {
-    gdata.rhs_mapping = static_cast<int64_t*>(rhs_mapping->data);
+    gdata.rhs_mapping = static_cast<Idx*>(rhs_mapping->data);
   }
   if (!utils::IsNoneArray(out_mapping)) {
-    gdata.out_mapping = static_cast<int64_t*>(out_mapping->data);
+    gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
   // fill out data with zero values
   utils::Fill<XPU>(ctx, gdata.out_data, utils::NElements(out_data), Zero<Reducer>::value);
@@ -252,25 +292,20 @@ void BinaryReduceBcastImpl(
     const BcastInfo& info,
     const std::string& reducer,
     const std::string& op,
-    runtime::NDArray indptr, runtime::NDArray indices,
-    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
+    const ImmutableGraph* graph,
     binary_op::Target lhs,
     binary_op::Target rhs,
-    runtime::NDArray lhs_mapping,
-    runtime::NDArray rhs_mapping,
     runtime::NDArray lhs_data,
     runtime::NDArray rhs_data,
-    runtime::NDArray out_mapping,
-    runtime::NDArray out_data) {
+    runtime::NDArray out_data,
+    runtime::NDArray lhs_mapping,
+    runtime::NDArray rhs_mapping,
+    runtime::NDArray out_mapping) {
   using runtime::NDArray;
   using minigun::Csr;
 #ifdef __CUDACC__
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
 #endif
-  // Graph
-  Csr csr = utils::CreateCsr(indptr, indices);
-  Csr rev_csr = utils::CreateCsr(rev_indptr, rev_indices);
-
   // advance config
   minigun::advance::RuntimeConfig rtcfg;
   rtcfg.ctx = out_data->ctx;
@@ -286,40 +321,63 @@ void BinaryReduceBcastImpl(
 
   const DLDataType& dtype = out_data->dtype;
   const int bcast_ndim = info.out_shape.size();
+  const auto bits = graph->NumBits();
+#ifdef __CUDACC__
+  CHECK(bits == 32) << "CUDA kernel only supports 32 bits graph.";
+#endif
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
   }
+#ifdef __CUDACC__
   DGL_DTYPE_SWITCH(dtype, DType, {
+    typedef int32_t Idx;
     REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
       BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
-        BcastGData<NDim, DType> gdata = AllocBcastGData<XPU, NDim, DType, Reducer>(
+        auto gdata = AllocBcastGData<XPU, NDim, Idx, DType, Reducer>(
             rtcfg.ctx, info, lhs_mapping, rhs_mapping,
             lhs_data, rhs_data, out_mapping, out_data);
         BINARY_OP_SWITCH(op, DType, BinaryOp, {
           TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-            CallBinaryReduceBcast<XPU, NDim, DType, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
+            CallBinaryReduceBcast<XPU, NDim, Idx, DType, LeftTarget,
+              RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
           });
         });
       });
     });
   });
+#else
+  DGL_DTYPE_SWITCH(dtype, DType, {
+    DGL_IDX_TYPE_SWITCH(bits, Idx, {
+      REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
+        BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
+          auto gdata = AllocBcastGData<XPU, NDim, Idx, DType, Reducer>(
+              rtcfg.ctx, info, lhs_mapping, rhs_mapping,
+              lhs_data, rhs_data, out_mapping, out_data);
+          BINARY_OP_SWITCH(op, DType, BinaryOp, {
+            TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
+              CallBinaryReduceBcast<XPU, NDim, Idx, DType, LeftTarget,
+                RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
+            });
+          });
+        });
+      });
+    });
+  });
+#endif
 }
-
 
 /****************************************************
  * BackwardBinaryOpReduceBcast
  ****************************************************/
-
-template <int XPU, int NDim, typename DType>
-BackwardBcastGData<NDim, DType> AllocBackwardBcastGData(
+template <int XPU, int NDim, typename Idx, typename DType>
+BackwardBcastGData<NDim, Idx, DType> AllocBackwardBcastGData(
     const DLContext& ctx, const BcastInfo& info,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping,
     runtime::NDArray lhs, runtime::NDArray rhs, runtime::NDArray out, runtime::NDArray grad_out,
     runtime::NDArray grad_lhs, runtime::NDArray grad_rhs) {
   // GData
-  BackwardBcastGData<NDim, DType> gdata;
+  BackwardBcastGData<NDim, Idx, DType> gdata;
   // dim, shape and stride
   gdata.ndim = info.lhs_shape.size();
   gdata.lhs_len = utils::Prod(info.lhs_shape);
@@ -333,13 +391,13 @@ BackwardBcastGData<NDim, DType> AllocBackwardBcastGData(
   std::copy(info.out_stride.begin(), info.out_stride.end(), gdata.out_stride);
   // mappings
   if (!utils::IsNoneArray(lhs_mapping)) {
-    gdata.lhs_mapping = static_cast<int64_t*>(lhs_mapping->data);
+    gdata.lhs_mapping = static_cast<Idx*>(lhs_mapping->data);
   }
   if (!utils::IsNoneArray(rhs_mapping)) {
-    gdata.rhs_mapping = static_cast<int64_t*>(rhs_mapping->data);
+    gdata.rhs_mapping = static_cast<Idx*>(rhs_mapping->data);
   }
   if (!utils::IsNoneArray(out_mapping)) {
-    gdata.out_mapping = static_cast<int64_t*>(out_mapping->data);
+    gdata.out_mapping = static_cast<Idx*>(out_mapping->data);
   }
   // data
   gdata.lhs_data = static_cast<DType*>(lhs->data);
@@ -366,8 +424,7 @@ void BackwardBinaryReduceBcastImpl(
     const BcastInfo& info,
     const std::string& reducer,
     const std::string& op,
-    runtime::NDArray indptr, runtime::NDArray indices,
-    runtime::NDArray rev_indptr, runtime::NDArray rev_indices,
+    const ImmutableGraph* graph,
     binary_op::Target lhs_tgt, binary_op::Target rhs_tgt,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping,
     runtime::NDArray lhs, runtime::NDArray rhs, runtime::NDArray out, runtime::NDArray grad_out,
@@ -377,10 +434,6 @@ void BackwardBinaryReduceBcastImpl(
 #ifdef __CUDACC__
   auto* thr_entry = runtime::CUDAThreadEntry::ThreadLocal();
 #endif
-  // Graph
-  Csr csr = utils::CreateCsr(indptr, indices);
-  Csr rev_csr = utils::CreateCsr(rev_indptr, rev_indices);
-
   // advance config
   minigun::advance::RuntimeConfig rtcfg;
   rtcfg.ctx = out->ctx;
@@ -398,13 +451,19 @@ void BackwardBinaryReduceBcastImpl(
   const int bcast_ndim = info.out_shape.size();
   const bool req_lhs = !utils::IsNoneArray(grad_lhs);
   const bool req_rhs = !utils::IsNoneArray(grad_rhs);
+  const auto bits = graph->NumBits();
+#ifdef __CUDACC__
+  CHECK(bits == 32) << "CUDA kernel only supports 32 bits graph.";
+#endif
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
   }
+#ifdef __CUDACC__
   DGL_DTYPE_SWITCH(dtype, DType, {
+    typedef int32_t Idx;
     BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
-      BackwardBcastGData<NDim, DType> gdata = AllocBackwardBcastGData<XPU, NDim, DType>(
+      auto gdata = AllocBackwardBcastGData<XPU, NDim, Idx, DType>(
           rtcfg.ctx, info,
           lhs_mapping, rhs_mapping, out_mapping,
           lhs, rhs, out, grad_out,
@@ -413,14 +472,37 @@ void BackwardBinaryReduceBcastImpl(
         REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
           BINARY_OP_SWITCH(op, DType, BinaryOp, {
             TARGET_SWITCH(lhs_tgt, rhs_tgt, LeftTarget, RightTarget, {
-              CallBackwardBinaryReduceBcast<XPU, Mode, NDim, DType, LeftTarget,
-                RightTarget, BinaryOp, Reducer>(rtcfg, csr, rev_csr, &gdata);
+              CallBackwardBinaryReduceBcast<XPU, Mode, NDim, Idx, DType,
+                LeftTarget, RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
             });
           });
         });
       });
     });
   });
+#else
+  DGL_DTYPE_SWITCH(dtype, DType, {
+    DGL_IDX_TYPE_SWITCH(bits, Idx, {
+      BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
+        auto gdata = AllocBackwardBcastGData<XPU, NDim, Idx, DType>(
+            rtcfg.ctx, info,
+            lhs_mapping, rhs_mapping, out_mapping,
+            lhs, rhs, out, grad_out,
+            grad_lhs, grad_rhs);
+        BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, {
+          REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
+            BINARY_OP_SWITCH(op, DType, BinaryOp, {
+              TARGET_SWITCH(lhs_tgt, rhs_tgt, LeftTarget, RightTarget, {
+                CallBackwardBinaryReduceBcast<XPU, Mode, NDim, Idx, DType,
+                  LeftTarget, RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
+              });
+            });
+          });
+        });
+      });
+    });
+  });
+#endif
 }
 
 }  // namespace kernel

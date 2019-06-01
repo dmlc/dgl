@@ -45,7 +45,10 @@ def randn(shape):
 
 def tensor(data, dtype=None):
     if dtype is None:
-        data = np.array(data)
+        if is_tensor(data):
+            data = zerocopy_to_numpy(data)
+        else:
+            data = np.array(data)
         dtype = int64 if np.issubdtype(data.dtype, np.integer) else float32
     return copy_to(_tensor(data, dtype), _default_context)
 

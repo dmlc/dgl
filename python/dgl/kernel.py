@@ -2,6 +2,7 @@
 from __future__ import absolute_import
 
 from ._ffi.function import _init_api
+from .ndarray import empty
 
 def infer_binary_feature_shape(lhs, rhs):
     """Infer the output feature shape after a binary operation between lhs and rhs.
@@ -21,247 +22,15 @@ def infer_binary_feature_shape(lhs, rhs):
     ret = _CAPI_DGLKernelInferBinaryFeatureShape(lhs, rhs)
     return tuple(ret.asnumpy())
 
-def src_op_edge_reduce(reducer,
-                       binary_op,
-                       indptr, indices,
-                       rev_indptr, rev_indices,
-                       src_mapping, edge_mapping,
-                       src_data, edge_data,
-                       out_mapping,
-                       out_data):
-    """Perform binary op between src node data with edge data and reduce.
+def binary_op_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
+                     out_data, lhs_mapping=None, rhs_mapping=None,
+                     out_mapping=None):
+    """Perform binary operation between the given data and reduce by the graph.
 
     Broadcasting is supported for feature dimensions.
 
-    Parameter
-    ---------
-    reducer : str
-        The type of the reducer ("sum", "max", "min", "mean", "prod", "none").
-        If the reducer is "none", the output is an edge feature tensor.
-        Otherwise, a node feature tensor is returned.
-    binary_op : str
-        The type of the binary functor ("add", "mul", "sub", "div", "dot").
-    indptr : dgl.ndarray.NDArray
-        An int64 row offset array for the graph CSR.
-    indices : dgl.ndarray.NDArray
-        An int64 column index array for the graph CSR.
-    rev_indptr : dgl.ndarray.NDArray
-        An int64 row offset array for the reverse graph CSR.
-    rev_indices : dgl.ndarray.NDArray
-        An int64 column index array for the reverse graph CSR.
-    src_mapping : dgl.ndarray.NDArray
-        An int64 array used for read src node data.
-        `src_mapping[src_node_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    edge_mapping : dgl.ndarray.NDArray
-        An int64 array used for read edge data.
-        `edge_mapping[edge_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    src_data : dgl.ndarray.NDArray
-        The source node feature tensor.
-    edge_data : dgl.ndarray.NDArray
-        The edge feature tensor.
-    out_mapping : dgl.ndarray.NDArray
-        An int64 array used for write output data.
-        `out_mapping[out_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    out_size : int
-        The number of rows of the output tensor.
-    out_data : dgl.ndarray.NDArray
-        The output tensor. Could be either node or edge feature tensor
-        depending on the reducer.
-    """
-    _CAPI_DGLKernelSrcMulEdgeReduce(
-        reducer, binary_op, indptr, indices, rev_indptr, rev_indices,
-        src_mapping, edge_mapping,
-        src_data, edge_data, out_mapping, out_data)
-
-def backward_lhs_src_mul_edge_reduce(
-        reducer, op,
-        indptr, indices,
-        rev_indptr, rev_indices,
-        src_mapping, edge_mapping, out_mapping,
-        src_data, edge_data, out_data,
-        grad_out_data,
-        grad_src_data):
-    """Backward operator for SrcOpEdgeReduce. Compute the gradient for the src
-    data.
-
-    The returned gradient tensor has the same shape as the grad_out_data. To compute
-    the correct gradient, extra reduction along broadcasting dimensions is required.
-
-    Parameter
-    ---------
-    reducer : str
-        The type of the reducer ("sum", "max", "mean", "min", "none").
-        If the reducer is "none", the output is an edge feature tensor.
-        Otherwise, a node feature tensor is returned.
-    op : str
-        The type of the mul functor ("mul", "add").
-    indptr : dgl.ndarray.NDArray
-        An int64 row offset array for the graph CSR.
-    indices : dgl.ndarray.NDArray
-        An int64 column index array for the graph CSR.
-    rev_indptr : dgl.ndarray.NDArray
-        An int64 row offset array for the reverse graph CSR.
-    rev_indices : dgl.ndarray.NDArray
-        An int64 column index array for the reverse graph CSR.
-    src_mapping : dgl.ndarray.NDArray
-        An int64 array used for read src node data.
-        `src_mapping[src_node_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    edge_mapping : dgl.ndarray.NDArray
-        An int64 array used for read edge data.
-        `edge_mapping[edge_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    out_mapping : dgl.ndarray.NDArray
-        An int64 array used for write output data.
-        `out_mapping[out_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    src_data : dgl.ndarray.NDArray
-        The source node feature tensor.
-    edge_data : dgl.ndarray.NDArray
-        The edge feature tensor.
-    out_data : dgl.ndarray.NDArray
-        The forward output tensor.
-    grad_out_data : dgl.ndarray.NDArray
-        (output variable) The gradient of the forward output tensor.
-    grad_src_data : dgl.ndarray.NDArray
-        (output variable) The gradient of src data.
-    """
-    _CAPI_DGLKernelBackwardLhsSrcMulEdgeReduce(
-        reducer, op, indptr, indices, rev_indptr, rev_indices,
-        src_mapping, edge_mapping, out_mapping,
-        src_data, edge_data, out_data, grad_out_data, grad_src_data)
-
-def backward_rhs_src_mul_edge_reduce(
-        reducer, op,
-        indptr, indices,
-        rev_indptr, rev_indices,
-        src_mapping, edge_mapping, out_mapping,
-        src_data, edge_data, out_data,
-        grad_out_data, grad_edge_data):
-    """Backward operator for SrcOpEdgeReduce. Compute the gradient for the edge
-    data.
-
-    The returned gradient tensor has the same shape as the grad_out_data. To compute
-    the correct gradient, extra reduction along broadcasting dimensions is required.
-
-    Parameter
-    ---------
-    reducer : str
-        The type of the reducer ("sum", "max", "mean", "min", "none").
-        If the reducer is "none", the output is an edge feature tensor.
-        Otherwise, a node feature tensor is returned.
-    op : str
-        The type of the mul functor ("mul", "add").
-    indptr : dgl.ndarray.NDArray
-        An int64 row offset array for the graph CSR.
-    indices : dgl.ndarray.NDArray
-        An int64 column index array for the graph CSR.
-    rev_indptr : dgl.ndarray.NDArray
-        An int64 row offset array for the reverse graph CSR.
-    rev_indices : dgl.ndarray.NDArray
-        An int64 column index array for the reverse graph CSR.
-    src_mapping : dgl.ndarray.NDArray
-        An int64 array used for read src node data.
-        `src_mapping[src_node_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    edge_mapping : dgl.ndarray.NDArray
-        An int64 array used for read edge data.
-        `edge_mapping[edge_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    out_mapping : dgl.ndarray.NDArray
-        An int64 array used for write output data.
-        `out_mapping[out_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    src_data : dgl.ndarray.NDArray
-        The source node feature tensor.
-    edge_data : dgl.ndarray.NDArray
-        The edge feature tensor.
-    out_data : dgl.ndarray.NDArray
-        The forward output tensor.
-    grad_out_data : dgl.ndarray.NDArray
-        (output variable) The gradient of the forward output tensor.
-    grad_edge_data : dgl.ndarray.NDArray
-        (output variable) The gradient of edge data.
-    """
-    _CAPI_DGLKernelBackwardRhsSrcMulEdgeReduce(
-        reducer, op, indptr, indices, rev_indptr, rev_indices,
-        src_mapping, edge_mapping, out_mapping,
-        src_data, edge_data, out_data, grad_out_data, grad_edge_data)
-
-def backward_both_src_mul_edge_reduce(
-        reducer, op,
-        indptr, indices,
-        rev_indptr, rev_indices,
-        src_mapping, edge_mapping, out_mapping,
-        src_data, edge_data, out_data,
-        grad_out_data,
-        grad_src_data, grad_edge_data):
-    """Backward operator for SrcOpEdgeReduce. Compute the gradient for both inputs
-    in one fused kernel.
-
-    The returned gradient tensor has the same shape as the grad_out_data. To compute
-    the correct gradient, extra reduction along broadcasting dimensions is required.
-
-    Parameter
-    ---------
-    reducer : str
-        The type of the reducer ("sum", "max", "mean", "min", "none").
-        If the reducer is "none", the output is an edge feature tensor.
-        Otherwise, a node feature tensor is returned.
-    op : str
-        The type of the mul functor ("mul", "add").
-    indptr : dgl.ndarray.NDArray
-        An int64 row offset array for the graph CSR.
-    indices : dgl.ndarray.NDArray
-        An int64 column index array for the graph CSR.
-    rev_indptr : dgl.ndarray.NDArray
-        An int64 row offset array for the reverse graph CSR.
-    rev_indices : dgl.ndarray.NDArray
-        An int64 column index array for the reverse graph CSR.
-    src_mapping : dgl.ndarray.NDArray
-        An int64 array used for read src node data.
-        `src_mapping[src_node_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    edge_mapping : dgl.ndarray.NDArray
-        An int64 array used for read edge data.
-        `edge_mapping[edge_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    out_mapping : dgl.ndarray.NDArray
-        An int64 array used for write output data.
-        `out_mapping[out_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    src_data : dgl.ndarray.NDArray
-        The source node feature tensor.
-    edge_data : dgl.ndarray.NDArray
-        The edge feature tensor.
-    out_data : dgl.ndarray.NDArray
-        The forward output tensor.
-    grad_out_data : dgl.ndarray.NDArray
-        The gradient of the forward output tensor.
-    grad_src_data : dgl.ndarray.NDArray
-        (output variable) The gradient of src data.
-    grad_edge_data : dgl.ndarray.NDArray
-        (output variable) The gradient of edge data.
-    """
-    _CAPI_DGLKernelBackwardBothSrcMulEdgeReduce(
-        reducer, op, indptr, indices, rev_indptr, rev_indices,
-        src_mapping, edge_mapping, out_mapping,
-        src_data, edge_data, out_data, grad_out_data,
-        grad_src_data, grad_edge_data)
-
-def src_op_dst_reduce(reducer,
-                      binary_op,
-                      indptr, indices,
-                      rev_indptr, rev_indices,
-                      src_mapping, dst_mapping,
-                      src_data, dst_data,
-                      out_mapping,
-                      out_data):
-    """Perform binary operation between src node data with dst node data and
-    then reduce.
+    Optional id mapping arrays could be provided to read/write from/to locations
+    other than node/edge ids.
 
     Parameter
     ---------
@@ -270,49 +39,48 @@ def src_op_dst_reduce(reducer,
         If the reducer is "none", the output is an edge feature tensor.
         Otherwise, a node feature tensor is returned.
     binary_op : str
-        The type of the binary functor ("add", "mul", "sub", "div", "dot").
-    indptr : dgl.ndarray.NDArray
-        An int64 row offset array for the graph CSR.
-    indices : dgl.ndarray.NDArray
-        An int64 column index array for the graph CSR.
-    rev_indptr : dgl.ndarray.NDArray
-        An int64 row offset array for the reverse graph CSR.
-    rev_indices : dgl.ndarray.NDArray
-        An int64 column index array for the reverse graph CSR.
-    src_mapping : dgl.ndarray.NDArray
-        An int64 array used for read src node data.
-        `src_mapping[src_node_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    dst_mapping : dgl.ndarray.NDArray
-        An int64 array used for read dst node data.
-        `dst_mapping[dst_node_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    src_data : dgl.ndarray.NDArray
-        The source node feature tensor.
-    dst_data : dgl.ndarray.NDArray
-        The destination node feature tensor.
-    out_mapping : dgl.ndarray.NDArray
-        An int64 array used for write output data.
-        `out_mapping[out_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    out_size : int
-        The number of rows of the output tensor.
-    out_data : dgl.ndarray.NDArray
-        The output tensor. Could be either node or edge feature tensor
-        depending on the reducer.
+        The type of the binary functor ("add", "mul", "sub", "div").
+    graph : GraphIndex
+        The graph
+    lhs : int
+        The lhs target (src, dst, edge)
+    rhs : int
+        The rhs target (src, dst, edge)
+    lhs_data : NDArray
+        The lhs data.
+    rhs_data : NDArray
+        The rhs data.
+    out_data : NDArray
+        The out data.
+    lhs_mapping : NDArray
+        The lhs id mapping array.
+    rhs_mapping : NDArray
+        The rhs id mapping array.
+    out_mapping : NDArray
+        The out id mapping array.
     """
-    _CAPI_DGLKernelSrcMulDstReduce(
-        reducer, binary_op, indptr, indices, rev_indptr, rev_indices,
-        src_mapping, dst_mapping,
-        src_data, dst_data, out_mapping, out_data)
+    if lhs_mapping is None:
+        lhs_mapping = empty([])
+    if rhs_mapping is None:
+        rhs_mapping = empty([])
+    if out_mapping is None:
+        out_mapping = empty([])
+    _CAPI_DGLKernelBinaryOpReduce(
+        reducer, binary_op, graph._handle,
+        int(lhs), int(rhs),
+        lhs_data, rhs_data, out_data,
+        lhs_mapping, rhs_mapping, out_mapping)
 
-def copy_src_reduce(reducer,
-                    indptr, indices,
-                    rev_indptr, rev_indices,
-                    src_mapping, src_data,
-                    out_mapping,
-                    out_data):
-    """Copy src node data and perform reduce.
+def backward_lhs_binary_op_reduce(
+        reducer, binary_op, graph,
+        lhs, rhs,
+        lhs_data, rhs_data, out_data,
+        grad_out_data, grad_lhs_data,
+        lhs_mapping=None, rhs_mapping=None, out_mapping=None):
+    """Compute lhs gradient of binary_op_reduce.
+
+    The returned gradient tensor has the same shape as the grad_out_data. To compute
+    the correct gradient, extra reduction along broadcasting dimensions is required.
 
     Parameter
     ---------
@@ -320,89 +88,54 @@ def copy_src_reduce(reducer,
         The type of the reducer ("sum", "max", "min", "mean", "prod", "none").
         If the reducer is "none", the output is an edge feature tensor.
         Otherwise, a node feature tensor is returned.
-    indptr : dgl.ndarray.NDArray
-        An int64 row offset array for the graph CSR.
-    indices : dgl.ndarray.NDArray
-        An int64 column index array for the graph CSR.
-    rev_indptr : dgl.ndarray.NDArray
-        An int64 row offset array for the reverse graph CSR.
-    rev_indices : dgl.ndarray.NDArray
-        An int64 column index array for the reverse graph CSR.
-    src_mapping : dgl.ndarray.NDArray
-        An optional int64 array for source node mapping.
-        If empty, source ids are consecutive integers [0, len(indptr) - 1).
-        Source ids are used to read source node data.
-    src_data : dgl.ndarray.NDArray
-        The source node feature tensor.
-    out_mapping : dgl.ndarray.NDArray
-        An optional int64 array for output mapping. If reducer is
-        "none", then it's a mapping to edge ids. Otherwise, it's
-        mapping to destination node ids.
-    out_size : int
-        The size of the first dimension of the output array.
-    out_data : dgl.ndarray.NDArray
-        The output tensor. Could be either node or edge feature tensor
-        depending on the reducer.
+    binary_op : str
+        The type of the binary functor ("add", "mul", "sub", "div").
+    graph : GraphIndex
+        The graph
+    lhs : int
+        The lhs target (src, dst, edge)
+    rhs : int
+        The rhs target (src, dst, edge)
+    lhs_data : NDArray
+        The lhs data.
+    rhs_data : NDArray
+        The rhs data.
+    out_data : NDArray
+        The out data.
+    grad_out_data : NDArray
+        The out gradient data.
+    grad_lhs_data : NDArray
+        The lhs gradient data.
+    lhs_mapping : NDArray
+        The lhs id mapping array.
+    rhs_mapping : NDArray
+        The rhs id mapping array.
+    out_mapping : NDArray
+        The out id mapping array.
     """
-    return _CAPI_DGLKernelCopySrcReduce(
-        reducer, indptr, indices, rev_indptr, rev_indices,
-        src_mapping, src_data, out_mapping,
-        out_data)
+    if lhs_mapping is None:
+        lhs_mapping = empty([])
+    if rhs_mapping is None:
+        rhs_mapping = empty([])
+    if out_mapping is None:
+        out_mapping = empty([])
+    _CAPI_DGLKernelBackwardLhsBinaryOpReduce(
+        reducer, binary_op, graph._handle,
+        int(lhs), int(rhs),
+        lhs_mapping, rhs_mapping, out_mapping,
+        lhs_data, rhs_data, out_data,
+        grad_out_data, grad_lhs_data)
 
-def backward_copy_src_reduce(
-        reducer,
-        indptr, indices,
-        rev_indptr, rev_indices,
-        src_mapping, out_mapping,
-        src_data, out_data,
-        grad_out_data,
-        grad_src_data):
-    """Backward operator for CopySrcReduce.
+def backward_rhs_binary_op_reduce(
+        reducer, binary_op, graph,
+        lhs, rhs,
+        lhs_data, rhs_data, out_data,
+        grad_out_data, grad_rhs_data,
+        lhs_mapping=None, rhs_mapping=None, out_mapping=None):
+    """Compute rhs gradient of binary_op_reduce.
 
-    Parameter
-    ---------
-    reducer : str
-        The type of the reducer ("sum", "max", "mean", "min", "none").
-        If the reducer is "none", the output is an edge feature tensor.
-        Otherwise, a node feature tensor is returned.
-    indptr : dgl.ndarray.NDArray
-        An int64 row offset array for the graph CSR.
-    indices : dgl.ndarray.NDArray
-        An int64 column index array for the graph CSR.
-    rev_indptr : dgl.ndarray.NDArray
-        An int64 row offset array for the reverse graph CSR.
-    rev_indices : dgl.ndarray.NDArray
-        An int64 column index array for the reverse graph CSR.
-    src_mapping : dgl.ndarray.NDArray
-        An int64 array used for read src node data.
-        `src_mapping[src_node_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    out_mapping : dgl.ndarray.NDArray
-        An int64 array used for write output data.
-        `out_mapping[out_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    src_data : dgl.ndarray.NDArray
-        The source node feature tensor.
-    out_data : dgl.ndarray.NDArray
-        The forward output tensor.
-    grad_out_data : dgl.ndarray.NDArray
-        The gradient of the forward output tensor.
-    grad_src_data : dgl.ndarray.NDArray
-        The gradient of src data.
-    """
-    _CAPI_DGLKernelBackwardCopySrcReduce(
-        reducer, indptr, indices, rev_indptr, rev_indices,
-        src_mapping, out_mapping,
-        src_data, out_data, grad_out_data, grad_src_data)
-
-def copy_edge_reduce(reducer,
-                     indptr, indices,
-                     rev_indptr, rev_indices,
-                     edge_mapping,
-                     edge_data,
-                     out_mapping,
-                     out_data):
-    """Copy edge data and perform reduce to destination node.
+    The returned gradient tensor has the same shape as the grad_out_data. To compute
+    the correct gradient, extra reduction along broadcasting dimensions is required.
 
     Parameter
     ---------
@@ -410,82 +143,118 @@ def copy_edge_reduce(reducer,
         The type of the reducer ("sum", "max", "min", "mean", "prod", "none").
         If the reducer is "none", the output is an edge feature tensor.
         Otherwise, a node feature tensor is returned.
-    indptr : dgl.ndarray.NDArray
-        An int64 row offset array for the graph CSR.
-    indices : dgl.ndarray.NDArray
-        An int64 column index array for the graph CSR.
-    rev_indptr : dgl.ndarray.NDArray
-        An int64 row offset array for the reverse graph CSR.
-    rev_indices : dgl.ndarray.NDArray
-        An int64 column index array for the reverse graph CSR.
-    edge_mapping : dgl.ndarray.NDArray
-        An int64 array used for read edge data.
-        `edge_mapping[edge_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    edge_data : dgl.ndarray.NDArray
-        The edge feature tensor.
-    out_mapping : dgl.ndarray.NDArray
-        An int64 array used for write output data.
-        `out_mapping[out_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    out_size : int
-        The number of rows of the output tensor.
-
-    Returns
-    -------
-    dgl.ndarray.NDArray
-        The output tensor. Could be either node or edge feature tensor
-        depending on the reducer.
+    binary_op : str
+        The type of the binary functor ("add", "mul", "sub", "div").
+    graph : GraphIndex
+        The graph
+    lhs : int
+        The lhs target (src, dst, edge)
+    rhs : int
+        The rhs target (src, dst, edge)
+    lhs_data : NDArray
+        The lhs data.
+    rhs_data : NDArray
+        The rhs data.
+    out_data : NDArray
+        The out data.
+    grad_out_data : NDArray
+        The out gradient data.
+    grad_rhs_data : NDArray
+        The lhs gradient data.
+    lhs_mapping : NDArray
+        The lhs id mapping array.
+    rhs_mapping : NDArray
+        The rhs id mapping array.
+    out_mapping : NDArray
+        The out id mapping array.
     """
-    _CAPI_DGLKernelCopyEdgeReduce(
-        reducer, indptr, indices, rev_indptr, rev_indices,
-        edge_mapping, edge_data, out_mapping,
-        out_data)
+    if lhs_mapping is None:
+        lhs_mapping = empty([])
+    if rhs_mapping is None:
+        rhs_mapping = empty([])
+    if out_mapping is None:
+        out_mapping = empty([])
+    _CAPI_DGLKernelBackwardRhsBinaryOpReduce(
+        reducer, binary_op, graph._handle,
+        int(lhs), int(rhs),
+        lhs_mapping, rhs_mapping, out_mapping,
+        lhs_data, rhs_data, out_data,
+        grad_out_data, grad_rhs_data)
 
-def backward_copy_edge_reduce(
-        reducer,
-        indptr, indices,
-        rev_indptr, rev_indices,
-        edge_mapping, out_mapping,
-        edge_data, out_data,
-        grad_out_data,
-        grad_edge_data):
-    """Backward operator for CopyEdgeReduce.
+def copy_reduce(reducer, graph, target,
+                in_data, out_data,
+                in_mapping=None, out_mapping=None):
+    """Copy target data and perform reduce by graph.
+
+    Optional id mapping arrays could be provided to read/write from/to locations
+    other than node/edge ids.
 
     Parameter
     ---------
     reducer : str
-        The type of the reducer ("sum", "max", "mean", "min", "none").
+        The type of the reducer ("sum", "max", "min", "mean", "prod", "none").
         If the reducer is "none", the output is an edge feature tensor.
         Otherwise, a node feature tensor is returned.
-    indptr : dgl.ndarray.NDArray
-        An int64 row offset array for the graph CSR.
-    indices : dgl.ndarray.NDArray
-        An int64 column index array for the graph CSR.
-    rev_indptr : dgl.ndarray.NDArray
-        An int64 row offset array for the reverse graph CSR.
-    rev_indices : dgl.ndarray.NDArray
-        An int64 column index array for the reverse graph CSR.
-    edge_mapping : dgl.ndarray.NDArray
-        An int64 array used for read edge data.
-        `edge_mapping[edge_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    out_mapping : dgl.ndarray.NDArray
-        An int64 array used for write output data.
-        `out_mapping[out_id]` stores the location to read data.
-        Empty array represents identity mapping.
-    edge_data : dgl.ndarray.NDArray
-        The edge feature tensor.
-    out_data : dgl.ndarray.NDArray
-        The forward output tensor.
-    grad_out_data : dgl.ndarray.NDArray
-        The gradient of the forward output tensor.
-    grad_edge_data : dgl.ndarray.NDArray
-        The gradient of edge data.
+    graph : GraphIndex
+        The graph
+    target : int
+        The input target (src, dst, edge)
+    in_data : NDArray
+        The input data.
+    out_data : NDArray
+        The out data.
+    in_mapping : NDArray
+        The input id mapping array.
+    out_mapping : NDArray
+        The out id mapping array.
     """
-    _CAPI_DGLKernelBackwardCopyEdgeReduce(
-        reducer, indptr, indices, rev_indptr, rev_indices,
-        edge_mapping, out_mapping,
-        edge_data, out_data, grad_out_data, grad_edge_data)
+    if in_mapping is None:
+        in_mapping = empty([])
+    if out_mapping is None:
+        out_mapping = empty([])
+    _CAPI_DGLKernelCopyReduce(
+        reducer, graph._handle, int(target),
+        in_data, out_data, in_mapping, out_mapping)
+
+def backward_copy_reduce(reducer, graph, target,
+                         in_data, out_data,
+                         grad_out_data, grad_in_data,
+                         in_mapping=None, out_mapping=None):
+    """Copy target data and perform reduce by graph.
+
+    Optional id mapping arrays could be provided to read/write from/to locations
+    other than node/edge ids.
+
+    Parameter
+    ---------
+    reducer : str
+        The type of the reducer ("sum", "max", "min", "mean", "prod", "none").
+        If the reducer is "none", the output is an edge feature tensor.
+        Otherwise, a node feature tensor is returned.
+    graph : GraphIndex
+        The graph
+    target : int
+        The input target (src, dst, edge)
+    in_data : NDArray
+        The input data.
+    out_data : NDArray
+        The out data.
+    grad_out_data : NDArray
+        The out gradient data.
+    grad_in_data : NDArray
+        The input gradient data.
+    in_mapping : NDArray
+        The input id mapping array.
+    out_mapping : NDArray
+        The out id mapping array.
+    """
+    if in_mapping is None:
+        in_mapping = empty([])
+    if out_mapping is None:
+        out_mapping = empty([])
+    _CAPI_DGLKernelBackwardCopyReduce(
+        reducer, graph._handle, int(target),
+        in_data, out_data, grad_out_data, grad_in_data,
+        in_mapping, out_mapping)
 
 _init_api("dgl.kernel")

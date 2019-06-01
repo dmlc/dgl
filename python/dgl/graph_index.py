@@ -594,41 +594,37 @@ class GraphIndex(object):
         else:
             raise Exception("unknown format")
 
-    @utils.cached_member(cache='_cache', prefix='csr_adj')
-    def csr_adjacency_matrix(self, transpose, ctx):
-        """Return the adjacency matrix representation of this graph in csr format
+    @utils.cached_member(cache='_cache', prefix='immu_gidx')
+    def get_immutable_gidx(self, ctx):
+        """Create an immutable graph index and copy to the given device context.
 
-        By default, a row of returned adjacency matrix represents the destination
-        of an edge and the column represents the source.
-
-        When transpose is True, a row represents the source and a column represents
-        a destination.
-
-        Note: this internal function is for scheduler use only
+        Note: this internal function is for DGL scheduler use only
 
         Parameters
         ----------
-        transpose : bool
-            A flag to transpose the returned adjacency matrix.
         ctx : DGLContext
-            The context of the returned matrix.
+            The context of the returned graph.
 
         Returns
         -------
-        SparseTensor
-            The adjacency matrix.
-        utils.Index
-            A index for data shuffling due to sparse format change. Return None
-            if shuffle is not required.
+        GraphIndex
         """
-        rst = _CAPI_DGLGraphGetAdj(self._handle, transpose, "csr")
-        indptr = rst(0).asnumpy().astype(np.int32)
-        indices = rst(1).asnumpy().astype(np.int32)
-        eids = rst(2)
-        indptr = nd.array(indptr, ctx=ctx)
-        indices = nd.array(indices, ctx=ctx)
-        eids = nd.array(eids, ctx=ctx)
-        return indptr, indices, eids
+        return self.to_immutable().asbits(self.bits_needed()).copy_to(ctx)
+
+    def get_csr_shuffle_order(self):
+        """Return the edge shuffling order when a coo graph is converted to csr format
+
+        Returns
+        -------
+        tuple of two utils.Index
+            The first element of the tuple is the shuffle order for outward graph
+            The second element of the tuple is the shuffle order for inward graph
+        """
+        csr = _CAPI_DGLGraphGetAdj(self._handle, True, "csr")
+        order = csr(2)
+        rev_csr = _CAPI_DGLGraphGetAdj(self._handle, False, "csr")
+        rev_order = rev_csr(2)
+        return utils.toindex(order), utils.toindex(rev_order)
 
     def adjacency_matrix(self, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
@@ -924,6 +920,88 @@ class GraphIndex(object):
         """
         handle = _CAPI_DGLGraphLineGraph(self._handle, backtracking)
         return GraphIndex(handle)
+
+    def to_immutable(self):
+        """Convert this graph index to an immutable one.
+
+        Returns
+        -------
+        GraphIndex
+            An immutable graph index.
+        """
+        handle = _CAPI_DGLToImmutable(self._handle)
+        return GraphIndex(handle, readonly=True)
+
+    def ctx(self):
+        """Return the context of this graph index.
+
+        Returns
+        -------
+        DGLContext
+            The context of the graph.
+        """
+        return _CAPI_DGLGraphContext(self._handle)
+
+    def copy_to(self, ctx):
+        """Copy this immutable graph index to the given device context.
+
+        NOTE: this method only works for immutable graph index
+
+        Parameters
+        ----------
+        ctx : DGLContext
+            The target device context.
+
+        Returns
+        -------
+        GraphIndex
+            The graph index on the given device context.
+        """
+        handle = _CAPI_DGLImmutableGraphCopyTo(self._handle, ctx.device_type, ctx.device_id)
+        return GraphIndex(handle, readonly=True)
+
+    def nbits(self):
+        """Return the number of integer bits used in the storage (32 or 64).
+
+        Returns
+        -------
+        int
+            The number of bits.
+        """
+        return _CAPI_DGLGraphNumBits(self._handle)
+
+    def bits_needed(self):
+        """Return the number of integer bits needed to represent the graph
+
+        Returns
+        -------
+        int
+            The number of bits needed
+        """
+        if self.number_of_edges() >= 0x80000000:
+            return 64
+        elif self.number_of_nodes() >= 0x80000000:
+            return 64
+        else:
+            return 32
+
+    def asbits(self, bits):
+        """Transform the graph to a new one with the given number of bits storage.
+
+        NOTE: this method only works for immutable graph index
+
+        Parameters
+        ----------
+        bits : int
+            The number of integer bits (32 or 64)
+
+        Returns
+        -------
+        GraphIndex
+            The graph index stored using the given number of bits.
+        """
+        handle = _CAPI_DGLImmutableGraphAsNumBits(self._handle, int(bits))
+        return GraphIndex(handle, readonly=True)
 
 class SubgraphIndex(GraphIndex):
     """Graph index for subgraph.

@@ -152,7 +152,7 @@ class NodeFlow(DGLBaseGraph):
         block_id = self._get_block_id(block_id)
         return int(self._block_offsets[block_id + 1]) - int(self._block_offsets[block_id])
 
-    def copy_from_parent(self, node_embed_names=ALL, edge_embed_names=ALL, ctx=F.cpu()):
+    def copy_from_parent(self, node_embed_names=ALL, edge_embed_names=ALL, ctx=None):
         """Copy node/edge features from the parent graph.
 
         Parameters
@@ -161,6 +161,8 @@ class NodeFlow(DGLBaseGraph):
             The names of embeddings in each layer.
         edge_embed_names : a list of lists of strings, optional
             The names of embeddings in each block.
+        ctx : Context
+            The device to copy tensor to. If None, features will stay at its original device
         """
         if self._parent._node_frame.num_rows != 0 and self._parent._node_frame.num_columns != 0:
             if is_all(node_embed_names):
@@ -397,13 +399,18 @@ class NodeFlow(DGLBaseGraph):
         assert F.asnumpy(F.sum(ret == -1, 0)) == 0, "The eid in the parent graph is invalid."
         return ret
 
-    def block_edges(self, block_id):
+    def block_edges(self, block_id, remap=False):
         """Return the edges in a block.
+
+        If remap is True, returned indices u, v, eid will be remapped to local
+        indices (i.e. starting from 0)
 
         Parameters
         ----------
         block_id : int
             The specified block to return the edges.
+        remap : boolean
+            Remap indices if True
 
         Returns
         -------
@@ -418,7 +425,8 @@ class NodeFlow(DGLBaseGraph):
         rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, "coo",
                                         int(layer0_size),
                                         int(self._layer_offsets[block_id + 1]),
-                                        int(self._layer_offsets[block_id + 2]))
+                                        int(self._layer_offsets[block_id + 2]),
+                                        remap)
         idx = utils.toindex(rst(0)).tousertensor()
         eid = utils.toindex(rst(1))
         num_edges = int(len(idx) / 2)
@@ -452,7 +460,8 @@ class NodeFlow(DGLBaseGraph):
         rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, fmt,
                                         int(layer0_size),
                                         int(self._layer_offsets[block_id + 1]),
-                                        int(self._layer_offsets[block_id + 2]))
+                                        int(self._layer_offsets[block_id + 2]),
+                                        True)
         num_rows = self.layer_size(block_id + 1)
         num_cols = self.layer_size(block_id)
 
@@ -511,7 +520,7 @@ class NodeFlow(DGLBaseGraph):
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
-        src, dst, eid = self.block_edges(block_id)
+        src, dst, eid = self.block_edges(block_id, remap=True)
         src = F.copy_to(src, ctx)  # the index of the ctx will be cached
         dst = F.copy_to(dst, ctx)  # the index of the ctx will be cached
         eid = F.copy_to(eid, ctx)  # the index of the ctx will be cached
@@ -735,7 +744,7 @@ class NodeFlow(DGLBaseGraph):
         assert func is not None
 
         if is_all(edges):
-            u, v, _ = self.block_edges(block_id)
+            u, v, _ = self.block_edges(block_id, remap=True)
             u = utils.toindex(u)
             v = utils.toindex(v)
             eid = utils.toindex(slice(0, self.block_size(block_id)))
@@ -821,8 +830,8 @@ class NodeFlow(DGLBaseGraph):
             assert len(u) > 0, "block_compute must run on edges"
             u = utils.toindex(self._glb2lcl_nid(u.tousertensor(), block_id))
             v = utils.toindex(self._glb2lcl_nid(v.tousertensor(), block_id + 1))
-            dest_nodes = utils.toindex(self._glb2lcl_nid(dest_nodes.tousertensor(),
-                                                         block_id + 1))
+            dest_nodes = utils.toindex(
+                self._glb2lcl_nid(dest_nodes.tousertensor(), block_id + 1))
             eid = utils.toindex(self._glb2lcl_eid(eid.tousertensor(), block_id))
 
             with ir.prog() as prog:
@@ -903,15 +912,20 @@ def _copy_to_like(arr1, arr2):
     return F.copy_to(arr1, F.context(arr2))
 
 def _get_frame(frame, names, ids, ctx):
-    col_dict = {name: F.copy_to(frame[name][_copy_to_like(ids, frame[name])], \
-                                ctx) for name in names}
+    col_dict = {}
+    for name in names:
+        col = frame[name][_copy_to_like(ids, frame[name])]
+        if ctx:
+            col = F.copy_to(col, ctx)
+        col_dict[name] = col
     if len(col_dict) == 0:
         return FrameRef(Frame(num_rows=len(ids)))
     else:
         return FrameRef(Frame(col_dict))
 
 def _copy_frame(frame, ctx):
-    return {name: F.copy_to(frame[name], ctx) for name in frame}
+    return {name: F.copy_to(frame[name], ctx)
+            if ctx else frame[name] for name in frame}
 
 
 def _update_frame(frame, names, ids, new_frame):

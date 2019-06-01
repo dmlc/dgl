@@ -490,6 +490,27 @@ def get_ndata_name(g, name):
         name += '_'
     return name
 
+def get_edata_name(g, name):
+    """Return an edge data name that does not exist in the given graph.
+
+    The given name is directly returned if it does not exist in the given graph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph.
+    name : str
+        The proposed name.
+
+    Returns
+    -------
+    str
+        The node data name that does not exist.
+    """
+    while name in g.edata:
+        name += '_'
+    return name
+
 def unwrap_to_ptr_list(wrapper):
     """Convert the internal vector wrapper to a python list of ctypes.c_void_p.
 
@@ -519,3 +540,14 @@ def to_dgl_context(ctx):
     device_type = nd.DGLContext.STR2MASK[F.device_type(ctx)]
     device_id = F.device_id(ctx)
     return nd.DGLContext(device_type, device_id)
+
+def to_nbits_int(tensor, nbits):
+    """Change the dtype of integer tensor
+    The dtype of returned tensor uses nbits, nbits can only be 32 or 64
+    """
+    if nbits == 32:
+        return F.astype(tensor, F.int32)
+    elif nbits == 64:
+        return F.astype(tensor, F.int64)
+    else:
+        assert(0), "nbits can either be 32 or 64"

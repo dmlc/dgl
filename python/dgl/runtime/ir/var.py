@@ -11,7 +11,7 @@ class VarType(object):
     FEAT = 0
     FEAT_DICT = 1
     # Types for concrete objects (i.e, they must have values).
-    SPMAT = 2
+    GRAPH = 2
     IDX = 3
     STR = 4
     FUNC = 5
@@ -21,7 +21,7 @@ class VarType(object):
 VAR_TYPE_NAME_MAP = [
     'Feat',
     'FeatDict',
-    'SpMat',
+    'GRAPH',
     'Idx',
     'Str',
     'Func',
@@ -78,9 +78,9 @@ def FEAT_DICT(data=None, name=None):
     """Create a variable for feature dict."""
     return new(VarType.FEAT_DICT, data, name)
 
-def SPMAT(data=None, name=None):
-    """Create a variable for sparse matrix lambda."""
-    return new(VarType.SPMAT, data, name)
+def GRAPH(data=None, name=None):
+    """Create a variable for graph index lambda."""
+    return new(VarType.GRAPH, data, name)
 
 def IDX(data=None, name=None):
     """Create a variable for index."""
