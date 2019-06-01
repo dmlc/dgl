@@ -6,12 +6,12 @@ function fail {
 }
 
 function usage {
-    echo "Usage: $0 device"
+    echo "Usage: $0 backend device"
 }
 
-if [ $# -ne 1 ]; then
+if [ $# -ne 2 ]; then
     usage
-    fail "Error: must specify device"
+    fail "Error: must specify backend and device"
 fi
 
 export DGLBACKEND=$1
