@@ -14,8 +14,11 @@ if [ $# -ne 1 ]; then
     fail "Error: must specify device"
 fi
 
-export DGLTESTDEV=$1
-export PYTHONPATH=tests:$PYTHONPATH
+export DGLBACKEND=$1
+export DGLTESTDEV=$2
+export DGL_LIBRARY_PATH=${PWD}/build
+export PYTHONPATH=tests:${PWD}/python:$PYTHONPATH
+export DGL_DOWNLOAD_DIR=${PWD}
 
 python3 -m nose -v --with-xunit tests/compute || fail "compute"
 python3 -m nose -v --with-xunit tests/graph_index || fail "graph_index"

@@ -6,20 +6,20 @@ if [ $# -ne 1 ]; then
     exit -1
 fi
 
-if [ "$1" == "cuda" ]; then
+if [ "$1" == "gpu" ]; then
     cp cmake/config.cmake config.cmake
     sed -i -e 's/USE_CUDA OFF/USE_CUDA ON/g' config.cmake
 fi
 
 if [ -d build ]; then
-	rm -rf build
+    rm -rf build
 fi
 mkdir build
 
 rm -rf _download
 
 pushd build
-cmake ..
+cmake .. -DBUILD_CPP_TEST=1
 make -j4
 popd
 

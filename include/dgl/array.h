@@ -49,8 +49,10 @@ IdArray Sub(dgl_id_t lhs, IdArray rhs);
 IdArray Mul(dgl_id_t lhs, IdArray rhs);
 IdArray Div(dgl_id_t lhs, IdArray rhs);
 
+
 /*! \brief Stack two arrays (of len L) into a 2*L length array */
 IdArray HStack(IdArray arr1, IdArray arr2);
+
 
 /*! \brief Plain CSR matrix */
 struct CSRMatrix {

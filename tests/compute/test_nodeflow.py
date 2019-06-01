@@ -131,6 +131,11 @@ def check_apply_edges(create_node_flow):
         expected_f_sum = g.ndata["f"][srcs] + g.ndata["f"][dsts]
         assert F.allclose(nf.blocks[i].data['f2'], expected_f_sum)
 
+        eids = nf.block_parent_eid(i)
+        srcs, dsts = g.find_edges(eids)
+        expected_f_sum = g.ndata["f"][srcs] + g.ndata["f"][dsts]
+        assert F.array_equal(nf.blocks[i].data['f2'], expected_f_sum)
+
 
 def test_apply_edges():
     check_apply_edges(create_full_nodeflow)

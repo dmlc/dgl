@@ -143,6 +143,6 @@ class MiniGCDataset(object):
     def _gen_circular_ladder(self, n):
         for _ in range(n):
             num_v = np.random.randint(self.min_num_v, self.max_num_v)
-            g = nx.circular_ladder_graph(num_v)
+            g = nx.circular_ladder_graph(num_v // 2)
             self.graphs.append(g)
             self.labels.append(7)

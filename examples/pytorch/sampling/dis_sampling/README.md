@@ -13,9 +13,18 @@ Dependencies
 pip install torch requests
 ``
 
-### Usage
+### Usage Guide
 
-To run the following demos, you need to start trainer and sampler process on different machines by changing the `--ip`. You can also change the number of sampler by the `--num-sampler` option.
+Assume that the user has already launched two instances (`instance_0` & `instance_1`) on AWS EC2, and also these two instances have the correct authority to access each other by TCP/IP protocol. Now we can treat `instance_0` as `Trainer` and `instance_1` as `Sampler`. Then, the user can start the trainer process and sampler process on these two instances separately. We have already provided a set of scripts to start the trainer and sampler process and users just need to change the `--ip` to their own IP address.
+
+Once we start the trainer process, users will see the following logging output:
+
+```
+[04:48:20] .../socket_communicator.cc:68: Bind to 127.0.0.1:2049
+[04:48:20] .../socket_communicator.cc:74: Listen on 127.0.0.1:2049, wait sender connect ...
+```
+
+After that user can start the sampler process. For the sampler instance_0, users can change the `--num-sampler` option to set the number of the sampler. The `sampler.py` script will start `--num-sampler` processes concurrently to maximalize the system utilization. Users can also launch many samplers in parallel across a set of machines. For example, if we have `10` sampler instance and for each instance, we set the `--num-sampler` to `2`, we need to set the `--num-sampler` of the trainer instance to `20`.
 
 ### Neighbor Sampling & Skip Connection
 

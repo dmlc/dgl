@@ -5,10 +5,13 @@ IF x%1x==xx (
 	ECHO Specify backend
 	EXIT /B 1
 ) ELSE (
-	SET DGLTESTDEV=%1
+	SET BACKEND=%1
 )
 
-SET PYTHONPATH=tests;!PYTHONPATH!
+SET PYTHONPATH=tests;!CD!\python;!PYTHONPATH!
+SET DGLBACKEND=!BACKEND!
+SET DGL_LIBRARY_PATH=!CD!\build
+SET DGL_DOWNLOAD_DIR=!CD!
 
 python -m nose -v --with-xunit tests\!DGLBACKEND! || EXIT /B 1
 python -m nose -v --with-xunit tests\graph_index || EXIT /B 1
