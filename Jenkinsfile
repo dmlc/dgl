@@ -136,7 +136,12 @@ pipeline {
           }
         }
         stage("GPU Build") {
-          agent { label "GPUNode" }
+          agent {
+            node {
+              label "GPUNode"
+              args "--runtime nvidia"
+            }
+          }
           steps {
             build_dgl_linux("gpu")
           }
@@ -151,6 +156,22 @@ pipeline {
             stage("Unit test") {
               steps {
                 unit_test("pytorch", "cpu")
+              }
+            }
+            //stage("Example test") {
+            //  steps {
+            //    unit_test("pytorch", "cpu")
+            //  }
+            //}
+          }
+        }
+        stage("Torch GPU") {
+          agent { label "CPUNode" }
+          stages {
+            stage("Unit test") {
+              steps {
+                //unit_test("pytorch", "gpu")
+                sh "nvidia-smi"
               }
             }
             //stage("Example test") {
