@@ -40,7 +40,7 @@ def cpp_unit_test_windows(){
 }
 
 def unit_test(backend, dev) {
-  //sh "pwd"
+  sh "pwd"
   //def wspace = "${env.WORKSPACE}/${backend}-${dev}-unittest/"
   //def build = "${env.WORKSPACE}/${dev}-build/"
   //ws("${wspace}") {
@@ -66,7 +66,7 @@ def unit_test(backend, dev) {
 //}
 
 def example_test(backend, dev) {
-  //sh "pwd"
+  sh "pwd"
   //def wspace = "${env.WORKSPACE}/${backend}-${dev}-exptest/"
   //def build = "${env.WORKSPACE}/${dev}-build/"
   //ws("${wspace}") {
@@ -131,15 +131,19 @@ pipeline {
                 sh "ls ./build"
               }
             }
-            stage("TH unit test") {
-              steps { unit_test("pytorch", "cpu") }
+            stage("Unittest") {
+              parallel {
+                stage("TH unit test") {
+                  steps { unit_test("pytorch", "cpu") }
+                }
+                stage("TH example test") {
+                  steps { example_test("pytorch", "cpu") }
+                }
+              }
             }
-            stage("TH example test") {
-              steps { example_test("pytorch", "cpu") }
-            }
-            stage("MX unit test") {
-              steps { unit_test("mxnet", "cpu") }
-            }
+            //stage("MX unit test") {
+            //  steps { unit_test("mxnet", "cpu") }
+            //}
             stage("Torch tutorial test") {
               steps { tutorial_test("pytorch") }
             }
