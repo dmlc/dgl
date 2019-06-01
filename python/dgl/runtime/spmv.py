@@ -1,9 +1,6 @@
 """Module for SPMV rules."""
 from __future__ import absolute_import
 
-import scipy.sparse as sp
-import numpy as np
-
 from ..base import DGLError
 from .. import backend as F
 from .. import utils
@@ -14,9 +11,9 @@ from . import ir
 from .ir import var
 
 
-def gen_v2v_spmv_schedule(graph, mfunc, rfunc, src_frame, dst_frame, edge_frame,
-                          out, out_size, src_map=None, dst_map=None,
-                          edge_map=None, out_map=None):
+def gen_v2v_spmv_schedule(graph, mfunc, rfunc, src_frame, dst_frame,
+                          edge_frame, out, out_size, src_map=None,
+                          dst_map=None, edge_map=None, out_map=None):
     """Generate v2v spmv schedule.
 
     Parameters
@@ -180,14 +177,15 @@ def build_adj_matrix_uv(edge_tuples, num_nodes):
     backward_map = utils.to_nbits_int(eid[backward.tousertensor()], nbits)
     forward_map = F.zerocopy_to_dgl_ndarray(forward_map)
     backward_map = F.zerocopy_to_dgl_ndarray(backward_map)
+    edge_map = utils.CtxCachedObject(
+        lambda ctx: (nd.array(forward_map, ctx=ctx),
+                     nd.array(backward_map, ctx=ctx)))
     return utils.CtxCachedObject(lambda ctx: gidx.get_immutable_gidx(ctx)), \
-        utils.CtxCachedObject(lambda ctx: (nd.array(forward_map, ctx=ctx),
-                                           nd.array(backward_map, ctx=ctx))), \
-        nbits
+        edge_map, nbits
 
 
-def build_block_adj_matrix_graph(graph, block_id):
-    """Build adjacency matrix of the whole graph.
+def build_block_adj_matrix(graph, block_id, edge_tuples=None):
+    """Build adjacency matrix for a given block in the node flow
 
     Parameters
     ----------
@@ -199,18 +197,23 @@ def build_block_adj_matrix_graph(graph, block_id):
 
     Returns
     -------
-    utils.CtxCachedObject
-        Get be used to get adjacency matrix on the provided ctx.
-    utils.Index
-        A index for data shuffling due to sparse format change. Return None
-        if shuffle is not required.
+    graph : utils.CtxCachedObject
+        Function that generates a immutable graph index on given context
+    edge_map : utils.CtxCachedObject
+        Function that generates forward and backward edge mapping on given
+        context
+    nbits : int
+        Number of ints needed to represent the graph
     """
     # FIXME (lingfan): nodeflow does not support get both csr and transposed
     # csr, for now use scipy to implement
-    u, v, eid = graph.block_edges(block_id)
-    u = utils.Index(u)
-    v = utils.Index(v)
-    eid = utils.Index(eid)
-    num_src = graph.layer_size(block_id)
-    num_dst = graph.layer_size(block_id + 1)
-    return build_adj_matrix_uv((u, v, eid), num_src, num_dst)
+    if edge_tuples is None:
+        u, v, eid = graph.block_edges(block_id, remap=True)
+        u = utils.toindex(u)
+        v = utils.toindex(v)
+        eid = utils.toindex(eid)
+    else:
+        u, v, eid = edge_tuples
+    num_nodes = max(graph.layer_size(block_id), graph.layer_size(block_id + 1))
+    gidx, edge_map, nbits = build_adj_matrix_uv((u, v, eid), num_nodes)
+    return gidx, edge_map, nbits

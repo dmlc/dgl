@@ -397,13 +397,18 @@ class NodeFlow(DGLBaseGraph):
         assert F.asnumpy(F.sum(ret == -1, 0)) == 0, "The eid in the parent graph is invalid."
         return ret
 
-    def block_edges(self, block_id):
+    def block_edges(self, block_id, remap=False):
         """Return the edges in a block.
+
+        If remap is True, returned indices u, v, eid will be remapped to local
+        indices (i.e. starting from 0)
 
         Parameters
         ----------
         block_id : int
             The specified block to return the edges.
+        remap : boolean
+            Remap indices if True
 
         Returns
         -------
@@ -418,7 +423,8 @@ class NodeFlow(DGLBaseGraph):
         rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, "coo",
                                         int(layer0_size),
                                         int(self._layer_offsets[block_id + 1]),
-                                        int(self._layer_offsets[block_id + 2]))
+                                        int(self._layer_offsets[block_id + 2]),
+                                        remap)
         idx = utils.toindex(rst(0)).tousertensor()
         eid = utils.toindex(rst(1))
         num_edges = int(len(idx) / 2)
@@ -452,7 +458,8 @@ class NodeFlow(DGLBaseGraph):
         rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, fmt,
                                         int(layer0_size),
                                         int(self._layer_offsets[block_id + 1]),
-                                        int(self._layer_offsets[block_id + 2]))
+                                        int(self._layer_offsets[block_id + 2]),
+                                        True)
         num_rows = self.layer_size(block_id + 1)
         num_cols = self.layer_size(block_id)
 
@@ -511,7 +518,7 @@ class NodeFlow(DGLBaseGraph):
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
-        src, dst, eid = self.block_edges(block_id)
+        src, dst, eid = self.block_edges(block_id, remap=True)
         src = F.copy_to(src, ctx)  # the index of the ctx will be cached
         dst = F.copy_to(dst, ctx)  # the index of the ctx will be cached
         eid = F.copy_to(eid, ctx)  # the index of the ctx will be cached
@@ -735,7 +742,7 @@ class NodeFlow(DGLBaseGraph):
         assert func is not None
 
         if is_all(edges):
-            u, v, _ = self.block_edges(block_id)
+            u, v, _ = self.block_edges(block_id, remap=True)
             u = utils.toindex(u)
             v = utils.toindex(v)
             eid = utils.toindex(slice(0, self.block_size(block_id)))
@@ -821,8 +828,8 @@ class NodeFlow(DGLBaseGraph):
             assert len(u) > 0, "block_compute must run on edges"
             u = utils.toindex(self._glb2lcl_nid(u.tousertensor(), block_id))
             v = utils.toindex(self._glb2lcl_nid(v.tousertensor(), block_id + 1))
-            dest_nodes = utils.toindex(self._glb2lcl_nid(dest_nodes.tousertensor(),
-                                                         block_id + 1))
+            dest_nodes = utils.toindex(
+                self._glb2lcl_nid(dest_nodes.tousertensor(), block_id + 1))
             eid = utils.toindex(self._glb2lcl_eid(eid.tousertensor(), block_id))
 
             with ir.prog() as prog:
