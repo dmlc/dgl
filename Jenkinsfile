@@ -101,11 +101,8 @@ pipeline {
     stage("Lint Check") {
       agent { docker { image "dgllib/dgl-ci-lint" } }
       steps {
-        ws("workspace/lint") {
-          sh "pwd"
-          init_git()
-          sh "bash tests/scripts/task_lint.sh"
-        }
+        init_git()
+        sh "bash tests/scripts/task_lint.sh"
       }
     }
     stage("Build") {
