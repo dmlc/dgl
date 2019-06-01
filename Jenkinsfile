@@ -64,14 +64,16 @@ def cpp_unit_test_windows() {
 }
 
 def unit_test(backend, dev) {
-  ws("workspace/${backend}-${dev}-unittest") {
+  def wspace = "workspace/${backend}-${dev}-unittest"
+  ws(wspace) {
     sh "pwd"
+    sh "ls -lh"
     init_git()
     unpack_lib("dgl-${dev}", dgl_linux_libs)
-    withEnv(["DGL_LIBRARY_PATH=${PWD}/build",
-             "PYTHONPATH=${PWD}/python",
+    withEnv(["DGL_LIBRARY_PATH=${wspace}/build",
+             "PYTHONPATH=${wspace}/python",
              "DGLBACKEND=${backend}",
-             "DGL_DOWNLOAD_DIR=${PWD}"]) {
+             "DGL_DOWNLOAD_DIR=${wspace}"]) {
       timeout(time: 2, unit: 'MINUTES') {
         sh "bash tests/scripts/task_unit_test.sh ${backend}"
       }
