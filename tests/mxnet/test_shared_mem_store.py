@@ -171,7 +171,7 @@ def test_compute():
     for worker_id in return_dict.keys():
         assert return_dict[worker_id] == 0, "worker %d fails" % worker_id
 
-def check_sync_barrier(graph_name, return_dict):
+def check_sync_barrier(worker_id, graph_name, return_dict):
     time.sleep(3)
     print("worker starts")
     try:
@@ -181,9 +181,11 @@ def check_sync_barrier(graph_name, return_dict):
             return
 
         start = time.time()
-        g._sync_barrier(30)
-        # this is very loose.
-        assert abs(time.time() - start) < 5
+        try:
+            g._sync_barrier(30)
+        except TimeoutError as e:
+            # this is very loose.
+            assert abs(time.time() - start) < 5
         g.destroy()
         return_dict[worker_id] = 0
     except Exception as e:
@@ -197,7 +199,7 @@ def test_sync_barrier():
     manager = Manager()
     return_dict = manager.dict()
     serv_p = Process(target=server_func, args=(2, 'test_graph4'))
-    work_p1 = Process(target=check_sync_barrier, args=('test_graph4', return_dict))
+    work_p1 = Process(target=check_sync_barrier, args=(0, 'test_graph4', return_dict))
     serv_p.start()
     work_p1.start()
     serv_p.join()
