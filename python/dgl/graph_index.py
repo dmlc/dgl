@@ -1358,40 +1358,12 @@ def from_bigraph_coo(num_nodes, src, dst, is_multigraph, readonly):
     handle = _CAPI_DGLBiGraphCreate(
         src.todgltensor(),
         dst.todgltensor(),
-        int(multigraph),
+        int(is_multigraph),
         int(num_nodes[0]),
         int(num_nodes[1]),
-        _readonly)
+        readonly)
     return BiGraphIndex(handle, num_nodes)
 
-
-def from_bigraph_csr(indptr, indices, num_nodes, edge_dir, shared_mem_name=""):
-    """Load a bipartite graph from the CSR matrix.
-
-    Parameters
-    ----------
-    indptr : a 1D tensor
-        index pointer in the CSR format
-    indices : a 1D tensor
-        column index array in the CSR format
-    edge_dir : string
-        the edge direction. The supported option is "in" and "out".
-    shared_mem_name : string
-        the name of shared memory
-    """
-    indptr = utils.toindex(indptr)
-    assert len(indptr) == num_nodes[0] + num_nodes[1] + 1
-    indices = utils.toindex(indices)
-    edge_ids = utils.toindex(F.arange(0, len(indices)))
-    handle = _CAPI_DGLBiGraphCSRCreate(
-        indptr.todgltensor(),
-        indices.todgltensor(),
-        edge_ids.todgltensor(),
-        num_nodes[0],
-        num_nodes[1],
-        shared_mem_name,
-        multigraph,
-        edge_dir)
 
 def create_bigraph_index(graph_data=None, num_nodes=(0, 0), multigraph=False, readonly=False):
     """Create a graph index object.
