@@ -137,6 +137,13 @@ class GraphOp {
    * \return a expanded Id array.
    */
   static IdArray ExpandIds(IdArray ids, IdArray offset);
+
+  /*!
+   * \brief Convert the graph to a simple graph.
+   * \param graph The input graph.
+   * \return a new immutable simple graph with no multi-edge.
+   */
+  static ImmutableGraph ToSimpleGraph(const GraphInterface* graph);
 };
 
 }  // namespace dgl

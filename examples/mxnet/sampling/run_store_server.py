@@ -12,10 +12,9 @@ class GraphData:
         num_nodes = csr.shape[0]
         num_edges = mx.nd.contrib.getnnz(csr).asnumpy()[0]
         edge_ids = np.arange(0, num_edges, step=1, dtype=np.int64)
-        self.graph = dgl.graph_index.GraphIndex(multigraph=False, readonly=True)
-        self.graph.from_csr_matrix(dgl.utils.toindex(csr.indptr),
-                                   dgl.utils.toindex(csr.indices), "in",
-                                   dgl.contrib.graph_store._get_graph_path(graph_name))
+        self.graph = dgl.graph_index.from_csr_matrix(
+                dgl.utils.toindex(csr.indptr), dgl.utils.toindex(csr.indices), False,
+                "in", dgl.contrib.graph_store._get_graph_path(graph_name))
         self.features = mx.nd.random.normal(shape=(csr.shape[0], num_feats))
         self.num_labels = 10
         self.labels = mx.nd.floor(mx.nd.random.uniform(low=0, high=self.num_labels,
