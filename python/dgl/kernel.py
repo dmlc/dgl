@@ -212,9 +212,13 @@ def copy_reduce(reducer, graph, target,
         in_mapping = empty([])
     if out_mapping is None:
         out_mapping = empty([])
+    print("before calling kernel, in_data value:")
+    print(in_data)
     _CAPI_DGLKernelCopyReduce(
         reducer, graph._handle, int(target),
         in_data, out_data, in_mapping, out_mapping)
+    print("after calling kernel, in_data value:")
+    print(in_data)
 
 def backward_copy_reduce(reducer, graph, target,
                          in_data, out_data,
