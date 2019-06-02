@@ -1099,6 +1099,57 @@ class DGLGraph(DGLBaseGraph):
             self._msg_index = self._msg_index.append_zeros(num)
         self._msg_frame.add_rows(num)
 
+    def del_nodes(self, vids):
+        """Remove multiple nodes.
+
+        Parameters
+        ----------
+        vids: list, tensor
+            The id of nodes to remove.
+        """
+        if self.is_readonly:
+            raise DGLError("del_nodes is not supported by read-only graph.")
+        induced_nodes = utils.set_diff(utils.toindex(self.nodes()), utils.toindex(vids))
+        sgi = self._graph.node_subgraph(induced_nodes)
+
+        if isinstance(self._node_frame, FrameRef):
+            self._node_frame = FrameRef(Frame(self._node_frame[sgi.induced_nodes]))
+        else:
+            self._node_frame = FrameRef(self._node_frame, sgi.induced_nodes)
+
+        if isinstance(self._edge_frame, FrameRef):
+            self._edge_frame = FrameRef(Frame(self._edge_frame[sgi.induced_edges]))
+        else:
+            self._edge_frame = FrameRef(self._edge_frame, sgi.induced_edges)
+
+        self._graph = create_graph_index(sgi.to_networkx(), sgi._multigraph, sgi._readonly)
+
+    def del_edges(self, eids):
+        """Remove multiple edges.
+
+        Parameters
+        ----------
+        eids: list, tensor
+            The id of edges to remove.
+        """
+        if self.is_readonly:
+            raise DGLError("del_edges is not supported by read-only graph.")
+        induced_edges = utils.set_diff(
+            utils.toindex(range(self.number_of_edges())), utils.toindex(eids))
+        sgi = self._graph.edge_subgraph(induced_edges)
+
+        if isinstance(self._node_frame, FrameRef):
+            self._node_frame = FrameRef(Frame(self._node_frame[sgi.induced_nodes]))
+        else:
+            self._node_frame = FrameRef(self._node_frame, sgi.induced_nodes)
+
+        if isinstance(self._edge_frame, FrameRef):
+            self._edge_frame = FrameRef(Frame(self._edge_frame[sgi.induced_edges]))
+        else:
+            self._edge_frame = FrameRef(self._edge_frame, sgi.induced_edges)
+
+        self._graph = create_graph_index(sgi.to_networkx(), sgi._multigraph, sgi._readonly)
+
     def clear(self):
         """Remove all nodes and edges, as well as their features, from the
         graph.
