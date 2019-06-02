@@ -13,7 +13,7 @@ from ..base import ALL, is_all, DGLError, dgl_warning
 from .. import backend as F
 from ..graph import DGLGraph
 from .. import utils
-from ..graph_index import GraphIndex, create_graph_index
+from ..graph_index import GraphIndex, create_graph_index, from_csr, from_shared_mem_csr_matrix
 from .._ffi.ndarray import empty_shared_mem
 from .._ffi.function import _init_api
 from .. import ndarray as nd
@@ -309,10 +309,9 @@ class SharedMemoryStoreServer(object):
         if isinstance(graph_data, GraphIndex):
             graph_idx = graph_data
         else:
-            graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
             indptr, indices = _to_csr(graph_data, edge_dir, multigraph)
-            graph_idx.from_csr_matrix(utils.toindex(indptr), utils.toindex(indices),
-                                      edge_dir, _get_graph_path(graph_name))
+            graph_idx = from_csr(utils.toindex(indptr), utils.toindex(indices),
+                                 multigraph, edge_dir, _get_graph_path(graph_name))
 
         self._graph = DGLGraph(graph_idx, multigraph=multigraph, readonly=True)
         self._num_workers = num_workers
@@ -541,8 +540,8 @@ class SharedMemoryDGLGraph(BaseGraphStore):
         num_nodes, num_edges, multigraph, edge_dir = self.proxy.get_graph_info(graph_name)
         num_nodes, num_edges = int(num_nodes), int(num_edges)
 
-        graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
-        graph_idx.from_shared_mem_csr_matrix(_get_graph_path(graph_name), num_nodes, num_edges, edge_dir)
+        graph_idx = from_shared_mem_csr_matrix(_get_graph_path(graph_name),
+                num_nodes, num_edges, edge_dir, multigraph)
         super(SharedMemoryDGLGraph, self).__init__(graph_idx, multigraph=multigraph)
         self._init_manager = InitializerManager()
 
