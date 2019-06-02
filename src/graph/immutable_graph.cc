@@ -521,7 +521,8 @@ COO::EdgeArray COO::Edges(const std::string &order) const {
   return EdgeArray{src_, dst_, rst_eid};
 }
 
-Subgraph COO::EdgeSubgraph(IdArray eids) const {
+Subgraph COO::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
+  // TODO(zihao): to handle the case of preserve_nodes=false
   CHECK(IsValidIdArray(eids));
   const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
   const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
@@ -640,7 +641,8 @@ Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
                   sg.induced_vertices, sg.induced_edges};
 }
 
-Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids) const {
+Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
+  // TODO(zihao): to handle the case of preserve_nodes=true.
   // We prefer to generate a subgraph from out-csr.
   auto sg = GetCOO()->EdgeSubgraph(eids);
   COOPtr subcoo = std::dynamic_pointer_cast<COO>(sg.graph);

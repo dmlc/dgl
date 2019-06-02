@@ -467,37 +467,56 @@ Subgraph Graph::VertexSubgraph(IdArray vids) const {
   return rst;
 }
 
-Subgraph Graph::EdgeSubgraph(IdArray eids) const {
+Subgraph Graph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
   CHECK(IsValidIdArray(eids)) << "Invalid edge id array.";
-
   const auto len = eids->shape[0];
-  std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
   std::vector<dgl_id_t> nodes;
   const int64_t* eid_data = static_cast<int64_t*>(eids->data);
 
-  for (int64_t i = 0; i < len; ++i) {
-    dgl_id_t src_id = all_edges_src_[eid_data[i]];
-    dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
-    if (oldv2newv.insert(std::make_pair(src_id, oldv2newv.size())).second)
-      nodes.push_back(src_id);
-    if (oldv2newv.insert(std::make_pair(dst_id, oldv2newv.size())).second)
-      nodes.push_back(dst_id);
-  }
-
   Subgraph rst;
-  rst.graph = std::make_shared<Graph>(IsMultigraph());
-  rst.induced_edges = eids;
-  rst.graph->AddVertices(nodes.size());
+  if (!preserve_nodes) {
+    std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
 
-  for (int64_t i = 0; i < len; ++i) {
-    dgl_id_t src_id = all_edges_src_[eid_data[i]];
-    dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
-    rst.graph->AddEdge(oldv2newv[src_id], oldv2newv[dst_id]);
+    for (int64_t i = 0; i < len; ++i) {
+      dgl_id_t src_id = all_edges_src_[eid_data[i]];
+      dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
+      if (oldv2newv.insert(std::make_pair(src_id, oldv2newv.size())).second)
+        nodes.push_back(src_id);
+      if (oldv2newv.insert(std::make_pair(dst_id, oldv2newv.size())).second)
+        nodes.push_back(dst_id);
+    }
+
+    rst.graph = std::make_shared<Graph>(IsMultigraph());
+    rst.induced_edges = eids;
+    rst.graph->AddVertices(nodes.size());
+
+    for (int64_t i = 0; i < len; ++i) {
+      dgl_id_t src_id = all_edges_src_[eid_data[i]];
+      dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
+      rst.graph->AddEdge(oldv2newv[src_id], oldv2newv[dst_id]);
+    }
+
+    rst.induced_vertices = IdArray::Empty(
+        {static_cast<int64_t>(nodes.size())}, eids->dtype, eids->ctx);
+    std::copy(nodes.begin(), nodes.end(), static_cast<int64_t*>(rst.induced_vertices->data));
+  } else {
+    rst.graph = std::make_shared<Graph>(IsMultigraph());
+    rst.induced_edges = eids;
+    rst.graph->AddVertices(NumVertices());
+    
+    for (int64_t i = 0; i < len; ++i) {
+      dgl_id_t src_id = all_edges_src_[eid_data[i]];
+      dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
+      rst.graph->AddEdge(src_id, dst_id);
+    }
+
+    for (int64_t i = 0; i < NumVertices(); ++i)
+      nodes.push_back(i);    
+
+    rst.induced_vertices = IdArray::Empty(
+        {static_cast<int64_t>(nodes.size())}, eids->dtype, eids->ctx);
+    std::copy(nodes.begin(), nodes.end(), static_cast<int64_t*>(rst.induced_vertices->data));
   }
-
-  rst.induced_vertices = IdArray::Empty(
-      {static_cast<int64_t>(nodes.size())}, eids->dtype, eids->ctx);
-  std::copy(nodes.begin(), nodes.end(), static_cast<int64_t*>(rst.induced_vertices->data));
 
   return rst;
 }

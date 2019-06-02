@@ -531,7 +531,7 @@ class GraphIndex(object):
             gis.append(self.node_subgraph(v))
         return gis
 
-    def edge_subgraph(self, e):
+    def edge_subgraph(self, e, preserve_nodes=False):
         """Return the induced edge subgraph.
 
         Parameters
@@ -545,7 +545,7 @@ class GraphIndex(object):
             The subgraph index.
         """
         e_array = e.todgltensor()
-        rst = _CAPI_DGLGraphEdgeSubgraph(self._handle, e_array)
+        rst = _CAPI_DGLGraphEdgeSubgraph(self._handle, e_array, preserve_nodes)
         induced_nodes = utils.toindex(rst(1))
         return SubgraphIndex(rst(0), self, induced_nodes, e)
 

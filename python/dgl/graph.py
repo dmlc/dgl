@@ -1136,7 +1136,7 @@ class DGLGraph(DGLBaseGraph):
             raise DGLError("del_edges is not supported by read-only graph.")
         induced_edges = utils.set_diff(
             utils.toindex(range(self.number_of_edges())), utils.toindex(eids))
-        sgi = self._graph.edge_subgraph(induced_edges)
+        sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes=True)
 
         if isinstance(self._node_frame, FrameRef):
             self._node_frame = FrameRef(Frame(self._node_frame[sgi.induced_nodes]))
