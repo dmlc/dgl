@@ -1160,13 +1160,9 @@ class BiGraphIndex(GraphIndex):
         Handler
     num_nodes : tuple
         The number of nodes of each type.
-    multigraph : bool, optional
-        whether the graph is a multigraph
-    readonly : bool, optional
-        whether the graph is readonly.
     """
-    def __init__(self, handle=None, num_nodes=(0, 0), multigraph=None, readonly=None):
-        super(BiGraphIndex, self).__init__(handle, multigraph, readonly)
+    def __init__(self, handle, num_nodes):
+        super(BiGraphIndex, self).__init__(handle)
         self._num_nodes = num_nodes
 
     def from_csr_matrix(self, indptr, indices, edge_dir, shared_mem_name=""):
@@ -1372,6 +1368,41 @@ class BiGraphIndex(GraphIndex):
         shuffle_idx = utils.toindex(shuffle_idx) if shuffle_idx is not None else None
         return inc, shuffle_idx
 
+def from_bigraph_coo(num_nodes, src, dst, is_multigraph, readonly):
+    """Construct a bipartite graph from coo arrays.
+
+    Parameters
+    ----------
+    num_nodes : a tuple of int
+        Numbers of nodes on both sides.
+    src : Tensor
+        Src end nodes of the edges.
+    dst : Tensor
+        Dst end nodes of the edges.
+    is_multigraph : bool or None
+        True if the graph is a multigraph. None means determined by data.
+    readonly : bool
+        True if the returned graph is readonly.
+
+    Returns
+    -------
+    GraphIndex
+        The graph index.
+    """
+    src = utils.toindex(src)
+    dst = utils.toindex(dst + num_nodes[0])
+    if is_multigraph is None:
+        is_multigraph = BoolFlag.BOOL_UNKNOWN
+    # TODO(zhengda) we need to support mutable bipartite graphs.
+    assert readonly, "We only support read-only bipartite graph for now."
+    handle = _CAPI_DGLGraphCreate(
+        src.todgltensor(),
+        dst.todgltensor(),
+        int(is_multigraph),
+        int(num_nodes[0] + num_nodes[1]),
+        readonly)
+    return BiGraphIndex(handle, num_nodes)
+
 
 def create_bigraph_index(graph_data=None, num_nodes=(0, 0), multigraph=False, readonly=False):
     """Create a graph index object.
@@ -1388,13 +1419,7 @@ def create_bigraph_index(graph_data=None, num_nodes=(0, 0), multigraph=False, re
     if isinstance(graph_data, (list, tuple)):
         assert len(graph_data) == 2
         src_nodes, dst_nodes = graph_data
-        dst_nodes = dst_nodes + num_nodes[0]
-        src_nodes = utils.toindex(src_nodes)
-        dst_nodes = utils.toindex(dst_nodes)
-
-        gidx = BiGraphIndex(None, num_nodes, multigraph, readonly)
-        gidx._init(src_nodes, dst_nodes, num_nodes[0] + num_nodes[1])
-        return gidx
+        return from_bigraph_coo(num_nodes, src_nodes, dst_nodes, multigraph, readonly)
     elif isinstance(graph_data, scipy.sparse.spmatrix):
         coo = graph_data.tocoo()
         return create_bigraph_index([coo.row, coo.col], num_nodes, multigraph, readonly)
