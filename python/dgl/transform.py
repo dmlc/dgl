@@ -4,7 +4,7 @@ from .graph import DGLGraph
 from .graph_index import GraphIndex
 from .batched_graph import BatchedDGLGraph
 
-__all__ = ['line_graph', 'reverse', 'to_simple_graph']
+__all__ = ['line_graph', 'reverse', 'to_simple_graph', 'to_bidirected']
 
 
 def line_graph(g, backtracking=True, shared=False):
@@ -123,5 +123,24 @@ def to_simple_graph(g):
     """
     newgidx = GraphIndex(_CAPI_DGLToSimpleGraph(g._graph.handle))
     return DGLGraph(newgidx, readonly=True)
+
+def to_bidirected(g):
+    """Convert the graph to a bidirected graph.
+
+    The function generates a new graph with no node/edge feature.
+    If g has m edges for i->j and n edges for j->i, then the
+    returned graph will have max(m, n) edges for both i->j and j->i.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+
+    Returns
+    -------
+    DGLGraph
+    """
+    newgidx = GraphIndex(_CAPI_DGLToBidirectedGraph(g._graph.handle))
+    return DGLGraph(newgidx)
 
 _init_api("dgl.transform")
