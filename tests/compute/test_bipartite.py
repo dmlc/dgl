@@ -476,6 +476,41 @@ def test_update_routines():
     reduce_msg_shapes.clear()
     F.allclose(g['dst'].ndata['res'], comp_res)
 
+def test_filter():
+    g = gen_from_edgelist()
+
+    src_repr = F.zeros((g['src'].number_of_nodes(), 5))
+    dst_repr = F.zeros((g['dst'].number_of_nodes(), 5))
+    e_repr = F.zeros((g.number_of_edges(), 5))
+    src_repr[[1, 3]] = 1
+    dst_repr[[1, 5]] = 1
+    e_repr[[1, 3]] = 1
+
+    g['src'].ndata['a'] = src_repr
+    g['dst'].ndata['a'] = dst_repr
+    g.edata['a'] = e_repr
+
+    def predicate(r):
+        return F.max(r.data['a'], 1) > 0
+
+    # full node filter
+    n_idx = g.filter_nodes('src', predicate)
+    assert set(F.zerocopy_to_numpy(n_idx)) == {1, 3}
+    n_idx = g.filter_nodes('dst', predicate)
+    assert set(F.zerocopy_to_numpy(n_idx)) == {1, 5}
+
+    # partial node filter
+    n_idx = g.filter_nodes('src', predicate, [0, 1])
+    assert set(F.zerocopy_to_numpy(n_idx)) == {1}
+
+    # full edge filter
+    e_idx = g.filter_edges(('src', 'dst', 'e'), predicate)
+    assert set(F.zerocopy_to_numpy(e_idx)) == {1, 3}
+
+    # partial edge filter
+    e_idx = g.filter_edges(('src', 'dst', 'e'), predicate, [0, 1])
+    assert set(F.zerocopy_to_numpy(e_idx)) == {1}
+
 if __name__ == '__main__':
     test_query()
     #test_mutation()
@@ -486,4 +521,5 @@ if __name__ == '__main__':
     test_apply_nodes()
     test_apply_edges()
     test_update_routines()
+    test_filter()
 

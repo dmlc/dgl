@@ -1714,7 +1714,6 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         """
         raise NotImplementedError('not supported')
 
-    # pylint: disable=unnecessary-pass
     def subgraph(self, nodes):
         """Return the subgraph induced on given nodes.
 
@@ -1737,9 +1736,8 @@ class DGLBipartiteGraph(DGLHeteroGraph):
             node/edge ID via `parent_nid` and `parent_eid` properties of the
             subgraph.
         """
-        pass
+        raise NotImplementedError('not supported')
 
-    # pylint: disable=unnecessary-pass
     def subgraphs(self, nodes):
         """Return a list of subgraphs, each induced in the corresponding given
         nodes in the list.
@@ -1760,9 +1758,8 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         G : A list of DGLHeteroSubGraph
             The subgraphs.
         """
-        pass
+        raise NotImplementedError('not supported')
 
-    # pylint: disable=unnecessary-pass
     def edge_subgraph(self, edges):
         """Return the subgraph induced on given edges.
 
@@ -1786,7 +1783,7 @@ class DGLBipartiteGraph(DGLHeteroGraph):
             node/edge ID via `parent_nid` and `parent_eid` properties of the
             subgraph.
         """
-        pass
+        raise NotImplementedError('not supported')
 
     def adjacency_matrix_scipy(self, etype, transpose=False, fmt='csr'):
         """Return the scipy adjacency matrix representation of edges with the
@@ -1893,7 +1890,6 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         assert etype == self._etype
         return self._graph.incidence_matrix(typestr, ctx)[0]
 
-    # pylint: disable=unnecessary-pass
     def filter_nodes(self, ntype, predicate, nodes=ALL):
         """Return a tensor of node IDs with the given node type that satisfy
         the given predicate.
@@ -1916,9 +1912,21 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         tensor
             The filtered nodes.
         """
-        pass
+        if is_all(nodes):
+            v = utils.toindex(slice(0, self._number_of_nodes(ntype)))
+        else:
+            v = utils.toindex(nodes)
 
-    # pylint: disable=unnecessary-pass
+        n_repr = self.get_n_repr(ntype, v)
+        nbatch = NodeBatch(self, v, n_repr)
+        n_mask = predicate(nbatch)
+
+        if is_all(nodes):
+            return F.nonzero_1d(n_mask)
+        else:
+            nodes = F.tensor(nodes)
+            return F.boolean_mask(nodes, n_mask)
+
     def filter_edges(self, etype, predicate, edges=ALL):
         """Return a tensor of edge IDs with the given edge type that satisfy
         the given predicate.
@@ -1943,9 +1951,35 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         tensor
             The filtered edges represented by their ids.
         """
-        pass
+        assert etype == self._etype
+        if is_all(edges):
+            u, v, _ = self._graph.edges('eid')
+            v = utils.toindex(v.tousertensor() - self._number_of_nodes(0))
+            eid = utils.toindex(slice(0, self.number_of_edges()))
+        elif isinstance(edges, tuple):
+            u, v = edges
+            u = utils.toindex(u)
+            v = utils.toindex(v + self._number_of_nodes(0))
+            # Rewrite u, v to handle edge broadcasting and multigraph.
+            u, v, eid = self._graph.edge_ids(u, v)
+            v = utils.toindex(v.tousertensor() - self._number_of_nodes(0))
+        else:
+            eid = utils.toindex(edges)
+            u, v, _ = self._graph.find_edges(eid)
+            v = utils.toindex(v.tousertensor() - self._number_of_nodes(0))
 
-    # pylint: disable=unnecessary-pass
+        src_data = self.get_n_repr(etype[0], u)
+        edge_data = self.get_e_repr(etype, eid)
+        dst_data = self.get_n_repr(etype[1], v)
+        ebatch = EdgeBatch(self, (u, v, eid), src_data, edge_data, dst_data)
+        e_mask = predicate(ebatch)
+
+        if is_all(edges):
+            return F.nonzero_1d(e_mask)
+        else:
+            edges = F.tensor(edges)
+            return F.boolean_mask(edges, e_mask)
+
     def readonly(self, readonly_state=True):
         """Set this graph's readonly state in-place.
 
@@ -1954,11 +1988,22 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         readonly_state : bool, optional
             New readonly state of the graph, defaults to True.
         """
-        pass
+        assert self.is_readonly
+        assert readonly_state, "Bipartite graph doesn't support mutable graph for now."
 
-    # pylint: disable=unnecessary-pass
     def __repr__(self):
-        pass
+        ret = ('DGLBipartiteGraph(num_src_nodes={src_node},\n'
+               '                  num_dst_nodes={dst_node},\n'
+               '                  num_edges={edge},\n'
+               '                  src_ndata_schemes={src_ndata}\n'
+               '                  dst_ndata_schemes={dst_ndata}\n'
+               '                  edata_schemes={edata})')
+        return ret.format(src_node=self._number_of_nodes(0),
+                          dst_node=self._number_of_nodes(1),
+                          edge=self.number_of_edges(),
+                          src_ndata=str(self.node_attr_schemes(self._ntypes[0])),
+                          dst_ndata=str(self.node_attr_schemes(self._ntypes[1])),
+                          edata=str(self.edge_attr_schemes(self._etype)))
 
     def __getitem__(self, key):
         """Returns a view on the bipartite graph with given node/edge type:
