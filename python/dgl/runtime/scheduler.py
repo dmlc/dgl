@@ -165,12 +165,12 @@ def schedule_bipartite_snr(graph,
                            reduce_func,
                            apply_func,
                            inplace):
-    """Schedule send_and_recv.
+    """Schedule send_and_recv on a bipartite graph.
 
     Parameters
     ----------
-    graph: DGLGraph
-        The DGLGraph to use
+    graph: DGLBipartiteGraph
+        The DGLBipartiteGraph to use
     edge_tuple: tuple
         A tuple of (src ids, dst ids, edge ids) representing edges to perform
         send_and_recv
@@ -255,12 +255,12 @@ def schedule_bipartite_update_all(graph,
                                   message_func,
                                   reduce_func,
                                   apply_func):
-    """get send and recv schedule
+    """get send and recv schedule on a bipartite graph.
 
     Parameters
     ----------
-    graph: DGLGraph
-        The DGLGraph to use
+    graph: DGLBipartiteGraph
+        The DGLBipartiteGraph to use
     message_func: callable or list of callable
         The message function
     reduce_func: callable or list of callable
@@ -472,8 +472,8 @@ def schedule_bipartite_apply_edges(graph,
 
     Parameters
     ----------
-    graph: NodeFlow
-        The NodeFlow to use
+    graph: DGLBipartiteGraph
+        The DGLBipartiteGraph to use
     u : utils.Index
         Source nodes of edges to apply
     v : utils.Index
@@ -602,12 +602,12 @@ def schedule_bipartite_pull(graph,
                             reduce_func,
                             apply_func,
                             inplace):
-    """get pull schedule
+    """get pull schedule on a bipartite graph
 
     Parameters
     ----------
-    graph: DGLGraph
-        The DGLGraph to use
+    graph: DGLBipartiteGraph
+        The DGLBipartiteGraph to use
     pull_nodes : utils.Index
         Destination nodes for pull
     message_func: callable or list of callable
