@@ -14,6 +14,12 @@ from . import utils
 
 GraphIndexHandle = ctypes.c_void_p
 
+class BoolFlag(object):
+    """Bool flag with unknown value"""
+    BOOL_UNKNOWN = -1
+    BOOL_FALSE = 0
+    BOOL_TRUE = 1
+
 class GraphIndex(object):
     """Graph index object.
 
@@ -52,18 +58,13 @@ class GraphIndex(object):
         self._multigraph = multigraph
         self._readonly = readonly
         if multigraph is None:
-            self._handle = _CAPI_DGLGraphCreate1(
-                src.todgltensor(),
-                dst.todgltensor(),
-                int(num_nodes),
-                readonly)
-        else:
-            self._handle = _CAPI_DGLGraphCreate(
-                src.todgltensor(),
-                dst.todgltensor(),
-                multigraph,
-                int(num_nodes),
-                readonly)
+            multigraph = BoolFlag.BOOL_UNKNOWN
+        self._handle = _CAPI_DGLGraphCreate(
+            src.todgltensor(),
+            dst.todgltensor(),
+            int(multigraph),
+            int(num_nodes),
+            readonly)
 
     @property
     def handle(self):
@@ -849,26 +850,21 @@ def from_coo(num_nodes, src, dst, is_multigraph, readonly):
     """
     src = utils.toindex(src)
     dst = utils.toindex(dst)
+    if is_multigraph is None:
+        is_multigraph = BoolFlag.BOOL_UNKNOWN
     if readonly:
-        if is_multigraph is None:
-            handle = _CAPI_DGLGraphCreate1(
-                src.todgltensor(),
-                dst.todgltensor(),
-                int(num_nodes),
-                readonly)
-        else:
-            handle = _CAPI_DGLGraphCreate(
-                src.todgltensor(),
-                dst.todgltensor(),
-                is_multigraph,
-                int(num_nodes),
-                readonly)
+        handle = _CAPI_DGLGraphCreate(
+            src.todgltensor(),
+            dst.todgltensor(),
+            int(is_multigraph),
+            int(num_nodes),
+            readonly)
         gidx = GraphIndex(handle)
     else:
-        if is_multigraph is None:
+        if is_multigraph is BoolFlag.BOOL_UNKNOWN:
             # TODO(minjie): better behavior in the future
-            is_multigraph = False
-        handle = _CAPI_DGLGraphCreateMutable(is_multigraph)
+            is_multigraph = BoolFlag.BOOL_FALSE
+        handle = _CAPI_DGLGraphCreateMutable(bool(is_multigraph))
         gidx = GraphIndex(handle)
         gidx.add_nodes(num_nodes)
         gidx.add_edges(src, dst)
@@ -894,18 +890,13 @@ def from_csr(indptr, indices, is_multigraph,
     indptr = utils.toindex(indptr)
     indices = utils.toindex(indices)
     if is_multigraph is None:
-        handle = _CAPI_DGLGraphCSRCreate1(
-            indptr.todgltensor(),
-            indices.todgltensor(),
-            shared_mem_name,
-            direction)
-    else:
-        handle = _CAPI_DGLGraphCSRCreate(
-            indptr.todgltensor(),
-            indices.todgltensor(),
-            shared_mem_name,
-            is_multigraph,
-            direction)
+        is_multigraph = BoolFlag.BOOL_UNKNOWN
+    handle = _CAPI_DGLGraphCSRCreate(
+        indptr.todgltensor(),
+        indices.todgltensor(),
+        shared_mem_name,
+        int(is_multigraph),
+        direction)
     return GraphIndex(handle)
 
 def from_shared_mem_csr_matrix(shared_mem_name,
