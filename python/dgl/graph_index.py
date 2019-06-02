@@ -1165,47 +1165,6 @@ class BiGraphIndex(GraphIndex):
         super(BiGraphIndex, self).__init__(handle)
         self._num_nodes = num_nodes
 
-    def from_csr_matrix(self, indptr, indices, edge_dir, shared_mem_name=""):
-        """Load a graph from the CSR matrix.
-
-        Parameters
-        ----------
-        indptr : a 1D tensor
-            index pointer in the CSR format
-        indices : a 1D tensor
-            column index array in the CSR format
-        edge_dir : string
-            the edge direction. The supported option is "in" and "out".
-        shared_mem_name : string
-            the name of shared memory
-        """
-        assert self.is_readonly()
-        indptr = utils.toindex(indptr)
-        assert len(indptr) == self._num_nodes[0] + self._num_nodes[1] + 1
-        indices = utils.toindex(indices)
-        edge_ids = utils.toindex(F.arange(0, len(indices)))
-        self._handle = _CAPI_DGLBiGraphCSRCreate(
-            indptr.todgltensor(),
-            indices.todgltensor(),
-            edge_ids.todgltensor(),
-            self._num_nodes[0],
-            self._num_nodes[1],
-            shared_mem_name,
-            self._multigraph,
-            edge_dir)
-
-    def _init(self, src_ids, dst_ids, num_nodes):
-        """The actual init function"""
-        assert len(src_ids) == len(dst_ids)
-        assert num_nodes == self._num_nodes[0] + self._num_nodes[1]
-        self._handle = _CAPI_DGLBiGraphCreate(
-            src_ids.todgltensor(),
-            dst_ids.todgltensor(),
-            self._multigraph,
-            self._num_nodes[0],
-            self._num_nodes[1],
-            self._readonly)
-
     @utils.cached_member(cache='_cache', prefix='scipy_adj')
     def adjacency_matrix_scipy(self, transpose, fmt):
         """Return the scipy adjacency matrix representation of this graph.
@@ -1389,20 +1348,50 @@ def from_bigraph_coo(num_nodes, src, dst, is_multigraph, readonly):
     GraphIndex
         The graph index.
     """
+    assert len(src) == len(dst)
     src = utils.toindex(src)
     dst = utils.toindex(dst + num_nodes[0])
     if is_multigraph is None:
         is_multigraph = BoolFlag.BOOL_UNKNOWN
     # TODO(zhengda) we need to support mutable bipartite graphs.
     assert readonly, "We only support read-only bipartite graph for now."
-    handle = _CAPI_DGLGraphCreate(
+    handle = _CAPI_DGLBiGraphCreate(
         src.todgltensor(),
         dst.todgltensor(),
-        int(is_multigraph),
-        int(num_nodes[0] + num_nodes[1]),
-        readonly)
+        int(multigraph),
+        int(num_nodes[0]),
+        int(num_nodes[1]),
+        _readonly)
     return BiGraphIndex(handle, num_nodes)
 
+
+def from_bigraph_csr(indptr, indices, num_nodes, edge_dir, shared_mem_name=""):
+    """Load a bipartite graph from the CSR matrix.
+
+    Parameters
+    ----------
+    indptr : a 1D tensor
+        index pointer in the CSR format
+    indices : a 1D tensor
+        column index array in the CSR format
+    edge_dir : string
+        the edge direction. The supported option is "in" and "out".
+    shared_mem_name : string
+        the name of shared memory
+    """
+    indptr = utils.toindex(indptr)
+    assert len(indptr) == num_nodes[0] + num_nodes[1] + 1
+    indices = utils.toindex(indices)
+    edge_ids = utils.toindex(F.arange(0, len(indices)))
+    handle = _CAPI_DGLBiGraphCSRCreate(
+        indptr.todgltensor(),
+        indices.todgltensor(),
+        edge_ids.todgltensor(),
+        num_nodes[0],
+        num_nodes[1],
+        shared_mem_name,
+        multigraph,
+        edge_dir)
 
 def create_bigraph_index(graph_data=None, num_nodes=(0, 0), multigraph=False, readonly=False):
     """Create a graph index object.
@@ -1422,7 +1411,7 @@ def create_bigraph_index(graph_data=None, num_nodes=(0, 0), multigraph=False, re
         return from_bigraph_coo(num_nodes, src_nodes, dst_nodes, multigraph, readonly)
     elif isinstance(graph_data, scipy.sparse.spmatrix):
         coo = graph_data.tocoo()
-        return create_bigraph_index([coo.row, coo.col], num_nodes, multigraph, readonly)
+        return from_bigraph_coo(num_nodes, coo.row, coo.col, multigraph, readonly)
     else:
         raise Exception("cannot create a bipartite graph from an unknown format")
 
