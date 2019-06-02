@@ -541,6 +541,36 @@ def schedule_push(graph,
     schedule_snr(graph, (u, v, eid),
                  message_func, reduce_func, apply_func, inplace)
 
+def schedule_bipartite_push(graph,
+                            u,
+                            message_func,
+                            reduce_func,
+                            apply_func,
+                            inplace):
+    """get push schedule on a bipartite graph
+
+    Parameters
+    ----------
+    graph: DGLBipartiteGraph
+        The DGLBipartiteGraph to use
+    u : utils.Index
+        Source nodes for push
+    message_func: callable or list of callable
+        The message function
+    reduce_func: callable or list of callable
+        The reduce function
+    apply_func: callable
+        The apply node function
+    inplace: bool
+        If True, the update will be done in place
+    """
+    u, v, eid = graph._graph.out_edges(u)
+    if len(eid) == 0:
+        # All the pushing nodes have no out edges. No computation is scheduled.
+        return
+    schedule_bipartite_snr(graph, (u, v, eid),
+                           message_func, reduce_func, apply_func, inplace)
+
 def schedule_pull(graph,
                   pull_nodes,
                   message_func,

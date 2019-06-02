@@ -463,11 +463,11 @@ def test_update_routines():
     F.allclose(g['dst'].ndata['res'][v], comp_res[v])
 
     # push
-    #v = F.tensor([0, 1, 2, 3])
-    #reduce_msg_shapes.clear()
-    #g.push(v)
-    #assert(reduce_msg_shapes == {(1, 3, D), (8, 1, D)})
-    #reduce_msg_shapes.clear()
+    v = F.tensor([0, 1, 2, 3])
+    reduce_msg_shapes.clear()
+    g.push(v)
+    assert(reduce_msg_shapes == {(1, 3, D), (8, 1, D)})
+    reduce_msg_shapes.clear()
 
     # update_all
     reduce_msg_shapes.clear()

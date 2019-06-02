@@ -1550,7 +1550,6 @@ class DGLBipartiteGraph(DGLHeteroGraph):
                                               inplace=inplace)
             Runtime.run(prog)
 
-    # pylint: disable=unnecessary-pass
     def push(self,
              u,
              message_func="default",
@@ -1614,7 +1613,22 @@ class DGLBipartiteGraph(DGLHeteroGraph):
         * the edge type of ``message_func`` and ``reduce_func`` must also be
           the same.
         """
-        pass
+        message_func, reduce_func, apply_node_func = self._get_func(message_func, reduce_func,
+                                                                    apply_node_func)
+        assert message_func is not None
+        assert reduce_func is not None
+
+        u = utils.toindex(u)
+        if len(u) == 0:
+            return
+        with ir.prog() as prog:
+            scheduler.schedule_bipartite_push(graph=self,
+                                              u=u,
+                                              message_func=message_func,
+                                              reduce_func=reduce_func,
+                                              apply_func=apply_node_func,
+                                              inplace=inplace)
+            Runtime.run(prog)
 
     def update_all(self,
                    message_func="default",
