@@ -7,6 +7,7 @@ from .frame import FrameRef, Frame
 from .view import HeteroEdgeView, HeteroNodeView
 from . import utils
 from .runtime import ir, scheduler, Runtime
+from .udf import NodeBatch, EdgeBatch
 
 __all__ = ['DGLBipartiteGraph']
 
