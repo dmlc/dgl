@@ -315,4 +315,35 @@ ImmutableGraph GraphOp::ToSimpleGraph(const GraphInterface* graph) {
   return ImmutableGraph(csr);
 }
 
+Graph GraphOp::BidirectedGraph(const Graph* g) {
+  Graph bg;
+  bg.AddVertices(g->NumVertices());
+  std::unordered_map<int, std::unordered_map<int,int>> n_edges;
+  for (size_t i = 0; i < g->all_edges_src_.size(); ++i) {
+    const auto u = g->all_edges_src_[i];
+    const auto v = g->all_edges_dst_[i];
+    n_edges[u][v]++;
+  }
+  for (dgl_id_t u = 0; u < g->NumVertices(); ++u) {
+    for (dgl_id_t v = u; v < g->NumVertices(); ++v) {
+      const auto new_n_edges = std::max(n_edges[u][v], n_edges[v][u]);
+      if (new_n_edges > 0) {
+        IdArray us = IdArray::Empty({new_n_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+        int64_t* us_data = static_cast<int64_t*>(us->data);
+        std::fill(us_data, us_data + new_n_edges, u);
+        if (u == v) {
+          bg.AddEdges(us, us);
+        } else {
+          IdArray vs = IdArray::Empty({new_n_edges}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+          int64_t* vs_data = static_cast<int64_t*>(vs->data);
+          std::fill(vs_data, vs_data + new_n_edges, v);
+          bg.AddEdges(us, vs);
+          bg.AddEdges(vs, us);
+        }
+      }
+    }
+  }
+  return bg;
+}
+
 }  // namespace dgl

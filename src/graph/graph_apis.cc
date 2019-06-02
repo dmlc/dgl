@@ -531,4 +531,16 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLToSimpleGraph")
     *rv = ret;
   });
 
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+    const Graph* gptr = dynamic_cast<const Graph*>(ptr);
+    CHECK(gptr) << "_CAPI_DGLGraphLineGraph isn't implemented in immutable graph";
+    Graph* bgptr = new Graph();
+    *bgptr = GraphOp::BidirectedGraph(gptr);
+    GraphHandle bghandle = bgptr;
+    *rv = bghandle;
+  });
+
 }  // namespace dgl
