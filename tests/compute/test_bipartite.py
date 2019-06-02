@@ -466,7 +466,7 @@ def test_update_routines():
     v = F.tensor([0, 1, 2, 3])
     reduce_msg_shapes.clear()
     g.push(v)
-    assert(reduce_msg_shapes == {(1, 3, D), (8, 1, D)})
+    assert(reduce_msg_shapes == {(2, 2, D), (5, 1, D)})
     reduce_msg_shapes.clear()
 
     # update_all
