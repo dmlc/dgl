@@ -564,7 +564,10 @@ def schedule_bipartite_push(graph,
     inplace: bool
         If True, the update will be done in place
     """
-    u, v, eid = graph._graph.out_edges(u)
+    u, v, eid = graph.out_edges(u)
+    u = utils.toindex(u)
+    v = utils.toindex(v)
+    eid = utils.toindex(eid)
     if len(eid) == 0:
         # All the pushing nodes have no out edges. No computation is scheduled.
         return
