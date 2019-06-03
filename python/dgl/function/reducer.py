@@ -6,7 +6,7 @@ from .base import BuiltinFunction, TargetCode
 from ..runtime import ir
 from ..runtime.ir import var
 
-__all__ = ["sum", "max"]
+__all__ = ["sum", "max", "min", "prod"]
 
 
 class ReduceFunction(BuiltinFunction):
@@ -96,3 +96,53 @@ def max(msg, out):
     >>>     return {'h': torch.max(nodes.mailbox['m'], dim=1)[0]}
     """
     return SimpleReduceFunction("max", msg, out)
+
+
+def min(msg, out):
+    """Builtin reduce function that aggregates messages by min.
+
+    Parameters
+    ----------
+    msg : str
+        The message field.
+    out : str
+        The output node feature field.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> reduce_func = dgl.function.min(msg='m', out='h')
+
+    The above example is equivalent to the following user defined function
+    (if using PyTorch):
+
+    >>> import torch
+    >>> def reduce_func(nodes):
+    >>>     return {'h': torch.min(nodes.mailbox['m'], dim=1)[0]}
+    """
+    return SimpleReduceFunction("min", msg, out)
+
+
+def prod(msg, out):
+    """Builtin reduce function that aggregates messages by production.
+
+    Parameters
+    ----------
+    msg : str
+        The message field.
+    out : str
+        The output node feature field.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> reduce_func = dgl.function.prod(msg='m', out='h')
+
+    The above example is equivalent to the following user defined function
+    (if using PyTorch):
+
+    >>> import torch
+    >>> def reduce_func(nodes):
+    >>>     return {'h': torch.prod(nodes.mailbox['m'], dim=1)[0]}
+    """
+    return SimpleReduceFunction("prod", msg, out)
