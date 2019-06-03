@@ -35,6 +35,7 @@ GData<Idx, DType> AllocGData(
   // GData
   GData<Idx, DType> gdata;
   gdata.x_length = x_len;
+  gdata.out_size = out_data->shape[0];
   gdata.lhs_data = static_cast<DType*>(lhs_data->data);
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
@@ -137,6 +138,7 @@ BackwardGData<Idx, DType> AllocBackwardGData(
   // GData
   BackwardGData<Idx, DType> gdata;
   gdata.x_length = x_len;
+  gdata.out_size = out_data->shape[0];
   gdata.lhs_data = static_cast<DType*>(lhs_data->data);
   gdata.rhs_data = static_cast<DType*>(rhs_data->data);
   gdata.out_data = static_cast<DType*>(out_data->data);
