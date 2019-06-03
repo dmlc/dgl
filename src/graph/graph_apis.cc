@@ -536,7 +536,7 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedGraph")
     GraphHandle ghandle = args[0];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
     const Graph* gptr = dynamic_cast<const Graph*>(ptr);
-    CHECK(gptr) << "_CAPI_DGLGraphLineGraph isn't implemented in immutable graph";
+    CHECK(gptr) << "_CAPI_DGLToBidirectedGraph isn't implemented in immutable graph";
     Graph* bgptr = new Graph();
     *bgptr = GraphOp::BidirectedGraph(gptr);
     GraphHandle bghandle = bgptr;
