@@ -127,11 +127,12 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreateMutable")
     *rv = ghandle;
   });
 
+
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     const IdArray src_ids = args[0];
     const IdArray dst_ids = args[1];
-    const bool multigraph = args[2];
+    const int multigraph = args[2];
     const int64_t num_nodes = args[3];
     const bool readonly = args[4];
     GraphHandle ghandle;
@@ -140,9 +141,15 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
       //   However, with MXNet backend, the memory would be corrupted if we directly
       //   save the passed-in ndarrays into DGL's graph object. We hope MXNet team
       //   could help look into this.
-      COOPtr coo(new COO(num_nodes, Clone(src_ids), Clone(dst_ids), multigraph));
-      ghandle = new ImmutableGraph(coo);
+      if (multigraph == kBoolUnknown) {
+        COOPtr coo(new COO(num_nodes, Clone(src_ids), Clone(dst_ids)));
+        ghandle = new ImmutableGraph(coo);
+      } else {
+        COOPtr coo(new COO(num_nodes, Clone(src_ids), Clone(dst_ids), multigraph));
+        ghandle = new ImmutableGraph(coo);
+      }
     } else {
+      CHECK_NE(multigraph, kBoolUnknown);
       ghandle = new Graph(src_ids, dst_ids, num_nodes, multigraph);
     }
     *rv = ghandle;
@@ -153,7 +160,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
     const IdArray indptr = args[0];
     const IdArray indices = args[1];
     const std::string shared_mem_name = args[2];
-    const bool multigraph = static_cast<bool>(args[3]);
+    const int multigraph = args[3];
     const std::string edge_dir = args[4];
     CSRPtr csr;
 
@@ -162,14 +169,23 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
     int64_t *edge_data = static_cast<int64_t *>(edge_ids->data);
     for (size_t i = 0; i < edge_ids->shape[0]; i++)
       edge_data[i] = i;
-    if (shared_mem_name.empty())
+    if (shared_mem_name.empty()) {
       // TODO(minjie): The array copy here is unnecessary and adds extra overhead.
       //   However, with MXNet backend, the memory would be corrupted if we directly
       //   save the passed-in ndarrays into DGL's graph object. We hope MXNet team
       //   could help look into this.
-      csr.reset(new CSR(Clone(indptr), Clone(indices), Clone(edge_ids), multigraph));
-    else
-      csr.reset(new CSR(indptr, indices, edge_ids, multigraph, shared_mem_name));
+      if (multigraph == kBoolUnknown) {
+        csr.reset(new CSR(Clone(indptr), Clone(indices), Clone(edge_ids)));
+      } else {
+        csr.reset(new CSR(Clone(indptr), Clone(indices), Clone(edge_ids), multigraph));
+      }
+    } else {
+      if (multigraph == kBoolUnknown) {
+        csr.reset(new CSR(indptr, indices, edge_ids, shared_mem_name));
+      } else {
+        csr.reset(new CSR(indptr, indices, edge_ids, multigraph, shared_mem_name));
+      }
+    }
 
     GraphHandle ghandle;
     if (edge_dir == "in")
@@ -553,6 +569,14 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphAsNumBits")
     CHECK(ig) << "Invalid argument: must be an immutable graph object.";
     GraphHandle newhandle = new ImmutableGraph(ig->AsNumBits(bits));
     *rv = newhandle;
+  });
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLToSimpleGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+    GraphHandle ret = GraphOp::ToSimpleGraph(ptr).Reset();
+    *rv = ret;
   });
 
 }  // namespace dgl

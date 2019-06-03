@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import scipy
 from xmlrpc.server import SimpleXMLRPCServer
@@ -12,7 +13,7 @@ from ..base import ALL, is_all, DGLError, dgl_warning
 from .. import backend as F
 from ..graph import DGLGraph
 from .. import utils
-from ..graph_index import GraphIndex, create_graph_index
+from ..graph_index import GraphIndex, create_graph_index, from_csr, from_shared_mem_csr_matrix
 from .._ffi.ndarray import empty_shared_mem
 from .._ffi.function import _init_api
 from .. import ndarray as nd
@@ -308,10 +309,9 @@ class SharedMemoryStoreServer(object):
         if isinstance(graph_data, GraphIndex):
             graph_idx = graph_data
         else:
-            graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
             indptr, indices = _to_csr(graph_data, edge_dir, multigraph)
-            graph_idx.from_csr_matrix(utils.toindex(indptr), utils.toindex(indices),
-                                      edge_dir, _get_graph_path(graph_name))
+            graph_idx = from_csr(utils.toindex(indptr), utils.toindex(indices),
+                                 multigraph, edge_dir, _get_graph_path(graph_name))
 
         self._graph = DGLGraph(graph_idx, multigraph=multigraph, readonly=True)
         self._num_workers = num_workers
@@ -394,7 +394,7 @@ class SharedMemoryStoreServer(object):
         def all_enter(worker_id, barrier_id):
             return self._barrier.all_enter(worker_id, barrier_id)
 
-        self.server = SimpleXMLRPCServer(("localhost", port))
+        self.server = SimpleXMLRPCServer(("127.0.0.1", port), logRequests=False)
         self.server.register_function(register, "register")
         self.server.register_function(get_graph_info, "get_graph_info")
         self.server.register_function(init_ndata, "init_ndata")
@@ -540,8 +540,8 @@ class SharedMemoryDGLGraph(BaseGraphStore):
         num_nodes, num_edges, multigraph, edge_dir = self.proxy.get_graph_info(graph_name)
         num_nodes, num_edges = int(num_nodes), int(num_edges)
 
-        graph_idx = GraphIndex(multigraph=multigraph, readonly=True)
-        graph_idx.from_shared_mem_csr_matrix(_get_graph_path(graph_name), num_nodes, num_edges, edge_dir)
+        graph_idx = from_shared_mem_csr_matrix(_get_graph_path(graph_name),
+                num_nodes, num_edges, edge_dir, multigraph)
         super(SharedMemoryDGLGraph, self).__init__(graph_idx, multigraph=multigraph)
         self._init_manager = InitializerManager()
 
@@ -616,14 +616,29 @@ class SharedMemoryDGLGraph(BaseGraphStore):
         """
         return self._worker_id
 
-    def _sync_barrier(self):
+    def _sync_barrier(self, timeout=None):
+        """This is a sync barrier among all workers.
+
+        Parameters
+        ----------
+        timeout: int
+            time out in seconds.
+        """
         # Here I manually implement multi-processing barrier with RPC.
         # It uses busy wait with RPC. Whenever, all_enter is called, there is
         # a context switch, so it doesn't burn CPUs so badly.
+
+        # if timeout isn't specified, we wait forever.
+        if timeout is None:
+            timeout = sys.maxsize
+
         bid = self.proxy.enter_barrier(self._worker_id)
-        while not self.proxy.all_enter(self._worker_id, bid):
+        start = time.time()
+        while not self.proxy.all_enter(self._worker_id, bid) and time.time() - start < timeout:
             continue
         self.proxy.leave_barrier(self._worker_id, bid)
+        if time.time() - start >= timeout and not self.proxy.all_enter(self._worker_id, bid):
+            raise TimeoutError("leave the sync barrier because of timeout.")
 
     def init_ndata(self, ndata_name, shape, dtype, ctx=F.cpu()):
         """Create node embedding.

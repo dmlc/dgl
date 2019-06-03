@@ -15,6 +15,12 @@ from . import ndarray as nd
 
 GraphIndexHandle = ctypes.c_void_p
 
+class BoolFlag(object):
+    """Bool flag with unknown value"""
+    BOOL_UNKNOWN = -1
+    BOOL_FALSE = 0
+    BOOL_TRUE = 1
+
 class GraphIndex(object):
     """Graph index object.
 
@@ -23,10 +29,10 @@ class GraphIndex(object):
     handle : GraphIndexHandle
         Handler
     """
-    def __init__(self, handle=None, multigraph=None, readonly=None):
+    def __init__(self, handle):
         self._handle = handle
-        self._multigraph = multigraph
-        self._readonly = readonly
+        self._multigraph = None  # python-side cache of the flag
+        self._readonly = None  # python-side cache of the flag
         self._cache = {}
 
     def __del__(self):
@@ -37,6 +43,7 @@ class GraphIndex(object):
     def __getstate__(self):
         src, dst, _ = self.edges()
         n_nodes = self.number_of_nodes()
+        # TODO(minjie): should try to avoid calling is_multigraph
         multigraph = self.is_multigraph()
         readonly = self.is_readonly()
 
@@ -46,28 +53,24 @@ class GraphIndex(object):
         """The pickle state of GraphIndex is defined as a triplet
         (number_of_nodes, multigraph, readonly, src_nodes, dst_nodes)
         """
-        n_nodes, multigraph, readonly, src, dst = state
+        num_nodes, multigraph, readonly, src, dst = state
 
         self._cache = {}
         self._multigraph = multigraph
         self._readonly = readonly
-        if readonly:
-            self._init(src, dst, n_nodes)
-        else:
-            self._handle = _CAPI_DGLGraphCreateMutable(multigraph)
-            self.clear()
-            self.add_nodes(n_nodes)
-            self.add_edges(src, dst)
-
-    def _init(self, src_ids, dst_ids, num_nodes):
-        """The actual init function"""
-        assert len(src_ids) == len(dst_ids)
+        if multigraph is None:
+            multigraph = BoolFlag.BOOL_UNKNOWN
         self._handle = _CAPI_DGLGraphCreate(
-            src_ids.todgltensor(),
-            dst_ids.todgltensor(),
-            self._multigraph,
+            src.todgltensor(),
+            dst.todgltensor(),
+            int(multigraph),
             int(num_nodes),
-            self._readonly)
+            readonly)
+
+    @property
+    def handle(self):
+        """Get the CAPI handle."""
+        return self._handle
 
     def add_nodes(self, num):
         """Add nodes.
@@ -771,141 +774,6 @@ class GraphIndex(object):
             ret.add_edge(u, v, id=e)
         return ret
 
-    def from_networkx(self, nx_graph):
-        """Convert from networkx graph.
-
-        If 'id' edge attribute exists, the edge will be added follows
-        the edge id order. Otherwise, order is undefined.
-
-        Parameters
-        ----------
-        nx_graph : networkx.DiGraph
-            The nx graph
-        """
-        if not isinstance(nx_graph, nx.Graph):
-            nx_graph = (nx.MultiDiGraph(nx_graph) if self.is_multigraph()
-                        else nx.DiGraph(nx_graph))
-        else:
-            if not nx_graph.is_directed():
-                # to_directed creates a deep copy of the networkx graph even if
-                # the original graph is already directed and we do not want to do it.
-                nx_graph = nx_graph.to_directed()
-
-        num_nodes = nx_graph.number_of_nodes()
-        if not self.is_readonly():
-            self.clear()
-            self.add_nodes(num_nodes)
-
-        if nx_graph.number_of_edges() == 0:
-            if self.is_readonly():
-                raise Exception("can't create an empty immutable graph")
-            return
-
-        # nx_graph.edges(data=True) returns src, dst, attr_dict
-        has_edge_id = 'id' in next(iter(nx_graph.edges(data=True)))[-1]
-        if has_edge_id:
-            num_edges = nx_graph.number_of_edges()
-            src = np.zeros((num_edges,), dtype=np.int64)
-            dst = np.zeros((num_edges,), dtype=np.int64)
-            for u, v, attr in nx_graph.edges(data=True):
-                eid = attr['id']
-                src[eid] = u
-                dst[eid] = v
-        else:
-            src = []
-            dst = []
-            for e in nx_graph.edges:
-                src.append(e[0])
-                dst.append(e[1])
-        num_nodes = nx_graph.number_of_nodes()
-        # We store edge Ids as an edge attribute.
-        src = utils.toindex(src)
-        dst = utils.toindex(dst)
-        self._init(src, dst, num_nodes)
-
-
-    def from_scipy_sparse_matrix(self, adj):
-        """Convert from scipy sparse matrix.
-
-        Parameters
-        ----------
-        adj : scipy sparse matrix
-        """
-        if not self.is_readonly():
-            self.clear()
-        num_nodes = max(adj.shape[0], adj.shape[1])
-        adj_coo = adj.tocoo()
-        src = utils.toindex(adj_coo.row)
-        dst = utils.toindex(adj_coo.col)
-        self._init(src, dst, num_nodes)
-
-    def from_csr_matrix(self, indptr, indices, edge_dir, shared_mem_name=""):
-        """Load a graph from the CSR matrix.
-
-        Parameters
-        ----------
-        indptr : utils.Index
-            index pointer in the CSR format
-        indices : utils.Index
-            column index array in the CSR format
-        edge_dir : string
-            the edge direction. The supported option is "in" and "out".
-        shared_mem_name : string
-            the name of shared memory
-        """
-        assert self.is_readonly()
-        self._handle = _CAPI_DGLGraphCSRCreate(
-            indptr.todgltensor(),
-            indices.todgltensor(),
-            shared_mem_name,
-            self._multigraph,
-            edge_dir)
-
-
-    def from_shared_mem_csr_matrix(self, shared_mem_name,
-                                   num_nodes, num_edges, edge_dir):
-        """Load a graph from the shared memory in the CSR format.
-
-        Parameters
-        ----------
-        shared_mem_name : string
-            the name of shared memory
-        num_nodes : int
-            the number of nodes
-        num_edges : int
-            the number of edges
-        edge_dir : string
-            the edge direction. The supported option is "in" and "out".
-        """
-        assert self.is_readonly()
-        self._handle = _CAPI_DGLGraphCSRCreateMMap(
-            shared_mem_name,
-            int(num_nodes), int(num_edges),
-            self._multigraph,
-            edge_dir)
-
-
-    def from_edge_list(self, elist):
-        """Convert from an edge list.
-
-        Parameters
-        ---------
-        elist : list
-            List of (u, v) edge tuple.
-        """
-        if not self.is_readonly():
-            self.clear()
-        src, dst = zip(*elist)
-        src = np.array(src)
-        dst = np.array(dst)
-        src_ids = utils.toindex(src)
-        dst_ids = utils.toindex(dst)
-        num_nodes = max(src.max(), dst.max()) + 1
-        min_nodes = min(src.min(), dst.min())
-        if min_nodes != 0:
-            raise DGLError('Invalid edge list. Nodes must start from 0.')
-        self._init(src_ids, dst_ids, num_nodes)
-
     def line_graph(self, backtracking=True):
         """Return the line graph of this graph.
 
@@ -1020,7 +888,7 @@ class SubgraphIndex(GraphIndex):
         The parent edge ids in this subgraph.
     """
     def __init__(self, handle, parent, induced_nodes, induced_edges):
-        super(SubgraphIndex, self).__init__(handle, parent.is_multigraph(), parent.is_readonly())
+        super(SubgraphIndex, self).__init__(handle)
         self._parent = parent
         self._induced_nodes = induced_nodes
         self._induced_edges = induced_edges
@@ -1066,6 +934,196 @@ class SubgraphIndex(GraphIndex):
     def __setstate__(self, state):
         raise NotImplementedError(
             "SubgraphIndex unpickling is not supported yet.")
+
+
+###############################################################
+# Conversion functions
+###############################################################
+def from_coo(num_nodes, src, dst, is_multigraph, readonly):
+    """Convert from coo arrays.
+
+    Parameters
+    ----------
+    num_nodes : int
+        Number of nodes.
+    src : Tensor
+        Src end nodes of the edges.
+    dst : Tensor
+        Dst end nodes of the edges.
+    is_multigraph : bool or None
+        True if the graph is a multigraph. None means determined by data.
+    readonly : bool
+        True if the returned graph is readonly.
+
+    Returns
+    -------
+    GraphIndex
+        The graph index.
+    """
+    src = utils.toindex(src)
+    dst = utils.toindex(dst)
+    if is_multigraph is None:
+        is_multigraph = BoolFlag.BOOL_UNKNOWN
+    if readonly:
+        handle = _CAPI_DGLGraphCreate(
+            src.todgltensor(),
+            dst.todgltensor(),
+            int(is_multigraph),
+            int(num_nodes),
+            readonly)
+        gidx = GraphIndex(handle)
+    else:
+        if is_multigraph is BoolFlag.BOOL_UNKNOWN:
+            # TODO(minjie): better behavior in the future
+            is_multigraph = BoolFlag.BOOL_FALSE
+        handle = _CAPI_DGLGraphCreateMutable(bool(is_multigraph))
+        gidx = GraphIndex(handle)
+        gidx.add_nodes(num_nodes)
+        gidx.add_edges(src, dst)
+    return gidx
+
+def from_csr(indptr, indices, is_multigraph,
+             direction, shared_mem_name=""):
+    """Load a graph from CSR arrays.
+
+    Parameters
+    ----------
+    indptr : Tensor
+        index pointer in the CSR format
+    indices : Tensor
+        column index array in the CSR format
+    is_multigraph : bool or None
+        True if the graph is a multigraph. None means determined by data.
+    direction : str
+        the edge direction. Either "in" or "out".
+    shared_mem_name : str
+        the name of shared memory
+    """
+    indptr = utils.toindex(indptr)
+    indices = utils.toindex(indices)
+    if is_multigraph is None:
+        is_multigraph = BoolFlag.BOOL_UNKNOWN
+    handle = _CAPI_DGLGraphCSRCreate(
+        indptr.todgltensor(),
+        indices.todgltensor(),
+        shared_mem_name,
+        int(is_multigraph),
+        direction)
+    return GraphIndex(handle)
+
+def from_shared_mem_csr_matrix(shared_mem_name,
+                               num_nodes, num_edges, edge_dir,
+                               is_multigraph):
+    """Load a graph from the shared memory in the CSR format.
+
+    Parameters
+    ----------
+    shared_mem_name : string
+        the name of shared memory
+    num_nodes : int
+        the number of nodes
+    num_edges : int
+        the number of edges
+    edge_dir : string
+        the edge direction. The supported option is "in" and "out".
+    """
+    handle = _CAPI_DGLGraphCSRCreateMMap(
+        shared_mem_name,
+        int(num_nodes), int(num_edges),
+        is_multigraph,
+        edge_dir)
+    return GraphIndex(handle)
+
+def from_networkx(nx_graph, readonly):
+    """Convert from networkx graph.
+
+    If 'id' edge attribute exists, the edge will be added follows
+    the edge id order. Otherwise, order is undefined.
+
+    Parameters
+    ----------
+    nx_graph : networkx.DiGraph
+        The nx graph or any graph that can be converted to nx.DiGraph
+    readonly : bool
+        True if the returned graph is readonly.
+
+    Returns
+    -------
+    GraphIndex
+        The graph index.
+    """
+    if not isinstance(nx_graph, nx.Graph):
+        nx_graph = nx.DiGraph(nx_graph)
+    else:
+        if not nx_graph.is_directed():
+            # to_directed creates a deep copy of the networkx graph even if
+            # the original graph is already directed and we do not want to do it.
+            nx_graph = nx_graph.to_directed()
+
+    is_multigraph = isinstance(nx_graph, nx.MultiDiGraph)
+    num_nodes = nx_graph.number_of_nodes()
+
+    # nx_graph.edges(data=True) returns src, dst, attr_dict
+    has_edge_id = 'id' in next(iter(nx_graph.edges(data=True)))[-1]
+    if has_edge_id:
+        num_edges = nx_graph.number_of_edges()
+        src = np.zeros((num_edges,), dtype=np.int64)
+        dst = np.zeros((num_edges,), dtype=np.int64)
+        for u, v, attr in nx_graph.edges(data=True):
+            eid = attr['id']
+            src[eid] = u
+            dst[eid] = v
+    else:
+        src = []
+        dst = []
+        for e in nx_graph.edges:
+            src.append(e[0])
+            dst.append(e[1])
+    num_nodes = nx_graph.number_of_nodes()
+    # We store edge Ids as an edge attribute.
+    src = utils.toindex(src)
+    dst = utils.toindex(dst)
+    return from_coo(num_nodes, src, dst, is_multigraph, readonly)
+
+def from_scipy_sparse_matrix(adj, readonly):
+    """Convert from scipy sparse matrix.
+
+    Parameters
+    ----------
+    adj : scipy sparse matrix
+    readonly : bool
+        True if the returned graph is readonly.
+
+    Returns
+    -------
+    GraphIndex
+        The graph index.
+    """
+    if adj.getformat() != 'csr' or not readonly:
+        num_nodes = max(adj.shape[0], adj.shape[1])
+        adj_coo = adj.tocoo()
+        return from_coo(num_nodes, adj_coo.row, adj_coo.col, False, readonly)
+    else:
+        return from_csr(adj.indptr, adj.indices, False, "out")
+
+def from_edge_list(elist, is_multigraph, readonly):
+    """Convert from an edge list.
+
+    Parameters
+    ---------
+    elist : list
+        List of (u, v) edge tuple.
+    """
+    src, dst = zip(*elist)
+    src = np.array(src)
+    dst = np.array(dst)
+    src_ids = utils.toindex(src)
+    dst_ids = utils.toindex(dst)
+    num_nodes = max(src.max(), dst.max()) + 1
+    min_nodes = min(src.min(), dst.min())
+    if min_nodes != 0:
+        raise DGLError('Invalid edge list. Nodes must start from 0.')
+    return from_coo(num_nodes, src_ids, dst_ids, is_multigraph, readonly)
 
 def map_to_subgraph_nid(subgraph, parent_nids):
     """Map parent node Ids to the subgraph node Ids.
@@ -1162,56 +1220,43 @@ def disjoint_partition(graph, num_or_size_splits):
         graphs.append(GraphIndex(handle))
     return graphs
 
-def create_graph_index(graph_data=None, multigraph=False, readonly=False):
+def create_graph_index(graph_data, multigraph, readonly):
     """Create a graph index object.
 
     Parameters
     ----------
-    graph_data : graph data, optional
+    graph_data : graph data
         Data to initialize graph. Same as networkx's semantics.
-    multigraph : bool, optional
-        Whether the graph is multigraph (default is False)
+    multigraph : bool
+        Whether the graph would be a multigraph. If none, the flag will be determined
+        by the data.
+    readonly : bool
+        Whether the graph structure is read-only.
     """
     if isinstance(graph_data, GraphIndex):
         # FIXME(minjie): this return is not correct for mutable graph index
         return graph_data
 
-    if readonly:
-        # FIXME(zhengda): we should construct a C graph index before constructing GraphIndex.
-        gidx = GraphIndex(None, multigraph, readonly)
-    else:
+    if graph_data is None:
+        if readonly:
+            raise Exception("can't create an empty immutable graph")
+        if multigraph is None:
+            multigraph = False
         handle = _CAPI_DGLGraphCreateMutable(multigraph)
-        gidx = GraphIndex(handle, multigraph, readonly)
-
-    if graph_data is None and readonly:
-        raise Exception("can't create an empty immutable graph")
-    elif graph_data is None:
+        return GraphIndex(handle)
+    elif isinstance(graph_data, (list, tuple)):
+        # edge list
+        return from_edge_list(graph_data, multigraph, readonly)
+    elif isinstance(graph_data, scipy.sparse.spmatrix):
+        # scipy format
+        return from_scipy_sparse_matrix(graph_data, readonly)
+    else:
+        # networkx - any format
+        try:
+            gidx = from_networkx(graph_data, readonly)
+        except Exception:  # pylint: disable=broad-except
+            raise DGLError('Error while creating graph from input of type "%s".'
+                           % type(graph_data))
         return gidx
-
-    # edge list
-    if isinstance(graph_data, (list, tuple)):
-        try:
-            gidx.from_edge_list(graph_data)
-            return gidx
-        except Exception:  # pylint: disable=broad-except
-            raise DGLError('Graph data is not a valid edge list.')
-
-    # scipy format
-    if isinstance(graph_data, scipy.sparse.spmatrix):
-        try:
-            gidx.from_scipy_sparse_matrix(graph_data)
-            return gidx
-        except Exception:  # pylint: disable=broad-except
-            raise DGLError('Graph data is not a valid scipy sparse matrix.')
-
-    # networkx - any format
-    try:
-        gidx.from_networkx(graph_data)
-    except Exception:  # pylint: disable=broad-except
-        raise DGLError('Error while creating graph from input of type "%s".'
-                       % type(graph_data))
-
-    return gidx
-
 
 _init_api("dgl.graph_index")
