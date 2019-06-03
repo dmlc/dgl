@@ -28,8 +28,10 @@ struct BcastInfo;
 
 template <typename Idx, typename DType>
 struct GData {
-  // length along x dimension
+  // length along x(feature) dimension
   int64_t x_length{0};
+  // number of rows of the output tensor
+  int64_t out_size{0};
   // input data
   DType *lhs_data{nullptr}, *rhs_data{nullptr};
   // output data
@@ -59,8 +61,10 @@ void BinaryReduceImpl(
 
 template <typename Idx, typename DType>
 struct BackwardGData {
-  // length along x dimension
+  // length along x(feature) dimension
   int64_t x_length{0};
+  // number of rows of the output tensor
+  int64_t out_size{0};
   // input data
   DType *lhs_data{nullptr}, *rhs_data{nullptr}, *out_data{nullptr};
   DType *grad_out_data{nullptr};

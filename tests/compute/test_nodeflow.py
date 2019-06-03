@@ -8,6 +8,7 @@ import dgl.function as fn
 from functools import partial
 import itertools
 
+np.random.seed(40)
 
 def generate_rand_graph(n, connect_more=False, complete=False):
     if complete:
@@ -153,7 +154,7 @@ def check_flow_compute(create_node_flow):
     for i in range(num_layers):
         nf.block_compute(i, fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                          lambda nodes: {'h' : nodes.data['t'] + 1})
-        exit()
+
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                      lambda nodes: {'h' : nodes.data['t'] + 1})
         assert F.allclose(nf.layers[i + 1].data['h'],

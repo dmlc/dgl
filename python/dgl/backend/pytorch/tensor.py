@@ -250,6 +250,7 @@ class CopyReduce(th.autograd.Function):
         out_data = in_data.new_empty((out_size,) + in_data.shape[1:])
         in_data_nd = zerocopy_to_dgl_ndarray(in_data)
         out_data_nd = zerocopy_to_dgl_ndarray(out_data)
+        u, v, eid = graph.copy_to(nd.cpu(0)).asbits(64).edges()
         K.copy_reduce(
             reducer, graph, target, in_data_nd, out_data_nd, in_map[0],
             out_map[0])
