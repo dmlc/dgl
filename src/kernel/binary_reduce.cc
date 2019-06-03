@@ -131,18 +131,6 @@ std::string IdArrayToStr(IdArray arr) {
   return oss.str();
 }
 
-std::string NDArrayToStr(NDArray arr, size_t num) {
-  arr = arr.CopyTo(DLContext{kDLCPU, 0});
-  std::ostringstream oss;
-  oss << "[";
-  float* arr_data = (float*)(arr->data);
-  for (size_t i = 0; i < num; ++i) {
-    oss << arr_data[i] << " ";
-  }
-  oss << "]";
-  return oss.str();
-}
-
 inline void CheckCtx(
     const DLContext& ctx,
     const std::vector<NDArray>& arrays,
