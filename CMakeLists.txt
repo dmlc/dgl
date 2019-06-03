@@ -23,6 +23,7 @@ endif()
 # and add set(OPTION VALUE) to override these build options.
 # Alernatively, use cmake -DOPTION=VALUE through command-line.
 dgl_option(USE_CUDA "Build with CUDA" OFF)
+dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 
 if(USE_CUDA)
   message(STATUS "Build with CUDA support")
@@ -110,7 +111,7 @@ install(TARGETS dgl DESTINATION lib${LIB_SUFFIX})
 
 # Testing
 if(BUILD_CPP_TEST)
-  message("Build with unittest")
+  message(STATUS "Build with unittest")
   add_subdirectory(./third_party/googletest)
   enable_testing()
   include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})

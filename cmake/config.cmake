@@ -32,12 +32,7 @@
 set(USE_CUDA OFF)
 
 #---------------------------------------------
-# Contrib libraries
+# Misc.
 #---------------------------------------------
-# Whether use BLAS, choices: openblas, mkl, atlas, apple
-set(USE_BLAS none)
-
-# /path/to/mkl: mkl root path when use mkl blas library
-# set(USE_MKL_PATH /opt/intel/mkl) for UNIX
-# set(USE_MKL_PATH ../IntelSWTools/compilers_and_libraries_2018/windows/mkl) for WIN32
-set(USE_MKL_PATH none)
+# Whether to build cpp unittest executables
+set(BUILD_CPP_TEST OFF)
