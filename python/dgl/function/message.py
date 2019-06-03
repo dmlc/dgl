@@ -9,7 +9,7 @@ from ..runtime import ir
 from ..runtime.ir import var
 
 
-__all__ = ["src_mul_edge", "copy_src", "copy_edge"]
+__all__ = ["src_mul_edge", "copy_src", "copy_edge", "copy_u", "copy_e"]
 
 
 class MessageFunction(BuiltinFunction):
@@ -145,6 +145,15 @@ def copy_e(e, out):
     return CopyMessageFunction(TargetCode.EDGE, e, out)
 
 
+###############################################################################
+# Generate all following  builtin message functions:
+# u_add_v, u_sub_v, u_mul_v, u_div_v
+# u_add_e, u_sub_e, u_mul_e, u_div_e
+# v_add_u, v_sub_u, v_mul_u, v_div_u
+# v_add_e, v_sub_e, v_mul_e, v_div_e
+# e_add_u, e_sub_u, e_mul_u, e_div_u
+# e_add_v, e_sub_v, e_mul_v, e_div_v
+
 _target_map = {
     "u": TargetCode.SRC,
     "v": TargetCode.DST,
@@ -194,7 +203,8 @@ for lhs, rhs in product(target, target):
             __all__.append(name)
 
 
-# For backward compatibility, shall we throw a warning?
+##############################################################################
+# For backward compatibility
 
 def src_mul_edge(src, edge, out):
     return getattr(sys.modules[__name__], "u_mul_e")(src, edge, out)
