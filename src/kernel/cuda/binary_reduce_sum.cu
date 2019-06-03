@@ -84,8 +84,9 @@ template <typename DType>
 void CusparseCsrmm2(
     const RuntimeConfig& rtcfg,
     const Csr& csr,
-    const DType* B_data, DType* C_data, int x_length) {
-  const int m = csr.row_offsets.length - 1;
+    const DType* B_data, DType* C_data,
+    int out_size, int x_length) {
+  const int m = out_size;
   const int k = csr.row_offsets.length - 1;
   const int n = x_length;
   const int nnz = csr.column_indices.length;
@@ -100,7 +101,7 @@ void CusparseCsrmm2(
   }
   CUSPARSE_CALL(cusparseSetStream(thr_entry->cusparse_handle, rtcfg.stream));
   // allocate matrix for temporary transposed output
-  DType* trans_out = static_cast<DType*>(device->AllocWorkspace(rtcfg.ctx, k * n * sizeof(DType)));
+  DType* trans_out = static_cast<DType*>(device->AllocWorkspace(rtcfg.ctx, m * n * sizeof(DType)));
   // all one data array
   DType* valptr = static_cast<DType*>(device->AllocWorkspace(rtcfg.ctx, nnz * sizeof(DType)));
   utils::Fill<kDLGPU>(rtcfg.ctx, valptr, nnz, static_cast<DType>(1.));
@@ -227,7 +228,8 @@ void CallBinaryReduce<kDLGPU, int32_t, float, SelectSrc, SelectDst,
     // cusparse use rev csr for csrmm
     auto incsr = graph->GetInCSR();
     Csr csr = utils::CreateCsr<int32_t>(incsr->indptr(), incsr->indices());
-    cuda::CusparseCsrmm2(rtcfg, csr, gdata->lhs_data, gdata->out_data, gdata->x_length);
+    cuda::CusparseCsrmm2(rtcfg, csr, gdata->lhs_data, gdata->out_data,
+        gdata->out_size, gdata->x_length);
   }
 }
 
@@ -243,7 +245,8 @@ void CallBinaryReduce<kDLGPU, int32_t, double, SelectSrc, SelectDst,
     // cusparse use rev csr for csrmm
     auto incsr = graph->GetInCSR();
     Csr csr = utils::CreateCsr<int32_t>(incsr->indptr(), incsr->indices());
-    cuda::CusparseCsrmm2(rtcfg, csr, gdata->lhs_data, gdata->out_data, gdata->x_length);
+    cuda::CusparseCsrmm2(rtcfg, csr, gdata->lhs_data, gdata->out_data,
+        gdata->out_size, gdata->x_length);
   }
 }
 
@@ -261,7 +264,8 @@ void CallBackwardBinaryReduce<kDLGPU, binary_op::kGradLhs, int32_t, float,
   } else {
     auto outcsr = graph->GetOutCSR();
     Csr csr = utils::CreateCsr<int32_t>(outcsr->indptr(), outcsr->indices());
-    cuda::CusparseCsrmm2(rtcfg, csr, gdata->grad_out_data, gdata->grad_lhs_data, gdata->x_length);
+    cuda::CusparseCsrmm2(rtcfg, csr, gdata->grad_out_data, gdata->grad_lhs_data,
+        gdata->out_size, gdata->x_length);
   }
 }
 
@@ -277,7 +281,8 @@ void CallBackwardBinaryReduce<kDLGPU, binary_op::kGradLhs, int32_t, double,
   } else {
     auto outcsr = graph->GetOutCSR();
     Csr csr = utils::CreateCsr<int32_t>(outcsr->indptr(), outcsr->indices());
-    cuda::CusparseCsrmm2(rtcfg, csr, gdata->grad_out_data, gdata->grad_lhs_data, gdata->x_length);
+    cuda::CusparseCsrmm2(rtcfg, csr, gdata->grad_out_data, gdata->grad_lhs_data,
+        gdata->out_size, gdata->x_length);
   }
 }
 

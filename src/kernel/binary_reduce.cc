@@ -112,9 +112,10 @@ BcastInfo CalcBcastInfo(NDArray lhs, NDArray rhs) {
 }
 
 std::string IdArrayToStr(IdArray arr) {
+  arr = arr.CopyTo(DLContext{kDLCPU, 0});
   int64_t len = arr->shape[0];
   std::ostringstream oss;
-  oss << "[";
+  oss << "(" << len << ")[";
   if (arr->dtype.bits == 32) {
     int32_t* data = static_cast<int32_t*>(arr->data);
     for (int64_t i = 0; i < len; ++i) {
@@ -125,6 +126,18 @@ std::string IdArrayToStr(IdArray arr) {
     for (int64_t i = 0; i < len; ++i) {
       oss << data[i] << " ";
     }
+  }
+  oss << "]";
+  return oss.str();
+}
+
+std::string NDArrayToStr(NDArray arr, size_t num) {
+  arr = arr.CopyTo(DLContext{kDLCPU, 0});
+  std::ostringstream oss;
+  oss << "[";
+  float* arr_data = (float*)(arr->data);
+  for (size_t i = 0; i < num; ++i) {
+    oss << arr_data[i] << " ";
   }
   oss << "]";
   return oss.str();
@@ -383,6 +396,7 @@ void CopyReduce(
     NDArray in_data, NDArray out_data,
     NDArray in_mapping, NDArray out_mapping) {
   const auto& ctx = graph->Context();
+  const auto incsr = graph->GetInCSR();
   // sanity check
   CheckCtx(ctx,
       {in_data, out_data, in_mapping, out_mapping},
