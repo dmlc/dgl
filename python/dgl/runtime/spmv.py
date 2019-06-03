@@ -5,7 +5,7 @@ from ..base import DGLError
 from .. import backend as F
 from .. import utils
 from .. import ndarray as nd
-from ..graph_index import create_graph_index
+from ..graph_index import from_coo
 
 from . import ir
 from .ir import var
@@ -167,9 +167,7 @@ def build_gidx_and_mapping_uv(edge_tuples, num_nodes):
         Number of ints needed to represent the graph
     """
     u, v, eid = edge_tuples
-    gidx = create_graph_index()
-    gidx.add_nodes(num_nodes)
-    gidx.add_edges(u, v)
+    gidx = from_coo(num_nodes, u, v, None, True)
     forward, backward = gidx.get_csr_shuffle_order()
     eid = eid.tousertensor()
     nbits = gidx.bits_needed()

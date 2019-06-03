@@ -800,7 +800,7 @@ class GraphIndex(object):
             An immutable graph index.
         """
         handle = _CAPI_DGLToImmutable(self._handle)
-        return GraphIndex(handle, readonly=True)
+        return GraphIndex(handle)
 
     def ctx(self):
         """Return the context of this graph index.
@@ -828,7 +828,7 @@ class GraphIndex(object):
             The graph index on the given device context.
         """
         handle = _CAPI_DGLImmutableGraphCopyTo(self._handle, ctx.device_type, ctx.device_id)
-        return GraphIndex(handle, readonly=True)
+        return GraphIndex(handle)
 
     def nbits(self):
         """Return the number of integer bits used in the storage (32 or 64).
@@ -871,7 +871,7 @@ class GraphIndex(object):
             The graph index stored using the given number of bits.
         """
         handle = _CAPI_DGLImmutableGraphAsNumBits(self._handle, int(bits))
-        return GraphIndex(handle, readonly=True)
+        return GraphIndex(handle)
 
 class SubgraphIndex(GraphIndex):
     """Graph index for subgraph.
