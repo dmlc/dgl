@@ -503,7 +503,7 @@ Subgraph Graph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
     rst.graph = std::make_shared<Graph>(IsMultigraph());
     rst.induced_edges = eids;
     rst.graph->AddVertices(NumVertices());
-    
+
     for (int64_t i = 0; i < len; ++i) {
       dgl_id_t src_id = all_edges_src_[eid_data[i]];
       dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
@@ -511,7 +511,7 @@ Subgraph Graph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
     }
 
     for (int64_t i = 0; i < NumVertices(); ++i)
-      nodes.push_back(i);    
+      nodes.push_back(i);
 
     rst.induced_vertices = IdArray::Empty(
         {static_cast<int64_t>(nodes.size())}, eids->dtype, eids->ctx);
