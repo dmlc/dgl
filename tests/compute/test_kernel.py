@@ -2,6 +2,7 @@ import dgl
 import dgl.function as fn
 import networkx as nx
 import backend as F
+from itertools import product
 
 def udf_src_x_edge(broadcast):
     def fn(edges):
@@ -63,12 +64,12 @@ def generate_graph(broadcast='none'):
     return g
 
 def test_src_op_edge_reduce():
-    def _test(red, broadcast='none'):
+    def _test(red, broadcast="none"):
         g = generate_graph(broadcast)
 
         with F.record_grad():
             g.update_all(fn.src_mul_edge(src='n', edge='e', out='m'),
-                        builtin[red](msg='m', out='r1'))
+                         builtin[red](msg='m', out='r1'))
             r1 = g.ndata['r1']
             F.backward(r1.sum())
             n_grad1 = F.grad(g.ndata['n'])
@@ -96,35 +97,6 @@ def test_src_op_edge_reduce():
     _test('max', 'src')
     _test('max', 'edge')
 
-
-def _test_src_op_dst_reduce():
-    def _test(red, test_backward=False, broadcast='none'):
-        g = generate_graph(broadcast)
-        # test forward
-        g.update_all(fn.src_mul_dst(src='n', dst='f', out='m'),
-                     builtin[red](msg='m', out='r1'))
-        r1 = g.ndata['r1']
-        n1 = g.ndata['n'].detach().requires_grad_()
-        f1 = g.ndata['f'].detach().requires_grad_()
-        u, v = g.all_edges('uv')
-        u, v = F.tensor(u), F.tensor(v)
-        msg = n1[u] * f1[v]
-        r2 = udf_reduce[red](msg, v, dim=0, fill_value=fill_value[red])
-        assert F.allclose(r1, r2)
-
-        # test backward
-        if test_backward:
-            r1.sum().backward()
-            r2.sum().backward()
-            assert(F.allclose(n1.grad, g.ndata['n'].grad))
-            assert(F.allclose(f1.grad, g.ndata['f'].grad))
-
-    _test('sum', True)
-    _test('sum', True, 'src')
-    _test('sum', True, 'dst')
-    _test('max', True)
-    _test('max', True, 'src')
-    _test('max', True, 'dst')
 
 def test_copy_src_reduce():
     def _test(red):
@@ -180,40 +152,80 @@ def test_copy_edge_reduce():
     _test('max')
 
 
-def _edge_softmax_ground_truth(a, dst, nv):
-    shape = a.shape
-    a = a.view(shape[0], -1)
-    max_norm = scatter_max(a, dst, dim=0, fill_value=float("-inf"))
-    a = a - max_norm.index_select(0, dst)
-    a = a.exp()
-    norm = scatter_add(a, dst, dim=0)
-    a = a.view(shape)
-    norm = norm.view((nv, ) + shape[1:])
-    return a, norm
+def test_all_binary_builtins():
+    def _test(lhs, rhs, binary_op, reducer):
+        g = dgl.DGLGraph()
+        g.add_nodes(10)
+        for i in range(1, 9):
+            g.add_edge(0, i)
+            g.add_edge(i, 9)
+        g.add_edge(9, 0)
+        nv = g.number_of_nodes()
+        ne = g.number_of_edges()
+        hv = F.randn((nv, D1))
+        he = F.randn((ne, D1))
+        g.ndata['h'] = F.attach_grad(hv)
+        g.edata['h'] = F.attach_grad(he)
 
+        builtin_msg_name = "{}_{}_{}".format(lhs, binary_op, rhs)
+        builtin_msg = getattr(fn, builtin_msg_name)
+        builtin_red = getattr(fn, reducer)
 
-def _test_edge_softmax():
-    g = generate_graph('src')  # generate high dim edge feature
-    softmax = EdgeSoftmax()
-    e = g.edata['e']
-    e1 = e.detach().requires_grad_()
-    a, norm = softmax(e, g)
-    _, dst = g.edges()
-    nv = g.number_of_nodes()
-    a1, norm1 = _edge_softmax_ground_truth(e1, dst.cuda(), nv)
-    assert(F.allclose(a, a1))
-    assert(F.allclose(norm, norm1))
-    loss = a.sum() + norm.sum()
-    loss1 = a1.sum() + norm1.sum()
-    loss.backward()
-    loss1.backward()
-    assert(F.allclose(e.grad, e1.grad))
+        with F.record_grad():
+            g.update_all(builtin_msg('h', 'h', 'm'), builtin_red('m', 'r1'))
+            r1 = g.ndata['r1']
+            F.backward(r1.sum())
+            n_grad1 = F.grad(g.ndata['h'])
+            e_grad1 = F.grad(g.edata['h'])
+
+        # reset grad
+        F.attach_grad(g.ndata['h'])
+        F.attach_grad(g.edata['h'])
+
+        def target_switch(edges, target):
+            if target == "u":
+                return edges.src
+            elif target == "v":
+                return edges.dst
+            elif target == "e":
+                return edges.data
+            else:
+                assert(0), "Unknown target {}".format(target)
+
+        def mfunc(edges):
+            op = getattr(F, binary_op)
+            lhs_data = target_switch(edges, lhs)
+            rhs_data = target_switch(edges, rhs)
+            return {"m": op(lhs_data['h'], rhs_data['h'])}
+
+        def rfunc(nodes):
+            op = getattr(F, reducer)
+            return {"r2":op(nodes.mailbox['m'], 1)}
+
+        with F.record_grad():
+            g.update_all(mfunc, rfunc)
+            r2 = g.ndata['r2']
+            F.backward(r2.sum())
+            n_grad2 = F.grad(g.ndata['h'])
+            e_grad2 = F.grad(g.edata['h'])
+
+        assert F.allclose(r1, r2)
+        if n_grad2 is not None:
+            assert(F.allclose(n_grad1, n_grad2))
+        if e_grad2 is not None:
+            assert(F.allclose(e_grad1, e_grad2))
+
+    target = ["u", "v", "e"]
+    for lhs, rhs in product(target, target):
+        if lhs == rhs:
+            continue
+        for reducer in ["sum", "max", "min", "prod"]:
+            for binary_op in ["add", "sub", "mul", "div"]:
+                _test(lhs, rhs, binary_op, reducer)
 
 
 if __name__ == '__main__':
     test_copy_src_reduce()
     test_copy_edge_reduce()
     test_src_op_edge_reduce()
-    # FIXME: expose backward of src_op_dst_reduce and enable this unit test
-    # test_src_op_dst_reduce()
-    # test_edge_softmax()
+    test_all_binary_builtins()
