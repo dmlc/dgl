@@ -75,10 +75,37 @@ def spmm(x, y):
     """Sparse dense matrix multiply"""
     pass
 
+def add(a, b):
+    """Compute a + b"""
+    pass
+
+def sub(a, b):
+    """Compute a - b"""
+    pass
+
+def mul(a, b):
+    """Compute a * b"""
+    pass
+
+def div(a, b):
+    """Compute a / b"""
+    pass
+
+def sum(x, dim):
+    """Computes the sum of array elements over given axes"""
+    pass
+
 def max(x, dim):
     """Computes the max of array elements over given axes"""
     pass
 
+def min(x, dim):
+    """Computes the min of array elements over given axes"""
+    pass
+
+def prod(x, dim):
+    """Computes the prod of array elements over given axes"""
+    pass
 ###############################################################################
 # Tensor functions used *only* on index tensor
 # ----------------

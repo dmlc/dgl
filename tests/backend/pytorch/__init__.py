@@ -52,8 +52,29 @@ def softmax(x, dim):
 def spmm(x, y):
     return th.spmm(x, y)
 
+def add(a, b):
+    return a + b
+
+def sub(a, b):
+    return a - b
+
+def mul(a, b):
+    return a * b
+
+def div(a, b):
+    return a / b
+
+def sum(x, dim):
+    return x.sum(dim)
+
 def max(x, dim):
     return x.max(dim)[0]
+
+def min(x, dim):
+    return x.min(dim)[0]
+
+def prod(x, dim):
+    return x.prod(dim)
 
 class record_grad(object):
     def __init__(self):
