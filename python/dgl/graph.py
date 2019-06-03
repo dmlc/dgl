@@ -3166,3 +3166,26 @@ class DGLGraph(DGLBaseGraph):
         return ret.format(node=self.number_of_nodes(), edge=self.number_of_edges(),
                           ndata=str(self.node_attr_schemes()),
                           edata=str(self.edge_attr_schemes()))
+
+    def to(self, device):
+        """
+        Move both ndata and edata to the targeted mode (cpu/gpu)
+        Framework agnostic, detect backend automatically and call _to_pt,
+        _to_mx, respectively
+
+        Parameters
+        ----------
+        device : device_id
+
+        """
+        self._to_pt(device)
+
+    def _to_pt(self, device):
+        for k in self.ndata.keys():
+            self.ndata[k] = self.ndata[k].to(device)
+        for k in self.edata.keys():
+            self.edata[k] = self.edata[k].to(device)
+
+
+    def _to_mx(self, device):
+        raise NotImplementedError
