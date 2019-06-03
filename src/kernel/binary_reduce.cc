@@ -384,7 +384,6 @@ void CopyReduce(
     NDArray in_data, NDArray out_data,
     NDArray in_mapping, NDArray out_mapping) {
   const auto& ctx = graph->Context();
-  const auto incsr = graph->GetInCSR();
   // sanity check
   CheckCtx(ctx,
       {in_data, out_data, in_mapping, out_mapping},

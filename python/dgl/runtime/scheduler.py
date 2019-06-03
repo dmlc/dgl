@@ -44,41 +44,22 @@ def schedule_send(graph, u, v, eid, message_func):
     message_func: callable or list of callable
         The message function
     """
-    message_func = _standardize_func_usage(message_func, 'message')
-    mfunc_is_list = utils.is_iterable(message_func)
-    # vars
+    var_mf = var.FEAT_DICT(graph._msg_frame)
     var_nf = var.FEAT_DICT(graph._node_frame)
     var_ef = var.FEAT_DICT(graph._edge_frame)
-    var_mf = var.FEAT_DICT(graph._msg_frame)
-    var_u = var.IDX(u)
-    var_v = var.IDX(v)
     var_eid = var.IDX(eid)
 
-    if mfunc_is_list:
-        if eid.is_slice(0, graph.number_of_edges()):
-            # full graph case
-            res = spmv.build_gidx_and_mapping_graph(graph)
-        else:
-            num_nodes = graph.number_of_nodes()
-            res = spmv.build_gidx_and_mapping_uv((u, v, eid), num_nodes)
-        adj, edge_map, _ = res
-        # create a tmp message frame
-        tmp_mfr = FrameRef(frame_like(graph._edge_frame._frame, len(eid)))
-        msg = var.FEAT_DICT(data=tmp_mfr)
-        spmv.gen_v2e_spmv_schedule(graph=adj,
-                                   mfunc=message_func,
-                                   src_frame=var_nf,
-                                   dst_frame=var_nf,
-                                   edge_frame=var_ef,
-                                   out=msg,
-                                   out_size=len(eid),
-                                   edge_map=edge_map)
-    else:
-        # UDF send
-        msg = _gen_send(graph, var_nf, var_nf, var_ef, var_u, var_v, var_eid,
-                        message_func)
+    var_msg = _gen_send(graph=graph,
+                        u=u,
+                        v=v,
+                        eid=eid,
+                        mfunc=message_func,
+                        var_src_nf=var_nf,
+                        var_dst_nf=var_nf,
+                        var_ef=var_ef)
+
     # write tmp msg back
-    ir.WRITE_ROW_(var_mf, var_eid, msg)
+    ir.WRITE_ROW_(var_mf, var_eid, var_msg)
     # set message indicator to 1
     graph._set_msg_index(graph._get_msg_index().set_items(eid, 1))
 
@@ -264,8 +245,8 @@ def schedule_apply_nodes(graph,
     -------
     A list of executors for DGL Runtime
     """
-    var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
     var_v = var.IDX(v)
+    var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
     v_nf = ir.READ_ROW(var_nf, var_v)
     def _afunc_wrapper(node_data):
         nbatch = NodeBatch(graph, v, node_data)
@@ -341,24 +322,17 @@ def schedule_apply_edges(graph,
     A list of executors for DGL Runtime
     """
     # vars
-    var_nf = var.FEAT_DICT(graph._node_frame, name='nf')
+    var_nf = var.FEAT_DICT(graph._node_frame)
+    var_ef = var.FEAT_DICT(graph._edge_frame)
+    var_out = _gen_send(graph=graph, u=u, v=v, eid=eid, mfunc=apply_func,
+                        var_src_nf=var_nf, var_dst_nf=var_nf, var_ef=var_ef)
     var_ef = var.FEAT_DICT(graph._edge_frame, name='ef')
-    var_u = var.IDX(u)
-    var_v = var.IDX(v)
     var_eid = var.IDX(eid)
     # schedule apply edges
-    fdsrc = ir.READ_ROW(var_nf, var_u)
-    fddst = ir.READ_ROW(var_nf, var_v)
-    fdedge = ir.READ_ROW(var_ef, var_eid)
-    def _efunc_wrapper(src_data, edge_data, dst_data):
-        ebatch = EdgeBatch(graph, (u, v, eid), src_data, edge_data, dst_data)
-        return apply_func(ebatch)
-    _efunc = var.FUNC(_efunc_wrapper)
-    new_fdedge = ir.EDGE_UDF(_efunc, fdsrc, fdedge, fddst)
     if inplace:
-        ir.WRITE_ROW_INPLACE_(var_ef, var_eid, new_fdedge)
+        ir.WRITE_ROW_INPLACE_(var_ef, var_eid, var_out)
     else:
-        ir.WRITE_ROW_(var_ef, var_eid, new_fdedge)
+        ir.WRITE_ROW_(var_ef, var_eid, var_out)
 
 def schedule_nodeflow_apply_edges(graph, block_id,
                                   u, v, eid,
@@ -389,25 +363,16 @@ def schedule_nodeflow_apply_edges(graph, block_id,
     """
     # vars
     in_var_nf = var.FEAT_DICT(graph._get_node_frame(block_id), name='in_nf')
-    out_var_nf = var.FEAT_DICT(graph._get_node_frame(block_id + 1), name='out_nf')
+    out_var_nf = var.FEAT_DICT(graph._get_node_frame(block_id + 1),
+                               name='out_nf')
     var_ef = var.FEAT_DICT(graph._get_edge_frame(block_id), name='ef')
-    var_u = var.IDX(u)
-    var_v = var.IDX(v)
+    var_out = _gen_send(graph, u, v, eid, apply_func, in_var_nf, out_var_nf,
+                        var_ef)
     var_eid = var.IDX(eid)
-    # schedule apply edges
-    fdsrc = ir.READ_ROW(in_var_nf, var_u)
-    fddst = ir.READ_ROW(out_var_nf, var_v)
-    fdedge = ir.READ_ROW(var_ef, var_eid)
-    def _efunc_wrapper(src_data, edge_data, dst_data):
-        ebatch = EdgeBatch(graph, (u, v, eid), src_data, edge_data, dst_data)
-        return apply_func(ebatch)
-    _efunc = var.FUNC(_efunc_wrapper)
-    new_fdedge = ir.EDGE_UDF(_efunc, fdsrc, fdedge, fddst)
-    # TODO we need to avoid index_copy here.
     if inplace:
-        ir.WRITE_ROW_INPLACE_(var_ef, var_eid, new_fdedge)
+        ir.WRITE_ROW_INPLACE_(var_ef, var_eid, var_out)
     else:
-        ir.WRITE_ROW_(var_ef, var_eid, new_fdedge)
+        ir.WRITE_ROW_(var_ef, var_eid, var_out)
 
 def schedule_push(graph,
                   u,
@@ -898,8 +863,8 @@ def _gen_send_reduce(
                                    edge_map=edge_map)
     else:
         # generate UDF send schedule
-        var_mf = _gen_send(graph, var_src_nf, var_dst_nf, var_ef, var_u, var_v,
-                           var_eid, mfunc)
+        var_mf = _gen_udf_send(graph, var_src_nf, var_dst_nf, var_ef, var_u,
+                               var_v, var_eid, mfunc)
 
     # 6. Generate reduce
     if rfunc_is_list:
@@ -920,11 +885,11 @@ def _gen_send_reduce(
                                          var_out)
         return var_out
 
-def _gen_send(graph, src_nfr, dst_nfr, efr, u, v, eid, mfunc):
-    """Internal function to generate send schedule."""
-    fdsrc = ir.READ_ROW(src_nfr, u)
-    fddst = ir.READ_ROW(dst_nfr, v)
-    fdedge = ir.READ_ROW(efr, eid)
+def _gen_udf_send(graph, var_src_nf, var_dst_nf, var_ef, u, v, eid, mfunc):
+    """Internal function to generate send schedule for UDF message function."""
+    fdsrc = ir.READ_ROW(var_src_nf, u)
+    fddst = ir.READ_ROW(var_dst_nf, v)
+    fdedge = ir.READ_ROW(var_ef, eid)
     def _mfunc_wrapper(src_data, edge_data, dst_data):
         ebatch = EdgeBatch(graph, (u.data, v.data, eid.data),
                            src_data, edge_data, dst_data)
@@ -932,6 +897,40 @@ def _gen_send(graph, src_nfr, dst_nfr, efr, u, v, eid, mfunc):
     _mfunc_wrapper = var.FUNC(_mfunc_wrapper)
     msg = ir.EDGE_UDF(_mfunc_wrapper, fdsrc, fdedge, fddst)
     return msg
+
+def _gen_send(graph, u, v, eid, mfunc, var_src_nf, var_dst_nf, var_ef):
+    """Internal function to generate send schedule"""
+    mfunc = _standardize_func_usage(mfunc, 'message')
+    mfunc_is_list = utils.is_iterable(mfunc)
+    # vars
+    var_u = var.IDX(u)
+    var_v = var.IDX(v)
+    var_eid = var.IDX(eid)
+
+    if mfunc_is_list:
+        if eid.is_slice(0, graph.number_of_edges()):
+            # full graph case
+            res = spmv.build_gidx_and_mapping_graph(graph)
+        else:
+            num_nodes = graph.number_of_nodes()
+            res = spmv.build_gidx_and_mapping_uv((u, v, eid), num_nodes)
+        adj, edge_map, _ = res
+        # create a tmp message frame
+        tmp_mfr = FrameRef(frame_like(graph._edge_frame._frame, len(eid)))
+        var_out = var.FEAT_DICT(data=tmp_mfr)
+        spmv.gen_v2e_spmv_schedule(graph=adj,
+                                   mfunc=mfunc,
+                                   src_frame=var_src_nf,
+                                   dst_frame=var_dst_nf,
+                                   edge_frame=var_ef,
+                                   out=var_out,
+                                   out_size=len(eid),
+                                   edge_map=edge_map)
+    else:
+        # UDF send
+        var_out = _gen_udf_send(graph, var_src_nf, var_dst_nf, var_ef, var_u,
+                                var_v, var_eid, mfunc)
+    return var_out
 
 def _build_idx_map(idx, nbits):
     """Build a map from the input ids to continuous ids that starts from zero.
