@@ -10,10 +10,34 @@
 
 namespace dgl {
 namespace {
-inline bool IsValidIdArray(const IdArray& arr) {
-  return arr->ctx.device_type == kDLCPU && arr->ndim == 1
-    && arr->dtype.code == kDLInt && arr->dtype.bits == 64;
-}
+// generate consecutive dgl ids
+class RangeIter : public std::iterator<std::input_iterator_tag, dgl_id_t> {
+ public:
+  explicit RangeIter(dgl_id_t from): cur_(from) {}
+
+  RangeIter& operator++() {
+    ++cur_;
+    return *this;
+  }
+
+  RangeIter operator++(int) {
+    RangeIter retval = *this;
+    ++cur_;
+    return retval;
+  }
+  bool operator==(RangeIter other) const {
+    return cur_ == other.cur_;
+  }
+  bool operator!=(RangeIter other) const {
+    return cur_ != other.cur_;
+  }
+  dgl_id_t operator*() const {
+    return cur_;
+  }
+
+ private:
+  dgl_id_t cur_;
+};
 }  // namespace
 
 Graph GraphOp::LineGraph(const Graph* g, bool backtracking) {
@@ -212,8 +236,8 @@ std::vector<ImmutableGraph> GraphOp::DisjointPartitionBySizes(const ImmutableGra
 }
 
 IdArray GraphOp::MapParentIdToSubgraphId(IdArray parent_vids, IdArray query) {
-  CHECK(dgl::IsValidIdArray(parent_vids)) << "Invalid parent id array.";
-  CHECK(dgl::IsValidIdArray(query)) << "Invalid query id array.";
+  CHECK(IsValidIdArray(parent_vids)) << "Invalid parent id array.";
+  CHECK(IsValidIdArray(query)) << "Invalid query id array.";
   const auto parent_len = parent_vids->shape[0];
   const auto query_len = query->shape[0];
   const dgl_id_t* parent_data = static_cast<dgl_id_t*>(parent_vids->data);
@@ -271,6 +295,24 @@ IdArray GraphOp::ExpandIds(IdArray ids, IdArray offset) {
     }
   }
   return rst;
+}
+
+ImmutableGraph GraphOp::ToSimpleGraph(const GraphInterface* graph) {
+  std::vector<dgl_id_t> indptr(graph->NumVertices() + 1), indices;
+  indptr[0] = 0;
+  for (dgl_id_t src = 0; src < graph->NumVertices(); ++src) {
+    std::unordered_set<dgl_id_t> hashmap;
+    for (const dgl_id_t dst : graph->SuccVec(src)) {
+      if (!hashmap.count(dst)) {
+        indices.push_back(dst);
+        hashmap.insert(dst);
+      }
+    }
+    indptr[src+1] = indices.size();
+  }
+  CSRPtr csr(new CSR(graph->NumVertices(), indices.size(),
+        indptr.begin(), indices.begin(), RangeIter(0), false));
+  return ImmutableGraph(csr);
 }
 
 }  // namespace dgl
