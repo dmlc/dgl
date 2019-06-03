@@ -50,7 +50,7 @@ Large-Scale Training of Graph Neural Networks
 #
 # The graph store has two parts: the server and the client. We need to run
 # the graph store server as a daemon before training. We provide a script
-# ``run_store_server.py`` `(link)<https://github.com/dmlc/dgl/blob/master/examples/mxnet/sampling/run_store_server.py>`__
+# ``run_store_server.py`` `(link) <https://github.com/dmlc/dgl/blob/master/examples/mxnet/sampling/run_store_server.py>`__
 # that runs the graph store server and loads graph data. For example, the
 # following command runs a graph store server that loads the reddit
 # dataset and is configured to run with four trainers.
