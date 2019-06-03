@@ -543,6 +543,8 @@ class GraphIndex(object):
         ----------
         e : utils.Index
             The edges.
+        preserve_nodes: bool
+            Indicates whether to preserve all nodes or not. (when set to false, all nodes without edge connected to it would be removed.)
 
         Returns
         -------
