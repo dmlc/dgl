@@ -8,6 +8,7 @@ import dgl
 def test_node_removal():
     g = dgl.DGLGraph()
     g.add_nodes(10)
+    g.add_edge(0, 0)
     assert g.number_of_nodes() == 10
     g.ndata['id'] = F.arange(0, 10)
 
