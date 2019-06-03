@@ -137,15 +137,11 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
     const bool readonly = args[4];
     GraphHandle ghandle;
     if (readonly) {
-      // TODO(minjie): The array copy here is unnecessary and adds extra overhead.
-      //   However, with MXNet backend, the memory would be corrupted if we directly
-      //   save the passed-in ndarrays into DGL's graph object. We hope MXNet team
-      //   could help look into this.
       if (multigraph == kBoolUnknown) {
-        COOPtr coo(new COO(num_nodes, Clone(src_ids), Clone(dst_ids)));
+        COOPtr coo(new COO(num_nodes, src_ids, dst_ids));
         ghandle = new ImmutableGraph(coo);
       } else {
-        COOPtr coo(new COO(num_nodes, Clone(src_ids), Clone(dst_ids), multigraph));
+        COOPtr coo(new COO(num_nodes, src_ids, dst_ids, multigraph));
         ghandle = new ImmutableGraph(coo);
       }
     } else {
@@ -170,14 +166,10 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
     for (size_t i = 0; i < edge_ids->shape[0]; i++)
       edge_data[i] = i;
     if (shared_mem_name.empty()) {
-      // TODO(minjie): The array copy here is unnecessary and adds extra overhead.
-      //   However, with MXNet backend, the memory would be corrupted if we directly
-      //   save the passed-in ndarrays into DGL's graph object. We hope MXNet team
-      //   could help look into this.
       if (multigraph == kBoolUnknown) {
-        csr.reset(new CSR(Clone(indptr), Clone(indices), Clone(edge_ids)));
+        csr.reset(new CSR(indptr, indices, edge_ids));
       } else {
-        csr.reset(new CSR(Clone(indptr), Clone(indices), Clone(edge_ids), multigraph));
+        csr.reset(new CSR(indptr, indices, edge_ids, multigraph));
       }
     } else {
       if (multigraph == kBoolUnknown) {
