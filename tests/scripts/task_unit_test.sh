@@ -15,7 +15,10 @@ if [ $# -ne 1 ]; then
 fi
 
 BACKEND=$1
-export PYTHONPATH=tests:$PYTHONPATH
+export DGLBACKEND=$1
+export DGL_LIBRARY_PATH=${PWD}/build
+export PYTHONPATH=tests:${PWD}/python:$PYTHONPATH
+export DGL_DOWNLOAD_DIR=${PWD}
 
 python3 -m nose -v --with-xunit tests/$BACKEND || fail "backend-specific"
 python3 -m nose -v --with-xunit tests/graph_index || fail "graph_index"

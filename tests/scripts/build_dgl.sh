@@ -9,7 +9,7 @@ mkdir build
 rm -rf _download
 
 pushd build
-cmake ..
+cmake .. -DBUILD_CPP_TEST=1
 make -j4
 popd
 

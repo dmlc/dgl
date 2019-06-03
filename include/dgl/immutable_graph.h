@@ -34,9 +34,17 @@ class CSR : public GraphInterface {
   //   that has the given number of verts and edges.
   CSR(const std::string &shared_mem_name,
       int64_t num_vertices, int64_t num_edges, bool is_multigraph);
+
   // Create a csr graph that shares the given indptr and indices.
   CSR(IdArray indptr, IdArray indices, IdArray edge_ids);
   CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph);
+
+  // Create a csr graph by data iterator
+  template <typename IndptrIter, typename IndicesIter, typename EdgeIdIter>
+  CSR(int64_t num_vertices, int64_t num_edges,
+      IndptrIter indptr_begin, IndicesIter indices_begin, EdgeIdIter edge_ids_begin,
+      bool is_multigraph);
+
   // Create a csr graph whose memory is stored in the shared memory
   //   and the structure is given by the indptr and indcies.
   CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
@@ -891,6 +899,26 @@ class ImmutableGraph: public GraphInterface {
   // Store the edge list indexed by edge id (COO)
   COOPtr coo_;
 };
+
+// inline implementations
+
+template <typename IndptrIter, typename IndicesIter, typename EdgeIdIter>
+CSR::CSR(int64_t num_vertices, int64_t num_edges,
+    IndptrIter indptr_begin, IndicesIter indices_begin, EdgeIdIter edge_ids_begin,
+    bool is_multigraph): is_multigraph_(is_multigraph) {
+  indptr_ = NewIdArray(num_vertices + 1);
+  indices_ = NewIdArray(num_edges);
+  edge_ids_ = NewIdArray(num_edges);
+  dgl_id_t* indptr_data = static_cast<dgl_id_t*>(indptr_->data);
+  dgl_id_t* indices_data = static_cast<dgl_id_t*>(indices_->data);
+  dgl_id_t* edge_ids_data = static_cast<dgl_id_t*>(edge_ids_->data);
+  for (int64_t i = 0; i < num_vertices + 1; ++i)
+    *(indptr_data++) = *(indptr_begin++);
+  for (int64_t i = 0; i < num_edges; ++i) {
+    *(indices_data++) = *(indices_begin++);
+    *(edge_ids_data++) = *(edge_ids_begin++);
+  }
+}
 
 }  // namespace dgl
 
