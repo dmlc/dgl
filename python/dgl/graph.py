@@ -1124,7 +1124,7 @@ class DGLGraph(DGLBaseGraph):
         else:
             self._edge_frame = FrameRef(self._edge_frame, sgi.induced_edges)
 
-        self._graph = create_graph_index(sgi.to_networkx(), sgi._multigraph, sgi._readonly)
+        self._graph = graph_index.create_graph_index(sgi.to_networkx(), sgi._multigraph, sgi._readonly)
 
     def del_edges(self, eids):
         """Remove multiple edges.
@@ -1150,7 +1150,7 @@ class DGLGraph(DGLBaseGraph):
         else:
             self._edge_frame = FrameRef(self._edge_frame, sgi.induced_edges)
 
-        self._graph = create_graph_index(sgi.to_networkx(), sgi._multigraph, sgi._readonly)
+        self._graph = graph_index.create_graph_index(sgi.to_networkx(), sgi._multigraph, sgi._readonly)
 
     def clear(self):
         """Remove all nodes and edges, as well as their features, from the
