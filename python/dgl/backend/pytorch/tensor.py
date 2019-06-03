@@ -81,7 +81,8 @@ def copy_to(input, ctx):
     if ctx.type == 'cpu':
         return input.cpu()
     elif ctx.type == 'cuda':
-        th.cuda.set_device(ctx.index)
+        if ctx.index is not None:
+            th.cuda.set_device(ctx.index)
         return input.cuda()
     else:
         raise RuntimeError('Invalid context', ctx)
