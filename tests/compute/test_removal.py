@@ -9,7 +9,7 @@ def test_node_removal():
     g = dgl.DGLGraph()
     g.add_nodes(10)
     assert g.number_of_nodes() == 10
-    g.ndata['id'] = F.arange(10)
+    g.ndata['id'] = F.arange(0, 10)
 
     # delete nodes
     g.del_nodes(range(4, 7))
@@ -32,7 +32,7 @@ def test_edge_removal():
     for i in range(5):
         for j in range(5):
             g.add_edge(i, j)
-    g.edata['id'] = F.arange(25)
+    g.edata['id'] = F.arange(0, 25)
 
     # delete edges
     g.del_edges(range(13, 20))
@@ -58,7 +58,7 @@ def test_node_and_edge_removal():
     for i in range(10):
         for j in range(10):
             g.add_edge(i, j)
-    g.edata['id'] = F.arange(100)
+    g.edata['id'] = F.arange(0, 100)
     assert g.number_of_nodes() == 10
     assert g.number_of_edges() == 100
 
