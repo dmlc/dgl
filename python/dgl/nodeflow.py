@@ -246,7 +246,8 @@ class NodeFlow(DGLBaseGraph):
         Tensor
             The parent node id array.
         """
-        return self._node_mapping.tousertensor()[nid]
+        nid = utils.toindex(nid)
+        return self._node_mapping.tousertensor()[nid.tousertensor()]
 
     def map_to_parent_eid(self, eid):
         """This maps the child edge Ids to the parent Ids.
@@ -261,7 +262,8 @@ class NodeFlow(DGLBaseGraph):
         Tensor
             The parent edge id array.
         """
-        return self._edge_mapping.tousertensor()[eid]
+        eid = utils.toindex(eid)
+        return self._edge_mapping.tousertensor()[eid.tousertensor()]
 
     def map_from_parent_nid(self, layer_id, parent_nids):
         """Map parent node Ids to NodeFlow node Ids in a certain layer.
