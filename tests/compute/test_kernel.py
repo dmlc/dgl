@@ -162,10 +162,10 @@ def test_all_binary_builtins():
         g.add_edge(9, 0)
         nv = g.number_of_nodes()
         ne = g.number_of_edges()
-        hv = F.randn((nv, D1))
-        he = F.randn((ne, D1))
-        g.ndata['h'] = F.attach_grad(hv)
-        g.edata['h'] = F.attach_grad(he)
+        hv = F.randn((nv, D1, D2))
+        he = F.randn((ne, D1, D2))
+        g.ndata['h'] = F.attach_grad(F.clone(hv))
+        g.edata['h'] = F.attach_grad(F.clone(he))
 
         builtin_msg_name = "{}_{}_{}".format(lhs, binary_op, rhs)
         builtin_msg = getattr(fn, builtin_msg_name)
@@ -179,8 +179,8 @@ def test_all_binary_builtins():
             e_grad1 = F.grad(g.edata['h'])
 
         # reset grad
-        F.attach_grad(g.ndata['h'])
-        F.attach_grad(g.edata['h'])
+        g.ndata['h'] = F.attach_grad(F.clone(hv))
+        g.edata['h'] = F.attach_grad(F.clone(he))
 
         def target_switch(edges, target):
             if target == "u":
@@ -219,8 +219,8 @@ def test_all_binary_builtins():
     for lhs, rhs in product(target, target):
         if lhs == rhs:
             continue
-        for reducer in ["sum", "max", "min", "prod"]:
-            for binary_op in ["add", "sub", "mul", "div"]:
+        for binary_op in ["add", "sub", "mul", "div"]:
+            for reducer in ["sum", "max", "min", "prod"]:
                 _test(lhs, rhs, binary_op, reducer)
 
 
