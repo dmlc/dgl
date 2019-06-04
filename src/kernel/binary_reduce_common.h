@@ -193,7 +193,7 @@ struct BinaryDiv {
     return static_cast<DType>(1) / rhs;
   }
   static DGLDEVICE DGLINLINE DType BackwardRhs(DType lhs, DType rhs, DType out) {
-    return -lhs;
+    return -lhs / (rhs * rhs);
   }
 };
 
