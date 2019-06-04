@@ -209,6 +209,9 @@ def test_all_binary_builtins():
             n_grad2 = F.grad(g.ndata['h'])
             e_grad2 = F.grad(g.edata['h'])
 
+        if not F.allclose(r1, r2):
+            print(r1)
+            print(r2)
         assert F.allclose(r1, r2)
         if n_grad2 is not None:
             assert(F.allclose(n_grad1, n_grad2))
@@ -221,6 +224,7 @@ def test_all_binary_builtins():
             continue
         for binary_op in ["add", "sub", "mul", "div"]:
             for reducer in ["sum", "max", "min", "prod"]:
+                print("Test {}_{}_{}_{}".format(lhs, binary_op, rhs, reducer))
                 _test(lhs, rhs, binary_op, reducer)
 
 

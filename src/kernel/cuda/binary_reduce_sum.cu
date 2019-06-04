@@ -158,7 +158,7 @@ void FallbackCallBinaryReduce(
   constexpr int XPU = kDLGPU;
   typedef int32_t Idx;
   typedef SelectSrc LeftSelector;
-  typedef SelectDst RightSelector;
+  typedef SelectNone RightSelector;
   typedef BinaryUseLhs<DType> BinaryOp;
   typedef ReduceSum<kDLGPU, DType> Reducer;
   typedef cuda::FunctorsTempl<Idx, DType, LeftSelector,
@@ -195,7 +195,7 @@ void FallbackCallBackwardBinaryReduce(
   constexpr int Mode = binary_op::kGradLhs;
   typedef int32_t Idx;
   typedef SelectSrc LeftSelector;
-  typedef SelectDst RightSelector;
+  typedef SelectNone RightSelector;
   typedef BinaryUseLhs<DType> BinaryOp;
   typedef ReduceSum<kDLGPU, DType> Reducer;
   // For backward computation, we use reverse csr and switch dst and src.
@@ -232,7 +232,7 @@ void FallbackCallBackwardBinaryReduce(
 }  // namespace cuda
 
 template <>
-void CallBinaryReduce<kDLGPU, int32_t, float, SelectSrc, SelectDst,
+void CallBinaryReduce<kDLGPU, int32_t, float, SelectSrc, SelectNone,
                       BinaryUseLhs<float>, ReduceSum<kDLGPU, float>>(
     const RuntimeConfig& rtcfg,
     const ImmutableGraph* graph,
@@ -249,7 +249,7 @@ void CallBinaryReduce<kDLGPU, int32_t, float, SelectSrc, SelectDst,
 }
 
 template <>
-void CallBinaryReduce<kDLGPU, int32_t, double, SelectSrc, SelectDst,
+void CallBinaryReduce<kDLGPU, int32_t, double, SelectSrc, SelectNone,
                       BinaryUseLhs<double>, ReduceSum<kDLGPU, double>>(
     const RuntimeConfig& rtcfg,
     const ImmutableGraph* graph,
@@ -269,7 +269,7 @@ void CallBinaryReduce<kDLGPU, int32_t, double, SelectSrc, SelectDst,
 
 template <>
 void CallBackwardBinaryReduce<kDLGPU, binary_op::kGradLhs, int32_t, float,
-                              SelectSrc, SelectDst,
+                              SelectSrc, SelectNone,
                               BinaryUseLhs<float>, ReduceSum<kDLGPU, float>>(
     const RuntimeConfig& rtcfg,
     const ImmutableGraph* graph,
@@ -286,7 +286,7 @@ void CallBackwardBinaryReduce<kDLGPU, binary_op::kGradLhs, int32_t, float,
 
 template <>
 void CallBackwardBinaryReduce<kDLGPU, binary_op::kGradLhs, int32_t, double,
-                              SelectSrc, SelectDst,
+                              SelectSrc, SelectNone,
                               BinaryUseLhs<double>, ReduceSum<kDLGPU, double>>(
     const RuntimeConfig& rtcfg,
     const ImmutableGraph* graph,
@@ -307,8 +307,8 @@ void CallBackwardBinaryReduce<kDLGPU, binary_op::kGradLhs, int32_t, double,
 #define XPU kDLGPU
 #define IDX int32_t
 
-EVAL(GEN_DTYPE, GEN_TARGET, GEN_BINARY_OP, GEN_DEFINE);
-EVAL(GEN_BACKWARD_MODE, GEN_DTYPE, GEN_TARGET, GEN_BINARY_OP, GEN_BACKWARD_DEFINE);
+EVAL(GEN_DTYPE, GEN_OP_TARGET, GEN_DEFINE);
+EVAL(GEN_BACKWARD_MODE, GEN_DTYPE, GEN_OP_TARGET, GEN_BACKWARD_DEFINE);
 
 }  // namespace kernel
 }  // namespace dgl

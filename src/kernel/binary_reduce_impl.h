@@ -88,41 +88,19 @@ void BinaryReduceImpl(
   }
   const DLDataType& dtype = out_data->dtype;
   const auto bits = graph->NumBits();
-#ifdef __CUDACC__
-  CHECK(bits == 32) << "CUDA kernel only supports 32 bits graph.";
-#endif
-#ifdef __CUDACC__
-  DGL_DTYPE_SWITCH(dtype, DType, {
-    typedef int32_t Idx;
-    REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
-      auto gdata = AllocGData<XPU, Idx, DType, Reducer>(
-          rtcfg.ctx, x_len, lhs_mapping, rhs_mapping,
-          lhs_data, rhs_data, out_mapping, out_data);
-      BINARY_OP_SWITCH(op, DType, BinaryOp, {
-        TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-          CallBinaryReduce<XPU, Idx, DType, LeftTarget,
-            RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
-        });
-      });
-    });
-  });
-#else
   DGL_DTYPE_SWITCH(dtype, DType, {
     DGL_IDX_TYPE_SWITCH(bits, Idx, {
       REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
         auto gdata = AllocGData<XPU, Idx, DType, Reducer>(
             rtcfg.ctx, x_len, lhs_mapping, rhs_mapping,
             lhs_data, rhs_data, out_mapping, out_data);
-        BINARY_OP_SWITCH(op, DType, BinaryOp, {
-          TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-            CallBinaryReduce<XPU, Idx, DType, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
-          });
+      OP_TARGET_SWITCH(op, lhs, rhs, DType, BinaryOp, LeftTarget, RightTarget, {
+          CallBinaryReduce<XPU, Idx, DType, LeftTarget,
+            RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
         });
       });
     });
   });
-#endif
 }
 
 /****************************************************
@@ -202,32 +180,10 @@ void BackwardBinaryReduceImpl(
   const bool req_lhs = !utils::IsNoneArray(grad_lhs_data);
   const bool req_rhs = !utils::IsNoneArray(grad_rhs_data);
   const auto bits = graph->NumBits();
-#ifdef __CUDACC__
-  CHECK(bits == 32) << "CUDA kernel only supports 32 bits graph.";
-#endif
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
   }
-#ifdef __CUDACC__
-  DGL_DTYPE_SWITCH(dtype, DType, {
-    typedef int32_t Idx;
-    auto gdata = AllocBackwardGData<XPU, Idx, DType>(
-        rtcfg.ctx, x_len, lhs_mapping, rhs_mapping, out_mapping,
-        lhs_data, rhs_data, out_data, grad_out_data,
-        grad_lhs_data, grad_rhs_data);
-    BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, {
-      REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
-        BINARY_OP_SWITCH(op, DType, BinaryOp, {
-          TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-            CallBackwardBinaryReduce<XPU, Mode, Idx, DType, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
-          });
-        });
-      });
-    });
-  });
-#else
   DGL_DTYPE_SWITCH(dtype, DType, {
     DGL_IDX_TYPE_SWITCH(bits, Idx, {
       auto gdata = AllocBackwardGData<XPU, Idx, DType>(
@@ -236,17 +192,14 @@ void BackwardBinaryReduceImpl(
           grad_lhs_data, grad_rhs_data);
       BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, {
         REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
-          BINARY_OP_SWITCH(op, DType, BinaryOp, {
-            TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-              CallBackwardBinaryReduce<XPU, Mode, Idx, DType, LeftTarget,
-                RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
-            });
+          OP_TARGET_SWITCH(op, lhs, rhs, DType, BinaryOp, LeftTarget, RightTarget, {
+            CallBackwardBinaryReduce<XPU, Mode, Idx, DType, LeftTarget,
+              RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
           });
         });
       });
     });
   });
-#endif
 }
 
 /****************************************************
@@ -324,31 +277,10 @@ void BinaryReduceBcastImpl(
   const DLDataType& dtype = out_data->dtype;
   const int bcast_ndim = info.out_shape.size();
   const auto bits = graph->NumBits();
-#ifdef __CUDACC__
-  CHECK(bits == 32) << "CUDA kernel only supports 32 bits graph.";
-#endif
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
   }
-#ifdef __CUDACC__
-  DGL_DTYPE_SWITCH(dtype, DType, {
-    typedef int32_t Idx;
-    REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
-      BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
-        auto gdata = AllocBcastGData<XPU, NDim, Idx, DType, Reducer>(
-            rtcfg.ctx, info, lhs_mapping, rhs_mapping,
-            lhs_data, rhs_data, out_mapping, out_data);
-        BINARY_OP_SWITCH(op, DType, BinaryOp, {
-          TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-            CallBinaryReduceBcast<XPU, NDim, Idx, DType, LeftTarget,
-              RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
-          });
-        });
-      });
-    });
-  });
-#else
   DGL_DTYPE_SWITCH(dtype, DType, {
     DGL_IDX_TYPE_SWITCH(bits, Idx, {
       REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
@@ -356,17 +288,14 @@ void BinaryReduceBcastImpl(
           auto gdata = AllocBcastGData<XPU, NDim, Idx, DType, Reducer>(
               rtcfg.ctx, info, lhs_mapping, rhs_mapping,
               lhs_data, rhs_data, out_mapping, out_data);
-          BINARY_OP_SWITCH(op, DType, BinaryOp, {
-            TARGET_SWITCH(lhs, rhs, LeftTarget, RightTarget, {
-              CallBinaryReduceBcast<XPU, NDim, Idx, DType, LeftTarget,
-                RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
-            });
+          OP_TARGET_SWITCH(op, lhs, rhs, DType, BinaryOp, LeftTarget, RightTarget, {
+            CallBinaryReduceBcast<XPU, NDim, Idx, DType, LeftTarget,
+              RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
           });
         });
       });
     });
   });
-#endif
 }
 
 /****************************************************
@@ -454,35 +383,10 @@ void BackwardBinaryReduceBcastImpl(
   const bool req_lhs = !utils::IsNoneArray(grad_lhs);
   const bool req_rhs = !utils::IsNoneArray(grad_rhs);
   const auto bits = graph->NumBits();
-#ifdef __CUDACC__
-  CHECK(bits == 32) << "CUDA kernel only supports 32 bits graph.";
-#endif
   if (reducer == binary_op::kReduceMean) {
     // TODO(minjie): divide
     LOG(FATAL) << "reduce mean is not supported.";
   }
-#ifdef __CUDACC__
-  DGL_DTYPE_SWITCH(dtype, DType, {
-    typedef int32_t Idx;
-    BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
-      auto gdata = AllocBackwardBcastGData<XPU, NDim, Idx, DType>(
-          rtcfg.ctx, info,
-          lhs_mapping, rhs_mapping, out_mapping,
-          lhs, rhs, out, grad_out,
-          grad_lhs, grad_rhs);
-      BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, {
-        REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
-          BINARY_OP_SWITCH(op, DType, BinaryOp, {
-            TARGET_SWITCH(lhs_tgt, rhs_tgt, LeftTarget, RightTarget, {
-              CallBackwardBinaryReduceBcast<XPU, Mode, NDim, Idx, DType,
-                LeftTarget, RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
-            });
-          });
-        });
-      });
-    });
-  });
-#else
   DGL_DTYPE_SWITCH(dtype, DType, {
     DGL_IDX_TYPE_SWITCH(bits, Idx, {
       BCAST_NDIM_SWITCH(bcast_ndim, NDim, {
@@ -493,18 +397,15 @@ void BackwardBinaryReduceBcastImpl(
             grad_lhs, grad_rhs);
         BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, {
           REDUCER_SWITCH(reducer, XPU, DType, Reducer, {
-            BINARY_OP_SWITCH(op, DType, BinaryOp, {
-              TARGET_SWITCH(lhs_tgt, rhs_tgt, LeftTarget, RightTarget, {
-                CallBackwardBinaryReduceBcast<XPU, Mode, NDim, Idx, DType,
-                  LeftTarget, RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
-              });
+            OP_TARGET_SWITCH(op, lhs_tgt, rhs_tgt, DType, BinaryOp, LeftTarget, RightTarget, {
+              CallBackwardBinaryReduceBcast<XPU, Mode, NDim, Idx, DType,
+                LeftTarget, RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
             });
           });
         });
       });
     });
   });
-#endif
 }
 
 }  // namespace kernel

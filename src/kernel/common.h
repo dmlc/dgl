@@ -81,6 +81,15 @@ namespace kernel {
   }
 #endif
 
+#ifdef __CUDACC__
+#define DGL_IDX_TYPE_SWITCH(bits, Idx, ...)            \
+  if (bits == 32) {                                    \
+    typedef int32_t Idx;                               \
+    {__VA_ARGS__}                                      \
+  } else {                                             \
+    LOG(FATAL) << "Unsupported idx bits: " << bits;    \
+  }
+#else
 #define DGL_IDX_TYPE_SWITCH(bits, Idx, ...)            \
   if (bits == 32) {                                    \
     typedef int32_t Idx;                               \
@@ -91,6 +100,7 @@ namespace kernel {
   } else {                                             \
     LOG(FATAL) << "Unsupported idx bits: " << bits;    \
   }
+#endif
 
 }  // namespace kernel
 }  // namespace dgl

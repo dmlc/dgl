@@ -159,6 +159,16 @@ inline void CheckIdArray(
   }
 }
 
+// Return true if the operator is commutative and lhs and rhs need
+// to be switched. For example, Add(kDst, kSrc) needs to be changed
+// to Add(kSrc, kDst)
+inline bool NeedSwitchOrder(const std::string& op,
+    binary_op::Target lhs, binary_op::Target rhs) {
+  CHECK_NE(lhs, rhs);
+  return (op == binary_op::kAdd || op == binary_op::kMul)
+    && lhs > rhs;
+}
+
 }  // namespace
 
 
@@ -198,23 +208,29 @@ void BinaryOpReduce(
   CheckIdArray(graph->NumBits(),
       {lhs_mapping, rhs_mapping, out_mapping},
       {"lhs_mapping", "rhs_mapping", "out_mapping"});
-  // Process mapping
-  if (HasBcast(lhs_data, rhs_data)) {
-    BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
-    DGL_XPU_SWITCH(ctx.device_type, BinaryReduceBcastImpl,
-        info, reducer, op, graph,
-        lhs, rhs,
-        lhs_data, rhs_data, out_data,
-        lhs_mapping, rhs_mapping, out_mapping);
+  // Switch order for commutative operation
+  if (NeedSwitchOrder(op, lhs, rhs)) {
+    BinaryOpReduce(reducer, op, graph,
+        rhs, lhs, rhs_data, lhs_data, out_data,
+        rhs_mapping, lhs_mapping, out_mapping);
   } else {
-    CHECK(IsValidBinaryOpShape(lhs_data, rhs_data))
-      << "Cannot compute binary operation between feature shapes "
-      << ShapeString(lhs_data) << " and " << ShapeString(rhs_data);
-    DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl,
-        reducer, op, graph,
-        lhs, rhs,
-        lhs_data, rhs_data, out_data,
-        lhs_mapping, rhs_mapping, out_mapping);
+    if (HasBcast(lhs_data, rhs_data)) {
+      BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
+      DGL_XPU_SWITCH(ctx.device_type, BinaryReduceBcastImpl,
+          info, reducer, op, graph,
+          lhs, rhs,
+          lhs_data, rhs_data, out_data,
+          lhs_mapping, rhs_mapping, out_mapping);
+    } else {
+      CHECK(IsValidBinaryOpShape(lhs_data, rhs_data))
+        << "Cannot compute binary operation between feature shapes "
+        << ShapeString(lhs_data) << " and " << ShapeString(rhs_data);
+      DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl,
+          reducer, op, graph,
+          lhs, rhs,
+          lhs_data, rhs_data, out_data,
+          lhs_mapping, rhs_mapping, out_mapping);
+    }
   }
 }
 
@@ -264,21 +280,30 @@ void BackwardLhsBinaryOpReduce(
   CheckIdArray(graph->NumBits(),
       {lhs_mapping, rhs_mapping, out_mapping},
       {"lhs_mapping", "rhs_mapping", "out_mapping"});
-  if (HasBcast(lhs_data, rhs_data)) {
-    BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
-    DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceBcastImpl,
-        info, reducer, op, graph,
-        lhs, rhs,
-        lhs_mapping, rhs_mapping, out_mapping,
-        lhs_data, rhs_data, out_data, grad_out_data,
-        grad_lhs_data, utils::NoneArray());
+  // Switch order for commutative operation
+  if (NeedSwitchOrder(op, lhs, rhs)) {
+    BackwardRhsBinaryOpReduce(reducer, op, graph,
+        rhs, lhs,
+        rhs_mapping, lhs_mapping, out_mapping,
+        rhs_data, lhs_data, out_data,
+        grad_out_data, grad_lhs_data);
   } else {
-    DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceImpl,
-        reducer, op, graph,
-        lhs, rhs,
-        lhs_mapping, rhs_mapping, out_mapping,
-        lhs_data, rhs_data, out_data, grad_out_data,
-        grad_lhs_data, utils::NoneArray());
+    if (HasBcast(lhs_data, rhs_data)) {
+      BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
+      DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceBcastImpl,
+          info, reducer, op, graph,
+          lhs, rhs,
+          lhs_mapping, rhs_mapping, out_mapping,
+          lhs_data, rhs_data, out_data, grad_out_data,
+          grad_lhs_data, utils::NoneArray());
+    } else {
+      DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceImpl,
+          reducer, op, graph,
+          lhs, rhs,
+          lhs_mapping, rhs_mapping, out_mapping,
+          lhs_data, rhs_data, out_data, grad_out_data,
+          grad_lhs_data, utils::NoneArray());
+    }
   }
 }
 
@@ -332,21 +357,29 @@ void BackwardRhsBinaryOpReduce(
   CheckIdArray(graph->NumBits(),
       {lhs_mapping, rhs_mapping, out_mapping},
       {"lhs_mapping", "rhs_mapping", "out_mapping"});
-  if (HasBcast(lhs_data, rhs_data)) {
-    BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
-    DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceBcastImpl,
-        info, reducer, op, graph,
-        lhs, rhs,
-        lhs_mapping, rhs_mapping, out_mapping,
-        lhs_data, rhs_data, out_data, grad_out_data,
-        utils::NoneArray(), grad_rhs_data);
+  if (NeedSwitchOrder(op, lhs, rhs)) {
+    BackwardLhsBinaryOpReduce(reducer, op, graph,
+        rhs, lhs,
+        rhs_mapping, lhs_mapping, out_mapping,
+        rhs_data, lhs_data, out_data,
+        grad_out_data, grad_rhs_data);
   } else {
-    DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceImpl,
-        reducer, op, graph,
-        lhs, rhs,
-        lhs_mapping, rhs_mapping, out_mapping,
-        lhs_data, rhs_data, out_data, grad_out_data,
-        utils::NoneArray(), grad_rhs_data);
+    if (HasBcast(lhs_data, rhs_data)) {
+      BcastInfo info = CalcBcastInfo(lhs_data, rhs_data);
+      DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceBcastImpl,
+          info, reducer, op, graph,
+          lhs, rhs,
+          lhs_mapping, rhs_mapping, out_mapping,
+          lhs_data, rhs_data, out_data, grad_out_data,
+          utils::NoneArray(), grad_rhs_data);
+    } else {
+      DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceImpl,
+          reducer, op, graph,
+          lhs, rhs,
+          lhs_mapping, rhs_mapping, out_mapping,
+          lhs_data, rhs_data, out_data, grad_out_data,
+          utils::NoneArray(), grad_rhs_data);
+    }
   }
 }
 
@@ -393,7 +426,7 @@ void CopyReduce(
       {"in_mapping", "out_mapping"});
   DGL_XPU_SWITCH(ctx.device_type, BinaryReduceImpl,
       reducer, binary_op::kUseLhs, graph,
-      target, binary_op::kDst /* any value != target could do */,
+      target, binary_op::kNone,
       in_data, utils::NoneArray(), out_data,
       in_mapping, utils::NoneArray(), out_mapping);
 }
@@ -441,7 +474,7 @@ void BackwardCopyReduce(
   }
   DGL_XPU_SWITCH(ctx.device_type, BackwardBinaryReduceImpl,
       reducer, binary_op::kUseLhs, graph,
-      target, binary_op::kDst /* any value != target could do */,
+      target, binary_op::kNone,
       in_mapping, utils::NoneArray(), out_mapping,
       in_data, utils::NoneArray(), out_data, grad_out_data,
       grad_in_data, utils::NoneArray());

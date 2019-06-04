@@ -34,6 +34,7 @@ enum Target {
   kSrc = 0,
   kDst,
   kEdge,
+  kNone,
 };
 
 enum BackwardMode {
@@ -76,6 +77,17 @@ struct SelectEdge {
   }
 };
 
+// Select none
+struct SelectNone {
+  // Target value
+  static constexpr binary_op::Target target = binary_op::kNone;
+  // Call functor.
+  template <typename T>
+  static DGLDEVICE DGLINLINE T Call(T src, T edge, T dst) {
+    return 0;
+  }
+};
+
 // Change SelectSrc to SelectDst and vice versa
 // SelectEdge will remain the same.
 template <typename Selector>
@@ -92,43 +104,6 @@ template <>
 struct SwitchSrcDst<SelectDst> {
   typedef SelectSrc Type;
 };
-
-#define TARGET_SWITCH(v1, v2, Tgt1, Tgt2, ...)                  \
-  if (v1 == binary_op::kSrc && v2 == binary_op::kDst) {         \
-    typedef SelectSrc Tgt1;                                     \
-    typedef SelectDst Tgt2;                                     \
-    {__VA_ARGS__}                                               \
-  } else if (v1 == binary_op::kSrc && v2 == binary_op::kEdge) { \
-    typedef SelectSrc Tgt1;                                     \
-    typedef SelectEdge Tgt2;                                     \
-    {__VA_ARGS__}                                               \
-  } else if (v1 == binary_op::kEdge && v2 == binary_op::kDst) { \
-    typedef SelectEdge Tgt1;                                     \
-    typedef SelectDst Tgt2;                                     \
-    {__VA_ARGS__}                                               \
-  } else if (v1 == binary_op::kDst && v2 == binary_op::kEdge) { \
-    typedef SelectDst Tgt1;                                     \
-    typedef SelectEdge Tgt2;                                     \
-    {__VA_ARGS__}                                               \
-  } else if (v1 == binary_op::kDst && v2 == binary_op::kSrc) { \
-    typedef SelectDst Tgt1;                                     \
-    typedef SelectSrc Tgt2;                                     \
-    {__VA_ARGS__}                                               \
-  } else if (v1 == binary_op::kEdge && v2 == binary_op::kSrc) { \
-    typedef SelectEdge Tgt1;                                     \
-    typedef SelectSrc Tgt2;                                     \
-    {__VA_ARGS__}                                               \
-  } else {                                                      \
-    LOG(FATAL) << "Invalid operand target: " << v1 << " and " << v2; \
-  }
-
-#define GEN_TARGET(GEN, ...)                        \
-  MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectDst))    \
-  MSVC_EXPAND(GEN(__VA_ARGS__, SelectDst, SelectSrc))    \
-  MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectEdge))   \
-  MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectSrc))   \
-  MSVC_EXPAND(GEN(__VA_ARGS__, SelectDst, SelectEdge))   \
-  MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectDst))
 
 // direct id
 template <int XPU, typename IdxType>
@@ -210,32 +185,136 @@ struct BinaryUseLhs {
   }
 };
 
-#define BINARY_OP_SWITCH(val, DType, OpType, ...)   \
-  if (val == binary_op::kAdd) {                     \
-    typedef BinaryAdd<DType> OpType;                \
-    {__VA_ARGS__}                                   \
-  } else if (val == binary_op::kSub) {              \
-    typedef BinarySub<DType> OpType;                \
-    {__VA_ARGS__}                                   \
-  } else if (val == binary_op::kMul) {              \
-    typedef BinaryMul<DType> OpType;                \
-    {__VA_ARGS__}                                   \
-  } else if (val == binary_op::kDiv) {              \
-    typedef BinaryDiv<DType> OpType;                \
-    {__VA_ARGS__}                                   \
-  } else if (val == binary_op::kUseLhs) {           \
-    typedef BinaryUseLhs<DType> OpType;             \
-    {__VA_ARGS__}                                   \
-  } else {                                          \
-    LOG(FATAL) << "Unsupported binary op: " << val; \
+#define OP_TARGET_SWITCH(op, lhs, rhs, DType, OpType, LeftType, RightType, ...)   \
+  {                                                            \
+  using namespace binary_op;                                   \
+  if (op == kAdd && lhs == kSrc && rhs == kDst) {              \
+    typedef BinaryAdd<DType> OpType;                           \
+    typedef SelectSrc LeftType;                                \
+    typedef SelectDst RightType;                               \
+    {__VA_ARGS__}                                              \
+  } else if (op == kAdd && lhs == kSrc && rhs == kEdge) {      \
+    typedef BinaryAdd<DType> OpType;                           \
+    typedef SelectSrc LeftType;                                \
+    typedef SelectEdge RightType;                              \
+    {__VA_ARGS__}                                              \
+  } else if (op == kAdd && lhs == kDst && rhs == kEdge) {      \
+    typedef BinaryAdd<DType> OpType;                           \
+    typedef SelectDst LeftType;                                \
+    typedef SelectEdge RightType;                              \
+    {__VA_ARGS__}                                              \
+  } else if (op == kMul && lhs == kSrc && rhs == kDst) {       \
+    typedef BinaryMul<DType> OpType;                           \
+    typedef SelectSrc LeftType;                                \
+    typedef SelectDst RightType;                               \
+    {__VA_ARGS__}                                              \
+  } else if (op == kMul && lhs == kSrc && rhs == kEdge) {      \
+    typedef BinaryMul<DType> OpType;                           \
+    typedef SelectSrc LeftType;                                \
+    typedef SelectEdge RightType;                              \
+    {__VA_ARGS__}                                              \
+  } else if (op == kMul && lhs == kDst && rhs == kEdge) {      \
+    typedef BinaryMul<DType> OpType;                           \
+    typedef SelectDst LeftType;                                \
+    typedef SelectEdge RightType;                              \
+    {__VA_ARGS__}                                              \
+  } else if (op == kSub && lhs == kSrc && rhs == kDst) {       \
+    typedef BinarySub<DType> OpType;                           \
+    typedef SelectSrc LeftType;                                \
+    typedef SelectDst RightType;                               \
+    {__VA_ARGS__}                                              \
+  } else if (op == kSub && lhs == kDst && rhs == kSrc) {       \
+    typedef BinarySub<DType> OpType;                           \
+    typedef SelectDst LeftType;                                \
+    typedef SelectSrc RightType;                               \
+    {__VA_ARGS__}                                              \
+  } else if (op == kSub && lhs == kSrc && rhs == kEdge) {      \
+    typedef BinarySub<DType> OpType;                           \
+    typedef SelectSrc LeftType;                                \
+    typedef SelectEdge RightType;                              \
+    {__VA_ARGS__}                                              \
+  } else if (op == kSub && lhs == kEdge && rhs == kSrc) {      \
+    typedef BinarySub<DType> OpType;                           \
+    typedef SelectEdge LeftType;                               \
+    typedef SelectSrc RightType;                               \
+    {__VA_ARGS__}                                              \
+  } else if (op == kSub && lhs == kDst && rhs == kEdge) {      \
+    typedef BinarySub<DType> OpType;                           \
+    typedef SelectDst LeftType;                                \
+    typedef SelectEdge RightType;                              \
+    {__VA_ARGS__}                                              \
+  } else if (op == kSub && lhs == kEdge && rhs == kDst) {      \
+    typedef BinarySub<DType> OpType;                           \
+    typedef SelectEdge LeftType;                               \
+    typedef SelectDst RightType;                               \
+    {__VA_ARGS__}                                              \
+  } else if (op == kDiv && lhs == kSrc && rhs == kDst) {       \
+    typedef BinaryDiv<DType> OpType;                           \
+    typedef SelectSrc LeftType;                                \
+    typedef SelectDst RightType;                               \
+    {__VA_ARGS__}                                              \
+  } else if (op == kDiv && lhs == kDst && rhs == kSrc) {       \
+    typedef BinaryDiv<DType> OpType;                           \
+    typedef SelectDst LeftType;                                \
+    typedef SelectSrc RightType;                               \
+    {__VA_ARGS__}                                              \
+  } else if (op == kDiv && lhs == kSrc && rhs == kEdge) {      \
+    typedef BinaryDiv<DType> OpType;                           \
+    typedef SelectSrc LeftType;                                \
+    typedef SelectEdge RightType;                              \
+    {__VA_ARGS__}                                              \
+  } else if (op == kDiv && lhs == kEdge && rhs == kSrc) {      \
+    typedef BinaryDiv<DType> OpType;                           \
+    typedef SelectEdge LeftType;                               \
+    typedef SelectSrc RightType;                               \
+    {__VA_ARGS__}                                              \
+  } else if (op == kDiv && lhs == kDst && rhs == kEdge) {      \
+    typedef BinaryDiv<DType> OpType;                           \
+    typedef SelectDst LeftType;                                \
+    typedef SelectEdge RightType;                              \
+    {__VA_ARGS__}                                              \
+  } else if (op == kDiv && lhs == kEdge && rhs == kDst) {      \
+    typedef BinaryDiv<DType> OpType;                           \
+    typedef SelectEdge LeftType;                               \
+    typedef SelectDst RightType;                               \
+    {__VA_ARGS__}                                              \
+  } else if (op == kUseLhs && lhs == kSrc) {                   \
+    typedef BinaryUseLhs<DType> OpType;                        \
+    typedef SelectSrc LeftType;                                \
+    typedef SelectNone RightType;                              \
+    {__VA_ARGS__}                                              \
+  } else if (op == kUseLhs && lhs == kEdge) {                  \
+    typedef BinaryUseLhs<DType> OpType;                        \
+    typedef SelectEdge LeftType;                               \
+    typedef SelectNone RightType;                              \
+    {__VA_ARGS__}                                              \
+  } else {                                                     \
+    LOG(FATAL) << "Unsupported operation: op=" << op           \
+      << " lhs=" << lhs << " rhs=" << rhs;                     \
+  }                                                            \
   }
 
-#define GEN_BINARY_OP(GEN, ...) \
-  MSVC_EXPAND(GEN(__VA_ARGS__, BinaryAdd)) \
-  MSVC_EXPAND(GEN(__VA_ARGS__, BinarySub)) \
-  MSVC_EXPAND(GEN(__VA_ARGS__, BinaryMul)) \
-  MSVC_EXPAND(GEN(__VA_ARGS__, BinaryDiv)) \
-  MSVC_EXPAND(GEN(__VA_ARGS__, BinaryUseLhs))
+#define GEN_OP_TARGET(GEN, ...) \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectDst, BinaryAdd))      \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectEdge, BinaryAdd))     \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectDst, SelectEdge, BinaryAdd))     \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectDst, BinaryMul))      \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectEdge, BinaryMul))     \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectDst, SelectEdge, BinaryMul))     \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectDst, BinarySub))      \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectDst, SelectSrc, BinarySub))      \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectEdge, BinarySub))     \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectSrc, BinarySub))     \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectDst, SelectEdge, BinarySub))     \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectDst, BinarySub))     \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectDst, BinaryDiv))      \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectDst, SelectSrc, BinaryDiv))      \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectEdge, BinaryDiv))     \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectSrc, BinaryDiv))     \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectDst, SelectEdge, BinaryDiv))     \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectDst, BinaryDiv))     \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectNone, BinaryUseLhs))  \
+  MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectNone, BinaryUseLhs))
 
 // functors for reducers
 template <int XPU, typename DType>
