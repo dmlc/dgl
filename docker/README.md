@@ -14,13 +14,3 @@ docker build -t dgl-gpu -f Dockerfile.ci_gpu .
 ```bash
 docker build -t dgl-lint -f Dockerfile.ci_lint .
 ```
-
-### CPU MXNet image
-```bash
-docker build -t dgl-mxnet-cpu -f Dockerfile.ci_cpu_mxnet .
-```
-
-### GPU MXNet image
-```bash
-docker build -t dgl-mxnet-gpu -f Dockerfile.ci_gpu_mxnet .
-```
