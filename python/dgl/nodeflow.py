@@ -305,6 +305,7 @@ class NodeFlow(DGLBaseGraph):
         Tensor
             The degree of the nodes in the specified layer.
         """
+        layer_id = self._get_layer_id(layer_id)
         return self._graph.in_degrees(utils.toindex(self.layer_nid(layer_id))).tousertensor()
 
     def layer_out_degree(self, layer_id):
@@ -320,6 +321,7 @@ class NodeFlow(DGLBaseGraph):
         Tensor
             The degree of the nodes in the specified layer.
         """
+        layer_id = self._get_layer_id(layer_id)
         return self._graph.out_degrees(utils.toindex(self.layer_nid(layer_id))).tousertensor()
 
     def layer_nid(self, layer_id):
@@ -461,6 +463,7 @@ class NodeFlow(DGLBaseGraph):
         block_id = self._get_block_id(block_id)
         fmt = F.get_preferred_sparse_format()
         # We need to extract two layers.
+        block_id = self._get_block_id(block_id)
         layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
         rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, fmt,
                                         int(layer0_size),
@@ -592,7 +595,8 @@ class NodeFlow(DGLBaseGraph):
             for i in range(self.num_layers):
                 self._node_frames[i].set_initializer(initializer, field)
         else:
-            self._node_frames[i].set_initializer(initializer, field)
+            layer_id = self._get_layer_id(layer_id)
+            self._node_frames[layer_id].set_initializer(initializer, field)
 
     def set_e_initializer(self, initializer, block_id=ALL, field=None):
         """Set the initializer for empty edge features.
@@ -617,6 +621,7 @@ class NodeFlow(DGLBaseGraph):
             for i in range(self.num_blocks):
                 self._edge_frames[i].set_initializer(initializer, field)
         else:
+            block_id = self._get_block_id(block_id)
             self._edge_frames[block_id].set_initializer(initializer, field)
 
 
@@ -638,6 +643,7 @@ class NodeFlow(DGLBaseGraph):
         if is_all(block_id):
             self._message_funcs = [func] * self.num_blocks
         else:
+            block_id = self._get_block_id(block_id)
             self._message_funcs[block_id] = func
 
     def register_reduce_func(self, func, block_id=ALL):
@@ -658,6 +664,7 @@ class NodeFlow(DGLBaseGraph):
         if is_all(block_id):
             self._reduce_funcs = [func] * self.num_blocks
         else:
+            block_id = self._get_block_id(block_id)
             self._reduce_funcs[block_id] = func
 
     def register_apply_node_func(self, func, block_id=ALL):
@@ -678,6 +685,7 @@ class NodeFlow(DGLBaseGraph):
         if is_all(block_id):
             self._apply_node_funcs = [func] * self.num_blocks
         else:
+            block_id = self._get_block_id(block_id)
             self._apply_node_funcs[block_id] = func
 
     def register_apply_edge_func(self, func, block_id=ALL):
@@ -697,6 +705,7 @@ class NodeFlow(DGLBaseGraph):
         if is_all(block_id):
             self._apply_edge_funcs = [func] * self.num_blocks
         else:
+            block_id = self._get_block_id(block_id)
             self._apply_edge_funcs[block_id] = func
 
     def apply_layer(self, layer_id, func="default", v=ALL, inplace=False):
@@ -714,6 +723,7 @@ class NodeFlow(DGLBaseGraph):
         inplace : bool, optional
             If True, update will be done in place, but autograd will break.
         """
+        layer_id = self._get_layer_id(layer_id)
         if func == "default":
             func = self._apply_node_funcs[layer_id]
         if is_all(v):
