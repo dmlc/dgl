@@ -952,7 +952,7 @@ def from_networkx(nx_graph, readonly):
     num_nodes = nx_graph.number_of_nodes()
 
     # nx_graph.edges(data=True) returns src, dst, attr_dict
-    if nx_graph.number_of_edges > 0:
+    if nx_graph.number_of_edges() > 0:
         has_edge_id = 'id' in next(iter(nx_graph.edges(data=True)))[-1]
     else:
         has_edge_id = False
