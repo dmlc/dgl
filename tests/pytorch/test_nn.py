@@ -52,24 +52,20 @@ def uniform_attention(g, shape):
     return a / g.in_degrees(g.edges()[1]).view(target_shape).float()
 
 def test_edge_softmax():
-    edge_softmax = nn.EdgeSoftmax()
+    def _test(edge_softmax):
+        # Basic
+        g = dgl.DGLGraph(nx.path_graph(3))
+        edata = th.ones(g.number_of_edges(), 1)
+        a = edge_softmax(g, edata)
+        assert th.allclose(a, uniform_attention(g, a.shape))
 
-    # Basic
-    g = dgl.DGLGraph(nx.path_graph(3))
-    edata = th.ones(g.number_of_edges(), 1)
-    unnormalized, normalizer = edge_softmax(edata, g)
-    g.edata["a"] = unnormalized
-    g.ndata["a_sum"] = normalizer
-    g.apply_edges(lambda edges : {"a": edges.data["a"] / edges.dst["a_sum"]})
-    assert th.allclose(g.edata["a"], uniform_attention(g, unnormalized.shape))
+        # Test higher dimension case
+        edata = th.ones(g.number_of_edges(), 3, 1)
+        a = edge_softmax(g, edata)
+        assert th.allclose(a, uniform_attention(g, a.shape))
 
-    # Test higher dimension case
-    edata = th.ones(g.number_of_edges(), 3, 1)
-    unnormalized, normalizer = edge_softmax(edata, g)
-    g.edata["a"] = unnormalized
-    g.ndata["a_sum"] = normalizer
-    g.apply_edges(lambda edges : {"a": edges.data["a"] / edges.dst["a_sum"]})
-    assert th.allclose(g.edata["a"], uniform_attention(g, unnormalized.shape))
+    _test(nn.edge_softmax)
+    _test(nn.EdgeSoftmax())
 
 if __name__ == '__main__':
     test_graph_conv()

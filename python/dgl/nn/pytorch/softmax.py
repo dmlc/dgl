@@ -8,7 +8,7 @@ from ... import utils
 from ... import function as fn
 from ...runtime import spmv
 
-__all__ = ['EdgeSoftmax']
+__all__ = ['EdgeSoftmax', 'edge_softmax']
 
 
 class EdgeSoftmax(object):
@@ -28,15 +28,15 @@ class EdgeSoftmax(object):
     the attention weights are computed with such an edgesoftmax operation.
     """
 
-    def __call__(self, logits, graph):
+    def __call__(self, graph, logits):
         r"""Compute edge softmax.
 
         Parameters
         ----------
-        logits : torch.Tensor
-            The input edge feature
         graph : DGLGraph
             The graph to perform edge softmax
+        logits : torch.Tensor
+            The input edge feature
 
         Returns
         -------
@@ -79,7 +79,7 @@ class EdgeSoftmax(object):
         logits = (logits - max_logits_.index_select(0, dst)).exp()
         norm = F.copy_reduce("sum", gidx, fn.TargetCode.EDGE, logits,
                              num_nodes, empty_map, empty_map)
-        return logits, norm
+        return logits / norm.index_select(0, dst)
 
 class EdgeSoftmax1(th.autograd.Function):
     @staticmethod
@@ -96,11 +96,11 @@ class EdgeSoftmax1(th.autograd.Function):
         tmp_name = utils.get_ndata_name(g, 'tmp')
         out_name = utils.get_edata_name(g, 'out')
         g.edata[score_name] = score
-        g.update_all(fn.copy_edge(score_name, 'm'), fn.max('m', tmp_name))
-        g.apply_edges(fn.edge_sub_dst(score_name, tmp_name, out_name))
+        g.update_all(fn.copy_e(score_name, 'm'), fn.max('m', tmp_name))
+        g.apply_edges(fn.e_sub_v(score_name, tmp_name, out_name))
         g.edata[out_name] = th.exp(g.edata[out_name])
-        g.update_all(fn.copy_edge(out_name, 'm'), fn.sum('m', tmp_name))
-        g.apply_edges(fn.edge_div_dst(out_name, tmp_name, out_name))
+        g.update_all(fn.copy_e(out_name, 'm'), fn.sum('m', tmp_name))
+        g.apply_edges(fn.e_div_v(out_name, tmp_name, out_name))
         g.edata.pop(score_name)
         g.ndata.pop(tmp_name)
         out = g.edata.pop(out_name)
@@ -121,13 +121,12 @@ class EdgeSoftmax1(th.autograd.Function):
         g, out = ctx.backward_cache
         out_name = utils.get_edata_name(g, 'out')
         accum_name = utils.get_ndata_name(g, 'accum')
-        tmp_score_name = utils.get_edata_name(g, 'tmp_score')
         grad_score_name = utils.get_edata_name(g, 'grad_score')
         g.edata[out_name] = out
         g.edata[grad_score_name] = out * grad_out
-        g.update_all(fn.copy_edge(grad_score_name, 'm'), fn.sum('m', accum_name))
-        g.apply_edges(fn.edge_mul_dst(out_name, accum_name, out_name))
+        g.update_all(fn.copy_e(grad_score_name, 'm'), fn.sum('m', accum_name))
+        g.apply_edges(fn.e_mul_v(out_name, accum_name, out_name))
         grad_score = g.edata[grad_score_name] - g.edata[out_name]
-        return grad_score
+        return None, grad_score
 
 edge_softmax = EdgeSoftmax1.apply
