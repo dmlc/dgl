@@ -463,7 +463,6 @@ class NodeFlow(DGLBaseGraph):
         block_id = self._get_block_id(block_id)
         fmt = F.get_preferred_sparse_format()
         # We need to extract two layers.
-        block_id = self._get_block_id(block_id)
         layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
         rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, fmt,
                                         int(layer0_size),

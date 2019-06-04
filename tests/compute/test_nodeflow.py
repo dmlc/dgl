@@ -65,6 +65,12 @@ def check_basic(g, nf):
         out_deg = nf.layer_out_degree(i - 1)
         assert F.asnumpy(F.sum(in_deg, 0) == F.sum(out_deg, 0))
 
+    # negative layer Ids.
+    for i in range(-1, -nf.num_layers, -1):
+        in_deg = nf.layer_in_degree(i)
+        out_deg = nf.layer_out_degree(i - 1)
+        assert F.asnumpy(F.sum(in_deg, 0) == F.sum(out_deg, 0))
+
 
 def test_basic():
     num_layers = 2
@@ -93,28 +99,31 @@ def test_basic():
     check_basic(g, nf)
 
 
-def check_apply_nodes(create_node_flow):
+def check_apply_nodes(create_node_flow, use_negative_block_id):
     num_layers = 2
     for i in range(num_layers):
+        l = -num_layers + i if use_negative_block_id else i
         g = generate_rand_graph(100)
         nf = create_node_flow(g, num_layers)
         nf.copy_from_parent()
-        new_feats = F.randn((nf.layer_size(i), 5))
+        new_feats = F.randn((nf.layer_size(l), 5))
         def update_func(nodes):
             return {'h1' : new_feats}
-        nf.apply_layer(i, update_func)
-        assert F.array_equal(nf.layers[i].data['h1'], new_feats)
+        nf.apply_layer(l, update_func)
+        assert F.array_equal(nf.layers[l].data['h1'], new_feats)
 
         new_feats = F.randn((4, 5))
         def update_func1(nodes):
             return {'h1' : new_feats}
-        nf.apply_layer(i, update_func1, v=nf.layer_nid(i)[0:4])
-        assert F.array_equal(nf.layers[i].data['h1'][0:4], new_feats)
+        nf.apply_layer(l, update_func1, v=nf.layer_nid(l)[0:4])
+        assert F.array_equal(nf.layers[l].data['h1'][0:4], new_feats)
 
 
 def test_apply_nodes():
-    check_apply_nodes(create_full_nodeflow)
-    check_apply_nodes(create_mini_batch)
+    check_apply_nodes(create_full_nodeflow, use_negative_block_id=False)
+    check_apply_nodes(create_mini_batch, use_negative_block_id=False)
+    check_apply_nodes(create_full_nodeflow, use_negative_block_id=True)
+    check_apply_nodes(create_mini_batch, use_negative_block_id=True)
 
 
 def check_apply_edges(create_node_flow):
@@ -142,9 +151,37 @@ def check_apply_edges(create_node_flow):
         assert F.array_equal(nf.blocks[i].data['f2'], expected_f_sum)
 
 
+def check_apply_edges1(create_node_flow):
+    num_layers = 2
+    for i in range(num_layers):
+        g = generate_rand_graph(100)
+        g.ndata["f"] = F.randn((100, 10))
+        nf = create_node_flow(g, num_layers)
+        nf.copy_from_parent()
+        new_feats = F.randn((nf.block_size(i), 5))
+
+        def update_func(edges):
+            return {'h2': new_feats, "f2": edges.src["f"] + edges.dst["f"]}
+
+        nf.register_apply_edge_func(update_func, i)
+        nf.apply_block(i)
+        assert F.array_equal(nf.blocks[i].data['h2'], new_feats)
+
+        # should also work for negative block ids
+        nf.register_apply_edge_func(update_func, -num_layers + i)
+        nf.apply_block(-num_layers + i)
+        assert F.array_equal(nf.blocks[i].data['h2'], new_feats)
+
+        eids = nf.block_parent_eid(i)
+        srcs, dsts = g.find_edges(eids)
+        expected_f_sum = g.ndata["f"][srcs] + g.ndata["f"][dsts]
+        assert F.array_equal(nf.blocks[i].data['f2'], expected_f_sum)
+
+
 def test_apply_edges():
     check_apply_edges(create_full_nodeflow)
     check_apply_edges(create_mini_batch)
+    check_apply_edges1(create_mini_batch)
 
 
 def check_flow_compute(create_node_flow, use_negative_block_id=False):
@@ -177,11 +214,48 @@ def check_flow_compute(create_node_flow, use_negative_block_id=False):
         assert F.allclose(data1, data2)
 
 
+def check_flow_compute1(create_node_flow, use_negative_block_id=False):
+    num_layers = 2
+    g = generate_rand_graph(100)
+
+    # test the case that we register UDFs per block.
+    nf = create_node_flow(g, num_layers)
+    nf.copy_from_parent()
+    g.ndata['h'] = g.ndata['h1']
+    nf.layers[0].data['h'] = nf.layers[0].data['h1']
+    for i in range(num_layers):
+        l = -num_layers + i if use_negative_block_id else i
+        nf.register_message_func(fn.copy_src(src='h', out='m'), l)
+        nf.register_reduce_func(fn.sum(msg='m', out='t'), l)
+        nf.register_apply_node_func(lambda nodes: {'h' : nodes.data['t'] + 1}, l)
+        nf.block_compute(l)
+        g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
+                     lambda nodes: {'h' : nodes.data['t'] + 1})
+        assert F.array_equal(nf.layers[i + 1].data['h'], g.ndata['h'][nf.layer_parent_nid(i + 1)])
+
+    # test the case that we register UDFs in all blocks.
+    nf = create_node_flow(g, num_layers)
+    nf.copy_from_parent()
+    g.ndata['h'] = g.ndata['h1']
+    nf.layers[0].data['h'] = nf.layers[0].data['h1']
+    nf.register_message_func(fn.copy_src(src='h', out='m'))
+    nf.register_reduce_func(fn.sum(msg='m', out='t'))
+    nf.register_apply_node_func(lambda nodes: {'h' : nodes.data['t'] + 1})
+    for i in range(num_layers):
+        l = -num_layers + i if use_negative_block_id else i
+        nf.block_compute(l)
+        g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
+                     lambda nodes: {'h' : nodes.data['t'] + 1})
+        assert F.array_equal(nf.layers[i + 1].data['h'], g.ndata['h'][nf.layer_parent_nid(i + 1)])
+
+
 def test_flow_compute():
     check_flow_compute(create_full_nodeflow)
     check_flow_compute(create_mini_batch)
     check_flow_compute(create_full_nodeflow, use_negative_block_id=True)
     check_flow_compute(create_mini_batch, use_negative_block_id=True)
+    check_flow_compute1(create_mini_batch)
+    check_flow_compute1(create_mini_batch, use_negative_block_id=True)
 
 
 def check_prop_flows(create_node_flow):
