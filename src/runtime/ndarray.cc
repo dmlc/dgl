@@ -52,13 +52,8 @@ struct NDArray::Internal {
       ptr->mem = nullptr;
 #endif  // _WIN32
     } else if (ptr->dl_tensor.data != nullptr) {
-      if (ptr->is_workspace_) {
-        dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeWorkspace(
-            ptr->dl_tensor.ctx, ptr->dl_tensor.data);
-      } else {
-        dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
-            ptr->dl_tensor.ctx, ptr->dl_tensor.data);
-      }
+      dgl::runtime::DeviceAPI::Get(ptr->dl_tensor.ctx)->FreeDataSpace(
+          ptr->dl_tensor.ctx, ptr->dl_tensor.data);
     }
     delete ptr;
   }
@@ -78,8 +73,7 @@ struct NDArray::Internal {
   // but does not allocate space for the data.
   static NDArray Create(std::vector<int64_t> shape,
                         DLDataType dtype,
-                        DLContext ctx,
-                        bool is_workspace) {
+                        DLContext ctx) {
     VerifyDataType(dtype);
     // critical zone
     NDArray::Container* data = new NDArray::Container();
@@ -102,8 +96,6 @@ struct NDArray::Internal {
     data->dl_tensor.dtype = dtype;
     // setup ctx
     data->dl_tensor.ctx = ctx;
-    // workspace flag
-    data->is_workspace_ = is_workspace;
     return ret;
   }
   // Implementation of API function
@@ -146,7 +138,7 @@ NDArray NDArray::CreateView(std::vector<int64_t> shape,
                             int64_t offset) {
   CHECK(data_ != nullptr);
   CHECK(IsContiguous()) << "Can only create view for compact tensor";
-  NDArray ret = Internal::Create(shape, dtype, data_->dl_tensor.ctx, false);
+  NDArray ret = Internal::Create(shape, dtype, data_->dl_tensor.ctx);
   ret.data_->dl_tensor.byte_offset =
       this->data_->dl_tensor.byte_offset;
   size_t curr_size = GetDataSize(this->data_->dl_tensor);
@@ -169,7 +161,7 @@ NDArray NDArray::EmptyShared(const std::string &name,
                        std::vector<int64_t> shape,
                        DLDataType dtype,
                        DLContext ctx, bool is_create) {
-  NDArray ret = Internal::Create(shape, dtype, ctx, false);
+  NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
 #ifndef _WIN32
@@ -189,21 +181,14 @@ NDArray NDArray::EmptyShared(const std::string &name,
 
 NDArray NDArray::Empty(std::vector<int64_t> shape,
                        DLDataType dtype,
-                       DLContext ctx,
-                       bool is_workspace) {
-  NDArray ret = Internal::Create(shape, dtype, ctx, is_workspace);
+                       DLContext ctx) {
+  NDArray ret = Internal::Create(shape, dtype, ctx);
   // setup memory content
   size_t size = GetDataSize(ret.data_->dl_tensor);
   size_t alignment = GetDataAlignment(ret.data_->dl_tensor);
-  if (is_workspace) {
-    ret.data_->dl_tensor.data =
-        DeviceAPI::Get(ret->ctx)->AllocWorkspace(
-            ret->ctx, size, ret->dtype);
-  } else {
-    ret.data_->dl_tensor.data =
-        DeviceAPI::Get(ret->ctx)->AllocDataSpace(
-            ret->ctx, size, alignment, ret->dtype);
-  }
+  ret.data_->dl_tensor.data =
+      DeviceAPI::Get(ret->ctx)->AllocDataSpace(
+          ret->ctx, size, alignment, ret->dtype);
   return ret;
 }
 

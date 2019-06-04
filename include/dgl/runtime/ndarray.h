@@ -151,8 +151,7 @@ class NDArray {
    */
   DGL_DLL static NDArray Empty(std::vector<int64_t> shape,
                                DLDataType dtype,
-                               DLContext ctx,
-                               bool is_workspace = false);
+                               DLContext ctx);
   /*!
    * \brief Create an empty NDArray with shared memory.
    * \param name The name of shared memory.
@@ -287,8 +286,6 @@ struct NDArray::Container {
   std::vector<int64_t> stride_;
   /*! \brief The internal array object */
   std::atomic<int> ref_counter_{0};
-  /*! \brief True if this ndarray represents a workspace */
-  bool is_workspace_{false};
 };
 
 // implementations of inline functions

@@ -533,7 +533,7 @@ class SharedMemoryDGLGraph(BaseGraphStore):
     def __init__(self, graph_name, port):
         self._graph_name = graph_name
         self._pid = os.getpid()
-        self.proxy = xmlrpc.client.ServerProxy("http://localhost:" + str(port) + "/")
+        self.proxy = xmlrpc.client.ServerProxy("http://127.0.0.1:" + str(port) + "/")
         self._worker_id, self._num_workers = self.proxy.register(graph_name)
         if self._worker_id < 0:
             raise Exception('fail to get graph ' + graph_name + ' from the graph store')

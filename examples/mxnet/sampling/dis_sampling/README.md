@@ -19,9 +19,9 @@ Assume that the user has already launched two instances (`instance_0` & `instanc
 
 Once we start the trainer process, users will see the following logging output:
 
-Sampler side:
 ```
-DGLBACKEND=mxnet python3 sampler.py --model gcn_ns --dataset reddit-self-loop --num-neighbors 2 --batch-size 1000 --ip 127.0.0.1:2049 --num-sampler 1
+[04:48:20] .../socket_communicator.cc:68: Bind to 127.0.0.1:2049
+[04:48:20] .../socket_communicator.cc:74: Listen on 127.0.0.1:2049, wait sender connect ...
 ```
 
 After that user can start the sampler process. For the sampler instance_0, users can change the `--num-sampler` option to set the number of the sampler. The `sampler.py` script will start `--num-sampler` processes concurrently to maximalize the system utilization. Users can also launch many samplers in parallel across a set of machines. For example, if we have `10` sampler instance and for each instance, we set the `--num-sampler` to `2`, we need to set the `--num-sampler` of the trainer instance to `20`.
