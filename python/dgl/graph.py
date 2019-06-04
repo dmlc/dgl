@@ -3048,7 +3048,7 @@ class DGLGraph(DGLBaseGraph):
 
         n_repr = self.get_n_repr(v)
         nbatch = NodeBatch(self, v, n_repr)
-        n_mask = predicate(nbatch)
+        n_mask = F.copy_to(predicate(nbatch), F.cpu())
 
         if is_all(nodes):
             return F.nonzero_1d(n_mask)
@@ -3121,7 +3121,7 @@ class DGLGraph(DGLBaseGraph):
         edge_data = self.get_e_repr(eid)
         dst_data = self.get_n_repr(v)
         ebatch = EdgeBatch(self, (u, v, eid), src_data, edge_data, dst_data)
-        e_mask = predicate(ebatch)
+        e_mask = F.copy_to(predicate(ebatch), F.cpu())
 
         if is_all(edges):
             return F.nonzero_1d(e_mask)
