@@ -27,6 +27,57 @@ def test_node_removal():
     assert g.number_of_nodes() == 7
     assert F.array_equal(g.ndata['id'], F.tensor([0, 7, 8, 9, 0, 0, 0]))
 
+def test_multigraph_node_removal():
+    g = dgl.DGLGraph(multigraph=True)
+    g.add_nodes(5)
+    for i in range(5):
+        g.add_edge(i, i)
+        g.add_edge(i, i)
+    assert g.number_of_nodes() == 5
+    assert g.number_of_edges() == 10
+
+    # delete nodes
+    g.del_nodes([2, 3])
+    assert g.number_of_nodes() == 3
+    assert g.number_of_edges() == 6
+
+    # add nodes
+    g.add_nodes(1)
+    g.add_edge(1, 1)
+    g.add_edge(1, 1)
+    assert g.number_of_nodes() == 4
+    assert g.number_of_edges() == 8
+
+    # delete nodes
+    g.del_nodes([0])
+    assert g.number_of_nodes() == 3
+    assert g.number_of_edges() == 6
+
+def test_multigraph_edge_removal():
+    g = dgl.DGLGraph(multigraph=True)
+    g.add_nodes(5)
+    for i in range(5):
+        g.add_edge(i, i)
+        g.add_edge(i, i)
+    assert g.number_of_nodes() == 5
+    assert g.number_of_edges() == 10
+
+    # delete edges
+    g.del_edges([2, 3])
+    assert g.number_of_nodes() == 5
+    assert g.number_of_edges() == 8
+
+    # add edges
+    g.add_edge(1, 1)
+    g.add_edge(1, 1)
+    assert g.number_of_nodes() == 5
+    assert g.number_of_edges() == 10
+
+    # delete edges
+    g.del_edges([0, 1])
+    assert g.number_of_nodes() == 5
+    assert g.number_of_edges() == 8
+
 def test_edge_removal():
     g = dgl.DGLGraph()
     g.add_nodes(5)
@@ -93,4 +144,6 @@ def test_node_and_edge_removal():
 if __name__ == '__main__':
     test_node_removal()
     test_edge_removal()
+    test_multigraph_node_removal()
+    test_multigraph_edge_removal()
     test_node_and_edge_removal()
