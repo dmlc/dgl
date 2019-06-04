@@ -2,11 +2,11 @@
 # pylint: disable=redefined-builtin
 from __future__ import absolute_import
 
+import sys
+
 from .base import BuiltinFunction, TargetCode
 from ..runtime import ir
 from ..runtime.ir import var
-
-__all__ = ["sum", "max", "min", "prod"]
 
 
 class ReduceFunction(BuiltinFunction):
@@ -49,8 +49,12 @@ class SimpleReduceFunction(ReduceFunction):
         return self._name
 
 
-def sum(msg, out):
-    """Builtin reduce function that aggregates messages by sum.
+###############################################################################
+# Generate all following reducer functions:
+# sum, max, min, prod
+
+def _gen_reduce_builtin(reducer):
+    docstring = """Builtin reduce function that aggregates messages by {0}.
 
     Parameters
     ----------
@@ -61,88 +65,26 @@ def sum(msg, out):
     Examples
     --------
     >>> import dgl
-    >>> reduce_func = dgl.function.sum(msg='m', out='h')
+    >>> reduce_func = dgl.function.{0}('m', 'h')
 
     The above example is equivalent to the following user defined function
     (if using PyTorch):
 
     >>> import torch
     >>> def reduce_func(nodes):
-    >>>     return {'h': torch.sum(nodes.mailbox['m'], dim=1)}
-    """
-    return SimpleReduceFunction("sum", msg, out)
+    >>>     return {{'h': torch.{0}(nodes.mailbox['m'], dim=1)}}
+    """.format(reducer)
+
+    def func(msg, out):
+        return SimpleReduceFunction(reducer, msg, out)
+    func.__name__ = reducer
+    func.__doc__ = docstring
+    return func
 
 
-def max(msg, out):
-    """Builtin reduce function that aggregates messages by max.
+__all__ = []
 
-    Parameters
-    ----------
-    msg : str
-        The message field.
-    out : str
-        The output node feature field.
-
-    Examples
-    --------
-    >>> import dgl
-    >>> reduce_func = dgl.function.max(msg='m', out='h')
-
-    The above example is equivalent to the following user defined function
-    (if using PyTorch):
-
-    >>> import torch
-    >>> def reduce_func(nodes):
-    >>>     return {'h': torch.max(nodes.mailbox['m'], dim=1)[0]}
-    """
-    return SimpleReduceFunction("max", msg, out)
-
-
-def min(msg, out):
-    """Builtin reduce function that aggregates messages by min.
-
-    Parameters
-    ----------
-    msg : str
-        The message field.
-    out : str
-        The output node feature field.
-
-    Examples
-    --------
-    >>> import dgl
-    >>> reduce_func = dgl.function.min(msg='m', out='h')
-
-    The above example is equivalent to the following user defined function
-    (if using PyTorch):
-
-    >>> import torch
-    >>> def reduce_func(nodes):
-    >>>     return {'h': torch.min(nodes.mailbox['m'], dim=1)[0]}
-    """
-    return SimpleReduceFunction("min", msg, out)
-
-
-def prod(msg, out):
-    """Builtin reduce function that aggregates messages by production.
-
-    Parameters
-    ----------
-    msg : str
-        The message field.
-    out : str
-        The output node feature field.
-
-    Examples
-    --------
-    >>> import dgl
-    >>> reduce_func = dgl.function.prod(msg='m', out='h')
-
-    The above example is equivalent to the following user defined function
-    (if using PyTorch):
-
-    >>> import torch
-    >>> def reduce_func(nodes):
-    >>>     return {'h': torch.prod(nodes.mailbox['m'], dim=1)[0]}
-    """
-    return SimpleReduceFunction("prod", msg, out)
+for reducer in ["max", "min", "sum", "prod"]:
+    func = _gen_reduce_builtin(reducer)
+    setattr(sys.modules[__name__], reducer, func)
+    __all__.append(reducer)

@@ -79,8 +79,6 @@ class EdgeSoftmax(object):
         logits = (logits - max_logits_.index_select(0, dst)).exp()
         norm = F.copy_reduce("sum", gidx, fn.TargetCode.EDGE, logits,
                              num_nodes, empty_map, empty_map)
-        print(logits.shape)
-        print(norm.shape)
         return logits / norm.index_select(0, dst)
 
 class EdgeSoftmax1(th.autograd.Function):

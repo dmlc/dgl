@@ -185,22 +185,23 @@ def _gen_message_builtin(lhs, rhs, binary_op):
                lhs, TargetCode.CODE2STR[_target_map[lhs]],
                rhs, TargetCode.CODE2STR[_target_map[rhs]],
                name)
+
     def func(lhs_field, rhs_field, out):
         return BinaryMessageFunction(
             binary_op, _target_map[lhs],
             _target_map[rhs], lhs_field, rhs_field, out)
     func.__name__ = name
     func.__doc__ = docstring
-    return name, func
+    return func
 
 
 target = ["u", "v", "e"]
 for lhs, rhs in product(target, target):
     if lhs != rhs:
         for binary_op in ["add", "sub", "mul", "div"]:
-            name, func = _gen_message_builtin(lhs, rhs, binary_op)
-            setattr(sys.modules[__name__], name, func)
-            __all__.append(name)
+            func = _gen_message_builtin(lhs, rhs, binary_op)
+            setattr(sys.modules[__name__], func.__name__, func)
+            __all__.append(func.__name__)
 
 
 ##############################################################################
@@ -209,8 +210,10 @@ for lhs, rhs in product(target, target):
 def src_mul_edge(src, edge, out):
     return getattr(sys.modules[__name__], "u_mul_e")(src, edge, out)
 
+
 def copy_src(src, out):
     return copy_u(src, out)
+
 
 def copy_edge(edge, out):
     return copy_e(edge, out)
