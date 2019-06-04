@@ -86,6 +86,21 @@ void CusparseCsrmm2(
     const Csr& csr,
     const DType* B_data, DType* C_data,
     int out_size, int x_length) {
+  // We use csrmm2 to perform following operation:
+  // C = A x B, where A is a sparse matrix in csr format, B is the dense matrix for node
+  // feature tensor. However, since cusparse only supports column-major, while our tensor
+  // is stored in row-major, the actual computation is:
+  // C = trans(A x trans(B)).
+  // Currently, we use cublasXgeam to implement transposition and allocate intermediate
+  // workspace memory for this.
+  // TODO(minjie): The given CSR could potentially represent a bipartite graph (e.g. in the
+  //   case of nodeflow). Currently, we don't have bipartite graph support. Here is a small
+  //   hack. In the python side, we create a CSR that includes both the source and destination
+  //   nodes in the bipartite graph (so it is still square matrix). Here, when multiplying
+  //   this sparse matrix, we specify the number of rows (the `m` here) to be equal to the
+  //   number of rows of the output tensor (i.e, the `out_size`).
+  //   In the future, we should make sure the number of rows of the given csr is equal
+  //   to out_size (a.k.a the given csr is a rectangle matrix).
   const int m = out_size;
   const int k = csr.row_offsets.length - 1;
   const int n = x_length;
