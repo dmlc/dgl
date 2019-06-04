@@ -224,6 +224,32 @@ pipeline {
             //}
           }
         }
+        stage("MXNet GPU") {
+          agent {
+            docker {
+              image "dgllib/dgl-ci-gpu"
+              args "--runtime nvidia"
+            }
+          }
+          stages {
+            stage("Unit test") {
+              steps {
+                sh "nvidia-smi"
+                unit_test_linux("mxnet", "gpu")
+              }
+            }
+            //stage("Example test") {
+            //  steps {
+            //    unit_test_linux("pytorch", "cpu")
+            //  }
+            //}
+            //stage("Tutorial test") {
+            //  steps {
+            //    tutorial_test_linux("mxnet")
+            //  }
+            //}
+          }
+        }
       }
     }
   }
