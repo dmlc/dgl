@@ -30,7 +30,7 @@ def binary_op_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
     If the reducer is one of "sum, "max, "min", "prod", the operator computes,
     for each node i,::
 
-        out[i] = Sigma_{j\in Neighbor(i)} ( A[s1(i, j, e)] op B[s2(i, j, e)] )
+        out[i] = Sigma_{j in Neighbor(i)} ( A[s1(i, j, e)] op B[s2(i, j, e)] )
 
     , where A, B are two input feature tensors, op could be element-wise add/sub/div/mul.
     Depending on the lhs and rhs target, s1 and s2 will select the src/dst/edge

@@ -760,7 +760,7 @@ def _gen_send_reduce(
     The function generates symbolic program for computing
     (1) message function on the given edges (var_send_edges).
     (2) reduce function on the given nodes (var_reduce_nodes).
-    
+
     If both message_func and reduce_func are DGL builtin functions, the schedule
     will invoke fused message passing kernels (e.g. dgl.backend.binary_reduce) to
     avoid generating explicit edge messages.
