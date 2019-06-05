@@ -73,7 +73,7 @@ class CSR : public GraphInterface {
   }
 
   uint8_t NumBits() const override {
-    return indptr_->dtype.bits;
+    return indices_->dtype.bits;
   }
 
   bool IsMultigraph() const override;

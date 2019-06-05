@@ -19,6 +19,7 @@ namespace dgl {
 namespace kernel {
 namespace {
 
+// convert ndarray shape to string
 std::string ShapeString(NDArray nd) {
   std::ostringstream oss;
   oss << "(";
@@ -32,6 +33,7 @@ std::string ShapeString(NDArray nd) {
   return oss.str();
 }
 
+// compute stride vector given shape; assume row-major storage
 std::vector<int64_t> ComputeStride(const std::vector<int64_t>& shape) {
   std::vector<int64_t> ret(shape.size(), 1);
   for (int i = shape.size() - 2; i >= 0; --i) {
@@ -40,6 +42,17 @@ std::vector<int64_t> ComputeStride(const std::vector<int64_t>& shape) {
   return ret;
 }
 
+// Return true if the feature shapes of the two ndarrays can be
+// computed element-wisely *without* broadcasting.
+// Examples:
+//
+// valid:
+//  lhs.shape = (N, D1, D2)
+//  rhs.shape = (M, D1, D2)  # the first dimension could be different
+//
+// invalid:
+//  lhs.shape = (N, D1, D2)
+//  rhs.shape = (M, D1)
 bool IsValidBinaryOpShape(NDArray lhs, NDArray rhs) {
   if (lhs->ndim != rhs->ndim) {
     return false;
@@ -52,6 +65,12 @@ bool IsValidBinaryOpShape(NDArray lhs, NDArray rhs) {
   return true;
 }
 
+// Return true if broadcasting might be required to compute the element-wise
+// operation between the features of the two ndarrays.
+// The broadcasting semantic strictly follows numpy.
+// Note that the function could return true for invalid element-wise shapes
+// (e.g. lhs.shape = (N, 3), rhs.shape = (N, 5)). This is fine since
+// ``CalcBcastInfo`` will handle that.
 bool HasBcast(NDArray lhs, NDArray rhs) {
   if (lhs->ndim != rhs->ndim) {
     return true;
@@ -64,6 +83,16 @@ bool HasBcast(NDArray lhs, NDArray rhs) {
   return false;
 }
 
+// Compute auxiliary information of broadcasting dimensions.
+// The function preprocesses the feature shapes so that:
+//  - The first dimension (for graph) is removed.
+//  - Feature dimensions are aligned.
+//    e.g. (4,) and (3, 4) become (1, 4) and (3, 4)
+//  - Continuous non-broadcasting dimenions are flattened to reduce number of
+//    integers used to represent the feature shape.
+//    e.g. (4, 1, 3, 3) and (4, 5, 3, 3) become (4, 1, 9) and (4, 5, 9)
+//
+// See also: BcastInfo (kernel/binary_reduce.h)
 BcastInfo CalcBcastInfo(NDArray lhs, NDArray rhs) {
   BcastInfo ret;
   const int max_ndim = std::max(lhs->ndim, rhs->ndim) - 1;
@@ -111,6 +140,7 @@ BcastInfo CalcBcastInfo(NDArray lhs, NDArray rhs) {
   return ret;
 }
 
+// Function to convert an idarray to string
 std::string IdArrayToStr(IdArray arr) {
   arr = arr.CopyTo(DLContext{kDLCPU, 0});
   int64_t len = arr->shape[0];
@@ -131,6 +161,7 @@ std::string IdArrayToStr(IdArray arr) {
   return oss.str();
 }
 
+// Check whether the given arguments have the same context.
 inline void CheckCtx(
     const DLContext& ctx,
     const std::vector<NDArray>& arrays,
@@ -144,6 +175,7 @@ inline void CheckCtx(
   }
 }
 
+// Check whether the given arguments use the same number of bits.
 inline void CheckIdArray(
     const uint8_t bits,
     const std::vector<NDArray>& arrays,
@@ -161,7 +193,10 @@ inline void CheckIdArray(
 
 // Return true if the operator is commutative and lhs and rhs need
 // to be switched. For example, Add(kDst, kSrc) needs to be changed
-// to Add(kSrc, kDst)
+// to Add(kSrc, kDst).
+// This is because we only generate kernels for
+//  Add(kSrc, kDst), Add(kDst, kEdge), Add(kSrc, kDst)
+// to save compilation time.
 inline bool NeedSwitchOrder(const std::string& op,
     binary_op::Target lhs, binary_op::Target rhs) {
   CHECK_NE(lhs, rhs);

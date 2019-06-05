@@ -17,6 +17,7 @@ namespace dgl {
 namespace kernel {
 namespace cuda {
 
+// Minigun UDF to compute binary reduce.
 template <typename Idx, typename DType, typename Functors>
 struct BinaryReduce {
   static __device__ __forceinline__ bool CondEdge(
@@ -53,6 +54,7 @@ struct BinaryReduce {
   }
 };
 
+// Convert flattened index to multi-dimension index (assume row-major).
 __device__ __forceinline__ void Unravel(
     int64_t idx, int ndim, const int64_t* shape, const int64_t* stride, int64_t* out) {
   for (int d = 0; d < ndim; ++d) {
@@ -60,6 +62,7 @@ __device__ __forceinline__ void Unravel(
   }
 }
 
+// Convert multi-dimension index to flattened index (assume row-major).
 __device__ __forceinline__ int64_t Ravel(
     const int64_t* idx, int ndim, const int64_t* shape, const int64_t* stride) {
   int64_t out = 0;
@@ -69,6 +72,7 @@ __device__ __forceinline__ int64_t Ravel(
   return out;
 }
 
+// Minigun UDF to compute binary reduce with broadcasting.
 template <int NDim, typename Idx, typename DType, typename Functors>
 struct BinaryReduceBcast {
   static __device__ __forceinline__ bool CondEdge(
@@ -108,6 +112,7 @@ struct BinaryReduceBcast {
   }
 };
 
+// Auxiliary template used in UDF.
 template <typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
@@ -141,6 +146,7 @@ struct FunctorsTempl {
 typedef minigun::advance::Config<true, minigun::advance::kV2N> AdvanceConfig;
 }  // namespace cuda
 
+// Template implementation of BinaryReduce operator.
 template <int XPU, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
@@ -172,6 +178,7 @@ void CallBinaryReduce(const minigun::advance::RuntimeConfig& rtcfg,
         rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
 }
 
+// Template implementation of BinaryReduce broadcasting operator.
 template <int XPU, int NDim, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
@@ -205,6 +212,8 @@ void CallBinaryReduceBcast(
         rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
 }
 
+// Following macro is used to generate explicit-specialization of the template
+// operator.
 #define GEN_DEFINE(dtype, lhs_tgt, rhs_tgt, op)                    \
   template void CallBinaryReduce<XPU, IDX,                      \
         dtype, lhs_tgt, rhs_tgt, op<dtype>, REDUCER<XPU, dtype>>(  \

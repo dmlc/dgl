@@ -23,9 +23,10 @@
 namespace dgl {
 namespace kernel {
 
-/****************************************************
- * BinaryOpReduce
- ****************************************************/
+///////////////////////////////////////////////////////////////////////////////
+// BinaryReduce device-agnostic implementation
+///////////////////////////////////////////////////////////////////////////////
+
 template <int XPU, typename Idx, typename DType, typename Reducer>
 GData<Idx, DType> AllocGData(
     const DLContext& ctx, int64_t x_len,
@@ -103,9 +104,10 @@ void BinaryReduceImpl(
   });
 }
 
-/****************************************************
- * BackwardBinaryOpReduce
- ****************************************************/
+///////////////////////////////////////////////////////////////////////////////
+// BackwardBinaryReduce device-agnostic implementation
+///////////////////////////////////////////////////////////////////////////////
+
 template <int XPU, typename Idx, typename DType>
 BackwardGData<Idx, DType> AllocBackwardGData(
     const DLContext& ctx, int64_t x_len,
@@ -202,9 +204,10 @@ void BackwardBinaryReduceImpl(
   });
 }
 
-/****************************************************
- * BinaryOpReduceBcast
- ****************************************************/
+///////////////////////////////////////////////////////////////////////////////
+// BinaryReduceBcast device-agnostic implementation
+///////////////////////////////////////////////////////////////////////////////
+
 template <int XPU, int NDim, typename Idx, typename DType, typename Reducer>
 BcastGData<NDim, Idx, DType> AllocBcastGData(
     const DLContext& ctx, const BcastInfo& info,
@@ -298,9 +301,10 @@ void BinaryReduceBcastImpl(
   });
 }
 
-/****************************************************
- * BackwardBinaryOpReduceBcast
- ****************************************************/
+///////////////////////////////////////////////////////////////////////////////
+// BackwardBinaryReduceBcast device-agnostic implementation
+///////////////////////////////////////////////////////////////////////////////
+
 template <int XPU, int NDim, typename Idx, typename DType>
 BackwardBcastGData<NDim, Idx, DType> AllocBackwardBcastGData(
     const DLContext& ctx, const BcastInfo& info,

@@ -17,6 +17,7 @@ namespace dgl {
 namespace kernel {
 namespace cuda {
 
+// Minigun UDF to compute backward binary reduce.
 template <int Mode, typename Idx, typename DType, typename Functors>
 struct BackwardBinaryReduce {
   static __device__ __forceinline__ bool CondEdge(
@@ -66,6 +67,7 @@ struct BackwardBinaryReduce {
   }
 };
 
+// Minigun UDF to compute backward binary reduce with broadcasting.
 template <int Mode, int NDim, typename Idx, typename DType, typename Functors>
 struct BackwardBinaryReduceBcast {
   static __device__ __forceinline__ bool CondEdge(
@@ -118,6 +120,7 @@ struct BackwardBinaryReduceBcast {
   }
 };
 
+// Auxiliary template used in UDF.
 template <typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
@@ -162,6 +165,7 @@ typedef minigun::advance::Config<true, minigun::advance::kV2N> AdvanceConfig;
 
 }  // namespace cuda
 
+// Template implementation of BackwardBinaryReduce operator.
 template <int XPU, int Mode, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
@@ -200,6 +204,8 @@ void CallBackwardBinaryReduce(
         rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
 }
 
+// Following macro is used to generate explicit-specialization of the template
+// operator.
 #define GEN_BACKWARD_DEFINE(mode, dtype, lhs_tgt, rhs_tgt, op)  \
   template void CallBackwardBinaryReduce<XPU,                \
                     mode, IDX, dtype,                           \
@@ -209,6 +215,7 @@ void CallBackwardBinaryReduce(
       const ImmutableGraph* graph,                              \
       BackwardGData<IDX, dtype>* gdata);
 
+// Template implementation of BackwardBinaryReduce with broadcasting operator.
 template <int XPU, int Mode, int NDim, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
@@ -248,6 +255,8 @@ void CallBackwardBinaryReduceBcast(
         rtcfg, csr, gdata, minigun::IntArray1D<Idx>());
 }
 
+// Following macro is used to generate explicit-specialization of the template
+// operator.
 #define GEN_BACKWARD_BCAST_DEFINE(mode, ndim, dtype, lhs_tgt, rhs_tgt, op)  \
   template void CallBackwardBinaryReduceBcast<XPU,                       \
                     mode, ndim, IDX, dtype,                                 \

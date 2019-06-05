@@ -39,10 +39,33 @@ std::vector<int64_t> InferBinaryFeatureShape(
     runtime::NDArray lhs,
     runtime::NDArray rhs);
 
-/*
- * !\brief Perform binary operation between the given data and reduce by the graph.
+/*!
+ * \brief Perform binary operation between the given data and reduce by the graph.
  *
- * \param reducer The type of the reducer ("sum", "max", "mean", "min", "none").
+ * If the reducer is one of "sum, "max, "min", "prod", the operator computes,
+ * for each node i,
+ *
+ *   out[i] = Sigma_{j\in Neighbor(i)} ( A[s1(i, j, e)] op B[s2(i, j, e)] )
+ *
+ * , where A, B are two input feature tensors, op could be element-wise add/sub/div/mul.
+ * Depending on the lhs and rhs target, s1 and s2 will select the src/dst/edge
+ * ids of each neighbor.
+ *
+ * If the reducer is "none", the operator computes, for each edge e,
+ *
+ *   out[e] = A[s1(i, j, e)] op B[s2(i, j, e)]
+ *
+ * Here, the node/edge feature (e.g., A[i], B[e]) could be dense tensor. In such
+ * case, broadcasting is supported on the feature dimensions.
+ *
+ * Examples:
+ *
+ * A.shape = (N, D1, D2)  # N is the number of nodes
+ * B.shape = (M, D1, 1)   # M is the number of edges
+ * C = BinaryOpReduce("sum", "add", graph, A, B, ...)
+ * C.shape = (N, D1, D2)
+ *
+ * \param reducer The type of the reducer ("sum", "max", "prod", "min", "none").
  *                If the reducer is "none", the output is an edge feature tensor.
  *                Otherwise, a node feature tensor is returned.
  * \param op The type of the binary operator ("mul", "add").
@@ -67,10 +90,23 @@ void BinaryOpReduce(
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
     runtime::NDArray out_mapping);
 
-/*
- * !\brief Compute the lhs gradient of BinaryOpReduce
+/*!
+ * \brief Compute the lhs gradient of BinaryOpReduce
  *
- * \param reducer The type of the reducer ("sum", "max", "mean", "min", "none").
+ * Broadcasting along feature dimensions is supported. However, the gradient
+ * of the being-broadcasted dimensions will *not* be reduced. Therefore, the
+ * gradient tensor has the same shape with the out tensor.
+ *
+ * Examples:
+ * A.shape = (N, D1, 1)    # N is the number of nodes
+ * B.shape = (M, D1, D2)   # M is the number of edges
+ * C = BinaryOpReduce("sum", "add", graph, A, B, ...)
+ * C.shape = (N, D1, D2)
+ * dC.shape = (N, D1, D2)
+ * dA = BackwardLhsBinaryOpReduce("sum", "add", graph, A, B, C, dC, ...)
+ * dA.shape = (N, D1, D2)  # extra reduction should be handled afterwards
+ *
+ * \param reducer The type of the reducer ("sum", "max", "prod", "min", "none").
  *                If the reducer is "none", the output is an edge feature tensor.
  *                Otherwise, a node feature tensor is returned.
  * \param op The type of the binary operator ("mul", "add").
@@ -101,10 +137,23 @@ void BackwardLhsBinaryOpReduce(
     runtime::NDArray grad_out_data,
     runtime::NDArray grad_lhs_data);
 
-/*
- * !\brief Compute the rhs gradient of BinaryOpReduce
+/*!
+ * \brief Compute the rhs gradient of BinaryOpReduce
  *
- * \param reducer The type of the reducer ("sum", "max", "mean", "min", "none").
+ * Broadcasting along feature dimensions is supported. However, the gradient
+ * of the being-broadcasted dimensions will *not* be reduced. Therefore, the
+ * gradient tensor has the same shape with the out tensor.
+ *
+ * Examples:
+ * A.shape = (N, D1, D2)   # N is the number of nodes
+ * B.shape = (M, D1, 1)    # M is the number of edges
+ * C = BinaryOpReduce("sum", "add", graph, A, B, ...)
+ * C.shape = (N, D1, D2)
+ * dC.shape = (N, D1, D2)
+ * dB = BackwardRhsBinaryOpReduce("sum", "add", graph, A, B, C, dC, ...)
+ * dB.shape = (N, D1, D2)  # extra reduction should be handled afterwards
+ *
+ * \param reducer The type of the reducer ("sum", "max", "prod", "min", "none").
  *                If the reducer is "none", the output is an edge feature tensor.
  *                Otherwise, a node feature tensor is returned.
  * \param op The type of the binary operator ("mul", "add").
@@ -135,10 +184,23 @@ void BackwardRhsBinaryOpReduce(
     runtime::NDArray grad_out_data,
     runtime::NDArray grad_rhs_data);
 
-/*
- * !\brief Copy the target data and reduce by graph structure.
+/*!
+ * \brief Copy the target data and reduce by graph structure.
  *
- * \param reducer The type of the reducer ("sum", "max", "mean", "min", "none").
+ * If the reducer is one of "sum, "max, "min", "prod", the operator computes,
+ * for each node i,
+ *
+ *   out[i] = Sigma_{j\in Neighbor(i)} A[s1(i, j, e)]
+ *
+ * , where A, B are two input feature tensors.
+ * Depending on the lhs and rhs target, s1 and s2 will select the src/dst/edge
+ * ids of each neighbor.
+ *
+ * If the reducer is "none", the operator computes, for each edge e,
+ *
+ *   out[e] = A[s1(i, j, e)]
+ *
+ * \param reducer The type of the reducer ("sum", "max", "prod", "min", "none").
  *                If the reducer is "none", the output is an edge feature tensor.
  *                Otherwise, a node feature tensor is returned.
  * \param graph The graph object.
@@ -156,10 +218,10 @@ void CopyReduce(
     runtime::NDArray in_data, runtime::NDArray out_data,
     runtime::NDArray in_mapping, runtime::NDArray out_mapping);
 
-/*
- * !\brief Compute backward of the CopyReduce
+/*!
+ * \brief Compute backward of the CopyReduce
  *
- * \param reducer The type of the reducer ("sum", "max", "mean", "min", "none").
+ * \param reducer The type of the reducer ("sum", "max", "prod", "min", "none").
  *                If the reducer is "none", the output is an edge feature tensor.
  *                Otherwise, a node feature tensor is returned.
  * \param graph The graph object.

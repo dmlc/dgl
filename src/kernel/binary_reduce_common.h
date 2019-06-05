@@ -36,10 +36,10 @@ static const char kUseLhs[] = "use_lhs";
  * \seealso BinaryOpReduce in binary_reduce_common.h
  */
 enum Target {
-  kSrc = 0,  // operand selects 
-  kDst,
-  kEdge,
-  kNone,
+  kSrc = 0,  // select src node
+  kDst,      // select dst node
+  kEdge,     // select edge
+  kNone,     // select none
 };
 
 /*! \brief Enum code for backward operator mode. */
@@ -193,6 +193,16 @@ struct BinaryUseLhs {
 };
 
 // Macro for dispatching op enum code and target code into template arguments.
+// The macro dispatches following combinations:
+//  - Add(Src, Dst), Add(Src, Edge), Add(Dst, Edge)
+//  - Mul(Src, Dst), Mul(Src, Edge), Mul(Dst, Edge)
+//  - Sub(Src, Dst), Sub(Src, Edge), Sub(Dst, Edge)
+//    Sub(Dst, Src), Sub(Edge, Src), Sub(Edge, Dst)
+//  - Div(Src, Dst), Div(Src, Edge), Div(Dst, Edge)
+//    Div(Dst, Src), Div(Edge, Src), Div(Edge, Dst)
+//  - UseLhs(Src, None), UseLhs(Edge, None)
+// Note that for commutative operators (e.g. Add and Mul), we only generate
+// kernels for lhs code smaller than rhs code.
 #define OP_TARGET_SWITCH(op, lhs, rhs, DType, OpType, LeftType, RightType, ...)   \
   {                                                            \
   using namespace binary_op;                                   \
