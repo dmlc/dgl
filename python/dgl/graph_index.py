@@ -848,9 +848,7 @@ class GraphIndex(object):
         int
             The number of bits needed
         """
-        if self.number_of_edges() >= 0x80000000:
-            return 64
-        elif self.number_of_nodes() >= 0x80000000:
+        if self.number_of_edges() >= 0x80000000 or self.number_of_nodes() >= 0x80000000:
             return 64
         else:
             return 32

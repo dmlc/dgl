@@ -12,7 +12,7 @@ from ..runtime.ir import var
 class ReduceFunction(BuiltinFunction):
     """Base builtin reduce function class."""
 
-    def __call__(self, graph, edge_frame, out_size, edge_map=None,
+    def _invoke(self, graph, edge_frame, out_size, edge_map=None,
                  out_map=None):
         """Symbolic computation of this builtin function to create
         runtime.executor
@@ -33,7 +33,7 @@ class SimpleReduceFunction(ReduceFunction):
         self.msg_field = msg_field
         self.out_field = out_field
 
-    def __call__(self, graph, edge_frame, out_size, edge_map=None,
+    def _invoke(self, graph, edge_frame, out_size, edge_map=None,
                  out_map=None):
         """Symbolic execution of this builtin function"""
         reducer = self._name

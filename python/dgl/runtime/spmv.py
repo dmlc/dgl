@@ -51,8 +51,9 @@ def gen_v2v_spmv_schedule(graph, mfunc, rfunc, src_frame, dst_frame,
             raise DGLError('Reduce function requires message field "%s",'
                            ' but no message function generates it.' % mfld)
         mfn = fld2mfunc[mfld]
-        ftdst = mfn(graph, src_frame, dst_frame, edge_frame, out_size, src_map,
-                    dst_map, edge_map, out_map, reducer=rfn.name)
+        ftdst = mfn._invoke(graph, src_frame, dst_frame, edge_frame, out_size,
+                            src_map, dst_map, edge_map, out_map,
+                            reducer=rfn.name)
         ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
 
@@ -88,8 +89,9 @@ def gen_v2e_spmv_schedule(graph, mfunc, src_frame, dst_frame, edge_frame, out,
         Function that generates output id mapping array on given context
     """
     for mfn in mfunc:
-        fmsg = mfn(graph, src_frame, dst_frame, edge_frame, out_size, src_map,
-                   dst_map, edge_map, out_map=out_map, reducer="none")
+        fmsg = mfn._invoke(graph, src_frame, dst_frame, edge_frame, out_size,
+                           src_map, dst_map, edge_map, out_map=out_map,
+                           reducer="none")
         ir.WRITE_COL_(out, var.STR(mfn.out_field), fmsg)
 
 
@@ -115,8 +117,8 @@ def gen_e2v_spmv_schedule(graph, rfunc, message_frame, out, out_size,
         Function that generates output id mapping array on given context
     """
     for rfn in rfunc:
-        ftdst = rfn(graph, message_frame, out_size, edge_map=edge_map,
-                    out_map=out_map)
+        ftdst = rfn._invoke(graph, message_frame, out_size, edge_map=edge_map,
+                            out_map=out_map)
         ir.WRITE_COL_(out, var.STR(rfn.out_field), ftdst)
 
 

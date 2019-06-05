@@ -278,6 +278,23 @@ copy_reduce = CopyReduce.apply
 
 
 def _reduce_grad(grad, shape):
+    """Reduce gradient on the broadcast dimension
+
+    If there is broadcast in forward pass, gradients need to be reduced on
+    broadcast dimension. This function checks the input tensor shape and
+    gradient shape and perform the reduction.
+
+    Parameters
+    ----------
+    grad: Tensor
+        Gradient tensor
+    shape: tuple
+        Shape of input tensor
+
+    Returns
+    -------
+    Tensor
+    """
     grad_shape = grad.shape[1:]
     in_shape = shape[1:]
     if in_shape == grad_shape:

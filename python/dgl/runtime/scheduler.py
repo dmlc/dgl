@@ -850,6 +850,8 @@ def _gen_send_reduce(
     if mfunc_is_list:
         # messages are builtin but reduce is UDF
         # Create a tmp frame to hold the message.
+        # TODO: should replace this with an IR call to make the program
+        # stateless.
         n_message = len(var_eid.data)
         tmp_msg_frame = FrameRef(frame_like(edge_frame._frame, n_message))
         var_mf = var.FEAT_DICT(data=tmp_msg_frame)

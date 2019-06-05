@@ -890,12 +890,12 @@ def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
         The rhs data
     out_size : int
         Size of first dimension of output data
-    lhs_map : tuple of two dgl.ndarray.NDArray
-        The lhs id mapping array
-    rhs_map : tuple of two dgl.ndarray.NDArray
-        The rhs id mapping array
-    out_map : tuple of two dgl.ndarray.NDArray
-        The out id mapping array
+    lhs_map : tuple
+        Two lhs id mapping arrays, one for forward pass, the other for backward
+    rhs_map : tuple
+        Two rhs id mapping arrays, one for forward pass, the other for backward
+    out_map : tuple
+        Two out id mapping arrays, one for forward pass, the other for backward
 
     Returns
     -------
@@ -920,10 +920,10 @@ def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
         The input data
     out_size : int
         Size of first dimension of output data
-    in_map : dgl.ndarray.NDArray
-        The input id mapping array
-    out_map : dgl.ndarray.NDArray
-        The output id mapping array
+    in_map : tuple
+        Two input id mapping arrays, one for forward, the other for backward
+    out_map : tuple
+        Two output id mapping arrays, one for forward, the other for backward
 
     Returns
     -------
