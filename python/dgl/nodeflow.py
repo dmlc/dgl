@@ -932,8 +932,10 @@ def _get_frame(frame, names, ids, ctx):
         return FrameRef(Frame(col_dict))
 
 def _copy_frame(frame, ctx):
-    return {name: F.copy_to(frame[name], ctx)
-            if ctx else frame[name] for name in frame}
+    new_frame = {}
+    for name in frame:
+        new_frame[name] = F.copy_to(frame[name], ctx) if ctx else frame[name]
+    return new_frame
 
 
 def _update_frame(frame, names, ids, new_frame):

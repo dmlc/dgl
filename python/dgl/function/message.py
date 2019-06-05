@@ -16,7 +16,7 @@ class MessageFunction(BuiltinFunction):
     """Base builtin message function class."""
 
     def _invoke(self, graph, src_frame, dst_frame, edge_frame, out_size,
-                 src_map, dst_map, edge_map, out_map, reducer="none"):
+                src_map, dst_map, edge_map, out_map, reducer="none"):
         """Symbolic computation of this builtin function to create
         runtime.executor
         """
@@ -44,7 +44,7 @@ class BinaryMessageFunction(MessageFunction):
         self.out_field = out_field
 
     def _invoke(self, graph, src_frame, dst_frame, edge_frame, out_size,
-                 src_map, dst_map, edge_map, out_map, reducer="none"):
+                src_map, dst_map, edge_map, out_map, reducer="none"):
         """Symbolic computation of builtin binary message function to create
         runtime.executor
         """
@@ -80,7 +80,7 @@ class CopyMessageFunction(MessageFunction):
         self.out_field = out_field
 
     def _invoke(self, graph, src_frame, dst_frame, edge_frame, out_size,
-                 src_map, dst_map, edge_map, out_map, reducer="none"):
+                src_map, dst_map, edge_map, out_map, reducer="none"):
         """Symbolic computation of builtin message function to create
         runtime.executor
         """
