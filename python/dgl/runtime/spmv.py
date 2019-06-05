@@ -180,7 +180,7 @@ def build_gidx_and_mapping_uv(edge_tuples, num_nodes):
     edge_map = utils.CtxCachedObject(
         lambda ctx: (nd.array(forward_map, ctx=ctx),
                      nd.array(backward_map, ctx=ctx)))
-    return utils.CtxCachedObject(gidx.get_immutable_gidx), edge_map, nbits
+    return gidx.get_immutable_gidx, edge_map, nbits
 
 
 def build_gidx_and_mapping_block(graph, block_id, edge_tuples=None):

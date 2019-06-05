@@ -5,7 +5,11 @@ __all__ = ['BuiltinFunction', 'TargetCode']
 
 
 class TargetCode(object):
-    """Code for target"""
+    """Code for target
+
+    Note: must be consistent with the target code definition in C++ side:
+          src/kernel/binary_reduce_common.h
+    """
     SRC = 0
     DST = 1
     EDGE = 2
