@@ -1,0 +1,23 @@
+---
+- hosts: build
+  tasks:
+  - name: Remote Build
+    block:
+    - name: Copy to remote
+      synchronize:
+        mode: push
+        src: ./
+        dest: /tmp/build/{{ src_dir }}/
+    - name: Build
+      command: chdir=/tmp/build/{{ src_dir }} bash /tmp/build/{{ src_dir }}/tests/scripts/build_dgl.sh
+    - name: Copy back
+      synchronize:
+        mode: pull
+        dest: ./
+        src: /tmp/build/{{ src_dir }}/
+    always:
+    - name: Delete files
+      file:
+        state: absent
+        path: /tmp/build/{{ src_dir }}/
+
