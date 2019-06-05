@@ -560,7 +560,7 @@ def schedule_nodeflow_compute(graph,
                               reduce_func,
                               apply_func,
                               inplace):
-    """get flow compute schedule in NodeFlow
+    """Get flow compute schedule in NodeFlow
 
     Parameters
     ----------
@@ -756,6 +756,22 @@ def _gen_send_reduce(
         adj_creator,
         out_map_creator):
     """Generate send and reduce schedule.
+
+    The function generates symbolic program for computing
+    (1) message function on the given edges (var_send_edges).
+    (2) reduce function on the given nodes (var_reduce_nodes).
+    
+    If both message_func and reduce_func are DGL builtin functions, the schedule
+    will invoke fused message passing kernels (e.g. dgl.backend.binary_reduce) to
+    avoid generating explicit edge messages.
+
+    If message_func is UDF while reduce_func is DGL builtin function, the schedule
+    first invokes UDF to generate explicit edge messages, and then invokes
+    dgl.backend.copy_reduce to reduce messages on the destination nodes.
+
+    If both message_func and reduce_func are UDFs, the schedule first invokes message
+    UDF to generate explicit edge messages and then use degree-bucketing to invoke
+    reduce UDF.
 
     Parameters
     ----------
