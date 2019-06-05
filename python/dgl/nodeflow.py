@@ -276,6 +276,7 @@ class NodeFlow(DGLBaseGraph):
         Tensor
             Node Ids in the NodeFlow.
         """
+        layer_id = self._get_layer_id(layer_id)
         parent_nids = utils.toindex(parent_nids)
         layers = self._layer_offsets
         start = int(layers[layer_id])
@@ -414,6 +415,7 @@ class NodeFlow(DGLBaseGraph):
         Tensor
             The edge ids.
         """
+        block_id = self._get_block_id(block_id)
         layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
         rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, "coo",
                                         int(layer0_size),
@@ -446,6 +448,7 @@ class NodeFlow(DGLBaseGraph):
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
+        block_id = self._get_block_id(block_id)
         fmt = F.get_preferred_sparse_format()
         # We need to extract two layers.
         layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
@@ -511,6 +514,7 @@ class NodeFlow(DGLBaseGraph):
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
+        block_id = self._get_block_id(block_id)
         src, dst, eid = self.block_edges(block_id)
         src = F.copy_to(src, ctx)  # the index of the ctx will be cached
         dst = F.copy_to(dst, ctx)  # the index of the ctx will be cached
@@ -730,6 +734,7 @@ class NodeFlow(DGLBaseGraph):
         inplace : bool, optional
             If True, update will be done in place, but autograd will break.
         """
+        block_id = self._get_block_id(block_id)
         if func == "default":
             func = self._apply_edge_funcs[block_id]
         assert func is not None
@@ -797,6 +802,7 @@ class NodeFlow(DGLBaseGraph):
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
         """
+        block_id = self._get_block_id(block_id)
         if message_func == "default":
             message_func = self._message_funcs[block_id]
         if reduce_func == "default":
