@@ -16,7 +16,7 @@
 namespace dgl {
 namespace kernel {
 namespace binary_op {
-
+/*! \brief Reducer names. */
 static const char kReduceSum[] = "sum";
 static const char kReduceMax[] = "max";
 static const char kReduceMin[] = "min";
@@ -24,27 +24,40 @@ static const char kReduceMean[] = "mean";
 static const char kReduceProd[] = "prod";
 static const char kReduceNone[] = "none";
 
+/*! \brief Binary op names. */
 static const char kAdd[] = "add";
 static const char kSub[] = "sub";
 static const char kMul[] = "mul";
 static const char kDiv[] = "div";
 static const char kUseLhs[] = "use_lhs";
 
+/*!
+ * \brief Enum code for operand targets.
+ * \seealso BinaryOpReduce in binary_reduce_common.h
+ */
 enum Target {
-  kSrc = 0,
+  kSrc = 0,  // operand selects 
   kDst,
   kEdge,
   kNone,
 };
 
+/*! \brief Enum code for backward operator mode. */
 enum BackwardMode {
-  kGradLhs = 0,
-  kGradRhs,
-  kGradBoth,
+  kGradLhs = 0,  // compute lhs gradient
+  kGradRhs,      // compute rhs gradient
+  kGradBoth,     // compute both gradients
 };
 }  // namespace binary_op
 
-// Select src
+//////////////////////////////////////////////////////////////////////////
+// Defines operand target category. Each category is a structure with
+// two static members:
+//  - target: The enum code of this category.
+//  - Call: The call functor that returns the selected target.
+//////////////////////////////////////////////////////////////////////////
+
+/*! \brief Select src category. */
 struct SelectSrc {
   // Target value
   static constexpr binary_op::Target target = binary_op::kSrc;
@@ -55,7 +68,7 @@ struct SelectSrc {
   }
 };
 
-// Select dst
+/*! \brief Select dst category. */
 struct SelectDst {
   // Target value
   static constexpr binary_op::Target target = binary_op::kDst;
@@ -66,7 +79,7 @@ struct SelectDst {
   }
 };
 
-// Select edge
+/*! \brief Select edge category. */
 struct SelectEdge {
   // Target value
   static constexpr binary_op::Target target = binary_op::kEdge;
@@ -77,7 +90,7 @@ struct SelectEdge {
   }
 };
 
-// Select none
+/*! \brief Select none category. */
 struct SelectNone {
   // Target value
   static constexpr binary_op::Target target = binary_op::kNone;
@@ -88,8 +101,8 @@ struct SelectNone {
   }
 };
 
-// Change SelectSrc to SelectDst and vice versa
-// SelectEdge will remain the same.
+/*! \brief Type functor to switch SelectSrc and SelectDst category.
+ * SelectEdge and SelectNone will remain the same. */
 template <typename Selector>
 struct SwitchSrcDst {
   typedef Selector Type;
@@ -105,19 +118,13 @@ struct SwitchSrcDst<SelectDst> {
   typedef SelectSrc Type;
 };
 
-// direct id
-template <int XPU, typename IdxType>
-struct DirectId {
-  static DGLDEVICE DGLINLINE IdxType Call(IdxType id, IdxType* shuffle_ids) {
-    return id;
-  }
-};
-
-// id mapped by another array
-template <int XPU, typename IdxType>
-struct IndirectId {
-  static DGLDEVICE DGLINLINE IdxType Call(IdxType id, IdxType* shuffle_ids);
-};
+//////////////////////////////////////////////////////////////////////////
+// Defines binary op category. Each category is a structure with
+// three static members:
+//  - Call: The forward computation given two operand.
+//  - BackwardLhs: Compute lhs gradient.
+//  - BackwardRhs: Compute rhs gradient.
+//////////////////////////////////////////////////////////////////////////
 
 // common binary functors
 template <typename DType>
@@ -185,6 +192,7 @@ struct BinaryUseLhs {
   }
 };
 
+// Macro for dispatching op enum code and target code into template arguments.
 #define OP_TARGET_SWITCH(op, lhs, rhs, DType, OpType, LeftType, RightType, ...)   \
   {                                                            \
   using namespace binary_op;                                   \
@@ -294,6 +302,7 @@ struct BinaryUseLhs {
   }                                                            \
   }
 
+// Macro for unrolling with various template argument combinations
 #define GEN_OP_TARGET(GEN, ...) \
   MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectDst, BinaryAdd))      \
   MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectEdge, BinaryAdd))     \
@@ -316,6 +325,15 @@ struct BinaryUseLhs {
   MSVC_EXPAND(GEN(__VA_ARGS__, SelectSrc, SelectNone, BinaryUseLhs))  \
   MSVC_EXPAND(GEN(__VA_ARGS__, SelectEdge, SelectNone, BinaryUseLhs))
 
+//////////////////////////////////////////////////////////////////////////
+// Defines reducer category. Each category is an empty structure.
+// The call functor is device dependent, so should be specialized
+// in the each device's implementation.
+// See Also:
+//  - kernel/cpu/functor.h
+//  - kernel/cuda/functor.cuh
+//////////////////////////////////////////////////////////////////////////
+
 // functors for reducers
 template <int XPU, typename DType>
 struct ReduceSum { };
@@ -332,6 +350,7 @@ struct ReduceProd { };
 template <int XPU, typename DType>
 struct ReduceNone { };
 
+// Macro for dispatching reducer names to Reducer op structure
 #define REDUCER_SWITCH(val, XPU, DType, RedType, ...)   \
   if (val == binary_op::kReduceSum                 \
       || val == binary_op::kReduceMean) {          \
@@ -353,7 +372,7 @@ struct ReduceNone { };
     LOG(FATAL) << "Unsupported reducer: " << val;  \
   }
 
-// functors for zero elements of reducers
+// Type trait for getting zero value of the given reducer type.
 template <typename Reducer>
 struct Zero { };
 
@@ -397,18 +416,20 @@ constexpr DType Zero<ReduceProd<XPU, DType>>::value;
 template <int XPU, typename DType>
 constexpr DType Zero<ReduceNone<XPU, DType>>::value;
 
-// Selecting output target based on reducer type
+// Type functor for selecting output target based on reducer type.
+/*! \brief For all the reducer types except ReduceNone, select dst as the output target. */
 template <typename Reducer>
 struct OutSelector {
   typedef SelectDst Type;
 };
 
+/*! \brief For ReduceNone, select edge as the output target. */
 template <int XPU, typename DType>
 struct OutSelector<ReduceNone<XPU, DType>> {
   typedef SelectEdge Type;
 };
 
-// macro for broadcasting
+// macro for dispatching number of broadcasting dimensions to template argument
 #define BCAST_NDIM_SWITCH(ndim, NDim, ...) \
   if (ndim <= 2) {                         \
     constexpr int NDim = 2;                \
@@ -423,12 +444,13 @@ struct OutSelector<ReduceNone<XPU, DType>> {
     LOG(FATAL) << "Too many broadcasting dimensions."; \
   }
 
+// macro for unrolling different broadcasting dimensions
 #define GEN_NDIM(GEN, ...) \
   MSVC_EXPAND(GEN(__VA_ARGS__, 2)) \
   MSVC_EXPAND(GEN(__VA_ARGS__, 4)) \
   MSVC_EXPAND(GEN(__VA_ARGS__, 8))
 
-// macro for backward mode
+// macro for dispatching backward mode enum to template argument
 #define BACKWARD_MODE_SWITCH(req_lhs, req_rhs, Mode, ...) \
   CHECK(!(req_lhs && req_rhs));                           \
   if (req_lhs) {                                          \
@@ -439,6 +461,7 @@ struct OutSelector<ReduceNone<XPU, DType>> {
     {__VA_ARGS__}                                         \
   }
 
+// macro for unrolling different backward mode
 #define GEN_BACKWARD_MODE(GEN, ...)        \
   MSVC_EXPAND(GEN(__VA_ARGS__, binary_op::kGradLhs))    \
   MSVC_EXPAND(GEN(__VA_ARGS__, binary_op::kGradRhs))    \

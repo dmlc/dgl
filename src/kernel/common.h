@@ -21,6 +21,7 @@ namespace kernel {
 #define DGLINLINE inline
 #endif  // __CUDACC__
 
+// Macro for dispatch device flag to template function calls
 #ifdef DGL_USE_CUDA
 #define DGL_XPU_SWITCH(val, Method, ...)  \
   if (val == kDLCPU) {                    \
@@ -39,38 +40,11 @@ namespace kernel {
   }
 #endif  // DGL_USE_CUDA
 
-#if 0
-#define GEN_DTYPE(GEN, ...)  \
-  GEN(__VA_ARGS__, float)    \
-  GEN(__VA_ARGS__, double)   \
-  GEN(__VA_ARGS__, int32_t)  \
-  GEN(__VA_ARGS__, int64_t)
-
-#define DGL_DTYPE_SWITCH(val, DType, ...)                   \
-  if (val.code == kDLInt && val.bits == 32) {               \
-    typedef int32_t DType;                                  \
-    {__VA_ARGS__}                                           \
-  } else if (val.code == kDLInt && val.bits == 64) {        \
-    typedef int64_t DType;                                  \
-    {__VA_ARGS__}                                           \
-  } else if (val.code == kDLFloat && val.bits == 32) {      \
-    typedef float DType;                                    \
-    {__VA_ARGS__}                                           \
-  } else if (val.code == kDLFloat && val.bits == 64) {      \
-    typedef double DType;                                   \
-    {__VA_ARGS__}                                           \
-  } else {                                                  \
-    LOG(FATAL) << "Unsupported dtype: " << val.code << "_"  \
-               << val.bits;                                 \
-  }
-#else
-
 // MSVC does not expand __VA_ARGS__ correctly, and needs this expand hack
 #define MSVC_EXPAND(x) x
 
-#define GEN_DTYPE(GEN, ...)  \
-  MSVC_EXPAND(GEN(__VA_ARGS__, float))
-
+// Macro for dispatch dtype flag to template argument. Currently only
+// support float32.
 #define DGL_DTYPE_SWITCH(val, DType, ...)                   \
   if (val.code == kDLFloat && val.bits == 32) {             \
     typedef float DType;                                    \
@@ -79,8 +53,12 @@ namespace kernel {
     LOG(FATAL) << "Unsupported dtype: " << val.code << "_"  \
                << val.bits;                                 \
   }
-#endif
 
+// Macro for unrolling with data type arguments.
+#define GEN_DTYPE(GEN, ...)  \
+  MSVC_EXPAND(GEN(__VA_ARGS__, float))
+
+// Macro for dispatch index nbits to template argument.
 #ifdef __CUDACC__
 #define DGL_IDX_TYPE_SWITCH(bits, Idx, ...)            \
   if (bits == 32) {                                    \

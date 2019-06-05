@@ -94,7 +94,7 @@ void BinaryReduceImpl(
         auto gdata = AllocGData<XPU, Idx, DType, Reducer>(
             rtcfg.ctx, x_len, lhs_mapping, rhs_mapping,
             lhs_data, rhs_data, out_mapping, out_data);
-      OP_TARGET_SWITCH(op, lhs, rhs, DType, BinaryOp, LeftTarget, RightTarget, {
+        OP_TARGET_SWITCH(op, lhs, rhs, DType, BinaryOp, LeftTarget, RightTarget, {
           CallBinaryReduce<XPU, Idx, DType, LeftTarget,
             RightTarget, BinaryOp, Reducer>(rtcfg, graph, &gdata);
         });

@@ -14,18 +14,26 @@
 
 namespace minigun {
 namespace advance {
+// forward declaration
 struct RuntimeConfig;
 }  // namespace advance
 }  // namespace minigun
 
 namespace dgl {
 
+// forward declaration
 class ImmutableGraph;
 
 namespace kernel {
 
+// forward declaration
 struct BcastInfo;
 
+///////////////////////////////////////////////////////////////////////////////
+// BinaryReduce declarations
+///////////////////////////////////////////////////////////////////////////////
+
+/*!\brief Data structure used by computing BinaryOpReduce in Minigun. */
 template <typename Idx, typename DType>
 struct GData {
   // length along x(feature) dimension
@@ -42,6 +50,29 @@ struct GData {
   Idx *out_mapping{nullptr};
 };
 
+/*!
+ * \brief Template for computing BinaryOpReduce.
+ *
+ * LeftSelector and RightSelector must be one of the four operand target
+ * categories.
+ *
+ * BinaryOp must be one of the binary operator types.
+ *
+ * Reducer must be one of the reducer types.
+ *
+ * See definitions in binary_reduce_common.h
+ *
+ * \tparam XPU the device flag
+ * \tparam Idx type of node/edge index (e.g. int32_t, int64_t)
+ * \tparam DType type of the feature data (e.g. float32)
+ * \tparam LeftSelect lhs category type
+ * \tparam RightSelect rhs category type
+ * \tparam BinaryOp Binary operator type
+ * \tparam Reducer Reducer type
+ * \param rtcfg Runtime configuration used by miningun
+ * \param graph The graph object.
+ * \param gdata The data used by the computation.
+ */
 template <int XPU, typename Idx, typename DType,
           typename LeftSelector, typename RightSelector,
           typename BinaryOp, typename Reducer>
@@ -50,6 +81,7 @@ void CallBinaryReduce(
     const ImmutableGraph* graph,
     GData<Idx, DType>* gdata);
 
+/*! \brief Template function used to implement logics shared by different devices. */
 template <int XPU>
 void BinaryReduceImpl(
     const std::string& reducer,
@@ -58,6 +90,10 @@ void BinaryReduceImpl(
     binary_op::Target lhs, binary_op::Target rhs,
     runtime::NDArray lhs_data, runtime::NDArray rhs_data, runtime::NDArray out_data,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping, runtime::NDArray out_mapping);
+
+///////////////////////////////////////////////////////////////////////////////
+// BackwardBinaryReduce declarations
+///////////////////////////////////////////////////////////////////////////////
 
 template <typename Idx, typename DType>
 struct BackwardGData {
@@ -95,7 +131,9 @@ void BackwardBinaryReduceImpl(
     runtime::NDArray grad_out_data,
     runtime::NDArray grad_lhs_data, runtime::NDArray grad_rhs_data);
 
-// Binary reduce with broadcasting
+///////////////////////////////////////////////////////////////////////////////
+// BinaryReduce with broadcasting declarations
+///////////////////////////////////////////////////////////////////////////////
 
 /*
  * !\brief Data and auxiliary information for binary broadcasting op.
@@ -141,6 +179,10 @@ void BinaryReduceBcastImpl(
     runtime::NDArray out_data,
     runtime::NDArray lhs_mapping, runtime::NDArray rhs_mapping,
     runtime::NDArray out_mapping);
+
+///////////////////////////////////////////////////////////////////////////////
+// BackwardBinaryReduce with broadcasting declarations
+///////////////////////////////////////////////////////////////////////////////
 
 /*
  * !\brief Data and auxiliary information for backward binary broadcasting op.
