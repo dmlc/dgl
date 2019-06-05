@@ -36,7 +36,7 @@ static const char kUseLhs[] = "use_lhs";
  * \seealso BinaryOpReduce in binary_reduce_common.h
  */
 enum Target {
-  kSrc = 0,  // operand selects 
+  kSrc = 0,  // operand selects
   kDst,
   kEdge,
   kNone,
