@@ -27,10 +27,42 @@ def binary_op_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
                      out_mapping=None):
     """Perform binary operation between the given data and reduce by the graph.
 
-    Broadcasting is supported for feature dimensions.
+    If the reducer is one of "sum, "max, "min", "prod", the operator computes,
+    for each node i,::
+    
+        out[i] = Sigma_{j\in Neighbor(i)} ( A[s1(i, j, e)] op B[s2(i, j, e)] )
+
+    , where A, B are two input feature tensors, op could be element-wise add/sub/div/mul.
+    Depending on the lhs and rhs target, s1 and s2 will select the src/dst/edge
+    ids of each neighbor.
+
+    If the reducer is "none", the operator computes, for each edge e,::
+    
+        out[e] = A[s1(i, j, e)] op B[s2(i, j, e)]
+    
+    Here, the node/edge feature (e.g., A[i], B[e]) could be dense tensor. In such
+    case, broadcasting is supported on the feature dimensions, which follows numpy
+    semantics.
+ 
+    Examples::
+
+        A.shape = (N, D1, D2)  # N is the number of nodes
+        B.shape = (M, D1, 1)   # M is the number of edges
+        C = BinaryOpReduce("sum", "add", graph, A, B, ...)
+        C.shape = (N, D1, D2)
 
     Optional id mapping arrays could be provided to read/write from/to locations
-    other than node/edge ids.
+    other than node/edge ids. Each mapping array is a 1D integer vector, whose
+    id bit-width should be consistent with the graph bit-width. The length of the
+    mapping array should be equal to the number of rows of the corresponding
+    operand. For example, if ``lhs=A`` and ``lhs_mapping=M``, then when reading/writing
+    to A tensor::
+
+        A[M[s1(i,j,e)]]
+
+    If no id is provided and the operand target is edge 1) lhs or rhs is edge 2) or
+    reducer is none so output is edge, edge id will be used to access corresponding
+    feature tensor.
 
     Parameter
     ---------
@@ -187,7 +219,17 @@ def copy_reduce(reducer, graph, target,
     """Copy target data and perform reduce by graph.
 
     Optional id mapping arrays could be provided to read/write from/to locations
-    other than node/edge ids.
+    other than node/edge ids. Each mapping array is a 1D integer vector, whose
+    id bit-width should be consistent with the graph bit-width. The length of the
+    mapping array should be equal to the number of rows of the corresponding
+    operand. For example, if ``in_data=A`` and ``in_mapping=M``, then when reading/writing
+    to A tensor::
+
+        A[M[s1(i,j,e)]]
+
+    If no id is provided and the operand target is edge 1) target is edge 2) or
+    reducer is none so output is edge, edge id will be used to access the corresponding
+    feature tensor.
 
     Parameter
     ---------
@@ -220,7 +262,7 @@ def backward_copy_reduce(reducer, graph, target,
                          in_data, out_data,
                          grad_out_data, grad_in_data,
                          in_mapping=None, out_mapping=None):
-    """Copy target data and perform reduce by graph.
+    """Backward operator of copy reduce
 
     Optional id mapping arrays could be provided to read/write from/to locations
     other than node/edge ids.
