@@ -29,7 +29,7 @@ def binary_op_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
 
     If the reducer is one of "sum, "max, "min", "prod", the operator computes,
     for each node i,::
-    
+
         out[i] = Sigma_{j\in Neighbor(i)} ( A[s1(i, j, e)] op B[s2(i, j, e)] )
 
     , where A, B are two input feature tensors, op could be element-wise add/sub/div/mul.
@@ -37,13 +37,13 @@ def binary_op_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
     ids of each neighbor.
 
     If the reducer is "none", the operator computes, for each edge e,::
-    
+
         out[e] = A[s1(i, j, e)] op B[s2(i, j, e)]
-    
+
     Here, the node/edge feature (e.g., A[i], B[e]) could be dense tensor. In such
     case, broadcasting is supported on the feature dimensions, which follows numpy
     semantics.
- 
+
     Examples::
 
         A.shape = (N, D1, D2)  # N is the number of nodes
