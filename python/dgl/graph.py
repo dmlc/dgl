@@ -1124,8 +1124,11 @@ class DGLGraph(DGLBaseGraph):
         else:
             self._edge_frame = FrameRef(self._edge_frame, sgi.induced_edges)
 
-        self._graph = graph_index.GraphIndex(sgi._handle)
-        self._graph._multigraph = sgi._multigraph
+        # FIXME(zihao): the following impl is not efficient, but directly reusing the handle of subgraph index would
+        # cause "malloc: *** error for object 0x7fa5a555b6f0: pointer being freed was not allocated"
+        self._graph = graph_index.create_graph_index(sgi.to_networkx(), sgi._multigraph, sgi._readonly)
+        # self._graph = graph_index.GraphIndex(sgi._handle)
+        # self._graph._multigraph = sgi._multigraph
 
     def del_edges(self, eids):
         """Remove multiple edges.
@@ -1151,8 +1154,10 @@ class DGLGraph(DGLBaseGraph):
         else:
             self._edge_frame = FrameRef(self._edge_frame, sgi.induced_edges)
 
-        self._graph = graph_index.GraphIndex(sgi._handle)
-        self._graph._multigraph = sgi._multigraph
+        # FIXME(zihao): the same problem as del_nodes.
+        self._graph = graph_index.create_graph_index(sgi.to_networkx(), sgi._multigraph, sgi._readonly)
+        #self._graph = graph_index.GraphIndex(sgi._handle)
+        #self._graph._multigraph = sgi._multigraph
 
     def clear(self):
         """Remove all nodes and edges, as well as their features, from the
