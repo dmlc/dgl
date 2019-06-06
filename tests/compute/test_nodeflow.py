@@ -81,6 +81,12 @@ def test_basic():
     nids = nf.map_from_parent_nid(0, parent_nids)
     assert F.array_equal(nids, parent_nids)
 
+    # should also work for negative layer ids
+    for l in range(-1, -num_layers, -1):
+        nids1 = nf.map_from_parent_nid(l, parent_nids)
+        nids2 = nf.map_from_parent_nid(l + num_layers, parent_nids)
+        assert F.array_equal(nids1, nids2)
+
     g = generate_rand_graph(100)
     nf = create_mini_batch(g, num_layers)
     assert nf.num_layers == num_layers + 1
@@ -126,6 +132,10 @@ def check_apply_edges(create_node_flow):
         nf.apply_block(i, update_func)
         assert F.array_equal(nf.blocks[i].data['h2'], new_feats)
 
+        # should also work for negative block ids
+        nf.apply_block(-num_layers + i, update_func)
+        assert F.array_equal(nf.blocks[i].data['h2'], new_feats)
+
         eids = nf.block_parent_eid(i)
         srcs, dsts = g.find_edges(eids)
         expected_f_sum = g.ndata["f"][srcs] + g.ndata["f"][dsts]
@@ -137,7 +147,7 @@ def test_apply_edges():
     check_apply_edges(create_mini_batch)
 
 
-def check_flow_compute(create_node_flow):
+def check_flow_compute(create_node_flow, use_negative_block_id=False):
     num_layers = 2
     g = generate_rand_graph(100)
     nf = create_node_flow(g, num_layers)
@@ -146,7 +156,8 @@ def check_flow_compute(create_node_flow):
     nf.layers[0].data['h'] = nf.layers[0].data['h1']
     # Test the computation on a layer at a time.
     for i in range(num_layers):
-        nf.block_compute(i, fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
+        l = -num_layers + i if use_negative_block_id else i
+        nf.block_compute(l, fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                          lambda nodes: {'h' : nodes.data['t'] + 1})
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                      lambda nodes: {'h' : nodes.data['t'] + 1})
@@ -155,8 +166,9 @@ def check_flow_compute(create_node_flow):
     # Test the computation when only a few nodes are active in a layer.
     g.ndata['h'] = g.ndata['h1']
     for i in range(num_layers):
+        l = -num_layers + i if use_negative_block_id else i
         vs = nf.layer_nid(i+1)[0:4]
-        nf.block_compute(i, fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
+        nf.block_compute(l, fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                         lambda nodes: {'h' : nodes.data['t'] + 1}, v=vs)
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                      lambda nodes: {'h' : nodes.data['t'] + 1})
@@ -168,6 +180,8 @@ def check_flow_compute(create_node_flow):
 def test_flow_compute():
     check_flow_compute(create_full_nodeflow)
     check_flow_compute(create_mini_batch)
+    check_flow_compute(create_full_nodeflow, use_negative_block_id=True)
+    check_flow_compute(create_mini_batch, use_negative_block_id=True)
 
 
 def check_prop_flows(create_node_flow):
@@ -258,13 +272,20 @@ def test_copy():
         nf.block_compute(i, partial(msg_func, ind=i), partial(reduce_func, ind=i))
 
 
-def test_block_adj_matrix():
+def test_block_edges():
     num_layers = 3
     g = generate_rand_graph(100)
     nf = create_mini_batch(g, num_layers)
     assert nf.num_layers == num_layers + 1
     for i in range(nf.num_blocks):
         src, dst, eid = nf.block_edges(i)
+
+        # should also work for negative block ids
+        src_by_neg, dst_by_neg, eid_by_neg = nf.block_edges(-nf.num_blocks + i)
+        assert F.array_equal(src, src_by_neg)
+        assert F.array_equal(dst, dst_by_neg)
+        assert F.array_equal(eid, eid_by_neg)
+
         dest_nodes = utils.toindex(nf.layer_nid(i + 1))
         u, v, _ = nf._graph.in_edges(dest_nodes)
         u = nf._glb2lcl_nid(u.tousertensor(), i)
@@ -272,14 +293,68 @@ def test_block_adj_matrix():
         assert F.array_equal(src, u)
         assert F.array_equal(dst, v)
 
+
+def test_block_adj_matrix():
+    num_layers = 3
+    g = generate_rand_graph(100)
+    nf = create_mini_batch(g, num_layers)
+    assert nf.num_layers == num_layers + 1
+    for i in range(nf.num_blocks):
+        u, v, _ = nf.block_edges(i)
         adj, _ = nf.block_adjacency_matrix(i, F.cpu())
         adj = F.sparse_to_numpy(adj)
+
+        # should also work for negative block ids
+        adj_by_neg, _ = nf.block_adjacency_matrix(-nf.num_blocks + i, F.cpu())
+        adj_by_neg = F.sparse_to_numpy(adj_by_neg)
+
         data = np.ones((len(u)), dtype=np.float32)
         v = utils.toindex(v)
         u = utils.toindex(u)
         coo = sp.sparse.coo_matrix((data, (v.tonumpy(), u.tonumpy())),
                                    shape=adj.shape).todense()
         assert np.array_equal(adj, coo)
+        assert np.array_equal(adj_by_neg, coo)
+
+
+def test_block_incidence_matrix():
+    num_layers = 3
+    g = generate_rand_graph(100)
+    nf = create_mini_batch(g, num_layers)
+    assert nf.num_layers == num_layers + 1
+    for i in range(nf.num_blocks):
+        typestrs = ["in", "out"] # todo need fix for "both"
+        adjs = []
+        for typestr in typestrs:
+            adj, _ = nf.block_incidence_matrix(i, typestr, F.cpu())
+            adj = F.sparse_to_numpy(adj)
+            adjs.append(adj)
+
+        # should work for negative block ids
+        adjs_by_neg = []
+        for typestr in typestrs:
+            adj_by_neg, _ = nf.block_incidence_matrix(-nf.num_blocks + i, typestr, F.cpu())
+            adj_by_neg = F.sparse_to_numpy(adj_by_neg)
+            adjs_by_neg.append(adj_by_neg)
+
+        u, v, e = nf.block_edges(i)
+        u = utils.toindex(u)
+        v = utils.toindex(v)
+        e = utils.toindex(e)
+
+        expected = []
+        data_in_and_out = np.ones((len(u)), dtype=np.float32)
+        expected.append(
+            sp.sparse.coo_matrix((data_in_and_out, (v.tonumpy(), e.tonumpy())),
+                                 shape=adjs[0].shape).todense()
+        )
+        expected.append(
+            sp.sparse.coo_matrix((data_in_and_out, (u.tonumpy(), e.tonumpy())),
+                                 shape=adjs[1].shape).todense()
+        )
+        for i in range(len(typestrs)):
+            assert np.array_equal(adjs[i], expected[i])
+            assert np.array_equal(adjs_by_neg[i], expected[i])
 
 
 if __name__ == '__main__':
@@ -291,3 +366,5 @@ if __name__ == '__main__':
     test_flow_compute()
     test_prop_flows()
     test_self_loop()
+    test_block_edges()
+    test_block_incidence_matrix()
