@@ -1,8 +1,18 @@
 #!/bin/bash
 set -e
 
+if [ $# -ne 1 ]; then
+    echo "Device argument required, can be cpu or gpu"
+    exit -1
+fi
+
+if [ "$1" == "gpu" ]; then
+    cp cmake/config.cmake config.cmake
+    sed -i -e 's/USE_CUDA OFF/USE_CUDA ON/g' config.cmake
+fi
+
 if [ -d build ]; then
-	rm -rf build
+    rm -rf build
 fi
 mkdir build
 

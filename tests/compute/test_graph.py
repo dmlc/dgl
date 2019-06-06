@@ -1,4 +1,3 @@
-import time
 import math
 import numpy as np
 import scipy.sparse as sp
@@ -308,7 +307,7 @@ def test_readonly():
     assert g.number_of_edges() == 4
 
     g.readonly()
-    assert g._graph.is_readonly() == True 
+    assert g._graph.is_readonly() == True
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 4
 
@@ -321,7 +320,7 @@ def test_readonly():
         assert fail
 
     g.readonly()
-    assert g._graph.is_readonly() == True 
+    assert g._graph.is_readonly() == True
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 4
 

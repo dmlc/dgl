@@ -35,7 +35,7 @@ def test_self_loop():
     nf = create_mini_batch(g, num_hops, add_self_loop=True)
     for i in range(1, nf.num_layers):
         in_deg = nf.layer_in_degree(i)
-        deg = F.ones(in_deg.shape, dtype=F.int64) * n
+        deg = F.copy_to(F.ones(in_deg.shape, dtype=F.int64), F.cpu()) * n
         assert F.array_equal(in_deg, deg)
 
 def create_mini_batch(g, num_hops, add_self_loop=False):
@@ -57,9 +57,9 @@ def check_basic(g, nf):
     assert nf.number_of_edges() == num_edges
 
     deg = nf.layer_in_degree(0)
-    assert F.array_equal(deg, F.zeros((nf.layer_size(0)), F.int64))
+    assert F.array_equal(deg, F.copy_to(F.zeros((nf.layer_size(0)), F.int64), F.cpu()))
     deg = nf.layer_out_degree(-1)
-    assert F.array_equal(deg, F.zeros((nf.layer_size(-1)), F.int64))
+    assert F.array_equal(deg, F.copy_to(F.zeros((nf.layer_size(-1)), F.int64), F.cpu()))
     for i in range(1, nf.num_layers):
         in_deg = nf.layer_in_degree(i)
         out_deg = nf.layer_out_degree(i - 1)
@@ -77,7 +77,7 @@ def test_basic():
     assert nf.layer_size(1) == g.number_of_nodes()
     check_basic(g, nf)
 
-    parent_nids = F.arange(0, g.number_of_nodes())
+    parent_nids = F.copy_to(F.arange(0, g.number_of_nodes()), F.cpu())
     nids = nf.map_from_parent_nid(0, parent_nids)
     assert F.array_equal(nids, parent_nids)
 
@@ -138,7 +138,7 @@ def check_apply_edges(create_node_flow):
 
         eids = nf.block_parent_eid(i)
         srcs, dsts = g.find_edges(eids)
-        expected_f_sum = g.ndata["f"][srcs] + g.ndata["f"][dsts]
+        expected_f_sum = g.nodes[srcs].data["f"] + g.nodes[dsts].data["f"]
         assert F.array_equal(nf.blocks[i].data['f2'], expected_f_sum)
 
 
@@ -161,7 +161,7 @@ def check_flow_compute(create_node_flow, use_negative_block_id=False):
                          lambda nodes: {'h' : nodes.data['t'] + 1})
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                      lambda nodes: {'h' : nodes.data['t'] + 1})
-        assert F.array_equal(nf.layers[i + 1].data['h'], g.ndata['h'][nf.layer_parent_nid(i + 1)])
+        assert F.allclose(nf.layers[i + 1].data['h'], g.nodes[nf.layer_parent_nid(i + 1)].data['h'])
 
     # Test the computation when only a few nodes are active in a layer.
     g.ndata['h'] = g.ndata['h1']
@@ -173,8 +173,8 @@ def check_flow_compute(create_node_flow, use_negative_block_id=False):
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                      lambda nodes: {'h' : nodes.data['t'] + 1})
         data1 = nf.layers[i + 1].data['h'][0:4]
-        data2 = g.ndata['h'][nf.map_to_parent_nid(vs)]
-        assert F.array_equal(data1, data2)
+        data2 = g.nodes[nf.map_to_parent_nid(vs)].data['h']
+        assert F.allclose(data1, data2)
 
 
 def test_flow_compute():
@@ -198,7 +198,7 @@ def check_prop_flows(create_node_flow):
     # Test the computation on all layers.
     nf2.prop_flow(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                   lambda nodes: {'h' : nodes.data['t'] + 1})
-    assert F.array_equal(nf2.layers[-1].data['h'], g.ndata['h'][nf2.layer_parent_nid(-1)])
+    assert F.allclose(nf2.layers[-1].data['h'], g.nodes[nf2.layer_parent_nid(-1)].data['h'])
 
 
 def test_prop_flows():
@@ -216,12 +216,12 @@ def test_copy():
         assert len(g.ndata.keys()) == len(nf.layers[i].data.keys())
         for key in g.ndata.keys():
             assert key in nf.layers[i].data.keys()
-            assert F.array_equal(nf.layers[i].data[key], g.ndata[key][nf.layer_parent_nid(i)])
+            assert F.array_equal(nf.layers[i].data[key], g.nodes[nf.layer_parent_nid(i)].data[key])
     for i in range(nf.num_blocks):
         assert len(g.edata.keys()) == len(nf.blocks[i].data.keys())
         for key in g.edata.keys():
             assert key in nf.blocks[i].data.keys()
-            assert F.array_equal(nf.blocks[i].data[key], g.edata[key][nf.block_parent_eid(i)])
+            assert F.array_equal(nf.blocks[i].data[key], g.edges[nf.block_parent_eid(i)].data[key])
 
     nf = create_mini_batch(g, num_layers)
     node_embed_names = [['h'], ['h1'], ['h']]
@@ -231,12 +231,12 @@ def test_copy():
         assert len(node_embed_names[i]) == len(nf.layers[i].data.keys())
         for key in node_embed_names[i]:
             assert key in nf.layers[i].data.keys()
-            assert F.array_equal(nf.layers[i].data[key], g.ndata[key][nf.layer_parent_nid(i)])
+            assert F.array_equal(nf.layers[i].data[key], g.nodes[nf.layer_parent_nid(i)].data[key])
     for i in range(nf.num_blocks):
         assert len(edge_embed_names[i]) == len(nf.blocks[i].data.keys())
         for key in edge_embed_names[i]:
             assert key in nf.blocks[i].data.keys()
-            assert F.array_equal(nf.blocks[i].data[key], g.edata[key][nf.block_parent_eid(i)])
+            assert F.array_equal(nf.blocks[i].data[key], g.edges[nf.block_parent_eid(i)].data[key])
 
     nf = create_mini_batch(g, num_layers)
     g.ndata['h0'] = F.clone(g.ndata['h'])
@@ -247,12 +247,12 @@ def test_copy():
                          lambda nodes: {'h%d' % (i+1) : nodes.data['t'] + 1})
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                      lambda nodes: {'h' : nodes.data['t'] + 1})
-        assert F.array_equal(nf.layers[i + 1].data['h%d' % (i+1)],
-                             g.ndata['h'][nf.layer_parent_nid(i + 1)])
+        assert F.allclose(nf.layers[i + 1].data['h%d' % (i+1)],
+                          g.nodes[nf.layer_parent_nid(i + 1)].data['h'])
     nf.copy_to_parent(node_embed_names=[['h0'], ['h1'], ['h2']])
     for i in range(num_layers + 1):
         assert F.array_equal(nf.layers[i].data['h%d' % i],
-                             g.ndata['h%d' % i][nf.layer_parent_nid(i)])
+                             g.nodes[nf.layer_parent_nid(i)].data['h%d' % i])
 
     nf = create_mini_batch(g, num_layers)
     g.ndata['h0'] = F.clone(g.ndata['h'])
@@ -278,10 +278,10 @@ def test_block_edges():
     nf = create_mini_batch(g, num_layers)
     assert nf.num_layers == num_layers + 1
     for i in range(nf.num_blocks):
-        src, dst, eid = nf.block_edges(i)
+        src, dst, eid = nf.block_edges(i, remap=True)
 
         # should also work for negative block ids
-        src_by_neg, dst_by_neg, eid_by_neg = nf.block_edges(-nf.num_blocks + i)
+        src_by_neg, dst_by_neg, eid_by_neg = nf.block_edges(-nf.num_blocks + i, remap=True)
         assert F.array_equal(src, src_by_neg)
         assert F.array_equal(dst, dst_by_neg)
         assert F.array_equal(eid, eid_by_neg)
@@ -300,7 +300,7 @@ def test_block_adj_matrix():
     nf = create_mini_batch(g, num_layers)
     assert nf.num_layers == num_layers + 1
     for i in range(nf.num_blocks):
-        u, v, _ = nf.block_edges(i)
+        u, v, _ = nf.block_edges(i, remap=True)
         adj, _ = nf.block_adjacency_matrix(i, F.cpu())
         adj = F.sparse_to_numpy(adj)
 
@@ -337,7 +337,7 @@ def test_block_incidence_matrix():
             adj_by_neg = F.sparse_to_numpy(adj_by_neg)
             adjs_by_neg.append(adj_by_neg)
 
-        u, v, e = nf.block_edges(i)
+        u, v, e = nf.block_edges(i, remap=True)
         u = utils.toindex(u)
         v = utils.toindex(v)
         e = utils.toindex(e)
