@@ -799,8 +799,8 @@ def _gen_send_reduce(
     uv_getter : callable
         Function that returns a pair of var.IDX (u, v) for the triggered edges.
     adj_creator : callable
-        Function that returns the adjmat, edge order of csr matrix, and edge
-        order of transposed csr matrix
+        Function that returns the adjmat, edge order of csr matrix, and
+        bit-width.
     out_map_creator: callable
         A function that returns a mapping from reduce_nodes to relabeled
         consecutive ids
