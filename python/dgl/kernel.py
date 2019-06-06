@@ -22,26 +22,55 @@ def infer_binary_feature_shape(lhs, rhs):
     ret = _CAPI_DGLKernelInferBinaryFeatureShape(lhs, rhs)
     return tuple(ret.asnumpy())
 
-def binary_op_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
-                     out_data, lhs_mapping=None, rhs_mapping=None,
-                     out_mapping=None):
-    """Perform binary operation between the given data and reduce by the graph.
+def binary_op_reduce(reducer, op, G, A_target, B_target, A, B, out,
+                     A_rows=None, B_rows=None, out_rows=None):
+    """Perform binary operation on the edges of graph ``G``, and optionally
+    reduce the per-edge result by edge destinations into per-node result.
 
-    If the reducer is one of "sum, "max, "min", "prod", the operator computes,
-    for each node i,::
+    Details
+    -------
+    Concretely, this function could be decomposed into two steps:
 
-        out[i] = Sigma_{j in Neighbor(i)} ( A[s1(i, j, e)] op B[s2(i, j, e)] )
+    1. Perform binary operations on each edge (u, v, e) on graph ``G`` as
+       follows,::
 
-    , where A, B are two input feature tensors, op could be element-wise add/sub/div/mul.
-    Depending on the lhs and rhs target, s1 and s2 will select the src/dst/edge
-    ids of each neighbor.
+           C[e] = A[select_A_target(u, v, e)] op B[select_B_target(u, v, e)]
 
-    If the reducer is "none", the operator computes, for each edge e,::
+       where
 
-        out[e] = A[s1(i, j, e)] op B[s2(i, j, e)]
+       * ``select_A_target`` and ``select_B_target`` would return the source
+         node ID, destination node ID, or edge ID, according to ``A_target``
+         and ``B_target`` which could take either
 
-    Here, the node/edge feature (e.g., A[i], B[e]) could be dense tensor. In such
-    case, broadcasting is supported on the feature dimensions, which follows numpy
+         - "source" (0),
+         - "destination" (1), or
+         - "edge" (2).
+
+       * ``A`` and ``B`` are data tensors.  If ``A_target`` is "edge", then
+         ``A.shape[0]`` should equal the number of edges of ``G``. Otherwise
+         that should equal the number of nodes of ``G``.  Similar constraints
+         apply for ``B``.
+
+       * ``op`` could be either of the following strings: "add", "mul", "sub",
+         "div".
+
+    2. Perform the optional reduction step on ``C`` computed previously.
+
+       * If ``reducer`` is None, then no reduction is performed and we return
+         the per-edge result ``C`` directly,::
+
+             out[e] = C[e]
+
+       * Otherwise, the per-edge result ``C`` is reduced into per-node result
+         according to edge destinations, in a similar fashion as
+         ``unsorted_segment_XXX`` in Tensorflow or ``scatter_XXX`` in PyTorch
+         or PyTorch-Scatter.  For all ``v`` that has incoming edges,::
+
+             out[v] = reducer_{e: (u, v, e) in G} C[e]
+
+    Broadcasting
+    ------------
+    Broadcasting is supported on the feature dimensions, following numpy
     semantics.
 
     Examples::
@@ -51,68 +80,88 @@ def binary_op_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
         C = BinaryOpReduce("sum", "add", graph, A, B, ...)
         C.shape = (N, D1, D2)
 
-    Optional id mapping arrays could be provided to read/write from/to locations
-    other than node/edge ids. Each mapping array is a 1D integer vector, whose
-    id bit-width should be consistent with the graph bit-width. The length of the
-    mapping array should be equal to the number of rows of the corresponding
-    operand. For example, if ``lhs=A`` and ``lhs_mapping=M``, then when reading/writing
-    to A tensor::
+    Partial reads/writes
+    --------------------
+    Optionally, one can provide which rows to read from ``A`` and ``B`` with
+    ``A_rows`` and ``B_rows``, both of which are 1D integer arrays.  Similarly,
+    one can provide which rows to write to ``out`` with ``out_rows``, which is
+    again a 1D integer array.  Concretely,
 
-        A[M[s1(i,j,e)]]
+    * Instead of from ``A`` and ``B``, ``C`` would be computed from
+      ``A[A_rows]`` and ``B[B_rows]``.  This implies that
 
-    If no id is provided and the operand target is edge 1) lhs or rhs is edge 2) or
-    reducer is none so output is edge, edge id will be used to access corresponding
-    feature tensor.
+      * ``A`` and ``B`` no longer need to have the same number of rows as
+        the number of nodes or edges in ``G``.  However, ``A_rows`` and
+        ``B_rows`` must have the same number of elements as the number of
+        nodes or edges in ``G``.
 
-    Parameter
-    ---------
+    * Instead of directly writing to ``out``, it will selectively write some
+      rows of ``C`` or reduced ``C``,::
+
+          out[out_rows[i]] = C[i]     if out_rows[i] != -1
+
+      Or
+
+          out[out_rows[i]] = reducer_{e: (u, v, e) in G} C[e]
+
+    Parameters
+    ----------
     reducer : str
         The type of the reducer ("sum", "max", "min", "mean", "prod", "none").
         If the reducer is "none", the output is an edge feature tensor.
         Otherwise, a node feature tensor is returned.
-    binary_op : str
+    op : str
         The type of the binary functor ("add", "mul", "sub", "div").
-    graph : GraphIndex
+    G : GraphIndex
         The graph
-    lhs : int
-        The lhs target (src, dst, edge)
-    rhs : int
-        The rhs target (src, dst, edge)
-    lhs_data : NDArray
-        The lhs data.
-    rhs_data : NDArray
-        The rhs data.
-    out_data : NDArray
-        The out data.
-    lhs_mapping : NDArray
-        The lhs id mapping array.
-    rhs_mapping : NDArray
-        The rhs id mapping array.
-    out_mapping : NDArray
-        The out id mapping array.
+    A_target : int
+        Choice of source, destination, or edge ID for edges on left operand
+    B_target : int
+        Choice of source, destination, or edge ID for edges on right operand
+    A : NDArray
+        Data tensor of left operand
+    B : NDArray
+        Data tensor of right operand
+    out : NDArray (output)
+        Output tensor.  The result will be written there in place.
+    A_rows : NDArray, optional
+        The rows to read from A.
+    B_rows : NDArray, optional
+        The rows to read from B.
+    out_rows : NDArray
+        The rows to write to output tensor.
     """
-    if lhs_mapping is None:
-        lhs_mapping = empty([])
-    if rhs_mapping is None:
-        rhs_mapping = empty([])
-    if out_mapping is None:
-        out_mapping = empty([])
+    if A_rows is None:
+        A_rows = empty([])
+    if B_rows is None:
+        B_rows = empty([])
+    if out_rows is None:
+        out_rows = empty([])
     _CAPI_DGLKernelBinaryOpReduce(
-        reducer, binary_op, graph._handle,
-        int(lhs), int(rhs),
-        lhs_data, rhs_data, out_data,
-        lhs_mapping, rhs_mapping, out_mapping)
+        reducer, op, G._handle,
+        int(A_target), int(B_target),
+        A, B, out,
+        A_rows, B_rows, out_rows)
 
 def backward_lhs_binary_op_reduce(
-        reducer, binary_op, graph,
-        lhs, rhs,
-        lhs_data, rhs_data, out_data,
-        grad_out_data, grad_lhs_data,
-        lhs_mapping=None, rhs_mapping=None, out_mapping=None):
-    """Compute lhs gradient of binary_op_reduce.
+        reducer, op, G,
+        A_target, B_target,
+        A, B, out,
+        grad_out, grad_A,
+        A_rows=None, B_rows=None, out_rows=None):
+    """Compute the gradient of ``binary_op_reduce`` w.r.t. ``A`` and store it
+    in ``grad_A``.
 
-    The returned gradient tensor has the same shape as the grad_out_data. To compute
-    the correct gradient, extra reduction along broadcasting dimensions is required.
+    See ``binary_op_reduce`` for forward propagation and partial reads/writes.
+
+    Gradient of broadcasted tensors
+    -------------------------------
+    ``grad_A`` is assumed to be unbroadcasted, i.e. the shape of ``grad_A``
+    is the same as ``grad_out`` except the first axis.
+
+    If broadcasting happened in forward propagation, one needs to manually
+    sum the gradients along the broadcasted dimension to yield the correct
+    gradient.
 
     Parameter
     ---------
@@ -120,54 +169,63 @@ def backward_lhs_binary_op_reduce(
         The type of the reducer ("sum", "max", "min", "mean", "prod", "none").
         If the reducer is "none", the output is an edge feature tensor.
         Otherwise, a node feature tensor is returned.
-    binary_op : str
+    op : str
         The type of the binary functor ("add", "mul", "sub", "div").
-    graph : GraphIndex
+    G : GraphIndex
         The graph
-    lhs : int
-        The lhs target (src, dst, edge)
-    rhs : int
-        The rhs target (src, dst, edge)
-    lhs_data : NDArray
-        The lhs data.
-    rhs_data : NDArray
-        The rhs data.
-    out_data : NDArray
-        The out data.
-    grad_out_data : NDArray
-        The out gradient data.
-    grad_lhs_data : NDArray
-        The lhs gradient data.
-    lhs_mapping : NDArray
-        The lhs id mapping array.
-    rhs_mapping : NDArray
-        The rhs id mapping array.
-    out_mapping : NDArray
-        The out id mapping array.
+    A_target : int
+        Choice of source, destination, or edge ID for edges on left operand
+    B_target : int
+        Choice of source, destination, or edge ID for edges on right operand
+    A : NDArray
+        Data tensor of left operand
+    B : NDArray
+        Data tensor of right operand
+    out : NDArray
+        Output tensor computed in the forward pass.
+    grad_out : NDArray
+        Gradient w.r.t. ``out``.
+    grad_A : NDArray (output)
+        Gradient w.r.t. ``A``.  The result will be written there in place.
+    A_rows : NDArray, optional
+        The rows read from A.
+    B_rows : NDArray, optional
+        The rows read from B.
+    out_rows : NDArray
+        The rows written to output tensor.
     """
-    if lhs_mapping is None:
-        lhs_mapping = empty([])
-    if rhs_mapping is None:
-        rhs_mapping = empty([])
-    if out_mapping is None:
-        out_mapping = empty([])
+    if A_rows is None:
+        A_rows = empty([])
+    if B_rows is None:
+        B_rows = empty([])
+    if out_rows is None:
+        out_rows = empty([])
     _CAPI_DGLKernelBackwardLhsBinaryOpReduce(
-        reducer, binary_op, graph._handle,
-        int(lhs), int(rhs),
-        lhs_mapping, rhs_mapping, out_mapping,
-        lhs_data, rhs_data, out_data,
-        grad_out_data, grad_lhs_data)
+        reducer, op, G._handle,
+        int(A_target), int(B_target),
+        A_rows, B_rows, out_rows,
+        A, B, out,
+        grad_out, grad_A)
 
 def backward_rhs_binary_op_reduce(
-        reducer, binary_op, graph,
-        lhs, rhs,
-        lhs_data, rhs_data, out_data,
-        grad_out_data, grad_rhs_data,
-        lhs_mapping=None, rhs_mapping=None, out_mapping=None):
-    """Compute rhs gradient of binary_op_reduce.
+        reducer, op, G,
+        A_target, B_target,
+        A, B, out,
+        grad_out, grad_B,
+        A_rows=None, B_rows=None, out_rows=None):
+    """Compute the gradient of ``binary_op_reduce`` w.r.t. ``B`` and store it
+    in ``grad_B``.
 
-    The returned gradient tensor has the same shape as the grad_out_data. To compute
-    the correct gradient, extra reduction along broadcasting dimensions is required.
+    See ``binary_op_reduce`` for forward propagation and partial reads/writes.
+
+    Gradient of broadcasted tensors
+    -------------------------------
+    ``grad_B`` is assumed to be unbroadcasted, i.e. the shape of ``grad_B``
+    is the same as ``grad_out`` except the first axis.
+
+    If broadcasting happened in forward propagation, one needs to manually
+    sum the gradients along the broadcasted dimension to yield the correct
+    gradient.
 
     Parameter
     ---------
@@ -175,61 +233,108 @@ def backward_rhs_binary_op_reduce(
         The type of the reducer ("sum", "max", "min", "mean", "prod", "none").
         If the reducer is "none", the output is an edge feature tensor.
         Otherwise, a node feature tensor is returned.
-    binary_op : str
+    op : str
         The type of the binary functor ("add", "mul", "sub", "div").
-    graph : GraphIndex
+    G : GraphIndex
         The graph
-    lhs : int
-        The lhs target (src, dst, edge)
-    rhs : int
-        The rhs target (src, dst, edge)
-    lhs_data : NDArray
-        The lhs data.
-    rhs_data : NDArray
-        The rhs data.
-    out_data : NDArray
-        The out data.
-    grad_out_data : NDArray
-        The out gradient data.
-    grad_rhs_data : NDArray
-        The lhs gradient data.
-    lhs_mapping : NDArray
-        The lhs id mapping array.
-    rhs_mapping : NDArray
-        The rhs id mapping array.
-    out_mapping : NDArray
-        The out id mapping array.
+    A_target : int
+        Choice of source, destination, or edge ID for edges on left operand
+    B_target : int
+        Choice of source, destination, or edge ID for edges on right operand
+    A : NDArray
+        Data tensor of left operand
+    B : NDArray
+        Data tensor of right operand
+    out : NDArray
+        Output tensor computed in the forward pass.
+    grad_out : NDArray
+        Gradient w.r.t. ``out``.
+    grad_B : NDArray (output)
+        Gradient w.r.t. ``B``.  The result will be written there in place.
+    A_rows : NDArray, optional
+        The rows read from A.
+    B_rows : NDArray, optional
+        The rows read from B.
+    out_rows : NDArray
+        The rows written to output tensor.
     """
-    if lhs_mapping is None:
-        lhs_mapping = empty([])
-    if rhs_mapping is None:
-        rhs_mapping = empty([])
-    if out_mapping is None:
-        out_mapping = empty([])
+    if A_rows is None:
+        A_rows = empty([])
+    if B_rows is None:
+        B_rows = empty([])
+    if out_rows is None:
+        out_rows = empty([])
     _CAPI_DGLKernelBackwardRhsBinaryOpReduce(
-        reducer, binary_op, graph._handle,
-        int(lhs), int(rhs),
-        lhs_mapping, rhs_mapping, out_mapping,
-        lhs_data, rhs_data, out_data,
-        grad_out_data, grad_rhs_data)
+        reducer, op, G._handle,
+        int(A_target), int(B_target),
+        A_rows, B_rows, out_rows,
+        A, B, out,
+        grad_out, grad_B)
 
-def copy_reduce(reducer, graph, target,
-                in_data, out_data,
-                in_mapping=None, out_mapping=None):
-    """Copy target data and perform reduce by graph.
+def copy_reduce(reducer, G, target,
+                X, out,
+                X_rows=None, out_rows=None):
+    """Copy data in ``X`` according to source/destination/edge ID onto the
+    edges of graph ``G``, and optionally reduce the per-edge result by edge
+    destinations into per-node result.
 
-    Optional id mapping arrays could be provided to read/write from/to locations
-    other than node/edge ids. Each mapping array is a 1D integer vector, whose
-    id bit-width should be consistent with the graph bit-width. The length of the
-    mapping array should be equal to the number of rows of the corresponding
-    operand. For example, if ``in_data=A`` and ``in_mapping=M``, then when reading/writing
-    to A tensor::
+    Details
+    -------
+    Concretely, this function could be decomposed into two steps:
 
-        A[M[s1(i,j,e)]]
+    1. For each edge (u, v, e) on graph ``G``, set
 
-    If no id is provided and the operand target is edge 1) target is edge 2) or
-    reducer is none so output is edge, edge id will be used to access the corresponding
-    feature tensor.
+           C[e] = X[select_target(u, v, e)]
+
+       where
+
+       * ``select_target`` would return the source node ID, destination node,
+         ID, or edge ID, according to ``target`` which could take either
+
+         - "source" (0),
+         - "destination" (1), or
+         - "edge" (2)
+
+       * ``X`` is a data tensor.  If ``target`` is "edge", then ``X.shape[0]``
+         should equal the number of edges of ``G``.  Otherwise that should
+         equal the number of nodes of ``G``.
+
+    2. Perform the optional reduction step on ``C`` computed previously.
+
+       * If ``reducer`` is None, then no reduction is performed and we return
+         the per-edge result ``C`` directly,::
+
+             out[e] = C[e]
+
+       * Otherwise, the per-edge result ``C`` is reduced into per-node result
+         according to edge destinations, in a similar fashion as
+         ``unsorted_segment_XXX`` in Tensorflow or ``scatter_XXX`` in PyTorch
+         or PyTorch-Scatter.  For all ``v`` that has incoming edges,::
+
+             out[v] = reducer_{e: (u, v, e) in G} C[e]
+
+    Partial reads/writes
+    --------------------
+    Optionally, one can provide which rows to read from ``X`` with ``X_rows``,
+    which is a 1D integer array.  Similarly, one can provide which rows to
+    write to ``out`` with ``out_rows``, which is again a 1D integer array.
+    Concretely,
+
+    * Instead of from ``X``, ``C`` would be copied from ``X[X_rows]``.  This
+      implies that
+
+      * ``X`` no longer needs to have the same number of rows as the number of
+        nodes or edges in ``G``.  However, ``X_rows`` must have the same
+        number of elements as the number of nodes or edges in ``G``.
+
+    * Instead of directly writing to ``out``, it will selectively write some
+      rows of ``C`` or reduced ``C``,::
+
+          out[out_rows[i]] = C[i]     if out_rows[i] != -1
+
+      Or
+
+          out[out_rows[i]] = reducer_{e: (u, v, e) in G} C[e]
 
     Parameter
     ---------
@@ -240,32 +345,33 @@ def copy_reduce(reducer, graph, target,
     graph : GraphIndex
         The graph
     target : int
-        The input target (src, dst, edge)
-    in_data : NDArray
-        The input data.
-    out_data : NDArray
-        The out data.
-    in_mapping : NDArray
-        The input id mapping array.
+        Choice of source, destination, or edge ID for edges to index in data
+        tensor.
+    X : NDArray
+        Data tensor.
+    out : NDArray (output)
+        Output tensor.  The result will be written there in place.
+    X_rows : NDArray, optional
+        The rows to read from X.
     out_mapping : NDArray
-        The out id mapping array.
+        The rows to write to output tensor.
     """
-    if in_mapping is None:
-        in_mapping = empty([])
-    if out_mapping is None:
-        out_mapping = empty([])
+    if X_rows is None:
+        X_rows = empty([])
+    if out_rows is None:
+        out_rows = empty([])
     _CAPI_DGLKernelCopyReduce(
-        reducer, graph._handle, int(target),
-        in_data, out_data, in_mapping, out_mapping)
+        reducer, G._handle, int(target),
+        X, out, X_rows, out_rows)
 
-def backward_copy_reduce(reducer, graph, target,
-                         in_data, out_data,
-                         grad_out_data, grad_in_data,
-                         in_mapping=None, out_mapping=None):
-    """Backward operator of copy reduce
+def backward_copy_reduce(reducer, G, target,
+                         X, out,
+                         grad_out, grad_X,
+                         X_rows=None, out_rows=None):
+    """Compute the gradient of ``copy_reduce`` w.r.t. ``X`` and store it in
+    ``grad_X``.
 
-    Optional id mapping arrays could be provided to read/write from/to locations
-    other than node/edge ids.
+    See ``copy_reduce`` for forward propagation and partial reads/writes.
 
     Parameter
     ---------
@@ -273,30 +379,31 @@ def backward_copy_reduce(reducer, graph, target,
         The type of the reducer ("sum", "max", "min", "mean", "prod", "none").
         If the reducer is "none", the output is an edge feature tensor.
         Otherwise, a node feature tensor is returned.
-    graph : GraphIndex
+    G : GraphIndex
         The graph
     target : int
-        The input target (src, dst, edge)
-    in_data : NDArray
-        The input data.
-    out_data : NDArray
-        The out data.
+        Choice of source, destination, or edge ID for edges to index in data
+        tensor.
+    X : NDArray
+        Data tensor.
+    out : NDArray
+        Output tensor computed in the forward pass.
     grad_out_data : NDArray
-        The out gradient data.
-    grad_in_data : NDArray
-        The input gradient data.
-    in_mapping : NDArray
-        The input id mapping array.
-    out_mapping : NDArray
-        The out id mapping array.
+        Gradient w.r.t. ``out``.
+    grad_X : NDArray (output)
+        Gradient w.r.t. ``X``.  The result will be written there in place.
+    X_rows : NDArray, optional
+        The rows read from X.
+    out_rows : NDArray
+        The rows written to output tensor.
     """
-    if in_mapping is None:
-        in_mapping = empty([])
-    if out_mapping is None:
-        out_mapping = empty([])
+    if X_rows is None:
+        X_rows = empty([])
+    if out_rows is None:
+        out_rows = empty([])
     _CAPI_DGLKernelBackwardCopyReduce(
-        reducer, graph._handle, int(target),
-        in_data, out_data, grad_out_data, grad_in_data,
-        in_mapping, out_mapping)
+        reducer, G._handle, int(target),
+        X, out, grad_out, grad_X,
+        X_rows, out_rows)
 
 _init_api("dgl.kernel")

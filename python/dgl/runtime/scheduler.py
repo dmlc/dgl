@@ -124,6 +124,10 @@ def schedule_snr(graph,
                  inplace):
     """Schedule send_and_recv.
 
+    Currently it builds a subgraph from edge_tuples with the same number of
+    nodes as the original graph, so that routines for whole-graph updates
+    (e.g. fused kernels) could be reused.
+
     Parameters
     ----------
     graph: DGLGraph
@@ -980,7 +984,7 @@ def _build_idx_map(idx, nbits):
     """
     x = idx.tousertensor()
     map_len = int(F.asnumpy(F.max(x, dim=0))) + 1
-    old_to_new = F.zeros((map_len,), dtype=F.int64, ctx=F.cpu())
+    old_to_new = F.full_1d(map_len, -1, dtype=F.int64, ctx=F.cpu())
     F.scatter_row_inplace(old_to_new, x, F.arange(0, len(x)))
     old_to_new = utils.to_nbits_int(old_to_new, nbits)
     old_to_new = F.zerocopy_to_dgl_ndarray(old_to_new)
