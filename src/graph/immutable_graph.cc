@@ -6,6 +6,7 @@
 
 #include <dgl/immutable_graph.h>
 #include <string.h>
+#include <cassert>
 #include <bitset>
 #include <numeric>
 #include <tuple>
@@ -522,7 +523,7 @@ COO::EdgeArray COO::Edges(const std::string &order) const {
 }
 
 Subgraph COO::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
-  // TODO(zihao): to handle the case of preserve_nodes=false
+  assert(!preserve_nodes); // TODO(zihao): handle the case of preserve_nodes == true
   CHECK(IsValidIdArray(eids));
   const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
   const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
@@ -642,7 +643,7 @@ Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
 }
 
 Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
-  // TODO(zihao): to handle the case of preserve_nodes=true.
+  assert(!preserve_nodes); // TODO(zihao): handle the case of preserve_nodes == true
   // We prefer to generate a subgraph from out-csr.
   auto sg = GetCOO()->EdgeSubgraph(eids);
   COOPtr subcoo = std::dynamic_pointer_cast<COO>(sg.graph);

@@ -452,7 +452,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeSubgraph")
     GraphHandle ghandle = args[0];
     const GraphInterface *gptr = static_cast<GraphInterface*>(ghandle);
     const IdArray eids = args[1];
-    bool preserve_nodes = args.size() > 2 ? args[2] : false;
+    bool preserve_nodes = args[2];
     *rv = ConvertSubgraphToPackedFunc(gptr->EdgeSubgraph(eids, preserve_nodes));
   });
 
