@@ -122,8 +122,8 @@ def test_node_subgraph():
     randv = np.unique(randv1)
     subg = g.node_subgraph(utils.toindex(randv))
     subig = ig.node_subgraph(utils.toindex(randv))
-    check_basics(subg, subig)
-    check_graph_equal(subg, subig)
+    check_basics(subg.graph, subig.graph)
+    check_graph_equal(subg.graph, subig.graph)
     assert F.sum(map_to_subgraph_nid(subg, utils.toindex(randv1[0:10])).tousertensor()
             == map_to_subgraph_nid(subig, utils.toindex(randv1[0:10])).tousertensor(), 0) == 10
 
@@ -136,8 +136,8 @@ def test_node_subgraph():
         subgs.append(g.node_subgraph(utils.toindex(randv)))
     subigs= ig.node_subgraphs(randvs)
     for i in range(4):
-        check_basics(subg, subig)
-        check_graph_equal(subgs[i], subigs[i])
+        check_basics(subg.graph, subig.graph)
+        check_graph_equal(subgs[i].graph, subigs[i].graph)
 
 def test_create_graph():
     elist = [(1, 2), (0, 1), (0, 2)]

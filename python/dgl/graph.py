@@ -1124,11 +1124,7 @@ class DGLGraph(DGLBaseGraph):
         else:
             self._edge_frame = FrameRef(self._edge_frame, sgi.induced_edges)
 
-        # FIXME(zihao): the following impl is not efficient, but directly reusing the handle of subgraph index would
-        # cause "malloc: *** error for object 0x7fa5a555b6f0: pointer being freed was not allocated"
-        self._graph = graph_index.create_graph_index(sgi.to_networkx(), sgi._multigraph, sgi._readonly)
-        # self._graph = graph_index.GraphIndex(sgi._handle)
-        # self._graph._multigraph = sgi._multigraph
+        self._graph = sgi.graph
 
     def del_edges(self, eids):
         """Remove multiple edges.
@@ -1154,10 +1150,7 @@ class DGLGraph(DGLBaseGraph):
         else:
             self._edge_frame = FrameRef(self._edge_frame, sgi.induced_edges)
 
-        # FIXME(zihao): the same problem as del_nodes.
-        self._graph = graph_index.create_graph_index(sgi.to_networkx(), sgi._multigraph, sgi._readonly)
-        #self._graph = graph_index.GraphIndex(sgi._handle)
-        #self._graph._multigraph = sgi._multigraph
+        self._graph = sgi.graph
 
     def clear(self):
         """Remove all nodes and edges, as well as their features, from the
@@ -2871,7 +2864,7 @@ class DGLGraph(DGLBaseGraph):
         from . import subgraph
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
-        return subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
+        return subgraph.DGLSubGraph(self, sgi)
 
     def subgraphs(self, nodes):
         """Return a list of subgraphs, each induced in the corresponding given
@@ -2899,8 +2892,7 @@ class DGLGraph(DGLBaseGraph):
         from . import subgraph
         induced_nodes = [utils.toindex(n) for n in nodes]
         sgis = self._graph.node_subgraphs(induced_nodes)
-        return [subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
-                for sgi in sgis]
+        return [subgraph.DGLSubGraph(self, sgi) for sgi in sgis]
 
     def edge_subgraph(self, edges):
         """Return the subgraph induced on given edges.
@@ -2947,7 +2939,7 @@ class DGLGraph(DGLBaseGraph):
         from . import subgraph
         induced_edges = utils.toindex(edges)
         sgi = self._graph.edge_subgraph(induced_edges)
-        return subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
+        return subgraph.DGLSubGraph(self, sgi)
 
     def adjacency_matrix_scipy(self, transpose=False, fmt='csr'):
         """Return the scipy adjacency matrix representation of this graph.
