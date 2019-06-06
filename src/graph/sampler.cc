@@ -700,6 +700,18 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
   return nf;
 }
 
+void build_csr(const ImmutableGraph &g, const std::string neigh_type) {
+  if (neigh_type == "in") {
+    auto csr = g.GetInCSR();
+    assert(csr);
+  } else if (neigh_type == "out") {
+    auto csr = g.GetOutCSR();
+    assert(csr);
+  } else {
+    LOG(FATAL) << "We don't support sample from neighbor type " << neigh_type;
+  }
+}
+
 DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     // arguments
@@ -721,6 +733,8 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
     const int64_t num_seeds = seed_nodes->shape[0];
     const int64_t num_workers = std::min(max_num_workers,
         (num_seeds + batch_size - 1) / batch_size - batch_start_id);
+    // We need to make sure we have the right CSR before we enter parallel sampling.
+    build_csr(*gptr, neigh_type);
     // generate node flows
     std::vector<NodeFlow*> nflows(num_workers);
 #pragma omp parallel for
@@ -758,6 +772,8 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_LayerSampling")
     const int64_t num_seeds = seed_nodes->shape[0];
     const int64_t num_workers = std::min(max_num_workers,
         (num_seeds + batch_size - 1) / batch_size - batch_start_id);
+    // We need to make sure we have the right CSR before we enter parallel sampling.
+    build_csr(*gptr, neigh_type);
     // generate node flows
     std::vector<NodeFlow*> nflows(num_workers);
 #pragma omp parallel for
