@@ -6,6 +6,8 @@ import numpy as np
 import mxnet as mx
 import mxnet.ndarray as nd
 import numbers
+from ... import ndarray as dglnd
+from ... import kernel as K
 
 MX_VERSION = LooseVersion(mx.__version__)
 # After MXNet 1.5, empty tensors aren't supprted by default.
@@ -92,6 +94,12 @@ def ndim(input):
 def context(input):
     return input.context
 
+def device_type(ctx):
+    return ctx.device_type
+
+def device_id(ctx):
+    return ctx.device_id
+
 def astype(input, ty):
     return nd.cast(input, ty)
 
@@ -163,9 +171,6 @@ def zeros_like(input):
 
 def ones(shape, dtype, ctx):
     return nd.ones(shape, dtype=dtype, ctx=ctx)
-
-def spmm(x, y):
-    return nd.dot(x, y)
 
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     # TODO: support other dimensions
@@ -246,3 +251,141 @@ def zerocopy_to_numpy(arr):
 def zerocopy_from_numpy(np_data):
     # NOTE: not zerocopy
     return nd.array(np_data, dtype=np_data.dtype)
+
+def zerocopy_to_dgl_ndarray(arr):
+    return dglnd.from_dlpack(arr.to_dlpack_for_read())
+
+def zerocopy_to_dgl_ndarray_for_write(arr):
+    return dglnd.from_dlpack(arr.to_dlpack_for_write())
+
+def zerocopy_from_dgl_ndarray(arr):
+    return nd.from_dlpack(arr.to_dlpack())
+
+
+class BinaryReduce(mx.autograd.Function):
+    def __init__(self, reducer, binary_op, graph, lhs, rhs, out_size, lhs_map,
+                 rhs_map, out_map):
+        super(BinaryReduce, self).__init__()
+        self.reducer = reducer
+        self.binary_op = binary_op
+        self.graph = graph
+        self.lhs = lhs
+        self.rhs = rhs
+        self.out_size = out_size
+        self.lhs_map = lhs_map
+        self.rhs_map = rhs_map
+        self.out_map = out_map
+
+    def forward(self, lhs_data, rhs_data):
+        lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
+        rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
+        feat_shape = K.infer_binary_feature_shape(lhs_data_nd, rhs_data_nd)
+        out_data = nd.empty((self.out_size,) + feat_shape,
+                            ctx=lhs_data.context, dtype=lhs_data.dtype)
+        out_data_nd = zerocopy_to_dgl_ndarray_for_write(out_data)
+        K.binary_op_reduce(
+            self.reducer, self.binary_op, self.graph, self.lhs, self.rhs,
+            lhs_data_nd, rhs_data_nd, out_data_nd, self.lhs_map[0],
+            self.rhs_map[0], self.out_map[0])
+        self.save_for_backward(lhs_data_nd, rhs_data_nd, out_data_nd,
+                               feat_shape)
+        return out_data
+
+    def backward(self, grad_out):
+        lhs_data_nd, rhs_data_nd, out_data_nd, feat_shape = self.saved_tensors
+        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
+        grad_lhs = nd.empty((lhs_data_nd.shape[0],) + feat_shape,
+                            ctx=grad_out.context, dtype=grad_out.dtype)
+        K.backward_lhs_binary_op_reduce(
+            self.reducer, self.binary_op, self.graph, self.lhs, self.rhs,
+            lhs_data_nd, rhs_data_nd, out_data_nd, grad_out_nd,
+            zerocopy_to_dgl_ndarray_for_write(grad_lhs), self.lhs_map[1],
+            self.rhs_map[1], self.out_map[1])
+        grad_lhs = _reduce_grad(grad_lhs, lhs_data_nd.shape)
+        grad_rhs = nd.empty((rhs_data_nd.shape[0],) + feat_shape,
+                             ctx=grad_out.context, dtype=grad_out.dtype)
+        K.backward_rhs_binary_op_reduce(
+            self.reducer, self.binary_op, self.graph, self.lhs, self.rhs,
+            lhs_data_nd, rhs_data_nd, out_data_nd, grad_out_nd,
+            zerocopy_to_dgl_ndarray_for_write(grad_rhs), self.lhs_map[1],
+            self.rhs_map[1], self.out_map[1])
+        grad_rhs = _reduce_grad(grad_rhs, rhs_data_nd.shape)
+        return grad_lhs, grad_rhs
+
+
+def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
+                  out_size, lhs_map, rhs_map, out_map):
+    func = BinaryReduce(reducer, binary_op, graph, lhs, rhs, out_size, lhs_map,
+                        rhs_map, out_map)
+    return func(lhs_data, rhs_data)
+
+
+class CopyReduce(mx.autograd.Function):
+    def __init__(self, reducer, graph, target, out_size, in_map, out_map):
+        super(CopyReduce, self).__init__()
+        self.reducer = reducer
+        self.graph = graph
+        self.target = target
+        self.out_size = out_size
+        self.in_map = in_map
+        self.out_map = out_map
+
+    def forward(self, in_data):
+        feat_shape = in_data.shape[1:]
+        out_data = nd.empty((self.out_size,) + feat_shape,
+                            ctx=in_data.context, dtype=in_data.dtype)
+        in_data_nd = zerocopy_to_dgl_ndarray(in_data)
+        out_data_nd = zerocopy_to_dgl_ndarray_for_write(out_data)
+        K.copy_reduce(
+            self.reducer, self.graph, self.target, in_data_nd, out_data_nd,
+            self.in_map[0], self.out_map[0])
+        self.save_for_backward(in_data_nd, out_data_nd)
+        return out_data
+
+    def backward(self, grad_out):
+        in_data_nd, out_data_nd = self.saved_tensors
+        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
+        grad_in = nd.empty(in_data_nd.shape, ctx=grad_out.context,
+                            dtype=grad_out.dtype)
+        K.backward_copy_reduce(
+            self.reducer, self.graph, self.target, in_data_nd, out_data_nd,
+            grad_out_nd, zerocopy_to_dgl_ndarray_for_write(grad_in),
+            self.in_map[1], self.out_map[1])
+        return grad_in
+
+
+def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
+    func = CopyReduce(reducer, graph, target, out_size, in_map, out_map)
+    return func(in_data)
+
+
+def _reduce_grad(grad, shape):
+    """Reduce gradient on the broadcast dimension
+
+    If there is broadcast in forward pass, gradients need to be reduced on
+    broadcast dimension. This function checks the input tensor shape and
+    gradient shape and perform the reduction.
+
+    Parameters
+    ----------
+    grad: Tensor
+        Gradient tensor
+    shape: tuple
+        Shape of input tensor
+
+    Returns
+    -------
+    Tensor
+    """
+    grad_shape = grad.shape[1:]
+    in_shape = shape[1:]
+    if in_shape == grad_shape:
+        # no need to reduce
+        return grad
+    num_to_squeeze = len(grad_shape) - len(in_shape)
+    # pad in_shape
+    in_shape = (1,) * num_to_squeeze + in_shape
+    reduce_idx = np.nonzero(np.array(grad_shape) - np.array(in_shape))[0]
+    reduce_idx += 1  # skip batch dim
+    grad = grad.sum(axis=tuple(reduce_idx), keepdims=True)
+    return grad.reshape(shape)

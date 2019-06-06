@@ -106,7 +106,7 @@ def test_10neighbor_sampler():
     check_10neighbor_sampler(g, seeds=np.unique(np.random.randint(0, g.number_of_nodes(),
                                                                   size=int(g.number_of_nodes() / 10))))
 
-def test_layer_sampler(prefetch=False):
+def _test_layer_sampler(prefetch=False):
     g = generate_rand_graph(100)
     nid = g.nodes()
     src, dst, eid = g.all_edges(form='all', order='eid')
@@ -157,5 +157,5 @@ if __name__ == '__main__':
     test_10neighbor_sampler_all()
     test_1neighbor_sampler()
     test_10neighbor_sampler()
-    test_layer_sampler()
-    test_layer_sampler(prefetch=True)
+    #test_layer_sampler()
+    #test_layer_sampler(prefetch=True)

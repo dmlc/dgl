@@ -13,7 +13,7 @@ SET DGLBACKEND=!BACKEND!
 SET DGL_LIBRARY_PATH=!CD!\build
 SET DGL_DOWNLOAD_DIR=!CD!
 
-python -m nose -v --with-xunit tests\!BACKEND! || EXIT /B 1
+python -m nose -v --with-xunit tests\!DGLBACKEND! || EXIT /B 1
 python -m nose -v --with-xunit tests\graph_index || EXIT /B 1
 python -m nose -v --with-xunit tests\compute || EXIT /B 1
 ENDLOCAL
