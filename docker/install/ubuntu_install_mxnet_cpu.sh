@@ -1,1 +1,1 @@
-pip3 install mxnet==1.5.0b20190604
+pip3 install mxnet==1.5.0b20190605
