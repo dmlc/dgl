@@ -3,8 +3,6 @@
 from __future__ import absolute_import
 
 from abc import abstractmethod
-import functools
-import operator
 
 from ... import backend as F
 from ...frame import FrameRef, Frame
@@ -19,8 +17,6 @@ __all__ = [
     'OpCode', 'Executor',
     'NodeUDFExecutor', 'NODE_UDF',
     'EdgeUDFExecutor', 'EDGE_UDF',
-    'SPMVExecutor', 'SPMV',
-    'SPMVWithDataExecutor', 'SPMV_WITH_DATA',
     'ReadExecutor', 'READ',
     'ReadColExecutor', 'READ_COL',
     'ReadRowExecutor', 'READ_ROW',
@@ -34,15 +30,16 @@ __all__ = [
     'AppendRow_Executor', 'APPEND_ROW_',
     'WriteRowInplace_Executor', 'WRITE_ROW_INPLACE_',
     'ClearFrame_Executor', 'CLEAR_FRAME_',
+    'BinaryReduceExecutor', 'BINARY_REDUCE',
+    'CopyReduceExecutor', 'COPY_REDUCE',
 ]
+
 
 class OpCode(object):
     """Opcode for all the executor types."""
     # immutable op
     NODE_UDF = 0
     EDGE_UDF = 1
-    SPMV = 2
-    SPMV_WITH_DATA = 3
     READ = 4
     READ_COL = 5
     READ_ROW = 6
@@ -58,6 +55,10 @@ class OpCode(object):
     APPEND_ROW_ = 25
     WRITE_ROW_INPLACE_ = 26
     CLEAR_FRAME_ = 27
+    # DGL kernels
+    BINARY_REDUCE = 50
+    COPY_REDUCE = 51
+
 
 class Executor(object):
     """Base executor class.
@@ -420,181 +421,6 @@ def READ_ROW(fd, row, ret=None):
     reg = IR_REGISTRY[OpCode.READ_ROW]
     ret = var.new(reg['ret_type']) if ret is None else ret
     get_current_prog().issue(reg['executor_cls'](fd, row, ret))
-    return ret
-
-class SPMVExecutor(Executor):
-    """Executor for sparse-matrix-dense-matrix multiply.
-
-    Parameters
-    ----------
-    spA : var.Var
-        Variable for sparse matrix lambda. The lambda returns the sparse matrix
-        given a context object.
-    B : var.Var
-        Variable for the dense feature tensor.
-    ret : var.Var
-        Variable for the result.
-    """
-    def __init__(self, spA, B, ret):
-        self.spA = spA
-        self.B = B
-        self.ret = ret
-
-    def opcode(self):
-        return OpCode.SPMV
-
-    def arg_vars(self):
-        return [self.spA, self.B]
-
-    def ret_var(self):
-        return self.ret
-
-    def run(self):
-        spA_ctx_fn = self.spA.data
-        B = self.B.data
-        ctx = F.context(B)
-        spA = spA_ctx_fn(ctx)
-        if F.ndim(B) == 1:
-            # B is a vector, append a (1,) dim at the end
-            B = F.unsqueeze(B, 1)
-            C = F.spmm(spA, B)
-            C = F.squeeze(C, 1)
-        elif F.ndim(B) > 2:
-            # Flatten the dim 1:~
-            B_shape = F.shape(B)
-            feat_shape = B_shape[1:]
-            tmp_B_shape = (B_shape[0], functools.reduce(operator.mul, feat_shape, 1))
-            B = F.reshape(B, tmp_B_shape)
-            C = F.spmm(spA, B)
-            C_shape = (F.shape(C)[0],) + feat_shape
-            C = F.reshape(C, C_shape)
-        else:
-            C = F.spmm(spA, B)
-        self.ret.data = C
-
-IR_REGISTRY[OpCode.SPMV] = {
-    'name' : 'SPMV',
-    'args_type' : [VarType.SPMAT, VarType.FEAT],
-    'ret_type' : VarType.FEAT,
-    'executor_cls' : SPMVExecutor,
-}
-
-def SPMV(spA, B, ret=None):
-    """Perform sparse-matrix-dense-matrix multiply symbolically.
-
-    Parameters
-    ----------
-    spA : var.Var
-        Variable for sparse matrix lambda. The lambda returns the sparse matrix
-        given a context object.
-    B : var.Var
-        Variable for the dense feature tensor.
-    ret : var.Var, optional
-        Variable for the result. If not give, a new variable will be created.
-
-    Returns
-    -------
-    var.Var
-        Variable for the result.
-    """
-    reg = IR_REGISTRY[OpCode.SPMV]
-    ret = var.new(reg['ret_type']) if ret is None else ret
-    get_current_prog().issue(reg['executor_cls'](spA, B, ret))
-    return ret
-
-class SPMVWithDataExecutor(Executor):
-    """Executor for sparse-matrix-dense-matrix multiply with provided sparse data.
-
-    Parameters
-    ----------
-    spA : var.Var
-        Variable for sparse matrix lambda. The lambda returns the sparse matrix
-        given a context object.
-    A_data : var.Var
-        Variable for the sparse matrix data.
-    B : var.Var
-        Variable for the dense feature tensor.
-    ret : var.Var
-        Variable for the result.
-    """
-    def __init__(self, spA, A_data, B, ret):
-        self.spA = spA
-        self.A_data = A_data
-        self.B = B
-        self.ret = ret
-
-    def opcode(self):
-        return OpCode.SPMV_WITH_DATA
-
-    def arg_vars(self):
-        return [self.spA, self.A_data, self.B]
-
-    def ret_var(self):
-        return self.ret
-
-    def run(self):
-        spA_ctx_fn = self.spA.data
-        A_data = self.A_data.data
-        if F.ndim(A_data) > 1:
-            # A_data is of shape (E, 1). Squeeze the last dim.
-            A_data = F.squeeze(A_data, 1)
-        B = self.B.data
-
-        ctx = F.context(B)
-        spA = spA_ctx_fn(ctx)
-        spidx = F.sparse_matrix_indices(spA)
-        shape = F.shape(spA)
-        # shuffle index is not used
-        spA, _ = F.sparse_matrix(A_data, spidx, shape)
-
-        if F.ndim(B) == 1:
-            # B is a vector, append a (1,) dim at the end
-            B = F.unsqueeze(B, 1)
-            C = F.spmm(spA, B)
-            C = F.squeeze(C, 1)
-        elif F.ndim(B) > 2:
-            # Flatten the dim 1:~
-            B_shape = F.shape(B)
-            feat_shape = B_shape[1:]
-            tmp_B_shape = (B_shape[0], functools.reduce(operator.mul, feat_shape, 1))
-            B = F.reshape(B, tmp_B_shape)
-            C = F.spmm(spA, B)
-            C_shape = (F.shape(C)[0],) + feat_shape
-            C = F.reshape(C, C_shape)
-        else:
-            C = F.spmm(spA, B)
-        self.ret.data = C
-
-IR_REGISTRY[OpCode.SPMV_WITH_DATA] = {
-    'name' : 'SPMV_WITH_DATA',
-    'args_type' : [VarType.SPMAT, VarType.FEAT, VarType.FEAT],
-    'ret_type' : VarType.FEAT,
-    'executor_cls' : SPMVWithDataExecutor,
-}
-
-def SPMV_WITH_DATA(spA, A_data, B, ret=None):
-    """Perform sparse-matrix-dense-matrix multiply with sparse data symbolically.
-
-    Parameters
-    ----------
-    spA : var.Var
-        Variable for sparse matrix lambda. The lambda returns the sparse matrix
-        given a context object.
-    A_data : var.Var
-        Variable for the sparse matrix data.
-    B : var.Var
-        Variable for the dense feature tensor.
-    ret : var.Var, optional
-        Variable for the result. If not give, a new variable will be created.
-
-    Returns
-    -------
-    var.Var
-        Variable for the result.
-    """
-    reg = IR_REGISTRY[OpCode.SPMV_WITH_DATA]
-    ret = var.new(reg['ret_type']) if ret is None else ret
-    get_current_prog().issue(reg['executor_cls'](spA, A_data, B, ret))
     return ret
 
 class MergeRowExecutor(Executor):
@@ -1169,3 +995,254 @@ def CLEAR_FRAME_(fd):
     """
     reg = IR_REGISTRY[OpCode.CLEAR_FRAME_]
     get_current_prog().issue(reg['executor_cls'](fd))
+
+
+class BinaryReduceExecutor(Executor):
+    """Executor for BINARY_REDUCE
+
+    Parameters
+    ----------
+    reducer : str
+        String representing reduction to perform, can be "sum", "max", "min",
+        "mean", "prod", "none" (no reduction)
+    binary_op : str
+        String representing binary operation to perform, can be "add", "mul",
+        "sub", "div", "dot"
+    graph : var.Var
+        Variable for graph index lambda. The lambda returns the immutable graph
+        index given a context object.
+    lhs: int
+        The lhs target (src, dst, edge)
+    rhs: int
+        The rhs target (src, dst, edge)
+    lhs_data : var.Var
+        Variable for the lhs data
+    rhs_data : var.Var
+        Variable for the rhs data
+    out_size : int
+        Output size
+    lhs_map : var.Var
+        Variable for mapping lambda. The lambda returns the lhs id mapping
+        array on given context
+    rhs_map : var.Var
+        Variable for mapping lambda. The lambda returns the rhs id mapping
+        array on given context
+    out_map : var.Var
+        Variable for mapping lambda. The lambda returns the output id mapping
+        array on given context
+    ret : var.Var
+        Variable for the result.
+    """
+    def __init__(self, reducer, binary_op, graph, lhs, rhs, lhs_data,
+                 rhs_data, out_size, lhs_map, rhs_map, out_map, ret):
+        self.reducer = reducer
+        self.binary_op = binary_op
+        self.graph = graph
+        self.lhs = lhs
+        self.rhs = rhs
+        self.lhs_data = lhs_data
+        self.rhs_data = rhs_data
+        self.out_size = out_size
+        self.lhs_map = lhs_map
+        self.rhs_map = rhs_map
+        self.out_map = out_map
+        self.ret = ret
+
+    def opcode(self):
+        return OpCode.BINARY_REDUCE
+
+    def arg_vars(self):
+        return [self.reducer, self.binary_op, self.graph, self.lhs, self.rhs,
+                self.lhs_data, self.rhs_data, self.out_size, self.lhs_map,
+                self.rhs_map, self.out_map]
+
+    def ret_var(self):
+        return self.ret
+
+    def run(self):
+        lhs_data = self.lhs_data.data
+        rhs_data = self.rhs_data.data
+        ctx = utils.to_dgl_context(F.context(lhs_data))
+        graph = self.graph.data(ctx)
+        lhs_map = self.lhs_map.data(ctx) if self.lhs_map.data else None
+        rhs_map = self.rhs_map.data(ctx) if self.rhs_map.data else None
+        out_map = self.out_map.data(ctx) if self.out_map.data else None
+        if not isinstance(lhs_map, tuple):
+            lhs_map = (lhs_map, lhs_map)
+        if not isinstance(rhs_map, tuple):
+            rhs_map = (rhs_map, rhs_map)
+        if not isinstance(out_map, tuple):
+            out_map = (out_map, out_map)
+        self.ret.data = F.binary_reduce(
+            self.reducer, self.binary_op, graph, self.lhs, self.rhs,
+            lhs_data, rhs_data, self.out_size, lhs_map, rhs_map, out_map)
+
+
+IR_REGISTRY[OpCode.BINARY_REDUCE] = {
+    'name': 'BINARY_REDUCE',
+    'args_type': [VarType.STR, VarType.STR, VarType.GRAPH, VarType.INT,
+                  VarType.INT, VarType.FEAT, VarType.FEAT, VarType.INT,
+                  VarType.MAP, VarType.MAP, VarType.MAP],
+    'ret_type': VarType.FEAT,
+    'executor_cls': BinaryReduceExecutor,
+}
+
+
+def BINARY_REDUCE(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
+                  out_size, lhs_map, rhs_map, out_map, ret=None):
+    """Perform BINARY_REDUCE symbolically.
+
+    Parameters
+    ----------
+    reducer : str
+        String representing reduction to perform, can be "sum", "max", "min",
+        "mean", "prod", "none" (no reduction)
+    binary_op : str
+        String representing binary operation to perform, can be "add", "mul",
+        "sub", "div", "dot"
+    graph : var.Var
+        Variable for graph index lambda. The lambda returns the immutable graph
+        index given a context object.
+    lhs: int
+        The lhs target (src, dst, edge)
+    rhs: int
+        The rhs target (src, dst, edge)
+    lhs_data : var.Var
+        Variable for the lhs data
+    rhs_data : var.Var
+        Variable for the rhs data
+    out_size : int
+        Output size
+    lhs_map : var.Var
+        Variable for mapping lambda. The lambda returns the lhs id mapping
+        array on given context
+    rhs_map : var.Var
+        Variable for mapping lambda. The lambda returns the rhs id mapping
+        array on given context
+    out_map : var.Var
+        Variable for mapping lambda. The lambda returns the output id mapping
+        array on given context
+    ret : var.Var, optional
+        Variable for the result. If not give, a new variable will be created.
+
+    Returns
+    -------
+    var.Var
+        Variable for the result.
+    """
+    reg = IR_REGISTRY[OpCode.BINARY_REDUCE]
+    ret = var.new(reg['ret_type']) if ret is None else ret
+    get_current_prog().issue(reg['executor_cls'](
+        reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data, out_size,
+        lhs_map, rhs_map, out_map, ret))
+    return ret
+
+
+class CopyReduceExecutor(Executor):
+    """Executor for COPY_REDUCE
+
+    Parameters
+    ----------
+    reducer : str
+        String representing reduction to perform, can be "sum", "max", "min",
+        "mean", "prod", "none" (no reduction)
+    graph : var.Var
+        Variable for graph index lambda. The lambda returns the immutable graph
+        index given a context object.
+    target: int
+        The input target (src, dst, edge)
+    in_data : var.Var
+        Variable for the input data
+    out_size : int
+        Output size
+    in_map : var.Var
+        Variable for mapping lambda. The lambda returns the input id mapping
+        array on given context
+    out_map : var.Var
+        Variable for mapping lambda. The lambda returns the output id mapping
+        array on given context
+    ret : var.Var
+        Variable for the result.
+    """
+    def __init__(self, reducer, graph, target, in_data, out_size, in_map,
+                 out_map, ret):
+        self.reducer = reducer
+        self.graph = graph
+        self.target = target
+        self.in_data = in_data
+        self.out_size = out_size
+        self.in_map = in_map
+        self.out_map = out_map
+        self.ret = ret
+
+    def opcode(self):
+        return OpCode.COPY_REDUCE
+
+    def arg_vars(self):
+        return [self.reducer, self.graph, self.target, self.in_data,
+                self.out_size, self.in_map, self.out_map]
+
+    def ret_var(self):
+        return self.ret
+
+    def run(self):
+        in_data = self.in_data.data
+        ctx = utils.to_dgl_context(F.context(in_data))
+        graph = self.graph.data(ctx)
+        in_map = self.in_map.data(ctx) if self.in_map.data else None
+        out_map = self.out_map.data(ctx) if self.out_map.data else None
+        if not isinstance(in_map, tuple):
+            in_map = (in_map, in_map)
+        if not isinstance(out_map, tuple):
+            out_map = (out_map, out_map)
+        self.ret.data = F.copy_reduce(
+            self.reducer, graph, self.target, in_data, self.out_size, in_map,
+            out_map)
+
+
+IR_REGISTRY[OpCode.COPY_REDUCE] = {
+    'name': 'COPY_REDUCE',
+    'args_type': [VarType.STR, VarType.GRAPH, VarType.INT, VarType.FEAT, VarType.INT,
+                  VarType.MAP, VarType.MAP],
+    'ret_type': VarType.FEAT,
+    'executor_cls': CopyReduceExecutor,
+}
+
+
+def COPY_REDUCE(reducer, graph, target, in_data, out_size, in_map, out_map,
+                ret=None):
+    """Perform COPY_REDUCE symbolically.
+
+    Parameters
+    ----------
+    reducer : str
+        String representing reduction to perform, can be "sum", "max", "min",
+        "mean", "prod", "none" (no reduction)
+    graph : var.Var
+        Variable for graph index lambda. The lambda returns the immutable graph
+        index given a context object.
+    target: int
+        The input target (src, dst, edge)
+    in_data : var.Var
+        Variable for the input data
+    out_size : int
+        Output size
+    in_map : var.Var
+        Variable for mapping lambda. The lambda returns the input id mapping
+        array on given context
+    out_map : var.Var
+        Variable for mapping lambda. The lambda returns the output id mapping
+        array on given context
+    ret : var.Var, optional
+        Variable for the result. If not give, a new variable will be created.
+
+    Returns
+    -------
+    var.Var
+        Variable for the result.
+    """
+    reg = IR_REGISTRY[OpCode.COPY_REDUCE]
+    ret = var.new(reg['ret_type']) if ret is None else ret
+    get_current_prog().issue(reg['executor_cls'](
+        reducer, graph, target, in_data, out_size, in_map, out_map, ret))
+    return ret

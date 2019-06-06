@@ -83,9 +83,10 @@ DGL_REGISTER_GLOBAL("nodeflow._CAPI_NodeFlowGetBlockAdj")
     int64_t layer0_size = args[2];
     int64_t start = args[3];
     int64_t end = args[4];
+    const bool remap = args[5];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
     const ImmutableGraph* gptr = dynamic_cast<const ImmutableGraph*>(ptr);
-    auto res = GetNodeFlowSlice(*gptr, format, layer0_size, start, end, true);
+    auto res = GetNodeFlowSlice(*gptr, format, layer0_size, start, end, remap);
     *rv = ConvertNDArrayVectorToPackedFunc(res);
   });
 

@@ -15,7 +15,7 @@ np.random.seed(42)
 def toset(x):
     return set(F.zerocopy_to_numpy(x).tolist())
 
-def test_bfs(n=1000):
+def test_bfs(n=100):
     def _bfs_nx(g_nx, src):
         edges = nx.bfs_edges(g_nx, src)
         layers_nx = [set([src])]
@@ -36,7 +36,7 @@ def test_bfs(n=1000):
         return layers_nx, edges_nx
 
     g = dgl.DGLGraph()
-    a = sp.random(n, n, 10 / n, data_rvs=lambda n: np.ones(n))
+    a = sp.random(n, n, 3 / n, data_rvs=lambda n: np.ones(n))
     g.from_scipy_sparse_matrix(a)
     g_nx = g.to_networkx()
     src = random.choice(range(n))
@@ -54,9 +54,9 @@ def test_bfs(n=1000):
     assert len(edges_dgl) == len(edges_nx)
     assert all(toset(x) == y for x, y in zip(edges_dgl, edges_nx))
 
-def test_topological_nodes(n=1000):
+def test_topological_nodes(n=100):
     g = dgl.DGLGraph()
-    a = sp.random(n, n, 10 / n, data_rvs=lambda n: np.ones(n))
+    a = sp.random(n, n, 3 / n, data_rvs=lambda n: np.ones(n))
     b = sp.tril(a, -1).tocoo()
     g.from_scipy_sparse_matrix(b)
 
@@ -65,13 +65,13 @@ def test_topological_nodes(n=1000):
     adjmat = g.adjacency_matrix()
     def tensor_topo_traverse():
         n = g.number_of_nodes()
-        mask = F.ones((n, 1))
+        mask = F.copy_to(F.ones((n, 1)), F.cpu())
         degree = F.spmm(adjmat, mask)
         while F.reduce_sum(mask) != 0.:
             v = F.astype((degree == 0.), F.float32)
             v = v * mask
             mask = mask - v
-            frontier = F.nonzero_1d(F.squeeze(v, 1))
+            frontier = F.copy_to(F.nonzero_1d(F.squeeze(v, 1)), F.cpu())
             yield frontier
             degree -= F.spmm(adjmat, v)
 
@@ -81,7 +81,7 @@ def test_topological_nodes(n=1000):
     assert all(toset(x) == toset(y) for x, y in zip(layers_dgl, layers_spmv))
 
 DFS_LABEL_NAMES = ['forward', 'reverse', 'nontree']
-def test_dfs_labeled_edges(n=1000, example=False):
+def test_dfs_labeled_edges(example=False):
     dgl_g = dgl.DGLGraph()
     dgl_g.add_nodes(6)
     dgl_g.add_edges([0, 1, 0, 3, 3], [1, 2, 2, 4, 5])

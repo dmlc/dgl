@@ -25,6 +25,32 @@ IdArray Clone(IdArray arr) {
   return ret;
 }
 
+IdArray AsNumBits(IdArray arr, uint8_t bits) {
+  if (arr->dtype.bits == bits) {
+    return arr;
+  } else {
+    const int64_t len = arr->shape[0];
+    IdArray ret = IdArray::Empty({len},
+        DLDataType{kDLInt, bits, 1}, DLContext{kDLCPU, 0});
+    if (arr->dtype.bits == 32 && bits == 64) {
+      const int32_t* arr_data = static_cast<int32_t*>(arr->data);
+      int64_t* ret_data = static_cast<int64_t*>(ret->data);
+      for (int64_t i = 0; i < len; ++i) {
+        ret_data[i] = arr_data[i];
+      }
+    } else if (arr->dtype.bits == 64 && bits == 32) {
+      const int64_t* arr_data = static_cast<int64_t*>(arr->data);
+      int32_t* ret_data = static_cast<int32_t*>(ret->data);
+      for (int64_t i = 0; i < len; ++i) {
+        ret_data[i] = arr_data[i];
+      }
+    } else {
+      LOG(FATAL) << "Invalid type conversion.";
+    }
+    return ret;
+  }
+}
+
 IdArray Add(IdArray lhs, IdArray rhs) {
   IdArray ret = NewIdArray(lhs->shape[0]);
   const dgl_id_t* lhs_data = static_cast<dgl_id_t*>(lhs->data);
