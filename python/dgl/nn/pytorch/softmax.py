@@ -130,4 +130,4 @@ class EdgeSoftmax1(th.autograd.Function):
         return None, grad_score
 
 
-edge_softmax = EdgeSoftmax1.apply
+edge_softmax = EdgeSoftmax1.apply   # pylint: disable=invalid-name

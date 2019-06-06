@@ -545,7 +545,7 @@ def to_nbits_int(tensor, nbits):
     """Change the dtype of integer tensor
     The dtype of returned tensor uses nbits, nbits can only be 32 or 64
     """
-    assert(nbits == 32 or nbits == 64), "nbits can either be 32 or 64"
+    assert(nbits in (32, 64)), "nbits can either be 32 or 64"
     if nbits == 32:
         return F.astype(tensor, F.int32)
     else:
