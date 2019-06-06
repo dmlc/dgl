@@ -4,6 +4,8 @@ import scipy as sp
 import dgl
 from dgl import utils
 
+np.random.seed(42)
+
 def generate_rand_graph(n):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
     return dgl.DGLGraph(arr, readonly=True)
