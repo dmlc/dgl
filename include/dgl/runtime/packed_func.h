@@ -642,6 +642,11 @@ class DGLRetValue : public DGLPODValue_ {
     value_.v_type = t;
     return *this;
   }
+  DGLRetValue& operator=(DGLContext ctx) {
+    this->SwitchToPOD(kDGLContext);
+    value_.v_ctx = ctx;
+    return *this;
+  }
   DGLRetValue& operator=(bool value) {
     this->SwitchToPOD(kDLInt);
     value_.v_int64 = value;

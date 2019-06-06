@@ -336,7 +336,7 @@ def build_relabel_map(x, is_sorted=False):
     >>> n2o
     [1, 3, 5, 6]
     >>> o2n
-    [n/a, 0, n/a, 2, n/a, 3, 4]
+    [n/a, 0, n/a, 1, n/a, 2, 3]
 
     "n/a" will be filled with 0
 
@@ -490,6 +490,27 @@ def get_ndata_name(g, name):
         name += '_'
     return name
 
+def get_edata_name(g, name):
+    """Return an edge data name that does not exist in the given graph.
+
+    The given name is directly returned if it does not exist in the given graph.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The graph.
+    name : str
+        The proposed name.
+
+    Returns
+    -------
+    str
+        The node data name that does not exist.
+    """
+    while name in g.edata:
+        name += '_'
+    return name
+
 def unwrap_to_ptr_list(wrapper):
     """Convert the internal vector wrapper to a python list of ctypes.c_void_p.
 
@@ -513,3 +534,19 @@ def unwrap_to_ptr_list(wrapper):
     rst = [ctypes.c_void_p(x) for x in data.contents]
     _api_internal._FreeVectorWrapper(wrapper)
     return rst
+
+def to_dgl_context(ctx):
+    """Convert a backend context to DGLContext"""
+    device_type = nd.DGLContext.STR2MASK[F.device_type(ctx)]
+    device_id = F.device_id(ctx)
+    return nd.DGLContext(device_type, device_id)
+
+def to_nbits_int(tensor, nbits):
+    """Change the dtype of integer tensor
+    The dtype of returned tensor uses nbits, nbits can only be 32 or 64
+    """
+    assert(nbits in (32, 64)), "nbits can either be 32 or 64"
+    if nbits == 32:
+        return F.astype(tensor, F.int32)
+    else:
+        return F.astype(tensor, F.int64)
