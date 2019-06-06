@@ -47,14 +47,9 @@ def test_v2v_update_all():
         assert F.allclose(v2, v3)
         # update all with edge weights
         v1 = g.ndata[fld]
-        if len(g.ndata[fld].shape) == 1:
-            g.update_all(fn.src_mul_edge(src=fld, edge='e1', out='m'),
-                    fn.sum(msg='m', out=fld), apply_func)
-            v2 = g.ndata[fld]
-        else:
-            g.update_all(fn.src_mul_edge(src=fld, edge='e2', out='m'),
-                    fn.sum(msg='m', out=fld), apply_func)
-            v2 = g.ndata[fld]
+        g.update_all(fn.src_mul_edge(src=fld, edge='e1', out='m'),
+                fn.sum(msg='m', out=fld), apply_func)
+        v2 = g.ndata[fld]
         g.set_n_repr({fld : v1})
         g.update_all(message_func_edge, reduce_func, apply_func)
         v4 = g.ndata[fld]
@@ -94,14 +89,9 @@ def test_v2v_snr():
         assert F.allclose(v2, v3)
         # send and recv with edge weights
         v1 = g.ndata[fld]
-        if len(g.ndata[fld].shape) == 1:
-            g.send_and_recv((u, v), fn.src_mul_edge(src=fld, edge='e1', out='m'),
-                    fn.sum(msg='m', out=fld), apply_func)
-            v2 = g.ndata[fld]
-        else:
-            g.send_and_recv((u, v), fn.src_mul_edge(src=fld, edge='e2', out='m'),
-                    fn.sum(msg='m', out=fld), apply_func)
-            v2 = g.ndata[fld]
+        g.send_and_recv((u, v), fn.src_mul_edge(src=fld, edge='e1', out='m'),
+                fn.sum(msg='m', out=fld), apply_func)
+        v2 = g.ndata[fld]
         g.set_n_repr({fld : v1})
         g.send_and_recv((u, v), message_func_edge, reduce_func, apply_func)
         v4 = g.ndata[fld]
@@ -140,14 +130,9 @@ def test_v2v_pull():
         assert F.allclose(v2, v3)
         # send and recv with edge weights
         v1 = g.ndata[fld]
-        if len(g.ndata[fld].shape) == 1:
-            g.pull(nodes, fn.src_mul_edge(src=fld, edge='e1', out='m'),
-                   fn.sum(msg='m', out=fld), apply_func)
-            v2 = g.ndata[fld]
-        else:
-            g.pull(nodes, fn.src_mul_edge(src=fld, edge='e2', out='m'),
-                   fn.sum(msg='m', out=fld), apply_func)
-            v2 = g.ndata[fld]
+        g.pull(nodes, fn.src_mul_edge(src=fld, edge='e1', out='m'),
+                fn.sum(msg='m', out=fld), apply_func)
+        v2 = g.ndata[fld]
         g.ndata[fld] = v1
         g.pull(nodes, message_func_edge, reduce_func, apply_func)
         v4 = g.ndata[fld]
