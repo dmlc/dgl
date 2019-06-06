@@ -2,11 +2,9 @@
 # pylint: disable= no-member, arguments-differ
 import torch as th
 
-from ... import ndarray as nd
 from ... import backend as F
 from ... import utils
 from ... import function as fn
-from ...runtime import spmv
 
 __all__ = ['EdgeSoftmax', 'edge_softmax']
 
@@ -81,7 +79,9 @@ class EdgeSoftmax(object):
                              num_nodes, empty_map, empty_map)
         return logits / norm.index_select(0, dst)
 
+
 class EdgeSoftmax1(th.autograd.Function):
+    """EdgeSoftmax implementation with DGL message passing APIs"""
     @staticmethod
     def forward(ctx, g, score):
         """
@@ -128,5 +128,6 @@ class EdgeSoftmax1(th.autograd.Function):
         g.apply_edges(fn.e_mul_v(out_name, accum_name, out_name))
         grad_score = g.edata[grad_score_name] - g.edata[out_name]
         return None, grad_score
+
 
 edge_softmax = EdgeSoftmax1.apply

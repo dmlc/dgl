@@ -11,7 +11,6 @@ from ._ffi.function import _init_api
 from .base import DGLError
 from . import backend as F
 from . import utils
-from . import ndarray as nd
 
 GraphIndexHandle = ctypes.c_void_p
 

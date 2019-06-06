@@ -154,7 +154,7 @@ def copy_e(e, out):
 # e_add_u, e_sub_u, e_mul_u, e_div_u
 # e_add_v, e_sub_v, e_mul_v, e_div_v
 
-_target_map = {
+_TARGET_MAP = {
     "u": TargetCode.SRC,
     "v": TargetCode.DST,
     "e": TargetCode.EDGE,
@@ -180,40 +180,113 @@ def _gen_message_builtin(lhs, rhs, binary_op):
     >>> import dgl
     >>> message_func = dgl.function.{}('h', 'h', 'm')
     """.format(binary_op,
-               TargetCode.CODE2STR[_target_map[lhs]],
-               TargetCode.CODE2STR[_target_map[rhs]],
-               lhs, TargetCode.CODE2STR[_target_map[lhs]],
-               rhs, TargetCode.CODE2STR[_target_map[rhs]],
+               TargetCode.CODE2STR[_TARGET_MAP[lhs]],
+               TargetCode.CODE2STR[_TARGET_MAP[rhs]],
+               lhs, TargetCode.CODE2STR[_TARGET_MAP[lhs]],
+               rhs, TargetCode.CODE2STR[_TARGET_MAP[rhs]],
                name)
 
     def func(lhs_field, rhs_field, out):
         return BinaryMessageFunction(
-            binary_op, _target_map[lhs],
-            _target_map[rhs], lhs_field, rhs_field, out)
+            binary_op, _TARGET_MAP[lhs],
+            _TARGET_MAP[rhs], lhs_field, rhs_field, out)
     func.__name__ = name
     func.__doc__ = docstring
     return func
 
 
-target = ["u", "v", "e"]
-for lhs, rhs in product(target, target):
-    if lhs != rhs:
-        for binary_op in ["add", "sub", "mul", "div"]:
-            func = _gen_message_builtin(lhs, rhs, binary_op)
-            setattr(sys.modules[__name__], func.__name__, func)
-            __all__.append(func.__name__)
+def _register_builtin_message_func():
+    """Register builtin message functions"""
+    target = ["u", "v", "e"]
+    for lhs, rhs in product(target, target):
+        if lhs != rhs:
+            for binary_op in ["add", "sub", "mul", "div"]:
+                func = _gen_message_builtin(lhs, rhs, binary_op)
+                setattr(sys.modules[__name__], func.__name__, func)
+                __all__.append(func.__name__)
+
+
+_register_builtin_message_func()
 
 
 ##############################################################################
 # For backward compatibility
 
 def src_mul_edge(src, edge, out):
+    """Builtin message function that computes message by performing
+    binary operation mul between src feature and dst feature.
+
+    Notes
+    -----
+    This function is deprecated. Please use u_mul_e instead.
+
+    Parameters
+    ----------
+    src : str
+        The source feature field.
+    dst : str
+        The destination feature field.
+    out : str
+        The output message field.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> message_func = dgl.function.src_mul_edge('h', 'h', 'm')
+    """
     return getattr(sys.modules[__name__], "u_mul_e")(src, edge, out)
 
 
 def copy_src(src, out):
+    """Builtin message function that computes message using source node
+    feature.
+
+    Notes
+    -----
+    This function is deprecated. Please use copy_u instead.
+
+    Parameters
+    ----------
+    src : str
+        The source feature field.
+    out : str
+        The output message field.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> message_func = dgl.function.copy_src('h', 'm')
+
+    The above example is equivalent to the following user defined function:
+
+    >>> def message_func(edges):
+    >>>     return {'m': edges.src['h']}
+    """
     return copy_u(src, out)
 
 
 def copy_edge(edge, out):
+    """Builtin message function that computes message using edge feature.
+
+    Notes
+    -----
+    This function is deprecated. Please use copy_e instead.
+
+    Parameters
+    ----------
+    edge : str
+        The edge feature field.
+    out : str
+        The output message field.
+
+    Examples
+    --------
+    >>> import dgl
+    >>> message_func = dgl.function.copy_edge('h', 'm')
+
+    The above example is equivalent to the following user defined function:
+
+    >>> def message_func(edges):
+    >>>     return {'m': edges.data['h']}
+    """
     return copy_e(edge, out)
