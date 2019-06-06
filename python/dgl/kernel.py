@@ -22,6 +22,7 @@ def infer_binary_feature_shape(lhs, rhs):
     ret = _CAPI_DGLKernelInferBinaryFeatureShape(lhs, rhs)
     return tuple(ret.asnumpy())
 
+# pylint: disable=invalid-name
 def binary_op_reduce(reducer, op, G, A_target, B_target, A, B, out,
                      A_rows=None, B_rows=None, out_rows=None):
     """Perform binary operation on the edges of graph ``G``, and optionally
@@ -143,6 +144,7 @@ def binary_op_reduce(reducer, op, G, A_target, B_target, A, B, out,
         A, B, out,
         A_rows, B_rows, out_rows)
 
+# pylint: disable=invalid-name
 def backward_lhs_binary_op_reduce(
         reducer, op, G,
         A_target, B_target,
@@ -207,6 +209,7 @@ def backward_lhs_binary_op_reduce(
         A, B, out,
         grad_out, grad_A)
 
+# pylint: disable=invalid-name
 def backward_rhs_binary_op_reduce(
         reducer, op, G,
         A_target, B_target,
@@ -271,6 +274,7 @@ def backward_rhs_binary_op_reduce(
         A, B, out,
         grad_out, grad_B)
 
+# pylint: disable=invalid-name
 def copy_reduce(reducer, G, target,
                 X, out,
                 X_rows=None, out_rows=None):
@@ -364,6 +368,7 @@ def copy_reduce(reducer, G, target,
         reducer, G._handle, int(target),
         X, out, X_rows, out_rows)
 
+# pylint: disable=invalid-name
 def backward_copy_reduce(reducer, G, target,
                          X, out,
                          grad_out, grad_X,
