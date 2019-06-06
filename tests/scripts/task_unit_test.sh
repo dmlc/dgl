@@ -2,7 +2,7 @@
 
 function fail {
     echo FAIL: $@
-    exit -1
+    exit 1
 }
 
 function usage {
