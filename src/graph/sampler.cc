@@ -527,119 +527,118 @@ NodeFlow SamplerOp::NeighborUniformSample(const ImmutableGraph *graph,
 }
 
 namespace {
-/*
- * Given a graph and a collection of seed nodes, this function constructs NodeFlow
- * layers via uniform layer-wise sampling, and return the resultant layers and their
- * corresponding probabilities.
- */
-void ConstructLayers(const dgl_id_t *indptr,
-                     const dgl_id_t *indices,
-                     const std::vector<dgl_id_t>& seed_array,
-                     IdArray layer_sizes,
-                     std::vector<dgl_id_t> *layer_offsets,
-                     std::vector<dgl_id_t> *node_mapping,
-                     std::vector<int64_t> *actl_layer_sizes,
-                     std::vector<float> *probabilities) {
-  const int64_t* layer_sizes_data = static_cast<int64_t*>(layer_sizes->data);
-  const int64_t num_layers = layer_sizes->shape[0];
+  void ConstructLayers(const dgl_id_t *indptr,
+                       const dgl_id_t *indices,
+                       const std::vector<dgl_id_t>& seed_array,
+                       IdArray layer_sizes,
+                       std::vector<dgl_id_t> *layer_offsets,
+                       std::vector<dgl_id_t> *node_mapping,
+                       std::vector<int64_t> *actl_layer_sizes,
+                       std::vector<float> *probabilities) {
+    /*
+     * Given a graph and a collection of seed nodes, this function constructs NodeFlow
+     * layers via uniform layer-wise sampling, and return the resultant layers and their
+     * corresponding probabilities.
+     */
+    std::copy(seed_array.begin(), seed_array.end(), std::back_inserter(*node_mapping));
+    actl_layer_sizes->push_back(node_mapping->size());
+    probabilities->insert(probabilities->end(), node_mapping->size(), 1);
+    const int64_t* layer_sizes_data = static_cast<int64_t*>(layer_sizes->data);
+    const int64_t num_layers = layer_sizes->shape[0];
 
-  // Push all seed nodes as the first layer
-  node_mapping->insert(node_mapping->end(), seed_array.begin(), seed_array.end());
-  actl_layer_sizes->push_back(node_mapping->size());
-  probabilities->insert(probabilities->end(), node_mapping->size(), 1.0);
-
-  size_t curr = 0;
-  size_t next = node_mapping->size();
-  unsigned int rand_seed = randseed();
-  for (int64_t i = num_layers - 1; i >= 0; --i) {
-    const int64_t layer_size = layer_sizes_data[i];
-    std::unordered_set<dgl_id_t> candidate_set;
-    for (auto j = curr; j < next; ++j) {
-      auto src = (*node_mapping)[j];
-      // insert all the successor nodes into the candidate set
-      candidate_set.insert(indices + indptr[src], indices + indptr[src + 1]);
-    }
-
-    const std::vector<dgl_id_t> candidate_vector(candidate_set.begin(), candidate_set.end());
-
-    std::unordered_map<dgl_id_t, size_t> n_occurrences;
-    auto n_candidates = candidate_vector.size();
-    for (int64_t j = 0; j != layer_size; ++j) {
-      auto dst = candidate_vector[rand_r(&rand_seed) % n_candidates];
-      if (!n_occurrences.insert(std::make_pair(dst, 1)).second) {
-        ++n_occurrences[dst];
+    size_t curr = 0;
+    size_t next = node_mapping->size();
+    unsigned int rand_seed = randseed();
+    for (int64_t i = num_layers - 1; i >= 0; --i) {
+      const int64_t layer_size = layer_sizes_data[i];
+      std::unordered_set<dgl_id_t> candidate_set;
+      for (auto j = curr; j != next; ++j) {
+        auto src = (*node_mapping)[j];
+        candidate_set.insert(indices + indptr[src], indices + indptr[src + 1]);
       }
-    }
 
-    for (auto const &pair : n_occurrences) {
-      node_mapping->push_back(pair.first);
-      const float p = pair.second * n_candidates / static_cast<float>(layer_size);
-      probabilities->push_back(p);
-    }
+      std::vector<dgl_id_t> candidate_vector;
+      std::copy(candidate_set.begin(), candidate_set.end(),
+                std::back_inserter(candidate_vector));
 
-    actl_layer_sizes->push_back(node_mapping->size() - next);
-    curr = next;
-    next = node_mapping->size();
-  }
-  std::reverse(node_mapping->begin(), node_mapping->end());
-  std::reverse(actl_layer_sizes->begin(), actl_layer_sizes->end());
-  layer_offsets->push_back(0);
-  for (const auto &size : *actl_layer_sizes) {
-    layer_offsets->push_back(size + layer_offsets->back());
-  }
-}
-
-void ConstructFlows(const dgl_id_t *indptr,
-                    const dgl_id_t *indices,
-                    const dgl_id_t *eids,
-                    const std::vector<dgl_id_t> &node_mapping,
-                    const std::vector<int64_t> &actl_layer_sizes,
-                    std::vector<dgl_id_t> *sub_indptr,
-                    std::vector<dgl_id_t> *sub_indices,
-                    std::vector<dgl_id_t> *sub_eids,
-                    std::vector<dgl_id_t> *flow_offsets,
-                    std::vector<dgl_id_t> *edge_mapping) {
-  /*
-   * Given a graph and a sequence of NodeFlow layers, this function constructs dense
-   * subgraphs (flows) between consecutive layers.
-   */
-  auto n_flows = actl_layer_sizes.size() - 1;
-  for (int64_t i = 0; i < actl_layer_sizes.front() + 1; i++)
-    sub_indptr->push_back(0);
-  flow_offsets->push_back(0);
-  int64_t first = 0;
-  for (size_t i = 0; i < n_flows; ++i) {
-    auto src_size = actl_layer_sizes[i];
-    std::unordered_map<dgl_id_t, dgl_id_t> source_map;
-    for (int64_t j = 0; j < src_size; ++j) {
-      source_map.insert(std::make_pair(node_mapping[first + j], first + j));
-    }
-    auto dst_size = actl_layer_sizes[i + 1];
-    for (int64_t j = 0; j < dst_size; ++j) {
-      auto dst = node_mapping[first + src_size + j];
-      typedef std::pair<dgl_id_t, dgl_id_t> id_pair;
-      std::vector<id_pair> neighbor_indices;
-      for (dgl_id_t k = indptr[dst]; k < indptr[dst + 1]; ++k) {
-        // TODO(gaiyu): accelerate hash table lookup
-        auto ret = source_map.find(indices[k]);
-        if (ret != source_map.end()) {
-          neighbor_indices.push_back(std::make_pair(ret->second, eids[k]));
+      std::unordered_map<dgl_id_t, size_t> n_occurrences;
+      auto n_candidates = candidate_vector.size();
+      for (int64_t j = 0; j != layer_size; ++j) {
+        auto dst = candidate_vector[rand_r(&rand_seed) % n_candidates];
+        if (!n_occurrences.insert(std::make_pair(dst, 1)).second) {
+          ++n_occurrences[dst];
         }
       }
-      auto cmp = [](const id_pair p, const id_pair q)->bool { return p.first < q.first; };
-      std::sort(neighbor_indices.begin(), neighbor_indices.end(), cmp);
-      for (const auto &pair : neighbor_indices) {
-        sub_indices->push_back(pair.first);
-        edge_mapping->push_back(pair.second);
+
+      for (auto const &pair : n_occurrences) {
+        node_mapping->push_back(pair.first);
+        float p = pair.second * n_candidates / static_cast<float>(layer_size);
+        probabilities->push_back(p);
       }
-      sub_indptr->push_back(sub_indices->size());
+
+      actl_layer_sizes->push_back(node_mapping->size() - next);
+      curr = next;
+      next = node_mapping->size();
     }
-    flow_offsets->push_back(sub_indices->size());
-    first += src_size;
+    std::reverse(node_mapping->begin(), node_mapping->end());
+    std::reverse(actl_layer_sizes->begin(), actl_layer_sizes->end());
+    layer_offsets->push_back(0);
+    for (const auto &size : *actl_layer_sizes) {
+      layer_offsets->push_back(size + layer_offsets->back());
+    }
   }
-  sub_eids->resize(sub_indices->size());
-  std::iota(sub_eids->begin(), sub_eids->end(), 0);
-}
+
+  void ConstructFlows(const dgl_id_t *indptr,
+                      const dgl_id_t *indices,
+                      const dgl_id_t *eids,
+                      const std::vector<dgl_id_t> &node_mapping,
+                      const std::vector<int64_t> &actl_layer_sizes,
+                      std::vector<dgl_id_t> *sub_indptr,
+                      std::vector<dgl_id_t> *sub_indices,
+                      std::vector<dgl_id_t> *sub_eids,
+                      std::vector<dgl_id_t> *flow_offsets,
+                      std::vector<dgl_id_t> *edge_mapping) {
+    /*
+     * Given a graph and a sequence of NodeFlow layers, this function constructs dense
+     * subgraphs (flows) between consecutive layers.
+     */
+    auto n_flows = actl_layer_sizes.size() - 1;
+    for (int64_t i = 0; i < actl_layer_sizes.front() + 1; i++)
+      sub_indptr->push_back(0);
+    flow_offsets->push_back(0);
+    int64_t first = 0;
+    for (size_t i = 0; i < n_flows; ++i) {
+      auto src_size = actl_layer_sizes[i];
+      std::unordered_map<dgl_id_t, dgl_id_t> source_map;
+      for (int64_t j = 0; j < src_size; ++j) {
+        source_map.insert(std::make_pair(node_mapping[first + j], first + j));
+      }
+      auto dst_size = actl_layer_sizes[i + 1];
+      for (int64_t j = 0; j < dst_size; ++j) {
+        auto dst = node_mapping[first + src_size + j];
+        typedef std::pair<dgl_id_t, dgl_id_t> id_pair;
+        std::vector<id_pair> neighbor_indices;
+        for (dgl_id_t k = indptr[dst]; k < indptr[dst + 1]; ++k) {
+          // TODO(gaiyu): accelerate hash table lookup
+          auto ret = source_map.find(indices[k]);
+          if (ret != source_map.end()) {
+            neighbor_indices.push_back(std::make_pair(ret->second, eids[k]));
+          }
+        }
+        auto cmp = [](const id_pair p, const id_pair q)->bool { return p.first < q.first; };
+        std::sort(neighbor_indices.begin(), neighbor_indices.end(), cmp);
+        for (const auto &pair : neighbor_indices) {
+          sub_indices->push_back(pair.first);
+          edge_mapping->push_back(pair.second);
+        }
+        sub_indptr->push_back(sub_indices->size());
+      }
+      flow_offsets->push_back(sub_indices->size());
+      first += src_size;
+    }
+    sub_eids->resize(sub_indices->size());
+    std::iota(sub_eids->begin(), sub_eids->end(), 0);
+  }
 }  // namespace
 
 NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
