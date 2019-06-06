@@ -31,10 +31,8 @@ def test_bfs(n=100):
                 edges_nx.append(edge_frontier)
                 frontier = set([v])
                 edge_frontier = set([g.edge_id(u, v)])
-        # avoids case of no successors
-        if len(frontier) > 0 and len(edge_frontier) > 0:
-            layers_nx.append(frontier)
-            edges_nx.append(edge_frontier)
+        layers_nx.append(frontier)
+        edges_nx.append(edge_frontier)
         return layers_nx, edges_nx
 
     g = dgl.DGLGraph()
