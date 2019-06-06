@@ -2,7 +2,7 @@
 
 function fail {
     echo FAIL: $@
-    exit -1
+    exit 1
 }
 
 function usage {
@@ -20,6 +20,6 @@ export DGL_LIBRARY_PATH=${PWD}/build
 export PYTHONPATH=tests:${PWD}/python:$PYTHONPATH
 export DGL_DOWNLOAD_DIR=${PWD}
 
-python3 -m nose -v --with-xunit tests/compute || fail "compute"
-python3 -m nose -v --with-xunit tests/graph_index || fail "graph_index"
-python3 -m nose -v --with-xunit tests/$DGLBACKEND || fail "backend-specific"
+python3 -m nose -v --with-xunit --nocapture tests/compute/test_sampler.py || fail "compute"
+#python3 -m nose -v --with-xunit tests/graph_index || fail "graph_index"
+#python3 -m nose -v --with-xunit tests/$DGLBACKEND || fail "backend-specific"
