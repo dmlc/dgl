@@ -7,7 +7,7 @@ from dgl import utils
 
 np.random.seed(42)
 
-def generate_rand_graph(n=100):
+def generate_rand_graph(n=1000):
     arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
     nx_g = nx.Graph(arr).to_directed()
     return dgl.DGLGraph(nx_g, readonly=True)

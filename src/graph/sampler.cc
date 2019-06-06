@@ -551,6 +551,8 @@ namespace {
     size_t curr = 0;
     size_t next = node_mapping->size();
     unsigned int rand_seed = randseed();
+    rand_seed = 1559848839;
+    LOG(INFO) << "seed=" << rand_seed;
     for (int64_t i = num_layers - 1; i >= 0; --i) {
       const int64_t layer_size = layer_sizes_data[i];
       std::unordered_set<dgl_id_t> candidate_set;
@@ -682,6 +684,8 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
   CHECK_EQ(sub_indptr[0], 0);
   CHECK_EQ(sub_indptr.back(), sub_indices.size());
   CHECK_EQ(sub_indices.size(), sub_edge_ids.size());
+  CHECK_EQ(sub_indices.size(), edge_mapping.size());
+  CHECK_EQ(flow_offsets.size(), layer_offsets.size() - 1);
 
   NodeFlow nf;
   auto sub_csr = CSRPtr(new CSR(

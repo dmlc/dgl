@@ -20,6 +20,6 @@ export DGL_LIBRARY_PATH=${PWD}/build
 export PYTHONPATH=tests:${PWD}/python:$PYTHONPATH
 export DGL_DOWNLOAD_DIR=${PWD}
 
-python3 -m nose -v --with-xunit tests/$BACKEND || fail "backend-specific"
-python3 -m nose -v --with-xunit tests/graph_index || fail "graph_index"
-python3 -m nose -v --with-xunit tests/compute || fail "compute"
+#python3 -m nose -v --with-xunit tests/$BACKEND || fail "backend-specific"
+#python3 -m nose -v --with-xunit tests/graph_index || fail "graph_index"
+python3 -m nose -v --nocapture --with-xunit tests/compute/test_sampler.py:test_10neighbor_sampler_all || fail "compute"
