@@ -231,7 +231,7 @@ def check_flow_compute1(create_node_flow, use_negative_block_id=False):
         nf.block_compute(l)
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                      lambda nodes: {'h' : nodes.data['t'] + 1})
-        assert F.array_equal(nf.layers[i + 1].data['h'], g.ndata['h'][nf.layer_parent_nid(i + 1)])
+        assert F.allclose(nf.layers[i + 1].data['h'], g.ndata['h'][nf.layer_parent_nid(i + 1)])
 
     # test the case that we register UDFs in all blocks.
     nf = create_node_flow(g, num_layers)
@@ -246,7 +246,7 @@ def check_flow_compute1(create_node_flow, use_negative_block_id=False):
         nf.block_compute(l)
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                      lambda nodes: {'h' : nodes.data['t'] + 1})
-        assert F.array_equal(nf.layers[i + 1].data['h'], g.ndata['h'][nf.layer_parent_nid(i + 1)])
+        assert F.allclose(nf.layers[i + 1].data['h'], g.ndata['h'][nf.layer_parent_nid(i + 1)])
 
 
 def test_flow_compute():
