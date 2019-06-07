@@ -54,7 +54,6 @@ Mapping between NodeFlow and parent graph
     NodeFlow.map_to_parent_nid
     NodeFlow.map_to_parent_eid
     NodeFlow.map_from_parent_nid
-    NodeFlow.map_from_parent_eid
 
 
 Synchronize features between NodeFlow and parent graph

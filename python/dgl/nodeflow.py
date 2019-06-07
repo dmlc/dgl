@@ -330,9 +330,6 @@ class NodeFlow(DGLBaseGraph):
         nflow_ids = transform_ids(mapping, parent_nids)
         return nflow_ids.tousertensor()
 
-    def map_from_parent_eid(self, block_id, parent_eids):
-        pass
-
     def layer_in_degree(self, layer_id):
         """Return the in-degree of the nodes in the specified layer.
 
