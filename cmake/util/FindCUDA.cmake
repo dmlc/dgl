@@ -5,7 +5,8 @@
 #   find_cuda(${USE_CUDA})
 #
 # - When USE_CUDA=ON, use auto search
-# - When USE_CUDA=/path/to/cuda-path, use the cuda path
+#
+# Please use the CMAKE variable CUDA_TOOLKIT_ROOT_DIR to set CUDA directory
 #
 # Provide variables:
 #
@@ -21,21 +22,7 @@
 macro(find_cuda use_cuda)
   set(__use_cuda ${use_cuda})
   if(__use_cuda STREQUAL "ON")
-    find_package(CUDA QUIET)
-  elseif(IS_DIRECTORY ${__use_cuda})
-    set(CUDA_TOOLKIT_ROOT_DIR ${__use_cuda})
-    message(STATUS "Custom CUDA_PATH=" ${CUDA_TOOLKIT_ROOT_DIR})
-    set(CUDA_INCLUDE_DIRS ${CUDA_TOOLKIT_ROOT_DIR}/include)
-    set(CUDA_FOUND TRUE)
-    if(MSVC)
-      find_library(CUDA_CUDART_LIBRARY cudart
-        ${CUDA_TOOLKIT_ROOT_DIR}/lib/x64
-        ${CUDA_TOOLKIT_ROOT_DIR}/lib/Win32)
-    else(MSVC)
-      find_library(CUDA_CUDART_LIBRARY cudart
-        ${CUDA_TOOLKIT_ROOT_DIR}/lib64
-        ${CUDA_TOOLKIT_ROOT_DIR}/lib)
-    endif(MSVC)
+    include(FindCUDA)
   endif()
 
   # additional libraries

@@ -255,7 +255,6 @@ class NeighborSampler(NodeFlowSampler):
 
         * "in": the neighbors on the in-edges.
         * "out": the neighbors on the out-edges.
-        * "both": the neighbors on both types of edges.
 
         Default: "in"
     node_prob : Tensor, optional
@@ -333,17 +332,35 @@ class LayerSampler(NodeFlowSampler):
 
     Parameters
     ----------
-    g: the DGLGraph where we sample NodeFlows.
-    batch_size: The number of NodeFlows in a batch.
-    layer_size: A list of layer sizes.
-    node_prob: the probability that a neighbor node is sampled.
-        Not implemented.
-    seed_nodes: a list of nodes where we sample NodeFlows from.
-        If it's None, the seed vertices are all vertices in the graph.
-    shuffle: indicates the sampled NodeFlows are shuffled.
-    num_workers: the number of worker threads that sample NodeFlows in parallel.
-    prefetch : bool, default False
-        Whether to prefetch the samples in the next batch.
+    g : DGLGraph
+        The DGLGraph where we sample NodeFlows.
+    batch_size : int
+        The batch size (i.e, the number of nodes in the last layer)
+    layer_size: int
+        A list of layer sizes.
+    neighbor_type: str, optional
+        Indicates the neighbors on different types of edges.
+
+        * "in": the neighbors on the in-edges.
+        * "out": the neighbors on the out-edges.
+
+        Default: "in"
+    node_prob : Tensor, optional
+        A 1D tensor for the probability that a neighbor node is sampled.
+        None means uniform sampling. Otherwise, the number of elements
+        should be equal to the number of vertices in the graph.
+        It's not implemented.
+        Default: None
+    seed_nodes : Tensor, optional
+        A 1D tensor  list of nodes where we sample NodeFlows from.
+        If None, the seed vertices are all the vertices in the graph.
+        Default: None
+    shuffle : bool, optional
+        Indicates the sampled NodeFlows are shuffled. Default: False
+    num_workers : int, optional
+        The number of worker threads that sample NodeFlows in parallel. Default: 1
+    prefetch : bool, optional
+        If true, prefetch the samples in the next batch. Default: False
     '''
 
     immutable_only = True
