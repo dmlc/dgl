@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.5)
 ########################################
 # Borrowed and adapted from TVM project
 ########################################
@@ -27,7 +27,7 @@ dgl_option(BUILD_CPP_TEST "Build cpp unittest executables" OFF)
 
 if(USE_CUDA)
   message(STATUS "Build with CUDA support")
-  project(dgl C CXX CUDA)
+  project(dgl C CXX)
   include(cmake/modules/CUDA.cmake)
 endif(USE_CUDA)
 
@@ -70,13 +70,18 @@ else(MSVC)
   check_cxx_compiler_flag("-std=c++11"    SUPPORT_CXX11)
   set(CMAKE_C_FLAGS "-O2 -Wall -fPIC ${CMAKE_C_FLAGS}")
   set(CMAKE_CXX_FLAGS "-O2 -Wall -fPIC -std=c++11 ${CMAKE_CXX_FLAGS}")
+endif(MSVC)
 
+if(USE_OPENMP)
   include(FindOpenMP)
   if(OPENMP_FOUND)
     set(CMAKE_C_FLAGS "${OpenMP_C_FLAGS} ${CMAKE_C_FLAGS}")
     set(CMAKE_CXX_FLAGS "${OpenMP_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
   endif(OPENMP_FOUND)
-endif(MSVC)
+endif(USE_OPENMP)
+
+# configure minigun
+add_definitions(-DENABLE_PARTIAL_FRONTIER=0)  # disable minigun partial frontier compile
 
 # Source file lists
 file(GLOB DGL_SRC
@@ -93,6 +98,7 @@ file(GLOB_RECURSE DGL_SRC_1
 
 list(APPEND DGL_SRC ${DGL_SRC_1})
 
+# Configure cuda
 if(USE_CUDA)
   dgl_config_cuda(DGL_CUDA_SRC)
   list(APPEND DGL_SRC ${DGL_CUDA_SRC})
