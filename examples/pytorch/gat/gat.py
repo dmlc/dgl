@@ -34,8 +34,8 @@ class GraphAttention(nn.Module):
             self.attn_drop = nn.Dropout(attn_drop)
         else:
             self.attn_drop = lambda x : x
-        self.attn_l = nn.Parameter(torch.Tensor(size=(num_heads, out_dim, 1)))
-        self.attn_r = nn.Parameter(torch.Tensor(size=(num_heads, out_dim, 1)))
+        self.attn_l = nn.Parameter(torch.Tensor(size=(1, num_heads, out_dim)))
+        self.attn_r = nn.Parameter(torch.Tensor(size=(1, num_heads, out_dim)))
         nn.init.xavier_normal_(self.fc.weight.data, gain=1.414)
         nn.init.xavier_normal_(self.attn_l.data, gain=1.414)
         nn.init.xavier_normal_(self.attn_r.data, gain=1.414)
@@ -53,9 +53,8 @@ class GraphAttention(nn.Module):
         # prepare
         h = self.feat_drop(inputs)  # NxD
         ft = self.fc(h).reshape((h.shape[0], self.num_heads, -1))  # NxHxD'
-        head_ft = ft.transpose(0, 1)  # HxNxD'
-        a1 = torch.bmm(head_ft, self.attn_l).transpose(0, 1)  # NxHx1
-        a2 = torch.bmm(head_ft, self.attn_r).transpose(0, 1)  # NxHx1
+        a1 = (ft * self.attn_l).sum(dim=-1).unsqueeze(-1) # N x H x 1
+        a2 = (ft * self.attn_r).sum(dim=-1).unsqueeze(-1) # N x H x 1
         self.g.ndata.update({'ft' : ft, 'a1' : a1, 'a2' : a2})
         # 1. compute edge attention
         self.g.apply_edges(self.edge_attention)
