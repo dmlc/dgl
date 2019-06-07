@@ -80,6 +80,9 @@ if(USE_OPENMP)
   endif(OPENMP_FOUND)
 endif(USE_OPENMP)
 
+# configure minigun
+add_definitions(-DENABLE_PARTIAL_FRONTIER=0)  # disable minigun partial frontier compile
+
 # Source file lists
 file(GLOB DGL_SRC
   src/*.cc
@@ -95,6 +98,7 @@ file(GLOB_RECURSE DGL_SRC_1
 
 list(APPEND DGL_SRC ${DGL_SRC_1})
 
+# Configure cuda
 if(USE_CUDA)
   dgl_config_cuda(DGL_CUDA_SRC)
   list(APPEND DGL_SRC ${DGL_CUDA_SRC})
