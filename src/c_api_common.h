@@ -12,7 +12,6 @@
 #include <algorithm>
 #include <vector>
 
-namespace {
 /*! \brief Check whether two device contexts are the same.*/
 inline bool operator == (const DLContext& ctx1, const DLContext& ctx2) {
   return ctx1.device_type == ctx2.device_type && ctx1.device_id == ctx2.device_id;
@@ -22,7 +21,6 @@ inline bool operator == (const DLContext& ctx1, const DLContext& ctx2) {
 inline std::ostream& operator << (std::ostream& os, const DLContext& ctx) {
   return os << "" << ctx.device_type << ":" << ctx.device_id << "";
 }
-}  // namespace
 
 namespace dgl {
 
