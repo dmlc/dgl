@@ -12,8 +12,8 @@ def test_node_removal():
     assert g.number_of_nodes() == 10
     g.ndata['id'] = F.arange(0, 10)
 
-    # delete nodes
-    g.del_nodes(range(4, 7))
+    # remove nodes
+    g.remove_nodes(range(4, 7))
     assert g.number_of_nodes() == 7
     assert F.array_equal(g.ndata['id'], F.tensor([0, 1, 2, 3, 7, 8, 9]))
 
@@ -22,8 +22,8 @@ def test_node_removal():
     assert g.number_of_nodes() == 10
     assert F.array_equal(g.ndata['id'], F.tensor([0, 1, 2, 3, 7, 8, 9, 0, 0, 0]))
 
-    # delete nodes
-    g.del_nodes(range(1, 4))
+    # remove nodes
+    g.remove_nodes(range(1, 4))
     assert g.number_of_nodes() == 7
     assert F.array_equal(g.ndata['id'], F.tensor([0, 7, 8, 9, 0, 0, 0]))
 
@@ -36,8 +36,8 @@ def test_multigraph_node_removal():
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 10
 
-    # delete nodes
-    g.del_nodes([2, 3])
+    # remove nodes
+    g.remove_nodes([2, 3])
     assert g.number_of_nodes() == 3
     assert g.number_of_edges() == 6
 
@@ -48,8 +48,8 @@ def test_multigraph_node_removal():
     assert g.number_of_nodes() == 4
     assert g.number_of_edges() == 8
 
-    # delete nodes
-    g.del_nodes([0])
+    # remove nodes
+    g.remove_nodes([0])
     assert g.number_of_nodes() == 3
     assert g.number_of_edges() == 6
 
@@ -62,8 +62,8 @@ def test_multigraph_edge_removal():
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 10
 
-    # delete edges
-    g.del_edges([2, 3])
+    # remove edges
+    g.remove_edges([2, 3])
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 8
 
@@ -73,8 +73,8 @@ def test_multigraph_edge_removal():
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 10
 
-    # delete edges
-    g.del_edges([0, 1])
+    # remove edges
+    g.remove_edges([0, 1])
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 8
 
@@ -86,8 +86,8 @@ def test_edge_removal():
             g.add_edge(i, j)
     g.edata['id'] = F.arange(0, 25)
 
-    # delete edges
-    g.del_edges(range(13, 20))
+    # remove edges
+    g.remove_edges(range(13, 20))
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 18
     assert F.array_equal(g.edata['id'], F.tensor(list(range(13)) + list(range(20, 25))))
@@ -98,8 +98,8 @@ def test_edge_removal():
     assert g.number_of_edges() == 19
     assert F.array_equal(g.edata['id'], F.tensor(list(range(13)) + list(range(20, 25)) + [0]))
 
-    # delete edges
-    g.del_edges(range(2, 10))
+    # remove edges
+    g.remove_edges(range(2, 10))
     assert g.number_of_nodes() == 5
     assert g.number_of_edges() == 11
     assert F.array_equal(g.edata['id'], F.tensor([0, 1, 10, 11, 12, 20, 21, 22, 23, 24, 0]))
@@ -114,13 +114,13 @@ def test_node_and_edge_removal():
     assert g.number_of_nodes() == 10
     assert g.number_of_edges() == 100
 
-    # delete nodes
-    g.del_nodes([2, 4])
+    # remove nodes
+    g.remove_nodes([2, 4])
     assert g.number_of_nodes() == 8
     assert g.number_of_edges() == 64
 
-    # delete edges
-    g.del_edges(range(10, 20))
+    # remove edges
+    g.remove_edges(range(10, 20))
     assert g.number_of_nodes() == 8
     assert g.number_of_edges() == 54
 
@@ -136,10 +136,33 @@ def test_node_and_edge_removal():
     assert g.number_of_nodes() == 10
     assert g.number_of_edges() == 58
 
-    # delete edges
-    g.del_edges(range(10, 20))
+    # remove edges
+    g.remove_edges(range(10, 20))
     assert g.number_of_nodes() == 10
     assert g.number_of_edges() == 48
+
+def test_node_frame():
+    g = dgl.DGLGraph()
+    g.add_nodes(10)
+    data = np.random.rand(10, 3)
+    new_data = data.take([0, 1, 2, 7, 8, 9], axis=0)
+    g.ndata['h'] = F.zerocopy_from_numpy(data)
+
+    # remove nodes
+    g.remove_nodes(range(3, 7))
+    assert F.allclose(g.ndata['h'], F.zerocopy_from_numpy(new_data))
+
+def test_edge_frame():
+    g = dgl.DGLGraph()
+    g.add_nodes(10)
+    g.add_edges(list(range(10)), list(range(1, 10)) + [0])
+    data = np.random.rand(10, 3)
+    new_data = data.take([0, 1, 2, 7, 8, 9], axis=0)
+    g.edata['h'] = F.zerocopy_from_numpy(data)
+
+    # remove edges
+    g.remove_edges(range(3, 7))
+    assert F.allclose(g.edata['h'], F.zerocopy_from_numpy(new_data))
 
 if __name__ == '__main__':
     test_node_removal()
@@ -147,3 +170,5 @@ if __name__ == '__main__':
     test_multigraph_node_removal()
     test_multigraph_edge_removal()
     test_node_and_edge_removal()
+    test_node_frame()
+    test_edge_frame()
