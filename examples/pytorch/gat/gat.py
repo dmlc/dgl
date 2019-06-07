@@ -61,11 +61,10 @@ class GraphAttention(nn.Module):
         self.g.apply_edges(self.edge_attention)
         # 2. compute softmax in two parts: exp(x - max(x)) and sum(exp(x - max(x)))
         self.edge_softmax()
-        # 2. compute the aggregated node features scaled by the dropped,
+        # 3. compute the aggregated node features scaled by the dropped,
         # unnormalized attention values.
         self.g.update_all(fn.src_mul_edge('ft', 'a_drop', 'ft'), fn.sum('ft', 'ft'))
-        # 3. apply normalizer
-        ret = self.g.ndata['ft'] / self.g.ndata['z']  # NxHxD'
+        ret = self.g.ndata['ft']
         # 4. residual
         if self.residual:
             if self.res_fc is not None:
@@ -81,11 +80,9 @@ class GraphAttention(nn.Module):
         return {'a' : a}
 
     def edge_softmax(self):
-        scores, normalizer = self.softmax(self.g.edata['a'], self.g)
-        # Save normalizer
-        self.g.ndata['z'] = normalizer
+        attention = self.softmax(self.g, self.g.edata.pop('a'))
         # Dropout attention scores and save them
-        self.g.edata['a_drop'] = self.attn_drop(scores)
+        self.g.edata['a_drop'] = self.attn_drop(attention)
 
 class GAT(nn.Module):
     def __init__(self,
