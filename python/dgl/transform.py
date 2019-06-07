@@ -124,7 +124,7 @@ def to_simple_graph(g):
     newgidx = GraphIndex(_CAPI_DGLToSimpleGraph(g._graph.handle))
     return DGLGraph(newgidx, readonly=True)
 
-def to_bidirected(g):
+def to_bidirected(g, readonly=True):
     """Convert the graph to a bidirected graph.
 
     The function generates a new graph with no node/edge feature.
@@ -135,12 +135,17 @@ def to_bidirected(g):
     ----------
     g : DGLGraph
         The input graph.
+    readonly : bool, default to be True
+        Whether the returned bidirected graph is readonly or not.
 
     Returns
     -------
     DGLGraph
     """
-    newgidx = GraphIndex(_CAPI_DGLToBidirectedGraph(g._graph.handle))
+    if readonly:
+        newgidx = GraphIndex(_CAPI_DGLToBidirectedImmutableGraph(g._graph.handle))
+    else:
+        newgidx = GraphIndex(_CAPI_DGLToBidirectedMutableGraph(g._graph.handle))
     return DGLGraph(newgidx)
 
 _init_api("dgl.transform")

@@ -315,15 +315,16 @@ ImmutableGraph GraphOp::ToSimpleGraph(const GraphInterface* graph) {
   return ImmutableGraph(csr);
 }
 
-Graph GraphOp::BidirectedGraph(const Graph* g) {
-  Graph bg;
-  bg.AddVertices(g->NumVertices());
+Graph GraphOp::ToBidirectedMutableGraph(const Graph* g) {
   std::unordered_map<int, std::unordered_map<int, int>> n_e;
   for (size_t i = 0; i < g->all_edges_src_.size(); ++i) {
     const auto u = g->all_edges_src_[i];
     const auto v = g->all_edges_dst_[i];
     n_e[u][v]++;
   }
+
+  Graph bg;
+  bg.AddVertices(g->NumVertices());
   for (dgl_id_t u = 0; u < g->NumVertices(); ++u) {
     for (dgl_id_t v = u; v < g->NumVertices(); ++v) {
       const auto new_n_e = std::max(n_e[u][v], n_e[v][u]);
@@ -344,6 +345,44 @@ Graph GraphOp::BidirectedGraph(const Graph* g) {
     }
   }
   return bg;
+}
+
+ImmutableGraph GraphOp::ToBidirectedImmutableGraph(const Graph* g) {
+  std::unordered_map<int, std::unordered_map<int, int>> n_e;
+  for (size_t i = 0; i < g->all_edges_src_.size(); ++i) {
+    const auto u = g->all_edges_src_[i];
+    const auto v = g->all_edges_dst_[i];
+    n_e[u][v]++;
+  }
+
+  std::vector<dgl_id_t> indptr(g->NumVertices() + 1), indices;
+  indptr[0] = 0;
+  for (dgl_id_t u = 0; u < g->NumVertices(); ++u) {
+    std::unordered_set<dgl_id_t> hashmap;
+    std::vector<dgl_id_t> nbrs;
+    for (const dgl_id_t v : g->SuccVec(u)) {
+      if (!hashmap.count(v)) {
+        nbrs.push_back(v);
+        hashmap.insert(v);
+      }
+    }
+    for (const dgl_id_t v : g->PredVec(u)) {
+      if (!hashmap.count(v)) {
+        nbrs.push_back(v);
+        hashmap.insert(v);
+      }
+    }
+    for (const dgl_id_t v : nbrs) {
+      const auto new_n_e = std::max(n_e[u][v], n_e[v][u]);
+      for (size_t i = 0; i < new_n_e; ++i) {
+        indices.push_back(v);
+      }
+    }
+    indptr[u+1] = indices.size();
+  }
+  CSRPtr csr(new CSR(g->NumVertices(), indices.size(),
+        indptr.begin(), indices.begin(), RangeIter(0), g->IsMultigraph()));
+  return ImmutableGraph(csr);
 }
 
 }  // namespace dgl
