@@ -13,14 +13,14 @@ def generate_rand_graph(n):
 def test_create_full():
     g = generate_rand_graph(100)
     full_nf = dgl.contrib.sampling.sampler.create_full_nodeflow(g, 5)
-    assert full_nf.number_of_nodes() == 600
+    assert full_nf.number_of_nodes() == g.number_of_nodes() * 6
     assert full_nf.number_of_edges() == g.number_of_edges() * 5
 
 def test_1neighbor_sampler_all():
     g = generate_rand_graph(100)
     # In this case, NeighborSampling simply gets the neighborhood of a single vertex.
     for i, subg in enumerate(dgl.contrib.sampling.NeighborSampler(
-            g, 1, 100, neighbor_type='in', num_workers=4)):
+            g, 1, g.number_of_nodes(), neighbor_type='in', num_workers=4)):
         seed_ids = subg.layer_parent_nid(-1)
         assert len(seed_ids) == 1
         src, dst, eid = g.in_edges(seed_ids, form='all')
@@ -80,8 +80,8 @@ def test_prefetch_neighbor_sampler():
 def test_10neighbor_sampler_all():
     g = generate_rand_graph(100)
     # In this case, NeighborSampling simply gets the neighborhood of a single vertex.
-    for subg in dgl.contrib.sampling.NeighborSampler(g, 10, 100, neighbor_type='in',
-                                                     num_workers=4):
+    for subg in dgl.contrib.sampling.NeighborSampler(g, 10, g.number_of_nodes(),
+                                                     neighbor_type='in', num_workers=4):
         seed_ids = subg.layer_parent_nid(-1)
         assert F.array_equal(seed_ids, subg.map_to_parent_nid(subg.layer_nid(-1)))
 
@@ -106,7 +106,7 @@ def test_10neighbor_sampler():
     check_10neighbor_sampler(g, seeds=np.unique(np.random.randint(0, g.number_of_nodes(),
                                                                   size=int(g.number_of_nodes() / 10))))
 
-def test_layer_sampler(prefetch=False):
+def _test_layer_sampler(prefetch=False):
     g = generate_rand_graph(100)
     nid = g.nodes()
     src, dst, eid = g.all_edges(form='all', order='eid')
@@ -151,6 +151,10 @@ def test_layer_sampler(prefetch=False):
         sub_m = sub_g.number_of_edges()
         assert sum(F.shape(sub_g.block_eid(i))[0] for i in range(n_blocks)) == sub_m
 
+def test_layer_sampler():
+    _test_layer_sampler()
+    _test_layer_sampler(prefetch=True)
+
 if __name__ == '__main__':
     test_create_full()
     test_1neighbor_sampler_all()
@@ -158,4 +162,3 @@ if __name__ == '__main__':
     test_1neighbor_sampler()
     test_10neighbor_sampler()
     test_layer_sampler()
-    test_layer_sampler(prefetch=True)

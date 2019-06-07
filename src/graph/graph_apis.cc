@@ -137,15 +137,11 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
     const bool readonly = args[4];
     GraphHandle ghandle;
     if (readonly) {
-      // TODO(minjie): The array copy here is unnecessary and adds extra overhead.
-      //   However, with MXNet backend, the memory would be corrupted if we directly
-      //   save the passed-in ndarrays into DGL's graph object. We hope MXNet team
-      //   could help look into this.
       if (multigraph == kBoolUnknown) {
-        COOPtr coo(new COO(num_nodes, Clone(src_ids), Clone(dst_ids)));
+        COOPtr coo(new COO(num_nodes, src_ids, dst_ids));
         ghandle = new ImmutableGraph(coo);
       } else {
-        COOPtr coo(new COO(num_nodes, Clone(src_ids), Clone(dst_ids), multigraph));
+        COOPtr coo(new COO(num_nodes, src_ids, dst_ids, multigraph));
         ghandle = new ImmutableGraph(coo);
       }
     } else {
@@ -170,14 +166,10 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
     for (size_t i = 0; i < edge_ids->shape[0]; i++)
       edge_data[i] = i;
     if (shared_mem_name.empty()) {
-      // TODO(minjie): The array copy here is unnecessary and adds extra overhead.
-      //   However, with MXNet backend, the memory would be corrupted if we directly
-      //   save the passed-in ndarrays into DGL's graph object. We hope MXNet team
-      //   could help look into this.
       if (multigraph == kBoolUnknown) {
-        csr.reset(new CSR(Clone(indptr), Clone(indices), Clone(edge_ids)));
+        csr.reset(new CSR(indptr, indices, edge_ids));
       } else {
-        csr.reset(new CSR(Clone(indptr), Clone(indices), Clone(edge_ids), multigraph));
+        csr.reset(new CSR(indptr, indices, edge_ids, multigraph));
       }
     } else {
       if (multigraph == kBoolUnknown) {
@@ -200,7 +192,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreateMMap")
     const std::string shared_mem_name = args[0];
     const int64_t num_vertices = args[1];
     const int64_t num_edges = args[2];
-    const bool multigraph = static_cast<bool>(args[3]);
+    const bool multigraph = args[3];
     const std::string edge_dir = args[4];
     // TODO(minjie): how to know multigraph
     CSRPtr csr(new CSR(shared_mem_name, num_vertices, num_edges, multigraph));
@@ -521,6 +513,54 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetAdj")
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
     auto res = ptr->GetAdj(transpose, format);
     *rv = ConvertAdjToPackedFunc(res);
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLToImmutable")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
+    GraphHandle newhandle = new ImmutableGraph(ImmutableGraph::ToImmutable(ptr));
+    *rv = newhandle;
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphContext")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
+    *rv = ptr->Context();
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyTo")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const int device_type = args[1];
+    const int device_id = args[2];
+    DLContext ctx;
+    ctx.device_type = static_cast<DLDeviceType>(device_type);
+    ctx.device_id = device_id;
+    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
+    const ImmutableGraph *ig = dynamic_cast<const ImmutableGraph*>(ptr);
+    CHECK(ig) << "Invalid argument: must be an immutable graph object.";
+    GraphHandle newhandle = new ImmutableGraph(ig->CopyTo(ctx));
+    *rv = newhandle;
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphNumBits")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
+    *rv = ptr->NumBits();
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphAsNumBits")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    int bits = args[1];
+    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
+    const ImmutableGraph *ig = dynamic_cast<const ImmutableGraph*>(ptr);
+    CHECK(ig) << "Invalid argument: must be an immutable graph object.";
+    GraphHandle newhandle = new ImmutableGraph(ig->AsNumBits(bits));
+    *rv = newhandle;
   });
 
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLToSimpleGraph")
