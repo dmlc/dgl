@@ -174,7 +174,8 @@ def check_apply_edges1(create_node_flow):
 
         eids = nf.block_parent_eid(i)
         srcs, dsts = g.find_edges(eids)
-        expected_f_sum = g.ndata["f"][srcs] + g.ndata["f"][dsts]
+        expected_f_sum = g.nodes[srcs].data["f"] + g.nodes[dsts].data["f"]
+        #expected_f_sum = g.ndata["f"][srcs] + g.ndata["f"][dsts]
         assert F.array_equal(nf.blocks[i].data['f2'], expected_f_sum)
 
 
@@ -231,7 +232,7 @@ def check_flow_compute1(create_node_flow, use_negative_block_id=False):
         nf.block_compute(l)
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                      lambda nodes: {'h' : nodes.data['t'] + 1})
-        assert F.allclose(nf.layers[i + 1].data['h'], g.ndata['h'][nf.layer_parent_nid(i + 1)])
+        assert F.allclose(nf.layers[i + 1].data['h'], g.nodes[nf.layer_parent_nid(i + 1)].data['h'])
 
     # test the case that we register UDFs in all blocks.
     nf = create_node_flow(g, num_layers)
@@ -246,7 +247,7 @@ def check_flow_compute1(create_node_flow, use_negative_block_id=False):
         nf.block_compute(l)
         g.update_all(fn.copy_src(src='h', out='m'), fn.sum(msg='m', out='t'),
                      lambda nodes: {'h' : nodes.data['t'] + 1})
-        assert F.allclose(nf.layers[i + 1].data['h'], g.ndata['h'][nf.layer_parent_nid(i + 1)])
+        assert F.allclose(nf.layers[i + 1].data['h'], g.nodes[nf.layer_parent_nid(i + 1)].data['h'])
 
 
 def test_flow_compute():
