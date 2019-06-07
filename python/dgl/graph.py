@@ -1101,7 +1101,7 @@ class DGLGraph(DGLBaseGraph):
             self._msg_index = self._msg_index.append_zeros(num)
         self._msg_frame.add_rows(num)
 
-    def del_nodes(self, vids):
+    def remove_nodes(self, vids):
         """Remove multiple nodes.
 
         Parameters
@@ -1110,7 +1110,7 @@ class DGLGraph(DGLBaseGraph):
             The id of nodes to remove.
         """
         if self.is_readonly:
-            raise DGLError("del_nodes is not supported by read-only graph.")
+            raise DGLError("remove_nodes is not supported by read-only graph.")
         induced_nodes = utils.set_diff(utils.toindex(self.nodes()), utils.toindex(vids))
         sgi = self._graph.node_subgraph(induced_nodes)
 
@@ -1126,7 +1126,7 @@ class DGLGraph(DGLBaseGraph):
 
         self._graph = sgi.graph
 
-    def del_edges(self, eids):
+    def remove_edges(self, eids):
         """Remove multiple edges.
 
         Parameters
@@ -1135,7 +1135,7 @@ class DGLGraph(DGLBaseGraph):
             The id of edges to remove.
         """
         if self.is_readonly:
-            raise DGLError("del_edges is not supported by read-only graph.")
+            raise DGLError("remove_edges is not supported by read-only graph.")
         induced_edges = utils.set_diff(
             utils.toindex(range(self.number_of_edges())), utils.toindex(eids))
         sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes=True)
@@ -2894,7 +2894,7 @@ class DGLGraph(DGLBaseGraph):
         sgis = self._graph.node_subgraphs(induced_nodes)
         return [subgraph.DGLSubGraph(self, sgi) for sgi in sgis]
 
-    def edge_subgraph(self, edges):
+    def edge_subgraph(self, edges, preserve_nodes=False):
         """Return the subgraph induced on given edges.
 
         Parameters
@@ -2902,6 +2902,10 @@ class DGLGraph(DGLBaseGraph):
         edges : list, or iterable
             An edge ID array to construct subgraph.
             All edges must exist in the subgraph.
+        preserve_nodes : bool
+            Indicates whether to preserve all nodes or not.
+            If true, keep the nodes which have no edge connected in the subgraph;
+            If false, all nodes without edge connected to it would be removed.
 
         Returns
         -------
@@ -2930,6 +2934,15 @@ class DGLGraph(DGLBaseGraph):
         tensor([0, 1, 4])
         >>> SG.parent_eid
         tensor([0, 4])
+        >>> SG = G.edge_subgraph([0, 4], preserve_nodes=True)
+        >>> SG.nodes()
+        tensor([0, 1, 2, 3, 4])
+        >>> SG.edges()
+        (tensor([0, 4]), tensor([1, 0]))
+        >>> SG.parent_nid
+        tensor([0, 1, 2, 3, 4])
+        >>> SG.parent_eid
+        tensor([0, 4])
 
         See Also
         --------
@@ -2938,7 +2951,7 @@ class DGLGraph(DGLBaseGraph):
         """
         from . import subgraph
         induced_edges = utils.toindex(edges)
-        sgi = self._graph.edge_subgraph(induced_edges)
+        sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes=preserve_nodes)
         return subgraph.DGLSubGraph(self, sgi)
 
     def adjacency_matrix_scipy(self, transpose=False, fmt='csr'):

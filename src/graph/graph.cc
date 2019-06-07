@@ -478,8 +478,8 @@ Subgraph Graph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
     std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
 
     for (int64_t i = 0; i < len; ++i) {
-      dgl_id_t src_id = all_edges_src_[eid_data[i]];
-      dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
+      const dgl_id_t src_id = all_edges_src_[eid_data[i]];
+      const dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
       if (oldv2newv.insert(std::make_pair(src_id, oldv2newv.size())).second)
         nodes.push_back(src_id);
       if (oldv2newv.insert(std::make_pair(dst_id, oldv2newv.size())).second)
@@ -491,8 +491,8 @@ Subgraph Graph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
     rst.graph->AddVertices(nodes.size());
 
     for (int64_t i = 0; i < len; ++i) {
-      dgl_id_t src_id = all_edges_src_[eid_data[i]];
-      dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
+      const dgl_id_t src_id = all_edges_src_[eid_data[i]];
+      const dgl_id_t dst_id = all_edges_dst_[eid_data[i]];
       rst.graph->AddEdge(oldv2newv[src_id], oldv2newv[dst_id]);
     }
 

@@ -51,8 +51,8 @@ Removing nodes and edges
 .. autosummary::
     :toctree: ../../generated/
     
-    DGLGraph.del_nodes
-    DGLGraph.del_edges
+    DGLGraph.remove_nodes
+    DGLGraph.remove_edges
 
 Transforming graph
 ------------------

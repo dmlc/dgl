@@ -4,6 +4,7 @@ from __future__ import absolute_import
 from .frame import Frame, FrameRef
 from .graph import DGLGraph
 from . import utils
+from .base import DGLError
 from .graph_index import map_to_subgraph_nid
 
 class DGLSubGraph(DGLGraph):
@@ -39,7 +40,7 @@ class DGLSubGraph(DGLGraph):
     """
     def __init__(self, parent, sgi, shared=False):
         super(DGLSubGraph, self).__init__(graph_data=sgi.graph,
-                                          readonly=sgi.graph.is_readonly())
+                                          readonly=True)
         if shared:
             raise DGLError('Shared mode is not yet supported.')
         self._parent = parent
