@@ -3167,6 +3167,7 @@ class DGLGraph(DGLBaseGraph):
                           ndata=str(self.node_attr_schemes()),
                           edata=str(self.edge_attr_schemes()))
 
+    # pylint: disable=invalid-name
     def to(self, ctx):
         """
         Move both ndata and edata to the targeted mode (cpu/gpu)
