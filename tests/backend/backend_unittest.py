@@ -9,6 +9,10 @@ def cuda():
     """Context object for CUDA."""
     pass
 
+def is_cuda_available():
+    """Check whether CUDA is available."""
+    pass
+
 ###############################################################################
 # Tensor functions on feature data
 # --------------------------------

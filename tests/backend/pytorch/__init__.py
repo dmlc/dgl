@@ -5,6 +5,9 @@ import torch as th
 def cuda():
     return th.device('cuda:0')
 
+def is_cuda_available():
+    return th.cuda.is_available()
+
 def array_equal(a, b):
     return th.equal(a.cpu(), b.cpu())
 
