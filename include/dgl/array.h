@@ -30,6 +30,9 @@ IdArray VecToIdArray(const std::vector<dgl_id_t>& vec);
 /*! \brief Create a copy of the given array */
 IdArray Clone(IdArray arr);
 
+/*! \brief Convert the idarray to the given bit width (on CPU) */
+IdArray AsNumBits(IdArray arr, uint8_t bits);
+
 /*! \brief Arithmetic functions */
 IdArray Add(IdArray lhs, IdArray rhs);
 IdArray Sub(IdArray lhs, IdArray rhs);

@@ -97,6 +97,16 @@ class GraphInterface {
   virtual void Clear() = 0;
 
   /*!
+   * \brief Get the device context of this graph.
+   */
+  virtual DLContext Context() const = 0;
+
+  /*!
+   * \brief Get the number of integer bits used to store node/edge ids (32 or 64).
+   */
+  virtual uint8_t NumBits() const = 0;
+
+  /*!
    * \note not const since we have caches
    * \return whether the graph is a multigraph
    */
