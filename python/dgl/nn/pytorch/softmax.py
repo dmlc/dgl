@@ -126,7 +126,8 @@ class EdgeSoftmax1(th.autograd.Function):
         g.edata[grad_score_name] = out * grad_out
         g.update_all(fn.copy_e(grad_score_name, 'm'), fn.sum('m', accum_name))
         g.apply_edges(fn.e_mul_v(out_name, accum_name, out_name))
-        grad_score = g.edata[grad_score_name] - g.edata[out_name]
+        g.ndata.pop(accum_name)
+        grad_score = g.edata.pop(grad_score_name) - g.edata.pop(out_name)
         return None, grad_score
 
 
