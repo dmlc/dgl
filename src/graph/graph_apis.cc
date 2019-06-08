@@ -444,8 +444,7 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeSubgraph")
     GraphHandle ghandle = args[0];
     const GraphInterface *gptr = static_cast<GraphInterface*>(ghandle);
     const IdArray eids = args[1];
-    bool preserve_nodes = args[2];
-    *rv = ConvertSubgraphToPackedFunc(gptr->EdgeSubgraph(eids, preserve_nodes));
+    *rv = ConvertSubgraphToPackedFunc(gptr->EdgeSubgraph(eids));
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")
@@ -576,9 +575,8 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedMutableGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    const Graph* gptr = static_cast<const Graph*>(ptr);
     Graph* bgptr = new Graph();
-    *bgptr = GraphOp::ToBidirectedMutableGraph(gptr);
+    *bgptr = GraphOp::ToBidirectedMutableGraph(ptr);
     GraphHandle bghandle = bgptr;
     *rv = bghandle;
   });
@@ -587,8 +585,7 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedImmutableGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    const Graph* gptr = static_cast<const Graph*>(ptr);
-    GraphHandle bghandle = GraphOp::ToBidirectedImmutableGraph(gptr).Reset();
+    GraphHandle bghandle = GraphOp::ToBidirectedImmutableGraph(ptr).Reset();
     *rv = bghandle;
   });
 

@@ -315,12 +315,12 @@ ImmutableGraph GraphOp::ToSimpleGraph(const GraphInterface* graph) {
   return ImmutableGraph(csr);
 }
 
-Graph GraphOp::ToBidirectedMutableGraph(const Graph* g) {
+Graph GraphOp::ToBidirectedMutableGraph(const GraphInterface* g) {
   std::unordered_map<int, std::unordered_map<int, int>> n_e;
-  for (size_t i = 0; i < g->all_edges_src_.size(); ++i) {
-    const auto u = g->all_edges_src_[i];
-    const auto v = g->all_edges_dst_[i];
-    n_e[u][v]++;
+  for (dgl_id_t u = 0; u < g->NumVertices(); ++u) {
+    for (const dgl_id_t v : g->SuccVec(u)) {
+      n_e[u][v]++;
+    }
   }
 
   Graph bg;
@@ -347,12 +347,12 @@ Graph GraphOp::ToBidirectedMutableGraph(const Graph* g) {
   return bg;
 }
 
-ImmutableGraph GraphOp::ToBidirectedImmutableGraph(const Graph* g) {
+ImmutableGraph GraphOp::ToBidirectedImmutableGraph(const GraphInterface* g) {
   std::unordered_map<int, std::unordered_map<int, int>> n_e;
-  for (size_t i = 0; i < g->all_edges_src_.size(); ++i) {
-    const auto u = g->all_edges_src_[i];
-    const auto v = g->all_edges_dst_[i];
-    n_e[u][v]++;
+  for (dgl_id_t u = 0; u < g->NumVertices(); ++u) {
+    for (const dgl_id_t v : g->SuccVec(u)) {
+      n_e[u][v]++;
+    }
   }
 
   std::vector<dgl_id_t> indptr(g->NumVertices() + 1), indices;

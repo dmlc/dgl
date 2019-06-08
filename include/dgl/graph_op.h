@@ -155,14 +155,14 @@ class GraphOp {
    * \param graph The input graph.
    * \return a new mutable bidirected graph.
    */
-  static Graph ToBidirectedMutableGraph(const Graph* graph);
+  static Graph ToBidirectedMutableGraph(const GraphInterface* graph);
 
   /*!
    * \brief Same as BidirectedMutableGraph except that the returned graph is immutable.
    * \param graph The input graph.
    * \return a new immutable bidirected graph.
    */
-  static ImmutableGraph ToBidirectedImmutableGraph(const Graph* graph);
+  static ImmutableGraph ToBidirectedImmutableGraph(const GraphInterface* graph);
 };
 
 }  // namespace dgl
