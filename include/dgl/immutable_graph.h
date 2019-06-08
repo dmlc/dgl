@@ -68,6 +68,14 @@ class CSR : public GraphInterface {
     LOG(FATAL) << "CSR graph does not allow mutation.";
   }
 
+  DLContext Context() const override {
+    return indptr_->ctx;
+  }
+
+  uint8_t NumBits() const override {
+    return indices_->dtype.bits;
+  }
+
   bool IsMultigraph() const override;
 
   bool IsReadonly() const override {
@@ -83,7 +91,7 @@ class CSR : public GraphInterface {
   }
 
   bool HasVertex(dgl_id_t vid) const override {
-    return vid < NumVertices() && vid >= 0;
+    return vid < NumVertices();
   }
 
   bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const override;
@@ -215,6 +223,20 @@ class CSR : public GraphInterface {
     return CSRMatrix{indptr_, indices_, edge_ids_};
   }
 
+  /*!
+   * \brief Copy the data to another context.
+   * \param ctx The target context.
+   * \return The graph under another context.
+   */
+  CSR CopyTo(const DLContext& ctx) const;
+
+  /*!
+   * \brief Convert the graph to use the given number of bits for storage.
+   * \param bits The new number of integer bits (32 or 64).
+   * \return The graph with new bit size storage.
+   */
+  CSR AsNumBits(uint8_t bits) const;
+
   // member getters
 
   IdArray indptr() const { return indptr_; }
@@ -266,6 +288,14 @@ class COO : public GraphInterface {
     LOG(FATAL) << "CSR graph does not allow mutation.";
   }
 
+  DLContext Context() const override {
+    return src_->ctx;
+  }
+
+  uint8_t NumBits() const override {
+    return src_->dtype.bits;
+  }
+
   bool IsMultigraph() const override;
 
   bool IsReadonly() const override {
@@ -281,7 +311,7 @@ class COO : public GraphInterface {
   }
 
   bool HasVertex(dgl_id_t vid) const override {
-    return vid < NumVertices() && vid >= 0;
+    return vid < NumVertices();
   }
 
   bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const override {
@@ -315,7 +345,7 @@ class COO : public GraphInterface {
   }
 
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const override {
-    CHECK(eid < NumEdges() && eid >= 0) << "Invalid edge id: " << eid;
+    CHECK(eid < NumEdges()) << "Invalid edge id: " << eid;
     const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
     const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
     return std::make_pair(src_data[eid], dst_data[eid]);
@@ -441,6 +471,20 @@ class COO : public GraphInterface {
     return COOMatrix{src_, dst_, {}};
   }
 
+  /*!
+   * \brief Copy the data to another context.
+   * \param ctx The target context.
+   * \return The graph under another context.
+   */
+  COO CopyTo(const DLContext& ctx) const;
+
+  /*!
+   * \brief Convert the graph to use the given number of bits for storage.
+   * \param bits The new number of integer bits (32 or 64).
+   * \return The graph with new bit size storage.
+   */
+  COO AsNumBits(uint8_t bits) const;
+
   // member getters
 
   IdArray src() const { return src_; }
@@ -526,6 +570,14 @@ class ImmutableGraph: public GraphInterface {
 
   void Clear() override {
     LOG(FATAL) << "Clear isn't supported in ImmutableGraph";
+  }
+
+  DLContext Context() const override {
+    return AnyGraph()->Context();
+  }
+
+  uint8_t NumBits() const override {
+    return AnyGraph()->NumBits();
   }
 
   /*!
@@ -870,6 +922,31 @@ class ImmutableGraph: public GraphInterface {
     }
     return coo_;
   }
+
+  /*!
+   * \brief Convert the given graph to an immutable graph.
+   *
+   * If the graph is already an immutable graph. The result graph will share
+   * the storage with the given one.
+   *
+   * \param graph The input graph.
+   * \return an immutable graph object.
+   */
+  static ImmutableGraph ToImmutable(const GraphInterface* graph);
+
+  /*!
+   * \brief Copy the data to another context.
+   * \param ctx The target context.
+   * \return The graph under another context.
+   */
+  ImmutableGraph CopyTo(const DLContext& ctx) const;
+
+  /*!
+   * \brief Convert the graph to use the given number of bits for storage.
+   * \param bits The new number of integer bits (32 or 64).
+   * \return The graph with new bit size storage.
+   */
+  ImmutableGraph AsNumBits(uint8_t bits) const;
 
  protected:
   /* !\brief internal default constructor */

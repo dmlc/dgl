@@ -7,14 +7,12 @@ dgl_win64_libs = "build\\dgl.dll, build\\runUnitTests.exe"
 def init_git() {
   sh "rm -rf *"
   checkout scm
-  sh "git submodule init"
-  sh "git submodule update"
+  sh "git submodule update --recursive --init"
 }
 
 def init_git_win64() {
   checkout scm
-  bat "git submodule init"
-  bat "git submodule update"
+  bat "git submodule update --recursive --init"
 }
 
 // pack libraries for later use
@@ -31,7 +29,7 @@ def unpack_lib(name, libs) {
 
 def build_dgl_linux(dev) {
   init_git()
-  sh "bash tests/scripts/build_dgl.sh"
+  sh "bash tests/scripts/build_dgl.sh ${dev}"
   pack_lib("dgl-${dev}-linux", dgl_linux_libs)
 }
 
@@ -59,7 +57,7 @@ def unit_test_linux(backend, dev) {
   init_git()
   unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
   timeout(time: 2, unit: 'MINUTES') {
-    sh "bash tests/scripts/task_unit_test.sh ${backend}"
+    sh "bash tests/scripts/task_unit_test.sh ${backend} ${dev}"
   }
 }
 
@@ -195,8 +193,8 @@ pipeline {
           stages {
             stage("Unit test") {
               steps {
-                //unit_test_linux("pytorch", "gpu")
                 sh "nvidia-smi"
+                unit_test_linux("pytorch", "gpu")
               }
             }
             stage("Example test") {
@@ -212,6 +210,32 @@ pipeline {
             stage("Unit test") {
               steps {
                 unit_test_linux("mxnet", "cpu")
+              }
+            }
+            //stage("Example test") {
+            //  steps {
+            //    unit_test_linux("pytorch", "cpu")
+            //  }
+            //}
+            //stage("Tutorial test") {
+            //  steps {
+            //    tutorial_test_linux("mxnet")
+            //  }
+            //}
+          }
+        }
+        stage("MXNet GPU") {
+          agent {
+            docker {
+              image "dgllib/dgl-ci-gpu"
+              args "--runtime nvidia"
+            }
+          }
+          stages {
+            stage("Unit test") {
+              steps {
+                sh "nvidia-smi"
+                unit_test_linux("mxnet", "gpu")
               }
             }
             //stage("Example test") {

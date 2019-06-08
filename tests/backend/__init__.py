@@ -30,7 +30,7 @@ _softmax = softmax
 _default_context_str = os.getenv('DGLTESTDEV', 'cpu')
 _context_dict = {
         'cpu': cpu(),
-        'cuda': cuda(),
+        'gpu': cuda(),
         }
 _default_context = _context_dict[_default_context_str]
 
@@ -45,7 +45,10 @@ def randn(shape):
 
 def tensor(data, dtype=None):
     if dtype is None:
-        data = np.array(data)
+        if is_tensor(data):
+            data = zerocopy_to_numpy(data)
+        else:
+            data = np.array(data)
         dtype = int64 if np.issubdtype(data.dtype, np.integer) else float32
     return copy_to(_tensor(data, dtype), _default_context)
 
