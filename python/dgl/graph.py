@@ -3244,9 +3244,9 @@ class DGLGraph(DGLBaseGraph):
         --------
         >>> import backend as F
         >>> G = dgl.DGLGraph()
-        >>> G.add_nodes(5, {'h': torch.ones((5,2))})
-        >>> G.add_edges([0,1],[1,2], {'m' : torch.ones((2,2))})
-        >>> G.add_edges([0,1],[1,2], {'m' : torch.ones((2,2))})
+        >>> G.add_nodes(5, {'h': torch.ones((5, 2))})
+        >>> G.add_edges([0, 1], [1, 2], {'m' : torch.ones((2, 2))})
+        >>> G.add_edges([0, 1], [1, 2], {'m' : torch.ones((2, 2))})
         >>> G.to(F.cuda())
 
         """
