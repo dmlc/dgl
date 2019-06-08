@@ -43,9 +43,9 @@ Results
 
 | Dataset | Test Accuracy | Time(s) | Baseline#1 times(s) | Baseline#2 times(s) |
 | ------- | ------------- | ------- | ------------------- | ------------------- |
-| Cora | 84.0% | 0.0076 | 0.0982 (**12.9x**) | 0.0424 (**5.6x**) |
-| Citeseer | 70.7% | 0.0077 | n/a | n/a |
-| Pubmed | 78.0% | 0.0077 | n/a | n/a |
+| Cora | 84.0% | 0.0113 | 0.0982 (**8.7x**) | 0.0424 (**3.8x**) |
+| Citeseer | 70.7% | 0.0111 | n/a | n/a |
+| Pubmed | 78.0% | 0.0115 | n/a | n/a |
 
 * All the accuracy numbers are obtained after 300 epochs.
 * The time measures how long it takes to train one epoch.
