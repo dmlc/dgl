@@ -39,11 +39,12 @@ def test_self_loop():
         assert F.array_equal(in_deg, deg)
 
 def create_mini_batch(g, num_hops, add_self_loop=False):
-    seed_ids = np.array([0, 1, 2, 3])
+    seed_ids = np.array([1, 2, 0, 3])
     sampler = NeighborSampler(g, batch_size=4, expand_factor=g.number_of_nodes(),
             num_hops=num_hops, seed_nodes=seed_ids, add_self_loop=add_self_loop)
     nfs = list(sampler)
     assert len(nfs) == 1
+    assert np.array_equal(F.asnumpy(nfs[0].layer_parent_nid(-1)), seed_ids)
     return nfs[0]
 
 def check_basic(g, nf):
