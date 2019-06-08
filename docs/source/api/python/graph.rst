@@ -45,6 +45,15 @@ Querying graph structure
     DGLGraph.out_degree
     DGLGraph.out_degrees
 
+Removing nodes and edges
+------------------------
+
+.. autosummary::
+    :toctree: ../../generated/
+    
+    DGLGraph.remove_nodes
+    DGLGraph.remove_edges
+
 Transforming graph
 ------------------
 

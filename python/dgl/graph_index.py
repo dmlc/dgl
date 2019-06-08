@@ -516,7 +516,8 @@ class GraphIndex(object):
         v_array = v.todgltensor()
         rst = _CAPI_DGLGraphVertexSubgraph(self._handle, v_array)
         induced_edges = utils.toindex(rst(2))
-        return SubgraphIndex(rst(0), self, v, induced_edges)
+        gidx = GraphIndex(rst(0))
+        return SubgraphIndex(gidx, self, v, induced_edges)
 
     def node_subgraphs(self, vs_arr):
         """Return the induced node subgraphs.
@@ -536,13 +537,17 @@ class GraphIndex(object):
             gis.append(self.node_subgraph(v))
         return gis
 
-    def edge_subgraph(self, e):
+    def edge_subgraph(self, e, preserve_nodes=False):
         """Return the induced edge subgraph.
 
         Parameters
         ----------
         e : utils.Index
             The edges.
+        preserve_nodes : bool
+            Indicates whether to preserve all nodes or not.
+            If true, keep the nodes which have no edge connected in the subgraph;
+            If false, all nodes without edge connected to it would be removed.
 
         Returns
         -------
@@ -550,9 +555,10 @@ class GraphIndex(object):
             The subgraph index.
         """
         e_array = e.todgltensor()
-        rst = _CAPI_DGLGraphEdgeSubgraph(self._handle, e_array)
+        rst = _CAPI_DGLGraphEdgeSubgraph(self._handle, e_array, preserve_nodes)
         induced_nodes = utils.toindex(rst(1))
-        return SubgraphIndex(rst(0), self, induced_nodes, e)
+        gidx = GraphIndex(rst(0))
+        return SubgraphIndex(gidx, self, induced_nodes, e)
 
     @utils.cached_member(cache='_cache', prefix='scipy_adj')
     def adjacency_matrix_scipy(self, transpose, fmt):
@@ -870,59 +876,25 @@ class GraphIndex(object):
         handle = _CAPI_DGLImmutableGraphAsNumBits(self._handle, int(bits))
         return GraphIndex(handle)
 
-class SubgraphIndex(GraphIndex):
-    """Graph index for subgraph.
+class SubgraphIndex(object):
+    """Internal subgraph data structure.
 
     Parameters
     ----------
-    handle : GraphIndexHandle
-        The capi handle.
-    paranet : GraphIndex
+    graph : GraphIndex
+        The graph structure of this subgraph.
+    parent : GraphIndex
         The parent graph index.
     induced_nodes : utils.Index
         The parent node ids in this subgraph.
     induced_edges : utils.Index
         The parent edge ids in this subgraph.
     """
-    def __init__(self, handle, parent, induced_nodes, induced_edges):
-        super(SubgraphIndex, self).__init__(handle)
-        self._parent = parent
-        self._induced_nodes = induced_nodes
-        self._induced_edges = induced_edges
-
-    def add_nodes(self, num):
-        """Add nodes. Disabled because SubgraphIndex is read-only."""
-        raise RuntimeError('Readonly graph. Mutation is not allowed.')
-
-    def add_edge(self, u, v):
-        """Add edges. Disabled because SubgraphIndex is read-only."""
-        raise RuntimeError('Readonly graph. Mutation is not allowed.')
-
-    def add_edges(self, u, v):
-        """Add edges. Disabled because SubgraphIndex is read-only."""
-        raise RuntimeError('Readonly graph. Mutation is not allowed.')
-
-    @property
-    def induced_nodes(self):
-        """Return parent node ids.
-
-        Returns
-        -------
-        utils.Index
-            The parent node ids.
-        """
-        return self._induced_nodes
-
-    @property
-    def induced_edges(self):
-        """Return parent edge ids.
-
-        Returns
-        -------
-        utils.Index
-            The parent edge ids.
-        """
-        return self._induced_edges
+    def __init__(self, graph, parent, induced_nodes, induced_edges):
+        self.graph = graph
+        self.parent = parent
+        self.induced_nodes = induced_nodes
+        self.induced_edges = induced_edges
 
     def __getstate__(self):
         raise NotImplementedError(

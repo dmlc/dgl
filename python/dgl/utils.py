@@ -252,6 +252,29 @@ def zero_index(size):
     """
     return Index(F.zeros((size,), dtype=F.int64, ctx=F.cpu()))
 
+def set_diff(ar1, ar2):
+    """Find the set difference of two index arrays.
+    Return the unique values in ar1 that are not in ar2.
+
+    Parameters
+    ----------
+    ar1: utils.Index
+        Input index array.
+
+    ar2: utils.Index
+        Input comparison index array.
+
+    Returns
+    -------
+    setdiff:
+        Array of values in ar1 that are not in ar2.
+    """
+    ar1_np = ar1.tonumpy()
+    ar2_np = ar2.tonumpy()
+    setdiff = np.setdiff1d(ar1_np, ar2_np)
+    setdiff = toindex(setdiff)
+    return setdiff
+
 class LazyDict(Mapping):
     """A readonly dictionary that does not materialize the storage."""
     def __init__(self, fn, keys):
