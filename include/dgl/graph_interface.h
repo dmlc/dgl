@@ -324,7 +324,7 @@ class GraphInterface {
    * \param eids The edges in the subgraph.
    * \return the induced edge subgraph
    */
-  virtual Subgraph EdgeSubgraph(IdArray eids) const = 0;
+  virtual Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const = 0;
 
   /*!
    * \brief Return a new graph with all the edges reversed.
