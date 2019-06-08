@@ -308,7 +308,7 @@ class Graph: public GraphInterface {
    * \param eids The edges in the subgraph.
    * \return the induced edge subgraph
    */
-  Subgraph EdgeSubgraph(IdArray eids) const override;
+  Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const override;
 
   /*!
    * \brief Return a new graph with all the edges reversed.
