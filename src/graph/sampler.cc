@@ -277,12 +277,14 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   for (int layer_id = num_hops - 1; layer_id >= 0; layer_id--) {
     // We sort the vertices in a layer so that we don't need to sort the neighbor Ids
     // after remap to a subgraph.
-    std::sort(sub_vers->begin() + layer_offsets[layer_id],
-              sub_vers->begin() + layer_offsets[layer_id + 1],
-              [](const std::pair<dgl_id_t, dgl_id_t> &a1,
-                 const std::pair<dgl_id_t, dgl_id_t> &a2) {
-      return a1.first < a2.first;
-    });
+    if (layer_id > 0) {
+      std::sort(sub_vers->begin() + layer_offsets[layer_id],
+                sub_vers->begin() + layer_offsets[layer_id + 1],
+                [](const std::pair<dgl_id_t, dgl_id_t> &a1,
+                   const std::pair<dgl_id_t, dgl_id_t> &a2) {
+        return a1.first < a2.first;
+      });
+    }
 
     // Save the sampled vertices and its layer Id.
     for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
@@ -305,11 +307,13 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   layer_off_data[1] = layer_offsets[num_hops] - layer_offsets[num_hops - 1];
   int out_layer_idx = 1;
   for (int layer_id = num_hops - 2; layer_id >= 0; layer_id--) {
-    std::sort(neigh_pos->begin() + layer_offsets[layer_id],
-              neigh_pos->begin() + layer_offsets[layer_id + 1],
-              [](const neighbor_info &a1, const neighbor_info &a2) {
-                return a1.id < a2.id;
-              });
+    if (layer_id > 0) {
+      std::sort(neigh_pos->begin() + layer_offsets[layer_id],
+                neigh_pos->begin() + layer_offsets[layer_id + 1],
+                [](const neighbor_info &a1, const neighbor_info &a2) {
+                  return a1.id < a2.id;
+                });
+    }
 
     for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
       dgl_id_t dst_id = sub_vers->at(i).first;
