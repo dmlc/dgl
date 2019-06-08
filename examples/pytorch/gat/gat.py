@@ -10,7 +10,7 @@ Pytorch implementation: https://github.com/Diego999/pyGAT
 import torch
 import torch.nn as nn
 import dgl.function as fn
-from dgl.nn.pytorch import EdgeSoftmax
+from dgl.nn.pytorch import edge_softmax
 
 class GraphAttention(nn.Module):
     def __init__(self,
@@ -40,7 +40,7 @@ class GraphAttention(nn.Module):
         nn.init.xavier_normal_(self.attn_l.data, gain=1.414)
         nn.init.xavier_normal_(self.attn_r.data, gain=1.414)
         self.leaky_relu = nn.LeakyReLU(alpha)
-        self.softmax = EdgeSoftmax()
+        self.softmax = edge_softmax
         self.residual = residual
         if residual:
             if in_dim != out_dim:
