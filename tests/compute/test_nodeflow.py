@@ -215,7 +215,6 @@ def check_flow_compute(create_node_flow, use_negative_block_id=False):
         data2 = g.nodes[nf.map_to_parent_nid(vs)].data['h']
         assert F.allclose(data1, data2)
 
-
 def check_flow_compute1(create_node_flow, use_negative_block_id=False):
     num_layers = 2
     g = generate_rand_graph(100)
@@ -250,6 +249,30 @@ def check_flow_compute1(create_node_flow, use_negative_block_id=False):
                      lambda nodes: {'h' : nodes.data['t'] + 1})
         assert F.allclose(nf.layers[i + 1].data['h'], g.nodes[nf.layer_parent_nid(i + 1)].data['h'])
 
+def check_flow_compute2(create_node_flow):
+    num_layers = 2
+    g = generate_rand_graph(100)
+    g.edata['h'] = F.ones((g.number_of_edges(), 10))
+
+    nf = create_node_flow(g, num_layers)
+    nf.copy_from_parent()
+    g.ndata['h'] = g.ndata['h1']
+    nf.layers[0].data['h'] = nf.layers[0].data['h1']
+    for i in range(num_layers):
+        nf.block_compute(i, fn.src_mul_edge('h', 'h', 'h'), fn.sum('h', 'h'))
+        g.update_all(fn.src_mul_edge('h', 'h', 'h'), fn.sum('h', 'h'))
+        assert F.allclose(nf.layers[i + 1].data['h'], g.nodes[nf.layer_parent_nid(i + 1)].data['h'])
+
+    nf = create_node_flow(g, num_layers)
+    nf.copy_from_parent()
+    g.ndata['h'] = g.ndata['h1']
+    nf.layers[0].data['h'] = nf.layers[0].data['h1']
+    for i in range(num_layers):
+        nf.block_compute(i, fn.u_mul_v('h', 'h', 'h'), fn.sum('h', 'h'))
+        g.update_all(fn.u_mul_v('h', 'h', 'h'), fn.sum('h', 'h'))
+        print(nf.layers[i + 1].data['h'])
+        print(g.nodes[nf.layer_parent_nid(i + 1)].data['h'])
+        assert F.allclose(nf.layers[i + 1].data['h'], g.nodes[nf.layer_parent_nid(i + 1)].data['h'])
 
 def test_flow_compute():
     check_flow_compute(create_full_nodeflow)
@@ -258,6 +281,7 @@ def test_flow_compute():
     check_flow_compute(create_mini_batch, use_negative_block_id=True)
     check_flow_compute1(create_mini_batch)
     check_flow_compute1(create_mini_batch, use_negative_block_id=True)
+    check_flow_compute2(create_mini_batch)
 
 
 def check_prop_flows(create_node_flow):
