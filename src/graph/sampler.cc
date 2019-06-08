@@ -276,7 +276,9 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   size_t out_node_idx = 0;
   for (int layer_id = num_hops - 1; layer_id >= 0; layer_id--) {
     // We sort the vertices in a layer so that we don't need to sort the neighbor Ids
-    // after remap to a subgraph.
+    // after remap to a subgraph. However, we don't need to sort the first layer
+    // because we want the order of the nodes in the first layer is the same as
+    // the input seed nodes.
     if (layer_id > 0) {
       std::sort(sub_vers->begin() + layer_offsets[layer_id],
                 sub_vers->begin() + layer_offsets[layer_id + 1],
@@ -307,6 +309,8 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   layer_off_data[1] = layer_offsets[num_hops] - layer_offsets[num_hops - 1];
   int out_layer_idx = 1;
   for (int layer_id = num_hops - 2; layer_id >= 0; layer_id--) {
+    // Because we don't sort the vertices in the first layer above, we can't sort
+    // the neighbor positions of the vertices in the first layer either.
     if (layer_id > 0) {
       std::sort(neigh_pos->begin() + layer_offsets[layer_id],
                 neigh_pos->begin() + layer_offsets[layer_id + 1],
