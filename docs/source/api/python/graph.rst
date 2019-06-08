@@ -70,6 +70,7 @@ Converting from/to other format
     DGLGraph.adjacency_matrix
     DGLGraph.adjacency_matrix_scipy
     DGLGraph.incidence_matrix
+    DGLGraph.to
 
 Using Node/edge features
 ------------------------

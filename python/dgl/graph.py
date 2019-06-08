@@ -3176,6 +3176,21 @@ class DGLGraph(DGLBaseGraph):
         ----------
         ctx : framework specific context object
 
+        Examples (Pytorch & MXNet)
+        --------
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(5, {'h': torch.ones((5,2))})
+        >>> G.add_edges([0,1],[1,2], {'m' : torch.ones((2,2))})
+        >>> G.add_edges([0,1],[1,2], {'m' : torch.ones((2,2))})
+        if PyTorch:
+        >>> device = torch.device('cuda')
+        >>> G.to(device)
+        >>> print(G.ndata['h'].is_cuda())
+        True
+        if MXNet:
+        >>> G.to(mx.gpu(0))
+        >>> print(G.ndata['h'].context)
+
         """
         for k in self.ndata.keys():
             self.ndata[k] = F.copy_to(self.ndata[k], ctx)
