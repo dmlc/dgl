@@ -96,20 +96,21 @@ def test_simple_graph():
     assert eset == set(elist)
 
 def test_bidirected_graph():
-    elist = [(0, 0), (0, 1), (0, 1), (1, 0), (1, 1), (2, 1), (2, 2), (2, 2)]
-    g = dgl.DGLGraph(elist)
-    elist.append((1, 2))
-    elist = set(elist)
-
-    def _test(readonly):
-        big = dgl.to_bidirected(g, readonly)
+    def _test(in_readonly, out_readonly):
+        elist = [(0, 0), (0, 1), (0, 1), (1, 0), (1, 1), (2, 1), (2, 2), (2, 2)]
+        g = dgl.DGLGraph(elist, readonly=in_readonly)
+        elist.append((1, 2))
+        elist = set(elist)
+        big = dgl.to_bidirected(g, out_readonly)
         assert big.number_of_edges() == 10
         src, dst = big.edges()
         eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
         assert eset == set(elist)
 
-    _test(readonly=True)
-    _test(readonly=False)
+    _test(True, True)
+    _test(True, False)
+    _test(False, True)
+    _test(False, False)
 
 if __name__ == '__main__':
     test_line_graph()

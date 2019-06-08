@@ -576,9 +576,8 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedMutableGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    const Graph* gptr = static_cast<const Graph*>(ptr);
     Graph* bgptr = new Graph();
-    *bgptr = GraphOp::ToBidirectedMutableGraph(gptr);
+    *bgptr = GraphOp::ToBidirectedMutableGraph(ptr);
     GraphHandle bghandle = bgptr;
     *rv = bghandle;
   });
@@ -587,8 +586,7 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedImmutableGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
-    const Graph* gptr = static_cast<const Graph*>(ptr);
-    GraphHandle bghandle = GraphOp::ToBidirectedImmutableGraph(gptr).Reset();
+    GraphHandle bghandle = GraphOp::ToBidirectedImmutableGraph(ptr).Reset();
     *rv = bghandle;
   });
 
