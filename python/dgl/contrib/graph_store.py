@@ -289,10 +289,19 @@ class SharedMemoryStoreServer(object):
     and store them in shared memory. The loaded graph can be identified by
     the graph name in the input argument.
 
+    DGL graph accepts graph data of multiple formats:
+
+    * NetworkX graph,
+    * scipy matrix,
+    * DGLGraph.
+
+    If the input graph data is DGLGraph, the constructed DGLGraph only contains
+    its graph index.
+
     Parameters
     ----------
     graph_data : graph data
-        Data to initialize graph. Same as networkx's semantics.
+        Data to initialize graph.
     edge_dir : string
         the edge direction for the graph structure ("in" or "out")
     graph_name : string
@@ -306,14 +315,14 @@ class SharedMemoryStoreServer(object):
     """
     def __init__(self, graph_data, edge_dir, graph_name, multigraph, num_workers, port):
         self.server = None
-        if isinstance(graph_data, GraphIndex):
-            graph_idx = graph_data
+        if isinstance(graph_data, (GraphIndex, DGLGraph)):
+            self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=True)
         else:
             indptr, indices = _to_csr(graph_data, edge_dir, multigraph)
             graph_idx = from_csr(utils.toindex(indptr), utils.toindex(indices),
                                  multigraph, edge_dir, _get_graph_path(graph_name))
+            self._graph = DGLGraph(graph_idx, multigraph=multigraph, readonly=True)
 
-        self._graph = DGLGraph(graph_idx, multigraph=multigraph, readonly=True)
         self._num_workers = num_workers
         self._graph_name = graph_name
         self._edge_dir = edge_dir
@@ -562,6 +571,7 @@ class SharedMemoryDGLGraph(BaseGraphStore):
             init = self._init_manager.serialize(init)
             dtype = np.dtype(dtype).name
             self.proxy.init_ndata(init, name, shape, dtype)
+            print("init ndata " + name + " on the server")
             data = empty_shared_mem(_get_ndata_path(self._graph_name, name),
                                     False, shape, dtype)
             dlpack = data.to_dlpack()
@@ -1043,10 +1053,19 @@ def create_graph_store_server(graph_data, graph_name, store_type, num_workers,
     After the server runs, the graph store clients can access the graph data
     with the specified graph name.
 
+    DGL graph accepts graph data of multiple formats:
+
+    * NetworkX graph,
+    * scipy matrix,
+    * DGLGraph.
+
+    If the input graph data is DGLGraph, the constructed DGLGraph only contains
+    its graph index.
+
     Parameters
     ----------
     graph_data : graph data
-        Data to initialize graph. Same as networkx's semantics.
+        Data to initialize graph.
     graph_name : string
         Define the name of the graph.
     store_type : string
