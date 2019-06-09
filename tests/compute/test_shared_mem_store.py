@@ -89,8 +89,10 @@ def server_func(num_workers, graph_name):
                                                           False, edge_dir="in", port=rand_port)
     assert num_nodes == g._graph.number_of_nodes()
     assert num_edges == g._graph.number_of_edges()
-    g.ndata['feat'] = F.arange(0, num_nodes * 10).reshape((num_nodes, 10))
-    g.edata['feat'] = F.arange(0, num_edges * 10).reshape((num_edges, 10))
+    nfeat = np.arange(0, num_nodes * 10).astype('float32').reshape((num_nodes, 10))
+    efeat = np.arange(0, num_edges * 10).astype('float32').reshape((num_edges, 10))
+    g.ndata['feat'] = F.tensor(nfeat)
+    g.edata['feat'] = F.tensor(efeat)
     g.run()
 
 def test_init():
