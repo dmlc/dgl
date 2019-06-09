@@ -89,7 +89,7 @@ def check_basic(g, nf):
         assert_array_equal(F.asnumpy(nids), F.asnumpy(nids1))
 
         data = nf.layers[i].data['h1']
-        data1 = g.ndata['h1'][nf.layer_parent_nid(i)]
+        data1 = g.nodes[nf.layer_parent_nid(i)].data['h1']
         assert_array_equal(F.asnumpy(data), F.asnumpy(data1))
 
     for i in range(nf.num_blocks):
