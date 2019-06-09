@@ -85,8 +85,8 @@ class NodeFlow(DGLBaseGraph):
     def _get_node_frame(self, layer_id):
         return self._node_frames[layer_id]
 
-    def _get_edge_frame(self, flow_id):
-        return self._edge_frames[flow_id]
+    def _get_edge_frame(self, block_id):
+        return self._edge_frames[block_id]
 
     @property
     def num_layers(self):
@@ -116,7 +116,6 @@ class NodeFlow(DGLBaseGraph):
 
         This is mainly for usage like:
         * `g.layers[2].data['h']` to get the node features of layer#2.
-        * `g.layers(2)` to get the nodes of layer#2.
         """
         return LayerView(self)
 
@@ -125,8 +124,7 @@ class NodeFlow(DGLBaseGraph):
         """Return a BlockView of this NodeFlow.
 
         This is mainly for usage like:
-        * `g.blocks[1,2].data['h']` to get the edge features of blocks from layer#1 to layer#2.
-        * `g.blocks(1, 2)` to get the edge ids of blocks #1->#2.
+        * `g.blocks[1].data['h']` to get the edge features of blocks from layer#1 to layer#2.
         """
         return BlockView(self)
 

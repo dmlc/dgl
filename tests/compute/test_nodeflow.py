@@ -76,6 +76,8 @@ def check_basic(g, nf):
     assert_array_equal(F.asnumpy(deg), np.zeros((nf.layer_size(0)), np.int64))
     deg = nf.layer_out_degree(-1)
     assert_array_equal(F.asnumpy(deg), np.zeros((nf.layer_size(-1)), np.int64))
+
+    nf.copy_from_parent()
     for i in range(1, nf.num_layers):
         in_deg = nf.layer_in_degree(i)
         out_deg = nf.layer_out_degree(i - 1)
@@ -85,6 +87,15 @@ def check_basic(g, nf):
         parent_nids = nf.map_to_parent_nid(nids)
         nids1 = nf.map_from_parent_nid(i, parent_nids)
         assert_array_equal(F.asnumpy(nids), F.asnumpy(nids1))
+
+        data = nf.layers[i].data['h1']
+        data1 = g.ndata['h1'][nf.layer_parent_nid(i)]
+        assert_array_equal(F.asnumpy(data), F.asnumpy(data1))
+
+    for i in range(nf.num_blocks):
+        data = nf.blocks[i].data['h2']
+        data1 = g.edata['h2'][nf.block_parent_eid(i)]
+        assert_array_equal(F.asnumpy(data), F.asnumpy(data1))
 
 
     # negative layer Ids.
