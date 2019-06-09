@@ -24,4 +24,6 @@ python3 -m nose -v --with-xunit tests/compute || fail "compute"
 python3 -m nose -v --with-xunit tests/graph_index || fail "graph_index"
 python3 -m nose -v --with-xunit tests/$DGLBACKEND || fail "backend-specific"
 export OMP_NUM_THREADS=1
-python3 -m nose -v --with-xunit tests/distributed || fail "distributed"
+if [ $2 != "gpu"]; then
+    python3 -m nose -v --with-xunit tests/distributed || fail "distributed"
+fi
