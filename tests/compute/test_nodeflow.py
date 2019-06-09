@@ -317,16 +317,16 @@ def check_flow_compute2(create_node_flow):
                         rtol=1e-4, atol=1e-4)
 
     nf = create_node_flow(g, num_layers)
-    nf.copy_from_parent()
     g.ndata['h'] = g.ndata['h1']
-    nf.layers[0].data['h'] = nf.layers[0].data['h1']
+    nf.copy_from_parent()
+    for i in range(nf.num_layers):
+        nf.layers[i].data['h'] = nf.layers[i].data['h1']
     for i in range(num_layers):
-        #TODO(zhengda)
-        nf.block_compute(i, fn.u_mul_v('h', 'h', 'h'), fn.sum('h', 'h'))
-        g.update_all(fn.u_mul_v('h', 'h', 'h'), fn.sum('h', 'h'))
-        #print(nf.layers[i + 1].data['h'])
-        #print(g.nodes[nf.layer_parent_nid(i + 1)].data['h'])
-        #assert F.allclose(nf.layers[i + 1].data['h'], g.nodes[nf.layer_parent_nid(i + 1)].data['h'])
+        nf.block_compute(i, fn.u_mul_v('h', 'h', 't'), fn.sum('t', 's'))
+        g.update_all(fn.u_mul_v('h', 'h', 't'), fn.sum('t', 's'))
+        assert_allclose(F.asnumpy(nf.layers[i + 1].data['s']),
+                        F.asnumpy(g.nodes[nf.layer_parent_nid(i + 1)].data['s']),
+                        rtol=1e-4, atol=1e-4)
 
 def test_flow_compute():
     check_flow_compute(create_full_nodeflow)
