@@ -757,6 +757,7 @@ class DGLGraph(DGLBaseGraph):
     to the feature data (in tensor).
 
     DGL graph accepts graph data of multiple formats:
+
     * NetworkX graph,
     * scipy matrix,
     * DGLGraph.
