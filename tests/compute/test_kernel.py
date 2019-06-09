@@ -1,6 +1,7 @@
 import dgl
 import dgl.function as fn
 import networkx as nx
+import numpy as np
 import backend as F
 from itertools import product
 
@@ -179,18 +180,19 @@ def test_all_binary_builtins():
             lhs_grad_2 = F.grad(target_feature_switch(g, lhs))
             rhs_grad_2 = F.grad(target_feature_switch(g, rhs))
 
-        def _print_error(a, b):
-            print("Test {}_{}_{}_{} {}".
-                  format(lhs, binary_op, rhs, reducer, broadcast))
-            print(a)
-            print(b)
-
         if reducer == 'prod':
             rtol = 1e-2
             atol = 1e-2
         else:
             rtol = 1e-4
             atol = 1e-4
+
+        def _print_error(a, b):
+            print("Test {}_{}_{}_{} {}".
+                  format(lhs, binary_op, rhs, reducer, broadcast))
+            for i, (x, y) in enumerate(zip(F.asnumpy(a), F.asnumpy(b))):
+                if not np.allclose(a, b, rtol, atol):
+                    print('@{} {} v.s. {}'.format(i, x, y))
 
         if not F.allclose(r1, r2, rtol, atol):
             _print_error(r1, r2)
