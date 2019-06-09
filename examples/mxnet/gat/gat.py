@@ -63,8 +63,7 @@ class GraphAttention(gluon.Block):
         self.g.ndata.update({'ft' : ft, 'a1' : a1, 'a2' : a2})
         # 1. compute edge attention
         self.g.apply_edges(self.edge_attention)
-        # 2. compute softmax in two parts: exp(x - max(x)) and
-        #    sum(exp(x - max(x)))
+        # 2. compute softmax
         self.edge_softmax()
         # 3. compute the aggregated node features
         self.g.update_all(fn.src_mul_edge('ft', 'a_drop', 'ft'),

@@ -64,12 +64,12 @@ def uniform_attention(g, shape):
 def test_edge_softmax():
     # Basic
     g = dgl.DGLGraph(nx.path_graph(3))
-    edata = mx.nd.ones(g.number_of_edges(), 1)
+    edata = mx.nd.ones((g.number_of_edges(), 1))
     a = nn.edge_softmax(g, edata)
     assert np.allclose(a, uniform_attention(g, a.shape))
 
     # Test higher dimension case
-    edata = mx.nd.ones(g.number_of_edges(), 3, 1)
+    edata = mx.nd.ones((g.number_of_edges(), 3, 1))
     a = nn.edge_softmax(g, edata)
     assert np.allclose(a, uniform_attention(g, a.shape))
 
