@@ -11,9 +11,9 @@ def is_cuda_available():
 def array_equal(a, b):
     return th.equal(a.cpu(), b.cpu())
 
-def allclose(a, b):
+def allclose(a, b, rtol=1e-4, atol=1e-4):
     return th.allclose(a.float().cpu(),
-            b.float().cpu(), rtol=1e-4, atol=1e-4)
+            b.float().cpu(), rtol=rtol, atol=atol)
 
 def randn(shape):
     return th.randn(*shape)
