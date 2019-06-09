@@ -94,7 +94,7 @@ def check_basic(g, nf):
 
     for i in range(nf.num_blocks):
         data = nf.blocks[i].data['h2']
-        data1 = g.edata['h2'][nf.block_parent_eid(i)]
+        data1 = g.edges[nf.block_parent_eid(i)].data['h2']
         assert_array_equal(F.asnumpy(data), F.asnumpy(data1))
 
 
