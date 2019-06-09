@@ -19,8 +19,8 @@ def is_cuda_available():
 def array_equal(a, b):
     return nd.equal(a, b).asnumpy().all()
 
-def allclose(a, b):
-    return np.allclose(a.asnumpy(), b.asnumpy(), rtol=1e-4, atol=1e-4)
+def allclose(a, b, rtol=1e-4, atol=1e-4):
+    return np.allclose(a.asnumpy(), b.asnumpy(), rtol=rtol, atol=atol)
 
 def randn(shape):
     return nd.random.randn(*shape)

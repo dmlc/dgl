@@ -1,6 +1,6 @@
-"""Torch modules for graph related softmax."""
+"""Gluon layer for graph related softmax."""
 # pylint: disable= no-member, arguments-differ
-import torch as th
+import mxnet as mx
 
 from ... import utils
 from ... import function as fn
@@ -8,7 +8,7 @@ from ... import function as fn
 __all__ = ['edge_softmax']
 
 
-class EdgeSoftmax(th.autograd.Function):
+class EdgeSoftmax(mx.autograd.Function):
     r"""Apply softmax over signals of incoming edges.
 
     For a node :math:`i`, edgesoftmax is an operation of computing
@@ -25,8 +25,11 @@ class EdgeSoftmax(th.autograd.Function):
     the attention weights are computed with such an edgesoftmax operation.
     """
 
-    @staticmethod
-    def forward(ctx, g, score):
+    def __init__(self, g):
+        super(EdgeSoftmax, self).__init__()
+        self.g = g
+
+    def forward(self, score):
         """
         score = dgl.EData(g, score)
         score_max = score.dst_max()  # of type dgl.NData
@@ -35,23 +38,23 @@ class EdgeSoftmax(th.autograd.Function):
         out = score / score_sum    # edge_div_dst, ret dgl.EData
         return out.data
         """
+        g = self.g
         score_name = utils.get_edata_name(g, 'score')
         tmp_name = utils.get_ndata_name(g, 'tmp')
         out_name = utils.get_edata_name(g, 'out')
         g.edata[score_name] = score
         g.update_all(fn.copy_e(score_name, 'm'), fn.max('m', tmp_name))
         g.apply_edges(fn.e_sub_v(score_name, tmp_name, out_name))
-        g.edata[out_name] = th.exp(g.edata[out_name])
+        g.edata[out_name] = g.edata[out_name].exp()
         g.update_all(fn.copy_e(out_name, 'm'), fn.sum('m', tmp_name))
         g.apply_edges(fn.e_div_v(out_name, tmp_name, out_name))
         g.edata.pop(score_name)
         g.ndata.pop(tmp_name)
         out = g.edata.pop(out_name)
-        ctx.backward_cache = (g, out)
+        self.save_for_backward(out)
         return out
 
-    @staticmethod
-    def backward(ctx, grad_out):
+    def backward(self, grad_out):
         """
         g, out = ctx.backward_cache
         grad_out = dgl.EData(g, grad_out)
@@ -61,7 +64,8 @@ class EdgeSoftmax(th.autograd.Function):
         grad_score = sds - sds * sds_sum  # multiple expressions
         return grad_score.data
         """
-        g, out = ctx.backward_cache
+        g = self.g
+        out = self.saved_tensors[0]
         out_name = utils.get_edata_name(g, 'out')
         accum_name = utils.get_ndata_name(g, 'accum')
         grad_score_name = utils.get_edata_name(g, 'grad_score')
@@ -71,7 +75,7 @@ class EdgeSoftmax(th.autograd.Function):
         g.apply_edges(fn.e_mul_v(out_name, accum_name, out_name))
         g.ndata.pop(accum_name)
         grad_score = g.edata.pop(grad_score_name) - g.edata.pop(out_name)
-        return None, grad_score
+        return grad_score
 
 
 def edge_softmax(graph, logits):
@@ -100,4 +104,5 @@ def edge_softmax(graph, logits):
     >>> import dgl.function as fn
     >>> attention = EdgeSoftmax(logits, graph)
     """
-    return EdgeSoftmax.apply(graph, logits)
+    softmax_op = EdgeSoftmax(graph)
+    return softmax_op(logits)
