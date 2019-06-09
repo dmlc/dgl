@@ -217,11 +217,11 @@ pipeline {
             //    unit_test_linux("pytorch", "cpu")
             //  }
             //}
-            stage("Tutorial test") {
-              steps {
-                tutorial_test_linux("mxnet")
-              }
-            }
+            //stage("Tutorial test") {
+            //  steps {
+            //    tutorial_test_linux("mxnet")
+            //  }
+            //}
           }
         }
         stage("MXNet GPU") {
@@ -243,11 +243,11 @@ pipeline {
             //    unit_test_linux("pytorch", "cpu")
             //  }
             //}
-            stage("Tutorial test") {
-              steps {
-                tutorial_test_linux("mxnet")
-              }
-            }
+            //stage("Tutorial test") {
+            //  steps {
+            //    tutorial_test_linux("mxnet")
+            //  }
+            //}
           }
         }
       }
