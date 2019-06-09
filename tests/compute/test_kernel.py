@@ -36,21 +36,21 @@ def generate_feature(g, broadcast='none'):
     nv = g.number_of_nodes()
     ne = g.number_of_edges()
     if broadcast == 'e':
-        u = F.randn((nv, D1, D2, D3))
-        e = F.randn((ne, D2, 1))
-        v = F.randn((nv, D1, D2, D3))
+        u = F.randn((nv, D1, D2, D3)) * 0.1 + 1
+        e = F.randn((ne, D2, 1)) * 0.1 + 1
+        v = F.randn((nv, D1, D2, D3)) * 0.1 + 1
     elif broadcast == 'u':
-        u = F.randn((nv, D2, 1))
-        e = F.randn((ne, D1, D2, D3))
-        v = F.randn((nv, D1, D2, D3))
+        u = F.randn((nv, D2, 1)) * 0.1 + 1
+        e = F.randn((ne, D1, D2, D3)) * 0.1 + 1
+        v = F.randn((nv, D1, D2, D3)) * 0.1 + 1
     elif broadcast == 'v':
-        u = F.randn((nv, D1, D2, D3))
-        e = F.randn((ne, D1, D2, D3))
-        v = F.randn((nv, D2, 1))
+        u = F.randn((nv, D1, D2, D3)) * 0.1 + 1
+        e = F.randn((ne, D1, D2, D3)) * 0.1 + 1
+        v = F.randn((nv, D2, 1)) * 0.1 + 1
     else:
-        u = F.randn((nv, D1, D2, D3))
-        e = F.randn((ne, D1, D2, D3))
-        v = F.randn((nv, D1, D2, D3))
+        u = F.randn((nv, D1, D2, D3)) * 0.1 + 1
+        e = F.randn((ne, D1, D2, D3)) * 0.1 + 1
+        v = F.randn((nv, D1, D2, D3)) * 0.1 + 1
     return u, v, e
 
 
