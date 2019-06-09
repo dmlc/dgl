@@ -185,17 +185,24 @@ def test_all_binary_builtins():
             print(a)
             print(b)
 
-        if not F.allclose(r1, r2):
+        if reducer == 'prod':
+            rtol = 1e-2
+            atol = 1e-2
+        else:
+            rtol = 1e-4
+            atol = 1e-4
+
+        if not F.allclose(r1, r2, rtol, atol):
             _print_error(r1, r2)
-        assert F.allclose(r1, r2)
-        if not F.allclose(rhs_grad_1, rhs_grad_2):
+        assert F.allclose(r1, r2, rtol, atol)
+        if not F.allclose(rhs_grad_1, rhs_grad_2, rtol, atol):
             print("left grad")
             _print_error(lhs_grad_1, lhs_grad_2)
-        assert(F.allclose(lhs_grad_1, lhs_grad_2))
-        if not F.allclose(rhs_grad_1, rhs_grad_2):
+        assert(F.allclose(lhs_grad_1, lhs_grad_2, rtol, atol))
+        if not F.allclose(rhs_grad_1, rhs_grad_2, rtol, atol):
             print("right grad")
             _print_error(rhs_grad_1, rhs_grad_2)
-        assert(F.allclose(rhs_grad_1, rhs_grad_2))
+        assert(F.allclose(rhs_grad_1, rhs_grad_2, rtol, atol))
 
     g = dgl.DGLGraph()
     g.add_nodes(20)

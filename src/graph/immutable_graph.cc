@@ -549,8 +549,8 @@ COO::EdgeArray COO::Edges(const std::string &order) const {
   return EdgeArray{src_, dst_, rst_eid};
 }
 
-Subgraph COO::EdgeSubgraph(IdArray eids) const {
-  CHECK(IsValidIdArray(eids));
+Subgraph COO::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
+  CHECK(IsValidIdArray(eids)) << "Invalid edge id array.";
   const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
   const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
   const dgl_id_t* eids_data = static_cast<dgl_id_t*>(eids->data);
@@ -558,32 +558,50 @@ Subgraph COO::EdgeSubgraph(IdArray eids) const {
   IdArray new_dst = NewIdArray(eids->shape[0]);
   dgl_id_t* new_src_data = static_cast<dgl_id_t*>(new_src->data);
   dgl_id_t* new_dst_data = static_cast<dgl_id_t*>(new_dst->data);
-  dgl_id_t newid = 0;
-  std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
+  if (!preserve_nodes) {
+    dgl_id_t newid = 0;
+    std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
 
-  for (int64_t i = 0; i < eids->shape[0]; ++i) {
-    const dgl_id_t eid = eids_data[i];
-    const dgl_id_t src = src_data[eid];
-    const dgl_id_t dst = dst_data[eid];
-    if (!oldv2newv.count(src)) {
-      oldv2newv[src] = newid++;
+    for (int64_t i = 0; i < eids->shape[0]; ++i) {
+      const dgl_id_t eid = eids_data[i];
+      const dgl_id_t src = src_data[eid];
+      const dgl_id_t dst = dst_data[eid];
+      if (!oldv2newv.count(src)) {
+        oldv2newv[src] = newid++;
+      }
+      if (!oldv2newv.count(dst)) {
+        oldv2newv[dst] = newid++;
+      }
+      *(new_src_data++) = oldv2newv[src];
+      *(new_dst_data++) = oldv2newv[dst];
     }
-    if (!oldv2newv.count(dst)) {
-      oldv2newv[dst] = newid++;
+
+    // induced nodes
+    IdArray induced_nodes = NewIdArray(newid);
+    dgl_id_t* induced_nodes_data = static_cast<dgl_id_t*>(induced_nodes->data);
+    for (const auto& kv : oldv2newv) {
+      induced_nodes_data[kv.second] = kv.first;
     }
-    *(new_src_data++) = oldv2newv[src];
-    *(new_dst_data++) = oldv2newv[dst];
-  }
 
-  // induced nodes
-  IdArray induced_nodes = NewIdArray(newid);
-  dgl_id_t* induced_nodes_data = static_cast<dgl_id_t*>(induced_nodes->data);
-  for (const auto& kv : oldv2newv) {
-    induced_nodes_data[kv.second] = kv.first;
-  }
+    COOPtr subcoo(new COO(newid, new_src, new_dst));
+    return Subgraph{subcoo, induced_nodes, eids};
+  } else {
+    for (int64_t i = 0; i < eids->shape[0]; ++i) {
+      const dgl_id_t eid = eids_data[i];
+      const dgl_id_t src = src_data[eid];
+      const dgl_id_t dst = dst_data[eid];
+      *(new_src_data++) = src;
+      *(new_dst_data++) = dst;
+    }
 
-  COOPtr subcoo(new COO(newid, new_src, new_dst));
-  return Subgraph{subcoo, induced_nodes, eids};
+    IdArray induced_nodes = NewIdArray(NumVertices());
+    dgl_id_t* induced_nodes_data = static_cast<dgl_id_t*>(induced_nodes->data);
+    for (int64_t i = 0; i < NumVertices(); ++i)
+      *(induced_nodes_data++) = i;
+
+    COOPtr subcoo(new COO(NumVertices(), new_src, new_dst));
+    return Subgraph{subcoo, induced_nodes, eids};
+  }
 }
 
 // complexity: time O(E + V), space O(1)
@@ -696,9 +714,9 @@ Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
                   sg.induced_vertices, sg.induced_edges};
 }
 
-Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids) const {
+Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
   // We prefer to generate a subgraph from out-csr.
-  auto sg = GetCOO()->EdgeSubgraph(eids);
+  auto sg = GetCOO()->EdgeSubgraph(eids, preserve_nodes);
   COOPtr subcoo = std::dynamic_pointer_cast<COO>(sg.graph);
   return Subgraph{GraphPtr(new ImmutableGraph(subcoo)),
                   sg.induced_vertices, sg.induced_edges};
