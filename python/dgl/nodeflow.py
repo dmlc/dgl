@@ -265,8 +265,11 @@ class NodeFlow(DGLBaseGraph):
         eid = utils.toindex(eid)
         return self._edge_mapping.tousertensor()[eid.tousertensor()]
 
-    def map_from_parent_nid(self, layer_id, parent_nids):
+    def map_from_parent_nid(self, layer_id, parent_nids, remap=False):
         """Map parent node Ids to NodeFlow node Ids in a certain layer.
+
+        If remap is True, it returns the node Ids local to the layer.
+        Otherwise, the node Ids are unique in the NodeFlow.
 
         Parameters
         ----------
@@ -290,7 +293,10 @@ class NodeFlow(DGLBaseGraph):
         mapping = mapping[start:end]
         mapping = utils.toindex(mapping)
         nflow_ids = transform_ids(mapping, parent_nids)
-        return nflow_ids.tousertensor()
+        if remap:
+            return nflow_ids.tousertensor()
+        else:
+            return nflow_ids.tousertensor() + int(self._layer_offsets[layer_id])
 
     def layer_in_degree(self, layer_id):
         """Return the in-degree of the nodes in the specified layer.
@@ -367,6 +373,8 @@ class NodeFlow(DGLBaseGraph):
     def block_eid(self, block_id):
         """Get the edge Ids in the specified block.
 
+        The returned edge Ids are unique in the NodeFlow.
+
         Parameters
         ----------
         block_id : int
@@ -375,7 +383,7 @@ class NodeFlow(DGLBaseGraph):
         Returns
         -------
         Tensor
-            The edge id array.
+            The edge ids of the block in the NodeFlow.
         """
         block_id = self._get_block_id(block_id)
         start = self._block_offsets[block_id]
@@ -393,7 +401,7 @@ class NodeFlow(DGLBaseGraph):
         Returns
         -------
         Tensor
-            The parent edge id array.
+            The edge ids of the block in the parent graph.
         """
         block_id = self._get_block_id(block_id)
         start = self._block_offsets[block_id]
@@ -408,7 +416,8 @@ class NodeFlow(DGLBaseGraph):
         """Return the edges in a block.
 
         If remap is True, returned indices u, v, eid will be remapped to local
-        indices (i.e. starting from 0)
+        Ids (i.e. starting from 0) in the block or in the layer. Otherwise,
+        u, v, eid are unique in the NodeFlow.
 
         Parameters
         ----------
@@ -498,17 +507,14 @@ class NodeFlow(DGLBaseGraph):
         value indicating whether the edge is incident to the node
         or not.
 
-        There are three types of an incidence matrix `I`:
+        There are two types of an incidence matrix `I`:
         * "in":
           - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
           - I[v, e] = 0 otherwise.
         * "out":
           - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
           - I[v, e] = 0 otherwise.
-        * "both":
-          - I[v, e] = 1 if e is the in-edge of v;
-          - I[v, e] = -1 if e is the out-edge of v;
-          - I[v, e] = 0 otherwise (including self-loop).
+        "both" isn't defined in the block of a NodeFlow.
 
         Parameters
         ----------
@@ -549,23 +555,6 @@ class NodeFlow(DGLBaseGraph):
             idx = F.cat([row, col], dim=0)
             # FIXME(minjie): data type
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
-        elif typestr == 'both':
-            # TODO does it work for bipartite graph?
-            # first remove entries for self loops
-            mask = F.logical_not(F.equal(src, dst))
-            src = F.boolean_mask(src, mask)
-            dst = F.boolean_mask(dst, mask)
-            eid = F.boolean_mask(eid, mask)
-            n_entries = F.shape(src)[0]
-            # create index
-            row = F.unsqueeze(F.cat([src, dst], dim=0), 0)
-            col = F.unsqueeze(F.cat([eid, eid], dim=0), 0)
-            idx = F.cat([row, col], dim=0)
-            # FIXME(minjie): data type
-            x = -F.ones((n_entries,), dtype=F.float32, ctx=ctx)
-            y = F.ones((n_entries,), dtype=F.float32, ctx=ctx)
-            dat = F.cat([x, y], dim=0)
             inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
         else:
             raise DGLError('Invalid incidence matrix type: %s' % str(typestr))
@@ -718,7 +707,7 @@ class NodeFlow(DGLBaseGraph):
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
         v : a list of vertex Ids or ALL.
-            The vertices to run the node update function.
+            The vertex Ids (unique in the NodeFlow) to run the node update function.
         inplace : bool, optional
             If True, update will be done in place, but autograd will break.
         """
@@ -750,7 +739,7 @@ class NodeFlow(DGLBaseGraph):
             Apply function on the edges. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
         edges : a list of edge Ids or ALL.
-            The edges to run the edge update function.
+            The edges Id to run the edge update function.
         inplace : bool, optional
             If True, update will be done in place, but autograd will break.
         """
@@ -818,7 +807,7 @@ class NodeFlow(DGLBaseGraph):
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
         v : a list of vertex Ids or ALL.
-            The specified nodes in layer i+1 to run the computation.
+            The Node Ids (unique in the NodeFlow) to run the computation.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
         """
