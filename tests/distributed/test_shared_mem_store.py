@@ -3,6 +3,7 @@ import sys
 import random
 import time
 import numpy as np
+from numpy.testing import assert_array_equal
 from multiprocessing import Process, Manager
 from scipy import sparse as spsp
 import backend as F
@@ -52,16 +53,16 @@ def check_init_func(worker_id, graph_name, return_dict):
 
         src, dst = g.all_edges()
         coo = csr.tocoo()
-        assert F.array_equal(dst, F.tensor(coo.row))
-        assert F.array_equal(src, F.tensor(coo.col))
-        feat = g.nodes[0].data['feat']
-        assert F.array_equal(feat, F.tensor(np.arange(10), dtype=F.dtype(feat)))
-        feat = g.edges[0].data['feat']
-        assert F.array_equal(feat, F.tensor(np.arange(10), dtype=F.dtype(feat)))
+        assert_array_equal(F.asnumpy(dst), coo.row)
+        assert_array_equal(F.asnumpy(src), coo.col)
+        feat = F.asnumpy(g.nodes[0].data['feat'])
+        assert_array_equal(np.squeeze(feat), np.arange(10, dtype=feat.dtype))
+        feat = F.asnumpy(g.edges[0].data['feat'])
+        assert_array_equal(np.squeeze(feat), np.arange(10, dtype=feat.dtype))
         g.init_ndata('test4', (g.number_of_nodes(), 10), 'float32')
         g.init_edata('test4', (g.number_of_edges(), 10), 'float32')
         g._sync_barrier(60)
-        check_array_shared_memory(g, worker_id, [g.nodes[:].data['test4']])
+        check_array_shared_memory(g, worker_id, [g.nodes[:].data['test4'], g.edges[:].data['test4']])
 
         data = g.nodes[:].data['test4']
         g.set_n_repr({'test4': F.ones((1, 10)) * 10}, u=[0])
