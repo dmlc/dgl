@@ -195,6 +195,16 @@ class NodeFlow(DGLBaseGraph):
     def copy_to_parent(self, node_embed_names=ALL, edge_embed_names=ALL):
         """Copy node/edge embeddings to the parent graph.
 
+        Note: if a node in the parent graph appears in multiple layers and they
+        in the NodeFlow has node data with the same name, the data of this node
+        in the lower layer will overwrite the node data in previous layer.
+
+        For example, node 5 in the parent graph appears in layer 0 and 1 and
+        they have the same node data 'h'. The node data in layer 1 of this node
+        will overwrite its data in layer 0 when copying the data back.
+
+        To avoid this, users can give node data in each layer a different name.
+
         Parameters
         ----------
         node_embed_names : a list of lists of strings, optional
@@ -333,6 +343,8 @@ class NodeFlow(DGLBaseGraph):
     def layer_nid(self, layer_id):
         """Get the node Ids in the specified layer.
 
+        The returned node Ids are unique in the NodeFlow.
+
         Parameters
         ----------
         layer_id : int
@@ -341,7 +353,7 @@ class NodeFlow(DGLBaseGraph):
         Returns
         -------
         Tensor
-            The node id array.
+            The node ids.
         """
         layer_id = self._get_layer_id(layer_id)
         assert layer_id + 1 < len(self._layer_offsets)
@@ -807,7 +819,7 @@ class NodeFlow(DGLBaseGraph):
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
         v : a list of vertex Ids or ALL.
-            The Node Ids (unique in the NodeFlow) to run the computation.
+            The Node Ids (unique in the NodeFlow) in layer block_id+1 to run the computation.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
         """
