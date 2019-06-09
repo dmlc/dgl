@@ -277,6 +277,8 @@ class NodeFlow(DGLBaseGraph):
             The layer Id.
         parent_nids: list or Tensor
             Node Ids in the parent graph.
+        remap_local: boolean
+            Remap layer/block-level local Id if True; otherwise, NodeFlow-level Id.
 
         Returns
         -------
@@ -424,7 +426,7 @@ class NodeFlow(DGLBaseGraph):
         block_id : int
             The specified block to return the edges.
         remap_local : boolean
-            Remap indices if True
+            Remap layer/block-level local Id if True; otherwise, NodeFlow-level Id.
 
         Returns
         -------
