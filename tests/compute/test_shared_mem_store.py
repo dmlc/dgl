@@ -29,13 +29,14 @@ def check_array_shared_memory(g, worker_id, arrays):
             assert_almost_equal(F.asnumpy(arr[0]), i + 10)
 
 def create_graph_store(graph_name):
-    try:
-        g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem",
+    for _ in range(10):
+        try:
+            g = dgl.contrib.graph_store.create_graph_from_store(graph_name, "shared_mem",
                                                                 port=rand_port)
-        return g
-    except ConnectionError as e:
-        traceback.print_exc()
-        time.sleep(1)
+            return g
+        except ConnectionError as e:
+            traceback.print_exc()
+            time.sleep(1)
     return None
 
 def check_init_func(worker_id, graph_name, return_dict):
@@ -56,9 +57,9 @@ def check_init_func(worker_id, graph_name, return_dict):
         assert F.array_equal(dst, F.tensor(coo.row))
         assert F.array_equal(src, F.tensor(coo.col))
         feat = g.nodes[0].data['feat']
-        #assert F.array_equal(feat, F.tensor(np.arange(10), dtype=F.dtype(feat)))
+        assert F.array_equal(feat, F.tensor(np.arange(10), dtype=F.dtype(feat)))
         feat = g.edges[0].data['feat']
-        #assert F.array_equal(feat, F.tensor(np.arange(10), dtype=F.dtype(feat)))
+        assert F.array_equal(feat, F.tensor(np.arange(10), dtype=F.dtype(feat)))
         g.init_ndata('test4', (g.number_of_nodes(), 10), 'float32')
         g.init_edata('test4', (g.number_of_edges(), 10), 'float32')
         g._sync_barrier(60)
