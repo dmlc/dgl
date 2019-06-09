@@ -7,12 +7,15 @@ Author's code: https://github.com/PetarV-/GAT
 Pytorch implementation: https://github.com/Diego999/pyGAT
 """
 
-import torch
-import torch.nn as nn
+import mxnet as mx
+from mxnet import gluon
+import mxnet.ndarray as nd
+import mxnet.gluon.nn as nn
 import dgl.function as fn
-from dgl.nn.pytorch import edge_softmax
+from dgl.nn.mxnet import edge_softmax
 
-class GraphAttention(nn.Module):
+
+class GraphAttention(gluon.Block):
     def __init__(self,
                  g,
                  in_dim,
@@ -25,7 +28,8 @@ class GraphAttention(nn.Module):
         super(GraphAttention, self).__init__()
         self.g = g
         self.num_heads = num_heads
-        self.fc = nn.Linear(in_dim, num_heads * out_dim, bias=False)
+        self.fc = nn.Dense(num_heads * out_dim, use_bias=False,
+                           weight_initializer=mx.init.Xavier())
         if feat_drop:
             self.feat_drop = nn.Dropout(feat_drop)
         else:
@@ -34,18 +38,19 @@ class GraphAttention(nn.Module):
             self.attn_drop = nn.Dropout(attn_drop)
         else:
             self.attn_drop = lambda x : x
-        self.attn_l = nn.Parameter(torch.Tensor(size=(1, num_heads, out_dim)))
-        self.attn_r = nn.Parameter(torch.Tensor(size=(1, num_heads, out_dim)))
-        nn.init.xavier_normal_(self.fc.weight.data, gain=1.414)
-        nn.init.xavier_normal_(self.attn_l.data, gain=1.414)
-        nn.init.xavier_normal_(self.attn_r.data, gain=1.414)
-        self.leaky_relu = nn.LeakyReLU(alpha)
+        self.attn_l = self.params.get("left_att", grad_req="add",
+                                      shape=(1, num_heads, out_dim),
+                                      init=mx.init.Xavier())
+        self.attn_r = self.params.get("right_att", grad_req="add",
+                                      shape=(1, num_heads, out_dim),
+                                      init=mx.init.Xavier())
+        self.alpha = alpha
         self.softmax = edge_softmax
         self.residual = residual
         if residual:
             if in_dim != out_dim:
-                self.res_fc = nn.Linear(in_dim, num_heads * out_dim, bias=False)
-                nn.init.xavier_normal_(self.res_fc.weight.data, gain=1.414)
+                self.res_fc = nn.Dense(num_heads * out_dim, use_bias=False,
+                                       weight_initializer=mx.init.Xavier())
             else:
                 self.res_fc = None
 
@@ -53,29 +58,30 @@ class GraphAttention(nn.Module):
         # prepare
         h = self.feat_drop(inputs)  # NxD
         ft = self.fc(h).reshape((h.shape[0], self.num_heads, -1))  # NxHxD'
-        a1 = (ft * self.attn_l).sum(dim=-1).unsqueeze(-1) # N x H x 1
-        a2 = (ft * self.attn_r).sum(dim=-1).unsqueeze(-1) # N x H x 1
+        a1 = (ft * self.attn_l.data(ft.context)).sum(axis=-1).expand_dims(-1)  # N x H x 1
+        a2 = (ft * self.attn_r.data(ft.context)).sum(axis=-1).expand_dims(-1)  # N x H x 1
         self.g.ndata.update({'ft' : ft, 'a1' : a1, 'a2' : a2})
         # 1. compute edge attention
         self.g.apply_edges(self.edge_attention)
         # 2. compute softmax
         self.edge_softmax()
-        # 3. compute the aggregated node features scaled by the dropped,
-        # unnormalized attention values.
-        self.g.update_all(fn.src_mul_edge('ft', 'a_drop', 'ft'), fn.sum('ft', 'ft'))
+        # 3. compute the aggregated node features
+        self.g.update_all(fn.src_mul_edge('ft', 'a_drop', 'ft'),
+                          fn.sum('ft', 'ft'))
         ret = self.g.ndata['ft']
         # 4. residual
         if self.residual:
             if self.res_fc is not None:
-                resval = self.res_fc(h).reshape((h.shape[0], self.num_heads, -1))  # NxHxD'
+                resval = self.res_fc(h).reshape(
+                    (h.shape[0], self.num_heads, -1))  # NxHxD'
             else:
-                resval = torch.unsqueeze(h, 1)  # Nx1xD'
+                resval = nd.expand_dims(h, axis=1)  # Nx1xD'
             ret = resval + ret
         return ret
 
     def edge_attention(self, edges):
         # an edge UDF to compute unnormalized attention values from src and dst
-        a = self.leaky_relu(edges.src['a1'] + edges.dst['a2'])
+        a = nd.LeakyReLU(edges.src['a1'] + edges.dst['a2'], slope=self.alpha)
         return {'a' : a}
 
     def edge_softmax(self):
@@ -83,7 +89,8 @@ class GraphAttention(nn.Module):
         # Dropout attention scores and save them
         self.g.edata['a_drop'] = self.attn_drop(attention)
 
-class GAT(nn.Module):
+
+class GAT(nn.Block):
     def __init__(self,
                  g,
                  num_layers,
@@ -99,11 +106,12 @@ class GAT(nn.Module):
         super(GAT, self).__init__()
         self.g = g
         self.num_layers = num_layers
-        self.gat_layers = nn.ModuleList()
+        self.gat_layers = []
         self.activation = activation
         # input projection (no residual)
         self.gat_layers.append(GraphAttention(
-            g, in_dim, num_hidden, heads[0], feat_drop, attn_drop, alpha, False))
+            g, in_dim, num_hidden, heads[0],
+            feat_drop, attn_drop, alpha, False))
         # hidden layers
         for l in range(1, num_layers):
             # due to multi-head, the in_dim = num_hidden * num_heads
@@ -114,11 +122,13 @@ class GAT(nn.Module):
         self.gat_layers.append(GraphAttention(
             g, num_hidden * heads[-2], num_classes, heads[-1],
             feat_drop, attn_drop, alpha, residual))
+        for i, layer in enumerate(self.gat_layers):
+            self.register_child(layer, "gat_layer_{}".format(i))
 
     def forward(self, inputs):
         h = inputs
         for l in range(self.num_layers):
-            h = self.gat_layers[l](h).flatten(1)
+            h = self.gat_layers[l](h).flatten()
             h = self.activation(h)
         # output projection
         logits = self.gat_layers[-1](h).mean(1)
