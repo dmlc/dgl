@@ -23,7 +23,7 @@ def array_equal(a, b):
     """Check whether the two tensors are *exactly* equal."""
     pass
 
-def allclose(a, b):
+def allclose(a, b, rtol=1e-4, atol=1e-4):
     """Check whether the two tensors are numerically close to each other."""
     pass
 
