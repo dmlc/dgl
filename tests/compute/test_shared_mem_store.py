@@ -96,6 +96,10 @@ def server_func(num_workers, graph_name):
     g.run()
 
 def test_init():
+    # The test can't run on GPU.
+    if os.environ['DGLTESTDEV'] == 'gpu':
+        return
+
     manager = Manager()
     return_dict = manager.dict()
     serv_p = Process(target=server_func, args=(2, 'test_graph1'))
@@ -161,6 +165,10 @@ def check_compute_func(worker_id, graph_name, return_dict):
         traceback.print_exc()
 
 def test_compute():
+    # The test can't run on GPU.
+    if os.environ['DGLTESTDEV'] == 'gpu':
+        return
+
     manager = Manager()
     return_dict = manager.dict()
     serv_p = Process(target=server_func, args=(2, 'test_graph3'))
@@ -206,6 +214,10 @@ def check_sync_barrier(worker_id, graph_name, return_dict):
 
 
 def test_sync_barrier():
+    # The test can't run on GPU.
+    if os.environ['DGLTESTDEV'] == 'gpu':
+        return
+
     manager = Manager()
     return_dict = manager.dict()
     serv_p = Process(target=server_func, args=(2, 'test_graph4'))
