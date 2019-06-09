@@ -265,10 +265,10 @@ class NodeFlow(DGLBaseGraph):
         eid = utils.toindex(eid)
         return self._edge_mapping.tousertensor()[eid.tousertensor()]
 
-    def map_from_parent_nid(self, layer_id, parent_nids, remap=False):
+    def map_from_parent_nid(self, layer_id, parent_nids, remap_local=False):
         """Map parent node Ids to NodeFlow node Ids in a certain layer.
 
-        If remap is True, it returns the node Ids local to the layer.
+        If `remap_local` is True, it returns the node Ids local to the layer.
         Otherwise, the node Ids are unique in the NodeFlow.
 
         Parameters
@@ -293,7 +293,7 @@ class NodeFlow(DGLBaseGraph):
         mapping = mapping[start:end]
         mapping = utils.toindex(mapping)
         nflow_ids = transform_ids(mapping, parent_nids)
-        if remap:
+        if remap_local:
             return nflow_ids.tousertensor()
         else:
             return nflow_ids.tousertensor() + int(self._layer_offsets[layer_id])
@@ -412,10 +412,10 @@ class NodeFlow(DGLBaseGraph):
         assert F.asnumpy(F.sum(ret == -1, 0)) == 0, "The eid in the parent graph is invalid."
         return ret
 
-    def block_edges(self, block_id, remap=False):
+    def block_edges(self, block_id, remap_local=False):
         """Return the edges in a block.
 
-        If remap is True, returned indices u, v, eid will be remapped to local
+        If remap_local is True, returned indices u, v, eid will be remapped to local
         Ids (i.e. starting from 0) in the block or in the layer. Otherwise,
         u, v, eid are unique in the NodeFlow.
 
@@ -423,7 +423,7 @@ class NodeFlow(DGLBaseGraph):
         ----------
         block_id : int
             The specified block to return the edges.
-        remap : boolean
+        remap_local : boolean
             Remap indices if True
 
         Returns
@@ -441,7 +441,7 @@ class NodeFlow(DGLBaseGraph):
                                         int(layer0_size),
                                         int(self._layer_offsets[block_id + 1]),
                                         int(self._layer_offsets[block_id + 2]),
-                                        remap)
+                                        remap_local)
         idx = utils.toindex(rst(0)).tousertensor()
         eid = utils.toindex(rst(1))
         num_edges = int(len(idx) / 2)
@@ -534,7 +534,7 @@ class NodeFlow(DGLBaseGraph):
             if shuffle is not required.
         """
         block_id = self._get_block_id(block_id)
-        src, dst, eid = self.block_edges(block_id, remap=True)
+        src, dst, eid = self.block_edges(block_id, remap_local=True)
         src = F.copy_to(src, ctx)  # the index of the ctx will be cached
         dst = F.copy_to(dst, ctx)  # the index of the ctx will be cached
         eid = F.copy_to(eid, ctx)  # the index of the ctx will be cached
@@ -749,7 +749,7 @@ class NodeFlow(DGLBaseGraph):
         assert func is not None
 
         if is_all(edges):
-            u, v, _ = self.block_edges(block_id, remap=True)
+            u, v, _ = self.block_edges(block_id, remap_local=True)
             u = utils.toindex(u)
             v = utils.toindex(v)
             eid = utils.toindex(slice(0, self.block_size(block_id)))

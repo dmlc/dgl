@@ -106,13 +106,13 @@ def test_basic():
     check_basic(g, nf)
 
     parent_nids = F.copy_to(F.arange(0, g.number_of_nodes()), F.cpu())
-    nids = nf.map_from_parent_nid(0, parent_nids, remap=True)
+    nids = nf.map_from_parent_nid(0, parent_nids, remap_local=True)
     assert_array_equal(F.asnumpy(nids), F.asnumpy(parent_nids))
 
     # should also work for negative layer ids
     for l in range(-1, -num_layers, -1):
-        nids1 = nf.map_from_parent_nid(l, parent_nids, remap=True)
-        nids2 = nf.map_from_parent_nid(l + num_layers, parent_nids, remap=True)
+        nids1 = nf.map_from_parent_nid(l, parent_nids, remap_local=True)
+        nids2 = nf.map_from_parent_nid(l + num_layers, parent_nids, remap_local=True)
         assert_array_equal(F.asnumpy(nids1), F.asnumpy(nids2))
 
     g = generate_rand_graph(100)
@@ -447,9 +447,10 @@ def test_block_edges():
         assert_array_equal(F.asnumpy(dst), F.asnumpy(dst1))
         assert_array_equal(F.asnumpy(eid), F.asnumpy(eid1))
 
-        src, dst, eid = nf.block_edges(i, remap=True)
+        src, dst, eid = nf.block_edges(i, remap_local=True)
         # should also work for negative block ids
-        src_by_neg, dst_by_neg, eid_by_neg = nf.block_edges(-nf.num_blocks + i, remap=True)
+        src_by_neg, dst_by_neg, eid_by_neg = nf.block_edges(-nf.num_blocks + i,
+                                                            remap_local=True)
         assert_array_equal(F.asnumpy(src), F.asnumpy(src_by_neg))
         assert_array_equal(F.asnumpy(dst), F.asnumpy(dst_by_neg))
         assert_array_equal(F.asnumpy(eid), F.asnumpy(eid_by_neg))
@@ -466,7 +467,7 @@ def test_block_adj_matrix():
     nf = create_mini_batch(g, num_layers)
     assert nf.num_layers == num_layers + 1
     for i in range(nf.num_blocks):
-        u, v, _ = nf.block_edges(i, remap=True)
+        u, v, _ = nf.block_edges(i, remap_local=True)
         adj, _ = nf.block_adjacency_matrix(i, F.cpu())
         adj = F.sparse_to_numpy(adj)
 
@@ -503,7 +504,7 @@ def test_block_incidence_matrix():
             adj_by_neg = F.sparse_to_numpy(adj_by_neg)
             adjs_by_neg.append(adj_by_neg)
 
-        u, v, e = nf.block_edges(i, remap=True)
+        u, v, e = nf.block_edges(i, remap_local=True)
         u = utils.toindex(u)
         v = utils.toindex(v)
         e = utils.toindex(e)
