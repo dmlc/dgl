@@ -190,9 +190,15 @@ def test_all_binary_builtins():
         def _print_error(a, b):
             print("Test {}_{}_{}_{} {}".
                   format(lhs, binary_op, rhs, reducer, broadcast))
-            for i, (x, y) in enumerate(zip(F.asnumpy(a), F.asnumpy(b))):
+            for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
                 if not np.allclose(a, b, rtol, atol):
                     print('@{} {} v.s. {}'.format(i, x, y))
+
+        #if binary_op == 'sub' and reducer == 'prod':
+            #print("Test {}_{}_{}_{} {}".
+                  #format(lhs, binary_op, rhs, reducer, broadcast))
+            #print(F.asnumpy(lhs_grad_1).flatten()[0], F.asnumpy(lhs_grad_2).flatten()[0])
+            #exit(1)
 
         if not F.allclose(r1, r2, rtol, atol):
             _print_error(r1, r2)
