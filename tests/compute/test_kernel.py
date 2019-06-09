@@ -191,7 +191,7 @@ def test_all_binary_builtins():
             print("Test {}_{}_{}_{} {}".
                   format(lhs, binary_op, rhs, reducer, broadcast))
             for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
-                if not np.allclose(a, b, rtol, atol):
+                if not np.allclose(x, y, rtol, atol):
                     print('@{} {} v.s. {}'.format(i, x, y))
 
         #if binary_op == 'sub' and reducer == 'prod':
