@@ -37,6 +37,7 @@ def build_dgl_linux(dev) {
     credentialsId: 'remotebuild',
     extraVars: [src_dir: "${env.GIT_COMMIT}_${dev}", dev: "${dev}"])
   // sh "bash tests/scripts/build_dgl.sh ${dev}"
+  sh "bash tests/scripts/install_dgl.sh"
   pack_lib("dgl-${dev}-linux", dgl_linux_libs)
 }
 

@@ -21,14 +21,14 @@ rm -rf _download
 
 pushd build
 cmake $CMAKE_VARS ..
-make -j4
+make -j8
 popd
 
-pushd python
-rm -rf build *.egg-info dist
-pip3 uninstall -y dgl
-# test install
-python3 setup.py install
-# test inplace build (for cython)
-python3 setup.py build_ext --inplace
-popd
+#pushd python
+#rm -rf build *.egg-info dist
+#pip3 uninstall -y dgl
+## test install
+#python3 setup.py install
+## test inplace build (for cython)
+#python3 setup.py build_ext --inplace
+#popd
