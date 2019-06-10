@@ -52,7 +52,7 @@ def main(args):
               n_test_samples))
 
     # create GCN model
-    g = DGLGraph(data.graph, readonly=True)
+    g = data.graph
     g.ndata['features'] = features
     g.ndata['labels'] = labels
 

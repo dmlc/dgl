@@ -1,9 +1,11 @@
 import dgl
 import dgl.function as fn
 import networkx as nx
+import numpy as np
 import backend as F
 from itertools import product
 
+np.random.seed(42)
 
 def udf_copy_src(edges):
     return {'m': edges.src['u']}
@@ -36,21 +38,21 @@ def generate_feature(g, broadcast='none'):
     nv = g.number_of_nodes()
     ne = g.number_of_edges()
     if broadcast == 'e':
-        u = F.randn((nv, D1, D2, D3))
-        e = F.randn((ne, D2, 1))
-        v = F.randn((nv, D1, D2, D3))
+        u = F.tensor(np.random.randn(nv, D1, D2, D3) + 1)
+        e = F.tensor(np.random.randn(ne, D2, 1) - 1)
+        v = F.tensor(np.random.randn(nv, D1, D2, D3))
     elif broadcast == 'u':
-        u = F.randn((nv, D2, 1))
-        e = F.randn((ne, D1, D2, D3))
-        v = F.randn((nv, D1, D2, D3))
+        u = F.tensor(np.random.randn(nv, D2, 1) + 1)
+        e = F.tensor(np.random.randn(ne, D1, D2, D3) - 1)
+        v = F.tensor(np.random.randn(nv, D1, D2, D3))
     elif broadcast == 'v':
-        u = F.randn((nv, D1, D2, D3))
-        e = F.randn((ne, D1, D2, D3))
-        v = F.randn((nv, D2, 1))
+        u = F.tensor(np.random.randn(nv, D1, D2, D3) + 1)
+        e = F.tensor(np.random.randn(ne, D1, D2, D3) - 1)
+        v = F.tensor(np.random.randn(nv, D2, 1))
     else:
-        u = F.randn((nv, D1, D2, D3))
-        e = F.randn((ne, D1, D2, D3))
-        v = F.randn((nv, D1, D2, D3))
+        u = F.tensor(np.random.randn(nv, D1, D2, D3) + 1)
+        e = F.tensor(np.random.randn(ne, D1, D2, D3) - 1)
+        v = F.tensor(np.random.randn(nv, D1, D2, D3))
     return u, v, e
 
 
@@ -175,27 +177,38 @@ def test_all_binary_builtins():
         with F.record_grad():
             g.update_all(mfunc, rfunc)
             r2 = g.ndata['r2']
-            F.backward(r2.sum())
+            F.backward(r2.sum(), F.tensor([1.]))
             lhs_grad_2 = F.grad(target_feature_switch(g, lhs))
             rhs_grad_2 = F.grad(target_feature_switch(g, rhs))
 
-        def _print_error(a, b):
-            print("Test {}_{}_{}_{} {}".
-                  format(lhs, binary_op, rhs, reducer, broadcast))
-            print(a)
-            print(b)
+        if reducer == 'prod':
+            rtol = 1e-2
+            atol = 1e-2
+        else:
+            rtol = 1e-4
+            atol = 1e-4
 
-        if not F.allclose(r1, r2):
+        def _print_error(a, b):
+            print("ERROR: Test {}_{}_{}_{} {}".
+                  format(lhs, binary_op, rhs, reducer, broadcast))
+            print(a, b)
+            for i, (x, y) in enumerate(zip(F.asnumpy(a).flatten(), F.asnumpy(b).flatten())):
+                if not np.allclose(x, y, rtol, atol):
+                    print('@{} {} v.s. {}'.format(i, x, y))
+
+        if not F.allclose(r1, r2, rtol, atol):
             _print_error(r1, r2)
-        assert F.allclose(r1, r2)
-        if not F.allclose(rhs_grad_1, rhs_grad_2):
+        assert F.allclose(r1, r2, rtol, atol)
+
+        if not F.allclose(lhs_grad_1, lhs_grad_2, rtol, atol):
             print("left grad")
             _print_error(lhs_grad_1, lhs_grad_2)
-        assert(F.allclose(lhs_grad_1, lhs_grad_2))
-        if not F.allclose(rhs_grad_1, rhs_grad_2):
+        assert(F.allclose(lhs_grad_1, lhs_grad_2, rtol, atol))
+
+        if not F.allclose(rhs_grad_1, rhs_grad_2, rtol, atol):
             print("right grad")
             _print_error(rhs_grad_1, rhs_grad_2)
-        assert(F.allclose(rhs_grad_1, rhs_grad_2))
+        assert(F.allclose(rhs_grad_1, rhs_grad_2, rtol, atol))
 
     g = dgl.DGLGraph()
     g.add_nodes(20)
@@ -216,7 +229,6 @@ def test_all_binary_builtins():
             for reducer in ["sum", "max", "min", "prod"]:
                 for broadcast in ["none", lhs, rhs]:
                     _test(g, lhs, rhs, binary_op, reducer)
-
 
 if __name__ == '__main__':
     test_copy_src_reduce()

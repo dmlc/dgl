@@ -56,5 +56,25 @@ def test_graph_conv():
     h1 = conv(h0, g)
     assert "_gconv_feat" in g.ndata
 
+def uniform_attention(g, shape):
+    a = mx.nd.ones(shape)
+    target_shape = (g.number_of_edges(),) + (1,) * (len(shape) - 1)
+    return a / g.in_degrees(g.edges()[1]).reshape(target_shape).astype('float32')
+
+def test_edge_softmax():
+    # Basic
+    g = dgl.DGLGraph(nx.path_graph(3))
+    edata = mx.nd.ones((g.number_of_edges(), 1))
+    a = nn.edge_softmax(g, edata)
+    assert np.allclose(a.asnumpy(), uniform_attention(g, a.shape).asnumpy(),
+            1e-4, 1e-4)
+
+    # Test higher dimension case
+    edata = mx.nd.ones((g.number_of_edges(), 3, 1))
+    a = nn.edge_softmax(g, edata)
+    assert np.allclose(a.asnumpy(), uniform_attention(g, a.shape).asnumpy(),
+            1e-4, 1e-4)
+
 if __name__ == '__main__':
     test_graph_conv()
+    test_edge_softmax()

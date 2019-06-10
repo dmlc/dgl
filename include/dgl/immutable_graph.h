@@ -159,7 +159,7 @@ class CSR : public GraphInterface {
 
   Subgraph VertexSubgraph(IdArray vids) const override;
 
-  Subgraph EdgeSubgraph(IdArray eids) const override {
+  Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const override {
     LOG(FATAL) << "CSR graph does not support efficient EdgeSubgraph."
       << " Please use COO graph instead.";
     return {};
@@ -409,7 +409,7 @@ class COO : public GraphInterface {
     return {};
   }
 
-  Subgraph EdgeSubgraph(IdArray eids) const override;
+  Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const override;
 
   GraphPtr Reverse() const override {
     return Transpose();
@@ -810,7 +810,7 @@ class ImmutableGraph: public GraphInterface {
    * \param eids The edges in the subgraph.
    * \return the induced edge subgraph
    */
-  Subgraph EdgeSubgraph(IdArray eids) const override;
+  Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const override;
 
   /*!
    * \brief Return a new graph with all the edges reversed.
