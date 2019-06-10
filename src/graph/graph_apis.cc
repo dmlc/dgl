@@ -158,33 +158,32 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
     const std::string shared_mem_name = args[2];
     const int multigraph = args[3];
     const std::string edge_dir = args[4];
-    CSRPtr csr;
 
     IdArray edge_ids = IdArray::Empty({indices->shape[0]},
                                       DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
     int64_t *edge_data = static_cast<int64_t *>(edge_ids->data);
     for (size_t i = 0; i < edge_ids->shape[0]; i++)
       edge_data[i] = i;
+    ImmutableGraph *g = nullptr;
     if (shared_mem_name.empty()) {
       if (multigraph == kBoolUnknown) {
-        csr.reset(new CSR(indptr, indices, edge_ids));
+        g = new ImmutableGraph(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids,
+                                                             edge_dir));
       } else {
-        csr.reset(new CSR(indptr, indices, edge_ids, multigraph));
+        g = new ImmutableGraph(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids,
+                                                             multigraph, edge_dir));
       }
     } else {
       if (multigraph == kBoolUnknown) {
-        csr.reset(new CSR(indptr, indices, edge_ids, shared_mem_name));
+        g = new ImmutableGraph(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids,
+                                                             edge_dir, shared_mem_name));
       } else {
-        csr.reset(new CSR(indptr, indices, edge_ids, multigraph, shared_mem_name));
+        g = new ImmutableGraph(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids,
+                                                             multigraph, edge_dir,
+                                                             shared_mem_name));
       }
     }
-
-    GraphHandle ghandle;
-    if (edge_dir == "in")
-      ghandle = new ImmutableGraph(csr, nullptr);
-    else
-      ghandle = new ImmutableGraph(nullptr, csr);
-    *rv = ghandle;
+    *rv = g;
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreateMMap")
@@ -195,12 +194,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreateMMap")
     const bool multigraph = args[3];
     const std::string edge_dir = args[4];
     // TODO(minjie): how to know multigraph
-    CSRPtr csr(new CSR(shared_mem_name, num_vertices, num_edges, multigraph));
-    GraphHandle ghandle;
-    if (edge_dir == "in")
-      ghandle = new ImmutableGraph(csr, nullptr);
-    else
-      ghandle = new ImmutableGraph(nullptr, csr);
+    GraphHandle ghandle = new ImmutableGraph(ImmutableGraph::CreateFromCSR(
+      shared_mem_name, num_vertices, num_edges, multigraph, edge_dir));
     *rv = ghandle;
   });
 

@@ -96,14 +96,14 @@ std::tuple<IdArray, IdArray, IdArray> MapFromSharedMemory(
 //////////////////////////////////////////////////////////
 
 CSR::CSR(int64_t num_vertices, int64_t num_edges, bool is_multigraph)
-  : is_multigraph_(is_multigraph), is_shared_mem_(false) {
+  : is_multigraph_(is_multigraph) {
   indptr_ = NewIdArray(num_vertices + 1);
   indices_ = NewIdArray(num_edges);
   edge_ids_ = NewIdArray(num_edges);
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids)
-  : indptr_(indptr), indices_(indices), edge_ids_(edge_ids), is_shared_mem_(false) {
+  : indptr_(indptr), indices_(indices), edge_ids_(edge_ids) {
   CHECK(IsValidIdArray(indptr));
   CHECK(IsValidIdArray(indices));
   CHECK(IsValidIdArray(edge_ids));
@@ -112,7 +112,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids)
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
   : indptr_(indptr), indices_(indices), edge_ids_(edge_ids),
-    is_multigraph_(is_multigraph), is_shared_mem_(false) {
+    is_multigraph_(is_multigraph) {
   CHECK(IsValidIdArray(indptr));
   CHECK(IsValidIdArray(indices));
   CHECK(IsValidIdArray(edge_ids));
@@ -120,7 +120,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
-         const std::string &shared_mem_name): is_shared_mem_(true) {
+         const std::string &shared_mem_name): shared_mem_name_(shared_mem_name) {
   CHECK(IsValidIdArray(indptr));
   CHECK(IsValidIdArray(indices));
   CHECK(IsValidIdArray(edge_ids));
@@ -136,7 +136,8 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
-         const std::string &shared_mem_name): is_multigraph_(is_multigraph), is_shared_mem_(true) {
+         const std::string &shared_mem_name): is_multigraph_(is_multigraph),
+         shared_mem_name_(shared_mem_name) {
   CHECK(IsValidIdArray(indptr));
   CHECK(IsValidIdArray(indices));
   CHECK(IsValidIdArray(edge_ids));
@@ -153,7 +154,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
 
 CSR::CSR(const std::string &shared_mem_name,
          int64_t num_verts, int64_t num_edges, bool is_multigraph)
-  : is_multigraph_(is_multigraph), is_shared_mem_(true) {
+  : is_multigraph_(is_multigraph), shared_mem_name_(shared_mem_name) {
   std::tie(indptr_, indices_, edge_ids_) = MapFromSharedMemory(
       shared_mem_name, num_verts, num_edges, false);
 }
@@ -471,10 +472,12 @@ CSR CSR::CopyTo(const DLContext& ctx) const {
 }
 
 CSR CSR::CopyToSharedMem(const std::string &name) const {
-  if (this->is_shared_mem_)
+  if (IsSharedMem()) {
+    CHECK(name == shared_mem_name_);
     return *this;
-  else
+  } else {
     return CSR(indptr_, indices_, edge_ids_, name);
+  }
 }
 
 CSR CSR::AsNumBits(uint8_t bits) const {
@@ -773,17 +776,18 @@ ImmutableGraph ImmutableGraph::CopyTo(const DLContext& ctx) const {
   //   be fixed later.
   CSRPtr new_incsr = CSRPtr(new CSR(GetInCSR()->CopyTo(ctx)));
   CSRPtr new_outcsr = CSRPtr(new CSR(GetOutCSR()->CopyTo(ctx)));
-  return ImmutableGraph(new_incsr, new_outcsr, nullptr);
+  return ImmutableGraph(new_incsr, new_outcsr);
 }
 
 ImmutableGraph ImmutableGraph::CopyToSharedMem(const std::string &edge_dir,
                                                const std::string &name) const {
   CSRPtr new_incsr, new_outcsr;
+  std::string shared_mem_name = GetSharedMemName(name, edge_dir);
   if (edge_dir == "in")
-    new_incsr = CSRPtr(new CSR(GetInCSR()->CopyToSharedMem(name)));
+    new_incsr = CSRPtr(new CSR(GetInCSR()->CopyToSharedMem(shared_mem_name)));
   else if (edge_dir == "out")
-    new_outcsr = CSRPtr(new CSR(GetOutCSR()->CopyToSharedMem(name)));
-  return ImmutableGraph(new_incsr, new_outcsr, nullptr);
+    new_outcsr = CSRPtr(new CSR(GetOutCSR()->CopyToSharedMem(shared_mem_name)));
+  return ImmutableGraph(new_incsr, new_outcsr, name);
 }
 
 ImmutableGraph ImmutableGraph::AsNumBits(uint8_t bits) const {
@@ -796,7 +800,7 @@ ImmutableGraph ImmutableGraph::AsNumBits(uint8_t bits) const {
     //   be fixed later.
     CSRPtr new_incsr = CSRPtr(new CSR(GetInCSR()->AsNumBits(bits)));
     CSRPtr new_outcsr = CSRPtr(new CSR(GetOutCSR()->AsNumBits(bits)));
-    return ImmutableGraph(new_incsr, new_outcsr, nullptr);
+    return ImmutableGraph(new_incsr, new_outcsr);
   }
 }
 

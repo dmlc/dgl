@@ -209,7 +209,7 @@ class CSR : public GraphInterface {
   }
 
   bool IsSharedMem() const {
-    return is_shared_mem_;
+    return !shared_mem_name_.empty();
   }
 
   /*! \brief Return the reverse of this CSR graph (i.e, a CSC graph) */
@@ -258,7 +258,7 @@ class CSR : public GraphInterface {
 
  private:
   /*! \brief prive default constructor */
-  CSR(): is_shared_mem_(false) {}
+  CSR() {}
 
   // The CSR arrays.
   //  - The index is 0-based.
@@ -274,8 +274,9 @@ class CSR : public GraphInterface {
   // whether the graph is a multi-graph
   LazyObject<bool> is_multigraph_;
 
-  // whether the graph is stored in shared memory.
-  bool is_shared_mem_;
+  // The name of the shared memory to store data.
+  // If it's empty, data isn't stored in shared memory.
+  std::string shared_mem_name_;
 };
 
 class COO : public GraphInterface {
@@ -537,6 +538,7 @@ class ImmutableGraph: public GraphInterface {
  public:
   /*! \brief Construct an immutable graph from the COO format. */
   explicit ImmutableGraph(COOPtr coo): coo_(coo) { }
+
   /*!
    * \brief Construct an immutable graph from the CSR format.
    *
@@ -987,6 +989,76 @@ class ImmutableGraph: public GraphInterface {
    */
   ImmutableGraph AsNumBits(uint8_t bits) const;
 
+  static ImmutableGraph CreateFromCSR(IdArray indptr, IdArray indices, IdArray edge_ids,
+                                      const std::string &edge_dir) {
+    CSRPtr csr(new CSR(indptr, indices, edge_ids));
+    if (edge_dir == "in") {
+      return ImmutableGraph(csr, nullptr);
+    } else if (edge_dir == "out") {
+      return ImmutableGraph(nullptr, csr);
+    } else {
+      LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+      return ImmutableGraph();
+    }
+  }
+
+  static ImmutableGraph CreateFromCSR(IdArray indptr, IdArray indices, IdArray edge_ids,
+                                      bool multigraph, const std::string &edge_dir) {
+    CSRPtr csr(new CSR(indptr, indices, edge_ids, multigraph));
+    if (edge_dir == "in") {
+      return ImmutableGraph(csr, nullptr);
+    } else if (edge_dir == "out") {
+      return ImmutableGraph(nullptr, csr);
+    } else {
+      LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+      return ImmutableGraph();
+    }
+  }
+
+  static ImmutableGraph CreateFromCSR(IdArray indptr, IdArray indices, IdArray edge_ids,
+                                      const std::string &edge_dir,
+                                      const std::string &shared_mem_name) {
+    CSRPtr csr(new CSR(indptr, indices, edge_ids, GetSharedMemName(shared_mem_name, edge_dir)));
+    if (edge_dir == "in") {
+      return ImmutableGraph(csr, nullptr, shared_mem_name);
+    } else if (edge_dir == "out") {
+      return ImmutableGraph(nullptr, csr, shared_mem_name);
+    } else {
+      LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+      return ImmutableGraph();
+    }
+  }
+
+  static ImmutableGraph CreateFromCSR(IdArray indptr, IdArray indices, IdArray edge_ids,
+                                      bool multigraph, const std::string &edge_dir,
+                                      const std::string &shared_mem_name) {
+    CSRPtr csr(new CSR(indptr, indices, edge_ids, multigraph,
+                       GetSharedMemName(shared_mem_name, edge_dir)));
+    if (edge_dir == "in") {
+      return ImmutableGraph(csr, nullptr, shared_mem_name);
+    } else if (edge_dir == "out") {
+      return ImmutableGraph(nullptr, csr, shared_mem_name);
+    } else {
+      LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+      return ImmutableGraph();
+    }
+  }
+
+  static ImmutableGraph CreateFromCSR(const std::string &shared_mem_name, size_t num_vertices,
+                                      size_t num_edges, bool multigraph,
+                                      const std::string &edge_dir) {
+    CSRPtr csr(new CSR(GetSharedMemName(shared_mem_name, edge_dir), num_vertices, num_edges,
+                       multigraph));
+    if (edge_dir == "in") {
+      return ImmutableGraph(csr, nullptr, shared_mem_name);
+    } else if (edge_dir == "out") {
+      return ImmutableGraph(nullptr, csr, shared_mem_name);
+    } else {
+      LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+      return ImmutableGraph();
+    }
+  }
+
  protected:
   /* !\brief internal default constructor */
   ImmutableGraph() {}
@@ -995,6 +1067,16 @@ class ImmutableGraph: public GraphInterface {
   ImmutableGraph(CSRPtr in_csr, CSRPtr out_csr, COOPtr coo)
     : in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
     CHECK(AnyGraph()) << "At least one graph structure should exist.";
+  }
+
+  ImmutableGraph(CSRPtr in_csr, CSRPtr out_csr, const std::string shared_mem_name)
+    : in_csr_(in_csr), out_csr_(out_csr) {
+    CHECK(in_csr_ || out_csr_) << "Both CSR are missing.";
+    this->shared_mem_name_ = shared_mem_name;
+  }
+
+  static std::string GetSharedMemName(const std::string &name, const std::string &edge_dir) {
+    return name + "_" + edge_dir;
   }
 
   /* !\brief return pointer to any available graph structure */
@@ -1014,6 +1096,10 @@ class ImmutableGraph: public GraphInterface {
   CSRPtr out_csr_;
   // Store the edge list indexed by edge id (COO)
   COOPtr coo_;
+
+  // The name of shared memory for this graph.
+  // If it's empty, the graph isn't stored in shared memory.
+  std::string shared_mem_name_;
 };
 
 // inline implementations
