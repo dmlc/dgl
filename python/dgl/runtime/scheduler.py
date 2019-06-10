@@ -536,7 +536,7 @@ def schedule_nodeflow_update_all(graph,
     var_eid = var.IDX(eid)
     # generate send + reduce
     def uv_getter():
-        src, dst, _ = graph.block_edges(block_id, remap=True)
+        src, dst, _ = graph.block_edges(block_id, remap_local=True)
         return var.IDX(utils.toindex(src)), var.IDX(utils.toindex(dst))
     adj_creator = lambda: spmv.build_gidx_and_mapping_block(graph, block_id)
     out_map_creator = lambda nbits: None
