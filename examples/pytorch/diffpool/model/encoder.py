@@ -266,8 +266,9 @@ class DiffPoolEncoder(GraphEncoder):
     def forward(self, g):
         self.link_pred_loss = []
         self.entropy_loss = []
-        h_a = g.ndata['a_feat'] # this is not used.
         h = g.ndata['feat']
+        # node feature for assignment matrix computation is the same as the
+        # original node feature
         h_a = h
 
         out_all = []
@@ -288,6 +289,8 @@ class DiffPoolEncoder(GraphEncoder):
             self.assign_tensor = self.gcn_forward(g, h_a,
                                                   self.gc_layers_assign[i],
                                                   False)
+            # so that each node will not be assigned to clusters of other
+            # graphs
             assign_tensor_masks = []
             for g_n_nodes in g.batch_num_nodes:
                 mask =torch.ones((g_n_nodes,
@@ -307,12 +310,15 @@ class DiffPoolEncoder(GraphEncoder):
                 sparse_assign[row_idx, list(idx)] = 1
                 self.assign_tensor = sparse_assign
 
+            # X_n = S^T X_{n-1}
             h = torch.matmul(torch.t(self.assign_tensor),g_embedding)
 
-            # current device
+            # we need to take out the adjacency matrix to compute S^TAS
+            # current device defaulted to cuda
             device = torch.device('cuda:0')
             adj = g.adjacency_matrix(ctx=device)
             node_seg_list = g.batch_num_nodes
+            # S^TAS
             adj_new = torch.sparse.mm(adj, self.assign_tensor)
             adj_new = torch.mm(torch.t(self.assign_tensor), adj_new)
 
@@ -321,12 +327,16 @@ class DiffPoolEncoder(GraphEncoder):
             pooled_g_n_nodes = self.assign_tensor.size()[1]
 
             pooled_g = dgl.DGLGraph()
+            # create the new pooled graph (batch version)
             pooled_g.add_nodes(pooled_g_n_nodes)
             adj_indices = adj_new.to_sparse()._indices()
+            # add edges
             pooled_g.add_edges(adj_indices[1], adj_indices[0])
 
             # edge weight is not set on pooled graph yet.\TODO
 
+            # at this point we have block diagonally dense graph (a batch
+            # graph)
             embedding_tensor = self.gcn_forward(pooled_g, h, self.gc_layers_after_pool[i])
 
             pooled_g.ndata['h'] = embedding_tensor
@@ -345,6 +355,7 @@ class DiffPoolEncoder(GraphEncoder):
                     out_temp.append(sum_slice)
                 out_all.append(out)
 
+            # L_{lp} = A - S^TS
             current_lp_loss = torch.norm(adj.to_dense() - torch.mm(self.assign_tensor,
                                                                    torch.t(self.assign_tensor))) / np.power(g.number_of_nodes(),2)
             self.link_pred_loss.append(current_lp_loss)

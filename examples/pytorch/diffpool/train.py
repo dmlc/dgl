@@ -151,7 +151,7 @@ def graph_classify_task(prog_args):
     # 'base' : graphsage
     # 'diffpool' : diffpool
     if prog_args.method == 'base':
-        basekwargs = {'concat':True, 'bn':prog_args.bn, 'bias':True,
+        basekwargs = {'concat':False, 'bn':prog_args.bn, 'bias':True,
                       'aggregator_type':'maxpool'}
         model = GraphEncoder(input_dim, hidden_dim, embedding_dim,
                              pred_hidden_dims, label_dim, activation,
