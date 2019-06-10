@@ -30,7 +30,7 @@ def unpack_lib(name, libs) {
 def build_dgl_linux(dev) {
   init_git()
   sh "export ANSIBLE_HOST_KEY_CHECKING=False"
-  sh "sudo apt-get install -y ssh"
+  sh "sudo apt-get install -y ssh rsync"
   sh "pip install ansible" // Should move to docker
   ansiblePlaybook(
     playbook: './build.yml',
