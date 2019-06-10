@@ -90,7 +90,7 @@ class KVServer(object):
                 raise RuntimeError('Unknown message type: %d' % msg.type)
 
     def _push_handler(self, name, ID, data):
-        """Msg handler for push operation
+        """User-defined msg handler for push operation
 
         Parameters
         ----------
@@ -101,12 +101,10 @@ class KVServer(object):
         data : tensor (mx.ndarray or torch.tensor)
             a data matrix with the same row size of id
         """
-        print(name)
-        print(ID)
-        print(data)
+        pass
 
     def _pull_handler(self, name, ID):
-        """Msg handler for pull operation
+        """User-defined msg handler for pull operation
 
         Parameters
         ----------

@@ -9,7 +9,6 @@ from .utils import unwrap_to_ptr_list
 from . import utils
 from . import ndarray
 
-
 import time
 import signal
 from collections import namedtuple
