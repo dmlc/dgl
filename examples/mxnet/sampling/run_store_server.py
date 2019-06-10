@@ -14,7 +14,7 @@ class GraphData:
         edge_ids = np.arange(0, num_edges, step=1, dtype=np.int64)
         self.graph = dgl.graph_index.from_csr_matrix(
                 dgl.utils.toindex(csr.indptr), dgl.utils.toindex(csr.indices), False,
-                "in", dgl.contrib.graph_store._get_graph_path(graph_name))
+                'in', dgl.contrib.graph_store._get_graph_path(graph_name))
         self.features = mx.nd.random.normal(shape=(csr.shape[0], num_feats))
         self.num_labels = 10
         self.labels = mx.nd.floor(mx.nd.random.uniform(low=0, high=self.num_labels,
@@ -69,7 +69,7 @@ def main(args):
     # create GCN model
     print('graph name: ' + graph_name)
     g = dgl.contrib.graph_store.create_graph_store_server(data.graph, graph_name, "shared_mem",
-                                                          args.num_workers, False)
+                                                          args.num_workers, False, edge_dir='in')
     g.ndata['features'] = features
     g.ndata['labels'] = labels
     g.ndata['train_mask'] = train_mask
