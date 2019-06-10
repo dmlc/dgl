@@ -756,10 +756,19 @@ class DGLGraph(DGLBaseGraph):
     Node and edge features are stored as a dictionary from the feature name
     to the feature data (in tensor).
 
+    DGL graph accepts graph data of multiple formats:
+
+    * NetworkX graph,
+    * scipy matrix,
+    * DGLGraph.
+
+    If the input graph data is DGLGraph, the constructed DGLGraph only contains
+    its graph index.
+
     Parameters
     ----------
     graph_data : graph data, optional
-        Data to initialize graph. Same as networkx's semantics.
+        Data to initialize graph.
     node_frame : FrameRef, optional
         Node feature storage.
     edge_frame : FrameRef, optional
@@ -898,7 +907,10 @@ class DGLGraph(DGLBaseGraph):
                  multigraph=None,
                  readonly=False):
         # graph
-        gidx = graph_index.create_graph_index(graph_data, multigraph, readonly)
+        if isinstance(graph_data, DGLGraph):
+            gidx = graph_data._graph
+        else:
+            gidx = graph_index.create_graph_index(graph_data, multigraph, readonly)
         super(DGLGraph, self).__init__(gidx)
 
         # node and edge frame
