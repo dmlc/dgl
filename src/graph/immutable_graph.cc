@@ -68,12 +68,12 @@ struct PairHash {
 };
 
 std::tuple<IdArray, IdArray, IdArray> MapFromSharedMemory(
-  const std::string &shared_mem_name, int64_t num_verts, int64_t num_edges) {
+  const std::string &shared_mem_name, int64_t num_verts, int64_t num_edges, bool is_create) {
 #ifndef _WIN32
   const int64_t file_size = (num_verts + 1 + num_edges * 2) * sizeof(dgl_id_t);
 
   IdArray sm_array = IdArray::EmptyShared(
-      shared_mem_name, {file_size}, DLDataType{kDLInt, 8, 1}, DLContext{kDLCPU, 0}, true);
+      shared_mem_name, {file_size}, DLDataType{kDLInt, 8, 1}, DLContext{kDLCPU, 0}, is_create);
   // Create views from the shared memory array. Note that we don't need to save
   //   the sm_array because the refcount is maintained by the view arrays.
   IdArray indptr = sm_array.CreateView({num_verts + 1}, DLDataType{kDLInt, 64, 1});
@@ -96,14 +96,14 @@ std::tuple<IdArray, IdArray, IdArray> MapFromSharedMemory(
 //////////////////////////////////////////////////////////
 
 CSR::CSR(int64_t num_vertices, int64_t num_edges, bool is_multigraph)
-  : is_multigraph_(is_multigraph) {
+  : is_multigraph_(is_multigraph), is_shared_mem_(false) {
   indptr_ = NewIdArray(num_vertices + 1);
   indices_ = NewIdArray(num_edges);
   edge_ids_ = NewIdArray(num_edges);
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids)
-  : indptr_(indptr), indices_(indices), edge_ids_(edge_ids) {
+  : indptr_(indptr), indices_(indices), edge_ids_(edge_ids), is_shared_mem_(false) {
   CHECK(IsValidIdArray(indptr));
   CHECK(IsValidIdArray(indices));
   CHECK(IsValidIdArray(edge_ids));
@@ -111,7 +111,8 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids)
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
-  : indptr_(indptr), indices_(indices), edge_ids_(edge_ids), is_multigraph_(is_multigraph) {
+  : indptr_(indptr), indices_(indices), edge_ids_(edge_ids),
+    is_multigraph_(is_multigraph), is_shared_mem_(false) {
   CHECK(IsValidIdArray(indptr));
   CHECK(IsValidIdArray(indices));
   CHECK(IsValidIdArray(edge_ids));
@@ -119,7 +120,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
-         const std::string &shared_mem_name) {
+         const std::string &shared_mem_name): is_shared_mem_(true) {
   CHECK(IsValidIdArray(indptr));
   CHECK(IsValidIdArray(indices));
   CHECK(IsValidIdArray(edge_ids));
@@ -127,7 +128,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
   const int64_t num_verts = indptr->shape[0] - 1;
   const int64_t num_edges = indices->shape[0];
   std::tie(indptr_, indices_, edge_ids_) = MapFromSharedMemory(
-      shared_mem_name, num_verts, num_edges);
+      shared_mem_name, num_verts, num_edges, true);
   // copy the given data into the shared memory arrays
   indptr_.CopyFrom(indptr);
   indices_.CopyFrom(indices);
@@ -135,7 +136,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
-         const std::string &shared_mem_name): is_multigraph_(is_multigraph) {
+         const std::string &shared_mem_name): is_multigraph_(is_multigraph), is_shared_mem_(true) {
   CHECK(IsValidIdArray(indptr));
   CHECK(IsValidIdArray(indices));
   CHECK(IsValidIdArray(edge_ids));
@@ -143,7 +144,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
   const int64_t num_verts = indptr->shape[0] - 1;
   const int64_t num_edges = indices->shape[0];
   std::tie(indptr_, indices_, edge_ids_) = MapFromSharedMemory(
-      shared_mem_name, num_verts, num_edges);
+      shared_mem_name, num_verts, num_edges, true);
   // copy the given data into the shared memory arrays
   indptr_.CopyFrom(indptr);
   indices_.CopyFrom(indices);
@@ -152,9 +153,9 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
 
 CSR::CSR(const std::string &shared_mem_name,
          int64_t num_verts, int64_t num_edges, bool is_multigraph)
-  : is_multigraph_(is_multigraph) {
+  : is_multigraph_(is_multigraph), is_shared_mem_(true) {
   std::tie(indptr_, indices_, edge_ids_) = MapFromSharedMemory(
-      shared_mem_name, num_verts, num_edges);
+      shared_mem_name, num_verts, num_edges, false);
 }
 
 bool CSR::IsMultigraph() const {
@@ -469,6 +470,13 @@ CSR CSR::CopyTo(const DLContext& ctx) const {
   }
 }
 
+CSR CSR::CopyToSharedMem(const std::string &name) const {
+  if (this->is_shared_mem_)
+    return *this;
+  else
+    return CSR(indptr_, indices_, edge_ids_, name);
+}
+
 CSR CSR::AsNumBits(uint8_t bits) const {
   if (NumBits() == bits) {
     return *this;
@@ -664,6 +672,10 @@ COO COO::CopyTo(const DLContext& ctx) const {
   }
 }
 
+COO COO::CopyToSharedMem(const std::string &name) const {
+  LOG(FATAL) << "COO doesn't supprt shared memory yet";
+}
+
 COO COO::AsNumBits(uint8_t bits) const {
   if (NumBits() == bits) {
     return *this;
@@ -761,6 +773,16 @@ ImmutableGraph ImmutableGraph::CopyTo(const DLContext& ctx) const {
   //   be fixed later.
   CSRPtr new_incsr = CSRPtr(new CSR(GetInCSR()->CopyTo(ctx)));
   CSRPtr new_outcsr = CSRPtr(new CSR(GetOutCSR()->CopyTo(ctx)));
+  return ImmutableGraph(new_incsr, new_outcsr, nullptr);
+}
+
+ImmutableGraph ImmutableGraph::CopyToSharedMem(const std::string &edge_dir,
+                                               const std::string &name) const {
+  CSRPtr new_incsr, new_outcsr;
+  if (edge_dir == "in")
+    new_incsr = CSRPtr(new CSR(GetInCSR()->CopyToSharedMem(name)));
+  else if (edge_dir == "out")
+    new_outcsr = CSRPtr(new CSR(GetOutCSR()->CopyToSharedMem(name)));
   return ImmutableGraph(new_incsr, new_outcsr, nullptr);
 }
 

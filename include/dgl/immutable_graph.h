@@ -208,6 +208,10 @@ class CSR : public GraphInterface {
     return {indptr_, indices_, edge_ids_};
   }
 
+  bool IsSharedMem() const {
+    return is_shared_mem_;
+  }
+
   /*! \brief Return the reverse of this CSR graph (i.e, a CSC graph) */
   CSRPtr Transpose() const;
 
@@ -231,6 +235,13 @@ class CSR : public GraphInterface {
   CSR CopyTo(const DLContext& ctx) const;
 
   /*!
+   * \brief Copy data to shared memory.
+   * \param name The name of the shared memory.
+   * \return The graph in the shared memory
+   */
+  CSR CopyToSharedMem(const std::string &name) const;
+
+  /*!
    * \brief Convert the graph to use the given number of bits for storage.
    * \param bits The new number of integer bits (32 or 64).
    * \return The graph with new bit size storage.
@@ -247,7 +258,7 @@ class CSR : public GraphInterface {
 
  private:
   /*! \brief prive default constructor */
-  CSR() {}
+  CSR(): is_shared_mem_(false) {}
 
   // The CSR arrays.
   //  - The index is 0-based.
@@ -262,6 +273,9 @@ class CSR : public GraphInterface {
 
   // whether the graph is a multi-graph
   LazyObject<bool> is_multigraph_;
+
+  // whether the graph is stored in shared memory.
+  bool is_shared_mem_;
 };
 
 class COO : public GraphInterface {
@@ -479,11 +493,22 @@ class COO : public GraphInterface {
   COO CopyTo(const DLContext& ctx) const;
 
   /*!
+   * \brief Copy data to shared memory.
+   * \param name The name of the shared memory.
+   * \return The graph in the shared memory
+   */
+  COO CopyToSharedMem(const std::string &name) const;
+
+  /*!
    * \brief Convert the graph to use the given number of bits for storage.
    * \param bits The new number of integer bits (32 or 64).
    * \return The graph with new bit size storage.
    */
   COO AsNumBits(uint8_t bits) const;
+
+  bool IsSharedMem() const {
+    return false;
+  }
 
   // member getters
 
@@ -889,6 +914,9 @@ class ImmutableGraph: public GraphInterface {
     if (!in_csr_) {
       if (out_csr_) {
         const_cast<ImmutableGraph*>(this)->in_csr_ = out_csr_->Transpose();
+        if (out_csr_->IsSharedMem())
+          LOG(WARNING) << "We just construct an in-CSR from a shared-memory out CSR. "
+                       << "It may dramatically increase memory consumption.";
       } else {
         CHECK(coo_) << "None of CSR, COO exist";
         const_cast<ImmutableGraph*>(this)->in_csr_ = coo_->Transpose()->ToCSR();
@@ -902,6 +930,9 @@ class ImmutableGraph: public GraphInterface {
     if (!out_csr_) {
       if (in_csr_) {
         const_cast<ImmutableGraph*>(this)->out_csr_ = in_csr_->Transpose();
+        if (out_csr_->IsSharedMem())
+          LOG(WARNING) << "We just construct an out-CSR from a shared-memory in CSR. "
+                       << "It may dramatically increase memory consumption.";
       } else {
         CHECK(coo_) << "None of CSR, COO exist";
         const_cast<ImmutableGraph*>(this)->out_csr_ = coo_->ToCSR();
@@ -940,6 +971,14 @@ class ImmutableGraph: public GraphInterface {
    * \return The graph under another context.
    */
   ImmutableGraph CopyTo(const DLContext& ctx) const;
+
+  /*!
+   * \brief Copy data to shared memory.
+   * \param edge_dir the graph of the specific edge direction to be copied.
+   * \param name The name of the shared memory.
+   * \return The graph in the shared memory
+   */
+  ImmutableGraph CopyToSharedMem(const std::string &edge_dir, const std::string &name) const;
 
   /*!
    * \brief Convert the graph to use the given number of bits for storage.

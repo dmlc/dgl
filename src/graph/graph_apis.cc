@@ -546,6 +546,18 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyTo")
     *rv = newhandle;
   });
 
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyToSharedMem")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    std::string edge_dir = args[1];
+    std::string name = args[2];
+    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
+    const ImmutableGraph *ig = dynamic_cast<const ImmutableGraph*>(ptr);
+    CHECK(ig) << "Invalid argument: must be an immutable graph object.";
+    GraphHandle newhandle = new ImmutableGraph(ig->CopyToSharedMem(edge_dir, name));
+    *rv = newhandle;
+  });
+
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphNumBits")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];

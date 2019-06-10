@@ -318,7 +318,12 @@ class SharedMemoryStoreServer(object):
     """
     def __init__(self, graph_data, edge_dir, graph_name, multigraph, num_workers, port):
         self.server = None
-        if isinstance(graph_data, (GraphIndex, DGLGraph)):
+        if isinstance(graph_data, GraphIndex):
+            graph_data = graph_data.copyto_shared_mem(edge_dir, _get_graph_path(graph_name))
+            self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=True)
+        elif isinstance(graph_data, DGLGraph):
+            print(graph_data._graph.number_of_nodes())
+            graph_data = graph_data._graph.copyto_shared_mem(edge_dir, _get_graph_path(graph_name))
             self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=True)
         else:
             indptr, indices = _to_csr(graph_data, edge_dir, multigraph)
