@@ -2,7 +2,7 @@
 .. _sampling:
 
 Large-Scale Training of Graph Neural Networks
-=======================================
+=============================================
 
 **Author**: Da Zheng, Chao Ma, Zheng Zhang
 """
