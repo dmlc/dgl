@@ -7,9 +7,12 @@
 #define DGL_GRAPH_NETWORK_H_
 
 #include <dmlc/logging.h>
+#include <dgl/runtime/ndarray.h>
 
 namespace dgl {
 namespace network {
+
+using dgl::runtime::NDArray;
 
 #define IS_SENDER    true
 #define IS_RECEIVER  false
@@ -26,6 +29,37 @@ const int kMaxTryCount = 500;
 // Control number
 const int CONTROL_NODEFLOW = 0;
 const int CONTROL_END_SIGNAL = 1;
+
+// KVStore message type
+const int PUSH_MSG = 2;
+const int PULL_MSG = 3;
+const int PULL_BACK_MSG = 4;
+
+/*!
+ * \brief C structure for holding DGL distributed kvstore message
+ */
+struct KVStoreMsg {
+  /*!
+   * \brief Message type: PUSH_MSG, PULL_MSG, PULL_BACK_MSG
+   */
+  int msg_type;
+  /*!
+   * \brief Sender's ID
+   */
+  int rank;
+   /*!
+   * \brief data name
+   */
+  std::string name;
+  /*!
+   * \brief data ID
+   */
+  NDArray ID;
+  /*!
+   * \brief data matrix
+   */
+  NDArray data;
+};
 
 }  // namespace network
 }  // namespace dgl

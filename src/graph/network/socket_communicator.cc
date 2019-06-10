@@ -189,14 +189,19 @@ void SocketReceiver::Finalize() {
   for (int i = 0; i <= num_sender_; ++i) {
     if (i != 0) {  // write -99 signal to exit loop
       int64_t data_size = -99;
-      queue_->Add(
-        reinterpret_cast<char*>(&data_size),
-        sizeof(int64_t));
+      if (queue_ != nullptr) {
+        queue_->Add(
+          reinterpret_cast<char*>(&data_size),
+          sizeof(int64_t));
+        queue_ = nullptr;
+      }
     }
-    if (socket_[i] != nullptr) {
-      socket_[i]->Close();
-      delete socket_[i];
-      socket_[i] = nullptr;
+    if (socket_.empty() == false) {
+      if (socket_[i] != nullptr) {
+        socket_[i]->Close();
+        delete socket_[i];
+        socket_[i] = nullptr;
+      }
     }
   }
   delete buffer_;

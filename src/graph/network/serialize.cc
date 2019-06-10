@@ -15,7 +15,7 @@
 namespace dgl {
 namespace network {
 
-const int kNumTensor = 7;  // We need to serialize 7 conponents (tensor) here
+const int kNumTensor = 7;
 
 int64_t SerializeSampledSubgraph(char* data,
                                  const CSRPtr csr,
@@ -159,6 +159,111 @@ void DeserializeSampledSubgraph(char* data,
   dgl_id_t* indptr_out = static_cast<dgl_id_t*>((*csr)->indptr()->data);
   memcpy(indptr_out, data_ptr, tensor_size);
   data_ptr += tensor_size;
+}
+
+int64_t SerializeKVMsg(char* data,
+                       const int msg_type,
+                       const int rank,
+                       const std::string& name,
+                       const NDArray* ID,
+                       const NDArray* tensor) {
+  int64_t total_size = 0;
+  int64_t id_size = ID->GetSize();
+  int64_t data_size = tensor->GetSize();
+  int64_t id_shape = (*ID)->shape[0];
+  int64_t data_shape_0 = 0;
+  int64_t data_shape_1 = 0;
+  if (tensor != nullptr) {
+    data_shape_0 = (*tensor)->shape[0];
+    data_shape_1 = (*tensor)->shape[1];
+  }
+  total_size += sizeof(msg_type);
+  total_size += sizeof(rank);
+  total_size += sizeof(name.length());
+  total_size += name.length();
+  total_size += id_size;
+  total_size += sizeof(id_size);
+  total_size += sizeof(id_shape);
+  if (tensor != nullptr) {
+    total_size += data_size;
+    total_size += sizeof(data_size);
+    total_size += sizeof(data_shape_0);
+    total_size += sizeof(data_shape_1);
+  }
+  if (total_size > kMaxBufferSize) {
+    LOG(FATAL) << "Message size: (" << total_size
+               << ") is larger than buffer size: ("
+               << kMaxBufferSize << ")";
+  }
+  char* data_ptr = data;
+  // Write message type
+  *(reinterpret_cast<int*>(data_ptr)) = msg_type;
+  data_ptr += sizeof(msg_type);
+  // Write rank
+  *(reinterpret_cast<int*>(data_ptr)) = rank;
+  data_ptr += sizeof(rank);
+  // write name
+  *(reinterpret_cast<size_t*>(data_ptr)) = name.length();
+  data_ptr += sizeof(name.length());
+  memcpy(data_ptr, name.data(), name.length());
+  data_ptr += name.length();
+  // Write id
+  *(reinterpret_cast<int64_t*>(data_ptr)) = id_shape;
+  data_ptr += sizeof(id_shape);
+  *(reinterpret_cast<int64_t*>(data_ptr)) = id_size;
+  data_ptr += sizeof(id_size);
+  char* id_ptr = static_cast<char*>((*ID)->data);
+  memcpy(data_ptr, id_ptr, id_size);
+  data_ptr += id_size;
+  // Write tensor
+  *(reinterpret_cast<int64_t*>(data_ptr)) = data_shape_0;
+  data_ptr += sizeof(data_shape_0);
+  *(reinterpret_cast<int64_t*>(data_ptr)) = data_shape_1;
+  data_ptr += sizeof(data_shape_1);
+  *(reinterpret_cast<int64_t*>(data_ptr)) = data_size;
+  data_ptr += sizeof(data_size);
+  char* tensor_ptr = static_cast<char*>((*tensor)->data);
+  memcpy(data_ptr, tensor_ptr, data_size);
+  return total_size;
+}
+
+void DeserializeKVMsg(char* data, 
+                      int* msg_type, 
+                      int* rank, 
+                      std::string* name, 
+                      NDArray* ID, 
+                      NDArray* tensor) {
+  char* data_ptr = data;
+  // Read message type
+  *msg_type = *(reinterpret_cast<int*>(data_ptr));
+  data_ptr += sizeof(int);
+  // Read rank
+  *rank = *(reinterpret_cast<int*>(data_ptr));
+  data_ptr += sizeof(int);
+  // Read name
+  size_t name_size = *(reinterpret_cast<size_t*>(data_ptr));
+  data_ptr += sizeof(name_size);
+  name->assign(data_ptr, name_size);
+  data_ptr += name_size;
+  // Read id
+  int64_t id_shape = *(reinterpret_cast<int64_t*>(data_ptr));
+  data_ptr += sizeof(id_shape);
+  int64_t id_size = *(reinterpret_cast<int64_t*>(data_ptr));
+  data_ptr += sizeof(id_size);
+  *ID = NDArray::Empty({id_shape}, DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
+  char* id_ptr = static_cast<char*>((*ID)->data);
+  memcpy(id_ptr, data_ptr, id_size);
+  data_ptr += id_size;
+  // Read tensor
+  int64_t data_shape_0 = *(reinterpret_cast<int64_t*>(data_ptr));
+  data_ptr += sizeof(data_shape_0);
+  int64_t data_shape_1 = *(reinterpret_cast<int64_t*>(data_ptr));
+  data_ptr += sizeof(data_shape_1);
+  int64_t data_size = *(reinterpret_cast<int64_t*>(data_ptr));
+  data_ptr += sizeof(data_size);
+  *tensor = NDArray::Empty({data_shape_0, data_shape_1}, DLDataType{kDLFloat, 32, 1}, DLContext{kDLCPU, 0});
+  char* tensor_ptr = static_cast<char*>((*tensor)->data);
+  memcpy(tensor_ptr, data_ptr, data_size);
 }
 
 }  // namespace network

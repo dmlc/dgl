@@ -54,11 +54,31 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderCreate")
     *rv = chandle;
   });
 
+DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    network::Receiver* receiver = new network::SocketReceiver();
+    try {
+      char* buffer = new char[kMaxBufferSize];
+      receiver->SetBuffer(buffer);
+    } catch (const std::bad_alloc&) {
+      LOG(FATAL) << "Not enough memory for receiver buffer: " << kMaxBufferSize;
+    }
+    CommunicatorHandle chandle = static_cast<CommunicatorHandle>(receiver);
+    *rv = chandle;
+  });
+
 DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeSender")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
     network::Sender* sender = static_cast<network::Sender*>(chandle);
     sender->Finalize();
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeReceiver")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    CommunicatorHandle chandle = args[0];
+    network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
+    receiver->Finalize();
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderAddReceiver")
@@ -78,6 +98,16 @@ DGL_REGISTER_GLOBAL("network._CAPI_DGLSenderConnect")
     if (sender->Connect() == false) {
       LOG(FATAL) << "Sender connection failed.";
     }
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverWait")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    CommunicatorHandle chandle = args[0];
+    std::string ip = args[1];
+    int port = args[2];
+    int num_sender = args[3];
+    network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
+    receiver->Wait(ip.c_str(), port, num_sender, kQueueSize);
   });
 
 DGL_REGISTER_GLOBAL("network._CAPI_SenderSendSubgraph")
@@ -120,36 +150,6 @@ DGL_REGISTER_GLOBAL("network._CAPI_SenderSendEndSignal")
     SendData(sender, buffer, sizeof(CONTROL_END_SIGNAL), recv_id);
   });
 
-DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverCreate")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    network::Receiver* receiver = new network::SocketReceiver();
-    try {
-      char* buffer = new char[kMaxBufferSize];
-      receiver->SetBuffer(buffer);
-    } catch (const std::bad_alloc&) {
-      LOG(FATAL) << "Not enough memory for receiver buffer: " << kMaxBufferSize;
-    }
-    CommunicatorHandle chandle = static_cast<CommunicatorHandle>(receiver);
-    *rv = chandle;
-  });
-
-DGL_REGISTER_GLOBAL("network._CAPI_DGLFinalizeReceiver")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    CommunicatorHandle chandle = args[0];
-    network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
-    receiver->Finalize();
-  });
-
-DGL_REGISTER_GLOBAL("network._CAPI_DGLReceiverWait")
-.set_body([] (DGLArgs args, DGLRetValue* rv) {
-    CommunicatorHandle chandle = args[0];
-    std::string ip = args[1];
-    int port = args[2];
-    int num_sender = args[3];
-    network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
-    receiver->Wait(ip.c_str(), port, num_sender, kQueueSize);
-  });
-
 DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     CommunicatorHandle chandle = args[0];
@@ -177,6 +177,98 @@ DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvSubgraph")
     } else {
       LOG(FATAL) << "Unknow control number: " << control;
     }
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_SenderSendKVMsg")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    CommunicatorHandle chandle = args[0];
+    network::Sender* sender = static_cast<network::Sender*>(chandle);
+    int recv_id = args[1];
+    int msg_type = args[2];
+    int rank = args[3];
+    std::string name = args[4];
+    const NDArray ID = args[5];
+    char* buffer = sender->GetBuffer();
+    int64_t data_size = 0;
+    if (msg_type == PUSH_MSG) {
+      const NDArray data = args[6];
+      data_size = network::SerializeKVMsg(
+        buffer, 
+        msg_type, 
+        rank, 
+        name, 
+        &ID, 
+        &data);
+    } else if (msg_type == PULL_MSG) {
+      data_size = network::SerializeKVMsg(
+        buffer, 
+        msg_type, 
+        rank, 
+        name, 
+        &ID, 
+        nullptr);
+    } else {
+      LOG(ERROR) << "Unknown message type: " << msg_type;
+    }
+    CHECK_GT(data_size, 0);
+    // Send data via network
+    SendData(sender, buffer, data_size, recv_id);
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_ReceiverRecvKVMsg")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    CommunicatorHandle chandle = args[0];
+    network::Receiver* receiver = static_cast<network::SocketReceiver*>(chandle);
+    // Recv data via network
+    char* buffer = receiver->GetBuffer();
+    RecvData(receiver, buffer, kMaxBufferSize);
+    KVStoreMsg *msg = new KVStoreMsg();
+    // Deserialize KVStoreMsg from recv_data_buffer
+    network::DeserializeKVMsg(
+      buffer, 
+      &(msg->msg_type), 
+      &(msg->rank), 
+      &(msg->name), 
+      &(msg->ID), 
+      &(msg->data));
+    std::vector<KVStoreMsg*> res_msg(1);
+    res_msg[0] = msg;
+    *rv = WrapVectorReturn(res_msg);
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_ReceiverGetKVMsgType")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    KVMsgHandle chandle = args[0];
+    network::KVStoreMsg* msg = static_cast<network::KVStoreMsg*>(chandle);
+    *rv = msg->msg_type;
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_ReceiverGetKVMsgRank")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    KVMsgHandle chandle = args[0];
+    network::KVStoreMsg* msg = static_cast<network::KVStoreMsg*>(chandle);
+    *rv = msg->rank;
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_ReceiverGetKVMsgName")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    KVMsgHandle chandle = args[0];
+    network::KVStoreMsg* msg = static_cast<network::KVStoreMsg*>(chandle);
+    *rv = msg->name;
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_ReceiverGetKVMsgID")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    KVMsgHandle chandle = args[0];
+    network::KVStoreMsg* msg = static_cast<network::KVStoreMsg*>(chandle);
+    *rv = msg->ID;
+  });
+
+DGL_REGISTER_GLOBAL("network._CAPI_ReceiverGetKVMsgData")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    KVMsgHandle chandle = args[0];
+    network::KVStoreMsg* msg = static_cast<network::KVStoreMsg*>(chandle);
+    *rv = msg->data;
   });
 
 }  // namespace network

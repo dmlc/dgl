@@ -9,6 +9,8 @@
 #include <dgl/sampler.h>
 #include <dgl/immutable_graph.h>
 
+using dgl::runtime::NDArray;
+
 namespace dgl {
 namespace network {
 
@@ -44,8 +46,34 @@ void DeserializeSampledSubgraph(char* data,
                                 IdArray* edge_mapping,
                                 IdArray* layer_offsets,
                                 IdArray* flow_offsets);
-
-// TODO(chao): we can add compression and decompression method here
+/*!
+ * \brief Serialize KVStoreMsg to binary data
+ * \param data pointer of data buffer
+ * \param msg_type message type
+ * \param rank sender's ID
+ * \param name data name
+ * \param tensor data NDArray
+ */
+int64_t SerializeKVMsg(char* data,
+                       const int msg_type,
+                       const int rank,
+                       const std::string& name,
+                       const NDArray* ID,
+                       const NDArray* tensor);
+/*!
+ * \brief Deserialize KVStoreMsg from binary data
+ * \param data pointer of data buffer
+ * \param msg_type message type
+ * \param rank sender's ID
+ * \param name data name
+ * \param tensor data NDArray
+ */
+void DeserializeKVMsg(char* data, 
+                      int* msg_type, 
+                      int* rank, 
+                      std::string* name, 
+                      NDArray* ID, 
+                      NDArray* tensor);
 
 }  // namespace network
 }  // namespace dgl

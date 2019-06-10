@@ -169,7 +169,7 @@ class SocketReceiver : public Receiver {
   /*!
    * \brief Message queue for communicator
    */ 
-  MessageQueue* queue_;
+  MessageQueue* queue_ = nullptr;
 
   /*!
    * \brief data buffer
