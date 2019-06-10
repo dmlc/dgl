@@ -756,10 +756,19 @@ class DGLGraph(DGLBaseGraph):
     Node and edge features are stored as a dictionary from the feature name
     to the feature data (in tensor).
 
+    DGL graph accepts graph data of multiple formats:
+
+    * NetworkX graph,
+    * scipy matrix,
+    * DGLGraph.
+
+    If the input graph data is DGLGraph, the constructed DGLGraph only contains
+    its graph index.
+
     Parameters
     ----------
     graph_data : graph data, optional
-        Data to initialize graph. Same as networkx's semantics.
+        Data to initialize graph.
     node_frame : FrameRef, optional
         Node feature storage.
     edge_frame : FrameRef, optional
@@ -898,7 +907,10 @@ class DGLGraph(DGLBaseGraph):
                  multigraph=None,
                  readonly=False):
         # graph
-        gidx = graph_index.create_graph_index(graph_data, multigraph, readonly)
+        if isinstance(graph_data, DGLGraph):
+            gidx = graph_data._graph
+        else:
+            gidx = graph_index.create_graph_index(graph_data, multigraph, readonly)
         super(DGLGraph, self).__init__(gidx)
 
         # node and edge frame
@@ -1100,6 +1112,57 @@ class DGLGraph(DGLBaseGraph):
         if self._msg_index is not None:
             self._msg_index = self._msg_index.append_zeros(num)
         self._msg_frame.add_rows(num)
+
+    def remove_nodes(self, vids):
+        """Remove multiple nodes.
+
+        Parameters
+        ----------
+        vids: list, tensor
+            The id of nodes to remove.
+        """
+        if self.is_readonly:
+            raise DGLError("remove_nodes is not supported by read-only graph.")
+        induced_nodes = utils.set_diff(utils.toindex(self.nodes()), utils.toindex(vids))
+        sgi = self._graph.node_subgraph(induced_nodes)
+
+        if isinstance(self._node_frame, FrameRef):
+            self._node_frame = FrameRef(Frame(self._node_frame[sgi.induced_nodes]))
+        else:
+            self._node_frame = FrameRef(self._node_frame, sgi.induced_nodes)
+
+        if isinstance(self._edge_frame, FrameRef):
+            self._edge_frame = FrameRef(Frame(self._edge_frame[sgi.induced_edges]))
+        else:
+            self._edge_frame = FrameRef(self._edge_frame, sgi.induced_edges)
+
+        self._graph = sgi.graph
+
+    def remove_edges(self, eids):
+        """Remove multiple edges.
+
+        Parameters
+        ----------
+        eids: list, tensor
+            The id of edges to remove.
+        """
+        if self.is_readonly:
+            raise DGLError("remove_edges is not supported by read-only graph.")
+        induced_edges = utils.set_diff(
+            utils.toindex(range(self.number_of_edges())), utils.toindex(eids))
+        sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes=True)
+
+        if isinstance(self._node_frame, FrameRef):
+            self._node_frame = FrameRef(Frame(self._node_frame[sgi.induced_nodes]))
+        else:
+            self._node_frame = FrameRef(self._node_frame, sgi.induced_nodes)
+
+        if isinstance(self._edge_frame, FrameRef):
+            self._edge_frame = FrameRef(Frame(self._edge_frame[sgi.induced_edges]))
+        else:
+            self._edge_frame = FrameRef(self._edge_frame, sgi.induced_edges)
+
+        self._graph = sgi.graph
 
     def clear(self):
         """Remove all nodes and edges, as well as their features, from the
@@ -2813,7 +2876,7 @@ class DGLGraph(DGLBaseGraph):
         from . import subgraph
         induced_nodes = utils.toindex(nodes)
         sgi = self._graph.node_subgraph(induced_nodes)
-        return subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
+        return subgraph.DGLSubGraph(self, sgi)
 
     def subgraphs(self, nodes):
         """Return a list of subgraphs, each induced in the corresponding given
@@ -2841,10 +2904,9 @@ class DGLGraph(DGLBaseGraph):
         from . import subgraph
         induced_nodes = [utils.toindex(n) for n in nodes]
         sgis = self._graph.node_subgraphs(induced_nodes)
-        return [subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
-                for sgi in sgis]
+        return [subgraph.DGLSubGraph(self, sgi) for sgi in sgis]
 
-    def edge_subgraph(self, edges):
+    def edge_subgraph(self, edges, preserve_nodes=False):
         """Return the subgraph induced on given edges.
 
         Parameters
@@ -2852,6 +2914,10 @@ class DGLGraph(DGLBaseGraph):
         edges : list, or iterable
             An edge ID array to construct subgraph.
             All edges must exist in the subgraph.
+        preserve_nodes : bool
+            Indicates whether to preserve all nodes or not.
+            If true, keep the nodes which have no edge connected in the subgraph;
+            If false, all nodes without edge connected to it would be removed.
 
         Returns
         -------
@@ -2880,6 +2946,15 @@ class DGLGraph(DGLBaseGraph):
         tensor([0, 1, 4])
         >>> SG.parent_eid
         tensor([0, 4])
+        >>> SG = G.edge_subgraph([0, 4], preserve_nodes=True)
+        >>> SG.nodes()
+        tensor([0, 1, 2, 3, 4])
+        >>> SG.edges()
+        (tensor([0, 4]), tensor([1, 0]))
+        >>> SG.parent_nid
+        tensor([0, 1, 2, 3, 4])
+        >>> SG.parent_eid
+        tensor([0, 4])
 
         See Also
         --------
@@ -2888,8 +2963,8 @@ class DGLGraph(DGLBaseGraph):
         """
         from . import subgraph
         induced_edges = utils.toindex(edges)
-        sgi = self._graph.edge_subgraph(induced_edges)
-        return subgraph.DGLSubGraph(self, sgi.induced_nodes, sgi.induced_edges, sgi)
+        sgi = self._graph.edge_subgraph(induced_edges, preserve_nodes=preserve_nodes)
+        return subgraph.DGLSubGraph(self, sgi)
 
     def adjacency_matrix_scipy(self, transpose=False, fmt='csr'):
         """Return the scipy adjacency matrix representation of this graph.
@@ -3166,3 +3241,28 @@ class DGLGraph(DGLBaseGraph):
         return ret.format(node=self.number_of_nodes(), edge=self.number_of_edges(),
                           ndata=str(self.node_attr_schemes()),
                           edata=str(self.edge_attr_schemes()))
+
+    # pylint: disable=invalid-name
+    def to(self, ctx):
+        """
+        Move both ndata and edata to the targeted mode (cpu/gpu)
+        Framework agnostic
+
+        Parameters
+        ----------
+        ctx : framework specific context object
+
+        Examples (Pytorch & MXNet)
+        --------
+        >>> import backend as F
+        >>> G = dgl.DGLGraph()
+        >>> G.add_nodes(5, {'h': torch.ones((5, 2))})
+        >>> G.add_edges([0, 1], [1, 2], {'m' : torch.ones((2, 2))})
+        >>> G.add_edges([0, 1], [1, 2], {'m' : torch.ones((2, 2))})
+        >>> G.to(F.cuda())
+
+        """
+        for k in self.ndata.keys():
+            self.ndata[k] = F.copy_to(self.ndata[k], ctx)
+        for k in self.edata.keys():
+            self.edata[k] = F.copy_to(self.edata[k], ctx)

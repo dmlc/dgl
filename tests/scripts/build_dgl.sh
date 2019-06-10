@@ -6,9 +6,10 @@ if [ $# -ne 1 ]; then
     exit -1
 fi
 
+CMAKE_VARS="-DBUILD_CPP_TEST=ON -DUSE_OPENMP=ON"
+
 if [ "$1" == "gpu" ]; then
-    cp cmake/config.cmake config.cmake
-    sed -i -e 's/USE_CUDA OFF/USE_CUDA ON/g' config.cmake
+    CMAKE_VARS="-DUSE_CUDA=ON $CMAKE_VARS"
 fi
 
 if [ -d build ]; then
@@ -19,7 +20,7 @@ mkdir build
 rm -rf _download
 
 pushd build
-cmake .. -DBUILD_CPP_TEST=1
+cmake $CMAKE_VARS ..
 make -j4
 popd
 

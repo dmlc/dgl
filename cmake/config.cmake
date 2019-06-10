@@ -36,3 +36,6 @@ set(USE_CUDA OFF)
 #---------------------------------------------
 # Whether to build cpp unittest executables
 set(BUILD_CPP_TEST OFF)
+
+# Whether to enable OpenMP
+set(USE_OPENMP ON)

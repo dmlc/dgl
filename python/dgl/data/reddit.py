@@ -4,7 +4,6 @@ import scipy.sparse as sp
 import numpy as np
 import dgl
 import os, sys
-from ..graph_index import create_graph_index
 from .utils import download, extract_archive, get_download_dir, _get_dgl_url
 
 
@@ -20,7 +19,7 @@ class RedditDataset(object):
         extract_archive(zip_file_path, extract_dir)
         # graph
         coo_adj = sp.load_npz(os.path.join(extract_dir, "reddit{}_graph.npz".format(self_loop_str)))
-        self.graph = create_graph_index(coo_adj, readonly=True)
+        self.graph = dgl.DGLGraph(coo_adj, readonly=True)
         # features and labels
         reddit_data = np.load(os.path.join(extract_dir, "reddit_data.npz"))
         self.features = reddit_data["feature"]
