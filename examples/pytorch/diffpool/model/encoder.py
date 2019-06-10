@@ -177,7 +177,6 @@ class DiffPoolEncoder(GraphEncoder):
                                               dropout, **kwargs)
 
 
-        self.num_pooling = n_pooling
         self.linkpred = linkpred
         self.n_pooling = n_pooling
         self.batch_size = kwargs['batch_size']

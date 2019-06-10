@@ -21,7 +21,8 @@ def arg_parse():
     '''
     parser = argparse.ArgumentParser(description='DiffPool arguments')
     parser.add_argument('--dataset', dest='dataset', help='Input Dataset')
-    parser.add_argument('--bmname', dest='benchmark name', help='Name of the benchmark datset')
+    parser.add_argument('--bmname', dest='benchmark name', help='Name of the\
+                        benchmark dataset')
     parser.add_argument('--pool_ratio', dest='pool_ratio', type=float, help='pooling ratio')
     parser.add_argument('--num_pool', dest='num_pool', type=int, help='num_pooling layer')
     parser.add_argument('--link_pred', dest='linkpred', action='store_const',
@@ -127,13 +128,18 @@ def graph_classify_task(prog_args):
           assign_input_dim)
     print("dataset label dimension is", label_dim)
     print("the max num node is", max_num_node)
+
+    # hidden dimension configs for diffpool model. \TODO allow user to change
+    # hidden dims?
     hidden_dim = 64
     embedding_dim = 64
     pred_hidden_dims = [64, 64]
+    # calculate assignment dimension: pool_ratio * largest graph's maximum
+    # number of nodes  in the dataset
     assign_dim = int(max_num_node * prog_args.pool_ratio) * prog_args.batch_size
     print("++++++++++MODEL STATISTICS++++++++")
     print("model hidden dim is", hidden_dim)
-    print("model embedding dim fr graph instance embedding", embedding_dim)
+    print("model embedding dim for graph instance embedding", embedding_dim)
     print("initial batched pool graph dim is", assign_dim)
 
     train_dataloader = prepare_data(dataset, prog_args, mode='train')
@@ -142,6 +148,8 @@ def graph_classify_task(prog_args):
     activation = F.relu
 
     # initialize model
+    # 'base' : graphsage
+    # 'diffpool' : diffpool
     if prog_args.method == 'base':
         basekwargs = {'concat':True, 'bn':prog_args.bn, 'bias':True,
                       'aggregator_type':'maxpool'}
@@ -157,6 +165,8 @@ def graph_classify_task(prog_args):
                           'aggregator_type':'maxpool', 'pool_ratio':
                           prog_args.pool_ratio, 'assign_dim': assign_dim,
                           'batch_size': prog_args.batch_size}
+        # when assign_input_dim & assign_n_layers == -1, they are defaulted to
+        # be the same as input_dim and n_layers, respectively.
         assign_input_dim = -1
         assign_n_layers = -1
         assign_hidden_dim = hidden_dim
@@ -177,20 +187,25 @@ def graph_classify_task(prog_args):
 def collate_fn(batch):
     '''
     collate_fn for dataset batching
+    transform ndata to tensor (in gpu is available)
     '''
     graphs, labels = map(list, zip(*batch))
     cuda = torch.cuda.is_available()
+    # batch graphs and cast to PyTorch tensor
     for graph in graphs:
         for (key, value) in graph.ndata.items():
             graph.ndata[key] = torch.FloatTensor(value)
     batched_graphs = dgl.batch(graphs)
+    # move to cuda
     for (key, value) in batched_graphs.ndata.items():
         if cuda:
             batched_graphs.ndata[key] = value.cuda()
         else:
             batched_graphs.ndata[key] = value
 
+    # cast to PyTorch tensor
     batched_labels = torch.LongTensor(np.concatenate(labels, axis=0))
+    # move to cuda
     if cuda:
         batched_labels = batched_labels.cuda()
     return batched_graphs, batched_labels
