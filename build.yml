@@ -3,13 +3,20 @@
   tasks:
   - name: Remote Build
     block:
+    - name: Creates directory
+      file: 
+        path: /tmp/build/{{ src_dir }}/
+        state: directory
     - name: Copy to remote
       synchronize:
         mode: push
         src: ./
         dest: /tmp/build/{{ src_dir }}/
     - name: Build
-      command: chdir=/tmp/build/{{ src_dir }} bash /tmp/build/{{ src_dir }}/tests/scripts/build_dgl.sh
+      command: chdir=/tmp/build/{{ src_dir }} bash /tmp/build/{{ src_dir }}/tests/scripts/build_dgl.sh {{ dev }}
+      register: build_result
+    - debug: 
+        var: build_result.stdout_lines
     - name: Copy back
       synchronize:
         mode: pull

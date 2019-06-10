@@ -34,7 +34,7 @@ def build_dgl_linux(dev) {
     playbook: './build.yml',
     inventory: './host.ini',
     credentialsId: 'remotebuild',
-    extraVars: [src_dir: "${env.GIT_COMMIT}"])
+    extraVars: [src_dir: "${env.GIT_COMMIT}"], dev: "${dev}")
   // sh "bash tests/scripts/build_dgl.sh ${dev}"
   pack_lib("dgl-${dev}-linux", dgl_linux_libs)
 }
