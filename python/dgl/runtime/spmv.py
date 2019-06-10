@@ -206,7 +206,7 @@ def build_gidx_and_mapping_block(graph, block_id, edge_tuples=None):
         Number of ints needed to represent the graph
     """
     if edge_tuples is None:
-        u, v, eid = graph.block_edges(block_id, remap=True)
+        u, v, eid = graph.block_edges(block_id, remap_local=True)
         u = utils.toindex(u)
         v = utils.toindex(v)
         eid = utils.toindex(eid)
