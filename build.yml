@@ -1,9 +1,5 @@
 ---
 - hosts: build
-  vars:
-    ansible_host_key_checking: false
-  roles:
-    - including_vars
   tasks:
   - name: Remote Build
     block:
