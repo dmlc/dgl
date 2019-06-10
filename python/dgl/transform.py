@@ -4,7 +4,7 @@ from .graph import DGLGraph
 from .graph_index import GraphIndex
 from .batched_graph import BatchedDGLGraph
 
-__all__ = ['line_graph', 'reverse', 'to_simple_graph']
+__all__ = ['line_graph', 'reverse', 'to_simple_graph', 'to_bidirected']
 
 
 def line_graph(g, backtracking=True, shared=False):
@@ -123,5 +123,51 @@ def to_simple_graph(g):
     """
     newgidx = GraphIndex(_CAPI_DGLToSimpleGraph(g._graph.handle))
     return DGLGraph(newgidx, readonly=True)
+
+def to_bidirected(g, readonly=True):
+    """Convert the graph to a bidirected graph.
+
+    The function generates a new graph with no node/edge feature.
+    If g has m edges for i->j and n edges for j->i, then the
+    returned graph will have max(m, n) edges for both i->j and j->i.
+
+    Parameters
+    ----------
+    g : DGLGraph
+        The input graph.
+    readonly : bool, default to be True
+        Whether the returned bidirected graph is readonly or not.
+
+    Returns
+    -------
+    DGLGraph
+
+    Examples
+    --------
+    The following two examples use PyTorch backend, one for non-multi graph
+    and one for multi-graph.
+
+    >>> # non-multi graph
+    >>> g = dgl.DGLGraph()
+    >>> g.add_nodes(2)
+    >>> g.add_edges([0, 0], [0, 1])
+    >>> bg1 = dgl.to_bidirected(g)
+    >>> bg1.edges()
+    (tensor([0, 1, 0]), tensor([0, 0, 1]))
+
+    >>> # multi-graph
+    >>> g.add_edges([0, 1], [1, 0])
+    >>> g.edges()
+    (tensor([0, 0, 0, 1]), tensor([0, 1, 1, 0]))
+
+    >>> bg2 = dgl.to_bidirected(g)
+    >>> bg2.edges()
+    (tensor([0, 1, 1, 0, 0]), tensor([0, 0, 0, 1, 1]))
+    """
+    if readonly:
+        newgidx = GraphIndex(_CAPI_DGLToBidirectedImmutableGraph(g._graph.handle))
+    else:
+        newgidx = GraphIndex(_CAPI_DGLToBidirectedMutableGraph(g._graph.handle))
+    return DGLGraph(newgidx)
 
 _init_api("dgl.transform")
