@@ -29,14 +29,13 @@ def unpack_lib(name, libs) {
 
 def build_dgl_linux(dev) {
   init_git()
-  sh "export ANSIBLE_HOST_KEY_CHECKING=False"
   sh "sudo apt-get install -y ssh rsync"
   sh "pip install ansible" // Should move to docker
   ansiblePlaybook(
     playbook: './build.yml',
     inventory: './host.ini',
     credentialsId: 'remotebuild',
-    extraVars: [src_dir: "${env.GIT_COMMIT}_${dev}"], dev: "${dev}")
+    extraVars: [src_dir: "${env.GIT_COMMIT}_${dev}", dev: "${dev}"])
   // sh "bash tests/scripts/build_dgl.sh ${dev}"
   pack_lib("dgl-${dev}-linux", dgl_linux_libs)
 }
