@@ -141,6 +141,28 @@ def to_bidirected(g, readonly=True):
     Returns
     -------
     DGLGraph
+
+    Examples
+    --------
+    The following two examples use PyTorch backend, one for non-multi graph
+    and one for multi-graph.
+
+    >>> # non-multi graph
+    >>> g = dgl.DGLGraph()
+    >>> g.add_nodes(2)
+    >>> g.add_edges([0, 0], [0, 1])
+    >>> bg1 = dgl.to_bidirected(g)
+    >>> bg1.edges()
+    (tensor([0, 1, 0]), tensor([0, 0, 1]))
+
+    >>> # multi-graph
+    >>> g.add_edges([0, 1], [1, 0])
+    >>> g.edges()
+    (tensor([0, 0, 0, 1]), tensor([0, 1, 1, 0]))
+
+    >>> bg2 = dgl.to_bidirected(g)
+    >>> bg2.edges()
+    (tensor([0, 1, 1, 0, 0]), tensor([0, 0, 0, 1, 1]))
     """
     if readonly:
         newgidx = GraphIndex(_CAPI_DGLToBidirectedImmutableGraph(g._graph.handle))
