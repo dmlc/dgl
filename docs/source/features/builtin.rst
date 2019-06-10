@@ -1,7 +1,9 @@
+.. currentmodule:: dgl
+
 Builtin message passing functions
 =================================
 
-In DGL, message passing is expressed by two functions:
+In DGL, message passing is expressed by two APIs:
 
 - ``send(edges, message_func)`` for computing the messages along the given edges.
 - ``recv(nodes, reduce_func)`` for collecting the in-coming messages, perform aggregation and so on.
@@ -11,7 +13,7 @@ passing paradigm, it is inefficient due to storing explicit messages. See our
 `blogpost <https://www.dgl.ai/blog/2019/05/04/kernel.html>`_ for more
 details and performance results.
 
-Our solution, also explained in the blogpost, is to fuse the two-stage into one kernel so no
+Our solution, also explained in the blogpost, is to fuse the two stages into one kernel so no
 explicit messages are generated and stored. To achieve this, we recommend using our builtin
 message/reduce functions so that DGL can analyze and map them to fused dedicated kernels. Here
 are some examples (in pytorch syntax):
@@ -33,13 +35,15 @@ are some examples (in pytorch syntax):
 
 ``fn.copy_u``, ``fn.u_mul_e``, ``fn.u_mul_v`` are builtin message functions, while ``fn.sum``
 and ``fn.max`` are builtin reduce functions. We use ``u``, ``v`` and ``e`` to represent
-source nodes, destination nodes and edges among them. Thus, ``copy_u`` copies the source
-node data as the messages, and ``u_mul_e`` multiplies source node features with edge features.
-To define a unary message function (e.g. ``copy_u``), one input feature name and one output
-message name need to be provided. To define a binary message function (e.g. ``u_mul_e``),
-two input feature names and one output message name need to be provided. During the computation,
+source nodes, destination nodes and edges among them, respectively. Hence, ``copy_u`` copies the source
+node data as the messages, ``u_mul_e`` multiplies source node features with edge features,
+so on and so forth.
+
+To define a unary message function (e.g. ``copy_u``) requires one input feature name and one output
+message name. To define a binary message function (e.g. ``u_mul_e``) requires
+two input feature names and one output message name. During the computation,
 the message function will read the data under the given names, perform computation, and return
-the output under the given name. For example, the above ``fn.u_mul_e('h', 'w', 'm')`` is
+the output using the output name. For example, the above ``fn.u_mul_e('h', 'w', 'm')`` is
 the same as the following user-defined function:
 
 .. code:: python
@@ -61,11 +65,11 @@ can be automatically expanded to be of equal sizes. The supported broadcasting s
 is standard as in `numpy's <https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html>`_
 and `pytorch's <https://pytorch.org/docs/stable/notes/broadcasting.html>`_. For unfamiliar
 users, we highly suggest reading those documents as broadcasting is very useful. In the
-above example, ``fn.u_mul_e`` will perform broadcasted multiply automatically because
-the node feature ``'h'`` and edge feature ``'w'`` are of different, but broadcastable shapes.
+above example, ``fn.u_mul_e`` will perform broadcasted multiplication automatically because
+the node feature ``'h'`` and the edge feature ``'w'`` are of different, but broadcastable shapes.
 
 All DGL's builtin functions support both CPU and GPU and backward computation so they
-can be used in autograd system. Also, builtin functions can be used not only in ``update_all``
+can be used in any autograd system. Also, builtin functions can be used not only in ``update_all``
 or ``apply_edges`` as shown in the example, but wherever message/reduce functions are
 required (e.g. ``pull``, ``push``, ``send_and_recv``, etc.).
 
@@ -104,3 +108,8 @@ Here is a cheatsheet of all the DGL builtins.
 |                         +----------------------------------------------------+-----------------------+
 |                         | ``prod``                                           |                       |
 +-------------------------+----------------------------------------------------+-----------------------+
+
+Next Step
+---------
+* Checkout our :mod:`dgl.nn` module for how builtin functions are used to implement Graph Neural
+  Network layers.
