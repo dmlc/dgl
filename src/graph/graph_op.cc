@@ -315,4 +315,75 @@ ImmutableGraph GraphOp::ToSimpleGraph(const GraphInterface* graph) {
   return ImmutableGraph(csr);
 }
 
+Graph GraphOp::ToBidirectedMutableGraph(const GraphInterface* g) {
+  std::unordered_map<int, std::unordered_map<int, int>> n_e;
+  for (dgl_id_t u = 0; u < g->NumVertices(); ++u) {
+    for (const dgl_id_t v : g->SuccVec(u)) {
+      n_e[u][v]++;
+    }
+  }
+
+  Graph bg;
+  bg.AddVertices(g->NumVertices());
+  for (dgl_id_t u = 0; u < g->NumVertices(); ++u) {
+    for (dgl_id_t v = u; v < g->NumVertices(); ++v) {
+      const auto new_n_e = std::max(n_e[u][v], n_e[v][u]);
+      if (new_n_e > 0) {
+        IdArray us = NewIdArray(new_n_e);
+        dgl_id_t* us_data = static_cast<dgl_id_t*>(us->data);
+        std::fill(us_data, us_data + new_n_e, u);
+        if (u == v) {
+          bg.AddEdges(us, us);
+        } else {
+          IdArray vs = NewIdArray(new_n_e);
+          dgl_id_t* vs_data = static_cast<dgl_id_t*>(vs->data);
+          std::fill(vs_data, vs_data + new_n_e, v);
+          bg.AddEdges(us, vs);
+          bg.AddEdges(vs, us);
+        }
+      }
+    }
+  }
+  return bg;
+}
+
+ImmutableGraph GraphOp::ToBidirectedImmutableGraph(const GraphInterface* g) {
+  std::unordered_map<int, std::unordered_map<int, int>> n_e;
+  for (dgl_id_t u = 0; u < g->NumVertices(); ++u) {
+    for (const dgl_id_t v : g->SuccVec(u)) {
+      n_e[u][v]++;
+    }
+  }
+
+  std::vector<dgl_id_t> srcs, dsts;
+  for (dgl_id_t u = 0; u < g->NumVertices(); ++u) {
+    std::unordered_set<dgl_id_t> hashmap;
+    std::vector<dgl_id_t> nbrs;
+    for (const dgl_id_t v : g->PredVec(u)) {
+      if (!hashmap.count(v)) {
+        nbrs.push_back(v);
+        hashmap.insert(v);
+      }
+    }
+    for (const dgl_id_t v : g->SuccVec(u)) {
+      if (!hashmap.count(v)) {
+        nbrs.push_back(v);
+        hashmap.insert(v);
+      }
+    }
+    for (const dgl_id_t v : nbrs) {
+      const auto new_n_e = std::max(n_e[u][v], n_e[v][u]);
+      for (size_t i = 0; i < new_n_e; ++i) {
+        srcs.push_back(v);
+        dsts.push_back(u);
+      }
+    }
+  }
+
+  IdArray srcs_array = VecToIdArray(srcs);
+  IdArray dsts_array = VecToIdArray(dsts);
+  COOPtr coo(new COO(g->NumVertices(), srcs_array, dsts_array, g->IsMultigraph()));
+  return ImmutableGraph(coo);
+}
+
 }  // namespace dgl

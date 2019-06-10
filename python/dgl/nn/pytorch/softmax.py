@@ -62,6 +62,8 @@ class EdgeSoftmax(th.autograd.Function):
         return grad_score.data
         """
         g, out = ctx.backward_cache
+        # clear backward cache explicitly
+        ctx.backward_cache = None
         out_name = utils.get_edata_name(g, 'out')
         accum_name = utils.get_ndata_name(g, 'accum')
         grad_score_name = utils.get_edata_name(g, 'grad_score')
