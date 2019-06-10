@@ -11,7 +11,6 @@ class GraphData:
     def __init__(self, csr, num_feats, graph_name):
         num_nodes = csr.shape[0]
         num_edges = mx.nd.contrib.getnnz(csr).asnumpy()[0]
-        edge_ids = np.arange(0, num_edges, step=1, dtype=np.int64)
         self.graph = dgl.graph_index.from_csr(csr.indptr, csr.indices, False,
                 'in', dgl.contrib.graph_store._get_graph_path(graph_name))
         self.features = mx.nd.random.normal(shape=(csr.shape[0], num_feats))
