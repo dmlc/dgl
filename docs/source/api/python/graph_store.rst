@@ -1,7 +1,7 @@
 .. _apigraphstore:
 
-Graph Store -- Graph with node/edge features for multi-processing and distributed training
-==========================================================================================
+Graph Store -- Graph for multi-processing and distributed training
+==================================================================
 
 .. currentmodule:: dgl.contrib
 .. autoclass:: SharedMemoryDGLGraph
