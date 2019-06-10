@@ -310,6 +310,7 @@ class BinaryReduce(mx.autograd.Function):
             zerocopy_to_dgl_ndarray_for_write(grad_rhs), self.lhs_map[1],
             self.rhs_map[1], self.out_map[1])
         grad_rhs = _reduce_grad(grad_rhs, rhs_data_nd.shape)
+        self.saved_tensors = None
         return grad_lhs, grad_rhs
 
 
@@ -351,6 +352,7 @@ class CopyReduce(mx.autograd.Function):
             self.reducer, self.graph, self.target, in_data_nd, out_data_nd,
             grad_out_nd, zerocopy_to_dgl_ndarray_for_write(grad_in),
             self.in_map[1], self.out_map[1])
+        self.saved_tensors = None
         return grad_in
 
 
