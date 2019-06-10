@@ -24,10 +24,6 @@ Using Node/edge features
 
     SharedMemoryDGLGraph.init_ndata
     SharedMemoryDGLGraph.init_edata
-    SharedMemoryDGLGraph.get_n_repr
-    SharedMemoryDGLGraph.get_e_repr
-    SharedMemoryDGLGraph.set_n_repr
-    SharedMemoryDGLGraph.set_e_repr
 
 Computing with Graph store
 -----------------------
