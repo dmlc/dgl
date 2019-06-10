@@ -66,6 +66,8 @@ class EdgeSoftmax(mx.autograd.Function):
         """
         g = self.g
         out, = self.saved_tensors
+        # clear saved tensors explicitly
+        self.saved_tensors = None
         out_name = utils.get_edata_name(g, 'out')
         accum_name = utils.get_ndata_name(g, 'accum')
         grad_score_name = utils.get_edata_name(g, 'grad_score')
@@ -75,8 +77,6 @@ class EdgeSoftmax(mx.autograd.Function):
         g.apply_edges(fn.e_mul_v(out_name, accum_name, out_name))
         g.ndata.pop(accum_name)
         grad_score = g.edata.pop(grad_score_name) - g.edata.pop(out_name)
-        # clear saved tensors explicitly
-        self.saved_tensors = None
         return grad_score
 
 
