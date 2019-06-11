@@ -564,7 +564,7 @@ class NodeFlow(DGLBaseGraph):
             - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
             - I[v, e] = 0 otherwise.
 
-        * "out":
+        * ``out``:
 
             - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
             - I[v, e] = 0 otherwise.
