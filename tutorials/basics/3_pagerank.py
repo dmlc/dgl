@@ -242,8 +242,8 @@ print(g.ndata['pv'])
 # Next steps
 # ----------
 # 
-# It is time to move on to some real models in DGL.
-#
+# * Learn how to use DGL builtin functions to write more efficient message passing
+#   (:doc:`link<../../features/builtin>`).
 # * Check out the :doc:`overview page<../models/index>`
 #   of all the model tutorials.
 # * Would like to know more about Graph Neural Networks? Start with the

@@ -579,4 +579,22 @@ DGL_REGISTER_GLOBAL("transform._CAPI_DGLToSimpleGraph")
     *rv = ret;
   });
 
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedMutableGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+    Graph* bgptr = new Graph();
+    *bgptr = GraphOp::ToBidirectedMutableGraph(ptr);
+    GraphHandle bghandle = bgptr;
+    *rv = bghandle;
+  });
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedImmutableGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+    GraphHandle bghandle = GraphOp::ToBidirectedImmutableGraph(ptr).Reset();
+    *rv = bghandle;
+  });
+
 }  // namespace dgl

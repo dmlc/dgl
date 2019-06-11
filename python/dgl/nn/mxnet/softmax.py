@@ -65,7 +65,9 @@ class EdgeSoftmax(mx.autograd.Function):
         return grad_score.data
         """
         g = self.g
-        out = self.saved_tensors[0]
+        out, = self.saved_tensors  # pylint: disable=access-member-before-definition, unpacking-non-sequence
+        # clear saved tensors explicitly
+        self.saved_tensors = None
         out_name = utils.get_edata_name(g, 'out')
         accum_name = utils.get_ndata_name(g, 'accum')
         grad_score_name = utils.get_edata_name(g, 'grad_score')
