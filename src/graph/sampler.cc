@@ -441,9 +441,20 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
                             &tmp_sampled_edge_list,
                             &time_seed);
       }
-      if (add_self_loop) {
+      // If we need to add self loop and it doesn't exist in the sampled neighbor list.
+      if (add_self_loop && std::find(tmp_sampled_src_list.begin(), tmp_sampled_src_list.end(),
+                                     dst_id) == tmp_sampled_src_list.end()) {
         tmp_sampled_src_list.push_back(dst_id);
-        tmp_sampled_edge_list.push_back(-1);
+        const dgl_id_t *src_list = col_list + *(indptr + dst_id);
+        const dgl_id_t *eid_list = val_list + *(indptr + dst_id);
+        // TODO(zhengda) this operation has O(N) complexity. It can be pretty slow.
+        const dgl_id_t *src = std::find(src_list, src_list + ver_len, dst_id);
+        // If there doesn't exist a self loop in the graph.
+        // we have to add -1 as the edge id for the self-loop edge.
+        if (src == src_list + ver_len)
+          tmp_sampled_edge_list.push_back(-1);
+        else
+          tmp_sampled_edge_list.push_back(eid_list[src - src_list]);
       }
       CHECK_EQ(tmp_sampled_src_list.size(), tmp_sampled_edge_list.size());
       neigh_pos.emplace_back(dst_id, neighbor_list.size(), tmp_sampled_src_list.size());
