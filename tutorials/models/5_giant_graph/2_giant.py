@@ -1,5 +1,5 @@
 """
-.. _sampling:
+.. _model-graph-store:
 
 Large-Scale Training of Graph Neural Networks
 =============================================
