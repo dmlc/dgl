@@ -7,7 +7,7 @@ Graph Store -- Graph for multi-processing and distributed training
 .. autoclass:: SharedMemoryDGLGraph
 
 Querying the distributed setting
-------------------------
+--------------------------------
 
 .. autosummary::
     :toctree: ../../generated/
@@ -26,7 +26,7 @@ Using Node/edge features
     SharedMemoryDGLGraph.init_edata
 
 Computing with Graph store
------------------------
+--------------------------
 
 .. autosummary::
     :toctree: ../../generated/

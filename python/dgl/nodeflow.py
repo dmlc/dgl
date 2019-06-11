@@ -558,12 +558,17 @@ class NodeFlow(DGLBaseGraph):
         or not.
 
         There are two types of an incidence matrix `I`:
-        * "in":
-          - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
-          - I[v, e] = 0 otherwise.
+
+        * ``in``:
+
+            - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
+            - I[v, e] = 0 otherwise.
+
         * "out":
-          - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
-          - I[v, e] = 0 otherwise.
+
+            - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
+            - I[v, e] = 0 otherwise.
+
         "both" isn't defined in the block of a NodeFlow.
 
         Parameters
