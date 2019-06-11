@@ -932,7 +932,7 @@ class ImmutableGraph: public GraphInterface {
     if (!out_csr_) {
       if (in_csr_) {
         const_cast<ImmutableGraph*>(this)->out_csr_ = in_csr_->Transpose();
-        if (out_csr_->IsSharedMem())
+        if (in_csr_->IsSharedMem())
           LOG(WARNING) << "We just construct an out-CSR from a shared-memory in CSR. "
                        << "It may dramatically increase memory consumption.";
       } else {
