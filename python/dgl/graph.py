@@ -3244,25 +3244,27 @@ class DGLGraph(DGLBaseGraph):
 
     # pylint: disable=invalid-name
     def to(self, ctx):
-        """
-        Move both ndata and edata to the targeted mode (cpu/gpu)
+        """Move both ndata and edata to the targeted mode (cpu/gpu)
         Framework agnostic
 
         Parameters
         ----------
-        ctx : framework specific context object
+        ctx : framework-specific context object
+            The context to move data to.
 
-        Examples (Pytorch & MXNet)
+        Examples
         --------
-        >>> import backend as F
+        The following example uses PyTorch backend.
+
+        >>> import torch
         >>> G = dgl.DGLGraph()
         >>> G.add_nodes(5, {'h': torch.ones((5, 2))})
         >>> G.add_edges([0, 1], [1, 2], {'m' : torch.ones((2, 2))})
         >>> G.add_edges([0, 1], [1, 2], {'m' : torch.ones((2, 2))})
-        >>> G.to(F.cuda())
-
+        >>> G.to(torch.device('cuda:0'))
         """
         for k in self.ndata.keys():
             self.ndata[k] = F.copy_to(self.ndata[k], ctx)
         for k in self.edata.keys():
             self.edata[k] = F.copy_to(self.edata[k], ctx)
+    # pylint: enable=invalid-name
