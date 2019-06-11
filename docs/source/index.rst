@@ -164,6 +164,14 @@ The model tutorials are categorized based on the way they utilize DGL APIs.
 Or go through all of them :doc:`here <tutorials/models/index>`.
 
 .. toctree::
+   :maxdepth: 1
+   :caption: Features
+   :hidden:
+   :glob:
+
+   features/builtin
+
+.. toctree::
    :maxdepth: 3
    :caption: Model Tutorials
    :hidden:
