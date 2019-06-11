@@ -95,9 +95,27 @@ def test_simple_graph():
     eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
     assert eset == set(elist)
 
+def test_bidirected_graph():
+    def _test(in_readonly, out_readonly):
+        elist = [(0, 0), (0, 1), (0, 1), (1, 0), (1, 1), (2, 1), (2, 2), (2, 2)]
+        g = dgl.DGLGraph(elist, readonly=in_readonly)
+        elist.append((1, 2))
+        elist = set(elist)
+        big = dgl.to_bidirected(g, out_readonly)
+        assert big.number_of_edges() == 10
+        src, dst = big.edges()
+        eset = set(zip(list(F.asnumpy(src)), list(F.asnumpy(dst))))
+        assert eset == set(elist)
+
+    _test(True, True)
+    _test(True, False)
+    _test(False, True)
+    _test(False, False)
+
 if __name__ == '__main__':
     test_line_graph()
     test_no_backtracking()
     test_reverse()
     test_reverse_shared_frames()
     test_simple_graph()
+    test_bidirected_graph()
