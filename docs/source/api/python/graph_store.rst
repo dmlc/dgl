@@ -3,7 +3,7 @@
 Graph Store -- Graph for multi-processing and distributed training
 ==================================================================
 
-.. currentmodule:: dgl.contrib
+.. currentmodule:: dgl.contrib.graph_store
 .. autoclass:: SharedMemoryDGLGraph
 
 Querying the distributed setting
@@ -43,5 +43,5 @@ Computing with Graph store
 Construct a graph store
 -----------------------
 
-.. autofunction:: create_graph_store_server
-.. autofunction:: create_graph_from_store
+.. autofunction:: dgl.contrib.graph_store.create_graph_store_server
+.. autofunction:: dgl.contrib.graph_store.create_graph_from_store
