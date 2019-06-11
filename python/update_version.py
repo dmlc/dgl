@@ -53,8 +53,6 @@ def main():
     for path in ["dgl"]:
         update(os.path.join(proj_root, "conda", path, "meta.yaml"),
                "(?<=version: \")[.0-9a-z]+", __version__)
-        update(os.path.join(proj_root, "conda", path, "meta.yaml"),
-               "(?<=git_rev: )[0-9]+.[0-9]+", __version__)
 
 if __name__ == "__main__":
     main()
