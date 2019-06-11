@@ -10,7 +10,7 @@ import dgl.function as fn
 from functools import partial
 import itertools
 
-def generate_rand_graph(n, connect_more=False, complete=False):
+def generate_rand_graph(n, connect_more=False, complete=False, add_self_loop=False):
     if complete:
         cord = [(i,j) for i, j in itertools.product(range(n), range(n)) if i != j]
         row = [t[0] for t in cord]
@@ -23,7 +23,13 @@ def generate_rand_graph(n, connect_more=False, complete=False):
         if connect_more:
             arr[0] = 1
             arr[:,0] = 1
-    g = dgl.DGLGraph(arr, readonly=True)
+    if add_self_loop:
+        g = dgl.DGLGraph(arr, readonly=False)
+        nodes = np.arange(g.number_of_nodes())
+        g.add_edges(nodes, nodes)
+        g.readonly()
+    else:
+        g = dgl.DGLGraph(arr, readonly=True)
     g.ndata['h1'] = F.randn((g.number_of_nodes(), 10))
     g.edata['h2'] = F.randn((g.number_of_edges(), 3))
     return g
@@ -38,6 +44,18 @@ def test_self_loop():
         in_deg = nf.layer_in_degree(i)
         deg = F.copy_to(F.ones(in_deg.shape, dtype=F.int64), F.cpu()) * n
         assert_array_equal(F.asnumpy(in_deg), F.asnumpy(deg))
+
+    g = generate_rand_graph(n, complete=True, add_self_loop=True)
+    g = dgl.to_simple_graph(g)
+    nf = create_mini_batch(g, num_hops, add_self_loop=True)
+    for i in range(nf.num_blocks):
+        parent_eid = F.asnumpy(nf.block_parent_eid(i))
+        parent_nid = F.asnumpy(nf.layer_parent_nid(i + 1))
+        # The loop eid in the parent graph must exist in the block parent eid.
+        parent_loop_eid = F.asnumpy(g.edge_ids(parent_nid, parent_nid))
+        assert len(parent_loop_eid) == len(parent_nid)
+        for eid in parent_loop_eid:
+            assert eid in parent_eid
 
 def create_mini_batch(g, num_hops, add_self_loop=False):
     seed_ids = np.array([1, 2, 0, 3])
@@ -59,7 +77,6 @@ def check_basic(g, nf):
     assert nf.number_of_edges() == num_edges
     assert len(nf) == num_nodes
     assert nf.is_readonly
-    assert not nf.is_multigraph
 
     assert np.all(F.asnumpy(nf.has_nodes(list(range(num_nodes)))))
     for i in range(num_nodes):
@@ -128,6 +145,11 @@ def test_basic():
 
     g = generate_rand_graph(100)
     nf = create_mini_batch(g, num_layers)
+    assert nf.num_layers == num_layers + 1
+    check_basic(g, nf)
+
+    g = generate_rand_graph(100, add_self_loop=True)
+    nf = create_mini_batch(g, num_layers, add_self_loop=True)
     assert nf.num_layers == num_layers + 1
     check_basic(g, nf)
 
