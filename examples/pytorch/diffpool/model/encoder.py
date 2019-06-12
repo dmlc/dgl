@@ -9,6 +9,7 @@ from scipy.linalg import block_diag
 import dgl
 
 from .graphSage import GraphSage, GraphSageLayer
+import time
 
 
 class GraphEncoder(nn.Module):
@@ -274,7 +275,13 @@ class DiffPoolEncoder(GraphEncoder):
         out_all = []
 
         # we use GCN blocks to get an embedding first
+        total_time = []
+        comment = []
+        start = time.time()
         g_embedding = self.gcn_forward(g, h, self.gc_layers)
+        end = time.time() - start
+        total_time.append(end)
+        comment.append("pre_assignment graph convolution")
 
         g.ndata['h'] = g_embedding
 
@@ -286,6 +293,7 @@ class DiffPoolEncoder(GraphEncoder):
 
         for i in range(self.n_pooling):
             # register as member because we need to use it in loss function
+            start = time.time()
             self.assign_tensor = self.gcn_forward(g, h_a,
                                                   self.gc_layers_assign[i],
                                                   False)
@@ -298,10 +306,17 @@ class DiffPoolEncoder(GraphEncoder):
                 assign_tensor_masks.append(mask)
             mask = torch.FloatTensor(block_diag(*assign_tensor_masks)).cuda()
 
+            end = time.time() - start
+            total_time.append(end)
+            comment.append("assignment matrix calculation")
 
 
+            start = time.time()
             self.assign_tensor = masked_softmax(self.assign_tensor, mask,
                                                 memory_efficient=False)
+            end = time.time() - start
+            total_time.append(end)
+            comment.append("mask softmax calculation")
 
             if not self.training:
                 _, idx = torch.max(self.assign_tensor, dim=1)
@@ -311,7 +326,11 @@ class DiffPoolEncoder(GraphEncoder):
                 self.assign_tensor = sparse_assign
 
             # X_n = S^T X_{n-1}
+            start = time.time()
             h = torch.matmul(torch.t(self.assign_tensor),g_embedding)
+            end = time.time() - start
+            total_time.append(end)
+            comment.append("lifting node feature matrix")
 
             # we need to take out the adjacency matrix to compute S^TAS
             # current device defaulted to cuda
@@ -319,25 +338,37 @@ class DiffPoolEncoder(GraphEncoder):
             adj = g.adjacency_matrix(ctx=device)
             node_seg_list = g.batch_num_nodes
             # S^TAS
+            start = time.time()
             adj_new = torch.sparse.mm(adj, self.assign_tensor)
             adj_new = torch.mm(torch.t(self.assign_tensor), adj_new)
+            end = time.time() - start
+            total_time.append(end)
+            comment.append("calculating next graph adj matrix")
 
             h_a = h# updating assignment input and embedding input
 
             pooled_g_n_nodes = self.assign_tensor.size()[1]
 
+            start = time.time()
             pooled_g = dgl.DGLGraph()
             # create the new pooled graph (batch version)
             pooled_g.add_nodes(pooled_g_n_nodes)
             adj_indices = adj_new.to_sparse()._indices()
             # add edges
             pooled_g.add_edges(adj_indices[1], adj_indices[0])
+            end = time.time() - start
+            total_time.append(end)
+            comment.append("consrtructing new graph")
 
             # edge weight is not set on pooled graph yet.\TODO
 
             # at this point we have block diagonally dense graph (a batch
             # graph)
+            start = time.time()
             embedding_tensor = self.gcn_forward(pooled_g, h, self.gc_layers_after_pool[i])
+            end = time.time() - start
+            total_time.append(end)
+            comment.append("after_assignment graph convolution")
 
             pooled_g.ndata['h'] = embedding_tensor
             out_temp = []
@@ -356,6 +387,7 @@ class DiffPoolEncoder(GraphEncoder):
                 out_all.append(out)
 
             # L_{lp} = A - S^TS
+            start = time.time()
             current_lp_loss = torch.norm(adj.to_dense() - torch.mm(self.assign_tensor,
                                                                    torch.t(self.assign_tensor))) / np.power(g.number_of_nodes(),2)
             self.link_pred_loss.append(current_lp_loss)
@@ -364,6 +396,9 @@ class DiffPoolEncoder(GraphEncoder):
             current_entropy_loss =\
             self.hloss(self.assign_tensor, mask) / np.power(g.number_of_nodes(), 2)
             self.entropy_loss.append(current_entropy_loss)
+            end = time.time() - start
+            comment.append("calculating loss")
+            total_time.append(end)
 
             g = pooled_g
 
@@ -371,7 +406,13 @@ class DiffPoolEncoder(GraphEncoder):
             output = torch.cat(out_all, dim=1)
         else:
             output = out
+        start = time.time()
         ypred = self.pred_model(output)
+        end = time.time() - start
+        total_time.append(end)
+        total_time = np.array(total_time)
+        print((total_time/np.sum(total_time))*100)
+        print(comment)
         return ypred
 
     def loss(self, pred, label):
