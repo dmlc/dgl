@@ -835,6 +835,26 @@ class GraphIndex(object):
         handle = _CAPI_DGLImmutableGraphCopyTo(self._handle, ctx.device_type, ctx.device_id)
         return GraphIndex(handle)
 
+    def copyto_shared_mem(self, edge_dir, shared_mem_name):
+        """Copy this immutable graph index to shared memory.
+
+        NOTE: this method only works for immutable graph index
+
+        Parameters
+        ----------
+        edge_dir : string
+            Indicate which CSR should copy ("in", "out", "both").
+        shared_mem_name : string
+            The name of the shared memory.
+
+        Returns
+        -------
+        GraphIndex
+            The graph index on the given device context.
+        """
+        handle = _CAPI_DGLImmutableGraphCopyToSharedMem(self._handle, edge_dir, shared_mem_name)
+        return GraphIndex(handle)
+
     def nbits(self):
         """Return the number of integer bits used in the storage (32 or 64).
 
