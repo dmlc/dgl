@@ -1,5 +1,5 @@
 """
-.. _sampling:
+.. _model-sampling:
 
 NodeFlow and Sampling
 =======================================

@@ -128,6 +128,44 @@ class NodeFlow(DGLBaseGraph):
         """
         return BlockView(self)
 
+    def node_attr_schemes(self, layer_id):
+        """Return the node feature schemes.
+
+        Each feature scheme is a named tuple that stores the shape and data type
+        of the node feature
+
+        Parameters
+        ----------
+        layer_id : int
+            the specified layer to get node data scheme.
+
+        Returns
+        -------
+        dict of str to schemes
+            The schemes of node feature columns.
+        """
+        layer_id = self._get_layer_id(layer_id)
+        return self._node_frames[layer_id].schemes
+
+    def edge_attr_schemes(self, block_id):
+        """Return the edge feature schemes.
+
+        Each feature scheme is a named tuple that stores the shape and data type
+        of the node feature
+
+        Parameters
+        ----------
+        block_id : int
+            the specified block to get edge data scheme.
+
+        Returns
+        -------
+        dict of str to schemes
+            The schemes of edge feature columns.
+        """
+        block_id = self._get_block_id(block_id)
+        return self._edge_frames[block_id].schemes
+
     def layer_size(self, layer_id):
         """Return the number of nodes in a specified layer.
 
@@ -520,12 +558,17 @@ class NodeFlow(DGLBaseGraph):
         or not.
 
         There are two types of an incidence matrix `I`:
-        * "in":
-          - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
-          - I[v, e] = 0 otherwise.
-        * "out":
-          - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
-          - I[v, e] = 0 otherwise.
+
+        * ``in``:
+
+            - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
+            - I[v, e] = 0 otherwise.
+
+        * ``out``:
+
+            - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
+            - I[v, e] = 0 otherwise.
+
         "both" isn't defined in the block of a NodeFlow.
 
         Parameters
