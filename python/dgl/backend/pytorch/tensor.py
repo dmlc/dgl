@@ -308,3 +308,7 @@ def _reduce_grad(grad, shape):
     reduce_idx += 1  # skip batch dim
     grad = grad.sum(dim=tuple(reduce_idx), keepdim=True)
     return grad.view(shape)
+
+def sync():
+    # Pytorch performs computation synchronously, so no need for synchronization.
+    pass
