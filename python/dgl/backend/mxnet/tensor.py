@@ -393,3 +393,12 @@ def _reduce_grad(grad, shape):
     reduce_idx += 1  # skip batch dim
     grad = grad.sum(axis=tuple(reduce_idx), keepdims=True)
     return grad.reshape(shape)
+
+def sync():
+    """Synchronize computation.
+
+    In DL frameworks such as MXNet and TensorFlow, the computation in operators
+    are done asynchronously. This is to synchronize computation and makes sure
+    that all computation is complete after this function call.
+    """
+    mx.nd.waitall()
