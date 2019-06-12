@@ -299,7 +299,7 @@ class NeighborSampler(NodeFlowSampler):
                 ThreadPrefetchingWrapper)
 
         assert g.is_readonly, "NeighborSampler doesn't support mutable graphs. " + \
-                "Please turn it into an immutable graph"
+                "Please turn it into an immutable graph with DGLGraph.readonly"
         assert node_prob is None, 'non-uniform node probability not supported'
         assert isinstance(expand_factor, Integral), 'non-int expand_factor not supported'
 
@@ -387,7 +387,7 @@ class LayerSampler(NodeFlowSampler):
                 ThreadPrefetchingWrapper)
 
         assert g.is_readonly, "LayerSampler doesn't support mutable graphs. " + \
-                "Please turn it into an immutable graph"
+                "Please turn it into an immutable graph with DGLGraph.readonly"
         assert node_prob is None, 'non-uniform node probability not supported'
 
         self._num_workers = int(num_workers)
