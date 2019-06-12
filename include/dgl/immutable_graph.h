@@ -208,6 +208,7 @@ class CSR : public GraphInterface {
     return {indptr_, indices_, edge_ids_};
   }
 
+  /*! \brief Indicate whether this uses shared memory. */
   bool IsSharedMem() const {
     return !shared_mem_name_.empty();
   }
@@ -507,6 +508,7 @@ class COO : public GraphInterface {
    */
   COO AsNumBits(uint8_t bits) const;
 
+  /*! \brief Indicate whether this uses shared memory. */
   bool IsSharedMem() const {
     return false;
   }
@@ -989,6 +991,7 @@ class ImmutableGraph: public GraphInterface {
    */
   ImmutableGraph AsNumBits(uint8_t bits) const;
 
+  /*! \brief Create an immutable graph from CSR. */
   static ImmutableGraph CreateFromCSR(IdArray indptr, IdArray indices, IdArray edge_ids,
                                       const std::string &edge_dir) {
     CSRPtr csr(new CSR(indptr, indices, edge_ids));
