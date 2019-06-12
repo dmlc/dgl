@@ -937,3 +937,12 @@ def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
 # ----------------
 # These are not related to tensors. Some of them are temporary workarounds that
 # should be included in DGL in the future.
+
+def sync():
+    """Synchronize computation.
+
+    In DL frameworks such as MXNet and TensorFlow, the computation in operators
+    are done asynchronously. This is to synchronize computation and makes sure
+    that all computation is complete after this function call.
+    """
+    pass
