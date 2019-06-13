@@ -94,7 +94,7 @@ def tutorial_test_linux(backend) {
 }
 
 pipeline {
-  agent none
+  agent any
   stages {
     stage("Lint Check") {
       agent { docker { image "dgllib/dgl-ci-lint" } }
