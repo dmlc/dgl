@@ -276,13 +276,17 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   size_t out_node_idx = 0;
   for (int layer_id = num_hops - 1; layer_id >= 0; layer_id--) {
     // We sort the vertices in a layer so that we don't need to sort the neighbor Ids
-    // after remap to a subgraph.
-    std::sort(sub_vers->begin() + layer_offsets[layer_id],
-              sub_vers->begin() + layer_offsets[layer_id + 1],
-              [](const std::pair<dgl_id_t, dgl_id_t> &a1,
-                 const std::pair<dgl_id_t, dgl_id_t> &a2) {
-      return a1.first < a2.first;
-    });
+    // after remap to a subgraph. However, we don't need to sort the first layer
+    // because we want the order of the nodes in the first layer is the same as
+    // the input seed nodes.
+    if (layer_id > 0) {
+      std::sort(sub_vers->begin() + layer_offsets[layer_id],
+                sub_vers->begin() + layer_offsets[layer_id + 1],
+                [](const std::pair<dgl_id_t, dgl_id_t> &a1,
+                   const std::pair<dgl_id_t, dgl_id_t> &a2) {
+        return a1.first < a2.first;
+      });
+    }
 
     // Save the sampled vertices and its layer Id.
     for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
@@ -305,11 +309,15 @@ NodeFlow ConstructNodeFlow(std::vector<dgl_id_t> neighbor_list,
   layer_off_data[1] = layer_offsets[num_hops] - layer_offsets[num_hops - 1];
   int out_layer_idx = 1;
   for (int layer_id = num_hops - 2; layer_id >= 0; layer_id--) {
-    std::sort(neigh_pos->begin() + layer_offsets[layer_id],
-              neigh_pos->begin() + layer_offsets[layer_id + 1],
-              [](const neighbor_info &a1, const neighbor_info &a2) {
-                return a1.id < a2.id;
-              });
+    // Because we don't sort the vertices in the first layer above, we can't sort
+    // the neighbor positions of the vertices in the first layer either.
+    if (layer_id > 0) {
+      std::sort(neigh_pos->begin() + layer_offsets[layer_id],
+                neigh_pos->begin() + layer_offsets[layer_id + 1],
+                [](const neighbor_info &a1, const neighbor_info &a2) {
+                  return a1.id < a2.id;
+                });
+    }
 
     for (size_t i = layer_offsets[layer_id]; i < layer_offsets[layer_id + 1]; i++) {
       dgl_id_t dst_id = sub_vers->at(i).first;
@@ -433,9 +441,20 @@ NodeFlow SampleSubgraph(const ImmutableGraph *graph,
                             &tmp_sampled_edge_list,
                             &time_seed);
       }
-      if (add_self_loop) {
+      // If we need to add self loop and it doesn't exist in the sampled neighbor list.
+      if (add_self_loop && std::find(tmp_sampled_src_list.begin(), tmp_sampled_src_list.end(),
+                                     dst_id) == tmp_sampled_src_list.end()) {
         tmp_sampled_src_list.push_back(dst_id);
-        tmp_sampled_edge_list.push_back(-1);
+        const dgl_id_t *src_list = col_list + *(indptr + dst_id);
+        const dgl_id_t *eid_list = val_list + *(indptr + dst_id);
+        // TODO(zhengda) this operation has O(N) complexity. It can be pretty slow.
+        const dgl_id_t *src = std::find(src_list, src_list + ver_len, dst_id);
+        // If there doesn't exist a self loop in the graph.
+        // we have to add -1 as the edge id for the self-loop edge.
+        if (src == src_list + ver_len)
+          tmp_sampled_edge_list.push_back(-1);
+        else
+          tmp_sampled_edge_list.push_back(eid_list[src - src_list]);
       }
       CHECK_EQ(tmp_sampled_src_list.size(), tmp_sampled_edge_list.size());
       neigh_pos.emplace_back(dst_id, neighbor_list.size(), tmp_sampled_src_list.size());
@@ -700,6 +719,18 @@ NodeFlow SamplerOp::LayerUniformSample(const ImmutableGraph *graph,
   return nf;
 }
 
+void BuildCsr(const ImmutableGraph &g, const std::string neigh_type) {
+  if (neigh_type == "in") {
+    auto csr = g.GetInCSR();
+    assert(csr);
+  } else if (neigh_type == "out") {
+    auto csr = g.GetOutCSR();
+    assert(csr);
+  } else {
+    LOG(FATAL) << "We don't support sample from neighbor type " << neigh_type;
+  }
+}
+
 DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     // arguments
@@ -721,6 +752,8 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformSampling")
     const int64_t num_seeds = seed_nodes->shape[0];
     const int64_t num_workers = std::min(max_num_workers,
         (num_seeds + batch_size - 1) / batch_size - batch_start_id);
+    // We need to make sure we have the right CSR before we enter parallel sampling.
+    BuildCsr(*gptr, neigh_type);
     // generate node flows
     std::vector<NodeFlow*> nflows(num_workers);
 #pragma omp parallel for
@@ -758,6 +791,8 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_LayerSampling")
     const int64_t num_seeds = seed_nodes->shape[0];
     const int64_t num_workers = std::min(max_num_workers,
         (num_seeds + batch_size - 1) / batch_size - batch_start_id);
+    // We need to make sure we have the right CSR before we enter parallel sampling.
+    BuildCsr(*gptr, neigh_type);
     // generate node flows
     std::vector<NodeFlow*> nflows(num_workers);
 #pragma omp parallel for

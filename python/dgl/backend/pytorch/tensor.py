@@ -5,6 +5,9 @@ from distutils.version import LooseVersion
 import torch as th
 from torch.utils import dlpack
 
+from ... import ndarray as nd
+from ... import kernel as K
+
 TH_VERSION = LooseVersion(th.__version__)
 
 def data_type_dict():
@@ -31,24 +34,12 @@ def get_preferred_sparse_format():
     """
     return "coo"
 
-if TH_VERSION.version[0] == 0:
-    def sparse_matrix(data, index, shape, force_format=False):
-        fmt = index[0]
-        if fmt != 'coo':
-            raise TypeError('Pytorch backend only supports COO format. But got %s.' % fmt)
-        # NOTE: use _sparse_coo_tensor_unsafe to avoid unnecessary boundary check
-        spmat = th._sparse_coo_tensor_unsafe(index[1], data, shape)
-        # No conversion is required.
-        return spmat, None
-else:
-    # VERSION 1.0+
-    def sparse_matrix(data, index, shape, force_format=False):
-        fmt = index[0]
-        if fmt != 'coo':
-            raise TypeError('Pytorch backend only supports COO format. But got %s.' % fmt)
-        spmat = th.sparse_coo_tensor(index[1], data, shape)
-        # No conversion is required.
-        return spmat, None
+def sparse_matrix(data, index, shape, force_format=False):
+    fmt = index[0]
+    if fmt != 'coo':
+        raise TypeError('Pytorch backend only supports COO format. But got %s.' % fmt)
+    spmat = th.sparse_coo_tensor(index[1], data, shape)
+    return spmat, None
 
 def sparse_matrix_indices(spmat):
     return ('coo', spmat._indices())
@@ -68,6 +59,15 @@ def ndim(input):
 def context(input):
     return input.device
 
+def device_type(ctx):
+    return ctx.type
+
+def device_id(ctx):
+    if ctx.index is None:
+        return 0
+    else:
+        return ctx.index
+
 def astype(input, ty):
     return input.type(ty)
 
@@ -81,7 +81,8 @@ def copy_to(input, ctx):
     if ctx.type == 'cpu':
         return input.cpu()
     elif ctx.type == 'cuda':
-        th.cuda.set_device(ctx.index)
+        if ctx.index is not None:
+            th.cuda.set_device(ctx.index)
         return input.cuda()
     else:
         raise RuntimeError('Invalid context', ctx)
@@ -134,18 +135,6 @@ def zeros_like(input):
 
 def ones(shape, dtype, ctx):
     return th.ones(shape, dtype=dtype, device=ctx)
-
-def spmm(x, y):
-    dst, src = x._indices()
-    # scatter index
-    index = dst.view(-1, 1).expand(-1, y.shape[1])
-    # zero tensor to be scatter_add to
-    out = y.new_full((x.shape[0], y.shape[1]), 0)
-    # look up src features and multiply by edge features
-    # Note: using y[src] instead of index_select will lead to terrible
-    #       performance in backward
-    feature = th.index_select(y, 0, src) * x._values().unsqueeze(-1)
-    return out.scatter_add(0, index, feature)
 
 def unsorted_1d_segment_sum(input, seg_id, n_segs, dim):
     y = th.zeros(n_segs, *input.shape[1:]).to(input)
@@ -201,3 +190,125 @@ def zerocopy_to_numpy(input):
 
 def zerocopy_from_numpy(np_array):
     return th.from_numpy(np_array)
+
+def zerocopy_to_dgl_ndarray(input):
+    return nd.from_dlpack(dlpack.to_dlpack(input.contiguous()))
+
+def zerocopy_from_dgl_ndarray(input):
+    return dlpack.from_dlpack(input.to_dlpack())
+
+
+class BinaryReduce(th.autograd.Function):
+    @staticmethod
+    def forward(ctx, reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
+                out_size, lhs_map, rhs_map, out_map):
+        lhs_data_nd = zerocopy_to_dgl_ndarray(lhs_data)
+        rhs_data_nd = zerocopy_to_dgl_ndarray(rhs_data)
+        feat_shape = K.infer_binary_feature_shape(lhs_data_nd, rhs_data_nd)
+        out_data = lhs_data.new_empty((out_size,) + feat_shape)
+        out_data_nd = zerocopy_to_dgl_ndarray(out_data)
+        K.binary_op_reduce(
+            reducer, binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
+            out_data_nd, lhs_map[0], rhs_map[0], out_map[0])
+        # save_for_backward can only save variables
+        ctx.backward_cache = (reducer, binary_op, graph, lhs, rhs, lhs_map,
+                              rhs_map, out_map, lhs_data_nd, rhs_data_nd,
+                              out_data_nd, feat_shape)
+        return out_data
+
+    @staticmethod
+    def backward(ctx, grad_out):
+        reducer, binary_op, graph, lhs, rhs, lhs_map, rhs_map, out_map, \
+            lhs_data_nd, rhs_data_nd, out_data_nd, feat_shape \
+            = ctx.backward_cache
+        ctx.backward_cache = None
+        grad_lhs = None
+        grad_rhs = None
+        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
+        if ctx.needs_input_grad[5]:
+            grad_lhs = grad_out.new_empty((lhs_data_nd.shape[0],) + feat_shape)
+            K.backward_lhs_binary_op_reduce(
+                reducer, binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
+                out_data_nd, grad_out_nd, zerocopy_to_dgl_ndarray(grad_lhs),
+                lhs_map[1], rhs_map[1], out_map[1])
+            grad_lhs = _reduce_grad(grad_lhs, lhs_data_nd.shape)
+        if ctx.needs_input_grad[6]:
+            grad_rhs = grad_out.new_empty((rhs_data_nd.shape[0],) + feat_shape)
+            K.backward_rhs_binary_op_reduce(
+                reducer, binary_op, graph, lhs, rhs, lhs_data_nd, rhs_data_nd,
+                out_data_nd, grad_out_nd, zerocopy_to_dgl_ndarray(grad_rhs),
+                lhs_map[1], rhs_map[1], out_map[1])
+            grad_rhs = _reduce_grad(grad_rhs, rhs_data_nd.shape)
+
+        return None, None, None, None, None, grad_lhs, grad_rhs, None, None, \
+            None, None
+
+
+class CopyReduce(th.autograd.Function):
+    @staticmethod
+    def forward(ctx, reducer, graph, target, in_data, out_size, in_map,
+                out_map):
+        out_data = in_data.new_empty((out_size,) + in_data.shape[1:])
+        in_data_nd = zerocopy_to_dgl_ndarray(in_data)
+        out_data_nd = zerocopy_to_dgl_ndarray(out_data)
+        K.copy_reduce(
+            reducer, graph, target, in_data_nd, out_data_nd, in_map[0],
+            out_map[0])
+        # save_for_backward can only save variables
+        ctx.backward_cache = (reducer, graph, target, in_map, out_map,
+                              in_data_nd, out_data_nd)
+        return out_data
+
+    @staticmethod
+    def backward(ctx, grad_out):
+        reducer, graph, target, in_map, out_map, in_data_nd, out_data_nd \
+            = ctx.backward_cache
+        ctx.backward_cache = None
+        grad_in = None
+        grad_out_nd = zerocopy_to_dgl_ndarray(grad_out)
+        if ctx.needs_input_grad[3]:
+            grad_in = grad_out.new_empty(in_data_nd.shape)
+            K.backward_copy_reduce(
+                reducer, graph, target, in_data_nd, out_data_nd, grad_out_nd,
+                zerocopy_to_dgl_ndarray(grad_in), in_map[1], out_map[1])
+        return None, None, None, grad_in, None, None, None
+
+
+binary_reduce = BinaryReduce.apply
+copy_reduce = CopyReduce.apply
+
+
+def _reduce_grad(grad, shape):
+    """Reduce gradient on the broadcast dimension
+
+    If there is broadcast in forward pass, gradients need to be reduced on
+    broadcast dimension. This function checks the input tensor shape and
+    gradient shape and perform the reduction.
+
+    Parameters
+    ----------
+    grad: Tensor
+        Gradient tensor
+    shape: tuple
+        Shape of input tensor
+
+    Returns
+    -------
+    Tensor
+    """
+    grad_shape = grad.shape[1:]
+    in_shape = shape[1:]
+    if in_shape == grad_shape:
+        # no need to reduce
+        return grad
+    num_to_squeeze = len(grad_shape) - len(in_shape)
+    # pad inshape
+    in_shape = (1,) * num_to_squeeze + in_shape
+    reduce_idx = th.nonzero(th.tensor(grad_shape) - th.tensor(in_shape))
+    reduce_idx += 1  # skip batch dim
+    grad = grad.sum(dim=tuple(reduce_idx), keepdim=True)
+    return grad.view(shape)
+
+def sync():
+    # Pytorch performs computation synchronously, so no need for synchronization.
+    pass

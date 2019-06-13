@@ -211,6 +211,14 @@ def context(input):
     """
     pass
 
+def device_type(ctx):
+    """Return a str representing device type"""
+    pass
+
+def device_id(ctx):
+    """Return device index"""
+    pass
+
 def astype(input, ty):
     """Convert the input tensor to the given data type.
 
@@ -392,7 +400,7 @@ def gather_row(data, row_index):
 
 def narrow_row(x, start, stop):
     """Narrow down the tensor along the first dimension.
-    
+
     Parameters
     ----------
     x : Tensor
@@ -552,23 +560,6 @@ def ones(shape, dtype, ctx):
     -------
     Tensor
         The one tensor.
-    """
-    pass
-
-def spmm(x, y):
-    """Multiply a sparse matrix with a dense matrix.
-
-    Parameters
-    ----------
-    x : SparseTensor
-        The sparse matrix.
-    y : Tensor
-        The dense matrix.
-
-    Returns
-    -------
-    Tensor
-        The result dense matrix.
     """
     pass
 
@@ -842,8 +833,116 @@ def zerocopy_from_numpy(np_array):
     """
     pass
 
+def zerocopy_to_dgl_ndarray(input):
+    """Zerocopy a framework-specific Tensor to dgl.ndarray.NDArray
+
+    Parameters
+    ----------
+    input : Tensor
+
+    Returns
+    -------
+    dgl.ndarray.NDArray
+    """
+    pass
+
+def zerocopy_from_dgl_ndarray(input):
+    """Zerocopy a dgl.ndarray.NDArray to framework-specific Tensor
+
+    Parameters
+    ----------
+    input : dgl.ndarray.NDArray
+
+    Returns
+    -------
+    Tensor
+    """
+    pass
+
+###############################################################################
+# Custom Operators for graph level computations.
+
+# Note: These operators are supposed to be implemented using DGL-provided
+# kernels (see kernel.py), and plug into tensor framework using custom op
+# extensions.
+
+def binary_reduce(reducer, binary_op, graph, lhs, rhs, lhs_data, rhs_data,
+                  out_size, lhs_map, rhs_map, out_map):
+    """Perform binary operation between given data and reduce based on graph
+    structure.
+
+    Parameters
+    ----------
+    reducer : str
+        Type of reduction: 'sum', 'max', 'min', 'mean', 'prod', 'none' (no
+        reduction)
+    binary_op : str
+        Binary operation to perform, can be 'add', 'mul', 'sub', 'div'
+    graph : GraphIndex
+        The graph
+    lhs : int
+        The lhs target (src, dst, edge)
+    rhs : int
+        The rhs target (src, dst, edge)
+    lhs_data : Tensor
+        The lhs data
+    rhs_data : Tensor
+        The rhs data
+    out_size : int
+        Size of first dimension of output data
+    lhs_map : tuple
+        Two lhs id mapping arrays, one for forward pass, the other for backward
+    rhs_map : tuple
+        Two rhs id mapping arrays, one for forward pass, the other for backward
+    out_map : tuple
+        Two out id mapping arrays, one for forward pass, the other for backward
+
+    Returns
+    -------
+    Tensor
+        The result.
+    """
+    pass
+
+def copy_reduce(reducer, graph, target, in_data, out_size, in_map, out_map):
+    """Copy target data and perform reduce based on graph structure.
+
+    Parameters
+    ----------
+    reducer : str
+        Type of reduction: be 'sum', 'max', 'min', 'mean', 'prod', 'none' (no
+        reduction)
+    graph : GraphIndex
+        The graph
+    target : int
+        The input target (src, dst, edge)
+    in_data : Tensor
+        The input data
+    out_size : int
+        Size of first dimension of output data
+    in_map : tuple
+        Two input id mapping arrays, one for forward, the other for backward
+    out_map : tuple
+        Two output id mapping arrays, one for forward, the other for backward
+
+    Returns
+    -------
+    Tensor
+        The result.
+    """
+    pass
+
 ###############################################################################
 # Other interfaces
 # ----------------
 # These are not related to tensors. Some of them are temporary workarounds that
 # should be included in DGL in the future.
+
+def sync():
+    """Synchronize computation.
+
+    In DL frameworks such as MXNet and TensorFlow, the computation in operators
+    are done asynchronously. This is to synchronize computation and makes sure
+    that all computation is complete after this function call.
+    """
+    pass

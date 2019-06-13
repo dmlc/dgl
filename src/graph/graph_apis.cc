@@ -137,15 +137,11 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCreate")
     const bool readonly = args[4];
     GraphHandle ghandle;
     if (readonly) {
-      // TODO(minjie): The array copy here is unnecessary and adds extra overhead.
-      //   However, with MXNet backend, the memory would be corrupted if we directly
-      //   save the passed-in ndarrays into DGL's graph object. We hope MXNet team
-      //   could help look into this.
       if (multigraph == kBoolUnknown) {
-        COOPtr coo(new COO(num_nodes, Clone(src_ids), Clone(dst_ids)));
+        COOPtr coo(new COO(num_nodes, src_ids, dst_ids));
         ghandle = new ImmutableGraph(coo);
       } else {
-        COOPtr coo(new COO(num_nodes, Clone(src_ids), Clone(dst_ids), multigraph));
+        COOPtr coo(new COO(num_nodes, src_ids, dst_ids, multigraph));
         ghandle = new ImmutableGraph(coo);
       }
     } else {
@@ -162,37 +158,32 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreate")
     const std::string shared_mem_name = args[2];
     const int multigraph = args[3];
     const std::string edge_dir = args[4];
-    CSRPtr csr;
 
     IdArray edge_ids = IdArray::Empty({indices->shape[0]},
                                       DLDataType{kDLInt, 64, 1}, DLContext{kDLCPU, 0});
     int64_t *edge_data = static_cast<int64_t *>(edge_ids->data);
     for (size_t i = 0; i < edge_ids->shape[0]; i++)
       edge_data[i] = i;
+    ImmutableGraph *g = nullptr;
     if (shared_mem_name.empty()) {
-      // TODO(minjie): The array copy here is unnecessary and adds extra overhead.
-      //   However, with MXNet backend, the memory would be corrupted if we directly
-      //   save the passed-in ndarrays into DGL's graph object. We hope MXNet team
-      //   could help look into this.
       if (multigraph == kBoolUnknown) {
-        csr.reset(new CSR(Clone(indptr), Clone(indices), Clone(edge_ids)));
+        g = new ImmutableGraph(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids,
+                                                             edge_dir));
       } else {
-        csr.reset(new CSR(Clone(indptr), Clone(indices), Clone(edge_ids), multigraph));
+        g = new ImmutableGraph(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids,
+                                                             multigraph, edge_dir));
       }
     } else {
       if (multigraph == kBoolUnknown) {
-        csr.reset(new CSR(indptr, indices, edge_ids, shared_mem_name));
+        g = new ImmutableGraph(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids,
+                                                             edge_dir, shared_mem_name));
       } else {
-        csr.reset(new CSR(indptr, indices, edge_ids, multigraph, shared_mem_name));
+        g = new ImmutableGraph(ImmutableGraph::CreateFromCSR(indptr, indices, edge_ids,
+                                                             multigraph, edge_dir,
+                                                             shared_mem_name));
       }
     }
-
-    GraphHandle ghandle;
-    if (edge_dir == "in")
-      ghandle = new ImmutableGraph(csr, nullptr);
-    else
-      ghandle = new ImmutableGraph(nullptr, csr);
-    *rv = ghandle;
+    *rv = g;
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreateMMap")
@@ -200,15 +191,11 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphCSRCreateMMap")
     const std::string shared_mem_name = args[0];
     const int64_t num_vertices = args[1];
     const int64_t num_edges = args[2];
-    const bool multigraph = static_cast<bool>(args[3]);
+    const bool multigraph = args[3];
     const std::string edge_dir = args[4];
     // TODO(minjie): how to know multigraph
-    CSRPtr csr(new CSR(shared_mem_name, num_vertices, num_edges, multigraph));
-    GraphHandle ghandle;
-    if (edge_dir == "in")
-      ghandle = new ImmutableGraph(csr, nullptr);
-    else
-      ghandle = new ImmutableGraph(nullptr, csr);
+    GraphHandle ghandle = new ImmutableGraph(ImmutableGraph::CreateFromCSR(
+      shared_mem_name, num_vertices, num_edges, multigraph, edge_dir));
     *rv = ghandle;
   });
 
@@ -452,7 +439,8 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphEdgeSubgraph")
     GraphHandle ghandle = args[0];
     const GraphInterface *gptr = static_cast<GraphInterface*>(ghandle);
     const IdArray eids = args[1];
-    *rv = ConvertSubgraphToPackedFunc(gptr->EdgeSubgraph(eids));
+    bool preserve_nodes = args[2];
+    *rv = ConvertSubgraphToPackedFunc(gptr->EdgeSubgraph(eids, preserve_nodes));
   });
 
 DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLDisjointUnion")
@@ -523,12 +511,90 @@ DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphGetAdj")
     *rv = ConvertAdjToPackedFunc(res);
   });
 
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLToImmutable")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
+    GraphHandle newhandle = new ImmutableGraph(ImmutableGraph::ToImmutable(ptr));
+    *rv = newhandle;
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphContext")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
+    *rv = ptr->Context();
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyTo")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const int device_type = args[1];
+    const int device_id = args[2];
+    DLContext ctx;
+    ctx.device_type = static_cast<DLDeviceType>(device_type);
+    ctx.device_id = device_id;
+    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
+    const ImmutableGraph *ig = dynamic_cast<const ImmutableGraph*>(ptr);
+    CHECK(ig) << "Invalid argument: must be an immutable graph object.";
+    GraphHandle newhandle = new ImmutableGraph(ig->CopyTo(ctx));
+    *rv = newhandle;
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphCopyToSharedMem")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    std::string edge_dir = args[1];
+    std::string name = args[2];
+    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
+    const ImmutableGraph *ig = dynamic_cast<const ImmutableGraph*>(ptr);
+    CHECK(ig) << "Invalid argument: must be an immutable graph object.";
+    GraphHandle newhandle = new ImmutableGraph(ig->CopyToSharedMem(edge_dir, name));
+    *rv = newhandle;
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLGraphNumBits")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
+    *rv = ptr->NumBits();
+  });
+
+DGL_REGISTER_GLOBAL("graph_index._CAPI_DGLImmutableGraphAsNumBits")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    int bits = args[1];
+    const GraphInterface *ptr = static_cast<GraphInterface *>(ghandle);
+    const ImmutableGraph *ig = dynamic_cast<const ImmutableGraph*>(ptr);
+    CHECK(ig) << "Invalid argument: must be an immutable graph object.";
+    GraphHandle newhandle = new ImmutableGraph(ig->AsNumBits(bits));
+    *rv = newhandle;
+  });
+
 DGL_REGISTER_GLOBAL("transform._CAPI_DGLToSimpleGraph")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     GraphHandle ghandle = args[0];
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
     GraphHandle ret = GraphOp::ToSimpleGraph(ptr).Reset();
     *rv = ret;
+  });
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedMutableGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+    Graph* bgptr = new Graph();
+    *bgptr = GraphOp::ToBidirectedMutableGraph(ptr);
+    GraphHandle bghandle = bgptr;
+    *rv = bghandle;
+  });
+
+DGL_REGISTER_GLOBAL("transform._CAPI_DGLToBidirectedImmutableGraph")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    GraphHandle ghandle = args[0];
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghandle);
+    GraphHandle bghandle = GraphOp::ToBidirectedImmutableGraph(ptr).Reset();
+    *rv = bghandle;
   });
 
 }  // namespace dgl

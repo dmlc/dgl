@@ -144,6 +144,25 @@ class GraphOp {
    * \return a new immutable simple graph with no multi-edge.
    */
   static ImmutableGraph ToSimpleGraph(const GraphInterface* graph);
+
+  /*!
+   * \brief Convert the graph to a mutable bidirected graph.
+   *
+   * If the original graph has m edges for i -> j and n edges for
+   * j -> i, the new graph will have max(m, n) edges for both
+   * i -> j and j -> i.
+   *
+   * \param graph The input graph.
+   * \return a new mutable bidirected graph.
+   */
+  static Graph ToBidirectedMutableGraph(const GraphInterface* graph);
+
+  /*!
+   * \brief Same as BidirectedMutableGraph except that the returned graph is immutable.
+   * \param graph The input graph.
+   * \return a new immutable bidirected graph.
+   */
+  static ImmutableGraph ToBidirectedImmutableGraph(const GraphInterface* graph);
 };
 
 }  // namespace dgl

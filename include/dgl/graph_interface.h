@@ -97,6 +97,16 @@ class GraphInterface {
   virtual void Clear() = 0;
 
   /*!
+   * \brief Get the device context of this graph.
+   */
+  virtual DLContext Context() const = 0;
+
+  /*!
+   * \brief Get the number of integer bits used to store node/edge ids (32 or 64).
+   */
+  virtual uint8_t NumBits() const = 0;
+
+  /*!
    * \note not const since we have caches
    * \return whether the graph is a multigraph
    */
@@ -314,7 +324,7 @@ class GraphInterface {
    * \param eids The edges in the subgraph.
    * \return the induced edge subgraph
    */
-  virtual Subgraph EdgeSubgraph(IdArray eids) const = 0;
+  virtual Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const = 0;
 
   /*!
    * \brief Return a new graph with all the edges reversed.

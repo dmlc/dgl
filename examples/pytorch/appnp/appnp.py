@@ -33,7 +33,7 @@ class GraphPropagation(nn.Module):
             self.g.ndata['h'] = h
             if self.edge_drop:
                 # performing edge dropout
-                ed = self.edge_drop(torch.ones((self.g.number_of_edges(), 1)))
+                ed = self.edge_drop(torch.ones((self.g.number_of_edges(), 1), device=h.device))
                 self.g.edata['d'] = ed
                 self.g.update_all(fn.src_mul_edge(src='h', edge='d', out='m'),
                                   fn.sum(msg='m', out='h'))

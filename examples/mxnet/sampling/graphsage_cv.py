@@ -111,7 +111,8 @@ class GraphSAGETrain(gluon.Block):
 
         for i, layer in enumerate(self.layers):
             parent_nid = dgl.utils.toindex(nf.layer_parent_nid(i+1))
-            layer_nid = nf.map_from_parent_nid(i, parent_nid).as_in_context(h.context)
+            layer_nid = nf.map_from_parent_nid(i, parent_nid,
+                                               remap_local=True).as_in_context(h.context)
             self_h = h[layer_nid]
             # activation from previous layer of myself, used in graphSAGE
             nf.layers[i+1].data['self_h'] = self_h
@@ -165,7 +166,8 @@ class GraphSAGEInfer(gluon.Block):
         for i, layer in enumerate(self.layers):
             nf.layers[i].data['h'] = h
             parent_nid = dgl.utils.toindex(nf.layer_parent_nid(i+1))
-            layer_nid = nf.map_from_parent_nid(i, parent_nid).as_in_context(h.context)
+            layer_nid = nf.map_from_parent_nid(i, parent_nid,
+                                               remap_local=True).as_in_context(h.context)
             # activation from previous layer of the nodes in (i+1)-th layer, used in graphSAGE
             self_h = h[layer_nid]
             nf.layers[i+1].data['self_h'] = self_h
