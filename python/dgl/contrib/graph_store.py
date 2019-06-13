@@ -318,7 +318,11 @@ class SharedMemoryStoreServer(object):
     """
     def __init__(self, graph_data, edge_dir, graph_name, multigraph, num_workers, port):
         self.server = None
-        if isinstance(graph_data, (GraphIndex, DGLGraph)):
+        if isinstance(graph_data, GraphIndex):
+            graph_data = graph_data.copyto_shared_mem(edge_dir, _get_graph_path(graph_name))
+            self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=True)
+        elif isinstance(graph_data, DGLGraph):
+            graph_data = graph_data._graph.copyto_shared_mem(edge_dir, _get_graph_path(graph_name))
             self._graph = DGLGraph(graph_data, multigraph=multigraph, readonly=True)
         else:
             indptr, indices = _to_csr(graph_data, edge_dir, multigraph)
@@ -363,6 +367,7 @@ class SharedMemoryStoreServer(object):
             init = self._init_manager.deserialize(init)
             data = init(shape, dtype, _get_ndata_path(graph_name, ndata_name))
             self._graph.ndata[ndata_name] = data
+            F.sync()
             return 0
 
         # RPC command: initialize edge embedding in the server.
@@ -375,6 +380,7 @@ class SharedMemoryStoreServer(object):
             assert self._graph.number_of_edges() == shape[0]
             init = self._init_manager.deserialize(init)
             data = init(shape, dtype, _get_edata_path(graph_name, edata_name))
+            F.sync()
             self._graph.edata[edata_name] = data
             return 0
 
@@ -636,6 +642,10 @@ class SharedMemoryDGLGraph(BaseGraphStore):
         timeout: int
             time out in seconds.
         """
+        # Before entering the barrier, we need to make sure all computation in the local
+        # process has completed.
+        F.sync()
+
         # Here I manually implement multi-processing barrier with RPC.
         # It uses busy wait with RPC. Whenever, all_enter is called, there is
         # a context switch, so it doesn't burn CPUs so badly.

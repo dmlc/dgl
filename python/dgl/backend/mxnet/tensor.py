@@ -310,6 +310,8 @@ class BinaryReduce(mx.autograd.Function):
             zerocopy_to_dgl_ndarray_for_write(grad_rhs), self.lhs_map[1],
             self.rhs_map[1], self.out_map[1])
         grad_rhs = _reduce_grad(grad_rhs, rhs_data_nd.shape)
+        # clear saved tensors explicitly
+        self.saved_tensors = None
         return grad_lhs, grad_rhs
 
 
@@ -351,6 +353,8 @@ class CopyReduce(mx.autograd.Function):
             self.reducer, self.graph, self.target, in_data_nd, out_data_nd,
             grad_out_nd, zerocopy_to_dgl_ndarray_for_write(grad_in),
             self.in_map[1], self.out_map[1])
+        # clear saved tensors explicitly
+        self.saved_tensors = None
         return grad_in
 
 
@@ -389,3 +393,12 @@ def _reduce_grad(grad, shape):
     reduce_idx += 1  # skip batch dim
     grad = grad.sum(axis=tuple(reduce_idx), keepdims=True)
     return grad.reshape(shape)
+
+def sync():
+    """Synchronize computation.
+
+    In DL frameworks such as MXNet and TensorFlow, the computation in operators
+    are done asynchronously. This is to synchronize computation and makes sure
+    that all computation is complete after this function call.
+    """
+    mx.nd.waitall()
