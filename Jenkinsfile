@@ -28,68 +28,86 @@ def unpack_lib(name, libs) {
 }
 
 def build_dgl_linux(dev) {
-  init_git()
-  sh "bash tests/scripts/build_dgl.sh ${dev}"
-  pack_lib("dgl-${dev}-linux", dgl_linux_libs)
+  ws("/workspace/build-linux-${dev}") {
+    init_git()
+    sh "bash tests/scripts/build_dgl.sh ${dev}"
+    pack_lib("dgl-${dev}-linux", dgl_linux_libs)
+  }
 }
 
 def build_dgl_win64(dev) {
   /* Assuming that Windows slaves are already configured with MSBuild VS2017,
    * CMake and Python/pip/setuptools etc. */
-  init_git_win64()
-  bat "CALL tests\\scripts\\build_dgl.bat"
-  pack_lib("dgl-${dev}-win64", dgl_win64_libs)
+  ws("/workspace/build-win-${dev}") {
+    init_git_win64()
+    bat "CALL tests\\scripts\\build_dgl.bat"
+    pack_lib("dgl-${dev}-win64", dgl_win64_libs)
+  }
 }
 
 def cpp_unit_test_linux() {
-  init_git()
-  unpack_lib("dgl-cpu-linux", dgl_linux_libs)
-  sh "bash tests/scripts/task_cpp_unit_test.sh"
+  ws("/workspace/cpptest-linux") {
+    init_git()
+    unpack_lib("dgl-cpu-linux", dgl_linux_libs)
+    sh "bash tests/scripts/task_cpp_unit_test.sh"
+  }
 }
 
 def cpp_unit_test_win64() {
-  init_git_win64()
-  unpack_lib("dgl-cpu-win64", dgl_win64_libs)
-  bat "CALL tests\\scripts\\task_cpp_unit_test.bat"
+  ws("/workspace/cpptest-win") {
+    init_git_win64()
+    unpack_lib("dgl-cpu-win64", dgl_win64_libs)
+    bat "CALL tests\\scripts\\task_cpp_unit_test.bat"
+  }
 }
 
 def unit_test_linux(backend, dev) {
-  init_git()
-  unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
-  timeout(time: 2, unit: 'MINUTES') {
-    sh "bash tests/scripts/task_unit_test.sh ${backend} ${dev}"
+  ws("/workspace/utest-linux-${backend}-${dev}") {
+    init_git()
+    unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
+    timeout(time: 2, unit: 'MINUTES') {
+      sh "bash tests/scripts/task_unit_test.sh ${backend} ${dev}"
+    }
   }
 }
 
 def unit_test_win64(backend, dev) {
-  init_git_win64()
-  unpack_lib("dgl-${dev}-win64", dgl_win64_libs)
-  timeout(time: 2, unit: 'MINUTES') {
-    bat "CALL tests\\scripts\\task_unit_test.bat ${backend}"
+  ws("/workspace/utest-win-${backend}-${dev}") {
+    init_git_win64()
+    unpack_lib("dgl-${dev}-win64", dgl_win64_libs)
+    timeout(time: 2, unit: 'MINUTES') {
+      bat "CALL tests\\scripts\\task_unit_test.bat ${backend}"
+    }
   }
 }
 
 def example_test_linux(backend, dev) {
-  init_git()
-  unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
-  timeout(time: 20, unit: 'MINUTES') {
-    sh "bash tests/scripts/task_example_test.sh ${dev}"
+  ws("/workspace/exptest-linux-${backend}-${dev}") {
+    init_git()
+    unpack_lib("dgl-${dev}-linux", dgl_linux_libs)
+    timeout(time: 20, unit: 'MINUTES') {
+      sh "bash tests/scripts/task_example_test.sh ${dev}"
+    }
   }
 }
 
 def example_test_win64(backend, dev) {
-  init_git_win64()
-  unpack_lib("dgl-${dev}-win64", dgl_win64_libs)
-  timeout(time: 20, unit: 'MINUTES') {
-    bat "CALL tests\\scripts\\task_example_test.bat ${dev}"
+  ws("/workspace/exptest-win-${backend}-${dev}") {
+    init_git_win64()
+    unpack_lib("dgl-${dev}-win64", dgl_win64_libs)
+    timeout(time: 20, unit: 'MINUTES') {
+      bat "CALL tests\\scripts\\task_example_test.bat ${dev}"
+    }
   }
 }
 
 def tutorial_test_linux(backend) {
-  init_git()
-  unpack_lib("dgl-cpu-linux", dgl_linux_libs)
-  timeout(time: 20, unit: 'MINUTES') {
-    sh "bash tests/scripts/task_${backend}_tutorial_test.sh"
+  ws("/workspace/tutorial-linux-${backend}") {
+    init_git()
+    unpack_lib("dgl-cpu-linux", dgl_linux_libs)
+    timeout(time: 20, unit: 'MINUTES') {
+      sh "bash tests/scripts/task_${backend}_tutorial_test.sh"
+    }
   }
 }
 
@@ -212,16 +230,11 @@ pipeline {
                 unit_test_linux("mxnet", "cpu")
               }
             }
-            //stage("Example test") {
+            //stage("Tutorial test") {
             //  steps {
-            //    unit_test_linux("pytorch", "cpu")
+            //    tutorial_test_linux("mxnet")
             //  }
             //}
-            stage("Tutorial test") {
-              steps {
-                tutorial_test_linux("mxnet")
-              }
-            }
           }
         }
         stage("MXNet GPU") {
@@ -236,16 +249,6 @@ pipeline {
               steps {
                 sh "nvidia-smi"
                 unit_test_linux("mxnet", "gpu")
-              }
-            }
-            //stage("Example test") {
-            //  steps {
-            //    unit_test_linux("pytorch", "cpu")
-            //  }
-            //}
-            stage("Tutorial test") {
-              steps {
-                tutorial_test_linux("mxnet")
               }
             }
           }
