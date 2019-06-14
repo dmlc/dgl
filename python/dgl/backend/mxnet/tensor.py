@@ -126,6 +126,8 @@ def stack(seq, dim):
 
 def split(x, sizes_or_sections, dim):
     if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] >= 5:
+        if isinstance(sizes_or_sections, np.ndarray):
+            sizes_or_sections = list(sizes_or_sections)
         return nd.split_v2(x, sizes_or_sections, axis=dim)
 
     if isinstance(sizes_or_sections, list) or isinstance(sizes_or_sections, np.ndarray):
