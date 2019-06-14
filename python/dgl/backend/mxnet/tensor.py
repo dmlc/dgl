@@ -125,8 +125,11 @@ def stack(seq, dim):
     return nd.stack(*seq, axis=dim)
 
 def split(x, sizes_or_sections, dim):
+    if MX_VERSION.version[0] == 1 and MX_VERSION.version[1] >= 5:
+        return nd.split_v2(x, sizes_or_sections, axis=dim)
+
     if isinstance(sizes_or_sections, list) or isinstance(sizes_or_sections, np.ndarray):
-        # TODO: fallback to numpy is unfortunate
+        # Old MXNet doesn't support split with different section sizes.
         np_arr = x.asnumpy()
         indices = np.cumsum(sizes_or_sections)[:-1]
         res = np.split(np_arr, indices, axis=dim)
