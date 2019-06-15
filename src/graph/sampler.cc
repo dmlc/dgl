@@ -865,4 +865,60 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_LayerSampling")
     *rv = List<NodeFlow>(nflows);
   });
 
+void BuildCoo(const ImmutableGraph &g) {
+  auto coo = g.GetCOO();
+  assert(coo);
+}
+
+
+DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    // arguments
+    const GraphHandle ghdl = args[0];
+    IdArray seed_edges = args[1];
+    const int64_t batch_start_id = args[2];
+    const int64_t batch_size = args[3];
+    const int64_t max_num_workers = args[4];
+    const int64_t expand_factor = args[5];
+    const int64_t num_hops = args[6];
+    const std::string neigh_type = args[7];
+    const bool add_self_loop = args[8];
+    // process args
+    const GraphInterface *ptr = static_cast<const GraphInterface *>(ghdl);
+    const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
+    CHECK(gptr) << "sampling isn't implemented in mutable graph";
+    CHECK(IsValidIdArray(seed_edges));
+    CHECK(!gptr->IsMultigraph()) << "Edge sampling doesn't support multi-graph";
+    BuildCsr(*gptr, neigh_type);
+    BuildCoo(*gptr);
+
+    const int64_t num_seeds = seed_edges->shape[0];
+    const int64_t num_workers = std::min(max_num_workers,
+        (num_seeds + batch_size - 1) / batch_size - batch_start_id);
+    // generate node flows
+    std::vector<NodeFlow*> nflows(num_workers * 2);
+#pragma omp parallel for
+    for (int i = 0; i < num_workers; i++) {
+      const int64_t start = (batch_start_id + i) * batch_size;
+      const int64_t end = std::min(start + batch_size, num_seeds);
+      const int64_t num_edges = end - start;
+      IdArray worker_seeds = seed_edges.CreateView({num_edges}, DLDataType{kDLInt, 64, 1},
+                                                   sizeof(dgl_id_t) * start);
+      GraphInterface::EdgeArray arr = gptr->FindEdges(worker_seeds);
+      const dgl_id_t *src_ids = static_cast<const dgl_id_t *>(arr.src->data);
+      const dgl_id_t *dst_ids = static_cast<const dgl_id_t *>(arr.dst->data);
+      std::vector<dgl_id_t> src_vec(src_ids, src_ids + num_edges);
+      std::vector<dgl_id_t> dst_vec(dst_ids, dst_ids + num_edges);
+      // TODO(zhengda) what if there are duplicates in the src and dst vectors.
+      nflows[i * 2] = new NodeFlow();
+      nflows[i * 2 + 1] = new NodeFlow();
+      // TODO(zhengda) we need to remove the edges from NodeFlows.
+      *nflows[i * 2] = SamplerOp::NeighborUniformSample(
+          gptr, src_vec, neigh_type, num_hops, expand_factor, add_self_loop);
+      *nflows[i * 2 + 1] = SamplerOp::NeighborUniformSample(
+          gptr, dst_vec, neigh_type, num_hops, expand_factor, add_self_loop);
+    }
+    *rv = WrapVectorReturn(nflows);
+  });
+
 }  // namespace dgl
