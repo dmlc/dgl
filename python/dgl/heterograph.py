@@ -1,5 +1,6 @@
 """Classes for heterogeneous graphs."""
 
+# pylint: disable=unnecessary-pass
 class DGLBaseHeteroGraph(object):
     """Base Heterogeneous graph class.
 
