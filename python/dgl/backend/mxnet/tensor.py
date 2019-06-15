@@ -258,8 +258,7 @@ def zerocopy_to_numpy(arr):
     return arr.asnumpy()
 
 def zerocopy_from_numpy(np_data):
-    # NOTE: not zerocopy
-    return nd.array(np_data, dtype=np_data.dtype)
+    return mx.nd.from_numpy(np_data, zero_copy=True)
 
 def zerocopy_to_dgl_ndarray(arr):
     return dglnd.from_dlpack(arr.to_dlpack_for_read())
