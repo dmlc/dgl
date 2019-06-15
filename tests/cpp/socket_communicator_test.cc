@@ -21,18 +21,12 @@ bool start_server();
 #include <unistd.h>
 
 TEST(SocketCommunicatorTest, SendAndRecv) {
-  int pid = fork();
-  ASSERT_GE(pid, 0);
-  if (pid > 0) {
-    EXPECT_TRUE(start_server());
-  } else {
-    start_client();
-  }
+  std::thread client_thread(start_client);
+  start_server();
+  client_thread.join();
 }
 
 #else   // WIN32
-
-// Win32 doesn't have a fork() equivalent so use threads instead.
 
 #include <windows.h>
 #include <winsock2.h>
@@ -79,12 +73,12 @@ TEST(SocketCommunicatorTest, SendAndRecv) {
 #endif  // WIN32
 
 void start_client() {
-  const char * msg = "0123456789";
+  const char * msg = "123456789";
   sleep(1);
   SocketSender sender;
   sender.AddReceiver("127.0.0.1", 2049, 0);
   sender.Connect();
-  sender.Send(msg, 10, 0);
+  sender.Send(msg, 9, 0);
   sender.Finalize();
 }
 
@@ -92,8 +86,8 @@ bool start_server() {
   char serbuff[10];
   memset(serbuff, '\0', 10);
   SocketReceiver receiver;
-  receiver.Wait("127.0.0.1", 2049, 1, 500);
-  receiver.Recv(serbuff, 10);
+  receiver.Wait("127.0.0.1", 2049, 1, 500 * 1024);
+  receiver.Recv(serbuff, 9);
   receiver.Finalize();
-  return string("0123456789") == string(serbuff);
+  return string("123456789") == string(serbuff);
 }

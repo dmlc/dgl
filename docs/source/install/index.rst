@@ -64,6 +64,13 @@ The backend is controlled by ``DGLBACKEND`` environment variable, which defaults
 |         |         | .. code:: bash                                   |
 |         |         |                                                  |
 |         |         |    pip install --pre mxnet                       |
+|         |         |                                                  |
+|         |         | or cuda version (e.g. for cuda 9.0)              |
+|         |         |                                                  |
+|         |         | .. code:: bash                                   |
+|         |         |                                                  |
+|         |         |    pip install --pre mxnet-cu90                  |
+|         |         |                                                  |
 +---------+---------+--------------------------------------------------+
 | numpy   | NumPy   | Does not support gradient computation            |
 +---------+---------+--------------------------------------------------+
@@ -102,14 +109,31 @@ For Fedora/RHEL/CentOS users, run:
 
    sudo yum install -y gcc-c++ python3-devel make cmake
 
-Build the shared library and install the Python binding afterwards:
+Build the shared library. Use the configuration template ``cmake/config.cmake``.
+Copy it to either the project directory or the build directory and change the
+configuration as you wish. For example, change ``USE_CUDA`` to ``ON`` will
+enable cuda build. You could also pass ``-DKEY=VALUE`` to the cmake command
+for the same purpose.
+
+- CPU-only build:
+   .. code:: bash
+
+      mkdir build
+      cd build
+      cmake ..
+      make -j4
+- Cuda build:
+   .. code:: bash
+
+      mkdir build
+      cd build
+      cmake -DUSE_CUDA=ON ..
+      make -j4
+
+Finally, install the Python binding.
 
 .. code:: bash
 
-   mkdir build
-   cd build
-   cmake ..
-   make -j4
    cd ../python
    python setup.py install
 

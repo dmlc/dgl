@@ -200,7 +200,7 @@ def test_nx_conversion():
     assert F.allclose(g.ndata['n1'], n1)
     # with id in nx edge feature, e1 should follow original order
     assert F.allclose(g.edata['e1'], e1)
-    assert F.array_equal(g.get_e_repr()['id'], F.arange(0, 4))
+    assert F.array_equal(g.get_e_repr()['id'], F.copy_to(F.arange(0, 4), F.cpu()))
 
     # test conversion after modifying DGLGraph
     g.pop_e_repr('id') # pop id so we don't need to provide id when adding edges
@@ -314,7 +314,7 @@ def test_apply_edges():
     u = F.tensor([0, 0, 0, 4, 5, 6])
     v = F.tensor([1, 2, 3, 9, 9, 9])
     g.apply_edges(lambda edges : {'w' : edges.data['w'] * 0.}, (u, v))
-    eid = g.edge_ids(u, v)
+    eid = F.tensor(g.edge_ids(u, v))
     assert F.allclose(F.gather_row(g.edata['w'], eid), F.zeros((6, D)))
 
 def test_update_routines():
@@ -643,8 +643,8 @@ def test_group_apply_edges():
             u, v, eid = g.out_edges(1, form='all')
         else:
             u, v, eid = g.in_edges(5, form='all')
-        out_feat = g.edata['norm_feat'][eid]
-        result = (g.ndata['h'][u] + g.ndata['h'][v]) * g.edata['feat'][eid]
+        out_feat = g.edges[eid].data['norm_feat']
+        result = (g.nodes[u].data['h'] + g.nodes[v].data['h']) * g.edges[eid].data['feat']
         result = F.softmax(F.sum(result, dim=1), dim=0)
         assert F.allclose(out_feat, result)
 

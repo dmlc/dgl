@@ -1,5 +1,5 @@
 """
-.. _sampling:
+.. _model-sampling:
 
 NodeFlow and Sampling
 =======================================
@@ -250,9 +250,9 @@ class GCNSampling(gluon.Block):
 # dropout probability
 dropout = 0.2
 # batch size
-batch_size = 10000
+batch_size = 1000
 # number of neighbors to sample
-num_neighbors = 8
+num_neighbors = 4
 # number of epochs
 num_epochs = 1
 
@@ -267,6 +267,7 @@ trainer = gluon.Trainer(model.collect_params(), 'adam',
                         {'learning_rate': 0.03, 'wd': 0})
 
 for epoch in range(num_epochs):
+    i = 0
     for nf in dgl.contrib.sampling.NeighborSampler(g, batch_size,
                                                    num_neighbors,
                                                    neighbor_type='in',
@@ -291,6 +292,10 @@ for epoch in range(num_epochs):
         # optimization
         trainer.step(batch_size=1)
         print("Epoch[{}]: loss {}".format(epoch, loss.asscalar()))
+        i += 1
+        # We only train the model with 32 mini-batches just for demonstration.
+        if i >= 32:
+            break
 
 ##############################################################################
 # Control Variate

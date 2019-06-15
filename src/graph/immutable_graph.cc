@@ -68,12 +68,12 @@ struct PairHash {
 };
 
 std::tuple<IdArray, IdArray, IdArray> MapFromSharedMemory(
-  const std::string &shared_mem_name, int64_t num_verts, int64_t num_edges) {
+  const std::string &shared_mem_name, int64_t num_verts, int64_t num_edges, bool is_create) {
 #ifndef _WIN32
   const int64_t file_size = (num_verts + 1 + num_edges * 2) * sizeof(dgl_id_t);
 
   IdArray sm_array = IdArray::EmptyShared(
-      shared_mem_name, {file_size}, DLDataType{kDLInt, 8, 1}, DLContext{kDLCPU, 0}, true);
+      shared_mem_name, {file_size}, DLDataType{kDLInt, 8, 1}, DLContext{kDLCPU, 0}, is_create);
   // Create views from the shared memory array. Note that we don't need to save
   //   the sm_array because the refcount is maintained by the view arrays.
   IdArray indptr = sm_array.CreateView({num_verts + 1}, DLDataType{kDLInt, 64, 1});
@@ -111,7 +111,8 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids)
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
-  : indptr_(indptr), indices_(indices), edge_ids_(edge_ids), is_multigraph_(is_multigraph) {
+  : indptr_(indptr), indices_(indices), edge_ids_(edge_ids),
+    is_multigraph_(is_multigraph) {
   CHECK(IsValidIdArray(indptr));
   CHECK(IsValidIdArray(indices));
   CHECK(IsValidIdArray(edge_ids));
@@ -119,7 +120,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph)
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
-         const std::string &shared_mem_name) {
+         const std::string &shared_mem_name): shared_mem_name_(shared_mem_name) {
   CHECK(IsValidIdArray(indptr));
   CHECK(IsValidIdArray(indices));
   CHECK(IsValidIdArray(edge_ids));
@@ -127,7 +128,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
   const int64_t num_verts = indptr->shape[0] - 1;
   const int64_t num_edges = indices->shape[0];
   std::tie(indptr_, indices_, edge_ids_) = MapFromSharedMemory(
-      shared_mem_name, num_verts, num_edges);
+      shared_mem_name, num_verts, num_edges, true);
   // copy the given data into the shared memory arrays
   indptr_.CopyFrom(indptr);
   indices_.CopyFrom(indices);
@@ -135,7 +136,8 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids,
 }
 
 CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
-         const std::string &shared_mem_name): is_multigraph_(is_multigraph) {
+         const std::string &shared_mem_name): is_multigraph_(is_multigraph),
+         shared_mem_name_(shared_mem_name) {
   CHECK(IsValidIdArray(indptr));
   CHECK(IsValidIdArray(indices));
   CHECK(IsValidIdArray(edge_ids));
@@ -143,7 +145,7 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
   const int64_t num_verts = indptr->shape[0] - 1;
   const int64_t num_edges = indices->shape[0];
   std::tie(indptr_, indices_, edge_ids_) = MapFromSharedMemory(
-      shared_mem_name, num_verts, num_edges);
+      shared_mem_name, num_verts, num_edges, true);
   // copy the given data into the shared memory arrays
   indptr_.CopyFrom(indptr);
   indices_.CopyFrom(indices);
@@ -152,9 +154,9 @@ CSR::CSR(IdArray indptr, IdArray indices, IdArray edge_ids, bool is_multigraph,
 
 CSR::CSR(const std::string &shared_mem_name,
          int64_t num_verts, int64_t num_edges, bool is_multigraph)
-  : is_multigraph_(is_multigraph) {
+  : is_multigraph_(is_multigraph), shared_mem_name_(shared_mem_name) {
   std::tie(indptr_, indices_, edge_ids_) = MapFromSharedMemory(
-      shared_mem_name, num_verts, num_edges);
+      shared_mem_name, num_verts, num_edges, false);
 }
 
 bool CSR::IsMultigraph() const {
@@ -455,6 +457,43 @@ COOPtr CSR::ToCOO() const {
   return COOPtr(new COO(NumVertices(), ret_src, ret_dst));
 }
 
+CSR CSR::CopyTo(const DLContext& ctx) const {
+  if (Context() == ctx) {
+    return *this;
+  } else {
+    // TODO(minjie): change to use constructor later
+    CSR ret;
+    ret.indptr_ = indptr_.CopyTo(ctx);
+    ret.indices_ = indices_.CopyTo(ctx);
+    ret.edge_ids_ = edge_ids_.CopyTo(ctx);
+    ret.is_multigraph_ = is_multigraph_;
+    return ret;
+  }
+}
+
+CSR CSR::CopyToSharedMem(const std::string &name) const {
+  if (IsSharedMem()) {
+    CHECK(name == shared_mem_name_);
+    return *this;
+  } else {
+    return CSR(indptr_, indices_, edge_ids_, name);
+  }
+}
+
+CSR CSR::AsNumBits(uint8_t bits) const {
+  if (NumBits() == bits) {
+    return *this;
+  } else {
+    // TODO(minjie): change to use constructor later
+    CSR ret;
+    ret.indptr_ = dgl::AsNumBits(indptr_, bits);
+    ret.indices_ = dgl::AsNumBits(indices_, bits);
+    ret.edge_ids_ = dgl::AsNumBits(edge_ids_, bits);
+    ret.is_multigraph_ = is_multigraph_;
+    return ret;
+  }
+}
+
 //////////////////////////////////////////////////////////
 //
 // COO graph implementation
@@ -521,8 +560,8 @@ COO::EdgeArray COO::Edges(const std::string &order) const {
   return EdgeArray{src_, dst_, rst_eid};
 }
 
-Subgraph COO::EdgeSubgraph(IdArray eids) const {
-  CHECK(IsValidIdArray(eids));
+Subgraph COO::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
+  CHECK(IsValidIdArray(eids)) << "Invalid edge id array.";
   const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
   const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
   const dgl_id_t* eids_data = static_cast<dgl_id_t*>(eids->data);
@@ -530,32 +569,50 @@ Subgraph COO::EdgeSubgraph(IdArray eids) const {
   IdArray new_dst = NewIdArray(eids->shape[0]);
   dgl_id_t* new_src_data = static_cast<dgl_id_t*>(new_src->data);
   dgl_id_t* new_dst_data = static_cast<dgl_id_t*>(new_dst->data);
-  dgl_id_t newid = 0;
-  std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
+  if (!preserve_nodes) {
+    dgl_id_t newid = 0;
+    std::unordered_map<dgl_id_t, dgl_id_t> oldv2newv;
 
-  for (int64_t i = 0; i < eids->shape[0]; ++i) {
-    const dgl_id_t eid = eids_data[i];
-    const dgl_id_t src = src_data[eid];
-    const dgl_id_t dst = dst_data[eid];
-    if (!oldv2newv.count(src)) {
-      oldv2newv[src] = newid++;
+    for (int64_t i = 0; i < eids->shape[0]; ++i) {
+      const dgl_id_t eid = eids_data[i];
+      const dgl_id_t src = src_data[eid];
+      const dgl_id_t dst = dst_data[eid];
+      if (!oldv2newv.count(src)) {
+        oldv2newv[src] = newid++;
+      }
+      if (!oldv2newv.count(dst)) {
+        oldv2newv[dst] = newid++;
+      }
+      *(new_src_data++) = oldv2newv[src];
+      *(new_dst_data++) = oldv2newv[dst];
     }
-    if (!oldv2newv.count(dst)) {
-      oldv2newv[dst] = newid++;
+
+    // induced nodes
+    IdArray induced_nodes = NewIdArray(newid);
+    dgl_id_t* induced_nodes_data = static_cast<dgl_id_t*>(induced_nodes->data);
+    for (const auto& kv : oldv2newv) {
+      induced_nodes_data[kv.second] = kv.first;
     }
-    *(new_src_data++) = oldv2newv[src];
-    *(new_dst_data++) = oldv2newv[dst];
-  }
 
-  // induced nodes
-  IdArray induced_nodes = NewIdArray(newid);
-  dgl_id_t* induced_nodes_data = static_cast<dgl_id_t*>(induced_nodes->data);
-  for (const auto& kv : oldv2newv) {
-    induced_nodes_data[kv.second] = kv.first;
-  }
+    COOPtr subcoo(new COO(newid, new_src, new_dst));
+    return Subgraph{subcoo, induced_nodes, eids};
+  } else {
+    for (int64_t i = 0; i < eids->shape[0]; ++i) {
+      const dgl_id_t eid = eids_data[i];
+      const dgl_id_t src = src_data[eid];
+      const dgl_id_t dst = dst_data[eid];
+      *(new_src_data++) = src;
+      *(new_dst_data++) = dst;
+    }
 
-  COOPtr subcoo(new COO(newid, new_src, new_dst));
-  return Subgraph{subcoo, induced_nodes, eids};
+    IdArray induced_nodes = NewIdArray(NumVertices());
+    dgl_id_t* induced_nodes_data = static_cast<dgl_id_t*>(induced_nodes->data);
+    for (int64_t i = 0; i < NumVertices(); ++i)
+      *(induced_nodes_data++) = i;
+
+    COOPtr subcoo(new COO(NumVertices(), new_src, new_dst));
+    return Subgraph{subcoo, induced_nodes, eids};
+  }
 }
 
 // complexity: time O(E + V), space O(1)
@@ -604,6 +661,38 @@ CSRPtr COO::ToCSR() const {
   return CSRPtr(new CSR(indptr, indices, edge_ids));
 }
 
+COO COO::CopyTo(const DLContext& ctx) const {
+  if (Context() == ctx) {
+    return *this;
+  } else {
+    // TODO(minjie): change to use constructor later
+    COO ret;
+    ret.num_vertices_ = num_vertices_;
+    ret.src_ = src_.CopyTo(ctx);
+    ret.dst_ = dst_.CopyTo(ctx);
+    ret.is_multigraph_ = is_multigraph_;
+    return ret;
+  }
+}
+
+COO COO::CopyToSharedMem(const std::string &name) const {
+  LOG(FATAL) << "COO doesn't supprt shared memory yet";
+}
+
+COO COO::AsNumBits(uint8_t bits) const {
+  if (NumBits() == bits) {
+    return *this;
+  } else {
+    // TODO(minjie): change to use constructor later
+    COO ret;
+    ret.num_vertices_ = num_vertices_;
+    ret.src_ = dgl::AsNumBits(src_, bits);
+    ret.dst_ = dgl::AsNumBits(dst_, bits);
+    ret.is_multigraph_ = is_multigraph_;
+    return ret;
+  }
+}
+
 //////////////////////////////////////////////////////////
 //
 // immutable graph implementation
@@ -640,9 +729,9 @@ Subgraph ImmutableGraph::VertexSubgraph(IdArray vids) const {
                   sg.induced_vertices, sg.induced_edges};
 }
 
-Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids) const {
+Subgraph ImmutableGraph::EdgeSubgraph(IdArray eids, bool preserve_nodes) const {
   // We prefer to generate a subgraph from out-csr.
-  auto sg = GetCOO()->EdgeSubgraph(eids);
+  auto sg = GetCOO()->EdgeSubgraph(eids, preserve_nodes);
   COOPtr subcoo = std::dynamic_pointer_cast<COO>(sg.graph);
   return Subgraph{GraphPtr(new ImmutableGraph(subcoo)),
                   sg.induced_vertices, sg.induced_edges};
@@ -663,6 +752,55 @@ std::vector<IdArray> ImmutableGraph::GetAdj(bool transpose, const std::string &f
   } else {
     LOG(FATAL) << "unsupported adjacency matrix format: " << fmt;
     return {};
+  }
+}
+
+ImmutableGraph ImmutableGraph::ToImmutable(const GraphInterface* graph) {
+  const ImmutableGraph* ig = dynamic_cast<const ImmutableGraph*>(graph);
+  if (ig) {
+    return *ig;
+  } else {
+    const auto& adj = graph->GetAdj(true, "csr");
+    CSRPtr csr(new CSR(adj[0], adj[1], adj[2]));
+    return ImmutableGraph(nullptr, csr);
+  }
+}
+
+ImmutableGraph ImmutableGraph::CopyTo(const DLContext& ctx) const {
+  if (ctx == Context()) {
+    return *this;
+  }
+  // TODO(minjie): since we don't have GPU implementation of COO<->CSR,
+  //   we make sure that this graph (on CPU) has materialized CSR,
+  //   and then copy them to other context (usually GPU). This should
+  //   be fixed later.
+  CSRPtr new_incsr = CSRPtr(new CSR(GetInCSR()->CopyTo(ctx)));
+  CSRPtr new_outcsr = CSRPtr(new CSR(GetOutCSR()->CopyTo(ctx)));
+  return ImmutableGraph(new_incsr, new_outcsr);
+}
+
+ImmutableGraph ImmutableGraph::CopyToSharedMem(const std::string &edge_dir,
+                                               const std::string &name) const {
+  CSRPtr new_incsr, new_outcsr;
+  std::string shared_mem_name = GetSharedMemName(name, edge_dir);
+  if (edge_dir == "in")
+    new_incsr = CSRPtr(new CSR(GetInCSR()->CopyToSharedMem(shared_mem_name)));
+  else if (edge_dir == "out")
+    new_outcsr = CSRPtr(new CSR(GetOutCSR()->CopyToSharedMem(shared_mem_name)));
+  return ImmutableGraph(new_incsr, new_outcsr, name);
+}
+
+ImmutableGraph ImmutableGraph::AsNumBits(uint8_t bits) const {
+  if (NumBits() == bits) {
+    return *this;
+  } else {
+    // TODO(minjie): since we don't have int32 operations,
+    //   we make sure that this graph (on CPU) has materialized CSR,
+    //   and then copy them to other context (usually GPU). This should
+    //   be fixed later.
+    CSRPtr new_incsr = CSRPtr(new CSR(GetInCSR()->AsNumBits(bits)));
+    CSRPtr new_outcsr = CSRPtr(new CSR(GetOutCSR()->AsNumBits(bits)));
+    return ImmutableGraph(new_incsr, new_outcsr);
   }
 }
 

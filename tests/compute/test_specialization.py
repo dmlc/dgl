@@ -51,14 +51,9 @@ def test_v2v_update_all():
                 fn.sum(msg='m', out=fld), apply_func)
         v2 = g.ndata[fld]
         g.set_n_repr({fld : v1})
-        g.update_all(fn.src_mul_edge(src=fld, edge='e2', out='m'),
-                fn.sum(msg='m', out=fld), apply_func)
-        v3 = g.ndata[fld]
-        g.set_n_repr({fld : v1})
         g.update_all(message_func_edge, reduce_func, apply_func)
         v4 = g.ndata[fld]
-        assert F.allclose(v2, v3)
-        assert F.allclose(v3, v4)
+        assert F.allclose(v2, v4)
     # test 1d node features
     _test('f1')
     # test 2d node features
@@ -98,14 +93,9 @@ def test_v2v_snr():
                 fn.sum(msg='m', out=fld), apply_func)
         v2 = g.ndata[fld]
         g.set_n_repr({fld : v1})
-        g.send_and_recv((u, v), fn.src_mul_edge(src=fld, edge='e2', out='m'),
-                fn.sum(msg='m', out=fld), apply_func)
-        v3 = g.ndata[fld]
-        g.set_n_repr({fld : v1})
         g.send_and_recv((u, v), message_func_edge, reduce_func, apply_func)
         v4 = g.ndata[fld]
-        assert F.allclose(v2, v3)
-        assert F.allclose(v3, v4)
+        assert F.allclose(v2, v4)
     # test 1d node features
     _test('f1')
     # test 2d node features
@@ -141,17 +131,12 @@ def test_v2v_pull():
         # send and recv with edge weights
         v1 = g.ndata[fld]
         g.pull(nodes, fn.src_mul_edge(src=fld, edge='e1', out='m'),
-               fn.sum(msg='m', out=fld), apply_func)
+                fn.sum(msg='m', out=fld), apply_func)
         v2 = g.ndata[fld]
-        g.ndata[fld] = v1
-        g.pull(nodes, fn.src_mul_edge(src=fld, edge='e2', out='m'),
-               fn.sum(msg='m', out=fld), apply_func)
-        v3 = g.ndata[fld]
         g.ndata[fld] = v1
         g.pull(nodes, message_func_edge, reduce_func, apply_func)
         v4 = g.ndata[fld]
-        assert F.allclose(v2, v3)
-        assert F.allclose(v3, v4)
+        assert F.allclose(v2, v4)
     # test 1d node features
     _test('f1')
     # test 2d node features
@@ -401,11 +386,6 @@ def test_update_all_multi_fallback():
                  fn.sum(msg='m2', out='o2'),
                  _afunc)
     assert F.allclose(o2, g.ndata.pop('o2'))
-    # v2v fallback to degree bucketing
-    g.update_all(fn.src_mul_edge(src='h', edge='w1', out='m1'),
-                 fn.max(msg='m1', out='o3'),
-                 _afunc)
-    assert F.allclose(o3, g.ndata.pop('o3'))
     # multi builtins, both v2v spmv
     g.update_all([fn.src_mul_edge(src='h', edge='w1', out='m1'), fn.src_mul_edge(src='h', edge='w1', out='m2')],
                  [fn.sum(msg='m1', out='o1'), fn.sum(msg='m2', out='o2')],
@@ -418,18 +398,6 @@ def test_update_all_multi_fallback():
                  _afunc)
     assert F.allclose(o1, g.ndata.pop('o1'))
     assert F.allclose(o2, g.ndata.pop('o2'))
-    # multi builtins, one v2v spmv, one fallback to e2v, one fallback to degree-bucketing
-    g.update_all([fn.src_mul_edge(src='h', edge='w1', out='m1'),
-                  fn.src_mul_edge(src='h', edge='w2', out='m2'),
-                  fn.src_mul_edge(src='h', edge='w1', out='m3')],
-                 [fn.sum(msg='m1', out='o1'),
-                  fn.sum(msg='m2', out='o2'),
-                  fn.max(msg='m3', out='o3')],
-                 _afunc)
-    assert F.allclose(o1, g.ndata.pop('o1'))
-    assert F.allclose(o2, g.ndata.pop('o2'))
-    assert F.allclose(o3, g.ndata.pop('o3'))
-
 
 def test_pull_multi_fallback():
     # create a graph with zero in degree nodes
@@ -476,11 +444,6 @@ def test_pull_multi_fallback():
                      fn.sum(msg='m2', out='o2'),
                      _afunc)
         assert F.allclose(o2, g.ndata.pop('o2'))
-        # v2v fallback to degree bucketing
-        g.pull(nodes, fn.src_mul_edge(src='h', edge='w1', out='m1'),
-                     fn.max(msg='m1', out='o3'),
-                     _afunc)
-        assert F.allclose(o3, g.ndata.pop('o3'))
         # multi builtins, both v2v spmv
         g.pull(nodes,
                [fn.src_mul_edge(src='h', edge='w1', out='m1'), fn.src_mul_edge(src='h', edge='w1', out='m2')],
@@ -495,18 +458,6 @@ def test_pull_multi_fallback():
                _afunc)
         assert F.allclose(o1, g.ndata.pop('o1'))
         assert F.allclose(o2, g.ndata.pop('o2'))
-        # multi builtins, one v2v spmv, one fallback to e2v, one fallback to degree-bucketing
-        g.pull(nodes,
-               [fn.src_mul_edge(src='h', edge='w1', out='m1'),
-                fn.src_mul_edge(src='h', edge='w2', out='m2'),
-                fn.src_mul_edge(src='h', edge='w1', out='m3')],
-               [fn.sum(msg='m1', out='o1'),
-                fn.sum(msg='m2', out='o2'),
-                fn.max(msg='m3', out='o3')],
-               _afunc)
-        assert F.allclose(o1, g.ndata.pop('o1'))
-        assert F.allclose(o2, g.ndata.pop('o2'))
-        assert F.allclose(o3, g.ndata.pop('o3'))
     # test#1: non-0deg nodes
     nodes = [1, 2, 9]
     _pull_nodes(nodes)

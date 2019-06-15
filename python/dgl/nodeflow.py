@@ -85,8 +85,8 @@ class NodeFlow(DGLBaseGraph):
     def _get_node_frame(self, layer_id):
         return self._node_frames[layer_id]
 
-    def _get_edge_frame(self, flow_id):
-        return self._edge_frames[flow_id]
+    def _get_edge_frame(self, block_id):
+        return self._edge_frames[block_id]
 
     @property
     def num_layers(self):
@@ -116,7 +116,6 @@ class NodeFlow(DGLBaseGraph):
 
         This is mainly for usage like:
         * `g.layers[2].data['h']` to get the node features of layer#2.
-        * `g.layers(2)` to get the nodes of layer#2.
         """
         return LayerView(self)
 
@@ -125,10 +124,47 @@ class NodeFlow(DGLBaseGraph):
         """Return a BlockView of this NodeFlow.
 
         This is mainly for usage like:
-        * `g.blocks[1,2].data['h']` to get the edge features of blocks from layer#1 to layer#2.
-        * `g.blocks(1, 2)` to get the edge ids of blocks #1->#2.
+        * `g.blocks[1].data['h']` to get the edge features of blocks from layer#1 to layer#2.
         """
         return BlockView(self)
+
+    def node_attr_schemes(self, layer_id):
+        """Return the node feature schemes.
+
+        Each feature scheme is a named tuple that stores the shape and data type
+        of the node feature
+
+        Parameters
+        ----------
+        layer_id : int
+            the specified layer to get node data scheme.
+
+        Returns
+        -------
+        dict of str to schemes
+            The schemes of node feature columns.
+        """
+        layer_id = self._get_layer_id(layer_id)
+        return self._node_frames[layer_id].schemes
+
+    def edge_attr_schemes(self, block_id):
+        """Return the edge feature schemes.
+
+        Each feature scheme is a named tuple that stores the shape and data type
+        of the node feature
+
+        Parameters
+        ----------
+        block_id : int
+            the specified block to get edge data scheme.
+
+        Returns
+        -------
+        dict of str to schemes
+            The schemes of edge feature columns.
+        """
+        block_id = self._get_block_id(block_id)
+        return self._edge_frames[block_id].schemes
 
     def layer_size(self, layer_id):
         """Return the number of nodes in a specified layer.
@@ -152,7 +188,7 @@ class NodeFlow(DGLBaseGraph):
         block_id = self._get_block_id(block_id)
         return int(self._block_offsets[block_id + 1]) - int(self._block_offsets[block_id])
 
-    def copy_from_parent(self, node_embed_names=ALL, edge_embed_names=ALL, ctx=F.cpu()):
+    def copy_from_parent(self, node_embed_names=ALL, edge_embed_names=ALL, ctx=None):
         """Copy node/edge features from the parent graph.
 
         Parameters
@@ -161,6 +197,8 @@ class NodeFlow(DGLBaseGraph):
             The names of embeddings in each layer.
         edge_embed_names : a list of lists of strings, optional
             The names of embeddings in each block.
+        ctx : Context
+            The device to copy tensor to. If None, features will stay at its original device
         """
         if self._parent._node_frame.num_rows != 0 and self._parent._node_frame.num_columns != 0:
             if is_all(node_embed_names):
@@ -194,6 +232,16 @@ class NodeFlow(DGLBaseGraph):
 
     def copy_to_parent(self, node_embed_names=ALL, edge_embed_names=ALL):
         """Copy node/edge embeddings to the parent graph.
+
+        Note: if a node in the parent graph appears in multiple layers and they
+        in the NodeFlow has node data with the same name, the data of this node
+        in the lower layer will overwrite the node data in previous layer.
+
+        For example, node 5 in the parent graph appears in layer 0 and 1 and
+        they have the same node data 'h'. The node data in layer 1 of this node
+        will overwrite its data in layer 0 when copying the data back.
+
+        To avoid this, users can give node data in each layer a different name.
 
         Parameters
         ----------
@@ -244,7 +292,8 @@ class NodeFlow(DGLBaseGraph):
         Tensor
             The parent node id array.
         """
-        return self._node_mapping.tousertensor()[nid]
+        nid = utils.toindex(nid)
+        return self._node_mapping.tousertensor()[nid.tousertensor()]
 
     def map_to_parent_eid(self, eid):
         """This maps the child edge Ids to the parent Ids.
@@ -259,10 +308,14 @@ class NodeFlow(DGLBaseGraph):
         Tensor
             The parent edge id array.
         """
-        return self._edge_mapping.tousertensor()[eid]
+        eid = utils.toindex(eid)
+        return self._edge_mapping.tousertensor()[eid.tousertensor()]
 
-    def map_from_parent_nid(self, layer_id, parent_nids):
+    def map_from_parent_nid(self, layer_id, parent_nids, remap_local=False):
         """Map parent node Ids to NodeFlow node Ids in a certain layer.
+
+        If `remap_local` is True, it returns the node Ids local to the layer.
+        Otherwise, the node Ids are unique in the NodeFlow.
 
         Parameters
         ----------
@@ -270,12 +323,15 @@ class NodeFlow(DGLBaseGraph):
             The layer Id.
         parent_nids: list or Tensor
             Node Ids in the parent graph.
+        remap_local: boolean
+            Remap layer/block-level local Id if True; otherwise, NodeFlow-level Id.
 
         Returns
         -------
         Tensor
             Node Ids in the NodeFlow.
         """
+        layer_id = self._get_layer_id(layer_id)
         parent_nids = utils.toindex(parent_nids)
         layers = self._layer_offsets
         start = int(layers[layer_id])
@@ -285,7 +341,10 @@ class NodeFlow(DGLBaseGraph):
         mapping = mapping[start:end]
         mapping = utils.toindex(mapping)
         nflow_ids = transform_ids(mapping, parent_nids)
-        return nflow_ids.tousertensor()
+        if remap_local:
+            return nflow_ids.tousertensor()
+        else:
+            return nflow_ids.tousertensor() + int(self._layer_offsets[layer_id])
 
     def layer_in_degree(self, layer_id):
         """Return the in-degree of the nodes in the specified layer.
@@ -300,6 +359,7 @@ class NodeFlow(DGLBaseGraph):
         Tensor
             The degree of the nodes in the specified layer.
         """
+        layer_id = self._get_layer_id(layer_id)
         return self._graph.in_degrees(utils.toindex(self.layer_nid(layer_id))).tousertensor()
 
     def layer_out_degree(self, layer_id):
@@ -315,10 +375,13 @@ class NodeFlow(DGLBaseGraph):
         Tensor
             The degree of the nodes in the specified layer.
         """
+        layer_id = self._get_layer_id(layer_id)
         return self._graph.out_degrees(utils.toindex(self.layer_nid(layer_id))).tousertensor()
 
     def layer_nid(self, layer_id):
         """Get the node Ids in the specified layer.
+
+        The returned node Ids are unique in the NodeFlow.
 
         Parameters
         ----------
@@ -328,7 +391,7 @@ class NodeFlow(DGLBaseGraph):
         Returns
         -------
         Tensor
-            The node id array.
+            The node ids.
         """
         layer_id = self._get_layer_id(layer_id)
         assert layer_id + 1 < len(self._layer_offsets)
@@ -360,6 +423,8 @@ class NodeFlow(DGLBaseGraph):
     def block_eid(self, block_id):
         """Get the edge Ids in the specified block.
 
+        The returned edge Ids are unique in the NodeFlow.
+
         Parameters
         ----------
         block_id : int
@@ -368,7 +433,7 @@ class NodeFlow(DGLBaseGraph):
         Returns
         -------
         Tensor
-            The edge id array.
+            The edge ids of the block in the NodeFlow.
         """
         block_id = self._get_block_id(block_id)
         start = self._block_offsets[block_id]
@@ -386,7 +451,7 @@ class NodeFlow(DGLBaseGraph):
         Returns
         -------
         Tensor
-            The parent edge id array.
+            The edge ids of the block in the parent graph.
         """
         block_id = self._get_block_id(block_id)
         start = self._block_offsets[block_id]
@@ -397,13 +462,19 @@ class NodeFlow(DGLBaseGraph):
         assert F.asnumpy(F.sum(ret == -1, 0)) == 0, "The eid in the parent graph is invalid."
         return ret
 
-    def block_edges(self, block_id):
+    def block_edges(self, block_id, remap_local=False):
         """Return the edges in a block.
+
+        If remap_local is True, returned indices u, v, eid will be remapped to local
+        Ids (i.e. starting from 0) in the block or in the layer. Otherwise,
+        u, v, eid are unique in the NodeFlow.
 
         Parameters
         ----------
         block_id : int
             The specified block to return the edges.
+        remap_local : boolean
+            Remap layer/block-level local Id if True; otherwise, NodeFlow-level Id.
 
         Returns
         -------
@@ -414,11 +485,13 @@ class NodeFlow(DGLBaseGraph):
         Tensor
             The edge ids.
         """
+        block_id = self._get_block_id(block_id)
         layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
         rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, "coo",
                                         int(layer0_size),
                                         int(self._layer_offsets[block_id + 1]),
-                                        int(self._layer_offsets[block_id + 2]))
+                                        int(self._layer_offsets[block_id + 2]),
+                                        remap_local)
         idx = utils.toindex(rst(0)).tousertensor()
         eid = utils.toindex(rst(1))
         num_edges = int(len(idx) / 2)
@@ -446,13 +519,15 @@ class NodeFlow(DGLBaseGraph):
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
+        block_id = self._get_block_id(block_id)
         fmt = F.get_preferred_sparse_format()
         # We need to extract two layers.
         layer0_size = self._layer_offsets[block_id + 1] - self._layer_offsets[block_id]
         rst = _CAPI_NodeFlowGetBlockAdj(self._graph._handle, fmt,
                                         int(layer0_size),
                                         int(self._layer_offsets[block_id + 1]),
-                                        int(self._layer_offsets[block_id + 2]))
+                                        int(self._layer_offsets[block_id + 2]),
+                                        True)
         num_rows = self.layer_size(block_id + 1)
         num_cols = self.layer_size(block_id)
 
@@ -482,17 +557,19 @@ class NodeFlow(DGLBaseGraph):
         value indicating whether the edge is incident to the node
         or not.
 
-        There are three types of an incidence matrix `I`:
-        * "in":
-          - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
-          - I[v, e] = 0 otherwise.
-        * "out":
-          - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
-          - I[v, e] = 0 otherwise.
-        * "both":
-          - I[v, e] = 1 if e is the in-edge of v;
-          - I[v, e] = -1 if e is the out-edge of v;
-          - I[v, e] = 0 otherwise (including self-loop).
+        There are two types of an incidence matrix `I`:
+
+        * ``in``:
+
+            - I[v, e] = 1 if e is the in-edge of v (or v is the dst node of e);
+            - I[v, e] = 0 otherwise.
+
+        * ``out``:
+
+            - I[v, e] = 1 if e is the out-edge of v (or v is the src node of e);
+            - I[v, e] = 0 otherwise.
+
+        "both" isn't defined in the block of a NodeFlow.
 
         Parameters
         ----------
@@ -511,7 +588,8 @@ class NodeFlow(DGLBaseGraph):
             A index for data shuffling due to sparse format change. Return None
             if shuffle is not required.
         """
-        src, dst, eid = self.block_edges(block_id)
+        block_id = self._get_block_id(block_id)
+        src, dst, eid = self.block_edges(block_id, remap_local=True)
         src = F.copy_to(src, ctx)  # the index of the ctx will be cached
         dst = F.copy_to(dst, ctx)  # the index of the ctx will be cached
         eid = F.copy_to(eid, ctx)  # the index of the ctx will be cached
@@ -532,23 +610,6 @@ class NodeFlow(DGLBaseGraph):
             idx = F.cat([row, col], dim=0)
             # FIXME(minjie): data type
             dat = F.ones((m,), dtype=F.float32, ctx=ctx)
-            inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
-        elif typestr == 'both':
-            # TODO does it work for bipartite graph?
-            # first remove entries for self loops
-            mask = F.logical_not(F.equal(src, dst))
-            src = F.boolean_mask(src, mask)
-            dst = F.boolean_mask(dst, mask)
-            eid = F.boolean_mask(eid, mask)
-            n_entries = F.shape(src)[0]
-            # create index
-            row = F.unsqueeze(F.cat([src, dst], dim=0), 0)
-            col = F.unsqueeze(F.cat([eid, eid], dim=0), 0)
-            idx = F.cat([row, col], dim=0)
-            # FIXME(minjie): data type
-            x = -F.ones((n_entries,), dtype=F.float32, ctx=ctx)
-            y = F.ones((n_entries,), dtype=F.float32, ctx=ctx)
-            dat = F.cat([x, y], dim=0)
             inc, shuffle_idx = F.sparse_matrix(dat, ('coo', idx), (n, m))
         else:
             raise DGLError('Invalid incidence matrix type: %s' % str(typestr))
@@ -577,7 +638,8 @@ class NodeFlow(DGLBaseGraph):
             for i in range(self.num_layers):
                 self._node_frames[i].set_initializer(initializer, field)
         else:
-            self._node_frames[i].set_initializer(initializer, field)
+            layer_id = self._get_layer_id(layer_id)
+            self._node_frames[layer_id].set_initializer(initializer, field)
 
     def set_e_initializer(self, initializer, block_id=ALL, field=None):
         """Set the initializer for empty edge features.
@@ -602,6 +664,7 @@ class NodeFlow(DGLBaseGraph):
             for i in range(self.num_blocks):
                 self._edge_frames[i].set_initializer(initializer, field)
         else:
+            block_id = self._get_block_id(block_id)
             self._edge_frames[block_id].set_initializer(initializer, field)
 
 
@@ -623,6 +686,7 @@ class NodeFlow(DGLBaseGraph):
         if is_all(block_id):
             self._message_funcs = [func] * self.num_blocks
         else:
+            block_id = self._get_block_id(block_id)
             self._message_funcs[block_id] = func
 
     def register_reduce_func(self, func, block_id=ALL):
@@ -643,6 +707,7 @@ class NodeFlow(DGLBaseGraph):
         if is_all(block_id):
             self._reduce_funcs = [func] * self.num_blocks
         else:
+            block_id = self._get_block_id(block_id)
             self._reduce_funcs[block_id] = func
 
     def register_apply_node_func(self, func, block_id=ALL):
@@ -663,6 +728,7 @@ class NodeFlow(DGLBaseGraph):
         if is_all(block_id):
             self._apply_node_funcs = [func] * self.num_blocks
         else:
+            block_id = self._get_block_id(block_id)
             self._apply_node_funcs[block_id] = func
 
     def register_apply_edge_func(self, func, block_id=ALL):
@@ -682,6 +748,7 @@ class NodeFlow(DGLBaseGraph):
         if is_all(block_id):
             self._apply_edge_funcs = [func] * self.num_blocks
         else:
+            block_id = self._get_block_id(block_id)
             self._apply_edge_funcs[block_id] = func
 
     def apply_layer(self, layer_id, func="default", v=ALL, inplace=False):
@@ -695,10 +762,11 @@ class NodeFlow(DGLBaseGraph):
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
         v : a list of vertex Ids or ALL.
-            The vertices to run the node update function.
+            The vertex Ids (unique in the NodeFlow) to run the node update function.
         inplace : bool, optional
             If True, update will be done in place, but autograd will break.
         """
+        layer_id = self._get_layer_id(layer_id)
         if func == "default":
             func = self._apply_node_funcs[layer_id]
         if is_all(v):
@@ -726,16 +794,17 @@ class NodeFlow(DGLBaseGraph):
             Apply function on the edges. The function should be
             an :mod:`Edge UDF <dgl.udf>`.
         edges : a list of edge Ids or ALL.
-            The edges to run the edge update function.
+            The edges Id to run the edge update function.
         inplace : bool, optional
             If True, update will be done in place, but autograd will break.
         """
+        block_id = self._get_block_id(block_id)
         if func == "default":
             func = self._apply_edge_funcs[block_id]
         assert func is not None
 
         if is_all(edges):
-            u, v, _ = self.block_edges(block_id)
+            u, v, _ = self.block_edges(block_id, remap_local=True)
             u = utils.toindex(u)
             v = utils.toindex(v)
             eid = utils.toindex(slice(0, self.block_size(block_id)))
@@ -793,10 +862,11 @@ class NodeFlow(DGLBaseGraph):
             Apply function on the nodes. The function should be
             a :mod:`Node UDF <dgl.udf>`.
         v : a list of vertex Ids or ALL.
-            The specified nodes in layer i+1 to run the computation.
+            The Node Ids (unique in the NodeFlow) in layer block_id+1 to run the computation.
         inplace: bool, optional
             If True, update will be done in place, but autograd will break.
         """
+        block_id = self._get_block_id(block_id)
         if message_func == "default":
             message_func = self._message_funcs[block_id]
         if reduce_func == "default":
@@ -821,8 +891,8 @@ class NodeFlow(DGLBaseGraph):
             assert len(u) > 0, "block_compute must run on edges"
             u = utils.toindex(self._glb2lcl_nid(u.tousertensor(), block_id))
             v = utils.toindex(self._glb2lcl_nid(v.tousertensor(), block_id + 1))
-            dest_nodes = utils.toindex(self._glb2lcl_nid(dest_nodes.tousertensor(),
-                                                         block_id + 1))
+            dest_nodes = utils.toindex(
+                self._glb2lcl_nid(dest_nodes.tousertensor(), block_id + 1))
             eid = utils.toindex(self._glb2lcl_eid(eid.tousertensor(), block_id))
 
             with ir.prog() as prog:
@@ -903,15 +973,22 @@ def _copy_to_like(arr1, arr2):
     return F.copy_to(arr1, F.context(arr2))
 
 def _get_frame(frame, names, ids, ctx):
-    col_dict = {name: F.copy_to(frame[name][_copy_to_like(ids, frame[name])], \
-                                ctx) for name in names}
+    col_dict = {}
+    for name in names:
+        col = frame[name][_copy_to_like(ids, frame[name])]
+        if ctx:
+            col = F.copy_to(col, ctx)
+        col_dict[name] = col
     if len(col_dict) == 0:
         return FrameRef(Frame(num_rows=len(ids)))
     else:
         return FrameRef(Frame(col_dict))
 
 def _copy_frame(frame, ctx):
-    return {name: F.copy_to(frame[name], ctx) for name in frame}
+    new_frame = {}
+    for name in frame:
+        new_frame[name] = F.copy_to(frame[name], ctx) if ctx else frame[name]
+    return new_frame
 
 
 def _update_frame(frame, names, ids, new_frame):

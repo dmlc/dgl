@@ -68,6 +68,14 @@ class CSR : public GraphInterface {
     LOG(FATAL) << "CSR graph does not allow mutation.";
   }
 
+  DLContext Context() const override {
+    return indptr_->ctx;
+  }
+
+  uint8_t NumBits() const override {
+    return indices_->dtype.bits;
+  }
+
   bool IsMultigraph() const override;
 
   bool IsReadonly() const override {
@@ -83,7 +91,7 @@ class CSR : public GraphInterface {
   }
 
   bool HasVertex(dgl_id_t vid) const override {
-    return vid < NumVertices() && vid >= 0;
+    return vid < NumVertices();
   }
 
   bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const override;
@@ -151,7 +159,7 @@ class CSR : public GraphInterface {
 
   Subgraph VertexSubgraph(IdArray vids) const override;
 
-  Subgraph EdgeSubgraph(IdArray eids) const override {
+  Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const override {
     LOG(FATAL) << "CSR graph does not support efficient EdgeSubgraph."
       << " Please use COO graph instead.";
     return {};
@@ -200,6 +208,11 @@ class CSR : public GraphInterface {
     return {indptr_, indices_, edge_ids_};
   }
 
+  /*! \brief Indicate whether this uses shared memory. */
+  bool IsSharedMem() const {
+    return !shared_mem_name_.empty();
+  }
+
   /*! \brief Return the reverse of this CSR graph (i.e, a CSC graph) */
   CSRPtr Transpose() const;
 
@@ -214,6 +227,27 @@ class CSR : public GraphInterface {
   CSRMatrix ToCSRMatrix() const {
     return CSRMatrix{indptr_, indices_, edge_ids_};
   }
+
+  /*!
+   * \brief Copy the data to another context.
+   * \param ctx The target context.
+   * \return The graph under another context.
+   */
+  CSR CopyTo(const DLContext& ctx) const;
+
+  /*!
+   * \brief Copy data to shared memory.
+   * \param name The name of the shared memory.
+   * \return The graph in the shared memory
+   */
+  CSR CopyToSharedMem(const std::string &name) const;
+
+  /*!
+   * \brief Convert the graph to use the given number of bits for storage.
+   * \param bits The new number of integer bits (32 or 64).
+   * \return The graph with new bit size storage.
+   */
+  CSR AsNumBits(uint8_t bits) const;
 
   // member getters
 
@@ -240,6 +274,10 @@ class CSR : public GraphInterface {
 
   // whether the graph is a multi-graph
   LazyObject<bool> is_multigraph_;
+
+  // The name of the shared memory to store data.
+  // If it's empty, data isn't stored in shared memory.
+  std::string shared_mem_name_;
 };
 
 class COO : public GraphInterface {
@@ -266,6 +304,14 @@ class COO : public GraphInterface {
     LOG(FATAL) << "CSR graph does not allow mutation.";
   }
 
+  DLContext Context() const override {
+    return src_->ctx;
+  }
+
+  uint8_t NumBits() const override {
+    return src_->dtype.bits;
+  }
+
   bool IsMultigraph() const override;
 
   bool IsReadonly() const override {
@@ -281,7 +327,7 @@ class COO : public GraphInterface {
   }
 
   bool HasVertex(dgl_id_t vid) const override {
-    return vid < NumVertices() && vid >= 0;
+    return vid < NumVertices();
   }
 
   bool HasEdgeBetween(dgl_id_t src, dgl_id_t dst) const override {
@@ -315,7 +361,7 @@ class COO : public GraphInterface {
   }
 
   std::pair<dgl_id_t, dgl_id_t> FindEdge(dgl_id_t eid) const override {
-    CHECK(eid < NumEdges() && eid >= 0) << "Invalid edge id: " << eid;
+    CHECK(eid < NumEdges()) << "Invalid edge id: " << eid;
     const dgl_id_t* src_data = static_cast<dgl_id_t*>(src_->data);
     const dgl_id_t* dst_data = static_cast<dgl_id_t*>(dst_->data);
     return std::make_pair(src_data[eid], dst_data[eid]);
@@ -379,7 +425,7 @@ class COO : public GraphInterface {
     return {};
   }
 
-  Subgraph EdgeSubgraph(IdArray eids) const override;
+  Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const override;
 
   GraphPtr Reverse() const override {
     return Transpose();
@@ -441,6 +487,32 @@ class COO : public GraphInterface {
     return COOMatrix{src_, dst_, {}};
   }
 
+  /*!
+   * \brief Copy the data to another context.
+   * \param ctx The target context.
+   * \return The graph under another context.
+   */
+  COO CopyTo(const DLContext& ctx) const;
+
+  /*!
+   * \brief Copy data to shared memory.
+   * \param name The name of the shared memory.
+   * \return The graph in the shared memory
+   */
+  COO CopyToSharedMem(const std::string &name) const;
+
+  /*!
+   * \brief Convert the graph to use the given number of bits for storage.
+   * \param bits The new number of integer bits (32 or 64).
+   * \return The graph with new bit size storage.
+   */
+  COO AsNumBits(uint8_t bits) const;
+
+  /*! \brief Indicate whether this uses shared memory. */
+  bool IsSharedMem() const {
+    return false;
+  }
+
   // member getters
 
   IdArray src() const { return src_; }
@@ -468,6 +540,7 @@ class ImmutableGraph: public GraphInterface {
  public:
   /*! \brief Construct an immutable graph from the COO format. */
   explicit ImmutableGraph(COOPtr coo): coo_(coo) { }
+
   /*!
    * \brief Construct an immutable graph from the CSR format.
    *
@@ -526,6 +599,14 @@ class ImmutableGraph: public GraphInterface {
 
   void Clear() override {
     LOG(FATAL) << "Clear isn't supported in ImmutableGraph";
+  }
+
+  DLContext Context() const override {
+    return AnyGraph()->Context();
+  }
+
+  uint8_t NumBits() const override {
+    return AnyGraph()->NumBits();
   }
 
   /*!
@@ -758,7 +839,7 @@ class ImmutableGraph: public GraphInterface {
    * \param eids The edges in the subgraph.
    * \return the induced edge subgraph
    */
-  Subgraph EdgeSubgraph(IdArray eids) const override;
+  Subgraph EdgeSubgraph(IdArray eids, bool preserve_nodes = false) const override;
 
   /*!
    * \brief Return a new graph with all the edges reversed.
@@ -837,6 +918,9 @@ class ImmutableGraph: public GraphInterface {
     if (!in_csr_) {
       if (out_csr_) {
         const_cast<ImmutableGraph*>(this)->in_csr_ = out_csr_->Transpose();
+        if (out_csr_->IsSharedMem())
+          LOG(WARNING) << "We just construct an in-CSR from a shared-memory out CSR. "
+                       << "It may dramatically increase memory consumption.";
       } else {
         CHECK(coo_) << "None of CSR, COO exist";
         const_cast<ImmutableGraph*>(this)->in_csr_ = coo_->Transpose()->ToCSR();
@@ -850,6 +934,9 @@ class ImmutableGraph: public GraphInterface {
     if (!out_csr_) {
       if (in_csr_) {
         const_cast<ImmutableGraph*>(this)->out_csr_ = in_csr_->Transpose();
+        if (in_csr_->IsSharedMem())
+          LOG(WARNING) << "We just construct an out-CSR from a shared-memory in CSR. "
+                       << "It may dramatically increase memory consumption.";
       } else {
         CHECK(coo_) << "None of CSR, COO exist";
         const_cast<ImmutableGraph*>(this)->out_csr_ = coo_->ToCSR();
@@ -871,6 +958,110 @@ class ImmutableGraph: public GraphInterface {
     return coo_;
   }
 
+  /*!
+   * \brief Convert the given graph to an immutable graph.
+   *
+   * If the graph is already an immutable graph. The result graph will share
+   * the storage with the given one.
+   *
+   * \param graph The input graph.
+   * \return an immutable graph object.
+   */
+  static ImmutableGraph ToImmutable(const GraphInterface* graph);
+
+  /*!
+   * \brief Copy the data to another context.
+   * \param ctx The target context.
+   * \return The graph under another context.
+   */
+  ImmutableGraph CopyTo(const DLContext& ctx) const;
+
+  /*!
+   * \brief Copy data to shared memory.
+   * \param edge_dir the graph of the specific edge direction to be copied.
+   * \param name The name of the shared memory.
+   * \return The graph in the shared memory
+   */
+  ImmutableGraph CopyToSharedMem(const std::string &edge_dir, const std::string &name) const;
+
+  /*!
+   * \brief Convert the graph to use the given number of bits for storage.
+   * \param bits The new number of integer bits (32 or 64).
+   * \return The graph with new bit size storage.
+   */
+  ImmutableGraph AsNumBits(uint8_t bits) const;
+
+  /*! \brief Create an immutable graph from CSR. */
+  static ImmutableGraph CreateFromCSR(IdArray indptr, IdArray indices, IdArray edge_ids,
+                                      const std::string &edge_dir) {
+    CSRPtr csr(new CSR(indptr, indices, edge_ids));
+    if (edge_dir == "in") {
+      return ImmutableGraph(csr, nullptr);
+    } else if (edge_dir == "out") {
+      return ImmutableGraph(nullptr, csr);
+    } else {
+      LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+      return ImmutableGraph();
+    }
+  }
+
+  static ImmutableGraph CreateFromCSR(IdArray indptr, IdArray indices, IdArray edge_ids,
+                                      bool multigraph, const std::string &edge_dir) {
+    CSRPtr csr(new CSR(indptr, indices, edge_ids, multigraph));
+    if (edge_dir == "in") {
+      return ImmutableGraph(csr, nullptr);
+    } else if (edge_dir == "out") {
+      return ImmutableGraph(nullptr, csr);
+    } else {
+      LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+      return ImmutableGraph();
+    }
+  }
+
+  static ImmutableGraph CreateFromCSR(IdArray indptr, IdArray indices, IdArray edge_ids,
+                                      const std::string &edge_dir,
+                                      const std::string &shared_mem_name) {
+    CSRPtr csr(new CSR(indptr, indices, edge_ids, GetSharedMemName(shared_mem_name, edge_dir)));
+    if (edge_dir == "in") {
+      return ImmutableGraph(csr, nullptr, shared_mem_name);
+    } else if (edge_dir == "out") {
+      return ImmutableGraph(nullptr, csr, shared_mem_name);
+    } else {
+      LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+      return ImmutableGraph();
+    }
+  }
+
+  static ImmutableGraph CreateFromCSR(IdArray indptr, IdArray indices, IdArray edge_ids,
+                                      bool multigraph, const std::string &edge_dir,
+                                      const std::string &shared_mem_name) {
+    CSRPtr csr(new CSR(indptr, indices, edge_ids, multigraph,
+                       GetSharedMemName(shared_mem_name, edge_dir)));
+    if (edge_dir == "in") {
+      return ImmutableGraph(csr, nullptr, shared_mem_name);
+    } else if (edge_dir == "out") {
+      return ImmutableGraph(nullptr, csr, shared_mem_name);
+    } else {
+      LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+      return ImmutableGraph();
+    }
+  }
+
+  static ImmutableGraph CreateFromCSR(const std::string &shared_mem_name, size_t num_vertices,
+                                      size_t num_edges, bool multigraph,
+                                      const std::string &edge_dir) {
+    CSRPtr csr(new CSR(GetSharedMemName(shared_mem_name, edge_dir), num_vertices, num_edges,
+                       multigraph));
+    if (edge_dir == "in") {
+      return ImmutableGraph(csr, nullptr, shared_mem_name);
+    } else if (edge_dir == "out") {
+      return ImmutableGraph(nullptr, csr, shared_mem_name);
+    } else {
+      LOG(FATAL) << "Unknown edge direction: " << edge_dir;
+      return ImmutableGraph();
+    }
+  }
+
  protected:
   /* !\brief internal default constructor */
   ImmutableGraph() {}
@@ -879,6 +1070,16 @@ class ImmutableGraph: public GraphInterface {
   ImmutableGraph(CSRPtr in_csr, CSRPtr out_csr, COOPtr coo)
     : in_csr_(in_csr), out_csr_(out_csr), coo_(coo) {
     CHECK(AnyGraph()) << "At least one graph structure should exist.";
+  }
+
+  ImmutableGraph(CSRPtr in_csr, CSRPtr out_csr, const std::string shared_mem_name)
+    : in_csr_(in_csr), out_csr_(out_csr) {
+    CHECK(in_csr_ || out_csr_) << "Both CSR are missing.";
+    this->shared_mem_name_ = shared_mem_name;
+  }
+
+  static std::string GetSharedMemName(const std::string &name, const std::string &edge_dir) {
+    return name + "_" + edge_dir;
   }
 
   /* !\brief return pointer to any available graph structure */
@@ -898,6 +1099,10 @@ class ImmutableGraph: public GraphInterface {
   CSRPtr out_csr_;
   // Store the edge list indexed by edge id (COO)
   COOPtr coo_;
+
+  // The name of shared memory for this graph.
+  // If it's empty, the graph isn't stored in shared memory.
+  std::string shared_mem_name_;
 };
 
 // inline implementations

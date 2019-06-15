@@ -427,16 +427,16 @@ class GraphIndex(object):
         utils.Index
             The edge ids.
         """
-        key = 'edges_s%s' % order
-        if key not in self._cache:
-            if order is None:
-                order = ""
-            edge_array = _CAPI_DGLGraphEdges(self._handle, order)
-            src = utils.toindex(edge_array(0))
-            dst = utils.toindex(edge_array(1))
-            eid = utils.toindex(edge_array(2))
-            self._cache[key] = (src, dst, eid)
-        return self._cache[key]
+        if order is None:
+            order = ""
+        edge_array = _CAPI_DGLGraphEdges(self._handle, order)
+        src = edge_array(0)
+        dst = edge_array(1)
+        eid = edge_array(2)
+        src = utils.toindex(src)
+        dst = utils.toindex(dst)
+        eid = utils.toindex(eid)
+        return src, dst, eid
 
     def in_degree(self, v):
         """Return the in degree of the node.
@@ -516,7 +516,8 @@ class GraphIndex(object):
         v_array = v.todgltensor()
         rst = _CAPI_DGLGraphVertexSubgraph(self._handle, v_array)
         induced_edges = utils.toindex(rst(2))
-        return SubgraphIndex(rst(0), self, v, induced_edges)
+        gidx = GraphIndex(rst(0))
+        return SubgraphIndex(gidx, self, v, induced_edges)
 
     def node_subgraphs(self, vs_arr):
         """Return the induced node subgraphs.
@@ -536,13 +537,17 @@ class GraphIndex(object):
             gis.append(self.node_subgraph(v))
         return gis
 
-    def edge_subgraph(self, e):
+    def edge_subgraph(self, e, preserve_nodes=False):
         """Return the induced edge subgraph.
 
         Parameters
         ----------
         e : utils.Index
             The edges.
+        preserve_nodes : bool
+            Indicates whether to preserve all nodes or not.
+            If true, keep the nodes which have no edge connected in the subgraph;
+            If false, all nodes without edge connected to it would be removed.
 
         Returns
         -------
@@ -550,9 +555,10 @@ class GraphIndex(object):
             The subgraph index.
         """
         e_array = e.todgltensor()
-        rst = _CAPI_DGLGraphEdgeSubgraph(self._handle, e_array)
+        rst = _CAPI_DGLGraphEdgeSubgraph(self._handle, e_array, preserve_nodes)
         induced_nodes = utils.toindex(rst(1))
-        return SubgraphIndex(rst(0), self, induced_nodes, e)
+        gidx = GraphIndex(rst(0))
+        return SubgraphIndex(gidx, self, induced_nodes, e)
 
     @utils.cached_member(cache='_cache', prefix='scipy_adj')
     def adjacency_matrix_scipy(self, transpose, fmt):
@@ -598,8 +604,38 @@ class GraphIndex(object):
         else:
             raise Exception("unknown format")
 
+    @utils.cached_member(cache='_cache', prefix='immu_gidx')
+    def get_immutable_gidx(self, ctx):
+        """Create an immutable graph index and copy to the given device context.
 
-    @utils.cached_member(cache='_cache', prefix='adj')
+        Note: this internal function is for DGL scheduler use only
+
+        Parameters
+        ----------
+        ctx : DGLContext
+            The context of the returned graph.
+
+        Returns
+        -------
+        GraphIndex
+        """
+        return self.to_immutable().asbits(self.bits_needed()).copy_to(ctx)
+
+    def get_csr_shuffle_order(self):
+        """Return the edge shuffling order when a coo graph is converted to csr format
+
+        Returns
+        -------
+        tuple of two utils.Index
+            The first element of the tuple is the shuffle order for outward graph
+            The second element of the tuple is the shuffle order for inward graph
+        """
+        csr = _CAPI_DGLGraphGetAdj(self._handle, True, "csr")
+        order = csr(2)
+        rev_csr = _CAPI_DGLGraphGetAdj(self._handle, False, "csr")
+        rev_order = rev_csr(2)
+        return utils.toindex(order), utils.toindex(rev_order)
+
     def adjacency_matrix(self, transpose, ctx):
         """Return the adjacency matrix representation of this graph.
 
@@ -650,7 +686,6 @@ class GraphIndex(object):
         else:
             raise Exception("unknown format")
 
-    @utils.cached_member(cache='_cache', prefix='inc')
     def incidence_matrix(self, typestr, ctx):
         """Return the incidence matrix representation of this graph.
 
@@ -761,59 +796,125 @@ class GraphIndex(object):
         handle = _CAPI_DGLGraphLineGraph(self._handle, backtracking)
         return GraphIndex(handle)
 
-class SubgraphIndex(GraphIndex):
-    """Graph index for subgraph.
+    def to_immutable(self):
+        """Convert this graph index to an immutable one.
+
+        Returns
+        -------
+        GraphIndex
+            An immutable graph index.
+        """
+        handle = _CAPI_DGLToImmutable(self._handle)
+        return GraphIndex(handle)
+
+    def ctx(self):
+        """Return the context of this graph index.
+
+        Returns
+        -------
+        DGLContext
+            The context of the graph.
+        """
+        return _CAPI_DGLGraphContext(self._handle)
+
+    def copy_to(self, ctx):
+        """Copy this immutable graph index to the given device context.
+
+        NOTE: this method only works for immutable graph index
+
+        Parameters
+        ----------
+        ctx : DGLContext
+            The target device context.
+
+        Returns
+        -------
+        GraphIndex
+            The graph index on the given device context.
+        """
+        handle = _CAPI_DGLImmutableGraphCopyTo(self._handle, ctx.device_type, ctx.device_id)
+        return GraphIndex(handle)
+
+    def copyto_shared_mem(self, edge_dir, shared_mem_name):
+        """Copy this immutable graph index to shared memory.
+
+        NOTE: this method only works for immutable graph index
+
+        Parameters
+        ----------
+        edge_dir : string
+            Indicate which CSR should copy ("in", "out", "both").
+        shared_mem_name : string
+            The name of the shared memory.
+
+        Returns
+        -------
+        GraphIndex
+            The graph index on the given device context.
+        """
+        handle = _CAPI_DGLImmutableGraphCopyToSharedMem(self._handle, edge_dir, shared_mem_name)
+        return GraphIndex(handle)
+
+    def nbits(self):
+        """Return the number of integer bits used in the storage (32 or 64).
+
+        Returns
+        -------
+        int
+            The number of bits.
+        """
+        return _CAPI_DGLGraphNumBits(self._handle)
+
+    def bits_needed(self):
+        """Return the number of integer bits needed to represent the graph
+
+        Returns
+        -------
+        int
+            The number of bits needed
+        """
+        if self.number_of_edges() >= 0x80000000 or self.number_of_nodes() >= 0x80000000:
+            return 64
+        else:
+            return 32
+
+    def asbits(self, bits):
+        """Transform the graph to a new one with the given number of bits storage.
+
+        NOTE: this method only works for immutable graph index
+
+        Parameters
+        ----------
+        bits : int
+            The number of integer bits (32 or 64)
+
+        Returns
+        -------
+        GraphIndex
+            The graph index stored using the given number of bits.
+        """
+        handle = _CAPI_DGLImmutableGraphAsNumBits(self._handle, int(bits))
+        return GraphIndex(handle)
+
+class SubgraphIndex(object):
+    """Internal subgraph data structure.
 
     Parameters
     ----------
-    handle : GraphIndexHandle
-        The capi handle.
-    paranet : GraphIndex
+    graph : GraphIndex
+        The graph structure of this subgraph.
+    parent : GraphIndex
         The parent graph index.
     induced_nodes : utils.Index
         The parent node ids in this subgraph.
     induced_edges : utils.Index
         The parent edge ids in this subgraph.
     """
-    def __init__(self, handle, parent, induced_nodes, induced_edges):
-        super(SubgraphIndex, self).__init__(handle)
-        self._parent = parent
-        self._induced_nodes = induced_nodes
-        self._induced_edges = induced_edges
-
-    def add_nodes(self, num):
-        """Add nodes. Disabled because SubgraphIndex is read-only."""
-        raise RuntimeError('Readonly graph. Mutation is not allowed.')
-
-    def add_edge(self, u, v):
-        """Add edges. Disabled because SubgraphIndex is read-only."""
-        raise RuntimeError('Readonly graph. Mutation is not allowed.')
-
-    def add_edges(self, u, v):
-        """Add edges. Disabled because SubgraphIndex is read-only."""
-        raise RuntimeError('Readonly graph. Mutation is not allowed.')
-
-    @property
-    def induced_nodes(self):
-        """Return parent node ids.
-
-        Returns
-        -------
-        utils.Index
-            The parent node ids.
-        """
-        return self._induced_nodes
-
-    @property
-    def induced_edges(self):
-        """Return parent edge ids.
-
-        Returns
-        -------
-        utils.Index
-            The parent edge ids.
-        """
-        return self._induced_edges
+    def __init__(self, graph, parent, induced_nodes, induced_edges):
+        self.graph = graph
+        self.parent = parent
+        self.induced_nodes = induced_nodes
+        self.induced_edges = induced_edges
 
     def __getstate__(self):
         raise NotImplementedError(
@@ -952,7 +1053,11 @@ def from_networkx(nx_graph, readonly):
     num_nodes = nx_graph.number_of_nodes()
 
     # nx_graph.edges(data=True) returns src, dst, attr_dict
-    has_edge_id = 'id' in next(iter(nx_graph.edges(data=True)))[-1]
+    if nx_graph.number_of_edges() > 0:
+        has_edge_id = 'id' in next(iter(nx_graph.edges(data=True)))[-1]
+    else:
+        has_edge_id = False
+
     if has_edge_id:
         num_edges = nx_graph.number_of_edges()
         src = np.zeros((num_edges,), dtype=np.int64)

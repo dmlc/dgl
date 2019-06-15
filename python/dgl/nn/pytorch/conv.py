@@ -149,5 +149,6 @@ class GraphConv(nn.Module):
         """
         summary = 'in={_in_feats}, out={_out_feats}'
         summary += ', normalization={_norm}'
-        summary += ', activation={_activation}'
+        if '_activation' in self.__dict__:
+            summary += ', activation={_activation}'
         return summary.format(**self.__dict__)
