@@ -871,6 +871,13 @@ void BuildCoo(const ImmutableGraph &g) {
 }
 
 
+struct EdgeBatch {
+  NodeFlow *src_nf;
+  NodeFlow *dst_nf;
+  IdArray eids;
+};
+
+
 DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
 .set_body([] (DGLArgs args, DGLRetValue* rv) {
     // arguments
@@ -896,7 +903,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
     const int64_t num_workers = std::min(max_num_workers,
         (num_seeds + batch_size - 1) / batch_size - batch_start_id);
     // generate node flows
-    std::vector<NodeFlow*> nflows(num_workers * 2);
+    std::vector<EdgeBatch*> nflows(num_workers);
 #pragma omp parallel for
     for (int i = 0; i < num_workers; i++) {
       const int64_t start = (batch_start_id + i) * batch_size;
@@ -910,15 +917,43 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
       std::vector<dgl_id_t> src_vec(src_ids, src_ids + num_edges);
       std::vector<dgl_id_t> dst_vec(dst_ids, dst_ids + num_edges);
       // TODO(zhengda) what if there are duplicates in the src and dst vectors.
-      nflows[i * 2] = new NodeFlow();
-      nflows[i * 2 + 1] = new NodeFlow();
+      nflows[i] = new EdgeBatch();
+      nflows[i]->src_nf = new NodeFlow();
+      nflows[i]->dst_nf = new NodeFlow();
       // TODO(zhengda) we need to remove the edges from NodeFlows.
-      *nflows[i * 2] = SamplerOp::NeighborUniformSample(
+      // TODO(zhengda) if this is an undirected graph, we need to remove the edges
+      // and their reversed edges from NodeFlows.
+      *nflows[i]->src_nf = SamplerOp::NeighborUniformSample(
           gptr, src_vec, neigh_type, num_hops, expand_factor, add_self_loop);
-      *nflows[i * 2 + 1] = SamplerOp::NeighborUniformSample(
+      *nflows[i]->dst_nf = SamplerOp::NeighborUniformSample(
           gptr, dst_vec, neigh_type, num_hops, expand_factor, add_self_loop);
+      nflows[i]->eids = worker_seeds;
     }
     *rv = WrapVectorReturn(nflows);
   });
+
+// Convert EdgeBatch structure to PackedFunc.
+PackedFunc ConvertEdgeBatchToPackedFunc(const EdgeBatch& eb) {
+  auto body = [eb] (DGLArgs args, DGLRetValue* rv) {
+      const int which = args[0];
+      if (which == 0) {
+        *rv = eb.src_nf;
+      } else if (which == 1) {
+        *rv = eb.dst_nf;
+      } else if (which == 2) {
+        *rv = std::move(eb.eids);
+      } else {
+        LOG(FATAL) << "invalid choice";
+      }
+    };
+  return PackedFunc(body);
+}
+
+DGL_REGISTER_GLOBAL("sampling._CAPI_GetEdgeBatch")
+.set_body([] (DGLArgs args, DGLRetValue* rv) {
+    void *ptr = args[0];
+    const EdgeBatch *eb = static_cast<const EdgeBatch *>(ptr);
+    *rv = ConvertEdgeBatchToPackedFunc(*eb);
+});
 
 }  // namespace dgl

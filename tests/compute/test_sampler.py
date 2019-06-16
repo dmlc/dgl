@@ -3,6 +3,7 @@ import numpy as np
 import scipy as sp
 import dgl
 from dgl import utils
+from numpy.testing import assert_array_equal
 
 np.random.seed(42)
 
@@ -219,6 +220,23 @@ def test_setseed():
             g, 5, 3, num_hops=2, neighbor_type='in', num_workers=4)):
         pass
 
+def test_edge_sampler():
+    g = generate_rand_graph(100)
+    EdgeNeighborSampler = getattr(dgl.contrib.sampling, 'EdgeNeighborSampler')
+    for src_nf, dst_nf, eids in EdgeNeighborSampler(g, 50, g.number_of_nodes(), num_hops=2):
+        src, dst = g.find_edges(eids)
+        src1 = src_nf.layer_parent_nid(-1)
+        dst1 = dst_nf.layer_parent_nid(-1)
+        #verify_subgraph(g, src_nf, src1)
+        #verify_subgraph(g, dst_nf, dst1)
+
+        src1 = np.unique(F.asnumpy(src1))
+        dst1 = np.unique(F.asnumpy(dst1))
+        src = np.unique(F.asnumpy(src))
+        dst = np.unique(F.asnumpy(dst))
+        assert_array_equal(src, src1)
+        assert_array_equal(dst, dst1)
+
 if __name__ == '__main__':
     test_create_full()
     test_1neighbor_sampler_all()
@@ -228,3 +246,4 @@ if __name__ == '__main__':
     test_layer_sampler()
     test_nonuniform_neighbor_sampler()
     test_setseed()
+    test_edge_sampler()

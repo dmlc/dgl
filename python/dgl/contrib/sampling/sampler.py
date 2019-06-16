@@ -16,7 +16,7 @@ try:
 except ImportError:
     import queue
 
-__all__ = ['NeighborSampler', 'LayerSampler']
+__all__ = ['NeighborSampler', 'LayerSampler', 'EdgeNeighborSampler']
 
 class SamplerIter(object):
     def __init__(self, sampler):
@@ -545,19 +545,17 @@ class EdgeNeighborSampler(EdgeSampler):
         handles = unwrap_to_ptr_list(_CAPI_UniformEdgeSampling(
             self.g.c_handle,
             self.seed_edges.todgltensor(),
-            current_nodeflow_index, # start batch id
+            current_index, # start batch id
             self.batch_size,        # batch size
             self._num_workers,      # num batches
             self._expand_factor,
             self._num_hops,
             self._neighbor_type,
             self._add_self_loop))
-        assert len(handles) % 2 == 0
         nflows = []
-        for i in range(len(handles) / 2):
-            hdl1 = handles[i * 2]
-            hdl2 = handles[i * 2 + 1]
-            nflows.append((NodeFlow(self.g, hdl1), NodeFlow(self.g, hdl2)))
+        for hdl in handles:
+            func = _CAPI_GetEdgeBatch(hdl)
+            nflows.append((NodeFlow(self.g, func(0)), NodeFlow(self.g, func(1)), func(2)))
         return nflows
 
 
