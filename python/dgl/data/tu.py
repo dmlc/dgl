@@ -2,6 +2,7 @@ from __future__ import absolute_import
 import numpy as np
 import dgl
 import os
+import random
 
 from dgl.data.utils import download, extract_archive, get_download_dir
 
@@ -23,11 +24,12 @@ class TUDataset(object):
 
     _url = r"https://ls11-www.cs.tu-dortmund.de/people/morris/graphkerneldatasets/{}.zip"
 
-    def __init__(self, name, use_pandas=False, hidden_size=10):
+    def __init__(self, name, use_pandas=False, hidden_size=10, n_split=0, split_ratio=None):
 
         self.name = name
         self.hidden_size = hidden_size
         self.extract_dir = self._download()
+        self.fold = -1
 
         if use_pandas:
             import pandas as pd
@@ -79,6 +81,22 @@ class TUDataset(object):
             for idxs, g in zip(node_idx_list, self.graph_lists):
                 g.ndata['feat'] = np.ones((g.number_of_nodes(), hidden_size))
             print("Use Constant one as Feature with hidden size {}".format(hidden_size))
+        
+        # randomly shuffle the data
+        random.shuffle(self.graph_lists)
+        random.shuffle(self.graph_labels)
+
+        #check dataset splitting:
+        eps = 1e-5
+        if split_ratio:
+            assert abs(sum(split_ratio) - 1) < eps, "sum of split ratio is not 1"
+            assert len(split_ratio) == n_split, "n_split and length of ratio provided disagree"
+            split_ratio = [0] + split_ratio
+            self.fold_start_idx = np.cumsum([np.floor(ratio*len(self.graph_lists)) for ratio in split_ratio])
+            self.fold_start_idx = list(map(lambda x: int(x), self.fold_start_idx))
+
+    def set_fold(self, n):
+        self.fold = n
 
     def __getitem__(self, idx):
         """Get the i^th sample.
@@ -92,10 +110,14 @@ class TUDataset(object):
             DGLGraph with node feature stored in `feat` field and node label in `node_label` if available.
             And its label.
         """
+        if self.fold != -1:
+            idx += self.fold_start_idx[self.fold]
         g = self.graph_lists[idx]
         return g, self.graph_labels[idx]
 
     def __len__(self):
+        if self.fold != -1:
+            return self.fold_start_idx[self.fold + 1] - self.fold_start_idx[self.fold]
         return len(self.graph_lists)
 
     def _download(self):

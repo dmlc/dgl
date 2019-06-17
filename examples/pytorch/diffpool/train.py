@@ -51,7 +51,7 @@ def arg_parse():
     parser.add_argument('--bias', dest='bias', action='store_const',
                         const=True, default=True, help='switch for bias')
 
-    parser.set_defaults(dataset='DD',
+    parser.set_defaults(dataset='ENZYMES',
                         bmname='PH',
                         pool_ratio=0.1,
                         num_pool=2,
@@ -59,8 +59,8 @@ def arg_parse():
                         cuda=1,
                         lr=0.001,
                         clip=2.0,
-                        batch_size=19,
-                        epoch=200,
+                        batch_size=10,
+                        epoch=700,
                         train_ratio=0.8,
                         test_ratio=0.1,
                         n_worker=0,
@@ -73,16 +73,16 @@ def arg_parse():
                         bias=True)
     return parser.parse_args()
 
-def prepare_data(dataset, prog_args, mode):
+def prepare_data(dataset, prog_args, fold=-1):
     '''
     load dataset into dataloader
     '''
-    if mode == 'train':
+    if fold == -1 or fold == 0:
         shuffle = True
     else:
         shuffle = False
 
-    #dataset.set_mode(mode)
+    dataset.set_fold(fold)
     return torch.utils.data.DataLoader(dataset,
                                        batch_size=prog_args.batch_size,
                                        shuffle=shuffle,
@@ -100,7 +100,7 @@ def graph_classify_task(prog_args):
     use_node_attr = False
     if prog_args.dataset == 'ENZYMES':
         use_node_attr = True
-    dataset = tu.TUDataset(name=prog_args.dataset)
+    dataset = tu.TUDataset(name=prog_args.dataset, n_split=3, split_ratio=[0.8, 0.1, 0.1])
     
     """
     dataset = tu.DiffpoolDataset(name=prog_args.dataset,
@@ -145,9 +145,9 @@ def graph_classify_task(prog_args):
     print("model embedding dim for graph instance embedding", embedding_dim)
     print("initial batched pool graph dim is", assign_dim)
 
-    train_dataloader = prepare_data(dataset, prog_args, mode='train')
-    val_dataloader = train_dataloader
-    test_dataloader = train_dataloader
+    train_dataloader = prepare_data(dataset, prog_args, fold=0)
+    val_dataloader = prepare_data(dataset, prog_args, fold=0)
+    test_dataloader = prepare_data(dataset, prog_args, fold=0)
     #val_dataloader = prepare_data(val_dataset, prog_args, mode='val')
     #test_dataloader = prepare_data(test_dataset, prog_args, mode='test')
     activation = F.relu
