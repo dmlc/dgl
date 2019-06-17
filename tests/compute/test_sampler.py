@@ -7,8 +7,12 @@ from numpy.testing import assert_array_equal
 
 np.random.seed(42)
 
-def generate_rand_graph(n):
-    arr = (sp.sparse.random(n, n, density=0.1, format='coo') != 0).astype(np.int64)
+def generate_rand_graph(n, directed=True):
+    mat = sp.sparse.random(n, n, density=0.1, format='coo')
+    # if the graph is undirected, we need to make sure the matrix is symmatric.
+    if not directed:
+        mat = mat + mat.T
+    arr = (mat != 0).astype(np.int64)
     return dgl.DGLGraph(arr, readonly=True)
 
 def test_create_full():
@@ -164,8 +168,10 @@ def test_edge_sampler():
         src, dst = g.find_edges(eids)
         src1 = src_nf.layer_parent_nid(-1)
         dst1 = dst_nf.layer_parent_nid(-1)
-        #verify_subgraph(g, src_nf, src1)
-        #verify_subgraph(g, dst_nf, dst1)
+        for seed in src1:
+            verify_subgraph(g, src_nf, seed)
+        for seed in dst1:
+            verify_subgraph(g, dst_nf, seed)
 
         src1 = np.unique(F.asnumpy(src1))
         dst1 = np.unique(F.asnumpy(dst1))
@@ -180,6 +186,27 @@ def test_edge_sampler():
         edges = np.concatenate(edges)
         for eid in F.asnumpy(eids):
             assert eid not in edges
+
+    # sample on the undirected graph
+    g = generate_rand_graph(100, False)
+    EdgeNeighborSampler = getattr(dgl.contrib.sampling, 'EdgeNeighborSampler')
+    for src_nf, dst_nf, eids in EdgeNeighborSampler(g, 50, g.number_of_nodes(),
+                                                    num_hops=2, undirected=True):
+        edges = []
+        for i in range(src_nf.num_blocks):
+            edges.append(F.asnumpy(src_nf.block_parent_eid(i)))
+        edges = np.concatenate(edges)
+
+        # The sampled edges shouldn't be in NodeFlow.
+        for eid in F.asnumpy(eids):
+            assert eid not in edges
+
+        # The reverse of the sampled edges shouldn't be in NodeFlow either.
+        src, dst = g.find_edges(eids)
+        eids = g.edge_ids(dst, src)
+        for eid in F.asnumpy(eids):
+            assert eid not in edges
+
 
 if __name__ == '__main__':
     test_create_full()

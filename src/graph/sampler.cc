@@ -869,6 +869,7 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
     const std::string neigh_type = args[7];
     const bool add_self_loop = args[8];
     const bool exclude_edges = args[9];
+    const bool undirected = args[10];
     // process args
     const GraphInterface *ptr = static_cast<const GraphInterface *>(ghdl);
     const ImmutableGraph *gptr = dynamic_cast<const ImmutableGraph*>(ptr);
@@ -902,11 +903,16 @@ DGL_REGISTER_GLOBAL("sampling._CAPI_UniformEdgeSampling")
 
       // We need to exclude the edges.
       std::unordered_set<dgl_id_t> exclude;
-      if (exclude_edges)
+      if (exclude_edges) {
         exclude.insert(edge_data, edge_data + num_edges);
+        if (undirected) {
+          // If this is an undirected graph, we need to remove the reverse edges as well.
+          GraphInterface::EdgeArray ea = gptr->EdgeIds(arr.dst, arr.src);
+          const dgl_id_t *edge_data1 = static_cast<const dgl_id_t *>(ea.id->data);
+          exclude.insert(edge_data1, edge_data1 + ea.id->shape[0]);
+        }
+      }
 
-      // TODO(zhengda) if this is an undirected graph, we need to remove the edges
-      // and their reversed edges from NodeFlows.
       *nflows[i]->src_nf = SamplerOp::NeighborUniformSample(
           gptr, src_vec, neigh_type, num_hops, expand_factor, add_self_loop, exclude);
       *nflows[i]->dst_nf = SamplerOp::NeighborUniformSample(
